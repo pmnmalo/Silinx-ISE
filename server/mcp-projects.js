@@ -1,0 +1,149 @@
+// The MCP server's tools of the projects and their files (server/mcp.js, #134): the examples, the projects,
+// a new project, its top module and test bench, its settings and files, reading and writing a file.
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import * as P from './projects.js';
+import { orderExamples } from '../core/examples.js';
+import { TEST_DESIGNS, orderTestDesigns } from '../core/test-designs.js';
+import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice } from './mcp-util.js';
+
+export const PROJECT_TOOLS = [
+  {
+    name: 'list_examples', title: 'List the example projects',
+    description: 'The example projects a new project can start from (new_project_from_example), in the order of the interface, with their top module, device and board; '
+      + 'then the test designs (the designs Silinx is tested with: schematics, state diagrams, C programs for Silinx HLS, each with its test), which a new project can start from too.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    async run() {
+      const about = (dir, n) => {
+        const pj = JSON.parse(fs.readFileSync(path.join(dir, n, 'silinx.json'), 'utf8'));
+        return { name: n, top: pj.top, simTop: pj.simTop || null, board: pj.board || null, device: pj.device ? `${pj.device.part}${pj.device.package}${pj.device.speed}` : null, files: (pj.files || []).length };
+      };
+      const examples = orderExamples(P.templateNames(P.EXAMPLES_DIR)).map(n => about(P.EXAMPLES_DIR, n));
+      // the test designs (#1746): their kind and what each shows (core/test-designs.js); the sources of a drawing or a C
+      // program are not in the project's list of HDL files
+      const testDesigns = orderTestDesigns(P.templateNames(P.TEST_DESIGNS_DIR)).map(n => {
+        const { kind = null, about: shows = null } = TEST_DESIGNS.find(d => d.name === n) || {};
+        const { files, ...rest } = about(P.TEST_DESIGNS_DIR, n);
+        return { ...rest, kind, about: shows };
+      });
+      const text = [...examples.map(e => `${e.name}: top ${e.top}${e.simTop ? `, test bench ${e.simTop}` : ''}, ${e.board || 'no board'} (${e.device}), ${e.files} file(s)`),
+        '', 'Test designs (the designs Silinx is tested with; its own, with their test):',
+        ...testDesigns.map(d => `${d.name} (${d.kind}): ${d.about}; top ${d.top}${d.simTop ? `, test bench ${d.simTop}` : ', its test the C\'s main()'}`)];
+      return { text: text.join('\n'), data: { examples, testDesigns } };
+    },
+  },
+  {
+    name: 'list_projects', title: 'List the projects',
+    description: 'The projects of the Silinx workspace (the folder the Project Navigator uses), with their top module, device and board.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    async run() {
+      const projects = (await P.listProjects()).map(p => ({ name: p.name, top: p.top || null, board: p.board || null, device: p.device ? `${p.device.part}${p.device.package}${p.device.speed}` : null }));
+      return { text: projects.length ? projects.map(p => `${p.name}: top ${p.top || '(none)'}, ${p.board || 'no board'} (${p.device})`).join('\n') : 'No project in the workspace (new_project_from_example makes one).', data: { workspace: P.workspaceDir(), projects } };
+    },
+  },
+  {
+    name: 'new_project_from_example', title: 'New project from an example',
+    description: 'Make a new project in the workspace from an example or a test design (list_examples), optionally for another board (basys2, nexys2): its pins are then the board\'s.',
+    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name (letters, digits, - and _).'), example: STR('The example, or test design (list_examples).'), board: STR('The board: basys2 or nexys2 (default: the example\'s).'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.') }, required: ['name', 'example'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    async run({ name, example, board, variant }) {
+      // (an example, or a test design: #1746)
+      const dir = [P.EXAMPLES_DIR, P.TEST_DESIGNS_DIR].find(d => /^[a-z0-9_-]+$/i.test(String(example || '')) && fs.existsSync(path.join(d, example, 'silinx.json')));
+      if (!dir) throw toolError(`unknown example '${example}' (list_examples)`);
+      let device;
+      if (board || variant) {
+        const ex = JSON.parse(fs.readFileSync(path.join(dir, example, 'silinx.json'), 'utf8'));
+        ({ board, device } = await boardDevice(board || ex.board, variant));
+      }
+      try { await P.createProject({ name, template: example, device, board }); } catch (e) { throw toolError(e.message); }
+      const pj = await P.readProject(name);
+      return { text: `Project '${name}' made from the ${dir === P.EXAMPLES_DIR ? 'example' : 'test design'} ${example}: top ${pj.top}, ${pj.board || 'no board'} (${pj.device.part}${pj.device.package}${pj.device.speed}).`, data: { project: name, top: pj.top, simTop: pj.simTop || null, board: pj.board, device: pj.device } };
+    },
+  },
+  {
+    name: 'new_project', title: 'New empty project',
+    description: 'Make a new empty project in the workspace for a board (basys2, nexys2; default: the Basys2-250\'s device, no board). Then write its sources with write_file (a test bench in sim/) and choose its top module and test bench with set_top.',
+    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name (letters, digits, - and _).'), board: STR('The board: basys2 or nexys2.'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.') }, required: ['name'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    async run({ name, board, variant }) {
+      let device;
+      if (board || variant) ({ board, device } = await boardDevice(board, variant));
+      try { await P.createProject({ name, device, board }); } catch (e) { throw toolError(e.message); }
+      const pj = await P.readProject(name);
+      return { text: `Empty project '${name}' made: ${pj.board || 'no board'} (${deviceName(pj.device)}). Write its sources with write_file, then set_top.`, data: { project: name, board: pj.board || null, device: pj.device } };
+    },
+  },
+  {
+    name: 'set_top', title: 'Set the top module and the test bench',
+    description: 'Choose a project\'s top module (what run_process synthesizes and implements) and / or its test bench (what simulate runs), as Set as Top Module does; each must elaborate. With update_constraints, the constraints file is written again from the board\'s pins for the new top\'s ports (clk, led, sw, btn, seg, an…), as Update Constraints does: its pin locations are replaced.',
+    inputSchema: { type: 'object', properties: { project: PROJECT, top: STR('The top module (an entity or module of the project\'s design sources).'), sim_top: STR('The test bench (a simulation source\'s entity or module).'), update_constraints: { type: 'boolean', description: 'Write the constraints file again from the board\'s pins (default false).' } }, required: ['project'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    async run({ project: name, top, sim_top: simTop, update_constraints: constraints = false }) {
+      const before = await readProject(name);
+      if (!top && !simTop) throw toolError('give top, sim_top or both');
+      // each must elaborate in its view (the test bench with the new top's sources)
+      for (const [mod, sim] of [[top, false], [simTop, true]]) {
+        if (!mod) continue;
+        const { design, diags } = await elaborateView(name, { top: mod, sim });
+        const errors = diags.filter(d => d.severity === 'error');
+        if (errors.length === 1 && /^top module '.*' not found$/.test(errors[0].message)) throw toolError(`no entity or module '${mod}' in the project's ${sim ? 'simulation' : 'design'} sources (project_info)`);
+        if (errors.length || !design?.top) throw toolError(`<${mod}> does not elaborate${sim ? ' as a test bench' : ''}: ${errors.map(diagLine).join('; ') || 'not found'}`);
+      }
+      if (constraints && !before.board) throw toolError(`the project '${name}' has no board: its constraints cannot come from a board's pins`);
+      await P.updateProject(name, pj => ({ ...pj, ...(top ? { top } : {}), ...(simTop ? { simTop } : {}) }));
+      const pj = await P.readProject(name);
+      if (constraints) await P.boardConstraints(P.projectDir(name), pj);
+      return { text: `${name}: top ${pj.top || '(none)'}, test bench ${pj.simTop || '(none)'}${constraints ? `; ${pj.constraints} written from the ${pj.board}'s pins` : ''}.`, data: { project: name, top: pj.top || null, simTop: pj.simTop || null, constraintsUpdated: constraints } };
+    },
+  },
+  {
+    name: 'project_info', title: 'A project\'s settings and files',
+    description: 'A project\'s top module, test bench (simulation top), device, board, constraints file and its files (path, language, role: design, sim or impl).',
+    inputSchema: { type: 'object', properties: { project: PROJECT }, required: ['project'], additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    async run({ project: name }) {
+      const pj = await readProject(name);
+      const files = (pj.files || []).map(f => ({ path: f.path, lang: f.lang, role: f.role || 'design' }));
+      const all = (await P.fileTree(name)).filter(f => !/^build\//.test(f));
+      const data = { project: name, top: pj.top || null, simTop: pj.simTop || null, device: pj.device || null, board: pj.board || null, constraints: pj.constraints || null, synthTool: pj.synthTool || null, files, otherFiles: all.filter(f => !files.some(x => x.path === f) && f !== 'silinx.json') };
+      return { text: [`${name}: top ${data.top || '(none)'}, test bench ${data.simTop || '(none)'}, ${data.board || 'no board'} (${data.device ? `${data.device.part}${data.device.package}${data.device.speed}` : 'no device'}), constraints ${data.constraints || '(none)'}`,
+        ...files.map(f => `  ${f.path} (${f.lang}, ${f.role})`), ...(data.otherFiles.length ? [`  other files: ${data.otherFiles.join(', ')}`] : [])].join('\n'), data };
+    },
+  },
+  {
+    name: 'read_file', title: 'Read a file of a project',
+    description: 'The text of a file of a project (a source, the constraints, a drawing\'s JSON, a report of build/…).',
+    inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The file\'s path in the project, e.g. src/top.vhd.') }, required: ['project', 'path'], additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    async run({ project: name, path: rel }) {
+      await readProject(name);
+      const full = await projectPath(name, rel);
+      let text;
+      try { text = await fsp.readFile(full, 'utf8'); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
+      return { text: clip(text), data: { project: name, path: rel, length: text.length } };
+    },
+  },
+  {
+    name: 'write_file', title: 'Write a file of a project',
+    description: 'Write (create or replace) a file of a project. A new VHDL or Verilog file is added to the project (a test bench in sim/ or named tb_… as a simulation source). The application\'s open editor of that file keeps its own text until it is reopened.',
+    inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The file\'s path in the project, e.g. src/counter.vhd.'), text: STR('The whole text of the file.') }, required: ['project', 'path', 'text'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    async run({ project: name, path: rel, text }) {
+      await readProject(name);
+      if (typeof text !== 'string') throw toolError('text: the whole text of the file');
+      // the path as the project lists it: ./silinx.json is silinx.json (#1233)
+      const key = P.relKey(P.projectDir(name), await projectPath(name, rel));
+      const low = key.toLowerCase();
+      if (low === P.PROJECT_FILE || low === 'build' || low.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
+      if (key.split('/').some(s => s.startsWith('.'))) throw toolError(`'${rel}': a hidden file or folder cannot be written`);
+      rel = key;
+      const existed = (await P.fileTree(name)).includes(rel);
+      try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }
+      const added = !existed && (await P.readProject(name)).files.some(f => f.path === rel);
+      return { text: `${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`, data: { project: name, path: rel, created: !existed, addedToProject: added } };
+    },
+  },
+];
