@@ -34,13 +34,13 @@ uiTest('Convert to Schematic of a behavioural Verilog module whose file holds an
   const c = CASES.find((x) => x.name === 'verilog-multi');
   await makeProject(env, { name: 'Conv_v', files: c.files, top: 'proc', simTop: 'tb_proc' });
   await page.openProject('Conv_v');
-  assert.equal(await badgesOf(page, 'proc'), '[Verilog*]');
+  assert.equal(await badgesOf(page, 'proc'), '[Verilog*] [VHDL]');
   await convert(page, 'proc');
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/proc.v'] === 'src/proc.sch.json' && window.Silinx.active?.id === 'sch:src/proc.sch.json', [], { what: 'converted, linked, open', timeout: 20000 });
   // the module's row: the schematic its base, its HDL generated from it; adder a plain module in adder.v
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.querySelector('.lbl').textContent === 'proc' && r.querySelector('.badge.base')?.textContent === 'Schematic'), [], { what: 'the [Schematic] badge' });
   assert.equal(await badgesOf(page, 'proc'), '[Schematic*] [Verilog]');
-  assert.equal(await badgesOf(page, 'u_add - adder'), '[Verilog*]');
+  assert.equal(await badgesOf(page, 'u_add - adder'), '[Verilog*] [VHDL]');
   assert.equal(await page.eval(() => [...document.querySelectorAll('#hier .row')].find((r) => r.querySelector('.lbl').textContent === 'u_add - adder').querySelector('.meta').textContent), '(adder.v)');
   // the files
   assert.equal(await readWs(env, 'Conv_v', 'src/adder.v'), '`timescale 1ns / 1ps\n`define WORD 8\nmodule adder #(parameter N = 4) (input [N-1:0] a, b, output [N:0] s);\n  assign s = a + b;\nendmodule\n');

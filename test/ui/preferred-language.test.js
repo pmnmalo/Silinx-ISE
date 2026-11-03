@@ -71,9 +71,12 @@ uiTest('Design Properties, Preferred Language Verilog: the state diagram and the
     assert.match(await readWs(env, 'PrefLang', hdl), /^\s*module \w+/m);
   }
   for (const [f, t] of Object.entries(hand)) assert.equal(await readWs(env, 'PrefLang', f), t, `${f} written by hand: as it is`);
-  // the Design pane: the drawings' HDL badge [Verilog], last; the HDL modules as they were
+  // the Design pane: the drawings' HDL badge [Verilog], last; the HDL modules as they were, but their translation badge
+  // (#2693): [Verilog] on a VHDL module's row, none on the Verilog one's
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.querySelector('.lbl').textContent.endsWith('traffic') && [...r.querySelectorAll('.badge')].some((b) => b.textContent === 'Verilog')), [], { what: 'the row of traffic with [Verilog]' });
-  assert.deepEqual(await rows(page), before.map((r) => (/^(fsm|algebra) /.test(r) ? r.replace('[VHDL]', '[Verilog]') : r)));
+  assert.ok(before.includes('verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)'), before.join('\n'));
+  assert.deepEqual(await rows(page), before.map((r) => (/^(fsm|algebra) /.test(r) ? r.replace('[VHDL]', '[Verilog]')
+    : r.replace('[VHDL*] (', '[VHDL*] [Verilog] (').replace('[Verilog*] [VHDL] (', '[Verilog*] ('))));
   assert.ok(before.some((r) => /^fsm .*\[FSM\*\] \[VHDL\]/.test(r)) && before.some((r) => /^algebra .*\[VHDL\]/.test(r)), before.join('\n'));
   // the open editor follows: its model in Verilog, linked to the Verilog file (its next edit keeps them)
   assert.deepEqual(await page.eval(() => { const m = window.Silinx.docs.find((d) => d.fsmEditor).fsmEditor.getModel(); return [m.lang, m.generatedFile]; }), ['verilog', 'src/traffic.v']);
