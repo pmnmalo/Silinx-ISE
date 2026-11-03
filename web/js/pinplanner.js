@@ -16,6 +16,7 @@ import { bitName, boardAutoAssign } from '/packages/silinx-fpga/src/parts.js';
 import { elaborate } from '/core/compile.js';
 import { boardRemove } from '/core/pin-board.js';
 import { S, app, setDirty } from './app.js';
+import { statusLine } from './status-line.js';
 
 export function mountPinPlanner(el, doc, top) {
   const pj = S.project;
@@ -132,7 +133,10 @@ export function mountPinPlanner(el, doc, top) {
     popupMenu(on.map(n => ({ label: `Remove ${n} from its pin`, action: () => removeNets([n]) })), e.clientX, e.clientY);
   }
   const resHost = h('div', { class: 'pp-res' });
-  const status = h('span', { class: 'pp-status' });
+  // (its status line, #2763: the ports assigned or its state, the top, the device, the board)
+  const line = statusLine();
+  let statusText = '';
+  const setStatus = (t) => { statusText = t; line.set([{ text: t, cls: 'pp-status' }, { text: `Top: ${top}`, cls: 'pp-info' }, `Device ${pj.device.part}-${pj.device.package}`, board ? `Board: ${board.name}` : 'no board selected']); };
   const sep = () => h('span', { class: 'asm-sep' });
   const autoBtn = toolWide('beautify', 'Auto-assign from Board', board ? 'Match port names with board resources (clk, led, sw, btn, seg, an…)' : 'Select a board in Design Properties', () => autoAssign());
   autoBtn.disabled = !board;
@@ -143,12 +147,9 @@ export function mountPinPlanner(el, doc, top) {
     h('div', { class: 'asm-group' }, autoBtn, toolWide('del', 'Clear All', 'Remove every pin assignment', () => { asg = {}; clocks = []; render(); changed(); })),
     h('div', { class: 'asm-spacer' }),
     // (a narrow window: the ports and the board's resources over the board and the table, shown by these)
-    h('div', { class: 'asm-group' }, portsBtn, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })),
-    // (what it says at its right end, as every toolbar's: #2725)
-    status, sep(),
-    h('span', { class: 'pp-info' }, `Top: ${top} · Device ${pj.device.part}-${pj.device.package}${board ? ` · Board: ${board.name}` : ' · no board selected'}`));
+    h('div', { class: 'asm-group' }, portsBtn, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })));
   const side = h('aside', { class: 'asm-side pp-side' }, h('div', { class: 'asm-cap' }, 'Board Resources'), resHost);
-  root.append(bar, h('div', { class: 'asm-body' }, portsSide, h('div', { class: 'asm-main' }, tableHost, boardHost), side));
+  root.append(bar, h('div', { class: 'asm-body' }, portsSide, h('div', { class: 'asm-main' }, tableHost, boardHost), side), line.el);
   mountSideFold({ root, side, key: 'silinx.pins.props.folded', titles: { fold: 'Collapse the Board Resources panel', unfold: 'Expand the Board Resources panel' } });
   mountSideFold({ root, side: portsSide, key: 'silinx.pins.ports.folded', titles: { fold: 'Collapse the Ports panel', unfold: 'Expand the Ports panel' }, cls: 'ports-folded', toward: 'left' });
   const closedGroups = new Set();   // (the groups folded, kept when the panel is drawn again: render)
@@ -200,7 +201,7 @@ export function mountPinPlanner(el, doc, top) {
     }
     tableHost.append(tbl, h('datalist', { id: 'pp-pins' }, ...resPins.map(r => h('option', { value: r.pin }, r.label))));
     const assigned = nets.filter(n => asg[n.net]?.loc).length;
-    status.textContent = `${assigned}/${nets.length} I/Os assigned`;
+    setStatus(`${assigned}/${nets.length} I/Os assigned`);
     // resources panel
     // (the groups folded, read before they are drawn again)
     for (const d of resHost.querySelectorAll('details.pp-grp')) { const name = d.dataset.grp; if (d.open) closedGroups.delete(name); else closedGroups.add(name); }
@@ -244,7 +245,7 @@ export function mountPinPlanner(el, doc, top) {
   async function save() {
     const u = used();
     const dup = [...u.entries()].filter(([, v]) => v.length > 1);
-    status.textContent = dup.length ? `⚠ pins assigned more than once: ${dup.map(([k]) => k).join(', ')}` : '';
+    setStatus(dup.length ? `⚠ pins assigned more than once: ${dup.map(([k]) => k).join(', ')}` : '');
     const text = writePins(pj.device, {
       ports: ports.map(p => ({ name: p.name, dir: p.dir, msb: p.msb, lsb: p.lsb, width: p.width })),
       assignments: asg, clocks, other,
@@ -256,7 +257,7 @@ export function mountPinPlanner(el, doc, top) {
     await app.saveProjectJson();
     await app.reloadProject();
     setDirty(doc, false);
-    if (!status.textContent) status.textContent = `Saved to ${pj.constraints}`;
+    if (!statusText) setStatus(`Saved to ${pj.constraints}`);
     const d = app.findDoc(`file:${pj.constraints}`);
     if (d) { d.editor.setValue(text); d.editor.markClean(); setDirty(d, false); }
   }

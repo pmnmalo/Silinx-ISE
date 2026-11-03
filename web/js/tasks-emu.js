@@ -28,9 +28,9 @@ export function boardZoom(room, board) {
 
 const shown = el => !!el && el.getClientRects().length > 0;
 /** The emulator's status (t = … ns · … cycles · … kHz (…% of real time)) right below the board in the Tasks interface,
- *  in place of the board's line (hidden by web/css/tasks.css); at the end of the emulator's bar in the others (#1022). */
+ *  in place of the board's line (hidden by web/css/tasks.css); in the emulator's status line in the others (#1022, #2763). */
 function placeStat(emu, wrap) {
-  const stat = emu.querySelector('.emu-bar > .stat, .emu-board-wrap > .stat'), bar = emu.querySelector('.emu-bar');
+  const stat = emu.querySelector(':scope > .doc-status > .stat, .emu-board-wrap > .stat'), bar = emu.querySelector(':scope > .doc-status');
   if (!stat || !bar) return;
   if (document.documentElement.dataset.layout === 'tasks') { if (stat.parentNode !== wrap) wrap.append(stat); }
   else if (stat.parentNode !== bar) bar.append(stat);

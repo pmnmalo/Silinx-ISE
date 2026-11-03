@@ -4,7 +4,6 @@
 .fv .fv-bar .btn { min-width: 0; padding: 0 10px; }
 .fv .fv-bar .btn.on { background: #f5c542; border-color: #b8860b; color: #000; }
 .fv-sep { width: 1px; height: 18px; background: var(--border-light, #ccc); margin: 0 4px; }
-.fv-info { margin-left: 8px; color: var(--muted, #666); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; text-align: right; }
 .fv-stale { padding: 4px 10px; background: #fff4ce; color: #5a4a00; border-bottom: 1px solid #e6d690; }
 .fv-main { flex: 1; display: flex; min-height: 0; }
 .fv-canvas { flex: 1; position: relative; min-width: 0; overflow: hidden; background: #0d1117; cursor: grab; }

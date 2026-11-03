@@ -3,7 +3,7 @@
 // what is under the mouse); its toolbar keeps its tools. Messages (errors, warnings, information) are the console's.
 import { h } from './dom.js';
 
-/** A field of the line: a text, or { text, cls, title }; empty ones are left out. */
+/** A field of the line: a text, or { text, cls, title, noI18n } (noI18n: names, not translated); empty ones are left out. */
 const field = (f) => (typeof f === 'string' || typeof f === 'number' ? { text: String(f) } : f);
 
 /** { el, set(fields, hint) } of a new status line: `fields` at its right, in order; `hint` (the schematic's tool's
@@ -17,7 +17,7 @@ export function statusLine(cls = '') {
     if (key === last) return;   // (redrawn on every mouse move: a text node kept keeps its translation)
     last = key;
     el.replaceChildren(h('span', { class: 'hint', text: hint }), h('span', { class: 'sp' }),
-      ...fs.map((f) => h('span', { class: `ds-f${f.cls ? ` ${f.cls}` : ''}`, title: f.title, text: f.text })));
+      ...fs.map((f) => h('span', { class: `ds-f${f.cls ? ` ${f.cls}` : ''}`, title: f.title, 'data-no-i18n': !!f.noI18n, text: f.text })));
   }
   set();
   return { el, set };

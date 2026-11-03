@@ -42,5 +42,6 @@ export const FPGA_PT_PATTERNS = [
   [/^(\S+) \((\S+)\): not used$/, '$1 ($2): não usada'],
   [/^address ([01]+) → ([01])$/, 'endereço $1 → $2'],
   [/^Inside (\S+)$/, 'Dentro de $1'],
+  [/^(\d+) of (\d+) slices · (\d+) I\/Os$/, '$1 de $2 slices · $3 E/S'],   // (the status line's, #2763)
   [/^The implemented design could not be read: (.*)$/s, 'Não foi possível ler o projeto implementado: $1'],
 ];

@@ -49,8 +49,7 @@ export function injectStyle() {
 .emu-menu-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .emu-menu-show { flex-wrap: wrap; max-width: 300px; white-space: normal; }
 .emu-bar .sep { width: 1px; height: 20px; background: var(--frame); margin: 0 4px; }
-.emu-bar .stat { margin-left: auto; color: var(--grey-3); font-family: var(--mono, monospace); font-variant-numeric: tabular-nums;
-  flex: 1 1 0; min-width: min(100%, 84ch); text-align: right; }   /* (the whole line, t = … ns · … cycles · … kHz (…% of real time): a row of its own when the controls leave it no room, two lines on a window too narrow for one, never cut, #918) */
+.emu > .doc-status > .stat { font-family: var(--mono, monospace); font-variant-numeric: tabular-nums; }   /* (in its status line, #2763) */
 /* the board and its modules (main), the side panel at their right, as the diagram editors' Properties (#2666) */
 .emu-body { flex: 1; display: flex; min-height: 0; }
 .emu-main { flex: 1; min-width: 0; overflow: auto; scroll-padding: 12px; display: flex; gap: 12px; padding: 12px; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; }   /* (a part scrolled to: clear of the edge and its scrollbar) */

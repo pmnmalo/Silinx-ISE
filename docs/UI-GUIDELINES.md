@@ -31,12 +31,14 @@ answer here.
 ## The status line
 
 Every editor and viewer has one status line, its last line, the Schematic editor's (`statusLine()` of
-`web/js/status-line.js`, `.doc-status`, the same look in every document) (#2763):
+`web/js/status-line.js`, `.doc-status` of `web/css/status-line.css`, the same look in every document) (#2763):
 
 - **What it says:** what the document is now, in short fields at its right: a drawing's counts ("7 state(s), 8
   transition(s)", "2 places · 2 transitions · 4 arcs", "3 states"), its kind and encoding ("Moore", "Encoding:
   Binary"), its tokens (a Petri net), a table's inputs, outputs and rows, the schematic's cursor and zoom; a text
-  editor's line and column and its language; a viewer's selection or what is under the mouse.
+  editor's line and column and its language; a viewer's selection or what is under the mouse (I/O Pin Planning's I/Os
+  assigned, top, device and board; the FPGA view's selection and the slices used; the Board Emulator's time, right below
+  the board in the Tasks interface).
 - **What it never says:** errors, warnings or information (the console's, #2718), the read-only notice and "Not in
   sync with …" (the toolbar's), a title or a path (the tab's).
 - A read-only view has it too, the same fields; printed, it is left out (`print-doc.js`).
