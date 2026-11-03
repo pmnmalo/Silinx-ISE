@@ -165,24 +165,18 @@ export async function openSchematic(mod, { netlist = null, task = netlist ? null
     create(el, docRef) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
-      let ed = null, cur = null, file = null;
+      let ed = null, cur = null;
       // an instance or a module by its name in the schematic (as written: VHDL names match in any case)
       const sameName = (a, b, vhdl) => a === b || (vhdl && String(a).toLowerCase() === String(b).toLowerCase());
       // ISE-style hierarchy navigation, in the schematic's toolbar (#2667): up to the parent, push into the selected
-      // instance; the module's file
+      // instance
       const navBtn = (nav, title, text, onclick) => h('button', { type: 'button', class: 'se-btn wide rtl-nav', 'data-nav': nav, title, onclick }, text);
       const upBtn = navBtn('up', 'Up to the parent module (Backspace)', '⬆ Up', () => cur?.parent && show(cur.parent));
       const intoBtn = navBtn('into', 'Push into the selected instance (Enter, or double-click it)', '⬇ Push into', () => ed?.openSelected());
-      const openBtn = navBtn('open', 'Open the module\'s HDL file', '', () => file && openFile(file.file, file.line));
       const canEnter = s => !!(s && cur?.children.some(c => (sameName(c.name, s.name, cur.mod?.lang === 'vhdl') || sameName(c.module, s.params.module, c.mod?.lang === 'vhdl')) && !c.blackbox && !isPrimitive(c)));
       // the buttons follow the instance drawn: they change with the drawing, once that is laid out, not before (a
       // click meanwhile went to the drawing left, its properties then replaced, #346)
-      const drawBar = (inst, info) => {
-        upBtn.disabled = !inst.parent; intoBtn.disabled = true;
-        file = info || null;
-        openBtn.hidden = !info;
-        openBtn.textContent = info ? `Open ${info.file.split('/').pop()}` : '';
-      };
+      const drawBar = inst => { upBtn.disabled = !inst.parent; intoBtn.disabled = true; };
       let want = null;   // the instance asked for last (its drawing being laid out)
       const show = async inst => {
         want = inst;
@@ -206,9 +200,9 @@ export async function openSchematic(mod, { netlist = null, task = netlist ? null
               },
             });
             docRef.viewer = ed;   // (the read-only editor of the view: tests)
-            host.querySelector('.se-toolbar')?.prepend(upBtn, intoBtn, openBtn, h('span', { class: 'se-sep' }));
+            host.querySelector('.se-toolbar')?.prepend(upBtn, intoBtn, h('span', { class: 'se-sep' }));
           } else ed.setDoc(doc);
-          drawBar(inst, info);
+          drawBar(inst);
           setTimeout(() => ed.fit?.(), 50);
         } catch (e) { log(`ERROR: ${kindName} schematic of ${inst.module}: ${e.message}`, 'err'); }
         finally { status('Ready'); }

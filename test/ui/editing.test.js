@@ -348,14 +348,14 @@ uiTest('View RTL Schematic of VHDL: the names as written in the design (instance
   await page.waitFor(() => window.Silinx.active?.id === 'rtl:top_level' && window.Silinx.active.viewer?.getDoc().symbols.length >= 3, [], { what: 'RTL schematic' });
   const view = () => page.eval(() => {
     const d = window.Silinx.active.viewer.getDoc();
-    // (#2667: Up, Push into and the file first in the schematic's toolbar, no bar above it)
-    const nav = [...document.querySelector('.doc:not([hidden]) .se-toolbar').children].slice(0, 4)
+    // (#2667: Up and Push into first in the schematic's toolbar, no bar above it; no button opening the file)
+    const nav = [...document.querySelector('.doc:not([hidden]) .se-toolbar').children].slice(0, 3)
       .map((b) => (b.classList.contains('se-sep') ? '|' : `${b.textContent}${b.disabled ? ' (off)' : ''}`));
     return { bar: !!document.querySelector('.doc:not([hidden]) .rtl-crumbs, .doc:not([hidden]) > .doc-toolbar'), nav, name: d.name, ports: d.ports.map((p) => p.name), nets: [...new Set(d.labels.map((l) => l.net))],
       syms: d.symbols.map((s) => [s.name, s.type, s.params.module || s.params.title || null]) };
   });
   assert.deepEqual(await view(), {
-    bar: false, nav: ['⬆ Up (off)', '⬇ Push into (off)', 'Open top.vhd', '|'], name: 'Top_Level', ports: ['CLK_50', 'nReset', 'LEDs'],
+    bar: false, nav: ['⬆ Up (off)', '⬇ Push into (off)', '|'], name: 'Top_Level', ports: ['CLK_50', 'nReset', 'LEDs'],
     nets: ['Blink_A'], syms: [['U_Blink', 'module', 'Blink_Ctrl'], ['inst_1', 'busjoin', null], ['inst_2', 'inv', null]],
   });
   // the instance's properties: its module, pins and generics as the entity writes them
@@ -371,7 +371,7 @@ uiTest('View RTL Schematic of VHDL: the names as written in the design (instance
   await page.click('.doc:not([hidden]) .rtl-nav', { text: '⬇ Push into' });
   await page.waitFor(() => window.Silinx.active.viewer.getDoc().name === 'Blink_Ctrl', [], { what: 'inside U_Blink' });
   assert.deepEqual(await view(), {
-    bar: false, nav: ['⬆ Up', '⬇ Push into (off)', 'Open top.vhd', '|'], name: 'Blink_Ctrl', ports: ['Clk', 'Rst_N', 'LED_Out'],
+    bar: false, nav: ['⬆ Up', '⬇ Push into (off)', '|'], name: 'Blink_Ctrl', ports: ['Clk', 'Rst_N', 'LED_Out'],
     nets: ['Toggle_Q'], syms: [['Flip', 'hdlblock', 'Flip'], ['LOGIC_1', 'hdlblock', 'assign']],
   });
   await page.click('.doc:not([hidden]) .rtl-nav', { text: '⬆ Up' });
@@ -381,12 +381,8 @@ uiTest('View RTL Schematic of VHDL: the names as written in the design (instance
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('pt');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .se-toolbar .rtl-nav')].map((b) => [b.textContent, b.title])), [
-    ['⬆ Subir', 'Subir para o módulo pai (Backspace)'], ['⬇ Entrar', 'Entrar na instância selecionada (Enter, ou duplo clique)'],
-    ['Abrir top.vhd', 'Abrir o ficheiro HDL do módulo']]);
+    ['⬆ Subir', 'Subir para o módulo pai (Backspace)'], ['⬇ Entrar', 'Entrar na instância selecionada (Enter, ou duplo clique)']]);
   await setLang('en');
-  // the module's file opened from the toolbar
-  await page.click('.doc:not([hidden]) .rtl-nav[data-nav="open"]');
-  await page.waitFor(() => /^file:.*top\.vhd$/.test(window.Silinx.active?.id || ''), [], { what: 'top.vhd opened' });
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
 });
 
