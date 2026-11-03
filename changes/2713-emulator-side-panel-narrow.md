@@ -9,4 +9,5 @@ In detail:
   the Tasks interface's panel beside it) the panel goes over the board, closed at first, shown and hidden by ☰
   Properties in the emulator's bar (`panelToggle`, remembered as the editors' Properties; `narrowOnly: false`, the
   emulator narrow by its own width), instead of below the board with the whole emulator scrolling down; the board's
-  area keeps the whole width. Tests: test/ui/emulator-panels.test.js, test/ui/tasks.test.js.
+  area keeps the whole width. Tests: test/ui/emulator-panels.test.js, test/ui/tasks.test.js (the bar's buttons in
+  test/ui/emulator-parts.test.js and test/ui/sim-emu.test.js without it).
