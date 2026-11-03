@@ -13,7 +13,7 @@ Xilinx ISE 14.7, following the method in [docs/OPEN-TOOLCHAIN.md](../../../../do
 | `build-device.mjs` | Builds the graph cache from the full device report; prints sizes and load time |
 | `timing-fit.mjs` | Fits the wire delay model of `packages/silinx-fpga/src/fpga/timing.js` to ISE's `reportgen -delay` of routed designs |
 | `route.mjs` | Removes a design's PIPs, routes it, writes the XDL, checks it against the graph (`--known`: only PIPs of known bits) |
-| `open-flow.mjs` | The fully open flow for a project: synthesis (Silinx + Yosys), pack, place, route on known PIPs, Silinx's bitgen |
+| `open-flow.mjs` | The fully open flow for a project: synthesis (Silinx + Yosys), the flow's nextpnr engine (pack, place, route on known PIPs, #2756), Silinx's bitgen |
 | `ise-open-check.sh` | Inside the ISE container, the oracle of the open flow: `xdl -xdl2ncd`, `drc`, `bitgen` (CRC on / off), `trce -a`, `reportgen -delay` |
 | `check.mjs` | Checks the routing of an XDL design (ISE's or Silinx's) against the graph |
 | `gen-controls.mjs` | Control designs: all PIPs removed, one antenna added, bidirectional PIPs flipped, rewritten unchanged |

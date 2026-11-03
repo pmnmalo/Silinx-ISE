@@ -13,7 +13,7 @@
 //   (also: SILINX_ISE_IMAGE, default xilinx/ise:14.7; SILINX_ISE_REMOTE_DIR, the host's folder for the work, default
 //   ~/.silinx/config.json's ssh.remoteDir, else ~/silinx-open-check: one Docker Desktop shares, #482).
 //   Needs the device cache (~/.silinx/devices).
-// Options after a project folder go to its open flow (e.g. `examples/pong --seed 2 --timing-route 0`); the
+// Options after a project folder go to its open flow (e.g. `examples/pong --seed 2`: nextpnr's first seed, #2756); the
 // same project may be given several times with different options. With SILINX_KEEP=1 the work
 // folder is kept, with ISE's timing report (routed.twr, trce -a) and every connection's delay
 // (routed.dly, reportgen -delay) next to each routed.xdl: packages/silinx-fpga/research/s3e-route/timing-fit.mjs.
