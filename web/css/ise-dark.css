@@ -1,0 +1,225 @@
+/* The ISE style look in the dark theme (#2676): <html data-ui="ise" data-theme="dark">. The look of theme.css and
+   app.css (caption bars, gradients, bottom tabs) kept, its colours dark. The dark tokens (--m-*), the pages' and
+   dialogs' own colours (--note-bg …) and the documents' dark rules (the HDL editor, the sheets on a dark desk, Symbol
+   Info, the live simulation) are silinx.css's, under html[data-theme="dark"], shared by both looks; here theme.css's
+   variables and the colours the ISE look writes in its own rules. */
+
+/* ------------------------------------------------------------------ theme.css's variables */
+html[data-ui="ise"][data-theme="dark"] {
+  --bg: #202328;
+  --panel: var(--m-surface);
+  --panel-alt: var(--m-surface-2);
+  --fg: var(--m-fg);
+  --muted: var(--m-muted);
+  --border: #474d57;
+  --border-light: var(--m-border);
+  --accent: #2f62c0;        /* the selection: white text on it */
+  --accent-fg: #ffffff;
+  --hover: #263247;
+  --danger: var(--m-danger);
+  --warning: var(--m-warning);
+  --success: var(--m-success);
+  --title-grad: linear-gradient(#2d3b53, #222e43);
+  --title-fg: #b9cff3;
+  --tab-active: var(--m-surface);
+  --tab-inactive: linear-gradient(#2c3036, #24272c);
+  --toolbar-grad: linear-gradient(#2c3036, #23262b);
+  --menu-bg: #25282e;
+  /* the ISE look's own lines and controls, dark */
+  --ise-line: #3a3f48;          /* a separator, a frame */
+  --ise-caption-line: #3b4b68;  /* under a caption bar */
+  --ise-btn: linear-gradient(#3b4048, #2f333a);
+  --ise-btn-line: #5a606b;
+  --ise-hot: linear-gradient(#304a72, #273d5f);   /* a button or an item under the pointer */
+  --ise-hot-line: #4f71a6;
+  --ise-down: linear-gradient(#253a5c, #1f314f);  /* pressed, on */
+  --ise-link: #8fb4ff;
+  --ise-head: #b9cff3;          /* the headings of pages and wizards */
+  /* SSim: the waveform stays black (as in ISim), its names and ruler dark */
+  --wave-names-bg: var(--m-surface);
+  --wave-head-1: #2c3036;
+  --wave-head-2: #23262b;
+  --wave-ruler-fg: var(--m-fg);
+  --wave-ruler-tick: var(--m-muted);
+}
+html[data-ui="ise"][data-theme="dark"] * { scrollbar-color: #4a505a #1d2024; }
+
+/* ------------------------------------------------------------------ theme.css: buttons, captions, tool icons */
+html[data-ui="ise"][data-theme="dark"] .btn { background: var(--ise-btn); border-color: var(--ise-btn-line); color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .btn:hover { background: var(--ise-hot); border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .btn:active { background: var(--ise-down); }
+html[data-ui="ise"][data-theme="dark"] .btn:disabled { background: #25282d; border-color: var(--ise-line); color: #858c98; }
+html[data-ui="ise"][data-theme="dark"] .btn.primary { border-color: #5b8def; }
+html[data-ui="ise"][data-theme="dark"] .ise-panel > .caption { border-bottom-color: var(--ise-caption-line); }
+html[data-ui="ise"][data-theme="dark"] .tb-btn { color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .tb-btn:hover { border-color: var(--ise-hot-line); background: var(--ise-hot); }
+html[data-ui="ise"][data-theme="dark"] .tb-sep { background: var(--ise-line); box-shadow: none; }
+html[data-ui="ise"][data-theme="dark"] :is(input:is(:not([type]), [type=text], [type=number], [type=search]), select, textarea) {
+  background: var(--m-surface); color: var(--fg); border-color: #555b66; }
+
+/* ------------------------------------------------------------------ app.css: title, menus, toolbar */
+html[data-ui="ise"][data-theme="dark"] #titlebar { background: linear-gradient(#26324a, #1c2639); border-bottom-color: #34425e; color: #c9d8f0; }
+html[data-ui="ise"][data-theme="dark"] .menubar { border-bottom-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .menubar .item:hover, html[data-ui="ise"][data-theme="dark"] .menubar .item.open { background: #2c3f5e; border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .menu-popup { background: var(--menu-bg); color: var(--fg); border-color: #4a4f58; box-shadow: 2px 2px 6px rgba(0, 0, 0, .5); }
+html[data-ui="ise"][data-theme="dark"] .menu-popup .mi:hover:not(.disabled) { background: var(--ise-hot); border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .menu-popup .mi.disabled { color: #858c98; }
+html[data-ui="ise"][data-theme="dark"] .menu-popup .sc { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .menu-popup .sep { background: var(--ise-line); border-bottom-color: transparent; }
+html[data-ui="ise"][data-theme="dark"] #toolbar { border-bottom-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .view-select { background: var(--panel-alt); border-bottom-color: var(--ise-line); }
+
+/* ------------------------------------------------------------------ the workspace, tabs, console, status bar */
+html[data-ui="ise"][data-theme="dark"] #workspace { background: var(--panel); }
+html[data-ui="ise"][data-theme="dark"] #split-empty { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .bottom-tabs .tab { border-color: var(--border); }
+html[data-ui="ise"][data-theme="dark"] .bottom-tabs .tab:hover:not(.active) { background: linear-gradient(#323a47, #2a313c); }
+html[data-ui="ise"][data-theme="dark"] .bottom-tabs .tab .tclose, html[data-ui="ise"][data-theme="dark"] .bottom-tabs .count { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .console-page .ln.err { color: var(--m-danger); }
+html[data-ui="ise"][data-theme="dark"] .console-page .ln.warn { color: var(--m-warning); }
+html[data-ui="ise"][data-theme="dark"] .console-page .ln.ok { color: var(--m-success); }
+html[data-ui="ise"][data-theme="dark"] .console-page .ln.info { color: var(--m-info); }
+html[data-ui="ise"][data-theme="dark"] .console-page .ln.hdr { color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .console-page .diag .loc, html[data-ui="ise"][data-theme="dark"] .console-page .diag .diag-more { color: var(--ise-link); }
+html[data-ui="ise"][data-theme="dark"] .console-page .diag .diag-fix { color: var(--ise-link); }
+html[data-ui="ise"][data-theme="dark"] .console-page .diag-hint { background: var(--m-surface-2); border-left-color: var(--m-warning); }
+html[data-ui="ise"][data-theme="dark"] #statusbar { border-top-color: var(--ise-line); color: #c8cdd4; }
+html[data-ui="ise"][data-theme="dark"] #drawer-btn:hover { background: #2c3f5e; border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .splitter:hover { background: #3a4f70; }
+
+/* ------------------------------------------------------------------ trees */
+html[data-ui="ise"][data-theme="dark"] .tree .row .meta { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .tree .row.sel :is(.meta, .twisty) { color: #dde6f7; }
+html[data-ui="ise"][data-theme="dark"] .tree .row.disabled { color: #858c98; }
+html[data-ui="ise"][data-theme="dark"] .tree .empty { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .tree .ico, html[data-ui="ise"][data-theme="dark"] .tab > .ico { filter: brightness(.92) saturate(.9); }
+
+/* ------------------------------------------------------------------ dialogs, wizards, tables, messages */
+html[data-ui="ise"][data-theme="dark"] .dlg-overlay { background: rgba(0, 0, 0, .45); }
+html[data-ui="ise"][data-theme="dark"] .dlg { border-color: #4c5a72; box-shadow: 0 6px 24px rgba(0, 0, 0, .6); }
+html[data-ui="ise"][data-theme="dark"] .dlg-title { background: var(--title-grad); border-bottom-color: var(--ise-caption-line); color: var(--title-fg); }
+html[data-ui="ise"][data-theme="dark"] .dlg-x { color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .dlg-buttons { border-top-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .dlg :is(input[type=text], input[type=number], select, textarea) { background: var(--m-surface); color: var(--fg); border-color: #555b66; }
+html[data-ui="ise"][data-theme="dark"] .dlg input:focus, html[data-ui="ise"][data-theme="dark"] .dlg select:focus { outline-color: #5b8def; border-color: #5b8def; }
+html[data-ui="ise"][data-theme="dark"] .wiz-side { background: linear-gradient(#1f3a66, #345a96); }
+html[data-ui="ise"][data-theme="dark"] .wiz-main h3 { color: var(--ise-head); }
+html[data-ui="ise"][data-theme="dark"] .wiz-main .hint { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .src-types { background: var(--panel); border-color: #555b66; }
+html[data-ui="ise"][data-theme="dark"] table.grid { background: var(--panel); }
+html[data-ui="ise"][data-theme="dark"] table.grid th { background: linear-gradient(#2e3238, #26292e); border-color: var(--ise-line); color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] table.grid td { border-color: #2c3037; }
+html[data-ui="ise"][data-theme="dark"] table.grid td input[type=text]:focus, html[data-ui="ise"][data-theme="dark"] table.grid td select:focus { background: var(--m-surface); border-color: #5b8def; }
+html[data-ui="ise"][data-theme="dark"] table.grid tr.sel td { background: #26344a; }
+html[data-ui="ise"][data-theme="dark"] .msg-text { color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .toast { background: #2f343c; }
+
+/* ------------------------------------------------------------------ pages: Start, Design Summary, links */
+html[data-ui="ise"][data-theme="dark"] .page h2, html[data-ui="ise"][data-theme="dark"] .start-box h3 { color: var(--ise-head); }
+html[data-ui="ise"][data-theme="dark"] .page a { color: var(--ise-link); }
+html[data-ui="ise"][data-theme="dark"] .start-box h3 { border-bottom-color: #34425a; }
+html[data-ui="ise"][data-theme="dark"] .start-box .start-sep { border-top-color: #34425a; }
+html[data-ui="ise"][data-theme="dark"] :is(.start-box .entry .disabled, .start-box .entry.hint, #start-page:not([data-project]) .start-export) { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .summary-table caption { background: var(--title-grad); color: var(--title-fg); border-color: var(--ise-caption-line); }
+html[data-ui="ise"][data-theme="dark"] .summary-table th, html[data-ui="ise"][data-theme="dark"] .summary-table td { border-color: #333a46; }
+html[data-ui="ise"][data-theme="dark"] .summary-table th { background: var(--m-surface-2); color: #c8cdd4; }
+html[data-ui="ise"][data-theme="dark"] .util-bar { background: #2a2f37; border-color: #4a4f58; }
+html[data-ui="ise"][data-theme="dark"] .util-bar > div { background: #5b8def; }
+
+/* ------------------------------------------------------------------ the HDL editor (its colours: silinx.css) */
+html[data-ui="ise"][data-theme="dark"] .editor-bar { background: var(--panel-alt); border-bottom-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .editor-bar .path { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .editor-host .xl-editor .cm-gutters { border-right-color: var(--ise-line); color: #6fa8c4; }
+html[data-ui="ise"][data-theme="dark"] .editor-host .xl-editor :is(.cm-activeLine, .cm-activeLineGutter) { background: rgba(255, 255, 255, .05); }
+html[data-ui="ise"][data-theme="dark"] .xl-hover-tip { background: var(--m-surface-2); color: var(--fg); border-color: #555b66; box-shadow: 1px 1px 4px rgba(0, 0, 0, .5); }
+html[data-ui="ise"][data-theme="dark"] .xl-hover-tip .k { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .editor-host .xl-editor .cm-tooltip.cm-tooltip-autocomplete { background: var(--m-surface-2); color: var(--fg); border-color: #555b66; }
+html[data-ui="ise"][data-theme="dark"] .editor-host .xl-editor .cm-completionDetail { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] :is(.editor-bar, .fsm-link, .tt-link, .sch-editor .se-toolbar) .gen-banner a, html[data-ui="ise"][data-theme="dark"] .rtl-crumbs a { color: var(--ise-link); }
+html[data-ui="ise"][data-theme="dark"] .rtl-crumbs .rtl-ro { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-toolbar .gen-banner { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-toolbar .gen-banner.out-of-sync { background: rgba(240, 113, 107, .14); border-color: rgba(240, 113, 107, .45); color: #ffb4ae; }
+html[data-ui="ise"][data-theme="dark"] .doc-toolbar { border-bottom-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .fp-hit mark { background: rgba(227, 179, 65, .35); }
+
+/* ------------------------------------------------------------------ the pin planner, iMPACT */
+html[data-ui="ise"][data-theme="dark"] .pin-planner .pp-bar { background: var(--panel-alt); border-bottom-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .pin-planner .pp-res { border-left-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .pin-planner .pp-res .res.used { color: #858c98; }
+html[data-ui="ise"][data-theme="dark"] .impact-dev .bypass { color: var(--muted); }
+
+/* ------------------------------------------------------------------ the drawings' toolbars (schematic, ASM, FSM, Petri net, truth table) */
+html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn, .asm-editor .asm-toolbar .asm-btn, .tt-menu-item, .tt-toolbar .tb-more-btn) { color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn, .asm-editor .asm-toolbar .asm-btn, .tt-menu-item, .tt-toolbar .tb-more-btn):hover:not(:disabled) { border-color: var(--ise-hot-line); background: var(--ise-hot); }
+html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn:active:not(:disabled), .sch-editor .se-btn.on, .asm-editor .asm-toolbar .asm-btn:active:not(:disabled), .asm-editor .asm-toolbar .asm-btn:is(.on, .active)) {
+  border-color: #5b8def; background: var(--ise-down); }
+html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-sep, .asm-editor .asm-sep, .tt-sep) { background: var(--ise-line); box-shadow: none; }
+html[data-ui="ise"][data-theme="dark"] .sch-editor :is(.se-cap, .se-dhead) { border-bottom-color: var(--ise-caption-line); }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-cathead { border-bottom-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .btn { background: var(--ise-btn); border-color: var(--ise-btn-line); color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .btn:hover { background: var(--ise-hot); border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-prompt input { background: var(--m-surface); color: var(--fg); border-color: #555b66; }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-modal { background: rgba(0, 0, 0, .45); }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-dialog { border-color: #4c5a72; }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-symdoc .sd-truth td.x { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .se-symdoc .sd-truth td.vZ { color: #79a8ff; }
+html[data-ui="ise"][data-theme="dark"] .sch-editor .lv-sep { background: rgba(76, 192, 107, .35); }
+
+/* ------------------------------------------------------------------ the truth table (the Karnaugh map a light card, as in the Silinx look) */
+html[data-ui="ise"][data-theme="dark"] .tt-table th { background: var(--m-surface-2); }
+html[data-ui="ise"][data-theme="dark"] .tt-table th.tt-out { background: #23324a; }
+html[data-ui="ise"][data-theme="dark"] .tt-table th.tt-out.sel { background: var(--accent); color: var(--accent-fg); }
+html[data-ui="ise"][data-theme="dark"] .tt-table td.tt-cell.sel { background: #26344a; }
+html[data-ui="ise"][data-theme="dark"] .tt-table td.v1 { color: var(--m-info); }
+html[data-ui="ise"][data-theme="dark"] .tt-table td.v0 { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .tt-table td.vX { color: var(--m-warning); }
+html[data-ui="ise"][data-theme="dark"] .tt-ess { color: var(--m-danger); }
+html[data-ui="ise"][data-theme="dark"] .tt-note { color: var(--m-warning); }
+html[data-ui="ise"][data-theme="dark"] .tt-tab { border-color: var(--ise-line); background: var(--m-surface-2); color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .tt-tab.active { background: var(--panel); color: var(--ise-link); border-bottom-color: var(--panel); }
+
+/* ------------------------------------------------------------------ the RTL / Technology Schematic viewer (a light sheet) */
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-btn { background: var(--ise-btn); border-color: var(--ise-btn-line); color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-btn:hover { background: var(--ise-hot); border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-btn:active { background: var(--ise-down); }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-btn:disabled { background: #25282d; border-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-sep { background: var(--ise-line); box-shadow: none; }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-crumbs { background: rgba(29, 33, 39, .94); border-color: #3b4b68; }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-crumb + .sch-title, html[data-ui="ise"][data-theme="dark"] .sch-view .sch-crumb.cur ~ .sch-title { border-left-color: #3b4b68; }
+html[data-ui="ise"][data-theme="dark"] .sch-view :is(.sch-hint, .sch-tip) { background: var(--m-surface-2); color: var(--fg); border-color: #555b66; }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-hint.empty { background: var(--panel); }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-tip .m { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .sch-view .sch-tip hr { border-top-color: #555b66; }
+
+/* ------------------------------------------------------------------ SSim */
+html[data-ui="ise"][data-theme="dark"] :is(.isim-title, .isim .ise-panel > .caption, .isim-dlg-title) { border-bottom-color: var(--ise-caption-line); }
+html[data-ui="ise"][data-theme="dark"] .isim-toolbar .tb-btn:hover:not(:disabled) { border-color: var(--ise-hot-line); background: var(--ise-hot); }
+html[data-ui="ise"][data-theme="dark"] .isim-toolbar .tb-btn:active:not(:disabled), html[data-ui="ise"][data-theme="dark"] .isim-toolbar .tb-btn.on { border-color: #5b8def; background: var(--ise-down); }
+html[data-ui="ise"][data-theme="dark"] .isim-toolbar .tb-sep { background: var(--ise-line); box-shadow: none; }
+html[data-ui="ise"][data-theme="dark"] .isim-stim-st.bad { color: var(--m-danger); }
+html[data-ui="ise"][data-theme="dark"] :is(.isim-rf-val, .isim-rf-unit, .isim-dlg-grid input, .isim-dlg-grid select) { background: var(--m-surface); color: var(--fg); border-color: #555b66; }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg-grid input[readonly] { background: var(--m-surface-2); color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] :is(.isim-split-v, .isim-split-h):hover { background: #3a4f70; }
+html[data-ui="ise"][data-theme="dark"] .isim .tree .row.sel .isim-mod { color: #dde6f7; }
+html[data-ui="ise"][data-theme="dark"] .isim .tree .twisty { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] .isim .tree .row.sel .twisty { color: #fff; }
+html[data-ui="ise"][data-theme="dark"] .isim-objs th { background: linear-gradient(#2e3238, #26292e); border-right-color: var(--ise-line); color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .isim-objs td { border-bottom-color: #2c3037; }
+html[data-ui="ise"][data-theme="dark"] :is(.isim-vscroll, .isim-hscroll) { background: #1d2024; }
+html[data-ui="ise"][data-theme="dark"] .isim-clear { background: var(--ise-btn); border-color: var(--ise-btn-line); color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .isim-clear:hover { background: var(--ise-hot); border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] :is(.isim-ln.k-cmd, .isim-ln.k-note, .isim-cmdline span) { color: var(--m-info); }
+html[data-ui="ise"][data-theme="dark"] .isim-st-delta { color: #6cc4e8; }
+html[data-ui="ise"][data-theme="dark"] .isim-st-time { border-left-color: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .isim-progress { background: #1d2024; border-color: #555b66; }
+html[data-ui="ise"][data-theme="dark"] .isim-menu { border-color: #4a4f58; box-shadow: 2px 3px 8px rgba(0, 0, 0, .5); }
+html[data-ui="ise"][data-theme="dark"] .isim-menu-item:hover:not(.dis) { background: var(--ise-hot); border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .isim-menu-item.dis { color: #858c98; }
+html[data-ui="ise"][data-theme="dark"] .isim-menu-sep { background: var(--ise-line); }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg-overlay { background: rgba(0, 0, 0, .45); }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg { border-color: #4c5a72; }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg-x { color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg-hint { color: #c8cdd4; }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg-btns .btn { background: var(--ise-btn); border-color: var(--ise-btn-line); color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg-btns .btn:hover { background: var(--ise-hot); border-color: var(--ise-hot-line); }
+html[data-ui="ise"][data-theme="dark"] .isim-dlg-btns .btn.primary { border-color: #5b8def; }

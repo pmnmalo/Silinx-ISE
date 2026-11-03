@@ -27,16 +27,16 @@ export { printActive, printable };
 
 const $ = id => document.getElementById(id);
 
-// the menus' entries the header's Settings shares (#1314): the language, the interface, the theme (the ISE style interface is
-// light only), the update check at start-up (#488: off, the app asks GitHub nothing until Check for Updates… is used)
+// the menus' entries the header's Settings shares (#1314): the language, the interface, the theme (both interfaces, #2676),
+// the update check at start-up (#488: off, the app asks GitHub nothing until Check for Updates… is used)
 const languageMenu = () => ({ label: 'Language', submenu: Object.entries(LOCALES).map(([id, l]) => ({ label: l.name, checked: getLanguage() === id, action: () => setLanguage(id) })) });
 const interfaceMenu = () => ({ label: 'Interface', submenu: INTERFACES.map((id) =>
   ({ label: INTERFACE_NAMES[id].label, checked: getInterface() === id, action: () => setInterface(id) })) });
-const themeMenu = () => (getInterface() !== 'ise' ? { label: 'Theme', submenu: [
+const themeMenu = () => ({ label: 'Theme', submenu: [
   { label: 'System', checked: getTheme() === 'system', action: () => setTheme('system') },
   { label: 'Light', checked: getTheme() === 'light', action: () => setTheme('light') },
   { label: 'Dark', checked: getTheme() === 'dark', action: () => setTheme('dark') },
-] } : null);
+] });
 const updateAtStartItem = () => ({ label: 'Check for Updates at Start-up', checked: wiz.updateCheckEnabled(), action: () => { wiz.setUpdateCheckEnabled(!wiz.updateCheckEnabled()); toast(wiz.updateCheckEnabled() ? 'Check for updates at start-up on: the latest release is asked of GitHub when the app starts' : 'Check for updates at start-up off: Help > Check for Updates… checks by hand'); } });
 /** The header's Settings menu (the Silinx interface, #1314). */
 export const settingsItems = () => [

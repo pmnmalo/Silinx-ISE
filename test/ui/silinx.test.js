@@ -141,8 +141,8 @@ uiTest('View ▸ Interface: the ISE style look and back, live and remembered aft
     };
   });
   assert.deepEqual(C, { title: true, search: false, tasks: 0, tabsBelow: true, leftTabsBelow: true, icons: 0, stored: 'ise' });
-  // no Theme menu in the ISE style look (light only)
-  assert.ok(!(await page.openMenu('View')).some((x) => x.label === 'Theme'));
+  // View ▸ Theme in the ISE style look too (#2676)
+  assert.ok((await page.openMenu('View')).some((x) => x.label === 'Theme'));
   await page.closeMenus();
   // remembered: the page loads in the ISE style look
   await page.reload();
@@ -226,6 +226,60 @@ uiTest('theme: follows the system, View ▸ Theme ▸ Dark / Light / System, hea
   await page.waitFor(() => document.documentElement.dataset.theme === 'light');
   assert.equal(await page.eval(() => localStorage.getItem('silinx.theme')), 'system');
 }, O);
+
+// #2676: the ISE style interface has the three themes of the Silinx one: View ▸ Theme ▸ System / Light / Dark (in Portuguese
+// Ver ▸ Tema ▸ Sistema / Claro / Escuro), the system followed, a choice remembered and set before the first paint; its look
+// dark: the title bar, the menu bar, the toolbar, the panes and their captions, the console, the status bar, a dialog, the
+// HDL editor
+uiTest('#2676 the ISE style interface\'s theme: View ▸ Theme ▸ System / Light / Dark, follows the system, remembered, a dark look; Portuguese', E, async (page) => {
+  const DARK = ['body', '#titlebar', '#menubar', '#toolbar', '#left .ise-panel > .caption', '#left .ise-panel', '#console-body', '#statusbar'];
+  const lums = () => page.eval((sels) => sels.map((s) => window.__lum(s)), DARK);
+  await page.eval(() => localStorage.setItem('silinx.ui', 'ise'));
+  await page.reload();
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
+  assert.deepEqual(await ui(page), { ui: 'ise', theme: 'light' });
+  await page.eval(LUM);
+  assert.ok((await lums()).every((l) => l > 0.6), `light by default: ${await lums()}`);
+  // the system switches to dark: the page follows (theme = System)
+  await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+  await page.waitFor(() => document.documentElement.dataset.theme === 'dark', [], { what: 'dark from the system' });
+  assert.ok((await lums()).every((l) => l < 0.15), `dark: ${await lums()}`);
+  assert.equal(await page.eval(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
+  // View ▸ Theme ▸ Light: fixed, whatever the system says
+  assert.deepEqual(await subMenu(page, 'View', 'Theme'), [{ label: 'System', checked: true }, { label: 'Light', checked: false }, { label: 'Dark', checked: false }]);
+  await subMenu(page, 'View', 'Theme', 'Light');
+  await page.waitFor(() => document.documentElement.dataset.theme === 'light');
+  assert.equal(await page.eval(() => localStorage.getItem('silinx.theme')), 'light');
+  assert.ok((await lums()).every((l) => l > 0.6), 'light, the system dark');
+  // View ▸ Theme ▸ Dark, the system light: dark, also after a reload (the early script of index.html)
+  await subMenu(page, 'View', 'Theme', 'Dark');
+  await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
+  await page.waitFor(() => document.documentElement.dataset.theme === 'dark');
+  assert.equal(await page.eval(() => localStorage.getItem('silinx.theme')), 'dark');
+  await page.reload();
+  assert.deepEqual(await ui(page), { ui: 'ise', theme: 'dark' });
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
+  await page.eval(LUM);
+  assert.ok((await lums()).every((l) => l < 0.15), 'dark after a reload');
+  // a dialog and the HDL editor dark
+  await page.menu('Help', 'About Silinx ISE');
+  await page.waitDialog();
+  assert.ok(await page.eval(() => window.__lum('.dlg') < 0.15 && window.__lum('.dlg-title') < 0.15), 'a dark dialog');
+  await page.eval(() => document.querySelectorAll('.dlg-overlay').forEach((d) => d.remove()));
+  await makeProject(env, { name: 'IseDarkPj', template: 'blinky' });
+  await page.openProject('IseDarkPj');
+  await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
+  await page.waitForSelector('.doc:not([hidden]) .cm-editor');
+  assert.ok(await page.eval(() => window.__lum('.doc:not([hidden]) .cm-editor') < 0.15 && window.__lum('.doc:not([hidden]) .editor-bar') < 0.15), 'a dark editor');
+  // in Portuguese: Ver ▸ Tema ▸ Sistema / Claro / Escuro
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  assert.deepEqual(await subMenu(page, 'Ver', 'Tema'), [{ label: 'Sistema', checked: false }, { label: 'Claro', checked: false }, { label: 'Escuro', checked: true }]);
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  // back to System: light, as the system
+  await subMenu(page, 'View', 'Theme', 'System');
+  await page.waitFor(() => document.documentElement.dataset.theme === 'light');
+  assert.equal(await page.eval(() => localStorage.getItem('silinx.theme')), 'system');
+});
 
 uiTest('command palette: Ctrl+K, search, arrow keys, Enter runs a command or opens a file, Escape, header button', E, async (page) => {
   await makeProject(env, { name: 'PalPj', template: 'blinky' });
