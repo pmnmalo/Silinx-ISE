@@ -26,7 +26,7 @@ export async function openCHdl(path) {
     id, title: name, tooltip: `${name}, generated from ${path}`, icon: lang,
     create(el, d) {
       const link = h('a', { onclick: () => openFile(path) }, path.split('/').pop());
-      const bar = h('div', { class: 'editor-bar' }, h('span', { class: 'path' }, name), h('span', { class: 'gen-banner read-only' }, 'Read-only, generated from ', link));
+      const bar = h('div', { class: 'editor-bar' }, h('span', { class: 'gen-banner read-only' }, 'Read-only, generated from ', link));   // (no name: the tab's, #2710)
       const host = h('div', { class: 'editor-host' });
       el.append(bar, host);
       d.editor = createEditor(host, { text: src?.text || '', lang, path: name, readOnly: true });
@@ -55,10 +55,11 @@ export async function openCAsm(path) {
     id, title: name, tooltip: `${name}, the state machine made from ${path}`, icon: 'asm',
     create(el, d) {
       const link = h('a', { onclick: () => openFile(path) }, path.split('/').pop());
-      const bar = h('div', { class: 'editor-bar' }, h('span', { class: 'path' }, name), h('span', { class: 'gen-banner read-only' }, 'Read-only, the state machine made from ', link));
+      // (its notice at the right end of the chart's toolbar, no bar of its own: the name is the tab's, #2710)
+      const banner = h('span', { class: 'gen-banner read-only' }, 'Read-only, the state machine made from ', link);
       const host = h('div', { class: 'doc-body' });
-      el.append(bar, host);
-      d.asmEditor = mountAsmEditor(host, { model: r.model, readOnly: true });
+      el.append(host);
+      d.asmEditor = mountAsmEditor(host, { model: r.model, readOnly: true, banner });
       return { destroy: () => d.asmEditor.destroy?.() };
     },
   });

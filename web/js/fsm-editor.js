@@ -2,7 +2,7 @@
 //
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
-//                                          onOpenFile(path), onTruthTables(), onToAsm(), readOnly });
+//                                          onOpenFile(path), onTruthTables(), onToAsm(), readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
@@ -52,11 +52,12 @@ export function radiusOf(s) {
 }
 
 // (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion and the problems hidden,
-// with their separators)
-function readOnlyChrome({ root, toolbar, hint, probSection }) {
+// with their separators; its notice, `banner`, at the right end of the toolbar, #2710)
+function readOnlyChrome({ root, toolbar, hint, probSection, banner }) {
   root.classList.add('asm-readonly');
   const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-type'));
   for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling, probSection]) g.hidden = true;
+  if (banner) toolbar.append(banner);
   hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it';
 }
 
@@ -154,7 +155,7 @@ export function mountFsmEditor(container, opts = {}) {
   const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
   mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
-  if (readOnly) readOnlyChrome({ root, toolbar, hint, probSection });
+  if (readOnly) readOnlyChrome({ root, toolbar, hint, probSection, banner: opts.banner });
   const statusMsg = h('span', { class: 'asm-status-msg' });
   const statusInfo = h('span', { class: 'asm-status-info' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));

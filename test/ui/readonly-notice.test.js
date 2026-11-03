@@ -1,10 +1,12 @@
 // UI (#2697): a read-only document's notice ("Read-only, generated from …") at the right end of its toolbar, the same in
 // every editor: the HDL generated from a drawing, a truth table's schematic, a C source's HDL, its state machine and
-// its C model; before the schematic's ⋮ menu; inside its toolbar on a narrow window; in Portuguese. No warnings.
+// its C model, a Petri net's state machine; before the schematic's ⋮ menu; inside its toolbar on a narrow window; in
+// Portuguese. No bar above the toolbar, no name in it (the tab's, #2710). No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { newTable, generateTableHdl } from '../../core/logic.js';
+import { newPetri } from '../../core/petri.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -32,20 +34,24 @@ const GCD = `unsigned gcd(unsigned a, unsigned b) {
 // the notice of the document in front: its text; the right-most of its toolbar's line (the ⋮ menu apart), at the end of
 // the toolbar's content (its padding the ⋮'s room), before the ⋮; the toolbar not overflowing
 const notice = (page) => page.eval(() => {
-  const b = document.querySelector('.doc:not([hidden]) .gen-banner.read-only'), bar = b.parentElement;
+  const doc = document.querySelector('.doc:not([hidden])');
+  const b = doc.querySelector('.gen-banner.read-only'), bar = b.parentElement;
+  // the toolbar the document's first (no bar above it), with no name
   const r = b.getBoundingClientRect(), br = bar.getBoundingClientRect(), cs = getComputedStyle(bar);
   const end = br.right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
   const others = [...bar.children].filter((e) => e !== b && e.getClientRects().length && !e.matches('.se-more, .tb-more'));
-  const more = bar.querySelector(':scope > :is(.se-more, .tb-more)');
+  const more = [...bar.querySelectorAll(':scope > :is(.se-more, .tb-more)')].find((e) => e.getClientRects().length);   // (a read-only diagram's hidden)
   return {
     text: b.textContent,
     rightmost: others.every((e) => { const o = e.getBoundingClientRect(); return o.right <= r.left + 0.5 || o.bottom <= r.top + 0.5; }),
     atEnd: Math.abs(r.right - end) < 1.5,
     beforeMore: !more || r.right <= more.getBoundingClientRect().left + 0.5,
     fits: r.left >= br.left - 0.5 && bar.scrollWidth <= bar.clientWidth + 1,
+    first: Math.abs(br.top - doc.getBoundingClientRect().top) < 1.5,
+    named: !!bar.querySelector('.path'),
   };
 });
-const OK = { rightmost: true, atEnd: true, beforeMore: true, fits: true };
+const OK = { rightmost: true, atEnd: true, beforeMore: true, fits: true, first: true, named: false };
 async function check(page, text, what) {
   assert.deepEqual(await notice(page), { text, ...OK }, what);
   await page.setViewport(760, 800);
@@ -97,5 +103,15 @@ uiTest('#2697 a C source\'s HDL and its state machine, an HDL module\'s C model:
   await page.waitFor(() => window.Silinx.active?.id === 'cmodel:neg' && window.Silinx.active.editor, [], { what: 'the C model' });
   await check(page, 'Read-only, the C model of neg', 'the C model');
   await inPortuguese(page, 'Só de leitura, o modelo C de neg', 'the C model');
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+});
+
+uiTest('#2710 a Petri net\'s state machine: the notice at the right of the diagram\'s toolbar, no bar above it', E, async (page) => {
+  await makeProject(env, { name: 'RoNotePn', top: 'ctl', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
+  await page.openProject('RoNotePn');
+  await page.eval(() => import('/js/drawings.js').then((m) => m.openPetriFsm('src/ctl.pn.json')));
+  await page.waitFor(() => window.Silinx.active?.id === 'pnfsm:src/ctl.pn.json' && document.querySelector('.doc:not([hidden]) .asm-toolbar > .gen-banner.read-only'), [], { what: 'the state machine' });
+  await check(page, 'Read-only, the state space of the Petri net ctl.pn.json (2 states)', 'the Petri net\'s state machine');
+  await inPortuguese(page, 'Só de leitura, o espaço de estados da rede de Petri ctl.pn.json (2 estados)', 'the Petri net\'s state machine');
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });

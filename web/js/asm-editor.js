@@ -136,15 +136,18 @@ export function pathD(pts, r = 7) {
 // ================================================================================ editor
 
 // (readOnly: a chart to read, a C function's machine, #1575: moved about, zoomed, its boxes selected and their
-// properties shown; nothing edited, not validated, no code of its own)
-function readOnlyChrome({ root, toolbar, hide }) {
+// properties shown; nothing edited, not validated, no code of its own; its notice, `banner`, at the right end of the
+// toolbar, #2710)
+function readOnlyChrome({ root, toolbar, hide, banner }) {
   root.classList.add('asm-readonly');
   // (the tools that change the chart, the language and encoding, Validate and Code: hidden)
   for (const g of [...toolbar.querySelectorAll('.asm-add, .asm-danger'), ...hide,
     ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
+  // (after the chart's counts, both at the toolbar's right)
+  if (banner) toolbar.querySelector('.asm-info').after(banner);
 }
 const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button:not(.asm-fold)')) x.disabled = true; };
-export function mountAsmEditor(container, { model, onChange, onProblems, onValidate, onMessage, readOnly = false } = {}) {
+export function mountAsmEditor(container, { model, onChange, onProblems, onValidate, onMessage, readOnly = false, banner } = {}) {
   const uid = `asm${++instanceCounter}`;
   let M = normalizeModel(model || newModel('fsm', 'vhdl'));
   let sel = { nodes: new Set(), edge: null };
@@ -242,7 +245,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   mountSideFold({ root, side, key: 'silinx.asm.props.folded' });
 
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
-  if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, toolbar.querySelector('.asm-encoding')] });
+  if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, toolbar.querySelector('.asm-encoding')], banner });
 
   // ---------------------------------------------------------------------------- model ops (asm-ops.js)
   const {
