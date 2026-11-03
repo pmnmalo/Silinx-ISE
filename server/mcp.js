@@ -17,6 +17,7 @@ import { HDL_TOOLS } from './mcp-hdl.js';
 import { PROCESS_TOOLS } from './mcp-processes.js';
 import { SETTINGS_TOOLS } from './mcp-settings.js';
 import { SOURCE_TOOLS } from './mcp-sources.js';
+import { NEW_SOURCE_TOOLS } from './mcp-new-source.js';
 import { TRANSFER_TOOLS } from './mcp-transfer.js';
 
 export { OPEN_REPORTS } from './mcp-processes.js';
@@ -24,13 +25,13 @@ export { OPEN_REPORTS } from './mcp-processes.js';
 export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'silinx-ise', title: 'Silinx ISE', version: VERSION };
 const INSTRUCTIONS = 'Silinx ISE: FPGA design for teaching (Spartan-3E; Basys2, Nexys2). Projects live in the Silinx workspace: '
-  + 'list_projects, new_project_from_example, or new_project (empty) then write_file and set_top; then read_file / write_file, check_syntax, simulate (the project\'s test bench), '
+  + 'list_projects, new_project_from_example, or new_project (empty) then new_source / write_file and set_top; then read_file / write_file, check_syntax, simulate (the project\'s test bench), '
   + 'set_design_properties (board, device: list_devices) and set_process_properties, remove_from_project / add_to_project, rename_file / rename_module, delete_file, import_project / export_project, '
   + 'run_process (synthesize, implement, bitstream, timing, power, pins) and get_report. The Silinx toolchain needs no Xilinx ISE.';
 
 // the tools, by area: the projects and their files (mcp-projects.js), their settings (mcp-settings.js), their
-// sources (mcp-sources.js), their import and export (mcp-transfer.js), the HDL (mcp-hdl.js), the processes (mcp-processes.js)
-export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS];
+// new sources (mcp-new-source.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), the HDL (mcp-hdl.js), the processes (mcp-processes.js)
+export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS];
 
 // ------------------------------------------------------------------ the protocol
 /** One request (or notification) of a client: its answer, or null for a notification. */
