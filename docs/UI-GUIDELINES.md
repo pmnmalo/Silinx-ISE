@@ -9,24 +9,37 @@ answer here.
 
 - **Its name is its tab's**, and its path the tab's tip. Nothing inside the document repeats them: no title, no
   path, no "file.vhd" label (#2514, #2710).
-- **Its toolbar is its first line.** No bar above it, below the tabs: no title bar, no notice bar, no second
-  toolbar (#2710). What a document has to say of itself goes in its toolbar (the read-only notice, "Not in sync
-  with …", its counts); its messages go to the console.
+- **Its toolbar is its first line** and its **status line its last** (#2763). No bar above the toolbar, below the
+  tabs: no title bar, no notice bar, no second toolbar (#2710). The toolbar holds its tools, and the two notices of
+  what the document is (the read-only notice, "Not in sync with …"); what it is now (its counts, its encoding, the
+  cursor's place, what is under the mouse) is in its status line; its messages go to the console.
 - **The toolbar's layout**, as the Schematic editor's (#2505): flat buttons with the shared icons; the tools that
   change the document on the left (add, delete), then zoom, then the document's settings; a spacer; the
   Properties toggle; the toolbar's ⋮ menu (`web/js/toolbar-menu.js`) at the right end of its first line for the
   commands used now and then (layout, conversion, export, analysis), its place kept free whatever wraps (#2208,
   #2331).
-- **What a toolbar says is at its right end**, never between its tools (#2725): its informational text, what it
-  says rather than does (the read-only notice, "Not in sync with …", the drawing's counts, I/O Pin Planning's "Top: …
-  · Device … · Board: …" and its status, the FPGA view's info on the site selected, the Board Emulator's status),
-  after the spacer and the ☰ panels' buttons, before the ⋮ menu (`test/ui/toolbar-info-right.test.js`).
+- **What a toolbar says is at its right end**, never between its tools (#2725): the read-only notice and "Not in
+  sync with …", after the spacer and the ☰ panels' buttons, before the ⋮ menu (`test/ui/toolbar-info-right.test.js`).
+  Nothing else the toolbar says: the rest is the status line's (#2763).
 - **No Undo, Redo or Print in a document's toolbar**: the main toolbar's, the Edit and File menus' and Ctrl+Z,
   Ctrl+Y, Ctrl+P act on the document in front (#2505, #2514).
 - **The side panels** are all alike (see below).
-- **No hint line and no status line** under the document (#2735): what the mouse does is in the tools' tips and the
-  Help; the drawing's counts ("2 places · 2 transitions · 4 arcs") are an informational text at the **right of the
-  toolbar** (before the read-only notice in a view); the zoom is the zoom tools'; a status message is the console's.
+- **No hint line** under the document (#2735): what the mouse does is in the tools' tips and the Help (the Schematic
+  editor's tool tip at the left of its status line, as it was); the zoom is the zoom tools'; a status message is the
+  console's.
+
+## The status line
+
+Every editor and viewer has one status line, its last line, the Schematic editor's (`statusLine()` of
+`web/js/status-line.js`, `.doc-status`, the same look in every document) (#2763):
+
+- **What it says:** what the document is now, in short fields at its right: a drawing's counts ("7 state(s), 8
+  transition(s)", "2 places · 2 transitions · 4 arcs", "3 states"), its kind and encoding ("Moore", "Encoding:
+  Binary"), its tokens (a Petri net), a table's inputs, outputs and rows, the schematic's cursor and zoom; a text
+  editor's line and column and its language; a viewer's selection or what is under the mouse.
+- **What it never says:** errors, warnings or information (the console's, #2718), the read-only notice and "Not in
+  sync with …" (the toolbar's), a title or a path (the tab's).
+- A read-only view has it too, the same fields; printed, it is left out (`print-doc.js`).
 
 ## A side panel
 
@@ -80,8 +93,9 @@ viewer of its own:
   (`web/js/messages.js`: `log(…)`, `WARNING: …`, `ERROR: …`), its Errors and Warnings tabs listing them, a click on
   one going to its place in the document. No problems panel, message box, log or warning line inside an editor or a
   viewer, and no `alert()` (#2718).
-- What the document shows of itself is not a message and stays in it: the read-only notice, "Not in sync with …" and
-  its counts in the toolbar, a selected item's properties, a highlight on the item a message points to.
+- What the document shows of itself is not a message and stays in it: the read-only notice and "Not in sync with …"
+  in the toolbar, its counts in its status line, a selected item's properties, a highlight on the item a message
+  points to.
 - A dialog says what is wrong with its own fields beside them, as long as it is open.
 - A toast only says an action was done, carrying its Undo when it can be undone.
 
@@ -90,6 +104,6 @@ viewer of its own:
 - **Both interfaces** (Silinx and ISE style), **light and dark themes**, **narrow screens** (a tablet in portrait)
   and **touch** (a long press is the right click).
 - **Portuguese**: every label has its translation (`web/js/i18n.js` and its modules, anchored patterns).
-- **Tests**: a UI test in both interfaces for anything visible. `test/ui/editor-toolbars.test.js`,
+- **Tests**: a UI test in both interfaces for anything visible. `test/ui/editor-toolbars.test.js` (the status line too),
   `test/ui/text-editor-bar.test.js` and `test/ui/readonly-notice.test.js` check the rules above on every editor; a
   new editor or view joins them.

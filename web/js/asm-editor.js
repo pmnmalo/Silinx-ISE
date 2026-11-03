@@ -32,6 +32,7 @@ import { mountAsmLayout } from './asm-layout.js';
 import { mountAsmView } from './asm-view.js';
 import { mountAsmOps } from './asm-ops.js';
 import { clone } from '/core/util.js';
+import { statusLine } from './status-line.js';
 
 export const GRID = 20;
 const CHW = 7.25;          // approx. width of a 12px monospace character
@@ -143,10 +144,12 @@ function readOnlyChrome({ root, toolbar, hide, banner }) {
   // (the tools that change the chart, the language and encoding, Validate and Code: hidden)
   for (const g of [...toolbar.querySelectorAll('.asm-add, .asm-danger'), ...hide,
     ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
-  // (after the chart's counts, both at the toolbar's right)
-  if (banner) toolbar.querySelector('.asm-info').after(banner);
+  // (at the toolbar's right end, before its ⋮ menu)
+  if (banner) toolbar.querySelector(':scope > .tb-more').before(banner);
 }
 const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button:not(.asm-fold)')) x.disabled = true; };
+/** The encodings' names, in the toolbar's select and the status line (#2763). */
+export const ENCODING_NAMES = { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enum / auto' };
 export function mountAsmEditor(container, { model, onChange, onProblems, onValidate, onMessage, readOnly = false, banner } = {}) {
   const uid = `asm${++instanceCounter}`;
   let M = normalizeModel(model || newModel('fsm', 'vhdl'));
@@ -172,12 +175,12 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   const sep = () => h('span', { class: 'asm-sep' });
 
   const encSel = h('select', { class: 'asm-select', title: 'State encoding', onchange: () => { M.encoding = encSel.value; commit('enc'); } },
-    ...ENCODINGS.map((e) => h('option', { value: e }, { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enum / auto' }[e])));
+    ...ENCODINGS.map((e) => h('option', { value: e }, ENCODING_NAMES[e])));
   const snapBtn = btn('# Snap', 'Toggle snapping to the grid', () => { snap = !snap; snapBtn.classList.toggle('on', snap); });
   snapBtn.classList.add('on');
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
-  // (what the toolbar says, at its right end: its states, #2725, #2730)
-  const info = h('span', { class: 'asm-info' });
+  // (what the chart is, its states and its encoding: in its status line, #2763)
+  const status = statusLine();
   const delBtn = toolIcon('delete', 'del', 'Delete selection (Del)', () => deleteSelection(), 'asm-danger');
 
   const more = toolbarMenu([
@@ -201,7 +204,6 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     h('div', { class: 'asm-group' }, toolWide('check', 'Validate', 'Check the chart for errors', () => { runValidate(); onValidate?.(diags.slice()); })),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
-    info,
     more.el);
 
   // canvas
@@ -245,7 +247,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
 
   mountSideFold({ root, side, key: 'silinx.asm.props.folded' });
 
-  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), status.el);
   if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, toolbar.querySelector('.asm-encoding')], banner });
 
   // ---------------------------------------------------------------------------- model ops (asm-ops.js)
@@ -304,7 +306,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   });
 
   // ---------------------------------------------------------------------------- rendering (asm-render.js)
-  const { render, updateToolbar } = mountRender({ state: () => ({ M, sel, diags, hist, hi }), uid, gBlocks, gEdges, gNodes, info,
+  const { render, updateToolbar } = mountRender({ state: () => ({ M, sel, diags, hist, hi }), uid, gBlocks, gEdges, gNodes, status,
     delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget });
 
   const flash = (msg) => onMessage?.(msg);

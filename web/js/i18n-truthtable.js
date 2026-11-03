@@ -58,4 +58,6 @@ export const TT_PT_PATTERNS = [
   [/^(\d+) gate\(s\), (\d+) of them inverter\(s\)$/, '$1 porta(s), $2 delas inversora(s)'],
   [/^— the truth table has errors: (.+)$/, '— a tabela de verdade tem erros: $1'],
   [/^— (.+) has errors$/, '— $1 tem erros'],
+  // the status line (#2763)
+  [/^(\d+) inputs? · (\d+) outputs? · (\d+) rows$/, (m, i, o, r) => `${i} entrada${i === '1' ? '' : 's'} · ${o} saída${o === '1' ? '' : 's'} · ${r} linhas`],
 ];

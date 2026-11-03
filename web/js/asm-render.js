@@ -4,11 +4,11 @@
 // called by mountAsmEditor where this code was.
 import { stateEncoding } from '/core/asm.js';
 import { esc } from './dom.js';
-import { CASE_BAR, nodeSize, box, pathD, portGeom, portsOf, routeEdge } from './asm-editor.js';
+import { CASE_BAR, ENCODING_NAMES, nodeSize, box, pathD, portGeom, portsOf, routeEdge } from './asm-editor.js';
 
 /** { render, updateToolbar } of an ASM chart editor (state(): its current model, selection, problems, history). */
 export function mountRender(ctx) {
-  const { state, uid, gBlocks, gEdges, gNodes, info, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget } = ctx;
+  const { state, uid, gBlocks, gEdges, gNodes, status, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget } = ctx;
 
   function blockMembers(stateId) {
     const { M } = state();
@@ -170,8 +170,9 @@ export function mountRender(ctx) {
 
     const ns = M.nodes.filter((n) => n.type === 'state').length;
     const na = M.nodes.filter((n) => n.type === 'always').length;
-    // (its problems: in the console, editor-problems.js, #2730)
-    info.textContent = `${ns} state${ns === 1 ? '' : 's'}${na ? ` · ${na} every-cycle block${na === 1 ? '' : 's'}` : ''}`;
+    // (its problems: in the console, editor-problems.js, #2730; its counts and encoding: in its status line, #2763)
+    status.set([{ text: `${ns} state${ns === 1 ? '' : 's'}${na ? ` · ${na} every-cycle block${na === 1 ? '' : 's'}` : ''}`, cls: 'asm-info' },
+      `Encoding: ${ENCODING_NAMES[M.encoding] || M.encoding}`]);
   }
 
   function updateToolbar() {

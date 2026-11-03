@@ -37,6 +37,7 @@ import { mountFsmInline } from './fsm-inline.js';
 import { mountFsmView } from './fsm-view.js';
 import { mountFsmHistory } from './fsm-history.js';
 import { clone } from '/core/util.js';
+import { statusLine } from './status-line.js';
 export { clone };   // (core/util.js's)
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -54,13 +55,16 @@ export function radiusOf(s) {
 }
 
 // (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion hidden, with their
-// separators; its notice, `banner`, after the diagram's counts at the right end of the toolbar, #2710)
+// separators; its notice, `banner`, at the right end of the toolbar, #2710)
 function readOnlyChrome({ root, toolbar, banner }) {
   root.classList.add('asm-readonly');
   const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc'));
   for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling]) g.hidden = true;
-  if (banner) toolbar.querySelector('.fsm-info').after(banner);
+  if (banner) toolbar.querySelector('.fsm-link').after(banner);
 }
+
+/** The encodings' names, in the toolbar's select and the status line (#2763). */
+export const FSM_ENCODING_NAMES = { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enumerated' };
 
 export function mountFsmEditor(container, opts = {}) {
   const uid = `fsm${++instances}`;
@@ -89,13 +93,13 @@ export function mountFsmEditor(container, opts = {}) {
   };
 
   // ---------------------------------------------------------------------------- toolbar
-  const encSel = select('fsm-enc', 'State encoding', FSM_ENCODINGS.map((e) => [e, { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enumerated' }[e]]),
+  const encSel = select('fsm-enc', 'State encoding', FSM_ENCODINGS.map((e) => [e, FSM_ENCODING_NAMES[e]]),
     (v) => { M.encoding = v; commit('enc'); });
   const styleSel = select('fsm-style', 'Style of the generated HDL', [['3process', '3 processes'], ['2process', '2 processes']], (v) => { M.style = v; commit('style'); });
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
   const tbLabel = (text) => h('span', { class: 'fsm-tb-label' }, text);
-  // (what the toolbar says, at its right end: the states and transitions, #2729, as every toolbar's informational text, #2725)
-  const statusInfo = h('span', { class: 'fsm-info' });
+  // (what the diagram is, its states and transitions, Moore or Mealy, its encoding: in its status line, #2763)
+  const status = statusLine();
   const delBtn = toolIcon('delete', 'del', 'Delete the selected state or transition (Del)', () => deleteSelection(), 'asm-danger');
   const tabBtns = {
     tables: btn('Tables', 'State table, transition table and encoded transition table', () => togglePanel('tables'), 'fsm-tab-btn'),
@@ -119,7 +123,7 @@ export function mountFsmEditor(container, opts = {}) {
       btn('Arrange', 'Automatic layout of the states', () => arrange()),
       btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.()),
     ], { title: 'Layout and conversion', btnClass: 'asm-btn' }).el,
-    linkHost, statusInfo);
+    linkHost);
   const readOnly = !!opts.readOnly;
 
   // ---------------------------------------------------------------------------- canvas
@@ -155,7 +159,7 @@ export function mountFsmEditor(container, opts = {}) {
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection);
   mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
   if (readOnly) readOnlyChrome({ root, toolbar, banner: opts.banner });
-  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), status.el);
 
   // ---------------------------------------------------------------------------- model helpers
   const stateById = (id) => M.states.find((s) => s.id === id);
@@ -227,7 +231,7 @@ export function mountFsmEditor(container, opts = {}) {
     opts, M: () => M, delBtn, destroyed: () => destroyed, encSel, hi: () => hi, hist: () => hist,
     lastKey: () => lastKey, lastT: () => lastT, panel: () => panel, render: (...a) => render(...a),
     renderPanel: (...a) => renderPanel(...a), renderSide: (...a) => renderSide(...a), sel: () => sel, stateById,
-    statusInfo, styleSel, tabBtns, timers, transById, validateSoon: (...a) => validateSoon(...a),
+    status, styleSel, tabBtns, timers, transById, validateSoon: (...a) => validateSoon(...a),
     setM: (v) => { M = v; }, setHist: (v) => { hist = v; }, setHi: (v) => { hi = v; },
     setLastKey: (v) => { lastKey = v; }, setLastT: (v) => { lastT = v; }, setSel: (v) => { sel = v; }
   });

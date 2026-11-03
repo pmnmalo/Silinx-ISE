@@ -1,6 +1,6 @@
 // UI: the FSM editor laid out as the other editors (#2729, docs/UI-GUIDELINES.md), on the traffic example: no hint line
-// and no status line; the toolbar's "Encoding:" and "Coding Style:" before their selectors, the zoom level beside the
-// zoom tools, "7 state(s), 8 transition(s)" at its right end (as every toolbar's informational text, #2725), counted
+// line; the toolbar's "Encoding:" and "Coding Style:" before their selectors, the zoom level beside the zoom tools;
+// "7 state(s), 8 transition(s)", Moore or Mealy and the encoding in its status line (#2763), none in its toolbar, counted
 // again on a change; the reset's name on the start-up arrow, following the Properties' Reset signal; a text typed in
 // place that is not valid: a warning in the console; a Petri net's state machine (read-only) the same; in Portuguese.
 // No other warnings.
@@ -15,9 +15,10 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
 const ED = '.doc:not([hidden]) .fsm-editor';
-// the toolbar's shown parts, left to right: a label's or the info's text, a select's class, a button's text
-const bar = (page) => page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-toolbar .asm-group > *, ${ed} .asm-toolbar > .fsm-info`)]
+// the toolbar's shown parts, left to right: a label's text, a select's class, a button's text
+const bar = (page) => page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-toolbar .asm-group > *`)]
   .filter((e) => e.getClientRects().length && /^(SPAN|SELECT)$/.test(e.tagName)).map((e) => (e.tagName === 'SELECT' ? `<${e.classList[1]}>` : e.textContent)), ED);
+const status = (page) => page.eval((ed) => [...document.querySelectorAll(`${ed} > .doc-status .ds-f`)].map((f) => f.textContent), ED);
 const warnings = (page) => page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text);
 
 async function openTraffic(page, name) {
@@ -32,27 +33,25 @@ async function openTraffic(page, name) {
   await page.waitFor(() => window.Silinx.active?.fsmEditor?.fitted(), [], { what: 'the FSM editor' });
 }
 
-uiTest('#2729 FSM editor: no hint or status line; labelled selectors, the zoom and the counts in the toolbar; the reset on the start-up arrow; an invalid text to the console', E, async (page) => {
+uiTest('#2729 FSM editor: no hint line; labelled selectors and the zoom in the toolbar, the counts in the status line (#2763); the reset on the start-up arrow; an invalid text to the console', E, async (page) => {
   await openTraffic(page, 'FsmLay');
-  // no hint line, no status line
-  assert.deepEqual(await page.eval((ed) => ['.asm-hint', '.asm-status', '.asm-status-msg'].map((s) => document.querySelectorAll(`${ed} ${s}`).length), ED), [0, 0, 0]);
-  // the toolbar: the labels before their selectors, the zoom level beside the zoom tools, the counts at its right end
+  // no hint line; one status line, the editor's last line
+  assert.deepEqual(await page.eval((ed) => ['.asm-hint', '.asm-status', '.asm-status-msg', '.doc-status'].map((s) => document.querySelectorAll(`${ed} ${s}`).length), ED), [0, 0, 0, 1]);
+  assert.equal(await page.eval((ed) => document.querySelector(ed).lastElementChild.className, ED), 'doc-status');
+  // the toolbar: the labels before their selectors, the zoom level beside the zoom tools, no counts
   const tb = await bar(page);
   assert.match(tb[0], /^\d+%$/);   // (the zoom level, the view fitted)
-  assert.deepEqual(tb.slice(1), ['Encoding:', '<fsm-enc>', 'Coding Style:', '<fsm-style>', '7 state(s), 8 transition(s)']);
-  const info = await page.eval((ed) => {
-    const tb = document.querySelector(`${ed} .asm-toolbar`), i = tb.querySelector('.fsm-info'), cs = getComputedStyle(tb);
-    const right = tb.getBoundingClientRect().right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
-    const ctl = [...tb.querySelectorAll('button, select')].filter((b) => b.getClientRects().length && !b.closest('.tb-more'));
-    return { last: tb.lastElementChild === i, room: Math.round(right - i.getBoundingClientRect().right), after: Math.round(i.getBoundingClientRect().left - Math.max(...ctl.map((c) => c.getBoundingClientRect().right))) };
-  }, ED);
-  assert.equal(info.last, true);
-  assert.ok(info.after > 0, `the counts after every control: ${JSON.stringify(info)}`);
+  assert.deepEqual(tb.slice(1), ['Encoding:', '<fsm-enc>', 'Coding Style:', '<fsm-style>']);
+  assert.deepEqual(await status(page), ['7 state(s), 8 transition(s)', 'Moore', 'Encoding: Binary']);
   // counted again: a state added and undone
   await page.click(`${ED} .asm-btn`, { text: 'State' });
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-info`).textContent === '8 state(s), 8 transition(s)', [ED], { what: 'a state counted' });
   await page.eval(() => window.Silinx.active.fsmEditor.undo());
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-info`).textContent === '7 state(s), 8 transition(s)', [ED], { what: 'undone' });
+  // the encoding changed: in the status line too
+  await page.eval((ed) => { const s = document.querySelector(`${ed} .fsm-enc`); s.value = 'onehot'; s.dispatchEvent(new Event('change')); }, ED);
+  assert.deepEqual(await status(page), ['7 state(s), 8 transition(s)', 'Moore', 'Encoding: One-hot']);
+  await page.eval(() => window.Silinx.active.fsmEditor.undo());
   // the Properties: nothing selected, no section of the selection; the Machine section a title, not a fold; a state
   // selected: its section above the machine's
   const props = () => page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-side > .asm-section`)].filter((s) => s.getClientRects().length)
@@ -86,7 +85,8 @@ uiTest('#2729 FSM editor: no hint or status line; labelled selectors, the zoom a
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} [data-state=s1] .fsm-outs`).textContent, ED), 'phase=0', 'not applied');
   // in Portuguese
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
-  assert.deepEqual((await bar(page)).slice(1), ['Codificação:', '<fsm-enc>', 'Estilo de Código:', '<fsm-style>', '7 estado(s), 8 transição(ões)']);
+  assert.deepEqual((await bar(page)).slice(1), ['Codificação:', '<fsm-enc>', 'Estilo de Código:', '<fsm-style>']);
+  assert.deepEqual(await status(page), ['7 estado(s), 8 transição(ões)', 'Moore', 'Codificação: Binária']);
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
   assert.deepEqual(warnings(page), []);
 });
@@ -99,7 +99,7 @@ uiTest('#2729 a Petri net\'s state machine (read-only): no hint or status line, 
   await page.waitFor((ed) => document.querySelector(`${ed}.asm-readonly .asm-side`)?.getClientRects().length, [ED], { what: 'the state machine' });
   const ro = await page.eval((ed) => {
     const e = document.querySelector(ed), f = [...e.querySelectorAll('.asm-side input, .asm-side select, .asm-side textarea')];
-    return { disabled: f.length > 0 && f.every((x) => x.disabled), hint: e.querySelectorAll('.asm-hint, .asm-status').length, info: e.querySelector('.fsm-info').textContent,
+    return { disabled: f.length > 0 && f.every((x) => x.disabled), hint: e.querySelectorAll('.asm-hint, .asm-status').length, info: e.querySelector(':scope > .doc-status .fsm-info').textContent,
       labels: [...e.querySelectorAll('.fsm-tb-label')].filter((x) => x.getClientRects().length).length, reset: e.querySelector('.fsm-reset')?.textContent };
   }, ED);
   assert.deepEqual(ro, { disabled: true, hint: 0, info: ro.info, labels: 0, reset: 'rst' });

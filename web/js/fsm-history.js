@@ -2,13 +2,13 @@
 // normalized, an undo step, a quick run of the same edit merged into one, onChange told a moment later), undo and
 // redo, and the toolbar's state.
 import { normalizeFsm } from '/core/fsm.js';
-import { clone } from './fsm-editor.js';
+import { clone, FSM_ENCODING_NAMES } from './fsm-editor.js';
 
 /** { commit, redo, undo, updateToolbar } of mountFsmEditor (M(), destroyed(), hi(), hist(), lastKey(), lastT(), panel(), sel(): its current values). */
 export function mountFsmHistory(ctx) {
   const {
     opts, M, delBtn, destroyed, encSel, hi, hist, lastKey, lastT, panel, render, renderPanel,
-    renderSide, sel, stateById, statusInfo, styleSel, tabBtns, timers, transById, validateSoon, setM,
+    renderSide, sel, stateById, status, styleSel, tabBtns, timers, transById, validateSoon, setM,
     setHist, setHi, setLastKey, setLastT, setSel
   } = ctx;
 
@@ -44,7 +44,8 @@ export function mountFsmHistory(ctx) {
     delBtn.disabled = !sel();
     encSel.value = M().encoding; styleSel.value = M().style;
     for (const [k, b] of Object.entries(tabBtns)) b.classList.toggle('on', panel() === k);
-    statusInfo.textContent = `${M().states.length} state(s), ${M().transitions.length} transition(s)`;
+    status.set([{ text: `${M().states.length} state(s), ${M().transitions.length} transition(s)`, cls: 'fsm-info' },
+      M().type === 'mealy' ? 'Mealy' : 'Moore', `Encoding: ${FSM_ENCODING_NAMES[M().encoding] || M().encoding}`]);
   }
 
   return { commit, redo, undo, updateToolbar };

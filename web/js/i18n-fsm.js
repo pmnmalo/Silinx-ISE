@@ -90,6 +90,8 @@ export const FSM_PT_PATTERNS = [
   [/^Transition (.+) → (.+): (.*)$/, 'Transição $1 → $2: $3'],
   // editor
   [/^(\d+) state\(s\), (\d+) transition\(s\)$/, '$1 estado(s), $2 transição(ões)'],
+  // the status line's encoding, the FSM's and the ASM chart's (#2763)
+  [/^Encoding: (Binary|Gray|One-hot|Enumerated|Enum \/ auto)$/, (m, e) => `Codificação: ${{ Binary: 'Binária', Enumerated: 'Enumerada', 'Enum / auto': 'Enum / automática' }[e] || e}`],
   [/^The diagram has (\d+) error\(s\): see Problems$/, 'O diagrama tem $1 erro(s): ver Problemas'],
   [/^\((\d+) error\(s\), (\d+) warning\(s\)\)$/, '($1 erro(s), $2 aviso(s))'],
   [/^Code: (\S+) \((\w+)\)$/, 'Código: $1 ($2)'],
