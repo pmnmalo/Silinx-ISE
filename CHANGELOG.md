@@ -3,7 +3,65 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.21.1
+
+The release of 15.21.0, published: v15.21.0 was tagged but not published, GitHub refused its notes for their
+length (#2685). What 15.21.0 brings (nextpnr by default, the iCE40 and the iCEBreaker, the Spartan-6 boards, the
+uart and micro80 examples, the Board Emulator's real boards, Silinx HLS closer to Vitis HLS) is in its section of
+CHANGELOG.md, https://github.com/pmnmalo/Silinx-ISE/blob/v15.21.1/CHANGELOG.md. With it, these changes since:
+
+In short:
+
+- I/O Pin Planning has the toolbar and the side panel of the other editors: its board resources fold to a strip, each
+  group by its title, and on a narrow window they open over the table from the toolbar's ☰ Board Resources.
+- View Implemented Design (FPGA): its side panel looks and folds as the Design editors' Properties panel, each of its
+  sections folded by its title; on a narrow window it opens over the chip from the toolbar's ☰ Properties.
+- The RTL and Technology Schematic views have one toolbar: ⬆ Up, ⬇ Push into and the module's file are its first
+  buttons, and the bar above it (with "RTL Schematic (read-only) — top : top") is gone.
+
+In detail:
+
+- **A release's notes stay under GitHub's limit (#2685):** v15.21.0's notes were about 162,000 characters and GitHub
+  refused to create the release (a release holds at most 125,000). `releaseNotes` (core/changelog.js) now keeps the
+  introduction, "In short" and as many "In detail" entries as fit, with a line saying how many were left out and
+  that the full list is in CHANGELOG.md at the tag, as the development build's notes do (#2411). Test:
+  test/changelog.test.js.
+- **The MCP server split by area (#2674):** `server/mcp.js` keeps the protocol, and its tools move, as they were,
+  into modules of their own: the projects and their files (`server/mcp-projects.js`), the HDL's Check Syntax and
+  simulation (`server/mcp-hdl.js`), the processes and their reports (`server/mcp-processes.js`) and their helpers
+  (`server/mcp-util.js`), before the tools of the rest of the interface join them. No change of behaviour: the
+  same tools, in the same order, with the same schemas. Test: test/mcp-modules.test.js.
+- **I/O Pin Planning: the diagram editors' toolbar and side panel (#2671):** the schematic, ASM, FSM and Petri net
+  editors' flat buttons with an icon and a label (Auto-assign from Board, Clear All), the design's line and the count
+  of I/Os assigned; the board's resources in their side panel, Board Resources, whose title's button folds it to a
+  strip (remembered, side-fold.js, which now takes the panel's own tips), each group (Clock, LEDs, Switches…) folded
+  by its title and kept folded as the assignments change; under 1024 px the panel over the table, shown and hidden by
+  ☰ Board Resources (narrow.js). Test: test/ui/pinplanner-panel.test.js.
+- **View Implemented Design (FPGA): the side panel as the diagram editors' Properties (#2668):** a Properties title
+  whose button folds the panel to a strip (remembered, side-fold.js); Device, Modules, Selection and Nets sections
+  folded by their titles; under 1024 px the panel over the chip, shown and hidden by ☰ Properties in the toolbar
+  (narrow.js); a row scrolled into view no longer hides under the panel's title. Test: test/ui/fpgaview.test.js.
+- **The RTL and Technology Schematic: Up and Push into in the schematic's toolbar (#2667):** web/js/viewers.js puts
+  ⬆ Up, ⬇ Push into and "Open <file>" at the start of the schematic editor's toolbar instead of a bar of their own
+  with the view's name and the hierarchy's path; they stay usable while trying the circuit (Try it). Tests:
+  test/ui/editing.test.js, test/ui/viewers-try.test.js, test/ui/open-toolchain.test.js, test/ui/standalone.test.js.
+- **The UI tests with out-of-date npm dependencies (#2649):** the harness's check of node_modules also lists a
+  dependency installed at another version than package-lock.json's, and fails at once with "run npm ci". A
+  worktree's node_modules left from an older main (nextpnr 0.13.0 where the lockfile has 0.15.0, the browser
+  edition's default engine) made the browser edition's Back-annotate Pin Locations test time out after 120 s.
+- **Spartan-6 post-synthesis model: a RAM32M's or a RAM64M's unused data inputs tied to 0 (#2639):** Yosys maps a
+  memory onto the A, B and C RAMs of a RAM32M or RAM64M and leaves D's write data (DID) unconnected when nothing reads
+  D; the model's VHDL and Verilog now tie it to 0, as the FPGA ties an unused input, and the Board Emulator's compiled
+  engine no longer warns "used but has no driver". Test: test/unisim-s6.test.js (each primitive's model compiled with no
+  warnings).
+- **Spartan-6 LUT combining never takes a slice more, by itself (#2636):** the Silinx packer's LUT combining
+  (`combine: 'area'`) now runs after the flip-flops are placed, so it no longer takes the LUT outputs they need and
+  never packs a design in more slices than without it; the packer no longer packs twice to keep the smaller. The
+  isqrt example takes one slice less with combining. Test: test/s6-pack.test.js.
+
 ## 15.21.0
+
+Tagged but not published (see 15.21.1).
 
 nextpnr as the Silinx toolchain's place and route, the iCE40 and the iCEBreaker, the Spartan-6 boards without a
 developer flag, the Board Emulator drawn as the real boards, two new examples (uart and micro80, a small processor),
