@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseChangelog, changesOf, changesSince, releaseNotes, buildChanges, changeTitle } from '../core/changelog.js';
+import { parseChangelog, changesOf, changesSince, releaseNotes, buildChanges, changeTitle, NOTES_LIMIT } from '../core/changelog.js';
 import { compareVersions, VERSION } from '../core/version.js';
 
 const MD = fs.readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
@@ -92,4 +92,19 @@ test('buildChanges: the fragments as changes, newest issue first, typed by label
   // the repository's own fragments: every one a change with a title
   const repo = buildChanges(fs.readdirSync('changes').filter(f => /^\d+-.*\.md$/.test(f)).map(name => ({ name, text: fs.readFileSync(path.join('changes', name), 'utf8') })));
   assert.ok(repo.every(x => x.issue > 0 && x.title && !/\*\*|#\d+\)$/.test(x.title)), JSON.stringify(repo.filter(x => !x.title)));
+});
+
+test('#2685 a release\'s notes stay under GitHub\'s 125,000 characters: "In detail" cut, the rest in full', () => {
+  const detail = Array.from({ length: 4000 }, (_, i) => `- **Change ${i}:** ${'a long line of text '.repeat(3)}\n  its continuation.`).join('\n');
+  const md = `# Changelog\n\n## 3.0.0\n\nThe introduction.\n\nIn short:\n\n- **Big:** news.\n\nIn detail:\n\n${detail}\n\n## 2.0.0\n\nIn detail:\n\n- old\n`;
+  const notes = releaseNotes(md, '3.0.0', 'COMMON', 'abc  file.zip\n');
+  assert.ok(new TextEncoder().encode(notes).length <= NOTES_LIMIT, 'under the limit');
+  assert.match(notes, /^## What's new in 3\.0\.0\n\nThe introduction\.\n\nIn short:\n\n- \*\*Big:\*\* news\.\n\nIn detail:\n\n- \*\*Change 0:\*\*/);
+  const left = Number(/(\d+) more entries of "In detail" left out/.exec(notes)?.[1]);
+  assert.ok(left > 0 && left < 4000, `some entries left out: ${left}`);
+  assert.equal(notes.split('\n- **Change ').length - 1 + left, 4000, 'every entry kept or counted');
+  assert.match(notes, /https:\/\/github\.com\/pmnmalo\/Silinx-ISE\/blob\/v3\.0\.0\/CHANGELOG\.md/);
+  assert.match(notes, /COMMON\n\n## Checking a download/);
+  // a short section is unchanged
+  assert.equal(releaseNotes('## 1.0.0\n\nIn detail:\n\n- x\n', '1.0.0', 'C'), '## What\'s new in 1.0.0\n\nIn detail:\n\n- x\n\nC\n');
 });
