@@ -154,3 +154,40 @@ for (const lang of ['vhdl', 'verilog']) {
     assert.ok(run(adder, { path: `tb2.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: t2 }, 'tb_adder').some(l => /Simulation finished/.test(l)));
   });
 }
+
+// #2740: the test bench's own names (done, got, errors, k, vin…) are not the module's ports': a module with a port of
+// that name (traffic's timer: done) gets a test bench whose clock runs, with tb_ before its own name
+test('#2740 a module\'s port named as the test bench\'s own names: tb_ before them, the bench runs, in VHDL and in Verilog', async () => {
+  const fs = await import('node:fs');
+  const { generateSkeleton } = await import('../core/testbench.js');
+  const timer = { path: 'src/timer.vhd', lang: 'vhdl', text: fs.readFileSync(new URL('../examples/traffic/src/timer.vhd', import.meta.url), 'utf8') };
+  // and a module whose ports are the bench's other names, in Verilog
+  const names = { path: 'src/names.v', lang: 'verilog', text: 'module names(input clk, input [1:0] vin, input k, output [1:0] got, output errors, output done, output cur_in);\n  reg [1:0] r;\n  always @(posedge clk) r <= vin ^ {k, k};\n  assign got = r;\n  assign errors = ^r;\n  assign done = &r;\n  assign cur_in = |r;\nendmodule\n' };
+  for (const [src, top] of [[timer, 'timer'], [names, 'names']]) {
+    const d = elaborate(compile([src]), top);
+    const ports = tbPorts(d, {});
+    const g = guessClockReset(ports);
+    const special = new Set([g.clock, g.reset].filter(Boolean));
+    const ins = ports.filter(p => p.dir === 'in' && !special.has(p.name));
+    const chk = ports.filter(p => p.dir === 'out');
+    const vectors = makeVectors(ins, { mode: 'count', count: 4 }).map(v => ({ in: v.in, drv: {}, exp: {} }));
+    for (const lang of ['vhdl', 'verilog']) {
+      const opts = { lang, uut: { name: top, params: [] }, ports, clock: { port: 'clk', periodNs: 20 }, reset: g.reset ? { port: g.reset, active: '1', cycles: 2 } : null, settleNs: 10 };
+      const ext = lang === 'vhdl' ? 'vhd' : 'v';
+      // the expected outputs from the design (Fill Expected from Current Design), then the test bench with them
+      const traced = generateTestbench({ ...opts, name: 'tb_trace', vectors, trace: true });
+      const r = simulate([src, { path: `tb_trace.${ext}`, lang, text: traced }], 'tb_trace', { until: 1e7 });
+      assert.deepEqual(r.errors, [], `${top} ${lang}`);
+      const exp = expectedFromTrace(r.sim.log.map(l => l.text), chk, vectors.length);
+      assert.ok(exp.every(Boolean), `${top} ${lang}: every vector reached`);
+      const tb = generateTestbench({ ...opts, name: 'tb', vectors: vectors.map((v, k) => ({ ...v, exp: exp[k] })) });
+      if (top === 'timer') assert.match(tb, lang === 'vhdl' ? /signal tb_done : boolean := false;[\s\S]*while not tb_done loop[\s\S]*tb_done <= true;/ : /\buut \(/);
+      const s = simulate([src, { path: `tb.${ext}`, lang, text: tb }], 'tb', { until: 1e7 });
+      assert.deepEqual(s.errors, [], `${top} ${lang}`);
+      assert.deepEqual(s.sim.log.map(l => l.text).filter(t => /TEST/.test(t)), ['TEST PASSED: 4 vector(s)'], `${top} ${lang}`);
+      // the skeleton: its own done too
+      const sk = generateSkeleton({ ...opts, name: 'tb_sk' });
+      assert.deepEqual(compile([src, { path: `tb_sk.${ext}`, lang, text: sk }]).errors.filter(e => e.severity === 'error'), [], `${top} ${lang} skeleton`);
+    }
+  }
+});

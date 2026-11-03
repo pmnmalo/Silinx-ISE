@@ -63,6 +63,13 @@ test('test_bench_wizard: given vectors, one expected value wrong: the mismatch a
   assert.match((await ok('check_syntax', { project: 'traffic', top: 'tb_sk', simulation: true })).text, /^Process "Check Syntax" of <tb_sk> completed successfully \(\d+ signals, \d+ processes\)\.$/);
 });
 
+test('test_bench_wizard: traffic\'s timer, its port named done (#2740): the bench\'s own is tb_done, TEST PASSED in VHDL and in Verilog', async () => {
+  for (const [lang, log] of [['vhdl', ['TEST PASSED: 8 vector(s)']], ['verilog', ['TEST PASSED: 8 vector(s)', 'simulation finished ($finish) at 200 ns']]]) {
+    await ok('test_bench_wizard', { project: 'traffic', module: 'timer', name: `tb_timer_${lang}`, language: lang, stimulus: 'random', count: 8, expected: 'design' });
+    assert.deepEqual(await run('traffic', `tb_timer_${lang}`), { log, failed: false });
+  }
+});
+
 test('test_bench_wizard: the wizard\'s refusals', async () => {
   await fails('test_bench_wizard', { project: 'gates', module: 'nosuch' }, 'no design module \'nosuch\' in the project');
   await fails('test_bench_wizard', { project: 'gates', name: '1tb' }, 'Enter a valid test bench name (a letter, then letters, digits and _).');
