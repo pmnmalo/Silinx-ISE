@@ -1,7 +1,7 @@
 // UI (#2730): the ASM chart editor as the other editors (docs/UI-GUIDELINES.md): no hint on the canvas, no status line,
-// its states at the toolbar's right end, "Encoding:" before its selector, the Machine section in its Properties, its
-// problems in the console's Errors and Warnings (a click selecting the box) and Validate's lines in the Console, none in
-// the editor; Portuguese. Both interfaces.
+// its states at the toolbar's right end, "Encoding:" before its selector, the Machine section in its Properties (not
+// folded; alone when nothing is selected, no "Selection" help, #2739), its problems in the console's Errors and Warnings
+// (a click selecting the box) and Validate's lines in the Console, none in the editor; Portuguese. Both interfaces.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -37,11 +37,13 @@ uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar
       info: info.textContent,
       after: [...tb.children].filter((c) => shown(c) && c.getBoundingClientRect().left > info.getBoundingClientRect().left).map((c) => c.className),
       encoding: [...el.querySelector('.asm-encoding').children].map((c) => c.textContent.slice(0, 9)),
-      side: [el.querySelector('.asm-side .asm-cap').textContent, [...el.querySelectorAll('.asm-side details > summary')].map((x) => x.textContent), !!el.querySelector('.asm-side details .asm-field')],
+      // (nothing selected: the machine's settings only, in a section that does not fold, #2739)
+      side: [el.querySelector('.asm-side .asm-cap').textContent, [...el.querySelectorAll('.asm-side h3')].filter((x) => x.getClientRects().length).map((x) => x.textContent),
+        !!el.querySelector('.asm-side .asm-machine .asm-field'), el.querySelectorAll('.asm-side details, .asm-side summary, .asm-legend').length],
       zoom: el.querySelector('.asm-toolbar .asm-zoom')?.textContent,
     };
   }, D);
-  assert.deepEqual(look, { gone: [], info: '4 states', after: [], encoding: ['Encoding:', 'BinaryGra'], side: ['Properties', ['Machine'], true], zoom: look.zoom });
+  assert.deepEqual(look, { gone: [], info: '4 states', after: [], encoding: ['Encoding:', 'BinaryGra'], side: ['Properties', ['Machine'], true, 0], zoom: look.zoom });
   assert.match(look.zoom, /^\d+%$/);
   // a narrower window: the toolbar wrapped, its states at the right end still
   await page.setViewport(1100, 800);
@@ -63,6 +65,8 @@ uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar
   await page.click('#console-log .ln.mc-link', { text: `WARNING: ${WARN}` });
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .asm-node.sel'), [], { what: 'the box selected' });
   assert.deepEqual(await selected(), ['sx']);
+  // (a box selected: its properties above the machine's)
+  assert.deepEqual(await page.eval((d) => [...document.querySelectorAll(`${d} .asm-side h3`)].filter((x) => x.getClientRects().length).map((x) => x.textContent), D), ['State', 'Machine']);
   await page.eval(() => { const ed = window.Silinx.active.asmEditor; ed.setModel(ed.getModel()); });   // (nothing selected)
   assert.deepEqual(await selected(), []);
   await page.eval(async () => (await import('/js/console.js')).showConsolePage('warnings'));

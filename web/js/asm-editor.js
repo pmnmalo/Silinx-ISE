@@ -236,7 +236,8 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   // side panel
   const selSection = h('section', { class: 'asm-section asm-selection' });
   const machineBody = h('div', { class: 'asm-section-body' });
-  const machineSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Machine'), machineBody);
+  // (the machine's settings always shown: a section of its own, not folded, #2739)
+  const machineSection = h('section', { class: 'asm-section asm-machine' }, h('h3', {}, 'Machine'), machineBody);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection);
 
   mountSideFold({ root, side, key: 'silinx.asm.props.folded' });

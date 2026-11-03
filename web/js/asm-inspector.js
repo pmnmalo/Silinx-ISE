@@ -14,6 +14,7 @@ export function mountInspector(ctx) {
   const put = (...kids) => selSection.append(...kids.filter((k) => k != null));
   function renderInspector() {
     selSection.innerHTML = '';
+    selSection.hidden = false;
     if (sel().edge) {
       const e = M().edges.find((x) => x.id === sel().edge);
       if (!e) return;
@@ -35,17 +36,7 @@ export function mountInspector(ctx) {
         btn('Delete selection', 'Delete (Del)', () => deleteSelection(), 'asm-danger'));
       return;
     }
-    if (sel().nodes.size === 0) {
-      put(h('h3', {}, 'Selection'),
-        h('p', { class: 'asm-muted' }, 'Select a box to edit it. Add boxes with the toolbar (a new box is connected below the selected one) or double-click the canvas.'),
-        h('div', { class: 'asm-legend' },
-          h('div', {}, h('span', { class: 'asm-ico ico-state' }), ' State: name + Moore outputs'),
-          h('div', {}, h('span', { class: 'asm-ico ico-decision' }), ' Decision: condition, exits 1 / 0'),
-          h('div', {}, h('span', { class: 'asm-ico ico-case' }), ' Case: one exit per value of a signal'),
-          h('div', {}, h('span', { class: 'asm-ico ico-output' }), ' Conditional (Mealy) outputs'),
-          h('div', {}, h('span', { class: 'asm-ico ico-always' }), ' Every cycle: logic in parallel with the states')));
-      return;
-    }
+    if (sel().nodes.size === 0) { selSection.hidden = true; return; }   // (nothing selected: the machine's settings only, #2739)
     const n = nodeById([...sel().nodes][0]);
     if (!n) return;
     const syntax = 'Syntax: out = 1, out = 4\'b1010, cnt = cnt + 1 (registered), or just "out" for out = 1';
