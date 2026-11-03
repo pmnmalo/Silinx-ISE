@@ -3,7 +3,7 @@
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
 //                                          onOpenFile(path), onTruthTables(), onToAsm(), onMessage(text), onProblems(diags),
-//                                          readOnly });
+//                                          readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.focus(d); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
@@ -54,11 +54,12 @@ export function radiusOf(s) {
 }
 
 // (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion hidden, with their
-// separators)
-function readOnlyChrome({ root, toolbar }) {
+// separators; its notice, `banner`, after the diagram's counts at the right end of the toolbar, #2710)
+function readOnlyChrome({ root, toolbar, banner }) {
   root.classList.add('asm-readonly');
   const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc'));
   for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling]) g.hidden = true;
+  if (banner) toolbar.querySelector('.fsm-info').after(banner);
 }
 
 export function mountFsmEditor(container, opts = {}) {
@@ -153,7 +154,7 @@ export function mountFsmEditor(container, opts = {}) {
   const machineSection = h('section', { class: 'asm-section fsm-machine' }, h('h3', {}, 'Machine'), machineBody);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection);
   mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
-  if (readOnly) readOnlyChrome({ root, toolbar });
+  if (readOnly) readOnlyChrome({ root, toolbar, banner: opts.banner });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
 
   // ---------------------------------------------------------------------------- model helpers

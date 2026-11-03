@@ -123,6 +123,8 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
 - **Two interfaces** (Silinx and ISE style), **light and dark themes**, **Portuguese**, **touch
   screens** (long press opens the right-click menus) and **narrow screens** (a tablet in portrait: the
   Design pane is a drawer).
+- **The interface's rules** (toolbars, read-only views, side panels, the Design pane's badges):
+  [docs/UI-GUIDELINES.md](docs/UI-GUIDELINES.md).
 - **Never commit Xilinx files:** not ISE, its Docker image, or ISE's raw outputs (`.bit`, `.ncd`,
   `.xdl`, logs).
 - **Yosys updates** come from Dependabot with a comparison table. They are never merged on green alone:
