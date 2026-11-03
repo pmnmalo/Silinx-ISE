@@ -157,7 +157,6 @@ test('validation: names, widths, initial state, expressions and output values (e
   has(/^Transition A → a: the condition 'x &&' is not valid \(unexpected end of expression\)$/);
   has(/^Transition A → 2nd: 'foo' in the condition 'foo' is not an input$/);
   has(/^Transition a → A: 'z' is an output; conditions can only test inputs$/);
-  has(/^Transition a → A has outputs \(z=1\), but this is a Moore machine/);
   has(/^A transition starts or ends at a state that does not exist$/);
   has(/^Transition 2nd → A: 'x' has 1 bit/);
   assert.match(errorsOf({ states: [] }).join('\n'), /The diagram has no states/);

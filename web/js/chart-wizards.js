@@ -136,9 +136,8 @@ export async function fsmWizard({ name = '', location = 'src', lang = null, name
     title: 'Name and Language', name, lang: L, loc: location, guard, ext: '.fsm.json', nameLabel: 'State machine (module) name:',
     hint: 'The wizard creates a state diagram with its inputs, outputs, states and transitions, ready for you to set the outputs of its states; its HDL is generated from it.',
   });
-  const typeSel = select([['moore', 'Moore (the outputs depend on the state)'], ['mealy', 'Mealy (the outputs depend on the state and the inputs)']], 'moore');
-  typeSel.classList.add('cw-type');
-  const io = ioPage(p1, field('Machine type:', typeSel));
+  // (no Moore / Mealy choice: the kind follows from where the outputs are, #2728)
+  const io = ioPage(p1);
   const states = ['S0', 'S1'];
   const transitions = [];
   let outs = {}, layout;   // a template's outputs of the states (by name) and its layout
@@ -156,14 +155,13 @@ export async function fsmWizard({ name = '', location = 'src', lang = null, name
   const tpl = templatePage('fsm', FSM_TEMPLATES, (id, params) => {
     const t = fsmTemplate(id, params);
     io.setPorts(t.ports);
-    typeSel.value = t.type;
     states.splice(0, states.length, ...t.states);
     transitions.splice(0, transitions.length, ...t.transitions.map(x => ({ ...x })));
     outs = structuredClone(t.outputs);
     layout = t.layout;
     st.render(); tt.render();
   });
-  const model = () => fsmFromSpec({ name: p1.name(), lang: p1.lang(), type: typeSel.value, clock: io.clock(), reset: io.reset(), description: p1.desc.value, ports: io.ports, states, outputs: outs, transitions, layout });
+  const model = () => fsmFromSpec({ name: p1.name(), lang: p1.lang(), clock: io.clock(), reset: io.reset(), description: p1.desc.value, ports: io.ports, states, outputs: outs, transitions, layout });
   const p3 = {
     title: 'States and Transitions',
     render: () => h('div', {},

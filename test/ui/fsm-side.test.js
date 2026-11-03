@@ -1,7 +1,7 @@
 // UI: the FSM editor's side panel (web/js/fsm-side.js, #405: out of mountFsmEditor), mounted alone in the page with
 // an editor of its own (the model of a new diagram) whose actions are recorded: nothing selected, a state (its name, its
 // Moore outputs and their errors, its code, made initial, its transitions, one opened), a transition (its condition, its
-// priority moved, its target, Mealy outputs in a Moore machine), a selection gone; the machine (its name, a port added
+// priority moved, its target, outputs given to it: the machine Mealy, #2728), a selection gone; the machine (its name, a port added
 // and removed, the reset, the description).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ const E = () => env;
 
 const MOUNT = async () => {
   const { mountSide } = await import('/js/fsm-side.js');
-  const { newFsm, fsmEncoding } = await import('/core/fsm.js');
+  const { newFsm, fsmEncoding, fsmKind } = await import('/core/fsm.js');
   const { h } = await import('/js/ui.js');
   const selSection = h('section'), machineBody = h('div');
   document.body.append(selSection, machineBody);
@@ -29,14 +29,14 @@ const MOUNT = async () => {
   const field = (root, label) => [...root.querySelectorAll('.asm-field')].find((f) => f.querySelector('.asm-label').textContent === label)
     .querySelector('input, select, textarea');
   const set = (el, v, ev = 'input') => { el.value = v; el.dispatchEvent(new Event(ev)); };
-  window.__s = { side, M, commits, calls, selSection, machineBody, field, set, sel: () => sel, select: (s) => { sel = s; } };
+  window.__s = { fsmKind, side, M, commits, calls, selSection, machineBody, field, set, sel: () => sel, select: (s) => { sel = s; } };
   return true;
 };
 
 uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its transitions), a transition (condition, priority, target)', E, async (page) => {
   await page.eval(MOUNT);
   const out = await page.eval(() => {
-    const { side, M, commits, calls, selSection: S, field, set, sel, select } = window.__s;
+    const { fsmKind, side, M, commits, calls, selSection: S, field, set, sel, select } = window.__s;
     const r = {};
     side.renderSide();
     r.none = [S.querySelector('h3').textContent, calls.splice(0)];
@@ -52,14 +52,16 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
     // its first transition opened
     S.querySelector('.fsm-tlist li').click();
     r.opened = [sel(), S.querySelector('h3').textContent, calls.splice(0)];
-    // the transition: its condition, made later (after !x), its target, Mealy outputs off in a Moore machine
+    // the transition: its condition, made later (after !x), its target, outputs: the Moore machine made Mealy (#2728)
     set(field(S, 'Condition'), ' x && y ');
     r.prio = S.querySelectorAll('.asm-label')[0] ? [...S.querySelectorAll('div.asm-label')].map((d) => d.textContent) : null;
     [...S.querySelectorAll('button')].find((b) => b.textContent === '▼ Later').click();
     r.order = M.transitions.filter((t) => t.from === 's2').map((t) => t.id);
     r.prio2 = [...S.querySelectorAll('div.asm-label')].map((d) => d.textContent);
     set(field(S, 'To'), 's2', 'change');
-    r.t3 = [M.transitions.find((t) => t.id === 't3').cond, M.transitions.find((t) => t.id === 't3').to, field(S, 'Outputs (Mealy)').disabled];
+    r.t3 = [M.transitions.find((t) => t.id === 't3').cond, M.transitions.find((t) => t.id === 't3').to, field(S, 'Outputs (Mealy)').disabled, fsmKind(M)];
+    set(field(S, 'Outputs (Mealy)'), 'z=1');
+    r.mealy = [M.transitions.find((t) => t.id === 't3').outputs, fsmKind(M), S.querySelectorAll('.asm-fhint')[1].textContent];
     // a selection whose transition is gone: nothing
     M.transitions = M.transitions.filter((t) => t.id !== 't3'); side.renderSide();
     r.gone = [sel(), S.querySelector('h3').textContent];
@@ -74,9 +76,10 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
   assert.deepEqual(out.prio, ['Priority 1 of 2 in MID']);
   assert.deepEqual(out.order, ['t4', 't3']);
   assert.deepEqual(out.prio2, ['Priority 2 of 2 in MID']);
-  assert.deepEqual(out.t3, ['x && y', 's2', true]);
+  assert.deepEqual(out.t3, ['x && y', 's2', false, 'moore']);
+  assert.deepEqual(out.mealy, [{ z: '1' }, 'mealy', 'Outputs while this transition is taken: output=value, separated by commas (they make the machine a Mealy machine).']);
   assert.deepEqual(out.gone, [null, 'Selection']);
-  assert.deepEqual(out.commits, ['sname', 'souts', '', 'cond', '', '']);
+  assert.deepEqual(out.commits, ['sname', 'souts', '', 'cond', '', '', 'touts']);
 });
 
 uiTest('#405 FSM side panel: the machine (its name, a port added and removed, the reset, the description)', E, async (page) => {

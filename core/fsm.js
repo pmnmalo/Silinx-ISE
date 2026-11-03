@@ -7,7 +7,7 @@
 //
 //   {
 //     version: 1, kind: 'fsm', name: 'det11', lang: 'vhdl' | 'verilog',
-//     type: 'moore' | 'mealy',
+//     type: 'moore' | 'mealy',                   (derived from the outputs: fsmKind, #2728)
 //     clock: 'clk', reset: { name: 'rst', active: 'high' | 'low', sync: false },
 //     encoding: 'binary' | 'gray' | 'onehot' | 'enum',
 //     style: '3process' | '2process',            (HDL style: separate or combined logic processes)
@@ -112,6 +112,12 @@ export function constValue(text) {
 // Model
 // ---------------------------------------------------------------------------------------
 
+/**
+ * The machine's kind, from where its outputs are (#2728): Mealy when a transition sets an output, Moore when only the
+ * states do (or nothing does). A stored `type` is not read: normalizeFsm writes this one.
+ */
+export const fsmKind = (m) => (m.transitions.some((t) => Object.keys(t.outputs || {}).length) ? 'mealy' : 'moore');
+
 /** Cleaned deep copy of `m` with every field present (does not validate). */
 export function normalizeFsm(m) {
   const src = m && typeof m === 'object' ? m : {};
@@ -134,7 +140,7 @@ export function normalizeFsm(m) {
     kind: 'fsm',
     name: String(src.name ?? 'fsm'),
     lang: src.lang === 'verilog' ? 'verilog' : 'vhdl',
-    type: src.type === 'mealy' ? 'mealy' : 'moore',
+    type: fsmKind({ transitions }),
     clock: String(src.clock || 'clk'),
     reset: { name: String(rs.name || 'rst'), active: rs.active === 'low' ? 'low' : 'high', sync: !!rs.sync },
     encoding: FSM_ENCODINGS.includes(src.encoding) ? src.encoding : 'binary',
@@ -156,7 +162,7 @@ export function normalizeFsm(m) {
 /** A new diagram: Moore machine that sets z after two consecutive 1s on x. */
 export function newFsm(name = 'fsm', lang = 'vhdl') {
   return normalizeFsm({
-    name, lang, type: 'moore', encoding: 'binary', style: '3process',
+    name, lang, encoding: 'binary', style: '3process',
     inputs: [{ name: 'x', width: 1 }],
     outputs: [{ name: 'z', width: 1, default: '0' }],
     states: [
@@ -406,9 +412,6 @@ export function validateFsm(model) {
         try { for (const lang of ['vhdl', 'verilog']) portExprCoder(m, lang).cond(t.cond); } catch (e) { ok = false; add('error', `${where}: ${e.message}`, ref); }
       }
       if (ok) parsed.set(t.id, p.ast);
-    }
-    if (Object.keys(t.outputs).length && m.type === 'moore') {
-      add('error', `${where} has outputs (${formatOutputs(t.outputs)}), but this is a Moore machine: give the outputs to the states, or make it a Mealy machine`, ref);
     }
     checkOutputs(t.outputs, where, ref);
   }

@@ -73,7 +73,6 @@ export function mountSide(ctx) {
       outErr.textContent = r.error || '';
       if (!r.error) { t.outputs = r.outputs; commit('touts'); }
     }, { cls: 'mono fsm-touts', ph: 'e.g. z=1', key: 'touts' });
-    if (M().type === 'moore' && !Object.keys(t.outputs).length) outs.disabled = true;
     const siblings = M().transitions.filter((x) => x.from === t.from);
     const pos = siblings.indexOf(t);
     const move = (dir) => {
@@ -86,7 +85,7 @@ export function mountSide(ctx) {
     selSection.append(h('h3', {}, 'Transition'),
       h('div', { class: 'asm-grid2' }, field('From', from), field('To', to)),
       field('Condition', cond, 'Boolean expression over the inputs: x, !x, x && y, x || !y, a == 2\'b01, b[0] (also and, or, not, =). Empty: always.'),
-      field('Outputs (Mealy)', outs, M().type === 'moore' ? 'A Moore machine has no outputs on the transitions (choose Mealy in the toolbar).' : 'Outputs while this transition is taken: output=value, separated by commas.'), outErr,
+      field('Outputs (Mealy)', outs, 'Outputs while this transition is taken: output=value, separated by commas (they make the machine a Mealy machine).'), outErr,
       h('div', { class: 'asm-label' }, `Priority ${pos + 1} of ${siblings.length} in ${stateById(t.from)?.name ?? '?'}`),
       h('div', { class: 'asm-row' },
         btn('▲ Earlier', 'Try this condition before the previous one', () => move(-1), 'asm-small'),
