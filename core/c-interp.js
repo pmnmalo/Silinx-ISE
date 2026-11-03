@@ -10,7 +10,7 @@
 //              each pointer's value before (ptrIn) and after (ptrOut), each array's values before and after (#1527), the
 //              steps it took (#1899)
 //     error: { line, col, message } when the run stopped (a division by zero, an index outside an array, an endless loop)
-import { checkC, constValue } from './c-check.js';
+import { checkC } from './c-check.js';
 import { loadBlackboxes, withModels } from './c-blackbox.js';
 import { typeOf } from './c-types.js';
 import { exprMethods, convert } from './c-interp-expr.js';
@@ -326,8 +326,8 @@ class Machine {
   switchStmt(s) {
     const v = this.intOf(this.eval(s.e), s);
     const body = s.body.kind === 'block' ? s.body.items : [s.body];
-    const consts = new Map();
-    let start = body.findIndex((x) => x.kind === 'case' && constValue(x.value, consts) === v);
+    // (a case's value a constant expression, evaluated as any: a named constant, an enum constant, a sizeof, #2749)
+    let start = body.findIndex((x) => x.kind === 'case' && this.intOf(this.eval(x.value), x) === v);
     if (start < 0) start = body.findIndex((x) => x.kind === 'default');
     if (start < 0) return undefined;
     const f = this.frames.at(-1);
