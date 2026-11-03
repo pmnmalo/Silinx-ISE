@@ -17,6 +17,10 @@ answer here.
   Properties toggle; the toolbar's ⋮ menu (`web/js/toolbar-menu.js`) at the right end of its first line for the
   commands used now and then (layout, conversion, export, analysis), its place kept free whatever wraps (#2208,
   #2331).
+- **What a toolbar says is at its right end**, never between its tools (#2725): its informational text, what it
+  says rather than does (the read-only notice, "Not in sync with …", the drawing's counts, I/O Pin Planning's "Top: …
+  · Device … · Board: …" and its status, the FPGA view's info on the site selected, the Board Emulator's status),
+  after the spacer and the ☰ panels' buttons, before the ⋮ menu (`test/ui/toolbar-info-right.test.js`).
 - **No Undo, Redo or Print in a document's toolbar**: the main toolbar's, the Edit and File menus' and Ctrl+Z,
   Ctrl+Y, Ctrl+P act on the document in front (#2505, #2514).
 - **The side panels** are all alike (see below).
