@@ -36,7 +36,7 @@ uiTest('#2696 a Petri net\'s state machine, read-only: its [FSM] badge and comma
       labels: [...el.querySelectorAll('.fsm-edges text')].map((t) => t.textContent),
       tools: [...el.querySelectorAll('.asm-toolbar .asm-btn, .asm-toolbar select')].filter(shown).map((b) => b.textContent.trim()).filter(Boolean),
       readOnly: el.querySelector(ed).classList.contains('asm-readonly'),
-      problems: shown(el.querySelector('.fsm-problems')),
+      problems: !!el.querySelector('.fsm-problems'),
       hint: el.querySelector('.asm-hint'),
     };
   }, ED);
