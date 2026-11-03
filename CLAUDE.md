@@ -63,6 +63,12 @@ the code and the lessons learnt.
   the right of its toolbar).
 - Every label of the interface has a Portuguese translation in `web/js/i18n.js` (anchored patterns,
   `^…$`); `test/web-i18n.test.js` checks it.
+- **What the interface does, the MCP server does too** (#2674): every action of the interface is a tool of the MCP
+  server (`server/mcp*.js`, `silinx-ise mcp`), or part of one, that does it through the same functions, with the same
+  checks and messages; a new feature or a changed one ships with its MCP tool and that tool's tests
+  (`test/mcp*.test.js`), in the same pull request. Logic the tool needs that lives in `web/js/` moves to `core/` or
+  `server/` first (a move, as below). Only what is the view alone stays out (zoom, layout, theme, language, tabs);
+  a file the user picks in the interface is one of the MCP's exchange folder (`SILINX_MCP_FOLDER`).
 - The Design pane shows one row per module: its drawing (schematic, ASM, FSM, truth table, Petri
   net) is the base and its HDL file is always generated from it; the badges show the drawing first,
   `[VHDL]` / `[Verilog]` last.
