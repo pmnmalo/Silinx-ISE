@@ -562,6 +562,33 @@ test('#2627 a clock on a side buffer built with --engine nextpnr: no warnings, i
   for (const i of loads) assert.ok(+/_X(\d+)Y/.exec(i.tile)[1] > centre, `${i.name} on ${i.tile}`);
 });
 
+// #2626, #2628, #2656: Silinx's test/fixtures/open-flow designs (Silinx's synthesis, the Basys2, their pads chosen by
+// nextpnr but hard_prim's clock): feat_bram, a MUXCY whose DI is its own select's net, and hard_prim, a block RAM of
+// 36-bit ports and two multipliers (router 1 looped on both); feat_constmult, two shift registers with no enable in one
+// slice (two VCC nets on its SR, routing stopped); feat_dcm2, a DCM fed by a global buffer of the other edge (a warning
+// that the DCM's CLKIN is out of its line's reach, which ISE's DRC passes)
+for (const name of ['feat_bram', 'hard_prim', 'feat_constmult', 'feat_dcm2']) {
+  test(`#2626 #2628 #2656 ${name} built with --engine nextpnr: no warnings, a complete bitstream`, { timeout: 300000 }, async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+    const netlist = path.join(dir, `${name}.json`), ucfFile = fixture(`${name}.ucf`);
+    fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture(`${name}.json.gz`))));
+    const out = [], err = [];
+    const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', ...(fs.existsSync(ucfFile) ? ['--ucf', fileURLToPath(ucfFile)] : []), '--out-dir', dir, '--engine', 'nextpnr'],
+      { out: l => out.push(l), err: l => err.push(l) });
+    assert.equal(code, 0, err.join('\n'));
+    assert.deepEqual(err, []);   // no warnings
+    assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+    if (name !== 'hard_prim') return;
+    // a block RAM with a 36-bit port alone in its tile, no multiplier beside it
+    const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+    const wide = design.insts.filter(i => i.type === 'RAMB16' && i.cfg.some(c => /^PORT[AB]_ATTR$/.test(c.attr) && /X36$/.test(c.value)));
+    assert.ok(wide.length, 'a block RAM of 36-bit ports');
+    const mults = new Set(design.insts.filter(i => i.type === 'MULT18X18SIO').map(i => i.tile));
+    assert.equal(mults.size, 2);
+    for (const r of wide) assert.ok(!mults.has(r.tile), `${r.name} on ${r.tile} beside a multiplier`);
+  });
+}
+
 test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its global buffer; an INST LOC as the DCM\'s BEL, a wrong site refused', () => {
   const json = () => fs.readFileSync(fixture('feat_dcm.json'), 'utf8'), ucf = fs.readFileSync(fixture('feat_dcm.ucf'), 'utf8');
   const { problems, sdc } = nextpnrNetlist(json(), 'top', ucf);
