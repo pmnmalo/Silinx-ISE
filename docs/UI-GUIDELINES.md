@@ -10,8 +10,8 @@ answer here.
 - **Its name is its tab's**, and its path the tab's tip. Nothing inside the document repeats them: no title, no
   path, no "file.vhd" label (#2514, #2710).
 - **Its toolbar is its first line.** No bar above it, below the tabs: no title bar, no notice bar, no second
-  toolbar (#2710). What a document has to say goes in its toolbar (the read-only notice, "Not in sync with …") or
-  in its hint line at the bottom.
+  toolbar (#2710). What a document has to say of itself goes in its toolbar (the read-only notice, "Not in sync
+  with …", its counts); its messages go to the console.
 - **The toolbar's layout**, as the Schematic editor's (#2505): flat buttons with the shared icons; the tools that
   change the document on the left (add, delete), then zoom, then the document's settings; a spacer; the
   Properties toggle; the toolbar's ⋮ menu (`web/js/toolbar-menu.js`) at the right end of its first line for the
@@ -20,8 +20,9 @@ answer here.
 - **No Undo, Redo or Print in a document's toolbar**: the main toolbar's, the Edit and File menus' and Ctrl+Z,
   Ctrl+Y, Ctrl+P act on the document in front (#2505, #2514).
 - **The side panels** are all alike (see below).
-- **The hint line** at the bottom says what the mouse does ("Double-click to add a state · …"); a read-only view's
-  starts with "Read-only · …".
+- **No hint line and no status line** under the document (#2735): what the mouse does is in the tools' tips and the
+  Help; the drawing's counts ("2 places · 2 transitions · 4 arcs") are an informational text at the **right of the
+  toolbar** (before the read-only notice in a view); the zoom is the zoom tools'; a status message is the console's.
 
 ## A side panel
 
@@ -72,8 +73,8 @@ viewer of its own:
   (`web/js/messages.js`: `log(…)`, `WARNING: …`, `ERROR: …`), its Errors and Warnings tabs listing them, a click on
   one going to its place in the document. No problems panel, message box, log or warning line inside an editor or a
   viewer, and no `alert()` (#2718).
-- What the document shows of itself is not a message and stays in it: the read-only notice and "Not in sync with …" in
-  the toolbar, the hint line, a selected item's properties, a highlight on the item a message points to.
+- What the document shows of itself is not a message and stays in it: the read-only notice, "Not in sync with …" and
+  its counts in the toolbar, a selected item's properties, a highlight on the item a message points to.
 - A dialog says what is wrong with its own fields beside them, as long as it is open.
 - A toast only says an action was done, carrying its Undo when it can be undone.
 
