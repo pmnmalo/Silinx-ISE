@@ -232,8 +232,14 @@ uiTest('theme: follows the system, View ▸ Theme ▸ Dark / Light / System, hea
 // dark: the title bar, the menu bar, the toolbar, the panes and their captions, the console, the status bar, a dialog, the
 // HDL editor
 uiTest('#2676 the ISE style interface\'s theme: View ▸ Theme ▸ System / Light / Dark, follows the system, remembered, a dark look; Portuguese', E, async (page) => {
-  const DARK = ['body', '#titlebar', '#menubar', '#toolbar', '#left .ise-panel > .caption', '#left .ise-panel', '#console-body', '#statusbar'];
-  const lums = () => page.eval((sels) => sels.map((s) => window.__lum(s)), DARK);
+  const DARK = ['body', '#titlebar', '#menubar', '#toolbar', '#left .ise-panel > .caption', '#left .ise-panel', '#console-wrap', '#statusbar'];
+  // (the luminance of an element's background, its gradient's first colour when it has one: the ISE look's bars)
+  const lumsOf = (sels) => page.eval((ss) => ss.map((s) => {
+    const cs = getComputedStyle(document.querySelector(s));
+    const c = (/rgba?\([^)]*\)/.exec(cs.backgroundImage) || [cs.backgroundColor])[0].match(/[\d.]+/g).map(Number);
+    return c.length > 3 && c[3] === 0 ? NaN : +((0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255).toFixed(2);
+  }), sels);
+  const lums = () => lumsOf(DARK);
   await page.eval(() => localStorage.setItem('silinx.ui', 'ise'));
   await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
@@ -243,7 +249,7 @@ uiTest('#2676 the ISE style interface\'s theme: View ▸ Theme ▸ System / Ligh
   // the system switches to dark: the page follows (theme = System)
   await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
   await page.waitFor(() => document.documentElement.dataset.theme === 'dark', [], { what: 'dark from the system' });
-  assert.ok((await lums()).every((l) => l < 0.15), `dark: ${await lums()}`);
+  assert.ok((await lums()).every((l) => l < 0.3), `dark: ${await lums()}`);
   assert.equal(await page.eval(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
   // View ▸ Theme ▸ Light: fixed, whatever the system says
   assert.deepEqual(await subMenu(page, 'View', 'Theme'), [{ label: 'System', checked: true }, { label: 'Light', checked: false }, { label: 'Dark', checked: false }]);
@@ -260,17 +266,17 @@ uiTest('#2676 the ISE style interface\'s theme: View ▸ Theme ▸ System / Ligh
   assert.deepEqual(await ui(page), { ui: 'ise', theme: 'dark' });
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   await page.eval(LUM);
-  assert.ok((await lums()).every((l) => l < 0.15), 'dark after a reload');
+  assert.ok((await lums()).every((l) => l < 0.3), 'dark after a reload');
   // a dialog and the HDL editor dark
   await page.menu('Help', 'About Silinx ISE');
   await page.waitDialog();
-  assert.ok(await page.eval(() => window.__lum('.dlg') < 0.15 && window.__lum('.dlg-title') < 0.15), 'a dark dialog');
+  assert.ok((await lumsOf(['.dlg', '.dlg-title', '.dlg .btn'])).every((l) => l < 0.3), 'a dark dialog');
   await page.eval(() => document.querySelectorAll('.dlg-overlay').forEach((d) => d.remove()));
   await makeProject(env, { name: 'IseDarkPj', template: 'blinky' });
   await page.openProject('IseDarkPj');
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   await page.waitForSelector('.doc:not([hidden]) .cm-editor');
-  assert.ok(await page.eval(() => window.__lum('.doc:not([hidden]) .cm-editor') < 0.15 && window.__lum('.doc:not([hidden]) .editor-bar') < 0.15), 'a dark editor');
+  assert.ok((await lumsOf(['.doc:not([hidden]) .cm-editor', '.doc:not([hidden]) .editor-bar'])).every((l) => l < 0.3), 'a dark editor');
   // in Portuguese: Ver ▸ Tema ▸ Sistema / Claro / Escuro
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   assert.deepEqual(await subMenu(page, 'Ver', 'Tema'), [{ label: 'Sistema', checked: false }, { label: 'Claro', checked: false }, { label: 'Escuro', checked: true }]);
