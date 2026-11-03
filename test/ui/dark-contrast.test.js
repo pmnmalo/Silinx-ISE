@@ -1,5 +1,5 @@
 // UI: the dark theme as a whole (#159): every screen of the application in the dark theme (the
-// Silinx interface) has its text readable — no text with a contrast ratio below 3 against what is
+// interface SILINX_UI_INTERFACE says: the Silinx one, or the ISE style one, dark too since #2676) has its text readable — no text with a contrast ratio below 3 against what is
 // behind it (a light background left in the code, a dark grey on the dark background), fields
 // included. The Start page, the menus, the command palette, the toasts, the dialogs of Help and
 // Tools, the New Project wizard; a project (gates): the Design / Files / Libraries panes, the HDL
@@ -21,6 +21,9 @@ before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
 const E = () => env;
 const MIN = 3;
+// the interface the screens are seen in (the ISE style one has no header's Settings nor palette button: Ctrl+K)
+const UI = process.env.SILINX_UI_INTERFACE === 'ise' ? 'ise' : 'silinx';
+const CTRL = 2;
 
 // texts left out on purpose (a selector each, with the reason), in every theme or in one
 const EXCEPTIONS = [
@@ -60,15 +63,15 @@ begin
 end rtl;
 `;
 
-/** The page in the Silinx interface and the given theme (whatever SILINX_UI_INTERFACE says: the
- *  ISE style interface is light only), with the scan installed; returns the checker: check(where)
- *  adds what the scan finds on the whole page, `bad` the list. */
+/** The page in the interface UI and the given theme, with the scan installed; returns the checker:
+ *  check(where) adds what the scan finds on the whole page, `bad` the list. */
 async function themed(page, theme) {
-  await page.eval((t) => { localStorage.setItem('silinx.ui', 'silinx'); localStorage.setItem('silinx.theme', t); }, theme);
+  await page.eval((u, t) => { localStorage.setItem('silinx.ui', u); localStorage.setItem('silinx.theme', t); }, UI, theme);
   await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   // (the drawer of a narrow screen, #266; the Silinx interface's layout by tasks and its arrangement, #1149)
-  assert.deepEqual(await page.eval(() => ({ ...document.documentElement.dataset })), { ui: 'silinx', theme, drawer: 'open', layout: 'tasks', task: 'edit', side: 'open', console: 'open', max: 'off', nodocs: 'on' });   // (no document yet: no tab bar, #1289)
+  assert.deepEqual(await page.eval(() => ({ ...document.documentElement.dataset })), UI === 'ise' ? { ui: 'ise', theme, drawer: 'open' }
+    : { ui: 'silinx', theme, drawer: 'open', layout: 'tasks', task: 'edit', side: 'open', console: 'open', max: 'off', nodocs: 'on' });   // (no document yet: no tab bar, #1289)
   await page.eval(CONTRAST);
   const bad = [];
   const skip = EXCEPTIONS.filter((x) => !x.theme || x.theme === theme).map((x) => x.skip).join(', ');
@@ -106,10 +109,17 @@ for (const theme of ['dark', 'light']) {
       await check(`menu ${m}`);
     }
     await page.closeMenus();
-    // the header's Settings menu (#1314; the menu bar gone, #1321)
-    await page.click('#settings-btn');
-    await page.waitForSelector('body > .menu-popup .mi');
-    await check('the Settings menu');
+    // the header's Settings menu (#1314; the menu bar gone, #1321), in the Silinx interface; View ▸ Theme in both (#2676)
+    if (UI === 'silinx') {
+      await page.click('#settings-btn');
+      await page.waitForSelector('body > .menu-popup .mi');
+      await check('the Settings menu');
+      await page.closeMenus();
+    }
+    const items = await page.openMenu('View');
+    await page.hover(await page.point('body > .menu-popup > .mi', { index: items.findIndex((x) => x.label === 'Theme') }));
+    await page.waitForSelector('.menu-popup.sub .mi');
+    await check('View ▸ Theme');
     await page.closeMenus();
     for (const [menu, item] of [['Help', 'About Silinx ISE'], ['Help', 'Keyboard Shortcuts'], ['Help', 'Check for Updates…'], ['Help', 'Tell Us Who You Are…'], ['Tools', 'Toolchain Settings (ISE / Programmers)…'], ['File', 'Open Project…']]) {
       await page.menu(menu, item);
@@ -130,7 +140,7 @@ for (const theme of ['dark', 'light']) {
       if (!await nextPage(page)) break;
     }
     await closeDialogs(page);
-    await page.click('#palette-btn');
+    if (UI === 'silinx') await page.click('#palette-btn'); else await page.key('k', { modifiers: CTRL });
     await page.waitForSelector('.pal');
     await page.type('pro');
     await check('command palette');

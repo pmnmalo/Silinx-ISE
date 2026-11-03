@@ -1,7 +1,8 @@
 /* The Silinx interface: applied under <html data-ui="silinx">, light or dark (data-theme).
    The ISE style look (theme.css + app.css) is <html data-ui="ise">; both share the same
    page (web/index.html) and the same element ids, so the application code does not depend on the look.
-   Preferences and command palette: web/js/silinx.js, web/js/palette.js. */
+   Preferences and command palette: web/js/silinx.js, web/js/palette.js. The dark theme's tokens and the documents'
+   dark rules (html[data-theme="dark"]) serve both looks; the ISE style look's own dark colours are in ise-dark.css (#2676). */
 
 /* ------------------------------------------------------------------ parts of the Silinx interface only */
 html:not([data-ui="silinx"]) #top-actions, html:not([data-ui="silinx"]) .m-steps,
@@ -96,7 +97,7 @@ html[data-ui="silinx"] {
 @media (pointer: coarse) {
   html[data-ui="silinx"] { --m-ctl-h: 40px; --m-tool-h: 36px; --m-row-h: 32px; --m-toolbar-h: 48px; }
 }
-html[data-ui="silinx"][data-theme="dark"] {
+html[data-theme="dark"] {
   --m-bg: #0f1115;
   --m-surface: #16191e;
   --m-surface-2: #1d2127;
@@ -496,68 +497,68 @@ html[data-ui="silinx"] .sch-view :is(.sch-hint, .sch-tip) { background: var(--m-
 html[data-ui="silinx"] .sch-view .sch-tip .m { color: var(--m-muted); }
 html[data-ui="silinx"] .sch-view .sch-tip hr { border-color: var(--m-border); }
 
-/* ------------------------------------------------------------------ dark theme */
-html[data-ui="silinx"][data-theme="dark"] .editor-host .cm-editor { background: var(--m-surface); color: #d6dae0; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-cursor { border-left-color: #e4e7eb; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-selectionBackground, html[data-ui="silinx"][data-theme="dark"] .xl-editor.cm-focused .cm-selectionBackground { background: rgba(91, 141, 239, .28); }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-keyword { color: #c792ea; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-builtin, html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-type { color: #4fc1c9; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-atom, html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-number { color: #f4a46a; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-string { color: #a5d6a7; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-comment { color: #7d8794; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-meta { color: #f07dc4; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-def { color: #82aaff; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .tok-variable2 { color: #e5c07b; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-selectionMatch { background: rgba(255, 255, 255, .08); }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-matchingBracket { background: rgba(76, 192, 107, .2); outline-color: #4cc06b; }
-html[data-ui="silinx"][data-theme="dark"] .xl-flash-line { background: rgba(227, 179, 65, .3) !important; }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-panels { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-panels input, html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-panels button { background: var(--m-surface); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-gutters { background: var(--m-surface); }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-foldPlaceholder { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-tooltip { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .xl-lint-tip { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] :is(.editor-bar .gen-banner, .asm-toolbar > .gen-banner.read-only) { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }
-html[data-ui="silinx"][data-theme="dark"] .gen-banner.out-of-sync { background: rgba(240, 113, 107, .14); border-color: rgba(240, 113, 107, .45); color: #ffb4ae; }
-html[data-ui="silinx"][data-theme="dark"] .msg-warn .msg-icon { color: #000; }
-html[data-ui="silinx"][data-theme="dark"] .impact-chain { background: var(--m-surface-2); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .pin-planner td.conflict input { background: rgba(240, 113, 107, .25) !important; }
-html[data-ui="silinx"][data-theme="dark"] .console-page .diag-hint b { color: var(--m-fg); }
+/* ------------------------------------------------------------------ dark theme (both looks: #2676) */
+html[data-theme="dark"] .editor-host .cm-editor { background: var(--m-surface); color: #d6dae0; }
+html[data-theme="dark"] .xl-editor .cm-cursor { border-left-color: #e4e7eb; }
+html[data-theme="dark"] .xl-editor .cm-selectionBackground, html[data-theme="dark"] .xl-editor.cm-focused .cm-selectionBackground { background: rgba(91, 141, 239, .28); }
+html[data-theme="dark"] .xl-editor .tok-keyword { color: #c792ea; }
+html[data-theme="dark"] .xl-editor .tok-builtin, html[data-theme="dark"] .xl-editor .tok-type { color: #4fc1c9; }
+html[data-theme="dark"] .xl-editor .tok-atom, html[data-theme="dark"] .xl-editor .tok-number { color: #f4a46a; }
+html[data-theme="dark"] .xl-editor .tok-string { color: #a5d6a7; }
+html[data-theme="dark"] .xl-editor .tok-comment { color: #7d8794; }
+html[data-theme="dark"] .xl-editor .tok-meta { color: #f07dc4; }
+html[data-theme="dark"] .xl-editor .tok-def { color: #82aaff; }
+html[data-theme="dark"] .xl-editor .tok-variable2 { color: #e5c07b; }
+html[data-theme="dark"] .xl-editor .cm-selectionMatch { background: rgba(255, 255, 255, .08); }
+html[data-theme="dark"] .xl-editor .cm-matchingBracket { background: rgba(76, 192, 107, .2); outline-color: #4cc06b; }
+html[data-theme="dark"] .xl-flash-line { background: rgba(227, 179, 65, .3) !important; }
+html[data-theme="dark"] .xl-editor .cm-panels { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
+html[data-theme="dark"] .xl-editor .cm-panels input, html[data-theme="dark"] .xl-editor .cm-panels button { background: var(--m-surface); color: var(--m-fg); border-color: var(--m-border); }
+html[data-theme="dark"] .xl-editor .cm-gutters { background: var(--m-surface); }
+html[data-theme="dark"] .xl-editor .cm-foldPlaceholder { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
+html[data-theme="dark"] .xl-editor .cm-tooltip { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
+html[data-theme="dark"] .xl-lint-tip { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
+html[data-theme="dark"] :is(.editor-bar .gen-banner, .asm-toolbar > .gen-banner.read-only) { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }
+html[data-theme="dark"] .gen-banner.out-of-sync { background: rgba(240, 113, 107, .14); border-color: rgba(240, 113, 107, .45); color: #ffb4ae; }
+html[data-theme="dark"] .msg-warn .msg-icon { color: #000; }
+html[data-theme="dark"] .impact-chain { background: var(--m-surface-2); border-color: var(--m-border); }
+html[data-theme="dark"] .pin-planner td.conflict input { background: rgba(240, 113, 107, .25) !important; }
+html[data-theme="dark"] .console-page .diag-hint b { color: var(--m-fg); }
 /* the ISE style colour icons of trees, menus and tabs: a little softer on the dark background */
-html[data-ui="silinx"][data-theme="dark"] .tree .ico, html[data-ui="silinx"][data-theme="dark"] .tab > .ico { filter: brightness(.92) saturate(.9); }
+html[data-theme="dark"] .tree .ico, html[data-theme="dark"] .tab > .ico { filter: brightness(.92) saturate(.9); }
 
-html[data-ui="silinx"][data-theme="dark"] :is(.fsm-link, .tt-link) .gen-banner { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }
-html[data-ui="silinx"][data-theme="dark"] :is(.fsm-link, .tt-link) .gen-banner.out-of-sync { background: rgba(240, 113, 107, .14); border-color: rgba(240, 113, 107, .45); color: #ffb4ae; }
+html[data-theme="dark"] :is(.fsm-link, .tt-link) .gen-banner { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }
+html[data-theme="dark"] :is(.fsm-link, .tt-link) .gen-banner.out-of-sync { background: rgba(240, 113, 107, .14); border-color: rgba(240, 113, 107, .45); color: #ffb4ae; }
 
 /* the colour icons of the toolbars (drawn for a light background): inverted lightness, same hues */
-html[data-ui="silinx"][data-theme="dark"] :is(button, .se-btn, .tb-btn) svg:not([stroke="currentColor"]),
-html[data-ui="silinx"][data-theme="dark"] .menu-popup .chk svg { filter: invert(1) hue-rotate(180deg) brightness(1.05); }
+html[data-theme="dark"] :is(button, .se-btn, .tb-btn) svg:not([stroke="currentColor"]),
+html[data-theme="dark"] .menu-popup .chk svg { filter: invert(1) hue-rotate(180deg) brightness(1.05); }
 
 /* diagram editors in the dark theme: the sheets stay light paper (the live simulation colours are
    drawn for it) on a dark desk; panels, fields, headers and tips follow the theme */
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-canvas { background: #0b0d11; }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-pv, html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symrow.active .se-pv { border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-cathead { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-cathead::before { color: var(--m-muted); }
-html[data-ui="silinx"][data-theme="dark"] :is(.sch-editor .se-pins, .sch-editor .se-symdoc .sd-formula code) { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] :is(.sch-editor .se-hint, .sch-editor .se-prompt, .sch-editor .lv-tip) { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border-strong); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-prompt label, html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-status { color: var(--m-muted); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-code { background: var(--m-surface); color: #d6dae0; }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-code .tk-kw { color: #c792ea; }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-code .tk-com { color: #7d8794; }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symdoc .sd-body { background: var(--m-surface); color: var(--m-fg); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symdoc .sd-main h3 { border-color: var(--m-border); color: var(--m-fg); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symdoc :is(.sd-table th, .sd-truth tr.grp th) { background: var(--m-surface-2); color: var(--m-fg); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symdoc :is(.sd-table th, .sd-table td) { border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symdoc .sd-truth td.out { background: rgba(255, 255, 255, .04); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symdoc .sd-truth td.v1 { color: var(--m-success); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-symdoc .btn.on { background: var(--m-accent-soft); border-color: var(--m-accent); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .lv-editor { background: var(--m-surface-2); color: var(--m-fg); border-color: rgba(76, 192, 107, .5); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-simbar .btn.on { background: rgba(76, 192, 107, .25); border-color: rgba(76, 192, 107, .6); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .se-simbar { background: rgba(76, 192, 107, .12); border-color: rgba(76, 192, 107, .35); color: var(--m-fg); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .lv-badge { color: var(--m-success); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor :is(.lv-lbl, .lv-time) { color: var(--m-muted); }
-html[data-ui="silinx"][data-theme="dark"] .sch-editor .lv-clock { background: transparent; border-color: rgba(76, 192, 107, .35); }
+html[data-theme="dark"] .sch-editor .se-canvas { background: #0b0d11; }
+html[data-theme="dark"] .sch-editor .se-pv, html[data-theme="dark"] .sch-editor .se-symrow.active .se-pv { border-color: var(--m-border); }
+html[data-theme="dark"] .sch-editor .se-cathead { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
+html[data-theme="dark"] .sch-editor .se-cathead::before { color: var(--m-muted); }
+html[data-theme="dark"] :is(.sch-editor .se-pins, .sch-editor .se-symdoc .sd-formula code) { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
+html[data-theme="dark"] :is(.sch-editor .se-hint, .sch-editor .se-prompt, .sch-editor .lv-tip) { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border-strong); }
+html[data-theme="dark"] .sch-editor .se-prompt label, html[data-theme="dark"] .sch-editor .se-status { color: var(--m-muted); }
+html[data-theme="dark"] .sch-editor .se-code { background: var(--m-surface); color: #d6dae0; }
+html[data-theme="dark"] .sch-editor .se-code .tk-kw { color: #c792ea; }
+html[data-theme="dark"] .sch-editor .se-code .tk-com { color: #7d8794; }
+html[data-theme="dark"] .sch-editor .se-symdoc .sd-body { background: var(--m-surface); color: var(--m-fg); }
+html[data-theme="dark"] .sch-editor .se-symdoc .sd-main h3 { border-color: var(--m-border); color: var(--m-fg); }
+html[data-theme="dark"] .sch-editor .se-symdoc :is(.sd-table th, .sd-truth tr.grp th) { background: var(--m-surface-2); color: var(--m-fg); }
+html[data-theme="dark"] .sch-editor .se-symdoc :is(.sd-table th, .sd-table td) { border-color: var(--m-border); }
+html[data-theme="dark"] .sch-editor .se-symdoc .sd-truth td.out { background: rgba(255, 255, 255, .04); }
+html[data-theme="dark"] .sch-editor .se-symdoc .sd-truth td.v1 { color: var(--m-success); }
+html[data-theme="dark"] .sch-editor .se-symdoc .btn.on { background: var(--m-accent-soft); border-color: var(--m-accent); }
+html[data-theme="dark"] .sch-editor .lv-editor { background: var(--m-surface-2); color: var(--m-fg); border-color: rgba(76, 192, 107, .5); }
+html[data-theme="dark"] .sch-editor .se-simbar .btn.on { background: rgba(76, 192, 107, .25); border-color: rgba(76, 192, 107, .6); }
+html[data-theme="dark"] .sch-editor .se-simbar { background: rgba(76, 192, 107, .12); border-color: rgba(76, 192, 107, .35); color: var(--m-fg); }
+html[data-theme="dark"] .sch-editor .lv-badge { color: var(--m-success); }
+html[data-theme="dark"] .sch-editor :is(.lv-lbl, .lv-time) { color: var(--m-muted); }
+html[data-theme="dark"] .sch-editor .lv-clock { background: transparent; border-color: rgba(76, 192, 107, .35); }
 
 /* ------------------------------------------------------------------ narrow windows */
 @media (max-width: 1180px) {

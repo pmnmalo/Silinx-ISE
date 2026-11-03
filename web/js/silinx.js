@@ -1,4 +1,4 @@
-// Silinx interfaces: the Silinx interface (default) or the ISE style one, the colour theme of the Silinx interface
+// Silinx interfaces: the Silinx interface (default) or the ISE style one, the colour theme of both
 // (follows the system, light or dark) and the command palette (Ctrl+K / Cmd+K): every menu command and every project
 // file, searched by name.
 //
@@ -58,7 +58,7 @@ export function onPrefsChange(fn) { listeners.add(fn); return () => listeners.de
 export function applyPrefs(root = document.documentElement) {
   const ui = getInterface();
   const theme = getTheme();
-  const shown = ui !== 'ise' ? effectiveTheme(theme, !!darkQuery()?.matches) : 'light';   // the ISE look is light only
+  const shown = effectiveTheme(theme, !!darkQuery()?.matches);   // (both looks, light or dark: the ISE style's dark in ise-dark.css, #2676)
   root.dataset.ui = ui;
   if (ui === 'silinx') root.dataset.layout = 'tasks'; else delete root.dataset.layout;
   root.dataset.theme = shown;
