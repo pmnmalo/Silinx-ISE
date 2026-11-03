@@ -10,5 +10,6 @@ In detail:
   `mountAsmEditor`), as the text editors and the schematic do (#2697), and no longer the document's name, which is
   the tab's; the C source's HDL and the C model's bar without the name too. Test: test/ui/readonly-notice.test.js.
 - **The interface's rules for contributors (#2710):** docs/UI-GUIDELINES.md, linked from CLAUDE.md and ONBOARDING.md:
-  no bar above a document's toolbar, the read-only notice at its right, no Undo / Redo / Print in it, the side panel,
-  the hint line, the Design pane's badges.
+  no bar above a document's toolbar, the read-only notice at its right, no Undo / Redo / Print in it, the side panels
+  alike (foldable, over the canvas behind a ☰ button of the toolbar on a narrow screen), the hint line, the Design
+  pane's badges.
