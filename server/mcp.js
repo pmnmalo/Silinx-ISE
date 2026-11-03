@@ -20,6 +20,7 @@ import { SOURCE_TOOLS } from './mcp-sources.js';
 import { NEW_SOURCE_TOOLS } from './mcp-new-source.js';
 import { WIZARD_TOOLS } from './mcp-wizards.js';
 import { TEST_BENCH_TOOLS } from './mcp-test-bench.js';
+import { CONVERT_TOOLS } from './mcp-convert.js';
 import { TRANSFER_TOOLS } from './mcp-transfer.js';
 
 export { OPEN_REPORTS } from './mcp-processes.js';
@@ -32,8 +33,8 @@ const INSTRUCTIONS = 'Silinx ISE: FPGA design for teaching (Spartan-3E; Basys2, 
   + 'run_process (synthesize, implement, bitstream, timing, power, pins) and get_report. The Silinx toolchain needs no Xilinx ISE.';
 
 // the tools, by area: the projects and their files (mcp-projects.js), their settings (mcp-settings.js), their
-// new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), the HDL (mcp-hdl.js), the processes (mcp-processes.js)
-export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS];
+// new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), the conversions (mcp-convert.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), the HDL (mcp-hdl.js), the processes (mcp-processes.js)
+export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS];
 
 // ------------------------------------------------------------------ the protocol
 /** One request (or notification) of a client: its answer, or null for a notification. */
