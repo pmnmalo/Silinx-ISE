@@ -44,9 +44,9 @@ const pinsOf = (part, pkg, btn) => ({
   ...Object.fromEntries((LEDS[pkg] || LEDS[part]).map((p, i) => [`led<${i}>`, p])),
 });
 const DEVICES = [['xc3s100e', 'cp132'], ['xc3s250e', 'cp132'], ['xc3s500e', 'fg320'], ['xc3s1200e', 'fg320']];
-const WARNINGS = {
-  xc3s100e: ['Warning: place: u_clk_u_dcm: its CLKIN comes from the pad B8 through general routing: only B9, A9, A10, C9 reach the CLKIN of DCM_X0Y1 on a dedicated path of known bits'],
-};
+// (none: on the XC3S100E the DCM's CLKIN comes from B8 through general routing, CLOCK_DEDICATED_ROUTE = FALSE, which
+// Silinx's placer said and nextpnr does not, #2756, #2768)
+const WARNINGS = {};
 // the derived PERIOD of each output, as the open flow's timing prints it
 const PERIODS = {
   feat_clkwiz: ['CLK0 of u_clk_u_dcm: 20 ns', 'CLK2X of u_clk_u_dcm: 10 ns', 'CLKDV of u_clk_u_dcm: 80 ns', 'CLKFX of u_clk_u_dcm: 15.385 ns'],

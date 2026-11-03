@@ -1,5 +1,5 @@
-// packages/silinx-fpga/src/fpga/place-route.js: the one place and route of the Silinx toolchain's flows (the app's,
-// packages/silinx-fpga/research/s3e-route/open-flow.mjs, the design corpus's: #79, #88). A placement is exactly the
+// packages/silinx-fpga/src/fpga/place-route.js: the one place and route of the Silinx toolchain's flows (the app's
+// Silinx engine, the design corpus's: #79, #88; research/s3e-route/open-flow.mjs's is nextpnr's since #2756). A placement is exactly the
 // placer's with the delay table, the clock and global buffer sites of known bits; the routing the
 // timing-driven router's; tries keep the fastest; register replication (#4) is tried on the best
 // and kept only when faster.
@@ -232,15 +232,20 @@ test('placeRouteBest: a replicated design that cannot be placed is not kept (the
   assert.equal(best.packed, packed);
 });
 
-test('the three flows (the app\'s, open-flow.mjs, the design corpus\'s) place and route through placeRouteBest only (#79, #88)', () => {
+// (open-flow.mjs places and routes through the flow's nextpnr engine since #2756: runFlow, engine 'nextpnr', checked below)
+test('the flows (the app\'s Silinx engine, the design corpus\'s) place and route through placeRouteBest only (#79, #88)', () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-  for (const f of ['packages/silinx-fpga/src/open-flow-s3e.js', 'packages/silinx-fpga/research/s3e-route/open-flow.mjs', 'test/designs-corpus/run.mjs']) {
+  for (const f of ['packages/silinx-fpga/src/open-flow-s3e.js', 'test/designs-corpus/run.mjs']) {
     const src = fs.readFileSync(path.join(root, f), 'utf8');
     // (the app's: placeRouteBest unless its io gives another place and route, #1678)
     assert.match(src, /placeRouteBest\)?\((ctx\.netlist\(\)|netlist), packed, /, f);
     // no placement, routing or replication of their own
     for (const call of ['place(', 'routeDesign(', 'replicationPlan(', 'replicateCells(', 'placedXdl(']) assert.ok(!new RegExp(`[^\\w.]${call.replace('(', '\\(')}`).test(src), `${f}: ${call}`);
   }
+  const research = fs.readFileSync(path.join(root, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), 'utf8');
+  assert.match(research, /await runFlow\(spec, io\)/);
+  assert.match(research, /engine: 'nextpnr' \}/);
+  assert.doesNotMatch(research, /placeRouteBest|place-route\.js|replicate\.js/);
 });
 
 // Regression (#249): a routing the router leaves with nodes shared (it did not converge: secworks-sha256 on
