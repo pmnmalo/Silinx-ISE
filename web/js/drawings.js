@@ -10,6 +10,7 @@ import { S, activateDoc, closeDocByPath, compileProject, findDoc, flushDoc, hdlI
   openFile, setDirty, status } from './app.js';
 import { log } from './console.js';
 import { editorProblems } from './editor-problems.js';
+import { t, onLanguageChange } from './i18n.js';
 import { reloadProject } from './project.js';
 import { markStale, saveAll } from './processes.js';
 import { openModuleSource, removeModule, renderHierarchy, saveProjectJson, setTop, topMenuItem } from './design.js';
@@ -145,6 +146,12 @@ export async function openFsm(path) {
     create(el, d) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
+      // (its problems in the console's Errors and Warnings, a click selecting the state or the transition, #2737)
+      const problems = editorProblems({ file: path, tool: 'FSM', goto: (x) => { activateDoc(d); ed.focus(x); } });
+      // (in the interface's language, as the panel had them, again when it changes: the console shows a message as given)
+      let last = [];
+      const setProblems = (diags) => { last = diags; problems.set(diags.map(x => ({ ...x, message: t(x.message) }))); };
+      const offLang = onLanguageChange(() => setProblems(last));
       const ed = mountFsmEditor(host, {
         model,
         onChange: () => setDirty(d, true),
@@ -153,6 +160,7 @@ export async function openFsm(path) {
         onTruthTables: () => fsmTruthTables(path),
         onToAsm: () => fsmToAsmChart(path),
         onMessage: msg => log(`WARNING: ${path}: ${msg} (not applied)`, 'warn'),
+        onProblems: setProblems,
       });
       d.fsmEditor = ed;
       return {
@@ -161,7 +169,7 @@ export async function openFsm(path) {
           await api.writeFile(S.project.name, path, JSON.stringify(m, null, 2)); setDirty(d, false);
           if (!S.syncing) syncHdlFromFsm(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
         },
-        destroy: () => ed.destroy?.(),
+        destroy: () => { offLang(); problems.clear(); ed.destroy?.(); },
       };
     },
   });

@@ -2,14 +2,16 @@
 //
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
-//                                          onOpenFile(path), onTruthTables(), onToAsm(), onMessage(text), readOnly });
-//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
+//                                          onOpenFile(path), onTruthTables(), onToAsm(), onMessage(text), onProblems(diags),
+//                                          readOnly });
+//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.focus(d); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
 // curved arrows labelled "condition / outputs" (Mealy outputs) — Moore outputs are written inside
 // the circles; the reset's name on the arrow into the initial state. Double-click the background to add a state,
 // drag from the rim of a state to another state (or to itself) to add a transition, double-click a state or a label to
-// edit it in place (a text not valid: onMessage), drag a label to bend its arrow. The bottom panel shows the tables
+// edit it in place (a text not valid: onMessage), drag a label to bend its arrow. Its problems are not shown in it:
+// onProblems(diags) after every validation (drawings.js: the console's Errors and Warnings, editor-problems.js, #2737). The bottom panel shows the tables
 // (transition table, state table, encoded table for the binary / gray encodings) and a step-by-step simulation of the
 // diagram (current state highlighted, inputs set by hand, clock steps).
 // readOnly: a diagram to read (a Petri net's state machine, #2696): moved about, zoomed, its states and transitions
@@ -51,12 +53,12 @@ export function radiusOf(s) {
   return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, Math.ceil(textW(outs) / 2) + 10);
 }
 
-// (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion and the problems hidden,
-// with their separators)
-function readOnlyChrome({ root, toolbar, probSection }) {
+// (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion hidden, with their
+// separators)
+function readOnlyChrome({ root, toolbar }) {
   root.classList.add('asm-readonly');
   const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc'));
-  for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling, probSection]) g.hidden = true;
+  for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling]) g.hidden = true;
 }
 
 export function mountFsmEditor(container, opts = {}) {
@@ -148,12 +150,9 @@ export function mountFsmEditor(container, opts = {}) {
   const selSection = h('section', { class: 'asm-section fsm-selection' });
   const machineBody = h('div', { class: 'asm-section-body' });
   const machineSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Machine'), machineBody);
-  const probList = h('ul', { class: 'asm-problems' });
-  const probCount = h('span', { class: 'asm-prob-count' });
-  const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);
-  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection);
   mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
-  if (readOnly) readOnlyChrome({ root, toolbar, probSection });
+  if (readOnly) readOnlyChrome({ root, toolbar });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
 
   // ---------------------------------------------------------------------------- model helpers
@@ -263,23 +262,19 @@ export function mountFsmEditor(container, opts = {}) {
   const { renderSide } = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody, btn, stateById, transById,
     encOf, commit, deleteSelection, readOnly, render, updateToolbar });
 
-  // ---------------------------------------------------------------------------- problems
+  // ---------------------------------------------------------------------------- problems (to onProblems: the console, #2737)
   function validateSoon() { clearTimeout(timers.val); timers.val = setTimeout(runValidate, 120); }
   function runValidate() {
     if (destroyed || readOnly) return;
     diags = validateFsm(M);
-    probList.textContent = '';
-    const n = (s) => diags.filter((d) => d.severity === s).length;
-    probCount.textContent = diags.length ? `(${n('error')} error(s), ${n('warning')} warning(s))` : '';
-    probCount.className = `asm-prob-count ${n('error') ? 'c-err' : n('warning') ? 'c-warn' : 'c-ok'}`;
-    if (!diags.length) probList.append(h('li', { class: 'asm-prob ok' }, h('span', { class: 'asm-sev' }, '✓'), h('span', {}, 'No problems: the diagram is complete.')));
-    for (const d of diags) {
-      const li = h('li', { class: `asm-prob ${d.severity}${d.state || d.transition ? ' link' : ''}` },
-        h('span', { class: 'asm-sev' }, d.severity === 'error' ? '✖' : d.severity === 'warning' ? '▲' : 'i'), h('span', { class: 'fsm-msg' }, d.message));
-      if (d.transition || d.state) li.addEventListener('click', () => { sel = d.transition ? { type: 'trans', id: d.transition } : { type: 'state', id: d.state }; render(); renderSide(); });
-      probList.append(li);
-    }
+    opts.onProblems?.(diags.slice());
     render();
+  }
+  // the state or the transition a problem is about selected (a click on its row in the console)
+  function focus(d) {
+    const s = d.transition ? { type: 'trans', id: d.transition } : d.state ? { type: 'state', id: d.state } : null;
+    if (!s || !(s.type === 'state' ? stateById(s.id) : transById(s.id))) return;
+    sel = s; render(); renderSide(); root.focus({ preventScroll: true });
   }
 
   // ---------------------------------------------------------------------------- bottom panel (fsm-bottom.js)
@@ -330,6 +325,7 @@ export function mountFsmEditor(container, opts = {}) {
     setLink(file) { linkModel(M, file); hist = hist.map((s) => linkSnapshot(s, file, normalizeFsm)); refreshLink(); },
     refreshLink,
     validate: () => { runValidate(); return diags.slice(); },
+    focus,
     showPanel: (p) => { if (panel !== p) togglePanel(p); },
     fit,
     // (the view fitted when the canvas first had a size, or the user's own: the drawing stays where it is, #2397)

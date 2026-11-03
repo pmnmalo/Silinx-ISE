@@ -241,7 +241,7 @@ uiTest('Example traffic (New Project…), the second example: the state diagram 
   assert.ok(await page.eval((ed) => !!document.querySelector(`${ed} [data-state=s1].initial .fsm-circle-in`), FSM), 'CARS is the initial state');
   assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} [data-trans]`).length, FSM), 8);
   // no error, no warning (only the notes that each state waits for its condition)
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, FSM), /^Problems \(0 error\(s\), 0 warning\(s\)\)/);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#console-errors .diag, #console-warnings .diag')].map((r) => r.textContent).filter((t) => t.includes('traffic.fsm.json'))), []);   // (its problems: the console's, #2737)
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-link`)?.dataset.hdl === 'traffic.vhd' && !document.querySelector(`${ed} .fsm-link .gen-banner`), [FSM], { what: 'the diagram synchronized with traffic.vhd' });
   // the truth table: 4 inputs, its 5 lamp outputs, synchronized with lamps.vhd
   await page.eval(() => window.SilinxApp.openTt('src/lamps.bool.json'));

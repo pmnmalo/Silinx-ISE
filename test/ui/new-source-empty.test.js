@@ -34,9 +34,11 @@ uiTest('#2176 New Source without the wizard: the FSM empty, its first state draw
   await create(page, 'Finite State Machine (FSM)', 'det', 'fsm:src/det.fsm.json');
   const m = JSON.parse(await readWs(env, 'EmptyFsm', 'src/det.fsm.json'));
   assert.deepEqual([m.name, m.states, m.transitions, m.inputs, m.outputs, m.initial], ['det', [], [], [], [], '']);
-  await page.waitForSelector(`${DOC} .fsm-problems`);
+  // (its problems in the console's Errors, not in its lines nor in the editor, #2737)
+  await page.waitFor(() => document.querySelectorAll('#console-errors .diag').length === 1, [], { what: 'its problems' });
   assert.equal(await page.eval((d) => document.querySelectorAll(`${d} .fsm-state`).length, DOC), 0);
-  assert.deepEqual(await problems(page), ['✖The diagram has no states: double-click the drawing to add one']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#console-errors .diag')].map((r) => r.textContent)), ['ERROR:FSM - "src/det.fsm.json": The diagram has no states: double-click the drawing to add one']);
+  assert.deepEqual(await problems(page), []);
   assert.deepEqual(await logProblems(page), []);
   // the first state, double-clicked on the drawing
   await page.waitFor((d) => document.querySelector(`${d} .fsm-canvas`)?.getBoundingClientRect().width > 100, [DOC], { what: 'the drawing' });
@@ -47,7 +49,7 @@ uiTest('#2176 New Source without the wizard: the FSM empty, its first state draw
   await page.key('Enter');
   await page.waitFor((d) => [...document.querySelectorAll(`${d} .fsm-name`)].some((t) => t.textContent === 'S0'), [DOC], { what: 'state S0' });
   assert.equal(await page.eval(() => window.Silinx.active.fsmEditor.getModel().initial), await page.eval(() => window.Silinx.active.fsmEditor.getModel().states[0].id));
-  await page.waitFor(() => !/no states/.test(document.querySelector('.doc:not([hidden]) .fsm-problems').textContent), [], { what: 'the problem gone' });
+  await page.waitFor(() => ![...document.querySelectorAll('#console-errors .diag')].some((r) => /no states/.test(r.textContent)), [], { what: 'the problem gone' });
 }, { timeout: 120000 });
 
 uiTest('#2176 New Source without the wizard: the ASM chart empty, its first state box added', E, async (page) => {
