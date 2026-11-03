@@ -46,13 +46,18 @@ process.env.SILINX_CONFIG_DIR = path.join(tmp, 'config');
 // two builds at a time: each runs in its own process (server/open-flow-run.js), and one after another
 // they took most of the unit tests' time
 describe('the examples on every board', { concurrency: 2 }, () => {
-  // (#2638) micro80's ALU has a carry chain the Spartan-6's packer puts on one pin twice: refused with its reason
+  // (#2679) micro80's two block RAMs: the frame bitgen writes again is measured with one, so the Spartan-6's bitgen
+  // refuses it with its reason, after the implementation (its ALU's carry chain packs since #2638) and the timing
   for (const t of S6_TARGETS) {
-    test(`example micro80 on the ${targetName(t)}: refused, the pin named (#2638)`, { timeout: 600000 }, async () => {
+    test(`example micro80 on the ${targetName(t)}: implemented, its bitstream refused, the block RAMs named (#2679)`, { timeout: 600000 }, async () => {
       const { dir, project } = exampleProject('micro80', t, tmp);
       const job = await silinxFlow(dir, project);
+      const log = job.lines.join('\n');
       assert.equal(job.status, 'error');
-      assert.match(job.lines.join('\n'), /the Spartan-6 design cannot be placed: .*its pin AX carries/);
+      assert.match(log, /All signals are completely routed\./);
+      assert.match(log, /All constraints were met\./);
+      assert.match(log, /1 feature\(s\) of the design are not in the bit database: no bitstream\n\s*2 block RAMs: the frame bitgen writes again measured with one/);
+      assert.deepEqual(job.lines.filter(l => /warning/i.test(l)), []);
     });
   }
   for (const name of EXAMPLES) {
