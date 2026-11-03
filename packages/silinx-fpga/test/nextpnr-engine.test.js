@@ -589,6 +589,24 @@ for (const name of ['feat_bram', 'hard_prim', 'feat_constmult', 'feat_dcm2']) {
   });
 }
 
+// #2642: Silinx's test/fixtures/open-flow/feat_bramwiz_inf, a 512 x 16 RAM inferred onto a RAMB16_S18 whose DI<15> Yosys
+// leaves undriven (word<8> on DOPA0, word<9..15> on DOA8..14, DOA15 not read): tied to 0, ISE's DRC warned of a dangling
+// DOA15 (PhysDesignRules:812); left unconnected, as Silinx's packer does, it passes with no warning
+test('#2642 a block RAM\'s undriven data input built with --engine nextpnr: left unconnected, no warnings, a complete bitstream', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const netlist = path.join(dir, 'feat_bramwiz_inf.json');
+  fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('feat_bramwiz_inf.json.gz'))));
+  const out = [], err = [];
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--out-dir', dir, '--engine', 'nextpnr'], { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  const ram = design.insts.find(i => i.type === 'RAMB16').name;
+  const pins = design.nets.flatMap(n => n.inpins.filter(p => p.inst === ram && /^DI/.test(p.pin)).map(p => p.pin));
+  assert.deepEqual(pins.sort(), [...Array.from({ length: 15 }, (_, i) => `DIA${i}`), 'DIPA0', 'DIPA1'].sort());
+});
+
 test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its global buffer; an INST LOC as the DCM\'s BEL, a wrong site refused', () => {
   const json = () => fs.readFileSync(fixture('feat_dcm.json'), 'utf8'), ucf = fs.readFileSync(fixture('feat_dcm.ucf'), 'utf8');
   const { problems, sdc } = nextpnrNetlist(json(), 'top', ucf);

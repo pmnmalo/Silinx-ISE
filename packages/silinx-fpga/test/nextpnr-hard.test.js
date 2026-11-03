@@ -26,7 +26,7 @@ const dirs = c => Object.fromEntries(Object.keys(c).map(p => [p, /^(DO|P)/.test(
 // a module of one cell, its bits from `first` numbered
 const module = (type, connections, parameters = {}) => ({ ports: {}, cells: { c: { type, connections, parameters, port_directions: dirs(connections) } } });
 
-test('hardInputs: a RAMB16 parity bit written and not read goes to a free data bit; the others at 0; a port never written has its data free', () => {
+test('hardInputs: a RAMB16 parity bit written and not read goes to a free data bit; an undriven data bit free, the parity at 0; a port never written has its data free', () => {
   // 1024 x 18, 14 bits on DIA (the top two undriven), one in DIPA0, read on port B: DOB0-13 and DOPB0
   const m = module('RAMB16_S18_S18', {
     ADDRA: bus(100, 10), ADDRB: bus(110, 10), CLKA: [2], CLKB: [2], ENA: ['1'], ENB: ['1'], SSRA: ['0'], SSRB: ['0'], WEA: [3], WEB: ['0'],
@@ -41,7 +41,9 @@ test('hardInputs: a RAMB16 parity bit written and not read goes to a free data b
   // the parity bit on the first data bit nobody uses (13 is used: bits 14, 15 free on both ports' sides)
   assert.equal(c.connections.DIA[14], 24);
   assert.deepEqual(c.connections.DIA.slice(0, 14), bus(10, 14));
-  assert.equal(c.connections.DIA[15], '0');
+  // the data bit left undriven stays free, as Silinx's packer leaves it (tied to 0, ISE's DRC called DOA15 a dangling
+  // pin, #2642); the parity inputs at 0 (all or none)
+  assert.equal(c.connections.DIA[15], 'x');
   assert.deepEqual(c.connections.DIPA, ['0', '0']);
   // what port B read in DOPB0 is now read in DOB14, the bit that moved
   assert.equal(c.connections.DOB[14], 66);
