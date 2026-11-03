@@ -319,11 +319,15 @@ export async function openPetri(path) {
     create(el, d) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
+      // (its problems in the console's Errors and Warnings, a click selecting the item; its messages in the console, #2718)
+      const problems = editorProblems({ file: path, tool: 'PetriNet', goto: (x) => { activateDoc(d); if (x.ref?.id) ed.select(x.ref); } });
       const ed = mountPetriEditor(host, {
         model,
         onChange: () => setDirty(d, true),
         linkInfo: () => { const f = S.schOwners?.[path]; return f ? { file: f } : null; },
         onOpenFile: f => openFile(f),
+        onProblems: (diags) => problems.set(diags),
+        onMessage: (text, err) => log(err ? `WARNING: ${path.split('/').pop()}: ${text}` : `${path.split('/').pop()}: ${text}`, err ? 'warn' : 'info'),
       });
       d.petriEditor = ed;
       return {
@@ -332,7 +336,7 @@ export async function openPetri(path) {
           await api.writeFile(S.project.name, path, JSON.stringify(m, null, 2)); setDirty(d, false);
           if (m.generatedFile && S.fileTree.includes(m.generatedFile)) await syncHdlFromPetri(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
         },
-        destroy: () => ed.destroy?.(),
+        destroy: () => { problems.clear(); ed.destroy?.(); },
       };
     },
   });

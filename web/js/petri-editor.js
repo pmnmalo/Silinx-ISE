@@ -1,8 +1,10 @@
 // Silinx - Petri net editor (documents <name>.pn.json; SVG, no framework).
 //
 //   import { mountPetriEditor } from './petri-editor.js';
-//   const ed = mountPetriEditor(container, { model, onChange(model), linkInfo() -> { file } | null, onOpenFile(path) });
-//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.print(); ed.destroy();
+//   const ed = mountPetriEditor(container, { model, onChange(model), linkInfo() -> { file } | null, onOpenFile(path),
+//     onProblems(diags), onMessage(text, isError) });
+//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.print();
+//   ed.select({ kind, id }); ed.destroy();
 //
 // Places are circles holding their tokens (dots, or a number), transitions bars; an arc goes from a
 // place to a transition (it takes tokens: its weight) or from a transition to a place (it puts them);
@@ -12,6 +14,9 @@
 // simulates it: click an enabled transition to fire it (the token game), or a clock step (every
 // enabled transition whose guard is true fires, as the generated hardware does), run, reset; and analyses it.
 // The HDL generated from the net is its linked file. Model, simulation, HDL and PNML: core/petri.js.
+// No hint and no status line (docs/UI-GUIDELINES.md, #2735): the net's counts at the toolbar's right, the zoom beside
+// its tools; its problems (`onProblems`, after every change) and its messages (`onMessage`: an arc that cannot be,
+// a PNML not read, a transition not enabled) go to the console (drawings.js, editor-problems.js; #2718).
 
 import { h, downloadText, linkModel, linkSnapshot, twoFingerView } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
@@ -77,6 +82,7 @@ export function mountPetriEditor(container, opts = {}) {
   });
   const linkHost = h('span', { class: 'pn-link' });
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
+  const info = h('span', { class: 'asm-info' });   // (the net's counts, at the toolbar's right)
   const more = toolbarMenu([tabBtns.analysis,
     btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
     btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()),
@@ -84,19 +90,18 @@ export function mountPetriEditor(container, opts = {}) {
   const toolbar = h('div', { class: 'asm-toolbar pn-toolbar' },
     h('div', { class: 'asm-group' }, ...Object.values(tools)), sep(),
     h('div', { class: 'asm-group' }, delBtn), sep(),
-    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBtn(f), () => fit())), sep(),
+    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBtn(f), () => fit()), zoomLbl), sep(),
     h('div', { class: 'asm-group' }, tabBtns.sim, pnmlIn),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
-    more.el, linkHost);
+    info, more.el, linkHost);
 
   // ---------------------------------------------------------------- canvas, panels
   const defs = sv('defs', {},
     sv('marker', { id: `${uid}-arr`, viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '8', markerHeight: '8', orient: 'auto-start-reverse' }, sv('path', { d: 'M0,0 L10,5 L0,10 z', class: 'pn-arrowhead' })));
   const world = sv('g', { class: 'pn-world' });
   const svg = sv('svg', { class: 'asm-canvas pn-canvas' }, defs, world);
-  const hint = h('div', { class: 'asm-hint' }, 'Place / Transition: click to add · Arc: click its two ends · drag to move · Del to delete · wheel to zoom');
-  const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg, hint);
+  const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg);
   const panelTitle = h('span', { class: 'asm-code-title' });
   const panelTools = h('span', { class: 'pn-panel-tools' });
   const panelBody = h('div', { class: 'pn-panel-body' });
@@ -106,14 +111,10 @@ export function mountPetriEditor(container, opts = {}) {
   const selSection = h('section', { class: 'asm-section pn-selection' });
   const netBody = h('div', { class: 'asm-section-body' });
   const netSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Net'), netBody);
-  const probList = h('ul', { class: 'asm-problems' });
-  const probCount = h('span', { class: 'asm-prob-count' });
-  const probSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Problems ', probCount), probList);
-  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection);
   mountSideFold({ root, side, key: 'silinx.petri.props.folded' });
-  const statusInfo = h('span', {}), statusMsg = h('span', { class: 'asm-status-msg' });
-  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
-  const status = (msg, err = false) => { statusMsg.textContent = msg || ''; statusMsg.classList.toggle('err', !!err); };
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
+  const status = (msg, err = false) => { if (msg) opts.onMessage?.(msg, err); };   // (in the console)
 
   // ---------------------------------------------------------------- model edits, history
   const placeOf = id => M.places.find(p => p.id === id);
@@ -189,13 +190,13 @@ export function mountPetriEditor(container, opts = {}) {
     M: () => M, arcFrom: () => arcFrom, delBtn, destroyed: () => destroyed, drag: () => drag,
     envOf: (...a) => envOf(...a), nodeOf, placeOf,
     refreshLink: (...a) => refreshLink(...a), renderPanel: (...a) => renderPanel(...a),
-    renderSide: (...a) => renderSide(...a), sel: () => sel, sim: () => sim, statusInfo, svg, uid,
+    renderSide: (...a) => renderSide(...a), sel: () => sel, sim: () => sim, info, svg, uid,
     view: () => view, world, zoomLbl
   });
 
   // ---------------------------------------------------------------- side panel (petri-side.js)
   const { refreshLink, renderSide } = mountPetriSide({
-    opts, M: () => M, btn, commit, linkHost, netBody, nodeOf, placeOf, probCount, probList, render, sel: () => sel,
+    opts, M: () => M, btn, commit, linkHost, netBody, nodeOf, placeOf, render, sel: () => sel,
     selSection, status, transOf, setSel: (v) => { sel = v; }
   });
 
@@ -325,6 +326,8 @@ export function mountPetriEditor(container, opts = {}) {
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file, normalizePetri); }); refreshLink(); },
     fit, refreshLink, print,
+    // (a problem's item, from the console)
+    select(ref) { if (!nodeOf(ref.id) && !M.arcs.some(a => a.id === ref.id)) return; sel = { kind: ref.kind, id: ref.id }; render(); },
     destroy() { destroyed = true; ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
   };
 }

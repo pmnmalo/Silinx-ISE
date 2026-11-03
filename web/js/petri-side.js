@@ -1,6 +1,7 @@
 // The Petri net editor's side panel (#405: out of mountPetriEditor in petri-editor.js): the selection's fields (a
 // place's name, tokens, capacity and outputs; a transition's name, guard, pulses and priority; an arc's weight and
-// inhibitor), the net's (its name, inputs, outputs, clock, reset, description), its problems, and the link to its HDL.
+// inhibitor), the net's (its name, inputs, outputs, clock, reset, description) and the link to its HDL; its problems go to
+// the console (opts.onProblems, #2718).
 import { formatOutputs, parseOutputs } from '/core/fsm.js';
 import { h } from './ui.js';
 import { validatePetri } from '/core/petri.js';
@@ -14,17 +15,19 @@ const parseIo = text => String(text || '').split(/[,;\s]+/).map(s => s.trim()).f
 /** { refreshLink, renderSide } of mountPetriEditor (M(), sel(): its current values). */
 export function mountPetriSide(ctx) {
   const {
-    opts, M, btn, commit, linkHost, netBody, nodeOf, placeOf, probCount, probList, render, sel, selSection, status,
+    opts, M, btn, commit, linkHost, netBody, nodeOf, placeOf, render, sel, selSection, status,
     transOf, setSel
   } = ctx;
 
+  let said = null;   // (the problems last said)
   // ---------------------------------------------------------------- side panel
   const field = (label, input, hintText) => h('label', { class: 'asm-field' }, h('span', { class: 'asm-label' }, label), input, hintText ? h('span', { class: 'asm-fhint' }, hintText) : null);
   const text = (value, onChange, cls = '') => { const i = h('input', { type: 'text', class: `asm-input ${cls}`, value: value ?? '', spellcheck: 'false' }); i.addEventListener('change', () => onChange(i.value)); return i; };
   const number = (value, min, max, onChange) => { const i = h('input', { type: 'number', class: 'asm-input', value: String(value), min: String(min), max: String(max) }); i.addEventListener('change', () => onChange(Math.max(min, Math.min(max, Math.round(+i.value || min))))); return i; };
   function renderSide() {
     selSection.replaceChildren();
-    if (!sel()) selSection.append(h('p', { class: 'asm-muted' }, 'Nothing selected: click a place, a transition or an arc'));
+    selSection.hidden = !sel();   // (nothing selected: nothing said, #2735)
+    if (!sel()) { /* the net's fields only */ }
     else if (sel().kind === 'place') {
       const p = placeOf(sel().id);
       if (p) selSection.append(h('h3', {}, `Place ${p.name}`),
@@ -56,14 +59,9 @@ export function mountPetriSide(ctx) {
       field('Clock', text(M().clock, v => { M().clock = v.trim() || 'clk'; commit(); }, 'mono')),
       field('Reset (synchronous, to the initial marking)', text(M().reset.name, v => { M().reset.name = v.trim() || 'rst'; commit(); }, 'mono')),
       field('Description', (() => { const ta = h('textarea', { class: 'asm-input', rows: 2 }, M().description || ''); ta.addEventListener('change', () => { M().description = ta.value; commit(); }); return ta; })()));
-    // the problems
-    const diags = validatePetri(M());
-    probList.replaceChildren(...diags.map(d => {
-      const li = h('li', { class: `asm-prob ${d.severity}` }, d.message);
-      if (d.ref?.id) li.addEventListener('click', () => { setSel({ kind: d.ref.kind, id: d.ref.id }); render(); });
-      return li;
-    }));
-    probCount.textContent = diags.length ? `(${diags.length})` : '';
+    // its problems: to the console (#2718), when they changed
+    const diags = validatePetri(M()), key = JSON.stringify(diags.map(d => [d.severity, d.message]));
+    if (key !== said) { said = key; opts.onProblems?.(diags); }
   }
   function refreshLink() {
     const li = opts.linkInfo?.();
