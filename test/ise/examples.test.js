@@ -26,7 +26,10 @@ const LOCAL = process.env.SILINX_ISE_HOST === 'local';
 const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILINX_ISE_HOST || '');
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the ISE Docker image), or local (the image here)' : false;
 // known failures of the Silinx toolchain, with their issue
-const KNOWN = {};
+const KNOWN = {
+  // micro80's register bank (RAM32M): its D LUT's DI1 / DI2 and WA pins with no net, 4 errors in ISE's DRC (#2755)
+  'micro80-nexys3': '#2755', 'micro80-atlys': '#2755',
+};
 // the warnings ISE gives on each example (the same on every device, the Spartan-6's too, #2321): XST, map, par
 const ISE_WARNINGS = {
   gates: [],
