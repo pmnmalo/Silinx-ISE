@@ -1,7 +1,8 @@
 // The Board Emulator's VGA monitor and side panel (#405: out of mountEmulator in emulator.js): the picture the design
 // scans out on the VGA connector (#420), the signals watched, the ports on no pin of the board, and the log with
 // why the engine runs the design as it does. The side panel is at the right of the board, as the diagram editors'
-// Properties, folded as theirs (side-fold.js, #2666); below the board on a narrow window.
+// Properties, folded as theirs (side-fold.js, #2666); over the board on a narrow window, shown by the bar's ☰ Properties
+// (#2713).
 import { h } from './dom.js';
 import { vgaPixels } from '/core/vga.js';
 import { mountSideFold } from './side-fold.js';

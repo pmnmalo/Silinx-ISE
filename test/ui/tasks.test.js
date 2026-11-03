@@ -541,7 +541,8 @@ uiTest('#800 Tasks ▸ Simulate: the waves get the screen; Simulate runs the tes
 }, { build: DEV });
 
 // #801: Emulate gives the board the screen: zoomed to fit, its switches and buttons inside the window with no scrolling
-// (a laptop, a tablet in portrait, a lab desktop); its Watch the task's side panel, beside the board or below it
+// (a laptop, a tablet in portrait, a lab desktop); its Watch the task's side panel, beside the board or, narrow, over it
+// behind the emulator's ☰ Properties (#2713)
 const boardFit = (page) => page.eval(() => {
   const emu = document.querySelector('.doc:not([hidden]) .emu'), wrap = emu.querySelector('.emu-board-wrap');
   const ctrls = [...emu.querySelectorAll('.emu-btn, .emu-sw')];
@@ -553,7 +554,7 @@ const boardFit = (page) => page.eval(() => {
   return { zoom: +wrap.style.zoom || 1, controls: ctrls.length, inside, aim, noScroll: emu.scrollHeight <= emu.clientHeight + 1,
     side: side.getClientRects().length ? (sr.left >= wr.right - 1 ? 'beside' : sr.top >= wr.bottom - 1 ? 'below' : 'over') : 'folded' };
 });
-uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on screen; its Watch beside the board or below it', E, async (page) => {
+uiTest('#801 #2713 Tasks ▸ Emulate: the board fits, its switches and buttons on screen; its Watch beside the board or over it behind ☰ Properties', E, async (page) => {
   await makeProject(env, { name: 'TasksEmu', template: 'blinky' });
   await page.setViewport(1680, 1050);   // (a laptop: the side panel, the board and the Watch side by side, #1399)
   await tasksInterface(page);
@@ -571,12 +572,17 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
   let f = await boardFit(page);
   // (the board at its proper size at least, #1021: on a screen 768 high its note may be scrolled to)
   assert.ok(f.controls >= 12 && f.inside && f.aim && f.side === 'beside', JSON.stringify(f));
-  // a tablet in portrait: the board at its size (#1021), Watch below it
+  // a tablet in portrait: the board at its size (#1021), the Watch behind the emulator's ☰ Properties, over the board
+  // when shown (#2713)
   await page.setViewport(820, 1180);
   // (the side panel docked there, as Implement's, #1463)
-  await page.waitFor(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); const s = e.querySelector('.emu-side').getBoundingClientRect(); const b = e.querySelector('.emu-board-wrap').getBoundingClientRect(); return s.top >= b.bottom - 1 && b.right <= innerWidth; }, [], { what: 'Watch below the board, the board refitted' });
+  await page.waitFor(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); const b = e.querySelector('.emu-board-wrap').getBoundingClientRect(); return !e.querySelector('.emu-side').getClientRects().length && e.querySelector('.emu-props-btn').getClientRects().length && b.right <= innerWidth; }, [], { what: 'Watch behind ☰ Properties, the board refitted' });
   f = await boardFit(page);
-  assert.ok(f.inside && f.aim && f.side === 'below', JSON.stringify(f));
+  assert.ok(f.inside && f.aim && f.side === 'folded', JSON.stringify(f));
+  await page.click('.doc:not([hidden]) .emu-props-btn');
+  f = await boardFit(page);
+  assert.ok(f.inside && f.side === 'over', JSON.stringify(f));
+  await page.click('.doc:not([hidden]) .emu-props-btn');
   assert.deepEqual(await noOverflow(page), { page: true, over: [] });
   // a lab desktop, the side panel folded (the Watch kept, beside the board, #1399): a larger board
   await page.setViewport(1920, 1080);
@@ -595,19 +601,19 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
 // #1021, #1999: the board fits the window (zoomed up on a large window; down on a smaller one, a tablet, to 0.7 at
 // least), the emulator's bar above it, never under it; when the width runs short, the VGA monitor wraps to the next
 // row, below the board, and the board's area scrolls down, not across; the Watch in the side panel at the board's right
-// (#2666), below it when the emulator is narrow (a tablet); a laptop, a tablet in landscape and in portrait; the ISE
+// (#2666), behind the emulator's ☰ Properties when it is narrow (a tablet, #2713); a laptop, a tablet in landscape and in portrait; the ISE
 // style interface as before
 const emuLayout = (page) => page.eval(() => {
   const emu = document.querySelector('.doc:not([hidden]) .emu'), wrap = emu.querySelector('.emu-board-wrap'), pcb = wrap.querySelector('.emu-pcb');
   const wr = wrap.getBoundingClientRect(), pr = pcb.getBoundingClientRect();
   const where = (el) => { const r = el.getBoundingClientRect(); return !el.getClientRects().length ? 'folded' : r.left >= wr.right - 1 ? 'beside' : r.top >= wr.bottom - 1 ? 'below' : 'over'; };
-  // (the board's area scrolls, the side panel beside it; the whole emulator on a narrow window, the side panel below it)
+  // (the board's area scrolls, the side panel beside it, or over it on a narrow window)
   const main = emu.querySelector('.emu-main'), scrolls = (k) => [emu, main].some((e) => e[`scroll${k}`] > e[`client${k}`] + 1);
   return { zoom: +wrap.style.zoom || 1, proper: pr.width >= parseFloat(pcb.style.width) - 0.5 && pr.height >= parseFloat(pcb.style.height) - 0.5,
     watch: where(emu.querySelector('.emu-side')), vga: where(emu.querySelector('.emu-vga')),
     scrollsDown: scrolls('Height'), scrollsAcross: scrolls('Width') };
 });
-uiTest('#1021 #1999 #2666 Tasks ▸ Emulate: the board fits the window; the VGA monitor wraps below it, scrolling down; the Watch at its right, below it when narrow; ISE style as before', E, async (page) => {
+uiTest('#1021 #1999 #2666 #2713 Tasks ▸ Emulate: the board fits the window; the VGA monitor wraps below it, scrolling down; the Watch at its right, behind ☰ Properties when narrow; ISE style as before', E, async (page) => {
   await makeProject(env, { name: 'TasksWrap', template: 'vga' });
   await page.setViewport(1280, 800);
   await tasksInterface(page);
@@ -626,14 +632,14 @@ uiTest('#1021 #1999 #2666 Tasks ▸ Emulate: the board fits the window; the VGA 
   let L = await at(1680, 1050);
   assert.ok(L.zoom >= 1, JSON.stringify(L));
   assert.deepEqual({ ...L, zoom: undefined }, { zoom: undefined, proper: true, watch: 'beside', vga: 'below', scrollsDown: true, scrollsAcross: false });
-  // (smaller than its proper size, down to 0.7, and the bar above the board, #1999; the Watch below it, or beside it
-  // when the board, fitting the height, leaves it the room: the Basys2 in its proportions, #2479)
-  const fits = (L, what, watch = ['below']) => assert.ok(L.zoom >= 0.7 && L.zoom < 1 && !L.proper && watch.includes(L.watch) && L.vga === 'below' && !L.scrollsAcross, `${what}: ${JSON.stringify(L)}`);
+  // (smaller than its proper size, down to 0.7, and the bar above the board, #1999; the Watch behind ☰ Properties
+  // (#2713), or beside it when the board, fitting the height, leaves it the room: the Basys2 in its proportions, #2479)
+  const fits = (L, what, watch = ['folded']) => assert.ok(L.zoom >= 0.7 && L.zoom < 1 && !L.proper && watch.includes(L.watch) && L.vga === 'below' && !L.scrollsAcross, `${what}: ${JSON.stringify(L)}`);
   const barAbove = () => page.eval(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); return e.querySelector('.emu-bar').getBoundingClientRect().bottom <= e.querySelector('.emu-board-wrap').getBoundingClientRect().top; });
   L = await at(1280, 800);
-  fits(L, 'a smaller laptop', ['below', 'beside']);
-  // a tablet in landscape: the side panel docked, not a drawer (#1418); the board smaller beside it, the Watch (the
-  // emulator narrow, #2666) and the VGA monitor below it, the area scrolling down only; the emulator's bar (two rows)
+  fits(L, 'a smaller laptop', ['folded', 'beside']);
+  // a tablet in landscape: the side panel docked, not a drawer (#1418); the board smaller beside it, the Watch behind ☰
+  // Properties (the emulator narrow, #2666, #2713), the VGA monitor below it, the area scrolling down only; the emulator's bar (two rows)
   // above the board
   L = await at(1024, 768);
   fits(L, 'a tablet in landscape');

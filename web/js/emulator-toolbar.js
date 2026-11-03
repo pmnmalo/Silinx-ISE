@@ -5,6 +5,7 @@
 import { h } from './dom.js';
 import { HIDDEN_KEY, SPEEDS } from './emulator.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { panelToggle, PROPS_KEY } from './narrow.js';
 
 /** { main, menu, resetBtn, root, runBtn, stat, stepBtn } (menu: the toolbar menu's element, its rows appended) of mountEmulator (compiled(), engineNote(), running(), speed(), whenHidden(): its current values). */
 export function mountEmuToolbar(ctx) {
@@ -50,7 +51,10 @@ export function mountEmuToolbar(ctx) {
     { title: 'Engine, when hidden, modules shown', btnClass: 'btn' });
   root.append(h('div', { class: 'emu-bar' }, modelSel ? 'Model:' : null, modelSel, modelSel ? h('span', { class: 'sep' }) : null,
     runBtn, stepBtn, resetBtn, h('span', { class: 'sep' }), 'Clock:', speedSel,
-    timingSel ? h('span', { class: 'sep' }) : null, timingSel ? 'Timing:' : null, timingSel, more.el, stat));
+    timingSel ? h('span', { class: 'sep' }) : null, timingSel ? 'Timing:' : null, timingSel,
+    // (the side panel over the board when the emulator is narrow, shown by its button as the diagram editors', #2713)
+    panelToggle(root, h('button', { class: 'btn emu-props-btn', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY, narrowOnly: false }),
+    more.el, stat));
 
   // the board and its modules (main), the side panel at its right (emulator-side.js)
   const main = h('div', { class: 'emu-main' });
