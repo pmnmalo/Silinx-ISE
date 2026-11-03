@@ -55,6 +55,9 @@ the code and the lessons learnt.
   - the new module gets its own test (mounted alone, or on real designs), and core moves are checked against
     main's module on the repository's corpus (every HDL file, schematic, chart) with the same output;
   - a module that holds interface labels (`text: '…'`) joins the list of files `test/web-i18n.test.js` scans.
+- **The interface's rules** are in [docs/UI-GUIDELINES.md](docs/UI-GUIDELINES.md): read them before changing an editor or a
+  view. Among them: no bar above an editor's or viewer's toolbar (its name is the tab's), a read-only notice at the right
+  end of the toolbar, no Undo / Redo / Print in a document's toolbar (the main toolbar's).
 - Every label of the interface has a Portuguese translation in `web/js/i18n.js` (anchored patterns,
   `^…$`); `test/web-i18n.test.js` checks it.
 - The Design pane shows one row per module: its drawing (schematic, ASM, FSM, truth table, Petri

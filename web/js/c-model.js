@@ -27,7 +27,7 @@ export async function openCModel(mod) {
   return openDoc({
     id, title: name, tooltip: `${name}, the C model of ${mod}`, icon: 'file',
     create(el, d) {
-      const bar = h('div', { class: 'editor-bar' }, h('span', { class: 'path' }, name), h('span', { class: 'gen-banner read-only' }, `Read-only, the C model of ${mod}`));
+      const bar = h('div', { class: 'editor-bar' }, h('span', { class: 'gen-banner read-only' }, `Read-only, the C model of ${mod}`));   // (no name: the tab's, #2710)
       const host = h('div', { class: 'editor-host' });
       el.append(bar, host);
       d.editor = createEditor(host, { text: r.text, lang: 'c', path: name, readOnly: true });
