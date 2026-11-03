@@ -844,13 +844,22 @@ export async function startRecordingProxy() {
  * The npm dependencies (package.json "dependencies") missing from <root>/node_modules. The server
  * serves the editor (CodeMirror), ELK and YoWASP from there: without them every page fails (the
  * editor's modules are not found), as in a fresh clone or worktree, where Node may still find
- * express in a parent folder's node_modules (#64).
+ * express in a parent folder's node_modules (#64). One installed at another version than package-lock.json's is
+ * listed too, as "name installed, not locked": a worktree's node_modules left from an older main (nextpnr 0.13.0 for
+ * 0.15.0, the browser edition's default engine) made the Silinx toolchain's tests time out (#2649).
  */
 export function missingDependencies(root = ROOT) {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  return Object.keys(pkg.dependencies || {}).filter((d) => !fs.existsSync(path.join(root, 'node_modules', d, 'package.json')));
+  let lock = {};
+  try { lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8')).packages || {}; } catch { /* no lockfile: names only */ }
+  return Object.keys(pkg.dependencies || {}).flatMap((d) => {
+    const file = path.join(root, 'node_modules', d, 'package.json');
+    if (!fs.existsSync(file)) return [d];
+    const want = lock[`node_modules/${d}`]?.version, have = JSON.parse(fs.readFileSync(file, 'utf8')).version;
+    return want && have !== want ? [`${d} ${have}, not ${want}`] : [];
+  });
 }
-export const dependenciesMessage = (missing) => `UI tests: npm dependencies missing from node_modules (${missing.join(', ')}): run npm ci`;
+export const dependenciesMessage = (missing) => `UI tests: npm dependencies missing from node_modules or out of date (${missing.join(', ')}): run npm ci`;
 /** The browser of the UI tests: chrome (default, CDP), or firefox / webkit / chromium (Playwright). */
 export const BROWSER = (process.env.SILINX_UI_BROWSER || 'chrome').toLowerCase();
 // a tablet (#1130): its screen in each orientation (an iPad Air's, 10.9"), its browser's User-Agent; a test that says

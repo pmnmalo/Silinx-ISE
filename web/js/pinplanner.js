@@ -1,5 +1,10 @@
 // I/O Pin Planning: assign top-level ports to package pins / board resources and write the UCF.
+// The look of the diagram editors (#2671, asm-editor.css): their toolbar, and their side panel for the board's resources,
+// folded to a strip (side-fold.js), its groups folded each, over the table on a narrow window (narrow.js).
 import { constraintsExt, readPins, writePins } from './constraints-format.js';
+import { toolWide } from './editor-icons.js';
+import { mountSideFold } from './side-fold.js';
+import { panelToggle, RESOURCES_KEY } from './narrow.js';
 import { api } from './api.js';
 import { icons } from './icons.js';
 import { h, toast, confirmDlg } from './ui.js';
@@ -11,7 +16,7 @@ export function mountPinPlanner(el, doc, top) {
   const pj = S.project;
   const db = S.devices;
   const board = app.projectBoard(pj);
-  const root = h('div', { class: 'pin-planner' });
+  const root = h('div', { class: 'asm-editor pin-planner' });
   el.append(root);
 
   // ports of the top module (elaborated to get real widths)
@@ -77,13 +82,22 @@ export function mountPinPlanner(el, doc, top) {
 
   const tableHost = h('div', { class: 'pp-table' });
   const resHost = h('div', { class: 'pp-res' });
-  const status = h('span', { style: { color: 'var(--grey-3)', marginLeft: '10px' } });
-  const bar = h('div', { class: 'pp-bar' },
-    h('button', { class: 'btn', onclick: () => autoAssign(), disabled: !board, title: board ? 'Match port names with board resources (clk, led, sw, btn, seg, an…)' : 'Select a board in Design Properties' }, 'Auto-assign from Board'),
-    h('button', { class: 'btn', onclick: () => { asg = {}; clocks = []; render(); changed(); } }, 'Clear All'),
-    h('span', {}, `Top: ${top} · Device ${pj.device.part}-${pj.device.package}${board ? ` · Board: ${board.name}` : ' · no board selected'}`),
-    status);
-  root.append(bar, h('div', { class: 'pp-body' }, tableHost, resHost));
+  const status = h('span', { class: 'pp-status' });
+  const sep = () => h('span', { class: 'asm-sep' });
+  const autoBtn = toolWide('beautify', 'Auto-assign from Board', board ? 'Match port names with board resources (clk, led, sw, btn, seg, an…)' : 'Select a board in Design Properties', () => autoAssign());
+  autoBtn.disabled = !board;
+  const bar = h('div', { class: 'asm-toolbar pp-bar' },
+    h('div', { class: 'asm-group' }, autoBtn, toolWide('del', 'Clear All', 'Remove every pin assignment', () => { asg = {}; clocks = []; render(); changed(); })),
+    sep(),
+    h('span', { class: 'pp-info' }, `Top: ${top} · Device ${pj.device.part}-${pj.device.package}${board ? ` · Board: ${board.name}` : ' · no board selected'}`),
+    sep(), status,
+    h('div', { class: 'asm-spacer' }),
+    // (a narrow window: the board's resources over the table, shown by this)
+    h('div', { class: 'asm-group' }, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })));
+  const side = h('aside', { class: 'asm-side pp-side' }, h('div', { class: 'asm-cap' }, 'Board Resources'), resHost);
+  root.append(bar, h('div', { class: 'asm-body' }, h('div', { class: 'asm-main' }, tableHost), side));
+  mountSideFold({ root, side, key: 'silinx.pins.props.folded', titles: { fold: 'Collapse the Board Resources panel', unfold: 'Expand the Board Resources panel' } });
+  const closedGroups = new Set();   // (the groups folded, kept when the panel is drawn again: render)
 
   function used() {
     const m = new Map();
@@ -131,14 +145,21 @@ export function mountPinPlanner(el, doc, top) {
     const assigned = nets.filter(n => asg[n.net]?.loc).length;
     status.textContent = `${assigned}/${nets.length} I/Os assigned`;
     // resources panel
+    // (the groups folded, read before they are drawn again)
+    for (const d of resHost.querySelectorAll('details.pp-grp')) { const name = d.dataset.grp; if (d.open) closedGroups.delete(name); else closedGroups.add(name); }
     resHost.innerHTML = '';
-    if (!board) { resHost.append(h('div', { style: { color: 'var(--grey-5)' } }, 'No board selected. Choose one in Project ▸ Design Properties to see the board resources and auto-assign pins.')); return; }
-    let grp = null;
+    if (!board) { resHost.append(h('div', { class: 'asm-section pp-none' }, 'No board selected. Choose one in Project ▸ Design Properties to see the board resources and auto-assign pins.')); return; }
+    let grp = null, body = null;
     for (const r of board.resources) {
-      if (r.group !== grp) { grp = r.group; resHost.append(h('div', { class: 'grp' }, grp || 'Other')); }
+      if (!body || r.group !== grp) {
+        grp = r.group;
+        const name = grp || 'Other';
+        body = h('div', { class: 'asm-section-body' });
+        resHost.append(h('details', { class: 'asm-section pp-grp', 'data-grp': name, open: !closedGroups.has(name) }, h('summary', {}, name), body));
+      }
       r.pins.forEach((pin, i) => {
         const who = u.get(pin);
-        resHost.append(h('div', { class: `res${who ? ' used' : ''}`, title: `${r.label}${r.verified === false ? ' (unverified)' : ''}${who ? `\nassigned to ${who.join(', ')}` : ''}` },
+        body.append(h('div', { class: `res${who ? ' used' : ''}`, title: `${r.label}${r.verified === false ? ' (unverified)' : ''}${who ? `\nassigned to ${who.join(', ')}` : ''}` },
           h('span', {}, r.pins.length > 1 ? `${r.name}<${i}>` : r.name), h('span', {}, pin)));
       });
     }

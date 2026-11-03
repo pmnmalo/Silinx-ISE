@@ -12,6 +12,8 @@
 // Styles: web/css/fpgaview.css.
 import { h } from './ui.js';
 import { mountSiteDetails } from './fpgaview-details.js';
+import { mountSideFold } from './side-fold.js';
+import { panelToggle, PROPS_KEY } from './narrow.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const S = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) if (v != null) e.setAttribute(k, v); return e; };
@@ -160,14 +162,18 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
     h('button', { class: 'btn', title: 'Zoom to the whole chip', onclick: () => fit() }, 'Fit'),
     h('button', { class: 'btn', title: 'Zoom in', onclick: () => zoom(1.4) }, '+'),
     h('button', { class: 'btn', title: 'Zoom out', onclick: () => zoom(1 / 1.4) }, '−'),
-    h('span', { class: 'fv-sep' }), 'Colour by:', levelSel, clockBtn, h('span', { class: 'fv-sep' }), info));
+    h('span', { class: 'fv-sep' }), 'Colour by:', levelSel, clockBtn, h('span', { class: 'fv-sep' }), info,
+    // (a narrow window: the side panel over the chip, shown by this, as the diagram editors', #2668)
+    panelToggle(root, h('button', { class: 'btn', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY })));
   if (stale) root.append(h('div', { class: 'fv-stale' }, 'The sources changed since this implementation: run Implement Design again to see the new one.'));
   const svg = S('svg', { class: 'fv-svg', 'aria-label': 'FPGA', role: 'img' });
   const canvas = h('div', { class: 'fv-canvas' }, svg);
   const tip = h('div', { class: 'fv-tip', hidden: true, 'data-no-i18n': '' });
   canvas.append(tip);
-  const side = h('div', { class: 'fv-side' });
+  // the side panel: the diagram editors' Properties, folded as theirs (side-fold.js), its sections folded each (#2668)
+  const side = h('aside', { class: 'fv-side' }, h('div', { class: 'asm-cap' }, 'Properties'));
   root.append(h('div', { class: 'fv-main' }, canvas, side));
+  mountSideFold({ root, side, key: 'silinx.fpgaview.props.folded' });
 
   // ------------------------------------------------------------------ chip
   const gTiles = S('g', { class: 'fv-tiles' }), gFree = S('g', { class: 'fv-free' }), gUsed = S('g', { class: 'fv-used' }), gOver = S('g', { class: 'fv-over' });
@@ -209,7 +215,7 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
   }
   const entityOf = path => entities.get(String(path).toLowerCase()) || null;
   const moduleLabel = k => (k === '' ? `${top || 'top'} (top level)` : `${k}${entityOf(k) ? ` — ${entityOf(k)}` : ''}`);
-  const sec = (title, ...kids) => h('div', { class: 'fv-sec' }, h('h4', {}, title), ...kids);
+  const sec = (title, ...kids) => h('details', { class: 'fv-sec', open: true }, h('summary', {}, title), h('div', { class: 'fv-sec-body' }, ...kids));
   const legendBox = h('div', { class: 'fv-legend' });
   function legend() {
     legendBox.innerHTML = '';

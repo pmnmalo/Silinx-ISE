@@ -294,7 +294,9 @@ uiTest('open mode: Synthesize counts the constraints\' warnings printed before i
 const TECH = '.doc:not([hidden])';
 const techView = (page) => page.eval(() => {
   const ed = window.Silinx.active?.viewer;
-  return ed ? { id: window.Silinx.active.id, title: window.Silinx.active.title, crumbs: document.querySelector('.doc:not([hidden]) .rtl-crumbs').innerText.replace(/\s+/g, ' '),
+  // (the hierarchy's buttons in the schematic's toolbar, no bar above it: #2667)
+  return ed ? { id: window.Silinx.active.id, title: window.Silinx.active.title, bar: !!document.querySelector('.doc:not([hidden]) .rtl-crumbs'),
+    nav: [...document.querySelectorAll('.doc:not([hidden]) .se-toolbar .rtl-nav')].filter((b) => !b.hidden).map((b) => `${b.textContent}${b.disabled ? ' (off)' : ''}`),
     syms: ed.getDoc().symbols.map((x) => ({ id: x.id, type: x.type, name: x.name, module: x.params?.module || null, generics: x.params?.generics || null })) } : null;
 });
 // the Technology Schematic of `top` open (Synthesize runs first: seconds, minutes on a slow machine);
@@ -311,22 +313,22 @@ async function waitTech(page, top) {
     throw new Error(`${e.message}\n--- the app: ${JSON.stringify(st)}\n--- console:\n${(await page.consoleText().catch(() => '')).split('\n').slice(-25).join('\n')}`);
   }
 }
-// push into the instance `inside` (its block, symbol `id`, double-clicked): the crumbs say it once its drawing
-// is shown, not before (#346: a click meanwhile went to the drawing left, its properties then replaced)
+// push into the instance `inside` (its block, symbol `id`, double-clicked): Up is on once its drawing is shown, not
+// before (#346: a click meanwhile went to the drawing left, its properties then replaced; #2667: in the toolbar)
 async function pushInto(page, id, inside) {
   await page.eval(() => {
-    const bar = document.querySelector('.doc:not([hidden]) .rtl-crumbs'), ed = window.Silinx.active.viewer;
-    window.__crumbs = [];
-    window.__crumbsObs?.disconnect();
-    window.__crumbsObs = new MutationObserver(() => window.__crumbs.push({ crumb: bar.querySelector('b')?.textContent ?? null, modules: ed.getDoc().symbols.map((x) => x.params?.module) }));
-    window.__crumbsObs.observe(bar, { childList: true, subtree: true, characterData: true });
+    const up = document.querySelector('.doc:not([hidden]) .se-toolbar .rtl-nav[data-nav="up"]'), ed = window.Silinx.active.viewer;
+    window.__ups = [];
+    window.__upObs?.disconnect();
+    window.__upObs = new MutationObserver(() => window.__ups.push({ up: !up.disabled, modules: ed.getDoc().symbols.map((x) => x.params?.module) }));
+    window.__upObs.observe(up, { attributes: true, attributeFilter: ['disabled'] });
   });
   await page.dblclick(`.doc:not([hidden]) .se-svg [data-kind=sym][data-id="${id}"]`);
-  await page.waitFor((b) => document.querySelector('.doc:not([hidden]) .rtl-crumbs b')?.textContent === `${b} : ${b}`, [inside], { what: `inside ${inside}`, timeout: 60000 });
-  const seen = await page.eval(() => { window.__crumbsObs.disconnect(); return window.__crumbs; });
-  // every change of the crumbs: the drawing then shown is the instance's (no block of that name in it, its primitives)
+  await page.waitFor(() => !document.querySelector('.doc:not([hidden]) .se-toolbar .rtl-nav[data-nav="up"]').disabled, [], { what: `inside ${inside}`, timeout: 60000 });
+  const seen = await page.eval(() => { window.__upObs.disconnect(); return window.__ups; });
+  // Up turned on: the drawing then shown is the instance's (no block of that name in it, its primitives)
   assert.ok(seen.length > 0);
-  for (const c of seen) assert.ok(c.crumb !== `${inside} : ${inside}` || (!c.modules.includes(inside) && c.modules.length > 5), `the crumbs say ${c.crumb} over the drawing of ${c.modules.join(' ')}`);
+  for (const c of seen) assert.ok(!c.up || (!c.modules.includes(inside) && c.modules.length > 5), `Up on over the drawing of ${c.modules.join(' ')}`);
 }
 async function checkTechSchematic(page, { top, blocks, message, inside }) {
   await page.treeRow('#procs', 'View Technology Schematic', { dbl: true, exact: true });
@@ -336,7 +338,7 @@ async function checkTechSchematic(page, { top, blocks, message, inside }) {
   assert.ok(log.includes(message), log.slice(-1500));
   let v = await techView(page);
   assert.equal(v.title, `${top} (Technology)`);
-  assert.ok(v.crumbs.includes(`Technology Schematic (read-only): the post-synthesis netlist — ${top} : ${top}`), v.crumbs);
+  assert.deepEqual([v.bar, v.nav.slice(0, 2), /^Open \w+\.(vhd|v)$/.test(v.nav[2])], [false, ['⬆ Up (off)', '⬇ Push into (off)'], true], v.nav.join());
   assert.equal(await page.eval(() => window.Silinx.status.tech), 'ok');
   const onTop = v;
   const mods = new Set(v.syms.map((x) => x.module));
@@ -347,6 +349,7 @@ async function checkTechSchematic(page, { top, blocks, message, inside }) {
   const blk = v.syms.find((x) => x.module === inside);
   await pushInto(page, blk.id, inside);
   v = await techView(page);
+  assert.equal(v.nav[0], '⬆ Up', 'Up on inside the instance');
   const types = new Set(v.syms.map((x) => x.module));
   for (const t of ['FDRE', 'MUXCY', 'XORCY']) assert.ok(types.has(t), `${t} in ${inside}: ${[...types].join(' ')}`);
   // a LUT: its function from its INIT, on demand (a collapsed section of its properties)
@@ -376,11 +379,11 @@ uiTest('open mode: View Technology Schematic of blinky and pong without ISE: the
   // Portuguese: the view's bar, its tab and the LUT's function have no untranslated text (the netlist's names apart)
   await page.eval(TEXTS);
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
-  const texts = () => page.eval(() => ['.doc:not([hidden]) .rtl-crumbs', '.doc:not([hidden]) .se-lutfn', '#doc-tabs .tab.active'].flatMap((q) => (document.querySelector(q) ? window.__uiTexts(document.querySelector(q)) : [])));
+  const texts = () => page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .se-toolbar .rtl-nav, .doc:not([hidden]) .se-lutfn, #doc-tabs .tab.active')].flatMap((e) => window.__uiTexts(e)));
   await setLang('en'); const en = await texts();
   await setLang('pt'); const pt = await texts();
   assert.deepEqual(untranslated(en, pt, [/^\w+ : \w+$/, /^\w+$/]), []);
-  assert.ok(pt.includes('Esquemático Tecnológico (só de leitura): a netlist pós-síntese'), pt.join(' | '));
+  assert.ok(pt.includes('⬆ Subir') && pt.includes('⬇ Entrar'), pt.join(' | '));
   assert.ok(pt.includes('Função do LUT (INIT)'), pt.join(' | '));
   await setLang('en');
   // pong: the instances of the design, and the logic of its top module by signal (blocks *_logic)
@@ -475,7 +478,7 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   const tech = await viewerTexts(page);
   assert.deepEqual(tech.kinds, ['wire', 'sym:module', 'sym:constant', 'sym:slice', 'sym:busjoin', 'port', 'label']);
   assert.deepEqual(tech.untranslated, []);
-  for (const s of ['Propriedades', 'Esquemático Tecnológico (só de leitura): a netlist pós-síntese', 'Módulo LUT2', 'Pinos (3)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
+  for (const s of ['Propriedades', '⬆ Subir', 'Abrir top.vhd', 'Módulo LUT2', 'Pinos (3)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
     assert.ok(tech.pt.has(s), `${s}: ${[...tech.pt].join(' | ')}`);
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });

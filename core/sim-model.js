@@ -64,13 +64,41 @@ export async function scalarVerilog(synth, run) {
   return { ...synth, files: { ...synth.files, [`${top}_yosys.v`]: asText(out[`${top}_yosys.v`]) } };
 }
 
+// The data inputs of a Spartan-6 distributed RAM of four ports (#2639): Yosys maps a memory onto the RAM32M's or the
+// RAM64M's A, B and C and leaves D's write data (DID) unconnected when nothing reads D, an input with no driver in
+// the model; tied to 0, as the FPGA ties an unused input. { type: data inputs' width }
+const LUTRAM_DATA = { RAM32M: 2, RAM64M: 1 };
+const LUTRAM_DIN = ['DIA', 'DIB', 'DIC', 'DID'];
+function tieLutramData(json) {
+  for (const mod of Object.values(json.modules || {})) {
+    for (const c of Object.values(mod.cells || {})) {
+      const w = LUTRAM_DATA[String(c.type).toUpperCase()];
+      if (!w) continue;
+      for (const p of LUTRAM_DIN) {
+        if (c.connections?.[p]) continue;
+        (c.connections ||= {})[p] = Array(w).fill('0');
+        if (c.port_directions) c.port_directions[p] = 'input';
+      }
+    }
+  }
+  return json;
+}
+// (in Yosys's Verilog netlist: an instance's ports one a line, ".PIN(…)", the last one before "  );")
+function tieLutramDataVerilog(v) {
+  return v.replace(/^(\s*)(RAM32M|RAM64M)\b([^;]*?)\n(\s*)\);/gm, (m, ind, type, body, end) => {
+    const w = LUTRAM_DATA[type];
+    const missing = LUTRAM_DIN.filter(p => !new RegExp(`^\\s*\\.${p}\\(`, 'm').test(body));
+    return missing.length ? `${ind}${type}${body},\n${missing.map(p => `${end}  .${p}(${w}'h0)`).join(',\n')}\n${end});` : m;
+  });
+}
+
 /**
  * The models from the synthesis's result (core/synth-front.js synthesizeOpen: its files):
  * { vhdl, verilog, cells, unknown: [cell types with no simulation model] }.
  * o: { top, part, generics: { NAME: value } given to the synthesis, testbench: its name }
  */
 export function postSynthesisModels(synth, { top, part = '', generics = {}, testbench = null } = {}) {
-  const json = JSON.parse(synth.files[`${synth.top}.json`]);
+  const json = tieLutramData(JSON.parse(synth.files[`${synth.top}.json`]));
   const tn = technologyNetlist(json, { top });
   // (the top module's cells: the netlist also holds the library cells Yosys read, a primitive's model with its
   // $specify2 timing arcs first, #493)
@@ -89,7 +117,7 @@ export function postSynthesisModels(synth, { top, part = '', generics = {}, test
   let body = tn.flat.replace(/^-- Technology netlist of [^\n]*\n/, '');
   // (a parameter's undefined bits, a memory with no initial contents: INIT_00(256'hxxxx…), are 0, as the
   // FPGA has them and as the VHDL model writes them)
-  let vlog = synth.files[`${synth.top}_yosys.v`].replace(/^(\s*\.\w+\(\d+'[bh])([0-9a-fA-FxXzZ_]+)\)/gm, (m, a, digits) => `${a}${digits.replace(/[xXzZ]/g, '0')})`);
+  let vlog = tieLutramDataVerilog(synth.files[`${synth.top}_yosys.v`]).replace(/^(\s*\.\w+\(\d+'[bh])([0-9a-fA-FxXzZ_]+)\)/gm, (m, a, digits) => `${a}${digits.replace(/[xXzZ]/g, '0')})`);
   if (gens.length) {
     // (the top's entity: the last one, after the stubs of cells Silinx has no model of)
     const at = body.lastIndexOf('\nentity '), eol = body.indexOf('\n', at + 1) + 1;
