@@ -356,7 +356,6 @@ table.grid tr.sel td { background: #dbe8fb; }
 /* a read-only document's notice ("Read-only, generated from …"), the same in every editor's toolbar (#2697): at its
    right end, before its ⋮ menu (the schematic's, placed apart), ellipsized when the window is narrow */
 :is(.editor-bar, .se-toolbar, .asm-toolbar) > .gen-banner.read-only { margin-left: auto; min-width: 0; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.asm-toolbar > .asm-info + .gen-banner.read-only { margin-left: 0; }   /* (after a chart's counts, at the right already) */
 
 /* plain-language help of a diagnostic (web/js/diaghelp.js): Errors / Warnings tabs and editor tooltip */
 .console-page .diag .diag-more { flex: none; margin-left: 10px; color: #0645ad; cursor: pointer; white-space: nowrap; }
