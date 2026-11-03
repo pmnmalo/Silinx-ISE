@@ -57,7 +57,7 @@ const answer = async (page, button = 'Yes', title = 'Remove Source') => {
 };
 
 const DRAWN = [
-  { kind: 'Petri net', file: 'src/ctl.pn.json', mod: 'ctl', ico: 'petri', badge: 'Petri', model: newPetri('ctl', 'vhdl') },
+  { kind: 'Petri net', file: 'src/ctl.pn.json', mod: 'ctl', ico: 'petri', badge: 'Petri', views: ' [FSM]', model: newPetri('ctl', 'vhdl') },
   { kind: 'schematic', file: 'src/gate.sch.json', mod: 'gate', ico: 'schematic', badge: 'Schematic', model: newDoc('gate', 'vhdl') },
   { kind: 'truth table', file: 'src/maj.tt.json', mod: 'maj', ico: 'algebra', badge: 'Algebra', views: ' [Schematic]', model: { ...newTable('maj', ['a', 'b', 'c'], ['f']), lang: 'vhdl', table: { f: '00010111' } } },
   { kind: 'ASM chart', file: 'src/seq.asm.json', mod: 'seq', ico: 'asm', badge: 'ASM', model: newModel('seq', 'vhdl') },
@@ -127,7 +127,7 @@ uiTest('#234 Remove from Project from the drawing\'s badge and from the HDL\'s b
   const hdl = await openDrawn(page, 'R_badges', k);
   // the drawing's badge: its commands, Remove from Project last; No: nothing changes
   await badgeRight(page, 'ctl', 'Petri');
-  assert.deepEqual(await menuLabels(page), ['Open', 'Remove from Project']);
+  assert.deepEqual(await menuLabels(page), ['Open', 'View State Machine (FSM)', 'Remove from Project']);
   await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
   assert.equal(await answer(page, 'No'), QUESTION(k.file, hdl));
   assert.deepEqual(await rows(page), ROWS('R_badges', k));

@@ -11,7 +11,7 @@ export function mountFsmPointer(ctx) {
   const {
     M, addState, addTransition, applyView, closeInline, commit, copySel, deleteSelection, drag, editLabel, editState,
     fit, fitted, gOverlay, gStates, geom, paste, print, redo, render, renderSide, root, sel, snapV, stateById, svg,
-    toWorld, transById, uid, undo, view, zoomAt, zoomBy, setFitted, setSel, setDrag
+    toWorld, transById, uid, undo, view, zoomAt, zoomBy, setFitted, setSel, setDrag, readOnly = false
   } = ctx;
 
   // ---------------------------------------------------------------------------- pointer
@@ -45,6 +45,7 @@ export function mountFsmPointer(ctx) {
     if (tEl) {
       const t = transById(tEl.dataset.trans);
       setSel({ type: 'trans', id: t.id }); render(); renderSide();
+      if (readOnly) return;   // (read-only, #2696: selected, not bent)
       setDrag({ kind: 'bend', sel0, t, start: w, moved: false, bend: t.bend, angle: t.angle });
       capture(ev);
       return;
@@ -55,6 +56,7 @@ export function mountFsmPointer(ctx) {
       const d = Math.hypot(w.x - s.x, w.y - s.y);
       const r = radiusOf(s);
       setSel({ type: 'state', id: s.id }); render(); renderSide();
+      if (readOnly) return;
       if (d > r - 7) {
         setDrag({ kind: 'connect', sel0, from: s, start: w });
         svg.classList.add('connecting');
@@ -64,6 +66,7 @@ export function mountFsmPointer(ctx) {
   }
   function onPointerMove(ev) {
     if (!drag()) {
+      if (readOnly) return;
       // the rim of a state shows where a transition can be drawn from
       const w = toWorld(ev.clientX, ev.clientY);
       const s = hitState(w, 6);
@@ -130,6 +133,7 @@ export function mountFsmPointer(ctx) {
     render(); renderSide();
   }
   function onDblClick(ev) {
+    if (readOnly) return;
     const tEl = ev.target.closest('[data-trans]');
     if (tEl) { editLabel(transById(tEl.dataset.trans)); return; }
     const sEl = ev.target.closest('[data-state]');
@@ -142,6 +146,7 @@ export function mountFsmPointer(ctx) {
     if (ev.target.closest('input, textarea, select')) return;
     const mod = ev.ctrlKey || ev.metaKey;
     const k = ev.key;
+    if (readOnly && (mod ? /^[zyxv]$/i.test(k) : /^(Delete|Backspace|F2)$/.test(k))) return;
     if (mod && (k === 'z' || k === 'Z')) { if (ev.shiftKey) redo(); else undo(); ev.preventDefault(); return; }
     if (mod && (k === 'y' || k === 'Y')) { redo(); ev.preventDefault(); return; }
     if (mod && (k === 'p' || k === 'P')) { print(); ev.preventDefault(); ev.stopPropagation(); return; }

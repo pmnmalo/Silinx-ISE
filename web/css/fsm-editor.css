@@ -84,3 +84,6 @@
 .fsm-editor .fsm-busl { font-family: var(--asm-mono); font-size: 12px; }
 .fsm-editor .fsm-led { font: 12px var(--asm-mono); padding: 3px 8px; border-radius: 10px; border: 1px solid var(--asm-border); }
 .fsm-editor .fsm-led.on { background: color-mix(in srgb, var(--asm-ok) 75%, transparent); color: #fff; border-color: var(--asm-ok); }
+
+/* read-only (a Petri net's state machine, #2696): the tools that change it hidden */
+.fsm-editor.asm-readonly .asm-toolbar > [hidden], .fsm-editor.asm-readonly .asm-side [hidden] { display: none; }
