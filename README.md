@@ -454,7 +454,8 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 `list_devices` (the boards and devices), `set_design_properties` (the board, the device, the synthesis tool, as
 *Design Properties*), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `delete_file`, `delete_project`,
-`export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
+`export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
+only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
 `simulate` (the test bench: its messages and its signals' changes), `run_process` (synthesize,
 implement, bitstream, timing, power, pins: the Silinx toolchain, or ISE when it is configured) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
