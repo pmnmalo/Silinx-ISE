@@ -1,12 +1,15 @@
-// The MCP server's modules (#2674): server/mcp.js split by area, the projects' tools (mcp-projects.js), the
-// HDL's (mcp-hdl.js), the processes' (mcp-processes.js) and their helpers (mcp-util.js). The server's
-// tools are those of the modules, in the order they had before the split; server/mcp.js still exports
-// what it did. The tools themselves are tested through the protocol in mcp.test.js.
+// The MCP server's modules (#2674): server/mcp.js split by area, the projects' tools (mcp-projects.js), their
+// settings' (mcp-settings.js) and sources' (mcp-sources.js), the HDL's (mcp-hdl.js), the processes'
+// (mcp-processes.js) and their helpers (mcp-util.js). The server's tools are those of the modules, the ones of
+// before the split in their order; server/mcp.js still exports what it did. The tools themselves are tested
+// through the protocol in mcp.test.js, mcp-settings.test.js and mcp-sources.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const mcp = await import('../server/mcp.js');
 const { PROJECT_TOOLS } = await import('../server/mcp-projects.js');
+const { SETTINGS_TOOLS } = await import('../server/mcp-settings.js');
+const { SOURCE_TOOLS } = await import('../server/mcp-sources.js');
 const { HDL_TOOLS } = await import('../server/mcp-hdl.js');
 const { PROCESS_TOOLS, PROCESSES, REPORT_FILES, OPEN_REPORTS } = await import('../server/mcp-processes.js');
 const U = await import('../server/mcp-util.js');
@@ -19,11 +22,13 @@ test('server/mcp.js exports what it did before the split', () => {
   assert.deepEqual(mcp.PROTOCOL_VERSIONS, ['2025-06-18', '2025-03-26', '2024-11-05']);
 });
 
-test('the tools: those of the three areas, in the order of before the split', () => {
+test('the tools: those of the areas, the ones of before the split in their order', () => {
   assert.deepEqual(names(PROJECT_TOOLS), ['list_examples', 'list_projects', 'new_project_from_example', 'new_project', 'set_top', 'project_info', 'read_file', 'write_file']);
+  assert.deepEqual(names(SETTINGS_TOOLS), ['list_devices', 'set_design_properties', 'set_process_properties']);
+  assert.deepEqual(names(SOURCE_TOOLS), ['unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'delete_file', 'delete_project']);
   assert.deepEqual(names(HDL_TOOLS), ['check_syntax', 'simulate']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS]);
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...SOURCE_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);

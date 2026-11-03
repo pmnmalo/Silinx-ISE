@@ -1,0 +1,157 @@
+// The MCP server's tools of a project's settings (server/mcp.js, #2674): the devices and boards to choose from,
+// Design Properties (the board, the device, the synthesis tool) and Process Properties (the Optimization, the
+// FPGA's start-up clock, the place and route engine), as the interface's dialogs (web/js/wizards.js
+// projectProperties, implProperties) set them: the same checks of a new device (web/js/device-change.js), the
+// constraints file of its format (web/js/constraints-format.js), Update Constraints from the new board's pins.
+import fs from 'node:fs';
+import path from 'node:path';
+import * as P from './projects.js';
+import { toolError, readProject, viewSourcesOf, STR, PROJECT, deviceName } from './mcp-util.js';
+
+// the device database (server/devices.js) and the toolchain package's checks, loaded on first use
+const devices = () => import('./devices.js');
+const parts = () => import('../packages/silinx-fpga/src/parts.js');
+
+const SYNTH_TOOLS = ['silinx', 'xst'];
+const OPTIMIZATIONS = ['fast', 'area', 'speed'];
+const STARTUP_CLOCKS = { jtag: 'JtagClk', cclk: 'CCLK', user: 'UserClk' };
+const ENGINES = ['silinx', 'auto', 'nextpnr'];
+
+// the issues of the design on a new device (web/js/device-change.js deviceChangeMessages): the primitives its
+// family lacks, the resources the design needs more of than the part has
+async function deviceChangeMessages(name, pj, next) {
+  const D = await devices(), R = await parts();
+  const to = D.findPart(next.part);
+  if (!to) return [];
+  const fromPart = D.findPart(pj.device?.part);
+  const from = fromPart?.family || pj.device?.family;
+  let instances = [], ports = 0;
+  if (pj.top) {
+    try {
+      const { compile, elaborate } = await import('../core/compile.js');
+      const { primitiveSources } = await import('../core/unisim.js');
+      const srcs = await viewSourcesOf(name, pj, false);
+      const top = elaborate(compile([...primitiveSources(srcs), ...srcs]), pj.top).top;
+      instances = R.primitiveInstances(top);
+      ports = (top?.ports || []).reduce((n, p) => n + (p.sig?.t?.w || 1), 0);
+    } catch { /* a design that does not elaborate: its report only */ }
+  }
+  let used = {};
+  try {
+    const { projectReports } = await import('./impl-routes.js');
+    if (fromPart) used = R.usedOfReport(await projectReports(name), R.resourcesOf(fromPart, pj.device.package));
+  } catch { /* no report */ }
+  const familyName = D.findFamily(to.family)?.displayName || to.family;
+  return R.deviceChangeIssues({ from, to, pkg: next.package, familyName, instances, used, ports }).messages;
+}
+
+export const SETTINGS_TOOLS = [
+  {
+    name: 'list_devices', title: 'The devices and boards',
+    description: 'The boards (with their variants and devices) and the devices (part, packages, speed grades, by family) a project can target, as Design Properties and New Project offer them; family narrows the devices to one family (spartan3e, spartan6, ice40…).',
+    inputSchema: { type: 'object', properties: { family: STR('Only the devices of this family (its id, e.g. spartan3e).') }, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    async run({ family }) {
+      const D = await devices();
+      const fams = family ? [D.findFamily(family)].filter(Boolean) : D.FAMILIES;
+      if (family && !fams.length) throw toolError(`unknown family '${family}' (${D.FAMILIES.map(f => f.id).join(', ')})`);
+      const boards = D.BOARDS.map(b => ({ id: b.id, name: b.name, device: deviceName(D.resolveBoard(b.id).device),
+        variants: (b.variants || []).map(v => ({ id: v.id, label: v.label, device: deviceName(v.device), ...(v.default ? { default: true } : {}) })) }));
+      const families = fams.map(f => ({ id: f.id, name: f.displayName || f.name,
+        parts: D.partsOfFamily(f.id).map(p => ({ part: p.part, packages: Object.fromEntries(Object.entries(p.packages).map(([k, v]) => [k, v.speeds || p.speeds])) })) }));
+      const text = [...(family ? [] : ['Boards:', ...boards.map(b => `  ${b.id}: ${b.name} (${b.variants.length ? b.variants.map(v => `${v.id} ${v.device}${v.default ? ', the default' : ''}`).join('; ') : b.device})`), '']),
+        'Devices:', ...families.flatMap(f => [`  ${f.name} (${f.id}):`, ...f.parts.map(p => `    ${p.part}: ${Object.entries(p.packages).map(([k, s]) => `${k}${s.length ? ` ${s.join(' ')}` : ''}`).join(', ')}`)])];
+      return { text: text.join('\n'), data: { ...(family ? {} : { boards }), families } };
+    },
+  },
+  {
+    name: 'set_design_properties', title: 'Design Properties',
+    description: 'Change a project\'s target as Design Properties does: its board (its device then the board\'s; none: no board) or its device (part, package, speed), and its synthesis tool (silinx: the Silinx toolchain; xst: Xilinx ISE). A new device is checked against the design first (the primitives its family lacks, the resources it has too few of: warnings). With update_constraints, a new board\'s pins are written into the constraints file for the top\'s ports, as Update Constraints does: its pin locations are replaced.',
+    inputSchema: { type: 'object', properties: {
+      project: PROJECT, board: STR('The board (list_devices), or none for no board.'), variant: STR('The board\'s variant (list_devices; default: the board\'s default).'),
+      part: STR('The device (list_devices), e.g. xc3s500e; with no board.'), package: STR('The device\'s package, e.g. fg320.'), speed: STR('The speed grade, e.g. -4.'),
+      synth_tool: { type: 'string', enum: SYNTH_TOOLS, description: 'The synthesis tool.' },
+      update_constraints: { type: 'boolean', description: 'With a new board: write its pins into the constraints file (default false).' },
+    }, required: ['project'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    async run({ project: name, board, variant, part, package: pkg, speed, synth_tool: synthTool, update_constraints: constraints = false }) {
+      const pj = await readProject(name);
+      const D = await devices(), R = await parts();
+      if (board === undefined && variant === undefined && part === undefined && pkg === undefined && speed === undefined && synthTool === undefined) throw toolError('give board, part, package, speed or synth_tool');
+      if (board && board !== 'none' && (part || pkg || speed)) throw toolError('give a board or a device (part, package, speed), not both: a board\'s device is its own');
+      let nextBoard = pj.board || null, next = { ...pj.device };
+      if (board === 'none' || board === '') nextBoard = null;
+      else if (board || variant) {
+        const id = board || pj.board;
+        if (!id) throw toolError('variant: the project has no board (give board)');
+        const r = D.resolveBoard(id, { variant });
+        if (!r) throw toolError(`unknown board '${id}' (list_devices)`);
+        if (variant && r.variant?.id !== variant) throw toolError(`the ${r.board.name} has no variant '${variant}'`);
+        nextBoard = r.board.id;
+        next = r.device;
+      }
+      if (part || pkg || speed) {
+        if (nextBoard) throw toolError(`the project's device is its board's (${nextBoard}): give board none to choose a device`);
+        // (a new part's package and speed: given, or its only one)
+        const p = D.findPart(part || next.part);
+        if (part && !p) throw toolError(`${D.validateDevice({ part }).join('; ')} (list_devices)`);
+        const only = (list, what) => {
+          if (list.length === 1) return list[0];
+          throw toolError(`${what}: the ${p.part.toUpperCase()} has ${list.length ? list.join(', ') : 'none'}`);
+        };
+        const newPart = part && p.part !== next.part;
+        const pk = String(pkg || (newPart ? only(Object.keys(p.packages), 'package') : next.package)).toLowerCase();
+        const speeds = p.packages[pk]?.speeds || p.speeds;
+        const sp = speed !== undefined ? String(speed) : newPart || pkg ? (speeds.length ? only(speeds, 'speed') : '') : next.speed;
+        next = { family: p.family, part: p.part, package: pk, speed: sp && !sp.startsWith('-') ? `-${sp}` : sp };
+      }
+      const errs = D.validateDevice(next);
+      if (errs.length) throw toolError(`${errs.join('; ')} (list_devices)`);
+      // a family ISE does not implement: the Silinx toolchain's only (as the dialog locks it)
+      const tool = synthTool || pj.synthTool || null;
+      if (R.openOnlyDevice(next) && tool === 'xst') throw toolError(`the ${next.part.toUpperCase()} is the Silinx toolchain's only: no XST`);
+      const warnings = [];
+      const deviceChanged = next.part !== pj.device?.part || next.package !== pj.device?.package;
+      if (deviceChanged) for (const m of await deviceChangeMessages(name, pj, next)) warnings.push(`WARNING: ${next.part.toUpperCase()}: ${m}`);
+      const changed = nextBoard !== (pj.board || null) || deviceChanged;
+      if (constraints && !(changed && nextBoard && pj.top)) throw toolError(nextBoard ? (pj.top ? 'update_constraints: the board did not change' : `the project '${name}' has no top module: its constraints cannot come from a board's pins`) : 'update_constraints: the project has no board');
+      // the constraints of the new device's format (UCF, or the iCE40's PCF)
+      const ext = R.openOnlyDevice(next) ? '.pcf' : '.ucf';
+      let constraintsFile = pj.constraints;
+      if (constraintsFile && !constraintsFile.toLowerCase().endsWith(ext)) {
+        const old = constraintsFile;
+        constraintsFile = old.replace(/\.[^./]*$/, '') + ext;
+        if (fs.existsSync(path.join(P.projectDir(name), old))) warnings.push(`WARNING: this device's constraints are ${ext.slice(1).toUpperCase()}: ${constraintsFile} is the project's now, ${old} was not converted.`);
+      }
+      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...(R.openOnlyDevice(next) ? { synthTool: 'silinx' } : synthTool ? { synthTool } : {}) }));
+      const after = await P.readProject(name);
+      if (constraints) await P.boardConstraints(P.projectDir(name), after);
+      else if (changed && !nextBoard && after.constraints && fs.existsSync(path.join(P.projectDir(name), after.constraints))) warnings.push(`WARNING: check the pin locations in ${after.constraints} — they must exist on the ${next.package.toUpperCase()} package.`);
+      const text = [...warnings, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`];
+      return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, constraints: after.constraints || null, constraintsUpdated: constraints, warnings } };
+    },
+  },
+  {
+    name: 'set_process_properties', title: 'Process Properties',
+    description: 'Change a project\'s Process Properties: the Optimization (fast: one mapping and one placement, the quickest build; area: the smallest circuit; speed: the fastest circuit, several placements tried), the FPGA start-up clock (jtag when programming over JTAG; cclk when booting from the PROM or flash; user) and the Silinx toolchain\'s place and route engine (silinx, nextpnr, or auto: nextpnr, Silinx\'s when nextpnr cannot).',
+    inputSchema: { type: 'object', properties: {
+      project: PROJECT,
+      optimization: { type: 'string', enum: OPTIMIZATIONS, description: 'The Optimization.' },
+      startup_clock: { type: 'string', enum: Object.keys(STARTUP_CLOCKS), description: 'The FPGA start-up clock.' },
+      pr_engine: { type: 'string', enum: ENGINES, description: 'The place and route engine of the Silinx toolchain.' },
+    }, required: ['project'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    async run({ project: name, optimization, startup_clock: clock, pr_engine: engine }) {
+      await readProject(name);
+      if (!optimization && !clock && !engine) throw toolError('give optimization, startup_clock or pr_engine');
+      if (optimization && !OPTIMIZATIONS.includes(optimization)) throw toolError(`optimization: one of ${OPTIMIZATIONS.join(', ')}`);
+      if (clock && !STARTUP_CLOCKS[clock]) throw toolError(`startup_clock: one of ${Object.keys(STARTUP_CLOCKS).join(', ')}`);
+      if (engine && !ENGINES.includes(engine)) throw toolError(`pr_engine: one of ${ENGINES.join(', ')}`);
+      const { synthGoal, GOAL_IMPL } = await import('../packages/silinx-fpga/src/index.js');
+      await P.updateProject(name, p => ({ ...p, impl: { ...(p.impl || {}), ...(optimization ? GOAL_IMPL[optimization] : {}), ...(clock ? { startupClk: STARTUP_CLOCKS[clock] } : {}), ...(engine ? { engine } : {}) } }));
+      const impl = (await P.readProject(name)).impl || {};
+      const data = { project: name, optimization: synthGoal(impl), startupClock: Object.keys(STARTUP_CLOCKS).find(k => STARTUP_CLOCKS[k] === (impl.startupClk || 'JtagClk')), prEngine: impl.engine || 'auto' };
+      return { text: `${name}: Optimization ${data.optimization}, FPGA start-up clock ${data.startupClock}, place and route ${data.prEngine}.`, data };
+    },
+  },
+];

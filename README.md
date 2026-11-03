@@ -450,7 +450,10 @@ in Firefox and WebKit.
 Desktop, Claude Code, any client of the Model Context Protocol) over stdin / stdout. Its tools:
 `list_examples` (the examples, then the test designs: the designs Silinx is tested with), `new_project_from_example`, `new_project` (an empty one, for a board), `set_top` (the top
 module and the test bench, as *Set as Top Module*; the constraints from the board's pins, as *Update
-Constraints*), `list_projects`, `project_info`, `read_file`, `write_file`, `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
+Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_info`, `read_file`, `write_file`,
+`list_devices` (the boards and devices), `set_design_properties` (the board, the device, the synthesis tool, as
+*Design Properties*), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+`remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `delete_file`, `delete_project`, `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
 `simulate` (the test bench: its messages and its signals' changes), `run_process` (synthesize,
 implement, bitstream, timing, power, pins: the Silinx toolchain, or ISE when it is configured) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
