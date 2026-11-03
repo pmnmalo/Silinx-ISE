@@ -480,13 +480,8 @@ export function initTasks(a) {
   // a folded side panel or messages open again when one of their tabs is clicked
   $('left-tabs').addEventListener('click', () => { if (on() && !arr().side) toggle({ [sideKey()]: true }); });
   $('console-tabs').addEventListener('click', () => { if (on() && !arr().console) toggle({ console: true }); });
-  // new errors open the messages (Check Syntax shows the Errors tab)
-  let errs = 0;
-  new MutationObserver(() => {
-    const n = parseInt($('err-count').textContent, 10) || 0;
-    if (on() && n > errs && !arr().console) arrange({ console: true });
-    errs = n;
-  }).observe($('err-count'), { childList: true, characterData: true, subtree: true });
+  // a new error or warning opens the messages (their Errors or Warnings tab in front, web/js/console.js, #2733)
+  document.addEventListener('silinx:console-problems', () => { if (on() && !arr().console) arrange({ console: true }); });
   // maximize: a document's tab double-clicked, or Ctrl/Cmd+Shift+Enter
   $('doc-tabs').addEventListener('dblclick', e => { if (on() && e.target.closest('.tab') && !e.target.closest('.tclose')) toggle({ max: !arr().max }); });
   addEventListener('keydown', e => {

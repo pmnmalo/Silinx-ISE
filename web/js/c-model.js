@@ -18,7 +18,7 @@ export async function openCModel(mod) {
     return null;
   }
   const r = hdlToCSafe(design);
-  if (!r.ok) { log(`ERROR: the C model of '${mod}': ${r.errors.join('; ')}`, 'err'); showConsolePage('console'); return null; }
+  if (!r.ok) { log(`ERROR: the C model of '${mod}': ${r.errors.join('; ')}`, 'err'); return null; }
   log(`The C model of '${mod}': ${r.clock ? `sequential, ${r.top}_step a rising edge of ${r.clock}` : 'combinational'}.`, 'ok');
   const id = `cmodel:${mod}`;
   const old = findDoc(id);

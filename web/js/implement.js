@@ -149,7 +149,6 @@ async function checkConstraints(warnings = null) {
   const devStr = d => `${d.part}${d.speed}-${d.package}`;
   if (board.device.part !== pj.device.part || board.device.package !== pj.device.package) {
     log(`ERROR: the project device ${devStr(pj.device)} does not match the board ${board.name} (${devStr(board.device)}). Fix it in Project > Design Properties.`, 'err');
-    showConsolePage('console');
     return false;
   }
   if (!pj.constraints || !S.fileTree.includes(pj.constraints)) return true;
