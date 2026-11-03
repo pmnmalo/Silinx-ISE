@@ -9,6 +9,7 @@ import { primitiveSources } from '/core/unisim.js';
 import { countEvent } from './analytics.js';
 import { S, closeDoc, findDoc, moduleInfo, openDoc, openSummary, projectBoard, refreshSummary, setDirty, status } from './app.js';
 import { log, logLine, showConsolePage, setDiagnostics } from './console.js';
+import { showCommandLines } from './messages.js';
 import { reloadProject } from './project.js';
 import { refreshOpenEditor, topUcfPorts, ucfPort } from './drawings.js';
 import { EXTRA_STEPS, IMPL_IDS, SIM_MODEL_NAMES, checkSyntax, loadUcfText, openMode, renderProcesses,
@@ -128,7 +129,7 @@ export async function checkUcfFile(path = S.project?.constraints, { quiet = fals
     return true;
   }
   setDiagnostics(diags);
-  if (!quiet) log(`\nStarted : "Check Constraints" of ${path}.\n`, 'hdr');
+  if (!quiet) { log(`\nStarted : "Check Constraints" of ${path}.\n`, 'hdr'); showCommandLines('impl'); }   // (Implementation's, in the Design task too, #2692)
   for (const d of diags) log(line(d), d.severity === 'error' ? 'err' : 'warn', { diag: false });
   if (ne) { log(`\nProcess "Check Constraints" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); showConsolePage('errors'); status(`${path.split('/').pop()}: ${ne} error(s)`); return false; }
   if (!quiet) log(`\nProcess "Check Constraints" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');

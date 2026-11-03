@@ -1,7 +1,8 @@
 // The message centre (#798, #782; in every interface since #925): the bottom panel as the one place of every
 // flow's messages (web/js/tasks.js starts it; its look: web/css/messages.css).
 // - Each line of the Console says where it comes from (data-src): Check Syntax (Design), Simulation, Emulation,
-//   Implementation (synthesis, implementation and programming the board: one filter, #1173), or the application
+//   Implementation (synthesis, implementation, the constraints' checks (#2692) and programming the board: one filter,
+//   #1173), or the application
 //   ('app'); sourceOf() reads it from the processes'
 //   headers ("Started : …", "=== SILINX STEP …", iMPACT's "Programming FPGA (SRAM)..."): the lines after a
 //   header are its process's.
@@ -18,7 +19,7 @@
 import { h } from './ui.js';
 
 export const SOURCES = ['check', 'sim', 'emu', 'impl'];
-export const SOURCE_LABEL = { all: 'All', check: 'Design',   // (the design's checks: Check Syntax, Check Constraints, Check Schematic, #994)
+export const SOURCE_LABEL = { all: 'All', check: 'Design',   // (the design's checks: Check Syntax, Check Schematic, #994; a UCF's are Implementation's, #2692)
   sim: 'Simulation', emu: 'Emulation', impl: 'Implementation' };   // (Implementation: synthesis, implementation and the board's, #1173)
 // the sources a task shows when the viewer has not picked a filter
 const TASK_SOURCES = { edit: ['check'], sim: ['sim'], emu: ['emu'], impl: ['impl'], prog: ['impl'] };
@@ -30,7 +31,7 @@ export function sourceOf(line, cur = 'app') {
   let m = /^Started : "([^"]+)"/.exec(s);
   if (m) {
     const p = m[1];
-    if (/Check Syntax|Check Constraints|Check Schematic/.test(p)) return 'check';
+    if (/Check Syntax|Check Schematic/.test(p)) return 'check';   // (Check Constraints, a UCF's Check Syntax too: Implementation's, #2692)
     if (/^Simulate\b|^Save as Test Bench|^C Simulation$|^C\/RTL Co-simulation$/.test(p)) return 'sim';   // (a C module's runs, #1852)
     return 'impl';   // synthesis, Translate, Map, Place & Route and their models, timing, power, back-annotation, the FPGA view
   }
