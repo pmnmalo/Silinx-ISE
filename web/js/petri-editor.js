@@ -109,8 +109,9 @@ export function mountPetriEditor(container, opts = {}) {
     h('div', { class: 'asm-codebar' }, panelTitle, panelTools, h('div', { class: 'asm-spacer' }), btn('✕', 'Close the panel', () => togglePanel(null))), panelBody);
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap, bottom);
   const selSection = h('section', { class: 'asm-section pn-selection' });
-  const netBody = h('div', { class: 'asm-section-body' });
-  const netSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Net'), netBody);
+  const netBody = h('div', { class: 'pn-net-body' });
+  // (the net's fields: a section always open, as the selection's; the panel folds as a whole, #2735)
+  const netSection = h('section', { class: 'asm-section pn-net' }, h('h3', {}, 'Net'), netBody);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection);
   mountSideFold({ root, side, key: 'silinx.petri.props.folded' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
