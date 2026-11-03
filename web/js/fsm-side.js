@@ -24,15 +24,9 @@ export function mountSide(ctx) {
 
   function renderSelection() {
     selSection.textContent = '';
-    if (!sel()) {
-      selSection.append(h('h3', {}, 'Selection'),
-        h('p', { class: 'asm-muted' }, 'Nothing selected. Click a state or a transition to edit it.'),
-        h('div', { class: 'asm-legend' },
-          h('div', {}, h('span', { class: 'fsm-leg-circle' }), 'State (Moore outputs inside)'),
-          h('div', {}, h('span', { class: 'fsm-leg-circle init' }), 'Initial (reset) state'),
-          h('div', {}, h('span', { class: 'fsm-leg-arrow' }), 'Transition: condition / Mealy outputs')));
-      return;
-    }
+    // (nothing selected: no section, #2729)
+    selSection.hidden = !sel();
+    if (!sel()) return;
     if (sel().type === 'state') {
       const s = stateById(sel().id);
       if (!s) { setSel(null); return renderSelection(); }
