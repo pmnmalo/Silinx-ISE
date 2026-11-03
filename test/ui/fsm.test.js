@@ -321,6 +321,8 @@ uiTest('State diagram (FSM) in Portuguese: every label of the editor, the panels
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /Estado A: as transições para B \('x'\) e para C \('y == 1'\) são ambas verdadeiras quando x=1, y=01/);
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /nenhuma transição é verdadeira quando/);
   await page.click(`${ED} [data-state=a] .fsm-circle`);
+  // (a state with no comment: no text "null" in its properties, #2722)
+  assert.doesNotMatch(await page.eval((ed) => document.querySelector(ed).textContent, ED), /null/);
   await check('state');
   await page.click(`${ED} [data-trans=t3] .fsm-label`);
   await check('transition');
