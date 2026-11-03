@@ -36,7 +36,27 @@ export function releaseNotes(md, version, common, sums) {
     + '`shasum -a 256 -c SHA256SUMS --ignore-missing` (macOS), `Get-FileHash <file>` (Windows PowerShell, compared by eye). '
     + 'Each file also has a build provenance attestation (it was built by this repository\'s Release workflow from this tag): '
     + '`gh attestation verify <file> --repo pmnmalo/Silinx-ISE`.' : '';
-  return `${head}${String(common || '').trim()}${check}\n`;
+  const notes = `${head}${String(common || '').trim()}${check}\n`;
+  return s && bytes(notes) > NOTES_LIMIT ? shortenNotes(notes, s, head, NOTES_LIMIT) : notes;
+}
+
+/** A release's notes stay under GitHub's 125,000 characters (#2685), counted in UTF-8 bytes, never fewer. */
+export const NOTES_LIMIT = 120000;
+const bytes = t => new TextEncoder().encode(t).length;   // (core/ runs in the browser too: no Buffer)
+
+// the section's "In detail" entries (each "- " at a line's start, its continuation indented) kept from the
+// newest, the first, until the notes and the line saying how many were left out fit
+function shortenNotes(notes, s, head, limit) {
+  const rest = notes.slice(head.length), mark = '\nIn detail:\n\n', at = head.lastIndexOf(mark);
+  if (at < 0) return notes;
+  const top = head.slice(0, at), items = head.slice(at + mark.length).replace(/\n+$/, '').split(/\n(?=- )/);
+  const note = n => `${n} more entr${n === 1 ? 'y' : 'ies'} of "In detail" left out (a release's notes hold at most 125,000 characters): ` +
+    `the full list is in CHANGELOG.md, https://github.com/pmnmalo/Silinx-ISE/blob/v${s.version}/CHANGELOG.md\n\n`;
+  for (let keep = items.length - 1; keep > 0; keep--) {
+    const t = `${top}${mark}${items.slice(0, keep).join('\n')}\n\n${note(items.length - keep)}${rest}`;
+    if (bytes(t) <= limit) return t;
+  }
+  return `${top.trimEnd()}\n\n${note(items.length)}${rest}`;
 }
 
 // ---- changelog fragments (#519): each change adds a file changes/<issue>-<slug>.md instead of editing
