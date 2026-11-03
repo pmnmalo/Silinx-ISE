@@ -54,7 +54,7 @@ test('#2643 the trip counts: the checker\'s loops, sizeof folded as the literal'
   const trips = (src) => checkC(src, { file: 'top.c' }).loops.map((l) => l.trip);
   assert.deepEqual(trips(CASES['a char array, sizeof c'][0]('sizeof c')), [8, 6]);
   assert.deepEqual(trips(CASES['stepped by sizeof(int)'][0]('sizeof b')), [8, 8]);
-  // (a global constant of a global array's: the checker's, synthesis refuses its initializer yet, #2654)
+  // (a global constant of a global array's: the checker's; synthesis's test/c-sizeof-const.test.js, #2654)
   assert.deepEqual(trips('static const int T[5] = { 1 };\nconst int TN = sizeof T / sizeof T[0];\nint top(int x[8]) {\n  int s = 0;\n  for (int i = 0; i < TN; i++) s += T[i] * x[i];\n  return s;\n}\n'), [5]);
   assert.deepEqual(trips(CASES['counting down from sizeof'][0]('sizeof b / sizeof b[0] - 1')), [8, 8]);
   // (a scalar's, a type's, a long long's, a short's array, an array of pointers', a struct's not known here: unknown)

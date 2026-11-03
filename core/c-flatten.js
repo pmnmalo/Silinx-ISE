@@ -33,6 +33,15 @@ export function sizeofType(t, depth, { param, init } = {}) {
   }
   return ty;
 }
+/** sizeof x of an array's or a pointer's variable (look(name): its entry, { type, init, param }): sizeof of its type,
+ *  or null as it was. */
+function sized(n, look) {
+  let b = n.e, depth = 0;
+  while (b.kind === 'index' || (b.kind === 'unary' && b.op === '*')) { b = b.e; depth++; }
+  const v = b.kind === 'id' ? look(b.name) : null;
+  const type = v?.type && sizeofType(v.type, depth, v);
+  return type ? { kind: 'sizeof', type, loc: n.loc } : null;
+}
 /** The functions made into hardware: the top and the functions it names (calls, hls::task's), the test bench's main()
  *  not one (#1820). */
 function hardware(checked) {
@@ -76,6 +85,15 @@ export function flattenArrays(checked, report) {
   /** A variable's entry in the scopes (its array made one): its dimensions, its type and initializer declared. */
   const entry = (v, where, param = false) => { const { type, init } = v; return { ds: flat(v, where), type, init, param }; };
   for (const it of checked.ast.items) if (it.kind === 'var') globals.set(it.name, entry(it, 'global'));
+  // (a global constant's initializer, const int N = sizeof T / sizeof T[0]: its sizeof's too, #2654)
+  const inGlobal = (n) => {
+    if (!n || typeof n !== 'object') return n;
+    if (Array.isArray(n)) return n.map(inGlobal);
+    if (n.kind === 'sizeof' && n.e) { const s = sized(n, (x) => globals.get(x)); if (s) return s; }
+    for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type' && v && typeof v === 'object') n[k] = inGlobal(v);
+    return n;
+  };
+  for (const it of checked.ast.items) if (it.kind === 'var' && it.init) it.init = inGlobal(it.init);
   const hw = hardware(checked);
   for (const f of checked.funcs.values()) {
     if (!f.body || !hw.has(f.name)) continue;
@@ -113,13 +131,7 @@ export function flattenArrays(checked, report) {
         }
         return n;
       }
-      if (n.kind === 'sizeof' && n.e) {
-        let b = n.e, depth = 0;
-        while (b.kind === 'index' || (b.kind === 'unary' && b.op === '*')) { b = b.e; depth++; }
-        const v = b.kind === 'id' ? look(b.name) : null;
-        const type = v?.type && sizeofType(v.type, depth, v);
-        if (type) return { kind: 'sizeof', type, loc: n.loc };
-      }
+      if (n.kind === 'sizeof' && n.e) { const s = sized(n, look); if (s) return s; }
       if (n.kind === 'index') {
         const r = index(n);
         if (r) { r.i = visit(r.i); r.idx = r.idx.map(visit); return r; }
