@@ -31,6 +31,7 @@ export async function openCModel(mod) {
       const host = h('div', { class: 'editor-host' });
       el.append(bar, host);
       d.editor = createEditor(host, { text: r.text, lang: 'c', path: name, readOnly: true });
+      el.append(d.editor.status);   // (its status line, #2763)
       return { lang: 'c', destroy: () => d.editor.destroy() };
     },
   });

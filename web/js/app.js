@@ -359,7 +359,6 @@ export function activateDoc(doc, { background = false } = {}) {
   // (its tab in sight in a full strip, once the Tasks layout and the split have placed it)
   requestAnimationFrame(() => doc.tab.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
   doc.onActivate?.();
-  $('status-pos').textContent = '';
   if (!keepView && !background) drawerGiveWay();   // a narrow screen: the drawer gives way to the document (#266)
   updateTitle();
   saveViewState();
@@ -545,10 +544,11 @@ export async function openFile(path, line, col, { task } = {}) {
           onChange: (info) => { setDirty(d, !d.editor.isClean(), info); if (lang === 'ucf') liveUcf(); else if (lang === 'vhdl' || lang === 'verilog') liveHdl(); },
           onSave: () => flushDoc(d),
           onGotoDefinition: ({ file, line: ln }) => openFile(file, ln),
-          onCursor: (l, c) => { if (S.active === d) $('status-pos').textContent = `Ln ${l}  Col ${c}`; clearTimeout(d.cursorTimer); d.cursorTimer = setTimeout(() => keepCursor(S.project?.name, path, { line: l - 1, ch: c - 1 }), 300); },
+          onCursor: (l, c) => { clearTimeout(d.cursorTimer); d.cursorTimer = setTimeout(() => keepCursor(S.project?.name, path, { line: l - 1, ch: c - 1 }), 300); },
           onRename: () => renameSymbolIn(d, lang, path),
           onFix: () => recheckFile(path),
         });
+        el.append(d.editor.status);   // (its status line: the line and column, the language, #2763)
         d.editor.setDiagnostics(S.diags.filter(x => x.file === path));
         let ucfTimer = null;
         const liveUcf = () => { clearTimeout(ucfTimer); ucfTimer = setTimeout(async () => { if (d.editor) d.editor.setDiagnostics(await ucfDiagnostics(d.editor.getValue(), path)); }, 400); };

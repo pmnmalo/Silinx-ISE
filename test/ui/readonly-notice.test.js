@@ -1,4 +1,4 @@
-// UI (#2697): a read-only document's notice ("Read-only, generated from …") at the right end of its toolbar, the same in
+// UI (#2697): a read-only document's notice ("Read-only, generated from …") at the right end of its toolbar, its status line at its bottom (#2763), the same in
 // every editor: the HDL generated from a drawing, a truth table's schematic, a C source's HDL, its state machine and
 // its C model, a Petri net's state machine; before the schematic's ⋮ menu; inside its toolbar on a narrow window; in
 // Portuguese. No bar above the toolbar, no name in it (the tab's, #2710). No warnings.
@@ -49,9 +49,11 @@ const notice = (page) => page.eval(() => {
     fits: r.left >= br.left - 0.5 && bar.scrollWidth <= bar.clientWidth + 1,
     first: Math.abs(br.top - doc.getBoundingClientRect().top) < 1.5,
     named: !!bar.querySelector('.path'),
+    // (its status line, one, at the document's bottom, #2763)
+    status: [...doc.querySelectorAll('.doc-status')].map((x) => Math.abs(x.getBoundingClientRect().bottom - doc.getBoundingClientRect().bottom) < 1.5),
   };
 });
-const OK = { rightmost: true, atEnd: true, beforeMore: true, fits: true, first: true, named: false };
+const OK = { rightmost: true, atEnd: true, beforeMore: true, fits: true, first: true, named: false, status: [true] };
 async function check(page, text, what) {
   assert.deepEqual(await notice(page), { text, ...OK }, what);
   await page.setViewport(760, 800);

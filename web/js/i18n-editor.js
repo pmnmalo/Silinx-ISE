@@ -52,6 +52,7 @@ export const EDITOR_PHRASES_PT = {
 };
 
 export const EDITOR_PT_PATTERNS = [
+  [/^Ln (\d+), Col (\d+)$/, 'Lin $1, Col $2'],   // (the status line's, #2763)
   [/^Fix: (.+)$/, (m, x) => `Corrigir: ${fixPt(x)}`],
   ...FIX_PT,
   [/^Renames the (.+?) '(.+)' everywhere it is used in this file: (\d+) (places?)\.$/, (m, k, n, c, w) => `Muda o nome de '${n}' (${kindPt(k)}) em todos os sítios onde é usado neste ficheiro: ${places(c, w)}.`],
