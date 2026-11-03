@@ -344,6 +344,7 @@
 /* under 1024 px wide (#266, #1418, web/js/narrow.js): the symbols and the properties go over the canvas,
    shown by the toolbar's Symbols (.pal-open) and Properties (.side-open) buttons */
 .sch-editor .se-panels { display: inline-flex; gap: 2px; margin-left: auto; }
+.sch-editor .se-panels:has(~ .se-banner) { margin-left: 0; }   /* (the notice after it at the right instead, #2697) */
 @media (max-width: 1023px) {
   .sch-editor .se-main { position: relative; }
   .sch-editor :is(.se-left, .se-right) { position: absolute; z-index: 6; top: 0; bottom: 0; }
@@ -365,7 +366,7 @@
 .sch-editor .se-keep, .sch-editor .se-branch, .sch-editor .se-names, .sch-editor .se-hops, .sch-editor .se-curved { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; padding: 0 4px; cursor: pointer; }
 .sch-editor.read-only .se-keep, .sch-editor.read-only .se-branch { display: none; }
 /* a read-only view's note at the end of its toolbar, as the generated HDL's (#1193) */
-.sch-editor .se-toolbar .gen-banner { margin-left: 8px; padding: 1px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 3px; color: #5a4a00; white-space: nowrap; }
+.sch-editor .se-toolbar .gen-banner { padding: 1px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 3px; color: #5a4a00; white-space: nowrap; }
 .sch-editor .se-toolbar .gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
 .sch-editor .se-toolbar .gen-banner a { color: #0645ad; cursor: pointer; text-decoration: underline; }
 .sch-editor.read-only:not(.ro-sim) [data-act="sim"] { display: none; }   /* a truth table's schematic simulates (#946) */
