@@ -77,6 +77,7 @@ export function cStructs(input, report, cpp) {
 function definitions(input, cx) {
   const { structs, enums, enumVals, report } = cx;
   const toks = [];
+  const sized = new Set();   // (the enum constants of sizeof, #2654)
   for (let k = 0; k < input.length; k++) {
     const t = input[k];
     // enum E { A, B = 5 }; (typedef enum { … } E;): its constants, its type an int
@@ -95,6 +96,14 @@ function definitions(input, cx) {
           const name = item[0];
           const val = item.length > 2 && op(item[1], '=') ? item.slice(2) : prev ? [...prev, L(name, '+'), L(name, '1', 'num')] : [L(name, '0', 'num')];
           const c = constTokens(val.map((x) => (x.t === 'id' && enumVals.has(x.v) ? L(x, String(enumVals.get(x.v)), 'num') : x)));
+          // (of sizeof, A = sizeof T / sizeof *T: a constant whose value the declarations give, folded where an int
+          // const's is, #2654)
+          if (c === null && val.some((x) => isId(x, 'sizeof') || (x.t === 'id' && sized.has(x.v)))) {
+            sized.add(name.v);
+            prev = [L(name, '('), ...val, L(name, ')')];
+            toks.push(L(name, 'const', 'id'), L(name, 'int', 'id'), name, L(name, '='), ...prev, L(name, ';'));
+            continue;
+          }
           if (c === null) report(name, `the enum constant '${name.v}': its value must be a constant`);
           v = c ?? v + 1n;
           prev = [L(name, String(v), 'num')];

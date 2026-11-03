@@ -14,6 +14,7 @@
 import { Graph } from './c-graph.js';
 import { BOOL, INT, typeOf, promote, binaryType, compareType, shiftType, unaryType, literalType, wrap } from './c-types.js';
 import { constValue } from './c-check.js';
+import { sizeofBytes } from './c-sizeof.js';
 
 const MAX_UNROLL = 65536;   // iterations unrolled in all, at most
 export const NOT_COMB = '(a sequential module: not supported yet, #1526)';
@@ -279,7 +280,9 @@ export class Flow {
   }
   consts() {
     const m = new Map();
-    for (const [k, v] of this.globals) if (v.init && v.init.kind !== 'init') { const c = constValue(v.init, m); if (c !== null) m.set(k, c); }
+    // (a constant of sizeof, its type core/c-flatten.js's, #2654)
+    const size = (e) => sizeofBytes(e, () => null, (x) => constValue(x, m, size));
+    for (const [k, v] of this.globals) if (v.init && v.init.kind !== 'init') { const c = constValue(v.init, m, size); if (c !== null) m.set(k, c); }
     return m;
   }
 
