@@ -89,8 +89,7 @@ test('#2654 the constants of sizeof co-simulated in VHDL and Verilog against cc,
 });
 
 test('#2654 the C simulation: the constants of sizeof as cc\'s', () => {
-  // (its switch left out: a case of a named constant is never taken in the C simulation yet, #2749)
-  const src = `#include <stdio.h>\n${HW.replace(/ {2}switch[^\n]*\n/, '')}int main(void) {\n  printf("%d %d %d %d %d %d\\n", N, (int)R, E, F, G, S);\n  for (int v = 3; v < 8; v++) printf("%d\\n", top(v));\n  return 0;\n}\n`;
+  const src = `#include <stdio.h>\n${HW}int main(void) {\n  printf("%d %d %d %d %d %d\\n", N, (int)R, E, F, G, S);\n  for (int v = 3; v < 8; v++) printf("%d\\n", top(v));\n  return 0;\n}\n`;
   const sim = simulateC(src, { file: 'tb.c' });
   assert.deepEqual([sim.error, sim.exitCode, said(sim.diagnostics)], [null, 0, []]);
   assert.equal(sim.output.split('\n')[0], '5 7 6 7 41 8');
