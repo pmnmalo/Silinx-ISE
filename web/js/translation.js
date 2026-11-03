@@ -1,8 +1,9 @@
 // An HDL source in the other language (#2693): a Verilog module of a VHDL project (or the other way round) has the
 // preferred language's badge too on its Design row, which opens the source translated (core/translate.js), read-only,
 // in a document of its own, made again when the source is saved. What cannot be translated is said in the document.
+// The source's tab menu shows it beside the source (Show Generated VHDL / Verilog Beside, web/js/split-view.js, #2711).
 import { h } from './dom.js';
-import { S, findDoc, closeDoc, openDoc, openFile } from './app.js';
+import { S, findDoc, closeDoc, openDoc, openFile, activateDoc } from './app.js';
 import { createEditor } from './editor.js';
 import { translateSource, translatedPath, translationLang } from '/core/translate.js';
 
@@ -14,6 +15,13 @@ const label = lang => (lang === 'vhdl' ? 'VHDL' : 'Verilog');
 export function translationBadge(file, context) {
   const lang = translationLang(file, preferred());
   return lang ? { text: label(lang), base: false, title: `Translated to ${label(lang)} (read-only)`, open: () => openTranslation(file), context } : null;
+}
+
+/** The language a project source is translated to ('VHDL' / 'Verilog': in the other language than the preferred one),
+ *  or null. */
+export function translationOf(path) {
+  const lang = S.sources.some(s => s.path === path && !s.view) && translationLang(path, preferred());
+  return lang ? label(lang) : null;
 }
 
 // the source's text: its open editor's (saved or not), else the project's
@@ -32,6 +40,8 @@ export async function openTranslation(path) {
   if (!lang) return openFile(path);
   const id = `tr:${path}`;
   const old = findDoc(id);
+  // (open already, in this language: made again, where it is)
+  if (old?.translation?.lang === lang) { await old.refresh(); activateDoc(old); return old; }
   if (old) await closeDoc(old);
   const r = translate(path, await sourceText(path));
   const name = translatedPath(path.split('/').pop(), lang);
@@ -54,6 +64,7 @@ export async function openTranslation(path) {
         show(t);
         if (t.text !== d.editor.getValue()) d.editor.setValue(t.text);
       };
+      d.refresh = follow;
       addEventListener('silinx:design-changed', follow);
       return { lang, destroy: () => { removeEventListener('silinx:design-changed', follow); d.editor.destroy(); } };
     },
