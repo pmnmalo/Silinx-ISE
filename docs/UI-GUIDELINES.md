@@ -54,17 +54,28 @@ viewer of its own:
   `mountAsmEditor` and `mountFsmEditor`, `setBanner` of the schematic editor). Out of sync, it is also
   `.out-of-sync` (red).
 - **The tools that change it are hidden**, not disabled: add, delete, arrange, validate, the language and the
-  encoding, the Problems panel. Zoom, pan, select, Tables and Simulate stay. Its properties are shown, their fields
+  encoding, the Problems panel (which goes to the console, #2718). Zoom, pan, select, Tables and Simulate stay. Its properties are shown, their fields
   disabled.
-- Nothing in it is validated or reported: it is right by construction, or its source's problems say why not.
+- Nothing in it is validated or reported: it is right by construction, or its source's problems (in the console) say
+  why not.
 
 ## The Design pane
 
 - One row per module: its drawing's badge first (the base, which opens it), the views made from it next (`[FSM]` of a
   Petri net, `[ASM]` of a C source), its HDL last (`[VHDL]` / `[Verilog]`). A badge's right-click opens the module's
   commands, which also hold every view its badges open.
-- Process output goes to the console (`web/js/messages.js`), errors as `ERROR: …`; a toast for an action that can be
-  undone carries its Undo. No `alert()`.
+
+## Messages
+
+- **Every message goes to the console, never into the document's window**: the information, warnings and errors of an
+  editor, a viewer, the emulator or a process (a check, a validation, an engine's note, a log) are lines of the console
+  (`web/js/messages.js`: `log(…)`, `WARNING: …`, `ERROR: …`), its Errors and Warnings tabs listing them, a click on
+  one going to its place in the document. No problems panel, message box, log or warning line inside an editor or a
+  viewer, and no `alert()` (#2718).
+- What the document shows of itself is not a message and stays in it: the read-only notice and "Not in sync with …" in
+  the toolbar, the hint line, a selected item's properties, a highlight on the item a message points to.
+- A dialog says what is wrong with its own fields beside them, as long as it is open.
+- A toast only says an action was done, carrying its Undo when it can be undone.
 
 ## Everywhere
 
