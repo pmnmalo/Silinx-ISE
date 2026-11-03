@@ -439,6 +439,9 @@ uiTest('#993 Tasks ▸ Edit: Check Schematic\'s errors and warnings in the conso
   await page.waitConsole(/Process "Check Schematic" failed/);
   assert.equal(await page.eval(() => document.documentElement.dataset.console), 'open');
   assert.ok(!(await shown(page, `${ED} .se-diags`)), 'not in the editor\'s panel');
+  // (its error brings the Errors tab forward, #2733: the Console's lines)
+  await page.waitFor(() => document.querySelector('#console-tabs .tab.active').dataset.page === 'errors', [], { what: 'the Errors tab in front' });
+  await page.click('#console-tabs .tab[data-page=console]');
   const lines = await page.eval(() => [...document.querySelectorAll('#console-log .ln')].filter((l) => l.getClientRects().length).map((l) => [l.dataset.src, l.textContent, l.classList.contains('mc-link')]));
   const at = lines.findIndex(([, t]) => t === 'Started : "Check Schematic" of bad.');
   assert.ok(at >= 0, JSON.stringify(lines));

@@ -1,7 +1,8 @@
 // UI (#2733): an error or a warning written to the console brings its Errors or Warnings tab to the front, whoever
 // wrote it (Check Syntax, a line of the console as the emulator's and the editors' problems): an error the Errors tab,
 // else a warning the Warnings tab; a mix the Errors tab; info changes nothing; a later warning leaves the Errors tab in
-// front while it lists errors; the keyboard's focus stays in the editor; the Silinx interface's folded messages open.
+// front while it lists errors; the keyboard's focus stays in the editor; a tab brought forward goes back to the Console
+// once emptied (cleared, a project opened after the start-up checks' warnings); the Silinx interface's folded messages open.
 // Both interfaces; the warnings asserted.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,7 +36,8 @@ uiTest('#2733 an error or a warning written to the console: its Errors or Warnin
   await page.showMessages();
   await page.eval(() => window.SilinxApp.openFile('src/top.v'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.v' && window.Silinx.active.editor);
-  await page.click('#console-tabs .tab[data-page=console]');
+  // (the start-up checks' warnings, if any, cleared by the project's opening: the Console tab again)
+  await waitShown(page, 'console');
   // info and a clean Check Syntax: the Console tab stays
   await log(page, 'INFO: a note', 'info');
   await log(page, 'Done.', 'ok');
@@ -76,10 +78,12 @@ uiTest('#2733 an error or a warning written to the console: its Errors or Warnin
   await page.eval(() => window.SilinxApp.setDiagnostics(window.Silinx.diags.filter((d) => d.source !== 'console')));
   await tick(200);
   assert.equal(await shown(page), 'console');
-  // cleared (the tab left as it is), then a warning only: the Warnings tab
+  // a new error, then cleared: the Errors tab brought forward goes back to the Console
+  await log(page, 'ERROR: Board Emulator: e2', 'err');
+  await waitShown(page, 'errors');
   await page.click('#console-clear');
-  await tick(200);
-  assert.equal(await shown(page), 'console');
+  await waitShown(page, 'console');
+  // a warning only: the Warnings tab
   await check(page, UNUSED);
   await waitShown(page, 'warnings');
   assert.deepEqual(await rows(page, 'errors'), []);

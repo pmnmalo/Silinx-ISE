@@ -62,6 +62,7 @@ export function logLine(line, opts) {
 }
 export function showConsolePage(page) {
   // (a tab of the console only: the keyboard's focus stays where it is, an editor's typing goes on)
+  broughtForward = null;
   document.querySelectorAll('#console-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.page === page));
   document.querySelectorAll('.console-page').forEach(p => { p.hidden = p.dataset.page !== page; });
 }
@@ -105,18 +106,24 @@ export function renderDiagnostics() {
 // A new error brings the Errors tab forward, else a new warning the Warnings one (#2733), whoever wrote it: once per
 // drawing (the console's lines are drawn at most every 50 ms: a run's batch, errors winning), a message already listed
 // (an editor's problem checked again as it is typed) not again, and a warning leaves the Errors tab in front while it
-// lists errors. The Tasks interface opens its folded messages on the event (web/js/tasks.js).
-let listed = new Set();
+// lists errors. A tab so brought forward goes back to the Console once it lists nothing (cleared, another project
+// opened: the start-up checks' warnings); one the viewer picked stays. The Tasks interface opens its folded messages on
+// the event (web/js/tasks.js).
+let listedDiags = new Set(), broughtForward = null;
 const diagKey = d => `${d.severity}|${d.tool || ''}|${d.file || ''}|${d.line || 0}|${d.message}`;
 const pageShown = () => document.querySelector('#console-tabs .tab.active')?.dataset.page;
 function focusNewDiagnostics(errs, warns) {
-  const before = listed;
-  listed = new Set([...errs, ...warns].map(diagKey));
+  const before = listedDiags;
+  listedDiags = new Set([...errs, ...warns].map(diagKey));
   const isNew = d => !before.has(diagKey(d));
   const page = errs.some(isNew) ? 'errors'
     : warns.some(d => d.severity === 'warning' && isNew(d)) && !(errs.length && pageShown() === 'errors') ? 'warnings' : null;
-  if (!page) return;
+  if (!page) {
+    if (broughtForward && pageShown() === broughtForward && !(broughtForward === 'errors' ? errs : warns).length) showConsolePage('console');
+    return;
+  }
   showConsolePage(page);
+  broughtForward = page;
   document.dispatchEvent(new CustomEvent('silinx:console-problems', { detail: { page } }));
 }
 onLanguageChange(() => renderDiagnostics());
