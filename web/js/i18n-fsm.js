@@ -21,7 +21,7 @@ export const FSM_PT = {
   'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas',
   // selection
   'State (Moore outputs inside)': 'Estado (saídas de Moore lá dentro)', 'Initial (reset) state': 'Estado inicial (de reset)',
-  'Transition: condition / Mealy outputs': 'Transição: condição / saídas de Mealy', 'Name': 'Nome', 'Outputs (Moore)': 'Saídas (Moore)',
+  'Name': 'Nome', 'Outputs (Moore)': 'Saídas (Moore)',
   'Outputs while in this state: output=value, separated by commas. The other outputs keep their default value.': 'Saídas neste estado: saída=valor, separadas por vírgulas. As outras saídas ficam com o valor por omissão.',
   "e.g. z=1, y=2'b10": "p.ex. z=1, y=2'b10", 'Delete state': 'Apagar estado', 'Delete this state and its transitions': 'Apagar este estado e as suas transições',
   'Transition': 'Transição', 'From': 'De', 'To': 'Para', 'Condition': 'Condição',
