@@ -330,6 +330,12 @@ export function designChecks(lib, design, { lint = true, rules = true } = {}) {
     for (const t of p.triggers || []) if (t.edge !== 'any' || p.kind === 'native') push(readers, t.sig, p);
     for (const s of p.writes || []) push(writers, s, p);
   }
+  // an input of a primitive is read by it, also when its simulation model does not read it (a DCM_SP's CLKFB, a
+  // PLL_BASE's CLKFBIN: the feedback the device uses, #2716)
+  for (const i of insts) {
+    if (!isPrim(i)) continue;
+    for (const port of i.ports || []) if (port.dir === 'in' && port.sig) push(readers, port.sig, { inst: i, kind: 'native', reads: [port.sig] });
+  }
 
   // ===================================================================== rules (errors)
   if (rules) {
