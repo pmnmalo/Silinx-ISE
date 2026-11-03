@@ -74,6 +74,7 @@ export const PETRI_PT_PATTERNS = [
   [/^(\d+) reachable markings? where no transition can fire$/, (m, n) => `${n} ${n === '1' ? 'marcação alcançável' : 'marcações alcançáveis'} onde nenhuma transição pode disparar`],
   [/^after ([A-Za-z]\w*(?:, [A-Za-z]\w*)*)$/, 'depois de $1'],
   [/^(\d+) places · (\d+) transitions · (\d+) arcs$/, '$1 lugares · $2 transições · $3 arcos'],
+  [/^(\d+) tokens?$/, (m, n) => `${n} marca${n === '1' ? '' : 's'}`],   // (the status line's, #2763)
   [/^Place ([A-Za-z]\w*)$/, 'Lugar $1'], [/^Transition ([A-Za-z]\w*)$/, 'Transição $1'], [/^Arc ([A-Za-z]\w*|\?) → ([A-Za-z]\w*|\?)$/, 'Arco $1 → $2'],
   [/^Priority (\d+) of (\d+) \(in a conflict, the first takes the tokens\)$/, 'Prioridade $1 de $2 (num conflito, a primeira tira as marcas)'],
   [/^fire ([A-Za-z]\w*)$/, 'disparo $1'], [/^clock: nothing fires$/, 'relógio: nada dispara'], [/^clock: ([A-Za-z]\w*(?:, [A-Za-z]\w*)*)$/, 'relógio: $1'],

@@ -32,6 +32,7 @@ import { mountPetriSide } from './petri-side.js';
 import { mountPetriDraw } from './petri-draw.js';
 import { clone } from '/core/util.js';
 import { printDiagram, svgSnapshot } from './print.js';
+import { statusLine } from './status-line.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const GRID = 20;
@@ -82,7 +83,7 @@ export function mountPetriEditor(container, opts = {}) {
   });
   const linkHost = h('span', { class: 'pn-link' });
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
-  const info = h('span', { class: 'asm-info' });   // (the net's counts, at the toolbar's right)
+  const info = statusLine();   // (the net's counts and its tokens: in its status line, #2763)
   const more = toolbarMenu([tabBtns.analysis,
     btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
     btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()),
@@ -94,7 +95,7 @@ export function mountPetriEditor(container, opts = {}) {
     h('div', { class: 'asm-group' }, tabBtns.sim, pnmlIn),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
-    info, more.el, linkHost);
+    more.el, linkHost);
 
   // ---------------------------------------------------------------- canvas, panels
   const defs = sv('defs', {},
@@ -114,7 +115,7 @@ export function mountPetriEditor(container, opts = {}) {
   const netSection = h('section', { class: 'asm-section pn-net' }, h('h3', {}, 'Net'), netBody);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection);
   mountSideFold({ root, side, key: 'silinx.petri.props.folded' });
-  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), info.el);
   const status = (msg, err = false) => { if (msg) opts.onMessage?.(msg, err); };   // (in the console)
 
   // ---------------------------------------------------------------- model edits, history

@@ -9,7 +9,7 @@ import { setPrintMeta } from './print.js';
 import { TEXT_CSS, domSnapshot, metaLine, openPrintView, printOptions, printPageHtml, textBody } from './print-view.js';
 
 // what a copy of a document leaves out: its toolbars, buttons and fields of commands, tips and menus
-const CHROME = ['.doc-toolbar', '.editor-bar', '.tb-btn', 'button', '.fv-tip', '.fv-search', '.ctx-menu', '.print-frame'];
+const CHROME = ['.doc-toolbar', '.doc-status', '.editor-bar', '.tb-btn', 'button', '.fv-tip', '.fv-search', '.ctx-menu', '.print-frame'];
 
 /** The project and file of document `d` (its header's line). */
 export const docMeta = (d) => metaLine({ project: d.project || S.project?.name || '', file: d.path || '' });

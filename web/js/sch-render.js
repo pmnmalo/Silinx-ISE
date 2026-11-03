@@ -189,7 +189,8 @@ export function mountRender(ctx) {
     const n = doc.symbols.length;
     const tip = live ? 'Trying it out: click the inputs (switches, bus values, clocks), hover a wire or pin to see its value, drag to pan. Esc stops.' : readOnly ? 'Read-only view. Drag on empty space to select, double-click a module to open it, wheel to zoom.' : ((doc.wireStyle === 'curved' && CURVED_HINT[tool]) || TOOL_HINT[tool] || '');
     const d = lastDiags ? ` · ${lastDiags.filter(x => x.severity === 'error').length} error(s), ${lastDiags.filter(x => x.severity === 'warning').length} warning(s)` : '';
-    status.innerHTML = `<span class="hint">${esc(tip)}</span><span class="sp"></span><span>${esc(n)} symbol${n === 1 ? '' : 's'}, ${nl ? nl.nets.length : 0} nets${esc(d)}</span><span class="xy">X ${snap(cursor.x)} Y ${snap(cursor.y)}</span><span class="zoom">${Math.round(view.s * 100)}%</span>`;
+    status.set([`${n} symbol${n === 1 ? '' : 's'}, ${nl ? nl.nets.length : 0} nets${d}`, { text: `X ${snap(cursor.x)} Y ${snap(cursor.y)}`, cls: 'xy' },
+      { text: `${Math.round(view.s * 100)}%`, cls: 'zoom' }], tip);
   }
 
   return { renderSheet, render, renderOverlay, updateToolbar, updateStatus };

@@ -26,6 +26,7 @@ import { reservedError } from '/core/reserved.js';
 import { cellText, placeKmap } from './tt-kmap3d.js';
 import { domSnapshot } from './print-view.js';
 import { t as tr } from './i18n.js';
+import { statusLine } from './status-line.js';
 
 const NEXT = { 0: '1', 1: 'X', X: '0' };
 const COLORS = ['#d62728', '#1f77b4', '#2ca02c', '#9467bd', '#ff7f0e', '#17becf', '#e377c2', '#8c564b', '#bcbd22', '#7f7f7f'];
@@ -61,10 +62,13 @@ function bestForm(doc, out, goal, label, tip, notation) {
 // tab) and the results; the commands, the expression's field, the hints and the options left out (the notes when it
 // has some).
 function ttPrintView(root, notes, name) {
-  const drop = ['.tt-toolbar', '.tt-cap-expr', '.tt-row', '.hint', '.tt-expr-err', '.tt-groups', '.tt-tab:not(.active)', '.tt-k3d-reset', '.tt-notation'];
+  const drop = ['.tt-toolbar', '.doc-status', '.tt-cap-expr', '.tt-row', '.hint', '.tt-expr-err', '.tt-groups', '.tt-tab:not(.active)', '.tt-k3d-reset', '.tt-notation'];
   if (!notes.value.trim()) drop.push('.tt-cap-notes', '.tt-notes');
   return { title: `${tr('Truth table')} ${name}`, app: true, body: domSnapshot(root, { drop }) };
 }
+
+// what the status line says of a table (#2763): its inputs, outputs and rows
+const shapeText = (m) => { const ni = m.inputs.length, no = m.outputs.length; return `${ni} input${ni === 1 ? '' : 's'} · ${no} output${no === 1 ? '' : 's'} · ${2 ** ni} rows`; };
 
 // a menu item as the schematic editor's: an icon and a label (#2505)
 const menuItem = (icon, label, title, onclick, cls = '') => h('button', { type: 'button', class: `tt-menu-item ${cls}`, title, html: `${ICON[icon]}<span>${label}</span>`, onclick });
@@ -178,7 +182,8 @@ export function mountTtEditor(container, opts = {}) {
     h('div', { class: 'tt-caption tt-cap-expr' }, 'Expression'), exprRow, h('div', { class: 'hint tt-ops' }, OPS), exprErr,
     h('div', { class: 'tt-caption' }, 'Karnaugh map'), grpSel, kmapHost,
     h('div', { class: 'tt-caption' }, 'Results'), results);
-  root.append(toolbar, h('div', { class: 'tt-body' }, left, right));
+  const status = statusLine();   // (its inputs, outputs and rows, #2763)
+  root.append(toolbar, h('div', { class: 'tt-body' }, left, right), status.el);
   root.tabIndex = -1;
   root.addEventListener('keydown', e => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;   // (their own undo)
@@ -348,7 +353,7 @@ export function mountTtEditor(container, opts = {}) {
     exprLbl.textContent = `${out} =`;
     if (document.activeElement !== exprIn || !exprIn.value) exprIn.value = M.exprs[out] || '';
     exprErr.textContent = '';
-    renderTabs(); renderTable(); renderKmap(); renderResults(); renderLink();
+    renderTabs(); renderTable(); renderKmap(); renderResults(); renderLink(); status.set([shapeText(M)]);
   }
   const uid = Math.random().toString(36).slice(2, 8);
   render();

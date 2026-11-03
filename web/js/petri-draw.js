@@ -81,7 +81,10 @@ export function mountPetriDraw(ctx) {
     renderSide();
     renderPanel();
     delBtn.disabled = !sel();
-    info.textContent = `${M().places.length} places · ${M().transitions.length} transitions · ${M().arcs.length} arcs`;
+    // (the tokens: the simulation's while it runs, else the initial marking's)
+    const tokens = Object.values(sim() ? sim().marking : initialMarking(M())).reduce((a, b) => a + b, 0);
+    info.set([{ text: `${M().places.length} places · ${M().transitions.length} transitions · ${M().arcs.length} arcs`, cls: 'asm-info' },
+      `${tokens} token${tokens === 1 ? '' : 's'}`]);
     refreshLink();
   }
 

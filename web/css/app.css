@@ -388,3 +388,15 @@ th.th-expected { background: var(--expected-bg); }   /* … and the expected out
 .fp-hit code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 .fp-hit mark { background: #ffe58a; color: inherit; border-radius: 2px; }
 .fp-one { padding: 1px 8px; font-size: 12px; }
+
+/* A document's status line (#2763, web/js/status-line.js): the one line at the bottom of every editor and viewer */
+.doc-status {
+  flex: none; display: flex; align-items: center; gap: 12px; height: 20px; padding: 0 6px; border-top: 1px solid var(--border, #a0a0a0);
+  background: var(--bg, #f0f0f0); color: var(--fg, #333); font-size: 11px; white-space: nowrap; overflow: hidden;
+}
+.doc-status .hint { overflow: hidden; text-overflow: ellipsis; color: var(--muted, #6d6d6d); }
+.doc-status .sp { flex: 1; }
+.doc-status .ds-f { flex: none; }
+.doc-status .xy { width: 110px; text-align: right; font-family: var(--mono, monospace); }
+.doc-status .zoom { width: 44px; text-align: right; }
+html[data-ui="silinx"] .doc-status { border-color: var(--m-border); background: var(--m-bg); color: var(--m-muted); }

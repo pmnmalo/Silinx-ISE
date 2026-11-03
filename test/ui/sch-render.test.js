@@ -20,9 +20,9 @@ const MOUNT = async () => {
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
   svg.innerHTML = '<g class="se-sheet"></g><g class="se-content"></g><g class="se-overlay"></g>';
-  const tb = document.createElement('div'), status = document.createElement('div');
+  const tb = document.createElement('div'), status = (await import('/js/status-line.js')).statusLine('se-status');
   tb.innerHTML = ['select', 'wire', 'net', 'io', 'place', 'sim', 'delete', 'rotate', 'mirror', 'mirrorv'].map((a) => `<button data-act="${a}"></button>`).join('');
-  document.body.append(svg, tb, status);
+  document.body.append(svg, tb, status.el);
   const inv = { id: 'S1', type: 'inv', name: 'U1', x: 200, y: 100 };
   const [I, O] = symbolPins(normalizeDoc({ symbols: [inv] }).symbols[0]);
   const doc = normalizeDoc({ name: 'top', lang: 'verilog', symbols: [inv, { id: 'S2', type: 'and2', name: 'U2', x: 400, y: 300 }],
@@ -59,16 +59,16 @@ uiTest('#405 schematic drawing: the sheet, the wires, symbols, markers and names
     o.labels = q('.se-content g[data-kind=label] text').map((t) => t.textContent);
     o.nc = q('.se-content .nc').length;
     o.toolbar = [on(), off('delete'), off('rotate'), off('mirrorv')];
-    o.status = status.textContent;
+    o.status = status.el.textContent;
     // nothing selected, the check's counts, read-only is not in the hint (the editor's flag), a live simulation's
     st.sel = new Set(); st.lastDiags = [{ severity: 'error' }, { severity: 'warning' }, { severity: 'warning' }];
     r.render();
     o.toolbar2 = [off('delete'), off('rotate'), off('mirrorv')];
-    o.status2 = status.textContent;
+    o.status2 = status.el.textContent;
     let updated = 0;
     st.live = { update: (full) => { updated += full ? 1 : 0; } };
     r.render();
-    o.live = [updated, on(), /^Trying it out/.test(status.textContent)];
+    o.live = [updated, on(), /^Trying it out/.test(status.el.textContent)];
     st.live = null;
     // destroyed: not drawn
     st.destroyed = true; st.doc = { ...st.doc, symbols: [] };

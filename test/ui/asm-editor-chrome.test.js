@@ -1,5 +1,5 @@
-// UI (#2730): the ASM chart editor as the other editors (docs/UI-GUIDELINES.md): no hint on the canvas, no status line,
-// its states at the toolbar's right end, "Encoding:" before its selector, the Machine section in its Properties (not
+// UI (#2730): the ASM chart editor as the other editors (docs/UI-GUIDELINES.md): no hint on the canvas, its states and
+// encoding in its status line (#2763), none in its toolbar, "Encoding:" before its selector, the Machine section in its Properties (not
 // folded; alone when nothing is selected, no "Selection" help, #2739), its problems in the console's Errors and Warnings
 // (a click selecting the box) and Validate's lines in the Console, none in the editor; Portuguese. Both interfaces.
 import { before, after } from 'node:test';
@@ -23,19 +23,18 @@ const ERR = "State 'LOST' has no exit (next state path)", WARN = "State 'LOST' i
 const tab = (page, id) => page.eval((i) => [...document.querySelectorAll(`#${i} .diag`)].map((r) => r.textContent), id);
 const lines = (page) => page.eval(() => [...document.querySelectorAll('#console-log .ln')].map((l) => l.textContent));
 
-uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar\'s right, Encoding:, its problems in the console; Portuguese', E, async (page) => {
+uiTest('#2730 the ASM editor: no hint, its states in its status line (#2763), Encoding:, its problems in the console; Portuguese', E, async (page) => {
   await page.setViewport(1600, 800);   // (the toolbar on one line)
   await makeProject(env, { name: 'AsmChrome', files: { 'src/ctl.asm.json': chart() } });
   await page.openProject('AsmChrome');
   await page.eval(() => window.SilinxApp.openFile('src/ctl.asm.json'));
   await page.waitFor((d) => document.querySelector(`${d} .asm-info`)?.textContent, [D], { what: 'the editor' });
   const look = await page.eval((d) => {
-    const el = document.querySelector(d), tb = el.querySelector('.asm-toolbar'), info = tb.querySelector('.asm-info');
-    const shown = (c) => c.getClientRects().length > 0 && getComputedStyle(c).position !== 'absolute';
+    const el = document.querySelector(d), tb = el.querySelector('.asm-toolbar');
     return {
-      gone: ['.asm-hint', '.asm-status', '.asm-problems', '.asm-prob', '.asm-left'].filter((s) => el.querySelector(s)),
-      info: info.textContent,
-      after: [...tb.children].filter((c) => shown(c) && c.getBoundingClientRect().left > info.getBoundingClientRect().left).map((c) => c.className),
+      gone: ['.asm-hint', '.asm-status', '.asm-problems', '.asm-prob', '.asm-left', '.asm-toolbar .asm-info'].filter((s) => el.querySelector(s)),
+      status: [...el.querySelectorAll(':scope > .doc-status .ds-f')].map((f) => f.textContent),
+      last: el.lastElementChild.className,
       encoding: [...el.querySelector('.asm-encoding').children].map((c) => c.textContent.slice(0, 9)),
       // (nothing selected: the machine's settings only, in a section that does not fold, #2739)
       side: [el.querySelector('.asm-side .asm-cap').textContent, [...el.querySelectorAll('.asm-side h3')].filter((x) => x.getClientRects().length).map((x) => x.textContent),
@@ -43,13 +42,8 @@ uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar
       zoom: el.querySelector('.asm-toolbar .asm-zoom')?.textContent,
     };
   }, D);
-  assert.deepEqual(look, { gone: [], info: '4 states', after: [], encoding: ['Encoding:', 'BinaryGra'], side: ['Properties', ['Machine'], true, 0], zoom: look.zoom });
+  assert.deepEqual(look, { gone: [], status: ['4 states', 'Encoding: Binary'], last: 'doc-status', encoding: ['Encoding:', 'BinaryGra'], side: ['Properties', ['Machine'], true, 0], zoom: look.zoom });
   assert.match(look.zoom, /^\d+%$/);
-  // a narrower window: the toolbar wrapped, its states at the right end still
-  await page.setViewport(1100, 800);
-  assert.ok(await page.eval((d) => { const tb = document.querySelector(`${d} .asm-toolbar`), r = tb.querySelector('.asm-info').getBoundingClientRect();
-    return tb.getBoundingClientRect().right - parseFloat(getComputedStyle(tb).paddingRight) - r.right < 8; }, D), 'at the right end');
-  await page.setViewport(1600, 800);
   // its problems in the console's tabs, not in its lines (until Validate)
   await page.waitFor(() => document.querySelectorAll('#console-warnings .diag').length, [], { what: 'the warnings' });
   assert.deepEqual(await tab(page, 'console-errors'), [`ERROR:ASM - "src/ctl.asm.json": ${ERR}`]);
@@ -88,6 +82,7 @@ uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor((d) => document.querySelector(`${d} .asm-info`).textContent === '4 estados', [D], { what: 'Portuguese' });
   assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-tb-label`).textContent, D), 'Codificação:');
+  assert.deepEqual(await page.eval((d) => [...document.querySelectorAll(`${d} .doc-status .ds-f`)].map((f) => f.textContent), D), ['4 estados', 'Codificação: Binária']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 }, { timeout: 120000 });

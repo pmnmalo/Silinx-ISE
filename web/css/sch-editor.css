@@ -259,16 +259,6 @@
 .sch-editor .se-drow.warning .sev { color: var(--se-warning); }
 .sch-editor .se-drow.ok { color: var(--success, #008000); }
 
-/* ------------------------------------------------------------------ status bar */
-.sch-editor .se-status {
-  flex: none; display: flex; align-items: center; gap: 12px; height: 20px; padding: 0 6px; border-top: 1px solid var(--se-border);
-  background: var(--se-bg); color: #333; font-size: 11px; white-space: nowrap; overflow: hidden;
-}
-.sch-editor .se-status .hint { overflow: hidden; text-overflow: ellipsis; color: var(--se-muted); }
-.sch-editor .se-status .sp { flex: 1; }
-.sch-editor .se-status .xy { width: 110px; text-align: right; font-family: var(--se-mono); }
-.sch-editor .se-status .zoom { width: 44px; text-align: right; }
-
 /* ------------------------------------------------------------------ View HDL dialog */
 .sch-editor .se-modal { position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; }
 .sch-editor .se-dialog {

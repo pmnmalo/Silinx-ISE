@@ -542,7 +542,7 @@ html[data-theme="dark"] .sch-editor .se-cathead { background: var(--m-surface-2)
 html[data-theme="dark"] .sch-editor .se-cathead::before { color: var(--m-muted); }
 html[data-theme="dark"] :is(.sch-editor .se-pins, .sch-editor .se-symdoc .sd-formula code) { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
 html[data-theme="dark"] :is(.sch-editor .se-hint, .sch-editor .se-prompt, .sch-editor .lv-tip) { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border-strong); }
-html[data-theme="dark"] .sch-editor .se-prompt label, html[data-theme="dark"] .sch-editor .se-status { color: var(--m-muted); }
+html[data-theme="dark"] .sch-editor .se-prompt label { color: var(--m-muted); }
 html[data-theme="dark"] .sch-editor .se-code { background: var(--m-surface); color: #d6dae0; }
 html[data-theme="dark"] .sch-editor .se-code .tk-kw { color: #c792ea; }
 html[data-theme="dark"] .sch-editor .se-code .tk-com { color: #7d8794; }

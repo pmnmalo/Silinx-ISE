@@ -130,3 +130,43 @@ uiTest('#2505 the Petri net, FSM and ASM side panels fold to a strip and expand,
   }
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 }, { timeout: 180000 });
+
+// (#2763) every editor's status line: its last line, the Schematic editor's look, what it says; its toolbar says none of it
+uiTest('#2763 the drawing editors\' status line, as the Schematic\'s: their counts and encoding there, not in their toolbars; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'StatT', template: 'traffic', files: { 'src/net.pn.json': JSON.stringify(newPetri('net')) } });
+  await makeProject(env, { name: 'StatB', template: 'blinky' });
+  await makeProject(env, { name: 'StatG', template: 'gates' });
+  await page.setViewport(1440, 900);
+  const line = (page, root) => page.eval((r) => {
+    const el = document.querySelector(r), st = el.querySelectorAll('.doc-status'), c = getComputedStyle(st[0]);
+    return { n: st.length, last: el.lastElementChild === st[0], fields: [...st[0].querySelectorAll('.ds-f')].map((f) => f.textContent),
+      look: { h: c.height, font: c.fontSize, border: c.borderTopStyle, bg: c.backgroundColor }, toolbar: el.querySelector(':scope > [class*=toolbar]').querySelectorAll('.asm-info, .fsm-info').length };
+  }, root);
+  await page.openProject('StatG');
+  await open(page, 'src/gates.sch.json', 'the schematic', '.se-toolbar');
+  const sch = await line(page, `${D} .sch-editor`);
+  assert.deepEqual({ ...sch, fields: undefined }, { n: 1, last: true, fields: undefined, look: sch.look, toolbar: 0 });
+  assert.match(sch.fields.join(' | '), /^\d+ symbols?, \d+ nets \| X -?\d+ Y -?\d+ \| \d+%$/);
+  const want = {
+    fsm: ['src/traffic.fsm.json', '.fsm-editor', ['7 state(s), 8 transition(s)', 'Moore', 'Encoding: Binary'], ['7 estado(s), 8 transição(ões)', 'Moore', 'Codificação: Binária']],
+    petri: ['src/net.pn.json', '.petri-editor', ['2 places · 2 transitions · 4 arcs', '1 token'], ['2 lugares · 2 transições · 4 arcos', '1 marca']],
+    tt: ['src/lamps.bool.json', '.tt-editor', null, null],
+    asm: ['src/speed_ctrl.asm.json', '.asm-editor:not(.fsm-editor):not(.petri-editor)', null, null],
+  };
+  for (const [name, [file, root, en, pt]] of Object.entries(want)) {
+    const pj = name === 'asm' ? 'StatB' : 'StatT';
+    if (await page.eval(() => window.SilinxApp.S.project?.name) !== pj) await page.openProject(pj);
+    await open(page, file, name, `${root} .doc-status .ds-f`);
+    const s = await line(page, `${D} ${root}`);
+    assert.deepEqual({ ...s, fields: undefined }, { n: 1, last: true, fields: undefined, look: sch.look, toolbar: 0 }, `${name}: one status line, the schematic's look`);
+    await shot(page, `status-${name}`);
+    if (en) assert.deepEqual(s.fields, en, name);
+    else if (name === 'tt') assert.match(s.fields.join(' | '), /^\d+ inputs? · \d+ outputs? · \d+ rows$/);
+    else assert.match(s.fields.join(' | '), /^\d+ states?(?: · \d+ every-cycle blocks?)? \| Encoding: (Binary|Gray|One-hot|Enum \/ auto)$/);
+    await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+    if (pt) await page.waitFor((r, w) => JSON.stringify([...document.querySelectorAll(`${r} .doc-status .ds-f`)].map((f) => f.textContent)) === w, [`${D} ${root}`, JSON.stringify(pt)], { what: `${name} in Portuguese` });
+    else await page.waitFor((r) => /entradas?|estados?/.test(document.querySelector(`${r} .doc-status .ds-f`).textContent), [`${D} ${root}`], { what: `${name} in Portuguese` });
+    await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  }
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+}, { timeout: 180000 });
