@@ -44,9 +44,10 @@ uiTest('#405 ASM inspector: nothing, several boxes, a state, a decision, a case 
     const { ins, commits, calls, selSection: S, text, input, set, M, select } = window.__i;
     const r = {};
     ins.renderInspector();
-    r.none = text(S);
+    r.none = [text(S), S.childElementCount, S.hidden];
     select(['s1', 's2']); ins.renderInspector();
     r.many = text(S);
+    r.shown = S.hidden;
     S.querySelector('button').click();
     // a state: its name, its outputs, made initial
     select(['s2']); ins.renderInspector();
@@ -74,7 +75,8 @@ uiTest('#405 ASM inspector: nothing, several boxes, a state, a decision, a case 
     r.calls = calls.splice(0);
     return r;
   });
-  assert.deepEqual(out.none, ['Selection']);
+  assert.deepEqual(out.none, [[], 0, true]);   // (nothing selected: no "Selection" help, the section hidden, #2739)
+  assert.equal(out.shown, false);
   assert.deepEqual(out.many, ['2 boxes selected', 'Delete selection']);
   assert.deepEqual(out.state, ['State', 'Name', 'Moore outputs (one per line)', 'Delete box']);
   assert.deepEqual(out.s2, ['WORK', ['busy = 1', 'load = 1'], 's2']);
