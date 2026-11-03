@@ -9,6 +9,7 @@
 // transition, + Input / + Output, Zoom / Fit, ↶ ↷ and Edit ▸ Undo / Redo (#195).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { waitProblems, clickProblem, panelGone } from './problems-helpers.js';
 import { setupUi, uiTest, makeProject, readWs, waitDownload } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 import { newFsm, normalizeFsm, simulateFsm, encodedTable, generateFsm } from '../../core/fsm.js';
@@ -88,7 +89,8 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} .fsm-state`).length, ED), 3);
   assert.ok(await page.eval((ed) => !!document.querySelector(`${ed} [data-state=s1].initial .fsm-circle-in`), ED));
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} [data-state=s3] .fsm-outs`).textContent, ED), 'z=1');
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /No problems/);
+  await waitProblems(page, 'src/det.fsm.json', [], 'no problems');
+  assert.ok(await panelGone(page), 'no Problems panel in the editor (#2718)');
   // the hierarchy lists the diagram
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => /det\.fsm\.json/.test(r.textContent)), [], { what: 'det.fsm.json in the hierarchy' });
 
@@ -107,11 +109,13 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   await page.waitFor((ed) => [...document.querySelectorAll(`${ed} .fsm-name`)].some((t) => t.textContent === 'S3'), [ED], { what: 'state S3' });
   const sid = await page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-state`)].find((g) => g.querySelector('.fsm-name').textContent === 'S3').dataset.state, ED);
   // a warning: S3 cannot be reached and has no exit
-  await page.waitFor((ed) => /State S3 cannot be reached/.test(document.querySelector(`${ed} .fsm-problems`).textContent), [ED]);
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-problems .asm-prob`)].map((li) => [li.className, li.textContent]), ED), [
-    ['asm-prob warning link', '▲State S3 cannot be reached from the initial state S0'],
-    ['asm-prob warning link', '▲State S3 has no exit: once there, the machine stays in it until a reset'],
+  // (in the console's Warnings tab, #2718; a click there selects the state)
+  await waitProblems(page, 'src/det.fsm.json', [
+    'warning: State S3 cannot be reached from the initial state S0',
+    'warning: State S3 has no exit: once there, the machine stays in it until a reset',
   ]);
+  await clickProblem(page, 'src/det.fsm.json', 'S3 has no exit');
+  await page.waitFor((ed, id) => document.querySelector(`${ed} [data-state=${id}]`)?.classList.contains('sel'), [ED, sid], { what: 'S3 selected' });
 
   // ---- a transition S3 -> S0: dragged from the rim of S3, condition typed in place (empty = always)
   const a = await statePos(page, sid), b = await statePos(page, 's1');
@@ -121,7 +125,7 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   // ---- S2 --!x--> S3 instead of S0: the transition chosen by its label, its target changed in the panel
   await selectTrans(page, 't6');
   await page.fill(`${ED} .fsm-to`, sid);
-  await page.waitFor((ed) => /No problems/.test(document.querySelector(`${ed} .fsm-problems`).textContent), [ED], { what: 'no problems' });
+  await waitProblems(page, 'src/det.fsm.json', [], 'no problems');
   await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
   // the save reaches the disk a moment after the tab is marked clean: wait for the new state in the file
   let m;
@@ -318,8 +322,12 @@ uiTest('State diagram (FSM) in Portuguese: every label of the editor, the panels
   };
   await check('editor');
   // problems (an overlap warning, an info), a state, a transition
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /Estado A: as transições para B \('x'\) e para C \('y == 1'\) são ambas verdadeiras quando x=1, y=01/);
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /nenhuma transição é verdadeira quando/);
+  // (the warning in the console's Warnings tab, #2718, translated there too; the note a line of its log, as ISE's INFO)
+  await setLang('pt');
+  await page.waitFor(() => /Estado A: as transições para B \('x'\) e para C \('y == 1'\) são ambas verdadeiras quando x=1, y=01/.test(document.getElementById('console-warnings').textContent), [], { what: 'the warning in Portuguese' });
+  await setLang('en');
+  assert.ok(await page.eval(() => [...document.querySelectorAll('#console-log .ln.mc-link')].some((l) => l.textContent.startsWith('INFO:FSM - "src/pt.fsm.json": State A: no transition is true when'))));
+  assert.ok(!(await page.eval(() => document.getElementById('console-warnings').textContent)).includes('no transition is true'));
   await page.click(`${ED} [data-state=a] .fsm-circle`);
   await check('state');
   await page.click(`${ED} [data-trans=t3] .fsm-label`);

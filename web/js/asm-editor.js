@@ -29,6 +29,7 @@ import { mountAsmLayout } from './asm-layout.js';
 import { mountAsmView } from './asm-view.js';
 import { mountAsmOps } from './asm-ops.js';
 import { clone } from '/core/util.js';
+import { reportProblems } from './problems.js';
 
 export const GRID = 20;
 const CHW = 7.25;          // approx. width of a 12px monospace character
@@ -136,7 +137,7 @@ export function pathD(pts, r = 7) {
 // properties shown; nothing edited, not validated, no code of its own)
 function readOnlyChrome({ root, toolbar, hide, hint }) {
   root.classList.add('asm-readonly');
-  // (the tools that change the chart, the language and encoding, Validate, Code and the problems: hidden)
+  // (the tools that change the chart, the language and encoding, Validate and Code: hidden; no problems said)
   for (const g of [...toolbar.querySelectorAll('.asm-add, .asm-danger'), ...hide,
     ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
   hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a box to see it';
@@ -191,7 +192,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
     sep(),
     h('div', { class: 'asm-group' }, encSel),
     sep(),
-    h('div', { class: 'asm-group' }, toolWide('check', 'Validate', 'Check the chart for errors', () => { runValidate(); showProblems(true); })),
+    h('div', { class: 'asm-group' }, toolWide('check', 'Validate', 'Check the chart for errors', () => runValidate('Check ASM Chart'))),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
     more.el);
@@ -234,10 +235,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   const selSection = h('section', { class: 'asm-section asm-selection' });
   const machineBody = h('div', { class: 'asm-section-body' });
   const machineSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Machine'), machineBody);
-  const probList = h('ul', { class: 'asm-problems' });
-  const probSummary = h('span', { class: 'asm-prob-count' });
-  const probSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Problems ', probSummary), probList);
-  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection);
 
   mountSideFold({ root, side, key: 'silinx.asm.props.folded' });
   const status = h('div', { class: 'asm-status' });
@@ -246,7 +244,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   status.append(statusInfo, statusMsg, zoomLbl);
 
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), status);
-  if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, encSel, probSection], hint });
+  if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, encSel], hint });
 
   // ---------------------------------------------------------------------------- model ops (asm-ops.js)
   const {
@@ -316,27 +314,12 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   }
 
   // ---------------------------------------------------------------------------- validation & code
-  function runValidate() {
+  function runValidate(check) {
     if (destroyed || readOnly) return;
     try { diags = validate(M); } catch (e) { diags = [{ severity: 'error', message: `Internal error: ${e.message}` }]; }
-    probList.innerHTML = '';
-    const ne = diags.filter((d) => d.severity === 'error').length;
-    const nw = diags.filter((d) => d.severity === 'warning').length;
-    probSummary.textContent = ne || nw ? `(${ne} error${ne === 1 ? '' : 's'}, ${nw} warning${nw === 1 ? '' : 's'})` : '';
-    probSummary.className = `asm-prob-count ${ne ? 'c-err' : nw ? 'c-warn' : ''}`;
-    if (!diags.length) probList.append(h('li', { class: 'asm-prob ok' }, h('span', { class: 'asm-sev' }, '✓'), 'No problems: the chart is ready to generate.'));
-    for (const d of diags) {
-      const li = h('li', { class: `asm-prob ${d.severity}${d.nodeId ? ' link' : ''}`, title: d.nodeId ? 'Click to show the box' : '' },
-        h('span', { class: 'asm-sev' }, d.severity === 'error' ? '✖' : d.severity === 'warning' ? '▲' : 'i'), d.message);
-      if (d.nodeId) li.addEventListener('click', () => focusNode(d.nodeId));
-      probList.append(li);
-    }
+    // (its problems in the console's Errors and Warnings tabs, #2718: a click there shows the box; Validate's in its log too)
+    reportProblems(root, { tool: 'ASM', diags, focus: (d) => d.nodeId && focusNode(d.nodeId), check, name: M.name });
     render();
-  }
-  function showProblems(announce) {
-    probSection.open = true;
-    const ne = diags.filter((d) => d.severity === 'error').length;
-    if (announce) flash(ne ? `${ne} error(s) found - see Problems` : diags.length ? 'No errors (see warnings in Problems)' : 'No problems found', ne ? 'err' : 'ok');
   }
   function focusNode(id) {
     const n = nodeById(id);
@@ -397,6 +380,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
       destroyed = true;
       Object.values(timers).forEach(clearTimeout);
       clearTimeout(flashTimer);
+      if (!readOnly) reportProblems(root, { tool: 'ASM', diags: [] });
       ro?.disconnect();
       root.remove();
     },

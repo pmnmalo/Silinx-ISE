@@ -35,6 +35,7 @@ import { mountFsmInline } from './fsm-inline.js';
 import { mountFsmView } from './fsm-view.js';
 import { mountFsmHistory } from './fsm-history.js';
 import { clone } from '/core/util.js';
+import { reportProblems } from './problems.js';
 export { clone };   // (core/util.js's)
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -51,12 +52,12 @@ export function radiusOf(s) {
   return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, Math.ceil(textW(outs) / 2) + 10);
 }
 
-// (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion and the problems hidden,
-// with their separators)
-function readOnlyChrome({ root, toolbar, hint, probSection }) {
+// (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion hidden, with their
+// separators; no problems said)
+function readOnlyChrome({ root, toolbar, hint }) {
   root.classList.add('asm-readonly');
   const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-type'));
-  for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling, probSection]) g.hidden = true;
+  for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling]) g.hidden = true;
   hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it';
 }
 
@@ -149,12 +150,9 @@ export function mountFsmEditor(container, opts = {}) {
   const selSection = h('section', { class: 'asm-section fsm-selection' });
   const machineBody = h('div', { class: 'asm-section-body' });
   const machineSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Machine'), machineBody);
-  const probList = h('ul', { class: 'asm-problems' });
-  const probCount = h('span', { class: 'asm-prob-count' });
-  const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);
-  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection);
   mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
-  if (readOnly) readOnlyChrome({ root, toolbar, hint, probSection });
+  if (readOnly) readOnlyChrome({ root, toolbar, hint });
   const statusMsg = h('span', { class: 'asm-status-msg' });
   const statusInfo = h('span', { class: 'asm-status-info' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
@@ -276,17 +274,12 @@ export function mountFsmEditor(container, opts = {}) {
   function runValidate() {
     if (destroyed || readOnly) return;
     diags = validateFsm(M);
-    probList.textContent = '';
-    const n = (s) => diags.filter((d) => d.severity === s).length;
-    probCount.textContent = diags.length ? `(${n('error')} error(s), ${n('warning')} warning(s))` : '';
-    probCount.className = `asm-prob-count ${n('error') ? 'c-err' : n('warning') ? 'c-warn' : 'c-ok'}`;
-    if (!diags.length) probList.append(h('li', { class: 'asm-prob ok' }, h('span', { class: 'asm-sev' }, '✓'), h('span', {}, 'No problems: the diagram is complete.')));
-    for (const d of diags) {
-      const li = h('li', { class: `asm-prob ${d.severity}${d.state || d.transition ? ' link' : ''}` },
-        h('span', { class: 'asm-sev' }, d.severity === 'error' ? '✖' : d.severity === 'warning' ? '▲' : 'i'), h('span', { class: 'fsm-msg' }, d.message));
-      if (d.transition || d.state) li.addEventListener('click', () => { sel = d.transition ? { type: 'trans', id: d.transition } : { type: 'state', id: d.state }; render(); renderSide(); });
-      probList.append(li);
-    }
+    // (its problems in the console's Errors and Warnings tabs, #2718: a click there selects the state or the transition)
+    reportProblems(root, { tool: 'FSM', diags, focus: (d) => {
+      if (!d.transition && !d.state) return;
+      sel = d.transition ? { type: 'trans', id: d.transition } : { type: 'state', id: d.state };
+      render(); renderSide();
+    } });
     render();
   }
 
@@ -345,6 +338,7 @@ export function mountFsmEditor(container, opts = {}) {
     print,
     destroy() {
       destroyed = true;
+      if (!readOnly) reportProblems(root, { tool: 'FSM', diags: [] });
       stopRun();
       Object.values(timers).forEach(clearTimeout);
       clearTimeout(flashTimer);

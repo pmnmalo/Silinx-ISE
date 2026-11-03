@@ -6,6 +6,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs, waitDownload, chromeOnly } from './harness.js';
+import { waitProblems, clickProblem } from './problems-helpers.js';
 import { compile, elaborate } from '../../core/compile.js';
 import { newModel, normalizeModel, generate } from '../../core/asm.js';
 
@@ -675,12 +676,16 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
   // the free state S0 is unreachable, and so are the states it leads to: warnings, not errors
   await page.click('.doc:not([hidden]) .asm-btn', { text: 'Validate' });
   await page.waitFor(() => /· 7 states · 0 errors/.test(document.querySelector('.doc:not([hidden]) .asm-status')?.textContent || ''), [], { what: 'chart valid' });
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .asm-problems .asm-prob')].map((li) => [li.className, li.textContent])), [
-    ['asm-prob warning link', "▲State 'S0' is unreachable from the initial state"],
-    ['asm-prob warning link', "▲State 'S1' is unreachable from the initial state"],
-    ['asm-prob warning link', "▲State 'S2' is unreachable from the initial state"],
-    ['asm-prob warning link', "▲State 'S3' is unreachable from the initial state"],
-  ]);
+  // (in the console's Warnings tab, #2718; Validate's lines in its log, under Design; a click selects the box)
+  await waitProblems(page, 'src/ctrl.asm.json', [0, 1, 2, 3].map((i) => `warning: State 'S${i}' is unreachable from the initial state`));
+  assert.deepEqual(await page.eval(() => {
+    const lns = [...document.querySelectorAll('#console-log .ln')];
+    const i = lns.findLastIndex((l) => l.textContent.trim() === 'Started : "Check ASM Chart" of ctrl.');
+    return lns.slice(i).map((l) => `${l.dataset.src} ${l.textContent.trim()}`).filter((t) => !/^\w+ $/.test(t));
+  }), ['check Started : "Check ASM Chart" of ctrl.', ...[0, 1, 2, 3].map((i) => `check WARNING: State 'S${i}' is unreachable from the initial state`),
+    'check Process "Check ASM Chart" completed successfully with 4 warning(s)']);
+  await clickProblem(page, 'src/ctrl.asm.json', "'S2'");
+  await page.waitFor(() => { const ed = window.Silinx.active.asmEditor; const s2 = ed.getModel().nodes.find((n) => n.name === 'S2').id; return document.querySelector(`.doc:not([hidden]) [data-node="${s2}"]`)?.classList.contains('sel'); }, [], { what: 'S2 selected' });
   const final = await model();
   // its HDL src/ctrl.vhd, generated from it (no Generate HDL any more, #220): every state in it
   assert.ok(!(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .asm-btn')].map((b) => b.textContent))).some((t) => /Generate/.test(t)));

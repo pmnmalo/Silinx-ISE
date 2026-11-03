@@ -1,9 +1,11 @@
 // The Petri net editor's side panel (#405: out of mountPetriEditor in petri-editor.js): the selection's fields (a
 // place's name, tokens, capacity and outputs; a transition's name, guard, pulses and priority; an arc's weight and
-// inhibitor), the net's (its name, inputs, outputs, clock, reset, description), its problems, and the link to its HDL.
+// inhibitor), the net's (its name, inputs, outputs, clock, reset, description) and the link to its HDL; its problems go to
+// the console (#2718).
 import { formatOutputs, parseOutputs } from '/core/fsm.js';
 import { h } from './ui.js';
 import { validatePetri } from '/core/petri.js';
+import { reportProblems } from './problems.js';
 
 const ioText = list => list.map(p => (p.width > 1 ? `${p.name}[${p.width}]` : p.name)).join(', ');
 const parseIo = text => String(text || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean).map(s => {
@@ -14,7 +16,7 @@ const parseIo = text => String(text || '').split(/[,;\s]+/).map(s => s.trim()).f
 /** { refreshLink, renderSide } of mountPetriEditor (M(), sel(): its current values). */
 export function mountPetriSide(ctx) {
   const {
-    opts, M, btn, commit, linkHost, netBody, nodeOf, placeOf, probCount, probList, render, sel, selSection, status,
+    opts, M, btn, commit, linkHost, netBody, nodeOf, placeOf, render, root, sel, selSection, status,
     transOf, setSel
   } = ctx;
 
@@ -56,14 +58,8 @@ export function mountPetriSide(ctx) {
       field('Clock', text(M().clock, v => { M().clock = v.trim() || 'clk'; commit(); }, 'mono')),
       field('Reset (synchronous, to the initial marking)', text(M().reset.name, v => { M().reset.name = v.trim() || 'rst'; commit(); }, 'mono')),
       field('Description', (() => { const ta = h('textarea', { class: 'asm-input', rows: 2 }, M().description || ''); ta.addEventListener('change', () => { M().description = ta.value; commit(); }); return ta; })()));
-    // the problems
-    const diags = validatePetri(M());
-    probList.replaceChildren(...diags.map(d => {
-      const li = h('li', { class: `asm-prob ${d.severity}` }, d.message);
-      if (d.ref?.id) li.addEventListener('click', () => { setSel({ kind: d.ref.kind, id: d.ref.id }); render(); });
-      return li;
-    }));
-    probCount.textContent = diags.length ? `(${diags.length})` : '';
+    // its problems: in the console's Errors and Warnings tabs (#2718), a click there selecting the item
+    reportProblems(root, { tool: 'PetriNet', diags: validatePetri(M()), focus: d => { if (d.ref?.id) { setSel({ kind: d.ref.kind, id: d.ref.id }); render(); } } });
   }
   function refreshLink() {
     const li = opts.linkInfo?.();

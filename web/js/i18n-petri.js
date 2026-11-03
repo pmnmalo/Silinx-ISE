@@ -21,7 +21,7 @@ export const PETRI_PT = {
   'Import a PNML net (replaces this one: Undo brings it back)': 'Importar uma rede PNML (substitui esta: Anular repõe-na)',
   'Place / Transition: click to add · Arc: click its two ends · drag to move · Del to delete · wheel to zoom': 'Lugar / Transição: clique para acrescentar · Arco: clique nas duas pontas · arraste para mover · Del para apagar · roda para zoom',
   // side panel
-  'Net': 'Rede', 'Problems': 'Problemas', 'Nothing selected: click a place, a transition or an arc': 'Nada selecionado: clique num lugar, numa transição ou num arco',
+  'Net': 'Rede', 'Nothing selected: click a place, a transition or an arc': 'Nada selecionado: clique num lugar, numa transição ou num arco',
   'Name': 'Nome', 'Initial tokens': 'Marcas iniciais', 'Capacity': 'Capacidade',
   '1: a safe place (one flip-flop); more: a counter': '1: um lugar seguro (um flip-flop); mais: um contador',
   'Outputs while marked': 'Saídas enquanto marcado', 'e.g. busy=1, st=2': 'p.ex. busy=1, st=2',

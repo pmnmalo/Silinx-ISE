@@ -5,8 +5,9 @@ import { h, toast } from './ui.js';
 import { quickFixes } from '/core/quickfix.js';
 import { t, onLanguageChange } from './i18n.js';
 import { hintRow, sevWord } from './diaghelp.js';
-import { S, app } from './app.js';
+import { S, app, activateDoc } from './app.js';
 import { MESSAGE_LINE } from './tool-descriptors.js';
+import { checkLines } from './tasks-check.js';
 
 const $ = id => document.getElementById(id);
 
@@ -68,8 +69,8 @@ export function showConsolePage(page) {
 // Diagnostics (Errors / Warnings tabs)
 export function setDiagnostics(diags, { keepConsole = true } = {}) {
   // a check replaces its own entries; warnings/errors collected from the console (e.g. a running
-  // implementation) are kept unless keepConsole is false
-  S.diags = [...diags, ...(keepConsole ? S.diags.filter(d => d.source === 'console') : [])];
+  // implementation) are kept unless keepConsole is false, the open drawings' problems always (#2718)
+  S.diags = [...diags, ...S.diags.filter(d => d.source === 'drawing' || (keepConsole && d.source === 'console'))];
   lastConsoleDiag = null;
   renderDiagnostics();
   // push file-local diagnostics to open editors
@@ -86,10 +87,10 @@ export function renderDiagnostics() {
       const hint = hintRow(d);   // plain-language explanation + fix, expandable under the message
       const row = h('div', { class: 'diag' }, icon(ico),
         h('span', {}, `${sevWord(d)}:${d.tool || 'HDLCompiler'} - `),
-        d.file ? h('span', { class: 'loc' }, `"${d.file}" Line ${d.line}`) : null,
-        h('span', { 'data-no-i18n': true }, d.file ? `: ${d.message}` : d.message), hint?.toggle,
+        d.file ? h('span', { class: 'loc' }, d.line ? `"${d.file}" Line ${d.line}` : `"${d.file}"`) : null,
+        h('span', { 'data-no-i18n': true }, `${d.file ? ': ' : ''}${d.source === 'drawing' ? t(d.message) : d.message}`), hint?.toggle,   // (a drawing's problems in the language, #2718)
         ...diagFixes(d).map(f => h('span', { class: 'diag-fix', role: 'button', 'data-no-i18n': true, onclick: e => { e.stopPropagation(); applyDiagFix(d, f); } }, `${t('Fix:')} ${t(f.title)}`)));
-      row.addEventListener('click', () => d.file && app.openFile(d.file, d.line, d.col));
+      row.addEventListener('click', () => (d.focus ? d.focus() : d.file && app.openFile(d.file, d.line, d.col)));
       el.append(row);
       if (hint) el.append(hint.box);
     }
@@ -118,6 +119,38 @@ async function applyDiagFix(d, f) {
   // the same fix on the editor's text now (it may have changed since the row was drawn)
   const fix = ed.quickFixes(d).find(x => x.title === f.title);
   if (fix) ed.applyFix(fix); else toast('No quick fix here.', 'info');
+}
+
+// A drawing's problems (#2718, web/js/problems.js): its errors and warnings, its file's entries of the Errors and
+// Warnings tabs, replacing its last ones; its notes (info), lines of the console's log as ISE's INFO lines, each written
+// once (again once it went and came back); a click on one brings the drawing in front with the item selected. A check
+// asked for (ASM's Validate) writes its lines in the log too (web/js/tasks-check.js checkLines).
+const notesSaid = new Map();   // file -> the notes in the log
+document.addEventListener('silinx-problems', e => {
+  const doc = S.docs.find(d => d.el.contains(e.target));
+  if (!doc?.path) return;   // (a view made from another file, the Petri net's state machine: not checked)
+  const { tool, diags, focus, check, name } = e.detail;
+  const show = d => () => { if (!doc.closed) { activateDoc(doc); focus?.(d); } };
+  const listed = diags.filter(d => d.severity !== 'info'), notes = diags.filter(d => d.severity === 'info');
+  const mine = d => d.source === 'drawing' && d.file === doc.path, key = list => list.map(d => `${d.severity}:${d.message}`).join('\n');
+  const same = key(S.diags.filter(mine)) === key(listed);   // (said again as it is drawn: the tabs as they are)
+  S.diags = [...S.diags.filter(d => !mine(d)), ...listed.map(d => ({
+    severity: d.severity, tool, message: d.message, file: doc.path, line: 0, source: 'drawing', focus: show(d),
+  }))];
+  if (!same) renderDiagnosticsSoon();
+  const said = notesSaid.get(doc.path) || new Set();
+  if (!check) for (const d of notes.filter(n => !said.has(n.message))) logLink(`INFO:${tool} - "${doc.path}": ${d.message}`, '', show(d));
+  notesSaid.set(doc.path, new Set(notes.map(n => n.message)));
+  if (!check) return;
+  for (const l of checkLines(check, name, diags)) if (l.diag) logLink(l.text, l.cls, show(l.diag)); else log(l.text, l.cls, { diag: false });
+  showConsolePage('console');
+});
+// a line of the log that takes the editor to its item
+function logLink(text, cls, onclick) {
+  log(text, cls, { diag: false });
+  const ln = $('console-log').lastElementChild;
+  ln.classList.add('mc-link');
+  ln.addEventListener('click', onclick);
 }
 
 // the Clear button: the console's lines and the messages of the tabs

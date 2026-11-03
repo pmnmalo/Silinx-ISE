@@ -21,7 +21,7 @@ export const FSM_PT = {
   'Make an ASM chart (.asm.json) of this state machine': 'Fazer um fluxograma ASM (.asm.json) desta máquina de estados',
   'Double-click to add a state · drag from the rim of a state to another state to add a transition · double-click to edit · drag a label to bend its arrow · wheel to zoom':
     'Duplo clique para acrescentar um estado · arraste da borda de um estado para outro estado para acrescentar uma transição · duplo clique para editar · arraste uma etiqueta para curvar a seta · roda para zoom',
-  'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas',
+  'Close the panel': 'Fechar o painel', 'Machine': 'Máquina',
   // selection
   'Selection': 'Seleção', 'Nothing selected. Click a state or a transition to edit it.': 'Nada selecionado. Clique num estado ou numa transição para o editar.',
   'State (Moore outputs inside)': 'Estado (saídas de Moore lá dentro)', 'Initial (reset) state': 'Estado inicial (de reset)',
@@ -42,7 +42,6 @@ export const FSM_PT = {
   '+ Input': '+ Entrada', 'Add an input': 'Acrescentar uma entrada', '+ Output': '+ Saída', 'Add an output': 'Acrescentar uma saída',
   'Clock': 'Relógio', 'Reset signal': 'Sinal de reset', 'Reset level': 'Nível do reset', 'active high': 'ativo a alto', 'active low': 'ativo a baixo',
   'Synchronous reset': 'Reset síncrono', 'Description': 'Descrição', 'What the machine does (written in the HDL header)': 'O que a máquina faz (escrito no cabeçalho do HDL)',
-  'No problems: the diagram is complete.': 'Sem problemas: o diagrama está completo.',
   // tables, code
   'Copy': 'Copiar','Export CSV': 'Exportar CSV',
   'Download this table as a CSV file (opens in a spreadsheet)': 'Descarregar esta tabela num ficheiro CSV (abre numa folha de cálculo)',
@@ -97,7 +96,6 @@ export const FSM_PT_PATTERNS = [
   // editor
   [/^(\d+) state\(s\), (\d+) transition\(s\) · (Moore|Mealy)$/, '$1 estado(s), $2 transição(ões) · $3'],
   [/^State (.+) added$/, 'Estado $1 acrescentado'],
-  [/^The diagram has (\d+) error\(s\): see Problems$/, 'O diagrama tem $1 erro(s): ver Problemas'],
   [/^\((\d+) error\(s\), (\d+) warning\(s\)\)$/, '($1 erro(s), $2 aviso(s))'],
   [/^Code: (\S+) \((\w+)\)$/, 'Código: $1 ($2)'],
   [/^Transitions out of (.+) \(the first true condition is taken\)$/, 'Transições a partir de $1 (é tomada a primeira condição verdadeira)'],

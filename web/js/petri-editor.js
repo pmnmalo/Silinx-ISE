@@ -27,6 +27,7 @@ import { mountPetriSide } from './petri-side.js';
 import { mountPetriDraw } from './petri-draw.js';
 import { clone } from '/core/util.js';
 import { printDiagram, svgSnapshot } from './print.js';
+import { reportProblems } from './problems.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const GRID = 20;
@@ -106,10 +107,7 @@ export function mountPetriEditor(container, opts = {}) {
   const selSection = h('section', { class: 'asm-section pn-selection' });
   const netBody = h('div', { class: 'asm-section-body' });
   const netSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Net'), netBody);
-  const probList = h('ul', { class: 'asm-problems' });
-  const probCount = h('span', { class: 'asm-prob-count' });
-  const probSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Problems ', probCount), probList);
-  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection);
   mountSideFold({ root, side, key: 'silinx.petri.props.folded' });
   const statusInfo = h('span', {}), statusMsg = h('span', { class: 'asm-status-msg' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
@@ -195,7 +193,7 @@ export function mountPetriEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------- side panel (petri-side.js)
   const { refreshLink, renderSide } = mountPetriSide({
-    opts, M: () => M, btn, commit, linkHost, netBody, nodeOf, placeOf, probCount, probList, render, sel: () => sel,
+    opts, M: () => M, btn, commit, linkHost, netBody, nodeOf, placeOf, render, root, sel: () => sel,
     selSection, status, transOf, setSel: (v) => { sel = v; }
   });
 
@@ -325,6 +323,6 @@ export function mountPetriEditor(container, opts = {}) {
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file, normalizePetri); }); refreshLink(); },
     fit, refreshLink, print,
-    destroy() { destroyed = true; ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
+    destroy() { destroyed = true; reportProblems(root, { tool: 'PetriNet', diags: [] }); ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
   };
 }

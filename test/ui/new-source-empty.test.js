@@ -5,6 +5,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
 import { pickSourceType, waitNewSourcePage } from './new-source-helpers.js';
+import { waitProblems } from './problems-helpers.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -26,7 +27,6 @@ async function create(page, type, name, id) {
   await page.waitFor((i) => window.Silinx.active?.id === i, [id], { what: id });
 }
 const logProblems = (page) => page.eval(() => [...document.querySelectorAll('#console-log .ln')].map((l) => l.textContent).filter((t) => /^(WARNING|ERROR)/.test(t)));
-const problems = (page) => page.eval((d) => [...document.querySelectorAll(`${d} .asm-prob`)].map((li) => li.textContent), DOC);
 
 uiTest('#2176 New Source without the wizard: the FSM empty, its first state drawn', E, async (page) => {
   await makeProject(env, { name: 'EmptyFsm' });
@@ -34,9 +34,10 @@ uiTest('#2176 New Source without the wizard: the FSM empty, its first state draw
   await create(page, 'Finite State Machine (FSM)', 'det', 'fsm:src/det.fsm.json');
   const m = JSON.parse(await readWs(env, 'EmptyFsm', 'src/det.fsm.json'));
   assert.deepEqual([m.name, m.states, m.transitions, m.inputs, m.outputs, m.initial], ['det', [], [], [], [], '']);
-  await page.waitForSelector(`${DOC} .fsm-problems`);
+  await page.waitForSelector(`${DOC} .fsm-canvas`);
   assert.equal(await page.eval((d) => document.querySelectorAll(`${d} .fsm-state`).length, DOC), 0);
-  assert.deepEqual(await problems(page), ['✖The diagram has no states: double-click the drawing to add one']);
+  // (in the console's Errors tab, #2718, not in its log)
+  await waitProblems(page, 'src/det.fsm.json', ['error: The diagram has no states: double-click the drawing to add one']);
   assert.deepEqual(await logProblems(page), []);
   // the first state, double-clicked on the drawing
   await page.waitFor((d) => document.querySelector(`${d} .fsm-canvas`)?.getBoundingClientRect().width > 100, [DOC], { what: 'the drawing' });
@@ -47,7 +48,7 @@ uiTest('#2176 New Source without the wizard: the FSM empty, its first state draw
   await page.key('Enter');
   await page.waitFor((d) => [...document.querySelectorAll(`${d} .fsm-name`)].some((t) => t.textContent === 'S0'), [DOC], { what: 'state S0' });
   assert.equal(await page.eval(() => window.Silinx.active.fsmEditor.getModel().initial), await page.eval(() => window.Silinx.active.fsmEditor.getModel().states[0].id));
-  await page.waitFor(() => !/no states/.test(document.querySelector('.doc:not([hidden]) .fsm-problems').textContent), [], { what: 'the problem gone' });
+  await waitProblems(page, 'src/det.fsm.json', ['warning: State S0 has no exit: once there, the machine stays in it until a reset'], 'the error gone');
 }, { timeout: 120000 });
 
 uiTest('#2176 New Source without the wizard: the ASM chart empty, its first state box added', E, async (page) => {
@@ -58,7 +59,7 @@ uiTest('#2176 New Source without the wizard: the ASM chart empty, its first stat
   assert.deepEqual([m.name, m.nodes, m.edges, m.inputs, m.outputs, m.initial], ['ctl', [], [], [], [], '']);
   await page.waitForSelector(`${DOC} .asm-add`);
   assert.equal(await page.eval((d) => document.querySelectorAll(`${d} [data-node]`).length, DOC), 0);
-  assert.deepEqual(await problems(page), ['✖The chart has no states', '✖No initial (reset) state selected']);
+  await waitProblems(page, 'src/ctl.asm.json', ['error: The chart has no states', 'error: No initial (reset) state selected']);
   assert.deepEqual(await logProblems(page), []);
   await page.click(`${DOC} .asm-add`);
   await page.waitFor((d) => document.querySelectorAll(`${d} [data-node]`).length === 1, [DOC], { what: 'the state box' });
@@ -72,5 +73,6 @@ uiTest('#2176 New Source without the wizard: the Petri net empty, with no proble
   const m = JSON.parse(await readWs(env, 'EmptyPn', 'src/net.pn.json'));
   assert.deepEqual([m.name, m.places, m.transitions, m.arcs, m.inputs, m.outputs], ['net', [], [], [], [], []]);
   await page.waitFor((d) => /0 places · 0 transitions · 0 arcs/.test(document.querySelector(`${d} .petri-editor .asm-status`)?.textContent), [DOC], { what: 'an empty net' });
+  await waitProblems(page, 'src/net.pn.json', []);
   assert.deepEqual(await logProblems(page), []);
 }, { timeout: 120000 });

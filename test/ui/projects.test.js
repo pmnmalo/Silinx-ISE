@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, readWs, waitDownload, ROOT } from './harness.js';
+import { problems } from './problems-helpers.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -241,7 +242,9 @@ uiTest('Example traffic (New Project…), the second example: the state diagram 
   assert.ok(await page.eval((ed) => !!document.querySelector(`${ed} [data-state=s1].initial .fsm-circle-in`), FSM), 'CARS is the initial state');
   assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} [data-trans]`).length, FSM), 8);
   // no error, no warning (only the notes that each state waits for its condition)
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, FSM), /^Problems \(0 error\(s\), 0 warning\(s\)\)/);
+  // (its notes: lines of the console's log, #2718, none in the Errors and Warnings tabs)
+  await page.waitFor(() => [...document.querySelectorAll('#console-log .ln')].filter((l) => l.textContent.startsWith('INFO:FSM - "src/traffic.fsm.json": State ')).length === 7, [], { what: 'its notes in the console' });
+  assert.deepEqual(await problems(page, 'src/traffic.fsm.json'), []);
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-link`)?.dataset.hdl === 'traffic.vhd' && !document.querySelector(`${ed} .fsm-link .gen-banner`), [FSM], { what: 'the diagram synchronized with traffic.vhd' });
   // the truth table: 4 inputs, its 5 lamp outputs, synchronized with lamps.vhd
   await page.eval(() => window.SilinxApp.openTt('src/lamps.bool.json'));

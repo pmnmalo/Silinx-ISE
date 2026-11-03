@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { newPetri } from '../../core/petri.js';
 import { setupUi, uiTest, makeProject, readWs, waitDownload } from './harness.js';
+import { waitProblems, clickProblem, panelGone } from './problems-helpers.js';
 import { newSourceWizardOf } from './new-source-helpers.js';
 
 let env;
@@ -68,7 +69,6 @@ async function newNet(page, pj) {
   await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-status`)?.textContent || ''), [ED], { what: 'the Petri net editor' });
 }
 const node = (page, id) => page.eval((ed, i) => { const r = document.querySelector(`${ed} [data-id=${i}] ${i[0] === 'p' ? 'circle' : 'rect'}`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, ED, id);
-const problems = (page) => page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-prob`)].map((li) => `${li.classList.contains('warning') ? 'warning' : 'error'}: ${li.textContent}`), ED);
 const saved = async (pj) => JSON.parse(await readWs(env, pj, 'src/ctl.pn.json'));
 // a project file once it is what `ok` wants (it is written by the autosave, ~0.8 s after the edit, and
 // later on a loaded machine): returns it; else fails naming `what` (and `ok` is asserted on the last read)
@@ -133,7 +133,7 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   m = await untilSaved('PnEd', (x) => x.transitions[0]?.name === 't1', 't3 (t1) first, saved');
   assert.deepEqual(m.places.map((p) => [p.name, p.tokens, p.capacity]), [['idle', 2, 2], ['work', 0, 1]]);
   assert.deepEqual(m.transitions.map((t) => [t.name, t.guard, t.outputs]), [['t1', 'go', { busy: '1' }], ['start', 'go', {}], ['done', '!go', {}]]);
-  assert.deepEqual(await problems(page), []);
+  await waitProblems(page, 'src/ctl.pn.json', []);
   // the problems, exact: a place alone, a guard that does not parse, an output not of the net
   await page.click(`${ED} .pn-tool`, { text: 'Place' });
   await page.click({ x: box.x, y: box.y - 120 });
@@ -143,15 +143,21 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   await setField(page, 'Guard', 'go &');
   await page.click(await node(page, 'p2'));
   await setField(page, 'Outputs while marked', 'zz=1');
-  await page.waitFor((ed) => document.querySelectorAll(`${ed} .asm-prob`).length === 3, [ED], { what: 'three problems' });
-  assert.deepEqual(await problems(page), [
+  // (in the console's Errors and Warnings tabs, #2718, none in the editor)
+  await waitProblems(page, 'src/ctl.pn.json', [
     "error: transition t1: guard 'go &': unexpected end of expression",
     "error: work: 'zz' is not an output of the net",
     'warning: place p1 is not connected',
-  ]);
+  ], 'three problems');
+  assert.ok(await panelGone(page));
   // a click on a problem selects what it is about
-  await page.click(`${ED} .asm-prob`, { text: 'place p1 is not connected' });
+  await clickProblem(page, 'src/ctl.pn.json', 'place p1 is not connected');
   await page.waitFor((ed) => /^Place p1/.test(document.querySelector(`${ed} .pn-selection h3`)?.textContent || ''), [ED], { what: 'p1 selected' });
+  // closed, its problems leave the console (#2718); opened again, they come back
+  await page.eval(async () => { const { closeDoc, findDoc } = await import('/js/app.js'); await closeDoc(findDoc('pn:src/ctl.pn.json')); });
+  await waitProblems(page, 'src/ctl.pn.json', [], 'its problems gone');
+  await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
+  await page.waitFor(() => window.SilinxApp.S.diags.filter((d) => d.file === 'src/ctl.pn.json').length === 3, [], { what: 'its problems back' });
 });
 
 uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (undone); the HDL file generated and kept in sync', E, async (page) => {
@@ -325,7 +331,7 @@ uiTest('Petri Net Wizard (#208): New Source ▸ Petri Net ▸ Wizard > (#958), t
   const m = JSON.parse(await readWs(env, 'PnWiz', 'nets/ctl.pn.json'));
   assert.deepEqual([m.name, m.lang, m.clock, m.reset, m.inputs, m.outputs, m.places, m.transitions, m.arcs],
     ['ctl', 'vhdl', 'clk', { name: 'rst', active: 'high', sync: true }, [{ name: 'go', width: 1 }, { name: 'sel', width: 3 }], [{ name: 'busy', width: 1 }, { name: 'st', width: 2 }], [], [], []]);
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-prob`)].map((li) => li.textContent), ED), []);
+  await waitProblems(page, 'nets/ctl.pn.json', [], 'no problems');
   // its HDL file, made with it (#207) and kept in sync
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'nets/ctl.vhd'), [], { what: 'nets/ctl.vhd', timeout: 15000 });
   assert.match(await readWs(env, 'PnWiz', 'nets/ctl.vhd'), /entity ctl is[\s\S]*sel : in std_logic_vector\(2 downto 0\);[\s\S]*st : out std_logic_vector\(1 downto 0\)/);

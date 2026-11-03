@@ -165,16 +165,7 @@
 .asm-editor .asm-x:hover { color: var(--asm-danger); background: color-mix(in srgb, var(--asm-danger) 15%, transparent); }
 
 /* problems */
-.asm-editor .asm-prob-count { text-transform: none; letter-spacing: 0; font-weight: 500; }
-.asm-editor .asm-problems { list-style: none; margin: 0; padding: 0 6px 8px; }
-.asm-editor .asm-prob { display: flex; gap: 7px; padding: 5px 6px; border-radius: 5px; font-size: 12px; line-height: 1.35; }
-.asm-editor .asm-prob.link { cursor: pointer; }
-.asm-editor .asm-prob.link:hover { background: color-mix(in srgb, var(--asm-panel) 80%, var(--asm-fg) 20%); }
 .asm-editor .asm-sev { flex: none; width: 14px; text-align: center; font-size: 11px; line-height: 16px; }
-.asm-editor .asm-prob.error .asm-sev { color: var(--asm-danger); }
-.asm-editor .asm-prob.warning .asm-sev { color: var(--asm-warn); }
-.asm-editor .asm-prob.info .asm-sev { color: var(--asm-accent); font-style: italic; font-weight: 700; }
-.asm-editor .asm-prob.ok { color: var(--asm-ok); }
 .asm-editor .c-err { color: var(--asm-danger); }
 .asm-editor .c-warn { color: var(--asm-warn); }
 .asm-editor .c-ok { color: var(--asm-ok); }

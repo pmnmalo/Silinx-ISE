@@ -7,6 +7,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { newPetri } from '../../core/petri.js';
 import { setupUi, uiTest, makeProject } from './harness.js';
+import { waitProblems, panelGone } from './problems-helpers.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -41,7 +42,8 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
   assert.equal(await ev((ed) => document.querySelectorAll(`${ed} .pn-selection input[type=number]`)[1].value), '3');
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .asm-side details .asm-section-body .asm-label`)].map((l) => l.textContent)),
     ['Module name', 'Inputs', 'Outputs', 'Clock', 'Reset (synchronous, to the initial marking)', 'Description']);
-  assert.equal(await ev((ed) => document.querySelectorAll(`${ed} .asm-problems li`).length), 0);
+  await waitProblems(page, 'src/ctl.pn.json', []);   // (in the console, #2718)
+  assert.ok(await panelGone(page));
   // ---- the simulation: the marking, go on and a clock step: start fires (idle 3 -> 2, work 1), busy
   await page.click(`${ED} .pn-tab-btn`, { text: 'Simulate' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=3  work=0', [ED], { what: 'the initial marking' });
