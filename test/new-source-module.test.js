@@ -26,11 +26,12 @@ test('#405 new-source.js: wizards.js still exports every name it exported before
 });
 
 test('#405 new-source.js: the New Source wizard is defined there only', () => {
-  for (const name of ['newSourceWizard', 'uutInfo']) {
-    const def = new RegExp(`^(?:export )?(?:async )?function ${name}\\(`, 'm');
-    assert.ok(def.test(ns), `${name} in new-source.js`);
-    assert.ok(!def.test(wiz), `${name} not in wizards.js`);
-  }
+  const def = name => new RegExp(`^(?:export )?(?:async )?function ${name}\\(`, 'm');
+  assert.ok(def('newSourceWizard').test(ns), 'newSourceWizard in new-source.js');
+  assert.ok(!def('newSourceWizard').test(wiz), 'newSourceWizard not in wizards.js');
+  // (its unit under test moved on to core/uut-info.js, #2674: the server makes a test bench too)
+  assert.ok(!def('uutInfo').test(ns) && !def('uutInfo').test(wiz), 'uutInfo in neither');
+  assert.match(ns, /^import \{ uutInfo \} from '\/core\/uut-info\.js';$/m);
   assert.match(ns, /^const SOURCE_TYPES = \[/m);
   assert.doesNotMatch(wiz, /SOURCE_TYPES/);
 });
