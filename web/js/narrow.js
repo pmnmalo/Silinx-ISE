@@ -57,15 +57,16 @@ export function leftTabClicked(page, shown) {
 // ------------------------------------------------------------------ the editors' side panels
 /** Makes `button` show / hide a side panel of an editor over its canvas on a narrow screen: `root`
  *  has the class `cls` while it is shown (remembered under `key`; hidden the first time). On a wide
- *  screen the button is not shown (.narrow-only) and the panel is always there. Returns the button. */
-export function panelToggle(root, button, { cls = 'side-open', key }) {
+ *  screen the button is not shown (.narrow-only) and the panel is always there; `narrowOnly` false: shown by the
+ *  editor's own style (the Board Emulator's, narrow by its own width, #2713). Returns the button. */
+export function panelToggle(root, button, { cls = 'side-open', key, narrowOnly = true }) {
   const set = (open, remember = true) => {
     root.classList.toggle(cls, open);
     button.classList.toggle('on', open);
     button.setAttribute('aria-pressed', String(open));
     if (remember) writeOpen(key, open);
   };
-  button.classList.add('narrow-only');
+  if (narrowOnly) button.classList.add('narrow-only');
   button.addEventListener('click', () => set(!root.classList.contains(cls)));
   set(readOpen(key, false), false);
   return button;

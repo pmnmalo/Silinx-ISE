@@ -84,12 +84,15 @@ export function injectStyle() {
   .emu.props-folded .emu-side .asm-cap .sp { display: none; }
   .emu.props-folded .emu-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
 }
-/* the emulator narrow (a tablet, the Tasks interface's panel beside it): the side panel below the board, the whole
-   emulator scrolling down */
+/* the emulator narrow (a tablet, the Tasks interface's panel beside it): the side panel over the board, as the diagram
+   editors' (#266), shown and hidden by the bar's Properties button (.side-open), which is there only then (#2713) */
+.emu-bar .emu-props-btn { display: none; }
 @container (max-width: 899px) {
-  .emu-body { flex: none; flex-direction: column; }
-  .emu-main { overflow: visible; }
-  .emu-side { width: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--border, #aaa); }
+  .emu-bar .emu-props-btn { display: inline-flex; }
+  .emu-bar .emu-props-btn.on { border-color: var(--accent, #3c7fb1); }
+  .emu-body { position: relative; }
+  .emu-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(280px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
+  .emu:not(.side-open) .emu-side { display: none; }
   .emu-side .asm-fold { display: none; }
 }
 .emu-box { background: var(--panel, #fff); border: 1px solid var(--border, #aaa); border-radius: 4px; padding: 8px; }

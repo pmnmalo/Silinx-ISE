@@ -4,7 +4,7 @@
 //   window (a tablet) it is made smaller, down to MIN_ZOOM; measured again when the window, the task's panels, the
 //   emulator's side panel (folded, #2666) or the board change (fitBoard).
 // - The emulator's side panel (Watch, the timing generics, the hints) is shown at first (#1020): at the right of the
-//   board (#2666), below it on a narrow window; the VGA monitor wraps below the board when the width runs short, and the
+//   board (#2666), over it on a narrow window, behind the bar's ☰ Properties (#2713); the VGA monitor wraps below the board when the width runs short, and the
 //   board's area scrolls (web/css/tasks.css); the Design pane is not shown in Emulate.
 // - Its Processes (#1204): the top module's User Constraints (I/O Pin Planning, Edit Constraints (Text), Check
 //   Constraints) and Emulate on Board with its models, as in Implement: the task's side panel, as Implement's
@@ -44,7 +44,7 @@ export function fitBoard(on) {
     wrap.style.zoom = '';
     if (!on || !shown(emu)) continue;
     const main = emu.querySelector('.emu-main'), bar = emu.querySelector('.emu-bar');
-    // (the board's area, the side panel at its right or below it, #2666: the VGA monitor wraps below the board)
+    // (the board's area, the side panel at its right or over it, #2666, #2713: the VGA monitor wraps below the board)
     const h = emu.clientHeight - (bar?.offsetHeight || 0) - 2 * GAP, board = { w: wrap.offsetWidth, h: wrap.offsetHeight };
     wrap.style.zoom = String(boardZoom({ w: main.clientWidth - 2 * GAP - BAR, h }, board));
   }
