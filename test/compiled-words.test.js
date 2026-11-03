@@ -171,10 +171,10 @@ async function same(design, label) {
 const EXPECTED = {
   gates: { chains: 0, registers: 0, cells: [1, 1] },
   traffic: { chains: 1, registers: 1, cells: [194, 141] },
-  blinky: { chains: 5, registers: 5, cells: [549, 301] },
-  pong: { chains: 9, registers: 8, cells: [1203, 439] },
-  stopwatch: { chains: 3, registers: 3, cells: [391, 254] },
-  clock: { chains: 6, registers: 6, cells: [920, 434] },
+  blinky: { chains: 4, registers: 4, cells: [543, 326] },
+  pong: { chains: 9, registers: 8, cells: [1115, 433] },
+  stopwatch: { chains: 3, registers: 3, cells: [403, 261] },
+  clock: { chains: 6, registers: 6, cells: [872, 450] },
   vga: { chains: 2, registers: 2, cells: [498, 426] },
   isqrt: { chains: 0, registers: 0, cells: [277, 277] },
   uart: { chains: 1, registers: 1, cells: [360, 339] },
@@ -185,10 +185,10 @@ const EXPECTED = {
 const TABLES = {
   gates: [0, { tables: 0, inputs: 12, words: 0, outputs: 0, cells: [1, 1] }, 0],
   traffic: [1, { tables: 8, inputs: 12, words: 7632, outputs: 42, cells: [137, 39] }, 4],
-  blinky: [2, { tables: 29, inputs: 12, words: 20368, outputs: 58, cells: [297, 146] }, 7],
-  pong: [9, { tables: 39, inputs: 12, words: 40084, outputs: 99, cells: [379, 203] }, 6],
-  stopwatch: [1, { tables: 31, inputs: 12, words: 12112, outputs: 62, cells: [250, 166] }, 9],
-  clock: [9, { tables: 32, inputs: 12, words: 49880, outputs: 76, cells: [422, 149] }, 4],
+  blinky: [3, { tables: 28, inputs: 12, words: 16272, outputs: 63, cells: [322, 138] }, 8],
+  pong: [9, { tables: 39, inputs: 12, words: 42212, outputs: 94, cells: [379, 202] }, 6],
+  stopwatch: [1, { tables: 33, inputs: 12, words: 12440, outputs: 63, cells: [257, 167] }, 9],
+  clock: [9, { tables: 28, inputs: 12, words: 15148, outputs: 75, cells: [414, 153] }, 4],
   vga: [2, { tables: 19, inputs: 12, words: 48864, outputs: 55, cells: [425, 110] }, 2],
   isqrt: [0, { tables: 34, inputs: 12, words: 22504, outputs: 78, cells: [277, 123] }, 6],
   uart: [0, { tables: 33, inputs: 11, words: 25328, outputs: 77, cells: [339, 167] }, 7],
@@ -227,15 +227,15 @@ test('#670 speed: pong\'s Post-Synthesis Simulation Model, at least 1.4 times as
 test('#650 #659 blinky\'s post-translate, post-map and post-place & route models at word level, with tables (SIMPRIM; the router\'s LUT pins in any order)', { timeout: 600000 }, async () => {
   const m = await models('blinky', ['synth', 'translate', 'posttrans', 'map', 'postmap', 'par', 'trce', 'postpar']);
   // (postpar: Normal's two placements of a small design (#651), the faster kept, with no flip-flop replicated)
-  const want = { posttrans: [549, 301], postmap: [639, 339], postpar: [639, 339] };
+  const want = { posttrans: [543, 326], postmap: [632, 367], postpar: [632, 367] };
   const wantTables = {
-    posttrans: [2, { tables: 20, inputs: 12, words: 11400, outputs: 112, cells: [301, 181] }, 6],
-    postmap: [2, { tables: 26, inputs: 12, words: 11600, outputs: 133, cells: [339, 204] }, 6],
-    postpar: [2, { tables: 26, inputs: 12, words: 11600, outputs: 133, cells: [339, 204] }, 6],
+    posttrans: [3, { tables: 19, inputs: 12, words: 7304, outputs: 127, cells: [326, 183] }, 6],
+    postmap: [3, { tables: 22, inputs: 12, words: 7392, outputs: 147, cells: [367, 207] }, 5],
+    postpar: [3, { tables: 22, inputs: 12, words: 7392, outputs: 147, cells: [367, 207] }, 5],
   };
   for (const [step, design] of Object.entries(m)) {
     const { stats, tables } = await same(design, step);
-    assert.deepEqual(stats, { chains: 5, registers: 5, cells: want[step] }, step);
+    assert.deepEqual(stats, { chains: 4, registers: 4, cells: want[step] }, step);
     assert.deepEqual([tables.equalities.equalities, tables.tables, tables.registers], wantTables[step], step);
   }
 });

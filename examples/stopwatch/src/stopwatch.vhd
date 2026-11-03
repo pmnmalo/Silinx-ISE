@@ -2,7 +2,7 @@
 -- Silinx example: a stopwatch with lap memory for the Basys2 / Nexys2.
 --   display : seconds and hundredths, 0.00 to 99.99 (then it starts again from 0.00)
 --   BTN0    : start / stop (while recalling laps: back to the running time)
---   BTN1    : lap: stores the time (up to 512 laps, in a block RAM); LD7..LD0 count the laps
+--   BTN1    : lap: stores the time (up to 1023 laps, in a block RAM); LD7..LD0 count the laps
 --   BTN2    : clear (when stopped): the time and the laps
 --   BTN3    : recall: the stored laps one after the other (LD7..LD0: the lap's number), then back
 --   SW0     : reset
@@ -33,11 +33,12 @@ architecture Behavioral of stopwatch is
     signal recalling : boolean := false;
     signal tick      : integer range 0 to CS - 1 := 0;
     signal elapsed   : UNSIGNED (13 downto 0) := (others => '0');   -- hundredths: 0 .. 9999
-    -- the lap memory: 512 times, written at `laps`, read at `index`
-    type lap_ram is array (0 to 511) of UNSIGNED (13 downto 0);
+    -- the lap memory: 1023 times, written at `laps`, read at `index` (1024 words, a whole block RAM:
+    -- the Spartan-6 would put 512 in a 9K half, whose initial data ISE says may be wrong)
+    type lap_ram is array (0 to 1023) of UNSIGNED (13 downto 0);
     signal laps_ram  : lap_ram;
-    signal laps      : UNSIGNED (9 downto 0) := (others => '0');   -- 0 .. 512 stored
-    signal index     : UNSIGNED (8 downto 0) := (others => '0');
+    signal laps      : UNSIGNED (9 downto 0) := (others => '0');   -- 0 .. 1023 stored
+    signal index     : UNSIGNED (9 downto 0) := (others => '0');
     signal lapTime   : UNSIGNED (13 downto 0);
     signal shown     : UNSIGNED (13 downto 0);
     signal digits    : STD_LOGIC_VECTOR (15 downto 0);
@@ -66,7 +67,7 @@ begin
                 -- the buttons
                 if startStop = '1' then
                     if recalling then recalling <= false; else running <= not running; end if;
-                elsif lap = '1' and running and laps < 512 then
+                elsif lap = '1' and running and laps < 1023 then
                     laps <= laps + 1;
                 elsif clear = '1' and not running then
                     elapsed <= (others => '0'); tick <= 0; laps <= (others => '0'); recalling <= false;
@@ -87,8 +88,8 @@ begin
     process (clk)
     begin
         if rising_edge(clk) then
-            if lap = '1' and running and laps < 512 and sw(0) = '0' then
-                laps_ram(to_integer(laps(8 downto 0))) <= elapsed;
+            if lap = '1' and running and laps < 1023 and sw(0) = '0' then
+                laps_ram(to_integer(laps)) <= elapsed;
             end if;
             lapTime <= laps_ram(to_integer(index));
         end if;

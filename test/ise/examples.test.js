@@ -4,8 +4,8 @@
 //     the warnings of XST, map and par are the expected ones (below);
 //   - the Silinx toolchain's routed design of each example passes ISE's design rule check with no
 //     error and no warning, and Silinx's bitstream is byte-identical to ISE's bitgen of it
-//     (scripts/check-open-flow.mjs); on the Spartan-6 boards (Nexys3, Atlys, #732) this check only, ISE's own build of
-//     them not yet recorded here.
+//     (scripts/check-open-flow.mjs); on the Spartan-6 boards (Nexys3, Atlys, #732) too, and ISE's own build of them
+//     with no warning either (#2321).
 //
 //   SILINX_ISE_TESTS=1 SILINX_ISE_HOST=user@host node --test test/ise/examples.test.js
 //   SILINX_ISE_HOST=local: the image on this machine (the self-hosted runner, .github/workflows/ise.yml)
@@ -27,7 +27,7 @@ const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILIN
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the ISE Docker image), or local (the image here)' : false;
 // known failures of the Silinx toolchain, with their issue
 const KNOWN = {};
-// the warnings ISE gives on each example (the same on every device): XST, map, par
+// the warnings ISE gives on each example (the same on every device, the Spartan-6's too, #2321): XST, map, par
 const ISE_WARNINGS = {
   gates: [],
   traffic: [],
@@ -70,8 +70,8 @@ for (const name of EXAMPLES) {
   for (const t of S6_EXAMPLES.includes(name) ? S6_TARGETS : []) {
     test(`example ${name} for the ${targetName(t)}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000, todo: KNOWN[`${name}-${targetName(t)}`] }, () => checkOpenFlow(name, t));
   }
-  for (const t of TARGETS) {
-    test(`ISE builds example ${name} for the ${t.board}-${t.variant}, with the expected warnings`, { skip, timeout: 30 * 60000 }, async () => {
+  for (const t of [...TARGETS, ...(S6_EXAMPLES.includes(name) ? S6_TARGETS : [])]) {
+    test(`ISE builds example ${name} for the ${targetName(t)}, with the expected warnings`, { skip, timeout: 30 * 60000 }, async () => {
       const { createJob } = await import('../../server/jobs.js');
       const { runImplementation } = await import('../../server/ise.js');
       const { dir, project } = exampleProject(name, t, path.join(tmp, 'ise'));
@@ -81,7 +81,8 @@ for (const name of EXAMPLES) {
       assert.ok(fs.existsSync(path.join(dir, 'build', `${project.top}.bit`)));
       assert.deepEqual(iseWarnings(job.lines), ISE_WARNINGS[name]);
     });
-
+  }
+  for (const t of TARGETS) {
     test(`example ${name} for the ${t.board}-${t.variant}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000, todo: KNOWN[name] }, () => checkOpenFlow(name, t));
   }
 }

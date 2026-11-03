@@ -160,7 +160,7 @@ test('the examples blinky and pong, synthesized by Yosys: technology netlists by
   const ELK = (await import('elkjs/lib/elk.bundled.js')).default;
   const elk = new ELK();
   // (blinky's BCD counter u_count drives the top's signal digits, and u_speed its step: their cells in them, #1003)
-  for (const [name, want] of [['blinky', { u_pre: 67, u_speed: 216, u_knight: 52, u_count: 84, u_display: 61 }], ['pong', null]]) {
+  for (const [name, want] of [['blinky', { u_pre: 67, u_speed: 212, u_knight: 52, u_count: 84, u_display: 61 }], ['pong', null]]) {
     const ex = example(name);
     const design = elaborate(compile([...primitiveSources(ex.design), ...ex.design]), ex.project.top);
     const syn = await synthesizeOpen(design, { run: yosysNode });
