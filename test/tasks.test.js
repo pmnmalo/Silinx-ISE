@@ -230,14 +230,15 @@ test('index.html: the Silinx interface (the Tasks one, #1149) before the first p
   // (the Silinx interface, the default, is the Tasks one, #1149: a stored tasks, or anything but ise)
   const silinx = { 'data-ui': 'silinx', 'data-layout': 'tasks', 'data-theme': 'dark', 'data-drawer': 'open' };
   for (const ui of ['silinx', 'tasks', 'retro', null]) assert.deepEqual(run(ui), silinx, String(ui));
-  assert.deepEqual(run('ise'), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'open' });
+  // (the ISE style interface with its theme too, dark as stored: #2676)
+  assert.deepEqual(run('ise'), { 'data-ui': 'ise', 'data-theme': 'dark', 'data-drawer': 'open' });
   // the site's development edition (dev/) reads its own keys (#1243): not the stable edition's
   const both = { 'silinx.ui': 'ise', 'silinx.theme': 'light', 'silinx.drawer': 'closed', 'silinx.dev.ui': 'silinx', 'silinx.dev.theme': 'dark' };
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: both }), silinx);
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/', store: both }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'closed' });
   // #2451 a preference saved with an old id: shown with its new one and stored so, once (web/js/silinx.js LEGACY_INTERFACES)
   const old = { 'silinx.ui': 'classic', 'silinx.dev.ui': 'modern', 'silinx.theme': 'dark', 'silinx.dev.theme': 'dark' };
-  assert.deepEqual(run(null, { store: old }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'open' });
+  assert.deepEqual(run(null, { store: old }), { 'data-ui': 'ise', 'data-theme': 'dark', 'data-drawer': 'open' });
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: old }), silinx);
   assert.deepEqual([old['silinx.ui'], old['silinx.dev.ui']], ['ise', 'silinx']);
   const kept = { 'silinx.ui': 'tasks', 'silinx.theme': 'dark' };
