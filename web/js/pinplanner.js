@@ -1,18 +1,20 @@
 // I/O Pin Planning: assign top-level ports to package pins / board resources and write the UCF.
 // The look of the diagram editors (#2671, asm-editor.css): their toolbar, and their side panel for the board's resources,
 // folded to a strip (side-fold.js), its groups folded each, over the table on a narrow window (narrow.js).
-// Two views (#2694): the table, and the board as the Board Emulator draws it, the ports dragged onto its parts
-// (pinplanner-board.js).
+// Two views (#2694): the table, and the board as the Board Emulator draws it (pinplanner-board.js), the ports dragged
+// from the Ports panel on its left (pinplanner-ports.js, #2715) onto its parts or onto the rows of Board Resources.
 import { constraintsExt, readPins, writePins } from './constraints-format.js';
 import { toolWide } from './editor-icons.js';
 import { mountSideFold } from './side-fold.js';
 import { mountPinBoard } from './pinplanner-board.js';
+import { mountPinPorts } from './pinplanner-ports.js';
 import { panelToggle, RESOURCES_KEY } from './narrow.js';
 import { api } from './api.js';
 import { icons } from './icons.js';
-import { h, toast, confirmDlg } from './ui.js';
+import { h, toast, confirmDlg, popupMenu } from './ui.js';
 import { bitName, boardAutoAssign } from '/packages/silinx-fpga/src/parts.js';
 import { elaborate } from '/core/compile.js';
+import { boardRemove } from '/core/pin-board.js';
 import { S, app, setDirty } from './app.js';
 
 export function mountPinPlanner(el, doc, top) {
@@ -85,6 +87,10 @@ export function mountPinPlanner(el, doc, top) {
 
   const tableHost = h('div', { class: 'pp-table' });
   const boardHost = h('div', { class: 'pp-board', hidden: true });
+  // the board's view: the ports on its left (folded to a strip, remembered), dragged onto it
+  const portsList = h('div', { class: 'pp-portlist' });
+  const portsSide = h('aside', { class: 'pp-ports-side', hidden: true }, h('div', { class: 'asm-cap' }, 'Ports'), portsList);
+  const portsView = board && mountPinPorts({ list: portsList, root, board, ports, assignments: () => asg, drop: boardDrop, remove: removeNets });
   // the view shown: the table or the board (its drawing loaded the first time: the emulator's module)
   let view = 'table', boardView = null;
   const viewBtn = (id, label, title) => h('button', { type: 'button', class: 'asm-btn asm-wide pp-view', 'data-view': id, title, onclick: () => setView(id) }, label);
@@ -93,18 +99,37 @@ export function mountPinPlanner(el, doc, top) {
   async function setView(id) {
     if (id === 'board' && !boardView) {
       const emulator = await import('./emulator.js');
-      boardView = mountPinBoard({ host: boardHost, board, title: top, ports, assignments: () => asg, drop: boardDrop, emulator });
+      boardView = mountPinBoard({ host: boardHost, board, title: top, assignments: () => asg, pinMenu, emulator });
     }
     view = id;
     render();
   }
-  // a port dropped on the board: its pins, undoable; the warnings in the console too
-  function boardDrop(r, p) {
+  // a port or a bit dropped on the board: its pins, undoable; what it placed, took and warns of in the console
+  function boardDrop(r) {
     for (const [net, a] of Object.entries(r.changes)) asg[net] = { ...(asg[net] || {}), ...a };
     clocks = clocks.filter(c => !r.clocks.some(x => x.net === c.net)).concat(r.clocks);
     changed();
     render();
+    if (r.placed.length) app.log(`I/O Pin Planning: ${r.placed.map(([n, l]) => `${n} → ${l}`).join(', ')}.`, 'ok');
+    for (const n of r.notes) app.log(`I/O Pin Planning: ${n}.`, 'info');
     for (const w of r.warnings) app.log(`I/O Pin Planning: ${w}.`, 'warn');
+  }
+  // bits taken off their pins (a ✕ of the Ports panel, a pin's menu), undoable
+  function removeNets(list) {
+    const r = boardRemove({ nets: list, assignments: asg, board });
+    if (!r.removed.length) return;
+    for (const [net, a] of Object.entries(r.changes)) asg[net] = { ...(asg[net] || {}), ...a };
+    clocks = clocks.filter(c => !(c.net in r.changes));
+    changed();
+    render();
+    app.log(`I/O Pin Planning: removed from their pins: ${r.removed.map(([n, l]) => `${n} (${l})`).join(', ')}.`, 'info');
+  }
+  // the right-click menu of a pin (a part of the board, a row of Board Resources) with bits on it
+  function pinMenu(e, pin) {
+    const on = used().get(String(pin).toUpperCase());
+    if (!on) return;
+    e.preventDefault();
+    popupMenu(on.map(n => ({ label: `Remove ${n} from its pin`, action: () => removeNets([n]) })), e.clientX, e.clientY);
   }
   const resHost = h('div', { class: 'pp-res' });
   const status = h('span', { class: 'pp-status' });
@@ -122,8 +147,9 @@ export function mountPinPlanner(el, doc, top) {
     // (a narrow window: the board's resources over the table, shown by this)
     h('div', { class: 'asm-group' }, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })));
   const side = h('aside', { class: 'asm-side pp-side' }, h('div', { class: 'asm-cap' }, 'Board Resources'), resHost);
-  root.append(bar, h('div', { class: 'asm-body' }, h('div', { class: 'asm-main' }, tableHost, boardHost), side));
+  root.append(bar, h('div', { class: 'asm-body' }, portsSide, h('div', { class: 'asm-main' }, tableHost, boardHost), side));
   mountSideFold({ root, side, key: 'silinx.pins.props.folded', titles: { fold: 'Collapse the Board Resources panel', unfold: 'Expand the Board Resources panel' } });
+  mountSideFold({ root, side: portsSide, key: 'silinx.pins.ports.folded', titles: { fold: 'Collapse the Ports panel', unfold: 'Expand the Ports panel' }, cls: 'ports-folded', toward: 'left' });
   const closedGroups = new Set();   // (the groups folded, kept when the panel is drawn again: render)
 
   function used() {
@@ -134,9 +160,9 @@ export function mountPinPlanner(el, doc, top) {
 
   function render() {
     const u = used();
-    tableHost.hidden = view !== 'table'; boardHost.hidden = view !== 'board';
+    tableHost.hidden = view !== 'table'; boardHost.hidden = view !== 'board'; portsSide.hidden = view !== 'board';
     for (const b of viewBtns) { b.classList.toggle('on', b.dataset.view === view); b.setAttribute('aria-pressed', String(b.dataset.view === view)); }
-    if (view === 'board') boardView.render();
+    if (view === 'board') { boardView.render(); portsView.render(); }
     tableHost.innerHTML = '';
     const tbl = h('table', { class: 'grid' }, h('tr', {}, ...['I/O Name', 'Direction', 'Board Resource', 'Site (LOC)', 'I/O Std.', 'Drive', 'Slew', 'Pull', 'Clock period (ns)'].map(t => h('th', {}, t))));
     for (const n of nets) {
@@ -187,9 +213,11 @@ export function mountPinPlanner(el, doc, top) {
         body = h('div', { class: 'asm-section-body' });
         resHost.append(h('details', { class: 'asm-section pp-grp', 'data-grp': name, open: !closedGroups.has(name) }, h('summary', {}, name), body));
       }
+      // (each pin a target of the Board view's drops, #2715: VGA, PS/2, the Pmods…; its right-click menu, the bits off it)
       r.pins.forEach((pin, i) => {
         const who = u.get(pin);
-        body.append(h('div', { class: `res${who ? ' used' : ''}`, title: `${r.label}${r.verified === false ? ' (unverified)' : ''}${who ? `\nassigned to ${who.join(', ')}` : ''}` },
+        body.append(h('div', { class: `res pp-target${who ? ' used' : ''}`, 'data-res': r.name, 'data-idx': i, oncontextmenu: e => pinMenu(e, pin),
+          title: `${r.label}${r.verified === false ? ' (unverified)' : ''}${who ? `\nassigned to ${who.join(', ')}` : ''}` },
           h('span', {}, r.pins.length > 1 ? `${r.name}<${i}>` : r.name), h('span', {}, pin)));
       });
     }

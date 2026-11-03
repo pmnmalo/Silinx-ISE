@@ -1,4 +1,4 @@
-// Silinx - I/O Pin Planning on the board (#2694): a top-level port dropped on a part of the board (an LED, a switch,
+// Silinx - I/O Pin Planning on the board (#2694, #2715): a top-level port dropped on a part of the board (an LED, a switch,
 // a button, a digit of the 7-segment display, a connector's resource) and the pins it takes. A bus spreads over the
 // resource's pins in order, its least significant bit on the part dropped on (moved back to fit the row); a port
 // dropped again moves (its bits leave the pins they had); a pin another port used is taken from it. The resource's
@@ -7,12 +7,17 @@
 // Isomorphic ES module (browser + Node), no DOM.
 import { bitName, periodNs } from '../packages/silinx-fpga/src/parts.js';
 
-/** The nets of a port ({ name, width, msb, lsb, bus }), its lowest bit first: [{ net, bit }]. */
+/** The nets of a port ({ name, width, msb, lsb, bus }), its lowest bit first: [{ net, bit }]; of one bit of a bus
+ *  (portBit), that bit. */
 export function portNets(port) {
+  if (port.net) return [{ net: port.net, bit: port.bit }];
   if (!port.bus) return [{ net: bitName(port.name), bit: null }];
   const lo = Math.min(port.msb, port.lsb);
   return Array.from({ length: port.width }, (_, i) => ({ net: bitName(port.name, lo + i), bit: lo + i }));
 }
+
+/** The bit `bit` of a bus port, dragged alone: a port of one net, named as the net (led<3>). */
+export const portBit = (port, bit) => ({ name: bitName(port.name, bit), dir: port.dir, width: 1, bus: false, net: bitName(port.name, bit), bit, of: port.name });
 
 /** A resource's pins' names, as the table shows them: led<0>, or mclk for a resource of one pin. */
 export const pinLabels = (res) => res.labels || res.pins.map((_, i) => (res.pins.length > 1 ? `${res.name}<${i}>` : res.name));
@@ -70,7 +75,7 @@ export function boardDrop({ port, res, index = 0, assignments = {} }) {
     changes[net] = { loc: pin, pull: res.pull, drive: res.drive, slew: res.slew };
     placed.push([net, label]);
   }
-  if (res.group === 'Clock' && n === 1 && !port.bus && port.dir === 'in') clocks.push({ net: nets[0].net, period: periodNs(res.extra?.period || '20 ns'), duty: 50 });
+  if (res.group === 'Clock' && n === 1 && !port.bus && !port.net && port.dir === 'in') clocks.push({ net: nets[0].net, period: periodNs(res.extra?.period || '20 ns'), duty: 50 });
   if (port.dir !== res.dir && res.dir !== 'inout' && port.dir !== 'inout') {
     warnings.push(`${port.name} is ${DIR_WORD[port.dir]}: ${res.name} is ${DIR_WORD[res.dir]} of the board`);
   }
@@ -78,4 +83,20 @@ export function boardDrop({ port, res, index = 0, assignments = {} }) {
     warnings.push(`${port.name} has ${nets.length} bits, ${res.name} ${len}: ${nets.slice(len).map((x) => x.net).join(', ')} not placed`);
   }
   return { changes, clocks, placed, notes, warnings };
+}
+
+/**
+ * The nets `nets` taken off their pins (a bit placed wrong, corrected): { changes, removed }. changes: { net: { loc:
+ * undefined } } for the nets that had a pin; removed: [[net, pin label, pin]] (the label: the board's, or the pin).
+ */
+export function boardRemove({ nets, assignments = {}, board }) {
+  const changes = {}, removed = [];
+  for (const net of nets) {
+    const loc = assignments[net]?.loc;
+    if (!loc) continue;
+    const r = resourceOfPin(board, loc);
+    changes[net] = { loc: undefined };
+    removed.push([net, r ? pinLabels(r.res)[r.idx] : loc, loc]);
+  }
+  return { changes, removed };
 }

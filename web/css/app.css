@@ -295,24 +295,37 @@ table.grid tr.sel td { background: #dbe8fb; }
 .pin-planner .pp-res .res { padding: 1px 4px; font-family: var(--mono); font-size: 11px; display: flex; justify-content: space-between; }
 .pin-planner .pp-res .res.used { color: #999; text-decoration: line-through; }
 .pin-planner td.conflict input { background: #ffd7d7 !important; }
-/* the Board view (#2694): the ports beside the board, dragged onto its parts */
-/* (the ports stay where they are, the board scrolls beside them) */
-.pin-planner .pp-board:not([hidden]) { flex: 1; display: flex; gap: 12px; padding: 10px 0 0 10px; overflow: hidden; min-height: 0; background: var(--panel, #fff); }
-.pin-planner .pp-ports { flex: none; width: 170px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; padding-bottom: 10px; }
-.pin-planner .pp-ports h4, .pin-planner .pp-chips h4 { margin: 0 0 4px; font-size: 12px; width: 100%; }
-.pin-planner .pp-port { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border: 1px solid var(--frame, #aaa); border-radius: 4px; background: var(--panel-alt, #f7f7f7); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; font-family: var(--mono); font-size: 12px; }
-.pin-planner .pp-port .pp-pname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pin-planner .pp-port .pp-pcount { color: var(--grey-4); font-size: 11px; }
+/* the Board view (#2694): the board, its parts the targets of the ports dragged from the Ports panel on its left (#2715,
+   as the schematic editor's Symbols: folded to a strip by its title's button, side-fold.js) */
+.pin-planner .pp-board:not([hidden]) { flex: 1; overflow: auto; min-height: 0; padding: 10px; background: var(--panel, #fff); }
+.pin-planner .pp-ports-side { width: 200px; flex: none; overflow-y: auto; background: var(--asm-panel); border-right: 1px solid var(--asm-border); }
+.pin-planner .pp-ports-side[hidden] { display: none; }
+@media (min-width: 1024px) {
+  .pin-planner.ports-folded .pp-ports-side:not([hidden]) { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+  .pin-planner.ports-folded .pp-ports-side > :not(.asm-cap) { display: none; }
+  .pin-planner.ports-folded .pp-ports-side .asm-cap {
+    flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px;
+    border-bottom: 0; align-items: center; background: var(--asm-panel);
+  }
+  .pin-planner.ports-folded .pp-ports-side .asm-cap .sp { display: none; }
+  .pin-planner.ports-folded .pp-ports-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+}
+@media (max-width: 1023px) { .pin-planner .pp-ports-side { width: 160px; } }
+.pin-planner .pp-portlist { display: flex; flex-direction: column; gap: 3px; padding: 6px; }
+.pin-planner .pp-port { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border: 1px solid var(--frame, #aaa); border-radius: 4px; background: var(--panel-alt, #f7f7f7); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; font-family: var(--mono); font-size: 12px; }
+.pin-planner .pp-port.pp-bit { margin-left: 18px; font-size: 11px; }
+.pin-planner .pp-port .pp-pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-planner .pp-port .pp-pcount { color: var(--grey-4); font-size: 11px; white-space: nowrap; }
 .pin-planner .pp-port.placed { border-color: #2e9d55; }
 .pin-planner .pp-port.partial { border-color: #d8a020; }
-.pin-planner .pp-board-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; overflow: auto; padding: 0 10px 10px 0; }
-.pin-planner .pp-chips { display: flex; flex-wrap: wrap; gap: 4px; max-width: 860px; }
-.pin-planner .pp-chip { padding: 2px 6px; border: 1px solid var(--frame, #aaa); border-radius: 10px; font-family: var(--mono); font-size: 11px; background: var(--panel-alt, #f7f7f7); }
-.pin-planner .pp-chip.pp-on { background: rgba(46, 157, 85, .18); border-color: #2e9d55; }
-.pin-planner .pp-target.pp-on:not(.pp-chip) { outline: 2px solid #ffcf66; outline-offset: 2px; border-radius: 3px; }
+.pin-planner .pp-exp, .pin-planner .pp-x { flex: none; width: 14px; padding: 0; border: 0; background: none; color: inherit; font-size: 10px; line-height: 1; cursor: pointer; }
+.pin-planner .pp-exp { transition: transform .12s; }
+.pin-planner .pp-exp.open { transform: rotate(90deg); }
+.pin-planner .pp-x { opacity: .6; }
+.pin-planner .pp-x:hover { opacity: 1; color: var(--log-error, #c00); }
+.pin-planner .pp-target.pp-on { outline: 2px solid #ffcf66; outline-offset: 2px; border-radius: 3px; }
 .pin-planner .pp-target.pp-over { outline: 3px solid #4da3ff !important; outline-offset: 2px; }
-.pin-planner .pp-drop-msg { font-family: var(--mono); font-size: 12px; min-height: 1em; }
-.pin-planner .pp-drop-msg .pp-warn { color: var(--log-warning); }
+.pin-planner .pp-res .res.pp-target.pp-over { outline-offset: -2px; }
 .pp-ghost { position: fixed; z-index: 1000; pointer-events: none; padding: 2px 8px; border-radius: 4px; background: #316ac5; color: #fff; font: 12px var(--mono, monospace); }
 
 /* impact */
