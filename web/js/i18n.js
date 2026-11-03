@@ -291,9 +291,8 @@ const PT = {
   'Gray': 'Gray', 'One-hot': 'One-hot', 'Enum / auto': 'Enum / automático',
   'Default (combinational) or reset value (registered)': 'Valor por omissão (combinatória) ou de reset (registada)',
   'Drop the connection on a box (a state, decision or conditional output)': 'Largue a ligação numa caixa (estado, decisão ou saída condicional)',
-  // ASM editor: its toolbar and its Machine panel on the left (#2730)
-  'Encoding:': 'Codificação:', '☰ Machine': '☰ Máquina', 'Show / hide the machine panel': 'Mostrar / esconder o painel da máquina',
-  'Collapse the Machine panel': 'Recolher o painel da máquina', 'Expand the Machine panel': 'Expandir o painel da máquina',
+  // ASM editor: its toolbar (#2730)
+  'Encoding:': 'Codificação:',
   // ASM editor: data path and every-cycle blocks
   'Every cycle': 'Cada ciclo', 'every clock cycle': 'em todos os ciclos de relógio', 'Every-cycle block': 'Bloco de cada ciclo',
   'Add an every-cycle block (logic evaluated on every clock cycle, in parallel with the states)': 'Adicionar um bloco de cada ciclo (lógica avaliada em todos os ciclos de relógio, em paralelo com os estados)',

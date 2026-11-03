@@ -1,7 +1,7 @@
 // UI (#2730): the ASM chart editor as the other editors (docs/UI-GUIDELINES.md): no hint on the canvas, no status line,
-// its states at the toolbar's right end, "Encoding:" before its selector, the Machine panel on the left (folded,
-// remembered, over the canvas on a narrow window by ☰ Machine), its problems in the console's Errors and Warnings (a
-// click selecting the box) and Validate's lines in the Console, none in the editor; Portuguese. Both interfaces.
+// its states at the toolbar's right end, "Encoding:" before its selector, the Machine section in its Properties, its
+// problems in the console's Errors and Warnings (a click selecting the box) and Validate's lines in the Console, none in
+// the editor; Portuguese. Both interfaces.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -22,9 +22,8 @@ const chart = () => {
 const ERR = "State 'LOST' has no exit (next state path)", WARN = "State 'LOST' is unreachable from the initial state";
 const tab = (page, id) => page.eval((i) => [...document.querySelectorAll(`#${i} .diag`)].map((r) => r.textContent), id);
 const lines = (page) => page.eval(() => [...document.querySelectorAll('#console-log .ln')].map((l) => l.textContent));
-const width = (page, s) => page.eval((d, x) => document.querySelector(`${d} ${x}`).offsetWidth, D, s);
 
-uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar\'s right, Encoding:, the Machine panel on the left, its problems in the console; Portuguese', E, async (page) => {
+uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar\'s right, Encoding:, its problems in the console; Portuguese', E, async (page) => {
   await page.setViewport(1600, 800);   // (the toolbar on one line)
   await makeProject(env, { name: 'AsmChrome', files: { 'src/ctl.asm.json': chart() } });
   await page.openProject('AsmChrome');
@@ -34,16 +33,15 @@ uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar
     const el = document.querySelector(d), tb = el.querySelector('.asm-toolbar'), info = tb.querySelector('.asm-info');
     const shown = (c) => c.getClientRects().length > 0 && getComputedStyle(c).position !== 'absolute';
     return {
-      gone: ['.asm-hint', '.asm-status', '.asm-problems', '.asm-prob', 'details'].filter((s) => el.querySelector(s)),
+      gone: ['.asm-hint', '.asm-status', '.asm-problems', '.asm-prob', '.asm-left'].filter((s) => el.querySelector(s)),
       info: info.textContent,
       after: [...tb.children].filter((c) => shown(c) && c.getBoundingClientRect().left > info.getBoundingClientRect().left).map((c) => c.className),
       encoding: [...el.querySelector('.asm-encoding').children].map((c) => c.textContent.slice(0, 9)),
-      left: [el.querySelector('.asm-body').firstElementChild.className, el.querySelector('.asm-left .asm-cap').textContent, !!el.querySelector('.asm-left .asm-field')],
-      right: [...el.querySelectorAll('.asm-side .asm-cap')].map((c) => c.textContent),
+      side: [el.querySelector('.asm-side .asm-cap').textContent, [...el.querySelectorAll('.asm-side details > summary')].map((x) => x.textContent), !!el.querySelector('.asm-side details .asm-field')],
       zoom: el.querySelector('.asm-toolbar .asm-zoom')?.textContent,
     };
   }, D);
-  assert.deepEqual(look, { gone: [], info: '4 states', after: [], encoding: ['Encoding:', 'BinaryGra'], left: ['asm-left', 'Machine', true], right: ['Properties'], zoom: look.zoom });
+  assert.deepEqual(look, { gone: [], info: '4 states', after: [], encoding: ['Encoding:', 'BinaryGra'], side: ['Properties', ['Machine'], true], zoom: look.zoom });
   assert.match(look.zoom, /^\d+%$/);
   // a narrower window: the toolbar wrapped, its states at the right end still
   await page.setViewport(1100, 800);
@@ -80,36 +78,12 @@ uiTest('#2730 the ASM editor: no hint nor status line, its states at the toolbar
   await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('asm:src/ctl.asm.json'), { force: true }));
   await page.waitFor(() => !document.querySelectorAll('#console-warnings .diag').length, [], { what: 'closed: no problems' });
 
-  // the Machine panel folded to a strip on the left, kept when the chart opens again; a click on the strip expands it
+  // in Portuguese, opened again
   await page.eval(() => window.SilinxApp.openFile('src/ctl.asm.json'));
-  await page.waitFor((d) => document.querySelector(`${d} .asm-left`)?.offsetWidth, [D], { what: 'the editor again' });
-  assert.equal(await width(page, '.asm-left'), 250);
-  await page.click(`${D} .asm-left .asm-fold`);
-  assert.deepEqual([await width(page, '.asm-left'), await width(page, '.asm-side')], [24, 250]);
-  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-left .asm-fold`).title, D), 'Expand the Machine panel');
-  await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('asm:src/ctl.asm.json'), { force: true }));
-  await page.eval(() => window.SilinxApp.openFile('src/ctl.asm.json'));
-  await page.waitFor((d) => document.querySelector(`${d} .asm-left`)?.offsetWidth === 24, [D], { what: 'remembered' });
-  await page.click(`${D} .asm-left`);
-  assert.equal(await width(page, '.asm-left'), 250);
-
-  // a narrow window: the Machine panel hidden, ☰ Machine shows it over the canvas on its left, and hides it
-  await page.setViewport(900, 700);
-  await page.eval(async () => (await import('/js/narrow.js')).setDrawer(false, { remember: false }));
-  const toggles = () => page.eval((d) => [...document.querySelectorAll(`${d} .asm-toolbar .asm-btn`)].filter((b) => b.getClientRects().length && /☰/.test(b.textContent)).map((b) => b.textContent), D);
-  assert.deepEqual(await toggles(), ['☰ Machine', '☰ Properties']);
-  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-left`).getClientRects().length, D), 0);
-  await page.click(`${D} .asm-toolbar .asm-btn`, { text: '☰ Machine' });
-  assert.deepEqual(await page.eval((d) => { const s = document.querySelector(`${d} .asm-left`); return [getComputedStyle(s).position, s.getBoundingClientRect().left === s.parentElement.getBoundingClientRect().left]; }, D), ['absolute', true]);
-  await page.click(`${D} .asm-toolbar .asm-btn`, { text: '☰ Machine' });
-  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-left`).getClientRects().length, D), 0);
-  await page.setViewport(1600, 800);
-
-  // in Portuguese
+  await page.waitFor((d) => document.querySelector(`${d} .asm-info`)?.textContent, [D], { what: 'the editor again' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor((d) => document.querySelector(`${d} .asm-info`).textContent === '4 estados', [D], { what: 'Portuguese' });
-  assert.deepEqual(await page.eval((d) => [document.querySelector(`${d} .asm-tb-label`).textContent, document.querySelector(`${d} .asm-left .asm-cap`).textContent.trim(),
-    document.querySelector(`${d} .asm-left .asm-fold`).title], D), ['Codificação:', 'Máquina', 'Recolher o painel da máquina']);
+  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-tb-label`).textContent, D), 'Codificação:');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 }, { timeout: 120000 });

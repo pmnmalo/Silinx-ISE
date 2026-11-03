@@ -11,15 +11,14 @@
 // parallel with the states; unconnected exits end the block), and the machine panel edits the
 // data path: generics, internal registers and the 2-flip-flop synchroniser of each input.
 //
-// The Machine panel on the left, the selection's Properties on the right (side-fold.js, narrow.js, #2730). The chart's
-// problems and notes are not shown in the editor (docs/UI-GUIDELINES.md "Messages"): `onProblems(diags)` after every
+// The chart's problems and notes are not shown in the editor (docs/UI-GUIDELINES.md "Messages"): `onProblems(diags)` after every
 // validation, `onValidate(diags)` on Validate, `onMessage(text)` for a note (drawings.js: the console, editor-problems.js).
 
 import { linkModel, linkSnapshot } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import { mountSideFold } from './side-fold.js';
 import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
-import { panelToggle, PROPS_KEY, MACHINE_KEY } from './narrow.js';
+import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
   normalizeModel, newModel, validate, generate, ENCODINGS,
 } from '/core/asm.js';
@@ -144,7 +143,7 @@ function readOnlyChrome({ root, toolbar, hide }) {
   for (const g of [...toolbar.querySelectorAll('.asm-add, .asm-danger'), ...hide,
     ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
 }
-const lockSide = (readOnly, ...sides) => { if (readOnly) for (const side of sides) for (const x of side.querySelectorAll('input, textarea, select, button:not(.asm-fold)')) x.disabled = true; };
+const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button:not(.asm-fold)')) x.disabled = true; };
 export function mountAsmEditor(container, { model, onChange, onProblems, onValidate, onMessage, readOnly = false } = {}) {
   const uid = `asm${++instanceCounter}`;
   let M = normalizeModel(model || newModel('fsm', 'vhdl'));
@@ -198,9 +197,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     sep(),
     h('div', { class: 'asm-group' }, toolWide('check', 'Validate', 'Check the chart for errors', () => { runValidate(); onValidate?.(diags.slice()); })),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' },
-      panelToggle(root, btn('☰ Machine', 'Show / hide the machine panel'), { cls: 'left-open', key: MACHINE_KEY }),
-      panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
     info,
     more.el);
 
@@ -236,16 +233,15 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
 
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap);
 
-  // side panels: the machine on the left, the selection's properties on the right
+  // side panel
   const selSection = h('section', { class: 'asm-section asm-selection' });
-  const machineBody = h('div', { class: 'asm-section-body asm-machine' });
-  const left = h('aside', { class: 'asm-left' }, h('div', { class: 'asm-cap' }, 'Machine'), machineBody);
-  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection);
+  const machineBody = h('div', { class: 'asm-section-body' });
+  const machineSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Machine'), machineBody);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection);
 
   mountSideFold({ root, side, key: 'silinx.asm.props.folded' });
-  mountSideFold({ root, side: left, key: 'silinx.asm.machine.folded', titles: { fold: 'Collapse the Machine panel', unfold: 'Expand the Machine panel' }, cls: 'left-folded', toward: 'left' });
 
-  root.append(toolbar, h('div', { class: 'asm-body' }, left, mainCol, side));
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
   if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, toolbar.querySelector('.asm-encoding')] });
 
   // ---------------------------------------------------------------------------- model ops (asm-ops.js)
@@ -326,8 +322,8 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   // ---------------------------------------------------------------------------- inspector (asm-inspector.js)
   const insp = mountInspector({ M: () => M, sel: () => sel, selSection, machineBody, btn, nodeById, caseExits,
     caseWidth, commit, deleteSelection });
-  const renderInspector = (...a) => { insp.renderInspector(...a); lockSide(readOnly, side, left); };
-  const renderMachine = (...a) => { insp.renderMachine(...a); lockSide(readOnly, side, left); };
+  const renderInspector = (...a) => { insp.renderInspector(...a); lockSide(readOnly, side); };
+  const renderMachine = (...a) => { insp.renderMachine(...a); lockSide(readOnly, side); };
 
   // ---------------------------------------------------------------------------- layout (asm-layout.js)
   const { autoArrange } = mountAsmLayout({
