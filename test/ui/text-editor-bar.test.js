@@ -33,3 +33,28 @@ uiTest('#2514 the text editors\' bar: no Undo / Redo, no path; the main toolbar\
   await page.waitFor(() => window.Silinx.active.editor.getValue() === '00\n01\n', [], { what: 'undone by the main toolbar' });
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
+
+// (#2763) a text editor's status line, its last line: the cursor's line and column and the language; Portuguese; none
+// of it in the application's status bar
+uiTest('#2763 the text editors\' status line: Ln, Col and the language; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'StatText', top: 'top', files: { 'src/top.vhd': VHD, 'src/add.cpp': 'int add(int a, int b) { return a + b; }\n', 'src/rom.mem': '00\n01\n', 'src/inv.v': 'module inv(input a, output y);\n  assign y = ~a;\nendmodule\n' } });
+  await page.openProject('StatText');
+  const status = () => page.eval(() => { const d = document.querySelector('.doc:not([hidden])'), st = d.querySelectorAll('.doc-status');
+    return { n: st.length, last: d.lastElementChild === st[0], fields: [...st[0].querySelectorAll('.ds-f')].map((f) => f.textContent) }; });
+  for (const [f, lang] of [['src/top.vhd', 'VHDL'], ['src/inv.v', 'Verilog'], ['src/add.cpp', 'C++'], ['src/rom.mem', 'Text']]) {
+    await page.eval((p) => window.SilinxApp.openFile(p), f);
+    await page.waitFor((p) => window.Silinx.active?.id === `file:${p}` && document.querySelector('.doc:not([hidden]) .doc-status .ds-f'), [f], { what: f });
+    assert.deepEqual(await status(page), { n: 1, last: true, fields: ['Ln 1, Col 1', lang] }, f);
+  }
+  await page.eval((p) => window.SilinxApp.openFile(p), 'src/top.vhd');
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd');
+  await page.eval(() => window.Silinx.active.editor.setCursor({ line: 4, ch: 2 }));
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .doc-status .pos').textContent === 'Ln 5, Col 3', [], { what: 'the cursor moved' });
+  assert.equal(await page.eval(() => /Ln \d/.test(document.getElementById('statusbar').textContent)), false, 'not in the application\'s status bar');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  try {
+    await page.waitFor(() => document.querySelector('.doc:not([hidden]) .doc-status .pos').textContent === 'Lin 5, Col 3', [], { what: 'Portuguese' });
+    assert.deepEqual((await status(page)).fields, ['Lin 5, Col 3', 'VHDL']);
+  } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+});

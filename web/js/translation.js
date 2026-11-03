@@ -57,6 +57,7 @@ export async function openTranslation(path) {
       show(r);
       d.translation = r;
       d.editor = createEditor(host, { text: r.text, lang, path: name, readOnly: true });
+      el.append(d.editor.status);   // (its status line, #2763)
       // (the source saved: translated again)
       const follow = async () => {
         const t = translate(path, await sourceText(path));
