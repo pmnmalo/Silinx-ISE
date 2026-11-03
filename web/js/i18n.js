@@ -281,7 +281,7 @@ const PT = {
   'Layout': 'Disposição', 'Selection': 'Seleção', 'Machine': 'Máquina',
   'Module / entity name': 'Nome do módulo / entidade', 'HDL language': 'Linguagem HDL', 'State encoding': 'Codificação de estados', 'Clock': 'Relógio',
   'Reset': 'Reset', 'Reset level': 'Nível do reset', 'Reset type': 'Tipo de reset', 'Initial state': 'Estado inicial', 'Inputs': 'Entradas', 'Inverted inputs': 'Entradas invertidas', 'Outputs': 'Saídas',
-  'Width': 'Largura', 'empty: the width of its net': 'vazia: a largura da sua rede', 'Registered': 'Registada', 'Condition': 'Condição', 'Problems': 'Problemas', 'No problems found': 'Nenhum problema encontrado',
+  'Width': 'Largura', 'empty: the width of its net': 'vazia: a largura da sua rede', 'Registered': 'Registada', 'Condition': 'Condição', 'Problems': 'Problemas',
   'Moore outputs (one per line)': 'Saídas de Moore (uma por linha)', 'Mealy outputs (one per line)': 'Saídas de Mealy (uma por linha)',
   'Make this the initial (reset) state': 'Tornar este o estado inicial (reset)', 'Initial (reset) state': 'Estado inicial (reset)',
   'Exchange the true and false branches': 'Trocar os ramos verdadeiro e falso', 'Swap 1 / 0 exits': 'Trocar saídas 1 / 0', 'Delete box': 'Apagar caixa',
@@ -291,7 +291,9 @@ const PT = {
   'Gray': 'Gray', 'One-hot': 'One-hot', 'Enum / auto': 'Enum / automático',
   'Default (combinational) or reset value (registered)': 'Valor por omissão (combinatória) ou de reset (registada)',
   'Drop the connection on a box (a state, decision or conditional output)': 'Largue a ligação numa caixa (estado, decisão ou saída condicional)',
-  'Drag from a port ● to a box to connect · drag background to pan · wheel to zoom · Shift+drag to select · double-click to add a state': 'Arraste de um porto ● para uma caixa para ligar · arraste o fundo para deslocar · roda para zoom · Shift+arrastar para selecionar · duplo clique para adicionar um estado',
+  // ASM editor: its toolbar and its Machine panel on the left (#2730)
+  'Encoding:': 'Codificação:', '☰ Machine': '☰ Máquina', 'Show / hide the machine panel': 'Mostrar / esconder o painel da máquina',
+  'Collapse the Machine panel': 'Recolher o painel da máquina', 'Expand the Machine panel': 'Expandir o painel da máquina',
   // ASM editor: data path and every-cycle blocks
   'Every cycle': 'Cada ciclo', 'every clock cycle': 'em todos os ciclos de relógio', 'Every-cycle block': 'Bloco de cada ciclo',
   'Add an every-cycle block (logic evaluated on every clock cycle, in parallel with the states)': 'Adicionar um bloco de cada ciclo (lógica avaliada em todos os ciclos de relógio, em paralelo com os estados)',
@@ -401,6 +403,7 @@ const PT_FF = [['synchronous set and reset (S over R)', 'set e reset síncronos 
   ['synchronous reset', 'reset síncrono'], ['synchronous set', 'set síncrono']];
 const PT_PATTERNS = [
   // the serial terminal's pins (#2536)
+  [/^(\d+) states?(?: · (\d+) every-cycle blocks?)?$/, (m, n, b) => `${n} estado${n === '1' ? '' : 's'}${b ? ` · ${b} bloco${b === '1' ? '' : 's'} de cada ciclo` : ''}`],   // (the ASM editor's toolbar, #2730)
   [/^TX: (.+) · RX: (.+)$/, (m, ...p) => `TX: ${p.slice(0, 2).map((x) => x.replace(/ \(pin (\S+)\)$/, ' (pino $1)').replace(/^not connected in the UCF$/, 'não ligado no UCF')).join(' · RX: ')}`], [/^(\d+) baud$/, '$1 baud'],
   // Find in Project (#1430)
   [/^(\d+) result\(s\) in (\d+) file\(s\)$/, '$1 resultado(s) em $2 ficheiro(s)'], [/^(\d+) replacement\(s\) in (\d+) file\(s\)$/, '$1 substituição(ões) em $2 ficheiro(s)'],
@@ -678,7 +681,6 @@ PT_PATTERNS.push(
 Object.assign(PT, {
   'Module (HDL)': 'Módulo (HDL)', 'C Function (HLS)': 'Função C (HLS)', 'C++ Function (HLS)': 'Função C++ (HLS)', 'Generated from the C': 'Gerado a partir do C',
   'View State Machine (ASM)': 'Ver Máquina de Estados (ASM)', 'Read-only, the state machine made from': 'Só de leitura, a máquina de estados feita de', 'The state machine made from the C (read-only)': 'A máquina de estados feita do C (só de leitura)',
-  'Read-only · drag the background to pan · wheel to zoom · click a box to see it': 'Só de leitura · arrastar o fundo para deslocar · roda para ampliar · clicar numa caixa para a ver',
   'View C Model': 'Ver Modelo C',
   'C Synthesis (HLS)': 'Síntese de C (HLS)', 'View/Edit C Source': 'Ver/Editar Fonte C', 'View C Synthesis Report': 'Ver Relatório da Síntese de C', 'View Generated HDL': 'Ver HDL Gerado',
   'C Simulation': 'Simulação de C', 'C/RTL Co-simulation': 'Co-simulação C/RTL', 'Run the test bench, main()': 'Correr o test bench, main()', "Replay main()'s calls of the top function on its HDL and compare": 'Repetir no seu HDL as chamadas que main() faz à função de topo, e comparar',
