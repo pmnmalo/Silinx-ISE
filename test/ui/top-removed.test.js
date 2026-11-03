@@ -50,7 +50,7 @@ uiTest('#253 Remove from Project of the top module: the module left becomes the 
   await page.menu('Tools', 'I/O Pin Planning');
   await page.waitFor(() => window.Silinx.active?.id === 'pins' && document.querySelectorAll('.pin-planner .pp-table tr').length > 1, [], { what: 'the planner' });
   assert.deepEqual(await ppRows(page), ['bcd<0>', 'bcd<1>', 'bcd<2>', 'bcd<3>', 'y<0>', 'y<1>', 'y<2>', 'y<3>', 'y<4>']);
-  assert.match(await page.eval(() => document.querySelector('.pp-bar').textContent), /Top: conv ·/);
+  assert.equal(await page.eval(() => document.querySelector('.pin-planner .doc-status .pp-info').textContent), 'Top: conv');   // (its status line's, #2763)
   // one Undo: top.vhd back, and the top with it
   await page.menu('Edit', 'Undo Remove from Project');
   await page.waitFor(() => window.Silinx.project?.top === 'top', [], { what: 'top the top again' });
