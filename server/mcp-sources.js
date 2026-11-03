@@ -1,7 +1,7 @@
 // The MCP server's tools of a project's sources (server/mcp.js, #2674), as the Design pane's menus do them:
 // Unset as Top Module (web/js/design.js unsetTop), Remove from Project and Add to Project (the file kept in the
 // project folder: design.js removeNow, app.js addNow), Rename of a file or a folder (the drawings' links to it
-// updated: web/js/rename.js renameSource), Delete File / Delete Folder and the deletion of a project (moved to
+// updated: web/js/rename.js renameSource) and of a module (its references with it: server/rename-module.js), Delete File / Delete Folder and the deletion of a project (moved to
 // the workspace's .trash). A top module the project no longer has becomes the one root left of its view, else
 // none (web/js/app.js fixMissingTops).
 import * as P from './projects.js';
@@ -140,6 +140,25 @@ export const SOURCE_TOOLS = [
         links.push(f);
       }
       return { text: `Rename: ${a} → ${b}${links.length ? ` (the link of ${links.join(', ')} updated)` : ''}.`, data: { project: name, from: a, to: b, links } };
+    },
+  },
+  {
+    name: 'rename_module', title: 'Rename a module',
+    description: 'Rename a module (an entity or a module of the project\'s HDL files), as Rename does: its declaration and its instances in every source, the schematics\' symbols of it, the drawing it is generated from (named after it, it follows), the project\'s top and test bench. Its file follows the new name when it is named after the module (file: another path, or keep to leave it); the drawings changed make their HDL again.',
+    inputSchema: { type: 'object', properties: { project: PROJECT, module: STR('The module\'s name now.'), to: STR('Its new name (a letter, then letters, digits and _).'), file: STR('Its file\'s new path, or keep (default: the file with the new name when it is named after the module).') }, required: ['project', 'module', 'to'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    async run({ project: name, module: oldName, to: newName, file }) {
+      await readProject(name);
+      if (typeof newName !== 'string' || !newName) throw toolError('to: the module\'s new name');
+      const R = await import('./rename-module.js');
+      const mod = (await R.projectModules(P, name)).find(m => m.name.toLowerCase() === String(oldName).toLowerCase() && m.kind !== 'package');
+      if (!mod) throw toolError(`no module '${oldName}' in the project's HDL files (a drawing with no HDL file: write_file its name)`);
+      let to = null;
+      if (file === undefined) to = R.followingFile(mod.file, mod.name, newName);
+      else if (file !== 'keep') to = await sourcePath(name, file);
+      let r;
+      try { r = await R.renameModule(P, name, mod.name, newName, { to }); } catch (e) { throw toolError(e.message); }
+      return { text: [r.message, ...r.hdl].join('\n'), data: { project: name, module: r.module, file: r.file, changed: r.changed, moved: r.moved.map(([a, b]) => ({ from: a, to: b })), ...await tops(name) } };
     },
   },
   {
