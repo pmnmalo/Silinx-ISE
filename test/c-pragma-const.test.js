@@ -55,6 +55,9 @@ const FOURS = [
   ['enum sizes { ONE = 1, N = ONE * 4 };', '', 'N'],
   ['const int M = 2;\nconst int N = M + M;', '', 'N'],
   ['const int N = sizeof(int);', '', 'N'],
+  // (an array's count, sizeof T / sizeof T[0], #2654)
+  ['const int T[4] = { 1, 2, 3, 4 };\nconst int N = sizeof T / sizeof T[0];', '', 'N'],
+  ['const int T[4] = { 1, 2, 3, 4 };\nenum { N = sizeof(T) / sizeof(T[0]) };', '', 'N'],
 ];
 
 test('#2750 UNROLL factor= of a constant (global, local, static, enum, of another, of sizeof): the module of factor=4', () => {
