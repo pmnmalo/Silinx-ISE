@@ -12,7 +12,7 @@ import { checkSlice } from '../packages/silinx-fpga/src/fpga/s6/pack.js';
 import { writeXdl } from '../packages/silinx-fpga/src/xdl.js';
 import { MEM_DESIGNS } from '../packages/silinx-fpga/research/s6/gen-mem6.mjs';
 import { memSummary } from '../packages/silinx-fpga/research/s6/ana-mem6.mjs';
-import { s6Device, s6Netlist, s6Phys, s6Verilog } from './s6-lib.mjs';
+import { s6Device, s6Example, s6Netlist, s6Phys, s6Verilog } from './s6-lib.mjs';
 
 const ISE = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/mem.json', import.meta.url), 'utf8'));
 const PART = 'xc6slx16csg324-3';
@@ -86,4 +86,37 @@ endmodule`);
   assert.ok(['A', 'B', 'C', 'D'].every(q => ms[0].pos[q].ff === null && ms[0].pos[q].ff5 === null), 'the flip-flop elsewhere');
   for (const s of p.packed.slices) assert.deepEqual(checkSlice(s, nl), []);
   assert.deepEqual(p.phys.warnings, []);
+});
+
+// (#2755) a RAM32M with no DID (the open synthesis's light8080 register bank, micro80): the D LUT's DX and DI tied low,
+// as ISE's map ties them on the same netlist (ISE's DRC: PhysDesignRules:1422 / 2100 with them unconnected); a DID with a
+// net keeps it
+test('packing: a RAM32M\'s data input with no net tied low, the D LUT\'s DX and DI on GLOBAL_LOGIC0, as ISE\'s map ties them (#2755)', async () => {
+  const nl = await s6Verilog(`module m(input clk, input we, input [4:0] wa, input [4:0] ra, input [4:0] rb, input [4:0] rc, input [1:0] d, output [1:0] qa, output [1:0] qb, output [1:0] qc);
+ reg [1:0] mem[0:31]; always @(posedge clk) if (we) mem[wa] <= d; assign qa = mem[ra]; assign qb = mem[rb]; assign qc = mem[rc];
+endmodule`);
+  const dataPins = p => {
+    const k = p.phys.insts.findIndex(x => x.kind === 'slice' && p.packed.slices[x.slice].mem);
+    return Object.fromEntries(p.phys.nets.flatMap(n => (n.loads ?? []).filter(l => l.inst === k && /^[A-D][IX]$/.test(l.pin)).map(l => [l.pin, n.power ? n.name : 'net'])).sort());
+  };
+  // DID driven: every data pin on the design's nets
+  assert.deepEqual(dataPins(s6Phys(nl)), { AI: 'net', AX: 'net', BI: 'net', BX: 'net', CI: 'net', CX: 'net', DI: 'net', DX: 'net' });
+  // no DID (as micro80's netlist has it): the RAM32M instantiated with DID left open (tied to 0 by the elaboration), its
+  // pins removed
+  const open = await s6Verilog(`module m(input clk, input we, input [4:0] wa, input [4:0] ra, input [4:0] rb, input [4:0] rc, input [1:0] d, output [1:0] qa, output [1:0] qb, output [1:0] qc);
+ RAM32M r(.DOA(qa), .DOB(qb), .DOC(qc), .ADDRA(ra), .ADDRB(rb), .ADDRC(rc), .ADDRD(wa), .DIA(d), .DIB(d), .DIC(d), .WCLK(clk), .WE(we));
+endmodule`);
+  const r = open.cells.find(x => x.type === 'RAM32M');
+  assert.deepEqual([r.pins['DID<0>'], r.pins['DID<1>']], [0, 0]);
+  for (const q of ['DID<0>', 'DID<1>']) delete r.pins[q];
+  const p = s6Phys(open);
+  assert.deepEqual(dataPins(p), { AI: 'net', AX: 'net', BI: 'net', BX: 'net', CI: 'net', CX: 'net', DI: 'GLOBAL_LOGIC0', DX: 'GLOBAL_LOGIC0' });
+  assert.deepEqual(p.phys.warnings, []);
+  // micro80's register bank on both boards
+  for (const board of ['nexys3', 'atlys']) {
+    const d = await s6Example('micro80', board);
+    const banks = d.phys.insts.flatMap((x, k) => (/rbank/.test(x.name) ? [k] : []));
+    assert.equal(banks.length, 2);
+    for (const k of banks) assert.deepEqual(d.phys.nets.filter(n => n.loads?.some(l => l.inst === k && /^D[IX]$/.test(l.pin))).map(n => [n.name, n.loads.filter(l => l.inst === k && /^D[IX]$/.test(l.pin)).map(l => l.pin).sort()]), [['GLOBAL_LOGIC0', ['DI', 'DX']]], board);
+  }
 });

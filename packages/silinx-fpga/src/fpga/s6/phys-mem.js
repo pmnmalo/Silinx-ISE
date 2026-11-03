@@ -105,6 +105,13 @@ export function memConstPins(c, ps, konst) {
   if (konst(c.pins.WE ?? 1) !== null) out.push(['CE', konst(c.pins.WE ?? 1)]);
   if (t === 'RAM32M') for (const p of ps) out.push([`${p}6`, 1]);
   else if (depth(t) === 32) for (const p of ps) out.push([`${p}1`, 0]);
+  // a RAM32M's / RAM64M's data input with no net (the open synthesis's RAM32M has no DID): tied low, as ISE's map ties
+  // the D LUT's DI and DX (#2755: ISE's DRC wants a RAM's DI1 and DI2 connected)
+  if (t === 'RAM32M' || t === 'RAM64M') {
+    for (const p of ps) {
+      for (const pin of t === 'RAM32M' ? [`DI${p}<0>`, `DI${p}<1>`] : [`DI${p}`]) if (!(pin in c.pins)) for (const sp of memInPins(c, ps, pin, null, () => null)) out.push([sp, 0]);
+    }
+  }
   for (const [pin, n] of Object.entries(c.pins)) {
     if (konst(n) === null || c.dirs[pin.replace(/<\d+>$/, '')] === 'output' || /^(WE|WCLK)$/.test(pin)) continue;
     for (const sp of memInPins(c, ps, pin, n, () => null)) out.push([sp, konst(n)]);
