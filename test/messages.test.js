@@ -53,7 +53,7 @@ test('sourceOf: each line of a session\'s Console is its process\'s (the lines a
 test('sourceOf: the processes\' headers', () => {
   const cases = {
     'Started : "Check Syntax" of src/pong.v.': 'check',
-    'Started : "Check Constraints" of constraints/top.ucf.': 'check',
+    'Started : "Check Constraints" of constraints/top.ucf.': 'impl',   // (a UCF's Check Syntax too, #2692)
     'Started : "Simulate Post-Place & Route Model".': 'sim',
     'Started : "Save as Test Bench".': 'sim',
     'Started : "C Simulation" of src/gcd.c.': 'sim',   // (#1852)
