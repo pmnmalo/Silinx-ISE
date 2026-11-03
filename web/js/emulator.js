@@ -37,7 +37,8 @@ const SVG = (tag, attrs = {}) => {
 };
 
 let styled = false;
-function injectStyle() {
+/** The emulator's style (its board's parts, each layout's): also I/O Pin Planning's Board view (#2694). */
+export function injectStyle() {
   if (styled) return;
   styled = true;
   document.head.append(h('style', {}, `

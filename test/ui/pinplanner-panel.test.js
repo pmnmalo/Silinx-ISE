@@ -42,7 +42,7 @@ uiTest('#2671 I/O Pin Planning: the diagram editors\' toolbar and side panel: Bo
   }, P);
   // the toolbar: the diagram editors' buttons; the panel beside the table, its groups open
   let L = await look();
-  assert.deepEqual(L.buttons, ['[icon] Auto-assign from Board', '[icon] Clear All']);
+  assert.deepEqual(L.buttons, ['Table', 'Board', '[icon] Auto-assign from Board', '[icon] Clear All']);   // (the views, #2694)
   assert.equal(L.status, '0/5 I/Os assigned');
   assert.deepEqual({ cap: L.cap, shown: L.shown, over: L.over, folded: L.folded }, { cap: 'Board Resources', shown: true, over: false, folded: false });
   assert.deepEqual(L.groups.slice(0, 4), ['Clock', 'LEDs', 'Switches', 'Buttons']);
@@ -81,7 +81,7 @@ uiTest('#2671 I/O Pin Planning: the diagram editors\' toolbar and side panel: Bo
   await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
   await page.waitFor(() => document.documentElement.lang === 'pt');
   L = await look();
-  assert.deepEqual([L.cap, L.buttons], ['Recursos da Placa', ['[icon] Atribuir Automaticamente pela Placa', '[icon] Limpar Tudo', '☰ Recursos da Placa']]);
+  assert.deepEqual([L.cap, L.buttons], ['Recursos da Placa', ['Tabela', 'Placa', '[icon] Atribuir Automaticamente pela Placa', '[icon] Limpar Tudo', '☰ Recursos da Placa']]);
   await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
   await page.click(`${P} .pp-bar .asm-btn`, { text: '☰ Board Resources' });
   assert.equal((await look()).shown, false, 'hidden again');
