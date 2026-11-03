@@ -17,7 +17,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { EXAMPLES, S6_EXAMPLES, S3E_TARGETS as TARGETS, S6_TARGETS, ROOT, targetName, exampleProject } from '../examples-lib.mjs';
 import { iseExamplesConfig } from '../ise-examples-config.mjs';
-import { micro80S3eWarnings } from '../ise-micro80-warnings.mjs';
+import { micro80S3eWarnings, MICRO80_S6_WARNINGS } from '../ise-micro80-warnings.mjs';
 
 const IMAGE = process.env.SILINX_ISE_IMAGE || 'xilinx/ise:14.7';
 const enabled = process.env.SILINX_ISE_TESTS === '1';
@@ -41,6 +41,8 @@ const ISE_WARNINGS = {
   // the light8080 processor, as it is (#2544), shared with test/ise/xise-interop.test.js
   micro80: micro80S3eWarnings('/work/src/src'),
 };
+// on the Spartan-6, micro80's are fewer (XST's) and map's and par's on its register bank, as in ISE's project flow (#2679)
+const ISE_S6_WARNINGS = { micro80: MICRO80_S6_WARNINGS };
 
 let tmp;
 before(() => {
@@ -79,7 +81,7 @@ for (const name of EXAMPLES) {
       while (job.status === 'running') await new Promise(r => setTimeout(r, 1000));
       assert.equal(job.status, 'ok', job.lines.filter(l => /ERROR/.test(l)).join('\n'));
       assert.ok(fs.existsSync(path.join(dir, 'build', `${project.top}.bit`)));
-      assert.deepEqual(iseWarnings(job.lines), ISE_WARNINGS[name]);
+      assert.deepEqual(iseWarnings(job.lines), project.device.family === 'spartan6' ? ISE_S6_WARNINGS[name] ?? ISE_WARNINGS[name] : ISE_WARNINGS[name]);
     });
   }
   for (const t of TARGETS) {

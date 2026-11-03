@@ -132,6 +132,18 @@ test('writeBit6: a frame written again (a design with a block RAM), as bitgen wr
   assert.throws(() => writeBit6({ fdri, rewrites: [{ far: [0, 0], words: new Uint16Array(65) }], device: LX45 }), /a frame written again: 65 words, expected 130/);
 });
 
+// (#2679: ISE's bitgen on two and three RAMB8BWERs in two columns or rows, research/s6/gen-brams6.mjs) the frames
+// written again one after another, WCFG before the first only
+test('writeBit6: several frames written again, WCFG before the first only, as bitgen writes them (#2679)', () => {
+  const fdri = emptyFdri(LX16), words = new Uint16Array(130).fill(0xffff);
+  const r = readBit6(writeBit6({ fdri, rewrites: [{ far: [0x0004, 0x17], words }, { far: [0x0016, 0x17], words }, { far: [0x0116, 0x17], words }], device: LX16 }));
+  const auto = k => `auto CRC ${r.packets[k].computed.toString(16).padStart(8, '0')}`;
+  assert.deepEqual(r.packets.slice(29, 41).map(packetLine6), ['NOOP x24', 'W FAR_MAJ 2: 0004 0017', 'W CMD 1: 0001', 'W FDRI 130 words', auto(33),
+    'W FAR_MAJ 2: 0016 0017', 'W FDRI 130 words', auto(36), 'W FAR_MAJ 2: 0116 0017', 'W FDRI 130 words', auto(39), 'W CMD 1: 000a']);
+  assert.deepEqual(r.rewrites.map(x => x.far), [[0x0004, 0x17], [0x0016, 0x17], [0x0116, 0x17]]);
+  assert.ok(r.crcChecks.every(x => x.expected === x.computed) && r.crcChecks.length === 5);
+});
+
 test('writeBit6: the frame data must have the device\'s length', () => {
   assert.throws(() => writeBit6({ fdri: new Uint16Array(10) }), /frame data: 10 words, expected 231953/);
   assert.throws(() => writeBit6({ fdri: emptyFdri(LX16), device: LX45 }), /expected 742057/);

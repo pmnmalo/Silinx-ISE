@@ -145,17 +145,18 @@ export function writeBit6({ fdri, rewrites = [], name = 'design.ncd', part = nul
   write('SEU_OPT', 0x1be2);
   write('EXP_SIGN', 0, 0);
   noop(2);
-  // the frames: one Type 2 write from FAR 0, then the auto CRC; the frames written again likewise
-  const frames = (far, data) => {
+  // the frames: one Type 2 write from FAR 0, then the auto CRC; the frames written again likewise, WCFG before the
+  // first only (#2679)
+  const frames = (far, data, wcfg = true) => {
     write('FAR_MAJ', ...far);
-    write('CMD', CMD6.WCFG);
+    if (wcfg) write('CMD', CMD6.WCFG);
     words.push(0x5000 | (R.FDRI << 5), data.length >>> 16, data.length & 0xffff);
     for (let i = 0; i < data.length; i++) { words.push(data[i]); c = crc6Update(c, R.FDRI, data[i]); }
     words.push(...crcWords());
   };
   frames([0, 0], fdri);
   noop(24);
-  for (const r of rewrites) frames(r.far, r.words);
+  rewrites.forEach((r, k) => frames(r.far, r.words, k === 0));
   write('CMD', CMD6.GRESTORE);
   write('CMD', CMD6.LFRM);
   noop(4);
