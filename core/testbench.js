@@ -178,6 +178,22 @@ function makeInVectors(inputs, { mode = 'exhaustive', count = 16, seed = 1 } = {
 // ------------------------------------------------------------------ generation
 const ident = (s) => /^[A-Za-z][A-Za-z0-9_]*$/.test(s);
 
+// the test bench's own names (its constants, signals, variables, labels): each one as it is, or with tb_ before it
+// while a port of the module has that name (#2740: a port named done, the bench's done flag, two signals of one name);
+// VHDL's names whatever their case
+function ownNames(ports, lang, names) {
+  const fold = s => (lang === 'verilog' ? s : s.toLowerCase());
+  const taken = new Set(ports.map(p => fold(p.name)));
+  const N = {};
+  for (const n of names) {
+    let m = n;
+    while (taken.has(fold(m))) m = `tb_${m}`;
+    taken.add(fold(m));
+    N[n] = m;
+  }
+  return N;
+}
+
 /**
  * The test bench text.
  *   opts: { name, lang: 'vhdl'|'verilog', uut: { name, params: [{ name, value }] }, ports (tbPorts),
@@ -235,6 +251,7 @@ export function generateTestbench(opts) {
 
   // ---------------------------------------------------------------- VHDL
   function vhdlTb() {
+    const N = ownNames(ports, 'vhdl', ['NV', 'CLK_PERIOD', 'vin_t', 'vout_t', 'vdrv_t', 'VIN', 'VDRV', 'VEXP', 'VMASK', 'ZERO', 'done', 'chr', 'ech', 'uut', 'clk_gen', 'stim', 'got', 'errors', 'k', 'i']);
     const range = (p) => `(${p.left} ${p.desc ? 'downto' : 'to'} ${p.right})`;
     const vtype = (p) => ({ sl: 'std_logic', slv: `std_logic_vector${range(p)}`, unsigned: `unsigned${range(p)}`, signed: `signed${range(p)}`, int: 'integer' })[p.kind];
     const init = (p) => (p.kind === 'sl' ? " := '0'" : p.kind === 'int' ? ' := 0' : " := (others => '0')");
@@ -245,14 +262,14 @@ export function generateTestbench(opts) {
     const lit = (b) => (b.length === 1 ? `"${b}"` : `"${b}"`);
     const table = (nm, arr) => arr.map((b, k) => `    ${k} => ${lit(b)}`).join(',\n');
     let at = 0;
-    const apply = ins.map(p => { const s = `      ${p.name} <= ${fromBits(p, slice('VIN(k)', p, at, NIN))};`; at += p.width; return s; });
+    const apply = ins.map(p => { const s = `      ${p.name} <= ${fromBits(p, slice(`${N.VIN}(${N.k})`, p, at, NIN))};`; at += p.width; return s; });
     at = 0;
-    const applyIo = ios.map(p => { const s = `      ${p.name} <= ${fromBits(p, slice('VDRV(k)', p, at, NIO))};   -- drive the bus (Z = release it)`; at += p.width; return s; });
+    const applyIo = ios.map(p => { const s = `      ${p.name} <= ${fromBits(p, slice(`${N.VDRV}(${N.k})`, p, at, NIO))};   -- drive the bus (Z = release it)`; at += p.width; return s; });
     // text of the bits of a port / vector variable, one chr() per bit (no sized string variable)
-    const bitsOf = (expr, idx) => idx.map(i => `chr(${expr}(${i}))`).join(' & ');
+    const bitsOf = (expr, idx) => idx.map(i => `${N.chr}(${expr}(${i}))`).join(' & ');
     const span = (hi, lo) => Array.from({ length: hi - lo + 1 }, (_, i) => hi - i);
     const portText = (p) => {
-      if (p.kind === 'sl') return `chr(${p.name})`;
+      if (p.kind === 'sl') return `${N.chr}(${p.name})`;
       if (p.kind === 'int') return bitsOf(`to_unsigned(${p.name}, ${p.width})`, span(p.width - 1, 0));
       const idx = p.desc ? span(p.left, p.right) : Array.from({ length: p.right - p.left + 1 }, (_, i) => p.left + i);
       return bitsOf(p.name, idx);
@@ -260,7 +277,7 @@ export function generateTestbench(opts) {
     const report = (ps) => ps.map(p => `" ${p.name}=" & ${portText(p)}`).join(' & ') || '""';
     const vecText = (v, n) => bitsOf(v, span(n - 1, 0));
     at = 0;
-    const ioText = ios.map(p => { const idx = p.kind === 'sl' ? [NIO - 1 - at] : span(NIO - 1 - at, NIO - p.width - at); at += p.width; return `" ${p.name}:drive=" & ${bitsOf('VDRV(k)', idx)}`; });
+    const ioText = ios.map(p => { const idx = p.kind === 'sl' ? [NIO - 1 - at] : span(NIO - 1 - at, NIO - p.width - at); at += p.width; return `" ${p.name}:drive=" & ${bitsOf(`${N.VDRV}(${N.k})`, idx)}`; });
     const L = [];
     L.push(header('--'), '', 'library ieee;', 'use ieee.std_logic_1164.all;', 'use ieee.numeric_std.all;', '',
       `entity ${name} is`, `end ${name};`, '', `architecture test of ${name} is`, '');
@@ -268,67 +285,67 @@ export function generateTestbench(opts) {
       if (p.dir === 'inout') L.push(`  signal ${p.name} : ${vtype(p)} := ${p.kind === 'sl' ? "'Z'" : "(others => 'Z')"};   -- bidirectional: the bench drives it or releases it ('Z')`);
       else L.push(`  signal ${p.name} : ${vtype(p)}${p.dir === 'in' ? init(p) : ''};`);
     }
-    L.push('', `  constant NV : integer := ${vectors.length};`);
-    if (clock) L.push(`  constant CLK_PERIOD : time := ${period} ns;`);
-    L.push(`  type vin_t is array (0 to NV - 1) of std_logic_vector(${NIN - 1} downto 0);`,
-      `  type vout_t is array (0 to NV - 1) of std_logic_vector(${NOUT - 1} downto 0);`,
+    L.push('', `  constant ${N.NV} : integer := ${vectors.length};`);
+    if (clock) L.push(`  constant ${N.CLK_PERIOD} : time := ${period} ns;`);
+    L.push(`  type ${N.vin_t} is array (0 to ${N.NV} - 1) of std_logic_vector(${NIN - 1} downto 0);`,
+      `  type ${N.vout_t} is array (0 to ${N.NV} - 1) of std_logic_vector(${NOUT - 1} downto 0);`,
       '  -- inputs of each vector' + (ins.length ? `: ${ins.map(p => `${p.name}(${p.width})`).join(' & ')}` : ' (none)'),
-      `  constant VIN : vin_t := (\n${table('VIN', inBits)}\n  );`,
-      ...(ios.length ? [`  type vdrv_t is array (0 to NV - 1) of std_logic_vector(${NIO - 1} downto 0);`,
+      `  constant ${N.VIN} : ${N.vin_t} := (\n${table('VIN', inBits)}\n  );`,
+      ...(ios.length ? [`  type ${N.vdrv_t} is array (0 to ${N.NV} - 1) of std_logic_vector(${NIO - 1} downto 0);`,
         `  -- what the bench drives on the bidirectional port(s) ${ios.map(p => `${p.name}(${p.width})`).join(' & ')}: 'Z' = released (the design may drive it)`,
-        `  constant VDRV : vdrv_t := (\n${table('VDRV', drvBits)}\n  );`] : []),
+        `  constant ${N.VDRV} : ${N.vdrv_t} := (\n${table('VDRV', drvBits)}\n  );`] : []),
       '  -- expected outputs' + (chk.length ? `: ${chk.map(p => `${p.name}(${p.width})`).join(' & ')}` : ' (none)'),
-      `  constant VEXP : vout_t := (\n${table('VEXP', expBits.map(b => b.replace(/-/g, '0')))}\n  );`,
+      `  constant ${N.VEXP} : ${N.vout_t} := (\n${table('VEXP', expBits.map(b => b.replace(/-/g, '0')))}\n  );`,
       "  -- bits checked ('1') of each vector: a '0' bit is not checked",
-      `  constant VMASK : vout_t := (\n${table('VMASK', expBits.map(b => b.replace(/[01]/g, '1').replace(/-/g, '0')))}\n  );`,
-      `  constant ZERO : std_logic_vector(${NOUT - 1} downto 0) := (others => '0');`,
-      '  signal done : boolean := false;', '',
+      `  constant ${N.VMASK} : ${N.vout_t} := (\n${table('VMASK', expBits.map(b => b.replace(/[01]/g, '1').replace(/-/g, '0')))}\n  );`,
+      `  constant ${N.ZERO} : std_logic_vector(${NOUT - 1} downto 0) := (others => '0');`,
+      `  signal ${N.done} : boolean := false;`, '',
       '  -- a bit as a character (VHDL-93 has no to_string)',
-      '  function chr(b : std_logic) return character is',
+      `  function ${N.chr}(b : std_logic) return character is`,
       '  begin',
       "    case b is when '0' => return '0'; when '1' => return '1'; when 'Z' => return 'Z'; when 'U' => return 'U'; when '-' => return '-'; when others => return 'X'; end case;",
       '  end function;',
       '  -- an expected bit as a character: - when it is not checked',
-      '  function ech(e, m : std_logic) return character is',
+      `  function ${N.ech}(e, m : std_logic) return character is`,
       '  begin',
-      "    if m = '1' then return chr(e); else return '-'; end if;",
+      `    if m = '1' then return ${N.chr}(e); else return '-'; end if;`,
       '  end function;',
       '', 'begin', '',
-      `  uut : entity work.${uut.name}${uut.params?.length ? `\n    generic map (${uut.params.map(g => `${g.name} => ${g.value}`).join(', ')})` : ''}`,
+      `  ${N.uut} : entity work.${uut.name}${uut.params?.length ? `\n    generic map (${uut.params.map(g => `${g.name} => ${g.value}`).join(', ')})` : ''}`,
       `    port map (${ports.map(p => `${p.name} => ${p.name}`).join(', ')});`, '');
     if (clock) L.push(`  -- clock ${clock.port}: runs until the end of the test`,
-      '  clk_gen : process', '  begin',
-      '    while not done loop',
-      `      ${clock.port} <= '0'; wait for CLK_PERIOD / 2;`,
-      `      ${clock.port} <= '1'; wait for CLK_PERIOD / 2;`,
+      `  ${N.clk_gen} : process`, '  begin',
+      `    while not ${N.done} loop`,
+      `      ${clock.port} <= '0'; wait for ${N.CLK_PERIOD} / 2;`,
+      `      ${clock.port} <= '1'; wait for ${N.CLK_PERIOD} / 2;`,
       '    end loop;', '    wait;', '  end process;', '');
-    L.push('  stim : process',
-      `    variable got : std_logic_vector(${NOUT - 1} downto 0);`,
-      '    variable errors : integer := 0;',
+    L.push(`  ${N.stim} : process`,
+      `    variable ${N.got} : std_logic_vector(${NOUT - 1} downto 0);`,
+      `    variable ${N.errors} : integer := 0;`,
       '  begin');
     if (reset) {
       const act = reset.active === '0' ? '0' : '1', inact = act === '1' ? '0' : '1';
       L.push(`    -- reset ${reset.port} active for ${reset.cycles || 2} ${clock ? 'clock cycle(s)' : 'x 10 ns'}`,
         `    ${reset.port} <= '${act}';`,
-        clock ? `    for i in 1 to ${reset.cycles || 2} loop wait until falling_edge(${clock.port}); end loop;` : `    wait for ${10 * (reset.cycles || 2)} ns;`,
+        clock ? `    for ${N.i} in 1 to ${reset.cycles || 2} loop wait until falling_edge(${clock.port}); end loop;` : `    wait for ${10 * (reset.cycles || 2)} ns;`,
         `    ${reset.port} <= '${inact}';`);
     } else if (clock && !startAtZero) L.push(`    wait until falling_edge(${clock.port});`);
-    L.push('    for k in 0 to NV - 1 loop', ...apply, ...applyIo,
+    L.push(`    for ${N.k} in 0 to ${N.NV} - 1 loop`, ...apply, ...applyIo,
       clock ? `      wait until falling_edge(${clock.port});` : `      wait for ${settle} ns;`,
       // (one std_logic checked: an aggregate, a std_logic is not a vector)
-      `      got := ${chk.length === 1 && chk[0].kind === 'sl' ? `(0 => ${chk[0].name})` : chk.length ? chk.map(toBits).join(' & ') : '"-"'};`);
-    if (trace) L.push(`      report "@TB " & integer'image(k) & " " & ${vecText('got', NOUT)};`);
-    L.push('      if ((got xor VEXP(k)) and VMASK(k)) /= ZERO then',
-      '        errors := errors + 1;',
-      `        report "vector " & integer'image(k) & ":" & ${[report(ins), ...ioText].join(' & ')} & " -> expected " & ${span(NOUT - 1, 0).map(i => `ech(VEXP(k)(${i}), VMASK(k)(${i}))`).join(' & ')} & ", got " & ${vecText('got', NOUT)} severity error;`,
+      `      ${N.got} := ${chk.length === 1 && chk[0].kind === 'sl' ? `(0 => ${chk[0].name})` : chk.length ? chk.map(toBits).join(' & ') : '"-"'};`);
+    if (trace) L.push(`      report "@TB " & integer'image(${N.k}) & " " & ${vecText(N.got, NOUT)};`);
+    L.push(`      if ((${N.got} xor ${N.VEXP}(${N.k})) and ${N.VMASK}(${N.k})) /= ${N.ZERO} then`,
+      `        ${N.errors} := ${N.errors} + 1;`,
+      `        report "vector " & integer'image(${N.k}) & ":" & ${[report(ins), ...ioText].join(' & ')} & " -> expected " & ${span(NOUT - 1, 0).map(i => `${N.ech}(${N.VEXP}(${N.k})(${i}), ${N.VMASK}(${N.k})(${i}))`).join(' & ')} & ", got " & ${vecText(N.got, NOUT)} severity error;`,
       '      end if;',
       '    end loop;',
-      '    if errors = 0 then',
-      `      report "TEST PASSED: " & integer'image(NV) & " vector(s)${checked ? '' : ' (no expected values)'}" severity note;`,
+      `    if ${N.errors} = 0 then`,
+      `      report "TEST PASSED: " & integer'image(${N.NV}) & " vector(s)${checked ? '' : ' (no expected values)'}" severity note;`,
       '    else',
-      '      report "TEST FAILED: " & integer\'image(errors) & " of " & integer\'image(NV) & " vector(s) wrong" severity error;',
+      `      report "TEST FAILED: " & integer'image(${N.errors}) & " of " & integer'image(${N.NV}) & " vector(s) wrong" severity error;`,
       '    end if;',
-      '    done <= true;',
+      `    ${N.done} <= true;`,
       '    wait;',
       '  end process;', '', 'end test;', '');
     return L.join('\n');
@@ -336,16 +353,17 @@ export function generateTestbench(opts) {
 
   // ---------------------------------------------------------------- Verilog
   function verilogTb() {
+    const N = ownNames(ports, 'verilog', ['NV', 'CLK_PERIOD', 'vin', 'vdrv', 'cur_drv', 'vexp', 'vmask', 'cur_in', 'got', 'k', 'errors', 'uut']);
     const decl = (p) => `${p.kind === 'signed' ? ' signed' : ''}${p.bus || p.width > 1 ? ` [${p.left ?? p.width - 1}:${p.right ?? 0}]` : ''}`;
     const vlit = (b) => `${b.length}'b${b.replace(/-/g, 'x').toLowerCase()}`;
     const mask = (b) => `${b.length}'b${b.replace(/[01]/g, '1').replace(/-/g, '0')}`;
     let at = 0;
-    const apply = ins.map(p => { const hi = NIN - 1 - at, lo = NIN - p.width - at; at += p.width; return `      ${p.name} = cur_in[${hi}${p.width > 1 || p.bus ? `:${lo}` : ''}];`; });
-    const taken = new Set(ports.map(p => p.name));
+    const apply = ins.map(p => { const hi = NIN - 1 - at, lo = NIN - p.width - at; at += p.width; return `      ${p.name} = ${N.cur_in}[${hi}${p.width > 1 || p.bus ? `:${lo}` : ''}];`; });
+    const taken = new Set([...ports.map(p => p.name), ...Object.values(N)]);
     const drvName = p => { let n = `${p.name}_drv`; while (taken.has(n)) n += '_'; taken.add(n); return n; };
     const drv = new Map(ios.map(p => [p.name, drvName(p)]));
     at = 0;
-    const applyIo = ios.map(p => { const hi = NIO - 1 - at, lo = NIO - p.width - at; at += p.width; return `      ${drv.get(p.name)} = cur_drv[${hi}${p.width > 1 || p.bus ? `:${lo}` : ''}];   // drive the bus (z = release it)`; });
+    const applyIo = ios.map(p => { const hi = NIO - 1 - at, lo = NIO - p.width - at; at += p.width; return `      ${drv.get(p.name)} = ${N.cur_drv}[${hi}${p.width > 1 || p.bus ? `:${lo}` : ''}];   // drive the bus (z = release it)`; });
     const fmt = ins.map(p => ` ${p.name}=%b`).join('') + ios.map(p => ` ${p.name}:drive=%b`).join('');
     const L = [];
     L.push(header('//'), '', '`timescale 1ns / 1ps', '', `module ${name};`, '');
@@ -356,18 +374,18 @@ export function generateTestbench(opts) {
           `  reg${decl(p)} ${drv.get(p.name)} = ${p.width}'bz;`, `  wire${decl(p)} ${p.name};`, `  assign ${p.name} = ${drv.get(p.name)};`);
       } else L.push(`  wire${decl(p)} ${p.name};`);
     }
-    L.push('', `  localparam NV = ${vectors.length};`);
-    if (clock) L.push(`  localparam CLK_PERIOD = ${period};`);
-    L.push(`  reg [${NIN - 1}:0] vin [0:NV-1];    // inputs${ins.length ? `: {${ins.map(p => p.name).join(', ')}}` : ' (none)'}`,
-      ...(ios.length ? [`  reg [${NIO - 1}:0] vdrv [0:NV-1];   // driven on {${ios.map(p => p.name).join(', ')}}, z = released`, `  reg [${NIO - 1}:0] cur_drv;`] : []),
-      `  reg [${NOUT - 1}:0] vexp [0:NV-1];   // expected outputs${chk.length ? `: {${chk.map(p => p.name).join(', ')}}` : ' (none)'}, x = not checked`,
-      `  reg [${NOUT - 1}:0] vmask [0:NV-1];  // 1 = bit checked`,
-      `  reg [${NIN - 1}:0] cur_in;`, `  reg [${NOUT - 1}:0] got;`, '  integer k, errors;', '',
-      `  ${uut.name}${uut.params?.length ? ` #(${uut.params.map(g => `.${g.name}(${g.value})`).join(', ')})` : ''} uut (${ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, '');
-    if (clock) L.push(`  always #(CLK_PERIOD / 2) ${clock.port} = ~${clock.port};`, '');
+    L.push('', `  localparam ${N.NV} = ${vectors.length};`);
+    if (clock) L.push(`  localparam ${N.CLK_PERIOD} = ${period};`);
+    L.push(`  reg [${NIN - 1}:0] ${N.vin} [0:${N.NV}-1];    // inputs${ins.length ? `: {${ins.map(p => p.name).join(', ')}}` : ' (none)'}`,
+      ...(ios.length ? [`  reg [${NIO - 1}:0] ${N.vdrv} [0:${N.NV}-1];   // driven on {${ios.map(p => p.name).join(', ')}}, z = released`, `  reg [${NIO - 1}:0] ${N.cur_drv};`] : []),
+      `  reg [${NOUT - 1}:0] ${N.vexp} [0:${N.NV}-1];   // expected outputs${chk.length ? `: {${chk.map(p => p.name).join(', ')}}` : ' (none)'}, x = not checked`,
+      `  reg [${NOUT - 1}:0] ${N.vmask} [0:${N.NV}-1];  // 1 = bit checked`,
+      `  reg [${NIN - 1}:0] ${N.cur_in};`, `  reg [${NOUT - 1}:0] ${N.got};`, `  integer ${N.k}, ${N.errors};`, '',
+      `  ${uut.name}${uut.params?.length ? ` #(${uut.params.map(g => `.${g.name}(${g.value})`).join(', ')})` : ''} ${N.uut} (${ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, '');
+    if (clock) L.push(`  always #(${N.CLK_PERIOD} / 2) ${clock.port} = ~${clock.port};`, '');
     L.push('  initial begin');
-    vectors.forEach((_, k) => L.push(`    vin[${k}] = ${vlit(inBits[k])};${ios.length ? ` vdrv[${k}] = ${drvBits[k].length}'b${drvBits[k].toLowerCase()};` : ''} vexp[${k}] = ${vlit(expBits[k])}; vmask[${k}] = ${mask(expBits[k])};`));
-    L.push('  end', '', '  initial begin', '    errors = 0;');
+    vectors.forEach((_, k) => L.push(`    ${N.vin}[${k}] = ${vlit(inBits[k])};${ios.length ? ` ${N.vdrv}[${k}] = ${drvBits[k].length}'b${drvBits[k].toLowerCase()};` : ''} ${N.vexp}[${k}] = ${vlit(expBits[k])}; ${N.vmask}[${k}] = ${mask(expBits[k])};`));
+    L.push('  end', '', '  initial begin', `    ${N.errors} = 0;`);
     if (reset) {
       const act = reset.active === '0' ? 0 : 1;
       L.push(`    // reset ${reset.port} active for ${reset.cycles || 2} ${clock ? 'clock cycle(s)' : 'x 10 ns'}`,
@@ -375,18 +393,18 @@ export function generateTestbench(opts) {
         clock ? `    repeat (${reset.cycles || 2}) @(negedge ${clock.port});` : `    #${10 * (reset.cycles || 2)};`,
         `    ${reset.port} = ${1 - act};`);
     } else if (clock && !startAtZero) L.push(`    @(negedge ${clock.port});`);
-    L.push('    for (k = 0; k < NV; k = k + 1) begin',
-      '      cur_in = vin[k];', ...apply, ...(ios.length ? ['      cur_drv = vdrv[k];', ...applyIo] : []),
+    L.push(`    for (${N.k} = 0; ${N.k} < ${N.NV}; ${N.k} = ${N.k} + 1) begin`,
+      `      ${N.cur_in} = ${N.vin}[${N.k}];`, ...apply, ...(ios.length ? [`      ${N.cur_drv} = ${N.vdrv}[${N.k}];`, ...applyIo] : []),
       clock ? `      @(negedge ${clock.port});` : `      #${settle};`,
-      `      got = ${chk.length ? `{${chk.map(p => p.name).join(', ')}}` : "1'b0"};`);
-    if (trace) L.push('      $display("@TB %0d %b", k, got);');
-    L.push('      if (((got ^ vexp[k]) & vmask[k]) !== 0) begin',
-      '        errors = errors + 1;',
-      `        $display("vector %0d:${fmt} -> expected %b, got %b", k${ins.map(p => `, ${p.name}`).join('')}${ios.map(p => `, ${drv.get(p.name)}`).join('')}, vexp[k], got);`,
+      `      ${N.got} = ${chk.length ? `{${chk.map(p => p.name).join(', ')}}` : "1'b0"};`);
+    if (trace) L.push(`      $display("@TB %0d %b", ${N.k}, ${N.got});`);
+    L.push(`      if (((${N.got} ^ ${N.vexp}[${N.k}]) & ${N.vmask}[${N.k}]) !== 0) begin`,
+      `        ${N.errors} = ${N.errors} + 1;`,
+      `        $display("vector %0d:${fmt} -> expected %b, got %b", ${N.k}${ins.map(p => `, ${p.name}`).join('')}${ios.map(p => `, ${drv.get(p.name)}`).join('')}, ${N.vexp}[${N.k}], ${N.got});`,
       '      end',
       '    end',
-      `    if (errors == 0) $display("TEST PASSED: %0d vector(s)${checked ? '' : ' (no expected values)'}", NV);`,
-      '    else $display("TEST FAILED: %0d of %0d vector(s) wrong", errors, NV);',
+      `    if (${N.errors} == 0) $display("TEST PASSED: %0d vector(s)${checked ? '' : ' (no expected values)'}", ${N.NV});`,
+      `    else $display("TEST FAILED: %0d of %0d vector(s) wrong", ${N.errors}, ${N.NV});`,
       '    $finish;',
       '  end', '', 'endmodule', '');
     return L.join('\n');
@@ -434,6 +452,7 @@ export function generateSkeleton(opts) {
   const settle = Math.max(1, Math.round(settleNs || 10));
   const cyc = reset?.cycles || 2;
   const ex = ins[0], exOut = outs[0];
+  const N = ownNames(ports, lang === 'verilog' ? 'verilog' : 'vhdl', ['CLK_PERIOD', 'done', 'uut', 'clk_gen', 'stim', 'i']);
   if (lang === 'verilog') {
     const decl = (p) => `${p.kind === 'signed' ? ' signed' : ''}${p.bus || p.width > 1 ? ` [${p.left ?? p.width - 1}:${p.right ?? 0}]` : ''}`;
     const lit = (p, v) => `${p.width}'d${v}`;
@@ -443,7 +462,7 @@ export function generateSkeleton(opts) {
       '', '`timescale 1ns / 1ps', '', `module ${name};`, '',
       ...ports.map(p => (p.dir === 'in' ? `  reg${decl(p)} ${p.name} = 0;` : p.dir === 'inout' ? `  wire${decl(p)} ${p.name};\n  reg${decl(p)} ${p.name}_drv = ${p.width}'bz;   // what the bench drives on ${p.name} (z = released)\n  assign ${p.name} = ${p.name}_drv;` : `  wire${decl(p)} ${p.name};`)),
       '',
-      `  ${uut.name}${uut.params?.length ? ` #(${uut.params.map(g => `.${g.name}(${g.value})`).join(', ')})` : ''} uut (${ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, '',
+      `  ${uut.name}${uut.params?.length ? ` #(${uut.params.map(g => `.${g.name}(${g.value})`).join(', ')})` : ''} ${N.uut} (${ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, '',
       ...(clock ? [`  // clock ${clock.port}: ${period} ns`, `  always #(${period} / 2) ${clock.port} = ~${clock.port};`, ''] : []),
       '  initial begin',
       ...(reset ? [`    // reset ${reset.port} active for ${cyc} ${clock ? 'clock cycle(s)' : 'x 10 ns'}`, `    ${reset.port} = ${reset.active === '0' ? 0 : 1};`,
@@ -471,24 +490,24 @@ export function generateSkeleton(opts) {
     '', 'library ieee;', 'use ieee.std_logic_1164.all;', 'use ieee.numeric_std.all;', '',
     `entity ${name} is`, `end ${name};`, '', `architecture test of ${name} is`, '',
     ...ports.map(p => `  signal ${p.name} : ${vtype(p)}${init(p)};${p.dir === 'inout' ? "   -- bidirectional: drive it or release it ('Z')" : ''}`),
-    ...(clock ? [`  constant CLK_PERIOD : time := ${period} ns;`, '  signal done : boolean := false;'] : []),
+    ...(clock ? [`  constant ${N.CLK_PERIOD} : time := ${period} ns;`, `  signal ${N.done} : boolean := false;`] : []),
     '', 'begin', '',
-    `  uut : entity work.${uut.name}${uut.params?.length ? `\n    generic map (${uut.params.map(g => `${g.name} => ${g.value}`).join(', ')})` : ''}`,
+    `  ${N.uut} : entity work.${uut.name}${uut.params?.length ? `\n    generic map (${uut.params.map(g => `${g.name} => ${g.value}`).join(', ')})` : ''}`,
     `    port map (${ports.map(p => `${p.name} => ${p.name}`).join(', ')});`, '',
-    ...(clock ? [`  -- clock ${clock.port}: runs until the stimulus ends`, '  clk_gen : process', '  begin', '    while not done loop',
-      `      ${clock.port} <= '0'; wait for CLK_PERIOD / 2;`, `      ${clock.port} <= '1'; wait for CLK_PERIOD / 2;`, '    end loop;', '    wait;', '  end process;', ''] : []),
-    '  stim : process', '  begin',
+    ...(clock ? [`  -- clock ${clock.port}: runs until the stimulus ends`, `  ${N.clk_gen} : process`, '  begin', `    while not ${N.done} loop`,
+      `      ${clock.port} <= '0'; wait for ${N.CLK_PERIOD} / 2;`, `      ${clock.port} <= '1'; wait for ${N.CLK_PERIOD} / 2;`, '    end loop;', '    wait;', '  end process;', ''] : []),
+    `  ${N.stim} : process`, '  begin',
     ...(reset ? [`    -- reset ${reset.port} active for ${cyc} ${clock ? 'clock cycle(s)' : 'x 10 ns'}`, `    ${reset.port} <= '${reset.active === '0' ? '0' : '1'}';`,
-      clock ? `    for i in 1 to ${cyc} loop wait until falling_edge(${clock.port}); end loop;` : `    wait for ${10 * cyc} ns;`, `    ${reset.port} <= '${reset.active === '0' ? '1' : '0'}';`] : []),
+      clock ? `    for ${N.i} in 1 to ${cyc} loop wait until falling_edge(${clock.port}); end loop;` : `    wait for ${10 * cyc} ns;`, `    ${reset.port} <= '${reset.active === '0' ? '1' : '0'}';`] : []),
     '',
     '    -- ---- stimulus: set the inputs, wait, check the outputs. For example:',
     ...(ex ? [`    -- ${ex.name} <= ${val(ex, 1)};`, `    -- ${wait}`] : [`    -- ${wait}`]),
     ...(exOut ? [`    -- assert ${exOut.name} = ${val(exOut, 0)} report "${exOut.name} is wrong" severity error;`] : []),
     ...(ios.length ? [`    -- ${ios[0].name} <= ${val(ios[0], 5)};   -- the bench drives ${ios[0].name}; ${ios[0].kind === 'sl' ? "'Z'" : "(others => 'Z')"} releases it`] : []),
     '',
-    `    wait for ${clock ? `CLK_PERIOD * 20` : `${settle * 20} ns`};`,
+    `    wait for ${clock ? `${N.CLK_PERIOD} * 20` : `${settle * 20} ns`};`,
     '    report "Simulation finished" severity note;',
-    ...(clock ? ['    done <= true;'] : []),
+    ...(clock ? [`    ${N.done} <= true;`] : []),
     '    wait;', '  end process;', '', 'end test;', '',
   ];
   return L.join('\n');
