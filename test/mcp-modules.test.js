@@ -12,6 +12,7 @@ const { PROJECT_TOOLS } = await import('../server/mcp-projects.js');
 const { SETTINGS_TOOLS } = await import('../server/mcp-settings.js');
 const { NEW_SOURCE_TOOLS } = await import('../server/mcp-new-source.js');
 const { WIZARD_TOOLS } = await import('../server/mcp-wizards.js');
+const { TEST_BENCH_TOOLS } = await import('../server/mcp-test-bench.js');
 const { SOURCE_TOOLS } = await import('../server/mcp-sources.js');
 const { TRANSFER_TOOLS } = await import('../server/mcp-transfer.js');
 const { HDL_TOOLS } = await import('../server/mcp-hdl.js');
@@ -30,12 +31,13 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(PROJECT_TOOLS), ['list_examples', 'list_projects', 'new_project_from_example', 'new_project', 'set_top', 'project_info', 'read_file', 'write_file']);
   assert.deepEqual(names(SETTINGS_TOOLS), ['list_devices', 'set_design_properties', 'set_process_properties', 'set_source_properties']);
   assert.deepEqual(names(NEW_SOURCE_TOOLS), ['new_source']);
-  assert.deepEqual(names(WIZARD_TOOLS), ['clock_manager', 'block_memory']);
+  assert.deepEqual(names(WIZARD_TOOLS), ['clock_manager', 'block_memory', 'constraints_wizard']);
+  assert.deepEqual(names(TEST_BENCH_TOOLS), ['test_bench_wizard']);
   assert.deepEqual(names(SOURCE_TOOLS), ['unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project']);
   assert.deepEqual(names(TRANSFER_TOOLS), ['export_project', 'import_project']);
   assert.deepEqual(names(HDL_TOOLS), ['check_syntax', 'simulate']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS]);
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...HDL_TOOLS, ...PROCESS_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);
