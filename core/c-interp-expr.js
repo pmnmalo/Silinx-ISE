@@ -148,8 +148,12 @@ export const exprMethods = {
         return num(e.op === '-' ? -v : e.op === '~' ? ~v : v, t);
       }
       // (*s of a reference to a stream: the stream, #1721)
-      case '*': { const p = this.eval(e.e); if (p.fifo) return p; if (!p.ptr) this.fail(e, "'*' of something that is not a pointer"); return p.ptr.get(); }
-      case '&': return { ptr: this.lvalue(e.e), t: this.lvalue(e.e).t };
+      case '*': { const p = this.eval(e.e); if (p.fifo) return p; if (!p.ptr) this.fail(e, "'*' of something that is not a pointer"); return this.target(p, e).get(); }
+      case '&': {
+        // (&a[k], &p[k]: a + k, one past the end too, #2655)
+        if (e.e.kind === 'index') { const b = this.eval(e.e.e); if (b.ptr || b.str !== undefined || (b.arr && !(b.dims?.length > 1))) return this.pointerArith('+', b, this.eval(e.e.i), e); }
+        return { ptr: this.lvalue(e.e), t: this.lvalue(e.e).t };
+      }
       case '++': case '--': {
         const ref = this.lvalue(e.e);
         ref.set(this.arith(e.op === '++' ? '+' : '-', ref.get(), num(1n, INT), e));
@@ -163,6 +167,7 @@ export const exprMethods = {
     if (e.op === '&&') return num(this.truth(this.eval(e.l)) && this.truth(this.eval(e.r)) ? 1n : 0n, INT);
     if (e.op === '||') return num(this.truth(this.eval(e.l)) || this.truth(this.eval(e.r)) ? 1n : 0n, INT);
     const l = this.eval(e.l), r = this.eval(e.r);
+    if (CMP[e.op] && (l.ptr || r.ptr || l.arr || r.arr)) return num(this.comparePointers(e.op, l, r, e) ? 1n : 0n, INT);
     if (CMP[e.op] && (l.t?.fl || r.t?.fl)) return num(CMP[e.op](this.numOf(l, e), this.numOf(r, e)) ? 1n : 0n, INT);
     if (CMP[e.op] && (l.t?.fx || r.t?.fx)) return num(fixedCompare(e.op, l, r) ? 1n : 0n, INT);
     if (CMP[e.op]) {
@@ -173,6 +178,7 @@ export const exprMethods = {
   },
   /** l op r with C's / ap_int's arithmetic: + - * / % & | ^ << >> */
   arith(op, l, r, e) {
+    if (l.ptr || r.ptr || l.arr || r.arr || l.str !== undefined || r.str !== undefined) return this.pointerArith(op, l, r, e);
     if (l.t?.fl || r.t?.fl) {
       // (floating point: in double, or float when neither is a double)
       const t = floatOf(l.t.fl ? l.t : {}, r.t.fl ? r.t : {});
@@ -258,10 +264,12 @@ export const exprMethods = {
       const c = this.lookup(e.name, e);
       if (c.arr) this.fail(e, `'${e.name}' is an array: give an index`);
       if (c.isFile) return { get: () => ({ fh: c.fh, v: c.fh ? 1n : 0n, t: c.t }), set: (x) => { c.fh = x.fh ?? null; }, t: c.t };
+      // (an array parameter, a pointer: set, it points elsewhere, p = a + 1, p++, #2655)
+      if (c.arr && c.pointer) return { get: () => ({ ptr: this.elemRef(c.arr, 0, c.t), t: c.t }), set: (x) => { if (!x.ptr) this.fail(e, `'${e.name}' is a pointer`); delete c.arr; delete c.dims; c.ref = x.ptr; }, t: c.t };
       if (c.ref) return { get: () => ({ ptr: c.ref, t: c.t }), set: (x) => { if (!x.ptr) this.fail(e, `'${e.name}' is a pointer`); c.ref = x.ptr; }, t: c.t };
-      return { get: () => ({ v: c.v, t: c.t }), set: (x) => { c.v = this.as(x, c.t, e); }, t: c.t };
+      return { get: () => ({ v: c.v, t: c.t }), set: (x) => { c.v = this.as(x, c.t, e); }, t: c.t, cell: c };
     }
-    if (e.kind === 'unary' && e.op === '*') { const p = this.eval(e.e); if (!p.ptr) this.fail(e, "'*' of something that is not a pointer"); return p.ptr; }
+    if (e.kind === 'unary' && e.op === '*') { const p = this.eval(e.e); if (!p.ptr) this.fail(e, "'*' of something that is not a pointer"); return this.target(p, e); }
     if (e.kind === 'index') return this.indexRef(e);
     // x.range(hi, lo) = v: those bits of x
     if (e.kind === 'call' && e.callee.kind === 'member' && e.callee.name === 'range' && e.args.length === 2) {
@@ -290,7 +298,8 @@ export const exprMethods = {
         return { get: () => ({ v: cell.v, t }), set: (x) => { cell.v = this.as(x, t, e); }, t, cell, arr: outer.flat ?? outer.arr, index: (outer.off ?? 0) + at };
       }
     }
-    const base = this.eval(e.e);
+    let base = this.eval(e.e);
+    if (base.str !== undefined) base = this.strPtr(base.str);   // ("abc"[k], #2655)
     const i = Number(this.intOf(this.eval(e.i), e));
     if (base.arr && base.dims?.length > 1) {
       const stride = base.dims.slice(1).reduce((a, b) => a * b, 1);
@@ -309,6 +318,8 @@ export const exprMethods = {
       if (base.ptr.arr) {
         const k = base.ptr.index + i;
         if (k < 0 || k >= base.ptr.arr.length) this.fail(e, `the index ${i} is outside the array the pointer points into`);
+        // (an array of const char *'s too: its cells pointers, #2655)
+        if (base.ptr.t?.text) return this.elemRef(base.ptr.arr, k, base.ptr.t);
         const cell = base.ptr.arr[k];
         return { get: () => ({ v: cell.v, t: base.t }), set: (x) => { cell.v = this.as(x, base.t, e); }, t: base.t, cell, arr: base.ptr.arr, index: k };
       }
@@ -329,6 +340,50 @@ export const exprMethods = {
       },
       t: BOOL,
     };
+  },
+  /** x as a pointer (#2655): a pointer's place; an array's first element (a row's, in the whole array: m[1] + 2); a
+   *  string literal's first char; else null. */
+  pointerOf(x, e) {
+    if (x.ptr) return x.ptr;
+    if (x.str !== undefined) return this.strPtr(x.str).ptr;
+    if (!x.arr) return null;
+    if (x.dims?.length > 1) this.fail(e, 'a pointer to a row of an array of arrays (m + i) cannot be simulated: give the row, m[i] + j');
+    return this.elemRef(x.flat ?? x.arr, x.off ?? 0, x.t);
+  },
+  /** l op r of a pointer and an integer (p + k, k + p, p - k: the element k away, in its array or one past its end, as
+   *  C allows) or of two pointers into one array (p - q: how many elements apart, a ptrdiff_t), #2655. */
+  pointerArith(op, l, r, e) {
+    const p = this.pointerOf(l, e), q = this.pointerOf(r, e);
+    if (op === '-' && p && q) {
+      if (!p.arr || p.arr !== q.arr) this.fail(e, 'the difference of pointers into different arrays is undefined in C');
+      return num(BigInt(p.index - q.index), { w: 64, s: true, ap: false });
+    }
+    if (!(op === '+' || op === '-') || (p && q) || (op === '-' && !p)) this.fail(e, `the operator '${op}' of ${p && q ? 'two pointers' : 'a pointer'}`);
+    const at = p || q, t = (p ? l : r).t;
+    const k = Number(this.intOf(p ? r : l, e)) * (op === '-' ? -1 : 1);
+    if (!k) return { ptr: at, t };
+    if (!at.arr) this.fail(e, 'a pointer to one value moved: the C simulation follows pointers into arrays');
+    const i = at.index + k;
+    if (i < 0 || i > at.arr.length) this.fail(e, `the pointer moves outside its array (to the element ${i} of 0 to ${at.arr.length - 1})`);
+    return { ptr: this.elemRef(at.arr, i, at.t), t };
+  },
+  /** p op q of pointers (into one array: their places compared; ==, != of any two, of a pointer and 0, NULL), #2655. */
+  comparePointers(op, l, r, e) {
+    const p = this.pointerOf(l, e), q = this.pointerOf(r, e);
+    if (!p || !q) {
+      if (this.intOf(p ? r : l, e) !== 0n || (op !== '==' && op !== '!=')) this.fail(e, `a pointer ${op} an integer`);
+      return op === '!=';   // (a pointer is never NULL here)
+    }
+    const same = p.arr ? p.arr === q.arr : p === q || (p.cell && p.cell === q.cell);
+    if (same && p.arr) return CMP[op](p.index, q.index);
+    if (op === '==' || op === '!=') return (op === '==') === same;
+    this.fail(e, `pointers into different arrays compared ('${op}' is undefined in C)`);
+    return false;
+  },
+  /** The place pointer p points to, read or written: refused outside its array (one past its end, #2655). */
+  target(p, e) {
+    if (p.ptr.arr && !(p.ptr.index >= 0 && p.ptr.index < p.ptr.arr.length)) this.fail(e, `the pointer points outside its array (to the element ${p.ptr.index} of 0 to ${p.ptr.arr.length - 1})`);
+    return p.ptr;
   },
   /** printf's formatting: %[flags][width][.precision][length]conversion (d i u x X o c s p %). */
   format(fmt, args, e, fh = null) {
