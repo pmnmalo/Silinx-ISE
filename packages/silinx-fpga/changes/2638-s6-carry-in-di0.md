@@ -8,4 +8,5 @@ In detail:
   (`s6/pack.js`, `s6/phys.js`, `s6/xdl.js`). The warning remains only when O5 is taken or the S LUT leaves no input.
   ISE accepts the result: the adder's placed XDL through `par -k` and its routed XDL through `drc`, with no error or
   warning; micro80 on the Nexys3 and the Atlys packs with no warning and `par -k` routes it completely. Its DRC errors
-  left are the RAM32M's (#2639). Tests: test/s6-pack.test.js, test/s6-xdl.test.js.
+  left are the RAM32M's (#2639), and the open flow's bitgen refuses its two block RAMs (#2679), which
+  test/examples.test.js now expects instead of the refusal at AX. Tests: test/s6-pack.test.js, test/s6-xdl.test.js, test/examples.test.js.

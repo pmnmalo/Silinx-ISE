@@ -27,7 +27,7 @@ export const S3E_TARGETS = [
 export const S6_TARGETS = [{ board: 'nexys3' }, { board: 'atlys' }];
 export const TARGETS = [...S3E_TARGETS, ...S6_TARGETS];
 // the examples the Spartan-6 builds: micro80's processor not yet, the post-synthesis model of its distributed RAM
-// (#2639; its ALU's carry chain packs since #2638)
+// (#2639) and the bitstream of its two block RAMs (#2679; its ALU's carry chain packs since #2638)
 export const S6_EXAMPLES = EXAMPLES.filter(n => n !== 'micro80');
 export const targetsOf = name => (S6_EXAMPLES.includes(name) ? TARGETS : S3E_TARGETS);
 // the iCE40's board (#2517): the examples on the iCEBreaker, the display and the switches on its Pmods; vga on its
