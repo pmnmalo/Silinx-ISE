@@ -7,23 +7,25 @@ import { prefKey } from './prefs.js';
 import { foldChevron } from './sch-panels.js';
 
 /** The side panel `side` of the editor `root` foldable, its title (.asm-cap) first; `key`: its preference; `titles`: its
- *  button's tips (another panel's name: I/O Pin Planning's Board Resources, #2671). */
-export function mountSideFold({ root, side, key, titles = { fold: 'Collapse the Properties panel', unfold: 'Expand the Properties panel' } }) {
+ *  button's tips (another panel's name: I/O Pin Planning's Board Resources, #2671); `cls`: the class of `root` folded,
+ *  `toward`: the side it folds to (I/O Pin Planning's Ports, on the left, #2715). */
+export function mountSideFold({ root, side, key, titles = { fold: 'Collapse the Properties panel', unfold: 'Expand the Properties panel' }, cls = 'props-folded', toward = 'right' }) {
+  const away = toward === 'left' ? 'right' : 'left';
   const cap = side.querySelector('.asm-cap');
   const b = h('button', { type: 'button', class: 'asm-fold', 'data-fold': 'props' });
   cap.append(h('span', { class: 'sp' }), b);
   function setFolded(folded, remember = true) {
-    root.classList.toggle('props-folded', folded);
+    root.classList.toggle(cls, folded);
     const title = folded ? titles.unfold : titles.fold;
     b.title = title; b.setAttribute('aria-label', title); b.setAttribute('aria-expanded', String(!folded));
-    b.innerHTML = foldChevron(folded ? 'left' : 'right');
+    b.innerHTML = foldChevron(folded ? away : toward);
     if (remember) try { localStorage.setItem(prefKey(key), folded ? '1' : '0'); } catch { /* storage unavailable */ }
     dispatchEvent(new Event('resize'));
   }
   // folded: a click anywhere on the strip expands it
   side.addEventListener('click', (e) => {
-    if (e.target.closest('.asm-fold')) setFolded(!root.classList.contains('props-folded'));
-    else if (root.classList.contains('props-folded')) setFolded(false);
+    if (e.target.closest('.asm-fold')) setFolded(!root.classList.contains(cls));
+    else if (root.classList.contains(cls)) setFolded(false);
   });
   let folded = false;
   try { folded = localStorage.getItem(prefKey(key)) === '1'; } catch { /* default */ }

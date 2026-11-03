@@ -11,7 +11,7 @@ In detail:
   it, dragged with the mouse or a finger. A bus spreads over the row from the part dropped on (moved back to fit
   it); on a digit of the 7-segment display, 7 bits take the segments CA..CG (8 with DP), as many bits as anodes the
   anodes, one bit the digit's anode; the resources the drawing has no part for (clocks, VGA, PS/2, the serial port,
-  the Pmods, the segments) are chips under it. A part shows the bit placed on it; a part another port has is taken
-  from it; a port dropped again moves. Warned, under the board and in the console: an output on an input of the
+  the Pmods) take a drop on their rows in Board Resources (#2715). A part shows the bit placed on it; a part another port has is taken
+  from it; a port dropped again moves. Warned in the console: an output on an input of the
   board (a switch, a button), an input on an output (an LED), a bus wider than the row (the bits left unplaced).
   Undoable; the table and the UCF the same assignments (core/pin-board.js).

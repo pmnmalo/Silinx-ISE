@@ -105,12 +105,12 @@
 @media (min-width: 1024px) {
   .asm-editor.props-folded .asm-side { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
   .asm-editor.props-folded .asm-side > :not(.asm-cap) { display: none; }
-  .asm-editor.props-folded .asm-cap {
+  .asm-editor.props-folded .asm-side .asm-cap {
     flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px;
     border-bottom: 0; align-items: center; background: var(--asm-panel);
   }
-  .asm-editor.props-folded .asm-cap .sp { display: none; }
-  .asm-editor.props-folded .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+  .asm-editor.props-folded .asm-side .asm-cap .sp { display: none; }
+  .asm-editor.props-folded .asm-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
 }
 @media (max-width: 1023px) { .asm-editor .asm-fold { display: none; } }
 .asm-editor .asm-side {

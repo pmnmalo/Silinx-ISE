@@ -1,9 +1,9 @@
-// I/O Pin Planning on the board (#2694, core/pin-board.js): a port dropped on a part of the Basys2 or the Nexys2 and
-// the pins it takes, against the boards' own resources (server/boards.js) and the UCF written from them.
+// I/O Pin Planning on the board (#2694, #2715, core/pin-board.js): a port, or one bit of a bus, dropped on a part of the Basys2
+// or the Nexys2 and the pins it takes; bits taken off their pins; against the boards' own resources (server/boards.js) and the UCF.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BOARDS } from '../server/boards.js';
-import { portNets, pinLabels, resourceOfPin, digitTarget, boardDrop } from '../core/pin-board.js';
+import { portNets, portBit, pinLabels, resourceOfPin, digitTarget, boardDrop, boardRemove } from '../core/pin-board.js';
 import { generateUcf, parseUcf } from '../packages/silinx-fpga/src/parts.js';
 
 const board = (id) => BOARDS.find((b) => b.id === id);
@@ -114,4 +114,33 @@ test('the drops written to a UCF and read back: the pins of the board (Basys2)',
   const back = parseUcf(text).assignments;
   assert.deepEqual(Object.fromEntries(Object.entries(back).map(([n, a]) => [n, a.loc])),
     { 'sw<0>': 'P11', 'sw<1>': 'L3', 'sw<2>': 'K3', 'sw<3>': 'B4', 'led<0>': 'N5', 'led<1>': 'N4', 'led<2>': 'P4', 'led<3>': 'G1', go: 'A7' });
+});
+
+test('#2715 one bit of a bus dropped alone: that pin only, the other bits kept; dropped again, moved; no clock; a digit its anode', () => {
+  const led = port('led', 'out', 4), bit = portBit(led, 2);
+  assert.deepEqual(bit, { name: 'led<2>', dir: 'out', width: 1, bus: false, net: 'led<2>', bit: 2, of: 'led' });
+  assert.deepEqual(portNets(bit), [{ net: 'led<2>', bit: 2 }]);
+  const asg = { 'led<0>': { loc: 'M5' }, 'led<2>': { loc: 'P4' } };
+  const r = boardDrop({ port: bit, res: res(B2, 'led'), index: 6, assignments: asg });
+  assert.deepEqual(locs(r.changes), { 'led<2>': res(B2, 'led').pins[6] });
+  assert.deepEqual([r.placed, r.notes, r.warnings], [[['led<2>', 'led<6>']], [], []]);
+  // (on the last LED: kept there, not moved back)
+  assert.deepEqual(boardDrop({ port: bit, res: res(B2, 'led'), index: 7 }).placed, [['led<2>', 'led<7>']]);
+  // a pin another bit of the same bus had: taken from it
+  const t = boardDrop({ port: bit, res: res(B2, 'led'), index: 0, assignments: { 'led<0>': { loc: res(B2, 'led').pins[0] } } });
+  assert.deepEqual([locs(t.changes), t.notes], [{ 'led<2>': res(B2, 'led').pins[0], 'led<0>': null }, ['led<0> taken from led<0>']]);
+  // an input bit on the oscillator: no clock period (a bus's bit has none in the table)
+  assert.deepEqual(boardDrop({ port: portBit(port('c', 'in', 2), 0), res: res(B2, 'mclk') }).clocks, []);
+  assert.deepEqual(digitTarget(B2, portBit(port('an', 'out', 4), 1), 2), { res: res(B2, 'an'), index: 2 });
+  // a bit on the board's input: warned with its name
+  assert.deepEqual(boardDrop({ port: bit, res: res(B2, 'sw') }).warnings, ['led<2> is an output: sw is an input of the board']);
+});
+
+test('#2715 boardRemove: the bits taken off their pins, named by the board; a pin off the board; a bit with no pin left out', () => {
+  const asg = { 'led<0>': { loc: 'm5', pull: 'up' }, 'led<1>': { loc: 'Z9' }, 'led<2>': {}, y: { loc: res(B2, 'mclk').pins[0] } };
+  const r = boardRemove({ nets: ['led<0>', 'led<1>', 'led<2>', 'led<3>', 'y'], assignments: asg, board: B2 });
+  assert.deepEqual(r.changes, { 'led<0>': { loc: undefined }, 'led<1>': { loc: undefined }, y: { loc: undefined } });
+  assert.deepEqual(r.removed, [['led<0>', `led<${res(B2, 'led').pins.indexOf('M5')}>`, 'm5'], ['led<1>', 'Z9', 'Z9'], ['y', 'mclk', res(B2, 'mclk').pins[0]]]);
+  assert.deepEqual(boardRemove({ nets: ['y'], assignments: {}, board: B2 }), { changes: {}, removed: [] });
+  assert.deepEqual(boardRemove({ nets: ['y'], assignments: { y: { loc: 'B8' } }, board: null }).removed, [['y', 'B8', 'B8']]);
 });
