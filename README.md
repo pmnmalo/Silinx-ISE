@@ -453,7 +453,8 @@ module and the test bench, as *Set as Top Module*; the constraints from the boar
 Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_info`, `read_file`, `write_file` (a drawing's HDL file made again from it, as its editor does),
 `list_devices` (the boards and devices), `set_design_properties` (the board, the device, the synthesis tool, the Preferred Language, as
 *Design Properties*), `set_source_properties` (a drawing's language), `new_source` (every type of *New Source*: a module with its ports, a test
-bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
+Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
