@@ -3,6 +3,10 @@ export const PETRI_PT = {
   // New Source, menus, processes, hierarchy
   'Petri Net': 'Rede de Petri', 'Petri Net Editor…': 'Editor de Redes de Petri…', 'View/Edit Petri Net': 'Ver/Editar Rede de Petri',
   'Open Petri Net': 'Abrir Rede de Petri',
+  // its state machine (#2696)
+  'View State Machine (FSM)': 'Ver Máquina de Estados (FSM)', 'The state machine of the Petri net: its state space (read-only)': 'A máquina de estados da rede de Petri: o seu espaço de estados (só de leitura)',
+  'Read-only, the state space of the Petri net': 'Só de leitura, o espaço de estados da rede de Petri',
+  'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it': 'Só de leitura · arrastar o fundo para deslocar · roda para ampliar · clicar num estado ou numa transição para o ver',
   // toolbar
   'Place': 'Lugar', 'Transition': 'Transição', 'Arc': 'Arco', 'Inhibitor': 'Inibidor',
   'Analysis and PNML': 'Análise e PNML', 'Fit': 'Ajustar', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',
@@ -65,6 +69,7 @@ export const PETRI_PT = {
   'after nothing (the initial marking)': 'logo de início (a marcação inicial)', 'analysis: a deadlock': 'análise: um bloqueio',
 };
 export const PETRI_PT_PATTERNS = [
+  [/^\((\d+) states?(, the first (\d+): the state space is larger)?\)$/, (m, n, more, max) => `(${n} ${n === '1' ? 'estado' : 'estados'}${more ? `, os primeiros ${max}: o espaço de estados é maior` : ''})`],
   [/^The token game, whatever the inputs \(the guards are not taken into account\): (\d+)(\+?) reachable markings?( \(stopped at (\d+): the results are partial\))?\.$/,
     (m, n, plus, part, max) => `O jogo das marcas, sejam quais forem as entradas (as guardas não são tidas em conta): ${n}${plus} ${n === '1' ? 'marcação alcançável' : 'marcações alcançáveis'}${part ? ` (parou em ${max}: os resultados são parciais)` : ''}.`],
   [/^(\d+)-bounded$/, '$1-limitada'], [/^(\d+) bits$/, '$1 bits'], [/^(\d+) \(reached\)$/, '$1 (atingida)'],

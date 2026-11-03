@@ -170,9 +170,14 @@ export function fire(model, marking, tid) {
  */
 export function clockStep(model, marking, env = {}) {
   const m = normalizePetri(model);
+  return clockStepBy(m, marking, t => guardOk(m, t, env));
+}
+/** The clock step with the guards' values given (`guardTrue(transition)`; m normalized): the state space of the
+ *  controller (core/petri-fsm.js) steps it for each combination of the guards. */
+export function clockStepBy(m, marking, guardTrue) {
   const cur = { ...marking }, add = {}, fired = [];
   for (const t of m.transitions) {
-    if (!guardOk(m, t, env)) continue;
+    if (!guardTrue(t)) continue;
     const pre = preset(m, t.id);
     if (!pre.every(a => (a.inhibitor ? (marking[a.place] || 0) < a.weight : (cur[a.place] || 0) >= a.weight))) continue;
     // the capacities: what is there now, minus what it takes, plus what is put already, plus its own

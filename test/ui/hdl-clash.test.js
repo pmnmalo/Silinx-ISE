@@ -65,7 +65,7 @@ uiTest('#230 regression, a Petri net whose HDL file exists and defines its modul
   assert.deepEqual(await warnings(page), [W_PN]);
   // its menu: Generate HDL File…; No: nothing changes
   await page.treeRow('#hier', 'ctl.pn.json', { right: true, exact: true });
-  assert.deepEqual(await menuLabels(page), ['Open', 'Set as Top Module', 'Rename…', 'Generate HDL File…', 'Remove from Project']);
+  assert.deepEqual(await menuLabels(page), ['Open', 'View State Machine (FSM)', 'Set as Top Module', 'Rename…', 'Generate HDL File…', 'Remove from Project']);
   await page.click('body > .menu-popup .mi', { text: 'Generate HDL File…' });
   await page.waitDialog('Generate HDL File');
   assert.match(await topText(page), /src\/ctl\.vhd defines the module ctl already\.\n\nReplace it with the HDL generated from ctl\.pn\.json\? Its current contents will be lost\./);
@@ -87,7 +87,7 @@ uiTest('#230 regression, a Petri net whose HDL file exists and defines its modul
   assert.deepEqual(await rows(page), [
     'project C_pn',
     '  chip xc3s250e-4-cp132',
-    '    moduleTop ctl [Petri*] [VHDL] (ctl.pn.json)',
+    '    moduleTop ctl [Petri*] [FSM] [VHDL] (ctl.pn.json)',
   ]);
   assert.deepEqual(await warnings(page), [W_PN]);
   // opened again: nothing to say
@@ -138,7 +138,7 @@ uiTest('#230 two drawings of the same module: the second has no HDL file, warned
   assert.deepEqual(await rows(page), [
     'project C_two',
     '  chip xc3s250e-4-cp132',
-    '    moduleTop ctl [Petri*] [VHDL] (ctl.pn.json)',
+    '    moduleTop ctl [Petri*] [FSM] [VHDL] (ctl.pn.json)',
     '    algebra other.tt.json [No HDL!]',
   ]);
   assert.equal(await warnTip(page), 'No HDL file: its module ctl is the module of src/ctl.pn.json. Rename one of them.');
@@ -213,7 +213,7 @@ uiTest('#230 in Portuguese: the [Sem HDL] badge and its tip, Gerar Ficheiro HDL�
       'Sem ficheiro HDL: src/ctl.vhd já define o seu módulo ctl. Gerar Ficheiro HDL… (botão direito) substitui-o pelo HDL gerado a partir do desenho.',
     ]);
     await page.treeRow('#hier', 'ctl.pn.json', { right: true, exact: true });
-    assert.deepEqual(await menuLabels(page), ['Abrir', 'Definir como Módulo de Topo', 'Mudar o Nome…', 'Gerar Ficheiro HDL…', 'Remover do Projeto']);
+    assert.deepEqual(await menuLabels(page), ['Abrir', 'Ver Máquina de Estados (FSM)', 'Definir como Módulo de Topo', 'Mudar o Nome…', 'Gerar Ficheiro HDL…', 'Remover do Projeto']);
     await page.click('body > .menu-popup .mi', { text: 'Gerar Ficheiro HDL…' });
     await page.waitDialog('Gerar Ficheiro HDL');
     assert.match(await topText(page), /src\/ctl\.vhd já define o módulo ctl\.\n\nSubstituí-lo pelo HDL gerado a partir de ctl\.pn\.json\? O conteúdo atual perde-se\./);
@@ -240,7 +240,7 @@ uiTest('#230 in Portuguese: the [Sem HDL] badge and its tip, Gerar Ficheiro HDL�
 // ---- #231: a drawing whose HDL file (generatedFile) is gone: deleted from the folder, or removed from the project
 const LINKED_PN = JSON.stringify({ ...JSON.parse(PN), generatedFile: 'src/ctl.vhd' }, null, 2);
 const CTL_HDL = viewHdl('src/ctl.pn.json', PN).text;
-const LINKED_ROWS = (pj) => [`project ${pj}`, '  chip xc3s250e-4-cp132', '    moduleTop ctl [Petri*] [VHDL] (ctl.pn.json)'];
+const LINKED_ROWS = (pj) => [`project ${pj}`, '  chip xc3s250e-4-cp132', '    moduleTop ctl [Petri*] [FSM] [VHDL] (ctl.pn.json)'];
 const W_RM = 'WARNING: src/ctl.pn.json has no HDL file: its HDL file src/ctl.vhd was removed from the project (it is still in the project folder). Generate HDL File… (its right-click menu in the Design pane) makes it again from src/ctl.pn.json; Add to Project (Files) brings it back as it is.';
 const TIP_RM = 'No HDL file: its HDL file src/ctl.vhd was removed from the project. Generate HDL File… (right-click) makes it again from the drawing.';
 const pjFiles = async (name) => (await env.server.api('GET', `/api/projects/${encodeURIComponent(name)}`)).files.map((f) => f.path);
@@ -312,7 +312,7 @@ uiTest('#231 regression, a Petri net whose HDL file is removed from the project 
   await page.waitFor(() => !!document.querySelector('#hier .badge.warn'), [], { what: 'the [No HDL] badge' });
   assert.deepEqual(await warnings(page), [W_RM]);
   assert.equal(await page.dialogCount(), 0);
-  assert.deepEqual(await rows(page), ['project L_rm', '  chip xc3s250e-4-cp132', '    moduleTop ctl [Petri*] [No HDL!] (ctl.pn.json)']);
+  assert.deepEqual(await rows(page), ['project L_rm', '  chip xc3s250e-4-cp132', '    moduleTop ctl [Petri*] [FSM] [No HDL!] (ctl.pn.json)']);
   assert.equal(await warnTip(page), TIP_RM);
   // nothing written: the file in the folder, out of the project; the net still names it
   assert.equal(await readWs(env, 'L_rm', 'src/ctl.vhd'), CTL_HDL);
@@ -328,7 +328,7 @@ uiTest('#231 regression, a Petri net whose HDL file is removed from the project 
   await page.waitFor(() => !!document.querySelector('#hier .badge.warn'), [], { what: 'the [No HDL] badge' });
   await page.treeRow('#hier', 'ctl', { right: true, exact: true });
   // (ctl the top: Unset as Top Module, #1220)
-  assert.deepEqual(await menuLabels(page), ['Open', 'Unset as Top Module', 'Rename…', 'Generate HDL File…', 'Remove from Project']);
+  assert.deepEqual(await menuLabels(page), ['Open', 'View State Machine (FSM)', 'Unset as Top Module', 'Rename…', 'Generate HDL File…', 'Remove from Project']);
   await page.click('body > .menu-popup .mi', { text: 'Generate HDL File…' });
   await page.waitDialog('Generate HDL File');
   assert.match(await topText(page), /src\/ctl\.vhd, the HDL file of ctl\.pn\.json, was removed from the project\.\n\nMake it again from ctl\.pn\.json and put it back in the project\? Its current contents will be lost\./);

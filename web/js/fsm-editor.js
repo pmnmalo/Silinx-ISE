@@ -2,7 +2,7 @@
 //
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
-//                                          onOpenFile(path), onTruthTables(), onToAsm() });
+//                                          onOpenFile(path), onTruthTables(), onToAsm(), readOnly });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
@@ -12,6 +12,8 @@
 // drag a label to bend its arrow. The bottom panel shows the tables (transition table, state
 // table, encoded table for the binary / gray encodings) and a step-by-step
 // simulation of the diagram (current state highlighted, inputs set by hand, clock steps).
+// readOnly: a diagram to read (a Petri net's state machine, #2696): moved about, zoomed, its states and transitions
+// selected and shown, its tables and its simulation; nothing edited, not validated.
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
 
 import { h, linkModel, linkSnapshot } from './ui.js';
@@ -47,6 +49,15 @@ export const textW = (s) => String(s).length * CHW;
 export function radiusOf(s) {
   const outs = formatOutputs(s.outputs);
   return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, Math.ceil(textW(outs) / 2) + 10);
+}
+
+// (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion and the problems hidden,
+// with their separators)
+function readOnlyChrome({ root, toolbar, hint, probSection }) {
+  root.classList.add('asm-readonly');
+  const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-type'));
+  for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling, probSection]) g.hidden = true;
+  hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it';
 }
 
 export function mountFsmEditor(container, opts = {}) {
@@ -106,6 +117,7 @@ export function mountFsmEditor(container, opts = {}) {
       btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.()),
     ], { title: 'Layout and conversion', btnClass: 'asm-btn' }).el,
     linkHost);
+  const readOnly = !!opts.readOnly;
 
   // ---------------------------------------------------------------------------- canvas
   const svg = sv('svg', { class: 'asm-canvas fsm-canvas' });
@@ -142,6 +154,7 @@ export function mountFsmEditor(container, opts = {}) {
   const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
   mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
+  if (readOnly) readOnlyChrome({ root, toolbar, hint, probSection });
   const statusMsg = h('span', { class: 'asm-status-msg' });
   const statusInfo = h('span', { class: 'asm-status-info' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
@@ -248,7 +261,7 @@ export function mountFsmEditor(container, opts = {}) {
   // ---------------------------------------------------------------------------- pointer (fsm-pointer.js)
   mountFsmPointer({
     M: () => M, addState, addTransition, applyView, closeInline, commit, copySel, deleteSelection, drag: () => drag,
-    editLabel, editState, fit, fitted: () => fitted, gOverlay, gStates, geom, paste, print, redo, render,
+    editLabel, editState, fit, fitted: () => fitted, gOverlay, gStates, geom, paste, print, readOnly, redo, render,
     renderSide: (...a) => renderSide(...a), root, sel: () => sel, snapV, stateById, svg, toWorld, transById, uid, undo,
     view: () => view, zoomAt, zoomBy, setFitted: (v) => { fitted = v; }, setSel: (v) => { sel = v; },
     setDrag: (v) => { drag = v; }
@@ -256,12 +269,12 @@ export function mountFsmEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------------------- side panel (fsm-side.js)
   const { renderSide } = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody, btn, stateById, transById,
-    encOf, commit, deleteSelection, render, updateToolbar });
+    encOf, commit, deleteSelection, readOnly, render, updateToolbar });
 
   // ---------------------------------------------------------------------------- problems
   function validateSoon() { clearTimeout(timers.val); timers.val = setTimeout(runValidate, 120); }
   function runValidate() {
-    if (destroyed) return;
+    if (destroyed || readOnly) return;
     diags = validateFsm(M);
     probList.textContent = '';
     const n = (s) => diags.filter((d) => d.severity === s).length;
@@ -312,7 +325,7 @@ export function mountFsmEditor(container, opts = {}) {
     canUndo: () => hi > 0, canRedo: () => hi < hist.length - 1,
     // Edit ▸ Cut / Copy / Paste / Delete (#677): a state (a transition: Delete only)
     copy: () => copySel(), cut: () => copySel(true), paste: () => paste(), deleteSelection: () => deleteSelection(),
-    canCopy: () => sel?.type === 'state', canDelete: () => !!sel, canPaste: () => hasClip('fsm'),
+    canCopy: () => sel?.type === 'state', canDelete: () => !readOnly && !!sel, canPaste: () => !readOnly && hasClip('fsm'),
     setModel(m) {
       closeInline(false);
       M = normalizeFsm(m);

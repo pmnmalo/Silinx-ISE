@@ -20,6 +20,8 @@ import {
 export {
   openTt, openTtSchematic, syncHdlFromTt, ttContextMenu
 };
+import { openPetriFsm } from './petri-fsm-doc.js';
+export { openPetriFsm };
 
 // ---- ASM
 export async function openAsm(path) {
@@ -335,6 +337,7 @@ async function syncHdlFromPetri(path, m) {
 export function petriContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openPetri(file) },
+    { label: 'View State Machine (FSM)', action: () => openPetriFsm(file) },   // (its state space, #2696)
     S.view === 'sim' ? null : topMenuItem(drawnTop(file), () => setViewAsTop(file)),
     { label: 'Rename…', action: () => renameDialog(file) },
     clashItem(file),
@@ -423,6 +426,7 @@ export function syncedViewMenu(e, sch) {
     { label: 'Open', action: () => openView(sch) },
     isAsm(sch) ? { label: 'Convert to State Diagram (FSM)…', action: () => asmToFsmDiagram(sch) } : null,
     isFsm(sch) ? { label: 'Convert to ASM chart', action: () => fsmToAsmChart(sch) } : null,
+    isPn(sch) ? { label: 'View State Machine (FSM)', action: () => openPetriFsm(sch) } : null,   // (its state space, #2696)
     viewKind(sch) === 'sch' ? { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) } : null,
     { label: 'Remove from Project', action: () => removeModule(sch) },
   ].filter(Boolean), e.clientX, e.clientY);

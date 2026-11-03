@@ -7,7 +7,7 @@ import { formatOutputs, parseOutputs } from '/core/fsm.js';
 
 /** { renderSide } of an FSM editor (M(), sel(): its current model and selection; setSel(s) selects). */
 export function mountSide(ctx) {
-  const { M, sel, setSel, selSection, machineBody, btn, stateById, transById, encOf, commit, deleteSelection, render,
+  const { M, sel, setSel, selSection, machineBody, btn, stateById, transById, encOf, commit, deleteSelection, readOnly = false, render,
     updateToolbar } = ctx;
 
   const field = (label, input, hintText) => h('label', { class: 'asm-field' }, h('span', { class: 'asm-label' }, label), input, hintText ? h('span', { class: 'asm-fhint' }, hintText) : null);
@@ -18,7 +18,9 @@ export function mountSide(ctx) {
     if (key) el.dataset.key = key;
     return el;
   };
-  function renderSide() { renderSelection(); renderMachine(); updateToolbar(); }
+  function renderSide() { renderSelection(); renderMachine(); updateToolbar(); lock(); }
+  // (read-only, #2696: its fields shown, disabled; its buttons hidden)
+  const lock = () => { if (readOnly) for (const x of [...selSection.querySelectorAll('input, select, button'), ...machineBody.querySelectorAll('input, select, button')]) if (x.tagName === 'BUTTON') x.hidden = true; else x.disabled = true; };
 
   function renderSelection() {
     selSection.textContent = '';
@@ -47,6 +49,7 @@ export function mountSide(ctx) {
       const ts = M().transitions.filter((t) => t.from === s.id);
       selSection.append(h('h3', {}, 'State'),
         field('Name', name),
+        s.comment ? h('p', { class: 'asm-muted fsm-scomment' }, s.comment) : null,
         field('Outputs (Moore)', outs, 'Outputs while in this state: output=value, separated by commas. The other outputs keep their default value.'), outErr,
         h('label', { class: 'asm-check' }, init, 'Initial (reset) state'),
         e && M().encoding !== 'enum' ? h('p', { class: 'asm-muted' }, `Code: ${e.bits} (${M().encoding})`) : null,
