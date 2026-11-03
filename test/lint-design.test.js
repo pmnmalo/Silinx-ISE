@@ -74,3 +74,34 @@ test('#1759 a C source\'s HDL: no design check warnings under the C file\'s name
   const lib2 = compile([{ path: 'src/fir.vhd', text: h.text, lang: h.lang }]);
   assert.ok(designChecks(lib2, elaborate(lib2, h.module), { lint: true }).some((x) => /Signal <ap_r_d_3> is assigned but never used/.test(x.message)));
 });
+
+// #2716: the feedback of a Clocking Wizard module feeds the primitive's input (a DCM_SP's CLKFB, a PLL_BASE's CLKFBIN),
+// which its simulation model does not read: it is used, no "assigned but never used"
+test('#2716 a signal that only feeds a primitive\'s input is used: the Clocking Wizard\'s feedback, in VHDL and in Verilog', async () => {
+  const { clockModule } = await import('../core/clocking.js');
+  const { primitiveSources } = await import('../core/unisim.js');
+  const base = { wizard: 'clock', version: 1, inMHz: 50, input: 'clk_in', ibufg: true, reset: 'rst', locked: 'locked' };
+  const specs = [
+    // a DCM with no CLK0 output: its CLK0 only the feedback (the case that warned)
+    { ...base, family: 'spartan3e', speed: '-4', div2: false, phaseShift: 0, outputs: [{ pin: 'CLKFX', port: 'f', mhz: 100 }] },
+    { ...base, family: 'spartan3e', speed: '-4', div2: false, phaseShift: 0, outputs: [{ pin: 'CLK2X', port: 'fast' }] },
+    // a PLL: its CLKFBOUT to CLKFBIN
+    { ...base, family: 'spartan6', speed: '-3', inMHz: 100, outputs: [{ port: 'c200', mhz: 200, phase: 0 }] },
+  ];
+  for (const s of specs) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const spec = { ...s, name: 'clkgen', lang };
+      const { code } = clockModule(spec);
+      assert.ok(code, `${s.family} ${lang}`);
+      const srcs = [{ path: `src/clkgen.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: code }];
+      const lib = compile([...primitiveSources(srcs), ...srcs]);
+      const d = elaborate(lib, 'clkgen');
+      assert.deepEqual(designChecks(lib, d, { lint: true }).map(x => x.message), [], `${s.family} ${lang} ${s.outputs[0].pin || s.outputs[0].port}`);
+    }
+  }
+});
+
+test('#2716 a signal no primitive and no process reads is still unused', () => {
+  const lib = compile([{ path: 'a.v', lang: 'verilog', text: 'module a(input clk, output q);\n  wire w;\n  assign w = clk;\n  assign q = clk;\nendmodule\n' }]);
+  assert.deepEqual(designChecks(lib, elaborate(lib, 'a'), { lint: true }).map(x => x.message), ['Signal <w> is assigned but never used. This unconnected signal will be trimmed during the optimization process.']);
+});
