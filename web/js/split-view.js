@@ -4,11 +4,13 @@
 // worked in (the one of the document in front, or the empty side clicked); a tab dragged to the other side's tabs or
 // pane, or its menu's Move to the Other Side, moves it there. Show Generated HDL Beside opens a drawing's HDL file, or a
 // C source's HDL, on the other side, read-only as always: it follows the drawing as it is saved (refreshOpenEditor,
-// web/js/drawings.js; the C's, web/js/c-source.js openCHdl). A side whose last document closes, or Close Split, leaves
-// one. The sides are kept with the open documents (app.js saveViewState). A narrow workspace stacks them.
+// web/js/drawings.js; the C's, web/js/c-source.js openCHdl); an HDL source in the other language than the preferred
+// one, its translation (Show Generated VHDL / Verilog Beside, web/js/translation.js, #2711). A side whose last
+// document closes, or Close Split, leaves one. The sides are kept with the open documents (app.js saveViewState). A narrow workspace stacks them.
 import { h, toast } from './ui.js';
 import { S, activateDoc, openFile, saveViewState } from './app.js';
 import { openCHdl, isC } from './c-source.js';
+import { openTranslation, translationOf } from './translation.js';
 import { DESIGN_ICON, taskOfDoc } from './tasks.js';
 import { prefKey } from './prefs.js';
 
@@ -91,13 +93,15 @@ export function moveToSide(doc, s) {
   activateDoc(doc);
 }
 
-/** The command opening the HDL generated from a document (a drawing's HDL file, a C source's HDL), or null. */
+/** The command opening the HDL generated from a document (a drawing's HDL file, a C source's HDL, an HDL source's
+ *  translation), or null. */
 export function generatedOpener(doc) {
   const p = doc?.path || /^(?:sch|asm|tt|fsm|pn):(.+)$/.exec(String(doc?.id || ''))?.[1];
   if (!p) return null;
   const hdl = /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(p) && S.schOwners?.[p];
   if (hdl) return () => openFile(hdl);
   if (isC(p) && S.sources.some(s => s.view && s.path === p)) return () => openCHdl(p);
+  if (translationOf(p)) return () => openTranslation(p);
   return null;
 }
 
@@ -118,10 +122,11 @@ export async function showGeneratedBeside(doc = S.active) {
 /** The commands of a document's tab. */
 export function splitItems(doc = S.active) {
   const gen = generatedOpener(doc);
+  const tr = doc?.path && translationOf(doc.path);
   return [
     '-',
     on ? { label: 'Move to the Other Side', action: () => moveToSide(doc, other(sideOf(doc))) } : null,
-    gen ? { label: 'Show Generated HDL Beside', action: () => showGeneratedBeside(doc) } : null,
+    gen ? { label: tr === 'VHDL' ? 'Show Generated VHDL Beside' : tr ? 'Show Generated Verilog Beside' : 'Show Generated HDL Beside', action: () => showGeneratedBeside(doc) } : null,
     on ? { label: 'Close Split', action: () => closeSplit() } : null,
   ].filter(Boolean);
 }

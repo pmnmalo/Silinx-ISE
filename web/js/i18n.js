@@ -86,7 +86,7 @@ const PT = {
   'Say hello on GitHub Discussions (a GitHub account is needed): your school or course, your role (teacher, student…), the boards you use. Only what you write there is seen.': 'Deixe uma mensagem no GitHub Discussions (é preciso uma conta GitHub): a sua escola ou disciplina, o seu papel (professor, estudante…), as placas que usa. Só se vê o que escrever lá.', 'Keyboard Shortcuts': 'Atalhos de Teclado',
   'Close': 'Fechar', 'Close Others': 'Fechar Outros', 'Close All': 'Fechar Todos', 'Open': 'Abrir', 'Remove from Project': 'Remover do Projeto',
   // (two documents side by side, each side with its tabs, #1619, #1652)
-  'Move to the Other Side': 'Mover para o Outro Lado', 'Show Generated HDL Beside': 'Mostrar o HDL Gerado ao Lado', 'Close Split': 'Fechar a Divisão', 'Split Editor': 'Dividir o Editor',
+  'Move to the Other Side': 'Mover para o Outro Lado', 'Show Generated HDL Beside': 'Mostrar o HDL Gerado ao Lado', 'Show Generated VHDL Beside': 'Mostrar o VHDL Gerado ao Lado', 'Show Generated Verilog Beside': 'Mostrar o Verilog Gerado ao Lado', 'Close Split': 'Fechar a Divisão', 'Split Editor': 'Dividir o Editor',
   'Split the editor: two documents side by side, each side with its tabs': 'Dividir o editor: dois documentos lado a lado, cada lado com os seus separadores',
   'Drag to resize the sides (double-click: halves)': 'Arraste para mudar o tamanho dos lados (duplo clique: metades)',
   'Drag a tab here, or right-click an open tab and choose Move to the Other Side': 'Arraste para aqui um separador, ou clique com o botão direito num separador aberto e escolha Mover para o Outro Lado',
