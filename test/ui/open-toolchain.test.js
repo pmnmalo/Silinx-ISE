@@ -780,7 +780,7 @@ uiTest('#490 open mode: Emulate Post-Synthesis Model with no model: "Generate an
     await new Promise((r) => setTimeout(r, 100));
   }
   // (a failure says what the emulator was doing: its status line, paused or its rate, and the page's visibility)
-  const why = seen.size >= 2 ? '' : await page.eval(() => `${document.querySelector('.doc:not([hidden]) .emu-bar .stat')?.textContent} · page ${document.visibilityState}`);
+  const why = seen.size >= 2 ? '' : await page.eval(() => `${document.querySelector('.doc:not([hidden]) .emu .stat')?.textContent} · page ${document.visibilityState}`);
   assert.ok(seen.size >= 2, `the LEDs change: ${[...seen].join(' ')} (${why})`);
   const again = (await page.consoleText()).length;
   await page.treeRow('#procs', 'Emulate Post-Synthesis Model', { dbl: true, exact: true });
