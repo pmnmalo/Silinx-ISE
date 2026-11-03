@@ -338,7 +338,7 @@ async function checkTechSchematic(page, { top, blocks, message, inside }) {
   assert.ok(log.includes(message), log.slice(-1500));
   let v = await techView(page);
   assert.equal(v.title, `${top} (Technology)`);
-  assert.deepEqual([v.bar, v.nav.slice(0, 2), /^Open \w+\.(vhd|v)$/.test(v.nav[2])], [false, ['⬆ Up (off)', '⬇ Push into (off)'], true], v.nav.join());
+  assert.deepEqual([v.bar, v.nav], [false, ['⬆ Up (off)', '⬇ Push into (off)']]);
   assert.equal(await page.eval(() => window.Silinx.status.tech), 'ok');
   const onTop = v;
   const mods = new Set(v.syms.map((x) => x.module));
@@ -461,7 +461,7 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   const rtl = await viewerTexts(page);
   assert.deepEqual(rtl.kinds, ['wire', 'sym:module', 'sym:slice', 'sym:constant', 'sym:and2b1', 'sym:hdlblock', 'port', 'label']);   // (the constant: the display's decimal points, #983)
   assert.deepEqual(rtl.untranslated, []);
-  for (const s of ['Propriedades', '<--Todos os Símbolos-->', '@Inversor', '@Porta AND de 2, 3 ou 4 entradas, as entradas e as entradas invertidas nas suas propriedades (bit a bit quando Largura > 1)', 'Abrir top.vhd', 'Fio · rede clk', "Rede 'clk', 1 bit",
+  for (const s of ['Propriedades', '<--Todos os Símbolos-->', '@Inversor', '@Porta AND de 2, 3 ou 4 entradas, as entradas e as entradas invertidas nas suas propriedades (bit a bit quando Largura > 1)', 'Fio · rede clk', "Rede 'clk', 1 bit",
     'Módulo prescaler', 'Parâmetros', 'vazio = valor por omissão do módulo', 'Pinos (3)', 'Índice do MSB', 'Marcador de E/S', 'Bidirecional', 'Nome de Rede',
     'um por linha: nome[largura] (acrescente "clock" para um pino de relógio)', 'nome[largura]',
     // (the Check panel's: the ISE style interface's, #1149)
@@ -478,7 +478,7 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   const tech = await viewerTexts(page);
   assert.deepEqual(tech.kinds, ['wire', 'sym:module', 'sym:constant', 'sym:slice', 'sym:busjoin', 'port', 'label']);
   assert.deepEqual(tech.untranslated, []);
-  for (const s of ['Propriedades', '⬆ Subir', 'Abrir top.vhd', 'Módulo LUT2', 'Pinos (3)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
+  for (const s of ['Propriedades', '⬆ Subir', 'Módulo LUT2', 'Pinos (3)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
     assert.ok(tech.pt.has(s), `${s}: ${[...tech.pt].join(' | ')}`);
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
