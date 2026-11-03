@@ -17,10 +17,12 @@ export function arrangeProgram(on) {
     page.parentNode.classList.toggle('task-impact', on);
     if (!on) { for (const c of ADDED) page.querySelectorAll(`.${c}`).forEach(e => e.remove()); page.classList.remove('settings-open'); continue; }
     if (!page.querySelector('.task-prog-settings')) {
-      page.querySelector('.imp-settings')?.before(h('button', { class: 'btn task-prog-settings', type: 'button', onclick: () => page.classList.toggle('settings-open') },
-        'Board, programming tool and cable…'));
+      // (a disclosure: aria-expanded says whether the settings are shown, #2450)
+      const b = h('button', { class: 'btn task-prog-settings', type: 'button', 'aria-expanded': 'false',
+        onclick: () => b.setAttribute('aria-expanded', String(page.classList.toggle('settings-open'))) }, 'Board, programming tool and cable…');
+      page.querySelector('.imp-settings')?.before(b);
       // (no board selected: the tool and cable are the student's to choose)
-      if (!page.querySelector('.imp-settings select')?.value) page.classList.add('settings-open');
+      if (!page.querySelector('.imp-settings select')?.value) { page.classList.add('settings-open'); b.setAttribute('aria-expanded', 'true'); }
     }
   }
 }
