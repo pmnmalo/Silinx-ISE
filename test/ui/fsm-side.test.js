@@ -39,7 +39,7 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
     const { fsmKind, side, M, commits, calls, selSection: S, field, set, sel, select } = window.__s;
     const r = {};
     side.renderSide();
-    r.none = [S.querySelector('h3').textContent, calls.splice(0)];
+    r.none = [S.hidden, S.childElementCount, calls.splice(0)];
     // the state S1: renamed, its outputs (an error shown, then valid), made initial
     select({ type: 'state', id: 's2' }); side.renderSide();
     r.state = [S.querySelector('h3').textContent, S.querySelector('.asm-muted').textContent, [...S.querySelectorAll('.fsm-tlist li')].map((li) => li.textContent)];
@@ -64,11 +64,11 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
     r.mealy = [M.transitions.find((t) => t.id === 't3').outputs, fsmKind(M), S.querySelectorAll('.asm-fhint')[1].textContent];
     // a selection whose transition is gone: nothing
     M.transitions = M.transitions.filter((t) => t.id !== 't3'); side.renderSide();
-    r.gone = [sel(), S.querySelector('h3').textContent];
+    r.gone = [sel(), S.hidden, S.childElementCount];
     r.commits = commits.splice(0);
     return r;
   });
-  assert.deepEqual(out.none, ['Selection', ['toolbar']]);
+  assert.deepEqual(out.none, [true, 0, ['toolbar']]);   // (nothing selected: no section, #2729)
   assert.deepEqual(out.state, ['State', 'Code: 01 (binary)', ['x → S2', '!x → S0']]);
   assert.equal(out.err, true);
   assert.deepEqual(out.s2, ['MID', { z: '1' }, 's2', '']);
@@ -78,7 +78,7 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
   assert.deepEqual(out.prio2, ['Priority 2 of 2 in MID']);
   assert.deepEqual(out.t3, ['x && y', 's2', false, 'moore']);
   assert.deepEqual(out.mealy, [{ z: '1' }, 'mealy', 'Outputs while this transition is taken: output=value, separated by commas (they make the machine a Mealy machine).']);
-  assert.deepEqual(out.gone, [null, 'Selection']);
+  assert.deepEqual(out.gone, [null, true, 0]);
   assert.deepEqual(out.commits, ['sname', 'souts', '', 'cond', '', '', 'touts']);
 });
 

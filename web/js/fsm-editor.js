@@ -147,7 +147,8 @@ export function mountFsmEditor(container, opts = {}) {
   // side panel
   const selSection = h('section', { class: 'asm-section fsm-selection' });
   const machineBody = h('div', { class: 'asm-section-body' });
-  const machineSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Machine'), machineBody);
+  // (the machine's section always open, as the selection's: a title, not a fold, #2729)
+  const machineSection = h('section', { class: 'asm-section fsm-machine' }, h('h3', {}, 'Machine'), machineBody);
   const probList = h('ul', { class: 'asm-problems' });
   const probCount = h('span', { class: 'asm-prob-count' });
   const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);

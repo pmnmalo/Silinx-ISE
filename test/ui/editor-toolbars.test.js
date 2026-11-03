@@ -103,7 +103,7 @@ uiTest('#2505 the Petri net, FSM and ASM side panels fold to a strip and expand,
   const state = () => page.eval((d) => {
     const e = document.querySelector(`${d} .asm-editor`), b = e.querySelector('.asm-fold');
     return { folded: e.classList.contains('props-folded'), side: Math.round(e.querySelector('.asm-side').getBoundingClientRect().width), title: b.title,
-      expanded: b.getAttribute('aria-expanded'), shown: !!e.querySelector('.asm-side details').getClientRects().length, cap: e.querySelector('.asm-cap').textContent };
+      expanded: b.getAttribute('aria-expanded'), shown: !!e.querySelector('.asm-side .asm-section:not([hidden])').getClientRects().length, cap: e.querySelector('.asm-cap').textContent };
   }, D);
   for (const [pj, file, name, bar] of [['BarsF', 'src/traffic.fsm.json', 'fsm', '.fsm-toolbar'], ['BarsF', 'src/net.pn.json', 'petri', '.pn-toolbar'], ['BarsFB', 'src/speed_ctrl.asm.json', 'asm', '.asm-chart-toolbar']]) {
     if (await page.eval(() => window.SilinxApp.S.project?.name) !== pj) await page.openProject(pj);
