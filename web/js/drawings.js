@@ -152,6 +152,7 @@ export async function openFsm(path) {
         onOpenFile: f => openFile(f),
         onTruthTables: () => fsmTruthTables(path),
         onToAsm: () => fsmToAsmChart(path),
+        onMessage: msg => log(`WARNING: ${path}: ${msg} (not applied)`, 'warn'),
       });
       d.fsmEditor = ed;
       return {

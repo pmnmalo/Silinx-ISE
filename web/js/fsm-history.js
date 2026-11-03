@@ -44,7 +44,7 @@ export function mountFsmHistory(ctx) {
     delBtn.disabled = !sel();
     encSel.value = M().encoding; styleSel.value = M().style;
     for (const [k, b] of Object.entries(tabBtns)) b.classList.toggle('on', panel() === k);
-    statusInfo.textContent = `${M().states.length} state(s), ${M().transitions.length} transition(s) · ${M().type === 'mealy' ? 'Mealy' : 'Moore'}`;
+    statusInfo.textContent = `${M().states.length} state(s), ${M().transitions.length} transition(s)`;
   }
 
   return { commit, redo, undo, updateToolbar };

@@ -17,8 +17,7 @@ export const FSM_PT = {
   'Arrange': 'Organizar', 'Automatic layout of the states': 'Disposição automática dos estados', 'Zoom out': 'Reduzir', 'Zoom in': 'Ampliar',
   'Fit': 'Ajustar',
   'Make an ASM chart (.asm.json) of this state machine': 'Fazer um fluxograma ASM (.asm.json) desta máquina de estados',
-  'Double-click to add a state · drag from the rim of a state to another state to add a transition · double-click to edit · drag a label to bend its arrow · wheel to zoom':
-    'Duplo clique para acrescentar um estado · arraste da borda de um estado para outro estado para acrescentar uma transição · duplo clique para editar · arraste uma etiqueta para curvar a seta · roda para zoom',
+  'Encoding:': 'Codificação:', 'Coding Style:': 'Estilo de Código:',
   'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas',
   // selection
   'Selection': 'Seleção', 'Nothing selected. Click a state or a transition to edit it.': 'Nada selecionado. Clique num estado ou numa transição para o editar.',
@@ -92,8 +91,7 @@ export const FSM_PT_PATTERNS = [
   [/^Output '(.*)' is never set: it always keeps its default value (.*)$/, "A saída '$1' nunca é alterada: fica sempre com o valor por omissão $2"],
   [/^Transition (.+) → (.+): (.*)$/, 'Transição $1 → $2: $3'],
   // editor
-  [/^(\d+) state\(s\), (\d+) transition\(s\) · (Moore|Mealy)$/, '$1 estado(s), $2 transição(ões) · $3'],
-  [/^State (.+) added$/, 'Estado $1 acrescentado'],
+  [/^(\d+) state\(s\), (\d+) transition\(s\)$/, '$1 estado(s), $2 transição(ões)'],
   [/^The diagram has (\d+) error\(s\): see Problems$/, 'O diagrama tem $1 erro(s): ver Problemas'],
   [/^\((\d+) error\(s\), (\d+) warning\(s\)\)$/, '($1 erro(s), $2 aviso(s))'],
   [/^Code: (\S+) \((\w+)\)$/, 'Código: $1 ($2)'],
