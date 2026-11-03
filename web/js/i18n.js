@@ -402,7 +402,7 @@ const PT_FF = [['synchronous set and reset (S over R)', 'set e reset síncronos 
 const PT_PATTERNS = [
   // the serial terminal's pins (#2536)
   [/^(\d+) states?(?: · (\d+) every-cycle blocks?)?$/, (m, n, b) => `${n} estado${n === '1' ? '' : 's'}${b ? ` · ${b} bloco${b === '1' ? '' : 's'} de cada ciclo` : ''}`],   // (the ASM editor's toolbar, #2730)
-  [/^TX: (.+) · RX: (.+)$/, (m, ...p) => `TX: ${p.slice(0, 2).map((x) => x.replace(/ \(pin (\S+)\)$/, ' (pino $1)').replace(/^not connected in the UCF$/, 'não ligado no UCF')).join(' · RX: ')}`], [/^(\d+) baud$/, '$1 baud'],
+  [/^(\d+) baud$/, '$1 baud'],
   // Find in Project (#1430)
   [/^(\d+) result\(s\) in (\d+) file\(s\)$/, '$1 resultado(s) em $2 ficheiro(s)'], [/^(\d+) replacement\(s\) in (\d+) file\(s\)$/, '$1 substituição(ões) em $2 ficheiro(s)'],
   [/^Invalid regular expression: (.*)$/, 'Expressão regular inválida: $1'],
@@ -534,14 +534,10 @@ Object.assign(PT, {
   'Real time': 'Tempo real', 'Engine:': 'Motor:', 'Compiled (real speed)': 'Compilado (velocidade real)', 'Event-driven (debugging)': 'Por eventos (depuração)',
   'The simulator that runs the design: compiled (its netlist, at the board\'s real speed) or event-driven (the behavioural RTL, with X values and the design\'s messages: for debugging)':
     'O simulador que corre o projeto: compilado (a sua netlist, à velocidade real da placa) ou por eventos (o RTL comportamental, com valores X e as mensagens do projeto: para depuração)',
-  'The design is compiled (its netlist, by Yosys) and runs at up to the board\'s clock rate; registers without an initial value start at 0, as on the FPGA; the event-driven engine shows X values and the design\'s messages. Each display digit keeps the last pattern it showed between its refreshes, as your eye does on the real board. Buttons: press and hold; Shift+click keeps a button pressed.':
-    'O projeto é compilado (a sua netlist, pelo Yosys) e corre até à frequência do relógio da placa; os registos sem valor inicial começam a 0, como na FPGA; o motor por eventos mostra os valores X e as mensagens do projeto. Cada dígito do mostrador mantém o último padrão entre atualizações, como o olho faz na placa real. Botões: carregue e mantenha; Shift+clique mantém um botão carregado.',
-  'Real values: the compiled engine runs the design at up to the board\'s clock rate.': 'Valores reais: o motor compilado corre o projeto até à frequência do relógio da placa.',
   'Compiling the design for the Board Emulator (Yosys)…': 'A compilar o projeto para o Emulador de Placa (Yosys)…',
   'Starting the Board Emulator…': 'A iniciar o Emulador de Placa…',
   'VGA monitor (640×480)': 'Monitor VGA (640×480)', 'VGA monitor': 'Monitor VGA', 'Show:': 'Mostrar:', 'Serial terminal': 'Terminal série', 'Send': 'Enviar',
   'Type a line, Enter sends it with CR': 'Escreva uma linha; Enter envia-a com CR', 'The baud rate (8 data bits, no parity, 1 stop bit)': 'A taxa de transmissão (8 bits de dados, sem paridade, 1 bit de paragem)',
-  'The serial terminal needs the compiled engine (the event-driven one is too slow for a frame)': 'O terminal série precisa do motor compilado (o orientado a eventos é demasiado lento para uma trama)',
   'Display': 'Mostrador', 'Switches': 'Interruptores',
   'Show or hide this module: the design goes on running': 'Mostrar ou esconder este módulo: o projeto continua a executar', 'No signal': 'Sem sinal',
   'The VGA monitor needs the compiled engine (the event-driven one is too slow for a frame)': 'O monitor VGA precisa do motor compilado (o motor por eventos é demasiado lento para uma imagem)',
@@ -561,12 +557,7 @@ Object.assign(PT, {
   'Rotary encoder: ROT_A / ROT_B not connected in the UCF': 'Codificador rotativo: ROT_A / ROT_B não ligados no UCF',
   'Turn left (counter-clockwise)': 'Rodar para a esquerda (sentido anti-horário)', 'Turn right (clockwise)': 'Rodar para a direita (sentido horário)',
   'Watch': 'Observar', 'Add a signal to watch…': 'Adicionar um sinal a observar…', 'Timing generics': 'Genéricos de temporização',
-  'Not on the board': 'Fora da placa', 'Messages': 'Mensagens', 'No clock input found': 'Nenhuma entrada de relógio encontrada',
-  'Divided so that counters, dividers and debouncers advance at the emulator\'s speed (about 10^5 clock cycles per second instead of 50 MHz). The design and the bitstream are not changed.':
-    'Divididos para que contadores, divisores e debouncers avancem à velocidade do emulador (cerca de 10^5 ciclos de relógio por segundo em vez de 50 MHz). O projeto e o bitstream não são alterados.',
-  'Real values: at the emulator\'s speed, a design that counts millions of cycles moves very slowly.': 'Valores reais: à velocidade do emulador, um projeto que conta milhões de ciclos avança muito devagar.',
-  'The design is simulated from its HDL (behavioural RTL) at a reduced clock rate; registers without an initial value start at 0, as on the FPGA; each display digit keeps the last pattern it showed between its refreshes, as your eye does on the real board. Buttons: press and hold; Shift+click keeps a button pressed.':
-    'O projeto é simulado a partir do seu HDL (RTL comportamental) com um relógio mais lento; os registos sem valor inicial começam a 0, como na FPGA; cada dígito do mostrador mantém o último padrão entre atualizações, como o olho faz na placa real. Botões: carregue e mantenha; Shift+clique mantém um botão carregado.',
+  'Buttons: press and hold; Shift+click keeps a button pressed.': 'Botões: carregue e mantenha; Shift+clique mantém um botão premido.', 'Messages': 'Mensagens', 'No clock input found': 'Nenhuma entrada de relógio encontrada',
   // ASM chart editor
   'Value(s) of this exit: binary digits, a literal, a|b, or others': 'Valor(es) desta saída: dígitos binários, um literal, a|b, ou others',
   'Registered output (holds its value, readable in conditions)': 'Saída registada (mantém o valor, pode ser lida em condições)',
@@ -615,13 +606,6 @@ PT_PATTERNS.unshift(
   [/^Timing ÷(.+) \(emulation only\)$/, 'Temporização ÷$1 (só na emulação)'],
   // the engines (#418): why the design is not compiled, what the compiled engine warns of
   [/^Not compiled: (.+)$/, 'Não compilado: $1'],
-  [/^Not compiled \((.+)\): the event-driven simulator runs the design\.$/, 'Não compilado ($1): o projeto corre no simulador por eventos.'],
-  [/^Compiled engine: (.+)$/, 'Motor compilado: $1'],
-  // the event-driven engine by default on a slow device (#952): why (core/emulate-engine.js slowDevice)
-  [/^The event-driven engine by default on this device \((.+)\): choose Engine ▸ Compiled to run the design at the board's real speed\.$/,
-    (m, w) => `O motor por eventos por omissão neste dispositivo (${w.split(', ').map((x) => x === 'a phone or tablet' ? 'um telemóvel ou tablet'
-      : x.replace(/^(\d+) processor cores?$/, (y, n) => `${n} ${n === '1' ? 'núcleo' : 'núcleos'} de processador`).replace(/^([\d.]+) GB of memory$/, (y, n) => `${n.replace('.', ',')} GB de memória`)).join(', ')}): `
-      + 'escolha Motor ▸ Compilado para correr o projeto à velocidade real da placa.'],
   // the VGA monitor (#420): what it measured, what is not 640x480 at 60 Hz
   [/^640×480 · (.+) Hz · line (.+) µs · (\d+) lines$/, '640×480 · $1 Hz · linha de $2 µs · $3 linhas'],
   [/^640×480 · line (.+) µs · no VSYNC$/, '640×480 · linha de $1 µs · sem VSYNC'],

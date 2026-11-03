@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, readWs, writeWs } from './harness.js';
+import { emuNotes } from './emu-notes.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 import { DB_DIR } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
 import { fileURLToPath } from 'node:url';
@@ -806,9 +807,9 @@ uiTest('#561 open mode: the vga example\'s Post-Synthesis Model runs on the comp
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { timeout: 180000, what: 'the emulator' });
   assert.equal(await page.eval(() => window.Silinx.active.title), 'Board Emulator (vga, Post-Synthesis)');
   assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-hint')].map((e) => e.textContent).filter((t) => /^(Not compiled|Compiled engine:)/.test(t))), []);
+  assert.deepEqual((await emuNotes(page)).filter((t) => /^(not compiled|compiled engine:)/.test(t)), []);   // (in the console, #2718)
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .emu-vga-stat')?.textContent === '640×480 · 59.52 Hz · line 32.00 µs · 525 lines', [], { what: 'the monitor\'s timing', timeout: 60000 });
-  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-vga-warn').textContent), '');
+  assert.deepEqual((await emuNotes(page)).filter((t) => t.startsWith('the VGA monitor')), []);
   await page.waitFor(() => window.Silinx.active.view.sim.vga().status.frames >= 2, [], { what: 'two frames', timeout: 60000 });
   await new Promise((r) => setTimeout(r, 100));   // (the next picture drawn: 30 a second)
   const pixel = (x, y) => page.eval((px, py) => [...document.querySelector('.doc:not([hidden]) .emu-vga canvas').getContext('2d').getImageData(px, py, 1, 1).data.slice(0, 3)], x, y);

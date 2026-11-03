@@ -429,7 +429,11 @@ export async function openEmulator(mod, { scale, model = null, engine = null, qu
       start().then((r) => {
         if (closed) return;
         wait.remove();
-        const view = mountEmulator(el, { design: r.design, board, assignments, title: `${mod}${model ? ` — ${SIM_MODEL_NAMES[model]} netlist` : ''}`, files,
+        // (what the emulator says of the design, in the console after the line that opens it, #2718)
+        const notes = [];
+        let opened = false;
+        const onNote = (text, kind = '') => (opened ? log(`Board Emulator: ${text}`, kind) : notes.push([text, kind]));
+        const view = mountEmulator(el, { onNote, design: r.design, board, assignments, title: `${mod}${model ? ` — ${SIM_MODEL_NAMES[model]} netlist` : ''}`, files,
           timing: { gens, scale: r.scale, onChange: (k) => setTimeout(() => openEmulator(mod, { scale: k, model, engine }), 0) },
           model: { current: model, available: models, names: SIM_MODEL_NAMES,
             onChange: (m) => setTimeout(() => openEmulator(mod, { model: m || null, engine }), 0) },
@@ -437,6 +441,8 @@ export async function openEmulator(mod, { scale, model = null, engine = null, qu
         doc.view = view;
         doc.scale = r.scale;   // (kept when run again, #1401)
         log(`Board Emulator: '${mod}' (${model ? `${SIM_MODEL_NAMES[model]} netlist` : 'RTL'}, ${view.engine === 'compiled' ? 'compiled' : 'event-driven'}) on ${board.name} — ${view.wiring.bits.length} port bit(s) on board resources${view.wiring.unmapped.length ? `, ${view.wiring.unmapped.length} not connected` : ''}.`, 'ok');
+        opened = true;
+        for (const [t, k] of notes) onNote(t, k);
       }).catch((e) => { if (!closed) { wait.textContent = `Cannot build the design: ${e.message}`; log(`ERROR: Board Emulator: ${e.message}`, 'err'); } });
       // the design or its pins changed (a source saved, a drawing, I/O Pin Planning, the UCF): its RTL emulation run again,
       // its settings kept, quietly; a netlist's says so instead (emulated again, the netlist is generated anew) (#1401)

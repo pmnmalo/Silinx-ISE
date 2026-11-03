@@ -146,7 +146,6 @@ export function injectStyle() {
 .emu-vga-nosig { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; color: #c8c8c8; font-size: 14px; }
 .emu-vga-nosig[hidden] { display: none; }   /* (its display: flex would show it hidden too, #453) */
 .emu-vga-stat { margin-top: 4px; font-family: var(--mono, monospace); color: var(--grey-3); }
-.emu-vga-warn { color: var(--log-warning); }
 /* the serial terminal (#2536) */
 .emu-serial { flex: none; width: 380px; max-width: 100%; }
 .emu-serial-out { height: 180px; margin: 4px 0; padding: 4px 6px; overflow: auto; background: #111; color: #c8f0c8; font: 12px var(--mono, monospace); white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 3px; }
@@ -227,7 +226,7 @@ function compiledHost() {
  *   engine: { netlist: { json, top } (netlistOf: the compiled engine) | null, reason: why not, auto: why the event-driven
  *     engine by default (a slow device, #952), onChange(engine) }
  */
-export function mountEmulator(container, { design, board, assignments, title = '', files, timing = null, model = null, engine = null }) {
+export function mountEmulator(container, { design, board, assignments, title = '', files, timing = null, model = null, engine = null, onNote = () => {} }) {
   injectStyle();
   const wiring = boardWiring({ ports: design.top.ports, assignments, board });
   const inputPorts = design.top.ports.filter((p) => p.dir === 'in');
@@ -315,12 +314,12 @@ export function mountEmulator(container, { design, board, assignments, title = '
   // (the VGA monitor, the side panel: emulator-side.js)
   const { logEl, side, watched } = mountEmuSide({
     board, design, engine, timing, title, after: (...a) => after(...a), clockSigs, compiled: () => compiled,
-    engineNote: () => engineNote, main, powered: () => powered, refresh: (...a) => refresh(...a), root,
+    engineNote: () => engineNote, main, note: onNote, powered: () => powered, refresh: (...a) => refresh(...a), root,
     running: () => running, sim, vgaView: () => vgaView, vgaWired, wiring, setVgaView: (v) => { vgaView = v; }
   });
   // (the modules outside the board shown or hidden, #2522: emulator-modules.js; shown when paused, the picture of now)
   // the serial terminal (#2536: emulator-serial.js), after the VGA monitor
-  const serialView = mountEmuSerial({ compiled: () => compiled, main, sim, wiring });
+  const serialView = mountEmuSerial({ compiled: () => compiled, main, note: onNote, sim, wiring });
   mountEmuModules({ main, menu, changed: () => { if (compiled && !running) after(advance(0)); } });
 
   // ------------------------------------------------------------------------------- simulation

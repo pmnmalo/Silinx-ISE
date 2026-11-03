@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { setupUi, uiTest, waitDownload, ROOT, chromeOnly, BROWSER } from './harness.js';
+import { emuNotes } from './emu-notes.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 import { buildInfo } from '../../scripts/build-info.mjs';
 // the builds here are development builds of their own, also in the CI of a pushed tag, whose GITHUB_REF would make them the
@@ -478,7 +479,7 @@ uiTest('standalone edition (file://): the Board Emulator runs blinky on the comp
   await page.menu('Tools', 'Board Emulator');
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'emulator running', timeout: 120000 });
   assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-side > .emu-hint')].map((e) => e.textContent).slice(1)), []);
+  assert.deepEqual((await emuNotes(page)).filter((t) => /^(not compiled|compiled engine:|the event-driven engine by default)/.test(t)), []);
   // #427: in its worker, started from the page's embedded text (a Blob)
   assert.equal(await page.eval(() => window.Silinx.active.view.worker), true, 'the compiled engine in a worker');
   await page.waitFor(() => window.Silinx.active.view.sim.now > 1e11, [], { what: '0.1 s of the board\'s time', timeout: 60000 });
@@ -519,7 +520,7 @@ uiTest('standalone edition (file://) in a user\'s browser (Chrome without --allo
   await page.menu('Tools', 'Board Emulator');
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'emulator running', timeout: 120000 });
   assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-side > .emu-hint')].map((e) => e.textContent).slice(1)), [], 'no reason, no warning');
+  assert.deepEqual((await emuNotes(page)).filter((t) => /^(not compiled|compiled engine:|the event-driven engine by default)/.test(t)), [], 'no reason, no warning');
   assert.equal(await page.eval(() => window.Silinx.active.view.worker), true, 'the compiled engine in a worker');
   await page.waitFor(() => window.Silinx.active.view.sim.now > 1e11, [], { what: '0.1 s of the board\'s time', timeout: 60000 });
 }, { url: () => 'about:blank', timeout: 300000 });
@@ -541,7 +542,7 @@ uiTest('browser edition: the Board Emulator runs blinky on the compiled engine, 
   await page.menu('Tools', 'Board Emulator');
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'emulator running', timeout: 120000 });
   assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-side > .emu-hint')].map((e) => e.textContent).slice(1)), [], 'no reason, no warning');
+  assert.deepEqual((await emuNotes(page)).filter((t) => /^(not compiled|compiled engine:|the event-driven engine by default)/.test(t)), [], 'no reason, no warning');
   assert.equal(await page.eval(() => window.Silinx.active.view.worker), true, 'the compiled engine in a worker (#427)');
   // the board's time runs at the clock's rate (real time): blinky's knight rider moves
   await page.waitFor(() => window.Silinx.active.view.sim.now > 1e11, [], { what: '0.1 s of the board\'s time', timeout: 60000 });

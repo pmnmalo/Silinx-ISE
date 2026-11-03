@@ -8,7 +8,7 @@ const MAX_TEXT = 20000;   // (the characters the terminal keeps)
 
 /** { draw() } of mountEmulator (compiled(): its current value), or null when the UCF wires no serial port. */
 export function mountEmuSerial(ctx) {
-  const { compiled, main, sim, wiring } = ctx;
+  const { compiled, main, note, sim, wiring } = ctx;
   const pins = uartPins(wiring);
   if (!pins) return null;
   let baud = 9600, prev = -1;
@@ -18,14 +18,14 @@ export function mountEmuSerial(ctx) {
   const baudSel = h('select', { title: 'The baud rate (8 data bits, no parity, 1 stop bit)', onchange: (e) => { baud = Number(e.target.value); if (compiled()) sim.baud(baud); } },
     ...BAUDS.map((b) => h('option', { value: b, selected: b === baud }, `${b} baud`)));
   const clearBtn = h('button', { class: 'btn', onclick: () => { out.textContent = ''; } }, 'Clear');
+  // (its pins, or why it cannot run, in the console, #2718)
   const pin = (b) => (b ? `${b.bit} (pin ${b.loc})` : 'not connected in the UCF');
-  const note = h('div', { class: 'emu-hint' }, compiled()
-    ? `TX: ${pin(pins.tx)} · RX: ${pin(pins.rx)}`
-    : 'The serial terminal needs the compiled engine (the event-driven one is too slow for a frame)');
+  if (compiled()) note(`the serial terminal: TX: ${pin(pins.tx)} · RX: ${pin(pins.rx)}.`, pins.tx && pins.rx ? '' : 'warn');
+  else note('the serial terminal needs the compiled engine (the event-driven one is too slow for a frame).', 'warn');
   line.disabled = sendBtn.disabled = !compiled() || !pins.rx;
   line.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
   const box = h('div', { class: 'emu-box emu-serial', 'data-module': 'serial' }, h('h4', {}, 'Serial terminal'),
-    h('div', { class: 'emu-serial-bar' }, baudSel, clearBtn), out, h('div', { class: 'emu-serial-bar' }, line, sendBtn), note);
+    h('div', { class: 'emu-serial-bar' }, baudSel, clearBtn), out, h('div', { class: 'emu-serial-bar' }, line, sendBtn));
   main.append(box);
 
   // the line typed and a CR, one frame after the other on RX (the board's time: core/emulate-remote.js sequence)

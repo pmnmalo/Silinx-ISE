@@ -5,7 +5,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
-import { TEXTS, untranslated } from './i18n-check.js';
+import { emuNotes } from './emu-notes.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -42,15 +42,14 @@ async function openEmulator(page, engine) {
   await running(page, engine);
 }
 const closeEmulator = (page) => page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('emulator')));
-// the Engine selector (its value, the options enabled) and the hint that says why the event-driven engine runs
-const engineUi = (page) => page.eval((s) => {
+// the Engine selector (its value, the options enabled) and the note that says why the event-driven engine runs (in the
+// console, #2718)
+const engineUi = async (page) => ({ ...await page.eval((s) => {
   const e = document.querySelector(s);
-  const hint = document.querySelector('.doc:not([hidden]) .emu-engine-auto');
-  return { value: e.value, enabled: [...e.options].filter((o) => !o.disabled).map((o) => o.value), hint: hint?.textContent ?? null,
-    saved: localStorage.getItem('silinx.emulator.engine') };
-}, engineSel);
+  return { value: e.value, enabled: [...e.options].filter((o) => !o.disabled).map((o) => o.value), saved: localStorage.getItem('silinx.emulator.engine') };
+}, engineSel), hint: ((await emuNotes(page)) || []).find((t) => /^the event-driven engine by default/.test(t)) ?? null });
 const choose = (page, v) => page.eval((s, x) => { const e = document.querySelector(s); e.value = x; e.dispatchEvent(new Event('change')); }, engineSel, v);
-const TABLET_HINT = 'The event-driven engine by default on this device (a phone or tablet, 2 processor cores): choose Engine ▸ Compiled to run the design at the board\'s real speed.';
+const TABLET_HINT = 'the event-driven engine by default on this device (a phone or tablet, 2 processor cores): choose Engine ▸ Compiled to run the design at the board\'s real speed.';
 
 uiTest('board emulator: a desktop starts compiled; a tablet event-driven, and says why; the choice of engine remembered, winning over the default (#952)', E, async (page) => {
   await makeProject(env, { name: 'EmuEngine', board: 'basys2', files: { 'src/cnt.vhd': COUNTER }, top: 'cnt' });
@@ -69,16 +68,7 @@ uiTest('board emulator: a desktop starts compiled; a tablet event-driven, and sa
   assert.deepEqual(await engineUi(page), { value: 'event', enabled: ['compiled', 'event'], hint: TABLET_HINT, saved: null });
   await page.waitConsole(/Board Emulator: 'cnt' \(RTL, event-driven\) on Digilent Basys2/);
 
-  // in Portuguese: the hint
-  await page.eval(TEXTS);
-  const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
-  const texts = () => page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-engine-auto')));
-  const en = await texts();
-  await setLang('pt');
-  const pt = await texts();
-  assert.deepEqual(pt, ['O motor por eventos por omissão neste dispositivo (um telemóvel ou tablet, 2 núcleos de processador): escolha Motor ▸ Compilado para correr o projeto à velocidade real da placa.']);
-  assert.deepEqual(untranslated(en, pt), []);
-  await setLang('en');
+  assert.ok(!(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-engine-auto'))), 'not in the window (#2718)');
 
   // the user chooses compiled: it runs compiled, remembered, and the next emulator starts compiled on the tablet too
   await choose(page, 'compiled');

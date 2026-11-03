@@ -5,6 +5,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
+import { waitEmuNote } from './emu-notes.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 
 let env;
@@ -49,7 +50,9 @@ uiTest('#2666 #2713 the Board Emulator: Watch and notes in a side panel at the r
   assert.deepEqual({ ...L, width: undefined }, { side: 'right', width: undefined, folded: false, cap: 'Properties', sections: ['Watch'],
     rows: ['Engine:', 'When hidden:', 'Show:'], menuShown: false, bar: ['Model:', 'Clock:'] });
   assert.equal(L.width, 280);
-  assert.match(await page.eval((d) => document.querySelector(`${d} .emu-side > .emu-hint`).textContent, DOC), /^The design is compiled .* Shift\+click keeps a button pressed\.$/);
+  // (its hint; what it says of the design, in the console, #2718)
+  assert.equal(await page.eval((d) => document.querySelector(`${d} .emu-side > .emu-hint`).textContent, DOC), 'Buttons: press and hold; Shift+click keeps a button pressed.');
+  await waitEmuNote(page, /^the design is compiled .* as your eye does on the real board\.$/);
   // the menu: opened by its button, closed by Esc and by a click elsewhere; its fields work
   const more = `${DOC} .emu-bar .tb-more-btn`;
   await page.click(more);
