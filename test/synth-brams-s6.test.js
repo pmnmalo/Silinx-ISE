@@ -32,7 +32,18 @@ test('the rule: Yosys\'s Spartan-6 block RAM, its whole mode alone (no MODE "HAL
   assert.equal(yosysFiles('m', '')[BRAMS_S6_FILE], BRAMS_S6);
 });
 
-// Regression (#2130): the stopwatch's lap memory (512 x 14) was a RAMB8BWER on the Nexys3 and the Atlys
+// a memory that fits half a block RAM: the stopwatch's lap memory before #2321 (512 x 14, written and read on the clock edge)
+const LAPS = `module laps(input clk, input we, input [8:0] wa, input [8:0] ra, input [13:0] d, output reg [13:0] q);
+  reg [13:0] ram [0:511];
+  always @(posedge clk) begin
+    if (we) ram[wa] <= d;
+    q <= ram[ra];
+  end
+endmodule
+`;
+
+// Regression (#2130): the stopwatch's lap memory (512 x 14) was a RAMB8BWER on the Nexys3 and the Atlys; 1024 x 14 since
+// #2321 (ISE's own XST took the 9K half too), one RAMB16BWER whichever the rule
 test('the stopwatch\'s lap memory on the Spartan-6: one RAMB16BWER, no RAMB8BWER, no warning', { timeout: 300000 }, async () => {
   const r = await synthesizeVerilog(example('stopwatch'), { family: 'spartan6', run: yosysNode });
   const c = types(r.files[`${r.top}.json`], r.top);
@@ -41,16 +52,27 @@ test('the stopwatch\'s lap memory on the Spartan-6: one RAMB16BWER, no RAMB8BWER
   assert.deepEqual(r.warnings, []);
 });
 
+test('a memory that fits half a block RAM: a RAMB16BWER on Silinx\'s rule, a RAMB8BWER on Yosys\'s', { timeout: 300000 }, async () => {
+  const synth = 'synth_xilinx -family xc6s -ise -flatten -top laps';
+  const silinx = types(await synthJson(LAPS, 'laps', s6SynthCommands(synth), { [BRAMS_S6_FILE]: BRAMS_S6 }), 'laps');
+  assert.equal(silinx.RAMB16BWER, 1);
+  assert.equal(silinx.RAMB8BWER, undefined);
+  const yosysRule = s6SynthCommands(synth).replace(`-lib ${BRAMS_S6_FILE}`, '-lib +/xilinx/brams_xc3sda.txt');
+  const yosys = types(await synthJson(LAPS, 'laps', yosysRule), 'laps');
+  assert.equal(yosys.RAMB8BWER, 1);
+  assert.equal(yosys.RAMB16BWER, undefined);
+});
+
 // The reference: synth_xilinx -family xc6s whole. The same steps on Yosys's own rule give its netlist byte for byte (the
 // split changes nothing), and on Silinx's rule too for a design with no memory a 9K half would take
-test('the memory step split out of synth_xilinx: the same netlist as synth_xilinx whole (blinky, clock; the stopwatch on Yosys\'s rule)', { timeout: 300000 }, async () => {
-  for (const name of ['blinky', 'clock', 'stopwatch']) {
-    const { text, top } = example(name);
+test('the memory step split out of synth_xilinx: the same netlist as synth_xilinx whole (blinky, clock, stopwatch; a 9K memory on Yosys\'s rule)', { timeout: 300000 }, async () => {
+  const designs = [...['blinky', 'clock', 'stopwatch'].map(name => ({ name, ...example(name) })), { name: 'laps', text: LAPS, top: 'laps' }];
+  for (const { name, text, top } of designs) {
     const synth = `synth_xilinx -family xc6s -ise -flatten -top ${top}`;
     const whole = await synthJson(text, top, synth);
     const yosysRule = s6SynthCommands(synth).replace(`-lib ${BRAMS_S6_FILE}`, '-lib +/xilinx/brams_xc3sda.txt');
     assert.equal(await synthJson(text, top, yosysRule), whole, name);
-    if (name !== 'stopwatch') assert.equal(await synthJson(text, top, s6SynthCommands(synth), { [BRAMS_S6_FILE]: BRAMS_S6 }), whole, name);
+    if (name !== 'laps') assert.equal(await synthJson(text, top, s6SynthCommands(synth), { [BRAMS_S6_FILE]: BRAMS_S6 }), whole, name);
     else assert.equal(types(whole, top).RAMB8BWER, 1);
   }
 });

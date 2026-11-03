@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { EXAMPLES, exampleProject, targetName } from '../examples-lib.mjs';
+import { EXAMPLES, S6_EXAMPLES, exampleProject, targetName } from '../examples-lib.mjs';
 import { iseExamplesConfig } from '../ise-examples-config.mjs';
 import { createZip, readZip } from '../../core/zip.js';
 
@@ -22,17 +22,6 @@ const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILIN
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the ISE Docker image), or local (the image here)' : false;
 // a device of each family the .xise names: its properties differ, the sources do not
 const TARGETS = [{ board: 'basys2', variant: '250' }, { board: 'nexys3' }];
-// the warnings of ISE's project flow: none, but on the Nexys3 those of XST and map, the same with no .xise (#2321)
-const constant = (block, cause, ...ffs) => ffs.map(ff => `WARNING:Xst:${cause ? `1896 - Due to other FF/Latch trimming, FF/Latch` : '1293 - FF/Latch'} <${ff}> has a constant value of 0 in block <${block}>. This FF/Latch will be trimmed during the optimization process.`);
-const counts = (...names) => names.flatMap(n => [20, 21, 22, 23].map(b => `${n}/count_${b}`));
-const NEXYS3_WARNINGS = {
-  blinky: constant('top', false, 'u_speed/ticks_7'),
-  pong: [...constant('pong', false, 'dbR/count_20'), ...constant('pong', true, 'beatCount_23', 'period_23', ...counts('db1', 'db2', 'dbL'), 'dbR/count_21', 'dbR/count_22', 'dbR/count_23')],
-  stopwatch: ['WARNING:PhysDesignRules:2410 - This design is using one or more 9K Block RAMs'],
-  clock: [...constant('digital_clock', false, 'db0/count_22'), ...constant('digital_clock', true, 'db0/count_20', 'db0/count_21', 'db0/count_23', ...counts('db1', 'db2', 'db3'))],
-};
-const expectedWarnings = (example, t) => (t.board === 'nexys3' && NEXYS3_WARNINGS[example] || []).slice().sort();
-
 const RUN_SH = '[ -n "$ISE_SETTINGS" ] && . "$ISE_SETTINGS" > /dev/null\nxtclsh interop.tcl\n';
 const interopTcl = xise => `project open ${xise}
 puts "INTEROP top [project get top]"
@@ -104,7 +93,7 @@ const iseWarnings = lines => [...new Set(lines.filter(l => /^WARNING:/.test(l)).
 const fileList = p => (p.files || []).map(f => `${f.path} ${f.lang} ${f.role}`).sort();
 
 for (const example of EXAMPLES) {
-  for (const t of TARGETS) {
+  for (const t of TARGETS.filter(x => x.board !== 'nexys3' || S6_EXAMPLES.includes(example))) {
     test(`example ${example} for the ${targetName(t)}: its exported project built in ISE's project flow, what ISE leaves imported back`, { skip, timeout: 30 * 60000 }, async () => {
       const name = `${example}-${targetName(t)}`;
       const { project } = exampleProject(example, t, process.env.SILINX_WORKSPACE);
@@ -119,7 +108,9 @@ for (const example of EXAMPLES) {
       assert.deepEqual(said.slice(0, 1), [`INTEROP top /${project.top}`]);
       assert.match(said[1], /^INTEROP status (up_to_date|warnings)$/, said.join('\n'));
       assert.ok(fs.existsSync(path.join(out.dir, `${project.top}.bit`)), `no ${project.top}.bit`);
-      assert.deepEqual(iseWarnings(job.lines), expectedWarnings(example, t));
+      // no warning, on the Nexys3 too (#2321: the examples' counters as wide as they need, the stopwatch's lap memory a
+      // whole block RAM)
+      assert.deepEqual(iseWarnings(job.lines), []);
 
       // the folder as ISE left it, as a user would zip it
       const zip = await createZip(walk(out.dir), NODE_CODEC);
