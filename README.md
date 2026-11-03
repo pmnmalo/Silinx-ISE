@@ -454,7 +454,8 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 `list_devices` (the boards and devices), `set_design_properties` (the board, the device, the synthesis tool, the Preferred Language, as
 *Design Properties*), `set_source_properties` (a drawing's language), `new_source` (every type of *New Source*: a module with its ports, a test
 bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
-Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `test_bench_wizard` (a self-checking
+test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;

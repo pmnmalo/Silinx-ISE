@@ -2,7 +2,8 @@
 // make their modules (web/js/clock-wizard.js, bram-wizard.js): a DCM (Spartan-3E) or a PLL (Spartan-6) for the
 // frequencies asked (core/clocking.js), a block RAM or ROM (core/blockram.js), its settings kept in the module's header
 // (`-- silinx-wizard: {...}`) so that a module made by a wizard is made again from them with the settings changed, as
-// editing it reopens the wizard. The wizards' checks and their messages.
+// editing it reopens the wizard; the UCF Wizard's constraints file, a module's ports on the board's pins
+// (web/js/ucf-wizard.js). The wizards' checks and their messages.
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
 
@@ -158,6 +159,68 @@ export const WIZARD_TOOLS = [
       return { text: [`Block Memory: ${did} ${t.path}, the module ${spec.name}: ${spec.depth} x ${spec.width}, ${spec.style === 'inferred' ? 'inferable HDL' : `${plan.blocks} ${plan.primName}`}.`,
         `Block RAMs: ${used}; ${plan.primName} of ${plan.shape.depth} x ${plan.shape.width}, ${plan.cols} side by side${plan.rows > 1 ? `, ${plan.rows} deep` : ''}.`].join('\n'),
       data: { project: name, path: t.path, module: spec.name, blocks: plan.blocks, primitive: plan.primName, halves: plan.halves, deviceBlocks: have } };
+    },
+  },
+  {
+    name: 'constraints_wizard', title: 'UCF Wizard',
+    description: 'Write a constraints file (UCF) for a module\'s ports, as the UCF Wizard does: each bit of its ports on a pin of the project\'s board, assigned by their names (clk, led, sw, btn, seg, an…) and directions, the clock\'s period from the board; pins given override them (a net: x, or x<3> for a bit of a bus), and with no board they are all given. The project\'s constraints file when it has none. A file that exists is not replaced (set_top with update_constraints writes the project\'s again).',
+    inputSchema: { type: 'object', properties: {
+      project: PROJECT, module: STR('The module (default: the project\'s top).'), name: STR('The file\'s name (default: the module\'s).'), location: STR('Its folder (default constraints).'),
+      pins: { type: 'object', additionalProperties: { type: 'string' }, description: 'Pins given: { net: pin }, e.g. { "led<0>": "M5", "clk": "B8" }.' },
+    }, required: ['project'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    async run({ project: name, module, name: file, location, pins = {} }) {
+      const pj = await readProject(name);
+      const { openOnlyDevice, generateUcf, bitName, boardAutoAssign } = await import('../packages/silinx-fpga/src/parts.js');
+      if (openOnlyDevice(pj.device)) throw toolError(`the ${String(pj.device.part).toUpperCase()}'s constraints are a PCF: new_source constraints writes one`);
+      const { compile, elaborate } = await import('../core/compile.js');
+      const { primitiveSources } = await import('../core/unisim.js');
+      const { viewSourcesOf } = await import('./mcp-util.js');
+      const design = (await viewSourcesOf(name, pj, false)).filter(x => (x.role || 'design') === 'design');
+      const lib = compile([...primitiveSources(design), ...design]);
+      const mods = [...lib.modules.values()].filter(m => design.some(x => x.path === m.file) && m.kind !== 'package');
+      const top = mods.find(m => m.name.toLowerCase() === String(module ?? pj.top ?? '').toLowerCase())?.name || (module ? null : mods[0]?.name);
+      if (!top) throw toolError(module ? `no design module '${module}' in the project` : 'The project has no design module.');
+      // its ports as I/O Pin Planning reads them, a net a bit
+      const d = elaborate(lib, top);
+      if (!d.top) throw toolError(`The ports of '${top}' cannot be read: ${(d.diags || []).find(x => x.severity === 'error')?.message || 'it does not elaborate'}.`);
+      const ports = d.top.ports.map(p => { const t = p.sig.t; const bus = t.w > 1 || (t.kind === 'logic' && !t.scalar); return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null, bus }; });
+      const nets = [];
+      for (const p of ports) {
+        if (!p.bus) { nets.push(bitName(p.name)); continue; }
+        const step = p.msb >= p.lsb ? -1 : 1;
+        for (let i = p.msb; ; i += step) { nets.push(bitName(p.name, i)); if (i === p.lsb) break; }
+      }
+      const { resolveBoard } = await import('./devices.js');
+      const board = pj.board ? resolveBoard(pj.board, { part: pj.device.part }) : null;
+      let asg = {}, clocks = [], unmatched = [];
+      if (board) ({ assignments: asg, clocks, unmatched } = boardAutoAssign(ports, { ...board.board, device: board.device, resources: board.resources }, { byDirection: true }));
+      for (const [net, pin] of Object.entries(pins)) {
+        if (!nets.includes(net)) throw toolError(`pins: '${net}' is not a net of ${top} (${nets.slice(0, 12).join(', ')}${nets.length > 12 ? '…' : ''})`);
+        if (pin) asg[net] = { ...(asg[net] || {}), loc: String(pin).trim().toUpperCase() }; else delete asg[net];
+      }
+      const used = new Map();
+      for (const [net, x] of Object.entries(asg)) {
+        const k = String(x.loc).toUpperCase();
+        if (used.has(k)) throw toolError(`The pin ${x.loc} is given to ${used.get(k)} and ${net}.`);
+        used.set(k, net);
+      }
+      const loc = String(location ?? 'constraints').trim().replace(/\/+$/, '');
+      const base = String(file ?? top).trim().replace(/\.ucf$/i, '');
+      if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(base)) throw toolError('Enter a valid file name (letters, digits, _ and -).');
+      if (!/^[A-Za-z0-9_/-]+$/.test(loc) || loc.split('/').some(x => !x || x.startsWith('.')) || /^build(\/|$)/i.test(loc)) throw toolError('Invalid location.');
+      const path = `${loc}/${base}.ucf`;
+      const tree = await P.fileTree(name);
+      if (tree.includes(path)) throw toolError(`${path} already exists: choose another name.`);
+      const text = generateUcf({ ports, assignments: asg, clocks,
+        header: `UCF generated by the Silinx UCF Wizard for '${top}' (${pj.device.part}${pj.device.speed}-${pj.device.package}${board ? `, ${board.board.name}` : ''})` });
+      const noConstraints = !pj.constraints || !tree.includes(pj.constraints);
+      await P.writeFile(name, path, text);
+      if (noConstraints) await P.updateProject(name, x => ({ ...x, constraints: path }));
+      const free = nets.filter(n => !asg[n]);
+      return { text: [`UCF Wizard: created ${path} for ${top}: ${Object.keys(asg).length} of ${nets.length} net(s) on a pin${board ? ` of the ${board.board.name}` : ''}${clocks.length ? `, the period of ${clocks.map(c => c.net || c.port || c.name).join(', ')}` : ''}.`,
+        ...(free.length ? [`WARNING: no pin for ${free.join(', ')}${board && unmatched.length ? ' (not on the board by its name)' : ''}.`] : []), ...(noConstraints ? [`${path} is the project's constraints file.`] : [])].join('\n'),
+      data: { project: name, path, module: top, assigned: Object.keys(asg).length, nets: nets.length, unassigned: free, constraints: (await P.readProject(name)).constraints } };
     },
   },
 ];
