@@ -17,7 +17,7 @@
 }
 .menu-popup .mi { display: flex; align-items: center; height: 22px; padding: 0 6px 0 2px; border: 1px solid transparent; border-radius: 2px; white-space: nowrap; }
 .menu-popup .mi:hover:not(.disabled) { background: linear-gradient(#e8f1fb, #d3e5fa); border-color: #aecff7; }
-.menu-popup .mi.disabled { color: #a0a0a0; }
+.menu-popup .mi.disabled { color: #8d8d8d; }   /* (as a disabled button: a contrast of 3, #2678) */
 .menu-popup .chk { width: 24px; text-align: center; display: inline-flex; justify-content: center; }
 .menu-popup .chk .ico, .menu-popup .chk svg { width: 16px; height: 16px; }
 .menu-popup .lbl { flex: 1; padding-right: 24px; }
@@ -151,6 +151,7 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 .tree .row .meta { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #hier .tree .row .lbl { flex: none; }
 .tree .row.sel .meta { color: #dde; }
+html:not([data-ui="silinx"]) .tree .row.sel .twisty { color: #dde; }   /* (readable on the selection, #2678) */
 .tree .row.top-mod .lbl { font-weight: bold; }
 .tree .row.disabled { color: #999; }
 .tree .row .status { width: 16px; height: 16px; display: inline-flex; flex: none; }
