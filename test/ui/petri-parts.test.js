@@ -41,7 +41,9 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
   await page.waitFor((ed) => document.querySelectorAll(`${ed} .pn-place[data-id=p1] .pn-token`).length === 3, [ED], { what: 'three tokens drawn' });
   // (the capacity follows the tokens)
   assert.equal(await ev((ed) => document.querySelectorAll(`${ed} .pn-selection input[type=number]`)[1].value), '3');
-  assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .asm-side details .asm-section-body .asm-label`)].map((l) => l.textContent)),
+  // (the net's section: not folding, no details in the panel, #2735)
+  assert.deepEqual(await ev((ed) => [document.querySelectorAll(`${ed} .asm-side details`).length, document.querySelector(`${ed} .pn-net h3`).textContent]), [0, 'Net']);
+  assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-net .asm-label`)].map((l) => l.textContent)),
     ['Module name', 'Inputs', 'Outputs', 'Clock', 'Reset (synchronous, to the initial marking)', 'Description']);
   assert.equal(await ev((ed) => document.querySelectorAll(`${ed} .asm-problems li`).length + document.querySelectorAll('#console-errors .diag, #console-warnings .diag').length), 0);
   // ---- the simulation: the marking, go on and a clock step: start fires (idle 3 -> 2, work 1), busy
