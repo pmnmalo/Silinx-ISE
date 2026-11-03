@@ -228,7 +228,7 @@ for (const [board, name] of [['basys2', 'Basys2'], ['nexys2', 'Nexys2']]) {
     const off = await page.eval(() => ({
       sw: document.querySelector('.doc:not([hidden]) .emu-power').getAttribute('aria-checked'),
       stat: document.querySelector('.doc:not([hidden]) .emu .stat').textContent,
-      disabled: [...document.querySelectorAll('.doc:not([hidden]) .emu-bar > .btn')].map((b) => [b.textContent, b.disabled]),
+      disabled: [...document.querySelectorAll('.doc:not([hidden]) .emu-bar > .btn:not(.emu-props-btn)')].map((b) => [b.textContent, b.disabled]),   // (☰ Properties: narrow only)
       t: window.Silinx.active.view.sim.now,
     }));
     assert.equal(off.sw, 'false');
