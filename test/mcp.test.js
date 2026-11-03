@@ -59,7 +59,11 @@ test('the handshake: the protocol version, the server, its tools with their sche
   assert.equal((await srv.send('initialize', { protocolVersion: '1999-01-01' })).result.protocolVersion, '2025-06-18');
   srv.p.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n');   // (a notification: no answer)
   const { tools } = (await srv.send('tools/list')).result;
-  assert.deepEqual(tools.map(t => t.name), ['list_examples', 'list_projects', 'new_project_from_example', 'new_project', 'set_top', 'project_info', 'read_file', 'write_file', 'check_syntax', 'simulate', 'run_process', 'get_report']);
+  assert.deepEqual(tools.map(t => t.name), ['list_examples', 'list_projects', 'new_project_from_example', 'new_project', 'set_top', 'project_info', 'read_file', 'write_file',
+    'list_devices', 'set_design_properties', 'set_process_properties', 'unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'delete_file', 'delete_project',
+    'check_syntax', 'simulate', 'run_process', 'get_report']);
+  // (a tool that deletes or replaces what is in the workspace says so: the client asks before it runs)
+  assert.deepEqual(tools.filter(t => t.annotations.destructiveHint).map(t => t.name), ['set_top', 'write_file', 'set_design_properties', 'delete_file', 'delete_project']);
   for (const t of tools) {
     assert.equal(t.inputSchema.type, 'object', t.name);
     assert.ok(t.description.length > 40 && t.title, t.name);
