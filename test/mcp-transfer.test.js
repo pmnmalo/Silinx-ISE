@@ -1,6 +1,7 @@
 // The MCP server's tools of a project's import and export (#2674, server/mcp-transfer.js): export_project (a Xilinx ISE
 // or a Silinx ISE .zip, never over a file) and import_project (a .zip, a .xise with its folder, a project folder),
-// round trips of the examples with Check Syntax after them (no warnings), a hostile zip's warnings, and the errors.
+// only in the exchange folder (SILINX_MCP_FOLDER; the symbolic links that leave it refused); round trips of the
+// examples with Check Syntax after them (no warnings), a hostile zip's warnings, and the errors.
 // The zip's own format and the routes are tested in server-api.test.js and server-hardening.test.js.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +10,11 @@ import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
 
 let tmp;
-before(async () => { tmp = fs.realpathSync(await scratchEnv('silinx-mcp-transfer-')); });
+before(async () => {
+  tmp = fs.realpathSync(await scratchEnv('silinx-mcp-transfer-'));
+  fs.mkdirSync(path.join(tmp, 'exchange'));
+  process.env.SILINX_MCP_FOLDER = path.join(tmp, 'exchange');
+});
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 const { handle } = await import('../server/mcp.js');
@@ -23,7 +28,7 @@ async function call(name, args = {}) {
 }
 const ok = async (name, args) => { const r = await call(name, args); assert.equal(r.isError, false, r.text); return r; };
 const fails = async (name, args, message) => { const r = await call(name, args); assert.equal(r.isError, true); assert.equal(r.text, `${name}: ${message}`); };
-const out = f => path.join(tmp, f);
+const out = f => path.join(tmp, 'exchange', f);
 const entryNames = async f => (await readZip(fs.readFileSync(f), NODE_CODEC)).map(e => e.path).sort();
 const enc = s => new TextEncoder().encode(s);
 
@@ -57,8 +62,9 @@ test('export_project / import_project: a Silinx ISE project, its drawings and bo
   assert.match(i.text, /^Imported the Silinx ISE project as 'gates_s': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
   assert.ok(i.data.extra.includes('src/gates.sch.json'));
   assert.equal((await ok('check_syntax', { project: 'gates_s' })).text, 'Process "Check Syntax" of <gates> completed successfully (22 signals, 21 processes).');
-  // a project folder (here a workspace's)
-  const d = await ok('import_project', { name: 'gates_f', from: P.projectDir('gates') });
+  // a project folder (a workspace's, copied into the exchange folder)
+  fs.cpSync(P.projectDir('gates'), out('gates-folder'), { recursive: true });
+  const d = await ok('import_project', { name: 'gates_f', from: 'gates-folder' });
   assert.match(d.text, /^Imported the Silinx ISE project as 'gates_f': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
   assert.deepEqual((await P.readProject('gates_f')).files, (await P.readProject('gates')).files);
 });
@@ -80,13 +86,14 @@ test('export_project / import_project: the errors', async () => {
   const size = fs.statSync(out('blinky.zip')).size;
   await fails('export_project', { project: 'blinky', path: out('blinky.zip') }, `'${out('blinky.zip')}' exists: an export does not replace a file (give another path)`);
   assert.equal(fs.statSync(out('blinky.zip')).size, size);
-  await fails('export_project', { project: 'blinky', path: 'blinky.zip' }, 'path: \'blinky.zip\' is not an absolute path');
+  // a name or a path in the exchange folder is one of its files
+  assert.equal((await ok('export_project', { project: 'blinky', path: 'sub/../blinky2.zip' })).data.path, out('blinky2.zip'));
   await fails('export_project', { project: 'blinky', path: out('blinky.tar') }, `path: '${out('blinky.tar')}' is not a .zip`);
   await fails('export_project', { project: 'blinky', path: out('nofolder/b.zip') }, `no folder '${out('nofolder')}'`);
   await fails('export_project', { project: 'blinky', kind: 'ise', path: out('b2.zip') }, 'kind: one of xilinx, silinx');
   await fails('export_project', { project: 'nosuch', path: out('b3.zip') }, 'no project \'nosuch\' in the workspace');
   await fails('import_project', { name: 'blinky', from: out('blinky.zip') }, 'project \'blinky\' already exists (delete_project, or another name)');
-  await fails('import_project', { name: 'n1', from: 'blinky.zip' }, 'from: \'blinky.zip\' is not an absolute path');
+  assert.equal((await ok('import_project', { name: 'blinky2', from: 'blinky2.zip' })).data.top, 'top');
   await fails('import_project', { name: 'n1', from: out('none.zip') }, `no file or folder '${out('none.zip')}'`);
   fs.writeFileSync(out('notes.txt'), 'x');
   await fails('import_project', { name: 'n1', from: out('notes.txt') }, `from: '${out('notes.txt')}' is not a .zip, a .xise or a folder`);
@@ -95,4 +102,35 @@ test('export_project / import_project: the errors', async () => {
   fs.writeFileSync(out('plain.zip'), await createZip([{ path: 'readme.txt', data: enc('x') }], NODE_CODEC));
   await fails('import_project', { name: 'n1', from: out('plain.zip') }, 'the zip contains no .xise (ISE project) and no silinx.json');
   assert.ok(!fs.existsSync(P.projectDir('n1')));
+});
+
+test('export_project / import_project: the exchange folder only, its symbolic links that leave it refused', async () => {
+  await ok('new_project_from_example', { name: 'vga', example: 'vga' });
+  const dir = path.join(tmp, 'exchange');
+  const away = path.join(tmp, 'elsewhere');
+  fs.mkdirSync(away);
+  const outside = (what, p) => `${what}: '${p}' is outside the exchange folder ${dir} (SILINX_MCP_FOLDER sets another)`;
+  await fails('export_project', { project: 'vga', path: path.join(away, 'vga.zip') }, outside('path', path.join(away, 'vga.zip')));
+  await fails('export_project', { project: 'vga', path: '../vga.zip' }, outside('path', '../vga.zip'));
+  await fails('import_project', { name: 'v1', from: P.projectDir('vga') }, outside('from', P.projectDir('vga')));
+  await fails('import_project', { name: 'v1', from: '/' }, outside('from', '/'));
+  assert.deepEqual(fs.readdirSync(away), []);
+  if (process.platform !== 'win32') {
+    // a link in the exchange folder to a folder out of it, and to a file out of it
+    fs.symlinkSync(away, path.join(dir, 'link'));
+    await fails('export_project', { project: 'vga', path: 'link/vga.zip' }, outside('path', 'link/vga.zip'));
+    assert.deepEqual(fs.readdirSync(away), []);
+    fs.symlinkSync(P.projectDir('vga'), path.join(dir, 'project-link'));
+    await fails('import_project', { name: 'v1', from: 'project-link' }, outside('from', 'project-link'));
+    // a link that leads into the exchange folder is in it
+    fs.mkdirSync(path.join(dir, 'real'));
+    fs.symlinkSync(path.join(dir, 'real'), path.join(dir, 'inside'));
+    assert.equal((await ok('export_project', { project: 'vga', path: 'inside/vga.zip' })).data.path, path.join(dir, 'inside/vga.zip'));
+    assert.ok(fs.existsSync(path.join(dir, 'real/vga.zip')));
+  }
+  assert.ok(!fs.existsSync(P.projectDir('v1')));
+  // no exchange folder
+  process.env.SILINX_MCP_FOLDER = path.join(tmp, 'none');
+  try { await fails('export_project', { project: 'vga', path: 'vga.zip' }, `no exchange folder ${path.join(tmp, 'none')} (SILINX_MCP_FOLDER sets another)`); }
+  finally { process.env.SILINX_MCP_FOLDER = dir; }
 });
