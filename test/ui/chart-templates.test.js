@@ -63,7 +63,6 @@ uiTest('#2149 FSM Wizard templates: a counter of 5 (its pages filled in), N refu
   await page.fill('.dlg-overlay .tp-type', 'mealy');
   await go(page, 'Next >', 'Inputs and Outputs');
   assert.deepEqual(await portRows(page), ['x:in:1', 'z:out:1']);
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-type').value), 'mealy');
   await go(page, 'Next >', 'States and Transitions');
   assert.deepEqual(await stateNames(page), ['S0', 'S1', 'S2']);
   assert.deepEqual(await transRows(page), ['S0 S1 x', 'S0 S0 !x', 'S1 S1 x', 'S1 S2 !x', 'S2 S1 x', 'S2 S0 !x']);

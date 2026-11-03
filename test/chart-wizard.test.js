@@ -16,10 +16,10 @@ const diagsOf = (g, top) => {
 const ports = [{ name: 'x', dir: 'in', width: 1 }, { name: 'n', dir: 'in', width: 4 }, { name: 'z', dir: 'out', width: 1 }, { name: 'q', dir: 'out', width: 3 }];
 
 test('#2082 fsmFromSpec: the ports, the states (the first the initial one), the transitions by name, laid out in rows of 4', () => {
-  const m = fsmFromSpec({ name: 'det', lang: 'verilog', type: 'mealy', clock: 'ck', reset: 'clr', description: ' A detector. ', ports,
+  const m = fsmFromSpec({ name: 'det', lang: 'verilog', clock: 'ck', reset: 'clr', description: ' A detector. ', ports,
     states: ['IDLE', 'A', 'B', 'C', 'D'], transitions: [{ from: 'IDLE', to: 'A', cond: 'x' }, { from: 'A', to: 'IDLE', cond: '' }, { from: 'D', to: 'D', cond: '1' }] });
   assert.equal(m.kind, 'fsm');
-  assert.deepEqual([m.name, m.lang, m.type, m.clock, m.reset, m.description], ['det', 'verilog', 'mealy', 'ck', { name: 'clr', active: 'high', sync: false }, 'A detector.']);
+  assert.deepEqual([m.name, m.lang, m.type, m.clock, m.reset, m.description], ['det', 'verilog', 'moore', 'ck', { name: 'clr', active: 'high', sync: false }, 'A detector.']);
   assert.deepEqual(m.inputs, [{ name: 'x', width: 1 }, { name: 'n', width: 4 }]);
   assert.deepEqual(m.outputs, [{ name: 'z', width: 1, default: '0' }, { name: 'q', width: 3, default: '0' }]);
   assert.deepEqual(m.states.map((s) => [s.id, s.name, s.x, s.y]), [['s1', 'IDLE', 120, 160], ['s2', 'A', 320, 160], ['s3', 'B', 520, 160], ['s4', 'C', 720, 160], ['s5', 'D', 120, 360]]);

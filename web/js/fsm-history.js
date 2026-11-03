@@ -8,7 +8,7 @@ import { clone } from './fsm-editor.js';
 export function mountFsmHistory(ctx) {
   const {
     opts, M, delBtn, destroyed, encSel, hi, hist, lastKey, lastT, panel, render, renderPanel,
-    renderSide, sel, stateById, statusInfo, styleSel, tabBtns, timers, transById, typeSel, validateSoon, setM,
+    renderSide, sel, stateById, statusInfo, styleSel, tabBtns, timers, transById, validateSoon, setM,
     setHist, setHi, setLastKey, setLastT, setSel
   } = ctx;
 
@@ -42,7 +42,7 @@ export function mountFsmHistory(ctx) {
   const redo = () => { if (hi() < hist().length - 1) restore(hi() + 1); };
   function updateToolbar() {
     delBtn.disabled = !sel();
-    typeSel.value = M().type; encSel.value = M().encoding; styleSel.value = M().style;
+    encSel.value = M().encoding; styleSel.value = M().style;
     for (const [k, b] of Object.entries(tabBtns)) b.classList.toggle('on', panel() === k);
     statusInfo.textContent = `${M().states.length} state(s), ${M().transitions.length} transition(s) · ${M().type === 'mealy' ? 'Mealy' : 'Moore'}`;
   }

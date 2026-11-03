@@ -262,7 +262,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   schematic with Silinx's symbols where you drew them and the wires routed square (Undo brings the drawing before
   back).
 - **State diagrams (FSM)** (*Tools ▸ FSM State Diagram Editor…*, New Source ▸ *Finite State Machine (FSM)*,
-  `.fsm.json`): the bubble diagram of the 1st-semester courses, Moore or Mealy. Double-click to add
+  `.fsm.json`): the bubble diagram of the 1st-semester courses, Moore or Mealy (Mealy when a transition has outputs). Double-click to add
   a state, drag from the rim of a state to another (or to itself) to add a transition, double-click
   to edit in place (`S2 / z=1` in a state, `x && !y / z=1` on an arrow), drag a label to bend its
   arrow; properties panel (initial/reset state, Moore outputs, condition, Mealy outputs, priority),

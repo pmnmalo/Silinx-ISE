@@ -1,6 +1,6 @@
 // UI: the FSM, ASM and UCF wizards of New Source (#2082), through its Wizard > button: they open at their own pages
 // (no page of the name; the name, the location and the language typed on New Source). FSM: its inputs and outputs,
-// clock and reset, Mealy, its states and transitions (a state renamed and removed: the transitions follow) -> the
+// clock and reset (no Moore / Mealy choice: Moore, no output on a transition, #2728), its states and transitions (a state renamed and removed: the transitions follow) -> the
 // diagram opened, its HDL generated, compiled and elaborated with no warnings. ASM: the states chained -> the chart
 // opened, its HDL the same. UCF: the top's bits on the board's pins (assigned from the board, one changed, one
 // given twice refused) -> the project's constraints file; no board: the pins typed. In Portuguese. The plain path
@@ -41,7 +41,7 @@ const diags = (path, text, top) => {
 };
 const logWarnings = (page) => page.eval(() => [...document.querySelectorAll('#console-log .ln')].map((l) => l.textContent).filter((t) => /^(WARNING|ERROR)/.test(t)));
 
-uiTest('#2082 FSM Wizard: inputs and outputs, Mealy, states and transitions (renamed, removed); the diagram opened, its Verilog compiling with no warnings', E, async (page) => {
+uiTest('#2082 FSM Wizard: inputs and outputs, no Moore / Mealy choice, states and transitions (renamed, removed); the diagram opened, its Verilog compiling with no warnings', E, async (page) => {
   await makeProject(env, { name: 'FwPj', top: '' });
   await page.openProject('FwPj');
   await newSourceWizardOf(page, 'Finite State Machine (FSM)', 'det', 'FSM Wizard', { location: 'fsm', lang: 'verilog' });
@@ -54,7 +54,7 @@ uiTest('#2082 FSM Wizard: inputs and outputs, Mealy, states and transitions (ren
   assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay .mw-qa').length), 0);
   await ports(page, [['x', 'in', 1], ['z', 'out', 1]]);
   assert.deepEqual(await page.eval(() => [...document.querySelector('.dlg-overlay .mw-pdir').options].map((o) => o.value)), ['in', 'out']);
-  await page.fill('.dlg-overlay .cw-type', 'mealy');
+  assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay .cw-type').length), 0);
   // the clock named as an input: refused
   await page.fill('.dlg-overlay .cw-clock', 'x');
   await page.dialogButton('Next >');
@@ -89,7 +89,7 @@ uiTest('#2082 FSM Wizard: inputs and outputs, Mealy, states and transitions (ren
   await next(page, 'Summary');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .mw-summary').textContent), [
     'The wizard will create the state diagram fsm/det.fsm.json and open it in the FSM editor.', '',
-    'Module: det (Verilog), Mealy machine', 'Inputs: x', 'Outputs: z', 'Clock: clk; reset: rst (asynchronous, active high)',
+    'Module: det (Verilog), Moore machine', 'Inputs: x', 'Outputs: z', 'Clock: clk; reset: rst (asynchronous, active high)',
     'States: IDLE, S1, S2 (initial: IDLE)', 'Transitions: IDLE → S1 (x), S1 → S2 (x), S2 → IDLE, IDLE → IDLE (!x)', '',
     'Then set the outputs of the states (and of the transitions, Mealy) in the editor.'].join('\n'));
   await next(page, null);
@@ -97,7 +97,7 @@ uiTest('#2082 FSM Wizard: inputs and outputs, Mealy, states and transitions (ren
   await page.waitFor(() => window.Silinx.active?.id === 'fsm:fsm/det.fsm.json', [], { what: 'the diagram opened' });
   const m = JSON.parse(await readWs(env, 'FwPj', 'fsm/det.fsm.json'));
   assert.deepEqual([m.name, m.lang, m.type, m.description, m.initial, m.states.map((s) => s.name), m.transitions.map((t) => `${t.from}>${t.to}:${t.cond}`)],
-    ['det', 'verilog', 'mealy', 'Detects 11.', 's1', ['IDLE', 'S1', 'S2'], ['s1>s2:x', 's2>s3:x', 's3>s1:', 's1>s1:!x']]);
+    ['det', 'verilog', 'moore', 'Detects 11.', 's1', ['IDLE', 'S1', 'S2'], ['s1>s2:x', 's2>s3:x', 's3>s1:', 's1>s1:!x']]);
   // its HDL file, made with it, compiling with no warnings
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'fsm/det.v'), [], { what: 'fsm/det.v', timeout: 15000 });
   assert.deepEqual(diags('fsm/det.v', await readWs(env, 'FwPj', 'fsm/det.v'), 'det'), []);

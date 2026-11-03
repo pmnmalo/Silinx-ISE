@@ -7,8 +7,6 @@ export const FSM_PT = {
   'Convert to State Diagram': 'Converter para Diagrama de Estados', 'Create Boolean Algebra': 'Criar Álgebra Booleana',
   
   // toolbar
-  'Moore machine: outputs depend on the state only (written in the circles). Mealy machine: outputs also on the transitions (condition / outputs).':
-    'Máquina de Moore: as saídas dependem só do estado (escritas nos círculos). Máquina de Mealy: saídas também nas transições (condição / saídas).',
   'State encoding': 'Codificação de estados', 'Binary': 'Binária', 'Gray': 'Gray', 'One-hot': 'One-hot', 'Enumerated': 'Enumerada',
   'Style of the generated HDL': 'Estilo do HDL gerado', '3 processes': '3 processos', '2 processes': '2 processos', 'HDL language': 'Linguagem HDL',
   'Zoom level': 'Nível de zoom',
@@ -31,8 +29,8 @@ export const FSM_PT = {
   'Transition': 'Transição', 'From': 'De', 'To': 'Para', 'Condition': 'Condição',
   "Boolean expression over the inputs: x, !x, x && y, x || !y, a == 2'b01, b[0] (also and, or, not, =). Empty: always.":
     "Expressão booleana das entradas: x, !x, x && y, x || !y, a == 2'b01, b[0] (também and, or, not, =). Vazia: sempre.",
-  'Outputs (Mealy)': 'Saídas (Mealy)', 'A Moore machine has no outputs on the transitions (choose Mealy in the toolbar).': 'Uma máquina de Moore não tem saídas nas transições (escolha Mealy na barra de ferramentas).',
-  'Outputs while this transition is taken: output=value, separated by commas.': 'Saídas enquanto esta transição é tomada: saída=valor, separadas por vírgulas.',
+  'Outputs (Mealy)': 'Saídas (Mealy)',
+  'Outputs while this transition is taken: output=value, separated by commas (they make the machine a Mealy machine).': 'Saídas enquanto esta transição é tomada: saída=valor, separadas por vírgulas (fazem da máquina uma máquina de Mealy).',
   'e.g. x && !y   (empty = always)': 'p.ex. x && !y   (vazia = sempre)', 'e.g. z=1': 'p.ex. z=1',
   '▲ Earlier': '▲ Antes', 'Try this condition before the previous one': 'Testar esta condição antes da anterior', '▼ Later': '▼ Depois',
   'Try this condition after the next one': 'Testar esta condição depois da seguinte', 'Straighten': 'Endireitar', 'Default shape of the arrow': 'Forma original da seta',
@@ -84,7 +82,6 @@ export const FSM_PT_PATTERNS = [
   [/^Transition (.+) → (.+): the condition '(.*)' is not valid \((.*)\)$/, "Transição $1 → $2: a condição '$3' não é válida ($4)"],
   [/^Transition (.+) → (.+): '(.*)' is an output; conditions can only test inputs$/, "Transição $1 → $2: '$3' é uma saída; as condições só podem testar entradas"],
   [/^Transition (.+) → (.+): '(.*)' in the condition '(.*)' is not an input$/, "Transição $1 → $2: '$3' na condição '$4' não é uma entrada"],
-  [/^Transition (.+) → (.+) has outputs \((.*)\), but this is a Moore machine: give the outputs to the states, or make it a Mealy machine$/, 'Transição $1 → $2 tem saídas ($3), mas esta é uma máquina de Moore: dê as saídas aos estados, ou faça dela uma máquina de Mealy'],
   [/^Transition (.+) → (.+) is never taken: its condition '(.*)' is never true$/, "Transição $1 → $2 nunca é tomada: a sua condição '$3' nunca é verdadeira"],
   [/^Transition (.+) → (.+) is never taken: the transitions listed before it are always taken first$/, 'Transição $1 → $2 nunca é tomada: as transições listadas antes dela são sempre tomadas primeiro'],
   [/^State (.+) cannot be reached from the initial state (.+)$/, 'O estado $1 não pode ser alcançado a partir do estado inicial $2'],

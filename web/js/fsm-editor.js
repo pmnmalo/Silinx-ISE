@@ -55,7 +55,7 @@ export function radiusOf(s) {
 // with their separators)
 function readOnlyChrome({ root, toolbar, hint, probSection }) {
   root.classList.add('asm-readonly');
-  const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-type'));
+  const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc'));
   for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling, probSection]) g.hidden = true;
   hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it';
 }
@@ -87,8 +87,6 @@ export function mountFsmEditor(container, opts = {}) {
   };
 
   // ---------------------------------------------------------------------------- toolbar
-  const typeSel = select('fsm-type', 'Moore machine: outputs depend on the state only (written in the circles). Mealy machine: outputs also on the transitions (condition / outputs).',
-    [['moore', 'Moore'], ['mealy', 'Mealy']], (v) => { M.type = v; commit('type'); renderSide(); });
   const encSel = select('fsm-enc', 'State encoding', FSM_ENCODINGS.map((e) => [e, { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enumerated' }[e]]),
     (v) => { M.encoding = v; commit('enc'); });
   const styleSel = select('fsm-style', 'Style of the generated HDL', [['3process', '3 processes'], ['2process', '2 processes']], (v) => { M.style = v; commit('style'); });
@@ -107,7 +105,7 @@ export function mountFsmEditor(container, opts = {}) {
     sep(),
     h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBy(f), () => fit())),
     sep(),
-    h('div', { class: 'asm-group' }, typeSel, encSel, styleSel),
+    h('div', { class: 'asm-group' }, encSel, styleSel),
     sep(),
     h('div', { class: 'asm-group' }, tabBtns.tables, tabBtns.sim),
     h('div', { class: 'asm-spacer' }),
@@ -230,7 +228,7 @@ export function mountFsmEditor(container, opts = {}) {
     opts, M: () => M, delBtn, destroyed: () => destroyed, encSel, hi: () => hi, hist: () => hist,
     lastKey: () => lastKey, lastT: () => lastT, panel: () => panel, render: (...a) => render(...a),
     renderPanel: (...a) => renderPanel(...a), renderSide: (...a) => renderSide(...a), sel: () => sel, stateById,
-    statusInfo, styleSel, tabBtns, timers, transById, typeSel, validateSoon: (...a) => validateSoon(...a),
+    statusInfo, styleSel, tabBtns, timers, transById, validateSoon: (...a) => validateSoon(...a),
     setM: (v) => { M = v; }, setHist: (v) => { hist = v; }, setHi: (v) => { hi = v; },
     setLastKey: (v) => { lastKey = v; }, setLastT: (v) => { lastT = v; }, setSel: (v) => { sel = v; }
   });
