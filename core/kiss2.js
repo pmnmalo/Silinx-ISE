@@ -65,7 +65,7 @@ export function fromKiss2(text, { name = 'fsm', lang = 'vhdl' } = {}) {
     }
   }
   const m = normalizeFsm({
-    name, lang, type: 'mealy', encoding: 'binary', style: '3process',
+    name, lang, encoding: 'binary', style: '3process',
     inputs: ni ? [{ name: 'x', width: ni }] : [], outputs: no ? [{ name: 'y', width: no, default: `${no}'b${'0'.repeat(no)}` }] : [],
     states, transitions, initial: id.get(reset || names[0]),
   });

@@ -42,7 +42,7 @@ test('every validation message of core/fsm.js has a Portuguese translation', () 
   // every kind of message is produced
   for (const re of [/has no name/, /is not a valid name/, /reserved word/, /used twice/, /the width must be/, /default value 'x' must be a constant/,
     /default value 3 does not fit/, /no states/, /Two states/, /is not an output$/, /must be a constant/, /does not fit in/, /does not exist/,
-    /is not valid \(/, /is an output; conditions/, /is not an input/, /Moore machine/, /never true/, /always taken first/, /cannot be reached/,
+    /is not valid \(/, /is an output; conditions/, /is not an input/, /never true/, /always taken first/, /cannot be reached/,
     /has no exit/, /both true when/, /no transition is true when/, /random combinations/, /is never set/, /: 'x' has 1 bit/]) {
     assert.ok([...msgs].some((x) => re.test(x)), `${re} produced`);
   }

@@ -14,10 +14,10 @@ const reset = name => ({ name, active: 'high', sync: false });
  * transitions [{ from, to, cond, outputs? }] by the states' names, in priority order (cond '' or 1: always; outputs:
  * Mealy); layout 'circle': the states round a circle (else rows of 4).
  */
-export function fsmFromSpec({ name, lang, type = 'moore', clock = 'clk', reset: rst = 'rst', description = '', ports = [], states = [], outputs = {}, transitions = [], layout }) {
+export function fsmFromSpec({ name, lang, clock = 'clk', reset: rst = 'rst', description = '', ports = [], states = [], outputs = {}, transitions = [], layout }) {
   const id = new Map(states.map((s, i) => [s, `s${i + 1}`]));
   return normalizeFsm({
-    name, lang, type, clock, reset: reset(rst), encoding: 'binary', style: '3process',
+    name, lang, clock, reset: reset(rst), encoding: 'binary', style: '3process',
     ...(description.trim() ? { description: description.trim() } : {}),
     inputs: io(ports, 'in'),
     outputs: io(ports, 'out', { default: '0' }),

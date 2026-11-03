@@ -64,7 +64,7 @@ export function petriToFsm(model, { maxStates = MAX_FSM_STATES } = {}) {
 
   const names = new Set();
   const fsm = normalizeFsm({
-    name: m.name, lang: m.lang, type: 'moore', clock: m.clock, reset: m.reset, encoding: 'binary',
+    name: m.name, lang: m.lang, clock: m.clock, reset: m.reset, encoding: 'binary',
     inputs: m.inputs, outputs: m.outputs.map(o => ({ ...o, default: '0' })),
     states: states.map((st, i) => ({
       id: `s${i}`, name: unique(stateName(m, st), names),

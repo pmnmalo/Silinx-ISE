@@ -11,8 +11,7 @@ export const WIZARDS_PT = {
   'The wizard creates an ASM chart with its inputs, outputs and state boxes, ready for you to add the decisions and the outputs; its HDL is generated from it.':
     'O assistente cria um diagrama ASM com as entradas, as saídas e as caixas de estado, pronto para acrescentar as decisões e as saídas; o HDL é gerado a partir dele.',
   'Reset (asynchronous, to the initial state):': 'Reset (assíncrono, para o estado inicial):',
-  'Machine type:': 'Tipo de máquina:', 'Moore (the outputs depend on the state)': 'Moore (as saídas dependem do estado)',
-  'Mealy (the outputs depend on the state and the inputs)': 'Mealy (as saídas dependem do estado e das entradas)',
+  'Machine type:': 'Tipo de máquina:',
   'States and Transitions': 'Estados e Transições', 'States': 'Estados', '(initial)': '(inicial)',
   'Add State': 'Acrescentar Estado', 'Add Transition': 'Acrescentar Transição', 'Empty: always': 'Vazia: sempre', 'always': 'sempre',
   'No transitions yet: use Add Transition, or draw them in the editor.': 'Ainda sem transições: use Acrescentar Transição, ou desenhe-as no editor.',

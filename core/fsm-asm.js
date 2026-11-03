@@ -4,7 +4,7 @@
 import { asmLayout } from './asm-from-hdl.js';
 import { exprToString, normalizeModel as normalizeAsm, parseAction, parseCaseChoices } from './asm.js';
 import {
-  clone, condNames, constValue, evalCond, inputCombos, normalizeFsm, parseCond, placeNew, stateById,
+  clone, condNames, constValue, evalCond, fsmKind, inputCombos, normalizeFsm, parseCond, placeNew, stateById,
   transitionsFrom
 } from './fsm.js';
 import { sortedOutputs } from './fsm-hdl.js';
@@ -156,7 +156,7 @@ export function asmToFsm(asmModel, { previous = null } = {}) {
   const pState = (name) => prev?.states.find((s) => s.name.toLowerCase() === name.toLowerCase());
   const m = normalizeFsm({
     name: prev && prev.name.toLowerCase() === asm.name.toLowerCase() ? prev.name : asm.name,
-    lang: asm.lang, type: prev?.type || 'moore', clock: asm.clock, reset: asm.reset, encoding: asm.encoding,
+    lang: asm.lang, clock: asm.clock, reset: asm.reset, encoding: asm.encoding,
     style: prev?.style || '3process',
     inputs: asm.inputs.map((i) => ({ name: i.name, width: i.width })),
     outputs: asm.outputs.map((o) => {
@@ -269,7 +269,7 @@ export function asmToFsm(asmModel, { previous = null } = {}) {
       push({ id: m.transitions.some((x) => x.id === prevStay.id) ? newTid() : prevStay.id, from: me, to: me, cond: text, outputs: {}, ...(prevStay.angle != null ? { angle: prevStay.angle } : {}) });
     }
   }
-  if (m.transitions.some((t) => Object.keys(t.outputs).length)) m.type = 'mealy';
+  m.type = fsmKind(m);
   m.transitions = m.transitions.map((t, i) => [t, i]).sort((a, b) => order.get(a[0]) - order.get(b[0]) || a[1] - b[1]).map(([t]) => t);
   if (prev) {
     // the order of the previous diagram (new states last)
