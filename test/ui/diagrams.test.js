@@ -674,13 +674,13 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
   }
   // the free state S0 is unreachable, and so are the states it leads to: warnings, not errors
   await page.click('.doc:not([hidden]) .asm-btn', { text: 'Validate' });
-  await page.waitFor(() => /· 7 states · 0 errors/.test(document.querySelector('.doc:not([hidden]) .asm-status')?.textContent || ''), [], { what: 'chart valid' });
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .asm-problems .asm-prob')].map((li) => [li.className, li.textContent])), [
-    ['asm-prob warning link', "▲State 'S0' is unreachable from the initial state"],
-    ['asm-prob warning link', "▲State 'S1' is unreachable from the initial state"],
-    ['asm-prob warning link', "▲State 'S2' is unreachable from the initial state"],
-    ['asm-prob warning link', "▲State 'S3' is unreachable from the initial state"],
-  ]);
+  // (its states at the toolbar's right end, its problems in the console's Warnings and Validate's lines, #2730)
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .asm-info')?.textContent === '7 states', [], { what: 'the states' });
+  await page.waitFor(() => document.querySelectorAll('#console-warnings .diag').length === 4 && !document.querySelectorAll('#console-errors .diag').length, [], { what: 'chart valid' });
+  const unreachable = ['S0', 'S1', 'S2', 'S3'].map((n) => `State '${n}' is unreachable from the initial state`);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#console-warnings .diag')].map((r) => r.textContent)), unreachable.map((m) => `WARNING:ASM - "src/ctrl.asm.json": ${m}`));
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#console-log .ln')].map((l) => l.textContent.trim()).filter(Boolean).slice(-6)),
+    ['Started : "Validate" of ctrl.asm.json.', ...unreachable.map((m) => `WARNING: ${m}`), 'Process "Validate" completed successfully with 4 warning(s)']);
   const final = await model();
   // its HDL src/ctrl.vhd, generated from it (no Generate HDL any more, #220): every state in it
   assert.ok(!(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .asm-btn')].map((b) => b.textContent))).some((t) => /Generate/.test(t)));

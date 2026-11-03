@@ -68,8 +68,8 @@ export function showConsolePage(page) {
 // Diagnostics (Errors / Warnings tabs)
 export function setDiagnostics(diags, { keepConsole = true } = {}) {
   // a check replaces its own entries; warnings/errors collected from the console (e.g. a running
-  // implementation) are kept unless keepConsole is false
-  S.diags = [...diags, ...(keepConsole ? S.diags.filter(d => d.source === 'console') : [])];
+  // implementation) are kept unless keepConsole is false, and the open editors' problems (editor-problems.js) always
+  S.diags = [...diags, ...S.diags.filter(d => (keepConsole && d.source === 'console') || d.source === 'editor')];
   lastConsoleDiag = null;
   renderDiagnostics();
   // push file-local diagnostics to open editors
@@ -86,10 +86,11 @@ export function renderDiagnostics() {
       const hint = hintRow(d);   // plain-language explanation + fix, expandable under the message
       const row = h('div', { class: 'diag' }, icon(ico),
         h('span', {}, `${sevWord(d)}:${d.tool || 'HDLCompiler'} - `),
-        d.file ? h('span', { class: 'loc' }, `"${d.file}" Line ${d.line}`) : null,
+        d.file ? h('span', { class: 'loc' }, d.line ? `"${d.file}" Line ${d.line}` : `"${d.file}"`) : null,
         h('span', { 'data-no-i18n': true }, d.file ? `: ${d.message}` : d.message), hint?.toggle,
         ...diagFixes(d).map(f => h('span', { class: 'diag-fix', role: 'button', 'data-no-i18n': true, onclick: e => { e.stopPropagation(); applyDiagFix(d, f); } }, `${t('Fix:')} ${t(f.title)}`)));
-      row.addEventListener('click', () => d.file && app.openFile(d.file, d.line, d.col));
+      // (an editor's problem: its item selected, editor-problems.js)
+      row.addEventListener('click', () => (d.goto ? d.goto() : d.file && app.openFile(d.file, d.line, d.col)));
       el.append(row);
       if (hint) el.append(hint.box);
     }

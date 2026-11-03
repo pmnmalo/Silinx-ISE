@@ -64,7 +64,11 @@ uiTest('#1575 a sequential C module\'s ASM chart, read-only: its [ASM] badge and
   await page.drag(box, { x: box.x + 120, y: box.y + 60 });
   await page.eval(() => document.querySelector('.doc:not([hidden]) .asm-editor').dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true })));
   assert.equal(await page.eval(() => JSON.stringify(window.Silinx.active.asmEditor.getModel())), before0);
-  assert.ok(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .asm-side input, .doc:not([hidden]) .asm-side textarea')].every((x) => x.disabled)));
+  assert.ok(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) :is(.asm-side, .asm-left) :is(input, textarea, select)')].every((x) => x.disabled)));
+  // (no hint nor status line; its states at the toolbar's right; the encoding hidden; no problems in the console, #2730)
+  assert.deepEqual(await page.eval(() => { const el = document.querySelector('.doc:not([hidden]) .asm-editor');
+    return [!!el.querySelector('.asm-hint, .asm-status'), /^\d+ states$/.test(el.querySelector('.asm-info').textContent), el.querySelector('.asm-encoding').hidden,
+      document.querySelectorAll('#console-errors .diag, #console-warnings .diag').length]; }), [false, true, true, 0]);
   // its process
   await page.treeRow('#hier', 'gcd');
   await page.treeRow('#procs', 'View State Machine (ASM)', { dbl: true, exact: true });

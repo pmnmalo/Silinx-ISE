@@ -44,8 +44,10 @@ uiTest('#2505 the editors\' toolbars and side panels as the Schematic editor\'s'
     assert.deepEqual(await look(page, b, `${b} [data-act=zin]`), ref, `${name}: the look of the schematic's toolbar`);
     assert.deepEqual(await ownHistory(b), [], `${name}: no Undo, Redo or Print of its own`);
     assert.deepEqual(await page.eval((x) => ['zin', 'zout', 'fit', 'delete'].map((a) => !!document.querySelector(`${x} [data-act=${a}] svg`)), b), [true, true, true, true], `${name}: the schematic's icons`);
-    assert.deepEqual(await sideLook(`${D} .asm-side`, `${D} .asm-cap`), refSide, `${name}: the side panel`);
-    assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-cap`).textContent, D), 'Properties');
+    assert.deepEqual(await sideLook(`${D} .asm-side`, `${D} .asm-side .asm-cap`), refSide, `${name}: the side panel`);
+    assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-side .asm-cap`).textContent, D), 'Properties');
+    // (the ASM editor's Machine panel, on the left: as the Properties, #2730)
+    if (name === 'asm') assert.deepEqual(await sideLook(`${D} .asm-left`, `${D} .asm-left .asm-cap`), refSide, 'asm: the Machine panel');
     assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-toolbar .gen-banner`), D), null, `${name}: its HDL in sync unsaid`);
     await shot(page, name);
   }
@@ -101,9 +103,10 @@ uiTest('#2505 the Petri net, FSM and ASM side panels fold to a strip and expand,
   await makeProject(env, { name: 'BarsFB', template: 'blinky' });
   await page.setViewport(1440, 900);
   const state = () => page.eval((d) => {
-    const e = document.querySelector(`${d} .asm-editor`), b = e.querySelector('.asm-fold');
+    // (the Properties panel's: the ASM editor's Machine panel is on the left, #2730)
+    const e = document.querySelector(`${d} .asm-editor`), b = e.querySelector('.asm-side .asm-fold');
     return { folded: e.classList.contains('props-folded'), side: Math.round(e.querySelector('.asm-side').getBoundingClientRect().width), title: b.title,
-      expanded: b.getAttribute('aria-expanded'), shown: !!e.querySelector('.asm-side details').getClientRects().length, cap: e.querySelector('.asm-cap').textContent };
+      expanded: b.getAttribute('aria-expanded'), shown: [...e.querySelectorAll('.asm-side > :not(.asm-cap)')].some((x) => x.getClientRects().length), cap: e.querySelector('.asm-side .asm-cap').textContent };
   }, D);
   for (const [pj, file, name, bar] of [['BarsF', 'src/traffic.fsm.json', 'fsm', '.fsm-toolbar'], ['BarsF', 'src/net.pn.json', 'petri', '.pn-toolbar'], ['BarsFB', 'src/speed_ctrl.asm.json', 'asm', '.asm-chart-toolbar']]) {
     if (await page.eval(() => window.SilinxApp.S.project?.name) !== pj) await page.openProject(pj);
@@ -111,7 +114,7 @@ uiTest('#2505 the Petri net, FSM and ASM side panels fold to a strip and expand,
     const canvas = () => page.eval((d) => Math.round(document.querySelector(`${d} .asm-canvas-wrap`).getBoundingClientRect().width), D);
     const c0 = await canvas();
     assert.deepEqual(await state(), { folded: false, side: 250, title: 'Collapse the Properties panel', expanded: 'true', shown: true, cap: 'Properties' }, name);
-    await page.click(`${D} .asm-fold`);
+    await page.click(`${D} .asm-side .asm-fold`);
     assert.deepEqual(await state(), { folded: true, side: 24, title: 'Expand the Properties panel', expanded: 'false', shown: false, cap: 'Properties' }, name);
     assert.ok(Math.abs(await canvas() - (c0 + 226)) <= 2, `${name}: the canvas wider`);
     if (name === 'fsm') await shot(page, 'fsm-folded');
@@ -122,7 +125,7 @@ uiTest('#2505 the Petri net, FSM and ASM side panels fold to a strip and expand,
     assert.equal((await state()).folded, true, `${name}: remembered`);
     if (name === 'asm') {
       await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
-      assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-fold`).title, D), 'Expandir o painel das propriedades');
+      assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-side .asm-fold`).title, D), 'Expandir o painel das propriedades');
       await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
     }
     await page.click(`${D} .asm-side`);

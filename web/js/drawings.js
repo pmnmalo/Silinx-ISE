@@ -9,6 +9,7 @@ import { modulesFromLibrary } from '/core/schdoc.js';
 import { S, activateDoc, closeDocByPath, compileProject, findDoc, flushDoc, hdlInProject, moduleInfo, openDoc,
   openFile, setDirty, status } from './app.js';
 import { log } from './console.js';
+import { editorProblems } from './editor-problems.js';
 import { reloadProject } from './project.js';
 import { markStale, saveAll } from './processes.js';
 import { openModuleSource, removeModule, renderHierarchy, saveProjectJson, setTop, topMenuItem } from './design.js';
@@ -38,9 +39,14 @@ export async function openAsm(path) {
     create(el, d) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
+      // (its problems in the console's Errors and Warnings, a click selecting the box, #2730)
+      const problems = editorProblems({ file: path, tool: 'ASM', goto: (x) => { activateDoc(d); if (x.nodeId) ed.focusNode(x.nodeId); } });
       const ed = mountAsmEditor(host, {
         model,
         onChange: () => setDirty(d, true),
+        onProblems: (diags) => problems.set(diags),
+        onValidate: (diags) => problems.log(diags),
+        onMessage: (text) => log(`${path.split('/').pop()}: ${text}`, 'info'),
       });
       d.asmEditor = ed;
       return {
@@ -49,7 +55,7 @@ export async function openAsm(path) {
           await api.writeFile(S.project.name, path, JSON.stringify(m, null, 2)); setDirty(d, false);
           if (!S.syncing) syncHdlFromAsm(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
         },
-        destroy: () => ed.destroy?.(),
+        destroy: () => { problems.clear(); ed.destroy?.(); },
       };
     },
   });
