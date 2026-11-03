@@ -1,14 +1,14 @@
 // The ASM chart editor's drawing of its chart (#405: out of mountAsmEditor): the every-cycle blocks, the connections
 // (their routes, a case's exit values, the selected one), the boxes (states with their code, decisions, cases,
-// conditional outputs, their problems marked) and the status line; the toolbar's state. mountRender(ctx) is called by
-// mountAsmEditor where this code was.
+// conditional outputs, their problems marked), the toolbar's count of states (#2730) and its state. mountRender(ctx) is
+// called by mountAsmEditor where this code was.
 import { stateEncoding } from '/core/asm.js';
 import { esc } from './dom.js';
 import { CASE_BAR, nodeSize, box, pathD, portGeom, portsOf, routeEdge } from './asm-editor.js';
 
 /** { render, updateToolbar } of an ASM chart editor (state(): its current model, selection, problems, history). */
 export function mountRender(ctx) {
-  const { state, uid, gBlocks, gEdges, gNodes, statusInfo, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget } = ctx;
+  const { state, uid, gBlocks, gEdges, gNodes, info, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget } = ctx;
 
   function blockMembers(stateId) {
     const { M } = state();
@@ -170,11 +170,8 @@ export function mountRender(ctx) {
 
     const ns = M.nodes.filter((n) => n.type === 'state').length;
     const na = M.nodes.filter((n) => n.type === 'always').length;
-    const ne = diags.filter((d) => d.severity === 'error').length, nw = diags.filter((d) => d.severity === 'warning').length;
-    statusInfo.innerHTML = `${esc(M.name)} · ${ns} state${ns === 1 ? '' : 's'} · ` +
-      (na ? `${na} every-cycle block${na === 1 ? '' : 's'} · ` : '') +
-      `<span class="${ne ? 'c-err' : 'c-ok'}">${esc(ne)} error${ne === 1 ? '' : 's'}</span> · ` +
-      `<span class="${nw ? 'c-warn' : ''}">${esc(nw)} warning${nw === 1 ? '' : 's'}</span>`;
+    // (its problems: in the console, editor-problems.js, #2730)
+    info.textContent = `${ns} state${ns === 1 ? '' : 's'}${na ? ` · ${na} every-cycle block${na === 1 ? '' : 's'}` : ''}`;
   }
 
   function updateToolbar() {

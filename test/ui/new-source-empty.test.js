@@ -58,7 +58,11 @@ uiTest('#2176 New Source without the wizard: the ASM chart empty, its first stat
   assert.deepEqual([m.name, m.nodes, m.edges, m.inputs, m.outputs, m.initial], ['ctl', [], [], [], [], '']);
   await page.waitForSelector(`${DOC} .asm-add`);
   assert.equal(await page.eval((d) => document.querySelectorAll(`${d} [data-node]`).length, DOC), 0);
-  assert.deepEqual(await problems(page), ['✖The chart has no states', '✖No initial (reset) state selected']);
+  // (its problems in the console's Errors, not in its lines nor in the editor, #2730)
+  await page.waitFor(() => document.querySelectorAll('#console-errors .diag').length === 2, [], { what: 'its problems' });
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#console-errors .diag')].map((r) => r.textContent)),
+    ['ERROR:ASM - "src/ctl.asm.json": The chart has no states', 'ERROR:ASM - "src/ctl.asm.json": No initial (reset) state selected']);
+  assert.deepEqual(await problems(page), []);
   assert.deepEqual(await logProblems(page), []);
   await page.click(`${DOC} .asm-add`);
   await page.waitFor((d) => document.querySelectorAll(`${d} [data-node]`).length === 1, [DOC], { what: 'the state box' });

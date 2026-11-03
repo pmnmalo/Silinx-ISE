@@ -63,6 +63,8 @@ test('sourceOf: the processes\' headers', () => {
     'Started : "Synthesize - Yosys (open)".': 'impl',
     'Started : "Implement Design".': 'impl',
     'Started : "Check Schematic" of gates.': 'check',   // (a schematic's, in the Tasks interface: #993)
+    'Started : "Validate" of ctl.asm.json.': 'check',   // (a chart's, #2730)
+    'Started : "Validate Design Rules".': 'impl',
     'Started : "Translate".': 'impl',
     'Started : "Generate Post-Synthesis Simulation Model".': 'impl',
     'Started : "Generate Text Power Report".': 'impl',
