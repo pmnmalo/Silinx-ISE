@@ -59,7 +59,7 @@ const ALLOW = [
   ['silinx', 'show or hide the messages', 'the same'],
   ['silinx', 'maximize the document (double-click its tab)', 'the same'],
   ['silinx', 'settings', 'the Silinx header\'s Settings menu: its items are the ISE style\'s View and Help menus\' ones'],
-  ['silinx', 'system', 'the theme (View ▸ Theme): the ISE style\'s look is light only'],
+  ['silinx', 'system', 'the theme (View ▸ Theme): the ISE style\'s look is light only until #2676'],
   ['silinx', 'light', 'the same'],
   ['silinx', 'dark', 'the same'],
   ['silinx', 'board, programming tool and cable', 'the Silinx interface folds iMPACT\'s settings once a board is chosen; the ISE style shows them always'],
