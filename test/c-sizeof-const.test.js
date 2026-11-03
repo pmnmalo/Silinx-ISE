@@ -78,7 +78,7 @@ int top(int v) {
   for (int i = 0; i < N; i++) b[i] = v + i;
   int s = 0;
   for (int i = 0; i < R; i++) s += b[i % N];
-  switch (v & 15) { case N: s += 1000; break; case F: s += 2000; break; default: break; }
+  switch (v & 15) { case E: s += 1000; break; case F: s += 2000; break; default: break; }
   return s + G * 10000 + S * 100 + n + (int)sizeof b;
 }
 `;
