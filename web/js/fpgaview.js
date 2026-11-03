@@ -162,9 +162,10 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
     h('button', { class: 'btn', title: 'Zoom to the whole chip', onclick: () => fit() }, 'Fit'),
     h('button', { class: 'btn', title: 'Zoom in', onclick: () => zoom(1.4) }, '+'),
     h('button', { class: 'btn', title: 'Zoom out', onclick: () => zoom(1 / 1.4) }, '−'),
-    h('span', { class: 'fv-sep' }), 'Colour by:', levelSel, clockBtn, h('span', { class: 'fv-sep' }), info,
+    h('span', { class: 'fv-sep' }), 'Colour by:', levelSel, clockBtn,
     // (a narrow window: the side panel over the chip, shown by this, as the diagram editors', #2668)
-    panelToggle(root, h('button', { class: 'btn', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY })));
+    panelToggle(root, h('button', { class: 'btn', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY }),
+    info));   // (at the right end, as every toolbar's informational text: #2725)
   if (stale) root.append(h('div', { class: 'fv-stale' }, 'The sources changed since this implementation: run Implement Design again to see the new one.'));
   const svg = S('svg', { class: 'fv-svg', 'aria-label': 'FPGA', role: 'img' });
   const canvas = h('div', { class: 'fv-canvas' }, svg);

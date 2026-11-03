@@ -7,6 +7,7 @@
 .tt-sep { width: 1px; height: 18px; background: #c0c0c0; box-shadow: 1px 0 #fff; margin: 0 4px; }
 .tt-check { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 .tt-err { color: var(--danger, #c00); }
+.tt-link { margin-left: auto; }   /* (its notice at the toolbar's right end, as every toolbar's informational text: #2725) */
 .tt-link .gen-banner { margin-left: 6px; padding: 1px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 3px; color: #5a4a00; }
 .tt-link .gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
 .tt-link .gen-banner a { color: #0645ad; cursor: pointer; text-decoration: underline; }
