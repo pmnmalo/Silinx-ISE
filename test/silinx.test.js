@@ -81,7 +81,7 @@ test('effectiveTheme: system follows the OS, light and dark are fixed', () => {
   assert.equal(M.effectiveTheme('dark', false), 'dark');
 });
 
-test('applyPrefs puts data-ui and data-theme on the root; the ISE style look is always light', () => {
+test('applyPrefs puts data-ui and data-theme on the root; the ISE style look follows the theme too (#2676)', () => {
   mem.clear();
   const r = fakeRoot();
   systemDark = true;
@@ -94,10 +94,19 @@ test('applyPrefs puts data-ui and data-theme on the root; the ISE style look is 
   M.applyPrefs(r);
   assert.equal(r.dataset.theme, 'dark');
   mem.set(M.UI_KEY, 'ise');
-  M.applyPrefs(r);
+  assert.deepEqual(M.applyPrefs(r), { ui: 'ise', theme: 'dark', shown: 'dark' });
   assert.equal(r.dataset.ui, 'ise');
-  assert.equal(r.dataset.theme, 'light', 'the ISE look has no dark theme');
+  assert.equal(r.dataset.theme, 'dark', 'the ISE look dark too');
+  assert.equal(r.style.colorScheme, 'dark');
   assert.equal(r.dataset.layout, undefined);
+  // light, and System following the OS, in the ISE look as in the Silinx one
+  mem.set(M.THEME_KEY, 'light');
+  assert.equal(M.applyPrefs(r).shown, 'light');
+  mem.set(M.THEME_KEY, 'system');
+  systemDark = true;
+  assert.deepEqual(M.applyPrefs(r), { ui: 'ise', theme: 'system', shown: 'dark' });
+  systemDark = false;
+  assert.equal(M.applyPrefs(r).shown, 'light');
 });
 
 // #1149: the Tasks interface became the Silinx one (the default, in every build): its look and its layout by tasks;
@@ -214,14 +223,17 @@ test('index.html: one page for both interfaces (header, activity bar icons, empt
   assert.match(head, /var k = \/\\\/dev\\\/\/\.test\(location\.pathname\) \? 'silinx\.dev\.' : 'silinx\.';/);
   assert.match(head, /localStorage\.getItem\(k \+ 'ui'\)/);
   assert.match(head, /prefers-color-scheme: dark/);
+  // (the theme in both interfaces, the ISE style one dark too: #2676)
+  assert.match(head, /d\.setAttribute\('data-theme', dark \? 'dark' : 'light'\);/);
   for (const page of ['start', 'design', 'files', 'libraries']) assert.match(html, new RegExp(`data-page="${page}" role="tab"`), page);
   assert.equal((html.match(/class="ico-inline tab-ico" data-icon="m\w+"/g) || []).length, 4);
 });
 
 test('silinx.css: the Silinx look applies only under data-ui="silinx"; the ISE style look hides its parts', () => {
   const css = fs.readFileSync(path.join(ROOT, 'web/css/silinx.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  // shared parts (both interfaces): the palette, the empty state, the header wrapper, the m-* controls, kbd keys
-  const shared = /^(\.pal\b|\.pal-|#ws-empty|#topbar$|\.m-|\.ws-|#app kbd$|html:not\(\[data-ui="silinx"\]\)|html\[data-theme="dark"\] \.m-sun$|html:not\(\[data-theme="dark"\]\) \.m-moon$)/;
+  // shared parts (both interfaces): the palette, the empty state, the header wrapper, the m-* controls, kbd keys; the dark
+  // theme's tokens and the documents' dark rules (#2676)
+  const shared = /^(\.pal\b|\.pal-|#ws-empty|#topbar$|\.m-|\.ws-|#app kbd$|html:not\(\[data-ui="silinx"\]\)|html\[data-theme="dark"\]( |$)|html:not\(\[data-theme="dark"\]\) \.m-moon$)/;
   // the selectors of a rule, split at the commas outside parentheses (:is(a, b))
   const parts = (sel) => { const out = []; let depth = 0, cur = ''; for (const c of sel) { if (c === ',' && !depth) { out.push(cur.trim()); cur = ''; continue; } depth += c === '(' ? 1 : c === ')' ? -1 : 0; cur += c; } out.push(cur.trim()); return out; };
   const selectors = [...css.matchAll(/(^|[{}])\s*([^{}@][^{}]*)\{/g)].map((m) => m[2].trim()).filter((x) => x && !x.startsWith('@'));
@@ -229,7 +241,7 @@ test('silinx.css: the Silinx look applies only under data-ui="silinx"; the ISE s
   assert.deepEqual(loose, []);
   // every theme token has a dark value
   const light = css.slice(css.indexOf('html[data-ui="silinx"] {'), css.indexOf('}', css.indexOf('html[data-ui="silinx"] {')));
-  const dark = css.slice(css.indexOf('html[data-ui="silinx"][data-theme="dark"] {'));
+  const dark = css.slice(css.indexOf('html[data-theme="dark"] {'));
   // (the sizes, lengths only or another token, are the same in both themes: the radius, the rows', bars' and controls' sizes, #1409)
   const tokens = [...light.matchAll(/(--m-[\w-]+):\s*([^;]+);/g)].filter((m) => !/^([\d.]+px( [\d.]+px)*|var\(--m-[\w-]+\))$/.test(m[2].trim())).map((m) => m[1]);
   assert.ok(tokens.includes('--m-bg') && !tokens.includes('--m-radius') && !tokens.includes('--m-row-h'), tokens.join(' '));
@@ -246,7 +258,7 @@ test('theme.css: the pages\' own colours have a dark value; no colour written in
   assert.deepEqual(vars, ['--note-bg', '--note-border', '--code-bg', '--frame', '--frame-light', '--frame-lighter', '--field-bg', '--field-fg', '--field-border',
     '--field-bad-bg', '--pin-name', '--drive-bg', '--release-bg', '--expected-bg', '--grey-1', '--grey-2', '--grey-3', '--grey-4', '--grey-5', '--grey-6', '--grey-7',
     '--error-fg', '--error-fg-2', '--log-error', '--log-warning']);
-  const start = css.indexOf('html[data-ui="silinx"][data-theme="dark"] {');
+  const start = css.indexOf('html[data-theme="dark"] {');
   const dark = css.slice(start, css.indexOf('}', start));
   assert.deepEqual(vars.filter((v) => !dark.includes(`  ${v}: `)), [], 'a dark value for each');
   // the colours written in the scripts: only these, on purpose (the board emulator's board and LEDs, the FPGA
@@ -270,6 +282,28 @@ test('theme.css: the pages\' own colours have a dark value; no colour written in
     assert.ok(rules.length, sel);
     for (const r of rules) assert.doesNotMatch(r, /#[0-9a-fA-F]{3,8}\b/, `${sel}: ${r}`);
   }
+});
+
+// #2676: the ISE style look's dark theme (ise-dark.css): every rule under html[data-ui="ise"][data-theme="dark"], each of
+// theme.css's colours of the look with a dark value there, the sheet loaded after silinx.css (whose dark tokens it uses)
+test('#2676 ise-dark.css: the ISE style look dark, only under data-ui="ise" and data-theme="dark", each of its colours dark', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'web/css/ise-dark.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const P = 'html[data-ui="ise"][data-theme="dark"]';
+  const parts = (sel) => { const out = []; let depth = 0, cur = ''; for (const c of sel) { if (c === ',' && !depth) { out.push(cur.trim()); cur = ''; continue; } depth += c === '(' ? 1 : c === ')' ? -1 : 0; cur += c; } out.push(cur.trim()); return out; };
+  const selectors = [...css.matchAll(/(^|[{}])\s*([^{}@][^{}]*)\{/g)].map((m) => m[2].trim()).filter(Boolean);
+  assert.ok(selectors.length > 100, `${selectors.length} rules`);
+  assert.deepEqual(selectors.filter((sel) => !parts(sel).every((x) => x === P || x.startsWith(`${P} `))), []);
+  // theme.css's variables of the look (before its schematic's and waveform's, which stay as they are: a light sheet, a black
+  // waveform), each with a dark value
+  const theme = fs.readFileSync(path.join(ROOT, 'web/css/theme.css'), 'utf8');
+  const look = [...theme.slice(theme.indexOf('--bg:'), theme.indexOf('--sch-bg:')).matchAll(/(--[\w-]+):/g)].map((m) => m[1]);
+  assert.deepEqual(look, ['--bg', '--panel', '--panel-alt', '--fg', '--muted', '--border', '--border-light', '--accent', '--accent-fg', '--hover', '--danger',
+    '--warning', '--success', '--title-grad', '--title-fg', '--tab-active', '--tab-inactive', '--toolbar-grad', '--menu-bg']);
+  const block = css.slice(css.indexOf(`${P} {`), css.indexOf('}', css.indexOf(`${P} {`)));
+  assert.deepEqual(look.filter((v) => !block.includes(`  ${v}: `)), [], 'a dark value for each');
+  // the sheet after silinx.css in the page
+  const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8');
+  assert.ok(html.indexOf('href="/css/silinx.css"') > 0 && html.indexOf('href="/css/ise-dark.css"') > html.indexOf('href="/css/silinx.css"'));
 });
 
 test('the Keyboard Shortcuts dialog lists the command palette', () => {
