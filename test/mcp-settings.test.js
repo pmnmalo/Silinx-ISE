@@ -59,7 +59,8 @@ test('set_design_properties: another board and its variant, its pins written int
 test('set_design_properties: a device with no board, the pins to check; the synthesis tool', async () => {
   await ok('new_project_from_example', { name: 'b2', example: 'blinky' });
   const r = await ok('set_design_properties', { project: 'b2', board: 'none', part: 'xc3s100e', package: 'vq100', speed: '-4', synth_tool: 'xst' });
-  assert.equal(r.text, 'WARNING: check the pin locations in constraints/top.ucf — they must exist on the VQ100 package.\nDevice set to xc3s100e-4-vq100; synthesis tool xst.');
+  // (the warning after the device, as the interface's console says them)
+  assert.equal(r.text, 'Device set to xc3s100e-4-vq100; synthesis tool xst.\nWARNING: check the pin locations in constraints/top.ucf — they must exist on the VQ100 package.');
   assert.deepEqual(r.data.warnings, ['WARNING: check the pin locations in constraints/top.ucf — they must exist on the VQ100 package.']);
   assert.equal((await P.readProject('b2')).board, null);
   // a speed grade without its '-'; the package and speed kept when only one changes
@@ -91,7 +92,7 @@ test('set_design_properties: a new device checked against the design (its I/O pa
 
 test('set_design_properties: the errors', async () => {
   await ok('new_project_from_example', { name: 'b4', example: 'gates' });
-  await fails('set_design_properties', { project: 'b4' }, 'give board, part, package, speed or synth_tool');
+  await fails('set_design_properties', { project: 'b4' }, 'give board, part, package, speed, synth_tool or preferred_language');
   await fails('set_design_properties', { project: 'b4', board: 'basys2', part: 'xc3s100e' }, 'give a board or a device (part, package, speed), not both: a board\'s device is its own');
   await fails('set_design_properties', { project: 'b4', part: 'xc3s100e' }, 'the project\'s device is its board\'s (basys2): give board none to choose a device');
   await fails('set_design_properties', { project: 'b4', board: 'nosuch' }, 'unknown board \'nosuch\' (list_devices)');

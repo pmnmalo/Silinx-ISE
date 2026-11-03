@@ -1,8 +1,10 @@
 // The MCP server's tools of a project's settings (server/mcp.js, #2674): the devices and boards to choose from,
-// Design Properties (the board, the device, the synthesis tool) and Process Properties (the Optimization, the
-// FPGA's start-up clock, the place and route engine), as the interface's dialogs (web/js/wizards.js
-// projectProperties, implProperties) set them: the same checks of a new device (web/js/device-change.js), the
-// constraints file of its format (web/js/constraints-format.js), Update Constraints from the new board's pins.
+// Design Properties (the board, the device, the synthesis tool, the Preferred Language), Process Properties (the
+// Optimization, the FPGA's start-up clock, the place and route engine) and a drawing's Source Properties (its
+// language), as the interface's dialogs (web/js/wizards.js projectProperties, implProperties, sourceProperties)
+// set them: the same checks of a new device (web/js/device-change.js), the constraints file of its format
+// (web/js/constraints-format.js), Update Constraints from the new board's pins, the drawings' HDL made again in
+// their language (server/drawing-sync.js).
 import fs from 'node:fs';
 import path from 'node:path';
 import * as P from './projects.js';
@@ -66,18 +68,20 @@ export const SETTINGS_TOOLS = [
   },
   {
     name: 'set_design_properties', title: 'Design Properties',
-    description: 'Change a project\'s target as Design Properties does: its board (its device then the board\'s; none: no board) or its device (part, package, speed), and its synthesis tool (silinx: the Silinx toolchain; xst: Xilinx ISE). A new device is checked against the design first (the primitives its family lacks, the resources it has too few of: warnings). With update_constraints, a new board\'s pins are written into the constraints file for the top\'s ports, as Update Constraints does: its pin locations are replaced.',
+    description: 'Change a project\'s target as Design Properties does: its board (its device then the board\'s; none: no board) or its device (part, package, speed), its synthesis tool (silinx: the Silinx toolchain; xst: Xilinx ISE) and its Preferred Language (the drawings\' HDL made again in it). A new device is checked against the design first (the primitives its family lacks, the resources it has too few of: warnings). With update_constraints, a new board\'s pins are written into the constraints file for the top\'s ports, as Update Constraints does: its pin locations are replaced.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, board: STR('The board (list_devices), or none for no board.'), variant: STR('The board\'s variant (list_devices; default: the board\'s default).'),
       part: STR('The device (list_devices), e.g. xc3s500e; with no board.'), package: STR('The device\'s package, e.g. fg320.'), speed: STR('The speed grade, e.g. -4.'),
       synth_tool: { type: 'string', enum: SYNTH_TOOLS, description: 'The synthesis tool.' },
+      preferred_language: { type: 'string', enum: ['vhdl', 'verilog'], description: 'The Preferred Language: the drawings\' HDL (the drawings with no language of their own) made again in it.' },
       update_constraints: { type: 'boolean', description: 'With a new board: write its pins into the constraints file (default false).' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-    async run({ project: name, board, variant, part, package: pkg, speed, synth_tool: synthTool, update_constraints: constraints = false }) {
+    async run({ project: name, board, variant, part, package: pkg, speed, synth_tool: synthTool, preferred_language: language, update_constraints: constraints = false }) {
       const pj = await readProject(name);
       const D = await devices(), R = await parts();
-      if (board === undefined && variant === undefined && part === undefined && pkg === undefined && speed === undefined && synthTool === undefined) throw toolError('give board, part, package, speed or synth_tool');
+      if (board === undefined && variant === undefined && part === undefined && pkg === undefined && speed === undefined && synthTool === undefined && language === undefined) throw toolError('give board, part, package, speed, synth_tool or preferred_language');
+      if (language !== undefined && !['vhdl', 'verilog'].includes(language)) throw toolError('preferred_language: vhdl or verilog');
       if (board && board !== 'none' && (part || pkg || speed)) throw toolError('give a board or a device (part, package, speed), not both: a board\'s device is its own');
       let nextBoard = pj.board || null, next = { ...pj.device };
       if (board === 'none' || board === '') nextBoard = null;
@@ -123,12 +127,23 @@ export const SETTINGS_TOOLS = [
         constraintsFile = old.replace(/\.[^./]*$/, '') + ext;
         if (fs.existsSync(path.join(P.projectDir(name), old))) warnings.push(`WARNING: this device's constraints are ${ext.slice(1).toUpperCase()}: ${constraintsFile} is the project's now, ${old} was not converted.`);
       }
-      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...(R.openOnlyDevice(next) ? { synthTool: 'silinx' } : synthTool ? { synthTool } : {}) }));
+      const oldLang = pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl';
+      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...(R.openOnlyDevice(next) ? { synthTool: 'silinx' } : synthTool ? { synthTool } : {}), ...(language ? { preferredLanguage: language } : {}) }));
+      // every drawing in the new language, its HDL file made again in it (#1477)
+      const languageLines = [];
+      if (language && language !== oldLang) {
+        const { drawingsInLanguage } = await import('./drawing-sync.js');
+        const r = await drawingsInLanguage(P, name, language);
+        languageLines.push(`Preferred Language: ${language === 'verilog' ? 'Verilog' : 'VHDL'}${r.changed.length ? ` (${r.changed.length} drawing(s) now in it, their HDL made again in it)` : ''}.`, ...r.messages);
+        warnings.push(...r.messages.filter(m => /^WARNING/.test(m)));
+      }
       const after = await P.readProject(name);
+      const pins = [];
       if (constraints) await P.boardConstraints(P.projectDir(name), after);
-      else if (changed && !nextBoard && after.constraints && fs.existsSync(path.join(P.projectDir(name), after.constraints))) warnings.push(`WARNING: check the pin locations in ${after.constraints} — they must exist on the ${next.package.toUpperCase()} package.`);
-      const text = [...warnings, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`];
-      return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, constraints: after.constraints || null, constraintsUpdated: constraints, warnings } };
+      else if (changed && !nextBoard && after.constraints && fs.existsSync(path.join(P.projectDir(name), after.constraints))) pins.push(`WARNING: check the pin locations in ${after.constraints} — they must exist on the ${next.package.toUpperCase()} package.`);
+      warnings.push(...pins);
+      const text = [...warnings.filter(w => !pins.includes(w) && !languageLines.includes(w)), ...languageLines, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`, ...pins];
+      return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, preferredLanguage: after.preferredLanguage || 'vhdl', constraints: after.constraints || null, constraintsUpdated: constraints, warnings } };
     },
   },
   {
@@ -152,6 +167,28 @@ export const SETTINGS_TOOLS = [
       const impl = (await P.readProject(name)).impl || {};
       const data = { project: name, optimization: synthGoal(impl), startupClock: Object.keys(STARTUP_CLOCKS).find(k => STARTUP_CLOCKS[k] === (impl.startupClk || 'JtagClk')), prEngine: impl.engine || 'auto' };
       return { text: `${name}: Optimization ${data.optimization}, FPGA start-up clock ${data.startupClock}, place and route ${data.prEngine}.`, data };
+    },
+  },
+  {
+    name: 'set_source_properties', title: 'Source Properties',
+    description: 'Choose a drawing\'s language, as Source Properties does: vhdl or verilog (its own: it keeps it when the Preferred Language changes), or project (the project\'s Preferred Language, following it). Its HDL file is then made in that language, the one in the other language removed. A drawing (or its HDL file); HDL written by hand, or a drawing made from its HDL, has no choice.',
+    inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The drawing (e.g. src/traffic.fsm.json) or its HDL file.'), language: { type: 'string', enum: ['vhdl', 'verilog', 'project'], description: 'Its language, or project (the Preferred Language).' } }, required: ['project', 'path', 'language'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    async run({ project: name, path: rel, language }) {
+      await readProject(name);
+      if (!['vhdl', 'verilog', 'project'].includes(language)) throw toolError('language: vhdl, verilog or project');
+      const S = await import('./drawing-sync.js');
+      // the drawing, or the drawing of an HDL file (its generatedFile)
+      const tree = await P.fileTree(name);
+      let drawing = null;
+      if (tree.includes(rel) && await S.drawingLanguage(P, name, rel)) drawing = rel;
+      else for (const f of tree.filter(f => /\.(sch|asm|tt|bool|fsm|pn)\.json$/i.test(f))) {
+        try { if (JSON.parse(await P.readFile(name, f)).generatedFile === rel && await S.drawingLanguage(P, name, f)) { drawing = f; break; } } catch { /* not a drawing */ }
+      }
+      if (!drawing) throw toolError(tree.includes(rel) ? `'${rel}' has no language to choose: HDL written by hand, or a drawing made from its HDL` : `no file '${rel}' in the project '${name}'`);
+      const r = await S.setSourceLanguage(P, name, drawing, language === 'project' ? '' : language);
+      const L = r.language === 'verilog' ? 'Verilog' : 'VHDL';
+      return { text: [...r.messages, `${drawing}: ${L}${language === 'project' ? ' (the project\'s Preferred Language)' : ''}${r.changed ? '' : ', as it was'}.`].join('\n'), data: { project: name, drawing, language: r.language, own: language !== 'project', changed: r.changed, messages: r.messages } };
     },
   },
 ];

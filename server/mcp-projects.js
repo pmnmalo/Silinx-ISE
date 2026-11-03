@@ -128,7 +128,7 @@ export const PROJECT_TOOLS = [
   },
   {
     name: 'write_file', title: 'Write a file of a project',
-    description: 'Write (create or replace) a file of a project. A new VHDL or Verilog file is added to the project (a test bench in sim/ or named tb_… as a simulation source). The application\'s open editor of that file keeps its own text until it is reopened.',
+    description: 'Write (create or replace) a file of a project. A new VHDL or Verilog file is added to the project (a test bench in sim/ or named tb_… as a simulation source). A drawing (a .sch, .asm, .fsm, .tt, .bool or .pn .json) makes its HDL file again, as its editor does when it is saved; one with errors leaves it as it was (Check Syntax then stops on it). The application\'s open editor of that file keeps its own text until it is reopened.',
     inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The file\'s path in the project, e.g. src/counter.vhd.'), text: STR('The whole text of the file.') }, required: ['project', 'path', 'text'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     async run({ project: name, path: rel, text }) {
@@ -143,7 +143,11 @@ export const PROJECT_TOOLS = [
       const existed = (await P.fileTree(name)).includes(rel);
       try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }
       const added = !existed && (await P.readProject(name)).files.some(f => f.path === rel);
-      return { text: `${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`, data: { project: name, path: rel, created: !existed, addedToProject: added } };
+      // a drawing: its HDL file made again from it (#2674), as its editor does when it is saved
+      const { syncDrawing } = await import('./drawing-sync.js');
+      const sync = await syncDrawing(P, name, rel);
+      return { text: [`${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`, ...(sync?.messages || [])].join('\n'),
+        data: { project: name, path: rel, created: !existed, addedToProject: added, ...(sync ? { hdl: { file: sync.target, written: !!sync.written, removed: sync.removed, stale: sync.stale } } : {}) } };
     },
   },
 ];
