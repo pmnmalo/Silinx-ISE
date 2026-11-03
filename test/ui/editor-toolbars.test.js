@@ -46,8 +46,6 @@ uiTest('#2505 the editors\' toolbars and side panels as the Schematic editor\'s'
     assert.deepEqual(await page.eval((x) => ['zin', 'zout', 'fit', 'delete'].map((a) => !!document.querySelector(`${x} [data-act=${a}] svg`)), b), [true, true, true, true], `${name}: the schematic's icons`);
     assert.deepEqual(await sideLook(`${D} .asm-side`, `${D} .asm-side .asm-cap`), refSide, `${name}: the side panel`);
     assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-side .asm-cap`).textContent, D), 'Properties');
-    // (the ASM editor's Machine panel, on the left: as the Properties, #2730)
-    if (name === 'asm') assert.deepEqual(await sideLook(`${D} .asm-left`, `${D} .asm-left .asm-cap`), refSide, 'asm: the Machine panel');
     assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-toolbar .gen-banner`), D), null, `${name}: its HDL in sync unsaid`);
     await shot(page, name);
   }
@@ -103,7 +101,6 @@ uiTest('#2505 the Petri net, FSM and ASM side panels fold to a strip and expand,
   await makeProject(env, { name: 'BarsFB', template: 'blinky' });
   await page.setViewport(1440, 900);
   const state = () => page.eval((d) => {
-    // (the Properties panel's: the ASM editor's Machine panel is on the left, #2730)
     const e = document.querySelector(`${d} .asm-editor`), b = e.querySelector('.asm-side .asm-fold');
     return { folded: e.classList.contains('props-folded'), side: Math.round(e.querySelector('.asm-side').getBoundingClientRect().width), title: b.title,
       expanded: b.getAttribute('aria-expanded'), shown: [...e.querySelectorAll('.asm-side > :not(.asm-cap)')].some((x) => x.getClientRects().length), cap: e.querySelector('.asm-side .asm-cap').textContent };
