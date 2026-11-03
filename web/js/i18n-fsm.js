@@ -20,7 +20,6 @@ export const FSM_PT = {
   'Encoding:': 'Codificação:', 'Coding Style:': 'Estilo de Código:',
   'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas',
   // selection
-  'Selection': 'Seleção', 'Nothing selected. Click a state or a transition to edit it.': 'Nada selecionado. Clique num estado ou numa transição para o editar.',
   'State (Moore outputs inside)': 'Estado (saídas de Moore lá dentro)', 'Initial (reset) state': 'Estado inicial (de reset)',
   'Transition: condition / Mealy outputs': 'Transição: condição / saídas de Mealy', 'Name': 'Nome', 'Outputs (Moore)': 'Saídas (Moore)',
   'Outputs while in this state: output=value, separated by commas. The other outputs keep their default value.': 'Saídas neste estado: saída=valor, separadas por vírgulas. As outras saídas ficam com o valor por omissão.',

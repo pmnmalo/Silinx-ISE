@@ -53,6 +53,14 @@ uiTest('#2729 FSM editor: no hint or status line; labelled selectors, the zoom a
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-info`).textContent === '8 state(s), 8 transition(s)', [ED], { what: 'a state counted' });
   await page.eval(() => window.Silinx.active.fsmEditor.undo());
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-info`).textContent === '7 state(s), 8 transition(s)', [ED], { what: 'undone' });
+  // the Properties: nothing selected, no section of the selection; the Machine section a title, not a fold; a state
+  // selected: its section above the machine's
+  const props = () => page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-side > .asm-section`)].filter((s) => s.getClientRects().length)
+    .map((s) => `${s.tagName.toLowerCase()} ${s.querySelector('h3, summary')?.textContent.split(' ')[0]}`), ED);
+  assert.deepEqual(await props(), ['section Machine', 'details Problems']);
+  assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} .asm-side summary`).length, ED), 1);
+  await page.click(`${ED} [data-state=s2] .fsm-circle`);
+  assert.deepEqual(await props(), ['section State', 'section Machine', 'details Problems']);
   // the reset's name on the start-up arrow into CARS, over the arrow; renamed in the Properties' Machine section
   const reset = () => page.eval((ed) => {
     const g = document.querySelector(`${ed} .fsm-state.initial`), t = g.querySelector('.fsm-reset'), a = g.querySelector('.fsm-entry').getBoundingClientRect(), r = t.getBoundingClientRect();
