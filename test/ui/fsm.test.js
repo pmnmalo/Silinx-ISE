@@ -73,6 +73,9 @@ const statePos = (page, id) => page.eval((ed, sid) => {
   return { x: b.left + b.width / 2, y: b.top + b.height / 2, r: b.width / 2 };
 }, ED, id);
 
+// the console's Errors and Warnings rows of a drawing (its problems, #2737)
+const diagRows = (page, file) => page.eval((f) => ['console-errors', 'console-warnings'].map((id) => [...document.querySelectorAll(`#${id} .diag`)].map((r) => r.textContent).filter((t) => t.includes(`"${f}"`))), file);
+
 uiTest('State diagram (FSM): New Source, states and transitions drawn and edited, tables, truth tables, linked HDL following it (read-only, #1176)', E, async (page) => {
   await makeProject(env, { name: 'FsmPj', files: { 'src/det.fsm.json': JSON.stringify(newFsm('det'), null, 2) } });
   await page.openProject('FsmPj');
@@ -88,7 +91,9 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} .fsm-state`).length, ED), 3);
   assert.ok(await page.eval((ed) => !!document.querySelector(`${ed} [data-state=s1].initial .fsm-circle-in`), ED));
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} [data-state=s3] .fsm-outs`).textContent, ED), 'z=1');
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /No problems/);
+  // no problems: nothing in the console's Errors and Warnings (#2737), no Problems panel
+  assert.deepEqual(await diagRows(page, 'src/det.fsm.json'), [[], []]);
+  assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} .fsm-problems, ${ed} .asm-prob`).length, ED), 0);
   // the hierarchy lists the diagram
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => /det\.fsm\.json/.test(r.textContent)), [], { what: 'det.fsm.json in the hierarchy' });
 
@@ -106,12 +111,16 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   await page.key('Enter');
   await page.waitFor((ed) => [...document.querySelectorAll(`${ed} .fsm-name`)].some((t) => t.textContent === 'S3'), [ED], { what: 'state S3' });
   const sid = await page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-state`)].find((g) => g.querySelector('.fsm-name').textContent === 'S3').dataset.state, ED);
-  // a warning: S3 cannot be reached and has no exit
-  await page.waitFor((ed) => /State S3 cannot be reached/.test(document.querySelector(`${ed} .fsm-problems`).textContent), [ED]);
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-problems .asm-prob`)].map((li) => [li.className, li.textContent]), ED), [
-    ['asm-prob warning link', '▲State S3 cannot be reached from the initial state S0'],
-    ['asm-prob warning link', '▲State S3 has no exit: once there, the machine stays in it until a reset'],
-  ]);
+  // two warnings in the console's Warnings: S3 cannot be reached and has no exit; a click on one selects S3 (#2737)
+  await page.waitFor(() => document.querySelectorAll('#console-warnings .diag').length === 2, [], { what: 'the warnings' });
+  assert.deepEqual(await diagRows(page, 'src/det.fsm.json'), [[], [
+    'WARNING:FSM - "src/det.fsm.json": State S3 cannot be reached from the initial state S0',
+    'WARNING:FSM - "src/det.fsm.json": State S3 has no exit: once there, the machine stays in it until a reset',
+  ]]);
+  await page.eval(async () => (await import('/js/console.js')).showConsolePage('warnings'));
+  await page.click('#console-warnings .diag');
+  await page.waitFor((ed, id) => document.querySelector(`${ed} .fsm-state.sel`)?.dataset.state === id, [ED, sid], { what: 'S3 selected' });
+  await page.eval(async () => (await import('/js/console.js')).showConsolePage('console'));
 
   // ---- a transition S3 -> S0: dragged from the rim of S3, condition typed in place (empty = always)
   const a = await statePos(page, sid), b = await statePos(page, 's1');
@@ -121,7 +130,7 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   // ---- S2 --!x--> S3 instead of S0: the transition chosen by its label, its target changed in the panel
   await selectTrans(page, 't6');
   await page.fill(`${ED} .fsm-to`, sid);
-  await page.waitFor((ed) => /No problems/.test(document.querySelector(`${ed} .fsm-problems`).textContent), [ED], { what: 'no problems' });
+  await page.waitFor(() => !document.querySelectorAll('#console-errors .diag, #console-warnings .diag').length, [], { what: 'no problems' });
   await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
   // the save reaches the disk a moment after the tab is marked clean: wait for the new state in the file
   let m;
@@ -317,9 +326,8 @@ uiTest('State diagram (FSM) in Portuguese: every label of the editor, the panels
     for (const s of untranslated(en, pt, SAME)) missing.push(`${where}: ${s}`);
   };
   await check('editor');
-  // problems (an overlap warning, an info), a state, a transition
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /Estado A: as transições para B \('x'\) e para C \('y == 1'\) são ambas verdadeiras quando x=1, y=01/);
-  assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, ED), /nenhuma transição é verdadeira quando/);
+  // problems (an overlap warning) in the console's Warnings (#2737), a state, a transition
+  assert.match((await diagRows(page, 'src/pt.fsm.json'))[1].join('\n'), /Estado A: as transições para B \('x'\) e para C \('y == 1'\) são ambas verdadeiras quando x=1, y=01/);
   await page.click(`${ED} [data-state=a] .fsm-circle`);
   // (a state with no comment: no text "null" in its properties, #2722)
   assert.doesNotMatch(await page.eval((ed) => document.querySelector(ed).textContent, ED), /null/);
