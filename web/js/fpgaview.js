@@ -14,6 +14,7 @@ import { h } from './ui.js';
 import { mountSiteDetails } from './fpgaview-details.js';
 import { mountSideFold } from './side-fold.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
+import { statusLine } from './status-line.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const S = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) if (v != null) e.setAttribute(k, v); return e; };
@@ -157,15 +158,17 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
     ...Array.from({ length: maxLevel }, (_, k) => h('option', { value: k + 1 }, k === 0 ? 'Top-level modules' : `Hierarchy level ${k + 1}`)));
   const clockBtn = h('button', { class: 'btn', title: 'Show the global clock nets: the clock buffers and every flip-flop they drive', onclick: () => { showClocks = !showClocks; clockBtn.classList.toggle('on', showClocks); overlay(); } }, 'Clock network');
   const netSearch = h('input', { type: 'search', class: 'fv-search', placeholder: 'Find a net or a site…', oninput: () => netList() });
-  const info = h('span', { class: 'fv-info' });
+  // (its status line, #2763: the site, net or module selected, then the slices and I/Os used)
+  const line = statusLine();
+  const nSlices = model.device.tiles.reduce((k, t) => k + t[4].filter((s) => isSlice(s[1])).length, 0);
+  const usage = `${model.insts.filter((i) => isSlice(i.type)).length} of ${nSlices} slices · ${model.insts.filter((i) => isIo(i.type)).length} I/Os`;
   root.append(h('div', { class: 'doc-toolbar fv-bar' },
     h('button', { class: 'btn', title: 'Zoom to the whole chip', onclick: () => fit() }, 'Fit'),
     h('button', { class: 'btn', title: 'Zoom in', onclick: () => zoom(1.4) }, '+'),
     h('button', { class: 'btn', title: 'Zoom out', onclick: () => zoom(1 / 1.4) }, '−'),
     h('span', { class: 'fv-sep' }), 'Colour by:', levelSel, clockBtn,
     // (a narrow window: the side panel over the chip, shown by this, as the diagram editors', #2668)
-    panelToggle(root, h('button', { class: 'btn', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY }),
-    info));   // (at the right end, as every toolbar's informational text: #2725)
+    panelToggle(root, h('button', { class: 'btn', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY })));
   if (stale) root.append(h('div', { class: 'fv-stale' }, 'The sources changed since this implementation: run Implement Design again to see the new one.'));
   const svg = S('svg', { class: 'fv-svg', 'aria-label': 'FPGA', role: 'img' });
   const canvas = h('div', { class: 'fv-canvas' }, svg);
@@ -173,7 +176,7 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
   canvas.append(tip);
   // the side panel: the diagram editors' Properties, folded as theirs (side-fold.js), its sections folded each (#2668)
   const side = h('aside', { class: 'fv-side' }, h('div', { class: 'asm-cap' }, 'Properties'));
-  root.append(h('div', { class: 'fv-main' }, canvas, side));
+  root.append(h('div', { class: 'fv-main' }, canvas, side), line.el);
   mountSideFold({ root, side, key: 'silinx.fpgaview.props.folded' });
 
   // ------------------------------------------------------------------ chip
@@ -322,8 +325,7 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
     if (selNet >= 0) { const n = model.nets[selNet]; parts.push(`Net ${n.name}: ${n.loads.length} load(s), ${n.pips} routing switch(es) in ${n.tiles.length} tile(s)`); }
     else if (selInst >= 0) parts.push(`${model.insts[selInst].site}: ${Object.keys(model.insts[selInst].pins).length} connection(s)`);
     else if (hlModule !== null) parts.push(`${moduleLabel(hlModule)}: ${rects.filter(r => r?.classList.contains('hl')).length} site(s)`);
-    info.textContent = parts.join(' · ');
-    info.toggleAttribute('data-no-i18n', parts.length > 0);
+    line.set([{ text: parts.join(' · '), cls: 'fv-info', noI18n: true }, usage]);
   }
   function select(i, { center = false } = {}) {
     selInst = i; selNet = -1;
@@ -393,7 +395,7 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
   const ro = new ResizeObserver(() => { if (!vb.fitted) { const r = canvas.getBoundingClientRect(); if (r.width > 20) { vb.fitted = true; fit(); } } });
   ro.observe(canvas);
 
-  paint(); legend(); details(); netList(); apply();
+  paint(); legend(); details(); netList(); apply(); status();
   requestAnimationFrame(() => fit());
   return {
     highlightModule: p => { highlightModule(p); legend(); highlight(); },

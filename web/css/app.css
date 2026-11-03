@@ -290,7 +290,6 @@ table.grid tr.sel td { background: #dbe8fb; }
 /* pin planner */
 /* I/O Pin Planning (web/js/pinplanner.js): the diagram editors' toolbar and side panel (asm-editor.css, #2671) */
 .pin-planner .pp-table { flex: 1; overflow: auto; background: var(--panel, #fff); }
-.pin-planner .pp-info, .pin-planner .pp-status { margin: 0 4px; color: var(--grey-3); white-space: nowrap; }
 .pin-planner .pp-missing { padding: 16px 20px; max-width: 640px; line-height: 1.5; }
 .pin-planner .pp-none { color: var(--grey-5); }
 .pin-planner .pp-res .res { padding: 1px 4px; font-family: var(--mono); font-size: 11px; display: flex; justify-content: space-between; }
@@ -388,15 +387,3 @@ th.th-expected { background: var(--expected-bg); }   /* … and the expected out
 .fp-hit code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 .fp-hit mark { background: #ffe58a; color: inherit; border-radius: 2px; }
 .fp-one { padding: 1px 8px; font-size: 12px; }
-
-/* A document's status line (#2763, web/js/status-line.js): the one line at the bottom of every editor and viewer */
-.doc-status {
-  flex: none; display: flex; align-items: center; gap: 12px; height: 20px; padding: 0 6px; border-top: 1px solid var(--border, #a0a0a0);
-  background: var(--bg, #f0f0f0); color: var(--fg, #333); font-size: 11px; white-space: nowrap; overflow: hidden;
-}
-.doc-status .hint { overflow: hidden; text-overflow: ellipsis; color: var(--muted, #6d6d6d); }
-.doc-status .sp { flex: 1; }
-.doc-status .ds-f { flex: none; }
-.doc-status .xy { width: 110px; text-align: right; font-family: var(--mono, monospace); }
-.doc-status .zoom { width: 44px; text-align: right; }
-html[data-ui="silinx"] .doc-status { border-color: var(--m-border); background: var(--m-bg); color: var(--m-muted); }

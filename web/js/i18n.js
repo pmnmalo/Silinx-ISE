@@ -463,8 +463,8 @@ const PT_PATTERNS = [
   [/^HDL kept with the schematic \((VHDL|VERILOG)\)$/, 'HDL guardado com o esquemático ($1)'],
   [/^Language: (.*)$/, 'Idioma: $1'],
   [/^(\d+)\/(\d+) I\/Os assigned$/, '$1/$2 E/S atribuídas'],
-  [/^Top: (.*?) · Device (.*?) · Board: (.*)$/, 'Topo: $1 · Dispositivo $2 · Placa: $3'],
-  [/^Top: (.*?) · Device (.*?) · no board selected$/, 'Topo: $1 · Dispositivo $2 · sem placa selecionada'],
+  // I/O Pin Planning's status line (#2763)
+  [/^Top: (.*)$/, 'Topo: $1'], [/^Device (\S+)$/, 'Dispositivo $1'], [/^Board: (.*)$/, 'Placa: $1'], [/^no board selected$/, 'sem placa selecionada'],
   [/^(.*) Project Status$/, 'Estado do Projeto $1'],
   [/^Configuration file: (.*)$/, 'Ficheiro de configuração: $1'],
   [/^Bitstream: design (.*)$/, 'Bitstream: projeto $1'],

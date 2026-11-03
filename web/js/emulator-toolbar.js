@@ -6,6 +6,7 @@ import { h } from './dom.js';
 import { HIDDEN_KEY, SPEEDS } from './emulator.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
+import { statusLine } from './status-line.js';
 
 /** { main, menu, resetBtn, root, runBtn, stat, stepBtn } (menu: the toolbar menu's element, its rows appended) of mountEmulator (compiled(), engineNote(), running(), speed(), whenHidden(): its current values). */
 export function mountEmuToolbar(ctx) {
@@ -22,7 +23,9 @@ export function mountEmuToolbar(ctx) {
   const resetBtn = h('button', { class: 'btn', title: 'Power-cycle the board: restart the design from time 0', onclick: () => powerCycle() }, '⟲ Power cycle');
   const speedSel = h('select', { title: 'Emulated clock rate', onchange: (e) => { setSpeed(e.target.value === 'max' || e.target.value === 'real' ? e.target.value : Number(e.target.value)); } },
     ...SPEEDS.map(([v, l]) => h('option', { value: v, selected: v === speed() }, l)));
-  const stat = h('span', { class: 'stat' });
+  // (its time and speed: in its status line, #2763; t = … ns · … cycles · … kHz, written by the emulator)
+  const line = statusLine(), stat = h('span', { class: 'stat ds-f' });
+  line.el.append(stat);
   const hiddenSel = h('select', { title: 'What the emulator does while it is not seen (another browser tab, a minimised window, another document tab): pause, and go on where it was when shown again, or keep running',
     onchange: (e) => { setWhenHidden(e.target.value); try { localStorage.setItem(HIDDEN_KEY, whenHidden()); } catch { /* ignore */ } visibility(); } },
     h('option', { value: 'pause', selected: whenHidden() === 'pause' }, 'Pause'), h('option', { value: 'run', selected: whenHidden() === 'run' }, 'Keep running'));
@@ -54,11 +57,11 @@ export function mountEmuToolbar(ctx) {
     timingSel ? h('span', { class: 'sep' }) : null, timingSel ? 'Timing:' : null, timingSel,
     // (the side panel over the board when the emulator is narrow, shown by its button as the diagram editors', #2713)
     panelToggle(root, h('button', { class: 'btn emu-props-btn', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY, narrowOnly: false }),
-    more.el, stat));
+    more.el));
 
   // the board and its modules (main), the side panel at its right (emulator-side.js)
   const main = h('div', { class: 'emu-main' });
-  root.append(h('div', { class: 'emu-body' }, main));
+  root.append(h('div', { class: 'emu-body' }, main), line.el);
 
   return { main, menu: more.el.querySelector('.tb-more-menu'), resetBtn, root, runBtn, stat, stepBtn };
 }
