@@ -18,7 +18,7 @@ import { openProject, closeProject, recent, clearRecent, storageMenuItems } from
 import { runImpl, stopProcesses } from './implement.js';
 import { setViewAsTop, topOfView, viewSel } from './drawings.js';
 import { checkSyntax, runProcess, saveAll, topConfirmed } from './processes.js';
-import { setTop, unsetTop } from './design.js';
+import { addFromFolderDialog, setTop, unsetTop } from './design.js';
 import { openEmulator, openSchematic, runSimulation } from './viewers.js';
 import { printActive, printable } from './print-doc.js';
 import { generatedOpener, showGeneratedBeside, splitState, toggleSplit } from './split-view.js';
@@ -121,6 +121,8 @@ export function setupMenus() {
     { label: 'Project', items: () => [
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
       { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog(), disabled: hasPj },   // (Import Source… in the Silinx interface, #1501)
+      // the project folder's files not in the project (the Silinx interface's Files page has it too, #1214, #2450)
+      { label: 'Add to Project…', action: () => addFromFolderDialog(), disabled: hasPj },
       '-',
       // the implementation top (the Simulation view has none: Simulate runs the selected module)
       // (the selected module the top: Unset as Top Module, #1220)
