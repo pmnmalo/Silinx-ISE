@@ -10,7 +10,7 @@ import { sv } from './petri-editor.js';
 export function mountPetriDraw(ctx) {
   const {
     M, arcFrom, delBtn, destroyed, drag, envOf, nodeOf, placeOf, refreshLink, renderPanel,
-    renderSide, sel, sim, statusInfo, svg, uid, view, world, zoomLbl
+    renderSide, sel, sim, info, svg, uid, view, world, zoomLbl
   } = ctx;
 
   // ---------------------------------------------------------------- drawing
@@ -81,7 +81,7 @@ export function mountPetriDraw(ctx) {
     renderSide();
     renderPanel();
     delBtn.disabled = !sel();
-    statusInfo.textContent = `${M().places.length} places · ${M().transitions.length} transitions · ${M().arcs.length} arcs`;
+    info.textContent = `${M().places.length} places · ${M().transitions.length} transitions · ${M().arcs.length} arcs`;
     refreshLink();
   }
 

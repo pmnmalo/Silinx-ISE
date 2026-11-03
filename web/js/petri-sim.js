@@ -30,7 +30,7 @@ export function mountPetriSim(ctx) {
   const say = (msg) => { sim().log.unshift(msg); sim().log.length = Math.min(sim().log.length, 50); };
   function fireOne(tid) {
     const ok = enabledTransitions(M(), sim().marking, envOf()).includes(tid);
-    if (!ok) { status(`${transOf(tid)?.name}: not enabled${enabledTransitions(M(), sim().marking, null).includes(tid) ? ' (its guard is false)' : ''}`, true); return; }
+    if (!ok) { status(`${transOf(tid)?.name}: not enabled${enabledTransitions(M(), sim().marking, null).includes(tid) ? ' (its guard is false)' : ''}`); return; }
     sim().marking = fire(M(), sim().marking, tid); sim().fired = [tid];
     say(`fire ${transOf(tid).name}`);
     status('');
@@ -44,7 +44,7 @@ export function mountPetriSim(ctx) {
   }
   function randomFire() {
     const en = enabledTransitions(M(), sim().marking, envOf());
-    if (!en.length) { status(isDeadlock(M(), sim().marking) ? 'Deadlock: no transition can fire' : 'No transition is enabled with these inputs', true); return; }
+    if (!en.length) { status(isDeadlock(M(), sim().marking) ? 'Deadlock: no transition can fire' : 'No transition is enabled with these inputs'); return; }
     fireOne(en[Math.floor(Math.random() * en.length)]);
   }
   // the simulation's controls (its buttons, the inputs) are made once and kept: drawn again at every

@@ -60,8 +60,8 @@ uiTest('#2505 the FSM: no HDL button; the Petri net: its zooms; the main toolbar
   assert.deepEqual(await page.eval((d) => [...document.querySelectorAll(`${d} .fsm-tab-btn`)].map((b) => b.textContent), D), ['Tables', 'Simulate']);
   await open(page, 'src/net.pn.json', 'the Petri net', '.pn-toolbar');
   const P = `${D} .pn-toolbar`;
-  const zoom = () => page.eval((d) => parseInt(document.querySelector(`${d} .asm-status .asm-zoom`).textContent, 10), D);
-  const moved = (cmp, z, what) => page.waitFor((d, c, v) => { const k = parseInt(document.querySelector(`${d} .asm-status .asm-zoom`).textContent, 10); return c === 'in' ? k > v : k < v; }, [D, cmp, z], { what });
+  const zoom = () => page.eval((d) => parseInt(document.querySelector(`${d} .pn-toolbar .asm-zoom`).textContent, 10), D);
+  const moved = (cmp, z, what) => page.waitFor((d, c, v) => { const k = parseInt(document.querySelector(`${d} .pn-toolbar .asm-zoom`).textContent, 10); return c === 'in' ? k > v : k < v; }, [D, cmp, z], { what });
   await page.click(`${P} [data-act=fit]`);
   const z0 = await zoom();
   await page.click(`${P} [data-act=zin]`);

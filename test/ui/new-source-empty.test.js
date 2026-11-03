@@ -75,6 +75,6 @@ uiTest('#2176 New Source without the wizard: the Petri net empty, with no proble
   await create(page, 'Petri Net', 'net', 'pn:src/net.pn.json');
   const m = JSON.parse(await readWs(env, 'EmptyPn', 'src/net.pn.json'));
   assert.deepEqual([m.name, m.places, m.transitions, m.arcs, m.inputs, m.outputs], ['net', [], [], [], [], []]);
-  await page.waitFor((d) => /0 places · 0 transitions · 0 arcs/.test(document.querySelector(`${d} .petri-editor .asm-status`)?.textContent), [DOC], { what: 'an empty net' });
+  await page.waitFor((d) => /0 places · 0 transitions · 0 arcs/.test(document.querySelector(`${d} .petri-editor .asm-info`)?.textContent), [DOC], { what: 'an empty net' });
   assert.deepEqual(await logProblems(page), []);
 }, { timeout: 120000 });

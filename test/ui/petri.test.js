@@ -20,15 +20,15 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   await page.openProject('PnPj');
   await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
   await page.waitFor((ed) => window.Silinx.active?.id === 'pn:src/ctl.pn.json' && document.querySelector(ed), [ED], { what: 'the Petri net editor' });
-  const count = () => page.eval((ed) => document.querySelector(`${ed} .asm-status`).textContent, ED);
-  await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED]);
+  const count = () => page.eval((ed) => document.querySelector(`${ed} .asm-info`).textContent, ED);
+  await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED]);
   // the Place tool, a click on the drawing: a third place; Edit ▸ Undo takes it away
   await page.click(`${ED} .pn-tool`, { text: 'Place' });
   const box = await page.eval((ed) => { const r = document.querySelector(`${ed} .pn-canvas`).getBoundingClientRect(); return { x: r.left + r.width - 80, y: r.top + r.height - 60 }; }, ED);
   await page.click({ x: box.x, y: box.y });
-  await page.waitFor((ed) => /^3 places/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'a place added' });
+  await page.waitFor((ed) => /^3 places/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'a place added' });
   await page.menu('Edit', 'Undo');
-  await page.waitFor((ed) => /^2 places/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'undone' });
+  await page.waitFor((ed) => /^2 places/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'undone' });
   assert.match(await count(), /2 places/);
   // the simulation: start is enabled but its guard (go) is false; go: it is ready, a click fires it
   await page.click(`${ED} [data-act=select]`);
@@ -65,10 +65,12 @@ async function newNet(page, pj) {
   await makeProject(env, { name: pj, top: '', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject(pj);
   await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
-  await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-status`)?.textContent || ''), [ED], { what: 'the Petri net editor' });
+  await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-info`)?.textContent || ''), [ED], { what: 'the Petri net editor' });
 }
 const node = (page, id) => page.eval((ed, i) => { const r = document.querySelector(`${ed} [data-id=${i}] ${i[0] === 'p' ? 'circle' : 'rect'}`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, ED, id);
-const problems = (page) => page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-prob`)].map((li) => `${li.classList.contains('warning') ? 'warning' : 'error'}: ${li.textContent}`), ED);
+// the net's problems: in the console's Errors and Warnings tabs (#2718), none in the editor
+const problems = (page, file = 'src/ctl.pn.json') => page.eval((f) => [...document.querySelectorAll('#console-errors .diag, #console-warnings .diag')]
+  .filter((d) => d.textContent.includes(`"${f}": `)).map((d) => `${d.closest('#console-errors') ? 'error' : 'warning'}: ${d.textContent.split(`"${f}": `)[1]}`), file);
 const saved = async (pj) => JSON.parse(await readWs(env, pj, 'src/ctl.pn.json'));
 // a project file once it is what `ok` wants (it is written by the autosave, ~0.8 s after the edit, and
 // later on a loaded machine): returns it; else fails naming `what` (and `ok` is asserted on the last read)
@@ -97,29 +99,29 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   await page.click(`${ED} .pn-tool`, { text: 'Transition' });
   const box = await page.eval((ed) => { const r = document.querySelector(`${ed} .pn-canvas`).getBoundingClientRect(); return { x: r.left + r.width - 70, y: r.top + r.height - 70 }; }, ED);
   await page.click(box);
-  await page.waitFor((ed) => /3 transitions/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 't3 added' });
+  await page.waitFor((ed) => /3 transitions/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 't3 added' });
   await page.click(`${ED} .pn-tool`, { text: 'Arc' });
   await page.click(await node(page, 'p2')); await page.click(await node(page, 't3'));
   await page.click(await node(page, 't3')); await page.click(await node(page, 'p1'));
-  await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'two arcs drawn' });
+  await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'two arcs drawn' });
   // a place to a place: refused
   await page.click(await node(page, 'p1')); await page.click(await node(page, 'p2'));
-  await page.waitFor((ed) => document.querySelector(`${ed} .asm-status-msg`).textContent === 'An arc joins a place and a transition', [ED]);
+  await page.waitConsole(/WARNING: ctl\.pn\.json: An arc joins a place and a transition/);
   // an inhibitor arc work ⊸ start; from a transition: refused
   await page.click(`${ED} .pn-tool`, { text: 'Inhibitor' });
   await page.click(await node(page, 't1')); await page.click(await node(page, 'p1'));
-  await page.waitFor((ed) => document.querySelector(`${ed} .asm-status-msg`).textContent === 'An inhibitor arc goes from a place to a transition', [ED]);
+  await page.waitConsole(/WARNING: ctl\.pn\.json: An inhibitor arc goes from a place to a transition/);
   await page.click(await node(page, 'p2')); await page.click(await node(page, 't1'));
-  await page.waitFor((ed) => /7 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent) && document.querySelector(`${ed} .pn-arc.inhibitor`), [ED], { what: 'the inhibitor arc' });
+  await page.waitFor((ed) => /7 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent) && document.querySelector(`${ed} .pn-arc.inhibitor`), [ED], { what: 'the inhibitor arc' });
   let m = await untilSaved('PnEd', (x) => x.arcs.length === 7, 'the 7 arcs saved');
   assert.deepEqual(m.arcs.slice(4).map((a) => [a.from, a.to, !!a.inhibitor]), [['p2', 't3', false], ['t3', 'p1', false], ['p2', 't1', true]]);
   // the inhibitor arc is selected: ✕ deletes it, ↶ brings it back, ↷ deletes it again
   await page.click(`${ED} [data-act=delete]`);
-  await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'deleted' });
+  await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'deleted' });
   await page.click(`#toolbar [data-cmd=undo]`);
-  await page.waitFor((ed) => /7 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'undone' });
+  await page.waitFor((ed) => /7 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'undone' });
   await page.click(`#toolbar [data-cmd=redo]`);
-  await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'redone' });
+  await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'redone' });
   // the properties: idle 2 tokens (its capacity follows), t3 a guard, a pulse, the first in priority
   await page.click(`${ED} [data-act=select]`);
   await page.click(await node(page, 'p1'));
@@ -137,20 +139,21 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   // the problems, exact: a place alone, a guard that does not parse, an output not of the net
   await page.click(`${ED} .pn-tool`, { text: 'Place' });
   await page.click({ x: box.x, y: box.y - 120 });
-  await page.waitFor((ed) => /3 places/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED]);
+  await page.waitFor((ed) => /3 places/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED]);
   await page.click(`${ED} [data-act=select]`);
   await page.click(await node(page, 't3'));
   await setField(page, 'Guard', 'go &');
   await page.click(await node(page, 'p2'));
   await setField(page, 'Outputs while marked', 'zz=1');
-  await page.waitFor((ed) => document.querySelectorAll(`${ed} .asm-prob`).length === 3, [ED], { what: 'three problems' });
+  await page.waitFor(() => document.querySelectorAll('#console-errors .diag, #console-warnings .diag').length >= 5, [], { what: 'three problems (and the two arcs refused)' });
+  assert.ok(!(await page.eval((ed) => document.querySelector(`${ed} .asm-problems, ${ed} .asm-prob`), ED)), 'none in the editor');
   assert.deepEqual(await problems(page), [
     "error: transition t1: guard 'go &': unexpected end of expression",
     "error: work: 'zz' is not an output of the net",
     'warning: place p1 is not connected',
   ]);
   // a click on a problem selects what it is about
-  await page.click(`${ED} .asm-prob`, { text: 'place p1 is not connected' });
+  await page.eval(() => [...document.querySelectorAll('#console-warnings .diag')].find((d) => d.textContent.includes('place p1 is not connected')).click());
   await page.waitFor((ed) => /^Place p1/.test(document.querySelector(`${ed} .pn-selection h3`)?.textContent || ''), [ED], { what: 'p1 selected' });
 });
 
@@ -161,7 +164,7 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=1  work=0', [ED]);
   // Random: go off, nothing can fire; go on: start fires
   await page.click(`${ED} .asm-codebar .asm-btn`, { text: '🎲 Random' });
-  await page.waitFor((ed) => document.querySelector(`${ed} .asm-status-msg`).textContent === 'No transition is enabled with these inputs', [ED], { what: 'nothing enabled' });
+  await page.waitConsole(/\nctl\.pn\.json: No transition is enabled with these inputs/);   // (the simulation's: a note)
   await page.click(`${ED} .pn-sim-ins input[type=checkbox]`);
   await page.click(`${ED} .asm-codebar .asm-btn`, { text: '🎲 Random' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=0  work=1', [ED], { what: 'start fired at random' });
@@ -212,10 +215,10 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
     <place id="P1"><name><text>b</text></name></place><transition id="T0"><name><text>go_on</text></name></transition>
     <arc id="x" source="P0" target="T0"/><arc id="y" source="T0" target="P1"/></net></pnml>`);
   await page.setFiles(`${ED} input[type=file]`, [pnml]);
-  await page.waitFor((ed) => document.querySelector(`${ed} .asm-status`).textContent.startsWith('2 places · 1 transitions · 2 arcs'), [ED], { what: 'imported' });
+  await page.waitFor((ed) => document.querySelector(`${ed} .asm-info`).textContent.startsWith('2 places · 1 transitions · 2 arcs'), [ED], { what: 'imported' });
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent, ED), 'a=1  b=0');
   await page.menu('Edit', 'Undo');
-  await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'the import undone' });
+  await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'the import undone' });
   // the HDL file: made with the net (every source has its HDL, #207), generated from it
   await page.waitFor(() => window.Silinx.project.files.some((x) => x.path === 'src/ctl.vhd'), [], { what: 'src/ctl.vhd in the project' });
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .petri-editor .pn-link')?.dataset.hdl === 'ctl.vhd', [], { what: 'the link banner' });
@@ -321,11 +324,11 @@ uiTest('Petri Net Wizard (#208): New Source ▸ Petri Net ▸ Wizard > (#958), t
     'Then draw its places, transitions and arcs; the outputs are set by the places (while marked) and the transitions (when they fire).'].join('\n'));
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor((ed) => window.Silinx.active?.id === 'pn:nets/ctl.pn.json' && /^0 places · 0 transitions · 0 arcs$/.test(document.querySelector(`${ed} .asm-status > span`)?.textContent || ''), [ED], { what: 'the empty net opened' });
+  await page.waitFor((ed) => window.Silinx.active?.id === 'pn:nets/ctl.pn.json' && /^0 places · 0 transitions · 0 arcs$/.test(document.querySelector(`${ed} .asm-info`)?.textContent || ''), [ED], { what: 'the empty net opened' });
   const m = JSON.parse(await readWs(env, 'PnWiz', 'nets/ctl.pn.json'));
   assert.deepEqual([m.name, m.lang, m.clock, m.reset, m.inputs, m.outputs, m.places, m.transitions, m.arcs],
     ['ctl', 'vhdl', 'clk', { name: 'rst', active: 'high', sync: true }, [{ name: 'go', width: 1 }, { name: 'sel', width: 3 }], [{ name: 'busy', width: 1 }, { name: 'st', width: 2 }], [], [], []]);
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-prob`)].map((li) => li.textContent), ED), []);
+  assert.deepEqual(await problems(page, 'nets/ctl.pn.json'), []);
   // its HDL file, made with it (#207) and kept in sync
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'nets/ctl.vhd'), [], { what: 'nets/ctl.vhd', timeout: 15000 });
   assert.match(await readWs(env, 'PnWiz', 'nets/ctl.vhd'), /entity ctl is[\s\S]*sel : in std_logic_vector\(2 downto 0\);[\s\S]*st : out std_logic_vector\(1 downto 0\)/);
