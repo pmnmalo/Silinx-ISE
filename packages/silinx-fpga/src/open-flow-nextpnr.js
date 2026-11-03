@@ -202,7 +202,8 @@ export function lowerClockSwitches(mod) {
 /**
  * The block RAMs' and multipliers' inputs as Silinx's packer leaves them (#2135), which ISE's DRC wants: a block RAM's
  * parity bit written and not read moved to a free data bit (pack-bram.js parityToData); the data inputs of a port never
- * written (WE at 0, its data constant or undriven) left unconnected; the other undriven inputs (x) at 0. In place.
+ * written (WE at 0, its data constant or undriven) and a data input left undriven unconnected; the other undriven inputs
+ * (x) at 0. In place.
  */
 export function hardInputs(mod) {
   // Silinx's netlist view of the module (fpga/netlist.js): nets 0 and 1 the constants, a net per bit
@@ -246,7 +247,10 @@ export function hardInputs(mod) {
     const conn = {}, dirs = {};
     for (const [pin, n] of Object.entries(cell.pins)) {
       const q = /^(\w+?)(?:<(\d+)>)?$/.exec(pin), port = q[1], i = q[2] === undefined ? 0 : +q[2];
-      const free = /^DIP?[AB]?$/.test(port) && unwritten.has(m && !m[3] ? 'A' : port.slice(-1));
+      // (and a block RAM's data input Yosys leaves undriven, as Silinx's packer leaves it out, pack-iobcfg.js: ISE's
+      // DRC calls the output bit of a data input tied to 0 a dangling pin, #2642; parity inputs stay at 0, all or none)
+      const free = (/^DIP?[AB]?$/.test(port) && unwritten.has(m && !m[3] ? 'A' : port.slice(-1)))
+        || (m && /^DI[AB]?$/.test(port) && cell.undriven.includes(pin));
       (conn[port] ||= [])[i] = free ? 'x' : nets[n].const !== undefined ? String(nets[n].const) : bitOf.get(n);
       dirs[port] = /^(DO|DOP|P|BCOUT)$/.test(port.replace(/[AB]$/, '')) || /^(P|BCOUT)$/.test(port) ? 'output' : 'input';
     }
