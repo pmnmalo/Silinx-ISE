@@ -72,8 +72,13 @@ export async function elaborateView(name, { top, sim = false } = {}) {
   let design = null, extra = [];
   try { design = elaborate(lib, mod); } catch (e) { extra = [{ severity: 'error', file: srcs[0]?.path || '', line: 1, col: 1, message: e.message }]; }
   if (design) { try { extra = designChecks(lib, design, { lint: true }); } catch { /* no checks */ } }
+  // (an HDL file its drawing cannot make again, #303: an error of the file, the drawing's errors in it, as Check Syntax's)
+  const { staleDrawings } = await import('./drawing-sync.js');
+  const inView = new Set(srcs.map(s => s.path));
+  const stale = (await staleDrawings(P, name)).filter(s => inView.has(s.target)).map(({ target, from, why }) => ({ severity: 'error', file: target, line: 1, col: 1, tool: 'Silinx',
+    message: `${target} is not up to date: ${from} cannot generate it, ${why}. Fix ${from} (its HDL is then generated again).` }));
   const seen = new Set();
-  const diags = [...lib.errors, ...(design?.diags || []), ...extra]
+  const diags = [...lib.errors, ...(design?.diags || []), ...extra, ...stale]
     .filter(d => { const k = `${d.file}:${d.line}:${d.message}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map(d => ({ ...d, tool: d.tool || 'HDLCompiler' }));
   return { project, srcs, lib, design, top: mod, diags };

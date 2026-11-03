@@ -450,9 +450,9 @@ in Firefox and WebKit.
 Desktop, Claude Code, any client of the Model Context Protocol) over stdin / stdout. Its tools:
 `list_examples` (the examples, then the test designs: the designs Silinx is tested with), `new_project_from_example`, `new_project` (an empty one, for a board), `set_top` (the top
 module and the test bench, as *Set as Top Module*; the constraints from the board's pins, as *Update
-Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_info`, `read_file`, `write_file`,
-`list_devices` (the boards and devices), `set_design_properties` (the board, the device, the synthesis tool, as
-*Design Properties*), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_info`, `read_file`, `write_file` (a drawing's HDL file made again from it, as its editor does),
+`list_devices` (the boards and devices), `set_design_properties` (the board, the device, the synthesis tool, the Preferred Language, as
+*Design Properties*), `set_source_properties` (a drawing's language), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
 only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),

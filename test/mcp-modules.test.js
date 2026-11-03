@@ -26,7 +26,7 @@ test('server/mcp.js exports what it did before the split', () => {
 
 test('the tools: those of the areas, the ones of before the split in their order', () => {
   assert.deepEqual(names(PROJECT_TOOLS), ['list_examples', 'list_projects', 'new_project_from_example', 'new_project', 'set_top', 'project_info', 'read_file', 'write_file']);
-  assert.deepEqual(names(SETTINGS_TOOLS), ['list_devices', 'set_design_properties', 'set_process_properties']);
+  assert.deepEqual(names(SETTINGS_TOOLS), ['list_devices', 'set_design_properties', 'set_process_properties', 'set_source_properties']);
   assert.deepEqual(names(SOURCE_TOOLS), ['unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'delete_file', 'delete_project']);
   assert.deepEqual(names(TRANSFER_TOOLS), ['export_project', 'import_project']);
   assert.deepEqual(names(HDL_TOOLS), ['check_syntax', 'simulate']);
