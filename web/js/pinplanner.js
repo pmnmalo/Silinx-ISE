@@ -141,12 +141,12 @@ export function mountPinPlanner(el, doc, top) {
     h('div', { class: 'asm-group' }, ...viewBtns),
     sep(),
     h('div', { class: 'asm-group' }, autoBtn, toolWide('del', 'Clear All', 'Remove every pin assignment', () => { asg = {}; clocks = []; render(); changed(); })),
-    sep(),
-    h('span', { class: 'pp-info' }, `Top: ${top} · Device ${pj.device.part}-${pj.device.package}${board ? ` · Board: ${board.name}` : ' · no board selected'}`),
-    sep(), status,
     h('div', { class: 'asm-spacer' }),
     // (a narrow window: the ports and the board's resources over the board and the table, shown by these)
-    h('div', { class: 'asm-group' }, portsBtn, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })));
+    h('div', { class: 'asm-group' }, portsBtn, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })),
+    // (what it says at its right end, as every toolbar's: #2725)
+    status, sep(),
+    h('span', { class: 'pp-info' }, `Top: ${top} · Device ${pj.device.part}-${pj.device.package}${board ? ` · Board: ${board.name}` : ' · no board selected'}`));
   const side = h('aside', { class: 'asm-side pp-side' }, h('div', { class: 'asm-cap' }, 'Board Resources'), resHost);
   root.append(bar, h('div', { class: 'asm-body' }, portsSide, h('div', { class: 'asm-main' }, tableHost, boardHost), side));
   mountSideFold({ root, side, key: 'silinx.pins.props.folded', titles: { fold: 'Collapse the Board Resources panel', unfold: 'Expand the Board Resources panel' } });
