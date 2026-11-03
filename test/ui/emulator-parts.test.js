@@ -75,6 +75,10 @@ uiTest('#405 Board Emulator parts: the toolbar, the board, a watched signal, the
   // ---- the power switch: off, the status line says so
   await page.eval(() => document.querySelector('.emu-power').click());
   await page.waitFor(() => document.querySelector('.emu .stat').textContent === 'Power off', [], { what: 'Power off' });
+  // (the status line: the emulator's last line, not in its toolbar, #2763; in the Tasks interface below the board, #1022)
+  assert.deepEqual(await page.eval(() => { const emu = document.querySelector('.emu'), st = emu.querySelector(':scope > .doc-status');
+    const tasks = document.documentElement.dataset.layout === 'tasks';
+    return [emu.lastElementChild === st, !!emu.querySelector('.emu-bar .stat'), tasks ? !st.getClientRects().length : !!st.querySelector('.stat')]; }), [true, false, true]);
 });
 
 uiTest('#1985 a tablet\'s long press on a push button: no context menu over the board, the button stays pressed until released', E, async (page) => {

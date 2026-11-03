@@ -674,12 +674,12 @@ uiTest('#1021 #1999 #2666 #2713 Tasks ▸ Emulate: the board fits the window; th
 
 // #1022: the emulator's status (t = … ns · … cycles · … kHz (…% of real time)) right below the board, in place of the
 // board's line ("Digilent Basys2 — top · Clock clk: 50 MHz on the board"), in English and Portuguese; the ISE style
-// interface keeps it at the end of the emulator's bar, the board's line below the board
+// interface keeps it in the emulator's status line (#2763), the board's line below the board
 const emuStatus = (page) => page.eval(() => {
   const emu = document.querySelector('.doc:not([hidden]) .emu'), stat = emu.querySelector('.stat'), note = emu.querySelector('.emu-board-note');
   const pr = emu.querySelector('.emu-pcb').getBoundingClientRect(), sr = stat.getBoundingClientRect();
   const hit = document.elementFromPoint(sr.left + sr.width / 2, sr.top + sr.height / 2);
-  return { where: stat.parentNode.classList.contains('emu-bar') ? 'bar' : stat.parentNode.classList.contains('emu-board-wrap') ? 'board' : '?',
+  return { where: stat.parentNode.classList.contains('doc-status') ? 'status' : stat.parentNode.classList.contains('emu-board-wrap') ? 'board' : '?',
     below: sr.top >= pr.bottom - 1 && sr.top - pr.bottom < 16 && sr.left >= pr.left - 1, seen: !!hit && stat.contains(hit),
     note: note.getClientRects().length > 0, text: stat.textContent, noteText: note.textContent };
 });
@@ -704,14 +704,14 @@ uiTest('#1022 Tasks ▸ Emulate: the emulation\'s time and rate right below the 
   s = await emuStatus(page);
   assert.ok(s.where === 'board' && s.below && s.seen && !s.note, JSON.stringify(s));
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // the Silinx and ISE style interfaces: at the end of the emulator's bar, the board's line below the board
+  // the ISE style interface: in the emulator's status line (#2763), its last line; the board's line below the board
   for (const ui of ['ise']) {
     await page.eval(async (u) => (await import('/js/silinx.js')).setInterface(u), ui);
     await page.waitFor(() => !document.documentElement.dataset.layout);
     await page.waitFor(() => /^t = .* cycles .* kHz \(.*% of real time\)$/.test(document.querySelector('.doc:not([hidden]) .emu .stat')?.textContent || ''), [], { what: `the status in ${ui}` });
     s = await emuStatus(page);
-    assert.deepEqual({ where: s.where, note: s.note, last: await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-bar').lastElementChild.classList.contains('stat')) },
-      { where: 'bar', note: true, last: true }, ui);
+    assert.deepEqual({ where: s.where, note: s.note, last: await page.eval(() => document.querySelector('.doc:not([hidden]) .emu').lastElementChild.classList.contains('doc-status')) },
+      { where: 'status', note: true, last: true }, ui);
     assert.match(s.noteText, /^Digilent Basys2 — top · Clock clk: 50 MHz on the board/, ui);
   }
   // and back to Tasks: below the board again
