@@ -19,11 +19,28 @@ answer here.
   #2331).
 - **No Undo, Redo or Print in a document's toolbar**: the main toolbar's, the Edit and File menus' and Ctrl+Z,
   Ctrl+Y, Ctrl+P act on the document in front (#2505, #2514).
-- **The side panel** is the Schematic editor's Properties: on the right, its caption, its width and fields, folded
-  to a strip by the button in its caption and remembered per editor (`web/js/side-fold.js`). The emulator, the pin
-  planner and the implemented design's view use the same (#2666, #2668, #2671).
+- **The side panels** are all alike (see below).
 - **The hint line** at the bottom says what the mouse does ("Double-click to add a state · …"); a read-only view's
   starts with "Read-only · …".
+
+## A side panel
+
+Every document's side panel (the editors' Properties, the schematic's Symbols, I/O Pin Planning's Board Resources, the
+Board Emulator's, the implemented design's) behaves as the Schematic editor's Properties, with the same code; a new
+panel uses it rather than its own:
+
+- **Where:** on the right of the canvas (the schematic's Symbols on the left), the same width in every editor; its
+  caption (`.asm-cap`) first, its name ("Properties", "Board Resources"), then its fields as the Properties' (titles,
+  labels, inputs).
+- **Foldable:** a button at the right of its caption folds it to a thin strip with its name down the side; a click
+  on the strip expands it again. Folded or not is remembered per editor (`mountSideFold` of `web/js/side-fold.js`, its
+  key `silinx.<editor>.props.folded`) (#2505).
+- **On a narrow screen** (under 1024 px, `NARROW_QUERY` of `web/js/narrow.js`): the panel goes over the canvas, closed
+  at first, and it is shown and hidden by a `☰ <its name>` button in the toolbar (`panelToggle`: a flat button of the
+  toolbar, before its ⋮ menu, shown only there); open or closed is remembered per viewer. No folding there, and the
+  panel never moves below or above the canvas (#266).
+- **Read-only:** shown, its fields disabled, its buttons hidden.
+- **Tests:** a UI test folds and expands it, reloads (the fold kept), and opens and closes it on a narrow window.
 
 ## A read-only view
 
