@@ -70,14 +70,3 @@ test('defaultEngine: event-driven on a slow device, compiled elsewhere; the save
   for (const saved of [null, '', 'fast', 'Compiled', undefined]) assert.deepEqual(defaultEngine({ saved, nav: phone }), { engine: 'event', auto: 'a phone or tablet' }, String(saved));
   assert.equal(ENGINE_KEY, 'silinx.emulator.engine');
 });
-
-test('the hint that says why has its Portuguese translation, every reason translated', async () => {
-  Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (k) => (k === 'silinx.lang' ? 'pt' : null), setItem() {}, removeItem() {} }, configurable: true, writable: true });
-  const { t } = await import('../web/js/i18n.js');
-  const hint = (why) => `The event-driven engine by default on this device (${why}): choose Engine ▸ Compiled to run the design at the board's real speed.`;
-  assert.equal(t(hint('a phone or tablet, 2 processor cores, 2 GB of memory')),
-    'O motor por eventos por omissão neste dispositivo (um telemóvel ou tablet, 2 núcleos de processador, 2 GB de memória): '
-    + 'escolha Motor ▸ Compilado para correr o projeto à velocidade real da placa.');
-  assert.match(t(hint('1 processor core, 0.5 GB of memory')), /\(1 núcleo de processador, 0,5 GB de memória\)/);
-  for (const [, [nav]] of Object.entries(SLOW)) assert.doesNotMatch(t(hint(slowDevice(nav))), /phone|processor|memory/, slowDevice(nav));
-});

@@ -400,8 +400,8 @@ const PT_FF = [['synchronous set and reset (S over R)', 'set e reset síncronos 
   ['clock enable', 'habilitação do relógio'], ['asynchronous clear', 'clear assíncrono'], ['asynchronous preset', 'preset assíncrono'],
   ['synchronous reset', 'reset síncrono'], ['synchronous set', 'set síncrono']];
 const PT_PATTERNS = [
-  // the serial terminal's pins (#2536)
   [/^(\d+) states?(?: · (\d+) every-cycle blocks?)?$/, (m, n, b) => `${n} estado${n === '1' ? '' : 's'}${b ? ` · ${b} bloco${b === '1' ? '' : 's'} de cada ciclo` : ''}`],   // (the ASM editor's toolbar, #2730)
+  // the serial terminal's rates (#2536)
   [/^(\d+) baud$/, '$1 baud'],
   // Find in Project (#1430)
   [/^(\d+) result\(s\) in (\d+) file\(s\)$/, '$1 resultado(s) em $2 ficheiro(s)'], [/^(\d+) replacement\(s\) in (\d+) file\(s\)$/, '$1 substituição(ões) em $2 ficheiro(s)'],
