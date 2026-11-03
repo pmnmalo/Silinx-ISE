@@ -81,3 +81,112 @@ test('#1599 what is not supported, said once', () => {
   assert.deepEqual(errs('int f(int v) {\n  int x = v;\n  int *p = &x;\n  return p[1];\n}\n'), ["4 the pointer 'p' to a variable: only *p (p[0])"]);
   assert.deepEqual(errs('int f(int v) {\n  int *p;\n  return v;\n}\n'), ["2 the pointer 'p' is never set"]);
 });
+
+// #2655: the test bench's pointers into arrays, as cc's: a + k, k + a, &a[k] (one past the end too), p++, p += n, p - q,
+// comparisons, passed to functions and to strlen, strcat, memcpy, %s; into a row (m[1] + 2), into an array of strings.
+const OFFSETS = `#include <stdio.h>
+#include <string.h>
+static int sum(const int *p, int n) { int s = 0; for (int i = 0; i < n; i++) s += p[i]; return s; }
+static void fill(int *p, int n, int v) { while (n--) *p++ = v; }
+int top(int x) { return x + 1; }
+static int len(const char *s) { const char *t = s; while (*t) t++; return t - s; }
+int main(void) {
+  int a[6] = { 1, 2, 3, 4, 5, 6 };
+  int *p = a + 1, *q = 2 + a, *e = &a[6];
+  printf("%d %d %d %d\\n", *p, *q, p[2], *(e - 1));
+  p++; p += 2; p -= 1; --p; ++p;
+  printf("%d %ld %ld %d\\n", *p, (long)(p - a), (long)(e - p), (int)(q - p));
+  printf("%d %d %d %d %d\\n", p < e, p > q, p == a + 3, p != q, p >= a);
+  *p = 40; p[1] = 50; *(p - 1) = 30;
+  printf("%d %d\\n", sum(a + 2, 3), sum(&a[1], 5));
+  fill(a + 4, 2, 9);
+  for (int *r = a; r < a + 6; r++) printf("%d ", *r);
+  printf("\\n");
+  int m[2][3] = { { 1, 2, 3 }, { 4, 5, 6 } };
+  int *w = m[1] + 2;
+  printf("%d %d %d\\n", *w, w[-1], sum(m[0] + 1, 4));
+  char b[] = "hello";
+  printf("%d %d %s %d\\n", (int)strlen(b + 1), len(b + 2), b + 3, (int)strlen(&"world"[1]));
+  char c[12] = "ab";
+  strcat(c + 1, "xy");
+  printf("%s\\n", c);
+  const char *names[] = { "zero", "one", "two" };
+  const char **n = names + 1;
+  printf("%s %s\\n", *n, n[1]);
+  int x = 3, *px = &x;
+  printf("%d %d\\n", px == &x, px != NULL);
+  int v = 0;
+  memcpy(&v, a + 3, sizeof v);
+  printf("%d\\n", v);
+  return top(0) + *(a + 5) + (int)(e - a);
+}
+`;
+
+test('#2655 an array plus an offset as a pointer in the C simulation: as cc\'s, no warnings', { skip: noCC }, () => {
+  const sim = simulateC(OFFSETS, { file: 'off.c', top: 'top' });
+  assert.deepEqual([sim.error, sim.diagnostics], [null, []]);
+  const ref = compiledRun(OFFSETS);
+  assert.equal(sim.output, ref.output);
+  assert.equal(sim.exitCode, ref.exitCode);
+  assert.equal(sim.output.split('\n')[0], '2 3 4 6');
+  assert.equal(sim.exitCode, 16);
+});
+
+test('#2655 a pointer outside its array, or one of pointers into different arrays: the C simulation stops there', () => {
+  const run = (body) => {
+    const src = `int top(int x) { return x; }\nint main(void) {\n  int a[4] = { 1, 2, 3, 4 }, b[2] = { 5, 6 };\n  int m[2][2] = { { 1, 2 }, { 3, 4 } };\n${body}\n}\n`;
+    const r = simulateC(src, { file: 'e.c', top: 'top' });
+    assert.deepEqual(r.diagnostics, []);
+    return r.error && `${r.error.line}:${r.error.col} ${r.error.message}`;
+  };
+  assert.equal(run('  int *p = a + 5;\n  return *p;'), '5:14 the pointer moves outside its array (to the element 5 of 0 to 3)');
+  assert.equal(run('  int *p = a + 4;\n  return *p;'), '6:10 the pointer points outside its array (to the element 4 of 0 to 3)');
+  assert.equal(run('  int *p = &a[4];\n  *p = 1;\n  return 0;'), '6:3 the pointer points outside its array (to the element 4 of 0 to 3)');
+  assert.equal(run('  int *p = &a[5];\n  return 0;'), '5:12 the pointer moves outside its array (to the element 5 of 0 to 3)');
+  assert.equal(run('  int *p = a + 3;\n  return p[1];'), '6:11 the index 1 is outside the array the pointer points into');
+  assert.equal(run('  int *p = a;\n  p--;\n  return 0;'), '6:4 the pointer moves outside its array (to the element -1 of 0 to 3)');
+  assert.equal(run('  int *p = a;\n  for (int i = 0; i < 6; i++) p++;\n  return 0;'), '6:32 the pointer moves outside its array (to the element 5 of 0 to 3)');
+  assert.equal(run('  return (int)(a - b);'), '5:18 the difference of pointers into different arrays is undefined in C');
+  assert.equal(run('  return a < b;'), "5:12 pointers into different arrays compared ('<' is undefined in C)");
+  assert.equal(run('  int *p = a;\n  return p * 2;'), "6:12 the operator '*' of a pointer");
+  assert.equal(run('  return *(m + 1)[0];'), '5:14 a pointer to a row of an array of arrays (m + i) cannot be simulated: give the row, m[i] + j');
+  assert.equal(run('  int x = 1, *p = &x;\n  return *(p + 1);'), '6:10 a pointer to one value: only [0]');
+  assert.equal(run('  int *p = a + 4, *q = &a[4];\n  return (p == q) + (p == a) * 2 + (p != 0) * 4 - 5;'), null);
+});
+
+test('#2655 synthesized: a + k, k + a, &a[k] moved, co-simulated in VHDL and Verilog with no warnings; p - a, p < q, g(a + 1), m[1] + 2 refused, said', () => {
+  const SYN = `#include <stdio.h>
+int offsets(int a[6], int k) {
+  int *p = a + 1, *q = 2 + a, *r = &a[3];
+  r++;
+  r += 1;
+  return *p + q[k & 1] * 10 + *r * 100;
+}
+
+int main(void) {
+  int a[6] = { 1, 2, 3, 4, 5, 6 }, s = 0;
+  for (int k = 0; k < 2; k++) s += offsets(a + 0, k);
+  int *w = a + 2;
+  *w = 7;
+  s += offsets(a, 1);
+  printf("%d\\n", s);
+  return s != 1916;
+}
+`;
+  const sim = simulateC(SYN, { file: 'p.c' });
+  assert.deepEqual([sim.error, sim.exitCode, sim.output, sim.diagnostics], [null, 0, '1916\n', []]);
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(SYN, { file: 'p.c', lang });
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
+    assert.deepEqual(r.gen.diagnostics, []);
+  }
+  const said = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
+  const P = (b) => `int f(int k) {\n  int a[4] = { 1, 2, 3, 4 };\n${b}\n}\n`;
+  const ARITH = 'error: pointer arithmetic is not possible in Silinx HLS: index the array instead', USED = "error: the pointer 'p': used other than *p, p[i], p = …, p += …, p++ (passed on, compared): not supported yet";
+  assert.deepEqual(said(P('  int *p = a + 1;\n  return (int)(p - a);')), [`3 ${ARITH}`, `4 ${USED}`, `4 ${ARITH}`]);
+  assert.deepEqual(said(P('  int *p = a + 1;\n  return p < a + 3;')), [`3 ${ARITH}`, `4 ${USED}`, `4 ${ARITH}`]);
+  assert.deepEqual(said('static int g(int *q) { return q[0] + q[1]; }\n' + P('  return g(a + 1);')), [`4 ${ARITH}`]);
+  assert.deepEqual(said('int f(int k) {\n  int m[2][3] = { { 1, 2, 3 }, { 4, 5, 6 } };\n  int *p = m[1] + 2;\n  return *p;\n}\n'), ["3 error: the pointer 'p': set to something other than an array, &x, &a[i] or a + i: not supported yet"]);
+  assert.deepEqual(said('#include <string.h>\nint f(int k) {\n  char b[] = "hey";\n  return strlen(b + 1);\n}\n'), ['4 error: strlen is a system call: not possible in the synthesized code (Silinx HLS, as Vitis HLS)', `4 ${ARITH}`]);
+});

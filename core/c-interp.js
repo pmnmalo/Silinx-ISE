@@ -158,9 +158,12 @@ class Machine {
     if (!et) this.fail(v, `'${v.name}' is not a number: it cannot be simulated`);
     return { t: et, v: v.init ? this.as(this.eval(v.init), et, v.init) : et.fl ? 0 : 0n };
   }
+  /** A pointer to arr's element index (one past its end too, #2655: read or written there, refused). */
   elemRef(arr, index, t) {
-    const cell = arr[index];
-    return { get: () => ({ v: cell.v, t }), set: (x) => { cell.v = this.as(x, t); }, t, arr, index };
+    const cell = arr[index], at = () => cell || this.fail(null, `the pointer points outside its array (to the element ${index} of 0 to ${arr.length - 1})`);
+    // (an array of const char *'s: its cells pointers, #2309)
+    if (t.text) return { get: () => at().v, set: (x) => { at().v = x.str !== undefined ? this.strPtr(x.str) : x; }, t, cell, arr, index };
+    return { get: () => ({ v: at().v, t }), set: (x) => { at().v = this.as(x, t); }, t, cell, arr, index };
   }
 
   run(entry) {

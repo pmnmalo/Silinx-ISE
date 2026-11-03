@@ -173,6 +173,7 @@ function pointerVariable(f, v, decl, types, report) {
     else if (e.kind === 'unary' && e.op === '&' && e.e.kind === 'id') { base = e.e.name; scalar = true; }
     else if (e.kind === 'unary' && e.op === '&' && e.e.kind === 'index' && e.e.e.kind === 'id') { base = e.e.e.name; off = e.e.i; }
     else if (e.kind === 'binary' && (e.op === '+' || e.op === '-') && e.l.kind === 'id') { base = e.l.name; off = e.op === '-' ? { kind: 'unary', op: '-', e: e.r, loc: e.loc } : e.r; }
+    else if (e.kind === 'binary' && e.op === '+' && e.r.kind === 'id' && types.get(e.r.name)?.kind === 'array') { base = e.r.name; off = e.l; }   // (k + a, #2655)
     if (!base || base === name) { fail(e.loc, 'set to something other than an array, &x, &a[i] or a + i: not supported yet'); return null; }
     const bt = types.get(base);
     const et = scalar ? bt : bt?.kind === 'array' || bt?.kind === 'ptr' ? bt.of ?? bt.to : null;
