@@ -36,6 +36,9 @@ panel uses it rather than its own:
 - **Foldable:** a button at the right of its caption folds it to a thin strip with its name down the side; a click
   on the strip expands it again. Folded or not is remembered per editor (`mountSideFold` of `web/js/side-fold.js`, its
   key `silinx.<editor>.props.folded`) (#2505).
+- **Its sections do not fold:** the panel folds as a whole, never a section of it (no `<details>`): the selection's,
+  the Machine's (ASM, FSM), the Net's (Petri net) are plain sections with their heading (#2735, #2739). Nothing
+  selected, the selection's section says nothing (no "Nothing selected: click …").
 - **On a narrow screen** (under 1024 px, `NARROW_QUERY` of `web/js/narrow.js`): the panel goes over the canvas, closed
   at first, and it is shown and hidden by a `☰ <its name>` button in the toolbar (`panelToggle`: a flat button of the
   toolbar, before its ⋮ menu, shown only there); open or closed is remembered per viewer. No folding there, and the
