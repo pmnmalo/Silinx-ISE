@@ -58,7 +58,7 @@ test('every validation message of core/fsm.js has a Portuguese translation', () 
 test('table messages, editor texts with names and the out-of-sync reasons are translated; the dictionary does not change other translations', () => {
   const m = models()[3];
   for (const s of [encodedTable({ ...m, encoding: 'onehot' }).error, encodedTable(m).error, truthTablesOf(normalizeFsm({ inputs: [{ name: 'a', width: 6 }], states: [{ id: 's', name: 'S' }, { id: 'q', name: 'Q' }] })).error,
-    '5 state(s), 7 transition(s) · Mealy', 'State S3 added', 'The diagram has 2 error(s): see Problems', 'Code: 01 (binary)', 'Transitions out of S0 (the first true condition is taken)',
+    '5 state(s), 7 transition(s)', 'The diagram has 2 error(s): see Problems', 'Code: 01 (binary)', 'Transitions out of S0 (the first true condition is taken)',
     'Priority 1 of 2 in S0', 'Next state, for the inputs x y_1', 'Outputs z w', 'q1 q0: present state (flip-flop outputs), d1 d0: next state (D flip-flop inputs). Unused codes: X (don\'t care).',
     'next clock edge → S1', 'no transition is true: stays in S0', "— the diagram cannot show it: process at line 40 is not part of the state machine (it drives 'cnt')",
     '— the state diagram has errors: Two states are named \'a\'', "'det' cannot be shown as a state diagram:\n\nno clocked process found"]) {

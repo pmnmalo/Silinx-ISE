@@ -37,7 +37,7 @@ uiTest('#2696 a Petri net\'s state machine, read-only: its [FSM] badge and comma
       tools: [...el.querySelectorAll('.asm-toolbar .asm-btn, .asm-toolbar select')].filter(shown).map((b) => b.textContent.trim()).filter(Boolean),
       readOnly: el.querySelector(ed).classList.contains('asm-readonly'),
       problems: shown(el.querySelector('.fsm-problems')),
-      hint: el.querySelector('.asm-hint').textContent,
+      hint: el.querySelector('.asm-hint'),
     };
   }, ED);
   assert.equal(view.banner, 'Read-only, the state space of the Petri net ctl.pn.json (2 states)');
@@ -45,7 +45,7 @@ uiTest('#2696 a Petri net\'s state machine, read-only: its [FSM] badge and comma
   assert.deepEqual(view.labels.sort(), ['!go', 'go']);
   assert.equal(view.readOnly, true);
   assert.equal(view.problems, false);
-  assert.equal(view.hint, 'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it');
+  assert.equal(view.hint, null);   // (no hint line, #2729)
   for (const t of ['State', 'Moore', 'Binary', '3 processes']) assert.ok(!view.tools.some((x) => x.endsWith(t)), `${t}: ${view.tools.join(', ')}`);
   assert.ok(view.tools.includes('Tables'), view.tools.join(', '));
   // a state selected: its properties shown (the marking), disabled; a drag, a double click and Delete change nothing

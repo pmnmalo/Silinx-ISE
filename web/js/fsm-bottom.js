@@ -8,7 +8,7 @@ import { clamp } from './fsm-editor.js';
 /** { renderPanel, resetSim, stopRun, togglePanel } of mountFsmEditor (M(), destroyed(), diags(), panel(), sim(): its current values). */
 export function mountFsmBottom(ctx) {
   const {
-    opts, M, bottom, btn, destroyed, diags, fit, flash, hint, panel, panelBody, panelTitle, panelTools, render, sim,
+    opts, M, bottom, btn, destroyed, diags, fit, flash, panel, panelBody, panelTitle, panelTools, render, sim,
     stateById, updateToolbar, setPanel, setSim
   } = ctx;
 
@@ -19,7 +19,6 @@ export function mountFsmBottom(ctx) {
     if (panel() === 'sim' && !sim()) resetSim();
     if (panel() !== 'sim') { setSim(null); }
     bottom.hidden = !panel();
-    hint.hidden = !!panel();
     requestAnimationFrame(() => { if (!destroyed()) fit(); });   // the drawing area changed size
     renderPanel();
     render();

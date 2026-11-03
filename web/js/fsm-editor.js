@@ -2,16 +2,16 @@
 //
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
-//                                          onOpenFile(path), onTruthTables(), onToAsm(), readOnly });
+//                                          onOpenFile(path), onTruthTables(), onToAsm(), onMessage(text), readOnly });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
 // curved arrows labelled "condition / outputs" (Mealy outputs) — Moore outputs are written inside
-// the circles. Double-click the background to add a state, drag from the rim of a state to another
-// state (or to itself) to add a transition, double-click a state or a label to edit it in place,
-// drag a label to bend its arrow. The bottom panel shows the tables (transition table, state
-// table, encoded table for the binary / gray encodings) and a step-by-step
-// simulation of the diagram (current state highlighted, inputs set by hand, clock steps).
+// the circles; the reset's name on the arrow into the initial state. Double-click the background to add a state,
+// drag from the rim of a state to another state (or to itself) to add a transition, double-click a state or a label to
+// edit it in place (a text not valid: onMessage), drag a label to bend its arrow. The bottom panel shows the tables
+// (transition table, state table, encoded table for the binary / gray encodings) and a step-by-step simulation of the
+// diagram (current state highlighted, inputs set by hand, clock steps).
 // readOnly: a diagram to read (a Petri net's state machine, #2696): moved about, zoomed, its states and transitions
 // selected and shown, its tables and its simulation; nothing edited, not validated.
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
@@ -53,11 +53,10 @@ export function radiusOf(s) {
 
 // (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion and the problems hidden,
 // with their separators)
-function readOnlyChrome({ root, toolbar, hint, probSection }) {
+function readOnlyChrome({ root, toolbar, probSection }) {
   root.classList.add('asm-readonly');
   const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc'));
   for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling, probSection]) g.hidden = true;
-  hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it';
 }
 
 export function mountFsmEditor(container, opts = {}) {
@@ -91,6 +90,9 @@ export function mountFsmEditor(container, opts = {}) {
     (v) => { M.encoding = v; commit('enc'); });
   const styleSel = select('fsm-style', 'Style of the generated HDL', [['3process', '3 processes'], ['2process', '2 processes']], (v) => { M.style = v; commit('style'); });
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
+  const tbLabel = (text) => h('span', { class: 'fsm-tb-label' }, text);
+  // (what the toolbar says, at its right end: the states and transitions, #2729, as every toolbar's informational text, #2725)
+  const statusInfo = h('span', { class: 'fsm-info' });
   const delBtn = toolIcon('delete', 'del', 'Delete the selected state or transition (Del)', () => deleteSelection(), 'asm-danger');
   const tabBtns = {
     tables: btn('Tables', 'State table, transition table and encoded transition table', () => togglePanel('tables'), 'fsm-tab-btn'),
@@ -103,9 +105,9 @@ export function mountFsmEditor(container, opts = {}) {
     sep(),
     h('div', { class: 'asm-group' }, delBtn),
     sep(),
-    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBy(f), () => fit())),
+    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBy(f), () => fit()), zoomLbl),
     sep(),
-    h('div', { class: 'asm-group' }, encSel, styleSel),
+    h('div', { class: 'asm-group' }, tbLabel('Encoding:'), encSel, tbLabel('Coding Style:'), styleSel),
     sep(),
     h('div', { class: 'asm-group' }, tabBtns.tables, tabBtns.sim),
     h('div', { class: 'asm-spacer' }),
@@ -114,7 +116,7 @@ export function mountFsmEditor(container, opts = {}) {
       btn('Arrange', 'Automatic layout of the states', () => arrange()),
       btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.()),
     ], { title: 'Layout and conversion', btnClass: 'asm-btn' }).el,
-    linkHost);
+    linkHost, statusInfo);
   const readOnly = !!opts.readOnly;
 
   // ---------------------------------------------------------------------------- canvas
@@ -131,8 +133,7 @@ export function mountFsmEditor(container, opts = {}) {
   const vp = svg.querySelector('.fsm-vp');
   const gEdges = svg.querySelector('.fsm-edges'), gStates = svg.querySelector('.fsm-states'), gOverlay = svg.querySelector('.fsm-overlay');
   const pattern = svg.querySelector('pattern');
-  const hint = h('div', { class: 'asm-hint' }, 'Double-click to add a state · drag from the rim of a state to another state to add a transition · double-click to edit · drag a label to bend its arrow · wheel to zoom');
-  const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg, hint);
+  const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg);
 
   // bottom panel (tables / simulation)
   const panelTitle = h('span', { class: 'asm-code-title' });
@@ -152,10 +153,8 @@ export function mountFsmEditor(container, opts = {}) {
   const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
   mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
-  if (readOnly) readOnlyChrome({ root, toolbar, hint, probSection });
-  const statusMsg = h('span', { class: 'asm-status-msg' });
-  const statusInfo = h('span', { class: 'asm-status-info' });
-  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
+  if (readOnly) readOnlyChrome({ root, toolbar, probSection });
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side));
 
   // ---------------------------------------------------------------------------- model helpers
   const stateById = (id) => M.states.find((s) => s.id === id);
@@ -177,7 +176,6 @@ export function mountFsmEditor(container, opts = {}) {
     sel = { type: 'state', id: s.id };
     commit();
     renderSide();
-    flash(`State ${s.name} added`);
     return s;
   }
   function addTransition(from, to) {
@@ -233,12 +231,8 @@ export function mountFsmEditor(container, opts = {}) {
     setLastKey: (v) => { lastKey = v; }, setLastT: (v) => { lastT = v; }, setSel: (v) => { sel = v; }
   });
 
-  let flashTimer = null;
-  function flash(msg, kind = '') {
-    statusMsg.textContent = msg; statusMsg.className = `asm-status-msg ${kind}`;
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => { statusMsg.textContent = ''; }, 4000);
-  }
+  // (a text typed in place that is not valid: to the console, by the document, #2729, as every message, #2718)
+  const flash = (msg) => opts.onMessage?.(msg);
 
   // ---------------------------------------------------------------------------- view (fsm-view.js)
   const { applyView, arrange, fit, print, toScreen, toWorld, zoomAt, zoomBy } = mountFsmView({
@@ -290,7 +284,7 @@ export function mountFsmEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------------------- bottom panel (fsm-bottom.js)
   const { renderPanel, resetSim, stopRun, togglePanel } = mountFsmBottom({
-    opts, M: () => M, bottom, btn, destroyed: () => destroyed, diags: () => diags, fit, flash, hint, panel: () => panel,
+    opts, M: () => M, bottom, btn, destroyed: () => destroyed, diags: () => diags, fit, flash, panel: () => panel,
     panelBody, panelTitle, panelTools, render, sim: () => sim, stateById, updateToolbar,
     setPanel: (v) => { panel = v; }, setSim: (v) => { sim = v; }
   });
@@ -345,7 +339,6 @@ export function mountFsmEditor(container, opts = {}) {
       destroyed = true;
       stopRun();
       Object.values(timers).forEach(clearTimeout);
-      clearTimeout(flashTimer);
       ro?.disconnect();
       root.remove();
     },

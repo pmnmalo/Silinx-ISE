@@ -118,6 +118,8 @@ export function mountRender(ctx) {
       }
       const e = enc.get(s.id);
       if (e) grp.append(sv('text', { class: 'fsm-code', x: r * 0.72 + 4, y: -r * 0.72 - 2 }, e.bits));
+      // (the reset's name on the start-up arrow, #2729)
+      if (s.id === M.initial) grp.append(sv('text', { class: 'fsm-reset', x: -r - 22, y: -5, 'text-anchor': 'middle' }, M.reset.name));
       gStates.append(grp);
     }
     updateToolbar();

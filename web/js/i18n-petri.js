@@ -6,7 +6,6 @@ export const PETRI_PT = {
   // its state machine (#2696)
   'View State Machine (FSM)': 'Ver Máquina de Estados (FSM)', 'The state machine of the Petri net: its state space (read-only)': 'A máquina de estados da rede de Petri: o seu espaço de estados (só de leitura)',
   'Read-only, the state space of the Petri net': 'Só de leitura, o espaço de estados da rede de Petri',
-  'Read-only · drag the background to pan · wheel to zoom · click a state or a transition to see it': 'Só de leitura · arrastar o fundo para deslocar · roda para ampliar · clicar num estado ou numa transição para o ver',
   // toolbar
   'Place': 'Lugar', 'Transition': 'Transição', 'Arc': 'Arco', 'Inhibitor': 'Inibidor',
   'Analysis and PNML': 'Análise e PNML', 'Fit': 'Ajustar', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',

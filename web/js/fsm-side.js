@@ -20,7 +20,7 @@ export function mountSide(ctx) {
   };
   function renderSide() { renderSelection(); renderMachine(); updateToolbar(); lock(); }
   // (read-only, #2696: its fields shown, disabled; its buttons hidden)
-  const lock = () => { if (readOnly) for (const x of [...selSection.querySelectorAll('input, select, button'), ...machineBody.querySelectorAll('input, select, button')]) if (x.tagName === 'BUTTON') x.hidden = true; else x.disabled = true; };
+  const lock = () => { if (readOnly) for (const x of [...selSection.querySelectorAll('input, select, textarea, button'), ...machineBody.querySelectorAll('input, select, textarea, button')]) if (x.tagName === 'BUTTON') x.hidden = true; else x.disabled = true; };
 
   function renderSelection() {
     selSection.textContent = '';
