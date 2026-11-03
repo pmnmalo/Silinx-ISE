@@ -8,7 +8,7 @@ import { toolWide } from './editor-icons.js';
 import { mountSideFold } from './side-fold.js';
 import { mountPinBoard } from './pinplanner-board.js';
 import { mountPinPorts } from './pinplanner-ports.js';
-import { panelToggle, RESOURCES_KEY } from './narrow.js';
+import { panelToggle, PORTS_KEY, RESOURCES_KEY } from './narrow.js';
 import { api } from './api.js';
 import { icons } from './icons.js';
 import { h, toast, confirmDlg, popupMenu } from './ui.js';
@@ -136,6 +136,7 @@ export function mountPinPlanner(el, doc, top) {
   const sep = () => h('span', { class: 'asm-sep' });
   const autoBtn = toolWide('beautify', 'Auto-assign from Board', board ? 'Match port names with board resources (clk, led, sw, btn, seg, an…)' : 'Select a board in Design Properties', () => autoAssign());
   autoBtn.disabled = !board;
+  const portsBtn = panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the ports panel' }, '☰ Ports'), { cls: 'ports-open', key: PORTS_KEY });
   const bar = h('div', { class: 'asm-toolbar pp-bar' },
     h('div', { class: 'asm-group' }, ...viewBtns),
     sep(),
@@ -144,8 +145,8 @@ export function mountPinPlanner(el, doc, top) {
     h('span', { class: 'pp-info' }, `Top: ${top} · Device ${pj.device.part}-${pj.device.package}${board ? ` · Board: ${board.name}` : ' · no board selected'}`),
     sep(), status,
     h('div', { class: 'asm-spacer' }),
-    // (a narrow window: the board's resources over the table, shown by this)
-    h('div', { class: 'asm-group' }, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })));
+    // (a narrow window: the ports and the board's resources over the board and the table, shown by these)
+    h('div', { class: 'asm-group' }, portsBtn, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', title: 'Show / hide the board resources panel' }, '☰ Board Resources'), { key: RESOURCES_KEY })));
   const side = h('aside', { class: 'asm-side pp-side' }, h('div', { class: 'asm-cap' }, 'Board Resources'), resHost);
   root.append(bar, h('div', { class: 'asm-body' }, portsSide, h('div', { class: 'asm-main' }, tableHost, boardHost), side));
   mountSideFold({ root, side, key: 'silinx.pins.props.folded', titles: { fold: 'Collapse the Board Resources panel', unfold: 'Expand the Board Resources panel' } });
@@ -160,7 +161,7 @@ export function mountPinPlanner(el, doc, top) {
 
   function render() {
     const u = used();
-    tableHost.hidden = view !== 'table'; boardHost.hidden = view !== 'board'; portsSide.hidden = view !== 'board';
+    tableHost.hidden = view !== 'table'; boardHost.hidden = view !== 'board'; portsSide.hidden = view !== 'board'; portsBtn.style.display = view === 'board' ? '' : 'none';
     for (const b of viewBtns) { b.classList.toggle('on', b.dataset.view === view); b.setAttribute('aria-pressed', String(b.dataset.view === view)); }
     if (view === 'board') { boardView.render(); portsView.render(); }
     tableHost.innerHTML = '';

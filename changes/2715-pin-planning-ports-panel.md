@@ -7,7 +7,8 @@ In short:
 In detail:
 
 - **I/O Pin Planning: a Ports panel, a bus's bits one by one, a bit taken off its pin (#2715):** the Board view's ports
-  in a side panel on the left, as the schematic editor's Symbols (its title, folded to a strip and remembered); a bus
+  in a side panel on the left, as the schematic editor's Symbols (its title, folded to a strip and remembered; under
+  1024 px over the board, shown by the toolbar's ☰ Ports); a bus
   expanded into its bits, where each one is, each dragged alone (the bus's other bits kept); a port's or a bit's ✕, a
   part's right-click menu and a row of Board Resources' take it off its pin, undoable (a clock's period with it). The
   resources the drawing has no part for (the clocks, VGA, PS/2, the serial port, the Pmods) take a drop on their rows

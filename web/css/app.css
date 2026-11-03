@@ -310,7 +310,11 @@ table.grid tr.sel td { background: #dbe8fb; }
   .pin-planner.ports-folded .pp-ports-side .asm-cap .sp { display: none; }
   .pin-planner.ports-folded .pp-ports-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
 }
-@media (max-width: 1023px) { .pin-planner .pp-ports-side { width: 160px; } }
+/* (under 1024 px: over the board on its left, shown by the toolbar's ☰ Ports, as Board Resources on the right) */
+@media (max-width: 1023px) {
+  .pin-planner .pp-ports-side { position: absolute; z-index: 6; top: 0; bottom: 0; left: 0; width: min(220px, 45%); box-shadow: 6px 0 20px rgba(0, 0, 0, .22); }
+  .pin-planner:not(.ports-open) .pp-ports-side { display: none; }
+}
 .pin-planner .pp-portlist { display: flex; flex-direction: column; gap: 3px; padding: 6px; }
 .pin-planner .pp-port { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border: 1px solid var(--frame, #aaa); border-radius: 4px; background: var(--panel-alt, #f7f7f7); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; font-family: var(--mono); font-size: 12px; }
 .pin-planner .pp-port.pp-bit { margin-left: 18px; font-size: 11px; }

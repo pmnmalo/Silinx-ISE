@@ -4,7 +4,8 @@
 // onto the rows of Board Resources (the clock, VGA, a Pmod); a bus expanded, its bits dragged one by one; a bit taken
 // off its pin (its ✕, a part's or a row's right-click menu); an output on a switch warned, a part taken from another
 // port, undone; what a drop says in the console only; the table the same assignments; the UCF written, on the Basys2
-// and the Nexys2; in Portuguese.
+// and the Nexys2; the panel's fold kept, the panel over the board on a narrow window (docs/UI-GUIDELINES.md); in
+// Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
@@ -50,15 +51,18 @@ async function openBoard(page, name, board) {
   await makeProject(env, { name, board, files: { 'src/top.vhd': TOP }, top: 'top' });
   await page.setViewport(1366, 900);
   await page.eval(async () => {
-    const { prefKey } = await import('/js/prefs.js');
-    localStorage.removeItem(prefKey('silinx.pins.ports.folded')); localStorage.removeItem(prefKey('silinx.pins.props.folded'));
+    const [{ prefKey }, { PORTS_KEY, RESOURCES_KEY }] = await Promise.all([import('/js/prefs.js'), import('/js/narrow.js')]);
+    for (const k of [prefKey('silinx.pins.ports.folded'), prefKey('silinx.pins.props.folded'), PORTS_KEY, RESOURCES_KEY]) localStorage.removeItem(k);
   });
   await page.openProject(name);
+  await openPlanner(page);
+  seen = 0;
+}
+async function openPlanner(page) {
   await page.menu('Tools', 'I/O Pin Planning');
   await page.waitFor((p) => window.Silinx.active?.id === 'pins' && document.querySelectorAll(`${p} .pp-table tr`).length === 23, [P], { what: 'the planner' });
   await page.click(`${P} .pp-bar .pp-view`, { text: 'Board' });
   await page.waitFor((p) => !!document.querySelector(`${p} .pp-board .emu-pcb [data-part="sw0"].pp-target`), [P], { what: 'the board' });
-  seen = 0;
 }
 const saved = async (page, name) => {
   await page.waitFor(() => !window.Silinx.active.tab.classList.contains('dirty'), [], { what: 'pin planning saved' });
@@ -149,10 +153,33 @@ uiTest('#2694 #2715 I/O Pin Planning on the Basys2: the Ports panel; ports onto 
   // no warning of I/O Pin Planning, nor any error
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /WARNING|ERROR/.test(l)), []);
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#console-log .ln.warn, #console-log .ln.err')].map((e) => e.textContent).filter((t) => /Pin Planning/.test(t))), []);
+  // a narrow window: the Ports panel hidden at first, ☰ Ports (the Board view's only) shows it over the board, on its
+  // left; a port dragged from it; hidden again (the left side's drawer closed: the ISE style interface's)
+  await page.setViewport(900, 700);
+  await page.eval(async () => (await import('/js/narrow.js')).setDrawer(false, { remember: false }));
+  const toggles = () => page.eval((p) => [...document.querySelectorAll(`${p} .pp-bar .asm-btn`)].filter((b) => b.getClientRects().length && /☰/.test(b.textContent)).map((b) => b.textContent), P);
+  assert.deepEqual(await toggles(), ['☰ Board Resources']);
+  await page.click(`${P} .pp-bar .pp-view`, { text: 'Board' });
+  await page.waitFor((p) => !document.querySelector(`${p} .pp-ports-side`).getClientRects().length, [P], { what: 'the panel hidden' });
+  assert.deepEqual(await toggles(), ['☰ Ports', '☰ Board Resources']);
+  await page.click(`${P} .pp-bar .asm-btn`, { text: '☰ Ports' });
+  assert.deepEqual(await page.eval((p) => { const s = document.querySelector(`${p} .pp-ports-side`); return [getComputedStyle(s).position, s.getBoundingClientRect().left === s.parentElement.getBoundingClientRect().left]; }, P), ['absolute', true]);
+  await dragTo(page, 'clk', '[data-part="btn0"]');
+  assert.deepEqual(await said(page), ['I/O Pin Planning: clk → btn<0>.']);
+  await page.click(`${P} .pp-bar .asm-btn`, { text: '☰ Ports' });
+  assert.equal(await page.eval((p) => document.querySelector(`${p} .pp-ports-side`).getClientRects().length, P), 0);
+  await page.setViewport(1366, 900);
 });
 
 uiTest('#2694 #2715 I/O Pin Planning on the Nexys2: a bus wider than its buttons warned, the rest placed, then moved to a digit; an input on an LED warned; a bus on a Pmod\'s row; the console; the UCF; Portuguese', E, async (page) => {
   await openBoard(page, 'PinBoardN2', 'nexys2');
+  // the Ports panel folded: kept when the planner opens again; a click on the strip expands it
+  await page.click(`${P} .pp-ports-side .asm-fold`);
+  await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('pins'), { force: true }));
+  await openPlanner(page);
+  assert.equal(await page.eval((p) => document.querySelector(`${p} .pp-ports-side`).offsetWidth, P), 24, 'remembered');
+  await page.click(`${P} .pp-ports-side`);
+  assert.equal(await page.eval((p) => document.querySelector(`${p} .pp-ports-side`).offsetWidth, P), 200);
   // seg on the buttons: an output on an input of the board, 3 bits left; the 4 placed; warned in the console
   await dragTo(page, 'seg', '[data-part="btn1"]');
   assert.deepEqual(await said(page), ['I/O Pin Planning: seg<0> → btn<0>, seg<1> → btn<1>, seg<2> → btn<2>, seg<3> → btn<3>.',
@@ -189,7 +216,7 @@ uiTest('#2694 #2715 I/O Pin Planning on the Nexys2: a bus wider than its buttons
   assert.deepEqual(await page.eval((p) => {
     const s = document.querySelector(`${p} .pp-ports-side`);
     return [s.querySelector('.asm-cap').textContent, s.querySelector('.asm-fold').title, s.querySelector('.pp-port[data-port="led"]').title, s.querySelector('.pp-port[data-port="led"] .pp-exp').title, s.querySelector('.pp-port[data-port="go"] .pp-x').title];
-  }, P), ['Portas', 'Recolher o painel Portas', 'Arraste-a para uma peça da placa ou uma linha de Recursos da Placa', 'Expandir os seus bits', 'Retirá-la do seu pino']);
+  }, P), ['Portas', 'Recolher o painel das portas', 'Arraste-a para uma peça da placa ou uma linha de Recursos da Placa', 'Expandir os seus bits', 'Retirá-la do seu pino']);
   assert.match(await page.eval((p) => document.querySelector(`${p} .emu-board-note`).textContent, P), /Arraste uma porta para uma peça da placa$/);
   await dragTo(page, 'y', '[data-part="sw0"]');
   await dragTo(page, 'clk', '[data-part="sw0"]');
