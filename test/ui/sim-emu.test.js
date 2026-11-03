@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, writeWs } from './harness.js';
+import { emuNotes } from './emu-notes.js';
 import { ROOT } from '../examples-lib.mjs';
 import { TEXTS, untranslated } from './i18n-check.js';
 
@@ -385,20 +386,20 @@ begin
   led <= std_logic_vector(q) xor sw;
 end rtl;
 `;
-const bar = (page) => page.eval(() => {
+// (hints: what the emulator says of the design, in the console since #2718)
+const bar = async (page) => ({ ...await page.eval(() => {
   const sels = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')];
   const engine = sels.find((x) => [...x.options].some((o) => o.value === 'compiled'));
   return { engine: engine?.value, compiledDisabled: engine ? [...engine.options].find((o) => o.value === 'compiled').disabled : null,
-    speed: sels.find((x) => [...x.options].some((o) => o.value === 'max'))?.value, view: window.Silinx.active.view.engine,
-    hints: [...document.querySelectorAll('.doc:not([hidden]) .emu-side > .emu-hint')].map((e) => e.textContent) };
-});
+    speed: sels.find((x) => [...x.options].some((o) => o.value === 'max'))?.value, view: window.Silinx.active.view.engine };
+}), hints: (await emuNotes(page)) || [] });
 uiTest('board emulator: the compiled engine at the board\'s speed (a real timing generic); the Engine selector to the event-driven engine and back', E, async (page) => {
   await emulatorProject(page, 'EmuEngine', 'basys2', { 'src/cnt.vhd': EMU_COUNT }, 'cnt');
   let b = await bar(page);
   assert.deepEqual([b.view, b.engine, b.compiledDisabled, b.speed], ['compiled', 'compiled', false, 'real']);
-  assert.match(b.hints[0], /^The design is compiled \(its netlist, by Yosys\) and runs at up to the board's clock rate/);
-  assert.equal(b.hints.length, 1);
-  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-box .emu-hint')?.textContent), 'Real values: the compiled engine runs the design at up to the board\'s clock rate.');
+  assert.match(b.hints[0], /^the design is compiled \(its netlist, by Yosys\) and runs at up to the board's clock rate/);
+  assert.deepEqual(b.hints.slice(1), ['the timing generics at their real values: the compiled engine runs the design at up to the board\'s clock rate.']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-hint')].map((e) => e.textContent)), ['Buttons: press and hold; Shift+click keeps a button pressed.']);
   // the real generic (5 000 000 cycles a step): LD0 changes within a few seconds of the board's time
   await page.waitFor(() => window.Silinx.active.view.sim.now > 2.2e11, [], { what: '0.22 s of the board\'s time', timeout: 60000 });
   await page.waitFor(() => window.Silinx.active.view.outputs.leds.slice(0, 2).some((v) => v > 0), [], { what: 'the counter counts (LD0, LD1)' });
@@ -410,7 +411,7 @@ uiTest('board emulator: the compiled engine at the board\'s speed (a real timing
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.engine === 'event' && window.Silinx.active.view.outputs, [], { what: 'the emulator on the event-driven engine' });
   b = await bar(page);
   assert.deepEqual([b.view, b.engine, b.compiledDisabled, b.speed], ['event', 'event', false, 'max']);
-  assert.match(b.hints[0], /^The design is simulated from its HDL \(behavioural RTL\) at a reduced clock rate/);
+  assert.match(b.hints[0], /^the design is simulated from its HDL \(behavioural RTL\) at a reduced clock rate/);
   assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-box h4')?.textContent || ''), /^Watch$/);
   assert.match(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-box h4')].map((e) => e.textContent).join('|')), /Timing ÷[\d,]+ \(emulation only\)/);
   // and back
@@ -461,11 +462,12 @@ uiTest('#918 board emulator: its status line whole at every window width (a row 
   await page.setViewport(1366, 768);
 }, { timeout: 300000, build: { commit: 'abc1234', date: '2026-10-21 12:00' } });
 
-uiTest('board emulator: a design with a combinational loop runs on the event-driven engine, the reason shown (and in Portuguese)', E, async (page) => {
+uiTest('board emulator: a design with a combinational loop runs on the event-driven engine, the reason said (and in Portuguese)', E, async (page) => {
   await emulatorProject(page, 'EmuLoop', 'basys2', { 'src/lp.vhd': EMU_LOOP }, 'lp');
   const b = await bar(page);
   assert.deepEqual([b.view, b.engine, b.compiledDisabled, b.speed], ['event', 'event', true, 'max']);
-  assert.deepEqual(b.hints.slice(1), ["Not compiled (combinational loop through 'b': not compiled): the event-driven simulator runs the design."]);
+  assert.deepEqual(b.hints.slice(1, 2), ["not compiled (combinational loop through 'b': not compiled): the event-driven simulator runs the design."]);
+  await page.waitFor(() => document.getElementById('console-warnings').textContent.includes("Board Emulator: not compiled (combinational loop through 'b'"), [], { what: 'a warning' });
   // SW0 on, SW1 off: a = 1, b = 0
   await widget(page, 'SW0 = sw<0>');
   await waitLed(page, 1, true);
@@ -479,7 +481,6 @@ uiTest('board emulator: a design with a combinational loop runs on the event-dri
   const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden])')));
   await setLang('pt');
   const pt = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden])')));
-  assert.ok(pt.includes("Não compilado (combinational loop through 'b': not compiled): o projeto corre no simulador por eventos."), 'the reason in Portuguese');
   assert.ok(pt.includes('Motor:') && pt.includes('Compilado (velocidade real)') && pt.includes('Por eventos (depuração)'));
   await setLang('en');
   const db = await env.server.api('GET', '/api/devices');
@@ -510,7 +511,7 @@ uiTest('board emulator: the VGA monitor draws the picture the design scans out, 
   const stat = () => page.eval(() => document.querySelector('.doc:not([hidden]) .emu-vga-stat').textContent);
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .emu-vga-stat')?.textContent === '640×480 · 59.52 Hz · line 32.00 µs · 525 lines', [], { what: 'the monitor\'s timing', timeout: 30000 });
   assert.equal(await page.eval(NOSIG_SHOWN), false, 'no "No signal" over the picture');
-  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-vga-warn').textContent), '');
+  assert.deepEqual((await emuNotes(page)).filter((t) => t.startsWith('the VGA monitor')), [], 'no warning of the monitor (in the console, #2718)');
   assert.doesNotMatch(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-board-note').textContent), /not emulated/, 'the VGA connector is emulated');
   // the bars (red across, green down: 3 bits each) and the square (blue, at column 8 * sw)
   await page.waitFor(() => window.Silinx.active.view.sim.vga().status.frames >= 2, [], { what: 'two frames', timeout: 30000 });

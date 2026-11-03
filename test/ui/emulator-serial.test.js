@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, ROOT } from './harness.js';
+import { emuNotes, waitEmuNote } from './emu-notes.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 
 let env;
@@ -36,11 +37,14 @@ uiTest('#2536 the serial terminal: a line typed comes back from a UART echo, its
   await page.openProject('EmuSerial');
   await open(page);
   assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
-  // the box: its title, its rate, its pins (the Nexys2's RS-232 port), with the board (the side panel at their right, #2666)
+  // the box: its title, its rate, with the board (the side panel at their right, #2666); its pins (the Nexys2's RS-232
+  // port) in the console (#2718), no note in the box
   assert.deepEqual(await page.eval((d) => {
     const b = document.querySelector(`${d} .emu-serial`);
-    return [b.querySelector('h4').textContent, b.querySelector('select').value, b.querySelector('.emu-hint').textContent, b.parentElement.classList.contains('emu-main')];
-  }, DOC), ['Serial terminal', '9600', 'TX: tx (pin P9) · RX: rx (pin U6)', true]);
+    return [b.querySelector('h4').textContent, b.querySelector('select').value, !!b.querySelector('.emu-hint'), b.parentElement.classList.contains('emu-main')];
+  }, DOC), ['Serial terminal', '9600', false, true]);
+  await waitEmuNote(page, /^the serial terminal: /);
+  assert.ok((await emuNotes(page)).includes('the serial terminal: TX: tx (pin P9) · RX: rx (pin U6).'));
   // a line: back as typed, a CR its end
   await type(page, 'Hello, FPGA');
   await page.waitFor((d) => document.querySelector(`${d} .emu-serial-out`).textContent === 'Hello, FPGA\n', [DOC], { what: 'the echo', timeout: 30000 });
@@ -74,15 +78,15 @@ uiTest('#2536 the serial terminal: a line typed comes back from a UART echo, its
   const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-serial')));
   await setLang('pt');
   const pt = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-serial')));
-  assert.ok(pt.includes('Terminal série') && pt.includes('TX: tx (pino P9) · RX: rx (pino U6)'), pt.join(' | '));
+  assert.ok(pt.includes('Terminal série'), pt.join(' | '));
   assert.match(await page.eval((d) => document.querySelector(`${d} .emu-bar`).textContent, DOC), /Terminal série/);
   await setLang('en');
   assert.deepEqual(untranslated(en, pt, [/^\d+ baud$/]), []);
   // the event-driven engine: the terminal says it needs the compiled one, nothing can be sent
   await page.eval(() => { const s = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')].find((x) => [...x.options].some((o) => o.value === 'compiled')); s.value = 'event'; s.dispatchEvent(new Event('change')); });
   await page.waitFor(() => window.Silinx.active.view?.engine === 'event' && window.Silinx.active.view.outputs, [], { what: 'the event-driven engine' });
-  assert.deepEqual(await page.eval((d) => [document.querySelector(`${d} .emu-serial .emu-hint`).textContent, document.querySelector(`${d} .emu-serial-in`).disabled], DOC),
-    ['The serial terminal needs the compiled engine (the event-driven one is too slow for a frame)', true]);
+  assert.equal(await page.eval((d) => document.querySelector(`${d} .emu-serial-in`).disabled, DOC), true);
+  await waitEmuNote(page, /^the serial terminal needs the compiled engine \(the event-driven one is too slow for a frame\)\.$/);
   assert.deepEqual(page.dialogs, []);
 });
 
