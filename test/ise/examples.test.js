@@ -17,6 +17,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { EXAMPLES, S6_EXAMPLES, S3E_TARGETS as TARGETS, S6_TARGETS, ROOT, targetName, exampleProject } from '../examples-lib.mjs';
 import { iseExamplesConfig } from '../ise-examples-config.mjs';
+import { micro80S3eWarnings } from '../ise-micro80-warnings.mjs';
 
 const IMAGE = process.env.SILINX_ISE_IMAGE || 'xilinx/ise:14.7';
 const enabled = process.env.SILINX_ISE_TESTS === '1';
@@ -37,50 +38,8 @@ const ISE_WARNINGS = {
   vga: [],
   isqrt: [],
   uart: [],
-  // the light8080 processor, as it is (#2544): its interrupt tied off, its unused outputs, microcode fields and DAA test
-  micro80: [
-    'WARNING:Xst:1710 - FF/Latch <int_pending> (without init value) has a constant value of 0 in block <cpu>. This FF/Latch will be trimmed during the optimization process.',
-    'WARNING:Xst:1710 - FF/Latch <inta_reg> (without init value) has a constant value of 0 in block <cpu>. This FF/Latch will be trimmed during the optimization process.',
-    'WARNING:Xst:1710 - FF/Latch <inta_reg> (without init value) has a constant value of 0 in block <light8080>. This FF/Latch will be trimmed during the optimization process.',
-    'WARNING:Xst:1780 - Signal <daa_test1a> is never used or assigned. This unconnected signal will be trimmed during the optimization process.',
-    'WARNING:Xst:1781 - Signal <rom> is used but never assigned. Tied to default value.',
-    'WARNING:Xst:1895 - Due to other FF/Latch trimming, FF/Latch <int_pending> (without init value) has a constant value of 0 in block <light8080>. This FF/Latch will be trimmed during the optimization process.',
-    'WARNING:Xst:2677 - Node <IR_6> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <IR_6> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <IR_7> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <IR_7> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <cpu/delayed_ei> of sequential type is unconnected in block <micro80_top>.',
-    'WARNING:Xst:2677 - Node <cpu/halt_reg> of sequential type is unconnected in block <micro80_top>.',
-    'WARNING:Xst:2677 - Node <cpu/inte_reg> of sequential type is unconnected in block <micro80_top>.',
-    'WARNING:Xst:2677 - Node <cpu/ucode_25> of sequential type is unconnected in block <micro80_top>.',
-    'WARNING:Xst:2677 - Node <daa_res9_8> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <daa_res9_8> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <delayed_ei> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <inte_reg> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_12> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_12> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <ucode_13> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_13> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <ucode_25> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_10> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_10> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_11> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_11> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_12> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_12> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_13> of sequential type is unconnected in block <cpu>.',
-    'WARNING:Xst:2677 - Node <ucode_field2_13> of sequential type is unconnected in block <light8080>.',
-    'WARNING:Xst:646 - Signal <IR<7:6>> is assigned but never used. This unconnected signal will be trimmed during the optimization process.',
-    'WARNING:Xst:646 - Signal <acc_high_ge9> is assigned but never used. This unconnected signal will be trimmed during the optimization process.',
-    'WARNING:Xst:646 - Signal <daa_res9<8>> is assigned but never used. This unconnected signal will be trimmed during the optimization process.',
-    'WARNING:Xst:646 - Signal <ucode_field2<13:10>> is assigned but never used. This unconnected signal will be trimmed during the optimization process.',
-    `WARNING:Xst:753 - "/work/src/src/micro80_top.vhd" line 61: Unconnected output port 'fetch' of component 'light8080'.`,
-    `WARNING:Xst:753 - "/work/src/src/micro80_top.vhd" line 61: Unconnected output port 'halt' of component 'light8080'.`,
-    `WARNING:Xst:753 - "/work/src/src/micro80_top.vhd" line 61: Unconnected output port 'inta' of component 'light8080'.`,
-    `WARNING:Xst:753 - "/work/src/src/micro80_top.vhd" line 61: Unconnected output port 'inte' of component 'light8080'.`,
-    `WARNING:Xst:753 - "/work/src/src/micro80_top.vhd" line 61: Unconnected output port 'rd' of component 'light8080'.`,
-    `WARNING:Xst:753 - "/work/src/src/micro80_top.vhd" line 61: Unconnected output port 'vma' of component 'light8080'.`,
-  ],
+  // the light8080 processor, as it is (#2544), shared with test/ise/xise-interop.test.js
+  micro80: micro80S3eWarnings('/work/src/src'),
 };
 
 let tmp;

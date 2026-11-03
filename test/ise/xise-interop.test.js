@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { EXAMPLES, exampleProject, targetName } from '../examples-lib.mjs';
 import { iseExamplesConfig } from '../ise-examples-config.mjs';
+import { micro80S3eWarnings, MICRO80_S6_WARNINGS } from '../ise-micro80-warnings.mjs';
 import { createZip, readZip } from '../../core/zip.js';
 
 const IMAGE = process.env.SILINX_ISE_IMAGE || 'xilinx/ise:14.7';
@@ -22,7 +23,9 @@ const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILIN
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the ISE Docker image), or local (the image here)' : false;
 // a device of each family the .xise names: its properties differ, the sources do not
 const TARGETS = [{ board: 'basys2', variant: '250' }, { board: 'nexys3' }];
-// the warnings of ISE's project flow: none, but on the Nexys3 those of XST and map, the same with no .xise (#2321)
+// the warnings of ISE's project flow, the same with no .xise (#2321): none, but micro80's (#2688: its processor's, as
+// test/ise/examples.test.js expects them, its VHDL read from the project's folder) and on the Nexys3 those of XST and map
+const S3E_WARNINGS = { micro80: micro80S3eWarnings('/work/src') };
 const constant = (block, cause, ...ffs) => ffs.map(ff => `WARNING:Xst:${cause ? `1896 - Due to other FF/Latch trimming, FF/Latch` : '1293 - FF/Latch'} <${ff}> has a constant value of 0 in block <${block}>. This FF/Latch will be trimmed during the optimization process.`);
 const counts = (...names) => names.flatMap(n => [20, 21, 22, 23].map(b => `${n}/count_${b}`));
 const NEXYS3_WARNINGS = {
@@ -30,8 +33,9 @@ const NEXYS3_WARNINGS = {
   pong: [...constant('pong', false, 'dbR/count_20'), ...constant('pong', true, 'beatCount_23', 'period_23', ...counts('db1', 'db2', 'dbL'), 'dbR/count_21', 'dbR/count_22', 'dbR/count_23')],
   stopwatch: ['WARNING:PhysDesignRules:2410 - This design is using one or more 9K Block RAMs'],
   clock: [...constant('digital_clock', false, 'db0/count_22'), ...constant('digital_clock', true, 'db0/count_20', 'db0/count_21', 'db0/count_23', ...counts('db1', 'db2', 'db3'))],
+  micro80: MICRO80_S6_WARNINGS,
 };
-const expectedWarnings = (example, t) => (t.board === 'nexys3' && NEXYS3_WARNINGS[example] || []).slice().sort();
+const expectedWarnings = (example, t) => ((t.board === 'nexys3' ? NEXYS3_WARNINGS : S3E_WARNINGS)[example] || []).slice().sort();
 
 const RUN_SH = '[ -n "$ISE_SETTINGS" ] && . "$ISE_SETTINGS" > /dev/null\nxtclsh interop.tcl\n';
 const interopTcl = xise => `project open ${xise}
