@@ -1,8 +1,8 @@
 // UI: the Design pane's hierarchy (#207, #220): one row per module / instance, its base's icon on the
 // left and a badge for each of its views after its name: the drawing's first ([Schematic] [ASM] [FSM]
-// [Algebra] [Petri], the base, marked), its HDL's last, named by its language ([VHDL] / [Verilog]: first
-// only when the module is only HDL); no child rows for the views. The examples in both views
-// (Implementation / Simulation); a badge opens its view, its right-click shows that view's commands
+// [Algebra] [Petri], the base, marked; a Petri net's [FSM] after it, #2696), its HDL's last, named by its
+// language ([VHDL] / [Verilog]: first only when the module is only HDL); no child rows for the views. The
+// examples in both views (Implementation / Simulation); a badge opens its view, its right-click shows that view's commands
 // (no Convert to HDL / HDL as base / Remove Synchronized …, #220); the module's menu (no truth table
 // of the module, no Export as ISE Schematic); a schematic's block (#175) is a plain HDL module; every
 // source has its HDL: a new drawing of every kind gets its HDL file at once (in the project's
@@ -286,7 +286,7 @@ const KINDS = [
   { type: 'asm', name: 'c1', file: 'src/c1.asm.json', ico: 'asm', badge: 'ASM', id: 'asm:src/c1.asm.json' },
   { type: 'fsm', name: 'f1', file: 'src/f1.fsm.json', ico: 'fsm', badge: 'FSM', id: 'fsm:src/f1.fsm.json' },
   { type: 'tt', name: 't1', file: 'src/t1.bool.json', ico: 'algebra', badge: 'Algebra', views: ' [Schematic]', id: 'tt:src/t1.bool.json' },
-  { type: 'petri', name: 'p1', file: 'src/p1.pn.json', ico: 'petri', badge: 'Petri', id: 'pn:src/p1.pn.json' },
+  { type: 'petri', name: 'p1', file: 'src/p1.pn.json', ico: 'petri', badge: 'Petri', views: ' [FSM]', id: 'pn:src/p1.pn.json' },   // ([FSM]: its state machine, #2696)
 ];
 // a chart starts empty (#2176), with no HDL until it can have one: one with its states, already in the project
 const CHART = { asm: [newModel, 'openAsm'], fsm: [newFsm, 'openFsm'] };

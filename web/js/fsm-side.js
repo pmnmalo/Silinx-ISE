@@ -47,7 +47,8 @@ export function mountSide(ctx) {
       const init = h('input', { type: 'checkbox', class: 'fsm-initial', checked: M().initial === s.id, disabled: M().initial === s.id });
       init.addEventListener('change', () => { if (init.checked) { M().initial = s.id; commit(); renderSelection(); } });
       const ts = M().transitions.filter((t) => t.from === s.id);
-      selSection.append(h('h3', {}, 'State'),
+      // (a state with no comment, or no code: nothing there, not the text "null", #2722)
+      selSection.append(...[h('h3', {}, 'State'),
         field('Name', name),
         s.comment ? h('p', { class: 'asm-muted fsm-scomment' }, s.comment) : null,
         field('Outputs (Moore)', outs, 'Outputs while in this state: output=value, separated by commas. The other outputs keep their default value.'), outErr,
@@ -56,7 +57,7 @@ export function mountSide(ctx) {
         h('div', { class: 'asm-label' }, `Transitions out of ${s.name} (the first true condition is taken)`),
         h('ol', { class: 'fsm-tlist' }, ...ts.map((t) => h('li', { class: 'link', onclick: () => { setSel({ type: 'trans', id: t.id }); render(); renderSide(); } },
           `${t.cond || '1'} → ${stateById(t.to)?.name ?? '?'}${Object.keys(t.outputs).length ? ` / ${formatOutputs(t.outputs)}` : ''}`))),
-        h('div', { class: 'asm-row' }, btn('Delete state', 'Delete this state and its transitions', () => deleteSelection(), 'asm-danger asm-small')));
+        h('div', { class: 'asm-row' }, btn('Delete state', 'Delete this state and its transitions', () => deleteSelection(), 'asm-danger asm-small'))].filter(Boolean));
       return;
     }
     const t = transById(sel().id);
