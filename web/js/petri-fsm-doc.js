@@ -26,11 +26,11 @@ export async function openPetriFsm(path) {
     create(el, d) {
       const link = h('a', { onclick: () => openPetri(path) }, path.split('/').pop());
       const count = `${r.states} state${r.states === 1 ? '' : 's'}${r.truncated ? `, the first ${MAX_FSM_STATES}: the state space is larger` : ''}`;
-      const bar = h('div', { class: 'editor-bar' }, h('span', { class: 'path' }, name),
-        h('span', { class: `gen-banner read-only${r.truncated ? ' out-of-sync' : ''}` }, 'Read-only, the state space of the Petri net ', link, ` (${count})`));
+      // (its notice at the right end of the diagram's toolbar, no bar of its own: the name is the tab's, #2710)
+      const banner = h('span', { class: `gen-banner read-only${r.truncated ? ' out-of-sync' : ''}` }, 'Read-only, the state space of the Petri net ', link, ` (${count})`);
       const host = h('div', { class: 'doc-body' });
-      el.append(bar, host);
-      d.petriFsm = mountFsmEditor(host, { model: r.fsm, readOnly: true });
+      el.append(host);
+      d.petriFsm = mountFsmEditor(host, { model: r.fsm, readOnly: true, banner });
       return { destroy: () => d.petriFsm.destroy?.() };
     },
   });

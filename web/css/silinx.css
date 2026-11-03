@@ -405,8 +405,8 @@ html[data-ui="silinx"] .editor-bar { gap: 4px; }
 
 /* HDL editor */
 html[data-ui="silinx"] .editor-bar .path { color: var(--m-muted); }
-html[data-ui="silinx"] .editor-bar .gen-banner { border-radius: 6px; }
-html[data-ui="silinx"] .editor-bar .gen-banner a { color: var(--m-accent); }
+html[data-ui="silinx"] :is(.editor-bar .gen-banner, .asm-toolbar > .gen-banner.read-only) { border-radius: 6px; }
+html[data-ui="silinx"] :is(.editor-bar .gen-banner, .asm-toolbar > .gen-banner.read-only) a { color: var(--m-accent); }
 html[data-ui="silinx"] .xl-editor .cm-gutters { background: var(--m-surface); border-right: 1px solid var(--m-border); color: var(--m-muted); }
 html[data-ui="silinx"] .xl-editor .cm-lineNumbers .cm-gutterElement { opacity: .8; }
 html[data-ui="silinx"] .xl-editor .cm-activeLine, html[data-ui="silinx"] .xl-editor .cm-activeLineGutter { background: var(--m-hover); }
@@ -517,7 +517,7 @@ html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-gutters { background: v
 html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-foldPlaceholder { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
 html[data-ui="silinx"][data-theme="dark"] .xl-editor .cm-tooltip { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
 html[data-ui="silinx"][data-theme="dark"] .xl-lint-tip { background: var(--m-surface-2); color: var(--m-fg); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .editor-bar .gen-banner { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }
+html[data-ui="silinx"][data-theme="dark"] :is(.editor-bar .gen-banner, .asm-toolbar > .gen-banner.read-only) { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }
 html[data-ui="silinx"][data-theme="dark"] .gen-banner.out-of-sync { background: rgba(240, 113, 107, .14); border-color: rgba(240, 113, 107, .45); color: #ffb4ae; }
 html[data-ui="silinx"][data-theme="dark"] .msg-warn .msg-icon { color: #000; }
 html[data-ui="silinx"][data-theme="dark"] .impact-chain { background: var(--m-surface-2); border-color: var(--m-border); }

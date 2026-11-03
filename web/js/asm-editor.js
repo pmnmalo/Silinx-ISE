@@ -133,16 +133,18 @@ export function pathD(pts, r = 7) {
 // ================================================================================ editor
 
 // (readOnly: a chart to read, a C function's machine, #1575: moved about, zoomed, its boxes selected and their
-// properties shown; nothing edited, not validated, no code of its own)
-function readOnlyChrome({ root, toolbar, hide, hint }) {
+// properties shown; nothing edited, not validated, no code of its own; its notice, `banner`, at the right end of the
+// toolbar, #2710)
+function readOnlyChrome({ root, toolbar, hide, hint, banner }) {
   root.classList.add('asm-readonly');
   // (the tools that change the chart, the language and encoding, Validate, Code and the problems: hidden)
   for (const g of [...toolbar.querySelectorAll('.asm-add, .asm-danger'), ...hide,
     ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
+  if (banner) toolbar.append(banner);
   hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a box to see it';
 }
 const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button:not(.asm-fold)')) x.disabled = true; };
-export function mountAsmEditor(container, { model, onChange, readOnly = false } = {}) {
+export function mountAsmEditor(container, { model, onChange, readOnly = false, banner } = {}) {
   const uid = `asm${++instanceCounter}`;
   let M = normalizeModel(model || newModel('fsm', 'vhdl'));
   let sel = { nodes: new Set(), edge: null };
@@ -246,7 +248,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   status.append(statusInfo, statusMsg, zoomLbl);
 
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), status);
-  if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, encSel, probSection], hint });
+  if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, encSel, probSection], hint, banner });
 
   // ---------------------------------------------------------------------------- model ops (asm-ops.js)
   const {
