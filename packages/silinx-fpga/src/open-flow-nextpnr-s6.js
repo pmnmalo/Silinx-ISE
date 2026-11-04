@@ -19,23 +19,21 @@ export function mountNextpnrS6(ctx) {
   const { io, spec, log, report, now, ms, netlist, constraints, StepError, setRouted, state } = ctx;
   const part = `${spec.device}${spec.pkg}`;
 
+  // one run of nextpnr: { json, lines } (its problems: StepError, with nextpnr's ERROR lines, e.nextpnr)
   async function run(what, args, input, db) {
     const lines = [];
+    const errors = () => lines.filter(l => /^ERROR:/.test(l)).slice(0, 20);
     let files;
     try {
       files = await io.nextpnr.spartan6.run(['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'out.json', ...args],
-        { 'design.json': JSON.stringify(input), 'chipdb.bin': db }, l => {
-          lines.push(l);
-          if (/^ERROR:/.test(l)) log(`ERROR:nextpnr - ${l.replace(/^ERROR:\s*/, '')}`);
-          // (a clock's frequency: the timing step's, of the seed kept)
-          else if (/^Warning:/.test(l) && !/Max frequency/.test(l)) log(`WARNING:nextpnr - ${l.replace(/^Warning:\s*/, '')}`);
-        });
+        { 'design.json': JSON.stringify(input), 'chipdb.bin': db }, l => lines.push(l));
     } catch (e) {
-      throw new StepError(`nextpnr's ${what} failed: ${e.message}`, lines.filter(l => /^ERROR:/.test(l)).slice(0, 20));
+      // (a WebAssembly exception has no message: nextpnr's own ERROR lines say why)
+      throw Object.assign(new StepError(`nextpnr's ${what} failed: ${e?.message ?? 'it stopped on an error'}`, errors()), { nextpnr: true });
     }
     const out = files?.['out.json'];
-    if (!out) throw new StepError(`nextpnr's ${what} wrote no design`, lines.filter(l => /^ERROR:/.test(l)).slice(0, 20));
-    return { json: JSON.parse(typeof out === 'string' ? out : new TextDecoder().decode(out)) };
+    if (!out) throw Object.assign(new StepError(`nextpnr's ${what} wrote no design`, errors()), { nextpnr: true });
+    return { json: JSON.parse(typeof out === 'string' ? out : new TextDecoder().decode(out)), lines };
   }
 
   async function runPar() {
@@ -64,9 +62,9 @@ export function mountNextpnrS6(ctx) {
     // 1. the placements and their routings, of the placed design with its constants' sources. The seeds differ by up
     // to 20 %, and nextpnr's estimates do not rank them: PLACE_SEEDS of them, the one Silinx's timing model finds fastest.
     const netlistIn = siteNetlist(unplaced, { top: spec.top, fixed, chains, generalOk, device });
-    let best = null;
-    for (let k = 0; k < PLACE_SEEDS; k++) {
-      const seed = String((spec.seed || 1) + k);
+    // (a seed nextpnr cannot route, #2131: the next one; the step fails only when none routes)
+    let best = null, failed = null;
+    const seedOf = async seed => {
       const placedRun = await run('placement', ['--no-route', '--seed', seed, ...freq], netlistIn, db);
       let placement, placed;
       try {
@@ -76,10 +74,23 @@ export function mountNextpnrS6(ctx) {
       const routedRun = await run('routing', ['--no-place', '--seed', seed, ...freq], siteNetlist(placed, { top: spec.top, generalOk, chains: [], device }), db);
       let routed;
       try { routed = routedDesignS6(routedRun.json, placed, device); } catch (e) { throw new StepError(`nextpnr's routed design cannot be read: ${e.message}`); }
-      const period = periodOf(routed, device);
-      log(`nextpnr, seed ${seed}: ${period ? `minimum period ${period.toFixed(3)} ns` : 'no clocked paths'}.`);
-      if (!best || period < best.period) best = { period, placed, placement, routed };
+      return { period: periodOf(routed, device), placed, placement, routed, lines: [...placedRun.lines, ...routedRun.lines] };
+    };
+    for (let k = 0; k < PLACE_SEEDS; k++) {
+      const seed = String((spec.seed || 1) + k);
+      let r;
+      try { r = await seedOf(seed); } catch (e) {
+        if (!e.nextpnr) throw e;
+        failed ||= e;
+        log(`nextpnr, seed ${seed}: ${e.message}${e.list[0] ? ` (${e.list[0].replace(/^ERROR:\s*/, '').replace(/\.$/, '')})` : ''}.`);
+        continue;
+      }
+      log(`nextpnr, seed ${seed}: ${r.period ? `minimum period ${r.period.toFixed(3)} ns` : 'no clocked paths'}.`);
+      if (!best || r.period < best.period) best = r;
     }
+    if (!best) throw failed;
+    // (the kept seed's warnings; a clock's frequency: the timing step's)
+    for (const l of best.lines) if (/^Warning:/.test(l) && !/Max frequency/.test(l)) log(`WARNING:nextpnr - ${l.replace(/^Warning:\s*/, '')}`);
     const { placed, placement, routed } = best;
     report.files.placed = io.write('open/placed.xdl', writeXdl(placed));
     log(`Placed ${placement.site.length} sites by nextpnr in ${ms(t)}: ${report.files.placed}`);
