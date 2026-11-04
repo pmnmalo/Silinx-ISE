@@ -178,6 +178,23 @@ three to five times as long (1 to 7 s more natively). Best of 4 against Silinx's
 noise, about ±0.7 %): the loads alone, the fitted delays alone, `lambda` 0.3 and 0.8, Silinx's exponent ramp from 1 to 8,
 extra moves for the critical clusters, warmer starts (up to an annealing from 1.0), 15 passes (−0.9 / −1.6 %).
 
+## Constants on routing, enables and resets active low (#2797)
+
+Silinx's packer had become smaller than nextpnr (3 % more slices on the examples). The difference was in the LUTs:
+nextpnr's JSON frontend makes a constant cell per constant input, and the micro-architecture a LUT of each, where Silinx's
+router ties the constants that need no LUT from a free slice's Y (a 0, ISE's `XDL_DUMMY` source, not an occupied slice)
+or a VCC site (a 1): a carry chain's carry in at 0 (BX), a pad's output, a flip-flop's D (BX / BY). And Silinx's packer
+takes an inverter on a flip-flop's enable or set / reset as the slice's CEINV / SRINV (#527), where nextpnr made a LUT.
+nextpnr-spartan v0.18.0 routes those constants once placed (`route_constants`) and reads `IS_CE_INVERTED` /
+`IS_<sr>_INVERTED` as CEINV / SRINV (a slice's two flip-flops of one polarity); the flow's netlist writes them from the
+inverters (`lowerControlInverters`). `consts.v` (in this folder) has each case; its constraints are
+`test/fixtures/nextpnr-engine/consts.ucf`. The examples, best of four seeds natively (Basys2-250), against v0.17.0:
+slices traffic 69 -> 66, blinky 122 -> 116, pong 230 -> 224, stopwatch 203 -> 197, clock 200 -> 195, vga 148 -> 143,
+isqrt 65 -> 63, uart 113 -> 112, micro80 152 -> 148 (Silinx's packer: 66, 116, 225, 197, 196, 144, 63, 112, 148; the
+gnd sources counted no more), the LUTs those of Silinx's packer; periods from -1.9 % to +2.5 %, +0.2 % on average. ISE
+(2026-11-04): each example and consts, xdl2ncd 0 warnings, DRC 0 errors and 0 warnings, its `.bit` (CRC on and off)
+byte-identical to Silinx's.
+
 ## What is left for a decision
 
 - **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:

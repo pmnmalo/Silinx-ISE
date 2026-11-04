@@ -16,8 +16,8 @@ import { analyzeTiming } from './fpga/timing.js';
 import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 import { dcmPeriodFactor, dcmSettings } from './fpga/nextpnr-dcm.js';
 import { parityToData } from './fpga/pack-bram.js';
-import { BRAM_TYPE, MULT_TYPE } from './fpga/pack.js';
-import { paramBits } from './fpga/netlist.js';
+import { BRAM_TYPE, MULT_TYPE, ffKind } from './fpga/pack.js';
+import { paramBits, paramInt } from './fpga/netlist.js';
 
 /** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops
  *  (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE) and the latches (LD, LDE, LDCE, LDPE), of the falling edge too
@@ -40,6 +40,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   const problems = [];
   lowerRam64(mod);
   lowerClockSwitches(mod);
+  lowerControlInverters(mod);
   // a BUF is a 1-input LUT, as Silinx's packer makes it (pack-prep.js)
   for (const c of Object.values(mod.cells)) {
     if (c.type !== 'BUF') continue;
@@ -169,6 +170,38 @@ export function lowerRam64(mod) {
         { A0: pin('A0'), A1: pin('A1'), A2: pin('A2'), A3: pin('A3'), A4: pin('A4'), D: pin('D'), WCLK: pin('WCLK'), WE: we, O: o });
     }
     addCell(`${name}_mux`, 'LUT3', { INIT: '11001010' }, { I0: oLo, I1: oHi, I2: pin('A5'), O: pin('O') });
+  }
+}
+
+/**
+ * The inverters on control pins as Silinx's packer takes them (pack-prep.js, #80, #527): an inverter's loads that are
+ * a flip-flop's or latch's clock, enable or set / reset (and an IOB's DDR register's C0 / C1) read its input with their
+ * IS_<pin>_INVERTED toggled, the slice's CLKINV / CEINV / SRINV (not a LUT each, a slice's worth on pong, #2797); the
+ * inverter left out when nothing else reads it. Not an inverter of a constant or of a port. In place.
+ */
+export function lowerControlInverters(mod) {
+  const cells = mod.cells, ports = new Set(Object.values(mod.ports).flatMap(p => p.bits));
+  const ctrlPin = (c, pin) => {
+    if (/^(IDDR2|ODDR2)$/.test(c.type)) return pin === 'C0' || pin === 'C1';
+    const k = ffKind(c.type);
+    return !!k && [k.latch ? 'G' : 'C', k.latch ? 'GE' : 'CE', k.sr].includes(pin);
+  };
+  for (const [name, inv] of Object.entries(cells)) {
+    if (inv.type !== 'INV') continue;
+    const src = inv.connections.I?.[0], out = inv.connections.O?.[0];
+    if (typeof src !== 'number' || typeof out !== 'number' || ports.has(out)) continue;
+    let others = false;
+    for (const c of Object.values(cells)) {
+      if (c === inv) continue;
+      for (const [pin, bits] of Object.entries(c.connections || {})) {
+        if (c.port_directions?.[pin] !== 'input' || !bits.includes(out)) continue;
+        if (!ctrlPin(c, pin) || bits.length !== 1) { others = true; continue; }
+        const p = `IS_${pin}_INVERTED`;
+        c.connections[pin] = [src];
+        c.parameters = { ...c.parameters, [p]: String((paramInt(c.parameters?.[p]) & 1) ^ 1) };
+      }
+    }
+    if (!others) delete cells[name];
   }
 }
 

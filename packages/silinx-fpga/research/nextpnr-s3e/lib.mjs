@@ -70,6 +70,9 @@ export function timingExport(device) {
 const DCM_DATA = /^(LOCKED|PSDONE|STATUS\d)$/;
 
 /** The netlist's simulation: its LUT4s by INIT, its flip-flops. */
+// a packed flip-flop's enable and set / reset active low (its CEINV / SRINV, #2797)
+const inversions = c => ({ ceInv: (parseInt(bitsOf(c.parameters.CEINV ?? '0'), 2) & 1) === 1, srInv: (parseInt(bitsOf(c.parameters.SRINV ?? '0'), 2) & 1) === 1 });
+
 function netlistSim(mod, inputs) {
   const S = { val: new Map(), luts: [], ffs: [] };
   // (a bus's bits by name[i], as the XDL's pads are named)
@@ -79,9 +82,9 @@ function netlistSim(mod, inputs) {
   for (const [name, c] of Object.entries(mod.cells)) {
     const con = p => portNet(c, p);
     if (c.type === 'LUT4') S.luts.push({ init: bitsOf(c.parameters.INIT).padStart(16, '0'), ins: [0, 1, 2, 3].map(i => con(`I${i}`)), out: con('O') });
-    else if (c.type === 'FF') S.ffs.push({ name: esc(name), d: con('D'), q: con('Q'), ce: con('CE'), sr: con('SR'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
+    else if (c.type === 'FF') S.ffs.push({ name: esc(name), d: con('D'), q: con('Q'), ce: con('CE'), sr: con('SR'), ...inversions(c), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
     // the IOB's registers (an unconnected Q: an ODDR2's second flip-flop); REV sets; CLKINV: the falling edge
-    else if (/^[IOT]FF$/.test(c.type)) S.ffs.push({ name: esc(name), d: con('D'), q: con('Q') ?? `${name}/Q`, ce: con('CE'), sr: con('SR'), rev: con('REV'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), async: /ASYNC/.test(c.parameters.SRMODE), falling: parseInt(bitsOf(c.parameters.CLKINV ?? '0'), 2) === 1, init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
+    else if (/^[IOT]FF$/.test(c.type)) S.ffs.push({ name: esc(name), d: con('D'), q: con('Q') ?? `${name}/Q`, ce: con('CE'), sr: con('SR'), ...inversions(c), rev: con('REV'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), async: /ASYNC/.test(c.parameters.SRMODE), falling: parseInt(bitsOf(c.parameters.CLKINV ?? '0'), 2) === 1, init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
     // a DCM's outputs but its clocks (LOCKED, PSDONE, STATUS): inputs of the design, the same in both simulations
     else if (c.type === 'DCM') { for (const p of Object.keys(c.connections || {})) if (DCM_DATA.test(p) && con(p) !== undefined) S.pads.set(`${esc(name)}.${p}`, [con(p)]); }
     else if (c.type === 'IOB' && con('I') !== undefined) { for (const v of S.pads.values()) if (v[0] === con('PAD')) v.push(con('I')); }
@@ -178,6 +181,7 @@ function xdlSim(design, inputs) {
           S.ffs.push({
             name: cfg[ff].name, d: cfg[`D${X}MUX`]?.value === '1' ? fx : pin(`B${X}`), q: pin(`${X}Q`),
             ce: cfg.CEINV ? pin('CE') : undefined, sr: cfg.SRINV && !cfg.WSGEN ? pin('SR') : undefined,   // (beside a memory, SR is its enable)
+            ceInv: cfg.CEINV?.value === 'CE_B', srInv: cfg.SRINV?.value === 'SR_B',
            
             set: cfg[`${ff}_SR_ATTR`]?.value === 'SRHIGH', init: cfg[`${ff}_INIT_ATTR`]?.value === 'INIT1' ? 1 : 0,
           });
@@ -194,6 +198,7 @@ function xdlSim(design, inputs) {
         if (!cfg[ff]) continue;
         const usesSr = cfg[`${ff}_SR_ATTR`] !== undefined;
         S.ffs.push({ name: cfg[ff].name, d, q: q ?? `${inst.name}/${ff}Q`, ce: cfg[`${g}CEINV`] ? pin(`${g}CE`) : undefined, sr: usesSr ? pin('SR') : undefined, hasSr: usesSr,
+          ceInv: /_B$/.test(cfg[`${g}CEINV`]?.value || ''), srInv: cfg.SRINV?.value === 'SR_B',
           rev: cfg.IREV_USED && g === 'I' ? pin('REV') : undefined, set: cfg[`${ff}_SR_ATTR`]?.value === 'SRHIGH', async: cfg[`${g}FFATTRBOX`]?.value === 'ASYNC',
           falling: /_B$/.test(cfg[`${clk}INV`]?.value || ''), init: cfg[`${ff}_INIT_ATTR`]?.value === 'INIT1' ? 1 : 0 });
       }
@@ -217,7 +222,7 @@ function settle(S, what) {
     // (an asynchronous set / reset at once)
     for (const f of S.ffs) {
       if (!f.async) continue;
-      const v = f.hasSr && S.get(f.sr) ? (f.set ? 1 : 0) : f.rev !== undefined && S.get(f.rev) ? 1 : null;
+      const v = f.hasSr && srOn(S, f) ? (f.set ? 1 : 0) : f.rev !== undefined && S.get(f.rev) ? 1 : null;
       if (v !== null && S.get(f.q) !== v) { S.val.set(f.q, v); changed = true; }
     }
     for (const l of S.luts) { const v = S.lut(l); if (S.val.get(l.out) !== v) { S.val.set(l.out, v); changed = true; } }
@@ -226,14 +231,17 @@ function settle(S, what) {
   throw new Error(`${what}: no stable state`);
 }
 
+// a flip-flop's set / reset taken, through the slice's SRINV (SR_B: active low, #2797)
+const srOn = (S, f) => S.get(f.sr) ^ !!f.srInv;
+
 /** A clock edge on the flip-flops of that edge: set / reset before REV, the enable last. */
 function clock(S, falling = false) {
   const mems = memEdges(S, falling);
   const ffs = S.ffs.filter(f => !!f.falling === falling);
   const next = ffs.map(f => {
-    if (f.hasSr && S.get(f.sr)) return f.set ? 1 : 0;
+    if (f.hasSr && srOn(S, f)) return f.set ? 1 : 0;
     if (f.rev !== undefined && S.get(f.rev)) return 1;
-    return f.ce === undefined || S.get(f.ce) ? S.get(f.d) : S.get(f.q);
+    return f.ce === undefined || S.get(f.ce) ^ !!f.ceInv ? S.get(f.d) : S.get(f.q);
   });
   ffs.forEach((f, i) => S.val.set(f.q, next[i]));
   for (const [m, bits] of mems) m.bits = bits;

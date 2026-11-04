@@ -1,0 +1,1506 @@
+{
+  "creator": "Yosys 0.70 (git sha1 28ba3cb92, Release, Clang /workspace/YoWASP/yosys/wasi-sdk-33.0-x86_64-linux/share/cmake/../..//bin/clang++ 22.1.0)",
+  "modules": {
+    "consts": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "consts_syn.v:4.1-15.10"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "rst_n": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "en_n": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "sw": {
+          "direction": "input",
+          "bits": [ 5, 6, 7, 8 ]
+        },
+        "led": {
+          "direction": "output",
+          "bits": [ 9, 10, 11, 12, 13, 14, 15, 16 ]
+        }
+      },
+      "cells": {
+        "$abc$1413$blif$1413$0": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 17 ],
+            "I1": [ 18 ],
+            "O": [ 19 ]
+          }
+        },
+        "$abc$1413$blif$1413$1": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "1000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 20 ],
+            "I1": [ 21 ],
+            "O": [ 22 ]
+          }
+        },
+        "$abc$1413$blif$1413$10": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 23 ],
+            "O": [ 24 ]
+          }
+        },
+        "$abc$1413$blif$1413$11": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 25 ],
+            "O": [ 26 ]
+          }
+        },
+        "$abc$1413$blif$1413$12": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 25 ],
+            "O": [ 27 ]
+          }
+        },
+        "$abc$1413$blif$1413$13": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 25 ],
+            "O": [ 28 ]
+          }
+        },
+        "$abc$1413$blif$1413$14": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 23 ],
+            "O": [ 29 ]
+          }
+        },
+        "$abc$1413$blif$1413$15": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 23 ],
+            "O": [ 30 ]
+          }
+        },
+        "$abc$1413$blif$1413$16": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 23 ],
+            "O": [ 31 ]
+          }
+        },
+        "$abc$1413$blif$1413$2": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 32 ],
+            "I1": [ 33 ],
+            "O": [ 34 ]
+          }
+        },
+        "$abc$1413$blif$1413$3": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 35 ],
+            "I1": [ 36 ],
+            "O": [ 37 ]
+          }
+        },
+        "$abc$1413$blif$1413$4": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 32 ],
+            "I1": [ 38 ],
+            "O": [ 39 ]
+          }
+        },
+        "$abc$1413$blif$1413$5": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 17 ],
+            "I1": [ 40 ],
+            "O": [ 41 ]
+          }
+        },
+        "$abc$1413$blif$1413$6": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 35 ],
+            "I1": [ 42 ],
+            "O": [ 43 ]
+          }
+        },
+        "$abc$1413$blif$1413$7": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 44 ],
+            "I1": [ 45 ],
+            "O": [ 46 ]
+          }
+        },
+        "$abc$1413$blif$1413$8": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 44 ],
+            "I1": [ 47 ],
+            "O": [ 48 ]
+          }
+        },
+        "$abc$1413$blif$1413$9": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 25 ],
+            "O": [ 49 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[0].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ "0" ],
+            "DI": [ 44 ],
+            "O": [ 50 ],
+            "S": [ 48 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[0].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ "0" ],
+            "LI": [ 48 ],
+            "O": [ 51 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[1].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 50 ],
+            "DI": [ 35 ],
+            "O": [ 52 ],
+            "S": [ 37 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[1].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 50 ],
+            "LI": [ 37 ],
+            "O": [ 53 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[2].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 52 ],
+            "DI": [ 17 ],
+            "O": [ 54 ],
+            "S": [ 19 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[2].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 52 ],
+            "LI": [ 19 ],
+            "O": [ 55 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[3].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 54 ],
+            "DI": [ 32 ],
+            "O": [ 56 ],
+            "S": [ 34 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[3].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 54 ],
+            "LI": [ 34 ],
+            "O": [ 57 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[4].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 56 ],
+            "DI": [ 44 ],
+            "O": [ 58 ],
+            "S": [ 46 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[4].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 56 ],
+            "LI": [ 46 ],
+            "O": [ 59 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[5].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 58 ],
+            "DI": [ 35 ],
+            "O": [ 60 ],
+            "S": [ 43 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[5].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 58 ],
+            "LI": [ 43 ],
+            "O": [ 61 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[6].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 60 ],
+            "DI": [ 17 ],
+            "O": [ 62 ],
+            "S": [ 41 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[6].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 60 ],
+            "LI": [ 41 ],
+            "O": [ 63 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.genblk1.slice[7].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 62 ],
+            "LI": [ 39 ],
+            "O": [ 64 ]
+          }
+        },
+        "$auto$clkbufmap.cc:261:execute$1434": {
+          "hide_name": 1,
+          "type": "BUFG",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 65 ],
+            "O": [ 66 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1271": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:9.3-11.51|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ 30 ],
+            "D": [ 48 ],
+            "Q": [ 67 ],
+            "R": [ 26 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1272": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:9.3-11.51|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ 29 ],
+            "D": [ 67 ],
+            "Q": [ 68 ],
+            "R": [ 27 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1273": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:9.3-11.51|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ 24 ],
+            "D": [ 68 ],
+            "Q": [ 69 ],
+            "R": [ 28 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1274": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:9.3-11.51|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ 31 ],
+            "D": [ 69 ],
+            "Q": [ 70 ],
+            "R": [ 49 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1277": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 51 ],
+            "Q": [ 47 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1278": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 53 ],
+            "Q": [ 36 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1279": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 55 ],
+            "Q": [ 18 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1280": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 57 ],
+            "Q": [ 33 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1281": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 59 ],
+            "Q": [ 45 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1282": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 61 ],
+            "Q": [ 42 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1283": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 63 ],
+            "Q": [ 40 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1284": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.3-8.47|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ "1" ],
+            "D": [ 64 ],
+            "Q": [ 38 ],
+            "R": [ "0" ]
+          }
+        },
+        "$iopadmap$consts.clk": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 2 ],
+            "O": [ 65 ]
+          }
+        },
+        "$iopadmap$consts.en_n": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 4 ],
+            "O": [ 23 ]
+          }
+        },
+        "$iopadmap$consts.led": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 45 ],
+            "O": [ 9 ]
+          }
+        },
+        "$iopadmap$consts.led_1": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ "0" ],
+            "O": [ 10 ]
+          }
+        },
+        "$iopadmap$consts.led_2": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ "1" ],
+            "O": [ 11 ]
+          }
+        },
+        "$iopadmap$consts.led_3": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 22 ],
+            "O": [ 12 ]
+          }
+        },
+        "$iopadmap$consts.led_4": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 69 ],
+            "O": [ 13 ]
+          }
+        },
+        "$iopadmap$consts.led_5": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 70 ],
+            "O": [ 14 ]
+          }
+        },
+        "$iopadmap$consts.led_6": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 40 ],
+            "O": [ 15 ]
+          }
+        },
+        "$iopadmap$consts.led_7": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 38 ],
+            "O": [ 16 ]
+          }
+        },
+        "$iopadmap$consts.rst_n": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 3 ],
+            "O": [ 25 ]
+          }
+        },
+        "$iopadmap$consts.sw": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 5 ],
+            "O": [ 44 ]
+          }
+        },
+        "$iopadmap$consts.sw_1": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 6 ],
+            "O": [ 35 ]
+          }
+        },
+        "$iopadmap$consts.sw_2": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 7 ],
+            "O": [ 17 ]
+          }
+        },
+        "$iopadmap$consts.sw_3": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 8 ],
+            "O": [ 32 ]
+          }
+        },
+        "u0": {
+          "hide_name": 0,
+          "type": "FDSE",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:12.8-12.61"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "S": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ 44 ],
+            "D": [ "0" ],
+            "Q": [ 20 ],
+            "S": [ 35 ]
+          }
+        },
+        "u1": {
+          "hide_name": 0,
+          "type": "FDRE",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "consts_syn.v:13.8-13.61"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 66 ],
+            "CE": [ 17 ],
+            "D": [ "1" ],
+            "Q": [ 21 ],
+            "R": [ 32 ]
+          }
+        }
+      },
+      "netnames": {
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1386": {
+          "hide_name": 1,
+          "bits": [ 24 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1388": {
+          "hide_name": 1,
+          "bits": [ 28 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1390": {
+          "hide_name": 1,
+          "bits": [ 29 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1392": {
+          "hide_name": 1,
+          "bits": [ 27 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1394": {
+          "hide_name": 1,
+          "bits": [ 30 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1396": {
+          "hide_name": 1,
+          "bits": [ 26 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1398": {
+          "hide_name": 1,
+          "bits": [ 31 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$auto$rtlil.cc:3483:NotGate$1400": {
+          "hide_name": 1,
+          "bits": [ 49 ],
+          "attributes": {
+          }
+        },
+        "$abc$1413$iopadmap$led[3]": {
+          "hide_name": 1,
+          "bits": [ 22 ],
+          "attributes": {
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.CO": {
+          "hide_name": 1,
+          "bits": [ 50, 52, 54, 56, 58, 60, 62, 71 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:116.23-116.25"
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.X": {
+          "hide_name": 1,
+          "bits": [ 48, 37, 19, 34, 46, 43, 41, 39 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:112.23-112.24"
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1117.Y": {
+          "hide_name": 1,
+          "bits": [ 51, 53, 55, 57, 59, 61, 63, 64 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "consts_syn.v:8.32-8.46|/share/xilinx/arith_map.v:112.26-112.27"
+          }
+        },
+        "$auto$clkbufmap.cc:262:execute$1435": {
+          "hide_name": 1,
+          "bits": [ 65 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$clk": {
+          "hide_name": 1,
+          "bits": [ 66 ],
+          "attributes": {
+          }
+        },
+        "$techmap1417$abc$1413$blif$1413$0.A": {
+          "hide_name": 1,
+          "bits": [ 17, 18 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1419$abc$1413$blif$1413$2.A": {
+          "hide_name": 1,
+          "bits": [ 32, 33 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1420$abc$1413$blif$1413$3.A": {
+          "hide_name": 1,
+          "bits": [ 35, 36 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1424$abc$1413$blif$1413$7.A": {
+          "hide_name": 1,
+          "bits": [ 44, 45 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1426$abc$1413$blif$1413$9.A": {
+          "hide_name": 1,
+          "bits": [ 25 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1427$abc$1413$blif$1413$10.A": {
+          "hide_name": 1,
+          "bits": [ 23 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "acc": {
+          "hide_name": 0,
+          "bits": [ 47, 36, 18, 33, 45, 42, 40, 38 ],
+          "attributes": {
+            "src": "consts_syn.v:5.13-5.16"
+          }
+        },
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "consts_syn.v:4.22-4.25"
+          }
+        },
+        "en_n": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "consts_syn.v:4.46-4.50"
+          }
+        },
+        "led": {
+          "hide_name": 0,
+          "bits": [ 9, 10, 11, 12, 13, 14, 15, 16 ],
+          "attributes": {
+            "src": "consts_syn.v:4.81-4.84"
+          }
+        },
+        "q0": {
+          "hide_name": 0,
+          "bits": [ 20 ],
+          "attributes": {
+            "src": "consts_syn.v:7.8-7.10"
+          }
+        },
+        "q1": {
+          "hide_name": 0,
+          "bits": [ 21 ],
+          "attributes": {
+            "src": "consts_syn.v:7.12-7.14"
+          }
+        },
+        "r": {
+          "hide_name": 0,
+          "bits": [ 67, 68, 69, 70 ],
+          "attributes": {
+            "src": "consts_syn.v:6.13-6.14"
+          }
+        },
+        "rst_n": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "consts_syn.v:4.33-4.38"
+          }
+        },
+        "sw": {
+          "hide_name": 0,
+          "bits": [ 5, 6, 7, 8 ],
+          "attributes": {
+            "src": "consts_syn.v:4.64-4.66"
+          }
+        }
+      }
+    }
+  }
+}

@@ -538,3 +538,37 @@ test('#2223 simCheck catches a mixed slice\'s wrong setting: a flip-flop from BX
   const r = simCheck(json, design, { cycles: 500, starts: 20, randomInputs: true });
   assert.equal(r.ok, false);
 });
+
+// #2797: nextpnr's routed consts (research/nextpnr-s3e/consts.v as Silinx's flow hands it over, seed 1): the constants
+// that need no LUT on routing as Silinx's router ties them, the reset and enable active low as the slices' SRINV / CEINV
+const constsRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/consts-routed.json.gz', import.meta.url))));
+
+test('#2797 nextpnrToXdl: a carry in at 0, pads and flip-flops\' D at 0 and 1 on gnd / vcc nets, no LUT giving a constant; a constant 0\'s slice not occupied; CE_B and SR_B', () => {
+  const json = constsRouted(), design = nextpnrToXdl(json, device, PART);
+  // 8 slices as Silinx's engine (its 10 LUTs and 14 flip-flops): the slices that are only a 0's source not counted
+  assert.deepEqual(xdlSize(design), { slices: 8, luts: 10, ffs: 14 });
+  const gnd = design.insts.filter(i => /^XDL_DUMMY_.*_SLICE_/.test(i.name));
+  assert.ok(gnd.length >= 1 && gnd.every(i => i.cfg.map(c => `${c.attr}:${c.value}`).join(' ') === '_NO_USER_LOGIC: _GND_SOURCE:Y'));
+  assert.equal(count(design, /^[FG]::#LUT:D=[01]$/), 0);
+  // each constant on its net: the pads' O1 (led<1> at 0, led<2> at 1), u0's D at 0 and u1's at 1 through BX (DXMUX 0),
+  // the sum's carry in at 0 through BX (CYINIT BX)
+  const sink = (type, inst, pin) => design.nets.some(n => n.type === type && n.inpins.some(p => p.inst === inst && p.pin === pin));
+  assert.ok(sink('gnd', 'led<1>', 'O1') && sink('vcc', 'led<2>', 'O1') && sink('gnd', 'u0', 'BX') && sink('vcc', 'u1', 'BX'));
+  for (const u of ['u0', 'u1']) assert.equal(design.insts.find(i => i.name === u).cfg.find(c => c.attr === 'DXMUX').value, '0');
+  const ci = design.nets.filter(n => n.type === 'gnd').flatMap(n => n.inpins).filter(p => p.pin === 'BX' && !/^u[01]$/.test(p.inst));
+  assert.equal(ci.length, 1);
+  assert.equal(design.insts.find(i => i.name === ci[0].inst).cfg.find(c => c.attr === 'CYINIT').value, 'BX');
+  // the shift register's reset and enable active low: its two slices SR_B and CE_B, the others SR / CE
+  assert.equal(count(design, /^SRINV::SR_B$/), 2);
+  assert.equal(count(design, /^CEINV::CE_B$/), 2);
+  assert.equal(checkRouting(design, device).ok, true);
+  assert.deepEqual(simCheck(json, design, { cycles: 2000, starts: 100, randomInputs: true }), { ok: true, flipFlops: 14, message: null });
+});
+
+test('#2797 simCheck catches an enable or a set / reset of the wrong polarity', () => {
+  const json = constsRouted(), text = writeXdl(nextpnrToXdl(json, device, PART));
+  for (const [from, to] of [['CEINV::CE_B', 'CEINV::CE'], ['SRINV::SR_B', 'SRINV::SR']]) {
+    assert.ok(text.includes(from), from);
+    assert.equal(simCheck(json, parseXdl(text.replace(from, to)), { cycles: 2000, starts: 100, randomInputs: true }).ok, false, from);
+  }
+});

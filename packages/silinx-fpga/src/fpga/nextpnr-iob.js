@@ -17,8 +17,8 @@ const clkInv = (c, pin) => (bitParam(c, 'CLKINV') ? `${pin}_B` : pin);
 /** The settings of a register alone (Silinx's iobRegCfg): its clock's only with `clk`; the parts not used left out. */
 function regCfg(f, g, ff, clk) {
   const cfg = [[ff, esc(f.name), '#FF'], [`${ff}_INIT_ATTR`, '', initOf(f)]];
-  if (portNet(f, 'SR') !== undefined) cfg.push([`${ff}_SR_ATTR`, '', srAttr(f)], [`${g}FFATTRBOX`, '', syncOf(f)], [`${g}SR_USED`, '', '0'], ['SRINV', '', 'SR']);
-  if (portNet(f, 'CE') !== undefined) cfg.push([`${g}CEINV`, '', `${g}CE`]);
+  if (portNet(f, 'SR') !== undefined) cfg.push([`${ff}_SR_ATTR`, '', srAttr(f)], [`${g}FFATTRBOX`, '', syncOf(f)], [`${g}SR_USED`, '', '0'], ['SRINV', '', bitParam(f, 'SRINV') ? 'SR_B' : 'SR']);
+  if (portNet(f, 'CE') !== undefined) cfg.push([`${g}CEINV`, '', bitParam(f, 'CEINV') ? `${g}CE_B` : `${g}CE`]);
   if (clk) cfg.push([`${clk}INV`, '', clkInv(f, clk)]);
   return cfg;
 }
