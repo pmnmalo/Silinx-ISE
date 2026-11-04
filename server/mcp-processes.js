@@ -47,6 +47,12 @@ export const OPEN_REPORTS = {
     ...(r.timing ? [`Timing constraints: ${r.timing.met === false ? `not met (${r.timing.timingErrors})` : 'all met'}${r.timing.minPeriodNs ? `; minimum period ${r.timing.minPeriodNs} ns (${r.timing.maxFreqMHz} MHz)` : ''}.`] : [])].join('\n'),
 };
 
+/** run_process's text: the run's errors and warnings, then '…' and the end of its log, then its result; no '…' with
+ *  nothing before it (#2795). */
+export function processText({ errors, warnings, lines, head, logLines = 40 }) {
+  return clip([...(errors.length || warnings.length ? [...errors, ...warnings, '…'] : []), ...lines.slice(-Math.max(1, logLines)), head].join('\n'));
+}
+
 /** A process of the project's top run to its end (or stopped after timeoutS): its log redacted, its errors and
  *  warnings, whether it ended well, its toolchain. Errors: tool errors. */
 export async function runProcess(name, proc, { toolchain, timeoutS = 1800 } = {}) {
@@ -85,7 +91,7 @@ export const PROCESS_TOOLS = [
       const { top, lines, errors, warnings, ok, silinx } = await runProcess(name, proc, { toolchain, timeoutS });
       const pj = { top };
       const head = `Process "${proc}" of <${pj.top}> ${ok ? `completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}` : `failed (${errors.length} error(s), ${warnings.length} warning(s))`}${silinx ? ' (Silinx toolchain)' : ' (Xilinx ISE)'}.`;
-      return { text: clip([...errors, ...warnings, '…', ...lines.slice(-Math.max(1, logLines)), head].join('\n')),
+      return { text: processText({ errors, warnings, lines, head, logLines }),
         data: { project: name, process: proc, toolchain: silinx ? 'silinx' : 'ise', ok, errors, warnings, log: lines.slice(-Math.max(1, logLines)) }, isError: !ok };
     },
   },

@@ -75,3 +75,14 @@ test('the helpers: a tool\'s error, the clipped text, the boards, the diagnostic
   assert.equal(U.diagLine(d), 'WARNING:HDLCompiler - "src/a.vhd" Line 3: unused signal');
   assert.deepEqual(U.diagJson(d), { severity: 'warning', file: 'src/a.vhd', line: 3, col: null, tool: 'HDLCompiler', message: 'unused signal' });
 });
+
+test('#2795 processText: the errors and warnings, then … and the log\'s end; no … when there is none', async () => {
+  const { processText } = await import('../server/mcp-processes.js');
+  const head = 'Process "implement" of <gates> completed successfully (Silinx toolchain).';
+  const lines = ['=== SILINX STEP par ===', 'All signals are completely routed.', 'Flow finished.'];
+  assert.equal(processText({ errors: [], warnings: [], lines, head, logLines: 2 }), 'All signals are completely routed.\nFlow finished.\n' + head);
+  assert.equal(processText({ errors: [], warnings: ['WARNING:Silinx - an input is unused'], lines, head, logLines: 1 }),
+    'WARNING:Silinx - an input is unused\n…\nFlow finished.\n' + head);
+  assert.equal(processText({ errors: ['ERROR:Silinx - no top'], warnings: ['WARNING:Silinx - w'], lines: ['x'], head: 'failed', logLines: 5 }),
+    'ERROR:Silinx - no top\nWARNING:Silinx - w\n…\nx\nfailed');
+});
