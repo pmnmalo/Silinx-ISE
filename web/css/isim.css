@@ -139,11 +139,8 @@
 .isim-cmdline span { font: bold 12px var(--mono, Consolas, monospace); color: #00008b; }
 .isim-cmdline input { flex: 1; border: none; outline: none; font: 12px var(--mono, Consolas, monospace); padding: 2px; background: transparent; color: var(--fg, #000); }
 
-/* status bar */
-.isim-status {
-  flex: none; height: 22px; display: flex; align-items: center; gap: 10px; padding: 0 8px;
-  background: var(--bg, #f0f0f0); border-top: 1px solid var(--border, #a0a0a0); white-space: nowrap; overflow: hidden;
-}
+/* status bar: the documents' status line (.doc-status, web/css/status-line.css, #2785), its fields */
+.isim-status { gap: 10px; }
 .isim-st-msg { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .isim-st-delta { color: #005a80; }
 .isim-st-time { padding-left: 10px; border-left: 1px solid #c0c0c0; font-variant-numeric: tabular-nums; }

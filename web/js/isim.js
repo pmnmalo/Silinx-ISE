@@ -262,7 +262,7 @@ export function mountISim(container, opts = {}) {
       <div class="isim-console" tabindex="0"></div>
       <div class="isim-cmdline"><span>SSim&gt;</span><input type="text" spellcheck="false" autocomplete="off" placeholder="Type a command (help)"></div>
     </div>
-    <div class="isim-status"><span class="isim-st-msg">Ready</span><span class="isim-progress"><span></span></span><span class="isim-st-delta"></span><span class="isim-st-time"></span></div>
+    <div class="doc-status isim-status"><span class="isim-st-msg">Ready</span><span class="isim-progress"><span></span></span><span class="isim-st-delta"></span><span class="isim-st-time"></span></div>
   `;
   container.appendChild(root);
   const $ = (s) => root.querySelector(s);
