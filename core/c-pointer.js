@@ -63,6 +63,19 @@ export function pointerArithmetic(funcs, globals, synth, report, structArgs = ne
       for (const k of Object.keys(n)) if (k !== 'loc') delete n[k];
       Object.assign(n, { kind: 'index', e: base, i, fromDeref: true });
     });
+    // g(a + k), g(k + a), g(a - k) of a synthesized function: g(&a[k]), its array from there (core/c-inline.js, #2751)
+    if (synth.has(f.name)) walk(f.body, (n) => {
+      if (n.kind !== 'call' || n.callee.kind !== 'id' || !funcs.get(n.callee.name)?.body) return;
+      const g = funcs.get(n.callee.name);
+      n.args.forEach((x, k) => {
+        const pt = g.params[k]?.type;
+        if (!(pt?.kind === 'array' || (pt?.kind === 'ptr' && !pt.ref && pt.to.kind !== 'stream' && pt.to.kind !== 'struct')) || x.kind !== 'binary' || (x.op !== '+' && x.op !== '-')) return;
+        const ts = terms(x);
+        const ps = ts.filter((t) => isPtr(t.x));
+        if (ps.length !== 1 || ps[0].neg) return;
+        replace(x, { kind: 'unary', op: '&', e: { kind: 'index', e: ps[0].x, i: sum(ts.filter((t) => t !== ps[0]), x.loc), loc: x.loc }, loc: x.loc });
+      });
+    });
   }
   // a pointer argument indexed, or passed to a function whose parameter is one (its array, #1684): an array (ap_memory)
   const isArg = (pa) => pa.name && pa.type.kind === 'ptr' && pa.type.to.kind !== 'ptr' && pa.type.to.kind !== 'stream' && pa.type.to.kind !== 'struct';
@@ -142,6 +155,53 @@ function walkP(n, fn, parent = null, key = null) {
   for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type' && k !== 'pragma' && v && typeof v === 'object') walkP(v, fn, n, k);
 }
 
+const CMPS = new Set(['==', '!=', '<', '<=', '>', '>=']);
+const plus = (a, b, loc) => (a.kind === 'num' && b.kind === 'num' ? num(a.value + b.value, loc) : a.kind === 'num' && a.value === 0n ? b : b.kind === 'num' && b.value === 0n ? a : { kind: 'binary', op: '+', l: a, r: b, loc });
+const neg = (a, loc) => (a.kind === 'num' ? num(-a.value, loc) : { kind: 'unary', op: '-', e: a, loc });
+/** A row's length of an array of arrays (int m[R][C]: C, a constant), else null. */
+function cols(t) {
+  if (t?.kind !== 'array' || t.of?.kind !== 'array' || t.of.of?.kind === 'array') return null;
+  const c = Number(t.of.length ?? (t.of.size?.kind === 'num' ? t.of.size.value : NaN));
+  return c >= 1 ? c : null;
+}
+/** The place an expression points to in an array (#2751): { base, off, cols } (an array, a pointer: its own; a, &a[i],
+ *  a + i, k + a, a - k; a row of an array of arrays, m[r] + j, &m[r][j]: its flat offset, r * C + j), else null. */
+function place(e, types) {
+  const loc = e.loc;
+  if (e.kind === 'id') { const t = types.get(e.name); return t?.kind === 'ptr' || (t?.kind === 'array' && t.of?.kind !== 'array') ? { base: e.name, off: num(0, loc) } : null; }
+  if (e.kind === 'index' && e.e.kind === 'id' && cols(types.get(e.e.name))) {
+    const c = cols(types.get(e.e.name));
+    return { base: e.e.name, off: e.i.kind === 'num' ? num(e.i.value * BigInt(c), loc) : { kind: 'binary', op: '*', l: e.i, r: num(c, loc), loc }, cols: c };
+  }
+  if (e.kind === 'unary' && e.op === '&' && e.e.kind === 'index') { const p = place(e.e.e, types); return p && { ...p, off: plus(p.off, e.e.i, loc) }; }
+  if (e.kind === 'binary' && (e.op === '+' || e.op === '-')) {
+    const l = place(e.l, types), r = e.op === '+' && !l ? place(e.r, types) : null;
+    if (l && !place(e.r, types)) return { ...l, off: plus(l.off, e.op === '-' ? neg(e.r, loc) : e.r, loc) };
+    if (r) return { ...r, off: plus(e.l, r.off, loc) };
+  }
+  return null;
+}
+/** p - q, p < q, … of places in one array (a pointer variable's, 'ptrpos', or an array's): of their offsets (#2751); a
+ *  pointer's left over said. */
+function pointerPlaces(body, types, report) {
+  const pos = (x) => (x.kind === 'ptrpos' ? x : x.kind === 'binary' && (x.op === '+' || x.op === '-') && (pos(x.l) || pos(x.r)) ? (() => {
+    const l = pos(x.l), r = x.op === '+' && !l ? pos(x.r) : null;
+    if (l && !pos(x.r)) return { ...l, off: plus(l.off, x.op === '-' ? neg(x.r, x.loc) : x.r, x.loc) };
+    return r && !l ? { ...r, off: plus(x.l, r.off, x.loc) } : null;
+  })() : place(x, types));
+  walkP(body, (n) => {
+    if (n.kind !== 'binary' || !(n.op === '-' || CMPS.has(n.op))) return;
+    const l = pos(n.l), r = pos(n.r);
+    if (!l || !r || l.base !== r.base || (l.kind !== 'ptrpos' && r.kind !== 'ptrpos')) return;
+    replace(n, { kind: 'binary', op: n.op, l: l.off, r: r.off, loc: n.loc });
+  });
+  walkP(body, (n) => {
+    if (n.kind !== 'ptrpos') return;
+    report(n.loc, `the pointer '${n.name}': subtracted or compared other than with a place in '${n.base}' (a, a + i, &a[i], a pointer into it): not supported yet`);
+    replace(n, num(0, n.loc));
+  });
+}
+
 export function pointerVariables(funcs, globals, synth, report) {
   for (const f of funcs.values()) {
     if (!f.body || !synth.has(f.name)) continue;
@@ -154,6 +214,7 @@ export function pointerVariables(funcs, globals, synth, report) {
       if (n.kind === 'var' && n.type.kind === 'ptr' && parent?.kind === 'decl') decls.push({ v: n, decl: parent });
     });
     for (const { v, decl } of decls) pointerVariable(f, v, decl, types, report);
+    pointerPlaces(f.body, types, report);
   }
 }
 
@@ -168,27 +229,26 @@ function pointerVariable(f, v, decl, types, report) {
   const target = (e) => {
     const cast = e.kind === 'cast';
     while (e.kind === 'cast') { e.said = true; e = e.e; }   // (a cast of a pointer said here, not by core/c-check.js)   // (its target's own type checked below)
-    let base = null, off = num(0, e.loc), scalar = false;
-    if (e.kind === 'id') base = e.name;
+    let base = null, off = num(0, e.loc), scalar = false, c = null;
+    // (an array, &a[i], a + i, k + a, a - k; into a row, m[r] + j, &m[r][j], #2751)
+    const at = e.kind === 'unary' && e.op === '&' && e.e.kind === 'id' ? null : place(e, types);
+    if (at) ({ base, off, cols: c } = at);
     else if (e.kind === 'unary' && e.op === '&' && e.e.kind === 'id') { base = e.e.name; scalar = true; }
-    else if (e.kind === 'unary' && e.op === '&' && e.e.kind === 'index' && e.e.e.kind === 'id') { base = e.e.e.name; off = e.e.i; }
-    else if (e.kind === 'binary' && (e.op === '+' || e.op === '-') && e.l.kind === 'id') { base = e.l.name; off = e.op === '-' ? { kind: 'unary', op: '-', e: e.r, loc: e.loc } : e.r; }
-    else if (e.kind === 'binary' && e.op === '+' && e.r.kind === 'id' && types.get(e.r.name)?.kind === 'array') { base = e.r.name; off = e.l; }   // (k + a, #2655)
     if (!base || base === name) { fail(e.loc, 'set to something other than an array, &x, &a[i] or a + i: not supported yet'); return null; }
     const bt = types.get(base);
-    const et = scalar ? bt : bt?.kind === 'array' || bt?.kind === 'ptr' ? bt.of ?? bt.to : null;
+    const et = scalar ? bt : c ? bt.of.of : bt?.kind === 'array' || bt?.kind === 'ptr' ? bt.of ?? bt.to : null;
     // (a cast to a narrower integer type, char *p = (char *)&a[i] (#1895): its elements the target's, r of them in one,
     // from its least significant bits, as on x86; its offset counted in its own elements)
     const to = v.type.to;
     const r = sameType(et, to) ? 1 : cast && !scalar && et?.kind === 'int' && to.kind === 'int' && !et.fixed && !to.fixed && et.bits && to.bits && et.bits % to.bits === 0 ? et.bits / to.bits : 0;
     if (!r || (r & (r - 1))) { fail(e.loc, `set to '${base}', of another type (a cast of a pointer): not supported (Vitis HLS: a cast of a pointer between native integer types, ${scalar ? 'to an array' : 'to a narrower one'})`); return null; }
     let j = bases.findIndex((b) => b.base === base);
-    if (j < 0) { j = bases.length; bases.push({ base, scalar, r }); }
+    if (j < 0) { j = bases.length; bases.push({ base, scalar, r, cols: c }); }
     if (bases[j].r !== r) { fail(e.loc, `set to '${base}' as another type before: not supported`); return null; }
     return { j, off: r === 1 ? off : off.kind === 'num' ? num(off.value * BigInt(r), e.loc) : { kind: 'binary', op: '*', l: off, r: num(r, e.loc), loc: e.loc } };
   };
   // its uses
-  const sets = [], moves = [], reads = [], passes = [];
+  const sets = [], moves = [], reads = [], passes = [], places = [];
   if (v.init) sets.push({ init: true, t: target(v.init) });
   walkP(f.body, (n, parent, key) => {
     if (n.kind !== 'id' || n.name !== name || bad) return;
@@ -201,16 +261,19 @@ function pointerVariable(f, v, decl, types, report) {
     else if (parent.kind === 'unary' && parent.op === '*') reads.push({ node: parent, i: num(0, parent.loc) });
     else if (parent.kind === 'index' && key === 'e') reads.push({ node: parent, i: parent.i });
     else if (parent.kind === 'call' && key === 'args') passes.push(n);
-    else fail(n.loc, 'used other than *p, p[i], p = …, p += …, p++ (passed on, compared): not supported yet');
+    else if (parent.kind === 'binary' && (parent.op === '+' || parent.op === '-' || CMPS.has(parent.op))) places.push(n);   // (p - a, p < q: its offset, #2751)
+    else fail(n.loc, 'used other than *p, p[i], p = …, p += …, p++, p - q, p < q, passed on: not supported yet');
   });
   if (bad || sets.some((s) => !s.t)) return;
   if (!bases.length) { report(v.loc, `the pointer '${name}' is never set`); v.said = true; return; }
   const many = bases.length > 1;
   const moving = moves.length > 0 || sets.some((s) => !(s.t.off.kind === 'num' && s.t.off.value === 0n));
   const sel = `${name}_sel`, off = `${name}_off`;
-  // passed on to a function: its target (one, not moved, its own type)
-  if (passes.length && (many || moving || bases[0].r > 1)) { report(passes[0].loc, `the pointer '${name}': passed on to a function ${many ? 'with several targets' : moving ? 'after it moves' : 'as another type'}: not supported yet`); v.said = true; return; }
-  for (const n of passes) replace(n, bases[0].scalar ? { kind: 'unary', op: '&', e: id(bases[0].base, n.loc), loc: n.loc } : id(bases[0].base, n.loc));
+  // passed on to a function: its target (one, its own type; moved: &a[p_off], #2751)
+  if (passes.length && (many || bases[0].r > 1 || (moving && (bases[0].scalar || bases[0].cols)))) { report(passes[0].loc, `the pointer '${name}': passed on to a function ${many ? 'with several targets' : moving ? 'after it moves' : 'as another type'}: not supported yet`); v.said = true; return; }
+  if (places.length && (many || bases[0].r > 1 || bases[0].scalar)) { report(places[0].loc, `the pointer '${name}': in a difference or a comparison ${many ? 'with several targets' : bases[0].scalar ? 'pointing to a variable' : 'as another type'}: not supported yet`); v.said = true; return; }
+  for (const n of passes) replace(n, bases[0].scalar ? { kind: 'unary', op: '&', e: id(bases[0].base, n.loc), loc: n.loc } : moving ? { kind: 'unary', op: '&', e: { kind: 'index', e: id(bases[0].base, n.loc), i: id(off, n.loc), loc: n.loc }, loc: n.loc } : id(bases[0].base, n.loc));
+  for (const n of places) replace(n, { kind: 'ptrpos', name, base: bases[0].base, off: moving ? id(off, n.loc) : num(0, n.loc) });
   // its variables in its declaration's place
   const vars = [];
   if (many) vars.push({ kind: 'var', name: sel, type: { ...INT_T }, init: v.init ? num(sets[0].t.j, v.loc) : null, static: false, const: false, loc: v.loc });
@@ -232,6 +295,8 @@ function pointerVariable(f, v, decl, types, report) {
   const elem = (b, i, loc) => {
     if (bases[b].scalar) return id(bases[b].base, loc);
     const k = moving ? { kind: 'binary', op: '+', l: id(off, loc), r: i, loc } : i, r = bases[b].r;
+    // (into an array of arrays: m[k / C][k % C])
+    if (bases[b].cols) return { kind: 'index', e: { kind: 'index', e: id(bases[b].base, loc), i: { kind: 'binary', op: '/', l: k, r: num(bases[b].cols, loc), loc }, loc }, i: { kind: 'binary', op: '%', l: structuredClone(k), r: num(bases[b].cols, loc), loc }, loc };
     if (r === 1) return { kind: 'index', e: id(bases[b].base, loc), i: k, loc };
     // (a narrower type's: its bits of the target's element, a[k / r] >> (k % r * W))
     const bin = (op, l, rr) => ({ kind: 'binary', op, l, r: rr, loc });

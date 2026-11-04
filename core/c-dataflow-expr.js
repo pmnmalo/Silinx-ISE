@@ -109,6 +109,7 @@ export const exprMethods = {
         const slot = this.lookup(e.e.kind === 'id' ? e.e.name : '', e.loc);
         if (slot.kind === 'out') return this.readOut(slot.out);
         if (slot.kind === 'alias') return this.read(slot.slot, e.e);
+        if (slot.view) return this.index({ ...e, kind: 'index', i: { kind: 'num', value: 0n, text: '0', loc: e.loc } }, g);   // (&a[k] given: a[k], #2751)
         this.error(e.loc, "'*' of something that is not a pointer argument");
         break;
       }
@@ -258,6 +259,7 @@ export const exprMethods = {
   },
   storeDeref(slot, val, g, l) {
     if (slot.kind === 'alias') return this.storeSlot(slot.slot, val, g);
+    if (slot.view) { const nv = this.conv(val, slot.t); this.arrayWrite(slot, this.v(this.g.const(0, INT), INT), nv, g, l); return nv; }
     if (slot.kind !== 'out') this.error(l.loc, "'*' of something that is not a pointer argument");
     const o = slot.out;
     const nv = this.conv(val, o.t);
@@ -332,9 +334,30 @@ export const exprMethods = {
     if (!fn) { if (['printf', 'fprintf', 'puts', 'putchar', 'assert'].includes(name)) return this.v(this.g.const(0, INT), INT); this.error(e.loc, `the function '${name}' cannot be called here`); }
     if (fn.blackbox) this.error(e.loc, `the RTL blackbox '${name}' is a call of a module: a state that waits for it (#1526)`);
     if (!fn.body) this.error(e.loc, `'${name}' is declared but not defined`);   // (#1605)
-    const scope = new Map();
+    const scope = new Map(), views = [];
     fn.params.forEach((pa, k) => {
       const a = e.args[k];
+      // (&a[k], a + k, k a constant: the array's elements from k, written back after the call, #2751)
+      const arr = a.kind === 'unary' && a.op === '&' && a.e.kind === 'index' && a.e.e.kind === 'id' && !pa.type.ref ? this.lookup(a.e.e.name, a.loc) : null;
+      if ((pa.type.kind === 'ptr' || pa.type.kind === 'array') && arr?.kind === 'array') {
+        const i = this.expr(a.e.i, g), n = arr.elems.length;
+        if (this.g.isConst(i.id)) {
+          const off = Number(this.g.k(i.id));
+          if (off < 0 || off > n) this.error(a.loc, `the offset ${off} is outside '${a.e.e.name}' (0 to ${n})`);
+          const view = { ...arr, elems: arr.elems.slice(off), lastWrite: null, view: true };
+          views.push({ arr, view, off });
+          scope.set(pa.name, view);
+          return;
+        }
+        // (an offset not constant: each element a multiplexer of the array's, by the offset; written back so)
+        const it = promote(i.t), iv = this.conv(i, it), at = Array.from({ length: n + 1 }, (_, o) => this.g.add('eq', [iv.id, this.g.const(o, it)], BOOL));
+        const zero = this.g.const(0, arr.t), elems = [];
+        for (let j = 0; j < n; j++) { let r = arr.elems[j]; for (let o = 1; o <= n; o++) r = this.mux(at[o], j + o < n ? arr.elems[j + o] : zero, r, arr.t); elems.push(r); }
+        const view = { ...arr, elems, lastWrite: null, view: true };
+        views.push({ arr, view, at });
+        scope.set(pa.name, view);
+        return;
+      }
       if (pa.type.kind === 'ptr' || pa.type.kind === 'array') {
         const target = a.kind === 'unary' && a.op === '&' && a.e.kind === 'id' ? this.lookup(a.e.name, a.loc) : a.kind === 'id' ? this.lookup(a.name, a.loc) : null;
         // (an element by reference, a method of an array of objects: inlined in a sequential module, #1964)
@@ -350,6 +373,11 @@ export const exprMethods = {
     const saved = { scopes: this.scopes };
     const r = this.inline(fn, scope, g);
     this.scopes = saved.scopes;
+    for (const { arr, view, off, at } of views) {
+      if (at) { const old = [...arr.elems]; old.forEach((x, k) => { let r = x; for (let o = 0; o <= k; o++) r = this.mux(at[o], view.elems[k - o], r, arr.t); arr.elems[k] = r; }); }
+      else view.elems.forEach((x, j) => { arr.elems[off + j] = x; });
+      arr.lastWrite = null;
+    }
     return r ?? this.v(this.g.const(0, INT), INT);
   },
   inline(fn, scope, g) {
