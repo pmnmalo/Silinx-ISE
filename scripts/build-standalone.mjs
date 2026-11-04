@@ -34,11 +34,14 @@ const BUILD = buildInfo(ROOT, VERSION);
 const YOSYS_VERSION = JSON.parse(rd('node_modules/@yowasp/yosys/package.json')).version;
 // nextpnr in WebAssembly (the nextpnr engine, #2136): its bundle and, beside it in ../chipdb, each device's chip database
 const NEXTPNR_VERSION = JSON.parse(rd('node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json')).version;
+// (the Spartan-6's, nextpnr-himbaechel-spartan6, in a folder of its own: #2288)
+const NEXTPNR_S6_VERSION = JSON.parse(rd('node_modules/@silinx/nextpnr-himbaechel-spartan6/package.json')).version;
 const PUBLISHED = 'https://pmnmalo.github.io/Silinx-ISE/';
 const LAYOUT = {
   dir: BUILD ? `dev-${BUILD.commit}/` : `${VERSION}/`,
   yosys: `../vendor/yowasp-yosys/${YOSYS_VERSION}/gen/bundle.js`,
   nextpnr: `../vendor/nextpnr-spartan/${NEXTPNR_VERSION}/gen/bundle.js`,
+  nextpnrS6: `../vendor/nextpnr-spartan6/${NEXTPNR_S6_VERSION}/gen/bundle.js`,
   // (the iCE40's: not published, from npm's registry on its first run, at package-lock.json's version and SHA-512, #2444)
   nextpnrIce40Package: (({ resolved: url, integrity }) => ({ url, integrity }))(JSON.parse(rd('package-lock.json')).packages['node_modules/@yowasp/nextpnr-ice40']),
   site: new URL(arg('--assets-url') || (BUILD ? `${PUBLISHED}dev/` : PUBLISHED)).href,
@@ -52,6 +55,8 @@ const ASSET_DIRS = [
   [`vendor/yowasp-yosys/${YOSYS_VERSION}/gen`, 'node_modules/@yowasp/yosys/gen', () => true],
   [`vendor/nextpnr-spartan/${NEXTPNR_VERSION}/gen`, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/gen', () => true],
   [`vendor/nextpnr-spartan/${NEXTPNR_VERSION}/chipdb`, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/chipdb', f => f.endsWith('.bin.gz')],
+  [`vendor/nextpnr-spartan6/${NEXTPNR_S6_VERSION}/gen`, 'node_modules/@silinx/nextpnr-himbaechel-spartan6/gen', () => true],
+  [`vendor/nextpnr-spartan6/${NEXTPNR_S6_VERSION}/chipdb`, 'node_modules/@silinx/nextpnr-himbaechel-spartan6/chipdb', f => f.endsWith('.bin.gz')],
 ];
 // each one's SHA-256 by its path under assets/, checked by the browser's cache before it keeps or uses a copy (#1237)
 LAYOUT.integrity = {};
@@ -83,6 +88,7 @@ function writeAssets(assets) {
   }
   // (nextpnr's: its package.json, with its licence's terms)
   fs.copyFileSync(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json'), path.join(assets, 'vendor/nextpnr-spartan', NEXTPNR_VERSION, 'package.json'));
+  fs.copyFileSync(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan6/package.json'), path.join(assets, 'vendor/nextpnr-spartan6', NEXTPNR_S6_VERSION, 'package.json'));
   for (const [k, { n, bytes }] of parts) console.log(`  assets/${k}: ${n} file(s), ${(bytes / 1024 / 1024).toFixed(1)} MB`);
 }
 if (arg('--assets-only')) {
