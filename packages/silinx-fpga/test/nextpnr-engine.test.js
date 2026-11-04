@@ -677,12 +677,12 @@ test('#2194 a DCM_SP (Silinx\'s synthesis) built with --engine nextpnr: no warni
   assert.deepEqual(design.insts.filter(i => i.type === 'BUFGMUX').map(i => i.site).sort(), ['BUFGMUX_X1Y10', 'BUFGMUX_X1Y11', 'BUFGMUX_X2Y10', 'BUFGMUX_X2Y11']);
 });
 
-test('#2136 --engine auto: nextpnr when it can implement the design, a port with no LOC too (#2625): no warnings', { timeout: 300000 }, async () => {
+test('#2137 the default engine, nextpnr: the design with its pads, and a port with no LOC (#2625): no warnings', { timeout: 300000 }, async () => {
   const build = async ucfText => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
     fs.writeFileSync(path.join(dir, 'gates.ucf'), ucfText);
     const out = [], err = [];
-    const code = await main(['build', fileURLToPath(fixture('gates.json')), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'gates.ucf'), '--out-dir', dir, '--engine', 'auto'],
+    const code = await main(['build', fileURLToPath(fixture('gates.json')), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'gates.ucf'), '--out-dir', dir],
       { out: l => out.push(l), err: l => err.push(l) });
     assert.equal(code, 0, err.join('\n'));
     assert.deepEqual(err, []);   // no warnings
