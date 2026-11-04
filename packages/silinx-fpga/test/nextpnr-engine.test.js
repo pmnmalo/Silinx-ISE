@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
-import { engineOf, lowerClockSwitches, lowerRam64, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
+import { engineOf, lowerClockSwitches, lowerControlInverters, lowerRam64, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
 import { BRAM_TYPE, LUT_K, MUXF, SLICEM_MEM, ffKind } from '../src/fpga/pack.js';
 import { parseXdl } from '../src/xdl.js';
 import { readYosysJson } from '../src/fpga/netlist.js';
@@ -413,6 +413,41 @@ test('#2218 a RAM64X1S built with --engine nextpnr: no warnings, its PERIOD met,
   }
 });
 
+test('#2797 lowerControlInverters: an inverter on a flip-flop\'s reset, enable or clock, a latch\'s gate, a DDR register\'s C1 as its IS_<pin>_INVERTED, as Silinx\'s packer takes it; one also read by logic kept for it; one of a constant or a port left', () => {
+  const io = (ins, outs) => Object.fromEntries([...ins.map(p => [p, 'input']), ...outs.map(p => [p, 'output'])]);
+  const inv = (i, o) => ({ type: 'INV', connections: { I: [i], O: [o] }, port_directions: io(['I'], ['O']) });
+  const mod = () => ({
+    ports: { rst_n: { direction: 'input', bits: [2] }, q: { direction: 'output', bits: [30] }, nq: { direction: 'output', bits: [16] } },
+    cells: {
+      i0: inv(2, 10), i1: inv(3, 11), i2: inv(4, 12), i3: inv(5, 13), i4: inv(6, 14), i5: inv(7, 15), i6: inv(8, 16),
+      // FDRE R and CE from inverters (one of them also read by a LUT); FDCE_1's clock; a latch's gate and enable; ODDR2's C1
+      f0: { type: 'FDRE', parameters: { INIT: '0' }, connections: { C: [9], CE: [11], R: [10], D: [20], Q: [30] }, port_directions: io(['C', 'CE', 'R', 'D'], ['Q']) },
+      f1: { type: 'FDCE_1', parameters: { IS_C_INVERTED: '1' }, connections: { C: [12], CE: ['1'], CLR: [10], D: [20], Q: [31] }, port_directions: io(['C', 'CE', 'CLR', 'D'], ['Q']) },
+      l0: { type: 'LDCE', connections: { G: [13], GE: [14], CLR: ['0'], D: [20], Q: [32] }, port_directions: io(['G', 'GE', 'CLR', 'D'], ['Q']) },
+      d0: { type: 'ODDR2', connections: { C0: [9], C1: [15], D0: [20], D1: [20], Q: [33] }, port_directions: io(['C0', 'C1', 'D0', 'D1'], ['Q']) },
+      g: { type: 'LUT2', parameters: { INIT: '0110' }, connections: { I0: [11], I1: [20], O: [34] }, port_directions: io(['I0', 'I1'], ['O']) },
+      // an inverter of a constant and one driving a port: left
+      c0: inv('1', 17), f2: { type: 'FDRE', connections: { C: [9], CE: ['1'], R: [17], D: [20], Q: [35] }, port_directions: io(['C', 'CE', 'R', 'D'], ['Q']) },
+      f3: { type: 'FDRE', connections: { C: [9], CE: ['1'], R: [16], D: [20], Q: [36] }, port_directions: io(['C', 'CE', 'R', 'D'], ['Q']) },
+    },
+  });
+  const m = mod();
+  lowerControlInverters(m);
+  assert.deepEqual(Object.keys(m.cells).filter(k => m.cells[k].type === 'INV').sort(), ['c0', 'i1', 'i6']);
+  assert.deepEqual(m.cells.f0.connections, { C: [9], CE: [3], R: [2], D: [20], Q: [30] });
+  assert.deepEqual(m.cells.f0.parameters, { INIT: '0', IS_CE_INVERTED: '1', IS_R_INVERTED: '1' });
+  // (an inversion already there toggled: FDCE_1's clock inverted twice, on the rising edge)
+  assert.deepEqual([m.cells.f1.connections.C, m.cells.f1.connections.CLR, m.cells.f1.parameters], [[4], [2], { IS_C_INVERTED: '0', IS_CLR_INVERTED: '1' }]);
+  assert.deepEqual([m.cells.l0.connections.G, m.cells.l0.connections.GE, m.cells.l0.parameters], [[5], [6], { IS_G_INVERTED: '1', IS_GE_INVERTED: '1' }]);
+  assert.deepEqual([m.cells.d0.connections.C1, m.cells.d0.parameters], [[7], { IS_C1_INVERTED: '1' }]);
+  // i1 also read by the LUT: kept for it, the LUT's input unchanged
+  assert.deepEqual(m.cells.g.connections.I0, [11]);
+  assert.deepEqual([m.cells.f2.connections.R, m.cells.f3.connections.R, m.cells.f2.parameters, m.cells.f3.parameters], [[17], [16], undefined, undefined]);
+  // in nextpnrNetlist
+  const json = { modules: { top: { attributes: { top: 1 }, ports: {}, cells: { i0: inv(2, 10), f0: mod().cells.f0 }, netnames: {} } } };
+  assert.equal(cellsOf(nextpnrNetlist(JSON.stringify(json), 'top', '').json).f0.parameters.IS_R_INVERTED, '1');
+});
+
 test('#2457 lowerClockSwitches: an input from a BUFG its input, the BUFG left out when nothing else reads it; a constant select a BUFG of its input; a BUF a LUT1', () => {
   const io = (ins, outs) => Object.fromEntries([...ins.map(p => [p, 'input']), ...outs.map(p => [p, 'output'])]);
   const mod = () => ({
@@ -719,4 +754,39 @@ test('#2223 flip-flops alone in the slices of carry chains built with --engine n
   assert.equal(vcc.length, 1);
   assert.match(vcc[0].outpins[0].inst, /^XDL_DUMMY_CLB_X\d+Y\d+_VCC_X\d+Y\d+$/);
   assert.equal(value(design.insts.find(i => i.name === vcc[0].inpins[0].inst), 'CYINIT'), 'BX');
+});
+
+// #2797: the design (research/nextpnr-s3e/consts.v): a sum's carry in at 0, pads at 0 and 1, flip-flops' D at 0 and 1,
+// a shift register with an active-low reset and enable (the synthesis's inverters on R and CE)
+test('#2797 constants and an active-low reset and enable built with --engine nextpnr: Silinx\'s 8 slices, no LUT giving a constant, SR_B and CE_B, no warnings, a complete bitstream; the XDL behaves as the netlist', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fileURLToPath(fixture('consts.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('consts.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of occupied Slices: 8 out of 2448 0%'), out.join('\n'));
+  assert.ok(out.includes('  Number of 4 input LUTs: 10 out of 4896 0%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const text = fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8');
+  const design = parseXdl(text);
+  assert.equal((text.match(/[FG]:[^ ]*:#LUT:D=[01] /g) || []).length, 0);
+  assert.equal((text.match(/SRINV::SR_B /g) || []).length, 2);
+  assert.equal((text.match(/CEINV::CE_B /g) || []).length, 2);
+  const sink = (type, inst, pin) => design.nets.some(n => n.type === type && n.inpins.some(p => p.inst === inst && p.pin === pin));
+  assert.ok(sink('gnd', 'led<1>', 'O1') && sink('vcc', 'led<2>', 'O1') && sink('gnd', 'u0', 'BX') && sink('vcc', 'u1', 'BX'));
+  const asPacked = t => {
+    const d = parseXdl(t), at = new Map(d.insts.map((i, k) => [i.name, k]));
+    for (const i of d.insts) {
+      if (/^(IOB|IBUF)$/.test(i.type)) Object.assign(i, { kind: 'iob', dir: i.type === 'IBUF' ? 'in' : 'out' });
+      else if (/^SLICE/.test(i.type)) i.kind = 'slice';
+      else if (/BUFG/.test(i.type)) i.kind = 'bufg';
+    }
+    for (const n of d.nets) for (const p of [...n.inpins, ...n.outpins]) p.inst = at.get(p.inst);
+    return d;
+  };
+  const netlist = readYosysJson(fs.readFileSync(fixture('consts.json'), 'utf8'));
+  assert.equal(compareSims(netlist, asPacked(text), { cycles: 5000 }), null);
+  for (const [from, to] of [['SRINV::SR_B ', 'SRINV::SR '], ['CEINV::CE_B ', 'CEINV::CE ']]) assert.notEqual(compareSims(netlist, asPacked(text.replace(from, to)), { cycles: 5000 }), null, from);
 });
