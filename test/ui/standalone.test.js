@@ -1370,7 +1370,8 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
 }, { url: () => 'about:blank' });
 
 // #2136: the browser edition's nextpnr engine: nextpnr in WebAssembly in the flow's worker, its chip database fetched from
-// the site's assets (vendor/nextpnr-spartan/<version>/), the project's engine nextpnr (Silinx when it cannot)
+// the site's assets (vendor/nextpnr-spartan/<version>/); a project saved with the Silinx engine (#2136's choice) too: nextpnr, the
+// one engine since #2137
 uiTest('#2136 browser edition: the nextpnr engine places and routes in the browser', E, async (page) => {
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
@@ -1384,7 +1385,7 @@ uiTest('#2136 browser edition: the nextpnr engine places and routes in the brows
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.project?.name === 'WebNextpnr' && window.Silinx.project.top);
-  await page.eval(async () => { window.Silinx.project.impl = { ...window.Silinx.project.impl, engine: 'auto' }; await window.SilinxApp.saveProjectJson(); });
+  await page.eval(async () => { window.Silinx.project.impl = { ...window.Silinx.project.impl, engine: 'silinx' }; await window.SilinxApp.saveProjectJson(); });
   await page.setView('impl');
   const before = (await page.consoleText()).length;
   await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });
@@ -1399,8 +1400,7 @@ uiTest('#2136 browser edition: the nextpnr engine places and routes in the brows
 }, { url: () => 'about:blank', timeout: 300000 });
 
 // #2288: the Spartan-6's nextpnr engine in the browser edition: nextpnr-himbaechel-spartan6 in the flow's worker, its chip
-// database from the site's assets (vendor/nextpnr-spartan6/<version>/), the project's engine nextpnr (its 'auto' is the
-// Silinx engine's on the Spartan-6)
+// database from the site's assets (vendor/nextpnr-spartan6/<version>/), the Spartan-6's engine since #2137 (no choice to make)
 uiTest('#2288 browser edition: the nextpnr engine places and routes a design of the Nexys3 in the browser', E, async (page) => {
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
@@ -1415,7 +1415,6 @@ uiTest('#2288 browser edition: the nextpnr engine places and routes a design of 
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.project?.name === 'WebNextpnrS6' && window.Silinx.project.top);
   assert.equal(await page.eval(() => window.Silinx.project.device.part), 'xc6slx16');
-  await page.eval(async () => { window.Silinx.project.impl = { ...window.Silinx.project.impl, engine: 'nextpnr' }; await window.SilinxApp.saveProjectJson(); });
   await page.setView('impl');
   const before = (await page.consoleText()).length;
   await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });

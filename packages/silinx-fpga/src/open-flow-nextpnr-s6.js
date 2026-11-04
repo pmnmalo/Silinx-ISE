@@ -3,6 +3,7 @@
 // micro-architecture (the fork pmnmalo/nextpnr-spartan, its WebAssembly package through io.nextpnr.spartan6) places those sites,
 // and, the placed design written with its constants' sources (fpga/s6/xdl.js), routes it.
 import { parseXdl, writeXdl } from './xdl.js';
+import { loadChipdb } from './nextpnr-io.js';
 import { s6Sites } from './fpga/s6/sites.js';
 import { placeS6 } from './fpga/s6/place.js';
 import { placedXdlS6 } from './fpga/s6/xdl.js';
@@ -38,9 +39,9 @@ export function mountNextpnrS6(ctx) {
 
   async function runPar() {
     const device = io.device(), { packed, phys } = state(), sites = state().sites || s6Sites(device), nl = netlist();
-    if (!io.nextpnr?.spartan6) throw new StepError('the nextpnr engine is not available here (io.nextpnr)', [], 'Choose the Silinx engine (Toolchain Settings).');
+    if (!io.nextpnr?.spartan6) throw new StepError('the nextpnr engine is not available here (io.nextpnr)');
     const t = now();
-    const db = await io.nextpnr.spartan6.chipdb(part, log);
+    const db = await loadChipdb(io.nextpnr.spartan6, part, log, StepError);
     // the pads and the global buffers, by Silinx's rules (the banks' VCCO, a clock pad's dedicated path); the block RAMs
     // and DSP48A1s from its timing-driven placement (nextpnr's analytical placer left them columns apart: the stopwatch
     // on the Atlys missed its 10 ns on every seed), a DSP48A1 cascade with them

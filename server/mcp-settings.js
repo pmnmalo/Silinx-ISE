@@ -1,6 +1,6 @@
 // The MCP server's tools of a project's settings (server/mcp.js, #2674): the devices and boards to choose from,
 // Design Properties (the board, the device, the synthesis tool, the Preferred Language), Process Properties (the
-// Optimization, the FPGA's start-up clock, the place and route engine) and a drawing's Source Properties (its
+// Optimization, the FPGA's start-up clock) and a drawing's Source Properties (its
 // language), as the interface's dialogs (web/js/wizards.js projectProperties, implProperties, sourceProperties)
 // set them: the same checks of a new device (web/js/device-change.js), the constraints file of its format
 // (web/js/constraints-format.js), Update Constraints from the new board's pins, the drawings' HDL made again in
@@ -17,7 +17,6 @@ const parts = () => import('../packages/silinx-fpga/src/parts.js');
 const SYNTH_TOOLS = ['silinx', 'xst'];
 const OPTIMIZATIONS = ['fast', 'area', 'speed'];
 const STARTUP_CLOCKS = { jtag: 'JtagClk', cclk: 'CCLK', user: 'UserClk' };
-const ENGINES = ['silinx', 'auto', 'nextpnr'];
 
 // the issues of the design on a new device (web/js/device-change.js deviceChangeMessages): the primitives its
 // family lacks, the resources the design needs more of than the part has
@@ -148,25 +147,27 @@ export const SETTINGS_TOOLS = [
   },
   {
     name: 'set_process_properties', title: 'Process Properties',
-    description: 'Change a project\'s Process Properties: the Optimization (fast: one mapping and one placement, the quickest build; area: the smallest circuit; speed: the fastest circuit, several placements tried), the FPGA start-up clock (jtag when programming over JTAG; cclk when booting from the PROM or flash; user) and the Silinx toolchain\'s place and route engine (silinx, nextpnr, or auto: nextpnr, Silinx\'s when nextpnr cannot).',
+    description: 'Change a project\'s Process Properties: the Optimization (fast: one mapping and one placement, the quickest build; area: the smallest circuit; speed: the fastest circuit, several placements tried), and the FPGA start-up clock (jtag when programming over JTAG; cclk when booting from the PROM or flash; user). The Silinx toolchain places and routes with nextpnr.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       optimization: { type: 'string', enum: OPTIMIZATIONS, description: 'The Optimization.' },
       startup_clock: { type: 'string', enum: Object.keys(STARTUP_CLOCKS), description: 'The FPGA start-up clock.' },
-      pr_engine: { type: 'string', enum: ENGINES, description: 'The place and route engine of the Silinx toolchain.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    async run({ project: name, optimization, startup_clock: clock, pr_engine: engine }) {
+    async run({ project: name, optimization, startup_clock: clock }) {
       await readProject(name);
-      if (!optimization && !clock && !engine) throw toolError('give optimization, startup_clock or pr_engine');
+      if (!optimization && !clock) throw toolError('give optimization or startup_clock');
       if (optimization && !OPTIMIZATIONS.includes(optimization)) throw toolError(`optimization: one of ${OPTIMIZATIONS.join(', ')}`);
       if (clock && !STARTUP_CLOCKS[clock]) throw toolError(`startup_clock: one of ${Object.keys(STARTUP_CLOCKS).join(', ')}`);
-      if (engine && !ENGINES.includes(engine)) throw toolError(`pr_engine: one of ${ENGINES.join(', ')}`);
       const { synthGoal, GOAL_IMPL } = await import('../packages/silinx-fpga/src/index.js');
-      await P.updateProject(name, p => ({ ...p, impl: { ...(p.impl || {}), ...(optimization ? GOAL_IMPL[optimization] : {}), ...(clock ? { startupClk: STARTUP_CLOCKS[clock] } : {}), ...(engine ? { engine } : {}) } }));
+      // (a place and route engine saved by an earlier version, #2136: dropped, nextpnr the one engine since #2137)
+      await P.updateProject(name, p => {
+        const { engine, ...impl } = p.impl || {};
+        return { ...p, impl: { ...impl, ...(optimization ? GOAL_IMPL[optimization] : {}), ...(clock ? { startupClk: STARTUP_CLOCKS[clock] } : {}) } };
+      });
       const impl = (await P.readProject(name)).impl || {};
-      const data = { project: name, optimization: synthGoal(impl), startupClock: Object.keys(STARTUP_CLOCKS).find(k => STARTUP_CLOCKS[k] === (impl.startupClk || 'JtagClk')), prEngine: impl.engine || 'auto' };
-      return { text: `${name}: Optimization ${data.optimization}, FPGA start-up clock ${data.startupClock}, place and route ${data.prEngine}.`, data };
+      const data = { project: name, optimization: synthGoal(impl), startupClock: Object.keys(STARTUP_CLOCKS).find(k => STARTUP_CLOCKS[k] === (impl.startupClk || 'JtagClk')) };
+      return { text: `${name}: Optimization ${data.optimization}, FPGA start-up clock ${data.startupClock}.`, data };
     },
   },
   {

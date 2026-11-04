@@ -276,9 +276,9 @@ test('open mode: a VHDL top with capital letters (its netlist is named in lower 
   await app.call('PUT', '/projects/VhdlCaps/file?path=src/Blink_Top.vhd', [
     'library ieee;', 'use ieee.std_logic_1164.all;', 'entity Blink_Top is', '  port (CLK : in std_logic; D : in std_logic; Q : out std_logic);', 'end Blink_Top;',
     'architecture rtl of Blink_Top is', 'begin', '  process (CLK) begin if rising_edge(CLK) then Q <= not D; end if; end process;', 'end rtl;', ''].join('\n'));
-  // (the Silinx engine, whose Map packs the slices: a design with no pins goes to nextpnr too since #2625)
-  await P.updateProject('VhdlCaps', pj => { pj.top = 'Blink_Top'; pj.impl = { ...pj.impl, engine: 'silinx' }; });
-  const j = await waitJob(jobs, await implement('VhdlCaps', { steps: ['synth', 'translate', 'map'] }), { timeoutMs: 280000 });
+  // (through Place & Route: nextpnr packs the slices there, #2137)
+  await P.updateProject('VhdlCaps', pj => { pj.top = 'Blink_Top'; });
+  const j = await waitJob(jobs, await implement('VhdlCaps', { steps: ['synth', 'translate', 'map', 'par'] }), { timeoutMs: 280000 });
   assert.equal(j.status, 'ok', j.lines.join('\n'));
   assert.ok(j.lines.some(l => /^Netlist: build\/open\/blink_top\.json/.test(l)), j.lines.join('\n'));
   assert.ok(j.lines.some(l => /Number of occupied Slices: 1 out of 2448/.test(l)), j.lines.join('\n'));
@@ -303,39 +303,6 @@ test('open mode: a design over the XC3S100E\'s block RAMs fails in Synthesize, t
   const rep = (await app.call('GET', '/projects/BramOver/reports')).body;
   assert.deepEqual(rep.synthesis.utilization.find(u => u.id === 'ramb16'), { id: 'ramb16', name: 'Number of RAMB16s', used: 5, total: 4, percent: 125 });
   assert.equal(rep.map, undefined);
-});
-
-test('open mode: Place & Route replicates a flip-flop of many loads on the critical path, the faster routing kept, the Design Summary of the design kept (#4)', { timeout: 240000 }, async () => {
-  await writeConfig({ mode: 'silinx' });
-  await app.call('POST', '/projects', { name: 'Fan64', device: DEV('xc3s250e', 'cp132') });
-  // (Optimization Speed: a new project's Area replicates no register, #2470)
-  const pj = (await app.call('GET', '/projects/Fan64')).body;
-  // (the Silinx engine's replication: a design with no pins goes to nextpnr too since #2625)
-  await app.call('PUT', '/projects/Fan64', { ...pj, impl: { ...pj.impl, optMode: 'Speed', optLevel: 2, engine: 'silinx' } });
-  // s selects 64 registers spread over the chip: its net is the slowest of the critical path
-  await app.call('PUT', '/projects/Fan64/file?path=src/fan.v', ['module fan(input clk, input sel, input din, output reg y);', '  reg s;', '  reg [63:0] a, q;', '  reg [15:0] r1;', '  reg [3:0] r2;', '  integer i;',
-    '  always @(posedge clk) begin', '    s <= sel;', '    a <= {a[62:0], din};', '    for (i = 0; i < 64; i = i + 1) q[i] <= s ? a[i] : a[63 - i];', '    for (i = 0; i < 16; i = i + 1) r1[i] <= ^q[4*i +: 4];',
-    '    for (i = 0; i < 4; i = i + 1) r2[i] <= ^r1[4*i +: 4];', '    y <= ^r2;', '  end', 'endmodule', ''].join('\n'));
-  await P.updateProject('Fan64', pj => { pj.top = 'fan'; });
-  const j = await waitJob(jobs, await implement('Fan64', { steps: ['synth', 'translate', 'map', 'par', 'trce'] }), { timeoutMs: 230000 });
-  const log = j.lines.join('\n');
-  assert.equal(j.status, 'ok', log);
-  const m = /^Register replication: 1 flip-flop\(s\) on the critical path copied \((\d+) copies\): (kept, ([\d.]+) ns instead of ([\d.]+) ns|not kept, no faster)\.$/m.exec(log);
-  assert.ok(m, log);
-  const kept = m[2].startsWith('kept');
-  const ffs = [...log.matchAll(/Number of Slice Flip Flops: (\d+) out of/g)].map(x => +x[1]);
-  const rep = (await app.call('GET', '/projects/Fan64/reports')).body;
-  const period = +/clock \S+: minimum period ([\d.]+) ns/.exec(log)[1];
-  if (kept) {
-    // the Design Summary has the flip-flops of the replicated design; the timing is the faster's
-    assert.match(log, new RegExp(`Design summary \\(pack, after the replication\\): Number of Slice Flip Flops ${ffs[0] + +m[1]}, Number of occupied Slices \\d+\\.`));
-    assert.equal(period, +m[3]);
-    assert.ok(+m[3] < +m[4]);
-    assert.equal(JSON.stringify(rep).includes(`"used":${ffs[0] + +m[1]}`), true);
-  } else assert.doesNotMatch(log, /after the replication/);
-  assert.match(log, /All signals are completely routed\./);
-  // the warnings, exactly: the pins (no UCF), nothing about the replication
-  assert.deepEqual(j.lines.filter(l => /warning/i.test(l)), ['WARNING: 4 port bit(s) have no LOC constraint (clk, sel, din, y): Silinx assigns free I/O pins automatically - do NOT program real hardware with this bitstream']);
 });
 
 test('open mode: a design with errors fails in Synthesize with the messages; Stop cancels a run', { timeout: 60000 }, async () => {

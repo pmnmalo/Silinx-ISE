@@ -27,7 +27,7 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-fpga-cli-'));
 
 test('#1679 parseArgs: the defaults, each option', () => {
   assert.deepEqual(parseArgs(['build', 'a.v', '--part', 'xc3s250e-cp132-4']),
-    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1, engine: 'auto' });
+    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1, engine: 'nextpnr' });   // (nextpnr by default, #2137)
   const o = parseArgs(['build', 'a.v', 'b.v', '--part', 'p', '--top', 't', '--ucf', 'u.ucf', '-o', 'x.bit', '--out-dir', 'o', '--effort', 'high', '--seed', '3', '--no-replicate', '--engine', 'nextpnr', '--quiet']);
   assert.deepEqual(o, { command: 'build', files: ['a.v', 'b.v'], part: 'p', top: 't', ucf: 'u.ucf', out: 'x.bit', outDir: 'o', effort: 'high', seed: 3, replicate: false, engine: 'nextpnr', quiet: true });
 });
@@ -42,7 +42,8 @@ test('#1679 parseArgs: what is wrong in a command line', () => {
   assert.equal(error(['build', 'a.v', '--part', 'p', '--effort', 'max']), '--effort max: normal or high');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '0']), '--seed: a whole number from 1');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '1.5']), '--seed: a whole number from 1');
-  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'vpr']), '--engine vpr: silinx, nextpnr or auto');   // (#2136)
+  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'vpr']), '--engine vpr: nextpnr or silinx');   // (#2136; no auto since #2137)
+  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'auto']), '--engine auto: nextpnr or silinx');
 });
 
 test('#1679 partOf: a part as ISE and the boards write it', () => {
@@ -125,7 +126,7 @@ async function ideBit() {
     device: () => (device ||= loadDeviceCache(findDeviceGraph('xc3s250ecp132-4'))), bitDb: () => (db ||= loadDb('xc3s250ecp132', { graph: io.device() })),
     yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: (name, data) => { store[name] = data; return name; }, read: name => store[name] ?? null, save: () => {} };
   const r = await runOpenFlow({ top: 'blinky', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
-    synthEffort: 'normal', startupClk: 'JtagClk', engine: 'auto', steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] }, io);   // (the IDE's default engine, #2136)
+    synthEffort: 'normal', startupClk: 'JtagClk', engine: 'nextpnr', steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] }, io);   // (the IDE's engine, #2137)
   assert.ok(r.ok, r.error);
   return Buffer.from(store['blinky.bit']);
 }

@@ -146,7 +146,8 @@ test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM
   // (the problems and the hint: the log's, after the error)
   const at = out.indexOf('  1 cell(s) RAM128X1S: not in the spartan3e micro-architecture yet');
   assert.ok(at > 0, out.join('\n'));
-  assert.equal(out[at + 1], 'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
+  // (#2137: no other engine to choose, ISE's mode the way out)
+  assert.equal(out[at + 1], 'The Silinx toolchain does not support this yet: implement the design in an ISE mode (Toolchain Settings).');
   assert.ok(!fs.existsSync(path.join(dir, 'gates.bit')));
 });
 
@@ -701,9 +702,9 @@ test('#2136 --engine auto: nextpnr when it can implement the design, a port with
   assert.equal(loadDeviceCache(findDeviceGraph('xc3s250ecp132-4')).site(pad)?.bonded, 1, pad);
 });
 
-// #2136: the engine 'auto' (the default) with nextpnr not starting (offline: its chip database not downloaded yet, #2329):
-// the Silinx engine builds the bitstream, with one warning saying so; nextpnr not run
-test('#2136 --engine auto with nextpnr not starting (its chip database unreachable): the Silinx engine, one warning', { timeout: 300000 }, async () => {
+// #2137: nextpnr not starting (offline: its chip database not downloaded yet, #2329): Map... Place & Route fails, saying why;
+// no fallback to the Silinx engine, which 'auto' had (#2136)
+test('#2137 nextpnr not starting (its chip database unreachable): Place & Route fails with the reason, no other engine', { timeout: 300000 }, async () => {
   const lines = [], store = { 'open/gates.json': gates() };
   let device, db, ran = 0;
   const io = { log: l => lines.push(l), sources: () => [], ucf: ucf(), ucfName: 'gates.ucf',
@@ -711,27 +712,19 @@ test('#2136 --engine auto with nextpnr not starting (its chip database unreachab
     nextpnr: { spartan3e: { chipdb: async () => { throw new Error('fetch failed'); }, run: async () => { ran++; return {}; } } },
     write: (name, data) => { store[name] = data; return name; }, read: name => store[name] ?? null, save: () => {} };
   const r = await runFlow({ top: 'gates', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
-    startupClk: 'JtagClk', engine: 'auto', steps: ['translate', 'map', 'par', 'trce', 'bitgen'] }, io);
-  assert.ok(r.ok, r.error);
-  assert.deepEqual(lines.filter(l => /warning/i.test(l)), ['WARNING:Map - the nextpnr engine could not start (fetch failed): the Silinx engine places and routes this design.']);
+    startupClk: 'JtagClk', engine: 'nextpnr', steps: ['translate', 'map', 'par', 'trce', 'bitgen'] }, io);
+  assert.equal(r.ok, false);
+  assert.equal(r.error, "nextpnr's chip database of xc3s250ecp132 could not be downloaded (fetch failed)");
+  assert.ok(lines.includes("Implement again when this computer is online: nextpnr's chip database is downloaded once, then kept."), lines.join('\n'));
   assert.equal(ran, 0);
-  assert.ok(!lines.some(l => /nextpnr packs|Placed and routed by nextpnr/.test(l)), lines.join('\n'));
-  assert.ok(lines.includes('All signals are completely routed.'), lines.join('\n'));
-  assert.ok(store['gates.bit'] instanceof Uint8Array || Buffer.isBuffer(store['gates.bit']), Object.keys(store).join(' '));
-  // --engine nextpnr: no fallback, the step fails
-  const n = await runFlow({ top: 'gates', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
-    startupClk: 'JtagClk', engine: 'nextpnr', steps: ['translate', 'map', 'par'] }, io);
-  assert.equal(n.ok, false);
-  assert.match(n.error, /fetch failed/);
+  assert.deepEqual(lines.filter(l => /warning/i.test(l)), []);
+  assert.ok(!lines.some(l => /Silinx engine|All signals are completely routed/.test(l)), lines.join('\n'));
+  assert.ok(lines.includes('=== SILINX FAILED par (exit 1) ==='), lines.join('\n'));
+  assert.ok(!store['gates.bit']);
 });
 
-test('#2136 engineOf: a project\'s engine, nextpnr (Silinx\'s when it cannot) when not set or not known', () => {
-  assert.equal(engineOf(undefined), 'auto');
-  assert.equal(engineOf({}), 'auto');
-  assert.equal(engineOf({ engine: 'silinx' }), 'silinx');
-  assert.equal(engineOf({ engine: 'auto' }), 'auto');
-  assert.equal(engineOf({ engine: 'nextpnr' }), 'nextpnr');
-  assert.equal(engineOf({ engine: 'vpr' }), 'auto');
+test('#2137 engineOf: nextpnr, whatever a project saved (silinx, auto, nextpnr: #2136\'s choice) or none', () => {
+  for (const impl of [undefined, {}, { engine: 'silinx' }, { engine: 'auto' }, { engine: 'nextpnr' }, { engine: 'vpr' }]) assert.equal(engineOf(impl), 'nextpnr', JSON.stringify(impl));
 });
 
 test('#2223 flip-flops alone in the slices of carry chains built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {

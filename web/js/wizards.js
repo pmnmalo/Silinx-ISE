@@ -608,14 +608,11 @@ export async function implProperties() {
   const { synthGoal, GOAL_IMPL } = await import('/packages/silinx-fpga/src/index.js');
   const opt = select([['fast', 'Fast'], ['area', 'Area'], ['speed', 'Speed']], synthGoal(pj.impl));
   const clk = select([['JtagClk', 'JTAG Clock'], ['CCLK', 'CCLK'], ['UserClk', 'User Clock']], pj.impl.startupClk || 'JtagClk');
-  // the Silinx toolchain's place and route (#2136): its own, nextpnr, or nextpnr when it can implement the design
-  const eng = select([['silinx', 'Silinx'], ['auto', 'nextpnr (Silinx when it cannot)'], ['nextpnr', 'nextpnr only']], pj.impl.engine || 'auto');
   const r = await dialog({
     title: 'Process Properties - Synthesis / Implementation / Bitstream', width: 520,
     body: h('div', { class: 'form-grid' },
       ...field('Optimization:', opt),
       ...field('FPGA Start-Up Clock:', clk),
-      ...(app.openMode() ? field('Place & Route Engine:', eng) : []),
       // what each Optimization does (#282, #2470)
       h('div', { class: 'effort-hint', style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } },
         'Fast: one mapping and one placement, the quickest build. Area: the smallest circuit, the mappings for speed tried too. Speed: the fastest circuit, every mapping for speed and several placements tried. ISE gets Speed / Normal, Area / High and Speed / High.'),
@@ -624,7 +621,9 @@ export async function implProperties() {
   if (!r) return;
   pj = await currentProject();   // (#2281)
   if (pj?.name !== pj0.name) return;
-  pj.impl = { ...pj.impl, ...GOAL_IMPL[opt.value], startupClk: clk.value, ...(app.openMode() ? { engine: eng.value } : {}) };
+  // (a place and route engine saved by an earlier version, #2136: nextpnr, the one engine since #2137)
+  const { engine, ...impl } = pj.impl;
+  pj.impl = { ...impl, ...GOAL_IMPL[opt.value], startupClk: clk.value };
   await app.saveProjectJson();
 }
 
