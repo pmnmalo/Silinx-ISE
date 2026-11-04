@@ -25,10 +25,10 @@ export const C_HINTS = [
   },
   {
     id: 'c-pointer-variable', re: /a pointer variable is not possible|^the pointer '\w+': /,
-    en: { explain: 'Inside the circuit there is no memory with addresses: Silinx HLS (as Vitis HLS) makes a local pointer into the arrays or variables it is set to (an array, &x, &a[i], a + i) and an offset in them, read as *p or p[i] and moved with p += n or p++.',
-      fix: 'Set the pointer only to arrays or variables of its own type, and use it only as *p, p[i], p = …, p += n or p++; or use an array and an index (a[i]) instead.' },
-    pt: { explain: 'Dentro do circuito não há uma memória com endereços: o Silinx HLS (como o Vitis HLS) faz de um apontador local os arrays ou variáveis para onde aponta (um array, &x, &a[i], a + i) e um deslocamento neles, lido como *p ou p[i] e movido com p += n ou p++.',
-      fix: 'Aponte o apontador só para arrays ou variáveis do seu tipo e use-o só como *p, p[i], p = …, p += n ou p++; ou use um array e um índice (a[i]).' },
+    en: { explain: 'Inside the circuit there is no memory with addresses: Silinx HLS (as Vitis HLS) makes a local pointer into the arrays or variables it is set to (an array, &x, &a[i], a + i) and an offset in them, read as *p or p[i], moved with p += n or p++, subtracted (p - a) or compared (p < q) with a place in the same array and passed to a function.',
+      fix: 'Set the pointer only to arrays or variables of its own type, and use it only as *p, p[i], p = …, p += n, p++, p - a, p < q or an argument of a function; or use an array and an index (a[i]) instead.' },
+    pt: { explain: 'Dentro do circuito não há uma memória com endereços: o Silinx HLS (como o Vitis HLS) faz de um apontador local os arrays ou variáveis para onde aponta (um array, &x, &a[i], a + i) e um deslocamento neles, lido como *p ou p[i], movido com p += n ou p++, subtraído (p - a) ou comparado (p < q) com um lugar do mesmo array e passado a uma função.',
+      fix: 'Aponte o apontador só para arrays ou variáveis do seu tipo e use-o só como *p, p[i], p = …, p += n, p++, p - a, p < q ou argumento de uma função; ou use um array e um índice (a[i]).' },
   },
   {
     id: 'c-pointer-arithmetic', re: /^pointer arithmetic is not possible/,

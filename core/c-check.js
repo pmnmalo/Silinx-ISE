@@ -262,7 +262,7 @@ function checkFunction(f, ctx) {
   }
   const declare = (v) => {
     if (scopes.at(-1).has(v.name)) report(v.loc, `'${v.name}' is declared twice in the same block`);
-    scopes.at(-1).set(v.name, { kind: v.static ? 'static' : 'local', type: v.type, init: v.init });
+    scopes.at(-1).set(v.name, { kind: v.static ? 'static' : 'local', type: v.type, init: v.init, said: v.said });
     typeOk(v.type, v.loc, !hw);
     textFits(v);
     if (hw) {
@@ -309,7 +309,8 @@ function checkFunction(f, ctx) {
         expr(e.e); return;
       case 'postfix': expr(e.e); return;
       case 'binary':
-        if (hw && (e.op === '+' || e.op === '-') && (isPtr(e.l) || isPtr(e.r))) report(e.loc, 'pointer arithmetic is not possible in Silinx HLS: index the array instead');
+        // (a pointer variable's own error said: not twice, #2751)
+        if (hw && (e.op === '+' || e.op === '-') && (isPtr(e.l) || isPtr(e.r)) && ![e.l, e.r].some((x) => x.kind === 'id' && lookup(x.name)?.said)) report(e.loc, 'pointer arithmetic is not possible in Silinx HLS: index the array instead');
         if (e.op === '/' || e.op === '%') { const d = constValue(e.r, consts); if (d === 0n) report(e.loc, 'division by zero'); }
         if ((e.op === '<<' || e.op === '>>') && !ctx.dead) { const s = constValue(e.r, consts); if (s !== null && s < 0n) report(e.loc, `a shift by a negative amount (${s}) is undefined in C`); e.constCount = s !== null; }
         expr(e.l); expr(e.r); return;

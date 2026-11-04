@@ -75,8 +75,10 @@ test('#1599 a C name as part of an HDL name: no \'__\', no \'_\' at its ends', (
 test('#1599 what is not supported, said once', () => {
   const errs = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
   assert.deepEqual(errs('int a[4], b[4];\nint f(int s, int v) {\n  int *p;\n  if (s) p = a; else p = b;\n  p[1] = v;\n  return p[0];\n}\n'), ["5 the pointer 'p' (to one of a, b): written through it: not supported yet (only read)"]);
-  assert.deepEqual(errs('int g(int *q) { return *q; }\nint f(int a[4]) {\n  int *p = a;\n  p++;\n  return g(p);\n}\n'), ["5 the pointer 'p': passed on to a function after it moves: not supported yet"]);   // (not moved: its target passed, #1895)
-  assert.deepEqual(errs('int f(int a[4]) {\n  int *p = a;\n  return p == a;\n}\n'), ["3 the pointer 'p': used other than *p, p[i], p = …, p += …, p++ (passed on, compared): not supported yet"]);
+  assert.deepEqual(errs('int g(int *q) { return *q; }\nint f(int a[4], int b[4], int s) {\n  int *p = a;\n  if (s) p = b;\n  return g(p);\n}\n'), ["5 the pointer 'p': passed on to a function with several targets: not supported yet"]);   // (one target, moved: &a[p_off], #2751)
+  assert.deepEqual(errs('int f(int a[4], int b[4], int s) {\n  int *p = a;\n  if (s) p = b;\n  return p == a;\n}\n'), ["4 the pointer 'p': in a difference or a comparison with several targets: not supported yet"]);
+  assert.deepEqual(errs('int f(int a[4], int b[4]) {\n  int *p = a;\n  return (p == b) + (p != 0);\n}\n'), ["3 the pointer 'p': subtracted or compared other than with a place in 'a' (a, a + i, &a[i], a pointer into it): not supported yet", "3 the pointer 'p': subtracted or compared other than with a place in 'a' (a, a + i, &a[i], a pointer into it): not supported yet"]);
+  assert.deepEqual(errs('int f(int a[4]) {\n  int *p = a;\n  return p * 2;\n}\n'), ["3 the pointer 'p': used other than *p, p[i], p = …, p += …, p++, p - q, p < q, passed on: not supported yet"]);
   assert.deepEqual(errs('int f(short a[4]) {\n  int *p = (int *)a;\n  return *p;\n}\n'), ["2 the pointer 'p': set to 'a', of another type (a cast of a pointer): not supported (Vitis HLS: a cast of a pointer between native integer types, to a narrower one)"]);
   assert.deepEqual(errs('int f(int v) {\n  int x = v;\n  int *p = &x;\n  return p[1];\n}\n'), ["4 the pointer 'p' to a variable: only *p (p[0])"]);
   assert.deepEqual(errs('int f(int v) {\n  int *p;\n  return v;\n}\n'), ["2 the pointer 'p' is never set"]);
@@ -154,8 +156,82 @@ test('#2655 a pointer outside its array, or one of pointers into different array
   assert.equal(run('  int *p = a + 4, *q = &a[4];\n  return (p == q) + (p == a) * 2 + (p != 0) * 4 - 5;'), null);
 });
 
-test('#2655 synthesized: a + k, k + a, &a[k] moved, co-simulated in VHDL and Verilog with no warnings; p - a, p < q, g(a + 1), m[1] + 2 refused, said', () => {
-  const SYN = `#include <stdio.h>
+// #2751: in synthesis, pointers into arrays as the C simulation takes them (#2655): p - a, p < q, p == e of pointers
+// into one array (their offsets), g(a + k) and a moved pointer passed on (&a[p_off]: the callee's indexes from k, in
+// a combinational module a multiplexer of the elements when k is not a constant), into a row (m[1] + 2: m[k / C][k % C]).
+const SYNTHESIZED = {
+  // (combinational: its loops unrolled, the offsets of p and q not constants)
+  unrolled: [`#include <stdio.h>
+static int pair(const int *q) { return q[0] + q[1] * 10; }
+static void put(int *q, int v) { q[0] = v; q[1] = v + 1; }
+int places(int k) {
+  int a[6] = { 1, 2, 3, 4, 5, 6 };
+  int m[2][3] = { { 1, 2, 3 }, { 4, 5, 6 } };
+  int *p = a + 1, *e = &a[6], *w = m[1] + 2, *q = &m[0][1];
+  p += k & 3;
+  q += k & 1;
+  int s = (int)(p - a) * 1000 + (int)(e - p) * 100 + (p < e) * 10 + (p == a + 2);
+  s += *w * 7 + q[1] * 3 + (int)(w - q);
+  s += pair(a + 2) + pair(2 + a) * 2 + pair(&a[3]) * 3 + pair(p) * 5;
+  put(a + 4, k);
+  s += a[4] + a[5];
+  int t = 0;
+  for (int *r = a; r < a + 6; r++) t += *r;
+  return s + t;
+}
+
+int main(void) {
+  int s = 0;
+  for (int k = 0; k < 5; k++) { int r = places(k); printf("%d\\n", r); s += r; }
+  return s & 0x7f;
+}
+`, []],
+  // (combinational, constant offsets: *q of a + 3, written through q)
+  combinational: [`#include <stdio.h>
+static int first(const int *q) { return *q; }
+static int pair(const int *q) { return q[0] + q[1] * 10; }
+static void put(int *q, int v) { *q = v; q[1] = v + 1; }
+int comb(int k) {
+  int a[4] = { 1, 2, 3, 4 };
+  put(a + 1, k);
+  return first(a + 3) + pair(2 + a) * 2 + first(&a[1]) * 100 + a[0] * 1000;
+}
+
+int main(void) {
+  int s = 0;
+  for (int k = -2; k < 3; k++) { int r = comb(k); printf("%d\\n", r); s += r; }
+  return s & 0x7f;
+}
+`, []],
+  // (sequential: a loop of n iterations; the calls inlined, their indexes from the offset)
+  sequential: [`#include <stdio.h>
+static int pair(const int *q) { return q[0] + q[1] * 10; }
+static void put(int *q, int v) { *q = v; q[1] = v + 1; }
+int walk(int n, int k) {
+  int a[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+  int m[2][4] = { { 1, 2, 3, 4 }, { 5, 6, 7, 8 } };
+  int *p = a, *e = a + 8, *w = m[1] + 1;
+  int s = 0;
+  for (int i = 0; i < n; i++) {
+    s += *p + (int)(p - a) * 100;
+    p++;
+    if (p == e) p = a;
+  }
+  put(a + (k & 3), n);
+  w += k & 1;
+  s += pair(p) + pair(a + 2) * 3 + *w * 7 + (int)(w - m[0]) * 1000 + (p < a + 4) * 10000;
+  return s;
+}
+
+int main(void) {
+  int s = 0;
+  for (int n = 0; n < 11; n += 3) for (int k = 0; k < 4; k++) { int r = walk(n, k); printf("%d ", r); s += r; }
+  printf("\\n");
+  return s & 0x7f;
+}
+`, ['9 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)']],
+  // (#2655's: a + 1, 2 + a, &a[3] moved; a memory argument)
+  offsets: [`#include <stdio.h>
 int offsets(int a[6], int k) {
   int *p = a + 1, *q = 2 + a, *r = &a[3];
   r++;
@@ -172,21 +248,50 @@ int main(void) {
   printf("%d\\n", s);
   return s != 1916;
 }
-`;
-  const sim = simulateC(SYN, { file: 'p.c' });
-  assert.deepEqual([sim.error, sim.exitCode, sim.output, sim.diagnostics], [null, 0, '1916\n', []]);
-  for (const lang of ['vhdl', 'verilog']) {
-    const r = cosimulate(SYN, { file: 'p.c', lang });
-    assert.deepEqual(r.errors, []);
-    assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics, []);
-  }
-  const said = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
-  const P = (b) => `int f(int k) {\n  int a[4] = { 1, 2, 3, 4 };\n${b}\n}\n`;
-  const ARITH = 'error: pointer arithmetic is not possible in Silinx HLS: index the array instead', USED = "error: the pointer 'p': used other than *p, p[i], p = …, p += …, p++ (passed on, compared): not supported yet";
-  assert.deepEqual(said(P('  int *p = a + 1;\n  return (int)(p - a);')), [`3 ${ARITH}`, `4 ${USED}`, `4 ${ARITH}`]);
-  assert.deepEqual(said(P('  int *p = a + 1;\n  return p < a + 3;')), [`3 ${ARITH}`, `4 ${USED}`, `4 ${ARITH}`]);
-  assert.deepEqual(said('static int g(int *q) { return q[0] + q[1]; }\n' + P('  return g(a + 1);')), [`4 ${ARITH}`]);
-  assert.deepEqual(said('int f(int k) {\n  int m[2][3] = { { 1, 2, 3 }, { 4, 5, 6 } };\n  int *p = m[1] + 2;\n  return *p;\n}\n'), ["3 error: the pointer 'p': set to something other than an array, &x, &a[i] or a + i: not supported yet"]);
-  assert.deepEqual(said('#include <string.h>\nint f(int k) {\n  char b[] = "hey";\n  return strlen(b + 1);\n}\n'), ['4 error: strlen is a system call: not possible in the synthesized code (Silinx HLS, as Vitis HLS)', `4 ${ARITH}`]);
+`, []],
+  // (a memory argument: a moved pointer passed on, compared; g(a + i) in a loop)
+  memory: [`#include <stdio.h>
+static int g(int *q) { return *q; }
+static int h(int *q) { return q[0] - q[1]; }
+int mem(int a[4], int k) {
+  int *p = a;
+  p++;
+  p += k;
+  int s = 0;
+  for (int i = 0; i < k; i++) s += h(a + i);
+  return g(p) + (int)(p - a) * 10 + (p == a + 2) * 100 + s * 1000;
+}
+
+int main(void) {
+  int a[4] = { 3, 5, 7, 9 }, s = 0;
+  for (int k = 0; k < 3; k++) { int r = mem(a, k); printf("%d\\n", r); s += r; }
+  return s & 0x7f;
+}
+`, ['9 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'], ['9 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)', "9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'a' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off"]],
+};
+
+for (const [name, [src, warnings, synthesis = warnings]] of Object.entries(SYNTHESIZED)) {
+  test(`#2751 pointers into arrays synthesized (${name}): the C simulation as cc's, co-simulated in VHDL and Verilog, its warnings`, () => {
+    const sim = simulateC(src, { file: 'p.c' });
+    assert.equal(sim.error, null);
+    assert.deepEqual(sim.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), warnings);
+    if (!noCC) {
+      const ref = compiledRun(src);
+      assert.deepEqual([sim.output, sim.exitCode], [ref.output, ref.exitCode]);
+    }
+    for (const lang of ['vhdl', 'verilog']) {
+      const r = cosimulate(src, { file: 'p.c', lang });
+      assert.deepEqual(r.errors, []);
+      assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
+      assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), synthesis);
+    }
+  });
+}
+
+test('#2751 what is still refused, said: a pointer with several targets subtracted or compared, a place in an array given to a sub-module', () => {
+  const said = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
+  assert.deepEqual(said('int f(int a[4], int b[4], int s) {\n  int *p = a;\n  if (s) p = b;\n  return (int)(p - a);\n}\n'), ["4 the pointer 'p': in a difference or a comparison with several targets: not supported yet"]);
+  const SUB = 'int g(int q[4]) {\n#pragma HLS INLINE off\n  int s = 0;\n  for (int i = 0; i < 4; i++) s += q[i];\n  return s;\n}\nint f(int a[8], int n) {\n  int s = 0;\n  for (int i = 0; i < n; i++) s += g(A);\n  return s;\n}\n';
+  assert.deepEqual(said(SUB.replace('A', 'a + 2')), ["9 the argument of 'q' in the call of the sub-module 'g': an array (its name), not a place in one: not supported yet"]);
+  assert.deepEqual(said(SUB.replace('A', 'a')), []);
 });

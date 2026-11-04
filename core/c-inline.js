@@ -54,7 +54,8 @@ export function inlineCalls(fn, funcs, report, sub = () => false) {
   // (math.h's fmod of constants: folded, core/c-dataflow-float.js, #2144)
   const folded = (e, f) => f?.library && e.args.every((a) => !has(a, (n) => n.kind === 'id' || n.kind === 'call'));
   // (an element of an array by reference: inlined too, a method of an array of objects, #1964)
-  const byElement = (e, f) => e.args.some((a, i) => a.kind === 'unary' && a.op === '&' && a.e.kind === 'index' && f.params[i]?.type.ref);
+  // (a place in an array, &a[k], to a pointer or an array parameter: inlined too, its offset in the indexes, #2751)
+  const byElement = (e, f) => e.args.some((a, i) => a.kind === 'unary' && a.op === '&' && a.e.kind === 'index' && (f.params[i]?.type.ref || (a.e.e.kind === 'id' && (f.params[i]?.type.kind === 'array' || f.params[i]?.type.kind === 'ptr'))));
   const inlined = (e) => e?.kind === 'call' && e.callee.kind === 'id' && funcs.get(e.callee.name)?.body && funcs.get(e.callee.name) !== fn && !folded(e, funcs.get(e.callee.name)) && (needs(funcs.get(e.callee.name)) || byElement(e, funcs.get(e.callee.name)));
   let fresh = 0;
   const statics = new Map();   // function -> Map(name -> its variable's name)
@@ -135,6 +136,17 @@ export function inlineCalls(fn, funcs, report, sub = () => false) {
     f.params.forEach((pa, i) => {
       const a = call.args[i];
       const t = pa.type;
+      // (&a[k], a + k: the array from its element k, an offset to each index; k computed once, #2751)
+      if ((t.kind === 'array' || (t.kind === 'ptr' && !t.ref && t.to.kind !== 'stream')) && a.kind === 'unary' && a.op === '&' && a.e.kind === 'index' && a.e.e.kind === 'id') {
+        let off = a.e.i;
+        if (off.kind !== 'num') {
+          const name = `${pa.name}_o${k}`;
+          items.push({ kind: 'decl', vars: [{ kind: 'var', name, type: { kind: 'int', name: 'int', bits: 32, signed: true }, init: off, loc: a.loc }], loc: a.loc });
+          off = id(name, a.loc);
+        }
+        alias.set(pa.name, { arr: a.e.e, off });
+        return;
+      }
       if (t.kind === 'array') {
         if (a.kind !== 'id') report(a.loc, `the argument of '${pa.name}' in the call of '${f.name}': an array (its name)`);
         alias.set(pa.name, { arr: a });
@@ -200,6 +212,7 @@ export function inlineCalls(fn, funcs, report, sub = () => false) {
     const items = [];
     const args = call.args.map((a, i) => {
       const t = f.params[i].type;
+      if (t.kind === 'array' && a.kind === 'unary' && a.op === '&') report(a.loc, `the argument of '${f.params[i].name}' in the call of the sub-module '${f.name}': an array (its name), not a place in one: not supported yet`);
       if (t.kind === 'array' || t.kind === 'ptr' || t.kind === 'stream' || a.kind === 'id' || a.kind === 'num') return a;
       const name = `ap_arg_${fresh++}`;
       items.push({ kind: 'decl', vars: [{ kind: 'var', name, type: t, init: a, loc: a.loc }], loc: a.loc });
@@ -218,6 +231,8 @@ export function inlineCalls(fn, funcs, report, sub = () => false) {
       // (a local named as a parameter hides it)
       const param = (x) => x.kind === 'id' && !locals.has(x.name) && alias.get(x.name);
       if (n.kind === 'unary' && n.op === '*' && param(n.e)?.ptr) return cloneBig(alias.get(n.e.name).ptr);
+      if (n.kind === 'unary' && n.op === '*' && param(n.e)?.off) { const a = alias.get(n.e.name); return { kind: 'index', e: cloneBig(a.arr), i: cloneBig(a.off), loc: n.loc }; }
+      if (n.kind === 'index' && param(n.e)?.off) { const a = alias.get(n.e.name); return { ...n, e: cloneBig(a.arr), i: { kind: 'binary', op: '+', l: cloneBig(a.off), r: bind(n.i, alias, own, locals), loc: n.loc } }; }
       if (n.kind === 'index' && param(n.e)?.ptr) return { ...n, e: cloneBig(alias.get(n.e.name).arg), i: bind(n.i, alias, own, locals) };
       if (n.kind !== 'id') return undefined;
       if (locals.has(n.name)) return { ...n, name: locals.get(n.name) };
@@ -225,6 +240,7 @@ export function inlineCalls(fn, funcs, report, sub = () => false) {
       const a = alias.get(n.name);
       if (!a) return undefined;
       if (a.val) return { ...n, name: a.val };
+      if (a.off) return { kind: 'unary', op: '&', e: { kind: 'index', e: cloneBig(a.arr), i: cloneBig(a.off), loc: n.loc }, loc: n.loc };   // (passed on: &a[k])
       if (a.arr) return cloneBig(a.arr);
       // (a pointer passed on as it is: the argument)
       return cloneBig(a.arg);
