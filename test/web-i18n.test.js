@@ -294,7 +294,7 @@ test('schematic editor and its RTL / Technology views (#130): every symbol descr
     'Module lut4': 'Módulo lut4', 'Module Blink_Ctrl': 'Módulo Blink_Ctrl', 'Pins (5)': 'Pinos (5)', 'Wire · net clk': 'Fio · rede clk',
     "Net 'clk', 1 bit": "Rede 'clk', 1 bit", "Net 'leds', 8 bits": "Rede 'leds', 8 bits", 'VHDL statements (emitted verbatim)': 'Instruções VHDL (copiadas tal e qual)',
     '2 objects selected': '2 objetos selecionados', '1 symbol, 3 nets': '1 símbolo, 3 redes', '12 symbols, 30 nets': '12 símbolos, 30 redes',
-    '3 ports · VHDL · src/knight.vhd': '3 portos · VHDL · src/knight.vhd', '1 ports': '1 porto', 'Check Schematic: 1 error(s), 0 warning(s)': 'Verificar Esquemático: 1 erro(s), 0 aviso(s)',
+    '3 ports · VHDL · src/knight.vhd': '3 portos · VHDL · src/knight.vhd', '1 ports': '1 porto',
     'Open top.vhd': 'Abrir top.vhd', 'Open pong.v': 'Abrir pong.v', 'Drawing Technology schematic of top…': 'A desenhar o esquemático tecnológico de top…',
     'Drawing RTL schematic of knight…': 'A desenhar o esquemático RTL de knight…', '(mixed)': '(vários)',
   };

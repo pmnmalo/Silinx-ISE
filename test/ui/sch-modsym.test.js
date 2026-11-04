@@ -49,9 +49,9 @@ uiTest('#1183 a module\'s ports changed: its instance drawn as placed, marked ou
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // Check Schematic: the warning, and the error of a's pin, connected
   await page.click(`${ED} .se-btn[data-act=check]`);
-  // (in the editor's panel, or the console below in the Tasks layout, #993)
-  await page.waitFor((ed) => /U1: pin a is connected, but module 'sub' no longer has that port/.test(`${document.querySelector(`${ed} .se-diags`)?.textContent} ${document.getElementById('console-log').textContent}`)
-    && /the symbol of module 'sub' is out of date \(its ports: added c; removed a\)/.test(`${document.querySelector(`${ed} .se-diags`)?.textContent} ${document.getElementById('console-log').textContent}`), [ED], { what: 'the check\'s error and warning' });
+  // (in the console, in both interfaces, #993, #2805)
+  await page.waitFor(() => /U1: pin a is connected, but module 'sub' no longer has that port/.test(document.getElementById('console-log').textContent)
+    && /the symbol of module 'sub' is out of date \(its ports: added c; removed a\)/.test(document.getElementById('console-log').textContent), [], { what: 'the check\'s error and warning' });
   // Update Symbol: b and y on their markers still, c unconnected, a's wire left; up to date
   await page.click(`${ED} .se-update`);
   await page.waitFor((ed) => !document.querySelector(`${ed} svg .sym[data-id="U"]`).classList.contains("stale"), [ED], { what: 'up to date' });

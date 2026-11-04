@@ -1,7 +1,7 @@
-// The Tasks interface's Edit: a schematic's Check in the console below (#993, #782), as every process's messages are
-// (the message centre, web/js/messages.js): a header, its errors and warnings, its result, under the Design source;
-// each message's line takes the editor to the item it is about. The editor's own panel is not shown there: the
-// editor asks first (web/js/sch-editor.js showDiags, a cancelable 'silinx-diagnostics' event).
+// A schematic's Check, and a Try it it refuses, in the console (#993, #782; in every interface, #2805), as every
+// process's messages are (the message centre, web/js/messages.js): a header, its errors and warnings, its result, under
+// the Design source; each message's line takes the editor to the item it is about. The editor has no panel of its own
+// (docs/UI-GUIDELINES.md, Messages): it sends a 'silinx-diagnostics' event (web/js/sch-try.js showDiags).
 // checkLines has no DOM and is unit tested (test/tasks.test.js).
 import { t, onLanguageChange } from './i18n.js';
 
@@ -19,13 +19,11 @@ export function checkLines(what, name, diags) {
   ];
 }
 
-/** Writes a schematic's Check in the console (`log`: web/js/console.js) while `on()` (the Tasks interface),
- *  `showConsole(diags)` opening it (its Errors, else Warnings tab in front, #2803). */
-export function initCheckMessages(on, showConsole, log) {
+/** Writes a schematic's Check or refused Try it in the console (`log`: web/js/console.js), `showConsole(diags)` showing
+ *  it (its Errors, else Warnings tab in front, #2803). */
+export function initCheckMessages(showConsole, log) {
   document.addEventListener('silinx-diagnostics', e => {
     const { what, name, diags, focus } = e.detail;
-    if (!on() || what !== 'Check Schematic') return;   // (a Try it refused: the editor's panel, beside the drawing)
-    e.preventDefault();
     for (const l of checkLines(what, name, diags)) {
       log(l.text, l.cls, { diag: !!l.diag });   // (the Errors and Warnings tabs: its errors and warnings, not its result)
       if (!l.diag) continue;

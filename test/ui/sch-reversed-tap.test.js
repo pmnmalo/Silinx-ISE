@@ -31,13 +31,10 @@ uiTest('#1702 a bus tap the wrong way round: the bus still drawn as a bus, Check
   const drawn = await page.eval((ed) => Object.fromEntries([...document.querySelectorAll(`${ed} [data-kind=wire]`)].map((g) => [g.dataset.id, g.classList.contains('bus')])), ED);
   assert.deepEqual(drawn, { W1: true, W3: true, W2: false });
   await page.click(`${ED} .se-btn[data-act=check]`);
-  // (in the editor's panel in the ISE style interface; in the console in the Silinx one, #993, #1149)
-  if (await page.eval(() => document.documentElement.dataset.layout === 'tasks')) await page.waitConsole(new RegExp(ERR.replace(/[()]/g, '\\$&')));
-  else {
-    // (the netlist's warnings, and the HDL's: C1's outputs not connected)
-    await page.waitFor((ed) => /^Check Schematic: 1 error\(s\), 6 warning\(s\)/.test(document.querySelector(`${ed} .se-diags`)?.textContent || ''), [ED], { what: 'the check in the panel' });
-    assert.ok((await page.eval((ed) => document.querySelector(`${ed} .se-diags`).textContent, ED)).includes(ERR));
-  }
+  // (in the console, in both interfaces, #993, #2805: the error, the netlist's warnings and the HDL's, C1's outputs not connected)
+  await page.waitConsole(/Process "Check Schematic" failed/);
+  const check = await page.eval(() => { const t = window.__console(); return t.slice(t.lastIndexOf('Started : "Check Schematic"')).split('\n'); });
+  assert.deepEqual([check.filter((l) => l.startsWith('ERROR: ')), check.filter((l) => l.startsWith('WARNING: ')).length], [[`ERROR: ${ERR}`], 6], check.join('\n'));
   // the counts in the status line, the check's errors and warnings not (the console's, #2784)
   assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .doc-status .ds-f`)].map((f) => f.textContent).slice(0, 1), ED), ['2 symbols, 6 nets']);
 });
