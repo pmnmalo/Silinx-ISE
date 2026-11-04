@@ -37,7 +37,7 @@ test('#2226 a hold violation reported: NOT MET, the path from the clock-to-out a
   const r = analyzeTiming(design, device);
   const lines = timingReport(r);
   const at = lines.findIndex(l => /^hold/.test(l));
-  assert.equal(lines[at], 'hold, clock $iopadmap$clk: NOT MET, worst slack -0.547 ns (the shortest path at its earliest; with the clock\'s skew)');
+  assert.equal(lines[at], 'hold, clock clk: NOT MET, worst slack -0.547 ns (the shortest path at its earliest; with the clock\'s skew)');
   // the launch: minLogic x the clock-to-out, plus the source's clock skew (on the global lines: none)
   const [h] = r.pads.hold, first = h.path[0];
   assert.equal(first.kind, 'clock-to-out');
