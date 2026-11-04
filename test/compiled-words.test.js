@@ -137,9 +137,11 @@ async function models(name, steps) {
       db[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
     }
     const bitDb = makeBitDb(dbFilesFrom(db, 'cp132'), device, 'xc3s250ecp132-4');
-    Object.assign(io, { ucf: exampleUcf(name, { board: 'basys2', variant: '250' }).text, device: () => device, bitDb: () => bitDb });
+    const { nextpnrNode } = await import('../packages/silinx-fpga/src/nextpnr-node.js');
+    // (placed and routed by nextpnr, the application's engine, #2137)
+    Object.assign(io, { ucf: exampleUcf(name, { board: 'basys2', variant: '250' }).text, device: () => device, bitDb: () => bitDb, nextpnr: { spartan3e: nextpnrNode() } });
   }
-  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps, seed: 1, effort: 1, simTop: ex.project.simTop }, io);
+  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps, seed: 1, effort: 1, simTop: ex.project.simTop, engine: 'nextpnr' }, io);
   assert.equal(r.ok, true, r.error);
   const FILES = { postsynth: /^netgen\/synthesis\/[^/]*_synthesis\.v$/, posttrans: /^netgen\/translate\/[^/]*_translate\.v$/, postmap: /^netgen\/map\/[^/]*_map\.v$/, postpar: /^netgen\/par\/[^/]*_timesim\.v$/ };
   return Object.fromEntries(steps.filter(s => FILES[s]).map(s => {
@@ -226,12 +228,12 @@ test('#670 speed: pong\'s Post-Synthesis Simulation Model, at least 1.4 times as
 });
 test('#650 #659 blinky\'s post-translate, post-map and post-place & route models at word level, with tables (SIMPRIM; the router\'s LUT pins in any order)', { timeout: 600000 }, async () => {
   const m = await models('blinky', ['synth', 'translate', 'posttrans', 'map', 'postmap', 'par', 'trce', 'postpar']);
-  // (postpar: Normal's two placements of a small design (#651), the faster kept, with no flip-flop replicated)
-  const want = { posttrans: [543, 326], postmap: [632, 367], postpar: [632, 367] };
+  // (postpar: the design nextpnr routed, #2137: one cell fewer than the packed design's, a constant on routing)
+  const want = { posttrans: [543, 326], postmap: [632, 367], postpar: [631, 366] };
   const wantTables = {
     posttrans: [3, { tables: 19, inputs: 12, words: 7304, outputs: 127, cells: [326, 183] }, 6],
     postmap: [3, { tables: 22, inputs: 12, words: 7392, outputs: 147, cells: [367, 207] }, 5],
-    postpar: [3, { tables: 22, inputs: 12, words: 7392, outputs: 147, cells: [367, 207] }, 5],
+    postpar: [3, { tables: 21, inputs: 12, words: 7328, outputs: 137, cells: [366, 215] }, 5],
   };
   for (const [step, design] of Object.entries(m)) {
     const { stats, tables } = await same(design, step);

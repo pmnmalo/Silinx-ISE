@@ -81,7 +81,8 @@ test('runOpenImplementation: the gates example on the Nexys3, synthesized for th
     assert.deepEqual(r3.completedSteps, ['synth', 'translate', 'map', 'par', 'trce'], j3.lines.join('\n'));
     // (the same one warning: no pins without a UCF)
     assert.deepEqual(j3.lines.filter(l => /^(WARNING|ERROR)/.test(l)), ['WARNING: 6 port bit(s) have no LOC constraint (sw<0>, sw<1>, sw<2>, sw<3>, led<0>, led<1>): Silinx assigns free I/O pins automatically - do NOT program real hardware with this bitstream'], j3.lines.join('\n'));
-    assert.ok(j3.lines.some(l => /^Routed \d+ nets \(\d+ PIPs, \d+ passes\)/.test(l)) && j3.lines.includes('All signals are completely routed.'), j3.lines.join('\n'));
+    // (by nextpnr, the application's engine since #2137)
+    assert.ok(j3.lines.some(l => /^Routed \d+ nets \(\d+ PIPs\) by nextpnr: /.test(l)) && j3.lines.includes('All signals are completely routed.'), j3.lines.join('\n'));
     const timing = fs.readFileSync(path.join(dir, 'build/open/timing.txt'), 'utf8');
     assert.match(timing, /^Static timing analysis of gates \(Silinx toolchain, delay model of fpga\/s6\/timing\.js, fitted to ISE's trce\)/);
     assert.match(timing, /pad to pad:\n {2}sw<0> +-> led<0> +\d+\.\d{3} ns/);
