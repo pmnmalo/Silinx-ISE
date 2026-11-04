@@ -185,11 +185,11 @@ export function mountRender(ctx) {
     wire: 'Add Wire (curved): click to start, click to add points the curve passes through, click on a pin/wire or double-click to finish; or draw a stroke of any shape from a pin/wire to another.',
   };
   function updateStatus() {
-    const { doc, nl, live, tool, lastDiags, cursor, view } = state();
+    const { doc, nl, live, tool, cursor, view } = state();
     const n = doc.symbols.length;
     const tip = live ? 'Trying it out: click the inputs (switches, bus values, clocks), hover a wire or pin to see its value, drag to pan. Esc stops.' : readOnly ? 'Read-only view. Drag on empty space to select, double-click a module to open it, wheel to zoom.' : ((doc.wireStyle === 'curved' && CURVED_HINT[tool]) || TOOL_HINT[tool] || '');
-    const d = lastDiags ? ` · ${lastDiags.filter(x => x.severity === 'error').length} error(s), ${lastDiags.filter(x => x.severity === 'warning').length} warning(s)` : '';
-    status.set([`${n} symbol${n === 1 ? '' : 's'}, ${nl ? nl.nets.length : 0} nets${d}`, { text: `X ${snap(cursor.x)} Y ${snap(cursor.y)}`, cls: 'xy' },
+    // (its errors and warnings are the console's, #2784)
+    status.set([`${n} symbol${n === 1 ? '' : 's'}, ${nl ? nl.nets.length : 0} nets`, { text: `X ${snap(cursor.x)} Y ${snap(cursor.y)}`, cls: 'xy' },
       { text: `${Math.round(view.s * 100)}%`, cls: 'zoom' }], tip);
   }
 

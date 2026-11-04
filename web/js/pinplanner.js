@@ -133,10 +133,9 @@ export function mountPinPlanner(el, doc, top) {
     popupMenu(on.map(n => ({ label: `Remove ${n} from its pin`, action: () => removeNets([n]) })), e.clientX, e.clientY);
   }
   const resHost = h('div', { class: 'pp-res' });
-  // (its status line, #2763: the ports assigned or its state, the top, the device, the board)
+  // (its status line, #2763: the ports assigned, the top, the device, the board)
   const line = statusLine();
-  let statusText = '';
-  const setStatus = (t) => { statusText = t; line.set([{ text: t, cls: 'pp-status' }, { text: `Top: ${top}`, cls: 'pp-info' }, `Device ${pj.device.part}-${pj.device.package}`, board ? `Board: ${board.name}` : 'no board selected']); };
+  const setStatus = (t) => { line.set([{ text: t, cls: 'pp-status' }, { text: `Top: ${top}`, cls: 'pp-info' }, `Device ${pj.device.part}-${pj.device.package}`, board ? `Board: ${board.name}` : 'no board selected']); };
   const sep = () => h('span', { class: 'asm-sep' });
   const autoBtn = toolWide('beautify', 'Auto-assign from Board', board ? 'Match port names with board resources (clk, led, sw, btn, seg, an…)' : 'Select a board in Design Properties', () => autoAssign());
   autoBtn.disabled = !board;
@@ -242,10 +241,14 @@ export function mountPinPlanner(el, doc, top) {
     app.log(`I/O Pin Planning: ${msg.join('; ')}.`, r.unmatched.length || !n ? 'warn' : 'ok');
   }
 
+  let lastDups = '';
   async function save() {
     const u = used();
     const dup = [...u.entries()].filter(([, v]) => v.length > 1);
-    setStatus(dup.length ? `⚠ pins assigned more than once: ${dup.map(([k]) => k).join(', ')}` : '');
+    // (a message the console's, not its status line's, #2784: once, until the pins in question change; saved, the tab's mark)
+    const dups = dup.map(([k]) => k).join(', ');
+    if (dups && dups !== lastDups) app.log(`I/O Pin Planning: pins assigned more than once: ${dups}.`, 'warn');
+    lastDups = dups;
     const text = writePins(pj.device, {
       ports: ports.map(p => ({ name: p.name, dir: p.dir, msb: p.msb, lsb: p.lsb, width: p.width })),
       assignments: asg, clocks, other,
@@ -257,7 +260,6 @@ export function mountPinPlanner(el, doc, top) {
     await app.saveProjectJson();
     await app.reloadProject();
     setDirty(doc, false);
-    if (!statusText) setStatus(`Saved to ${pj.constraints}`);
     const d = app.findDoc(`file:${pj.constraints}`);
     if (d) { d.editor.setValue(text); d.editor.markClean(); setDirty(d, false); }
   }

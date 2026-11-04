@@ -60,7 +60,7 @@ uiTest('#405 schematic drawing: the sheet, the wires, symbols, markers and names
     o.nc = q('.se-content .nc').length;
     o.toolbar = [on(), off('delete'), off('rotate'), off('mirrorv')];
     o.status = status.el.textContent;
-    // nothing selected, the check's counts, read-only is not in the hint (the editor's flag), a live simulation's
+    // nothing selected, the check's counts not in the status line (the console's, #2784), read-only is not in the hint (the editor's flag), a live simulation's
     st.sel = new Set(); st.lastDiags = [{ severity: 'error' }, { severity: 'warning' }, { severity: 'warning' }];
     r.render();
     o.toolbar2 = [off('delete'), off('rotate'), off('mirrorv')];
@@ -86,7 +86,8 @@ uiTest('#405 schematic drawing: the sheet, the wires, symbols, markers and names
   // (6 nets: A, Y, D and the 3 pins of U2, each a net of its own)
   assert.match(out.status, /^Click to select, drag to move.*2 symbols, 6 nets\s*X 120 Y 460\s*150%$/);
   assert.deepEqual(out.toolbar2, [true, true, true]);
-  assert.match(out.status2, /2 symbols, 6 nets · 1 error\(s\), 2 warning\(s\)/);
+  assert.match(out.status2, /2 symbols, 6 nets\s*X 120 Y 460/);
+  assert.doesNotMatch(out.status2, /error|warning/);
   assert.deepEqual(out.live, [1, ['sim'], true]);
   assert.equal(out.destroyed, 2);
 });
