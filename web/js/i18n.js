@@ -654,8 +654,6 @@ PT_PATTERNS.push([/^(.+) - \[Design Summary\]$/, (m, pj) => `${pj} - [${PT['Desi
 // a task's button with its dot (web/js/tasks.js taskTitle, #991): "Implement — done with warnings"
 PT_PATTERNS.push([/^(Design|Simulate|Implement) — (done, no warnings|done with warnings|errors|out of date \(a source changed\)|running…)$/, (m, a, b) => `${a === 'Design' ? 'Design' : PT[a]} — ${PT[b]}`]);   // (the Design task: 'Design' in Portuguese too, #1046)
 PT_PATTERNS.push(
-  [/^Cannot try it out: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Não é possível experimentar: $1 erro(s), $2 aviso(s)'],
-  [/^Cannot try it out: (.*)$/s, 'Não é possível experimentar: $1'],
   [/^Stopped: (.*)$/s, 'Parado: $1'],
   [/^Simulation stopped: (.*)$/s, 'Simulação parada: $1'],
 );

@@ -418,8 +418,9 @@ uiTest('#991 Tasks: a task\'s dot explained by its button\'s tooltip; in Portugu
 }, { build: DEV });
 
 // #993: in the Tasks interface a schematic's Check writes its errors and warnings in the console below (the Design
-// source), each line showing its item in the drawing; the editor's own panel only in the other interfaces
-uiTest('#993 Tasks ▸ Edit: Check Schematic\'s errors and warnings in the console below, under Design; not in the editor\'s panel', E, async (page) => {
+// source), each line showing its item in the drawing; in the ISE style interface too, the editor having no panel of its
+// own (#2805)
+uiTest('#993 #2805 Check Schematic\'s errors and warnings in the console, under Design, in both interfaces; no panel in the editor', E, async (page) => {
   // (two inverters' outputs on one net: an error)
   const doc = newDoc('bad', 'vhdl');
   doc.symbols.push({ id: 'S1', type: 'inv', x: 200, y: 100, rot: 0, mirror: false, name: 'U1', params: {} }, { id: 'S2', type: 'inv', x: 200, y: 200, rot: 0, mirror: false, name: 'U2', params: {} });
@@ -438,7 +439,7 @@ uiTest('#993 Tasks ▸ Edit: Check Schematic\'s errors and warnings in the conso
   await page.click(`${ED} .se-btn[data-act=check]`);
   await page.waitConsole(/Process "Check Schematic" failed/);
   assert.equal(await page.eval(() => document.documentElement.dataset.console), 'open');
-  assert.ok(!(await shown(page, `${ED} .se-diags`)), 'not in the editor\'s panel');
+  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-diags`), ED), null, 'no panel in the editor');
   // (its error brings the Errors tab forward, #2733: the Console's lines)
   await page.waitFor(() => document.querySelector('#console-tabs .tab.active').dataset.page === 'errors', [], { what: 'the Errors tab in front' });
   await page.click('#console-tabs .tab[data-page=console]');
@@ -457,11 +458,24 @@ uiTest('#993 Tasks ▸ Edit: Check Schematic\'s errors and warnings in the conso
   await page.waitFor(() => document.querySelector('#console-log .ln.mc-link').title === 'Mostrar no desenho', [], { what: 'Portuguese' });
   assert.equal(await page.eval(() => document.querySelector('#mc-filters .filt[data-src="check"]').textContent), 'Projeto');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // the Silinx interface: the editor's panel, as before
+  // the ISE style interface: the console too (#2805), the Errors tab brought to the front, a line's click selecting its
+  // item; no panel in the editor
   await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
+  await page.click('#console-tabs .tab[data-page=console]');
   await page.click(`${ED} .se-btn[data-act=check]`);
-  await page.waitFor((sel) => { const d = document.querySelector(`${sel} .se-diags`); return d && !d.hidden && /^Check Schematic: 1 error/.test(d.textContent); }, [ED], { what: 'the editor\'s panel' });
+  await page.waitFor(() => (window.__console().match(/Process "Check Schematic" failed/g) || []).length === 2, [], { what: 'the check again, in the console' });
+  await page.waitFor(() => document.querySelector('#console-tabs .tab.active').dataset.page === 'errors', [], { what: 'the Errors tab in front (ISE)' });
+  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-diags`), ED), null, 'no panel in the editor (ISE)');
+  await page.click('#console-tabs .tab[data-page=console]');
+  // (the second check's lines: its header, its error and warnings, each a link to its item, its result)
+  const again = await page.eval(() => { const ls = [...document.querySelectorAll('#console-log .ln')]; const at = ls.findLastIndex((l) => l.textContent === 'Started : "Check Schematic" of bad.'); return ls.slice(at).map((l) => [l.textContent, l.classList.contains('mc-link') && l.title]); });
+  const msgs = again.filter(([t]) => /^(ERROR|WARNING): /.test(t));
+  assert.deepEqual(msgs.filter(([t]) => t.startsWith('ERROR: ')).map(([t]) => t), ["ERROR: net 'net_2' has 2 drivers (U1.O, U2.O)"], JSON.stringify(again));
+  assert.ok(msgs.length > 1 && msgs.every(([, link]) => link === 'Show it in the drawing'), JSON.stringify(again));
+  assert.equal(again.at(-1)[0], 'Process "Check Schematic" failed');
+  await page.eval(() => [...document.querySelectorAll('#console-log .ln.mc-link')].filter((l) => /^ERROR: /.test(l.textContent)).at(-1).click());
+  await page.waitFor((sel) => document.querySelector(`${sel} svg .sym.sel`), [ED], { what: 'its gate selected' });
 }, { build: DEV });
 
 // #1042: no project chip in the header, in any interface (a project is opened from File and the Start page, its

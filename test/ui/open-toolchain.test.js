@@ -440,12 +440,6 @@ async function viewerTexts(page) {
   await page.key('a', { modifiers: 2 });
   await page.waitFor(() => / objects selected$/.test(document.querySelector('.doc:not([hidden]) .se-ptitle')?.textContent || ''), [], { what: 'all selected' });
   runs.push(await both());
-  // the Check panel (the ISE style interface's: the Silinx one writes the check in its console, #993, #1149)
-  if (!await page.eval(() => document.documentElement.dataset.layout)) {
-    await page.click('.doc:not([hidden]) .se-toolbar [data-act=check]');
-    await page.waitFor(() => !document.querySelector('.doc:not([hidden]) .se-diags').hidden, [], { what: 'Check panel' });
-    runs.push(await both());
-  }
   return { kinds, untranslated: [...new Set(runs.flatMap((r) => untranslated(r.en, r.pt, [/^\w+ : \w+$/, /^Flip-Flops$/, /^@Buffer$/])))], pt: new Set(runs.flatMap((r) => r.pt)), en: new Set(runs.flatMap((r) => r.en)) };
 }
 
@@ -464,14 +458,10 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   assert.deepEqual(rtl.untranslated, []);
   for (const s of ['Propriedades', '<--Todos os Símbolos-->', '@Inversor', '@Porta AND de 2, 3 ou 4 entradas, as entradas e as entradas invertidas nas suas propriedades (bit a bit quando Largura > 1)', 'Fio · rede clk', "Rede 'clk', 1 bit",
     'Módulo prescaler', 'Parâmetros', 'vazio = valor por omissão do módulo', 'Pinos (3)', 'Índice do MSB', 'Marcador de E/S', 'Bidirecional', 'Nome de Rede',
-    'um por linha: nome[largura] (acrescente "clock" para um pino de relógio)', 'nome[largura]',
-    // (the Check panel's: the ISE style interface's, #1149)
-    ...(await page.eval(() => document.documentElement.dataset.layout) ? [] : ['Verificar Esquemático: 0 erro(s), 0 aviso(s)', 'Nenhum erro ou aviso encontrado.'])])
+    'um por linha: nome[largura] (acrescente "clock" para um pino de relógio)', 'nome[largura]'])
     assert.ok(rtl.pt.has(s), `${s}: ${[...rtl.pt].join(' | ')}`);
   // texts starting with a number (which the language check takes for numbers) are translated too
   assert.ok([...rtl.pt].some((s) => /^\d+ objetos selecionados$/.test(s)), [...rtl.pt].join(' | '));
-  // (the check's count in the status bar: after the ISE style interface's Check, #1149)
-  if (!await page.eval(() => document.documentElement.dataset.layout)) assert.ok([...rtl.pt].some((s) => /^\d+ símbolos, \d+ redes · 0 erro\(s\), 0 aviso\(s\)$/.test(s)), [...rtl.pt].join(' | '));
   // Technology Schematic of the same design (the Silinx toolchain's synthesis)
   await page.setView('impl');
   await page.treeRow('#procs', 'View Technology Schematic', { dbl: true, exact: true });

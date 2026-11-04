@@ -1,6 +1,6 @@
 // The schematic editor's Try it (#405: out of mountSchEditor in sch-editor.js): the drawing's live simulation
-// started (web/js/sch-live.js on core/schlive.js) and left, and the problems of a check shown: in the Tasks
-// interface's console (a cancelable silinx-diagnostics event, #993) or in the editor's own panel, each one taking the
+// started (web/js/sch-live.js on core/schlive.js) and left, and the problems of a check or of a refused Try it shown in
+// the console, in every interface (a silinx-diagnostics event: web/js/tasks-check.js, #993, #2805), each one taking the
 // view to what it is about.
 import { h } from './dom.js';
 import { symbolBox } from '/core/schdoc.js';
@@ -9,7 +9,7 @@ import { KEYS, clone } from './sch-editor.js';
 /** { enterSim, leaveSim, showDiags } of mountSchEditor (destroyed(), doc(), genLang(), lastDiags(), live(), liveStarting(), modules(), nl(), sel(), tool(), view(), wireDraw(): its current values). */
 export function mountSchTry(ctx) {
   const {
-    container, opts, canSim, canvas, centerOn, contentG, destroyed, diagPanel, doc, finishWire, flash, genLang, hint,
+    container, opts, canSim, canvas, centerOn, contentG, destroyed, doc, finishWire, flash, genLang, hint,
     lastDiags, live, liveStarting, modules, nl, render, renderProps, sel, setTool, simBar, simG, tool, updateStatus,
     view, wireDraw, setLive, setLiveStarting, setLastDiags, setSel
   } = ctx;
@@ -33,21 +33,21 @@ export function mountSchTry(ctx) {
       });
       if (!res.ok) {
         setLastDiags(res.diagnostics?.length ? res.diagnostics : res.errors.map(message => ({ severity: 'error', message })));
-        showDiags('Cannot try it out');
-        flash(`Cannot try it out: ${res.errors[0]}`);
+        hint.hidden = true;
+        showDiags('Try it');
         updateStatus();
         return;
       }
       setLive(res.ctl);
       sel().clear();
-      diagPanel.hidden = true;
       hint.hidden = true;
       container.classList.add('sim-mode');
       render(); renderProps();
       opts.onSimulate?.(true);
     } catch (err) {
       console.error(err);
-      flash(`Cannot try it out: ${err.message}`);
+      setLastDiags([{ severity: 'error', message: err.message }]);
+      showDiags('Try it');
     } finally { setLiveStarting(false); }
   }
   function leaveSim() {
@@ -61,18 +61,7 @@ export function mountSchTry(ctx) {
     container.focus({ preventScroll: true });
   }
   function showDiags(what = 'Check Schematic') {
-    if (!container.dispatchEvent(new CustomEvent('silinx-diagnostics', { bubbles: true, cancelable: true, detail: { what, name: doc().name, diags: lastDiags(), focus: focusDiag } }))) { diagPanel.hidden = true; return; }   // (in the console below: the Tasks interface's, web/js/tasks-check.js, #993)
-    diagPanel.hidden = false; diagPanel.innerHTML = '';
-    const errs = lastDiags().filter(d => d.severity === 'error').length, warns = lastDiags().filter(d => d.severity === 'warning').length;
-    const head = h('div', { class: 'se-cap' }, h('span', { text: `${what}: ${errs} error(s), ${warns} warning(s)` }), h('span', { class: 'sp' }), h('button', { type: 'button', class: 'se-x', title: 'Close', text: '×', onclick: () => { diagPanel.hidden = true; } }));
-    const list = h('div', { class: 'se-dlist' });
-    if (!lastDiags().length) list.append(h('div', { class: 'se-drow ok', text: 'No errors or warnings found.' }));
-    for (const d of lastDiags()) {
-      const row = h('div', { class: `se-drow ${d.severity}` }, h('span', { class: 'sev', text: d.severity === 'error' ? 'ERROR' : d.severity === 'warning' ? 'WARNING' : 'INFO' }), h('span', { text: d.message }));
-      row.addEventListener('click', () => focusDiag(d));
-      list.append(row);
-    }
-    diagPanel.append(head, list);
+    container.dispatchEvent(new CustomEvent('silinx-diagnostics', { bubbles: true, detail: { what, name: doc().name, diags: lastDiags(), focus: focusDiag } }));
   }
   function focusDiag(d) {
     const r = d.ref || {};

@@ -475,7 +475,7 @@ export function initTasks(a) {
   fitSoon = initEmulate(() => on() && current() === 'emu');
   initProgram(() => arrangeProgram(on()));
   // (its Errors, else Warnings tab in front, #2803: console.js, imported when used, as tasks.js is in node's tests)
-  initCheckMessages(on, (diags) => { import('./console.js').then((c) => c.showProblems(diags)); if (!arr().console) arrange({ console: true }); }, (...a) => app.log(...a));
+  initCheckMessages((diags) => { import('./console.js').then((c) => c.showProblems(diags)); if (on() && !arr().console) arrange({ console: true }); }, (...a) => app.log(...a));
   initTreeMenus(app, { on, task: () => current() });
   const $ = id => document.getElementById(id);
   // a folded side panel or messages open again when one of their tabs is clicked

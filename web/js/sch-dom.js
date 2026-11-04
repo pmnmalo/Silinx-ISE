@@ -6,7 +6,7 @@ import { SVGNS } from './sch-svg.js';
 import { h } from './dom.js';
 import { statusLine } from './status-line.js';
 
-/** { canvas, contentG, diagPanel, hint, left, overlayG, right, sheetG, simBar, simG, status, svg, tb, vp } of mountSchEditor
+/** { canvas, contentG, hint, left, overlayG, right, sheetG, simBar, simG, status, svg, tb, vp } of mountSchEditor
  * (status: its status line, { el, set }, #2763). */
 export function mountSchDom(ctx) {
   const {
@@ -19,9 +19,8 @@ export function mountSchDom(ctx) {
   const canvas = h('div', { class: 'se-canvas' });
   const right = h('div', { class: 'se-right' });
   const status = statusLine('se-status');
-  const diagPanel = h('div', { class: 'se-diags', hidden: true });
   const simBar = h('div', { class: 'se-simbar', hidden: true });
-  const main = h('div', { class: 'se-main' }, left, h('div', { class: 'se-center' }, simBar, canvas, diagPanel), right);
+  const main = h('div', { class: 'se-main' }, left, h('div', { class: 'se-center' }, simBar, canvas), right);
   container.append(tb, main, status.el);
 
   canvas.innerHTML = `<svg class="se-svg" xmlns="${SVGNS}">
@@ -39,5 +38,5 @@ export function mountSchDom(ctx) {
   const simG = svg.querySelector('.se-simlayer');
   const hint = canvas.querySelector('.se-hint');
 
-  return { canvas, contentG, diagPanel, hint, left, overlayG, right, sheetG, simBar, simG, status, svg, tb, vp };
+  return { canvas, contentG, hint, left, overlayG, right, sheetG, simBar, simG, status, svg, tb, vp };
 }
