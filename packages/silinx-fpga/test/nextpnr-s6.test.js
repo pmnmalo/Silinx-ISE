@@ -114,3 +114,48 @@ for (const [dev, pkg] of [['xc6slx16', 'csg324'], ['xc6slx45', 'csg324']]) {
     assert.ok(Object.keys(files).some(n => /\.bit$/.test(n)));
   });
 }
+
+// (#2131) a seed nextpnr cannot route: the next one, the step failing only when none routes; nextpnr's WebAssembly
+// exception has no message, so its own ERROR line says why
+const ROUTE_ERROR = "ERROR: Failed to route arc 0.0 of net 'led_OBUF[0]', from X0Y0/A to X1Y1/B.";
+const failingRoutes = (inner, seeds) => ({
+  ...inner,
+  async run(args, files, onLine) {
+    const seed = args[args.indexOf('--seed') + 1];
+    if (args.includes('--no-place') && seeds.includes(seed)) { onLine('Info: Routing..'); onLine(ROUTE_ERROR); throw new WebAssembly.Exception(new WebAssembly.Tag({ parameters: [] }), []); }
+    return inner.run(args, files, onLine);
+  },
+});
+const counterFlow = async seeds => {
+  const part = 'xc6slx16csg324-3', dv = loadDeviceCache(part), db = loadBitDbS6(part);
+  const files = {}, lines = [];
+  const io = {
+    log: l => lines.push(String(l)), sources: () => [{ path: 'top.v', lang: 'verilog', text: COUNTER }], ucf: UCF.xc6slx16csg324, ucfName: 't.ucf',
+    device: () => dv, bitDb: () => db, yosys: yosysNode, nextpnr: { spartan6: failingRoutes(nextpnrS6Node(), seeds) },
+    write: (n, d) => { files[n] = d; return n; }, read: n => files[n] ?? null, save: () => {},
+  };
+  const r = await runFlow({ top: 'top', part, device: 'xc6slx16', pkg: 'csg324', family: 'spartan6', steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'], seed: 1, effort: 1,
+    synthEffort: 'normal', replicate: false, startupClk: 'JtagClk', engine: 'nextpnr' }, io);
+  return { r, lines, files };
+};
+
+test('the nextpnr engine on the Spartan-6: a seed whose routing fails is left, the next ones kept, no warning (#2131)', { timeout: 600000 }, async () => {
+  const { r, lines, files } = await counterFlow(['1']);
+  assert.ok(r.ok, r.error);
+  assert.deepEqual(lines.filter(l => /^nextpnr, seed/.test(l)).map(l => l.replace(/[\d.]+ ns/, 'N ns')), [
+    "nextpnr, seed 1: nextpnr's routing failed: it stopped on an error (Failed to route arc 0.0 of net 'led_OBUF[0]', from X0Y0/A to X1Y1/B).",
+    'nextpnr, seed 2: minimum period N ns.', 'nextpnr, seed 3: minimum period N ns.']);
+  assert.deepEqual(lines.filter(l => /WARNING|ERROR/.test(l)), []);
+  assert.ok(Object.keys(files).some(n => /\.bit$/.test(n)));
+});
+
+test('the nextpnr engine on the Spartan-6: no seed routes, Place & Route fails with nextpnr\'s reason, not "undefined" (#2131)', { timeout: 600000 }, async () => {
+  const { r, lines } = await counterFlow(['1', '2', '3']);
+  assert.equal(r.ok, false);
+  assert.equal(r.error, "nextpnr's routing failed: it stopped on an error");
+  const at = lines.indexOf("ERROR:Silinx - nextpnr's routing failed: it stopped on an error");
+  assert.ok(at > 0, lines.join('\n'));
+  assert.equal(lines[at + 1], `  ${ROUTE_ERROR}`);
+  assert.equal(lines.filter(l => /^nextpnr, seed \d: nextpnr's routing failed/.test(l)).length, 3);
+  assert.deepEqual(lines.filter(l => /WARNING/.test(l)), []);
+});
