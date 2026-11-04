@@ -1,11 +1,13 @@
 // The MCP server's tools of the HDL (server/mcp.js, #134): Check Syntax and the simulation, of the behavioural model or
 // (#2674) of a simulation model of the flow (post-synthesis, post-translate, post-map, post-place & route, with its
 // timing), as the interface simulates them (web/js/viewers.js runSimulation, netlistSources), the project's data
-// files given to it; its waves written as a VCD file.
+// files given to it, signals forced as SSim forces them; its waves written as a VCD file.
 import fs from 'node:fs';
 import path from 'node:path';
 import * as P from './projects.js';
 import { toolError, clip, elaborateView, diagLine, diagJson, STR, PROJECT } from './mcp-util.js';
+import { parseTime, parseValue } from '../core/ssim-values.js';
+import { findSignalIn, injectForceIn } from '../core/ssim-forces.js';
 
 export const SIM_MODELS = { postsynth: 'Post-Synthesis', posttrans: 'Post-Translate', postmap: 'Post-Map', postpar: 'Post-Place & Route' };
 // the process that makes each model (run_process), and the stage it comes after
@@ -56,6 +58,46 @@ async function modelSources(name, pj, model, generate) {
   return { sources: [...primitiveSources([net]), net], notes, warnings, file: m.path };
 }
 
+// the forces of a simulation as SSim's Force Constant / Force Clock add them (web/js/isim-dialogs.js, isim-forces.js
+// addForce, through core/ssim-forces.js): their messages ('Force: …'); errors as tool errors
+function applyForces(sim, design, list) {
+  if (!Array.isArray(list)) throw toolError('forces: a list of { signal, value } or { signal, clock, period… }');
+  const out = [], all = [];
+  for (const [k, f] of list.entries()) {
+    const what = `forces[${k}]`;
+    const sig = findSignalIn(design, String(f?.signal ?? ''));
+    if (!sig) throw toolError(`${what}: signal '${f?.signal ?? ''}' not found`);
+    if (!sig.wave) throw toolError(`${what}: arrays/memories cannot be forced`);
+    const time = (v, d) => { if (v === undefined || v === null || v === '') return d; const ps = typeof v === 'number' ? Math.round(v * 1000) : parseTime(String(v), 'ns'); if (Number.isNaN(ps)) throw toolError(`${what}: invalid time '${v}'`); return ps; };
+    const radix = f.radix || 'default';
+    const val = (text, d) => { try { return parseValue(String(text ?? d), sig.t, radix); } catch (e) { throw toolError(`${what}: ${e.message}`); } };
+    const start = time(f.start, 0), cancel = time(f.cancel, null);
+    let force;
+    if (f.clock) {
+      if (f.value !== undefined) throw toolError(`${what}: a clock has lead and trail, not value`);
+      const period = time(f.period, 10000), duty = f.duty ?? 50;
+      if (!(period >= 2)) throw toolError(`${what}: period must be at least 2 ps`);
+      if (!(duty > 0 && duty < 100)) throw toolError(`${what}: duty cycle must be between 0 and 100`);
+      const hi = Math.max(1, Math.min(period - 1, Math.round(period * duty / 100)));
+      force = { pattern: [{ off: 0, val: val(f.lead, '0') }, { off: hi, val: val(f.trail, '1') }], repeat: period,
+        desc: `clock ${f.lead ?? '0'}/${f.trail ?? '1'} period ${period / 1000} ns duty ${duty}%` };
+    } else {
+      if (f.value === undefined) throw toolError(`${what}: value, or clock`);
+      force = { pattern: [{ off: 0, val: val(f.value) }], repeat: 0, desc: `${f.value}` };
+    }
+    // (a new force of the signal cuts the earlier ones from its start, as addForce's truncateForces)
+    for (const g of all.filter(g => g.sig === sig)) {
+      if (g.start >= start) { g.rt.done = true; g.cut = true; continue; }
+      if (g.end == null || g.end > start) { g.end = start; g.endRelease = false; g.rt.done = true; injectForceIn(sim, design, g); }
+    }
+    const one = { sig, ...force, start, end: cancel, endRelease: true };
+    injectForceIn(sim, design, one);
+    all.push(one);
+    out.push(`Force: ${sig.path} = ${force.desc} from ${start / 1000} ns${cancel != null ? ` until ${cancel / 1000} ns` : ''}`);
+  }
+  return out;
+}
+
 export const HDL_TOOLS = [
   {
     name: 'check_syntax', title: 'Check Syntax',
@@ -83,9 +125,16 @@ export const HDL_TOOLS = [
       model: { type: 'string', enum: ['behavioral', ...Object.keys(SIM_MODELS)], description: 'What the test bench runs against: behavioral (the sources, default), or a simulation model of the flow of the project\'s top: postsynth, posttrans, postmap, postpar (with its timing).' },
       generate: { type: 'boolean', description: 'A model not made yet: make it first (its run_process), as "Generate and Simulate" does.' },
       vcd: STR('Write the waves as a VCD file into the exchange folder (its name, e.g. tb.vcd; a new file).'),
+      forces: { type: 'array', items: { type: 'object', properties: {
+        signal: STR('The signal\'s path (clk, uut/count, /tb/uut/count).'), value: STR('Force to this value (a constant).'),
+        clock: { type: 'boolean', description: 'A clock: lead, then trail, every period.' }, lead: STR('A clock\'s leading edge value (default 0).'), trail: STR('A clock\'s trailing edge value (default 1).'),
+        period: STR('A clock\'s period (default 10 ns).'), duty: { type: 'number', description: 'A clock\'s duty cycle, % (default 50).' },
+        start: STR('When the force starts (default 0; a time: 20 ns, 1.5 us).'), cancel: STR('When it is released (default never).'),
+        radix: { type: 'string', enum: ['bin', 'hex', 'dec', 'oct', 'ascii'], description: 'The values\' radix (default: binary, a VHDL / Verilog literal or 0x… read as such).' },
+      }, required: ['signal'] }, description: 'Forces, as SSim\'s Force Constant and Force Clock (ssim force add): over what drives the signal, from start until cancel. A later force of a signal cuts its earlier one.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
-    async run({ project: name, top, time_ns: timeNs = 1000, signals, max_changes: maxChanges = 20, model = 'behavioral', generate = false, vcd }) {
+    async run({ project: name, top, time_ns: timeNs = 1000, signals, max_changes: maxChanges = 20, model = 'behavioral', generate = false, vcd, forces }) {
       if (!(timeNs > 0) || timeNs > 1e9) throw toolError('time_ns: from 0 to 1e9 ns');
       if (model !== 'behavioral' && !SIM_MODELS[model]) throw toolError(`model: behavioral or one of ${Object.keys(SIM_MODELS).join(', ')}`);
       // the behavioural Check Syntax first, as the interface's simulation does
@@ -126,6 +175,7 @@ export const HDL_TOOLS = [
       const wanted = signals?.length ? signals : [...byPath.keys()].filter(k => !k.includes('/'));
       const unknown = wanted.filter(n => !byPath.has(n) && !byPath.has(String(n).toLowerCase()));
       if (unknown.length) throw toolError(`no signal ${unknown.map(n => `'${n}'`).join(', ')} in <${mod}> (names of the top, or paths as uut/count)`);
+      if (forces) for (const line of applyForces(sim, design, forces)) head.push(line);
       const st = sim.run(timeNs * 1000);
       const fmt = (s, v) => (s.t?.w === 1 ? V.toBin(v) : `${V.toBin(v).length <= 16 ? `"${V.toBin(v)}"` : `x"${V.format(v, 'hex')}"`}`);
       const sigs = {};
