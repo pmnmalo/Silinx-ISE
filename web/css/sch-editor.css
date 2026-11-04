@@ -249,15 +249,6 @@
 .sch-editor .se-canvas.se-lod svg .nc { display: none; }
 
 /* ------------------------------------------------------------------ diagnostics */
-.sch-editor .se-diags { flex: none; height: 150px; display: flex; flex-direction: column; border-top: 1px solid var(--se-border); background: var(--se-panel); }
-.sch-editor .se-diags[hidden] { display: none; }
-.sch-editor .se-dlist { flex: 1; overflow: auto; }
-.sch-editor .se-drow { display: flex; gap: 8px; padding: 1px 8px; cursor: default; white-space: nowrap; }
-.sch-editor .se-drow:hover { background: var(--se-hover); }
-.sch-editor .se-drow .sev { width: 62px; flex: none; font-weight: bold; }
-.sch-editor .se-drow.error .sev { color: var(--se-danger); }
-.sch-editor .se-drow.warning .sev { color: var(--se-warning); }
-.sch-editor .se-drow.ok { color: var(--success, #008000); }
 
 /* ------------------------------------------------------------------ View HDL dialog */
 .sch-editor .se-modal { position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; }

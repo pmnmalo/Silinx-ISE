@@ -155,8 +155,11 @@ uiTest('live schematic simulation is refused with the errors listed (two drivers
   await page.eval(() => window.SilinxApp.openSch('src/bad.sch.json'));
   await page.waitFor((sel) => document.querySelector(`${sel} .se-btn[data-act=sim]`), [ED]);
   await page.click(`${ED} .se-btn[data-act=sim]`);
-  await page.waitFor((sel) => { const d = document.querySelector(`${sel} .se-diags`); return d && !d.hidden && /^Cannot try it out: \d+ error/.test(d.textContent); }, [ED], { what: 'refusal listed' });
-  assert.match(await page.eval((sel) => document.querySelector(`${sel} .se-diags`).textContent, ED), /2 drivers/);
+  // (in the console, in both interfaces, #2805: its errors in the Errors tab, in front)
+  await page.waitConsole(/Process "Try it" failed/);
+  assert.match(await page.eval(() => window.__console()), /Started : "Try it" of bad\.\n+ERROR: [^\n]*2 drivers/);
+  await page.waitFor(() => document.querySelector('#console-tabs .tab.active').dataset.page === 'errors', [], { what: 'the Errors tab in front' });
+  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-diags`), ED), null);
   assert.equal(await page.eval((sel) => document.querySelector(sel).classList.contains('sim-mode'), ED), false);
 });
 

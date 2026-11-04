@@ -126,7 +126,7 @@ export function mountSchEditor(container, opts = {}) {
   container.innerHTML = '';
 
   // ---------------- DOM skeleton (sch-dom.js)
-  const { canvas, contentG, diagPanel, hint, left, overlayG, right, sheetG, simBar, simG, status, svg, tb, vp } =
+  const { canvas, contentG, hint, left, overlayG, right, sheetG, simBar, simG, status, svg, tb, vp } =
     mountSchDom({ container, uidE });
 
   // ---------------- toolbar
@@ -294,7 +294,7 @@ export function mountSchEditor(container, opts = {}) {
 
   // ---------------- live simulation (Logisim style): web/js/sch-live.js on core/schlive.js (sch-try.js)
   const { enterSim, leaveSim, showDiags } = mountSchTry({
-    container, opts, canSim, canvas, centerOn, contentG, destroyed: () => destroyed, diagPanel, doc: () => doc,
+    container, opts, canSim, canvas, centerOn, contentG, destroyed: () => destroyed, doc: () => doc,
     finishWire, flash: (...a) => flash(...a), genLang: () => genLang, hint, lastDiags: () => lastDiags,
     live: () => live, liveStarting: () => liveStarting, modules: () => modules, nl: () => nl, render, renderProps,
     sel: () => sel, setTool, simBar, simG, tool: () => tool, updateStatus, view: () => view, wireDraw: () => wireDraw,
@@ -347,7 +347,7 @@ export function mountSchEditor(container, opts = {}) {
     copy: () => copySel(), cut: () => copySel(true), paste: (clip, offset) => paste(clip, offset), deleteSelection: () => { if (!live) deleteSel(); },
     canCopy: () => !readOnly && !live && sel.size > 0, canPaste: () => !readOnly && !live && hasClip('schematic'),
     handwritten: readOnly ? null : () => import('./sch-ink.js').then(m => m.handwrittenSchematicInto({ doc: () => doc, replace: parts => edit(() => { doc = { ...doc, ...parts }; }), fit: () => fit() })),   // (#1067, #1098)
-    setDoc(d) { leaveSim(); infoDlg?.close(); doc = normalizeDoc(d || newDoc(), { modules }); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; diagPanel.hidden = true; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
+    setDoc(d) { leaveSim(); infoDlg?.close(); doc = normalizeDoc(d || newDoc(), { modules }); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) {
       linkModel(doc, file);

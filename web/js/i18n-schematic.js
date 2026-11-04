@@ -92,7 +92,6 @@ export const SCH_PT = {
   'one per line: name[width] (add "clock" for a clock pin)': 'um por linha: nome[largura] (acrescente "clock" para um pino de relógio)',
   'name[width], add "reg" if assigned in always/initial': 'nome[largura], acrescente "reg" se atribuído em always/initial',
   'name[width]': 'nome[largura]',
-  'No errors or warnings found.': 'Nenhum erro ou aviso encontrado.',
   // the device primitives (#791, core/primitives.js): their descriptions and parameters (their attributes: the
   // UNISIM names, the same in Portuguese)
   'Block RAM 16 Kbit + parity, single port (RAMB16_S1 … RAMB16_S36)': 'RAM de bloco de 16 Kbit + paridade, um porto (RAMB16_S1 … RAMB16_S36)',
@@ -152,7 +151,6 @@ export const SCH_PT_PATTERNS = [
   [/^Net '(.*)', (\d+) (bits?)$/s, "Rede '$1', $2 $3"],
   [/^(VHDL|VERILOG) statements \(emitted verbatim\)$/, 'Instruções $1 (copiadas tal e qual)'],
   [/^(\d+) symbols?, (\d+) nets$/, (m, n, k) => `${n} símbolo${n === '1' ? '' : 's'}, ${k} redes`],
-  [/^Check Schematic: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Verificar Esquemático: $1 erro(s), $2 aviso(s)'],
   // a module's symbol out of date (#1183): what changed, Update All, what Update Symbol did
   [/^The symbol is out of date: module '(.+)' changed its ports \((.+)\)\.$/, (m, mod, what) => `O símbolo está desatualizado: o módulo '${mod}' mudou os seus portos (${what
     .replace(/\badded\b/g, 'acrescentados').replace(/\bremoved\b/g, 'removidos').replace(/\bdirection changed\b/g, 'direção mudada')}).`],
