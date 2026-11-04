@@ -20,7 +20,7 @@ const MAX_FILES = 5000;
 export const exchangeDir = () => path.resolve(process.env.SILINX_MCP_FOLDER || path.join(os.homedir(), 'Downloads'));
 
 // a path of the exchange folder (relative to it, or absolute inside it), also once its symbolic links are followed
-async function exchangePath(p, what) {
+export async function exchangePath(p, what) {
   const dir = exchangeDir();
   if (typeof p !== 'string' || !p) throw toolError(`${what}: a path in the exchange folder ${dir}`);
   let root;

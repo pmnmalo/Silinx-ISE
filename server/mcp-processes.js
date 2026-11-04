@@ -12,6 +12,11 @@ export const PROCESSES = {
   timing: ['synth', 'translate', 'map', 'par', 'trce'],
   power: ['synth', 'translate', 'map', 'par', 'xpwr'],
   pins: ['synth', 'translate', 'map', 'par', 'pin2ucf'],
+  // the simulation models (Generate Post-… Simulation Model, #2674): the flow up to their stage, then the model
+  post_synthesis_model: ['synth', 'postsynth'],
+  post_translate_model: ['synth', 'translate', 'posttrans'],
+  post_map_model: ['synth', 'translate', 'map', 'postmap'],
+  post_par_model: ['synth', 'translate', 'map', 'par', 'postpar'],
 };
 // a report of the build folder: its file, by the toolchain of the last run (#460: the Silinx toolchain
 // writes Yosys's statistics, no map or par report: those two are made from its Design Summary)
@@ -42,10 +47,33 @@ export const OPEN_REPORTS = {
     ...(r.timing ? [`Timing constraints: ${r.timing.met === false ? `not met (${r.timing.timingErrors})` : 'all met'}${r.timing.minPeriodNs ? `; minimum period ${r.timing.minPeriodNs} ns (${r.timing.maxFreqMHz} MHz)` : ''}.`] : [])].join('\n'),
 };
 
+/** A process of the project's top run to its end (or stopped after timeoutS): its log redacted, its errors and
+ *  warnings, whether it ended well, its toolchain. Errors: tool errors. */
+export async function runProcess(name, proc, { toolchain, timeoutS = 1800 } = {}) {
+  const pj = await readProject(name);
+  const steps = PROCESSES[proc];
+  if (!steps) throw toolError(`process: one of ${Object.keys(PROCESSES).join(', ')}`);
+  if (!pj.top) throw toolError(`the project '${name}' has no top module`);
+  const { startImplementation } = await import('./impl-routes.js');
+  let job;
+  try { job = await startImplementation(name, { steps, ...(toolchain ? { toolchain } : {}) }); } catch (e) { throw toolError(e.message); }
+  const end = Date.now() + timeoutS * 1000;
+  while (job.status === 'running' && Date.now() < end) await new Promise(r => setTimeout(r, 250));
+  if (job.status === 'running') {
+    const { cancelJob } = await import('./jobs.js');
+    cancelJob(job.id);
+    throw toolError(`the process ${proc} did not end in ${timeoutS} s: stopped`);
+  }
+  const redact = await redactor();
+  const lines = job.lines.map(redact);
+  const errors = lines.filter(l => /^ERROR/.test(l)), warnings = lines.filter(l => /^WARNING/.test(l));
+  return { top: pj.top, lines, errors, warnings, ok: job.status === 'ok', silinx: job.meta?.toolchain === 'silinx' };
+}
+
 export const PROCESS_TOOLS = [
   {
     name: 'run_process', title: 'Run a process',
-    description: 'Run a process of the project\'s top module and wait for it: synthesize, implement (translate, map, place & route), bitstream (Generate Programming File), timing (static timing), power (an estimate in the Silinx toolchain), pins (Back-annotate Pin Locations). With the Silinx toolchain (no ISE) by default when it is the configured one; toolchain: ise to use Xilinx ISE when it is configured. Returns the errors, the warnings and the end of the log.',
+    description: 'Run a process of the project\'s top module and wait for it: synthesize, implement (translate, map, place & route), bitstream (Generate Programming File), timing (static timing), power (an estimate in the Silinx toolchain), pins (Back-annotate Pin Locations), post_synthesis_model / post_translate_model / post_map_model / post_par_model (Generate Post-… Simulation Model: simulate it with simulate model). With the Silinx toolchain (no ISE) by default when it is the configured one; toolchain: ise to use Xilinx ISE when it is configured. Returns the errors, the warnings and the end of the log.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, process: { type: 'string', enum: Object.keys(PROCESSES), description: 'The process.' },
       toolchain: { type: 'string', enum: ['silinx', 'ise'], description: 'The toolchain (default: the project\'s synthesis tool, else Toolchain Settings).' },
@@ -54,27 +82,11 @@ export const PROCESS_TOOLS = [
     }, required: ['project', 'process'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     async run({ project: name, process: proc, toolchain, log_lines: logLines = 40, timeout_s: timeoutS = 1800 }) {
-      const pj = await readProject(name);
-      const steps = PROCESSES[proc];
-      if (!steps) throw toolError(`process: one of ${Object.keys(PROCESSES).join(', ')}`);
-      if (!pj.top) throw toolError(`the project '${name}' has no top module`);
-      const { startImplementation } = await import('./impl-routes.js');
-      let job;
-      try { job = await startImplementation(name, { steps, ...(toolchain ? { toolchain } : {}) }); } catch (e) { throw toolError(e.message); }
-      const end = Date.now() + timeoutS * 1000;
-      while (job.status === 'running' && Date.now() < end) await new Promise(r => setTimeout(r, 250));
-      if (job.status === 'running') {
-        const { cancelJob } = await import('./jobs.js');
-        cancelJob(job.id);
-        throw toolError(`the process ${proc} did not end in ${timeoutS} s: stopped`);
-      }
-      const redact = await redactor();
-      const lines = job.lines.map(redact);
-      const errors = lines.filter(l => /^ERROR/.test(l)), warnings = lines.filter(l => /^WARNING/.test(l));
-      const ok = job.status === 'ok';
-      const head = `Process "${proc}" of <${pj.top}> ${ok ? `completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}` : `failed (${errors.length} error(s), ${warnings.length} warning(s))`}${job.meta?.toolchain === 'silinx' ? ' (Silinx toolchain)' : ' (Xilinx ISE)'}.`;
+      const { top, lines, errors, warnings, ok, silinx } = await runProcess(name, proc, { toolchain, timeoutS });
+      const pj = { top };
+      const head = `Process "${proc}" of <${pj.top}> ${ok ? `completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}` : `failed (${errors.length} error(s), ${warnings.length} warning(s))`}${silinx ? ' (Silinx toolchain)' : ' (Xilinx ISE)'}.`;
       return { text: clip([...errors, ...warnings, '…', ...lines.slice(-Math.max(1, logLines)), head].join('\n')),
-        data: { project: name, process: proc, toolchain: job.meta?.toolchain === 'silinx' ? 'silinx' : 'ise', ok, errors, warnings, log: lines.slice(-Math.max(1, logLines)) }, isError: !ok };
+        data: { project: name, process: proc, toolchain: silinx ? 'silinx' : 'ise', ok, errors, warnings, log: lines.slice(-Math.max(1, logLines)) }, isError: !ok };
     },
   },
   {
