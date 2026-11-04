@@ -2,7 +2,7 @@
 //
 //   import { mountPetriEditor } from './petri-editor.js';
 //   const ed = mountPetriEditor(container, { model, onChange(model), linkInfo() -> { file } | null, onOpenFile(path),
-//     onProblems(diags), onMessage(text, isError) });
+//     onProblems(diags), onCheck(diags), onMessage(text, isError) });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.print();
 //   ed.select({ kind, id }); ed.destroy();
 //
@@ -15,7 +15,7 @@
 // enabled transition whose guard is true fires, as the generated hardware does), run, reset; and analyses it.
 // The HDL generated from the net is its linked file. Model, simulation, HDL and PNML: core/petri.js.
 // No hint and no status line (docs/UI-GUIDELINES.md, #2735): the net's counts at the toolbar's right, the zoom beside
-// its tools; its problems (`onProblems`, after every change) and its messages (`onMessage`: an arc that cannot be,
+// its tools; its problems (`onProblems`, after every change; `onCheck`, its Check's: the token game's too, #2803) and its messages (`onMessage`: an arc that cannot be,
 // a PNML not read, a transition not enabled) go to the console (drawings.js, editor-problems.js; #2718).
 
 import { h, downloadText, linkModel, linkSnapshot, twoFingerView } from './ui.js';
@@ -70,6 +70,7 @@ export function mountPetriEditor(container, opts = {}) {
     inhibitor: toolWide('inhibitor', 'Inhibitor', 'Click a place then a transition: the transition fires only while the place holds fewer tokens than the weight', () => setTool('inhibitor'), 'pn-tool'),
   };
   const delBtn = toolIcon('delete', 'del', 'Delete the selection (Del)', () => deleteSelection(), 'asm-danger');
+  const checkBtn = toolWide('check', 'Check', 'Check the net for errors and warnings (its token game too: transitions that never fire, deadlocks)', () => opts.onCheck?.(check()), 'pn-check');
   const tabBtns = {
     sim: toolWide('sim', 'Simulate', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
     analysis: btn('∑ Analysis', 'Reachable markings, bounds, deadlocks, liveness, invariants', () => togglePanel('analysis'), 'pn-tab-btn'),
@@ -92,6 +93,7 @@ export function mountPetriEditor(container, opts = {}) {
     h('div', { class: 'asm-group' }, ...Object.values(tools)), sep(),
     h('div', { class: 'asm-group' }, delBtn), sep(),
     h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBtn(f), () => fit()), zoomLbl), sep(),
+    h('div', { class: 'asm-group' }, checkBtn), sep(),
     h('div', { class: 'asm-group' }, tabBtns.sim, pnmlIn),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
@@ -197,7 +199,7 @@ export function mountPetriEditor(container, opts = {}) {
   });
 
   // ---------------------------------------------------------------- side panel (petri-side.js)
-  const { refreshLink, renderSide } = mountPetriSide({
+  const { check, refreshLink, renderSide } = mountPetriSide({
     opts, M: () => M, btn, commit, linkHost, netBody, nodeOf, placeOf, render, sel: () => sel,
     selSection, status, transOf, setSel: (v) => { sel = v; }
   });

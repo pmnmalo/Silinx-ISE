@@ -1,7 +1,8 @@
 // UI (#2505): the drawing editors' toolbars and side panels as the Schematic editor's, in both interfaces: flat buttons
 // of the same height, the same bar, no second Undo / Redo or Print, no note of the HDL in sync; the Petri net's zooms;
-// the Algebra editor's menu an icon and a label; the main toolbar's Undo still undoes an edit; the side panels folded as
-// the schematic's, remembered per editor, in Portuguese. No warnings.
+// the Algebra editor's menu an icon and a label; their check (Validate, Check: #2803) a wide button with the shared
+// icon; the main toolbar's Undo still undoes an edit; the side panels folded as the schematic's, remembered per editor,
+// in Portuguese. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { newPetri } from '../../core/petri.js';
@@ -44,6 +45,8 @@ uiTest('#2505 the editors\' toolbars and side panels as the Schematic editor\'s'
     assert.deepEqual(await look(page, b, `${b} [data-act=zin]`), ref, `${name}: the look of the schematic's toolbar`);
     assert.deepEqual(await ownHistory(b), [], `${name}: no Undo, Redo or Print of its own`);
     assert.deepEqual(await page.eval((x) => ['zin', 'zout', 'fit', 'delete'].map((a) => !!document.querySelector(`${x} [data-act=${a}] svg`)), b), [true, true, true, true], `${name}: the schematic's icons`);
+    // (its check: Validate, the FSM's and the Petri net's Check, #2803: a wide flat button, the shared icon)
+    assert.deepEqual(await page.eval((x) => [...document.querySelectorAll(`${x} .asm-wide`)].filter((e) => /^(Check|Validate)$/.test(e.textContent) && e.querySelector('svg')).map((e) => e.textContent), b), [name === 'asm' ? 'Validate' : 'Check'], `${name}: its check`);
     assert.deepEqual(await sideLook(`${D} .asm-side`, `${D} .asm-side .asm-cap`), refSide, `${name}: the side panel`);
     assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-side .asm-cap`).textContent, D), 'Properties');
     assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-toolbar .gen-banner`), D), null, `${name}: its HDL in sync unsaid`);

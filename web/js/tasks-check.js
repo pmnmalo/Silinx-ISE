@@ -20,7 +20,7 @@ export function checkLines(what, name, diags) {
 }
 
 /** Writes a schematic's Check in the console (`log`: web/js/console.js) while `on()` (the Tasks interface),
- *  `showConsole()` opening it. */
+ *  `showConsole(diags)` opening it (its Errors, else Warnings tab in front, #2803). */
 export function initCheckMessages(on, showConsole, log) {
   document.addEventListener('silinx-diagnostics', e => {
     const { what, name, diags, focus } = e.detail;
@@ -34,7 +34,7 @@ export function initCheckMessages(on, showConsole, log) {
       ln.title = t(SHOW);   // (the console's lines are not translated: their tooltip here, again when the language changes)
       ln.addEventListener('click', () => focus(l.diag));
     }
-    showConsole();
+    showConsole(diags);
   });
   onLanguageChange(() => { for (const ln of document.querySelectorAll('#console-log .ln.mc-link')) ln.title = t(SHOW); });
 }

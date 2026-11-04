@@ -106,7 +106,14 @@ export function validatePetri(model) {
   for (const t of m.transitions) {
     name(t.name, 'transition', { kind: 'transition', id: t.id }, true);
     try { portExprCoder(m, lang).cond(t.guard || '1'); } catch (e) { add('error', `transition ${t.name}: guard '${t.guard}': ${e.message}`, { kind: 'transition', id: t.id }); }
-    if (!preset(m, t.id).some(a => !a.inhibitor)) add('warning', `transition ${t.name} takes no token: it fires on every clock edge while its guard is true`, { kind: 'transition', id: t.id });
+    const ref = { kind: 'transition', id: t.id };
+    if (!m.arcs.some(a => a.from === t.id || a.to === t.id)) add('warning', `transition ${t.name} is not connected`, ref);
+    else if (!preset(m, t.id).some(a => !a.inhibitor)) add('warning', `transition ${t.name} takes no token: it fires on every clock edge while its guard is true`, ref);
+    // (an arc's weight past its place's capacity: the transition can never take, or put, that many tokens, #2803)
+    for (const [list, what] of [[preset(m, t.id).filter(a => !a.inhibitor), 'takes'], [postset(m, t.id), 'puts']]) for (const a of list) {
+      const p = placeOf(m, a.place);
+      if (p && a.weight > p.capacity) add('warning', `transition ${t.name} never fires: it ${what} ${a.weight} tokens ${what === 'takes' ? 'from' : 'into'} place ${p.name}, whose capacity is ${p.capacity}`, ref);
+    }
   }
   const outNames = new Set(m.outputs.map(o => o.name));
   for (const x of [...m.places, ...m.transitions]) for (const [o, v] of Object.entries(x.outputs)) {

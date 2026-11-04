@@ -1,14 +1,14 @@
-// A drawing editor's problems (its chart's validation: the ASM chart's, #2730) in the console, never in the editor's
-// window (#2718, docs/UI-GUIDELINES.md "Messages"): its errors and warnings in the Errors and Warnings tabs while it is
-// open, updated as it is edited, a click on one going to its item; Validate writes them in the Console too, as a
-// schematic's Check (tasks-check.js checkLines), each line's click going to its item.
+// A drawing editor's problems (its chart's validation: the ASM chart's, #2730; the FSM's, the Petri net's, #2803) in the
+// console, never in the editor's window (#2718, docs/UI-GUIDELINES.md "Messages"): its errors and warnings in the Errors
+// and Warnings tabs while it is open, updated as it is edited, a click on one going to its item; Validate (Check) writes
+// them in the Console too, as a schematic's Check (tasks-check.js checkLines), each line's click going to its item.
 //
 //   const p = editorProblems({ file, tool: 'ASM', what: 'Validate', goto: (d) => … });
 //   p.set(diags);    // the editor's validation ({ severity, message, … }), as it is now
-//   p.log(diags);    // Validate: its lines in the Console, shown
+//   p.log(diags);    // Validate / Check: its lines in the Console, its Errors (else Warnings, else Console) tab in front
 //   p.clear();       // the editor closed
 import { S } from './app.js';
-import { log, renderDiagnostics, showConsolePage } from './console.js';
+import { log, renderDiagnostics, showConsolePage, showProblems } from './console.js';
 import { checkLines } from './tasks-check.js';
 import { t, onLanguageChange } from './i18n.js';
 
@@ -32,7 +32,8 @@ export function editorProblems({ file, tool, what = 'Validate', goto }) {
         ln.title = t(SHOW);
         ln.addEventListener('click', () => goto(l.diag));
       }
-      showConsolePage('console');
+      // (its errors or warnings in front, else the Console's lines, #2803)
+      if (!showProblems(diags)) showConsolePage('console');
     },
     clear: () => set([]),
   };

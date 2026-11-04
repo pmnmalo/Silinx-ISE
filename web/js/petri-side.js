@@ -5,6 +5,7 @@
 import { formatOutputs, parseOutputs } from '/core/fsm.js';
 import { h } from './ui.js';
 import { validatePetri } from '/core/petri.js';
+import { checkPetri } from '/core/petri-analysis.js';
 
 const ioText = list => list.map(p => (p.width > 1 ? `${p.name}[${p.width}]` : p.name)).join(', ');
 const parseIo = text => String(text || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean).map(s => {
@@ -12,7 +13,7 @@ const parseIo = text => String(text || '').split(/[,;\s]+/).map(s => s.trim()).f
   return m ? { name: m[1], width: Math.max(1, Math.min(32, +(m[2] || 1))) } : null;
 }).filter(Boolean);
 
-/** { refreshLink, renderSide } of mountPetriEditor (M(), sel(): its current values). */
+/** { check, refreshLink, renderSide } of mountPetriEditor (M(), sel(): its current values). */
 export function mountPetriSide(ctx) {
   const {
     opts, M, btn, commit, linkHost, netBody, nodeOf, placeOf, render, sel, selSection, status,
@@ -20,6 +21,7 @@ export function mountPetriSide(ctx) {
   } = ctx;
 
   let said = null;   // (the problems last said)
+  let checked = null;   // (Check's, the token game's too, #2803: { net, diags } until the net changes)
   // ---------------------------------------------------------------- side panel
   const field = (label, input, hintText) => h('label', { class: 'asm-field' }, h('span', { class: 'asm-label' }, label), input, hintText ? h('span', { class: 'asm-fhint' }, hintText) : null);
   const text = (value, onChange, cls = '') => { const i = h('input', { type: 'text', class: `asm-input ${cls}`, value: value ?? '', spellcheck: 'false' }); i.addEventListener('change', () => onChange(i.value)); return i; };
@@ -60,8 +62,18 @@ export function mountPetriSide(ctx) {
       field('Reset (synchronous, to the initial marking)', text(M().reset.name, v => { M().reset.name = v.trim() || 'rst'; commit(); }, 'mono')),
       field('Description', (() => { const ta = h('textarea', { class: 'asm-input', rows: 2 }, M().description || ''); ta.addEventListener('change', () => { M().description = ta.value; commit(); }); return ta; })()));
     // its problems: to the console (#2718), when they changed
-    const diags = validatePetri(M()), key = JSON.stringify(diags.map(d => [d.severity, d.message]));
+    if (checked && checked.net !== JSON.stringify(M())) checked = null;
+    say(checked ? checked.diags : validatePetri(M()));
+  }
+  function say(diags) {
+    const key = JSON.stringify(diags.map(d => [d.severity, d.message]));
     if (key !== said) { said = key; opts.onProblems?.(diags); }
+  }
+  // Check (#2803): the net's validation and its token game's analysis, in the console's tabs until the net changes
+  function check() {
+    checked = { net: JSON.stringify(M()), diags: checkPetri(M()) };
+    say(checked.diags);
+    return checked.diags.slice();
   }
   function refreshLink() {
     const li = opts.linkInfo?.();
@@ -69,5 +81,5 @@ export function mountPetriSide(ctx) {
     linkHost.dataset.hdl = li?.file ? li.file.split('/').pop() : '';
   }
 
-  return { refreshLink, renderSide };
+  return { check, refreshLink, renderSide };
 }

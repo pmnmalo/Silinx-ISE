@@ -106,26 +106,38 @@ export function renderDiagnostics() {
 
 // A new error brings the Errors tab forward, else a new warning the Warnings one (#2733), whoever wrote it: once per
 // drawing (the console's lines are drawn at most every 50 ms: a run's batch, errors winning), a message already listed
-// (an editor's problem checked again as it is typed) not again, and a warning leaves the Errors tab in front while it
-// lists errors. A tab so brought forward goes back to the Console once it lists nothing (cleared, another project
-// opened: the start-up checks' warnings); one the viewer picked stays. The Tasks interface opens its folded messages on
-// the event (web/js/tasks.js).
-let listedDiags = new Set(), broughtForward = null;
+// (an editor's problem checked again as it is typed) not again, but one written again (a process run again: listed
+// twice) is new, and a warning leaves the Errors tab in front while it lists errors. A tab so brought forward goes back
+// to the Console once it lists nothing (cleared, another project opened: the start-up checks' warnings); one the viewer
+// picked stays. The Tasks interface opens its folded messages on the event (web/js/tasks.js).
+let listedDiags = new Map(), broughtForward = null;
 const diagKey = d => `${d.severity}|${d.tool || ''}|${d.file || ''}|${d.line || 0}|${d.message}`;
 const pageShown = () => document.querySelector('#console-tabs .tab.active')?.dataset.page;
 function focusNewDiagnostics(errs, warns) {
   const before = listedDiags;
-  listedDiags = new Set([...errs, ...warns].map(diagKey));
-  const isNew = d => !before.has(diagKey(d));
-  const page = errs.some(isNew) ? 'errors'
-    : warns.some(d => d.severity === 'warning' && isNew(d)) && !(errs.length && pageShown() === 'errors') ? 'warnings' : null;
+  listedDiags = new Map();   // (each message's count: one listed more times than before is new)
+  const isNew = d => { const k = diagKey(d), n = (listedDiags.get(k) || 0) + 1; listedDiags.set(k, n); return n > (before.get(k) || 0); };
+  const newErr = errs.map(isNew).some(Boolean), newWarn = warns.map(d => isNew(d) && d.severity === 'warning').some(Boolean);
+  const page = newErr ? 'errors' : newWarn && !(errs.length && pageShown() === 'errors') ? 'warnings' : null;
   if (!page) {
     if (broughtForward && pageShown() === broughtForward && !(broughtForward === 'errors' ? errs : warns).length) showConsolePage('console');
     return;
   }
+  bringForward(page);
+}
+function bringForward(page) {
   showConsolePage(page);
   broughtForward = page;
   document.dispatchEvent(new CustomEvent('silinx:console-problems', { detail: { page } }));
+}
+
+/** The end of a check (#2803: Check Syntax, Check Constraints, a drawing's Check or Validate): its errors bring the
+ *  Errors tab forward, else its warnings the Warnings tab, also when they were listed already (the same check run
+ *  again). Its page, or null when it found neither (the tabs as they were). */
+export function showProblems(diags) {
+  const page = diags.some(d => d.severity === 'error') ? 'errors' : diags.some(d => d.severity === 'warning') ? 'warnings' : null;
+  if (page) bringForward(page);
+  return page;
 }
 onLanguageChange(() => renderDiagnostics());
 

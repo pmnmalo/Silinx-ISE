@@ -1,7 +1,7 @@
 // UI (#2730): the ASM chart editor as the other editors (docs/UI-GUIDELINES.md): no hint on the canvas, its states and
 // encoding in its status line (#2763), none in its toolbar, "Encoding:" before its selector, the Machine section in its Properties (not
 // folded; alone when nothing is selected, no "Selection" help, #2739), its problems in the console's Errors and Warnings
-// (a click selecting the box) and Validate's lines in the Console, none in the editor; Portuguese. Both interfaces.
+// (a click selecting the box) and Validate's lines in the Console (its Errors tab in front, #2803), none in the editor; Portuguese. Both interfaces.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -54,7 +54,10 @@ uiTest('#2730 the ASM editor: no hint, its states in its status line (#2763), En
   const said = (await lines(page)).filter((t) => t.trim()).slice(-4);
   assert.deepEqual(said, ['Started : "Validate" of ctl.asm.json.', `ERROR: ${ERR}`, `WARNING: ${WARN}`, 'Process "Validate" failed']);
   assert.equal(await page.eval(() => [...document.querySelectorAll('#console-log .ln')].find((l) => /^Started : "Validate"/.test(l.textContent.trim())).dataset.src), 'check');
+  // (its errors: the Errors tab in front, not the Console, #2803)
+  await page.waitFor(() => document.querySelector('#console-tabs .tab.active').dataset.page === 'errors', [], { what: 'the Errors tab in front' });
   // a click on a line, and on a row of the Warnings tab: LOST selected
+  await page.click('#console-tabs .tab[data-page=console]');
   const selected = () => page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .asm-node.sel')].map((g) => g.dataset.node));
   await page.click('#console-log .ln.mc-link', { text: `WARNING: ${WARN}` });
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .asm-node.sel'), [], { what: 'the box selected' });

@@ -16,6 +16,7 @@ export const PETRI_PT = {
   'Click a place then a transition: the transition fires only while the place holds fewer tokens than the weight': 'Clique num lugar e depois numa transição: a transição só dispara enquanto o lugar tiver menos marcas do que o peso',
   'Delete the selection (Del)': 'Apagar a seleção (Del)',
   'Play the net: fire transitions, clock steps, run': 'Jogar a rede: disparar transições, passos de relógio, correr',
+  'Check the net for errors and warnings (its token game too: transitions that never fire, deadlocks)': 'Verificar erros e avisos na rede (também o seu jogo de marcas: transições que nunca disparam, bloqueios)',
   'Export the net as PNML (for PIPE, WoPeD, TINA…)': 'Exportar a rede em PNML (para o PIPE, WoPeD, TINA…)',
   'Import a PNML net (replaces this one: Undo brings it back)': 'Importar uma rede PNML (substitui esta: Anular repõe-na)',
   // side panel

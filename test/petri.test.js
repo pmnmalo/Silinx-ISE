@@ -7,6 +7,7 @@ import {
   outputsOf, generatePetri, toPnml, fromPnml,
 } from '../core/petri.js';
 import { simulate } from '../core/compile.js';
+import { checkPetri } from '../core/petri-analysis.js';
 
 // a producer / consumer over a buffer of 3, pulses when one is put, the buffer's state as outputs
 const prodCons = () => normalizePetri({
@@ -163,4 +164,49 @@ test('a net with ports and nothing else (the Petri Net Wizard, #208): valid, its
     assert.deepEqual(r.errors, [], `${lang}: ${r.errors.join('; ')}`);
     assert.deepEqual(r.sim.log.map(e => String(e.text).trim()).filter(s => /^[01xz_]+$/.test(s)), ['0_00'], lang);
   }
+});
+
+// a sequence that ends: idle → start → work → stop → over, no way back
+const ending = () => normalizePetri({
+  name: 'ending', inputs: [{ name: 'go', width: 1 }], outputs: [],
+  places: [{ id: 'p1', name: 'idle', tokens: 1 }, { id: 'p2', name: 'work' }, { id: 'p3', name: 'over' }],
+  transitions: [{ id: 't1', name: 'start', guard: 'go' }, { id: 't2', name: 'stop' }],
+  arcs: [{ id: 'a1', from: 'p1', to: 't1' }, { id: 'a2', from: 't1', to: 'p2' }, { id: 'a3', from: 'p2', to: 't2' }, { id: 'a4', from: 't2', to: 'p3' }],
+});
+const said = diags => diags.map(d => `${d.severity}: ${d.message}${d.ref ? ` [${d.ref.id}]` : ''}`);
+
+test('#2803 the validation: a transition not connected; an arc that takes or puts more tokens than its place holds', () => {
+  const m = ending();
+  m.transitions.push({ ...m.transitions[1], id: 't3', name: 'alone' });
+  m.arcs.push({ id: 'a5', from: 'p3', to: 't2', weight: 2 }, { id: 'a6', from: 't1', to: 'p3', weight: 3 });
+  assert.deepEqual(said(validatePetri(normalizePetri(m))), [
+    'warning: transition start never fires: it puts 3 tokens into place over, whose capacity is 1 [t1]',
+    'warning: transition stop never fires: it takes 2 tokens from place over, whose capacity is 1 [t2]',
+    'warning: transition alone is not connected [t3]',
+  ]);
+});
+
+test('#2803 the Check: the validation, then the token game\'s transitions that never fire and its first deadlock', () => {
+  assert.deepEqual(checkPetri(newPetri('ctl')), [], 'a new net: none');
+  assert.deepEqual(checkPetri(prodCons()), []);
+  assert.deepEqual(checkPetri(conflict()), []);
+  assert.deepEqual(said(checkPetri(ending())), ['warning: the net can reach a deadlock, no transition able to fire: after start, stop']);
+  // no token at all: every transition dead, a deadlock at once
+  const none = ending(); none.places[0].tokens = 0;
+  assert.deepEqual(said(checkPetri(none)), [
+    'warning: transition start never fires: no reachable marking enables it [t1]',
+    'warning: transition stop never fires: no reachable marking enables it [t2]',
+    'warning: the net can reach a deadlock, no transition able to fire: at once',
+  ]);
+  // a transition the validation says never fires: not twice
+  const heavy = ending(); heavy.arcs[2].weight = 2;
+  assert.deepEqual(said(checkPetri(normalizePetri(heavy))), [
+    'warning: transition stop never fires: it takes 2 tokens from place work, whose capacity is 1 [t2]',
+    'warning: the net can reach a deadlock, no transition able to fire: after start',
+  ]);
+  // an error: the validation's only; a graph explored in part: nothing of the token game
+  const bad = ending(); bad.transitions[0].guard = 'go &';
+  assert.deepEqual(said(checkPetri(bad)), ["error: transition start: guard 'go &': unexpected end of expression [t1]"]);
+  assert.deepEqual(checkPetri(ending(), { maxStates: 2 }), []);
+  assert.deepEqual(checkPetri(normalizePetri({ name: 'empty', places: [], transitions: [], arcs: [] })), []);
 });

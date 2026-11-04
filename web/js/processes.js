@@ -11,7 +11,7 @@ import * as wiz from './wizards.js';
 import { designDiags, sevWord } from './diaghelp.js';
 import { S, flushDoc, openFile, openFpgaView, openImpact, openPinPlanner, openSummary, openUcf,
   status, viewRoots, withPrimitives } from './app.js';
-import { log, showConsolePage, setDiagnostics } from './console.js';
+import { log, showProblems, setDiagnostics } from './console.js';
 import { backAnnotatePins, checkUcfFile, generateSimModel, postParTiming, runImpl, stopProcesses,
   synthOpen, textPowerReport, worst } from './implement.js';
 import { isAsm, isFsm, isPn, isTt, openAsm, openFsm, openPetri, openSch, openTt } from './drawings.js';
@@ -287,7 +287,8 @@ async function checkSyntaxInner(mod, sim, id) {
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
   for (const d of diags) log(`${sevWord(d)}:${d.tool || 'HDLCompiler'} - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
-  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); setStatus(id, 'err'); showConsolePage('errors'); return false; }
+  showProblems(diags);   // (the Errors tab, else the Warnings tab, in front: run again too, #2803)
+  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); setStatus(id, 'err'); return false; }
   log(`Elaborating top module <${mod}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
   setStatus(id, nw ? 'warn' : 'ok');
@@ -326,7 +327,8 @@ export async function checkFileSyntax(path) {
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
   for (const d of diags) log(`${sevWord(d)}:${d.tool || 'HDLCompiler'} - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
-  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); showConsolePage('errors'); status(`Check Syntax: ${ne} error(s)`); return false; }
+  showProblems(diags);   // (the Errors tab, else the Warnings tab, in front: run again too, #2803)
+  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); status(`Check Syntax: ${ne} error(s)`); return false; }
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
   status(`Check Syntax: ${path.split('/').pop()} OK${nw ? ` (${nw} warning(s))` : ''}`);
   return true;

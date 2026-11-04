@@ -277,7 +277,7 @@ const PT = {
   'Add state box (rectangle)': 'Adicionar caixa de estado (retângulo)', 'Add decision box (diamond)': 'Adicionar caixa de decisão (losango)',
   'Add conditional output box (oval)': 'Adicionar caixa de saída condicional (oval)', 'Delete selection': 'Apagar seleção',
   'Toggle snapping to the grid': 'Ativar/desativar alinhamento à grelha',
-  'Check the chart for errors': 'Verificar erros no diagrama',
+  'Check the chart for errors': 'Verificar erros no diagrama', 'Check the diagram for errors and warnings': 'Verificar erros e avisos no diagrama',
   'Layout': 'Disposição', 'Selection': 'Seleção', 'Machine': 'Máquina',
   'Module / entity name': 'Nome do módulo / entidade', 'HDL language': 'Linguagem HDL', 'State encoding': 'Codificação de estados', 'Clock': 'Relógio',
   'Reset': 'Reset', 'Reset level': 'Nível do reset', 'Reset type': 'Tipo de reset', 'Initial state': 'Estado inicial', 'Inputs': 'Entradas', 'Inverted inputs': 'Entradas invertidas', 'Outputs': 'Saídas',
