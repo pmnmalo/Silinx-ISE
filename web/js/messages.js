@@ -31,7 +31,7 @@ export function sourceOf(line, cur = 'app') {
   let m = /^Started : "([^"]+)"/.exec(s);
   if (m) {
     const p = m[1];
-    if (/Check Syntax|Check Schematic|^Validate$/.test(p)) return 'check';   // (a chart's Validate, #2730)   // (Check Constraints, a UCF's Check Syntax too: Implementation's, #2692)
+    if (/Check Syntax|Check Schematic|^Check (State Diagram|Petri Net)$|^Validate$/.test(p)) return 'check';   // (a chart's Validate, #2730; Check, #2803)   // (Check Constraints, a UCF's Check Syntax too: Implementation's, #2692)
     if (/^Simulate\b|^Save as Test Bench|^C Simulation$|^C\/RTL Co-simulation$/.test(p)) return 'sim';   // (a C module's runs, #1852)
     return 'impl';   // synthesis, Translate, Map, Place & Route and their models, timing, power, back-annotation, the FPGA view
   }

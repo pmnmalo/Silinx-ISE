@@ -5,7 +5,7 @@
 // The token game ignores the guards: a transition may fire whenever its tokens are there, whatever the
 // inputs (the reachable markings of the hardware are among these). The capacities of the places hold
 // (core/petri.js isEnabled), so the graph is finite; it is explored up to `maxStates` markings.
-import { normalizePetri, preset, postset } from './petri.js';
+import { normalizePetri, preset, postset, validatePetri } from './petri.js';
 
 const MAX_STATES = 20000;
 
@@ -137,6 +137,29 @@ export function analyzePetri(model, { maxStates = MAX_STATES } = {}) {
     pInvariants, tInvariants,
     conservative: covered,
   };
+}
+
+/**
+ * The editor's Check of a net (#2803): its validation (core/petri.js validatePetri) and, when that finds no error, what
+ * the token game finds (the guards ignored, as above): the transitions that never fire, the first deadlock with the
+ * firing sequence that reaches it. A graph explored only in part says nothing of either.
+ */
+export function checkPetri(model, opts) {
+  const m = normalizePetri(model);
+  const out = validatePetri(m);
+  if (out.some(d => d.severity === 'error') || !m.transitions.length) return out;
+  const a = analyzePetri(m, opts);
+  if (a.truncated) return out;
+  const said = new Set(out.filter(d => / never fires: /.test(d.message)).map(d => d.ref.id));
+  for (const t of m.transitions) {
+    if (a.liveness[t.id] === 'dead' && !said.has(t.id)) out.push({ severity: 'warning', message: `transition ${t.name} never fires: no reachable marking enables it`, ref: { kind: 'transition', id: t.id } });
+  }
+  const dl = a.deadlocks[0];
+  if (dl) {
+    const name = id => m.transitions.find(t => t.id === id).name;
+    out.push({ severity: 'warning', message: `the net can reach a deadlock, no transition able to fire: ${dl.path.length ? `after ${dl.path.map(name).join(', ')}` : 'at once'}` });
+  }
+  return out;
 }
 
 /** Strongly connected components (iterative Tarjan): { comps: [[states]], of: [component of each state] }. */

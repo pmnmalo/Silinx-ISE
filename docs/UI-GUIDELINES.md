@@ -96,6 +96,9 @@ viewer of its own:
   (`web/js/messages.js`: `log(…)`, `WARNING: …`, `ERROR: …`), its Errors and Warnings tabs listing them, a click on
   one going to its place in the document. No problems panel, message box, log or warning line inside an editor or a
   viewer, and no `alert()` (#2718).
+- **A check ends with its tab in front** (#2803): its Errors tab if it found errors, else its Warnings tab if it found
+  warnings (`showProblems` of `web/js/console.js`), run again too; a drawing's check is a `Check` (`Validate` for the
+  ASM chart) of its toolbar, the shared check icon, after its settings, hidden in a read-only view.
 - What the document shows of itself is not a message and stays in it: the read-only notice and "Not in sync with …"
   in the toolbar, its counts in its status line, a selected item's properties, a highlight on the item a message
   points to.

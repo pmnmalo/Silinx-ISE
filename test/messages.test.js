@@ -64,6 +64,8 @@ test('sourceOf: the processes\' headers', () => {
     'Started : "Implement Design".': 'impl',
     'Started : "Check Schematic" of gates.': 'check',   // (a schematic's, in the Tasks interface: #993)
     'Started : "Validate" of ctl.asm.json.': 'check',   // (a chart's, #2730)
+    'Started : "Check State Diagram" of ctl.fsm.json.': 'check',   // (#2803)
+    'Started : "Check Petri Net" of ctl.pn.json.': 'check',
     'Started : "Validate Design Rules".': 'impl',
     'Started : "Translate".': 'impl',
     'Started : "Generate Post-Synthesis Simulation Model".': 'impl',

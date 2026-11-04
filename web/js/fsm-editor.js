@@ -2,7 +2,7 @@
 //
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
-//                                          onOpenFile(path), onTruthTables(), onToAsm(), onMessage(text), onProblems(diags),
+//                                          onOpenFile(path), onTruthTables(), onToAsm(), onMessage(text), onProblems(diags), onCheck(diags),
 //                                          readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.focus(d); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
@@ -54,11 +54,11 @@ export function radiusOf(s) {
   return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, Math.ceil(textW(outs) / 2) + 10);
 }
 
-// (read-only, #2696: the tools that change the diagram, its HDL's settings, Layout and conversion hidden, with their
+// (read-only, #2696: the tools that change the diagram, its HDL's settings, Check, Layout and conversion hidden, with their
 // separators; its notice, `banner`, at the right end of the toolbar, #2710)
 function readOnlyChrome({ root, toolbar, banner }) {
   root.classList.add('asm-readonly');
-  const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc'));
+  const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc, .fsm-check'));
   for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling]) g.hidden = true;
   if (banner) toolbar.querySelector('.fsm-link').after(banner);
 }
@@ -101,6 +101,8 @@ export function mountFsmEditor(container, opts = {}) {
   // (what the diagram is, its states and transitions, Moore or Mealy, its encoding: in its status line, #2763)
   const status = statusLine();
   const delBtn = toolIcon('delete', 'del', 'Delete the selected state or transition (Del)', () => deleteSelection(), 'asm-danger');
+  // (Check, #2803: its problems in the console, as the ASM chart's Validate)
+  const checkBtn = toolWide('check', 'Check', 'Check the diagram for errors and warnings', () => { runValidate(); opts.onCheck?.(diags.slice()); }, 'fsm-check');
   const tabBtns = {
     tables: btn('Tables', 'State table, transition table and encoded transition table', () => togglePanel('tables'), 'fsm-tab-btn'),
     sim: toolWide('sim', 'Simulate', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs', () => togglePanel('sim'), 'fsm-tab-btn'),
@@ -115,6 +117,8 @@ export function mountFsmEditor(container, opts = {}) {
     h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBy(f), () => fit()), zoomLbl),
     sep(),
     h('div', { class: 'asm-group' }, tbLabel('Encoding:'), encSel, tbLabel('Coding Style:'), styleSel),
+    sep(),
+    h('div', { class: 'asm-group' }, checkBtn),
     sep(),
     h('div', { class: 'asm-group' }, tabBtns.tables, tabBtns.sim),
     h('div', { class: 'asm-spacer' }),

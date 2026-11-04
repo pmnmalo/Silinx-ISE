@@ -147,10 +147,11 @@ export async function openFsm(path) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
       // (its problems in the console's Errors and Warnings, a click selecting the state or the transition, #2737)
-      const problems = editorProblems({ file: path, tool: 'FSM', goto: (x) => { activateDoc(d); ed.focus(x); } });
+      const problems = editorProblems({ file: path, tool: 'FSM', what: 'Check State Diagram', goto: (x) => { activateDoc(d); ed.focus(x); } });
       // (in the interface's language, as the panel had them, again when it changes: the console shows a message as given)
       let last = [];
-      const setProblems = (diags) => { last = diags; problems.set(diags.map(x => ({ ...x, message: t(x.message) }))); };
+      const inLanguage = (diags) => diags.map(x => ({ ...x, message: t(x.message) }));
+      const setProblems = (diags) => { last = diags; problems.set(inLanguage(diags)); };
       const offLang = onLanguageChange(() => setProblems(last));
       const ed = mountFsmEditor(host, {
         model,
@@ -161,6 +162,7 @@ export async function openFsm(path) {
         onToAsm: () => fsmToAsmChart(path),
         onMessage: msg => log(`WARNING: ${path}: ${msg} (not applied)`, 'warn'),
         onProblems: setProblems,
+        onCheck: (diags) => problems.log(inLanguage(diags)),   // (Check: in the Console too, #2803)
       });
       d.fsmEditor = ed;
       return {
@@ -320,13 +322,14 @@ export async function openPetri(path) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
       // (its problems in the console's Errors and Warnings, a click selecting the item; its messages in the console, #2718)
-      const problems = editorProblems({ file: path, tool: 'PetriNet', goto: (x) => { activateDoc(d); if (x.ref?.id) ed.select(x.ref); } });
+      const problems = editorProblems({ file: path, tool: 'PetriNet', what: 'Check Petri Net', goto: (x) => { activateDoc(d); if (x.ref?.id) ed.select(x.ref); } });
       const ed = mountPetriEditor(host, {
         model,
         onChange: () => setDirty(d, true),
         linkInfo: () => { const f = S.schOwners?.[path]; return f ? { file: f } : null; },
         onOpenFile: f => openFile(f),
         onProblems: (diags) => problems.set(diags),
+        onCheck: (diags) => problems.log(diags),   // (Check: in the Console too, #2803)
         onMessage: (text, err) => log(err ? `WARNING: ${path.split('/').pop()}: ${text}` : `${path.split('/').pop()}: ${text}`, err ? 'warn' : 'info'),
       });
       d.petriEditor = ed;
