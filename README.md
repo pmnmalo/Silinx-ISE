@@ -462,7 +462,9 @@ instances, drawings and top with it), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
 only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
 `simulate` (the test bench: its messages and its signals' changes; against the post-synthesis, post-translate, post-map or
-post-place & route model too, with its timing; signals forced, a value or a clock, as SSim's Force; its waves as a VCD file), `run_process` (synthesize,
+post-place & route model too, with its timing; signals forced, a value or a clock, as SSim's Force; its waves as a VCD file), `c_simulation`, `c_cosimulation`,
+`c_synthesis_report` and `c_generated` (a C / C++ source of Silinx HLS: its main() run, its C/RTL co-simulation, its report, the HDL
+and the ASM chart made from it), `run_process` (synthesize,
 implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
 statistics for the synthesis and the pack and route summaries for map and par). The projects are those of the Project Navigator
