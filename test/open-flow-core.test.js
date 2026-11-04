@@ -71,8 +71,8 @@ test('the browser edition\'s flow (in memory, the database as JSON) writes the b
   // usual mapping names it, not ABC9's alias '$abc$…$aiger$o…' (#496)
   const clockLines = lines.filter(l => /^clock /.test(l));
   assert.equal(clockLines.length, 1, clockLines.join('\n'));
-  assert.match(clockLines[0], /^clock \$iopadmap\$clk: minimum period \d+\.\d{3} ns \(\d+\.\d MHz\)$/);
-  assert.match(store['open/timing.txt'], /^clock \$iopadmap\$clk: minimum period /m);
+  assert.match(clockLines[0], /^clock clk: minimum period \d+\.\d{3} ns \(\d+\.\d MHz\)$/);
+  assert.match(store['open/timing.txt'], /^clock clk: minimum period /m);
   assert.deepEqual(reports.at(-1).timing.clocks.map(c => [c.clock, c.port]), [['$iopadmap$clk', 'clk']]);
 });
 

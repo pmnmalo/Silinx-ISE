@@ -964,3 +964,26 @@ test('#661 checkSwitching: CLKIN_DIVIDE_BY_2 halves every limit of the DCM in tr
   // (ISE's XDL writes #OFF for a setting off)
   assert.deepEqual(sw('CLKIN_DIVIDE_BY_2::#OFF CLK_FEEDBACK::1X', ['CLK0']).CLKIN, ['Tdcmpc', 20, 'min', 4.166, 15.834]);
 });
+
+// #2793: a clock is named in the report as the design names it: the pad's net, $iopadmap$<port> (Yosys's I/O pad mapping),
+// the port's name, on every line that names a clock (its period, its detours, the paths between clocks, its hold check);
+// a clock made by logic keeps its net's name
+test('#2793 timingReport names a pad\'s clock by its port, not $iopadmap$clk', async () => {
+  const { shownClock, timingReport: report } = await import('../packages/silinx-fpga/src/fpga/timing-checks.js');
+  assert.equal(shownClock('$iopadmap$clk'), 'clk');
+  assert.equal(shownClock('$iopadmap$tm3_clk_v0'), 'tm3_clk_v0');
+  assert.equal(shownClock('div_q'), 'div_q');
+  const r = {
+    clocks: [{ clock: '$iopadmap$clk', period: 10.661, path: [] }, { clock: 'div_q', period: 4, path: [] }],
+    detours: [{ clock: '$iopadmap$clk', pins: 2, of: 10, skew: 0.5 }],
+    pads: { inputs: [], outputs: [], padToPad: [], hold: [{ clock: '$iopadmap$clk', slack: 0.2, path: [] }] },
+  };
+  const lines = report(r, [{ kind: 'cross', from: '$iopadmap$clk', to: 'div_q', related: false }]);
+  const named = lines.filter(l => /clock/.test(l));
+  assert.ok(named.includes('clock clk: minimum period 10.661 ns (93.8 MHz)'), named.join('\n'));
+  assert.ok(named.includes('clock div_q: minimum period 4.000 ns (250.0 MHz)'), named.join('\n'));
+  assert.ok(named.includes('clock clk: 2 of its 10 clock pins reached through general routing, not the global lines (clock skew up to 0.500 ns)'), named.join('\n'));
+  assert.ok(named.includes('paths from clock clk (rising) to clock div_q (rising): not timed (unrelated clocks: not from one port with a PERIOD constraint)'), named.join('\n'));
+  assert.ok(named.some(l => /^hold, clock clk: met, worst slack 0\.200 ns/.test(l)), named.join('\n'));
+  assert.ok(!named.some(l => /\$iopadmap\$/.test(l)), named.join('\n'));
+});

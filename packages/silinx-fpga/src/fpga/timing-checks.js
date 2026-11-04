@@ -285,6 +285,10 @@ export function switchingLine(k) {
   return `switching limit of ${k.resource} (${k.limit}): ${k.met ? 'met' : 'NOT MET'}, period ${k.period.toFixed(3)} ns, ${k.bound} period limit ${lim.toFixed(3)} ns (${(1000 / lim).toFixed(3)} MHz), slack ${k.slack.toFixed(3)} ns`;
 }
 
+/** A clock net's name as the report says it (#2793): a pad's net, which Yosys's I/O pad mapping names $iopadmap$<port>,
+ *  the port's (clk), as the constraint's line and ISE's trce say it; another net's as it is. */
+export const shownClock = n => String(n ?? '').replace(/^\$iopadmap\$/, '');
+
 /** A readable report of the critical path of each clock (lines of text), with the PERIOD checks
  *  (checkPeriods), the switching limits (checkSwitching, #661) and the OFFSET checks (checkOffsets) when given; the
  *  paths between two clocks (checkCross, #601); then the pads' paths and the hold check (#26). */
@@ -292,6 +296,7 @@ export function timingReport(r, checks = []) {
   const lines = [];
   const step = s => `  ${s.kind.padEnd(12)} ${s.delay.toFixed(3).padStart(7)} ${s.arrival.toFixed(3).padStart(8)}  ${s.inst}.${s.pin}`;
   const edgeName = e => (e ? 'falling' : 'rising');
+  const clockName = n => shownClock(n);
   // (a pad bounded on two clocks or more, a DCM's: each line names its clock, #601)
   const clocksOf = new Map();
   for (const k of checks) if (k.kind === 'offset' && k.clock) clocksOf.set(`${k.text}\u0000${k.port}`, (clocksOf.get(`${k.text}\u0000${k.port}`) || 0) + 1);
@@ -305,7 +310,7 @@ export function timingReport(r, checks = []) {
     if (k.kind === 'offset') {
       lines.push(k.unsupported ? `constraint ${k.text}: not analyzed (only OFFSET on a NET or on all pads)`
         : k.missing ? `constraint ${k.text}: no pad of the design is bounded by it`
-          : `constraint ${k.text}: ${k.met ? 'met' : 'NOT MET'} on ${k.port}${clocksOf.get(`${k.text}\u0000${k.port}`) > 1 ? `, clock ${k.clock}` : ''} (${k.dir === 'in' ? 'pad to setup' : 'clock to pad'} ${k.value.toFixed(3)} ns, slack ${k.slack.toFixed(3)} ns)`);
+          : `constraint ${k.text}: ${k.met ? 'met' : 'NOT MET'} on ${k.port}${clocksOf.get(`${k.text}\u0000${k.port}`) > 1 ? `, clock ${clockName(k.clock)}` : ''} (${k.dir === 'in' ? 'pad to setup' : 'clock to pad'} ${k.value.toFixed(3)} ns, slack ${k.slack.toFixed(3)} ns)`);
       continue;
     }
     if (k.noPaths) { lines.push(`constraint PERIOD ${k.required} ns on ${k.port}: met (no path between two flip-flops of its clock to time)`); continue; }
@@ -313,18 +318,18 @@ export function timingReport(r, checks = []) {
       : `constraint PERIOD ${k.required} ns on ${k.port}: ${k.met ? 'met' : 'NOT MET'} (period ${k.period.toFixed(3)} ns, slack ${k.slack.toFixed(3)} ns)`);
   }
   for (const c of r.clocks) {
-    lines.push(`clock ${c.clock}: minimum period ${c.period.toFixed(3)} ns (${(1000 / c.period).toFixed(1)} MHz)`);
+    lines.push(`clock ${clockName(c.clock)}: minimum period ${c.period.toFixed(3)} ns (${(1000 / c.period).toFixed(1)} MHz)`);
     for (const s of c.path) lines.push(step(s));
   }
   // (#2224: a global clock's loads reached off its global lines, their skew in the periods and the hold check)
   const skewed = new Set();
   for (const d of r.detours || []) {
     skewed.add(d.clock);
-    lines.push(`clock ${d.clock}: ${d.pins} of its ${d.of} clock pins reached through general routing, not the global lines (clock skew up to ${d.skew.toFixed(3)} ns)`);
+    lines.push(`clock ${clockName(d.clock)}: ${d.pins} of its ${d.of} clock pins reached through general routing, not the global lines (clock skew up to ${d.skew.toFixed(3)} ns)`);
   }
   // (#601: as trce, against the time between the clocks' edges; unrelated clocks not timed)
   for (const x of checks.filter(k => k.kind === 'cross')) {
-    const what = `paths from clock ${x.from} (${edgeName(x.launch)}) to clock ${x.to} (${edgeName(x.capture)})`;
+    const what = `paths from clock ${clockName(x.from)} (${edgeName(x.launch)}) to clock ${clockName(x.to)} (${edgeName(x.capture)})`;
     if (!x.related) { lines.push(`${what}: not timed (unrelated clocks: not from one port with a PERIOD constraint)`); continue; }
     lines.push(`${what}: ${x.met ? 'met' : 'NOT MET'}, requirement ${x.required.toFixed(3)} ns between the clocks' edges (delay ${x.delay.toFixed(3)} ns, slack ${x.slack.toFixed(3)} ns)`);
     for (const s of x.path) lines.push(step(s));
@@ -340,7 +345,7 @@ export function timingReport(r, checks = []) {
   }
   table('pad to pad:', p.padToPad, x => `  ${x.from.padEnd(w)} -> ${x.to.padEnd(w)} ${x.delay.toFixed(3).padStart(7)} ns`);
   for (const h of p.hold) {
-    lines.push('', `hold, clock ${h.clock}: ${h.slack >= 0 ? 'met' : 'NOT MET'}, worst slack ${h.slack.toFixed(3)} ns (the shortest path at its earliest; ${skewed.has(h.clock) ? 'with the clock\'s skew' : 'the global clock reaches both flip-flops at once'})`);
+    lines.push('', `hold, clock ${clockName(h.clock)}: ${h.slack >= 0 ? 'met' : 'NOT MET'}, worst slack ${h.slack.toFixed(3)} ns (the shortest path at its earliest; ${skewed.has(h.clock) ? 'with the clock\'s skew' : 'the global clock reaches both flip-flops at once'})`);
     for (const s of h.path) lines.push(step(s));
   }
   return lines;
