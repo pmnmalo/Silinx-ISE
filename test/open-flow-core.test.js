@@ -456,7 +456,8 @@ OFFSET = IN 20 ns BEFORE "clk" ;\nNET "q" OFFSET = OUT 1 ns AFTER "clk" ;\nTIMEG
   assert.ok(q, timing);
   assert.match(timing, /^constraint OFFSET = IN 20 ns BEFORE "clk": met on a \(pad to setup -?\d+\.\d{3} ns, slack \d+\.\d{3} ns\)$/m);
   assert.match(timing, /^OFFSET IN \(pad to setup; hold\), clock \S+:\n {2}a +-?\d+\.\d{3} ns; hold +-?\d+\.\d{3} ns$/m);
-  assert.match(timing, /^pad to pad:\n {2}a +-> y +\d+\.\d{3} ns\n {2}b +-> y +\d+\.\d{3} ns$/m);
+  // (the slower first: which of the two, as the placement makes it)
+  assert.match(timing, /^pad to pad:\n {2}([ab]) +-> y +\d+\.\d{3} ns\n {2}(?!\1)[ab] +-> y +\d+\.\d{3} ns$/m);
   assert.deepEqual(r.lines.filter(l => /^WARNING/.test(l)), [
     `WARNING:Timing - constraint NET "q" OFFSET = OUT 1 ns AFTER "clk" not met on q: clock to pad ${q[1]} ns`,
     'WARNING:Timing - constraint OFFSET = IN 5 ns BEFORE "other": no pad of the design is bounded by it',
