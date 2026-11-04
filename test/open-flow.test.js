@@ -136,11 +136,12 @@ const FEATURES = {
   feat_side_clock: [SLICES, 'BUFGMUX', [/^inst "[^"]+" "BUFGMUX",placed CLKL_X0Y23 BUFGMUX_X0Y6 /m, /^inst "[^"]+" "BUFGMUX",placed CLKR_X35Y23 BUFGMUX_X3Y9 /m,
     /^ {2}pip CLKL_X0Y23 CLKL_CKI4 -> CLKL_GCLK4 ,$/m, /^ {2}pip CLKR_X35Y23 CLKR_CKI7 -> CLKR_GCLK7 ,$/m], [/IOIS_F\d_B3 ,/]],
   // a clock switch (#846): a BUFGMUX choosing between the two clock pins, I1 / S used (SINV not inverted); clka also
-  // on a BUFG of its own (X2Y11), so the switch on another pair (its I1 is the line of its partner's I0): from clka's
-  // pad, not from the BUFG's global line through the fabric
-  feat_bufgmux: [SLICES, 'BUFGMUX', [/^inst "u_mux" "BUFGMUX",placed CLKT_X13Y35 BUFGMUX_X\dY1[01] +,\n {2}cfg " DISABLE_ATTR::LOW I0_USED::0 I1_USED::0 SINV::S GCLKMUX:u_mux.GCLKMUX: "/m,
+  // on a BUFG of its own: the switch on the one buffer clka's pad reaches on its dedicated path (X2Y11: CKI4 -> GCLK0 ->
+  // GCLKIN00, the switches first, #2770), the BUFG on another through a CLKDUB, not from a global line through the fabric
+  feat_bufgmux: [SLICES, 'BUFGMUX', [/^inst "u_mux" "BUFGMUX",placed CLKT_X13Y35 BUFGMUX_X2Y11 +,\n {2}cfg " DISABLE_ATTR::LOW I0_USED::0 I1_USED::0 SINV::S GCLKMUX:u_mux.GCLKMUX: "/m,
     /^inst "[^"]+" "BUFGMUX",placed CLKT_X13Y35 BUFGMUX_X\dY1[01] /m, /^net "[^"]+" , \n {2}outpin "clka" I ,\n(?: {2}inpin "[^"]+" I0 ,\n){0,1} {2}inpin "u_mux" I0 ,$/m,
-    /^ {2}pip CLKT_X13Y35 CLKV_\w+ -> CLKT_SELDUB\d ,$/m], [/BUFGMUX_X2Y10/, /BUFGMUX_X1Y10/, /CLKT_TO_OMUX/]],
+    /^ {2}pip CLKT_X13Y35 CLKV_\w+ -> CLKT_SELDUB\d ,$/m, /^ {2}pip CLKT_X13Y35 CLKT_CKI4 -> CLKT_GCLK0 ,$/m, /^ {2}pip CLKT_X13Y35 CLKT_GCLK0 -> CLKT_GCLKIN00 ,$/m],
+    [/BUFGMUX_X2Y10/, /BUFGMUX_X1Y10/, /CLKT_TO_OMUX/]],
   // BUFGMUX_1 (#846): its output held high while it switches, DISABLE_ATTR HIGH (measured on the 24 buffers)
   feat_bufgmux_1: [SLICES, 'BUFGMUX', [/^inst "u_mux" "BUFGMUX",placed CLKT_X13Y35 BUFGMUX_X\dY1[01] +,\n {2}cfg " DISABLE_ATTR::HIGH I0_USED::0 I1_USED::0 SINV::S GCLKMUX:u_mux.GCLKMUX: "/m]],
   feat_dcm: [SLICES, 'DCM'],
@@ -150,7 +151,7 @@ const FEATURES = {
   // reaches its four on switches of known bits, #2); its CLKIN from the first one's CLK0 buffer (#47)
   feat_dcm2: [SLICES, 'DCM', [/^inst "u_dcma" "DCM",placed /m, /^inst "u_dcmb" "DCM",placed /m,
     // (B's CLKIN from A's CLK0 buffer on the global line, not through general routing, #93; the sites nextpnr's, #2756)
-    /^ {2}pip DCM_\w+ GCLK\d -> DCM_CLKIN ,$/m], [/_TO_OMUX/], 'nextpnr routes B\'s CLKIN on general routing, #2770'],
+    /^ {2}pip DCM_\w+ GCLK\d -> DCM_CLKIN ,$/m], [/_TO_OMUX/]],
   // the clock pad (B8, LOC'd) into a global buffer that feeds the DCM's CLKIN: B8's buffer, whose line
   // reaches the top-left DCM's CLKIN, kept for it, the DCM's outputs on the others (#94)
   feat_dcm_bufgin: [SLICES, 'DCM', [/^inst "u_dcm" "DCM",placed DCM_TL_CENTER_X13Y34 DCM_X0Y1 /m, /^inst "u_bin" "BUFGMUX",placed CLKT_X13Y35 BUFGMUX_X2Y11 /m]],
@@ -260,9 +261,8 @@ test('the open flow: feat_ll_splitters at seed 2 across the XC3S1200E, every reg
 // #749: feat_iob_pair with its pads LOC'd on two differential pairs of the Basys2-250 (J12 / K14, N13 / N14), each pair's
 // two registers on different clocks: before, "the routing did not converge"; now both clocks routed into each tile, the
 // DIFFM's register on its second flip-flop (as ISE does: its DRC clean on this routed XDL), whose settings on a pad alone
-// are in the bit database since #759: a complete bitstream, no warning
-// (nextpnr does not route it yet: the second clock reaches no clock wire of the pair's I/O tile, #2766)
-test('the open flow: two registers of one kind on different clocks in the two IOBs of a LOC\'d pair: routed, the DIFFM\'s on its second flip-flop, a complete bitstream (#749, #759)', { timeout: 300000, todo: 'nextpnr fails to route the second clock, #2766' }, () => {
+// are in the bit database since #759: a complete bitstream, no warning (nextpnr too since #2766)
+test('the open flow: two registers of one kind on different clocks in the two IOBs of a LOC\'d pair: routed, the DIFFM\'s on its second flip-flop, a complete bitstream (#749, #759)', { timeout: 300000 }, () => {
   const dir = path.join(tmp, 'feat_iob_pair_loc'), out = path.join(tmp, 'feat_iob_pair_loc-out');
   fs.cpSync(path.join(ROOT, 'test/fixtures/open-flow/feat_iob_pair'), dir, { recursive: true });
   fs.appendFileSync(path.join(dir, 'top.ucf'), 'NET "led<0>" LOC = "J12" ;\nNET "led<1>" LOC = "K14" ;\nNET "sw<0>" LOC = "N13" ;\nNET "sw<1>" LOC = "N14" ;\n');
@@ -274,7 +274,7 @@ test('the open flow: two registers of one kind on different clocks in the two IO
   assert.match(routed, /^inst "led<1>" "IOB",placed RIOIS_PCI_X27Y14 K14 +,\n {2}cfg "[^"]* OMUX::OFF2 [^"]* OFF2:/m);
   assert.match(routed, /^inst "led<0>" "IOB",placed RIOIS_PCI_X27Y14 J12 +,\n {2}cfg "[^"]* OFF1:/m);
   assert.match(routed, /^inst "sw<0>" "IBUF",placed RIOIS_X27Y1 N13 +,\n {2}cfg "[^"]* IFF2:/m);
-  for (const re of [/^ {2}pip RIOIS_PCI_X27Y14 GCLK\d -> IOIS_CLK5 ,\n {2}pip RIOIS_PCI_X27Y14 IOIS_CLK5 -> OTCLK20 ,$/m, /^ {2}pip RIOIS_PCI_X27Y14 IOIS_CLK1 -> OTCLK11 ,$/m,
+  for (const re of [/^ {2}pip RIOIS_PCI_X27Y14 GCLK\d -> IOIS_CLK5 ,$/m, /^ {2}pip RIOIS_PCI_X27Y14 IOIS_CLK5 -> OTCLK20 ,$/m, /^ {2}pip RIOIS_PCI_X27Y14 IOIS_CLK1 -> OTCLK11 ,$/m,
     /^ {2}pip RIOIS_X27Y1 IOIS_CLK4 -> ICLK20 ,$/m, /^ {2}pip RIOIS_X27Y1 IOIS_CLK0 -> ICLK11 ,$/m]) assert.match(routed, re);
 });
 
@@ -329,8 +329,9 @@ test('the open flow: inputs that drive nothing (the clock, the buttons) get no p
 
 // A DCM with more outputs on global buffers than its output multiplexer reaches (four; feat_dcm's CLK0, CLKDV, CLKFX,
 // CLK2X and CLK90 too, on the XC3S100E): Silinx's placer refused it ("no free global clock buffer reachable"); nextpnr
-// takes the fifth to a buffer of its own through general routing, into the buffer's CLKDUB input (#2756)
-test('the open flow: a DCM with five outputs on global buffers, one past its output multiplexer\'s four, the fifth through general routing, no warning', { timeout: 300000 }, () => {
+// takes the fifth to a buffer of its own through general routing, into the buffer's CLKDUB input (#2756). The Basys2's
+// clock on B8, which reaches no CLKIN of the XC3S100E on a dedicated path: said (#2768).
+test('the open flow: a DCM with five outputs on global buffers, one past its output multiplexer\'s four, the fifth through general routing, the CLKIN from B8 said', { timeout: 300000 }, () => {
   const dir = path.join(tmp, 'dcm5');
   fs.mkdirSync(dir, { recursive: true });
   const src = fs.readFileSync(path.join(ROOT, 'test/fixtures/open-flow/feat_dcm/top.vhd'), 'utf8').replace('CLK90 => open', 'CLK90 => clk90_u')
@@ -346,14 +347,15 @@ test('the open flow: a DCM with five outputs on global buffers, one past its out
   const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, path.join(dir, 'out')], { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.match(r.stdout, /top\.bit: complete \(every feature in the bit database\)/);
-  assert.doesNotMatch(`${r.stdout}\n${r.stderr}`, /warning/i);
+  assert.deepEqual(`${r.stdout}\n${r.stderr}`.split('\n').filter(l => /warning/i.test(l)).map(l => l.trim()),
+    ['WARNING:nextpnr - DCM u_dcm: its CLKIN comes from the pad B8 through general routing: only B9, A9, A10, C9 reach its CLKIN on a dedicated path.']);
   const routed = fs.readFileSync(path.join(dir, 'out', 'routed.xdl'), 'utf8');
   assert.equal((routed.match(/^inst "u_b\w+" "BUFGMUX",placed /gm) || []).length, 5);
-  // each output's net into its buffer: the dedicated path (DLL_OUT…) or general routing into a CLKDUB, at least one of
-  // them so (nextpnr takes two, where one would do, #2770)
+  // each output's net into its buffer: the dedicated path (DLL_OUT…), but one through general routing into a CLKDUB
+  // (#2770: nextpnr took two)
   const nets = routed.split(/^net /m).slice(1).filter(n => /\n {2}outpin "u_dcm" CLK\w+ ,\n/.test(n));
   assert.equal(nets.length, 5);
-  assert.ok(nets.filter(n => /_CLKDUB\d -> \w+_GCLK\d ,/.test(n)).length >= 1);
+  assert.equal(nets.filter(n => /_CLKDUB\d -> \w+_GCLK\d ,/.test(n)).length, 1);
 });
 
 // blinky on the other boards (stage F of packages/silinx-fpga/research/s3e-bitstream): the Basys2-100 with the Basys2's
@@ -470,7 +472,7 @@ for (const [issue, fixture, part, pkg, loc, want, warnings] of CLOCK_CASES) {
 // path from the clock's pad (#92); the sites and the pad nextpnr's (#2756: Silinx's placer took the top-left and
 // bottom-left DCMs and ISE's pad).
 for (const [part, pkg] of [['xc3s100e', 'cp132'], ['xc3s500e', 'fg320'], ['xc3s1200e', 'fg320']]) {
-  test(`the open flow: two DCMs (feat_dcm2) on the ${part.toUpperCase()}-${pkg.toUpperCase()}: complete bitstream, the exact warnings (#47)`, { timeout: 300000, todo: 'nextpnr routes the CLKINs on general routing, #2770' }, () => {
+  test(`the open flow: two DCMs (feat_dcm2) on the ${part.toUpperCase()}-${pkg.toUpperCase()}: complete bitstream, the exact warnings (#47)`, { timeout: 300000 }, () => {
     const dir = path.join(tmp, `dcm2-${part}`);
     fs.mkdirSync(dir, { recursive: true });
     let src = fs.readFileSync(path.join(ROOT, 'test/fixtures/open-flow/feat_dcm2/top.vhd'), 'utf8');
@@ -537,7 +539,7 @@ for (const [part, pkg] of [['xc3s100e', 'cp132'], ['xc3s250e', 'cp132'], ['xc3s5
 // buffers, no warning (before #94: the DCM's outputs took the buffers first, and the pad's buffer, not reaching the
 // CLKIN, was said and reached through general routing).
 for (const [part, pkg] of [['xc3s100e', 'cp132'], ['xc3s250e', 'cp132'], ['xc3s500e', 'fg320'], ['xc3s1200e', 'fg320']]) {
-  test(`the open flow: a pad's global buffer into a DCM's CLKIN (feat_dcm_bufgin) on the ${part.toUpperCase()}-${pkg.toUpperCase()}: the DCM and the buffer together, no warning (#94)`, { timeout: 300000, todo: 'nextpnr routes the CLKIN on general routing, #2770' }, () => {
+  test(`the open flow: a pad's global buffer into a DCM's CLKIN (feat_dcm_bufgin) on the ${part.toUpperCase()}-${pkg.toUpperCase()}: the DCM and the buffer together, no warning (#94)`, { timeout: 300000 }, () => {
     const dir = path.join(tmp, `dcm-bufgin-${part}`);
     fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(ROOT, 'test/fixtures/open-flow/feat_dcm_bufgin/top.vhd'), path.join(dir, 'top.vhd'));
