@@ -15,7 +15,7 @@ import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
 import { ice40FromTarball } from './nextpnr-ice40-browser.js';
-import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES, NEXTPNR_FILES, nextpnrChipdb } from './asset-cache.js';
+import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES, nextpnrFiles, nextpnrChipdb } from './asset-cache.js';
 
 // (Yosys in this worker's own thread, where it cannot start workers of its own: its Blobs readable, #556)
 readableBlobs();
@@ -44,11 +44,11 @@ const yosysSource = bundle => assetFetchSource() + yosysWorkerSource(bundle);
 /** What a run of the device fetches, fetched into the cache: { fetched, bytes, pruned }. */
 async function prepare({ prepare: d, assets, yosys, nextpnr, root }) {
   const base = new URL(assets);
-  // (this version's nextpnr kept, its gen/ and chipdb/, whatever this project's engine)
+  // (this version's nextpnr kept, its gen/ and chipdb/, whatever this project's engine; nextpnr: the family's, #2288)
   const pruned = await pruneAssetCache(root, [base.href, new URL('.', yosys).href, ...(nextpnr ? [new URL('..', nextpnr).href] : [])]);
   const urls = [new URL(`devices/${d.graph}`, base), ...dbUrls(d, base),
     ...YOSYS_FILES.map(f => new URL(f, yosys)),
-    ...(nextpnr && d.nextpnr ? [...NEXTPNR_FILES, nextpnrChipdb(d.device)].map(f => new URL(f, nextpnr)) : [])];
+    ...(nextpnr && d.nextpnr ? [...nextpnrFiles(d.family === 'spartan6' ? 'spartan6' : 'spartan3e'), nextpnrChipdb(d.device)].map(f => new URL(f, nextpnr)) : [])];
   return { ...await prefetchAssets(urls, { fetchFn: netFetch }), pruned };
 }
 // a device's bit database files: the Spartan-3E's in bitdb/, the Spartan-6's in bitdb/s6 (#2103)
@@ -65,15 +65,15 @@ let lastDevice = null;   // { key, device, db }
 
 // nextpnr in this worker's thread (#2136), from its bundle; the log says what the wait is the first time
 const nextpnrs = new Map();
-function nextpnrBrowser(url, post) {
-  if (!nextpnrs.has(url)) nextpnrs.set(url, nextpnrIo(() => import(url)));
+function nextpnrBrowser(url, post, runner, mb = 7) {
+  if (!nextpnrs.has(url)) nextpnrs.set(url, nextpnrIo(() => import(url), runner));
   const io = nextpnrs.get(url);
   return {
     run: io.run,
     chipdb: async part => {
       if (!loaded.has(`${url} ${part}`)) {
         loaded.add(`${url} ${part}`);
-        post({ line: `Loading nextpnr and the chip database of ${part} (WebAssembly, about 7 MB: once, then kept by this browser)…` });
+        post({ line: `Loading nextpnr and the chip database of ${part} (WebAssembly, about ${mb} MB: once, then kept by this browser)…` });
       }
       return io.chipdb(part);
     },
@@ -90,7 +90,7 @@ function ice40Browser(where, post) {
 }
 
 self.onmessage = async ({ data }) => {
-  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl, nextpnrIce40: ice40Url } = data;
+  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl, nextpnrS6: nextpnrS6Url, nextpnrIce40: ice40Url } = data;
   // every message carries the run's id (web/js/open-flow-browser.js: each run hears only its own)
   const post = m => self.postMessage({ ...m, id: data.id });
   if (data.integrity) self.SILINX_ASSET_INTEGRITY = data.integrity;   // (the assets' SHA-256, #1237: this worker's fetches and its Yosys workers')
@@ -159,9 +159,13 @@ self.onmessage = async ({ data }) => {
       return inThread(args, yfiles, onLine);
     }, { parallel: pool ? pool.parallel : 1 });
     const { io, store } = workerIo({ post, sources, simSources, ucf, ucfName, files, device: () => device, bitDb: () => db, yosys,
-      // (the nextpnr engine's, #2136: its bundle and the device's chip database fetched on its first use, then kept by the cache)
+      // (the nextpnr engine's, #2136: its bundle and the device's chip database fetched on its first use, then kept by the
+      // cache; the Spartan-6's, #2288)
       nextpnr: ice40Url ? { ice40: ice40Browser(ice40Url, post) }
-        : spec.engine && spec.engine !== 'silinx' ? { spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) } : null });
+        : spec.engine && spec.engine !== 'silinx' ? {
+          spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post),
+          spartan6: nextpnrBrowser(nextpnrS6Url || new URL('vendor/nextpnr-spartan6/gen/bundle.js', base).href, post, 'runNextpnrHimbaechelSpartan6', 5),
+        } : null });
     const res = await runOpenFlow(spec, io);
     // the FPGA view's model, from the routed design
     let view = null;

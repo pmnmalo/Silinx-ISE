@@ -21,8 +21,9 @@ export const FAMILY_PROFILES = {
     // halves of 9 Kbit: RAMB8BWER, and RAMB16BWER as two of them
     blockRam: { resource: 'ramb8bwer', halves: true },
     multiplier: 'dsp48a1',
-    // the Nexys3's and Atlys's parts, the bit databases in bitdb/s6 (#2103)
-    openFlow: { parts: /^xc6slx\d+$/, bitDb: 's6' },
+    // the Nexys3's and Atlys's parts, the bit databases in bitdb/s6 (#2103); nextpnr (nextpnr-himbaechel-spartan6) when the
+    // project's engine is it (#2138, #2288: 'auto' is the Silinx engine's)
+    openFlow: { parts: /^xc6slx\d+$/, bitDb: 's6', nextpnr: 'chosen' },
   },
   ice40: {
     // its own tools (#2295): nextpnr-ice40 and icepack, their steps, no device description of the Silinx toolchain

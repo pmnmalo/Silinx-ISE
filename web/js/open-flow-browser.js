@@ -30,7 +30,7 @@ export const BROWSER_DEVICES = {
 // versions with the same Yosys: ../vendor/yowasp-yosys/<its version>/gen/bundle.js), and the site the
 // page opened from a file fetches them from (the site keeps the older releases' folders, so that a
 // downloaded Silinx-ISE.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
-const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
+const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
 // (and each asset's SHA-256, checked by the cache, web/js/asset-cache.js #1237: here, in the flow worker's messages
 // and in the Yosys workers' code)
 if (LAYOUT.integrity) globalThis.SILINX_ASSET_INTEGRITY ||= LAYOUT.integrity;
@@ -49,6 +49,14 @@ export const assetsRoot = (base = assetsBase()) => (LAYOUT.dir ? new URL('../', 
 export const yosysBundleUrl = (base = assetsBase()) => new URL(LAYOUT.yosys, base).href;
 /** The URL of nextpnr's bundle (its chip databases in ../chipdb beside it, #2136) for the assets at `base`. */
 export const nextpnrBundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnr || 'vendor/nextpnr-spartan/gen/bundle.js', base).href;
+/** The URL of the Spartan-6's nextpnr bundle (nextpnr-himbaechel-spartan6, its chip databases in ../chipdb, #2288). */
+export const nextpnrS6BundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnrS6 || 'vendor/nextpnr-spartan6/gen/bundle.js', base).href;
+// does Implement of a family run nextpnr with the project's engine (impl)? The Spartan-3E's but with the Silinx engine
+// (#2136); the Spartan-6's only when chosen (#2288: its 'auto' is the Silinx engine's)
+const usesNextpnr = (family, impl) => {
+  const np = familyProfile(family).openFlow?.nextpnr;
+  return np === true ? engineOf(impl) !== 'silinx' : np === 'chosen' && engineOf(impl) === 'nextpnr';
+};
 
 /** Can the browser edition implement a design for this device? { available, reason, part, family, graph, steps (the
  *  steps it has for the device, when not all of them: the Spartan-6's, as the server's openStatus) }. */
@@ -186,13 +194,13 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
       fail: e => { end(); reject(e); },
     });
     signal?.addEventListener('abort', abort, { once: true });
-    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null });
   });
 }
 
 /**
  * What Implement of the project's device fetches (Yosys, the device description, its bit database; nextpnr and the device's
- * chip database unless the project's engine (impl, engineOf) is Silinx's, #2136), fetched into the
+ * chip database when the project's engine (impl, engineOf) runs it, #2136, #2288), fetched into the
  * browser's Cache Storage by the flow's worker, in the background, when a project opens (#967): its first run does not
  * wait for 17 MB to download. Nothing in a page opened from a file (the single file: WebKit and Firefox give it a
  * Cache Storage, and a navigation that cancelled the download was a console error in WebKit, #1450), where there is
@@ -207,7 +215,7 @@ export function prepareBrowserFlow(device = {}, impl = undefined) {
   const w = getWorker(), id = ++runSeq;
   return new Promise(resolve => {
     runs.set(id, { onData: data => { if (data.done) { runs.delete(id); resolve(data.done); } }, fail: () => { runs.delete(id); prepared.delete(st.graph); resolve(null); } });
-    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: !!familyProfile(st.family).openFlow?.nextpnr && engineOf(impl) !== 'silinx' }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: usesNextpnr(st.family, impl) }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: st.family === 'spartan6' ? nextpnrS6BundleUrl() : nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
   });
 }
 

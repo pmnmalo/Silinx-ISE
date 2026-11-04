@@ -167,6 +167,9 @@ test('#2103 the Spartan-6 in the browser: the Nexys3\'s and the Atlys\'s parts, 
   assert.equal(m.spec.part, 'xc6slx16csg324-3');
   assert.equal(m.spec.graph, 'xc6slx16csg324-3.json.gz');
   assert.deepEqual(m.spec.steps, ['synth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit']);
+  // (the worker's nextpnr bundles: the Spartan-3E's and the Spartan-6's, #2288)
+  assert.equal(m.nextpnr, 'https://example.test/assets/vendor/nextpnr-spartan/gen/bundle.js');
+  assert.equal(m.nextpnrS6, 'https://example.test/assets/vendor/nextpnr-spartan6/gen/bundle.js');
   w.send({ id: m.id, done: { ok: true } });
   assert.deepEqual(await r, { ok: true });
   await assert.rejects(runBrowserFlow({ project: s6, files, steps: ['xpwr'], onLine: () => {} }),
@@ -180,5 +183,13 @@ test('#2103 the Spartan-6 in the browser: the Nexys3\'s and the Atlys\'s parts, 
     assert.deepEqual(pm.prepare, { graph: 'xc6slx16csg324-3.json.gz', part: 'xc6slx16csg324-3', family: 'spartan6', device: 'xc6slx16', pkg: 'csg324', nextpnr: false });
     pw.send({ id: pm.id, done: { fetched: 30, bytes: 3e6, pruned: 0 } });
     assert.deepEqual(await p, { fetched: 30, bytes: 3e6, pruned: 0 });
+    // (#2288: a project that chooses nextpnr: the Spartan-6's bundle and chip database; 'auto' is the Silinx engine's)
+    const atlys = { family: 'spartan6', part: 'xc6slx45', package: 'csg324', speed: '-3' };
+    const q = prepareBrowserFlow(atlys, { engine: 'nextpnr' });
+    const qw = live(), qm = qw.posted.at(-1);
+    assert.deepEqual(qm.prepare, { graph: 'xc6slx45csg324-3.json.gz', part: 'xc6slx45csg324-3', family: 'spartan6', device: 'xc6slx45', pkg: 'csg324', nextpnr: true });
+    assert.equal(qm.nextpnr, 'https://example.test/assets/vendor/nextpnr-spartan6/gen/bundle.js');
+    qw.send({ id: qm.id, done: { fetched: 8, bytes: 5e6, pruned: 0 } });
+    assert.deepEqual(await q, { fetched: 8, bytes: 5e6, pruned: 0 });
   } finally { delete globalThis.caches; delete globalThis.isSecureContext; }
 });
