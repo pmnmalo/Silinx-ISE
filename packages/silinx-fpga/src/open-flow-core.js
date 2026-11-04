@@ -160,6 +160,7 @@ export async function runFlow(spec, io) {
   const { runPostMap, runPostPar, runPostSynth, runPostTranslate } = (io.simModels || noSimModels)({
     io, spec, knownPips, log, netlist: () => netlist, packed: () => impl.packed?.() ?? null, parTries, parExtra, report,
     routedOrEarlier: (...a) => impl.routedOrEarlier(...a), routedText: () => impl.routedText(), step, synth: () => synth, top,
+    placeRouteNetlist: (...a) => (impl.placeRouteNetlist ? impl.placeRouteNetlist(...a) : Promise.reject(new StepError(`no Place & Route of another netlist for the ${spec.family}`))),
     constraints
   });
 

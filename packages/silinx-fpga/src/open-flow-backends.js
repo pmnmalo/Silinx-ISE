@@ -21,6 +21,7 @@ import { bitgen } from './fpga/bitgen.js';
 import { analyzeTimingS6 } from './fpga/s6/timing.js';
 import { bitstreamS6 } from './fpga/s6/bitgen.js';
 import { parseXdl } from './xdl.js';
+import { readYosysJson } from './fpga/netlist.js';
 import { mountFlowReports } from './open-flow-reports.js';
 import { mountS3eSteps } from './open-flow-s3e.js';
 import { mountS6Steps } from './open-flow-s6.js';
@@ -72,6 +73,20 @@ function xdlRouted({ io, StepError }) {
 
 // the Xilinx families' steps after the synthesis (XILINX_STEPS, ISE's names): Translate reads the netlist, then Map and
 // Place & Route (the family's, with its engines), the timing, the pins, the power, the bitstreams and the FPGA view
+// the back end's Map and Place & Route of another netlist (the simulation models' design, synthesized with the test
+// bench's generics, #122): mount(ctx) gives { runMap, runPar }, on a report and a log of their own, nothing written;
+// resolves the routed design's text (#2137: nextpnr's, no longer fpga/place-route.js's)
+function placeRouteNetlist(base, mount) {
+  return async (text, top) => {
+    let routed = null;
+    const steps = mount({ ...base, top, netlist: () => readYosysJson(text), netlistText: () => text, report: { files: {} }, log: () => {},
+      io: { ...base.io, write: name => name }, setRouted: t => { routed = t; } });
+    await steps.runMap();
+    await steps.runPar();
+    return routed;
+  };
+}
+
 function xilinxSteps(ctx, runMap, runPar, r) {
   const { top, spec, report, log } = ctx;
   return {
@@ -98,6 +113,7 @@ function mountS3e(base) {
   return {
     steps: xilinxSteps(ctx, runMap, runPar, mountFlowReports({ ...ctx, reports: S3E_REPORTS })),
     packed: own.packed, routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
+    placeRouteNetlist: placeRouteNetlist(base, c => mountNextpnrSteps(c)),
   };
 }
 
@@ -108,7 +124,8 @@ function mountS6(base) {
   const own = mountS6Steps(ctx);
   const np = ctx.spec.engine === 'nextpnr' ? mountNextpnrS6({ ...ctx, state: own.state }) : null;
   return { steps: xilinxSteps(ctx, own.runMap, () => (np || own).runPar(), mountFlowReports({ ...ctx, reports: S6_REPORTS })),
-    routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText };
+    routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
+    placeRouteNetlist: placeRouteNetlist(base, c => { const o = mountS6Steps(c); return { runMap: o.runMap, runPar: mountNextpnrS6({ ...c, state: o.state }).runPar }; }) };
 }
 
 // the synthesis's report: its lines as XST names them (the Spartan-3E's), else as the MAP report does (the part's resources)
