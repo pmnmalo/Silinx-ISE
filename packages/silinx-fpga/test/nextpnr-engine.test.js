@@ -158,7 +158,8 @@ test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) bui
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
   assert.ok(out.includes('  Number of Slice Flip Flops: 24 out of 4896 0%'), out.join('\n'));
-  assert.ok(out.includes('  Number of occupied Slices: 13 out of 2448 1%'), out.join('\n'));
+  // (12: the carry in at 0 from a GND source, not a LUT, #2797)
+  assert.ok(out.includes('  Number of occupied Slices: 12 out of 2448 0%'), out.join('\n'));
   assert.ok(out.some(l => /^constraint PERIOD 20 ns on clk: met \(period [0-9.]+ ns, slack [0-9.]+ ns\)$/.test(l)), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'));
   assert.ok(out.includes('Bitstream: build/blink.bit (169288 bytes, every feature in the bit database)'));
@@ -181,7 +182,7 @@ test('#2196 --seed 5: placements from that seed on, each reported, the fastest k
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
-  const tries = out.map(l => /^Placement (\d) of 4 \(seed (\d)\): ([0-9.]+) ns, 13 slices, in [0-9.]+ s\.$/.exec(l)).filter(Boolean);
+  const tries = out.map(l => /^Placement (\d) of 4 \(seed (\d)\): ([0-9.]+) ns, 12 slices, in [0-9.]+ s\.$/.exec(l)).filter(Boolean);
   assert.deepEqual(tries.map(m => [+m[1], +m[2]]), [[1, 5], [2, 6], [3, 7], [4, 8]]);
   const fastest = Math.min(...tries.map(m => +m[3]));
   const kept = out.map(l => /^Kept the fastest of 4 placements: seed (\d), ([0-9.]+) ns\.$/.exec(l)).find(Boolean);
@@ -195,7 +196,7 @@ test('#2196 --seed 5: placements from that seed on, each reported, the fastest k
   assert.deepEqual(out2.filter(l => /^(Placement|Kept)/.test(l)), []);
 });
 
-test('#2196 the VGA example built with --engine nextpnr: at most 148 slices as the packing fills them (#2223), no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
+test('#2196 the VGA example built with --engine nextpnr: 143 slices as the packing fills them (#2223), its constants on routing (#2797), no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'top.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('vga.json.gz'))));
@@ -204,8 +205,8 @@ test('#2196 the VGA example built with --engine nextpnr: at most 148 slices as t
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
-  assert.ok(out.includes('  Number of occupied Slices: 148 out of 2448 6%'), out.join('\n'));
-  assert.ok(out.includes('  Number of 4 input LUTs: 278 out of 4896 6%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 143 out of 2448 6%'), out.join('\n'));
+  assert.ok(out.includes('  Number of 4 input LUTs: 269 out of 4896 5%'), out.join('\n'));
   assert.ok(out.includes('  Number of Slice Flip Flops: 56 out of 4896 1%'), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'), out.join('\n'));
   const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
@@ -223,7 +224,8 @@ test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry 
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
   assert.ok(out.includes('  Number of Slice Flip Flops: 58 out of 4896 1%'), out.join('\n'));
-  assert.ok(out.includes('  Number of occupied Slices: 69 out of 2448 3%'), out.join('\n'));
+  // (66 as Silinx's engine: the pads' and the carry ins' constants on routing, #2797)
+  assert.ok(out.includes('  Number of occupied Slices: 66 out of 2448 3%'), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'), out.join('\n'));
   assert.ok(out.includes('Bitstream: build/top.bit (169286 bytes, every feature in the bit database)'), out.join('\n'));
   // the wide multiplexers on the slices' own: twelve F5s, two F6s each reading two of them
