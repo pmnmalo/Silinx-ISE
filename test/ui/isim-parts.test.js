@@ -1,7 +1,7 @@
 // UI: the parts of ISim's window (#405: out of mountISim in web/js/isim.js), the window mounted in the page on a design
 // of its own: the toolbar (isim-toolbar.js: its buttons, a run for the time typed in, Break disabled while no run goes
 // on, a marker, the cursor moved, the zooms, Save and Load Wave Configuration, #1019), the view (isim-view.js: the zoom about the cursor, the
-// fit), the status bar (isim-status.js: the simulated time, the cursor, the marker's delta), the public API
+// fit), the status bar (isim-status.js: the simulated time, the cursor, the marker's delta; the documents' status line, #2785), the public API
 // (isim-api.js: the state saved and restored, restart; the wave configuration, isim-wcfg.js) and the theme's colours (isim-colors.js: the wave window's
 // background drawn in the theme's colour).
 import { before, after } from 'node:test';
@@ -43,6 +43,12 @@ uiTest('#405 ISim window parts: the toolbar, the view, the status, the API, the 
     const $ = (s) => host.querySelector(s);
     const btn = (title) => [...host.querySelectorAll('.isim-toolbar .tb-btn')].find((b) => b.title === title);
     const r = {};
+    // the status line: the documents' (#2785, web/js/status-line.js), the same look as an editor's
+    const look = (el) => { const c = getComputedStyle(el); return [c.height, c.fontSize, c.borderTopStyle, c.borderTopColor, c.backgroundColor, c.paddingLeft]; };
+    const shared = (await import('/js/status-line.js')).statusLine().el;
+    host.append(shared);
+    r.statusLook = [$('.isim-status').classList.contains('doc-status'), look($('.isim-status')), look(shared)];
+    shared.remove();
     r.buttons = [...host.querySelectorAll('.isim-toolbar .tb-btn')].map((b) => b.title);
     r.runTime = [$('.isim-rf-val').value, $('.isim-rf-unit').value, btn('Break').disabled];
     // a run for 100 ns, typed in
@@ -68,10 +74,15 @@ uiTest('#405 ISim window parts: the toolbar, the view, the status, the API, the 
     isim.setState({ ...s, runTime: { value: '7', unit: 'ps' }, cursor: 20000, markers: [5000, 15000] });
     await wait(50);
     r.restored = [$('.isim-rf-val').value, $('.isim-rf-unit').value, isim.state.cursor, isim.state.markers.map((m) => m.t)];
-    // the colours: the theme's wave background changed, read again (refresh): the wave window drawn in it (sampled down
-    // its middle: a marker's or the cursor's line may cross one sample)
+    // the colours: the theme's wave background changed, read again (refresh): the wave window drawn in it (the share of
+    // its pixels in the theme's #2040c0 under the window's faint shading: the traces, the grid and the cursor cross some)
     const cw = $('.isim-waves');
-    const samples = () => [0.1, 0.3, 0.5, 0.7, 0.9, 0.98].map((f) => [...cw.getContext('2d').getImageData(Math.floor(cw.width / 2), Math.floor(cw.height * f), 1, 1).data.slice(0, 3)]);
+    const samples = () => {
+      const d = cw.getContext('2d').getImageData(0, 0, cw.width, cw.height).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 0x20) <= 16 && Math.abs(d[i + 1] - 0x40) <= 16 && Math.abs(d[i + 2] - 0xc0) <= 16) n++;
+      return n / (d.length / 4);
+    };
     isim.redraw();
     const before = samples();
     $('.isim').style.setProperty('--wave-bg', '#2040c0');
@@ -111,15 +122,16 @@ uiTest('#405 ISim window parts: the toolbar, the view, the status, the API, the 
     'Zoom Out', 'Zoom to Full View', 'Go to Time 0', 'Go to Latest Time', 'Previous Transition (selected signal)', 'Next Transition (selected signal)',
     'Add Marker at cursor', 'Radix of selected signals', 'Save Wave Configuration', 'Load Wave Configuration']);
   assert.deepEqual(out.runTime, ['1', 'us', true]);
+  assert.deepEqual(out.statusLook, [true, out.statusLook[2], out.statusLook[2]]);
+  assert.equal(out.statusLook[2][0], '20px');
   assert.deepEqual(out.afterRun, [100000, 'Sim Time: 100,000 ps', 'Cursor: 100 ns']);
   assert.deepEqual(out.marker, [[0], 100000, 'Marker: 0 ns   Δ = 100 ns']);
   assert.deepEqual(out.zoom, [true, false, 0.5]);
   assert.deepEqual(out.state, [['tb.clk', 'tb.q'], { value: '100', unit: 'ns' }, [0], 100000]);
   assert.deepEqual(out.restored, ['7', 'ps', 20000, [5000, 15000]]);
-  // (the theme's #2040c0 under the window's faint shading: most samples; none before)
-  const blue = ([r0, g0, b0]) => Math.abs(r0 - 0x20) <= 16 && Math.abs(g0 - 0x40) <= 16 && Math.abs(b0 - 0xc0) <= 16;
-  assert.equal(out.bg[0].filter(blue).length, 0, JSON.stringify(out.bg[0]));
-  assert.ok(out.bg[1].filter(blue).length >= 4, JSON.stringify(out.bg[1]));
+  // (the theme's blue: most of the window; none before)
+  assert.equal(out.bg[0], 0);
+  assert.ok(out.bg[1] > 0.5, JSON.stringify(out.bg));
   assert.deepEqual(out.restart, [0, 'Sim Time: 0 ps']);
   // the wave configuration: saved as ISim's .wcfg, loaded back the same
   const cfg = [['div', 'Clock', null, null], ['sig', 'clk', 'default', null], ['group', 'Count', null, null], ['sig', 'q', 'udec', 'Count']];
