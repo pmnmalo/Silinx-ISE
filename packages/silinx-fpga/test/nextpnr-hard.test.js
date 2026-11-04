@@ -86,7 +86,9 @@ const design = parseXdl(writeXdl(nextpnrToXdl(routed, device, PART)));
 const cfgOf = (i, attr) => i.cfg.find(c => c.attr === attr)?.value;
 
 test('nextpnrToXdl: a block RAM and multipliers, as Silinx\'s packer writes them', () => {
-  assert.deepEqual(xdlSize(design), { slices: 211, luts: 374, ffs: 200 });
+  // (the four slices that are constant 0s' sources, XDL_DUMMY, not counted as occupied, #2797)
+  assert.deepEqual(xdlSize(design), { slices: 207, luts: 374, ffs: 200 });
+  assert.equal(design.insts.filter(i => /^XDL_DUMMY_.*SLICE/.test(i.name) && cfgOf(i, '_GND_SOURCE') === 'Y').length, 4);
   const ram = design.insts.filter(i => i.type === 'RAMB16'), mult = design.insts.filter(i => i.type === 'MULT18X18SIO');
   assert.equal(ram.length, 1);
   assert.equal(mult.length, 3);

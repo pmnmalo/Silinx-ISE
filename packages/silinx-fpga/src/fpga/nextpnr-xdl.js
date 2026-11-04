@@ -228,14 +228,16 @@ function instanceCfg(inst, mod, part) {
       add(`FF${X}_INIT_ATTR`, '', init ? 'INIT1' : 'INIT0');
       add(`FF${X}_SR_ATTR`, '', /_SET$/.test(mode) || (mode === 'NONE' && init && !mem) ? 'SRHIGH' : 'SRLOW');
       add(`D${X}MUX`, '', inst.mux[`D${X}`] === 'bypass' ? '0' : '1');
-      ctrl = { ce: portNet(ff, 'CE') !== undefined, sr: portNet(ff, 'SR') !== undefined, sync: !/ASYNC/.test(mode) && !bitParam(ff, 'LATCH'), clkInv: bitParam(ff, 'CLKINV') };   // (a latch: ASYNC)
+      ctrl = { ce: portNet(ff, 'CE') !== undefined, sr: portNet(ff, 'SR') !== undefined, sync: !/ASYNC/.test(mode) && !bitParam(ff, 'LATCH'), clkInv: bitParam(ff, 'CLKINV'),
+        ceInv: bitParam(ff, 'CEINV'), srInv: bitParam(ff, 'SRINV') };   // (a latch: ASYNC)
     }
     if (mem) memCfg(inst, add, 'controls');
     if (ctrl) {
       // (the falling edge, or a latch with an active-high gate: CLK_B, #2457)
       if (!mem) add('CLKINV', '', ctrl.clkInv ? 'CLK_B' : 'CLK');
-      if (ctrl.ce) add('CEINV', '', 'CE');
-      if (ctrl.sr) add('SRINV', '', 'SR');
+      // (an enable or a set / reset active low: CE_B, SR_B, #2797)
+      if (ctrl.ce) add('CEINV', '', ctrl.ceInv ? 'CE_B' : 'CE');
+      if (ctrl.sr) add('SRINV', '', ctrl.srInv ? 'SR_B' : 'SR');
       // (beside a memory, whose enable has SR: a flip-flop with no set / reset, as Silinx's packer writes it)
       add('SYNC_ATTR', '', ctrl.sync && !(mem && !ctrl.sr) ? 'SYNC' : 'ASYNC');
     }
@@ -400,9 +402,10 @@ export function nextpnrToXdl(json, device, part = device.part) {
 export const nextpnrToXdlText = (json, device, part) => writeXdl(nextpnrToXdl(json, device, part));
 
 // ---------------------------------------------------------------- measuring the result
-/** The slices, LUTs and flip-flops of an XDL design (parseXdl's). */
+/** The slices, LUTs and flip-flops of an XDL design (parseXdl's). A constant 0's source (XDL_DUMMY, _NO_USER_LOGIC) is
+ *  not an occupied slice, as ISE's map and Silinx's packer count them (#2797). */
 export function xdlSize(design) {
-  const slices = design.insts.filter(i => /^SLICE[LM]$/.test(i.type));
+  const slices = design.insts.filter(i => /^SLICE[LM]$/.test(i.type) && !i.cfg.some(c => c.attr === '_NO_USER_LOGIC'));
   const has = attr => slices.reduce((n, i) => n + i.cfg.filter(c => c.attr === attr).length, 0);
   return { slices: slices.length, luts: has('F') + has('G'), ffs: has('FFX') + has('FFY') };
 }
