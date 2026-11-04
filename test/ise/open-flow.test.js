@@ -67,8 +67,7 @@ function twoPairs(part, pkg) {
   return [...byTile.values()].filter(ps => ps.length === 2).slice(0, 2).map(ps => ps.sort((a, b) => b.master - a.master).map(p => p.name));
 }
 
-// (nextpnr does not route the pair's second clock yet, #2766: todo until then)
-test('feat_iob_pair LOC\'d on two pairs of every device: the second flip-flops alone, byte-identical to ISE\'s, DRC clean, no warning', { skip, todo: !skip && 'nextpnr fails to route the second clock, #2766', timeout: 60 * 60000 }, () => {
+test('feat_iob_pair LOC\'d on two pairs of every device: the second flip-flops alone, byte-identical to ISE\'s, DRC clean, no warning', { skip, timeout: 60 * 60000 }, () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-iobpair-'));
   const names = [];
   for (const [part, pkg] of DEVICES) {

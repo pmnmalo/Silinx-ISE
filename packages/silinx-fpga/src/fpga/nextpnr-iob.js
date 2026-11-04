@@ -1,6 +1,7 @@
 // Silinx toolchain - the IOB's settings of nextpnr's routed design (#2135), as ISE's map writes them and as Silinx's
 // packer does (fpga/pack-pads.js, pack-iobcfg.js): the pad buffer, its registers (IFF1, OFF1, TFF1) and DDR registers
-// (IFF1 / IFF2, OFF1 / OFF2: an IDDR2's or ODDR2's two flip-flops, cells <instance>/FF0 and FF1).
+// (IFF1 / IFF2, OFF1 / OFF2: an IDDR2's or ODDR2's two flip-flops, cells <instance>/FF0 and FF1); a register alone on
+// its IOB's second flip-flop (IFF2, OFF2: the DIFFM of a pair whose two IOBs' registers have different clocks, #2766).
 const esc = x => String(x).replace(/:/g, '_');
 const bitsOf = v => (typeof v === 'string' ? v : (v >>> 0).toString(2));
 const portNet = (c, p) => c.connections?.[p]?.[0];
@@ -60,8 +61,27 @@ function readByFabric(mod, bit) {
     && Object.entries(x.connections || {}).some(([p, b]) => x.port_directions?.[p] === 'input' && b[0] === bit));
 }
 
+// A register alone on its second flip-flop (#2766), as ISE's map writes it (Silinx's placer did, place.js
+// secondFlipFlops, #749): the first flip-flop's settings, each named for the second (IFF1 -> IFF2 clocked by ICLK2;
+// OFF1 -> OFF2 by OTCLK2, its data on O2, OMUX on OFF2)
+const SECOND = {
+  I: ['IFF1', 'IFF1_INIT_ATTR', 'IFF1_SR_ATTR', 'ICLK1INV'],
+  O: ['OFF1', 'OFF1_INIT_ATTR', 'OFF1_SR_ATTR', 'O1INV', 'O1_DDRMUX', 'OMUX', 'OTCLK1INV'],
+};
+const second = v => v.replace(/1(?=$|_|INV$)/, '2');
+const onSecond = (cfg, groups) => {
+  const attrs = new Set(groups.flatMap(g => SECOND[g]));
+  return cfg.map(([a, n, v]) => (attrs.has(a) ? [second(a), n, /^(IFF|OFF|ICLK|OTCLK|O)1(_B)?$/.test(v) ? second(v) : v] : [a, n, v]));
+};
+
 /** An IOB instance's XDL type and settings: [attr, name, value] in the order Silinx's packer writes them. */
 export function iobSettings(c, name, mod, part) {
+  const groups = [...(c.IFF2 && !c.IFF1 ? ['I'] : []), ...(c.OFF2 && !c.OFF1 ? ['O'] : [])];
+  if (groups.length) {
+    const { IFF2, OFF2, ...rest } = c;
+    const s = iobSettings({ ...rest, ...(IFF2 && !c.IFF1 ? { IFF1: IFF2 } : { IFF2 }), ...(OFF2 && !c.OFF1 ? { OFF1: OFF2 } : { OFF2 }) }, name, mod, part);
+    return { ...s, cfg: onSecond(s.cfg, groups) };
+  }
   const i = portNet(c.IOB, 'I'), read = readByFabric(mod, i);
   const out = portNet(c.IOB, 'O') !== undefined;
   const buf = name, std = attr(c.IOB, 'IOSTANDARD') || 'LVCMOS25', pull = PULL[attr(c.IOB, 'PULL')];
