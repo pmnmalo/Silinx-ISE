@@ -151,8 +151,7 @@ export const SCH_PT_PATTERNS = [
   [/^Wire · net (.+)$/, 'Fio · rede $1'],
   [/^Net '(.*)', (\d+) (bits?)$/s, "Rede '$1', $2 $3"],
   [/^(VHDL|VERILOG) statements \(emitted verbatim\)$/, 'Instruções $1 (copiadas tal e qual)'],
-  [/^(\d+) symbols?, (\d+) nets(?: · (\d+) error\(s\), (\d+) warning\(s\))?$/,
-    (m, n, k, e, w) => `${n} símbolo${n === '1' ? '' : 's'}, ${k} redes${e ? ` · ${e} erro(s), ${w} aviso(s)` : ''}`],
+  [/^(\d+) symbols?, (\d+) nets$/, (m, n, k) => `${n} símbolo${n === '1' ? '' : 's'}, ${k} redes`],
   [/^Check Schematic: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Verificar Esquemático: $1 erro(s), $2 aviso(s)'],
   // a module's symbol out of date (#1183): what changed, Update All, what Update Symbol did
   [/^The symbol is out of date: module '(.+)' changed its ports \((.+)\)\.$/, (m, mod, what) => `O símbolo está desatualizado: o módulo '${mod}' mudou os seus portos (${what

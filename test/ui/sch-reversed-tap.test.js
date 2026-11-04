@@ -1,5 +1,5 @@
 // UI: a bus tap the wrong way round on a counter's bus (#1702): the bus still drawn as a bus (it was drawn as a 1-bit
-// wire), the tap's O not connected, and Check reports the tap. The netlist: test/schdoc-reversed-tap.test.js.
+// wire), the tap's O not connected, and Check reports the tap (not in the status line, #2784). The netlist: test/schdoc-reversed-tap.test.js.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -38,4 +38,6 @@ uiTest('#1702 a bus tap the wrong way round: the bus still drawn as a bus, Check
     await page.waitFor((ed) => /^Check Schematic: 1 error\(s\), 6 warning\(s\)/.test(document.querySelector(`${ed} .se-diags`)?.textContent || ''), [ED], { what: 'the check in the panel' });
     assert.ok((await page.eval((ed) => document.querySelector(`${ed} .se-diags`).textContent, ED)).includes(ERR));
   }
+  // the counts in the status line, the check's errors and warnings not (the console's, #2784)
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .doc-status .ds-f`)].map((f) => f.textContent).slice(0, 1), ED), ['2 symbols, 6 nets']);
 });
