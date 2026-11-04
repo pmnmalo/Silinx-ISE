@@ -2,17 +2,17 @@
 // io.simModels by core/flow-ide.js runOpenFlow; #405: out of runOpenFlow in packages/silinx-fpga/src/open-flow-core.js, #120,
 // #121, #122, #622): the design the models are made of (the test bench's generics), the post-synthesis,
 // post-translate, post-map and post-place & route models, the board's model beside them.
-import { analyzeTiming, pack, placeRouteBest, readYosysJson, synthesizeVerilog, synthesizeArea, FAST_SYNTH, StepError } from '../packages/silinx-fpga/src/index.js';
+import { analyzeTiming, pack, readYosysJson, synthesizeVerilog, synthesizeArea, FAST_SYNTH, StepError } from '../packages/silinx-fpga/src/index.js';
 import { compile, elaborate } from './compile.js';
 import { flowFrontEnd } from './synth-front.js';
 import { dutGenerics, postMapModels, postParModels, postSynthesisModels, postTranslateModels, scalarVerilog } from './sim-model.js';
-import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/parts.js';
+import { parseXdl } from '../packages/silinx-fpga/src/parts.js';
 import { primitiveSources } from './unisim.js';
 
 /** { runPostMap, runPostPar, runPostSynth, runPostTranslate } of runOpenFlow (netlist(), packed(), routedText(), synth(): its current values). */
 export function mountSimModels(ctx) {
   const {
-    io, spec, knownPips, log, netlist, packed, parTries, parExtra, report, routedOrEarlier, routedText, step, synth, top, constraints
+    io, spec, log, netlist, packed, report, routedOrEarlier, routedText, step, synth, top, constraints, placeRouteNetlist
   } = ctx;
 
   // The design the simulation models are made of (#120, #121): synthesized with the generics the test bench
@@ -151,15 +151,11 @@ export function mountSimModels(ctx) {
     let text = null;
     if (!d.own) { routedOrEarlier(); text = routedText(); }
     else {
-      let p;
-      try { p = modelPacked ||= pack(d.nl, { ucf: constraints(), part: spec.part }); } catch (e) { throw new StepError(`packing failed: ${e.message}`); }
-      let pr;
-      try {
-        pr = placeRouteBest(d.nl, p, io.device(), knownPips(), { seed: spec.seed || 1, tries: parTries(p.stats.slices), extra: parExtra(), effort: spec.effort || 1, replicate: spec.replicate !== false, routeIterations: spec.routeIterations || null, pack: { ucf: constraints(), part: spec.part } });
-      } catch (e) { throw new StepError(`placement of the model's design failed: ${e.message}`, [], e.hint); }
-      const r = pr.routed;
-      if (r.errors.length || r.failed.length || r.overused) throw new StepError(`the model's design (synthesized with the test bench's generics) could not be routed: ${r.failed.length} net(s) not routed, ${r.overused || 0} routing node(s) shared`, [...r.errors, ...r.unreached.map(u => `${u.net} -> ${u.inst}.${u.pin}`)].slice(0, 50));
-      text = writeXdl(r.design);
+      // (its own Map and Place & Route: the back end's, nextpnr, #2137)
+      log('Placing and routing the design synthesized with the test bench\'s generics (nextpnr), for its model.');
+      try { text = await placeRouteNetlist(d.synth.files[`${d.synth.top}.json`], d.synth.top); } catch (e) {
+        throw new StepError(`the model's design (synthesized with the test bench's generics) could not be placed and routed: ${e.message}`, e.list || [], e.hint);
+      }
     }
     const design = parseXdl(text);
     const sta = analyzeTiming(design, io.device());

@@ -11,6 +11,7 @@ import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { runOpenFlow } from '../core/flow-ide.js';
+import { nextpnrNode } from '../packages/silinx-fpga/src/nextpnr-node.js';
 import { orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { parseSdf, annotateSdf } from '../core/sdf.js';
 import { loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
@@ -34,8 +35,9 @@ export const bitDb = () => {
 };
 export const flow = (spec, sources, sims, ucf = null) => {
   const store = {}, lines = [];
-  return runOpenFlow({ part: PART, device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1, ...spec },
-    { log: l => lines.push(l), sources: () => sources, simSources: () => sims, ucf, device, bitDb, yosys: yosysNode,
+  // (the application's engine, nextpnr, #2137)
+  return runOpenFlow({ part: PART, device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1, engine: 'nextpnr', ...spec },
+    { log: l => lines.push(l), sources: () => sources, simSources: () => sims, ucf, device, bitDb, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() },
       write: (n, d) => { store[n] = d; return `build/${n}`; }, read: n => store[n] ?? null, save: () => {} }).then(r => ({ ...r, store, lines }));
 };
 // a netlist (with its SDF built in) compiled with the test bench, elaborated and simulated: the log, its errors
@@ -103,6 +105,8 @@ export async function exampleTimesim(name, langs = ['vhdl', 'verilog']) {
   if (Object.keys(pm.generics || {}).length) {
     assert.deepEqual(pm.board, { path: `build/netgen/par/${top}_timesim_board.vhd`, verilog: `build/netgen/par/${top}_timesim_board.v` }, name);
     assert.match(r.store[`netgen/par/${top}_timesim.vhd`], /Synthesized with the generics the test bench/, name);
+    // (placed and routed by the back end's engine, nextpnr, #2137)
+    assert.ok(r.lines.includes('Placing and routing the design synthesized with the test bench\'s generics (nextpnr), for its model.'), name);
     assert.doesNotMatch(r.store[`netgen/par/${top}_timesim_board.vhd`], /Synthesized with the generics/, name);
   } else assert.equal(pm.board, undefined, name);
   const sdf = parseSdf(r.store[`netgen/par/${top}_timesim.sdf`]);
