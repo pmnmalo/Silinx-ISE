@@ -1,5 +1,60 @@
-// The MCP server's tools of the HDL (server/mcp.js, #134): Check Syntax and the behavioural simulation.
+// The MCP server's tools of the HDL (server/mcp.js, #134): Check Syntax and the simulation, of the behavioural model or
+// (#2674) of a simulation model of the flow (post-synthesis, post-translate, post-map, post-place & route, with its
+// timing), as the interface simulates them (web/js/viewers.js runSimulation, netlistSources), the project's data
+// files given to it; its waves written as a VCD file.
+import fs from 'node:fs';
+import path from 'node:path';
+import * as P from './projects.js';
 import { toolError, clip, elaborateView, diagLine, diagJson, STR, PROJECT } from './mcp-util.js';
+
+export const SIM_MODELS = { postsynth: 'Post-Synthesis', posttrans: 'Post-Translate', postmap: 'Post-Map', postpar: 'Post-Place & Route' };
+// the process that makes each model (run_process), and the stage it comes after
+export const MODEL_PROCESS = { postsynth: 'post_synthesis_model', posttrans: 'post_translate_model', postmap: 'post_map_model', postpar: 'post_par_model' };
+const STAGE = { postsynth: 'synth', posttrans: 'translate', postmap: 'map', postpar: 'par' };
+
+// the project's data files ($readmemh, textio: viewers.js readDataFiles), with the sources' texts
+async function dataFiles(name, srcs) {
+  const map = new Map(srcs.map(s => [s.path, s.text]));
+  for (const f of (await P.fileTree(name)).filter(f => /\.(mem|hex|txt|dat|coe|bin)$/i.test(f) && !/^build\//.test(f))) {
+    try { map.set(f, await P.readFile(name, f)); } catch { /* ignore */ }
+  }
+  return map;
+}
+
+// the netlist of a simulation model as the interface simulates it: its timing (the post-place & route SDF) built in,
+// its nets single bits; { sources, notes, warnings } or a tool error when there is none
+async function modelSources(name, pj, model, generate) {
+  const { projectReports } = await import('./impl-routes.js');
+  const modelOf = async () => { const r = await projectReports(name).catch(() => null); return r?.simModels?.[model] && r.top === pj.top ? r.simModels[model] : null; };
+  let m = await modelOf();
+  const notes = [], warnings = [];
+  if (!m) {
+    if (!generate) throw toolError(`There is no ${SIM_MODELS[model].toLowerCase()} simulation model of '${pj.top}' yet: run_process ${MODEL_PROCESS[model]} (or generate: true).`);
+    const { runProcess } = await import('./mcp-processes.js');
+    const r = await runProcess(name, MODEL_PROCESS[model]);
+    if (!r.ok) throw toolError(`"${MODEL_PROCESS[model]}" failed: ${r.errors.slice(0, 3).join('; ') || 'see run_process'}`);
+    notes.push(`${SIM_MODELS[model]} simulation model generated (${MODEL_PROCESS[model]}).`);
+    m = await modelOf();
+    if (!m) throw toolError(`"${MODEL_PROCESS[model]}" made no ${SIM_MODELS[model].toLowerCase()} model`);
+  }
+  // older than the sources: said, as the interface says it of a stale model
+  const t = m.mtime ? Date.parse(m.mtime) : null;
+  const newest = Math.max(0, ...(pj.files || []).map(f => { try { return fs.statSync(path.join(P.projectDir(name), f.path)).mtimeMs; } catch { return 0; } }));
+  if (t && newest > t) warnings.push(`WARNING: the ${SIM_MODELS[model].toLowerCase()} model is older than the sources (run "${MODEL_PROCESS[model]}" again to update it).`);
+  let raw = await P.readFile(name, m.path);
+  if (m.sdf) {
+    try {
+      const { parseSdf, annotateSdf } = await import('../core/sdf.js');
+      const a = annotateSdf(raw, 'vhdl', parseSdf(await P.readFile(name, m.sdf)));
+      raw = a.text;
+      notes.push(`Timing: ${m.sdf} (${a.annotated} instances with their delays).`);
+    } catch (e) { warnings.push(`WARNING: the model is simulated without its timing (${m.sdf}: ${e.message}).`); }
+  }
+  const { scalarizeNetlist } = await import('../core/netlist-hier.js');
+  const { primitiveSources } = await import('../core/unisim.js');
+  const net = { path: m.path, lang: 'vhdl', text: scalarizeNetlist(raw), role: 'design', netlist: model };
+  return { sources: [...primitiveSources([net]), net], notes, warnings, file: m.path };
+}
 
 export const HDL_TOOLS = [
   {
@@ -19,23 +74,47 @@ export const HDL_TOOLS = [
   },
   {
     name: 'simulate', title: 'Simulate Behavioral Model',
-    description: 'Run the behavioural simulation of the project\'s test bench (or another top) for a time: its messages (report / $display, assertions), where it stopped, and the values of signals (the test bench\'s by default; hierarchical names as tb/uut/count) with their changes.',
+    description: 'Run the simulation of the project\'s test bench (or another top) for a time, behavioural or against a simulation model of the flow (post-synthesis, post-translate, post-map, post-place & route with its timing): its messages (report / $display, assertions), where it stopped, and the values of signals (the test bench\'s by default; hierarchical names as tb/uut/count) with their changes.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, top: STR('The simulation top (default: the project\'s test bench).'),
       time_ns: { type: 'number', description: 'How long to simulate, in ns (default 1000; at most 1e9).' },
       signals: { type: 'array', items: { type: 'string' }, description: 'The signals to return (names of the top, or paths through instances: uut/count).' },
       max_changes: { type: 'integer', description: 'The changes of each signal returned at most (default 20, the last ones).' },
+      model: { type: 'string', enum: ['behavioral', ...Object.keys(SIM_MODELS)], description: 'What the test bench runs against: behavioral (the sources, default), or a simulation model of the flow of the project\'s top: postsynth, posttrans, postmap, postpar (with its timing).' },
+      generate: { type: 'boolean', description: 'A model not made yet: make it first (its run_process), as "Generate and Simulate" does.' },
+      vcd: STR('Write the waves as a VCD file into the exchange folder (its name, e.g. tb.vcd; a new file).'),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
-    async run({ project: name, top, time_ns: timeNs = 1000, signals, max_changes: maxChanges = 20 }) {
+    async run({ project: name, top, time_ns: timeNs = 1000, signals, max_changes: maxChanges = 20, model = 'behavioral', generate = false, vcd }) {
       if (!(timeNs > 0) || timeNs > 1e9) throw toolError('time_ns: from 0 to 1e9 ns');
-      const { srcs, design, top: mod, diags } = await elaborateView(name, { top, sim: true });
+      if (model !== 'behavioral' && !SIM_MODELS[model]) throw toolError(`model: behavioral or one of ${Object.keys(SIM_MODELS).join(', ')}`);
+      // the behavioural Check Syntax first, as the interface's simulation does
+      const view = await elaborateView(name, { top, sim: true });
+      const { srcs, top: mod, diags } = view;
+      let { design } = view;
       const errors = diags.filter(d => d.severity === 'error');
       if (errors.length || !design?.top) return { text: [...errors.map(diagLine), `The simulation of <${mod}> did not start: ${errors.length} error(s) (check_syntax with simulation).`].join('\n'), data: { project: name, top: mod, started: false, errors: errors.map(diagJson) }, isError: true };
-      const { Simulator } = await import('../core/simulator.js');
+      // a model of the flow: the test bench against its netlist, compiled after the sources (its entity replaces the RTL one)
+      const head = [];
+      let simSrcs = srcs;
+      if (model !== 'behavioral') {
+        const pj = await P.readProject(name);
+        if (!pj.top) throw toolError(`the project '${name}' has no top module: its models are of the top`);
+        const net = await modelSources(name, pj, model, generate);
+        head.push(...net.notes, ...net.warnings);
+        const { compile, elaborate } = await import('../core/compile.js');
+        const { primitiveSources } = await import('../core/unisim.js');
+        simSrcs = [...srcs, ...net.sources];
+        const lib = compile([...primitiveSources(srcs), ...simSrcs]);
+        lib.errors = lib.errors.filter(e => !/redefined/.test(e.message));
+        design = elaborate(lib, mod);
+        const errs = [...lib.errors, ...design.diags].filter(d => d.severity === 'error');
+        if (errs.length || !design.top) return { text: [...head, ...errs.map(diagLine), `The simulation of <${mod}> with the ${SIM_MODELS[model].toLowerCase()} model did not start: ${errs.length} error(s).`].join('\n'), data: { project: name, top: mod, model, started: false, errors: errs.map(diagJson) }, isError: true };
+      }
+      const { Simulator, toVCD } = await import('../core/simulator.js');
       const V = await import('../core/values.js');
       const log = [];
-      const sim = new Simulator(design, { files: new Map(srcs.map(s => [s.path, s.text])), onLog: e => { if (log.length < 500) log.push({ timeNs: e.time / 1000, kind: e.kind, text: e.text }); } });
+      const sim = new Simulator(design, { files: await dataFiles(name, simSrcs), onLog: e => { if (log.length < 500) log.push({ timeNs: e.time / 1000, kind: e.kind, text: e.text }); } });
       // the signals by name: the top's, then through its instances (uut/count)
       const byPath = new Map();
       const walk = (inst, prefix) => {
@@ -58,9 +137,18 @@ export const HDL_TOOLS = [
       }
       const failed = st.finished === 'error' || log.some(l => l.kind === 'error' || l.kind === 'failure');
       const stopped = `Simulation of <${mod}> stopped at ${st.now / 1000} ns${st.finished ? ` (${st.finished})` : ''}.`;
-      const text = [...diags.filter(d => d.severity !== 'error').map(diagLine), ...log.map(l => `[${l.timeNs.toFixed(3)} ns] ${l.kind === 'print' ? '' : `${l.kind.toUpperCase()}: `}${l.text}`), stopped,
-        ...Object.entries(sigs).map(([n, s]) => `${n} = ${s.final ?? '(no value)'}${s.totalChanges > 1 ? ` (${s.totalChanges} changes)` : ''}`)].join('\n');
-      return { text: clip(text), data: { project: name, top: mod, started: true, stoppedAtNs: st.now / 1000, finished: st.finished || null, failed, log, signals: sigs, warnings: diags.filter(d => d.severity !== 'error').map(diagJson) }, isError: false };
+      // its waves as a VCD file, into the exchange folder (Export VCD: the user picks the file)
+      let vcdPath = null;
+      if (vcd) {
+        const { exchangePath } = await import('./mcp-transfer.js');
+        vcdPath = await exchangePath(vcd, 'vcd');
+        if (!/\.vcd$/i.test(vcdPath)) throw toolError(`vcd: '${vcd}' is not a .vcd`);
+        if (!fs.existsSync(path.dirname(vcdPath))) throw toolError(`no folder '${path.dirname(vcdPath)}'`);
+        try { fs.writeFileSync(vcdPath, toVCD(design, sim), { flag: 'wx' }); } catch (e) { throw toolError(e.code === 'EEXIST' ? `'${vcdPath}' exists: a VCD does not replace a file (give another name)` : e.message); }
+      }
+      const text = [...head, ...diags.filter(d => d.severity !== 'error').map(diagLine), ...log.map(l => `[${l.timeNs.toFixed(3)} ns] ${l.kind === 'print' ? '' : `${l.kind.toUpperCase()}: `}${l.text}`), stopped,
+        ...Object.entries(sigs).map(([n, s]) => `${n} = ${s.final ?? '(no value)'}${s.totalChanges > 1 ? ` (${s.totalChanges} changes)` : ''}`), ...(vcdPath ? [`Waves written: ${vcdPath}.`] : [])].join('\n');
+      return { text: clip(text), data: { project: name, top: mod, model, started: true, stoppedAtNs: st.now / 1000, finished: st.finished || null, failed, log, signals: sigs, warnings: diags.filter(d => d.severity !== 'error').map(diagJson), notes: head, ...(vcdPath ? { vcd: vcdPath } : {}) }, isError: false };
     },
   },
 ];
