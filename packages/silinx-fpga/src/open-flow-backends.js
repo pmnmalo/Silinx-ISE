@@ -87,39 +87,22 @@ function xilinxSteps(ctx, runMap, runPar, r) {
   };
 }
 
-// nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine: 'nextpnr' always; 'auto' when it can
-// implement the design (its cells, every port's pad), else the Silinx engine, which Map says
+// nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js) by spec.engine 'nextpnr', the application's (#2137: no
+// fallback to the Silinx engine); the Silinx engine's otherwise, until it goes (#2137)
 function mountS3e(base) {
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
-  const { spec, log } = ctx;
   const own = mountS3eSteps(ctx);
-  const np = (spec.engine === 'nextpnr' || spec.engine === 'auto') ? mountNextpnrSteps(ctx) : null;
-  let viaNextpnr = null;
-  const useNextpnr = async () => {
-    if (viaNextpnr !== null) return viaNextpnr;
-    viaNextpnr = !!np && (spec.engine === 'nextpnr' || !np.problems().length);
-    if (np && !viaNextpnr) {
-      const p = np.problems();
-      log(`Map: the nextpnr engine cannot implement this design yet (${p[0]}${p.length > 1 ? `, and ${p.length - 1} more` : ''}): the Silinx engine places and routes it.`);
-    } else if (viaNextpnr && spec.engine === 'auto') {
-      // 'auto' with nextpnr not starting (offline, its chip database not downloaded yet, #2329): the Silinx engine, warned
-      try { await np.load(); } catch (e) {
-        viaNextpnr = false;
-        log(`WARNING:Map - the nextpnr engine could not start (${e.message}): the Silinx engine places and routes this design.`);
-      }
-    }
-    return viaNextpnr;
-  };
-  const runMap = async () => (await useNextpnr() ? np.runMap : own.runMap)();
-  const runPar = async () => (await useNextpnr() ? np.runPar : own.runPar)();
+  const np = ctx.spec.engine === 'nextpnr' ? mountNextpnrSteps(ctx) : null;
+  const runMap = () => (np || own).runMap();
+  const runPar = () => (np || own).runPar();
   return {
     steps: xilinxSteps(ctx, runMap, runPar, mountFlowReports({ ...ctx, reports: S3E_REPORTS })),
     packed: own.packed, routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
   };
 }
 
-// the Spartan-6's Map and Place & Route (#732: open-flow-s6.js); by nextpnr ('nextpnr' only, #2138): Silinx's Map,
-// nextpnr's Place & Route (open-flow-nextpnr-s6.js)
+// the Spartan-6's Map and Place & Route (#732: open-flow-s6.js); by nextpnr (spec.engine 'nextpnr', #2138, the
+// application's since #2137): Silinx's Map, nextpnr's Place & Route (open-flow-nextpnr-s6.js)
 function mountS6(base) {
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
   const own = mountS6Steps(ctx);

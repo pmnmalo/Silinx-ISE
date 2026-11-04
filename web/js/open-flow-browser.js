@@ -51,12 +51,8 @@ export const yosysBundleUrl = (base = assetsBase()) => new URL(LAYOUT.yosys, bas
 export const nextpnrBundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnr || 'vendor/nextpnr-spartan/gen/bundle.js', base).href;
 /** The URL of the Spartan-6's nextpnr bundle (nextpnr-himbaechel-spartan6, its chip databases in ../chipdb, #2288). */
 export const nextpnrS6BundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnrS6 || 'vendor/nextpnr-spartan6/gen/bundle.js', base).href;
-// does Implement of a family run nextpnr with the project's engine (impl)? The Spartan-3E's but with the Silinx engine
-// (#2136); the Spartan-6's only when chosen (#2288: its 'auto' is the Silinx engine's)
-const usesNextpnr = (family, impl) => {
-  const np = familyProfile(family).openFlow?.nextpnr;
-  return np === true ? engineOf(impl) !== 'silinx' : np === 'chosen' && engineOf(impl) === 'nextpnr';
-};
+// does Implement of a family run nextpnr? The Spartan-3E's and the Spartan-6's (#2136, #2288, #2137: nextpnr, the one engine)
+const usesNextpnr = family => !!familyProfile(family).openFlow?.nextpnr;
 
 /** Can the browser edition implement a design for this device? { available, reason, part, family, graph, steps (the
  *  steps it has for the device, when not all of them: the Spartan-6's, as the server's openStatus) }. */
@@ -200,7 +196,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
 
 /**
  * What Implement of the project's device fetches (Yosys, the device description, its bit database; nextpnr and the device's
- * chip database when the project's engine (impl, engineOf) runs it, #2136, #2288), fetched into the
+ * chip database, #2136, #2288), fetched into the
  * browser's Cache Storage by the flow's worker, in the background, when a project opens (#967): its first run does not
  * wait for 17 MB to download. Nothing in a page opened from a file (the single file: WebKit and Firefox give it a
  * Cache Storage, and a navigation that cancelled the download was a console error in WebKit, #1450), where there is
@@ -208,14 +204,14 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
  * Resolves { fetched, bytes, pruned } or null.
  */
 const prepared = new Set();
-export function prepareBrowserFlow(device = {}, impl = undefined) {
+export function prepareBrowserFlow(device = {}) {
   const st = browserOpenStatus(device);
   if (!st.available || !st.graph || prepared.has(st.graph) || globalThis.location?.protocol === 'file:' || !globalThis.isSecureContext || !globalThis.caches) return Promise.resolve(null);
   prepared.add(st.graph);
   const w = getWorker(), id = ++runSeq;
   return new Promise(resolve => {
     runs.set(id, { onData: data => { if (data.done) { runs.delete(id); resolve(data.done); } }, fail: () => { runs.delete(id); prepared.delete(st.graph); resolve(null); } });
-    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: usesNextpnr(st.family, impl) }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: st.family === 'spartan6' ? nextpnrS6BundleUrl() : nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: usesNextpnr(st.family) }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: st.family === 'spartan6' ? nextpnrS6BundleUrl() : nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
   });
 }
 

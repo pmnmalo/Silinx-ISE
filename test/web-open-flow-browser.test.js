@@ -114,11 +114,11 @@ test('#967 prepareBrowserFlow: the device\'s assets asked of the flow\'s worker 
     const q = prepareBrowserFlow(dev2);
     live().onerror({ message: 'boom' });
     assert.equal(await q, null);
-    // (a project on the Silinx engine: no nextpnr fetched, #2136)
-    const q2 = prepareBrowserFlow(dev2, { engine: 'silinx' });
+    // (a project saved with the Silinx engine, #2136: nextpnr too, the one engine since #2137)
+    const q2 = prepareBrowserFlow(dev2);
     const w2 = live(), m2 = w2.posted.at(-1);
     assert.equal(m2.prepare.graph, 'xc3s1200efg320-4.json.gz');
-    assert.equal(m2.prepare.nextpnr, false);
+    assert.equal(m2.prepare.nextpnr, true);
     w2.send({ id: m2.id, done: { fetched: 0, bytes: 0, pruned: 1 } });
     assert.deepEqual(await q2, { fetched: 0, bytes: 0, pruned: 1 });
   } finally { delete globalThis.caches; delete globalThis.isSecureContext; }
@@ -179,13 +179,14 @@ test('#2103 the Spartan-6 in the browser: the Nexys3\'s and the Atlys\'s parts, 
   try {
     const p = prepareBrowserFlow(nexys3);
     const pw = live(), pm = pw.posted.at(-1);
-    // (no nextpnr: the Spartan-6's engine is Silinx's unless the project asks for nextpnr, which the browser has not for it)
-    assert.deepEqual(pm.prepare, { graph: 'xc6slx16csg324-3.json.gz', part: 'xc6slx16csg324-3', family: 'spartan6', device: 'xc6slx16', pkg: 'csg324', nextpnr: false });
+    // (nextpnr, the Spartan-6's engine too since #2137: its bundle and chip database, #2288)
+    assert.deepEqual(pm.prepare, { graph: 'xc6slx16csg324-3.json.gz', part: 'xc6slx16csg324-3', family: 'spartan6', device: 'xc6slx16', pkg: 'csg324', nextpnr: true });
+    assert.equal(pm.nextpnr, 'https://example.test/assets/vendor/nextpnr-spartan6/gen/bundle.js');
     pw.send({ id: pm.id, done: { fetched: 30, bytes: 3e6, pruned: 0 } });
     assert.deepEqual(await p, { fetched: 30, bytes: 3e6, pruned: 0 });
-    // (#2288: a project that chooses nextpnr: the Spartan-6's bundle and chip database; 'auto' is the Silinx engine's)
+    // (the Atlys's)
     const atlys = { family: 'spartan6', part: 'xc6slx45', package: 'csg324', speed: '-3' };
-    const q = prepareBrowserFlow(atlys, { engine: 'nextpnr' });
+    const q = prepareBrowserFlow(atlys);
     const qw = live(), qm = qw.posted.at(-1);
     assert.deepEqual(qm.prepare, { graph: 'xc6slx45csg324-3.json.gz', part: 'xc6slx45csg324-3', family: 'spartan6', device: 'xc6slx45', pkg: 'csg324', nextpnr: true });
     assert.equal(qm.nextpnr, 'https://example.test/assets/vendor/nextpnr-spartan6/gen/bundle.js');

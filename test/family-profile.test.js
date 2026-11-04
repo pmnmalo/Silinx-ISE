@@ -70,9 +70,8 @@ test('the open flow: the parts each family\'s Silinx toolchain takes, its bit da
   }
   assert.equal(familyProfile('spartan3e').openFlow.bitDb, 'bitdb');
   assert.equal(familyProfile('spartan6').openFlow.bitDb, 's6');
-  // nextpnr: the Spartan-3E's by default (#2136), the Spartan-6's when the project chooses it (#2288)
-  assert.deepEqual(Object.fromEntries(Object.keys(FAMILY_PROFILES).filter(f => familyProfile(f).openFlow?.nextpnr).map(f => [f, familyProfile(f).openFlow.nextpnr])),
-    { spartan3e: true, spartan6: 'chosen' });
+  // nextpnr: the Spartan-3E's and the Spartan-6's engine (#2136, #2288, #2137)
+  assert.deepEqual(Object.keys(FAMILY_PROFILES).filter(f => familyProfile(f).openFlow?.nextpnr), ['spartan3e', 'spartan6']);
   for (const dev of ['xc3s200a', 'xc3s400', 'xc6slx45t', 'xc7a35t']) {
     assert.ok(!familyProfile('spartan3e').openFlow.parts.test(dev) && !familyProfile('spartan6').openFlow.parts.test(dev), dev);
   }

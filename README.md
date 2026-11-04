@@ -512,8 +512,8 @@ synthesizes any design with Yosys compiled to WebAssembly, in parallel Web Worke
 **Speed**. Fast maps the design once and Place & Route makes one placement: the quickest build. Area, the default of a
 new project, also synthesizes as Speed does and keeps the smaller netlist (by slices, then LUTs), with one placement and no
 register replication. Speed tries the mappings for speed, its state machines of 8 states or more one-hot, and keeps the
-fastest; Place & Route makes several placements and keeps the fastest (two and a third when the placer estimates it faster
-with Silinx's engine, eight with nextpnr's). A project made before these three is Fast (its Speed and Normal). ISE gets
+fastest; Place & Route makes several placements and keeps the fastest (eight by nextpnr on the Spartan-3E, three on the
+Spartan-6). A project made before these three is Fast (its Speed and Normal). ISE gets
 them as its Optimization Goal and Effort: Speed / Normal, Area / High and Speed / High. Implement Design and Generate Programming File do not
 synthesize again while the synthesis is up to date (the design's sources, top, device and Optimization
 unchanged). For the **Basys2-100 and Basys2-250

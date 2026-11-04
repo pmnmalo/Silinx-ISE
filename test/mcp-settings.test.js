@@ -108,19 +108,22 @@ test('set_design_properties: the errors', async () => {
   assert.deepEqual((await P.readProject('b4')).device, { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' });
 });
 
-test('set_process_properties: the Optimization, the start-up clock, the place and route engine', async () => {
+test('set_process_properties: the Optimization, the start-up clock; no place and route engine (#2137: nextpnr, the one engine)', async () => {
   await ok('new_project_from_example', { name: 'p1', example: 'gates' });
-  const r = await ok('set_process_properties', { project: 'p1', optimization: 'area', startup_clock: 'cclk', pr_engine: 'nextpnr' });
-  assert.equal(r.text, 'p1: Optimization area, FPGA start-up clock cclk, place and route nextpnr.');
-  assert.deepEqual((await P.readProject('p1')).impl, { optMode: 'Area', optLevel: 2, startupClk: 'CCLK', engine: 'nextpnr' });
+  // (a project saved by an earlier version with an engine, #2136: dropped on the next change)
+  await P.updateProject('p1', p => ({ ...p, impl: { ...(p.impl || {}), engine: 'silinx' } }));
+  const r = await ok('set_process_properties', { project: 'p1', optimization: 'area', startup_clock: 'cclk' });
+  assert.equal(r.text, 'p1: Optimization area, FPGA start-up clock cclk.');
+  assert.deepEqual(r.data, { project: 'p1', optimization: 'area', startupClock: 'cclk' });
+  assert.deepEqual((await P.readProject('p1')).impl, { optMode: 'Area', optLevel: 2, startupClk: 'CCLK' });
   // one at a time: the others kept
   const s = await ok('set_process_properties', { project: 'p1', optimization: 'speed' });
-  assert.equal(s.text, 'p1: Optimization speed, FPGA start-up clock cclk, place and route nextpnr.');
-  assert.deepEqual((await P.readProject('p1')).impl, { optMode: 'Speed', optLevel: 2, startupClk: 'CCLK', engine: 'nextpnr' });
+  assert.equal(s.text, 'p1: Optimization speed, FPGA start-up clock cclk.');
+  assert.deepEqual((await P.readProject('p1')).impl, { optMode: 'Speed', optLevel: 2, startupClk: 'CCLK' });
   const f = await ok('set_process_properties', { project: 'p1', optimization: 'fast', startup_clock: 'jtag' });
-  assert.equal(f.text, 'p1: Optimization fast, FPGA start-up clock jtag, place and route nextpnr.');
-  await fails('set_process_properties', { project: 'p1' }, 'give optimization, startup_clock or pr_engine');
+  assert.equal(f.text, 'p1: Optimization fast, FPGA start-up clock jtag.');
+  await fails('set_process_properties', { project: 'p1' }, 'give optimization or startup_clock');
   await fails('set_process_properties', { project: 'p1', optimization: 'tiny' }, 'optimization: one of fast, area, speed');
   await fails('set_process_properties', { project: 'p1', startup_clock: 'JtagClk' }, 'startup_clock: one of jtag, cclk, user');
-  await fails('set_process_properties', { project: 'p1', pr_engine: 'vpr' }, 'pr_engine: one of silinx, auto, nextpnr');
+  await fails('set_process_properties', { project: 'p1', pr_engine: 'silinx' }, 'unknown pr_engine');
 });

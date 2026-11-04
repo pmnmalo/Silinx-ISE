@@ -3,6 +3,15 @@
 // flow worker (web/js/open-flow-worker.js), each loading the package its own way; io.nextpnr.spartan6 the same from the spartan6
 // one's (@silinx/nextpnr-himbaechel-spartan6, #2138: nextpnr-s6-node.js).
 
+/** The hint of a chip database nextpnr could not load (offline, not downloaded yet: #2329; no other engine to fall back on, #2137). */
+export const CHIPDB_HINT = 'Implement again when this computer is online: nextpnr\'s chip database is downloaded once, then kept.';
+/** nextpnr's chip database of a part (np: a micro-architecture's of io.nextpnr), its failure a StepError (the flow's) saying so. */
+export async function loadChipdb(np, part, log, StepError) {
+  try { return await np.chipdb(part, log); } catch (e) {
+    throw new StepError(`nextpnr's chip database of ${part} could not be downloaded (${e.message})`, [], CHIPDB_HINT);
+  }
+}
+
 /** A micro-architecture's of io.nextpnr: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }; load() resolves the package's module,
  *  whose function `runner` runs nextpnr. */
 export function nextpnrIo(load, runner = 'runNextpnrHimbaechelSpartan3e') {

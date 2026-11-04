@@ -10,6 +10,7 @@ import { UCF, readConstraints } from './constraints.js';
 import { portAssignments, ucfPattern } from './ucf.js';
 export { engineOf } from './open-steps.js';
 import { parseXdl, writeXdl } from './xdl.js';
+import { loadChipdb } from './nextpnr-io.js';
 import { checkRouting } from './fpga/route.js';
 import { deviceSites } from './fpga/place.js';
 import { analyzeTiming } from './fpga/timing.js';
@@ -300,7 +301,7 @@ export const NEXTPNR_TRIES = { normal: 4, high: 8, maxSlices: 500 };
 export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRIES.high : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
 
 /**
- * { problems, runMap, runPar } of runFlow for the nextpnr engine (problems(): what keeps it from the design, [] if nothing). ctx: { io, spec, log, report, util, now, ms, netlistText (a
+ * { runMap, runPar } of runFlow for the nextpnr engine. ctx: { io, spec, log, report, util, now, ms, netlistText (a
  * getter: the synthesis's JSON), top, constraints, StepError, setRouted (the routed design's text, for the reports and
  * the bitstream) }. io.nextpnr.spartan3e: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }.
  */
@@ -310,22 +311,12 @@ export function mountNextpnrSteps(ctx) {
   let input = null, sdc = '';
   const part = `${spec.device}${spec.pkg}`;
 
-  // what keeps the nextpnr engine from implementing the design, [] when nothing (the engine 'auto' then takes it)
-  let found = null;
-  function problems() {
-    if (found) return found;
-    if (spec.family !== 'spartan3e') return (found = [`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`]);
-    if (!io.nextpnr?.spartan3e) return (found = ['the nextpnr engine is not available here (io.nextpnr)']);
-    return (found = nextpnrNetlist(netlistText(), top, model(), io.device()).problems);
-  }
-
   function runMap() {
-    if (spec.family !== 'spartan3e') throw new StepError(`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`, [], 'Choose the Silinx engine (Toolchain Settings).');
-    if (!io.nextpnr?.spartan3e) throw new StepError('the nextpnr engine is not available here (io.nextpnr)', [], 'Choose the Silinx engine (Toolchain Settings).');
+    if (spec.family !== 'spartan3e') throw new StepError(`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`);
+    if (!io.nextpnr?.spartan3e) throw new StepError('the nextpnr engine is not available here (io.nextpnr)');
     const r = nextpnrNetlist(netlistText(), top, model(), io.device());
     if (r.problems.length) {
-      throw new StepError(`the nextpnr engine cannot implement this design yet: ${r.problems.length} problem(s)`, r.problems.slice(0, 50),
-        'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
+      throw new StepError(`the nextpnr engine cannot implement this design yet: ${r.problems.length} problem(s)`, r.problems.slice(0, 50));
     }
     input = JSON.stringify(r.json);
     sdc = r.sdc;
@@ -334,7 +325,7 @@ export function mountNextpnrSteps(ctx) {
 
   // nextpnr and the device's chip database, loaded once (offline, a database not downloaded yet fails: #2329)
   let db = null;
-  const load = async () => (db ||= await io.nextpnr.spartan3e.chipdb(part, log));
+  const load = async () => (db ||= await loadChipdb(io.nextpnr.spartan3e, part, log, StepError));
 
   async function runPar() {
     if (!input) runMap();
@@ -408,5 +399,5 @@ export function mountNextpnrSteps(ctx) {
     for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
   }
 
-  return { problems, load, runMap, runPar };
+  return { runMap, runPar };
 }

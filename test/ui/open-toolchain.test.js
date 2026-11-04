@@ -1004,11 +1004,13 @@ uiTest('#282 #2470 open mode: Optimization Fast (an example\'s) synthesizes once
   assert.ok(!/is up to date/.test(log) && log.includes(FAST), log.slice(0, 2000));
 }, { timeout: 300000, ui: 'ise' });
 
-// #2136: Process Properties chooses the place and route engine of the Silinx toolchain; nextpnr (Silinx when it cannot)
-// by default: it implements blinky with nextpnr; the Silinx engine when chosen, saved with the project; Portuguese
-uiTest('#2136 open mode: Process Properties chooses the place and route engine, nextpnr by default; the Silinx engine when chosen; Portuguese', E, async (page) => {
+// #2137: nextpnr, the one place and route engine of the Silinx toolchain: Process Properties has no choice of it (in
+// Portuguese neither); a project saved with the Silinx engine (#2136's choice) implements with nextpnr, its choice dropped on OK
+uiTest('#2137 open mode: no place and route engine to choose; a project saved with the Silinx engine implements with nextpnr; Portuguese', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'OpenEngine', template: 'blinky' });
+  const pj = await env.server.api('GET', '/api/projects/OpenEngine');
+  await env.server.api('PUT', '/api/projects/OpenEngine', { ...pj, impl: { ...pj.impl, engine: 'silinx' } });
   await page.openProject('OpenEngine');
   await reloadToolchain(page);
   // (the Silinx interface: Implement's task, its Processes panel there)
@@ -1021,40 +1023,32 @@ uiTest('#2136 open mode: Process Properties chooses the place and route engine, 
     return page.eval(() => [...document.querySelectorAll('.dlg-overlay .form-grid > *')].map((e) => e.tagName === 'SELECT' ? [...e.options].map((o) => o.text).join('|') : e.textContent.trim()).filter(Boolean));
   };
   const fields = await props();
-  assert.ok(fields.includes('Place & Route Engine:'), fields.join('\n'));
-  assert.ok(fields.includes('Silinx|nextpnr (Silinx when it cannot)|nextpnr only'), fields.join('\n'));
-  // (a project that never chose one: nextpnr, Silinx when it cannot)
-  assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay select')].find((x) => [...x.options].some((o) => o.value === 'auto')).value), 'auto');
+  assert.deepEqual(fields.slice(0, 4), ['Optimization:', 'Fast|Area|Speed', 'FPGA Start-Up Clock:', 'JTAG Clock|CCLK|User Clock']);
+  assert.ok(!fields.some((f) => /Engine|nextpnr/.test(f)), fields.join('\n'));
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('pt');
   try {
     const pt = await props('Implementar Projeto', 'Propriedades do Processo…');
-    assert.ok(pt.includes('Motor de Place & Route:') && pt.includes('Silinx|nextpnr (Silinx quando não consegue)|Só nextpnr'), pt.join('\n'));
+    assert.deepEqual(pt.slice(0, 2), ['Otimização:', 'Rápido|Área|Velocidade']);
+    assert.ok(!pt.some((f) => /Motor|nextpnr/.test(f)), pt.join('\n'));
     await page.dialogButton('Cancelar');
     await page.waitNoDialog();
   } finally { await setLang('en'); }
-  const implement = async () => {
-    const before = (await page.consoleText()).length;
-    await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });
-    await page.waitFor((b) => /Process "Implement Design" (completed successfully|failed)/.test(window.__console().slice(b)), [before], { what: 'Implement Design', timeout: 240000 });
-    const log = (await page.consoleText()).slice(before);
-    assert.match(log, /Process "Implement Design" completed successfully/, log.slice(-3000));
-    assert.doesNotMatch(log, /WARNING|ERROR/, log.slice(-3000));
-    return log;
-  };
-  // by default, with no engine saved: nextpnr
-  const log = await implement();
+  // the project saved with the Silinx engine: nextpnr places and routes it, with no warning
+  const before = (await page.consoleText()).length;
+  await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });
+  await page.waitFor((b) => /Process "Implement Design" (completed successfully|failed)/.test(window.__console().slice(b)), [before], { what: 'Implement Design', timeout: 240000 });
+  const log = (await page.consoleText()).slice(before);
+  assert.match(log, /Process "Implement Design" completed successfully/, log.slice(-3000));
+  assert.doesNotMatch(log, /WARNING|ERROR/, log.slice(-3000));
   assert.ok(log.includes('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).'), log.slice(0, 3000));
   assert.match(log, /Placed and routed by nextpnr in \d/);
-  // the Silinx engine, chosen: saved with the project, and nextpnr not run
+  // OK in Process Properties: the old choice dropped from the project
   await props();
-  await page.eval(() => { const s = [...document.querySelectorAll('.dlg-overlay select')].find((x) => [...x.options].some((o) => o.value === 'auto')); s.value = 'silinx'; s.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.dialogButton('OK');
   await page.waitNoDialog();
-  await page.waitFor(async () => (await (await fetch('/api/projects/OpenEngine')).json()).impl.engine === 'silinx', [], { what: 'the engine saved' });
-  const own = await implement();
-  assert.doesNotMatch(own, /nextpnr/, own.slice(0, 3000));
+  await page.waitFor(async () => !('engine' in (await (await fetch('/api/projects/OpenEngine')).json()).impl), [], { what: 'the engine dropped' });
 }, { timeout: 400000 });
 
