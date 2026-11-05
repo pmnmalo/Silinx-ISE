@@ -8,7 +8,7 @@ documentation, in what order, and what is still open. Nothing here is decided; t
 
 | | The measured graph (chip32) |
 |---|---|
-| Built from | ISE's routed designs (178), the arc probe (`xdl -xdl2ncd`), the DRC join tests (37 rounds), the bit database, the device report's grid and sites; the shipped graph used for scoring only |
+| Built from | ISE's routed designs (178), the arc probe (`xdl -xdl2ncd`), the DRC join tests (37 rounds), the bit database; the grid and the sites measured too since #2502 (the device report's before); the shipped graph used for scoring only |
 | Size | 0.75 MB (the shipped: 1.96 MB) |
 | Nodes | 0 merged; 3413 split, **none with two pieces a net can reach** (no short), 478 costing a route |
 | Pins | 0 wrong; the missing ones none the open flow uses, but 216 BCIN wires named as the pin (their nodes right) |

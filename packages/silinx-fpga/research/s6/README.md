@@ -190,20 +190,20 @@ high (A6 too in a 16-bit one), its INIT as it is, its data on AI … (16-bit) or
 its routing of each (`ise-place-check.sh`): `par -k` routes the placement completely, the DRC finds no error and no
 warning. The contents in the bitstream: #2556, below (the slice settings).
 
-### The router (#730, 2026-10-24)
+### The router (#730, 2026-10-24; removed 2026-11-05, #2824: nextpnr routes the Spartan-6)
 
-`packages/silinx-fpga/src/fpga/s6/route.js` (PathFinder, as the Spartan-3E router), `route-nets.js` (the general interconnect, which
-the global clocks never take; the route-through sites; the TIEOFFs), `route-output.js` (the routed XDL, its
-XDL_DUMMY instances: the I/O logic an input or output passes through, ILOGIC2 D -> FABRICOUT and OLOGIC2 D1 -> OQ, a
-clock region's BUFH, the TIEOFFs), `route-check.js` (the rules against the graph). Every example routes completely
+Silinx's own router, `src/fpga/s6/route.js` (PathFinder, as the Spartan-3E router; removed, in git's history), and
+the modules nextpnr's routing still uses: `route-nets.js` (the general interconnect, which the global clocks never
+take; the route-through sites; the TIEOFFs), `route-output.js` (the routed XDL, its XDL_DUMMY instances: the I/O
+logic an input or output passes through, ILOGIC2 D -> FABRICOUT and OLOGIC2 D1 -> OQ, a clock region's BUFH, the TIEOFFs), `route-check.js` (the rules against the graph). Every example routes completely
 on both parts in 3 to 5 passes and under 3 s; against ISE's routing of the same netlists (`compare-route.mjs`,
-`measured/route-compare.json`) it takes 1.0 to 1.2 times the switches per connection, more singles: ISE also swaps
+`measured/route-compare.json`, both removed with it) it takes 1.0 to 1.2 times the switches per connection, more singles: ISE also swaps
 a LUT's inputs to the pin its route reaches best, which the Silinx router does not yet. ISE reads every example's
 routed XDL on both boards and its DRC finds no error and no warning but stopwatch's 9K block RAM note
 (`measured/ise-check.json`). The first round found a route through the net's own slice by a LUT in use (D4 -> D,
 PhysDesignRules:2066): out of its own slice a net takes only COUT -> DMUX.
 
-- **The LUT inputs swapped** (#1152, 2026-11-02; `route-swap.js`): a net ends on any free pin of its LUT position (not
+- **The LUT inputs swapped** (#1152, 2026-11-02; `route-swap.js`, removed with the router): a net ends on any free pin of its LUT position (not
   a RAM's or shift register's, not A6 under an O5, not a clock's, power net's or unrouted net's pin), the O6 / O5
   equations rewritten for the pins taken. The examples take 10 to 14 % fewer switches: 1.00 to 1.08 times ISE's per
   connection (1.10 to 1.22 before; `compare-route.mjs --silinx`), in 3 or 4 passes; ISE reads the 14 routings and its
@@ -877,7 +877,6 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `bits6.mjs` | Reads a Spartan-6 `.bit`: its header and the UG380 packets (16-bit words) |
 | `compare-place.mjs` | The placer against ISE's placement of the same netlists (night 1): `measured/place-compare.json` |
 | `place-xdl.mjs` | The examples placed (and with `--route`, routed by nextpnr, #2824) as XDL, for ISE's check |
-| `compare-route.mjs` | The router against ISE's routing of the same netlists (night 1): `measured/route-compare.json` |
 | `ise-place-check.sh` | Inside the ISE container: `xdl -xdl2ncd`, `par -k` and `drc` of the placed XDL, `drc` of the routed one |
 | `summarize-ise-check.mjs` | That check's logs as `measured/ise-check.json` (the messages by id and count) |
 | `ise-format.sh` | Inside the ISE container: the empty designs through bitgen with Silinx's options and their variants (#724) |

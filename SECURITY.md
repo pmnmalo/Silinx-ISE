@@ -104,6 +104,11 @@ board or a PROM) without the user's say.
    slipped through still could not run. Its `'unsafe-eval'` is the compiled simulator's (`core/compiled-sim.js`), whose
    generated code holds no name of the design, only its own variables and numbers: the test lists the application's
    only dynamic code.
-3. **Trust for outside projects:** an imported project opens, edits, checks, simulates and runs the open toolchain
-   in the browser; it runs nothing outside the browser's sandbox (ISE, ssh, Docker, board or PROM programming,
-   external tools) until the user confirms.
+3. **Trust for outside projects** (`core/trust.js`): an imported project (a zip, an ISE project, a design link, the
+   MCP's `import_project`) is marked `trusted: false` in its `silinx.json`, whatever the zip's own `silinx.json` says.
+   It opens, is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE (Docker, ssh, a local
+   install) and programming a board or a PROM are refused (the server's 403, the browser edition's error, the MCP
+   tool's) until the user trusts it: the console says so when the project opens, with a **Trust Project** button.
+   Saving the project's description does not make it trusted; only that button does. The MCP server has no tool to
+   trust a project, by design: an assistant led astray by what it read cannot. A project made in Silinx is trusted
+   from the start.

@@ -26,6 +26,8 @@ showed it.
 | `gen-observe.mjs` | Random designs over the CLB slices for ISE to route |
 | `gen-obshdl.mjs` | Observation designs in HDL for ISE to implement: every block RAM's and multiplier's outputs, every pad's input (round 5) |
 | `build.mjs` | Measurements -> the packed format of the shipped graphs (`packages/silinx-fpga/src/fpga/device.js`) |
+| `grid.mjs` | The grid and the sites measured (#2502): the tiles the measurements name, their rows and columns and types, the sites ISE placed or routed to, their types, slots and order by rule (section 16) |
+| `compare-grid.mjs` | Two descriptions of a die compared tile by tile: tiles, places, PIPs, wires, nodes, sites, pins (section 16) |
 | `measure.mjs` | The XC3S250E's recipe for another die, in stages: `designs` (every observation design, sized to the part), `observe`, `tiles` (the tile probe: switch-tiles.txt, clb-tiles.txt), `random`, `round k` and `verdicts k` (the join tests' rounds) (#3, the other devices) |
 | `prototype.mjs` | The phase-2 prototype: observe, predict, tests, verdicts, build the measured CLB array, compare it with the shipped graph; `score`: the tests' verdicts against the shipped graph |
 
@@ -1365,4 +1367,65 @@ and off. The shipped graph stays.
 ```
 PART=xc3s1200efg320-4 node splitters.mjs pred pred.json
 SPLITTERS=1 MAXJOINS=2 node prototype.mjs tests pred.json obs.json sp && ise-remote.sh -f -b sp && node splitters.mjs verdicts sp
+```
+
+## 16. The grid and the sites measured: no device report in the build (2026-11-05, #2502)
+
+Until now `build-measured.mjs` took the grid and the sites from the device report: the tile names, rows and columns,
+the tile types, and the sites' names, types, order and bonding (`chipMeasurements`' `dev`). `grid.mjs` measures them
+from the data folder alone, and `build-measured.mjs` no longer reads the report (`--dev` is gone; the report is kept
+for scoring only, in the tests).
+
+- **Tiles:** every tile a measurement names: the tile probe's `switch-tiles.txt`, ISE's routes (PIPs, sites, pins,
+  joins, pin joins), the arc probe's PIPs that exist, the joins the tests confirmed. On the four dies, these are
+  exactly the measured description's tiles (479, 1057, 1760, 3061). The tile's type is the name's prefix; a CLB is
+  `CENTER_SMALL`, or `CENTER_SMALL_BRK` in a row with a switch box named `*_BRK` (`BRAM3_SMALL_BRK`, `LIOIS_BRK`,
+  `RIBUFS_BRK`; a `BRAMSITE2_BRK` sits in the lowest of its block RAM's rows): the layouts' `brkRows`.
+- **Rows and columns** (`gridRowsCols`): each tile Y is a row, counted from the top, and each X a column. Some tiles go
+  in a lane beside their Y's row or X's column. Before the row go the top terminations and the clock rows (`GCLKH`,
+  the block-RAM columns' `*_GCLKH*`, the centre row's `CLKL` / `CLKC` / `CLKR` / `GCLKVM*` / `CLKH`). After it go the
+  bottom terminations and `CLKB`. Before the column go the left terminations and `CLKL`. After it go the right
+  terminations, `CLKR` and the clock column (`GCLKVC`, `GCLKV*`, `CLKT` / `CLKV` / `CLKC` / `CLKB`, `CLKVC`). On the
+  XC3S1200E, whose centre has the long-line splitters (`CLKC_LL`), there is an empty row before the centre's clock row.
+  Checked against the report on the four dies: every tile but the `EMPTY_*` ones (named by their place, never
+  measured) is in the report's row and column, and the numbers of rows and columns are the report's.
+- **Sites:** every site ISE placed or routed to: `obs.json`'s sites, pins and pin joins, and the other packages'
+  sites except their pads (whose names are that package's). A pad is bonded, the others internal. The type and the
+  slot in the tile come by rule (`siteSlot`). A slice is a SLICEM where X is even, a SLICEL where X is odd, with slot
+  `S<2(x%2)+y%2>`. A pad's slot is `P<k>`, k from its I pin's `Ik_PINWIRE` (or an ICLK / OTCLK pin's wire), and its
+  type is DIFFM / DIFFS / IOB (DIFFMI / DIFFSI / IBUF in the input-only tiles) by k. A BUFGMUX's slot is its rank in
+  its tile; VCC, RAMB16, MULT18X18SIO and DCM are their own. The order in the tile (`siteOrder`) is the report's:
+  VCC first, except in `CLKB`, `CLKT` and `CLKL` where it is last; then pads by k, slices by slot, the block RAM
+  before its multiplier.
+- **VCC sites:** ISE's routes show a VCC site only where a constant net used it. Every tile of a type that has one
+  (seen in a tile of the type, or a type whose PIPs leave one VCC wire, the VCCOUT rule's) gets one, named
+  `VCC_X<i>Y<j>`: i is the rank of the tile's column among those tiles, j the rank of its row from the bottom. Every
+  VCC site ISE named follows the rule, and so does the report's on the four dies.
+- **Pins** are keyed by the tile type and the site's slot (they were keyed by its index in the report's site list).
+  Another package's pads give their pins to their slot, as `renamePads` did through the report. The report's pin
+  list no longer filters them, and no pin changes.
+
+**Against the description built with the report** (`compare-grid.mjs`, on all four dies): the same tiles, rows,
+columns and tile types. The PIPs, wires, nodes and pins are identical, and every site kept has the report's name,
+type, bonding and place among its tile's sites. The measured description leaves out only sites no design can place
+or route to:
+
+| Left out | XC3S100E | XC3S250E | XC3S500E | XC3S1200E |
+|---|---|---|---|---|
+| unbonded pads (IOB, DIFFM, DIFFS, IBUF, DIFFMI, DIFFSI) | 145 | 268 | 248 | 386 |
+| RESERVED_LL, RESERVED_ANDOR, GLOBALSIG | 412 | 944 | 1616 | 2780 |
+| PMV, BSCAN, STARTUP, ICAP, CAPTURE, PCILOGICSE ×2 | 7 | 7 | 7 | 7 |
+| the corners' VCC sites (no pin) | 4 | 4 | 4 | 4 |
+
+None of them has a pin a design could use. The unbonded pads' pins came from the bonded pads of the same slot. The
+other sites have no pins in the measured description, and the open flow uses none of them: Silinx's XDL writer hides
+them, and nextpnr's chip database makes BELs only of slices, pads, BUFGMUX, RAMB16, MULT18X18SIO, DCM and VCC, and
+package pads only of bonded pads. So no observation designs were made for BSCAN, STARTUP, ICAP, CAPTURE, PMV or
+PCILOGIC. An unbonded pad's name (`NOPAD<n>`, `PAD<n>`, `IPAD<n>`) could only be had from the report or a site probe.
+Since tiles whose unbonded pads differ now differ in their sites, they are variants of their own: 96, 106, 103 and 119
+templates instead of 86, 96, 95 and 106, so the descriptions are larger (0.35, 0.47, 0.54 and 0.76 MB).
+
+```
+node build-measured.mjs out.json.gz data/xc3s250e --part xc3s250ecp132-4
+node compare-grid.mjs before.json.gz out.json.gz
 ```

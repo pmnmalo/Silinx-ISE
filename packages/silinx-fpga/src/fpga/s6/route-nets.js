@@ -1,6 +1,7 @@
-// Silinx - the Spartan-6 router's nets and resources (#730, fpga/s6/route.js): the endpoints of each net of a
-// placed design, the nodes of the general interconnect (which the global clocks do not take), the sites of the
-// route-through PIPs and which of them a net may take, the TIEOFFs the power nets are routed from (browser + Node).
+// Silinx - the Spartan-6 routing's nets and resources (#730; for nextpnr's routing read back, fpga/s6/nextpnr.js,
+// and its check, route-check.js, #2824): the endpoints of each net of a placed design, the nodes of the general
+// interconnect (which the global clocks do not take), the sites of the route-through PIPs and which of them a net may
+// take, the TIEOFFs the power nets are routed from (browser + Node).
 import { PIP_ROUTETHRU } from '../device.js';
 
 // a wire of the general interconnect in a switch box: the singles, doubles and quads (EE2B3, SR1E1, NN4M0 …), the

@@ -41,7 +41,7 @@ const PT = {
   // menus
   'File': 'Ficheiro', 'Edit': 'Editar', 'View': 'Ver', 'Project': 'Projeto', 'Process': 'Processo', 'Tools': 'Ferramentas',
   'Window': 'Janela', 'Help': 'Ajuda', 'Language': 'Idioma',
-  'New Project…': 'Novo Projeto…', 'Open Project…': 'Abrir Projeto…', 'Close Project': 'Fechar Projeto', 'Check Design': 'Verificar Projeto', 'Show the waveform': 'Mostrar a forma de onda', 'Open the HDL here, in Simulation': 'Abrir o HDL aqui, na Simulação',
+  'New Project…': 'Novo Projeto…', 'Open Project…': 'Abrir Projeto…', 'Close Project': 'Fechar Projeto', 'Trust Project': 'Confiar no Projeto', 'Check Design': 'Verificar Projeto', 'Show the waveform': 'Mostrar a forma de onda', 'Open the HDL here, in Simulation': 'Abrir o HDL aqui, na Simulação',
   'Import Xilinx ISE Project (.zip)…': 'Importar Projeto Xilinx ISE (.zip)…', 'Export Xilinx ISE Project (.zip)…': 'Exportar Projeto Xilinx ISE (.zip)…',
   'Import Silinx ISE Project (.zip)…': 'Importar Projeto Silinx ISE (.zip)…', 'Export Silinx ISE Project (.zip)…': 'Exportar Projeto Silinx ISE (.zip)…',
   'Download Project Bundle…': 'Descarregar Pacote do Projeto…', 'Open Project Bundle…': 'Abrir Pacote do Projeto…',

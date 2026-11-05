@@ -161,7 +161,18 @@ async function writeProjectUnlocked(name, pj) {
 
 export function writeProject(name, pj) {
   projectDir(name);
-  return withProjectLock(name, () => writeProjectUnlocked(name, pj));
+  return withProjectLock(name, async () => {
+    // a project from outside stays so until the user trusts it (trustProject, #2830): a description written whole (the
+    // interface's) does not make it trusted
+    let cur = null;
+    try { cur = await readProject(name); } catch { /* a new project */ }
+    return writeProjectUnlocked(name, cur?.trusted === false ? { ...pj, trusted: false } : pj);
+  });
+}
+
+/** The user trusts a project from outside (#2830): Xilinx ISE and programming may run for it. */
+export function trustProject(name) {
+  return updateProject(name, pj => { const { trusted, ...rest } = pj; return rest; });
 }
 
 /** Read silinx.json, let `fn(pj)` change it (or return a new object), write it back, all under the project lock. */

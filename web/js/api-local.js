@@ -20,6 +20,7 @@ import TEST_DESIGNS from 'silinx-test-designs';
 import { orderTestDesigns } from '../../core/test-designs.js';
 import { createZip, browserCodec, textOf } from '../../core/zip.js';
 import { GATE_LIMITS, gateEntries, gateMessages, gateZip } from '../../core/import-gate.js';
+import { isTrusted, markUntrusted, untrustedMessage } from '../../core/trust.js';
 import { runBrowserFlow, browserOpenStatus } from './open-flow-browser.js';
 import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from '../../core/adept.js';
 import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ice40.js';
@@ -275,6 +276,7 @@ export const api = {
   createProject: p => ops.create(p),
   project: name => ops.project(name),
   saveProject: (name, pj) => ops.saveProject(name, pj),
+  trustProject: name => ops.trustProject(name),
   renameFile: (name, from, to) => ops.renameFile(name, from, to),
   deleteProject: name => ops.deleteProject(name),
   // a file of the build (build/…: not among the project's files): this session's, else (a
@@ -366,6 +368,7 @@ export const api = {
   },
   // { project, bitfile, bitData? (a .bit chosen from the disk) }
   program: async ({ project, bitfile, bitData } = {}) => usbJob('program', async log => {
+    if (project && !isTrusted(await projectJson(project))) fail(untrustedMessage(project, 'programming the board'));   // (#2830)
     // an iCE40's .bin: into its board's SPI flash, through its FT2232H (#2298)
     if (/\.bin$/i.test(bitfile || '')) {
       const bin = await bitOf(project, bitfile);
@@ -383,6 +386,7 @@ export const api = {
   // verify, reconfigure }; the lines of the full application's (server/programmer.js promJob); a
   // backup (read) is downloaded
   prom: async ({ project, op, bitfile, bitData, verify = true, reconfigure = false } = {}) => usbJob('prom', async (log, job) => {
+    if (project && !isTrusted(await projectJson(project))) fail(untrustedMessage(project, 'programming the PROM'));   // (#2830)
     if (!PROM_OPS.includes(op)) fail(`unknown PROM operation '${op}' (valid: ${PROM_OPS.join(', ')})`);
     let bit = null;
     if (op === 'program' || op === 'verify') {
@@ -423,7 +427,7 @@ export const api = {
     const g = gateEntries([{ path: 'project.xise', data: xise }, ...Object.entries(files).map(([path, data]) => ({ path, data }))]);
     const x = g.files.find(f => f.path === 'project.xise') ?? fail(`the .xise: ${g.refusals.find(r => r.path === 'project.xise')?.reason}`);
     const r = xiseProject(name, x.text, Object.fromEntries(g.files.filter(f => f !== x && f.text != null).map(f => [f.path, f.text])));
-    return { project: await ops.put(name, r.json, r.files), warnings: [...gateMessages(g), ...r.warnings] };
+    return { project: await ops.put(name, markUntrusted(r.json), r.files), warnings: [...gateMessages(g), ...r.warnings] };
   },
   syncXise: async () => fail('not available in the standalone edition (use File > Export Xilinx ISE Project)'),
   exportZip: async (name, kind = 'xilinx') => {
@@ -479,6 +483,7 @@ export const api = {
     const g = gateEntries(Object.entries(b.files && typeof b.files === 'object' ? b.files : {}).filter(([, v]) => typeof v === 'string').map(([path, data]) => ({ path, data })));
     const files = Object.fromEntries(g.files.map(f => [f.path, f.text ?? textOf(f)]));
     n.warnings.unshift(...gateMessages(g));
+    n.json = markUntrusted(n.json);   // (a project from outside, #2830)
     await ops.put(name, n.json, files);
     api.lastImportWarnings = n.warnings;
     return name;

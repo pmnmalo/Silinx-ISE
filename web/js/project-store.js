@@ -13,6 +13,7 @@ import { DEV_SITE } from './prefs.js';
 import { openOnlyDevice } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
 import { gateMessages, requireGated } from '../../core/import-gate.js';
+import { markUntrusted } from '../../core/trust.js';
 
 const PROJECT_FILE = 'silinx.json';
 export const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
@@ -96,6 +97,7 @@ export function normalizeProjectJson(saved, name) {
   if (saved.preferredLanguage === 'vhdl' || saved.preferredLanguage === 'verilog') json.preferredLanguage = saved.preferredLanguage;
   if (plain(saved.sourceLanguage)) json.sourceLanguage = saved.sourceLanguage;
   if (typeof saved.synthTool === 'string') json.synthTool = saved.synthTool;
+  if (saved.trusted === false) json.trusted = false;   // (a project from outside, #2830: never made trusted by its description)
   return { json: clone(json), warnings };
 }
 
@@ -145,7 +147,8 @@ export function projectFromZip(name, gated, { xiseProject, textOf }) {
       }
     }
   }
-  return { json: p.json, files: p.files, warnings, missing };
+  // a project from outside: trusted only once the user says so (#2830, core/trust.js)
+  return { json: markUntrusted(p.json), files: p.files, warnings, missing };
 }
 
 // ------------------------------------------------------------------ the browser's storage
@@ -413,11 +416,19 @@ export function projectOps(getStore, examples = {}) {
       return { ...clone(p.json), fileTree: Object.keys(p.files).sort() };
     },
     saveProject: async (name, pj) => {
-      await S().load(name);
+      const cur = await S().load(name);
       const clean = { ...clone(pj), name };
       delete clean.fileTree;
+      // a project from outside stays so until the user trusts it (trustProject, #2830), as the server's writeProject
+      if (cur.json?.trusted === false) clean.trusted = false;
       await S().saveJson(name, clean);
       return clone(clean);
+    },
+    // the user trusts a project from outside (#2830): Xilinx ISE and programming may run for it
+    trustProject: async (name) => {
+      const { trusted, ...json } = (await S().load(name)).json;
+      await S().saveJson(name, json);
+      return clone({ ...json, name });
     },
     readFile: async (name, path) => {
       const t = (await S().load(name)).files[cleanPath(path)];

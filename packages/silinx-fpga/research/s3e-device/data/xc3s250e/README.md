@@ -1,8 +1,7 @@
 # The measurements of the XC3S250E (#3)
 
 What the measured description of the XC3S250E-CP132 is built from (research/s3e-device README sections 9-15), and the
-description itself. `node research/s3e-device/build-measured.mjs out.json.gz` (`--part xc3s250ecp132-4`, the default) rebuilds it from these files alone, with
-the bit database and the device report's grid and sites; `test/s3e-device.test.js` checks the rebuild is
+description itself. `node research/s3e-device/build-measured.mjs out.json.gz` (`--part xc3s250ecp132-4`, the default) rebuilds it from these files alone, with the bit database (no device report: the grid and the sites measured too, #2502); `test/s3e-device.test.js` checks the rebuild is
 `measured.json.gz`.
 
 | File | What |

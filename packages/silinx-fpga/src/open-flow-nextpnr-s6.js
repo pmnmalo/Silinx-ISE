@@ -1,5 +1,5 @@
-// Silinx toolchain - the Spartan-6's Place & Route by nextpnr (#2138; the plan: #2131), chosen by spec.engine ===
-// 'nextpnr'. Silinx's Map stays (open-flow-s6.js: the netlist packed into sites); nextpnr-himbaechel with the spartan6
+// Silinx toolchain - the Spartan-6's Place & Route by nextpnr (#2138; the plan: #2131), the one engine since Silinx's
+// own router was removed (#2824). Silinx's Map stays (open-flow-s6.js: the netlist packed into sites); nextpnr-himbaechel with the spartan6
 // micro-architecture (the fork pmnmalo/nextpnr-spartan, its WebAssembly package through io.nextpnr.spartan6) places those sites,
 // and, the placed design written with its constants' sources (fpga/s6/xdl.js), routes it.
 import { parseXdl, writeXdl } from './xdl.js';

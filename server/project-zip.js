@@ -10,6 +10,7 @@ import fss from 'node:fs';
 import path from 'node:path';
 import { createZip } from '../core/zip.js';
 import { gateMessages, requireGated } from '../core/import-gate.js';
+import { markUntrusted } from '../core/trust.js';
 import { exportCSources, exportIseSchematics, exportXise } from './xise.js';
 import { isCSource } from '../core/view-hdl.js';
 import { ISE_OUTPUT, NODE_CODEC, SILINX_ONLY, importXiseProject } from './impl-routes.js';
@@ -118,5 +119,7 @@ export async function importProjectEntries(P, name, gated, bad) {
       }
     }
   }
+  // a project from outside: trusted only once the user says so (#2830, core/trust.js)
+  project = await P.updateProject(name, markUntrusted);
   return { project, missing: result.missing, warnings: result.warnings, extra };
 }

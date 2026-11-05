@@ -5,6 +5,7 @@ import { icon } from './icons.js';
 import { h, alertDlg, toast } from './ui.js';
 import * as wiz from './wizards.js';
 import { PRODUCT, VERSION_LABEL } from '/core/version.js';
+import { isTrusted, untrustedNotice } from '/core/trust.js';
 import { S, closeAllDocs, compileProject, renderFilesPage, renderLibsPage, showLeftPage, fixMissingTops,
   restoreViewState, openSummary } from './app.js';
 import { log, renderDiagnostics } from './console.js';
@@ -61,6 +62,8 @@ async function openProjectNow(name, { startup = false } = {}) {
   await reloadProject();
   await fixMissingTops();   // (a project saved with a top it no longer has, #253)
   log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
+  // a project from outside (#2830): what waits for the user's trust, and the button that gives it
+  if (!isTrusted(S.project)) log(untrustedNotice(name), 'info', { action: { label: 'Trust Project', run: () => trustProject(name) } });
   warnReservedNames();
   // the processes' status of the last run, its synthesis up to date or not (#280), restored before the project is
   // used: not awaited, it drew the Processes panel again under a double-click on a process and Implement Design
@@ -78,6 +81,13 @@ async function openProjectNow(name, { startup = false } = {}) {
   if (startup) return;
   await new Promise(r => setTimeout(r, 0));
   if (S.project?.name === name) dispatchEvent(new CustomEvent('silinx:project-opened', { detail: name }));
+}
+
+// The user trusts the project from outside (#2830): Xilinx ISE and programming may run for it from now on
+async function trustProject(name) {
+  await api.trustProject(name);
+  if (S.project?.name === name) delete S.project.trusted;
+  log(`Project "${name}" trusted: Xilinx ISE and programming a board or a PROM may run for it.`, 'ok');
 }
 
 // The modules named with a reserved word of VHDL or Verilog (#679), said when the project is opened

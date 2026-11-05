@@ -118,9 +118,11 @@ test('decodeDesign: names that are not a project\'s, paths that leave the projec
 });
 
 test('decodeDesign: through the import gate (#2830): a file it refuses left out, said in the warnings', async () => {
-  const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/a.vhd': 'entity a is end;\n', 'doc/page.html': '<script>alert(1)</script>', 'src/A.VHD': '' } }));
+  const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/a.vhd': 'entity a is end;\n', 'src/page.vhd': '<script>alert(1)</script>', 'src/A.VHD': '' } }));
   assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/a.vhd']);
-  assert.deepEqual(d.warnings, ['doc/page.html: not imported: a web page, script or program: not a project file', 'src/A.VHD: not imported: same name as \'src/a.vhd\' but for its case']);
+  assert.deepEqual(d.warnings, ['src/page.vhd: not imported: a web page (HTML), not the file its name says', 'src/A.VHD: not imported: same name as \'src/a.vhd\' but for its case']);
+  // (the gate's result, what an importer takes)
+  assert.deepEqual(d.gated.files.map(f => f.path), ['silinx.json', 'src/a.vhd']);
 });
 
 test('decodeDesign: a drawing\'s HDL that cannot be made again is a warning, the drawing kept', async () => {

@@ -209,7 +209,7 @@ export function bitstreamS6(design, device, db, { name = 'top.ncd;UserID=0xFFFFF
 }
 
 /**
- * The routing switches whose bits the databases have, for the router (route.js routeS6's allowPip(tile, pip)): a
+ * The routing switches whose bits the databases have (allow(tile, pip), for nextpnr's chip database: nextpnr-export.js): a
  * switch box's PIP that pipLookup finds (either way, a bidirectional one), a slice tile's (no bits of their own), any
  * other tile's in the other PIPs' database (measured, with bits or none) or of a family with none (NO_BITS), as
  * predictDesign reads them.

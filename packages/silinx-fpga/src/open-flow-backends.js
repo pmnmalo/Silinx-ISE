@@ -113,13 +113,13 @@ function mountS3e(base) {
   };
 }
 
-// the Spartan-6's Map and Place & Route (#732: open-flow-s6.js); by nextpnr (spec.engine 'nextpnr', #2138, the
-// application's since #2137): Silinx's Map, nextpnr's Place & Route (open-flow-nextpnr-s6.js)
+// the Spartan-6's Map (#732: open-flow-s6.js) and nextpnr's Place & Route (#2138: open-flow-nextpnr-s6.js), the one
+// engine (#2824: Silinx's own router removed); Place & Route alone packs first, as Map would
 function mountS6(base) {
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
-  const own = mountS6Steps(ctx);
-  const np = ctx.spec.engine === 'nextpnr' ? mountNextpnrS6({ ...ctx, state: own.state }) : null;
-  return { steps: xilinxSteps(ctx, own.runMap, () => (np || own).runPar(), mountFlowReports({ ...ctx, reports: S6_REPORTS })),
+  const own = mountS6Steps(ctx), np = mountNextpnrS6({ ...ctx, state: own.state });
+  const runPar = () => { if (!own.state().phys) own.runMap(); return np.runPar(); };
+  return { steps: xilinxSteps(ctx, own.runMap, runPar, mountFlowReports({ ...ctx, reports: S6_REPORTS })),
     routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
     placeRouteNetlist: placeRouteNetlist(base, c => { const o = mountS6Steps(c); return { runMap: o.runMap, runPar: mountNextpnrS6({ ...c, state: o.state }).runPar }; }) };
 }

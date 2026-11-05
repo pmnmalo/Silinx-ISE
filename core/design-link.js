@@ -150,7 +150,8 @@ export async function decodeDesign(design, { codec = browserCodec() } = {}) {
   const kept = new Set(g.files.map(f => f.path));
   const entries = raw.filter(e => kept.has(e.path));
   if (!kept.has('silinx.json')) throw linkError('the link\'s design is not a Silinx project');
-  return { name, project: payload.project, entries, warnings };
+  // (gated: the gate's result, what an importer takes: server/project-zip.js importProjectEntries)
+  return { name, project: payload.project, entries, warnings, gated: g };
 }
 
 // a file's path inside the project: relative, forward slashes, no '..', no hidden part (.git, settings), not silinx.json
