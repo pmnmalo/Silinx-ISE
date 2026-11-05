@@ -943,6 +943,46 @@ test('zip import: a zip bomb (an entry larger than it declares) is refused, the 
   assert.equal((await call('GET', '/templates')).status, 200);
 });
 
+test('trust for outside projects (#2830): an imported project runs no Xilinx ISE and programs nothing until the user trusts it', async () => {
+  const pj = { name: 'T', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }], device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, trusted: true };
+  const top = 'entity top is end;\narchitecture a of top is begin end;\n';
+  // a zip's silinx.json saying trusted: still from outside
+  let r = await call('POST', '/projects/import-zip?name=Tr1', new Uint8Array(await zip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/top.vhd', data: top }])));
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.project.trusted, false);
+  const refused = what => `project 'Tr1' came from outside (imported): ${what} runs only once you trust it (Trust Project, in the console when the project opens)`;
+  r = await call('POST', '/projects/Tr1/implement', { toolchain: 'ise' });
+  assert.deepEqual([r.status, r.body.error], [403, refused('Xilinx ISE')]);
+  r = await call('POST', '/program', { project: 'Tr1' });
+  assert.deepEqual([r.status, r.body.error], [403, refused('programming the board')]);
+  r = await call('POST', '/prom', { project: 'Tr1', op: 'program' });
+  assert.deepEqual([r.status, r.body.error], [403, refused('programming the PROM')]);
+  // the Silinx toolchain runs (in the open flow, nothing outside)
+  r = await call('POST', '/projects/Tr1/implement', { toolchain: 'silinx' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  // the description written whole (the interface's save) does not make it trusted
+  const cur = (await call('GET', '/projects/Tr1')).body;
+  delete cur.trusted;
+  r = await call('PUT', '/projects/Tr1', { ...cur, board: 'basys2' });
+  assert.equal(r.body.trusted, false);
+  assert.equal((await call('GET', '/projects/Tr1')).body.trusted, false);
+  // the user trusts it: ISE and programming may run (here: no bitstream yet, no ISE)
+  r = await call('POST', '/projects/Tr1/trust');
+  assert.equal(r.status, 200);
+  assert.equal('trusted' in r.body, false);
+  assert.equal('trusted' in (await call('GET', '/projects/Tr1')).body, false);
+  r = await call('POST', '/program', { project: 'Tr1' });
+  assert.equal(r.status, 404);
+  assert.match(r.body.error, /^bitstream not found/);
+  // an ISE project (.xise) imported, a project made here
+  r = await call('POST', '/projects/import-xise', { name: 'Tr2', xise: XISE, files: { 'rtl/top.vhd': TOP_VHD } });
+  assert.equal(r.body.project.trusted, false);
+  await call('POST', '/projects', { name: 'Tr3', template: 'blinky' });
+  assert.equal('trusted' in (await call('GET', '/projects/Tr3')).body, false);
+  assert.equal((await call('POST', '/program', { project: 'Tr3' })).status, 404, 'a project made here: trusted');
+  assert.equal((await call('POST', '/projects/Nope/trust')).status, 404);
+});
+
 test('zip import: error paths', async () => {
   let r = await call('POST', '/projects/import-zip', new Uint8Array(await zip([{ path: 'silinx.json', data: '{}' }])));
   assert.equal(r.status, 400);

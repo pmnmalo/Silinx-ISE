@@ -44,6 +44,7 @@ export const api = {
   createProject: p => req('POST', '/api/projects', p),
   project: name => req('GET', `/api/projects/${enc(name)}`),
   saveProject: (name, pj) => req('PUT', `/api/projects/${enc(name)}`, pj),
+  trustProject: name => req('POST', `/api/projects/${enc(name)}/trust`),
   deleteProject: name => req('DELETE', `/api/projects/${enc(name)}`),
   readFile: (name, path) => req('GET', `/api/projects/${enc(name)}/file?path=${enc(path)}`, undefined, { text: true }),
   writeFile: (name, path, text) => req('PUT', `/api/projects/${enc(name)}/file?path=${enc(path)}`, text),

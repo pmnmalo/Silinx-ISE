@@ -362,15 +362,30 @@ test('#483 projectFromZip: entries leaving the project skipped with a warning, s
   assert.deepEqual(Object.keys(r.files).sort(), ['a/b.txt', 'src/top.vhd']);
   assert.deepEqual(r.missing, ['src/gone.vhd', 'constraints/top.ucf']);
   // (a project read with no Optimization: Fast, #2470)
-  assert.deepEqual(r.json, { ...emptyProjectJson('Hostile'), impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' }, top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }], constraints: 'constraints/top.ucf' });
+  assert.deepEqual(r.json, { ...emptyProjectJson('Hostile'), impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' }, top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }], constraints: 'constraints/top.ucf', trusted: false });   // (from outside, #2830)
   // the project in a folder of the zip, silinx.json not JSON: an empty project with the files
   const r2 = projectFromZip('Sub', gateEntries([E('MyProj/silinx.json', '{ not json'), E('MyProj/src/a.v', 'a'), E('MyProj/../outside.v', 'o'), E('other/x.v', 'x')]), { textOf, xiseProject: null });
   assert.deepEqual(r2.warnings, ["MyProj/../outside.v: not imported: path leaves the project ('..')", 'silinx.json is not valid JSON: ignored']);
   assert.deepEqual(Object.keys(r2.files), ['src/a.v']);
-  assert.deepEqual(r2.json, emptyProjectJson('Sub'));
+  assert.deepEqual(r2.json, { ...emptyProjectJson('Sub'), trusted: false });
   assert.deepEqual(r2.missing, []);
   assert.throws(() => projectFromZip('X', gateEntries([E('readme.txt', 'x')]), { textOf }), { message: 'the zip contains no .xise (ISE project) and no silinx.json' });
   assert.throws(() => projectFromZip('X', [E('silinx.json', '{}')], { textOf }), { message: 'projectFromZip: the entries must pass the import gate (core/import-gate.js)' });
+});
+
+test('#2830 trust for outside projects in the browser\'s stores: saving the description keeps it untrusted, trustProject clears it', async () => {
+  for (const { ops } of [folder(), (() => { const s = browserStore(memStorage()); return { ops: projectOps(() => s, EXAMPLES) }; })()]) {
+    const p = projectFromZip('Out', gateEntries([{ path: 'silinx.json', data: new TextEncoder().encode(JSON.stringify({ name: 'Out', trusted: true })) }]), { textOf });
+    assert.equal(p.json.trusted, false, 'a silinx.json saying trusted: still from outside');
+    await ops.put('Out', p.json, p.files);
+    const { trusted, ...rest } = await ops.project('Out');
+    assert.equal(trusted, false);
+    assert.equal((await ops.saveProject('Out', { ...rest, board: 'basys2' })).trusted, false);
+    assert.equal((await ops.project('Out')).trusted, false);
+    assert.equal('trusted' in await ops.trustProject('Out'), false);
+    assert.equal('trusted' in await ops.project('Out'), false);
+    assert.equal('trusted' in await ops.saveProject('Out', { ...rest, board: 'nexys2' }), false);
+  }
 });
 
 test('#1228 #1230 a folder renamed or deleted: the files removed from the project stay removed, the deleted UCF is not the constraints, in both stores', async () => {

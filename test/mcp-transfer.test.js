@@ -83,6 +83,17 @@ test('import_project: a hostile zip, what is sound imported, what was dropped sa
     'silinx.json: constraints path outside the project dropped (../x.ucf)']);
 });
 
+test('import_project: the project is from outside (#2830): no Xilinx ISE for it, and no tool trusts it (only the user, in the interface)', async () => {
+  const pj = { top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl' }], trusted: true };
+  fs.writeFileSync(out('outside.zip'), await createZip([{ path: 'silinx.json', data: enc(JSON.stringify(pj)) }, { path: 'src/top.vhd', data: enc('entity top is end;\narchitecture a of top is begin end;\n') }], NODE_CODEC));
+  await ok('import_project', { name: 'outside', from: 'outside.zip' });
+  assert.equal((await P.readProject('outside')).trusted, false);
+  await fails('run_process', { project: 'outside', process: 'synthesize', toolchain: 'ise' },
+    "project 'outside' came from outside (imported): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)");
+  const { result } = await handle({ jsonrpc: '2.0', id: ++id, method: 'tools/list', params: {} });
+  assert.deepEqual(result.tools.filter(t => /trust/i.test(t.name)), []);
+});
+
 test('import_project: the import gate (#2830): a zip bomb, an XXE .xise, a script in a name, refused with their reasons', async () => {
   const zeros = new Uint8Array(4 << 20);
   const bomb = await createZip([{ path: 'silinx.json', data: enc('{}') }, { path: 'big.mem', data: zeros }], NODE_CODEC);

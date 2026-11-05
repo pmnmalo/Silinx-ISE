@@ -820,6 +820,46 @@ uiTest('#2830 Import Source / Add Copy of Source: the import gate leaves out wha
   assert.deepEqual((await env.server.api('GET', '/api/projects/GateAdd')).fileTree.filter((f) => f.startsWith('src/')), ['src/inv.vhd']);
 });
 
+// #2830: trust for outside projects: an imported project opens with a console line and its Trust Project button; until
+// it is pressed, Xilinx ISE and programming are refused (the server's 403); in Portuguese, the button's label
+uiTest('#2830 an imported project waits for the user\'s trust: the console line and its Trust Project button', E, async (page) => {
+  const { createZip } = await import('../../core/zip.js');
+  const zlib = await import('node:zlib');
+  const codec = { deflate: (d) => zlib.deflateRawSync(d), inflate: (d, l) => zlib.inflateRawSync(d, { maxOutputLength: l }) };
+  const top = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity top is port (a : in std_logic; y : out std_logic); end;\narchitecture rtl of top is begin y <= a; end;\n';
+  const pj = { name: 'O', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }], device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, trusted: true };
+  const file = path.join(env.tmp, 'outside-silinx.zip');
+  await fs.writeFile(file, await createZip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/top.vhd', data: top }], codec));
+  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
+  await page.waitDialog('Import Silinx ISE Project');
+  await page.setFiles('.dlg-overlay input[type=file]', [file]);
+  await page.fill('.dlg-overlay input[type=text]', 'Outside');
+  await page.dialogButton('Import');
+  await page.waitFor(() => window.Silinx.project?.name === 'Outside');
+  const NOTICE = 'Project "Outside" came from outside (imported): it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.';
+  await page.waitConsole(/came from outside \(imported\)/);
+  const line = () => page.eval(() => { const b = document.querySelector('#console-log .ln .ln-action'); return b && { line: b.parentElement.firstChild.textContent, label: b.textContent, disabled: b.disabled }; });
+  assert.deepEqual(await line(), { line: NOTICE, label: 'Trust Project', disabled: false });
+  const refused = "project 'Outside' came from outside (imported): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)";
+  await assert.rejects(env.server.api('POST', '/api/projects/Outside/implement', { toolchain: 'ise' }), (e) => e.message.includes(refused));
+  // in Portuguese: the button's label
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.openProject('Outside');
+  await page.waitFor(() => document.querySelectorAll('#console-log .ln-action').length === 2, [], { what: 'the line said again' });
+  assert.equal(await page.eval(() => [...document.querySelectorAll('#console-log .ln-action')].at(-1).textContent), 'Confiar no Projeto');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  // the user trusts it
+  await page.eval(() => [...document.querySelectorAll('#console-log .ln-action')].at(-1).click());
+  await page.waitConsole(/Project "Outside" trusted: Xilinx ISE and programming a board or a PROM may run for it\./);
+  assert.equal(await page.eval(() => [...document.querySelectorAll('#console-log .ln-action')].at(-1).disabled), true);
+  assert.equal('trusted' in await env.server.api('GET', '/api/projects/Outside'), false);
+  assert.equal(await page.eval(() => 'trusted' in window.Silinx.project), false);
+  // opened again: no line
+  await page.openProject('Outside');
+  assert.equal(await page.eval(() => document.querySelectorAll('#console-log .ln-action').length), 2);
+  assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /^(WARNING|ERROR)/.test(l)), []);
+});
+
 uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth Table starts the project with that top and its synchronized HDL', E, async (page) => {
   const cases = [['sch', 'top.sch.json', 'vhdl', 'Schematic'], ['fsm', 'top.fsm.json', 'verilog', 'Finite State Machine (FSM)'],
     ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.bool.json', 'verilog', 'Boolean Algebra']];
