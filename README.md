@@ -461,7 +461,9 @@ diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
-only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
+only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `project_link` and `open_link` (a project's
+link, the project inside it, opening Try it, the simulation or the board emulator, for slides; a project made from such a link
+or from an example's, one that differs never replaced), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
 `simulate` (the test bench: its messages and its signals' changes; against the post-synthesis, post-translate, post-map or
 post-place & route model too, with its timing; signals forced, a value or a clock, as SSim's Force; its waves as a VCD file), `c_simulation`, `c_cosimulation`,
 `c_synthesis_report` and `c_generated` (a C / C++ source of Silinx HLS: its main() run, its C/RTL co-simulation, its report, the HDL

@@ -1,0 +1,111 @@
+// The MCP server's tools of a design's link (#2826, server/mcp-link.js): project_link (a project's link, the project
+// inside it) and open_link (a project of a link: the design inside it, or an example), as the interface's Copy Link…
+// and its opening of a link; a project that differs never replaced (#2829), a zip at an address never fetched, and
+// the errors of a broken link or of a view the design does not have.
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
+import { scratchEnv } from './server-helpers.js';
+
+let tmp;
+before(async () => { tmp = fs.realpathSync(await scratchEnv('silinx-mcp-link-')); });
+after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+const { handle } = await import('../server/mcp.js');
+const P = await import('../server/projects.js');
+let id = 0;
+async function call(name, args = {}) {
+  const r = (await handle({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: args } })).result;
+  return { text: r.content[0].text, data: r.structuredContent, isError: r.isError };
+}
+const ok = async (name, args) => { const r = await call(name, args); assert.equal(r.isError, false, r.text); return r; };
+const fails = async (name, args, message) => { const r = await call(name, args); assert.equal(r.isError, true); assert.equal(r.text, `${name}: ${message}`); };
+const files = async name => Object.fromEntries(await Promise.all((await P.fileTree(name)).map(async f => [f, await P.readFile(name, f)])));
+
+test('project_link / open_link: gates (a schematic) round trip into Try it, the same files, Check Syntax with no warnings', async () => {
+  await ok('new_project_from_example', { name: 'gates', example: 'gates' });
+  const r = await ok('project_link', { project: 'gates', view: 'try', base: 'http://localhost:3000/' });
+  const link = r.data.link;
+  assert.match(link, /^http:\/\/localhost:3000\/#design=[A-Za-z0-9_-]+&view=try$/);
+  assert.equal(r.text, `WARNING: the link is ${link.length} characters long: some slide tools cut a link longer than 2000 (a zip hosted elsewhere makes a short one)\nThe link of 'gates', opening Try it (${link.length} characters; src/gates.vhd made again from its drawing):\n${link}`);
+  assert.deepEqual(r.data.left, ['src/gates.vhd']);
+  // into a new project: every file as it was
+  const o = await ok('open_link', { link, name: 'gates_link' });
+  assert.equal(o.text, 'Opened the link as the new project \'gates_link\': top gates, basys2; the link opens Try it (Try it is the interface\'s (a schematic\'s live simulation)).');
+  assert.deepEqual(o.data, { project: 'gates_link', created: true, view: 'try', top: null, board: 'basys2', warnings: [] });
+  assert.deepEqual(await files('gates_link'), await files('gates'));
+  const c = await ok('check_syntax', { project: 'gates_link' });
+  assert.doesNotMatch(c.text, /WARNING|ERROR/);
+  // opened again: the same project, kept
+  const again = await ok('open_link', { link, name: 'gates_link' });
+  assert.equal(again.text, 'The link\'s design is the project \'gates_link\' already (unchanged): top gates, basys2; the link opens Try it (Try it is the interface\'s (a schematic\'s live simulation)).');
+  assert.equal(again.data.created, false);
+  // changed: never replaced (#2829)
+  await P.writeFile('gates_link', 'sim/tb_gates.vhd', '-- the student\'s work\n');
+  await fails('open_link', { link, name: 'gates_link' }, 'project \'gates_link\' exists and differs from the link\'s design: it is not replaced (give another name, or delete_project first)');
+  assert.equal(await P.readFile('gates_link', 'sim/tb_gates.vhd'), '-- the student\'s work\n');
+  // named after the design: 'gates', the same as the example's project
+  assert.equal((await ok('open_link', { link: new URL(link).hash })).data.created, false);
+});
+
+test('project_link: the views a design has, the default base, the errors', async () => {
+  await ok('new_project_from_example', { name: 'traffic', example: 'traffic' });
+  const s = await ok('project_link', { project: 'traffic', view: 'simulate', top: 'traffic' });
+  assert.match(s.data.link, /^https:\/\/pmnmalo\.github\.io\/Silinx-ISE\/#design=[A-Za-z0-9_-]+&top=traffic&view=simulate$/);
+  assert.deepEqual(s.data.left.sort(), ['src/lamps.vhd', 'src/traffic.vhd']);
+  const e = await ok('project_link', { project: 'traffic' });
+  assert.doesNotMatch(e.data.link, /view=|top=/);
+  await fails('project_link', { project: 'traffic', view: 'try' }, 'Try it: \'top\' is not a schematic (Try it is a schematic\'s)');
+  await fails('project_link', { project: 'traffic', top: 'nothere' }, 'the design has no module \'nothere\'');
+  await fails('project_link', { project: 'traffic', view: 'run' }, 'view: one of try, simulate, emulate');
+  await fails('project_link', { project: 'traffic', base: 'javascript:alert(1)' }, 'base: \'javascript:alert(1)\' is not an http(s) address');
+  await fails('project_link', { project: 'traffic', base: 'nope' }, 'base: \'nope\' is not an address');
+  await fails('project_link', { project: 'nothere' }, 'no project \'nothere\' in the workspace');
+  await ok('new_project', { name: 'empty' });
+  await fails('project_link', { project: 'empty', view: 'emulate' }, 'the design has no board to emulate it on');
+  await fails('project_link', { project: 'empty', view: 'simulate' }, 'the design has no test bench to simulate');
+});
+
+test('project_link: a project too large for a link', async () => {
+  await ok('new_project', { name: 'big' });
+  const noise = Array.from({ length: 60000 }, (_, i) => ((i * 2654435761) >>> 0).toString(36)).join(' ');
+  await P.writeFile('big', 'src/noise.txt', noise);
+  const r = await call('project_link', { project: 'big' });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /^project_link: the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Silinx ISE Project\) and link to that$/);
+});
+
+test('open_link: an example, on its board and on another (its pins the board\'s), in the emulator', async () => {
+  const r = await ok('open_link', { link: 'https://pmnmalo.github.io/Silinx-ISE/#open=example:pong&view=emulate' });
+  assert.equal(r.text, 'Opened the link as the new project \'pong\': top pong, basys2; the link opens the board emulator (run_process bitstream builds it for the board).');
+  const n = await ok('open_link', { link: '#open=example:blinky&board=nexys2', name: 'blinky_n2' });
+  assert.equal(n.data.board, 'nexys2');
+  assert.equal((await P.readProject('blinky_n2')).device.part, 'xc3s500e');
+  // opened again: the example's project as it is
+  assert.equal((await ok('open_link', { link: '#open=example:pong' })).data.created, false);
+  await P.writeFile('pong', 'src/extra.vhd', '-- mine\n');
+  await fails('open_link', { link: '#open=example:pong' }, 'project \'pong\' exists and differs from the link\'s design: it is not replaced (give another name, or delete_project first)');
+  await fails('open_link', { link: '#open=example:nothere' }, 'the link names no example \'nothere\' (list_examples)');
+  await fails('open_link', { link: '#open=example:pong&board=zx81', name: 'p2' }, 'the link\'s board \'zx81\' is not a board (list_devices)');
+  await fails('open_link', { link: '#open=example:gates&view=simulate&top=nothere', name: 'g2' }, 'the design has no module \'nothere\'');
+  assert.equal(fs.existsSync(P.projectDir('g2')), false);
+});
+
+test('open_link: a broken or hostile link is refused, nothing made (#2829)', async () => {
+  const before = (await P.listProjects()).length;
+  await fails('open_link', { link: 'https://pmnmalo.github.io/Silinx-ISE/' }, 'the link has no design (#design=… or #open=…)');
+  await fails('open_link', { link: '#token=abc' }, 'the link has no design (#design=… or #open=…)');
+  await fails('open_link', { link: '#open=https://example.org/lecture3.zip' }, 'the link opens a zip at https://example.org/lecture3.zip: the MCP server fetches nothing from the network (download it into the exchange folder, then import_project)');
+  await fails('open_link', { link: '#open=http://192.168.1.1/a.zip' }, 'the link\'s open= is not an https address (\'http://192.168.1.1/a.zip\')');
+  await fails('open_link', { link: '#open=https://127.0.0.1/a.zip' }, 'the link\'s open= is an address of this computer or of a local network (\'127.0.0.1\')');
+  await fails('open_link', { link: '#design=abc$' }, 'the design in the link is not base64url');
+  const hostile = Buffer.from(zlib.deflateRawSync(JSON.stringify({ v: 1, project: { name: 'evil' }, files: { '../../escape.vhd': 'x' } }))).toString('base64url');
+  await fails('open_link', { link: `#design=${hostile}` }, 'the link\'s design has a file outside the project (\'../../escape.vhd\')');
+  const named = Buffer.from(zlib.deflateRawSync(JSON.stringify({ v: 1, project: { name: '<svg onload=alert(1)>' }, files: {} }))).toString('base64url');
+  await fails('open_link', { link: `#design=${named}` }, 'the link\'s design has no valid project name (\'<svg onload=alert(1)>\')');
+  await fails('open_link', { link: '#open=example:gates', name: '../x' }, 'name: \'../x\' is not a project name (a letter, then letters, digits, - and _)');
+  assert.equal((await P.listProjects()).length, before);
+  assert.equal(fs.existsSync(path.join(tmp, 'escape.vhd')), false);
+});
