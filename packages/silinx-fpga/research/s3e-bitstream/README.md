@@ -461,7 +461,8 @@ are the XC3S250E's, `chkempty`: Silinx's writer gives ISE's empty and map design
 | XC3S1200E | `01C2E093` | 125 | 959 | 60 rows |
 
 **Layout** (`gen-map.mjs`: one design per 4000 slices numbers every slice in its LUT; `decode-map.mjs`;
-`gen-layout.mjs` from the map, the empty design and the device grid): every slice found once, one
+`gen-layout.mjs` from the map, the empty design and the die's tiles, the measured ones since #2502: `research/s3e-device`
+grid.mjs, no device report): every slice found once, one
 frame per slice column and one bit per slice row on every device. Every tile column but the I/O
 columns has CLB tiles (the block-RAM columns at their top and bottom), so the map gives all the
 columns: the global clock columns (3 frames; 4 on the XC3S1200E), the left I/O column (21 frames),
