@@ -130,7 +130,9 @@ export function projectFromZip(name, gated, { xiseProject, textOf }) {
   }
   const p = xe ? xiseProject(name, textOf(xe), files) : { json: emptyProjectJson(name), files: {}, warnings: [] };
   warnings.push(...p.warnings);
-  const known = new Set(p.json.files.map(f => f.path).concat(p.json.constraints));
+  // (an ISE project's sources are xiseProject's already; a Silinx export's files are all the zip's: the empty project's
+  // default constraints path is not a file, and constraints/top.ucf, the pins, is one to keep, #2894)
+  const known = new Set(xe ? p.json.files.map(f => f.path).concat(p.json.constraints) : []);
   for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && k !== PROJECT_FILE) p.files[k] = v;
   const missing = [];
   if (pe) {

@@ -117,3 +117,32 @@ test('open_link: a broken or hostile link is refused, nothing made (#2829)', asy
   assert.equal((await P.listProjects()).length, before);
   assert.equal(fs.existsSync(path.join(tmp, 'escape.vhd')), false);
 });
+
+test('#2894 project_link / open_link of every example with constraints: the same .ucf, board, device and top; implemented with the same pinout and the same warnings; a module link and the project only too', { timeout: 900000 }, async () => {
+  for (const ex of ['traffic', 'pong', 'stopwatch', 'clock', 'vga', 'uart']) {
+    const o = `${ex}_2894`, l = `${ex}_2894l`;
+    await ok('new_project_from_example', { name: o, example: ex });
+    const src = await P.readProject(o);
+    // the project only, and a module's link (the top's first other module; Copy Link to This Module…)
+    const mod = (await Promise.all(src.files.filter(f => f.role !== 'sim').map(f => P.readFile(o, f.path)))).join('\n')
+      .match(/^\s*(?:entity|module)\s+(\w+)/gim).map(m => m.trim().split(/\s+/)[1]).find(m => m.toLowerCase() !== src.top.toLowerCase());
+    for (const [args, as] of [[{}, l], [{ top: mod }, `${l}m`], [{ view: 'emulate' }, `${l}e`]]) {
+      const r = await ok('open_link', { link: (await ok('project_link', { project: o, ...args })).data.link, name: as });
+      assert.deepEqual(r.data.warnings, [], `${as}`);
+      const got = await P.readProject(as);
+      for (const k of ['constraints', 'board', 'device', 'top', 'simTop', 'files']) assert.deepEqual(got[k], src[k], `${as}: ${k}`);
+      assert.equal(await P.readFile(as, got.constraints), await P.readFile(o, src.constraints), `${as}: the same ${src.constraints}`);
+      assert.deepEqual(await files(as), await files(o), as);
+    }
+    // implemented: the same pins (the placed design's pads), the same warnings
+    const run = async p => { const r = await ok('run_process', { project: p, process: 'pins' }); return { warnings: r.data.warnings, pins: (await ok('get_report', { project: p, report: 'pins' })).text }; };
+    const [a, b] = [await run(o), await run(l)];
+    assert.deepEqual(b.warnings, a.warnings, `${ex}: no new warnings`);
+    assert.equal(b.pins, a.pins, `${ex}: the same pinout`);
+    assert.match(b.pins, /LOC = "B8"/, `${ex}: the clock on its pin`);
+  }
+  // to the bitstream (pong, the link's copy): no warnings
+  const bit = await ok('run_process', { project: 'pong_2894l', process: 'bitstream' });
+  assert.deepEqual(bit.data.warnings, []);
+  assert.ok(fs.existsSync(path.join(P.projectDir('pong_2894l'), 'build', 'pong.bit')) || /bit/i.test(bit.text));
+});
