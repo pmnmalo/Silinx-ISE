@@ -13,6 +13,8 @@ import { MIRRORS, mirrorFeatures } from '../research/s3e-bitstream/dcm-mirror.mj
 import { makeDb, featureBits } from '../src/fpga/bitgen.js';
 import { measuredPips, UNIFY } from '../research/s3e-bitstream/want-pips.mjs';
 import { windowKeyOf } from '../research/s3e-bitstream/db.mjs';
+import { frameGrid, typeTables, tilesByType } from '../research/s3e-bitstream/gen-layout.mjs';
+import { measuredGridOf, PARTS } from '../research/s3e-device/build-measured.mjs';
 
 test('resolvePatterns: a PIP measured with different bits keeps the pattern without artefacts', () => {
   const p = (pat, n) => [pat, new Array(n).fill('T')];
@@ -465,4 +467,18 @@ net "c" ,
     assert.equal(fs.readFileSync(path.join(T, 'a', 'B3-s', 'top.ucf'), 'utf8'), 'NET "clk" LOC = "B8" ;\nNET "ctl" LOC = "J16" ;\nNET "d" LOC = "B3" ;\nNET "q<0>" LOC = "J17" ;\nNET "q<1>" LOC = "K12" ;\n');
     assert.notEqual(tool('gen-padalone.mjs', [path.join(T, 'b'), 'J16'], { PART: 'xc3s1200efg320-4' }).status, 0, 'a pad the designs use otherwise');
   } finally { fs.rmSync(T, { recursive: true, force: true }); }
+});
+
+test('gen-layout: every die\'s layout from its measured tiles (no device report) and its chip map: the columns\' and rows\' starts, the special tiles\' frames and bits, the break rows, as committed (#2502)', () => {
+  const HERE = path.dirname(fileURLToPath(import.meta.url));
+  const read = f => JSON.parse(fs.readFileSync(path.join(HERE, '../bitdb', f), 'utf8'));
+  for (const [die, part] of Object.entries(PARTS)) {
+    const layout = read(`${die}-layout.json`), names = measuredGridOf(part).tiles.map(t => t.name);
+    const { cols, rows } = frameGrid(read(`${die}-lut.json`).lutF, names);
+    assert.deepEqual({ cols, rows }, { cols: layout.cols, rows: layout.rows }, die);
+    const t = typeTables(names, { cols, rows, frameWords: layout.frameWords, part });
+    assert.deepEqual(t, { brkRows: layout.brkRows, typeCols: layout.typeCols, typeRows: layout.typeRows, typeFrames: layout.typeFrames, typeBits: layout.typeBits }, die);
+  }
+  // the tiles by type, and the CLBs' extent; a name of another form left out
+  assert.deepEqual(tilesByType(['CLB_X1Y2', 'CLB_X3Y1', 'GCLKH_X1Y2', 'VCC']), { tilesOf: { CLB: [[1, 2], [3, 1]], GCLKH: [[1, 2]] }, maxX: 3, maxY: 2 });
 });

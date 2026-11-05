@@ -1429,3 +1429,11 @@ templates instead of 86, 96, 95 and 106, so the descriptions are larger (0.35, 0
 node build-measured.mjs out.json.gz data/xc3s250e --part xc3s250ecp132-4
 node compare-grid.mjs before.json.gz out.json.gz
 ```
+
+**The layout from the measured tiles.** `gen-layout.mjs` (research/s3e-bitstream) took the tile names and the CLBs'
+break rows from the report. It now takes them from the die's measured grid (`build-measured.mjs measuredGridOf`), and
+its parts are functions: `frameGrid` (the columns' and rows' first frames and bits, from the chip map), `typeTables`
+(the special tiles' frames and bits, the break rows). From the measured tiles and each die's committed chip map
+(`bitdb/<die>-lut.json`), they give each `bitdb/<die>-layout.json` as committed: the same `cols`, `rows`, `typeCols`,
+`typeRows`, `typeFrames`, `typeBits` and `brkRows` on all four dies (`test/s3e-bitstream-tools.test.js`). The rest of a
+layout (`defaults`, `idcode`, `frames`) is the empty design's bitstream, never the report's.

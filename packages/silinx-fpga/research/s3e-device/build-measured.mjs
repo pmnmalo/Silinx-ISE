@@ -11,6 +11,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { chipMeasurements } from './chip.mjs';
+import { measuredGrid } from './grid.mjs';
 import { packMeasured } from './build.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +52,21 @@ export function measurementsOf(part, dir) {
     joins: verdicts.flatMap(l => l.filter(v => v[2] === 'join').map(v => [v[0], v[1]])),
     switchTiles: fs.readFileSync(path.join(dir, 'switch-tiles.txt'), 'utf8').split(/\s+/).filter(Boolean),
     rules: true,
+  });
+}
+
+/** The measured grid of a part (grid.mjs measuredGrid: its tiles, rows, columns and sites; not the VCC sites a type's PIPs
+ *  give, which chipMeasurements adds) from the data in `dir` (by default its die's folder). */
+export function measuredGridOf(part, dir) {
+  const die = dieOf(part);
+  if (!die) throw new Error(`build-measured: ${part} is not a Spartan-3E part of ${Object.values(PARTS).join(', ')}`);
+  dir ??= dataDir(die);
+  const probes = Object.values(gz(path.join(dir, 'probes.json.gz')));
+  return measuredGrid({
+    part, obs: gz(path.join(dir, 'obs.json.gz')), others: gz(path.join(dir, 'others.json.gz')),
+    probes: { yes: probes.flatMap(p => p.yes) },
+    joins: Object.values(gz(path.join(dir, 'verdicts.json.gz'))).flatMap(l => l.filter(v => v[2] === 'join')),
+    switchTiles: fs.readFileSync(path.join(dir, 'switch-tiles.txt'), 'utf8').split(/\s+/).filter(Boolean),
   });
 }
 
