@@ -24,7 +24,7 @@ export function mountRender(ctx) {
   }
 
   function render() {
-    const { M, sel, diags } = state();
+    const { M, sel, diags, sim } = state();   // (sim: the Simulate panel's present cycle, asm-sim.js view(), #2880)
     const diagBy = new Map();
     for (const d of diags) {
       if (!d.nodeId) continue;
@@ -71,6 +71,7 @@ export function mountRender(ctx) {
       }
       const d = pathD(pts);
       const selc = sel.edge === e.id ? ' sel' : '';
+      const hot = sim?.edges.has(e.id) ? ' sim-path' : '';
       let label = '';
       if (a.type === 'decision') {
         const p = pts[0];
@@ -81,8 +82,8 @@ export function mountRender(ctx) {
         const p = pts[0];
         label = `<text class="asm-edge-label asm-case-label" x="${p.x + 5}" y="${p.y + 13}">${esc(e.port)}</text>`;
       }
-      eh += `<g class="asm-edge${selc}" data-edge="${esc(e.id)}"><path class="asm-edge-hit" d="${d}"/>` +
-        `<path class="asm-edge-line" d="${d}" marker-end="url(#${uid}-arr${selc ? '-sel' : ''})"/>${label}</g>`;
+      eh += `<g class="asm-edge${selc}${hot}" data-edge="${esc(e.id)}"><path class="asm-edge-hit" d="${d}"/>` +
+        `<path class="asm-edge-line" d="${d}" marker-end="url(#${uid}-arr${selc ? '-sel' : hot ? '-hot' : ''})"/>${label}</g>`;
     }
     // case boxes: stem and bar from which the exits leave
     let ch = '';
@@ -106,6 +107,12 @@ export function mountRender(ctx) {
       const sev = diagBy.get(n.id);
       if (sev === 'error') cls.push('err'); else if (sev === 'warning') cls.push('warn');
       if (n.id === M.initial) cls.push('initial');
+      if (sim) {
+        if (n.id === sim.state) cls.push('sim-cur');
+        if (n.id === sim.next) cls.push('sim-next');
+        if (sim.nodes.has(n.id)) cls.push('sim-path');
+        if (sim.lit.has(n.id)) cls.push('sim-lit');
+      }
       let inner = '';
       const lines = (arr) => {
         const lh = 17, y0 = -((arr.length - 1) * lh) / 2;

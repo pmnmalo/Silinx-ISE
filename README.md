@@ -81,6 +81,10 @@ for Xilinx FPGAs supported by ISE 14.7.
   signal (e.g. an `opcode`), one exit per value (`00100`, `0|1`, `others`), generated as a
   `case` statement; conditions can test bits and slices (`opcode[4]`, `opcode[4:3]`).
   Charts and schematics print on one page or tiled over several, or save as PNG / SVG.
+  *Simulate* steps through the chart: set its inputs (and its reset), apply clock edges (one, or *Run* at a chosen
+  rate; *Back* undoes one), and see the present state, the decisions tested and the exits followed, the conditional
+  outputs reached and the next state drawn on the chart, its Moore and Mealy outputs, its registers and their next
+  values, and the last cycles, exactly as its generated HDL behaves.
   The chart always has its HDL file, generated from it (an edit of the HDL updates the chart), and
   an HDL state machine (1/2/3-process, VHDL or Verilog) can be converted to a chart (*Convert to
   State Machine*).
@@ -474,7 +478,7 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
 Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `test_bench_wizard` (a self-checking
 test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins), `convert_module` (an HDL module to a schematic, ASM chart or state
-diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;

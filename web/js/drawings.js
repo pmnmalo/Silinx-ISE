@@ -47,7 +47,7 @@ export async function openAsm(path) {
         onChange: () => setDirty(d, true),
         onProblems: (diags) => problems.set(diags),
         onValidate: (diags) => problems.log(diags),
-        onMessage: (text) => log(`${path.split('/').pop()}: ${text}`, 'info'),
+        onMessage: (text) => log(`${path.split('/').pop()}: ${t(text)}`, 'info'),
       });
       d.asmEditor = ed;
       return {

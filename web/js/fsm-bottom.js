@@ -1,9 +1,10 @@
 // The state diagram editor's bottom panel (#405: out of mountFsmEditor in fsm-editor.js): the tables (the state and
 // output tables, the encodings), and the simulation (the inputs, a clock step,
-// run, reset, the state and outputs, the trace).
+// run, reset, the state and outputs, the trace; its inputs' controls and its trace sim-panel.js's, shared with the ASM
+// chart's, #2880).
 import { downloadText, h } from './ui.js';
 import { encodedTable, stateTable, stepFsm, toCsv, transitionTable } from '/core/fsm.js';
-import { clamp } from './fsm-editor.js';
+import { simInputControls, simTraceTable } from './sim-panel.js';
 
 /** { renderPanel, resetSim, stopRun, togglePanel } of mountFsmEditor (M(), destroyed(), diags(), panel(), sim(): its current values). */
 export function mountFsmBottom(ctx) {
@@ -105,32 +106,7 @@ export function mountFsmBottom(ctx) {
   const simNext = h('span', { class: 'asm-muted' });
   const simOuts = h('div', { class: 'fsm-sim-outputs' });
   const simTrace = h('div', { class: 'fsm-sim-trace' });
-  let simIns = null;   // { key: the inputs (names, widths), el: their controls, set(): the controls show sim.inputs }
-  function simInputs() {
-    const key = JSON.stringify(M().inputs.map((i) => [i.name, i.width]));
-    if (simIns?.key !== key) {
-      const sets = [];
-      const el = h('div', { class: 'fsm-sim-inputs' }, ...M().inputs.map((i) => {
-        if (i.width === 1) {
-          const b = h('button', { type: 'button', class: 'asm-btn fsm-bit', 'data-input': i.name, title: 'Click to toggle the input' });
-          b.addEventListener('click', () => { sim().inputs[i.name] = sim().inputs[i.name] ? 0 : 1; render(); renderPanel(); });
-          sets.push(() => {
-            const t = `${i.name} = ${sim().inputs[i.name]}`;
-            if (b.textContent !== t) b.textContent = t;
-            b.classList.toggle('on', !!sim().inputs[i.name]);
-          });
-          return b;
-        }
-        const e = h('input', { type: 'number', class: 'asm-input fsm-bus', min: 0, max: 2 ** i.width - 1, 'data-input': i.name });
-        e.addEventListener('change', () => { sim().inputs[i.name] = clamp(parseInt(e.value, 10) || 0, 0, 2 ** i.width - 1); render(); renderPanel(); });
-        sets.push(() => { if (document.activeElement !== e) e.value = String(sim().inputs[i.name]); });
-        return h('label', { class: 'fsm-busl' }, `${i.name} = `, e);
-      }));
-      simIns = { key, el, set: () => sets.forEach((f) => f()) };
-    }
-    simIns.set();
-    return simIns.el;
-  }
+  const simInputs = simInputControls({ inputs: () => M().inputs, values: () => sim().inputs, changed: () => { render(); renderPanel(); } });
   let simView = null;   // the panel's body while simulating: its rows, kept
   function renderSim() {
     panelTitle.textContent = 'Simulation';
@@ -161,10 +137,7 @@ export function mountFsmBottom(ctx) {
     simNext.textContent = r.transition ? `next clock edge → ${stateById(r.next)?.name}` : `no transition is true: stays in ${cur?.name ?? '?'}`;
     simOuts.replaceChildren(...M().outputs.map((o) => h('span', { class: `fsm-led${r.outputs[o.name] ? ' on' : ''}`, 'data-output': o.name },
       `${o.name} = ${o.width === 1 ? r.outputs[o.name] : r.outputs[o.name].toString(2).padStart(o.width, '0')}`)));
-    simTrace.replaceChildren(...(sim().trace.length ? [h('table', { class: 'fsm-table fsm-trace' },
-      h('tr', {}, h('th', {}, 'Cycle'), h('th', {}, 'State'), h('th', {}, 'Inputs'), h('th', {}, 'Outputs'), h('th', {}, 'Next state')),
-      ...sim().trace.slice(-12).reverse().map((x) => h('tr', {}, h('td', {}, String(x.cycle)), h('td', {}, x.state), h('td', { class: 'mono' }, Object.entries(x.inputs).map(([k, v]) => `${k}=${v}`).join(' ')),
-        h('td', { class: 'mono' }, Object.entries(x.outputs).map(([k, v]) => `${k}=${v}`).join(' ')), h('td', {}, x.next))))] : []));
+    simTrace.replaceChildren(...simTraceTable(sim().trace));
   }
 
   return { renderPanel, resetSim, stopRun, togglePanel };
