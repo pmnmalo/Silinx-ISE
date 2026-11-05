@@ -83,7 +83,7 @@ uiTest('#2536 the serial terminal: a line typed comes back from a UART echo, its
   await setLang('en');
   assert.deepEqual(untranslated(en, pt, [/^\d+ baud$/]), []);
   // the event-driven engine: the terminal says it needs the compiled one, nothing can be sent
-  await page.eval(() => { const s = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')].find((x) => [...x.options].some((o) => o.value === 'compiled')); s.value = 'event'; s.dispatchEvent(new Event('change')); });
+  await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-bar .tb-more-menu [data-value=event]').click());   // (the menu's Engine item, #2846)
   await page.waitFor(() => window.Silinx.active.view?.engine === 'event' && window.Silinx.active.view.outputs, [], { what: 'the event-driven engine' });
   assert.equal(await page.eval((d) => document.querySelector(`${d} .emu-serial-in`).disabled, DOC), true);
   await waitEmuNote(page, /^the serial terminal needs the compiled engine \(the event-driven one is too slow for a frame\)\.$/);

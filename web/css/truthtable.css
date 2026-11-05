@@ -88,13 +88,19 @@ html[data-theme="dark"] .tt-k3d-cell.v1 .tt-k3d-v { color: #8fb4ff; }
 /* a toolbar's menu (web/js/toolbar-menu.js) */
 .tb-more { position: absolute; top: 5px; right: 8px; }
 .tb-more .tb-more-btn { box-sizing: border-box; width: 28px; min-width: 0; padding-left: 0; padding-right: 0; justify-content: center; text-align: center; }   /* (inside the place its toolbar keeps free, #2331) */
-.tb-more-menu { position: absolute; top: 100%; right: 0; margin-top: 2px; z-index: 30; display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px; background: var(--toolbar-grad, #eee); border: 1px solid var(--border, #aaa); box-shadow: 2px 2px 6px rgba(0, 0, 0, .3); }
+.tb-more-menu { position: absolute; top: 100%; right: 0; margin-top: 2px; z-index: 30; font-size: var(--fs, 12px); display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px; background: var(--toolbar-grad, #eee); border: 1px solid var(--border, #aaa); box-shadow: 2px 2px 6px rgba(0, 0, 0, .3); }
 .tb-more-menu[hidden] { display: none; }
 .tb-more-menu button { white-space: nowrap; text-align: left; }
+/* its items (#2846): a command, or a choice's options and a setting on or off (checkable, a ✓ in their own column), under a
+   section title; the Boolean algebra's look (.tt-menu-item) for every viewer's */
+.tb-menu-title { padding: 3px 6px 1px 4px; color: var(--muted, #666); font-size: 11px; font-weight: 600; white-space: nowrap; cursor: default; }
+.tb-menu-item + .tb-menu-title { margin-top: 3px; padding-top: 5px; border-top: 1px solid var(--border, #aaa); }
+.tb-menu-tick { width: 14px; flex: none; text-align: center; }
+.tb-menu-item:disabled { opacity: .5; }
 /* the Boolean algebra's menu and its button as the schematic editor's (#2505): flat, an icon and a label */
 .tt-toolbar .tb-more { top: 2px; right: 4px; }
 .tt-toolbar .tb-more-btn { width: 24px; height: 22px; display: inline-flex; align-items: center; border: 1px solid transparent; border-radius: 2px; background: none; }
-.tt-menu-item { height: 22px; padding: 0 6px 0 4px; border: 1px solid transparent; border-radius: 2px; background: none; color: inherit; font: inherit; display: inline-flex; align-items: center; gap: 3px; cursor: default; }
+:is(.tt-menu-item, .tb-menu-item) { height: 22px; padding: 0 6px 0 4px; border: 1px solid transparent; border-radius: 2px; background: none; color: inherit; font: inherit; display: inline-flex; align-items: center; gap: 3px; cursor: default; }
 .tt-menu-item svg { width: 16px; height: 16px; flex: none; }
-.tt-menu-item:hover, .tt-toolbar .tb-more-btn:hover { border-color: #a8c8eb; background: linear-gradient(#f3f8fd, #d5e6f8); }
+:is(.tt-menu-item, .tb-menu-item:not(:disabled)):is(:hover, :focus-visible), .tt-toolbar .tb-more-btn:hover { border-color: #a8c8eb; background: linear-gradient(#f3f8fd, #d5e6f8); }
 .pn-toolbar, .fsm-toolbar, .asm-chart-toolbar { position: relative; padding-right: 40px; }

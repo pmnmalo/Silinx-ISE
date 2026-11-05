@@ -44,10 +44,6 @@ export function injectStyle() {
   document.head.append(h('style', {}, `
 .emu { display: flex; flex-direction: column; height: 100%; background: var(--bg, #f0f0f0); font: 12px var(--font, system-ui); overflow: auto; container-type: inline-size; }
 .emu-bar { flex: none; position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 6px 44px 6px 8px; border-bottom: 1px solid var(--border, #aaa); background: var(--panel-alt, #f7f7f7); flex-wrap: wrap; }
-/* its menu (#2666): the three dots at the right of its first line (toolbar-menu.js), the rows of fields */
-.emu-bar .tb-more-menu { padding: 6px; gap: 6px; }
-.emu-menu-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.emu-menu-show { flex-wrap: wrap; max-width: 300px; white-space: normal; }
 .emu-bar .sep { width: 1px; height: 20px; background: var(--frame); margin: 0 4px; }
 .emu > .doc-status > .stat { font-family: var(--mono, monospace); font-variant-numeric: tabular-nums; }   /* (in its status line, #2763) */
 /* the board and its modules (main), the side panel at their right, as the diagram editors' Properties (#2666) */
@@ -109,7 +105,6 @@ export function injectStyle() {
 /* the room for a board's modules given back, none being shown (#2522) */
 .emu-no-room > * { translate: 0 calc(-1 * var(--emu-room)); }
 .emu-no-room > .emu-pcb-art { pointer-events: none; }
-.emu-module { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 .emu-at { position: absolute; transform: translateX(-50%); display: flex; justify-content: center; }
 .emu-silk { color: #e8edf7; font: bold 10px Arial, sans-serif; white-space: nowrap; }
 /* the power switch (a slide switch, ON to the right) and its LED */

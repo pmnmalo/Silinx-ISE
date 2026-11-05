@@ -830,7 +830,7 @@ uiTest('#695 #698 open mode: blinky\'s Post-Map Model on the event-driven engine
   await page.waitFor(() => window.Silinx.active?.title === 'Board Emulator (top, Post-Map)' && window.Silinx.active.view?.outputs, [], { timeout: 180000, what: 'the emulator' });
   assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
   const start = (await page.consoleText()).length;
-  await page.eval(() => { const s = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')].find((x) => [...x.options].some((o) => o.value === 'event')); s.value = 'event'; s.dispatchEvent(new Event('change')); });
+  await page.eval(() => { document.querySelector('.doc:not([hidden]) .emu-bar .tb-more-menu [data-value=event]').click(); });
   await page.waitFor(() => window.Silinx.active?.title === 'Board Emulator (top, Post-Map)' && window.Silinx.active.view?.engine === 'event' && window.Silinx.active.view.outputs, [], { timeout: 60000, what: 'the emulator on the event-driven engine' });
   const lines = (await page.consoleText()).slice(start).split('\n').map((l) => l.trim()).filter(Boolean);
   assert.ok(lines.some((l) => /^Board Emulator: 'top' \(Post-Map netlist, event-driven\) /.test(l)), lines.join('\n'));

@@ -30,7 +30,10 @@ end rtl;
 // a property of the emulator's view ('sim.now', 'held', 'paints' …)
 const emu = (page, prop) => page.eval((p) => p.split('.').reduce((o, k) => o?.[k], window.SilinxApp.findDoc('emulator').view), prop);
 const stat = (page) => page.eval(() => document.querySelector('.emu .stat').textContent);
-const hiddenSel = '.emu-bar select[title^="What the emulator does while it is not seen"]';
+// the When hidden choice: its items in the toolbar's menu (#2846), the one checked, one chosen
+const hiddenItems = '.doc:not([hidden]) .emu-bar .tb-more-menu [role=menuitemradio][title^="What the emulator does while it is not seen"]';
+const hiddenValue = (page) => page.eval((s) => document.querySelector(`${s}[aria-checked=true]`).dataset.value, hiddenItems);
+const chooseHidden = (page, v) => page.eval((s, x) => document.querySelector(`${s}[data-value="${x}"]`).click(), hiddenItems, v);
 async function openEmulator(page) {
   await page.menu('Tools', 'Board Emulator');
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'emulator running' });
@@ -77,8 +80,8 @@ uiTest('board emulator: paused while hidden and while its document tab is not ac
   await page.eval(() => window.SilinxApp.openFile('src/cnt.vhd'));
   await openEmulator(page);
   assert.equal(await emu(page, 'engine'), 'compiled');
-  assert.deepEqual(await page.eval((s) => { const e = document.querySelector(s); return [e.value, [...e.options].map((o) => o.textContent), e.previousSibling.textContent]; }, hiddenSel),
-    ['pause', ['Pause', 'Keep running'], 'When hidden:'], 'the selector, next to the other settings; Pause by default');
+  assert.deepEqual(await page.eval((s) => { const e = [...document.querySelectorAll(s)]; return [e.map((b) => [b.textContent, b.getAttribute('aria-checked')]), e[0].previousElementSibling.textContent]; }, hiddenItems),
+    [[['✓Pause', 'true'], ['Keep running', 'false']], 'When hidden'], 'its items, under their title, next to the other settings; Pause by default');
   await advances(page, 'running');
 
   // running: at most one drawing per displayed frame (60 a second here), the frames by requestAnimationFrame, no timer
@@ -124,7 +127,8 @@ uiTest('board emulator: paused while hidden and while its document tab is not ac
   await advances(page, 'running after power on');
 
   // "Keep running": it simulates on while not seen (drawing nothing), and the choice is remembered
-  await page.eval((s) => { const e = document.querySelector(s); e.value = 'run'; e.dispatchEvent(new Event('change')); }, hiddenSel);
+  await chooseHidden(page, 'run');
+  assert.equal(await hiddenValue(page), 'run', 'the ✓ follows');
   assert.equal(await page.eval(() => localStorage.getItem('silinx.emulator.hidden')), 'run');
   await activate(page, null);
   await new Promise((r) => setTimeout(r, 200));
@@ -139,10 +143,10 @@ uiTest('board emulator: paused while hidden and while its document tab is not ac
   await setHidden(page, false);
   await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('emulator')));
   await openEmulator(page);
-  assert.equal(await page.eval((s) => document.querySelector(s).value, hiddenSel), 'run', 'remembered');
+  assert.equal(await hiddenValue(page), 'run', 'remembered');
 
   // in Portuguese: the selector and the status line
-  await page.eval((s) => { const e = document.querySelector(s); e.value = 'pause'; e.dispatchEvent(new Event('change')); }, hiddenSel);
+  await chooseHidden(page, 'pause');
   await activate(page, null);
   await page.waitFor(() => window.SilinxApp.findDoc('emulator').view.held, [], { what: 'held' });
   await activate(page, 'emulator');
@@ -155,7 +159,7 @@ uiTest('board emulator: paused while hidden and while its document tab is not ac
   const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-bar')));
   await setLang('pt');
   const pt = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-bar')));
-  for (const t of ['Quando oculto:', 'Pausa', 'Continuar a executar', '@O que o emulador faz enquanto não está à vista (outro separador do navegador, uma janela minimizada, outro separador de documento): pausa, e continua onde estava quando volta a ser mostrado, ou continua a executar'])
+  for (const t of ['Quando oculto', 'Pausa', 'Continuar a executar', '@O que o emulador faz enquanto não está à vista (outro separador do navegador, uma janela minimizada, outro separador de documento): pausa, e continua onde estava quando volta a ser mostrado, ou continua a executar'])
     assert.ok(pt.includes(t), `${t}: ${pt.join(' | ')}`);
   assert.deepEqual(untranslated(en, pt, [/^(cnt|real \(÷1\))\b/]), []);
   await page.click('.doc:not([hidden]) .emu-bar .btn', { text: '▶ Executar' });

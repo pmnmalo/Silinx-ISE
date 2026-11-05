@@ -51,7 +51,8 @@ uiTest('#405 Board Emulator parts: the toolbar, the board, a watched signal, the
   // ---- the toolbar: running; its selectors, the engine and when hidden in its menu (#2666)
   assert.deepEqual(await q('.emu-bar > button:not(.emu-props-btn)'), ['⏸ Pause', '⏭ Step', '⟲ Power cycle']);   // (☰ Properties: narrow only, emulator-panels.test.js)
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-bar > select')].map((s) => [s.value, s.options.length])), [['', 5], ['real', 8]]);
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-bar .tb-more-menu select')].map((s) => [s.value, s.options.length])), [['compiled', 2], ['pause', 2]]);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-bar .tb-more-menu [role=menuitemradio]')].map((b) => [b.textContent, b.getAttribute('aria-checked')])),
+    [['✓Compiled (real speed)', 'true'], ['Event-driven (debugging)', 'false'], ['✓Pause', 'true'], ['Keep running', 'false']]);   // (menu items, #2846)
   // ---- the board: 8 LEDs, 8 switches, 4 buttons, the power switch
   assert.deepEqual(await page.eval(() => ['.emu-led', '.emu-sw', '.emu-btn', '.emu-power'].map((s) => document.querySelectorAll(s).length)), [8, 8, 4, 1]);
   // ---- Pause: Run shown; Step: one clock cycle (20 ns) further

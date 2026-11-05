@@ -18,6 +18,11 @@ answer here.
   Properties toggle; the toolbar's ⋮ menu (`web/js/toolbar-menu.js`) at the right end of its first line for the
   commands used now and then (layout, conversion, export, analysis), its place kept free whatever wraps (#2208,
   #2331).
+- **A ⋮ menu holds menu items, never form fields** (#2846): no `<select>`, input or check box in it. A choice is a
+  section title and its options, checkable items with a ✓ on the current one (`menuChoice`); a setting on or off is one
+  checkable item (`menuCheck`); an option that can't be chosen is disabled, its reason its tip. They are
+  `toolbar-menu.js`'s, styled in one place for every viewer, with the hover and the keys (↑ ↓ Home End Esc) of every ⋮
+  menu: no menu styles of a viewer's own.
 - **What a toolbar says is at its right end**, never between its tools (#2725): the read-only notice and "Not in
   sync with …", after the spacer and the ☰ panels' buttons, before the ⋮ menu (`test/ui/toolbar-info-right.test.js`).
   Nothing else the toolbar says: the rest is the status line's (#2763).
