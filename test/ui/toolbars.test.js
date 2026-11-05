@@ -78,7 +78,8 @@ for (const theme of ['light', 'dark']) {
       assert.ok(b.n > 0, `${name}: its controls`);
       // (SSim's toolbar is its wave window's line in the Tasks interface: the line's height and padding)
       // (a toolbar with a menu, #2208: the menu's place kept free at the right, the same padding otherwise, #2331)
-      const want = name === 'ssim' ? { min: '0px', pad: '6px 0px', controls: [28] } : { min: '40px', pad: b.menu ? '6px 40px 6px 8px' : '6px 8px', controls: [28] };
+      // (SSim's menu, #2839: its place kept free at the right end of the wave window's line)
+      const want = name === 'ssim' ? { min: '0px', pad: b.menu ? '6px 32px 6px 0px' : '6px 0px', controls: [28] } : { min: '40px', pad: b.menu ? '6px 40px 6px 8px' : '6px 8px', controls: [28] };
       assert.deepEqual({ min: b.min, pad: b.pad, controls: b.controls }, want, `${name}: ${JSON.stringify(b)}`);
       if (b.menu) assert.ok(b.clear, `${name}: its menu clear of the other controls`);
     }

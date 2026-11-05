@@ -323,8 +323,10 @@ uiTest('#1353 #1391 Tasks ▸ Simulate: the model chosen in the wave window\'s t
     const tb = document.querySelector('.doc:not([hidden]) .isim-toolbar'), s = tb.querySelector('.isim-model');
     const stim = [...tb.querySelectorAll('.tb-btn')].find((b) => /Edit Stimuli/.test(b.textContent));
     const f = s?.closest('.isim-model-field'), l = f?.querySelector('span');
-    return s && { label: l?.textContent, before: !!l && l.getBoundingClientRect().right <= s.getBoundingClientRect().left, value: s.value, options: [...s.options].map((o) => o.textContent), last: tb.lastElementChild === f,
-      right: Math.abs(s.getBoundingClientRect().right - tb.getBoundingClientRect().right) < 12, afterStim: !!stim && s.getBoundingClientRect().left > stim.getBoundingClientRect().right };
+    return s && { label: l?.textContent, before: !!l && l.getBoundingClientRect().right <= s.getBoundingClientRect().left, value: s.value, options: [...s.options].map((o) => o.textContent),
+      // (last but the toolbar's ⋮ menu, at its right end, #2839)
+      last: f?.nextElementSibling === tb.lastElementChild && tb.lastElementChild.classList.contains('tb-more'),
+      right: Math.abs(s.getBoundingClientRect().right - tb.querySelector('.tb-more-btn').getBoundingClientRect().left) < 12, afterStim: !!stim && s.getBoundingClientRect().left > stim.getBoundingClientRect().right };
   });
   assert.deepEqual(await g(), { label: 'Model:', before: true, value: '', options: ['Behavioral', 'Post-Synthesis', 'Post-Translate', 'Post-Map', 'Post-Place & Route'], last: true, right: true, afterStim: true });
   // Post-Synthesis chosen: generated, then simulated in its own tab; this one keeps Behavioral
