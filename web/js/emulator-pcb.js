@@ -9,9 +9,18 @@ const SVG = (tag, attrs = {}) => {
   return el;
 };
 
+// each drawn board its own ids (#2838): the Board Emulator and I/O Pin Planning's Board view draw the same board at once,
+// and a url(#id) the document has twice resolves to the first, maybe in a hidden tab, its fill then lost. The ids the
+// drawing defines get the drawing's number, in their definitions and in every reference to them (url(#…), href="#…").
+export function scopeIds(body, n) {
+  const ids = new Set([...body.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+  return ids.size ? body.replace(/(\sid="|url\(#|href="#)([^")]+)/g, (m, pre, id) => (ids.has(id) ? `${pre}${id}-${n}` : m)) : body;
+}
+let drawn = 0;
+
 export function svgEl(w, hgt, body) {
   const s = SVG('svg', { width: w, height: hgt, viewBox: `0 0 ${w} ${hgt}`, class: 'emu-pcb-art' });
-  s.innerHTML = body;
+  s.innerHTML = scopeIds(body, `b${++drawn}`);
   return s;
 }
 

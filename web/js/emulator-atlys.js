@@ -28,7 +28,7 @@ export function atlysLayout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButto
   const segs = ['CA', 'CB', 'CC', 'CD', 'CE', 'CF', 'CG', 'DP'].map((s, i) => `${s}(${(i < 7 ? pinsOf(board, 'seg')[i] : pinsOf(board, 'dp')[0]) ?? ''})`);
   const art = `
     <defs><linearGradient id="atpcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a4d40"/><stop offset="1" stop-color="#203e33"/></linearGradient></defs>
-    <rect x="4" y="4" width="${BW - 8}" height="${H - 8}" rx="10" fill="url(#atpcb)" stroke="#0f2219" stroke-width="3"/>
+    <rect x="4" y="4" width="${BW - 8}" height="${H - 8}" rx="10" fill="url(#atpcb) #2a4d40" stroke="#0f2219" stroke-width="3"/>
     ${holes4(BW, H)}
     <rect x="40" y="0" width="62" height="84" rx="3" fill="#1a1a1a" stroke="#000"/><circle cx="71" cy="24" r="12" fill="#333"/><circle cx="71" cy="24" r="4" fill="#888"/>
     ${text(POWER[0], 16, 'ON', { size: 7 })}${text(POWER[0], 100, 'OFF', { size: 7 })}${text(POWER[0], 112, 'POWER', { size: 8 })}

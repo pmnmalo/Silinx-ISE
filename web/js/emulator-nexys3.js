@@ -27,7 +27,7 @@ const BTN_AT = [['BTNS', 731, 812], ['BTNU', 731, 744], ['BTNL', 656, 812], ['BT
 export function nexys3Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkPower }) {
   const art = `
     <defs><linearGradient id="nx3pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b4f3e"/><stop offset="1" stop-color="#213f31"/></linearGradient></defs>
-    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="8" fill="url(#nx3pcb)" stroke="#0f2219" stroke-width="3"/>
+    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="8" fill="url(#nx3pcb) #2b4f3e" stroke="#0f2219" stroke-width="3"/>
     ${holes4(W, H)}
     <rect x="62" y="0" width="72" height="96" rx="3" fill="#1a1a1a" stroke="#000"/><circle cx="98" cy="30" r="14" fill="#333"/><circle cx="98" cy="30" r="4" fill="#888"/>
     <rect x="146" y="6" width="14" height="26" rx="2" fill="#2a6fd1"/>${text(166, 26, 'J1', { size: 7, anchor: 'start', weight: 'normal' })}
