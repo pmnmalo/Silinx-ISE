@@ -219,6 +219,12 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent, ED), 'a=1  b=0');
   await page.menu('Edit', 'Undo');
   await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-info`).textContent), [ED], { what: 'the import undone' });
+  // through the import gate (#2830): a net with a DTD (XXE, billion laughs) is refused, said in the console, the net kept
+  const evil = path.join(page.downloadDir, 'evil.pnml');
+  await fs.writeFile(evil, '<?xml version="1.0"?><!DOCTYPE p [<!ENTITY x SYSTEM "file:///etc/passwd">]><pnml><net id="&x;"/></pnml>');
+  await page.setFiles(`${ED} input[type=file]`, [evil]);
+  await page.waitConsole(/PNML: evil\.pnml: XML with a DTD \(<!DOCTYPE>\): external entities and entity expansion are not accepted/);
+  assert.match(await page.eval((ed) => document.querySelector(`${ed} .asm-info`).textContent, ED), /^2 places · 2 transitions · 4 arcs/);
   // the HDL file: made with the net (every source has its HDL, #207), generated from it
   await page.waitFor(() => window.Silinx.project.files.some((x) => x.path === 'src/ctl.vhd'), [], { what: 'src/ctl.vhd in the project' });
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .petri-editor .pn-link')?.dataset.hdl === 'ctl.vhd', [], { what: 'the link banner' });
@@ -239,7 +245,9 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   assert.equal(await page.eval(() => window.Silinx.active.editor.getValue()), hdl);
   assert.equal(await readWs(env, 'PnSim', 'src/ctl.vhd'), hdl);
   assert.equal(await readWs(env, 'PnSim', 'src/ctl.pn.json'), net);
-  assert.doesNotMatch(await page.consoleText(), /WARNING|not synchronized/);
+  // (the one warning: the refused PNML, #2830)
+  const con = await page.consoleText();
+  assert.deepEqual(con.split('\n').filter((l) => /WARNING|not synchronized/.test(l)), ['WARNING: ctl.pn.json: PNML: evil.pnml: XML with a DTD (<!DOCTYPE>): external entities and entity expansion are not accepted']);
 });
 
 uiTest('Petri net editor: the analysis (#188): properties, places, transitions, invariants, a deadlock shown in the simulation; in Portuguese', E, async (page) => {

@@ -117,6 +117,20 @@ test('read_file / write_file: a source read and written, a new HDL file added to
   // #1233: the same files spelt otherwise; a source spelt otherwise is written and listed once, by its plain path
   for (const p of ['./silinx.json', 'src/../silinx.json', 'src//../silinx.json', './build/top.bit', 'build', 'src/../build/x.v'])
     assert.equal((await srv.call('write_file', { project: 'Blinky', path: p, text: '{}' })).content[0].text, `write_file: '${p}' is written by Silinx itself`);
+  // what an assistant writes passes the import gate (#2830): an XXE schematic, a binary source, a script in a name, a
+  // 2000-branch elsif chain (#2577) refused with their reasons, nothing written
+  const gateCases = [
+    ['src/x.sch', '<?xml version="1.0"?><!DOCTYPE d [<!ENTITY e SYSTEM "file:///etc/passwd">]><drawing>&e;</drawing>', 'src/x.sch: not written: XML with a DTD (<!DOCTYPE>): external entities and entity expansion are not accepted'],
+    ['src/bin.vhd', 'entity\0x', 'src/bin.vhd: not written: binary content (a NUL byte) in a text file'],
+    ['src/<img src=x onerror=alert(1)>.vhd', 'x', 'src/<img src=x onerror=alert(1)>.vhd: not written: character not allowed in a name (< > : " | ? *): \'<img src=x onerror=alert(1)>.vhd\''],
+    ['src/chain.vhd', `if a then x; ${'elsif a then x;\n'.repeat(1001)} end if;`, 'src/chain.vhd: not written: more than 1000 elsif / else if branches (#2577)'],
+    ['src/page.v', '<!DOCTYPE html><script>alert(1)</script>', 'src/page.v: not written: a web page (HTML), not the file its name says'],
+  ];
+  for (const [p, text, message] of gateCases) {
+    const r = await srv.call('write_file', { project: 'Blinky', path: p, text });
+    assert.deepEqual([r.isError, r.content[0].text], [true, `write_file: ${message}`], p);
+  }
+  for (const [p] of gateCases) assert.equal((await srv.call('read_file', { project: 'Blinky', path: p })).isError, true, `${p} not written`);
   assert.equal((await srv.call('write_file', { project: 'Blinky', path: './src//inv.vhd', text: 'library ieee; use ieee.std_logic_1164.all;\nentity inv is port (a : in std_logic; y : out std_logic); end inv;\narchitecture rtl of inv is begin y <= not a; end rtl;\n' })).content[0].text, 'Wrote src/inv.vhd (164 characters).');
   const listed = JSON.parse(fs.readFileSync(path.join(ws, 'Blinky', 'silinx.json'), 'utf8'));
   assert.deepEqual(listed.files.filter(f => f.path.includes('inv')).map(f => f.path), ['src/inv.vhd']);

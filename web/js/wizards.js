@@ -9,6 +9,7 @@ import { S, app } from './app.js';
 import { THIRD_PARTY } from '/core/third-party.js';
 import { drawnHdlPath, isView } from '/core/view-hdl.js';
 import { reservedError } from '/core/reserved.js';
+import { GateError, gateFile } from '/core/import-gate.js';
 import { reservedNameDiags } from './processes.js';
 import { countEvent, siteCounts } from './analytics.js';
 import { confirmDeviceChange } from './device-change.js';
@@ -498,7 +499,17 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     const ext = f.name.split('.').pop().toLowerCase();
     const dir = ext === 'ucf' || ext === 'pcf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
-    const text = await f.text();
+    // through the import gate (#2830): a file it refuses is not added, said in the console
+    let text;
+    try {
+      const g = gateFile(path, new Uint8Array(await f.arrayBuffer()));
+      if (g.warning) app.log(`WARNING: ${g.warning}`, 'warn');
+      text = g.text ?? new TextDecoder().decode(g.data);
+    } catch (e) {
+      if (!(e instanceof GateError)) throw e;
+      app.log(`WARNING: ${e.path}: not imported: ${e.reason}`, 'warn');
+      continue;
+    }
     // a drawing named with a reserved word of VHDL or Verilog (its HDL is generated): refused (#679); an
     // HDL file's module, written in its own language, is said when the project is reloaded
     if (/\.json$/i.test(f.name)) {
