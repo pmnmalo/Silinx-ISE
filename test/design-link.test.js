@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { EXAMPLE_ORDER } from '../core/examples.js';
-import { LINK_LIMITS, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
+import { LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
 import { readZip, textOf } from '../core/zip.js';
 
 const ROOT = path.join(import.meta.dirname, '..', 'examples');
@@ -193,4 +193,26 @@ test('sameFiles: silinx.json left out, any other difference counts', () => {
   assert.ok(!sameFiles({ a: 'x' }, { a: 'y' }));
   assert.ok(!sameFiles({ a: 'x' }, { a: 'x', b: '' }));
   assert.equal(textOf({ data: new TextEncoder().encode('ok') }), 'ok');
+});
+
+test('viewProblem / tryDrawing: Try it is a schematic\'s, a state diagram\'s or a Petri net\'s Simulate (#2869); the other views', () => {
+  const files = {
+    'src/g.sch.json': JSON.stringify({ name: 'g' }), 'src/m.fsm.json': JSON.stringify({ name: 'm' }), 'src/n.pn.json': JSON.stringify({ name: 'n' }),
+    'src/a.asm.json': JSON.stringify({ name: 'a' }), 'src/t.bool.json': JSON.stringify({ name: 't' }), 'src/h.vhd': 'entity h is end;\n', 'src/bad.fsm.json': '{',
+  };
+  const pj = { top: 'g', simTop: 'tb', board: 'basys2' };
+  assert.equal(tryDrawing(files, 'g'), 'src/g.sch.json');
+  assert.equal(tryDrawing(files, 'm'), 'src/m.fsm.json');
+  assert.equal(tryDrawing(files, 'n'), 'src/n.pn.json');
+  for (const m of ['a', 't', 'h', 'bad', 'nothere']) assert.equal(tryDrawing(files, m), null, m);
+  assert.ok(TRY_DRAWING.test('x.PN.JSON') && !TRY_DRAWING.test('x.asm.json'));
+  for (const top of [undefined, 'm', 'n']) assert.equal(viewProblem(pj, files, { view: 'try', top }), null, top);
+  for (const top of ['a', 't', 'h']) assert.equal(viewProblem(pj, files, { view: 'try', top }), `Try it: '${top}' is not a schematic, a state diagram or a Petri net`);
+  assert.equal(viewProblem({ ...pj, top: '' }, files, { view: 'try' }), 'Try it: the design has no top module (give top)');
+  assert.equal(viewProblem(pj, files, { view: 'try', top: 'zz' }), 'the design has no module \'zz\'');
+  assert.equal(viewProblem(pj, files, { view: 'simulate' }), null);
+  assert.equal(viewProblem({ top: 'g' }, files, { view: 'simulate' }), 'the design has no test bench to simulate');
+  assert.equal(viewProblem(pj, files, { view: 'emulate', top: 'n' }), null);
+  assert.equal(viewProblem({ top: 'g' }, files, { view: 'emulate' }), 'the design has no board to emulate it on');
+  assert.equal(viewProblem({ board: 'basys2' }, files, { view: 'emulate' }), 'the design has no top module to emulate');
 });

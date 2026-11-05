@@ -380,18 +380,19 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
 ### A design in a link (for lecture slides)
 
 A link opens Silinx on a design, straight in Try it, the simulation or the board emulator, with no project to create
-or import: **Copy Link to Project…** (the project's right-click menu in the Design pane, the Start page, the ISE style's
-File menu) or **Copy Link to This Module…** (a module's right-click menu) makes it, the view and the module chosen.
-The whole project goes inside the link (`#design=…`, compressed: 5 to 25 KB for the examples; anyone with the link
-has every file, its comments too), so nothing has to be hosted. Some slide tools cut a link longer than about 2 000
-characters: a larger project goes as a zip hosted elsewhere (*Export Silinx ISE Project*, then
+or import: **Copy Link to Project…** (the project's right-click menu in the Design pane, the Start page, the ISE
+style's File menu) or **Copy Link to This Module…** (a module's right-click menu) makes it, the view and the module
+chosen. The whole project goes inside the link (`#design=…`, compressed: 5 to 25 KB for the examples; anyone with the
+link has every file, its comments too), so nothing has to be hosted. Some slide tools cut a link longer than about 2
+000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx ISE Project*, then
 `…/Silinx-ISE/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
-(`…/Silinx-ISE/#open=example:traffic&view=try`). `view=` is `try` (a schematic's Try it), `simulate` (the test bench)
-or `emulate` (the board emulator); `top=` names the module. Opening a link makes a project named after the design;
+(`…/Silinx-ISE/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
+is `try` (a schematic's Try it; a state diagram's or a Petri net's Simulate panel), `simulate` (the test bench) or
+`emulate` (the board emulator); `top=` names the module. Opening a link makes a project named after the design;
 clicked again, that project is opened as it is when it has the same files, and one the student changed is replaced
 only when they say so. A zip from another site is fetched only once you agree (its address shown), and only from an
-https address that is not of this computer or a local network; a broken link is said in the console, the workspace
-as it was.
+https address that is not of this computer or a local network; a broken link is said in the console, the workspace as
+it was.
 
 ## For developers
 

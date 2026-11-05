@@ -337,6 +337,7 @@ export function mountFsmEditor(container, opts = {}) {
     validate: () => { runValidate(); return diags.slice(); },
     focus,
     showPanel: (p) => { if (panel !== p) togglePanel(p); },
+    get panel() { return panel; },   // (the panel shown: a link's view=try opens 'sim', #2869)
     fit,
     // (the view fitted when the canvas first had a size, or the user's own: the drawing stays where it is, #2397)
     fitted: () => fitted,
