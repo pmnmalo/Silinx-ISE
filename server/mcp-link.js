@@ -12,7 +12,7 @@ import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
 import { LINK_LIMITS, LINK_VIEWS, SITE_URL, decodeDesign, encodeDesign, makeLink, parseLink, sameFiles, viewProblem } from '../core/design-link.js';
 
 const VIEW_NAMES = { try: 'Try it', simulate: 'the simulation', emulate: 'the board emulator' };
-const NEXT = { simulate: 'simulate runs its test bench', emulate: 'run_process bitstream builds it for the board', try: 'Try it is the interface\'s: a schematic\'s live simulation, a state diagram\'s or a Petri net\'s Simulate' };
+const NEXT = { simulate: 'simulate runs its test bench', emulate: 'run_process bitstream builds it for the board', try: 'Try it is the interface\'s: a schematic\'s live simulation, a state diagram\'s, a Petri net\'s or an ASM chart\'s simulation' };
 const text = d => (typeof d === 'string' ? d : Buffer.from(d).toString('utf8'));
 
 // a project's files as { path: text } (silinx.json left out)
@@ -26,7 +26,7 @@ const linkFail = e => (e.linkError ? toolError(e.message) : e);
 export const LINK_TOOLS = [
   {
     name: 'project_link', title: 'Copy Link (a project\'s link)',
-    description: `The link that opens a project in Silinx, as Copy Link… does (for lecture slides): the whole project inside the link (compressed; the HDL its drawings make again left out), and what it opens in: view try (Try it: a schematic's live simulation, a state diagram's or a Petri net's Simulate), simulate (its test bench's simulation) or emulate (the board emulator); top: the module (default the project's top). A link longer than ${LINK_LIMITS.slides} characters works in a browser but some slide tools cut it; one above ${LINK_LIMITS.maxEncoded} cannot be made (export_project kind silinx, a zip hosted elsewhere, and its link #open=<its https address>). Anyone with the link has the whole project, its comments included.`,
+    description: `The link that opens a project in Silinx, as Copy Link… does (for lecture slides): the whole project inside the link (compressed; the HDL its drawings make again left out), and what it opens in: view try (Try it: a schematic's live simulation, a state diagram's, a Petri net's or an ASM chart's simulation), simulate (its test bench's simulation) or emulate (the board emulator); top: the module (default the project's top). A link longer than ${LINK_LIMITS.slides} characters works in a browser but some slide tools cut it; one above ${LINK_LIMITS.maxEncoded} cannot be made (export_project kind silinx, a zip hosted elsewhere, and its link #open=<its https address>). Anyone with the link has the whole project, its comments included.`,
     inputSchema: { type: 'object', properties: {
       project: PROJECT, view: { type: 'string', enum: LINK_VIEWS, description: 'What the link opens: try, simulate or emulate (default: the project only).' },
       top: STR('The module to open (default: the project\'s top); with view simulate, the test bench to simulate (default: the project\'s); a test bench only with simulate.'),

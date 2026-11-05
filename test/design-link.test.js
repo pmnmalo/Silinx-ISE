@@ -204,10 +204,11 @@ test('viewProblem / tryDrawing: Try it is a schematic\'s, a state diagram\'s or 
   assert.equal(tryDrawing(files, 'g'), 'src/g.sch.json');
   assert.equal(tryDrawing(files, 'm'), 'src/m.fsm.json');
   assert.equal(tryDrawing(files, 'n'), 'src/n.pn.json');
-  for (const m of ['a', 't', 'h', 'bad', 'nothere']) assert.equal(tryDrawing(files, m), null, m);
-  assert.ok(TRY_DRAWING.test('x.PN.JSON') && !TRY_DRAWING.test('x.asm.json'));
-  for (const top of [undefined, 'm', 'n']) assert.equal(viewProblem(pj, files, { view: 'try', top }), null, top);
-  for (const top of ['a', 't', 'h']) assert.equal(viewProblem(pj, files, { view: 'try', top }), `Try it: '${top}' is not a schematic, a state diagram or a Petri net`);
+  assert.equal(tryDrawing(files, 'a'), 'src/a.asm.json');   // (an ASM chart's simulation, #2881)
+  for (const m of ['t', 'h', 'bad', 'nothere']) assert.equal(tryDrawing(files, m), null, m);
+  assert.ok(TRY_DRAWING.test('x.PN.JSON') && TRY_DRAWING.test('x.asm.json') && !TRY_DRAWING.test('x.bool.json'));
+  for (const top of [undefined, 'm', 'n', 'a']) assert.equal(viewProblem(pj, files, { view: 'try', top }), null, top);
+  for (const top of ['t', 'h']) assert.equal(viewProblem(pj, files, { view: 'try', top }), `Try it: '${top}' is not a schematic, a state diagram, a Petri net or an ASM chart`);
   assert.equal(viewProblem({ ...pj, top: '' }, files, { view: 'try' }), 'Try it: the design has no top module (give top)');
   assert.equal(viewProblem(pj, files, { view: 'try', top: 'zz' }), 'the design has no module \'zz\'');
   assert.equal(viewProblem(pj, files, { view: 'simulate' }), null);

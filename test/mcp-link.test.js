@@ -33,14 +33,14 @@ test('project_link / open_link: gates (a schematic) round trip into Try it, the 
   assert.deepEqual(r.data.left, ['src/gates.vhd']);
   // into a new project: every file as it was
   const o = await ok('open_link', { link, name: 'gates_link' });
-  assert.equal(o.text, 'Opened the link as the new project \'gates_link\': top gates, basys2; the link opens Try it (Try it is the interface\'s: a schematic\'s live simulation, a state diagram\'s or a Petri net\'s Simulate).');
+  assert.equal(o.text, 'Opened the link as the new project \'gates_link\': top gates, basys2; the link opens Try it (Try it is the interface\'s: a schematic\'s live simulation, a state diagram\'s, a Petri net\'s or an ASM chart\'s simulation).');
   assert.deepEqual(o.data, { project: 'gates_link', created: true, view: 'try', top: null, board: 'basys2', warnings: [] });
   assert.deepEqual(await files('gates_link'), await files('gates'));
   const c = await ok('check_syntax', { project: 'gates_link' });
   assert.doesNotMatch(c.text, /WARNING|ERROR/);
   // opened again: the same project, kept
   const again = await ok('open_link', { link, name: 'gates_link' });
-  assert.equal(again.text, 'The link\'s design is the project \'gates_link\' already (unchanged): top gates, basys2; the link opens Try it (Try it is the interface\'s: a schematic\'s live simulation, a state diagram\'s or a Petri net\'s Simulate).');
+  assert.equal(again.text, 'The link\'s design is the project \'gates_link\' already (unchanged): top gates, basys2; the link opens Try it (Try it is the interface\'s: a schematic\'s live simulation, a state diagram\'s, a Petri net\'s or an ASM chart\'s simulation).');
   assert.equal(again.data.created, false);
   // changed: never replaced (#2829)
   await P.writeFile('gates_link', 'sim/tb_gates.vhd', '-- the student\'s work\n');
@@ -59,7 +59,7 @@ test('project_link: the views a design has, the default base, the errors', async
   assert.doesNotMatch(e.data.link, /view=|top=/);
   // a state diagram's module (traffic's FSM, #2869): its Simulate
   assert.match((await ok('project_link', { project: 'traffic', view: 'try', top: 'traffic' })).data.link, /#design=[A-Za-z0-9_-]+&top=traffic&view=try$/);
-  await fails('project_link', { project: 'traffic', view: 'try' }, 'Try it: \'top\' is not a schematic, a state diagram or a Petri net');
+  await fails('project_link', { project: 'traffic', view: 'try' }, 'Try it: \'top\' is not a schematic, a state diagram, a Petri net or an ASM chart');
   await fails('project_link', { project: 'traffic', top: 'nothere' }, 'the design has no module \'nothere\'');
   // the simulation's top= a test bench; the other views', a design module (#2878)
   assert.match((await ok('project_link', { project: 'traffic', view: 'simulate', top: 'tb_traffic' })).data.link, /&top=tb_traffic&view=simulate$/);

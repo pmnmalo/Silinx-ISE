@@ -27,7 +27,8 @@ async function openLink(page, hash, query = 'l=1') {
 const projects = async () => (await fs.readdir(env.server.workspace)).filter((f) => !f.startsWith('.')).sort();
 const exists = (p) => fs.access(path.join(env.server.workspace, p)).then(() => true, () => false);
 async function contextMenu(page, row, item) {
-  await page.rightClick('#hier .row', { index: row });
+  // (on its name: the row's middle may be one of its badges)
+  await page.rightClick('#hier .row .lbl', { index: row });
   await page.waitForSelector('body > .menu-popup');
   const items = await page.eval(() => [...document.querySelectorAll('body > .menu-popup .mi')].map((m) => m.querySelector('.lbl')?.textContent.trim() ?? m.textContent.trim()));
   if (item) await page.click('body > .menu-popup .mi', { text: item });
@@ -52,6 +53,17 @@ uiTest('#2869 view=try on a state diagram: traffic\'s FSM opened in its Simulate
   await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
   assert.equal(await page.eval(() => window.Silinx.active?.id), 'fsm:src/traffic.fsm.json');
   await page.waitConsole(/Opened 'traffic' from a link( \(a new project\))?: Try it\./);
+  assert.deepEqual(await consoleWarnings(page), []);
+});
+
+uiTest('#2881 view=try on an ASM chart: blinky\'s speed_ctrl opened, its simulation panel when the ASM editor has one, else the chart and the console\'s line', E, async (page) => {
+  await openLink(page, 'open=example:blinky&top=speed_ctrl&view=try', 'asm=1');
+  await linkOpened(page);
+  await page.waitFor(() => window.Silinx.active?.id === 'asm:src/speed_ctrl.asm.json', [], { what: 'the ASM chart open', timeout: 30000 });
+  const hasSim = await page.eval(() => typeof window.SilinxApp.findDoc('asm:src/speed_ctrl.asm.json')?.asmEditor?.showPanel === 'function');
+  if (hasSim) await page.waitFor(() => window.SilinxApp.findDoc('asm:src/speed_ctrl.asm.json').asmEditor.panel === 'sim', [], { what: 'the ASM chart\'s simulation' });
+  else await page.waitConsole(/Open from a link: src\/speed_ctrl\.asm\.json opened; the ASM chart's simulation is not in this version yet\./);
+  assert.doesNotMatch(await page.consoleText(), /ERROR: Open from a link/);
   assert.deepEqual(await consoleWarnings(page), []);
 });
 
@@ -87,7 +99,7 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-info').textContent), /^\d+ characters: some slide tools cut a link longer than 2000 \(export the project as a \.zip, host it, and link to it with #open=\)\.$/);
   // a view the design does not have: said in the dialog, no link
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'try'; s.dispatchEvent(new Event('change')); });
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), 'Try it: \'top\' is not a schematic, a state diagram or a Petri net.');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), 'Try it: \'top\' is not a schematic, a state diagram, a Petri net or an ASM chart.');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), '');
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'simulate'; s.dispatchEvent(new Event('change')); });
   const link = await page.waitFor(() => /&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the simulation\'s link' });
@@ -188,10 +200,12 @@ uiTest('#2878 Copy Link…: the Module list follows Open in: Simulation the test
 });
 
 uiTest('#2876 regression, a schematic named in another case than its module (Gates, the HDL\'s gates): Copy Link to This Module… offers Try it, no error; the link opens it', E, async (page) => {
-  const sch = JSON.parse(fs.readFileSync(new URL('../../examples/gates/src/gates.sch.json', import.meta.url), 'utf8'));
+  const sch = JSON.parse(await fs.readFile(new URL('../../examples/gates/src/gates.sch.json', import.meta.url), 'utf8'));
+  // (as the user's ALU_4bit: the schematic's name as typed, its HDL file generated from it, the compiled module in
+  // lower case)
   sch.name = 'Gates';
-  delete sch.generatedFile;
-  await makeProject(env, { name: 'CaseLink', top: 'gates', files: { 'src/gates.sch.json': JSON.stringify(sch, null, 1) } });
+  const hdl = await fs.readFile(new URL('../../examples/gates/src/gates.vhd', import.meta.url), 'utf8');
+  await makeProject(env, { name: 'CaseLink', top: 'gates', files: { 'src/gates.sch.json': JSON.stringify(sch, null, 1), 'src/gates.vhd': hdl } });
   await page.openProject('CaseLink');
   const row = await page.waitFor(() => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => (r.dataset.module || '').toLowerCase() === 'gates'); return i >= 0 ? i : null; }, [], { what: 'the schematic\'s row' });
   await contextMenu(page, row, 'Copy Link to This Module…');

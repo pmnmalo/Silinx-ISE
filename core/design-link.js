@@ -185,8 +185,9 @@ export function sameFiles(a, b) {
   return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
 }
 
-/** The drawings `view=try` opens (#2869): a schematic (its Try it), a state diagram or a Petri net (its Simulate). */
-export const TRY_DRAWING = /\.(sch|fsm|pn)\.json$/i;
+/** The drawings `view=try` opens (#2869): a schematic (its Try it), a state diagram, a Petri net or an ASM chart (its
+ *  simulation, #2881). */
+export const TRY_DRAWING = /\.(sch|fsm|pn|asm)\.json$/i;
 /** The drawing of a module that `view=try` opens: its path in files ({ path: text }), or null. The drawing's name, or
  *  its generated HDL file's module, whatever its case (#2876: the HDL's VHDL names are in lower case, a drawing's as it
  *  was typed). */
@@ -216,7 +217,7 @@ export function viewProblem(project, files, { view, top } = {}) {
   if (view !== 'simulate' && bench) return `'${top}' is a test bench: a link opens it in the simulation`;
   if (view === 'try') {
     if (!module) return 'Try it: the design has no top module (give top)';
-    if (!tryDrawing(files, module)) return `Try it: '${module}' is not a schematic, a state diagram or a Petri net`;
+    if (!tryDrawing(files, module)) return `Try it: '${module}' is not a schematic, a state diagram, a Petri net or an ASM chart`;
   }
   if (view === 'simulate' && !top && !project?.simTop) return 'the design has no test bench to simulate';
   if (view === 'emulate') {
