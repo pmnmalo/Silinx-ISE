@@ -84,8 +84,9 @@ export const LINK_TOOLS = [
         if (board && board !== project.board) warnings.push(`WARNING: the link's board ${board} is not the design's (${project.board || 'none'}): the design's kept`);
         make = async () => {
           const { importProjectEntries } = await import('./project-zip.js');
-          const r = await importProjectEntries(P, pjName, d.entries, toolError);
-          warnings.push(...r.warnings.map(w => `WARNING: ${w}`), ...r.missing.map(m => `WARNING: ${m}: listed by the project, not found`));
+          // (the gate's result of decodeDesign, #2830; its refusals already among the link's warnings)
+          const r = await importProjectEntries(P, pjName, d.gated, toolError);
+          warnings.push(...r.warnings.filter(w => !d.warnings.includes(w)).map(w => `WARNING: ${w}`), ...r.missing.map(m => `WARNING: ${m}: listed by the project, not found`));
         };
       } else {
         const dir = path.join(P.EXAMPLES_DIR, source.name);
