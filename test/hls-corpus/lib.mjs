@@ -13,6 +13,14 @@ export function unitOf(design, texts) {
   return { unit: srcs.map((f) => `#include "${f}"`).join('\n') + '\n', headers: texts };
 }
 
+/** A design's unit and the options Silinx HLS runs it with: its file (a C++ design's unit is C++, #1590), headers, top,
+ *  directives and RTL blackboxes (#1903; scripts/hls-vitis.mjs's ports too, #2855). */
+export function optionsOf(design, texts) {
+  const { unit, headers } = unitOf(design, texts);
+  const opts = { file: design.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: design.top, directives: design.directives, ...(design.blackbox ? { blackboxes: design.blackbox.descriptions.map((f) => ({ file: f, text: texts[f] })) } : {}) };
+  return { unit, opts };
+}
+
 // (a test bench's run longer than the C simulation's limit of steps: 2 frames of 30000 pixels, 225 taps each, twice, #2234)
 const STEPS = { 'modeling-using-array-stencil-2d': 2_000_000_000 };
 const first = (diags) => diags.find((d) => d.severity === 'error');
@@ -21,9 +29,7 @@ const why = (d) => (d ? `${d.file && !/^unit\.c(pp)?$/.test(d.file) ? `${d.file.
 /** A design through the stages: { csim, synth, cosim, latency, reason } (each 'pass', 'fail' or 'skip'). */
 export function runDesign(design, texts, { maxCycles = 100000 } = {}) {
   const r = { csim: 'skip', synth: 'skip', cosim: 'skip', latency: null, reason: null };
-  const { unit, headers } = unitOf(design, texts);
-  // (a C++ design's unit is C++, #1590)
-  const opts = { file: design.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: design.top, directives: design.directives, ...(design.blackbox ? { blackboxes: design.blackbox.descriptions.map((f) => ({ file: f, text: texts[f] })) } : {}) };
+  const { unit, opts } = optionsOf(design, texts);
   const maxSteps = STEPS[design.name];
   const sim = simulateC(unit, { ...opts, files: texts, ...(maxSteps ? { maxSteps } : {}) });
   r.csim = sim.ok && sim.exitCode === 0 ? 'pass' : 'fail';

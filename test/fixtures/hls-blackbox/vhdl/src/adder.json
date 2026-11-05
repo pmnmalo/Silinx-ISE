@@ -1,0 +1,18 @@
+{
+  "c_function_name": "adder",
+  "rtl_top_module_name": "adder_rtl",
+  "c_files": [{ "c_file": "adder_model.cpp", "cflag": "" }],
+  "rtl_files": ["adder.v"],
+  "c_parameters": [
+    { "c_name": "a", "c_port_direction": "in", "rtl_ports": { "data_read_in": "a" } },
+    { "c_name": "b", "c_port_direction": "in", "rtl_ports": { "data_read_in": "b" } },
+    { "c_name": "z", "c_port_direction": "out", "rtl_ports": { "data_write_out": "z", "data_write_valid": "z_ap_vld" } }
+  ],
+  "rtl_common_signal": {
+    "module_clock": "ap_clk",
+    "module_reset": "ap_rst",
+    "ap_ctrl_chain_protocol_start": "ap_start",
+    "ap_ctrl_chain_protocol_done": "ap_done"
+  },
+  "rtl_performance": { "latency": "1", "II": "1" }
+}

@@ -5,7 +5,7 @@
 // with the page: .github/workflows/pages.yml).
 import { unconstrainedPorts } from '/core/auto-pins.js';
 import { isGeneratedSource, viewHdl } from '/core/view-hdl.js';
-import { blackboxesIn } from '/core/c-blackbox.js';
+import { blackboxesIn, blackboxModels } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
 import { synthEffort, synthGoal, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
@@ -147,7 +147,8 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
     try { modules = modulesFromLibrary(compile(sources), { sources: Object.fromEntries(sources.map(s => [s.path, s.text])) }); } catch { /* none */ }
     const hdlMods = new Set(Object.keys(modules).map(n => n.toLowerCase()));   // (a module an HDL file defines: that file)
     const hls = await blackboxesIn(Object.keys(files).filter(p => typeof files[p] === 'string'), p => files[p]);   // (#1903)
-    for (const p of viewPaths) {
+    const models = blackboxModels(hls);   // (a blackbox's C model: the C simulation's, not a module, #2854)
+    for (const p of viewPaths.filter(v => !models.has(v))) {
       // (a drawing whose HDL file is gone, deleted or removed from the project, is one without it: #231)
       const r = viewHdl(p, files[p], { lang: project.preferredLanguage, modules, linked: f => typeof files[f] === 'string' && (project.files || []).some(x => x.path === f), hls });
       if (!r || (r.text && hdlMods.has(String(r.module).toLowerCase()))) continue;

@@ -1,0 +1,27 @@
+{
+  "name": "hls-blackbox-vhdl",
+  "version": 1,
+  "device": {
+    "family": "spartan3e",
+    "part": "xc3s250e",
+    "package": "cp132",
+    "speed": "-4"
+  },
+  "board": "basys2",
+  "top": "bb_top",
+  "files": [
+    {
+      "path": "src/adder.v",
+      "lang": "verilog",
+      "role": "design"
+    },
+    {
+      "path": "src/bb_top.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    }
+  ],
+  "constraints": "constraints/top.ucf",
+  "stimuli": {},
+  "preferredLanguage": "vhdl"
+}

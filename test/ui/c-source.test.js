@@ -100,5 +100,9 @@ uiTest('#1903 Silinx HLS: an RTL blackbox of the project (syn.blackbox): its Ver
   await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the module top' });
   assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('top').ports.map((p) => p.name)), ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a', 'b', 's', 's_ap_vld']);
   assert.match(await page.eval(() => window.SilinxApp.S.viewSources.find((s) => s.path === 'src/top.cpp').text), /ap_bb0 : adder_rtl port map \(clk => ap_clk, a => ap_bb0_a_i_w, b => ap_bb0_b_i_w, z => ap_bb0_z_o\)/);
+  // (#2854) the C model is the C simulation's, not a module of the design: no row of its own, no error
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.viewSources.map((s) => [s.path, s.errors])), [['src/top.cpp', 0]]);
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.modules.map((m) => m.name).filter((n) => /adder/.test(n))), ['adder_rtl']);
+  assert.doesNotMatch(await page.eval(() => document.querySelector('#hier')?.textContent || ''), /adder_model|'adder' is the top function/);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });

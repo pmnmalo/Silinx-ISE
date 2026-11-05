@@ -8,6 +8,7 @@
 //   loadBlackboxes([{ file, text }], headers) -> { list: [description], diagnostics }
 //   withModels(source, headers, list) -> { source, headers }: the C models added, for the C simulation
 //   applyBlackboxes(checked, list, report): the functions replaced, for the synthesis
+//   blackboxModels(hls) -> Set of paths: the project's C models, not modules of the design (#2341)
 import { BOOL, typeOf } from './c-types.js';
 import { parse as parseVerilog } from './verilog/parser.js';
 import { parse as parseVhdl } from './vhdl/parser.js';
@@ -209,6 +210,22 @@ export async function blackboxesIn(paths, read) {
   return { blackboxes, headers };
 }
 
+/** The C models the descriptions of blackboxesIn's result name, as the project's paths: a model is the C simulation's, never
+ *  a C source made into a module of the design (#2854: its function, the top of its file, refused as a blackbox's). */
+export function blackboxModels(hls) {
+  const out = new Set();
+  for (const b of hls?.blackboxes || []) {
+    let j;
+    try { j = JSON.parse(b.text); } catch { continue; }
+    for (const c of Array.isArray(j?.c_files) ? j.c_files : []) {
+      const n = typeof c === 'string' ? c : c?.c_file;
+      const f = typeof n === 'string' && findFile(hls.headers || {}, b.file, n);
+      if (f) out.add(f);
+    }
+  }
+  return out;
+}
+
 const isBB = (self, n) => n?.kind === 'call' && n.callee?.kind === 'id' && !!self.c.funcs.get(n.callee.name)?.blackbox;
 
 /** The machine's part (core/c-fsmd.js): a call's registers and its state. */
@@ -336,10 +353,12 @@ export function blackboxHdl(insts) {
       if (!o.vld) { vhdl.push(`  ${O}_v <= ${O}_o;`); verilog.push(`  assign ${O}_v = ${O}_o;`); continue; }
       decls.vhdl.push(`  signal ${O}_cap : ${vec(o.w)};`, `  signal ${O}_got : std_logic;`);
       decls.verilog.push(`  reg ${vvec(o.w)}${O}_cap;`, `  reg ${O}_got;`);
-      vhdl.push(`  ${O}_v <= ${O}_o when ${O}_vld = '1' else ${O}_cap;`, `  ${O}_any <= ${O}_vld or ${O}_got;`,
-        '  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', `      if ap_rst = '1' or ${P}_done = '1' then`, `        ${O}_got <= '0';`, `      elsif ${O}_vld = '1' then`, `        ${O}_got <= '1';`, `        ${O}_cap <= ${O}_o;`, '      end if;', '    end if;', '  end process;');
-      verilog.push(`  assign ${O}_v = ${O}_vld ? ${O}_o : ${O}_cap;`, `  assign ${O}_any = ${O}_vld | ${O}_got;`,
-        `  always @(posedge ap_clk) if (ap_rst | ${P}_done) ${O}_got <= 1'b0; else if (${O}_vld) begin ${O}_got <= 1'b1; ${O}_cap <= ${O}_o; end`);
+      // (taken on every valid, forgotten as the next call starts, its start cycle reading only the valid: a valid that comes
+      // with ap_done, the usual module's, had been dropped there, the capture a constant XST trimmed with a warning, #2862)
+      vhdl.push(`  ${O}_v <= ${O}_o when ${O}_vld = '1' else ${O}_cap;`, `  ${O}_any <= ${O}_vld or (${O}_got and not ${P}_start);`,
+        '  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', `      if ap_rst = '1' then`, `        ${O}_got <= '0';`, `      elsif ${O}_vld = '1' then`, `        ${O}_got <= '1';`, `        ${O}_cap <= ${O}_o;`, `      elsif ${P}_start = '1' then`, `        ${O}_got <= '0';`, '      end if;', '    end if;', '  end process;');
+      verilog.push(`  assign ${O}_v = ${O}_vld ? ${O}_o : ${O}_cap;`, `  assign ${O}_any = ${O}_vld | (${O}_got & ~${P}_start);`,
+        `  always @(posedge ap_clk) if (ap_rst) ${O}_got <= 1'b0; else if (${O}_vld) begin ${O}_got <= 1'b1; ${O}_cap <= ${O}_o; end else if (${P}_start) ${O}_got <= 1'b0;`);
     }
   }
   return { inner, decls, vhdl, verilog };
