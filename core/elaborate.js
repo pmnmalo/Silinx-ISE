@@ -179,6 +179,25 @@ export function topCandidates(lib) {
   return [...lib.modules.values()].filter(m => !used.has(m.name.toLowerCase())).map(m => m.name);
 }
 
+// The roots of the Implementation view's hierarchy (#2877), as ISE's: the top module first, always a root (its
+// sub-tree under it) even when another module instantiates it, then the `visible` modules no visible module
+// instantiates (a module instantiated only from a test bench is a root too; the top's former parent one of them).
+export function implRoots(lib, { top = '', visible = () => true } = {}) {
+  const used = new Set();
+  const visit = items => {
+    for (const it of items || []) {
+      if (it.kind === 'instance') used.add(it.module.toLowerCase());
+      if (it.items) visit(it.items);
+      if (it.then) visit(it.then);
+      if (it.else) visit(it.else);
+    }
+  };
+  for (const m of lib.modules.values()) if (visible(m.name)) visit(m.items);
+  const topMod = top ? findModule(lib, top) : null;
+  const first = topMod && visible(topMod.name) ? [topMod.name] : [];
+  return first.concat([...lib.modules.values()].filter(m => m !== topMod && visible(m.name) && !used.has(m.name.toLowerCase())).map(m => m.name));
+}
+
 // ---------------------------------------------------------------- elaboration entry
 export function elaborate(lib, topName, opts = {}) {
   const design = {

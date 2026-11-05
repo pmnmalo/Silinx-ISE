@@ -1,7 +1,7 @@
 // Front-end driver: parse a set of sources and build the library; elaborate a top.
 import { parse as parseVerilog } from './verilog/parser.js';
 import { parse as parseVhdl } from './vhdl/parser.js';
-import { buildLibrary, elaborate, topCandidates } from './elaborate.js';
+import { buildLibrary, elaborate, implRoots, topCandidates } from './elaborate.js';
 import { Simulator } from './simulator.js';
 import { MATH_REAL_SOURCE, usesMathReal } from './vhdl/math-real.js';
 
@@ -60,7 +60,7 @@ export function compile(sources) {
   return lib;
 }
 
-export { elaborate, topCandidates };
+export { elaborate, implRoots, topCandidates };
 
 // Convenience: compile + elaborate + simulate (used by tests and the CLI).
 export function simulate(sources, top, { until = Infinity, files, maxDeltas } = {}) {

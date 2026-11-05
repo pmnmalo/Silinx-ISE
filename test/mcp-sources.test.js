@@ -152,3 +152,23 @@ test('rename_module: its references, the drawing it is made from, the top; the f
     [{ module: 'tick', to: 'tock', file: 'src/sevenseg.v' }, 'src/sevenseg.v already exists.'],
   ]) await fails('rename_module', { project: 'm', ...args }, message);
 });
+
+// #2877: the top set on a module another one instantiates (b under a): set_top, project_info, Check Syntax and
+// synthesis on b alone, as the Design pane's root; a again: as before. The one warning, the pins' (no board), either way.
+test('set_top on an instantiated module (#2877): project_info, Check Syntax and synthesis on it; the former parent again', { timeout: 120000 }, async () => {
+  await ok('new_project', { name: 'nested' });
+  await ok('write_file', { project: 'nested', path: 'src/a.vhd', text: 'library ieee; use ieee.std_logic_1164.all;\nentity a is port (x : in std_logic; y : out std_logic); end a;\narchitecture r of a is begin u_b : entity work.b port map (x => x, y => y); end r;\n' });
+  await ok('write_file', { project: 'nested', path: 'src/b.v', text: 'module b(input x, output y); assign y = ~x; endmodule\n' });
+  const PINS = 'WARNING: 2 port bit(s) have no LOC constraint (x, y): Silinx assigns free I/O pins automatically - do NOT program real hardware with this bitstream';
+  for (const top of ['b', 'a']) {
+    assert.equal((await ok('set_top', { project: 'nested', top })).text, `nested: top ${top}, test bench (none).`);
+    const info = await ok('project_info', { project: 'nested' });
+    assert.equal(info.data.top, top);
+    assert.match(info.text, new RegExp(`^nested: top ${top}, `));
+    assert.equal((await ok('check_syntax', { project: 'nested' })).text, `Process "Check Syntax" of <${top}> completed successfully (2 signals, 1 processes).`);
+    const synth = await ok('run_process', { project: 'nested', process: 'synthesize', log_lines: 3 });
+    assert.equal(synth.text.split('\n').pop(), `Process "synthesize" of <${top}> completed successfully with 1 warning(s) (Silinx toolchain).`);
+    assert.deepEqual(synth.data.errors, []);
+    assert.deepEqual(synth.data.warnings, [PINS]);
+  }
+});
