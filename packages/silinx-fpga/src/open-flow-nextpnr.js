@@ -11,6 +11,7 @@ import { portAssignments, ucfPattern } from './ucf.js';
 export { engineOf } from './open-steps.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { loadChipdb } from './nextpnr-io.js';
+import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
 import { checkRouting } from './fpga/route-check.js';
 import { deviceSites } from './fpga/device-sites.js';
 import { analyzeTiming } from './fpga/timing.js';
@@ -318,9 +319,26 @@ export function mountNextpnrSteps(ctx) {
     if (r.problems.length) {
       throw new StepError(`the nextpnr engine cannot implement this design yet: ${r.problems.length} problem(s)`, r.problems.slice(0, 50));
     }
+    hardBlocks(r.json);
     input = JSON.stringify(r.json);
     sdc = r.sdc;
     log('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).');
+  }
+
+  // more block RAMs, multipliers or DCMs than the device has sites for (a netlist synthesized without the part's
+  // counts): said at Map, the summary's rows over 100 %, as Silinx's packer said it (#795, #2137), not by nextpnr's placer
+  function hardBlocks(json) {
+    const counts = {};
+    for (const c of Object.values(Object.values(json.modules)[0].cells)) counts[c.type] = (counts[c.type] || 0) + 1;
+    const used = usedOfPrimitives('spartan3e', counts), sites = deviceSites(io.device());
+    const rows = [['ramb16', 'Number of RAMB16s', sites.brams.length], ['mult18x18', 'Number of MULT18X18SIOs', sites.mults.length], ['dcm', 'Number of DCMs', sites.dcms.length]];
+    const over = overResources(rows.map(([id, report, count]) => ({ id, report, count })), used);
+    if (!over.length) return;
+    const items = rows.map(([id, name, total]) => ({ id, ...util(name, used[id] || 0, total) }));
+    report.map = { utilization: items, warnings: 0, errors: over.length, engine: 'nextpnr' };
+    log('Design summary (nextpnr):');
+    for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
+    throw new StepError(over.map(o => overMessage(o, spec.device)).join('; '), [], 'Choose a larger device (Design Properties).');
   }
 
   // nextpnr and the device's chip database, loaded once (offline, a database not downloaded yet fails: #2329)

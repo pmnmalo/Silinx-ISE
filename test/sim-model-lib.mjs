@@ -12,6 +12,7 @@ import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { runOpenFlow } from '../core/flow-ide.js';
+import { nextpnrNode } from '../packages/silinx-fpga/src/nextpnr-node.js';
 import { orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { scalarizeNetlist } from '../core/netlist-hier.js';
 import { Simulator } from '../core/simulator.js';
@@ -51,7 +52,7 @@ function exampleFlow(name) {
     const design = ex.design.map(f => ({ path: f.path, lang: f.lang, text: f.text })), sim = ex.sim.map(f => ({ path: f.path, lang: f.lang, text: f.text }));
     const written = {}, lines = [];
     const r = await runOpenFlow({ top: ex.project.top, part: 'xc3s250ecp132-4', family: 'spartan3e', steps: orderOpenSteps(['posttrans', 'postmap']), simTop: ex.project.simTop },
-      { log: l => lines.push(l), sources: () => design, simSources: () => sim, yosys: yosysNode, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {}, device });
+      { log: l => lines.push(l), sources: () => design, simSources: () => sim, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {}, device });
     return { ex, design, sim, r, lines, written };
   })());
   return flows.get(name);
