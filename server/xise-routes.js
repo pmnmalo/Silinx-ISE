@@ -2,7 +2,8 @@
 // project file written from a project and read back into it, and a whole project as a zip (Xilinx ISE or Silinx).
 import fs from 'node:fs/promises';
 import express from 'express';
-import { readZip, ZIP_LIMITS } from '../core/zip.js';
+import { ZIP_LIMITS } from '../core/zip.js';
+import { GateError, gateEntries, gateMessages, gateZip } from '../core/import-gate.js';
 import fss from 'node:fs';
 import path from 'node:path';
 import { exportXise, importXise } from './xise.js';
@@ -33,7 +34,15 @@ export function mountXiseRoutes(ctx) {
     const b = req.body || {};
     if (!b.name) throw bad('missing project name');
     if (typeof b.xise !== 'string' || !b.xise.trim()) throw bad('missing xise text');
-    return importXiseProject(P, b.name, b.xise, b.files && typeof b.files === 'object' ? b.files : {});
+    // the .xise and its files through the import gate (#2830): a file refused is left out, said in the warnings
+    const files = b.files && typeof b.files === 'object' ? b.files : {};
+    let g;
+    try { g = gateEntries([{ path: 'project.xise', data: b.xise }, ...Object.entries(files).filter(([, t]) => typeof t === 'string').map(([p, t]) => ({ path: p, data: t }))]); }
+    catch (e) { throw bad(e.message); }
+    const xise = g.files.find(f => f.path === 'project.xise');
+    if (!xise) throw bad(`the .xise: ${g.refusals.find(r => r.path === 'project.xise')?.reason}`);
+    const r = await importXiseProject(P, b.name, xise.text, Object.fromEntries(g.files.filter(f => f !== xise && f.text != null).map(f => [f.path, f.text])));
+    return { ...r, warnings: [...gateMessages(g), ...r.warnings] };
   }));
 
   // ----- whole project as a zip (server/project-zip.js): ?kind=xilinx (default), a Xilinx ISE project;
@@ -52,9 +61,10 @@ export function mountXiseRoutes(ctx) {
     const name = String(req.query.name || '');
     if (!name) throw bad('missing project name (?name=)');
     if (!Buffer.isBuffer(req.body) || !req.body.length) throw bad('empty upload');
-    let entries;
-    try { entries = await readZip(new Uint8Array(req.body), NODE_CODEC); } catch (e) { throw bad(`cannot read zip: ${e.message}`); }
-    return importProjectEntries(P, name, entries, bad);
+    // the zip through the import gate (#2830): its caps checked while it is read, each entry's name and content
+    let gated;
+    try { gated = await gateZip(new Uint8Array(req.body), NODE_CODEC); } catch (e) { throw e instanceof GateError ? bad(e.message) : e; }
+    return importProjectEntries(P, name, gated, bad);
   }));
 
   api.post('/projects/:p/sync-xise', wrap(async req => {

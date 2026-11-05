@@ -74,10 +74,34 @@ test('import_project: a hostile zip, what is sound imported, what was dropped sa
   fs.writeFileSync(out('hostile.zip'), await createZip([{ path: 'silinx.json', data: enc(JSON.stringify(pj)) },
     { path: 'src/top.vhd', data: enc('entity top is end;\narchitecture a of top is begin end;\n') }, { path: '.git/config', data: enc('[core]') }], NODE_CODEC));
   const r = await ok('import_project', { name: 'hostile', from: out('hostile.zip') });
-  assert.equal(r.text, ['WARNING: silinx.json: file path outside the project dropped (../evil.vhd)', 'WARNING: silinx.json: constraints path outside the project dropped (../x.ucf)',
+  // (the import gate's refusals first, #2830)
+  assert.equal(r.text, ["WARNING: .git/config: not imported: hidden file or folder ('.git')", 'WARNING: silinx.json: file path outside the project dropped (../evil.vhd)', 'WARNING: silinx.json: constraints path outside the project dropped (../x.ucf)',
     'WARNING: src/gone.vhd: listed by the project, not found', 'Imported the Silinx ISE project as \'hostile\': top top, test bench (none), no board (xc3s250ecp132-4), 2 source(s), 1 other file(s).'].join('\n'));
   assert.ok(!fs.existsSync(path.join(P.projectDir('hostile'), '.git')));
   assert.ok(!fs.existsSync(path.join(P.workspaceDir(), 'evil.vhd')));
+  assert.deepEqual(r.data.warnings, [".git/config: not imported: hidden file or folder ('.git')", 'silinx.json: file path outside the project dropped (../evil.vhd)',
+    'silinx.json: constraints path outside the project dropped (../x.ucf)']);
+});
+
+test('import_project: the import gate (#2830): a zip bomb, an XXE .xise, a script in a name, refused with their reasons', async () => {
+  const zeros = new Uint8Array(4 << 20);
+  const bomb = await createZip([{ path: 'silinx.json', data: enc('{}') }, { path: 'big.mem', data: zeros }], NODE_CODEC);
+  // the central directory says big.mem is 100 bytes: inflating stops there
+  const dv = new DataView(bomb.buffer, bomb.byteOffset, bomb.byteLength);
+  let p = dv.getUint32(bomb.length - 22 + 16, true);
+  p += 46 + dv.getUint16(p + 28, true) + dv.getUint16(p + 30, true) + dv.getUint16(p + 32, true);
+  dv.setUint32(p + 24, 100, true);
+  fs.writeFileSync(out('bomb.zip'), bomb);
+  const b = await call('import_project', { name: 'bomb', from: 'bomb.zip' });
+  assert.equal(b.isError, true);
+  assert.match(b.text, /^import_project: cannot read zip: zip entry larger than it declares or corrupt \(big\.mem\)/);
+  assert.ok(!fs.existsSync(P.projectDir('bomb')));
+  fs.writeFileSync(out('xxe.zip'), await createZip([{ path: 'p.xise', data: enc('<?xml version="1.0"?><!DOCTYPE p [<!ENTITY x SYSTEM "file:///etc/passwd">]><project>&x;</project>') }], NODE_CODEC));
+  await fails('import_project', { name: 'xxe', from: 'xxe.zip' }, 'p.xise: not imported: XML with a DTD (<!DOCTYPE>): external entities and entity expansion are not accepted');
+  fs.writeFileSync(out('xss.zip'), await createZip([{ path: 'silinx.json', data: enc('{}') }, { path: 'src/<img src=x onerror=alert(1)>.vhd', data: enc('x') }], NODE_CODEC));
+  const x = await ok('import_project', { name: 'xss', from: 'xss.zip' });
+  assert.deepEqual(x.data.warnings, ['src/<img src=x onerror=alert(1)>.vhd: not imported: character not allowed in a name (< > : " | ? *): \'<img src=x onerror=alert(1)>.vhd\'']);
+  assert.deepEqual(x.data.extra, []);
 });
 
 test('export_project / import_project: the errors', async () => {

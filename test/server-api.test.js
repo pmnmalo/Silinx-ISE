@@ -647,6 +647,7 @@ const XISE = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 `;
 const TOP_VHD = 'library ieee; use ieee.std_logic_1164.all;\nentity top is port(a : in std_logic; y : out std_logic); end top;\narchitecture rtl of top is begin y <= a; end rtl;\n';
 
+let WARN_XCO;
 test('xise: import with provided / missing files (unsafe paths mapped into the project), export, sync', async () => {
   let r = await call('POST', '/projects/import-xise', { name: 'X1', xise: XISE, files: { 'rtl/top.vhd': TOP_VHD, 'util.v': 'module util; endmodule\n', 'board.ucf': 'NET "a" LOC = "P1";\n' } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -657,7 +658,9 @@ test('xise: import with provided / missing files (unsafe paths mapped into the p
     { path: 'sim/tb.vhd', lang: 'vhdl', role: 'sim' },
   ]);
   assert.deepEqual(r.body.missing, ['C:/work/tb.vhd']);
-  assert.ok(r.body.warnings.some(w => /fifo.xco: CORE Generator IP/.test(w)));
+  assert.equal(r.body.warnings.length, 1);
+  [WARN_XCO] = r.body.warnings;
+  assert.match(WARN_XCO, /fifo.xco: CORE Generator IP/);
   assert.deepEqual(pj.device, { family: 'spartan3e', part: 'xc3s500e', package: 'fg320', speed: '-5' });
   assert.deepEqual(pj.impl, { optMode: 'Area', optLevel: 2, startupClk: 'UserClk' });
   assert.equal(pj.top, 'top');
@@ -679,6 +682,14 @@ test('xise: import with provided / missing files (unsafe paths mapped into the p
     assert.equal(r.status, status, JSON.stringify(body));
     assert.match(r.body.error, re);
   }
+  // the import gate (#2830): an XXE .xise refused, a file of a name that leaves the project or holds a script left out
+  r = await call('POST', '/projects/import-xise', { name: 'Xg1', xise: `<?xml version="1.0"?><!DOCTYPE p [<!ENTITY x SYSTEM "file:///etc/passwd">]>${XISE.replace(/^<\?xml[^>]*\?>/, '')}`, files: {} });
+  assert.deepEqual([r.status, r.body.error], [400, 'the .xise: XML with a DTD (<!DOCTYPE>): external entities and entity expansion are not accepted']);
+  assert.equal((await call('GET', '/projects/Xg1')).status, 404);
+  r = await call('POST', '/projects/import-xise', { name: 'Xg2', xise: XISE, files: { 'rtl/top.vhd': TOP_VHD, '../../util.v': 'module util; endmodule\n', 'board<script>.ucf': 'x' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual(r.body.warnings, ["../../util.v: not imported: path leaves the project ('..')", 'board<script>.ucf: not imported: character not allowed in a name (< > : " | ? *): \'board<script>.ucf\'', WARN_XCO]);
+  assert.deepEqual(r.body.missing, ['../shared/util.v', 'C:/work/tb.vhd', 'board.ucf']);
   // no files object at all: everything is missing, constraints default stays when the .xise has none
   r = await call('POST', '/projects/import-xise', { name: 'X3', xise: XISE.replace(/<file xil_pn:name="board.ucf"[\s\S]*?<\/file>/, ''), files: 'nope' });
   assert.equal(r.status, 200);
@@ -867,6 +878,8 @@ test('zip import: nested root folder, ISE outputs and traversal entries skipped,
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.deepEqual(r.body.extra.sort(), ['docs/notes.md', 'shared/util.v']);
   assert.deepEqual(r.body.missing, ['C:/work/tb.vhd']);   // util.v was found by its file name
+  // the import gate's refusals first (#2830), not those of an ISE project's own outputs (.hidden), then the .xise's
+  assert.deepEqual(r.body.warnings, ["MyProj/../../evil.txt: not imported: path leaves the project ('..')", WARN_XCO]);
   const pj = r.body.project;
   assert.equal(pj.board, 'basys2');
   assert.deepEqual(pj.stimuli, { clk: 'clock' });

@@ -1241,8 +1241,10 @@ uiTest('#483 browser edition: a hostile zip (paths leaving the project, a broken
   const warnings = (await page.consoleText()).split('\n').filter((l) => /^WARNING/.test(l));
   assert.deepEqual(warnings, [
     "WARNING: files listed in silinx.json but not in the zip: src/gone.vhd",
-    'WARNING: zip entry outside the project skipped (../escape.txt)',
-    'WARNING: zip entry outside the project skipped (/abs.txt)',
+    // (the import gate's refusals, #2830)
+    "WARNING: ../escape.txt: not imported: path leaves the project ('..')",
+    'WARNING: /abs.txt: not imported: absolute path',
+    "WARNING: build/top.bit: not imported: the project's build folder (build/) is Silinx's own",
     'WARNING: silinx.json: file path outside the project dropped (../../etc/passwd)',
     'WARNING: silinx.json: file path outside the project dropped ("junk")',
     'WARNING: silinx.json: file path outside the project dropped (C:\\win\\x.v)',

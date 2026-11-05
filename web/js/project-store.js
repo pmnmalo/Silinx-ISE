@@ -12,6 +12,7 @@
 import { DEV_SITE } from './prefs.js';
 import { openOnlyDevice } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
+import { gateMessages, requireGated } from '../../core/import-gate.js';
 
 const PROJECT_FILE = 'silinx.json';
 export const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
@@ -99,19 +100,23 @@ export function normalizeProjectJson(saved, name) {
 }
 
 /**
- * A zip's entries ({ path, data }, core/zip.js) as a project (#483): a .xise (an ISE project, read
- * by `xiseProject(name, text, files)`) or a silinx.json (a Silinx export) at its root; every other
- * file keeps its path, skipped with a warning when it would leave the project (a '..', an absolute
- * path); build/ is never imported. Returns { json, files, warnings, missing } (missing: the files
- * silinx.json lists that the zip has not), not stored.
+ * A zip's entries as the import gate let them through (core/import-gate.js gateZip / gateEntries, #2830) as a
+ * project (#483): a .xise (an ISE project, read by `xiseProject(name, text, files)`) or a silinx.json (a Silinx
+ * export) at its root; every other file keeps its path, skipped with a warning when it would leave the project;
+ * build/ is never imported. Returns { json, files, warnings, missing } (missing: the files silinx.json lists that
+ * the zip has not; the gate's refusals first in the warnings), not stored.
  */
-export function projectFromZip(name, entries, { xiseProject, textOf }) {
+export function projectFromZip(name, gated, { xiseProject, textOf }) {
+  const entries = requireGated(gated, 'projectFromZip').map(f => ({ ...f, text: f.text ?? textOf(f) }));
+  textOf = e => e.text;
   const xe = entries.filter(e => /\.xise$/i.test(e.path)).sort((a, b) => a.path.split('/').length - b.path.split('/').length)[0];
   const pe = entries.find(e => /(^|\/)silinx\.json$/.test(e.path));
-  if (!xe && !pe) fail('the zip contains no .xise (ISE project) and no silinx.json');
+  // (a project file the import gate refused: why)
+  const refused = gated.refusals.find(x => /(\.xise|(^|\/)silinx\.json)$/i.test(x.path));
+  if (!xe && !pe) fail(refused ? `${refused.path}: not imported: ${refused.reason}` : 'the zip contains no .xise (ISE project) and no silinx.json');
   const root = (xe || pe).path.includes('/') ? (xe || pe).path.replace(/\/[^/]*$/, '') : '';
   const rel = p => (!root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
-  const warnings = [];
+  const warnings = gateMessages(gated);
   const files = {};
   for (const e of entries) {
     const r = rel(e.path);

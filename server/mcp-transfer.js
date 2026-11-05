@@ -104,19 +104,26 @@ export const TRANSFER_TOOLS = [
         const me = path.basename(src);
         entries = [...all.filter(e => e.path === me), ...all.filter(e => e.path !== me)];
       } else if (/\.zip$/i.test(src)) {
-        const { readZip, ZIP_LIMITS } = await import('../core/zip.js');
-        const { NODE_CODEC } = await import('./impl-routes.js');
+        const { ZIP_LIMITS } = await import('../core/zip.js');
         if (st.size > ZIP_LIMITS.maxEntry) throw toolError(`the zip is larger than ${ZIP_LIMITS.maxEntry >> 20} MB, the most an import takes`);
-        try { entries = await readZip(new Uint8Array(await fsp.readFile(src)), NODE_CODEC); } catch (e) { throw toolError(`cannot read zip: ${e.message}`); }
+        entries = new Uint8Array(await fsp.readFile(src));
       } else throw toolError(`from: '${src}' is not a .zip, a .xise or a folder`);
+      // through the import gate (#2830), as the interface's import: a zip's caps checked while it is read, each file's
+      // name and content; its refusals are the result's warnings
+      const { GateError, gateEntries, gateZip } = await import('../core/import-gate.js');
+      let gated;
+      try {
+        if (entries instanceof Uint8Array) { const { NODE_CODEC } = await import('./impl-routes.js'); gated = await gateZip(entries, NODE_CODEC); }
+        else gated = gateEntries(entries);
+      } catch (e) { throw e instanceof GateError ? toolError(e.message) : e; }
       const { importProjectEntries } = await import('./project-zip.js');
       let r;
-      try { r = await importProjectEntries(P, name, entries, toolError); } catch (e) {
+      try { r = await importProjectEntries(P, name, gated, toolError); } catch (e) {
         if (e.toolError) throw e;
         throw toolError(e.message);
       }
       const pj = r.project;
-      const kind = entries.some(e => /\.xise$/i.test(e.path)) ? 'Xilinx ISE' : 'Silinx ISE';
+      const kind = gated.files.some(e => /\.xise$/i.test(e.path)) ? 'Xilinx ISE' : 'Silinx ISE';
       const lines = [...r.warnings.map(w => `WARNING: ${w}`), ...r.missing.map(m => `WARNING: ${m}: listed by the project, not found`),
         `Imported the ${kind} project as '${name}': top ${pj.top || '(none)'}, test bench ${pj.simTop || '(none)'}, ${pj.board || 'no board'} (${pj.device ? `${pj.device.part}${pj.device.package}${pj.device.speed}` : 'no device'}), ${(pj.files || []).length} source(s)${r.extra.length ? `, ${r.extra.length} other file(s)` : ''}.`];
       return { text: lines.join('\n'), data: { project: name, kind: kind === 'Xilinx ISE' ? 'xilinx' : 'silinx', top: pj.top || null, simTop: pj.simTop || null, board: pj.board || null, device: pj.device || null, files: (pj.files || []).map(f => f.path), extra: r.extra, missing: r.missing, warnings: r.warnings } };
