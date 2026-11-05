@@ -14,6 +14,7 @@ import { mountFlowReports } from '../packages/silinx-fpga/src/open-flow-reports.
 import { loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
 import { dbFileNames, dbFilesFrom, makeBitDb } from '../packages/silinx-fpga/src/fpga/bitdb.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { nextpnrNode } from '../packages/silinx-fpga/src/nextpnr-node.js';
 import { shippedDevicePath } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +37,7 @@ test('#405 open flow parts: the gates example through every step: each step\'s f
   const io = {
     log: l => lines.push(l), sources: () => sources.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(PJ, s.path), 'utf8') })),
     ucf: fs.readFileSync(path.join(PJ, project.constraints), 'utf8'), ucfName: path.basename(project.constraints),
-    device: () => device, bitDb: () => makeBitDb(dbFilesFrom(json, spec.pkg), device, spec.part), yosys: yosysNode,
+    device: () => device, bitDb: () => makeBitDb(dbFilesFrom(json, spec.pkg), device, spec.part), yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() },
     write: (name, data) => { store[name] = data; return `build/${name}`; }, read: name => (typeof store[name] === 'string' ? store[name] : null), save: () => {},
   };
   const res = await runOpenFlow(spec, io);
