@@ -280,3 +280,26 @@
 }
 .asm-editor .asm-end { fill: none; stroke: var(--asm-muted); stroke-width: 1.5; pointer-events: none; }
 .asm-editor .asm-port.end { stroke: var(--asm-muted); fill: var(--asm-bg); opacity: .8; }
+
+/* ------------------------------------------------------------------ the Simulate panel (#2880, web/js/asm-sim.js) */
+/* its rows, inputs, outputs and trace: fsm-editor.css's (.asm-editor .fsm-sim…); on the chart the present state, the
+   path taken this cycle (the decisions tested, the exits followed), the conditional outputs reached, the next state */
+.asm-editor { --asm-sim-hot: #e0752d; }
+.asm-editor .asm-node.sim-cur .asm-shape { fill: color-mix(in srgb, var(--asm-panel) 45%, var(--asm-sim-hot) 55%); stroke: var(--asm-sim-hot); stroke-width: 3; }
+.asm-editor .asm-node.sim-path .asm-shape { stroke: var(--asm-sim-hot); stroke-width: 2.6; }
+.asm-editor .asm-node.sim-lit .asm-shape { fill: color-mix(in srgb, var(--asm-panel) 45%, var(--asm-ok) 55%); stroke: var(--asm-ok); stroke-width: 2.6; }
+.asm-editor .asm-node.sim-next:not(.sim-cur) .asm-shape { stroke: var(--asm-sim-hot); stroke-width: 2.6; stroke-dasharray: 7 4; }
+.asm-editor .asm-edge.sim-path .asm-edge-line { stroke: var(--asm-sim-hot); stroke-width: 3; stroke-dasharray: 8 4; }
+.asm-editor .asm-arrowhead.hot { fill: var(--asm-sim-hot); }
+.asm-editor .asm-simpanel.folded { flex: 0 0 auto; }
+.asm-editor .asm-simpanel.folded > .fsm-panel-body { display: none; }
+.asm-editor .asm-sim-fold { width: 26px; padding: 0; }
+.asm-editor .asm-sim-rate { height: 24px; }
+.asm-editor .asm-sim-reg.changes { border-color: var(--asm-sim-hot); }
+.asm-editor .fsm-sim-row[hidden] { display: none; }
+/* on a narrow screen (web/js/narrow.js): over the canvas, at its bottom */
+@media (max-width: 1023px) {
+  .asm-editor .asm-main { position: relative; }
+  .asm-editor .asm-simpanel { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; max-height: 60%; box-shadow: 0 -6px 20px rgba(0, 0, 0, .22); }
+  .asm-editor .asm-simpanel .fsm-panel-tools { flex-wrap: wrap; }
+}

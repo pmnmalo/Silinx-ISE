@@ -52,34 +52,34 @@
 .fsm-editor .fsm-tlist li.link { cursor: pointer; padding: 1px 0; }
 .fsm-editor .fsm-tlist li.link:hover { color: var(--asm-accent); }
 
-/* bottom panel */
-.fsm-editor .fsm-panel { flex: 0 0 44%; }
-.fsm-editor .fsm-panel-tools { display: inline-flex; gap: 6px; margin-left: 10px; }
-.fsm-editor .fsm-panel-body { flex: 1; overflow: auto; min-height: 0; background: var(--asm-bg); }
-.fsm-editor .fsm-panel-body .asm-code { height: 100%; }
-.fsm-editor .fsm-tables { padding: 8px 12px 16px; }
-.fsm-editor .fsm-tcap { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
-.fsm-editor .fsm-tcap:first-child { margin-top: 0; }
-.fsm-editor .fsm-table { border-collapse: collapse; font-size: 12px; }
-.fsm-editor .fsm-table th, .fsm-editor .fsm-table td { border: 1px solid var(--asm-border); padding: 2px 8px; text-align: center; }
-.fsm-editor .fsm-table th { background: var(--asm-panel); color: var(--asm-muted); font-weight: 600; }
-.fsm-editor .fsm-table td.mono, .fsm-editor .fsm-table th.mono { font-family: var(--asm-mono); }
-.fsm-editor .fsm-table tr.stays td { color: var(--asm-muted); }
-.fsm-editor .fsm-table tr.unused td { color: var(--asm-muted); font-style: italic; }
-.fsm-editor .fsm-table td.sepl { border-left: 2px solid var(--asm-muted); }
-.fsm-editor .fsm-table td.fsm-note { color: var(--asm-muted); text-align: left; font-size: 11.5px; }
-.fsm-editor .fsm-sim { padding: 8px 12px; display: grid; gap: 8px; }
-.fsm-editor .fsm-sim-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.fsm-editor .fsm-sim-trace:empty { display: none; }
-.fsm-editor .fsm-sim-row > .asm-label { width: 60px; margin: 0; }
-.fsm-editor .fsm-sim-state { font-size: 15px; color: var(--fsm-hot); }
-.fsm-editor .fsm-sim-inputs, .fsm-editor .fsm-sim-outputs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.fsm-editor .fsm-bit { font-family: var(--asm-mono); min-width: 64px; }
-.fsm-editor .asm-btn.fsm-bit.on, .fsm-editor .asm-btn.fsm-bit.on:hover { background: #2e9d5b; border-color: #2e9d5b; color: #fff; }
-.fsm-editor .fsm-bus { width: 80px; display: inline-block; }
-.fsm-editor .fsm-busl { font-family: var(--asm-mono); font-size: 12px; }
-.fsm-editor .fsm-led { font: 12px var(--asm-mono); padding: 3px 8px; border-radius: 10px; border: 1px solid var(--asm-border); }
-.fsm-editor .fsm-led.on { background: color-mix(in srgb, var(--asm-ok) 75%, transparent); color: #fff; border-color: var(--asm-ok); }
+/* bottom panel (its simulation's rules the ASM chart's Simulate panel's too, #2880: .asm-editor, which both editors are) */
+.asm-editor .fsm-panel { flex: 0 0 44%; }
+.asm-editor .fsm-panel-tools { display: inline-flex; gap: 6px; margin-left: 10px; }
+.asm-editor .fsm-panel-body { flex: 1; overflow: auto; min-height: 0; background: var(--asm-bg); }
+.asm-editor .fsm-panel-body .asm-code { height: 100%; }
+.asm-editor .fsm-tables { padding: 8px 12px 16px; }
+.asm-editor .fsm-tcap { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.asm-editor .fsm-tcap:first-child { margin-top: 0; }
+.asm-editor .fsm-table { border-collapse: collapse; font-size: 12px; }
+.asm-editor .fsm-table th, .asm-editor .fsm-table td { border: 1px solid var(--asm-border); padding: 2px 8px; text-align: center; }
+.asm-editor .fsm-table th { background: var(--asm-panel); color: var(--asm-muted); font-weight: 600; }
+.asm-editor .fsm-table td.mono, .asm-editor .fsm-table th.mono { font-family: var(--asm-mono); }
+.asm-editor .fsm-table tr.stays td { color: var(--asm-muted); }
+.asm-editor .fsm-table tr.unused td { color: var(--asm-muted); font-style: italic; }
+.asm-editor .fsm-table td.sepl { border-left: 2px solid var(--asm-muted); }
+.asm-editor .fsm-table td.fsm-note { color: var(--asm-muted); text-align: left; font-size: 11.5px; }
+.asm-editor .fsm-sim { padding: 8px 12px; display: grid; gap: 8px; }
+.asm-editor .fsm-sim-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.asm-editor .fsm-sim-trace:empty { display: none; }
+.asm-editor .fsm-sim-row > .asm-label { width: 60px; margin: 0; }
+.asm-editor .fsm-sim-state { font-size: 15px; color: var(--asm-sim-hot); }
+.asm-editor .fsm-sim-inputs, .asm-editor .fsm-sim-outputs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.asm-editor .fsm-bit { font-family: var(--asm-mono); min-width: 64px; }
+.asm-editor .asm-btn.fsm-bit.on, .asm-editor .asm-btn.fsm-bit.on:hover { background: #2e9d5b; border-color: #2e9d5b; color: #fff; }
+.asm-editor .fsm-bus { width: 80px; display: inline-block; }
+.asm-editor .fsm-busl { font-family: var(--asm-mono); font-size: 12px; }
+.asm-editor .fsm-led { font: 12px var(--asm-mono); padding: 3px 8px; border-radius: 10px; border: 1px solid var(--asm-border); }
+.asm-editor .fsm-led.on { background: color-mix(in srgb, var(--asm-ok) 75%, transparent); color: #fff; border-color: var(--asm-ok); }
 
 /* read-only (a Petri net's state machine, #2696): the tools that change it hidden */
 .fsm-editor.asm-readonly .asm-toolbar > [hidden], .fsm-editor.asm-readonly .asm-side [hidden] { display: none; }

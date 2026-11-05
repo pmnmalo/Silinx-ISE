@@ -13,6 +13,8 @@
 //
 // The chart's problems and notes are not shown in the editor (docs/UI-GUIDELINES.md "Messages"): `onProblems(diags)` after every
 // validation, `onValidate(diags)` on Validate, `onMessage(text)` for a note (drawings.js: the console, editor-problems.js).
+// Its Simulate panel (asm-sim.js, #2880) steps through the chart; a chart with errors is not simulated (its errors go
+// to onValidate, as Validate's).
 
 import { linkModel, linkSnapshot } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
@@ -33,6 +35,7 @@ import { mountAsmView } from './asm-view.js';
 import { mountAsmOps } from './asm-ops.js';
 import { clone } from '/core/util.js';
 import { statusLine } from './status-line.js';
+import { mountAsmSim } from './asm-sim.js';
 
 export const GRID = 20;
 const CHW = 7.25;          // approx. width of a 12px monospace character
@@ -183,6 +186,13 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   const status = statusLine();
   const delBtn = toolIcon('delete', 'del', 'Delete selection (Del)', () => deleteSelection(), 'asm-danger');
 
+  // (Simulate, #2880: its panel below the canvas, as the state diagram's)
+  const simBtn = toolWide('sim', 'Simulate', 'Step through the chart: set the inputs, apply clock edges, see the state, the path taken and the outputs', () => simApi.toggle(), 'asm-sim-btn');
+  const simApi = mountAsmSim({
+    M: () => M, btn, render: () => render(), layout: () => applyView(), destroyed: () => destroyed, simBtn,
+    onErrors: (diags) => { onMessage?.('The chart cannot be simulated: correct its errors first'); onValidate?.(diags); },
+  });
+
   const more = toolbarMenu([
     btn('Arrange', 'Automatic layout (states top-down, every-cycle blocks on the right)', () => autoArrange()),
     snapBtn,
@@ -201,7 +211,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     sep(),
     h('div', { class: 'asm-group asm-encoding' }, h('span', { class: 'asm-tb-label' }, 'Encoding:'), encSel),
     sep(),
-    h('div', { class: 'asm-group' }, toolWide('check', 'Validate', 'Check the chart for errors', () => { runValidate(); onValidate?.(diags.slice()); })),
+    h('div', { class: 'asm-group' }, toolWide('check', 'Validate', 'Check the chart for errors', () => { runValidate(); onValidate?.(diags.slice()); }), simBtn),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
     more.el);
@@ -220,6 +230,9 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
       <marker id="${uid}-arr-sel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
         <path d="M0,1 L10,5 L0,9 z" class="asm-arrowhead sel"/>
       </marker>
+      <marker id="${uid}-arr-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+        <path d="M0,1 L10,5 L0,9 z" class="asm-arrowhead hot"/>
+      </marker>
     </defs>
     <rect class="asm-bg" x="0" y="0" width="100%" height="100%" fill="url(#${uid}-grid)"/>
     <g class="asm-vp">
@@ -236,7 +249,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
 
   const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg);
 
-  const mainCol = h('div', { class: 'asm-main' }, canvasWrap);
+  const mainCol = h('div', { class: 'asm-main' }, canvasWrap, simApi.panel);
 
   // side panel
   const selSection = h('section', { class: 'asm-section asm-selection' });
@@ -278,6 +291,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     render();
     scheduleValidate();
     updateToolbar();
+    simApi.refresh();
   }
   function restore(i) {
     hi = i;
@@ -285,7 +299,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     lastKey = null;
     sel.nodes = new Set([...sel.nodes].filter((id) => nodeById(id)));
     if (sel.edge && !M.edges.some((e) => e.id === sel.edge)) sel.edge = null;
-    render(); renderInspector(); renderMachine(); scheduleValidate(); updateToolbar(); scheduleChange();
+    render(); renderInspector(); renderMachine(); scheduleValidate(); updateToolbar(); scheduleChange(); simApi.refresh();
   }
   const undo = () => { if (hi > 0) restore(hi - 1); };
   const redo = () => { if (hi < hist.length - 1) restore(hi + 1); };
@@ -306,7 +320,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   });
 
   // ---------------------------------------------------------------------------- rendering (asm-render.js)
-  const { render, updateToolbar } = mountRender({ state: () => ({ M, sel, diags, hist, hi }), uid, gBlocks, gEdges, gNodes, status,
+  const { render, updateToolbar } = mountRender({ state: () => ({ M, sel, diags, hist, hi, sim: simApi.view() }), uid, gBlocks, gEdges, gNodes, status,
     delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget });
 
   const flash = (msg) => onMessage?.(msg);
@@ -365,7 +379,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
       M = normalizeModel(m || newModel('fsm', 'vhdl'));
       hist = [JSON.stringify(M)]; hi = 0; lastKey = null;
       sel = { nodes: new Set(), edge: null };
-      render(); renderInspector(); renderMachine(); updateToolbar(); runValidate();
+      render(); renderInspector(); renderMachine(); updateToolbar(); runValidate(); simApi.refresh();
       fitted = tryInitialFit();
     },
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
@@ -373,10 +387,14 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     validate: () => { runValidate(); return diags.slice(); },
     // the box a problem is about selected and shown (a click on its line in the console)
     focusNode: (id) => focusNode(id),
+    // the Simulate panel ('sim', a design link's view=try opens it, #2881) or none (null)
+    showPanel: (p) => simApi.show(p === 'sim'),
+    get panel() { return simApi.isOpen() ? 'sim' : null; },
     fit,
     print,
     destroy() {
       destroyed = true;
+      simApi.stop();
       Object.values(timers).forEach(clearTimeout);
       ro?.disconnect();
       root.remove();
