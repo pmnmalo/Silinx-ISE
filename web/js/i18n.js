@@ -243,6 +243,11 @@ const PT = {
   'Save Wave Configuration': 'Guardar Configuração de Formas de Onda', 'Load Wave Configuration': 'Carregar Configuração de Formas de Onda',
   'File name in the project:': 'Nome do ficheiro no projeto:', 'Wave configuration:': 'Configuração de formas de onda:', 'Load': 'Carregar',
   'The project has no wave configuration (.wcfg) yet: save one first.': 'O projeto ainda não tem configurações de formas de onda (.wcfg): guarde uma primeiro.',
+  // (its commands in the simulator toolbar's ⋮ menu, #2839)
+  'Wave configuration (save, load)': 'Configuração de formas de onda (guardar, carregar)',
+  'Save Wave Configuration…': 'Guardar Configuração de Formas de Onda…', 'Load Wave Configuration…': 'Carregar Configuração de Formas de Onda…',
+  "Save the wave window's signals, dividers, groups and markers to a .wcfg file of the project": 'Guardar os sinais, divisores, grupos e marcadores da janela de formas de onda num ficheiro .wcfg do projeto',
+  'Load a .wcfg file of the project into the wave window': 'Carregar um ficheiro .wcfg do projeto na janela de formas de onda',
   'Add to Wave Window': 'Adicionar à Janela de Formas de Onda', 'Add to Wave Window (Recursive)': 'Adicionar à Janela de Formas de Onda (Recursivo)',
   'Show in wave window': 'Mostrar na janela de formas de onda', 'Force Constant...': 'Forçar Constante...', 'Force Clock...': 'Forçar Relógio...',
   'Remove Force': 'Remover Forçamento', 'Force Selected Signal': 'Forçar Sinal Selecionado', 'Define Clock': 'Definir Relógio', 'Signal Name:': 'Nome do Sinal:',

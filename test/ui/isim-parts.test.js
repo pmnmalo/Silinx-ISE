@@ -1,6 +1,6 @@
 // UI: the parts of ISim's window (#405: out of mountISim in web/js/isim.js), the window mounted in the page on a design
 // of its own: the toolbar (isim-toolbar.js: its buttons, a run for the time typed in, Break disabled while no run goes
-// on, a marker, the cursor moved, the zooms, Save and Load Wave Configuration, #1019), the view (isim-view.js: the zoom about the cursor, the
+// on, a marker, the cursor moved, the zooms, Save and Load Wave Configuration in its ⋮ menu, #1019, #2839), the view (isim-view.js: the zoom about the cursor, the
 // fit), the status bar (isim-status.js: the simulated time, the cursor, the marker's delta; the documents' status line, #2785), the public API
 // (isim-api.js: the state saved and restored, restart; the wave configuration, isim-wcfg.js) and the theme's colours (isim-colors.js: the wave window's
 // background drawn in the theme's colour).
@@ -42,6 +42,8 @@ uiTest('#405 ISim window parts: the toolbar, the view, the status, the API, the 
     await wait(100);
     const $ = (s) => host.querySelector(s);
     const btn = (title) => [...host.querySelectorAll('.isim-toolbar .tb-btn')].find((b) => b.title === title);
+    // (Save and Load in the toolbar's ⋮ menu, #2839)
+    const item = (label) => [...host.querySelectorAll('.isim-toolbar .tb-more-menu button')].find((b) => b.textContent === label);
     const r = {};
     // the status line: the documents' (#2785, web/js/status-line.js), the same look as an editor's
     const look = (el) => { const c = getComputedStyle(el); return [c.height, c.fontSize, c.borderTopStyle, c.borderTopColor, c.backgroundColor, c.paddingLeft]; };
@@ -97,21 +99,21 @@ uiTest('#405 ISim window parts: the toolbar, the view, the status, the API, the 
       { kind: 'sig', path: 'tb.q', radix: 'udec', group: 2 }], markers: [10000, 30000] });
     const rows = () => isim.state.rows.map((x) => [x.kind, x.name, x.radix ?? null, x.group != null ? isim.state.rows.find((g) => g.id === x.group).name : null]);
     r.cfgRows = rows();
-    btn('Save Wave Configuration').click();
+    item('Save Wave Configuration…').click();
     await wait(50);
     r.saved = files.saved;
     isim.setState({ rows: [{ kind: 'sig', path: 'tb.q' }], markers: [] });
     files.toLoad = { name: 'tb.wcfg', text: files.saved };
-    btn('Load Wave Configuration').click();
+    item('Load Wave Configuration…').click();
     await wait(50);
     r.loaded = [rows(), isim.state.markers.map((m) => m.t), isim.state.activeMarker?.t];
     // a configuration with a signal the design does not have: said, left out; one that is not a configuration: an error
     files.toLoad = { name: 'other.wcfg', text: files.saved.replace('/tb/clk', '/tb/gone') };
-    btn('Load Wave Configuration').click();
+    item('Load Wave Configuration…').click();
     await wait(50);
     r.other = rows();
     files.toLoad = { name: 'bad.wcfg', text: '{}' };
-    btn('Load Wave Configuration').click();
+    item('Load Wave Configuration…').click();
     await wait(50);
     r.bad = rows();
     r.cfgLog = [...$('.isim-console').children].map((l) => [l.className.replace('isim-ln ', ''), l.textContent]).slice(-5);
@@ -120,7 +122,7 @@ uiTest('#405 ISim window parts: the toolbar, the view, the status, the API, the 
   }, VHDL);
   assert.deepEqual(out.buttons, ['Restart', 'Run All', 'Run for the specified time', 'Step (advance to the next scheduled event)', 'Break', 'Zoom In',
     'Zoom Out', 'Zoom to Full View', 'Go to Time 0', 'Go to Latest Time', 'Previous Transition (selected signal)', 'Next Transition (selected signal)',
-    'Add Marker at cursor', 'Radix of selected signals', 'Save Wave Configuration', 'Load Wave Configuration']);
+    'Add Marker at cursor', 'Radix of selected signals', 'Wave configuration (save, load)']);
   assert.deepEqual(out.runTime, ['1', 'us', true]);
   assert.deepEqual(out.statusLook, [true, out.statusLook[2], out.statusLook[2]]);
   assert.equal(out.statusLook[2][0], '20px');

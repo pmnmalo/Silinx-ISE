@@ -8,7 +8,9 @@
 // rows: { kind: 'sig', path: '/tb_top/uut/cnt', name: 'cnt', type: 'logic' | 'array' | 'other', radix, expanded }
 //       { kind: 'div', name }       { kind: 'group', name, expanded, rows: [ …its signals and dividers ] }
 // radix: 'default' | 'bin' | 'hex' | 'oct' | 'udec' | 'sdec' | 'c1dec' | 'ascii' (the simulator's; c1dec, one's complement, has no ISE radix and is not written); markers: times in ps.
-// wcfgPath and wcfgList: the configurations' files in a project (web/js/sim-wcfg.js).
+// wcfgPath and wcfgList: the configurations' files in a project (web/js/sim-wcfg.js). wcfgSignal and placeWcfg: a
+// configuration's rows from and onto an elaborated design's signals, the wave window's (web/js/isim-wcfg.js) and the
+// MCP's (server/mcp-wcfg.js, #2839).
 
 const RADIX = { bin: 'BINARYRADIX', hex: 'HEXRADIX', oct: 'OCTALRADIX', udec: 'UNSIGNEDDECRADIX', sdec: 'SIGNEDDECRADIX', ascii: 'ASCIIRADIX' };
 const RADIX_OF = Object.fromEntries(Object.entries(RADIX).map(([k, v]) => [v, k]));
@@ -116,4 +118,29 @@ export function wcfgPath(name) {
 export function wcfgList(files, mod) {
   const own = f => f.split('/').pop().toLowerCase() === `${String(mod).toLowerCase()}.wcfg`;
   return files.filter(f => /\.wcfg$/i.test(f)).sort((a, b) => (own(b) - own(a)) || a.localeCompare(b));
+}
+
+/** A signal's path in a configuration (an elaborated design's 'tb.uut.cnt': '/tb/uut/cnt'). */
+export const wcfgSigPath = sig => '/' + String(sig.path || sig.name).replace(/\./g, '/');
+
+/** A signal of an elaborated design as a configuration's row. */
+export function wcfgSignal(sig, { radix = 'default', expanded = false } = {}) {
+  const t = sig.t || {};
+  return { kind: 'sig', path: wcfgSigPath(sig), name: sig.name, radix, expanded: !!expanded,
+    type: t.kind === 'logic' && t.w === 1 ? 'logic' : t.kind === 'logic' ? 'array' : 'other' };
+}
+
+/** A configuration's rows on a design's signals: { rows, missing } in the wave window's one level of groups (a group in
+ *  a group: its members in the outer one), a signal row's sig the design's; missing: the paths the design has not. */
+export function placeWcfg(cfgRows, signals) {
+  const byPath = new Map(signals.map(s => [wcfgSigPath(s), s]));
+  const missing = [];
+  const place = (list, inGroup) => list.flatMap(r => {
+    if (r.kind === 'div') return [{ kind: 'div', name: r.name }];
+    if (r.kind === 'group') return inGroup ? place(r.rows, true) : [{ kind: 'group', name: r.name, expanded: r.expanded !== false, rows: place(r.rows, true) }];
+    const sig = byPath.get(r.path);
+    if (!sig) { missing.push(r.path); return []; }
+    return [{ kind: 'sig', sig, radix: r.radix, expanded: !!r.expanded }];
+  });
+  return { rows: place(cfgRows, false), missing };
 }

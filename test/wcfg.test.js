@@ -1,9 +1,12 @@
 // The simulator's wave configuration file (#1019, core/wcfg.js): written and read back the same (the signals, their
 // order and radix, the dividers, the groups, the markers), the text as ISim's .wcfg, a file written by ISim read, and
-// what is not a wave configuration refused; the file's path in the project (wcfgPath, wcfgList).
+// what is not a wave configuration refused; the file's path in the project (wcfgPath, wcfgList); a configuration's rows
+// from and onto a design's signals (wcfgSignal, placeWcfg: the wave window's and the MCP's, #2839), on an elaborated
+// VHDL and Verilog design.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeWcfg, readWcfg, wcfgPath, wcfgList } from '../core/wcfg.js';
+import { writeWcfg, readWcfg, wcfgPath, wcfgList, wcfgSignal, wcfgSigPath, placeWcfg } from '../core/wcfg.js';
+import { compile, elaborate } from '../core/compile.js';
 
 const CFG = {
   tops: ['tb_top'],
@@ -131,3 +134,31 @@ test('#1019 wcfg: what is not a wave configuration is refused', () => {
   // a marker with no time, or a negative one: left out
   assert.deepEqual(readWcfg('<wave_config><marker label="" /><marker time="-5" /><marker time="7" /></wave_config>').markers, [7]);
 });
+
+// a design of its own, in each language: a clock, a bus, an integer, an instance's signal
+const VHDL = `library ieee; use ieee.std_logic_1164.all;
+entity sub is port (a : in std_logic; y : out std_logic); end sub;
+architecture rtl of sub is signal inner : std_logic_vector(3 downto 0); begin y <= a; inner <= (others => a); end rtl;
+entity tb is end tb;
+architecture sim of tb is signal clk : std_logic := '0'; signal bus8 : std_logic_vector(7 downto 0); signal n : integer := 0; signal q : std_logic;
+begin uut: entity work.sub port map (a => clk, y => q); end sim;`;
+const VERILOG = `module sub(input a, output y); reg [3:0] inner; assign y = a; endmodule
+module tb; reg clk = 0; reg [7:0] bus8; integer n; wire q; sub uut(.a(clk), .y(q)); endmodule`;
+for (const [lang, text] of [['vhdl', VHDL], ['verilog', VERILOG]]) {
+  test(`#2839 wcfg: a design's signals as rows and a configuration placed on them (${lang})`, () => {
+    const design = elaborate(compile([{ path: `tb.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text }]), 'tb');
+    const sig = (p) => design.signals.find((s) => wcfgSigPath(s) === p);
+    assert.deepEqual(wcfgSignal(sig('/tb/clk')), { kind: 'sig', path: '/tb/clk', name: 'clk', radix: 'default', expanded: false, type: 'logic' });
+    assert.deepEqual(wcfgSignal(sig('/tb/bus8'), { radix: 'hex', expanded: 1 }), { kind: 'sig', path: '/tb/bus8', name: 'bus8', radix: 'hex', expanded: true, type: 'array' });
+    assert.equal(wcfgSignal(sig('/tb/n')).type, 'other');   // (an integer)
+    // written, read back and placed: the same signals; a group in a group flattened; a signal the design has not, missing
+    const rows = [wcfgSignal(sig('/tb/clk')), { kind: 'div', name: 'Sub' },
+      { kind: 'group', name: 'G', expanded: false, rows: [wcfgSignal(sig('/tb/uut/inner'), { radix: 'bin' }), { kind: 'group', name: 'H', rows: [wcfgSignal(sig('/tb/bus8'))] }] },
+      { kind: 'sig', path: '/tb/gone', name: 'gone' }];
+    const { rows: placed, missing } = placeWcfg(readWcfg(writeWcfg({ tops: ['tb'], rows })).rows, design.signals);
+    const show = (list) => list.map((r) => (r.kind === 'sig' ? [r.sig.path, r.radix, r.expanded] : r.kind === 'group' ? [r.name, r.expanded, show(r.rows)] : ['div', r.name]));
+    assert.deepEqual(show(placed), [['tb.clk', 'default', false], ['div', 'Sub'], ['G', false, [['tb.uut.inner', 'bin', false], ['tb.bus8', 'default', false]]]]);
+    assert.deepEqual(missing, ['/tb/gone']);
+    assert.deepEqual(placeWcfg([], design.signals), { rows: [], missing: [] });
+  });
+}

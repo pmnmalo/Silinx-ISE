@@ -14,6 +14,7 @@ import { VERSION } from '../core/version.js';
 import { redactor } from './mcp-util.js';
 import { PROJECT_TOOLS } from './mcp-projects.js';
 import { HDL_TOOLS } from './mcp-hdl.js';
+import { WCFG_TOOLS } from './mcp-wcfg.js';
 import { PROCESS_TOOLS } from './mcp-processes.js';
 import { SETTINGS_TOOLS } from './mcp-settings.js';
 import { SOURCE_TOOLS } from './mcp-sources.js';
@@ -31,13 +32,13 @@ export { OPEN_REPORTS } from './mcp-processes.js';
 export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'silinx-ise', title: 'Silinx ISE', version: VERSION };
 const INSTRUCTIONS = 'Silinx ISE: FPGA design for teaching (Spartan-3E; Basys2, Nexys2). Projects live in the Silinx workspace: '
-  + 'list_projects, new_project_from_example, or new_project (empty) then new_source (clock_manager, block_memory, test_bench_wizard, constraints_wizard) / write_file and set_top; then read_file / write_file, check_syntax, simulate (the project\'s test bench), '
+  + 'list_projects, new_project_from_example, or new_project (empty) then new_source (clock_manager, block_memory, test_bench_wizard, constraints_wizard) / write_file and set_top; then read_file / write_file, check_syntax, simulate (the project\'s test bench; its wave configurations: save_wave_config / load_wave_config), '
   + 'set_design_properties (board, device: list_devices) and set_process_properties, remove_from_project / add_to_project, rename_file / rename_module, delete_file, import_project / export_project, project_link / open_link (a design\'s link, for slides), '
   + 'run_process (synthesize, implement, bitstream, timing, power, pins) and get_report. The Silinx toolchain needs no Xilinx ISE.';
 
 // the tools, by area: the projects and their files (mcp-projects.js), their settings (mcp-settings.js), their
-// new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), the conversions (mcp-convert.js), a drawing's Check (mcp-check.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), the HDL (mcp-hdl.js), the C / C++ of Silinx HLS (mcp-hls.js), the processes (mcp-processes.js)
-export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...CHECK_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS];
+// new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), the conversions (mcp-convert.js), a drawing's Check (mcp-check.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), the HDL (mcp-hdl.js), the wave configurations (mcp-wcfg.js), the C / C++ of Silinx HLS (mcp-hls.js), the processes (mcp-processes.js)
+export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...CHECK_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS];
 
 // ------------------------------------------------------------------ the protocol
 /** One request (or notification) of a client: its answer, or null for a notification. */

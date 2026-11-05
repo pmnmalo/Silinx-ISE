@@ -1,8 +1,10 @@
 // SSim's toolbar (#405: out of mountISim in isim.js): restart, run all, run for a time (its value and unit), step,
-// break, the zooms, the cursor's moves, a marker, the radix, Save and Load Wave Configuration (#1019: with
-// opts.wcfg; no VCD export), and Edit Stimuli with its bar of commands (#336, #853) when the window can draw stimuli.
+// break, the zooms, the cursor's moves, a marker, the radix, and Edit Stimuli with its bar of commands (#336, #853) when
+// the window can draw stimuli; Save and Load Wave Configuration (#1019: with opts.wcfg; no VCD export) in the toolbar's
+// ⋮ menu at its right end (#2839, toolbar-menu.js).
 import { esc, h } from './dom.js';
 import { ICON, UNITS, parseTime } from './isim.js';
+import { toolbarMenu } from './toolbar-menu.js';
 
 /** { btns, rfUnit, rfVal, stimBar } of mountISim (api(): its current values). */
 export function mountToolbar(ctx) {
@@ -45,11 +47,6 @@ export function mountToolbar(ctx) {
     const r = radixBtn.getBoundingClientRect();
     showMenu(r.left, r.bottom, radixItems());
   });
-  if (opts.wcfg) {
-    sep();
-    addBtn('wcfgSave', 'Save Wave Configuration', () => api().saveWcfg());
-    addBtn('wcfgLoad', 'Load Wave Configuration', () => api().loadWcfg());
-  }
   // the stimuli drawn on the inputs' waveforms (#336), with their bar of commands
   const stimBar = h('div', { class: 'isim-stimbar' });
   stimBar.hidden = true;
@@ -64,6 +61,16 @@ export function mountToolbar(ctx) {
     stimBar.querySelector('[data-stim=fill]').onclick = () => fillStim();
     stimBar.querySelector('[data-stim=save]').onclick = () => { if (st.stim.m) stimOpt.onSaveTestbench?.(JSON.parse(JSON.stringify(st.stim.m))); };
     stimBar.querySelector('[data-stim=stop]').onclick = () => toggleStim(false);
+  }
+  // the menu (#2839): the wave configuration's commands, used now and then
+  if (opts.wcfg) {
+    const item = (key, label, title, fn) => (btns[key] = h('button', { type: 'button', class: 'tt-menu-item', title, onclick: () => fn() }, label));
+    const more = toolbarMenu([
+      item('wcfgSave', 'Save Wave Configuration…', 'Save the wave window\'s signals, dividers, groups and markers to a .wcfg file of the project', () => api().saveWcfg()),
+      item('wcfgLoad', 'Load Wave Configuration…', 'Load a .wcfg file of the project into the wave window', () => api().loadWcfg()),
+    ], { title: 'Wave configuration (save, load)' });
+    tb.classList.add('has-more');
+    tb.appendChild(more.el);
   }
   btns.brk.disabled = true;
 

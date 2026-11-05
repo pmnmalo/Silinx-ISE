@@ -48,7 +48,8 @@ function placeModel(d, tasks) {
     const { runSimulation } = await import('./viewers.js');   // (not at load: viewers.js loads the app)
     runSimulation(mod, v || undefined);
   });
-  tb.append(h('label', { class: 'isim-model-field' }, h('span', {}, 'Model:'), sel));   // (its label, #1391)
+  // (its label, #1391; before the toolbar's ⋮ menu, which stays at its right end, #2839)
+  tb.insertBefore(h('label', { class: 'isim-model-field' }, h('span', {}, 'Model:'), sel), tb.querySelector(':scope > .tb-more'));
 }
 
 /** The simulations' tabs to the right of the side panel, which starts at the top of the work area as Design's and
