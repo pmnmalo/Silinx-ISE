@@ -19,7 +19,7 @@
 //                                                                     leaves without a pad; the die's description, PART's)
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { deviceSites } from '../../src/fpga/place.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

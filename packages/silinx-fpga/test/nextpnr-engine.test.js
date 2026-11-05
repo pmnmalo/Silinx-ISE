@@ -1,6 +1,6 @@
 // The flow's nextpnr engine (#2136, src/open-flow-nextpnr.js): the netlist made ready for nextpnr (the pads on its I/O
 // buffers, the cells and constants the spartan3e micro-architecture has), and the gates example (Silinx's synthesis's
-// netlist, test/fixtures/nextpnr-engine) built from the command line with --engine nextpnr: nextpnr's WebAssembly
+// netlist, test/fixtures/nextpnr-engine) built from the command line (nextpnr, the one engine since #2137): nextpnr's WebAssembly
 // package places and routes it, its result goes to XDL, the routing check and the bitstream.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -107,12 +107,12 @@ test('#2457 the nextpnr engine takes every cell Silinx\'s packer takes', () => {
   }
 });
 
-test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2136 the gates example built by nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const ucfFile = path.join(dir, 'gates.ucf');
   fs.writeFileSync(ucfFile, ucf());
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('gates.json')), '--part', 'xc3s250e-cp132-4', '--ucf', ucfFile, '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('gates.json')), '--part', 'xc3s250e-cp132-4', '--ucf', ucfFile, '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -129,14 +129,14 @@ test('#2136 the gates example built with --engine nextpnr: no warnings, its pads
   assert.equal(fs.statSync(path.join(dir, 'gates.bit')).size, 169288);
 });
 
-test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM128X1S): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
+test('#2136 nextpnr on a netlist with cells it does not have yet (a RAM128X1S): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const json = JSON.parse(gates());
   cellsOf(json).ram = { type: 'RAM128X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
   fs.writeFileSync(path.join(dir, 'gates.json'), JSON.stringify(json));
   fs.writeFileSync(path.join(dir, 'gates.ucf'), ucf());
   const out = [], err = [];
-  const code = await main(['build', path.join(dir, 'gates.json'), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'gates.ucf'), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', path.join(dir, 'gates.json'), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'gates.ucf'), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 1);
   assert.deepEqual(err, [
@@ -151,10 +151,10 @@ test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM
   assert.ok(!fs.existsSync(path.join(dir, 'gates.bit')));
 });
 
-test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) built by nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('counter.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('counter.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('counter.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('counter.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -179,7 +179,7 @@ test('#2196 nextpnrTries: four placements at Normal up to 500 slices, one above;
 test('#2196 --seed 5: placements from that seed on, each reported, the fastest kept; the design with no clock takes one', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('counter.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('counter.ucf')), '--out-dir', dir, '--engine', 'nextpnr', '--seed', '5'],
+  const code = await main(['build', fileURLToPath(fixture('counter.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('counter.ucf')), '--out-dir', dir, '--seed', '5'],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -193,16 +193,16 @@ test('#2196 --seed 5: placements from that seed on, each reported, the fastest k
   const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   fs.writeFileSync(path.join(dir2, 'gates.ucf'), ucf());
   const out2 = [];
-  assert.equal(await main(['build', fileURLToPath(fixture('gates.json')), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir2, 'gates.ucf'), '--out-dir', dir2, '--engine', 'nextpnr'], { out: l => out2.push(l), err: () => {} }), 0);
+  assert.equal(await main(['build', fileURLToPath(fixture('gates.json')), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir2, 'gates.ucf'), '--out-dir', dir2], { out: l => out2.push(l), err: () => {} }), 0);
   assert.deepEqual(out2.filter(l => /^(Placement|Kept)/.test(l)), []);
 });
 
-test('#2196 the VGA example built with --engine nextpnr: 143 slices as the packing fills them (#2223), its constants on routing (#2797), no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
+test('#2196 the VGA example built by nextpnr: 143 slices as the packing fills them (#2223), its constants on routing (#2797), no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'top.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('vga.json.gz'))));
   const out = [], err = [];
-  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('vga.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('vga.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -215,12 +215,12 @@ test('#2196 the VGA example built with --engine nextpnr: 143 slices as the packi
   assert.deepEqual(clock.pips.filter(p => /^CLK\d$/.test(p.to) && !/^GCLK/.test(p.from)), []);
 });
 
-test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry chains) built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry chains) built by nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'top.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('traffic.json.gz'))));
   const out = [], err = [];
-  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('traffic.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('traffic.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -237,10 +237,10 @@ test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry 
   assert.equal(has('F5USED'), 4);
 });
 
-test('#2192 the IOB registers\' design (Silinx\'s synthesis) built with --engine nextpnr: no warnings, its PERIOD met, the registers in their IOBs, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2192 the IOB registers\' design (Silinx\'s synthesis) built by nextpnr: no warnings, its PERIOD met, the registers in their IOBs, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('iob_regs.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('iob_regs.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('iob_regs.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('iob_regs.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -289,19 +289,20 @@ test('#2195 nextpnrNetlist: a pad\'s constraints on its buffer, a NET name with 
   assert.equal(nextpnrNetlist(gates(), 'gates', 'NET "nothing" PERIOD = 5 ns ;\n').sdc, '');
 });
 
-test('#2195 --engine nextpnr with the whole UCF: no warnings (TIG and CLOCK_DEDICATED_ROUTE change nothing, as in Silinx\'s flow); each PERIOD and OFFSET checked by the timing step, as with Silinx\'s engine', { timeout: 300000 }, async () => {
-  const build = async engine => {
+test('#2195 nextpnr with the whole UCF: no warnings (TIG and CLOCK_DEDICATED_ROUTE change nothing); each PERIOD and OFFSET checked by the timing step', { timeout: 300000 }, async () => {
+  const build = async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
     const out = [], err = [];
-    const code = await main(['build', fileURLToPath(fixture('ucf_all.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('ucf_all.ucf')), '--out-dir', dir, '--engine', engine],
+    const code = await main(['build', fileURLToPath(fixture('ucf_all.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('ucf_all.ucf')), '--out-dir', dir],
       { out: l => out.push(l), err: l => err.push(l) });
     assert.equal(code, 0, err.join('\n'));
     assert.deepEqual(err, []);   // no warnings
     const checks = out.filter(l => /^constraint /.test(l)).map(l => l.replace(/ \(.*$/, '')).sort();
     return { checks, out };
   };
-  const n = await build('nextpnr'), s = await build('silinx');
-  assert.deepEqual(n.checks, s.checks);
+  const n = await build();
+  assert.deepEqual(n.checks, ['constraint OFFSET = IN 15 ns BEFORE "clk": met on sw<0>', 'constraint OFFSET = IN 15 ns BEFORE "clk": met on sw<1>',
+    ...[0, 1, 2, 3].map(k => `constraint OFFSET = OUT 15 ns AFTER "clk": met on led<${k}>`), 'constraint PERIOD 10 ns on clk2: met', 'constraint PERIOD 20 ns on clk: met']);
   assert.ok(n.checks.includes('constraint PERIOD 10 ns on clk2: met'), n.checks.join('\n'));
   assert.ok(n.checks.includes('constraint PERIOD 20 ns on clk: met'));
   assert.ok(n.checks.includes('constraint OFFSET = IN 15 ns BEFORE "clk": met on sw<0>'));
@@ -310,10 +311,10 @@ test('#2195 --engine nextpnr with the whole UCF: no warnings (TIG and CLOCK_DEDI
   assert.ok(n.out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), n.out.join('\n'));
 });
 
-test('#2190 MUXF7 and MUXF8 built with --engine nextpnr: no warnings, its PERIOD met, the multiplexers on the dedicated wires, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2190 MUXF7 and MUXF8 built by nextpnr: no warnings, its PERIOD met, the multiplexers on the dedicated wires, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('widemux.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('widemux.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('widemux.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('widemux.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -325,10 +326,10 @@ test('#2190 MUXF7 and MUXF8 built with --engine nextpnr: no warnings, its PERIOD
   assert.equal(design.insts.reduce((n, i) => n + i.cfg.filter(c => c.attr === 'F6MUX').length, 0), 10);
 });
 
-test('#2191 the SLICEM\'s memories built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2191 the SLICEM\'s memories built by nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('slicemem.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('slicemem.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('slicemem.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('slicemem.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -338,10 +339,10 @@ test('#2191 the SLICEM\'s memories built with --engine nextpnr: no warnings, its
   assert.equal(design.insts.filter(i => i.type === 'SLICEM').length, 9);
 });
 
-test('#2191 a shift register read at its last stage into several others (only one is its cascade) built with --engine nextpnr: no warnings, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2191 a shift register read at its last stage into several others (only one is its cascade) built by nextpnr: no warnings, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('srl_fanout.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('srl_fanout.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('srl_fanout.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('srl_fanout.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -384,10 +385,10 @@ test('#2218 lowerRam64: a short INIT padded with zeros, an INIT missing all zero
   assert.equal(new Set(numbers).size, numbers.length);   // one driver per net
 });
 
-test('#2218 a RAM64X1S built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream; the XDL behaves as the RAM64X1S', { timeout: 300000 }, async () => {
+test('#2218 a RAM64X1S built by nextpnr: no warnings, its PERIOD met, a complete bitstream; the XDL behaves as the RAM64X1S', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('ram64.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('ram64.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('ram64.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('ram64.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -491,10 +492,10 @@ test('#2457 lowerClockSwitches: an input from a BUFG its input, the BUFG left ou
 // latches (an active-high gate with its enable and clear, an active-low one with its preset), an output and an input
 // register in their IOBs on the falling edge, a BUFGMUX_1 switching clk and clk2 beside the BUFG of clk, a BUFGMUX whose
 // select is 0 (a BUFG of clk2) clocking a falling-edge flip-flop
-test('#2457 falling-edge flip-flops, latches and clock switches built with --engine nextpnr: no warnings, its PERIOD met, the settings Silinx\'s packer writes, a complete bitstream; the XDL behaves as the netlist', { timeout: 300000 }, async () => {
+test('#2457 falling-edge flip-flops, latches and clock switches built by nextpnr: no warnings, its PERIOD met, the settings Silinx\'s packer writes, a complete bitstream; the XDL behaves as the netlist', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('edges.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('edges.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('edges.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('edges.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -552,10 +553,10 @@ test('#2457 falling-edge flip-flops, latches and clock switches built with --eng
 
 // #2566: the design (Silinx's test/fixtures/open-flow/feat_mult_chain on the Basys2): three MULT18X18SIOs, u_m0's B
 // cascaded into u_m1's and u_m1's into u_m2's (B_INPUT = CASCADE)
-test('#2566 a multiplier cascade built with --engine nextpnr: no warnings, the chain up a block RAM column, BCOUT -> BCIN through the cascade\'s PIP', { timeout: 300000 }, async () => {
+test('#2566 a multiplier cascade built by nextpnr: no warnings, the chain up a block RAM column, BCOUT -> BCIN through the cascade\'s PIP', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('mult_chain.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('mult_chain.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('mult_chain.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('mult_chain.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -578,10 +579,10 @@ test('#2566 a multiplier cascade built with --engine nextpnr: no warnings, the c
 // dedicated path, and clkb on K14, a side GCLK pin whose path reaches only the right side buffer BUFGMUX_X3Y6; eight
 // flip-flops on each. A side buffer drives its line in its half of the chip only: clkb's flip-flops must be right of the
 // clock tiles' column (nextpnr had put them anywhere, and router 1 stopped on its assert valid_wires_for_net)
-test('#2627 a clock on a side buffer built with --engine nextpnr: no warnings, its flip-flops in its half of the chip, the other clock on a top / bottom buffer', { timeout: 300000 }, async () => {
+test('#2627 a clock on a side buffer built by nextpnr: no warnings, its flip-flops in its half of the chip, the other clock on a top / bottom buffer', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('side_clock.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('side_clock.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('side_clock.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('side_clock.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -606,12 +607,12 @@ test('#2627 a clock on a side buffer built with --engine nextpnr: no warnings, i
 // slice (two VCC nets on its SR, routing stopped); feat_dcm2, a DCM fed by a global buffer of the other edge (a warning
 // that the DCM's CLKIN is out of its line's reach, which ISE's DRC passes)
 for (const name of ['feat_bram', 'hard_prim', 'feat_constmult', 'feat_dcm2']) {
-  test(`#2626 #2628 #2656 ${name} built with --engine nextpnr: no warnings, a complete bitstream`, { timeout: 300000 }, async () => {
+  test(`#2626 #2628 #2656 ${name} built by nextpnr: no warnings, a complete bitstream`, { timeout: 300000 }, async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
     const netlist = path.join(dir, `${name}.json`), ucfFile = fixture(`${name}.ucf`);
     fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture(`${name}.json.gz`))));
     const out = [], err = [];
-    const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', ...(fs.existsSync(ucfFile) ? ['--ucf', fileURLToPath(ucfFile)] : []), '--out-dir', dir, '--engine', 'nextpnr'],
+    const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', ...(fs.existsSync(ucfFile) ? ['--ucf', fileURLToPath(ucfFile)] : []), '--out-dir', dir],
       { out: l => out.push(l), err: l => err.push(l) });
     assert.equal(code, 0, err.join('\n'));
     assert.deepEqual(err, []);   // no warnings
@@ -630,12 +631,12 @@ for (const name of ['feat_bram', 'hard_prim', 'feat_constmult', 'feat_dcm2']) {
 // #2642: Silinx's test/fixtures/open-flow/feat_bramwiz_inf, a 512 x 16 RAM inferred onto a RAMB16_S18 whose DI<15> Yosys
 // leaves undriven (word<8> on DOPA0, word<9..15> on DOA8..14, DOA15 not read): tied to 0, ISE's DRC warned of a dangling
 // DOA15 (PhysDesignRules:812); left unconnected, as Silinx's packer does, it passes with no warning
-test('#2642 a block RAM\'s undriven data input built with --engine nextpnr: left unconnected, no warnings, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2642 a block RAM\'s undriven data input built by nextpnr: left unconnected, no warnings, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'feat_bramwiz_inf.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('feat_bramwiz_inf.json.gz'))));
   const out = [], err = [];
-  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--out-dir', dir, '--engine', 'nextpnr'], { out: l => out.push(l), err: l => err.push(l) });
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--out-dir', dir], { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
   assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
@@ -659,10 +660,10 @@ test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its 
   assert.deepEqual(nextpnrNetlist(json(), 'top', `${ucf}\nINST "u_dcm" LOC = "SLICE_X0Y0" ;\n`, device).problems, ['INST u_dcm: LOC SLICE_X0Y0 is not a DCM site of this device']);
 });
 
-test('#2194 a DCM_SP (Silinx\'s synthesis) built with --engine nextpnr: no warnings, each clock\'s PERIOD derived and met, on its buffers, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2194 a DCM_SP (Silinx\'s synthesis) built by nextpnr: no warnings, each clock\'s PERIOD derived and met, on its buffers, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('feat_dcm.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('feat_dcm.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('feat_dcm.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('feat_dcm.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -727,10 +728,10 @@ test('#2137 engineOf: nextpnr, whatever a project saved (silinx, auto, nextpnr: 
   for (const impl of [undefined, {}, { engine: 'silinx' }, { engine: 'auto' }, { engine: 'nextpnr' }, { engine: 'vpr' }]) assert.equal(engineOf(impl), 'nextpnr', JSON.stringify(impl));
 });
 
-test('#2223 flip-flops alone in the slices of carry chains built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2223 flip-flops alone in the slices of carry chains built by nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('ffcarry.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('ffcarry.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('ffcarry.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('ffcarry.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
@@ -753,10 +754,10 @@ test('#2223 flip-flops alone in the slices of carry chains built with --engine n
 
 // #2797: the design (research/nextpnr-s3e/consts.v): a sum's carry in at 0, pads at 0 and 1, flip-flops' D at 0 and 1,
 // a shift register with an active-low reset and enable (the synthesis's inverters on R and CE)
-test('#2797 constants and an active-low reset and enable built with --engine nextpnr: Silinx\'s 8 slices, no LUT giving a constant, SR_B and CE_B, no warnings, a complete bitstream; the XDL behaves as the netlist', { timeout: 300000 }, async () => {
+test('#2797 constants and an active-low reset and enable built by nextpnr: Silinx\'s 8 slices, no LUT giving a constant, SR_B and CE_B, no warnings, a complete bitstream; the XDL behaves as the netlist', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
-  const code = await main(['build', fileURLToPath(fixture('consts.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('consts.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', fileURLToPath(fixture('consts.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('consts.ucf')), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings

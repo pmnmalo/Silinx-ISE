@@ -35,7 +35,7 @@ test('the routing graph of the XC3S250E-CP132 ships with Silinx; the user\'s own
 });
 
 test('every shipped device description loads and has the datasheet\'s slices and user I/O pins', async () => {
-  const { deviceSites } = await import('../packages/silinx-fpga/src/fpga/place.js');
+  const { deviceSites } = await import('../packages/silinx-fpga/src/fpga/device-sites.js');
   // DS312 (Spartan-3E family data sheet): CLB slices; user I/O of the package
   const want = { 'xc3s100ecp132-4': [960, 83], 'xc3s250ecp132-4': [2448, 92], 'xc3s500efg320-4': [4656, 232], 'xc3s1200efg320-4': [8672, 250] };
   for (const [part, [slices, pads]] of Object.entries(want)) {

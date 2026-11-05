@@ -15,7 +15,7 @@ import { readBit, diffFrames } from '../../src/fpga/bitstream.js';
 import { parseXdl } from '../../src/xdl.js';
 import { frameData, iobRegFeatures } from '../../src/fpga/bitgen.js';
 import { loadDb, PART } from './db.mjs';
-import { deviceSites } from '../../src/fpga/place.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
 
 const args = process.argv.slice(2);

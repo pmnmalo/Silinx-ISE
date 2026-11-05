@@ -83,7 +83,7 @@ test('Spartan-6: every part\'s resources as DS160 gives them (a CMT 2 DCM + 1 PL
 
 test('the Silinx toolchain\'s devices: the sites of each shipped device report equal to the model\'s counts', async () => {
   const { loadDeviceCache, SHIPPED_DEVICES_DIR } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
-  const { deviceSites } = await import('../packages/silinx-fpga/src/fpga/place.js');
+  const { deviceSites } = await import('../packages/silinx-fpga/src/fpga/device-sites.js');
   const shipped = fs.readdirSync(SHIPPED_DEVICES_DIR).filter(f => f.endsWith('.json.gz')).map(f => f.replace(/\.json\.gz$/, ''));
   // (the Spartan-6 ones, #723, their sites in a description of their own: core/fpga/s6, #826)
   assert.deepEqual(shipped.sort(), ['xc3s100ecp132-4', 'xc3s1200efg320-4', 'xc3s250ecp132-4', 'xc3s500efg320-4', 'xc6slx16csg324-3', 'xc6slx45csg324-3']);

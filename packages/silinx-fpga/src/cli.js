@@ -3,9 +3,9 @@
 // runs it (server/open-flow-run.js) without its front end: the Verilog is synthesized as it is, VHDL needs Silinx
 // ISE. bin/silinx-fpga.js runs main(); the tests call it with their own output.
 //   silinx-fpga build <file.v ...|netlist.json> --part xc3s250e-cp132-4 [--top name] [--ucf pins.ucf] [-o top.bit]
-//     [--out-dir build] [--effort normal|high] [--seed N] [--no-replicate] [--engine nextpnr|silinx] [--quiet]
-// Writes into the out folder the synthesis's netlist (<top>.json), the routed design (routed.xdl; placed.xdl too by
-// Silinx's engine), the timing report (timing.txt) and the .bit; prints the flow's log (its warnings, the timing summary).
+//     [--out-dir build] [--effort normal|high] [--seed N] [--quiet]
+// Writes into the out folder the synthesis's netlist (<top>.json), the routed design (routed.xdl, by nextpnr), the timing
+// report (timing.txt) and the .bit; prints the flow's log (its warnings, the timing summary).
 // Exit codes: 0 built, 1 the flow failed (the design, the constraints, the routing), 2 the command line is wrong.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,20 +22,20 @@ export const USAGE = `usage:
   --top <name>     the top module (default: the one no other module instantiates)
   --ucf <file>     the constraints: the pins (LOC), the clocks (PERIOD)
   -o <file.bit>    the bitstream (default: <out-dir>/<top>.bit)
-  --out-dir <dir>  the netlist, the placed and routed XDL, the timing report (default: build)
+  --out-dir <dir>  the netlist, the routed XDL, the timing report (default: build)
   --effort normal|high   the optimization effort: more placements tried at high (default: normal)
-  --seed <N>       the placer's first seed (default: 1)
-  --no-replicate   no register replication on the critical path
-  --engine nextpnr|silinx   the place and route: nextpnr (default, #2137), or Silinx's own, which goes
+  --seed <N>       nextpnr's first seed (default: 1)
   --quiet          only the warnings, the errors and the result`;
 
-const VALUED = new Set(['--part', '--top', '--ucf', '-o', '--out-dir', '--effort', '--seed', '--engine']);
-const FLAGS = new Set(['--no-replicate', '--quiet']);
+const VALUED = new Set(['--part', '--top', '--ucf', '-o', '--out-dir', '--effort', '--seed']);
+const FLAGS = new Set(['--quiet']);
+// the options of Silinx's own placer and router, which nextpnr replaced (#2137): refused by name
+const GONE = new Set(['--engine', '--no-replicate']);
 
-/** The command line's options: { command, files, part, top, ucf, out, outDir, effort, seed, replicate, engine, quiet }, or { command, error }. */
+/** The command line's options: { command, files, part, top, ucf, out, outDir, effort, seed, quiet }, or { command, error }. */
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
-  const o = { command, files: [], replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1, engine: 'nextpnr' };
+  const o = { command, files: [], quiet: false, outDir: 'build', effort: 'normal', seed: 1 };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (VALUED.has(a)) {
@@ -48,11 +48,9 @@ export function parseArgs(argv) {
       else if (a === '--out-dir') o.outDir = v;
       else if (a === '--effort') o.effort = v;
       else if (a === '--seed') o.seed = Number(v);
-      else if (a === '--engine') o.engine = v;
-    } else if (FLAGS.has(a)) {
-      if (a === '--no-replicate') o.replicate = false;
-      else o.quiet = true;
-    } else if (a.startsWith('-')) return { command, error: `unknown option ${a}` };
+    } else if (FLAGS.has(a)) o.quiet = true;
+    else if (GONE.has(a)) return { command, error: `${a}: an option of Silinx's own placer and router, which nextpnr replaced (#2137)` };
+    else if (a.startsWith('-')) return { command, error: `unknown option ${a}` };
     else o.files.push(a);
   }
   if (command !== 'build') return o;
@@ -60,7 +58,6 @@ export function parseArgs(argv) {
   if (!o.part) return { command, error: '--part is needed (xc3s250e-cp132-4: the Basys2\'s)' };
   if (!['normal', 'high'].includes(o.effort)) return { command, error: `--effort ${o.effort}: normal or high` };
   if (!Number.isInteger(o.seed) || o.seed < 1) return { command, error: '--seed: a whole number from 1' };
-  if (!['silinx', 'nextpnr'].includes(o.engine)) return { command, error: `--engine ${o.engine}: nextpnr or silinx` };
   return o;
 }
 
@@ -168,7 +165,7 @@ export async function main(argv, { out = l => console.log(l), err = l => console
   };
   const steps = [...(netlist == null ? ['synth'] : []), 'translate', 'map', 'par', 'trce', 'bitgen'];
   const spec = { top, part: p.part, device: p.device, pkg: p.pkg, family: p.family, steps, seed: o.seed, effort: 1,
-    synthEffort: o.effort, replicate: o.replicate, startupClk: 'JtagClk', engine: o.engine };
+    synthEffort: o.effort, startupClk: 'JtagClk', engine: 'nextpnr' };
   const r = await runFlow(spec, io);
   if (!r.ok) { err(`silinx-fpga: ${r.error}`); return 1; }
   const bit = written[`${top}.bit`];

@@ -59,7 +59,7 @@ test('test shard: the repository\'s timings — measured files that exist, in se
   assert.deepEqual(UNIT_DIRS, ['test', 'packages/silinx-fpga/test']);
   assert.ok(files.length > 100 && files.every(f => UNIT_TESTS.test(f)), String(files.length));
   assert.deepEqual(files, [...testFiles(), ...testFiles(ROOT, 'packages/silinx-fpga/test')].sort());
-  assert.ok(files.includes('packages/silinx-fpga/test/fpga-route.test.js') && files.includes('test/flow-ide.test.js'));
+  assert.ok(files.includes('packages/silinx-fpga/test/fpga-hard.test.js') && files.includes('test/flow-ide.test.js'));
   assert.ok(!files.includes('packages/silinx-fpga/test/fpga-sim.js'), 'test files only');
   assert.ok(uiFiles.length > 50 && uiFiles.every(f => /^test\/ui\/[\w.-]+\.test\.js$/.test(f)), String(uiFiles.length));
   assert.ok(!uiFiles.includes('test/ui/harness.js'), 'test files only');

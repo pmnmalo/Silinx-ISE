@@ -117,7 +117,7 @@ test('#2385 constraints its format cannot read fail at translate, with the forma
 });
 
 test('#2385 the orchestrator and the reports do not parse UCF', () => {
-  for (const f of ['open-flow-core.js', 'open-flow-reports.js', 'open-flow-nextpnr.js', 'open-flow-nextpnr-s6.js', 'open-flow-s3e.js', 'open-flow-s6.js']) {
+  for (const f of ['open-flow-core.js', 'open-flow-reports.js', 'open-flow-nextpnr.js', 'open-flow-nextpnr-s6.js', 'open-flow-s6.js']) {
     assert.doesNotMatch(fs.readFileSync(new URL(`../packages/silinx-fpga/src/${f}`, import.meta.url), 'utf8'), /parseUcf|ucfText/, f);
   }
 });

@@ -11,7 +11,7 @@
 // pad a direct input). Each: top.vhd, top.ucf (the pins of the pads).
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { deviceSites } from '../../src/fpga/place.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
 import { PART } from './db.mjs';
 
 const args = process.argv.slice(2);

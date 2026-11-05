@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import { parseXdl } from '../../src/xdl.js';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { checkRouting } from '../../src/fpga/route.js';
+import { checkRouting } from '../../src/fpga/route-check.js';
 
 const [file, part] = process.argv.slice(2);
 const design = parseXdl(fs.readFileSync(file, 'utf8'));

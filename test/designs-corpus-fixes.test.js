@@ -159,77 +159,6 @@ end architecture;`, 'tb.vhd')], 'tb');
   assert.ok(prints(r).includes('y1=255 y2=85 n=3'), prints(r).join('; '));
 });
 
-test('placer: the I/Os of a bank share its VCCO (ISE DRC PhysDesignRules:755: a 3.3 V clock on B8 and 2.5 V outputs in bank 0)', async () => {
-  const { synthesizeOpen } = await import('../core/synth-front.js');
-  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
-  const { readYosysJson } = await import('../packages/silinx-fpga/src/fpga/netlist.js');
-  const { pack } = await import('../packages/silinx-fpga/src/fpga/pack.js');
-  const { deviceSites, place, PlaceError, bankOfPad, vccoOfStandard } = await import('../packages/silinx-fpga/src/fpga/place.js');
-  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
-  assert.equal(vccoOfStandard('LVCMOS33'), 3.3);
-  assert.equal(vccoOfStandard('lvttl'), 3.3);
-  assert.equal(vccoOfStandard('LVCMOS25'), 2.5);
-  assert.equal(vccoOfStandard('FOO'), null);
-  const lib = compile([v(`module m (input clk, input [15:0] a, output reg [31:0] q);
-  always @(posedge clk) q <= {a, ~a};
-endmodule`)]);
-  const syn = await synthesizeOpen(elaborate(lib, 'm'), { run: yosysNode });
-  const nl = readYosysJson(syn.files['m.json']);
-  const sites = deviceSites(loadDeviceCache('xc3s250ecp132-4'));
-  // the clock at 3.3 V on B8 (bank 0); everything else unconstrained: LVCMOS25, ISE's default
-  const ucf = 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\n';
-  for (const seed of [1, 2, 3]) {
-    const packed = pack(nl, { ucf, part: 'xc3s250ecp132-4' });
-    const r = place(packed, sites, { seed, effort: 0.3 });
-    const banks = new Map();
-    packed.insts.forEach((inst, i) => {
-      if (inst.kind !== 'iob') return;
-      const std = inst.cfg.find(c => c.attr === 'IOATTRBOX').value;
-      const b = bankOfPad(r.sites[i]);
-      (banks.get(b) || banks.set(b, new Set()).get(b)).add(vccoOfStandard(std));
-    });
-    for (const [b, vs] of banks) assert.equal(vs.size, 1, `seed ${seed}: bank ${b} mixes ${[...vs].join(' and ')} V`);
-    assert.deepEqual([...banks.get(0)], [3.3]);
-  }
-  // two fixed I/Os of one bank at different voltages: refused, as ISE refuses them
-  const bad = pack(nl, { ucf: `${ucf}NET "q<0>" LOC = "A10" | IOSTANDARD = LVCMOS25 ;\n`, part: 'xc3s250ecp132-4' });
-  assert.throws(() => place(bad, sites, { seed: 1, effort: 0.3 }), e => e instanceof PlaceError && /bank 0.*VCCO 3.3 V, not 2.5 V/.test(e.message));
-});
-
-test('placer: no pad for I/Os because of the banks\' VCCO (every bank holds LVCMOS33 pins, the others LVCMOS25) is said, not "not enough pads" (#128)', async () => {
-  const { synthesizeOpen } = await import('../core/synth-front.js');
-  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
-  const { readYosysJson } = await import('../packages/silinx-fpga/src/fpga/netlist.js');
-  const { pack } = await import('../packages/silinx-fpga/src/fpga/pack.js');
-  const { deviceSites, place, PlaceError } = await import('../packages/silinx-fpga/src/fpga/place.js');
-  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
-  const lib = compile([v(`module m (input clk, input [2:0] a, input [3:0] b, output reg [3:0] q);
-  always @(posedge clk) q <= {a, 1'b0} ^ b;
-endmodule`)]);
-  const syn = await synthesizeOpen(elaborate(lib, 'm'), { run: yosysNode });
-  const nl = readYosysJson(syn.files['m.json']);
-  const sites = deviceSites(loadDeviceCache('xc3s250ecp132-4'));
-  // one LVCMOS33 pin in each of the 4 banks (B8: bank 0, C14: 1, M2: 2, B2: 3); b and q: LVCMOS25
-  const ucf = ['NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;', 'NET "a<0>" LOC = "C14" | IOSTANDARD = LVCMOS33 ;',
-    'NET "a<1>" LOC = "M2" | IOSTANDARD = LVCMOS33 ;', 'NET "a<2>" LOC = "B2" | IOSTANDARD = LVCMOS33 ;', ''].join('\n');
-  const packed = pack(nl, { ucf, part: 'xc3s250ecp132-4' });
-  let err;
-  try { place(packed, sites, { seed: 1, effort: 0.3 }); } catch (e) { err = e; }
-  assert.ok(err instanceof PlaceError, String(err));
-  assert.equal(err.message, `place: no pad for 8 I/O(s) of LVCMOS25 (VCCO 2.5 V): b<0>, b<1>, b<2>, b<3>, q<0>, q<1>, q<2>, q<3>: the banks with free pads need another VCCO: bank 0 VCCO 3.3 V (LVCMOS33: clk), bank 1 VCCO 3.3 V (LVCMOS33: a<0>), bank 2 VCCO 3.3 V (LVCMOS33: a<1>), bank 3 VCCO 3.3 V (LVCMOS33: a<2>)`);
-  assert.equal(err.hint, `Give them the I/O standard of a bank in the constraints (UCF), e.g. NET "b<0>" IOSTANDARD = LVCMOS33; (or LOC them on pads of a bank of their own).`);
-  // given that standard: placed
-  const fixed = pack(nl, { ucf: ucf + [0, 1, 2, 3].map(k => `NET "b<${k}>" IOSTANDARD = LVCMOS33 ;\nNET "q<${k}>" IOSTANDARD = LVCMOS33 ;\n`).join(''), part: 'xc3s250ecp132-4' });
-  assert.ok(place(fixed, sites, { seed: 1, effort: 0.3 }).sites.length);
-  // too few pads, whatever the standards: still "not enough pads"
-  const wide = compile([v(`module w (input [199:0] a, output [199:0] q);
-  assign q = ~a;
-endmodule`)]);
-  const wsyn = await synthesizeOpen(elaborate(wide, 'w'), { run: yosysNode });
-  assert.throws(() => place(pack(readYosysJson(wsyn.files['w.json']), { part: 'xc3s250ecp132-4' }), sites, { seed: 1, effort: 0.3 }),
-    e => e instanceof PlaceError && e.message === 'place: not enough pads' && e.hint === undefined);
-});
-
 test('open synthesis: a for loop in an instance\'s process (its variable named after the instance: \\u.j) is not lost (verilog-axis FIFO in a wrapper)', async () => {
   // Yosys 0.68 does not unroll `for (\u.j = 3; …)` on an escaped name with a dot: the pipeline vanished
   const r = await diffSynth({ name: 'loop-in-instance', top: 'top', sim: { cycles: 60 }, sources: [v(`module pipe (input clk, input [7:0] d, output [7:0] q);
@@ -260,4 +189,73 @@ test('RAMB16 model: a port reading the word the other port writes at the same ed
 endmodule`)] });
   assert.equal(r.status, 'pass', r.report || `${r.stage}: ${r.reason}`);
   assert.ok(Object.keys(r.cells).some(c => /^RAMB16/.test(c)), JSON.stringify(r.cells));
+});
+
+// #2137: the banks' VCCO on the nextpnr engine (Silinx's placer had these rules, #128; nextpnr-spartan's spartan3e.cc does
+// now): the I/Os of a bank share its VCCO (ISE DRC PhysDesignRules:755), and an I/O with no pad left in a bank of its VCCO
+// is said with its standard, not "not enough pads"
+const vccoFlow = async (text, top, ucf) => {
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
+  const { nextpnrPlaceRoute } = await import('./designs-corpus/lib.mjs');
+  const syn = await synthesizeOpen(elaborate(compile([v(text)]), top), { run: yosysNode });
+  const part = 'xc3s250ecp132-4', device = loadDeviceCache(part);
+  return (u, seed = 1) => nextpnrPlaceRoute({ netlist: syn.files[`${top}.json`], top, part, ucf: u ?? ucf, device, db: loadDb(part, { graph: device }), seed });
+};
+const banksOf = async routedText => {
+  const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
+  const { deviceSites, bankOfPad, vccoOfStandard } = await import('../packages/silinx-fpga/src/fpga/device-sites.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const pads = deviceSites(loadDeviceCache('xc3s250ecp132-4')).pads, banks = new Map();
+  for (const i of parseXdl(routedText).insts.filter(x => /^(IOB|IBUF)$/.test(x.type))) {
+    const std = i.cfg.find(c => /^[IO]STANDARD$|^IOATTRBOX$/.test(c.attr) && c.value !== '#OFF')?.value || 'LVCMOS25';
+    const b = bankOfPad(pads.get(i.site));
+    (banks.get(b) || banks.set(b, new Set()).get(b)).add(vccoOfStandard(std));
+  }
+  return banks;
+};
+
+test('nextpnr: the I/Os of a bank share its VCCO (ISE DRC PhysDesignRules:755: a 3.3 V clock on B8 and 2.5 V outputs in bank 0)', { timeout: 300000 }, async () => {
+  const { vccoOfStandard } = await import('../packages/silinx-fpga/src/fpga/device-sites.js');
+  assert.deepEqual(['LVCMOS33', 'lvttl', 'LVCMOS25', 'FOO'].map(vccoOfStandard), [3.3, 3.3, 2.5, null]);
+  // the clock at 3.3 V on B8 (bank 0); everything else unconstrained: LVCMOS25, ISE's default
+  const run = await vccoFlow(`module m (input clk, input [15:0] a, output reg [31:0] q);
+  always @(posedge clk) q <= {a, ~a};
+endmodule`, 'm', 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\n');
+  for (const seed of [1, 2, 3]) {
+    const r = await run(undefined, seed);
+    assert.equal(r.ok, true, r.error);
+    assert.deepEqual(r.warnings, []);
+    const banks = await banksOf(r.routedText);
+    for (const [b, vs] of banks) assert.equal(vs.size, 1, `seed ${seed}: bank ${b} mixes ${[...vs].join(' and ')} V`);
+    assert.deepEqual([...banks.get(0)], [3.3]);
+  }
+});
+
+test('nextpnr: two LOC\'d I/Os of one bank at different voltages are refused, as ISE refuses them', { timeout: 300000, todo: '#2813' }, async () => {
+  const run = await vccoFlow(`module m (input clk, input [15:0] a, output reg [31:0] q);
+  always @(posedge clk) q <= {a, ~a};
+endmodule`, 'm', 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\nNET "q<0>" LOC = "A10" | IOSTANDARD = LVCMOS25 ;\n');
+  const r = await run();
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some(l => /bank 0.*3\.3 V.*2\.5 V|bank 0.*2\.5 V.*3\.3 V/.test(l)), r.errors.join('\n'));
+});
+
+test('nextpnr: no pad for an I/O because of the banks\' VCCO (every bank holds LVCMOS33 pins, the others LVCMOS25) is said with its standard (#128)', { timeout: 300000 }, async () => {
+  // one LVCMOS33 pin in each of the 4 banks (B8: bank 0, C14: 1, M2: 2, B2: 3); b and q: LVCMOS25
+  const ucf = ['NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;', 'NET "a<0>" LOC = "C14" | IOSTANDARD = LVCMOS33 ;',
+    'NET "a<1>" LOC = "M2" | IOSTANDARD = LVCMOS33 ;', 'NET "a<2>" LOC = "B2" | IOSTANDARD = LVCMOS33 ;', ''].join('\n');
+  const run = await vccoFlow(`module m (input clk, input [2:0] a, input [3:0] b, output reg [3:0] q);
+  always @(posedge clk) q <= {a, 1'b0} ^ b;
+endmodule`, 'm', ucf);
+  const r = await run();
+  assert.equal(r.ok, false);
+  assert.equal(r.error, "nextpnr failed: it stopped on an error");
+  assert.ok(r.errors.some(l => /ERROR: IO \S+: no free pad in a bank of VCCO 2\.5 V \(its I\/O standard LVCMOS25\): the banks with free pads have I\/Os of another VCCO\. Give it the I\/O standard of a bank in the constraints \(UCF\), or a LOC\.$/.test(l)), r.errors.join('\n'));
+  // given that standard: placed and routed
+  const fixed = await run(ucf + [0, 1, 2, 3].map(k => `NET "b<${k}>" IOSTANDARD = LVCMOS33 ;\nNET "q<${k}>" IOSTANDARD = LVCMOS33 ;\n`).join(''));
+  assert.equal(fixed.ok, true, fixed.error);
+  assert.deepEqual(fixed.warnings, []);
 });

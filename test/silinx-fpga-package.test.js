@@ -48,7 +48,7 @@ test('#1677 silinx-fpga: its dependencies are the toolchain\'s npm packages, at 
 
 // #1677: the toolchain's modules moved from core/ into the package; #1678: core/'s old paths, which re-exported them,
 // are gone (the IDE imports the package's API, test/toolchain-boundary.test.js)
-const MOVED = ['fpga/place.js', 'fpga/route.js', 'fpga/bitgen.js', 'fpga/s6/pack.js', 'synth-open.js', 'open-flow-core.js', 'xdl.js', 'ucf.js', 'family.js', 'power.js'];
+const MOVED = ['fpga/device-sites.js', 'fpga/route-check.js', 'fpga/bitgen.js', 'fpga/s6/pack.js', 'synth-open.js', 'open-flow-core.js', 'xdl.js', 'ucf.js', 'family.js', 'power.js'];
 
 test('#1677 #1678 the toolchain\'s modules are in the package, core/ has their old paths no more', () => {
   for (const f of MOVED) {

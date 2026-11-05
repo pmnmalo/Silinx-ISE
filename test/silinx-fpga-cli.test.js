@@ -27,9 +27,9 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-fpga-cli-'));
 
 test('#1679 parseArgs: the defaults, each option', () => {
   assert.deepEqual(parseArgs(['build', 'a.v', '--part', 'xc3s250e-cp132-4']),
-    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1, engine: 'nextpnr' });   // (nextpnr by default, #2137)
-  const o = parseArgs(['build', 'a.v', 'b.v', '--part', 'p', '--top', 't', '--ucf', 'u.ucf', '-o', 'x.bit', '--out-dir', 'o', '--effort', 'high', '--seed', '3', '--no-replicate', '--engine', 'nextpnr', '--quiet']);
-  assert.deepEqual(o, { command: 'build', files: ['a.v', 'b.v'], part: 'p', top: 't', ucf: 'u.ucf', out: 'x.bit', outDir: 'o', effort: 'high', seed: 3, replicate: false, engine: 'nextpnr', quiet: true });
+    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', quiet: false, outDir: 'build', effort: 'normal', seed: 1 });
+  const o = parseArgs(['build', 'a.v', 'b.v', '--part', 'p', '--top', 't', '--ucf', 'u.ucf', '-o', 'x.bit', '--out-dir', 'o', '--effort', 'high', '--seed', '3', '--quiet']);
+  assert.deepEqual(o, { command: 'build', files: ['a.v', 'b.v'], part: 'p', top: 't', ucf: 'u.ucf', out: 'x.bit', outDir: 'o', effort: 'high', seed: 3, quiet: true });
 });
 
 test('#1679 parseArgs: what is wrong in a command line', () => {
@@ -42,8 +42,8 @@ test('#1679 parseArgs: what is wrong in a command line', () => {
   assert.equal(error(['build', 'a.v', '--part', 'p', '--effort', 'max']), '--effort max: normal or high');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '0']), '--seed: a whole number from 1');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '1.5']), '--seed: a whole number from 1');
-  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'vpr']), '--engine vpr: nextpnr or silinx');   // (#2136; no auto since #2137)
-  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'auto']), '--engine auto: nextpnr or silinx');
+  // (the options of Silinx's own placer and router, #2136, #4: refused by name since #2137, nextpnr the one engine)
+  for (const a of ['--engine', '--no-replicate']) assert.equal(error(['build', 'a.v', '--part', 'p', a, 'nextpnr']), `${a}: an option of Silinx's own placer and router, which nextpnr replaced (#2137)`);
 });
 
 test('#1679 partOf: a part as ISE and the boards write it', () => {

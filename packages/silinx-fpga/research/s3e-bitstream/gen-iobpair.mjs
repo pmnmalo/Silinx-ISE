@@ -10,7 +10,7 @@
 // outputs, or both, by turns: pair i has (i + k) % 3, the kinds moved by k). Each: top.vhd, top.ucf.
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { deviceSites } from '../../src/fpga/place.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
 import { PART } from './db.mjs';
 
 const args = process.argv.slice(2);

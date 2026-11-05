@@ -31,7 +31,7 @@ import { rng, clbSlices, observeXdl } from '../packages/silinx-fpga/research/s3e
 import { tileCandidates, siteCandidates, censusCandidates, ioCandidates, leftCandidates, restCandidates } from '../packages/silinx-fpga/research/s3e-device/candidates.mjs';
 import { bram, mult, pads, inputs, padDefaults } from '../packages/silinx-fpga/research/s3e-device/gen-obshdl.mjs';
 import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
-import { deviceSites } from '../packages/silinx-fpga/src/fpga/place.js';
+import { deviceSites } from '../packages/silinx-fpga/src/fpga/device-sites.js';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
