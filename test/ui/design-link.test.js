@@ -114,6 +114,39 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   assert.equal(await page.dialogCount(), 0, 'no question: the project is the link\'s');
 });
 
+uiTest('#2871 regression, Copy Link to This Module… with Open the project only: the link opens the project on that module, selected, its source open; the top too; with a view', E, async (page) => {
+  await openLink(page, 'open=example:traffic');
+  await linkOpened(page);
+  // the module's link, made in the dialog (no view)
+  const linkOf = async (module) => {
+    const row = await page.waitFor((m) => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => r.dataset.module === m); return i >= 0 ? i : null; }, [module], { what: `${module}'s row` });
+    await contextMenu(page, row, 'Copy Link to This Module…');
+    await page.waitDialog('Copy Link');
+    assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view]').value), '');
+    const link = await page.waitFor(() => document.querySelector('.dlg-overlay .link-out').value || null, [], { what: 'the link' });
+    await page.dialogButton('Cancel');
+    await page.waitNoDialog();
+    return link;
+  };
+  const selected = () => page.eval(() => document.querySelector('#hier .row.sel')?.dataset.module ?? null);
+  for (const [module, doc, q] of [['timer', 'src/timer.vhd', 'm=1'], ['top', 'src/top.vhd', 'm=2']]) {
+    const link = await linkOf(module);
+    assert.match(link, new RegExp(`#design=[A-Za-z0-9_-]+&top=${module}$`));
+    await openLink(page, new URL(link).hash.slice(1), q);
+    await linkOpened(page);
+    await page.waitFor((m) => document.querySelector('#hier .row.sel')?.dataset.module === m, [module], { what: `${module} selected` });
+    await page.waitFor((d) => window.Silinx.active?.path === d, [doc], { what: `${doc} open`, timeout: 30000 });
+    assert.equal(await page.eval(() => window.Silinx.sel?.module), module);
+    await page.waitConsole(/Opened 'traffic' from a link\./);
+    assert.deepEqual(await consoleWarnings(page), []);
+  }
+  // with a view: the module selected, its view open
+  await openLink(page, 'open=example:traffic&top=traffic&view=try', 'm=3');
+  await linkOpened(page);
+  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
+  assert.equal(await selected(), 'traffic');
+});
+
 uiTest('#2826 a changed project: replaced only when the user says so (Keep Mine, then Replace)', E, async (page) => {
   await openLink(page, 'open=example:blinky');
   await linkOpened(page);

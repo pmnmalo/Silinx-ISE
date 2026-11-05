@@ -104,6 +104,8 @@ export async function openFromLink(opts) {
       if (problem) throw fail(problem);
     }
     app.log(`Opened '${d.name}' from a link${exists ? '' : ' (a new project)'}${view ? `: ${VIEWS[view]}` : ''}.`, 'ok');
+    // the link's module selected in the Design pane, its source open when no view opens (#2871)
+    if (top || view) await showModule(top || S.project.top, !view);
     if (view) await openView(view, top || S.project.top, d.files);
     return true;
   } catch (e) {
@@ -123,4 +125,21 @@ async function openView(view, module, files) {
   if (/\.pn\.json$/i.test(path)) { await app.openPetri(path); return app.findDoc(`pn:${path}`)?.petriEditor?.showPanel('sim'); }
   await app.openSch(path);
   await app.findDoc(`sch:${path}`)?.schEditor?.simulate();
+}
+
+// the link's module in the Design pane (#2871): its row selected, its parents expanded, scrolled to; opened as a
+// double-click does (its drawing, else its HDL) when `open`
+async function showModule(name, open) {
+  await new Promise(r => setTimeout(r, 0));   // (the tree drawn for the project just opened)
+  const row = [...document.querySelectorAll('#hier .row[data-module]')].find(r => r.dataset.module.toLowerCase() === String(name).toLowerCase());
+  if (!row) return;
+  for (let ul = row.closest('ul'); ul && ul.closest('#hier'); ul = ul.parentElement?.closest('ul')) {
+    if (!ul.hidden) continue;
+    ul.hidden = false;
+    const tw = ul.previousElementSibling?.querySelector('.twisty');
+    if (tw) tw.textContent = '▾';
+  }
+  row.click();
+  row.scrollIntoView({ block: 'nearest' });
+  if (open) row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 }
