@@ -9,6 +9,8 @@ answer here.
 
 - **Its name is its tab's**, and its path the tab's tip. Nothing inside the document repeats them: no title, no
   path, no "file.vhd" label (#2514, #2710).
+- **Its tab is the user's to place** (#2887): dragged in its row or to the other side's (a finger or a pen too),
+  Alt+Shift+← / → when focused, the tip's second line saying so; the order is kept with the open documents.
 - **Its toolbar is its first line** and its **status line its last** (#2763). No bar above the toolbar, below the
   tabs: no title bar, no notice bar, no second toolbar (#2710). The toolbar holds its tools, and the two notices of
   what the document is (the read-only notice, "Not in sync with …"); what it is now (its counts, its encoding, the

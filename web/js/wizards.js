@@ -965,7 +965,7 @@ export async function checkUpdatesDialog({ rel: known = null, served = undefined
 }
 
 export function shortcutsDialog() {
-  const rows = [['Ctrl/Cmd+K', 'Command palette: search commands and files'], ['Ctrl+Space', 'Auto-complete'], ['Ctrl/Cmd+/', 'Toggle comment'], ['Ctrl+F / Ctrl+H', 'Find / Replace'], ['Ctrl+G', 'Go to line'], ['F12 or Ctrl/Cmd+Click', 'Go to definition'], ['F2', 'Rename symbol'], ['Ctrl/Cmd+.', 'Quick fix of an error'], ['Ctrl+Q', 'Fold block'], ['Double-click process', 'Run process'], ['Double-click instance (schematic)', 'Push into instance']];
+  const rows = [['Ctrl/Cmd+K', 'Command palette: search commands and files'], ['Ctrl+Space', 'Auto-complete'], ['Ctrl/Cmd+/', 'Toggle comment'], ['Ctrl+F / Ctrl+H', 'Find / Replace'], ['Ctrl+G', 'Go to line'], ['F12 or Ctrl/Cmd+Click', 'Go to definition'], ['F2', 'Rename symbol'], ['Ctrl/Cmd+.', 'Quick fix of an error'], ['Ctrl+Q', 'Fold block'], ['Alt+Shift+← / →', 'Move the focused document tab left / right (or drag it)'], ['Double-click process', 'Run process'], ['Double-click instance (schematic)', 'Push into instance']];
   return dialog({
     title: 'Keyboard Shortcuts', width: 440,
     body: h('table', { class: 'grid' }, ...rows.map(([k, v]) => h('tr', {}, h('td', { style: { fontFamily: 'var(--mono)' } }, k), h('td', {}, v)))),

@@ -230,7 +230,7 @@ const PT = {
   'struct argument': 'argumento struct', 'hls::stream (read, write)': 'hls::stream (ler, escrever)', 'DATAFLOW (two processes, a stream)': 'DATAFLOW (dois processos, um stream)',
   'hls::task (data-driven)': 'hls::task (guiado pelos dados)',
   'Toggle comment': 'Comentar/descomentar', 'Find / Replace': 'Procurar / Substituir', 'Go to line': 'Ir para a linha', 'Go to definition': 'Ir para a definição',
-  'Fold block': 'Dobrar bloco', 'Run process': 'Executar processo', 'Push into instance': 'Entrar na instância',
+  'Fold block': 'Dobrar bloco', 'Move the focused document tab left / right (or drag it)': 'Mover o separador do documento com o foco para a esquerda / direita (ou arrastá-lo)', 'Run process': 'Executar processo', 'Push into instance': 'Entrar na instância',
   'Double-click process': 'Duplo clique num processo', 'Double-click instance (schematic)': 'Duplo clique numa instância (esquemático)',
   // SSim
   'Instances and Processes': 'Instâncias e Processos', 'Objects': 'Objetos', 'Object Name': 'Nome do Objeto', 'Value': 'Valor', 'Data Type': 'Tipo de Dados',
@@ -421,6 +421,7 @@ const PT_PATTERNS = [
   [/^Write (\S+) into the board's SPI flash\? The FPGA then loads it, and again at every power-up\.$/, 'Escrever $1 na flash SPI da placa? A FPGA depois carrega-o, e de novo sempre que é ligada.'],
   // Simulate's side panel: a test bench's row (#1378)
   [/^Simulate ([A-Za-z][A-Za-z0-9_]*)$/, 'Simular $1'],
+  [/^([^\n]*)\nDrag to move it, or Alt\+Shift\+← \/ →$/, (m, tip) => `${t(tip)}\nArraste para o mover, ou Alt+Shift+← / →`],   // (a document's tab's tooltip, its own translated, #2887)
   [/^Read-only, the C model of (.+)$/, 'Só de leitura, o modelo C de $1'],
   [/^Translated to (VHDL|Verilog) \(read-only\)$/, 'Traduzido para $1 (só de leitura)'],
   // the Development menu (#707)

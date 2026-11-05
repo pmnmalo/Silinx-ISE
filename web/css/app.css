@@ -70,6 +70,13 @@
   border-left: none; background: inherit; background-color: var(--bg); }
 #doc-tabs > .tab-group.drop { outline: 2px dashed var(--accent); outline-offset: -2px; }
 body.dragging-tab, body.dragging-tab * { cursor: grabbing !important; }
+/* a tab dragged (#2887): a slot of its width where it lands, the tab itself under the pointer (web/js/tab-order.js); a
+   finger drags the tab rather than scrolling the strip */
+#doc-tabs .tab { touch-action: none; }
+html #doc-tabs .tab.tab-drag-src { display: none; }
+html #doc-tabs .tab.tab-slot { background: transparent; box-shadow: none; border: none; outline: 2px dashed var(--accent); outline-offset: -3px; padding: 0; }
+html #doc-tabs .tab.tab-slot[hidden] { display: none; }
+#doc-tabs .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #split-btn[aria-pressed="true"] { color: var(--accent); }
 #toolbar > #split-btn { margin-left: auto; }
 #split-divider { position: absolute; top: 0; bottom: 0; left: calc(var(--split, 50%) - 3px); width: 6px; z-index: 3; cursor: col-resize; touch-action: none;

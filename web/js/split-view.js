@@ -7,11 +7,15 @@
 // the front there: a drawing's HDL file, read-only as always, follows the drawing as it is saved (refreshOpenEditor,
 // web/js/drawings.js; a C's HDL, web/js/c-source.js openCHdl); an HDL source's translation (#2711). A side whose last
 // document closes, or Close Split, leaves one. The sides are kept with the open documents (app.js saveViewState). A narrow workspace stacks them.
+// A tab dragged in its row or to the other side's, and its keyboard moves: web/js/tab-order.js (#2887).
 import { h } from './ui.js';
 import { S, activateDoc, saveViewState } from './app.js';
 import { relatedViews } from './related-views.js';
 import { DESIGN_ICON, taskOfDoc } from './tasks.js';
 import { prefKey } from './prefs.js';
+import { moveTab, mountTabOrder, orderTabs } from './tab-order.js';
+
+export { tabTip } from './tab-order.js';
 
 const RATIO_KEY = 'silinx.split.ratio';
 const NARROW = 720;   // (a workspace narrower than this: the sides one above the other)
@@ -84,13 +88,20 @@ function end() {
   layout();
 }
 
-/** Moves a document to side `s` (splitting), and brings it to the front there. */
+/** Moves a document to side `s` (splitting), at its row's end, and brings it to the front there. */
 export function moveToSide(doc, s) {
+  on = true;
+  moveTab(doc, s);
+}
+/** tab-order.js moveTab: `doc`, placed in S.docs already, on side `s` (splitting), in front there. */
+export function setSide(doc, s) {
   on = true;
   doc.side = s;
   target = s;
   activateDoc(doc);
 }
+/** A document's tab's row: its side's when split, else the one row. */
+export const tabParent = d => (on && groups ? groups[sideOf(d)] : $('doc-tabs'));
 
 /** Show … Beside (#2834): a view related to `doc` (web/js/related-views.js: { find, open }) on the other side (split),
  *  `doc` kept in front: made or opened there; open already, brought to the front there (made again where it is, a view
@@ -100,7 +111,7 @@ export async function showBeside(doc, view) {
   let g = view.find();
   on = true;
   // (in the Tasks interface, of the document's task: a waveform's HDL beside it in Simulate)
-  const place = () => { if (g !== doc) { g.side = s; g.task = taskOf(doc); } };
+  const place = () => { if (g !== doc) { if (sideOf(g) !== s) S.docs.push(...S.docs.splice(S.docs.indexOf(g), 1)); g.side = s; g.task = taskOf(doc); } };   // (at its new row's end)
   if (g) { place(); await g.refresh?.(); activateDoc(g); }
   else {
     target = s;
@@ -129,9 +140,12 @@ export function splitItems(doc = S.active) {
 export function splitKeys(key, open) {
   return on ? { b: S.docs.filter(d => sideOf(d) === 'b').map(key).filter(k => open.includes(k)) } : null;
 }
-/** The kept split back (`find`: a document by its key), before the one in front is brought there. (#1619 kept the two
- *  documents shown, [a, b]: b on the right side.) */
-export function restoreSplit(kept, find) {
+/** The kept split back (`find`: a document by its key), before the one in front is brought there, and the kept documents
+ *  in their order (`open`: their keys, #2887; the others keep their places). (#1619 kept the two documents shown, [a, b]: b
+ *  on the right side.) */
+export function restoreSplit(kept, find, open = []) {
+  const docs = open.map(find).filter(d => d && S.docs.includes(d)), slots = S.docs.map((d, i) => (docs.includes(d) ? i : -1)).filter(i => i >= 0);
+  slots.forEach((i, k) => { S.docs[i] = docs[k]; });
   const right = Array.isArray(kept) ? kept.slice(1) : Array.isArray(kept?.b) ? kept.b : null;
   on = !!right;
   for (const d of S.docs) d.side = 'a';
@@ -170,14 +184,9 @@ function layout() {
   center.style.setProperty('--split', `${(ratio * 100).toFixed(2)}%`);
   // each side's tabs (not split: one row, as they were opened)
   if (on && !groups) groups = { a: h('div', { class: 'tab-group', 'data-side': 'a' }), b: h('div', { class: 'tab-group', 'data-side': 'b' }) };
-  if (on) {
-    for (const s of ['a', 'b']) if (groups[s].parentNode !== bar) bar.append(groups[s]);
-    for (const d of S.docs) if (d.tab.parentNode !== groups[sideOf(d)]) groups[sideOf(d)].append(d.tab);
-  } else if (groups) {
-    for (const d of S.docs) if (d.tab.parentNode !== bar) bar.append(d.tab);
-    groups.a.remove(); groups.b.remove();
-    groups = null;
-  }
+  if (on) for (const s of ['a', 'b']) if (groups[s].parentNode !== bar) bar.append(groups[s]);
+  orderTabs(tabParent);   // (in S.docs's order, #2887)
+  if (!on && groups) { groups.a.remove(); groups.b.remove(); groups = null; }
   if (vertical) placeStacked(ws, bar);
   if (p && !divider) {
     divider = h('div', { id: 'split-divider', role: 'separator', title: 'Drag to resize the sides (double-click: halves)' });
@@ -229,8 +238,7 @@ function showEmpty(ws, side, beside) {
   if (empty.parentNode !== ws) ws.append(empty);
 }
 
-// a click in the other side's pane brings its document to the front; a tab dragged to the other side moves there; the
-// workspace's width decides the stacking
+// a click in the other side's pane brings its document to the front; the workspace's width decides the stacking
 function watch(ws) {
   if (watched) return;
   watched = true;
@@ -239,7 +247,6 @@ function watch(ws) {
     const d = p && [p.a, p.b].find(x => x?.el.contains(e.target));
     if (d && d !== S.active) activateDoc(d);
   }, true);
-  addEventListener('pointerdown', dragTab);
   let wasV = null;
   new ResizeObserver(() => { const v = ws.clientWidth < NARROW; if (sides() && (v !== wasV || v)) { wasV = v; layout(); } }).observe(ws);
   // (the header rebuilt: the Tasks interface on or off, View ▸ Interface)
@@ -248,36 +255,6 @@ function watch(ws) {
   new MutationObserver(replace).observe($('topbar'), { childList: true, subtree: true });
   // (the Tasks interface's task changed: its documents on each side)
   new MutationObserver(() => { if (on) layout(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-task'] });
-}
-
-// the side under a point: its tabs, its pane or its empty page
-function sideAt(x, y) {
-  const el = document.elementFromPoint(x, y)?.closest('.tab-group, #split-empty, #workspace > .doc');
-  if (!el) return null;
-  if (el.dataset.side) return el.dataset.side;
-  return el.classList.contains('pane-b') ? 'b' : el.classList.contains('pane-a') ? 'a' : null;
-}
-function dragTab(e) {
-  const tab = on && e.button === 0 && e.isPrimary && !e.target.closest('.tclose') && e.target.closest('.tab-group > .tab');
-  const doc = tab && S.docs.find(d => d.tab === tab);
-  if (!doc) return;
-  const x0 = e.clientX, y0 = e.clientY;
-  let moving = false;
-  const mark = s => { for (const g of Object.values(groups || {})) g.classList.toggle('drop', g.dataset.side === s && s !== sideOf(doc)); };
-  const mv = ev => {
-    if (ev.pointerId !== e.pointerId) return;
-    if (!moving && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) { moving = true; document.body.classList.add('dragging-tab'); }
-    if (moving) mark(sideAt(ev.clientX, ev.clientY));
-  };
-  const up = ev => {
-    if (ev.pointerId !== e.pointerId) return;
-    removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
-    document.body.classList.remove('dragging-tab');
-    mark(null);
-    const s = moving && ev.type === 'pointerup' && sideAt(ev.clientX, ev.clientY);
-    if (s && s !== sideOf(doc) && S.docs.includes(doc)) moveToSide(doc, s);
-  };
-  addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
 
 function setRatio(r) {
@@ -307,4 +284,4 @@ function drag(e) {
 }
 
 /** On the page from the start: the Split button. */
-export function mountSplit() { placeButton(); const ws = $('workspace'); if (ws) watch(ws); }
+export function mountSplit() { placeButton(); mountTabOrder(); const ws = $('workspace'); if (ws) watch(ws); }
