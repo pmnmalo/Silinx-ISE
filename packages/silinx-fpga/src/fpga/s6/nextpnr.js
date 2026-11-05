@@ -1,6 +1,6 @@
 // Silinx toolchain - the Spartan-6 through nextpnr (#2138): a design of whole sites (fpga/s6/pack.js, phys.js, xdl.js)
 // as the netlist the fork's spartan6 micro-architecture places and routes, and its results read back: the sites its cells
-// took (the placement placedXdlS6 takes) and the PIPs of its nets (the routed design routedXdlS6 writes).
+// took (the placement placedXdlS6 takes) and the PIPs of its nets (the routed design route-output.js writes).
 //
 //   siteNetlist(design, { top, fixed, chains, generalOk, arcs }) -> the JSON netlist of a placed or unplaced XDL design
 //   placementOf(json, phys, device) -> { site, tile, pos } by phys.insts
@@ -105,7 +105,7 @@ export function placementOf(json, phys, device) {
   return { site, tile, pos };
 }
 
-/** The routed design (for writeXdl) from nextpnr's routing of a placed XDL design: routedXdlS6's, on nextpnr's PIPs. */
+/** The routed design (for writeXdl) from nextpnr's routing of a placed XDL design (route-output.js's, on nextpnr's PIPs). */
 export function routedDesignS6(json, placed, device) {
   const mod = moduleOf(json);
   const res = routingResources(device);

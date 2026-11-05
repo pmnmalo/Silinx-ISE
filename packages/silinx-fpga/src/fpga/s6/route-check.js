@@ -10,7 +10,7 @@ import { checkRouting } from '../route-check.js';
 import { PIP_ROUTETHRU } from '../device.js';
 import { routingResources, routeThruSite } from './route-nets.js';
 
-/** The rules above on a routed design (parseXdl's structure, routedXdlS6's). */
+/** The rules above on a routed design (parseXdl's structure, routedDesignS6's). */
 export function checkRoutingS6(routed, device) {
   const res = routingResources(device);
   const problems = [...checkRouting(routed, device).problems];

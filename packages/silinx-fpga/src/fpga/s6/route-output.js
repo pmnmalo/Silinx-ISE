@@ -1,13 +1,11 @@
-// Silinx - the Spartan-6 router's routed design (#730, fpga/s6/route.js routedXdlS6): each net's PIPs, a
-// power net split into one net per TIEOFF it is routed from (GLOBAL_LOGIC1_0 …), the TIEOFFs and the sites of the
+// Silinx - the Spartan-6's routed design (#730; of nextpnr's routing since #2824, fpga/s6/nextpnr.js routedDesignS6):
+// each net's PIPs, a power net split into one net per TIEOFF it is routed from (GLOBAL_LOGIC1_0 …), the TIEOFFs and the sites of the
 // route-throughs declared as XDL_DUMMY instances (xdl -xdl2ncd rejects an outpin of an undeclared one), as ISE
-// writes them; a route-through out of a net's own source site as that instance's _ROUTETHROUGH setting; the LUT inputs
-// the router swapped on their new pins, the equations rewritten for them (route-swap.js, #1152).
+// writes them; a route-through out of a net's own source site as that instance's _ROUTETHROUGH setting.
 import { PIP_ROUTETHRU } from '../device.js';
 import { routeThruSite } from './route-nets.js';
-import { applyLutSwapsS6 } from './route-swap.js';
 
-/** The routed design of routedXdlS6. */
+/** The routed design of a routing (r: { work, trees, E, fromOf }, routedDesignS6's). */
 export function mountRoutedS6(ctx) {
   const { design, device, r, res } = ctx;
   const { E, fromOf } = r;
@@ -34,8 +32,6 @@ export function mountRoutedS6(ctx) {
     if (own) { const l = extraCfg.get(own.name) || []; if (!l.some(x => x.name === item.name)) l.push(item); extraCfg.set(own.name, l); } else dummy(site, rt.type, [item]);
   };
 
-  const { insts: swapped, pinOf } = applyLutSwapsS6(design.insts, r.lutGroups);
-  const repin = pins => pins.map(p => (pinOf.has(p) ? { ...p, pin: pinOf.get(p) } : p));
   const nets = [];
   const byNet = new Map(r.work.map((w, i) => [w.net, i]));
   for (const net of design.nets) {
@@ -45,7 +41,7 @@ export function mountRoutedS6(ctx) {
     if (!w.power) {
       const pips = [];
       for (const e of tree.values()) if (e >= 0) { pips.push(pipOf(e)); routeThru(e); }
-      nets.push({ ...net, inpins: repin(net.inpins), pips });
+      nets.push({ ...net, pips });
       continue;
     }
     // a power net: one net a TIEOFF (the root of each part of its tree)
@@ -72,6 +68,6 @@ export function mountRoutedS6(ctx) {
     const left = w.sinks.filter(s => !tree.has(s.node)).map(s => s.pin);
     if (left.length) nets.push({ ...net, inpins: left, pips: [] });
   }
-  const insts = swapped.map(i => (extraCfg.has(i.name) ? { ...i, cfg: [...(i.cfg || []), ...extraCfg.get(i.name)], cfgRaw: undefined } : i));
+  const insts = design.insts.map(i => (extraCfg.has(i.name) ? { ...i, cfg: [...(i.cfg || []), ...extraCfg.get(i.name)], cfgRaw: undefined } : i));
   return { ...design, insts: [...insts, ...dummies.values()], nets };
 }
