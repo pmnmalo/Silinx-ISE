@@ -31,7 +31,7 @@ const ALLOW = [
   ['test/lang-vhdl-types.test.js', '6.4.2.3', 'a section of the VHDL standard'],
   [/^(core\/(elab-expr|elaborate)\.js|test\/vhdl-unconstrained-const\.test\.js)$/, '9.3.3.3', 'a section of the VHDL standard (#2559)'],
   ['core/vhdl/actual.js', '4.3.2.2', 'a section of the VHDL standard, which the file named before #2579 (in the history only)'],
-  [/^test\/(design|mcp)-link\.test\.js$/, /^(https:\/\/u:p@example\.org\/a\.zip|10\.0\.0\.5|192\.168\.1\.1|172\.(20|32)\.0\.1|169\.254\.169\.254|fd00::1|mac-mini\.local|100\.101\.102\.103|8\.8\.8\.8|192\.169\.0\.1|2606:4700::1111)$/,
+  [/^test\/(ui\/)?(design|mcp)-link\.test\.js$/, /^(https:\/\/u:p@example\.org\/a\.zip|10\.0\.0\.5|192\.168\.1\.1|172\.(20|32)\.0\.1|169\.254\.169\.254|fd00::1|mac-mini\.local|100\.101\.102\.103|8\.8\.8\.8|192\.169\.0\.1|2606:4700::1111)$/,
     'a link\'s zip address refused or taken (#2829): made-up local and public addresses, a made-up login'],
   ['test/server-api.test.js', /^(fpga-lab\.local|box\.lan)$/, 'made-up computer names: the Host header test, the ssh settings'],
   ['test/impl.test.js', /^(dev@)?10\.0\.0\.2$/, 'a made-up address of an example (in the history only)'],

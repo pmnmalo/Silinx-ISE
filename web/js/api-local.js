@@ -272,6 +272,8 @@ export const api = {
   projects: () => ops.list(),
   templates: async () => orderExamples(Object.keys(EXAMPLES)),
   testDesigns: async () => orderTestDesigns(Object.keys(TEST_DESIGNS)),
+  // an example's description and files ({ project, files: { path: text } }, #2826)
+  exampleFiles: async name => (Object.hasOwn(EXAMPLES, name) ? { project: structuredClone(EXAMPLES[name].json), files: { ...EXAMPLES[name].files } } : fail(`unknown example '${name}'`)),
   createProject: p => ops.create(p),
   project: name => ops.project(name),
   saveProject: (name, pj) => ops.saveProject(name, pj),

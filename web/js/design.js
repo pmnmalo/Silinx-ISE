@@ -312,6 +312,8 @@ function moduleContextMenu(e, mod, file) {
       { label: 'Convert to State Diagram (FSM)…', action: () => convertToFsm(mod) },
     ]),
     isSimView ? { label: 'Simulate Behavioral Model', action: () => runSimulation(mod) } : null,
+    // (a schematic's module: its Try it, #2826)
+    { label: 'Copy Link to This Module…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog({ module: mod, view: /\.sch\.json$/i.test(S.hdlToSch?.[file] || file) ? 'try' : null })) },
     '-',
     { label: 'New Source…', action: () => wiz.newSourceWizard() },
     { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog() },
@@ -385,6 +387,7 @@ function projectContextMenu(e) {
     { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog() },
     '-',
     { label: 'Design Properties…', action: () => wiz.projectProperties() },
+    { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()) },   // (#2826)
     '-',
     { label: 'Close Project', action: () => closeProject() },   // (#1300)
   ], e.clientX, e.clientY);

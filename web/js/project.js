@@ -208,7 +208,8 @@ export async function renderStartPage() {
       h('button', { class: 'btn', type: 'button', onclick: () => wiz.openProjectDialog() }, 'Open Project…')),   // (Close Project: under the Design tree, #1309)
     // the Silinx and the Xilinx imports and exports, as the File menu has them, a line between (#1216)
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
-      ...[['Import Silinx ISE Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx ISE Project (.zip)…', 'save', exportZip('silinx'), true]].map(command),
+      ...[['Import Silinx ISE Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx ISE Project (.zip)…', 'save', exportZip('silinx'), true],
+        ['Copy Link to Project…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]].map(command),   // (#2826)
       h('hr', { class: 'start-sep' }),
       ...[['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command)),
     // (where the projects are kept above the recent ones, #2029)

@@ -1,0 +1,68 @@
+// Copy Link… (#2826): the link that opens the project in Silinx (for lecture slides), the whole project inside it
+// (core/design-link.js encodeDesign), and what it opens: the project only, Try it (a schematic's), the simulation (the
+// test bench), the board emulator; the module. The link is shown as it is made, its length with it; one too large
+// for a link (a zip hosted elsewhere then) or a view the design does not have is said in the dialog, and the copy in
+// the console. Anyone with the link has the whole project, its comments too: the dialog says so (#2829).
+import { api } from './api.js';
+import { h, dialog } from './ui.js';
+import { S, app } from './app.js';
+import { writeClip } from './clipboard.js';
+import { LINK_LIMITS, encodeDesign, makeLink, viewProblem } from '/core/design-link.js';
+import { browserCodec, textOf } from '/core/zip.js';
+import { gateZip } from '/core/import-gate.js';
+
+const VIEWS = [['', 'Open the project only'], ['try', 'Try it'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
+/** The address of this app, the base of its links (its hash, a token or a link, left out). */
+export const linkBase = () => location.origin + location.pathname;
+
+/** The Copy Link… dialog of the open project: module and view chosen first (a module's context menu). Resolves to
+ *  the link copied, or null. */
+export async function copyLinkDialog({ module = null, view = null } = {}) {
+  if (!S.project) return null;
+  const name = S.project.name;
+  let entries;
+  try { entries = (await gateZip(new Uint8Array(await (await api.exportZip(name, 'silinx')).blob.arrayBuffer()), browserCodec())).files; } catch (e) { app.log(`ERROR: Copy Link: ${e.message}`, 'err'); return null; }
+  const files = Object.fromEntries(entries.filter(e => e.path !== 'silinx.json').map(e => [e.path, textOf(e)]));
+  let design = null, encodeError = null;
+  try { design = (await encodeDesign(entries)).design; } catch (e) { encodeError = e.message; }
+  const mods = [...new Set([S.project.top, ...(S.modules || []).map(m => m.name)].filter(Boolean))];
+  const viewSel = h('select', { 'data-field': 'view' }, ...VIEWS.map(([v, l]) => h('option', { value: v, selected: v === (view || '') }, l)));
+  const modSel = h('select', { 'data-field': 'module' }, ...mods.map(m => h('option', { value: m, selected: m === (module || S.project.top) }, m === S.project.top ? `${m} (top)` : m)));
+  const out = h('textarea', { class: 'link-out', readonly: true, rows: 4, spellcheck: false, style: { width: '100%', fontFamily: 'var(--mono, monospace)', fontSize: '11px' } });
+  const info = h('div', { class: 'hint link-info' });
+  const err = h('div', { class: 'wiz-error link-error' });
+  let link = null;
+  const update = () => {
+    link = null;
+    out.value = ''; info.textContent = ''; err.textContent = '';
+    if (encodeError) { err.textContent = encodeError; return; }
+    // (the module: in the link when it is not the project's top)
+    const top = modSel.value && modSel.value !== S.project.top ? modSel.value : null;
+    const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
+    if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
+    link = makeLink(linkBase(), { design, view: viewSel.value || null, top });
+    out.value = link;
+    info.textContent = link.length > LINK_LIMITS.slides
+      ? `${link.length} characters: some slide tools cut a link longer than ${LINK_LIMITS.slides} (export the project as a .zip, host it, and link to it with #open=).`
+      : `${link.length} characters.`;
+  };
+  viewSel.addEventListener('change', update);
+  modSel.addEventListener('change', update);
+  update();
+  const r = await dialog({
+    title: 'Copy Link', width: 560,
+    body: h('div', {},
+      h('div', { class: 'hint' }, `A link that opens '${name}' in Silinx, for slides or a message: the whole project is inside the link (no file to host). Anyone with the link has every file of the project, its comments too.`),
+      h('div', { class: 'form-grid', style: { marginTop: '10px' } },
+        h('label', {}, 'Open in:'), viewSel,
+        h('label', {}, 'Module:'), modSel,
+        h('label', {}, 'Board:'), h('span', { class: 'link-board' }, S.project.board || 'none')),
+      out, info, err),
+    buttons: [{ label: 'Copy Link', primary: true, value: true, validate: () => !!link }, { label: 'Cancel', value: null }],
+  });
+  if (!r || !link) return null;
+  writeClip('text', link);
+  app.log(`Copy Link: the link of '${name}'${viewSel.value ? ` (${VIEWS.find(([v]) => v === viewSel.value)[1]}, ${modSel.value})` : ''} copied, ${link.length} characters.`, 'ok');
+  if (link.length > LINK_LIMITS.slides) app.log(`WARNING: Copy Link: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides}.`, 'warn');
+  return link;
+}
