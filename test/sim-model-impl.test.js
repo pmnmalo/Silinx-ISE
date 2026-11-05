@@ -14,6 +14,7 @@ import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { synthesizeOpen } from '../core/synth-front.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { nextpnrNode } from '../packages/silinx-fpga/src/nextpnr-node.js';
 import { postTranslateModels, postMapModels, SIMPRIM_PRIMITIVES } from '../core/sim-model.js';
 import { runOpenFlow } from '../core/flow-ide.js';
 import { orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
@@ -121,7 +122,7 @@ for (const name of ['adder', 'bram_dp', 'bram_prim', 'bram_sp', 'dram', 'fsm', '
 test('the flow\'s posttrans and postmap steps: the models synthesized with the test bench\'s generics, and the board\'s of this run\'s netlist (#622), written, in the report, the exact log', { timeout: 300000 }, async () => {
   const written = {}, lines = [];
   const r = await runOpenFlow({ top: 'cnt', part: 'xc3s250ecp132-4', family: 'spartan3e', steps: orderOpenSteps(['postmap', 'posttrans']), simTop: 'tb' },
-    { log: l => lines.push(l), sources: () => src, simSources: () => tb, yosys: yosysNode, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {}, device });
+    { log: l => lines.push(l), sources: () => src, simSources: () => tb, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {}, device });
   assert.equal(r.ok, true, lines.join('\n'));
   assert.deepEqual(lines.filter(l => /^=== SILINX STEP/.test(l)), ['synth', 'translate', 'posttrans', 'map', 'postmap'].map(x => `=== SILINX STEP ${x} ===`));
   assert.deepEqual(Object.keys(written).filter(f => /^netgen/.test(f)).sort(), ['netgen/map/cnt_map.v', 'netgen/map/cnt_map.vhd', 'netgen/map/cnt_map_board.v', 'netgen/map/cnt_map_board.vhd',
@@ -152,7 +153,7 @@ test('the flow\'s posttrans and postmap steps: the models synthesized with the t
   // without a test bench: the design's own generics, from this run's netlist and packed design (no synthesis again)
   const lines3 = [];
   const r3 = await runOpenFlow({ top: 'cnt', part: 'xc3s250ecp132-4', family: 'spartan3e', steps: orderOpenSteps(['postmap', 'posttrans']) },
-    { log: l => lines3.push(l), sources: () => src, yosys: yosysNode, write: n => `build/${n}`, read: () => null, save: () => {}, device });
+    { log: l => lines3.push(l), sources: () => src, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: n => `build/${n}`, read: () => null, save: () => {}, device });
   assert.equal(r3.ok, true, lines3.join('\n'));
   assert.deepEqual(r3.report.simModels.postmap, { path: 'build/netgen/map/cnt_map.vhd', verilog: 'build/netgen/map/cnt_map.v' });
   assert.deepEqual(lines3.filter(l => /^(WARNING|INFO|ERROR|Synthesizing)/.test(l)), []);

@@ -13,6 +13,7 @@ import { resourcesOf } from '../packages/silinx-fpga/src/resources.js';
 import { findPart } from '../server/devices.js';
 import { runOpenFlow } from '../core/flow-ide.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { nextpnrNode } from '../packages/silinx-fpga/src/nextpnr-node.js';
 import { shippedDevicePath, loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const S100 = resourcesOf(findPart('xc3s100e'), 'cp132');
@@ -90,7 +91,7 @@ let s100Device = null;
 async function flow(text, spec) {
   const lines = [], reports = [];
   const io = {
-    log: l => lines.push(l), sources: () => [{ path: 'top.v', lang: 'verilog', text }], ucf: null, yosys: yosysNode,
+    log: l => lines.push(l), sources: () => [{ path: 'top.v', lang: 'verilog', text }], ucf: null, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() },
     device: () => (s100Device ||= loadDeviceCache(S100_SPEC.graph)),
     write: name => `build/${name}`, read: () => null, save: r => reports.push(structuredClone(r)),
   };
@@ -126,7 +127,7 @@ test('#795 the synthesis: every resource used of the part\'s; a design over the 
   }
 });
 
-test('#795 MAP: every resource used of the device\'s sites (block RAMs, multipliers, DCMs too); at the XC3S100E\'s counts, no warnings', { timeout: 300000 }, async () => {
+test('#795 the Design Summary\'s map section: every resource used of the device\'s sites (block RAMs, multipliers, DCMs too), by nextpnr at Place & Route (#2137); at the XC3S100E\'s counts, no warnings', { timeout: 300000 }, async () => {
   const text = `module top(input clk, input [17:0] a, input [17:0] b, input [1:0] c, output [9:0] q);
 genvar i;
 generate for (i = 0; i < 4; i = i + 1) begin : g
@@ -140,10 +141,10 @@ ${DCM.replace('.LOCKED(q[i])', '.LOCKED(q[8 + i])')}
 end endgenerate
 endmodule
 `;
-  const r = await flow(text, { ...S100_SPEC, steps: ['synth', 'translate', 'map'], resources: S100 });
+  const r = await flow(text, { ...S100_SPEC, steps: ['synth', 'translate', 'map', 'par'], resources: S100 });
   assert.ok(r.ok, r.lines.join('\n'));
   assert.deepEqual(r.warnings, []);
-  assert.deepEqual(r.lines.slice(r.lines.indexOf('Design summary (pack):') + 1).filter(l => /^ {2}Number/.test(l)), [
+  assert.deepEqual(r.lines.slice(r.lines.indexOf('Design summary (nextpnr):') + 1).filter(l => /^ {2}Number/.test(l)), [
     '  Number of Slice Flip Flops: 0 out of 1920 0%', `  Number of 4 input LUTs: ${r.report.map.summary.luts.used} out of 1920 ${r.report.map.summary.luts.percent}%`,
     `  Number of occupied Slices: ${r.report.map.summary.slices.used} out of 960 ${r.report.map.summary.slices.percent}%`, '  Number of bonded IOBs: 49 out of 83 59%',
     '  Number of RAMB16s: 4 out of 4 100%', '  Number of MULT18X18SIOs: 4 out of 4 100%', '  Number of BUFGMUXs: 3 out of 24 13%', '  Number of DCMs: 2 out of 2 100%']);
@@ -154,7 +155,7 @@ endmodule
     ['Number of RAMB16s', 4, 4], ['Number of MULT18X18SIOs', 4, 4], ['Number of GCLKs', 3, 24], ['Number of DCMs', 2, 2], ['Number of IOs', 49, 83]]);
 });
 
-test('#795 MAP: a netlist over the device\'s block RAMs and multipliers (a synthesis without the part\'s counts) fails at MAP, not at Place, both named; the summary\'s rows over 100 %', { timeout: 300000 }, async () => {
+test('#795 MAP: a netlist over the device\'s block RAMs and multipliers (a synthesis without the part\'s counts) fails at MAP, not at Place, both named; the summary\'s rows over 100 % (nextpnr\'s Map, #2137)', { timeout: 300000 }, async () => {
   const text = `module top(input clk, input [17:0] a, input [17:0] b, output [9:0] q);
 genvar i;
 generate for (i = 0; i < 5; i = i + 1) begin : g

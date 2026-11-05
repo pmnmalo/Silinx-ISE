@@ -142,7 +142,7 @@ export async function silinxEstimate(example, target) {
   const zlib = await import('node:zlib');
   const { exampleProject } = await import('../test/examples-lib.mjs');
   const { runOpenFlow } = await import('../core/flow-ide.js');
-  const { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, yosysNode, shippedDevicePath, estimatePower, parseXdl, parseUcf } = await import('../packages/silinx-fpga/src/node.js');
+  const { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, yosysNode, nextpnrNode, shippedDevicePath, estimatePower, parseXdl, parseUcf } = await import('../packages/silinx-fpga/src/node.js');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-estimate-'));
   try {
     const { dir, project } = exampleProject(example, target, tmp);
@@ -158,7 +158,7 @@ export async function silinxEstimate(example, target) {
     let report = null;
     const r = await runOpenFlow(spec, {
       log: l => log.push(l), sources: () => design.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(dir, s.path), 'utf8') })),
-      ucf, ucfName: path.basename(project.constraints), device: () => device, bitDb: () => db, yosys: yosysNode,
+      ucf, ucfName: path.basename(project.constraints), device: () => device, bitDb: () => db, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() },
       write: (n, data) => { store[n] = data; return `build/${n}`; }, read: n => (typeof store[n] === 'string' ? store[n] : null), save: x => { report = x; },
     });
     if (!r.ok) throw new Error(`${example} on the ${target.board}-${target.variant}: ${r.error}`);
