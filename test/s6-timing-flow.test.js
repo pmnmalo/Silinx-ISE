@@ -9,9 +9,8 @@ import { analyzeTimingS6, arcsS6, wireDelay, clockArrivalsS6, S6_CLOCK_PIN, CLAS
 import { S6_SPEED_3 } from '../packages/silinx-fpga/src/fpga/s6/timing-model.js';
 import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
 import { placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';
-import { routeS6, routedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/route.js';
 import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
-import { s6Device, s6Phys, s6Verilog } from './s6-lib.mjs';
+import { s6Device, s6Phys, s6Verilog, s6RouteNextpnr, NEXYS3_SW, NEXYS3_LD } from './s6-lib.mjs';
 
 const inst = (name, type, cfg = {}, site = 'SLICE_X2Y2') => ({ name, type, site, tile: 'CLEXL_X1Y2', placed: true, cfg: Object.entries(cfg).map(([attr, value]) => ({ attr, name: '', value })) });
 
@@ -56,9 +55,12 @@ test('s6/timing: the wire model\'s delay, the arcs of an IOB and a slice by its 
 
 test('s6/timing: a design routed by the open flow timed: its clock\'s period and critical path, its pads\' paths', async () => {
   const part = 'xc6slx16csg324-3', { device, sites } = s6Device(part);
-  const d = s6Phys(await s6Verilog('module m(input clk, input [7:0] a, output reg [7:0] q); reg [7:0] r; always @(posedge clk) begin r <= a; q <= q + r; end endmodule'));
+  // (placed by the Spartan-6's placer and routed by nextpnr, #2824: the pads on the Nexys3's switches and LEDs, whose I/O
+  // paths nextpnr has)
+  const ucf = [['clk', 'V10'], ...NEXYS3_SW.map((l, i) => [`a<${i}>`, l]), ...NEXYS3_LD.map((l, i) => [`q<${i}>`, l])].map(([n, l]) => `NET "${n}" LOC = "${l}";`).join('\n');
+  const d = s6Phys(await s6Verilog('module m(input clk, input [7:0] a, output reg [7:0] q); reg [7:0] r; always @(posedge clk) begin r <= a; q <= q + r; end endmodule'), ucf);
   const x = placedXdlS6(d.nl, d.packed, d.phys, placeS6(d.phys, sites, { nl: d.nl, seed: 1 }), { part, device });
-  const design = parseXdl(writeXdl(routedXdlS6(x, device, routeS6(x, device))));
+  const design = parseXdl(writeXdl(await s6RouteNextpnr(x, part)));
   const r = analyzeTimingS6(design, device);
   // one clock: a period of a few ns (an 8-bit adder), its path from a clock-to-out through nets and logic to a setup
   assert.equal(r.clocks.length, 1);

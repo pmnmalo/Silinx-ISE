@@ -10,9 +10,8 @@ import { nnls } from '../packages/silinx-fpga/research/s3e-route/timing-fit.mjs'
 import { arcKey, arcTable, modelPath } from '../packages/silinx-fpga/research/s6/timing6.mjs';
 import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
 import { placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';
-import { routeS6, routedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/route.js';
 import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
-import { s6Device, s6Phys, s6Verilog } from './s6-lib.mjs';
+import { s6Device, s6Phys, s6Verilog, s6RouteNextpnr } from './s6-lib.mjs';
 
 // a report in trce's layout, its numbers made up
 const TWR = `Timing constraint: TS_clk = PERIOD TIMEGRP "clk" 10 ns HIGH 50%;
@@ -108,9 +107,11 @@ test('timing6: an arc\'s key (a setup through its LUT by the flip-flop\'s input 
 
 test('timing-fit6: every connection of reportgen\'s report on a routed design, the clock left out', async () => {
   const part = 'xc6slx16csg324-3', { device, sites } = s6Device(part);
-  const d = s6Phys(await s6Verilog('module m(input clk, input a, input b, output reg y); always @(posedge clk) y <= a ^ b; endmodule'));
+  // (placed by the Spartan-6's placer and routed by nextpnr, #2824: the pads on the Nexys3's, whose I/O paths nextpnr has)
+  const d = s6Phys(await s6Verilog('module m(input clk, input a, input b, output reg y); always @(posedge clk) y <= a ^ b; endmodule'),
+    'NET "clk" LOC = "V10";\nNET "a" LOC = "T10";\nNET "b" LOC = "T9";\nNET "y" LOC = "U16";\n');
   const x = placedXdlS6(d.nl, d.packed, d.phys, placeS6(d.phys, sites, { nl: d.nl, seed: 1 }), { part, device });
-  const xdl = parseXdl(writeXdl(routedXdlS6(x, device, routeS6(x, device))));
+  const xdl = parseXdl(writeXdl(await s6RouteNextpnr(x, part)));
   // reportgen's layout: the net, its driver, each load's delay and name; a clock net and an unknown load too
   const nets = xdl.nets.filter(n => n.outpins.length && n.inpins.length && n.pips?.length);
   const data = nets.find(n => !n.inpins.some(p => /CLK/.test(p.pin))), clock = nets.find(n => n.inpins.some(p => /CLK/.test(p.pin)) && n !== data);
