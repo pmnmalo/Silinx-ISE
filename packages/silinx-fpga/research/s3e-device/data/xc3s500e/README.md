@@ -9,7 +9,7 @@ database (no device report: the grid and the sites measured too, #2502); `test/s
 |---|---|
 | `obs.json.gz` | The observation of ISE's routed designs (`prototype.mjs observe`, `INTERSECT=1`): the 38 observation designs and `iobddr-b`, the 12 sparser clock designs, the 4 random designs, the 42 open-flow designs ISE implemented (part 8): PIPs, sites, pin wires, joins seen, the joins rules decided (`decided`, hypotheses), the ambiguous ones |
 | `others.json.gz` | Silinx's routes of the 7 examples on the shipped graph, which ISE's DRC passed (their XB / YB pins only) |
-| `probes.json.gz` | The arc probe's answers (`xdl -xdl2ncd`): `yes` / `no` per PIP and tile, by probe (the I/O tiles of the joins left; every non-CLB tile's PIPs, the I/O names and the block RAMs' clock PIPs) |
+| `probes.json.gz` | The arc probe's answers (`xdl -xdl2ncd`): `yes` / `no` per PIP and tile, by probe (the I/O tiles of the joins left; every non-CLB tile's PIPs, the I/O names and the block RAMs' clock PIPs); the tile types' PIPs only the bit database showed, `typeprobe`, #2502 |
 | `verdicts.json.gz` | The verdicts of every round of join and clock tests (ISE's DRC), by round, in the order they were taken: `[a, b, 'join' \| 'no-join' \| …]` (`invalid`: a test whose path crossed the other end's node, see part 7) |
 | `switch-tiles.txt` | The tiles that hold a switch box (the tile probe), for the rules in switch-box coordinates |
 | `measured.json.gz` | The measured description, Silinx's packed format (`core/fpga/device.js` `loadDevice`) |

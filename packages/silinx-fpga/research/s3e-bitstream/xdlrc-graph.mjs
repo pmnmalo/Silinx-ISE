@@ -10,6 +10,8 @@
 //   g.pips[t] = [[from, to, bidir, routeThrough], …] (wire names of tile t)
 import fs from 'node:fs';
 import v8 from 'node:v8';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
 
 const W = 1 << 16;   // wire name ids per tile in a wire key (key = tile * W + name id)
@@ -120,6 +122,16 @@ export function graphFromDevice(d) {
       return Array.from(d.nodeWireIds(d.nodeOf[d.tileWireBase[t] + l]), w => { const x = d.wireInfo(w); return [tileByName.get(x.tile), x.name]; });
     },
   };
+}
+
+/** The file of a graph argument: `measured`, the measured description of the part's die (research/s3e-device, #2502);
+ *  anything else as given (a part, a .json.gz description, a device report). */
+export function graphFile(arg, part) {
+  if (arg !== 'measured') return arg;
+  const die = /^(xc3s\d+e)/.exec(String(part).toLowerCase())?.[1];
+  const f = die && path.join(path.dirname(fileURLToPath(import.meta.url)), '../s3e-device/data', die, 'measured.json.gz');
+  if (!f || !fs.existsSync(f)) throw new Error(`no measured description of ${part} (research/s3e-device/data)`);
+  return f;
 }
 
 /** The device graph: of a device report (parsed once, then cached as dev-full.cache next to it), or

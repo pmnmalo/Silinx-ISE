@@ -12,12 +12,12 @@
 # The routing switches measured are the ones the database holds (want-pips.mjs: the candidates of
 # every batch), in this order: the switches of designs implemented by ISE, removed by codewords
 # (gen-pipdrop.mjs), the global clock tree (gen-clock.mjs), test designs routed through the switches
-# (gen-pipcover.mjs --want, rounds with the slice pins, carry, clock, constant, block-RAM pins, long
-# lines, dead ends), and the rest as dead-end branches of those designs' nets (gen-branch.mjs). Each
-# step is skipped when its results are there (a run can be resumed). With W lost but the remote work
-# folders (RW, RW-impl) still on the ISE machine: run on a new W; the same designs are written again
-# and fuzz-remote.sh / impl-remote.sh reuse the remote results of the same inputs only. About 6-8
-# hours of ISE.
+# (gen-pipcover.mjs --want on the die's measured description, GRAPH to name another graph (#2502); rounds with
+# the slice pins, carry, clock, constant, block-RAM pins, long lines, dead ends), and the rest as dead-end
+# branches of those designs' nets (gen-branch.mjs). Each step is skipped when its results are there (a run can be
+# resumed). With W lost but the remote work folders (RW, RW-impl) still on the ISE machine: run on a new W; the
+# same designs are written again and fuzz-remote.sh / impl-remote.sh reuse the remote results of the same inputs
+# only. About 6-8 hours of ISE.
 set -e
 cd "$(dirname "$0")"
 export W=${1:-${TMPDIR:-/tmp}/silinx-bitdb}; W=${W%/}
@@ -81,7 +81,7 @@ while [ "$idle" -lt ${#OPTS[@]} ] && [ "$r" -lt "${ROUNDS:-80}" ]; do
   if [ ! -f "$W/pips/$name/key.json" ]; then
     left=$(want | tail -1); [ "$left" = 0 ] && break
     # (an option that reaches none of the switches left gives a design without nets)
-    node gen-pipcover.mjs "$PART" "$W/pips/$name" --want "$W/want.json" --k 8 --seed $((r + 1)) ${OPTS[$((r % ${#OPTS[@]}))]} | tee "$W/pips/$name.txt"
+    node gen-pipcover.mjs "${GRAPH:-measured}" "$W/pips/$name" --want "$W/want.json" --k 8 --seed $((r + 1)) ${OPTS[$((r % ${#OPTS[@]}))]} | tee "$W/pips/$name.txt"
     if grep -q '^0 nets' "$W/pips/$name.txt"; then rm -rf "$W/pips/$name"; idle=$((idle + 1)); r=$((r + 1)); continue; fi
   fi
   before=$(want | tail -1)
