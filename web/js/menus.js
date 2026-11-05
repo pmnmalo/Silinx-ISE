@@ -21,7 +21,7 @@ import { checkSyntax, runProcess, saveAll, topConfirmed } from './processes.js';
 import { addFromFolderDialog, setTop, unsetTop } from './design.js';
 import { openEmulator, openSchematic, runSimulation } from './viewers.js';
 import { printActive, printable } from './print-doc.js';
-import { generatedOpener, showGeneratedBeside, splitState, toggleSplit } from './split-view.js';
+import { besideItems, splitState, toggleSplit } from './split-view.js';
 // (Print: the document in front, whichever it is, #1509)
 export { printActive, printable };
 
@@ -112,7 +112,8 @@ export function setupMenus() {
       '-',
       // (two documents side by side, each side with its tabs, #1619, #1652)
       { label: 'Split Editor', checked: splitState().on, action: () => toggleSplit() },
-      { label: 'Show Generated HDL Beside', action: () => showGeneratedBeside(), disabled: () => !generatedOpener(S.active) },
+      // (the document in front's related views, as its tab's menu, #2834)
+      ...besideItems(S.active),
       '-',
       languageMenu(), interfaceMenu(), themeMenu(),
       '-',
