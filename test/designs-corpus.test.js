@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateManifest, compareExpectations, updatedExpectations, normalizeWarning, countWarnings, parseTime, ioWrapper, paramWrapper, boardClockUcf, isGood, kindOf, FLOW_PARTS, chipOf, deviceOf, flaggedSynth,
   qualityOf, describeQuality, compareQuality, timesOf, compareTimes, slowestTable, machineClass, resultsTable, withResultsTable, readmeResultsTable, TABLE_BEGIN, TABLE_END, PADS_SHORT,
-  timesTable, withTimesTable, readmeTimesTable, TIMES_BEGIN, TIMES_END } from './designs-corpus/lib.mjs';
+  timesTable, withTimesTable, readmeTimesTable, TIMES_BEGIN, TIMES_END, nextpnrPlaceRoute } from './designs-corpus/lib.mjs';
 import { remoteFiles, mainCheckout, corpusPaths, CACHE } from '../scripts/fetch-design-corpus.mjs';
 import { compile, elaborate } from '../core/compile.js';
 import { Simulator } from '../core/simulator.js';
@@ -507,4 +507,23 @@ test('boardClockUcf / periodNs: the PERIOD of the clock, 20 ns unless the design
   }
   // the corpus's own: iwls05-spi clear of the 20 ns edge
   assert.equal(MANIFEST.designs.find(d => d.name === 'iwls05-spi').periodNs, 25);
+});
+
+// #2137: the corpus's and the research's Place & Route, the application's flow on the nextpnr engine
+test('nextpnrPlaceRoute: a netlist placed and routed by nextpnr, the Map report\'s size, a routed XDL, no warnings; a failure as an error', { timeout: 300000 }, async () => {
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
+  const fx = f => fs.readFileSync(path.join(HERE, '..', 'packages/silinx-fpga/test/fixtures/nextpnr-engine', f), 'utf8');
+  const part = 'xc3s250ecp132-4', device = loadDeviceCache(part), db = loadDb(part, { graph: device });
+  const r = await nextpnrPlaceRoute({ netlist: fx('gates.json'), top: 'gates', part, ucf: fx('gates.ucf'), device, db });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(r.warnings, []);
+  assert.equal(r.par.engine, 'nextpnr');
+  assert.ok(r.summary.slices.used >= 1 && r.summary.luts.used >= 1, JSON.stringify(r.summary));
+  assert.match(r.routedText, /^inst "led<0>" "IOB",placed \w+ M5/m);
+  // a netlist that cannot be read: the flow's error, no routed design
+  const bad = await nextpnrPlaceRoute({ netlist: '{', top: 'gates', part, ucf: fx('gates.ucf'), device, db });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.error);
+  assert.equal(bad.routedText, null);
 });

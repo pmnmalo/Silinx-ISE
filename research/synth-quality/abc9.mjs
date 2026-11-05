@@ -1,7 +1,7 @@
 // ABC9 on the Spartan-3E (#369): Yosys's `synth_xilinx -abc9` failed on xc3se in YoWASP 0.68 and runs in 0.70.
 // This measures its LUT mapping against the open synthesis's, on the examples and the design corpus's
 // representative subset (scripts/yosys-update-report.mjs DESIGN_SUBSET), each mapping through the open back end
-// (pack, place and route as the app's flow, Silinx's static timing analysis of the routed design). Four mappings,
+// (Translate, Map and Place & Route as the app's flow, by nextpnr: #2137; Silinx's static timing analysis of the routed design). Four mappings,
 // the same front end (core/synth-verilog.js) and the same steps up to the LUT mapping (packages/silinx-fpga/src/synth-open.js
 // synthCommands: tables, shift registers in SRL16E):
 //   now    what the open synthesis does (synthesizeOpen: LUT4s alone, the wider and the depth-oriented
@@ -125,20 +125,17 @@ async function measure(argv) {
   const { compareNetlist } = await import('../../test/diff-synth.js');
   const { readYosysJson } = await import('../../packages/silinx-fpga/src/fpga/netlist.js');
   const { pack } = await import('../../packages/silinx-fpga/src/fpga/pack.js');
-  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/place.js');
-  const { placeRouteBest } = await import('../../packages/silinx-fpga/src/fpga/place-route.js');
+  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/device-sites.js');
   const { loadDeviceCache } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
-  const { knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
-  const { analyzeTiming, delayTable } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
-  const { writeXdl, parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
+  const { analyzeTiming } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
+  const { parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
   const { loadDb } = await import('../../packages/silinx-fpga/research/s3e-bitstream/db.mjs');
   const { designs, compile, elaborate, primitiveSources, lib } = await load(only || []);
   const devices = new Map();
   const deviceOf = part => {
     if (!devices.has(part)) {
       const device = loadDeviceCache(part);
-      const known = knownRouting(loadDb(part, { graph: device }));
-      devices.set(part, { device, sites: deviceSites(device), known, delays: delayTable(device, { allowPip: known.allowPip }) });
+      devices.set(part, { device, sites: deviceSites(device), db: loadDb(part, { graph: device }) });
     }
     return devices.get(part);
   };
@@ -197,18 +194,16 @@ async function measure(argv) {
           const dev = deviceOf(part);
           const packed = pack(netlist, { ucf, part, carryOut: 'xor' });
           if (packed.stats.slices > dev.sites.slices.size) continue;
-          let pr;
-          try { pr = placeRouteBest(netlist, packed, dev.device, dev.known, { seed, delays: dev.delays, pack: { ucf, part, carryOut: 'xor' } }); }
-          catch (e) { if (/slices needed|block RAMs needed|multipliers needed|no room|not enough pads|no pad for/.test(e.message)) continue; throw e; }
-          if (pr.routed.errors.length || pr.routed.failed.length || pr.routed.overused) throw new Error(`route: ${pr.routed.errors[0] || `${pr.routed.failed.length} nets unrouted, ${pr.routed.overused} nodes shared`}`);
-          const routedText = writeXdl(pr.routed.design);
+          const pr = await lib.nextpnrPlaceRoute({ netlist: flowSyn.files[`${flowSyn.top}.json`], top: flowSyn.top, part, ucf, device: dev.device, db: dev.db, seed });
+          if (!pr.ok) { if (/slices needed|block RAMs needed|multipliers needed|no room|not enough pads|no pad for|Unable to place|Failed to place/i.test(pr.error)) continue; throw new Error(pr.error); }
+          const routedText = pr.routedText;
           if (routedDir) {
             const dir = path.join(routedDir, `${d.name}__${way}`.replace(/[^\w.-]/g, '_'));
             fs.mkdirSync(dir, { recursive: true });
             fs.writeFileSync(path.join(dir, 'routed.xdl'), routedText);
           }
           const sta = analyzeTiming(parseXdl(routedText), dev.device);
-          const q = lib.qualityOf(part, pr.packed.stats, sta.clocks);
+          const q = lib.qualityOf(part, { slices: pr.summary.slices.used, luts: pr.summary.luts.used, ffs: pr.summary.ffs.used }, sta.clocks);
           Object.assign(m, { part, slices: q.slices, period: q.period });
           break;
         }

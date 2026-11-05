@@ -22,7 +22,7 @@
 //   onehot-port  also the registers refused only because a port reads them ("connected to module port", maybe
 //                with "users don't benefit"), marked by hand as a front end could mark a state machine
 // Each netlist is simulated against the RTL from power-up (test/diff-synth.js compareNetlist) and taken through
-// the open back end (pack, place and route, seeds 1-3; Silinx's static timing analysis of the routed design).
+// the open back end (Translate, Map and Place & Route by nextpnr, #2137, seeds 1-3; Silinx's static timing analysis of the routed design).
 //
 //   node research/synth-quality/fsm.mjs --detect [--filter a,b]       which registers fsm_detect marks, every design
 //   node research/synth-quality/fsm.mjs [--filter a,b] [--ways base,onehot] [--seeds 1,2,3] [--effort normal|high]
@@ -253,21 +253,16 @@ async function main(argv) {
 
 
   const { compareNetlist } = await import('../../test/diff-synth.js');
-  const { readYosysJson } = await import('../../packages/silinx-fpga/src/fpga/netlist.js');
-  const { pack } = await import('../../packages/silinx-fpga/src/fpga/pack.js');
-  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/place.js');
-  const { placeRouteBest } = await import('../../packages/silinx-fpga/src/fpga/place-route.js');
+  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/device-sites.js');
   const { loadDeviceCache } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
-  const { knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
-  const { analyzeTiming, delayTable } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
-  const { writeXdl, parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
+  const { analyzeTiming } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
+  const { parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
   const { loadDb } = await import('../../packages/silinx-fpga/research/s3e-bitstream/db.mjs');
   const devices = new Map();
   const deviceOf = part => {
     if (!devices.has(part)) {
       const device = loadDeviceCache(part);
-      const known = knownRouting(loadDb(part, { graph: device }));
-      devices.set(part, { device, sites: deviceSites(device), known, delays: delayTable(device, { allowPip: known.allowPip }) });
+      devices.set(part, { device, sites: deviceSites(device), db: loadDb(part, { graph: device }) });
     }
     return devices.get(part);
   };
@@ -332,30 +327,29 @@ async function main(argv) {
         const frec = [];
         const flowSyn = flowDesign === d.design ? bare : await synthesizeOpen(flowDesign, { run: fsmRun(yosysNode, way, frec), effort, fsm: way === 'core' });
         if (flowDesign !== d.design) m.flowFsms = (frec[0]?.fsms || []).length;
-        let netlist = readYosysJson(flowSyn.files[`${flowSyn.top}.json`]);
+        // (Translate, Map and Place & Route by nextpnr, as the app's flow: lib.mjs nextpnrPlaceRoute, #2137)
+        let netSyn = flowSyn;
         const dev = deviceOf(part);
         const periods = [];
         for (const seed of seeds) {
-          let pr;
-          try { pr = placeRouteBest(netlist, pack(netlist, { ucf, part, carryOut: 'xor' }), dev.device, dev.known, { seed, delays: dev.delays, pack: { ucf, part, carryOut: 'xor' } }); }
-          catch (e) {
-            // too few pads for the design's ports as the placer counts them: the I/O wrapper (as run.mjs does)
-            if (!d.corpus || flowDesign !== d.design || !/not enough pads|no pad for/.test(e.message)) throw e;
+          const placeRoute = () => lib.nextpnrPlaceRoute({ netlist: netSyn.files[`${netSyn.top}.json`], top: netSyn.top, part, ucf, device: dev.device, db: dev.db, seed });
+          let pr = await placeRoute();
+          // too few pads for the design's ports: the I/O wrapper (as run.mjs does)
+          if (!pr.ok && d.corpus && flowDesign === d.design && /not enough pads|no pad for/.test(pr.error)) {
             ({ flowDesign, ucf } = wrapped());
             const frec2 = [];
-            const syn2 = await synthesizeOpen(flowDesign, { run: fsmRun(yosysNode, way, frec2), effort, fsm: way === 'core' });
+            netSyn = await synthesizeOpen(flowDesign, { run: fsmRun(yosysNode, way, frec2), effort, fsm: way === 'core' });
             m.flowFsms = (frec2[0]?.fsms || []).length;
-            netlist = readYosysJson(syn2.files[`${syn2.top}.json`]);
-            pr = placeRouteBest(netlist, pack(netlist, { ucf, part, carryOut: 'xor' }), dev.device, dev.known, { seed, delays: dev.delays, pack: { ucf, part, carryOut: 'xor' } });
+            pr = await placeRoute();
           }
-          if (pr.routed.errors.length || pr.routed.failed.length || pr.routed.overused) throw new Error(`route: ${pr.routed.errors[0] || `${pr.routed.failed.length} nets unrouted, ${pr.routed.overused} nodes shared`}`);
-          const routedText = writeXdl(pr.routed.design);
+          if (!pr.ok) throw new Error(pr.error);
+          const routedText = pr.routedText;
           if (routedDir && seed === seeds[0]) {
             const dir = path.join(routedDir, `${d.name}__${way}__s${seed}`.replace(/[^\w.-]/g, '_'));
             fs.mkdirSync(dir, { recursive: true });
             fs.writeFileSync(path.join(dir, 'routed.xdl'), routedText);
           }
-          const q = lib.qualityOf(part, pr.packed.stats, analyzeTiming(parseXdl(routedText), dev.device).clocks);
+          const q = lib.qualityOf(part, { slices: pr.summary.slices.used, luts: pr.summary.luts.used, ffs: pr.summary.ffs.used }, analyzeTiming(parseXdl(routedText), dev.device).clocks);
           m.part = part;
           m.slices = q.slices;
           if (Number.isFinite(q.period)) periods.push(q.period);

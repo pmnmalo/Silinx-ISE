@@ -438,6 +438,26 @@ export const withTimesTable = (readme, lines) => withBlock(readme, TIMES_BEGIN, 
 /** The run times of a README (the lines between the markers), or null. */
 export const readmeTimesTable = readme => readmeBlock(readme, TIMES_BEGIN, TIMES_END);
 
-// the placer's 'too few pads' errors: the package's pads, or those of the banks with a fitting VCCO
+// the 'too few pads' errors (Silinx's placer's; nextpnr's, #2137): the package's pads, or those of the banks with a fitting VCCO
 // (#128: 'no pad for N I/O(s) of …'); the design corpus then implements the design in its I/O wrapper
-export const PADS_SHORT = /not enough pads|place: no pad for \d+ I\/O/;
+export const PADS_SHORT = /not enough pads|place: no pad for \d+ I\/O|no free pad left in this package/;
+
+/**
+ * Translate, Map and Place & Route of a synthesized netlist as the application's flow runs them: runFlow on the nextpnr
+ * engine (#2137), one placement (Optimization Fast's). netlist: the Yosys JSON's text; part: 'xc3s250ecp132-4'; ucf: its
+ * text or null; device, db: the part's device graph and bit database. Resolves { ok, error, routedText, summary (the Map
+ * report's: slices, luts, ffs), par (the Place & Route report's), warnings (the flow's WARNING lines), errors (its ERROR lines) }.
+ */
+export async function nextpnrPlaceRoute({ netlist, top, part, ucf = null, device, db, seed = 1 }) {
+  const { runFlow } = await import('../../packages/silinx-fpga/src/open-flow-core.js');
+  const { nextpnrNode } = await import('../../packages/silinx-fpga/src/nextpnr-node.js');
+  const [, dev, pkg] = /^(xc3s\d+e)(\w+?)-\d$/.exec(part);
+  const store = {}, lines = [];
+  const io = { log: l => lines.push(l), sources: () => [], ucf, ucfName: ucf ? 'top.ucf' : null, device: () => device, bitDb: () => db,
+    nextpnr: { spartan3e: nextpnrNode() }, write: (name, data) => { store[name] = data; return name; },
+    read: name => (name === `open/${top}.json` ? netlist : store[name] ?? null), save: () => {} };
+  const r = await runFlow({ top, part, device: dev, pkg, family: 'spartan3e', steps: ['translate', 'map', 'par'], seed, effort: 1,
+    synthEffort: 'normal', synthGoal: 'fast', startupClk: 'JtagClk', engine: 'nextpnr' }, io);
+  return { ok: r.ok, error: r.error, routedText: store['open/routed.xdl'] ?? null, summary: r.report?.map?.summary, par: r.report?.par,
+    warnings: lines.filter(l => /^WARNING/.test(l)), errors: lines.filter(l => /^ *ERROR/.test(l)) };
+}
