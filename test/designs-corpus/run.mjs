@@ -9,9 +9,9 @@
 //   synth     the open synthesis: Silinx's synthesis front end + Yosys (YoWASP)
 //   diff      the netlist simulated against the RTL, cycle by cycle (test/diff-synth.js)
 //   flow      the open back end on the XC3S250E (Basys2-250), or the larger XC3S500E / XC3S1200E
-//             (Nexys2) for a design too large for it: pack, then place and route as the app's flow
-//             does (packages/silinx-fpga/src/fpga/place-route.js: the delay table, routing on the PIPs of known bits,
-//             static timing, register replication), bitgen ('complete' when the bitstream is complete). The
+//             (Nexys2) for a design too large for it: pack (the size Silinx's packer counts, #2529), then Translate,
+//             Map and Place & Route as the app's flow does (runFlow on the nextpnr engine, #2137), the static timing,
+//             bitgen ('complete' when the bitstream is complete). The
 //             clock is put on the board's oscillator pin (B8, PERIOD 20 ns). A design with more port
 //             bits than the package has pins goes through an I/O wrapper (lib.mjs ioWrapper); cells
 //             the packer does not support yet (block / distributed RAM, shift registers,
@@ -46,7 +46,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { STAGES, kindOf, validateManifest, compareExpectations, updatedExpectations, countWarnings, parseTime, ioWrapper, paramWrapper, boardClockUcf, FLOW_PARTS as PARTS, chipOf, deviceOf, flaggedSynth,
-  qualityOf, compareQuality, QUALITY_TOLERANCE, machineClass, timesOf, compareTimes, slowestTable, resultsTable, withResultsTable, timesTable, withTimesTable, PADS_SHORT } from './lib.mjs';
+  qualityOf, compareQuality, QUALITY_TOLERANCE, machineClass, timesOf, compareTimes, slowestTable, resultsTable, withResultsTable, timesTable, withTimesTable, PADS_SHORT, nextpnrPlaceRoute } from './lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
@@ -211,11 +211,9 @@ async function synthWith(design, flags, m) {
 async function backEnd(d, design, syn, srcs, res, opts, m, forceWrap = false, part = PARTS[0]) {
   const { readYosysJson } = await import('../../packages/silinx-fpga/src/fpga/netlist.js');
   const { pack, PackError } = await import('../../packages/silinx-fpga/src/fpga/pack.js');
-  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/place.js');
-  const { placeRouteBest } = await import('../../packages/silinx-fpga/src/fpga/place-route.js');
+  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/device-sites.js');
   const { loadDeviceCache } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
-  const { checkRouting } = await import('../../packages/silinx-fpga/src/fpga/route.js');
-  const { bitgen, knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { bitgen } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
   const { analyzeTiming, checkPeriods } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
   const { parseUcf } = await import('../../packages/silinx-fpga/src/ucf.js');
   const { parseXdl, writeXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
@@ -224,7 +222,6 @@ async function backEnd(d, design, syn, srcs, res, opts, m, forceWrap = false, pa
   let again = false;
   res.details.flowSteps = steps;
   const step = (k, t, v) => { steps[k] = { ms: Date.now() - t, ...v }; };
-  let routedAt = 0;
   try {
     res.details.part = part;
     const device = loadDeviceCache(part);
@@ -283,51 +280,29 @@ async function backEnd(d, design, syn, srcs, res, opts, m, forceWrap = false, pa
       if (larger) { await tryLarger(); return; }
       res.flow = `too large: ${packed.stats.slices} slices, the ${chipOf(part)} has ${sites.slices.size}`; return;
     }
-    // place and route as the app's flow does (packages/silinx-fpga/src/fpga/place-route.js: the delay table, the clock
-    // and global buffer sites of known bits, the timing-driven router), with its register
-    // replication (#79, #88)
+    // Translate, Map and Place & Route as the app's flow does (lib.mjs nextpnrPlaceRoute: runFlow on the nextpnr engine, #2137,
+    // one placement: the corpus tests the flow, the size and speed of one seed)
     t = Date.now();
     const db = loadDb(part, { graph: device });
-    const known = knownRouting(db);
-    let pr;
-    try {
-      pr = placeRouteBest(netlist, packed, device, known, {
-        seed: opts.seed, pack: { ucf, part },
-        onPlaced: (r, info) => {
-          if (info.replication) return;
-          w.push(...(r.warnings || []).map(x => `WARNING:Silinx (place) - ${x}`));
-          step('place', t, { estimate: +r.delay.toFixed(2) });
-        },
-        onRouted: (x, info) => {
-          if (info.replication) return;
-          step('route', t + x.placeMs, { nets: x.routed.routed, pips: x.routed.pips, passes: x.routed.iterations });
-          routedAt = Date.now();
-        },
-        // the replication pass: its own time (plan, pack, place and route again), not the route's
-        onReplication: x => {
-          steps.replication = { ms: Date.now() - routedAt, ...(x.result && { placeMs: x.result.placeMs, routeMs: x.result.routeMs }),
-            flipFlops: x.flipFlops, luts: x.luts, copies: x.copies, kept: x.kept, before: +x.before.toFixed(3),
-            ...(x.result?.sta && { period: +x.result.period.toFixed(3) }), ...(x.error && { error: clean(x.error.message) }) };
-        },
-      });
-    } catch (e) {
-      // fewer pads than ports once the clock pad, the input-only pads and the banks' VCCO (#128: 'no pad
-      // for N I/O(s) of …') are counted: the I/O wrapper
-      if (PADS_SHORT.test(e.message) && !wrapper) { again = true; await backEnd(d, design, syn, srcs, res, opts, m, true); return; }
-      if (/slices needed|block RAMs needed|multipliers needed|no room/.test(e.message) || PADS_SHORT.test(e.message)) {
+    const r = await nextpnrPlaceRoute({ netlist: flowSyn.files[`${flowSyn.top}.json`], top: flowSyn.top, part, ucf, device, db, seed: opts.seed });
+    w.push(...r.warnings.map(l => l.replace(/^WARNING:(\w+) - /, 'WARNING:Silinx ($1) - ')));
+    if (!r.ok) {
+      // (the step's error and nextpnr's own ERROR lines under it)
+      const said = [r.error, ...r.errors].join('\n');
+      // fewer pads than ports (once the clock pad, the input-only pads and the banks' VCCO are counted): the I/O wrapper
+      if (PADS_SHORT.test(said) && !wrapper) { again = true; await backEnd(d, design, syn, srcs, res, opts, m, true); return; }
+      // no site left for a cell (nextpnr: 'no BELs remaining'): the next, larger device
+      if (/slices needed|block RAMs needed|multipliers needed|no room|no BELs remaining/i.test(said) || PADS_SHORT.test(said)) {
         if (larger) { await tryLarger(); return; }
-        res.flow = `too large: ${clean(e.message.replace(/^place: /, ''))}`; return;
+        res.flow = `too large: ${clean(r.errors.map(l => l.trim()).find(l => /^ERROR: /.test(l))?.replace(/^ERROR: /, '') || r.error)}`; return;
       }
-      throw e;
+      // (nextpnr's own reason, its first ERROR line under the step's)
+      res.details.errors = r.errors.slice(0, 5).map(l => clean(l.trim()));
+      const why = r.errors.map(l => l.trim()).find(l => /^ERROR: /.test(l))?.replace(/^ERROR: /, '');
+      res.flow = `fail: ${clean(why ? `${r.error}: ${why}` : r.error)}`; return;
     }
-    const routed = pr.routed;
-    if (routed.errors.length) { res.flow = `fail: route: ${clean(routed.errors[0])}`; return; }
-    if (routed.failed.length) { res.flow = `fail: route: ${routed.failed.length} nets cannot be routed on PIPs of known bits`; res.details.unreached = routed.unreached.slice(0, 10).map(u => `${u.net} -> ${u.inst}.${u.pin}`); return; }
-    if (routed.overused) { res.flow = `fail: route: did not converge (${routed.overused} nodes shared after ${routed.iterations} passes, ${1 + pr.retried} placements)`; return; }
-    if (pr.retried) res.details.retried = { seed: pr.seed, placements: pr.retried };   // (#249: placed again, the routing before did not converge)
-    const routedText = writeXdl(routed.design);
-    const chk = checkRouting(parseXdl(routedText), device);
-    if (!chk.ok) { res.flow = `fail: routing check: ${clean(chk.problems[0])}`; return; }
+    const { par, summary, routedText } = r;
+    step('route', t, { nets: par.nets, pips: par.pips });
     // static timing, against the PERIOD of the UCF
     t = Date.now();
     const routedDesign = parseXdl(routedText);
@@ -340,7 +315,7 @@ async function backEnd(d, design, syn, srcs, res, opts, m, forceWrap = false, pa
       }
     }
     step('sta', t, { clocks: sta.clocks.map(c => ({ clock: String(c.clock).replace(/[^\w]/g, '_').slice(0, 40), period: +c.period.toFixed(3) })) });
-    const quality = qualityOf(part, pr.packed.stats, sta.clocks);
+    const quality = qualityOf(part, { slices: summary.slices.used, luts: summary.luts.used, ffs: summary.ffs.used }, sta.clocks);
     // bitgen
     t = Date.now();
     const { bytes, unknown } = bitgen(routedText, db, { name: `${d.name}.ncd`, crc: true, startupClk: 'JtagClk', part: part.replace(/^xc/, '').replace(/-\d$/, '') });

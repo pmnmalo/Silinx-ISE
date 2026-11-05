@@ -7,10 +7,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 232,
-   "luts": 464,
+   "slices": 197,
+   "luts": 366,
    "ffs": 386,
-   "period": 10.33
+   "period": 11.563
   }
  },
  "epfl-bar": {
@@ -21,10 +21,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 471,
+   "slices": 520,
    "luts": 941,
-   "ffs": 288,
-   "period": 8.768
+   "ffs": 264,
+   "period": 9.295
   }
  },
  "epfl-cavlc": {
@@ -36,7 +36,7 @@
   "quality": {
    "part": "xc3s250ecp132-4",
    "slices": 143,
-   "luts": 286,
+   "luts": 285,
    "ffs": 0,
    "period": null
   }
@@ -66,7 +66,7 @@
    "slices": 187,
    "luts": 373,
    "ffs": 265,
-   "period": 6.46
+   "period": 6.439
   }
  },
  "epfl-i2c": {
@@ -77,10 +77,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 249,
+   "slices": 248,
    "luts": 489,
    "ffs": 276,
-   "period": 6.773
+   "period": 7.254
   }
  },
  "epfl-int2float": {
@@ -105,7 +105,7 @@
   "flow": "complete: on the XC3S1200E",
   "quality": {
    "part": "xc3s1200efg320-4",
-   "slices": 5341,
+   "slices": 5385,
    "luts": 10682,
    "ffs": 0,
    "period": null
@@ -119,15 +119,16 @@
   "flow": "complete",
   "warnings": {
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clk': 43.84 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 684,
-   "luts": 1367,
+   "slices": 672,
+   "luts": 1344,
    "ffs": 643,
-   "period": 23.557
+   "period": 25.806
   }
  },
  "epfl-multiplier": {
@@ -138,6 +139,7 @@
   "flow": "complete: on the XC3S500E",
   "warnings": {
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clk': 15.04 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
@@ -146,7 +148,7 @@
    "slices": 4360,
    "luts": 8719,
    "ffs": 257,
-   "period": 63.924
+   "period": 72.51
   }
  },
  "epfl-priority": {
@@ -160,7 +162,7 @@
    "slices": 117,
    "luts": 233,
    "ffs": 137,
-   "period": 8.95
+   "period": 9.458
   }
  },
  "epfl-router": {
@@ -171,10 +173,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 34,
+   "slices": 39,
    "luts": 62,
    "ffs": 64,
-   "period": 7.184
+   "period": 6.913
   }
  },
  "epfl-sin": {
@@ -185,7 +187,7 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1075,
+   "slices": 1064,
    "luts": 2128,
    "ffs": 0,
    "period": null
@@ -199,6 +201,7 @@
   "flow": "complete",
   "warnings": {
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clk': 39.94 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
@@ -207,7 +210,7 @@
    "slices": 1162,
    "luts": 2323,
    "ffs": 1003,
-   "period": 25.689
+   "period": 26.288
   }
  },
  "femtorv32-quark": {
@@ -218,10 +221,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 410,
-   "luts": 816,
+   "slices": 394,
+   "luts": 784,
    "ffs": 224,
-   "period": 16.235
+   "period": 15.56
   }
  },
  "fpu-adder": {
@@ -232,10 +235,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 339,
-   "luts": 673,
+   "slices": 338,
+   "luts": 671,
    "ffs": 389,
-   "period": 9.637
+   "period": 11.673
   }
  },
  "fpu-multiplier": {
@@ -249,7 +252,7 @@
    "slices": 231,
    "luts": 456,
    "ffs": 404,
-   "period": 14.355
+   "period": 14.194
   }
  },
  "itc99-b01": {
@@ -263,7 +266,7 @@
    "slices": 5,
    "luts": 9,
    "ffs": 5,
-   "period": 2.538
+   "period": 2.559
   }
  },
  "itc99-b02": {
@@ -277,7 +280,7 @@
    "slices": 2,
    "luts": 4,
    "ffs": 4,
-   "period": 1.959
+   "period": 2.075
   }
  },
  "itc99-b03": {
@@ -291,7 +294,7 @@
    "slices": 15,
    "luts": 29,
    "ffs": 30,
-   "period": 5.738
+   "period": 5.949
   }
  },
  "itc99-b04": {
@@ -302,10 +305,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 105,
-   "luts": 203,
+   "slices": 101,
+   "luts": 189,
    "ffs": 66,
-   "period": 14.284
+   "period": 11.975
   }
  },
  "itc99-b05": {
@@ -323,10 +326,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 254,
-   "luts": 468,
-   "ffs": 35,
-   "period": 10.759
+   "slices": 252,
+   "luts": 464,
+   "ffs": 34,
+   "period": 10.796
   }
  },
  "itc99-b06": {
@@ -340,7 +343,7 @@
    "slices": 5,
    "luts": 10,
    "ffs": 8,
-   "period": 2.899
+   "period": 3.136
   }
  },
  "itc99-b07": {
@@ -351,10 +354,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 56,
-   "luts": 111,
+   "slices": 62,
+   "luts": 117,
    "ffs": 43,
-   "period": 5.824
+   "period": 6.142
   }
  },
  "itc99-b08": {
@@ -365,10 +368,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 17,
+   "slices": 19,
    "luts": 34,
    "ffs": 21,
-   "period": 6.605
+   "period": 6.671
   }
  },
  "itc99-b09": {
@@ -382,7 +385,7 @@
    "slices": 21,
    "luts": 41,
    "ffs": 28,
-   "period": 5.362
+   "period": 5.701
   }
  },
  "itc99-b10": {
@@ -393,10 +396,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 21,
+   "slices": 22,
    "luts": 41,
    "ffs": 24,
-   "period": 5.417
+   "period": 5.32
   }
  },
  "itc99-b11": {
@@ -407,10 +410,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 100,
-   "luts": 192,
+   "slices": 96,
+   "luts": 184,
    "ffs": 36,
-   "period": 8.301
+   "period": 9.131
   }
  },
  "itc99-b12": {
@@ -429,7 +432,7 @@
    "slices": 178,
    "luts": 354,
    "ffs": 119,
-   "period": 8.708
+   "period": 9.167
   }
  },
  "itc99-b13": {
@@ -443,7 +446,7 @@
    "slices": 42,
    "luts": 82,
    "ffs": 64,
-   "period": 5.535
+   "period": 6.09
   }
  },
  "itc99-b14": {
@@ -451,19 +454,7 @@
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "complete",
-  "warnings": {
-   "flow": [
-    "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
-   ]
-  },
-  "quality": {
-   "part": "xc3s250ecp132-4",
-   "slices": 686,
-   "luts": 1358,
-   "ffs": 334,
-   "period": 32.384
-  }
+  "flow": "fail: nextpnr failed: it stopped on an error"
  },
  "itc99-b15": {
   "frontend": "pass",
@@ -482,10 +473,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1244,
-   "luts": 2479,
-   "ffs": 554,
-   "period": 17.809
+   "slices": 1233,
+   "luts": 2457,
+   "ffs": 546,
+   "period": 19.976
   }
  },
  "itc99-b17": {
@@ -505,15 +496,16 @@
     "Warning: Replacing memory \\p7_v0 with list of registers. See b17_syn.v:885, b17_syn.v:787"
    ],
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clock': 48.52 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
    ]
   },
   "quality": {
    "part": "xc3s500efg320-4",
-   "slices": 3735,
-   "luts": 7442,
-   "ffs": 1356,
-   "period": 20.735
+   "slices": 3801,
+   "luts": 7575,
+   "ffs": 1380,
+   "period": 22.055
   }
  },
  "itc99-b20": {
@@ -521,59 +513,25 @@
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "complete",
-  "warnings": {
-   "flow": [
-    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
-   ]
-  },
-  "quality": {
-   "part": "xc3s250ecp132-4",
-   "slices": 1355,
-   "luts": 2691,
-   "ffs": 492,
-   "period": 34.703
-  }
+  "flow": "fail: nextpnr failed: it stopped on an error"
  },
  "itc99-b21": {
   "frontend": "pass",
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "complete",
-  "warnings": {
-   "flow": [
-    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
-   ]
-  },
-  "quality": {
-   "part": "xc3s250ecp132-4",
-   "slices": 1412,
-   "luts": 2804,
-   "ffs": 492,
-   "period": 33.963
-  }
+  "flow": "fail: nextpnr failed: it stopped on an error"
  },
  "itc99-b22": {
   "frontend": "pass",
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "complete",
+  "flow": "fail: nextpnr failed: it stopped on an error",
   "warnings": {
    "frontend": [
     "WARNING:Silinx:646 (unused-signal) - b22.vhd:1609: Signal <datao_3> is assigned but never used. This unconnected signal will be trimmed during the optimization process."
-   ],
-   "flow": [
-    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
    ]
-  },
-  "quality": {
-   "part": "xc3s250ecp132-4",
-   "slices": 1997,
-   "luts": 3962,
-   "ffs": 706,
-   "period": 35.239
   }
  },
  "iwls05-i2c": {
@@ -584,10 +542,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 141,
-   "luts": 280,
+   "slices": 123,
+   "luts": 245,
    "ffs": 130,
-   "period": 8.638
+   "period": 7.17
   }
  },
  "iwls05-sasc": {
@@ -605,10 +563,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 49,
-   "luts": 96,
+   "slices": 80,
+   "luts": 159,
    "ffs": 54,
-   "period": 4.324
+   "period": 5.198
   }
  },
  "iwls05-simple-spi": {
@@ -626,10 +584,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 90,
-   "luts": 179,
-   "ffs": 131,
-   "period": 6.189
+   "slices": 111,
+   "luts": 220,
+   "ffs": 67,
+   "period": 6.699
   }
  },
  "iwls05-spi": {
@@ -645,10 +603,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 357,
-   "luts": 710,
+   "slices": 356,
+   "luts": 706,
    "ffs": 229,
-   "period": 13.768
+   "period": 15.92
   }
  },
  "iwls05-ss-pcm": {
@@ -665,9 +623,9 @@
   "quality": {
    "part": "xc3s250ecp132-4",
    "slices": 42,
-   "luts": 38,
+   "luts": 39,
    "ffs": 79,
-   "period": 5.134
+   "period": 4.694
   }
  },
  "iwls05-usb-phy": {
@@ -683,10 +641,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 63,
-   "luts": 120,
+   "slices": 68,
+   "luts": 127,
    "ffs": 106,
-   "period": 4.852
+   "period": 5.149
   }
  },
  "light8080": {
@@ -721,7 +679,7 @@
    "slices": 189,
    "luts": 374,
    "ffs": 206,
-   "period": 12.329
+   "period": 11.787
   }
  },
  "nandland-spi-verilog": {
@@ -737,10 +695,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 32,
-   "luts": 61,
+   "slices": 31,
+   "luts": 59,
    "ffs": 37,
-   "period": 5.697
+   "period": 5.676
   }
  },
  "nandland-spi-vhdl": {
@@ -757,10 +715,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 31,
-   "luts": 59,
+   "slices": 30,
+   "luts": 57,
    "ffs": 37,
-   "period": 5.312
+   "period": 5.674
   }
  },
  "neorv32": {
@@ -849,10 +807,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1679,
-   "luts": 3344,
+   "slices": 1663,
+   "luts": 3312,
    "ffs": 1319,
-   "period": 15.704
+   "period": 16.212
   }
  },
  "picorv32": {
@@ -905,7 +863,7 @@
    "slices": 706,
    "luts": 1410,
    "ffs": 767,
-   "period": 11.489
+   "period": 11.76
   }
  },
  "secworks-aes": {
@@ -921,6 +879,7 @@
     "Warning: Replacing memory \\sbox_inst.sbox with list of registers. See aes_core_syn.v:3106, aes_core_syn.v:3102, aes_core_syn.v:3098, aes_core_syn.v:3094, aes_core_syn.v:3090, aes_core_syn.v:3086, aes_core_syn.v:3082, aes_core_syn.v:3078, aes_core_syn.v:3074, aes_core_syn.v:3070, aes_core_syn.v:3066,"
    ],
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clk': 37.49 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
@@ -929,7 +888,7 @@
    "slices": 4346,
    "luts": 8691,
    "ffs": 2996,
-   "period": 29.355
+   "period": 28.877
   }
  },
  "secworks-sha1": {
@@ -948,10 +907,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1025,
-   "luts": 2047,
+   "slices": 1024,
+   "luts": 2046,
    "ffs": 1528,
-   "period": 16.994
+   "period": 17.306
   }
  },
  "secworks-sha256": {
@@ -968,15 +927,16 @@
     "Warning: Replacing memory \\w_mem_inst.w_mem with list of registers. See sha256_core_syn.v:440"
    ],
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clk': 42.60 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1436,
-   "luts": 2870,
+   "slices": 1434,
+   "luts": 2868,
    "ffs": 1809,
-   "period": 26.129
+   "period": 24.389
   }
  },
  "secworks-siphash": {
@@ -990,7 +950,7 @@
    "slices": 686,
    "luts": 1370,
    "ffs": 798,
-   "period": 14.806
+   "period": 15.465
   }
  },
  "serv": {
@@ -1024,10 +984,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 159,
-   "luts": 300,
+   "slices": 156,
+   "luts": 305,
    "ffs": 293,
-   "period": 10.174
+   "period": 10.932
   }
  },
  "spi-fpga-master": {
@@ -1046,7 +1006,7 @@
    "slices": 19,
    "luts": 34,
    "ffs": 21,
-   "period": 4.679
+   "period": 4.942
   }
  },
  "spi-fpga-slave": {
@@ -1058,9 +1018,9 @@
   "quality": {
    "part": "xc3s250ecp132-4",
    "slices": 14,
-   "luts": 27,
+   "luts": 26,
    "ffs": 21,
-   "period": 4.696
+   "period": 5.033
   }
  },
  "t80": {
@@ -1080,10 +1040,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1034,
-   "luts": 2059,
-   "ffs": 237,
-   "period": 18.327
+   "slices": 1065,
+   "luts": 2121,
+   "ffs": 233,
+   "period": 19.11
   }
  },
  "uart-for-fpga": {
@@ -1102,7 +1062,7 @@
    "slices": 41,
    "luts": 78,
    "ffs": 53,
-   "period": 4.487
+   "period": 4.472
   }
  },
  "verilog-axis-fifo": {
@@ -1129,10 +1089,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 19,
+   "slices": 20,
    "luts": 33,
    "ffs": 32,
-   "period": 6.15
+   "period": 5.406
   }
  },
  "verilog-i2c-master": {
@@ -1151,10 +1111,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 114,
-   "luts": 225,
+   "slices": 113,
+   "luts": 223,
    "ffs": 72,
-   "period": 10.091
+   "period": 10.105
   }
  },
  "verilog-lfsr-crc": {
@@ -1168,7 +1128,7 @@
    "slices": 50,
    "luts": 99,
    "ffs": 64,
-   "period": 3.869
+   "period": 3.756
   }
  },
  "verilog-lfsr-prbs": {
@@ -1187,7 +1147,7 @@
    "slices": 16,
    "luts": 16,
    "ffs": 31,
-   "period": 2.302
+   "period": 2.192
   }
  },
  "verilog-uart": {
@@ -1198,10 +1158,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 125,
-   "luts": 244,
+   "slices": 117,
+   "luts": 229,
    "ffs": 79,
-   "period": 8.431
+   "period": 8.539
   }
  },
  "vtr-ch-intrinsics": {
@@ -1240,9 +1200,9 @@
   "quality": {
    "part": "xc3s250ecp132-4",
    "slices": 266,
-   "luts": 158,
+   "luts": 166,
    "ffs": 509,
-   "period": 5.931
+   "period": 6.165
   }
  },
  "vtr-diffeq1": {
@@ -1253,15 +1213,16 @@
   "flow": "complete: on the XC3S500E",
   "warnings": {
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clk': 27.60 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
   "quality": {
    "part": "xc3s500efg320-4",
-   "slices": 261,
-   "luts": 412,
+   "slices": 260,
+   "luts": 409,
    "ffs": 451,
-   "period": 37.379
+   "period": 36.627
   }
  },
  "vtr-diffeq2": {
@@ -1272,15 +1233,16 @@
   "flow": "complete: on the XC3S500E",
   "warnings": {
    "flow": [
+    "WARNING:Silinx (nextpnr) - Max frequency for clock '$iopadmap$clk': 37.05 MHz (FAIL at 50.00 MHz)",
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
   "quality": {
    "part": "xc3s500efg320-4",
-   "slices": 144,
-   "luts": 281,
+   "slices": 142,
+   "luts": 278,
    "ffs": 96,
-   "period": 26.133
+   "period": 27.446
   }
  },
  "vtr-mkPktMerge": {
@@ -1331,7 +1293,7 @@
    "slices": 719,
    "luts": 751,
    "ffs": 962,
-   "period": 6.892
+   "period": 6.941
   }
  },
  "vtr-sha": {
@@ -1342,10 +1304,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 803,
-   "luts": 1602,
+   "slices": 798,
+   "luts": 1594,
    "ffs": 893,
-   "period": 15.201
+   "period": 15.608
   }
  },
  "vtr-stereovision3": {
@@ -1365,10 +1327,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 78,
-   "luts": 155,
-   "ffs": 121,
-   "period": 7.729
+   "slices": 73,
+   "luts": 144,
+   "ffs": 120,
+   "period": 7.538
   }
  }
 }

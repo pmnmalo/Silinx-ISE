@@ -233,9 +233,9 @@ test('placeRouteBest: a replicated design that cannot be placed is not kept (the
 });
 
 // (open-flow.mjs places and routes through the flow's nextpnr engine since #2756: runFlow, engine 'nextpnr', checked below)
-test('the flows (the app\'s Silinx engine, the design corpus\'s) place and route through placeRouteBest only (#79, #88)', () => {
+test('the Silinx engine\'s flow places and routes through placeRouteBest only; the research\'s and the design corpus\'s through the flow\'s nextpnr (#79, #88, #2756)', () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-  for (const f of ['packages/silinx-fpga/src/open-flow-s3e.js', 'test/designs-corpus/run.mjs']) {
+  for (const f of ['packages/silinx-fpga/src/open-flow-s3e.js']) {
     const src = fs.readFileSync(path.join(root, f), 'utf8');
     // (the app's: placeRouteBest unless its io gives another place and route, #1678)
     assert.match(src, /placeRouteBest\)?\((ctx\.netlist\(\)|netlist), packed, /, f);
@@ -246,6 +246,11 @@ test('the flows (the app\'s Silinx engine, the design corpus\'s) place and route
   assert.match(research, /await runFlow\(spec, io\)/);
   assert.match(research, /engine: 'nextpnr' \}/);
   assert.doesNotMatch(research, /placeRouteBest|place-route\.js|replicate\.js/);
+  // (the design corpus: test/designs-corpus/lib.mjs nextpnrPlaceRoute, #2756)
+  const corpus = fs.readFileSync(path.join(root, 'test/designs-corpus/run.mjs'), 'utf8'), lib = fs.readFileSync(path.join(root, 'test/designs-corpus/lib.mjs'), 'utf8');
+  assert.match(corpus, /await nextpnrPlaceRoute\(/);
+  assert.match(lib, /engine: 'nextpnr' \}, io\)/);
+  assert.doesNotMatch(corpus + lib, /placeRouteBest|place-route\.js|replicate\.js/);
 });
 
 // Regression (#249): a routing the router leaves with nodes shared (it did not converge: secworks-sha256 on
