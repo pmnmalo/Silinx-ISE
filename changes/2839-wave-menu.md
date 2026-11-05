@@ -19,5 +19,5 @@ In detail:
     has not said and left out, with the interface's messages.
   - **Tests:** test/ui/sim-wcfg.test.js (Silinx, ISE style and Tasks, in Portuguese: no Save / Load on the toolbar, ⋮
     at its right end, the menu by the mouse and the keyboard, Save and Load as before, the status line unchanged, no
-    warnings), test/ui/isim-parts.test.js, test/mcp-wcfg.test.js, test/wcfg.test.js (`wcfgSignal`, `placeWcfg` on a VHDL
+    warnings), test/ui/isim-parts.test.js, test/ui/tasks-sim.test.js and test/ui/toolbars.test.js (the Model field and the line's padding with the ⋮), test/mcp-wcfg.test.js, test/wcfg.test.js (`wcfgSignal`, `placeWcfg` on a VHDL
     and a Verilog design).
