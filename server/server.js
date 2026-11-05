@@ -10,6 +10,8 @@ import { orderTestDesigns } from '../core/test-designs.js';
 import { importMapPackages } from './import-map.js';
 import { contentSecurityPolicy, inlineScriptHashes } from './csp.js';
 import { configDir } from './toolchain.js';
+import { createProjectWatcher } from './project-watch.js';
+import { listJobs } from './jobs.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -64,6 +66,25 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
       let oh = '';
       try { oh = new URL(req.headers.origin).host.toLowerCase(); } catch { /* invalid origin */ }
       if (oh !== String(req.headers.host || '').toLowerCase()) return res.status(403).json({ error: 'cross-origin request refused' });
+    }
+    next();
+  });
+  // the open projects watched (#2843): what another process changes in them is told to the page; this server's
+  // own changes are not (a request that may write holds its project while it runs, and a run of its own too)
+  const watcher = createProjectWatcher({
+    dirOf: P.projectDir,
+    busy: name => listJobs().some(j => j.status === 'running' && String(j.meta?.project || '').toLowerCase() === name.toLowerCase()),
+  });
+  app.locals.watcher = watcher;
+  const WRITING_GET = /^\/projects\/[^/]+\/(export\.xise|fpga-view)$/;
+  app.use('/api', (req, res, next) => {
+    const m = /^\/projects\/([^/]+)/.exec(req.path);
+    if (m && (!['GET', 'HEAD'].includes(req.method) || WRITING_GET.test(req.path))) {
+      let name = '';
+      try { name = decodeURIComponent(m[1]); } catch { /* a bad name: refused by its route */ }
+      const release = watcher.hold(name);
+      res.once('finish', release);
+      res.once('close', release);
     }
     next();
   });
@@ -125,6 +146,17 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
     return P.renameFile(req.params.p, String(from), String(to));
   }));
   api.delete('/projects/:p/file', wrap(async req => { await P.deleteFile(req.params.p, req.query.path); return { ok: true }; }));
+  // what changes in the project's folder made by another process (#2843): server-sent events, one { project,
+  // changes: [{ path, kind }] } each (a comment now and then keeps the stream open through proxies)
+  api.get('/projects/:p/events', wrap(async (req, res) => {
+    await P.readProject(req.params.p);   // (a project that does not exist: its error, as JSON)
+    res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
+    res.write(': watching\n\n');
+    const off = watcher.subscribe(req.params.p, ev => res.write(`data: ${JSON.stringify(ev)}\n\n`));
+    const beat = setInterval(() => res.write(': \n\n'), 25_000);
+    beat.unref?.();
+    res.on('close', () => { clearInterval(beat); off(); });
+  }));
   api.get('/projects/:p/sources', wrap(req => P.readSources(req.params.p)));
   // the examples, in the order the interface lists them (gates first: core/examples.js)
   api.get('/templates', wrap(() => orderExamples(fs.readdirSync(P.EXAMPLES_DIR, { withFileTypes: true })

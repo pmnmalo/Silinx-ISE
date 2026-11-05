@@ -388,12 +388,15 @@ export async function saveImplStatus() {
   } catch { /* best effort */ }
 }
 
-export async function restoreImplStatus() {
+// fromReports: a run made outside the page (the MCP server, #2843): its marks from its reports, not the page's
+// saved ones (of an earlier run)
+export async function restoreImplStatus({ fromReports = false } = {}) {
   S.synthDone = null;
   await loadUcfText();
   if (!S.project?.top) return;
   let saved = null;
-  try { saved = JSON.parse(await api.readFile(S.project.name, STATUS_FILE)); } catch { /* none */ }
+  if (fromReports) for (const id of IMPL_IDS) delete S.status[id];
+  else try { saved = JSON.parse(await api.readFile(S.project.name, STATUS_FILE)); } catch { /* none */ }
   await loadUcfText();
   let status = {};
   S.synthDone = saved?.top === S.project.top && saved.synth?.fingerprint ? saved.synth : null;
@@ -403,7 +406,7 @@ export async function restoreImplStatus() {
     let rep = null;
     try { rep = await api.reports(S.project.name); } catch { /* none */ }
     const sum = rep?.summary;
-    if (!sum || rep.top !== S.project.top) return;
+    if (!sum || rep.top !== S.project.top) { if (fromReports) renderProcesses(); return; }
     const w = (n) => (n ? 'warn' : 'ok');
     const mapWarn = (rep.map?.utilization || []).find(u => /warnings/i.test(u.name))?.used;
     if (sum.synthesized) status.synth = w(rep.synthesis?.warnings);
