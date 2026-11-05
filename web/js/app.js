@@ -4,7 +4,7 @@ import { icons, icon } from './icons.js';
 import { h, dialog, alertDlg, confirmDlg, promptDlg, popupMenu, splitter, toast } from './ui.js';
 import { createEditor, instTemplate, snippetsFor, typeText } from './editor.js';
 import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC } from './c-source.js';
-import { compile, topCandidates } from '/core/compile.js';
+import { compile, implRoots, topCandidates } from '/core/compile.js';
 import { primitiveSources } from '/core/unisim.js';
 import * as wiz from './wizards.js';
 import { PRODUCT, VERSION_LABEL } from '/core/version.js';
@@ -141,16 +141,13 @@ export function projectBoard(pj = S.project) {
 
 export function moduleInfo(name) { return S.modules.find(m => m.name === name) || S.modules.find(m => m.name.toLowerCase() === String(name).toLowerCase()); }
 
-// The modules at the root of a view's hierarchy: those of its role no module of it instantiates (in the
-// Implementation view, a module instantiated only from a test bench is a root too)
+// The modules at the root of a view's hierarchy: those of its role no module of it instantiates; in the
+// Implementation view the top first, a root even when instantiated (#2877; core/elaborate.js implRoots)
 export function viewRoots(sim) {
   const lib = S.lib;
   if (!lib) return [];
   const visible = name => inView(moduleInfo(name)?.role || 'design', sim);
-  if (sim) return topCandidates(lib).filter(visible);
-  const used = new Set();
-  for (const m of lib.modules.values()) if (visible(m.name)) for (const i of instancesOf(m)) used.add(i.module.toLowerCase());
-  return [...lib.modules.values()].filter(m => visible(m.name) && !used.has(m.name.toLowerCase())).map(m => m.name);
+  return sim ? topCandidates(lib).filter(visible) : implRoots(lib, { top: S.project?.top, visible });
 }
 
 // A top-level module the project no longer has (its source removed from the project, #253): the

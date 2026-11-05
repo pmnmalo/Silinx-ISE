@@ -596,3 +596,46 @@ uiTest('#1100 the Design pane: the design tree right under the View selector, no
   assert.equal((await pane()).words, false);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
 }, { ui: 'ise' });
+
+// #2877: Set as Top Module on a module another module instantiates (b, under a): b a root, first, with the top's icon and
+// style, its sub-tree under it; a a root after it, b under it a plain instance row; the processes on b; Set as Top Module
+// on a again: the tree as before. Both interfaces; no warnings.
+uiTest('#2877 Set as Top Module on an instantiated module: it is the first root, the top\'s icon and style; its former parent a root after it; back on the parent, the tree as before', E, async (page) => {
+  const A = 'library ieee; use ieee.std_logic_1164.all;\nentity a is port (x : in std_logic; y : out std_logic); end a;\narchitecture r of a is begin u_b : entity work.b port map (x => x, y => y); end r;\n';
+  const B = 'module b(input x, output y); assign y = ~x; endmodule\n';
+  await makeProject(env, { name: 'H_nested_top', top: 'a', files: { 'src/a.vhd': A, 'src/b.v': B } });
+  await page.openProject('H_nested_top');
+  await page.leftTab('design');
+  const head = ['project H_nested_top', '  chip xc3s250e-4-cp132'];
+  const before = [...head, '    moduleTop a [VHDL*] (a.vhd)', '      verilog u_b - b [Verilog*] [VHDL] (b.v)'];
+  const tops = () => page.eval(() => [...document.querySelectorAll('#hier .row.top-mod')].map((r) => r.querySelector('.lbl').textContent));
+  const setTop = async (label) => {
+    await page.treeRow('#hier', label, { right: true, exact: true });
+    await page.waitForSelector('body > .menu-popup');
+    await page.click('body > .menu-popup .mi', { text: 'Set as Top Module' });
+  };
+  await page.waitFor((n) => document.querySelectorAll('#hier .row').length === n, [before.length], { what: 'the hierarchy' });
+  assert.deepEqual(await rows(page), before);
+  assert.deepEqual(await tops(page), ['a']);
+  // b, under a, the top: the first root, its icon and its style; a a root after it, b a plain instance under it
+  await setTop('u_b - b');
+  await page.waitFor(() => window.Silinx.project.top === 'b', [], { what: 'b the top' });
+  const after = [...head, '    moduleTop b [Verilog*] [VHDL] (b.v)', '    vhdl a [VHDL*] (a.vhd)', '      verilog u_b - b [Verilog*] [VHDL] (b.v)'];
+  await page.waitFor((n) => document.querySelectorAll('#hier .row').length === n, [after.length], { what: 'b a root' });
+  assert.deepEqual(await rows(page), after);
+  assert.deepEqual(await tops(page), ['b']);
+  // the processes on b, the root's row: Check Syntax of b, no question
+  await page.treeRow('#hier', 'b', { exact: true });
+  await page.waitFor(() => window.Silinx.sel?.module === 'b' && !window.Silinx.sel.instName, [], { what: 'b\'s root selected' });
+  await page.treeRow('#procs', 'Check Syntax', { dbl: true, exact: true });
+  await page.waitConsole(/Process "Check Syntax" completed successfully/);
+  assert.deepEqual(page.dialogs, []);
+  // a the top again: the tree as before
+  await setTop('a');
+  await page.waitFor(() => window.Silinx.project.top === 'a', [], { what: 'a the top' });
+  await page.waitFor((n) => document.querySelectorAll('#hier .row').length === n, [before.length], { what: 'the tree as before' });
+  assert.deepEqual(await rows(page), before);
+  assert.deepEqual(await tops(page), ['a']);
+  assert.equal((await env.server.api('GET', '/api/projects/H_nested_top')).top, 'a');
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+});

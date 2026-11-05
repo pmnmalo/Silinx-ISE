@@ -50,10 +50,11 @@ export function renderHierarchy() {
   const lib = S.lib;
   const roots = viewRoots(sim);
   const topName = !sim ? pj.top : null;   // the Simulation view has no top: Simulate runs the selected module
-  roots.sort((a, b) => (a === topName ? -1 : b === topName ? 1 : a.localeCompare(b)));
+  const isTopName = n => !!topName && String(n).toLowerCase() === String(topName).toLowerCase();
+  roots.sort((a, b) => (isTopName(a) ? -1 : isTopName(b) ? 1 : a.localeCompare(b)));
   const addModule = (parentUl, modName, instName, depth, path) => {
     const info = moduleInfo(modName);
-    const isTop = !instName && modName === topName;
+    const isTop = !instName && isTopName(modName);   // (the root's row only: the top's instances are plain rows, #2877)
     const file = info?.file || '?';
     // "label - module" like ISE; just the name when the instance is labelled with the module name
     const label = instName && instName.toLowerCase() !== String(modName).toLowerCase() ? `${instName} - ${modName}` : modName;
