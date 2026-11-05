@@ -3,7 +3,8 @@
 Silinx ISE is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E: Basys2, Nexys2). It runs in
 the browser (the site, the standalone `Silinx-ISE.html`) or as a local Node server, with its own open
 toolchain (Yosys WebAssembly, then Silinx's pack, place, route and bitgen) and, optionally, Xilinx ISE
-14.7. It is Pedro Maló's project (AGPL-3.0-only), used at FCT NOVA.
+14.7. It is Pedro Maló's project (AGPL-3.0-only), used at FCT NOVA. Its story, and where its rules come from:
+[docs/HISTORY.md](docs/HISTORY.md).
 
 **Read [CLAUDE.md](CLAUDE.md) first.** It is the project's rulebook and every session reads it at start-up.
 This guide adds what a new session needs on top of it: the setup, how several Claude sessions work
