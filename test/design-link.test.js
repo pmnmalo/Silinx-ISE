@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { EXAMPLE_ORDER } from '../core/examples.js';
-import { freeName, LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
+import { benchNames, freeName, LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
 import { readZip, textOf } from '../core/zip.js';
 
 const ROOT = path.join(import.meta.dirname, '..', 'examples');
@@ -243,4 +243,24 @@ test('#2876 regression: Try it finds a drawing whose name differs in case from i
   assert.equal(viewProblem({}, files, { view: 'try', top: 'MUX4' }), null);
   assert.equal(viewProblem({}, files, { top: 'Alu_4Bit' }), null);
   assert.equal(viewProblem({}, files, { top: 'nothere' }), 'the design has no module \'nothere\'');
+});
+
+test('#2878 viewProblem: the simulation\'s top= a test bench, the other views\' a design module; benchNames', () => {
+  const project = { top: 'top', simTop: 'tb_top', board: 'basys2', files: [
+    { path: 'src/top.vhd', role: 'design' }, { path: 'src/G.sch.json', role: 'design' }, { path: 'sim/tb_top.vhd', role: 'sim' }, { path: 'sim/tb_other.v', role: 'sim' }] };
+  const files = {
+    'src/top.vhd': 'entity top is end;\n', 'src/G.sch.json': JSON.stringify({ name: 'G' }),
+    'sim/tb_top.vhd': 'entity TB_top is end;\n', 'sim/tb_other.v': 'module tb_other; endmodule\n',
+  };
+  assert.deepEqual([...benchNames(project, files)].sort(), ['tb_other', 'tb_top']);
+  assert.deepEqual([...benchNames({}, files)], []);
+  assert.equal(viewProblem(project, files, { view: 'simulate' }), null);
+  assert.equal(viewProblem(project, files, { view: 'simulate', top: 'tb_other' }), null);
+  assert.equal(viewProblem(project, files, { view: 'simulate', top: 'TB_TOP' }), null);
+  assert.equal(viewProblem(project, files, { view: 'simulate', top: 'top' }), '\'top\' is not a test bench of the design');
+  assert.equal(viewProblem({ ...project, simTop: '' }, files, { view: 'simulate', top: 'tb_other' }), null);
+  assert.equal(viewProblem({ ...project, simTop: '' }, files, { view: 'simulate' }), 'the design has no test bench to simulate');
+  for (const view of [null, 'try', 'emulate']) assert.equal(viewProblem(project, files, { view, top: 'tb_other' }), '\'tb_other\' is a test bench: a link opens it in the simulation', view);
+  assert.equal(viewProblem(project, files, { view: 'try', top: 'g' }), null);
+  assert.equal(viewProblem(project, files, { top: 'top' }), null);
 });

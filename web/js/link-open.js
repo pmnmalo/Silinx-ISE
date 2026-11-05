@@ -107,7 +107,7 @@ export async function openFromLink(opts) {
     }
     app.log(`Opened '${d.name}' from a link${exists ? '' : kept ? ` (a new project; '${kept}' kept as it is)` : ' (a new project)'}${view ? `: ${VIEWS[view]}` : ''}.`, 'ok');
     // the link's module selected in the Design pane, its source open when no view opens (#2871)
-    if (top || view) await showModule(top || S.project.top, !view);
+    if ((top || view) && view !== 'simulate') await showModule(top || S.project.top, !view);
     if (view) await openView(view, top || S.project.top, d.files);
     return true;
   } catch (e) {
@@ -119,7 +119,7 @@ export async function openFromLink(opts) {
 // the link's view of the project now open: Try it (a schematic opened, its live simulation started; a state diagram or
 // a Petri net opened, its Simulate panel shown, #2869), the test bench's simulation, the board emulator
 async function openView(view, module, files) {
-  if (view === 'simulate') return app.runSimulation(S.project.simTop);
+  if (view === 'simulate') return app.runSimulation(module === S.project.top ? S.project.simTop : module);   // (the link's test bench, else the project's, #2878)
   if (view === 'emulate') { const { openEmulator } = await import('./viewers.js'); return openEmulator(module); }
   const path = tryDrawing(files || {}, module);
   if (!path) throw fail(`Try it: '${module}' is not a schematic, a state diagram or a Petri net`);

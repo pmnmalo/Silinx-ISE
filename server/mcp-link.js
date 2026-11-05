@@ -29,7 +29,7 @@ export const LINK_TOOLS = [
     description: `The link that opens a project in Silinx, as Copy Link… does (for lecture slides): the whole project inside the link (compressed; the HDL its drawings make again left out), and what it opens in: view try (Try it: a schematic's live simulation, a state diagram's or a Petri net's Simulate), simulate (its test bench's simulation) or emulate (the board emulator); top: the module (default the project's top). A link longer than ${LINK_LIMITS.slides} characters works in a browser but some slide tools cut it; one above ${LINK_LIMITS.maxEncoded} cannot be made (export_project kind silinx, a zip hosted elsewhere, and its link #open=<its https address>). Anyone with the link has the whole project, its comments included.`,
     inputSchema: { type: 'object', properties: {
       project: PROJECT, view: { type: 'string', enum: LINK_VIEWS, description: 'What the link opens: try, simulate or emulate (default: the project only).' },
-      top: STR('The module to open (default: the project\'s top).'),
+      top: STR('The module to open (default: the project\'s top); with view simulate, the test bench to simulate (default: the project\'s); a test bench only with simulate.'),
       base: STR(`The address of Silinx the link opens (default ${SITE_URL}, the site's latest release; e.g. a local server's http://localhost:3000/).`),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },

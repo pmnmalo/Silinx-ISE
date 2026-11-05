@@ -210,16 +210,26 @@ export function tryDrawing(files, module) {
 export function viewProblem(project, files, { view, top } = {}) {
   const module = top || project?.top || '';
   if (top && !moduleNames(files).has(top.toLowerCase())) return `the design has no module '${top}'`;
+  // a test bench's simulation, the other views the design's modules (#2878)
+  const bench = top && benchNames(project, files).has(top.toLowerCase());
+  if (view === 'simulate' && top && !bench) return `'${top}' is not a test bench of the design`;
+  if (view !== 'simulate' && bench) return `'${top}' is a test bench: a link opens it in the simulation`;
   if (view === 'try') {
     if (!module) return 'Try it: the design has no top module (give top)';
     if (!tryDrawing(files, module)) return `Try it: '${module}' is not a schematic, a state diagram or a Petri net`;
   }
-  if (view === 'simulate' && !project?.simTop) return 'the design has no test bench to simulate';
+  if (view === 'simulate' && !top && !project?.simTop) return 'the design has no test bench to simulate';
   if (view === 'emulate') {
     if (!project?.board) return 'the design has no board to emulate it on';
     if (!module) return 'the design has no top module to emulate';
   }
   return null;
+}
+/** The design's test benches (#2878): the modules of its files with the Simulation association (silinx.json's role
+ *  'sim'), in lower case. */
+export function benchNames(project, files) {
+  const sim = Object.fromEntries((project?.files || []).filter(f => f?.role === 'sim' && typeof files[f.path] === 'string').map(f => [f.path, files[f.path]]));
+  return moduleNames(sim);
 }
 // the modules a project's files define, in lower case (#2876): its HDL's entities and modules, its drawings' names
 function moduleNames(files) {

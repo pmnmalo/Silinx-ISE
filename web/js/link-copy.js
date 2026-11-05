@@ -25,9 +25,20 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   const files = Object.fromEntries(entries.filter(e => e.path !== 'silinx.json').map(e => [e.path, textOf(e)]));
   let design = null, encodeError = null;
   try { design = (await encodeDesign(entries)).design; } catch (e) { encodeError = e.message; }
-  const mods = [...new Set([S.project.top, ...(S.modules || []).map(m => m.name)].filter(Boolean))];
+  // the Module list follows Open in (#2878): the simulation's, the test benches (the project's first); the others', the
+  // design's modules (its top first), no test bench
+  const pj = S.project, byName = (a, b) => a.localeCompare(b);
+  const benches = [...new Set([pj.simTop, ...(S.modules || []).filter(m => m.role === 'sim').map(m => m.name).sort(byName)].filter(Boolean))];
+  const designMods = [...new Set([pj.top, ...(S.modules || []).filter(m => m.role !== 'sim').map(m => m.name)].filter(Boolean))];
   const viewSel = h('select', { 'data-field': 'view' }, ...VIEWS.map(([v, l]) => h('option', { value: v, selected: v === (view || '') }, l)));
-  const modSel = h('select', { 'data-field': 'module' }, ...mods.map(m => h('option', { value: m, selected: m === (module || S.project.top) }, m === S.project.top ? `${m} (top)` : m)));
+  const modSel = h('select', { 'data-field': 'module' });
+  let chosen = { design: module || pj.top, bench: pj.simTop };
+  const isSim = () => viewSel.value === 'simulate';
+  const fillModules = () => {
+    const [list, sel, mark, tag] = isSim() ? [benches, chosen.bench, pj.simTop, 'the project\'s'] : [designMods, chosen.design, pj.top, 'top'];
+    modSel.replaceChildren(...list.map(m => h('option', { value: m, selected: m === sel }, m === mark ? `${m} (${tag})` : m)));
+  };
+  fillModules();
   const out = h('textarea', { class: 'link-out', readonly: true, rows: 4, spellcheck: false, style: { width: '100%', fontFamily: 'var(--mono, monospace)', fontSize: '11px' } });
   const info = h('div', { class: 'hint link-info' });
   const err = h('div', { class: 'wiz-error link-error' });
@@ -37,8 +48,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     out.value = ''; info.textContent = ''; err.textContent = '';
     if (encodeError) { err.textContent = encodeError; return; }
     // (the module: in the link when it is not the project's top, or when the link is a module's: Copy Link to This
-    // Module…, the project then opened on it, #2871)
-    const top = modSel.value && (module || modSel.value !== S.project.top) ? modSel.value : null;
+    // Module…, the project then opened on it, #2871; a test bench when it is not the project's, #2878)
+    const top = !modSel.value ? null : isSim() ? (modSel.value !== pj.simTop ? modSel.value : null) : (module || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
     link = makeLink(linkBase(), { design, view: viewSel.value || null, top });
@@ -47,8 +58,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
       ? `${link.length} characters: some slide tools cut a link longer than ${LINK_LIMITS.slides} (export the project as a .zip, host it, and link to it with #open=).`
       : `${link.length} characters.`;
   };
-  viewSel.addEventListener('change', update);
-  modSel.addEventListener('change', update);
+  viewSel.addEventListener('change', () => { fillModules(); update(); });
+  modSel.addEventListener('change', () => { chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
   update();
   const r = await dialog({
     title: 'Copy Link', width: 560,
