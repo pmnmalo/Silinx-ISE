@@ -32,7 +32,10 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   const designMods = [...new Set([pj.top, ...(S.modules || []).filter(m => m.role !== 'sim').map(m => m.name)].filter(Boolean))];
   const viewSel = h('select', { 'data-field': 'view' }, ...VIEWS.map(([v, l]) => h('option', { value: v, selected: v === (view || '') }, l)));
   const modSel = h('select', { 'data-field': 'module' });
-  let chosen = { design: module || pj.top, bench: pj.simTop };
+  // (a test bench given, from the Simulation hierarchy's menu: the simulation, that test bench chosen, #2883)
+  const givenBench = module && benches.includes(module) ? module : null;
+  if (givenBench && !view) viewSel.value = 'simulate';
+  let chosen = { design: givenBench ? pj.top : module || pj.top, bench: givenBench || pj.simTop };
   const isSim = () => viewSel.value === 'simulate';
   const fillModules = () => {
     const [list, sel, mark, tag] = isSim() ? [benches, chosen.bench, pj.simTop, 'the project\'s'] : [designMods, chosen.design, pj.top, 'top'];
@@ -49,7 +52,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     if (encodeError) { err.textContent = encodeError; return; }
     // (the module: in the link when it is not the project's top, or when the link is a module's: Copy Link to This
     // Module…, the project then opened on it, #2871; a test bench when it is not the project's, #2878)
-    const top = !modSel.value ? null : isSim() ? (modSel.value !== pj.simTop ? modSel.value : null) : (module || modSel.value !== pj.top ? modSel.value : null);
+    const top = !modSel.value ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
     link = makeLink(linkBase(), { design, view: viewSel.value || null, top });

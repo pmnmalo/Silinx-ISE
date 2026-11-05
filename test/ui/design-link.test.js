@@ -199,6 +199,50 @@ uiTest('#2878 Copy Link…: the Module list follows Open in: Simulation the test
   await page.waitConsole(/ERROR: Open from a link: 'tb_b' is a test bench: a link opens it in the simulation\./);
 });
 
+uiTest('#2883 a test bench\'s Copy Link to This Module… in the Simulation hierarchy: Simulation, that test bench chosen; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'TbLink', top: 'inv', simTop: 'tb_a',
+    files: { 'src/inv.vhd': INV, 'sim/tb_a.vhd': tbOf('tb_a'), 'sim/tb_b.vhd': tbOf('tb_b') },
+    roles: { 'sim/tb_a.vhd': 'sim', 'sim/tb_b.vhd': 'sim' } });
+  await page.openProject('TbLink');
+  // the Simulation hierarchy: Tasks ▸ Simulate's panel (the Silinx interface), the Design pane's Simulation view (ISE style)
+  const tasks = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
+  const benchMenu = async (item) => {
+    if (tasks) {
+      // (Simulate's task, unless shown: its button again would fold it)
+      const shown = () => page.eval(() => [...document.querySelectorAll('#task-sim-panel .task-sim-bench .row')].some((r) => r.getClientRects().length));
+      if (!await shown()) await page.click('#task-switch .task-btn[data-task="sim"]');
+      await page.waitFor(() => [...document.querySelectorAll('#task-sim-panel .task-sim-bench .row')].some((r) => r.getClientRects().length && /tb_b/.test(r.textContent)), [], { what: 'the test benches' });
+      await page.rightClick('#task-sim-panel .task-sim-bench .row .lbl', { text: 'tb_b' });
+    } else {
+      await page.click('input[name=view][value=sim]');
+      await page.waitFor(() => [...document.querySelectorAll('#hier .row .lbl')].some((l) => l.textContent === 'tb_b'), [], { what: 'the Simulation view' });
+      await page.rightClick('#hier .row .lbl', { text: 'tb_b' });
+    }
+    await page.waitForSelector('body > .menu-popup');
+    await page.click('body > .menu-popup .mi', { text: item });
+  };
+  await benchMenu('Copy Link to This Module…');
+  await page.waitDialog('Copy Link');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view]').value), 'simulate');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=module]').value), 'tb_b');
+  const link = await page.waitFor(() => /&top=tb_b&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'tb_b\'s link' });
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  try {
+    await benchMenu('Copiar Ligação para Este Módulo…');
+    assert.equal(await page.waitDialog('Copiar Ligação'), 'Copiar Ligação');
+    assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view] option:checked').textContent), 'Simulação');
+    await page.dialogButton('Cancelar');
+    await page.waitNoDialog();
+  } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
+  // the link simulates tb_b
+  await openLink(page, new URL(link).hash.slice(1), 'tbl=1');
+  await linkOpened(page);
+  await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'isim:tb_b'), [], { what: 'tb_b simulated', timeout: 60000 });
+});
+
 uiTest('#2876 regression, a schematic named in another case than its module (Gates, the HDL\'s gates): Copy Link to This Module… offers Try it, no error; the link opens it', E, async (page) => {
   const sch = JSON.parse(await fs.readFile(new URL('../../examples/gates/src/gates.sch.json', import.meta.url), 'utf8'));
   // (as the user's ALU_4bit: the schematic's name as typed, its HDL file generated from it, the compiled module in
