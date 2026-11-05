@@ -277,8 +277,11 @@ test('theme.css: the pages\' own colours have a dark value; no colour written in
   ]);
   // the board emulator's own style sheet: the page's parts (not the board) in theme colours
   const emu = fs.readFileSync(path.join(ROOT, 'web/js/emulator.js'), 'utf8');
+  // a selector as a RegExp of its text: every RegExp character escaped, the backslash too (CodeQL js/incomplete-sanitization, #2623)
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const s of ['.emu-log .error', '.a\\:b[c] > (d)+e?', 'x\\.y']) assert.match(s, new RegExp(`^${esc(s)}$`), s);
   for (const sel of ['.emu-bar .sep', '.emu > .doc-status > .stat', '.emu-box td', '.emu-log', '.emu-log .error', '.emu-log .warning', '.emu-hint', '.emu-board-note']) {
-    const rules = [...emu.matchAll(new RegExp(`(^|\\} )${sel.replace(/[.*]/g, '\\$&')} \\{([^}]*)\\}`, 'gm'))].map((m) => m[2]);
+    const rules = [...emu.matchAll(new RegExp(`(^|\\} )${esc(sel)} \\{([^}]*)\\}`, 'gm'))].map((m) => m[2]);
     assert.ok(rules.length, sel);
     for (const r of rules) assert.doesNotMatch(r, /#[0-9a-fA-F]{3,8}\b/, `${sel}: ${r}`);
   }
