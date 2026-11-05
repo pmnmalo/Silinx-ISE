@@ -26,6 +26,23 @@ export function templateNames(dir) {
 
 export const PROJECT_FILE = 'silinx.json';
 
+/** An example's description and files: { project, files: { path: text } } (silinx.json apart; #2826: a link to it
+ *  opens the project of that name as it is when it has the same files). */
+export function exampleFiles(name) {
+  const dir = path.join(EXAMPLES_DIR, String(name));
+  if (!/^[a-z0-9_-]+$/i.test(String(name)) || !fsSync.existsSync(path.join(dir, PROJECT_FILE))) throw new HttpError(404, `unknown example '${name}'`);
+  const files = {};
+  const walk = sub => {
+    for (const d of fsSync.readdirSync(path.join(dir, sub), { withFileTypes: true })) {
+      const rel = sub ? `${sub}/${d.name}` : d.name;
+      if (d.isDirectory()) walk(rel);
+      else if (d.isFile() && rel !== PROJECT_FILE) files[rel] = fsSync.readFileSync(path.join(dir, rel), 'utf8');
+    }
+  };
+  walk('');
+  return { project: JSON.parse(fsSync.readFileSync(path.join(dir, PROJECT_FILE), 'utf8')), files };
+}
+
 export function workspaceDir() {
   return process.env.SILINX_WORKSPACE || path.join(os.homedir(), 'Silinx-projects');
 }

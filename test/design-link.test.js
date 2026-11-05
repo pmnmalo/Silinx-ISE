@@ -1,0 +1,194 @@
+// A design opened from a link (#2826, core/design-link.js): the design inside the link (encodeDesign / decodeDesign)
+// round trip on every example, byte for byte, the HDL a drawing makes again left out; the link's hash (parseLink /
+// makeLink); and the refusals of an untrusted link (#2829): too long, not base64url, a decompression bomb, a path
+// that leaves the project, a zip address that is not https or is of this computer or a local network, names that
+// are not names (markup).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
+import { EXAMPLE_ORDER } from '../core/examples.js';
+import { LINK_LIMITS, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
+import { readZip, textOf } from '../core/zip.js';
+
+const ROOT = path.join(import.meta.dirname, '..', 'examples');
+function exampleEntries(name) {
+  const out = [];
+  const walk = d => {
+    for (const f of fs.readdirSync(path.join(ROOT, name, d), { withFileTypes: true })) {
+      const rel = d ? `${d}/${f.name}` : f.name;
+      if (f.isDirectory()) walk(rel); else out.push({ path: rel, data: new Uint8Array(fs.readFileSync(path.join(ROOT, name, rel))) });
+    }
+  };
+  walk('');
+  return out;
+}
+const textMap = entries => Object.fromEntries(entries.map(e => [e.path, typeof e.data === 'string' ? e.data : Buffer.from(e.data).toString('utf8')]));
+// a design= made by hand from a payload (as a hostile link would be)
+const b64url = buf => Buffer.from(buf).toString('base64url');
+const raw = payload => b64url(zlib.deflateRawSync(Buffer.from(typeof payload === 'string' ? payload : JSON.stringify(payload))));
+const rejects = (p, message) => assert.rejects(p, e => { assert.equal(e.linkError, true); assert.equal(e.message, message); return true; });
+const throws = (f, message) => assert.throws(f, e => { assert.equal(e.linkError, true); assert.equal(e.message, message); return true; });
+
+// the HDL each example's drawings make again (left out of the link), and the link's length
+const LEFT = { gates: ['src/gates.vhd'], traffic: ['src/lamps.vhd', 'src/traffic.vhd'], blinky: ['src/speed_ctrl.vhd'] };
+
+for (const name of EXAMPLE_ORDER) {
+  test(`encodeDesign / decodeDesign: ${name}, every file back byte for byte`, async () => {
+    const entries = exampleEntries(name);
+    const e = await encodeDesign(entries);
+    assert.equal(e.name, name);
+    assert.deepEqual(e.left.sort(), LEFT[name] || []);
+    assert.equal(e.length, e.design.length);
+    assert.ok(e.length < LINK_LIMITS.maxEncoded);
+    assert.match(e.design, /^[A-Za-z0-9_-]+$/);
+    const d = await decodeDesign(e.design);
+    assert.equal(d.name, name);
+    assert.deepEqual(d.warnings, []);
+    assert.equal(d.entries[0].path, 'silinx.json');
+    const before = textMap(entries), after = textMap(d.entries);
+    assert.deepEqual(Object.keys(after).sort(), Object.keys(before).sort());
+    for (const p of Object.keys(before)) {
+      if (p === 'silinx.json') assert.deepEqual(JSON.parse(after[p]), JSON.parse(before[p]));
+      else assert.equal(after[p], before[p], p);
+    }
+    assert.ok(sameFiles(before, after));
+    // as a Silinx export's zip, for the import
+    const zip = await designZip(d.entries);
+    assert.deepEqual((await readZip(zip, { inflate: x => zlib.inflateRawSync(x) })).map(z => z.path).sort(), Object.keys(before).sort());
+  });
+}
+
+test('encodeDesign: the size of the examples\' links (gates, the smallest with a drawing, fits a slide tool\'s 2 000 characters? no: about 5 000)', async () => {
+  const len = {};
+  for (const n of ['gates', 'traffic', 'micro80']) len[n] = (await encodeDesign(exampleEntries(n))).length;
+  assert.ok(len.gates > LINK_LIMITS.slides && len.gates < 8000, `gates ${len.gates}`);
+  assert.ok(len.traffic < 12000, `traffic ${len.traffic}`);
+  assert.ok(len.micro80 < 30000, `micro80 ${len.micro80}`);
+});
+
+test('encodeDesign: a file that is not text goes as base64 and comes back; a drawing\'s HDL edited by hand stays in the link', async () => {
+  const entries = exampleEntries('gates');
+  const vhd = entries.find(e => e.path === 'src/gates.vhd');
+  vhd.data = new TextEncoder().encode(Buffer.from(vhd.data).toString() + '\n-- edited\n');
+  entries.push({ path: 'doc/logo.png', data: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0, 1]) });
+  const e = await encodeDesign(entries);
+  assert.deepEqual(e.left, []);
+  const d = await decodeDesign(e.design);
+  assert.match(textMap(d.entries)['src/gates.vhd'], /-- edited\n$/);
+  assert.deepEqual([...d.entries.find(x => x.path === 'doc/logo.png').data], [0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0, 1]);
+});
+
+test('encodeDesign: too large for a link, not a project', async () => {
+  const big = [{ path: 'silinx.json', data: JSON.stringify({ name: 'big', files: [] }) },
+    { path: 'src/noise.vhd', data: Array.from({ length: 60000 }, (_, i) => ((i * 2654435761) >>> 0).toString(36)).join(' ') }];
+  await assert.rejects(encodeDesign(big), e => e.linkError && /^the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Silinx ISE Project\) and link to that$/.test(e.message));
+  await rejects(encodeDesign([{ path: 'src/a.vhd', data: 'x' }]), 'not a Silinx project: no silinx.json');
+});
+
+test('decodeDesign: a broken link is refused with its reason', async () => {
+  await rejects(decodeDesign(''), 'the link has no design');
+  await rejects(decodeDesign('a'.repeat(LINK_LIMITS.maxEncoded + 1)), 'the design in the link is too long (64001 characters, at most 64000)');
+  await rejects(decodeDesign('abc$def'), 'the design in the link is not base64url');
+  await assert.rejects(decodeDesign('AAAAAAAA'), e => e.linkError && /^the design in the link does not decode \(/.test(e.message));
+  await assert.rejects(decodeDesign(raw('{not json')), e => e.linkError && /^the design in the link does not decode \(/.test(e.message));
+  await rejects(decodeDesign(raw({ v: 2, project: { name: 'a' }, files: {} })), 'the link\'s design is not a Silinx project');
+  await rejects(decodeDesign(raw({ v: 1, project: [], files: {} })), 'the link\'s design is not a Silinx project');
+  await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: [] })), 'the link\'s design is not a Silinx project');
+  await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/a.vhd': 3 } })), 'the link\'s design: src/a.vhd is not a text');
+  const many = Object.fromEntries(Array.from({ length: LINK_LIMITS.maxFiles + 1 }, (_, i) => [`src/f${i}.vhd`, '']));
+  await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: many })), 'the link\'s design has more than 400 files');
+});
+
+test('decodeDesign: a decompression bomb stops at the limit, inflating no further (#2829)', async () => {
+  const bomb = b64url(zlib.deflateRawSync(Buffer.alloc(32 << 20, 0x20), { level: 9 }));
+  assert.ok(bomb.length < LINK_LIMITS.maxEncoded, `${bomb.length}`);
+  await rejects(decodeDesign(bomb), 'the design in the link does not decode (output above the declared size)');
+});
+
+test('decodeDesign: names that are not a project\'s, paths that leave the project (#2829)', async () => {
+  for (const name of ['', '<img src=x onerror=alert(1)>', '../x', 'a b', 'x'.repeat(65)]) {
+    await rejects(decodeDesign(raw({ v: 1, project: { name }, files: {} })), `the link's design has no valid project name ('${name.slice(0, 64)}')`);
+  }
+  for (const p of ['../evil.vhd', 'src/../../evil', '/etc/passwd', 'C:/x.vhd', 'src\\..\\x', '.git/config', 'src/.silinx', 'silinx.json', 'SILINX.JSON', 'a//b', 'src/<script>\n.vhd']) {
+    await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { [p]: '' } })), `the link's design has a file outside the project ('${p}')`);
+    await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: {}, bin: { [p]: '' } })), `the link's design has a file outside the project ('${p}')`);
+  }
+});
+
+test('decodeDesign: through the import gate (#2830): a file it refuses left out, said in the warnings', async () => {
+  const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/a.vhd': 'entity a is end;\n', 'doc/page.html': '<script>alert(1)</script>', 'src/A.VHD': '' } }));
+  assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/a.vhd']);
+  assert.deepEqual(d.warnings, ['doc/page.html: not imported: a web page, script or program: not a project file', 'src/A.VHD: not imported: same name as \'src/a.vhd\' but for its case']);
+});
+
+test('decodeDesign: a drawing\'s HDL that cannot be made again is a warning, the drawing kept', async () => {
+  const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/x.fsm.json': '{broken' }, made: ['src/x.vhd'] }));
+  assert.deepEqual(d.warnings, ['src/x.vhd: not made again from its drawing']);
+  assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/x.fsm.json']);
+});
+
+test('parseLink: the options of a link', () => {
+  assert.equal(parseLink(''), null);
+  assert.equal(parseLink('#'), null);
+  assert.equal(parseLink('#token=abc'), null);
+  assert.deepEqual(parseLink('#open=example:traffic&view=try'), { source: { kind: 'example', name: 'traffic' }, view: 'try', top: null, board: null });
+  assert.deepEqual(parseLink('#design=AbC-_9&top=counter&view=emulate'), { source: { kind: 'design', design: 'AbC-_9' }, view: 'emulate', top: 'counter', board: null });
+  assert.deepEqual(parseLink('open=https://example.org/c/lecture3.zip&board=basys2&view=simulate'), { source: { kind: 'zip', url: 'https://example.org/c/lecture3.zip' }, view: 'simulate', top: null, board: 'basys2' });
+  assert.deepEqual(parseLink('#open=https%3A%2F%2Fraw.githubusercontent.com%2Fu%2Fr%2Fmain%2Fa%20b.zip'), { source: { kind: 'zip', url: 'https://raw.githubusercontent.com/u/r/main/a%20b.zip' }, view: null, top: null, board: null });
+  // the token is not one of the link's options (api.js reads it), and no link sets it (#2829)
+  assert.deepEqual(parseLink('#token=abc&open=example:gates'), { source: { kind: 'example', name: 'gates' }, view: null, top: null, board: null });
+});
+
+test('parseLink: a broken or hostile link is refused (#2829)', () => {
+  throws(() => parseLink('#view=try'), 'the link names no design (design= or open=)');
+  throws(() => parseLink('#design=&view=try'), 'the link\'s design= is empty');
+  throws(() => parseLink('#design=a&open=example:gates'), 'the link has both design= and open=');
+  throws(() => parseLink('#open=example:gates&open=example:pong'), 'the link has two open=');
+  throws(() => parseLink('#open=example:../x'), 'the link names no example (\'../x\')');
+  throws(() => parseLink('#open=%E0%A4%A'), 'the link\'s open is not well encoded');
+  throws(() => parseLink('#open=not a url'), 'the link\'s open= is not an address (\'not a url\')');
+  for (const u of ['javascript:alert(1)', 'data:application/zip;base64,AAAA', 'file:///etc/passwd', 'blob:https://x.org/1', 'http://example.org/a.zip', 'ftp://example.org/a.zip']) {
+    throws(() => parseLink(`#open=${encodeURIComponent(u)}`), `the link's open= is not an https address ('${u}')`);
+  }
+  throws(() => parseLink('#open=https://u:p@example.org/a.zip'), 'the link\'s open= carries a user name or password');
+  for (const [u, host] of [['https://localhost:3000/a.zip', 'localhost'], ['https://127.0.0.1/a.zip', '127.0.0.1'], ['https://2130706433/a.zip', '127.0.0.1'],
+    ['https://0x7f.1/a.zip', '127.0.0.1'], ['https://10.0.0.5/a.zip', '10.0.0.5'], ['https://192.168.1.1/a.zip', '192.168.1.1'], ['https://172.20.0.1/a.zip', '172.20.0.1'],
+    ['https://169.254.169.254/a.zip', '169.254.169.254'], ['https://[::1]/a.zip', '[::1]'], ['https://[fd00::1]/a.zip', '[fd00::1]'], ['https://mac-mini.local/a.zip', 'mac-mini.local'],
+    ['https://router/a.zip', 'router'], ['https://100.101.102.103/a.zip', '100.101.102.103']]) {
+    throws(() => parseLink(`#open=${u}`), `the link's open= is an address of this computer or of a local network ('${host}')`);
+  }
+  throws(() => parseLink('#open=example:gates&view=run'), 'the link\'s view \'run\' is not one of try, simulate, emulate');
+  throws(() => parseLink('#open=example:gates&top=%3Cscript%3E'), 'the link\'s top \'<script>\' is not a module name');
+  throws(() => parseLink('#open=example:gates&board=%22%3E%3Cimg%3E'), 'the link\'s board \'"><img>\' is not a board name');
+  throws(() => parseLink(`#design=${'a'.repeat(LINK_LIMITS.maxEncoded + 1100)}`), 'the link is too long');
+});
+
+test('privateHost: the public names and addresses are not', () => {
+  for (const h of ['example.org', 'raw.githubusercontent.com', '8.8.8.8', '172.32.0.1', '192.169.0.1', '[2606:4700::1111]']) assert.equal(privateHost(h), false, h);
+});
+
+test('makeLink: the link of a design, an example, a zip; parseLink reads it back', async () => {
+  const base = 'https://pmnmalo.github.io/Silinx-ISE/#token=x';
+  assert.equal(makeLink(base, { example: 'traffic', view: 'try' }), 'https://pmnmalo.github.io/Silinx-ISE/#open=example:traffic&view=try');
+  const { design } = await encodeDesign(exampleEntries('gates'));
+  const l = makeLink('http://localhost:3000/', { design, top: 'gates', board: 'nexys2', view: 'emulate' });
+  assert.deepEqual(parseLink(new URL(l).hash), { source: { kind: 'design', design }, view: 'emulate', top: 'gates', board: 'nexys2' });
+  const z = makeLink(base, { zip: 'https://example.org/a b.zip?x=1&y=2#z' });
+  assert.equal(z, 'https://pmnmalo.github.io/Silinx-ISE/#open=https://example.org/a%20b.zip?x=1%26y=2%23z');
+  assert.equal(parseLink(new URL(z).hash).source.url, 'https://example.org/a%20b.zip?x=1&y=2#z');
+  throws(() => makeLink(base, {}), 'a link has one design: design, example or zip');
+  throws(() => makeLink(base, { example: 'a', design: 'b' }), 'a link has one design: design, example or zip');
+  throws(() => makeLink(base, { example: 'a', view: 'x' }), 'view: one of try, simulate, emulate');
+  throws(() => makeLink(base, { example: 'a', top: '1x' }), 'top: \'1x\' is not a module name');
+  throws(() => makeLink(base, { example: 'a', board: 'a b' }), 'board: \'a b\' is not a board name');
+  throws(() => makeLink(base, { example: 'a/b' }), 'example: \'a/b\' is not an example\'s name');
+});
+
+test('sameFiles: silinx.json left out, any other difference counts', () => {
+  assert.ok(sameFiles({ 'silinx.json': '1', a: 'x' }, { 'silinx.json': '2', a: 'x' }));
+  assert.ok(!sameFiles({ a: 'x' }, { a: 'y' }));
+  assert.ok(!sameFiles({ a: 'x' }, { a: 'x', b: '' }));
+  assert.equal(textOf({ data: new TextEncoder().encode('ok') }), 'ok');
+});
