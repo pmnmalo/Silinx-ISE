@@ -105,7 +105,7 @@ async function askReplaceProject(pname) {
 // the import then fails, it comes back from a snapshot taken before (standalone: a bundle; server:
 // a Silinx zip of the whole project) and is opened again if it was open. Should the restore fail
 // too, the server still has the old project in the workspace .trash folder.
-async function replaceProjectWith(pname, fn) {
+export async function replaceProjectWith(pname, fn) {
   const exists = (await api.projects()).some(p => p.name === pname);
   const wasOpen = S.project?.name === pname;
   let backup = null;

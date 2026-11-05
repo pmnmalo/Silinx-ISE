@@ -4,11 +4,12 @@ import { prefKey } from './prefs.js';
 
 // The server answers only with its token, made at every start (#2564) and given in the address it
 // prints and opens (…/#token=…): kept for this browser (another tab opened at the plain address has it
-// too, until the server restarts), sent with every request.
+// too, until the server restarts), sent with every request. Only an address whose hash is the token alone sets it: a
+// link with other options (#2826) does not (#2829).
 const TOKEN_KEY = prefKey('silinx-token');
 const TOKEN = (() => {
   try {
-    const m = /(?:^#|&)token=([\w-]+)/.exec(location.hash);
+    const m = /^#token=([\w-]+)$/.exec(location.hash);
     if (m) { localStorage.setItem(TOKEN_KEY, m[1]); history.replaceState(null, '', location.pathname + location.search); }
     return localStorage.getItem(TOKEN_KEY);
   } catch { return null; }
@@ -41,6 +42,7 @@ export const api = {
   workspace: () => req('GET', '/api/workspace'),
   templates: () => req('GET', '/api/templates'),
   testDesigns: () => req('GET', '/api/test-designs'),
+  exampleFiles: name => req('GET', `/api/templates/${enc(name)}/files`),
   createProject: p => req('POST', '/api/projects', p),
   project: name => req('GET', `/api/projects/${enc(name)}`),
   saveProject: (name, pj) => req('PUT', `/api/projects/${enc(name)}`, pj),

@@ -112,3 +112,37 @@ board or a PROM) without the user's say.
    Saving the project's description does not make it trusted; only that button does. The MCP server has no tool to
    trust a project, by design: an assistant led astray by what it read cannot. A project made in Silinx is trusted
    from the start.
+
+### A design opened from a link (#2826, #2829)
+
+A link (`…/#design=…`, `#open=example:<name>`, `#open=<zip address>`, with `view=`, `top=`, `board=`) can come from a
+slide, an e-mail or a forum post. What it can do: open a design in a project of the user's workspace (a new one, named
+after the design) and its view (Try it, the test bench's simulation, the board emulator), all inside the browser.
+What it cannot do:
+
+- **Run a script, or carry markup:** its project's name and `top=` / `board=` must be names (letters, digits, `_`,
+  `-`), anything else refuses the link; its files go through the import gate above and reach the page as text.
+- **Exhaust the memory:** the link's design is at most 64 000 characters, inflated to at most 4 MB (inflating stops
+  there) and 400 files; a zip at an address is read to at most 16 MB, then through the gate.
+- **Reach this computer or a local network, or send anything:** `open=` takes an `https:` address only, with no user
+  name or password, never `localhost`, a loopback, private, link-local or carrier-grade address, an IPv6 local one or
+  a `.local` / `.lan` / `.internal` name (also a decimal or hexadecimal address, read as the browser reads it). The
+  zip is fetched by the browser, never by the local server, only after the user agrees in a dialog that names its
+  address, with no cookies and no referrer. The MCP server's `open_link` fetches nothing: it opens a design inside
+  the link or an example. The link's hash is never sent to a server (a browser sends no hash in a request; the site's page count
+  takes the page's path, not its hash), and it is cleared from the address once read.
+- **Replace the user's work:** a project of the design's name is opened as it is when its files are the link's; one
+  that differs is replaced only when the user chooses Replace (the old one to the workspace's `.trash`, or deleted
+  from the browser's storage, as the dialog says); Keep Mine leaves it. The MCP server's `open_link` never replaces
+  one. No setting (interface, language, toolchain, MCP folder) is changed by a link.
+- **Set the local server's token:** only an address whose hash is the token alone (`#token=…`, the one the server
+  prints and opens) stores it; a link with other options never sets or replaces it, and the link's fetch never
+  carries it.
+- **Run anything outside the browser:** opening a link runs no ISE, shell or programmer; Try it, the simulation and
+  the emulator run the design in the browser's simulators, which a Stop ends. A project made from a link's design
+  or zip (not an example) is an imported one (trust, above): Xilinx ISE and programming a board or a PROM wait for
+  its Trust Project.
+
+Privacy: a `#design=` link holds the whole project, its comments too (a student's name in a header): Copy Link…
+says so. A broken link, a design that does not decode, a zip that cannot be fetched, or a view the design does not
+have is an error in the console, the workspace as it was.

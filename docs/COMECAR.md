@@ -58,6 +58,9 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   menos memória, por isso um desenho grande pode falhar na síntese. Os menus do botão direito abrem
   com um **toque longo** (o dedo parado meio segundo); dois dedos movem um desenho e o gesto de pinça faz zoom. Na vertical o painel Projeto é uma gaveta (o botão à esquerda do
   cabeçalho) e as propriedades dos editores abrem por cima do desenho (**Propriedades**).
+- **Uma ligação para os diapositivos**: clique com o botão direito no projeto, no painel Design, **Copiar Ligação
+  para o Projeto…**: a ligação abre o Silinx no circuito, em Experimentar, na simulação ou no emulador da placa, com o
+  projeto inteiro lá dentro (ver o README, *A design in a link*).
 - A interface pode ser posta em português em **View ▸ Language**.
 
 ---
