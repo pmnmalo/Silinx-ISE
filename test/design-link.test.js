@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { EXAMPLE_ORDER } from '../core/examples.js';
-import { LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
+import { freeName, LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
 import { readZip, textOf } from '../core/zip.js';
 
 const ROOT = path.join(import.meta.dirname, '..', 'examples');
@@ -215,4 +215,13 @@ test('viewProblem / tryDrawing: Try it is a schematic\'s, a state diagram\'s or 
   assert.equal(viewProblem(pj, files, { view: 'emulate', top: 'n' }), null);
   assert.equal(viewProblem({ top: 'g' }, files, { view: 'emulate' }), 'the design has no board to emulate it on');
   assert.equal(viewProblem({ board: 'basys2' }, files, { view: 'emulate' }), 'the design has no top module to emulate');
+});
+
+test('freeName: the first free <name>_N (#2875), the case ignored, within 64 characters', () => {
+  assert.equal(freeName('ALU', ['ALU']), 'ALU_2');
+  assert.equal(freeName('ALU', ['ALU', 'ALU_2', 'alu_3']), 'ALU_4');
+  assert.equal(freeName('ALU', ['ALU', 'ALU_3']), 'ALU_2');
+  const long = 'a'.repeat(64);
+  assert.equal(freeName(long, [long]), `${'a'.repeat(62)}_2`);
+  assert.equal(freeName(long, [long, `${'a'.repeat(62)}_2`]).length, 64);
 });
