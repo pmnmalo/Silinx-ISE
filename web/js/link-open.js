@@ -122,9 +122,16 @@ async function openView(view, module, files) {
   if (view === 'simulate') return app.runSimulation(module === S.project.top ? S.project.simTop : module);   // (the link's test bench, else the project's, #2878)
   if (view === 'emulate') { const { openEmulator } = await import('./viewers.js'); return openEmulator(module); }
   const path = tryDrawing(files || {}, module);
-  if (!path) throw fail(`Try it: '${module}' is not a schematic, a state diagram or a Petri net`);
+  if (!path) throw fail(`Try it: '${module}' is not a schematic, a state diagram, a Petri net or an ASM chart`);
   if (/\.fsm\.json$/i.test(path)) { await app.openFsm(path); return app.findDoc(`fsm:${path}`)?.fsmEditor?.showPanel('sim'); }
   if (/\.pn\.json$/i.test(path)) { await app.openPetri(path); return app.findDoc(`pn:${path}`)?.petriEditor?.showPanel('sim'); }
+  // an ASM chart's simulation (#2881): its editor's, once it has one; until then the chart, said
+  if (/\.asm\.json$/i.test(path)) {
+    await app.openAsm(path);
+    const ed = app.findDoc(`asm:${path}`)?.asmEditor;
+    if (typeof ed?.showPanel === 'function') return ed.showPanel('sim');
+    return app.log(`Open from a link: ${path} opened; the ASM chart's simulation is not in this version yet.`, 'info');
+  }
   await app.openSch(path);
   await app.findDoc(`sch:${path}`)?.schEditor?.simulate();
 }

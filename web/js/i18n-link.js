@@ -24,7 +24,7 @@ export const LINK_PT_PATTERNS = [
   [/^'(.+)' is not a test bench of the design\.$/, '\'$1\' não é um test bench do circuito.'],
   [/^'(.+)' is a test bench: a link opens it in the simulation\.$/, '\'$1\' é um test bench: uma ligação abre-o na simulação.'],
   [/^Try it: the design has no top module \(give top\)\.$/, 'Experimentar: o circuito não tem módulo de topo.'],
-  [/^Try it: '(.+)' is not a schematic, a state diagram or a Petri net\.$/, 'Experimentar: \'$1\' não é um esquemático, um diagrama de estados nem uma rede de Petri.'],
+  [/^Try it: '(.+)' is not a schematic, a state diagram, a Petri net or an ASM chart\.$/, 'Experimentar: \'$1\' não é um esquemático, um diagrama de estados, uma rede de Petri nem um fluxograma ASM.'],
   [/^The design has no module '(.+)'\.$/, 'O circuito não tem o módulo \'$1\'.'],
   [/^The design has no test bench to simulate\.$/, 'O circuito não tem test bench para simular.'],
   [/^The design has no board to emulate it on\.$/, 'O circuito não tem placa onde o emular.'],
