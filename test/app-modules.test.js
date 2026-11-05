@@ -37,7 +37,7 @@ const PARTS = {
     'fsmFromHdlFile', 'convertToFsm', 'fsmToAsmChart', 'asmToFsmDiagram', 'fsmTruthTables', 'openPetri',
     'syncHdlFromPetri', 'petriContextMenu', 'fsmContextMenu', 'schModules', 'openSch', 'isAsm', 'isTt', 'isFsm',
     'isPn', 'viewNoun', 'viewTitle', 'viewIcon', 'viewKind', 'viewContextMenu', 'openView', 'viewBadge',
-    'syncedViewMenu', 'drawnHdlLanguage', 'adoptDrawnHdl', 'writeDrawnHdl', 'linkOpenEditor', 'clashTip',
+    'drawingCommands', 'drawnHdlLanguage', 'adoptDrawnHdl', 'writeDrawnHdl', 'linkOpenEditor', 'clashTip',
     'drawnHdlClashes', 'clashItem', 'resolveHdlClash', 'syncBanner', 'refreshSyncBanner',
     'topUcfPorts', 'ucfPort', 'refreshOpenEditor', 'syncHdlFromSchematic',
     'convertToSchematic', 'drawingsAsBase', 'setViewAsTop', 'viewSel', 'topOfView', 'exportSchAsIse', 'schContextMenu'],
