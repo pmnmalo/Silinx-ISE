@@ -1290,6 +1290,53 @@ uiTest('#2826 browser edition (the Pages site): a design\'s link and an example\
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /WARNING|ERROR/.test(l)), []);
 }, { url: () => 'about:blank', timeout: 180000 });
 
+uiTest('#2894 regression, browser edition (the Pages site): a link opened in a new browser keeps constraints/top.ucf: the project only and a module\'s link, the emulator with every top port on its pin, Generate Programming File with no warnings', E, async (page) => {
+  const boot = () => page.waitFor(() => window.SilinxApp && window.Silinx.linkOpened, [], { what: 'the link opened', timeout: 60000 });
+  const ucf = await fs.readFile(path.join(ROOT, 'examples/pong/constraints/top.ucf'), 'utf8');
+  const pj = JSON.parse(await fs.readFile(path.join(ROOT, 'examples/pong/silinx.json'), 'utf8'));
+  await page.goto(`${siteUrl}?l=1#open=example:pong`);
+  await boot();
+  // Copy Link…'s links: the project only, the module debounce's, the board emulator
+  const copy = async (view, module) => {
+    if (module) {
+      const row = await page.waitFor((m) => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => r.dataset.module === m); return i >= 0 ? i : null; }, [module], { what: `${module}'s row` });
+      await page.rightClick('#hier .row .lbl', { index: row });
+      await page.waitForSelector('body > .menu-popup');
+      await page.click('body > .menu-popup .mi', { text: 'Copy Link to This Module…' });
+    } else await page.menu('File', 'Copy Link to Project…');
+    await page.waitDialog('Copy Link');
+    await page.eval((v) => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = v; s.dispatchEvent(new Event('change')); }, view);
+    const link = await page.waitFor(() => /#design=[\w-]+/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
+    await page.dialogButton('Cancel');
+    await page.waitNoDialog();
+    return link;
+  };
+  const links = { only: await copy(''), module: await copy('', 'debounce'), emulate: await copy('emulate') };
+  // each opened in a browser that has none of it (a student's): imported, its constraints with it
+  let n = 2;
+  for (const [what, link] of Object.entries(links)) {
+    await page.eval(() => localStorage.removeItem('silinx.standalone.fs'));
+    await page.goto(link.replace('#', `?l=${n++}#`));
+    await boot();
+    await page.waitConsole(/Opened 'pong' from a link \(a new project\)/);
+    const got = await page.eval(() => ({ constraints: window.Silinx.project.constraints, board: window.Silinx.project.board, device: window.Silinx.project.device, top: window.Silinx.project.top, ucf: window.Silinx.fileTree.includes('constraints/top.ucf') }));
+    assert.deepEqual(got, { constraints: 'constraints/top.ucf', board: pj.board, device: pj.device, top: pj.top, ucf: true }, what);
+  }
+  // the emulator's: every top port on its pin, the .ucf's text
+  await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.wiring, [], { what: 'the emulator', timeout: 120000 });
+  assert.deepEqual(await page.eval(() => window.Silinx.active.view.wiring.unmapped), []);
+  assert.ok(await page.eval(() => window.Silinx.active.view.wiring.bits.length) > 20);
+  assert.equal(await page.eval(() => window.Silinx.ucfText), ucf);
+  // implemented to the bitstream, its pins the .ucf's
+  await page.setView('impl');
+  const before = (await page.consoleText()).length;
+  await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
+  await page.waitFor((b) => /Process "Generate Programming File" (completed successfully|failed)/.test(window.__console().slice(b)), [before], { what: 'the flow', timeout: 180000 });
+  const log = (await page.consoleText()).slice(before);
+  assert.match(log, /Process "Generate Programming File" completed successfully/);
+  assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /WARNING|ERROR/.test(l)), []);
+}, { url: () => 'about:blank', timeout: 360000 });
+
 uiTest('#2320 browser edition: Export Xilinx ISE Project writes a C source as its HDL, in the zip and the .xise, not the C', E, async (page) => {
   const codec = { deflate: (d) => zlib.deflateRawSync(d), inflate: (d) => zlib.inflateRawSync(d) };
   const pj = { name: 'CMod', top: 'twice', preferredLanguage: 'vhdl', files: [] };

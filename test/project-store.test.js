@@ -475,3 +475,42 @@ test('#1156 byLastUsed: the newest change or opening first, then by name; the br
   // the listing of the operations passes it on
   assert.deepEqual((await projectOps(() => browserStore(storage)).list()).map((p) => p.modified), [0]);
 });
+
+// ---- #2894: a design's link (and a Silinx export's zip) imported in the browser keeps its constraints
+import { encodeDesign, decodeDesign } from '../core/design-link.js';
+
+test('#2894 regression: a Silinx export imported in the browser keeps constraints/top.ucf (the default path of an empty project, the I/O Pin Planning\'s), its association, board, device and top', () => {
+  const enc = new TextEncoder();
+  const pj = { ...emptyProjectJson('Pins'), board: 'basys2', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }] };
+  const ucf = 'NET "led<0>" LOC = "M5";\n';
+  const r = projectFromZip('Pins', gateEntries([{ path: 'silinx.json', data: enc.encode(JSON.stringify(pj)) }, { path: 'src/top.vhd', data: enc.encode('entity top is end;') }, { path: 'constraints/top.ucf', data: enc.encode(ucf) }]), { textOf });
+  assert.equal(r.files['constraints/top.ucf'], ucf, 'the old code dropped it');
+  assert.deepEqual(r.missing, []);
+  assert.deepEqual(r.warnings, []);
+  assert.equal(r.json.constraints, 'constraints/top.ucf');
+});
+
+test('#2894 a link round trip of every example with constraints in the browser\'s store (Copy Link…, then the page opening it): the same .ucf text, board, device, top, every file', async () => {
+  for (const ex of ['traffic', 'pong', 'stopwatch', 'clock', 'vga', 'uart']) {
+    const store = browserStore(memStorage()), ops = projectOps(() => store, EXAMPLES);
+    await ops.create({ name: ex, template: ex });
+    const src = await store.load(ex);
+    // (as api-local.js exportZip kind 'silinx', then link-open.js: decodeDesign, the zip's import, projectFromZip)
+    const entries = [{ path: 'silinx.json', data: JSON.stringify(src.json, null, 2) + '\n' }, ...Object.entries(src.files).map(([p, data]) => ({ path: p, data }))];
+    const d = await decodeDesign((await encodeDesign(entries)).design);
+    assert.deepEqual(d.warnings, [], ex);
+    const r = projectFromZip(`${ex}_link`, d.gated, { textOf });
+    assert.deepEqual(r.warnings, [], ex);
+    assert.deepEqual(r.missing, [], ex);
+    await ops.put(`${ex}_link`, r.json, r.files);
+    const got = await store.load(`${ex}_link`);
+    const ucf = src.json.constraints;
+    assert.match(ucf, /\.ucf$/, ex);
+    assert.equal(got.json.constraints, ucf, ex);
+    assert.equal(got.files[ucf], src.files[ucf], `${ex}: the same ${ucf}`);
+    assert.match(got.files[ucf], /LOC\s*=/i, ex);
+    for (const k of ['board', 'device', 'top', 'simTop', 'files']) assert.deepEqual(got.json[k], src.json[k], `${ex}: ${k}`);
+    assert.deepEqual(Object.keys(got.files).sort(), Object.keys(src.files).sort(), ex);
+    for (const [p, t] of Object.entries(src.files)) assert.equal(got.files[p], t, `${ex}: ${p}`);
+  }
+});
