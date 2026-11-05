@@ -352,8 +352,15 @@ export function ucfPattern(name, flags = '') {
 }
 const hasWildcard = name => /[*?]/.test(name);
 // a one-bit bus port (std_logic_vector(0 downto 0)) is x in the netlist, its UCF name x<0> (or x(0), x[0]),
-// as XST names it and ngdbuild finds it (#2199); not a scalar's (#2229)
-const ONE_BIT = /^(.+?)\s*[<([]\s*0\s*[>)\]]$/;
+// as XST names it and ngdbuild finds it (#2199); not a scalar's (#2229). Its x: what /^(.+?)\s*[<([]\s*0\s*[>)\]]$/ takes,
+// found from the bit's end in linear time (that RegExp was quadratic on a long run of spaces, #2318)
+const ONE_BIT_END = /[<([]\s*0\s*[>)\]]$/;
+export function oneBitBase(n) {
+  const m = ONE_BIT_END.exec(n);
+  if (!m || !m.index) return null;
+  const before = n.slice(0, m.index), base = before.trimEnd() || before[0];
+  return /[\n\r\u2028\u2029]/.test(base) ? null : base;
+}
 
 /**
  * The constraints of the top's port bits (names: their UCF names, x<i> for a bus bit) from a UCF's
@@ -369,7 +376,7 @@ const ONE_BIT = /^(.+?)\s*[<([]\s*0\s*[>)\]]$/;
 export function portAssignments(parsed, names, { oneBitBuses = [] } = {}) {
   const stmts = parsed?.netStatements || Object.entries(parsed?.assignments || {}).map(([net, attrs]) => ({ net, attrs }));
   const assignments = {}, unmatched = [];
-  const exact = n => { const m = ONE_BIT.exec(n); return m && !names.includes(n) && oneBitBuses.includes(m[1]) ? m[1] : n; };
+  const exact = n => { const x = oneBitBase(n); return x && !names.includes(n) && oneBitBuses.includes(x) ? x : n; };
   for (const { net, attrs } of stmts) {
     const targets = hasWildcard(net) ? names.filter(n => ucfPattern(net, 'i').test(n)) : [exact(net)];
     if (!targets.length && !unmatched.includes(net)) unmatched.push(net);

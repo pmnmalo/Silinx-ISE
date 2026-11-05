@@ -534,3 +534,18 @@ test('ucfPattern: as the RegExp of the name on every small case, and linear on a
   assert.deepEqual(r, { assignments: {}, unmatched: [`${'a*'.repeat(12)}b`] });
   assert.ok(Date.now() - t0 < 1000, 'no exponential time');
 });
+
+test('oneBitBase: as the RegExp it replaces on every small name, and linear on a long run of spaces (#2318)', async () => {
+  const { oneBitBase, parseUcf, portAssignments } = await import('../packages/silinx-fpga/src/ucf.js');
+  const old = /^(.+?)\s*[<([]\s*0\s*[>)\]]$/;
+  const words = (alphabet, n) => (n === 0 ? [''] : words(alphabet, n - 1).flatMap(w => ['', ...alphabet].map(c => w + c)));
+  for (const n of new Set(words(['a', ' ', '\n', '<', '(', ']', '>', '0'], 5))) assert.equal(oneBitBase(n), old.exec(n)?.[1] ?? null, JSON.stringify(n));
+  assert.equal(oneBitBase('btn<0>'), 'btn');
+  assert.equal(oneBitBase('btn ( 0 )'), 'btn');
+  assert.equal(oneBitBase('led<1>'), null);
+  const t0 = Date.now();
+  for (const n of [`a${' '.repeat(100000)}`, `<${' '.repeat(100000)}x`, `a${' '.repeat(100000)}<0`]) assert.equal(oneBitBase(n), null);
+  const r = portAssignments(parseUcf(`NET "a${' '.repeat(50000)}" LOC = "P1";`), ['a'], { oneBitBuses: ['a'] });
+  assert.deepEqual(r.unmatched, []);
+  assert.ok(Date.now() - t0 < 1000, `${Date.now() - t0} ms: no quadratic time`);
+});
