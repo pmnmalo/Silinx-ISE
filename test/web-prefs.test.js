@@ -70,7 +70,7 @@ test('the constants that name the settings\' keys are made by prefKey', () => {
   assert.match(src('ui.js'), /getItem\(prefKey\(storageKey\)\)/);
   assert.match(src('ui.js'), /setItem\(prefKey\(storageKey\),/);
   assert.match(src('viewers.js'), /getItem\(prefKey\(ENGINE_KEY\)\)/);
-  assert.match(src('app.js'), /const VIEW_KEY = name => prefKey\(`silinx\.view\.\$\{name\}`\);/);
+  assert.match(src('view-state.js'), /const VIEW_KEY = name => prefKey\(`silinx\.view\.\$\{name\}`\);/);
   assert.match(src('doc-cursor.js'), /const CURSOR_KEY = project => prefKey\(`silinx\.cursor\.\$\{project\}`\);/);   // (#1299)
   // index.html's early script: the interface, the theme and the drawer under the same keys
   const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8');
