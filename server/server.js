@@ -107,6 +107,8 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) throw Object.assign(new Error('expected a JSON project object'), { status: 400 });
     return P.writeProject(req.params.p, req.body);
   }));
+  // the user trusts a project from outside (#2830, core/trust.js): the interface's Trust Project, no MCP tool
+  api.post('/projects/:p/trust', wrap(req => P.trustProject(req.params.p)));
   api.delete('/projects/:p', wrap(async req => { await P.deleteProject(req.params.p); return { ok: true }; }));
   api.get('/projects/:p/file', wrap(async (req, res) => {
     const text = await P.readFile(req.params.p, req.query.path);   // read first: an error must go out as JSON, not text/plain

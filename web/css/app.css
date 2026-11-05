@@ -104,6 +104,8 @@ body.dragging-tab, body.dragging-tab * { cursor: grabbing !important; }
 .console-page { position: absolute; inset: 0; overflow: auto; padding: 2px 4px; white-space: pre-wrap; }
 .console-page[hidden] { display: none; }
 .console-page .ln { line-height: 16px; }
+/* a line's button: what it asks of the user (Trust Project, #2830) */
+.console-page .ln .ln-action { padding: 0 8px; margin-left: 6px; line-height: 14px; font-size: inherit; }
 .console-page .ln.err { color: var(--danger); }
 .console-page .ln.warn { color: #9a6700; }
 .console-page .ln.ok { color: var(--success); }

@@ -10,12 +10,18 @@ import { MESSAGE_LINE } from './tool-descriptors.js';
 
 const $ = id => document.getElementById(id);
 
-export function log(text, cls = '', { diag = true } = {}) {
+// action: { label, run }, a button at the end of the (last) line: what the line asks of the user (Trust Project, #2830);
+// it is disabled once run
+export function log(text, cls = '', { diag = true, action = null } = {}) {
   const el = $('console-log');
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
   for (const line of String(text).split('\n')) {
     el.append(h('div', { class: `ln ${cls}` }, line));
     if (diag) consoleMessage(line, cls);
+  }
+  if (action) {
+    const b = h('button', { type: 'button', class: 'btn ln-action', onclick: async () => { b.disabled = true; try { await action.run(); } catch (e) { b.disabled = false; log(`ERROR: ${e.message}`, 'err'); } } }, t(action.label));
+    el.lastElementChild.append(' ', b);
   }
   while (el.childElementCount > 5000) el.firstChild.remove();
   if (atBottom) el.scrollTop = el.scrollHeight;

@@ -17,6 +17,7 @@ import { within } from './paths.js';
 import * as Projects from './projects.js';
 import { mountXiseRoutes } from './xise-routes.js';
 import { IDENT } from './ident.js';
+import { isTrusted, untrustedMessage } from '../core/trust.js';
 
 // files that only Silinx understands: not part of an exported Xilinx ISE project
 export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|bool|fsm)\.json)$/i;
@@ -54,6 +55,9 @@ export async function startImplementation(name, body = {}) {
   // (the synthesis up to date, #280: the run starts at Translate from its netlist)
   const synthUpToDate = !!body.synthUpToDate;
   if (open) { try { steps = openSteps(body.steps, { synthUpToDate, family: deviceFamily(project.device) }); } catch (e) { throw bad(e.message); } }
+  // Xilinx ISE (Docker, ssh, the Mac's or the PC's own) runs outside the browser's sandbox: not for a project from
+  // outside until the user trusts it (#2830); the Silinx toolchain does
+  if (!open && !isTrusted(project)) throw bad(untrustedMessage(name, 'Xilinx ISE'), 403);
   const job = open
     ? createJob('implement', j => runOpenImplementation(j, { project, projectDir, steps, synthUpToDate }), { meta: { project: name, steps, toolchain: 'silinx' } })
     : createJob('implement', j => runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }), { meta: { project: name, steps } });
@@ -171,6 +175,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     let bitfile = null, project = null;
     if (b.project) {
       project = await P.readProject(b.project);
+      if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board'), 403);   // (#2830)
       const dir = P.projectDir(b.project);
       if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
       else {
@@ -203,6 +208,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const b = req.body || {};
     if (!b.project) throw bad('give a project');
     const project = await P.readProject(b.project);
+    if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the PROM'), 403);   // (#2830)
     const dir = P.projectDir(b.project);
     const board = b.board || project.board || null;
     if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
@@ -292,6 +298,7 @@ export async function importXiseProject(P, name, xiseText, provided) {
     device: parsed.device.part ? parsed.device : pj.device,
     top: parsed.top || '', simTop: parsed.simTop || '', topSourceType: parsed.topSourceType || 'hdl', files, constraints,
     impl: { ...pj.impl, ...parsed.impl },
+    trusted: false,   // (a project from outside: trusted only once the user says so, #2830)
   }));
   return { project: saved, missing, warnings };
 }
