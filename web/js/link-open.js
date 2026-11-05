@@ -120,7 +120,7 @@ export async function openFromLink(opts) {
 // a Petri net opened, its Simulate panel shown, #2869), the test bench's simulation, the board emulator
 async function openView(view, module, files) {
   if (view === 'simulate') return app.runSimulation(module === S.project.top ? S.project.simTop : module);   // (the link's test bench, else the project's, #2878)
-  if (view === 'emulate') { const { openEmulator } = await import('./viewers.js'); return openEmulator(module); }
+  if (view === 'emulate') { const { openEmulator } = await import('./viewers.js'); return openEmulator(S.project.top); }   // (the top's, #2884)
   const path = tryDrawing(files || {}, module);
   if (!path) throw fail(`Try it: '${module}' is not a schematic, a state diagram, a Petri net or an ASM chart`);
   if (/\.fsm\.json$/i.test(path)) { await app.openFsm(path); return app.findDoc(`fsm:${path}`)?.fsmEditor?.showPanel('sim'); }

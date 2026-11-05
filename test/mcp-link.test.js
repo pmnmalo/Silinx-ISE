@@ -71,6 +71,8 @@ test('project_link: the views a design has, the default base, the errors', async
   await fails('project_link', { project: 'nothere' }, 'no project \'nothere\' in the workspace');
   await ok('new_project', { name: 'empty' });
   await fails('project_link', { project: 'empty', view: 'emulate' }, 'the design has no board to emulate it on');
+  // (the top module only, #2884)
+  await fails('project_link', { project: 'traffic', view: 'emulate', top: 'timer' }, 'the board emulator emulates the top module, \'top\', not \'timer\'');
   await fails('project_link', { project: 'empty', view: 'simulate' }, 'the design has no test bench to simulate');
 });
 

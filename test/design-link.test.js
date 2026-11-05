@@ -213,7 +213,8 @@ test('viewProblem / tryDrawing: Try it is a schematic\'s, a state diagram\'s or 
   assert.equal(viewProblem(pj, files, { view: 'try', top: 'zz' }), 'the design has no module \'zz\'');
   assert.equal(viewProblem(pj, files, { view: 'simulate' }), null);
   assert.equal(viewProblem({ top: 'g' }, files, { view: 'simulate' }), 'the design has no test bench to simulate');
-  assert.equal(viewProblem(pj, files, { view: 'emulate', top: 'n' }), null);
+  assert.equal(viewProblem(pj, files, { view: 'emulate', top: 'n' }), 'the board emulator emulates the top module, \'g\', not \'n\'');
+  assert.equal(viewProblem(pj, files, { view: 'emulate', top: 'G' }), null);
   assert.equal(viewProblem({ top: 'g' }, files, { view: 'emulate' }), 'the design has no board to emulate it on');
   assert.equal(viewProblem({ board: 'basys2' }, files, { view: 'emulate' }), 'the design has no top module to emulate');
 });
@@ -276,4 +277,15 @@ test('#2882 regression: a C source\'s module (its top function\'s) is one of the
   assert.equal(viewProblem(project, files, { view: 'emulate', top: 'fir' }), null);
   assert.equal(viewProblem(project, files, { view: 'try', top: 'fir' }), 'Try it: \'fir\' is not a schematic, a state diagram, a Petri net or an ASM chart');
   assert.equal(viewProblem(project, files, { top: 'broken' }), 'the design has no module \'broken\'');
+});
+
+test('#2884 regression: the board emulator emulates the top module, a link\'s other top= refused', () => {
+  const project = { top: 'top', board: 'basys2', files: [] };
+  const files = { 'src/top.vhd': 'entity top is end;\n', 'src/timer.vhd': 'entity timer is end;\n' };
+  assert.equal(viewProblem(project, files, { view: 'emulate' }), null);
+  assert.equal(viewProblem(project, files, { view: 'emulate', top: 'top' }), null);
+  assert.equal(viewProblem(project, files, { view: 'emulate', top: 'timer' }), 'the board emulator emulates the top module, \'top\', not \'timer\'');
+  assert.equal(viewProblem({ board: 'basys2' }, files, { view: 'emulate', top: 'timer' }), 'the design has no top module to emulate');
+  // (the project only and the simulation are not the emulator's)
+  assert.equal(viewProblem(project, files, { top: 'timer' }), null);
 });

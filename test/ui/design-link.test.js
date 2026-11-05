@@ -243,6 +243,35 @@ uiTest('#2883 a test bench\'s Copy Link to This Module… in the Simulation hier
   await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'isim:tb_b'), [], { what: 'tb_b simulated', timeout: 60000 });
 });
 
+uiTest('#2884 regression, Board Emulator: the Module list disabled on the top, the link names no module; a link\'s other top= refused; Portuguese', E, async (page) => {
+  await openLink(page, 'open=example:traffic');
+  await linkOpened(page);
+  const row = await page.waitFor(() => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => r.dataset.module === 'timer'); return i >= 0 ? i : null; }, [], { what: 'timer\'s row' });
+  await contextMenu(page, row, 'Copy Link to This Module…');
+  await page.waitDialog('Copy Link');
+  await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = 'emulate'; v.dispatchEvent(new Event('change')); });
+  const state = () => page.eval(() => { const m = document.querySelector('.dlg-overlay select[data-field=module]'); return { disabled: m.disabled, options: [...m.options].map((o) => `${o.textContent}${o.selected ? ' *' : ''}`) }; });
+  assert.deepEqual(await state(), { disabled: true, options: ['top (top) *'] });
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+&view=emulate$/);
+  // back to the project only: timer again, the list enabled
+  await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = ''; v.dispatchEvent(new Event('change')); });
+  assert.equal((await state()).disabled, false);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=module]').value), 'timer');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  // a link that would emulate another module: refused, the reason in the console
+  await openLink(page, 'open=example:traffic&top=timer&view=emulate', 'emu=1');
+  await linkOpened(page);
+  await page.waitConsole(/ERROR: Open from a link: the board emulator emulates the top module, 'top', not 'timer'\./);
+  assert.equal(await page.eval(() => window.Silinx.docs.some((d) => d.id === 'emulator')), false);
+  // in Portuguese, the dialog's refusal
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  try {
+    const { t } = await page.eval(async () => ({ t: (await import('/js/i18n.js')).t('The board emulator emulates the top module, \'top\', not \'timer\'.') }));
+    assert.equal(t, 'O emulador da placa emula o módulo de topo, \'top\', não \'timer\'.');
+  } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
+});
+
 uiTest('#2876 regression, a schematic named in another case than its module (Gates, the HDL\'s gates): Copy Link to This Module… offers Try it, no error; the link opens it', E, async (page) => {
   const sch = JSON.parse(await fs.readFile(new URL('../../examples/gates/src/gates.sch.json', import.meta.url), 'utf8'));
   // (as the user's ALU_4bit: the schematic's name as typed, its HDL file generated from it, the compiled module in
