@@ -96,8 +96,14 @@ board or a PROM) without the user's say.
      invalid bytes replaced with a warning.
    - The result: the files accepted, and each refusal with its reason, in the console and in the MCP tools' results.
      A file refused is left out and the import goes on; a bomb refuses the whole import.
-2. **Safe output:** what a file names (a module, a port, a label, a file) reaches the page only as text, and the
-   Content Security Policy (`server/csp.js`) runs no injected script.
+2. **Safe output:** what a file names (a module, a port, a label, a comment, a file) reaches the page only as text:
+   `textContent`, attributes set through the DOM, SVG text escaped (`web/js/dom.js` `esc`). `test/safe-output.test.js`
+   fails on HTML built from a non-constant string that is not among the reviewed sinks, and
+   `test/ui/safe-output.test.js` opens every kind of drawing and an HDL source with a payload in each text field. The
+   Content Security Policy (`server/csp.js`) runs no inline script but the page's own, by hash, so an injection that
+   slipped through still could not run. Its `'unsafe-eval'` is the compiled simulator's (`core/compiled-sim.js`), whose
+   generated code holds no name of the design, only its own variables and numbers: the test lists the application's
+   only dynamic code.
 3. **Trust for outside projects:** an imported project opens, edits, checks, simulates and runs the open toolchain
    in the browser; it runs nothing outside the browser's sandbox (ISE, ssh, Docker, board or PROM programming,
    external tools) until the user confirms.
