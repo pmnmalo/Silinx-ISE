@@ -303,7 +303,6 @@
   "test/s6-pips.test.js": 0.6,
   "test/s6-place.test.js": 132.7,
   "test/s6-research.test.js": 32.7,
-  "test/s6-route.test.js": 163,
   "test/s6-slice.test.js": 0,
   "test/s6-sta.test.js": 0.1,
   "test/s6-timing-flow.test.js": 6,

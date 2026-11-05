@@ -52,8 +52,8 @@ export class StepError extends Error {
 
 /**
  * Run the steps of spec ({ top, family, device, pkg, part, steps, seed, effort, replicate,
- * startupClk, synthUpToDate, synthEffort, synthGoal, deepRule, placements, engine }) with io (above). engine: 'nextpnr' for nextpnr's Map and Place & Route, 'auto' for it when it can implement the design (else the Silinx engine's)
- * (#2136, io.nextpnr), else Silinx's own. synthEffort: 'normal' | 'high' (the default), the
+ * startupClk, synthUpToDate, synthEffort, synthGoal, deepRule, placements, engine }) with io (above). engine: not read, nextpnr
+ * places and routes every family (io.nextpnr; #2136's choice of engine gone with Silinx's own, #2137, #2824). synthEffort: 'normal' | 'high' (the default), the
  * synthesis's Optimization Effort (#282; 'high' given, Place & Route makes HIGH_TRIES placements too, the fastest kept, and HIGH_EXTRA more routed when the placer's estimate is promising, #651; Normal NORMAL_TRIES for a small design); deepRule: Normal's rule of the deep designs (synth-open.js DEEP_RULE, for tests). placements: the number of nextpnr's placements, in place of the Optimization's (for tests, #2828). synthUpToDate ({ report }: the synthesis part of the
  * report of the run that made it, or null), when the steps start after the synthesis: the netlist of that
  * run is the design's (#280); it is used as it is, or, when it is not there, the synthesis runs.

@@ -102,8 +102,9 @@ for (const [dev, pkg] of [['xc6slx16', 'csg324'], ['xc6slx45', 'csg324']]) {
       device: () => dv, bitDb: () => db, yosys: yosysNode, nextpnr: { spartan6: nextpnrS6Node() },
       write: (n, d) => { files[n] = d; return n; }, read: n => files[n] ?? null, save: () => {},
     };
+    // (no engine named: nextpnr, the one engine, #2824)
     const r = await runFlow({ top: 'top', part, device: dev, pkg, family: 'spartan6', steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'], seed: 1, effort: 1,
-      synthEffort: 'normal', replicate: false, startupClk: 'JtagClk', engine: 'nextpnr' }, io);
+      synthEffort: 'normal', replicate: false, startupClk: 'JtagClk' }, io);
     assert.ok(r.ok, r.error);
     assert.deepEqual(lines.filter(l => /^WARNING/.test(l)), []);
     assert.equal(lines.filter(l => /^nextpnr, seed \d: minimum period/.test(l)).length, 3);
@@ -114,6 +115,23 @@ for (const [dev, pkg] of [['xc6slx16', 'csg324'], ['xc6slx45', 'csg324']]) {
     assert.ok(Object.keys(files).some(n => /\.bit$/.test(n)));
   });
 }
+
+// (#2824) Place & Route with no Map before it packs first (Silinx's Map), then nextpnr places and routes
+test('Place & Route with no Map step: the design packed first, placed and routed by nextpnr, no warnings', { timeout: 600000 }, async () => {
+  const part = 'xc6slx16csg324-3', dv = loadDeviceCache(part), files = {}, lines = [];
+  const io = {
+    log: l => lines.push(String(l)), sources: () => [{ path: 'top.v', lang: 'verilog', text: COUNTER }], ucf: UCF.xc6slx16csg324, ucfName: 't.ucf',
+    device: () => dv, bitDb: () => loadBitDbS6(part), yosys: yosysNode, nextpnr: { spartan6: nextpnrS6Node() },
+    write: (n, d) => { files[n] = d; return n; }, read: n => files[n] ?? null, save: () => {},
+  };
+  const r = await runFlow({ top: 'top', part, device: 'xc6slx16', pkg: 'csg324', family: 'spartan6', steps: ['synth', 'translate', 'par'], seed: 1, effort: 1,
+    synthEffort: 'normal', startupClk: 'JtagClk' }, io);
+  assert.ok(r.ok, r.error);
+  assert.deepEqual(lines.filter(l => /^WARNING/.test(l)), []);
+  assert.ok(lines.some(l => /^Packed in /.test(l)), lines.join('\n'));
+  assert.equal(r.report.par.engine, 'nextpnr');
+  assert.ok(checkRoutingS6(parseXdl(files['open/routed.xdl']), dv).ok);
+});
 
 // (#2131) a seed nextpnr cannot route: the next one, the step failing only when none routes; nextpnr's WebAssembly
 // exception has no message, so its own ERROR line says why
