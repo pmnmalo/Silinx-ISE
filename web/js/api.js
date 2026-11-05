@@ -79,6 +79,25 @@ export const api = {
     return j;
   },
   syncXise: (name, direction) => req('POST', `/api/projects/${enc(name)}/sync-xise`, { direction }),
+  // what another process changes in the project (#2843): onEvent({ project, changes: [{ path, kind }] }) for each,
+  // until the stream ends or `signal` aborts (server-sent events read through fetch: the token in a header, not in the URL)
+  events: async (name, onEvent, signal) => {
+    const r = await fetch(`/api/projects/${enc(name)}/events`, { headers: auth(), signal });
+    if (!r.ok || !r.body) throw Object.assign(new Error(`${r.status} ${r.statusText}`), { status: r.status });
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      buf += dec.decode(value, { stream: true });
+      let k;
+      while ((k = buf.indexOf('\n\n')) >= 0) {
+        const data = buf.slice(0, k).split('\n').filter(l => l.startsWith('data: ')).map(l => l.slice(6)).join('\n');
+        buf = buf.slice(k + 2);
+        if (data) { try { onEvent(JSON.parse(data)); } catch { /* not an event */ } }
+      }
+    }
+  },
 };
 
 // Poll a server job until it finishes, streaming log lines.

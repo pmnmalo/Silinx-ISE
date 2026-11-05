@@ -15,6 +15,11 @@ export const EDITOR_PT = {
   'Rename Symbol…': 'Mudar o Nome do Símbolo…', 'Rename Symbol': 'Mudar o Nome do Símbolo', 'New name:': 'Novo nome:',
   'There is no name to rename here.': 'Não há aqui nenhum nome a mudar.',
   'Rename symbol': 'Mudar o nome do símbolo',
+  // a document changed in the editor and on disk (#2843)
+  'File Changed on Disk': 'Ficheiro Alterado no Disco', 'Which version do you keep?': 'Que versão mantém?',
+  'This file was changed outside Silinx, and it has changes in the editor not saved yet.': 'Este ficheiro foi alterado fora do Silinx e tem alterações no editor ainda não guardadas.',
+  'This file was deleted outside Silinx, and it has changes in the editor not saved yet.': 'Este ficheiro foi apagado fora do Silinx e tem alterações no editor ainda não guardadas.',
+  'Keep the Editor\'s': 'Manter a do Editor', 'Load from Disk': 'Carregar do Disco', 'Close It': 'Fechá-lo',
   'Fix:': 'Corrigir:', 'No quick fix here.': 'Não há aqui nenhuma correção rápida.', 'Quick fix of an error': 'Correção rápida de um erro', 'Quick Fix…': 'Correção Rápida…',
 };
 
