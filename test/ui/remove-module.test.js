@@ -125,9 +125,14 @@ for (const k of DRAWN) {
 uiTest('#234 Remove from Project from the drawing\'s badge and from the HDL\'s badge: both leave the project (No: nothing changes), the toast\'s Undo brings both back; the Files view removes the drawing alone, its HDL file a plain HDL module', E, async (page) => {
   const k = DRAWN[0];
   const hdl = await openDrawn(page, 'R_badges', k);
-  // the drawing's badge: its commands, Remove from Project last; No: nothing changes
+  // the drawing's badge: the row's menu (the module name's, #2872), the drawing's command in it; No: nothing changes
+  await page.treeRow('#hier', 'ctl', { exact: true, right: true });
+  const own = await menuLabels(page);
+  await page.closeMenus();
   await badgeRight(page, 'ctl', 'Petri');
-  assert.deepEqual(await menuLabels(page), ['Open', 'View State Machine (FSM)', 'Remove from Project']);
+  const menu = await menuLabels(page);
+  assert.deepEqual(menu, own);
+  assert.ok(['Open', 'View State Machine (FSM)', 'Remove from Project'].every((l) => menu.includes(l)), menu.join(' | '));
   await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
   assert.equal(await answer(page, 'No'), QUESTION(k.file, hdl));
   assert.deepEqual(await rows(page), ROWS('R_badges', k));
