@@ -15104,24 +15104,236 @@
     },
     "misc-rtl-as-blackbox": {
       "vitis": {
-        "csim": "fail",
-        "synth": "fail",
-        "cosim": "skip",
-        "latency": null,
-        "interval": null,
-        "cosimLatency": null,
+        "csim": "pass",
+        "synth": "pass",
+        "cosim": "pass",
+        "latency": {
+          "min": 4,
+          "max": 4
+        },
+        "interval": {
+          "min": 5,
+          "max": 5
+        },
+        "cosimLatency": {
+          "min": 4,
+          "avg": 4,
+          "max": 4
+        },
         "loops": [],
-        "ports": []
+        "ports": [
+          {
+            "name": "ap_clk",
+            "dir": "in",
+            "w": 1,
+            "protocol": "ap_ctrl_hs",
+            "object": "example"
+          },
+          {
+            "name": "ap_rst",
+            "dir": "in",
+            "w": 1,
+            "protocol": "ap_ctrl_hs",
+            "object": "example"
+          },
+          {
+            "name": "ap_start",
+            "dir": "in",
+            "w": 1,
+            "protocol": "ap_ctrl_hs",
+            "object": "example"
+          },
+          {
+            "name": "ap_done",
+            "dir": "out",
+            "w": 1,
+            "protocol": "ap_ctrl_hs",
+            "object": "example"
+          },
+          {
+            "name": "ap_idle",
+            "dir": "out",
+            "w": 1,
+            "protocol": "ap_ctrl_hs",
+            "object": "example"
+          },
+          {
+            "name": "ap_ready",
+            "dir": "out",
+            "w": 1,
+            "protocol": "ap_ctrl_hs",
+            "object": "example"
+          },
+          {
+            "name": "a1",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "a1"
+          },
+          {
+            "name": "a2",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "a2"
+          },
+          {
+            "name": "a3",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "a3"
+          },
+          {
+            "name": "a4",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "a4"
+          },
+          {
+            "name": "b1",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "b1"
+          },
+          {
+            "name": "b2",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "b2"
+          },
+          {
+            "name": "b3",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "b3"
+          },
+          {
+            "name": "b4",
+            "dir": "in",
+            "w": 10,
+            "protocol": "ap_none",
+            "object": "b4"
+          },
+          {
+            "name": "sigma",
+            "dir": "out",
+            "w": 10,
+            "protocol": "ap_vld",
+            "object": "sigma"
+          },
+          {
+            "name": "sigma_ap_vld",
+            "dir": "out",
+            "w": 1,
+            "protocol": "ap_vld",
+            "object": "sigma"
+          }
+        ]
       },
       "silinx": {
-        "csim": "fail",
-        "synth": "fail",
-        "cosim": "skip",
-        "latency": null,
+        "csim": "pass",
+        "synth": "pass",
+        "cosim": "pass",
+        "latency": {
+          "min": 5,
+          "max": 5
+        },
         "loops": [],
-        "ports": []
+        "ports": [
+          {
+            "name": "ap_clk",
+            "dir": "in",
+            "w": 1
+          },
+          {
+            "name": "ap_rst",
+            "dir": "in",
+            "w": 1
+          },
+          {
+            "name": "ap_start",
+            "dir": "in",
+            "w": 1
+          },
+          {
+            "name": "ap_done",
+            "dir": "out",
+            "w": 1
+          },
+          {
+            "name": "ap_idle",
+            "dir": "out",
+            "w": 1
+          },
+          {
+            "name": "ap_ready",
+            "dir": "out",
+            "w": 1
+          },
+          {
+            "name": "a1",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "a2",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "a3",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "a4",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "b1",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "b2",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "b3",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "b4",
+            "dir": "in",
+            "w": 10
+          },
+          {
+            "name": "sigma",
+            "dir": "out",
+            "w": 10
+          },
+          {
+            "name": "sigma_ap_vld",
+            "dir": "out",
+            "w": 1
+          }
+        ]
       },
-      "ports": null
+      "ports": {
+        "same": true,
+        "missing": [],
+        "extra": [],
+        "differ": []
+      }
     },
     "modeling-conditional-control-of-pragmas-using-defines": {
       "vitis": {

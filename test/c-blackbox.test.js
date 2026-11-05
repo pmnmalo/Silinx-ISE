@@ -260,3 +260,28 @@ test('#1903 a project\'s descriptions: its JSON files that are ones, beside thei
   const v = viewHdl('src/t.cpp', UNIT(TOP), { lang: 'verilog', hls: { ...r, headers: r.headers } });
   assert.deepEqual(v.errors.filter((e) => !/main|top/.test(e)), []);
 });
+
+test('#2862 an output\'s valid with ap_done (the usual module): taken, not cleared by ap_done (XST had trimmed the capture as a constant, with a warning); the next call does not read it', () => {
+  const g = (lang) => cToHdl(UNIT(TOP), { ...OPTS(), lang }).hdl;
+  assert.match(g('verilog'), /assign ap_bb0_z_any = ap_bb0_z_vld \| \(ap_bb0_z_got & ~ap_bb0_start\);\n  always @\(posedge ap_clk\) if \(ap_rst\) ap_bb0_z_got <= 1'b0; else if \(ap_bb0_z_vld\) begin ap_bb0_z_got <= 1'b1; ap_bb0_z_cap <= ap_bb0_z_o; end else if \(ap_bb0_start\) ap_bb0_z_got <= 1'b0;/);
+  assert.match(g('vhdl'), /ap_bb0_z_any <= ap_bb0_z_vld or \(ap_bb0_z_got and not ap_bb0_start\);[\s\S]*if ap_rst = '1' then\n        ap_bb0_z_got <= '0';\n      elsif ap_bb0_z_vld = '1' then\n        ap_bb0_z_got <= '1';\n        ap_bb0_z_cap <= ap_bb0_z_o;\n      elsif ap_bb0_start = '1' then\n        ap_bb0_z_got <= '0';/);
+  // a combinational module (latency 0: its end the start's cycle), its valid 1 on some calls only, called again and again:
+  // a call with no valid keeps the variable, never the last call's capture
+  const v = 'module adder_rtl(input [9:0] a, b, output [9:0] z, output z_vld);\n  assign z = a + b; assign z_vld = a[0];\nendmodule\n';
+  const model = '#include "ap_int.h"\ntypedef ap_int<10> data_t;\nvoid adder(data_t a, data_t b, data_t &z) { if (a[0]) z = a + b; }\n';
+  const unit = `#include "ap_int.h"
+typedef ap_int<10> data_t;
+void adder(data_t a, data_t b, data_t &z);
+void top(data_t a, data_t b, data_t &s) { data_t t = 100, u = 7; adder(a, b, t); adder(a + 1, b, u); s = t + u; }
+int main() { for (int i = 0; i < 6; i++) { data_t s; top(i, 3, s); if (s != (i & 1 ? i + 3 + 7 : 100 + i + 4)) return 1; } return 0; }
+`;
+  const desc = DESC({ rtl_files: ['adder.v'], c_parameters: [A, B, P('z', 'out', { data_write_out: 'z', data_write_valid: 'z_vld' })], rtl_common_signal: {}, rtl_performance: { latency: '0' } });
+  for (const lang of ['vhdl', 'verilog']) {
+    const c = cosimulate(unit, { ...OPTS(desc, { 'adder.cpp': model, 'adder.v': v }), lang });
+    assert.equal(c.sim.exitCode, 0);
+    assert.deepEqual(c.errors, []);
+    assert.deepEqual(c.mismatches, []);
+    assert.equal(c.pass, true);
+    assert.deepEqual(warns(c.gen), []);
+  }
+});

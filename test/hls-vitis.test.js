@@ -163,3 +163,29 @@ test('#1826 --collect keeps the run on the host unless --update saved its result
   assert.ok(rm > 0 && written > 0 && rm > written);
   assert.doesNotMatch(src, /`\$\{work\}\/`\]\);\n\s*ssh\(`rm -rf/, 'no deletion right after the fetch');
 });
+
+test('#2855 a design with an RTL blackbox: the ports compared are those Silinx HLS makes with its description (optionsOf, as runDesign)', async () => {
+  const { optionsOf, runDesign } = await import('./hls-corpus/lib.mjs');
+  const { cToHdl } = await import('../core/c-hdl.js');
+  const design = { name: 'bb', language: 'c++', top: 'top', files: ['d/top.cpp'], tb: ['d/tb.cpp'], headers: [],
+    blackbox: { descriptions: ['d/adder.json'], files: ['d/adder.v', 'd/adder_model.cpp'] } };
+  const texts = {
+    'd/top.cpp': '#include "ap_int.h"\nvoid adder(ap_uint<8> a, ap_uint<8> b, ap_uint<8> &z);\nvoid top(ap_uint<8> a, ap_uint<8> b, ap_uint<8> &s) { ap_uint<8> t; adder(a, b, t); s = t; }\n',
+    'd/tb.cpp': 'int main() { ap_uint<8> s; top(2, 3, s); return s == 5 ? 0 : 1; }\n',
+    'd/adder_model.cpp': '#include "ap_int.h"\nvoid adder(ap_uint<8> a, ap_uint<8> b, ap_uint<8> &z) { z = a + b; }\n',
+    'd/adder.v': 'module adder_rtl(input clk, input [7:0] a, b, output reg [7:0] z);\n  always @(posedge clk) z <= a + b;\nendmodule\n',
+    'd/adder.json': JSON.stringify({ c_function_name: 'adder', rtl_top_module_name: 'adder_rtl', c_files: [{ c_file: 'adder_model.cpp', cflag: '' }], rtl_files: ['adder.v'],
+      c_parameters: [{ c_name: 'a', c_port_direction: 'in', rtl_ports: { data_read_in: 'a' } }, { c_name: 'b', c_port_direction: 'in', rtl_ports: { data_read_in: 'b' } }, { c_name: 'z', c_port_direction: 'out', rtl_ports: { data_write_out: 'z' } }],
+      rtl_common_signal: { module_clock: 'clk' }, rtl_performance: { latency: '1' } }),
+  };
+  const { unit, opts } = optionsOf(design, texts);
+  assert.deepEqual(opts.blackboxes.map((b) => b.file), ['d/adder.json']);
+  // (the script's own synthesis had none: 'adder' declared, not defined, and no ports to compare)
+  const g = cToHdl(unit, { ...opts, lang: 'vhdl' });
+  assert.equal(g.ok, true);
+  assert.deepEqual(g.diagnostics.filter((d) => d.severity === 'warning'), []);
+  const vitis = [['ap_clk', 'in', 1], ['ap_rst', 'in', 1], ['ap_start', 'in', 1], ['ap_done', 'out', 1], ['ap_idle', 'out', 1], ['ap_ready', 'out', 1],
+    ['a', 'in', 8], ['b', 'in', 8], ['s', 'out', 8], ['s_ap_vld', 'out', 1]].map(([name, dir, w]) => ({ name, dir, w }));
+  assert.deepEqual(comparePorts(g.ports, vitis), { same: true, missing: [], extra: [], differ: [] });
+  assert.deepEqual(runDesign(design, texts), { csim: 'pass', synth: 'pass', cosim: 'pass', latency: runDesign(design, texts).latency, reason: null });
+});
