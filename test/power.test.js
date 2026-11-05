@@ -158,12 +158,13 @@ test('measure-power --only: the runs measured merged into the JSON\'s', () => {
 });
 
 // the estimate of the Silinx toolchain's own routed design (its flow, through xpwr) against XPower's of
-// ISE's implementation: four examples on the Basys2-250 here; all of them: scripts/measure-power.mjs --compare
+// ISE's implementation: four examples on the Basys2-250 here, one placement each (the four of Normal took over
+// five minutes on CI's runners, #2828); all of them: scripts/measure-power.mjs --compare
 test('the estimate on the examples: the total within ESTIMATE_ERROR_PERCENT of XPower\'s, the dynamic power within DYNAMIC_RANGE; the flow\'s report and log', { timeout: 300000 }, async () => {
   const { runs } = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
   for (const example of ['traffic', 'blinky', 'pong', 'vga']) {
     const x = runs.find(r => r.example === example && r.board === 'basys2' && r.variant === '250');
-    const { estimate: e, report, log, top, text } = await silinxEstimate(example, { board: 'basys2', variant: '250' });
+    const { estimate: e, report, log, top, text } = await silinxEstimate(example, { board: 'basys2', variant: '250' }, { placements: 1 });
     const err = (100 * (e.totalMw - x.power.total)) / x.power.total;
     assert.ok(Math.abs(err) <= ESTIMATE_ERROR_PERCENT, `${example}: ${e.totalMw} mW, XPower ${x.power.total} mW (${err.toFixed(1)} %)`);
     const ratio = e.dynamicMw / (x.power.total - x.power.static);
@@ -172,6 +173,9 @@ test('the estimate on the examples: the total within ESTIMATE_ERROR_PERCENT of X
     // the flow's step: the report (as the Design Summary reads it), the log, no warning (the examples' UCFs give their clocks)
     assert.deepEqual(report.power, { totalMw: e.totalMw, dynamicMw: e.dynamicMw, staticMw: e.staticMw, junctionC: e.junctionC, estimate: true });
     assert.deepEqual(parsePwr(text), { totalMw: e.totalMw, dynamicMw: e.dynamicMw, staticMw: e.staticMw, junctionC: e.junctionC });
+    // (one placement: spec.placements, in place of Normal's four)
+    assert.ok(log.some(l => l.startsWith('Placed and routed by nextpnr in ')), log.join('\n'));
+    assert.deepEqual(log.filter(l => /^Placement \d+ of|^Kept the fastest/.test(l)), []);
     assert.ok(log.includes('=== SILINX STEP xpwr ==='));
     assert.ok(log.includes(`Estimated power: ${e.totalMw.toFixed(2)} mW (dynamic ${e.dynamicMw.toFixed(2)} mW, static ${e.staticMw.toFixed(2)} mW), junction ${e.junctionC.toFixed(1)} C: build/${top}.pwr (an estimate, not Xilinx XPower)`), log.join('\n'));
     assert.deepEqual(log.filter(l => /^WARNING:Power/.test(l)), []);

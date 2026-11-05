@@ -135,10 +135,11 @@ export function fit(runs) {
 
 /**
  * The Silinx toolchain's estimate for an example on a target ({ board, variant }): the flow (as the
- * browser edition runs it, in memory) through the estimated power. Returns { estimate, report, log,
+ * browser edition runs it, in memory, at the default Optimization Effort, Normal) through the estimated power;
+ * placements: nextpnr's, in place of Normal's (one: the tests', #2828). Returns { estimate, report, log,
  * top, text (build/<top>.pwr) }.
  */
-export async function silinxEstimate(example, target) {
+export async function silinxEstimate(example, target, { placements } = {}) {
   const zlib = await import('node:zlib');
   const { exampleProject } = await import('../test/examples-lib.mjs');
   const { runOpenFlow } = await import('../core/flow-ide.js');
@@ -147,7 +148,7 @@ export async function silinxEstimate(example, target) {
   try {
     const { dir, project } = exampleProject(example, target, tmp);
     const d = project.device, part = `${d.part}${d.package}${d.speed}`;
-    const spec = { top: project.top, part, device: d.part, pkg: d.package, family: 'spartan3e', graph: shippedDevicePath(part), steps: ['synth', 'translate', 'map', 'par', 'trce', 'xpwr'], seed: 1, effort: 1 };
+    const spec = { top: project.top, part, device: d.part, pkg: d.package, family: 'spartan3e', graph: shippedDevicePath(part), steps: ['synth', 'translate', 'map', 'par', 'trce', 'xpwr'], seed: 1, effort: 1, synthEffort: 'normal', ...(placements && { placements }) };
     const device = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(spec.graph)).toString('utf8')));
     const dbDir = path.join(ROOT, 'packages/silinx-fpga/bitdb'), json = {};
     for (const [k, f] of Object.entries(dbFileNames(spec.device, spec.pkg))) { const p = path.join(dbDir, f); json[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; }
