@@ -107,19 +107,19 @@ test('zip bombs: the archive, the declared and the real decompressed sizes, the 
   // the archive itself
   await rejects(gateZip(new Uint8Array(GATE_LIMITS.maxArchive + 1), codec), 'the zip is larger than 64 MB, the most an import takes');
   // a file over the cap (declared)
-  await rejects(gateZip(one, codec, { limits: { maxFile: 1 << 20 } }), 'cannot read the zip: zip entry too large (src/zeros.mem: 4194304 bytes, at most 1048576)');
+  await rejects(gateZip(one, codec, { limits: { maxFile: 1 << 20 } }), 'cannot read zip: zip entry too large (src/zeros.mem: 4194304 bytes, at most 1048576)');
   // the total over the cap, file by file (none inflated past it)
   const many = await createZip(Array.from({ length: 8 }, (_, i) => ({ path: `m${i}.mem`, data: big })), codec);
-  await rejects(gateZip(many, codec, { limits: { maxTotal: 20 << 20 } }), 'cannot read the zip: zip too large once uncompressed (more than 20971520 bytes)');
+  await rejects(gateZip(many, codec, { limits: { maxTotal: 20 << 20 } }), 'cannot read zip: zip too large once uncompressed (more than 20971520 bytes)');
   // a declared size that lies: 1 KB said, 4 MB inflated: stopped at the declared size
   const liar = await patchedZip([{ path: 'src/zeros.mem', data: big }], (dv, p) => dv.setUint32(p + 24, 1024, true));
-  await assert.rejects(gateZip(liar, codec), e => e instanceof GateError && /^cannot read the zip: zip entry larger than it declares or corrupt \(src\/zeros\.mem\)/.test(e.message));
+  await assert.rejects(gateZip(liar, codec), e => e instanceof GateError && /^cannot read zip: zip entry larger than it declares or corrupt \(src\/zeros\.mem\)/.test(e.message));
   // a declared size of 4 GB: refused before anything is inflated
   const huge = await patchedZip([{ path: 'src/zeros.mem', data: big }], (dv, p) => dv.setUint32(p + 24, 0xffffffff, true));
-  await rejects(gateZip(huge, codec), 'cannot read the zip: zip entry too large (src/zeros.mem: 4294967295 bytes, at most 67108864)');
+  await rejects(gateZip(huge, codec), 'cannot read zip: zip entry too large (src/zeros.mem: 4294967295 bytes, at most 67108864)');
   // too many entries: refused before any is read
   const lots = await createZip(Array.from({ length: 30 }, (_, i) => ({ path: `f${i}.txt`, data: 'x' })), codec);
-  await rejects(gateZip(lots, codec, { limits: { maxFiles: 20 } }), 'cannot read the zip: zip has too many entries (30, at most 20)');
+  await rejects(gateZip(lots, codec, { limits: { maxFiles: 20 } }), 'cannot read zip: zip has too many entries (30, at most 20)');
   // and entries already read: the count, the total
   await assert.throws(() => gateEntries(Array.from({ length: 30 }, (_, i) => ({ path: `f${i}`, data: 'x' })), { limits: { maxFiles: 20 } }),
     { message: 'the import has too many files (30, at most 20)' });

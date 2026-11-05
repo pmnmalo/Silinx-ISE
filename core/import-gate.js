@@ -228,7 +228,7 @@ export async function gateZip(bytes, codec, { limits } = {}) {
         return null;
       },
     });
-  } catch (e) { throw new GateError(`cannot read the zip: ${e.message}`); }
+  } catch (e) { throw new GateError(`cannot read zip: ${e.message}`); }
   const out = { files: [], refusals, warnings: [] };
   for (const e of entries) {
     const s = screen(paths.get(e.path) ?? e.path, e.data, L);
