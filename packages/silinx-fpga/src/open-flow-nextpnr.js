@@ -384,7 +384,8 @@ export function mountNextpnrSteps(ctx) {
       if (!best || r.period < best.period) best = r;
     }
     if (!best) throw failed.e;
-    for (const l of best.lines) if (/^Warning:/.test(l)) log(`WARNING:nextpnr - ${l.replace(/^Warning:\s*/, '')}`);
+    // (nextpnr's own estimate of each clock, met or not, is no warning: the timing step says whether a PERIOD is met, #2820)
+    for (const l of best.lines) if (/^Warning:/.test(l) && !/Max frequency/.test(l)) log(`WARNING:nextpnr - ${l.replace(/^Warning:\s*/, '')}`);
     if (tried > 1) log(`Kept the fastest of ${tried} placements: seed ${best.seed}, ${best.period.toFixed(3)} ns.`);
     const fmax = best.lines.map(l => /Max frequency for clock '(.*)': ([0-9.]+) MHz/.exec(l)).filter(Boolean).at(-1);
     log(`Placed and routed by nextpnr in ${ms(t)}${fmax ? ` (its estimate: ${fmax[2]} MHz)` : ''}.`);
