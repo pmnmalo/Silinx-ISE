@@ -510,6 +510,10 @@ assistant's projects apart, give it a workspace of its own: `"env": { "SILINX_WO
 in Claude Desktop's entry, or `claude mcp add silinx -e SILINX_WORKSPACE=/path/to/folder -- node …` (the
 server's name before `-e`, which takes several values).
 
+With the same workspace, the interface of `silinx-ise serve` follows what the assistant does in the project it has
+open: a source written or made, a run (the Design pane, an open editor, the processes' marks and the Design Summary
+update at once); a file changed in its editor and by the assistant asks which version to keep.
+
 ### Standalone edition (a single HTML file)
 
 ```bash

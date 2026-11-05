@@ -124,7 +124,8 @@ and the board's Platform Flash: in the browser over WebUSB, with Silinx's own JT
 
 - **The command line**: `bin/silinx-ise.js` (check, simulate, constraints, the toolchain's settings); the toolchain's own:
   `packages/silinx-fpga/bin/silinx-fpga.js`.
-- **An MCP server** for an AI assistant on the projects of the workspace (`server/mcp.js`).
+- **An MCP server** for an AI assistant on the projects of the workspace (`server/mcp.js`); what it changes in a project open in the
+  interface the local server tells the page (`server/project-watch.js`, `web/js/project-watch.js`, #2843).
 - **Security**: the pages' Content-Security-Policy (`server/csp.js`), the paths kept inside a project
   (`server/paths.js`), the server on this computer only unless asked ([SECURITY.md](../SECURITY.md)).
 
