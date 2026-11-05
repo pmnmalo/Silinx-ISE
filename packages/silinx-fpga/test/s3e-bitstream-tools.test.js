@@ -14,6 +14,7 @@ import { makeDb, featureBits } from '../src/fpga/bitgen.js';
 import { measuredPips, UNIFY } from '../research/s3e-bitstream/want-pips.mjs';
 import { windowKeyOf } from '../research/s3e-bitstream/db.mjs';
 import { frameGrid, typeTables, tilesByType } from '../research/s3e-bitstream/gen-layout.mjs';
+import { graphFile, loadGraph } from '../research/s3e-bitstream/xdlrc-graph.mjs';
 import { measuredGridOf, PARTS } from '../research/s3e-device/build-measured.mjs';
 
 test('resolvePatterns: a PIP measured with different bits keeps the pattern without artefacts', () => {
@@ -481,4 +482,17 @@ test('gen-layout: every die\'s layout from its measured tiles (no device report)
   }
   // the tiles by type, and the CLBs' extent; a name of another form left out
   assert.deepEqual(tilesByType(['CLB_X1Y2', 'CLB_X3Y1', 'GCLKH_X1Y2', 'VCC']), { tilesOf: { CLB: [[1, 2], [3, 1]], GCLKH: [[1, 2]] }, maxX: 3, maxY: 2 });
+});
+
+test('xdlrc-graph graphFile: `measured`, the die\'s measured description, as gen-pipcover\'s graph; anything else as given; a die with none refused (#2502)', () => {
+  const f = graphFile('measured', 'xc3s100ecp132-4');
+  assert.match(f, /research[\\/]s3e-device[\\/]data[\\/]xc3s100e[\\/]measured\.json\.gz$/);
+  for (const a of ['xc3s250ecp132-4', 'dev-full.xdlrc', '/x/g.json.gz']) assert.equal(graphFile(a, 'xc3s250ecp132-4'), a);
+  assert.throws(() => graphFile('measured', 'xc6slx16csg324-3'), /no measured description of xc6slx16csg324-3/);
+  // the graph gen-pipcover searches: the measured tiles, their PIPs and their pins
+  const g = loadGraph(f);
+  assert.equal(g.tiles.length, 479);
+  const clb = g.tiles[g.tileByName.get('CLB_X1Y1')];
+  assert.deepEqual(clb.sites.filter(s => /^SLICE/.test(s.type)).map(s => s.type), ['SLICEM', 'SLICEM', 'SLICEL', 'SLICEL']);
+  assert.ok(g.pipsOf(g.tileByName.get('CLB_X1Y1')).length > 1000);
 });

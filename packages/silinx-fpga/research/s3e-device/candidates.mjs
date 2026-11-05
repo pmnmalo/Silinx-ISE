@@ -7,6 +7,10 @@
 //   node candidates.mjs io obs.json out.json [tests.json]   every PIP of the database's I/O types in every observed I/O tile
 //                                                     (#3, round 7); with a round's tests.json, only those its untestable
 //                                                     joins need (leftCandidates)
+//   node candidates.mjs types measured.json.gz out.json obs.json [probe.json,…]   each PIP of a measured description's tile
+//                                                     types that neither ISE's routes (in a tile of the type) nor a probe
+//                                                     (in a tile of the type) showed, asked in the first tile that has it:
+//                                                     the database's own, #2502
 //   node candidates.mjs rest measured.json.gz out.json obs.json [probe.json,…]   every PIP of a measured description's
 //                                                     non-CLB tiles neither ISE's routes nor a probe showed there, and an
 //                                                     I/O tile's outputs in its own names (IOIS_X0): #3, section 10
@@ -130,6 +134,26 @@ export function restCandidates(pips, obs, probes = []) {
   return [...out.values()];
 }
 
+/**
+ * The PIPs of each tile type no measurement but the bit database's showed (#2502): pips [{ tile, type, from, to }] (a
+ * measured description's, Device pip(), with the tile's type), less the routethroughs and those ISE's routes took in a
+ * tile of the type (obs: its PIPs' tiles typed by typeOf) or a probe (probes: [{ yes, no }]) asked in one; each asked in
+ * the first tile that has it. Returns [{ tile, from, to, dir }].
+ */
+export function typeCandidates(pips, obs, probes = [], typeOf = t => tileXY(t)?.prefix) {
+  const key = (t, a, b) => `${t} ${a} ${b}`;
+  const seen = new Set();
+  for (const p of obs.pips) { seen.add(key(typeOf(p.tile), p.from, p.to)); if (p.dir === '=-') seen.add(key(typeOf(p.tile), p.to, p.from)); }
+  for (const r of probes) for (const p of [...r.yes, ...r.no]) seen.add(key(typeOf(p.tile), p.from, p.to));
+  const out = new Map();
+  for (const p of pips) {
+    const k = key(p.type, p.from, p.to);
+    if (p.routethru || seen.has(k) || out.has(k)) continue;
+    out.set(k, { tile: p.tile, from: p.from, to: p.to, dir: p.dir || '->' });
+  }
+  return [...out.values()];
+}
+
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
   const [cmd, input, out, tests, probes] = process.argv.slice(2);
   const read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -150,7 +174,14 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
     const pips = [];
     for (let k = 0; k < M.tileCount; k++) for (let i = 0; i < M.templates[M.tileTemplate[k]].from.length; i++) pips.push(M.pip(k, i));
     res = { part: PART, pips: restCandidates(pips, read(tests), (probes || '').split(',').filter(Boolean).map(read)) };
-  } else { console.error('usage: candidates.mjs tiles|sites|census|io|rest input out.json'); process.exit(1); }
+  } else if (cmd === 'types') {
+    const [{ default: zlib }, { loadDevice }] = await Promise.all([import('node:zlib'), import('../../src/fpga/device.js')]);
+    const M = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(input))));
+    const type = t => M.templates[M.tileTemplate[M.tile(t)]]?.type, pips = [];
+    for (let k = 0; k < M.tileCount; k++) for (let i = 0; i < M.templates[M.tileTemplate[k]].from.length; i++) pips.push({ ...M.pip(k, i), type: type(M.tileNames[k]) });
+    const pr = (probes || '').split(',').filter(Boolean).map(read).flatMap(r => (r.pips ? [r.pips] : Object.values(r)));
+    res = { part: PART, pips: typeCandidates(pips, read(tests), pr, type) };
+  } else { console.error('usage: candidates.mjs tiles|sites|census|io|types|rest input out.json'); process.exit(1); }
   fs.writeFileSync(out, JSON.stringify(res));
   console.log(`${(res.pips || res.sites).length} candidates`);
 }

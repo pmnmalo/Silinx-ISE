@@ -30,7 +30,7 @@ import { loadDevice, PIP_BIDI } from '../packages/silinx-fpga/src/fpga/device.js
 import { probeXdl, probeFirstLine, parseProbeLog, sortPips, sortSites } from '../packages/silinx-fpga/research/s3e-device/probe.mjs';
 import { joinTestDesigns, parseJoinTests, testSources } from '../packages/silinx-fpga/research/s3e-device/hypotheses.mjs';
 import { rng, clbSlices, observeXdl } from '../packages/silinx-fpga/research/s3e-device/gen-observe.mjs';
-import { tileCandidates, siteCandidates, censusCandidates, ioCandidates, leftCandidates, restCandidates } from '../packages/silinx-fpga/research/s3e-device/candidates.mjs';
+import { tileCandidates, siteCandidates, censusCandidates, ioCandidates, leftCandidates, restCandidates, typeCandidates } from '../packages/silinx-fpga/research/s3e-device/candidates.mjs';
 import { bram, mult, pads, inputs, padDefaults } from '../packages/silinx-fpga/research/s3e-device/gen-obshdl.mjs';
 import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 import { deviceSites } from '../packages/silinx-fpga/src/fpga/device-sites.js';
@@ -1245,6 +1245,35 @@ test('compare-grid compareDevices: two descriptions tile by tile: the tiles, pla
   const b = loadDevice(packMeasured(chipMeasurements({ tilesDb, obs: { ...obs, joins: [], sites: obs.sites.slice(0, 1), pins: [{ ...obs.pins[0], wire: 'OMUX3' }] }, switchTiles: ['CLB_X2Y1', 'CLB_X3Y1'] })));
   const d = compareDevices(a, b);
   assert.deepEqual([d.tiles.onlyB, d.nodes, d.sites.onlyA, d.pins.wire, d.wires], [['CLB_X3Y1'], 2, { VCC: 2 }, ['SLICE_X0Y0.X'], { onlyA: 0, onlyB: 0 }]);
+});
+
+test('candidates types: each tile type\'s PIPs no route and no probe showed, asked once in the first tile that has them (#2502)', () => {
+  const pips = [
+    { tile: 'CLB_X1Y1', type: 'CENTER_SMALL', from: 'A', to: 'B', dir: '->' }, { tile: 'CLB_X2Y1', type: 'CENTER_SMALL', from: 'A', to: 'B', dir: '->' },
+    { tile: 'CLB_X1Y1', type: 'CENTER_SMALL', from: 'C', to: 'D', dir: '->' }, { tile: 'CLB_X1Y1', type: 'CENTER_SMALL', from: 'E', to: 'F', dir: '=-' },
+    { tile: 'CLB_X1Y1', type: 'CENTER_SMALL', from: 'G', to: 'H', dir: '->' }, { tile: 'CLB_X1Y1', type: 'CENTER_SMALL', from: 'X0', to: 'Y', dir: '->', routethru: 'r' },
+    { tile: 'CLB_X3Y2', type: 'CENTER_SMALL_BRK', from: 'C', to: 'D', dir: '->' }, { tile: 'LIOIS_X0Y1', type: 'LIOIS', from: 'G', to: 'H', dir: '->' },
+  ];
+  const typeOf = t => ({ CLB_X1Y1: 'CENTER_SMALL', CLB_X2Y1: 'CENTER_SMALL', CLB_X5Y5: 'CENTER_SMALL', CLB_X3Y2: 'CENTER_SMALL_BRK', LIOIS_X0Y1: 'LIOIS' })[t];
+  // C -> D taken by a route in another CLB of the type; F -> E by a bidirectional one; G -> H asked of the probe in a CLB
+  const obs = { pips: [{ tile: 'CLB_X5Y5', from: 'C', to: 'D', dir: '->' }, { tile: 'CLB_X5Y5', from: 'F', to: 'E', dir: '=-' }] };
+  const c = typeCandidates(pips, obs, [{ yes: [{ tile: 'CLB_X2Y1', from: 'G', to: 'H' }], no: [] }], typeOf);
+  assert.deepEqual(c, [{ tile: 'CLB_X1Y1', from: 'A', to: 'B', dir: '->' }, { tile: 'CLB_X3Y2', from: 'C', to: 'D', dir: '->' }, { tile: 'LIOIS_X0Y1', from: 'G', to: 'H', dir: '->' }]);
+  assert.deepEqual(typeCandidates([], { pips: [] }), []);
+});
+
+test('build-measured: every PIP of every measured description shown by ISE, in a route through a tile of its type or accepted by the arc probe in one: none rests on the bit database alone (#2502)', () => {
+  const gz = f => JSON.parse(zlib.gunzipSync(fs.readFileSync(f)).toString());
+  for (const die of measuredDies()) {
+    const d = loadDevice(gz(path.join(dataDir(die), 'measured.json.gz')));
+    const typeOf = t => { const k = d.tileIndex.get(t); return k === undefined ? null : d.templates[d.tileTemplate[k]].type; };
+    const pips = [];
+    for (let k = 0; k < d.tileCount; k++) for (let i = 0; i < d.templates[d.tileTemplate[k]].from.length; i++) pips.push({ ...d.pip(k, i), type: typeOf(d.tileNames[k]) });
+    const probes = Object.values(gz(path.join(dataDir(die), 'probes.json.gz')));
+    assert.deepEqual(typeCandidates(pips, gz(path.join(dataDir(die), 'obs.json.gz')), probes, typeOf), [], die);
+    // (the type probe of #2502: every PIP it asked exists)
+    assert.ok(probes.length && gz(path.join(dataDir(die), 'probes.json.gz')).typeprobe.no.length === 0, die);
+  }
 });
 
 test('research scripts: the command line recognised on Windows too (#1877: not `file://${process.argv[1]}`, a C:\\ path)', () => {
