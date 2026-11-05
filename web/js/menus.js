@@ -64,6 +64,7 @@ export function setupMenus() {
       '-',
       { label: 'Import Silinx ISE Project (.zip)…', action: () => wiz.importSilinxDialog() },
       { label: 'Export Silinx ISE Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
+      { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()), disabled: hasPj },   // (#2826)
       '-',
       { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
       { label: 'Export Xilinx ISE Project (.zip)…', action: () => exportProjectZip('xilinx'), disabled: hasPj },

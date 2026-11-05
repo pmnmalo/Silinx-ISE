@@ -650,7 +650,7 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.leftTab('start');
   await page.waitFor(() => document.querySelectorAll('#start-page .start-btns .btn').length === 2, [], { what: 'the Start page' });
   assert.deepEqual(await startPage(page), { buttons: ['New Project…', 'Open Project…'], top: true, halves: true, commands: [
-    'Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)… (disabled)', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)'] });
+    'Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)… (disabled)', 'Copy Link to Project… (disabled)', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)'] });
   // drawn again with a project open (a late drawing while one opens): the same page kept, only its host's attribute
   // changes, so that a click pressed before is not lost (#494, #1222)
   assert.deepEqual(await page.eval(async () => {
@@ -676,7 +676,7 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.openProject('StartZip');
   await page.leftTab('start');
   await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the exports enabled' });
-  assert.deepEqual((await startPage(page)).commands, ['Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)…', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…']);
+  assert.deepEqual((await startPage(page)).commands, ['Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)…', 'Copy Link to Project…', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…']);
   await page.click('#start-page .entry a', { text: 'Export Silinx ISE Project (.zip)…' });
   await waitDownload(page, 'StartZip-silinx.zip');
   await page.click('#start-page .entry a', { text: 'Export Xilinx ISE Project (.zip)…' });

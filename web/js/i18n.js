@@ -21,6 +21,7 @@ import { FPGA_PT, FPGA_PT_PATTERNS } from './i18n-fpga.js';
 import { SCH_PT, SCH_PT_PATTERNS } from './i18n-schematic.js';
 import { CLOCKING_PT, CLOCKING_PT_PATTERNS } from './i18n-clocking.js';
 import { WIZARDS_PT, WIZARDS_PT_PATTERNS } from './i18n-wizards.js';
+import { LINK_PT, LINK_PT_PATTERNS } from './i18n-link.js';
 import { MEMORY_PT, MEMORY_PT_PATTERNS } from './i18n-memory.js';
 import { RESOURCES_PT, RESOURCES_PT_PATTERNS } from './i18n-resources.js';
 import { PINS_PT, PINS_PT_PATTERNS } from './i18n-pins.js';
@@ -802,6 +803,8 @@ PT_PATTERNS.unshift(...CLOCKING_PT_PATTERNS,
   [/^(Input port|Reset input|LOCKED output|Output (\w+)): (.*)\.$/, (m, w, o, e) => `${{ 'Input port': 'Porto de entrada', 'Reset input': 'Entrada de reset', 'LOCKED output': 'Saída LOCKED' }[w] || `Saída ${o}`}: ${ptIdent(e)}.`]);
 for (const [k, v] of Object.entries(WIZARDS_PT)) if (!(k in PT)) PT[k] = v;   // the FSM, ASM and UCF wizards (#2082)
 PT_PATTERNS.unshift(...WIZARDS_PT_PATTERNS);
+for (const [k, v] of Object.entries(LINK_PT)) if (!(k in PT)) PT[k] = v;   // a design's link (#2826)
+PT_PATTERNS.unshift(...LINK_PT_PATTERNS);
 for (const [k, v] of Object.entries(RESOURCES_PT)) if (!(k in PT)) PT[k] = v;   // the device's resources checked against the design (#796)
 PT_PATTERNS.unshift(...RESOURCES_PT_PATTERNS);
 for (const [k, v] of Object.entries(PINS_PT)) if (!(k in PT)) PT[k] = v;   // I/O Pin Planning's Board view (#2694)

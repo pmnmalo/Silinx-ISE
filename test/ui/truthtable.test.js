@@ -312,7 +312,7 @@ uiTest('Algebra from Module: a vector adder read into a table (exhaustive simula
   assert.deepEqual(await page.waitFor(() => { const m = [...document.querySelectorAll('body > .menu-popup .mi')].map((i) => i.textContent.trim()); return m.length ? m : null; }), [
     'Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', ...TB,
     'Convert to Schematic (editable)…', 'Convert to State Machine (ASM)…', 'Convert to State Diagram (FSM)…',
-    'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…',
+    'Copy Link to This Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…',
   ]);
   await page.closeMenus();
   // the editor's "Algebra from Module…" on a new table (with its HDL file, #207)

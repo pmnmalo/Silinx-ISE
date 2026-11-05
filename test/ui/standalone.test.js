@@ -1266,6 +1266,30 @@ uiTest('#483 browser edition: a hostile zip (paths leaving the project, a broken
   assert.equal(await page.eval(() => document.getElementById('err-count').textContent), '', 'no error');
 }, { url: () => 'about:blank' });
 
+uiTest('#2826 browser edition (the Pages site): a design\'s link and an example\'s, opened again unchanged with no question', E, async (page) => {
+  const boot = () => page.waitFor(() => window.SilinxApp && window.Silinx.linkOpened, [], { what: 'the link opened', timeout: 60000 });
+  await page.goto(`${siteUrl}?l=1#open=example:gates&view=try`);
+  await boot();
+  await page.waitFor(() => window.SilinxApp.findDoc('sch:src/gates.sch.json')?.schEditor?.simulating, [], { what: 'Try it running', timeout: 60000 });
+  await page.waitConsole(/Opened 'gates' from a link \(a new project\): Try it\./);
+  // the example's link again: the same files (api-local.js exampleFiles), no question
+  await page.goto(`${siteUrl}?l=2#open=example:gates`);
+  await boot();
+  await page.waitConsole(/Opened 'gates' from a link\./);
+  assert.equal(await page.dialogCount(), 0);
+  // the project's own link (Copy Link…'s), opened: the same project
+  await page.menu('File', 'Copy Link to Project…');
+  await page.waitDialog('Copy Link');
+  await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = 'simulate'; v.dispatchEvent(new Event('change')); });
+  const link = await page.waitFor(() => /^https?:.*#design=[\w-]+&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
+  await page.dialogButton('Cancel');
+  await page.goto(link.replace('#', '?l=3#'));
+  await boot();
+  await page.waitConsole(/Opened 'gates' from a link: the simulation\./);
+  assert.equal(await page.dialogCount(), 0);
+  assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /WARNING|ERROR/.test(l)), []);
+}, { url: () => 'about:blank', timeout: 180000 });
+
 uiTest('#2320 browser edition: Export Xilinx ISE Project writes a C source as its HDL, in the zip and the .xise, not the C', E, async (page) => {
   const codec = { deflate: (d) => zlib.deflateRawSync(d), inflate: (d) => zlib.inflateRawSync(d) };
   const pj = { name: 'CMod', top: 'twice', preferredLanguage: 'vhdl', files: [] };

@@ -130,6 +130,8 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   api.get('/templates', wrap(() => orderExamples(fs.readdirSync(P.EXAMPLES_DIR, { withFileTypes: true })
     .filter(d => d.isDirectory() && fs.existsSync(path.join(P.EXAMPLES_DIR, d.name, 'silinx.json')))
     .map(d => d.name))));
+  // an example's files (#2826: a link to it opens the project of that name as it is when it has the same files)
+  api.get('/templates/:name/files', wrap(req => P.exampleFiles(req.params.name)));
   // the test designs (#1746), a category of their own (core/test-designs.js)
   api.get('/test-designs', wrap(() => orderTestDesigns(P.templateNames(P.TEST_DESIGNS_DIR))));
 
