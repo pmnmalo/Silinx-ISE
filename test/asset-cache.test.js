@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isVersionedAsset, assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, assetDigest, ASSET_CACHE, YOSYS_FILES, NEXTPNR_FILES, nextpnrFiles, nextpnrChipdb } from '../web/js/asset-cache.js';
+import { VERSIONED_ASSET, isVersionedAsset, assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, assetDigest, ASSET_CACHE, YOSYS_FILES, NEXTPNR_FILES, nextpnrFiles, nextpnrChipdb } from '../web/js/asset-cache.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -56,6 +56,45 @@ test('#967 the versioned assets: Yosys and nextpnr (#2136) of a version, a versi
   for (const u of ['http://127.0.0.1:8/vendor/yowasp-yosys/gen/yosys.core.wasm', 'http://127.0.0.1:8/vendor/nextpnr-spartan/gen/bundle.js', `${SITE}assets/vendor/nextpnr-spartan/0.11.2/package.json`, `${SITE}assets/vendor/nextpnr-spartan6/0.1.1/package.json`, `${SITE}assets/vendor/nextpnr-spartan7/0.1.1/gen/bundle.js`, 'http://127.0.0.1:8/vendor/nextpnr-spartan6/gen/bundle.js', 'http://127.0.0.1:8/assets/devices/xc3s250ecp132-4.json.gz', SITE, `${SITE}version.json`,
     `${SITE}assets/15.12.0/devices/`, `${SITE}assets/15.12.0/bitdb/s6/`, `${SITE}assets/15.12.0/bitdb/x6/a.json`, `${GRAPH}?x=1`, `${SITE}assets/latest/devices/a.json.gz`])
     assert.equal(isVersionedAsset(u), false, u);
+});
+
+// nextpnr's bundles and chip databases (#2136, the Spartan-6's #2288), as the flow worker's prepare fetches them
+const NEXTPNR = [`${SITE}assets/vendor/nextpnr-spartan/0.11.2/gen/`, `${SITE}dev/assets/vendor/nextpnr-spartan6/0.1.3/gen/`];
+const NEXTPNR_URLS = [...nextpnrFiles('spartan3e').map(f => new URL(f, NEXTPNR[0]).href), new URL(nextpnrChipdb('xc3s250e'), NEXTPNR[0]).href,
+  ...nextpnrFiles('spartan6').map(f => new URL(f, NEXTPNR[1]).href), new URL(nextpnrChipdb('xc6slx45'), NEXTPNR[1]).href];
+
+test('#2792 assetFetch reads nextpnr\'s files (both bundles, their chip databases) from the cache: prefetched, then no request; in a Yosys worker\'s code too', async () => {
+  for (const install of [s => assetFetch(s), s => new Function('self', assetFetchSource())(s)]) {
+    const s = scope();
+    assert.deepEqual(await prefetchAssets(NEXTPNR_URLS, { scope: s }), { fetched: NEXTPNR_URLS.length, bytes: NEXTPNR_URLS.reduce((n, u) => n + `body of ${u}`.length, 0) });
+    s.requests.length = 0;
+    install(s);
+    for (const u of NEXTPNR_URLS) {
+      assert.equal(isVersionedAsset(u), true, u);
+      assert.equal(await (await s.fetch(u)).text(), `body of ${u}`);
+    }
+    assert.deepEqual(s.requests, [], 'every one from the cache');
+    // and a miss is kept: the next run reads it with no request
+    const fresh = scope();
+    install(fresh);
+    for (const u of NEXTPNR_URLS) await (await fresh.fetch(u)).text();
+    await settle();
+    assert.deepEqual(fresh.cache.puts, NEXTPNR_URLS);
+    for (const u of NEXTPNR_URLS) await fresh.fetch(u);
+    assert.equal(fresh.requests.length, NEXTPNR_URLS.length);
+  }
+});
+
+test('#2792 assetFetch and isVersionedAsset agree: one pattern (VERSIONED_ASSET), the worker\'s code carries it', async () => {
+  const urls = [WASM, GRAPH, ...NEXTPNR_URLS, `${SITE}assets/15.12.0/bitdb/s6/xc6slx16-lut.json`, `${SITE}version.json`, `${GRAPH}?x=1`,
+    'http://127.0.0.1:8/vendor/nextpnr-spartan/gen/bundle.js', `${SITE}assets/vendor/nextpnr-spartan7/0.1.1/gen/bundle.js`];
+  const s = scope();
+  assetFetch(s);
+  for (const u of urls) { await (await s.fetch(u)).text(); await s.fetch(u); }
+  await settle();
+  assert.deepEqual(s.cache.puts, urls.filter(isVersionedAsset));
+  assert.equal(s.requests.length, urls.filter(isVersionedAsset).length + 2 * urls.filter(u => !isVersionedAsset(u)).length);
+  assert.ok(assetFetchSource().includes(String(VERSIONED_ASSET)));
 });
 
 test('#967 assetFetch: a miss is fetched and kept, the next fetch of it reads the cache with no request', async () => {

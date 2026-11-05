@@ -585,7 +585,8 @@ uiTest('#280 browser edition: Generate Programming File again, the design unchan
 // goto / reload now name the requests the page still waits for)
 uiTest('#967 browser edition: what Implement needs is downloaded when a project opens and kept in Cache Storage; Implement then fetches none of it, after a reload too', E, async (page) => {
   const assets = `${siteUrl}assets/`;
-  const versioned = () => served.filter((p) => /^assets\/(vendor\/yowasp-yosys\/[^/]+\/gen\/(?!bundle\.js)|dev-[0-9a-f]+\/(devices|bitdb)\/)/.test(p));
+  // (nextpnr's too, its WebAssembly and its chip databases, #2792; the bundles' bundle.js is an import, not assetFetch's)
+  const versioned = () => served.filter((p) => /^assets\/(vendor\/(yowasp-yosys|nextpnr-spartan6?)\/[^/]+\/(gen\/(?!bundle\.js)|chipdb\/)|dev-[0-9a-f]+\/(devices|bitdb)\/)/.test(p));
   const boot = async () => {
     await page.goto(siteUrl);
     await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
@@ -664,6 +665,7 @@ uiTest('#967 browser edition: what Implement needs is downloaded when a project 
   assert.doesNotMatch(log, /Loading Yosys/);
   assert.match(log, /Process "Generate Programming File" completed successfully/);
   assert.ok(versioned().some((p) => p.endsWith('yosys.core.wasm')) && versioned().some((p) => p.endsWith('.json.gz')));
+  assert.ok(versioned().some((p) => p.endsWith('nextpnr-himbaechel-spartan3e.core.wasm')) && versioned().some((p) => p.endsWith('chipdb-xc3s250e.bin.gz')), versioned().join('\n'));
   await page.waitFor(() => caches.open('silinx-assets').then((c) => c.keys()).then((ks) => ks.length >= 8), [], { what: 'kept by the run' });
 }, { url: () => 'about:blank', timeout: 300000, skip: chromeOnly });   // (Page.addScriptToEvaluateOnNewDocument)
 
