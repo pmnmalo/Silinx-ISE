@@ -823,7 +823,8 @@ Recorded here because the work was planned without the author's answers (2026-10
 
 ### The open flow's routings checked by ISE (#732, 2026-10-29)
 
-`flow-xdl6.mjs` writes each example as the open flow routes it (on the switches whose bits are known); ISE turns
+`flow-xdl6.mjs` writes each example as the open flow routes it (on the switches whose bits are known; by nextpnr since
+#2824, Silinx's own router then, for the results below); ISE turns
 each XDL into an NCD, checks it (`drc`) and writes its bitstream (`bitgen -g CRC:Disable`); `check-bitgen6.mjs`
 compares that with `bitstreamS6`'s of the same XDL. Eleven designs (the seven examples on the Nexys3, gates,
 traffic, blinky and pong on the Atlys):
@@ -875,7 +876,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `summarize-night1.mjs` | Night 1's results as `measured/night1.json` (counts and observations, no Xilinx file) |
 | `bits6.mjs` | Reads a Spartan-6 `.bit`: its header and the UG380 packets (16-bit words) |
 | `compare-place.mjs` | The placer against ISE's placement of the same netlists (night 1): `measured/place-compare.json` |
-| `place-xdl.mjs` | The examples placed (and with `--route`, routed) as XDL, for ISE's check |
+| `place-xdl.mjs` | The examples placed (and with `--route`, routed by nextpnr, #2824) as XDL, for ISE's check |
 | `compare-route.mjs` | The router against ISE's routing of the same netlists (night 1): `measured/route-compare.json` |
 | `ise-place-check.sh` | Inside the ISE container: `xdl -xdl2ncd`, `par -k` and `drc` of the placed XDL, `drc` of the routed one |
 | `summarize-ise-check.mjs` | That check's logs as `measured/ise-check.json` (the messages by id and count) |
@@ -911,7 +912,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets, or every connection of reportgen's `.dly`, on ISE's routing (#731) |
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
 | `sta6.mjs` | The static timing of a routed design (its XDL): the slices' and hard blocks' arcs, PERIOD slack and OFFSET IN / OUT against trce's (#731) |
-| `flow-xdl6.mjs` | The examples routed as the open flow routes them, written as XDL for ISE's DRC and bitgen (#732) |
+| `flow-xdl6.mjs` | The examples routed as the open flow routes them (by nextpnr, #2824), written as XDL for ISE's DRC and bitgen (#732) |
 | `gen-flowdrop6.mjs` | The PIPs of the open flow's designs not in the databases, each dropped alone in context for ISE (#732) |
 | `check-bitgen6.mjs` | The Silinx toolchain's .bit of each routed XDL against ISE's bitgen's, byte for byte (#732) |
 | `fit-model6.mjs` | The timing model of the Silinx toolchain fitted on routed designs: `packages/silinx-fpga/src/fpga/s6/timing-model.js` (#732) |
