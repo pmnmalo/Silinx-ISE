@@ -79,7 +79,7 @@ export function renderHierarchy() {
     ].filter(Boolean);
     const it = treeItem({
       label, meta: info ? `(${(sch || file).split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : sch ? viewIcon(sch) : cSrc ? 'file' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
-      cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2, badges,
+      cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2, badges, module: modName,
       onSelect: () => select(drawn ? { type: viewKind(drawn), file: drawn, module: modName, path, instName } : { type: 'module', module: modName, file, path, instName, sch, wizard: wz }),
       onOpen: () => info && (sch ? openView(sch) : wz ? openWizardModule(file) : openFile(file, info.line)),
       onContext: e => (drawn ? viewContextMenu(e, drawn) : moduleContextMenu(e, modName, file)),
@@ -192,7 +192,7 @@ function viewOfModule(name, file) {
 
 // badges: the views of a module ({ text, base, title, open, context }), after its name: a click opens
 // that view, a right-click shows its commands; the base's is marked. Tab reaches the selected row's badges.
-export function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext, cls = '', key, badges = [] }) {
+export function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext, cls = '', key, badges = [], module = null }) {
   const li = h('li');
   // what the user collapsed / expanded is remembered across redraws
   if (key && S.treeOpen.has(key)) open = S.treeOpen.get(key);
@@ -205,7 +205,8 @@ export function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onC
     return el;
   });
   // (the badges next to the name, the file in brackets last: in a narrow pane it gives way first)
-  const row = h('div', { class: `row ${cls}`, 'data-key': key }, tw, icon(ico), h('span', { class: 'lbl' }, label),
+  // (a module's row: its module's name, which a link's top= selects, #2871)
+  const row = h('div', { class: `row ${cls}`, 'data-key': key, ...(module ? { 'data-module': module } : {}) }, tw, icon(ico), h('span', { class: 'lbl' }, label),
     views.length ? h('span', { class: 'badges' }, views) : null, meta ? h('span', { class: 'meta' }, meta) : null);
   const ul = h('ul');
   if (!open) ul.hidden = true;

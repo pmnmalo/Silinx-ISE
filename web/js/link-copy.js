@@ -36,8 +36,9 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     link = null;
     out.value = ''; info.textContent = ''; err.textContent = '';
     if (encodeError) { err.textContent = encodeError; return; }
-    // (the module: in the link when it is not the project's top)
-    const top = modSel.value && modSel.value !== S.project.top ? modSel.value : null;
+    // (the module: in the link when it is not the project's top, or when the link is a module's: Copy Link to This
+    // Module…, the project then opened on it, #2871)
+    const top = modSel.value && (module || modSel.value !== S.project.top) ? modSel.value : null;
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
     link = makeLink(linkBase(), { design, view: viewSel.value || null, top });
