@@ -54,6 +54,8 @@ const PARTS = {
     'openSilinxTechSchematic', 'openSchematic', 'readDataFiles', 'runSimulation', 'runSimulationInner',
     'saveStimTestbench', 'confirmElabErrors', 'openEmulator'],
   'rename.js': ['renameSymbolIn', 'extOf', 'dirOf', 'renameDialog', 'renameSource'],
+  // where the user was (#160, #163; moved as it was, #2886)
+  'view-state.js': ['VIEW_KEY', 'inProject', 'REOPEN', 'reopenable', 'reopenKey', 'viewKept', 'closeAllDocs', 'saveViewState', 'savedViewState', 'restoreViewState'],
 };
 // every module out of app.js, the ones split out of a part included
 const MODULES = [...Object.keys(PARTS), ...Object.values(SPLIT).flat()];
@@ -193,8 +195,9 @@ test('#405 rename.js: Rename Symbol and renaming a source left app.js', () => {
 
 // A module uses no name of app.js's world (app.js's and the modules' top-level names, what they import) without
 // importing or defining it: the first runs of the UI tests caught such a name only once its code ran. `t` is a
-// local name of several functions (a truth table, a text), not i18n's t, which none of the modules uses.
-const LOCAL_NAMES = new Set(['t']);
+// local name of several functions (a truth table, a text), not i18n's t, which none of the modules uses; `inProject`
+// a local Set of app.js's Files page, not view-state.js's helper (#2886).
+const LOCAL_NAMES = new Set(['t', 'inProject']);
 const imported = code => new Set([...code.matchAll(/^import (?:\{([^}]*)\}|\* as ([\w$]+)|([\w$]+)) from/gm)]
   .flatMap(m => (m[1] ? m[1].split(',').map(x => x.trim().split(' as ').pop().trim()).filter(Boolean) : [m[2] || m[3]])));
 const topNames = code => new Set([...code.matchAll(/^(?:export )?(?:async )?(?:function\*? |const |let |var |class )([\w$]+)/gm)].map(m => m[1]));
