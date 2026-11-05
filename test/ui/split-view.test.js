@@ -1,5 +1,5 @@
 // UI (#1619, #1652): two documents side by side, each side with its own tabs. A schematic (the example gates) and its
-// generated VHDL: Show Generated HDL Beside (its tab's right-click menu) opens the HDL on the other side, read-only, the
+// generated VHDL: Show VHDL Beside (its tab's right-click menu, #2834) opens the HDL on the other side, read-only, the
 // schematic kept in front; an edit of the schematic reaches the HDL beside it; a click in a pane brings its document to
 // the front; the divider dragged; a document opened goes to the side worked in; kept with the project (a reload comes
 // back split); a side's last document closed leaves the other alone. The Split button (the header's right end, before
@@ -56,10 +56,10 @@ uiTest('#1619 a schematic and its generated VHDL side by side: the HDL follows t
   await page.waitFor((id) => window.Silinx.active?.id === id && window.Silinx.active.schEditor, [SCH], { what: 'the schematic' });
   assert.deepEqual(await ids(page), [`-:${SCH}*`]);
 
-  // its tab's menu: Show Generated HDL Beside (no Move to the Other Side, no Close Split: not split)
+  // its tab's menu: Show VHDL / Verilog Beside (no Move to the Other Side, no Close Split: not split)
   const m = await tabMenu(page, 'gates.sch.json');
-  assert.deepEqual(m.slice(-2), ['Close All', 'Show Generated HDL Beside']);
-  await page.click('body > .menu-popup .mi', { text: 'Show Generated HDL Beside' });
+  assert.deepEqual(m.slice(-3), ['Close All', 'Show VHDL Beside', 'Show Verilog Beside']);
+  await page.click('body > .menu-popup .mi', { text: 'Show VHDL Beside' });
   await page.waitFor(() => document.getElementById('workspace').classList.contains('split') && window.Silinx.docs.find((d) => d.id === 'file:src/gates.vhd')?.editor, [], { what: 'split' });
   // the schematic left, in front; its VHDL right, read-only; the divider between them
   let s = await shown(page);
@@ -141,7 +141,7 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
   await page.waitFor((id) => window.Silinx.active?.id === id && window.Silinx.active.editor, [VHD]);
   const viewItems = () => page.eval(() => window.SilinxApp.S.menus.find((m) => m.label === 'View').items().filter((x) => x && x !== '-' && /Split|Beside/.test(x.label))
     .map((x) => `${x.label}${x.checked ? ' (checked)' : ''}${x.disabled?.() ? ' (disabled)' : ''}`));
-  assert.deepEqual(await viewItems(), ['Split Editor', 'Show Generated HDL Beside (disabled)']);
+  assert.deepEqual(await viewItems(), ['Split Editor', 'Show Schematic Beside', 'Show Verilog Beside']);
   // (no Open to the Side any more: the tab's menu, not split)
   assert.ok(!(await tabMenu(page, 'tb_gates.vhd')).some((l) => /Side|Split/.test(l)));
   await page.closeMenus();
@@ -162,7 +162,7 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
   const empty = await page.eval(() => { const e = document.getElementById('split-empty'); return { side: e.dataset.side, front: e.classList.contains('pane-front'), text: e.querySelector('p').textContent, icon: (() => { const r = e.querySelector('.split-ico svg')?.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height), r.bottom <= e.querySelector('p').getBoundingClientRect().top] : null; })(), picks: [...e.querySelectorAll('.split-picks button')].filter((b) => b.getClientRects().length).map((b) => b.textContent) }; });
   assert.deepEqual(empty, { side: 'b', front: true, text: 'Drag a tab here, or right-click an open tab and choose Move to the Other Side', icon: [48, 48, true], picks: tasks ? ['tb_gates.vhd'] : ['Design Summary', 'tb_gates.vhd'] });
   assert.equal(await page.eval(() => document.getElementById('split-btn').getAttribute('aria-pressed')), 'true');
-  assert.deepEqual(await viewItems(), ['Split Editor (checked)', 'Show Generated HDL Beside (disabled)']);
+  assert.deepEqual(await viewItems(), ['Split Editor (checked)', 'Show Schematic Beside', 'Show Verilog Beside']);
   // a document opened (the Design pane's schematic): there
   await page.eval(() => window.SilinxApp.openSch('src/gates.sch.json'));
   await page.waitFor((id) => window.Silinx.active?.id === id && window.Silinx.active.schEditor, [SCH], { what: 'the schematic' });
@@ -175,7 +175,7 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
   assert.deepEqual(await ids(page), [`a:${VHD}`, 'b:file:sim/tb_gates.vhd*']);
   assert.deepEqual((await tabRows(page)).b, ['gates.sch.json', 'tb_gates.vhd*']);
   // its menu: Move to the Other Side, Close Split
-  assert.deepEqual((await tabMenu(page, 'tb_gates.vhd')).slice(-2), ['Move to the Other Side', 'Close Split']);
+  assert.deepEqual((await tabMenu(page, 'tb_gates.vhd')).slice(-4), ['Move to the Other Side', 'Show Verilog Beside', 'Show Unit Under Test Beside', 'Close Split']);
   await page.click('body > .menu-popup .mi', { text: 'Move to the Other Side' });
   await page.waitFor(() => document.querySelector('#doc-tabs > .tab-group[data-side="a"] .tab.active')?.textContent.includes('tb_gates'), [], { what: 'moved back' });
   assert.deepEqual(await ids(page), ['a:file:sim/tb_gates.vhd*', `b:${SCH}`]);
@@ -195,10 +195,10 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
 
   // Portuguese: the commands, the button, the divider, the empty side
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  assert.deepEqual((await tabMenu(page, 'tb_gates.vhd')).slice(-2), ['Mover para o Outro Lado', 'Fechar a Divisão']);
+  assert.deepEqual((await tabMenu(page, 'tb_gates.vhd')).slice(-4), ['Mover para o Outro Lado', 'Mostrar o Verilog ao Lado', 'Mostrar a Unidade em Teste ao Lado', 'Fechar a Divisão']);
   await page.closeMenus();
   const pt = await page.openMenu('Ver');
-  for (const l of ['Dividir o Editor', 'Mostrar o HDL Gerado ao Lado']) assert.ok(pt.some((i) => i.label === l), `${l}: ${pt.map((i) => i.label).join(' | ')}`);
+  for (const l of ['Dividir o Editor', 'Mostrar o Verilog ao Lado', 'Mostrar a Unidade em Teste ao Lado']) assert.ok(pt.some((i) => i.label === l), `${l}: ${pt.map((i) => i.label).join(' | ')}`);
   await page.closeMenus();
   assert.deepEqual(await page.eval(() => [document.getElementById('split-btn').title, document.getElementById('split-divider').title]),
     ['Dividir o editor: dois documentos lado a lado, cada lado com os seus separadores', 'Arraste para mudar o tamanho dos lados (duplo clique: metades)']);
@@ -222,7 +222,7 @@ uiTest('#1619 a C source and its generated VHDL side by side: made again as the 
   await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'mac'), [], { what: 'the module mac' });
   await page.eval(() => window.SilinxApp.openFile('src/mac.c'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/mac.c' && window.Silinx.active.editor);
-  await page.menu('View', 'Show Generated HDL Beside');
+  await page.menu('View', 'Show VHDL Beside');
   await page.waitFor(() => document.getElementById('workspace').classList.contains('split') && window.Silinx.docs.find((d) => d.id === 'chdl:src/mac.c')?.editor, [], { what: 'the C and its VHDL' });
   assert.deepEqual(await ids(page), ['a:file:src/mac.c*', 'b:chdl:src/mac.c']);
   const hdl = () => page.eval(() => window.Silinx.docs.find((d) => d.id === 'chdl:src/mac.c').editor.getValue());
@@ -246,7 +246,7 @@ uiTest('#1619 Tasks interface: the schematic and its VHDL side by side in Design
     await page.waitFor((id) => window.Silinx.active?.id === id && window.Silinx.active.schEditor, [SCH], { what: 'the schematic' });
     // (the Split button in the header's layout buttons, before Maximize: #1657)
     assert.deepEqual(await page.eval(() => [...document.getElementById('task-view').children].map((b) => b.id || b.dataset.act)), ['side', 'console', 'split-btn', 'max']);
-    await page.menu('View', 'Show Generated HDL Beside');
+    await page.menu('View', 'Show VHDL Beside');
     await page.waitFor(() => document.getElementById('workspace').classList.contains('split'), [], { what: 'split' });
     assert.deepEqual(await ids(page), [`a:${SCH}*`, `b:${VHD}`]);
     // the Design Summary (Implement's): alone, the pair kept for Design

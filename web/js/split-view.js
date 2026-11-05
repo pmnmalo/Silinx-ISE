@@ -2,15 +2,14 @@
 // in front, a divider between them. The Split button (the header's right end, before Maximize; View ▸ Split
 // Editor) splits it: the right side empty, where the next document opened goes. A document opened goes to the side
 // worked in (the one of the document in front, or the empty side clicked); a tab dragged to the other side's tabs or
-// pane, or its menu's Move to the Other Side, moves it there. Show Generated HDL Beside opens a drawing's HDL file, or a
-// C source's HDL, on the other side, read-only as always: it follows the drawing as it is saved (refreshOpenEditor,
-// web/js/drawings.js; the C's, web/js/c-source.js openCHdl); an HDL source in the other language than the preferred
-// one, its translation (Show Generated VHDL / Verilog Beside, web/js/translation.js, #2711). A side whose last
+// pane, or its menu's Move to the Other Side, moves it there. Its menu's Show … Beside (#2834) opens a related view on
+// the other side (web/js/related-views.js: what the document generates, what it comes from or shows), or brings it to
+// the front there: a drawing's HDL file, read-only as always, follows the drawing as it is saved (refreshOpenEditor,
+// web/js/drawings.js; a C's HDL, web/js/c-source.js openCHdl); an HDL source's translation (#2711). A side whose last
 // document closes, or Close Split, leaves one. The sides are kept with the open documents (app.js saveViewState). A narrow workspace stacks them.
-import { h, toast } from './ui.js';
-import { S, activateDoc, openFile, saveViewState } from './app.js';
-import { openCHdl, isC } from './c-source.js';
-import { openTranslation, translationOf } from './translation.js';
+import { h } from './ui.js';
+import { S, activateDoc, saveViewState } from './app.js';
+import { relatedViews } from './related-views.js';
 import { DESIGN_ICON, taskOfDoc } from './tasks.js';
 import { prefKey } from './prefs.js';
 
@@ -93,40 +92,34 @@ export function moveToSide(doc, s) {
   activateDoc(doc);
 }
 
-/** The command opening the HDL generated from a document (a drawing's HDL file, a C source's HDL, an HDL source's
- *  translation), or null. */
-export function generatedOpener(doc) {
-  const p = doc?.path || /^(?:sch|asm|tt|fsm|pn):(.+)$/.exec(String(doc?.id || ''))?.[1];
-  if (!p) return null;
-  const hdl = /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(p) && S.schOwners?.[p];
-  if (hdl) return () => openFile(hdl);
-  if (isC(p) && S.sources.some(s => s.view && s.path === p)) return () => openCHdl(p);
-  if (translationOf(p)) return () => openTranslation(p);
-  return null;
+/** Show … Beside (#2834): a view related to `doc` (web/js/related-views.js: { find, open }) on the other side (split),
+ *  `doc` kept in front: made or opened there; open already, brought to the front there (made again where it is, a view
+ *  that can be, as a translation). Not made (its errors in the console): as it was. */
+export async function showBeside(doc, view) {
+  const s = other(sideOf(doc)), was = on;
+  let g = view.find();
+  on = true;
+  // (in the Tasks interface, of the document's task: a waveform's HDL beside it in Simulate)
+  const place = () => { if (g !== doc) { g.side = s; g.task = taskOf(doc); } };
+  if (g) { place(); await g.refresh?.(); activateDoc(g); }
+  else {
+    target = s;
+    try { await view.open(); } finally { g = view.find(); if (!g) { on = was; target = sideOf(doc); layout(); } }
+    if (g) place();   // (open already, on the same side: moved)
+  }
+  if (S.docs.includes(doc)) activateDoc(doc);
+  return g || null;
 }
 
-/** Show Generated HDL Beside: the generated HDL of `doc` on the other side (split), `doc` kept in front. */
-export async function showGeneratedBeside(doc = S.active) {
-  const open = generatedOpener(doc);
-  if (!open) { toast('This document has no generated HDL to show beside it', 'info'); return null; }
-  const s = other(sideOf(doc));
-  on = true;
-  target = s;
-  let g;
-  try { g = await open(); } finally { if (target === s && !g) target = sideOf(doc); }
-  if (g && g !== doc && S.docs.includes(g)) g.side = s;   // (open already, on the same side: moved)
-  if (S.docs.includes(doc)) activateDoc(doc);
-  return g;
-}
+/** The Show … Beside commands of a document (its tab's menu, View). */
+export const besideItems = (doc = S.active) => relatedViews(doc).map(v => ({ label: v.label, action: () => showBeside(doc, v) }));
 
 /** The commands of a document's tab. */
 export function splitItems(doc = S.active) {
-  const gen = generatedOpener(doc);
-  const tr = doc?.path && translationOf(doc.path);
   return [
     '-',
     on ? { label: 'Move to the Other Side', action: () => moveToSide(doc, other(sideOf(doc))) } : null,
-    gen ? { label: tr === 'VHDL' ? 'Show Generated VHDL Beside' : tr ? 'Show Generated Verilog Beside' : 'Show Generated HDL Beside', action: () => showGeneratedBeside(doc) } : null,
+    ...besideItems(doc),
     on ? { label: 'Close Split', action: () => closeSplit() } : null,
   ].filter(Boolean);
 }

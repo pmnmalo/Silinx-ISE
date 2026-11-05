@@ -1,7 +1,8 @@
 // An HDL source in the other language (#2693): a Verilog module of a VHDL project (or the other way round) has the
 // preferred language's badge too on its Design row, which opens the source translated (core/translate.js), read-only,
 // in a document of its own, made again when the source is saved. What cannot be translated is said in the document.
-// The source's tab menu shows it beside the source (Show Generated VHDL / Verilog Beside, web/js/split-view.js, #2711).
+// The source's tab menu shows it beside the source (Show VHDL / Verilog Beside, web/js/split-view.js, #2711), in the
+// other language whichever the preferred one (#2834).
 import { h } from './dom.js';
 import { S, findDoc, closeDoc, openDoc, openFile, activateDoc } from './app.js';
 import { createEditor } from './editor.js';
@@ -32,18 +33,18 @@ async function sourceText(path) {
   if (s?.text != null) return s.text;
   return (await import('./api.js')).api.readFile(S.project.name, path);
 }
-const translate = (path, text) => translateSource(text, { path, to: translationLang(path, preferred()), sources: S.sources.filter(s => !s.view) });
+const translate = (path, text, to) => translateSource(text, { path, to, sources: S.sources.filter(s => !s.view) });
 
-/** The source translated to the preferred language, read-only, in a document of its own. */
-export async function openTranslation(path) {
-  const lang = translationLang(path, preferred());
+/** The source translated to `to` (the preferred language when not given), read-only, in a document of its own. */
+export async function openTranslation(path, to = null) {
+  const lang = to ? translationLang(path, to) : translationLang(path, preferred());
   if (!lang) return openFile(path);
   const id = `tr:${path}`;
   const old = findDoc(id);
   // (open already, in this language: made again, where it is)
   if (old?.translation?.lang === lang) { await old.refresh(); activateDoc(old); return old; }
   if (old) await closeDoc(old);
-  const r = translate(path, await sourceText(path));
+  const r = translate(path, await sourceText(path), lang);
   const name = translatedPath(path.split('/').pop(), lang);
   return openDoc({
     id, title: name, tooltip: `${name}, translated from ${path}`, icon: lang,
@@ -60,7 +61,7 @@ export async function openTranslation(path) {
       el.append(d.editor.status);   // (its status line, #2763)
       // (the source saved: translated again)
       const follow = async () => {
-        const t = translate(path, await sourceText(path));
+        const t = translate(path, await sourceText(path), lang);
         d.translation = t;
         show(t);
         if (t.text !== d.editor.getValue()) d.editor.setValue(t.text);

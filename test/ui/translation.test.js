@@ -2,7 +2,7 @@
 // after its own on its Design row: [Verilog*] [VHDL] in a VHDL project, [VHDL*] [Verilog] in a Verilog one. The badge
 // opens the source translated (core/translate.js), read-only (typing changes nothing), made again when the source is
 // saved; a source that cannot be translated says why, with its line. Both preferred languages, Portuguese; no warnings.
-// The source's tab menu (#2711): Show Generated VHDL / Verilog Beside, the translation on the other side, the source in
+// The source's tab menu (#2711, #2834): Show VHDL / Verilog Beside, the translation on the other side, the source in
 // front; a source in the preferred language has none.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -191,20 +191,20 @@ uiTest('#2693 a VHDL source in a Verilog project: [VHDL*] [Verilog], the Verilog
   await noWarnings(page);
 });
 
-uiTest('#2711 an HDL source\'s tab menu: Show Generated VHDL Beside (a Verilog source, a VHDL project), its translation on the other side, the source in front; again, where it is; Verilog Beside in a Verilog project; Portuguese; no warnings', E, async (page) => {
+uiTest('#2711 an HDL source\'s tab menu: Show VHDL Beside (a Verilog source, a VHDL project), its translation on the other side, the source in front; again, where it is; Verilog Beside in a Verilog project; Portuguese; no warnings', E, async (page) => {
   await makeProject(env, { name: 'TrBeside', top: 'top', preferredLanguage: 'vhdl', files: { 'src/top.vhd': TOP, 'src/cnt.v': CNT } });
   await page.openProject('TrBeside');
   await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'cnt'), [], { what: 'the modules' });
-  // a source in the preferred language: no such item
+  // a source in the preferred language: its translation to the other one (#2834)
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd' && window.Silinx.active.editor);
-  assert.ok(!(await tabMenu(page, 'top.vhd')).some((l) => /Beside/.test(l)));
+  assert.deepEqual((await tabMenu(page, 'top.vhd')).filter((l) => /Beside/.test(l)), ['Show Verilog Beside']);
   await page.closeMenus();
-  // the Verilog source: Show Generated VHDL Beside
+  // the Verilog source: Show VHDL Beside
   await page.eval(() => window.SilinxApp.openFile('src/cnt.v'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/cnt.v' && window.Silinx.active.editor);
-  assert.equal((await tabMenu(page, 'cnt.v')).at(-1), 'Show Generated VHDL Beside');
-  await page.click('body > .menu-popup .mi', { text: 'Show Generated VHDL Beside' });
+  assert.equal((await tabMenu(page, 'cnt.v')).at(-1), 'Show VHDL Beside');
+  await page.click('body > .menu-popup .mi', { text: 'Show VHDL Beside' });
   await page.waitFor(() => window.Silinx.docs.find((d) => d.id === 'tr:src/cnt.v')?.el.classList.contains('pane-b'), [], { what: 'the translation beside' });
   assert.ok((await sides(page)).includes('a:file:src/cnt.v*'));
   assert.ok((await sides(page)).includes('b:tr:src/cnt.v'));
@@ -212,33 +212,33 @@ uiTest('#2711 an HDL source\'s tab menu: Show Generated VHDL Beside (a Verilog s
   // again (the source edited, not saved): made again, where it is
   await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().replace("q + 4'd1", "q - 4'd1")); });
   await tabMenu(page, 'cnt.v');
-  await page.click('body > .menu-popup .mi', { text: 'Show Generated VHDL Beside' });
+  await page.click('body > .menu-popup .mi', { text: 'Show VHDL Beside' });
   await page.waitFor(() => window.Silinx.docs.find((d) => d.id === 'tr:src/cnt.v').editor.getValue().includes('unsigned(q_i) - 1'), [], { what: 'the translation made again' });
   assert.ok((await sides(page)).includes('a:file:src/cnt.v*'));
   assert.ok((await sides(page)).includes('b:tr:src/cnt.v'));
   assert.equal(await page.eval(() => window.Silinx.docs.filter((d) => d.id === 'tr:src/cnt.v').length), 1);
-  // View ▸ Show Generated HDL Beside: enabled for it
-  assert.equal(await page.eval(() => window.SilinxApp.S.menus.find((m) => m.label === 'View').items().find((x) => x?.label === 'Show Generated HDL Beside').disabled()), false);
+  // View ▸ Show VHDL Beside: there for it
+  assert.ok(await page.eval(() => window.SilinxApp.S.menus.find((m) => m.label === 'View').items().some((x) => x?.label === 'Show VHDL Beside')));
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  assert.ok((await tabMenu(page, 'cnt.v')).includes('Mostrar o VHDL Gerado ao Lado'));
+  assert.ok((await tabMenu(page, 'cnt.v')).includes('Mostrar o VHDL ao Lado'));
   await page.closeMenus();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await noWarnings(page);
 });
 
-uiTest('#2711 a VHDL source\'s tab menu in a Verilog project: Show Generated Verilog Beside, its translation on the other side; no warnings', E, async (page) => {
+uiTest('#2711 a VHDL source\'s tab menu in a Verilog project: Show Verilog Beside, its translation on the other side; no warnings', E, async (page) => {
   await makeProject(env, { name: 'TrBesideV', top: 'top', preferredLanguage: 'verilog', files: { 'src/top.vhd': TOP, 'src/cnt.v': CNT } });
   await page.openProject('TrBesideV');
   await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'cnt'), [], { what: 'the modules' });
   await page.eval(() => window.SilinxApp.openFile('src/cnt.v'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/cnt.v' && window.Silinx.active.editor);
-  assert.ok(!(await tabMenu(page, 'cnt.v')).some((l) => /Beside/.test(l)));
+  assert.deepEqual((await tabMenu(page, 'cnt.v')).filter((l) => /Beside/.test(l)), ['Show VHDL Beside']);
   await page.closeMenus();
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd' && window.Silinx.active.editor);
-  assert.equal((await tabMenu(page, 'top.vhd')).at(-1), 'Show Generated Verilog Beside');
-  await page.click('body > .menu-popup .mi', { text: 'Show Generated Verilog Beside' });
+  assert.equal((await tabMenu(page, 'top.vhd')).at(-1), 'Show Verilog Beside');
+  await page.click('body > .menu-popup .mi', { text: 'Show Verilog Beside' });
   await page.waitFor(() => window.Silinx.docs.find((d) => d.id === 'tr:src/top.vhd')?.el.classList.contains('pane-b'), [], { what: 'the translation beside' });
   assert.ok((await sides(page)).includes('a:file:src/top.vhd*'));
   assert.equal(await page.eval(() => window.Silinx.docs.find((d) => d.id === 'tr:src/top.vhd').editor.getValue()), TOP_VERILOG);
