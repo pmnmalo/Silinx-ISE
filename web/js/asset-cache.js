@@ -18,14 +18,17 @@
 
 export const ASSET_CACHE = 'silinx-assets';
 /** Is url one of the versioned assets (its content never changes)? */
-export const isVersionedAsset = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/vendor\/nextpnr-spartan6?\/\d[^/]*\/(gen|chipdb)\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb(\/s6)?)\/[^/?#]+$/.test(String(url));
+/** The versioned assets' URLs: one pattern for isVersionedAsset and assetFetch (#2792: assetFetch had its own, without nextpnr's). */
+export const VERSIONED_ASSET = /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/vendor\/nextpnr-spartan6?\/\d[^/]*\/(gen|chipdb)\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb(\/s6)?)\/[^/?#]+$/;
+export const isVersionedAsset = url => VERSIONED_ASSET.test(String(url));
 
 /** The scope's fetch reads the versioned assets from Cache Storage, and puts there those it fetches. Returns
- *  whether it replaced it. Self-contained: assetFetchSource writes its text into the Yosys Blob workers. */
-export function assetFetch(scope = globalThis, name = 'silinx-assets') {
+ *  whether it replaced it. Self-contained: assetFetchSource writes its text into the Yosys Blob workers, with the pattern
+ *  as a literal (its default, VERSIONED_ASSET, is not in a worker's scope). */
+export function assetFetch(scope = globalThis, name = 'silinx-assets', pattern = VERSIONED_ASSET) {
   const net = scope.fetch;
   if (typeof net !== 'function' || net.assetCache) return false;
-  const versioned = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb(\/s6)?)\/[^/?#]+$/.test(url);
+  const versioned = url => pattern.test(url);
   const open = () => { try { return scope.caches ? scope.caches.open(name) : null; } catch { return null; } };   // (an opaque origin throws)
   // the SHA-256 the build wrote for url (none: not checked), and a response's body checked against it (null: it differs)
   const expected = url => { const i = url.lastIndexOf('/assets/'); return i >= 0 ? scope.SILINX_ASSET_INTEGRITY?.[url.slice(i + 8)] : undefined; };
@@ -65,7 +68,7 @@ export function assetFetch(scope = globalThis, name = 'silinx-assets') {
 /** The code that installs assetFetch in a worker, for the front of a Yosys Blob worker's code (packages/silinx-fpga/src/synth-open.js
  *  yosysWorkerSource): run before its import of YoWASP's bundle. */
 export const assetFetchSource = (integrity = globalThis.SILINX_ASSET_INTEGRITY) =>
-  `self.SILINX_ASSET_INTEGRITY = ${JSON.stringify(integrity || null)};\n(${assetFetch})(self, ${JSON.stringify(ASSET_CACHE)});\n`;
+  `self.SILINX_ASSET_INTEGRITY = ${JSON.stringify(integrity || null)};\n(${assetFetch})(self, ${JSON.stringify(ASSET_CACHE)}, ${VERSIONED_ASSET});\n`;
 
 const cacheOf = async (scope = globalThis) => { try { return scope.caches ? await scope.caches.open(ASSET_CACHE) : null; } catch { return null; } };
 
