@@ -763,6 +763,38 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
   await page.waitFor(() => window.Silinx.project?.name === 'ZipCopy');
 });
 
+// #2830: the import gate on the local server: a zip's refused entries (a hidden folder, a script in a name, an XXE
+// schematic, a traversal) are left out and said in the console; the sound files are imported
+uiTest('#2830 Import Silinx ISE Project: the import gate leaves out what it refuses and says why in the console', E, async (page) => {
+  const { createZip } = await import('../../core/zip.js');
+  const zlib = await import('node:zlib');
+  const codec = { deflate: (d) => zlib.deflateRawSync(d), inflate: (d, l) => zlib.inflateRawSync(d, { maxOutputLength: l }) };
+  const top = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity top is port (a : in std_logic; y : out std_logic); end;\narchitecture rtl of top is begin y <= a; end;\n';
+  const pj = { name: 'G', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }], device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' } };
+  const zip = await createZip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/top.vhd', data: top }, { path: '.git/hooks/post-checkout', data: '#!/bin/sh\n' },
+    { path: 'src/<img src=x onerror=alert(1)>.vhd', data: top }, { path: 'src/x.sch', data: '<?xml version="1.0"?><!DOCTYPE d [<!ENTITY e SYSTEM "file:///etc/passwd">]><drawing>&e;</drawing>' },
+    { path: '../evil.vhd', data: top }], codec);
+  const file = path.join(env.tmp, 'gate-silinx.zip');
+  await fs.writeFile(file, zip);
+  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
+  await page.waitDialog('Import Silinx ISE Project');
+  await page.setFiles('.dlg-overlay input[type=file]', [file]);
+  await page.fill('.dlg-overlay input[type=text]', 'Gated');
+  await page.dialogButton('Import');
+  await page.waitFor(() => window.Silinx.project?.name === 'Gated' && document.querySelector('#hier .row'), [], { what: 'the imported project open' });
+  await page.waitConsole(/Imported Silinx project 'Gated' \(1 source file\(s\), 1 other file\(s\)\)\./);
+  const warnings = (await page.consoleText()).split('\n').filter((l) => /^WARNING/.test(l));
+  assert.deepEqual(warnings, [
+    "WARNING: .git/hooks/post-checkout: not imported: hidden file or folder ('.git')",
+    'WARNING: src/<img src=x onerror=alert(1)>.vhd: not imported: character not allowed in a name (< > : " | ? *): \'<img src=x onerror=alert(1)>.vhd\'',
+    "WARNING: ../evil.vhd: not imported: path leaves the project ('..')",
+    'WARNING: src/x.sch: not imported: XML with a DTD (<!DOCTYPE>): external entities and entity expansion are not accepted',
+  ]);
+  assert.deepEqual((await env.server.api('GET', '/api/projects/Gated')).fileTree, ['src/top.vhd']);
+  // the console shows the payload as text: no element was made of it
+  assert.equal(await page.eval(() => document.querySelectorAll('img[src="x"]').length), 0);
+});
+
 uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth Table starts the project with that top and its synchronized HDL', E, async (page) => {
   const cases = [['sch', 'top.sch.json', 'vhdl', 'Schematic'], ['fsm', 'top.fsm.json', 'verilog', 'Finite State Machine (FSM)'],
     ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.bool.json', 'verilog', 'Boolean Algebra']];

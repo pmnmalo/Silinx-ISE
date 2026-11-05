@@ -176,7 +176,7 @@ test('sources: oversize, long lines, deep nesting, long elsif chains (#2577) ref
   assert.equal(one('a.vhd', `if a then x; ${'elsif a then x;\n'.repeat(2000)} end if;`, GATE_LIMITS), 'more than 1000 elsif / else if branches (#2577)');
 });
 
-test('types by content: a text file that is binary or a web page, active files; invalid UTF-8 replaced with a warning', () => {
+test('types by content: a text file that is binary or a web page refused, other files kept opaque; invalid UTF-8 replaced with a warning', () => {
   const r = gateEntries([
     { path: 'src/a.vhd', data: new Uint8Array([0x65, 0, 0x66]) },
     { path: 'src/b.vhd', data: '<!DOCTYPE html><html><script>alert(1)</script></html>' },
@@ -193,12 +193,11 @@ test('types by content: a text file that is binary or a web page, active files; 
     'src/b.vhd: not imported: a web page (HTML), not the file its name says',
     'src/c.v: not imported: a web page (HTML), not the file its name says',
     'n.pnml: not imported: a web page (HTML), not the file its name says',
-    'doc/index.html: not imported: a web page, script or program: not a project file',
-    'tools/run.js: not imported: a web page, script or program: not a project file',
-    'tools/setup.exe: not imported: a web page, script or program: not a project file',
     'src/latin.vhd: not valid UTF-8 (the invalid bytes replaced)',
   ]);
-  assert.deepEqual(r.files.map(f => [f.path, f.kind, f.text]), [['src/latin.vhd', 'hdl', '-- \uFFFD\n'], ['build.bit', 'opaque', undefined]]);
+  // (a document, a script, a program: kept as they are, never rendered as a page nor run)
+  assert.deepEqual(r.files.map(f => [f.path, f.kind, f.text]), [['doc/index.html', 'opaque', undefined], ['tools/run.js', 'opaque', undefined],
+    ['tools/setup.exe', 'opaque', undefined], ['src/latin.vhd', 'hdl', '-- \uFFFD\n'], ['build.bit', 'opaque', undefined]]);
   assert.equal(gateFile('src/x.vhd', '\uFEFFentity x is end;\n').text, 'entity x is end;\n', 'a BOM is dropped');
   assert.equal(gateFile('src/latin.vhd', new Uint8Array([0xe9])).warning, 'src/latin.vhd: not valid UTF-8 (the invalid bytes replaced)');
   assert.throws(() => gateFile('../x.vhd', 'x'), { message: "../x.vhd: path leaves the project ('..')" });

@@ -12,6 +12,7 @@ after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 const P = await import('../server/projects.js');
 const { exportProjectZip, importProjectEntries, sourcesOf } = await import('../server/project-zip.js');
+const { gateEntries, gateZip } = await import('../core/import-gate.js');
 const { readZip } = await import('../core/zip.js');
 const { NODE_CODEC } = await import('../server/impl-routes.js');
 const names = async zip => (await readZip(zip, NODE_CODEC)).map(e => e.path).sort();
@@ -37,12 +38,15 @@ test('exportProjectZip: a C source goes out as its HDL', async () => {
 });
 
 test('importProjectEntries: the two exports back as projects; no project in the entries: bad()', async () => {
-  const back = async (from, to, kind) => importProjectEntries(P, to, await readZip((await exportProjectZip(P, from, kind)).zip, NODE_CODEC), m => new Error(m));
+  const back = async (from, to, kind) => importProjectEntries(P, to, await gateZip((await exportProjectZip(P, from, kind)).zip, NODE_CODEC), m => new Error(m));
   const x = await back('gates', 'gates_x', 'xilinx');
   assert.deepEqual([x.project.top, x.project.simTop, x.missing, x.warnings], ['gates', 'tb_gates', [], []]);
   const s = await back('gates', 'gates_s', 'silinx');
   assert.deepEqual([s.project.top, s.project.board, s.missing, s.warnings], ['gates', 'basys2', [], []]);
   assert.ok(s.extra.includes('src/gates.sch.json'));
-  await assert.rejects(importProjectEntries(P, 'none', [{ path: 'a.txt', data: new Uint8Array(1) }], m => Object.assign(new Error(m), { mine: true })),
+  await assert.rejects(importProjectEntries(P, 'none', gateEntries([{ path: 'a.txt', data: new Uint8Array(1) }]), m => Object.assign(new Error(m), { mine: true })),
     { mine: true, message: 'the zip contains no .xise (ISE project) and no silinx.json' });
+  // entries that did not pass the import gate (#2830): refused
+  await assert.rejects(importProjectEntries(P, 'none', [{ path: 'silinx.json', data: new Uint8Array(2) }], m => new Error(m)),
+    { message: 'importProjectEntries: the entries must pass the import gate (core/import-gate.js)' });
 });

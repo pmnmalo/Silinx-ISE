@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
 import { createZip } from '../core/zip.js';
+import { gateMessages, requireGated } from '../core/import-gate.js';
 import { exportCSources, exportIseSchematics, exportXise } from './xise.js';
 import { isCSource } from '../core/view-hdl.js';
 import { ISE_OUTPUT, NODE_CODEC, SILINX_ONLY, importXiseProject } from './impl-routes.js';
@@ -57,9 +58,11 @@ export async function exportProjectZip(P, name, kind = 'xilinx') {
   return { zip: await createZip(entries, NODE_CODEC), file: `${name}.zip`, warnings };
 }
 
-/** A new project `name` from the entries of a zip ([{ path, data }]): { project, missing, warnings, extra }. bad(message):
- *  the error of an entry set that is not a project. */
-export async function importProjectEntries(P, name, entries, bad) {
+/** A new project `name` from the entries of a zip or a folder, as the import gate let them through (core/import-gate.js
+ *  gateZip / gateEntries, #2830): { project, missing, warnings, extra }, the gate's refusals first in the warnings.
+ *  bad(message): the error of an entry set that is not a project. */
+export async function importProjectEntries(P, name, gated, bad) {
+  const entries = requireGated(gated, 'importProjectEntries');
   const xiseEntry = entries.filter(e => /\.xise$/i.test(e.path)).sort((x, y) => x.path.split('/').length - y.path.split('/').length)[0];
   const pjEntry = entries.find(e => /(^|\/)silinx\.json$/i.test(e.path));
   const root = (xiseEntry || pjEntry) ? path.posix.dirname((xiseEntry || pjEntry).path) : '';
@@ -73,7 +76,14 @@ export async function importProjectEntries(P, name, entries, bad) {
   } else if (pjEntry) {
     await P.createProject({ name, template: 'empty' });
     result = { project: await P.readProject(name), missing: [], warnings: [] };
-  } else throw bad('the zip contains no .xise (ISE project) and no silinx.json');
+  } else {
+    // (a project file the import gate refused: why)
+    const refused = gated.refusals.find(x => /(\.xise|(^|\/)silinx\.json)$/i.test(x.path));
+    throw bad(refused ? `${refused.path}: not imported: ${refused.reason}` : 'the zip contains no .xise (ISE project) and no silinx.json');
+  }
+  // (an ISE project's own outputs are left out anyway: their refusals not said; a path that leaves the project always is)
+  const quiet = { test: p => ISE_OUTPUT.test(p) && !p.split('/').includes('..') };
+  result.warnings.unshift(...gateMessages(gated, { quiet: xiseEntry ? quiet : null }));
   // copy every other file of the project folder (ASM charts, memory files, docs...) keeping its path.
   // ISE import: the sources were written by importXiseProject and ISE's own outputs are skipped.
   // Silinx export: nothing is written yet (the empty project's default constraints path is not a

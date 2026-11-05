@@ -297,6 +297,7 @@ test('browser storage: a build\'s results are not kept (this session only), noth
 
 // ---- #483: every path inside the project, the imported silinx.json normalised
 import { safePath, cleanPath, normalizeProjectJson, projectFromZip, emptyProjectJson } from '../web/js/project-store.js';
+import { gateEntries } from '../core/import-gate.js';
 import { textOf } from '../core/zip.js';
 
 test('#483 safePath / cleanPath: hostile paths refused, odd but harmless ones normalised', () => {
@@ -353,20 +354,23 @@ test('#483 projectFromZip: entries leaving the project skipped with a warning, s
   const pj = { name: 'Evil', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: '../../etc/passwd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }], constraints: 'constraints/top.ucf', device: 'nope', stimuli: 5 };
   const entries = [E('silinx.json', JSON.stringify(pj)), E('src/top.vhd', 'entity top is end;'), E('../escape.txt', 'x'), E('/abs.txt', 'x'), E('sub\\win.v', 'module m; endmodule'),
     E('a/./b.txt', 'b'), E('build/top.bit', 'bits'), E('C:\\x.v', 'x')];
-  const r = projectFromZip('Hostile', entries, { textOf, xiseProject: () => { throw new Error('no .xise here'); } });
-  assert.deepEqual(r.warnings, ['zip entry outside the project skipped (../escape.txt)', 'zip entry outside the project skipped (/abs.txt)', 'zip entry outside the project skipped (C:\\x.v)',
+  const r = projectFromZip('Hostile', gateEntries(entries), { textOf, xiseProject: () => { throw new Error('no .xise here'); } });
+  // (the import gate's refusals first, #2830)
+  assert.deepEqual(r.warnings, ["../escape.txt: not imported: path leaves the project ('..')", '/abs.txt: not imported: absolute path', 'sub\\win.v: not imported: backslash in the name',
+    "build/top.bit: not imported: the project's build folder (build/) is Silinx's own", 'C:\\x.v: not imported: absolute path (a drive letter)',
     'silinx.json: file path outside the project dropped (../../etc/passwd)']);
-  assert.deepEqual(Object.keys(r.files).sort(), ['a/b.txt', 'src/top.vhd', 'sub/win.v']);
+  assert.deepEqual(Object.keys(r.files).sort(), ['a/b.txt', 'src/top.vhd']);
   assert.deepEqual(r.missing, ['src/gone.vhd', 'constraints/top.ucf']);
   // (a project read with no Optimization: Fast, #2470)
   assert.deepEqual(r.json, { ...emptyProjectJson('Hostile'), impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' }, top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }], constraints: 'constraints/top.ucf' });
   // the project in a folder of the zip, silinx.json not JSON: an empty project with the files
-  const r2 = projectFromZip('Sub', [E('MyProj/silinx.json', '{ not json'), E('MyProj/src/a.v', 'a'), E('MyProj/../outside.v', 'o'), E('other/x.v', 'x')], { textOf, xiseProject: null });
-  assert.deepEqual(r2.warnings, ['zip entry outside the project skipped (../outside.v)', 'silinx.json is not valid JSON: ignored']);
+  const r2 = projectFromZip('Sub', gateEntries([E('MyProj/silinx.json', '{ not json'), E('MyProj/src/a.v', 'a'), E('MyProj/../outside.v', 'o'), E('other/x.v', 'x')]), { textOf, xiseProject: null });
+  assert.deepEqual(r2.warnings, ["MyProj/../outside.v: not imported: path leaves the project ('..')", 'silinx.json is not valid JSON: ignored']);
   assert.deepEqual(Object.keys(r2.files), ['src/a.v']);
   assert.deepEqual(r2.json, emptyProjectJson('Sub'));
   assert.deepEqual(r2.missing, []);
-  assert.throws(() => projectFromZip('X', [E('readme.txt', 'x')], { textOf }), { message: 'the zip contains no .xise (ISE project) and no silinx.json' });
+  assert.throws(() => projectFromZip('X', gateEntries([E('readme.txt', 'x')]), { textOf }), { message: 'the zip contains no .xise (ISE project) and no silinx.json' });
+  assert.throws(() => projectFromZip('X', [E('silinx.json', '{}')], { textOf }), { message: 'projectFromZip: the entries must pass the import gate (core/import-gate.js)' });
 });
 
 test('#1228 #1230 a folder renamed or deleted: the files removed from the project stay removed, the deleted UCF is not the constraints, in both stores', async () => {

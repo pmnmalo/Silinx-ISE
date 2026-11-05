@@ -18,7 +18,8 @@ import { isCSource } from '../../core/view-hdl.js';
 import { orderExamples } from '../../core/examples.js';
 import TEST_DESIGNS from 'silinx-test-designs';
 import { orderTestDesigns } from '../../core/test-designs.js';
-import { createZip, readZip, browserCodec, textOf } from '../../core/zip.js';
+import { createZip, browserCodec, textOf } from '../../core/zip.js';
+import { GATE_LIMITS, gateEntries, gateMessages, gateZip } from '../../core/import-gate.js';
 import { runBrowserFlow, browserOpenStatus } from './open-flow-browser.js';
 import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from '../../core/adept.js';
 import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ice40.js';
@@ -417,9 +418,12 @@ export const api = {
     }
     return { ...j, lines: [], next: j.lines.length };
   },
+  // the .xise and its files through the import gate (#2830), as the server's import-xise route
   importXise: async ({ name, xise, files = {} }) => {
-    const r = xiseProject(name, xise, files);
-    return { project: await ops.put(name, r.json, r.files), warnings: r.warnings };
+    const g = gateEntries([{ path: 'project.xise', data: xise }, ...Object.entries(files).map(([path, data]) => ({ path, data }))]);
+    const x = g.files.find(f => f.path === 'project.xise') ?? fail(`the .xise: ${g.refusals.find(r => r.path === 'project.xise')?.reason}`);
+    const r = xiseProject(name, x.text, Object.fromEntries(g.files.filter(f => f !== x && f.text != null).map(f => [f.path, f.text])));
+    return { project: await ops.put(name, r.json, r.files), warnings: [...gateMessages(g), ...r.warnings] };
   },
   syncXise: async () => fail('not available in the standalone edition (use File > Export Xilinx ISE Project)'),
   exportZip: async (name, kind = 'xilinx') => {
@@ -446,9 +450,12 @@ export const api = {
   },
   // the zip's entries as a project (project-store.js projectFromZip: every path inside the project,
   // silinx.json normalised, what was dropped in the warnings), then stored
+  // (through the import gate, #2830: its caps checked while the zip is read, each entry's name and content)
   importZip: async (name, file) => {
-    const entries = await readZip(new Uint8Array(await file.arrayBuffer()), browserCodec());
-    const p = projectFromZip(name, entries, { xiseProject, textOf });
+    if (file.size > GATE_LIMITS.maxArchive) fail(`the zip is larger than ${GATE_LIMITS.maxArchive >> 20} MB, the most an import takes`);
+    let gated;
+    try { gated = await gateZip(new Uint8Array(await file.arrayBuffer()), browserCodec()); } catch (e) { fail(e.message); }
+    const p = projectFromZip(name, gated, { xiseProject, textOf });
     if (await store.exists(name)) fail(`project '${name}' already exists`);
     return { project: await ops.put(name, p.json, p.files), missing: p.missing, warnings: p.warnings };
   },
@@ -468,12 +475,10 @@ export const api = {
     let name = base;
     while (await store.exists(name)) name = `${base}_${Math.floor(Math.random() * 1000)}`;
     const n = normalizeProjectJson(b.project, name);
-    const files = {};
-    for (const [k, v] of Object.entries(b.files && typeof b.files === 'object' ? b.files : {})) {
-      const p = safePath(k);
-      if (!p || typeof v !== 'string') { n.warnings.push(`bundle entry outside the project skipped (${k})`); continue; }
-      files[p] = v;
-    }
+    // its files through the import gate (#2830)
+    const g = gateEntries(Object.entries(b.files && typeof b.files === 'object' ? b.files : {}).filter(([, v]) => typeof v === 'string').map(([path, data]) => ({ path, data })));
+    const files = Object.fromEntries(g.files.map(f => [f.path, f.text ?? textOf(f)]));
+    n.warnings.unshift(...gateMessages(g));
     await ops.put(name, n.json, files);
     api.lastImportWarnings = n.warnings;
     return name;

@@ -9,7 +9,8 @@
 //   normalizePath(p) -> { path } | { reason }                                  a path of a project's file
 //
 // files: [{ path, data (Uint8Array), kind, text (a text kind's, decoded) }]; refusals: [{ path, reason }], the files
-// left out (the import goes on without them); warnings: what was accepted with a change (invalid UTF-8 replaced).
+// left out (the import goes on without them); warnings: what was accepted with a change (invalid UTF-8 replaced);
+// gated: true (the importers take only a gate's result: requireGated).
 // What makes the whole import fail (a bomb: an archive, a decompressed total or a file count over the caps) throws a
 // GateError, its message for the console. gateMessages(result) gives the lines the console and the MCP tools show.
 //
@@ -22,8 +23,8 @@
 // - XML (.xise, .sch, .sym, PNML, .wcfg, .svg): no DTD (<!DOCTYPE>, <!ENTITY>), so no external entity and no entity
 //   expansion (XXE, billion laughs), whatever the parser that reads it next;
 // - types: by the extension and the content: a text file (an HDL source, a drawing, constraints…) that holds a NUL
-//   byte or is a web page is refused, an active file (.html, .js, an executable) is refused, text is decoded as UTF-8
-//   (invalid sequences replaced, with a warning).
+//   byte or is a web page is refused; text is decoded as UTF-8 (invalid sequences replaced, with a warning); any other
+//   file (a document, an image, a script) is kept as it is, opaque: Silinx never renders it as a page nor runs it.
 
 /** The caps of an import (bytes, counts). */
 export const GATE_LIMITS = Object.freeze({
@@ -52,14 +53,11 @@ const KINDS = [
   ['json', /\.json$/i],
   ['data', /\.(mem|hex|coe|txt|dat|csv|md|vcd|do|tcl|ini|log)$/i],
 ];
-// files a browser or the system runs: never part of a project
-const ACTIVE = /\.(html?|xhtml|m?js|exe|dll|so|dylib|bat|cmd|com|ps1|scr|lnk|jar|msi|vbs|wsf|hta)$/i;
 const TEXT_KINDS = new Set(['hdl', 'c', 'constraints', 'xml', 'json', 'data']);
 const LINE_KINDS = new Set(['hdl', 'c', 'constraints']);
 
-/** The kind of a file by its name: hdl, c, constraints, xml, json, data (a text kind), active, or opaque. */
+/** The kind of a file by its name: hdl, c, constraints, xml, json, data (a text kind), or opaque. */
 export function kindOf(path) {
-  if (ACTIVE.test(path)) return 'active';
   for (const [k, re] of KINDS) if (re.test(path)) return k;
   return 'opaque';
 }
@@ -72,8 +70,8 @@ export function normalizePath(p, { limits = GATE_LIMITS } = {}) {
   if (p.length > limits.maxPath) return { reason: `path longer than ${limits.maxPath} characters` };
   // eslint-disable-next-line no-control-regex
   if (/[\0-\x1f\x7f]/.test(p)) return { reason: 'control character in the name' };
-  if (p.includes('\\')) return { reason: 'backslash in the name' };
   if (/^[A-Za-z]:/.test(p)) return { reason: 'absolute path (a drive letter)' };
+  if (p.includes('\\')) return { reason: 'backslash in the name' };
   if (p.startsWith('/')) return { reason: 'absolute path' };
   const parts = p.split('/').filter(s => s !== '' && s !== '.');
   if (!parts.length) return { reason: 'no name' };
@@ -164,7 +162,6 @@ function textReason(kind, text, limits) {
 function screen(path, data, limits) {
   const bytes = toBytes(data);
   const kind = kindOf(path);
-  if (kind === 'active') return { reason: 'a web page, script or program: not a project file' };
   if (bytes.length > limits.maxFile) return { reason: `file larger than ${mb(limits.maxFile)}` };
   if (!TEXT_KINDS.has(kind)) return { file: { path, data: bytes, kind } };
   let text, warning = null;
@@ -197,7 +194,7 @@ export function gateEntries(entries, { limits } = {}) {
   const total = entries.reduce((a, e) => a + (typeof e.data === 'string' ? e.data.length : e.data?.length ?? e.data?.byteLength ?? 0), 0);
   if (total > L.maxTotal) throw new GateError(`the import is larger than ${mb(L.maxTotal)} (${mb(total)})`);
   const name = nameCheck(L);
-  const out = { files: [], refusals: [], warnings: [] };
+  const out = { files: [], refusals: [], warnings: [], gated: true };
   for (const e of entries) {
     const n = name(e.path, e);
     if (n.reason) { out.refusals.push({ path: String(e.path), reason: n.reason }); continue; }
@@ -229,7 +226,7 @@ export async function gateZip(bytes, codec, { limits } = {}) {
       },
     });
   } catch (e) { throw new GateError(`cannot read zip: ${e.message}`); }
-  const out = { files: [], refusals, warnings: [] };
+  const out = { files: [], refusals, warnings: [], gated: true };
   for (const e of entries) {
     const s = screen(paths.get(e.path) ?? e.path, e.data, L);
     if (s.reason) out.refusals.push({ path: e.path, reason: s.reason });
@@ -249,5 +246,12 @@ export function gateFile(path, data, { limits } = {}) {
   return s.warning ? { ...s.file, warning: s.warning } : s.file;
 }
 
-/** The console's lines of a gate's result (each a warning: 'WARNING: ' is the caller's). */
-export const gateMessages = r => [...r.refusals.map(x => `${x.path}: not imported: ${x.reason}`), ...r.warnings];
+/** The console's lines of a gate's result (each a warning: 'WARNING: ' is the caller's); `quiet`: the paths the importer
+ *  leaves out anyway, whose refusal is not said (an ISE project's own outputs). */
+export const gateMessages = (r, { quiet = null } = {}) => [...r.refusals.filter(x => !quiet?.test(x.path)).map(x => `${x.path}: not imported: ${x.reason}`), ...r.warnings];
+
+/** The entries of a gate's result (an importer's argument), or an error: entries that did not pass the gate. */
+export function requireGated(r, who) {
+  if (!r || r.gated !== true || !Array.isArray(r.files)) throw new Error(`${who}: the entries must pass the import gate (core/import-gate.js)`);
+  return r.files;
+}
