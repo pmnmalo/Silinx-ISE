@@ -3,7 +3,7 @@
 What the measured description of the XC3S1200E-FG320 (Nexys2-1200) is built from (research/s3e-device README, "The
 recipe for the other dies", part 9), and the description itself. `node research/s3e-device/build-measured.mjs
 out.json.gz research/s3e-device/data/xc3s1200e --part xc3s1200efg320-4` rebuilds it from these files alone, with the bit
-database and the device report's grid and sites; `test/s3e-device.test.js` checks the rebuild is `measured.json.gz`.
+database (no device report: the grid and the sites measured too, #2502); `test/s3e-device.test.js` checks the rebuild is `measured.json.gz`.
 
 | File | What |
 |---|---|

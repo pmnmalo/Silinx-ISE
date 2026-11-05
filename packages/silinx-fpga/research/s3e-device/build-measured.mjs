@@ -1,10 +1,10 @@
 // #3, a measured description rebuilt from its measurements alone (research/s3e-device/data/<die>, README sections
 // 9-15): the observation of ISE's routed designs (obs.json.gz), the other packages' observations (others.json.gz: the
 // FT256's pads, Silinx's XB / YB routes ISE's DRC passed), the arc probes (probes.json.gz), the verdicts of every round
-// of join and clock tests (verdicts.json.gz, in the order they were taken), with the bit database, the die's layout and
-// the device report's grid and sites (dev). chip.mjs makes the measurements, build.mjs packs them. One folder per die
-// (the XC3S250E's so far); the part is the board's package of it (PARTS).
-//   node build-measured.mjs out.json.gz [data-dir] [--part xc3s250ecp132-4] [--dev graph.json.gz]
+// of join and clock tests (verdicts.json.gz, in the order they were taken), the tile probe's tiles (switch-tiles.txt),
+// with the bit database; no device report (#2502: the grid and the sites measured too, grid.mjs). chip.mjs makes the
+// measurements, build.mjs packs them. One folder per die; the part is the board's package of it (PARTS).
+//   node build-measured.mjs out.json.gz [data-dir] [--part xc3s250ecp132-4]
 //   (the rules on: PINRULES, sections 9 and 11)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,34 +34,38 @@ export function measuredDies(root = DATA) {
   return Object.keys(PARTS).filter(d => fs.existsSync(path.join(root, d, 'measured.json.gz')));
 }
 
-/** The packed measured description (the object loadDevice() takes) from the data in `dir` (by default the die's
- *  folder); dev: a Device of the part, of which only its name, the grid and the sites are taken. */
-export function buildMeasured(dev, dir) {
-  const die = dieOf(dev.part);
-  if (!die) throw new Error(`build-measured: ${dev.part} is not a Spartan-3E part of ${Object.values(PARTS).join(', ')}`);
+/** The measurements (chip.mjs chipMeasurements, with their grid) of a part from the data in `dir` (by default its die's
+ *  folder). */
+export function measurementsOf(part, dir) {
+  const die = dieOf(part);
+  if (!die) throw new Error(`build-measured: ${part} is not a Spartan-3E part of ${Object.values(PARTS).join(', ')}`);
   dir ??= dataDir(die);
-  for (const f of ['obs.json.gz', 'others.json.gz', 'probes.json.gz', 'verdicts.json.gz'])
+  for (const f of ['obs.json.gz', 'others.json.gz', 'probes.json.gz', 'verdicts.json.gz', 'switch-tiles.txt'])
     if (!fs.existsSync(path.join(dir, f))) throw new Error(`build-measured: ${die} has no ${f} in ${dir}`);
   const probes = Object.values(gz(path.join(dir, 'probes.json.gz')));
   const verdicts = Object.values(gz(path.join(dir, 'verdicts.json.gz')));
-  const m = chipMeasurements({
-    dev, tilesDb: JSON.parse(fs.readFileSync(path.join(DB, 's3e-tiles.json'), 'utf8')),
-    layout: JSON.parse(fs.readFileSync(path.join(DB, `${die}-layout.json`), 'utf8')),
+  return chipMeasurements({
+    part, tilesDb: JSON.parse(fs.readFileSync(path.join(DB, 's3e-tiles.json'), 'utf8')),
     obs: gz(path.join(dir, 'obs.json.gz')), others: gz(path.join(dir, 'others.json.gz')),
     probe: { yes: probes.flatMap(p => p.yes), no: probes.flatMap(p => p.no) },
     joins: verdicts.flatMap(l => l.filter(v => v[2] === 'join').map(v => [v[0], v[1]])),
+    switchTiles: fs.readFileSync(path.join(dir, 'switch-tiles.txt'), 'utf8').split(/\s+/).filter(Boolean),
     rules: true,
   });
-  return packMeasured(m);
+}
+
+/** The packed measured description (the object loadDevice() takes) of a part from the data in `dir` (by default its
+ *  die's folder). */
+export function buildMeasured(part, dir) {
+  return packMeasured(measurementsOf(part, dir));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = k => { const i = args.indexOf(k); return i < 0 ? null : args.splice(i, 2)[1]; };
-  const part = opt('--part') || PARTS.xc3s250e, devFile = opt('--dev') || path.join(HERE, '../../devices', `${part}.json.gz`);
+  const part = opt('--part') || PARTS.xc3s250e;
   const [out, dir] = args;
-  const { loadDevice } = await import('../../src/fpga/device.js');
-  const packed = buildMeasured(loadDevice(gz(devFile)), dir);
+  const packed = buildMeasured(part, dir);
   fs.writeFileSync(out, zlib.gzipSync(JSON.stringify(packed), { level: 9 }));
   console.log(`${out}: ${JSON.stringify(packed.counts)}`);
 }
