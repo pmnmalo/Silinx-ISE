@@ -11,7 +11,7 @@ import { LINK_LIMITS, encodeDesign, makeLink, viewProblem } from '/core/design-l
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateZip } from '/core/import-gate.js';
 
-const VIEWS = [['', 'Open the project only'], ['try', 'Try it'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
+const VIEWS = [['', 'Open the project only'], ['try', 'Try it (a drawing\'s simulation)'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
 /** The address of this app, the base of its links (its hash, a token or a link, left out). */
 export const linkBase = () => location.origin + location.pathname;
 

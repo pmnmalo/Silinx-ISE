@@ -7,7 +7,8 @@
 //   #open=<url of a .zip>                    a Silinx (or Xilinx ISE) project's zip hosted elsewhere (https, not
 //                                            this computer nor a local network: #2829), fetched once the user agrees
 //   #open=example:<name>                     one of the examples
-//   &view=try|simulate|emulate               Try it (the drawing's), the test bench's simulation, the board emulator
+//   &view=try|simulate|emulate               Try it (a schematic's; a state diagram's or a Petri net's Simulate, #2869),
+//                                            the test bench's simulation, the board emulator
 //   &top=<module>  &board=<board>            the module to open, the board to emulate
 // A link comes from anywhere: everything here is untrusted input, sizes capped (the link, the design inflated, its
 // files), paths checked again by the import (a design becomes a Silinx zip, imported as one).
@@ -174,9 +175,16 @@ export function sameFiles(a, b) {
   return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
 }
 
+/** The drawings `view=try` opens (#2869): a schematic (its Try it), a state diagram or a Petri net (its Simulate). */
+export const TRY_DRAWING = /\.(sch|fsm|pn)\.json$/i;
+/** The drawing of a module that `view=try` opens: its path in files ({ path: text }), or null. */
+export function tryDrawing(files, module) {
+  return Object.keys(files).find(p => TRY_DRAWING.test(p) && (() => { try { return JSON.parse(files[p])?.name === module; } catch { return false; } })()) || null;
+}
+
 /**
- * Whether a design has what a link's view opens (null: it has; else the message): Try it a schematic's (the module's
- * drawn as one: top, else the project's top), the simulation a test bench (the project's), the emulator a board and a
+ * Whether a design has what a link's view opens (null: it has; else the message): Try it a schematic's, a state
+ * diagram's or a Petri net's (the module's drawn as one: top, else the project's top), the simulation a test bench (the project's), the emulator a board and a
  * top. files: { path: text } of the project's files (silinx.json's project given apart).
  */
 export function viewProblem(project, files, { view, top } = {}) {
@@ -184,8 +192,7 @@ export function viewProblem(project, files, { view, top } = {}) {
   if (top && !moduleNames(files).has(top)) return `the design has no module '${top}'`;
   if (view === 'try') {
     if (!module) return 'Try it: the design has no top module (give top)';
-    const drawn = Object.entries(files).some(([p, t]) => /\.sch\.json$/i.test(p) && (() => { try { return JSON.parse(t)?.name === module; } catch { return false; } })());
-    if (!drawn) return `Try it: '${module}' is not a schematic (Try it is a schematic's)`;
+    if (!tryDrawing(files, module)) return `Try it: '${module}' is not a schematic, a state diagram or a Petri net`;
   }
   if (view === 'simulate' && !project?.simTop) return 'the design has no test bench to simulate';
   if (view === 'emulate') {

@@ -312,8 +312,8 @@ function moduleContextMenu(e, mod, file) {
       { label: 'Convert to State Diagram (FSM)…', action: () => convertToFsm(mod) },
     ]),
     isSimView ? { label: 'Simulate Behavioral Model', action: () => runSimulation(mod) } : null,
-    // (a schematic's module: its Try it, #2826)
-    { label: 'Copy Link to This Module…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog({ module: mod, view: /\.sch\.json$/i.test(S.hdlToSch?.[file] || file) ? 'try' : null })) },
+    // (a schematic's, a state diagram's or a Petri net's module: its Try it or Simulate, #2826, #2869)
+    { label: 'Copy Link to This Module…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog({ module: mod, view: /\.(sch|fsm|pn)\.json$/i.test(S.hdlToSch?.[file] || file) ? 'try' : null })) },
     '-',
     { label: 'New Source…', action: () => wiz.newSourceWizard() },
     { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog() },

@@ -3,7 +3,7 @@
 export const LINK_PT = {
   'Copy Link to Project…': 'Copiar Ligação para o Projeto…', 'Copy Link to This Module…': 'Copiar Ligação para Este Módulo…',
   'Copy Link': 'Copiar Ligação', 'Open from a Link': 'Abrir a partir de uma Ligação',
-  'Open in:': 'Abrir em:', 'Open the project only': 'Abrir só o projeto', 'Try it': 'Experimentar', 'Simulation': 'Simulação', 'Board Emulator': 'Emulador da Placa',
+  'Open in:': 'Abrir em:', 'Open the project only': 'Abrir só o projeto', 'Try it': 'Experimentar', 'Try it (a drawing\'s simulation)': 'Experimentar (a simulação de um desenho)', 'Simulation': 'Simulação', 'Board Emulator': 'Emulador da Placa',
   'Keep Mine': 'Manter o Meu', 'Open': 'Abrir',
 };
 
@@ -20,7 +20,7 @@ export const LINK_PT_PATTERNS = [
   [/^A project named '(.+)' already exists, with changes of its own\.\n\nReplace it with the link's design\? The existing project is moved to the workspace \.trash folder\.$/,
     'Já existe um projeto chamado \'$1\', com alterações próprias.\n\nSubstituí-lo pelo circuito da ligação? O projeto existente é movido para a pasta .trash da área de trabalho.'],
   [/^Try it: the design has no top module \(give top\)\.$/, 'Experimentar: o circuito não tem módulo de topo.'],
-  [/^Try it: '(.+)' is not a schematic \(Try it is a schematic's\)\.$/, 'Experimentar: \'$1\' não é um esquemático (Experimentar é dos esquemáticos).'],
+  [/^Try it: '(.+)' is not a schematic, a state diagram or a Petri net\.$/, 'Experimentar: \'$1\' não é um esquemático, um diagrama de estados nem uma rede de Petri.'],
   [/^The design has no module '(.+)'\.$/, 'O circuito não tem o módulo \'$1\'.'],
   [/^The design has no test bench to simulate\.$/, 'O circuito não tem test bench para simular.'],
   [/^The design has no board to emulate it on\.$/, 'O circuito não tem placa onde o emular.'],

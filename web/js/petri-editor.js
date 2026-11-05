@@ -335,6 +335,7 @@ export function mountPetriEditor(container, opts = {}) {
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file, normalizePetri); }); refreshLink(); },
     fit, refreshLink, print,
+    showPanel: (p) => { if (panel !== p) togglePanel(p); }, get panel() { return panel; },   // ('sim': a link's view=try, #2869)
     // (a problem's item, from the console)
     select(ref) { if (!nodeOf(ref.id) && !M.arcs.some(a => a.id === ref.id)) return; sel = { kind: ref.kind, id: ref.id }; render(); },
     destroy() { destroyed = true; ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },

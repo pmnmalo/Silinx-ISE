@@ -7,7 +7,7 @@
 import { api } from './api.js';
 import { confirmDlg } from './ui.js';
 import { S, app } from './app.js';
-import { decodeDesign, designZip, parseLink, sameFiles, viewProblem } from '/core/design-link.js';
+import { TRY_DRAWING, decodeDesign, designZip, parseLink, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateMessages, gateZip } from '/core/import-gate.js';
 
@@ -98,8 +98,9 @@ export async function openFromLink(opts) {
     } else if (!exists) await d.make();
     await app.openProject(d.name);
     app.showLeftPage('design');
-    if (!d.project) {
-      const problem = viewProblem(S.project, Object.fromEntries(await Promise.all((S.fileTree || []).filter(p => /\.(sch\.json|vhdl?|s?v)$/i.test(p)).map(async p => [p, await api.readFile(d.name, p)]))), { view, top });
+    if (!d.project) {   // (a zip's: its drawings and HDL read now, for its view)
+      d.files = Object.fromEntries(await Promise.all((S.fileTree || []).filter(p => TRY_DRAWING.test(p) || /\.(vhdl?|s?v)$/i.test(p)).map(async p => [p, await api.readFile(d.name, p)])));
+      const problem = viewProblem(S.project, d.files, { view, top });
       if (problem) throw fail(problem);
     }
     app.log(`Opened '${d.name}' from a link${exists ? '' : ' (a new project)'}${view ? `: ${VIEWS[view]}` : ''}.`, 'ok');
@@ -111,14 +112,15 @@ export async function openFromLink(opts) {
   }
 }
 
-// the link's view of the project now open: Try it (its schematic opened, its live simulation started), the test
-// bench's simulation, the board emulator
+// the link's view of the project now open: Try it (a schematic opened, its live simulation started; a state diagram or
+// a Petri net opened, its Simulate panel shown, #2869), the test bench's simulation, the board emulator
 async function openView(view, module, files) {
   if (view === 'simulate') return app.runSimulation(S.project.simTop);
   if (view === 'emulate') { const { openEmulator } = await import('./viewers.js'); return openEmulator(module); }
-  const path = Object.keys(files || {}).find(p => /\.sch\.json$/i.test(p) && (() => { try { return JSON.parse(files[p]).name === module; } catch { return false; } })())
-    || (S.fileTree || []).find(p => /\.sch\.json$/i.test(p) && p.split('/').pop().replace(/\.sch\.json$/i, '') === module);
-  if (!path) throw fail(`Try it: '${module}' is not a schematic`);
+  const path = tryDrawing(files || {}, module);
+  if (!path) throw fail(`Try it: '${module}' is not a schematic, a state diagram or a Petri net`);
+  if (/\.fsm\.json$/i.test(path)) { await app.openFsm(path); return app.findDoc(`fsm:${path}`)?.fsmEditor?.showPanel('sim'); }
+  if (/\.pn\.json$/i.test(path)) { await app.openPetri(path); return app.findDoc(`pn:${path}`)?.petriEditor?.showPanel('sim'); }
   await app.openSch(path);
   await app.findDoc(`sch:${path}`)?.schEditor?.simulate();
 }

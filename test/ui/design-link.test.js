@@ -8,7 +8,8 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { setupUi, uiTest, readWs, writeWs } from './harness.js';
+import { setupUi, uiTest, readWs, writeWs, makeProject } from './harness.js';
+import { newPetri } from '../../core/petri.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -45,6 +46,33 @@ uiTest('#2826 an example\'s link opens it into Try it: the schematic\'s live sim
   assert.deepEqual(warnings(page), []);
 });
 
+uiTest('#2869 view=try on a state diagram: traffic\'s FSM opened in its Simulate panel', E, async (page) => {
+  await openLink(page, 'open=example:traffic&top=traffic&view=try');
+  await linkOpened(page);
+  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
+  assert.equal(await page.eval(() => window.Silinx.active?.id), 'fsm:src/traffic.fsm.json');
+  await page.waitConsole(/Opened 'traffic' from a link( \(a new project\))?: Try it\./);
+  assert.deepEqual(await consoleWarnings(page), []);
+});
+
+uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link opens the net in its Simulate panel', E, async (page) => {
+  await makeProject(env, { name: 'PnLink', top: 'ctl', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
+  await page.openProject('PnLink');
+  const row = await page.waitFor(() => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => /\bctl\b/.test(r.textContent)); return i > 0 ? i : null; }, [], { what: 'the net\'s row' });
+  await contextMenu(page, row, 'Copy Link to This Module…');
+  await page.waitDialog('Copy Link');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view]').value), 'try');
+  const link = await page.waitFor(() => /&view=try$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await openLink(page, new URL(link).hash.slice(1), 'pn=1');
+  await linkOpened(page);
+  await page.waitFor(() => window.SilinxApp.findDoc('pn:src/ctl.pn.json')?.petriEditor?.panel === 'sim', [], { what: 'the net\'s Simulate panel', timeout: 30000 });
+  await page.waitConsole(/Opened 'PnLink' from a link: Try it\./);
+  assert.equal(await page.dialogCount(), 0, 'the same project: no question');
+  assert.deepEqual(await consoleWarnings(page), []);
+});
+
 uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu, the Start page; the link opened again into the simulation, the same project kept', E, async (page) => {
   await openLink(page, 'open=example:traffic');
   await linkOpened(page);
@@ -59,7 +87,7 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-info').textContent), /^\d+ characters: some slide tools cut a link longer than 2000 \(export the project as a \.zip, host it, and link to it with #open=\)\.$/);
   // a view the design does not have: said in the dialog, no link
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'try'; s.dispatchEvent(new Event('change')); });
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), 'Try it: \'top\' is not a schematic (Try it is a schematic\'s).');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), 'Try it: \'top\' is not a schematic, a state diagram or a Petri net.');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), '');
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'simulate'; s.dispatchEvent(new Event('change')); });
   const link = await page.waitFor(() => /&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the simulation\'s link' });
@@ -155,7 +183,7 @@ uiTest('#2826 in Portuguese: Copy Link… and the replace question', E, async (p
   await page.menu('Ficheiro', 'Copiar Ligação para o Projeto…');
   assert.equal(await page.waitDialog('Copiar Ligação'), 'Copiar Ligação');
   const t = await page.eval(() => document.querySelector('.dlg-overlay .dlg-body').innerText);
-  for (const s of ['Abrir em:', 'Abrir só o projeto', 'Módulo:', 'Placa:', 'Uma ligação que abre \'gates\' no Silinx', 'caracteres']) assert.ok(t.includes(s), `${s} in:\n${t}`);
+  for (const s of ['Abrir em:', 'Abrir só o projeto', 'Experimentar (a simulação de um desenho)', 'Módulo:', 'Placa:', 'Uma ligação que abre \'gates\' no Silinx', 'caracteres']) assert.ok(t.includes(s), `${s} in:\n${t}`);
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Copiar Ligação', 'Cancelar']);
   await page.dialogButton('Cancelar');
   await writeWs(env, 'gates', 'sim/tb_gates.vhd', '-- mine\n');
