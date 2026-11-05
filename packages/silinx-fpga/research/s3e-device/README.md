@@ -1437,3 +1437,20 @@ its parts are functions: `frameGrid` (the columns' and rows' first frames and bi
 (`bitdb/<die>-lut.json`), they give each `bitdb/<die>-layout.json` as committed: the same `cols`, `rows`, `typeCols`,
 `typeRows`, `typeFrames`, `typeBits` and `brkRows` on all four dies (`test/s3e-bitstream-tools.test.js`). The rest of a
 layout (`defaults`, `idcode`, `frames`) is the empty design's bitstream, never the report's.
+
+**The bit database's PIP candidates.** `gen-pipcover.mjs` (research/s3e-bitstream) searched its test routes over the
+device report (`dev-full.xdlrc`, or the shipped graph built from it), and its candidates were that graph's PIPs. It
+now takes `measured`, the die's measured description, as its graph (`xdlrc-graph.mjs graphFile`), and `measure-db.sh`
+passes that by default (`GRAPH` names another). Its candidates are then the measured PIPs. Most of them were seen by
+ISE in a route through a tile of their type, or accepted by the arc probe in one tile. The rest came only from the bit
+database's features, whose candidates were the report's: 258, 789, 788 and 829 per-type PIPs on the four dies, almost
+all a CLB's (`candidates.mjs types`). The arc probe asked each of them once, in the first tile of its type that has it:
+one round of 8 designs per die, and **all 2664 exist**. They are the probe `typeprobe` of each `probes.json.gz`. The
+descriptions are unchanged, and now every PIP in them was shown by ISE: in a route through a tile of its type, or
+accepted by the arc probe in a tile of its type (`test/s3e-device.test.js`).
+
+```
+PART=xc3s250ecp132-4 node candidates.mjs types data/xc3s250e/measured.json.gz cand.json obs.json probes.json
+node probe-run.mjs cand.json probe.json
+PART=xc3s250ecp132-4 node ../s3e-bitstream/gen-pipcover.mjs measured out --types CENTER_SMALL
+```

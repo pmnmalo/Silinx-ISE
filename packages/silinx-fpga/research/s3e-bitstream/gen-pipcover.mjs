@@ -4,11 +4,14 @@
 // (xdlrc-graph.mjs) using only free wires. The variants remove the PIPs under test by codewords as in
 // gen-pipdrop.mjs (key.json has the same format, so ana-pipdrop.mjs analyses both).
 //
-//   node gen-pipcover.mjs dev-full.xdlrc outdir [--types CENTER_SMALL,…] [--k 4] [--L 8] [--w 2]
+//   node gen-pipcover.mjs graph outdir [--types CENTER_SMALL,…] [--k 4] [--L 8] [--w 2]
 //        [--skip measured.json] [--seed 1]
+// graph: `measured`, the die's measured description (research/s3e-device/data/<die>/measured.json.gz, #2502: tiles,
+// PIPs, nodes and pins from Silinx's own measurements, no device report), the candidates its PIPs; or a part (the
+// graph the toolchain loads for it), a .json.gz description, a device report (dev-full.xdlrc).
 // measured.json: { "TYPE": ["from->to", …] } PIPs already measured (not chosen again unless all are).
 import fs from 'node:fs';
-import { loadGraph } from './xdlrc-graph.mjs';
+import { loadGraph, graphFile } from './xdlrc-graph.mjs';
 import { PART, windowKeyOf } from './db.mjs';
 import { separateWindows } from './lib.mjs';
 
@@ -35,7 +38,7 @@ let seed = +opt('--seed', '1');
 const [xdlrc, out] = args;
 const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x80000000; };
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-const g = loadGraph(xdlrc);
+const g = loadGraph(graphFile(xdlrc, PART));
 const measured = skipFile && fs.existsSync(skipFile) ? JSON.parse(fs.readFileSync(skipFile, 'utf8')) : {};
 const done = new Map(Object.entries(measured).map(([t, l]) => [t, new Set(l)]));
 

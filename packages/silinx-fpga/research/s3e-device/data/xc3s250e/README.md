@@ -8,7 +8,7 @@ description itself. `node research/s3e-device/build-measured.mjs out.json.gz` (`
 |---|---|
 | `obs.json.gz` | The observation of ISE's routed designs (`prototype.mjs observe`, 178 designs, merged with the earlier ones'): PIPs, sites, pin wires, joins seen, the joins rules decided (`decided`, hypotheses), the ambiguous ones |
 | `others.json.gz` | The other observations: the FT256 package's (its pads renamed to the CP132's sites), Silinx's XB / YB routes ISE's DRC passed (pins only) |
-| `probes.json.gz` | The arc probe's answers (`xdl -xdl2ncd`): `yes` / `no` per PIP and tile, by probe |
+| `probes.json.gz` | The arc probe's answers (`xdl -xdl2ncd`): `yes` / `no` per PIP and tile, by probe; the tile types' PIPs only the bit database showed, `typeprobe`, #2502 |
 | `verdicts.json.gz` | The verdicts of every round of join tests and clock tests (ISE's DRC), by round, in the order they were taken: `[a, b, 'join' \| 'no-join' \| …]` |
 | `switch-tiles.txt` | The tiles that hold a switch box (the tile probe), for the rules in switch-box coordinates |
 | `measured.json.gz` | The measured description, Silinx's packed format (`packages/silinx-fpga/src/fpga/device.js` `loadDevice`) |
