@@ -222,7 +222,9 @@ export function viewProblem(project, files, { view, top } = {}) {
   if (view === 'simulate' && !top && !project?.simTop) return 'the design has no test bench to simulate';
   if (view === 'emulate') {
     if (!project?.board) return 'the design has no board to emulate it on';
-    if (!module) return 'the design has no top module to emulate';
+    if (!project?.top) return 'the design has no top module to emulate';
+    // (the emulator's pins are the constraints', the top's ports: #2884)
+    if (top && top.toLowerCase() !== String(project.top).toLowerCase()) return `the board emulator emulates the top module, '${project.top}', not '${top}'`;
   }
   return null;
 }

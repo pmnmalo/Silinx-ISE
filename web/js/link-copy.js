@@ -37,9 +37,12 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   if (givenBench && !view) viewSel.value = 'simulate';
   let chosen = { design: givenBench ? pj.top : module || pj.top, bench: givenBench || pj.simTop };
   const isSim = () => viewSel.value === 'simulate';
+  // (the board emulator emulates the top module, its pins the constraints': the list disabled on it, #2884)
+  const isEmu = () => viewSel.value === 'emulate';
   const fillModules = () => {
-    const [list, sel, mark, tag] = isSim() ? [benches, chosen.bench, pj.simTop, 'the project\'s'] : [designMods, chosen.design, pj.top, 'top'];
+    const [list, sel, mark, tag] = isSim() ? [benches, chosen.bench, pj.simTop, 'the project\'s'] : [isEmu() ? designMods.slice(0, 1) : designMods, isEmu() ? pj.top : chosen.design, pj.top, 'top'];
     modSel.replaceChildren(...list.map(m => h('option', { value: m, selected: m === sel }, m === mark ? `${m} (${tag})` : m)));
+    modSel.disabled = isEmu();
   };
   fillModules();
   const out = h('textarea', { class: 'link-out', readonly: true, rows: 4, spellcheck: false, style: { width: '100%', fontFamily: 'var(--mono, monospace)', fontSize: '11px' } });
@@ -52,7 +55,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     if (encodeError) { err.textContent = encodeError; return; }
     // (the module: in the link when it is not the project's top, or when the link is a module's: Copy Link to This
     // Module…, the project then opened on it, #2871; a test bench when it is not the project's, #2878)
-    const top = !modSel.value ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
+    const top = !modSel.value || isEmu() ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
     link = makeLink(linkBase(), { design, view: viewSel.value || null, top });
@@ -62,7 +65,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
       : `${link.length} characters.`;
   };
   viewSel.addEventListener('change', () => { fillModules(); update(); });
-  modSel.addEventListener('change', () => { chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
+  modSel.addEventListener('change', () => { if (!isEmu()) chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
   update();
   const r = await dialog({
     title: 'Copy Link', width: 560,
