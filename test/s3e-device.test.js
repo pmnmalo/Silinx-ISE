@@ -22,7 +22,9 @@ import { sliceDesign } from '../packages/silinx-fpga/research/s3e-device/gen-obs
 import { muxDesign, muxCount } from '../packages/silinx-fpga/research/s3e-device/gen-obsmux.mjs';
 import { srlCascade, f8Muxes, ramClkB, bufgs, dcmPads } from '../packages/silinx-fpga/research/s3e-device/gen-obspins2.mjs';
 import { observationDesigns, implemented, GENERATORS, tileLists, roundPaths, roundSummary } from '../packages/silinx-fpga/research/s3e-device/measure.mjs';
-import { buildMeasured, DATA_DIR, PARTS, dieOf, dataDir, measuredDies } from '../packages/silinx-fpga/research/s3e-device/build-measured.mjs';
+import { buildMeasured, measurementsOf, DATA_DIR, PARTS, dieOf, dataDir, measuredDies } from '../packages/silinx-fpga/research/s3e-device/build-measured.mjs';
+import { gridRowsCols, brkRowsOf, tileTypeOf, siteSlot, siteOrder, padK, padSlots, measuredTiles } from '../packages/silinx-fpga/research/s3e-device/grid.mjs';
+import { compareDevices } from '../packages/silinx-fpga/research/s3e-device/compare-grid.mjs';
 import { indexVariants, pipVariants, joinVariants, clockLineVariants, clockRowVariants, longLineVariants, tapVariants, spineVariants, pinVariants, DCM_SWITCH } from '../packages/silinx-fpga/research/s3e-device/varyjoins.mjs';
 import { loadDevice, PIP_BIDI } from '../packages/silinx-fpga/src/fpga/device.js';
 import { probeXdl, probeFirstLine, parseProbeLog, sortPips, sortSites } from '../packages/silinx-fpga/research/s3e-device/probe.mjs';
@@ -870,7 +872,6 @@ test('observeNet: a carry chain\'s lower CIN on the tile below\'s COUT_Nk (pinJo
 });
 
 test('chipMeasurements: a tile\'s PIPs from the database\'s features and the routes, less the probe\'s refusals; pins where observed; the lower CIN by its COUT\'s index; the joins kept to measured wires (#3, step 5)', () => {
-  const dev = loadDeviceCache('xc3s250ecp132-4');
   const tilesDb = { types: { CENTER_SMALL: { features: { 'E2END1->E2BEG1': [], 'OMUX3->E2BEG1': [], 'X0->OMUX3': [] } } } };
   const obs = {
     pips: [{ tile: 'CLB_X1Y3', from: 'COUT3', dir: '->', to: 'COUT_N3' }, { tile: 'CLB_X1Y4', from: 'E2MID1', dir: '=-', to: 'E2BEG1' }],
@@ -878,13 +879,13 @@ test('chipMeasurements: a tile\'s PIPs from the database\'s features and the rou
     pinJoins: [{ site: 'SLICE_X1Y6', pin: 'CIN', tile: 'CLB_X1Y4', end: 'CLB_X1Y3/COUT_N3' }],
     joins: [['CLB_X1Y3/E2BEG1', 'CLB_X1Y4/E2MID1'], ['CLB_X1Y3/E2BEG1', 'CLB_X9Y9/NOWIRE']],
   };
-  const m = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs, probe: { yes: [], no: [{ tile: 'CLB_X1Y4', from: 'X0', to: 'OMUX3' }] } });
+  const m = chipMeasurements({ tilesDb, obs, probe: { yes: [], no: [{ tile: 'CLB_X1Y4', from: 'X0', to: 'OMUX3' }] } });
   const tile = n => { const t = m.tiles.find(x => x.name === n); return m.types[t.type]; };
   const pips = n => tile(n).pips.map(([a, b, f]) => `${a}->${b}${f ? '*' : ''}`).sort();
   // the database's three, the routes' (a bidirectional one both ways), the refused one left out in its tile only
   assert.deepEqual(pips('CLB_X1Y3'), ['COUT3->COUT_N3', 'E2END1->E2BEG1', 'E2MID1->E2BEG1*', 'E2BEG1->E2MID1*', 'OMUX3->E2BEG1', 'X0->OMUX3'].sort());
   assert.ok(!pips('CLB_X1Y4').includes('X0->OMUX3'));
-  // SLICE_X1Y6 (position 2 of CLB_X1Y4): its COUT1 seen in another tile of the type, its CIN named CIN1, on COUT_N3
+  // SLICE_X1Y6 (slot S2 of CLB_X1Y4): its COUT1 seen in another tile of the type, its CIN named CIN1, on COUT_N3
   const pin = (n, site, p) => { const t = m.tiles.find(x => x.name === n); const i = t.sites.findIndex(([s]) => s === site); return m.types[t.type].sites[i].pins.find(x => x[0] === p); };
   assert.deepEqual(pin('CLB_X1Y4', 'SLICE_X1Y6', 'CIN'), ['CIN', 'i', 'CIN1']);
   assert.ok(m.joins.some(([a, b]) => a === 'CLB_X1Y3/COUT_N3' && b === 'CLB_X1Y4/CIN1'));
@@ -893,22 +894,21 @@ test('chipMeasurements: a tile\'s PIPs from the database\'s features and the rou
 });
 
 test('chipMeasurements: an I/O tile\'s database names as the probe found them (IOIS_X0, no route of ISE\'s took it) (#3, the I/O names)', () => {
-  const dev = loadDeviceCache('xc3s250ecp132-4');
+  const switchTiles = ['TIOIS_X5Y35'];
   const tilesDb = { types: { TIOIS: { features: { 'X0->OMUX3': [], 'XQ0->OMUX3': [] } } } };
   const obs = { pips: [{ tile: 'TIOIS_X3Y35', from: 'IOIS_XQ0', dir: '->', to: 'OMUX3' }], pins: [], pinJoins: [], joins: [] };
   const pips = m => { const t = m.tiles.find(x => x.name === 'TIOIS_X5Y35'); return m.types[t.type].pips.map(([a, b]) => `${a}->${b}`).sort(); };
   // the routes name IOIS_XQ0 only: X0 stays the database's name
-  assert.deepEqual(pips(chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs })), ['IOIS_XQ0->OMUX3', 'X0->OMUX3']);
+  assert.deepEqual(pips(chipMeasurements({ tilesDb, obs, switchTiles })), ['IOIS_XQ0->OMUX3', 'X0->OMUX3']);
   // the probe accepted IOIS_X0 in one tile: the name of every tile's
   const probe = { yes: [{ tile: 'TIOIS_X3Y35', from: 'IOIS_X0', to: 'OMUX3' }], no: [] };
-  assert.deepEqual(pips(chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs, probe })), ['IOIS_X0->OMUX3', 'IOIS_XQ0->OMUX3']);
+  assert.deepEqual(pips(chipMeasurements({ tilesDb, obs, probe, switchTiles })), ['IOIS_X0->OMUX3', 'IOIS_XQ0->OMUX3']);
 });
 
 test('observeNet and chipMeasurements: an F8\'s FXINB from the CLB above (FX -> FX_Sk there, nothing in its own tile), on its FXINA\'s wire with A and B swapped; FX<k> of F5<k> (#3, the wide multiplexers)', () => {
   const ins = new Map([['a', { name: 'a', tile: 'CLB_X1Y2', site: 'SLICE_X0Y3' }], ['b', { name: 'b', tile: 'CLB_X1Y1', site: 'SLICE_X1Y1' }]]);
   const r = observeNet({ name: 'f7', outpins: [{ inst: 'a', pin: 'FX' }], inpins: [{ inst: 'b', pin: 'FXINB' }], pips: [{ tile: 'CLB_X1Y2', from: 'FX2', dir: '->', to: 'FX_S2' }] }, ins);
   assert.deepEqual(r.pinJoins, [{ site: 'SLICE_X1Y1', pin: 'FXINB', tile: 'CLB_X1Y1', end: 'CLB_X1Y2/FX_S2' }]);
-  const dev = loadDeviceCache('xc3s250ecp132-4');
   const tilesDb = { types: { CENTER_SMALL: { features: { 'FX2->FX_S2': [] } } } };
   const obs = {
     pips: [{ tile: 'CLB_X1Y2', from: 'FX2', dir: '->', to: 'FX_S2' }], joins: [], pinJoins: r.pinJoins,
@@ -916,9 +916,9 @@ test('observeNet and chipMeasurements: an F8\'s FXINB from the CLB above (FX -> 
   };
   const pin = (m, n, site, p) => { const t = m.tiles.find(x => x.name === n); const i = t.sites.findIndex(([s]) => s === site); return m.types[t.type].sites[i].pins.find(x => x[0] === p); };
   // without the rules: no FXINB, no join
-  const m0 = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs });
+  const m0 = chipMeasurements({ tilesDb, obs });
   assert.equal(pin(m0, 'CLB_X1Y1', 'SLICE_X1Y1', 'FXINB'), undefined);
-  const m = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs, rules: true });
+  const m = chipMeasurements({ tilesDb, obs, rules: true });
   assert.deepEqual(pin(m, 'CLB_X1Y1', 'SLICE_X1Y1', 'FXINB'), ['FXINB', 'i', 'FXINA3']);
   assert.deepEqual(pin(m, 'CLB_X1Y1', 'SLICE_X1Y1', 'FX'), ['FX', 'o', 'FX3']);
   assert.ok(m.joins.some(j => j.includes('CLB_X1Y2/FX_S2') && j.includes('CLB_X1Y1/FXINA3')));
@@ -941,16 +941,18 @@ test('observeNet: the last loose ends paired with the undriven wires the one way
 });
 
 test('chipMeasurements, PINRULES: a pin joined to the next tile\'s wire in one tile joined so in every tile of its type; ICLK1 of ICLK2\'s wire; a DCM\'s pin in the other DCM tiles (#3)', () => {
-  const dev = loadDeviceCache('xc3s250ecp132-4');
+  // (the tiles the tile probe found; the sites ISE placed: the slices of the tile above, the other DCM)
+  const switchTiles = ['CLB_X1Y5', 'TIBUFS_X13Y35'];
+  const sites = [{ site: 'SLICE_X0Y8', tile: 'CLB_X1Y5', type: 'SLICEM' }, { site: 'DCM_X0Y0', tile: 'DCM_BL_CENTER_X13Y1', type: 'DCM' }];
   const tilesDb = { types: { CENTER_SMALL: { features: { 'COUT1->COUT_N1': [] } } } };
   const obs = {
     pips: [{ tile: 'CLB_X1Y3', from: 'COUT1', dir: '->', to: 'COUT_N1' }], joins: [],
     pins: [{ site: 'SLICE_X0Y4', pin: 'COUT', dir: 'o', tile: 'CLB_X1Y3', wire: 'COUT0' }, { site: 'SLICE_X0Y5', pin: 'COUT', dir: 'o', tile: 'CLB_X1Y3', wire: 'COUT1' },
       { site: 'M4', pin: 'ICLK2', dir: 'i', tile: 'BIOIS_X11Y0', wire: 'ICLK20' }, { site: 'DCM_X0Y1', pin: 'PSCLK', dir: 'i', tile: 'DCM_TL_CENTER_X13Y34', wire: 'DCM_PSCLK_PINWIRE' }],
-    pinJoins: [{ site: 'SLICE_X0Y6', pin: 'CIN', tile: 'CLB_X1Y4', end: 'CLB_X1Y3/COUT_N1' }],
+    pinJoins: [{ site: 'SLICE_X0Y6', pin: 'CIN', tile: 'CLB_X1Y4', end: 'CLB_X1Y3/COUT_N1' }], sites,
   };
-  const m0 = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs });
-  const m = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs, rules: true });
+  const m0 = chipMeasurements({ tilesDb, obs, switchTiles });
+  const m = chipMeasurements({ tilesDb, obs, switchTiles, rules: true });
   // the observed one either way; with the rules, the tile above too (CLB_X1Y5's lower SLICEM on CLB_X1Y4's COUT_N1)
   for (const x of [m0, m]) assert.ok(x.joins.some(j => j.includes('CLB_X1Y3/COUT_N1') && j.includes('CLB_X1Y4/CIN0')));
   assert.ok(!m0.joins.some(j => j.includes('CLB_X1Y5/CIN0')));
@@ -960,7 +962,7 @@ test('chipMeasurements, PINRULES: a pin joined to the next tile\'s wire in one t
   assert.deepEqual(pin('BIOIS_X11Y0', 'M4', 'ICLK1'), ['ICLK1', 'i', 'ICLK10']);
   // an input-only pad's OTCLK1 / OTCLK2 (no design drives them): on <pin><k> of its I pin's Ik_PINWIRE
   const obs3 = { ...obs, pins: [...obs.pins, { site: 'C8', pin: 'I', dir: 'o', tile: 'TIBUFS_X13Y35', wire: 'I1_PINWIRE' }] };
-  const m3 = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs: obs3, rules: true });
+  const m3 = chipMeasurements({ tilesDb, obs: obs3, switchTiles, rules: true });
   const pin3 = (n, site, p) => { const t = m3.tiles.find(x => x.name === n); const i = t.sites.findIndex(([q]) => q === site); return m3.types[t.type].sites[i].pins.find(x => x[0] === p); };
   assert.deepEqual(['ICLK1', 'OTCLK1', 'OTCLK2'].map(p => pin3('TIBUFS_X13Y35', 'C8', p)), [['ICLK1', 'i', 'ICLK11'], ['OTCLK1', 'i', 'OTCLK11'], ['OTCLK2', 'i', 'OTCLK21']]);
   assert.deepEqual(pin('DCM_BL_CENTER_X13Y1', 'DCM_X0Y0', 'PSCLK'), ['PSCLK', 'i', 'DCM_PSCLK_PINWIRE']);
@@ -1058,10 +1060,12 @@ test('varyjoins rows: a clock row\'s join moved to the other rows where the tile
   assert.deepEqual(h.map(j => j.join(' ')).sort(), ['GCLKH_X1Y13/GCLKH_GCLK0 GCLKH_X2Y13/GCLKH_GCLK0', 'GCLKH_X1Y5/GCLKH_GCLK1 GCLKH_X2Y5/GCLKH_GCLK1']);
 });
 
-test('chipMeasurements and packMeasured: the tiles on the device report\'s grid, not on their names\' coordinates (CLB_X13 and CLKT_X13 in columns of their own: the placer\'s halves, its distances) (#3)', () => {
+test('chipMeasurements and packMeasured: the tiles on the measured grid, not on their names\' coordinates (CLB_X13 and CLKT_X13 in columns of their own: the placer\'s halves, its distances) (#3, #2502)', () => {
   const dev = loadDeviceCache('xc3s250ecp132-4');
   const tilesDb = { types: { CENTER_SMALL: { features: { 'E2END1->E2BEG1': [] } }, CLKT: { features: { 'CLKV_E2BEG0->CLKT_CLKDUB0': [] } } } };
-  const m = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs: { pips: [], pins: [], pinJoins: [], joins: [] } });
+  // (the report's tiles named by their place, EMPTY_*: never measured)
+  const switchTiles = dev.tileNames.filter(n => !/^EMPTY_/.test(n));
+  const m = chipMeasurements({ tilesDb, obs: { pips: [], pins: [], pinJoins: [], joins: [] }, switchTiles });
   assert.deepEqual([m.rows, m.cols], [dev.rows, dev.cols]);
   const g = loadDevice(packMeasured(m));
   const rc = (D, t) => { const k = D.tile(t); return [D.tileRow[k], D.tileCol[k]]; };
@@ -1107,9 +1111,8 @@ test('prototype.mjs predict, WIRES: a rule applied where a measured graph has th
   const obs = { pips: [{ tile: 'CLB_X5Y5', from: 'X0', dir: '->', to: 'OMUX14' }, { tile: 'CLB_X4Y5', from: 'OMUX_W14', dir: '->', to: 'F1_B0' }], joins: [['CLB_X5Y5/OMUX14', 'CLB_X4Y5/OMUX_W14']] };
   fs.writeFileSync(path.join(dir, 'obs.json'), JSON.stringify(obs));
   fs.writeFileSync(path.join(dir, 'tiles.txt'), ['CLB_X4Y5', 'CLB_X5Y5', 'TIOIS_X4Y35', 'TIOIS_X5Y35'].join('\n') + '\n');
-  const dev = loadDeviceCache('xc3s250ecp132-4');
   const tilesDb = { types: { CENTER_SMALL: { features: { 'X0->OMUX14': [], 'OMUX_W14->F1_B0': [] } }, TIOIS: { features: { 'X0->OMUX14': [], 'OMUX_W14->F1_B0': [] } } } };
-  const m = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs: { pips: [], pins: [], pinJoins: [], joins: [] } });
+  const m = chipMeasurements({ tilesDb, obs: { pips: [], pins: [], pinJoins: [], joins: [] }, switchTiles: ['CLB_X4Y5', 'CLB_X5Y5', 'TIOIS_X4Y35', 'TIOIS_X5Y35'] });
   fs.writeFileSync(path.join(dir, 'g.json.gz'), zlib.gzipSync(JSON.stringify(packMeasured(m))));
   const run = env => { execFileSync(process.execPath, ['packages/silinx-fpga/research/s3e-device/prototype.mjs', 'predict', path.join(dir, 'obs.json'), path.join(dir, 'tiles.txt'), path.join(dir, 'p.json')], { stdio: 'pipe', env: { ...process.env, ...env } }); return JSON.parse(fs.readFileSync(path.join(dir, 'p.json'), 'utf8')).map(j => j.join(' ')); };
   // the I/O tiles' OMUX14 / OMUX_W14: predicted only with the measured graph's wires
@@ -1130,22 +1133,44 @@ test('gen-obspins2 dcmpads: every DCM on the clock pad ISE gives it (DCM_PAD), r
   assert.deepEqual([lib.errors, elaborate(lib, 'top').diags], [[], []]);
 });
 
-test('build-measured: every measured die rebuilt from its measurements alone is the committed description (#3)', () => {
+test('build-measured: every measured die rebuilt from its measurements alone, no device report, is the committed description (#3, #2502)', () => {
   assert.deepEqual(measuredDies(), ['xc3s100e', 'xc3s250e', 'xc3s500e', 'xc3s1200e']);
   assert.equal(dataDir('xc3s250e'), DATA_DIR);
   // (the tiles with a PIP or a site: the XC3S100E's 479 of the grid's 667, the XC3S250E's 1057 of 1419, the XC3S500E's 1760,
   // the XC3S1200E's 3061)
   const tiles = { xc3s100e: 479, xc3s250e: 1057, xc3s500e: 1760, xc3s1200e: 3061 };
+  // the report's sites the measured grid leaves out: none a design can place or route to (the reserved and configuration
+  // sites, the unbonded pads, the corners' VCC sites); the four dies alike but for their numbers
+  const left = (rll, globalsig, randor, pads) => ({ RESERVED_LL: rll, GLOBALSIG: globalsig, RESERVED_ANDOR: randor, VCC: 4, PMV: 1, BSCAN: 1, STARTUP: 1, ICAP: 1, CAPTURE: 1, PCILOGICSE: 2, ...pads });
+  const leftOut = {
+    xc3s100e: left(340, 40, 32, { IOB: 46, DIFFM: 19, DIFFS: 19, IBUF: 18, DIFFMI: 22, DIFFSI: 21 }),
+    xc3s250e: left(788, 104, 52, { IOB: 84, DIFFM: 49, DIFFS: 46, IBUF: 30, DIFFMI: 30, DIFFSI: 29 }),
+    xc3s500e: left(1412, 136, 68, { IOB: 100, DIFFM: 36, DIFFS: 36, IBUF: 12, DIFFMI: 32, DIFFSI: 32 }),
+    xc3s1200e: left(2504, 184, 92, { IOB: 142, DIFFM: 73, DIFFS: 71, IBUF: 20, DIFFMI: 40, DIFFSI: 40 }),
+  };
   for (const die of measuredDies()) {
-    const g = loadDeviceCache(PARTS[die]);
-    const packed = buildMeasured(g);
+    const m = measurementsOf(PARTS[die]);
+    const packed = packMeasured(m);
     const committed = zlib.gunzipSync(fs.readFileSync(path.join(dataDir(die), 'measured.json.gz'))).toString();
     assert.equal(JSON.stringify(packed), committed, die);
-    // (loads, on the device's grid, named as the part)
-    const m = loadDevice(packed);
-    assert.equal(m.part, PARTS[die]);
-    assert.deepEqual([m.rows, m.cols], [g.rows, g.cols], die);
-    assert.equal(m.tileCount, tiles[die], die);
+    const d = loadDevice(packed);
+    assert.equal(d.part, PARTS[die]);
+    assert.equal(d.tileCount, tiles[die], die);
+    // the grid and the sites against the device report's (scoring only): the same rows, columns and tile types; every
+    // measured site as the report has it (name, type, bonding, its place among the tile's sites)
+    const g = loadDeviceCache(PARTS[die]), grid = m.grid;
+    assert.deepEqual([grid.rows, grid.cols], [g.rows, g.cols], die);
+    const bad = [], out = {};
+    for (const t of grid.tiles) {
+      const k = g.tileIndex.get(t.name), tp = g.templates[g.tileTemplate[k]];
+      if (g.tileRow[k] !== t.r || g.tileCol[k] !== t.c || tp.type !== t.type) bad.push(t.name);
+      const kept = g.tileSites[k].map(([n, b], i) => ({ n, b, type: tp.sites[i].type })).filter(x => grid.site.has(x.n));
+      if (JSON.stringify(kept.map(x => [x.n, x.type, x.b])) !== JSON.stringify(t.sites.map(x => [x.name, x.type, x.bonded]))) bad.push(t.name);
+    }
+    for (let k = 0; k < g.tileCount; k++) g.tileSites[k].forEach(([n], i) => { if (!grid.site.has(n) && d.tileIndex.has(g.tileNames[k])) { const ty = g.templates[g.tileTemplate[k]].sites[i].type; out[ty] = (out[ty] || 0) + 1; } });
+    assert.deepEqual(bad, [], die);
+    assert.deepEqual(out, leftOut[die], die);
+    assert.deepEqual([grid.unknown, grid.brkRows], [[], JSON.parse(fs.readFileSync(`packages/silinx-fpga/bitdb/${die}-layout.json`, 'utf8')).brkRows], die);
   }
 });
 
@@ -1154,13 +1179,72 @@ test('build-measured: the die of a part; a part with no die or no measurements r
   assert.equal(dieOf('XC3S250EFT256-4'), 'xc3s250e');
   assert.equal(dieOf('xc3s250evq100-4'), 'xc3s250e');
   for (const p of ['xc3s1600efg320-4', 'xc6slx16csg324-3', 'xc3s250e', '', undefined]) assert.equal(dieOf(p), null, String(p));
-  assert.throws(() => buildMeasured({ part: 'xc6slx16csg324-3' }), /xc6slx16csg324-3 is not a Spartan-3E part of xc3s100ecp132-4, xc3s250ecp132-4, xc3s500efg320-4, xc3s1200efg320-4/);
+  assert.throws(() => buildMeasured('xc6slx16csg324-3'), /xc6slx16csg324-3 is not a Spartan-3E part of xc3s100ecp132-4, xc3s250ecp132-4, xc3s500efg320-4, xc3s1200efg320-4/);
   // a folder with no measurements: its missing file named
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-measured-'));
   try {
-    assert.throws(() => buildMeasured({ part: 'xc3s1200efg320-4' }, empty), /build-measured: xc3s1200e has no obs\.json\.gz in .*silinx-measured-\w+$/);
+    assert.throws(() => buildMeasured('xc3s1200efg320-4', empty), /build-measured: xc3s1200e has no obs\.json\.gz in .*silinx-measured-\w+$/);
     assert.deepEqual(measuredDies(empty), []);
   } finally { fs.rmSync(empty, { recursive: true }); }
+});
+
+test('grid gridRowsCols: the rows and columns of every Spartan-3E die from its tile names, as the device report has them (#2502)', () => {
+  // a small chip: the top terminations and the clock rows before their Y's row, the bottom terminations and CLKB after it;
+  // the left terminations before their X's column, the right ones and the clock column after it
+  const names = ['TTERM_X1Y2', 'TIOIS_X1Y2', 'CLB_X1Y1', 'GCLKH_X1Y1', 'BIOIS_X1Y0', 'BTERM_X1Y0', 'LTERM_X0Y1', 'LIOIS_X0Y1', 'CLKV_X1Y1', 'RIOIS_X2Y1', 'RTERM_X2Y1', 'nonsense'];
+  const g = gridRowsCols(names);
+  assert.deepEqual([g.rows, g.cols], [6, 6]);
+  assert.deepEqual(names.map((n, i) => [g.r[i], g.c[i]]), [[0, 2], [1, 2], [3, 2], [2, 2], [4, 2], [5, 2], [3, 0], [3, 1], [3, 3], [3, 4], [3, 5], [-1, -1]]);
+  // (the XC3S1200E's long-line splitters: an empty row before the centre's clock row)
+  const ll = gridRowsCols(['CLB_X1Y1', 'CLKC_LL_X1Y1', 'CLB_X1Y0']);
+  assert.deepEqual([ll.rows, ll.r], [4, [2, 1, 3]]);
+  // every tile of the four dies' reports but the EMPTY_* ones (named by their place: never measured)
+  for (const part of Object.values(PARTS)) {
+    const dev = loadDeviceCache(part), k = dev.tileNames.map((n, i) => i).filter(i => !/^EMPTY_/.test(dev.tileNames[i]));
+    const r = gridRowsCols(k.map(i => dev.tileNames[i]));
+    assert.deepEqual([r.rows, r.cols], [dev.rows, dev.cols], part);
+    assert.deepEqual(k.filter((i, j) => r.r[j] !== dev.tileRow[i] || r.c[j] !== dev.tileCol[i]).map(i => dev.tileNames[i]), [], part);
+    // the tile types: the names' prefixes, a CLB's CENTER_SMALL(_BRK) by brkRowsOf
+    const brk = brkRowsOf(dev.tileNames);
+    assert.deepEqual(k.filter(i => tileTypeOf(dev.tileNames[i], brk) !== dev.tileType(i)).map(i => dev.tileNames[i]), [], part);
+  }
+});
+
+test('grid siteSlot, siteOrder, padK, padSlots: a site\'s type and slot by rule, its place among its tile\'s sites, a pad\'s k from its pins (#2502)', () => {
+  assert.deepEqual(['SLICE_X0Y66', 'SLICE_X0Y67', 'SLICE_X1Y66', 'SLICE_X1Y67'].map(s => siteSlot(s, 'CLB_X1Y34')), [
+    { type: 'SLICEM', slot: 'S0' }, { type: 'SLICEM', slot: 'S1' }, { type: 'SLICEL', slot: 'S2' }, { type: 'SLICEL', slot: 'S3' }]);
+  assert.deepEqual(['VCC_X2Y36', 'RAMB16_X0Y5', 'MULT18X18_X0Y5', 'DCM_X0Y1'].map(s => siteSlot(s, 'X_X1Y1').type), ['VCC', 'RAMB16', 'MULT18X18SIO', 'DCM']);
+  assert.deepEqual(siteSlot('BUFGMUX_X1Y1', 'CLKB_X13Y0', { bufgRank: 1 }), { type: 'BUFGMUX', slot: 'B1' });
+  assert.deepEqual([0, 1, 2].map(k => siteSlot('M6', 'BIBUFS_X14Y0', { k }).type), ['DIFFMI', 'DIFFSI', 'IBUF']);
+  assert.deepEqual([0, 1, 2].map(k => siteSlot('A3', 'TIOIS_X1Y35', { k }).type), ['DIFFM', 'DIFFS', 'IOB']);
+  // no rule: a pad with no k, a BUFGMUX with no rank, a site of another kind
+  for (const [s, t] of [['A3', 'TIOIS_X1Y35'], ['BUFGMUX_X1Y1', 'CLKB_X13Y0'], ['STARTUP', 'LR_X27Y0'], ['RLL_X1Y34', 'CLB_X1Y34']]) assert.equal(siteSlot(s, t), null, s);
+  // VCC first, but in CLKB, CLKT, CLKL (CLKR's first); a block RAM before its multiplier; pads and slices by their slot
+  assert.ok(siteOrder('VCC', 'CENTER_SMALL') < siteOrder('S0', 'CENTER_SMALL') && siteOrder('S0', 'CENTER_SMALL') < siteOrder('S3', 'CENTER_SMALL'));
+  assert.ok(siteOrder('VCC', 'CLKB') > siteOrder('B3', 'CLKB') && siteOrder('VCC', 'CLKR') < siteOrder('B7', 'CLKR'));
+  assert.ok(siteOrder('RAMB16', 'BRAMSITE2') < siteOrder('MULT18X18SIO', 'BRAMSITE2') && siteOrder('P0', 'LIOIS') < siteOrder('P2', 'LIOIS'));
+  assert.equal(padK([{ pin: 'O', wire: 'O2' }, { pin: 'I', wire: 'I1_PINWIRE' }]), 1);
+  assert.equal(padK([{ pin: 'ICLK1', wire: 'ICLK12' }]), 2);
+  assert.equal(padK([{ pin: 'O', wire: 'O2' }]), null);
+  // another package's pads by their slot (only those with a pin that tells it; its VCC sites are named alike everywhere)
+  const ps = padSlots({ pins: [{ site: 'T5', pin: 'I', wire: 'I2_PINWIRE', tile: 'BIOIS_X2Y0' }, { site: 'R5', pin: 'O', wire: 'O1', tile: 'BIOIS_X2Y0' }, { site: 'VCC_X3Y1', pin: 'VCCOUT', wire: 'IOIS_VCC_WIRE', tile: 'BIOIS_X2Y0' }] });
+  assert.deepEqual([...ps], [['T5', 'P2']]);
+  // the tiles a measurement names, of names of tiles only
+  assert.deepEqual(measuredTiles({ obs: { pips: [{ tile: 'CLB_X1Y1' }], pins: [], joins: [['CLB_X1Y1/A', 'CLB_X2Y1/B']], pinJoins: [{ tile: 'CLB_X3Y1', end: 'CLB_X4Y1/C' }] }, probes: { yes: [{ tile: 'BIOIS_X1Y0' }] }, joins: [['TTERM_X1Y2/D', 'CLB_X1Y1/E']], switchTiles: ['LIOIS_X0Y1', 'junk'] }).sort(),
+    ['BIOIS_X1Y0', 'CLB_X1Y1', 'CLB_X2Y1', 'CLB_X3Y1', 'CLB_X4Y1', 'LIOIS_X0Y1', 'TTERM_X1Y2']);
+});
+
+test('compare-grid compareDevices: two descriptions tile by tile: the tiles, places, PIPs, wires, nodes, sites and pins either has alone (#2502)', () => {
+  const tilesDb = { types: { CENTER_SMALL: { features: { 'E2END1->E2BEG1': [], 'X0->OMUX3': [] } } } };
+  const obs = { pips: [], pinJoins: [], joins: [['CLB_X1Y1/E2BEG1', 'CLB_X2Y1/E2END1']],
+    sites: [{ site: 'SLICE_X0Y0', tile: 'CLB_X1Y1', type: 'SLICEM' }, { site: 'VCC_X0Y0', tile: 'CLB_X1Y1', type: 'VCC' }],
+    pins: [{ site: 'SLICE_X0Y0', pin: 'X', dir: 'o', tile: 'CLB_X1Y1', wire: 'X0' }] };
+  const a = loadDevice(packMeasured(chipMeasurements({ tilesDb, obs, switchTiles: ['CLB_X2Y1'] })));
+  assert.deepEqual(compareDevices(a, a), { tiles: { onlyA: [], onlyB: [], place: [], type: [] }, pips: { onlyA: 0, onlyB: 0 }, wires: { onlyA: 0, onlyB: 0 }, nodes: 0, sites: { onlyA: {}, onlyB: {}, changed: [] }, pins: { onlyA: {}, onlyB: {}, wire: [] } });
+  // b: no join, no VCC site (in a, CLB_X1Y1's and, by rule, CLB_X2Y1's), a tile more, the slice's pin on another wire
+  const b = loadDevice(packMeasured(chipMeasurements({ tilesDb, obs: { ...obs, joins: [], sites: obs.sites.slice(0, 1), pins: [{ ...obs.pins[0], wire: 'OMUX3' }] }, switchTiles: ['CLB_X2Y1', 'CLB_X3Y1'] })));
+  const d = compareDevices(a, b);
+  assert.deepEqual([d.tiles.onlyB, d.nodes, d.sites.onlyA, d.pins.wire, d.wires], [['CLB_X3Y1'], 2, { VCC: 2 }, ['SLICE_X0Y0.X'], { onlyA: 0, onlyB: 0 }]);
 });
 
 test('research scripts: the command line recognised on Windows too (#1877: not `file://${process.argv[1]}`, a C:\\ path)', () => {
