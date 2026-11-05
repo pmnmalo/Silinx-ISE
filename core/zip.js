@@ -3,10 +3,12 @@
 // browser -> CompressionStream/DecompressionStream('deflate-raw') (see browserCodec()).
 //
 //   await createZip([{ path, data: Uint8Array|string }], codec) -> Uint8Array
-//   await readZip(bytes, codec, { maxEntry, maxTotal }) -> [{ path, data: Uint8Array }]   (directories skipped)
+//   await readZip(bytes, codec, { maxEntry, maxTotal, maxFiles, onEntry }) -> [{ path, data: Uint8Array }]   (directories skipped)
 //
 // A zip can declare (or inflate to) far more than it holds: an entry or a whole archive above the
 // limits is refused before it is inflated, and codec.inflate(data, limit) stops at the entry's size.
+// onEntry({ path, size, symlink }), called before an entry is inflated, returns null to read it or the reason
+// it is left out (the import gate's check of its name, core/import-gate.js, #2830): a refused entry is never inflated.
 
 /** The default limits of readZip: an entry, the whole archive (uncompressed). */
 export const ZIP_LIMITS = Object.freeze({ maxEntry: 64 << 20, maxTotal: 256 << 20 });
@@ -76,7 +78,7 @@ export async function createZip(files, codec) {
   return out;
 }
 
-export async function readZip(bytes, codec, { maxEntry = ZIP_LIMITS.maxEntry, maxTotal = ZIP_LIMITS.maxTotal } = {}) {
+export async function readZip(bytes, codec, { maxEntry = ZIP_LIMITS.maxEntry, maxTotal = ZIP_LIMITS.maxTotal, maxFiles = Infinity, onEntry = null } = {}) {
   const b = toBytes(bytes);
   const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
   // find the end-of-central-directory record (it may be followed by a comment)
@@ -86,6 +88,7 @@ export async function readZip(bytes, codec, { maxEntry = ZIP_LIMITS.maxEntry, ma
   }
   if (eocd < 0) throw new Error('not a zip file');
   const count = dv.getUint16(eocd + 10, true);
+  if (count > maxFiles) throw new Error(`zip has too many entries (${count}, at most ${maxFiles})`);
   let p = dv.getUint32(eocd + 16, true);
   const out = [];
   let total = 0;
@@ -94,11 +97,14 @@ export async function readZip(bytes, codec, { maxEntry = ZIP_LIMITS.maxEntry, ma
     const flags = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true);
     const csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true);
     const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
-    const lho = dv.getUint32(p + 42, true);
+    const madeBy = dv.getUint16(p + 4, true), attrs = dv.getUint32(p + 38, true), lho = dv.getUint32(p + 42, true);
     const nameBytes = b.subarray(p + 46, p + 46 + nlen);
     const path = flags & 0x0800 ? dec.decode(nameBytes) : Array.from(nameBytes, c => String.fromCharCode(c)).join('');
     p += 46 + nlen + xlen + clen;
     if (path.endsWith('/') || path.startsWith('__MACOSX/') || /(^|\/)\.DS_Store$/.test(path)) continue;
+    // (a symbolic link: made on Unix, its mode's file type S_IFLNK)
+    const symlink = madeBy >> 8 === 3 && ((attrs >>> 16) & 0o170000) === 0o120000;
+    if (onEntry && onEntry({ path, size: usize, symlink }) != null) continue;
     if (flags & 1) throw new Error(`encrypted zip entries are not supported (${path})`);
     const dataStart = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
     const body = b.subarray(dataStart, dataStart + csize);

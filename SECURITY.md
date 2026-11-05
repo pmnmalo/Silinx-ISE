@@ -65,3 +65,39 @@ can read that user's files has the server too.
   a fork waits for the maintainer's approval before any of its workflows runs.
 - On GitHub, secret scanning and push protection refuse a token or key at push time, and private
   vulnerability reporting is on.
+
+## Files and projects from outside (#2830)
+
+A project's zip, an ISE project (`.xise` and its folder), a design link, a file added to a project, a drawing
+(an ISE schematic, a PNML Petri net), a wave configuration, a test bench's data, and whatever the MCP server imports
+or writes can come from anyone: a course site, an e-mail, a forum, an assistant led astray by what it read. Silinx
+treats them as untrusted, in three layers.
+
+**What such a file must not do:** run a script in the page (a name or a label shown as markup); read or write a
+file outside its own project (`..`, an absolute path, a symbolic link, a hidden folder such as `.git` with its hooks);
+exhaust the memory or the stack (a zip bomb, a file far larger than it says, a billion-laughs XML, a deeply nested or
+endlessly chained source, #2577); read a local file or the network through the XML parser (XXE); replace another
+project or the user's settings; or run a program outside the browser's sandbox (ISE, ssh, Docker, programming a
+board or a PROM) without the user's say.
+
+1. **One import gate** (`core/import-gate.js`, the same module in the browser and on the server): every outside file
+   passes through it before any parser or editor sees it.
+   - Sizes: the zip (64 MB), the decompressed total (256 MB), the files (5000), each file (64 MB, a text 16 MB), a
+     source's line (1 MB), the nesting of brackets, XML elements and JSON (256), an HDL file's `elsif` / `else if`
+     branches (1000). A zip's sizes are checked before each entry is inflated, and inflating stops at the size the
+     entry declares.
+   - Names: relative to the project, no `..`, absolute path, drive letter, backslash, control character, `< > : " | ?
+     *`, hidden file or folder, reserved name (`build/`, `CON`, `NUL`, …), symbolic link, or a name that differs from
+     another only by its case. A refused entry is never inflated.
+   - XML (`.xise`, `.sch`, `.sym`, PNML, `.wcfg`, `.svg`): no DTD and no entity declaration, so no external entity
+     and no entity expansion, whatever parser reads it next (Silinx's own XML readers expand none either).
+   - Types by extension and content: a web page, a script or a program is refused; a text file (a source, a drawing,
+     constraints, a memory's data) that holds a NUL byte or is an HTML page is refused; text is read as UTF-8, its
+     invalid bytes replaced with a warning.
+   - The result: the files accepted, and each refusal with its reason, in the console and in the MCP tools' results.
+     A file refused is left out and the import goes on; a bomb refuses the whole import.
+2. **Safe output:** what a file names (a module, a port, a label, a file) reaches the page only as text, and the
+   Content Security Policy (`server/csp.js`) runs no injected script.
+3. **Trust for outside projects:** an imported project opens, edits, checks, simulates and runs the open toolchain
+   in the browser; it runs nothing outside the browser's sandbox (ISE, ssh, Docker, board or PROM programming,
+   external tools) until the user confirms.
