@@ -168,6 +168,16 @@ export async function designZip(entries, { codec = browserCodec() } = {}) {
   return createZip(entries, codec);
 }
 
+/** A project's name with the first free suffix: ALU -> ALU_2, ALU_3, … (#2875: the link's design beside the student's
+ *  project), within a project name's 64 characters; taken: the workspace's names (their case ignored). */
+export function freeName(name, taken) {
+  const have = new Set(taken.map(n => n.toLowerCase()));
+  for (let n = 2; ; n++) {
+    const tail = `_${n}`, cand = name.slice(0, 64 - tail.length) + tail;
+    if (!have.has(cand.toLowerCase())) return cand;
+  }
+}
+
 /** Whether two projects' files are the same ({ path: text }), silinx.json left out (opening a project rewrites it). */
 export function sameFiles(a, b) {
   const keys = o => Object.keys(o).filter(k => k !== 'silinx.json').sort();

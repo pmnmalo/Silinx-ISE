@@ -5,9 +5,9 @@
 // Silinx zip (the import's checks); the student's work is kept: a project of that name with the same files is opened
 // as it is, one that differs is replaced only when the user says so. Every message in the console.
 import { api } from './api.js';
-import { confirmDlg } from './ui.js';
+import { confirmDlg, dialog, h } from './ui.js';
 import { S, app } from './app.js';
-import { TRY_DRAWING, decodeDesign, designZip, parseLink, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
+import { TRY_DRAWING, decodeDesign, designZip, freeName, parseLink, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateMessages, gateZip } from '/core/import-gate.js';
 
@@ -53,19 +53,19 @@ async function fetchZip(url) {
 }
 
 // the link's design: { name, project (null: not known before its import), files ({ path: text }: null, not known),
-// make(): its import or creation } (null: the user did not agree)
+// make(as): its import or creation, as the project `as` (default its name) } (null: the user did not agree)
 async function designOf(source) {
   if (source.kind === 'example') {
     const { name } = source;
     if (!(await api.templates()).includes(name)) throw fail(`no example '${name}'`);
     const ex = await api.exampleFiles(name);
-    return { name, project: ex.project, files: ex.files, make: () => api.createProject({ name, template: name }) };
+    return { name, project: ex.project, files: ex.files, make: (as = name) => api.createProject({ name: as, template: name }) };
   }
   if (source.kind === 'design') {
     const { entries, name, project, warnings } = await decodeDesign(source.design);
     for (const w of warnings) app.log(`WARNING: Open from a link: ${w}`, 'warn');
     const zip = await designZip(entries);
-    return { name, project, files: texts(entries.filter(e => e.path !== 'silinx.json')), make: () => api.importZip(name, new Blob([zip], { type: 'application/zip' })) };
+    return { name, project, files: texts(entries.filter(e => e.path !== 'silinx.json')), make: (as = name) => api.importZip(as, new Blob([zip], { type: 'application/zip' })) };
   }
   const z = await fetchZip(source.url);
   if (!z) return null;
@@ -74,7 +74,7 @@ async function designOf(source) {
   try { pj = JSON.parse(textOf(z.entries.find(e => /(^|\/)silinx\.json$/i.test(e.path)))); } catch { /* an ISE project */ }
   const file = decodeURIComponent(new URL(source.url).pathname.split('/').pop() || '').replace(/\.zip$/i, '').replace(/-silinx$/i, '');
   const name = String(pj?.name || file).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64) || 'linked';
-  return { name, project: null, files: null, make: () => api.importZip(name, new Blob([z.bytes], { type: 'application/zip' })) };
+  return { name, project: null, files: null, make: (as = name) => api.importZip(as, new Blob([z.bytes], { type: 'application/zip' })) };
 }
 
 /** Open the link's design (linkOptions) and its view; errors in the console, the workspace left as it was. */
@@ -88,13 +88,15 @@ export async function openFromLink(opts) {
       if (problem) throw fail(problem);
       if (board && board !== d.project.board) app.log(`WARNING: Open from a link: the link's board ${board} is not the design's (${d.project.board || 'none'}): the design's is kept.`, 'warn');
     }
-    const exists = (await api.projects()).some(p => p.name === d.name);
+    const names = (await api.projects()).map(p => p.name);
+    let exists = names.includes(d.name), kept = null;
     if (exists && !(d.files && sameFiles(texts((await gateZip(new Uint8Array(await (await api.exportZip(d.name, 'silinx')).blob.arrayBuffer()), browserCodec())).files), d.files))) {
-      // the student's work: replaced only when they say so (#2829)
-      const yes = await confirmDlg('Open from a Link', `A project named '${d.name}' already exists, with changes of its own.\n\nReplace it with the link's design? ${api.standalone && !api.keepsTrash ? 'The existing project will be deleted from this browser.' : 'The existing project is moved to the workspace .trash folder.'}`, { yes: 'Replace', no: 'Keep Mine' });
-      if (!yes) { app.log(`Open from a link: the project '${d.name}' was kept as it is; the link's design was not opened.`, 'info'); return false; }
-      const { replaceProjectWith } = await import('./wizards.js');
-      await replaceProjectWith(d.name, d.make);
+      // the student's work: replaced only when they say so (#2829); or the link's design in a project of its own (#2875)
+      const other = freeName(d.name, names);
+      const answer = await askReplace(d.name, other);
+      if (!answer) { app.log(`Open from a link: the project '${d.name}' was kept as it is; the link's design was not opened.`, 'info'); return false; }
+      if (answer === 'other') { kept = d.name; d.name = other; exists = false; await d.make(other); }
+      else { const { replaceProjectWith } = await import('./wizards.js'); await replaceProjectWith(d.name, () => d.make()); }
     } else if (!exists) await d.make();
     await app.openProject(d.name);
     app.showLeftPage('design');
@@ -103,7 +105,7 @@ export async function openFromLink(opts) {
       const problem = viewProblem(S.project, d.files, { view, top });
       if (problem) throw fail(problem);
     }
-    app.log(`Opened '${d.name}' from a link${exists ? '' : ' (a new project)'}${view ? `: ${VIEWS[view]}` : ''}.`, 'ok');
+    app.log(`Opened '${d.name}' from a link${exists ? '' : kept ? ` (a new project; '${kept}' kept as it is)` : ' (a new project)'}${view ? `: ${VIEWS[view]}` : ''}.`, 'ok');
     // the link's module selected in the Design pane, its source open when no view opens (#2871)
     if (top || view) await showModule(top || S.project.top, !view);
     if (view) await openView(view, top || S.project.top, d.files);
@@ -142,4 +144,15 @@ async function showModule(name, open) {
   row.click();
   row.scrollIntoView({ block: 'nearest' });
   if (open) row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+}
+
+// a project of the link's name the student changed: Open as <other> / Replace / Keep Mine ('other', 'replace' or null)
+function askReplace(name, other) {
+  return dialog({
+    title: 'Open from a Link', width: 460,
+    body: h('div', { class: 'msg msg-question' }, h('div', { class: 'msg-icon' }, '?'), h('div', { class: 'msg-text' },
+      `A project named '${name}' already exists, with changes of its own.\n\nReplace it with the link's design? ${api.standalone && !api.keepsTrash ? 'The existing project will be deleted from this browser.' : 'The existing project is moved to the workspace .trash folder.'} Or open the link's design as a new project, '${other}', yours kept as it is.`)),
+    // (the one that loses nothing first, Enter's)
+    buttons: [{ label: `Open as ${other}`, value: 'other', primary: true }, { label: 'Replace', value: 'replace' }, { label: 'Keep Mine', value: null }],
+  });
 }

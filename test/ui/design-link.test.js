@@ -147,18 +147,33 @@ uiTest('#2871 regression, Copy Link to This Module… with Open the project only
   assert.equal(await selected(), 'traffic');
 });
 
-uiTest('#2826 a changed project: replaced only when the user says so (Keep Mine, then Replace)', E, async (page) => {
+uiTest('#2826 #2875 a changed project: replaced only when the user says so; or the link\'s design opened as <name>_2, _3, the student\'s kept (Keep Mine, Open as, Replace)', E, async (page) => {
   await openLink(page, 'open=example:blinky');
   await linkOpened(page);
   const name = (await fs.readdir(path.join(env.server.workspace, 'blinky', 'sim')))[0];
   await writeWs(env, 'blinky', `sim/${name}`, '-- the student\'s work\n');
   await openLink(page, 'open=example:blinky&view=emulate', 'l=2');
   assert.equal(await page.waitDialog('Open from a Link'), 'Open from a Link');
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent), /^A project named 'blinky' already exists, with changes of its own\.\s+Replace it with the link's design\? The existing project is moved to the workspace \.trash folder\.$/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent), /^A project named 'blinky' already exists, with changes of its own\.\s+Replace it with the link's design\? The existing project is moved to the workspace \.trash folder\. Or open the link's design as a new project, 'blinky_2', yours kept as it is\.$/);
+  // (the one that loses nothing first, the primary: Enter's)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => `${b.textContent}${b.classList.contains('primary') ? ' (primary)' : ''}`)), ['Open as blinky_2 (primary)', 'Replace', 'Keep Mine']);
   await page.dialogButton('Keep Mine');
   await linkOpened(page);
   await page.waitConsole(/Open from a link: the project 'blinky' was kept as it is; the link's design was not opened\./);
   assert.equal(await readWs(env, 'blinky', `sim/${name}`), '-- the student\'s work\n');
+  // Open as blinky_2, then blinky_3: the link's design beside the student's project, which stays as it is
+  for (const [n, q] of [['blinky_2', 'l=4'], ['blinky_3', 'l=5']]) {
+    await openLink(page, 'open=example:blinky&top=speed_ctrl', q);
+    await page.waitDialog('Open from a Link');
+    await page.dialogButton(`Open as ${n}`);
+    await linkOpened(page);
+    await page.waitConsole(new RegExp(`Opened '${n}' from a link \\(a new project; 'blinky' kept as it is\\)\\.`));
+    assert.equal(await page.eval(() => window.Silinx.project.name), n);
+    await page.waitFor(() => document.querySelector('#hier .row.sel')?.dataset.module === 'speed_ctrl', [], { what: 'the link\'s module selected' });
+    assert.notEqual(await readWs(env, n, `sim/${name}`), '-- the student\'s work\n');
+  }
+  assert.equal(await readWs(env, 'blinky', `sim/${name}`), '-- the student\'s work\n');
+  assert.deepEqual(await consoleWarnings(page), []);
   // Replace: the example's again, in the board emulator
   await openLink(page, 'open=example:blinky&view=emulate', 'l=3');
   await page.waitDialog('Open from a Link');
@@ -223,7 +238,7 @@ uiTest('#2826 in Portuguese: Copy Link… and the replace question', E, async (p
   await openLink(page, 'open=example:gates', 'l=pt');
   await page.waitDialog('Abrir a partir de uma Ligação');
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent), /^Já existe um projeto chamado 'gates', com alterações próprias\./);
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Substituir', 'Manter o Meu']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Abrir como gates_2', 'Substituir', 'Manter o Meu']);
   await page.dialogButton('Manter o Meu');
   await linkOpened(page);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
