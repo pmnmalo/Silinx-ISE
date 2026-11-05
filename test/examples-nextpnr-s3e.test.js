@@ -2,7 +2,7 @@
 // tries the seeds from the first on and skips one nextpnr cannot route without a word (open-flow-nextpnr.js), and the
 // examples are set to one placement (Optimization Fast), so the test runs Place & Route on each seed itself: 1 to 4, the
 // placements of the Normal effort (nextpnrTries). Each example on one of the four devices, in turn (all of them on each,
-// seeds 1 to 8: #2811's sweep, every run routed with no warning on 0.19.0 and on 0.20.0; about 6 minutes here).
+// seeds 1 to 8: #2811's sweep, every run routed with no warning on 0.19.0 and on 0.20.0; 1.0.0 is 0.20.0's engine: #2438; about 6 minutes here).
 // - #2800's router fix (nextpnr-spartan's PR 11, in nextpnr-himbaechel-spartan3e 0.20.0): a net whose box fits in one of
 //   nextpnr's router partitions but whose route leaves it. The single-threaded router (the WebAssembly build) retried it
 //   only inside the partition and gave it up as unroutable; it now hands it to the whole-device pass.
