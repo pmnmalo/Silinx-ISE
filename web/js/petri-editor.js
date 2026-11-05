@@ -25,6 +25,7 @@ import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import { normalizePetri, newPetri, fire, toPnml, fromPnml } from '/core/petri.js';
+import { GateError, gateFile, kindOf } from '/core/import-gate.js';
 import { copyDrawing, pasteDrawing, drawingClipEmpty } from '/core/drawclip.js';
 import { writeClip, readClip, pasteFromKey, hasClip } from './clipboard.js';
 import { mountPetriSim } from './petri-sim.js';
@@ -79,8 +80,12 @@ export function mountPetriEditor(container, opts = {}) {
   pnmlIn.addEventListener('change', async () => {
     const f = pnmlIn.files[0]; pnmlIn.value = '';
     if (!f) return;
-    try { const n = fromPnml(await f.text(), { name: M.name }); M = normalizePetri({ ...n, lang: M.lang, generatedFile: M.generatedFile }); sel = null; commit(); fit(); }
-    catch (e) { status(`PNML: ${e.message}`, true); }
+    // (through the import gate, #2830: no DTD, its size and nesting; its name only said, never part of a path)
+    try {
+      const g = gateFile(f.name.replace(/[^\w.-]/g, '_'), new Uint8Array(await f.arrayBuffer()));
+      if (kindOf(g.path) !== 'xml') throw new Error(`${f.name}: not a PNML file (.pnml or .xml)`);
+      const n = fromPnml(g.text, { name: M.name }); M = normalizePetri({ ...n, lang: M.lang, generatedFile: M.generatedFile }); sel = null; commit(); fit();
+    } catch (e) { status(`PNML: ${e instanceof GateError ? `${f.name}: ${e.reason}` : e.message}`, true); }
   });
   const linkHost = h('span', { class: 'pn-link' });
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');

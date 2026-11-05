@@ -42,7 +42,7 @@ export const GATE_LIMITS = Object.freeze({
 
 /** An import refused as a whole (its message is the console's). */
 export class GateError extends Error {
-  constructor(message) { super(message); this.name = 'GateError'; this.gate = true; }
+  constructor(message, { path = null, reason = null } = {}) { super(message); this.name = 'GateError'; this.gate = true; this.path = path; this.reason = reason; }
 }
 
 const KINDS = [
@@ -235,14 +235,14 @@ export async function gateZip(bytes, codec, { limits } = {}) {
   return out;
 }
 
-/** One file through the gate (Add Source, a drawing or a wave configuration opened, the MCP's write_file): the file,
- *  or a GateError naming it and the reason. */
+/** One file through the gate (Add Source, a PNML net imported, the MCP's write_file): the file (its `warning`: invalid
+ *  UTF-8 replaced), or a GateError naming it (`path`, `reason`). */
 export function gateFile(path, data, { limits } = {}) {
   const L = merge(limits);
   const n = normalizePath(path, { limits: L });
-  if (n.reason) throw new GateError(`${path}: ${n.reason}`);
+  if (n.reason) throw new GateError(`${path}: ${n.reason}`, { path: String(path), reason: n.reason });
   const s = screen(n.path, data ?? '', L);
-  if (s.reason) throw new GateError(`${n.path}: ${s.reason}`);
+  if (s.reason) throw new GateError(`${n.path}: ${s.reason}`, { path: n.path, reason: s.reason });
   return s.warning ? { ...s.file, warning: s.warning } : s.file;
 }
 

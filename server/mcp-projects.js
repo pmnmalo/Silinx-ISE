@@ -139,6 +139,10 @@ export const PROJECT_TOOLS = [
       const low = key.toLowerCase();
       if (low === P.PROJECT_FILE || low === 'build' || low.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
       if (key.split('/').some(s => s.startsWith('.'))) throw toolError(`'${rel}': a hidden file or folder cannot be written`);
+      // what an assistant writes comes from outside: through the import gate (#2830), as a file added to a project
+      const { GateError, gateFile } = await import('../core/import-gate.js');
+      let gated;
+      try { gated = gateFile(key, text); } catch (e) { throw e instanceof GateError ? toolError(`${e.path}: not written: ${e.reason}`) : e; }
       rel = key;
       const existed = (await P.fileTree(name)).includes(rel);
       try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }
@@ -146,7 +150,7 @@ export const PROJECT_TOOLS = [
       // a drawing: its HDL file made again from it (#2674), as its editor does when it is saved
       const { syncDrawing } = await import('./drawing-sync.js');
       const sync = await syncDrawing(P, name, rel);
-      return { text: [`${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`, ...(sync?.messages || [])].join('\n'),
+      return { text: [...(gated.warning ? [`WARNING: ${gated.warning}`] : []), `${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`, ...(sync?.messages || [])].join('\n'),
         data: { project: name, path: rel, created: !existed, addedToProject: added, ...(sync ? { hdl: { file: sync.target, written: !!sync.written, removed: sync.removed, stale: sync.stale } } : {}) } };
     },
   },

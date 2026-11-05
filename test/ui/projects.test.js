@@ -795,6 +795,31 @@ uiTest('#2830 Import Silinx ISE Project: the import gate leaves out what it refu
   assert.equal(await page.eval(() => document.querySelectorAll('img[src="x"]').length), 0);
 });
 
+// #2830: Import Source / Add Copy of Source through the import gate: a file it refuses (binary, a script in its name, an
+// XXE drawing) is not added and said in the console; the sound one is added
+uiTest('#2830 Import Source / Add Copy of Source: the import gate leaves out what it refuses and says why in the console', E, async (page) => {
+  const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
+  await makeProject(env, { name: 'GateAdd', template: 'empty' });
+  await page.openProject('GateAdd');
+  const dir = path.join(env.tmp, 'gate-add');
+  await fs.mkdir(dir, { recursive: true });
+  const files = { 'inv.vhd': 'library ieee; use ieee.std_logic_1164.all;\nentity inv is port (a : in std_logic; y : out std_logic); end inv;\narchitecture rtl of inv is begin y <= not a; end rtl;\n',
+    'bin.vhd': 'entity\0bin', 'x<y>.v': 'module m; endmodule\n', 'evil.sch.json': '{"a":' + '['.repeat(300) + ']'.repeat(300) + '}' };
+  for (const [f, t] of Object.entries(files)) await fs.writeFile(path.join(dir, f), t);
+  await page.menu('Project', `${IMPORT}…`);
+  await page.waitDialog(IMPORT);
+  await page.setFiles('.dlg-overlay input[type=file]', Object.keys(files).map((f) => path.join(dir, f)));
+  await page.dialogButton('OK');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/inv.vhd'), [], { what: 'inv.vhd added' });
+  const warnings = (await page.consoleText()).split('\n').filter((l) => /^WARNING/.test(l));
+  assert.deepEqual(warnings, [
+    'WARNING: src/bin.vhd: not imported: binary content (a NUL byte) in a text file',
+    'WARNING: src/x<y>.v: not imported: character not allowed in a name (< > : " | ? *): \'x<y>.v\'',
+    'WARNING: src/evil.sch.json: not imported: JSON nested deeper than 256 levels',
+  ]);
+  assert.deepEqual((await env.server.api('GET', '/api/projects/GateAdd')).fileTree.filter((f) => f.startsWith('src/')), ['src/inv.vhd']);
+});
+
 uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth Table starts the project with that top and its synchronized HDL', E, async (page) => {
   const cases = [['sch', 'top.sch.json', 'vhdl', 'Schematic'], ['fsm', 'top.fsm.json', 'verilog', 'Finite State Machine (FSM)'],
     ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.bool.json', 'verilog', 'Boolean Algebra']];
