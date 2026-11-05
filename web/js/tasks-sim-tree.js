@@ -18,6 +18,8 @@ export function benchItems(app, name) {
     { label: 'Open', action: () => { const i = info(); if (i) app.openFile(i.file, i.line, undefined, { task: 'sim' }); } },
     { label: 'Rename…', action: () => import('./rename.js').then(r => r.renameDialog(file(), name)) },
     { label: 'Check Syntax', action: () => check(name) },
+    // (its link, the simulation of this test bench, #2883)
+    { label: 'Copy Link to This Module…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog({ module: name })) },
     '-',
     { label: 'New Test Bench…', action: () => newBench(app) },
     { label: 'Import Test Bench…', action: addCopy },
