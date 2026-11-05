@@ -74,7 +74,7 @@ export async function applyViewState(v) {
       if (!re) continue;
       try { await open(...re.exec(id).slice(1)); } catch { /* a document that cannot open any more */ }
     }
-    restoreSplit(v.split, k => S.docs.find(d => reopenKey(d) === k));
+    restoreSplit(v.split, k => S.docs.find(d => reopenKey(d) === k), v.open);   // (in the kept order, #2887)
     const active = v.active && S.docs.find(d => reopenKey(d) === v.active);
     if (active) activateDoc(active);
   } finally { keepView = false; }

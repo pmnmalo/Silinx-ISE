@@ -33,7 +33,7 @@ import { renameSymbolIn } from './rename.js';
 import { writeClip, readClip, noteCopy, canPasteText } from './clipboard.js';
 import { prefKey } from './prefs.js';
 import { keepCursor, keptCursor } from './doc-cursor.js';
-import { mountSplit, placeSplit, splitClosed, splitItems } from './split-view.js';
+import { mountSplit, placeSplit, splitClosed, splitItems, tabTip } from './split-view.js';
 import { closeAllDocs, restoreViewState, saveViewState, viewKept } from './view-state.js';
 
 // ------------------------------------------------------------------ state
@@ -311,7 +311,7 @@ async function addNow(file) {
 
 // ------------------------------------------------------------------ documents
 function docTab(doc) {
-  const tab = h('div', { class: 'tab', title: doc.tooltip || doc.title }, icon(doc.icon || 'file'), h('span', { class: 'tlabel' }, doc.title),
+  const tab = h('div', { class: 'tab', title: tabTip(doc), tabindex: '0' }, icon(doc.icon || 'file'), h('span', { class: 'tlabel' }, doc.title),
     h('span', { class: 'tclose', title: 'Close' }, '✕'));
   tab.addEventListener('mousedown', e => { if (e.button === 0 && !e.target.closest('.tclose')) activateDoc(doc); });
   tab.querySelector('.tclose').addEventListener('click', e => { e.stopPropagation(); closeDoc(doc); });

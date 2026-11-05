@@ -22,7 +22,7 @@ uiTest('#2514 the text editors\' bar: no Undo / Redo, no path; the main toolbar\
       const bar = document.querySelector(b);
       return { history: [...bar.querySelectorAll('button')].filter((x) => /^(Undo|Redo)$/.test(x.title)).length, path: !!bar.querySelector('.path'), text: bar.textContent.includes('src/') };
     }, B), { history: 0, path: false, text: false }, f);
-    assert.equal(await page.eval(() => window.Silinx.active.tab.title || window.Silinx.active.tab.querySelector('[title]')?.title), f, `${f}: the path in the tab's tip`);
+    assert.equal(await page.eval(() => (window.Silinx.active.tab.title || window.Silinx.active.tab.querySelector('[title]')?.title).split('\n')[0]), f, `${f}: the path in the tab's tip (its first line; how to move the tab under it, #2887)`);
   }
   // typed in the memory file, undone by the main toolbar's Undo
   await page.eval(() => window.Silinx.active.editor.view.focus());
