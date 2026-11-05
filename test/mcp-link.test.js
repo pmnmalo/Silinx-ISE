@@ -52,8 +52,8 @@ test('project_link / open_link: gates (a schematic) round trip into Try it, the 
 
 test('project_link: the views a design has, the default base, the errors', async () => {
   await ok('new_project_from_example', { name: 'traffic', example: 'traffic' });
-  const s = await ok('project_link', { project: 'traffic', view: 'simulate', top: 'traffic' });
-  assert.match(s.data.link, /^https:\/\/pmnmalo\.github\.io\/Silinx-ISE\/#design=[A-Za-z0-9_-]+&top=traffic&view=simulate$/);
+  const s = await ok('project_link', { project: 'traffic', view: 'simulate', top: 'tb_traffic' });
+  assert.match(s.data.link, /^https:\/\/pmnmalo\.github\.io\/Silinx-ISE\/#design=[A-Za-z0-9_-]+&top=tb_traffic&view=simulate$/);
   assert.deepEqual(s.data.left.sort(), ['src/lamps.vhd', 'src/traffic.vhd']);
   const e = await ok('project_link', { project: 'traffic' });
   assert.doesNotMatch(e.data.link, /view=|top=/);
@@ -61,6 +61,10 @@ test('project_link: the views a design has, the default base, the errors', async
   assert.match((await ok('project_link', { project: 'traffic', view: 'try', top: 'traffic' })).data.link, /#design=[A-Za-z0-9_-]+&top=traffic&view=try$/);
   await fails('project_link', { project: 'traffic', view: 'try' }, 'Try it: \'top\' is not a schematic, a state diagram or a Petri net');
   await fails('project_link', { project: 'traffic', top: 'nothere' }, 'the design has no module \'nothere\'');
+  // the simulation's top= a test bench; the other views', a design module (#2878)
+  assert.match((await ok('project_link', { project: 'traffic', view: 'simulate', top: 'tb_traffic' })).data.link, /&top=tb_traffic&view=simulate$/);
+  await fails('project_link', { project: 'traffic', view: 'simulate', top: 'timer' }, '\'timer\' is not a test bench of the design');
+  await fails('project_link', { project: 'traffic', top: 'tb_traffic' }, '\'tb_traffic\' is a test bench: a link opens it in the simulation');
   await fails('project_link', { project: 'traffic', view: 'run' }, 'view: one of try, simulate, emulate');
   await fails('project_link', { project: 'traffic', base: 'javascript:alert(1)' }, 'base: \'javascript:alert(1)\' is not an http(s) address');
   await fails('project_link', { project: 'traffic', base: 'nope' }, 'base: \'nope\' is not an address');

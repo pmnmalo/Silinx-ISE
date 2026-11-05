@@ -388,7 +388,7 @@ link has every file, its comments too), so nothing has to be hosted. Some slide 
 `…/Silinx-ISE/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
 (`…/Silinx-ISE/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
 is `try` (a schematic's Try it; a state diagram's or a Petri net's Simulate panel), `simulate` (the test bench) or
-`emulate` (the board emulator); `top=` names the module. Opening a link makes a project named after the design;
+`emulate` (the board emulator); `top=` names the module (with `simulate`, the test bench). Opening a link makes a project named after the design;
 clicked again, that project is opened as it is when it has the same files, and one the student changed is replaced
 only when they say so. A zip from another site is fetched only once you agree (its address shown), and only from an
 https address that is not of this computer or a local network; a broken link is said in the console, the workspace as

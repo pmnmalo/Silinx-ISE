@@ -20,6 +20,9 @@ export const LINK_PT_PATTERNS = [
   [/^A project named '(.+)' already exists, with changes of its own\.\n\nReplace it with the link's design\? The existing project is moved to the workspace \.trash folder\. Or open the link's design as a new project, '(.+)', yours kept as it is\.$/,
     'Já existe um projeto chamado \'$1\', com alterações próprias.\n\nSubstituí-lo pelo circuito da ligação? O projeto existente é movido para a pasta .trash da área de trabalho. Ou abrir o circuito da ligação num projeto novo, \'$2\', mantendo o seu como está.'],
   [/^Open as (.+)$/, 'Abrir como $1'],
+  [/^(\S+) \(the project's\)$/, '$1 (o do projeto)'],   // (a test bench in Copy Link's Module list, #2878)
+  [/^'(.+)' is not a test bench of the design\.$/, '\'$1\' não é um test bench do circuito.'],
+  [/^'(.+)' is a test bench: a link opens it in the simulation\.$/, '\'$1\' é um test bench: uma ligação abre-o na simulação.'],
   [/^Try it: the design has no top module \(give top\)\.$/, 'Experimentar: o circuito não tem módulo de topo.'],
   [/^Try it: '(.+)' is not a schematic, a state diagram or a Petri net\.$/, 'Experimentar: \'$1\' não é um esquemático, um diagrama de estados nem uma rede de Petri.'],
   [/^The design has no module '(.+)'\.$/, 'O circuito não tem o módulo \'$1\'.'],

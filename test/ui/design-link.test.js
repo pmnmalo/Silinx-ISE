@@ -93,7 +93,7 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   const link = await page.waitFor(() => /&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the simulation\'s link' });
   await page.dialogButton('Copy Link');
   await page.waitNoDialog();
-  await page.waitConsole(/Copy Link: the link of 'traffic' \(Simulation, top\) copied, \d+ characters\./);
+  await page.waitConsole(/Copy Link: the link of 'traffic' \(Simulation, tb_traffic\) copied, \d+ characters\./);
   assert.deepEqual(await consoleWarnings(page), [`WARNING: Copy Link: the link is ${link.length} characters long: some slide tools cut a link longer than 2000.`]);
   // a module's menu: its module chosen (the Start page's command: the same dialog)
   const row = await page.eval(() => [...document.querySelectorAll('#hier .row')].findIndex((r) => /\btimer\b/.test(r.textContent)));
@@ -145,6 +145,46 @@ uiTest('#2871 regression, Copy Link to This Module… with Open the project only
   await linkOpened(page);
   await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
   assert.equal(await selected(), 'traffic');
+});
+
+const INV = "library ieee;\nuse ieee.std_logic_1164.all;\nentity inv is port (a : in std_logic; y : out std_logic); end inv;\narchitecture rtl of inv is begin y <= not a; end rtl;\n";
+const tbOf = (n) => `library ieee;\nuse ieee.std_logic_1164.all;\nentity ${n} is end ${n};\narchitecture sim of ${n} is\n  signal a, y : std_logic := '0';\nbegin\n  uut : entity work.inv port map (a => a, y => y);\n  process begin a <= '1'; wait for 10 ns; wait; end process;\nend sim;\n`;
+
+uiTest('#2878 Copy Link…: the Module list follows Open in: Simulation the test benches (the project\'s first), the others the design\'s modules; the link simulates the chosen test bench', E, async (page) => {
+  await makeProject(env, { name: 'TwoTb', top: 'inv', simTop: 'tb_a',
+    files: { 'src/inv.vhd': INV, 'sim/tb_a.vhd': tbOf('tb_a'), 'sim/tb_b.vhd': tbOf('tb_b') },
+    roles: { 'sim/tb_a.vhd': 'sim', 'sim/tb_b.vhd': 'sim' } });
+  await page.openProject('TwoTb');
+  await page.menu('File', 'Copy Link to Project…');
+  await page.waitDialog('Copy Link');
+  const options = () => page.eval(() => [...document.querySelectorAll('.dlg-overlay select[data-field=module] option')].map((o) => `${o.textContent}${o.selected ? ' *' : ''}`));
+  const setView = (v) => page.eval((x) => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = x; s.dispatchEvent(new Event('change')); }, v);
+  // the project only, Try it, the emulator: no test bench
+  for (const v of ['', 'try', 'emulate']) { await setView(v); assert.deepEqual(await options(), ['inv (top) *'], v); }
+  // the simulation: the test benches, the project's first and chosen
+  await setView('simulate');
+  assert.deepEqual(await options(), ["tb_a (the project's) *", 'tb_b']);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+&view=simulate$/);
+  await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=module]'); s.value = 'tb_b'; s.dispatchEvent(new Event('change')); });
+  const link = await page.waitFor(() => /&top=tb_b&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'tb_b\'s link' });
+  // back to the project only: the design's module again; then the simulation: tb_b kept
+  await setView('');
+  assert.deepEqual(await options(), ['inv (top) *']);
+  await setView('simulate');
+  assert.deepEqual(await options(), ["tb_a (the project's)", 'tb_b *']);
+  await page.dialogButton('Copy Link');
+  await page.waitNoDialog();
+  await page.waitConsole(/Copy Link: the link of 'TwoTb' \(Simulation, tb_b\) copied, \d+ characters\./);
+  // the link simulates tb_b, not the project's tb_a
+  await openLink(page, new URL(link).hash.slice(1), 'tb=1');
+  await linkOpened(page);
+  await page.waitConsole(/Opened 'TwoTb' from a link: the simulation\./);
+  await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'isim:tb_b'), [], { what: 'tb_b simulated', timeout: 60000 });
+  assert.equal(await page.eval(() => window.Silinx.docs.some((d) => d.id === 'isim:tb_a')), false);
+  // a test bench in a link with another view: refused, said in the console
+  await openLink(page, new URL(link).hash.slice(1).replace('&view=simulate', ''), 'tb=2');
+  await linkOpened(page);
+  await page.waitConsole(/ERROR: Open from a link: 'tb_b' is a test bench: a link opens it in the simulation\./);
 });
 
 uiTest('#2876 regression, a schematic named in another case than its module (Gates, the HDL\'s gates): Copy Link to This Module… offers Try it, no error; the link opens it', E, async (page) => {
@@ -252,6 +292,9 @@ uiTest('#2826 in Portuguese: Copy Link… and the replace question', E, async (p
   assert.equal(await page.waitDialog('Copiar Ligação'), 'Copiar Ligação');
   const t = await page.eval(() => document.querySelector('.dlg-overlay .dlg-body').innerText);
   for (const s of ['Abrir em:', 'Abrir só o projeto', 'Experimentar (a simulação de um desenho)', 'Módulo:', 'Placa:', 'Uma ligação que abre \'gates\' no Silinx', 'caracteres']) assert.ok(t.includes(s), `${s} in:\n${t}`);
+  // the simulation's Module list: the test bench, marked the project's (#2878)
+  await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = 'simulate'; v.dispatchEvent(new Event('change')); });
+  assert.deepEqual(await page.waitFor(() => { const o = [...document.querySelectorAll('.dlg-overlay select[data-field=module] option')].map((x) => x.textContent); return o.length && o; }, [], { what: 'the test benches' }), ['tb_gates (o do projeto)']);
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Copiar Ligação', 'Cancelar']);
   await page.dialogButton('Cancelar');
   await writeWs(env, 'gates', 'sim/tb_gates.vhd', '-- mine\n');
