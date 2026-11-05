@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { EXAMPLE_ORDER } from '../core/examples.js';
-import { benchNames, freeName, LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
+import { UI_LIMITS, benchNames, decodeUi, encodeUi, freeName, LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
 import { readZip, textOf } from '../core/zip.js';
 
 const ROOT = path.join(import.meta.dirname, '..', 'examples');
@@ -288,4 +288,43 @@ test('#2884 regression: the board emulator emulates the top module, a link\'s ot
   assert.equal(viewProblem({ board: 'basys2' }, files, { view: 'emulate', top: 'timer' }), 'the design has no top module to emulate');
   // (the project only and the simulation are not the emulator's)
   assert.equal(viewProblem(project, files, { top: 'timer' }), null);
+});
+
+test('#2886 encodeUi / decodeUi: the view in a link (tabs, the one in front, the split, page, view, layout), back as it was', () => {
+  const view = { open: ['file:src/a.vhd', 'sch:src/g.sch.json', 'isim:tb_a', 'emulator:top@synth', 'rtl:top', 'summary', 'pins'], active: 'sch:src/g.sch.json',
+    split: { b: ['isim:tb_a'] }, page: 'files', view: 'sim' };
+  const layout = { task: 'sim', side: false, console: true, max: true };
+  const u = encodeUi(view, layout);
+  assert.match(u, /^[A-Za-z0-9_-]+$/);
+  assert.deepEqual(decodeUi(u), { view, layout, dropped: [] });
+  // the ISE style interface: no layout
+  assert.deepEqual(decodeUi(encodeUi(view, null)).layout, null);
+  // nothing open
+  assert.deepEqual(decodeUi(encodeUi({ open: [] })), { view: { open: [], active: null, split: null, page: null, view: null }, layout: null, dropped: [] });
+  // through a link
+  const link = makeLink('http://localhost:3000/', { example: 'gates', view: 'try', ui: u });
+  assert.equal(parseLink(new URL(link).hash).ui, u);
+});
+
+test('#2886 decodeUi: a hostile view is left out, said; a broken one refused (#2829)', () => {
+  const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const r = decodeUi(b64({ o: ['file:../../etc/passwd', 'file:/abs.vhd', 'sch:.git/config', 'javascript:alert(1)', 'rtl:<img>', 'isim:tb_a@x y', 'rtl:top@synth', 42, 'file:src/ok.vhd'],
+    a: 'file:../../etc/passwd', b: ['file:../../etc/passwd', 'file:src/ok.vhd'], p: '<script>', v: 'other', t: 'evil', s: 'yes', z: 1 }));
+  assert.deepEqual(r.view, { open: ['file:src/ok.vhd'], active: null, split: { b: ['file:src/ok.vhd'] }, page: null, view: null });
+  assert.equal(r.layout, null);
+  assert.deepEqual(r.dropped, ["a document 'file:../../etc/passwd'", "a document 'file:/abs.vhd'", "a document 'sch:.git/config'", "a document 'javascript:alert(1)'",
+    "a document 'rtl:<img>'", "a document 'isim:tb_a@x y'", "a document 'rtl:top@synth'", "a document '42'", "'z'"]);
+  // a layout's fields: booleans only (else false)
+  assert.deepEqual(decodeUi(b64({ o: [], t: 'emu', s: 1, c: 'true', m: true })).layout, { task: 'emu', side: false, console: false, max: true });
+  // capped
+  const many = Array.from({ length: UI_LIMITS.maxOpen + 5 }, (_, i) => `file:src/f${i}.vhd`);
+  const capped = decodeUi(b64({ o: many }));
+  assert.equal(capped.view.open.length, UI_LIMITS.maxOpen);
+  assert.deepEqual(capped.dropped, ['5 document(s) over 40']);
+  for (const [t, m] of [['', 'the link\'s view (ui=) is not one'], ['x'.repeat(UI_LIMITS.maxEncoded + 1), 'the link\'s view (ui=) is not one'],
+    ['abc$', 'the link\'s view (ui=) does not decode'], [b64([1, 2]), 'the link\'s view (ui=) is not one'], [Buffer.from('{oops').toString('base64url'), 'the link\'s view (ui=) does not decode']]) {
+    assert.throws(() => decodeUi(t), e => { assert.equal(e.linkError, true); assert.equal(e.message, m); return true; });
+  }
+  assert.throws(() => parseLink(`#open=example:gates&ui=${'a'.repeat(UI_LIMITS.maxEncoded + 1)}`), e => e.message === 'the link\'s view (ui=) is not one');
+  assert.throws(() => parseLink('#open=example:gates&ui=a%24b'), e => e.message === 'the link\'s view (ui=) is not one');
 });

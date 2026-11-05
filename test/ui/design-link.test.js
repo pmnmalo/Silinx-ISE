@@ -74,7 +74,7 @@ uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link 
   await contextMenu(page, row, 'Copy Link to This Module…');
   await page.waitDialog('Copy Link');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view]').value), 'try');
-  const link = await page.waitFor(() => /&view=try$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
+  const link = await page.waitFor(() => /&view=try(&ui=[A-Za-z0-9_-]+)?$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   await openLink(page, new URL(link).hash.slice(1), 'pn=1');
@@ -95,14 +95,14 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   await page.menu('File', 'Copy Link to Project…');
   assert.equal(await page.waitDialog('Copy Link'), 'Copy Link');
   const plain = await dialogLink(page);
-  assert.match(plain, new RegExp(`^${env.server.url.replace(/[.]/g, '\\.')}/#design=[A-Za-z0-9_-]+$`));
+  assert.match(plain, new RegExp(`^${env.server.url.replace(/[.]/g, '\\.')}/#design=[A-Za-z0-9_-]+(&ui=[A-Za-z0-9_-]+)?$`));
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-info').textContent), /^\d+ characters: some slide tools cut a link longer than 2000 \(export the project as a \.zip, host it, and link to it with #open=\)\.$/);
   // a view the design does not have: said in the dialog, no link
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'try'; s.dispatchEvent(new Event('change')); });
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), 'Try it: \'top\' is not a schematic, a state diagram, a Petri net or an ASM chart.');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), '');
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'simulate'; s.dispatchEvent(new Event('change')); });
-  const link = await page.waitFor(() => /&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the simulation\'s link' });
+  const link = await page.waitFor(() => /&view=simulate(&ui=[A-Za-z0-9_-]+)?$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the simulation\'s link' });
   await page.dialogButton('Copy Link');
   await page.waitNoDialog();
   await page.waitConsole(/Copy Link: the link of 'traffic' \(Simulation, tb_traffic\) copied, \d+ characters\./);
@@ -143,7 +143,7 @@ uiTest('#2871 regression, Copy Link to This Module… with Open the project only
   const selected = () => page.eval(() => document.querySelector('#hier .row.sel')?.dataset.module ?? null);
   for (const [module, doc, q] of [['timer', 'src/timer.vhd', 'm=1'], ['top', 'src/top.vhd', 'm=2']]) {
     const link = await linkOf(module);
-    assert.match(link, new RegExp(`#design=[A-Za-z0-9_-]+&top=${module}$`));
+    assert.match(link, new RegExp(`#design=[A-Za-z0-9_-]+&top=${module}(&ui=[A-Za-z0-9_-]+)?$`));
     await openLink(page, new URL(link).hash.slice(1), q);
     await linkOpened(page);
     await page.waitFor((m) => document.querySelector('#hier .row.sel')?.dataset.module === m, [module], { what: `${module} selected` });
@@ -176,9 +176,9 @@ uiTest('#2878 Copy Link…: the Module list follows Open in: Simulation the test
   // the simulation: the test benches, the project's first and chosen
   await setView('simulate');
   assert.deepEqual(await options(), ["tb_a (the project's) *", 'tb_b']);
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+&view=simulate$/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+&view=simulate(&ui=[A-Za-z0-9_-]+)?$/);
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=module]'); s.value = 'tb_b'; s.dispatchEvent(new Event('change')); });
-  const link = await page.waitFor(() => /&top=tb_b&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'tb_b\'s link' });
+  const link = await page.waitFor(() => /&top=tb_b&view=simulate(&ui=[A-Za-z0-9_-]+)?$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'tb_b\'s link' });
   // back to the project only: the design's module again; then the simulation: tb_b kept
   await setView('');
   assert.deepEqual(await options(), ['inv (top) *']);
@@ -225,7 +225,7 @@ uiTest('#2883 a test bench\'s Copy Link to This Module… in the Simulation hier
   await page.waitDialog('Copy Link');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view]').value), 'simulate');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=module]').value), 'tb_b');
-  const link = await page.waitFor(() => /&top=tb_b&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'tb_b\'s link' });
+  const link = await page.waitFor(() => /&top=tb_b&view=simulate(&ui=[A-Za-z0-9_-]+)?$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'tb_b\'s link' });
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   // in Portuguese
@@ -252,7 +252,7 @@ uiTest('#2884 regression, Board Emulator: the Module list disabled on the top, t
   await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = 'emulate'; v.dispatchEvent(new Event('change')); });
   const state = () => page.eval(() => { const m = document.querySelector('.dlg-overlay select[data-field=module]'); return { disabled: m.disabled, options: [...m.options].map((o) => `${o.textContent}${o.selected ? ' *' : ''}`) }; });
   assert.deepEqual(await state(), { disabled: true, options: ['top (top) *'] });
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+&view=emulate$/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+&view=emulate(&ui=[A-Za-z0-9_-]+)?$/);
   // back to the project only: timer again, the list enabled
   await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = ''; v.dispatchEvent(new Event('change')); });
   assert.equal((await state()).disabled, false);
@@ -284,7 +284,7 @@ uiTest('#2876 regression, a schematic named in another case than its module (Gat
   await contextMenu(page, row, 'Copy Link to This Module…');
   await page.waitDialog('Copy Link');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view]').value), 'try');
-  const link = await page.waitFor(() => /&view=try$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
+  const link = await page.waitFor(() => /&view=try(&ui=[A-Za-z0-9_-]+)?$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), '');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
@@ -301,7 +301,7 @@ uiTest('#2882 regression, a C module (Silinx HLS): Copy Link to This Module… m
   await contextMenu(page, row, 'Copy Link to This Module…');
   await page.waitDialog('Copy Link');
   const link = await page.waitFor(() => document.querySelector('.dlg-overlay .link-out').value || null, [], { what: 'the link' });
-  assert.match(link, /#design=[A-Za-z0-9_-]+&top=fir$/);
+  assert.match(link, /#design=[A-Za-z0-9_-]+&top=fir(&ui=[A-Za-z0-9_-]+)?$/);
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), '');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
@@ -310,6 +310,66 @@ uiTest('#2882 regression, a C module (Silinx HLS): Copy Link to This Module… m
   await page.waitFor(() => document.querySelector('#hier .row.sel')?.dataset.module === 'fir', [], { what: 'fir selected' });
   await page.waitFor(() => window.Silinx.active?.path === 'src/fir.c', [], { what: 'the C source open', timeout: 30000 });
   assert.doesNotMatch(await page.consoleText(), /ERROR: Open from a link/);
+});
+
+uiTest('#2886 the link carries Silinx\'s view: tabs, the one in front, the split and (the Silinx interface) the panels; opened elsewhere as it was, not kept as the viewer\'s layout', E, async (page, env) => {
+  await openLink(page, 'open=example:traffic');
+  await linkOpened(page);
+  const tasks = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
+  // the teacher's Silinx: three tabs, timer's HDL on the right side, the state diagram in front; folded side panel, maximized
+  await page.eval(async () => {
+    const A = window.SilinxApp;
+    await A.openFile('src/timer.vhd'); await A.openFsm('src/traffic.fsm.json'); await A.openSummary();
+    const { moveToSide } = await import('/js/split-view.js');
+    moveToSide(A.findDoc('file:src/timer.vhd'), 'b');
+    A.activateDoc(A.findDoc('fsm:src/traffic.fsm.json'));
+  });
+  if (tasks) {
+    await page.click('#task-view [data-act=side]');
+    await page.click('#task-view [data-act=max]');
+    await page.waitFor(() => document.documentElement.dataset.side === 'folded' && document.documentElement.dataset.max === 'on', [], { what: 'folded and maximized' });
+  }
+  const shown = (p) => p.eval(() => ({
+    docs: window.Silinx.docs.map((d) => d.reopen || d.id).filter((k) => /^(file|fsm|summary)/.test(k)).sort(),
+    active: window.Silinx.active?.reopen || window.Silinx.active?.id,
+    right: window.Silinx.docs.filter((d) => d.side === 'b').map((d) => d.reopen || d.id),
+    layout: document.documentElement.dataset.layout === 'tasks' ? { task: document.documentElement.dataset.task, side: document.documentElement.dataset.side, max: document.documentElement.dataset.max } : null,
+  }));
+  const before = await shown(page);
+  assert.deepEqual(before.docs, ['file:src/timer.vhd', 'fsm:src/traffic.fsm.json', 'summary']);
+  assert.equal(before.active, 'fsm:src/traffic.fsm.json');
+  assert.deepEqual(before.right, ['file:src/timer.vhd']);
+  // Copy Link…: the current view included (checked)
+  await page.menu('File', 'Copy Link to Project…');
+  await page.waitDialog('Copy Link');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[data-field=ui]').checked), true);
+  const link = await page.waitFor(() => /&ui=[A-Za-z0-9_-]+$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link with its view' });
+  await page.eval(() => { const c = document.querySelector('.dlg-overlay input[data-field=ui]'); c.checked = false; c.dispatchEvent(new Event('change')); });
+  assert.doesNotMatch(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /&ui=/);
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  // another viewer (a browser of its own): the link opens Silinx as it was
+  const p2 = await env.newPage(`${env.server.url}/?view=1${new URL(link).hash}`);
+  try {
+    await p2.waitFor(() => window.Silinx?.linkOpened, [], { what: 'the link opened', timeout: 60000 });
+    await p2.waitFor(() => window.Silinx.active?.id === 'fsm:src/traffic.fsm.json', [], { what: 'the state diagram in front' });
+    const after = await shown(p2);
+    assert.deepEqual({ ...after, layout: null }, { ...before, layout: null });
+    if (tasks) assert.deepEqual(after.layout, before.layout);
+    assert.doesNotMatch(await p2.eval(() => window.__console()), /WARNING|ERROR/);
+    // not kept as that viewer's layout: a reload of the page (no link) shows the defaults
+    if (tasks) {
+      assert.doesNotMatch(await p2.eval(() => localStorage.getItem('silinx.tasks') || ''), /"max":true/);
+      await p2.reload();
+      assert.equal(await p2.eval(() => document.documentElement.dataset.max), 'off');
+    }
+  } finally { await p2.close(); }
+  // a hostile view (a path that leaves the project, an unknown field): left out, said; the project opens (#2829)
+  const evil = Buffer.from(JSON.stringify({ o: ['file:../../etc/passwd', 'file:src/timer.vhd'], a: 'file:src/timer.vhd', zz: 1 })).toString('base64url');
+  await openLink(page, `open=example:traffic&ui=${evil}`, 'evil=1');
+  await linkOpened(page);
+  await page.waitConsole(/WARNING: Open from a link: the link's view left out a document 'file:\.\.\/\.\.\/etc\/passwd', 'zz'\./);
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/timer.vhd', [], { what: 'the sound part of the view' });
 });
 
 uiTest('#2826 #2875 a changed project: replaced only when the user says so; or the link\'s design opened as <name>_2, _3, the student\'s kept (Keep Mine, Open as, Replace)', E, async (page) => {
@@ -396,7 +456,7 @@ uiTest('#2826 in Portuguese: Copy Link… and the replace question', E, async (p
   await page.menu('Ficheiro', 'Copiar Ligação para o Projeto…');
   assert.equal(await page.waitDialog('Copiar Ligação'), 'Copiar Ligação');
   const t = await page.eval(() => document.querySelector('.dlg-overlay .dlg-body').innerText);
-  for (const s of ['Abrir em:', 'Abrir só o projeto', 'Experimentar (a simulação de um desenho)', 'Módulo:', 'Placa:', 'Uma ligação que abre \'gates\' no Silinx', 'caracteres']) assert.ok(t.includes(s), `${s} in:\n${t}`);
+  for (const s of ['Abrir em:', 'Abrir só o projeto', 'Experimentar (a simulação de um desenho)', 'Incluir a vista atual: os separadores abertos, a divisão, os painéis', 'Módulo:', 'Placa:', 'Uma ligação que abre \'gates\' no Silinx', 'caracteres']) assert.ok(t.includes(s), `${s} in:\n${t}`);
   // the simulation's Module list: the test bench, marked the project's (#2878)
   await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = 'simulate'; v.dispatchEvent(new Event('change')); });
   assert.deepEqual(await page.waitFor(() => { const o = [...document.querySelectorAll('.dlg-overlay select[data-field=module] option')].map((x) => x.textContent); return o.length && o; }, [], { what: 'the test benches' }), ['tb_gates (o do projeto)']);

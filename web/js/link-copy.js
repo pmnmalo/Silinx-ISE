@@ -7,7 +7,9 @@ import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app } from './app.js';
 import { writeClip } from './clipboard.js';
-import { LINK_LIMITS, encodeDesign, makeLink, viewProblem } from '/core/design-link.js';
+import { LINK_LIMITS, encodeDesign, encodeUi, makeLink, viewProblem } from '/core/design-link.js';
+import { currentViewState } from './view-state.js';
+import { layoutNow } from './tasks.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateZip } from '/core/import-gate.js';
 
@@ -48,6 +50,9 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   const out = h('textarea', { class: 'link-out', readonly: true, rows: 4, spellcheck: false, style: { width: '100%', fontFamily: 'var(--mono, monospace)', fontSize: '11px' } });
   const info = h('div', { class: 'hint link-info' });
   const err = h('div', { class: 'wiz-error link-error' });
+  // Silinx as it is now (#2886): the open tabs, the one in front, the split, the panels, the task
+  const ui = encodeUi(currentViewState(), layoutNow());
+  const withView = h('input', { type: 'checkbox', 'data-field': 'ui', checked: true });
   let link = null;
   const update = () => {
     link = null;
@@ -58,13 +63,14 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     const top = !modSel.value || isEmu() ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
-    link = makeLink(linkBase(), { design, view: viewSel.value || null, top });
+    link = makeLink(linkBase(), { design, view: viewSel.value || null, top, ui: withView.checked ? ui : null });
     out.value = link;
     info.textContent = link.length > LINK_LIMITS.slides
       ? `${link.length} characters: some slide tools cut a link longer than ${LINK_LIMITS.slides} (export the project as a .zip, host it, and link to it with #open=).`
       : `${link.length} characters.`;
   };
   viewSel.addEventListener('change', () => { fillModules(); update(); });
+  withView.addEventListener('change', update);
   modSel.addEventListener('change', () => { if (!isEmu()) chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
   update();
   const r = await dialog({
@@ -74,7 +80,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         h('label', {}, 'Open in:'), viewSel,
         h('label', {}, 'Module:'), modSel,
-        h('label', {}, 'Board:'), h('span', { class: 'link-board' }, S.project.board || 'none')),
+        h('label', {}, 'Board:'), h('span', { class: 'link-board' }, S.project.board || 'none'),
+        h('span'), h('label', { class: 'link-ui' }, withView, h('span', {}, 'Include the current view: the open tabs, the split, the panels'))),
       out, info, err),
     buttons: [{ label: 'Copy Link', primary: true, value: true, validate: () => !!link }, { label: 'Cancel', value: null }],
   });

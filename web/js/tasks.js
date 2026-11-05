@@ -167,11 +167,18 @@ let docsShown = { t: null, n: 0 };   // (the current task's documents when tagDo
 function keep() { try { localStorage.setItem(TASKS_KEY, JSON.stringify({ ...state, v: STATE_V })); } catch { /* storage unavailable */ } }
 function load() { try { state = readState(localStorage.getItem(TASKS_KEY)); } catch { state = readState(null); } }
 const current = () => state.task;
-const arr = (t = current()) => arrangement(t, state.tasks[t], isNarrow());
+// a design link's layout (#2886): over the kept arrangement, in this page only, until the viewer changes it
+let linkLayout = {};
+const arr = (t = current()) => ({ ...arrangement(t, state.tasks[t], isNarrow()), ...(linkLayout[t] || {}) });
 // the field the side button sets: the narrow screen's own for a task folded there at first
 const sideKey = () => (isNarrow() && FOLDED_NARROW.includes(current()) ? 'narrowSide' : 'side');
 /** Changes the current task's arrangement (`patch`: side, console, max), kept. */
-function arrange(patch) { Object.assign(state.tasks[current()], patch); keep(); apply(); }
+function arrange(patch) {
+  // (a link's layout shown: the viewer's change keeps it with theirs, #2886)
+  const t = current(), a = linkLayout[t] ? arr() : null;
+  if (a) { Object.assign(state.tasks[t], { side: a.side, console: a.console, max: a.max }); delete linkLayout[t]; }
+  Object.assign(state.tasks[t], patch); keep(); apply();
+}
 // by the user: the side panel, the messages or the document maximized toggled (a drawing in front: Full View, #1203)
 function toggle(patch) { arrange(patch); layoutToggled(); }
 
@@ -189,6 +196,21 @@ export function setTask(t, { fromDoc = false } = {}) {
     else if (!want && S.project?.top && t === 'impl') app.openSummary();   // (none with no top module: #1287)
   }
   apply();
+}
+
+/** The layout now (#2886: a design link's): { task, side, console, max }; null outside the Silinx interface. */
+export function layoutNow() {
+  if (!on()) return null;
+  const a = arr();
+  return { task: current(), side: !!a.side, console: !!a.console, max: !!a.max };
+}
+/** A design link's layout on the page (#2886): the task and its arrangement, for this page only, not kept as the
+ *  viewer's (what the viewer then changes is). */
+export function applyLayout({ task, side, console, max } = {}) {
+  if (!on() || !app?.S.project) return;
+  const t = TASKS.includes(task) && hasTask(app.projectTool(), task) ? task : current();
+  linkLayout = { [t]: { side: !!side, console: !!console, max: !!max } };
+  if (t !== current()) setTask(t); else apply();
 }
 
 /** Puts the current task and its arrangement on the page. */
@@ -242,7 +264,7 @@ function tagDocs() {
   // #1564)
   const was = docsShown;
   docsShown = { t: current(), n: mine };
-  if (on() && !mine && was.t === current() && was.n > 0 && state.tasks[current()].max) { arrange({ max: false }); return; }
+  if (on() && !mine && was.t === current() && was.n > 0 && arr().max) { arrange({ max: false }); return; }
   placeSimSide(S, on() && current() === 'sim');   // (a source in front: the simulation's side panel beside it, #1343)
   // a task whose document is single by nature: no tab bar (none open: its page); the document's module and model,
   // and its close, in the task's bar (#854)
@@ -501,14 +523,14 @@ export function initTasks(a) {
   // panel and messages shown, whatever was left folded or maximized (#1557)
   addEventListener('silinx:project-opened', () => {
     if (!on()) return;
-    state = openedState(state);
+    state = openedState(state); linkLayout = {};
     setTask('edit');
     app.showLeftPage('design');
   });
   // a project closed: in Design, its side panel shown with the Start page, whatever was left folded or maximized (#2169)
   addEventListener('silinx:project-closed', () => {
     if (!on()) return;
-    state = closedState(state);
+    state = closedState(state); linkLayout = {};
     setTask('edit');
   });
   // the documents: opened, closed, brought to the front

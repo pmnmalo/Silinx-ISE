@@ -398,6 +398,10 @@ only when they say so. A zip from another site is fetched only once you agree (i
 https address that is not of this computer or a local network; a broken link is said in the console, the workspace as
 it was.
 
+Copy Link… includes Silinx as it is when the link is copied (**Include the current view**): the open tabs, the one in
+front, the split and, in the Silinx interface, the task, the side panel, the messages and a maximized document; the
+link opens it so, for that page only (the viewer's own layout is not changed).
+
 ## For developers
 
 ```bash
