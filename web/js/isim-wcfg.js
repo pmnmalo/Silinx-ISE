@@ -3,8 +3,7 @@
 // writes it to a file of the project; Load Wave Configuration applies a file's to the current simulation (a signal the
 // design does not have is said in the console and left out). opts.wcfg: { save(text) → its name | null, load() →
 // { name, text } | null }; without it the toolbar has no such buttons.
-import { readWcfg, writeWcfg } from '/core/wcfg.js';
-import { isScalarType, pathOf } from './isim.js';
+import { placeWcfg, readWcfg, wcfgSignal, writeWcfg } from '/core/wcfg.js';
 
 /** { wcfgText, applyWcfg, saveWcfg, loadWcfg } of mountISim, through its API (isim-api.js). */
 export function mountWcfg(ctx) {
@@ -12,8 +11,7 @@ export function mountWcfg(ctx) {
 
   /** The wave window's configuration as a .wcfg file's text. */
   function wcfgText() {
-    const sig = r => ({ kind: 'sig', path: pathOf(r.sig), name: r.sig.name, radix: r.radix, expanded: !!r.expanded,
-      type: isScalarType(r.sig.t) ? 'logic' : r.sig.t.kind === 'logic' ? 'array' : 'other' });
+    const sig = r => wcfgSignal(r.sig, r);
     const row = r => r.kind === 'div' ? { kind: 'div', name: r.name }
       : r.kind === 'group' ? { kind: 'group', name: r.name, expanded: r.expanded !== false, rows: st.rows.filter(m => m.group === r.id).map(row) }
         : sig(r);
@@ -23,27 +21,21 @@ export function mountWcfg(ctx) {
   /** A .wcfg file's configuration applied to the wave window (name: the file's, for the console). */
   function applyWcfg(text, name = 'the wave configuration') {
     const cfg = readWcfg(text);
-    const byPath = new Map(design.signals.map(s => [pathOf(s), s]));
-    const rows = [], missing = [];
+    const { rows: placed, missing } = placeWcfg(cfg.rows, design.signals);
+    const rows = [];
     const add = (r, group) => {
-      let row = null;
+      let row;
       if (r.kind === 'div') row = { id: st.rowSeq++, kind: 'div', name: r.name };
       else if (r.kind === 'group') {
-        // (a group in a group: its members in the outer one, the window has one level)
-        if (group != null) { for (const c of r.rows) add(c, group); return; }
-        row = { id: st.rowSeq++, kind: 'group', name: r.name, expanded: r.expanded !== false };
+        row = { id: st.rowSeq++, kind: 'group', name: r.name, expanded: r.expanded };
         rows.push(row);
         for (const c of r.rows) add(c, row.id);
         return;
-      } else {
-        const sig = byPath.get(r.path);
-        if (!sig) { missing.push(r.path); return; }
-        row = newRow(sig, { radix: r.radix, expanded: !!r.expanded });
-      }
+      } else row = newRow(r.sig, { radix: r.radix, expanded: r.expanded });
       if (group != null) row.group = group;
       rows.push(row);
     };
-    for (const r of cfg.rows) add(r, null);
+    for (const r of placed) add(r, null);
     st.rows = rows;
     st.sel.clear();
     st.markers = cfg.markers.map(t => ({ id: st.markerSeq++, t }));

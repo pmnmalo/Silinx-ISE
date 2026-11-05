@@ -59,8 +59,6 @@ export const ICON = {
   nextEdge: S('<path d="M1 4h9v8h5" fill="none" stroke="#108010" stroke-width="1.5"/><path d="M6 8.5l5.5 3L6 14.5z" fill="#1d4f91"/>'),
   marker: S('<path d="M8 1v14" stroke="#0090c0" stroke-width="1.6"/><path d="M8 1.5h6l-2 2.2 2 2.3H8z" fill="#00b4f0" stroke="#006a90"/>'),
   stim: S('<path d="M1 12h3V4h4v8h3V7h4" fill="none" stroke="#2f8f3a" stroke-width="1.6"/><path d="M10.5 1.5l3 3-6.5 6.5H4v-3z" fill="#f2c94c" stroke="#8a6d1d"/>'),
-  wcfgSave: S('<path d="M2 2h10l2 2v10H2z" fill="#4a72b8" stroke="#24467e"/><rect x="4.5" y="2.5" width="6" height="4" fill="#fff"/><rect x="4" y="9" width="8" height="5" fill="#d9e4f5"/><path d="M5 10.5h6M5 12.5h6" stroke="#108010"/>'),
-  wcfgLoad: S('<path d="M1.5 4V13.5h11l2.5-6.5H4L1.5 13.5" fill="#ffd862" stroke="#9a7400"/><path d="M1.5 4h4l1 1.5h6V7" fill="none" stroke="#9a7400"/><path d="M6 10.5h2l1-2 1 3 1-1h2" fill="none" stroke="#108010" stroke-width="1.2"/>'),
   radix: S('<rect x="1" y="3" width="14" height="10" rx="1.5" fill="#fff" stroke="#666"/><text x="8" y="11" font-size="7" text-anchor="middle" font-family="Arial" font-weight="bold" fill="#1d4f91">0x</text>'),
   inst: S('<rect x="3" y="3" width="10" height="10" fill="#e8f0ff" stroke="#000080"/><path d="M1 6h2M1 10h2M13 8h2" stroke="#000080"/>'),
   top: S('<rect x="3" y="3" width="10" height="10" fill="#cfe8cf" stroke="#006000"/><path d="M1 6h2M1 10h2M13 8h2" stroke="#006000"/><rect x="5.5" y="5.5" width="5" height="5" fill="#2a2"/>'),

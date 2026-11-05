@@ -32,6 +32,9 @@
 .isim-toolbar .tb-btn:has(.tb-label) { width: auto; gap: 4px; padding: 0 6px; }
 .isim-toolbar .tb-label { white-space: nowrap; }
 .isim-toolbar .tb-btn.on { border-color: #7ea6d8; background: linear-gradient(#d5e6f8, #bcd7f3); }
+/* its ⋮ menu at the right of its first line (#2839, web/js/toolbar-menu.js), its place kept free */
+.isim-toolbar.has-more { position: relative; padding-right: 32px; }
+.isim-toolbar .tb-more { top: 2px; right: 4px; }
 .isim-stimbar {
   flex: none; display: flex; align-items: center; gap: 6px; padding: 2px 6px; min-height: 26px; flex-wrap: wrap;
   background: var(--panel, #fff); border-bottom: 1px solid var(--border, #a0a0a0);
