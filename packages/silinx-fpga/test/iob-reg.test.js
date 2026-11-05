@@ -8,8 +8,8 @@ import { designFeatures, frameData, iobRegFeatures, parseBit } from '../src/fpga
 import { getBit, diffFrames } from '../src/fpga/bitstream.js';
 import { loadDb } from '../src/fpga/bitdb-node.js';
 import { loadDeviceCache } from '../src/fpga/device-node.js';
-import { deviceSites } from '../src/fpga/place.js';
-import { bufgReach } from '../src/fpga/route.js';
+import { deviceSites } from '../src/fpga/device-sites.js';
+import { bufgReach } from '../src/fpga/clock-reach.js';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 

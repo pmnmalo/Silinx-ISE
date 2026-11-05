@@ -6,7 +6,7 @@
 //   PART=xc3s500efg320-4 node gen-padalone.mjs outdir A3,B3 [--clk B8]      (outdir/<pad>-r, <pad>-s: top.vhd, top.ucf)
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { deviceSites } from '../../src/fpga/place.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
 import { PART } from './db.mjs';
 
 const args = process.argv.slice(2);

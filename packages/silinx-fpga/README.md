@@ -11,14 +11,13 @@ supported boards in `devices/`, their bit databases in `bitdb/`. It is published
 
 ```
 silinx-fpga build <file.v ...|netlist.json> --part <part> [--top name] [--ucf pins.ucf] [-o top.bit]
-  [--out-dir build] [--effort normal|high] [--seed N] [--no-replicate] [--engine nextpnr|silinx] [--quiet]
+  [--out-dir build] [--effort normal|high] [--seed N] [--quiet]
 ```
 
 It synthesizes the Verilog with Yosys, or reads a Yosys JSON netlist, then packs, places, routes, checks the timing
-and writes the bitstream; it places and routes with nextpnr (the default, #2137; `--engine silinx` for Silinx's own
-engine, which goes). The parts are those of
+and writes the bitstream; it places and routes with nextpnr (the one engine, #2137: `io.nextpnr`). The parts are those of
 the Basys2 (`xc3s250e-cp132-4`, `xc3s100e-cp132-4`) and of the Nexys2 (`xc3s500e-fg320-4`, `xc3s1200e-fg320-4`). The
-out folder (`build`) gets the netlist, the routed design (`routed.xdl`; `placed.xdl` too by Silinx's engine) and the
+out folder (`build`) gets the netlist, the routed design (`routed.xdl`) and the
 timing report (`timing.txt`); the warnings and errors go to stderr. It exits with 0 when the `.bit` is written, 1
 when the flow fails (the design, the constraints, the routing) and 2 when the command line is wrong. VHDL needs
 Silinx ISE, whose front end turns it into Verilog.
@@ -61,7 +60,7 @@ Three entries; a name they do not export is the package's own and may change in 
 
 - `silinx-fpga` (`src/index.js`): the same in Node and in the browser. The flow (`runFlow`, `OPEN_STEPS`,
   `StepError`), the synthesis (`synthesizeVerilog`), the netlist and the constraints in (`readYosysJson`,
-  `parseUcf`), the implementation's steps for a flow of one's own (`pack`, `placeRouteBest`, `bitgen`), the placed
+  `parseUcf`), the implementation's steps for a flow of one's own (`pack`, `bitgen`), the placed
   and routed design and the bitstream out (`parseXdl`, `writeXdl`, `readBit`), the reports (`analyzeTiming`,
   `timingReport`, `estimatePower`, `powerReport`), the devices and bit databases from their files' contents
   (`loadDevice`, `makeBitDb`), the parts (`familyOfPart`, `resourcesOf`).
@@ -75,7 +74,7 @@ The flow takes the design and gives its files through an `io` (each hook is desc
 `src/open-flow-core.js`):
 
 ```js
-import { runFlow, findDeviceGraph, loadDeviceCache, loadDb, yosysNode } from 'silinx-fpga/node';
+import { runFlow, findDeviceGraph, loadDeviceCache, loadDb, yosysNode, nextpnrNode } from 'silinx-fpga/node';
 import fs from 'node:fs';
 
 const part = 'xc3s250ecp132-4';   // the Basys2's
@@ -87,6 +86,7 @@ const io = {
   device: () => (device ||= loadDeviceCache(findDeviceGraph(part))),
   bitDb: () => (bitDb ||= loadDb('xc3s250ecp132', { graph: io.device() })),
   yosys: yosysNode,
+  nextpnr: { spartan3e: nextpnrNode() },
   write: (name, data) => { fs.mkdirSync('build/open', { recursive: true }); fs.writeFileSync(`build/${name}`, data); return `build/${name}`; },
   read: name => (fs.existsSync(`build/${name}`) ? fs.readFileSync(`build/${name}`, 'utf8') : null),
   save: report => {},
@@ -97,7 +97,7 @@ const { ok, report } = await runFlow({ top: 'blinky', part, device: 'xc3s250e', 
 ```
 
 The sources are flat Verilog; VHDL needs an HDL front end (`io.frontEnd`, Silinx ISE's). The place and route is
-Silinx's own unless `io.placeRoute` gives another engine (`placeRouteBest`'s arguments and result).
+nextpnr's, `io.nextpnr` (in Node `nextpnrNode()` and `nextpnrS6Node()` of `silinx-fpga/node`).
 
 Licence: Apache-2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)), its code and its data; its dependencies' licences are in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The npm package holds `src/`, `bin/`, `bitdb/` and `devices/`; the research

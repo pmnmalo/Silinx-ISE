@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseXdl } from '../../src/xdl.js';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { netEndpoints } from '../../src/fpga/route.js';
+import { netEndpoints } from '../../src/fpga/route-check.js';
 import { WIRE_NAMES, nodeClasses, netTree, treePath, pathDelay, SPEED_4 } from '../../src/fpga/timing.js';
 import { fileURLToPath } from 'node:url';
 

@@ -15,7 +15,7 @@ import { readBit, getBit } from '../../src/fpga/bitstream.js';
 import { tileOf, tileBase } from '../../src/fpga/bitgen.js';
 import { loadDb } from '../../src/fpga/bitdb-node.js';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { deviceSites } from '../../src/fpga/place.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
 
 const dirs = process.argv.slice(2);
 const part = JSON.parse(fs.readFileSync(path.join(dirs[0], 'key.json'), 'utf8')).part;

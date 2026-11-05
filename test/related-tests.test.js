@@ -223,9 +223,9 @@ test('related tests: a module of the toolchain\'s package, through core/\'s old 
   // the module, its re-export, the tests that import the re-export; not the importers of a module that does more
   assert.deepEqual(relatedTests(files, ['packages/p/src/fpga/route.js']).unit, ['test/fpga-route.test.js']);
   assert.deepEqual(relatedTests(files, ['packages/p/src/fpga/place.js']).unit, ['test/fpga-place.test.js']);
-  // the repository: a change of the package's router runs the router's tests, in the package's folder of tests too (#1680)
-  const { unit } = relatedTests(sources(), ['packages/silinx-fpga/src/fpga/route.js']);
-  for (const f of ['packages/silinx-fpga/test/fpga-route.test.js', 'packages/silinx-fpga/test/route-parts.test.js', 'test/code-size.test.js']) assert.ok(unit.includes(f), f);
+  // the repository: a change of the package's routing check runs its tests, in the package's folder of tests too (#1680)
+  const { unit } = relatedTests(sources(), ['packages/silinx-fpga/src/fpga/route-check.js']);
+  for (const f of ['packages/silinx-fpga/test/engine-shared-parts.test.js', 'test/fpga-timing.test.js', 'test/code-size.test.js']) assert.ok(unit.includes(f), f);
   // its test helper changed: the tests that import it, in both folders
   const sim = relatedTests(sources(), ['packages/silinx-fpga/test/fpga-sim.js']).unit;
   for (const f of ['packages/silinx-fpga/test/fpga-pack.test.js', 'test/iob-pack.test.js']) assert.ok(sim.includes(f), f);

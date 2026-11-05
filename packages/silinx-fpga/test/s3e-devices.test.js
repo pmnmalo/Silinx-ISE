@@ -449,7 +449,7 @@ test('the PIPs a tile type\'s features offer that its tiles do not have (#74): m
 });
 
 test('the block RAMs\' and multipliers\' clock pins from every global line (#2): every top / bottom buffer reaches every CLKA, CLKB and multiplier CLK on known switches, on the four devices', async () => {
-  const { clockReach } = await import('../src/fpga/route.js');
+  const { clockReach } = await import('../src/fpga/clock-reach.js');
   // (GCLKk -> BRAM_CLKj of the block-RAM interconnect tiles, two bits each: before, only lines 4 and 5 reached a CLKA,
   // line 4 alone a CLKB or a multiplier's CLK)
   const t = JSON.parse(fs.readFileSync(path.join(DB_DIR, 's3e-tiles.json'), 'utf8')).types;
@@ -469,7 +469,7 @@ test('the block RAMs\' and multipliers\' clock pins from every global line (#2):
 });
 
 test('the global clock pads\' dedicated paths to the top and bottom buffers (#2): every one on known switches, on the four devices (CKIk -> GCLKj, one bit each)', async () => {
-  const { bufgReach } = await import('../src/fpga/route.js');
+  const { bufgReach } = await import('../src/fpga/clock-reach.js');
   const t = JSON.parse(fs.readFileSync(path.join(DB_DIR, 's3e-tiles.json'), 'utf8')).types;
   // (each buffer from two pads: CKIk and CKI(k+4) of its clock tile; before, three of the sixteen were known)
   assert.deepEqual(t.CLKT.features['CLKT_CKI0->CLKT_GCLK0'], ['2,67']);

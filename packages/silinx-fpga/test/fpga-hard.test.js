@@ -1,5 +1,5 @@
 // The packer (packages/silinx-fpga/src/fpga/pack.js) on distributed RAMs and shift registers (SLICEM), block RAMs and
-// multipliers, the placer (packages/silinx-fpga/src/fpga/place.js) on their sites, their timing arcs
+// multipliers, their sites' clock network (fpga/clock-reach.js; their placement went with Silinx's placer, #2137), their timing arcs
 // (packages/silinx-fpga/src/fpga/timing.js): small synthetic Yosys netlists, the XDL settings as ISE's map writes them
 // (research/s3e-bitstream/README.md, stage D), and - the main check - the packed design simulated
 // from its own XDL settings behaves like the netlist (test/fpga-sim.js).
@@ -322,91 +322,9 @@ test('netlistSim: SRL16E shifts on its clock when enabled, Q is the stage at the
 
 // placement on the XC3S250E's own sites (the device description that ships with Silinx)
 const { loadDeviceCache } = await import('../src/fpga/device-node.js');
-const { deviceSites, place, PlaceError } = await import('../src/fpga/place.js');
+const { deviceSites } = await import('../src/fpga/device-sites.js');
 let dev = null;
 const device = () => (dev ||= deviceSites(loadDeviceCache('xc3s250ecp132-4')));
-
-// n multipliers and a block RAM with a 36-bit port
-function multsAndBram(n) {
-  const cells = [...clock, ...ibuf('a', 9)];
-  for (let k = 0; k < n; k++) {
-    cells.push({ name: `m${k}`, type: 'MULT18X18', conns: { A: [...bus('a_i', 9), ...Array(9).fill('0')], B: [...bus('a_i', 9).reverse(), ...Array(9).fill('0')], P: bus(`p${k}`, 36) }, outs: ['P'] });
-    cells.push(obuf(`p[${k}]`, `p${k}[${k + 3}]`));
-  }
-  cells.push({ name: 'r', type: 'RAMB16_S36', conns: { ADDR: bus('a_i', 9), DI: [...bus('a_i', 9), ...Array(23).fill('0')], DIP: bus('a_i', 4), DO: bus('q', 32), DOP: bus('qp', 4), CLK: 'clk_g', EN: '1', SSR: '0', WE: 'a_i[0]' }, outs: ['DO', 'DOP'] });
-  cells.push(obuf('q', 'q[7]'));
-  return yjson({ clk: ['input', 1], a: ['input', 9], p: ['output', n], q: ['output', 1] }, cells);
-}
-
-test('placement: block RAMs and multipliers on their sites, never a multiplier beside a block RAM with 36-bit ports', () => {
-  const d = device();
-  assert.deepEqual([d.brams.length, d.mults.length], [12, 12]);
-  const p = pack(multsAndBram(11));
-  const r = place(p, d, { seed: 2, effort: 0.2 });
-  const tiles = new Map();
-  p.insts.forEach((inst, k) => {
-    if (inst.kind === 'bram') assert.match(r.sites[k].site, /^RAMB16_X\dY\d$/);
-    if (inst.kind === 'mult') assert.match(r.sites[k].site, /^MULT18X18_X\dY\d$/);
-    if (inst.kind === 'bram' || inst.kind === 'mult') { assert.ok(!tiles.get(r.sites[k].tile)?.includes(inst.kind)); tiles.set(r.sites[k].tile, [...(tiles.get(r.sites[k].tile) || []), inst.kind]); }
-  });
-  const bramTile = r.sites[p.insts.findIndex(i => i.kind === 'bram')].tile;
-  assert.deepEqual(tiles.get(bramTile), ['bram'], 'the 36-bit block RAM has its tile to itself');
-  assert.equal(new Set(r.sites.map(s => s.site)).size, r.sites.length, 'one instance per site');
-  // 12 multipliers leave no tile for it
-  assert.throws(() => place(pack(multsAndBram(12)), d, { seed: 1, effort: 0.1 }), err => err instanceof PlaceError && /no free block RAM site/.test(err.message));
-  // more multipliers than the device has: said plainly, up front (#19)
-  assert.throws(() => place(pack(multsAndBram(13)), d, { seed: 1, effort: 0.1 }), err => err instanceof PlaceError && err.message === 'place: 13 multipliers needed, the device has 12');
-});
-
-test('placement: RAMs and shift registers (SLICEM instances) only on SLICEM sites', () => {
-  const d = device();
-  const p = pack(drams());
-  const r = place(p, d, { seed: 5, effort: 0.3 });
-  p.insts.forEach((inst, k) => {
-    if (inst.type !== 'SLICEM') return;
-    const [, x] = /^SLICE_X(\d+)Y/.exec(r.sites[k].site);
-    assert.equal(+x % 2, 0, `${inst.name} on ${r.sites[k].site}`);
-  });
-});
-
-// a multiplier cascade (#2): m0's B (registered) into m1 through BCOUT -> BCIN, m1's (not registered) into m2; m3 apart
-function multChain() {
-  const sio = (name, breg, cascade, b, bcout) => ({ name, type: 'MULT18X18SIO', params: { AREG: 0, BREG: breg, PREG: 1, B_INPUT: cascade ? 'CASCADE' : 'DIRECT' },
-    conns: { A: [...bus('a_i', 6), ...Array(12).fill('a_i[5]')], B: b, BCIN: cascade ? bus(cascade, 18) : Array(18).fill('0'), CEA: '1', CEB: 'c_i[0]', CEP: '1', CLK: 'clk_g',
-      RSTA: '0', RSTB: '0', RSTP: 'c_i[1]', P: bus(`p_${name}`, 36), BCOUT: bcout ? bus(bcout, 18) : bus(`x_${name}`, 18) }, outs: ['P', 'BCOUT'] });
-  const bb = [...bus('b_i', 6), ...Array(12).fill('b_i[5]')];
-  return yjson({ clk: ['input', 1], a: ['input', 6], b: ['input', 6], c: ['input', 2], p: ['output', 12] }, [
-    ...clock, ...ibuf('a', 6), ...ibuf('b', 6), ...ibuf('c', 2),
-    sio('m0', 1, null, bb, 'bc0'), sio('m1', 0, 'bc0', bb, 'bc1'), sio('m2', 1, 'bc1', Array(18).fill('0')), sio('m3', 1, null, bb),
-    ...['p_m0[0]', 'p_m0[9]', 'p_m1[1]', 'p_m1[11]', 'p_m1[35]', 'p_m2[0]', 'p_m2[5]', 'p_m2[12]', 'p_m2[35]', 'p_m3[2]', 'p_m3[7]', 'p_m3[35]'].map((n, i) => obuf(`p[${i}]`, n)),
-  ]);
-}
-
-test('the multiplier cascade (#2): BCOUT -> BCIN as ISE builds it, the chain on consecutive sites of a column, behaviour', () => {
-  const nl = multChain();
-  const p = pack(nl);
-  assert.deepEqual(p.warnings, []);
-  const k = n => p.insts.findIndex(i => i.name === n);
-  assert.deepEqual(['m0', 'm1', 'm2', 'm3'].map(n => val(p.insts[k(n)], 'B_INPUT')), ['DIRECT', 'CASCADE', 'CASCADE', 'DIRECT']);
-  assert.deepEqual(p.multChains, [[k('m0'), k('m1'), k('m2')]]);
-  // each BCOUTj of one into BCINj of the next, one net each; a cascading one's B not connected (ISE's DRC warns:
-  // PhysDesignRules:1135); m2's and m3's BCOUT unused
-  for (const [lo, hi] of [['m0', 'm1'], ['m1', 'm2']]) for (let j = 0; j < 18; j++) {
-    assert.deepEqual(p.nets.filter(n => n.inpins.some(x => x.inst === k(hi) && x.pin === `BCIN${j}`)).map(n => [n.outpins, n.inpins]), [[[{ inst: k(lo), pin: `BCOUT${j}` }], [{ inst: k(hi), pin: `BCIN${j}` }]]]);
-  }
-  assert.ok(!p.nets.some(n => n.inpins.some(x => (x.inst === k('m1') || x.inst === k('m2')) && /^B\d+$/.test(x.pin))));
-  assert.ok(p.nets.some(n => n.inpins.some(x => x.inst === k('m0') && x.pin === 'B0')));
-  assert.ok(!p.nets.some(n => n.outpins.some(x => (x.inst === k('m2') || x.inst === k('m3')) && /^BCOUT/.test(x.pin))));
-  assert.ok(!p.nets.some(n => n.inpins.some(x => (x.inst === k('m0') || x.inst === k('m3')) && /^BCIN/.test(x.pin))));
-  same(nl, p, 300);
-  // the placer: the chain one above the other (MULT18X18_XxYy, y + 1), on every seed
-  for (const seed of [1, 2, 3]) {
-    const r = place(p, device(), { seed, effort: 0.3 });
-    const at = n => /^MULT18X18_X(\d+)Y(\d+)$/.exec(r.sites[k(n)].site).slice(1).map(Number);
-    const [a, b, c] = ['m0', 'm1', 'm2'].map(at);
-    assert.deepEqual([b, c], [[a[0], a[1] + 1], [a[0], a[1] + 2]], `seed ${seed}`);
-  }
-});
 
 test('the multiplier cascade (#2): the site above each one is the one its BCOUT reaches in the routing graph, on every device', () => {
   for (const part of ['xc3s100ecp132-4', 'xc3s250ecp132-4', 'xc3s500efg320-4', 'xc3s1200efg320-4']) {
@@ -438,40 +356,8 @@ test('the multiplier cascade (#2): what is not a chain of BCOUT -> BCIN is refus
   assert.throws(() => pack(two(bus('bc', 18), [], { B_INPUT: 'DIRECT' })), /MULT18X18SIO m0: the cascade output BCOUT<0> into anything but BCIN<0>/);
 });
 
-test('DCM: the top-left DCM site (no INST LOC: the placer\'s choice, #47), the settings as ISE\'s map writes them, constant inputs', () => {
-  const nl = yjson({ clk: ['input', 1], o: ['output', 2] }, [
-    { name: 'ib', type: 'IBUFG', conns: { I: 'clk', O: 'clk_i' }, outs: ['O'] },
-    { name: 'u', type: 'DCM_SP', params: { CLKDV_DIVIDE: '2.500000', CLKFX_DIVIDE: bin(2, 32), CLKFX_MULTIPLY: bin(3, 32), CLKIN_PERIOD: '20.000000', CLK_FEEDBACK: '1X', DFS_FREQUENCY_MODE: 'LOW', DLL_FREQUENCY_MODE: 'LOW', STARTUP_WAIT: 'FALSE' },
-      conns: { CLKIN: 'clk_i', CLKFB: 'c0b', RST: '0', DSSEN: '0', PSCLK: '0', PSEN: '0', PSINCDEC: '0', CLK0: 'c0', CLKFX: 'cfx', LOCKED: 'lk' }, outs: ['CLK0', 'CLKFX', 'LOCKED'] },
-    { name: 'b0', type: 'BUFG', conns: { I: 'c0', O: 'c0b' }, outs: ['O'] },
-    { name: 'bfx', type: 'BUFG', conns: { I: 'cfx', O: 'cfxb' }, outs: ['O'] },
-    { name: 'ff', type: 'FDRE', params: { INIT: '0' }, conns: { C: 'cfxb', CE: '1', R: '0', D: 'lk', Q: 'q' }, outs: ['Q'] },
-    obuf('o[0]', 'lk'), obuf('o[1]', 'q'),
-  ]);
-  const p = pack(nl);
-  const u = p.insts.find(i => i.kind === 'dcm');
-  assert.deepEqual([u.type, u.loc, p.stats.dcms], ['DCM', null, 1]);
-  assert.deepEqual(['CLKDV_DIVIDE', 'CLKFX_MULTIPLY', 'CLKFX_DIVIDE', 'CLK_FEEDBACK', 'DESKEW_ADJUST', 'DUTY_CYCLE_CORRECTION', 'PHASE_SHIFT', 'RSTINV', 'X_CLKIN_PERIOD'].map(a => val(u, a)),
-    ['2_5', '3', '2', '1X', '7', 'TRUE', '0', 'RST', '20.0000000000000000']);
-  assert.equal(cfgOf(u).DCM.name, 'u');
-  // the unused inputs tied to 0 as ISE's map ties them (DSSEN left open)
-  const k = p.insts.indexOf(u);
-  const gnd = p.nets.filter(n => n.type === 'gnd').flatMap(n => n.inpins.filter(x => x.inst === k).map(x => x.pin)).sort();
-  assert.deepEqual(gnd, ['PSCLK', 'PSEN', 'PSINCDEC', 'RST']);
-  // placed on the top-left DCM, its clock outputs on the global buffers their paths reach
-  const r = place(p, device(), { seed: 1, effort: 0.1, bufgSites: (site, pin) => (pin === 'CLK0' ? ['BUFGMUX_X2Y10'] : pin === 'CLKFX' ? ['BUFGMUX_X1Y10'] : []) });
-  assert.equal(r.sites[k].site, 'DCM_X0Y1');
-  assert.equal(r.sites[p.insts.findIndex(i => i.name === 'b0')].site, 'BUFGMUX_X2Y10');
-  assert.equal(r.sites[p.insts.findIndex(i => i.name === 'bfx')].site, 'BUFGMUX_X1Y10');
-  assert.throws(() => place(p, device(), { seed: 1, effort: 0.1, bufgSites: () => [] }), /no free global clock buffer reachable from u\.CLK0 through switches of known bits/);
-  // the output that reaches fewer buffers chooses first: CLKFX takes X1Y10, CLK0 the other one it reaches
-  const r2 = place(p, device(), { seed: 1, effort: 0.1, bufgSites: (site, pin) => (pin === 'CLK0' ? ['BUFGMUX_X1Y10', 'BUFGMUX_X2Y10'] : pin === 'CLKFX' ? ['BUFGMUX_X1Y10'] : []) });
-  assert.equal(r2.sites[p.insts.findIndex(i => i.name === 'bfx')].site, 'BUFGMUX_X1Y10');
-  assert.equal(r2.sites[p.insts.findIndex(i => i.name === 'b0')].site, 'BUFGMUX_X2Y10');
-});
-
 test('bufgReach: each output of the top-left DCM reaches its global buffer through switches of known bits (CLK0, CLK2X, CLKDV, CLKFX)', async () => {
-  const { bufgReach } = await import('../src/fpga/route.js');
+  const { bufgReach } = await import('../src/fpga/clock-reach.js');
   const { knownRouting } = await import('../src/fpga/bitgen.js');
   const { loadDb } = await import('../src/fpga/bitdb-node.js');
   const known = knownRouting(loadDb('xc3s250ecp132-4'));
@@ -486,10 +372,10 @@ test('bufgReach: each output of the top-left DCM reaches its global buffer throu
 });
 
 test('clockReach: a side global buffer reaches only the slices of its half of the chip, never through general routing (#95)', async () => {
-  const { clockReach } = await import('../src/fpga/route.js');
+  const { clockReach } = await import('../src/fpga/clock-reach.js');
   const { knownRouting } = await import('../src/fpga/bitgen.js');
   const { loadDb } = await import('../src/fpga/bitdb-node.js');
-  const { deviceSites } = await import('../src/fpga/place.js');
+  const { deviceSites } = await import('../src/fpga/device-sites.js');
   const known = knownRouting(loadDb('xc3s250ecp132-4'));
   const g = loadDeviceCache('xc3s250ecp132-4');
   const dev = deviceSites(g, known);
@@ -630,115 +516,6 @@ test('block RAMs: a 9-bit word on 2048 x 9 ports, written on port A and read on 
   same(nh, ph, 200);
 });
 
-// x * 6554 (x / 10 = x * 6554 / 65536, as the stopwatch example computes it) on all 12 multipliers:
-// the B inputs tied to 0 and 1 (GLOBAL_LOGIC0 / GLOBAL_LOGIC1)
-function constMults() {
-  const B = [...bin(6554, 18)].reverse();
-  const cells = [...ibuf('a', 14)];
-  for (let k = 0; k < 12; k++) {
-    cells.push({ name: `m${k}`, type: 'MULT18X18', conns: { A: [...bus('a_i', 14), '0', '0', '0', '0'], B, P: bus(`p${k}`, 36) }, outs: ['P'] });
-    cells.push(obuf(`p[${k}]`, `p${k}[${16 + k}]`));
-  }
-  return yjson({ a: ['input', 14], p: ['output', 12] }, cells);
-}
-
-test('multipliers with constant inputs (x * 6554) on every multiplier site: every input tied to 1 routed on switches of known bits, from the VCC site of its own block-RAM interconnect tile, as ISE does (#35)', { timeout: 120000 }, async () => {
-  const { routeDesign, checkRouting } = await import('../src/fpga/route.js');
-  const { knownRouting, bitgen } = await import('../src/fpga/bitgen.js');
-  const { loadDb } = await import('../src/fpga/bitdb-node.js');
-  const { placedXdl } = await import('../src/fpga/place.js');
-  const { parseXdl, writeXdl } = await import('../src/xdl.js');
-  const g = loadDeviceCache('xc3s250ecp132-4');
-  const db = loadDb('xc3s250ecp132-4', { graph: g });
-  const nl = constMults();
-  const p = pack(nl);
-  assert.deepEqual(p.warnings, []);
-  assert.equal(p.stats.mults, 12);
-  const r = place(p, device(), { seed: 1, effort: 0.1 });
-  assert.equal(new Set(p.insts.map((x, k) => (x.kind === 'mult' ? r.sites[k].site : null)).filter(Boolean)).size, 12);
-  const routed = routeDesign(parseXdl(writeXdl(placedXdl(p, r))), g, knownRouting(db));
-  assert.deepEqual([routed.failed, routed.unreached, routed.errors], [[], [], []]);
-  const text = writeXdl(routed.design);
-  const check = checkRouting(parseXdl(text), g);
-  assert.ok(check.ok, check.problems.slice(0, 5).join('\n'));
-  // 10 inputs tied to 1 per multiplier (the 7 bits set in 6554, and a MULT18X18's RSTA, RSTB,
-  // RSTP: #50), each from the VCC site of the interconnect tile of its pin: BRAM_VCC_WIRE -> the
-  // pin's wire there, then the site tile's PIP
-  const isMult = x => /^m\d+$/.test(x.inst);
-  const vcc = routed.design.nets.filter(n => n.type === 'vcc' && n.inpins.some(isMult));
-  assert.equal(vcc.flatMap(n => n.inpins.filter(isMult)).length, 12 * 10);
-  for (const n of vcc) {
-    assert.match(n.outpins[0].inst, /^XDL_DUMMY_BRAM[0-3]_SMALL(_BRK)?_X\d+Y\d+_VCC_X\d+Y\d+$/, n.name);
-    assert.equal(n.pips.length, 2 * n.inpins.length, `${n.name}: two switches per pin`);
-    for (const pip of n.pips) assert.ok(pip.from === 'BRAM_VCC_WIRE' || /^BRAMSITE2_/.test(pip.tile), `${n.name}: ${pip.tile} ${pip.from} -> ${pip.to}`);
-  }
-  // a complete bitstream: every switch and setting in the bit database
-  assert.deepEqual(bitgen(text, db).unknown, []);
-});
-
-// Control pins tied to constants, as ISE ties them (#50, measured with ISE's map and par on the
-// XC3S250E: every combination of 1 / 0 / a signal on a block RAM's EN / WE / SSR, a multiplier's
-// CE / RST with and without registers, a DCM's RST / PS… / DSSEN): to VCC or GND, never inverted;
-// a DCM's DSSEN left open; a DCM's pins tied to 1 from the VCC site of its own tile (#190)
-test('control pins tied to 1 / 0: block RAM EN / WE / SSR, multiplier CE / RST and DCM RST / PS… on VCC / GND, not inverted, routed on switches of known bits; a DCM\'s DSSEN open (#50, #190)', { timeout: 120000 }, async () => {
-  const { routeDesign, checkRouting } = await import('../src/fpga/route.js');
-  const { knownRouting, bitgen, designFeatures } = await import('../src/fpga/bitgen.js');
-  const { loadDb } = await import('../src/fpga/bitdb-node.js');
-  const { placedXdl } = await import('../src/fpga/place.js');
-  const { parseXdl, writeXdl } = await import('../src/xdl.js');
-  const nl = yjson({ clk: ['input', 1], a: ['input', 10], q: ['output', 4] }, [
-    ...clock, ...ibuf('a', 10),
-    { name: 'b', type: 'RAMB16_S9_S9', conns: { ADDRA: bus('a_i', 10, 0).concat('a_i[0]'), DIA: bus('a_i', 8), DIPA: ['0'], DOA: bus('qa', 8), DOPA: ['qap'], CLKA: 'clk_g', ENA: '0', WEA: '1', SSRA: '1',
-      ADDRB: bus('a_i', 10).reverse().concat('a_i[9]'), DIB: bus('a_i', 8, 2), DIPB: ['0'], DOB: bus('qb', 8), DOPB: ['qbp'], CLKB: 'clk_g', ENB: '1', WEB: '0', SSRB: '0' }, outs: ['DOA', 'DOPA', 'DOB', 'DOPB'] },
-    { name: 'm', type: 'MULT18X18SIO', params: { AREG: 1, BREG: 0, PREG: 0, B_INPUT: 'DIRECT' },
-      conns: { A: [...bus('a_i', 10), ...Array(8).fill('0')], B: [...bus('a_i', 10).reverse(), ...Array(8).fill('0')], BCIN: Array(18).fill('0'), CEA: '1', CEB: '0', CEP: '1', CLK: 'clk_g', RSTA: '0', RSTB: '1', RSTP: '0', P: bus('p', 36) }, outs: ['P'] },
-    obuf('q[0]', 'qa[0]'), obuf('q[1]', 'qb[7]'), obuf('q[2]', 'p[3]'), obuf('q[3]', 'p[12]'),
-  ]);
-  const p = pack(nl);
-  assert.deepEqual(p.warnings, []);
-  const pins = name => { const k = p.insts.findIndex(i => i.name === name); return new Map(p.nets.flatMap(n => n.inpins.filter(x => x.inst === k).map(x => [x.pin, n.type]))); };
-  const b = p.insts.find(i => i.name === 'b'), m = p.insts.find(i => i.name === 'm');
-  const bc = ['ENA', 'WEA', 'SSRA', 'ENB', 'WEB', 'SSRB'], mc = ['CEA', 'CEB', 'CEP', 'RSTA', 'RSTB', 'RSTP'];
-  assert.deepEqual(bc.map(x => [val(b, `${x}INV`), pins('b').get(x)]), bc.map((x, i) => [x, ['gnd', 'vcc', 'vcc', 'vcc', 'gnd', 'gnd'][i]]));
-  assert.deepEqual(mc.map(x => [val(m, `${x}INV`), pins('m').get(x)]), mc.map((x, i) => [x, ['vcc', 'gnd', 'vcc', 'gnd', 'vcc', 'gnd'][i]]));
-  // placed, routed: each pin tied to 1 from the VCC site of a block-RAM interconnect tile, on
-  // switches of known bits; the bitstream complete, no inverter set
-  const g = loadDeviceCache('xc3s250ecp132-4');
-  const db = loadDb('xc3s250ecp132-4', { graph: g });
-  const { sites, opts } = await flowOf('xc3s250ecp132-4');
-  const r = place(p, sites, { seed: 1, effort: 0.1, ...opts });
-  const routed = routeDesign(parseXdl(writeXdl(placedXdl(p, r))), g, knownRouting(db));
-  assert.deepEqual([routed.failed, routed.unreached, routed.errors], [[], [], []]);
-  const text = writeXdl(routed.design);
-  assert.ok(checkRouting(parseXdl(text), g).ok);
-  const vcc = routed.design.nets.filter(n => n.type === 'vcc' && n.inpins.some(x => x.inst === 'b' || x.inst === 'm'));
-  assert.deepEqual(vcc.flatMap(n => n.inpins.map(x => `${x.inst}.${x.pin}`)).sort(), ['b.ENB', 'b.SSRA', 'b.WEA', 'm.CEA', 'm.CEP', 'm.RSTB']);
-  for (const n of vcc) assert.match(n.outpins[0].inst, /^XDL_DUMMY_BRAM[0-3]_SMALL(_BRK)?_X\d+Y\d+_VCC_X\d+Y\d+$/, n.name);
-  assert.deepEqual(bitgen(text, db).unknown, []);
-  const feats = designFeatures(parseXdl(text), db).feats.map(x => x.feature);
-  assert.deepEqual(feats.filter(f => /^(RAMB16|MULT18X18SIO):\w+INV:/.test(f)).filter(f => /_B$/.test(f)), []);
-  assert.ok(['RAMB16:ENAINV:ENA', 'RAMB16:ENBINV:ENB', 'MULT18X18SIO:CEAINV:CEA', 'MULT18X18SIO:RSTBINV:RSTB'].every(f => feats.includes(f)), feats.filter(f => /INV/.test(f)).join(' '));
-  // a DCM: RST and PSINCDEC tied to 1 (VCC), PSCLK / PSEN tied to 0 (GND), DSSEN tied to 1 left open
-  const dn = yjson({ clk: ['input', 1], o: ['output', 1] }, [{ name: 'ib', type: 'IBUFG', conns: { I: 'clk', O: 'clk_i' }, outs: ['O'] },
-    { name: 'u', type: 'DCM_SP', params: { CLK_FEEDBACK: 'NONE' }, conns: { CLKIN: 'clk_i', RST: '1', DSSEN: '1', PSCLK: '0', PSEN: '0', PSINCDEC: '1', LOCKED: 'lk' }, outs: ['LOCKED'] }, obuf('o', 'lk')]);
-  const pd = pack(dn);
-  const u = pd.insts.find(i => i.name === 'u'), ku = pd.insts.indexOf(u);
-  const upins = new Map(pd.nets.flatMap(n => n.inpins.filter(x => x.inst === ku).map(x => [x.pin, n.type])));
-  const dc = ['RST', 'PSCLK', 'PSEN', 'PSINCDEC', 'DSSEN'];
-  assert.deepEqual(dc.map(x => [val(u, `${x}INV`), upins.get(x)]), [['RST', 'vcc'], ['PSCLK', 'gnd'], ['PSEN', 'gnd'], ['PSINCDEC', 'vcc'], [undefined, undefined]]);
-  // placed, routed: RST and PSINCDEC from the VCC site of the DCM's tile, through its switches (no
-  // bits), as ISE routes them; every switch in the bit database (the DCM's CLK_FEEDBACK NONE is not)
-  const rd = place(pd, sites, { seed: 1, effort: 0.1, ...opts });
-  const routedD = routeDesign(parseXdl(writeXdl(placedXdl(pd, rd))), g, knownRouting(db));
-  assert.deepEqual([routedD.failed, routedD.unreached, routedD.errors], [[], [], []]);
-  const dtext = writeXdl(routedD.design);
-  assert.ok(checkRouting(parseXdl(dtext), g).ok);
-  const dvcc = routedD.design.nets.filter(n => n.type === 'vcc' && n.inpins.some(x => x.inst === 'u'));
-  assert.deepEqual(dvcc.map(n => [n.outpins[0].inst, n.inpins.map(x => x.pin).sort(), n.pips.map(q => `${q.from} -> ${q.to}`).sort()]),
-    [['XDL_DUMMY_DCM_TL_CENTER_X13Y34_VCC_X14Y36', ['PSINCDEC', 'RST'], ['DCM_G1_B2 -> DCM_PSINCDEC_PINWIRE', 'DCM_G1_B3 -> DCM_RST_PINWIRE', 'DCM_VCC_WIRE -> DCM_G1_B2', 'DCM_VCC_WIRE -> DCM_G1_B3']]]);
-  assert.deepEqual(bitgen(dtext, db).unknown, [{ tile: 'DCM_TL_CENTER_X13Y34', feature: 'DCM:CLK_FEEDBACK:NONE' }]);
-});
-
 // Clocks on the four devices that ship (their own graphs and bit databases), placed as the open
 // flow places them: the switches of known bits (clockReach, bufgReach), the global buffers whose
 // settings are known (knownRouting allowBufg). #56, #57, #58.
@@ -746,7 +523,7 @@ const SHIPPED = [['xc3s100ecp132-4', 'M4', 'G3'], ['xc3s250ecp132-4', 'M4', 'G3'
 const flows = new Map();
 async function flowOf(part) {
   if (flows.has(part)) return flows.get(part);
-  const { clockReach, bufgReach } = await import('../src/fpga/route.js');
+  const { clockReach, bufgReach } = await import('../src/fpga/clock-reach.js');
   const { knownRouting } = await import('../src/fpga/bitgen.js');
   const { loadDb } = await import('../src/fpga/bitdb-node.js');
   const g = loadDeviceCache(part);
@@ -757,28 +534,6 @@ async function flowOf(part) {
   flows.set(part, f);
   return f;
 }
-// a block RAM (both ports) and a registered multiplier on one clock, and a flip-flop
-function clockedHard() {
-  return yjson({ clk: ['input', 1], a: ['input', 10], we: ['input', 1], q: ['output', 3] }, [
-    ...clock, ...ibuf('a', 10), ...ibuf('we', 1),
-    { name: 'm', type: 'RAMB16_S18_S18', conns: { ADDRA: bus('a_i', 10), DIA: [...bus('a_i', 10), ...Array(6).fill('0')], DIPA: ['0', '0'], DOA: bus('qa', 16), DOPA: bus('qap', 2), CLKA: 'clk_g', ENA: '1', SSRA: '0', WEA: 'we_i',
-      ADDRB: bus('a_i', 10).reverse(), DIB: Array(16).fill('0'), DIPB: ['0', '0'], DOB: bus('qb', 16), DOPB: bus('qbp', 2), CLKB: 'clk_g', ENB: '1', SSRB: '0', WEB: '0' }, outs: ['DOA', 'DOPA', 'DOB', 'DOPB'] },
-    { name: 'x', type: 'MULT18X18S', conns: { A: [...bus('a_i', 10), ...Array(8).fill('0')], B: [...bus('a_i', 10).reverse(), ...Array(8).fill('0')], C: 'clk_g', CE: '1', R: '0', P: bus('p', 36) }, outs: ['P'] },
-    { name: 'ff', type: 'FDRE', params: { INIT: '0' }, conns: { C: 'clk_g', CE: '1', R: '0', D: 'we_i', Q: 'f' }, outs: ['Q'] },
-    obuf('q[0]', 'qb[0]'), obuf('q[1]', 'p[3]'), obuf('q[2]', 'f'),
-  ]);
-}
-// flip-flops only
-const clockedFf = () => yjson({ clk: ['input', 1], d: ['input', 1], q: ['output', 1] }, [
-  ...clock, ...ibuf('d', 1), { name: 'ff', type: 'FDRE', params: { INIT: '0' }, conns: { C: 'clk_g', CE: '1', R: '0', D: 'd_i', Q: 'f' }, outs: ['Q'] }, obuf('q', 'f')]);
-// the pad ISE's placer gives a DCM's CLKIN when the clock has no LOC (#92: implemented by ISE, one DCM on each site)
-const ISE_DCM_PAD = {
-  'xc3s100ecp132-4': { DCM_X0Y1: 'A9', DCM_X0Y0: 'M6' },
-  'xc3s250ecp132-4': { DCM_X0Y1: 'C8', DCM_X1Y1: 'A9', DCM_X0Y0: 'N5', DCM_X1Y0: 'M6' },
-  'xc3s500efg320-4': { DCM_X0Y1: 'B9', DCM_X1Y1: 'A10', DCM_X0Y0: 'V9', DCM_X1Y0: 'U10' },
-  'xc3s1200efg320-4': { DCM_X1Y3: 'B9', DCM_X2Y3: 'A10', DCM_X1Y0: 'V9', DCM_X2Y0: 'U10', DCM_X0Y1: 'K3', DCM_X0Y2: 'J4', DCM_X3Y1: 'K13', DCM_X3Y2: 'J15' },
-};
-const siteOf = (p, r, name) => r.sites[p.insts.findIndex(i => i.name === name)].site;
 
 test('clockReach: the clock pins of the block RAMs and multipliers a global buffer reaches on switches of known bits (#56)', { timeout: 300000 }, async () => {
   for (const [part] of SHIPPED) {
@@ -792,199 +547,6 @@ test('clockReach: the clock pins of the block RAMs and multipliers a global buff
     // (and DCM clock inputs, #47)
     assert.equal([...clockSites('BUFGMUX_X2Y1')].filter(s => s.startsWith('SLICE_')).length, sites.slices.size, part);
   }
-});
-
-test('a clock LOC\'d on the bottom GCLK pin (N9 / M4): its dedicated buffer, which reaches the flip-flops, the block RAM and the multiplier clocks, no warning (#56, #2)', { timeout: 300000 }, async () => {
-  for (const [part, bottom] of SHIPPED) {
-    const { opts, sites, clockSites } = await flowOf(part);
-    const ucf = `NET "clk" LOC = "${bottom}";`;
-    // flip-flops only: BUFGMUX_X2Y1, on its dedicated path, no warning
-    const f = pack(clockedFf(), { ucf, part });
-    const rf = place(f, sites, { seed: 1, effort: 0.1, ...opts });
-    assert.deepEqual([siteOf(f, rf, 'bufg'), rf.warnings], ['BUFGMUX_X2Y1', []], part);
-    // a block RAM and a multiplier: BUFGMUX_X2Y1 too (before #2's measurement its line reached no block RAM or multiplier
-    // clock, and BUFGMUX_X2Y11 was taken through general routing, with a warning)
-    const p = pack(clockedHard(), { ucf, part });
-    for (const seed of [1, 2]) {
-      const r = place(p, sites, { seed, effort: 0.1, ...opts });
-      assert.equal(siteOf(p, r, 'clk'), bottom);
-      assert.deepEqual([siteOf(p, r, 'bufg'), r.warnings], ['BUFGMUX_X2Y1', []], part);
-      const reach = clockSites('BUFGMUX_X2Y1');
-      assert.ok(reach.has(`${siteOf(p, r, 'm')}.CLKA`) && reach.has(`${siteOf(p, r, 'm')}.CLKB`) && reach.has(`${siteOf(p, r, 'x')}.CLK`), part);
-    }
-  }
-});
-
-test('block RAMs and multipliers only on the sites whose clock pins their clock\'s lines reach (clockSites); none: said clearly (#56)', () => {
-  const p = pack(clockedHard(), { ucf: 'NET "clk" LOC = "P11";' });
-  const d = device();
-  const slices = [...d.slices.values()].map(s => s.name);
-  const allowed = new Set([...slices, 'RAMB16_X1Y3.CLKA', 'RAMB16_X1Y3.CLKB', 'RAMB16_X0Y2.CLKA', 'MULT18X18_X0Y4.CLK']);
-  for (const seed of [1, 2, 3]) {
-    const r = place(p, d, { seed, effort: 0.2, clockSites: () => allowed });
-    assert.deepEqual([siteOf(p, r, 'm'), siteOf(p, r, 'x'), r.warnings], ['RAMB16_X1Y3', 'MULT18X18_X0Y4', []], `seed ${seed}`);
-  }
-  assert.throws(() => place(p, d, { seed: 1, effort: 0.1, clockSites: () => new Set(slices) }),
-    err => err instanceof PlaceError && /^place: m: no block RAM site whose clock pins the lines of BUFGMUX_X\dY\d+ reach through switches of known bits$/.test(err.message));
-});
-
-test('a clock with no LOC that drives a DCM\'s CLKIN goes on a pad whose dedicated path of known bits reaches it, ISE\'s choice (C8 -> DCM_X0Y1 on the XC3S250E), kept there (#57, #92)', { timeout: 300000 }, async () => {
-  const cells = () => [
-    { name: 'ib', type: 'IBUFG', conns: { I: 'clk', O: 'clk_i' }, outs: ['O'] },
-    { name: 'u', type: 'DCM_SP', params: { CLKIN_PERIOD: '20.000000', CLK_FEEDBACK: '1X', DFS_FREQUENCY_MODE: 'LOW', DLL_FREQUENCY_MODE: 'LOW', STARTUP_WAIT: 'FALSE' },
-      conns: { CLKIN: 'clk_i', CLKFB: 'c0b', RST: '0', DSSEN: '0', PSCLK: '0', PSEN: '0', PSINCDEC: '0', CLK0: 'c0' }, outs: ['CLK0'] },
-    { name: 'b0', type: 'BUFG', conns: { I: 'c0', O: 'c0b' }, outs: ['O'] },
-    { name: 'ff', type: 'FDRE', params: { INIT: '0' }, conns: { C: 'c0b', CE: '1', R: '0', D: 'q', Q: 'qn' }, outs: ['Q'] },
-    { name: 'inv', type: 'LUT1', params: { INIT: '01' }, conns: { I0: 'qn', O: 'q' }, outs: ['O'] },
-    obuf('o', 'qn'),
-  ];
-  const nl = () => yjson({ clk: ['input', 1], o: ['output', 1] }, cells());
-  // the top-left DCM (DCM_X0Y1; DCM_X1Y3 on the XC3S1200E, whose DCM_X0Y1 is a side DCM, its outputs reaching
-  // only side buffers, #47; the top one of the XC3S100E), its CLKIN from the pad ISE gives it (#92: every
-  // pad's dedicated path to every DCM is measured)
-  for (const [part, dcm] of [['xc3s250ecp132-4', 'DCM_X0Y1'], ['xc3s500efg320-4', 'DCM_X0Y1'], ['xc3s1200efg320-4', 'DCM_X1Y3'], ['xc3s100ecp132-4', 'DCM_X0Y1']]) {
-    const { opts, sites } = await flowOf(part);
-    const p = pack(nl(), { part });
-    for (const seed of [1, 2, 3]) {
-      const r = place(p, sites, { seed, effort: 0.1, ...opts });
-      assert.deepEqual([siteOf(p, r, 'clk'), siteOf(p, r, 'u'), r.warnings], [ISE_DCM_PAD[part][dcm], dcm, []], `${part} seed ${seed}`);
-    }
-  }
-  // ISE's pad taken (another input LOC'd on B9 of the XC3S500E): the first other pad whose dedicated path reaches the DCM
-  const { opts: o500, sites: s500 } = await flowOf('xc3s500efg320-4');
-  const withX = yjson({ clk: ['input', 1], xa: ['input', 1], o: ['output', 1], ya: ['output', 1] }, [...cells(), ...ibuf('xa', 1), obuf('ya', 'xa_i')]);
-  const taken = pack(withX, { part: 'xc3s500efg320-4', ucf: 'NET "xa" LOC = "B9";' });
-  const rt = place(taken, s500, { seed: 1, effort: 0.1, ...o500 });
-  assert.deepEqual([siteOf(taken, rt, 'clk'), siteOf(taken, rt, 'u'), rt.warnings], ['C9', 'DCM_X0Y1', []]);
-  // only a pad whose path reaches that DCM's CLKIN (asked as bufgSites(pad, 'I', ['DCM', 'CLKIN']))
-  const asked = new Set();
-  const p = pack(nl());
-  const buf = (site, pin) => (pin === 'CLK0' ? ['BUFGMUX_X2Y10'] : []);
-  const r = place(p, device(), { seed: 1, effort: 0.1, bufgSites: (site, pin, to) => { if (to) asked.add(`${pin}>${to.join('.')}`); return to ? (site === 'L3' ? ['DCM_X0Y1'] : site === 'P11' ? ['DCM_X1Y1'] : []) : buf(site, pin); } });
-  assert.deepEqual([siteOf(p, r, 'clk'), [...asked]], ['L3', ['I>DCM.CLKIN']]);
-  // none: any pad, its CLKIN through general routing, said (#47)
-  const none = place(p, device(), { seed: 1, effort: 0.1, bufgSites: (site, pin, to) => (to ? [] : buf(site, pin)) });
-  assert.equal(siteOf(p, none, 'u'), 'DCM_X0Y1');
-  assert.deepEqual(none.warnings, [`u: its CLKIN comes from the pad ${siteOf(p, none, 'clk')} through general routing: no pad reaches the CLKIN of DCM_X0Y1 on a dedicated path of known bits`]);
-  // a pad that reaches another DCM's CLKIN: the DCM goes there (#47), not on the top-left site
-  const other = place(p, device(), { seed: 1, effort: 0.1, bufgSites: (site, pin, to) => (to ? (site === 'P11' ? ['DCM_X1Y1'] : []) : buf(site, pin)) });
-  assert.deepEqual([siteOf(p, other, 'clk'), siteOf(p, other, 'u'), other.warnings], ['P11', 'DCM_X1Y1', []]);
-});
-
-test('a clock LOC\'d on a side GCLK pin (K3 / G3): on its own side buffer, through the side clock tile\'s CKIk, as ISE pairs them, no warning (#641, #58, #95)', { timeout: 300000 }, async () => {
-  for (const [part, , side] of SHIPPED) {
-    const { opts, sites } = await flowOf(part);
-    // (the eight top / bottom buffers and the sixteen side ones, #95)
-    assert.equal(sites.bufgmux.length, 24, part);
-    const ucf = `NET "clk" LOC = "${side}";`;
-    // G3 / K3: BUFGMUX_X0Y6, the buffer ISE's placer gives it (measure-641.sh: every side GCLK pin on its own buffer)
-    for (const nl of [clockedHard(), clockedFf()]) {
-      const p = pack(nl, { ucf, part });
-      const r = place(p, sites, { seed: 1, effort: 0.1, ...opts });
-      assert.deepEqual([siteOf(p, r, 'clk'), siteOf(p, r, 'bufg'), r.warnings], [side, 'BUFGMUX_X0Y6', []], part);
-    }
-  }
-});
-
-// Two DCMs (#47): clk1 -> u1 (CLK0 the feedback, and `u1`'s outputs), clk2 -> u2 (CLK0 the feedback,
-// and `u2`'s), each output on a global buffer clocking a flip-flop
-function twoDcms({ u1 = ['CLKFX'], u2 = ['CLKDV'] } = {}) {
-  const dcm = (u, k, extra) => [
-    { name: `ib${k}`, type: 'IBUFG', conns: { I: `clk${k}`, O: `ci${k}` }, outs: ['O'] },
-    { name: u, type: 'DCM_SP', params: { CLKIN_PERIOD: '20.000000', CLK_FEEDBACK: '1X', DFS_FREQUENCY_MODE: 'LOW', DLL_FREQUENCY_MODE: 'LOW', STARTUP_WAIT: 'FALSE' },
-      conns: { CLKIN: `ci${k}`, CLKFB: `${u}_0b`, RST: '0', DSSEN: '0', PSCLK: '0', PSEN: '0', PSINCDEC: '0', CLK0: `${u}_0`, ...Object.fromEntries(extra.map(p => [p, `${u}_${p}`])), LOCKED: `${u}_lk` }, outs: ['CLK0', ...extra, 'LOCKED'] },
-    { name: `${u}_b0`, type: 'BUFG', conns: { I: `${u}_0`, O: `${u}_0b` }, outs: ['O'] },
-    ...extra.map(p => ({ name: `${u}_b${p}`, type: 'BUFG', conns: { I: `${u}_${p}`, O: `${u}_${p}b` }, outs: ['O'] })),
-    ...['0', ...extra].map(p => ({ name: `${u}_ff${p}`, type: 'FDRE', params: { INIT: '0' }, conns: { C: p === '0' ? `${u}_0b` : `${u}_${p}b`, CE: '1', R: '0', D: `${u}_lk`, Q: `${u}_q${p}` }, outs: ['Q'] })),
-  ];
-  const all = [...dcm('u1', 1, u1), ...dcm('u2', 2, u2)];
-  const qs = all.filter(c => c.type === 'FDRE').map(c => c.conns.Q);
-  return yjson({ clk1: ['input', 1], clk2: ['input', 1], o: ['output', qs.length] }, [...all, ...qs.map((q, i) => obuf(`o[${i}]`, q))]);
-}
-const clockSitesOf = (p, r) => Object.fromEntries(p.insts.flatMap((i, k) => (i.kind === 'dcm' || i.kind === 'bufg' || /^clk\d$/.test(i.name) ? [[i.name, r.sites[k].site]] : [])));
-
-// the clock sites of a placement of twoDcms: two DCMs, each output on a buffer of its own that the DCM's output reaches on
-// switches of known bits, each clock pad the one ISE gives the DCM it feeds (#92); no warning
-function checkTwoDcms(part, p, r, opts, outs) {
-  const got = clockSitesOf(p, r);
-  assert.notEqual(got.u1, got.u2, part);
-  for (const [u, pins] of Object.entries(outs)) {
-    for (const pin of ['0', ...pins]) {
-      const b = got[`${u}_b${pin}`];
-      assert.ok(opts.bufgSites(got[u], pin === '0' ? 'CLK0' : pin).includes(b), `${part}: ${u}.${pin} on ${b}`);
-    }
-  }
-  const bufs = Object.entries(got).filter(([k]) => /_b/.test(k)).map(([, v]) => v);
-  assert.equal(new Set(bufs).size, bufs.length, `${part}: a buffer each`);
-  assert.deepEqual([got.clk1, got.clk2], [ISE_DCM_PAD[part][got.u1], ISE_DCM_PAD[part][got.u2]], part);
-  assert.deepEqual(r.warnings, [], part);
-  return got;
-}
-
-test('two DCMs on each device: each on a site whose outputs reach global buffers of their own on switches of known bits, each clock pad on the dedicated path to its CLKIN, ISE\'s pad (#47, #92)', { timeout: 300000 }, async () => {
-  // (before #2 the sites were forced: u2's CLKDV reached a buffer only from the top-left DCM, from the XC3S100E's bottom one;
-  // now every DCM output reaches its four buffers, and the placer chooses)
-  for (const [part] of SHIPPED) {
-    const { opts, sites } = await flowOf(part);
-    const p = pack(twoDcms(), { part });
-    for (const seed of [1, 2]) checkTwoDcms(part, p, place(p, sites, { seed, effort: 0.1, ...opts }), opts, { u1: ['CLKFX'], u2: ['CLKDV'] });
-  }
-});
-
-test('DCM outputs CLK2X180, CLKFX180 and CLK90: on every device, each on a global buffer the DCM reaches it from on switches of known bits (#47, #2)', { timeout: 300000 }, async () => {
-  // (before #2: CLK2X180 only from the bottom-left DCM, none on the XC3S100E, said; CLKFX180 from some DCMs)
-  for (const [part] of SHIPPED) {
-    const { opts, sites } = await flowOf(part);
-    for (const outs of [{ u1: ['CLK2X180'], u2: ['CLKDV'] }, { u1: ['CLKFX180'], u2: ['CLK90'] }, { u1: ['CLK2X180', 'CLKFX180', 'CLK90'], u2: ['CLK180', 'CLK270', 'CLK2X'] }]) {
-      const p = pack(twoDcms(outs), { part });
-      checkTwoDcms(part, p, place(p, sites, { seed: 1, effort: 0.1, ...opts }), opts, outs);
-    }
-  }
-});
-
-test('a DCM\'s INST LOC: the packer keeps it, the placer puts the DCM there; a LOC that is no DCM site, two DCMs on one site, more DCMs than sites: said clearly (#47)', { timeout: 300000 }, async () => {
-  const { opts, sites } = await flowOf('xc3s250ecp132-4');
-  const p = pack(twoDcms(), { part: 'xc3s250ecp132-4', ucf: 'INST "u1" LOC = "DCM_X1Y0";\nINST u2 LOC=dcm_x0y1 ;' });
-  assert.deepEqual(p.insts.filter(i => i.kind === 'dcm').map(i => [i.name, i.loc]), [['u1', 'DCM_X1Y0'], ['u2', 'DCM_X0Y1']]);
-  const r = place(p, sites, { seed: 1, effort: 0.1, ...opts });
-  const got = clockSitesOf(p, r);
-  assert.deepEqual([got.u1, got.u2, got.clk1, got.clk2, r.warnings], ['DCM_X1Y0', 'DCM_X0Y1', 'M6', 'C8', []]);
-  const bad = ucf => () => place(pack(twoDcms(), { part: 'xc3s250ecp132-4', ucf }), sites, { seed: 1, effort: 0.1, ...opts });
-  assert.throws(bad('INST "u1" LOC = "DCM_X3Y1";'), err => err instanceof PlaceError && err.message === 'place: u1: no DCM site DCM_X3Y1 on xc3s250ecp132-4');
-  assert.throws(bad('INST "u1" LOC = "DCM_X0Y0";\nINST "u2" LOC = "DCM_X0Y0";'), err => err instanceof PlaceError && err.message === 'place: u1: DCM site DCM_X0Y0 used twice');
-  // the XC3S100E has two DCMs
-  const three = yjson({ clk: ['input', 1], o: ['output', 3] }, [{ name: 'ib', type: 'IBUFG', conns: { I: 'clk', O: 'ci' }, outs: ['O'] }, ...['a', 'b', 'c'].flatMap((u, k) => [
-    { name: u, type: 'DCM_SP', params: { CLK_FEEDBACK: 'NONE' }, conns: { CLKIN: 'ci', RST: '0', DSSEN: '0', PSCLK: '0', PSEN: '0', PSINCDEC: '0', LOCKED: `lk${k}` }, outs: ['LOCKED'] },
-    obuf(`o[${k}]`, `lk${k}`),
-  ])]);
-  const s100 = (await flowOf('xc3s100ecp132-4')).sites;
-  assert.throws(() => place(pack(three, { part: 'xc3s100ecp132-4' }), s100, { seed: 1, effort: 0.1 }), err => err instanceof PlaceError && err.message === 'place: 3 DCMs needed, the device has 2');
-});
-
-test('clockReach: the DCM clock inputs (CLKIN, CLKFB) a global buffer reaches on switches of known bits; a cascade of two DCMs (#47)', { timeout: 300000 }, async () => {
-  const { opts, sites, clockSites } = await flowOf('xc3s250ecp132-4');
-  const dcmPins = b => [...clockSites(b)].filter(s => s.startsWith('DCM_')).sort();
-  // (with the DCM pins' switches of the designs of #46 / #47 with CLKIN from a global buffer: X1Y0's and X1Y1's CLKIN too)
-  assert.deepEqual(dcmPins('BUFGMUX_X2Y11'), ['DCM_X0Y0.CLKFB', 'DCM_X0Y0.CLKIN', 'DCM_X0Y1.CLKFB', 'DCM_X0Y1.CLKIN', 'DCM_X1Y0.CLKIN', 'DCM_X1Y1.CLKFB', 'DCM_X1Y1.CLKIN']);
-  assert.deepEqual(dcmPins('BUFGMUX_X2Y10'), ['DCM_X0Y1.CLKFB', 'DCM_X1Y0.CLKFB', 'DCM_X1Y1.CLKFB', 'DCM_X1Y1.CLKIN']);
-  // u2's CLKIN from u1's CLK0 buffer: u1's CLK0 on the buffer that reaches both u1's CLKFB and u2's CLKIN, u2 on the
-  // top-right DCM (before #2 the bottom-left one, the only one whose CLK2X180 reached a buffer)
-  const nl = yjson({ clk: ['input', 1], o: ['output', 2] }, [
-    { name: 'ib', type: 'IBUFG', conns: { I: 'clk', O: 'ci' }, outs: ['O'] },
-    { name: 'u1', type: 'DCM_SP', params: { CLK_FEEDBACK: '1X' }, conns: { CLKIN: 'ci', CLKFB: 'a0b', RST: '0', DSSEN: '0', PSCLK: '0', PSEN: '0', PSINCDEC: '0', CLK0: 'a0', CLKFX: 'afx' }, outs: ['CLK0', 'CLKFX'] },
-    { name: 'ba0', type: 'BUFG', conns: { I: 'a0', O: 'a0b' }, outs: ['O'] },
-    { name: 'bafx', type: 'BUFG', conns: { I: 'afx', O: 'afxb' }, outs: ['O'] },
-    { name: 'u2', type: 'DCM_SP', params: { CLK_FEEDBACK: '1X' }, conns: { CLKIN: 'a0b', CLKFB: 'b0b', RST: '0', DSSEN: '0', PSCLK: '0', PSEN: '0', PSINCDEC: '0', CLK0: 'b0', CLK2X180: 'b2' }, outs: ['CLK0', 'CLK2X180'] },
-    { name: 'bb0', type: 'BUFG', conns: { I: 'b0', O: 'b0b' }, outs: ['O'] },
-    { name: 'bb2', type: 'BUFG', conns: { I: 'b2', O: 'b2b' }, outs: ['O'] },
-    { name: 'f1', type: 'FDRE', params: { INIT: '0' }, conns: { C: 'afxb', CE: '1', R: '0', D: 'ci', Q: 'q1' }, outs: ['Q'] },
-    { name: 'f2', type: 'FDRE', params: { INIT: '0' }, conns: { C: 'b2b', CE: '1', R: '0', D: 'ci', Q: 'q2' }, outs: ['Q'] },
-    obuf('o[0]', 'q1'), obuf('o[1]', 'q2'),
-  ]);
-  const p = pack(nl, { part: 'xc3s250ecp132-4' });
-  const r = place(p, sites, { seed: 1, effort: 0.1, ...opts });
-  assert.deepEqual(['clk', 'u1', 'ba0', 'u2', 'bb0', 'bb2'].map(n => siteOf(p, r, n)), ['C8', 'DCM_X0Y1', 'BUFGMUX_X2Y11', 'DCM_X1Y1', 'BUFGMUX_X1Y11', 'BUFGMUX_X1Y10']);
-  assert.deepEqual(r.warnings, []);
 });
 
 // #84: the packer reads the UCF with the top's ports, as Check Constraints does (#63): a bus bit

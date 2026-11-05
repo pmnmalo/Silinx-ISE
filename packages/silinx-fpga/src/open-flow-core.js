@@ -17,11 +17,8 @@
 //   io.frontEnd(sources, top)          the HDL front end (core/synth-front.js flowFrontEnd): { errors, input() } of the
 //                                      synthesis; without it the sources are the flat Verilog Yosys synthesizes (#1675)
 //   io.simModels(ctx)                  the simulation models' steps (core/flow-models.js mountSimModels), optional
-//   io.placeRoute(netlist, packed, device, knownPips, options)
-//                                      the place and route (#1678), optional: fpga/place-route.js placeRouteBest by default;
-//                                      another engine (nextpnr, #1953) returns its result's shape
 //   io.nextpnr                         { <micro-architecture>: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array } }:
-//                                      nextpnr-himbaechel for spec.engine 'nextpnr' (#2136, #2360): spartan3e (open-flow-nextpnr.js: its
+//                                      nextpnr-himbaechel, the place and route engine (#2136, #2360, #2137): spartan3e (open-flow-nextpnr.js: its
 //                                      Map and Place & Route), spartan6 (#2138, open-flow-nextpnr-s6.js: its Place & Route), optional
 // core/flow-ide.js runOpenFlow is runFlow with the IDE's front end and simulation models (#1675).
 // spec.resources: the part's resources (resources.js resourcesOf(part, pkg)), for the synthesis's used of
@@ -33,8 +30,6 @@ import { cellCounts, DEEP_RULE, FAST_SYNTH } from './synth-open.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
 import { UCF, readConstraints } from './constraints.js';
 import { readYosysJson } from './fpga/netlist.js';
-import { effortTries, effortExtra } from './fpga/place-route.js';
-import { knownRouting } from './fpga/bitgen.js';
 import { backendOf } from './open-flow-backends.js';
 
 // without the HDL front end (io.frontEnd): the sources are the flat Verilog given to Yosys, its top module `top` (#1675)
@@ -66,8 +61,7 @@ export class StepError extends Error {
 export async function runFlow(spec, io) {
   // (the Optimization, #2470: Fast, the usual mapping alone; Area, the smaller of its netlist and Speed's; both one placement,
   // no register replication. Speed, or none given: by the Optimization Effort)
-  const goal = spec.synthGoal, area = goal === 'area', once = goal === 'fast' || area;
-  if (once) spec = { ...spec, replicate: false };
+  const goal = spec.synthGoal, area = goal === 'area';
   const { top } = spec;
   const log = io.log;
   const report = { files: {} };
@@ -78,12 +72,6 @@ export async function runFlow(spec, io) {
   const ms = t => `${((now() - t) / 1000).toFixed(1)} s`;
   const pct = (u, t) => (t ? Math.round((100 * u) / t) : 0);
   const util = (name, used, total) => ({ name, used, total, percent: pct(used, total) });
-  let known = null;
-  const knownPips = () => (known ||= knownRouting(io.bitDb()));
-  // the placements Place & Route makes for a design of `slices` slices: HIGH_TRIES at Optimization Effort High, NORMAL_TRIES at Normal (#651)
-  const parTries = slices => (once ? 1 : effortTries(spec.synthEffort, slices));
-  // and the placements more at High, each routed only when its estimate is promising (#651)
-  const parExtra = () => (once ? 0 : effortExtra(spec.synthEffort));
   let synth = null, netlist = null, netlistText = null;
   const backend = backendOf(spec.family);
   // the constraints, read when a step asks, in the back end's format (constraints.js, #2385)
@@ -158,7 +146,7 @@ export async function runFlow(spec, io) {
 
   // The design the simulation models are made of (#120, #121): synthesized with the generics the test bench (open-flow-models.js)
   const { runPostMap, runPostPar, runPostSynth, runPostTranslate } = (io.simModels || noSimModels)({
-    io, spec, knownPips, log, netlist: () => netlist, packed: () => impl.packed?.() ?? null, parTries, parExtra, report,
+    io, spec, log, netlist: () => netlist, packed: () => impl.packed?.() ?? null, report,
     routedOrEarlier: (...a) => impl.routedOrEarlier(...a), routedText: () => impl.routedText(), step, synth: () => synth, top,
     placeRouteNetlist: (...a) => (impl.placeRouteNetlist ? impl.placeRouteNetlist(...a) : Promise.reject(new StepError(`no Place & Route of another netlist for the ${spec.family}`))),
     constraints
@@ -179,7 +167,7 @@ export async function runFlow(spec, io) {
   // the family's steps after the synthesis (open-flow-backends.js, #2360, #2387: its list, backend.steps, and their
   // functions, impl.steps; readNetlist for the step that reads the netlist); the routed design is the back end's, in its
   // format: the steps after Place & Route read it, or an earlier run's (#2384)
-  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, readNetlist: runTranslate, top, knownPips, parTries, parExtra, constraints, StepError });
+  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, readNetlist: runTranslate, top, constraints, StepError });
   // the synthesis and the simulation models' steps are the flow's own (the models: the IDE's, io.simModels)
   const own = { synth: runSynth, postsynth: runPostSynth, posttrans: runPostTranslate, postmap: runPostMap, postpar: runPostPar };
 

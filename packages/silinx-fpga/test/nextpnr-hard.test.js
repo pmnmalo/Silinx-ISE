@@ -1,7 +1,7 @@
 // The nextpnr engine's block RAMs and multipliers (#2193): their inputs made ready as Silinx's packer leaves them
 // (src/open-flow-nextpnr.js hardInputs), the routed design as XDL (src/fpga/nextpnr-xdl.js) on the stopwatch example
 // (Silinx's synthesis, Basys2-250: three MULT18X18s, a RAMB16_S18_S18; its native nextpnr result, which ISE's DRC passed
-// with no warnings and whose .bit is byte-identical to ISE's), and the example built with --engine nextpnr.
+// with no warnings and whose .bit is byte-identical to ISE's), and the example built by nextpnr.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +12,7 @@ import { main } from '../src/cli.js';
 import { hardInputs } from '../src/open-flow-nextpnr.js';
 import { parseXdl, writeXdl } from '../src/xdl.js';
 import { loadDeviceCache } from '../src/fpga/device-node.js';
-import { checkRouting } from '../src/fpga/route.js';
+import { checkRouting } from '../src/fpga/route-check.js';
 import { bitgen } from '../src/fpga/bitgen.js';
 import { loadDb } from '../research/s3e-bitstream/db.mjs';
 import { nextpnrToXdl, simCheck, xdlSize } from '../research/nextpnr-s3e/lib.mjs';
@@ -146,12 +146,12 @@ test('nextpnrToXdl: stopwatch routed on the device graph, every feature in the b
   assert.equal(r.flipFlops, 200);
 });
 
-test('#2193 the stopwatch example (Silinx\'s synthesis) built with --engine nextpnr: no warnings, a complete bitstream', { timeout: 300000 }, async () => {
+test('#2193 the stopwatch example (Silinx\'s synthesis) built by nextpnr: no warnings, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'stopwatch.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-engine/stopwatch.json.gz', import.meta.url))));
   const out = [], err = [];
-  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(new URL('./fixtures/nextpnr-engine/stopwatch.ucf', import.meta.url)), '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(new URL('./fixtures/nextpnr-engine/stopwatch.ucf', import.meta.url)), '--out-dir', dir],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings

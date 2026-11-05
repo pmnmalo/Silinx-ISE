@@ -8,7 +8,7 @@
 // Writes outdir/rbd-<standard> (top.vhd, top.ucf) for LVCMOS33, LVCMOS25, LVTTL, LVCMOS18, LVCMOS15, LVCMOS12.
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { deviceSites } from '../../src/fpga/place.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
 import { PART } from './db.mjs';
 
 const BIDIR_STDS = ['LVCMOS33', 'LVCMOS25', 'LVTTL', 'LVCMOS18', 'LVCMOS15', 'LVCMOS12'];

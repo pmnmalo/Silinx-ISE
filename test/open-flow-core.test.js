@@ -14,6 +14,7 @@ import { runOpenFlow } from '../core/flow-ide.js';
 import { loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
 import { dbFileNames, dbFilesFrom, makeBitDb } from '../packages/silinx-fpga/src/fpga/bitdb.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { nextpnrNode } from '../packages/silinx-fpga/src/nextpnr-node.js';
 import { shippedDevicePath } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,7 +55,7 @@ test('the browser edition\'s flow (in memory, the database as JSON) writes the b
     log: l => lines.push(l),
     sources: () => sources.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(PJ, s.path), 'utf8') })),
     ucf: fs.readFileSync(path.join(PJ, project.constraints), 'utf8'), ucfName: path.basename(project.constraints),
-    device: () => device, bitDb: () => db, yosys: yosysNode,
+    device: () => device, bitDb: () => db, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() },
     write: (name, data) => { store[name] = data; return `build/${name}`; },
     read: name => (typeof store[name] === 'string' ? store[name] : null),
     save: rep => reports.push(rep),
@@ -91,7 +92,7 @@ test('Back-annotate Pin Locations (pin2ucf): the placer\'s pads as UCF; built ag
     const io = {
       log: l => lines.push(l),
       sources: () => sources.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(PJ, s.path), 'utf8') })),
-      ucf, ucfName: 'top.ucf', device: () => device, bitDb: () => db, yosys: yosysNode,
+      ucf, ucfName: 'top.ucf', device: () => device, bitDb: () => db, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() },
       write: (name, data) => { store[name] = data; return `build/${name}`; },
       read: name => (typeof store[name] === 'string' ? store[name] : null),
       save: rep => reports.push(rep),
@@ -148,90 +149,20 @@ test('Implement Design: ports without a LOC nor an I/O standard (LVCMOS25) where
   const io = {
     log: l => lines.push(l),
     sources: () => sources.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(PJ, s.path), 'utf8') })),
-    ucf, ucfName: 'top.ucf', device: () => device, bitDb: () => db, yosys: yosysNode,
+    ucf, ucfName: 'top.ucf', device: () => device, bitDb: () => db, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() },
     write: name => `build/${name}`, read: () => null, save: () => {},
   };
   const res = await runOpenFlow({ ...spec, steps: ['synth', 'translate', 'map', 'par'] }, io);
   assert.equal(res.ok, false);
   const at = lines.findIndex(l => l.startsWith('ERROR:'));
+  // (nextpnr's own message, #2137; its I/O by its cell's name and the generic hint: #2816)
   assert.deepEqual(lines.slice(at), [
-    'ERROR:Silinx - placement failed: place: no pad for 4 I/O(s) of LVCMOS25 (VCCO 2.5 V): led<4>, led<5>, led<6>, led<7>: the banks with free pads need another VCCO: '
-      + 'bank 0 VCCO 3.3 V (LVCMOS33: btn<1>, clk, sw<3>), bank 1 VCCO 3.3 V (LVCMOS33: an<0>, an<1>, an<2> and 8 more), bank 2 VCCO 3.3 V (LVCMOS33: led<0>, led<1>, led<2> and 4 more), bank 3 VCCO 3.3 V (LVCMOS33: sw<1>, sw<2>)',
-    'Give them the I/O standard of a bank in the constraints (UCF), e.g. NET "led<4>" IOSTANDARD = LVCMOS33; (or LOC them on pads of a bank of their own).',
+    'ERROR:Silinx - nextpnr failed: it stopped on an error',
+    '  ERROR: IO $iopadmap$top.led_4: no free pad in a bank of VCCO 2.5 V (its I/O standard LVCMOS25): the banks with free pads have I/Os of another VCCO. Give it the I/O standard of a bank in the constraints (UCF), or a LOC.',
+    'The Silinx toolchain does not support this yet: implement the design in an ISE mode (Toolchain Settings).',
     '=== SILINX FAILED par (exit 1) ===',
   ]);
   assert.deepEqual(lines.filter(l => /warning/i.test(l)), []);
-});
-
-// #249: a routing that does not converge on any placement tried (the router's passes at most: 1 here,
-// so that blinky's routing still has nodes shared) is said so, not through the routing check
-test('Implement Design: the routing does not converge on the placements tried: said so plainly, no routing check (#249)', { timeout: 300000 }, async () => {
-  const device = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(spec.graph)).toString('utf8')));
-  const json = {};
-  for (const [k, f] of Object.entries(dbFileNames(spec.device, spec.pkg))) {
-    const p = path.join(DB_DIR, f);
-    json[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
-  }
-  const db = makeBitDb(dbFilesFrom(json, spec.pkg), device, spec.part);
-  const lines = [];
-  const io = {
-    log: l => lines.push(l),
-    sources: () => sources.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(PJ, s.path), 'utf8') })),
-    ucf: fs.readFileSync(path.join(PJ, project.constraints), 'utf8'), ucfName: 'top.ucf', device: () => device, bitDb: () => db, yosys: yosysNode,
-    write: name => `build/${name}`, read: () => null, save: () => {},
-  };
-  const res = await runOpenFlow({ ...spec, steps: ['synth', 'translate', 'map', 'par'], routeIterations: 1 }, io);
-  assert.equal(res.ok, false);
-  const at = lines.findIndex(l => l.startsWith('ERROR:'));
-  assert.match(lines[at], /^ERROR:Silinx - the routing did not converge: \d+ routing node\(s\) still used by more than one net after 1 passes, on 4 placement\(s\) \(seeds 1 to 4\)$/, lines.slice(-6).join('\n'));
-  assert.deepEqual(lines.slice(at + 1), ['The design is too dense for the router on this device: a larger device, or an ISE mode (Toolchain Settings), may implement it.', '=== SILINX FAILED par (exit 1) ===']);
-  assert.deepEqual(lines.filter(l => /warning/i.test(l)), []);
-});
-
-// #651: at Optimization Effort High, Place & Route makes two placements (seeds 1 and 2) and keeps the faster, said;
-// at Normal too for a design of 500 slices at most (blinky; a larger one: one, test/fpga-place-route.test.js). At High a
-// third placement (seed 3), routed only when the placer's estimate is shorter than one of the first two's; said either way
-test('Implement Design at Optimization Effort High: three placements, the third routed when its estimate says so, the faster kept and said; Normal, a small design: two (#651)', { timeout: 300000 }, async () => {
-  const device = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(spec.graph)).toString('utf8')));
-  const json = {};
-  for (const [k, f] of Object.entries(dbFileNames(spec.device, spec.pkg))) {
-    const p = path.join(DB_DIR, f);
-    json[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
-  }
-  const db = makeBitDb(dbFilesFrom(json, spec.pkg), device, spec.part);
-  const run = async synthEffort => {
-    const lines = [];
-    const io = {
-      log: l => lines.push(l),
-      sources: () => sources.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(PJ, s.path), 'utf8') })),
-      ucf: fs.readFileSync(path.join(PJ, project.constraints), 'utf8'), ucfName: 'top.ucf', device: () => device, bitDb: () => db, yosys: yosysNode,
-      write: name => `build/${name}`, read: () => null, save: () => {},
-    };
-    const res = await runOpenFlow({ ...spec, steps: ['synth', 'translate', 'map', 'par', 'trce'], synthEffort }, io);
-    assert.ok(res.ok, `${res.error}\n${lines.join('\n')}`);
-    assert.deepEqual(lines.filter(l => /warning/i.test(l)), [], synthEffort);
-    return { lines, period: res.report.timing.minPeriodNs };
-  };
-  const placements = async (effort, name, n) => {
-    const r = await run(effort);
-    const said = r.lines.filter(l => /placements/.test(l));
-    assert.equal(said.length, 1, r.lines.join('\n'));
-    const seeds = Array.from({ length: n }, (_, k) => k + 1);
-    const m = new RegExp(`^Optimization Effort ${name}: ${n} placements \\(seeds ${seeds.join(', ')}\\): (.*); seed (\\d) kept\\.$`).exec(said[0]);
-    assert.ok(m, said[0]);
-    const each = m[1].split(', ');
-    assert.equal(each.length, n, said[0]);
-    // the first two routed; the third routed (its period) or not (estimated slower)
-    each.forEach((x, k) => assert.match(x, k < 2 ? /^\d+\.\d{3} ns$/ : /^(\d+\.\d{3} ns|not routed \(estimated slower\))$/, said[0]));
-    const ns = each.map(x => (/ ns$/.test(x) ? parseFloat(x) : Infinity));
-    // the faster kept: its period the report's (replication gives none faster on blinky)
-    assert.equal(+m[2], ns.indexOf(Math.min(...ns)) + 1);
-    assert.ok(Math.abs(r.period - Math.min(...ns)) < 0.0015, `${r.period} against ${ns}`);
-    return r;
-  };
-  await placements('high', 'High', 3);
-  // Normal: blinky is small (500 slices at most), so two placements, said, and no third
-  await placements('normal', 'Normal', 2);
 });
 
 // #280: the synthesis up to date: the steps from Translate on use the netlist of the earlier run, and the
@@ -251,7 +182,7 @@ test('#280 the synthesis up to date: its netlist used, its report kept; no netli
       log: l => lines.push(l),
       sources: () => sources.map(s => ({ path: s.path, lang: s.lang, text: fs.readFileSync(path.join(PJ, s.path), 'utf8') })),
       ucf: fs.readFileSync(path.join(PJ, project.constraints), 'utf8'), ucfName: 'top.ucf', device: () => device, bitDb: () => db,
-      yosys: (...a) => { yosysRuns++; return yosysNode(...a); },
+      yosys: (...a) => { yosysRuns++; return yosysNode(...a); }, nextpnr: { spartan3e: nextpnrNode() },
       write: (name, data) => { store[name] = data; return `build/${name}`; },
       read: name => (typeof store[name] === 'string' ? store[name] : null),
       save: rep => reports.push(rep),
