@@ -17,6 +17,7 @@ import { newDoc, normalizeDoc, symbolPins } from '../../core/schdoc.js';
 import { viewHdl } from '../../core/view-hdl.js';
 import { newModel } from '../../core/asm.js';
 import { newFsm } from '../../core/fsm.js';
+import { newPetri } from '../../core/petri.js';
 const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
 // a module's Create Test Bench (Wizard): the ISE style interface's only (the Tasks interface's test benches on its Test page, #1330)
@@ -52,6 +53,10 @@ const badge = async (page, label, text, opts = {}) => {
   return page.click(at, opts);
 };
 const menuLabels = (page) => page.waitFor(() => { const m = [...document.querySelectorAll('body > .menu-popup .mi')].map((i) => i.textContent.trim()); return m.length ? m : null; }, [], { what: 'the context menu' });
+// a row's own menu (a right-click on its name)
+const rowMenu = async (page, label) => { await page.treeRow('#hier', label, { right: true, exact: true }); const m = await menuLabels(page); await page.closeMenus(); return m; };
+// a module's menu with its drawing's commands (#2872: before Copy Link to This Module…)
+const withDrawing = (menu, ...items) => { const i = menu.indexOf('Copy Link to This Module…'); return [...menu.slice(0, i), ...items, ...menu.slice(i)]; };
 const badgeMenu = async (page, label, text) => { await badge(page, label, text, { button: 'right' }); const m = await menuLabels(page); await page.closeMenus(); return m; };
 // what the last opening of a project logged about its sources (before its "Project … opened" line):
 // the lines on its files, the warnings and the errors
@@ -184,7 +189,7 @@ uiTest('Design pane (#1303): a module defined again in another file keeps the fi
 }, { ui: 'ise' });
 
 // the menus of every module's row and badge in the examples: none of the commands removed by #220
-uiTest('Design pane (#220): a badge opens its view, its right-click shows that view\'s commands; the module\'s menu; no Convert to HDL, HDL as base, Remove Synchronized, truth table of a module, Export as ISE Schematic on a module', E, async (page) => {
+uiTest('Design pane (#220, #2872): a badge opens its view; a right-click shows the row\'s menu on its name and on every badge, the drawing\'s commands in it; its Open opens the drawing; no Convert to HDL, HDL as base, Remove Synchronized, truth table of a module', E, async (page) => {
   await makeProject(env, { name: 'H_badges', template: 'gates' });
   await page.openProject('H_badges');
   await badge(page, 'gates', 'VHDL');
@@ -198,16 +203,18 @@ uiTest('Design pane (#220): a badge opens its view, its right-click shows that v
   const procs = await page.eval(() => [...document.querySelectorAll('#procs .lbl')].map((l) => l.textContent));
   assert.deepEqual(procs.slice(0, 2), ['View/Edit Schematic', 'Design Summary/Reports']);
   assert.ok(!procs.some((p) => /Convert to HDL|as base|Generate HDL/.test(p)), procs.join(' | '));
-  // the schematic's commands (Export as ISE Schematic on the schematic, not on the module)
-  assert.deepEqual(await badgeMenu(page, 'gates', 'Schematic'), ['Open', 'Export as ISE Schematic (.sch)…', 'Remove from Project']);
-  // the HDL's: the module's, the same as the row's
+  // one menu on the name and on every badge (#2872): the module's, the schematic's commands in it
   const MODULE = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', ...TB, 'Copy Link to This Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…'];
   // (gates the top: Unset as Top Module, #1220)
-  const TOP = ['Unset as Top Module', ...MODULE.slice(1)];
-  assert.deepEqual(await badgeMenu(page, 'gates', 'VHDL'), TOP);
-  await page.treeRow('#hier', 'gates', { right: true, exact: true });
-  assert.deepEqual(await menuLabels(page), TOP);
-  await page.closeMenus();
+  const GATES = withDrawing(['Unset as Top Module', ...MODULE.slice(1)], 'Export as ISE Schematic (.sch)…');
+  assert.deepEqual(await rowMenu(page, 'gates'), GATES);
+  assert.deepEqual(await badgeMenu(page, 'gates', 'Schematic'), GATES);
+  assert.deepEqual(await badgeMenu(page, 'gates', 'VHDL'), GATES);
+  // its Open: the drawing, as a double-click (not the HDL generated from it)
+  await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('sch:src/gates.sch.json')));
+  await badge(page, 'gates', 'VHDL', { button: 'right' });
+  await page.click('body > .menu-popup .mi', { text: 'Open' });
+  await page.waitFor(() => window.Silinx.active?.id === 'sch:src/gates.sch.json', [], { what: 'the schematic opened by the menu\'s Open' });
   // the HDL editor's menu opens the schematic
   await page.eval(() => window.SilinxApp.openFile('src/gates.vhd'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/gates.vhd' && window.Silinx.active.editor);
@@ -218,11 +225,12 @@ uiTest('Design pane (#220): a badge opens its view, its right-click shows that v
   assert.equal(ed.at(-1), 'Open Schematic', ed.join(' | '));
   assert.ok(!ed.some((l) => /Synchronized/.test(l)), ed.join(' | '));
 
-  // the other drawings' badges: theirs only
+  // the other drawings: the same on the name and on every badge, the drawing's commands in it
   await makeProject(env, { name: 'H_badges2', template: 'traffic' });
   await page.openProject('H_badges2');
-  assert.deepEqual(await badgeMenu(page, 'u_fsm - traffic', 'FSM'), ['Open', 'Convert to ASM chart', 'Remove from Project']);
-  assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Algebra'), ['Open', 'Remove from Project']);
+  const TRAFFIC = withDrawing(MODULE, 'Convert to ASM chart');
+  for (const b of [null, 'FSM', 'VHDL']) assert.deepEqual(await (b ? badgeMenu(page, 'u_fsm - traffic', b) : rowMenu(page, 'u_fsm - traffic')), TRAFFIC, b);
+  for (const b of [null, 'Algebra', 'Schematic', 'VHDL']) assert.deepEqual(await (b ? badgeMenu(page, 'u_lamps - lamps', b) : rowMenu(page, 'u_lamps - lamps')), MODULE, b);
   const PLAIN = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', ...TB,
     'Convert to Schematic (editable)…', 'Convert to State Machine (ASM)…', 'Convert to State Diagram (FSM)…', 'Copy Link to This Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…'];
   assert.deepEqual(await badgeMenu(page, 'u_timer - timer', 'VHDL'), PLAIN);
@@ -230,7 +238,17 @@ uiTest('Design pane (#220): a badge opens its view, its right-click shows that v
   assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'VHDL'), MODULE);
   await makeProject(env, { name: 'H_badges3', template: 'blinky' });
   await page.openProject('H_badges3');
-  assert.deepEqual(await badgeMenu(page, 'u_speed - speed_ctrl', 'ASM'), ['Open', 'Convert to State Diagram (FSM)…', 'Remove from Project']);
+  const SPEED = withDrawing(MODULE, 'Convert to State Diagram (FSM)…');
+  for (const b of [null, 'ASM', 'VHDL']) assert.deepEqual(await (b ? badgeMenu(page, 'u_speed - speed_ctrl', b) : rowMenu(page, 'u_speed - speed_ctrl')), SPEED, b);
+  // a Petri net (its HDL file made when the project opens, #207): the module's menu, the net's View State Machine in it,
+  // on its name and on its badges alike
+  await makeProject(env, { name: 'H_badges4', top: 'ctl', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
+  await page.openProject('H_badges4');
+  const NET = await rowMenu(page, 'ctl');
+  assert.deepEqual(NET, withDrawing(['Unset as Top Module', ...MODULE.slice(1)], 'View State Machine (FSM)'));
+  const netBadges = await page.eval(() => [...[...document.querySelectorAll('#hier .row')].find((r) => r.querySelector('.lbl').textContent === 'ctl').querySelectorAll('.badge')].map((b) => b.textContent));
+  assert.ok(netBadges.length >= 1, netBadges.join(' | '));
+  for (const b of netBadges) assert.deepEqual(await badgeMenu(page, 'ctl', b), NET, b);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
 
@@ -394,8 +412,11 @@ uiTest('Design pane (#207, #220) in Portuguese: the badges [FSM] [Álgebra] [VHD
       'u_lamps - lamps: Álgebra (Base: o seu HDL é gerado a partir daqui) Esquemático (Gerado a partir da álgebra booleana, na sua forma da lógica do HDL) VHDL (Gerado a partir da álgebra booleana)',
       'u_display - sevenseg: Verilog (Abrir) VHDL (Traduzido para VHDL (só de leitura))',
     ]);
-    assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Álgebra'), ['Abrir', 'Remover do Projeto']);
-    assert.deepEqual(await badgeMenu(page, 'u_fsm - traffic', 'FSM'), ['Abrir', 'Converter para fluxograma ASM', 'Remover do Projeto']);
+    // the row's menu on every badge (#2872), the drawing's commands in it
+    const fsm = await rowMenu(page, 'u_fsm - traffic');
+    assert.ok(fsm.includes('Converter para fluxograma ASM') && fsm.includes('Copiar Ligação para Este Módulo…') && fsm.includes('Abrir'), fsm.join(' | '));
+    assert.deepEqual(await badgeMenu(page, 'u_fsm - traffic', 'FSM'), fsm);
+    assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Álgebra'), await rowMenu(page, 'u_lamps - lamps'));
     // the HDL editor's banner
     await badge(page, 'u_lamps - lamps', 'VHDL');
     await page.waitFor(() => document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent === 'Só de leitura, gerado a partir de lamps.bool.json', [], { what: 'the banner in Portuguese' });

@@ -441,17 +441,15 @@ export function openView(p) { return isAsm(p) ? openAsm(p) : isTt(p) ? openTt(p)
 // a view's badge in the Design tree (#207)
 export const viewBadge = p => (isAsm(p) ? 'ASM' : isTt(p) ? 'Algebra' : isFsm(p) ? 'FSM' : isPn(p) ? 'Petri' : 'Schematic');
 
-// the commands of a module's drawing (its badge in the Design tree): the drawing is the base, its HDL
-// file generated from it (#220)
-export function syncedViewMenu(e, sch) {
-  popupMenu([
-    { label: 'Open', action: () => openView(sch) },
+// the commands of a module's drawing (the drawing its base, its HDL file generated from it, #220), in the module's menu,
+// on its name and on every badge of its row alike (#2872)
+export function drawingCommands(sch) {
+  return [
     isAsm(sch) ? { label: 'Convert to State Diagram (FSM)…', action: () => asmToFsmDiagram(sch) } : null,
     isFsm(sch) ? { label: 'Convert to ASM chart', action: () => fsmToAsmChart(sch) } : null,
     isPn(sch) ? { label: 'View State Machine (FSM)', action: () => openPetriFsm(sch) } : null,   // (its state space, #2696)
     viewKind(sch) === 'sch' ? { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) } : null,
-    { label: 'Remove from Project', action: () => removeModule(sch) },
-  ].filter(Boolean), e.clientX, e.clientY);
+  ].filter(Boolean);
 }
 
 // A drawing's language changed (its editor's HDL language, a schematic's Language): its HDL file,
