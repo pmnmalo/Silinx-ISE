@@ -4,7 +4,7 @@
 //
 // The flow: runFlow(spec, io) runs the steps (OPEN_STEPS) on a design, everything outside it through `io`
 // (open-flow-core.js says what each hook is): the sources (flat Verilog; VHDL through io.frontEnd), the UCF, the
-// device and its bit database, Yosys, the place and route (io.placeRoute, Silinx's own by default), the files it
+// device and its bit database, Yosys, nextpnr (io.nextpnr, the place and route engine, #2137), the files it
 // writes (the netlist, the placed and routed XDL, the .bit) and the report (utilisation, timing, power).
 
 // the parts, the constraints, the steps' names, the XDL (the light entry, silinx-fpga/parts)
@@ -32,8 +32,7 @@ export { readYosysJson, paramBits, paramInt } from './fpga/netlist.js';
 
 // the implementation's steps, for a flow of one's own
 export { pack, PackError } from './fpga/pack.js';
-export { placeRouteBest } from './fpga/place-route.js';
-export { checkRouting } from './fpga/route.js';
+export { checkRouting } from './fpga/route-check.js';
 export { bitgen, knownRouting } from './fpga/bitgen.js';
 
 // the bitstream out (the placed and routed design, XDL: ./parts.js)

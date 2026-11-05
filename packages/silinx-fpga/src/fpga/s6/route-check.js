@@ -6,7 +6,7 @@
 // LUT set as its constant.
 //
 //   checkRoutingS6(routed, device) -> { ok, problems: [strings] }
-import { checkRouting } from '../route.js';
+import { checkRouting } from '../route-check.js';
 import { PIP_ROUTETHRU } from '../device.js';
 import { routingResources, routeThruSite } from './route-nets.js';
 

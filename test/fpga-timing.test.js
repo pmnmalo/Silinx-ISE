@@ -1,5 +1,5 @@
 // packages/silinx-fpga/src/fpga/timing.js: the delay model (wire classes, routed connection delays, slice arcs), the
-// static timing analysis, and the timing-driven router (packages/silinx-fpga/src/fpga/route.js, opts.timing).
+// static timing analysis (the timing-driven router went with Silinx's router: #2137).
 // Device: packages/silinx-fpga/test/fixtures/fpga/timing-device.xdlrc (hand-made: three CLBs in a row, a slow way by two
 // double lines and a fast one by a long line). Designs: small XDL texts below.
 import { test } from 'node:test';
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packDevice, loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
-import { routeDesign, checkRouting, netEndpoints } from '../packages/silinx-fpga/src/fpga/route.js';
+import { checkRouting, netEndpoints } from '../packages/silinx-fpga/src/fpga/route-check.js';
 import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
 import { WIRE, SPEED_4, classOfWires, nodeClasses, nodeDelays, lutPinIndex, netTree, treePath, pathDelay, distanceDelay, instArcs, timingGraph, analyzeTiming, timingReport, clockPort, checkPeriods, delayTable, clockArrivals, parseOffsets, checkOffsets, DELAY_KIND, delayKind, clockSources, clockRequirement, checkCross } from '../packages/silinx-fpga/src/fpga/timing.js';
 import { checkSwitching, switchingLine } from '../packages/silinx-fpga/src/fpga/timing.js';
@@ -34,7 +34,6 @@ const CLK = net('clk', [['ck', 'I']], [['a', 'CLK'], ['b', 'CLK']]);
 const design = nets => parseXdl(`design "t" xc3s50etq144-4 v3.2 ,\n  cfg "";\n${INSTS}${CLK}${nets}`);
 // d: a.XQ to b.G1 (not timed: G -> Y goes to no flip-flop) and to b.F1 (timed: F -> X -> the flip-flop)
 const D_NET = net('d', [['a', 'XQ']], [['b', 'G1'], ['b', 'F1']]);
-const pipsOf = (r, name) => r.design.nets.filter(n => n.name === name).flatMap(n => n.pips.map(p => `${p.tile} ${p.from} -> ${p.to}`)).sort();
 
 test('wire classes: from the names of a node\'s wires (long line, hex, double, OMUX, clock, input multiplexer, I/O) and site pins', () => {
   assert.equal(classOfWires(['LH12']), WIRE.LONG);
@@ -230,32 +229,6 @@ test('analyzeTiming: connection delays from the design\'s routing, or from the d
   assert.deepEqual(rf.conns.map(c => [c.net, c.from, c.to, c.crit]), [['d', 'a.XQ', 'b.F1', 1]]);
 });
 
-test('timing-driven routing: the critical load gets the fast long line, routed first; without timing it branches off the doubles', () => {
-  // b.G1 can only be reached by the doubles; b.F1 by the doubles (branching off G1's path: one new
-  // node) or by the long line from the source (two new nodes, but faster)
-  const plain = routeDesign(design(D_NET), device);
-  assert.deepEqual(plain.failed, []);
-  assert.ok(!pipsOf(plain, 'd').includes('CLB_X3Y0 LH0 -> F1_B_PINWIRE0'));
-  assert.ok(pipsOf(plain, 'd').includes('CLB_X3Y0 E2END1 -> F1_B_PINWIRE0'));
-  assert.equal(plain.period, null);
-  const timed = routeDesign(design(D_NET), device, { timing: true });
-  assert.deepEqual(timed.failed, []);
-  assert.deepEqual(pipsOf(timed, 'd'), ['CLB_X1Y0 OMUX0 -> E2BEG0', 'CLB_X1Y0 OMUX0 -> LH0', 'CLB_X1Y0 XQ0 -> OMUX0', 'CLB_X2Y0 E2END0 -> E2BEG1', 'CLB_X3Y0 E2END1 -> G1_B_PINWIRE0', 'CLB_X3Y0 LH0 -> F1_B_PINWIRE0']);
-  assert.ok(checkRouting(timed.design, device).ok);
-  // the router's period is the analysis of the routing it returns, and shorter than without timing
-  const sta = analyzeTiming(parseXdl(writeXdl(timed.design)), device);
-  close(timed.period, sta.period);
-  assert.ok(sta.period < analyzeTiming(parseXdl(writeXdl(plain.design)), device).period);
-  // a net with no timed load is routed as before
-  const g = routeDesign(design(net('d', [['a', 'XQ']], [['b', 'G1']])), device, { timing: true });
-  assert.deepEqual(pipsOf(g, 'd'), ['CLB_X1Y0 OMUX0 -> E2BEG0', 'CLB_X1Y0 XQ0 -> OMUX0', 'CLB_X2Y0 E2END0 -> E2BEG1', 'CLB_X3Y0 E2END1 -> G1_B_PINWIRE0']);
-  // the long line not allowed: the doubles, still legal
-  const noLong = routeDesign(design(D_NET), device, { timing: true, allowPip: (t, f, to) => to !== 'LH0' });
-  assert.deepEqual(noLong.failed, []);
-  assert.ok(pipsOf(noLong, 'd').includes('CLB_X3Y0 E2END1 -> F1_B_PINWIRE0'));
-  assert.ok(netEndpoints(noLong.design, device).errors.length === 0);
-});
-
 test('SLICEM memory arcs, as trce times them (#443): a shift register\'s and a RAM\'s clock to X / Y, data, address and enable setups', () => {
   const M = SPEED_4.mem;
   const sl = cfg => instArcs({ type: 'SLICEM', site: 'SLICE_X2Y0', cfg: cfg.map(([attr, value]) => ({ attr, name: '', value })) });
@@ -409,25 +382,6 @@ test('#1359 a LUT input\'s delay by its pin: the model against ISE\'s delays of 
   assert.equal(nd[f3], Math.fround(SPEED_4.wire[WIRE.PIN] + SPEED_4.lutPin[2]));
   assert.equal(nd[f1], Math.fround(SPEED_4.wire[WIRE.PIN] + SPEED_4.lutPin[0]));
   assert.ok(SPEED_4.lutPin[2] < SPEED_4.lutPin[0] && SPEED_4.lutPin[3] < SPEED_4.lutPin[0]);
-});
-
-test('#1359 timing-driven routing: the critical loads of the LUTs on their fast inputs (3 and 4), the period shorter', async () => {
-  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
-  const g = loadDeviceCache('xc3s250ecp132-4');
-  const d = parseXdl(zlib.gunzipSync(fs.readFileSync(path.join(FIX, 'trce', 'stopwatch.xdl.gz'))).toString('utf8'));
-  const routed = model => {
-    const r = routeDesign(d, g, { timing: true, model });
-    assert.deepEqual(r.failed, []);
-    const sta = analyzeTiming(parseXdl(writeXdl(r.design)), g);
-    const byPin = [0, 0, 0, 0];
-    for (const c of sta.conns) { const m = /\.[FG]([1-4])$/.exec(c.to); if (m && c.crit > 0.9) byPin[m[1] - 1]++; }
-    return { period: sta.period, byPin };
-  };
-  const flat = routed({ ...SPEED_4, lutPin: [0, 0, 0, 0] }), pins = routed(SPEED_4);
-  assert.deepEqual(pins.byPin, [0, 1, 5, 8]);
-  // (without the pins' delays: spread over the four, #2286's carry delays moving the critical paths)
-  assert.deepEqual(flat.byPin, [2, 3, 4, 5]);
-  assert.ok(pins.period < flat.period, `${pins.period} against ${flat.period}`);
 });
 
 test('#1103 a PERIOD on the port of a clock with no path between two of its flip-flops (one register stage): met, no path to time, not missing', () => {
@@ -879,27 +833,6 @@ test('delayTable (XC3S250E graph, #104): a flip-flop\'s output reaches its own C
   assert.equal(t.at(0, -1), t.at(0, -1, DELAY_KIND.COMB), 'the default kind');
   for (let dr = -4; dr <= 4; dr++) for (let dc = -4; dc <= 4; dc++) assert.ok(t.at(dc, dr, DELAY_KIND.REG) >= t.at(dc, dr, DELAY_KIND.COMB) - 1e-6, `${dc},${dr}`);
   assert.deepEqual(['XQ', 'YQ', 'X', 'Y', 'I', 'DOA0', 'P0'].map(delayKind), [1, 1, 0, 0, 0, 0, 0]);
-});
-
-test('timing-driven routing: branch loads (XC3S250E graph): a net of 17 timed loads branches less at its driver and gets faster', async () => {
-  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
-  const dev = loadDeviceCache('xc3s250ecp132-4');
-  const at = (name, site, cfg) => inst(name, 'SLICEL', dev.site(site).tileName, site, cfg);
-  const loads = Array.from({ length: 16 }, (_, k) => [`c${k}`, 'G1']);
-  const text = `design "t" xc3s250ecp132-4 v3.2 ,\n  cfg "";\n${at('a', 'SLICE_X20Y20', ' FFX:a:#FF DXMUX::0 ')}${at('b', 'SLICE_X22Y21', ' F:b_f:#LUT:D=A1 FXMUX::F FFX:b:#FF DXMUX::1 ')}`
-    + loads.map(([n], k) => at(n, `SLICE_X${17 + (k % 4) * 2}Y${16 + Math.floor(k / 4) * 2}`, ` G:${n}_g:#LUT:D=A1 GYMUX::G FFY:${n}:#FF DYMUX::1 `)).join('')
-    + net('clk', [], [['a', 'CLK'], ['b', 'CLK'], ...loads.map(([n]) => [n, 'CLK'])]) + net('d', [['a', 'XQ']], [['b', 'F1'], ...loads]);
-  const src = dev.sitePinNode('SLICE_X20Y20', 'XQ');
-  // (the router's passes alone: the polish routes the net again, with the loads, either way, #651)
-  const run = branchLoad => {
-    const r = routeDesign(parseXdl(text), dev, { timing: true, branchLoad, polish: 0 });
-    assert.deepEqual(r.failed, []);
-    assert.deepEqual(checkRouting(parseXdl(writeXdl(r.design)), dev).problems.filter(p => !/^net clk: sink/.test(p)), []);   // (the clock has no source here)
-    return { period: analyzeTiming(parseXdl(writeXdl(r.design)), dev).period, branches: netTree(r.design.nets.find(n => n.name === 'd').pips, [src], dev).children.get(src) };
-  };
-  const without = run(0), withLoads = run(1);
-  assert.ok(withLoads.branches < without.branches, `${withLoads.branches} < ${without.branches} branches at the driver`);
-  assert.ok(withLoads.period < without.period, `${withLoads.period} < ${without.period} ns`);
 });
 
 // #661: trce's Component Switching Limit checks on a DCM. One DCM_SP on the pad clk (PERIOD 20 ns unless said), its

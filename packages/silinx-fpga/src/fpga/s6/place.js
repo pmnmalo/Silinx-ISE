@@ -18,7 +18,8 @@
 //   const r = placeS6(phys, s6Sites(device), { seed, effort, timing, nl })
 //     r = { site: [site name by inst], tile: [tile name by inst], pos: [[px, py]], wirelength, delay (the estimate's
 //           critical path, ns), warnings, stats: { moves, temps, seconds, objects, initialWirelength, initialDelay } }
-import { PlaceError, crossing, rng, vccoOfStandard } from '../place.js';
+import { PlaceError, crossing, rng } from '../place-common.js';
+import { vccoOfStandard } from '../device-sites.js';
 import { timingGraphS6, analyzeS6 } from './place-timing.js';
 import { mountMovesS6 } from './place-moves.js';
 

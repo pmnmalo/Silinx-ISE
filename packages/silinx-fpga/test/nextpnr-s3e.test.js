@@ -10,7 +10,7 @@ import { parseXdl, writeXdl } from '../src/xdl.js';
 import { loadDeviceCache } from '../src/fpga/device-node.js';
 import { loadDb } from '../src/fpga/bitdb-node.js';
 import { bitgen } from '../src/fpga/bitgen.js';
-import { checkRouting } from '../src/fpga/route.js';
+import { checkRouting } from '../src/fpga/route-check.js';
 import { WIRE } from '../src/fpga/timing.js';
 import { SPEED_4 } from '../src/fpga/timing.js';
 import { readYosysJson } from '../src/fpga/netlist.js';

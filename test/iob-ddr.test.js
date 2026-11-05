@@ -14,7 +14,7 @@ import { primitiveSources } from '../core/unisim.js';
 import { Simulator } from '../core/simulator.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
 import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
-import { deviceSites, place } from '../packages/silinx-fpga/src/fpga/place.js';
+import { deviceSites } from '../packages/silinx-fpga/src/fpga/device-sites.js';
 import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 import { loadDb } from '../packages/silinx-fpga/src/fpga/bitdb-node.js';
 import { instArcs, timingGraph } from '../packages/silinx-fpga/src/fpga/timing.js';
@@ -193,22 +193,6 @@ test('IDDR2 / ODDR2 the packer refuses: DDR_ALIGNMENT C0 / C1, an IDDR2 not on a
   refused({ u: oddr2('a', 'a', 'z'), x: lut2('z', 'a', 'p') }, 'pack: ODDR2 u: its Q must drive an output port and nothing else (the DDR registers are in the IOBs)');
   refused({ u: oddr2('a', 'a', 'p', { c1: 'a' }) }, 'pack: ODDR2 u: its clock C1 (a) is not on a global clock buffer (BUFG)');
   refused({ u: oddr2('a', 'a', 'p', { r: 'a', s: 'a' }) }, 'pack: ODDR2 u: both R and S used (the IOB has one set / reset for its output registers)');
-});
-
-test('an ODDR2 and an output register on another clock in the two IOBs of a differential pair: kept apart when free, refused when LOC\'d there (both share each clock wire of their tile)', () => {
-  const sites = deviceSites(loadDeviceCache('xc3s250ecp132-4'));
-  const byTile = new Map();
-  for (const x of sites.pads.values()) if (x.pair && !x.inputOnly) byTile.set(x.pair, [...(byTile.get(x.pair) || []), x]);
-  const [m, sl] = [...byTile.values()].find(ps => ps.length === 2).sort((a, b) => b.master - a.master);
-  const nl = () => design({ g2: ['BUFG', { I: 'k', O: 'k2' }], u: oddr2('a', 'k', 'p'), r: ['FDRE', { C: 'k2', CE: '1', R: '0', D: 'a', Q: 'q' }] }, { ins: ['a', 'k'], outs: ['p', 'q'] });
-  const few = { ...sites, pads: new Map([...sites.pads].filter(([n]) => n !== m.name && n !== sl.name).slice(0, 6).concat([[m.name, m], [sl.name, sl]])) };
-  for (let seed = 1; seed <= 6; seed++) {
-    const p = pack(nl(), { iobRegs: 'o', ucf: '' }), r = place(p, few, { seed, effort: 0.1 });
-    const at = n => r.sites[p.insts.findIndex(x => x.name === n)].site;
-    assert.ok(!([at('p_o'), at('q_o')].includes(m.name) && [at('p_o'), at('q_o')].includes(sl.name)), `seed ${seed}`);
-  }
-  const p = pack(nl(), { iobRegs: 'o', ucf: `NET "p_o" LOC = "${m.name}" ;\nNET "q_o" LOC = "${sl.name}" ;\n` });
-  assert.throws(() => place(p, sites, { seed: 1, effort: 0.1 }), { message: `place: p_o, q_o: their output registers have different clocks (${clockName(p)}, k2) on pads ${m.name}, ${sl.name}, whose IOBs share the clock wires of the I/O tile ${m.tile}, and p_o's are DDR registers (both flip-flops): put them on pads of different I/O tiles` });
 });
 
 test('the packed IDDR2 / ODDR2 behave as the netlist, cycle by cycle (random stimulus, both clock edges)', () => {

@@ -23,7 +23,6 @@ import { bitstreamS6 } from './fpga/s6/bitgen.js';
 import { parseXdl } from './xdl.js';
 import { readYosysJson } from './fpga/netlist.js';
 import { mountFlowReports } from './open-flow-reports.js';
-import { mountS3eSteps } from './open-flow-s3e.js';
 import { mountS6Steps } from './open-flow-s6.js';
 import { mountNextpnrSteps } from './open-flow-nextpnr.js';
 import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
@@ -102,17 +101,14 @@ function xilinxSteps(ctx, runMap, runPar, r) {
   };
 }
 
-// nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js) by spec.engine 'nextpnr', the application's (#2137: no
-// fallback to the Silinx engine); the Silinx engine's otherwise, until it goes (#2137)
+// nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), the one engine (#2137: Silinx's placer and router
+// removed); the simulation models pack the netlist themselves (no packed design: nextpnr packs at Place & Route)
 function mountS3e(base) {
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
-  const own = mountS3eSteps(ctx);
-  const np = ctx.spec.engine === 'nextpnr' ? mountNextpnrSteps(ctx) : null;
-  const runMap = () => (np || own).runMap();
-  const runPar = () => (np || own).runPar();
+  const np = mountNextpnrSteps(ctx);
   return {
-    steps: xilinxSteps(ctx, runMap, runPar, mountFlowReports({ ...ctx, reports: S3E_REPORTS })),
-    packed: own.packed, routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
+    steps: xilinxSteps(ctx, () => np.runMap(), () => np.runPar(), mountFlowReports({ ...ctx, reports: S3E_REPORTS })),
+    packed: () => null, routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
     placeRouteNetlist: placeRouteNetlist(base, c => mountNextpnrSteps(c)),
   };
 }

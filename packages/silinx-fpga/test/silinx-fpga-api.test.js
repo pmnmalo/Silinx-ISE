@@ -1,6 +1,6 @@
 // silinx-fpga's public API (#1678, step 7 of the toolchain's separation, #1651): the package's entries (exports),
 // the same in Node and in the browser (./parts: the light part of it; ./node adds the disk's loaders), and a design from Verilog and a UCF to its
-// .bit through them alone, Silinx's place and route or one given through io.placeRoute.
+// .bit through them alone, placed and routed by nextpnr (io.nextpnr, the one engine since #2137).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,7 +25,7 @@ const API = ['FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'ICE40_PARTS', 'ICE40_STE
   'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'familyFromXise', 'familyName',
   'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
-  'nextpnrIo', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'placeRouteBest', 'powerReport',
+  'nextpnrIo', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'powerReport',
   'primitiveInstances', 'readBit', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
   'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea',
   'synthesizeVerilog', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'writeBit', 'writeXdl', 'yosysWorkerSource'];
@@ -86,7 +86,7 @@ function apiIo(extra = {}) {
   const io = { log: l => lines.push(l), sources: () => [{ path: 'cnt.v', lang: 'verilog', text: COUNTER }], ucf: UCF, ucfName: 'cnt.ucf',
     device: () => (dev ||= node.loadDeviceCache(node.findDeviceGraph(spec.part))),
     bitDb: () => (db ||= node.loadDb('xc3s250ecp132', { graph: io.device() })),
-    yosys: node.yosysNode,
+    yosys: node.yosysNode, nextpnr: { spartan3e: node.nextpnrNode() },
     write: (name, data) => { store[name] = data; return `build/${name}`; }, read: name => store[name] ?? null, save: () => {}, ...extra };
   return { io, store, lines };
 }
@@ -96,7 +96,8 @@ test('#1678 through the API alone: Verilog and a UCF in, the routed XDL, the tim
   const res = await api.runFlow(spec, io);
   assert.ok(res.ok, `${res.error}\n${lines.join('\n')}`);
   assert.deepEqual(lines.filter(l => /warning/i.test(l)), []);
-  assert.equal(api.parseXdl(store['open/routed.xdl']).name, 'cnt');
+  // (the routed design by nextpnr, its instances at their sites: the counter's four outputs on their pads)
+  assert.deepEqual(api.parseXdl(store['open/routed.xdl']).insts.filter(i => /^q</.test(i.name)).map(i => i.site).sort(), ['M11', 'M5', 'P6', 'P7']);
   assert.ok(store['open/timing.txt']);
   const bit = readBit(store['cnt.bit']);
   assert.equal(bit.header.b, '3s250ecp132');
@@ -104,18 +105,12 @@ test('#1678 through the API alone: Verilog and a UCF in, the routed XDL, the tim
   assert.equal(res.report.par.routed, true);
 });
 
-test('#1678 io.placeRoute: the flow places and routes through it (an engine of one\'s own); its failure is the step\'s', { timeout: 300000 }, async () => {
-  const calls = [];
-  const a = apiIo({ placeRoute: (...args) => { calls.push(args.length); return api.placeRouteBest(...args); } });
-  const res = await api.runFlow({ ...spec, steps: ['synth', 'translate', 'map', 'par'] }, a.io);
-  assert.ok(res.ok, `${res.error}\n${a.lines.join('\n')}`);
-  assert.deepEqual(calls, [5]);
-  assert.ok(a.store['open/routed.xdl']);
-
-  const b = apiIo({ placeRoute: () => { throw Object.assign(new Error('no such engine'), { hint: 'install it' }); } });
+test('#2137 io.nextpnr: the flow places and routes through it, the one engine; without it Map says so (io.placeRoute, Silinx\'s engine, gone)', { timeout: 300000 }, async () => {
+  assert.equal(api.placeRouteBest, undefined);
+  const b = apiIo({ nextpnr: undefined });
   const r = await api.runFlow({ ...spec, steps: ['synth', 'translate', 'map', 'par'] }, b.io);
   assert.equal(r.ok, false);
-  assert.equal(r.error, 'placement failed: no such engine');
-  assert.ok(b.lines.includes('=== SILINX FAILED par (exit 1) ==='), b.lines.join('\n'));
+  assert.equal(r.error, 'the nextpnr engine is not available here (io.nextpnr)');
+  assert.ok(b.lines.includes('=== SILINX FAILED map (exit 1) ==='), b.lines.join('\n'));
   assert.equal(b.store['open/routed.xdl'], undefined);
 });

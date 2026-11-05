@@ -74,7 +74,7 @@ test('#1672 toolchain boundary: how the imports across are found', () => {
 });
 
 test('#1672 toolchain boundary: the toolchain\'s modules are found', () => {
-  for (const f of ['fpga/route.js', 'fpga/bitgen.js', 'fpga/s6/bitstream.js', 'synth-open.js', 'open-flow-core.js', 'xdl.js',
+  for (const f of ['fpga/route-check.js', 'fpga/bitgen.js', 'fpga/s6/bitstream.js', 'synth-open.js', 'open-flow-core.js', 'xdl.js',
     'ucf.js', 'family.js']) assert.ok(toolchain.includes(`packages/silinx-fpga/src/${f}`), f);
   for (const f of ['core/compile.js', 'core/sim-model.js', 'core/schdoc.js', 'core/synth-front.js', 'core/fpga/techview.js']) assert.ok(!toolchain.includes(f), f);
   assert.ok(toolchain.length >= 70, `${toolchain.length} modules`);

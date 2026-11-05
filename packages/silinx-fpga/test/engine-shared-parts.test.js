@@ -1,8 +1,7 @@
-// The parts of Silinx's placer and router that other modules use too (#2137: out of packages/silinx-fpga/src/fpga/place.js and
-// route.js, which go with the Spartan-3E's engine): the device's sites and its I/O banks (device-sites.js), the placers'
-// error, random numbers and crossing correction (place-common.js, the Spartan-6's placer's too), a routed design's
-// check (route-check.js, the nextpnr flow's and the Spartan-6's). Mounted alone on the test devices; place.js and route.js
-// still export them.
+// The parts of Silinx's placer and router that other modules use (#2137: moved out of packages/silinx-fpga/src/fpga/place.js
+// and route.js, removed with the Spartan-3E's engine): the device's sites and its I/O banks (device-sites.js), the placers'
+// error, random numbers and crossing correction (place-common.js, the Spartan-6's placer's), a routed design's check
+// (route-check.js, the nextpnr flow's and the Spartan-6's). Mounted alone on the test devices.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,8 +12,6 @@ import { packDevice, loadDevice } from '../src/fpga/device.js';
 import { deviceSites, bankOfPad, vccoOfStandard } from '../src/fpga/device-sites.js';
 import { PlaceError, rng, crossing } from '../src/fpga/place-common.js';
 import { checkRouting, netEndpoints } from '../src/fpga/route-check.js';
-import * as place from '../src/fpga/place.js';
-import * as route from '../src/fpga/route.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const xdlrc = fs.readFileSync(path.join(FIX, 'place-device.xdlrc'), 'utf8');
@@ -79,10 +76,4 @@ test('#2137 a routed design\'s check: a whole tree passes; a missing PIP, a sink
   assert.deepEqual([ends.nets[0].sources.length, ends.nets[0].sinks.map(s => s.pin.inst), ends.errors], [1, ['b0', 'b1'], []]);
   const unplaced = parseXdl(`design "t" xc3s50etq144-4 v3.2 ,\n  cfg "";\ninst "u" "SLICEL",unplaced ,\n  cfg " A::B "\n  ;\n${INSTS}net "k" , \n  outpin "u" X ,\n  inpin "b0" F1 ,\n  ;\n`);
   assert.deepEqual(netEndpoints(unplaced, device).errors, ['net k: outpin u.X: instance not placed or unknown']);
-});
-
-test('#2137 place.js and route.js still export what moved, the same functions', () => {
-  assert.deepEqual([place.deviceSites, place.bankOfPad, place.vccoOfStandard], [deviceSites, bankOfPad, vccoOfStandard]);
-  assert.deepEqual([place.PlaceError, place.rng, place.crossing], [PlaceError, rng, crossing]);
-  assert.deepEqual([route.checkRouting, route.netEndpoints], [checkRouting, netEndpoints]);
 });

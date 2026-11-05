@@ -10,8 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { project, openFlow, withDelays } from './gen-pairdly.mjs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
-import { deviceSites } from '../../src/fpga/place.js';
-import { bufgReach } from '../../src/fpga/route.js';
+import { deviceSites } from '../../src/fpga/device-sites.js';
+import { bufgReach } from '../../src/fpga/clock-reach.js';
 import { loadDb } from '../../src/fpga/bitdb-node.js';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';

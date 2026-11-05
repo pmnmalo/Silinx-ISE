@@ -61,9 +61,9 @@ Map and Place & Route have one engine in the application, nextpnr (#2137); a pro
 | Spartan-6 | Silinx's packer (`fpga/s6/`) | nextpnr; the pads, global buffers, block RAMs and DSPs placed by Silinx's rules first |
 
 There is no fallback: where nextpnr cannot start (its chip database not downloaded yet, offline) Place & Route fails,
-saying so. **nextpnr replaces Silinx's placer and router** (decided in #2131; parity in #2135, #2797): the Silinx engine
-is left only in `runFlow` without `engine: 'nextpnr'` (the command line's `--engine silinx`, the tests), until #2137
-removes it. Silinx's packer stays: the open synthesis counts the slices with it (#2529), the Post-Map model is written
+saying so. **nextpnr replaced Silinx's placer and router** (decided in #2131; parity in #2135, #2797; removed in #2137,
+the Spartan-3E's: their parts other modules use are in `fpga/device-sites.js`, `fpga/place-common.js`,
+`fpga/route-check.js`, `fpga/clock-reach.js`). Silinx's packer stays: the open synthesis counts the slices with it (#2529), the Post-Map model is written
 from it (#2530).
 The micro-architectures live in the fork `pmnmalo/nextpnr-spartan`. What stays Silinx's in any case: the timing, the bitstream
 and their data. nextpnr's routed design is converted to XDL (`fpga/nextpnr-xdl.js`), which those steps read.
