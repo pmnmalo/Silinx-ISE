@@ -33,7 +33,7 @@ const layout = (page) => page.eval((d) => {
     side: sr.left >= mr.right - 1 && sr.top < mr.bottom ? 'right' : sr.top >= mr.bottom - 1 ? 'below' : 'over', width: Math.round(sr.width),
     folded: emu.classList.contains('props-folded'), cap: side.querySelector('.asm-cap').textContent,
     sections: [...side.querySelectorAll('.emu-box h4')].filter((h) => h.getClientRects().length).map((h) => h.textContent),
-    rows: [...menu.children].map((r) => r.firstChild.nodeValue), menuShown: !menu.hidden && menu.getClientRects().length > 0,
+    rows: [...menu.querySelectorAll('.tb-menu-title')].map((r) => r.textContent), menuShown: !menu.hidden && menu.getClientRects().length > 0,
     bar: [...emu.querySelector('.emu-bar').childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue),
   };
 }, DOC);
@@ -48,7 +48,7 @@ uiTest('#2666 #2713 the Board Emulator: Watch and notes in a side panel at the r
   // toolbar keeps the model and the clock
   let L = await layout(page);
   assert.deepEqual({ ...L, width: undefined }, { side: 'right', width: undefined, folded: false, cap: 'Properties', sections: ['Watch'],
-    rows: ['Engine:', 'When hidden:', 'Show:'], menuShown: false, bar: ['Model:', 'Clock:'] });
+    rows: ['Engine', 'When hidden', 'Show'], menuShown: false, bar: ['Model:', 'Clock:'] });
   assert.equal(L.width, 280);
   // (its hint; what it says of the design, in the console, #2718)
   assert.equal(await page.eval((d) => document.querySelector(`${d} .emu-side > .emu-hint`).textContent, DOC), 'Buttons: press and hold; Shift+click keeps a button pressed.');
@@ -109,7 +109,7 @@ uiTest('#2666 #2713 the Board Emulator: Watch and notes in a side panel at the r
   const en = await page.eval((d) => window.__uiTexts(document.querySelector(`${d} .emu`)), DOC);
   await setLang('pt');
   const pt = await page.eval((d) => window.__uiTexts(document.querySelector(`${d} .emu`)), DOC);
-  for (const t of ['Propriedades', '@Recolher o painel das propriedades', '@Motor, quando oculto, módulos mostrados', 'Motor:', 'Quando oculto:', 'Mostrar:', 'Monitor VGA'])
+  for (const t of ['Propriedades', '@Recolher o painel das propriedades', '@Motor, quando oculto, módulos mostrados', 'Motor', 'Quando oculto', 'Mostrar', 'Monitor VGA'])
     assert.ok(pt.includes(t), `${t}: ${pt.join(' | ')}`);
   assert.deepEqual(untranslated(en, pt, [/^(vga|real \(÷1\))\b/, /^\w+<\d+>$/, /^@?[A-Z_0-9]+:? /, /^@?[A-Z_0-9]+ = /, /^@?[A-Z]{2,}\d*$/]), []);
   await setLang('en');

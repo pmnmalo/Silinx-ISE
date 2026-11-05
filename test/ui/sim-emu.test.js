@@ -389,8 +389,9 @@ end rtl;
 // (hints: what the emulator says of the design, in the console since #2718)
 const bar = async (page) => ({ ...await page.eval(() => {
   const sels = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')];
-  const engine = sels.find((x) => [...x.options].some((o) => o.value === 'compiled'));
-  return { engine: engine?.value, compiledDisabled: engine ? [...engine.options].find((o) => o.value === 'compiled').disabled : null,
+  // (the engine: the menu's items, #2846)
+  const item = (v) => document.querySelector(`.doc:not([hidden]) .emu-bar .tb-more-menu [data-value=${v}]`), compiled = item('compiled');
+  return { engine: compiled ? (compiled.getAttribute('aria-checked') === 'true' ? 'compiled' : 'event') : undefined, compiledDisabled: compiled ? compiled.disabled : null,
     speed: sels.find((x) => [...x.options].some((o) => o.value === 'max'))?.value, view: window.Silinx.active.view.engine };
 }), hints: (await emuNotes(page)) || [] });
 uiTest('board emulator: the compiled engine at the board\'s speed (a real timing generic); the Engine selector to the event-driven engine and back', E, async (page) => {
@@ -407,7 +408,7 @@ uiTest('board emulator: the compiled engine at the board\'s speed (a real timing
   await widget(page, 'SW7 = sw<7>');
   await waitLed(page, 7, true);
   // the event-driven engine: the emulator opens again on it, the generic divided, at Max speed
-  await page.eval(() => { const s = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')].find((x) => [...x.options].some((o) => o.value === 'compiled')); s.value = 'event'; s.dispatchEvent(new Event('change')); });
+  await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-bar .tb-more-menu [data-value=event]').click());
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.engine === 'event' && window.Silinx.active.view.outputs, [], { what: 'the emulator on the event-driven engine' });
   b = await bar(page);
   assert.deepEqual([b.view, b.engine, b.compiledDisabled, b.speed], ['event', 'event', false, 'max']);
@@ -415,7 +416,7 @@ uiTest('board emulator: the compiled engine at the board\'s speed (a real timing
   assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-box h4')?.textContent || ''), /^Watch$/);
   assert.match(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-box h4')].map((e) => e.textContent).join('|')), /Timing ÷[\d,]+ \(emulation only\)/);
   // and back
-  await page.eval(() => { const s = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')].find((x) => [...x.options].some((o) => o.value === 'compiled')); s.value = 'compiled'; s.dispatchEvent(new Event('change')); });
+  await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-bar .tb-more-menu [data-value=compiled]').click());
   await page.waitFor(() => window.Silinx.active.view?.engine === 'compiled' && window.Silinx.active.view.outputs, [], { what: 'the emulator on the compiled engine again' });
   assert.deepEqual(page.dialogs, []);
 });
@@ -474,14 +475,14 @@ uiTest('board emulator: a design with a combinational loop runs on the event-dri
   // in Portuguese: no untranslated text
   await page.click('.doc:not([hidden]) .emu-bar .btn', { text: '⏸ Pause' });
   await page.eval(TEXTS);
-  // (the Engine selector in the toolbar's menu, opened, #2666)
+  // (the Engine items in the toolbar's menu, opened, #2666, #2846)
   await page.click('.doc:not([hidden]) .emu-bar .tb-more-btn');
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('en');
   const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden])')));
   await setLang('pt');
   const pt = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden])')));
-  assert.ok(pt.includes('Motor:') && pt.includes('Compilado (velocidade real)') && pt.includes('Por eventos (depuração)'));
+  assert.ok(pt.includes('Motor') && pt.includes('Compilado (velocidade real)') && pt.includes('Por eventos (depuração)'));
   await setLang('en');
   const db = await env.server.api('GET', '/api/devices');
   const same = [{ test: (s) => db.boards.some((b2) => b2.name === s) }, /^(lp|led|sw|real \(÷1\))\b/, /^@?[A-Z_0-9]+:? /, /^@?[A-Z_0-9]+ = /];
@@ -545,7 +546,7 @@ uiTest('board emulator: the VGA monitor draws the picture the design scans out, 
   const same = [{ test: (x) => db.boards.some((b) => b.name === x) }, /^(vga_bars|hsync|vsync|red|green|blue|sw|clk|tick|hc|vc|pol|real \(÷1\))\b/, /^@?[A-Z_0-9]+:? /, /^@?[A-Z_0-9]+ = /];
   assert.deepEqual(untranslated(en, pt, same), []);
   // the event-driven engine: the monitor says it needs the compiled one
-  await page.eval(() => { const s = [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select')].find((x) => [...x.options].some((o) => o.value === 'compiled')); s.value = 'event'; s.dispatchEvent(new Event('change')); });
+  await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-bar .tb-more-menu [data-value=event]').click());
   await page.waitFor(() => window.Silinx.active.view?.engine === 'event' && window.Silinx.active.view.outputs, [], { what: 'the event-driven engine' });
   assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-vga-nosig').textContent), 'The VGA monitor needs the compiled engine (the event-driven one is too slow for a frame)');
   assert.deepEqual(page.dialogs, []);
