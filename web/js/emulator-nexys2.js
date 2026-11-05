@@ -31,7 +31,7 @@ export function nexys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButt
   const pin = (res, k = 0) => pinsOf(board, res)[k] ?? '';
   const art = `
     <defs><linearGradient id="nx2pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26493a"/><stop offset="1" stop-color="#1d3b2e"/></linearGradient></defs>
-    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="8" fill="url(#nx2pcb)" stroke="#0f2219" stroke-width="3"/>
+    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="8" fill="url(#nx2pcb) #26493a" stroke="#0f2219" stroke-width="3"/>
     ${holes4(W, H)}
     <rect x="112" y="0" width="54" height="66" rx="3" fill="#1a1a1a" stroke="#000"/><circle cx="139" cy="18" r="10" fill="#333"/><circle cx="139" cy="18" r="3" fill="#888"/>
     ${text(139, 80, '5V', { size: 8 })}${text(POWER[0], 82, 'POWER', { size: 7 })}${text(POWER[0], 91, 'SWITCH', { size: 7 })}

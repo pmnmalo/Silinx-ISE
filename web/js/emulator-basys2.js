@@ -28,7 +28,7 @@ export function basys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButt
   const segs = ['CA', 'CB', 'CC', 'CD', 'CE', 'CF', 'CG'].map((s, i) => `${s}(${pinsOf(board, 'seg')[i] ?? ''})`).concat(`DP(${pinsOf(board, 'dp')[0] ?? ''})`);
   const art = `
     <defs><linearGradient id="b2pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2156b3"/><stop offset="1" stop-color="#18449a"/></linearGradient></defs>
-    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="8" fill="url(#b2pcb)" stroke="#0e2a66" stroke-width="3"/>
+    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="8" fill="url(#b2pcb) #2156b3" stroke="#0e2a66" stroke-width="3"/>
     ${holes4(W, H)}
     ${pmodTop(99, 'JA', [pinsOf(board, 'ja')[0], ...pinsOf(board, 'tx'), ...pinsOf(board, 'rx'), pinsOf(board, 'ja')[1]])}${pmodTop(278, 'JB', pinsOf(board, 'jb'))}${pmodTop(457, 'JC', pinsOf(board, 'jc'))}${pmodTop(635, 'JD', pinsOf(board, 'jd'))}
     <rect x="0" y="91" width="54" height="96" rx="3" fill="#c3c7cd" stroke="#6b7079"/><rect x="0" y="104" width="30" height="70" fill="#9da2a9"/><rect x="34" y="96" width="14" height="86" fill="#d9dce1"/>

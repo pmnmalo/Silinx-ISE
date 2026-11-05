@@ -33,7 +33,7 @@ export function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabe
   const tact = ([x, y]) => `<rect x="${x - 15}" y="${y - 15}" width="30" height="30" rx="2" fill="#c9ccd1" stroke="#7b8088"/>`;
   const art = `
     <defs><linearGradient id="s3epcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a5c3d"/><stop offset="1" stop-color="#1f4a30"/></linearGradient></defs>
-    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="10" fill="url(#s3epcb)" stroke="#102a1b" stroke-width="3"/>
+    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="10" fill="url(#s3epcb) #2a5c3d" stroke="#102a1b" stroke-width="3"/>
     ${holes4(W, H)}
     <rect x="62" y="0" width="46" height="60" rx="3" fill="#1a1a1a" stroke="#000"/><circle cx="85" cy="16" r="9" fill="#333"/><circle cx="85" cy="16" r="3" fill="#888"/>
     ${text(85, 72, '5V DC')}${text(140, 56, 'ON', { size: 8 })}${text(140, 118, 'POWER', { size: 8 })}

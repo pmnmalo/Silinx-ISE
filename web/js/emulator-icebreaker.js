@@ -40,7 +40,7 @@ export function icebreakerLayout({ board, title, h, mkDigit, mkLed, mkSwitch, mk
   const hasDisp = has('an'), hasSw = has('sw'), Y0 = hasDisp || hasSw ? TOP : 0, H = BH + Y0;
   const art = `${modules(board, hasDisp, hasSw)}<g transform="translate(0 ${Y0})">
     <defs><linearGradient id="icbpcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d3a7a"/><stop offset="1" stop-color="#152d63"/></linearGradient></defs>
-    <rect x="4" y="4" width="${MW - 8}" height="${BH - 8}" rx="18" fill="url(#icbpcb)" stroke="#0b1a40" stroke-width="3"/>
+    <rect x="4" y="4" width="${MW - 8}" height="${BH - 8}" rx="18" fill="url(#icbpcb) #1d3a7a" stroke="#0b1a40" stroke-width="3"/>
     ${holes4(MW, BH)}
     ${header12(80, 4)}${text(180, 78, 'PMOD1A', { size: 12 })}${text(70, 26, '7', { size: 9 })}${text(70, 50, '1', { size: 9 })}
     <rect x="330" y="8" width="28" height="48" rx="3" fill="#13254d" stroke="#d8c67e" stroke-width="1.5"/><circle cx="344" cy="20" r="7" fill="#d8c67e"/><circle cx="344" cy="44" r="7" fill="#d8c67e"/>${text(344, 78, '+5V', { size: 10 })}
@@ -61,7 +61,7 @@ export function icebreakerLayout({ board, title, h, mkDigit, mkLed, mkSwitch, mk
     <rect x="540" y="361" width="24" height="24" rx="2" fill="#141414"/><circle cx="552" cy="373" r="5" fill="#c9a94a"/>${text(576, 368, 'CRESET', { size: 7, rotate: true })}
     <rect x="344" y="452" width="240" height="32" rx="3" fill="#13254d" stroke="#d8c67e" stroke-width="1.5"/>${Array.from({ length: 8 }, (_, i) => `<circle cx="${358 + i * 30}" cy="468" r="7" fill="#d8c67e"/>`).join('')}${text(464, 446, 'FLASH', { size: 8, weight: 'normal' })}
     <rect x="${MW}" y="190" width="10" height="110" fill="#8d939b"/>
-    <rect x="720" y="109" width="${W - 724}" height="264" rx="14" fill="url(#icbpcb)" stroke="#0b1a40" stroke-width="3"/>
+    <rect x="720" y="109" width="${W - 724}" height="264" rx="14" fill="url(#icbpcb) #1d3a7a" stroke="#0b1a40" stroke-width="3"/>
     ${[[740, 129], [740, 353]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" fill="#d8c67e"/><circle cx="${x}" cy="${y}" r="3.5" fill="#1b1b1b"/>`).join('')}
     <rect x="756" y="141" width="44" height="190" rx="3" fill="#141414"/>${Array.from({ length: 12 }, (_, i) => `<rect x="${764 + Math.floor(i / 6) * 20}" y="${152 + (i % 6) * 31}" width="8" height="8" fill="#c9a94a"/>`).join('')}
     ${text(820, 135, 'PMOD', { size: 9 })}
