@@ -1,14 +1,14 @@
-// The Board Emulator's modules outside the board (#2522): a checkbox for each in the toolbar's menu (#2666), to show or hide it (the
+// The Board Emulator's modules outside the board (#2522): a checkable item for each in the toolbar's menu (#2666, #2846), to show or hide it (the
 // VGA monitor, the serial terminal, the iCEBreaker's modules on its Pmods). A module is what its drawing marks with data-module; hiding it
 // changes the view only: the design goes on driving it. The choice is remembered, per module.
-import { h } from './dom.js';
 import { prefKey } from './prefs.js';
+import { menuCheck, menuTitle } from './toolbar-menu.js';
 
 const LABELS = { vga: 'VGA monitor', serial: 'Serial terminal', display: 'Display', switches: 'Switches' };
 const MODULE_KEY = (id) => prefKey(`silinx.emulator.module.${id}`);
 const pref = (id) => { try { return localStorage.getItem(MODULE_KEY(id)) !== 'hidden'; } catch { return true; } };
 
-/** The checkboxes, in the toolbar's menu (menu), for the modules in main; changed(): after one is shown or hidden. */
+/** The items, in the toolbar's menu (menu), for the modules in main; changed(): after one is shown or hidden. */
 export function mountEmuModules({ main, menu, changed }) {
   const all = [...main.querySelectorAll('[data-module]')], ids = [...new Set(all.map((e) => e.dataset.module))];
   if (!ids.length) return;
@@ -22,15 +22,17 @@ export function mountEmuModules({ main, menu, changed }) {
     }
   };
   const show = (id, on) => { for (const e of all) if (e.dataset.module === id) e.style.display = on ? '' : 'none'; fit(); };
-  const box = (id) => {
+  // (a checkable item of the menu for each, as every toolbar menu's, #2846)
+  const item = (id) => {
     const on = pref(id);
     show(id, on);
-    return h('label', { class: 'emu-module', title: 'Show or hide this module: the design goes on running' },
-      h('input', { type: 'checkbox', checked: on, 'data-module-toggle': id, onchange: (e) => {
-        show(id, e.target.checked);
-        try { localStorage.setItem(MODULE_KEY(id), e.target.checked ? 'shown' : 'hidden'); } catch { /* ignore */ }
-        changed();
-      } }), LABELS[id] || id);
+    const it = menuCheck(LABELS[id] || id, { checked: on, title: 'Show or hide this module: the design goes on running', onChange: (shown) => {
+      show(id, shown);
+      try { localStorage.setItem(MODULE_KEY(id), shown ? 'shown' : 'hidden'); } catch { /* ignore */ }
+      changed();
+    } });
+    it.dataset.moduleToggle = id;
+    return it;
   };
-  menu.append(h('div', { class: 'emu-menu-row emu-menu-show' }, 'Show:', ...ids.map(box)));
+  menu.append(menuTitle('Show'), ...ids.map(item));
 }

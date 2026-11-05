@@ -149,8 +149,8 @@ html[data-ui="ise"][data-theme="dark"] .pin-planner .pp-res .res.used { color: #
 html[data-ui="ise"][data-theme="dark"] .impact-dev .bypass { color: var(--muted); }
 
 /* ------------------------------------------------------------------ the drawings' toolbars (schematic, ASM, FSM, Petri net, truth table) */
-html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn, .asm-editor .asm-toolbar .asm-btn, .tt-menu-item, .tt-toolbar .tb-more-btn) { color: var(--fg); }
-html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn, .asm-editor .asm-toolbar .asm-btn, .tt-menu-item, .tt-toolbar .tb-more-btn):hover:not(:disabled) { border-color: var(--ise-hot-line); background: var(--ise-hot); }
+html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn, .asm-editor .asm-toolbar .asm-btn, .tt-menu-item, .tb-menu-item, .tt-toolbar .tb-more-btn) { color: var(--fg); }
+html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn, .asm-editor .asm-toolbar .asm-btn, .tt-menu-item, .tb-menu-item, .tt-toolbar .tb-more-btn):hover:not(:disabled) { border-color: var(--ise-hot-line); background: var(--ise-hot); }
 html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-btn:active:not(:disabled), .sch-editor .se-btn.on, .asm-editor .asm-toolbar .asm-btn:active:not(:disabled), .asm-editor .asm-toolbar .asm-btn:is(.on, .active)) {
   border-color: #5b8def; background: var(--ise-down); }
 html[data-ui="ise"][data-theme="dark"] :is(.sch-editor .se-sep, .asm-editor .asm-sep, .tt-sep) { background: var(--ise-line); box-shadow: none; }

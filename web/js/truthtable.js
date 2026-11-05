@@ -71,7 +71,7 @@ function ttPrintView(root, notes, name) {
 const shapeText = (m) => { const ni = m.inputs.length, no = m.outputs.length; return `${ni} input${ni === 1 ? '' : 's'} · ${no} output${no === 1 ? '' : 's'} · ${2 ** ni} rows`; };
 
 // a menu item as the schematic editor's: an icon and a label (#2505)
-const menuItem = (icon, label, title, onclick, cls = '') => h('button', { type: 'button', class: `tt-menu-item ${cls}`, title, html: `${ICON[icon]}<span>${label}</span>`, onclick });
+const menuItem = (icon, label, title, onclick, cls = '') => h('button', { type: 'button', class: `tt-menu-item tb-menu-item ${cls}`, title, html: `${ICON[icon]}<span>${label}</span>`, onclick });
 
 export function mountTtEditor(container, opts = {}) {
   let M = normalizeTable(opts.model);

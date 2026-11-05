@@ -32,7 +32,7 @@ const forget = (page) => page.eval(async () => {
   for (const id of ['vga', 'display', 'switches']) localStorage.removeItem(prefKey(`silinx.emulator.module.${id}`));
 });
 const DOC = '.doc:not([hidden])';
-const toggles = (page, root) => page.eval((r) => [...document.querySelectorAll(`${r} [data-module-toggle]`)].map((c) => [c.dataset.moduleToggle, c.checked, c.parentElement.textContent]), root);
+const toggles = (page, root) => page.eval((r) => [...document.querySelectorAll(`${r} [data-module-toggle]`)].map((c) => [c.dataset.moduleToggle, c.getAttribute('aria-checked') === 'true', c.textContent.replace(/^✓/, '')]), root);   // (checkable menu items, #2846)
 const toggle = (page, root, id) => page.eval((r, i) => document.querySelector(`${r} [data-module-toggle="${i}"]`).click(), root, id);
 
 uiTest('#2522 the VGA monitor hidden and shown again: the design goes on, no picture while hidden, the picture of now when paused; the choice remembered, in Portuguese too', E, async (page) => {
@@ -67,7 +67,7 @@ uiTest('#2522 the VGA monitor hidden and shown again: the design goes on, no pic
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('pt');
   assert.deepEqual((await toggles(page, DOC))[0][2], 'Monitor VGA');
-  assert.match(await page.eval((d) => document.querySelector(`${d} .emu-bar`).textContent, DOC), /Mostrar:/);
+  assert.match(await page.eval((d) => document.querySelector(`${d} .emu-bar`).textContent, DOC), /Mostrar/);
   await setLang('en');
   await forget(page);
 });
@@ -79,7 +79,7 @@ uiTest('#2522 a board with no module outside it: no control', E, async (page) =>
   await page.eval(() => window.SilinxApp.openFile('src/cnt.vhd'));
   await open(page);
   assert.deepEqual(await toggles(page, DOC), []);
-  assert.doesNotMatch(await page.eval((d) => document.querySelector(`${d} .emu-bar`).textContent, DOC), /Show:/);
+  assert.doesNotMatch(await page.eval((d) => document.querySelector(`${d} .emu-bar`).textContent, DOC), /Show/);
 });
 
 // the iCEBreaker with its Pmod modules, drawn alone (the emulator's style in place: a Basys2's opened first)

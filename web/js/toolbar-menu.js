@@ -1,7 +1,8 @@
 // The menu of a document's toolbar (#2257, #2259, as the schematic editor's, #2208): three dots always at the right of
 // the toolbar's first line (absolute, the CSS), open until a click elsewhere, Esc or one of its commands. The keyboard
 // (#2839): Enter or Space on the dots opens it on its first entry (↓ too), ↑ / ↓ / Home / End move through its entries,
-// Esc closes it back on the dots.
+// Esc closes it back on the dots. It holds menu items, never form fields (#2846): a choice is a section title and its
+// options, checkable items, a ✓ on the current one (menuChoice), a setting on or off one checkable item (menuCheck).
 import { h } from './ui.js';
 
 const DOTS = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>';
@@ -43,4 +44,47 @@ export function toolbarMenu(items, { title, btnClass = 'tb-btn' }) {
     document[open ? 'addEventListener' : 'removeEventListener']('keydown', onEsc, true);
   }
   return { el, button, menu, close: () => show(false) };
+}
+
+/** A section title of a toolbar menu. */
+export const menuTitle = (label) => h('div', { class: 'tb-menu-title', role: 'presentation' }, label);
+
+// a checkable item: the ✓ in its own column, its label; role the ARIA one (menuitemradio, menuitemcheckbox)
+const checkItem = (role, label, { checked, disabled = false, title = null, onclick }) => h('button', {
+  type: 'button', class: `tb-menu-item tb-menu-check${checked ? ' checked' : ''}`, role, 'aria-checked': String(!!checked), disabled, title, onclick
+}, h('span', { class: 'tb-menu-tick', 'aria-hidden': 'true' }, checked ? '✓' : ''), h('span', {}, label));
+
+/** An item's ✓ put or taken away. */
+export function setChecked(item, on) {
+  item.classList.toggle('checked', on);
+  item.setAttribute('aria-checked', String(on));
+  item.firstChild.textContent = on ? '✓' : '';
+}
+
+/** A choice in a toolbar menu: its title, then an item for each of options ({ value, label, disabled, title: the
+ *  reason it is disabled, or its tip }), ✓ on the one of value, which follows the one chosen; onChange(value) when
+ *  another is chosen. */
+export function menuChoice(label, options, { value, onChange, title = null }) {
+  const head = menuTitle(label);
+  if (title) head.title = title;
+  const items = options.map((o) => checkItem('menuitemradio', o.label, {
+    checked: o.value === value, disabled: !!o.disabled, title: o.title ?? title, onclick: () => {
+      if (o.value === value) return;
+      value = o.value;
+      items.forEach((it, i) => setChecked(it, options[i].value === value));
+      onChange(value);
+    }
+  }));
+  items.forEach((it, i) => { it.dataset.value = String(options[i].value); });   // (its option's value: the tests')
+  return [head, ...items];
+}
+
+/** A setting on or off in a toolbar menu: one item, ✓ when on; onChange(on) when clicked. */
+export function menuCheck(label, { checked, onChange, title = null }) {
+  const item = checkItem('menuitemcheckbox', label, { checked, title, onclick: () => {
+    const on = item.getAttribute('aria-checked') !== 'true';
+    setChecked(item, on);
+    onChange(on);
+  } });
+  return item;
 }

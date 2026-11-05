@@ -4,11 +4,11 @@
 // event-driven, #418), what it does while not seen and the modules shown (emulator-modules.js).
 import { h } from './dom.js';
 import { HIDDEN_KEY, SPEEDS } from './emulator.js';
-import { toolbarMenu } from './toolbar-menu.js';
+import { menuChoice, toolbarMenu } from './toolbar-menu.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import { statusLine } from './status-line.js';
 
-/** { main, menu, resetBtn, root, runBtn, stat, stepBtn } (menu: the toolbar menu's element, its rows appended) of mountEmulator (compiled(), engineNote(), running(), speed(), whenHidden(): its current values). */
+/** { main, menu, resetBtn, root, runBtn, stat, stepBtn } (menu: the toolbar menu's element, its items appended) of mountEmulator (compiled(), engineNote(), running(), speed(), whenHidden(): its current values). */
 export function mountEmuToolbar(ctx) {
   const {
     container, engine, model, timing, title, compiled, engineNote, powerCycle, running, setRunning, speed, step,
@@ -26,9 +26,10 @@ export function mountEmuToolbar(ctx) {
   // (its time and speed: in its status line, #2763; t = … ns · … cycles · … kHz, written by the emulator)
   const line = statusLine(), stat = h('span', { class: 'stat ds-f' });
   line.el.append(stat);
-  const hiddenSel = h('select', { title: 'What the emulator does while it is not seen (another browser tab, a minimised window, another document tab): pause, and go on where it was when shown again, or keep running',
-    onchange: (e) => { setWhenHidden(e.target.value); try { localStorage.setItem(HIDDEN_KEY, whenHidden()); } catch { /* ignore */ } visibility(); } },
-    h('option', { value: 'pause', selected: whenHidden() === 'pause' }, 'Pause'), h('option', { value: 'run', selected: whenHidden() === 'run' }, 'Keep running'));
+  // what it does while not seen (#719)
+  const hidden = menuChoice('When hidden', [{ value: 'pause', label: 'Pause' }, { value: 'run', label: 'Keep running' }], {
+    value: whenHidden(), title: 'What the emulator does while it is not seen (another browser tab, a minimised window, another document tab): pause, and go on where it was when shown again, or keep running',
+    onChange: (v) => { setWhenHidden(v); try { localStorage.setItem(HIDDEN_KEY, whenHidden()); } catch { /* ignore */ } visibility(); } });
   // timing scale: the top's large integer generics divided (see core/emulate.js)
   let timingSel = null;
   if (timing?.gens?.length) {
@@ -44,14 +45,16 @@ export function mountEmuToolbar(ctx) {
     h('option', { value: '', selected: !model.current }, 'Behavioral (RTL)'),
     ...Object.entries(model.names).map(([k, n]) => h('option', { value: k, selected: model.current === k },
       `${n} netlist`))) : null;
-  // the engine (#418): compiled (the board's speed) or event-driven (debugging)
-  const engineSel = engine ? h('select', { title: 'The simulator that runs the design: compiled (its netlist, at the board\'s real speed) or event-driven (the behavioural RTL, with X values and the design\'s messages: for debugging)',
-    onchange: (e) => engine.onChange?.(e.target.value) },
-    h('option', { value: 'compiled', selected: !!compiled(), disabled: !compiled() && !!engineNote(), title: !compiled() && engineNote() ? `Not compiled: ${engineNote()}` : null }, 'Compiled (real speed)'),
-    h('option', { value: 'event', selected: !compiled() }, 'Event-driven (debugging)')) : null;
-  const row = (label, el) => h('label', { class: 'emu-menu-row' }, label, el);
-  const more = toolbarMenu([engineSel ? row('Engine:', engineSel) : null, row('When hidden:', hiddenSel)].filter(Boolean),
-    { title: 'Engine, when hidden, modules shown', btnClass: 'btn' });
+  // the engine (#418): compiled (the board's speed) or event-driven (debugging); compiled disabled, its reason its tip,
+  // when the design is not compiled
+  const noCompiled = !compiled() && engineNote() ? `Not compiled: ${engineNote()}` : null;
+  const engineChoice = engine ? menuChoice('Engine', [
+    { value: 'compiled', label: 'Compiled (real speed)', disabled: !!noCompiled, title: noCompiled },
+    { value: 'event', label: 'Event-driven (debugging)' }], {
+    value: compiled() ? 'compiled' : 'event', onChange: (v) => engine.onChange?.(v),
+    title: 'The simulator that runs the design: compiled (its netlist, at the board\'s real speed) or event-driven (the behavioural RTL, with X values and the design\'s messages: for debugging)' }) : [];
+  // (its items: menu items, never form fields, as every toolbar menu's, #2846; the modules shown appended, emulator-modules.js)
+  const more = toolbarMenu([...engineChoice, ...hidden], { title: 'Engine, when hidden, modules shown', btnClass: 'btn' });
   root.append(h('div', { class: 'emu-bar' }, modelSel ? 'Model:' : null, modelSel, modelSel ? h('span', { class: 'sep' }) : null,
     runBtn, stepBtn, resetBtn, h('span', { class: 'sep' }), 'Clock:', speedSel,
     timingSel ? h('span', { class: 'sep' }) : null, timingSel ? 'Timing:' : null, timingSel,

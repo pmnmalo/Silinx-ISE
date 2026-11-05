@@ -64,7 +64,7 @@ export function mountToolbar(ctx) {
   }
   // the menu (#2839): the wave configuration's commands, used now and then
   if (opts.wcfg) {
-    const item = (key, label, title, fn) => (btns[key] = h('button', { type: 'button', class: 'tt-menu-item', title, onclick: () => fn() }, label));
+    const item = (key, label, title, fn) => (btns[key] = h('button', { type: 'button', class: 'tt-menu-item tb-menu-item', title, onclick: () => fn() }, label));
     const more = toolbarMenu([
       item('wcfgSave', 'Save Wave Configuration…', 'Save the wave window\'s signals, dividers, groups and markers to a .wcfg file of the project', () => api().saveWcfg()),
       item('wcfgLoad', 'Load Wave Configuration…', 'Load a .wcfg file of the project into the wave window', () => api().loadWcfg()),

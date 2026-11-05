@@ -28,7 +28,8 @@ begin
 end rtl;
 `;
 
-const engineSel = '.doc:not([hidden]) .emu-bar select[title^="The simulator that runs the design"]';
+// the Engine choice: its items in the toolbar's menu (#2846)
+const engineItems = '.doc:not([hidden]) .emu-bar .tb-more-menu [role=menuitemradio]:is([data-value=compiled], [data-value=event])';
 // the device a tablet: what the browser says of it (User-Agent Client Hints' mobile, 2 cores), until the page reloads
 const slowDevice = (page) => page.eval(() => {
   Object.defineProperty(Navigator.prototype, 'userAgentData', { configurable: true, get: () => ({ mobile: true, brands: [], platform: 'Android' }) });
@@ -45,10 +46,10 @@ const closeEmulator = (page) => page.eval(() => window.SilinxApp.closeDoc(window
 // the Engine selector (its value, the options enabled) and the note that says why the event-driven engine runs (in the
 // console, #2718)
 const engineUi = async (page) => ({ ...await page.eval((s) => {
-  const e = document.querySelector(s);
-  return { value: e.value, enabled: [...e.options].filter((o) => !o.disabled).map((o) => o.value), saved: localStorage.getItem('silinx.emulator.engine') };
-}, engineSel), hint: ((await emuNotes(page)) || []).find((t) => /^the event-driven engine by default/.test(t)) ?? null });
-const choose = (page, v) => page.eval((s, x) => { const e = document.querySelector(s); e.value = x; e.dispatchEvent(new Event('change')); }, engineSel, v);
+  const e = [...document.querySelectorAll(s)];
+  return { value: e.find((b) => b.getAttribute('aria-checked') === 'true').dataset.value, enabled: e.filter((b) => !b.disabled).map((b) => b.dataset.value), saved: localStorage.getItem('silinx.emulator.engine') };
+}, engineItems), hint: ((await emuNotes(page)) || []).find((t) => /^the event-driven engine by default/.test(t)) ?? null });
+const choose = (page, v) => page.eval((s, x) => document.querySelector(`${s}[data-value="${x}"]`).click(), engineItems, v);
 const TABLET_HINT = 'the event-driven engine by default on this device (a phone or tablet, 2 processor cores): choose Engine ▸ Compiled to run the design at the board\'s real speed.';
 
 uiTest('board emulator: a desktop starts compiled; a tablet event-driven, and says why; the choice of engine remembered, winning over the default (#952)', E, async (page) => {
@@ -104,9 +105,9 @@ uiTest('Tasks ▸ Emulate on a tablet: the event-driven engine, switched to comp
   const ui = await engineUi(page);
   assert.deepEqual({ ...ui, hint: !!ui.hint }, { value: 'event', enabled: ['compiled', 'event'], hint: true, saved: null });
   // (in the toolbar's menu, #2666)
-  assert.ok(await page.eval((s) => !document.querySelector(s).getClientRects().length, engineSel), 'the Engine selector in the closed menu');
+  assert.ok(await page.eval((s) => !document.querySelector(s).getClientRects().length, engineItems), 'the Engine items in the closed menu');
   await page.click('.doc:not([hidden]) .emu-bar .tb-more-btn');
-  assert.ok(await page.eval((s) => document.querySelector(s).getClientRects().length > 0, engineSel), 'the Engine selector shown');
+  assert.ok(await page.eval((s) => document.querySelector(s).getClientRects().length > 0, engineItems), 'the Engine items shown');
   await choose(page, 'compiled');
   await running(page, 'compiled');
   assert.deepEqual(await engineUi(page), { value: 'compiled', enabled: ['compiled', 'event'], hint: null, saved: 'compiled' }, { build: { commit: 'abc1234', date: '2026-10-21 12:00' } });   // (the Tasks interface: a development build's only, #838)
