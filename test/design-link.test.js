@@ -265,3 +265,15 @@ test('#2878 viewProblem: the simulation\'s top= a test bench, the other views\' 
   assert.equal(viewProblem(project, files, { view: 'try', top: 'g' }), null);
   assert.equal(viewProblem(project, files, { top: 'top' }), null);
 });
+
+test('#2882 regression: a C source\'s module (its top function\'s) is one of the design\'s, for top= and every view but Try it', async () => {
+  const fs = await import('node:fs');
+  const c = fs.readFileSync(new URL('../test-designs/fir/src/fir.c', import.meta.url), 'utf8');
+  const project = { top: 'fir', board: 'basys2', files: [{ path: 'src/fir.c', role: 'design' }] };
+  const files = { 'src/fir.c': c, 'src/broken.c': 'int x( {' };
+  assert.equal(viewProblem(project, files, { top: 'fir' }), null);
+  assert.equal(viewProblem(project, files, { top: 'FIR' }), null);
+  assert.equal(viewProblem(project, files, { view: 'emulate', top: 'fir' }), null);
+  assert.equal(viewProblem(project, files, { view: 'try', top: 'fir' }), 'Try it: \'fir\' is not a schematic, a state diagram, a Petri net or an ASM chart');
+  assert.equal(viewProblem(project, files, { top: 'broken' }), 'the design has no module \'broken\'');
+});

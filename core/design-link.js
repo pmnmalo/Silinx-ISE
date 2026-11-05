@@ -14,7 +14,7 @@
 // files), paths checked again by the import (a design becomes a Silinx zip, imported as one).
 // Isomorphic: the codec is the browser's CompressionStream (in Node too), or one given.
 import { browserCodec, createZip } from './zip.js';
-import { VIEW_RE, viewHdl } from './view-hdl.js';
+import { VIEW_RE, isCSource, viewHdl } from './view-hdl.js';
 import { gateEntries, gateMessages } from './import-gate.js';
 
 /** The limits of a link: the design's encoded length (characters), its JSON inflated (bytes), its files; `slides`:
@@ -232,14 +232,28 @@ export function benchNames(project, files) {
   const sim = Object.fromEntries((project?.files || []).filter(f => f?.role === 'sim' && typeof files[f.path] === 'string').map(f => [f.path, files[f.path]]));
   return moduleNames(sim);
 }
-// the modules a project's files define, in lower case (#2876): its HDL's entities and modules, its drawings' names
+// the modules a project's files define, in lower case (#2876): its HDL's entities and modules, its drawings' names, its
+// C / C++ sources' (their top function's module, as the Design pane's, #2882)
 function moduleNames(files) {
   const out = new Set();
   for (const [p, t] of Object.entries(files)) {
     if (/\.(vhdl?|s?v)$/i.test(p)) for (const m of String(t).matchAll(/^\s*(?:entity|module)\s+([A-Za-z_][\w$]*)/gim)) out.add(m[1].toLowerCase());
     else if (VIEW_RE.test(p)) { try { const n = JSON.parse(t)?.name; if (typeof n === 'string') out.add(n.toLowerCase()); } catch { /* not a drawing */ } }
+    else if (isCSource(p)) { const m = cModule(p, t); if (m) out.add(m.toLowerCase()); }
   }
   return out;
+}
+// a C source's module (its top function's), or null (errors); made once per text (Copy Link… asks at every choice)
+const C_MODULES = new Map();
+function cModule(path, text) {
+  const key = `${path}\0${text}`;
+  if (!C_MODULES.has(key)) {
+    let m = null;
+    try { const r = viewHdl(path, String(text)); m = r && !r.errors.length ? r.module : null; } catch { /* not C */ }
+    if (C_MODULES.size > 64) C_MODULES.clear();
+    C_MODULES.set(key, m);
+  }
+  return C_MODULES.get(key);
 }
 
 /** The address of the Silinx site (its latest release), the base of a link made away from the app (the MCP server). */

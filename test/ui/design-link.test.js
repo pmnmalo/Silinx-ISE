@@ -221,6 +221,24 @@ uiTest('#2876 regression, a schematic named in another case than its module (Gat
   assert.doesNotMatch(await page.consoleText(), /ERROR: Open from a link/);
 });
 
+uiTest('#2882 regression, a C module (Silinx HLS): Copy Link to This Module… makes its link, no error; the link opens the project on it', E, async (page) => {
+  await makeProject(env, { name: 'CLink', template: 'fir' });
+  await page.openProject('CLink');
+  const row = await page.waitFor(() => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => r.dataset.module === 'fir'); return i >= 0 ? i : null; }, [], { what: 'the C module\'s row' });
+  await contextMenu(page, row, 'Copy Link to This Module…');
+  await page.waitDialog('Copy Link');
+  const link = await page.waitFor(() => document.querySelector('.dlg-overlay .link-out').value || null, [], { what: 'the link' });
+  assert.match(link, /#design=[A-Za-z0-9_-]+&top=fir$/);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), '');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await openLink(page, new URL(link).hash.slice(1), 'c=1');
+  await linkOpened(page);
+  await page.waitFor(() => document.querySelector('#hier .row.sel')?.dataset.module === 'fir', [], { what: 'fir selected' });
+  await page.waitFor(() => window.Silinx.active?.path === 'src/fir.c', [], { what: 'the C source open', timeout: 30000 });
+  assert.doesNotMatch(await page.consoleText(), /ERROR: Open from a link/);
+});
+
 uiTest('#2826 #2875 a changed project: replaced only when the user says so; or the link\'s design opened as <name>_2, _3, the student\'s kept (Keep Mine, Open as, Replace)', E, async (page) => {
   await openLink(page, 'open=example:blinky');
   await linkOpened(page);
