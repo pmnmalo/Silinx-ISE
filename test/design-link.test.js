@@ -225,3 +225,22 @@ test('freeName: the first free <name>_N (#2875), the case ignored, within 64 cha
   assert.equal(freeName(long, [long]), `${'a'.repeat(62)}_2`);
   assert.equal(freeName(long, [long, `${'a'.repeat(62)}_2`]).length, 64);
 });
+
+test('#2876 regression: Try it finds a drawing whose name differs in case from its module\'s (VHDL\'s lower case), or by its generated HDL\'s module', () => {
+  const files = {
+    'src/ALU_4bit.sch.json': JSON.stringify({ name: 'ALU_4bit', generatedFile: 'src/ALU_4bit.vhd' }), 'src/ALU_4bit.vhd': 'entity ALU_4bit is end;\n',
+    'src/Ctl.fsm.json': JSON.stringify({ name: 'Ctl' }), 'src/Net.pn.json': JSON.stringify({ name: 'Net' }),
+    // a drawing named otherwise than its HDL's module: found by its generated file
+    'src/old.sch.json': JSON.stringify({ name: 'old_name', generatedFile: 'src/mux4.vhd' }), 'src/mux4.vhd': 'entity Mux4 is end;\n',
+  };
+  assert.equal(tryDrawing(files, 'alu_4bit'), 'src/ALU_4bit.sch.json');
+  assert.equal(tryDrawing(files, 'ctl'), 'src/Ctl.fsm.json');
+  assert.equal(tryDrawing(files, 'NET'), 'src/Net.pn.json');
+  assert.equal(tryDrawing(files, 'mux4'), 'src/old.sch.json');
+  assert.equal(tryDrawing(files, 'nothere'), null);
+  assert.equal(viewProblem({ top: 'alu_4bit' }, files, { view: 'try' }), null);
+  assert.equal(viewProblem({}, files, { view: 'try', top: 'alu_4bit' }), null);
+  assert.equal(viewProblem({}, files, { view: 'try', top: 'MUX4' }), null);
+  assert.equal(viewProblem({}, files, { top: 'Alu_4Bit' }), null);
+  assert.equal(viewProblem({}, files, { top: 'nothere' }), 'the design has no module \'nothere\'');
+});

@@ -147,6 +147,26 @@ uiTest('#2871 regression, Copy Link to This Module… with Open the project only
   assert.equal(await selected(), 'traffic');
 });
 
+uiTest('#2876 regression, a schematic named in another case than its module (Gates, the HDL\'s gates): Copy Link to This Module… offers Try it, no error; the link opens it', E, async (page) => {
+  const sch = JSON.parse(fs.readFileSync(new URL('../../examples/gates/src/gates.sch.json', import.meta.url), 'utf8'));
+  sch.name = 'Gates';
+  delete sch.generatedFile;
+  await makeProject(env, { name: 'CaseLink', top: 'gates', files: { 'src/gates.sch.json': JSON.stringify(sch, null, 1) } });
+  await page.openProject('CaseLink');
+  const row = await page.waitFor(() => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => (r.dataset.module || '').toLowerCase() === 'gates'); return i >= 0 ? i : null; }, [], { what: 'the schematic\'s row' });
+  await contextMenu(page, row, 'Copy Link to This Module…');
+  await page.waitDialog('Copy Link');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay select[data-field=view]').value), 'try');
+  const link = await page.waitFor(() => /&view=try$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-error').textContent), '');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await openLink(page, new URL(link).hash.slice(1), 'case=1');
+  await linkOpened(page);
+  await page.waitFor(() => window.SilinxApp.findDoc('sch:src/gates.sch.json')?.schEditor?.simulating, [], { what: 'Try it running', timeout: 60000 });
+  assert.doesNotMatch(await page.consoleText(), /ERROR: Open from a link/);
+});
+
 uiTest('#2826 #2875 a changed project: replaced only when the user says so; or the link\'s design opened as <name>_2, _3, the student\'s kept (Keep Mine, Open as, Replace)', E, async (page) => {
   await openLink(page, 'open=example:blinky');
   await linkOpened(page);

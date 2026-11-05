@@ -187,9 +187,19 @@ export function sameFiles(a, b) {
 
 /** The drawings `view=try` opens (#2869): a schematic (its Try it), a state diagram or a Petri net (its Simulate). */
 export const TRY_DRAWING = /\.(sch|fsm|pn)\.json$/i;
-/** The drawing of a module that `view=try` opens: its path in files ({ path: text }), or null. */
+/** The drawing of a module that `view=try` opens: its path in files ({ path: text }), or null. The drawing's name, or
+ *  its generated HDL file's module, whatever its case (#2876: the HDL's VHDL names are in lower case, a drawing's as it
+ *  was typed). */
 export function tryDrawing(files, module) {
-  return Object.keys(files).find(p => TRY_DRAWING.test(p) && (() => { try { return JSON.parse(files[p])?.name === module; } catch { return false; } })()) || null;
+  const want = String(module).toLowerCase();
+  return Object.keys(files).find(p => {
+    if (!TRY_DRAWING.test(p)) return false;
+    let m;
+    try { m = JSON.parse(files[p]); } catch { return false; }
+    if (String(m?.name ?? '').toLowerCase() === want) return true;
+    const hdl = typeof m?.generatedFile === 'string' ? files[m.generatedFile] : null;
+    return typeof hdl === 'string' && moduleNames({ [m.generatedFile]: hdl }).has(want);
+  }) || null;
 }
 
 /**
@@ -199,7 +209,7 @@ export function tryDrawing(files, module) {
  */
 export function viewProblem(project, files, { view, top } = {}) {
   const module = top || project?.top || '';
-  if (top && !moduleNames(files).has(top)) return `the design has no module '${top}'`;
+  if (top && !moduleNames(files).has(top.toLowerCase())) return `the design has no module '${top}'`;
   if (view === 'try') {
     if (!module) return 'Try it: the design has no top module (give top)';
     if (!tryDrawing(files, module)) return `Try it: '${module}' is not a schematic, a state diagram or a Petri net`;
@@ -211,12 +221,12 @@ export function viewProblem(project, files, { view, top } = {}) {
   }
   return null;
 }
-// the modules a project's files define: its HDL's entities and modules, its drawings' names
+// the modules a project's files define, in lower case (#2876): its HDL's entities and modules, its drawings' names
 function moduleNames(files) {
   const out = new Set();
   for (const [p, t] of Object.entries(files)) {
-    if (/\.(vhdl?|s?v)$/i.test(p)) for (const m of String(t).matchAll(/^\s*(?:entity|module)\s+([A-Za-z_][\w$]*)/gim)) out.add(m[1]);
-    else if (VIEW_RE.test(p)) { try { const n = JSON.parse(t)?.name; if (typeof n === 'string') out.add(n); } catch { /* not a drawing */ } }
+    if (/\.(vhdl?|s?v)$/i.test(p)) for (const m of String(t).matchAll(/^\s*(?:entity|module)\s+([A-Za-z_][\w$]*)/gim)) out.add(m[1].toLowerCase());
+    else if (VIEW_RE.test(p)) { try { const n = JSON.parse(t)?.name; if (typeof n === 'string') out.add(n.toLowerCase()); } catch { /* not a drawing */ } }
   }
   return out;
 }
