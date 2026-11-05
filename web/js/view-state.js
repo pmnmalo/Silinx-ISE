@@ -42,12 +42,15 @@ export async function closeAllDocs() {
   try { for (const d of [...S.docs]) if (!await closeDoc(d)) return false; } finally { keepView = false; }
   return true;
 }
-export function saveViewState() {
-  if (keepView || !S.project) return;
+/** The open project's view state now: { open, active, page, view, split } (kept per project; a design link's, #2886). */
+export function currentViewState() {
   const open = S.docs.filter(d => d.project === S.project.name && REOPEN.some(([re]) => re.test(reopenKey(d)))).map(reopenKey);
   const active = S.active && reopenKey(S.active);
-  const state = { open, active: open.includes(active) ? active : null, page: S.leftPage || null, view: S.view, split: splitKeys(reopenKey, open) };
-  try { localStorage.setItem(VIEW_KEY(S.project.name), JSON.stringify(state)); } catch { /* storage unavailable */ }
+  return { open, active: open.includes(active) ? active : null, page: S.leftPage || null, view: S.view, split: splitKeys(reopenKey, open) };
+}
+export function saveViewState() {
+  if (keepView || !S.project) return;
+  try { localStorage.setItem(VIEW_KEY(S.project.name), JSON.stringify(currentViewState())); } catch { /* storage unavailable */ }
 }
 function savedViewState(name) {
   try { const v = JSON.parse(localStorage.getItem(VIEW_KEY(name)) || 'null'); return v && Array.isArray(v.open) ? v : null; } catch { return null; }
@@ -56,6 +59,12 @@ function savedViewState(name) {
 export async function restoreViewState(name) {
   const v = savedViewState(name);
   if (!v) return false;
+  await applyViewState(v);
+  return true;
+}
+/** A view state ({ open, active, page, view, split }: a kept one, or a design link's, #2886) put on the page: its
+ *  documents reopened (those of REOPEN's kinds that open in this project), the split, the one in front. */
+export async function applyViewState(v) {
   keepView = true;
   try {
     if (v.view === 'sim' || v.view === 'impl') { if (v.view !== S.view) setView(v.view); }
@@ -70,5 +79,4 @@ export async function restoreViewState(name) {
     if (active) activateDoc(active);
   } finally { keepView = false; }
   saveViewState();
-  return true;
 }

@@ -7,7 +7,9 @@
 import { api } from './api.js';
 import { confirmDlg, dialog, h } from './ui.js';
 import { S, app } from './app.js';
-import { TRY_DRAWING, decodeDesign, designZip, freeName, parseLink, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
+import { applyViewState } from './view-state.js';
+import { applyLayout } from './tasks.js';
+import { TRY_DRAWING, decodeDesign, decodeUi, designZip, freeName, parseLink, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateMessages, gateZip } from '/core/import-gate.js';
 
@@ -106,8 +108,10 @@ export async function openFromLink(opts) {
       if (problem) throw fail(problem);
     }
     app.log(`Opened '${d.name}' from a link${exists ? '' : kept ? ` (a new project; '${kept}' kept as it is)` : ' (a new project)'}${view ? `: ${VIEWS[view]}` : ''}.`, 'ok');
+    // Silinx as the link was copied (#2886): its tabs, split and panels, before the link's own view, its module
+    if (opts.ui) await openLinkView(opts.ui);
     // the link's module selected in the Design pane, its source open when no view opens (#2871)
-    if ((top || view) && view !== 'simulate') await showModule(top || S.project.top, !view);
+    if ((top || view) && view !== 'simulate') await showModule(top || S.project.top, !view);   // (after the link's view: the module's source in front, #2871)
     if (view) await openView(view, top || S.project.top, d.files);
     return true;
   } catch (e) {
@@ -162,4 +166,14 @@ function askReplace(name, other) {
     // (the one that loses nothing first, Enter's)
     buttons: [{ label: `Open as ${other}`, value: 'other', primary: true }, { label: 'Replace', value: 'replace' }, { label: 'Keep Mine', value: null }],
   });
+}
+
+// a link's view (#2886): its documents reopened (those that open in this project), the one in front, the split, then the
+// layout for this page only; what it leaves out said in the console
+async function openLinkView(text) {
+  let u;
+  try { u = decodeUi(text); } catch (e) { app.log(`WARNING: Open from a link: ${e.message}; the view not restored.`, 'warn'); return; }
+  if (u.dropped.length) app.log(`WARNING: Open from a link: the link's view left out ${u.dropped.join(', ')}.`, 'warn');
+  await applyViewState(u.view);
+  if (u.layout) applyLayout(u.layout);
 }

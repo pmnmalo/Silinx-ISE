@@ -262,7 +262,7 @@ function cModule(path, text) {
 export const SITE_URL = 'https://pmnmalo.github.io/Silinx-ISE/';
 
 // ------------------------------------------------------------------ the link's hash
-const KEYS = ['design', 'open', 'view', 'top', 'board'];
+const KEYS = ['design', 'open', 'view', 'top', 'board', 'ui'];
 
 /**
  * The options of a link's hash ('#design=…&view=try'): null when it has none of them (the plain address, a token);
@@ -305,7 +305,8 @@ export function parseLink(hash) {
   if (opts.view !== undefined && opts.view !== '' && !LINK_VIEWS.includes(opts.view)) throw linkError(`the link's view '${opts.view.slice(0, 32)}' is not one of ${LINK_VIEWS.join(', ')}`);
   if (opts.top && !MODULE_RE.test(opts.top)) throw linkError(`the link's top '${opts.top.slice(0, 64)}' is not a module name`);
   if (opts.board && !BOARD_RE.test(opts.board)) throw linkError(`the link's board '${opts.board.slice(0, 32)}' is not a board name`);
-  return { source, view: opts.view || null, top: opts.top || null, board: opts.board || null };
+  if (opts.ui !== undefined && (opts.ui.length > UI_LIMITS.maxEncoded || !/^[A-Za-z0-9_-]+$/.test(opts.ui))) throw linkError('the link\'s view (ui=) is not one');
+  return { source, view: opts.view || null, top: opts.top || null, board: opts.board || null, ...(opts.ui ? { ui: opts.ui } : {}) };
 }
 
 // a host of this computer or of a local network (a literal address, localhost, .local / .internal / .lan names):
@@ -326,7 +327,7 @@ export function privateHost(host) {
 /**
  * A link: base (the app's address, its hash dropped) + the hash of { design | example | zip, view, top, board }.
  */
-export function makeLink(base, { design, example, zip, view, top, board } = {}) {
+export function makeLink(base, { design, example, zip, view, top, board, ui } = {}) {
   const sources = [design, example, zip].filter(v => v !== undefined && v !== null);
   if (sources.length !== 1) throw linkError('a link has one design: design, example or zip');
   if (view && !LINK_VIEWS.includes(view)) throw linkError(`view: one of ${LINK_VIEWS.join(', ')}`);
@@ -337,5 +338,53 @@ export function makeLink(base, { design, example, zip, view, top, board } = {}) 
   if (top) parts.push(`top=${top}`);
   if (board) parts.push(`board=${board}`);
   if (view) parts.push(`view=${view}`);
+  if (ui) parts.push(`ui=${ui}`);
   return `${String(base).replace(/#.*$/, '')}#${parts.join('&')}`;
+}
+
+// ------------------------------------------------------------------ the view in a link (#2886)
+// The state of Silinx when the link was copied, as `ui=` (base64url JSON): { o: the open documents' reopen keys (web/js/
+// view-state.js REOPEN), a: the one in front, b: the split's right side, p: the left page, v: the Design view, t: the
+// Silinx interface's task, s / c / m: its side panel, messages, maximized }. Untrusted as the rest: only reopen keys of
+// the known kinds naming paths inside the project and module names, known pages, views and tasks, booleans; capped.
+export const UI_LIMITS = Object.freeze({ maxEncoded: 4000, maxOpen: 40 });
+const PATH_KEY = /^(file|sch|asm|tt|ttsch|fsm|pn|chdl):(.+)$/;
+const MODULE_KEY = /^(rtl|isim|emulator):([A-Za-z_][\w$]{0,127})(@\w{1,32})?$/;
+const PAGES = ['design', 'files', 'libs'], DESIGN_VIEWS = ['sim', 'impl'], TASK_IDS = ['edit', 'sim', 'emu', 'impl'];
+const reopenKeyOk = k => typeof k === 'string' && k.length <= 300 && (['summary', 'pins', 'impact'].includes(k)
+  || (MODULE_KEY.test(k) && !(k.startsWith('rtl:') && k.includes('@')))
+  || (PATH_KEY.test(k) && safePath(PATH_KEY.exec(k)[2])));
+
+/** The view state ({ open, active, split, page, view } of view-state.js, and a layout { task, side, console, max } or
+ *  null) as a link's `ui=`. */
+export function encodeUi(view, layout = null) {
+  const open = (view?.open || []).filter(reopenKeyOk).slice(0, UI_LIMITS.maxOpen);
+  const st = { o: open };
+  if (view?.active && open.includes(view.active)) st.a = view.active;
+  const right = Array.isArray(view?.split?.b) ? view.split.b.filter(k => open.includes(k)) : null;
+  if (right) st.b = right;
+  if (PAGES.includes(view?.page)) st.p = view.page;
+  if (DESIGN_VIEWS.includes(view?.view)) st.v = view.view;
+  if (layout && TASK_IDS.includes(layout.task)) Object.assign(st, { t: layout.task, s: !!layout.side, c: !!layout.console, m: !!layout.max });
+  return toB64url(enc.encode(JSON.stringify(st)));
+}
+
+/** A link's `ui=` read back: { view: { open, active, split, page, view }, layout: { task, side, console, max } | null,
+ *  dropped: [what was left out, said in the console] }. Throws (error.linkError) when it is not one at all. */
+export function decodeUi(text) {
+  if (typeof text !== 'string' || !text || text.length > UI_LIMITS.maxEncoded) throw linkError('the link\'s view (ui=) is not one');
+  let st;
+  try { st = JSON.parse(dec.decode(fromB64url(text))); } catch { throw linkError('the link\'s view (ui=) does not decode'); }
+  if (!st || typeof st !== 'object' || Array.isArray(st)) throw linkError('the link\'s view (ui=) is not one');
+  const dropped = [];
+  const raw = Array.isArray(st.o) ? st.o : [];
+  const open = [];
+  for (const k of raw.slice(0, UI_LIMITS.maxOpen)) (reopenKeyOk(k) ? open.push(k) : dropped.push(`a document '${String(k).slice(0, 80)}'`));
+  if (raw.length > UI_LIMITS.maxOpen) dropped.push(`${raw.length - UI_LIMITS.maxOpen} document(s) over ${UI_LIMITS.maxOpen}`);
+  const view = { open, active: open.includes(st.a) ? st.a : null, split: Array.isArray(st.b) ? { b: st.b.filter(k => open.includes(k)) } : null,
+    page: PAGES.includes(st.p) ? st.p : null, view: DESIGN_VIEWS.includes(st.v) ? st.v : null };
+  const layout = TASK_IDS.includes(st.t) ? { task: st.t, side: st.s === true, console: st.c === true, max: st.m === true } : null;
+  const known = new Set(['o', 'a', 'b', 'p', 'v', 't', 's', 'c', 'm']);
+  for (const k of Object.keys(st)) if (!known.has(k)) dropped.push(`'${k.slice(0, 32)}'`);
+  return { view, layout, dropped };
 }

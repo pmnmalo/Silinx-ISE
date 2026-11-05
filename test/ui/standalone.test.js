@@ -1281,7 +1281,7 @@ uiTest('#2826 browser edition (the Pages site): a design\'s link and an example\
   await page.menu('File', 'Copy Link to Project…');
   await page.waitDialog('Copy Link');
   await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = 'simulate'; v.dispatchEvent(new Event('change')); });
-  const link = await page.waitFor(() => /^https?:.*#design=[\w-]+&view=simulate$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
+  const link = await page.waitFor(() => /^https?:.*#design=[\w-]+&view=simulate(&ui=[\w-]+)?$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
   await page.dialogButton('Cancel');
   await page.goto(link.replace('#', '?l=3#'));
   await boot();
