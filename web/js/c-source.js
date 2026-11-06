@@ -143,7 +143,8 @@ export function hlsFamily() {
 
 /** The multiplier blocks a cycle may take (#2125): the project's device's, else no limit. */
 export function hlsMults() {
-  return hlsMultsOf(S.project?.device);
+  const d = S.project?.device;
+  return hlsMultsOf(d, d && S.devices?.parts?.find((p) => p.part === d.part));
 }
 
 /** View C Synthesis Report (#1531): what the C was made into (core/c-hdl.js's report): the module, its ports, its

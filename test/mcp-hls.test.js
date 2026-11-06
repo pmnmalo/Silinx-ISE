@@ -1,6 +1,6 @@
 // The MCP server's tools of a C or C++ source (#2674, server/mcp-hls.js), as the C module's processes: C Simulation and
 // C/RTL Co-simulation of the test designs (fir, gcd, sort, popcount; stream_sum in C++), the co-simulation in VHDL and
-// in Verilog; View C Synthesis Report; the HDL and the ASM chart made from the C; a C with an error; the errors.
+// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks); the HDL and the ASM chart made from the C; a C with an error; the errors.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -52,6 +52,23 @@ test('c_synthesis_report: fir\'s module, clock, ports and loop', async () => {
     '', 'Loops:', '  line 12   3 iterations; in the state it is in, 0 cycles; unrolled', '  line 17   4 iterations; in the state it is in, 0 cycles; unrolled',
     'Process "View C Synthesis Report" completed successfully'].join('\n'));
   assert.deepEqual(r.data.warnings, []);
+});
+
+// #2783: six multiplications in one state on the Basys2-100 (an XC3S100E, 4 MULT18X18s): 4 blocks, the device's limit
+test('#2783 c_synthesis_report and c_cosimulation: within the device\'s multiplier blocks, PASS in VHDL and in Verilog', async () => {
+  const six = 'int six(short a, short b, short c, short d, short e, short g) {\n  return a * b + c * d + e * g + a * c + b * d + e * a;\n}\n';
+  await ok('write_file', { project: 'gcd', path: 'src/six.c', text: `${six}int main() {\n  return six(3, -4, 5, 6, -7, 8) == 3 * -4 + 5 * 6 + -7 * 8 + 3 * 5 + -4 * 6 + -7 * 3 ? 0 : 1;\n}\n` });
+  for (const [variant, units, blocks] of [['100', 4, 4], ['250', 6, 6]]) {
+    await ok('set_design_properties', { project: 'gcd', board: 'basys2', variant });
+    const r = await ok('c_synthesis_report', { project: 'gcd', path: 'src/six.c' });
+    assert.ok(r.text.includes(`\nMultipliers: ${units} units, ${blocks} multiplier blocks\n`), `${variant}: ${r.text}`);
+    assert.deepEqual(r.data.warnings, []);
+    for (const language of ['vhdl', 'verilog']) {
+      const c = await ok('c_cosimulation', { project: 'gcd', path: 'src/six.c', language });
+      assert.deepEqual([c.data.pass, c.data.mismatches], [true, []], `${variant} ${language}`);
+    }
+  }
+  await ok('delete_file', { project: 'gcd', path: 'src/six.c' });
 });
 
 test('c_generated: the HDL and the ASM chart made from fir.c', async () => {
