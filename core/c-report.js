@@ -19,10 +19,10 @@ export function hlsFamilyOf(device) {
   return familyOf(device ? deviceFamily(device) : null);
 }
 
-/** The multiplier blocks a cycle may take (#2125): the device's, else no limit. */
-export function hlsMultsOf(device) {
-  const part = device?.part;
-  if (!part) return null;
+/** The multiplier blocks a cycle may take (#2125): the device's, else no limit. part: the device's part record
+ *  (server/devices.js findPart, S.devices.parts; #2783: resourceCount needs the record, not the part's name). */
+export function hlsMultsOf(device, part) {
+  if (!device?.part || !part) return null;
   // (the family's multiplier, #2310; a family with no profile: the Spartan-3 generation's MULT18X18)
   try { return resourceCount(part, familyProfile(deviceFamily(device)).multiplier || 'mult18x18') || null; } catch { return null; }
 }

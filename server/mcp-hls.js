@@ -16,12 +16,12 @@ async function cContext(name, rel) {
   let text;
   try { text = await P.readFile(name, rel); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
   const { hlsClockOf, hlsFamilyOf, hlsMultsOf } = await import('../core/c-report.js');
-  const { resolveBoard } = await import('./devices.js');
+  const { resolveBoard, findPart } = await import('./devices.js');
   const { blackboxesIn } = await import('../core/c-blackbox.js');
   const tree = await P.fileTree(name);
   const hls = await blackboxesIn(tree, f => P.readFile(name, f)).catch(() => null);
   const lang = pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl';
-  return { pj, text, tree, lang, clock: hlsClockOf(pj.board ? resolveBoard(pj.board)?.board : null), family: hlsFamilyOf(pj.device), mults: hlsMultsOf(pj.device), hls: hls || {} };
+  return { pj, text, tree, lang, clock: hlsClockOf(pj.board ? resolveBoard(pj.board)?.board : null), family: hlsFamilyOf(pj.device), mults: hlsMultsOf(pj.device, findPart(pj.device?.part)), hls: hls || {} };
 }
 
 // the test bench's files (c-source.js tbFiles): the project's files its strings name

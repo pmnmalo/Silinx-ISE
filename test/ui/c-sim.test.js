@@ -320,6 +320,29 @@ uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), th
   }
 });
 
+// #2783: the device's multiplier blocks a limit: six multiplications in one state on an XC3S100E (4 MULT18X18s) take 4
+// blocks, on an XC3S250E (12) six; C/RTL Co-simulation PASS
+uiTest('#2783 View C Synthesis Report: the multiplications within the device\'s multiplier blocks (4 on an XC3S100E); C/RTL Co-simulation PASS', E, async (page) => {
+  const six = 'int six(short a, short b, short c, short d, short e, short g) {\n  return a * b + c * d + e * g + a * c + b * d + e * a;\n}\nint main() {\n  return six(3, -4, 5, 6, -7, 8) == 3 * -4 + 5 * 6 + -7 * 8 + 3 * 5 + -4 * 6 + -7 * 3 ? 0 : 1;\n}\n';
+  for (const [part, n] of [['xc3s100e', 4], ['xc3s250e', 6]]) {
+    const name = `CMul${n}`;
+    await makeProject(env, { name, top: 'six', device: { family: 'spartan3e', part, package: 'cp132', speed: '-4' }, files: { 'src/six.c': six } });
+    await page.openProject(name);
+    await page.showMessages();
+    await page.treeRow('#hier', 'six');
+    await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+    // (the lines of this project's run: the Console keeps the other's)
+    const since = `Project "${name}" opened`;
+    await page.waitConsole(new RegExp(`${since}[\\s\\S]*Process "View C Synthesis Report" completed successfully`));
+    const mine = async () => (await page.consoleText()).split(since)[1];
+    assert.match(await mine(), new RegExp(`\\nMultipliers: ${n} units, ${n} multiplier blocks\\n`), part);
+    await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
+    await page.waitConsole(new RegExp(`${since}[\\s\\S]*Process "C\\/RTL Co-simulation" completed successfully`), { timeout: 60000 });
+    assert.match(await mine(), /C\/RTL co-simulation PASS: 1 call\(s\), the same results/);
+    assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+  }
+});
+
 // #2080: a pipelined loop that does not fit the board's clock: its II kept, said in the report, not in a compilation's messages
 uiTest('#2080 View C Synthesis Report: a pipelined loop too slow for the board\'s clock said, with its path; one that fits, not', E, async (page) => {
   const loop = (name, prag) => `int ${name}(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n#pragma HLS PIPELINE ${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n`;
