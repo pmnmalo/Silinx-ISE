@@ -363,7 +363,9 @@ export function primeImplicants(on, dc, n) {
  * Cost: fewest terms, then fewest literals. Returns
  *   { form, n, terms: [cube + { literals, minterms, essential }], primes: [cube + { essential }],
  *     essential: [cubes], solutions (number of minimal solutions found, ≤ cap), several, exact,
- *     ast, literals, gates: { and, or, not, inputs } }
+ *     literals, alternatives: [{ terms, literals }] }
+ * `alternatives` are every minimal solution found (#2928), in a stable order (their primes' indices, by literals then
+ * first minterm), the first the one of `terms`; one when the search was cut short.
  * For 'pos' the cubes are implicants of the zeros; each is the clause (sum) of its complemented literals.
  */
 export function minimize(colIn, n, { form = 'sop', maxNodes = 200000, cap = 64 } = {}) {
@@ -418,9 +420,9 @@ export function minimize(colIn, n, { form = 'sop', maxNodes = 200000, cap = 64 }
     }
   };
   search();
-  let solution;
+  let solution, keys = [];
   if (exact || sols.size) {
-    const keys = [...sols.values()].sort((a, b) => { for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i]; return a.length - b.length; });
+    keys = [...sols.values()].sort((a, b) => { for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i]; return a.length - b.length; });
     solution = keys[0] || [];
   }
   if (!solution) {
@@ -443,7 +445,9 @@ export function minimize(colIn, n, { form = 'sop', maxNodes = 200000, cap = 64 }
     essential: [...essential].sort((a, b) => a - b).map(mk),
     solutions: Math.max(1, sols.size), several: sols.size > 1, exact,
   };
-  res.literals = terms.reduce((s, t) => s + t.literals.length, 0);
+  const litsOf = ts => ts.reduce((s, t) => s + t.literals.length, 0);
+  res.literals = litsOf(terms);
+  res.alternatives = [{ terms, literals: res.literals }, ...keys.slice(1).map(k => { const ts = k.map(mk); return { terms: ts, literals: litsOf(ts) }; })];
   return res;
 }
 
@@ -809,8 +813,11 @@ export function analyzeOutput(doc, out, opts = {}) {
   const col = normColumn(doc.table[out], n);
   const can = canonical(col);
   const sop = minimize(col, n, { form: 'sop', ...opts }), pos = minimize(col, n, { form: 'pos', ...opts });
-  sop.ast = minimalAst(sop, doc.inputs); pos.ast = minimalAst(pos, doc.inputs);
-  sop.gates = gateCount(sop); pos.gates = gateCount(pos);
+  for (const m of [sop, pos]) {
+    // every minimal solution with its expression and gates (#2928): the first is the form itself
+    for (const a of m.alternatives) { const r = { ...m, ...a }; a.ast = minimalAst(r, doc.inputs); a.gates = gateCount(r); }
+    m.ast = m.alternatives[0].ast; m.gates = m.alternatives[0].gates;
+  }
   const xor = minimizeXor(col, doc.inputs, { than: [sop.ast, pos.ast] });
   return { col, ...can, canon: canonicalAsts(col, doc.inputs), sop, pos, xor, nand: gateForm(sop, doc.inputs, 'nand'), nor: gateForm(pos, doc.inputs, 'nor') };
 }

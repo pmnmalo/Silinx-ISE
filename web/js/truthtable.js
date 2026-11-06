@@ -67,11 +67,23 @@ function canonForms(A, out, notation) {
     h('div', { class: 'tt-canon-lists' }, h('b', {}, 'Minterm and maxterm lists'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.sigma}`), h('br'), h('code', { 'data-no-i18n': '' }, `${out} = ${A.pi}`)));
 }
 
+// a minimal SOP or POS as shown (#2928): the solution chosen (`pick`, on the analysis: the first again when the table
+// changes) of its minimal ones; the HDL, the schematic and the NAND / NOR forms keep the first
+const shown = m => ({ ...m, pick: m.pick || 0, ...(m.alternatives[m.pick || 0] || m.alternatives[0]) });
+// its note and, when it has several, their selector: "Solution 2 of 5", previous / next (round: `go(±1)`)
+function solutionPicker(r, go) {
+  return [h('span', { class: 'tt-note' }, r.solutions >= 64 ? 'Many minimal solutions exist; the first 64 can be browsed.' : `${r.solutions} minimal solutions exist.`),
+    h('div', { class: 'tt-sol' },
+      h('button', { type: 'button', class: 'tt-sol-btn tt-sol-prev', title: 'Previous solution', onclick: () => go(-1) }, '◀'),
+      h('span', { class: 'tt-sol-n' }, `Solution ${r.pick + 1} of ${r.alternatives.length}`),
+      h('button', { type: 'button', class: 'tt-sol-btn tt-sol-next', title: 'Next solution', onclick: () => go(1) }, '▶'))];
+}
+
 // A truth table's print view (#1510): the table, the Karnaugh map of the output in front (flat or 3D, as shown, its
 // tab) and the results; the commands, the expression's field, the hints and the options left out (the notes when it
 // has some).
 function ttPrintView(root, notes, name) {
-  const drop = ['.tt-toolbar', '.doc-status', '.tt-cap-expr', '.tt-row', '.hint', '.tt-expr-err', '.tt-groups', '.tt-tab:not(.active)', '.tt-k3d-reset', '.tt-notation'];
+  const drop = ['.tt-toolbar', '.doc-status', '.tt-cap-expr', '.tt-row', '.hint', '.tt-expr-err', '.tt-groups', '.tt-tab:not(.active)', '.tt-k3d-reset', '.tt-notation', '.tt-sol-btn'];
   if (!notes.value.trim()) drop.push('.tt-cap-notes', '.tt-notes');
   return { title: `${tr('Truth table')} ${name}`, app: true, body: domSnapshot(root, { drop }) };
 }
@@ -243,7 +255,7 @@ export function mountTtEditor(container, opts = {}) {
       grpSel.append(h('label', { class: 'tt-check' }, r, ` ${label}`));
     }
     const L = kmapLayout(n);
-    const res = groups === 'pos' ? A.pos : A.sop;
+    const res = shown(groups === 'pos' ? A.pos : A.sop);
     const C = 40, rowsN = L.rowCodes.length, colsN = L.colCodes.length;
     const gw = colsN * C, gh = rowsN * C;
     const left0 = 18 + 12 * Math.max(1, L.rowVars.length), top0 = 46;
@@ -309,10 +321,10 @@ export function mountTtEditor(container, opts = {}) {
     results.innerHTML = '';
     const nsel = h('select', { class: 'tt-notation', title: 'Notation of the expressions', onchange: () => { notation = nsel.value; renderResults(); renderKmap(); } },
       ...NOTATIONS.map(([v, l]) => h('option', { value: v, selected: v === notation }, l)));
-    const form = (label, r, cls) => {
-      const g = r.gates;
+    const form = (label, f, cls) => {
+      const m = A[f], r = shown(m), g = r.gates;
       const note = [];
-      if (r.several) note.push(h('span', { class: 'tt-note' }, `${r.solutions >= 64 ? 'many' : r.solutions} minimal solutions exist; one is shown.`));
+      if (r.several) note.push(...solutionPicker(r, d => { m.pick = (r.pick + d + r.alternatives.length) % r.alternatives.length; renderResults(); renderKmap(); }));
       if (!r.exact) note.push(h('span', { class: 'tt-note' }, 'The exact search was cut short: this solution may not be minimal.'));
       return h('div', { class: `tt-res ${cls}` },
         h('div', {}, h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)),
@@ -333,8 +345,8 @@ export function mountTtEditor(container, opts = {}) {
     results.append(
       h('div', { class: 'tt-row' }, h('label', {}, 'Notation:'), nsel),
       canonForms(A, out, notation),
-      form('Minimal SOP', A.sop, 'tt-sop'),
-      form('Minimal POS', A.pos, 'tt-pos'),
+      form('Minimal SOP', 'sop', 'tt-sop'),
+      form('Minimal POS', 'pos', 'tt-pos'),
       ...(xorForm ? [xorForm] : []),
       gateForm('NAND form', A.nand, 'tt-nand', 'The minimal SOP with NAND gates only (double negation); an inverter is a NAND of one input'),
       gateForm('NOR form', A.nor, 'tt-nor', 'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input'),
