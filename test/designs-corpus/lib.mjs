@@ -85,6 +85,15 @@ export function normalizeWarning(w) {
     .slice(0, 300);
 }
 
+/**
+ * The result of a design that ran out of time (#2909): the stages it finished as they were (the worker's last
+ * progress: { progress: the stage that was running, partial: the result so far }), the running stage's a timeout.
+ */
+export function timedOutResult(name, running, minutes) {
+  const r = running?.partial || { name, warnings: {}, times: {}, details: {} };
+  return { ...r, name, [running?.progress || 'frontend']: `error: timeout (no result after ${minutes} min)` };
+}
+
 /** Warnings with repeats counted: ['message', 'other (x3)'] (sorted, stable between runs). */
 export function countWarnings(list) {
   const n = new Map();

@@ -45,7 +45,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
-import { STAGES, kindOf, validateManifest, compareExpectations, updatedExpectations, countWarnings, parseTime, ioWrapper, paramWrapper, boardClockUcf, FLOW_PARTS as PARTS, chipOf, deviceOf, flaggedSynth,
+import { STAGES, kindOf, timedOutResult, validateManifest, compareExpectations, updatedExpectations, countWarnings, parseTime, ioWrapper, paramWrapper, boardClockUcf, FLOW_PARTS as PARTS, chipOf, deviceOf, flaggedSynth,
   qualityOf, compareQuality, QUALITY_TOLERANCE, machineClass, timesOf, compareTimes, slowestTable, resultsTable, withResultsTable, timesTable, withTimesTable, PADS_SHORT, nextpnrPlaceRoute } from './lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -54,9 +54,9 @@ const EXPECTED = path.join(HERE, 'expected.json');
 // the stage times of a full run per machine class ('ci', 'local', …): the run-time baselines
 const TIMES = path.join(HERE, 'times.json');
 const README = path.join(HERE, 'README.md');
-// per design: the largest (AES on the XC3S1200E) take about 6 min on an Apple-silicon Mac, more on CI;
+// per design: on nextpnr the largest flows take tens of minutes on an Apple-silicon Mac and up to 2 h on CI (#2909);
 // generous, for a loaded machine (#55)
-const TIMEOUT = 120 * 60000;
+const TIMEOUT = 180 * 60000;
 
 const clean = s => String(s).replace(/\s+/g, ' ').replace(/(?:\/[^\s:'"/]+)*\/\.cache\/designs-corpus\/[^/\s]+\/[0-9a-f]{40}\//g, '').slice(0, 200);
 
@@ -93,7 +93,11 @@ async function runDesign(manifest, d, opts) {
   const res = { name: d.name, warnings: {}, times: {}, details: {} };
   const stages = new Set(opts.stages);
   const warn = (st, list) => { const w = countWarnings(list); if (w.length) res.warnings[st] = w; };
-  const timed = async (st, fn) => { const t = Date.now(); try { return await fn(); } finally { res.times[st] = Date.now() - t; } };
+  // (each stage said to the main thread as it starts, with the stages done: a timeout is the running stage's, #2909)
+  const timed = async (st, fn) => {
+    parentPort?.postMessage({ progress: st, partial: JSON.parse(JSON.stringify(res)) });
+    const t = Date.now(); try { return await fn(); } finally { res.times[st] = Date.now() - t; }
+  };
   const srcs = loadSources(manifest, d, sourceDir);
 
   // ---- frontend: parse, elaborate, design checks (as Check Syntax)
@@ -434,14 +438,21 @@ if (!isMainThread) {
       if (next >= todo.length) { if (!live) resolve(); return; }
       live++;
       const w = new Worker(fileURLToPath(import.meta.url), { workerData: { manifest, opts }, resourceLimits: { maxOldGenerationSizeMb: 6144 } });
-      let cur = null, timer = null;
+      let cur = null, timer = null, running = null;
       const give = () => {
         if (next >= todo.length) { w.terminate(); return; }
         cur = todo[next++];
-        timer = setTimeout(() => { results[cur] = { name: cur, frontend: `error: timeout (no result after ${TIMEOUT / 60000} min)`, warnings: {}, times: {}, details: {} }; done++; cur = null; w.terminate(); }, TIMEOUT);
+        running = null;
+        // (the timeout is the stage's that was running, the stages before it kept, #2909)
+        timer = setTimeout(() => {
+          results[cur] = timedOutResult(cur, running, TIMEOUT / 60000);
+          console.error(`${String(++done).padStart(3)}/${todo.length} ${cur.padEnd(24)} ${running?.progress || 'frontend'} timeout`);
+          cur = null; w.terminate();
+        }, TIMEOUT);
         w.postMessage(cur);
       };
       w.on('message', r => {
+        if (r.progress) { running = r; return; }
         clearTimeout(timer);
         results[r.name] = r;
         done++;
