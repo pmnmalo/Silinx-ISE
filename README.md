@@ -225,17 +225,18 @@ for Xilinx FPGAs supported by ISE 14.7.
   `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; the variables MSB → LSB by columns then rows, or by rows then
   columns, chosen beside the map; 5–6 inputs as two/four 4×4 maps, the most significant picking the map) with the groups of the minimal SOP
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
-  the canonical SOP and POS in full (the sum of the minterms, the product of the maxterms) and their Σm / ΠM lists; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
-  essential prime implicants marked, several minimal solutions browsed one by one, #2928) with literal and gate
+  the canonical SOP and POS in full (the sum of the minterms, the product of the maxterms), each with its Σm / ΠM list; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
+  essential prime implicants marked; several minimal solutions browsed on the map, the one chosen used) with literal and gate
   counts; the *XOR form* when it is simpler than both (fewer literals, or as many and fewer
   two-input operators): `a ⊕ b ⊕ c`, a full adder's carry `a·b + c·(a ⊕ b)`, a comparator's
   `/(a1 ⊕ b1)·/(a0 ⊕ b0)`, `a ⊕ b·c` (sums of products of literals and XOR / XNOR factors, or a
   variable XOR one; up to 6 inputs, don't cares used, checked on the whole table); and the *NAND
   form* and *NOR form*, the minimal SOP with NAND gates only and the minimal POS with NOR gates only
   (double negation: `/(/(a.b)./(c.d))`), with their gate counts. The expressions are written with `/` as NOT and `.` as AND (`/a.b + c`, `/(a + b)`), or, chosen, as
-  `/ab + c`, `a·b' + c`, `ab' + c`, VHDL or Verilog; each reads back as typed. *HDL logic* picks the
-  logic of its module and of its schematic: the minimal SOP, POS, the XOR form where it is simpler
-  (`xor` / `xnor`, `^` / `~^`), NAND gates only (`a nand b`, `~(a & b)`) or NOR gates only. The table always has its HDL module, made with it in the project's
+  `/ab + c`, `a·b' + c`, `ab' + c`, VHDL or Verilog; each reads back as typed. A tick box on
+  each result picks that output's logic in the module and the schematic (its *HDL logic*; the least gates' by default):
+  the canonical SOP or POS, the minimal SOP, POS, the XOR form where it is simpler
+  (`xor` / `xnor`, `^` / `~^`), NAND gates only (`a nand b`, `~(a & b)`), NOR gates only, the least gates or delay. The table always has its HDL module, made with it in the project's
   preferred language, kept in sync with the table both ways (like ASM charts: editing the table
   rewrites it; editing and saving the HDL updates the table by exhaustive simulation, don't cares
   kept in its comments; a module that no longer fits — sequential, too many inputs — shows the
@@ -485,7 +486,7 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
 Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `test_bench_wizard` (a self-checking
 test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins), `convert_module` (an HDL module to a schematic, ASM chart or state
-diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
