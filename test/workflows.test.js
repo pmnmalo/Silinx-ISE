@@ -210,12 +210,26 @@ test('workflows: every job has a time limit; the Playwright browsers cached by i
   assert.deepEqual(installs.map(([n]) => n).sort(), ['browsers', 'webkit-standalone']);
   for (const [name, lines] of installs) {
     const body = lines.join('\n');
-    const browsers = /npx playwright install --with-deps ([\w ]+?)(?: &&|\n|$)/.exec(body)[1].split(' ');
+    const browsers = /npx playwright install --with-deps ([\w ]+?)(?: &&|;|\n|$)/.exec(body)[1].split(' ');
     const cache = /uses: actions\/cache@.+\n\s+with:\n\s+path: ~\/\.cache\/ms-playwright\n\s+key: (.+)/.exec(body);
     assert.ok(cache, name);
     assert.equal(cache[1], `playwright-\${{ runner.os }}-${browsers.join('-')}-\${{ hashFiles('node_modules/playwright-core/package.json') }}`, name);
     assert.ok(body.indexOf('ms-playwright') > body.indexOf('npm ci') && body.indexOf('ms-playwright') < body.indexOf('npx playwright install'), `${name}: after npm ci (the key's file), before the install`);
+    // the system's packages: apt's downloads restored for the runner's image before the install, saved after it
+    // (before the tests, which may fail), and an install that stalls stopped and run once more (#2921, #2939)
+    const key = `apt-${browsers.join('-')}-\${{ steps.image.outputs.key }}`;
+    const restore = body.indexOf(`uses: actions/cache/restore@`), install = body.indexOf('npx playwright install');
+    const save = body.indexOf(`- if: steps.apt.outputs.cache-hit != 'true'\n        uses: actions/cache/save@`), tests = body.search(/run: npm run test:/);
+    assert.match(body, /- id: image\n\s+run: echo "key=\$ImageOS-\$ImageVersion" >> "\$GITHUB_OUTPUT"/, name);
+    assert.ok(restore > 0 && restore < install && install < save && save < tests, `${name}: restore, install, save, tests`);
+    assert.ok(body.slice(restore, install).includes(`path: ~/apt-archives\n          key: ${key}\n          restore-keys: apt-${browsers.join('-')}-\n`), name);
+    assert.ok(body.slice(save, tests).includes(`path: ~/apt-archives\n          key: ${key}\n`), name);
+    assert.match(body, /Dir::Cache::Archives "%s";.*' ~\/apt-archives/, name);
+    assert.match(body, /for attempt in 1 2; do\n\s+if timeout 10m npx playwright install /, name);
+    assert.match(body, /npx playwright install [^\n]+\n(?:.*\n){3}\s+exit 1\n\s+timeout-minutes: 25\n/, `${name}: the step's limit past its two attempts`);
   }
+  // the browsers job's limit past its steps' own (the install's 25 minutes, the tests' 40), so a step's fires
+  assert.match(j.browsers.join('\n'), /^ {4}timeout-minutes: 70$/m);
 });
 
 test('workflows: one setup for the jobs that run the repository\'s code, the action of the repository (#417)', () => {
