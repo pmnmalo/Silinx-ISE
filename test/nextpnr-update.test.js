@@ -10,7 +10,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PACKAGES, FORK, MARK, BOARDS, METRICS, TOLERANCE, packageVersion, installSpec, nextpnrChanges, changeSummary, measurementOf, readSide, reportMarkdown } from '../scripts/nextpnr-update-report.mjs';
-import { qualityRows } from '../scripts/yosys-update-report.mjs';
+import { qualityRows, githubOutputLines } from '../scripts/yosys-update-report.mjs';
 import { TARGETS, S3E_TARGETS, S6_TARGETS, targetName } from './examples-lib.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -85,7 +85,22 @@ test('nextpnr update: the "versions" command writes the step\'s outputs; a spec 
     assert.equal(r.status, 1);
     assert.match(r.stderr, /@silinx\/nextpnr-himbaechel-spartan3e: the head's is not a version or a release of pmnmalo\/nextpnr-spartan: "npm:evil@1\.0\.0"/);
     assert.ok(!fs.existsSync(out));
+    // a version package-lock.json resolves that is not one (a line break would write outputs of its own) refused, nothing written (#2959)
+    for (const v of ['0.1.4\nbase=x', '0.1.4\r\nchanged=false', '0.1.4 x']) {
+      const lock = write('lock.json', { packages: { [`node_modules/${S3E}`]: { version: '1.0.0' }, [`node_modules/${S6}`]: { version: v } } });
+      r = run([files[0], files[1], files[2], lock]);
+      assert.equal(r.status, 1, JSON.stringify(v));
+      assert.equal(r.stderr.trim(), `${S6}: the head's package-lock.json version is not a version: ${JSON.stringify(v)}`);
+      assert.equal(r.stdout, '');
+      assert.ok(!fs.existsSync(out));
+    }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('nextpnr and Yosys updates: a step\'s outputs never hold a line break (#2959)', () => {
+  assert.equal(githubOutputLines({ changed: true, base: 'a@1 b@2', summary: 'spartan6 0.1.3 → 0.1.4' }), 'changed=true\nbase=a@1 b@2\nsummary=spartan6 0.1.3 → 0.1.4\n');
+  assert.equal(githubOutputLines({ changed: false, base: '', summary: '' }), 'changed=false\nbase=\nsummary=\n');
+  for (const v of ['x\ny', 'x\r', '\n']) assert.throws(() => githubOutputLines({ changed: false, summary: v }), new RegExp(`^Error: the output summary holds a line break: ${JSON.stringify(v).replace(/\\/g, '\\\\')}$`));
 });
 
 test('nextpnr update: an example\'s measurement from the flow\'s job; none when it did not complete', () => {

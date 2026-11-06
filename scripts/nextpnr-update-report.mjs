@@ -24,7 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { QUALITY_TOLERANCE } from '../test/designs-corpus/lib.mjs';
 import { EXAMPLE_ORDER } from '../core/examples.js';
-import { qualityRows, postComment } from './yosys-update-report.mjs';
+import { qualityRows, postComment, VERSION_SHAPE, githubOutputLines } from './yosys-update-report.mjs';
 
 export const PACKAGES = ['@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6'];
 // the repository whose releases a package may be pinned by (the fork, #2131): a release's tarball, spartan6-vX.Y.Z
@@ -138,11 +138,13 @@ async function main() {
     const base = [];
     for (const c of changes) {
       for (const side of ['base', 'head']) if (c[side].spec !== null && !installSpec(c.name, c[side].spec)) { console.error(`${c.name}: the ${side}'s is not a version or a release of ${FORK}: ${JSON.stringify(c[side].spec)}`); process.exit(1); }
+      // the versions package-lock.json resolves go into the summary (the step's outputs, the comment): a version's shape only (#2959)
+      for (const side of ['base', 'head']) if (c[side].resolved !== null && !VERSION_SHAPE.test(String(c[side].resolved))) { console.error(`${c.name}: the ${side}'s package-lock.json version is not a version: ${JSON.stringify(c[side].resolved)}`); process.exit(1); }
       if (c.base.spec !== null) base.push(installSpec(c.name, c.base.spec));
     }
     const summary = changeSummary(changes);
     console.log(changes.length ? summary : 'the nextpnr packages: unchanged');
-    if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changes.length > 0}\nbase=${base.join(' ')}\nsummary=${summary}\n`);
+    if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, githubOutputLines({ changed: changes.length > 0, base: base.join(' '), summary }));
   } else if (cmd === 'boards') {
     console.log(JSON.stringify(Object.keys(BOARDS)));
   } else if (cmd === 'measure') {

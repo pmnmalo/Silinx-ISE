@@ -43,6 +43,13 @@ export function yosysVersion(pkg, lock) {
  *  of a pull request is not trusted further (the workflow passes it through the environment, #479). */
 export const VERSION_SHAPE = /^[\w.^~<>=+-]*$/;
 
+/** A step's outputs as $GITHUB_OUTPUT's lines (name=value): a value that holds a line break would write outputs of its
+ *  own, refused (#2959). */
+export function githubOutputLines(fields) {
+  for (const [k, v] of Object.entries(fields)) if (/[\r\n]/.test(String(v))) throw new Error(`the output ${k} holds a line break: ${JSON.stringify(String(v))}`);
+  return Object.entries(fields).map(([k, v]) => `${k}=${v}\n`).join('');
+}
+
 /** Whether a pull request changes Yosys: { changed, base, head } (the resolved versions, else the specs). */
 export function yosysChange(base, head) {
   const b = base.resolved ?? base.spec, h = head.resolved ?? head.spec;
@@ -199,7 +206,7 @@ async function main() {
     const c = yosysChange(yosysVersion(readJson(bp), readJson(bl)), yosysVersion(readJson(hp), readJson(hl)));
     for (const v of [c.base, c.head]) if (v !== null && !VERSION_SHAPE.test(String(v))) { console.error(`${PACKAGE}: not a version: ${JSON.stringify(v)}`); process.exit(1); }
     console.log(`${PACKAGE}: ${c.base} → ${c.head}${c.changed ? '' : ' (unchanged)'}`);
-    if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${c.changed}\nbase=${c.base}\nhead=${c.head}\n`);
+    if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, githubOutputLines({ changed: c.changed, base: c.base, head: c.head }));
   } else if (cmd === 'subset') {
     console.log(DESIGN_SUBSET.join(','));
   } else if (cmd === 'report') {
