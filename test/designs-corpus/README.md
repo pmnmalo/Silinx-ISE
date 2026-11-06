@@ -186,15 +186,15 @@ least its slowest design's time (the testbench included: uart-for-fpga's is most
 | machine class | designs | synthesis (s) | flow (s) | all the stages (s) |
 | --- | ---: | ---: | ---: | ---: |
 | `ci` | 67 | 6615 | 7714 | 16101 |
-| `local` | 67 | 1791 | 2591 | 4852 |
+| `local` | 67 | 2189 | 3937 | 6647 |
 
 The 8 slowest designs (s: synthesis / flow / all the stages):
 
 | design | `ci` | `local` |
 | --- | ---: | ---: |
-| epfl-multiplier | 1358 / 2062 / 3721 | 351 / 869 / 1263 |
-| epfl-log2 | 1643 / 331 / 2753 | 405 / 116 / 790 |
-| secworks-aes | 91 / 1228 / 1384 | 105 / 535 / 658 |
+| epfl-multiplier | 1358 / 2062 / 3721 | 588 / 1425 / 2078 |
+| epfl-log2 | 1643 / 331 / 2753 | 572 / 375 / 1249 |
+| secworks-aes | 91 / 1228 / 1384 | 102 / 840 / 956 |
 | epfl-voter | 340 / 415 / 792 | 68 / 81 / 159 |
 | itc99-b17 | 146 / 495 / 676 | 44 / 103 / 153 |
 | epfl-max | 274 / 364 / 647 | 67 / 95 / 164 |

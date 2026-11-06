@@ -36,9 +36,9 @@
    "total": 5380
   },
   "epfl-log2": {
-   "synth": 405409,
-   "flow": 116039,
-   "total": 789653
+   "synth": 572136,
+   "flow": 375295,
+   "total": 1248599
   },
   "epfl-max": {
    "synth": 67312,
@@ -46,9 +46,9 @@
    "total": 163934
   },
   "epfl-multiplier": {
-   "synth": 350920,
-   "flow": 869116,
-   "total": 1262546
+   "synth": 588012,
+   "flow": 1424822,
+   "total": 2077745
   },
   "epfl-priority": {
    "synth": 5989,
@@ -236,9 +236,9 @@
    "total": 61256
   },
   "secworks-aes": {
-   "synth": 104669,
-   "flow": 534664,
-   "total": 657539
+   "synth": 101923,
+   "flow": 839882,
+   "total": 956448
   },
   "secworks-sha1": {
    "synth": 20045,
@@ -311,9 +311,9 @@
    "total": 15131
   },
   "vtr-diffeq1": {
-   "synth": 10682,
-   "flow": 28426,
-   "total": 40144
+   "synth": 7739,
+   "flow": 253463,
+   "total": 262483
   },
   "vtr-diffeq2": {
    "synth": 15540,
