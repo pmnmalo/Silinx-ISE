@@ -10,7 +10,7 @@ import { h } from './dom.js';
 import { reservedError } from '/core/reserved.js';
 import { nudgeWire, routePath, wireGrid, cleanPath } from '/core/schpath.js';
 import { setCurve } from '/core/schcurve.js';
-import { newMarkerDir } from '/core/schmarker.js';
+import { newMarkerDir, newMarkerSide } from '/core/schmarker.js';
 import { clone, snap, onSeg, segDist, cleanPts } from './sch-editor.js';
 
 /** { setTool, renderOpts, startPlace, placeAt, connPoints, pinNear, snapPoint, routeTo, finishWire, wireClick, netClick, ioClick } of a
@@ -188,7 +188,11 @@ export function mountTools(ctx) {
       const j = await joinMarker(name, net);
       if (j === false) continue;
       if (j) { width = j.width; if (!near?.pin && !net) dir = newMarkerDir(doc(), { net: j.net }); }
-      edit(() => { if (!near) splitWiresAt(doc(), [p]); doc().ports.push({ id: nextId('P', doc().ports), name, dir, width, x: p.x, y: p.y }); }, { keepProps: true });
+      const side = newMarkerSide(dir, near?.pin);   // (on a pin, the way the pin points, #2926)
+      edit(() => {
+        if (!near) splitWiresAt(doc(), [p]);
+        doc().ports.push({ id: nextId('P', doc().ports), name, dir, width, x: p.x, y: p.y, ...(side ? { side } : {}) });
+      }, { keepProps: true });
       return;
     }
   }

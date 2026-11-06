@@ -3,8 +3,10 @@
 // joined to a bus compiled and simulated in VHDL and Verilog with no warnings.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newDoc, normalizeDoc, netlist, generateHdl, symbolPins } from '../core/schdoc.js';
-import { lastMarkerDir, newMarkerDir, markerJoin, setMarkerWidth } from '../core/schmarker.js';
+import { SYMBOLS, defaultParams, newDoc, normalizeDoc, normModules, netlist, generateHdl, portSide, symbolBox, symbolPins } from '../core/schdoc.js';
+import { lastMarkerDir, newMarkerDir, newMarkerSide, pinSide, markerJoin, setMarkerWidth } from '../core/schmarker.js';
+import { exportIseSch } from '../core/isesch-export.js';
+import { importIseSch } from '../core/isesch.js';
 import { simulate } from '../core/compile.js';
 
 const P = (x, y) => ({ x, y });
@@ -111,5 +113,81 @@ test('#2170 a marker joined to count(7:0): an 8-bit output port, one net; no war
     const log = r.sim.log.map((l) => `${l.kind}:${l.text}`);
     assert.deepEqual(r.sim.log.filter((l) => l.kind === 'error' || l.kind === 'failure'), [], `${lang}: ${log.join('\n')}`);
     assert.ok(log.some((l) => /done/.test(l)), `${lang}: ran to the end`);
+  }
+});
+
+// #2926: an I/O marker added on a pin continues the pin outwards: its side the pin's outward direction on the sheet,
+// the symbol's rotation and mirror applied (up: N, ISE's R270; down: S, R90; left: W; right: E)
+const sym = (type, rot = 0, mirror = false, params = {}) => ({ id: 'S1', type, x: 100, y: 100, rot, mirror, name: 'U1', params: { ...defaultParams(type), ...params } });
+
+test('#2926 pinSide: a gate\'s, a flip-flop\'s, a module symbol\'s and a bus pin\'s outward direction in every rotation and mirror', () => {
+  const turns = [[0, false], [90, false], [180, false], [270, false], [0, true], [90, true], [180, true], [270, true]];
+  // a pin pointing West unturned (an input), East (an output), South (a multiplexer's select), North (GND's)
+  const W = ['W', 'N', 'E', 'S', 'E', 'S', 'W', 'N'], E = ['E', 'S', 'W', 'N', 'W', 'N', 'E', 'S'];
+  const S = ['S', 'W', 'N', 'E', 'S', 'W', 'N', 'E'], N = ['N', 'E', 'S', 'W', 'N', 'E', 'S', 'W'];
+  const mods = normModules([{ name: 'cnt', ports: [{ name: 'clk', dir: 'in', width: 1 }, { name: 'q', dir: 'out', width: 4 }] }]);
+  for (const [type, pin, want, params, modules] of [
+    ['and2', 'I0', W], ['and2', 'O', E], ['fdce', 'C', W], ['fdce', 'Q', E], ['mux2', 'S0', S], ['gnd', 'G', N],
+    ['inv', 'I', W, { width: 8 }], ['inv', 'O', E, { width: 8 }],   // (bus pins)
+    ['module', 'clk', W, { module: 'cnt' }, mods], ['module', 'q', E, { module: 'cnt' }, mods],
+  ]) assert.deepEqual(turns.map(([r, m]) => pinSide(sym(type, r, m, params), pin, modules)), want, `${type}.${pin}`);
+  assert.equal(pinSide(sym('and2'), 'nope'), null, 'no such pin');
+});
+
+test('#2926 pinSide against the drawing: every symbol, rotation and mirror, each pin on the edge of the box its side names', () => {
+  const onEdge = (b, p, side) => ({ W: p.x === b.x, E: p.x === b.x + b.w, N: p.y === b.y, S: p.y === b.y + b.h })[side];
+  let n = 0;
+  for (const type of Object.keys(SYMBOLS)) for (const rot of [0, 90, 180, 270]) for (const mirror of [false, true]) {
+    const s = sym(type, rot, mirror);
+    let pins;
+    try { pins = symbolPins(s); } catch { continue; }   // (a module symbol with no module)
+    const b = symbolBox(s);
+    for (const p of pins) { n++; assert.ok(onEdge(b, p, pinSide(s, p.name)), `${type} R${rot}${mirror ? ' mirrored' : ''} ${p.name}: ${pinSide(s, p.name)}`); }
+  }
+  assert.ok(n > 5000, `${n} pins`);
+});
+
+test('#2926 newMarkerSide: on a pin its outward direction, the direction\'s default not stored; on a wire or empty space none', () => {
+  const pins = s => Object.fromEntries(symbolPins(s).map(p => [p.name, p]));
+  // regression: an input added on an upward pin (an AND turned 90°: its inputs point up) faces up, no longer West
+  const up = pins(sym('and2', 90));
+  assert.equal(newMarkerSide('in', up.I0), 'N');
+  assert.equal(newMarkerSide('out', up.O), 'S');
+  const flat = pins(sym('and2')), back = pins(sym('and2', 0, true));
+  assert.deepEqual([newMarkerSide('in', flat.I0), newMarkerSide('out', flat.O)], [undefined, undefined], 'left and right: the defaults');
+  assert.deepEqual([newMarkerSide('in', back.I0), newMarkerSide('out', back.O)], ['E', 'W'], 'mirrored: an input to the right, an output to the left');
+  assert.equal(newMarkerSide('inout', back.O), 'W', 'a bidirectional port (default E) to the left');
+  assert.deepEqual([newMarkerSide('in'), newMarkerSide('out', null), newMarkerSide('in', {})], [undefined, undefined, undefined]);
+});
+
+test('#2926 markers on an upward and a downward pin: sides N and S, .sch orien R270 and R90 and back; the HDL as without the sides, compiled and simulated in VHDL and Verilog', () => {
+  for (const lang of ['vhdl', 'verilog']) {
+    const doc = newDoc('top', lang);
+    doc.symbols.push(sym('inv', 90, false, { width: 1 }));   // (its input points up, its output down)
+    const [I, O] = symbolPins(normalizeDoc(doc).symbols[0]);
+    for (const [name, dir, pin] of [['a', 'in', I], ['y', 'out', O]]) {
+      const side = newMarkerSide(dir, pin);
+      doc.ports.push({ id: `P${doc.ports.length + 1}`, name, dir, width: 1, x: pin.x, y: pin.y, ...(side ? { side } : {}) });
+    }
+    const d = normalizeDoc(doc);
+    assert.deepEqual(d.ports.map(p => [p.name, portSide(p)]), [['a', 'N'], ['y', 'S']]);
+    assert.deepEqual(netlist(d).diagnostics.map(x => x.message), [], `${lang}: no warnings`);
+    const g = generateHdl(d, { lang });
+    assert.deepEqual(g.diagnostics, [], lang);
+    const plain = normalizeDoc({ ...d, ports: d.ports.map(({ side, ...p }) => p) });
+    assert.equal(g.code, generateHdl(plain, { lang }).code, `${lang}: the HDL unchanged by the sides`);
+    // .sch: ISE's orien, and back
+    const { xml } = exportIseSch(d, { timestamp: '2026-11-6T0:0:0' });
+    const orien = Object.fromEntries([...xml.matchAll(/<iomarker [^>]*name="([^"]+)" orien="(\w+)"/g)].map(m => [m[1], m[2]]));
+    assert.deepEqual(orien, { a: 'R270', y: 'R90' }, lang);
+    assert.deepEqual(importIseSch(xml).doc.ports.map(p => [p.name, p.side]).sort(), [['a', 'N'], ['y', 'S']], `${lang}: imported again`);
+    const ext = lang === 'vhdl' ? 'vhd' : 'v';
+    const tb = lang === 'vhdl'
+      ? 'library ieee; use ieee.std_logic_1164.all;\nentity tb is end tb;\narchitecture t of tb is\n  signal a, y : std_logic := \'0\';\nbegin\n  uut: entity work.top port map (a => a, y => y);\n  process begin\n    a <= \'1\'; wait for 10 ns;\n    assert y = \'0\' report "y wrong" severity error;\n    a <= \'0\'; wait for 10 ns;\n    assert y = \'1\' report "y wrong" severity error;\n    report "done"; wait;\n  end process;\nend t;\n'
+      : '`timescale 1ns/1ps\nmodule tb;\n  reg a = 0;\n  wire y;\n  top uut (.a(a), .y(y));\n  initial begin\n    a = 1; #10;\n    if (y !== 1\'b0) $error("y wrong");\n    a = 0; #10;\n    if (y !== 1\'b1) $error("y wrong");\n    $display("done"); $finish;\n  end\nendmodule\n';
+    const r = simulate([{ path: `top.${ext}`, text: g.code }, { path: `tb.${ext}`, text: tb }], 'tb', { until: 1e6 });
+    assert.deepEqual([...r.lib.errors, ...r.design.diags].map(e => `${e.severity}: ${e.message}`), [], `${lang}: compiled and elaborated with no warnings`);
+    assert.deepEqual(r.sim.log.filter(l => l.kind === 'error' || l.kind === 'failure'), [], lang);
+    assert.ok(r.sim.log.some(l => /done/.test(l.text)), `${lang}: ran to the end`);
   }
 });
