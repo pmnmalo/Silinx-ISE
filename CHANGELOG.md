@@ -3,6 +3,40 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.22.1
+
+In short:
+
+- An open project no longer says "Changed outside Silinx: silinx.json." after a change made in the interface itself.
+- **Convert to Schematic of a ripple-carry adder:** instances that each drive a bit of a vector (`s => s(0)`,
+  `co => c(1)`) are drawn as module symbols, wired bit by bit, no longer one HDL block holding them all.
+
+In detail:
+
+- **The page's own writes not told as another process's (#2913).** The watcher of an open project (#2843) could
+  read the folder just before a request of the page wrote to it, the request ending during that read: the read used
+  up the request's mark ("what changed is ours") with the folder as it was before the write, and the next look told
+  the page's own write as a change made outside Silinx. A request ending during a read now keeps the mark for the next
+  look too (`server/project-watch.js`).
+  - **Tests:** test/project-watch.test.js (a request ending while the folder is read: nothing told; another process's
+    write after it: told).
+- **The Nightly's design corpus on nextpnr: the time it takes, and a timeout told by its stage (#2909).** The corpus's
+  largest flows take one to two hours each on nextpnr on a hosted runner, and the job stopped at its 3 h: its budget is
+  now 340 min and a design's 180 min. A design out of time was reported as a front end timeout, whatever stage was
+  running (secworks-sha256's front end passes in under a second): the worker now tells each stage as it starts, and the
+  timeout is that stage's, the stages it finished kept (`timedOutResult`, test/designs-corpus/lib.mjs).
+  - **Tests:** test/designs-corpus.test.js.
+- **Convert to Schematic: an instance's output on a bit or a slice of a vector (#2901):** drawn on a net named as
+  the bus's bits (`c(1)`, `c[3:2]`, as ISE names them), the next instance reading that net; a port's bits joined into
+  it by a bus join, in the port's order (`downto` or `to`). Done when every item writing the vector is such an instance
+  and their parts cover it once, and an internal vector is read by drawn instances only, by its parts; otherwise the
+  instances stay one HDL block as before (#1715). The schematic's HDL no longer declares twice a bus made of its bits
+  that the declarations kept from the source declare already.
+- **Convert to Schematic: an instance's drawing in a module of its own (#2901, #405):** the step of `schematicFromHdl`
+  that draws a module instance as a module symbol moved, as it was, to `core/schdoc-instance.js`
+  (`mountInstanceDrawing`), so that the function (296 lines) has room for #2901's fix; the same schematics on the
+  repository's 185 modules (examples, test designs, the schematic corpus, the fixtures), its own test.
+
 ## 15.22.0
 
 nextpnr is now Silinx's one place & route engine, design links open Silinx on a design for lecture slides, imported
