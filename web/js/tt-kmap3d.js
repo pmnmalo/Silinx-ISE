@@ -7,6 +7,7 @@
 
 import { h } from './ui.js';
 import { kmapSolid, kmapSceneSide } from '/core/kmap3d.js';
+import { surfaceBox, surfaceOn, mountKmapSurface } from './tt-kmapsurface.js';
 
 const C = 40;      // a cell's side (px)
 const GAP = 90;    // between layers (px)
@@ -98,10 +99,13 @@ export function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCel
   return { view: () => ({ ...view }), reset };
 }
 
-/** The K-map in `host`: its flat `svg`, or its maps in 3D (5 or 6 inputs, the 3D box ticked: added to `options`, its
- *  Reset view right after it, #1567). */
+/** The K-map in `host`: its flat `svg`, or in 3D when the 3D box is ticked (added to `options`, its Reset view right
+ *  after it, #1567): the maps of 5 or 6 inputs stacked, the map of 3 or 4 on a cylinder or a torus (#2925). */
 export function placeKmap({ host, options, svg, changed, ...map }) {
-  if (map.layout.n >= 5) options.append(k3dBox(changed));
-  if (map.layout.n >= 5 && on) options.append(mountKmap3d(host, map).reset);
+  const n = map.layout.n;
+  if (n >= 5) options.append(k3dBox(changed));
+  if (n === 3 || n === 4) options.append(surfaceBox(n, changed));
+  if (n >= 5 && on) options.append(mountKmap3d(host, map).reset);
+  else if ((n === 3 || n === 4) && surfaceOn()) options.append(mountKmapSurface(host, { ...map, cellText }).reset);
   else host.append(svg);
 }

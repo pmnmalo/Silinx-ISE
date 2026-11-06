@@ -649,23 +649,23 @@ uiTest('#1492 Truth Table: the Notes box keeps its height under a table of 5 or 
 
 // #1407: the K-map of 5 or 6 inputs in 3D: its maps stacked (2 or 4 layers, Gray order), a group on each layer it
 // covers and a box between neighbouring layers; turned by dragging and the arrow keys, Reset view; a cell clicked
-// cycles its value; no 3D box under 5 inputs; Portuguese
+// cycles its value; no 3D box under 3 inputs (3 and 4: a cylinder and a torus, #2925); Portuguese
 uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups as boxes through the layers; turned; Portuguese', E, async (page) => {
   // f = c·e over 5 inputs (a b c d e): one group across both maps (a = 0, 1)
   const col5 = Array.from({ length: 32 }, (_, m) => ((m & 0b00101) === 0b00101 ? '1' : '0')).join('');
   const k5 = { version: 1, name: 'k5', inputs: ['a', 'b', 'c', 'd', 'e'], outputs: ['f'], table: { f: col5 }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
-  const k3 = { version: 1, name: 'k3', inputs: ['a', 'b', 'c'], outputs: ['f'], table: { f: '00010111' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
+  const k2 = { version: 1, name: 'k2', inputs: ['a', 'b'], outputs: ['f'], table: { f: '0111' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
   const col6 = Array.from({ length: 64 }, (_, m) => ((m & 0b000101) === 0b000101 ? '1' : '0')).join('');
   const k6 = { version: 1, name: 'k6', inputs: ['a', 'b', 'c', 'd', 'e', 'g'], outputs: ['f'], table: { f: col6 }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
-  await makeProject(env, { name: 'Tt3d', files: { 'src/k5.bool.json': JSON.stringify(k5), 'src/k3.bool.json': JSON.stringify(k3), 'src/k6.bool.json': JSON.stringify(k6) } });
+  await makeProject(env, { name: 'Tt3d', files: { 'src/k5.bool.json': JSON.stringify(k5), 'src/k2.bool.json': JSON.stringify(k2), 'src/k6.bool.json': JSON.stringify(k6) } });
   await page.openProject('Tt3d');
   const T = '.doc:not([hidden]) .tt-editor';
   const open = async (f) => {
     await page.eval((p) => window.SilinxApp.openTt(p), f);
     await page.waitFor((p) => window.Silinx.active?.id === `tt:${p}` && document.querySelector('.doc:not([hidden]) .tt-editor .tt-kmap-host'), [f], { what: f });
   };
-  // under 5 inputs: no 3D box
-  await open('src/k3.bool.json');
+  // under 3 inputs: no 3D box
+  await open('src/k2.bool.json');
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-k3d-on`).length, T), 0);
   // 5 inputs: flat at first; ticked, 2 layers, the group on both and a box (its 4 sides) between them
   await open('src/k5.bool.json');
