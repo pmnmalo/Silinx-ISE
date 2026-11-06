@@ -124,6 +124,17 @@ function checkRemoteSettings(cfg) {
     throw bad('ssh.settings must be an absolute path outside ssh.remoteDir (the build folder)');
 }
 
+/** ssh.remoteDir set through the API: a folder inside the remote home (every run removes and remakes
+ *  <remoteDir>/<project> on the host), an optional leading '~/', then no leading '/' or '-', no other '~'
+ *  and no '..'; an absolute folder (a folder Docker Desktop shares on the host) is set in config.json only (#2958). */
+export function checkApiRemoteDir(dir) {
+  const rel = String(dir ?? '').replace(/^~\//, '');
+  if (rel === '') return;   // the default, silinx-build
+  if (rel.startsWith('/')) throw Object.assign(new Error(`ssh.remoteDir: an absolute folder can only be set in ${configPath()}`), { status: 403 });
+  if (/^-|~/.test(rel) || rel.split('/').includes('..'))
+    throw bad('ssh.remoteDir must be a folder inside the remote home (no leading / or -, no ~ or ..)');
+}
+
 /** Validate + persist a (partial) config, merged over the current one. fromApi: a change asked
  *  through the HTTP API (the FILE_ONLY settings may only be sent unchanged). */
 export async function saveConfig(partial, { fromApi = false } = {}) {
@@ -146,6 +157,7 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
   if (fromApi) {
     const changed = key => { const v = at(partial, key); return v !== undefined && !same(v, at(current, key)); };
     if (changed('local.settings') && cfg.local.settings) cfg.local.settings = await checkLocalSettings(String(cfg.local.settings));
+    if (changed('ssh.remoteDir')) checkApiRemoteDir(cfg.ssh.remoteDir);
     if (['docker.settings', 'ssh.settings', 'ssh.remoteDir'].some(changed)) checkRemoteSettings(cfg);
   }
   if (cfg.docker.image && !IMAGE.test(cfg.docker.image)) throw Object.assign(new Error('docker.image contains invalid characters'), { status: 400 });

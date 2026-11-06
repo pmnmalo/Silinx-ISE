@@ -342,6 +342,21 @@ test('devices DB and toolchain configuration', async () => {
     assert.equal(r.status, 400, JSON.stringify(body));
     assert.match(r.body.error, re);
   }
+  // ssh.remoteDir: every run removes <remoteDir>/<project> on the host; through the API a folder of the remote home only (#2958)
+  for (const [dir, status, re] of [['/home/me', 403, /^ssh.remoteDir: an absolute folder can only be set in .*config\.json$/],
+    ['../me', 400, /^ssh.remoteDir must be a folder inside the remote home \(no leading \/ or -, no ~ or \.\.\)$/], ['-rf', 400, /^ssh.remoteDir must be a folder inside the remote home/]]) {
+    r = await call('PUT', '/toolchain', { ssh: { remoteDir: dir } });
+    assert.equal(r.status, status, dir);
+    assert.match(r.body.error, re);
+  }
+  assert.equal(JSON.parse(await fs.readFile(cfgFile, 'utf8')).ssh.remoteDir, 'silinx-build', 'nothing written');
+  assert.equal((await call('PUT', '/toolchain', { ssh: { remoteDir: '~/builds' } })).status, 200);
+  // an absolute folder written in config.json is kept when the whole config is sent back unchanged
+  await fs.writeFile(cfgFile, JSON.stringify({ ...JSON.parse(await fs.readFile(cfgFile, 'utf8')), ssh: { host: 'box.lan', user: 'me', remoteDir: '/Users/Shared/silinx-build' } }));
+  r = await call('PUT', '/toolchain', (await call('GET', '/toolchain')).body.config);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.config.ssh.remoteDir, '/Users/Shared/silinx-build');
+  await call('PUT', '/toolchain', { ssh: { remoteDir: 'silinx-build' } });
   r = await call('PUT', '/toolchain', { ...(await call('GET', '/toolchain')).body.config, ssh: { host: 'box.lan', user: 'me', sshArgs: [] } });
   assert.equal(r.status, 200);
   assert.equal(r.body.config.docker.command, 'docker');

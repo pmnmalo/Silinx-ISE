@@ -624,7 +624,8 @@ function sshParts(cfg) {
 export function remoteDirFor(cfg, projectName) {
   let base = String(cfg.ssh.remoteDir || 'silinx-build').replace(/^~\/?/, '') || 'silinx-build';
   base = base.replace(/\/+$/, '');
-  if (!/^[\w./-]+$/.test(base) || base.split('/').includes('..')) throw new Error(`invalid ssh.remoteDir '${cfg.ssh.remoteDir}'`);
+  // no leading '-': the folder is an argument of rm -rf on the host (#2958)
+  if (!/^[\w./][\w./-]*$/.test(base) || base.split('/').includes('..')) throw new Error(`invalid ssh.remoteDir '${cfg.ssh.remoteDir}'`);
   return `${base}/${projectName}`;
 }
 

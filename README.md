@@ -424,7 +424,8 @@ the page keeps it, so the plain address works afterwards in the same browser (#2
 same computer has no token. With `serve --host 0.0.0.0` (or another address) other computers can reach it:
 it then prints a warning, and the address with the token is the only way they can use it. The toolchain settings that run a program
 (`docker.command`, `docker.extraArgs`, `ssh.sshArgs`, `ssh.identity`, `paths`) are set in
-`~/.silinx/config.json` only, never from the page.
+`~/.silinx/config.json` only, never from the page; so is an absolute `ssh.remoteDir` (from the page, a folder
+inside the remote home, #2958).
 
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
 publishes a release with the files above (`.github/workflows/release.yml`), once CI, which the tag
