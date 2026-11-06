@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateManifest, compareExpectations, updatedExpectations, normalizeWarning, countWarnings, parseTime, ioWrapper, paramWrapper, boardClockUcf, isGood, kindOf, FLOW_PARTS, chipOf, deviceOf, flaggedSynth,
+import { validateManifest, timedOutResult, compareExpectations, updatedExpectations, normalizeWarning, countWarnings, parseTime, ioWrapper, paramWrapper, boardClockUcf, isGood, kindOf, FLOW_PARTS, chipOf, deviceOf, flaggedSynth,
   qualityOf, describeQuality, compareQuality, timesOf, compareTimes, slowestTable, machineClass, resultsTable, withResultsTable, readmeResultsTable, TABLE_BEGIN, TABLE_END, PADS_SHORT,
   timesTable, withTimesTable, readmeTimesTable, TIMES_BEGIN, TIMES_END, nextpnrPlaceRoute } from './designs-corpus/lib.mjs';
 import { remoteFiles, mainCheckout, corpusPaths, CACHE } from '../scripts/fetch-design-corpus.mjs';
@@ -61,6 +61,19 @@ test('validateManifest: a branch instead of a commit, an unknown licence, bad pa
     f(m);
     assert.ok(validateManifest(m).some(p => re.test(p)), `${re}: ${validateManifest(m).join('; ')}`);
   }
+});
+
+test('#2909 a design out of time: the running stage a timeout, the stages it finished kept, a regression of that stage only', () => {
+  const partial = { name: 'd', frontend: 'pass', tb: 'skip: no self-checking testbench', synth: 'pass', diff: 'pass', warnings: { synth: ['w'] }, times: { synth: 5 }, details: {} };
+  const r = timedOutResult('d', { progress: 'flow', partial }, 180);
+  assert.deepEqual(r, { ...partial, flow: 'error: timeout (no result after 180 min)' });
+  // no progress yet (the worker had not started): the front end's
+  assert.deepEqual(timedOutResult('d', null, 180), { name: 'd', warnings: {}, times: {}, details: {}, frontend: 'error: timeout (no result after 180 min)' });
+  // against the expectations: the flow's regression alone, the front end's warnings not vanished
+  const exp = { d: { frontend: 'pass', synth: 'pass', diff: 'pass', flow: 'complete', warnings: { synth: ['w'] } } };
+  const cmp = compareExpectations(exp, { d: r });
+  assert.deepEqual(cmp.regressions.map(x => `${x.design} ${x.stage}`), ['d flow']);
+  assert.deepEqual(cmp.vanishedWarnings, []);
 });
 
 test('compareExpectations: regressions, improvements, changes, and warnings that appear or vanish', () => {
