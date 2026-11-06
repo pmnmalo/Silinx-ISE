@@ -62,22 +62,23 @@ const pct = x => `${x > 0 ? '+' : ''}${(100 * x).toFixed(1)}%`;
  * The size and speed of each design with both Yosys versions: [{ name, cells: { metric: text }, worse: [metric],
  * better: [metric], note }]. base / head: { name: quality | null } (quality: { part, slices, luts, ffs, period },
  * null: the flow did not complete). A change beyond QUALITY_TOLERANCE (the design corpus's noise) is worse or
- * better; within it the cell shows it, unmarked.
+ * better; within it the cell shows it, unmarked. metrics, tool: the columns and the tool's name in the notes (a nextpnr
+ * update's, scripts/nextpnr-update-report.mjs, #2935).
  */
-export function qualityRows(base, head, tolerance = QUALITY_TOLERANCE) {
+export function qualityRows(base, head, tolerance = QUALITY_TOLERANCE, { metrics = METRICS, tool = 'Yosys' } = {}) {
   const rows = [];
   for (const name of [...new Set([...Object.keys(base), ...Object.keys(head)])]) {
     const b = base[name] ?? null, h = head[name] ?? null;
     const row = { name, cells: {}, worse: [], better: [], note: '' };
     if (!b || !h) {
-      row.note = !b && !h ? 'no result with either Yosys' : !h ? 'no result with the new Yosys (it did with the base\'s)' : 'a result with the new Yosys only';
-      for (const [m] of METRICS) row.cells[m] = fmt(m, (h || b)?.[m]);
+      row.note = !b && !h ? `no result with either ${tool}` : !h ? `no result with the new ${tool} (it did with the base's)` : `a result with the new ${tool} only`;
+      for (const [m] of metrics) row.cells[m] = fmt(m, (h || b)?.[m]);
       if (!h && b) row.worse.push('flow');
       rows.push(row);
       continue;
     }
     if (b.part !== h.part) row.note = `built on the ${h.part} (the base's on the ${b.part}): not compared`;
-    for (const [m] of METRICS) {
+    for (const [m] of metrics) {
       const x = b[m], y = h[m];
       if (x === y || typeof x !== 'number' || typeof y !== 'number' || row.note) { row.cells[m] = x === y ? fmt(m, y) : `${fmt(m, x)} → ${fmt(m, y)}`; continue; }
       const change = x ? (y - x) / x : y > 0 ? 1 : -1;
@@ -175,18 +176,19 @@ export function readSide(dir) {
   };
 }
 
-async function comment(file) {
+/** The table as the pull request's comment, the one that starts with `mark` updated (also a nextpnr update's, #2935). */
+export async function postComment(file, { mark = MARK, artifact = 'yosys-update-report' } = {}) {
   const { GITHUB_TOKEN: token, GITHUB_REPOSITORY: repo, PR_NUMBER: pr } = process.env;
   if (!token || !repo || !pr) { console.error('usage: comment <file> (GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER)'); process.exit(2); }
   const body = fs.readFileSync(file, 'utf8');
   const api = (p, opts = {}) => fetch(`https://api.github.com/repos/${repo}/${p}`, { ...opts, headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', ...(opts.body && { 'Content-Type': 'application/json' }) } });
   const list = await api(`issues/${pr}/comments?per_page=100`);
-  const mine = list.ok ? (await list.json()).find(c => String(c.body || '').startsWith(MARK)) : null;
+  const mine = list.ok ? (await list.json()).find(c => String(c.body || '').startsWith(mark)) : null;
   const r = mine ? await api(`issues/comments/${mine.id}`, { method: 'PATCH', body: JSON.stringify({ body }) })
     : await api(`issues/${pr}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
   if (r.ok) { console.log(mine ? `updated the comment ${mine.id}` : `commented on #${pr}`); return; }
   // a read-only token (a Dependabot pull request, a fork's): the summary and the artifact have the table
-  console.log(`::notice::No comment on #${pr} (GitHub API ${r.status}: the token may not write): the table is in the job summary and the artifact yosys-update-report`);
+  console.log(`::notice::No comment on #${pr} (GitHub API ${r.status}: the token may not write): the table is in the job summary and the artifact ${artifact}`);
 }
 
 async function main() {
@@ -210,7 +212,7 @@ async function main() {
       runUrl: process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_SERVER_URL || 'https://github.com'}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : '' });
     if (opt('--out')) fs.writeFileSync(opt('--out'), md); else process.stdout.write(md);
   } else if (cmd === 'comment') {
-    await comment(args[0]);
+    await postComment(args[0]);
   } else {
     console.error('usage: yosys-update-report.mjs versions|subset|report|comment …'); process.exit(2);
   }

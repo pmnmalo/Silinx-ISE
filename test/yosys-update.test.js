@@ -255,7 +255,8 @@ test('yosys update: Dependabot weekly, npm grouped but for Yosys, the majors wit
   const patterns = /patterns: \[([^\]]+)\]/.exec(npm)[1].split(',').map(s => s.trim().replace(/^'(.*)'$/, '$1'));
   const matches = (p, n) => (p.endsWith('*') ? n.startsWith(p.slice(0, -1)) : n === p);
   const pkg = JSON.parse(read('package.json'));
-  const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter(n => n !== PACKAGE);
+  // (nor nextpnr: a pull request of its own too, measured by nextpnr-update.yml, #2935)
+  const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter(n => n !== PACKAGE && !n.startsWith('@silinx/nextpnr-himbaechel-'));
   for (const n of deps) assert.ok(patterns.some(p => matches(p, n)), `${n} in the group`);
   for (const p of patterns) assert.ok(deps.some(n => matches(p, n)), `the pattern ${p} names a dependency`);
   assert.ok(patterns.includes('@codemirror/*') && patterns.includes('@lezer/*'));
