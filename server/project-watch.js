@@ -53,8 +53,8 @@ export function diffScans(before, after) {
  *   subscribe(name, onChange) -> unsubscribe; onChange({ project, changes })
  *   hold(name) -> release: the changes made until release() are this server's own (not told)
  */
-export function createProjectWatcher({ dirOf, busy = () => false, interval = 500 } = {}) {
-  const watched = new Map();   // key -> { name, dir, listeners, snap, holds, timer, inflight, next, wasBusy, resync, ready }
+export function createProjectWatcher({ dirOf, busy = () => false, interval = 500, scanDir = scan } = {}) {
+  const watched = new Map();   // key -> { name, dir, listeners, snap, holds, timer, inflight, next, wasBusy, resync, releases, ready }
   const keyOf = name => String(name).toLowerCase();   // (case-insensitive file systems: one folder)
 
   // one look at a time; asked while one runs (a release, a check): another one after it (the timer's: skipped)
@@ -65,11 +65,12 @@ export function createProjectWatcher({ dirOf, busy = () => false, interval = 500
   }
   async function look(w) {
     await w.ready;
-    const heldBefore = w.holds > 0 || busy(w.name);
-    const now = await scan(w.dir);
+    const heldBefore = w.holds > 0 || busy(w.name), releases = w.releases;
+    const now = await scanDir(w.dir);
     const held = heldBefore || w.holds > 0 || busy(w.name);   // (held during the scan: its files may be our own)
-    // held, or just released by a run: what changed is known, not told
-    if (held || w.wasBusy || w.resync) { w.snap = now; w.wasBusy = held && busy(w.name); w.resync = false; return; }
+    // held, or just released by a run: what changed is known, not told; released during the scan, the scan may have
+    // read the folder before the request's writes: the next look too (#2913)
+    if (held || w.wasBusy || w.resync) { w.snap = now; w.wasBusy = held && busy(w.name); w.resync = w.releases !== releases; return; }
     const changes = diffScans(w.snap, now);
     w.snap = now;
     if (changes.length) for (const fn of [...w.listeners]) { try { fn({ project: w.name, changes }); } catch { /* a listener's own error */ } }
@@ -79,8 +80,8 @@ export function createProjectWatcher({ dirOf, busy = () => false, interval = 500
     const key = keyOf(name);
     let w = watched.get(key);
     if (!w) {
-      w = { name, dir: dirOf(name), listeners: new Set(), snap: new Map(), holds: 0, inflight: null, next: null, wasBusy: false, resync: false };
-      w.ready = scan(w.dir).then(s => { w.snap = s; });
+      w = { name, dir: dirOf(name), listeners: new Set(), snap: new Map(), holds: 0, inflight: null, next: null, wasBusy: false, resync: false, releases: 0 };
+      w.ready = scanDir(w.dir).then(s => { w.snap = s; });
       w.timer = setInterval(() => { poll(w, { after: false }).catch(() => {}); }, interval);
       w.timer.unref?.();
       watched.set(key, w);
@@ -97,7 +98,7 @@ export function createProjectWatcher({ dirOf, busy = () => false, interval = 500
     if (!w) return () => {};
     w.holds++;
     let done = false;
-    return () => { if (done) return; done = true; w.holds--; w.resync = true; poll(w).catch(() => {}); };
+    return () => { if (done) return; done = true; w.holds--; w.resync = true; w.releases++; poll(w).catch(() => {}); };
   }
 
   /** Looks at the project now (the tests; a page told sooner). */
