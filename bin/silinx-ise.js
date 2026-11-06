@@ -47,18 +47,22 @@ async function main() {
         srv = await startServer({ port, host });
       } catch (e) {
         if (e.code !== 'EADDRINUSE') throw e;
-        // already running (e.g. the launcher was double-clicked twice): just open it, with the token it
-        // wrote for its owner (#2564)
+        // already running (e.g. the launcher was double-clicked twice): opened, with a one-time code it gives for
+        // the token it wrote for its owner (#2564), only when it proves it holds that token (#2955): a server
+        // another user started on the port first is another program
+        const { holdsToken } = await import('../server/open-code.js');
         let token = null;
         try { token = fs.readFileSync(tokenFile(port), 'utf8').trim(); } catch { /* none written */ }
-        const headers = token ? { 'X-Silinx-Token': token } : {};
-        const up = await fetch(`${url}/api/templates`, { headers }).then(r => r.ok).catch(() => false);
-        if (!up) { console.error(`Port ${port} is used by another program. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}`); process.exit(1); }
+        if (!await holdsToken(url, token)) { console.error(`Port ${port} is used by another program. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}`); process.exit(1); }
         console.log(`Silinx is already running at ${url}`);
-        if (args.includes('--open')) await openBrowser(token ? `${url}/#token=${token}` : url);
+        if (args.includes('--open')) {
+          const code = await fetch(`${url}/api/open-code`, { method: 'POST', headers: { 'X-Silinx-Token': token } })
+            .then(r => (r.ok ? r.json() : {})).then(j => j.code, () => null);
+          await openBrowser(code ? `${url}/#code=${code}` : url);
+        }
         process.exit(0);
       }
-      if (args.includes('--open')) await openBrowser(srv.silinxUrl);
+      if (args.includes('--open')) await openBrowser(srv.silinxOpenUrl());
       console.log('Keep this window open while you use Silinx. To stop it, close the window or press Ctrl+C.');
       break;
     }

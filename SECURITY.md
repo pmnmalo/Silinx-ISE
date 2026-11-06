@@ -33,7 +33,10 @@ can read that user's files has the server too.
 
 - The server listens on this computer only (loopback) unless told otherwise, and a token made at every
   start is the only way in, on loopback too (another user of the same computer has none, #2564); it
-  checks the Host and Origin headers of every request.
+  checks the Host and Origin headers of every request. The browser a launcher opens is given a one-time code
+  (single use, for a minute), which the page exchanges for the token, so that the token is on no command line; a
+  second launch opens a server already on its port only when that server proves it holds the token of its file
+  (#2955).
 - The pages carry a Content Security Policy with the hashes of their scripts and styles.
 - Every path a request names is confined to the project it belongs to; a project's zip is limited in
   size when it is unpacked.
@@ -138,7 +141,8 @@ What it cannot do:
   from the browser's storage, as the dialog says); Keep Mine leaves it. The MCP server's `open_link` never replaces
   one. No setting (interface, language, toolchain, MCP folder) is changed by a link.
 - **Set the local server's token:** only an address whose hash is the token alone (`#token=…`, the one the server
-  prints and opens) stores it; a link with other options never sets or replaces it, and the link's fetch never
+  prints, or the one-time code a launcher opens, `#code=…`) stores it, and a token replaces the one kept only when the
+  server accepts it (#2955); a link with other options never sets or replaces it, and the link's fetch never
   carries it.
 - **Run anything outside the browser:** opening a link runs no ISE, shell or programmer; Try it, the simulation and
   the emulator run the design in the browser's simulators, which a Stop ends. A project made from a link's design

@@ -273,14 +273,21 @@ test('serve: starts on the given port with the scratch workspace and opens the b
     assert.equal(r.status, 200);
     assert.ok(Array.isArray(await r.json()));
     for (let i = 0; i < 300 && !fss.existsSync(env.FAKE_OPEN_LOG); i++) await sleep(10);
-    assert.match(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'), new RegExp(`(open|xdg-open) http://127.0.0.1:${port}/#token=${token}`));
-    // a second launch (the launcher double-clicked twice): "already running", and opens it with the token
+    // the browser opened with a one-time code, never the token on the opener's command line (#2955)
+    const opened = await fs.readFile(env.FAKE_OPEN_LOG, 'utf8');
+    assert.match(opened, new RegExp(`(open|xdg-open) http://127.0.0.1:${port}/#code=[\\w-]{24}$`, 'm'));
+    assert.ok(!opened.includes(token));
+    // a second launch (the launcher double-clicked twice): "already running" (the server proved it holds the token of
+    // its file), and opens it with a code of its own
     await fs.rm(env.FAKE_OPEN_LOG, { force: true });
     const again = await cli(['serve', '--port', String(port), '--open']);
     assert.equal(again.code, 0, again.err);
     assert.match(again.out, new RegExp(`^Silinx is already running at http://127.0.0.1:${port}$`, 'm'));
     for (let i = 0; i < 300 && !fss.existsSync(env.FAKE_OPEN_LOG); i++) await sleep(10);
-    assert.match(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'), new RegExp(`http://127.0.0.1:${port}/#token=${token}`));
+    const code = /#code=([\w-]+)/.exec(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'))?.[1];
+    assert.ok(code);
+    const page = { method: 'POST', headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json' }, body: JSON.stringify({ code }) };
+    assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/api/token`, page)).json(), { token });
   } finally { await stop(s.proc); }
   await fs.rm(env.FAKE_OPEN_LOG, { force: true });
   // PORT from the environment, host 0.0.0.0 shown as 127.0.0.1 in the URL
@@ -294,17 +301,31 @@ test('serve: starts on the given port with the scratch workspace and opens the b
   } finally { await stop(s2.proc); }
 });
 
-test('serve: port already used by Silinx -> "already running" (exit 0, opens it); by another program -> exit 1', { skip: POSIX_ONLY }, async () => {
+test('serve: port already used by another program -> exit 1, a server that answers everything or has no token too', { skip: POSIX_ONLY }, async () => {
+  // (#2955: a server answering 200 was taken for a running Silinx and the browser opened there; and one without the
+  // token of the file in the configuration folder, which is never sent to it)
+  const seen = [];
+  const answers = http.createServer((req, res) => { seen.push(req.headers['x-silinx-token']); res.setHeader('content-type', 'application/json'); res.end('[]'); });
+  await new Promise(r => answers.listen(0, '127.0.0.1', r));
+  const aport = answers.address().port;
+  await fs.writeFile(path.join(process.env.SILINX_CONFIG_DIR, `server-${aport}.token`), 'stale-token-of-a-crashed-run');
   const app = await startApp();
   try {
-    const r = await cli(['serve', '--port', String(app.port), '--open']);
-    assert.equal(r.code, 0, r.err);
-    assert.match(r.out, new RegExp(`^Silinx is already running at http://127.0.0.1:${app.port}$`, 'm'));
-    for (let i = 0; i < 300 && !fss.existsSync(env.FAKE_OPEN_LOG); i++) await sleep(10);
-    assert.match(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'), new RegExp(`http://127.0.0.1:${app.port}`));
-    const r2 = await cli(['serve', '--port', String(app.port)]);
-    assert.equal(r2.code, 0);
-  } finally { await app.close(); }
+    for (const port of [aport, app.port]) {
+      await fs.rm(env.FAKE_OPEN_LOG, { force: true });
+      const r = await cli(['serve', '--port', String(port), '--open']);
+      assert.equal(r.code, 1);
+      assert.match(r.err, new RegExp(`^Port ${port} is used by another program\\. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}$`, 'm'));
+      assert.doesNotMatch(r.out, /already running/);
+      assert.ok(!fss.existsSync(env.FAKE_OPEN_LOG), 'no browser opened');
+    }
+    assert.ok(!seen.includes('stale-token-of-a-crashed-run'), 'the token is never sent to it');
+  } finally {
+    await app.close();
+    answers.closeAllConnections?.();
+    await new Promise(r => answers.close(r));
+    await fs.rm(path.join(process.env.SILINX_CONFIG_DIR, `server-${aport}.token`), { force: true });
+  }
 
   const other = http.createServer((req, res) => { res.statusCode = 404; res.end('nope'); });
   await new Promise(r => other.listen(0, '127.0.0.1', r));

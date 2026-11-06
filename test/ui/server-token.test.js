@@ -1,6 +1,8 @@
 // UI (#2564): the server a launcher starts makes a token at every start, on loopback too. The page opened at
 // the address with it (…/#token=…) reaches the API, drops the token from its address, and keeps it for the
-// browser (the plain address works afterwards); a browser without it is refused. No warnings.
+// browser (the plain address works afterwards); a browser without it is refused. The address a launcher opens has a
+// one-time code instead (…/#code=…, #2955), exchanged for the token; an address with a token the server refuses
+// leaves the one kept as it is. No warnings.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fsp from 'node:fs/promises';
@@ -32,6 +34,25 @@ test('#2564 the page opened with the server\'s token reaches the API and keeps t
     await listed(page);
     assert.equal(await page.eval(() => fetch('/api/projects').then((x) => x.status)), 403, 'a request without the header');
   } finally { await page.close(); }
+  // the address a launcher opens (#2955): a one-time code, exchanged for the token, once
+  const code = async () => (await (await fetch(`${srv.url}/api/open-code`, { method: 'POST', headers: srv.headers() })).json()).code;
+  const opened = await env.newPage(`${srv.url}/#code=${await code()}`);
+  try {
+    await listed(opened);
+    assert.equal(await opened.eval(() => location.hash), '', 'the code is not left in the address');
+    // an address with a token the server refuses (another page may open one): the token kept stays
+    await opened.eval(() => { location.hash = '#token=not-the-token-of-this-server'; });
+    await opened.reload();
+    await listed(opened);
+    assert.equal(await opened.eval(() => location.hash), '');
+  } finally { await opened.close(); }
+  // a code spent, or made up: no token for a browser without one
+  const spent = await code();
+  assert.equal((await fetch(`${srv.url}/api/token`, { method: 'POST', headers: { origin: srv.url, 'content-type': 'application/json' }, body: JSON.stringify({ code: spent }) })).status, 200);
+  for (const c of [spent, 'made-up']) {
+    const p = await env.newPage(`${srv.url}/#code=${c}`);
+    try { assert.equal(await projects(p), 'this Silinx server needs its token: open the URL it printed at start-up'); } finally { await p.close(); }
+  }
   // another browser (another user of this computer): no token, refused
   const other = await env.newPage(srv.url);
   try {
