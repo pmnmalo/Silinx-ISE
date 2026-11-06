@@ -378,9 +378,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 1,
-      "max": 1,
-      "avg": 1
+      "min": 3,
+      "max": 3,
+      "avg": 3
     },
     "reason": null
   },
@@ -499,9 +499,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 2,
-      "max": 2,
-      "avg": 2
+      "min": 13,
+      "max": 14,
+      "avg": 13.25
     },
     "reason": null
   },
@@ -510,9 +510,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 5,
-      "max": 5,
-      "avg": 5
+      "min": 13,
+      "max": 13,
+      "avg": 13
     },
     "reason": null
   },
