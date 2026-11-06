@@ -19,6 +19,10 @@ In short:
 
 In detail:
 
+- **The release workflow publishes the tarball by its path (#2915).** `npm publish out/silinx-fpga-0.3.0.tgz` took
+  the path for a GitHub repository's shorthand (owner/repo) and failed on `git ls-remote`, the first time 0.3.0 was
+  tagged: the publish step gives it as `./out/silinx-fpga-*.tgz`.
+  - **Tests:** test/silinx-fpga-release-workflow.test.js.
 - **The number of nextpnr's placements, for tests (#2828):** the flow's spec takes `placements`, the placements
   nextpnr's Place & Route makes (the fastest kept), in place of the Optimization's (Normal: four for a small design,
   High: eight); the IDE and the command line do not set it.

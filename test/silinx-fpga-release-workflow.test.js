@@ -61,7 +61,10 @@ test('#1681 silinx-fpga release: the commit on main, its version and changelog, 
   assert.match(download, /name: silinx-fpga\n {10}path: out(\n|$)/);
   const [publish, publishStep, m] = pub(/name: Publish\n/);
   assert.equal(publish, m - 1);
-  assert.match(publishStep, /npm publish out\/silinx-fpga-\*\.tgz --provenance --access public --ignore-scripts\n/);
+  // the tarball by its path, ./ first: npm takes out/silinx-fpga-0.3.0.tgz for a GitHub repository (owner/repo) and
+  // runs git ls-remote on it (#2915)
+  assert.match(publishStep, /npm publish \.\/out\/silinx-fpga-\*\.tgz --provenance --access public --ignore-scripts\n/);
+  assert.doesNotMatch(publishStep, /npm publish (?!\.\/|\/)/, 'npm publish of a relative path without ./');
   // npm's trusted publishing (#2428): GitHub's OIDC token, no secret, no npmrc; npm 11.5.1 or later, pinned, before publishing
   assert.doesNotMatch(yml, /secrets\.|NODE_AUTH_TOKEN|_authToken|npmrc/i);
   const npm = /run: \|\n\s+npm install --global npm@(\d+)\.(\d+)\.(\d+) --ignore-scripts --no-audit --no-fund\n\s+npm publish /.exec(publishStep);
