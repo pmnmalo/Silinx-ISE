@@ -87,6 +87,29 @@ html[data-theme="dark"] .tt-k3d-cell:hover { background: #26324a; }
 html[data-theme="dark"] .tt-k3d-cell.v1 { background: #1d2738; }
 html[data-theme="dark"] .tt-k3d-cell.v1 .tt-k3d-v { color: #8fb4ff; }
 
+/* the map of 3 or 4 inputs on a cylinder or a torus (#2925, web/js/tt-kmapsurface.js): its faces drawn farthest first,
+   seen from behind dimmed; the groups as patches over the cells, their outlines in their colours */
+.tt-ks-svg { overflow: visible; }
+.tt-ks-face { fill: #fff; stroke: #b4b4b4; stroke-width: .6; cursor: pointer; }
+.tt-ks-face:hover { fill: #eef5ff; }
+.tt-ks-face.v1 { fill: #eef3ff; }
+.tt-ks-face.back { fill: #dcdcdc; }
+.tt-ks-group { fill-opacity: .24; stroke: none; pointer-events: none; }
+.tt-ks-group.back { fill-opacity: .12; }
+.tt-ks-edge { stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
+.tt-ks-text { pointer-events: none; }
+.tt-ks-m { font-size: 9px; fill: #999; }
+.tt-ks-v { font: bold 15px var(--mono, monospace); fill: #666; }
+.tt-ks-v.v1 { fill: #0040c0; }
+.tt-ks-v.vX { fill: #a06000; }
+html[data-theme="dark"] .tt-ks-face { fill: #1e2228; stroke: #555; }
+html[data-theme="dark"] .tt-ks-face:hover { fill: #26324a; }
+html[data-theme="dark"] .tt-ks-face.v1 { fill: #1d2738; }
+html[data-theme="dark"] .tt-ks-face.back { fill: #121417; }
+html[data-theme="dark"] .tt-ks-v { fill: #aaa; }
+html[data-theme="dark"] .tt-ks-v.v1 { fill: #8fb4ff; }
+html[data-theme="dark"] .tt-ks-v.vX { fill: #e0a040; }
+
 /* a toolbar's menu (web/js/toolbar-menu.js) */
 .tb-more { position: absolute; top: 5px; right: 8px; }
 .tb-more .tb-more-btn { box-sizing: border-box; width: 28px; min-width: 0; padding-left: 0; padding-right: 0; justify-content: center; text-align: center; }   /* (inside the place its toolbar keeps free, #2331) */

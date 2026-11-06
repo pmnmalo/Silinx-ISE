@@ -19,6 +19,10 @@ export const TT_PT = {
   // the maps in 3D (#1407)
   'Reset view': 'Repor a vista', 'Drag (or the arrow keys) to turn the maps': 'Arraste (ou use as setas) para rodar os mapas',
   'The maps stacked in depth: a group across maps seen as one box': 'Os mapas empilhados em profundidade: um grupo que atravessa mapas visto como uma só caixa',
+  // the maps of 3 and 4 variables on a cylinder and a torus (#2925)
+  'The map rolled into a cylinder: the cells across its edges joined': 'O mapa enrolado num cilindro: as células de um lado e do outro das margens juntas',
+  'The map on a torus: both pairs of its edges joined': 'O mapa num toro: os dois pares de margens juntos',
+  'Drag (or the arrow keys) to turn the map': 'Arraste (ou use as setas) para rodar o mapa',
   'The form with the fewest gates, each symbol one gate whatever its number of inputs': 'A forma com menos portas, cada símbolo uma porta qualquer que seja o seu número de entradas',
   'The form with the fewest gates on its longest path, every gate the same delay': 'A forma com menos portas no caminho mais longo, todas as portas com o mesmo atraso',
   'Algebra from Module…': 'Álgebra de um Módulo…', 'Fill the table': 'Preencher a tabela',
