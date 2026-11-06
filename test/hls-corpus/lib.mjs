@@ -46,13 +46,19 @@ export function runDesign(design, texts, { maxCycles = 100000 } = {}) {
   return r;
 }
 
-/** The differences between the results and the expectations: [{ name, stage, expected, got }]. */
+// a co-simulation's latency as the README's table writes it ('-': none)
+const latencyText = (l) => (l ? (l.min === l.max ? `${l.min}` : `${l.min}-${l.max} (avg ${l.avg})`) : '-');
+
+/** The differences between the results and the expectations: [{ name, stage, expected, got }]; the co-simulation's
+ *  latency too (#2614: its cycles moved with the stages the same, unnoticed). */
 export function compareExpectations(results, expected) {
   const out = [];
   for (const [name, r] of Object.entries(results)) {
     const e = expected[name];
     if (!e) { out.push({ name, stage: '*', expected: 'none', got: 'new design' }); continue; }
     for (const s of STAGES) if (e[s] !== r[s]) out.push({ name, stage: s, expected: e[s], got: r[s] });
+    const [le, lr] = [latencyText(e.latency), latencyText(r.latency)];
+    if (le !== lr) out.push({ name, stage: 'latency', expected: le, got: lr });
   }
   return out;
 }

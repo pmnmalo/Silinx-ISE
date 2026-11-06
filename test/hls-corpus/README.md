@@ -19,7 +19,8 @@ Not part of `npm test` (it needs the network once).
   synthesis (VHDL and Verilog), the C/RTL co-simulation (its calls of the top function replayed on the VHDL), its
   latency; a C++ example is skipped (#1590). The first reason a design stops is recorded.
 - **The expectations**: `expected.json`; a run fails on any difference (a design that passes a stage it did not, or
-  no longer passes one): record an improvement with `--update`, and make an issue of a loss.
+  no longer passes one, or a co-simulation's latency that changed, #2614): record an improvement with `--update`, and
+  make an issue of a loss.
 
 ## The results
 
@@ -60,14 +61,14 @@ Not part of `npm test` (it needs the network once).
 | interface-streaming-using-axi-stream-with-struct | C++ | pass | pass | pass | 32 |  |
 | migration-python-scripts | C | pass | pass | pass | 22-23 |  |
 | migration-vitis-unified-cli | C | pass | pass | pass | 22-23 |  |
-| misc-initialization-and-reset-static-array-rom | C++ | pass | pass | pass | 1 |  |
+| misc-initialization-and-reset-static-array-rom | C++ | pass | pass | pass | 3 |  |
 | misc-malloc-removed | C | pass | pass | pass | 67 |  |
 | misc-rtl-as-blackbox | C++ | pass | pass | pass | 5 |  |
 | modeling-pointers-basic-arithmetic | C | pass | pass | pass | 60 |  |
 | modeling-pointers-multiple-pointers | C | pass | pass | pass | 1 |  |
 | modeling-pointers-native-casts | C | pass | pass | pass | 411 |  |
-| modeling-pointers-stream-better | C | pass | pass | pass | 2 |  |
-| modeling-pointers-stream-good | C | pass | pass | pass | 5 |  |
+| modeling-pointers-stream-better | C | pass | pass | pass | 13-14 |  |
+| modeling-pointers-stream-good | C | pass | pass | pass | 13 |  |
 | modeling-pointers-using-double | C | pass | pass | pass | 21-23 |  |
 | modeling-conditional-control-of-pragmas-using-defines | C++ | pass | pass | pass | 31 |  |
 | modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 60 |  |

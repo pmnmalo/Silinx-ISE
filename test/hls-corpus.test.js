@@ -53,5 +53,11 @@ test('#1597 a design through the stages; the differences from the expectations; 
   const cpp = runDesign({ ...design, language: 'c++' }, { ...texts, 'x/acc.c': texts['x/acc.c'].replace('int acc(int v) {', 'int acc(int v) {\n  int &w = v; (void)w;') });
   assert.equal(cpp.synth, 'fail');
   assert.deepEqual(compareExpectations({ acc: r, new1: r }, { acc: { ...r, cosim: 'fail' } }), [{ name: 'acc', stage: 'cosim', expected: 'fail', got: 'pass' }, { name: 'new1', stage: '*', expected: 'none', got: 'new design' }]);
+  // (#2614: the co-simulation's latency compared too, its minimum, maximum and average)
+  const lat = (min, max, avg) => ({ ...r, latency: { min, max, avg } });
+  assert.deepEqual(compareExpectations({ acc: lat(13, 14, 13.25) }, { acc: lat(2, 2, 2) }), [{ name: 'acc', stage: 'latency', expected: '2', got: '13-14 (avg 13.25)' }]);
+  assert.deepEqual(compareExpectations({ acc: lat(3, 5, 4) }, { acc: lat(3, 5, 4.5) }), [{ name: 'acc', stage: 'latency', expected: '3-5 (avg 4.5)', got: '3-5 (avg 4)' }]);
+  assert.deepEqual(compareExpectations({ acc: { ...r, latency: null } }, { acc: lat(1, 1, 1) }), [{ name: 'acc', stage: 'latency', expected: '1', got: '-' }]);
+  assert.deepEqual(compareExpectations({ acc: r }, { acc: { ...r } }), []);
   assert.match(table({ designs: [design] }, { acc: r }), /^\| acc \| C \| pass \| pass \| pass \| \d+ \|  \|$/m);
 });
