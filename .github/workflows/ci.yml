@@ -103,16 +103,39 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      # the browsers kept between runs, for the version of Playwright (#415); the system's libraries
-      # installed every run (--with-deps)
+      # the browsers kept between runs, for the version of Playwright (#415); the system's packages they need
+      # installed every run (--with-deps), from apt's downloads kept between runs too, for the runner's image
+      # (#2921: a slow mirror took 13 minutes for them, #1559, then 50, at 31 kB/s, the job's time gone)
+      - id: image
+        run: echo "key=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
-      # (the system's packages: a slow mirror took 13 minutes, #1559; the tests' time apart)
+      - id: apt
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-webkit-${{ steps.image.outputs.key }}
+          restore-keys: apt-webkit-
+      # an install that stalls stopped at 10 minutes and run once more, with what it downloaded
       - name: WebKit and its system packages
-        run: npx playwright install --with-deps webkit
+        run: |
+          mkdir -p ~/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\nAPT::Sandbox::User "root";\n' ~/apt-archives \
+            | sudo tee /etc/apt/apt.conf.d/90silinx-archives > /dev/null
+          for attempt in 1 2; do
+            if timeout 10m npx playwright install --with-deps webkit; then sudo chown -R "$USER" ~/apt-archives; exit 0; fi
+            echo "::warning::WebKit and its system packages: attempt $attempt stopped or failed (#2921)"
+            sudo dpkg --configure -a
+          done
+          exit 1
         timeout-minutes: 25
+      - if: steps.apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-webkit-${{ steps.image.outputs.key }}
       - name: Memory in WebKit (Safari's engine)
         run: npm run test:webkit
         timeout-minutes: 15
@@ -136,18 +159,46 @@ jobs:
   # the main UI flows in Firefox and in WebKit (Safari's engine)
   browsers:
     runs-on: ubuntu-latest
-    # (Firefox, then WebKit, one file at a time: about 25 minutes, #1126)
-    timeout-minutes: 60
+    # (Firefox, then WebKit, one file at a time: about 25 minutes, #1126; the steps' own limits first, #2939)
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      # the browsers kept between runs, for the version of Playwright (#415); the system's packages they need
+      # installed every run (--with-deps), from apt's downloads kept between runs too, for the runner's image
+      # (#2921: a slow mirror took 13 minutes for them, #1559, then 50, at 31 kB/s, the job's time gone)
+      - id: image
+        run: echo "key=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-firefox-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
-      - run: npx playwright install --with-deps firefox webkit
+      - id: apt
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-firefox-webkit-${{ steps.image.outputs.key }}
+          restore-keys: apt-firefox-webkit-
+      # an install that stalls stopped at 10 minutes and run once more, with what it downloaded
+      - name: Firefox, WebKit and their system packages
+        run: |
+          mkdir -p ~/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\nAPT::Sandbox::User "root";\n' ~/apt-archives \
+            | sudo tee /etc/apt/apt.conf.d/90silinx-archives > /dev/null
+          for attempt in 1 2; do
+            if timeout 10m npx playwright install --with-deps firefox webkit; then sudo chown -R "$USER" ~/apt-archives; exit 0; fi
+            echo "::warning::Firefox, WebKit and their system packages: attempt $attempt stopped or failed (#2921)"
+            sudo dpkg --configure -a
+          done
+          exit 1
+        timeout-minutes: 25
+      - if: steps.apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-firefox-webkit-${{ steps.image.outputs.key }}
       - run: npm run test:browsers
         timeout-minutes: 40
 

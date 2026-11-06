@@ -57,7 +57,8 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
   assert.match(ui, /^    timeout-minutes: 45$/m, 'the job holds the step and its setup');
   // Firefox and WebKit, one after the other (#1126)
   const br = j.browsers.join('\n');
-  assert.match(br, /^ {4}timeout-minutes: 60$/m);
+  // (past its steps' own: the install's 25 minutes, the tests' 40, #2939)
+  assert.match(br, /^ {4}timeout-minutes: 70$/m);
   assert.match(br, /- run: npm run test:browsers\n {8}timeout-minutes: 40$/m);
   // the macOS and Windows smoke tests
   assert.ok(j.os.includes('        os: [macos-latest, windows-latest]'));
@@ -130,7 +131,8 @@ test('CodeQL (#498): a workflow of its own, nightly on main when its code change
 
 test('CI: WebKit and its system packages installed in a step of their own, its time apart from the tests\' (#1559)', () => {
   const w = jobs(read('.github/workflows/ci.yml'))['webkit-standalone'].join('\n');
-  assert.match(w, /- name: WebKit and its system packages\n\s+run: npx playwright install --with-deps webkit\n\s+timeout-minutes: 25\n/);
+  // (an install that stalls stopped at 10 minutes and run once more, within the step's 25, #2921)
+  assert.match(w, /- name: WebKit and its system packages\n\s+run: \|\n(?:.*\n)*?\s+if timeout 10m npx playwright install --with-deps webkit; then .*\n(?:.*\n){3}\s+exit 1\n\s+timeout-minutes: 25\n/);
   assert.match(w, /- name: Memory in WebKit \(Safari's engine\)\n\s+run: npm run test:webkit\n\s+timeout-minutes: 15\n/);
   const job = +w.match(/^    timeout-minutes: (\d+)$/m)[1];
   assert.ok(job >= 25 + 15, `the job's ${job} minutes hold both steps`);
