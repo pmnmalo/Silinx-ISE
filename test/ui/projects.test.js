@@ -505,6 +505,26 @@ uiTest('Add Copy of Source: new files, association, overwrite confirmation (No k
   assert.ok(rows.includes('src/inv.vhd|All|vhdl') && rows.includes('src/buf2.v|All|verilog') && rows.includes('sim/tb_buf2.v|Simulation|verilog'), rows.join('\n'));
 }, { ui: 'ise' });
 
+uiTest('#2973 Files view: Rename to a name the import gate refuses (CON.vhd): the error, the file as it was', E, async (page) => {
+  await makeProject(env, { name: 'GateRen', top: 'a', files: { 'src/a.vhd': 'entity a is end;\narchitecture r of a is begin end r;\n' } });
+  await page.openProject('GateRen');
+  await page.leftTab('files');
+  const i = await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].findIndex((tr) => tr.cells[0]?.textContent === 'src/a.vhd') + 1) - 1;
+  await page.rightClick('#files-page tr', { index: i });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Rename…' });
+  await page.waitDialog('Rename');
+  await page.fill('.dlg-overlay input[type=text]', 'src/CON.vhd', { index: 1 });
+  await page.dialogButton('Rename');
+  await page.waitFor(() => /not renamed/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the refusal' });
+  assert.match(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().innerText),
+    /could not rename src\/a\.vhd → src\/CON\.vhd: 'src\/CON\.vhd': not renamed: reserved name \('CON\.vhd'\)\. Nothing was changed\./);
+  await page.dialogButton('OK');
+  await page.waitNoDialog();
+  assert.match(await readWs(env, 'GateRen', 'src/a.vhd'), /entity a is/);
+  assert.deepEqual(await page.eval(() => window.Silinx.project.files.map((f) => f.path)), ['src/a.vhd']);
+});
+
 uiTest('Files view: rename a file into another folder, remove a file (right-click)', E, async (page) => {
   await makeProject(env, {
     name: 'FilesPj', top: 'a',

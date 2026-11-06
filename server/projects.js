@@ -10,6 +10,7 @@ import { boardAutoAssign, boardConstraintsText, openOnlyDevice } from '../packag
 import { resolveBoard } from './devices.js';
 import { within } from './paths.js';
 import { topNameError } from './ident.js';
+import { normalizePath } from '../core/import-gate.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
@@ -341,12 +342,16 @@ export async function writeFile(name, rel0, text) {
 
 
 /** Move/rename a project file (or folder), keeping the project's file list and constraints path. */
-export async function renameFile(name, from, to) {
+// checkName: the new name by the import gate's rules for a name (the interface's Rename and MCP rename_file alike,
+// #2973); false only to put a file back at the name it had (a rename undone)
+export async function renameFile(name, from, to, { checkName = true } = {}) {
   const dir = projectDir(name);
   const src = safeJoin(dir, from), dst = safeJoin(dir, to);
   if (src === dir || dst === dir) throw new HttpError(400, 'cannot rename the project folder itself');
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
   if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
+  const gated = checkName ? normalizePath(toKey) : {};
+  if (gated.reason) throw new HttpError(400, `'${to}': not renamed: ${gated.reason}`);
   return withProjectLock(name, async () => {
     let st;
     try { st = await fs.stat(src); } catch { throw new HttpError(404, `file '${from}' not found`); }

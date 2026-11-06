@@ -96,7 +96,7 @@ test('rename_file: a file and a folder, the project\'s files, the drawings\' lin
   await fails('rename_file', { project: 'n', from: 'silinx.json', to: 'x.json' }, 'silinx.json is the project\'s description');
   await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '../top.vhd' }, 'path escapes project');
   await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: 'build/top.vhd' }, 'build/ is written by Silinx itself');
-  await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '.hidden/top.vhd' }, '\'.hidden/top.vhd\': a hidden file or folder');
+  await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '.hidden/top.vhd' }, '\'.hidden/top.vhd\': not renamed: hidden file or folder (\'.hidden\')');   // (the import gate's message, as Rename's, #2973)
 });
 
 test('delete_file: a drawing\'s HDL file (the drawing\'s HDL made from it then), a folder; delete_project', async () => {

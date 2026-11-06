@@ -126,6 +126,11 @@ test('folder: the exact errors (as the browser storage\'s)', async () => {
       [() => ops.renameFile('Err', 'src/a.vhd', 'src/b.vhd'), "'src/b.vhd' already exists"],
       [() => ops.renameFile('Err', 'lib', 'lib/inner'), "cannot move 'lib' into itself"],
       [() => ops.renameFile('Err', 'lib', 'src'), "'src' already exists"],
+      // the new name by the import gate's rules, as the local server's Rename (#2973)
+      [() => ops.renameFile('Err', 'src/a.vhd', 'src/CON.vhd'), "'src/CON.vhd': not renamed: reserved name ('CON.vhd')"],
+      [() => ops.renameFile('Err', 'src/a.vhd', 'src/a.vhd.'), "'src/a.vhd.': not renamed: name ending with a space or a dot ('a.vhd.')"],
+      [() => ops.renameFile('Err', 'src/a.vhd', 'src/a|b.vhd'), "'src/a|b.vhd': not renamed: character not allowed in a name (< > : \" | ? *): 'a|b.vhd'"],
+      [() => ops.renameFile('Err', 'lib', 'build'), "'build': not renamed: the project's build folder (build/) is Silinx's own"],
       [() => ops.writeFile('Err', '../out.v', 'x'), 'invalid path'],
     ];
     for (const [fn, msg] of errs) await assert.rejects(fn, { message: msg });
