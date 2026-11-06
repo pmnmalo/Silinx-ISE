@@ -12,6 +12,7 @@ import { contentSecurityPolicy, inlineScriptHashes } from './csp.js';
 import { configDir } from './toolchain.js';
 import { createProjectWatcher } from './project-watch.js';
 import { listJobs } from './jobs.js';
+import { createOpenCodes, tokenProof } from './open-code.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,7 +37,7 @@ export function pageCsp(file) {
 /** A loopback address (the server only reachable from this machine). */
 export const isLoopback = host => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(String(host).toLowerCase()) || /^127\./.test(String(host)) || /^::ffff:127\./.test(String(host));
 
-export async function createApp({ host = '127.0.0.1', token = null } = {}) {
+export async function createApp({ host = '127.0.0.1', token = null, codes = createOpenCodes() } = {}) {
   const app = express();
   // The API changes files and runs the ISE flow: only the Silinx page itself may call it.
   // A request from another web origin (a malicious page in the same browser) is refused, and when
@@ -46,22 +47,28 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   // page rebinding its name to this one, has none. ?token= is taken on the download links only
   // (export.xise, export.zip: a GET a link opens, #1434): an address stays in the browser's history and in
   // proxies' logs. Without a token (tests, an app embedding the server) only loopback is allowed.
+  // Two requests need no token (#2955): the page a launcher opened exchanges its one-time code for the token
+  // (POST /api/token, from the page itself: its Origin required), and a second launch asks for the proof that
+  // this server holds the token of its file (GET /api/proof, an HMAC of the launcher's nonce).
   const LOCAL = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
   const DOWNLOAD = /^\/projects\/[^/]+\/export\.(xise|zip)$/;
   const exposed = !isLoopback(host);
   if (exposed && !token) throw new Error('a server on a non-loopback address needs a token');
   const digest = s => crypto.createHash('sha256').update(s).digest();
   const tokenOk = t => typeof t === 'string' && crypto.timingSafeEqual(digest(t), digest(token));
+  app.locals.openCode = () => codes.issue();
+  const tokenless = req => (req.method === 'POST' && req.path === '/token') || (req.method === 'GET' && req.path === '/proof');
   app.use('/api', (req, res, next) => {
     // never cached (#1434): a project's text would stay in the browser's disk cache after the project is deleted
     res.set('Cache-Control', 'no-store');
     const hostName = String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase();
     if (!exposed && hostName && !LOCAL.has(hostName) && hostName !== String(host).toLowerCase()) return res.status(403).json({ error: 'forbidden host' });
-    if (token && !tokenOk(req.headers['x-silinx-token']) && !(req.method === 'GET' && DOWNLOAD.test(req.path) && tokenOk(req.query.token)))
+    if (token && !tokenless(req) && !tokenOk(req.headers['x-silinx-token']) && !(req.method === 'GET' && DOWNLOAD.test(req.path) && tokenOk(req.query.token)))
       return res.status(403).json({ error: 'this Silinx server needs its token: open the URL it printed at start-up' });
     // a request another site's page made (an <img>, a link, a form: the browser says so in
     // Sec-Fetch-Site) is refused, a GET too: some GETs write a file or start a process
     if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({ error: 'cross-site request refused' });
+    if (tokenless(req) && req.method === 'POST' && !req.headers.origin) return res.status(403).json({ error: 'cross-origin request refused' });
     if (req.method !== 'GET' && req.method !== 'HEAD' && req.headers.origin) {
       let oh = '';
       try { oh = new URL(req.headers.origin).host.toLowerCase(); } catch { /* invalid origin */ }
@@ -119,6 +126,20 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   app.use('/vendor/nextpnr-ice40', express.static(path.join(ROOT, 'node_modules/@yowasp/nextpnr-ice40')));
 
   const api = express.Router();
+  // the token for a one-time code of a launcher's address (#2955); a code for the address a second launch opens
+  const noToken = () => Object.assign(new Error('this Silinx server has no token'), { status: 404 });
+  api.post('/token', wrap(req => {
+    if (!token) throw noToken();
+    if (!codes.redeem(req.body?.code)) throw Object.assign(new Error('this address has expired: open the URL Silinx printed at start-up'), { status: 403 });
+    return { token };
+  }));
+  api.post('/open-code', wrap(() => { if (!token) throw noToken(); return { code: codes.issue() }; }));
+  api.get('/proof', wrap(req => {
+    if (!token) throw noToken();
+    const nonce = String(req.query.nonce || '');
+    if (!/^[\w-]{16,128}$/.test(nonce)) throw Object.assign(new Error('a nonce is required'), { status: 400 });
+    return { proof: tokenProof(token, nonce) };
+  }));
   api.get('/projects', wrap(() => P.listProjects()));
   // where the projects are kept: the Start page says it (#1297)
   api.get('/workspace', wrap(() => ({ folder: P.workspaceDir() })));
@@ -204,6 +225,8 @@ export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
       } catch { /* no configuration folder: a second launch only says it is running */ }
       const shown = ['0.0.0.0', '::'].includes(host) ? '127.0.0.1' : host;
       srv.silinxUrl = `http://${shown}:${real}/#token=${token}`;
+      // the address to open in the browser: a one-time code, not the token, on the opener's command line (#2955)
+      srv.silinxOpenUrl = () => `http://${shown}:${real}/#code=${app.locals.openCode()}`;
       console.log(`Silinx running at http://${host}:${port}  (workspace: ${P.workspaceDir()})`);
       if (!isLoopback(host)) {
         console.log(`WARNING: listening on ${host}, not only on this machine. Other computers that can reach this port need the address below (with its token);`);

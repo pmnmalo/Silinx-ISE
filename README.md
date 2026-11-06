@@ -419,7 +419,8 @@ Security: report a vulnerability privately, as [SECURITY.md](SECURITY.md) says (
 in scope and what the project does to protect its users).
 
 The server listens on this computer only (`127.0.0.1`), and answers only the browser that has its token: it
-makes one at every start and prints the address with it (`…/#token=…`), which the launchers and `--open` open;
+makes one at every start and prints the address with it (`…/#token=…`); the launchers and `--open` open it with a
+one-time code instead (`…/#code=…`, which the page exchanges for the token: no token on a command line, #2955);
 the page keeps it, so the plain address works afterwards in the same browser (#2564). Another user of the
 same computer has no token. With `serve --host 0.0.0.0` (or another address) other computers can reach it:
 it then prints a warning, and the address with the token is the only way they can use it. The toolchain settings that run a program

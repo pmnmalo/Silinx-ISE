@@ -3,21 +3,44 @@
 import { prefKey } from './prefs.js';
 
 // The server answers only with its token, made at every start (#2564) and given in the address it
-// prints and opens (…/#token=…): kept for this browser (another tab opened at the plain address has it
-// too, until the server restarts), sent with every request. Only an address whose hash is the token alone sets it: a
-// link with other options (#2826) does not (#2829).
+// prints (…/#token=…); the address a launcher opens has a one-time code instead (…/#code=…, #2955: not the token,
+// on the opener's command line), which the page exchanges for the token. The token is kept for this browser
+// (another tab opened at the plain address has it too, until the server restarts), sent with every request.
+// Only an address whose hash is the token alone, or the code alone, sets it: a link with other options (#2826) does
+// not (#2829); and an address's token replaces the one kept only if the server accepts it (#2955).
 const TOKEN_KEY = prefKey('silinx-token');
-const TOKEN = (() => {
-  try {
-    const m = /^#token=([\w-]+)$/.exec(location.hash);
-    if (m) { localStorage.setItem(TOKEN_KEY, m[1]); history.replaceState(null, '', location.pathname + location.search); }
-    return localStorage.getItem(TOKEN_KEY);
-  } catch { return null; }
+const store = {
+  get: () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } },
+  set: t => { try { localStorage.setItem(TOKEN_KEY, t); } catch { /* not kept: this page only */ } },
+};
+let TOKEN = store.get();
+const READY = (async () => {
+  let m;
+  try { m = /^#(token|code)=([\w-]+)$/.exec(location.hash); } catch { return; }
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  const token = await tokenOf(m[1], m[2], fetch);
+  if (token) { TOKEN = token; store.set(token); }
 })();
 const auth = (headers = {}) => (TOKEN ? { ...headers, 'X-Silinx-Token': TOKEN } : headers);
+const authed = async (headers = {}) => { await READY; return auth(headers); };
+
+/** The token an address gives (null when refused or the server is not reached): a one-time code exchanged for it
+ *  (POST /api/token), or a token the server accepts (GET /api/workspace with it). */
+export async function tokenOf(kind, value, f = fetch) {
+  try {
+    if (kind === 'code') {
+      const r = await f('/api/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: value }) });
+      const j = r.ok ? await r.json() : null;
+      return typeof j?.token === 'string' ? j.token : null;
+    }
+    const r = await f('/api/workspace', { headers: { 'X-Silinx-Token': value } });
+    return r.ok ? value : null;
+  } catch { return null; }
+}
 
 async function req(method, url, body, { text = false } = {}) {
-  const opts = { method, headers: auth() };
+  const opts = { method, headers: await authed() };
   if (body !== undefined) {
     if (typeof body === 'string') { opts.body = body; opts.headers['Content-Type'] = 'text/plain'; }
     else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
@@ -69,14 +92,14 @@ export const api = {
   importXise: body => req('POST', '/api/projects/import-xise', body),
   // whole project as a zip (.xise + silinx.json + all files)
   exportZip: async (name, kind = 'xilinx') => {
-    const r = await fetch(`/api/projects/${enc(name)}/export.zip?kind=${enc(kind)}`, { headers: auth() });
+    const r = await fetch(`/api/projects/${enc(name)}/export.zip?kind=${enc(kind)}`, { headers: await authed() });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
     let warnings = [];
     try { warnings = JSON.parse(decodeURIComponent(r.headers.get('X-Silinx-Warnings') || '[]')); } catch { /* none */ }
     return { blob: await r.blob(), filename: kind === 'silinx' ? `${name}-silinx.zip` : `${name}.zip`, warnings };
   },
   importZip: async (name, file) => {
-    const r = await fetch(`/api/projects/import-zip?name=${enc(name)}`, { method: 'POST', headers: auth({ 'Content-Type': 'application/zip' }), body: file });
+    const r = await fetch(`/api/projects/import-zip?name=${enc(name)}`, { method: 'POST', headers: await authed({ 'Content-Type': 'application/zip' }), body: file });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
     return j;
@@ -85,7 +108,7 @@ export const api = {
   // what another process changes in the project (#2843): onEvent({ project, changes: [{ path, kind }] }) for each,
   // until the stream ends or `signal` aborts (server-sent events read through fetch: the token in a header, not in the URL)
   events: async (name, onEvent, signal) => {
-    const r = await fetch(`/api/projects/${enc(name)}/events`, { headers: auth(), signal });
+    const r = await fetch(`/api/projects/${enc(name)}/events`, { headers: await authed(), signal });
     if (!r.ok || !r.body) throw Object.assign(new Error(`${r.status} ${r.statusText}`), { status: r.status });
     const reader = r.body.getReader(), dec = new TextDecoder();
     let buf = '';
