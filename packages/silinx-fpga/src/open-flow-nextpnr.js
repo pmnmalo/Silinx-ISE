@@ -315,10 +315,14 @@ export function bankVccoConflicts(ios, device) {
 }
 
 // The placements the nextpnr engine makes, each routed, the fastest kept. Measured on the examples (#2196): the best of
-// four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement.
-export const NEXTPNR_TRIES = { normal: 4, high: 8, maxSlices: 500 };
+// four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement. At High, a small
+// design (up to 100 slices, about 2 s a placement) gets 32 (#2940): its seeds spread widely (iwls05-sasc 4.76 to 5.22 ns,
+// itc99-b10 4.75 to 5.56 ns over 16), and the best of 32 is 1 to 4 % shorter than the best of 8 (sasc 4.763 -> 4.563 ns,
+// b10 4.751 -> 4.659, usb-phy 4.889 -> 4.819), Place & Route two to three times as long.
+export const NEXTPNR_TRIES = { normal: 4, high: 8, highSmall: 32, smallSlices: 100, maxSlices: 500 };
 /** The placements at an Optimization Effort ('high', else Normal) for a design of `slices` slices: one for a large one at Normal. */
-export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRIES.high : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
+export const nextpnrTries = (effort, slices) => (effort === 'high' ? (slices <= NEXTPNR_TRIES.smallSlices ? NEXTPNR_TRIES.highSmall : NEXTPNR_TRIES.high)
+  : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
 
 /**
  * { runMap, runPar } of runFlow for the nextpnr engine. ctx: { io, spec, log, report, util, now, ms, netlistText (a

@@ -171,9 +171,10 @@ test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) bui
   assert.equal(cfg('CYINIT', 'CIN'), 11);
 });
 
-test('#2196 nextpnrTries: four placements at Normal up to 500 slices, one above; eight at High', () => {
-  assert.deepEqual(NEXTPNR_TRIES, { normal: 4, high: 8, maxSlices: 500 });
-  for (const [effort, slices, n] of [['normal', 1, 4], ['normal', 500, 4], ['normal', 501, 1], ['high', 1, 8], ['high', 4000, 8], [undefined, 100, 4]]) assert.equal(nextpnrTries(effort, slices), n);
+test('#2196 #2940 nextpnrTries: four placements at Normal up to 500 slices, one above; at High 32 up to 100 slices, eight above', () => {
+  assert.deepEqual(NEXTPNR_TRIES, { normal: 4, high: 8, highSmall: 32, smallSlices: 100, maxSlices: 500 });
+  for (const [effort, slices, n] of [['normal', 1, 4], ['normal', 100, 4], ['normal', 500, 4], ['normal', 501, 1], ['high', 1, 32], ['high', 100, 32],
+    ['high', 101, 8], ['high', 4000, 8], [undefined, 100, 4]]) assert.equal(nextpnrTries(effort, slices), n);
 });
 
 test('#2196 --seed 5: placements from that seed on, each reported, the fastest kept; the design with no clock takes one', { timeout: 300000 }, async () => {
