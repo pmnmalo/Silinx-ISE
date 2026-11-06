@@ -19,7 +19,7 @@ test('#2438 the Spartan-3E nextpnr package is a 1.x, its version the one Silinx 
   for (const p of ['package.json', 'packages/silinx-fpga/package.json']) {
     assert.equal(JSON.parse(fs.readFileSync(p, 'utf8')).dependencies['@silinx/nextpnr-himbaechel-spartan3e'], meta.version, p);
   }
-  assert.match(fs.readFileSync(path.join(dir, 'CHANGELOG.md'), 'utf8'), new RegExp(`^## ${meta.version.replace(/\./g, '\\.')}$`, 'm'));
+  assert.match(fs.readFileSync(path.join(dir, 'CHANGELOG.md'), 'utf8'), new RegExp(`^## ${meta.version.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}$`, 'm'));
 });
 
 test('#2438 the exports Silinx uses are the frozen ones, declared in lib/api.d.ts', () => {
