@@ -93,7 +93,7 @@ async function tableResults(name, rel, doc, notation) {
     };
   });
   const lines = outputs.flatMap(r => [
-    `Canonical SOP: ${r.canonicalSop}`, `Canonical POS: ${r.canonicalPos}`, `Minterm and maxterm lists: ${r.minterms}; ${r.maxterms}`,
+    `Canonical SOP: ${r.canonicalSop}`, `Canonical POS: ${r.canonicalPos}`, `Minterm list: ${r.minterms}`, `Maxterm list: ${r.maxterms}`,
     `Minimal SOP: ${r.minimalSop.expr}   (${r.minimalSop.terms} term(s), ${r.minimalSop.literals} literal(s))`, ...solutionLines(r.minimalSop),
     `Minimal POS: ${r.minimalPos.expr}   (${r.minimalPos.terms} term(s), ${r.minimalPos.literals} literal(s))`, ...solutionLines(r.minimalPos),
     ...(r.xor ? [`XOR form: ${r.xor}`] : []), `NAND form: ${r.nand}`, `NOR form: ${r.nor}`,
