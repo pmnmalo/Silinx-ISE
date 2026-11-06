@@ -103,6 +103,26 @@ test('the open flow refuses the options of Silinx\'s own placer and router (#275
   assert.ok(!fs.existsSync(path.join(tmp, 'gone')));
 });
 
+// #2502: --chipdb dir, nextpnr's chip database from dir (one built from other device descriptions, the measured ones): the
+// package's own database given so routes blinky as the package's does; a folder without the die's database refused, named
+test('the open flow with --chipdb: the given chip database, the same route as the package\'s; a missing one said (#2502)', { timeout: 300000 }, () => {
+  const dir = path.join(tmp, 'chipdb');
+  fs.mkdirSync(dir, { recursive: true });
+  const pkg = path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/chipdb/chipdb-xc3s250e.bin.gz');
+  fs.writeFileSync(path.join(dir, 'chipdb-xc3s250e.bin'), zlib.gunzipSync(fs.readFileSync(pkg)));
+  const out = path.join(tmp, 'blinky-chipdb');
+  const r = openFlow(path.join(ROOT, 'examples/blinky'), out, ['--chipdb', dir]);
+  assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+  assert.match(r.stdout, /top\.bit: complete \(every feature in the bit database\)/);
+  assert.deepEqual(r.warnings, BLINKY_WARNINGS);
+  assert.equal(fs.readFileSync(path.join(out, 'routed.xdl'), 'utf8'), fs.readFileSync(path.join(tmp, 'blinky', 'routed.xdl'), 'utf8'));
+  const none = path.join(tmp, 'no-chipdb');
+  fs.mkdirSync(none, { recursive: true });
+  const m = openFlow(path.join(ROOT, 'examples/blinky'), path.join(tmp, 'blinky-none'), ['--chipdb', none]);
+  assert.equal(m.status, 1);
+  assert.match(`${m.stdout}\n${m.stderr}`, new RegExp(`--chipdb: no ${path.join(none, 'chipdb-xc3s250e.bin').replace(/[.\\/]/g, '\\$&')}`));
+});
+
 // The rest of the Spartan-3E in the open flow (test/fixtures/open-flow: the board tests and the ISE
 // check of instantiated primitives; ISE converts the same routed XDL to the same .bit, with no DRC
 // error or warning: npm run check:open-flow on these folders): block RAM, multipliers, shift

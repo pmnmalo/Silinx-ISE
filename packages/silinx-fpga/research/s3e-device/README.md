@@ -1454,3 +1454,46 @@ PART=xc3s250ecp132-4 node candidates.mjs types data/xc3s250e/measured.json.gz ca
 node probe-run.mjs cand.json probe.json
 PART=xc3s250ecp132-4 node ../s3e-bitstream/gen-pipcover.mjs measured out --types CENTER_SMALL
 ```
+
+## 17. The designs through ISE on the measured descriptions, with nextpnr (2026-11-06, #2502)
+
+Silinx's own placer and router were removed (#2823). nextpnr places and routes now, on a chip database built from a
+device description by the fork's generator (pmnmalo/nextpnr-spartan, `himbaechel/uarch/spartan3e/gen/s3e_gen.py`).
+That generator stopped on the measured descriptions in two ways. First, a measured description leaves out the report's
+`EMPTY_*` tiles, so the generator found grid places with no tile. Second, it leaves out some site pins: SLICEM
+SHIFTIN / SHIFTOUT, the IOBs' DDR and PCI pins, the DCM's status pins. The fork's change
+(pmnmalo/nextpnr-spartan#14) fixes both. A place with no tile gets an empty tile type, `EMPTY_MEASURED`. A pin the
+description lacks leaves out its BEL pin and the PIPs that would use it. On the report's descriptions, the four chip
+databases and site lists are byte-identical before and after the change.
+
+`open-flow.mjs --chipdb dir` (research/s3e-route) runs nextpnr on `dir/chipdb-<die>.bin` instead of the package's
+database. `SILINX_CONFIG_DIR/devices/<part>.json.gz` gives the matching device graph, for the XDL and the bitstream.
+`check-open-flow.mjs` passes the option on to each design's open flow.
+
+**The designs:** 85 in all. That is the 10 examples on each of the four Spartan-3E boards (Basys2-100 / 250, Nexys2-500
+/ 1200), and the 45 feature fixtures of `test/fixtures/open-flow` on their own die. Every design was placed and routed on
+the measured chip database of its die and written with the measured graph.
+
+- **The open flow:** every `.bit` is complete (every feature is in the bit database), with 0 warnings and timing met. No
+  design needed a pin the measured descriptions leave out.
+- **ISE**, on all 85 designs:
+  - xdl2ncd: 0 warnings;
+  - DRC: 0 errors, 0 warnings;
+  - the `.bit`: byte-identical to ISE's bitgen on the same routed design, with CRC on and off.
+
+So with nextpnr as with Silinx's old router (sections 11 to 13), the measured descriptions give the same designs as
+the report's. The device report is no longer needed to build a working toolchain for the Spartan-3E.
+
+Notes:
+
+- The run used the nextpnr of the worktree's `node_modules`, `@silinx/nextpnr-himbaechel-spartan3e` 0.19.0, not main's
+  1.0.0. The generator is the same in both, and the chip databases were built with the fork's changed generator.
+- Setting `SILINX_CONFIG_DIR` hides `~/.silinx/config.json`, including the remote ISE work folder (`ssh.remoteDir`). The
+  ISE step then works in a folder Docker cannot mount, and fails with "Mounts denied". Set
+  `SILINX_ISE_REMOTE_DIR` to that folder explicitly.
+
+```
+# the chip databases, from the fork (s3e_gen.py, then bbasm --le), into cdb/chipdb-<die>.bin
+# the measured graphs into cfg/devices/<part>.json.gz
+SILINX_CONFIG_DIR=cfg SILINX_ISE_REMOTE_DIR=<remote dir> node scripts/check-open-flow.mjs <project> --chipdb cdb
+```
