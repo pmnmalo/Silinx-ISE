@@ -58,7 +58,8 @@ export function vgaStatus(state, period) {
   if (off(lineUs, VGA_MODE.lineUs, 0.02)) w.push(`HSYNC every ${fmt(lineUs, 2)} µs (${fmt(1000 / lineUs, 2)} kHz): ${VGA_MODE.lineUs.toFixed(1)} µs (31.5 kHz) expected for 640×480 at 60 Hz`);
   if (r.hsyncUs != null && off(r.hsyncUs, VGA_MODE.hsyncUs, 0.25)) w.push(`HSYNC pulse of ${fmt(r.hsyncUs, 2)} µs: 3.8 µs (96 pixels) expected`);
   if (!r.hsyncLow) w.push('HSYNC active high: 640×480 at 60 Hz has it active low');
-  if (!vOn) w.push('No VSYNC: the monitor finds no frames');
+  // (no VSYNC once 100 ms of the design ran with no frame: not while the first frames are still on their way, #2898)
+  if (!vOn) { if (g.fp > 0 || us(g.ct) > 100000) w.push('No VSYNC: the monitor finds no frames'); }
   else {
     if (Math.abs(r.lines - VGA_MODE.lines) > 0.5) w.push(`${fmt(r.lines, 1)} lines a frame: ${VGA_MODE.lines} expected`);
     else if (off(r.frameHz, VGA_MODE.frameHz, 0.02)) w.push(`${fmt(r.frameHz, 2)} Hz: 60 Hz expected`);

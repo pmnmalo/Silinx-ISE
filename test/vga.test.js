@@ -105,7 +105,9 @@ architecture r of flat is begin hsync <= '1'; vsync <= '1'; red <= sw(2 downto 0
   assert.deepEqual(m.cb.vga().status, { signal: false });
   // vga_bars with its VSYNC never active (V_SYNC = 0)
   m = await monitor({ generics: { V_SYNC: 0, V_BACK: 35 } });
-  m.cb.run(2 * FRAME * 20000);
+  m.cb.run(FRAME * 20000);
+  assert.deepEqual(m.cb.vga().status.warnings, [], 'not yet: a frame is still on its way (#2898)');
+  m.cb.run(7 * FRAME * 20000);
   const s = m.cb.vga().status;
   assert.equal(s.signal, true);
   assert.deepEqual(s.warnings, ['No VSYNC: the monitor finds no frames']);
