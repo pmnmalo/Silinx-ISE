@@ -468,5 +468,5 @@ export async function nextpnrPlaceRoute({ netlist, top, part, ucf = null, device
   const r = await runFlow({ top, part, device: dev, pkg, family: 'spartan3e', steps: ['translate', 'map', 'par'], seed, effort: 1,
     synthEffort: 'normal', synthGoal: 'fast', startupClk: 'JtagClk', engine: 'nextpnr' }, io);
   return { ok: r.ok, error: r.error, routedText: store['open/routed.xdl'] ?? null, summary: r.report?.map?.summary, par: r.report?.par,
-    warnings: lines.filter(l => /^WARNING/.test(l)), errors: lines.filter(l => /^ *ERROR/.test(l)) };
+    warnings: lines.filter(l => /^WARNING/.test(l)), errors: lines.filter(l => /^ *ERROR/.test(l)), lines };
 }

@@ -13,7 +13,7 @@ import { parseXdl, writeXdl } from './xdl.js';
 import { loadChipdb } from './nextpnr-io.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
 import { checkRouting } from './fpga/route-check.js';
-import { deviceSites } from './fpga/device-sites.js';
+import { deviceSites, bankOfPad, vccoOfStandard } from './fpga/device-sites.js';
 import { analyzeTiming } from './fpga/timing.js';
 import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 import { dcmPeriodFactor, dcmSettings } from './fpga/nextpnr-dcm.js';
@@ -34,12 +34,12 @@ export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|M
  * I/O buffer at its LOC). The UCF's IOB = TRUE / FALSE as the attribute IOB, the micro-architecture's question: NET on the
  * port bit's buffer, INST on the cell; INST LOC on a DCM as its BEL (device: the device's graph, for the site's place). Returns { json, problems }: the cells the micro-architecture does not have, ports without
  * a pad; and sdc, the PERIODs as nextpnr's clock constraints. An input nothing reads is left out, as Silinx's packer does.
- * (The constants: the micro-architecture's, #2135.)
+ * ios: the port bits with a LOC, { name, loc, iostandard } (their banks' VCCO: bankVccoConflicts). (The constants: the micro-architecture's, #2135.)
  */
 export function nextpnrNetlist(text, top, ucf, device = null) {
   const json = JSON.parse(text);
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
-  const problems = [];
+  const problems = [], ios = [];
   lowerRam64(mod);
   lowerClockSwitches(mod);
   lowerControlInverters(mod);
@@ -101,6 +101,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
       if (!buffer) problems.push(`port ${bit}: no I/O buffer (IBUF / OBUF) on it`);
       else {
         const iob = asked('NET', bit);
+        if (a.loc) ios.push({ name: bit, loc: a.loc, iostandard: a.iostandard });
         // (the converter to XDL writes the IOB's settings from them: they stay on the cell in the routed design; a port
         // with no LOC gets its pad from nextpnr, #2625)
         buffer.attributes = { ...buffer.attributes, ...(a.loc ? { LOC: a.loc } : {}), ...(iob ? { IOB: iob } : {}), ...(a.iostandard ? { IOSTANDARD: a.iostandard } : {}),
@@ -140,7 +141,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   for (const [n, period] of clockNets) if (n && !(periods.get(n) <= period)) periods.set(n, period);
   const sdc = [...periods].map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
   json.modules = { [name]: mod };
-  return { json, problems, sdc };
+  return { json, problems, sdc, ios };
 }
 
 /**
@@ -295,6 +296,24 @@ export function hardInputs(mod) {
   });
 }
 
+/**
+ * The I/Os LOC'd on pads of one bank whose I/O standards need different VCCO (ios: nextpnrNetlist's, { name, loc,
+ * iostandard }; ISE's default LVCMOS25): ISE's DRC refuses them (PhysDesignRules:755), and nextpnr gives a bank's VCCO
+ * only to the I/Os it places itself (#2813). Returns the messages, each I/O against the bank's first, as Silinx's placer said them.
+ */
+export function bankVccoConflicts(ios, device) {
+  const pads = deviceSites(device).pads, banks = new Map(), out = [];
+  for (const { name, loc, iostandard } of ios) {
+    const pad = pads.get(String(loc).toUpperCase());
+    const std = String(iostandard || 'LVCMOS25').toUpperCase(), v = vccoOfStandard(std), b = pad ? bankOfPad(pad) : -1;
+    if (v === null || b < 0) continue;
+    const first = banks.get(b);
+    if (!first) banks.set(b, { name, pad: pad.name, std, v });
+    else if (first.v !== v) out.push(`place: ${name}: pad ${pad.name} is in bank ${b}, whose other I/Os (${first.name} on ${first.pad}, ${first.std}) need VCCO ${first.v} V, not ${v} V (${std})`);
+  }
+  return out;
+}
+
 // The placements the nextpnr engine makes, each routed, the fastest kept. Measured on the examples (#2196): the best of
 // four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement.
 export const NEXTPNR_TRIES = { normal: 4, high: 8, maxSlices: 500 };
@@ -309,7 +328,7 @@ export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRI
 export function mountNextpnrSteps(ctx) {
   const { io, spec, log, report, util, now, ms, netlistText, top, constraints, StepError, setRouted } = ctx;
   const model = () => { try { return constraints(); } catch { return null; } };   // (checked by translate)
-  let input = null, sdc = '';
+  let input = null, sdc = '', ios = [];
   const part = `${spec.device}${spec.pkg}`;
 
   function runMap() {
@@ -322,6 +341,7 @@ export function mountNextpnrSteps(ctx) {
     hardBlocks(r.json);
     input = JSON.stringify(r.json);
     sdc = r.sdc;
+    ios = r.ios;
     log('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).');
   }
 
@@ -348,6 +368,9 @@ export function mountNextpnrSteps(ctx) {
   async function runPar() {
     if (!input) runMap();
     const t = now();
+    // two LOC'd I/Os of one bank at different VCCO: refused, as ISE's DRC refuses them (#2813)
+    const vcco = bankVccoConflicts(ios, io.device());
+    if (vcco.length) throw new StepError(`${vcco.length} I/O(s) in a bank of another VCCO (PhysDesignRules:755)`, vcco, 'Give the I/Os of each bank I/O standards of one VCCO, or LOC them on pads of another bank (the constraints, UCF).');
     await load();
     // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
