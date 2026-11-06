@@ -58,6 +58,23 @@ test('convert_module to a schematic (#2901): a ripple-carry adder whose instance
   await passes('r', 6000, []);
 });
 
+test('convert_module to a schematic (#2903): internal vectors not from 0, c(3 downto 1) and d(1 to 3), read by bus taps, in VHDL and Verilog', async () => {
+  for (const [name, n, log] of [['vhdl-vec-not-0', 'z', []], ['verilog-vec-not-0', 'zv', ['simulation finished ($finish) at 160 ns']]]) {
+    const c = CASES.find(x => x.name === name);
+    await ok('new_project', { name: n });
+    for (const [f, text] of Object.entries(c.files)) await ok('write_file', { project: n, path: f, text });
+    await ok('set_top', { project: n, top: c.module, sim_top: c.tb });
+    await passes(n, 200, log);
+    const hdl = c.file, sch = hdl.replace(/\.(vhd|v)$/, '.sch.json');
+    assert.equal((await ok('convert_module', { project: n, module: c.module, to: 'schematic' })).text,
+      `'${c.module}' converted to the schematic ${sch} (9 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module's base, ${hdl} generated from it.`);
+    const doc = JSON.parse(read(n, sch));
+    assert.deepEqual(doc.labels.map(l => l.net).sort(), name.startsWith('vhdl') ? ['c(3:1)', 'd(1:3)'] : ['c[3:1]', 'd[1:3]']);
+    assert.match((await ok('check_syntax', { project: n })).text, new RegExp(`^Process "Check Syntax" of <${c.module}> completed successfully \\(\\d+ signals, \\d+ processes\\)\\.$`));
+    await passes(n, 200, log);
+  }
+});
+
 test('convert_module to a state diagram and to an ASM chart: traffic\'s state machine from its HDL, the test bench as before', async () => {
   for (const [to, word] of [['fsm', 'state diagram'], ['asm', 'ASM chart']]) {
     const n = `t_${to}`;

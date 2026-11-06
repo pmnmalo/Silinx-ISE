@@ -415,8 +415,9 @@ export function netlist(docIn, { modules = {} } = {}) {
     net.width = portW[0] ?? lw[0] ?? drv.find(e => isNum(e.width))?.width ?? (cands.length ? Math.max(...cands) : (wires.some(id => doc.wires.find(w => w.id === id)?.bus) ? null : 1));
     if (net.width == null) net.width = 1;
     // a bus named with its indices, not from 0 (d(7:4), #1689): declared with them; an I/O marker's net keeps 0
-    const rng = !ports.length && labels.find(L => L.lsb != null && L.msb > L.lsb && L.width === net.width);
-    if (rng && rng.lsb > 0) net.range = { msb: rng.msb, lsb: rng.lsb };
+    // (named ascending, d(4:7), #2903: its bits the same, 7 downto 4)
+    const rng = !ports.length && labels.find(L => L.lsb != null && L.msb !== L.lsb && L.width === net.width);
+    if (rng && Math.min(rng.msb, rng.lsb) > 0) net.range = { msb: Math.max(rng.msb, rng.lsb), lsb: Math.min(rng.msb, rng.lsb) };
     const mism = new Set(cands);
     if (mism.size > 1) {
       const where = pinW.find(e => e.width !== net.width) || eps[0];

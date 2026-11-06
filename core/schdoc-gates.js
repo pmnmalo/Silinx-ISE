@@ -34,7 +34,8 @@ export function mountGateConversion(ctx) {
       let msb, lsb;
       if (e.op === 'slice') { msb = constIdx(e.left); lsb = constIdx(e.right); }
       else { msb = lsb = constIdx(e.op === 'apply' ? e.args[0] : e.index); }
-      if (msb == null || lsb == null) return null;
+      // (a slice of an ascending vector, c(1 to 2), stays HDL: a bus tap takes its bits MSB downto LSB, #1691, #2903)
+      if (msb == null || lsb == null || msb < lsb) return null;
       const w = Math.abs(msb - lsb) + 1;
       plan.push(() => {
         const s = addSym('slice', { msb, lsb });

@@ -404,6 +404,13 @@ export async function schematicFromHdl(inst, opts = {}) {
 
   // ---- geometry
   for (const n of nets.values()) if (!n.part) n.name = sp(n.name);   // (a bus's bits named already, s(0), #2901)
+  // a vector not from 0, signal c : std_logic_vector(3 downto 1) (#2903): its net named with its indices, c(3:1), as a
+  // bus is (#1689), its bus taps' bits the vector's own; an ascending one, (1 to 3), as written, c(1:3)
+  for (const [k, n] of nets) {
+    const s = sigByName.get(k), t = s?.t;
+    if (n.part || !s || portSig.has(s) || !t || t.left == null || t.right == null || Math.min(t.left, t.right) <= 0 || W(s) !== n.width) continue;
+    n.name = ci ? `${n.name}(${t.left}:${t.right})` : `${n.name}[${t.left}:${t.right}]`;
+  }
   const conns = [...nets.values()].filter(n => n.eps.length > 0);
   await placeAndRoute(doc, conns, { layout: opts.layout, modules: normModules(opts.modules), nk });
   if (diags.length) doc.importDiagnostics = diags;
