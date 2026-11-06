@@ -112,6 +112,38 @@ test('the server\'s own changes: held while a request runs, and during a run of 
   w.close();
 });
 
+test('#2913 a request ending while the folder is read: its writes not told, by that look nor the next', async () => {
+  // the folder as a scan reads it, and the scans let finish one by one
+  const files = new Map([['silinx.json', '1']]);
+  const pending = [];
+  const scanDir = () => { const read = new Map(files); return new Promise(resolve => pending.push(() => resolve(read))); };   // (read when the scan starts)
+  const settle = async () => { await new Promise(r => setImmediate(r)); while (pending.length) { pending.shift()(); await new Promise(r => setImmediate(r)); } };
+  const w = createProjectWatcher({ dirOf: n => n, scanDir, interval: 60_000 });
+  const seen = [];
+  w.subscribe('p', ev => seen.push(...ev.changes));
+  await settle();
+  // the timer's look reads the folder (before the request's write) ...
+  const look = w.check('p');
+  await new Promise(r => setImmediate(r));
+  const read = pending.shift();
+  // ... while the page's request writes silinx.json and ends
+  const release = w.hold('p');
+  files.set('silinx.json', '2');
+  release();
+  read();   // (that look's scan: the folder before the write)
+  await settle();
+  await look;
+  await settle();
+  assert.deepEqual(seen, [], 'the page\'s own write: known');
+  // another process's write after it: told
+  files.set('silinx.json', '3');
+  const after = w.check('p');
+  await settle();
+  await after;
+  assert.deepEqual(seen, [{ path: 'silinx.json', kind: 'changed' }]);
+  w.close();
+});
+
 test('unsubscribed: the project no longer watched once its last page left', async () => {
   const { w, off } = await setup('p4');
   const off2 = w.subscribe('p4', () => {});
