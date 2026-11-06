@@ -1,6 +1,7 @@
-// UI (#1556): the schematic editor's right-click menu on a symbol: Rename… (#1546), Duplicate, Rotate, Mirror, Delete
-// with their shortcuts; each of the symbol clicked, or of the whole selection when it is part of it; each one undo
-// step. An I/O marker's menu has the same, a net name's Rename… and Delete. In English and in Portuguese.
+// UI (#1556): the schematic editor's right-click menu on a symbol: Symbol Info… (#2953), Rename… (#1546), Duplicate,
+// Rotate, Mirror, Delete with their shortcuts; each of the symbol clicked, or of the whole selection when it is part
+// of it (Symbol Info… always the symbol clicked's); each one undo step. An I/O marker's menu has the same but Symbol
+// Info…, a net name's Rename… and Delete; a read-only schematic's, Symbol Info… alone. In English and in Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -69,11 +70,25 @@ uiTest('#1556 schematic: Duplicate, Rotate, Mirror, Delete in the right-click me
     assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), false, `${what}: one undo step`);
   };
   const sym = async (id) => (await getDoc()).symbols.find((s) => s.id === id);
-  const SYMBOL_MENU = [['Rename…', ''], ['Duplicate', ''], ['Rotate', 'Ctrl+R'], ['Mirror', 'Ctrl+M'], ['Delete', 'Del']];
+  const MARKER_MENU = [['Rename…', ''], ['Duplicate', ''], ['Rotate', 'Ctrl+R'], ['Mirror', 'Ctrl+M'], ['Delete', 'Del']];
+  const SYMBOL_MENU = [['Symbol Info…', 'F1'], ...MARKER_MENU];
+  // the Symbol Info dialog's heading, closed with Escape; the document unchanged
+  const info = async (what) => {
+    await page.waitFor(() => document.querySelector('.se-symdoc .se-dhead b'), [], { what: `${what}: Symbol Info` });
+    const head = await page.eval(() => document.querySelector('.se-symdoc .se-dhead b').textContent);
+    await page.key('Escape');
+    await page.waitFor(() => !document.querySelector('.se-symdoc'), [], { what: `${what}: Symbol Info closed` });
+    assert.equal(JSON.stringify(await getDoc()), doc0, `${what}: the document unchanged`);
+    return head;
+  };
 
   // M1 alone: its menu, M1 selected
   assert.deepEqual(await right(SYM('S3')), SYMBOL_MENU);
   assert.deepEqual(await selection(), ['S3'], 'the symbol clicked selected');
+  // Symbol Info…: M1's datasheet, the module sub
+  await choose('Symbol Info…');
+  assert.match(await info('M1'), /^Symbol Info: .*\bsub\b/);
+  await right(SYM('S3'));
   // Duplicate: a copy right of it with a fresh name, no wire copied, the copy selected
   await choose('Duplicate');
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols.length === 3, [], { what: 'duplicated' });
@@ -107,6 +122,14 @@ uiTest('#1556 schematic: Duplicate, Rotate, Mirror, Delete in the right-click me
     await right(SYM('S3'));
     assert.deepEqual(await selection(), ['S1', 'S3'], 'the selection kept');
   };
+  // Symbol Info… of the symbol clicked, U1 (an INV), the selection kept
+  await page.key('Escape');
+  await page.click(SYM('S3'));
+  await page.click(SYM('S1'), { modifiers: 8 });
+  await right(SYM('S1'));
+  await choose('Symbol Info…');
+  assert.equal(await info('U1 of two'), 'Symbol Info: INV');
+  assert.deepEqual(await selection(), ['S1', 'S3'], 'the selection kept');
   await both();
   await choose('Rotate');
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols.every((s) => s.rot === 90), [], { what: 'both rotated' });
@@ -138,7 +161,7 @@ uiTest('#1556 schematic: Duplicate, Rotate, Mirror, Delete in the right-click me
 
   // the I/O marker a: the same commands (Duplicate: a_1); the net name s: Rename… and Delete
   await page.key('Escape');
-  assert.deepEqual(await right(PORT), SYMBOL_MENU);
+  assert.deepEqual(await right(PORT), MARKER_MENU);
   await choose('Duplicate');
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().ports.length === 3, [], { what: 'the marker duplicated' });
   assert.equal((await getDoc()).ports[2].name, 'a_1');
@@ -154,12 +177,46 @@ uiTest('#1556 schematic: Duplicate, Rotate, Mirror, Delete in the right-click me
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
     await page.key('Escape');
-    assert.deepEqual(await right(SYM('S3')), [['Mudar o Nome…', ''], ['Duplicar', ''], ['Rodar', 'Ctrl+R'], ['Espelhar', 'Ctrl+M'], ['Apagar', 'Del']]);
+    assert.deepEqual(await right(SYM('S3')), [['Informação do Símbolo…', 'F1'], ['Mudar o Nome…', ''], ['Duplicar', ''], ['Rodar', 'Ctrl+R'], ['Espelhar', 'Ctrl+M'], ['Apagar', 'Del']]);
     await page.key('Escape');
     await page.closeMenus();
     assert.deepEqual(await right(LABEL), [['Mudar o Nome…', ''], ['Apagar', 'Del']]);
     await page.closeMenus();
   } finally {
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  }
+});
+
+uiTest('#2953 a read-only schematic: a symbol\'s right-click menu has Symbol Info… alone; an I/O marker\'s, no menu', E, async (page) => {
+  const doc = newDoc('ro', 'vhdl');
+  doc.symbols.push({ id: 'S1', type: 'inv', name: 'U1', x: 80, y: 90, rot: 0, mirror: false, params: { width: 1 } });
+  doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] });
+  await makeProject(env, { name: 'CtxRo', files: { 'src/ro.sch.json': JSON.stringify(doc) } });
+  await page.openProject('CtxRo');
+  await page.eval(async (d) => {
+    const { mountSchEditor } = await import('/js/sch-editor.js');
+    const host = document.createElement('div');
+    host.id = 'ro-host';
+    host.style.cssText = 'position:fixed;left:0;top:0;width:800px;height:500px;z-index:50';
+    document.body.append(host);
+    window.roEd = mountSchEditor(host, { readOnly: true });
+    window.roEd.setDoc(JSON.parse(d));
+  }, JSON.stringify(doc));
+  try {
+    const menu = () => page.eval(() => [...document.querySelectorAll('body > .menu-popup .mi')].map((m) => [m.querySelector('.lbl').textContent, m.querySelector('.sc').textContent]));
+    await page.rightClick('#ro-host svg .sym[data-id="S1"] .hitbox');
+    await page.waitFor(() => document.querySelector('body > .menu-popup'), [], { what: 'the menu' });
+    assert.deepEqual(await menu(), [['Symbol Info…', 'F1']]);
+    await page.click('body > .menu-popup > .mi', { index: 0 });
+    await page.waitFor(() => document.querySelector('#ro-host .se-symdoc .se-dhead b'), [], { what: 'Symbol Info' });
+    assert.equal(await page.eval(() => document.querySelector('#ro-host .se-symdoc .se-dhead b').textContent), 'Symbol Info: INV');
+    await page.key('Escape');
+    await page.waitFor(() => !document.querySelector('.se-symdoc'), [], { what: 'Symbol Info closed' });
+    await page.rightClick('#ro-host svg .port[data-id="P1"] .hitbox');
+    assert.equal(await page.eval(() => !!document.querySelector('body > .menu-popup')), false, 'no menu on a marker');
+    assert.deepEqual(await page.eval(() => window.roEd.getDoc().symbols.length), 1);
+  } finally {
+    await page.eval(() => { window.roEd.destroy(); document.getElementById('ro-host').remove(); });
   }
 });
