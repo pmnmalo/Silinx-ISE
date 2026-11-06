@@ -15,6 +15,7 @@ const { WIZARD_TOOLS } = await import('../server/mcp-wizards.js');
 const { TEST_BENCH_TOOLS } = await import('../server/mcp-test-bench.js');
 const { CONVERT_TOOLS } = await import('../server/mcp-convert.js');
 const { VIEW_TOOLS } = await import('../server/mcp-views.js');
+const { TABLE_TOOLS } = await import('../server/mcp-tables.js');
 const { CHECK_TOOLS } = await import('../server/mcp-check.js');
 const { SIMULATE_DRAWING_TOOLS } = await import('../server/mcp-simulate-drawing.js');
 const { SOURCE_TOOLS } = await import('../server/mcp-sources.js');
@@ -42,6 +43,7 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(TEST_BENCH_TOOLS), ['test_bench_wizard']);
   assert.deepEqual(names(CONVERT_TOOLS), ['convert_module', 'convert_drawing']);
   assert.deepEqual(names(VIEW_TOOLS), ['related_view']);
+  assert.deepEqual(names(TABLE_TOOLS), ['set_output_logic']);
   assert.deepEqual(names(CHECK_TOOLS), ['check_drawing']);
   assert.deepEqual(names(SIMULATE_DRAWING_TOOLS), ['simulate_drawing']);
   assert.deepEqual(names(SOURCE_TOOLS), ['unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project']);
@@ -51,7 +53,7 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(WCFG_TOOLS), ['save_wave_config', 'load_wave_config']);
   assert.deepEqual(names(HLS_TOOLS), ['c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...CHECK_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS]);
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);

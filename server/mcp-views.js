@@ -19,7 +19,7 @@ const json = (text, rel) => { try { return JSON.parse(text); } catch (e) { throw
 export const VIEW_TOOLS = [
   {
     name: 'related_view', title: 'A read-only view related to a source',
-    description: 'A view the interface shows beside a source, made from it and read-only, nothing written to the project: translation (an HDL source in the other language: VHDL to Verilog, Verilog to VHDL), asm (a state diagram\'s ASM chart, its JSON), fsm (an ASM chart\'s state diagram, or a Petri net\'s state machine: a state per marking, its JSON), schematic (a Boolean algebra / truth table\'s schematic, its JSON), results (a Boolean algebra / truth table\'s results, as its editor shows them, per output: the canonical SOP and POS, the minterm and maxterm lists, the minimal SOP and POS with every minimal solution when there are several (up to 64; the first is the one its HDL uses), the XOR form when simpler, the NAND and NOR forms, the forms of least gates and of least delay). A drawing\'s HDL is read_file\'s, a C source\'s c_generated\'s and c_synthesis_report\'s; convert_drawing makes a drawing a new module.',
+    description: 'A view the interface shows beside a source, made from it and read-only, nothing written to the project: translation (an HDL source in the other language: VHDL to Verilog, Verilog to VHDL), asm (a state diagram\'s ASM chart, its JSON), fsm (an ASM chart\'s state diagram, or a Petri net\'s state machine: a state per marking, its JSON), schematic (a Boolean algebra / truth table\'s schematic, its JSON), results (a Boolean algebra / truth table\'s results, as its editor shows them, per output: the canonical SOP and POS, the minterm and maxterm lists, the minimal SOP and POS with every minimal solution when there are several (up to 64; the one used marked), each output\'s HDL logic (set_output_logic changes it), the XOR form when simpler, the NAND and NOR forms, the forms of least gates and of least delay). A drawing\'s HDL is read_file\'s, a C source\'s c_generated\'s and c_synthesis_report\'s; convert_drawing makes a drawing a new module.',
     inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The source: an HDL file (.vhd, .v), a state diagram (.fsm.json), an ASM chart (.asm.json), a Petri net (.pn.json) or a truth table (.bool.json, .tt.json).'), view: { type: 'string', enum: VIEWS, description: 'The view.' }, notation: { type: 'string', enum: NOTATIONS, description: 'results: the notation of the expressions (default slash, /a.b + c, as the editor\'s).' } }, required: ['project', 'path', 'view'], additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false },
     async run({ project: name, path: rel, view, notation = 'slash' }) {
@@ -71,8 +71,8 @@ export const VIEW_TOOLS = [
 ];
 const reply = (name, rel, view, model, more = {}) => ({ text: JSON.stringify(model, null, 2), data: { project: name, path: rel, view, model, ...more } });
 
-// a truth table's results, as the editor's results panel shows them (web/js/truthtable.js renderResults, #2927)
-const FORM_NAMES = { sop: 'Minimal SOP', pos: 'Minimal POS', xor: 'XOR form', nand: 'NAND form', nor: 'NOR form' };
+// a truth table's results, as the editor's results panel shows them (web/js/truthtable.js renderResults, #2927): each
+// output's HDL logic too (#2951), and the minimal solution its SOP and POS use (#2950)
 async function tableResults(name, rel, doc, notation) {
   const L = await import('../core/logic.js');
   const m = L.normalizeTable(doc);
@@ -82,25 +82,28 @@ async function tableResults(name, rel, doc, notation) {
   const outputs = m.outputs.map(o => {
     const A = L.analyzeOutput(m, o, big);
     const ex = ast => `${o} = ${L.formatExpr(ast, notation)}`;
-    // a minimal form and every minimal solution of it (#2928): the first is the form's (the HDL's); `many`: the cap reached
-    const minimal = r => ({ expr: ex(r.ast), terms: r.terms.length, literals: r.literals, many: r.solutions >= 64,
+    // a minimal form (the solution used, `used`) and every minimal solution of it (#2928, #2950); `many`: the cap reached
+    const minimal = r => ({ expr: ex(r.ast), terms: r.terms.length, literals: r.literals, used: r.pick, many: r.solutions >= 64,
       solutions: r.alternatives.map(a => ({ expr: ex(a.ast), terms: a.terms.length, literals: a.literals, gates: a.gates })) });
-    const least = goal => { const r = L.outputForm(m, o, goal); return { form: FORM_NAMES[r.form] || FORM_NAMES.sop, expr: ex(r.ast) }; };
+    const least = goal => { const r = L.outputForm(m, o, goal); return { form: L.FORM_NAMES[r.form] || L.FORM_NAMES.sop, expr: ex(r.ast) }; };
+    const hdl = L.outputForm(m, o);
     return {
       output: o, canonicalSop: ex(A.canon.sop), canonicalPos: ex(A.canon.pos), minterms: `${o} = ${A.sigma}`, maxterms: `${o} = ${A.pi}`,
       minimalSop: minimal(A.sop), minimalPos: minimal(A.pos),
       xor: A.xor ? ex(A.xor.ast) : null, nand: ex(A.nand.ast), nor: ex(A.nor.ast), leastGates: least('gates'), leastDelay: least('delay'),
+      hdlLogic: { form: L.formOf(m, o), name: L.FORM_NAMES[L.formOf(m, o)], expr: ex(hdl.ast), what: hdl.what },
     };
   });
   const lines = outputs.flatMap(r => [
-    `Canonical SOP: ${r.canonicalSop}`, `Canonical POS: ${r.canonicalPos}`, `Minterm list: ${r.minterms}`, `Maxterm list: ${r.maxterms}`,
+    `Canonical SOP: ${r.canonicalSop}`, `  ${r.minterms}`, `Canonical POS: ${r.canonicalPos}`, `  ${r.maxterms}`,   // (each with its list, #2952)
     `Minimal SOP: ${r.minimalSop.expr}   (${r.minimalSop.terms} term(s), ${r.minimalSop.literals} literal(s))`, ...solutionLines(r.minimalSop),
     `Minimal POS: ${r.minimalPos.expr}   (${r.minimalPos.terms} term(s), ${r.minimalPos.literals} literal(s))`, ...solutionLines(r.minimalPos),
     ...(r.xor ? [`XOR form: ${r.xor}`] : []), `NAND form: ${r.nand}`, `NOR form: ${r.nor}`,
-    `Least number of gates: ${r.leastGates.form}: ${r.leastGates.expr}`, `Least delay: ${r.leastDelay.form}: ${r.leastDelay.expr}`, '']);
+    `Least number of gates: ${r.leastGates.form}: ${r.leastGates.expr}`, `Least delay: ${r.leastDelay.form}: ${r.leastDelay.expr}`,
+    `HDL logic: ${r.hdlLogic.name}: ${r.hdlLogic.expr}   (${r.hdlLogic.what})`, '']);
   return { text: lines.join('\n').trimEnd(), data: { project: name, path: rel, view: 'results', notation, inputs: m.inputs, outputs } };
 }
-// the minimal solutions of a form, when it has several (#2928), as the editor's note and selector say them
+// the minimal solutions of a form, when it has several (#2928), as the editor's selector says them, the one used marked
 const solutionLines = m => (m.solutions.length < 2 ? [] : [
   `  ${m.many ? 'Many minimal solutions exist; the first 64 can be browsed.' : `${m.solutions.length} minimal solutions exist.`}`,
-  ...m.solutions.map((x, i) => `  Solution ${i + 1} of ${m.solutions.length}: ${x.expr}`)]);
+  ...m.solutions.map((x, i) => `  Solution ${i + 1} of ${m.solutions.length}: ${x.expr}${i === m.used ? '   (used)' : ''}`)]);

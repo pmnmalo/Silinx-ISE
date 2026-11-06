@@ -23,7 +23,8 @@ test('#405 truth table schematic: every form, both languages: the module simulat
       const g = generateHdl(sch, {});
       assert.deepEqual(g.diagnostics, [], what);
       const tt = logic.truthTableFromModule([{ path: g.filename, lang, text: g.code }], sch.name);
-      assert.deepEqual(tt.table, { f: '01101001', g: '00011111' }, what);
+      // (the don't care as the minimal form chose it; the canonical SOP leaves it out: 0, #2951)
+      assert.deepEqual(tt.table, { f: '01101001', g: form === 'csop' ? '00010111' : '00011111' }, what);
     }
   }
 });

@@ -23,8 +23,10 @@ import { clocksOf, latchGates } from './schematic.js';
 import { tbPorts, generateTestbench, expectedFromTrace } from './testbench.js';
 import { gateForm } from './logic-sch.js';
 import { circuitCost, costOrder } from './logic-cost.js';
+import { formOf, normalizeChoices, newOutputForms, solutionOf } from './logic-choice.js';
 export { circuitCost } from './logic-cost.js';
 export { gateForm, schematicErrors, schematicFromTable } from './logic-sch.js';
+export { FORM_NAMES, formOf, setOutputLogic, solutionOf } from './logic-choice.js';
 
 export const TT_VERSION = 1;
 export const MAX_INPUTS = 8;          // truth tables (display, module tables)
@@ -746,11 +748,11 @@ const IDENT = /^[A-Za-z][A-Za-z0-9_]*$/;
 const RESERVED = new Set([...VHDL93_WORDS, ...VERILOG_WORDS, 'logic', 'std_logic', 'ieee']);
 
 /** The logic forms of a table's HDL module and schematic (#694). */
-export const FORMS = ['sop', 'pos', 'xor', 'nand', 'nor', 'gates', 'delay'];   // (the last two: the form of least gates or delay, #1427)
+export const FORMS = ['sop', 'pos', 'xor', 'nand', 'nor', 'gates', 'delay', 'csop', 'cpos'];   // (gates, delay: the form of least gates or delay, #1427; csop, cpos: the canonical SOP and POS, #2951)
 
 export function newTable(name = 'truth_table', inputs = ['a', 'b', 'c'], outputs = ['f']) {
   const n = inputs.length;
-  return { version: TT_VERSION, name, inputs: [...inputs], outputs: [...outputs], table: Object.fromEntries(outputs.map(o => [o, '0'.repeat(1 << n)])), exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
+  return { version: TT_VERSION, name, inputs: [...inputs], outputs: [...outputs], table: Object.fromEntries(outputs.map(o => [o, '0'.repeat(1 << n)])), exprs: {}, notes: '', form: 'gates', lang: 'vhdl' };
 }
 
 export function normalizeTable(d) {
@@ -769,7 +771,7 @@ export function normalizeTable(d) {
   doc.lang = doc.lang === 'verilog' ? 'verilog' : 'vhdl';
   // the Karnaugh maps' order (#2924): written only when not the default
   if (doc.kmapOrder !== 'rows') delete doc.kmapOrder;
-  return doc;
+  return normalizeChoices(doc);   // (each output's form and minimal solution, #2950, #2951)
 }
 
 /** Problems of a table document: [{ severity: 'error' | 'warning', message }] (names, sizes; a warning: a
@@ -810,7 +812,7 @@ export function reshapeTable(doc, inputs, outputs) {
   }
   const exprs = {};
   for (const o of outputs) { const k = Object.keys(doc.exprs || {}).find(x => x.toLowerCase() === o.toLowerCase()); if (k && inputs.length === n0 && inputs.every((v, j) => v === old[j])) exprs[o] = doc.exprs[k]; }
-  return { ...doc, inputs: [...inputs], outputs: [...outputs], table, exprs };
+  return { ...doc, inputs: [...inputs], outputs: [...outputs], table, exprs, ...newOutputForms(doc, inputs, outputs) };
 }
 
 /**
@@ -827,7 +829,7 @@ export function analyzeOutput(doc, out, opts = {}) {
   for (const m of [sop, pos]) {
     // every minimal solution with its expression and gates (#2928): the first is the form itself
     for (const a of m.alternatives) { const r = { ...m, ...a }; a.ast = minimalAst(r, doc.inputs); a.gates = gateCount(r); }
-    m.ast = m.alternatives[0].ast; m.gates = m.alternatives[0].gates;
+    m.pick = solutionOf(doc, out, m.form, m.alternatives.length); Object.assign(m, m.alternatives[m.pick]);   // (the one used, #2950)
   }
   const xor = minimizeXor(col, doc.inputs, { than: [sop.ast, pos.ast] });
   return { col, ...can, canon: canonicalAsts(col, doc.inputs), sop, pos, xor, nand: gateForm(sop, doc.inputs, 'nand'), nor: gateForm(pos, doc.inputs, 'nor') };
@@ -838,7 +840,7 @@ export function analyzeOutput(doc, out, opts = {}) {
  * module and its schematic (#694): { ast, what, form (the form it is in), cost ({ gates, delay }) }. 'gates' and
  * 'delay': the form of the fewest gates, or of the least delay, among the others (the first when they tie, #1427).
  */
-export function outputForm(doc, o, form = doc.form) {
+export function outputForm(doc, o, form = formOf(doc, o)) {
   if (form === 'gates' || form === 'delay') {
     const order = costOrder(form);
     const best = ['sop', 'pos', 'xor', 'nand', 'nor'].map(f => outputForm(doc, o, f)).reduce((a, b) => (order(b.cost, a.cost) < 0 ? b : a));
@@ -852,9 +854,11 @@ const withCost = (r, form) => {
 };
 function plainForm(doc, o, form) {
   const n = doc.inputs.length;
-  const m = minimize(doc.table[o], n, { form: form === 'pos' || form === 'nor' ? 'pos' : 'sop', ...(n > MAX_EDIT_INPUTS ? { maxNodes: 50000 } : {}) });
+  if (form === 'csop' || form === 'cpos') return { ast: canonicalAsts(doc.table[o], doc.inputs)[form.slice(1)], what: `canonical ${form.slice(1).toUpperCase()}` };
+  const m0 = minimize(doc.table[o], n, { form: form === 'pos' || form === 'nor' ? 'pos' : 'sop', ...(n > MAX_EDIT_INPUTS ? { maxNodes: 50000 } : {}) });
+  const k = solutionOf(doc, o, m0.form, m0.alternatives.length), m = { ...m0, ...m0.alternatives[k] };   // (the minimal solution used, #2950)
   const ast = minimalAst(m, doc.inputs);
-  const what = `minimal ${m.form === 'pos' ? 'POS' : 'SOP'}, ${m.literals} literal(s)`;
+  const what = `minimal ${m.form === 'pos' ? 'POS' : 'SOP'}${k ? ` (solution ${k + 1} of ${m.alternatives.length})` : ''}, ${m.literals} literal(s)`;
   if (form === 'xor') {
     // the XOR form against both minimal forms; a fixed node budget only, no time limit: the
     // same table always gives the same module
@@ -877,7 +881,7 @@ const DC_RE = /don't cares?:\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*d\(([^)]*)\)/gi;
  * (outputForm): its minimal SOP or POS; with form 'xor', its XOR form where there is one (xor / xnor,
  * ^ / ~^), else its minimal SOP; with 'nand' / 'nor', NAND / NOR operations only (#694).
  */
-export function generateTableHdl(docIn, lang = docIn.lang || 'vhdl', { form = docIn.form || 'sop', source } = {}) {
+export function generateTableHdl(docIn, lang = docIn.lang || 'vhdl', { form, source } = {}) {   // (form: every output's; else each its own, #2951)
   const doc = normalizeTable(docIn);
   const errs = validateTable(doc).filter(x => x.severity === 'error');
   if (errs.length) throw new Error(errs.map(x => x.message).join('; '));

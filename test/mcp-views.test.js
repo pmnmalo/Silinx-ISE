@@ -66,15 +66,15 @@ test('related_view: a Verilog source in VHDL; a Petri net\'s state machine', asy
   assert.deepEqual([fsm.data.model, fsm.data.states, fsm.data.truncated], [want.fsm, want.states, !!want.truncated]);
 });
 
-test('related_view: a truth table\'s results, as its editor shows them: the canonical SOP and POS first, then their lists (#2927)', async () => {
+test('related_view: a truth table\'s results, as its editor shows them: the canonical SOP and POS first, each with its list (#2927, #2952), each output\'s HDL logic (#2951)', async () => {
   await call('new_project', { name: 'q' });
   await call('write_file', { project: 'q', path: 'src/m.bool.json', text: JSON.stringify({ ...newTable('m', ['a', 'b', 'c'], ['f', 'z']), table: { f: '01X10X10', z: '00000000' } }) });
   const before = files('q');
   const r = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'textbook' });
   assert.equal(r.text, `Canonical SOP: f = a'·b'·c + a'·b·c + a·b·c'
+  f = Σm(1, 3, 6) + d(2, 5)
 Canonical POS: f = (a + b + c)·(a' + b + c)·(a' + b' + c')
-Minterm list: f = Σm(1, 3, 6) + d(2, 5)
-Maxterm list: f = ΠM(0, 4, 7) · D(2, 5)
+  f = ΠM(0, 4, 7) · D(2, 5)
 Minimal SOP: f = a'·c + b·c'   (2 term(s), 4 literal(s))
 Minimal POS: f = (b + c)·(a' + c')   (2 term(s), 4 literal(s))
 XOR form: f = c ⊕ a·b
@@ -82,17 +82,19 @@ NAND form: f = ((a'·c)'·(b·c')')'
 NOR form: f = ((b + c)' + (a' + c')')'
 Least number of gates: XOR form: f = c ⊕ a·b
 Least delay: XOR form: f = c ⊕ a·b
+HDL logic: Least number of gates: f = c ⊕ a·b   (least gates: XOR form, 3 literal(s), 2 gate(s), delay 2)
 
 Canonical SOP: z = 0
+  z = Σm()
 Canonical POS: z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')
-Minterm list: z = Σm()
-Maxterm list: z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
+  z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
 Minimal SOP: z = 0   (0 term(s), 0 literal(s))
 Minimal POS: z = 0   (1 term(s), 0 literal(s))
 NAND form: z = 0
 NOR form: z = 0
 Least number of gates: Minimal SOP: z = 0
-Least delay: Minimal SOP: z = 0`);
+Least delay: Minimal SOP: z = 0
+HDL logic: Least number of gates: z = 0   (least gates: minimal SOP, 0 literal(s), 0 gate(s), delay 0)`);
   assert.deepEqual([r.data.view, r.data.notation, r.data.inputs, r.data.outputs.map(o => o.output)], ['results', 'textbook', ['a', 'b', 'c'], ['f', 'z']]);
   // the editor's default notation, the core's canonical forms
   const s = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results' });
@@ -103,7 +105,7 @@ Least delay: Minimal SOP: z = 0`);
   await fails({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'latex' }, 'notation: slash, slash-compact, textbook, compact, ascii, vhdl, verilog');
 });
 
-test('related_view results: every minimal solution when there are several (#2928), the first the form\'s; one: none listed', async () => {
+test('related_view results: every minimal solution when there are several (#2928), the one used marked (#2950); one: none listed', async () => {
   await call('new_project', { name: 'sol' });
   // the cyclic chart Σm(0,1,2,5,6,7): two minimal SOPs, one POS; z: 64 or more (the cap)
   const doc = { ...newTable('cyc', ['a', 'b', 'c'], ['f']), table: { f: '11100111' } };
@@ -117,7 +119,7 @@ test('related_view results: every minimal solution when there are several (#2928
   assert.deepEqual([sop.many, pos.many, pos.solutions.length, pos.solutions[0].expr], [false, false, 1, pos.expr]);
   assert.ok(r.text.includes(`Minimal SOP: f = /a./b + b./c + a.c   (3 term(s), 6 literal(s))
   2 minimal solutions exist.
-  Solution 1 of 2: f = /a./b + b./c + a.c
+  Solution 1 of 2: f = /a./b + b./c + a.c   (used)
   Solution 2 of 2: f = /a./c + /b.c + a.b
 Minimal POS: `), r.text);
   assert.doesNotMatch(r.text.slice(r.text.indexOf('Minimal POS')), /minimal solutions|Solution \d/);

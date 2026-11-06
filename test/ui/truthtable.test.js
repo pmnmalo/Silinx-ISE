@@ -28,6 +28,14 @@ const consoleAfterOpen = async (page) => {
   return lines.slice(lines.findIndex((l) => /^Project ".*" opened/.test(l)) + 1);
 };
 const problemRows = (page) => page.eval(() => [...document.querySelectorAll('#console-errors .diag, #console-warnings .diag')].map((d) => d.textContent));
+/** An output's HDL logic (#2951): the tick box of its result (`form`: tt-sop, tt-xor, tt-nand, …), each of `outs` in turn. */
+const tickForm = async (page, form, outs) => {
+  for (const o of outs) {
+    await page.click(`.doc:not([hidden]) .tt-editor .tt-tab[data-out=${o}]`);
+    await page.eval((f) => document.querySelector(`.doc:not([hidden]) .tt-editor .tt-res.tt-${f} .tt-hdl`).scrollIntoView({ block: 'center' }), form);
+    await page.click(`.doc:not([hidden]) .tt-editor .tt-res.tt-${form} .tt-hdl`);
+  }
+};
 
 const ADDER = `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
 entity add1 is port (a, b : in std_logic_vector(1 downto 0); s : out std_logic_vector(2 downto 0)); end add1;
@@ -145,7 +153,9 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   assert.ok([...'0X10100X'].every((c, i) => c === 'X' || c === sim[i]), sim);
 
   // ---- its schematic (#694): the Schematic badge of its row opens it, generated from the table (a view, no file),
-  // the minimal SOP's gates (the HDL logic form)
+  // the minimal SOP's gates (the HDL logic form, ticked: a new table's is the least gates', here its XOR form, #2951)
+  await tickForm(page, 'sop', ['f']);
+  await page.waitFor(async () => /\(minimal SOP, /.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'the HDL in minimal SOP', timeout: 15000 });
   const badge = (mod, text) => page.eval((m, x) => { const r = [...document.querySelectorAll('#hier .row')].find((e) => e.querySelector('.lbl').textContent === m); [...r.querySelectorAll('.badge')].find((b) => b.textContent === x).click(); }, mod, text);
   await badge('maj3', 'Schematic');
   await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/maj3.bool.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
@@ -158,10 +168,10 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   const careSim = (st) => assert.ok([...'0X10100X'].every((c, i) => c === 'X' || c === st[i]), st);
   careSim(simTable(generateHdl(sch).code, 'maj3.vhd', 'maj3').f);
   assert.ok(!(await page.eval(() => window.Silinx.fileTree)).some((f) => /\.sch\.json$/.test(f)), 'no schematic file');
-  // HDL logic: NAND gates only: the HDL and the open schematic follow, NAND gates only
+  // HDL logic: NAND gates only (its result's tick box, #2951): the HDL and the open schematic follow, NAND gates only
   await page.eval(() => window.SilinxApp.openTt('src/maj3.bool.json'));
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.bool.json');
-  await page.fill(`${T} .tt-form`, 'nand');
+  await tickForm(page, 'nand', ['f']);
   await page.waitFor(async () => /\(NAND gates only, from the minimal SOP/.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'the NAND-only HDL', timeout: 15000 });
   vhd = await readWs(env, 'TtPj', 'src/maj3.vhd');
   assert.doesNotMatch(vhd.slice(vhd.indexOf('begin')), /\b(or|nor|xor|xnor)\b/);
@@ -490,19 +500,18 @@ end rtl;
   await page.fill(`${T} .tt-notation`, 'slash');
   assert.equal((await texts()).xor, 'co = a.b + c.(a ⊕ b)');
 
-  // ---- the HDL: the minimal SOP by default; "XOR form (when simpler)" puts it in the module
+  // ---- the HDL: the table's minimal SOP; the XOR form ticked (s, co; x has none simpler, #2951) puts it in the module
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/fa.vhd'] === 'src/fa.bool.json', [], { what: 'linked HDL' });
   await page.waitFor(async () => /co = Σm\(3, 5, 6, 7\)/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the HDL of the table', timeout: 15000 });
   assert.doesNotMatch(await readWs(env, 'TtXor', 'src/fa.vhd'), /xor/);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-form option`)].map((o) => `${o.value}:${o.textContent}`), T), ['sop:Minimal SOP', 'pos:Minimal POS', 'xor:XOR form (when simpler)', 'nand:NAND gates only', 'nor:NOR gates only', 'gates:Least number of gates', 'delay:Least delay']);
-  await page.fill(`${T} .tt-form`, 'xor');
+  await tickForm(page, 'xor', ['s', 'co']);
   await page.waitFor(async () => /s <= a xor b xor c;/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the HDL with the XOR form', timeout: 15000 });
   const vhd = await readWs(env, 'TtXor', 'src/fa.vhd');
   assert.match(vhd, /^ {4}co <= \(a and b\) or \(c and \(a xor b\)\);$/m);
   assert.match(vhd, /^ {4}x <= c or \(a and b\);$/m);
   assert.match(vhd, /^-- co = a·b \+ c·\(a ⊕ b\) {3}\(XOR form, 5 literal\(s\), 4 gate\(s\), delay 3\)$/m);
   assert.deepEqual(simTable(vhd, 'fa.vhd', 'fa'), fa.table);
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.bool.json')).json()).form === 'xor', [], { what: 'saved' });
+  await page.waitFor(async () => JSON.stringify((await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.bool.json')).json()).forms) === '{"s":"xor","co":"xor"}', [], { what: 'saved' });
   await page.eval(() => window.SilinxApp.openFile('src/fa.vhd'));
   assert.deepEqual(await problemRows(page), []);
   // its schematic in the XOR form too (#694): s an XOR3; then NOR gates only, the HDL and the schematic
@@ -514,7 +523,7 @@ end rtl;
   assert.deepEqual(simTable(generateHdl(sch).code, 'fa.vhd', 'fa'), fa.table);
   await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json');
-  await page.fill(`${T} .tt-form`, 'nor');
+  await tickForm(page, 'nor', ['s', 'co', 'x']);
   await page.waitFor(async () => /\(NOR gates only, from the minimal POS/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the NOR-only HDL', timeout: 15000 });
   const nor = await readWs(env, 'TtXor', 'src/fa.vhd');
   assert.doesNotMatch(nor.slice(nor.indexOf('begin')), /\b(and|nand|xor|xnor)\b/);
@@ -534,7 +543,7 @@ end rtl;
     await page.waitFor((h, o) => window.Silinx.hdlToSch?.[h] === 'src/fa.bool.json' && !window.Silinx.fileTree.includes(o), [`src/fa.${ext}`, `src/fa.${other}`], { what: `fa in ${L}`, timeout: 15000 });
     await page.waitConsole(new RegExp(`src/fa\\.bool\\.json: its HDL is now in ${L}, src/fa\\.${ext} \\(src/fa\\.${other} removed\\)`));
     const d = await ttFile('TtXor', 'src/fa.bool.json');
-    assert.deepEqual([d.lang, d.generatedFile, d.form], [lang, `src/fa.${ext}`, 'nor']);
+    assert.deepEqual([d.lang, d.generatedFile, d.forms], [lang, `src/fa.${ext}`, { s: 'nor', co: 'nor', x: 'nor' }]);
     const code = await readWs(env, 'TtXor', `src/fa.${ext}`);
     assert.match(code, lang === 'verilog' ? /^module fa \(/m : /^entity fa is/m);
     assert.match(code, /\(NOR gates only, from the minimal POS/);
@@ -565,9 +574,7 @@ end rtl;
   assert.deepEqual(untranslated(en, pt, [/^@?(\/a.b \+ c|\/ab \+ c|a.b' \+ c|ab' \+ c|[a-z]+ =|s|co|x|a, b, c|s, co, x|fa\.vhd)$/]), []);
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-xor b`).textContent, T), 'Forma XOR');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-xor .tt-cost`).textContent, T), '3 literal(is), 2 operador(es) de duas entradas: 2 XOR / XNOR, 0 AND, 0 OR');
-  assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-form option[value=xor]`).textContent, T), 'Forma XOR (quando mais simples)');
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-form option`)].slice(3).map((o) => o.textContent), T), ['Só portas NAND', 'Só portas NOR', 'Menor número de portas', 'Menor atraso']);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar label`)].map((l) => l.textContent), T), ['Entradas:', 'Saídas:', 'Lógica do HDL:']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar label`)].map((l) => l.textContent), T), ['Entradas:', 'Saídas:']);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Preencher a tabela', 'Álgebra de um Módulo…', 'Álgebra Manuscrita…']);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-nand b, ${t} .tt-nor b, ${t} .tt-nand .tt-cost`)].map((b) => b.textContent), T), ['Forma NAND', '8 porta(s), 3 delas inversora(s)', 'Forma NOR']);
   // the Design pane's badges and the schematic's bar
@@ -610,7 +617,7 @@ uiTest('#1427 Truth Table: Least number of gates and Least delay, every form\'s 
   assert.deepEqual(await page.eval((t) => ['gates', 'delay'].map((g) => [document.querySelector(`${t} .tt-${g} b`).textContent, document.querySelector(`${t} .tt-${g} .tt-best-form`).textContent, document.querySelector(`${t} .tt-${g} .tt-expr`).textContent]), T),
     [['Least number of gates', 'XOR form', 's = a ⊕ b ⊕ c'], ['Least delay', 'XOR form', 's = a ⊕ b ⊕ c']]);
   // the module in the form of the fewest gates: s its XOR, co its minimal SOP; it simulates to the table
-  await page.fill(`${T} .tt-form`, 'gates');
+  await tickForm(page, 'gates', ['co', 's']);
   await page.waitFor(async () => /least gates/.test(await (await fetch('/api/projects/TtCost/file?path=src%2Ffa.vhd')).text()), [], { what: 'the HDL of least gates', timeout: 15000 });
   const vhd = await readWs(env, 'TtCost', 'src/fa.vhd');
   assert.match(vhd, /^-- s = a ⊕ b ⊕ c {3}\(least gates: XOR form, 3 literal\(s\), 1 gate\(s\), delay 1\)$/m);
@@ -619,8 +626,8 @@ uiTest('#1427 Truth Table: Least number of gates and Least delay, every form\'s 
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor((t) => document.querySelector(`${t} .tt-gates b`)?.textContent === 'Menor número de portas', [T], { what: 'Portuguese' });
-  assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-delay b`).textContent, document.querySelector(`${t} .tt-xor .tt-circuit`).textContent, [...document.querySelectorAll(`${t} .tt-form option`)].slice(-2).map((o) => o.textContent)], T),
-    ['Menor atraso', 'Como circuito: 1 porta(s), atraso 1', ['Menor número de portas', 'Menor atraso']]);
+  assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-delay b`).textContent, document.querySelector(`${t} .tt-xor .tt-circuit`).textContent], T),
+    ['Menor atraso', 'Como circuito: 1 porta(s), atraso 1']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
 });
 

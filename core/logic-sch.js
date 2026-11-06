@@ -92,11 +92,10 @@ function astTree(e, index) {
  * form, the one of its HDL module (outputForm, #694: minimal SOP: AND gates then an OR gate; POS: OR
  * then AND; the XOR form with XOR / XNOR gates; NAND or NOR gates only, the inverters too) and the
  * output markers on the right. A gate has at most 5 inputs (AND, OR), 4 (NAND, NOR, XOR, XNOR).
- * opts: { form: one of FORMS (default: the table's), lang, name }.
+ * opts: { form: one of FORMS for every output (default: each output's own, #2951), lang, name }.
  */
 export function schematicFromTable(docIn, { form, lang, name } = {}) {
   const tt = normalizeTable(docIn);
-  form ||= tt.form;
   const n = tt.inputs.length;
   const doc = newDoc(name || tt.name, lang || tt.lang);
   let sid = 0, wid = 0, pid = 0, lid = 0;

@@ -1,15 +1,16 @@
 // Boolean Algebra / Karnaugh Map editor (#2017: it was Truth Table; documents <name>.bool.json, <name>.tt.json before #2065). The inputs (1–6) and outputs (any
 // number: the table scrolls, one output at a time in the tabs) are named in the toolbar; the truth table is edited by clicking its output cells (0 → 1 → X) or by
 // typing an expression per output. For the selected output: Karnaugh map with the groups of the
-// minimal SOP (1s) or POS (0s), canonical SOP and POS and their lists Σm / ΠM, minimal SOP and POS with their literal and
+// minimal SOP (1s) or POS (0s) (the minimal solution used chosen there when it has several, #2950), canonical SOP and POS
+// with their lists Σm / ΠM, minimal SOP and POS with their literal and
 // gate counts, the XOR form when it is cheaper (#435), the NAND-only and NOR-only forms (#694), each one's gates and delay
 // as a circuit, and the forms of the fewest gates and of the least delay (#1427).
 // The expressions are written in the notation chosen, by default with / as NOT and . as AND (/a.b + c, #434, #1496); one may be written
 // by hand (#1056), and the whole table drawn by hand (#1066), both from the Development menu (#1098). Tables read from a
 // module may have up to 8 inputs (no Karnaugh map then). Logic: core/logic.js. The table always has its HDL module,
 // in its language (the project's preferred one), generated from it by the host (app.js), which keeps both in sync,
-// and its schematic (#694, a view of its module in the Design pane), both in the form chosen in HDL logic; its
-// language is chosen in Language (#696).
+// and its schematic (#694, a view of its module in the Design pane), each output in the form ticked among its results
+// (#2951: its HDL logic; least gates by default); its language is the project's (#696).
 //
 //   const ed = mountTtEditor(host, { model, onChange(model), onFromModule(), linkInfo() -> { file, why } | null,
 //                                    onOpenFile(path) });
@@ -20,7 +21,7 @@ import { ICON } from './editor-icons.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import {
   normalizeTable, validateTable, reshapeTable, analyzeOutput, parseExpr, exprColumn, formatExpr,
-  kmapLayout, kmapRects, MAX_EDIT_INPUTS, circuitCost, outputForm,
+  kmapLayout, kmapRects, MAX_EDIT_INPUTS, circuitCost, outputForm, formOf, setOutputLogic,
 } from '/core/logic.js';
 import { reservedError } from '/core/reserved.js';
 import { cellText, placeKmap } from './tt-kmap3d.js';
@@ -43,7 +44,9 @@ const names = s => String(s || '').split(/[\s,;]+/).map(x => x.trim()).filter(Bo
 // the HDL logic of the fewest gates, or of the least delay, among the other forms (#1427)
 const GATES_TIP = 'The form with the fewest gates, each symbol one gate whatever its number of inputs';
 const DELAY_TIP = 'The form with the fewest gates on its longest path, every gate the same delay';
-const leastOptions = () => [h('option', { value: 'gates', title: GATES_TIP }, 'Least number of gates'), h('option', { value: 'delay', title: DELAY_TIP }, 'Least delay')];
+// the tick box of a result (#2951): ticked, the output's HDL logic (its module and schematic in that form); `pick()` ticks it
+const HDL_TIP = 'The HDL logic of this output: its module and its schematic in this form';
+const hdlTick = (on, pick) => h('input', { type: 'checkbox', class: 'tt-hdl', checked: on, title: HDL_TIP, onchange: e => { if (e.target.checked) pick(); else e.target.checked = true; } });
 // a form as a circuit: its gates (each symbol one) and its delay (its longest path, every gate the same delay, #1427)
 function circuit(ast) {
   const c = circuitCost(ast);
@@ -51,34 +54,31 @@ function circuit(ast) {
 }
 // the form of the fewest gates or of the least delay of an output (#1427): which one, its expression, its gates and delay
 const FORM_NAMES = { sop: 'Minimal SOP', pos: 'Minimal POS', xor: 'XOR form', nand: 'NAND form', nor: 'NOR form' };
-function bestForm(doc, out, goal, label, tip, notation) {
+function bestForm(doc, out, goal, label, tip, notation, tick) {
   const r = outputForm(doc, out, goal);
   return h('div', { class: `tt-res tt-${goal}`, title: tip },
-    h('div', {}, h('b', {}, label), ': ', h('span', { class: 'tt-best-form' }, FORM_NAMES[r.form] || FORM_NAMES.sop)),
+    h('div', {}, tick(goal), h('b', {}, label), ': ', h('span', { class: 'tt-best-form' }, FORM_NAMES[r.form] || FORM_NAMES.sop)),
     h('div', {}, h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)), circuit(r.ast));
 }
 
-// the canonical forms in full, the sum of the minterms and the product of the maxterms, then the lists of their terms
-// (#2927), each on a line of its own (#2947)
-function canonForms(A, out, notation) {
-  const expr = (cls, label, title, ast) => h('div', { class: cls, title }, h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`));
+// the canonical forms in full, the sum of the minterms and the product of the maxterms (#2927), each with the list of
+// its terms under it (#2952), each with its tick box (#2951)
+function canonForms(A, out, notation, tick) {
+  const expr = (f, label, title, ast, list) => h('div', { class: `tt-canon-${f.slice(1)}`, title }, tick(f), h('b', {}, label), ': ',
+    h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`), h('br'), h('code', { class: 'tt-canon-list', 'data-no-i18n': '' }, `${out} = ${list}`));
   return h('div', { class: 'tt-res tt-canon' },
-    expr('tt-canon-sop', 'Canonical SOP', 'The sum of the minterms: every input in every term, the don\'t cares left out', A.canon.sop),
-    expr('tt-canon-pos', 'Canonical POS', 'The product of the maxterms: every input in every term, the don\'t cares left out', A.canon.pos),
-    h('div', { class: 'tt-canon-minterms' }, h('b', {}, 'Minterm list'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.sigma}`)),
-    h('div', { class: 'tt-canon-maxterms' }, h('b', {}, 'Maxterm list'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.pi}`)));
+    expr('csop', 'Canonical SOP', 'The sum of the minterms: every input in every term, the don\'t cares left out', A.canon.sop, A.sigma),
+    expr('cpos', 'Canonical POS', 'The product of the maxterms: every input in every term, the don\'t cares left out', A.canon.pos, A.pi));
 }
 
-// a minimal SOP or POS as shown (#2928): the solution chosen (`pick`, on the analysis: the first again when the table
-// changes) of its minimal ones; the HDL, the schematic and the NAND / NOR forms keep the first
-const shown = m => ({ ...m, pick: m.pick || 0, ...(m.alternatives[m.pick || 0] || m.alternatives[0]) });
-// its note and, when it has several, their selector: "Solution 2 of 5", previous / next (round: `go(±1)`)
+// the minimal solutions of the SOP or POS on the Karnaugh map (#2928; there, #2950): how many, the one used ("Solution 2
+// of 5", the one of its HDL and results), previous / next (round: `go(±1)`)
 function solutionPicker(r, go) {
-  return [h('span', { class: 'tt-note' }, r.solutions >= 64 ? 'Many minimal solutions exist; the first 64 can be browsed.' : `${r.solutions} minimal solutions exist.`),
-    h('div', { class: 'tt-sol' },
-      h('button', { type: 'button', class: 'tt-sol-btn tt-sol-prev', title: 'Previous solution', onclick: () => go(-1) }, '◀'),
-      h('span', { class: 'tt-sol-n' }, `Solution ${r.pick + 1} of ${r.alternatives.length}`),
-      h('button', { type: 'button', class: 'tt-sol-btn tt-sol-next', title: 'Next solution', onclick: () => go(1) }, '▶'))];
+  return h('div', { class: 'tt-sol' },
+    h('span', { class: 'tt-sol-count' }, r.solutions >= 64 ? 'Many minimal solutions exist; the first 64 can be browsed.' : `${r.solutions} minimal solutions exist.`),
+    h('button', { type: 'button', class: 'tt-sol-btn tt-sol-prev', title: 'Previous solution', onclick: () => go(-1) }, '◀'),
+    h('span', { class: 'tt-sol-n' }, `Solution ${r.pick + 1} of ${r.alternatives.length}`),
+    h('button', { type: 'button', class: 'tt-sol-btn tt-sol-next', title: 'Next solution', onclick: () => go(1) }, '▶'));
 }
 
 // A truth table's print view (#1510): the table, the Karnaugh map of the output in front (flat or 3D, as shown, its
@@ -157,10 +157,6 @@ export function mountTtEditor(container, opts = {}) {
     el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyShape(); } });
     el.addEventListener('change', applyShape);
   }
-  const FORM_TIP = 'Form of the logic in the generated HDL module and schematic';
-  const formSel = h('select', { class: 'tt-form', title: FORM_TIP, onchange: () => { M.form = formSel.value; changed(); } },
-    h('option', { value: 'sop' }, 'Minimal SOP'), h('option', { value: 'pos' }, 'Minimal POS'), h('option', { value: 'xor' }, 'XOR form (when simpler)'),
-    h('option', { value: 'nand' }, 'NAND gates only'), h('option', { value: 'nor' }, 'NOR gates only'), ...leastOptions());
   const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, title, onclick }, label);
   const link = h('span', { class: 'tt-link' });
   const more = toolbarMenu([
@@ -170,7 +166,6 @@ export function mountTtEditor(container, opts = {}) {
   const toolbar = h('div', { class: 'tt-toolbar' },
     h('label', {}, 'Inputs:'), inIn, h('label', {}, 'Outputs:'), outIn, shapeErr,
     h('span', { class: 'tt-sep' }),
-    h('label', { title: FORM_TIP }, 'HDL logic:'), formSel,
     more.el,
     link);
 
@@ -189,7 +184,7 @@ export function mountTtEditor(container, opts = {}) {
     if (!text) return;
     try {
       const col = exprColumn(parseExpr(text, { vars: M.inputs }), M.inputs);
-      M.table[out] = col; M.exprs[out] = text;
+      M.table[out] = col; M.exprs[out] = text; delete M.solutions?.[out];   // (a new column: its first minimal solutions, #2950)
       changed();
     } catch (e) { exprErr.textContent = e.message; }
   };
@@ -229,7 +224,7 @@ export function mountTtEditor(container, opts = {}) {
   const cycle = (o, r) => {
     const c = M.table[o][r];
     M.table[o] = M.table[o].slice(0, r) + NEXT[c] + M.table[o].slice(r + 1);
-    delete M.exprs[o];   // the column no longer comes from the typed expression
+    delete M.exprs[o]; delete M.solutions?.[o];   // the column no longer comes from the typed expression; its first minimal solutions (#2950)
     changed();
   };
 
@@ -266,7 +261,8 @@ export function mountTtEditor(container, opts = {}) {
     }
     if (n >= 2) grpSel.append(kmapOrderSelect(M.kmapOrder, o => { if (o === 'rows') M.kmapOrder = 'rows'; else delete M.kmapOrder; changed(); }));
     const L = kmapLayout(n, M.kmapOrder || 'cols');
-    const res = shown(groups === 'pos' ? A.pos : A.sop);
+    const res = groups === 'pos' ? A.pos : A.sop, k = res.alternatives.length;
+    if (res.several) kmapHost.append(solutionPicker(res, d => { M = setOutputLogic(M, out, { solution: { [groups]: (res.pick + d + k) % k } }); changed(); }));
     const C = 40, rowsN = L.rowCodes.length, colsN = L.colCodes.length;
     const gw = colsN * C, gh = rowsN * C;
     const left0 = 18 + 12 * Math.max(1, L.rowVars.length), top0 = 46;
@@ -332,30 +328,31 @@ export function mountTtEditor(container, opts = {}) {
     results.innerHTML = '';
     const nsel = h('select', { class: 'tt-notation', title: 'Notation of the expressions', onchange: () => { notation = nsel.value; renderResults(); renderKmap(); } },
       ...NOTATIONS.map(([v, l]) => h('option', { value: v, selected: v === notation }, l)));
+    // its tick box (#2951): the form ticked, the output's HDL logic (an XOR form not simpler: its minimal SOP's)
+    const tick = f => hdlTick((formOf(M, out) === 'xor' && !A.xor ? 'sop' : formOf(M, out)) === f, () => { M = setOutputLogic(M, out, { form: f }); changed(); });
     const form = (label, f, cls) => {
-      const m = A[f], r = shown(m), g = r.gates;
-      const note = [];
-      if (r.several) note.push(...solutionPicker(r, d => { m.pick = (r.pick + d + r.alternatives.length) % r.alternatives.length; renderResults(); renderKmap(); }));
+      const r = A[f], g = r.gates;
+      const note = r.several ? [h('span', { class: 'tt-note tt-sol-of' }, `Solution ${r.pick + 1} of ${r.alternatives.length}`)] : [];
       if (!r.exact) note.push(h('span', { class: 'tt-note' }, 'The exact search was cut short: this solution may not be minimal.'));
       return h('div', { class: `tt-res ${cls}` },
-        h('div', {}, h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)),
+        h('div', {}, tick(f), h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)),
         h('div', { class: 'tt-cost' }, `${r.terms.length} term(s), ${r.literals} literal(s); gates: ${g.and} AND, ${g.or} OR, ${g.not} NOT (${g.inputs} gate inputs)`),
         circuit(r.ast), ...note);
     };
     // the XOR form, when cheaper than both (#435)
     const x = A.xor;
     const xorForm = x && h('div', { class: 'tt-res tt-xor', title: 'Shown when it has fewer literals than the minimal SOP and POS, or as many and fewer operators' },
-      h('div', {}, h('b', {}, 'XOR form'), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(x.ast, notation)}`)),
+      h('div', {}, tick('xor'), h('b', {}, 'XOR form'), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(x.ast, notation)}`)),
       h('div', { class: 'tt-cost' }, `${x.literals} literal(s), ${x.ops} two-input operator(s): ${x.xor} XOR / XNOR, ${x.and} AND, ${x.or} OR`), circuit(x.ast),
       x.exact ? null : h('span', { class: 'tt-note' }, 'The search was cut short: a simpler XOR form may exist.'));
     // NAND and NOR only (#694): the minimal SOP and POS by double negation
     const gateForm = (label, g, cls, from) => h('div', { class: `tt-res ${cls}`, title: from },
-      h('div', {}, h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(g.ast, notation)}`)),
+      h('div', {}, tick(cls.slice(3)), h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(g.ast, notation)}`)),
       h('div', { class: 'tt-cost' }, `${g.gates} gate(s), ${g.inverters} of them inverter(s)`), circuit(g.ast));
-    const best = (goal, label, tip) => bestForm(M, out, goal, label, tip, notation);
+    const best = (goal, label, tip) => bestForm(M, out, goal, label, tip, notation, tick);
     results.append(
       h('div', { class: 'tt-row' }, h('label', {}, 'Notation:'), nsel),
-      canonForms(A, out, notation),
+      canonForms(A, out, notation, tick),
       form('Minimal SOP', 'sop', 'tt-sop'),
       form('Minimal POS', 'pos', 'tt-pos'),
       ...(xorForm ? [xorForm] : []),
@@ -379,7 +376,6 @@ export function mountTtEditor(container, opts = {}) {
     if (!M.outputs.includes(out)) out = M.outputs[0];
     if (document.activeElement !== inIn) inIn.value = M.inputs.join(', ');
     if (document.activeElement !== outIn) outIn.value = M.outputs.join(', ');
-    formSel.value = M.form;
     if (document.activeElement !== notes) notes.value = M.notes;
     A = analyzeOutput(M, out, M.inputs.length > MAX_EDIT_INPUTS ? { maxNodes: 50000 } : {});   // module tables of 7–8 inputs: keep it quick
     exprLbl.textContent = `${out} =`;
@@ -391,7 +387,7 @@ export function mountTtEditor(container, opts = {}) {
   render();
 
   return {
-    getModel: () => JSON.parse(JSON.stringify(M)),
+    getModel: () => normalizeTable(M),   // (a copy; empty choices left out, #2950)
     setModel(m) { M = normalizeTable(m); hist.length = 0; hist.push(JSON.stringify(M)); hi = 0; render(); },
     undo, redo,
     canUndo: () => hi > 0,

@@ -588,7 +588,7 @@ test('analyzeOutput: everything shown for an output', () => {
 
 // ------------------------------------------------------------------ any number of outputs (#176)
 const SIX = () => ({ ...newTable('six', ['a', 'b', 'c'], ['y0', 'y1', 'y2', 'y3', 'y4', 'y5']),
-  table: { y0: '00000001', y1: '01111111', y2: '01101001', y3: '00010111', y4: '10100000', y5: '1X0X0X1X' } });
+  table: { y0: '00000001', y1: '01111111', y2: '01101001', y3: '00010111', y4: '10100000', y5: '1X0X0X1X' }, form: 'sop' });   // (a table in minimal SOP: a new one's form is the least gates', #2951)
 
 test('tables of more than 4 outputs: validated, saved and loaded, reshaped, K-map and SOP of each output (#176)', () => {
   const doc = normalizeTable(SIX());
@@ -905,7 +905,7 @@ endmodule
     for (const o of doc.outputs) assert.ok(careEqual(doc.table[o], t.table[o]), `${g.lang} ${o}`);
     assert.deepEqual(dontCaresInHdl(g.code), { y5: [1, 3, 5, 7] });
   }
-  // the default (SOP) is unchanged: no XOR in the module
+  // a table in minimal SOP: no XOR in the module
   assert.doesNotMatch(generateTableHdl(SIX(), 'vhdl').code, /xor|xnor|⊕/);
   // random tables of 2–6 inputs with form 'xor': simulate to the table in both languages
   const r = rng(4350);
