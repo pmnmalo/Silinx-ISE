@@ -251,6 +251,92 @@ test('Quine–McCluskey + exact cover = brute force on hundreds of random functi
   assert.ok(several > 5, `${several} functions with several minimal solutions`);
 });
 
+// every minimal cover by brute force over the prime implicants (a minimal cover is all primes: a non-prime term has
+// a prime with fewer literals over it): its { value/mask } keys, sorted
+function bruteCovers(col, n, target, terms, lits) {
+  const on = [...col].map((c, i) => (c === target ? i : -1)).filter(i => i >= 0);
+  const dc = [...col].map((c, i) => (c === 'X' ? i : -1)).filter(i => i >= 0);
+  const ps = primeImplicants(on, dc, n).map(p => ({ key: `${p.value}/${p.mask}`, ms: cubeMinterms(p, n), lits: n - p.mask.toString(2).replace(/0/g, '').length }));
+  const out = [];
+  const rec = (start, chosen) => {
+    if (chosen.length === terms) {
+      if (chosen.reduce((s, p) => s + p.lits, 0) === lits && on.every(m => chosen.some(p => p.ms.includes(m)))) out.push(chosen.map(p => p.key).sort().join(' '));
+      return;
+    }
+    for (let i = start; i < ps.length; i++) rec(i + 1, [...chosen, ps[i]]);
+  };
+  if (on.length) rec(0, []); else out.push('');
+  return out.sort();
+}
+
+test('every minimal solution (#2928): each a minimal cover, none repeated, all of them, the first today\'s; the count unchanged', () => {
+  const keys = a => a.terms.map(t => `${t.value}/${t.mask}`).sort().join(' ');
+  const check = (col, n, form) => {
+    const res = minimize(col, n, { form });
+    const target = form === 'pos' ? '0' : '1';
+    const b = bruteMin(col, n, target);
+    assert.equal(res.alternatives.length, res.solutions, `${form} of ${col}`);
+    assert.equal(res.several, res.alternatives.length > 1);
+    assert.equal(res.alternatives[0].terms, res.terms);
+    assert.equal(res.alternatives[0].literals, res.literals);
+    for (const a of res.alternatives) {
+      checkCover(col, n, { ...res, ...a });
+      assert.deepEqual([a.terms.length, a.literals], [b.terms, b.lits], `${form} of ${col}: a minimal cover`);
+      assert.equal(a.literals, a.terms.reduce((s, t) => s + t.literals.length, 0));
+    }
+    const ks = res.alternatives.map(keys);
+    assert.equal(new Set(ks).size, ks.length, `${form} of ${col}: no repeats`);
+    assert.deepEqual([...ks].sort(), bruteCovers(col, n, target, b.terms, b.lits), `${form} of ${col}: every one`);
+    // stable: the same order on every call
+    assert.deepEqual(minimize(col, n, { form }).alternatives.map(keys), ks);
+    return res;
+  };
+  // the cyclic chart Σm(0,1,2,5,6,7): no essential prime, two solutions (a'b' + bc' + ac, a'c' + b'c + ab)
+  const cyc = check('11100111', 3, 'sop');
+  assert.deepEqual([cyc.solutions, cyc.essential.length], [2, 0]);
+  const vars = ['a', 'b', 'c'];
+  const exprs = cyc.alternatives.map(a => formatExpr(minimalAst({ ...cyc, ...a }, vars), 'compact'));
+  assert.equal(exprs[0], formatExpr(minimalAst(cyc, vars), 'compact'));
+  assert.notEqual(exprs[0], exprs[1]);
+  for (const e of exprs) assert.equal(exprColumn(parseExpr(e, { vars }), vars), '11100111');
+  // its complement, as a POS: cyclic too
+  assert.equal(check('11100111', 3, 'pos').solutions, 1);
+  assert.equal(check('00011000', 3, 'pos').solutions, 2);
+  // a 4-input cyclic chart: Σm(0,1,5,7,8,10,14,15)
+  let col = '0'.repeat(16).split(''); for (const m of [0, 1, 5, 7, 8, 10, 14, 15]) col[m] = '1';
+  assert.ok(check(col.join(''), 4, 'sop').solutions > 1);
+  // with don't cares: Σm(1,3,7,11,15) + d(0,2,5): CD + A'B' or CD + A'D
+  col = '0'.repeat(16).split(''); for (const m of [1, 3, 7, 11, 15]) col[m] = '1'; for (const m of [0, 2, 5]) col[m] = 'X';
+  assert.equal(check(col.join(''), 4, 'sop').solutions, 2);
+  // one solution, constants
+  for (const [c, n] of [['00010111', 3], ['0000', 2], ['1111', 2], ['11X1', 2]]) for (const f of ['sop', 'pos']) assert.equal(check(c, n, f).solutions, 1);
+  // random functions with don't cares
+  const r = rng(2928);
+  for (let k = 0; k < 120; k++) { const n = 3 + (k % 2); for (const f of ['sop', 'pos']) check(randCol(r, n, 0.2), n, f); }
+  // the cap: the 64 first, distinct, all minimal; a search cut short keeps one
+  const bigCol = '0X1X1X1X1101XXX0X11XX0X0X1X0011X', big = minimize(bigCol, 5), bb = bruteMin(bigCol, 5);
+  assert.deepEqual([big.solutions, big.alternatives.length, new Set(big.alternatives.map(keys)).size], [64, 64, 64]);
+  for (const a of big.alternatives) { checkCover(bigCol, 5, { ...big, ...a }); assert.deepEqual([a.terms.length, a.literals], [bb.terms, bb.lits]); }
+  const cut = minimize('0110100110010110', 4, { maxNodes: 0 });
+  assert.deepEqual([cut.exact, cut.alternatives.length, cut.alternatives[0].terms], [false, 1, cut.terms]);
+});
+
+test('analyzeOutput (#2928): every minimal solution with its expression and gates, the first the form\'s', () => {
+  const doc = { ...newTable('cyc', ['a', 'b', 'c'], ['f']) };
+  doc.table = { f: '11100111' };
+  const A = analyzeOutput(normalizeTable(doc), 'f');
+  assert.equal(A.sop.alternatives.length, 2);
+  assert.equal(A.sop.ast, A.sop.alternatives[0].ast);
+  assert.equal(A.sop.gates, A.sop.alternatives[0].gates);
+  for (const a of A.sop.alternatives) {
+    assert.equal(exprColumn(a.ast, ['a', 'b', 'c']), '11100111');
+    assert.deepEqual(a.gates, gateCount({ ...A.sop, ...a }));
+    assert.deepEqual(a.gates, { and: 3, or: 1, not: 3, literals: 6, inputs: 9 });
+  }
+  // the NAND form and the HDL keep the first solution
+  assert.equal(formatExpr(outputForm(normalizeTable(doc), 'f', 'sop').ast), formatExpr(A.sop.ast));
+});
+
 test('minimisation of random 5- and 6-input functions: correct, prime, no worse than a greedy cover; deterministic', () => {
   const r = rng(99);
   for (let k = 0; k < 60; k++) {

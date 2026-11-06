@@ -10,7 +10,7 @@ import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
 import { translateSource } from '../core/translate.js';
 import { fsmToAsm, normalizeFsm } from '../core/fsm.js';
-import { schematicFromTable, normalizeTable, newTable, canonicalAsts, formatExpr } from '../core/logic.js';
+import { schematicFromTable, normalizeTable, newTable, canonicalAsts, formatExpr, analyzeOutput } from '../core/logic.js';
 import { newPetri } from '../core/petri.js';
 import { petriToFsm } from '../core/petri-fsm.js';
 
@@ -99,6 +99,33 @@ Least delay: Minimal SOP: z = 0`);
   assert.equal(s.data.outputs[0].canonicalPos, 'f = (a + b + c).(/a + b + c).(/a + /b + /c)');
   assert.deepEqual(files('q'), before);
   await fails({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'latex' }, 'notation: slash, slash-compact, textbook, compact, ascii, vhdl, verilog');
+});
+
+test('related_view results: every minimal solution when there are several (#2928), the first the form\'s; one: none listed', async () => {
+  await call('new_project', { name: 'sol' });
+  // the cyclic chart Σm(0,1,2,5,6,7): two minimal SOPs, one POS; z: 64 or more (the cap)
+  const doc = { ...newTable('cyc', ['a', 'b', 'c'], ['f']), table: { f: '11100111' } };
+  await call('write_file', { project: 'sol', path: 'src/cyc.bool.json', text: JSON.stringify(doc) });
+  const r = await ok({ project: 'sol', path: 'src/cyc.bool.json', view: 'results' });
+  const A = analyzeOutput(normalizeTable(doc), 'f'), sop = r.data.outputs[0].minimalSop, pos = r.data.outputs[0].minimalPos;
+  assert.deepEqual(sop.solutions.map(x => x.expr), A.sop.alternatives.map(a => `f = ${formatExpr(a.ast, 'slash')}`));
+  assert.deepEqual(sop.solutions.map(x => x.expr), ['f = /a./b + b./c + a.c', 'f = /a./c + /b.c + a.b']);
+  assert.equal(sop.expr, sop.solutions[0].expr);
+  assert.deepEqual(sop.solutions.map(x => [x.terms, x.literals, x.gates]), A.sop.alternatives.map(a => [3, 6, a.gates]));
+  assert.deepEqual([sop.many, pos.many, pos.solutions.length, pos.solutions[0].expr], [false, false, 1, pos.expr]);
+  assert.ok(r.text.includes(`Minimal SOP: f = /a./b + b./c + a.c   (3 term(s), 6 literal(s))
+  2 minimal solutions exist.
+  Solution 1 of 2: f = /a./b + b./c + a.c
+  Solution 2 of 2: f = /a./c + /b.c + a.b
+Minimal POS: `), r.text);
+  assert.doesNotMatch(r.text.slice(r.text.indexOf('Minimal POS')), /minimal solutions|Solution \d/);
+  // the cap: the first 64
+  const many = { ...newTable('many', ['a', 'b', 'c', 'd', 'e'], ['f']), table: { f: '0X1X1X1X1101XXX0X11XX0X0X1X0011X' } };
+  await call('write_file', { project: 'sol', path: 'src/many.bool.json', text: JSON.stringify(many) });
+  const m = await ok({ project: 'sol', path: 'src/many.bool.json', view: 'results' });
+  const ms = m.data.outputs[0].minimalSop;
+  assert.deepEqual([ms.many, ms.solutions.length, new Set(ms.solutions.map(x => x.expr)).size], [true, 64, 64]);
+  assert.match(m.text, /\n {2}Many minimal solutions exist; the first 64 can be browsed\.\n {2}Solution 1 of 64: f = [^\n]+\n[\s\S]*\n {2}Solution 64 of 64: f = /);
 });
 
 test('related_view refuses: an ASM chart that is not a plain state machine, a state diagram with errors, the wrong kind of source, a file not there', async () => {

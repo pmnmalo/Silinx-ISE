@@ -225,7 +225,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; 5–6 inputs as two/four 4×4 maps) with the groups of the minimal SOP
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
   the canonical SOP and POS in full (the sum of the minterms, the product of the maxterms) and their Σm / ΠM lists; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
-  essential prime implicants marked, "several minimal solutions" noted) with literal and gate
+  essential prime implicants marked, several minimal solutions browsed one by one, #2928) with literal and gate
   counts; the *XOR form* when it is simpler than both (fewer literals, or as many and fewer
   two-input operators): `a ⊕ b ⊕ c`, a full adder's carry `a·b + c·(a ⊕ b)`, a comparator's
   `/(a1 ⊕ b1)·/(a0 ⊕ b0)`, `a ⊕ b·c` (sums of products of literals and XOR / XNOR factors, or a

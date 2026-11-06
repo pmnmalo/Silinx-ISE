@@ -50,13 +50,16 @@ export const TT_PT = {
   'The exact search was cut short: this solution may not be minimal.': 'A procura exata foi interrompida: esta solução pode não ser mínima.',
   'No Karnaugh map for more than 6 inputs.': 'Sem mapa de Karnaugh para mais de 6 entradas.',
   '1 to 6 inputs': '1 a 6 entradas', 'At least 1 output': 'Pelo menos 1 saída',
+  'Many minimal solutions exist; the first 64 can be browsed.': 'Existem muitas soluções mínimas; podem ver-se as primeiras 64.',
+  'Previous solution': 'Solução anterior', 'Next solution': 'Solução seguinte',
 };
 
 export const TT_PT_PATTERNS = [
   [/^As a circuit: (\d+) gate\(s\), delay (\d+)$/, 'Como circuito: $1 porta(s), atraso $2'],   // (#1427)
   [/^(\d+) term\(s\), (\d+) literal\(s\); gates: (\d+) AND, (\d+) OR, (\d+) NOT \((\d+) gate inputs\)$/, '$1 termo(s), $2 literal(is); portas: $3 AND, $4 OR, $5 NOT ($6 entradas de portas)'],
   [/^(\d+) literal\(s\), (\d+) two-input operator\(s\): (\d+) XOR \/ XNOR, (\d+) AND, (\d+) OR$/, '$1 literal(is), $2 operador(es) de duas entradas: $3 XOR / XNOR, $4 AND, $5 OR'],
-  [/^(\d+|many) minimal solutions exist; one is shown\.$/, (m, k) => `${k === 'many' ? 'Muitas' : k} soluções mínimas; é mostrada uma.`],
+  [/^(\d+) minimal solutions exist\.$/, (m, k) => `Existem ${k} soluções mínimas.`],
+  [/^Solution (\d+) of (\d+)$/, (m, i, k) => `Solução ${i} de ${k}`],
   [/^\((\d+) prime implicant\(s\)\)$/, '($1 implicante(s) primo(s))'],
   [/^(\d+) gate\(s\), (\d+) of them inverter\(s\)$/, '$1 porta(s), $2 delas inversora(s)'],
   [/^— the truth table has errors: (.+)$/, '— a tabela de verdade tem erros: $1'],
