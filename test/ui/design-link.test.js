@@ -95,7 +95,7 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   await page.menu('File', 'Copy Link to Project…');
   assert.equal(await page.waitDialog('Copy Link'), 'Copy Link');
   const plain = await dialogLink(page);
-  assert.match(plain, new RegExp(`^${env.server.url.replace(/[.]/g, '\\.')}/#design=[A-Za-z0-9_-]+(&ui=[A-Za-z0-9_-]+)?$`));
+  assert.match(plain, new RegExp(`^${env.server.url.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}/#design=[A-Za-z0-9_-]+(&ui=[A-Za-z0-9_-]+)?$`));
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-info').textContent), /^\d+ characters: some slide tools cut a link longer than 2000 \(export the project as a \.zip, host it, and link to it with #open=\)\.$/);
   // a view the design does not have: said in the dialog, no link
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'try'; s.dispatchEvent(new Event('change')); });
