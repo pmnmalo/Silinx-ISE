@@ -1,5 +1,5 @@
 // The MCP server's conversions (#2674, server/mcp-convert.js): an HDL module to a schematic (stopwatch, blinky's top,
-// a ripple-carry adder whose instances drive bits of vectors, #2901), an ASM chart or a state diagram (traffic's state
+// a ripple-carry adder whose instances drive bits of vectors, #2901; vectors and ports not from 0, #2903, #2961), an ASM chart or a state diagram (traffic's state
 // machine, from its HDL), each then the module's base, the test bench passing after it; a state diagram to an ASM chart
 // and back, and to its Boolean algebra; a Verilog module; the converters' refusals.
 import { test, before, after } from 'node:test';
@@ -70,6 +70,24 @@ test('convert_module to a schematic (#2903): internal vectors not from 0, c(3 do
       `'${c.module}' converted to the schematic ${sch} (9 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module's base, ${hdl} generated from it.`);
     const doc = JSON.parse(read(n, sch));
     assert.deepEqual(doc.labels.map(l => l.net).sort(), name.startsWith('vhdl') ? ['c(3:1)', 'd(1:3)'] : ['c[3:1]', 'd[1:3]']);
+    assert.match((await ok('check_syntax', { project: n })).text, new RegExp(`^Process "Check Syntax" of <${c.module}> completed successfully \\(\\d+ signals, \\d+ processes\\)\\.$`));
+    await passes(n, 200, log);
+  }
+});
+
+test('convert_module to a schematic (#2961): ports not from 0, a(4 downto 1) and b(1 to 4), read by bus taps, in VHDL and Verilog', async () => {
+  for (const [name, n, log, decl] of [
+    ['vhdl-port-not-0', 'pz', [], /^ {4}a : in std_logic_vector\(4 downto 1\);$/m],
+    ['verilog-port-not-0', 'pzv', ['simulation finished ($finish) at 160 ns'], /^ {2}input wire \[4:1\] a,$/m]]) {
+    const c = CASES.find(x => x.name === name);
+    await ok('new_project', { name: n });
+    for (const [f, text] of Object.entries(c.files)) await ok('write_file', { project: n, path: f, text });
+    await ok('set_top', { project: n, top: c.module, sim_top: c.tb });
+    await passes(n, 200, log);
+    const hdl = c.file, sch = hdl.replace(/\.(vhd|v)$/, '.sch.json');
+    assert.equal((await ok('convert_module', { project: n, module: c.module, to: 'schematic' })).text,
+      `'${c.module}' converted to the schematic ${sch} (9 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module's base, ${hdl} generated from it.`);
+    assert.match(read(n, hdl), decl);
     assert.match((await ok('check_syntax', { project: n })).text, new RegExp(`^Process "Check Syntax" of <${c.module}> completed successfully \\(\\d+ signals, \\d+ processes\\)\\.$`));
     await passes(n, 200, log);
   }
