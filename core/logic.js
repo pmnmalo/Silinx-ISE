@@ -676,25 +676,34 @@ export function minimizeXor(colIn, inputs, { than, maxNodes = 30000, timeMs = 25
 // ===================================================================== Karnaugh maps
 export const gray = k => Array.from({ length: 1 << k }, (_, i) => i ^ (i >> 1));
 
+/** The orders of a Karnaugh map's variables (#2924): 'cols' (the default) MSB → LSB on the columns, then the rows;
+ *  'rows' MSB → LSB on the rows, then the columns. */
+export const KMAP_ORDERS = ['cols', 'rows'];
+
 /**
- * Layout of the Karnaugh map(s) of n (1–6) variables:
- *   { n, mapVars, rowVars, colVars, rowCodes, colCodes, maps: [{ code, fixed: [{ v, bit }] }],
+ * Layout of the Karnaugh map(s) of n (1–6) variables, in `order` (KMAP_ORDERS, #2924):
+ *   { n, order, mapVars, rowVars, colVars, rowCodes, colCodes, maps: [{ code, fixed: [{ v, bit }] }],
  *     minterm(map, r, c) }
- * 1: one row, x0 on the columns; 2: x0 rows, x1 columns; 3: x0 rows, x1x2 columns (Gray);
- * 4: x0x1 rows, x2x3 columns; 5: two 4×4 maps (x0 = 0, 1); 6: four 4×4 maps (x0x1 = 00, 01, 11, 10).
+ * The map's shape is the same in both orders (2^⌈k/2⌉ columns, 2^⌊k/2⌋ rows); only which variables go where changes.
+ * 'cols': 1: one row, x0 on the columns; 2: x0 columns, x1 rows; 3: x0x1 columns (Gray), x2 rows; 4: x0x1 columns,
+ * x2x3 rows. 'rows': 2: x0 rows, x1 columns; 3: x0 rows, x1x2 columns; 4: x0x1 rows, x2x3 columns.
+ * 5 and 6 variables, in both orders: the most significant pick the map, x0 (two 4×4 maps, x0 = 0, 1) or x0x1 (four,
+ * x0x1 = 00, 01, 11, 10), and the order lays the other four out on each map as with 4 variables.
  */
-export function kmapLayout(n) {
+export function kmapLayout(n, order = 'cols') {
   if (!(n >= 1 && n <= MAX_EDIT_INPUTS)) throw new Error(`Karnaugh maps need 1 to ${MAX_EDIT_INPUTS} variables`);
+  if (!KMAP_ORDERS.includes(order)) throw new Error(`a Karnaugh map's order is one of ${KMAP_ORDERS.join(', ')}`);
   const spec = { 1: [0, 0, 1], 2: [0, 1, 1], 3: [0, 1, 2], 4: [0, 2, 2], 5: [1, 2, 2], 6: [2, 2, 2] }[n];
   const [mv, rv, cv] = spec;
-  const mapVars = Array.from({ length: mv }, (_, i) => i);
-  const rowVars = Array.from({ length: rv }, (_, i) => mv + i);
-  const colVars = Array.from({ length: cv }, (_, i) => mv + rv + i);
+  const range = (k, from) => Array.from({ length: k }, (_, i) => from + i);
+  const mapVars = range(mv, 0);
+  const rowVars = order === 'rows' ? range(rv, mv) : range(rv, mv + cv);
+  const colVars = order === 'rows' ? range(cv, mv + rv) : range(cv, mv);
   const rowCodes = gray(rv), colCodes = gray(cv);
   const maps = gray(mv).map(code => ({ code, fixed: mapVars.map((v, i) => ({ v, bit: (code >> (mv - 1 - i)) & 1 })) }));
   const put = (vars, code) => vars.reduce((m, v, i) => m | (((code >> (vars.length - 1 - i)) & 1) << (n - 1 - v)), 0);
   const minterm = (map, r, c) => put(mapVars, maps[map].code) | put(rowVars, rowCodes[r]) | put(colVars, colCodes[c]);
-  return { n, mapVars, rowVars, colVars, rowCodes, colCodes, maps, minterm };
+  return { n, order, mapVars, rowVars, colVars, rowCodes, colCodes, maps, minterm };
 }
 
 // indices of a Gray-ordered axis that match the cube on `vars`, as runs [lo, hi] with open ends
@@ -758,6 +767,8 @@ export function normalizeTable(d) {
   doc.notes = String(doc.notes ?? '');
   doc.form = FORMS.includes(doc.form) ? doc.form : 'sop';
   doc.lang = doc.lang === 'verilog' ? 'verilog' : 'vhdl';
+  // the Karnaugh maps' order (#2924): written only when not the default
+  if (doc.kmapOrder !== 'rows') delete doc.kmapOrder;
   return doc;
 }
 

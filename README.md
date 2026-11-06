@@ -222,7 +222,8 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Boolean Algebra / Karnaugh Map** (it was Truth Table; *Tools ▸ Boolean Algebra / Karnaugh Map…*, New Source ▸
   *Boolean Algebra (.bool.json)*): name 1–6 inputs and any number of outputs, click the cells (0 → 1 → X don't care)
   or type an expression per output (`ab' + c`, `a·b + c`, `/a.b + a./b`, `~a & b`,
-  `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; 5–6 inputs as two/four 4×4 maps) with the groups of the minimal SOP
+  `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; the variables MSB → LSB by columns then rows, or by rows then
+  columns, chosen beside the map; 5–6 inputs as two/four 4×4 maps, the most significant picking the map) with the groups of the minimal SOP
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
   the canonical SOP and POS in full (the sum of the minterms, the product of the maxterms) and their Σm / ΠM lists; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
   essential prime implicants marked, several minimal solutions browsed one by one, #2928) with literal and gate

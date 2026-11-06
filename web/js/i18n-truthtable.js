@@ -30,6 +30,9 @@ export const TT_PT = {
   'Select this output': 'Selecionar esta saída', 'Expression': 'Expressão', 'Fill Table': 'Preencher Tabela',
   'Fill the column of this output from the expression': 'Preencher a coluna desta saída a partir da expressão',
   'Karnaugh map': 'Mapa de Karnaugh', 'SOP groups (1s)': 'Grupos SOP (1s)', 'POS groups (0s)': 'Grupos POS (0s)',
+  // the variables' order on the map (#2924)
+  'Order:': 'Ordem:', 'Order of the variables on the map, from the most significant to the least': 'Ordem das variáveis no mapa, da mais significativa para a menos',
+  'MSB → LSB by columns, then rows': 'MSB → LSB pelas colunas, depois linhas', 'MSB → LSB by rows, then columns': 'MSB → LSB pelas linhas, depois colunas',
   'Results': 'Resultados', 'e.g. /a.b + c': 'p.ex. /a.b + c',
   "Operators: / ' ~ (NOT), . · * (AND), ⊕ ^ or xor (XOR), xnor, + (OR)": "Operadores: / ' ~ (NOT), . · * (AND), ⊕ ^ ou xor (XOR), xnor, + (OR)",
   'XOR form': 'Forma XOR',
