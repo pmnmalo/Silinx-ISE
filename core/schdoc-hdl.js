@@ -249,6 +249,7 @@ export function generateHdl(docIn, opts = {}) {
     madeOf.set(k, { name: n.part.base, msb: Math.max(r?.msb ?? n.part.msb, n.part.msb), lsb: Math.min(r?.lsb ?? n.part.lsb, n.part.lsb) });
   }
   for (const [k, r] of madeOf) {
+    if (declared.has(k)) continue;   // (declared by the declarations kept from the source, #2901)
     if (ci) sigDecls.push(`  signal ${r.name} : std_logic_vector(${r.msb} downto ${r.lsb});`);
     else sigDecls.push(`  ${regBases.has(k) ? 'reg ' : 'wire'} [${r.msb}:${r.lsb}] ${r.name};`);
   }

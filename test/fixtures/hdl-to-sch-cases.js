@@ -581,3 +581,144 @@ end;
 `,
   },
 });
+
+// VHDL: instances whose outputs drive bits of vectors (#2901): a ripple-carry adder, the carries a vector not from
+// 0 read by the next instance, the sum's bits an output port's
+add({
+  name: 'vhdl-inst-bits', module: 'add4', file: 'src/add4.vhd', tb: 'tb_add4', until: 3e6,
+  files: {
+    'src/fa.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+entity fa is
+  port (a, b, ci : in std_logic; s, co : out std_logic);
+end fa;
+architecture rtl of fa is
+begin
+  s <= a xor b xor ci;
+  co <= (a and b) or (ci and (a xor b));
+end rtl;
+`,
+    'src/add4.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+entity add4 is
+  port (a, b : in std_logic_vector(3 downto 0); ci : in std_logic;
+        s : out std_logic_vector(3 downto 0); co : out std_logic);
+end add4;
+architecture st of add4 is
+  component fa port (a, b, ci : in std_logic; s, co : out std_logic); end component;
+  signal c : std_logic_vector(3 downto 1);
+begin
+  U0: fa port map (a => a(0), b => b(0), ci => ci,   s => s(0), co => c(1));
+  U1: fa port map (a => a(1), b => b(1), ci => c(1), s => s(1), co => c(2));
+  U2: fa port map (a => a(2), b => b(2), ci => c(2), s => s(2), co => c(3));
+  U3: fa port map (a => a(3), b => b(3), ci => c(3), s => s(3), co => co);
+end st;
+`,
+    'sim/tb_add4.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity tb_add4 is end;
+architecture t of tb_add4 is
+  signal a, b, s : std_logic_vector(3 downto 0);
+  signal ci, co : std_logic;
+begin
+  dut: entity work.add4 port map (a => a, b => b, ci => ci, s => s, co => co);
+  process begin
+    for i in 0 to 15 loop for j in 0 to 15 loop for k in 0 to 1 loop
+      a <= std_logic_vector(to_unsigned(i, 4)); b <= std_logic_vector(to_unsigned(j, 4));
+      ci <= '1' when k = 1 else '0';
+      wait for 10 ns;
+      assert unsigned(co & s) = to_unsigned(i + j + k, 5) report "sum" severity error;
+    end loop; end loop; end loop;
+    wait;
+  end process;
+end;
+`,
+  },
+});
+
+// Verilog: instances driving slices of two bits of an output port, and bits of a wire the next instance reads (#2901)
+add({
+  name: 'verilog-inst-slices', module: 'add4v', file: 'src/add4v.v', tb: 'tb_add4v', until: 1e6,
+  files: {
+    'src/add2.v': `module add2(input [1:0] a, input [1:0] b, input ci, output [1:0] s, output co);
+  assign {co, s} = a + b + ci;
+endmodule
+`,
+    'src/add4v.v': `module add4v(input [5:0] a, input [5:0] b, output [5:0] s, output co);
+  wire [1:0] c;
+  add2 lo(.a(a[1:0]), .b(b[1:0]), .ci(1'b0), .s(s[1:0]), .co(c[0]));
+  add2 mid(.a(a[3:2]), .b(b[3:2]), .ci(c[0]), .s(s[3:2]), .co(c[1]));
+  add2 hi(.a(a[5:4]), .b(b[5:4]), .ci(c[1]), .s(s[5:4]), .co(co));
+endmodule
+`,
+    'sim/tb_add4v.v': `\`timescale 1ns/1ps
+module tb_add4v; reg [5:0] a = 0, b = 0; wire [5:0] s; wire co;
+  add4v dut(.a(a), .b(b), .s(s), .co(co));
+  integer i, j;
+  initial begin
+    for (i = 0; i < 64; i = i + 7) for (j = 0; j < 64; j = j + 5) begin
+      a = i; b = j; #10;
+      if ({co, s} !== i + j) $display("sum %0d + %0d = %0d", i, j, {co, s});
+    end
+    $finish;
+  end
+endmodule
+`,
+  },
+});
+
+// VHDL: the bits of a port (0 to 3) driven by instances, joined in its order; and a vector driven so that an
+// assignment reads: its instances stay one HDL block (#1715, #2901)
+add({
+  name: 'vhdl-inst-bits-to', module: 'bitsto', file: 'src/bitsto.vhd', tb: 'tb_bitsto', until: 1e6,
+  files: {
+    'src/inv2.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+entity inv2 is
+  port (a : in std_logic_vector(1 downto 0); y : out std_logic_vector(1 downto 0));
+end inv2;
+architecture rtl of inv2 is
+begin
+  y <= not a;
+end rtl;
+`,
+    'src/bitsto.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity bitsto is
+  port (x : in std_logic_vector(3 downto 0);
+        z : out std_logic_vector(0 to 3); w : out std_logic_vector(3 downto 0));
+end bitsto;
+architecture st of bitsto is
+  component inv2 port (a : in std_logic_vector(1 downto 0); y : out std_logic_vector(1 downto 0)); end component;
+  signal v : std_logic_vector(3 downto 0);
+begin
+  Z0: inv2 port map (a => x(3 downto 2), y => z(0 to 1));
+  Z1: inv2 port map (a => x(1 downto 0), y => z(2 to 3));
+  V0: inv2 port map (a => x(1 downto 0), y => v(1 downto 0));
+  V1: inv2 port map (a => x(3 downto 2), y => v(3 downto 2));
+  w <= v;
+end st;
+`,
+    'sim/tb_bitsto.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity tb_bitsto is end;
+architecture t of tb_bitsto is
+  signal x, w : std_logic_vector(3 downto 0);
+  signal z : std_logic_vector(0 to 3);
+begin
+  dut: entity work.bitsto port map (x => x, z => z, w => w);
+  process begin
+    for i in 0 to 15 loop
+      x <= std_logic_vector(to_unsigned(i, 4));
+      wait for 10 ns;
+      assert z = not x and w = not x report "z, w" severity error;
+    end loop;
+    wait;
+  end process;
+end;
+`,
+  },
+});

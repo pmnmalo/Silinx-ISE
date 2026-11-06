@@ -3,7 +3,7 @@
 // module's row (the base), its HDL generated from it at once, the other design units kept in a file
 // of their own; the console says what was done; a module that does not elaborate is not converted
 // (the dialog says why, in English and in Portuguese); an escaped internal wire (\\t[0] ) is a wire of the drawing
-// (#1809).
+// (#1809); a ripple-carry adder whose instances drive bits of vectors, every instance drawn (#2901).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -53,6 +53,23 @@ uiTest('Convert to Schematic of a behavioural Verilog module whose file holds an
   assert.deepEqual((await linesFrom(page, /^'proc' converted/)).slice(0, 2), [
     "'proc' converted to the schematic src/proc.sch.json (2 symbols drawn, 6 HDL blocks keeping the HDL that is not drawn): it is now the module's base, src/proc.v generated from it.",
     'The other design units of src/proc.v moved to src/adder.v.',
+  ]);
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+});
+
+uiTest('Convert to Schematic of a ripple-carry adder whose instances drive bits of vectors (#2901): every instance a module symbol, no HDL block', E, async (page) => {
+  const c = CASES.find((x) => x.name === 'vhdl-inst-bits');
+  await makeProject(env, { name: 'Conv_bits', files: c.files, top: 'add4', simTop: 'tb_add4' });
+  await page.openProject('Conv_bits');
+  await convert(page, 'add4');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/add4.vhd'] === 'src/add4.sch.json' && window.Silinx.active?.id === 'sch:src/add4.sch.json', [], { what: 'converted, linked, open', timeout: 20000 });
+  await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.querySelector('.lbl').textContent === 'add4' && r.querySelector('.badge.base')?.textContent === 'Schematic'), [], { what: 'the [Schematic] base badge' });
+  assert.equal(await badgesOf(page, 'add4'), '[Schematic*] [VHDL]');
+  const doc = JSON.parse(await readWs(env, 'Conv_bits', 'src/add4.sch.json'));
+  assert.deepEqual(doc.symbols.filter((s) => s.type === 'module').map((s) => s.name).sort(), ['U0', 'U1', 'U2', 'U3']);
+  assert.equal(doc.symbols.filter((s) => s.type === 'hdlblock').length, 0);
+  assert.deepEqual((await linesFrom(page, /^'add4' converted/)).slice(0, 1), [
+    "'add4' converted to the schematic src/add4.sch.json (13 symbols drawn, 0 HDL blocks keeping the HDL that is not drawn): it is now the module's base, src/add4.vhd generated from it.",
   ]);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
