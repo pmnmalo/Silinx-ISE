@@ -265,7 +265,7 @@ export function mountSchEditor(container, opts = {}) {
   // the right-click menu (sch-context.js): Rename… (sch-rename.js, #1546), the selection's commands (#1556)
   const { rename } = mountSchRename({ doc: () => doc, nl: () => nl, edit, joinByName, joinMarker, renameLabel });
   const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, segSel, sel: () => sel, tool: () => tool, render, renderProps,
-    rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; } });
+    rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; }, openInfo: (...a) => openInfo(...a), symTarget: (...a) => symTarget(...a) });
   const { finishMove, onMove, onUp } = mountSchMouse({
     segSel, wholeBranch, container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor: () => cursor, destroyed: () => destroyed, doc: () => doc, drag: () => drag, finishSegMove, finishWire,
@@ -305,7 +305,7 @@ export function mountSchEditor(container, opts = {}) {
   // ---------------- Symbol Info (datasheet of the selected / palette symbol): web/js/symbol-info.js
   let infoDlg = null;
   // (the symbol it is about, its datasheet opened: sch-info.js)
-  const { infoTarget, openInfo } = mountSchInfo({
+  const { infoTarget, openInfo, symTarget } = mountSchInfo({
     container, destroyed: () => destroyed, device: () => device, doc: () => doc, genLang: () => genLang,
     infoDlg: () => infoDlg, infoItem: () => infoItem, itemTarget, modules: () => modules, placing: () => placing,
     sel: () => sel, selected, tool: () => tool, setInfoDlg: (v) => { infoDlg = v; }
