@@ -91,6 +91,8 @@ test('open_link: an example, on its board and on another (its pins the board\'s)
   const n = await ok('open_link', { link: '#open=example:blinky&board=nexys2', name: 'blinky_n2' });
   assert.equal(n.data.board, 'nexys2');
   assert.equal((await P.readProject('blinky_n2')).device.part, 'xc3s500e');
+  // a project the MCP server made, as new_project_from_example's: untrusted (#2981)
+  for (const pj of ['pong', 'blinky_n2']) assert.deepEqual([(await P.readProject(pj)).trusted, (await P.readProject(pj)).madeBy], [false, 'mcp'], pj);
   // opened again: the example's project as it is
   assert.equal((await ok('open_link', { link: '#open=example:pong' })).data.created, false);
   await P.writeFile('pong', 'src/extra.vhd', '-- mine\n');

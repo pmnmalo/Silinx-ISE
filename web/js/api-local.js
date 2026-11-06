@@ -370,7 +370,8 @@ export const api = {
   },
   // { project, bitfile, bitData? (a .bit chosen from the disk) }
   program: async ({ project, bitfile, bitData } = {}) => usbJob('program', async log => {
-    if (project && !isTrusted(await projectJson(project))) fail(untrustedMessage(project, 'programming the board'));   // (#2830)
+    const pjb = project && await projectJson(project);
+    if (project && !isTrusted(pjb)) fail(untrustedMessage(project, 'programming the board', pjb));   // (#2830)
     // an iCE40's .bin: into its board's SPI flash, through its FT2232H (#2298)
     if (/\.bin$/i.test(bitfile || '')) {
       const bin = await bitOf(project, bitfile);
@@ -388,7 +389,8 @@ export const api = {
   // verify, reconfigure }; the lines of the full application's (server/programmer.js promJob); a
   // backup (read) is downloaded
   prom: async ({ project, op, bitfile, bitData, verify = true, reconfigure = false } = {}) => usbJob('prom', async (log, job) => {
-    if (project && !isTrusted(await projectJson(project))) fail(untrustedMessage(project, 'programming the PROM'));   // (#2830)
+    const pjp = project && await projectJson(project);
+    if (project && !isTrusted(pjp)) fail(untrustedMessage(project, 'programming the PROM', pjp));   // (#2830)
     if (!PROM_OPS.includes(op)) fail(`unknown PROM operation '${op}' (valid: ${PROM_OPS.join(', ')})`);
     let bit = null;
     if (op === 'program' || op === 'verify') {

@@ -167,13 +167,14 @@ export function writeProject(name, pj) {
     // interface's) does not make it trusted
     let cur = null;
     try { cur = await readProject(name); } catch { /* a new project */ }
-    return writeProjectUnlocked(name, cur?.trusted === false ? { ...pj, trusted: false } : pj);
+    // (and who made it, the MCP server: its messages, #2981)
+    return writeProjectUnlocked(name, cur?.trusted === false ? { ...pj, trusted: false, ...(cur.madeBy ? { madeBy: cur.madeBy } : {}) } : pj);
   });
 }
 
 /** The user trusts a project from outside (#2830): Xilinx ISE and programming may run for it. */
 export function trustProject(name) {
-  return updateProject(name, pj => { const { trusted, ...rest } = pj; return rest; });
+  return updateProject(name, pj => { const { trusted, madeBy, ...rest } = pj; return rest; });   // eslint-disable-line no-unused-vars
 }
 
 /** Read silinx.json, let `fn(pj)` change it (or return a new object), write it back, all under the project lock. */
@@ -216,7 +217,8 @@ async function copyDir(src, dst) {
 
 // fromOutside: an import's project, trusted: false from its first write, so an import that fails halfway leaves no
 // trusted project (#2956, core/trust.js)
-export async function createProject({ name, template = 'empty', device, board, fromOutside = false }) {
+// madeBy 'mcp': a project the MCP server makes, untrusted too, its messages saying so (#2981)
+export async function createProject({ name, template = 'empty', device, board, fromOutside = false, madeBy = null }) {
   const dir = projectDir(name);
   if (await exists(dir)) throw new HttpError(409, `project '${name}' already exists`);
   if (template && template !== 'empty') {
@@ -230,6 +232,7 @@ export async function createProject({ name, template = 'empty', device, board, f
     if (device) pj.device = device;
     if (board !== undefined) pj.board = board;
     if (fromOutside) pj.trusted = false;
+    if (madeBy === 'mcp') Object.assign(pj, { trusted: false, madeBy });
     const out = await writeProject(name, pj);
     // another board or device than the example's: its pins are the chosen board's (#36)
     if (pj.board && `${pj.board}|${pj.device?.part}|${pj.device?.package}` !== was) await boardConstraints(dir, pj);
@@ -243,6 +246,7 @@ export async function createProject({ name, template = 'empty', device, board, f
     top: '', simTop: '', files: [], constraints: `constraints/top${openOnlyDevice(device) ? '.pcf' : '.ucf'}`,
     stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
     ...(fromOutside ? { trusted: false } : {}),
+    ...(madeBy === 'mcp' ? { trusted: false, madeBy } : {}),
   });
 }
 

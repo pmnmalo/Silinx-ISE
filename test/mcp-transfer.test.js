@@ -169,3 +169,39 @@ test('export_project / import_project: the exchange folder only, its symbolic li
   try { await fails('export_project', { project: 'vga', path: 'vga.zip' }, `no exchange folder ${path.join(tmp, 'none')} (SILINX_MCP_FOLDER sets another)`); }
   finally { process.env.SILINX_MCP_FOLDER = dir; }
 });
+
+test('#2981 a project the MCP server makes is untrusted: no Xilinx ISE for it until the user trusts it, its messages saying who made it', async () => {
+  const UNTRUSTED = ' It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
+  let r = await ok('new_project', { name: 'byai' });
+  assert.equal(r.text, "Empty project 'byai' made: no board (xc3s250ecp132-4). Write its sources with write_file, then set_top." + UNTRUSTED);
+  r = await ok('new_project_from_example', { name: 'byai2', example: 'blinky' });
+  assert.ok(r.text.endsWith(UNTRUSTED), r.text);
+  for (const name of ['byai', 'byai2']) {
+    const pj = await P.readProject(name);
+    assert.deepEqual([pj.trusted, pj.madeBy], [false, 'mcp'], name);
+  }
+  await ok('write_file', { project: 'byai', path: 'src/top.vhd', text: 'entity top is end;\narchitecture a of top is begin end;\n' });
+  await ok('set_top', { project: 'byai', top: 'top' });
+  await fails('run_process', { project: 'byai', process: 'synthesize', toolchain: 'ise' },
+    "project 'byai' was made through the MCP server (by an assistant): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)");
+  // the interface's description written whole keeps it so; the user's trust clears both marks
+  await P.writeProject('byai', { ...(await P.readProject('byai')), trusted: true, madeBy: undefined });
+  assert.deepEqual([(await P.readProject('byai')).trusted, (await P.readProject('byai')).madeBy], [false, 'mcp']);
+  await P.trustProject('byai');
+  const t = await P.readProject('byai');
+  assert.deepEqual(['trusted' in t, 'madeBy' in t], [false, false]);
+  // exported and imported again: an imported project (madeBy gone), as any zip
+  await ok('export_project', { project: 'byai2', kind: 'silinx', path: out('byai2.zip') });
+  await ok('import_project', { name: 'byai3', from: 'byai2.zip' });
+  const i = await P.readProject('byai3');
+  assert.deepEqual([i.trusted, 'madeBy' in i], [false, false]);
+});
+
+test('#2981 the trust messages: who made the project', async () => {
+  const { untrustedMessage, untrustedNotice, markUntrusted, markMadeByMcp } = await import('../core/trust.js');
+  assert.equal(untrustedMessage('p', 'Xilinx ISE'), "project 'p' came from outside (imported): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)");
+  assert.equal(untrustedMessage('p', 'programming the board', { madeBy: 'mcp' }), "project 'p' was made through the MCP server (by an assistant): programming the board runs only once you trust it (Trust Project, in the console when the project opens)");
+  assert.match(untrustedNotice('p', { madeBy: 'mcp' }), /^Project "p" was made through the MCP server \(by an assistant\): it is edited/);
+  assert.deepEqual(markMadeByMcp({ name: 'p' }), { name: 'p', trusted: false, madeBy: 'mcp' });
+  assert.deepEqual(markUntrusted({ name: 'p', madeBy: 'mcp' }), { name: 'p', trusted: false });
+});
