@@ -233,9 +233,10 @@ uiTest('theme: follows the system, View ▸ Theme ▸ Dark / Light / System, hea
 // HDL editor
 uiTest('#2676 the ISE style interface\'s theme: View ▸ Theme ▸ System / Light / Dark, follows the system, remembered, a dark look; Portuguese', E, async (page) => {
   const DARK = ['body', '#titlebar', '#menubar', '#toolbar', '#left .ise-panel > .caption', '#left .ise-panel', '#console-wrap', '#statusbar'];
-  // (the luminance of an element's background, its gradient's first colour when it has one: the ISE look's bars)
+  // (the luminance of an element's background, its gradient's first colour when it has one: the ISE look's bars; the
+  // element shown: WebKit keeps the old style of one under display: none, the left pane's hidden pages, #2906)
   const lumsOf = (sels) => page.eval((ss) => ss.map((s) => {
-    const cs = getComputedStyle(document.querySelector(s));
+    const cs = getComputedStyle([...document.querySelectorAll(s)].find((e) => e.getClientRects().length) || document.querySelector(s));
     const c = (/rgba?\([^)]*\)/.exec(cs.backgroundImage) || [cs.backgroundColor])[0].match(/[\d.]+/g).map(Number);
     return c.length > 3 && c[3] === 0 ? NaN : +((0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255).toFixed(2);
   }), sels);

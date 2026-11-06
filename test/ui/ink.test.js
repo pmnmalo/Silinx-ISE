@@ -281,6 +281,8 @@ const view = (page) => page.eval((d) => document.querySelector(`${d} .ink-canvas
 uiTest('Handwritten expressions: the pad zoomed and moved with two fingers and the wheel; Fit; the same text at any zoom', E, async (page) => {
   void page.eval(async () => { window.__ink = (await import('/js/ink-dialog.js')).handwrittenExpression(); });
   await page.waitDialog('Handwritten Expression');
+  // (the pad drawn once: its view is set by its first drawing, after the dialog opens, #2907)
+  await page.waitFor((d) => !!document.querySelector(`${d} .ink-canvas`)?.dataset.view, [D], { what: 'the pad drawn' });
   const c = await canvasAt(page);
   const mid = { x: c.x + c.w / 2, y: c.y + c.h / 2 };
   assert.deepEqual(await view(page), [1, 0, 0]);

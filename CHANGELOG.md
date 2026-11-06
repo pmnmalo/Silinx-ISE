@@ -38,6 +38,10 @@ In short:
 
 In detail:
 
+- **Two UI tests that failed in the release's CI (#2906, #2907).** The ISE style theme's test measures the element
+  shown, as WebKit keeps the old style of one under `display: none` (the left pane's hidden pages); the handwritten
+  expressions' test waits for the pad's first drawing before it reads its view.
+  - **Tests:** test/ui/silinx.test.js, test/ui/ink.test.js.
 - **No VSYNC only once 100 ms of the design ran with no frame (#2898).** The monitor said its warnings once they had
   lasted a second of real time; on a slow machine the first two VSYNC pulses (about 33 ms of the design's time) may take
   longer, and it said "No VSYNC: the monitor finds no frames" for a design that has them. `core/vga.js` now waits for
