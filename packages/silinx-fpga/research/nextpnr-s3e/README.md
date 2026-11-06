@@ -195,6 +195,16 @@ gnd sources counted no more), the LUTs those of Silinx's packer; periods from -1
 (2026-11-04): each example and consts, xdl2ncd 0 warnings, DRC 0 errors and 0 warnings, its `.bit` (CRC on and off)
 byte-identical to Silinx's.
 
+A LUT memory's constant inputs (#2940): nextpnr's front end makes a constant cell of each constant bit of a cell's
+port, and the micro-architecture routes only a pad's output, a flip-flop's D and a carry in from a GND source / VCC
+site (the LUTs' own constants it folds): each other one is a LUT. A distributed RAM's unused address bits and a shift
+register's fixed length took a LUT each, which cannot share the memory's slice: iwls05-sasc's two 4-word FIFOs (16
+RAM16X1D, A2 / A3 / DPRA2 / DPRA3 at 0) had 64 LUTs of 0, 81 slices where Silinx's packer made 49, and a critical path
+of 4.888 ns where Silinx's engine made 4.200 (Optimization Speed, the XC3S1200E). The flow's netlist puts those bits on
+one net of 0 and one of 1 (`shareMemoryConstants`, as ISE's GLOBAL_LOGIC0 / 1): one LUT each, 52 slices, 4.424 ns.
+`memconsts.v` (in this folder) is the case; its constraints are `test/fixtures/nextpnr-engine/memconsts.ucf`: 28 slices
+-> 13. Left to the fork: those pins from a free slice's GND source / the VCC site too (`routed_users`), no LUT at all.
+
 ## What is left for a decision
 
 - **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:

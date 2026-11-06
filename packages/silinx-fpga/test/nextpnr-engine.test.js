@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
-import { engineOf, lowerClockSwitches, lowerControlInverters, lowerRam64, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
+import { engineOf, lowerClockSwitches, lowerControlInverters, lowerRam64, nextpnrNetlist, nextpnrTries, shareMemoryConstants, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
 import { BRAM_TYPE, LUT_K, MUXF, SLICEM_MEM, ffKind } from '../src/fpga/pack.js';
 import { parseXdl } from '../src/xdl.js';
 import { readYosysJson } from '../src/fpga/netlist.js';
@@ -785,4 +785,73 @@ test('#2797 constants and an active-low reset and enable built by nextpnr: Silin
   const netlist = readYosysJson(fs.readFileSync(fixture('consts.json'), 'utf8'));
   assert.equal(compareSims(netlist, asPacked(text), { cycles: 5000 }), null);
   for (const [from, to] of [['SRINV::SR_B ', 'SRINV::SR '], ['CEINV::CE_B ', 'CEINV::CE ']]) assert.notEqual(compareSims(netlist, asPacked(text.replace(from, to)), { cycles: 5000 }), null, from);
+});
+
+// #2940: a LUT memory's constant inputs (its unused address bits, a fixed length) on one net of 0 and one of 1, not a LUT each
+test('#2940 shareMemoryConstants: the distributed RAMs\' and shift registers\' constant inputs on one GND and one VCC net; a LUT\'s, a flip-flop\'s and an output\'s left to the micro-architecture', () => {
+  const ram = (a2, dpra3) => ({ type: 'RAM16X1D', parameters: {}, attributes: {}, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', DPRA0: 'input', DPRA1: 'input', DPRA2: 'input', DPRA3: 'input', D: 'input', WE: 'input', WCLK: 'input', SPO: 'output', DPO: 'output' },
+    connections: { A0: [2], A1: [3], A2: [a2], A3: ['0'], DPRA0: [4], DPRA1: [5], DPRA2: ['0'], DPRA3: [dpra3], D: [6], WE: [7], WCLK: [8], SPO: [9], DPO: [10] } });
+  const mod = { netnames: { a: { bits: [2, 3, 4, 5] }, d: { bits: [6, 7, 8, 9, 10] } }, cells: {
+    r0: ram('0', '0'), r1: ram(11, '0'),
+    s: { type: 'SRL16E', port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', CE: 'input', CLK: 'input', D: 'input', Q: 'output' }, connections: { A0: ['1'], A1: ['0'], A2: ['1'], A3: ['0'], CE: ['1'], CLK: [8], D: [6], Q: [12] } },
+    l: { type: 'LUT2', port_directions: { I0: 'input', I1: 'input', O: 'output' }, connections: { I0: ['0'], I1: [2], O: [13] } },
+    f: { type: 'FDRE', port_directions: { C: 'input', CE: 'input', R: 'input', D: 'input', Q: 'output' }, connections: { C: [8], CE: ['1'], R: ['0'], D: ['0'], Q: [14] } },
+  } };
+  shareMemoryConstants(mod);
+  const { $silinx$gnd: gnd, $silinx$vcc: vcc } = mod.cells;
+  assert.deepEqual([gnd.type, Object.keys(gnd.connections), gnd.port_directions.G, vcc.type, Object.keys(vcc.connections), vcc.port_directions.P], ['GND', ['G'], 'output', 'VCC', ['P'], 'output']);
+  const [g] = gnd.connections.G, [v] = vcc.connections.P;
+  assert.ok(g > 14 && v > 14 && g !== v, 'new nets, above every bit of the netlist');
+  assert.deepEqual([mod.netnames.$silinx$gnd.bits, mod.netnames.$silinx$vcc.bits], [[g], [v]]);
+  const c = mod.cells;
+  assert.deepEqual([c.r0.connections.A2, c.r0.connections.A3, c.r0.connections.DPRA2, c.r0.connections.DPRA3], [[g], [g], [g], [g]]);
+  assert.deepEqual([c.r1.connections.A2, c.r1.connections.A3, c.r1.connections.DPRA3], [[11], [g], [g]]);
+  assert.deepEqual(['A0', 'A1', 'A2', 'A3', 'CE'].map(p => c.s.connections[p][0]), [v, g, v, g, v]);
+  // the LUT's constant (folded into its INIT), the flip-flop's (its CE, SR dropped; its D routed from a GND source, #2797): as they were
+  assert.deepEqual(c.l.connections.I0, ['0']);
+  assert.deepEqual([c.f.connections.CE, c.f.connections.R, c.f.connections.D], [['1'], ['0'], ['0']]);
+  // no memory, or no constant on one: nothing added
+  const plain = { netnames: {}, cells: { l: { type: 'LUT1', port_directions: { I0: 'input', O: 'output' }, connections: { I0: ['1'], O: [2] } }, r: ram(3, 4) } };
+  plain.cells.r.connections = { ...plain.cells.r.connections, A2: [5], A3: [6], DPRA2: [7], DPRA3: [8] };
+  shareMemoryConstants(plain);
+  assert.deepEqual(Object.keys(plain.cells), ['l', 'r']);
+  // in the netlist nextpnr gets
+  const json = nextpnrNetlist(fs.readFileSync(fixture('memconsts.json'), 'utf8'), 'memconsts', fs.readFileSync(fixture('memconsts.ucf'), 'utf8')).json;
+  const cells = Object.values(cellsOf(json));
+  assert.equal(cells.filter(x => x.type === 'RAM16X1D').length, 8);
+  assert.ok(cells.filter(x => /^(RAM16X1D|SRL16E)$/.test(x.type)).every(x => Object.values(x.connections).flat().every(b => b !== '0' && b !== '1')));
+  assert.deepEqual(cells.filter(x => /^(GND|VCC)$/.test(x.type)).map(x => x.type).sort(), ['GND', 'VCC']);
+});
+
+test('#2940 a 4-word FIFO\'s memory (eight RAM16X1D on two address bits) and a fixed-length shift register built by nextpnr: 13 slices, not 28 (a LUT of 0 for each unused address bit), no warnings, a complete bitstream; the XDL behaves as the netlist', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fileURLToPath(fixture('memconsts.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('memconsts.ucf')), '--out-dir', dir],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of occupied Slices: 13 out of 2448 1%'), out.join('\n'));
+  assert.ok(out.includes('  Number of 4 input LUTs: 20 out of 4896 0%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const text = fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8');
+  // one LUT of 0 for the 32 address bits and the SRL16E's three (its address 4'b0100), where each bit had its own
+  assert.deepEqual(text.match(/[FG]:[^ ]*:#LUT:D=0 /g), ['F:$silinx$gnd:#LUT:D=0 ']);
+  const design = parseXdl(text);
+  const gnd = design.nets.find(n => n.name === '$silinx$gnd');
+  assert.equal(gnd.inpins.length, 35);
+  const asPacked = t => {
+    const d = parseXdl(t), at = new Map(d.insts.map((i, k) => [i.name, k]));
+    for (const i of d.insts) {
+      if (/^(IOB|IBUF)$/.test(i.type)) Object.assign(i, { kind: 'iob', dir: i.type === 'IBUF' ? 'in' : 'out' });
+      else if (/^SLICE/.test(i.type)) i.kind = 'slice';
+      else if (/BUFG/.test(i.type)) i.kind = 'bufg';
+    }
+    for (const n of d.nets) for (const q of [...n.inpins, ...n.outpins]) q.inst = at.get(q.inst);
+    return d;
+  };
+  const netlist = readYosysJson(fs.readFileSync(fixture('memconsts.json'), 'utf8'));
+  assert.equal(compareSims(netlist, asPacked(text), { cycles: 5000 }), null);
+  // the shared 0 at 1 (every RAM read and written at words 12 to 15, the shift register 16 stages long): caught
+  assert.notEqual(compareSims(netlist, asPacked(text.replace('F:$silinx$gnd:#LUT:D=0 ', 'F:$silinx$gnd:#LUT:D=1 ')), { cycles: 5000 }), null);
 });

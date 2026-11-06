@@ -41,6 +41,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
   const problems = [];
   lowerRam64(mod);
+  shareMemoryConstants(mod);
   lowerClockSwitches(mod);
   lowerControlInverters(mod);
   // a BUF is a 1-input LUT, as Silinx's packer makes it (pack-prep.js)
@@ -141,6 +142,34 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   const sdc = [...periods].map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
   json.modules = { [name]: mod };
   return { json, problems, sdc };
+}
+
+// the memories in a slice's LUTs: their LUT is the memory, so a constant on an input cannot be folded into it
+const LUT_MEMORY = /^(RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
+
+/**
+ * The constant inputs of the distributed RAMs and shift registers (an address bit a small memory does not use, a fixed
+ * length) on one net of 0 and one of 1, each driven by a GND / VCC cell, as ISE's GLOBAL_LOGIC0 / 1 (#2940). nextpnr's
+ * front end makes a constant cell of each such bit, and the micro-architecture a LUT of each (a LUT's own constant
+ * inputs it folds): iwls05-sasc's 16 RAM16X1D had 64 LUTs of 0, its 49 slices 81 and its critical path 16 % longer.
+ * In place.
+ */
+export function shareMemoryConstants(mod) {
+  const bits = [...Object.values(mod.netnames || {}).flatMap(n => n.bits), ...Object.values(mod.cells).flatMap(c => Object.values(c.connections || {}).flat())];
+  let next = 1 + Math.max(1, ...bits.filter(b => typeof b === 'number'));
+  const nets = {};
+  const net = v => (nets[v] ??= (() => {
+    const b = next++, [type, port] = v === '0' ? ['GND', 'G'] : ['VCC', 'P'];
+    mod.cells[`$silinx$${type.toLowerCase()}`] = { type, parameters: {}, attributes: {}, port_directions: { [port]: 'output' }, connections: { [port]: [b] } };
+    (mod.netnames ||= {})[`$silinx$${type.toLowerCase()}`] = { hide_name: 1, bits: [b], attributes: {} };
+    return b;
+  })());
+  for (const c of Object.values(mod.cells)) {
+    if (!LUT_MEMORY.test(c.type)) continue;
+    for (const [p, b] of Object.entries(c.connections || {})) {
+      if (c.port_directions?.[p] === 'input' && b.some(x => x === '0' || x === '1')) c.connections[p] = b.map(x => (x === '0' || x === '1' ? net(x) : x));
+    }
+  }
 }
 
 /**

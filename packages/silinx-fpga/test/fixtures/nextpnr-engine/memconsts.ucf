@@ -1,0 +1,4 @@
+# Basys2-250 (#2940): research/nextpnr-s3e/memconsts.v; the other ports on pads nextpnr chooses (#2625)
+NET "clk" LOC = "B8" ;
+NET "clk" TNM_NET = "clk" ;
+TIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;
