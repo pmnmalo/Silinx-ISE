@@ -3,6 +3,799 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.22.0
+
+nextpnr is now Silinx's one place & route engine, design links open Silinx on a design for lecture slides, imported
+projects are screened and trusted only by you, and every action of the interface is a tool of the MCP server.
+
+In short:
+
+- **One place & route engine, nextpnr:** the Silinx toolchain places and routes with nextpnr on the Spartan-3E and the
+  Spartan-6, in the browser too; Silinx's own placers and routers are gone. On the Spartan-3E it takes no more slices
+  than they did.
+- **Design links:** Copy Link… opens Silinx on a design, a module, a test bench's simulation or an ASM chart's, state
+  diagram's or Petri net's Simulate panel, with the pins and, if you choose, the current view (the open tabs, the split,
+  the panels); a link's design can open beside your own project.
+- **Imports screened:** an imported project (Silinx or Xilinx ISE, a .zip, a link, the MCP server) and every file added
+  to one are checked before Silinx reads them, and an imported project is untrusted until you trust it.
+- **Simulate an ASM chart:** a Simulate panel in the ASM chart editor, as the state diagram's.
+- **Show … Beside:** right-click a tab in Design or Simulate to show any related view beside it (a drawing's HDL, an HDL
+  source's translation, the waveform's source).
+- **Tabs in your order:** drag a tab left or right to reorder it, as in a browser.
+- **The editors, one layout:** errors and warnings in the console (each check brings its tab to the front), a drawing's
+  counts at the right of its toolbar, no hint or status lines, the read-only notice at the toolbar's right end; the ⋮
+  menus of the simulator and the Board Emulator alike; Set as Top Module on an instantiated module shows it as the top.
+- **I/O Pin Planning on the board:** a Board view draws the board, its ports dragged onto the pins.
+- **The ISE style interface** has the Silinx one's themes, and Project ▸ Add to Project….
+- **The MCP server does what the interface does:** new sources and wizards, settings, renames, conversions, drawings,
+  simulations of every model, forced signals, C simulation and co-simulation, imports and exports; the open project in
+  the browser follows what it changes.
+- **Silinx HLS:** pointers into arrays, `sizeof` constants, named constants in pragmas and `case`s, RTL blackboxes on the
+  boards.
+- **Spartan-6:** micro80 builds on the Nexys3 and the Atlys, and the examples build with ISE with no warnings.
+- The Board Emulator's VGA monitor no longer says "No VSYNC" on a slow computer while the first frames are still being
+  simulated.
+
+In detail:
+
+- **No VSYNC only once 100 ms of the design ran with no frame (#2898).** The monitor said its warnings once they had
+  lasted a second of real time; on a slow machine the first two VSYNC pulses (about 33 ms of the design's time) may take
+  longer, and it said "No VSYNC: the monitor finds no frames" for a design that has them. `core/vga.js` now waits for
+  100 ms of the design's time, as for a VSYNC that stopped.
+  - **Tests:** test/vga.test.js (no warning after one frame, the warning once 100 ms ran with no VSYNC).
+- **The checks the release's CI found broken (#2897).** The browser edition's flow asks the family's profile for the
+  Spartan-6's nextpnr bundle (`openFlow.bitDb`), not the family's name; the tab order's Escape handler is `onEscape`, no
+  longer taken for an HTML escape of its own; the ASM chart's simulated path's class is a listed safe shape. The tests
+  follow a document tab's Show … Beside (the long press's menu, the interfaces' parity: the ISE style's View menu, the
+  Silinx interface's tab menu), and on Windows compare cc's output with LF line ends and retry removing their scratch
+  folder.
+  - **Tests:** test/family-conditions.test.js, test/web-dom.test.js, test/web-markup-interpolations.test.js,
+    test/ui/long-press.test.js, test/ui/interface-parity.test.js, test/c-sizeof-const.test.js, test/server-api.test.js.
+- **A Silinx project imported in the browser keeps `constraints/top.ucf` (#2894):** the browser's import of a Silinx
+  export (a design's link, a `.zip`) left out a file at the path of an empty project's default constraints,
+  `constraints/top.ucf`, the I/O Pin Planning's and most examples': the pins were lost and the file reported missing.
+  Every file of a Silinx export is now kept (`web/js/project-store.js` `projectFromZip`). Tests: a regression test, a
+  link's round trip of every example with constraints in the browser's store, the MCP's `project_link` / `open_link`
+  (the project only, a module's link, the emulator's: the same `.ucf`, board, device and top, implemented with the
+  same pinout and warnings) and the page's (the emulator's every port on its pin, Generate Programming File with no
+  warnings).
+- **The remove-module UI test follows #2872 (#2892):** a drawing's badge shows the row's menu, the same as its module
+  name's, with the drawing's commands in it; the test asserted the badge's old short menu.
+- **The documents' tabs reordered by dragging (#2887):** `web/js/tab-order.js` (in place of split-view.js's drag to
+  the other side): a slot of the tab's width marks where it lands while the other tabs make room; Escape or a drop
+  outside the rows cancels; a click still selects and the close button still closes; pointer events (a finger or a
+  pen too). A focused tab moves with Alt+Shift+← / → (Ctrl+Shift+PageUp / PageDown where the browser leaves them),
+  named in its tooltip and in Help ▸ Keyboard Shortcuts. The order is the documents' (each task's, Design's and
+  Simulate's), kept with the open documents and restored in it, each side's in a split; Move to the Other Side and
+  Show … Beside put a document at its new row's end. Portuguese; both interfaces; view-only, no MCP tool.
+- **The view in a design's link (#2886):** Copy Link…'s Include the current view (checked) adds `ui=` to the link: the
+  open documents' reopen keys, the one in front, the split's right side, the left page, the Design view and the Silinx
+  interface's task and arrangement (core/design-link.js `encodeUi`). Opening the link reopens them as a reload does
+  (web/js/view-state.js `applyViewState`), then the link's own view; the layout is for that page only, over the
+  viewer's kept one (web/js/tasks.js `applyLayout`), which a change of theirs keeps. Untrusted as the rest (#2829):
+  only documents of the known kinds naming the project's files and modules, known pages, views and tasks, booleans,
+  at most 40 documents and 4000 characters; what is left out is said in the console.
+- **app.js's "where the user was" in a module of its own (#2886, #405):** the open documents' state kept per project
+  (#160, #163: `saveViewState`, `restoreViewState`, `closeAllDocs` and their reopening table) moved as it was to
+  web/js/view-state.js, app.js re-exporting what moved; no change of behaviour. app.js from 998 lines to 939, room
+  for a link to carry the view (#2886).
+- **A link's board emulator emulates the top module (#2884):** Copy Link… with Board Emulator let any module be
+  chosen, and the link emulated that module, whose ports have none of the constraints' pins: the board showed nothing
+  connected. Its Module list is now disabled on the top module, the link names no module, a link opens the emulator
+  on the project's top, and a `top=` other than the top is refused with the reason in the console
+  (core/design-link.js `viewProblem`, the MCP tools so too).
+- **Copy Link to This Module… on a test bench (#2883):** Copy Link… given a test bench opens on the simulation with
+  that test bench chosen, and the link names it (`view=simulate&top=<test bench>`); the Silinx interface's test bench
+  menu (Tasks ▸ Simulate's hierarchy and SSim's tree, web/js/tasks-sim-tree.js) has the item, as the ISE style's
+  Simulation view has.
+- **Copy Link… and a link's `top=` take a C module (#2882):** a module written in C (Silinx HLS) was refused, "The
+  design has no module": core/design-link.js read the design's modules from its HDL and its drawings only. Its C / C++
+  sources' modules (their top function's, as the Design pane's) are now among them.
+- **A design's link into an ASM chart's simulation (#2881):** `view=try` is valid for a module drawn as an ASM chart
+  (core/design-link.js `TRY_DRAWING`); the link opens the chart and its simulation panel through the ASM editor's
+  `showPanel('sim')`, as the state diagram's and the Petri net's; until the editor has it, the chart opens and the
+  console says its simulation is not in this version yet. Copy Link to This Module… chooses it; the MCP tools say so.
+- **The ASM chart's Simulate panel (#2880):** `core/asm-sim.js` simulates a chart cycle by cycle with its generated
+  HDL's semantics (Verilog's widths, the every-cycle blocks before the state's assignments, the synchronised inputs,
+  the synchronous or asynchronous reset), checked against the VHDL and the Verilog simulated, on the examples' charts
+  and on edge cases (`test/asm-sim.test.js`); `web/js/asm-sim.js` is its panel (foldable, over the canvas on a narrow
+  screen), sharing its inputs' controls and its trace with the state diagram's (`web/js/sim-panel.js`); a chart with
+  errors is not simulated, its errors in the console; the editor's `showPanel('sim')` and `panel` open it and say
+  whether it is open (a design link's `view=try`, #2881). The MCP server's `simulate_drawing` steps an ASM chart or a state diagram as their
+  panels do. In both interfaces and in Portuguese (`test/ui/asm-sim.test.js`).
+- **A link's simulation of a chosen test bench (#2878):** Copy Link…'s Module list follows Open in: the simulation's
+  lists the test benches (the modules of the files with the Simulation association, the project's first and
+  chosen), the others the design's modules, no test bench. `view=simulate&top=<test bench>` simulates that test
+  bench (with no `top=`, the project's); core/design-link.js `viewProblem` refuses a `top=` that is not a test bench
+  with `simulate`, and a test bench with another view (`benchNames`); the MCP server's `project_link` and
+  `open_link` so too.
+- **The top always a root of the Implementation view (#2877):** the hierarchy's roots are the top module, first, then
+  the modules no module of the view instantiates (`implRoots`, core/elaborate.js, read by the Design pane's
+  `viewRoots`); a top another module instantiates was an instance row only, with no top icon nor style. Its other
+  appearances under other modules are plain instance rows; setting the top back on the parent restores the tree. The
+  processes, Check Syntax, synthesis and the MCP server's `set_top` / `project_info` work on the same top.
+- **A link's Try it found the drawing whatever its name's case (#2876):** Copy Link… and `view=try` refused a module
+  drawn as a schematic whose name differed in case from the module's (the HDL's VHDL names are in lower case, a
+  drawing's as it was typed): "is not a schematic, a state diagram or a Petri net". A module and its drawing now match
+  whatever their case, or through the drawing's generated HDL file; a link's `top=` is checked so too.
+- **Open from a Link: Open as `<name>_N` (#2875):** a project of the link's design's name that differs from it is
+  replaced only on Replace (#2826); now the question's first answer, the primary, opens the link's design as a new
+  project with the first free suffix (`_2`, `_3`, …; core/design-link.js `freeName`), the student's project kept,
+  the link's view and module opened in the new one; Keep Mine and Replace as before. In Portuguese.
+- **The Design pane's module menu the same everywhere (#2872):** every badge of a module's row shows the row's menu
+  (the module's, or a drawing's own for a drawing with no HDL file), no longer a short menu of the drawing's (#220).
+  The drawing's commands joined the module's menu (Convert to State Diagram (FSM)… for an ASM chart, Convert to ASM
+  chart for a state diagram, View State Machine (FSM) for a Petri net, Export as ISE Schematic (.sch)… for a
+  schematic: web/js/drawings.js `drawingCommands`, in place of `syncedViewMenu`); its Open opens the drawing, else the
+  HDL, as a double-click does.
+- **A link's module selected (#2871):** a link's `top=` selects its module's row in the Design pane (its parents
+  expanded, scrolled to) and, with no view, opens its source as a double-click does (its drawing, else its HDL); with
+  a view, the module is selected and the view opens as before. The Design pane's module rows carry their module's name
+  (`data-module`). Copy Link to This Module… always puts its module in the link, the project's top too.
+- **A design's link into a state diagram's or a Petri net's simulation (#2869):** `view=try` is valid for a module
+  drawn as a schematic, a state diagram or a Petri net (core/design-link.js `tryDrawing`): the link opens the drawing
+  and its Simulate panel (the Petri net editor's `showPanel`, as the state diagram's); any other module is refused
+  with the reason in the console. Copy Link to This Module… chooses it for those three; the dialog's option reads
+  "Try it (a drawing's simulation)"; the MCP server's `project_link` and `open_link` describe it so.
+- **A ⋮ menu's choices as menu items (#2846):** `toolbar-menu.js` has checkable items for every viewer: `menuChoice` (a
+  section title and its options, ✓ on the current one, an option that can't be chosen disabled with its reason as its
+  tip) and `menuCheck` (a setting on or off), styled once with the other menus' items (`.tb-menu-item`), and ↑ / ↓ /
+  Home / End move among a ⋮ menu's items. The Board Emulator's Engine, When hidden and Show (its modules) use them,
+  its own menu styles (`.emu-menu-row`) gone; docs/UI-GUIDELINES.md: a ⋮ menu holds menu items, never form fields.
+- **The local server watches the open project (#2843):** `server/project-watch.js` looks at the folder of every
+  project a page has open (its files, `build/reports.json`, `build/silinx-status.json`) and tells the page what
+  another process changed (`GET /api/projects/:p/events`, server-sent events read through fetch, the token in a
+  header); the server's own changes (a request of the page that may write, a run of its own) are not told back.
+  The page (`web/js/project-watch.js`) reloads the project, an open document with no changes of its own (a deleted
+  one closed), the processes' marks from a run made outside it, and the Design Summary; a document changed in the
+  editor too asks "File Changed on Disk" (Keep the Editor's / Load from Disk). The browser edition has no events.
+- **The waveform viewer's ⋮ menu (#2839):** the simulator's toolbar ends with the documents' ⋮ menu
+  (`web/js/toolbar-menu.js`), at the right of its first line, its place kept free whatever wraps (in the Tasks
+  interface after the Model field); Save Wave Configuration… and Load Wave Configuration… are its entries, with their
+  tooltips and Portuguese labels, and their two buttons leave the toolbar. The shared menu now works from the keyboard,
+  in every document that has it: Enter or Space on ⋮ opens it on its first entry (↓ and ↑ too), ↑ / ↓ / Home / End move
+  through its entries, Esc closes it back on ⋮; it is a `menu` for screen readers. A configuration's rows from and onto
+  a design's signals are `core/wcfg.js`'s (`wcfgSignal`, `placeWcfg`), shared by the wave window and the MCP.
+  - **MCP (#2674):** `save_wave_config` writes a .wcfg of the simulation (the test bench's signals by default, or the
+    rows given: signals with their radix, dividers, groups; the markers) next to its source, replacing a file only with
+    `overwrite`; `load_wave_config` reads one onto the design, its signals as `simulate` takes them, a signal the design
+    has not said and left out, with the interface's messages.
+  - **Tests:** test/ui/sim-wcfg.test.js (Silinx, ISE style and Tasks, in Portuguese: no Save / Load on the toolbar, ⋮
+    at its right end, the menu by the mouse and the keyboard, Save and Load as before, the status line unchanged, no
+    warnings), test/ui/isim-parts.test.js, test/ui/tasks-sim.test.js and test/ui/toolbars.test.js (the Model field and the line's padding with the ⋮), test/mcp-wcfg.test.js, test/wcfg.test.js (`wcfgSignal`, `placeWcfg` on a VHDL
+    and a Verilog design).
+- **Each drawn board its own SVG ids (#2838):** the boards' PCBs got their colour from a gradient with a fixed id
+  (`b2pcb`, `nx2pcb`, `s3epcb`, `nx3pcb`, `atpcb`, `icbpcb`); with the Board Emulator and I/O Pin Planning's Board view
+  both open the document had each id twice, and the visible board's `url(#…)` resolved to the hidden tab's gradient,
+  so the PCB was painted white. `svgEl` (`web/js/emulator-pcb.js`) now gives the ids a drawing defines the drawing's
+  own number, in their definitions and their references (`scopeIds`), and every PCB's fill has a plain fallback
+  colour. The editors' drawings (schematic, ASM, FSM, Petri net, truth table) already had ids per instance.
+  - **Tests:** test/emulator-pcb-ids.test.js (every board drawn twice: no id shared, every reference its own
+    drawing's, the fallback colour), test/ui/emu-board-ids.test.js (the emulator and the Board view together, tabs
+    switched, each closed, on every board, both interfaces, no warnings).
+- **A tab's related views, side by side (#2834).** A tab's menu, and View for the document in front, list Show … Beside
+  for every view related to the document that exists or can be made now (`web/js/related-views.js`): Boolean algebra →
+  its schematic; a state diagram → its ASM chart; an ASM chart → its state diagram; a Petri net → its state machine; a
+  drawing → its HDL and the HDL's translation; a generated HDL file, a converted drawing or the table's schematic → the
+  drawing; an HDL source → its translation to the other language, whichever the preferred one; a test bench → its unit
+  under test; a C / C++ source → its HDL, its ASM chart (sequential), its synthesis report; the views made from it → the
+  C; a waveform → the module it shows, or the test bench and its unit under test; the RTL and technology schematics, the
+  C model, the power report and the Design Summary → their module. An entry opens the view on the split's other side,
+  the document kept in front; a view open already is brought to the front there (a translation made again); one that
+  cannot be made says why in the console and leaves the split as it was. The labels replace Show Generated HDL / VHDL /
+  Verilog Beside ("Show Schematic Beside", "Show VHDL Beside", "Show Test Bench Beside", …), in Portuguese too. New
+  read-only views: a state diagram's ASM chart, an ASM chart's state diagram, a C source's synthesis report as a
+  document (`web/js/related-docs.js`). In the Tasks interface a view shown beside joins its document's task.
+  - **MCP:** `related_view` gets the read-only views that are no file of the project (an HDL source's translation, a
+    state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic), nothing
+    written; the others are `read_file`'s, `c_generated`'s and `c_synthesis_report`'s.
+  - **Tests:** test/ui/related-views.test.js (per kind of document the entries, each beside, one open already brought to
+    the front, a failing conversion in the console, Portuguese; both interfaces), test/ui/split-view.test.js and
+    test/ui/translation.test.js (the new labels), test/mcp-views.test.js (each view as the core makes it, nothing
+    written, the refusals), test/mcp.test.js and test/mcp-modules.test.js (the tool list).
+- **The single-file imports through the import gate (#2830):** Import Source / Add Copy of Source (`gateFile` for each
+  file; one refused is not added, a `WARNING:` line in the console), the Petri net editor's PNML ⇧ (a refused net leaves
+  the net as it was), the MCP's `write_file` (`<path>: not written: <reason>`). `test/import-gate-coverage.test.js`
+  fails when a module that reads a file from outside (a file input, files dropped, a zip, an upload, the MCP's exchange
+  folder, a design link's compressed text) does not import the gate, or is not listed there with the reason it needs
+  none.
+  - **Tests:** test/import-gate-coverage.test.js, test/mcp.test.js (write_file: an XXE schematic, a binary source, a
+    script in a name, a long elsif chain, a web page), test/ui/projects.test.js (Import Source, both interfaces),
+    test/ui/petri.test.js (an XXE PNML).
+- **The project imports through the import gate (#2830):** the zip upload (`/api/projects/import-zip`), the `.xise` with
+  its files (`/api/projects/import-xise`), the browser edition's `importZip`, `importXise` and project bundles, and the
+  MCP's `import_project` (a zip, a `.xise` with its folder, a folder) read their files through `core/import-gate.js`
+  (`gateZip`, `gateEntries`); `importProjectEntries` and `projectFromZip` take only a gate's result. The gate's refusals
+  come first in the import's warnings (the console's and the MCP result's), but those of an ISE project's own outputs,
+  which the import leaves out anyway; a refused `.xise` or `silinx.json` is the import's error, with its reason. The gate
+  keeps a project's documents, scripts and other files as they are (opaque: never shown as a page nor run).
+  - **Tests:** test/server-api.test.js (the zip and `.xise` routes: an XXE `.xise`, a traversal and a script in a name,
+    every warning asserted), test/mcp-transfer.test.js (a zip bomb, an XXE `.xise`, a script in a name),
+    test/project-zip.test.js, test/project-store.test.js, test/import-gate.test.js, test/ui/projects.test.js (the
+    console's refusals, in both interfaces), test/ui/standalone.test.js.
+- **The import gate (#2830):** `core/import-gate.js`, the one module every file or project from outside Silinx is to pass
+  through before any parser or editor sees it, the same in the browser and on the server: the sizes of a zip, its
+  decompressed total, its file count, each file, a source's lines and nesting (an HDL's long `elsif` chain, #2577),
+  checked while the zip is read (a refused entry is never inflated); the names (no `..`, absolute path, drive letter,
+  backslash, control character, hidden folder, reserved name, symbolic link, duplicate but for case); XML with no DTD
+  or entity declaration (XXE, billion laughs); each file's type by its name and its content (a web page, a script or a
+  program refused; a text that is binary or HTML refused; invalid UTF-8 replaced with a warning). `core/zip.js`'s
+  `readZip` takes the entry count's cap and a check of each entry before it is inflated, and says which entries are
+  symbolic links. SECURITY.md describes the threat model and the three layers (the gate, safe output, trust for
+  outside projects); the importers move onto the gate in the next pull requests.
+  - **Tests:** test/import-gate.test.js (a test per threat: zip bombs, traversal, symbolic links, XXE and billion
+    laughs in every XML format, a script in every file name, oversize and deeply nested sources, types by content;
+    the examples and the ISE fixtures accepted with no refusal and no warning), test/zip.test.js.
+- **Safe output, checked (#2830):** `test/safe-output.test.js` scans `web/js` for HTML built from a non-constant string
+  (`innerHTML` / `outerHTML` assigned, `insertAdjacentHTML`, `document.write`, `h()`'s `html:`): each one is among the
+  reviewed sinks, whose project text goes through an escaping helper (`esc`, `highlightHdl`, `svgText`), or the test
+  fails (the reviewed counts only shrink). It checks the Content Security Policy (no inline script but the page's own,
+  no remote script, no plugin, no `<base>`) and that the application's only dynamic code is the compiled simulator's
+  (whose generated code holds no name of the design) and the iCE40 nextpnr's own module, so `'unsafe-eval'` runs no
+  project text. `test/ui/safe-output.test.js` opens a schematic, an FSM, an ASM chart, a truth table, a Petri net and HDL
+  sources with a markup payload in every text field, in the editors, the Design tree and the console: no element is
+  made of it. SECURITY.md says how.
+  - **Tests:** test/safe-output.test.js, test/ui/safe-output.test.js (both interfaces).
+- **Trust for outside projects (#2830):** `core/trust.js`. Every import marks the project `trusted: false` in its
+  `silinx.json` (a zip's own `silinx.json` cannot say otherwise); the local server refuses Xilinx ISE
+  (`/implement` with ISE), `/program` and `/prom` for it with a 403 and the reason, the browser edition its WebUSB
+  programming, the MCP's `run_process` with ISE; saving the project's description keeps it untrusted (the server's
+  `writeProject`, the browser stores' `saveProject`). `POST /api/projects/:p/trust` (the browser edition's
+  `trustProject`) clears it: the console's line said when the project opens carries a Trust Project button (`log()`'s
+  new `action`), "Confiar no Projeto" in Portuguese. No MCP tool trusts a project, by design (only the user, in the
+  interface). SECURITY.md, GETTING-STARTED and COMECAR say so.
+  - **Tests:** test/server-api.test.js (the refusals, a description written whole, the trust route, a project made
+    here), test/project-store.test.js (both browser stores), test/mcp-transfer.test.js (run_process with ISE refused,
+    no trust tool), test/ui/projects.test.js (the line and its button, in Portuguese, both interfaces),
+    test/ui/standalone.test.js.
+- **The power estimate's test on the examples within its time on CI (#2828):** since nextpnr is the one engine, the
+  test of the estimate on four examples took about 330 s on GitHub's runners against its 300 s. It now places each
+  example once (`placements`, a test's field of the flow's spec, in place of Normal's four), and
+  `scripts/measure-power.mjs`'s flow synthesises at Normal, the IDE's default, rather than High: about 70 s
+  locally, against 300 s, with the same expected values and no warnings.
+  - **Tests:** test/power.test.js (one placement logged, the estimates within their bounds, no warnings).
+- **A design's link, its encoding and the MCP server's tools (#2826, #2829):** `core/design-link.js` puts a whole
+  project in a link (`#design=`: its files as JSON, deflate-raw, base64url, the HDL a drawing makes again left out
+  and made again on opening: every example back byte for byte, 5 to 25 KB), reads a link's options (`design=`,
+  `open=<https zip>`, `open=example:<name>`, `view=try|simulate|emulate`, `top=`, `board=`) and checks that a design
+  has the view it opens; the design's files go through the import gate (core/import-gate.js, #2830); an untrusted link is refused with its reason: too long, a decompression bomb (inflated no
+  further than its limit), a file outside the project, a name that is not one, a zip address that is not https or is
+  of this computer or a local network. The MCP server's `project_link` makes a project's link and `open_link` makes a
+  project of a link (never replacing a project that differs; a zip at an address is not fetched).
+- **Opening a design from a link, Copy Link… (#2826, #2829):** at start-up the address's `#design=` /
+  `#open=example:` / `#open=<https zip>` with `view=try|simulate|emulate` and `top=` opens the design in a project
+  named after it (web/js/link-open.js) and then its view: the schematic's Try it running, the test bench simulated, the
+  board emulator; the link cleared from the address. A project of that name with the same files is opened as it is,
+  one that differs is replaced only on Replace (Keep Mine keeps it); a zip from another site is fetched only once the
+  user agrees, with no credentials nor referrer, at most 16 MB. A broken or hostile link, or a view the design does
+  not have, is an error in the console, the workspace as it was. Copy Link… (web/js/link-copy.js) shows the link as it
+  is made, its length, and says when it is too long for some slide tools or too large for a link. The local server's
+  token is now taken only from an address whose hash is the token alone, never from a link. In both interfaces, in
+  Portuguese; `GET /api/templates/:name/files` (and the browser edition's) gives an example's files.
+- **nextpnr's "Max frequency" is no warning on the Spartan-3E (#2820).** The nextpnr step logged every `Warning:` line
+  of the kept placement, nextpnr's estimate of each clock among them (`WARNING:nextpnr - Max frequency for clock
+  '$iopadmap$clk': … (FAIL at 50.00 MHz)`), which can disagree with the timing step (fitted to ISE's trce). It leaves
+  it out now, as the Spartan-6's step does; the estimate stays in the step's summary line ("its estimate: … MHz").
+  The design corpus's expectations lose the eight such warnings, each beside the timing step's own.
+  - **Tests:** `test/nextpnr-fmax-warning.test.js`: blinky on the Basys2-250 with a PERIOD of 4 ns, one warning (the
+    timing step's, on `clk`); with no PERIOD, no warning.
+- **Tests on the nextpnr engine (#2814).** Three test files still built with Silinx's engine, which the application no
+  longer chooses (#2137), and failed on `main`:
+  - `test/nextpnr-size.test.js` compares nextpnr's slices with Silinx's packer's by packing the build's own netlist
+    (`fpga/pack.js`, which stays);
+  - `test/s6-devices.test.js` asserts nextpnr's routing line on the Nexys3;
+  - `test/compiled-words.test.js` places and routes blinky's models through nextpnr, its Post-Place & Route model one
+    cell fewer, a constant on routing.
+  - **Tests:** those three.
+- **The Spartan-3E with the nextpnr engine: the router's fix of #2800 (#2811).** nextpnr-himbaechel-spartan3e 0.20.0
+  has the Spartan-6's fix of #2800: a net whose route leaves one of nextpnr's router partitions is routed by its
+  whole-device pass instead of being given up. No example hit it on the Spartan-3E, but any design could on some seed.
+  The examples route on every seed on the Basys2 and the Nexys2, with no warnings.
+- **No problems panel in the schematic editor (#2805):** the editor's Check and a refused Try it send their problems
+  to the console in every interface (`web/js/tasks-check.js initCheckMessages`, no longer only in the Silinx one),
+  as docs/UI-GUIDELINES.md asks: a header, the errors and warnings, each taking the drawing to its item, and the
+  result ("Check Schematic", "Try it"), the Errors tab brought to the front, else the Warnings tab (`showProblems`,
+  #2803). The editor's `.se-diags` panel is gone (`web/js/sch-try.js`, `web/js/sch-dom.js`), with its styles and
+  its labels' translations, and so is the refused Try it's message in the editor's hint line.
+- **The Petri net's and the state diagram's Check (#2803):** a `Check` button with the shared check icon, after the
+  editor's zoom or settings (`web/js/petri-editor.js`, `web/js/fsm-editor.js`), hidden in a read-only diagram. Its
+  lines go to the Console under Design ("Check Petri Net", "Check State Diagram"), and a click on a line selects
+  its item. Its errors and warnings go to the Errors and Warnings tabs (`web/js/editor-problems.js`). The Petri
+  net's validation (`core/petri.js`) also finds a transition that is not connected and an arc that takes or puts
+  more tokens than its place holds. Its Check (`core/petri-analysis.js checkPetri`) adds the token game's
+  transitions that never fire and its first deadlock, with the firing sequence that reaches it, and keeps them in
+  the tabs until the net changes. The MCP server's `check_drawing` (`server/mcp-check.js`) checks an ASM chart, a
+  state diagram or a Petri net the same way.
+- **The end of a check brings its tab to the front (#2803):** `showProblems` of `web/js/console.js` brings the
+  Errors tab forward if the check found errors, else the Warnings tab if it found warnings, even when they were
+  already listed. Check Syntax (the design, a file, a C source), Check Constraints, the charts' Validate and Check
+  and the Schematic's Check in the Silinx interface all end with it. The ASM's Validate no longer brings the
+  Console tab in front of its errors. A message written to the console again (a process run again) counts as new,
+  so it brings its tab forward too.
+- **The Spartan-6 with the nextpnr engine: every seed routes (#2800).** nextpnr gave up on some seeds: blinky on the
+  Nexys3, seed 1, and clock on the Atlys, seeds 2 and 3, each on a net from an input pad. Place & Route worked only
+  because it moved on to the next seed. nextpnr's router now routes those nets on every seed, with no warnings.
+- **nextpnr's slices on the Spartan-3E (#2797):** nextpnr-spartan v0.18.0 routes the constants that need no LUT as
+  Silinx's router ties them (a carry chain's carry in at 0, a pad's output at 0 or 1, a flip-flop's D through BX / BY:
+  from a free slice's GND source or the VCC site that reaches the pin), where it made a LUT each, and takes an enable or a
+  set / reset active low as the slice's CEINV / SRINV: the flow's netlist turns an inverter on a flip-flop's control pin
+  into its `IS_<pin>_INVERTED`, as Silinx's packer does (#527). A slice that is only a constant 0's source is no longer
+  counted as occupied, as ISE's map and Silinx's packer count it. The examples, nextpnr / Silinx: traffic 66 / 66,
+  blinky 116 / 116, pong 224 / 225, stopwatch 197 / 197, clock 195 / 196, vga 143 / 144, isqrt 63 / 63, uart 112 / 112,
+  micro80 148 / 148 (69, 122, 232, 207, 200, 148, 65, 113 and 154 before); their periods unchanged on average (+0.2 %).
+  ISE's DRC passes each, its `.bit` byte-identical to Silinx's.
+  - **Tests:** test/nextpnr-size.test.js, packages/silinx-fpga/test/nextpnr-engine.test.js, packages/silinx-fpga/test/nextpnr-s3e.test.js, packages/silinx-fpga/test/nextpnr-hard.test.js.
+- **MCP run_process: no bare '…' (#2795):** its text gave a `…` line, the separator between the run's errors and
+  warnings and the end of its log, also when there were none, the text then beginning with it; it is written only
+  after errors or warnings now (`processText`). Test: test/mcp-modules.test.js.
+- **A pad's clock named by its port in the timing report (#2793):** the report (fpga/timing-checks.js `timingReport`)
+  named a clock by its net, which Yosys's I/O pad mapping calls `$iopadmap$<port>`, where its constraint's line and
+  ISE's trce name the port; every line that names a clock (its period, its detours, the paths between clocks, its
+  hold check) now says the port's name (`shownClock`), a clock made by logic its net's. The report's data keep the
+  nets' names. Tests: test/fpga-timing.test.js, test/open-flow-core.test.js, test/fpga-clock-skew.test.js,
+  test/fpga-ff-hold.test.js.
+- **The browser edition's cache reads nextpnr's files (#2792).** `assetFetch`, the flow worker's and the Yosys workers'
+  fetch that reads and fills Cache Storage, had its own pattern of the versioned assets, written before nextpnr: Yosys,
+  the device descriptions and the bit databases, not nextpnr's bundles nor its chip databases
+  (`vendor/nextpnr-spartan/<version>/gen|chipdb/`, `vendor/nextpnr-spartan6/…`). A project's prefetch put them in the
+  cache, but where the service worker did not answer (it reads the same cache), every run fetched them again. One pattern now, `VERSIONED_ASSET`, for `isVersionedAsset`
+  and `assetFetch`; `assetFetchSource` writes it into the Yosys workers' code as a literal.
+  - **Tests:** test/asset-cache.test.js (nextpnr's files of both families, prefetched, read with no request, in the flow
+    worker and in a Yosys worker's code; a miss kept; `assetFetch` and `isVersionedAsset` agree on every URL, failing on the old code); test/ui/standalone.test.js (#967:
+    nextpnr's files counted among the versioned assets Implement must not fetch, and those a run with an empty cache downloads).
+- **The Spartan-6 with the nextpnr engine: uart builds on the Atlys (#2791).** nextpnr's Spartan-6 package is now
+  built from the current bit database, which knows the switches of the Atlys's USB-UART pins (#2539). nextpnr routes
+  uart on every seed, on the Nexys3 and the Atlys, with no warnings.
+- **The Spartan-6 with the nextpnr engine (#2788):** a placement that nextpnr cannot route no longer stops Place &
+  Route: the next seed is tried, and the error, when no seed routes, gives nextpnr's reason instead of "undefined".
+- **The waveform viewer's status line the shared one (#2785):** its line (the simulated time, the cursor, the marker's
+  delta, a run's progress) has the documents' status line's class and style (`.doc-status`, web/css/status-line.css,
+  #2763), 20 px high as the others; its test of the theme's wave colour counts the window's pixels in it rather than six
+  points a trace may cross.
+- **The status line says no messages (#2784):** the Schematic editor's status line no longer counts the check's errors
+  and warnings; I/O Pin Planning's "pins assigned more than once" is a warning in the console (once, until the pins in
+  question change) and its "Saved to …" is gone (the tab's mark says it), its status line keeping "N/M I/Os assigned"
+  (docs/UI-GUIDELINES.md).
+- **The nextpnr engine's clocks on their dedicated paths (#2770, #2768, #2766), nextpnr-spartan v0.19.0.** A DCM's
+  CLKIN from its clock pad or from another DCM's buffer, a clock switch's input from its pad and a DCM's outputs into
+  their buffers take their dedicated paths (they took general routing, which ISE's DRC passes, with more delay and
+  skew); a DCM with five outputs on buffers takes one CLKDUB, not two. A DCM's CLKIN from a pad that does not reach it
+  on a dedicated path is said, with the pads that do: `DCM u_dcm: its CLKIN comes from the pad B8 through general
+  routing: only B9, A9, A10, C9 reach its CLKIN on a dedicated path.` Two IOB registers of one kind on different clocks
+  in a LOC'd differential pair are routed: the DIFFM's on its second flip-flop (IFF2, OFF2), as ISE's map puts it.
+  - **Tests:** test/open-flow.test.js (the todos of #2770 and #2766 removed; the clock switch's pad, the five-output
+    DCM's one CLKDUB and its warning), test/clocking-flow.test.js (the warning on the XC3S100E again),
+    test/ise/open-flow.test.js (the LOC'd pairs, their todo removed), packages/silinx-fpga/test/nextpnr-iob.test.js.
+- **The status line, one for every editor (#2763):** the Schematic editor's status line becomes a shared module
+  (`web/js/status-line.js`, `.doc-status`), mounted by the ASM chart editor (its states and every-cycle blocks, its
+  encoding), the FSM editor (its states and transitions, Moore or Mealy, its encoding), the Petri net editor (its places,
+  transitions and arcs, its tokens) and the truth table (its inputs, outputs and rows), in their read-only views too;
+  the counts leave their toolbars (#2725, #2734, #2748). Left out of a print. docs/UI-GUIDELINES.md says what the status
+  line holds and what stays in the toolbar.
+- **The text editors' status line (#2763):** `createEditor` (web/js/editor.js) gives its editor a status line (the
+  shared one of web/js/status-line.js), "Ln 5, Col 3" and the language, put under it by the HDL / C / UCF editor, a C
+  source's HDL, a module's C model and the HDL translation; the cursor's place leaves the application's status bar.
+- **The viewers' status line (#2763):** I/O Pin Planning, the implemented design's FPGA view and the Board Emulator
+  mount the shared status line (web/js/status-line.js), their informational texts out of their toolbars (#2725); the
+  emulator's time is in it (right below the board in the Tasks interface still, #1022). The status line's style is a file of its own, web/css/status-line.css, which the demo
+  pages load too.
+- **The design corpus and the synthesis's measurements on the nextpnr engine (#2756).** `test/designs-corpus/run.mjs`
+  places and routes each design through the flow's Translate, Map and Place & Route with the nextpnr engine, one
+  placement (`lib.mjs` `nextpnrPlaceRoute`), not through Silinx's `placeRouteBest`. Silinx's packer still gives the size
+  the runner reads first, to choose a larger device. nextpnr's errors are read for the I/O wrapper ("no free pad left in
+  this package") and for the larger device ("no BELs remaining"), and a failure gives nextpnr's reason. The expectations
+  are recorded again (the README's results table). 63 of the 67 designs build, 13 smaller or faster. The ITC'99 b14,
+  b20, b21 and b22 stop in nextpnr's placer (#2818). Nine are larger or slower than Silinx's engine made them (#2819). Six
+  have nextpnr's "Max frequency" warning (#2820). `research/synth-quality`'s `abc9.mjs` and `fsm.mjs` place and route
+  through the same helper. `measure.mjs` loses `--place`, the estimate of Silinx's placer.
+  - **Tests:** test/designs-corpus.test.js (nextpnrPlaceRoute on the gates netlist; a failure as an error).
+- **The open flow's check against ISE runs on the nextpnr engine (#2756):** `npm run check:open-flow` and the ISE tests
+  build each design as the application does, through nextpnr, not through Silinx's own placer and router.
+  - **Tests:** test/open-flow.test.js, test/blockram-flow.test.js, test/clocking-flow.test.js, test/fpga-place-route.test.js.
+- **micro80 on the Spartan-6, checked against ISE (#2755):** its register bank's distributed RAM gets its unused data
+  inputs tied low, as ISE's map does, so ISE's DRC passes on the open flow's micro80 for the Nexys3 and the Atlys and
+  test/ise/examples.test.js's check of it is no longer marked as known to fail.
+- **Pointers into arrays in synthesis (#2751):** a pointer variable with one target in a difference or a comparison
+  with another place in that array (`a`, `a + i`, `&a[i]`, `m[r] + j`, a pointer into it) is a difference or a comparison
+  of their offsets; `g(a + k)` is `g(&a[k])`, and a moved pointer passed on `&a[p_off]` (core/c-pointer.js). The callee
+  is inlined with its indexes from k (core/c-inline.js); in a combinational module its array is the caller's elements
+  from k, a multiplexer of them by k when k is not a constant, written back after the call (core/c-dataflow-expr.js).
+  A pointer into a row of an array of arrays has a flat offset, its elements `m[k / C][k % C]`. A pointer with several
+  targets in a difference or a comparison, or a place in an array given to a sub-module, is said; a pointer's own error
+  no longer comes with "pointer arithmetic is not possible" too (core/c-check.js). The hint of the pointer errors says so,
+  in English and Portuguese.
+- **Silinx HLS: a pragma's numeric argument given by a constant (#2750):** UNROLL `factor=`, PIPELINE `II=`,
+  ARRAY_PARTITION and ARRAY_RESHAPE `factor=` and `dim=`, STREAM `depth=`, INTERFACE `depth=`, and the other pragmas'
+  numbers take a global or local `const`, a `static const`, C++'s `constexpr`, an enum's constant, a constant of another
+  or of `sizeof`, as Vitis HLS does (UG1399): the same module as with the number. A name that is not a constant keeps
+  its error or warning, which now says "'N' is not a constant".
+- **The C simulation's switch: a case of a named constant (#2749):** `switchStmt` in core/c-interp.js folded each
+  case's value with no constants in scope, so a case of a global or local `const`, a `static const`, a `constexpr`, an
+  enum constant or a `sizeof` one (#2654) never matched and the `default` was taken. Each case's value is now
+  evaluated by the interpreter, as any expression. test/c-switch-const.test.js compares the C simulation with cc's (enum constants: GCC takes
+  no `const int` as a case label in C) and the named constants' cases with the values written out.
+- **The test bench's own names never a port's (#2740):** the Test Bench Wizard's test benches (core/testbench.js
+  `generateTestbench`, `generateSkeleton`) declare their constants, signals, variables and labels with tb_ before
+  them when the module has a port of that name (VHDL whatever its case): a port named done (traffic's timer) made
+  two signals named done, the clock never ran and Fill Expected from Current Design said the simulation did not
+  reach every vector. A test bench without a clash is as it was (the examples' modules: 128 test benches and
+  skeletons byte for byte). Tests: test/testbench.test.js, test/mcp-test-bench.test.js.
+- **The ASM chart editor's Properties panel (#2739):** with nothing selected, no "Selection" heading, help text and box
+  legend (web/js/asm-inspector.js: the selection's section hidden); the Machine section a section of its own with its
+  heading, not a `<details>` that folds (web/js/asm-editor.js), in the editor and its read-only views. Tests:
+  test/ui/asm-inspector.test.js, test/ui/asm-editor-chrome.test.js (both interfaces).
+- **The FSM editor's problems to the console (#2737):** the editor gives its validation to `onProblems(diags)` and no
+  longer lists it; drawings.js puts its errors and warnings in the console's Errors and Warnings tabs with the ASM
+  editor's editor-problems.js (#2730), in the interface's language (again when it changes), removed when the editor
+  closes; a row's click selects the state or the transition (`focus(d)`). The notes (a state that stays when no
+  condition is true) are no longer listed. A read-only view is not validated. Tests: test/ui/fsm.test.js,
+  test/ui/new-source-empty.test.js, test/ui/projects.test.js, test/ui/petri-fsm.test.js.
+- **The Petri net editor's hint and status lines gone (#2735):** as docs/UI-GUIDELINES.md asks and the ASM editor
+  did (#2730): its counts are the toolbar's informational text (`.asm-info`), the zoom level beside the zoom tools,
+  the selection's section hidden when nothing is selected, the net's a plain section (not a `details`).
+- **Its problems and messages in the console (#2718):** the Problems section is gone; `mountPetriEditor` says its
+  validation with `onProblems` (when it changes) and its messages with `onMessage(text, isError)`; drawings.js puts
+  them in the Errors and Warnings tabs (editor-problems.js, a click selecting the item with `ed.select`) and the
+  Console (an edit refused: a warning; the simulation's: a note), and clears them when the net is closed.
+- **An error or a warning written: its tab in front (#2733):** the console's shared drawing of its Errors and
+  Warnings tabs (`web/js/console.js`) brings the Errors tab forward for a new error, else the Warnings tab for a new
+  warning: once per batch of lines (errors winning), not again for a message already listed, and a warning leaves the
+  Errors tab in front while it lists errors, and a tab so brought forward goes back to the Console once it lists
+  nothing (cleared, a project opened after the start-up checks' warnings); info never switches it, and the keyboard's focus stays where it is. The
+  Silinx interface's folded messages open for a new warning too (for errors only before).
+- **The ASM chart editor and its read-only views as the other editors (#2730):** no hint text on the canvas and no
+  status line (web/js/asm-editor.js); the count of states (and of every-cycle blocks) at the toolbar's right end
+  (`.asm-info`, asm-render.js), the zoom level beside the zoom tools, an "Encoding:" label before the encoding's
+  selector. The Problems panel removed: the chart's errors and warnings go to the console's Errors and Warnings tabs
+  while it is open, updated as it is edited, a click selecting the box (web/js/editor-problems.js, for the diagram
+  editors; part of #2718), and Validate writes them in the Console under Design (`Started : "Validate" of …`, each line going to its box);
+  the editor's notes (a connection dropped on nothing) are Console lines. Portuguese. Tests:
+  test/ui/asm-editor-chrome.test.js (both interfaces), test/ui/asm-render.test.js, test/ui/diagrams.test.js,
+  test/ui/new-source-empty.test.js, test/ui/c-asm.test.js, test/ui/editor-toolbars.test.js, test/messages.test.js.
+- **The FSM editor's layout (#2729):** the hint line under the canvas and the status line under the editor are gone,
+  in the editor and in a Petri net's state machine (read-only). "N state(s), M transition(s)" is the toolbar's
+  informational text at its right end (as #2725); the zoom level follows the zoom tools; "Encoding:" and "Coding
+  Style:" label the toolbar's two selectors. Nothing selected, the Properties have no Selection section (its text and
+  legend gone); the Machine section is a title, not a fold. The reset's name is drawn on the start-up arrow (fsm-render.js). A text
+  typed in place that is not valid goes to the console as a warning (`onMessage`), no longer to the status line; a
+  read-only view's description is disabled too. Portuguese for the new labels. Tests: test/ui/fsm-layout.test.js (both
+  interfaces), test/ui/petri-fsm.test.js, test/ui/fsm.test.js.
+- **The kind of a state machine derived from its outputs (#2728):** `fsmKind` of core/fsm.js, which normalizeFsm writes
+  as the diagram's `type`; the stored one is not read. A file whose stored kind agrees with its outputs generates the
+  same VHDL and Verilog as before (the repository's 23 state machines: the test designs, traffic, the KISS2 corpus,
+  the wizard's templates, in every encoding and style). When it contradicts them, the outputs win: a "Mealy" machine
+  with no output on a transition is Moore (the same logic, its header saying Moore); a "Moore" machine with an output
+  on a transition, an error before, is Mealy and generates its HDL. The Sequence detector template keeps its Moore /
+  Mealy choice (it draws two different machines). Tests: test/fsm-kind.test.js (the HDL compiled, elaborated and
+  simulated in both languages), test/ui/fsm-side.test.js, test/ui/chart-wizards.test.js.
+- **The interface's guidelines: what a toolbar says at its right end (#2725):** docs/UI-GUIDELINES.md's toolbar layout
+  says a toolbar's informational text (the read-only notice, the sync notice, the counts, I/O Pin Planning's top, device
+  and board, the FPGA view's info, the Board Emulator's status) goes at its right end, never between its tools.
+- **A toolbar's informational text at its right end (#2725):** I/O Pin Planning's "Top: … · Device … · Board: …"
+  and its status after the spacer and the ☰ panels' buttons (web/js/pinplanner.js), the FPGA view's info after its
+  ☰ Properties, right-justified (web/js/fpgaview.js, fpgaview.css), the truth table's sync notice (truthtable.css);
+  the rule in docs/UI-GUIDELINES.md. Test: test/ui/toolbar-info-right.test.js, both interfaces.
+- **UI tests in step with main again (#2722):** a state's properties in the state diagram editor showed the text
+  "null" under its name when it has no comment (since #2696; web/js/fsm-side.js), which the FSM editor's Portuguese
+  test caught, now with an assertion of its own; the hierarchy test expects a Petri net's [FSM] badge (#2696); the open
+  toolchain's Technology Schematic test, blinky's and pong's cell counts after their counters were narrowed (#2321).
+- **The emulator's notes go to the console (#2718):** as docs/UI-GUIDELINES.md asks, no message in a document's window.
+  `mountEmulator` says them with `onNote(text, kind)` (web/js/emulator-side.js, web/js/emulator-serial.js); the
+  Board Emulator's document writes them as "Board Emulator: …" lines after its first one (web/js/viewers.js), each run.
+  The "Not on the board" box, the engine's and timing's notes, the VGA monitor's warning line and the serial
+  terminal's note left the window, with their Portuguese (console lines are not translated).
+- **A signal that only feeds a primitive's input is used (#2716):** the design checks (core/lint.js) count an input of
+  a primitive as read by it, also when its simulation model does not read it: the Clocking Wizard's feedback, a
+  DCM_SP's CLKFB with no CLK0 output, a PLL_BASE's CLKFBIN, was said "assigned but never used" (Silinx:646), in VHDL
+  and in Verilog. The warnings of the repository's 70 projects (90 views) are unchanged. Tests:
+  test/lint-design.test.js, test/mcp-wizards.test.js.
+- **I/O Pin Planning: a Ports panel, a bus's bits one by one, a bit taken off its pin (#2715):** the Board view's ports
+  in a side panel on the left, as the schematic editor's Symbols (its title, folded to a strip and remembered; under
+  1024 px over the board, shown by the toolbar's ☰ Ports); a bus
+  expanded into its bits, where each one is, each dragged alone (the bus's other bits kept); a port's or a bit's ✕, a
+  part's right-click menu and a row of Board Resources' take it off its pin, undoable (a clock's period with it). The
+  resources the drawing has no part for (the clocks, VGA, PS/2, the serial port, the Pmods) take a drop on their rows
+  in Board Resources; the chips under the board, which repeated that panel, are gone. What a drop places, the pins it
+  takes from other ports and its warnings go to the console only, not under the board (core/pin-board.js
+  `portBit`, `boardRemove`; web/js/pinplanner-ports.js).
+- **The pull request template asks for the interface's rules (#2714):** a checkbox, a change to the interface keeps
+  docs/UI-GUIDELINES.md (its toolbars, read-only views and side panels).
+- **The Board Emulator's side panel on a narrow window as the diagram editors' (#2713):** under 900 px wide (a tablet,
+  the Tasks interface's panel beside it) the panel goes over the board, closed at first, shown and hidden by ☰
+  Properties in the emulator's bar (`panelToggle`, remembered as the editors' Properties; `narrowOnly: false`, the
+  emulator narrow by its own width), instead of below the board with the whole emulator scrolling down; the board's
+  area keeps the whole width. Tests: test/ui/emulator-panels.test.js, test/ui/tasks.test.js (the bar's buttons in
+  test/ui/emulator-parts.test.js and test/ui/sim-emu.test.js without it).
+- **Show Generated VHDL / Verilog Beside (#2711):** an HDL source in the other language than the Preferred Language
+  has the item in its tab's menu, and View ▸ Show Generated HDL Beside opens its translation too (web/js/split-view.js
+  generatedOpener). The translation already open is made again where it is, with the source's unsaved edits
+  (web/js/translation.js), rather than closed and opened again.
+- **Read-only diagrams without a bar above their toolbar (#2710):** a Petri net's state machine and a C source's ASM
+  chart show their notice at the right end of the diagram's toolbar (`banner` of `mountFsmEditor` and
+  `mountAsmEditor`), as the text editors and the schematic do (#2697), and no longer the document's name, which is
+  the tab's; the C source's HDL and the C model's bar without the name too. Test: test/ui/readonly-notice.test.js.
+- **The interface's rules for contributors (#2710):** docs/UI-GUIDELINES.md, linked from CLAUDE.md and ONBOARDING.md:
+  no bar above a document's toolbar, the read-only notice at its right, no Undo / Redo / Print in it, the side panels
+  alike (foldable, over the canvas behind a ☰ button of the toolbar on a narrow screen), the hint line, every message
+  in the console and never in the document's window, the Design pane's badges.
+- **A read-only document's notice at the right end of its toolbar (#2697):** one shared style for every
+  `.gen-banner.read-only` of an editor's bar or a schematic's toolbar (`margin-left: auto`, ellipsized); in the
+  schematic, before its ⋮ menu and after the Symbols / Properties buttons of a narrow window.
+- **A Petri net's state machine, from its state space (#2696):** `core/petri-fsm.js` `petriToFsm(net)` explores
+  the markings the hardware reaches (the clock step: every enabled transition whose guard is true fires, in
+  priority order; `clockStepBy`, shared with `clockStep`), a Moore state for each (and for each set of the
+  transitions with pulse outputs that fired at the last edge, the pulses being registered), its outputs the net's;
+  a transition to each next state, its condition the guards' combinations that lead there, minimized
+  (Quine–McCluskey), the combinations no input value gives as don't cares. The machine runs as the net, cycle by
+  cycle. The FSM editor has a read-only mode (moved about, zoomed, its states selected, their marking shown, its
+  tables and simulation; nothing edited); the Design row's **FSM** badge, between the net's and its HDL's, opens it.
+- **I/O Pin Planning: a Board view, the ports dragged onto the board's parts (#2694):** Table and Board in the
+  toolbar; the Board view draws the project's board with the Board Emulator's layouts (Basys2, Nexys2, Nexys3, Atlys,
+  Spartan-3E Starter Kit, iCEBreaker; another board as rows of LEDs, switches and buttons), the top-level ports beside
+  it, dragged with the mouse or a finger. A bus spreads over the row from the part dropped on (moved back to fit
+  it); on a digit of the 7-segment display, 7 bits take the segments CA..CG (8 with DP), as many bits as anodes the
+  anodes, one bit the digit's anode; the resources the drawing has no part for (clocks, VGA, PS/2, the serial port,
+  the Pmods) take a drop on their rows in Board Resources (#2715). A part shows the bit placed on it; a part another port has is taken
+  from it; a port dropped again moves. Warned in the console: an output on an input of the
+  board (a switch, a button), an input on an output (an LED), a bus wider than the row (the bits left unplaced).
+  Undoable; the table and the UCF the same assignments (core/pin-board.js).
+- **VHDL ↔ Verilog translation in the Design pane (#2693):** the badge of the Preferred Language on the row of an HDL
+  module in the other language (web/js/translation.js) opens its file translated by a new translator (core/translate.js,
+  translate-to-verilog.js, translate-to-vhdl.js, translate-vhdl-expr.js) working on the parsers' IR: generics and
+  parameters, ports, signals, constants, enumerated types (localparams), memories and ROM tables, processes and always
+  blocks (clocked, with an asynchronous reset, combinational, a test bench's with waits and delays), if / case / for /
+  while, concurrent assignments (when/else, with/select, ?:), instances, generates, functions, the numeric_std
+  conversions; VHDL's names in their spelling, reserved words renamed (said in the header), an output read inside the
+  module an internal signal, a ?: inside an expression or an expression in a port map an intermediate signal. Records,
+  procedures, tasks, casez with don't-care bits and a few more have no translation: the document says which, with the
+  line. The comments are not carried over. Every example's design sources translate both ways, and their test benches
+  pass with the translations swapped in (test/translate.test.js).
+- **A UCF's Check Syntax and Check Constraints: Implementation's lines (#2692):** the message centre gives the
+  "Check Constraints" header the Implementation source (it was Design's, since #994); run from the Design task of
+  the Tasks interface, its lines are shown and the filter turns to Implementation (as a C module's commands, #2262).
+- RTL and Technology Schematic: the "Open ‹module's file›" button removed from the schematic's toolbar, and its
+  translation (#2690).
+- **The ISE interoperability test expects micro80's warnings (#2688):** test/ise/xise-interop.test.js expected no
+  warning from ISE's project flow on the micro80 example, which gives the light8080 processor's (the accepted ones of
+  #2544). It now expects, on the Basys2-250, the same 41 warnings of XST test/ise/examples.test.js expects (one list,
+  in test/ise-micro80-warnings.mjs, shared by both, the top's VHDL path its parameter), and on the Nexys3 the
+  Spartan-6's 26 of XST, map and par. Test: test/ise-micro80-warnings.test.js.
+- **The Spartan-6's bitstream with two or more block RAMs (#2679):** the open flow's bitgen refused micro80 ("2 block
+  RAMs: the frame bitgen writes again measured with one"). It now writes the frames ISE's bitgen writes again for any
+  number of block RAMs (packages/silinx-fpga), byte-identical with ISE's on micro80 on both boards. micro80 joins
+  `S6_EXAMPLES` (test/examples-lib.mjs): test/examples.test.js builds it on the Nexys3 and the Atlys with no warning,
+  test/s6-xdl.test.js takes a SLICEM's distributed RAM settings (its register bank), and test/ise/examples.test.js
+  expects ISE's Spartan-6 warnings on it (test/ise-micro80-warnings.mjs, checked on both boards); its open-flow check
+  against ISE is known to fail on ISE's DRC (the register bank's RAM32M, #2755).
+- **The ISE style interface: the themes System, Light and Dark (#2676):** View ▸ Theme in its menus, the theme shown
+  following the choice (and the system) as in the Silinx interface, also before the first paint; a dark version of the
+  ISE look (`web/css/ise-dark.css`): the menu bar, the toolbars, the panes and their captions, Processes, the console,
+  the dialogs and wizards, the HDL editor, the schematic, FSM, ASM, Petri net and truth table editors, SSim, the board
+  emulator, iMPACT and the pin planner; the dark tokens and the documents' dark rules of `silinx.css` shared by both
+  looks. The dark contrast scan runs in the interface the UI tests run in; the theme leaves the interface parity test's
+  allow-list (#2450). Tests: test/ui/silinx.test.js, test/ui/dark-contrast.test.js, test/ui/interface-parity.test.js.
+- **The ISE style interface, light: the disabled menu items and a selected tree row's twisty readable (#2678):** they
+  were below a contrast of 3 (2.4 and 1.4). Test: test/ui/dark-contrast.test.js.
+- **Silinx HLS's report and options in core/ (#2674):** View C Synthesis Report's lines and warnings (`cReportLines`) and
+  the clock, family delays and multiplier blocks a C function is scheduled for (`hlsClockOf`, `hlsFamilyOf`,
+  `hlsMultsOf`, of a board and a device) move, as they were, from web/js/c-source.js into `core/c-report.js`, so that
+  the server reports them too (the MCP's C tools, next); c-source.js's `hlsClock`, `hlsFamily` and `hlsMults` call
+  them. No change of behaviour (the multiplier blocks never a limit, as before: #2783). Test: test/c-report.test.js.
+- **MCP: the conversions (#2674):** `convert_module` converts a module of an HDL file as Convert to Schematic / ASM /
+  State Diagram does (core/hdl-to-sch.js laid out with elkjs, core/asm-from-hdl.js, core/fsm.js): the drawing becomes
+  the module's base, a file of several design units split; its HDL file stays as it is until the drawing is edited.
+  `convert_drawing` makes a new, unlinked ASM chart of a state diagram, a state diagram of an ASM chart, or the
+  Boolean algebra of a state diagram's next-state and output logic. The converters' refusals; a module that is a
+  drawing's already is not converted. In `server/mcp-convert.js`. Test: test/mcp-convert.test.js (stopwatch's and
+  traffic's test benches as before the conversion).
+- **MCP: the drawings' HDL made again on the server (#2674):** `write_file` of a drawing linked to its HDL file
+  makes that file again from it (`server/drawing-sync.js`, the editors' generators through core/view-hdl.js: the
+  repository's drawings give their HDL files byte for byte), and a drawing with errors leaves it as it was, stale:
+  Check Syntax and the simulation then stop on it with the interface's error (#303). `set_source_properties` gives a
+  drawing a language of its own, or the project's, and `set_design_properties` takes `preferred_language`: the
+  drawings and their HDL files in that language, the files in the other one removed (#220, #1477, #2254). The
+  test benches of gates, blinky and traffic pass in both languages. Design Properties' warning to check the pins
+  comes after "Device set to", as in the interface. Tests: test/drawing-sync.test.js, test/mcp-drawings.test.js.
+- **MCP: forces (#2674):** `simulate` takes `forces`: a value, or a clock (its leading and trailing values, period,
+  duty cycle), from a start until a cancel, over what drives the signal, as SSim's Force Constant / Force Clock
+  (`ssim force add`) through core/ssim-forces.js; a later force of a signal cuts its earlier one, a released signal
+  takes what the design gives it again. Test: test/mcp-forces.test.js (VHDL and Verilog).
+- **MCP: Silinx HLS (#2674):** `c_simulation` runs a C source's main() (core/c-interp.js: its output, what main()
+  returned, its calls of the top function), `c_cosimulation` replays them on the HDL made from it in VHDL or Verilog
+  (core/c-cosim.js: PASS or FAIL with each mismatch, the latency), `c_synthesis_report` says what it is made into
+  (core/c-report.js) and `c_generated` gives the HDL or the ASM chart made of it; scheduled for the board's clock,
+  the device's delays and the project's RTL blackboxes, as in the interface, with its messages. In
+  `server/mcp-hls.js`. Test: test/mcp-hls.test.js (the test designs fir, gcd, sort, popcount and stream_sum).
+- **MCP: a project's import and export (#2674):** `export_project` writes a project as a .zip on the disk, as
+  Export Xilinx ISE Project (its .xise, the schematics as ISE schematics, a C source as its HDL) or Export Silinx
+  ISE Project does, never over an existing file; `import_project` makes a new project from a .zip, a .xise with
+  its folder or a project folder, as Import Silinx / Xilinx ISE Project does: the paths that leave the project
+  and the hidden files dropped, with the import's warnings and the files the project lists but were not found.
+  Where the interface has the user choose the file, the assistant names it: both tools take only the paths of one
+  exchange folder (the user's Downloads, or `SILINX_MCP_FOLDER`), its symbolic links that leave it refused.
+  The export.zip and import-zip routes' code moves, as it was, into `server/project-zip.js`, which both call.
+  Tests: test/mcp-transfer.test.js, test/project-zip.test.js.
+- **MCP: New Source (#2674):** `new_source` makes each type of the New Source wizard from its own templates
+  (web/js/templates.js, c-templates.js) and the drawings' models, test benches with the wizard's unit under test
+  (core/uut-info.js), in the project's Preferred Language or the one given, with the wizard's checks (a file name,
+  a reserved word, a module or a drawing's HDL file already there); a file that exists is not replaced, and a
+  constraints file is the project's when it has none (a PCF for an iCE40). In `server/mcp-new-source.js`. Test:
+  test/mcp-new-source.test.js (the module and its test bench compiled, elaborated and simulated in VHDL and in
+  Verilog; the drawings' Check Syntax).
+- **MCP: the project's settings and sources (#2674):** nine new tools of the MCP server. `list_devices` lists the
+  boards (their variants) and the devices by family; `set_design_properties` sets a board or a device and the
+  synthesis tool as Design Properties does, the new device checked against the design (its warnings), the
+  constraints file of the device's format (a PCF for an iCE40) and, with `update_constraints`, the new board's
+  pins written into it; `set_process_properties` sets the Optimization (Fast, Area, Speed), the FPGA start-up
+  clock and the place and route engine. `unset_top`, `remove_from_project` (a drawing with its HDL file),
+  `add_to_project`, `rename_file` (a file or a folder: the drawings' links follow), `delete_file` (a file or a
+  folder) and `delete_project` (to the workspace's .trash) do what the Design pane's menus do; a top module the
+  project no longer has becomes the one root left of its view, else none, with the interface's messages. In
+  `server/mcp-settings.js` and `server/mcp-sources.js`. Tests: test/mcp-settings.test.js, test/mcp-sources.test.js.
+- **MCP: a module renamed with its references (#2674):** `rename_module` renames a module of the project's HDL
+  files as the interface's Rename does (`server/rename-module.js`, web/js/rename.js's renameSource on the server):
+  its declaration and instances in every source (core/rename.js), the schematics' symbols of it, the drawing it is
+  made from (named after it, renamed with it; its HDL made again), the project's top, test bench and stimuli; its
+  file follows the new name when it is named after the module, or goes where it is told, or stays. The dialog's
+  refusals: a bad name, a reserved word of VHDL, Verilog or SystemVerilog, a module or a file that exists; the files
+  are moved all or nothing. Tests: test/rename-module.test.js, test/mcp-sources.test.js.
+- **MCP: the simulation models (#2674):** `run_process` makes each model (`post_synthesis_model`, `post_translate_model`,
+  `post_map_model`, `post_par_model`: the flow up to its stage, then the model) and `simulate` takes `model`: the test
+  bench against that netlist as Simulate Post-… Model does (compiled after the sources, its nets single bits, the
+  post-place & route model with its SDF's delays), `generate` making it first; a model older than the sources is
+  said; `vcd` writes the waves into the exchange folder (a new file). Test: test/mcp-simulate-models.test.js.
+- **The MCP's simulation reads the project's data files (#2778):** `simulate` gave the simulator only the HDL, and a
+  test bench's `$readmemh` of a .mem said it was not found; it now gets the data files the interface gives it.
+- **MCP: the Test Bench Wizard and the UCF Wizard (#2674):** `test_bench_wizard` writes a test bench of a module
+  through core/testbench.js as the wizard does: its clock and reset guessed or given, the vectors generated or
+  given, their expected outputs given or taken from a simulation of the design (Fill Expected from Current
+  Design), or a skeleton; it reports each mismatch and TEST PASSED / TEST FAILED. `constraints_wizard` writes a UCF
+  of a module's ports on the board's pins (assigned by their names and directions, the clock's period), pins
+  given overriding them, as the UCF Wizard does. In `server/mcp-test-bench.js` and `server/mcp-wizards.js`. Test:
+  test/mcp-test-bench.test.js. A module with a port named done gets a test bench that never ends: #2740.
+- **MCP: the Clocking Wizard and the Block Memory wizard (#2674):** `clock_manager` makes a DCM_SP or a PLL_BASE
+  module for the frequencies asked (core/clocking.js: each output at the nearest frequency it can, said when it is
+  not the one asked), `block_memory` a RAM or a ROM of the device's block RAMs (core/blockram.js: one port or two,
+  its write mode, the primitives or inferable HDL, its initial contents from a .mem or .coe file), in VHDL or
+  Verilog; `edit` makes a module of theirs again from the settings in its header with those given changed, as
+  editing it reopens the wizard. The wizards' checks and messages (the device's family and its DCMs, PLLs and block
+  RAMs, a memory larger than the device, the ports' names). In `server/mcp-wizards.js`. Test:
+  test/mcp-wizards.test.js (the modules compiled in both languages and simulated: the ROMs read back their .mem
+  file, the DCMs lock and make their 100 MHz). A wrong warning of their Check Syntax found on the way: #2716.
+- **A project rule: what the interface does, the MCP server does too (#2674):** CLAUDE.md's Programming section
+  says that every action of the interface is a tool of the MCP server, doing it through the same functions, and
+  that a new or changed feature ships with its MCP tool and that tool's tests in the same pull request.
+- **SSim's times, values and forces in core/ (#2674):** `parseTime`, `parseValue` and `UNITS` move, as they were, from
+  web/js/isim.js into `core/ssim-values.js`, and the signals' and instances' paths and the forces' pseudo-process
+  (`findSignalIn`, `findInstIn`, `injectForceIn`) from web/js/isim-forces.js into `core/ssim-forces.js`, so that the
+  server forces signals as SSim does (the MCP's forces, next); isim.js still exports the three. No change of
+  behaviour. Test: test/ssim-forces.test.js.
+- **A type's text and a test bench's unit under test in core/ (#2674):** `typeText` (with its range and short
+  expression helpers) moves, as it was, from web/js/editor.js into `core/type-text.js`, and the New Source
+  wizard's `uutInfo` from web/js/new-source.js into `core/uut-info.js`, so that the server makes a test bench as
+  the wizard does (the MCP's New Source, next); editor.js still exports `typeText`. No change of behaviour. Test:
+  test/type-text.test.js.
+- **Board Emulator laid out as the diagram editors (#2666):** its side column is a side panel at the board's right
+  (web/js/emulator-side.js), folded as the ASM, FSM and Petri net editors' Properties (side-fold.js) and remembered,
+  below the board when the emulator is under 900 px wide (a container query); the board's area scrolls on its own.
+  The toolbar's menu (toolbar-menu.js) holds the engine, what it does when hidden and the modules shown
+  (web/js/emulator-toolbar.js, emulator-modules.js). The print view keeps the Watch; the Tasks interface fits the
+  board to the room left of the panel (web/js/tasks-emu.js). Test: test/ui/emulator-panels.test.js.
+- **Pointer arithmetic in the C simulation (#2655):** an array, a pointer into one or a string literal plus or minus an
+  integer (`a + k`, `k + a`, `p - k`, `&a[k]`, one past the end too) is a pointer to that element; `p++`, `p += n`,
+  the difference of two pointers into one array (a ptrdiff_t), their comparisons, `==` / `!=` of any two and of a
+  pointer and NULL; such pointers given to functions, to strlen, strcat, memcpy and printf's `%s`; into a row of an
+  array of arrays (`m[1] + 2`) and into an array of strings (`const char **n = names + 1`). A pointer moved outside its
+  array, read or written one past its end, or pointers into different arrays subtracted or compared, stop the run
+  with their place (core/c-interp-expr.js). In synthesis `int *p = k + a` is taken as `a + k` (core/c-pointer.js);
+  `p - a`, `p < q`, `g(a + 1)` and `m[1] + 2` are still refused there, said (#2751).
+- **Silinx HLS: the constants of sizeof (#2654):** a global constant's initializer has its `sizeof` of an array, a
+  row or a pointer made `sizeof` of its type (core/c-flatten.js), as the functions' bodies had (#2641); synthesis's
+  constants for a `case` fold `sizeof`; an enum constant of `sizeof` becomes a constant declaration
+  (core/c-struct.js) instead of the error "its value must be a constant". `static const`, `const unsigned`, C++
+  `constexpr`, a constant of another, a struct's and a row's `sizeof`: no message, a literal's trip counts and
+  latency, co-simulated against cc.
+- **The workflows that publish hold their writing token in a job of their own (#2644):** the development build, the
+  release and silinx-fpga's npm release build in a job that only reads, and a job that runs no code of the repository
+  or of its dependencies publishes the artifact (the tag `dev` moved by the API, the attestation, the release, `npm
+  publish` of the packed tarball); the Yosys update's report job runs the base's scripts only, and checks the pull
+  request out no more. A test checks that no job whose token writes installs a dependency.
+- **The Vitis HLS image's base pinned by its digest (#2645),** as the ISE image's, and updated by Dependabot.
+- **The nextpnr engine leaves a block RAM's undriven data input unconnected (#2642),** as Silinx's engine does: ISE's
+  DRC had warned of a dangling output pin on a 16-bit RAM inferred onto a block RAM.
+  - **Tests:** packages/silinx-fpga/test/nextpnr-hard.test.js, packages/silinx-fpga/test/nextpnr-engine.test.js.
+- **Spartan-6: a carry chain's carry in and its first data input (#2638):** both used to need the slice's bypass input
+  AX, and the implementation stopped with "its pin AX carries … and …". The first data input now goes through the LUT's
+  O5, as ISE's map does it (packages/silinx-fpga/changes/2638-s6-carry-in-di0.md). Tests: test/s6-pack.test.js,
+  test/s6-xdl.test.js.
+- **Tests: the #1220 Unset as Top Module UI test waits for the hierarchy's top module redraw (#2630):** in the ISE
+  style interface, setting the top module redraws the hierarchy tree with the new top first; waiting for the row to
+  become top before clicking avoids a race where the click missed 'b'.
+- **nextpnr-spartan v0.17.0 (#2626, #2628, #2656):** nextpnr's router no longer loops on a carry multiplexer whose DI
+  is its own select or on a 36-bit block RAM beside its tile's multiplier, a slice's two memories share one enable
+  constant, and a DCM's clock input from the other edge is routed with no warning.
+  - **Tests:** packages/silinx-fpga/test/nextpnr-engine.test.js.
+- **A test's selectors escaped in full (#2623).** test/silinx.test.js made a RegExp of each board emulator selector,
+  escaping only `.` and `*` (CodeQL's js/incomplete-sanitization: a backslash was left as it was). Every RegExp character
+  is escaped now, the backslash too, and the test checks it on selectors that have them. Tests: test/silinx.test.js.
+- **Interface parity, a test (#2450):** `test/ui/interface-parity.test.js` collects, in both interfaces, every action a
+  user can reach with a project open and each kind of editor open (the menus, the toolbars and their "more" menus, the
+  panes' and the editors' context menus, the Processes, the command search) and fails on any difference that is not
+  in its allow-list, each entry with its reason; every command of the command search runs in both. The gap it found:
+  Add to Project… (#1214) had no way in the ISE style interface, now in the Project menu; iMPACT's folded settings
+  button in the Silinx interface says whether they are shown (`aria-expanded`).
+- **The Spartan-3E's nextpnr engine at 1.0.0 (#2438).** nextpnr-himbaechel-spartan3e 1.0.0 is 0.20.0's place and route
+  with a stable interface: a change Silinx would need outside it is a 2.0.0. The designs place and route as with 0.20.0.
+- **The RTL blackbox through synthesis (#2341):** the blackbox (#1903) had been checked by co-simulation only. A project
+  with one did not build: its C model (the description's `c_files`, the C simulation's) was made a module of its own,
+  refused ("'adder' is the top function", #2854). `blackboxModels` (`core/c-blackbox.js`) lists the C models the descriptions
+  name, and the build leaves them out, on the server (`viewSources`, the Silinx toolchain and ISE) and in the browser
+  edition. An HLS module calling a module in the other language (a VHDL machine and a Verilog module, a Verilog machine
+  and a VHDL module, `test/fixtures/hls-blackbox`) builds with the Silinx toolchain on every device of the examples,
+  and with ISE (XST), with no warnings.
+  - **The output's capture (#2862):** an output with a valid was captured, for a valid before `ap_done`, in registers
+    `ap_done` cleared first: with the usual module, its valid with `ap_done`, the capture never happened, and XST
+    trimmed it with a warning per bit (Xst:1710, Xst:1895). It is now taken on every valid and forgotten as the next
+    call starts, that start's cycle reading the valid alone.
+  - **The corpus against Vitis HLS:** misc-rtl-as-blackbox run again through Vitis HLS 2025.2: its C simulation,
+    synthesis and co-simulation pass, Silinx's ports the same as Vitis's, a latency of 5 cycles to Vitis's 4
+    (`test/hls-corpus/vitis.json`, the README's table). `scripts/hls-vitis.mjs` synthesized the design without its
+    blackbox descriptions to compare the ports: it now takes the options the corpus runs with (`optionsOf`,
+    `test/hls-corpus/lib.mjs`, #2855).
+  - **Tests:** test/hls-blackbox-flow.test.js (the C model not a module; the C simulation and co-simulation; the
+    Silinx toolchain on the six boards, no warnings), test/ise/hls-blackbox.test.js (ISE on the six boards, no
+    warnings; opt-in), test/hls-vitis.test.js (a blackbox design's ports compared), test/c-blackbox.test.js (the capture; calls
+    of a combinational module whose valid is 0 on some, none reading the last capture), test/ui/c-source.test.js (the
+    C model no row of the Design pane, no error).
+- **The examples on the Spartan-6 with ISE: no warning (#2321):** XST on the Spartan-6 trimmed the counter bits that
+  are always 0 (`Xst:1293`, `Xst:1896`) and map warned of the stopwatch's 9K block RAM (`PhysDesignRules:2410`). The
+  button debouncers of clock and pong count in 20 bits (24 before), pong's step and beat counters in 23 (24), blinky's
+  ASM chart's `ticks` register in 7 bits (8; `speed_ctrl.vhd` generated again), and the stopwatch's lap memory holds
+  1023 times in 1024 words (512 x 14 took a RAMB8BWER, 1024 x 14 a whole RAMB16BWER; on the Spartan-3E one RAMB16
+  either way). The open toolchain's netlists of clock, pong and blinky are smaller; the stopwatch's 2 LUTs larger on
+  the Spartan-3E (its Speed mapping 28), 3 on the Spartan-6.
+  test/ise/examples.test.js builds every example with ISE on the Nexys3 and the Atlys too, with no warning, and
+  test/ise/xise-interop.test.js expects none on the Nexys3; test/synth-brams-s6.test.js keeps a 512 x 14 memory of
+  its own for the open synthesis's 9K rule (#2130).
+- **nextpnr-himbaechel-spartan6 in the browser (#2288):** the flow's worker gives the Spartan-6's nextpnr engine its
+  `io.nextpnr.spartan6`, from the package's bundle and the device's chip database (about 5 MB, fetched on its first use,
+  then kept by the browser's cache). The local server serves the package at `/vendor/nextpnr-spartan6`, and the standalone
+  build publishes it with the site's assets (`assets/vendor/nextpnr-spartan6/<its version>/gen` and `chipdb`, each file's
+  SHA-256 in the page). When a project opens, the browser fetches nextpnr ahead only for a Spartan-6 project that chooses
+  the nextpnr engine (its `auto` is still the Silinx engine's on the Spartan-6, #2131).
+  - **Tests:** test/ui/standalone.test.js (traffic on the Nexys3 by nextpnr in the browser edition), test/web-open-flow-browser.test.js, test/asset-cache.test.js, test/family-profile.test.js.
+- **The Post-Place & Route model's design by nextpnr (#2137).** When the test bench gives the top other generics, the
+  design synthesized with them is placed and routed for its model by the family's back end, nextpnr, as Implement does
+  (`placeRouteNetlist`, a report and a log of its own), no longer by Silinx's own placer and router. The console says
+  "Placing and routing the design synthesized with the test bench's generics (nextpnr), for its model."; a failure names
+  nextpnr's reason.
+  - **Tests:** test/sim-model-par.test.js (the examples' test benches on their post-place & route models, through
+    nextpnr; blinky's with its test bench's generics).
+- **nextpnr, the application's one engine (#2137).** `engineOf` gives `nextpnr` for every project. A project's
+  `impl.engine` (`silinx`, `auto`, `nextpnr`: #2136's choice) is no longer read, and Process Properties' OK drops it. The
+  `auto` fallback to the Silinx engine is gone: when nextpnr cannot start, Place & Route fails with "nextpnr's chip
+  database of <part> could not be downloaded (…)" and a hint to implement again online. The nextpnr steps' hints no longer
+  say "Choose the Silinx engine". The Spartan-6 places and routes with nextpnr too (its speed gap, #2798, accepted), and
+  the browser fetches its nextpnr ahead when a project opens. MCP: `set_process_properties` loses `pr_engine`. The command
+  line's `--engine` default is `nextpnr` and `auto` is refused; `--engine silinx` stays until Silinx's placer and router are
+  removed. Register replication (#4), the Silinx engine's only, leaves the application with it.
+  - **Tests:** test/ui/open-toolchain.test.js (no engine in Process Properties, in Portuguese neither; a project saved
+    with the Silinx engine implements with nextpnr), test/ui/standalone.test.js, test/mcp-settings.test.js,
+    test/open-toolchain.test.js, test/silinx-fpga-cli.test.js, test/web-open-flow-browser.test.js,
+    test/family-profile.test.js, packages/silinx-fpga/test/nextpnr-engine.test.js.
+- **Silinx's Spartan-3E placer and router removed (#2137).** nextpnr has been the application's one place and route
+  engine since #2810; its code, its tests and the two research scripts that placed and routed with it
+  (`research/s3e-place/flow.mjs`, `research/s3e-route/route.mjs`) are gone. Register replication (#4) went with it. The
+  parts other modules use stay, moved as they were: the device's sites and banks (`fpga/device-sites.js`), the placers'
+  common parts (`fpga/place-common.js`, the Spartan-6's placer's), a routed design's check (`fpga/route-check.js`), and
+  the clock network's reach and ISE's clock pad per DCM (`fpga/clock-reach.js`, which the device tests and the research's
+  generators of ISE designs read). Silinx's packer stays (#2529, #2530), and so does the Spartan-6's own engine. The bank
+  VCCO tests (#128) run on nextpnr: two LOC'd I/Os of one bank with different VCCO are accepted by nextpnr (#2813, a todo),
+  and its message for an I/O with no pad of its VCCO names the cell (#2816).
+  - **Tests:** packages/silinx-fpga/test/engine-shared-parts.test.js, packages/silinx-fpga/test/fpga-hard.test.js,
+    packages/silinx-fpga/test/silinx-fpga-api.test.js, test/designs-corpus-fixes.test.js, test/open-flow-core.test.js,
+    test/iob-pair-clocks.test.js, test/iob-ddr.test.js, test/fpga-timing.test.js, test/silinx-fpga-cli.test.js.
+
 ## 15.21.1
 
 The release of 15.21.0, published: v15.21.0 was tagged but not published, GitHub refused its notes for their
