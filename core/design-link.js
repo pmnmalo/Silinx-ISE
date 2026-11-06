@@ -310,18 +310,52 @@ export function parseLink(hash) {
 }
 
 // a host of this computer or of a local network (a literal address, localhost, .local / .internal / .lan names):
-// a link from anywhere does not make the browser fetch from them (#2829)
+// a link from anywhere does not make the browser fetch from them (#2829); the IPv6 forms that carry an IPv4 address
+// (IPv4-compatible ::a.b.c.d, mapped, NAT64, 6to4) and the reserved ranges too (#2962)
 export function privateHost(host) {
   const h = String(host).toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   if (!h || h === 'localhost' || /\.(localhost|local|internal|lan|home|arpa)$/.test(h) || !h.includes('.') && !h.includes(':')) return true;
   const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (v4) {
-    const [a, b] = [+v4[1], +v4[2]];
-    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
-      || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  if (v4) return privateV4(+v4[1], +v4[2], +v4[3]);
+  if (h.includes(':')) {
+    const g = ipv6Groups(h);
+    if (!g) return true;   // not an address: refused
+    const [a, b] = g;
+    return a === 0                                            // ::/16: ::, ::1, IPv4-compatible, mapped (::ffff:0:0/96), translated
+      || (a === 0x100 && !b && !g[2] && !g[3])                // 100::/64, discard only
+      || (a === 0x64 && b === 0xff9b)                         // NAT64: 64:ff9b::/96, 64:ff9b:1::/48
+      || (a & 0xfe00) === 0xfc00 || (a & 0xff80) === 0xfe80   // fc00::/7 unique local; fe80::/10 link-local, fec0::/10 site-local
+      || (a & 0xff00) === 0xff00                              // ff00::/8 multicast
+      || (a === 0x2001 && b === 0xdb8)                        // 2001:db8::/32 documentation
+      || (a === 0x2002 && privateV4(b >> 8, b & 0xff, g[2] >> 8));   // 6to4: the IPv4 address it carries
   }
-  if (h.includes(':')) return h === '::' || h === '::1' || /^(fc|fd|fe[89ab])/.test(h) || /^::ffff:/.test(h);
   return false;
+}
+
+// an IPv4 address of this computer, of a local network or of a reserved range (its first three bytes)
+function privateV4(a, b, c) {
+  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19))
+    || (a === 192 && b === 0 && (c === 0 || c === 2)) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113);
+}
+
+// an IPv6 address's eight 16-bit groups (an IPv4 address at its end as two of them); null: not an address
+function ipv6Groups(h) {
+  let s = h.replace(/%.*$/, '');
+  const tail = /^(.*:)(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(s);
+  if (tail) {
+    const q = tail.slice(2).map(Number);
+    if (q.some(n => n > 255)) return null;
+    s = `${tail[1]}${((q[0] << 8) | q[1]).toString(16)}:${((q[2] << 8) | q[3]).toString(16)}`;
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const part = x => (x ? x.split(':') : []);
+  const [l, r] = [part(halves[0]), part(halves[1])];
+  if ([...l, ...r].some(x => !/^[0-9a-f]{1,4}$/.test(x))) return null;
+  const zeros = 8 - l.length - r.length;
+  if (halves.length === 1 ? zeros !== 0 : zeros < 1) return null;
+  return [...l, ...Array(halves.length === 2 ? zeros : 0).fill('0'), ...r].map(x => parseInt(x, 16));
 }
 
 /**

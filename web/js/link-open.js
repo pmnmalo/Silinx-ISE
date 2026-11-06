@@ -9,7 +9,7 @@ import { confirmDlg, dialog, h } from './ui.js';
 import { S, app } from './app.js';
 import { applyViewState } from './view-state.js';
 import { applyLayout } from './tasks.js';
-import { TRY_DRAWING, decodeDesign, decodeUi, designZip, freeName, parseLink, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
+import { TRY_DRAWING, decodeDesign, decodeUi, designZip, freeName, parseLink, privateHost, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateMessages, gateZip } from '/core/import-gate.js';
 
@@ -35,6 +35,13 @@ async function fetchZip(url) {
   let r;
   try { r = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' }); } catch (e) { throw fail(`cannot fetch ${url} (${e.message}; the site must allow it)`); }
   if (!r.ok) throw fail(`cannot fetch ${url} (${r.status} ${r.statusText})`);
+  // a redirection checked as the link's own address is (#2962): https, not this computer's nor a local network's
+  let to = null;
+  try { to = new URL(r.url || url); } catch { /* checked below */ }
+  if (!to || to.protocol !== 'https:' || privateHost(to.hostname)) {
+    r.body?.cancel().catch(() => {});
+    throw fail(`${url} leads to an address of this computer or of a local network, or not an https one ('${String(r.url).slice(0, 120)}')`);
+  }
   // (read with a running total: no more than the limit, whatever the site says it sends)
   const reader = r.body.getReader(), parts = [];
   let n = 0;
