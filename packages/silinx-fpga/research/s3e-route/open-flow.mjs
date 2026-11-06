@@ -3,7 +3,7 @@
 // (packages/silinx-fpga/src/open-flow-core.js runFlow, as the application runs them: nextpnr packs, places and routes on the
 // PIPs whose bits are known, #2137) -> Silinx's bitgen. Needs the device cache (~/.silinx/devices, built from the user's own
 // device report: research/s3e-route/build-device.mjs).
-//   node research/s3e-route/open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--no-crc] [--quality file]
+//   node research/s3e-route/open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--no-crc] [--quality file] [--chipdb dir]
 // (--seed: nextpnr's first seed, the flow trying several, packages/silinx-fpga/src/open-flow-nextpnr.js nextpnrTries; the
 // options of Silinx's own placer and router, --effort, --timing, --timing-route, --tries, --no-replicate and
 // --replicate-opts, went with it, #2137). After routing, the static timing
@@ -13,6 +13,8 @@
 // scripts/yosys-update-report.mjs). Fails (exit 1)
 // listing what keeps the flow from the design, or the features of the design the bit
 // database does not know: the .bit is written only when it is complete.
+// --chipdb dir: nextpnr's chip database from dir/chipdb-<die>.bin, not the package's (a database built from other device
+// descriptions, as #2502's check of the measured ones with SILINX_CONFIG_DIR/devices holding those descriptions).
 import fs from 'node:fs';
 import path from 'node:path';
 import { compile, elaborate } from '../../../../core/compile.js';
@@ -37,9 +39,9 @@ const flag = name => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 
 const GONE = ['--effort', '--timing', '--timing-route', '--tries', '--no-replicate', '--replicate-opts'];
 const gone = args.filter(a => GONE.includes(a));
 if (gone.length) { console.error(`open-flow.mjs: ${gone.join(', ')}: an option of Silinx's own placer and router, which nextpnr replaced (#2137)`); process.exit(2); }
-const json = opt('--json', null), seed = +opt('--seed', '1'), noCrc = flag('--no-crc'), qualityFile = opt('--quality', null);
+const json = opt('--json', null), seed = +opt('--seed', '1'), noCrc = flag('--no-crc'), qualityFile = opt('--quality', null), chipdbDir = opt('--chipdb', null);
 const [projDir, outDir] = args;
-if (!projDir || !outDir) { console.error('usage: open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--no-crc] [--quality file]'); process.exit(2); }
+if (!projDir || !outDir) { console.error('usage: open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--no-crc] [--quality file] [--chipdb dir]'); process.exit(2); }
 const proj = JSON.parse(fs.readFileSync(path.join(projDir, 'silinx.json'), 'utf8'));
 const top = proj.top;
 const part = `${proj.device.part}${proj.device.package}${proj.device.speed}`;
@@ -79,6 +81,12 @@ const ucf = proj.constraints ? fs.readFileSync(path.resolve(projDir, proj.constr
 const netText = fs.readFileSync(netFile, 'utf8');
 let device = null, db = null;
 const files = {};
+// --chipdb: the given database of the part's die (chipdb-xc3s250e.bin)
+const givenChipdb = () => {
+  const f = path.join(chipdbDir, `chipdb-${/^xc3s\d+e/.exec(part)[0]}.bin`);
+  if (!fs.existsSync(f)) throw new Error(`--chipdb: no ${f}`);
+  return new Uint8Array(fs.readFileSync(f));
+};
 const io = {
   log: line => { if (/^(WARNING|ERROR)/.test(line)) console.log(`  ${line}`); else if (/^(Map|Placed|Routed|Design summary|  |constraint)/.test(line)) console.log(line); },
   sources: () => [],
@@ -86,7 +94,7 @@ const io = {
   device: () => (device ||= loadDeviceCache(part)),
   bitDb: () => (db ||= loadDb(part, { graph: io.device() })),
   yosys: yosysWorkers(),
-  nextpnr: { spartan3e: nextpnrNode() },
+  nextpnr: { spartan3e: chipdbDir ? { ...nextpnrNode(), chipdb: async () => givenChipdb() } : nextpnrNode() },
   write: (name, data) => { files[name] = data; const f = path.join(outDir, name.replace(/^open\//, '')); fs.writeFileSync(f, data); return f; },
   read: name => (name === `open/${top}.json` ? netText : files[name] ?? null),
   save: () => {},
