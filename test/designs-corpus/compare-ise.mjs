@@ -13,8 +13,8 @@
 // host), so that both critical paths come from the same timing analyser; Silinx's estimate is kept too.
 // Of each critical path, trce's breakdown (#646): its levels of logic, its LUT, carry, flip-flop and other
 // logic delays and its routing delay (`path`), to tell a synthesis's loss from a place and route's.
-// Silinx is built at its two Optimization Efforts (#377): Normal, the app's default (`silinx` in the
-// results), and High (impl.optLevel 2, `silinxHigh`); ISE at its default (Normal).
+// Silinx is built at two of its Optimizations (#2470, #2941): Area, a new project's default (`silinx` in the
+// results), and Speed (`silinxHigh`), the results' `optimizations`; ISE at its default (Normal).
 //
 //   node test/designs-corpus/run.mjs --stages frontend,synth,flow --sizes <dir>     (the projects)
 //   node test/designs-corpus/compare-ise.mjs <dir> [--filter a,b] [--jobs n] [--ise-jobs n] [--period ns] [--serial] [--guard]
@@ -34,7 +34,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { qualityPage } from './quality-page.mjs';
 import { DOCKER_ISOLATION } from '../../server/ise.js';
-import { lastError, newFailures, parseClocks, constrainedPeriod, criticalPath, remoteWork } from './compare-lib.mjs';
+import { lastError, newFailures, parseClocks, constrainedPeriod, criticalPath, remoteWork, mergeable, OPTIMIZATIONS } from './compare-lib.mjs';
+import { GOAL_IMPL } from '../../packages/silinx-fpga/src/synth-open.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
@@ -71,6 +72,11 @@ const PERIOD = +opt('--period', 5);
 if (!dir || !fs.existsSync(dir)) { console.error('usage: compare-ise.mjs <dir of projects from run.mjs --sizes> [--filter a,b] [--jobs n] [--ise-jobs n] | --report'); process.exit(2); }
 const filter = opt('--filter', null)?.split(',');
 const names = fs.readdirSync(dir).filter(n => fs.existsSync(path.join(dir, n, 'silinx.json')) && (!filter || filter.includes(n))).sort();
+// (a --filter run merges into the earlier results: not those of other Optimizations, the results before #2941, in one table)
+if (filter && fs.existsSync(RESULTS)) {
+  const old = JSON.parse(fs.readFileSync(RESULTS, 'utf8'));
+  if (!mergeable(old, { optimizations: OPTIMIZATIONS })) { console.error(`--filter: ${path.relative(ROOT, RESULTS)} is of other Optimizations (${old.optimizations?.join(', ') || 'Normal, High'}); compare every design (no --filter)`); process.exit(2); }
+}
 
 // ISE: the image on this machine (SILINX_ISE_HOST=local), else the user's ISE settings in SSH mode, in
 // a configuration of this run's own
@@ -106,13 +112,13 @@ const runJob = (fn) => new Promise(resolve => {
 const used = x => (x && typeof x === 'object' ? x.used : x) ?? null;
 const item = (items, re) => used((items || []).find(i => re.test(i.name)));
 
-// Silinx at its two Optimization Efforts (#377): Normal (the app's default, one mapping) and High (the
-// mappings for speed too, impl.optLevel 2); ISE at its default (Normal) in both comparisons
-const EFFORTS = { normal: 1, high: 2 };
-async function silinxRun(name, effort = 'normal') {
-  const projectDir = copyProject(name, effort === 'normal' ? 'silinx' : `silinx-${effort}`);
+// Silinx at two of its Optimizations (#2941), the Process Properties' ISE properties of each (GOAL_IMPL, #2470): Area (a new
+// project's default: the smaller of the usual mapping's netlist and Speed's, one placement) and Speed (the mappings for speed,
+// several placements); ISE at its default (Normal) in both comparisons
+async function silinxRun(name, goal) {
+  const projectDir = copyProject(name, `silinx-${goal}`);
   const project = JSON.parse(fs.readFileSync(path.join(projectDir, 'silinx.json'), 'utf8'));
-  project.impl = { ...(project.impl || {}), optLevel: EFFORTS[effort] };
+  project.impl = { ...(project.impl || {}), ...GOAL_IMPL[goal] };
   const { job, ms } = await runJob(j => runOpenImplementation(j, { project, projectDir, steps: STEPS }));
   let rep = {};
   try { rep = JSON.parse(fs.readFileSync(path.join(projectDir, 'build', 'open', 'report.json'), 'utf8')); } catch { /* nothing written */ }
@@ -160,18 +166,19 @@ async function pool(items, n, fn) {
 }
 
 console.log(`${names.length} designs; work folder ${work}`);
-const silinxAll = (effort) => pool(names, +opt('--jobs', 3), async n => { const r = await silinxRun(n, effort); console.log(`silinx ${effort.padEnd(6)} ${n}: ${r.error ? `FAILED ${r.error}` : `${r.slices} slices, ${r.estimateNs} ns (estimate), ${r.seconds} s`}`); return r; });
-const silinxBoth = async () => ({ normal: await silinxAll('normal'), high: await silinxAll('high') });
+const silinxAll = (goal) => pool(names, +opt('--jobs', 3), async n => { const r = await silinxRun(n, goal); console.log(`silinx ${goal.padEnd(6)} ${n}: ${r.error ? `FAILED ${r.error}` : `${r.slices} slices, ${r.estimateNs} ns (estimate), ${r.seconds} s`}`); return r; });
+const [MAIN, SECOND] = OPTIMIZATIONS;
+const silinxBoth = async () => ({ main: await silinxAll(MAIN), second: await silinxAll(SECOND) });
 const iseAll = () => pool(names, +opt('--ise-jobs', 2), async n => { const r = await iseRun(n); console.log(`ise    ${n}: ${r.error ? `FAILED ${r.error}` : `${r.slices} slices, ${r.periodNs} ns, ${r.seconds} s`}`); return r; });
 const [both, ise] = SERIAL ? [await silinxBoth(), await iseAll()] : await Promise.all([silinxBoth(), iseAll()]);
-const sil = both.normal, silHigh = both.high;
+const sil = both.main, silHigh = both.second;
 
 // ISE's trce on Silinx's routed designs (ise-open-check.sh: xdl -xdl2ncd, drc, bitgen, trce)
 const host = LOCAL ? null : `${userCfg.ssh.user ? `${userCfg.ssh.user}@` : ''}${userCfg.ssh.host}`;
 const image = LOCAL ? IMAGE : userCfg.ssh.image || 'xilinx/ise:14.7';
 const tdir = path.join(work, 'trce');
-// (each design's routing at both efforts: <name> and <name>__high)
-const HIGH = '__high';
+// (each design's routing at both Optimizations: <name> and <name>__<second>)
+const HIGH = `__${SECOND}`;
 const timedNames = [
   ...names.filter((n, k) => !sil[k].error && fs.existsSync(sil[k].routed)),
   ...names.filter((n, k) => !silHigh[k].error && fs.existsSync(silHigh[k].routed)).map(n => `${n}${HIGH}`),
@@ -228,7 +235,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 const manifest = JSON.parse(fs.readFileSync(path.join(HERE, 'manifest.json'), 'utf8'));
 const notBuilt = filter ? undefined : manifest.designs.map(d => d.name).filter(n => !fs.existsSync(path.join(dir, n, 'silinx.json')));
 const res = {
-  generatedAt: new Date().toISOString(), silinxVersion: pkg.version, device: 'xc3s1200efg320-4', steps: STEPS, isePeriodNs: PERIOD, notBuilt,   // (no `pending`: every design built)
+  generatedAt: new Date().toISOString(), silinxVersion: pkg.version, device: 'xc3s1200efg320-4', steps: STEPS, isePeriodNs: PERIOD, optimizations: OPTIMIZATIONS, notBuilt,   // (no `pending`: every design built)
   designs: names.map((name, k) => {
     const { routed, ...s } = sil[k];
     const { routed: routedHigh, ...h } = silHigh[k];

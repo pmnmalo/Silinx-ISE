@@ -13,14 +13,28 @@ export function lastError(job) {
   return (before ? `${summary} (${before})` : summary || 'failed').replace(/\s+/g, ' ').slice(0, 240);
 }
 
+// Silinx's two builds in the results (#2941): `silinx` and `silinxHigh`, at the Optimizations the results' `optimizations`
+// names (the Process Properties' Optimization of #2470: Area, a new project's default, and Speed); results without it
+// (before #2941) are of the Optimization Efforts Normal and High
+export const OPTIMIZATIONS = ['area', 'speed'];
+const OPTIMIZATION_NAMES = { area: 'Area', speed: 'Speed', fast: 'Fast' };
+/** The names of the results' two Silinx builds: { main, second } ('Area', 'Speed'; 'Normal', 'High' before #2941). */
+export function silinxSides(res) {
+  const [main, second] = res?.optimizations || [];
+  return main ? { main: OPTIMIZATION_NAMES[main], second: OPTIMIZATION_NAMES[second] } : { main: 'Normal', second: 'High' };
+}
+/** Whether a run's results (a --filter run's) can be merged into the earlier ones: both of the same Optimizations. */
+export const mergeable = (old, now) => String(old?.optimizations || '') === String(now?.optimizations || '');
+
 /** The designs built before (no error on a side) that fail now on that side: ['name (Silinx): error', …]. */
 export function newFailures(before, now) {
   const old = new Map((before?.designs || []).map(d => [d.name, d]));
   const out = [];
+  const opt = now.optimizations && silinxSides(now);
   for (const d of now.designs || []) {
     const o = old.get(d.name);
     if (!o) continue;
-    for (const [side, label] of [['silinx', 'Silinx'], ['silinxHigh', 'Silinx, effort High'], ['ise', 'ISE']]) {
+    for (const [side, label] of [['silinx', opt ? `Silinx, ${opt.main}` : 'Silinx'], ['silinxHigh', opt ? `Silinx, ${opt.second}` : 'Silinx, effort High'], ['ise', 'ISE']]) {
       if (o[side] && !o[side].error && d[side]?.error) out.push(`${d.name} (${label}): ${d[side].error}`);
     }
   }
