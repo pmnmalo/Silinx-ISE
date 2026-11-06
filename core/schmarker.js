@@ -1,6 +1,6 @@
 // A new I/O marker of a schematic (#2170): its direction (what it is placed on, or the marker added last), and the net
 // of the same name it can join (that net's width).
-import { parseNetName, netByName } from './schdoc.js';
+import { parseNetName, netByName, portSide, symbolPins } from './schdoc.js';
 
 const DIRS = ['in', 'out', 'inout'];
 
@@ -21,6 +21,20 @@ export function newMarkerDir(doc, { pin = null, net = null } = {}) {
   if (pin) return pin.dir === 'out' ? 'out' : pin.dir === 'inout' ? 'inout' : 'in';
   if (net) return net.drivers.length ? 'out' : 'in';
   return lastMarkerDir(doc);
+}
+
+/** The outward direction on the sheet ('N', 'E', 'S', 'W') of the pin `pin` (its name) of the symbol `sym`, its
+ *  rotation and mirror applied (#2926), or null when it has no such pin. */
+export function pinSide(sym, pin, modules = {}) {
+  return symbolPins(sym, modules).find(q => q.name === pin)?.side || null;
+}
+
+/** The side a new I/O marker of direction `dir` stores (#2926): added on a pin (a pin of symbolPins: its side the
+ *  sheet's), that pin's outward direction, the marker continuing the pin (up: N, ISE's R270; down: S, R90); none when
+ *  that is the direction's default (an input W, an output E) or not on a pin (a wire, empty space: the default). */
+export function newMarkerSide(dir, pin = null) {
+  const side = pin?.side;
+  return side && side !== portSide({ dir }) ? side : undefined;
 }
 
 /** The net of `doc` (nl: netlist(doc)) named `name` other than `except` (the marker's own net) that a marker of that
