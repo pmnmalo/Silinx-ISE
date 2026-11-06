@@ -295,8 +295,9 @@ export async function schematicFromHdl(inst, opts = {}) {
   const { clsOfSig, exprToGates, materialise, sigOfRef, triParts } = mountGateConversion({
     W, addSym, anonNet, ci, connect, moduleLevel, nk, sigByName, typeText
   });
-  const { drawInstance } = mountInstanceDrawing({
-    W, addSym, anonNet, archText, ci, connect, exprToGates, materialise, modsN, moduleLevel, nk, sigOfRef, sp, srcOf
+  const { drawInstance, drawJoins } = mountInstanceDrawing({
+    W, addSym, anonNet, archText, ci, clsOfSig, connect, exprToGates, isPort: s => portSig.has(s), items: mod.items, materialise,
+    modsN, moduleLevel, nk, rwOf: it => itemRW.get(it), sigOfRef, sp, srcOf
   });
 
   // ---- items
@@ -374,6 +375,7 @@ export async function schematicFromHdl(inst, opts = {}) {
     for (const x of [...clocks, ...others]) connect(x.name, W(x), { sym: s.id, pin: sp(x.name) });
     for (const x of outs) connect(x.name, W(x), { sym: s.id, pin: sp(x.name) }, true);
   }
+  drawJoins();
   mergePartDrivers(symbols, nets, nk);
   // hide hdlblock output pins whose signal nobody else uses (internal state)
   for (const s of symbols) {
@@ -401,7 +403,7 @@ export async function schematicFromHdl(inst, opts = {}) {
   doc.symbols = symbols;
 
   // ---- geometry
-  for (const n of nets.values()) n.name = sp(n.name);
+  for (const n of nets.values()) if (!n.part) n.name = sp(n.name);   // (a bus's bits named already, s(0), #2901)
   const conns = [...nets.values()].filter(n => n.eps.length > 0);
   await placeAndRoute(doc, conns, { layout: opts.layout, modules: normModules(opts.modules), nk });
   if (diags.length) doc.importDiagnostics = diags;

@@ -27,7 +27,7 @@ const types = (doc) => doc.symbols.map((s) => s.type + (s.params.module ? `:${s.
 
 test('#405 drawInstance mounted alone: an item that is not an instance, or an instance of no module, is not drawn', () => {
   const added = [];
-  const { drawInstance } = mountInstanceDrawing({ addSym: (...a) => { added.push(a); return { id: 'S1' }; } });
+  const { drawInstance } = mountInstanceDrawing({ addSym: (...a) => { added.push(a); return { id: 'S1' }; }, isPort: () => false, items: [] });
   assert.equal(drawInstance({ kind: 'assign' }, { children: [] }), false);
   assert.equal(drawInstance({ kind: 'instance' }, { children: [] }), false);
   assert.equal(drawInstance({ kind: 'instance' }, { children: [{ blackbox: true }] }), false);

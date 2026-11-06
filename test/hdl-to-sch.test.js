@@ -403,6 +403,11 @@ const EXPECT = {
   'verilog-reg-init': { kinds: { hdlblock: 2, buf: 1 }, moved: false, hdlPath: 'src/ri.v', writes: ['src/ri.v'] },
   'verilog-generate-inst': { kinds: { hdlblock: 4 }, moved: false, hdlPath: 'src/bank.v', writes: ['src/bank.v'] },
   'vhdl-rom-gates': { kinds: { or2: 1, and2: 1, and2b1: 1, xor2: 1, and3b1: 1, slice: 2, hdlblock: 2 }, moved: false, hdlPath: 'src/romdec.vhd', writes: ['src/romdec.vhd'] },
+  // (#2901: the instances drawn, the carries' bits nets, c(1), the sum's joined into its port; was one HDL block)
+  'vhdl-inst-bits': { kinds: { module: 4, slice: 8, busjoin: 1 }, moved: false, hdlPath: 'src/add4.vhd', writes: ['src/add4.vhd'] },
+  'verilog-inst-slices': { kinds: { module: 3, slice: 6, constant: 1, busjoin: 1 }, moved: false, hdlPath: 'src/add4v.v', writes: ['src/add4v.v'] },
+  // (z's instances drawn, joined in z's order; v read by an assignment: its instances one HDL block, as before)
+  'vhdl-inst-bits-to': { kinds: { module: 2, slice: 2, hdlblock: 1, buf: 1, busjoin: 1 }, moved: false, hdlPath: 'src/bitsto.vhd', writes: ['src/bitsto.vhd'] },
 };
 
 for (const c of CASES) {
