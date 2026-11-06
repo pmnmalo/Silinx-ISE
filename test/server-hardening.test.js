@@ -276,3 +276,22 @@ test("#2956 a drawn source's name that would end XST's quotes: refused, as an HD
   fs.copyFileSync(path.resolve('examples/traffic/src/lamps.bool.json'), path.join(dir, 'src', 'la"mps.bool.json'));
   await assert.rejects(generate(dir, 'DrawnQuote'), /file path not allowed in XST's script: "src\/la\\"mps.bool.json"/);
 });
+
+test("#2973 the interface's Rename: the new name by the import gate's rules, as MCP rename_file's, with the same message", async () => {
+  await project('RenameRoute');
+  for (const [to, reason] of [['src/CON.vhd', "reserved name ('CON.vhd')"], ['src/top.vhd.', "name ending with a space or a dot ('top.vhd.')"], ['src/a|b.vhd', "character not allowed in a name (< > : \" | ? *): 'a|b.vhd'"], ['src/.hide.vhd', "hidden file or folder ('.hide.vhd')"]]) {
+    const r = await app.call('POST', '/projects/RenameRoute/rename', { from: 'src/top.vhd', to });
+    assert.deepEqual([r.status, r.body], [400, { error: `'${to}': not renamed: ${reason}` }], to);
+    const m = await mcp('rename_file', { project: 'RenameRoute', from: 'src/top.vhd', to });
+    assert.deepEqual([m.isError, m.content[0].text], [true, `rename_file: '${to}': not renamed: ${reason}`], to);
+  }
+  assert.ok(fs.existsSync(path.join(P.projectDir('RenameRoute'), 'src', 'top.vhd')));
+  const r = await app.call('POST', '/projects/RenameRoute/rename', { from: 'src/top.vhd', to: 'src/main.vhd' });
+  assert.equal(r.status, 200);
+  assert.deepEqual((await P.readProject('RenameRoute')).files.map(f => f.path), ['src/main.vhd']);
+  // a rename undone puts the file back at the name it had, whatever it was (rename-module's rollback)
+  fs.writeFileSync(path.join(P.projectDir('RenameRoute'), 'src', 'old .vhd'), VHD);
+  await P.renameFile('RenameRoute', 'src/old .vhd', 'src/old.vhd');
+  await P.renameFile('RenameRoute', 'src/old.vhd', 'src/old .vhd', { checkName: false });
+  assert.ok(fs.existsSync(path.join(P.projectDir('RenameRoute'), 'src', 'old .vhd')));
+});

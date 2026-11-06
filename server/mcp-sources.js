@@ -124,11 +124,7 @@ export const SOURCE_TOOLS = [
       await readProject(name);
       const a = await sourcePath(name, from), b = await sourcePath(name, to);
       if (/^build(\/|$)/i.test(a) || /^build(\/|$)/i.test(b)) throw toolError('build/ is written by Silinx itself');
-      if (b.split('/').some(s => s.startsWith('.'))) throw toolError(`'${to}': a hidden file or folder`);
-      // the new name as the import gate takes a name (#2830): no reserved name, trailing dot or space, < > : " | ? * (#2956)
-      const { normalizePath } = await import('../core/import-gate.js');
-      const nb = normalizePath(b);
-      if (nb.reason) throw toolError(`'${to}': not renamed: ${nb.reason}`);
+      // (the new name by the import gate's rules: P.renameFile, as the interface's Rename, #2973)
       if (a === b) return { text: `${a}: the same path, nothing renamed.`, data: { project: name, from: a, to: b, links: [] } };
       try { await P.renameFile(name, a, b); } catch (e) { throw toolError(e.message); }
       // the drawings linked to a renamed HDL file (or to one in a renamed folder) follow it

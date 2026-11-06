@@ -12,7 +12,7 @@
 import { DEV_SITE } from './prefs.js';
 import { openOnlyDevice } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
-import { gateMessages, requireGated } from '../../core/import-gate.js';
+import { gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
 import { markUntrusted } from '../../core/trust.js';
 
 const PROJECT_FILE = 'silinx.json';
@@ -455,6 +455,9 @@ export function projectOps(getStore, examples = {}) {
     },
     renameFile: async (name, from, to) => {
       from = notDescriptor(cleanPath(from)); to = notDescriptor(cleanPath(to));
+      // the new name by the import gate's rules for a name, as the local server's Rename (#2973)
+      const gated = normalizePath(to);
+      if (gated.reason) fail(`'${to}': not renamed: ${gated.reason}`);
       const p = await S().load(name);
       const json = clone(p.json);
       const inside = Object.keys(p.files).filter(k => k.startsWith(`${from}/`));
