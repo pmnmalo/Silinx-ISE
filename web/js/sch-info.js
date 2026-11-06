@@ -8,19 +8,24 @@ import { primitiveResource } from '/core/primitives.js';
 import { symbolDrawingSvg } from './sch-svg.js';
 import { clone } from './sch-editor.js';
 
-/** { infoTarget, openInfo } of mountSchEditor (destroyed(), device(), doc(), genLang(), infoDlg(), infoItem(), modules(), placing(), sel(), tool(): its current values). */
+/** { infoTarget, openInfo, symTarget } of mountSchEditor (destroyed(), device(), doc(), genLang(), infoDlg(), infoItem(), modules(), placing(), sel(), tool(): its current values). */
 export function mountSchInfo(ctx) {
   const {
     container, destroyed, device, doc, genLang, infoDlg, infoItem, itemTarget, modules, placing, sel, selected, tool,
     setInfoDlg
   } = ctx;
 
+  // a symbol of the schematic's Symbol Info (by its id; the right-click menu's, #2953)
+  function symTarget(id) {
+    const s = doc().symbols.find(x => x.id === id);
+    return s ? { type: s.type, params: clone(s.params), hdl: s.hdl, preset: presetOf(s.type, s.params) } : null;
+  }
   // the symbol the Symbol Info action is about: the selected symbol, else the one being placed / last picked in the palette
   function infoTarget() {
     const ids = selected('sym');
     if (ids.length === 1 && sel().size === 1) {
-      const s = doc().symbols.find(x => x.id === ids[0]);
-      if (s) return { type: s.type, params: clone(s.params), hdl: s.hdl, preset: presetOf(s.type, s.params) };
+      const t = symTarget(ids[0]);
+      if (t) return t;
     }
     if (tool() === 'place' && placing()) return { type: placing().type, params: clone(placing().params), preset: placing().preset };
     return infoItem() ? itemTarget(infoItem()) : null;
@@ -45,5 +50,5 @@ export function mountSchInfo(ctx) {
     return { part: device(), used: id ? doc().symbols.filter(s => SYMBOLS[s.type]?.prim && primitiveResource(s.type, device().family, s.params) === id).length : null };
   }
 
-  return { infoTarget, openInfo };
+  return { infoTarget, openInfo, symTarget };
 }
