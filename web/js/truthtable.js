@@ -58,13 +58,15 @@ function bestForm(doc, out, goal, label, tip, notation) {
     h('div', {}, h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)), circuit(r.ast));
 }
 
-// the canonical forms in full, the sum of the minterms and the product of the maxterms, then the lists of their terms (#2927)
+// the canonical forms in full, the sum of the minterms and the product of the maxterms, then the lists of their terms
+// (#2927), each on a line of its own (#2947)
 function canonForms(A, out, notation) {
   const expr = (cls, label, title, ast) => h('div', { class: cls, title }, h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`));
   return h('div', { class: 'tt-res tt-canon' },
     expr('tt-canon-sop', 'Canonical SOP', 'The sum of the minterms: every input in every term, the don\'t cares left out', A.canon.sop),
     expr('tt-canon-pos', 'Canonical POS', 'The product of the maxterms: every input in every term, the don\'t cares left out', A.canon.pos),
-    h('div', { class: 'tt-canon-lists' }, h('b', {}, 'Minterm and maxterm lists'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.sigma}`), h('br'), h('code', { 'data-no-i18n': '' }, `${out} = ${A.pi}`)));
+    h('div', { class: 'tt-canon-minterms' }, h('b', {}, 'Minterm list'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.sigma}`)),
+    h('div', { class: 'tt-canon-maxterms' }, h('b', {}, 'Maxterm list'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.pi}`)));
 }
 
 // a minimal SOP or POS as shown (#2928): the solution chosen (`pick`, on the analysis: the first again when the table

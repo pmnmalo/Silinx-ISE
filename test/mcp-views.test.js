@@ -73,7 +73,8 @@ test('related_view: a truth table\'s results, as its editor shows them: the cano
   const r = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'textbook' });
   assert.equal(r.text, `Canonical SOP: f = a'·b'·c + a'·b·c + a·b·c'
 Canonical POS: f = (a + b + c)·(a' + b + c)·(a' + b' + c')
-Minterm and maxterm lists: f = Σm(1, 3, 6) + d(2, 5); f = ΠM(0, 4, 7) · D(2, 5)
+Minterm list: f = Σm(1, 3, 6) + d(2, 5)
+Maxterm list: f = ΠM(0, 4, 7) · D(2, 5)
 Minimal SOP: f = a'·c + b·c'   (2 term(s), 4 literal(s))
 Minimal POS: f = (b + c)·(a' + c')   (2 term(s), 4 literal(s))
 XOR form: f = c ⊕ a·b
@@ -84,7 +85,8 @@ Least delay: XOR form: f = c ⊕ a·b
 
 Canonical SOP: z = 0
 Canonical POS: z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')
-Minterm and maxterm lists: z = Σm(); z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
+Minterm list: z = Σm()
+Maxterm list: z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
 Minimal SOP: z = 0   (0 term(s), 0 literal(s))
 Minimal POS: z = 0   (1 term(s), 0 literal(s))
 NAND form: z = 0

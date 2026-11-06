@@ -41,7 +41,7 @@ export const TT_PT = {
   'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input': 'A POS mínima só com portas NOR (dupla negação); um inversor é uma NOR de uma entrada',
   'Generated from the Boolean algebra, in its HDL logic form': 'Gerado a partir da álgebra booleana, na sua forma da lógica do HDL',
   'Notation:': 'Notação:', 'Notation of the expressions': 'Notação das expressões', 'Canonical SOP': 'Forma canónica SOP', 'Canonical POS': 'Forma canónica POS',
-  'Minterm and maxterm lists': 'Listas de mintermos e maxtermos',
+  'Minterm list': 'Lista de mintermos', 'Maxterm list': 'Lista de maxtermos',
   'The sum of the minterms: every input in every term, the don\'t cares left out': 'A soma dos mintermos: todas as entradas em todos os termos, sem as indiferenças',
   'The product of the maxterms: every input in every term, the don\'t cares left out': 'O produto dos maxtermos: todas as entradas em todos os termos, sem as indiferenças',
   'essential': 'essencial',
