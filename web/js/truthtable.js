@@ -96,6 +96,14 @@ const shapeText = (m) => { const ni = m.inputs.length, no = m.outputs.length; re
 // a menu item as the schematic editor's: an icon and a label (#2505)
 const menuItem = (icon, label, title, onclick, cls = '') => h('button', { type: 'button', class: `tt-menu-item tb-menu-item ${cls}`, title, html: `${ICON[icon]}<span>${label}</span>`, onclick });
 
+// the Karnaugh map's order of the variables (#2924), saved with the table: MSB → LSB by columns then rows (the default),
+// or by rows then columns
+function kmapOrderSelect(order, set) {
+  const osel = h('select', { class: 'tt-kmap-order', title: 'Order of the variables on the map, from the most significant to the least', onchange: () => set(osel.value) },
+    ...[['cols', 'MSB → LSB by columns, then rows'], ['rows', 'MSB → LSB by rows, then columns']].map(([v, l]) => h('option', { value: v, selected: (order || 'cols') === v }, l)));
+  return h('label', { class: 'tt-check' }, 'Order:', ' ', osel);
+}
+
 export function mountTtEditor(container, opts = {}) {
   let M = normalizeTable(opts.model);
   let out = M.outputs[0];
@@ -256,12 +264,7 @@ export function mountTtEditor(container, opts = {}) {
       const r = h('input', { type: 'radio', name: `tt-grp-${uid}`, value: g, checked: groups === g, onchange: () => { groups = g; renderKmap(); } });
       grpSel.append(h('label', { class: 'tt-check' }, r, ` ${label}`));
     }
-    // the variables' order (#2924), saved with the table: MSB → LSB by columns then rows (the default), or by rows
-    if (n >= 2) {
-      const osel = h('select', { class: 'tt-kmap-order', title: 'Order of the variables on the map, from the most significant to the least', onchange: () => { if (osel.value === 'rows') M.kmapOrder = 'rows'; else delete M.kmapOrder; changed(); } },
-        ...[['cols', 'MSB → LSB by columns, then rows'], ['rows', 'MSB → LSB by rows, then columns']].map(([v, l]) => h('option', { value: v, selected: (M.kmapOrder || 'cols') === v }, l)));
-      grpSel.append(h('label', { class: 'tt-check' }, 'Order:', ' ', osel));
-    }
+    if (n >= 2) grpSel.append(kmapOrderSelect(M.kmapOrder, o => { if (o === 'rows') M.kmapOrder = 'rows'; else delete M.kmapOrder; changed(); }));
     const L = kmapLayout(n, M.kmapOrder || 'cols');
     const res = shown(groups === 'pos' ? A.pos : A.sop);
     const C = 40, rowsN = L.rowCodes.length, colsN = L.colCodes.length;
