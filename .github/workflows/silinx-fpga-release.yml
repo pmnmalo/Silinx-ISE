@@ -62,4 +62,4 @@ jobs:
       - name: Publish
         run: |
           npm install --global npm@11.21.0 --ignore-scripts --no-audit --no-fund
-          npm publish out/silinx-fpga-*.tgz --provenance --access public --ignore-scripts
+          npm publish ./out/silinx-fpga-*.tgz --provenance --access public --ignore-scripts
