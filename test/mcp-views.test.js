@@ -1,7 +1,7 @@
 // The MCP server's related views (#2834, server/mcp-views.js): related_view makes, read-only and writing nothing, the
 // views the interface shows beside a source: an HDL source's translation (traffic's VHDL to Verilog, pong's Verilog to
 // VHDL), a state diagram's ASM chart (traffic's), a truth table's schematic (traffic's lamps), a Petri net's state machine,
-// each the same as the core's converters make; an ASM chart that is not a plain state machine, a state diagram with errors
+// each the same as the core's converters make; a truth table's results, as the editor's results panel (#2927); an ASM chart that is not a plain state machine, a state diagram with errors
 // and the wrong kinds of source refused, each with its reason.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
 import { translateSource } from '../core/translate.js';
 import { fsmToAsm, normalizeFsm } from '../core/fsm.js';
-import { schematicFromTable, normalizeTable } from '../core/logic.js';
+import { schematicFromTable, normalizeTable, newTable, canonicalAsts, formatExpr } from '../core/logic.js';
 import { newPetri } from '../core/petri.js';
 import { petriToFsm } from '../core/petri-fsm.js';
 
@@ -66,6 +66,41 @@ test('related_view: a Verilog source in VHDL; a Petri net\'s state machine', asy
   assert.deepEqual([fsm.data.model, fsm.data.states, fsm.data.truncated], [want.fsm, want.states, !!want.truncated]);
 });
 
+test('related_view: a truth table\'s results, as its editor shows them: the canonical SOP and POS first, then their lists (#2927)', async () => {
+  await call('new_project', { name: 'q' });
+  await call('write_file', { project: 'q', path: 'src/m.bool.json', text: JSON.stringify({ ...newTable('m', ['a', 'b', 'c'], ['f', 'z']), table: { f: '01X10X10', z: '00000000' } }) });
+  const before = files('q');
+  const r = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'textbook' });
+  assert.equal(r.text, `Canonical SOP: f = a'·b'·c + a'·b·c + a·b·c'
+Canonical POS: f = (a + b + c)·(a' + b + c)·(a' + b' + c')
+Minterm and maxterm lists: f = Σm(1, 3, 6) + d(2, 5); f = ΠM(0, 4, 7) · D(2, 5)
+Minimal SOP: f = a'·c + b·c'   (2 term(s), 4 literal(s))
+Minimal POS: f = (b + c)·(a' + c')   (2 term(s), 4 literal(s))
+XOR form: f = c ⊕ a·b
+NAND form: f = ((a'·c)'·(b·c')')'
+NOR form: f = ((b + c)' + (a' + c')')'
+Least number of gates: XOR form: f = c ⊕ a·b
+Least delay: XOR form: f = c ⊕ a·b
+
+Canonical SOP: z = 0
+Canonical POS: z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')
+Minterm and maxterm lists: z = Σm(); z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
+Minimal SOP: z = 0   (0 term(s), 0 literal(s))
+Minimal POS: z = 0   (1 term(s), 0 literal(s))
+NAND form: z = 0
+NOR form: z = 0
+Least number of gates: Minimal SOP: z = 0
+Least delay: Minimal SOP: z = 0`);
+  assert.deepEqual([r.data.view, r.data.notation, r.data.inputs, r.data.outputs.map(o => o.output)], ['results', 'textbook', ['a', 'b', 'c'], ['f', 'z']]);
+  // the editor's default notation, the core's canonical forms
+  const s = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results' });
+  assert.equal(s.data.notation, 'slash');
+  assert.equal(s.data.outputs[0].canonicalSop, `f = ${formatExpr(canonicalAsts('01X10X10', ['a', 'b', 'c']).sop, 'slash')}`);
+  assert.equal(s.data.outputs[0].canonicalPos, 'f = (a + b + c).(/a + b + c).(/a + /b + /c)');
+  assert.deepEqual(files('q'), before);
+  await fails({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'latex' }, 'notation: slash, slash-compact, textbook, compact, ascii, vhdl, verilog');
+});
+
 test('related_view refuses: an ASM chart that is not a plain state machine, a state diagram with errors, the wrong kind of source, a file not there', async () => {
   await call('new_project_from_example', { name: 'b', example: 'blinky' });
   await fails({ project: 'b', path: 'src/speed_ctrl.asm.json', view: 'fsm' }, 'speed_ctrl.asm.json cannot be shown as a state diagram: it is not a plain state machine: it has internal registers (cnt_f, deb_f, cnt_s, deb_s, level, ticks); it has generics/parameters (DEBOUNCE); it has registered outputs (step); it synchronises inputs; it has logic that runs on every cycle besides the states');
@@ -75,6 +110,7 @@ test('related_view refuses: an ASM chart that is not a plain state machine, a st
   assert.match(r.text, /^related_view: the ASM chart of empty\.fsm\.json: /);
   await fails({ project: 'b', path: 'src/top.vhd', view: 'asm' }, 'src/top.vhd: a state diagram (.fsm.json) has an ASM chart');
   await fails({ project: 'b', path: 'src/top.vhd', view: 'schematic' }, 'src/top.vhd: a truth table (.bool.json, .tt.json) has a schematic');
+  await fails({ project: 'b', path: 'src/top.vhd', view: 'results' }, 'src/top.vhd: a truth table (.bool.json, .tt.json) has results');
   await fails({ project: 'b', path: 'src/top.vhd', view: 'fsm' }, 'src/top.vhd: an ASM chart (.asm.json) or a Petri net (.pn.json) has a state diagram');
   await fails({ project: 'b', path: 'src/speed_ctrl.asm.json', view: 'translation' }, 'src/speed_ctrl.asm.json: an HDL source (.vhd, .v) is translated');
   await fails({ project: 'b', path: 'src/none.vhd', view: 'translation' }, 'no file \'src/none.vhd\' in the project \'b\'');

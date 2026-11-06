@@ -75,7 +75,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // no Check my answer, no My expression (#694); the NAND and NOR forms below the minimal ones
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-caption`)].map((c) => c.textContent), T), ['Truth table', 'Notes', 'Expression', 'Karnaugh map', 'Results']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-mine-in, ${t} .tt-mine-out`).length, T), 0);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Minimal SOP', 'Minimal POS', 'XOR form', 'NAND form', 'NOR form', 'Least number of gates', 'Least delay']);   // (the last two: #1427)
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Canonical SOP', 'Minimal SOP', 'Minimal POS', 'XOR form', 'NAND form', 'NOR form', 'Least number of gates', 'Least delay']);   // (the last two: #1427)
   // no list of the essential prime implicants below them (#705): the K-map's legend marks them
   assert.deepEqual(await page.eval((t) => [document.querySelectorAll(`${t} .tt-ess-list`).length, /Essential prime implicants/.test(document.querySelector(t).textContent)], T), [0, false]);
   assert.deepEqual(await page.eval((t) => [`${t} .tt-nand`, `${t} .tt-nor`].map((q) => [document.querySelector(`${q} .tt-expr`).textContent, document.querySelector(`${q} .tt-cost`).textContent]), T), [
@@ -460,7 +460,7 @@ end rtl;
   assert.deepEqual((await texts()).groups, ['a + b + c', 'a + /b + /c', '/a + b + /c', '/a + /b + c']);
   await page.click(`${T} .tt-groups input[value=sop]`);
   // below the XOR form, the NAND and NOR forms (#694), then those of the fewest gates and of the least delay (#1427)
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Minimal SOP', 'Minimal POS', 'XOR form', 'NAND form', 'NOR form', 'Least number of gates', 'Least delay']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Canonical SOP', 'Minimal SOP', 'Minimal POS', 'XOR form', 'NAND form', 'NOR form', 'Least number of gates', 'Least delay']);
   // co: the carry a·b + c·(a ⊕ b), 5 literals against 6
   await page.click(`${T} .tt-tab[data-out=co]`);
   let x = await texts();

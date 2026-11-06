@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseExpr, formatExpr, exprVars, exprColumn, canonical, minimize, minimalAst, gateCount, primeImplicants,
+  parseExpr, formatExpr, exprVars, exprColumn, canonical, canonicalAsts, minimize, minimalAst, gateCount, primeImplicants,
   cubeMinterms, kmapLayout, kmapRects, gray, newTable, normalizeTable, validateTable, reshapeTable, analyzeOutput,
   generateTableHdl, dontCaresInHdl, truthTableFromModule, schematicFromTable, schematicErrors, LogicError,
   minimizeXor, exprCost, MAX_XOR_INPUTS, gateForm, outputForm, FORMS,
@@ -137,6 +137,61 @@ test('canonical forms Σm / ΠM with don\'t cares', () => {
   assert.equal(c.sigma, 'Σm(1, 3, 6) + d(2, 5)');
   assert.equal(c.pi, 'ΠM(0, 4, 7) · D(2, 5)');
 });
+
+// a canonical form of a column, by the textbook's rule written out as text (an independent reference): a minterm's
+// literal complemented where the row's bit is 0, a maxterm's where it is 1
+const refCanon = (col, vars, kind) => {
+  const n = vars.length, rows = [...col].map((c, r) => (c === (kind === 'sop' ? '1' : '0') ? r : -1)).filter(r => r >= 0);
+  if (!rows.length) return kind === 'sop' ? '0' : '1';
+  const bit = (r, j) => (r >> (n - 1 - j)) & 1;
+  if (kind === 'sop') return rows.map(r => vars.map((v, j) => (bit(r, j) ? v : `${v}'`)).join('·')).join(' + ');
+  const t = rows.map(r => vars.map((v, j) => (bit(r, j) ? `${v}'` : v)).join(' + '));
+  return t.map(x => (vars.length > 1 && t.length > 1 ? `(${x})` : x)).join('·');
+};
+
+test('canonical SOP and POS as expressions: every input in every term, each equal to the column on every row, the don\'t cares left out (#2927)', () => {
+  // a 3-input table with don't cares, in every notation
+  const v3 = ['a', 'b', 'c'], c = canonicalAsts('01X10X10', v3);
+  assert.deepEqual(['textbook', 'compact', 'slash', 'slash-compact', 'ascii'].map(N => [formatExpr(c.sop, N), formatExpr(c.pos, N)]), [
+    ["a'·b'·c + a'·b·c + a·b·c'", "(a + b + c)·(a' + b + c)·(a' + b' + c')"],
+    ["a'b'c + a'bc + abc'", "(a + b + c)(a' + b + c)(a' + b' + c')"],
+    ['/a./b.c + /a.b.c + a.b./c', '(a + b + c).(/a + b + c).(/a + /b + /c)'],
+    ['/a/bc + /abc + ab/c', '(a + b + c)(/a + b + c)(/a + /b + /c)'],
+    ["a'*b'*c + a'*b*c + a*b*c'", "(a + b + c)*(a' + b + c)*(a' + b' + c')"],
+  ]);
+  assert.equal(formatExpr(c.sop, 'vhdl'), '(not a and not b and c) or (not a and b and c) or (a and b and not c)');
+  assert.equal(formatExpr(c.pos, 'verilog'), '(a | b | c) & (~a | b | c) & (~a | ~b | ~c)');
+  // the degenerate cases: constants, one input, one term, all don't cares
+  const f = (col, vars) => { const x = canonicalAsts(col, vars); return [formatExpr(x.sop), formatExpr(x.pos)]; };
+  assert.deepEqual(f('0000', ['a', 'b']), ['0', "(a + b)·(a + b')·(a' + b)·(a' + b')"]);
+  assert.deepEqual(f('1111', ['a', 'b']), ["a'·b' + a'·b + a·b' + a·b", '1']);
+  assert.deepEqual(f('01', ['x']), ['x', 'x']);
+  assert.deepEqual(f('10', ['x']), ["x'", "x'"]);
+  assert.deepEqual(f('00', ['x']), ['0', "x·x'"]);
+  assert.deepEqual(f('XX', ['x']), ['0', '1']);
+  assert.deepEqual(f('0100', ['a', 'b']), ["a'·b", "(a + b)·(a' + b)·(a' + b')"]);
+  assert.deepEqual(f('1011', ['a', 'b']), ["a'·b' + a·b' + a·b", "a + b'"]);
+  // random tables of 1 to 8 inputs: as the reference's text, equal to the column on every row but the don't cares
+  // (where the SOP is 0 and the POS 1: they are left out), and read back by the parser as the same function
+  const r = rng(2927);
+  for (let k = 0; k < 40; k++) {
+    const n = 1 + (k % 8), vars = Array.from({ length: n }, (_, j) => `x${j}`), col = randCol(r, n, k % 3 ? 0.2 : 0);
+    const x = canonicalAsts(col, vars);
+    assert.equal(formatExpr(x.sop), refCanon(col, vars, 'sop'), col);
+    assert.equal(formatExpr(x.pos), refCanon(col, vars, 'pos'), col);
+    const sop = exprColumn(x.sop, vars), pos = exprColumn(x.pos, vars);
+    for (let row = 0; row < col.length; row++) {
+      if (col[row] === 'X') { assert.equal(sop[row], '0'); assert.equal(pos[row], '1'); } else { assert.equal(sop[row], col[row]); assert.equal(pos[row], col[row]); }
+    }
+    if (n <= 4) for (const N of ['textbook', 'slash', 'ascii']) assert.equal(exprColumn(parseExpr(formatExpr(x.sop, N), { vars }), vars), sop, N);
+  }
+  // 8 inputs, every row 1: 256 minterms of 8 literals each
+  const all = canonicalAsts('1'.repeat(256), V8);
+  assert.equal(all.sop.args.length, 256);
+  assert.ok(all.sop.args.every(t => t.t === 'and' && t.args.length === 8));
+  assert.equal(exprColumn(all.sop, V8), '1'.repeat(256));
+});
+const V8 = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
 // brute force: the cheapest cover of the 1s (terms, then literals) by any implicants, by DP over covered sets
 function bruteMin(col, n, target = '1') {
@@ -400,6 +455,8 @@ test('analyzeOutput: everything shown for an output', () => {
   const doc = { ...newTable('m', ['a', 'b', 'c'], ['f']), table: { f: '01X1X0X1' } };
   const a = analyzeOutput(doc, 'f');
   assert.equal(a.sigma, 'Σm(1, 3, 7) + d(2, 4, 6)');
+  assert.equal(formatExpr(a.canon.sop, 'compact'), "a'b'c + a'bc + abc");
+  assert.equal(formatExpr(a.canon.pos, 'compact'), "(a + b + c)(a' + b + c')");
   assert.equal(formatExpr(a.sop.ast, 'compact'), "b + a'c");
   assert.equal(formatExpr(a.pos.ast, 'compact'), "c(a' + b)");
   assert.deepEqual(a.sop.gates, { and: 1, or: 1, not: 1, literals: 3, inputs: 4 });
