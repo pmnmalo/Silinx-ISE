@@ -724,6 +724,34 @@ test('#2137 nextpnr not starting (its chip database unreachable): Place & Route 
   assert.ok(!store['gates.bit']);
 });
 
+// #2818: nextpnr stopping on an exception of its own (a WebAssembly exception has no message) with no ERROR line: its
+// last line says where it stopped
+test('#2818 nextpnr stopping with no ERROR line: Place & Route fails, its last line said', { timeout: 300000 }, async () => {
+  const lines = [], store = { 'open/gates.json': gates() };
+  let device, db;
+  const crash = async (args, files, onLine) => {
+    onLine('Info: Running main analytical placer, max placement attempts per cell = 732655.');
+    onLine('Info:     at iteration #11, type ALL: wirelen solved = 2092, spread = 11208, legal = 15230; time = 0.04s');
+    onLine('');
+    throw new (class Exception {})();   // (as WebAssembly.Exception: no message)
+  };
+  const io = { log: l => lines.push(l), sources: () => [], ucf: ucf(), ucfName: 'gates.ucf',
+    device: () => (device ||= loadDeviceCache(findDeviceGraph('xc3s250ecp132-4'))), bitDb: () => (db ||= loadDb('xc3s250ecp132', { graph: io.device() })),
+    nextpnr: { spartan3e: { chipdb: async () => new Uint8Array(1), run: crash } },
+    write: (name, data) => { store[name] = data; return name; }, read: name => store[name] ?? null, save: () => {} };
+  const r = await runFlow({ top: 'gates', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
+    startupClk: 'JtagClk', engine: 'nextpnr', steps: ['translate', 'map', 'par'] }, io);
+  assert.equal(r.ok, false);
+  const at = lines.findIndex(l => l.startsWith('ERROR:'));
+  assert.deepEqual(lines.slice(at), [
+    'ERROR:Silinx - nextpnr failed: it stopped on an error',
+    '  nextpnr stopped with no error message, after: Info:     at iteration #11, type ALL: wirelen solved = 2092, spread = 11208, legal = 15230; time = 0.04s',
+    'The Silinx toolchain does not support this yet: implement the design in an ISE mode (Toolchain Settings).',
+    '=== SILINX FAILED par (exit 1) ===',
+  ]);
+  assert.deepEqual(lines.filter(l => /warning/i.test(l)), []);
+});
+
 test('#2137 engineOf: nextpnr, whatever a project saved (silinx, auto, nextpnr: #2136\'s choice) or none', () => {
   for (const impl of [undefined, {}, { engine: 'silinx' }, { engine: 'auto' }, { engine: 'nextpnr' }, { engine: 'vpr' }]) assert.equal(engineOf(impl), 'nextpnr', JSON.stringify(impl));
 });

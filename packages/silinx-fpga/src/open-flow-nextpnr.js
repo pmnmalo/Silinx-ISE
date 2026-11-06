@@ -380,7 +380,12 @@ export function mountNextpnrSteps(ctx) {
       const t1 = now(), lines = [];
       const args = ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'routed.json', '--seed', String(seed),
         ...(mhz ? ['--freq', mhz.toFixed(3)] : []), ...(sdc ? ['--sdc', 'design.sdc'] : []), '--timing-allow-fail'];
-      const errors = () => lines.filter(l => /^ERROR:/.test(l)).slice(0, 20);
+      // (none: nextpnr stopped on an exception of its own with no ERROR line, a WebAssembly exception without a message
+      // before nextpnr-spartan 1.1.1: where it stopped, its last line, #2818)
+      const errors = () => {
+        const e = lines.filter(l => /^ERROR:/.test(l)).slice(0, 20), last = lines.filter(l => l.trim()).at(-1);
+        return e.length || !last ? e : [`nextpnr stopped with no error message, after: ${last.trim()}`];
+      };
       let files;
       try {
         files = await io.nextpnr.spartan3e.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => lines.push(l));
