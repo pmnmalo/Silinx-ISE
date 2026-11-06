@@ -108,7 +108,7 @@ function dragStart(e) {
     tab.before(slot);
     tab.classList.add('tab-drag-src');
     document.body.classList.add('dragging-tab');
-    addEventListener('keydown', esc, true);
+    addEventListener('keydown', onEscape, true);
     return true;
   };
   // the slot where the tab would land: before or after the tab under the pointer (its half), or at the row's end
@@ -139,7 +139,7 @@ function dragStart(e) {
     place(ev.clientX, ev.clientY);
   };
   const finish = commit => {
-    removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); removeEventListener('keydown', esc, true);
+    removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); removeEventListener('keydown', onEscape, true);
     if (!slot) return;
     // where it lands: the first tab shown after the slot in its row (none: the row's end)
     let ref = slot.nextElementSibling;
@@ -152,7 +152,7 @@ function dragStart(e) {
     if (to) moveTab(doc, to.side, to.ref);
   };
   const up = ev => { if (ev.pointerId === e.pointerId) finish(ev.type === 'pointerup'); };
-  const esc = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); } };
+  const onEscape = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); } };
   addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
 

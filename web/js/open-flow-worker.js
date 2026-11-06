@@ -48,7 +48,7 @@ async function prepare({ prepare: d, assets, yosys, nextpnr, root }) {
   const pruned = await pruneAssetCache(root, [base.href, new URL('.', yosys).href, ...(nextpnr ? [new URL('..', nextpnr).href] : [])]);
   const urls = [new URL(`devices/${d.graph}`, base), ...dbUrls(d, base),
     ...YOSYS_FILES.map(f => new URL(f, yosys)),
-    ...(nextpnr && d.nextpnr ? [...nextpnrFiles(d.family === 'spartan6' ? 'spartan6' : 'spartan3e'), nextpnrChipdb(d.device)].map(f => new URL(f, nextpnr)) : [])];
+    ...(nextpnr && d.nextpnr ? [...nextpnrFiles(familyProfile(d.family).openFlow?.bitDb === 's6' ? 'spartan6' : 'spartan3e'), nextpnrChipdb(d.device)].map(f => new URL(f, nextpnr)) : [])];
   return { ...await prefetchAssets(urls, { fetchFn: netFetch }), pruned };
 }
 // a device's bit database files: the Spartan-3E's in bitdb/, the Spartan-6's in bitdb/s6 (#2103)

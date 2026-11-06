@@ -117,7 +117,7 @@ uiTest('#263 a long press opens the right-click menu of a Design-pane row, its b
   await page.waitFor(() => [...document.querySelectorAll('#doc-tabs .tab')].some((t) => /cnt\.vhd/.test(t.textContent)), [], { what: 'the tab of cnt.vhd' });
   const tab = await page.eval(() => [...document.querySelectorAll('#doc-tabs .tab')].findIndex((t) => /cnt\.vhd/.test(t.textContent)));
   await press(page, '#doc-tabs .tab', { index: tab });
-  assert.deepEqual(await menuItems(page), ['Close', 'Close Others', 'Close All']);
+  assert.deepEqual(await menuItems(page), ['Close', 'Close Others', 'Close All', 'Show Verilog Beside']);   // (and its related views, #2834)
   await closeAll(page);
   const tabs = await page.eval(() => document.querySelectorAll('#doc-tabs .tab').length);
   await press(page, '#doc-tabs .tab', { ms: 100 });
