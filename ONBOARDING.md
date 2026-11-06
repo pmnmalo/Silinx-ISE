@@ -133,6 +133,10 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
 
 ## 6. Lessons learnt (things that bit us)
 
+- **A worktree runs `npm ci` of its own.** Node looks for a package in the `node_modules` of every folder above
+  the script's, so a worktree under `.claude/worktrees/` with none of its own runs on the main checkout's, which may
+  be far behind: #2949's "regression" of the design corpus was nextpnr 0.15.0 measured against 1.1.0's expectations.
+  `test/designs-corpus/run.mjs` says so (`scripts/installed-packages.mjs`) and refuses `--update` then.
 - **Intermittent UI tests are usually real races in the app.** The usual causes:
   - a DOM rebuilt between a press and its release (a click lost);
   - a view refit after the user started dragging;
