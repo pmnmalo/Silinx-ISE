@@ -8,6 +8,9 @@
 //     head of their default branch: how many commits behind, and which of the files the designs use changed
 //   - the Model Checking Contest's models of the diagram corpus (test/diagram-corpus/mcc.json: a year's
 //     archives), against the latest year of the contest
+//   - the packages pinned by a GitHub release's tarball (package.json, packages/silinx-fpga/package.json: the
+//     Spartan-6 nextpnr's, https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-vX.Y.Z/…, #2934),
+//     against the repository's latest tag of the same prefix (spartan6-v*)
 // What is behind becomes one issue, "Pinned sources: newer versions available" (labels enhancement and
 // tests & CI), opened or updated (its text replaced); none when all are current, and the issue is closed
 // when they become so. As scripts/report-failure.mjs (#251), the issue is written by the workflow.
@@ -29,7 +32,16 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const TITLE = 'Pinned sources: newer versions available';
 export const LABELS = ['enhancement', 'tests & CI'];
 
-/** The pins of the repository at `root`: [{ kind, name, file, … }] (kind: yosys-tests, commit, mcc). */
+// The package.json files whose dependencies may be pinned by a release's URL
+const PACKAGE_FILES = ['package.json', 'packages/silinx-fpga/package.json'];
+
+/** A GitHub release asset's URL: { repo, tag, prefix, version } ('spartan6-v0.1.3': prefix 'spartan6-v'), or null. */
+export function parseReleaseUrl(url) {
+  const m = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/releases\/download\/((.*?v)(\d+\.\d+\.\d+))\/[^/]+$/.exec(String(url || ''));
+  return m ? { repo: m[1], tag: m[2], prefix: m[3], version: m[4] } : null;
+}
+
+/** The pins of the repository at `root`: [{ kind, name, file, … }] (kind: yosys-tests, commit, mcc, release). */
 export function collectPins(root = ROOT, { testsPin = YOSYS_TESTS_PIN } = {}) {
   const read = f => JSON.parse(fs.readFileSync(path.join(root, f), 'utf8'));
   const pkg = read('package.json');
@@ -44,6 +56,20 @@ export function collectPins(root = ROOT, { testsPin = YOSYS_TESTS_PIN } = {}) {
   const mcc = read('test/diagram-corpus/mcc.json');
   const years = [...new Set(mcc.nets.map(n => +(/mcc\.lip6\.fr\/(\d{4})\//.exec(n.url) || [])[1]).filter(Boolean))];
   pins.push({ kind: 'mcc', name: 'diagram corpus: Model Checking Contest models', file: 'test/diagram-corpus/mcc.json', year: Math.max(...years), models: mcc.nets.map(n => n.instance) });
+  // (one pin per package and URL: the files that pin it the same way listed together)
+  const releases = new Map();
+  for (const file of PACKAGE_FILES) {
+    if (!fs.existsSync(path.join(root, file))) continue;
+    const json = read(file);
+    for (const [name, spec] of Object.entries({ ...json.dependencies, ...json.optionalDependencies })) {
+      const rel = parseReleaseUrl(spec);
+      if (!rel) continue;
+      const key = `${name} ${spec}`;
+      if (releases.has(key)) releases.get(key).files.push(file);
+      else releases.set(key, { kind: 'release', name, files: [file], ...rel });
+    }
+  }
+  for (const pin of releases.values()) pins.push({ ...pin, file: pin.files.join(', ') });
   return pins;
 }
 
@@ -120,11 +146,30 @@ export function checkMcc(pin, years) {
     notes: latest > pin.year ? [`the models of MCC ${latest} (https://mcc.lip6.fr/${latest}/models.php): their archives' SHA-256 and expected values change with them`] : [] };
 }
 
+/** -1 / 0 / 1: versions X.Y.Z compared as numbers. */
+export function compareVersions(a, b) {
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0) ? -1 : 1;
+  return 0;
+}
+
+/** A release pin against its repository's tags of the same prefix (refs: their ls-remote): { pin, behind, current, latest, notes }. */
+export function checkRelease(pin, refs) {
+  const versions = Object.keys(refs).filter(r => r.startsWith(`refs/tags/${pin.prefix}`)).map(r => r.slice(10 + pin.prefix.length)).filter(v => /^\d+\.\d+\.\d+$/.test(v));
+  const latest = versions.sort(compareVersions).at(-1);
+  if (!latest) return { pin, current: pin.tag, latest: '?', behind: false, notes: [`no ${pin.prefix}* tag in ${pin.repo}`] };
+  const behind = compareVersions(latest, pin.version) > 0;
+  return { pin, current: pin.tag, latest: `${pin.prefix}${latest}`, behind,
+    notes: behind ? [`a "nextpnr update" pull request: the URL's tag and file name in ${pin.file}, \`npm install\`; its comparison reviewed (#2935)`] : [] };
+}
+
 const HOW = {
   'yosys-tests': 'with the Yosys update: `YOSYS_TESTS_PIN` (the tag and its commit), `npm run test:corpus -- --update`, test/corpus/README.md',
   commit: 'test/designs-corpus/manifest.json (the commit), then `npm run fetch:designs` and `npm run test:designs`; review the changes, `--update` records them',
   mcc: 'test/diagram-corpus/mcc.json (url, sha256, file, expected: the contest\'s consensus), `npm run fetch:diagrams`, `npm run test:diagrams`',
+  release: 'the release\'s URL in the package.json (its tag and its file name), `npm install`, then the package\'s tests and the comparison of its pull request',
 };
+const KIND_NAMES = { commit: 'the design corpus', mcc: 'the MCC models', 'yosys-tests': 'Yosys\'s test designs', release: 'the packages pinned by a release' };
 
 /** The issue's text for the checks that are behind (and those that could not be read). */
 export function issueBody(checks, date) {
@@ -134,7 +179,7 @@ export function issueBody(checks, date) {
   '| source | file | pinned | latest | notes |', '|---|---|---|---|---|'];
   for (const c of behind) L.push(`| ${c.pin.name}${c.pin.repo ? ` ([${c.pin.repo}](https://github.com/${c.pin.repo}))` : ''} | ${c.pin.file} | ${c.current} | ${c.latest} | ${c.notes.join('; ')} |`);
   L.push('', 'To update (each a change of its own, reviewed: new sources can change the results):', '');
-  for (const kind of [...new Set(behind.map(c => c.pin.kind))]) L.push(`- ${kind === 'commit' ? 'the design corpus' : kind === 'mcc' ? 'the MCC models' : 'Yosys\'s test designs'}: ${HOW[kind]}`);
+  for (const kind of [...new Set(behind.map(c => c.pin.kind))]) L.push(`- ${KIND_NAMES[kind]}: ${HOW[kind]}`);
   const unread = checks.filter(c => !c.behind && c.notes.length);
   if (unread.length) L.push('', 'Not checked:', '', ...unread.map(c => `- ${c.pin.name}: ${c.notes.join('; ')}`));
   L.push('', '(Written by the workflow: the next month\'s check replaces this text, and closes the issue when all are current.)');
@@ -165,7 +210,7 @@ export async function checkAll(pins, net) {
         const years = [];
         for (let y = pin.year + 1; y <= new Date().getUTCFullYear(); y++) if (await net.exists(`https://mcc.lip6.fr/${y}/models.php`)) years.push(y);
         out.push(checkMcc(pin, years));
-      }
+      } else if (pin.kind === 'release') out.push(checkRelease(pin, await net.lsRemote(`https://github.com/${pin.repo}.git`, `refs/tags/${pin.prefix}*`)));
     } catch (e) {
       out.push({ pin, current: pin.tag || pin.commit?.slice(0, 7) || String(pin.year), latest: '?', behind: false, notes: [`could not be checked: ${e.message.split('\n')[0]}`] });
     }
