@@ -722,3 +722,81 @@ end;
 `,
   },
 });
+
+// VHDL: internal vectors not from 0 read by bits and slices (#2903): c (3 downto 1) its net named c(3:1), its bus taps
+// its own bits; d (1 to 3) as written, d(1:3), its bits tapped, its slice an HDL block
+add({
+  name: 'vhdl-vec-not-0', module: 'vnz', file: 'src/vnz.vhd', tb: 'tb_vnz', until: 1e6,
+  files: {
+    'src/vnz.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+entity vnz is
+  port (a : in std_logic_vector(3 downto 0); y, u : out std_logic; z, w : out std_logic_vector(1 downto 0));
+end vnz;
+architecture r of vnz is
+  signal c : std_logic_vector(3 downto 1);
+  signal d : std_logic_vector(1 to 3);
+begin
+  c <= a(3 downto 1) and a(2 downto 0);
+  y <= c(3);
+  z <= c(2 downto 1);
+  d <= a(3 downto 1) xor a(2 downto 0);
+  u <= d(3);
+  w <= d(1 to 2);
+end r;
+`,
+    'sim/tb_vnz.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity tb_vnz is end;
+architecture t of tb_vnz is
+  signal a : std_logic_vector(3 downto 0);
+  signal y, u : std_logic;
+  signal z, w : std_logic_vector(1 downto 0);
+begin
+  dut: entity work.vnz port map (a => a, y => y, u => u, z => z, w => w);
+  process begin
+    for i in 0 to 15 loop
+      a <= std_logic_vector(to_unsigned(i, 4));
+      wait for 10 ns;
+      assert y = (a(3) and a(2)) and z = (a(2 downto 1) and a(1 downto 0)) report "c" severity error;
+      assert u = (a(1) xor a(0)) and w = (a(3 downto 2) xor a(2 downto 1)) report "d" severity error;
+    end loop;
+    wait;
+  end process;
+end;
+`,
+  },
+});
+
+// Verilog: the same (#2903): wire [3:1] c, its net c[3:1]; wire [1:3] d, d[1:3]
+add({
+  name: 'verilog-vec-not-0', module: 'vnzv', file: 'src/vnzv.v', tb: 'tb_vnzv', until: 1e6,
+  files: {
+    'src/vnzv.v': `module vnzv(input [3:0] a, output y, output u, output [1:0] z, output [1:0] w);
+  wire [3:1] c;
+  wire [1:3] d;
+  assign c = a[3:1] & a[2:0];
+  assign y = c[3];
+  assign z = c[2:1];
+  assign d = a[3:1] ^ a[2:0];
+  assign u = d[3];
+  assign w = d[1:2];
+endmodule
+`,
+    'sim/tb_vnzv.v': `\`timescale 1ns/1ps
+module tb_vnzv; reg [3:0] a = 0; wire y, u; wire [1:0] z, w;
+  vnzv dut(.a(a), .y(y), .u(u), .z(z), .w(w));
+  integer i;
+  initial begin
+    for (i = 0; i < 16; i = i + 1) begin
+      a = i; #10;
+      if (y !== (a[3] & a[2]) || z !== (a[2:1] & a[1:0])) $display("c at %0d", i);
+      if (u !== (a[1] ^ a[0]) || w !== (a[3:2] ^ a[2:1])) $display("d at %0d", i);
+    end
+    $finish;
+  end
+endmodule
+`,
+  },
+});
