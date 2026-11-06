@@ -101,7 +101,8 @@ board or a PROM) without the user's say.
      A file refused is left out and the import goes on; a bomb refuses the whole import.
 2. **Safe output:** what a file names (a module, a port, a label, a comment, a file) reaches the page only as text:
    `textContent`, attributes set through the DOM, SVG text escaped (`web/js/dom.js` `esc`). `test/safe-output.test.js`
-   fails on HTML built from a non-constant string that is not among the reviewed sinks, and
+   fails on HTML built from a non-constant string that is not among the reviewed sinks (every spelling of a sink, in
+   `web/js` and the pages' inline scripts; the SVG and HTML templates of `core/` and `server/` too, #2986), and
    `test/ui/safe-output.test.js` opens every kind of drawing and an HDL source with a payload in each text field. The
    Content Security Policy (`server/csp.js`) runs no inline script but the page's own, by hash, so an injection that
    slipped through still could not run. Its `'unsafe-eval'` is the compiled simulator's (`core/compiled-sim.js`), whose
