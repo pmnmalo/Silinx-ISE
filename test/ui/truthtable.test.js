@@ -70,8 +70,8 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   assert.match(await page.eval((t) => document.querySelector(`${t} .tt-canon`).textContent, T), /f = Σm\(3, 5, 6, 7\)[\s\S]*f = ΠM\(0, 1, 2, 4\)/);
   // POS groups: the 0s
   await page.click(`${T} .tt-groups input[value=pos]`);
-  // (a + c), the 0s of rows 0 and 2, wraps around the left and right edges: drawn as two parts
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} svg.tt-kmap .tt-group`)].map((g) => g.dataset.term), T), ["0", "1", "1", "2"]);
+  // (b + c), the 0s of rows 0 and 4 (columns ab = 00 and 10, #2924), wraps around the left and right edges: drawn as two parts
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} svg.tt-kmap .tt-group`)].map((g) => g.dataset.term), T), ["0", "1", "2", "2"]);
   // no Check my answer, no My expression (#694); the NAND and NOR forms below the minimal ones
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-caption`)].map((c) => c.textContent), T), ['Truth table', 'Notes', 'Expression', 'Karnaugh map', 'Results']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-mine-in, ${t} .tt-mine-out`).length, T), 0);
@@ -221,9 +221,10 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   assert.ok(await page.eval((t) => document.querySelector(`${t} .tt-tab.active`).dataset.out === 'y5' && document.querySelector(`${t} .tt-table th.tt-out.sel`).textContent === 'y5', T));
   // (SOP groups: the 1s and the don't cares written, the 0s blank; POS groups: the 0s and X, the 1s blank, #1494)
   const kcells = () => page.eval((t) => [...document.querySelectorAll(`${t} svg.tt-kmap .tt-kcell`)].map((g) => `${g.dataset.row}:${g.querySelector('.tt-k-v').textContent}`), T);
-  assert.deepEqual(await kcells(), ['0:1', '1:X', '3:', '2:', '4:', '5:', '7:', '6:1']);
+  // (a b on the columns, c on the rows, #2924)
+  assert.deepEqual(await kcells(), ['0:1', '2:', '6:1', '4:', '1:X', '3:', '7:', '5:']);
   await page.click(`${T} input[name^=tt-grp][value=pos]`);
-  assert.deepEqual(await kcells(), ['0:', '1:X', '3:0', '2:0', '4:0', '5:0', '7:0', '6:']);
+  assert.deepEqual(await kcells(), ['0:', '2:0', '6:', '4:0', '1:X', '3:0', '7:0', '5:0']);
   await page.click(`${T} input[name^=tt-grp][value=sop]`);
   assert.match(await page.eval((t) => document.querySelector(`${t} .tt-canon`).textContent, T), /y5 = Σm\(0, 6\) \+ d\(1\)/);
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-sop .tt-expr`).textContent, T), "y5 = /a./b + a.b./c");
@@ -760,7 +761,7 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
   const tables = {
     corners: table('corners', I5, (m) => !(m & 0b00100) && !(m & 0b00001)),   // c'·e': the four corners of both layers
     ends: table('ends', I6, (m) => !(m & 0b010000) && !!(m & 0b000100)),      // b'·d: the first and last of four layers
-    sides: table('sides', I6, (m) => !(m & 0b100000) && !(m & 0b000001)),     // a'·g': the left and right edges of layers 0 and 1
+    sides: table('sides', I6, (m) => !(m & 0b100000) && !(m & 0b000100)),     // a'·d': the left and right edges of layers 0 and 1 (c d the columns, #2924)
   };
   await makeProject(env, { name: 'Tt3dShape', files: Object.fromEntries(Object.entries(tables).map(([k, d]) => [`src/${k}.bool.json`, JSON.stringify(d)])) });
   await page.openProject('Tt3dShape');
@@ -778,10 +779,11 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
   }), T);
   // the flat map's cells on a layer: the 1s whose map variables (the bits above the rows and columns') are the layer's
   const cellsOf = (d, map) => [...d.table.f].flatMap((v, m) => (v === '1' && m >> 4 === [0, 1, 3, 2][map] ? [m] : []));
-  // 5 inputs, c'·e': on each layer the four corners apart (each open on its two edges), joined by their 8 walls
+  // 5 inputs, c'·e': on each layer the four corners apart (each open on its two edges), joined by their 8 walls (b c on
+  // the columns, d e on the rows, #2924: cell 2, d e = 10, at the bottom left)
   await open('src/corners.bool.json');
   const c = await solid();
-  assert.deepEqual(c.pieces, ['0@0:0:TopLeft', '0@0:10:BottomRight', '0@0:2:TopRight', '0@0:8:BottomLeft', '0@1:16:TopLeft', '0@1:18:TopRight', '0@1:24:BottomLeft', '0@1:26:BottomRight']);
+  assert.deepEqual(c.pieces, ['0@0:0:TopLeft', '0@0:10:BottomRight', '0@0:2:BottomLeft', '0@0:8:TopRight', '0@1:16:TopLeft', '0@1:18:BottomLeft', '0@1:24:TopRight', '0@1:26:BottomRight']);
   assert.deepEqual([0, 1].map((m) => c.pieces.filter((p) => p.startsWith(`0@${m}:`)).map((p) => +p.split(':')[1]).sort((a, b) => a - b)), [cellsOf(tables.corners, 0), cellsOf(tables.corners, 1)]);
   assert.deepEqual(c.walls, ['0@0-1:0-0,0-0:bottom', '0@0-1:0-0,0-0:right', '0@0-1:0-0,3-3:bottom', '0@0-1:0-0,3-3:left', '0@0-1:3-3,0-0:right', '0@0-1:3-3,0-0:top', '0@0-1:3-3,3-3:left', '0@0-1:3-3,3-3:top']);
   // 6 inputs, b'·d: on the first and last layers (neighbours in Gray order), no walls through the two between
@@ -790,7 +792,7 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
   assert.deepEqual(e.pieces.map((p) => p.split(':').slice(0, 1).concat(p.split(':')[2]).join(':')), ['0@0:', '0@3:']);
   assert.deepEqual(e.pieces.map((p) => p.split(':')[1]), [0, 3].map((m) => cellsOf(tables.ends, m).join(',')));
   assert.deepEqual(e.walls, []);
-  // 6 inputs, a'·g': on layers 0 and 1 the left and right columns apart, each open on its edge, joined by 3 walls each
+  // 6 inputs, a'·d': on layers 0 and 1 the left and right columns apart, each open on its edge, joined by 3 walls each
   await open('src/sides.bool.json');
   const s = await solid();
   assert.deepEqual(s.pieces.map((p) => p.replace(/:[\d,]+:/, ':')), ['0@0:Left', '0@0:Right', '0@1:Left', '0@1:Right']);

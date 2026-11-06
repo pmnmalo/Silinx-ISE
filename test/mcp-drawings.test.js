@@ -56,6 +56,22 @@ test('write_file of a drawing: its HDL file made again; with errors, stale, and 
   assert.equal((await ok('check_syntax', { project: 't' })).text, 'Process "Check Syntax" of <top> completed successfully (41 signals, 30 processes).');
 });
 
+// #2924: the Karnaugh maps' order of a truth table, the interface's selector, is the document's kmapOrder: written with
+// write_file, kept, its HDL unchanged
+test('#2924 write_file of a truth table with its Karnaugh maps\' order: kept, its HDL the same', async () => {
+  await ok('new_project_from_example', { name: 'k', example: 'traffic' });
+  const hdl = read('k', 'src/lamps.vhd');
+  const tt = JSON.parse(read('k', 'src/lamps.bool.json'));
+  assert.equal('kmapOrder' in tt, false, 'by columns, then rows: the default, not written');
+  const text = JSON.stringify({ ...tt, kmapOrder: 'rows' }, null, 2);
+  const w = await ok('write_file', { project: 'k', path: 'src/lamps.bool.json', text });
+  assert.equal(w.text, `Wrote src/lamps.bool.json (${text.length} characters).`);
+  assert.deepEqual([JSON.parse(read('k', 'src/lamps.bool.json')).kmapOrder, read('k', 'src/lamps.vhd')], ['rows', hdl]);
+  assert.match((await ok('check_syntax', { project: 'k' })).text, /completed successfully/);
+  const { tools } = (await handle({ jsonrpc: '2.0', id: ++id, method: 'tools/list', params: {} })).result;
+  assert.match(tools.find(t => t.name === 'write_file').description, /"kmapOrder": "rows" lays its Karnaugh maps' variables out MSB → LSB by rows, then columns/);
+});
+
 test('set_source_properties: a drawing in Verilog (its HDL file with it), back to the project\'s; HDL written by hand has none', async () => {
   await ok('new_project_from_example', { name: 's', example: 'traffic' });
   const v = await ok('set_source_properties', { project: 's', path: 'src/traffic.vhd', language: 'verilog' });
