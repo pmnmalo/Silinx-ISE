@@ -168,7 +168,25 @@ test('parseLink: a broken or hostile link is refused (#2829)', () => {
 });
 
 test('privateHost: the public names and addresses are not', () => {
-  for (const h of ['example.org', 'raw.githubusercontent.com', '8.8.8.8', '172.32.0.1', '192.169.0.1', '[2606:4700::1111]']) assert.equal(privateHost(h), false, h);
+  for (const h of ['example.org', 'raw.githubusercontent.com', '8.8.8.8', '172.32.0.1', '192.169.0.1', '[2606:4700::1111]', '2606:4700::1111',
+    '[2002:808:808::1]', '[64:ff9a::1]', '[fbff::1]', '198.20.0.1', '192.0.3.1', '203.0.114.1']) assert.equal(privateHost(h), false, h);
+});
+
+test('privateHost: the IPv6 forms that carry an IPv4 address, the reserved IPv6 and IPv4 ranges, what is not an address (#2962)', () => {
+  for (const h of [
+    '[::]', '[::1]', '[0:0:0:0:0:0:0:1]', '[::7f00:1]', '[::127.0.0.1]', '[::a00:5]', '[::8.8.8.8]',   // ::/16: IPv4-compatible among them
+    '[::ffff:7f00:1]', '[::ffff:127.0.0.1]', '[::ffff:0:a00:1]',                                        // mapped, translated
+    '[64:ff9b::7f00:1]', '[64:ff9b::127.0.0.1]', '[64:ff9b::808:808]', '[64:ff9b:1::1]',                 // NAT64
+    '[2002:7f00:1::1]', '[2002:c0a8:101::1]', '[2002:a00:1::]',                                         // 6to4 of a private IPv4 address
+    '[fc00::1]', '[fd12:3456::1]', '[fe80::1]', '[fe80::1%25en0]', '[febf::1]', '[fec0::1]', '[ff02::1]', '[100::1]', '[2001:db8::1]',
+    '[1::2::3]', '[gggg::1]', '[1:2:3]', '[::1.2.3.256]',                                              // not an address
+    '198.18.0.1', '198.19.255.255', '192.0.0.8', '192.0.2.1', '198.51.100.7', '203.0.113.9',          // reserved IPv4
+  ]) assert.equal(privateHost(h), true, h);
+  // the link's own check, on the address as the browser reads it (new URL writes ::127.0.0.1 as ::7f00:1)
+  for (const [u, host] of [['https://[::127.0.0.1]/a.zip', '[::7f00:1]'], ['https://[::7f00:1]/a.zip', '[::7f00:1]'], ['https://[64:ff9b::127.0.0.1]/a.zip', '[64:ff9b::7f00:1]'],
+    ['https://[::ffff:10.0.0.1]/a.zip', '[::ffff:a00:1]'], ['https://[fe80::1]/a.zip', '[fe80::1]'], ['https://[0:0::0:1]/a.zip', '[::1]']]) {
+    assert.throws(() => parseLink(`#open=${u}`), { message: `the link's open= is an address of this computer or of a local network ('${host}')` }, u);
+  }
 });
 
 test('makeLink: the link of a design, an example, a zip; parseLink reads it back', async () => {
