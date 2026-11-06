@@ -296,6 +296,20 @@ export function canonical(col) {
   return { ones, zeros, dcs, sigma: `Σm(${ones.join(', ')})${d}`, pi: `ΠM(${zeros.join(', ')})${D}` };
 }
 
+/**
+ * The canonical forms of a column as expressions (#2927): { sop, pos }, the sum of its minterms and the product of
+ * its maxterms, every input in every term (vars[0] the most significant bit of a row), the don't cares left out; no
+ * minterm: the constant 0, no maxterm: the constant 1.
+ */
+export function canonicalAsts(col, vars) {
+  const n = vars.length, ones = idxOf(col, '1'), zeros = idxOf(col, '0');
+  const lit = (j, neg) => (neg ? { t: 'not', a: { t: 'var', name: vars[j] } } : { t: 'var', name: vars[j] });
+  // a minterm's literal is complemented where the row's bit is 0, a maxterm's where it is 1
+  const term = (r, op, negOn) => { const ls = vars.map((_, j) => lit(j, !!(r >> (n - 1 - j) & 1) === negOn)); return ls.length === 1 ? ls[0] : { t: op, args: ls }; };
+  const join = (ts, op, empty) => (!ts.length ? { t: 'const', v: empty } : ts.length === 1 ? ts[0] : { t: op, args: ts });
+  return { sop: join(ones.map(r => term(r, 'and', false)), 'or', 0), pos: join(zeros.map(r => term(r, 'or', true)), 'and', 1) };
+}
+
 /** Literals of an implicant: [{ v: index, neg: bool }] (for SOP; a POS clause complements them). */
 export function cubeLiterals(c, n) {
   const out = [];
@@ -785,7 +799,8 @@ export function reshapeTable(doc, inputs, outputs) {
 }
 
 /**
- * All the results shown for one output: canonical forms, minimal SOP and POS, gate counts, the
+ * All the results shown for one output: canonical forms (canon: { sop, pos } as expressions, sigma / pi as the lists),
+ * minimal SOP and POS, gate counts, the
  * XOR form when it is cheaper than both (else null; none above MAX_XOR_INPUTS inputs), and the NAND and
  * NOR forms (#694: { ast, gates, inverters }).
  */
@@ -797,7 +812,7 @@ export function analyzeOutput(doc, out, opts = {}) {
   sop.ast = minimalAst(sop, doc.inputs); pos.ast = minimalAst(pos, doc.inputs);
   sop.gates = gateCount(sop); pos.gates = gateCount(pos);
   const xor = minimizeXor(col, doc.inputs, { than: [sop.ast, pos.ast] });
-  return { col, ...can, sop, pos, xor, nand: gateForm(sop, doc.inputs, 'nand'), nor: gateForm(pos, doc.inputs, 'nor') };
+  return { col, ...can, canon: canonicalAsts(col, doc.inputs), sop, pos, xor, nand: gateForm(sop, doc.inputs, 'nand'), nor: gateForm(pos, doc.inputs, 'nor') };
 }
 
 /**

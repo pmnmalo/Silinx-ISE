@@ -1,7 +1,7 @@
 // Boolean Algebra / Karnaugh Map editor (#2017: it was Truth Table; documents <name>.bool.json, <name>.tt.json before #2065). The inputs (1–6) and outputs (any
 // number: the table scrolls, one output at a time in the tabs) are named in the toolbar; the truth table is edited by clicking its output cells (0 → 1 → X) or by
 // typing an expression per output. For the selected output: Karnaugh map with the groups of the
-// minimal SOP (1s) or POS (0s), canonical forms Σm / ΠM, minimal SOP and POS with their literal and
+// minimal SOP (1s) or POS (0s), canonical SOP and POS and their lists Σm / ΠM, minimal SOP and POS with their literal and
 // gate counts, the XOR form when it is cheaper (#435), the NAND-only and NOR-only forms (#694), each one's gates and delay
 // as a circuit, and the forms of the fewest gates and of the least delay (#1427).
 // The expressions are written in the notation chosen, by default with / as NOT and . as AND (/a.b + c, #434, #1496); one may be written
@@ -56,6 +56,15 @@ function bestForm(doc, out, goal, label, tip, notation) {
   return h('div', { class: `tt-res tt-${goal}`, title: tip },
     h('div', {}, h('b', {}, label), ': ', h('span', { class: 'tt-best-form' }, FORM_NAMES[r.form] || FORM_NAMES.sop)),
     h('div', {}, h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)), circuit(r.ast));
+}
+
+// the canonical forms in full, the sum of the minterms and the product of the maxterms, then the lists of their terms (#2927)
+function canonForms(A, out, notation) {
+  const expr = (cls, label, title, ast) => h('div', { class: cls, title }, h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`));
+  return h('div', { class: 'tt-res tt-canon' },
+    expr('tt-canon-sop', 'Canonical SOP', 'The sum of the minterms: every input in every term, the don\'t cares left out', A.canon.sop),
+    expr('tt-canon-pos', 'Canonical POS', 'The product of the maxterms: every input in every term, the don\'t cares left out', A.canon.pos),
+    h('div', { class: 'tt-canon-lists' }, h('b', {}, 'Minterm and maxterm lists'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.sigma}`), h('br'), h('code', { 'data-no-i18n': '' }, `${out} = ${A.pi}`)));
 }
 
 // A truth table's print view (#1510): the table, the Karnaugh map of the output in front (flat or 3D, as shown, its
@@ -323,7 +332,7 @@ export function mountTtEditor(container, opts = {}) {
     const best = (goal, label, tip) => bestForm(M, out, goal, label, tip, notation);
     results.append(
       h('div', { class: 'tt-row' }, h('label', {}, 'Notation:'), nsel),
-      h('div', { class: 'tt-res tt-canon' }, h('b', {}, 'Canonical forms'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.sigma}`), h('br'), h('code', { 'data-no-i18n': '', style: { marginLeft: '0' } }, `${out} = ${A.pi}`)),
+      canonForms(A, out, notation),
       form('Minimal SOP', A.sop, 'tt-sop'),
       form('Minimal POS', A.pos, 'tt-pos'),
       ...(xorForm ? [xorForm] : []),
