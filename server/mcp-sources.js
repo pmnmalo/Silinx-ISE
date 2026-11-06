@@ -37,9 +37,10 @@ async function fixMissingTops(name) {
 // a path of the project as the project lists it, inside it; not silinx.json nor build/
 async function sourcePath(name, rel) {
   if (typeof rel !== 'string' || !rel) throw toolError('path: a file\'s path in the project (project_info)');
-  const key = P.relKey(P.projectDir(name), await projectPath(name, rel));
+  const full = await projectPath(name, rel);
+  const key = P.relKey(P.projectDir(name), full);
   if (!key) throw toolError('path: a file\'s path in the project, not the project\'s folder');
-  if (key.toLowerCase() === P.PROJECT_FILE) throw toolError(`${P.PROJECT_FILE} is the project's description`);
+  if (await P.isProjectFileAt(P.projectDir(name), full)) throw toolError(`${P.PROJECT_FILE} is the project's description`);
   return key;
 }
 
@@ -124,6 +125,10 @@ export const SOURCE_TOOLS = [
       const a = await sourcePath(name, from), b = await sourcePath(name, to);
       if (/^build(\/|$)/i.test(a) || /^build(\/|$)/i.test(b)) throw toolError('build/ is written by Silinx itself');
       if (b.split('/').some(s => s.startsWith('.'))) throw toolError(`'${to}': a hidden file or folder`);
+      // the new name as the import gate takes a name (#2830): no reserved name, trailing dot or space, < > : " | ? * (#2956)
+      const { normalizePath } = await import('../core/import-gate.js');
+      const nb = normalizePath(b);
+      if (nb.reason) throw toolError(`'${to}': not renamed: ${nb.reason}`);
       if (a === b) return { text: `${a}: the same path, nothing renamed.`, data: { project: name, from: a, to: b, links: [] } };
       try { await P.renameFile(name, a, b); } catch (e) { throw toolError(e.message); }
       // the drawings linked to a renamed HDL file (or to one in a renamed folder) follow it

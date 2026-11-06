@@ -105,7 +105,9 @@ board or a PROM) without the user's say.
    generated code holds no name of the design, only its own variables and numbers: the test lists the application's
    only dynamic code.
 3. **Trust for outside projects** (`core/trust.js`): an imported project (a zip, an ISE project, a design link, the
-   MCP's `import_project`) is marked `trusted: false` in its `silinx.json`, whatever the zip's own `silinx.json` says.
+   MCP's `import_project`) is marked `trusted: false` in its `silinx.json` from the import's first write (an import that
+   stops halfway leaves no trusted project), whatever the zip's own `silinx.json` says; no file route or MCP tool
+   writes, renames or deletes `silinx.json`, by any spelling a case-insensitive file system takes for it (#2956).
    It opens, is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE (Docker, ssh, a local
    install) and programming a board or a PROM are refused (the server's 403, the browser edition's error, the MCP
    tool's) until the user trusts it: the console says so when the project opens, with a **Trust Project** button.

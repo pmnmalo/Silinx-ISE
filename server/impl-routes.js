@@ -18,6 +18,7 @@ import * as Projects from './projects.js';
 import { mountXiseRoutes } from './xise-routes.js';
 import { IDENT } from './ident.js';
 import { isTrusted, untrustedMessage } from '../core/trust.js';
+import { normalizePath } from '../core/import-gate.js';
 
 // files that only Silinx understands: not part of an exported Xilinx ISE project
 export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|bool|fsm)\.json)$/i;
@@ -257,22 +258,25 @@ export async function importXiseProject(P, name, xiseText, provided) {
   let parsed;
   try { parsed = importXise(xiseText); } catch (e) { throw Object.assign(new Error(e.message), { status: 400 }); }
   const lookup = p => provided[p] ?? provided[path.posix.basename(p)];
-  await P.createProject({ name, template: 'empty' });
+  await P.createProject({ name, template: 'empty', fromOutside: true });
   const files = [];
   const missing = [];
+  const refused = [];   // (a path the import gate refuses, #2956)
   const sources = {};
   for (const f of parsed.files) {
     const target = safeRel(f.path, f.role === 'sim' ? 'sim' : 'src');
+    if (target.reason) { refused.push(`${f.path}: not imported: ${target.reason}`); continue; }
     const text = lookup(f.path);
     if (typeof text === 'string') { await P.writeFile(name, target, text); sources[target] = text; } else missing.push(f.path);
     files.push({ path: target, lang: f.lang, role: f.role });
   }
   // ISE schematics -> Silinx schematics + their synchronized HDL
-  const warnings = [...parsed.warnings];
+  const warnings = [...refused, ...parsed.warnings];
   if (parsed.schematics.length) {
     const schFiles = {}, roles = {};
     for (const x of parsed.schematics) {
       const target = safeRel(x.path, x.role === 'sim' ? 'sim' : 'src');
+      if (target.reason) { warnings.push(`${x.path}: not imported: ${target.reason}`); continue; }
       const text = lookup(x.path);
       if (typeof text !== 'string') { missing.push(x.path); continue; }
       schFiles[target] = text; roles[target] = x.role;
@@ -290,9 +294,13 @@ export async function importXiseProject(P, name, xiseText, provided) {
   }
   let constraints = 'constraints/top.ucf';
   if (parsed.constraints) {
-    constraints = safeRel(parsed.constraints, 'constraints');
-    const text = lookup(parsed.constraints);
-    if (typeof text === 'string') await P.writeFile(name, constraints, text); else missing.push(parsed.constraints);
+    const c = safeRel(parsed.constraints, 'constraints');
+    if (c.reason) warnings.push(`${parsed.constraints}: not imported: ${c.reason}`);
+    else {
+      constraints = c;
+      const text = lookup(parsed.constraints);
+      if (typeof text === 'string') await P.writeFile(name, constraints, text); else missing.push(parsed.constraints);
+    }
   }
   const saved = await P.updateProject(name, pj => Object.assign(pj, {
     device: parsed.device.part ? parsed.device : pj.device,
@@ -309,10 +317,12 @@ export const ISE_OUTPUT = /(^|\/)(build|_ngo|xst|iseconfig|_xmsgs|isim|xlnx_auto
 // inflate stops at the entry's declared size (core/zip.js: a zip bomb is refused, not inflated)
 export const NODE_CODEC = { deflate: d => zlib.deflateRawSync(d), inflate: (d, limit) => zlib.inflateRawSync(d, limit === undefined ? {} : { maxOutputLength: Math.max(1, limit) }) };
 
+// (the path as the import gate takes it, #2830: no hidden folder such as .git/, no build/, #2956; one that leaves the
+// project, or is absolute, is the file's name in <dir>/; a String, else { reason } it is refused)
 function safeRel(p, dir) {
   const norm = String(p).replace(/\\/g, '/');
-  if (!norm || path.posix.isAbsolute(norm) || /^[A-Za-z]:/.test(norm) || norm.split('/').includes('..')) {
-    return `${dir}/${path.posix.basename(norm)}`;
-  }
-  return path.posix.normalize(norm);
+  const n = normalizePath(norm);
+  if (n.path) return n.path;
+  const b = normalizePath(`${dir}/${path.posix.basename(norm)}`);
+  return b.path || { reason: n.reason };
 }
