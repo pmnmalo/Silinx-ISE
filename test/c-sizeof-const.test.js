@@ -98,7 +98,7 @@ test('#2654 the C simulation: the constants of sizeof as cc\'s', () => {
   try {
     writeFileSync(join(dir, 'tb.c'), src);
     execFileSync(CC, ['-o', join(dir, 'tb'), join(dir, 'tb.c')]);
-    assert.equal(sim.output, execFileSync(join(dir, 'tb')).toString());
+    assert.equal(sim.output, execFileSync(join(dir, 'tb')).toString().replace(/\r\n/g, '\n'));   // (Windows' cc writes CRLF)
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

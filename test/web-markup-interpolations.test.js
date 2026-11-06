@@ -73,7 +73,7 @@ const SAFE = [
   // a loop's index counted from 1
   [/^[ijkn] \+ 1$/, 'number'],
   // a class name or a selector's marker chosen among literals by the renderer
-  [/^(?:cls|cls\.join\(' '\)|selc|free|kcls|midClass|bus|lv|tick|shape|ico|bg|fill|silk)$/, 'class'],
+  [/^(?:cls|cls\.join\(' '\)|selc|hot|free|kcls|midClass|bus|lv|tick|shape|ico|bg|fill|silk)$/, 'class'],
 ];
 
 // an expression that chooses among safe values: a ? b : c, a || b, a ?? b, (a)

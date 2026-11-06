@@ -69,6 +69,9 @@ const ALLOW = [
     ['ise', actionKey(`Simulate ${m} Model`), 'a netlist simulated: the Silinx interface\'s Simulate, its model chosen in its bar'],
     ['ise', actionKey(`Generate ${m} Simulation Model`), 'the Silinx interface\'s Simulate generates the model it needs'],
   ]),
+  // the ISE style's View menu for the document in front; the Silinx interface's is its tab's menu (#2834)
+  ['ise', 'show vhdl beside', 'the ISE style\'s View menu: the Silinx interface\'s tab menu (Show … Beside)'],
+  ['ise', 'show verilog beside', 'the same'],
 ];
 
 const OTHER = { silinx: 'ise', ise: 'silinx' };

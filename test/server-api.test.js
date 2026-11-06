@@ -23,7 +23,7 @@ before(async () => {
 });
 after(async () => {
   await app.close();
-  await fs.rm(tmp, { recursive: true, force: true });
+  await fs.rm(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });   // (Windows: a folder still held for a moment, EBUSY)
 });
 const call = (...a) => app.call(...a);
 
