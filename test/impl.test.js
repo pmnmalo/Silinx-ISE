@@ -246,6 +246,19 @@ test('ssh remote dir sanitising', () => {
   assert.equal(ise.remoteDirFor({ ssh: { remoteDir: '/scratch/x' } }, 'p'), '/scratch/x/p');
   assert.throws(() => ise.remoteDirFor({ ssh: { remoteDir: '../etc' } }, 'p'));
   assert.throws(() => ise.remoteDirFor({ ssh: { remoteDir: 'a b;rm' } }, 'p'));
+  // a leading '-' would be an option of rm -rf on the host (#2958)
+  for (const d of ['-rf', '~/-x', '--no-preserve-root']) assert.throws(() => ise.remoteDirFor({ ssh: { remoteDir: d } }, 'p'), /^Error: invalid ssh.remoteDir/, d);
+  assert.equal(ise.remoteDirFor({ ssh: { remoteDir: 'a-b/c-' } }, 'p'), 'a-b/c-/p');
+});
+
+test('ssh remote dir through the API: a folder inside the remote home only; an absolute one from config.json (#2958)', () => {
+  for (const d of ['silinx-build', '~/silinx-build', 'builds/ise', 'a-b', '', undefined]) assert.doesNotThrow(() => tc.checkApiRemoteDir(d), String(d));
+  for (const d of ['/home/me', '/', '~/../x', 'a/../../b', '..', '-rf', '~/-x', '~', '~other/x', 'a/~/b']) {
+    const e = (() => { try { tc.checkApiRemoteDir(d); } catch (err) { return err; } })();
+    assert.ok(e, d);
+    if (d.startsWith('/')) { assert.equal(e.status, 403, d); assert.match(e.message, /^ssh.remoteDir: an absolute folder can only be set in .*config\.json$/, d); }
+    else { assert.equal(e.status, 400, d); assert.equal(e.message, 'ssh.remoteDir must be a folder inside the remote home (no leading / or -, no ~ or ..)', d); }
+  }
 });
 
 // ------------------------------------------------------------------------------------------
@@ -519,6 +532,9 @@ test('toolchain config through the API: the settings scripts the project files c
     assert.equal((await api({ mode: 'docker', docker: { image: 'my/ise:14.7', settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } })).docker.settings, '/opt/Xilinx/14.7/ISE_DS/settings64.sh');
     for (const s of ['/home/me/silinx-build/y/src/settings64.sh', '/Users/Me/Silinx-Build/y/settings64.sh', '/home/me/./silinx-build/y/settings64.sh', 'silinx-build/y/settings64.sh'])
       await assert.rejects(api({ mode: 'ssh', ssh: { host: 'h', remoteDir: 'silinx-build', settings: s } }), /^Error: ssh.settings must be an absolute path outside ssh.remoteDir \(the build folder\)$/);
+    // an absolute build folder: config.json's only (#2958), and the script outside it all the same
+    await assert.rejects(api({ mode: 'ssh', ssh: { host: 'h', remoteDir: '/srv/b' } }), /^Error: ssh.remoteDir: an absolute folder can only be set in .*config\.json$/);
+    await tc.saveConfig({ mode: 'ssh', ssh: { host: 'h', remoteDir: '/srv/b', settings: '/opt/ise/settings64.sh' } });
     await assert.rejects(api({ mode: 'ssh', ssh: { host: 'h', remoteDir: '/srv/b', settings: '/srv/b/y/settings64.sh' } }), /ssh.settings must be an absolute path outside ssh.remoteDir/);
     await assert.rejects(api({ mode: 'ssh', ssh: { host: 'h', remoteDir: '.', settings: '/home/me/y/settings64.sh' } }), /^Error: ssh.remoteDir must name a folder of its own for the builds$/);
     // moving the build folder over the script is refused too
