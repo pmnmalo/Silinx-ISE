@@ -256,7 +256,13 @@ export function mountTtEditor(container, opts = {}) {
       const r = h('input', { type: 'radio', name: `tt-grp-${uid}`, value: g, checked: groups === g, onchange: () => { groups = g; renderKmap(); } });
       grpSel.append(h('label', { class: 'tt-check' }, r, ` ${label}`));
     }
-    const L = kmapLayout(n);
+    // the variables' order (#2924), saved with the table: MSB → LSB by columns then rows (the default), or by rows
+    if (n >= 2) {
+      const osel = h('select', { class: 'tt-kmap-order', title: 'Order of the variables on the map, from the most significant to the least', onchange: () => { if (osel.value === 'rows') M.kmapOrder = 'rows'; else delete M.kmapOrder; changed(); } },
+        ...[['cols', 'MSB → LSB by columns, then rows'], ['rows', 'MSB → LSB by rows, then columns']].map(([v, l]) => h('option', { value: v, selected: (M.kmapOrder || 'cols') === v }, l)));
+      grpSel.append(h('label', { class: 'tt-check' }, 'Order:', ' ', osel));
+    }
+    const L = kmapLayout(n, M.kmapOrder || 'cols');
     const res = shown(groups === 'pos' ? A.pos : A.sop);
     const C = 40, rowsN = L.rowCodes.length, colsN = L.colCodes.length;
     const gw = colsN * C, gh = rowsN * C;

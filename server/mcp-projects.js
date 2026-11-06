@@ -128,7 +128,7 @@ export const PROJECT_TOOLS = [
   },
   {
     name: 'write_file', title: 'Write a file of a project',
-    description: 'Write (create or replace) a file of a project. A new VHDL or Verilog file is added to the project (a test bench in sim/ or named tb_… as a simulation source). A drawing (a .sch, .asm, .fsm, .tt, .bool or .pn .json) makes its HDL file again, as its editor does when it is saved; one with errors leaves it as it was (Check Syntax then stops on it). The application\'s open editor of that file keeps its own text until it is reopened.',
+    description: 'Write (create or replace) a file of a project. A new VHDL or Verilog file is added to the project (a test bench in sim/ or named tb_… as a simulation source). A drawing (a .sch, .asm, .fsm, .tt, .bool or .pn .json) makes its HDL file again, as its editor does when it is saved; one with errors leaves it as it was (Check Syntax then stops on it). A truth table\'s view options are in it too: "kmapOrder": "rows" lays its Karnaugh maps\' variables out MSB → LSB by rows, then columns (left out: by columns, then rows). The application\'s open editor of that file keeps its own text until it is reopened.',
     inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The file\'s path in the project, e.g. src/counter.vhd.'), text: STR('The whole text of the file.') }, required: ['project', 'path', 'text'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     async run({ project: name, path: rel, text }) {
