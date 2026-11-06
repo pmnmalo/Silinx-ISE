@@ -420,7 +420,8 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   for (const f of design) {
     const from = inside(scriptSafe(f.path));
     if (!fss.existsSync(from)) { warnings.push(`missing source file ${f.path} (skipped)`); continue; }
-    const rel = f.path.split(/[\\/]/).join('/');
+    // (its path inside the project, as resolved: a '..' of silinx.json's never reaches past build/src/, #2956)
+    const rel = path.relative(projectDir, from).split(path.sep).join('/');
     const to = path.join(srcDir, rel);
     await fs.mkdir(path.dirname(to), { recursive: true });
     await fs.copyFile(from, to);
@@ -428,7 +429,7 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   }
   for (const v of drawn) {
     if (!v.text) continue;
-    const rel = `${v.path.split(/[\\/]/).join('/')}.${v.lang === 'vhdl' ? 'vhd' : 'v'}`;   // e.g. src/top.sch.json.vhd
+    const rel = `${scriptSafe(v.path).split(/[\\/]/).join('/')}.${v.lang === 'vhdl' ? 'vhd' : 'v'}`;   // e.g. src/top.sch.json.vhd (#2956)
     const to = path.join(srcDir, rel);
     await fs.mkdir(path.dirname(to), { recursive: true });
     await fs.writeFile(to, v.text);

@@ -135,9 +135,10 @@ export const PROJECT_TOOLS = [
       await readProject(name);
       if (typeof text !== 'string') throw toolError('text: the whole text of the file');
       // the path as the project lists it: ./silinx.json is silinx.json (#1233)
-      const key = P.relKey(P.projectDir(name), await projectPath(name, rel));
-      const low = key.toLowerCase();
-      if (low === P.PROJECT_FILE || low === 'build' || low.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
+      const full = await projectPath(name, rel);
+      const key = P.relKey(P.projectDir(name), full);
+      const low = P.foldName(key);   // (ſilinx.json is silinx.json on a case-insensitive file system, #2956)
+      if (await P.isProjectFileAt(P.projectDir(name), full) || low === 'build' || low.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
       if (key.split('/').some(s => s.startsWith('.'))) throw toolError(`'${rel}': a hidden file or folder cannot be written`);
       // what an assistant writes comes from outside: through the import gate (#2830), as a file added to a project
       const { GateError, gateFile } = await import('../core/import-gate.js');

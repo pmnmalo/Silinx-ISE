@@ -213,7 +213,9 @@ async function copyDir(src, dst) {
   }
 }
 
-export async function createProject({ name, template = 'empty', device, board }) {
+// fromOutside: an import's project, trusted: false from its first write, so an import that fails halfway leaves no
+// trusted project (#2956, core/trust.js)
+export async function createProject({ name, template = 'empty', device, board, fromOutside = false }) {
   const dir = projectDir(name);
   if (await exists(dir)) throw new HttpError(409, `project '${name}' already exists`);
   if (template && template !== 'empty') {
@@ -226,6 +228,7 @@ export async function createProject({ name, template = 'empty', device, board })
     const was = `${pj.board}|${pj.device?.part}|${pj.device?.package}`;
     if (device) pj.device = device;
     if (board !== undefined) pj.board = board;
+    if (fromOutside) pj.trusted = false;
     const out = await writeProject(name, pj);
     // another board or device than the example's: its pins are the chosen board's (#36)
     if (pj.board && `${pj.board}|${pj.device?.part}|${pj.device?.package}` !== was) await boardConstraints(dir, pj);
@@ -238,6 +241,7 @@ export async function createProject({ name, template = 'empty', device, board })
     name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null,
     top: '', simTop: '', files: [], constraints: `constraints/top${openOnlyDevice(device) ? '.pcf' : '.ucf'}`,
     stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
+    ...(fromOutside ? { trusted: false } : {}),
   });
 }
 
@@ -281,8 +285,19 @@ export async function deleteProject(name) {
 
 // project-relative path normalised to forward slashes, without './' or a trailing '/'
 export const relKey = (dir, full) => path.relative(dir, full).split(path.sep).join('/');
+// a name as a case-insensitive file system may read it: full case folding (ſ is s, K is k) and NFKC, not
+// toLowerCase alone ('ſilinx.json' is silinx.json on APFS, #2956)
+export const foldName = s => String(s).normalize('NFKC').toUpperCase().toLowerCase();
 // (whatever its case: on a case-insensitive file system SILINX.JSON is the same file)
-const isProjectFile = key => key.toLowerCase() === PROJECT_FILE;
+export const isProjectFile = key => foldName(key) === PROJECT_FILE;
+// a path of the project that is its silinx.json, by its name or as the very same file on disk (#2956)
+export async function isProjectFileAt(dir, full) {
+  if (isProjectFile(relKey(dir, full))) return true;
+  try {
+    const [a, b] = await Promise.all([fs.stat(full), fs.stat(path.join(dir, PROJECT_FILE))]);
+    return a.dev === b.dev && a.ino === b.ino;
+  } catch { return false; }
+}
 
 export async function readFile(name, rel) {
   const full = safeJoin(projectDir(name), rel);
@@ -297,7 +312,7 @@ export async function writeFile(name, rel0, text) {
   // project's description, written by the project's own routes (as the browser store refuses it)
   const rel = relKey(dir, full);
   if (!rel) throw new HttpError(400, 'missing path');
-  if (isProjectFile(rel)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
+  if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
   await fs.mkdir(path.dirname(full), { recursive: true });
   // atomic: a reader (or a crash) never sees a half-written / empty file
   const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed
@@ -331,7 +346,7 @@ export async function renameFile(name, from, to) {
   const src = safeJoin(dir, from), dst = safeJoin(dir, to);
   if (src === dir || dst === dir) throw new HttpError(400, 'cannot rename the project folder itself');
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
-  if (isProjectFile(fromKey) || isProjectFile(toKey)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
+  if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
   return withProjectLock(name, async () => {
     let st;
     try { st = await fs.stat(src); } catch { throw new HttpError(404, `file '${from}' not found`); }
@@ -367,7 +382,7 @@ export async function deleteFile(name, rel) {
   const full = safeJoin(dir, rel);
   if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
   const key = relKey(dir, full);
-  if (isProjectFile(key)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
+  if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
   await withProjectLock(name, async () => {
     await fs.rm(full, { recursive: true, force: true });
     const pj = await readProject(name);

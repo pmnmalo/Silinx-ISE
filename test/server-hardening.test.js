@@ -165,3 +165,114 @@ test('a token of any bytes is refused, not a crash', async () => {
     assert.equal(r.status, 403);
   } finally { await exposed.close(); }
 });
+
+// #2956: silinx.json by another spelling (U+017F, the long s: 'ſilinx.json' is silinx.json on a case-insensitive file
+// system such as APFS, and toLowerCase leaves it as it is), imports untrusted from their first write, an ISE project's
+// paths through the import gate, the build's copies inside build/src
+const LONG_S = 'ſilinx.json';
+const mcp = async (name, args) => (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })).result;
+const imported = async name => { await project(name); await P.writeProject(name, { ...await P.readProject(name), trusted: false }); return P.projectDir(name); };
+
+test('#2956 foldName: the full case fold and NFKC, as a case-insensitive file system may read a name', () => {
+  assert.equal('ſilinx.json'.toLowerCase(), 'ſilinx.json');   // (what the check was)
+  for (const s of ['silinx.json', 'SILINX.JSON', LONG_S, 'SİLINX.JSON'.normalize('NFC').replace('İ', 'I'), 'ｓilinx.json']) assert.equal(P.foldName(s), 'silinx.json', s);
+  assert.equal(P.foldName('buıld'), 'build');   // (the dotless i)
+  for (const s of ['src/silinx.json', 'silinx.json5', 'xilinx.json']) assert.equal(P.isProjectFile(s), false, s);
+});
+
+test('#2956 silinx.json by another spelling: not written, renamed or deleted through the file routes, and the project stays untrusted', async () => {
+  const dir = await imported('LongS');
+  await assert.rejects(P.writeFile('LongS', LONG_S, '{"name":"LongS"}'), /project's description/);
+  await assert.rejects(P.deleteFile('LongS', LONG_S), /cannot be deleted/);
+  await assert.rejects(P.renameFile('LongS', LONG_S, 'x.json'), /cannot be renamed/);
+  await P.writeFile('LongS', 'src/x.json', '{}');
+  await assert.rejects(P.renameFile('LongS', 'src/x.json', LONG_S), /cannot be renamed/);
+  // the very same file under another name (a hard link): refused as silinx.json itself
+  if (POSIX) {
+    fs.linkSync(path.join(dir, 'silinx.json'), path.join(dir, 'alias.json'));
+    await assert.rejects(P.writeFile('LongS', 'alias.json', '{}'), /project's description/);
+    await assert.rejects(P.deleteFile('LongS', 'alias.json'), /cannot be deleted/);
+    fs.rmSync(path.join(dir, 'alias.json'));
+  }
+  assert.equal((await P.readProject('LongS')).trusted, false);
+});
+
+test('#2956 silinx.json by another spelling: the MCP tools write_file, rename_file, delete_file refuse it', async () => {
+  await imported('LongSMcp');
+  let r = await mcp('write_file', { project: 'LongSMcp', path: LONG_S, text: '{"name":"LongSMcp"}' });
+  assert.deepEqual([r.isError, r.content[0].text], [true, `write_file: '${LONG_S}' is written by Silinx itself`]);
+  r = await mcp('write_file', { project: 'LongSMcp', path: 'buıld/run.sh', text: 'x' });
+  assert.deepEqual([r.isError, r.content[0].text], [true, "write_file: 'buıld/run.sh' is written by Silinx itself"]);
+  for (const [tool, args] of [['delete_file', { path: LONG_S }], ['rename_file', { from: LONG_S, to: 'x.json' }], ['rename_file', { from: 'src/top.vhd', to: LONG_S }]]) {
+    r = await mcp(tool, { project: 'LongSMcp', ...args });
+    assert.deepEqual([r.isError, r.content[0].text], [true, `${tool}: silinx.json is the project's description`], tool);
+  }
+  assert.equal((await P.readProject('LongSMcp')).trusted, false);
+  assert.ok(fs.existsSync(path.join(P.projectDir('LongSMcp'), 'src', 'top.vhd')));
+});
+
+test('#2956 MCP rename_file: the new name as the import gate takes a name', async () => {
+  await project('RenameGate');
+  for (const [to, reason] of [['src/CON.vhd', "reserved name ('CON.vhd')"], ['src/top.vhd.', "name ending with a space or a dot ('top.vhd.')"], ['src/a|b.vhd', "character not allowed in a name (< > : \" | ? *): 'a|b.vhd'"]]) {
+    const r = await mcp('rename_file', { project: 'RenameGate', from: 'src/top.vhd', to });
+    assert.deepEqual([r.isError, r.content[0].text], [true, `rename_file: '${to}': not renamed: ${reason}`], to);
+  }
+  assert.ok(fs.existsSync(path.join(P.projectDir('RenameGate'), 'src', 'top.vhd')));
+});
+
+test('#2956 a zip: no silinx.json by another spelling restored, and the project untrusted', async () => {
+  const pj = { name: 'x', version: 1, top: 'top', device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, files: [{ path: 'src/ok.vhd', lang: 'vhdl', role: 'design' }], trusted: true };
+  const zip = await createZip([
+    { path: 'silinx.json', data: new TextEncoder().encode(JSON.stringify(pj)) },
+    { path: 'src/ok.vhd', data: new TextEncoder().encode(VHD) },
+    { path: LONG_S, data: new TextEncoder().encode('{"name":"x","version":1,"files":[]}') },
+  ], codec);
+  const r = await app.call('POST', '/projects/import-zip?name=ZipLongS', zip);
+  assert.equal(r.status, 200);
+  const saved = await P.readProject('ZipLongS');
+  assert.deepEqual([saved.trusted, saved.top, saved.files.map(f => f.path)], [false, 'top', ['src/ok.vhd']]);
+});
+
+const xise = (files, top = 'Architecture|top|rtl') => `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://www.xilinx.com/XMLSchema" xmlns:xil_pn="http://www.xilinx.com/XMLSchema"><files>
+${files.map(f => `<file xil_pn:name="${f}" xil_pn:type="FILE_VHDL"><association xil_pn:name="Implementation" xil_pn:seqID="1"/></file>`).join('\n')}
+</files><properties>
+<property xil_pn:name="Device" xil_pn:value="xc3s250e" xil_pn:valueState="non-default"/>
+<property xil_pn:name="Device Family" xil_pn:value="Spartan3E" xil_pn:valueState="non-default"/>
+<property xil_pn:name="Package" xil_pn:value="cp132" xil_pn:valueState="non-default"/>
+<property xil_pn:name="Speed Grade" xil_pn:value="-4" xil_pn:valueState="non-default"/>
+<property xil_pn:name="Implementation Top" xil_pn:value="${top}" xil_pn:valueState="non-default"/>
+</properties></project>`;
+
+test('#2956 an ISE project whose import stops halfway leaves no trusted project', async () => {
+  const r = await app.call('POST', '/projects/import-xise', { name: 'XiseHalf', xise: xise(['src/top.vhd'], 'Module|../../x'), files: { 'src/top.vhd': VHD } });
+  assert.equal(r.status, 400);
+  assert.equal((await P.readProject('XiseHalf')).trusted, false);
+});
+
+test('#2956 an ISE project: no file written in a hidden folder or in build/', async () => {
+  const r = await app.call('POST', '/projects/import-xise', { name: 'XiseDots', xise: xise(['src/top.vhd', '.git/config', 'build/run.vhd']), files: { 'src/top.vhd': VHD, '.git/config': '[core]\n', 'build/run.vhd': VHD } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const dir = P.projectDir('XiseDots');
+  assert.equal(fs.existsSync(path.join(dir, '.git')), false);
+  assert.equal(fs.existsSync(path.join(dir, 'build', 'run.vhd')), false);
+  assert.deepEqual(r.body.project.files.map(f => f.path).sort(), ['src/config', 'src/run.vhd', 'src/top.vhd']);
+  assert.equal(r.body.project.trusted, false);
+});
+
+test("#2956 the build copies a source by its path inside the project: silinx.json's '..' reaches nothing outside build/src", async () => {
+  const dir = await project('DotDot');
+  const back = `../${path.basename(dir)}/src/top.vhd`;   // (back into the project: kept by the import, as before)
+  await P.writeProject('DotDot', { ...await P.readProject('DotDot'), files: [{ path: back, lang: 'vhdl', role: 'design' }] });
+  const before = fs.readdirSync(path.dirname(dir)).sort();
+  const b = await generate(dir, 'DotDot');
+  assert.ok(fs.existsSync(path.join(dir, 'build', 'src', 'src', 'top.vhd')));
+  assert.deepEqual(fs.readdirSync(path.dirname(dir)).sort(), before);
+  assert.deepEqual(b.warnings, ['no constraints file (constraints/top.ucf) - do NOT program real hardware with this bitstream']);
+});
+
+test("#2956 a drawn source's name that would end XST's quotes: refused, as an HDL file's", { skip: !POSIX }, async () => {
+  const dir = await project('DrawnQuote');
+  fs.copyFileSync(path.resolve('examples/traffic/src/lamps.bool.json'), path.join(dir, 'src', 'la"mps.bool.json'));
+  await assert.rejects(generate(dir, 'DrawnQuote'), /file path not allowed in XST's script: "src\/la\\"mps.bool.json"/);
+});

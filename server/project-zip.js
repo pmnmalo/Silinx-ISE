@@ -75,7 +75,7 @@ export async function importProjectEntries(P, name, gated, bad) {
     for (const e of entries) { const r = rel(e.path); if (r !== null) provided[r] = text(e); provided[path.posix.basename(e.path)] ??= text(e); }
     result = await importXiseProject(P, name, text(xiseEntry), provided);
   } else if (pjEntry) {
-    await P.createProject({ name, template: 'empty' });
+    await P.createProject({ name, template: 'empty', fromOutside: true });
     result = { project: await P.readProject(name), missing: [], warnings: [] };
   } else {
     // (a project file the import gate refused: why)
@@ -93,12 +93,14 @@ export async function importProjectEntries(P, name, gated, bad) {
   const extra = [];
   for (const e of entries) {
     const r = rel(e.path);
-    if (r === null || written.has(r) || /\.xise$/i.test(r) || r.toLowerCase() === 'silinx.json' || (xiseEntry && ISE_OUTPUT.test(r))) continue;
+    if (r === null || written.has(r) || /\.xise$/i.test(r) || P.isProjectFile(r) || (xiseEntry && ISE_OUTPUT.test(r))) continue;
     const norm = path.posix.normalize(r);
     // (no hidden file or folder: an export has none, and a .git/ or an editor's settings would run commands)
     if (norm.startsWith('..') || path.posix.isAbsolute(norm) || norm.split('/').some(s => s.startsWith('.'))) continue;
-    await fs.mkdir(path.dirname(P.safeJoin(P.projectDir(name), norm)), { recursive: true });
-    await fs.writeFile(P.safeJoin(P.projectDir(name), norm), Buffer.from(e.data));
+    const to = P.safeJoin(P.projectDir(name), norm);
+    if (await P.isProjectFileAt(P.projectDir(name), to)) continue;   // (silinx.json by another spelling: ſilinx.json, #2956)
+    await fs.mkdir(path.dirname(to), { recursive: true });
+    await fs.writeFile(to, Buffer.from(e.data));
     extra.push(norm);
   }
   // Silinx export: restore the settings ISE does not know about (board, stimuli, language...)
@@ -112,7 +114,7 @@ export async function importProjectEntries(P, name, gated, bad) {
       if (Array.isArray(saved.files)) saved.files = saved.files.filter(f => { const ok = typeof f?.path === 'string' && safe(f.path); if (!ok) result.warnings.push(`silinx.json: file path outside the project dropped (${f?.path})`); return ok; });
       if (typeof saved.constraints === 'string' && saved.constraints && !safe(saved.constraints)) { result.warnings.push(`silinx.json: constraints path outside the project dropped (${saved.constraints})`); delete saved.constraints; }
       const exists = p => { try { return fss.existsSync(P.safeJoin(P.projectDir(name), p)); } catch { return false; } };
-      project = await P.updateProject(name, cur => ({ ...cur, ...(xiseEntry ? { board: saved.board ?? cur.board, stimuli: saved.stimuli || {}, preferredLanguage: saved.preferredLanguage, impl: { ...cur.impl, ...saved.impl } } : { ...saved, name }) }));
+      project = await P.updateProject(name, cur => ({ ...cur, ...(xiseEntry ? { board: saved.board ?? cur.board, stimuli: saved.stimuli || {}, preferredLanguage: saved.preferredLanguage, impl: { ...cur.impl, ...saved.impl } } : { ...saved, name, trusted: false }) }));
       if (!xiseEntry) {
         for (const f of Array.isArray(saved.files) ? saved.files : []) if (f?.path && !exists(f.path)) result.missing.push(f.path);
         if (typeof saved.constraints === 'string' && saved.constraints && !exists(saved.constraints) && !result.missing.includes(saved.constraints)) result.missing.push(saved.constraints);

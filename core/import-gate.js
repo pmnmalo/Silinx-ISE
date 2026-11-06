@@ -83,7 +83,8 @@ export function normalizePath(p, { limits = GATE_LIMITS } = {}) {
     if (WINDOWS_DEVICE.test(s)) return { reason: `reserved name ('${s}')` };
     if (s.length > limits.maxSegment) return { reason: `name longer than ${limits.maxSegment} characters` };
   }
-  if (parts[0].toLowerCase() === 'build') return { reason: "the project's build folder (build/) is Silinx's own" };
+  // (by its full case fold: what a case-insensitive file system may take for build, #2956)
+  if (parts[0].normalize('NFKC').toUpperCase().toLowerCase() === 'build') return { reason: "the project's build folder (build/) is Silinx's own" };
   return { path: parts.join('/') };
 }
 
