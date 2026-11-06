@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { qualityPage } from './designs-corpus/quality-page.mjs';
-import { lastError, newFailures, parseClocks, constrainedPeriod, trcePaths, criticalPath, remoteWork } from './designs-corpus/compare-lib.mjs';
+import { lastError, newFailures, parseClocks, constrainedPeriod, trcePaths, criticalPath, remoteWork, silinxSides, mergeable, OPTIMIZATIONS } from './designs-corpus/compare-lib.mjs';
+import { GOAL_IMPL, synthGoal } from '../packages/silinx-fpga/src/synth-open.js';
 import os from 'node:os';
 import { iseWorkBase } from '../server/toolchain.js';
 
@@ -119,6 +120,53 @@ test('quality page: Silinx at efforts Normal and High (the High columns and summ
   // the guard: a design built at High before that fails at High now
   const before = { designs: [{ name: 'serv', silinx: {}, silinxHigh: {}, ise: {} }] };
   assert.deepEqual(newFailures(before, res), ['serv (Silinx, effort High): out of memory']);
+});
+
+// #2941: since #2470 the Optimization is Fast, Area or Speed (impl.optLevel 1 alone is Fast): the comparison builds Area, a new
+// project's default, and Speed, by their ISE properties, and the page names them; the results before it read as Normal and High
+test('ISE comparison: Silinx at Optimizations Area and Speed, by their ISE properties, named in the page; the results before as Normal and High (#2941)', () => {
+  assert.deepEqual(OPTIMIZATIONS, ['area', 'speed']);
+  // what compare-ise.mjs sets on each build's project is what the flow reads as that Optimization (not optLevel 1: Fast)
+  for (const goal of OPTIMIZATIONS) assert.equal(synthGoal({ startupClk: 'JtagClk', optLevel: 1, ...GOAL_IMPL[goal] }), goal);
+  const src = fs.readFileSync(path.join(ROOT, 'test/designs-corpus/compare-ise.mjs'), 'utf8');
+  assert.match(src, /project\.impl = \{ \.\.\.\(project\.impl \|\| \{\}\), \.\.\.GOAL_IMPL\[goal\] \};/);
+  assert.doesNotMatch(src, /optLevel: EFFORTS/);
+  assert.match(src, /optimizations: OPTIMIZATIONS, notBuilt/);
+  assert.deepEqual(silinxSides({ optimizations: ['area', 'speed'] }), { main: 'Area', second: 'Speed' });
+  assert.deepEqual(silinxSides({}), { main: 'Normal', second: 'High' });
+  const p = (levels, logic, route) => ({ levels, lut: logic - 1.5, carry: 0, ff: 1.5, other: 0, logic, route });
+  const res = { generatedAt: '2026-11-06', silinxVersion: 'x', isePeriodNs: 5, optimizations: ['area', 'speed'], designs: [
+    { name: 'itc99-b12', silinx: { luts: 315, slices: 168, ffs: 119, periodNs: 10.6, estimateNs: 10.63, path: p(6, 5.8, 4.8) }, silinxHigh: { luts: 335, slices: 178, ffs: 119, periodNs: 9.4, estimateNs: 9.45, path: p(6, 5.8, 3.6) }, ise: { luts: 362, slices: 214, ffs: 141, periodNs: 7.8, path: p(5, 5, 2.8) } },
+    { name: 'serv', silinx: { error: 'out of memory' }, silinxHigh: { error: 'no room' }, ise: { luts: 330, slices: 210, ffs: 350, periodNs: 13 } },
+  ] };
+  const page = qualityPage(res);
+  assert.match(page, /^Silinx is built at two of its Optimizations \(Process Properties of \*Synthesize\*\): \*\*Area\*\*\n\(the default of a new project: .*\), and \*\*Speed\*\*\n\(the mappings for speed for every design and several placements, the faster circuit\); ISE at its default\. \*Silinx\* in the summary is Area; \*Area\* and \*Speed\* in the tables are the two\.$/m);
+  assert.doesNotMatch(page, /Normal|Effort High|\| High|High \(trce\)/);
+  assert.match(page, /^- \*\*Size:\*\* 1 designs built by both\. Logic LUTs: Silinx −13% against ISE/m);
+  assert.match(page, /^- \*\*At Optimization Speed:\*\* logic LUTs −7%, slices −17% against ISE \(1 designs\);\n {2}critical path \+21%, as fast or faster on 0 of 1\.$/m);
+  assert.match(page, /\*A \/ I\*: Area \/ ISE, the\nratio of logic LUTs/);
+  assert.match(page, /^\| design \| LUTs Area \| LUTs Speed \| LUTs ISE \| A \/ I \| Sp \/ I \| FFs Area \| FFs ISE \| slices Area \| slices Speed \| slices ISE \| SRL16 A \/ I \| RAMB16 A \/ I \| MULT A \/ I \|$/m);
+  assert.match(page, /^\| itc99-b12 \| 315 \| 335 \| 362 \| 0\.87 \| 0\.93 \| 119 \| 141 \| 168 \| 178 \| 214 \|/m);
+  assert.match(page, /\*Area estimate\*: Silinx's own/);
+  assert.match(page, /^\| design \| Area \(trce\) \| Speed \(trce\) \| ISE \(trce\) \| A \/ I \| Sp \/ I \| Area estimate \| Speed estimate \|$/m);
+  assert.match(page, /^\| itc99-b12 \| 10\.60 \| 9\.40 \| 7\.80 \| 1\.36 \| 1\.21 \| 10\.63 \| 9\.45 \|$/m);
+  assert.match(page, /^- Area: 1 design slower than ISE; against ISE's critical paths, on average, logic\n {2}\+0\.80 ns, routing \+2\.00 ns\.$/m);
+  assert.match(page, /^- Speed: 1 design slower than ISE;/m);
+  assert.match(page, /^\| design \| levels Area \| levels Speed \| levels ISE \| logic Area \|/m);
+  assert.match(page, /^- serv, Silinx at Optimization Area: `out of memory`$/m);
+  assert.match(page, /^- serv, Silinx at Optimization Speed: `no room`$/m);
+  // the guard names them too
+  const before = { designs: [{ name: 'serv', silinx: {}, silinxHigh: {}, ise: {} }] };
+  assert.deepEqual(newFailures(before, res), ['serv (Silinx, Area): out of memory', 'serv (Silinx, Speed): no room']);
+  // a --filter run is merged only into results of the same Optimizations (not the Normal and High of the results before)
+  assert.equal(mergeable(res, { optimizations: OPTIMIZATIONS }), true);
+  assert.equal(mergeable({ designs: [] }, { optimizations: OPTIMIZATIONS }), false);
+  assert.equal(mergeable({ optimizations: ['fast', 'speed'] }, { optimizations: OPTIMIZATIONS }), false);
+  // the results before #2941 (the committed ones of 2026-10-25): their page as it was, Normal and High
+  const old = qualityPage({ ...res, optimizations: undefined });
+  assert.match(old, /\*\*Normal\*\*, the\ndefault/);
+  assert.match(old, /^\| design \| LUTs Silinx \| LUTs High \| LUTs ISE \| S \/ I \| H \/ I \|/m);
+  assert.match(old, /^- serv, Silinx at effort High: `no room`$/m);
 });
 
 // #646: the critical paths' breakdown, from trce's reports (text extracts of ISE 14.7's trce -v 3 on the
