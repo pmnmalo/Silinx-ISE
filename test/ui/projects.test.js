@@ -880,6 +880,24 @@ uiTest('#2830 an imported project waits for the user\'s trust: the console line 
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /^(WARNING|ERROR)/.test(l)), []);
 });
 
+uiTest('#2981 a project the MCP server made waits for the user\'s trust too: the console line says so, Trust Project', E, async (page) => {
+  await makeProject(env, { name: 'ByMcp', top: 'top', files: { 'src/top.vhd': 'entity top is end;\narchitecture rtl of top is begin end;\n' } });
+  // (its silinx.json as the MCP server writes it: server/mcp-projects.js, createProject's madeBy)
+  const file = path.join(env.server.workspace, 'ByMcp', 'silinx.json');
+  await fs.writeFile(file, JSON.stringify({ ...JSON.parse(await fs.readFile(file, 'utf8')), trusted: false, madeBy: 'mcp' }, null, 2));
+  await page.openProject('ByMcp');
+  await page.waitConsole(/was made through the MCP server/);
+  const line = () => page.eval(() => { const b = [...document.querySelectorAll('#console-log .ln .ln-action')].at(-1); return b && { line: b.parentElement.firstChild.textContent, label: b.textContent, disabled: b.disabled }; });
+  assert.deepEqual(await line(), { line: 'Project "ByMcp" was made through the MCP server (by an assistant): it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.', label: 'Trust Project', disabled: false });
+  await assert.rejects(env.server.api('POST', '/api/projects/ByMcp/implement', { toolchain: 'ise' }),
+    (e) => e.message.includes("project 'ByMcp' was made through the MCP server (by an assistant): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)"));
+  await page.eval(() => [...document.querySelectorAll('#console-log .ln-action')].at(-1).click());
+  await page.waitConsole(/Project "ByMcp" trusted: Xilinx ISE and programming a board or a PROM may run for it\./);
+  const pj = await env.server.api('GET', '/api/projects/ByMcp');
+  assert.deepEqual(['trusted' in pj, 'madeBy' in pj], [false, false]);
+  assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /^(WARNING|ERROR)/.test(l)), []);
+});
+
 uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth Table starts the project with that top and its synchronized HDL', E, async (page) => {
   const cases = [['sch', 'top.sch.json', 'vhdl', 'Schematic'], ['fsm', 'top.fsm.json', 'verilog', 'Finite State Machine (FSM)'],
     ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.bool.json', 'verilog', 'Boolean Algebra']];

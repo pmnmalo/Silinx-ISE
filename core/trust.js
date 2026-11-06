@@ -4,16 +4,23 @@
 // browser's sandbox; what runs outside it (Xilinx ISE over Docker or ssh, programming a board or a PROM) waits until the
 // user trusts it: the console's line with its Trust Project button, said when the project opens. A project the user
 // made is trusted from the start (no `trusted` field). Only the user trusts a project, in the interface: the MCP server
-// has no tool for it, so that an assistant led astray by what it read cannot. Isomorphic (browser and server).
+// has no tool for it, so that an assistant led astray by what it read cannot. A project the MCP server makes holds what an
+// assistant wrote: untrusted from the start too, `madeBy: "mcp"` saying so (#2981). Isomorphic (browser and server).
 
 /** Whether a project's description lets it run what is outside the browser's sandbox. */
 export const isTrusted = pj => pj?.trusted !== false;
 
+// where an untrusted project came from, as its messages say it (pj: its description, #2981)
+const origin = pj => (pj?.madeBy === 'mcp' ? 'was made through the MCP server (by an assistant)' : 'came from outside (imported)');
+
 /** The refusal of `what` (Xilinx ISE, programming the board…) for an untrusted project. */
-export const untrustedMessage = (name, what) => `project '${name}' came from outside (imported): ${what} runs only once you trust it (Trust Project, in the console when the project opens)`;
+export const untrustedMessage = (name, what, pj = null) => `project '${name}' ${origin(pj)}: ${what} runs only once you trust it (Trust Project, in the console when the project opens)`;
 
 /** The console's line of an untrusted project opened. */
-export const untrustedNotice = name => `Project "${name}" came from outside (imported): it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.`;
+export const untrustedNotice = (name, pj = null) => `Project "${name}" ${origin(pj)}: it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.`;
 
-/** A project description marked as from outside (the import's last step). */
-export const markUntrusted = pj => ({ ...pj, trusted: false });
+/** A project description marked as from outside (the import's last step): an imported one, whoever made it before. */
+export const markUntrusted = pj => { const { madeBy, ...rest } = pj; return { ...rest, trusted: false }; };   // eslint-disable-line no-unused-vars
+
+/** A project description the MCP server makes (#2981): untrusted, made by an assistant. */
+export const markMadeByMcp = pj => ({ ...pj, trusted: false, madeBy: 'mcp' });

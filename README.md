@@ -496,7 +496,8 @@ or from an example's, one that differs never replaced), `check_syntax` (the erro
 post-place & route model too, with its timing; signals forced, a value or a clock, as SSim's Force; its waves as a VCD file), `c_simulation`, `c_cosimulation`,
 `c_synthesis_report` and `c_generated` (a C / C++ source of Silinx HLS: its main() run, its C/RTL co-simulation, its report, the HDL
 and the ASM chart made from it), `run_process` (synthesize,
-implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured) and
+implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured; a project the
+MCP server made or imported runs ISE, or programs a board or a PROM, only once you trust it in the interface: *Trust Project*, #2981) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
 statistics for the synthesis and the pack and route summaries for map and par). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being

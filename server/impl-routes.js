@@ -58,7 +58,7 @@ export async function startImplementation(name, body = {}) {
   if (open) { try { steps = openSteps(body.steps, { synthUpToDate, family: deviceFamily(project.device) }); } catch (e) { throw bad(e.message); } }
   // Xilinx ISE (Docker, ssh, the Mac's or the PC's own) runs outside the browser's sandbox: not for a project from
   // outside until the user trusts it (#2830); the Silinx toolchain does
-  if (!open && !isTrusted(project)) throw bad(untrustedMessage(name, 'Xilinx ISE'), 403);
+  if (!open && !isTrusted(project)) throw bad(untrustedMessage(name, 'Xilinx ISE', project), 403);
   const job = open
     ? createJob('implement', j => runOpenImplementation(j, { project, projectDir, steps, synthUpToDate }), { meta: { project: name, steps, toolchain: 'silinx' } })
     : createJob('implement', j => runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }), { meta: { project: name, steps } });
@@ -176,7 +176,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     let bitfile = null, project = null;
     if (b.project) {
       project = await P.readProject(b.project);
-      if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board'), 403);   // (#2830)
+      if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board', project), 403);   // (#2830)
       const dir = P.projectDir(b.project);
       if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
       else {
@@ -209,7 +209,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const b = req.body || {};
     if (!b.project) throw bad('give a project');
     const project = await P.readProject(b.project);
-    if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the PROM'), 403);   // (#2830)
+    if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the PROM', project), 403);   // (#2830)
     const dir = P.projectDir(b.project);
     const board = b.board || project.board || null;
     if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);

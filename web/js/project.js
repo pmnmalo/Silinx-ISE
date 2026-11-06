@@ -64,7 +64,7 @@ async function openProjectNow(name, { startup = false } = {}) {
   await fixMissingTops();   // (a project saved with a top it no longer has, #253)
   log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
   // a project from outside (#2830): what waits for the user's trust, and the button that gives it
-  if (!isTrusted(S.project)) log(untrustedNotice(name), 'info', { action: { label: 'Trust Project', run: () => trustProject(name) } });
+  if (!isTrusted(S.project)) log(untrustedNotice(name, S.project), 'info', { action: { label: 'Trust Project', run: () => trustProject(name) } });
   warnReservedNames();
   // the processes' status of the last run, its synthesis up to date or not (#280), restored before the project is
   // used: not awaited, it drew the Processes panel again under a double-click on a process and Implement Design

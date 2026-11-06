@@ -98,8 +98,8 @@ export const LINK_TOOLS = [
         const other = board && board !== project.board;
         // (on another board: New Project from the example for it, its pins the board's)
         make = async () => {
-          if (other) { const { resolveBoard } = await import('./devices.js'); await P.createProject({ name: pjName, template: source.name, board, device: resolveBoard(board).device }); }
-          else await P.createProject({ name: pjName, template: source.name });
+          if (other) { const { resolveBoard } = await import('./devices.js'); await P.createProject({ name: pjName, template: source.name, board, device: resolveBoard(board).device, madeBy: 'mcp' }); }
+          else await P.createProject({ name: pjName, template: source.name, madeBy: 'mcp' });   // (untrusted, #2981)
         };
         if (other) project = { ...project, board };
       }

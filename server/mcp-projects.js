@@ -8,6 +8,9 @@ import { orderExamples } from '../core/examples.js';
 import { TEST_DESIGNS, orderTestDesigns } from '../core/test-designs.js';
 import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice } from './mcp-util.js';
 
+// a project the MCP server makes is untrusted (#2981): its tools' results say so
+const UNTRUSTED = ' It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
+
 export const PROJECT_TOOLS = [
   {
     name: 'list_examples', title: 'List the example projects',
@@ -58,9 +61,9 @@ export const PROJECT_TOOLS = [
         const ex = JSON.parse(fs.readFileSync(path.join(dir, example, 'silinx.json'), 'utf8'));
         ({ board, device } = await boardDevice(board || ex.board, variant));
       }
-      try { await P.createProject({ name, template: example, device, board }); } catch (e) { throw toolError(e.message); }
+      try { await P.createProject({ name, template: example, device, board, madeBy: 'mcp' }); } catch (e) { throw toolError(e.message); }
       const pj = await P.readProject(name);
-      return { text: `Project '${name}' made from the ${dir === P.EXAMPLES_DIR ? 'example' : 'test design'} ${example}: top ${pj.top}, ${pj.board || 'no board'} (${pj.device.part}${pj.device.package}${pj.device.speed}).`, data: { project: name, top: pj.top, simTop: pj.simTop || null, board: pj.board, device: pj.device } };
+      return { text: `Project '${name}' made from the ${dir === P.EXAMPLES_DIR ? 'example' : 'test design'} ${example}: top ${pj.top}, ${pj.board || 'no board'} (${pj.device.part}${pj.device.package}${pj.device.speed}).${UNTRUSTED}`, data: { project: name, top: pj.top, simTop: pj.simTop || null, board: pj.board, device: pj.device, trusted: false } };
     },
   },
   {
@@ -71,9 +74,9 @@ export const PROJECT_TOOLS = [
     async run({ name, board, variant }) {
       let device;
       if (board || variant) ({ board, device } = await boardDevice(board, variant));
-      try { await P.createProject({ name, device, board }); } catch (e) { throw toolError(e.message); }
+      try { await P.createProject({ name, device, board, madeBy: 'mcp' }); } catch (e) { throw toolError(e.message); }
       const pj = await P.readProject(name);
-      return { text: `Empty project '${name}' made: ${pj.board || 'no board'} (${deviceName(pj.device)}). Write its sources with write_file, then set_top.`, data: { project: name, board: pj.board || null, device: pj.device } };
+      return { text: `Empty project '${name}' made: ${pj.board || 'no board'} (${deviceName(pj.device)}). Write its sources with write_file, then set_top.${UNTRUSTED}`, data: { project: name, board: pj.board || null, device: pj.device, trusted: false } };
     },
   },
   {

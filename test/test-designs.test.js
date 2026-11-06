@@ -134,7 +134,7 @@ test('#1746 the MCP server: list_examples lists the test designs apart; new_proj
   assert.match(ex.text, /\n\nTest designs \(the designs Silinx is tested with; its own, with their test\):\nbus_taps \(schematic\): bus taps of one bit and of several, [^\n]*; top bus_taps, test bench tb_bus_taps\n/);
   assert.match(ex.text, /\ngcd \(c\): C: the greatest common divisor, [^\n]*; top gcd, its test the C's main\(\)\n/);
   const made = await tool('new_project_from_example', { name: 'Vend', example: 'vending' });
-  assert.equal(made.text, 'Project \'Vend\' made from the test design vending: top vending, no board (xc3s250ecp132-4).');
+  assert.equal(made.text, 'Project \'Vend\' made from the test design vending: top vending, no board (xc3s250ecp132-4). It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   assert.ok(fs.existsSync(path.join(P.projectDir('Vend'), 'sim', 'tb_vending.vhd')));
   await assert.rejects(tool('new_project_from_example', { name: 'X', example: '../test-designs/gcd' }), /unknown example '\.\.\/test-designs\/gcd' \(list_examples\)/);
 });

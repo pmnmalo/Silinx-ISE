@@ -88,7 +88,7 @@ test('the examples, a new project from one (for another board too), the projects
   assert.deepEqual(ex.structuredContent.examples.find(e => e.name === 'blinky'), { name: 'blinky', top: 'top', simTop: 'tb_top', board: 'basys2', device: 'xc3s250ecp132-4', files: 7 });
   assert.equal((await srv.call('list_projects')).content[0].text, 'No project in the workspace (new_project_from_example makes one).');
   const made = await srv.call('new_project_from_example', { name: 'Blinky', example: 'blinky' });
-  assert.equal(made.content[0].text, 'Project \'Blinky\' made from the example blinky: top top, basys2 (xc3s250ecp132-4).');
+  assert.equal(made.content[0].text, 'Project \'Blinky\' made from the example blinky: top top, basys2 (xc3s250ecp132-4). It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   assert.ok(fs.existsSync(path.join(ws, 'Blinky', 'silinx.json')));
   // for the Nexys2-500: its device and its pins
   const nx = await srv.call('new_project_from_example', { name: 'TrafficN', example: 'traffic', board: 'nexys2', variant: '500' });
@@ -241,13 +241,13 @@ test('run_process and get_report: the power estimate of blinky with the Silinx t
 
 test('new_project and set_top: an empty project for a board, its source written, its top and test bench chosen, its constraints from the board\'s pins; implemented (#460)', { timeout: 120000 }, async () => {
   const made = await srv.call('new_project', { name: 'Counter4', board: 'basys2', variant: '100' });
-  assert.equal(made.content[0].text, 'Empty project \'Counter4\' made: basys2 (xc3s100ecp132-4). Write its sources with write_file, then set_top.');
+  assert.equal(made.content[0].text, 'Empty project \'Counter4\' made: basys2 (xc3s100ecp132-4). Write its sources with write_file, then set_top. It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   assert.deepEqual(made.structuredContent.device, { family: 'spartan3e', part: 'xc3s100e', package: 'cp132', speed: '-4' });
   assert.equal((await srv.call('new_project', { name: 'Counter4' })).content[0].text, 'new_project: project \'Counter4\' already exists');
   assert.equal((await srv.call('new_project', { name: 'X', board: 'zedboard' })).content[0].text, 'new_project: unknown board \'zedboard\' (basys2, nexys2)');
   assert.equal((await srv.call('new_project', { name: 'X', board: 'nexys2', variant: '250' })).content[0].text, 'new_project: the Digilent Nexys2 has no variant \'250\'');
   const bare = await srv.call('new_project', { name: 'Bare' });
-  assert.equal(bare.content[0].text, 'Empty project \'Bare\' made: no board (xc3s250ecp132-4). Write its sources with write_file, then set_top.');
+  assert.equal(bare.content[0].text, 'Empty project \'Bare\' made: no board (xc3s250ecp132-4). Write its sources with write_file, then set_top. It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   await srv.call('write_file', { project: 'Counter4', path: 'src/counter.vhd', text: 'library ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\nentity counter is\n  port (clk, btn : in std_logic; led : out std_logic_vector(3 downto 0));\nend counter;\narchitecture rtl of counter is\n  signal c : unsigned(3 downto 0) := (others => \'0\');\nbegin\n  process (clk) begin\n    if rising_edge(clk) then\n      if btn = \'1\' then c <= (others => \'0\'); else c <= c + 1; end if;\n    end if;\n  end process;\n  led <= std_logic_vector(c);\nend rtl;\n' });
   await srv.call('write_file', { project: 'Counter4', path: 'sim/tb_counter.vhd', text: 'library ieee;\nuse ieee.std_logic_1164.all;\nentity tb_counter is end;\narchitecture t of tb_counter is\n  signal clk, btn : std_logic := \'0\';\n  signal led : std_logic_vector(3 downto 0);\nbegin\n  uut: entity work.counter port map (clk, btn, led);\n  clk <= not clk after 10 ns;\n  process begin wait for 105 ns; assert led = "0101" report "led wrong" severity error; report "done"; wait; end process;\nend;\n' });
   // refused: nothing to set, a module that is not there, a test bench as the top, constraints without a board

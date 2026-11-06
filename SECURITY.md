@@ -116,7 +116,9 @@ board or a PROM) without the user's say.
    tool's) until the user trusts it: the console says so when the project opens, with a **Trust Project** button.
    Saving the project's description does not make it trusted; only that button does. The MCP server has no tool to
    trust a project, by design: an assistant led astray by what it read cannot. A project made in Silinx is trusted
-   from the start.
+   from the start, but for one the MCP server makes (`new_project`, `new_project_from_example`, `open_link` of an
+   example): it holds what an assistant writes, so it is untrusted too, its console line and refusals saying it was made
+   through the MCP server (#2981).
 
 ### A design opened from a link (#2826, #2829)
 
