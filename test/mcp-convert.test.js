@@ -1,12 +1,13 @@
-// The MCP server's conversions (#2674, server/mcp-convert.js): an HDL module to a schematic (stopwatch, blinky's top),
-// an ASM chart or a state diagram (traffic's state machine, from its HDL), each then the module's base, the test bench
-// passing after it; a state diagram to an ASM chart and back, and to its Boolean algebra; a Verilog module; the
-// converters' refusals.
+// The MCP server's conversions (#2674, server/mcp-convert.js): an HDL module to a schematic (stopwatch, blinky's top,
+// a ripple-carry adder whose instances drive bits of vectors, #2901), an ASM chart or a state diagram (traffic's state
+// machine, from its HDL), each then the module's base, the test bench passing after it; a state diagram to an ASM chart
+// and back, and to its Boolean algebra; a Verilog module; the converters' refusals.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
+import { CASES } from './fixtures/hdl-to-sch-cases.js';
 
 let tmp;
 const { handle } = await import('../server/mcp.js');
@@ -41,6 +42,20 @@ test('convert_module to a schematic: stopwatch\'s and blinky\'s top, the schemat
   assert.equal((await ok('convert_module', { project: 'b', module: 'top', to: 'schematic' })).text,
     '\'top\' converted to the schematic src/top.sch.json (15 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module\'s base, src/top.vhd generated from it.');
   assert.match((await ok('check_syntax', { project: 'b', simulation: true })).text, /^Process "Check Syntax" of <tb_top> completed successfully \(\d+ signals, \d+ processes\)\.$/);
+});
+
+test('convert_module to a schematic (#2901): a ripple-carry adder whose instances drive bits of vectors, every instance drawn', async () => {
+  const c = CASES.find(x => x.name === 'vhdl-inst-bits');
+  await ok('new_project', { name: 'r' });
+  for (const [f, text] of Object.entries(c.files)) await ok('write_file', { project: 'r', path: f, text });
+  await ok('set_top', { project: 'r', top: 'add4', sim_top: 'tb_add4' });
+  await passes('r', 6000, []);
+  assert.equal((await ok('convert_module', { project: 'r', module: 'add4', to: 'schematic' })).text,
+    '\'add4\' converted to the schematic src/add4.sch.json (13 symbols drawn, 0 HDL blocks keeping the HDL that is not drawn): it is now the module\'s base, src/add4.vhd generated from it.');
+  const doc = JSON.parse(read('r', 'src/add4.sch.json'));
+  assert.deepEqual(doc.symbols.filter(s => s.type === 'module').map(s => s.name).sort(), ['U0', 'U1', 'U2', 'U3']);
+  assert.match((await ok('check_syntax', { project: 'r' })).text, /^Process "Check Syntax" of <add4> completed successfully \(\d+ signals, \d+ processes\)\.$/);
+  await passes('r', 6000, []);
 });
 
 test('convert_module to a state diagram and to an ASM chart: traffic\'s state machine from its HDL, the test bench as before', async () => {
