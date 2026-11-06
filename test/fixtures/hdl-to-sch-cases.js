@@ -800,3 +800,79 @@ endmodule
 `,
   },
 });
+
+// VHDL: ports not from 0 read by bits and slices (#2961): a (4 downto 1), its I/O marker's net by its type, its bus taps
+// its own bits; b (1 to 4) the same, its slice an HDL block; an output q (3 downto 1) driven by a gate
+add({
+  name: 'vhdl-port-not-0', module: 'pnz', file: 'src/pnz.vhd', tb: 'tb_pnz', until: 1e6,
+  files: {
+    'src/pnz.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+entity pnz is
+  port (a : in std_logic_vector(4 downto 1); b : in std_logic_vector(1 to 4);
+        y, u : out std_logic; z, w : out std_logic_vector(1 downto 0); q : out std_logic_vector(3 downto 1));
+end pnz;
+architecture r of pnz is
+begin
+  y <= a(4) and a(1);
+  z <= a(3 downto 2);
+  q <= not a(4 downto 2);
+  u <= b(4) xor b(1);
+  w <= b(2 to 3);
+end r;
+`,
+    'sim/tb_pnz.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity tb_pnz is end;
+architecture t of tb_pnz is
+  signal a : std_logic_vector(4 downto 1);
+  signal b : std_logic_vector(1 to 4);
+  signal y, u : std_logic;
+  signal z, w : std_logic_vector(1 downto 0);
+  signal q : std_logic_vector(3 downto 1);
+begin
+  dut: entity work.pnz port map (a => a, b => b, y => y, u => u, z => z, w => w, q => q);
+  process begin
+    for i in 0 to 15 loop
+      a <= std_logic_vector(to_unsigned(i, 4));
+      b <= std_logic_vector(to_unsigned(15 - i, 4));
+      wait for 10 ns;
+      assert y = (a(4) and a(1)) and z = a(3 downto 2) and q = not a(4 downto 2) report "a" severity error;
+      assert u = (b(4) xor b(1)) and w = b(2 to 3) report "b" severity error;
+    end loop;
+    wait;
+  end process;
+end;
+`,
+  },
+});
+
+// Verilog: the same (#2961): input [4:1] a, input [1:4] b, output [3:1] q
+add({
+  name: 'verilog-port-not-0', module: 'pnzv', file: 'src/pnzv.v', tb: 'tb_pnzv', until: 1e6,
+  files: {
+    'src/pnzv.v': `module pnzv(input [4:1] a, input [1:4] b, output y, output u, output [1:0] z, output [1:0] w, output [3:1] q);
+  assign y = a[4] & a[1];
+  assign z = a[3:2];
+  assign q = ~a[4:2];
+  assign u = b[4] ^ b[1];
+  assign w = b[2:3];
+endmodule
+`,
+    'sim/tb_pnzv.v': `\`timescale 1ns/1ps
+module tb_pnzv; reg [4:1] a = 0; reg [1:4] b = 0; wire y, u; wire [1:0] z, w; wire [3:1] q;
+  pnzv dut(.a(a), .b(b), .y(y), .u(u), .z(z), .w(w), .q(q));
+  integer i;
+  initial begin
+    for (i = 0; i < 16; i = i + 1) begin
+      a = i; b = 15 - i; #10;
+      if (y !== (a[4] & a[1]) || z !== a[3:2] || q !== ~a[4:2]) $display("a at %0d", i);
+      if (u !== (b[4] ^ b[1]) || w !== b[2:3]) $display("b at %0d", i);
+    end
+    $finish;
+  end
+endmodule
+`,
+  },
+});

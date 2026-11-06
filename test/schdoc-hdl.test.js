@@ -146,6 +146,33 @@ test('#2903 a bus named d(4:7): its bits 7 downto 4, declared (7 downto 4) / [7:
   }
 });
 
+// #2961: an I/O marker's net by its port's type, a(4 downto 1) / [4:1]: its bits 4 downto 1, its tap of bit 4 in it;
+// without a type (or a range of generics) from 0, as before, its tap of bit 4 outside it
+test('#2961 an I/O marker typed (4 downto 1) / [4:1]: its net\'s bits 4 downto 1; portRange of a marker\'s type', async () => {
+  const { normalizeDoc, symbolPins, netlist, portRange } = await import('../core/schdoc.js');
+  assert.deepEqual(portRange({ type: 'std_logic_vector(4 downto 1)' }), { msb: 4, lsb: 1 });
+  assert.deepEqual(portRange({ type: 'unsigned(1 to 4)' }), { msb: 1, lsb: 4 });
+  assert.deepEqual(portRange({ type: '[4:1]' }), { msb: 4, lsb: 1 });
+  assert.deepEqual(portRange({ type: 'signed [7:2]' }), { msb: 7, lsb: 2 });
+  for (const type of ['std_logic', 'std_logic_vector(N-1 downto 1)', '[N:1]', '', undefined]) assert.equal(portRange({ type }), null, String(type));
+  const make = (lang, type) => {
+    const d = { version: 5, name: 'pt', lang, sheet: { w: 1700, h: 1100 }, symbols: [], wires: [], labels: [], ports: [] };
+    d.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 4, x: 100, y: 100, ...(type ? { type } : {}) }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 900, y: 100 });
+    const s = { id: 'S1', type: 'slice', x: 300, y: 300, rot: 0, mirror: false, name: 'U1', params: { msb: 4, lsb: 4 } };
+    d.symbols.push(s);
+    const pins = Object.fromEntries(symbolPins(normalizeDoc({ ...d }).symbols[0]).map((p) => [p.name, p]));
+    d.wires.push({ id: 'W1', points: [{ x: 100, y: 100 }, { x: pins.I.x, y: 100 }, { x: pins.I.x, y: pins.I.y }], bus: true });
+    d.wires.push({ id: 'W2', points: [{ x: pins.O.x, y: pins.O.y }, { x: 900, y: pins.O.y }, { x: 900, y: 100 }] });
+    return netlist(normalizeDoc(d));
+  };
+  for (const [lang, type] of [['vhdl', 'std_logic_vector(4 downto 1)'], ['verilog', '[4:1]']]) {
+    const nl = make(lang, type);
+    assert.deepEqual(nl.diagnostics.map((x) => x.message), [], lang);
+    assert.deepEqual(nl.nets.find((x) => x.name === 'a').range, { msb: 4, lsb: 1 }, lang);
+  }
+  assert.deepEqual(make('vhdl', null).diagnostics.map((x) => x.message), ["bus tap U1 takes bit 4, outside its bus 'a' (3 downto 0)"]);
+});
+
 // #1689: a bus named with its indices, not from 0 (d(7:4)): declared with them (VHDL (7 downto 4), Verilog [7:4]), a
 // tap of its bit 7 its most significant bit; a bus join into e(7:4); the same through the ISE export and import
 test('#1689 a bus named d(7:4): declared (7 downto 4) / [7:4], its taps by their indices, simulated; the ISE round trip keeps them', async () => {
