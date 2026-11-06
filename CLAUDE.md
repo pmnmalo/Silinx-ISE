@@ -107,7 +107,10 @@ the code and the lessons learnt.
   A **"yosys update" pull request is never merged on green alone**: the maintainer (or the session) reviews
   the comparison `yosys-update.yml` writes (the open synthesis's size and speed with the new Yosys and
   the base's, Yosys's test designs against their expectations), and the user decides. After merging, the
-  quality comparison against ISE is run by hand (Actions ▸ Quality ▸ Run workflow) and reviewed. The
+  quality comparison against ISE is run by hand (Actions ▸ Quality ▸ Run workflow) and reviewed. A
+  **"nextpnr update" pull request** (a nextpnr package: Dependabot's, or a release of the fork pinned by hand) is
+  reviewed the same way, on the comparison `nextpnr-update.yml` writes (the examples' size, period and run time on a
+  board of each family with the new nextpnr and the base's), then `npm run check:open-flow` after merging. The
   sources pinned outside npm are checked monthly (`pins.yml`: one issue lists what is behind).
 - **`main` is protected** (repository rulesets): no deletion and no force push, for anyone; a linear
   history, rebase merging only; a pull request's `related-tests` check and a code owner's approving review

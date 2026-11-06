@@ -8,9 +8,11 @@
 #   - Docker: the Vitis HLS image's base (scripts/vitis-hls-image/Dockerfile), pinned by its digest (#2645), which
 #     Dependabot updates with the digest within Ubuntu 22.04 (the release Vivado supports); the ISE image's
 #     Ubuntu 14.04 (docker/ise/) has no new digest to come (end of life), and is left out
-# @silinx/nextpnr-himbaechel-spartan3e (nextpnr, #2136) is pinned by its version on npm (#2307), which Dependabot updates;
-# -spartan6 (#2138) is still pinned by its release's URL (pmnmalo/nextpnr-spartan), which Dependabot does not update:
-# a new release of it is pinned by hand (its group entry only keeps every dependency named).
+# @silinx/nextpnr-himbaechel-spartan3e (nextpnr, #2136) is pinned by its version on npm (#2307), which Dependabot updates,
+# never grouped: a pull request of its own, which .github/workflows/nextpnr-update.yml labels "nextpnr update" and
+# measures (the examples with the new nextpnr against the base's), never merged on green alone (#2935); -spartan6 (#2138)
+# is still pinned by its release's URL (pmnmalo/nextpnr-spartan), which Dependabot does not update: the monthly Pins
+# check lists a newer release (#2934), pinned by hand in a pull request the same workflow measures.
 # Sources pinned outside npm (Yosys's test designs, the design corpus, the MCC models): the monthly
 # .github/workflows/pins.yml (scripts/check-pins.mjs).
 # elkjs is no longer ignored (0.9 to 0.12 in #351): a 0.x minor update may change the schematic layout;
@@ -31,7 +33,7 @@ updates:
     labels: [dependencies]
     groups:
       npm-minor-patch:
-        patterns: ['@codemirror/*', '@lezer/*', '@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6', '@yowasp/nextpnr-ice40', express, elkjs, esbuild, playwright]
+        patterns: ['@codemirror/*', '@lezer/*', '@yowasp/nextpnr-ice40', express, elkjs, esbuild, playwright]
         update-types: [minor, patch]
     # (no update ignored)
     # CodeMirror: on 6 since #349, its major updates no longer ignored
