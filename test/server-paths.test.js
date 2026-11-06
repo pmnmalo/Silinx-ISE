@@ -89,3 +89,11 @@ test('#1234 a symbolic link to a file outside the project', { skip: !canLinkFile
   await assert.rejects(P.writeFile('FileLink', 'src/top.vhd', 'overwritten'), e => e.message === 'path escapes project');
   assert.equal(fs.readFileSync(path.join(tmp, 'id_rsa'), 'utf8'), 'KEY');
 });
+
+test('#2917 projectDir: a project name that is not a string is refused as invalid (400), never joined into a path', () => {
+  for (const name of [['demo'], { toString: () => 'demo' }, 7, null, undefined]) {
+    assert.throws(() => P.projectDir(name), e => e instanceof P.HttpError && e.status === 400 && /^invalid project name/.test(e.message), String(name));
+  }
+  assert.equal(P.projectDir('demo'), path.join(ws, 'demo'));
+  assert.throws(() => P.projectDir('../demo'), e => e.status === 400);
+});

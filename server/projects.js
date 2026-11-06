@@ -56,7 +56,7 @@ export class HttpError extends Error {
 }
 
 export function projectDir(name) {
-  if (!NAME_RE.test(name || '')) throw new HttpError(400, `invalid project name '${name}'`);
+  if (typeof name !== 'string' || !NAME_RE.test(name)) throw new HttpError(400, `invalid project name '${name}'`);
   return path.join(workspaceDir(), name);
 }
 
