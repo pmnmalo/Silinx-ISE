@@ -68,7 +68,6 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const bbs = loadBlackboxes(blackboxes, headers);
   diagnostics.push(...bbs.diagnostics);
   applyBlackboxes(checked, bbs.list, (d) => diagnostics.push(d));
-  if (checked.dataflow && bbs.list.length) diagnostics.push({ file, line: 1, col: 1, message: 'syn.blackbox: an RTL blackbox in a DATAFLOW region is not supported yet', severity: 'error' });
   if (diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
   foldTables(checked, diagnostics);
@@ -99,7 +98,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall, flat, taken });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall, flat, taken, blackboxes });
     if (!r.fallback) return r;
     if (hasStreams(checked.funcs.get(checked.top))) {
       const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };

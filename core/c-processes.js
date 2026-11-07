@@ -19,6 +19,7 @@ import { firHdl } from './hls-fir-hdl.js';
 import { moduleRegistry } from './c-submodule.js';
 import { structPragmas, wordGroups } from './c-aggregate.js';
 import { wordAdapter, wordPorts } from './c-processes-word.js';
+import { blackboxProcess } from './c-blackbox-process.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
@@ -88,7 +89,7 @@ function streamWords(checked, fn, use, rn, flat) {
   });
 }
 
-export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module = null, stall = false, flat = false, taken = null }) {
+export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module = null, stall = false, flat = false, taken = null, blackboxes = null }) {
   const fn = checked.funcs.get(checked.top);
   const rg = region(fn, checked.consts);
   // (a top running an hls::FIR has none, #1942)
@@ -107,8 +108,10 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const elem = (t) => typeOf(t.kind === 'ptr' ? t.to : t.kind === 'array' || t.kind === 'stream' ? t.of : t);
   const reg = moduleRegistry({ make: (callee, depths, module) => {
     const fir = checked.ast.firs?.get(callee), f = checked.funcs.get(callee);
+    // (an RTL blackbox: its module inside a process's, core/c-blackbox-process.js, #2340)
+    if (f?.blackbox) return blackboxProcess(f, { lang, module: `${module}_bb`, file });
     return fir ? firHdl(fir, { lang, module, src: file.split('/').pop(), types: Object.fromEntries(f.params.map((pa) => [pa.name, elem(pa.type)])) })
-      : cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, stall, modules: reg, ...(/^Loop_\d+_proc$/.test(callee) ? { host: checked.top } : {}) });
+      : cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, stall, modules: reg, blackboxes, ...(/^Loop_\d+_proc$/.test(callee) ? { host: checked.top } : {}) });
   } });
   const sizeOf = (a) => {
     if (a?.kind !== 'id') return null;
@@ -118,7 +121,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const locals = (n) => rg.locals.get(n);
   rg.calls.forEach((c, k) => {
     const f = checked.funcs.get(c.callee);
-    if (!f?.body) { fail(c.loc, `'${c.callee}' is not defined`); return; }
+    if (!f?.body && !f?.blackbox) { fail(c.loc, `'${c.callee}' is not defined`); return; }
     const depths = {};
     f.params.forEach((pa, i) => { const n = sizeOf(c.args[i]); if (n && pa.name) depths[pa.name] = n; });
     const m = reg.of(c.callee, depths);
@@ -249,10 +252,12 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const net = { stall, name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free, ties, inner, words };
   const top = lang === 'vhdl' ? vhdlTop(net) : verilogTop(net);
   const hdl = [...reg.modules().map((m) => m.gen.hdl), ...top].join('\n');
-  const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), ...regionTiming(procs), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, latency: p.mod.gen.report.latency ?? null, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
+  const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), ...regionTiming(procs), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, latency: p.mod.gen.report.latency ?? null, ...(p.mod.gen.report.blackbox ? { blackbox: p.mod.gen.report.blackbox } : {}), after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
     memories: [...memories.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' })), ...[...rg.locals].filter(([, l]) => l.kind === 'array').map(([n, l]) => ({ name: n, words: Number(l.type.length), bits: typeOf(l.type.of)?.w ?? 0, kind: 'RAM (PIPO)' }))],
     fifos: [...rg.locals].filter(([, l]) => l.kind === 'stream').map(([n, l]) => ({ name: n, depth: l.depth })), waits, loops: [] };
-  return { ok: true, hdl, top: name, ports, diagnostics: diagnostics.sort(byLine), sequential: true, states: 0, memories, fifos, report, dataflow: true };
+  // (the RTL blackboxes, a process's or in one, #2340: their files the co-simulation's)
+  const bbs = [...new Map(reg.modules().flatMap((m) => m.gen.blackboxes || []).map((d) => [d.file, d])).values()];
+  return { ok: true, ...(bbs.length ? { blackboxes: bbs } : {}), hdl, top: name, ports, diagnostics: diagnostics.sort(byLine), sequential: true, states: 0, memories, fifos, report, dataflow: true };
 }
 
 /** The report's region (#1706): its latency, the longest chain of processes one waiting for another's buffers (streams
