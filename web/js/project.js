@@ -139,8 +139,7 @@ async function reloadProjectNow(render = true, depth = 0) {
     } catch { /* unreadable */ }
   }
   // (the RTL blackboxes of its C functions, as it opens, #1903)
-  const { blackboxesIn } = await import('/core/c-blackbox.js');
-  const hls = await blackboxesIn(S.diskTree, f => api.readFile(pj.name, f)).catch(() => null);
+  const hls = await readBlackboxes(pj.name);
   Object.assign(S, { schOwners, hdlToSch, viewModule, viewTexts, hls });
   compileProject();
   // a drawing whose base was its HDL (before #220) is made the base; a drawn source without its HDL
@@ -158,6 +157,22 @@ async function reloadProjectNow(render = true, depth = 0) {
   renderFilesPage();
   renderLibsPage();
   if (!render) return;
+}
+
+// the project's RTL blackboxes (core/c-blackbox.js, #1903): its descriptions, with the files they name and its headers
+async function readBlackboxes(name) {
+  const { blackboxesIn } = await import('/core/c-blackbox.js');
+  return blackboxesIn(S.diskTree, f => api.readFile(name, f)).catch(() => null);
+}
+
+/** A file saved in its editor that a blackbox reads (its description, its RTL module, its C model): the descriptions
+ *  read again, so that the C sources' HDL and their C simulation are made with it (#2342). (A file added, removed or
+ *  renamed, or changed outside, reloads the project, which reads them.) */
+export async function refreshBlackboxes(path) {
+  const h = S.hls;
+  if (!S.project || !h || !(path in (h.headers || {}) || h.blackboxes.some(b => b.file === path))) return false;
+  S.hls = await readBlackboxes(S.project.name);
+  return true;
 }
 
 async function closeProjectNow() {

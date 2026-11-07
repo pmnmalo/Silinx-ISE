@@ -128,3 +128,34 @@ uiTest('#2339 Silinx HLS: an RTL blackbox with a memory port: the top\'s memory 
   assert.match(await page.consoleText(), /C simulation: 2 call\(s\) of 'top' replayed on its VHDL\.[\s\S]*C\/RTL co-simulation PASS: 2 call\(s\), the same results/);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });
+
+// (#2342) a blackbox's files edited while the project is open: its RTL module, its description, its C model, each
+// saved in its editor, seen at once (the C's HDL made again, its C simulation with the new model)
+uiTest('#2342 Silinx HLS: an RTL blackbox\'s module, description and C model edited and saved while the project is open: the C\'s HDL and its C simulation see them', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxEdit', top: '', files: { 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxEdit');
+  await page.showMessages();
+  await page.leftTab('design');
+  const top = () => page.eval(() => window.SilinxApp.S.viewSources.find((s) => s.path === 'src/top.cpp'));
+  await page.waitFor(() => window.SilinxApp.S.viewSources.some((s) => s.path === 'src/top.cpp' && s.errors === 0), [], { what: 'the C\'s module' });
+  const edit = async (path, from, to) => {
+    await page.eval((f) => window.SilinxApp.openFile(f), path);
+    await page.waitFor((f) => window.Silinx.active?.id === `file:${f}` && window.Silinx.active.editor, [path]);
+    await page.eval(([a, b]) => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().split(a).join(b)); }, [from, to]);
+    await page.eval(() => window.SilinxApp.saveAll());
+  };
+  // the module's port renamed: the description's no longer there, the C's module not made (#2995: not said yet)
+  await edit('src/msum.v', 'm_q0', 'm_qq');
+  await page.waitFor(() => !window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module gone' });
+  // the description corrected: the module again, joined to the new port
+  await edit('src/msum.json', '"RAM_data_read_in": "m_q0"', '"RAM_data_read_in": "m_qq"');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module again' });
+  assert.match((await top()).text, /m_qq => ap_bb0_m_q0/);
+  // the C model changed: the C simulation runs the new one (main() sees each word written back two more)
+  await edit('src/msum.cpp', 'm[i] = m[i] + 1', 'm[i] = m[i] + 2');
+  await page.treeRow('#hier', 'top');
+  await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C Simulation" (completed successfully|failed)/);
+  assert.match(await page.consoleText(), /main\(\) returned 2; 1 call\(s\) of 'top'\./);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
