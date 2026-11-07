@@ -451,7 +451,19 @@
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error"
+  "flow": "complete",
+  "warnings": {
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
+   ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 657,
+   "luts": 1300,
+   "ffs": 334,
+   "period": 35.424
+  }
  },
  "itc99-b15": {
   "frontend": "pass",
@@ -509,25 +521,47 @@
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error"
+  "flow": "fail: nextpnr failed: it stopped on an error: Routing design failed: router 2 did not converge in 500 iterations (router2/maxIter), 2 wire(s) still overused: X11Y8/G3_B_PINWIRE2 (net $techmap38480$abc$38319"
  },
  "itc99-b21": {
   "frontend": "pass",
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error"
+  "flow": "complete",
+  "warnings": {
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
+   ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 1363,
+   "luts": 2702,
+   "ffs": 492,
+   "period": 38.19
+  }
  },
  "itc99-b22": {
   "frontend": "pass",
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error",
+  "flow": "complete",
   "warnings": {
    "frontend": [
     "WARNING:Silinx:646 (unused-signal) - b22.vhd:1609: Signal <datao_3> is assigned but never used. This unconnected signal will be trimmed during the optimization process."
+   ],
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
    ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 2030,
+   "luts": 4026,
+   "ffs": 706,
+   "period": 39.372
   }
  },
  "iwls05-i2c": {
