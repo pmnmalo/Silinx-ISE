@@ -40,7 +40,7 @@ uiTest('#2951 the HDL logic of each output: a tick box on each result, least gat
   // no HDL logic in the toolbar
   assert.equal(await page.eval((t) => [document.querySelector(`${t} .tt-form`), [...document.querySelectorAll(`${t} .tt-toolbar label`)].find((l) => /HDL/.test(l.textContent))].filter(Boolean).length, T), 0);
   // a tick box on every result; least gates ticked
-  assert.deepEqual((await ticks(page)).map(([r]) => r), ['canon-sop', 'canon-pos', 'tt-sop', 'tt-pos', 'tt-xor', 'tt-nand', 'tt-nor', 'tt-gates', 'tt-delay']);   // (the majority's XOR form simpler)
+  assert.deepEqual((await ticks(page)).map(([r]) => r), ['tt-gates', 'tt-delay', 'tt-sop', 'tt-pos', 'canon-sop', 'canon-pos', 'tt-xor', 'tt-nand', 'tt-nor']);   // (the majority's XOR form simpler; the order: #3065)
   assert.deepEqual(await ticked(page), ['tt-gates']);
   // the canonical SOP of f: the table and its module follow; the others keep least gates
   await tick(page, '.tt-canon-sop');

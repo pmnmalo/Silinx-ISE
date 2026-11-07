@@ -353,13 +353,14 @@ export function mountTtEditor(container, opts = {}) {
     const best = (goal, label, tip) => bestForm(M, out, goal, label, tip, notation, tick);
     results.append(
       h('div', { class: 'tt-row' }, h('label', {}, 'Notation:'), nsel),
-      canonForms(A, out, notation, tick),
+      // (the circuit's two choices first, then the minimal forms, the canonical ones after them, #3065)
+      best('gates', 'Least number of gates', GATES_TIP), best('delay', 'Least delay', DELAY_TIP),
       form('Minimal SOP', 'sop', 'tt-sop'),
       form('Minimal POS', 'pos', 'tt-pos'),
+      canonForms(A, out, notation, tick),
       ...(xorForm ? [xorForm] : []),
       gateForm('NAND form', A.nand, 'tt-nand', 'The minimal SOP with NAND gates only (double negation); an inverter is a NAND of one input'),
-      gateForm('NOR form', A.nor, 'tt-nor', 'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input'),
-      best('gates', 'Least number of gates', GATES_TIP), best('delay', 'Least delay', DELAY_TIP));
+      gateForm('NOR form', A.nor, 'tt-nor', 'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input'));
   }
 
   function renderLink() {
