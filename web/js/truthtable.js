@@ -332,7 +332,7 @@ export function mountTtEditor(container, opts = {}) {
     const tick = f => hdlTick((formOf(M, out) === 'xor' && !A.xor ? 'sop' : formOf(M, out)) === f, () => { M = setOutputLogic(M, out, { form: f }); changed(); });
     const form = (label, f, cls) => {
       const r = A[f], g = r.gates;
-      const note = r.several ? [h('span', { class: 'tt-note tt-sol-of' }, `Solution ${r.pick + 1} of ${r.alternatives.length}`)] : [];
+      const note = [];   // (the solution's number: the Karnaugh map's selector, not here, #3060)
       if (!r.exact) note.push(h('span', { class: 'tt-note' }, 'The exact search was cut short: this solution may not be minimal.'));
       return h('div', { class: `tt-res ${cls}` },
         h('div', {}, tick(f), h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)),
