@@ -62,7 +62,7 @@ test('#1961 ALLOCATION of mul limit=1: one multiplier, in more cycles, the C\'s 
 
 test('#1961 ALLOCATION: what is not made, its warning', () => {
   const m = (p) => msgs(`int f(int a) {\n#pragma HLS ALLOCATION ${p}\n  return g(a) + h(a);\n}`.replace(/^/, 'int g(int v) {\n#pragma HLS INLINE\n  return v + 1;\n}\nint h(int v) {\n#pragma HLS INLINE off\n  return v + 2;\n}\n')).filter((x) => /ALLOCATION/.test(x));   // (h's own: combinational, its logic in its caller's)
-  assert.deepEqual(m('instances=add limit=1 operation'), ['10 warning: #pragma HLS ALLOCATION of add: only multiplications are shared: ignored']);
+  assert.deepEqual(m('instances=add limit=1 operation'), ['10 warning: #pragma HLS ALLOCATION of add: only multiplications and the floating-point operations (fadd, fsub, fmul, fdiv, fsqrt, dadd, dsub, dmul, ddiv, dsqrt) are shared: ignored']);
   assert.deepEqual(m('instances=mul'), ['10 warning: #pragma HLS ALLOCATION needs instances=<what> limit=N, a whole number, 1 or more: ignored']);
   assert.deepEqual(m('instances=g limit=1 function'), ["10 warning: #pragma HLS ALLOCATION of the function 'g': it is inlined, no instance to limit (INLINE off makes it a sub-module, one instance): ignored"]);
   assert.deepEqual(m('instances=q limit=1 function'), ["10 warning: #pragma HLS ALLOCATION of the function 'q': no such function: ignored"]);

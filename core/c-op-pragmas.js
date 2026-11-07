@@ -10,6 +10,8 @@
 //   mulLimit(checked) -> ALLOCATION's limit of mul, or null
 //   latencyPragma(fn) -> { min, max, loc } of the function's own LATENCY, or null
 
+import { FLOAT_OPS } from './c-float-units.js';
+
 const INT_OPS = new Set(['add', 'sub', 'mul', 'mult', 'addsub', 'udiv', 'sdiv', 'div', 'urem', 'srem', 'mod']);
 const NUM = /^\d+$/;
 const walk = (x, f) => {
@@ -40,7 +42,10 @@ export function checkOpPragma({ name, args }, loc, report, where, fname, top, fu
       if (!f) report(loc, `#pragma HLS ALLOCATION of the function '${args.instances}': no such function: ignored`, 'warning');
       else if (!f.body?.items.some((s) => s.kind === 'pragma' && s.pragma.name === 'INLINE' && s.pragma.args.off)) report(loc, `#pragma HLS ALLOCATION of the function '${args.instances}': it is inlined, no instance to limit (INLINE off makes it a sub-module, one instance): ignored`, 'warning');
       else if (Number(args.limit) > 1) report(loc, `#pragma HLS ALLOCATION limit=${args.limit} of '${args.instances}': one instance made, its calls sharing it`, 'warning');
-    } else if (!isMul(lower(args.instances))) report(loc, `#pragma HLS ALLOCATION of ${args.instances}: only multiplications are shared: ignored`, 'warning');
+    } else if (FLOAT_OPS.has(lower(args.instances))) {
+      // (a floating-point operation's unit, core/c-float-units.js, #2273)
+      if (Number(args.limit) > 1) report(loc, `#pragma HLS ALLOCATION limit=${args.limit} of ${lower(args.instances)}: one unit made, its operations sharing it`, 'warning');
+    } else if (!isMul(lower(args.instances))) report(loc, `#pragma HLS ALLOCATION of ${args.instances}: only multiplications and the floating-point operations (fadd, fsub, fmul, fdiv, fsqrt, dadd, dsub, dmul, ddiv, dsqrt) are shared: ignored`, 'warning');
     return true;
   }
   if (name === 'LATENCY') {

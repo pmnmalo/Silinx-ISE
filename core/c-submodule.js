@@ -178,7 +178,7 @@ export const subMethods = {
         const ptr = pa.type.kind === 'ptr';
         const et = typeOf(ptr ? pa.type.to : pa.type);
         const target = ptr ? (a.kind === 'unary' && a.op === '&' ? a.e : { kind: 'unary', op: '*', e: a, loc: a.loc }) : a;
-        if (p.dir === 'in') { drive.set(p.name, this.conv(this.expr(target, g), { w: p.w, s: et.s }).id); continue; }
+        if (p.dir === 'in') { drive.set(p.name, this.conv(this.expr(target, g), et.fl ? et : { w: p.w, s: et.s }).id); continue; }   // (a float's: its bits, #2273)
         // (written: taken each time it comes, its _ap_vld; without one, at the end of the call)
         const vld = byName.get(`${p.name}_ap_vld`);
         this.store(target, this.v(I(p.name, et), et), vld ? I(vld.name, BOOL) : done);
