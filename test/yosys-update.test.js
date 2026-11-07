@@ -154,8 +154,9 @@ test('yosys update: the design corpus\'s subset: designs of the manifest whose f
   // VHDL and Verilog, CPUs and benchmarks
   const lang = n => manifest.designs.find(d => d.name === n).files.some(f => /\.vhdl?$/.test(f));
   assert.ok(DESIGN_SUBSET.some(lang) && DESIGN_SUBSET.some(n => !lang(n)));
-  // the stages run (frontend, synth, flow) under 40 min of one job on CI (4 jobs in the workflow)
-  assert.ok(total < 40 * 60000, `${(total / 60000).toFixed(0)} min`);
+  // the stages run (frontend, synth, flow) under 60 min of one job on CI: about 15 min with the workflow's 4 jobs, of
+  // its 90 (46 min on the nextpnr engine 1.1.0's times, #3003)
+  assert.ok(total < 60 * 60000, `${(total / 60000).toFixed(0)} min`);
   const r = spawnSync(process.execPath, [SCRIPT, 'subset'], { encoding: 'utf8' });
   assert.equal(r.stdout.trim(), DESIGN_SUBSET.join(','));
 });
