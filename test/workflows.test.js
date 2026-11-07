@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isWorkflowFile, workflowFiles } from './workflows-lib.mjs';
+import { isWorkflowFile, workflowFiles, checkoutLayout } from './workflows-lib.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, '.github/workflows');
@@ -55,7 +55,8 @@ test('workflows: the self-hosted runner only for main, read-only, without the ch
   for (const f of FILES) {
     const yml = read(f);
     for (const [name, lines] of Object.entries(jobs(yml))) {
-      if (!lines.some(l => /^ {4}runs-on: .*self-hosted/.test(l))) continue;
+      // (runs-on as a mapping, labels: / group: under it: the self-hosted check below refuses it, #3037)
+      if (!lines.some(l => /^ {4}runs-on: .*self-hosted/.test(l) || /^ {4}runs-on:\s*(#.*)?$/.test(l))) continue;
       selfHosted.push(`${f}:${name}`);
       // never a pull request's code: scheduled or by hand, main only
       assert.doesNotMatch(yml.slice(0, yml.indexOf('\njobs:\n')), /pull_request|push:|workflow_run/, f);
@@ -81,6 +82,13 @@ const SELF_HOSTED = '[self-hosted, ise]';
 const SELF_HOSTED_EVENTS = ['schedule', 'workflow_dispatch'];
 const SELF_HOSTED_IF = "(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'";
 
+/** The line of the key a job's line i is under (the nearest line above it with less indentation), '' if none. */
+function parentOf(lines, i) {
+  const indent = lines[i].search(/\S/);
+  for (let k = i - 1; k >= 0; k--) if (lines[k].trim() && lines[k].search(/\S/) < indent) return lines[k];
+  return '';
+}
+
 /** What could send a pull request's code to the self-hosted ISE runner in a workflow: [problem] (#482). */
 export function selfHostedProblems(f, yml) {
   const problems = [];
@@ -89,6 +97,11 @@ export function selfHostedProblems(f, yml) {
   for (const [name, lines] of Object.entries(jobs(yml))) {
     const body = lines.join('\n');
     const runsOn = lines.map(l => /^ {4}runs-on: (.*)$/.exec(l)?.[1]).filter(Boolean);
+    // runs-on as a mapping (its labels: / group: on the lines below it, or { … } on its line): a runner group or
+    // labels the checks below do not read, refused whatever it names (#3037)
+    const mapping = lines.some(l => /^ {4}runs-on:\s*(#.*)?$/.test(l)) || runsOn.some(r => r.trim().startsWith('{'))
+      || lines.some((l, i) => /^\s+(labels|group):/.test(l) && /^ {4}\S/.test(parentOf(lines, i)) && !/^ {4}concurrency:\s*$/.test(parentOf(lines, i)));
+    if (mapping) { problems.push(`${f}:${name}: runs-on as a mapping (labels:, group:): GitHub's runners, or ${SELF_HOSTED}, on its line`); continue; }
     // a job calling a reusable workflow: one of the repository's (checked on its own: those have no self-hosted job)
     const uses = lines.map(l => /^ {4}uses: (.*)$/.exec(l)?.[1]).find(Boolean);
     if (uses && !/^\.\/\.github\/workflows\/[\w-]+\.yml$/.test(uses)) problems.push(`${f}:${name}: a reusable workflow from elsewhere (${uses})`);
@@ -143,6 +156,32 @@ test('workflows: no pull request\'s code can reach the self-hosted ISE runner (#
   assert.deepEqual(selfHostedProblems('m.yml', wf('  pull_request:\n', `    strategy:\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n${job('${{ matrix.os }}')}`)), []);
   assert.deepEqual(selfHostedProblems('x.yml', wf('  pull_request:\n', job('${{ inputs.runner }}'))), ['x.yml:j0: runs-on from an expression (${{ inputs.runner }})']);
   assert.deepEqual(selfHostedProblems('u.yml', wf('  pull_request:\n', '    uses: someone/else/.github/workflows/x.yml@main\n')), ['u.yml:j0: a reusable workflow from elsewhere (someone/else/.github/workflows/x.yml@main)']);
+  // runs-on as a mapping: its labels or its runner group on the lines below it, or { … } on its line (#3037)
+  const MAPPING = 'runs-on as a mapping (labels:, group:): GitHub\'s runners, or [self-hosted, ise], on its line';
+  for (const runsOn of ['\n      labels: [self-hosted, ise]', '\n      group: ise', '\n      group: ise\n      labels: [self-hosted]', '  # the runner\n      labels: ise', '{ group: ise }', '{ labels: [self-hosted, ise] }']) {
+    assert.deepEqual(selfHostedProblems('g.yml', wf('  pull_request:\n', job(runsOn))), [`g.yml:j0: ${MAPPING}`], runsOn);
+    assert.deepEqual(selfHostedProblems('g.yml', wf(SCHED, job(runsOn, GUARD))), [`g.yml:j0: ${MAPPING}`], runsOn);
+  }
+  // not one: a job's own concurrency group, the labels of a step's input, on GitHub's runner
+  assert.deepEqual(selfHostedProblems('c.yml', wf('  pull_request:\n', job('ubuntu-latest', '    concurrency:\n      group: x-${{ github.ref }}\n      cancel-in-progress: true\n'))), []);
+  assert.deepEqual(selfHostedProblems('c.yml', wf(SCHED, job(SELF_HOSTED, GUARD + '    concurrency:\n      group: ise\n'))), []);
+  assert.deepEqual(selfHostedProblems('c.yml', wf('  pull_request:\n', job('ubuntu-latest') + '      - uses: actions/labeler@x\n        with:\n          labels: a\n          group: b\n')), []);
+});
+
+test('workflows: a pull request\'s job with a writing token runs the base\'s scripts at the root, the pull request under head/ (#3038)', () => {
+  for (const f of ['yosys-update.yml', 'nextpnr-update.yml'])
+    assert.deepEqual(checkoutLayout(jobs(read(f)).check.join('\n')), { base: '', head: 'head', clean: true }, f);
+  // the checker itself: the old layout (the pull request at the root, where a bare import of base/scripts resolves),
+  // the check missing or after node, the check of another folder
+  const co = (ref, at) => `      - uses: actions/checkout@x\n        with:\n${ref ? '          ref: ${{ github.event.pull_request.base.sha }}\n' : ''}${at ? `          path: ${at}\n` : ''}          persist-credentials: false\n`;
+  const job = (...steps) => `    runs-on: ubuntu-latest\n    steps:\n${steps.join('')}`;
+  const TEST = '      - run: test ! -e node_modules\n', NODE = '      - run: node scripts/x.mjs versions package.json head/package.json\n';
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), TEST, NODE)), { base: '', head: 'head', clean: true });
+  assert.deepEqual(checkoutLayout(job(co(false), co(true, 'base'), '      - run: node base/scripts/x.mjs\n')), { base: 'base', head: '', clean: false });
+  assert.deepEqual(checkoutLayout(job(co(false), co(true, 'base'), '      - run: test ! -e base/node_modules\n', '      - run: node base/scripts/x.mjs\n')), { base: 'base', head: '', clean: true });
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), NODE)), { base: '', head: 'head', clean: false });
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), NODE, TEST)), { base: '', head: 'head', clean: false });
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), '      - run: test ! -e head/node_modules\n', NODE)), { base: '', head: 'head', clean: false });
 });
 
 test('workflows: the weekly comparison\'s results pushed from GitHub\'s runner, after a passing comparison (#412)', () => {

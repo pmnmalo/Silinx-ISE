@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { checkoutLayout } from './workflows-lib.mjs';
 import { yosysVersion, yosysChange, yosysTag, qualityRows, designQualities, mergeCorpus, reportMarkdown, readSide, DESIGN_SUBSET, MARK, PACKAGE, CORPUS_SHARDS } from '../scripts/yosys-update-report.mjs';
 import { EXAMPLE_ORDER } from '../core/examples.js';
 
@@ -170,8 +171,8 @@ test('yosys update: the workflow on pull requests that change @yowasp/yosys, Git
   for (const m of yml.matchAll(/runs-on: (.+)/g)) assert.equal(m[1], 'ubuntu-latest');
   assert.match(yml, /\npermissions:\n  contents: read\n/);
   // the check of the diff: the base's versions against the pull request's, by the base's script (#1440); the label
-  assert.match(yml, /\n      - id: v\n        run: node base\/scripts\/yosys-update-report\.mjs versions base\/package\.json base\/package-lock\.json package\.json package-lock\.json\n/);
-  assert.doesNotMatch(yml, /node scripts\/yosys-update-report\.mjs (versions|comment) /);
+  assert.match(yml, /\n      - id: v\n        run: node scripts\/yosys-update-report\.mjs versions package\.json package-lock\.json head\/package\.json head\/package-lock\.json\n/);
+  assert.doesNotMatch(yml, /node (head\/)?scripts\/yosys-update-report\.mjs comment /);
   assert.match(yml, /gh pr edit .* --add-label "yosys update"/);
   for (const job of ['measure', 'corpus']) assert.match(yml, new RegExp(`\\n  ${job}:\\n    needs: check\\n    if: needs\\.check\\.outputs\\.changed == 'true'\\n`), job);
   assert.match(yml, /\n  report:\n    needs: \[check, measure, corpus\]\n    if: always\(\) && needs\.check\.outputs\.changed == 'true'\n/);
@@ -207,21 +208,22 @@ test('yosys update: the steps with a writing token run the base\'s code, and the
     else if (name && /^ {4}/.test(line)) j[name].push(line);
   }
   assert.deepEqual(Object.keys(j), ['check', 'measure', 'corpus', 'report']);
-  // the base checked out under base/ in the two jobs whose token writes (check: the label; report: the comment),
-  // with no credentials kept, and the pull request's script never run there with the token
+  // the base checked out in the two jobs whose token writes (check: the label; report: the comment), with no
+  // credentials kept, and the pull request's script never run there with the token: the check job's base at the
+  // root, the pull request under head/ (#3038), the report job's base under base/
+  assert.deepEqual(checkoutLayout(j.check.join('\n')), { base: '', head: 'head', clean: true });
   const baseCheckout = /\n      - uses: actions\/checkout@[0-9a-f]{40} # v[\d.]+\n        with:\n          ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}\n          path: base\n          persist-credentials: false\n/;
-  for (const job of ['check', 'report']) {
-    assert.match(`\n${j[job].join('\n')}\n`, baseCheckout, job);
-    assert.ok(!j[job].some(l => /run: .*\bnode scripts\//.test(l) && /GITHUB_TOKEN|GH_TOKEN/.test(l)), job);
-  }
+  assert.match(`\n${j.report.join('\n')}\n`, baseCheckout, 'report');
+  for (const job of ['check', 'report'])
+    assert.ok(!j[job].some(l => /run: .*\bnode (head\/)?scripts\//.test(l) && /GITHUB_TOKEN|GH_TOKEN/.test(l)), job);
   // nothing of the pull request runs in them (#2644): only the base's scripts (check reads the pull request's
   // package files as data); the report job does not check the pull request out at all
-  for (const job of ['check', 'report'])
-    assert.ok(!j[job].some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), `${job}: the base's scripts only`);
+  assert.ok(!j.check.some(l => /\bhead\/(?!package(-lock)?\.json\b)/.test(l.replace(/#.*$/, ''))), 'check: the pull request\'s package files only');
+  assert.ok(!j.report.some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), 'report: the base\'s scripts only');
   assert.equal(j.report.filter(l => /uses: actions\/checkout@/.test(l)).length, 1, 'report: the base\'s checkout only');
   assert.ok(j.report.some(l => /^ {10}node base\/scripts\/yosys-update-report\.mjs report --base /.test(l)), 'the table by the base\'s script');
   // the versions by the base's script, the comment by the base's script with the token
-  assert.ok(j.check.some(l => l === '        run: node base/scripts/yosys-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json'));
+  assert.ok(j.check.some(l => l === '        run: node scripts/yosys-update-report.mjs versions package.json package-lock.json head/package.json head/package-lock.json'));
   const comment = j.report.indexOf('        run: node base/scripts/yosys-update-report.mjs comment yosys-update.md');
   assert.ok(comment > 0);
   assert.match(j.report.slice(comment, comment + 4).join('\n'), /GITHUB_TOKEN: \$\{\{ github\.token \}\}/);

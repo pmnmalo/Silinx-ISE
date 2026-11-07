@@ -21,8 +21,9 @@ concurrency:
   cancel-in-progress: true
 jobs:
   # whether the pull request changes a nextpnr package: the base's package.json / package-lock.json against the pull
-  # request's, by the base's script (#1440: the steps that hold a writing token run the base's code, checked out under
-  # base/); labelled "nextpnr update"
+  # request's, by the base's script (#1440: the steps that hold a writing token run the base's code); labelled
+  # "nextpnr update". The base at the workspace's root and the pull request under head/, read as data (#3038): a bare
+  # import of the base's script resolves upward from the root, never into the pull request's tree
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,17 +38,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base
+          path: head
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      # no node_modules the base's script could import from (none installed: the base's checkout is its code alone)
+      - run: test ! -e node_modules
       - id: v
-        run: node base/scripts/nextpnr-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json
+        run: node scripts/nextpnr-update-report.mjs versions package.json package-lock.json head/package.json head/package-lock.json
       - if: steps.v.outputs.changed == 'true'
         continue-on-error: true
         run: gh pr edit "$PR_NUMBER" --add-label "nextpnr update"

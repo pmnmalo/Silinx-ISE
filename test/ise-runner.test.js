@@ -208,6 +208,17 @@ test('install.sh --docker-acl: the runner\'s user on Docker Desktop\'s socket, a
   assert.equal(r.calls().length, 2);
   assert.match(r.calls()[0], /^launchctl bootout gui\/\d+\/com\.github\.pmnmalo\.silinx-ise\.docker-acl$/);
   assert.match(r.calls()[1], new RegExp(`^launchctl bootstrap gui/\\d+ ${r.home}/Library/LaunchAgents/com\\.github\\.pmnmalo\\.silinx-ise\\.docker-acl\\.plist$`));
+  // what it prints: the check, and that the socket gives the runner's user Docker Desktop's shared folders (#3033)
+  assert.equal(r.out, `Installed: iserunner may use ${sock} (again after each start of Docker Desktop). Check:\n`
+    + `  sudo -u iserunner docker -H unix://${sock} version\n`
+    + 'Note: through the socket, iserunner may mount into a container every folder Docker Desktop shares (by default\n'
+    + `  /Users, ${r.home} among them). Restrict Docker Desktop's file sharing to the runner's work and cache folders:\n`
+    + '  Docker Desktop ▸ Settings ▸ Resources ▸ File sharing.\n');
+  assert.equal(r.err, '');
+  // the uninstall says nothing of it
+  const un = installIn(['--uninstall', '--docker-acl', 'iserunner']);
+  assert.equal(un.code, 0, un.err);
+  assert.equal(un.out, 'Uninstalled: iserunner no longer reaches Docker\'s socket.\n');
 });
 
 test('install.sh --docker-acl: the agent waits for the socket Docker Desktop makes anew, then sets the ACL (#1799)', { skip: !posix }, async () => {

@@ -20,7 +20,9 @@
 #       for the machine that runs the nightly;
 #   sh scripts/ise-runner/install.sh --docker-acl <user>
 #       run by the user of Docker Desktop: a launchd agent that lets <user> use Docker Desktop's socket,
-#       again each time Docker Desktop makes it anew.
+#       again each time Docker Desktop makes it anew. The socket gives <user> every folder Docker Desktop
+#       shares (/Users by default: that user's home), so its file sharing must be the runner's work and
+#       cache folders only (Docker Desktop > Settings > Resources > File sharing); it says so (#3033).
 #   --uninstall before any of them removes what it installed.
 # After a run that looks wrong (a job that should not have run, a design that is not ours), clear the
 # runner user's silinx-cache folder (the quality comparison's design corpus, under that user's home: it
@@ -69,6 +71,10 @@ PLIST
   $LAUNCHCTL bootstrap "gui/$(id -u)" "$PLIST"
   echo "Installed: $RUSER may use $SOCK (again after each start of Docker Desktop). Check:"
   echo "  sudo -u $RUSER docker -H unix://$SOCK version"
+  # the socket is the runner's real boundary: a container it starts mounts any folder Docker Desktop shares (#3033)
+  echo "Note: through the socket, $RUSER may mount into a container every folder Docker Desktop shares (by default"
+  echo "  /Users, $HOME among them). Restrict Docker Desktop's file sharing to the runner's work and cache folders:"
+  echo "  Docker Desktop ▸ Settings ▸ Resources ▸ File sharing."
   exit 0
 fi
 

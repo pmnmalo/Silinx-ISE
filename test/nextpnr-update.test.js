@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { checkoutLayout } from './workflows-lib.mjs';
 import { PACKAGES, FORK, MARK, BOARDS, METRICS, TOLERANCE, packageVersion, installSpec, nextpnrChanges, changeSummary, measurementOf, readSide, reportMarkdown } from '../scripts/nextpnr-update-report.mjs';
 import { qualityRows, githubOutputLines } from '../scripts/yosys-update-report.mjs';
 import { TARGETS, S3E_TARGETS, S6_TARGETS, targetName } from './examples-lib.mjs';
@@ -187,14 +188,16 @@ test('nextpnr update: the steps with a writing token run the base\'s code; the b
     else if (name && /^ {4}/.test(line)) j[name].push(line);
   }
   assert.deepEqual(Object.keys(j), ['check', 'measure', 'report']);
+  // the check job's base at the root, the pull request under head/, read as data (#3038); the report job's base under base/
+  assert.deepEqual(checkoutLayout(j.check.join('\n')), { base: '', head: 'head', clean: true });
   const baseCheckout = /\n      - uses: actions\/checkout@[0-9a-f]{40} # v[\d.]+\n        with:\n          ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}\n          path: base\n          persist-credentials: false\n/;
-  for (const job of ['check', 'report']) {
-    assert.match(`\n${j[job].join('\n')}\n`, baseCheckout, job);
-    assert.ok(!j[job].some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), `${job}: the base's scripts only`);
+  assert.match(`\n${j.report.join('\n')}\n`, baseCheckout, 'report');
+  assert.ok(!j.check.some(l => /\bhead\/(?!package(-lock)?\.json\b)/.test(l.replace(/#.*$/, ''))), 'check: the pull request\'s package files only');
+  assert.ok(!j.report.some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), 'report: the base\'s scripts only');
+  for (const job of ['check', 'report'])
     assert.ok(!j[job].some(l => /uses: \.\/\.github\/actions\/setup|\bnpm (ci|install)\b/.test(l)), `${job}: no dependency installed`);
-  }
   assert.equal(j.report.filter(l => /uses: actions\/checkout@/.test(l)).length, 1, 'report: the base\'s checkout only');
-  assert.ok(j.check.includes('        run: node base/scripts/nextpnr-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json'));
+  assert.ok(j.check.includes('        run: node scripts/nextpnr-update-report.mjs versions package.json package-lock.json head/package.json head/package-lock.json'));
   assert.ok(j.report.some(l => /^ {10}node base\/scripts\/nextpnr-update-report\.mjs report --base results\/base --head results\/head --summary "\$SUMMARY"/.test(l)));
   // the measure job: the check step before the install, the base's side only
   const m = j.measure;

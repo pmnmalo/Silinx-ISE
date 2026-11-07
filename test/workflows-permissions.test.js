@@ -128,7 +128,7 @@ test('a job whose token writes installs no dependency (#2644): the build reads, 
       writing.push(`${f}:${name}`);
       const code = job.replace(/#.*$/gm, '');
       // the setup action (npm ci), npm installing or running the project's packages, npx
-      assert.doesNotMatch(code, /uses: \.\/\.github\/actions\/setup|\bnpm (ci|install(?! --global npm@\d+\.\d+\.\d+ --ignore-scripts)|run|test|exec)\b|\bnpx\b/, `${f}:${name} (${writes}): installs or runs dependencies`);
+      assert.doesNotMatch(code, /uses: \.\/\.github\/actions\/setup|\bnpm (ci|install(?! --global "\$RUNNER_TEMP\/npm\.tgz" --ignore-scripts)|run|test|exec)\b|\bnpx\b/, `${f}:${name} (${writes}): installs or runs dependencies`);
     }
   }
   // the publishing jobs among them (a sanity check of the parsing)
