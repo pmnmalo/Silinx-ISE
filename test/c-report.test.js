@@ -49,7 +49,7 @@ test('#2783 a C function with more multiplications than the Basys2-100\'s 4 MULT
 });
 
 test('cReportLines: the C Synthesis Report of fir and gcd', () => {
-  for (const [d, regs] of [['fir', 418], ['gcd', 130]]) {
+  for (const [d, regs] of [['fir', 386], ['gcd', 130]]) {   // (fir's sum a tree, #2613: was 418)
     const path = `src/${d}.c`;
     const r = cToHdl(fs.readFileSync(new URL(`../test-designs/${d}/${path}`, import.meta.url), 'utf8'), { file: path, lang: 'vhdl', clock: 20, family: 'spartan3e', mults: null });
     assert.ok(r.ok, d);

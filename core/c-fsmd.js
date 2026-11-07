@@ -253,6 +253,8 @@ class SeqFlow extends Flow {
     const { top, funcs, ast } = this.c;
     const fn = funcs.get(top);
     this.fn = fn;
+    // (#pragma HLS EXPRESSION_BALANCE off: its sums as the C writes them, #2613)
+    this.balance = !fn.body.items.some((x) => x.kind === 'pragma' && x.pragma.name === 'EXPRESSION_BALANCE' && x.pragma.args.off !== undefined);
     this.ctrl = 'ap_ctrl_hs';
     this.modes = new Map();
     this.globals = new Map();
@@ -620,7 +622,7 @@ class SeqFlow extends Flow {
     // (the states split by the clock, #2080: before the memories' ports, which the states drive)
     if (this.split) {
       const piped = new Set([...(this.loopReport || []).filter((l) => l.pipeline).flatMap((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), ...this.reached.filter((b) => b.pipe).map((b) => b.num)]);
-      const r = this.split({ graph: this.g, states: this.states, stateT: this.stateT, done: this.doneNum, piped });
+      const r = this.split({ graph: this.g, states: this.states, stateT: this.stateT, done: this.doneNum, piped, balance: this.balance });
       if (r.overflow) this.statesAdded = r.overflow;
       else {
         this.states = r.states;

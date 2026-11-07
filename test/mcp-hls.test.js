@@ -46,7 +46,7 @@ test('c_simulation and c_cosimulation: the test designs\' C, PASS in VHDL and in
 test('c_synthesis_report: fir\'s module, clock, ports and loop', async () => {
   const r = await ok('c_synthesis_report', { project: 'fir', path: 'src/fir.c' });
   assert.equal(r.text, ['C Synthesis Report of \'fir\' (src/fir.c, VHDL)', '',
-    'Module: sequential, ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready), 4 states, 418 register bits',
+    'Module: sequential, ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready), 4 states, 386 register bits',   // (its sum a tree, #2613: was 418)
     'Target clock: 20 ns (the board\'s oscillator)', '', 'Ports:',
     '  ap_clk           in    1 bit', '  ap_rst           in    1 bit', '  ap_start         in    1 bit', '  ap_done          out   1 bit',
     '  ap_idle          out   1 bit', '  ap_ready         out   1 bit', '  x                in   32 bits', '  ap_return        out  32 bits',
