@@ -12,7 +12,7 @@
 import { rewriteCarryChains, GATE_MIN, ADDER_MIN } from './carry-chain.js';
 import { readYosysJson } from './fpga/netlist.js';
 import { pack } from './fpga/pack.js';
-import { fsmProbeCommands, fsmChosen, fsmExtractCommands, fsmForceCommands, fsmInits, fsmRestCommands, markWires, setInits, oldStateInits, refusedForUsers, quietForced, FSM_PRE_FILE, FSM_MARKED_FILE, FSM_POST_FILE, FSM_ENC_FILE, FSM_DETECT_FILE, FSM_FORCED_FILE } from './synth-fsm.js';
+import { fsmProbeCommands, fsmChosen, fsmExtracted, fsmExtractCommands, fsmForceCommands, fsmInits, fsmRestCommands, markWires, setInits, oldStateInits, refusedForUsers, quietForced, FSM_PRE_FILE, FSM_MARKED_FILE, FSM_POST_FILE, FSM_ENC_FILE, FSM_DETECT_FILE, FSM_FORCED_FILE } from './synth-fsm.js';
 import { asText } from './synth-open-yosys.js';
 import {
   DEEP_RULE, criticalDelay, deepDesign, logicLevels, pathEnds
@@ -697,7 +697,9 @@ export const FAST_SYNTH = { effort: 'normal', depth: false, speed: false, abc9: 
  * design whose state machines of FSM_RULE.states states or more the init values keep out of Yosys's fsm is
  * synthesized once more with them one-hot (#539, synth-fsm.js), and at both efforts a design whose machines of as many
  * states fsm_detect refuses for their users alone (#652), that netlist kept when better by DEPTH_RULE:
- * r.depth.fsm { machines: [{ wire, states }], ns, luts, slices, kept } (fsm: false leaves it out, 'always' keeps it). A design
+ * r.depth.fsm { machines: [{ wire, states }], ns, luts, slices, kept } (fsm: false leaves it out, 'always' keeps it); at High
+ * a design whose machines Yosys's fsm extracts itself (one-hot: a Verilog register without an initial value) once more with
+ * them as written (#652), kept so too: r.depth.written { machines: [wire], ns, luts, slices, kept }. A design
  * whose usual run left memories written to in logic is synthesized once more with them as distributed RAM (#54, LUTRAM_COST),
  * High's mappings made from it (at Normal without them: its usual mapping and the one balanced onto LUT4s alone), its netlist
  * of fewest slices no slower than the one chosen kept: r.depth.lutram { memories, left (those still in logic), netlist (the
@@ -775,7 +777,9 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
           : null;
         const all = enc === null ? fsmChosen(pre, asText(out[FSM_ENC_FILE])) : fsmChosen(pre, enc, undefined, forced);
         const machines = normal ? all.filter(m => forced.includes(m.wire)) : all;
-        return { out, machines, forced: machines.map(m => m.wire).filter(w => forced.includes(w)) };
+        // (High: the machines the usual run makes one-hot itself, tried as written too, #652)
+        const written = normal ? [] : fsmExtracted(pre, asText(out[FSM_DETECT_FILE]), top);
+        return { out, machines, written, forced: machines.map(m => m.wire).filter(w => forced.includes(w)) };
       }, () => null)
     : null;
   if (probe && !normal) {
@@ -825,8 +829,11 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
   // (with machines to try one-hot, the usual netlist's messages are said once the choice is made)
   const fsmFound = probe && await probe;
   const machines = fsmFound?.machines.length ? fsmFound.machines : null;
+  const written = fsmFound?.written.length ? fsmFound.written : null;
+  // (the lines of the netlist kept, said once the encodings are chosen)
   const linesU = [];
-  const emit = machines ? l => { if (!quiet(l)) linesU.push(l); } : line;
+  let said = linesU;
+  const emit = machines || written ? l => { if (!quiet(l)) linesU.push(l); } : line;
   let res = null, chains = [];
   if (lut4 && gates) {
     // (Normal, not deep: an adder's chains only, its first run started beside the usual one, #377)
@@ -849,7 +856,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
       else { for (const l of linesN) emit(l); res = resN; }
     }
   }
-  if (!res) res = machines ? await withDepth(await usualRun(emit), () => {}, linesU) : await withDepth(await usualRun(line), line, [...log]);
+  if (!res) res = machines || written ? await withDepth(await usualRun(emit), () => {}, linesU) : await withDepth(await usualRun(line), line, [...log]);
   const memories = res.memories || 0;
   if (machines) {
     // the machines one-hot (#539): marked, extracted and re-encoded, their new power-up codes written back, the
@@ -872,14 +879,32 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
     const lutsOf = r => utilization(r.cells).luts;
     const kept = !!resF && (withFsm === 'always' || keepDepth([res.ns, resF.ns], [lutsOf(res), lutsOf(resF)], DEPTH_RULE, [res.slices(), resF.slices()]));
     const fsmInfo = { machines: machines.map(({ wire, states }) => ({ wire, states })), ns: resF?.ns ?? null, luts: resF ? lutsOf(resF) : null, slices: resF ? resF.slices() : null, kept };
-    if (kept) { res = resF; chains = []; }
-    for (const l of kept ? linesF : linesU) line(l);
+    if (kept) { res = resF; chains = []; said = linesF; }
     if (failed) {
       fsmInfo.failed = failed;
-      line(`Warning: the one-hot encoding of the state machines failed (${failed}): the usual encoding is kept`);
+      said.push(`Warning: the one-hot encoding of the state machines failed (${failed}): the usual encoding is kept`);
     }
     res.info.fsm = fsmInfo;
   }
+  if (written) {
+    // the machines the usual run makes one-hot itself, as written (#652, synth-fsm.js fsmExtracted): marked
+    // fsm_encoding "none", the rest of the script and High's mappings from that netlist; kept when better by DEPTH_RULE
+    const linesW = [...linesP], say = l => { if (!quiet(l)) linesW.push(l); };
+    try {
+      const out2 = await run(['-q', '-p', fsmExtractCommands()], { [FSM_MARKED_FILE]: markWires(asText(fsmFound.out[FSM_PRE_FILE]), written, 'none').il }, say);
+      const cmds = synthCommands(top, family, opts), first = `${memorySteps(synth, memoryOpts(YOSYS_FAMILY[family], opts))}; `;
+      if (cmds.startsWith(first)) {
+        const out3 = await run(['-q', '-p', `${fsmRestCommands(synth, cmds.slice(first.length))}; ${outputs(top)}`], { ...yosysFiles(top, text, opts), [FSM_POST_FILE]: asText(out2[FSM_POST_FILE]) }, say);
+        const resW = await withDepth(out3, () => {}, linesW), luts = r => utilization(r.cells).luts;
+        // (by DEPTH_RULE, and by its gain or its area at least: picorv32's, as fast by the estimate and 8 LUTs fewer, routed 8 % slower)
+        const n = [res.ns, resW.ns], l = [luts(res), luts(resW)], k = [res.slices(), resW.slices()], less = x => x[1] <= x[0] * (1 - DEPTH_RULE.area);
+        const kept = withFsm === 'always' || (keepDepth(n, l, DEPTH_RULE, k) && (n[1] <= n[0] * (1 - DEPTH_RULE.gain) || less(l) || less(k)));
+        res.info.written = { machines: written, ns: resW.ns, luts: luts(resW), slices: resW.slices(), kept };
+        if (kept) { res = { ...resW, info: { ...resW.info, fsm: res.info.fsm, written: res.info.written } }; chains = []; said = linesW; }
+      }
+    } catch { /* (an optional candidate: the netlist chosen above kept) */ }
+  }
+  if (machines || written) for (const l of said) line(l);
   if (withLutram && memories && (highMappings || (depth && lut4))) {
     // the memories as distributed RAM (#54, LUTRAM_COST), when the usual run left some to logic: the design synthesized
     // again so and, when that took some of them, High's mappings from its netlist (at Normal, a design that gets none
