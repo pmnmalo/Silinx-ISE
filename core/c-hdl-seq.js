@@ -20,6 +20,14 @@ export function seqRoots(m) {
   for (const inst of m.instances || []) for (const p of inst.ports) if (p.node != null) roots.push(p.node);
   return roots;
 }
+/** The registers the machine keeps: those a state writes, a call's start latches, an output is, or a node reads; not a
+ *  pipelined loop's own variable or a memory's read, whose values the pipeline's registers hold (#2990). */
+export function liveRegs(m) {
+  const kept = new Set(m.states.flatMap((st) => [...st.updates.keys()]));
+  for (const o of m.outputs.values()) if (o.reg != null) kept.add(o.reg);
+  for (const n of m.graph.needed(seqRoots(m))) if (n.op === 'reg') kept.add(n.port.key.slice(4));
+  return m.regs.filter((r) => r.latch != null || kept.has(r.name));
+}
 /** The nodes the machine needs. */
 const nodesOf = (m) => m.graph.written(seqRoots(m));
 // (a memory inside the module: 2^aw words, its initial values, the rest 0)

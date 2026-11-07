@@ -15,9 +15,6 @@ import { MSUM_V, INC_V, RAM, MDESC, FIN, FOUT, IDESC, EXT, LOCAL, STREAM, FILES 
 const OPTS = (desc, files = FILES) => ({ file: 'u.cpp', top: 'top', headers: files, blackboxes: [{ file: 'bb.json', text: JSON.stringify(desc) }] });
 const warns = (r) => r.diagnostics.filter((d) => d.severity === 'warning').map((d) => d.message);
 const errs = (r) => r.diagnostics.filter((d) => d.severity === 'error').map((d) => d.message);
-// (a memory of the top's own read in a loop, the loop pipelined: a register of the read left unused, with or without a
-// blackbox, #2990)
-const UNUSED = (lang) => [`top.${lang === 'vhdl' ? 'vhd:30' : 'v:22'} Signal <ap_r_ap_mem_m_0> is assigned but never used. This unconnected signal will be trimmed during the optimization process.`];
 // (the stream's loop: pipelined automatically, a state that waits for the module, as a scalar blackbox's, #1903)
 const LOOP = 'this loop is pipelined automatically, as Vitis HLS does (II=1): II=4 made (it calls an RTL blackbox, a state that waits for the module); #pragma HLS PIPELINE off in it turns that off';
 
@@ -31,7 +28,7 @@ function checked(g, lang, checks = []) {
 
 const CASES = [
   ['the top\'s memory, inout', EXT, MDESC, 2, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a_address0', 'a_ce0', 'a_we0', 'a_d0', 'a_q0', 's', 's_ap_vld'], [], () => []],
-  ['a memory of its own, inout', LOCAL, MDESC, 6, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'base', 's', 's_ap_vld'], [], UNUSED],
+  ['a memory of its own, inout', LOCAL, MDESC, 6, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'base', 's', 's_ap_vld'], [], () => []],
   ['the top\'s streams, in and out', STREAM, IDESC, 1, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a_dout', 'a_empty_n', 'a_read', 'b_din', 'b_full_n', 'b_write'], [LOOP], () => []],
 ];
 for (const [what, unit, desc, calls, ports, w, checks] of CASES) {

@@ -161,3 +161,32 @@ test('#2968 the reads of different memories in one state, each its own port; a r
   assert.deepEqual(latency('int f(int i) {\n  return A[i] + B[A[i] >> 2];\n}', '  for (int i = 0; i < 100; i++) if (f(i) != i * 3 + 100 - (i * 3 >> 2)) return 1;'), [4, 6]);
   assert.deepEqual(latency('int f(int i, int j) {\n  return A[i] + A[j];\n}', '  for (int i = 0; i < 100; i++) if (f(i, 99 - i) != 297) return 1;'), [3, 5]);
 });
+
+// (#2990: a pipelined loop's read of a local memory and its body's own variable: their values in the pipeline's
+// registers, no register of their own left never written; the design checks' messages gone)
+const PIPED = (body) => `void top(int base, int *s) {
+  int m[80];
+  for (int i = 0; i < 80; i++) m[i] = base + i;
+  int u = 0;
+  for (int i = 0; i < 80; i++) ${body}
+  *s = u;
+}
+int main(void) { int s; top(7, &s); return s == 80 * 7 + 3160 ? 0 : 1; }
+`;
+
+test('#2990 a local memory read in a pipelined loop, alone or into the body\'s own variable: no register of the read nor of the variable, no design check message, in VHDL and Verilog; co-simulated, no warning', async () => {
+  const { designChecks } = await import('../core/lint.js');
+  for (const body of ['u += m[i];', '{ int x = m[i]; u += x; }']) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const g = cToHdl(PIPED(body), { file: 'f.c', lang, top: 'top' });
+      assert.deepEqual(g.diagnostics, [], `${body} ${lang}`);
+      assert.deepEqual(g.report.loops.map((l) => [l.ii, l.depth]), [[1, 1], [1, 2]], `${body} ${lang}`);
+      assert.doesNotMatch(g.hdl, /ap_r_ap_mem_m_0|ap_r_x\b/, `${body} ${lang}`);
+      const lib = compile([{ path: `top.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.hdl }]);
+      const design = elaborate(lib, 'top');
+      assert.deepEqual([...lib.errors, ...design.diags].map((d) => `${d.severity}: ${d.message}`), [], `${body} ${lang}`);
+      assert.deepEqual(designChecks(lib, design).map((d) => d.message), [], `${body} ${lang}`);
+    }
+    passes(PIPED(body), 'f.c');
+  }
+});
