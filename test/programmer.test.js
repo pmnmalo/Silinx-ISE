@@ -124,28 +124,43 @@ test('program: board default tool, bit header checks, explicit tools and positio
   assert.ok(j.lines.includes('Programming finished.'));
   assert.deepEqual(j.meta, { project: 'Prog', bitfile: bitPath('top.bit'), board: 'basys2' });
 
-  // the project's device differs from the bitstream part: warned, still programmed
+  // the project's device differs from the bitstream part: refused, nothing run (#3040, as the browser's programming);
+  // the request's force: true programs it, warned
   await P.updateProject('Prog', pj => { pj.device = { family: 'spartan3e', part: 'xc3s100e', package: 'cp132', speed: '-4' }; });
+  const mismatch = "bitstream was built for '3s250ecp132' but the target device is 'xc3s100e-cp132'";
   j = await run('/program', { project: 'Prog', tool: 'openFPGALoader', cable: 'digilent_hs2', position: 1 });
+  assert.equal(j.status, 'error');
+  assert.equal(j.error, `${mismatch}: not programmed`);
+  assert.ok(!j.lines.some(l => /^Programming \(SRAM/.test(l)), j.lines.join('\n'));
+  for (const force of [false, 'true', 1]) assert.equal((await run('/program', { project: 'Prog', force })).error, `${mismatch}: not programmed`, String(force));
+  j = await run('/program', { project: 'Prog', tool: 'openFPGALoader', cable: 'digilent_hs2', position: 1, force: true });
   assert.equal(j.status, 'ok');
-  assert.match(j.result.warnings[0], /built for '3s250ecp132' but the target device is 'xc3s100e-cp132'/);
+  assert.deepEqual(j.result.warnings, [mismatch]);
+  assert.ok(j.lines.includes(`WARNING: ${mismatch}`));
   assert.deepEqual(j.result.commands[0].args, ['-c', 'digilent_hs2', '--index-chain', '1', bitPath('top.bit')]);
   assert.ok(j.lines.some(l => /defaults for this board are not verified/.test(l)));
-  // explicit expected device (board-less) overrides the project's
+  // the request's expected device is not taken: the project's says (#3040)
   j = await run('/program', { project: 'Prog', tool: 'xc3sprog', cable: 'jtaghs1', expectDevice: { part: 'xc3s250e', package: 'cp132' } });
-  assert.deepEqual(j.result.warnings, []);
+  assert.equal(j.error, `${mismatch}: not programmed`);
   await P.updateProject('Prog', pj => { pj.device = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }; });
+  j = await run('/program', { project: 'Prog', tool: 'xc3sprog', cable: 'jtaghs1', expectDevice: { part: 'xc3s100e', package: 'cp132' } });
+  assert.equal(j.status, 'ok');
+  assert.deepEqual(j.result.warnings, []);
 
-  // relative bitfile inside the project; unrecognised part in the header
+  // relative bitfile inside the project; unrecognised part in the header (not the project's: refused unless forced)
   await fs.writeFile(bitPath('odd.bit'), makeBit({ part: 'weird123' }));
   j = await run('/program', { project: 'Prog', bitfile: 'build/odd.bit', tool: 'xc3sprog', cable: 'xpc' });
+  assert.equal(j.error, "bitstream was built for 'weird123' but the target device is 'xc3s250e-cp132': not programmed");
+  j = await run('/program', { project: 'Prog', bitfile: 'build/odd.bit', tool: 'xc3sprog', cable: 'xpc', force: true });
   assert.equal(j.status, 'ok');
-  assert.ok(j.result.warnings.includes("unrecognised part 'weird123' in the bitstream header"));
-  // absolute bitfile without a project, board from the request
+  assert.deepEqual(j.result.warnings, ["bitstream was built for 'weird123' but the target device is 'xc3s250e-cp132'", "unrecognised part 'weird123' in the bitstream header"]);
+  // absolute bitfile without a project, board from the request: the board's device, refused unless forced
   j = await run('/program', { bitfile: bitPath('top.bit'), board: 'nexys2', device: 'Nexys2b' });
+  assert.equal(j.error, "bitstream was built for '3s250ecp132' but the target device is 'xc3s500e-fg320': not programmed");
+  j = await run('/program', { bitfile: bitPath('top.bit'), board: 'nexys2', device: 'Nexys2b', force: true });
   assert.equal(j.result.options.tool, 'djtgcfg');
   assert.deepEqual(j.result.commands[0].args.slice(0, 3), ['prog', '-d', 'Nexys2b']);
-  assert.match(j.result.warnings[0] || '', /target device is 'xc3s500e-fg320'/);
+  assert.deepEqual(j.result.warnings, ["bitstream was built for '3s250ecp132' but the target device is 'xc3s500e-fg320'"]);
   // absolute bitfile with a project
   j = await run('/program', { project: 'Prog', bitfile: bitPath('top.bit'), tool: 'djtgcfg', device: 'Basys2' });
   assert.equal(j.status, 'ok');
@@ -173,9 +188,12 @@ test('program: an iCE40 project\'s .bin into the iCEBreaker\'s flash with openFP
   for (const l of [`Configuration file ${bin} (104090 bytes, an iCE40's .bin)`, 'Programming (SPI flash, non-volatile) with openFPGALoader board=ice40_generic',
     'NOTE: the openFPGALoader defaults for this board are not verified on real hardware.', 'Programming finished.']) assert.ok(j.lines.includes(l), l);
   assert.match(await fs.readFile(process.env.FAKE_PROG_LOG, 'utf8'), /^openFPGALoader -b ice40_generic .*top\.bin$/m);
-  // the .bin of a project of another family: warned; another tool, the tool failing, a .bin by an absolute path: errors
+  // the request's expected device not taken (#3040); a .bin for a device of another family: warned; another tool, the
+  // tool failing, a .bin by an absolute path: errors
   j = await run('/program', { project: 'Ice', expectDevice: { part: 'xc3s250e', package: 'cp132' } });
-  assert.deepEqual(j.result.warnings, ["a .bin is an iCE40's configuration, but the target device is 'xc3s250e'"]);
+  assert.deepEqual(j.result.warnings, []);
+  const other = jobs.createJob('program', jj => prog.programJob(jj, { board: 'icebreaker', bitfile: bin, expectDevice: { part: 'xc3s250e', package: 'cp132' } }));
+  assert.deepEqual((await waitJob(jobs, other.id)).result.warnings, ["a .bin is an iCE40's configuration, but the target device is 'xc3s250e'"]);
   j = await run('/program', { project: 'Ice', tool: 'xc3sprog', cable: 'xpc' });
   assert.equal(j.status, 'error');
   assert.match(j.error, /an iCE40's \.bin is programmed with openFPGALoader, not xc3sprog/);
@@ -265,6 +283,45 @@ test('program: request errors', async () => {
   assert.match(j.error, /bitstream not found/);
 });
 
+// #3039: a .bit named by its absolute path is its project's when it is in the workspace (by its name or through a
+// link): that project's trust applies, with or without a project in the request; a .bit from the disk is no project's
+test('program: an absolute bitfile of the workspace is programmed only when its project is trusted', { skip: POSIX_ONLY }, async () => {
+  await P.createProject({ name: 'Untr', board: 'basys2', fromOutside: true });
+  const untr = path.join(P.projectDir('Untr'), 'build', 'top.bit');
+  await fs.mkdir(path.dirname(untr), { recursive: true });
+  await fs.writeFile(untr, makeBit());
+  const link = path.join(tmp, 'link.bit'), loose = path.join(path.dirname(P.projectDir('Untr')), 'loose.bit'), disk = path.join(tmp, 'disk.bit');
+  await fs.symlink(untr, link);
+  await fs.writeFile(loose, makeBit());
+  await fs.writeFile(disk, makeBit());
+  const refused = "project 'Untr' came from outside (imported): programming the board runs only once you trust it (Trust Project, in the console when the project opens)";
+  for (const [body, error] of [
+    [{ bitfile: untr }, refused],
+    [{ project: 'Prog', bitfile: untr }, refused],
+    [{ bitfile: link }, refused],
+    [{ project: 'Prog', bitfile: link }, refused],
+    [{ bitfile: path.join(P.projectDir('Untr'), 'build', 'none.bit') }, refused],
+    [{ bitfile: loose }, `${loose} is in the workspace but in no project: a workspace's bitstream is programmed from its project`],
+  ]) {
+    const r = await app.call('POST', '/program', body);
+    assert.equal(r.status, 403, JSON.stringify(body));
+    assert.deepEqual(r.body, { error }, JSON.stringify(body));
+  }
+  // a .bit from the disk (iMPACT's file box), with or without the open project; a trusted project's by its path
+  for (const body of [{ bitfile: disk }, { project: 'Prog', bitfile: disk }, { bitfile: bitPath('top.bit') }]) {
+    const j = await run('/program', { ...body, tool: 'xc3sprog', cable: 'xpc' });
+    assert.equal(j.status, 'ok', JSON.stringify(body));
+    assert.deepEqual(j.result.warnings, [], JSON.stringify(body));
+  }
+  // the user trusts it: programmed
+  await P.trustProject('Untr');
+  for (const bitfile of [untr, link]) {
+    const j = await run('/program', { bitfile, tool: 'xc3sprog', cable: 'xpc' });
+    assert.equal(j.status, 'ok', bitfile);
+    assert.equal(j.result.bitfile, bitfile);
+  }
+});
+
 // ------------------------------------------------------------------------------------------------
 // Platform Flash PROM
 // ------------------------------------------------------------------------------------------------
@@ -291,10 +348,19 @@ test('prom: program (+verify, +reconfigure), verify, erase, read backup, reconfi
   const log = await fs.readFile(process.env.FAKE_PROG_LOG, 'utf8');
   assert.match(log, /^python xcf_prog.py --device 0 program .*top_prom\.bit --reconfigure$/m);
   assert.match(log, /^python xcf_prog.py --device 2 program .*top_prom\.bit --no-verify$/m);
-  // project device differs from the PROM image: warned
+  // project device differs from the PROM image: refused, nothing run (#3040); force: true: warned, run
   await P.updateProject('Prog', pj => { pj.device = { family: 'spartan3e', part: 'xc3s100e', package: 'cp132', speed: '-4' }; });
-  j = await run('/prom', { project: 'Prog', op: 'verify' });
-  assert.ok(j.lines.some(l => /^WARNING: bitstream was built for/.test(l)));
+  const mismatch = "bitstream was built for '3s250ecp132' but the target device is 'xc3s100e-cp132'";
+  for (const op of ['program', 'verify']) {
+    j = await run('/prom', { project: 'Prog', op });
+    assert.equal(j.error, `${mismatch}: not programmed`, op);
+    assert.ok(!j.lines.some(l => /^Platform Flash:/.test(l)), op);
+  }
+  j = await run('/prom', { project: 'Prog', op: 'verify', force: true });
+  assert.equal(j.status, 'ok', j.lines.join('\n'));
+  assert.ok(j.lines.includes(`WARNING: ${mismatch}`));
+  // (erase, read and reconfigure write no bitstream: nothing to check)
+  assert.equal((await run('/prom', { project: 'Prog', op: 'erase' })).status, 'ok');
   await P.updateProject('Prog', pj => { pj.device = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }; });
 });
 
