@@ -55,14 +55,17 @@ test('#1961 BIND_STORAGE: what the device has not, its warning, the memory kept'
   assert.deepEqual(arg.diagnostics.map((d) => d.message), ["#pragma HLS BIND_STORAGE impl=lutram of the argument 'a': its memory is outside the module: ignored"]);
 });
 
-test('#1961 ARRAY_RESHAPE of a local: as a partition, said; of an argument: its port kept, said', () => {
-  const said = "4 warning: #pragma HLS ARRAY_RESHAPE of 'm': made as ARRAY_PARTITION, its elements at once as in one wide word, in memories side by side";
-  assert.deepEqual([run(`${P}ARRAY_RESHAPE variable=m cyclic factor=2`)].map((r) => [r.mems, r.messages]), [[[['m_0', 50], ['m_1', 50]], [said]]]);
-  assert.deepEqual(run(`${P}ARRAY_RESHAPE variable=m block factor=4 dim=1`).mems.length, 4);
+test('#1961 #2424 ARRAY_RESHAPE of a local: one memory of wide words; of an argument: its port of the words; complete: registers; no warning of the pragma', () => {
+  // (were: a partition's memories side by side, and the argument's port kept, each said)
+  // (its loop writing it: a word's element at a time, the word held and written whole, an access a state)
+  const ii2 = "5 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off";
+  assert.deepEqual([run(`${P}ARRAY_RESHAPE variable=m cyclic factor=2`)].map((r) => [r.mems, r.messages]), [[[['m', 50]], [ii2]]]);
+  assert.deepEqual(run(`${P}ARRAY_RESHAPE variable=m block factor=4 dim=1`).mems, [['m', 25]]);
   assert.deepEqual(run(`${P}ARRAY_RESHAPE variable=m complete`).mems, []);
   const arg = cToHdl(`int f(int a[8]) {\n${P}ARRAY_RESHAPE variable=a cyclic factor=2\n  return a[1];\n}`, { file: 't.c', top: 'f' });
-  assert.deepEqual(arg.diagnostics.map((d) => d.message), ["#pragma HLS ARRAY_RESHAPE of the argument 'a': not made: its port's words kept, one element each"]);
-  assert.ok(arg.ports.some((p) => p.name === 'a_q0' && p.w === 32));
+  assert.deepEqual(arg.diagnostics.map((d) => d.message), []);
+  assert.ok(arg.ports.some((p) => p.name === 'a_q0' && p.w === 64));
+  assert.ok(arg.ports.some((p) => p.name === 'a_address0' && p.w === 2));
 });
 
 const REGION = (pr) => `#include <hls_stream.h>
