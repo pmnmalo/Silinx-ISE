@@ -13,7 +13,6 @@ const C = 40;      // a cell's side (px)
 const GAP = 90;    // between layers (px)
 const TITLE = 22;  // a layer's title, over it (px)
 const PERSPECTIVE = 1100;
-let view = { rx: -28, ry: 32 };   // (kept between redraws, as the viewer left it)
 
 /** A cell's value as the map shows it: SOP groups the 1s, its 0s left blank; POS the 0s, its 1s blank (X always, #1494). */
 export const cellText = (v, groups) => (v === (groups === 'pos' ? '1' : '0') ? '' : v);
@@ -27,7 +26,8 @@ export function k3dBox(d3, changed) {
  * The 3D map in `host`: { layout, col (the output's column), terms (the groups), groups ('sop' | 'pos'), colors, names
  * (the inputs), onCell(mt), title(code) (a layer's label) }.
  */
-export function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCell, title }) {
+export function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCell, title, d3 }) {
+  let view = d3.stack || { rx: -28, ry: 32 };   // (this table's, kept between its redraws as the viewer left it, #3074)
   const rows = L.rowCodes.length, cols = L.colCodes.length, W = cols * C, H = rows * C, depth = (L.maps.length - 1) * GAP;
   const stack = h('div', { class: 'tt-k3d-stack', style: { width: `${W}px`, height: `${H}px` } });
   const apply = () => { stack.style.transform = `translateZ(${-depth / 2}px) rotateX(${view.rx}deg) rotateY(${view.ry}deg) translateZ(${depth / 2}px)`; };
@@ -83,17 +83,17 @@ export function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCel
   // turned by dragging, or by the arrow keys
   let drag = null;
   scene.addEventListener('pointerdown', e => { if (e.target.closest('.tt-k3d-cell')) return; drag = { x: e.clientX, y: e.clientY, ...view }; scene.setPointerCapture?.(e.pointerId); });
-  scene.addEventListener('pointermove', e => { if (!drag) return; view = { ry: drag.ry + (e.clientX - drag.x) / 2, rx: Math.max(-85, Math.min(85, drag.rx - (e.clientY - drag.y) / 2)) }; apply(); });
+  scene.addEventListener('pointermove', e => { if (!drag) return; view = d3.stack = { ry: drag.ry + (e.clientX - drag.x) / 2, rx: Math.max(-85, Math.min(85, drag.rx - (e.clientY - drag.y) / 2)) }; apply(); });
   scene.addEventListener('pointerup', () => { drag = null; });
   scene.addEventListener('keydown', e => {
     const d = { ArrowLeft: [0, -10], ArrowRight: [0, 10], ArrowUp: [10, 0], ArrowDown: [-10, 0] }[e.key];
     if (!d) return;
     e.preventDefault();
-    view = { rx: Math.max(-85, Math.min(85, view.rx + d[0])), ry: view.ry + d[1] };
+    view = d3.stack = { rx: Math.max(-85, Math.min(85, view.rx + d[0])), ry: view.ry + d[1] };
     apply();
   });
   // (Reset view: placed by its caller, beside the 3D box, #1567)
-  const reset = h('button', { type: 'button', class: 'btn tt-k3d-reset', onclick: () => { view = { rx: -28, ry: 32 }; apply(); } }, 'Reset view');
+  const reset = h('button', { type: 'button', class: 'btn tt-k3d-reset', onclick: () => { view = d3.stack = { rx: -28, ry: 32 }; apply(); } }, 'Reset view');
   host.append(scene);
   return { view: () => ({ ...view }), reset };
 }
@@ -105,7 +105,7 @@ export function placeKmap({ host, options, svg, changed, d3, ...map }) {
   const n = map.layout.n;
   if (n >= 5) options.append(k3dBox(d3, changed));
   if (n === 3 || n === 4) options.append(surfaceBox(n, d3, changed));
-  if (n >= 5 && d3.on) options.append(mountKmap3d(host, map).reset);
-  else if ((n === 3 || n === 4) && d3.on) options.append(mountKmapSurface(host, { ...map, cellText }).reset);
+  if (n >= 5 && d3.on) options.append(mountKmap3d(host, { ...map, d3 }).reset);
+  else if ((n === 3 || n === 4) && d3.on) options.append(mountKmapSurface(host, { ...map, cellText, d3 }).reset);
   else host.append(svg);
 }
