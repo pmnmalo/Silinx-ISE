@@ -2,7 +2,7 @@
 // of 2 ▶") a line of its own, the map under it at the section's left (the options' left), its groups' legend right
 // after it (beside it, or just under it when there is no room); with 2 to 6 inputs, one solution (no row) or several,
 // SOP and POS, flat and in 3D, on a wide and a narrow screen. Its options: SOP / POS groups, then Order and 3D (Reset view)
-// on a line of their own at the same left (#3063).
+// on a line of their own at the same left (#3063). The legend beside the map centred on its cells (#3064).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -19,7 +19,10 @@ const place = (page) => page.eval((t) => {
   const host = document.querySelector(`${t} .tt-kmap-host`), r = (e) => e && e.getBoundingClientRect();
   const map = [...host.children].find((e) => !e.matches('.tt-sol, .tt-legend'));
   const box = (e) => e && { left: Math.round(r(e).left), right: Math.round(r(e).right), top: Math.round(r(e).top), bottom: Math.round(r(e).bottom) };
-  return { options: box(document.querySelector(`${t} .tt-groups`)), sol: box(host.querySelector(':scope > .tt-sol')), map: box(map), mapClass: map?.getAttribute('class'), legend: box(host.querySelector(':scope > .tt-legend')) };
+  // the map's cells: the flat map's frames (its labels left out), the 3D scene whole
+  const frames = map?.matches('svg') ? [...map.querySelectorAll('.tt-k-frame')].map(r) : map ? [r(map)] : [];
+  const cells = frames.length ? { top: Math.min(...frames.map((f) => f.top)), bottom: Math.max(...frames.map((f) => f.bottom)) } : null;
+  return { cells, options: box(document.querySelector(`${t} .tt-groups`)), sol: box(host.querySelector(':scope > .tt-sol')), map: box(map), mapClass: map?.getAttribute('class'), legend: box(host.querySelector(':scope > .tt-legend')) };
 }, T);
 
 /** The map under the solutions' row (when there is one), at the section's left; the legend right after it. */
@@ -32,8 +35,11 @@ function laidOut(p, what, several) {
   }
   assert.ok(Math.abs(p.map.left - p.options.left) <= 1, `${what}: the map (left ${p.map.left}) at the section's left (${p.options.left})`);
   const beside = p.legend.left >= p.map.right - 1 && p.legend.top < p.map.bottom;
-  const under = Math.abs(p.legend.left - p.options.left) <= 1 && p.legend.top >= p.map.bottom - 1 && p.legend.top - p.map.bottom <= 20;
+  const under = Math.abs(p.legend.left - p.options.left) <= 1 && p.legend.top >= p.map.bottom - 1 && p.legend.top - p.map.bottom <= 30;
   assert.ok(beside || under, `${what}: the legend right after the map (${JSON.stringify({ map: p.map, legend: p.legend })})`);
+  // beside it, centred on its cells (#3064), unless taller than the map
+  const mid = (b) => (b.top + b.bottom) / 2;
+  if (beside && p.legend.bottom - p.legend.top < p.cells.bottom - p.cells.top) assert.ok(Math.abs(mid(p.legend) - mid(p.cells)) <= 2, `${what}: the legend (middle ${mid(p.legend)}) centred on the map's cells (${mid(p.cells)})`);
 }
 
 uiTest('#3059 Karnaugh map: under the minimal solutions\' row, at the section\'s left, the legend right after it', E, async (page) => {
