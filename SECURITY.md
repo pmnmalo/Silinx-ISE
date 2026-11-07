@@ -36,10 +36,11 @@ can read that user's files has the server too.
   checks the Host and Origin headers of every request. The browser a launcher opens is given a one-time code
   (single use, for a minute), which the page exchanges for the token, so that the token is on no command line; a
   second launch opens a server already on its port only when that server proves it holds the token of its file
-  (#2955).
+  (#2955). The token travels in a request's `X-Silinx-Token` header only, never in an address (#3045).
 - The pages carry a Content Security Policy with the hashes of their scripts and styles.
 - Every path a request names is confined to the project it belongs to; a project's zip is limited in
-  size when it is unpacked.
+  size when it is unpacked. A hidden file or folder (`.git`, `.env`, an editor's settings) is no part of a project:
+  no file route and no MCP tool reads, writes, renames or deletes one, by its name or through a link (#3035, #3036).
 - The programs the toolchain and the board programming run (Docker, ssh, ISE's tools, the programming tools) are
   spawned without a shell. The programs' paths and the arguments given to Docker and ssh come from the user's
   configuration file only: the page cannot change them (the settings `server/toolchain.js` names `FILE_ONLY`, which
@@ -100,8 +101,9 @@ board or a PROM) without the user's say.
      branches (1000). A zip's sizes are checked before each entry is inflated, and inflating stops at the size the
      entry declares.
    - Names: relative to the project, no `..`, absolute path, drive letter, backslash, control character, `< > : " | ?
-     *`, hidden file or folder, reserved name (`build/`, `CON`, `NUL`, …), symbolic link, or a name that differs from
-     another only by its case. A refused entry is never inflated.
+     *`, hidden file or folder, reserved name (`build/`, `CON`, `NUL`, …), symbolic link, a name that differs from
+     another only as a case-insensitive file system reads it (its case, `ſ`, its NFC / NFD form: the server's fold,
+     `core/fold-name.js`), or another spelling of `silinx.json` (#3034). A refused entry is never inflated.
    - XML (`.xise`, `.sch`, `.sym`, PNML, `.wcfg`, `.svg`): no DTD and no entity declaration, so no external entity
      and no entity expansion, whatever parser reads it next (Silinx's own XML readers expand none either).
    - Types by extension and content: a text file (a source, a drawing, constraints, a memory's data) that holds a
@@ -123,10 +125,13 @@ board or a PROM) without the user's say.
 3. **Trust for outside projects** (`core/trust.js`): an imported project (a zip, an ISE project, a design link, the
    MCP's `import_project`) is marked `trusted: false` in its `silinx.json` from the import's first write (an import that
    stops halfway leaves no trusted project), whatever the zip's own `silinx.json` says; no file route or MCP tool
-   writes, renames or deletes `silinx.json`, by any spelling a case-insensitive file system takes for it (#2956).
+   writes, renames or deletes `silinx.json`, by any spelling a case-insensitive file system takes for it (#2956), nor do the browser edition's stores and a
+   design link (#3034).
    It opens, is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE (Docker, ssh, a local
    install) and programming a board or a PROM are refused (the server's 403, the browser edition's error, the MCP
-   tool's) until the user trusts it: the console says so when the project opens, with a **Trust Project** button.
+   tool's) until the user trusts it: the console says so when the project opens, with a **Trust Project** button. A
+   bitstream of the workspace named by its path takes its project's trust (#3039), and a bitstream built for another
+   device than the project's is not programmed, by the server as by the browser, unless the request forces it (#3040).
    Saving the project's description does not make it trusted; only that button does. The MCP server has no tool to
    trust a project, by design: an assistant led astray by what it read cannot. Nor has it a tool to program a board
    or a PROM; its `run_process` runs the Silinx toolchain, or Xilinx ISE as Toolchain Settings configure it (a local
@@ -153,13 +158,17 @@ What it cannot do:
   check reads the host's name, not its DNS: a public name that resolves to a private address passes, but being
   `https:` it cannot reach the local server, which serves plain `http:`. The
   zip is fetched by the browser, never by the local server, only after the user agrees in a dialog that names its
-  address, with no cookies and no referrer. The MCP server's `open_link` fetches nothing: it opens a design inside
+  address, with no cookies and no referrer, and never through a redirect: the address the dialog names is the one
+  read (#3042). The MCP server's `open_link` fetches nothing: it opens a design inside
   the link or an example. The link's hash is never sent to a server (a browser sends no hash in a request; the site's page count
   takes the page's path, not its hash), and it is cleared from the address once read.
 - **Replace the user's work:** a project of the design's name is opened as it is when its files are the link's; one
   that differs is replaced only when the user chooses Replace (the old one to the workspace's `.trash`, or deleted
   from the browser's storage, as the dialog says); Keep Mine leaves it. The MCP server's `open_link` never replaces
   one. No setting (interface, language, toolchain, MCP folder) is changed by a link.
+- **Show the page under another site's:** the Pages site and the single file do not start in another site's frame,
+  but say so with a link that opens them in a tab of their own (#3041); the local server's pages refuse a frame by
+  their policy (`frame-ancestors 'none'`).
 - **Set the local server's token:** only an address whose hash is the token alone (`#token=…`, the one the server
   prints, or the one-time code a launcher opens, `#code=…`) stores it, and a token replaces the one kept only when the
   server accepts it (#2955); a link with other options never sets or replaces it, and the link's fetch never
