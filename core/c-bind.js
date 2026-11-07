@@ -93,7 +93,7 @@ function roomy(g, states, stateW, { family, budget }) {
 }
 
 /** Each state's multiplications bound to units (see above). */
-export function bindMuls(g, states, stateT, { family = 'artix7', budget = Infinity, always = false } = {}) {
+export function bindMuls(g, states, stateT, { family = 'artix7', budget = Infinity, always = false, held = null } = {}) {
   const units = [], rank = new Map(), byState = states.map(() => new Map());
   // (the select's comparison as wide as the states' numbers: the state's register's bits above them always 0)
   const stateW = Math.max(...states.map((st) => st.id)).toString(2).length;
@@ -116,9 +116,10 @@ export function bindMuls(g, states, stateT, { family = 'artix7', budget = Infini
       after.set(n.id, dep);
     }
   });
-  if (units.length === 0) return { states, units: [] };
+  if (units.length === 0) return { states, units: [], regs: [], dropped: new Set() };
   const cs = g.add('reg', [], stateT, { port: { key: 'reg:ap_CS_fsm', name: 'ap_CS_fsm' } });
   const memos = states.map(() => new Map());
+  const regs = [], dropped = new Set(), edits = new Map();
   // a node as a state computes it: its multiplications the outputs of their units (of a lower rank when a unit is being made)
   const value = (k, v) => {
     const memo = memos[k];
@@ -153,12 +154,51 @@ export function bindMuls(g, states, stateT, { family = 'artix7', budget = Infini
       continue;
     }
     const ta = { w: u.a, s: true }, tb = { w: u.b, s: true }, t = { w: u.w, s: true };
+    // (its uses' operands held in registers, core/c-schedule.js, #2273: the unit's own two, each written by the state
+    // before a use; the multiplexers before them, on their inputs, not before the multiplication)
+    const reg = (x) => { const n = g.get(x); return n.op === 'reg' && held?.has(n.port.key.slice(4)) ? n.port.key.slice(4) : null; };
+    if (held && made.length > 1 && made.every((x) => (reg(x.a) || reg(x.b)) && (reg(x.a) || g.get(x.a).op === 'const') && (reg(x.b) || g.get(x.b).op === 'const'))) {
+      const k = regs.length / 2, own = [['a', ta], ['b', tb]].map(([key, tt]) => {
+        const name = `u${k}_${key}`;
+        return { key, tt, r: { name, w: tt.w, s: true, t: tt, reset: 0n, latch: null }, node: g.add('reg', [], tt, { port: { key: `reg:${name}`, name: `ap_r_${name}` } }) };
+      });
+      regs.push(...own.map((o) => o.r));
+      for (const x of made) {
+        const writer = held.get(reg(x.a) || reg(x.b)).writer;
+        for (const o of own) {
+          const name = reg(x[o.key]);
+          (edits.get(writer) || edits.set(writer, []).get(writer)).push({ name, set: o.r.name, tt: o.tt, val: name ? null : x[o.key], uses: made.length });
+          if (name) dropped.add(name);
+        }
+      }
+      const node = g.add('mul', [own[0].node, own[1].node], t);
+      u.out = (k2, n) => g.add('ext', [node], { w: n.w, s: n.s });
+      continue;
+    }
     const operand = (key, tt) => chosen(g, cs, stateT, [...made].sort((x, y) => x.state - y.state).map((x) => ({ state: x.state, val: g.add('ext', [x[key]], tt) })), tt);
     const node = g.add('mul', [operand('a', ta), operand('b', tb)], t);
     u.out = (k, n) => g.add('ext', [node], { w: n.w, s: n.s });
   }
+  const out = states.map((st, k) => rebuilt(st, (v) => value(k, v)));
+  // (the held operands: the unit's registers written in their stead; their path, the value's in its state then the
+  // multiplexer of the unit's register, a state's comparison and the log of its writers deep)
+  let heldNs = 0;
+  const F = FAMILIES[family];
+  for (const st of out) {
+    const es = edits.get(st.id);
+    if (!es) continue;
+    const at = new Map();
+    for (const n of g.needed(rootsOf(st).concat(es.map((e) => (e.name ? st.updates.get(e.name) : e.val))))) at.set(n.id, n.args.reduce((m, a) => Math.max(m, at.get(a) ?? 0), 0) + nodeDelay(g, n, family));
+    for (const e of es) {
+      const v = e.name ? st.updates.get(e.name) : value(states.findIndex((x) => x.id === st.id), e.val);
+      heldNs = Math.max(heldNs, (at.get(v) ?? 0) + F.lt(stateW) + Math.ceil(Math.log2(e.uses)) * F.mux());
+      if (e.name) st.updates.delete(e.name);
+      st.updates.set(e.set, g.add('ext', [v], e.tt));
+    }
+  }
   return {
-    states: states.map((st, k) => rebuilt(st, (v) => value(k, v))),
+    states: out,
     units: units.map(({ a, b, w, blocks, uses, inputs }) => ({ a, b, w, blocks, uses: uses.length, inputs })),
+    regs, dropped, heldNs,
   };
 }
