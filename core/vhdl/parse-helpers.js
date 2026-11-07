@@ -13,7 +13,7 @@ export function isRealRange(r) {
 }
 
 /** Map a VHDL type mark (+ optional constraint) to an IR TypeSpec. */
-export function makeType(name, range, hasRange) {
+export function makeType(name, range, hasRange, pkg = null) {
   if (SCALAR_LOGIC.has(name)) return { kind: 'logic', range: null, signed: false };
   if (VECTOR_LOGIC.has(name)) {
     const t = { kind: 'logic', range: hasRange ? range : null, signed: name.endsWith('signed') && !name.endsWith('unsigned') };
@@ -33,6 +33,7 @@ export function makeType(name, range, hasRange) {
     case 'real': return { kind: 'real' };
     default: {
       const t = { kind: 'named', name };
+      if (pkg) t.pkg = pkg;
       if (hasRange && range) t.range = range;
       return t;
     }

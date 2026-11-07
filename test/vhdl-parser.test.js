@@ -675,7 +675,7 @@ describe('expressions', () => {
     assert.deepEqual(expr('mem(i)(3)'), { op: 'index', base: { op: 'apply', name: 'mem', args: [R('i')] }, index: I(3) });
     assert.deepEqual(expr('mem(i)(7 downto 4)'), { op: 'slice', base: { op: 'apply', name: 'mem', args: [R('i')] },
       left: I(7), right: I(4), dir: 'downto' });
-    assert.deepEqual(expr('work.pkg.c'), R('c'));
+    assert.deepEqual(expr('work.pkg.c'), { op: 'ref', name: 'c', pkg: 'pkg' });
     assert.deepEqual(expr('ieee.numeric_std.to_unsigned(x, 8)'), { op: 'apply', name: 'to_unsigned', args: [R('x'), I(8)] });
     assert.deepEqual(expr('to_unsigned(arg => x, size => 8)'), { op: 'apply', name: 'to_unsigned',
       args: [{ named: 'arg', value: R('x') }, { named: 'size', value: I(8) }] });

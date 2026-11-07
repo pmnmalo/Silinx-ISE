@@ -2,6 +2,7 @@
 // and primaries (names, calls, attributes, aggregates, literals: numbers with their units, bit strings, characters,
 // strings), as methods of the parser (Object.assign(Parser.prototype, expressionMethods) in parser.js).
 import { ref, int, bin, mapBits, baseName } from './nodes.js';
+import { STD_LIBS } from './parse-defs.js';
 
 const LOGIC_CHARS = /^[01uxzwlhUXZWLH-]*$/;
 const TIME_UNITS = { fs: ['fs', 1], ps: ['ps', 1], ns: ['ns', 1], us: ['us', 1], ms: ['ms', 1], sec: ['sec', 1], min: ['sec', 60], hr: ['sec', 3600] };
@@ -181,9 +182,11 @@ export const expressionMethods = {
     if (!this.isId()) this.fail(`expected a name but found ${this.describe(this.peek())}`);
     const first = this.next();
     let e = ref(first.value);
+    let pkg = null;
     // Drop library / package prefixes: work.pkg.c -> c ; ieee.numeric_std.f -> f ; std.env.finish -> finish.
     // level 2: prefix is a library (next segment is a package), 1: prefix is a package, 0: not droppable.
     let level = this.libraries.has(first.value) ? 2 : this.packageNames.has(first.value) ? 1 : 0;
+    if (level === 1) pkg = first.value;
     for (;;) {
       if (this.isOp('.')) {
         this.next();
@@ -193,9 +196,14 @@ export const expressionMethods = {
         else if (this.peek().type === 'str') field = `"${this.next().value.toLowerCase()}"`;
         else if (this.peek().type === 'char') field = `'${this.next().value}'`;
         else this.fail(`expected name after '.' but found ${this.describe(this.peek())}`);
-        if (level > 0 && e.op === 'ref') {
-          e = ref(field);
-          level--;
+        if (level === 2) {
+          if (!STD_LIBS.has(first.value)) pkg = field;
+          else e = ref(field);
+          level = 1;
+        } else if (level === 1) {
+          e = { op: 'ref', name: field, ...(pkg ? { pkg } : {}) };
+          level = 0;
+          pkg = null;
         } else {
           e = { op: 'field', base: e, name: field };
           level = 0;
@@ -213,7 +221,7 @@ export const expressionMethods = {
           this.next();
           const inner = this.parseParenOrAggregate();
           const type = e.op === 'ref' ? e.name : baseName(e);
-          e = { op: 'qualified', type, expr: inner };
+          e = { op: 'qualified', type, ...(e.pkg ? { pkg: e.pkg } : {}), expr: inner };
           continue;
         }
         const at = this.peek(1);
@@ -233,6 +241,7 @@ export const expressionMethods = {
         }
         this.fail('expected attribute name after \'');
       }
+      if (level === 1 && !STD_LIBS.has(first.value) && pkg) e = ref(pkg);
       return e;
     }
   },
@@ -265,7 +274,7 @@ export const expressionMethods = {
       if (args.length !== 1) this.fail('a slice takes exactly one range');
       return { op: 'slice', base, left: range.left, right: range.right, dir: range.dir };
     }
-    if (base.op === 'ref') return { op: 'apply', name: base.name, args };
+    if (base.op === 'ref') return { op: 'apply', name: base.name, ...(base.pkg ? { pkg: base.pkg } : {}), args };
     // chained: mem(i)(3), r.f(2)
     if (args.length !== 1 || (args[0] && args[0].named)) this.diag('multiple indices on a chained name are not supported');
     return { op: 'index', base, index: args[0] && args[0].named ? args[0].value : args[0] };

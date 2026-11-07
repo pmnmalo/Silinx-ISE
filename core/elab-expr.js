@@ -9,7 +9,7 @@ import { evalE, strToVal, bitpos } from './interp.js';
 import { mapBits } from './vhdl/parser.js';
 import {
   BIT, BOOL, CHAR, ElabError, INT, PHYS, REAL, STR, TIME, charConst, constOf, defaultValue, diag, elabType,
-  enumChar, evalRange, fold, locNode, newSignal, probeCtx, scalarBounds, stdTypeName, strVec, vecT,
+  enumChar, evalRange, fold, locNode, newSignal, packageScope, probeCtx, scalarBounds, stdTypeName, strVec, vecT,
 } from './elaborate.js';
 import { bindBuiltin, bindCall, bindVlogCall, positional } from './elab-call.js';
 export { BUILTIN_SUBPROGRAMS, TEXTIO_PROCS, bindTextio, boundFunction, pickOverload, positional } from './elab-call.js';
@@ -103,7 +103,7 @@ function bindExpr0(E, e, expect, loc) {
       return { k: 'c', val: V.fromBits(bit.repeat(w)), t: expect || BIT, fillBit: bit };
     }
     case 'ref': {
-      const entry = lookupOrErr(E, e.name, loc);
+      const entry = e.pkg ? packageScope(E.ctx, e.pkg, E.file, loc, E)?.lookup(e.name) : lookupOrErr(E, e.name, loc);
       if (entry?.kind === 'subalias') return bindExpr0(E, { ...e, name: entry.target }, expect, loc);
       if (entry) {
         const n = refNode(E, entry, e.name);
@@ -111,6 +111,7 @@ function bindExpr0(E, e, expect, loc) {
         if (entry.kind === 'func') return bindCall(E, entry, [], e.name, loc);
         if (entry.kind === 'type') throw new ElabError(`type '${e.name}' used as a value`, loc);
       }
+      if (e.pkg) throw notDeclared(e.name, loc);
       if (E.lang === 'vhdl' && e.name === 'now') return { k: 'now', t: TIME, unit: 1 };
       if (!entry && E.lang === 'verilog' && (e.path || e.name.includes('.'))) {
         const r = hierResolve(E, e.name, e.path, loc);
@@ -204,7 +205,7 @@ function bindExpr0(E, e, expect, loc) {
     case 'field': return fold(fieldNode(E, bindExpr(E, e.base, null, loc), e.name, loc));
     case 'aggregate': return bindAggregate(E, e, expect, loc);
     case 'qualified': {
-      const te = E.sc.lookup(e.type);
+      const te = e.pkg ? packageScope(E.ctx, e.pkg, E.file, loc, E)?.lookup(e.type) : E.sc.lookup(e.type);
       const sn = stdTypeName(e.type);
       let t = te && te.kind === 'type' ? te.t : null;
       // unsigned'(0 => x) / std_logic_vector'(a, b): the aggregate's own length gives the width
@@ -535,7 +536,7 @@ function bindAttr(E, e, loc) {
   if (at === 'image' || at === 'to_string') {
     const a = bindExpr(E, e.args[0], null, loc);
     // T'image(x): formatted as a value of T (boolean / enumeration prefixes)
-    const pe = e.prefix.op === 'ref' ? E.sc.lookup(e.prefix.name) : null;
+    const pe = e.prefix.op === 'ref' ? (e.prefix.pkg ? packageScope(E.ctx, e.prefix.pkg, E.file, loc, E)?.lookup(e.prefix.name) : E.sc.lookup(e.prefix.name)) : null;
     const it = pe && pe.kind === 'type' && pe.t && (pe.t.kind === 'enum' || pe.t.kind === 'bool') ? pe.t
       : e.prefix.op === 'ref' && /^boolean$/i.test(e.prefix.name) ? BOOL : e.prefix.op === 'ref' && /^character$/i.test(e.prefix.name) ? CHAR : null;
     if (it === CHAR && a.k === 'str' && a.value.length === 1) return { k: 'image', a: charConst(a.value), t: STR, it };
@@ -544,7 +545,7 @@ function bindAttr(E, e, loc) {
   // prefix could be a type name
   let t, node = null;
   if (e.prefix.op === 'ref') {
-    const ent = E.sc.lookup(e.prefix.name);
+    const ent = e.prefix.pkg ? packageScope(E.ctx, e.prefix.pkg, E.file, loc, E)?.lookup(e.prefix.name) : E.sc.lookup(e.prefix.name);
     if (ent && ent.kind === 'type') t = ent.t;
     else if (!ent && stdTypeName(e.prefix.name)) t = elabType(E, stdTypeName(e.prefix.name));
   }
@@ -729,7 +730,7 @@ function bindAggregate(E, e, expect, loc) {
 function bindApply(E, e, expect, loc) {
   const name = e.name;
   const args = e.args.slice();
-  const entry = E.sc.lookup(name);
+  const entry = e.pkg ? packageScope(E.ctx, e.pkg, E.file, loc, E)?.lookup(name) : E.sc.lookup(name);
   if (entry?.kind === 'subalias') return bindApply(E, { ...e, name: entry.target }, expect, loc);
   if (entry && (entry.kind === 'sig' || entry.kind === 'const' || entry.kind === 'loc' || entry.kind === 'alias')) {
     let base = refNode(E, entry, name);
@@ -749,5 +750,6 @@ function bindApply(E, e, expect, loc) {
     const t = entry.t;
     return fold({ k: 'conv', a, ext: a.t.s, t: t.unconstrained ? { ...a.t } : t });
   }
+  if (e.pkg) throw notDeclared(name, loc);
   return bindBuiltin(E, name, args, expect, loc);
 }

@@ -1,7 +1,7 @@
 // The VHDL parser's declarations (#405: out of parser.js): declarative parts and their items (signals, constants,
 // variables, types and subtypes, components, attributes, aliases, subprograms), subtype indications and ranges, as
 // methods of the parser (Object.assign(Parser.prototype, declarationMethods) in parser.js).
-import { DECL_KWS } from './parse-defs.js';
+import { DECL_KWS, STD_LIBS } from './parse-defs.js';
 import { isRealRange, makeType } from './parse-helpers.js';
 
 /** Parser's methods of this part, assigned to its prototype by parser.js. */
@@ -270,10 +270,19 @@ export const declarationMethods = {
       do { if (this.isOp('(')) depth++; else if (this.isOp(')')) depth--; this.next(); } while (depth > 0 && !this.atEof());
     }
     let name = this.expectId('type name');
+    let pkg = null;
+    if (this.libraries?.has(name) && !STD_LIBS.has(name)) {
+      if (this.acceptOp('.')) {
+        pkg = this.expectId('package name');
+      }
+    } else if (this.packageNames?.has(name)) {
+      pkg = name;
+    }
     while (this.acceptOp('.')) name = this.expectId('type name');
     if (this.isId()) {
       // `resolved std_ulogic` : first name is a resolution function
       name = this.next().value;
+      pkg = null;
       while (this.acceptOp('.')) name = this.expectId('type name');
     }
     let range = null, hasRange = false;
@@ -299,7 +308,7 @@ export const declarationMethods = {
       else range = this.parseRange();
       hasRange = true;
     }
-    return makeType(name, range, hasRange);
+    return makeType(name, range, hasRange, pkg);
   },
 
   /**
