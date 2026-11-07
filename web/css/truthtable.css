@@ -69,6 +69,7 @@
 .tt-res code, .tt-expr { font-family: var(--mono, monospace); font-size: 13px; }
 /* a canonical form of 8 inputs (256 terms) wraps in the panel (#2927) */
 .tt-canon code { overflow-wrap: anywhere; }
+.tt-canon { display: flex; flex-direction: column; gap: 6px; }   /* (its two forms spaced as the results, #3071) */
 .tt-cost, .tt-circuit { color: var(--muted, #666); }   /* (a form as a circuit: its gates and delay, #1427) */
 .tt-note { display: block; color: #8a5a00; }
 

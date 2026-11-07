@@ -75,6 +75,7 @@ const reply = (name, rel, view, model, more = {}) => ({ text: JSON.stringify(mod
 // output's HDL logic too (#2951), and the minimal solution its SOP and POS use (#2950)
 async function tableResults(name, rel, doc, notation) {
   const L = await import('../core/logic.js');
+  const { canonicalCost } = await import('../core/logic-canon.js');
   const m = L.normalizeTable(doc);
   const errs = L.validateTable(m).filter(x => x.severity !== 'warning');
   if (errs.length) throw toolError(`the results of ${base(rel)}: ${errs.map(x => x.message).join('; ')}`);
@@ -89,6 +90,7 @@ async function tableResults(name, rel, doc, notation) {
     const hdl = L.outputForm(m, o);
     return {
       output: o, canonicalSop: ex(A.canon.sop), canonicalPos: ex(A.canon.pos), minterms: `${o} = ${A.sigma}`, maxterms: `${o} = ${A.pi}`,
+      canonicalCost: canonicalCost(A.col, m.inputs.length),   // (their terms, literals and gates, #3072)
       minimalSop: minimal(A.sop), minimalPos: minimal(A.pos),
       xor: A.xor ? ex(A.xor.ast) : null, nand: ex(A.nand.ast), nor: ex(A.nor.ast), leastGates: least('gates'), leastDelay: least('delay'),
       hdlLogic: { form: L.formOf(m, o), name: L.FORM_NAMES[L.formOf(m, o)], expr: ex(hdl.ast), what: hdl.what },
@@ -98,7 +100,9 @@ async function tableResults(name, rel, doc, notation) {
     `Least number of gates: ${r.leastGates.form}: ${r.leastGates.expr}`, `Least delay: ${r.leastDelay.form}: ${r.leastDelay.expr}`,
     `Minimal SOP: ${r.minimalSop.expr}   (${r.minimalSop.terms} term(s), ${r.minimalSop.literals} literal(s))`, ...solutionLines(r.minimalSop),
     `Minimal POS: ${r.minimalPos.expr}   (${r.minimalPos.terms} term(s), ${r.minimalPos.literals} literal(s))`, ...solutionLines(r.minimalPos),
-    `Canonical SOP: ${r.minterms}`, `  ${r.canonicalSop}`, `Canonical POS: ${r.maxterms}`, `  ${r.canonicalPos}`,   // (its list, #2952, then its expression, #3069)
+    // (its list, #2952, then its expression, #3069, its terms and literals, #3072)
+    `Canonical SOP: ${r.minterms}   (${r.canonicalCost.sop.terms} term(s), ${r.canonicalCost.sop.literals} literal(s))`, `  ${r.canonicalSop}`,
+    `Canonical POS: ${r.maxterms}   (${r.canonicalCost.pos.terms} term(s), ${r.canonicalCost.pos.literals} literal(s))`, `  ${r.canonicalPos}`,
     ...(r.xor ? [`XOR form: ${r.xor}`] : []), `NAND form: ${r.nand}`, `NOR form: ${r.nor}`,
     `HDL logic: ${r.hdlLogic.name}: ${r.hdlLogic.expr}   (${r.hdlLogic.what})`, '']);
   return { text: lines.join('\n').trimEnd(), data: { project: name, path: rel, view: 'results', notation, inputs: m.inputs, outputs } };

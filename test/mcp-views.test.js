@@ -72,14 +72,14 @@ test('related_view: a truth table\'s results, as its editor shows them: the cano
   const before = files('q');
   const r = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'textbook' });
   // (the editor's order, #3065: the circuit's two choices, the minimal forms, the canonical ones (their list, then their
-  // expression, #3069), XOR, NAND, NOR)
+  // expression, #3069; their terms and literals, #3072), XOR, NAND, NOR)
   assert.equal(r.text, `Least number of gates: XOR form: f = c ⊕ a·b
 Least delay: XOR form: f = c ⊕ a·b
 Minimal SOP: f = a'·c + b·c'   (2 term(s), 4 literal(s))
 Minimal POS: f = (b + c)·(a' + c')   (2 term(s), 4 literal(s))
-Canonical SOP: f = Σm(1, 3, 6) + d(2, 5)
+Canonical SOP: f = Σm(1, 3, 6) + d(2, 5)   (3 term(s), 9 literal(s))
   f = a'·b'·c + a'·b·c + a·b·c'
-Canonical POS: f = ΠM(0, 4, 7) · D(2, 5)
+Canonical POS: f = ΠM(0, 4, 7) · D(2, 5)   (3 term(s), 9 literal(s))
   f = (a + b + c)·(a' + b + c)·(a' + b' + c')
 XOR form: f = c ⊕ a·b
 NAND form: f = ((a'·c)'·(b·c')')'
@@ -90,14 +90,19 @@ Least number of gates: Minimal SOP: z = 0
 Least delay: Minimal SOP: z = 0
 Minimal SOP: z = 0   (0 term(s), 0 literal(s))
 Minimal POS: z = 0   (1 term(s), 0 literal(s))
-Canonical SOP: z = Σm()
+Canonical SOP: z = Σm()   (0 term(s), 0 literal(s))
   z = 0
-Canonical POS: z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
+Canonical POS: z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)   (8 term(s), 24 literal(s))
   z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')
 NAND form: z = 0
 NOR form: z = 0
 HDL logic: Least number of gates: z = 0   (least gates: minimal SOP, 0 literal(s), 0 gate(s), delay 0)`);
   assert.deepEqual([r.data.view, r.data.notation, r.data.inputs, r.data.outputs.map(o => o.output)], ['results', 'textbook', ['a', 'b', 'c'], ['f', 'z']]);
+  // the canonical forms' terms, literals and gates, as the editor's (#3072)
+  assert.deepEqual(r.data.outputs[0].canonicalCost, {
+    sop: { terms: 3, literals: 9, gates: { and: 3, or: 1, not: 3, inputs: 12, literals: 9 } },
+    pos: { terms: 3, literals: 9, gates: { and: 1, or: 3, not: 3, inputs: 12, literals: 9 } },
+  });
   // the editor's default notation, the core's canonical forms
   const s = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results' });
   assert.equal(s.data.notation, 'slash');

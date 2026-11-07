@@ -24,6 +24,7 @@ import {
   kmapLayout, kmapRects, MAX_EDIT_INPUTS, circuitCost, outputForm, formOf, setOutputLogic,
 } from '/core/logic.js';
 import { reservedError } from '/core/reserved.js';
+import { canonicalCost } from '/core/logic-canon.js';
 import { cellText, placeKmap } from './tt-kmap3d.js';
 import { domSnapshot } from './print-view.js';
 import { t as tr } from './i18n.js';
@@ -62,10 +63,14 @@ function bestForm(doc, out, goal, label, tip, notation, tick) {
 }
 
 // the canonical forms in full, the sum of the minterms and the product of the maxterms (#2927), each the list of its
-// terms first (#2952), its full expression under it (#3069), each with its tick box (#2951)
-function canonForms(A, out, notation, tick) {
+// terms first (#2952), its full expression under it (#3069), its terms, literals, gates and circuit as the minimal
+// forms' (#3072), each with its tick box (#2951)
+const costText = (terms, literals, g) => `${terms} term(s), ${literals} literal(s); gates: ${g.and} AND, ${g.or} OR, ${g.not} NOT (${g.inputs} gate inputs)`;
+function canonForms(A, out, n, notation, tick) {
+  const cost = canonicalCost(A.col, n);
   const expr = (f, label, title, ast, list) => h('div', { class: `tt-canon-${f.slice(1)}`, title }, tick(f), h('b', {}, label), ': ',
-    h('code', { class: 'tt-canon-list', 'data-no-i18n': '' }, `${out} = ${list}`), h('br'), h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`));
+    h('code', { class: 'tt-canon-list', 'data-no-i18n': '' }, `${out} = ${list}`), h('br'), h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`),
+    h('div', { class: 'tt-cost' }, costText(cost[f.slice(1)].terms, cost[f.slice(1)].literals, cost[f.slice(1)].gates)), circuit(ast));
   return h('div', { class: 'tt-res tt-canon' },
     expr('csop', 'Canonical SOP', 'The sum of the minterms: every input in every term, the don\'t cares left out', A.canon.sop, A.sigma),
     expr('cpos', 'Canonical POS', 'The product of the maxterms: every input in every term, the don\'t cares left out', A.canon.pos, A.pi));
@@ -338,7 +343,7 @@ export function mountTtEditor(container, opts = {}) {
       if (!r.exact) note.push(h('span', { class: 'tt-note' }, 'The exact search was cut short: this solution may not be minimal.'));
       return h('div', { class: `tt-res ${cls}` },
         h('div', {}, tick(f), h('b', {}, label), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)),
-        h('div', { class: 'tt-cost' }, `${r.terms.length} term(s), ${r.literals} literal(s); gates: ${g.and} AND, ${g.or} OR, ${g.not} NOT (${g.inputs} gate inputs)`),
+        h('div', { class: 'tt-cost' }, costText(r.terms.length, r.literals, g)),
         circuit(r.ast), ...note);
     };
     // the XOR form, when cheaper than both (#435)
@@ -358,7 +363,7 @@ export function mountTtEditor(container, opts = {}) {
       best('gates', 'Least number of gates', GATES_TIP), best('delay', 'Least delay', DELAY_TIP),
       form('Minimal SOP', 'sop', 'tt-sop'),
       form('Minimal POS', 'pos', 'tt-pos'),
-      canonForms(A, out, notation, tick),
+      canonForms(A, out, M.inputs.length, notation, tick),
       ...(xorForm ? [xorForm] : []),
       gateForm('NAND form', A.nand, 'tt-nand', 'The minimal SOP with NAND gates only (double negation); an inverter is a NAND of one input'),
       gateForm('NOR form', A.nor, 'tt-nor', 'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input'));

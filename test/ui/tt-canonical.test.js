@@ -1,6 +1,7 @@
 // UI: the Boolean Algebra editor's canonical forms (#2927): the canonical SOP (the sum of the minterms) and POS (the
 // product of the maxterms) as full expressions, in the chosen notation, after the least gates / delay and the minimal
-// forms (#3065), each the list of its terms (Σm / ΠM, #2952) first, its full expression under it (#3069), with its HDL logic tick box (#2951). A constant
+// forms (#3065), each the list of its terms (Σm / ΠM, #2952) first, its full expression under it (#3069), its terms,
+// literals, gates and circuit (#3072), with its HDL logic tick box (#2951), the two spaced as the other results (#3071). A constant
 // output; a table of 8 inputs, whose 256-term expressions wrap in the panel; in Portuguese (SdP and PdS, #3066).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,6 +42,17 @@ uiTest('#2927 #2952 Truth Table: the canonical SOP and POS in full, in the notat
     ['tt-canon-pos', 'Canonical POS', 'f = (a + b + c).(/a + b + c).(/a + /b + /c)', 'f = ΠM(0, 4, 7) · D(2, 5)'],
   ]);
   assert.deepEqual(await listFirst(page), [['tt-canon-list', 'tt-expr', true, true], ['tt-canon-list', 'tt-expr', true, true]], 'the list first, the expression under it (#3069)');
+  // their terms, literals, gates and circuit, as the minimal forms' (#3072)
+  assert.deepEqual(await page.eval((t) => ['sop', 'pos'].map((k) => [document.querySelector(`${t} .tt-canon-${k} .tt-cost`)?.textContent, document.querySelector(`${t} .tt-canon-${k} .tt-circuit`)?.textContent]), T), [
+    ['3 term(s), 9 literal(s); gates: 3 AND, 1 OR, 3 NOT (12 gate inputs)', 'As a circuit: 7 gate(s), delay 3'],
+    ['3 term(s), 9 literal(s); gates: 1 AND, 3 OR, 3 NOT (12 gate inputs)', 'As a circuit: 7 gate(s), delay 3'],
+  ]);
+  // Canonical SOP and POS spaced as the other results (#3071): as Minimal SOP and Minimal POS
+  const gaps = await page.eval((t) => {
+    const r = (s) => document.querySelector(`${t} ${s}`).getBoundingClientRect();
+    return [Math.round(r('.tt-canon-pos').top - r('.tt-canon-sop').bottom), Math.round(r('.tt-res.tt-pos').top - r('.tt-res.tt-sop').bottom)];
+  }, T);
+  assert.ok(Math.abs(gaps[0] - gaps[1]) <= 1, `the canonical forms ${gaps[0]} px apart, the minimal ones ${gaps[1]}`);
   // no row of the lists of their own (#2952); each canonical form its tick box (#2951), not ticked (least gates)
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-canon-minterms, ${t} .tt-canon-maxterms, ${t} .tt-canon-lists`).length, T), 0);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-canon .tt-hdl`)].map((c) => c.checked), T), [false, false]);
