@@ -25,6 +25,8 @@ const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
 // (ap_ce: an AXI master's wait, the whole module's, core/c-axi-master.js, #1893)
 const SHARED = ['ap_clk', 'ap_rst', 'ap_ce'];
+// (a process's ap_ready: the region's top reads its ap_done, its ap_ready left open, no signal never read, #2992)
+const OPEN = ['ap_ready'];
 const SAID = /^#pragma HLS (DATAFLOW|STREAM) is accepted and ignored/;
 
 /** Whether name is assigned in body (=, op=, ++, --) or its address taken. */
@@ -290,7 +292,7 @@ function pieces(net) {
   const { procs, use, locals, params, rn } = net;
   const sig = (p, port) => `${p.inst}_${port.name}`;
   const sigs = [], links = [], fifos = [], bufs = [];
-  for (const p of procs) for (const port of p.mod.gen.ports) if (!SHARED.includes(port.name)) sigs.push({ name: sig(p, port), w: port.w });
+  for (const p of procs) for (const port of p.mod.gen.ports) if (!SHARED.includes(port.name) && !OPEN.includes(port.name)) sigs.push({ name: sig(p, port), w: port.w });
   for (const p of procs) {
     for (const x of p.wires) {
       if (x.top !== undefined) { const tp = net.ports.find((q) => q.param === x.top); links.push({ dst: sig(p, x.port), dw: x.port.w, src: tp.name, sw: tp.w, s: tp.s }); }
@@ -364,7 +366,7 @@ function vhdlTop(net) {
   L.push('begin');
   for (const p of procs) {
     // (a process's own ap_ctrl_chain: the top's machine takes its ap_done at once)
-    const m = p.mod.gen.ports.map((port) => `${port.name} => ${port.name === 'ap_continue' ? "'1'" : SHARED.includes(port.name) ? port.name : sig(p, port)}`);
+    const m = p.mod.gen.ports.map((port) => `${port.name} => ${port.name === 'ap_continue' ? "'1'" : SHARED.includes(port.name) ? port.name : OPEN.includes(port.name) ? 'open' : sig(p, port)}`);
     L.push(`  ${p.inst} : entity work.${p.mod.module} port map (${m.join(', ')});`);
   }
   net.words.forEach((g, i) => L.push(`  ap_word${i} : entity work.${name}_ap_word${i} port map (${wordMap(net, g).map(([a, b]) => `${a} => ${b}`).join(', ')});`));
@@ -441,7 +443,7 @@ function verilogTop(net) {
   if (chain) L.push("  reg ap_done_reg = 1'b0;");
   if (net.free) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
   for (const b of bufs) L.push(`  reg [${b.w - 1}:0] ${b.name} [0:${b.n - 1}];`, `  reg [${b.w - 1}:0] ${b.name}_q;`, `  wire [${b.aw - 1}:0] ${b.name}_addr;`, `  wire ${b.name}_ce, ${b.name}_we;`, `  wire [${b.w - 1}:0] ${b.name}_d;`);
-  for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${port.name === 'ap_continue' ? "1'b1" : SHARED.includes(port.name) ? port.name : sig(p, port)})`).join(', ')});`);
+  for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${port.name === 'ap_continue' ? "1'b1" : SHARED.includes(port.name) ? port.name : OPEN.includes(port.name) ? '' : sig(p, port)})`).join(', ')});`);
   net.words.forEach((g, i) => L.push(`  ${name}_ap_word${i} ap_word${i} (${wordMap(net, g).map(([a, b]) => `.${a}(${b})`).join(', ')});`));
   const conv = (s0, sw, dw, sg = false) => (dw > sw && sg && sw > 1 ? `{{${dw - sw}{${s0}[${sw - 1}]}}, ${s0}}` : dw < sw ? (dw === 1 ? `${s0}[0]` : `${s0}[${dw - 1}:0]`) : s0);
   for (const t of net.ties) L.push(`  assign ${t.name} = ${t.w}'d0;`);

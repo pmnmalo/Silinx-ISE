@@ -66,14 +66,13 @@ int main() {
 }
 `;
 
-// (each process's ap_ready, never read by the region's top: a message per process, as of any region; the top's array's
-// second port's _q1, #2992)
-const READY = (lang, insts) => insts.map((i) => `Signal <${lang === 'vhdl' ? i.toLowerCase() : i}_ap_ready> is assigned but never used. This unconnected signal will be trimmed during the optimization process.`);
-function checked(g, lang, insts, extra = []) {
+// (each process's ap_ready left open, #2992: no message of it; the top's array's second port's _q1, made as Vitis HLS
+// makes it (#1901), its input never read)
+function checked(g, lang, extra = []) {
   const lib = compile([{ path: `top.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.hdl }, ...g.blackboxes.flatMap((d) => d.rtl)]);
   const design = elaborate(lib, 'top');
   assert.deepEqual([...lib.errors, ...design.diags].map((d) => `${d.severity}: ${d.message}`), []);
-  assert.deepEqual(designChecks(lib, design).map((d) => d.message), [...extra, ...READY(lang, insts)]);
+  assert.deepEqual(designChecks(lib, design).map((d) => d.message), extra);
 }
 
 // (the loop of inc's calls, a process of its own, Loop_0_proc: pipelined automatically, a state that waits for the module)
@@ -95,7 +94,7 @@ for (const [what, unit, descs, calls, insts, w, extra] of CASES) {
       assert.deepEqual(errs(g), []); assert.deepEqual(warns(g), w);
       assert.equal(g.report.dataflow, true);
       assert.deepEqual(g.report.processes.map((p) => p.instance), insts);
-      checked(g, lang, insts, extra);
+      checked(g, lang, extra);
       const c = cosimulate(unit, { ...OPTS(descs()), lang });
       assert.deepEqual(c.errors, []);
       assert.deepEqual(c.mismatches, []);
