@@ -51,7 +51,7 @@
     "29 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=7 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off",
     "54 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)",
     "54 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=7 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off",
-    "77 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=9 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off",
+    "77 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=7 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off",
     "89 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'x_aux' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off",
     "94 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'x_aux' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off"
   ]
