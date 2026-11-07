@@ -13,7 +13,7 @@ import { deviceFamily, openOnlyDevice } from '../packages/silinx-fpga/src/parts.
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
-import { within } from './paths.js';
+import { within, realOf } from './paths.js';
 import * as Projects from './projects.js';
 import { mountXiseRoutes } from './xise-routes.js';
 import { IDENT } from './ident.js';
@@ -30,6 +30,22 @@ const implJobs = new Map();   // project name -> id of its latest implementation
 function topOf(project) {
   if (project.top && !IDENT.test(project.top)) throw new Projects.HttpError(400, `invalid top module name '${project.top}'`);
   return project.top;
+}
+
+// An absolute .bit of the workspace is programmed as its project's (#3039): the project it is in, by its name and once
+// its links are followed, must be trusted, as the project's own route asks (#2830); a file outside the workspace
+// (iMPACT's file box: a .bit from the disk) is not any project's
+async function checkWorkspaceBit(full) {
+  const P = Projects, ws = path.resolve(P.workspaceDir()), names = new Set();
+  for (const [dir, f] of [[ws, path.resolve(full)], [realOf(ws), realOf(path.resolve(full))]]) {
+    if (f.startsWith(dir + path.sep)) names.add(path.relative(dir, f).split(path.sep)[0]);
+  }
+  for (const name of names) {
+    let project = null;
+    try { project = await P.readProject(name); } catch { /* not a project's folder */ }
+    if (!project) throw new P.HttpError(403, `${full} is in the workspace but in no project: a workspace's bitstream is programmed from its project`);
+    if (!isTrusted(project)) throw new P.HttpError(403, untrustedMessage(name, 'programming the board', project));
+  }
 }
 
 /**
@@ -188,6 +204,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       bitfile = b.bitfile;
     } else throw bad('give a project or a bitfile');
     if (!/\.bit$/i.test(bitfile) && !(/\.bin$/i.test(bitfile) && !path.isAbsolute(b.bitfile || ''))) throw bad('only .bit files, or a project\'s .bin (the iCE40), can be programmed');
+    if (path.isAbsolute(b.bitfile || '')) await checkWorkspaceBit(bitfile);
     if (!fss.existsSync(bitfile)) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
     // a file outside the project (iMPACT's file box takes any path): only a real Xilinx bitstream,
     // and the same answer for any other file as for a missing one (no file-existence check by the API)
@@ -198,8 +215,9 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     }
     const board = b.board || project?.board || null;
     if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
-    const expect = b.expectDevice || expectedDevice(project, board);
-    const opts = { tool: b.tool, cable: b.cable, device: b.device, position: b.position, board, bitfile, expectDevice: expect };
+    // the device the bitstream must be built for: the project's, else the board's, never the request's (#3040); a
+    // mismatch refused unless the request says force
+    const opts = { tool: b.tool, cable: b.cable, device: b.device, position: b.position, board, bitfile, expectDevice: expectedDevice(project, board), force: b.force === true };
     const job = createJob('program', j => programJob(j, opts), { meta: { project: b.project || null, bitfile, board } });
     return { job: job.id };
   }));
@@ -213,7 +231,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const dir = P.projectDir(b.project);
     const board = b.board || project.board || null;
     if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
-    const opts = { op: b.op, device: b.device, verify: b.verify !== false, reconfigure: !!b.reconfigure, board, expectDevice: expectedDevice(project, board) };
+    const opts = { op: b.op, device: b.device, verify: b.verify !== false, reconfigure: !!b.reconfigure, board, expectDevice: expectedDevice(project, board), force: b.force === true };
     if (b.op === 'program' || b.op === 'verify') {
       if (!topOf(project) && !b.bitfile) throw bad('project has no top module; cannot locate build/<top>_prom.bit');
       opts.bitfile = b.bitfile ? P.safeJoin(dir, b.bitfile) : path.join(dir, 'build', `${project.top}_prom.bit`);
