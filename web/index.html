@@ -25,6 +25,22 @@
 (function () { var d = document.documentElement, ui = 'silinx', th = 'system';
   /* the site's development edition (dev/) keeps its own settings: web/js/prefs.js prefKey (#1243) */
   var k = /\/dev\//.test(location.pathname) ? 'silinx.dev.' : 'silinx.';
+  /* in another site's frame (#3041: the static editions, whose <meta> policy cannot carry frame-ancestors; the local
+     server's header refuses it): the app does not start (another page's content over its buttons), a notice with a
+     link that opens it in a tab of its own, in the language of web/js/i18n.js (not loaded yet) */
+  var framed = true; try { framed = window.top !== window.self; } catch (e) {}
+  if (framed) {
+    window.stop();
+    var lang = ''; try { lang = localStorage.getItem(k + 'lang') || ''; } catch (e) {}
+    var pt = lang === 'pt' || (lang !== 'en' && /^pt\b/i.test(navigator.language || ''));
+    var b = document.createElement('body'), p = document.createElement('p'), a = document.createElement('a');
+    b.className = 'framed-notice'; b.setAttribute('style', 'margin: 0; padding: 24px; font: 14px sans-serif; background: Canvas; color: CanvasText');
+    p.textContent = pt ? 'O Silinx ISE não abre dentro da página de outro site.' : 'Silinx ISE does not open inside another site\'s page.';
+    a.textContent = pt ? 'Abrir o Silinx ISE num separador próprio' : 'Open Silinx ISE in a tab of its own';
+    a.href = location.href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    b.appendChild(p); b.appendChild(a); d.appendChild(b); d.lang = pt ? 'pt' : 'en';
+    return;
+  }
   /* a preference saved with the ids of before (#2451) migrated once: web/js/silinx.js LEGACY_INTERFACES */
   try { var v = localStorage.getItem(k + 'ui'), was = v; v = v === 'modern' ? 'silinx' : v === 'classic' ? 'ise' : v;
     if (v !== was) localStorage.setItem(k + 'ui', v);

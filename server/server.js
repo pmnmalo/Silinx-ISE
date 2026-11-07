@@ -44,14 +44,13 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   // bound to localhost the Host header must be local too (DNS rebinding). With a token (`serve` makes one
   // at every start, on every address, #2564), the API answers only the requests that carry it
   // (X-Silinx-Token; printed in the URL at start-up): another user of this computer, another machine, or a
-  // page rebinding its name to this one, has none. ?token= is taken on the download links only
-  // (export.xise, export.zip: a GET a link opens, #1434): an address stays in the browser's history and in
-  // proxies' logs. Without a token (tests, an app embedding the server) only loopback is allowed.
+  // page rebinding its name to this one, has none. Never in a query string (#3045: an address stays in the
+  // browser's history, in a shell's and in proxies' logs; the page downloads an export with the header).
+  // Without a token (tests, an app embedding the server) only loopback is allowed.
   // Two requests need no token (#2955): the page a launcher opened exchanges its one-time code for the token
   // (POST /api/token, from the page itself: its Origin required), and a second launch asks for the proof that
   // this server holds the token of its file (GET /api/proof, an HMAC of the launcher's nonce).
   const LOCAL = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
-  const DOWNLOAD = /^\/projects\/[^/]+\/export\.(xise|zip)$/;
   const exposed = !isLoopback(host);
   if (exposed && !token) throw new Error('a server on a non-loopback address needs a token');
   const digest = s => crypto.createHash('sha256').update(s).digest();
@@ -63,7 +62,7 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
     res.set('Cache-Control', 'no-store');
     const hostName = String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase();
     if (!exposed && hostName && !LOCAL.has(hostName) && hostName !== String(host).toLowerCase()) return res.status(403).json({ error: 'forbidden host' });
-    if (token && !tokenless(req) && !tokenOk(req.headers['x-silinx-token']) && !(req.method === 'GET' && DOWNLOAD.test(req.path) && tokenOk(req.query.token)))
+    if (token && !tokenless(req) && !tokenOk(req.headers['x-silinx-token']))
       return res.status(403).json({ error: 'this Silinx server needs its token: open the URL it printed at start-up' });
     // a request another site's page made (an <img>, a link, a form: the browser says so in
     // Sec-Fetch-Site) is refused, a GET too: some GETs write a file or start a process
