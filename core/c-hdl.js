@@ -26,6 +26,7 @@ import { reshapeGroups } from './c-reshape.js';
 import { axiPlan, axiWrap } from './c-axi.js';
 import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
 import { latencyPragma, markFabric, mulLimit } from './c-op-pragmas.js';
+import { isUnit, shareUnits, unitSource } from './c-float-units.js';
 import { bindable } from './c-bind.js';
 import { hierarchy, inlineMode, latencyOf, moduleRegistry } from './c-submodule.js';
 import { fftTop } from './hls-fft-hdl.js';
@@ -44,8 +45,19 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 export function cToHdl(source, opts = {}) {
   const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true, directives = null, host = null } = opts;
   // (host: a loop of that top's DATAFLOW region made a process, core/c-dataflow-loops.js, #1706)
-  const checked = checkC(source, file, { headers, top: host ?? top, depths: host ? null : depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+  const check = (src, t = host ?? top) => checkC(src, file, { headers, top: t, depths: host ? null : depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+  let checked = check(source);
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
+  // (ALLOCATION of a floating-point operation: its unit a function of the source's, a sub-module, its operations its calls, #2273)
+  let units = shareUnits(checked);
+  const more = unitSource(units.used, checked.funcs);
+  if (more) {
+    source += more;
+    checked = check(source, host ?? checked.top);   // (the same top: the units are not)
+    if (!checked.ok) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
+    units = shareUnits(checked);
+  }
+  for (const w of units.warnings) checked.diagnostics.push({ file, line: w.loc.line, col: w.loc.col, message: w.message, severity: 'warning' });
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
   const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
   // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js;
@@ -132,7 +144,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults }), seq: true };
   // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
   // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
-  else if (!flat && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && (!fitsClock(df.graph, clock, family) || lat?.min > 0 || (limit !== null && mulsIn(df.graph) > limit))) {
+  else if ((!flat || isUnit(checked.top)) && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && (!fitsClock(df.graph, clock, family) || lat?.min > 0 || (limit !== null && mulsIn(df.graph) > limit))) {
     const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults });
     if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
   }

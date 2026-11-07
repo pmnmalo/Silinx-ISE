@@ -1,6 +1,6 @@
 // The MCP server's tools of a C or C++ source (#2674, server/mcp-hls.js), as the C module's processes: C Simulation and
 // C/RTL Co-simulation of the test designs (fir, gcd, sort, popcount; stream_sum in C++), the co-simulation in VHDL and
-// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks); the HDL and the ASM chart made from the C; a C with an error; the errors.
+// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit); the HDL and the ASM chart made from the C; a C with an error; the errors.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -70,6 +70,22 @@ test('#2783 c_synthesis_report and c_cosimulation: within the device\'s multipli
     }
   }
   await ok('delete_file', { project: 'gcd', path: 'src/six.c' });
+});
+
+// #2273: ALLOCATION of fmul: the three multiplications one unit, a sub-module called three times
+test('#2273 c_synthesis_report and c_cosimulation: ALLOCATION of fmul, one unit and its calls, PASS in VHDL and in Verilog', async () => {
+  const fm = 'float fm(float x, float y, float z) {\n#pragma HLS ALLOCATION operation instances=fmul limit=1\n  float p = x * y;\n  float q = p * z;\n  return q * x;\n}\n';
+  await ok('write_file', { project: 'gcd', path: 'src/fm.c', text: `${fm}int main() {\n  return fm(1.5f, -2.0f, 0.25f) == 1.5f * -2.0f * 0.25f * 1.5f ? 0 : 1;\n}\n` });
+  await ok('set_design_properties', { project: 'gcd', board: 'basys2', variant: '250' });
+  const r = await ok('c_synthesis_report', { project: 'gcd', path: 'src/fm.c' });
+  assert.ok(r.text.includes('\nFunctions (the module\'s latency: 61 cycles):\n  ap_unit_fmul_U0  ap_unit_fmul: 3 calls; latency 17 cycles, 19 states, 2876 register bits\n'), r.text);
+  assert.ok(!r.text.includes('\nMultipliers:'), r.text);
+  assert.deepEqual(r.data.warnings, []);
+  for (const language of ['vhdl', 'verilog']) {
+    const c = await ok('c_cosimulation', { project: 'gcd', path: 'src/fm.c', language });
+    assert.deepEqual([c.data.pass, c.data.mismatches, c.data.latency.max], [true, [], 61], language);
+  }
+  await ok('delete_file', { project: 'gcd', path: 'src/fm.c' });
 });
 
 test('c_generated: the HDL and the ASM chart made from fir.c', async () => {
