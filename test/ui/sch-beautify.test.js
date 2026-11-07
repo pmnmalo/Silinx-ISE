@@ -2,7 +2,7 @@
 // Rearrange Wires: the wires drawn again, the symbols and markers where they are; with a selection, its wires only.
 // Rearrange Schematic: the whole sheet laid out again, the markers moved (the inputs on the left, the outputs on the
 // right). One undo step each; nothing to do said so; their labels, tooltips and notes in Portuguese; hidden in a
-// read-only view.
+// read-only view. A channel's wires ordered with no crossing (no hop-over) and spread evenly (#1994).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -130,6 +130,39 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
   } finally {
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   }
+});
+
+// #1994: a -> y and b -> z, their vertical runs side by side at x = 200 and 210, crossing twice (two hop-overs drawn)
+function channel() {
+  const doc = newDoc('chan', 'vhdl');
+  doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 100, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 500, y: 250 },
+    { id: 'P3', name: 'b', dir: 'in', width: 1, x: 100, y: 200 }, { id: 'P4', name: 'z', dir: 'out', width: 1, x: 500, y: 350 });
+  doc.wires.push({ id: 'W1', points: [P(100, 100), P(200, 100), P(200, 250), P(500, 250)] }, { id: 'W2', points: [P(100, 200), P(210, 200), P(210, 350), P(500, 350)] });
+  return doc;
+}
+
+uiTest('#1994 schematic: Rearrange Wires orders a channel\'s wires with no crossing (no hop-over drawn) and spreads them evenly; one undo step', E, async (page) => {
+  await makeProject(env, { name: 'ChanPj', files: { 'src/chan.sch.json': JSON.stringify(channel()) } });
+  await page.openProject('ChanPj');
+  await page.eval(() => window.SilinxApp.openSch('src/chan.sch.json'));
+  await page.waitFor((ed) => document.querySelectorAll(`${ed} svg .port`).length === 4, [ED], { what: 'drawn' });
+  const wires = async () => (await page.eval(() => window.Silinx.active.schEditor.getDoc())).wires.map((w) => w.points);
+  const hops = () => page.eval((ed) => [...document.querySelectorAll(`${ed} svg .wire path.wline`)].reduce((n, e) => n + (e.getAttribute('d').match(/ A/g) || []).length, 0), ED);
+  const hint = (t) => page.waitFor((ed, x) => { const e = document.querySelector(`${ed} .se-hint`); return !!e && !e.hidden && e.textContent === x; }, [ED, t], { what: `the note: ${t}` });
+  assert.equal(await hops(), 2, 'two hop-overs');
+  const before = await wires();
+  await page.click(`${ED} .se-btn[data-act=more]`);
+  await page.click(`${ED} .se-toolbar [data-act=rewire]`);
+  await hint('Rearrange Wires: 2 wires drawn again');
+  // b's run left of a's: no crossing; spread between the markers (their walls at 100 and 500): 230 and 370
+  assert.deepEqual(await wires(), [[P(100, 100), P(370, 100), P(370, 250), P(500, 250)], [P(100, 200), P(230, 200), P(230, 350), P(500, 350)]]);
+  await page.waitFor((ed) => ![...document.querySelectorAll(`${ed} svg .wire path.wline`)].some((e) => / A/.test(e.getAttribute('d'))), [ED], { what: 'no hop-over' });
+  await page.click(`${ED} .se-btn[data-act=more]`);
+  await page.click(`${ED} .se-toolbar [data-act=rewire]`);
+  await hint('Rearrange Wires: the wires are already as clear as they can be');
+  await page.click(`#toolbar [data-cmd=undo]`);
+  await page.waitFor((w) => JSON.stringify(window.Silinx.active.schEditor.getDoc().wires.map((x) => x.points)) === w, [JSON.stringify(before)], { what: 'undone' });
+  assert.equal(await hops(), 2, 'the hop-overs back');
 });
 
 uiTest('#1481 schematic: a read-only view (RTL schematic) has neither Rearrange button', E, async (page) => {

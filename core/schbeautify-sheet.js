@@ -10,7 +10,7 @@
 import { key, netlist, symbolBox, portBox } from './schdoc.js';
 import { generateHdl } from './schdoc-hdl.js';
 import { placeAndRoute } from './schdoc-place.js';
-import { beautifyWires } from './schbeautify.js';
+import { beautifyWires, wiresNote } from './schbeautify.js';
 import { segPoints, wireGrid } from './schpath.js';
 import { clone } from './util.js';
 
@@ -107,4 +107,11 @@ export async function beautifySheet(doc, { modules = {}, layout } = {}) {
     } catch { /* the wires only */ }
   }
   return { sheet: false, changed: beautifyWires(doc, { modules }).changed };
+}
+
+/** Rearrange Schematic's message (the interface's and the MCP server's): r: beautifySheet's result, same: the drawing as it was. */
+export function sheetNote(r, same) {
+  // (not laid out again: it would not mean the same, or its symbols would overlap; its wires drawn again only)
+  if (!r.sheet) return `Rearrange Schematic: the symbols kept where they were; ${wiresNote('wires', r.changed.length).replace(/^wires: /, '')}`;
+  return same ? 'Rearrange Schematic: the schematic is already laid out this way' : 'Rearrange Schematic: the schematic laid out again';
 }
