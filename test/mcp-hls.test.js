@@ -129,3 +129,20 @@ test('#2340 an RTL blackbox in a DATAFLOW region: two processes of its module, a
   assert.match(r.text, /\nRTL blackbox: inc is the module inc \(inc\.v\)\n/);
   assert.match(r.text, /\n {2}inc_bb_U0 {8}inc: the RTL blackbox inc, ended by its ap_done\n {2}inc_bb_U1 {8}inc: the RTL blackbox inc, ended by its ap_done\n\nFIFOs:\n {2}t {16}2 words\n/);
 });
+
+test('#2342 an RTL blackbox\'s files written while the project is open: the next tool reads them (the module, the description, the C model)', async () => {
+  await ok('new_project', { name: 'bbedit' });
+  for (const [path, text] of [['src/msum.json', JSON.stringify(MDESC(), null, 2)], ['src/msum.cpp', MSUM_C], ['src/msum.v', MSUM_V], ['src/top.cpp', EXT]]) await ok('write_file', { project: 'bbedit', path, text });
+  assert.equal((await ok('c_cosimulation', { project: 'bbedit', path: 'src/top.cpp' })).data.pass, true);
+  // the module's port renamed: refused, said
+  await ok('write_file', { project: 'bbedit', path: 'src/msum.v', text: MSUM_V.split('m_q0').join('m_qq') });
+  const r = await call('c_synthesis_report', { project: 'bbedit', path: 'src/top.cpp' });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /syn\.blackbox: msum\.json: the argument 'm': the module 'msum' has no port 'm_q0'/);
+  // the description corrected: made again
+  await ok('write_file', { project: 'bbedit', path: 'src/msum.json', text: JSON.stringify(MDESC({}, { rtl_ports: { RAM_address: 'm_address0', RAM_clock_enable: 'm_ce0', RAM_write_enable: 'm_we0', RAM_data_write_out: 'm_d0', RAM_data_read_in: 'm_qq' } }), null, 2) });
+  assert.equal((await ok('c_cosimulation', { project: 'bbedit', path: 'src/top.cpp' })).data.pass, true);
+  // the C model changed: the C simulation runs it
+  await ok('write_file', { project: 'bbedit', path: 'src/msum.cpp', text: MSUM_C.replace('m[i] = m[i] + 1', 'm[i] = m[i] + 2') });
+  assert.equal((await ok('c_simulation', { project: 'bbedit', path: 'src/top.cpp' })).data.exitCode, 2);
+});

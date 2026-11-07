@@ -21,7 +21,7 @@ import { deviceFamily, openOnlyDevice } from '/packages/silinx-fpga/src/parts.js
 import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
-import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus } from './project.js';
+import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus, refreshBlackboxes } from './project.js';
 import { FLOW_UP_TO, boardUcf, checkUcfFile, regenerateUcf, runImpl, stepTracker, ucfDiagnostics } from './implement.js';
 import { adoptDrawnHdl, drawnHdlClashes, freshHdl, openAsm, openFsm, openPetri, openSch,
   openTt, openTtSchematic, openView, projectPart, refreshSyncBanner, schModules, staleHdl, syncBanner, viewTitle } from './drawings.js';
@@ -559,6 +559,7 @@ export async function openFile(path, line, col, { task } = {}) {
             const src = S.sources.find(s => s.path === path && !s.view);
             if (isC(path)) S.viewTexts[path] = text; else if (src) src.text = text;   // (a C source: its HDL made again, #1531)
             else await reloadProject(false);
+            await refreshBlackboxes(path);   // (an RTL blackbox's module or C model: the C sources' HDL made with it, #2342)
             compileProject(); renderHierarchy(); markStale();
             status(`Saved ${path}`);
             // the other open editors depend on this file (ports, instances): check them again
