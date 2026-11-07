@@ -1,7 +1,7 @@
 // UI: the Boolean Algebra editor's canonical forms (#2927): the canonical SOP (the sum of the minterms) and POS (the
-// product of the maxterms) as full expressions, in the chosen notation, first, each with the list of its terms under
-// it (Σm / ΠM, #2952) and its HDL logic tick box (#2951); then the minimal forms. A constant output; a table of 8 inputs, whose 256-term expressions wrap in the
-// panel; in Portuguese.
+// product of the maxterms) as full expressions, in the chosen notation, after the least gates / delay and the minimal
+// forms (#3065), each with the list of its terms under it (Σm / ΠM, #2952) and its HDL logic tick box (#2951). A constant
+// output; a table of 8 inputs, whose 256-term expressions wrap in the panel; in Portuguese (SdP and PdS, #3066).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -27,8 +27,8 @@ uiTest('#2927 #2952 Truth Table: the canonical SOP and POS in full, in the notat
   } });
   await page.openProject('TtCanon');
   await open(page, 'src/m.bool.json');
-  // the canonical forms first, then the minimal ones and the rest, as before
-  assert.deepEqual((await order(page)).slice(0, 3), ['tt-canon', 'tt-sop', 'tt-pos']);
+  // the least gates and delay first, the minimal forms, then the canonical ones, then the rest (#3065)
+  assert.deepEqual((await order(page)).slice(0, 5), ['tt-gates', 'tt-delay', 'tt-sop', 'tt-pos', 'tt-canon']);
   // the / notation by default
   assert.deepEqual(await canon(page), [
     ['tt-canon-sop', 'Canonical SOP', 'f = /a./b.c + /a.b.c + a.b./c', 'f = Σm(1, 3, 6) + d(2, 5)'],
@@ -49,11 +49,19 @@ uiTest('#2927 #2952 Truth Table: the canonical SOP and POS in full, in the notat
   assert.deepEqual((await canon(page)).map((r) => r.slice(2)), [['z = 0', 'z = Σm()'], ["z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')", 'z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)']]);
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  await page.waitFor((t) => document.querySelector(`${t} .tt-canon-sop b`)?.textContent === 'Forma canónica SOP', [T], { what: 'Portuguese' });
+  await page.waitFor((t) => document.querySelector(`${t} .tt-canon-sop b`)?.textContent === 'Forma canónica SdP', [T], { what: 'Portuguese' });
   assert.deepEqual(await page.eval((t) => ['sop', 'pos'].map((k) => [document.querySelector(`${t} .tt-canon-${k} b`).textContent, document.querySelector(`${t} .tt-canon-${k}`).title]), T), [
-    ['Forma canónica SOP', 'A soma dos mintermos: todas as entradas em todos os termos, sem as indiferenças'],
-    ['Forma canónica POS', 'O produto dos maxtermos: todas as entradas em todos os termos, sem as indiferenças'],
+    ['Forma canónica SdP', 'A soma dos mintermos: todas as entradas em todos os termos, sem as indiferenças'],
+    ['Forma canónica PdS', 'O produto dos maxtermos: todas as entradas em todos os termos, sem as indiferenças'],
   ]);
+  // SdP (soma de produtos) and PdS (produto de somas), not SOP and POS (#3066): the minimal forms, the map's groups, the tips
+  assert.deepEqual(await page.eval((t) => [
+    ...['sop', 'pos'].map((k) => document.querySelector(`${t} .tt-res.tt-${k} b`).textContent),
+    ...[...document.querySelectorAll(`${t} .tt-groups input[type=radio]`)].map((r) => r.closest('label').textContent.trim()),
+    document.querySelector(`${t} .tt-res.tt-nand`).title, document.querySelector(`${t} .tt-res.tt-nor`).title,
+  ], T), ['SdP mínima', 'PdS mínimo', 'Grupos SdP (1s)', 'Grupos PdS (0s)',
+    'A SdP mínima só com portas NAND (dupla negação); um inversor é uma NAND de uma entrada', 'O PdS mínimo só com portas NOR (dupla negação); um inversor é uma NOR de uma entrada']);
+  assert.doesNotMatch(await page.eval((t) => document.querySelector(t).innerText, T), /\b(SOP|POS)\b/, 'no SOP nor POS left');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // 8 inputs: 255 minterms of 8 literals, one maxterm; the expressions wrap, the panel does not scroll sideways
   await open(page, 'src/w.bool.json');
