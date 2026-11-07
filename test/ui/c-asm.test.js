@@ -92,6 +92,7 @@ void sums(hls::stream<int> &in, hls::stream<int> &out) {
 }
 `;
 
+// (#3026: no S7 since a stream's read is made in the state that computes with its value, #2967: 5 states, not 8)
 uiTest('#1927 the ASM chart of a free-running C module (ap_ctrl_none): no ap_start decision, IDLE and DONE setting nothing, its inputs and outputs the module\'s ports', E, async (page) => {
   await makeProject(env, { name: 'CAsmFree', top: 'sums', files: { 'src/sums.cpp': FREE } });
   await page.openProject('CAsmFree');
@@ -114,7 +115,7 @@ uiTest('#1927 the ASM chart of a free-running C module (ap_ctrl_none): no ap_sta
     };
   });
   assert.deepEqual(view, {
-    banner: 'Read-only, the state machine made from sums.cpp', states: ['IDLE', 'S1', 'S7', 'DONE'], protocol: [], decisions: ['i < 3'],
+    banner: 'Read-only, the state machine made from sums.cpp', states: ['IDLE', 'S1', 'DONE'], protocol: [], decisions: ['i < 3'],
     inputs: ['in_r_dout', 'in_r_empty_n', 'out_r_full_n'], outputs: ['in_r_read', 'out_r_din', 'out_r_write'], readOnly: true,
   });
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
