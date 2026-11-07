@@ -1,6 +1,6 @@
 // UI: the Boolean Algebra editor's minimal solutions (#2928): a minimal SOP or POS with several has its selector in the
 // Karnaugh map's section, for the groups the map shows (#2950): "N minimal solutions exist.", previous / next (round),
-// "Solution 2 of N"; the solution chosen is the one used: its expression, cost, circuit, NAND / NOR form, the map's groups
+// "Solution 2 of N" (there only, not in the results, #3060); the solution chosen is the one used: its expression, cost, circuit, NAND / NOR form, the map's groups
 // (flat, 3D, the cylinder, #2925; in either variable order, #2924), saved in the table and in its HDL module; a cell changed: the first again; "Many" at the cap, its first
 // 64 browsed; printed as shown; Undo; in Portuguese.
 import { before, after } from 'node:test';
@@ -47,14 +47,14 @@ uiTest('#2950 several minimal solutions: the selector on the Karnaugh map; the o
   await capturePrints(page);
   await open(page, 'src/cyc.bool.json');
   const s1 = await shownOf(page);
-  assert.deepEqual([s1.expr, s1.count, s1.sol, s1.notes, s1.inResults], ['f = /a./b + b./c + a.c', '2 minimal solutions exist.', 'Solution 1 of 2', ['Solution 1 of 2'], false]);
+  assert.deepEqual([s1.expr, s1.count, s1.sol, s1.notes, s1.inResults], ['f = /a./b + b./c + a.c', '2 minimal solutions exist.', 'Solution 1 of 2', [], false]);
   assert.deepEqual(s1.groups, ['/a./b', 'b./c', 'a.c'], 'the map\'s groups: the first solution');
   assert.equal(s1.cost, '3 term(s), 6 literal(s); gates: 3 AND, 1 OR, 3 NOT (9 gate inputs)');
   const flat1 = await groupRects(page);
   // next: the second solution, used: its groups, its NAND form, the table, its module
   await solClick(page, 'next');
   const s2 = await shownOf(page);
-  assert.deepEqual([s2.expr, s2.sol, s2.notes, s2.count], ['f = /a./c + /b.c + a.b', 'Solution 2 of 2', ['Solution 2 of 2'], '2 minimal solutions exist.']);
+  assert.deepEqual([s2.expr, s2.sol, s2.notes, s2.count], ['f = /a./c + /b.c + a.b', 'Solution 2 of 2', [], '2 minimal solutions exist.']);
   assert.deepEqual(s2.groups, ['/a./c', '/b.c', 'a.b']);
   assert.deepEqual([s2.cost, s2.circuit], [s1.cost, s1.circuit]);
   assert.notEqual(await groupRects(page), flat1, 'the flat map\'s groups changed');
@@ -68,7 +68,8 @@ uiTest('#2950 several minimal solutions: the selector on the Karnaugh map; the o
   await confirmPrint(page);
   const html = await printed(page, 1), body = html.slice(html.indexOf('<main'));
   assert.ok(body.includes('f = /a./c + /b.c + a.b'), 'the solution used');
-  assert.ok(body.includes('<span class="tt-note tt-sol-of">Solution 2 of 2</span>'), 'its number');
+  assert.ok(body.includes('<span class="tt-sol-n">Solution 2 of 2</span>'), 'its number, the map\'s');
+  assert.ok(!body.includes('tt-sol-of'), 'not in the results (#3060)');
   assert.ok(!body.includes('tt-sol-btn'), 'not the selector\'s buttons');
   // with the map's variable order (#2924): the selector and the solution used kept, the groups drawn in that order
   await page.fill(`${T} .tt-kmap-order`, 'rows');
@@ -106,9 +107,9 @@ uiTest('#2950 several minimal solutions: the selector on the Karnaugh map; the o
   assert.deepEqual([(await shownOf(page)).sol, (await model(page)).solutions], ['Solution 1 of 2', undefined]);
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  const pt = await page.eval((t) => { const k = document.querySelector(`${t} .tt-kmap-host`); return [k.querySelector('.tt-sol-count').textContent, k.querySelector('.tt-sol-n').textContent, k.querySelector('.tt-sol-prev').title, k.querySelector('.tt-sol-next').title, document.querySelector(`${t} .tt-sol-of`).textContent]; }, T);
+  const pt = await page.eval((t) => { const k = document.querySelector(`${t} .tt-kmap-host`); return [k.querySelector('.tt-sol-count').textContent, k.querySelector('.tt-sol-n').textContent, k.querySelector('.tt-sol-prev').title, k.querySelector('.tt-sol-next').title]; }, T);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  assert.deepEqual(pt, ['Existem 2 soluções mínimas.', 'Solução 1 de 2', 'Solução anterior', 'Solução seguinte', 'Solução 1 de 2']);
+  assert.deepEqual(pt, ['Existem 2 soluções mínimas.', 'Solução 1 de 2', 'Solução anterior', 'Solução seguinte']);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
 
