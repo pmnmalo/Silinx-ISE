@@ -61,11 +61,11 @@ function bestForm(doc, out, goal, label, tip, notation, tick) {
     h('div', {}, h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(r.ast, notation)}`)), circuit(r.ast));
 }
 
-// the canonical forms in full, the sum of the minterms and the product of the maxterms (#2927), each with the list of
-// its terms under it (#2952), each with its tick box (#2951)
+// the canonical forms in full, the sum of the minterms and the product of the maxterms (#2927), each the list of its
+// terms first (#2952), its full expression under it (#3069), each with its tick box (#2951)
 function canonForms(A, out, notation, tick) {
   const expr = (f, label, title, ast, list) => h('div', { class: `tt-canon-${f.slice(1)}`, title }, tick(f), h('b', {}, label), ': ',
-    h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`), h('br'), h('code', { class: 'tt-canon-list', 'data-no-i18n': '' }, `${out} = ${list}`));
+    h('code', { class: 'tt-canon-list', 'data-no-i18n': '' }, `${out} = ${list}`), h('br'), h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(ast, notation)}`));
   return h('div', { class: 'tt-res tt-canon' },
     expr('csop', 'Canonical SOP', 'The sum of the minterms: every input in every term, the don\'t cares left out', A.canon.sop, A.sigma),
     expr('cpos', 'Canonical POS', 'The product of the maxterms: every input in every term, the don\'t cares left out', A.canon.pos, A.pi));

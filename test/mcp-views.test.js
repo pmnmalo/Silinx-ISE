@@ -71,15 +71,16 @@ test('related_view: a truth table\'s results, as its editor shows them: the cano
   await call('write_file', { project: 'q', path: 'src/m.bool.json', text: JSON.stringify({ ...newTable('m', ['a', 'b', 'c'], ['f', 'z']), table: { f: '01X10X10', z: '00000000' } }) });
   const before = files('q');
   const r = await ok({ project: 'q', path: 'src/m.bool.json', view: 'results', notation: 'textbook' });
-  // (the editor's order, #3065: the circuit's two choices, the minimal forms, the canonical ones, XOR, NAND, NOR)
+  // (the editor's order, #3065: the circuit's two choices, the minimal forms, the canonical ones (their list, then their
+  // expression, #3069), XOR, NAND, NOR)
   assert.equal(r.text, `Least number of gates: XOR form: f = c ⊕ a·b
 Least delay: XOR form: f = c ⊕ a·b
 Minimal SOP: f = a'·c + b·c'   (2 term(s), 4 literal(s))
 Minimal POS: f = (b + c)·(a' + c')   (2 term(s), 4 literal(s))
-Canonical SOP: f = a'·b'·c + a'·b·c + a·b·c'
-  f = Σm(1, 3, 6) + d(2, 5)
-Canonical POS: f = (a + b + c)·(a' + b + c)·(a' + b' + c')
-  f = ΠM(0, 4, 7) · D(2, 5)
+Canonical SOP: f = Σm(1, 3, 6) + d(2, 5)
+  f = a'·b'·c + a'·b·c + a·b·c'
+Canonical POS: f = ΠM(0, 4, 7) · D(2, 5)
+  f = (a + b + c)·(a' + b + c)·(a' + b' + c')
 XOR form: f = c ⊕ a·b
 NAND form: f = ((a'·c)'·(b·c')')'
 NOR form: f = ((b + c)' + (a' + c')')'
@@ -89,10 +90,10 @@ Least number of gates: Minimal SOP: z = 0
 Least delay: Minimal SOP: z = 0
 Minimal SOP: z = 0   (0 term(s), 0 literal(s))
 Minimal POS: z = 0   (1 term(s), 0 literal(s))
-Canonical SOP: z = 0
-  z = Σm()
-Canonical POS: z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')
-  z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
+Canonical SOP: z = Σm()
+  z = 0
+Canonical POS: z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)
+  z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')
 NAND form: z = 0
 NOR form: z = 0
 HDL logic: Least number of gates: z = 0   (least gates: minimal SOP, 0 literal(s), 0 gate(s), delay 0)`);

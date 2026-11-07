@@ -98,7 +98,7 @@ async function tableResults(name, rel, doc, notation) {
     `Least number of gates: ${r.leastGates.form}: ${r.leastGates.expr}`, `Least delay: ${r.leastDelay.form}: ${r.leastDelay.expr}`,
     `Minimal SOP: ${r.minimalSop.expr}   (${r.minimalSop.terms} term(s), ${r.minimalSop.literals} literal(s))`, ...solutionLines(r.minimalSop),
     `Minimal POS: ${r.minimalPos.expr}   (${r.minimalPos.terms} term(s), ${r.minimalPos.literals} literal(s))`, ...solutionLines(r.minimalPos),
-    `Canonical SOP: ${r.canonicalSop}`, `  ${r.minterms}`, `Canonical POS: ${r.canonicalPos}`, `  ${r.maxterms}`,   // (each with its list, #2952)
+    `Canonical SOP: ${r.minterms}`, `  ${r.canonicalSop}`, `Canonical POS: ${r.maxterms}`, `  ${r.canonicalPos}`,   // (its list, #2952, then its expression, #3069)
     ...(r.xor ? [`XOR form: ${r.xor}`] : []), `NAND form: ${r.nand}`, `NOR form: ${r.nor}`,
     `HDL logic: ${r.hdlLogic.name}: ${r.hdlLogic.expr}   (${r.hdlLogic.what})`, '']);
   return { text: lines.join('\n').trimEnd(), data: { project: name, path: rel, view: 'results', notation, inputs: m.inputs, outputs } };
