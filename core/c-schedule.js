@@ -16,7 +16,7 @@
 import { bindable, bindMuls } from './c-bind.js';
 import { fsmd } from './c-fsmd.js';
 import { hdlName } from './c-graph.js';
-import { splitMuls } from './c-mul-split.js';
+import { operandOf, splitMuls } from './c-mul-split.js';
 import { BOOL } from './c-types.js';
 import { DEFAULT_CLOCK, UNCERTAINTY, nodeDelay } from './c-timing.js';
 
@@ -95,12 +95,23 @@ function schedule({ graph: g, states, stateT, done, piped }, budget, family, mul
   const bound = bindMuls(g, r.states, stateT, { family, budget, always: mults != null });
   // (the longest path once bound, the units' multiplexers in it: what a state does not choose counts for the tools too)
   const unitsNs = bound.units.some((u) => u.inputs > 1) ? longestOf(g, bound.states, family) : 0;
-  return { ...r, ...bound, unitsNs, slow };
+  // (the device's blocks shared and their multiplexers over the period: each multiplication's operands held in the unit's
+  // registers, written the cycle before it, the multiplexers before them, #2273; kept when the path is shorter so)
+  if (mults != null && unitsNs > budget) {
+    const plansH = sts.map((st) => (piped.has(st.id) || !splittable(g, st) ? null : stagesOf(g, st, budget, family, mults, true)));
+    const extraH = plansH.reduce((a, p) => a + (p ? p.n - 1 : 0), 0);
+    if ((done + extraH).toString(2).length > stateT.w) return { overflow: extraH };
+    const rH = split(g, sts, plansH, stateT, done, mults);
+    const boundH = bindMuls(g, rH.states, stateT, { family, budget, always: true, held: rH.operands });
+    const nsH = Math.max(boundH.heldNs, boundH.units.some((u) => u.inputs > 1) ? longestOf(g, boundH.states, family) : 0);
+    if (nsH < unitsNs) return { ...rH, ...boundH, regs: [...rH.regs.filter((x) => !boundH.dropped.has(x.name)), ...boundH.regs], unitsNs: nsH, slow };
+  }
+  return { ...r, ...bound, regs: r.regs, unitsNs, slow };
 }
 
 /** A state's operations by the cycle they run in: { n: cycles, stage: Map node -> cycle }, or null when it fits one
  *  cycle. */
-function stagesOf(g, st, budget, family, mults) {
+function stagesOf(g, st, budget, family, mults, held = false) {
   const stage = new Map(), at = new Map(), taken = [];
   let n = 1;
   for (const node of g.needed(rootsOf(g, st))) {
@@ -114,6 +125,8 @@ function stagesOf(g, st, budget, family, mults) {
     if (d > 0 && t > 0 && t + d > budget) { s++; t = 0; }
     // (the multiplier blocks of this cycle all taken: a later one's)
     if (mults != null && bindable(g, node)) {
+      // (its operands held in registers, written the cycle before: a cycle of its own, #2273)
+      if (held) { s++; t = 0; }
       while ((taken[s] || 0) >= mults) { s++; t = 0; }
       taken[s] = (taken[s] || 0) + 1;
     }
@@ -121,11 +134,11 @@ function stagesOf(g, st, budget, family, mults) {
     at.set(node.id, t + d);
     n = Math.max(n, s + 1);
   }
-  return n > 1 ? { n, stage } : null;
+  return n > 1 ? { n, stage, ...(held ? { held: true } : {}) } : null;
 }
 
-function split(g, sts, plans, stateT, done) {
-  const regs = [], states = [], subStates = new Map();
+function split(g, sts, plans, stateT, done, mults = null) {
+  const regs = [], states = [], subStates = new Map(), operands = new Map();
   let id = done;
   sts.forEach((st, k) => {
     const p = plans[k];
@@ -141,6 +154,21 @@ function split(g, sts, plans, stateT, done) {
       }
       return cut.get(v).node;
     };
+    // (held: a multiplication's operands in registers of their own, written the cycle before it, #2273; a register holds
+    // the value an extension widens, as core/c-mul-split.js's operandOf takes it; a constant stays one)
+    const held = [];
+    const operand = (v, k) => {
+      const node = g.get(v), a = node.args[k], [base] = operandOf(g, a, node.s), b = g.get(base);
+      if (b.op === 'const') return null;
+      let h = held.find((x) => x.v === v && x.k === k);
+      if (!h) {
+        const name = `s${st.id}_u${v}_${k}`, t = { w: b.w, s: b.s };
+        h = { v, k, base, reg: { name, w: t.w, s: t.s, t, reset: 0n, latch: null }, node: g.add('reg', [], t, { port: { key: `reg:${name}`, name: `ap_r_${hdlName(name)}` } }) };
+        regs.push(h.reg);
+        held.push(h);
+      }
+      return base === a ? h.node : g.add('ext', [h.node], { w: g.get(a).w, s: g.get(a).s });
+    };
     // a node as the cycle `c` computes it: its operands of an earlier cycle read from their registers
     const at = (c) => {
       const memo = new Map();
@@ -148,6 +176,12 @@ function split(g, sts, plans, stateT, done) {
         const node = g.get(v);
         if (!node.args.length || !p.stage.has(v)) return v;
         const s = p.stage.get(v);
+        if (p.held && s === c && s > 0 && mults != null && bindable(g, node)) {
+          if (memo.has(v)) return memo.get(v);
+          const r = g.add(node.op, node.args.map((a, k) => operand(v, k) ?? f(a)), { w: node.w, s: node.s }, extraOf(node));
+          memo.set(v, r);
+          return r;
+        }
         // (a value widened: its register as narrow as the value, a multiplication then knowing its operand's width, #1961)
         if (s < c && node.op === 'ext' && g.get(node.args[0]).w < node.w) return g.add('ext', [f(node.args[0])], { w: node.w, s: node.s });
         if (s < c) return cutReg(v);
@@ -164,13 +198,15 @@ function split(g, sts, plans, stateT, done) {
     const end = rebuilt(g, st, at(last), stateT, ids[last]);
     // (the cycles before the last, from the last back: each writes the registers of the values it computes for a later
     // one, those its own operations read from an earlier one known before that one is made)
-    const handOn = Array.from({ length: last }, () => new Map());
+    const handOn = Array.from({ length: last }, () => new Map()), holds = Array.from({ length: last }, () => new Map());
     for (let c = last - 1; c >= 0; c--) {
       const f = at(c);
+      // (the operands held for a multiplication of the next cycle)
+      for (const h of held) if (p.stage.get(h.v) === c + 1 && !holds[c].has(h.reg.name)) { holds[c].set(h.reg.name, f(h.base)); operands.set(h.reg.name, { writer: ids[c], user: ids[c + 1] }); }
       for (const v of [...cut.keys()]) if (p.stage.get(v) === c) handOn[c].set(v, f(v));
     }
     for (let c = 0; c < last; c++) {
-      const u = new Map();
+      const u = new Map(holds[c]);
       for (const [v, val] of handOn[c]) u.set(cut.get(v).reg.name, val);
       // (a stream's read with what computes with its value, #2967: the wait in the first, the value then there until
       // the last takes it)
@@ -180,7 +216,7 @@ function split(g, sts, plans, stateT, done) {
     }
     states.push({ ...end, id: ids[last], sub: true });
   });
-  return { states, regs, subStates };
+  return { states, regs, subStates, operands };
 }
 
 const extraOf = (node) => {
