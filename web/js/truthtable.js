@@ -259,6 +259,7 @@ export function mountTtEditor(container, opts = {}) {
       const r = h('input', { type: 'radio', name: `tt-grp-${uid}`, value: g, checked: groups === g, onchange: () => { groups = g; renderKmap(); } });
       grpSel.append(h('label', { class: 'tt-check' }, r, ` ${label}`));
     }
+    if (n >= 2) grpSel.append(h('div', { class: 'tt-groups-br' }));   // (Order and 3D on the line below, #3063)
     if (n >= 2) grpSel.append(kmapOrderSelect(M.kmapOrder, o => { if (o === 'rows') M.kmapOrder = 'rows'; else delete M.kmapOrder; changed(); }));
     const L = kmapLayout(n, M.kmapOrder || 'cols');
     const res = groups === 'pos' ? A.pos : A.sop, k = res.alternatives.length;
