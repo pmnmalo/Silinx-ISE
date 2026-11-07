@@ -7,20 +7,19 @@
 
 import { h } from './ui.js';
 import { kmapSolid, kmapSceneSide } from '/core/kmap3d.js';
-import { surfaceBox, surfaceOn, mountKmapSurface } from './tt-kmapsurface.js';
+import { surfaceBox, mountKmapSurface } from './tt-kmapsurface.js';
 
 const C = 40;      // a cell's side (px)
 const GAP = 90;    // between layers (px)
 const TITLE = 22;  // a layer's title, over it (px)
 const PERSPECTIVE = 1100;
 let view = { rx: -28, ry: 32 };   // (kept between redraws, as the viewer left it)
-let on = false;                   // (the 3D box ticked: every table's map of 5 or 6 inputs in 3D)
 
 /** A cell's value as the map shows it: SOP groups the 1s, its 0s left blank; POS the 0s, its 1s blank (X always, #1494). */
 export const cellText = (v, groups) => (v === (groups === 'pos' ? '1' : '0') ? '' : v);
-/** The 3D box of the K-map's options (`changed`: the map drawn again). */
-export function k3dBox(changed) {
-  const c = h('input', { type: 'checkbox', class: 'tt-k3d-on', checked: on, onchange: () => { on = c.checked; changed(); } });
+/** The 3D box of the K-map's options: `d3` the editor's ({ on }, #3074: each table its own), `changed` the map drawn again. */
+export function k3dBox(d3, changed) {
+  const c = h('input', { type: 'checkbox', class: 'tt-k3d-on', checked: d3.on, onchange: () => { d3.on = c.checked; changed(); } });
   return h('label', { class: 'tt-check', title: 'The maps stacked in depth: a group across maps seen as one box' }, c, ' 3D');
 }
 
@@ -100,12 +99,13 @@ export function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCel
 }
 
 /** The K-map in `host`: its flat `svg`, or in 3D when the 3D box is ticked (added to `options`, its Reset view right
- *  after it, #1567): the maps of 5 or 6 inputs stacked, the map of 3 or 4 on a cylinder or a torus (#2925). */
-export function placeKmap({ host, options, svg, changed, ...map }) {
+ *  after it, #1567): the maps of 5 or 6 inputs stacked, the map of 3 or 4 on a cylinder or a torus (#2925). `d3`: the
+ *  editor's 3D box ({ on }), its own, not every table's (#3074). */
+export function placeKmap({ host, options, svg, changed, d3, ...map }) {
   const n = map.layout.n;
-  if (n >= 5) options.append(k3dBox(changed));
-  if (n === 3 || n === 4) options.append(surfaceBox(n, changed));
-  if (n >= 5 && on) options.append(mountKmap3d(host, map).reset);
-  else if ((n === 3 || n === 4) && surfaceOn()) options.append(mountKmapSurface(host, { ...map, cellText }).reset);
+  if (n >= 5) options.append(k3dBox(d3, changed));
+  if (n === 3 || n === 4) options.append(surfaceBox(n, d3, changed));
+  if (n >= 5 && d3.on) options.append(mountKmap3d(host, map).reset);
+  else if ((n === 3 || n === 4) && d3.on) options.append(mountKmapSurface(host, { ...map, cellText }).reset);
   else host.append(svg);
 }

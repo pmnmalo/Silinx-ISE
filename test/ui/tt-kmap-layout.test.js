@@ -86,7 +86,7 @@ uiTest('#3059 #3067 Karnaugh map: at the section\'s left, the legend right after
       laidOut(await place(page), `${at} ${k}`, await several());
       if (k === 'k2') continue;
       await d3(); laidOut(await place(page), `${at} ${k} in 3D`, await several());
-      await d3();   // (the 3D box is shared by every table: left as it was found)
+      await d3();   // (the 3D box left as it was found)
     }
   }
   await page.setViewport(1400, 900);
@@ -134,7 +134,7 @@ uiTest('#3063 Karnaugh map: Order and 3D on a line of their own, under SOP / POS
     await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T);
     await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d-reset`), [T], { what: 'Reset view' });
     two(await optionLines(page), ['order', '3d', 'reset'], `${w}px 6 inputs in 3D`, w > 1000);
-    await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T);   // (the 3D box is shared by every table)
+    await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T);   // (the 3D box left as it was found)
   }
   await page.setViewport(1400, 900);
 });

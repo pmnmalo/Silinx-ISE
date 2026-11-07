@@ -206,6 +206,7 @@ export function mountTtEditor(container, opts = {}) {
   const OPS = "Operators: / ' ~ (NOT), . · * (AND), ⊕ ^ or xor (XOR), xnor, + (OR)";
   exprIn.title = OPS;
   const kmapHost = h('div', { class: 'tt-kmap-host' });
+  const d3 = { on: false };   // (the map's 3D box: this table's, unticked when opened, #3074)
   const grpSel = h('div', { class: 'tt-groups' });
   const results = h('div', { class: 'tt-results' });
   const right = h('div', { class: 'tt-right' },
@@ -315,7 +316,7 @@ export function mountTtEditor(container, opts = {}) {
       svg.append(gl);
       svg.append(sv('rect', { x: ox, y: oy, width: gw, height: gh, class: 'tt-k-frame' }));
     });
-    placeKmap({ host: kmapHost, options: grpSel, svg, changed: () => renderKmap(), layout: L, col: M.table[out], terms: res.terms, groups, colors: COLORS, onCell: mt => cycle(out, mt), title: c => `${vn(L.mapVars)} = ${bits(c, L.mapVars.length)}` });   // (3D: #1407)
+    placeKmap({ host: kmapHost, options: grpSel, svg, changed: () => renderKmap(), d3, layout: L, col: M.table[out], terms: res.terms, groups, colors: COLORS, onCell: mt => cycle(out, mt), title: c => `${vn(L.mapVars)} = ${bits(c, L.mapVars.length)}` });   // (3D: #1407)
     // legend: one line per group
     const leg = h('div', { class: 'tt-legend' });
     res.terms.forEach((t, ti) => {

@@ -89,8 +89,10 @@ uiTest('#2925 Truth Table: the Karnaugh map of 3 inputs on a cylinder, of 4 on a
   await page.click(await seen(m));
   await page.click(await seen(m));
   await page.waitFor((t, k) => document.querySelector(`${t} .tt-ks-face[data-row="${k}"]`)?.classList.contains('v0'), [T, m], { what: `m${m} back to 0` });
-  // 4 inputs: the torus kept, the four corners one patch, its four sides outlined
+  // 4 inputs: flat at first (each table its own 3D box, #3074), then the torus, the four corners one patch, its four sides outlined
   await open('src/k4.bool.json');
+  assert.ok(await page.eval((t) => !!document.querySelector(`${t} svg.tt-kmap`) && !document.querySelector(`${t} .tt-k3d-on`).checked, T), 'k4 flat at first');
+  await page.click(`${T} .tt-k3d-on`);
   await page.waitFor((t) => !!document.querySelector(`${t} .tt-ks`), [T], { what: 'the torus' });
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).closest('label').title, T), 'The map on a torus: both pairs of its edges joined');
   const s4 = await shape();

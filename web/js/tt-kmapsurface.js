@@ -13,15 +13,13 @@ const CELL = 80;           // a cell's side along the surface (px)
 const PERSPECTIVE = 900;
 const HOME = { rx: -30, ry: 20 };
 let view = { ...HOME };    // (kept between redraws, as the viewer left it)
-let on = false;            // (the 3D box ticked: every table's map of 3 or 4 inputs on its surface)
 
-/** The 3D box of a map of 3 or 4 inputs (`changed`: the map drawn again). */
-export function surfaceBox(n, changed) {
-  const c = h('input', { type: 'checkbox', class: 'tt-k3d-on', checked: on, onchange: () => { on = c.checked; changed(); } });
+/** The 3D box of a map of 3 or 4 inputs: `d3` the editor's ({ on }, #3074), `changed` the map drawn again. */
+export function surfaceBox(n, d3, changed) {
+  const c = h('input', { type: 'checkbox', class: 'tt-k3d-on', checked: d3.on, onchange: () => { d3.on = c.checked; changed(); } });
   const tip = { 3: { title: 'The map rolled into a cylinder: the cells across its edges joined' }, 4: { title: 'The map on a torus: both pairs of its edges joined' } }[n];
   return h('label', { class: 'tt-check', ...tip }, c, ' 3D');
 }
-export const surfaceOn = () => on;
 
 /**
  * The map on its surface in `host`: { layout, col (the output's column), terms (the groups), groups ('sop' | 'pos'),
