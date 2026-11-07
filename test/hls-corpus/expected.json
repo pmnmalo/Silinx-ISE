@@ -224,9 +224,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 13283,
-      "max": 13283,
-      "avg": 13283
+      "min": 13282,
+      "max": 13282,
+      "avg": 13282
     },
     "reason": null
   },
@@ -291,8 +291,8 @@
     "cosim": "pass",
     "latency": {
       "min": 6,
-      "max": 7,
-      "avg": 6.6
+      "max": 6,
+      "avg": 6
     },
     "reason": null
   },
@@ -301,9 +301,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 24619,
-      "max": 24619,
-      "avg": 24619
+      "min": 18648,
+      "max": 18648,
+      "avg": 18648
     },
     "reason": null
   },
@@ -335,8 +335,8 @@
     "cosim": "pass",
     "latency": {
       "min": 6,
-      "max": 7,
-      "avg": 6.6
+      "max": 6,
+      "avg": 6
     },
     "reason": null
   },
@@ -499,9 +499,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 13,
-      "max": 14,
-      "avg": 13.25
+      "min": 6,
+      "max": 9,
+      "avg": 7.5
     },
     "reason": null
   },
@@ -510,9 +510,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 13,
-      "max": 13,
-      "avg": 13
+      "min": 6,
+      "max": 6,
+      "avg": 6
     },
     "reason": null
   },
@@ -689,9 +689,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 594,
-      "max": 594,
-      "avg": 594
+      "min": 530,
+      "max": 530,
+      "avg": 530
     },
     "reason": null
   },
@@ -700,9 +700,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 594,
-      "max": 594,
-      "avg": 594
+      "min": 530,
+      "max": 530,
+      "avg": 530
     },
     "reason": null
   },
@@ -711,9 +711,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 152,
-      "max": 152,
-      "avg": 152
+      "min": 120,
+      "max": 120,
+      "avg": 120
     },
     "reason": null
   },
@@ -722,9 +722,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 152,
-      "max": 152,
-      "avg": 152
+      "min": 120,
+      "max": 120,
+      "avg": 120
     },
     "reason": null
   },
@@ -755,9 +755,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 602,
-      "max": 603,
-      "avg": 602.6666666666666
+      "min": 430,
+      "max": 431,
+      "avg": 430.6666666666667
     },
     "reason": null
   },
@@ -766,9 +766,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 157,
-      "max": 157,
-      "avg": 157
+      "min": 139,
+      "max": 139,
+      "avg": 139
     },
     "reason": null
   },
@@ -777,9 +777,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 60,
-      "max": 60,
-      "avg": 60
+      "min": 45,
+      "max": 45,
+      "avg": 45
     },
     "reason": null
   },
@@ -788,9 +788,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 108,
-      "max": 110,
-      "avg": 109
+      "min": 76,
+      "max": 77,
+      "avg": 76.25
     },
     "reason": null
   }
