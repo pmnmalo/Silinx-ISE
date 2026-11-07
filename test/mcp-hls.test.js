@@ -1,6 +1,6 @@
 // The MCP server's tools of a C or C++ source (#2674, server/mcp-hls.js), as the C module's processes: C Simulation and
 // C/RTL Co-simulation of the test designs (fir, gcd, sort, popcount; stream_sum in C++), the co-simulation in VHDL and
-// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit); the HDL and the ASM chart made from the C; a C with an error; the errors.
+// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -161,4 +161,20 @@ test('#2342 an RTL blackbox\'s files written while the project is open: the next
   // the C model changed: the C simulation runs it
   await ok('write_file', { project: 'bbedit', path: 'src/msum.cpp', text: MSUM_C.replace('m[i] = m[i] + 1', 'm[i] = m[i] + 2') });
   assert.equal((await ok('c_simulation', { project: 'bbedit', path: 'src/top.cpp' })).data.exitCode, 2);
+});
+
+// (#2995) a blackbox refused: check_syntax of the top (the C's module) says the description's error, in its file, not that
+// the module is missing, as the interface's Check Syntax; corrected, the module again
+test('#2995 an RTL blackbox refused: check_syntax of the C\'s module says the description\'s error, not a missing top; no warnings', async () => {
+  await ok('new_project', { name: 'bbcheck' });
+  for (const [path, text] of [['src/msum.json', JSON.stringify(MDESC(), null, 2)], ['src/msum.cpp', MSUM_C], ['src/msum.v', MSUM_V], ['src/top.cpp', EXT]]) await ok('write_file', { project: 'bbcheck', path, text });
+  await ok('set_top', { project: 'bbcheck', top: 'top' });
+  const a = await ok('check_syntax', { project: 'bbcheck' });
+  assert.deepEqual([a.data.ok, a.data.errors, a.data.warnings], [true, [], []]);
+  await ok('write_file', { project: 'bbcheck', path: 'src/msum.v', text: MSUM_V.split('m_q0').join('m_qq') });
+  const b = await ok('check_syntax', { project: 'bbcheck' });
+  assert.deepEqual([b.data.ok, b.data.errors, b.data.warnings], [false, [{ severity: 'error', file: 'src/msum.json', line: 1, col: 1, tool: 'SilinxC', message: "syn.blackbox: msum.json: the argument 'm': the module 'msum' has no port 'm_q0'" }], []]);
+  assert.equal(b.text, `ERROR:SilinxC - "src/msum.json" Line 1: syn.blackbox: msum.json: the argument 'm': the module 'msum' has no port 'm_q0'\nProcess "Check Syntax" of <top> failed (1 error(s), 0 warning(s)).`);
+  await ok('write_file', { project: 'bbcheck', path: 'src/msum.v', text: MSUM_V });
+  assert.equal((await ok('check_syntax', { project: 'bbcheck' })).data.ok, true);
 });

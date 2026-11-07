@@ -164,7 +164,7 @@ uiTest('#2342 Silinx HLS: an RTL blackbox\'s module, description and C model edi
     await page.eval(([a, b]) => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().split(a).join(b)); }, [from, to]);
     await page.eval(() => window.SilinxApp.saveAll());
   };
-  // the module's port renamed: the description's no longer there, the C's module not made (#2995: not said yet)
+  // the module's port renamed: the description's no longer there, the C's module not made (#2995: said, its row marked)
   await edit('src/msum.v', 'm_q0', 'm_qq');
   await page.waitFor(() => !window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module gone' });
   // the description corrected: the module again, joined to the new port
@@ -177,5 +177,57 @@ uiTest('#2342 Silinx HLS: an RTL blackbox\'s module, description and C model edi
   await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
   await page.waitConsole(/Process "C Simulation" (completed successfully|failed)/);
   assert.match(await page.consoleText(), /main\(\) returned 2; 1 call\(s\) of 'top'\./);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// (#2995) a blackbox refused (its module's port renamed): the C's Design row kept, marked [No HDL], its error in the
+// Console once, the top kept; Check Syntax of the C checks the description too (its error and the new input's warning);
+// the module corrected, the row the C's module's again. Portuguese: the badge's tip.
+uiTest('#2995 Silinx HLS: an RTL blackbox refused: the C\'s Design row marked, its error in the Console, the top kept; Check Syntax of the C checks the description; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxNo', top: 'top', files: { 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxNo');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module' });
+  assert.deepEqual(await row(page, 'top'), { badges: ['C++*', 'ASM', 'VHDL'], meta: '(top.cpp)' });
+  const save = async (path, text) => {
+    await page.eval((f) => window.SilinxApp.openFile(f), path);
+    await page.waitFor((f) => window.Silinx.active?.id === `file:${f}` && window.Silinx.active.editor, [path]);
+    await page.eval((t) => window.Silinx.active.editor.setValue(t), text);
+    await page.eval(() => window.SilinxApp.saveAll());
+  };
+  const NO_PORT = `"src/msum.json" Line 1: syn.blackbox: msum.json: the argument 'm': the module 'msum' has no port 'm_q0'`;
+  const SAID = `The HDL of src/top.cpp cannot be made (its module top is not in the design):\nERROR:SilinxC - ${NO_PORT}`;
+  const said = async () => (await page.consoleText()).split(SAID).length - 1;
+  await save('src/msum.v', MSUM_V.split('m_q0').join('m_qq'));
+  await page.waitFor(() => !window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module not made' });
+  await page.leftTab('design');
+  assert.deepEqual(await row(page, 'top'), { badges: ['C++*', 'No HDL'], meta: '(top.cpp)' });
+  assert.equal(await page.eval(() => [...document.querySelectorAll('#hier .row')].find((x) => x.querySelector('.lbl')?.textContent.trim() === 'top').querySelectorAll('.badge')[1].title), 'Its HDL cannot be made: its errors are in the Console');
+  assert.equal(await said(), 1);
+  assert.equal(await page.eval(() => window.SilinxApp.S.project.top), 'top');
+  // (saved again, the same error: said once)
+  await save('src/msum.v', `${MSUM_V.split('m_q0').join('m_qq')}\n`);
+  assert.equal(await said(), 1);
+  // Check Syntax of the C: the description's error and the module's new input's warning
+  await page.eval(async () => (await import('/js/processes.js')).checkFileSyntax('src/top.cpp'));
+  await page.waitConsole(/Process "Check Syntax" (completed successfully|failed)/);
+  const text = await page.consoleText();
+  assert.ok(text.includes(`Top function: top\nERROR:SilinxC - ${NO_PORT}\nWARNING:SilinxC - "src/msum.json" Line 1: syn.blackbox: msum.json: the input 'm_qq' of 'msum' is not in the description: left unconnected\n\nProcess "Check Syntax" failed (1 error(s), 1 warning(s))`), text.slice(-800));
+  // Check Syntax of the design (the top, the C's module): the same error, not a missing top
+  await page.eval(async () => (await import('/js/processes.js')).checkSyntax('top'));
+  await page.waitConsole(/Started : "Check Syntax"\.[\s\S]*Process "Check Syntax" (completed successfully|failed)/);
+  assert.match(await page.consoleText(), new RegExp(`Started : "Check Syntax"\\.\\n\\n(?:[^\\n]*file "[^"]*" into library work\\n)*ERROR:SilinxC - ${NO_PORT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\nProcess "Check Syntax" failed \\(1 error\\(s\\), 0 warning\\(s\\)\\)$`));
+  // in Portuguese: the badge's tip
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.leftTab('design');
+  assert.equal(await page.eval(() => [...document.querySelectorAll('#hier .row')].find((x) => x.querySelector('.lbl')?.textContent.trim() === 'top').querySelectorAll('.badge')[1].title), 'O seu HDL não pode ser gerado: os seus erros estão na Consola');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  // the module corrected: the C's module again
+  await save('src/msum.v', MSUM_V);
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module again' });
+  await page.leftTab('design');
+  assert.deepEqual(await row(page, 'top'), { badges: ['C++*', 'ASM', 'VHDL'], meta: '(top.cpp)' });
+  assert.equal(await said(), 1);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });

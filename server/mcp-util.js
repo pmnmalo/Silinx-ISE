@@ -46,13 +46,16 @@ export async function readProject(name) {
 }
 
 // the HDL of a view (the project's sources of that view and the HDL of its drawings), as the
-// application's Check Syntax and simulation take it; sim: the simulation view
-export async function viewSourcesOf(name, project, sim) {
+// application's Check Syntax and simulation take it; sim: the simulation view (failed: the C sources whose HDL cannot be
+// made, viewHdl's results, added to it, #2995)
+export async function viewSourcesOf(name, project, sim, failed = null) {
   const { viewSources } = await import('./ise.js');
   const inView = role => (role === 'sim' ? sim : role === 'impl' ? !sim : true);
   const hdl = (await P.readSources(name)).filter(s => !s.missing && (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role || 'design'));
   let drawn = [];
-  try { drawn = (await viewSources(project, P.projectDir(name), hdl)).filter(v => v.text); } catch { /* none */ }
+  try { drawn = await viewSources(project, P.projectDir(name), hdl); } catch { /* none */ }
+  if (failed) failed.push(...drawn.filter(v => !v.text && /\.(c|cpp|cc|cxx)$/i.test(v.path)));
+  drawn = drawn.filter(v => v.text);
   return [...hdl, ...drawn.map(v => ({ path: v.path, lang: v.lang, text: v.text, role: 'design' }))];
 }
 
@@ -67,10 +70,14 @@ export async function elaborateView(name, { top, sim = false } = {}) {
   const { compile, elaborate } = await import('../core/compile.js');
   const { primitiveSources } = await import('../core/unisim.js');
   const { designChecks } = await import('../core/lint.js');
-  const srcs = await viewSourcesOf(name, project, sim);
+  const failed = [];
+  const srcs = await viewSourcesOf(name, project, sim, failed);
   const lib = compile([...primitiveSources(srcs), ...srcs]);
+  // (a C source whose HDL cannot be made, #2995: its errors, as the Design pane's; its module, the top, then not elaborated)
+  const cErrs = failed.flatMap(v => (v.diagnostics || []).map(d => ({ ...d, tool: 'SilinxC' })));
+  const cTop = failed.some(v => String(v.module || '').toLowerCase() === String(mod).toLowerCase());
   let design = null, extra = [];
-  try { design = elaborate(lib, mod); } catch (e) { extra = [{ severity: 'error', file: srcs[0]?.path || '', line: 1, col: 1, message: e.message }]; }
+  if (!cTop) { try { design = elaborate(lib, mod); } catch (e) { extra = [{ severity: 'error', file: srcs[0]?.path || '', line: 1, col: 1, message: e.message }]; } }
   if (design) { try { extra = designChecks(lib, design, { lint: true }); } catch { /* no checks */ } }
   // (an HDL file its drawing cannot make again, #303: an error of the file, the drawing's errors in it, as Check Syntax's)
   const { staleDrawings } = await import('./drawing-sync.js');
@@ -78,7 +85,7 @@ export async function elaborateView(name, { top, sim = false } = {}) {
   const stale = (await staleDrawings(P, name)).filter(s => inView.has(s.target)).map(({ target, from, why }) => ({ severity: 'error', file: target, line: 1, col: 1, tool: 'Silinx',
     message: `${target} is not up to date: ${from} cannot generate it, ${why}. Fix ${from} (its HDL is then generated again).` }));
   const seen = new Set();
-  const diags = [...lib.errors, ...(design?.diags || []), ...extra, ...stale]
+  const diags = [...lib.errors, ...(design?.diags || []), ...extra, ...stale, ...cErrs]
     .filter(d => { const k = `${d.file}:${d.line}:${d.message}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map(d => ({ ...d, tool: d.tool || 'HDLCompiler' }));
   return { project, srcs, lib, design, top: mod, diags };
