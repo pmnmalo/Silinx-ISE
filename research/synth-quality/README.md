@@ -1358,6 +1358,40 @@ pool: blinky 2.0 → 4.3 s, pong 3.1 → 6.2, itc99-b11 2.6 → 8.4, epfl-i2c's 
 ISE's check (the routings that change at Normal, 16; 14 timed): trce 8.0 % shorter in geometric mean (2.0 % over the 57
 timed designs at Normal), every DRC 0 errors and 0 warnings, every `.bit` byte-identical to ISE's bitgen.
 
+### The state machines Yosys makes one-hot, tried as written (#652, 2026-11-07)
+
+Where vtr-stereovision3 and iwls05-usb-phy keep their level more than XST: both have Verilog state registers with no
+initial value, which Yosys's own `fsm` extracts and makes one-hot (its `auto`): usb-phy's `fs_state` (8 states, 3 bits
+written) as 8 flip-flops, stereovision3's `reg_prog_state` (27 states, 5 bits) as 27. XST keeps the first in its author's
+codes ("user") and the second sequential (fsm-ise.json). One-hot widens their next-state logic: each of usb-phy's
+`fs_state` bits is a function of 9 to 15 flip-flops at 3 levels, none with a disjoint (or one-shared-variable)
+decomposition into 2 levels of LUT4s. The measurement of #438 (above) compared Yosys's binary *re-encoding*, which
+renumbers the states, not the author's own codes.
+
+Now at High (`fsmExtracted`, synth-fsm.js) the registers run 1's `fsm_detect` marks and that have no init value are
+marked `fsm_encoding "none"` in run 1's netlist, and the rest of the script and High's mappings run from it. It is kept
+when DEPTH_RULE keeps it and it is 3 % faster by the estimate or 5 % smaller (DEPTH_RULE's gain and area): picorv32's,
+as fast by the estimate and 8 LUTs fewer, routed 8 % slower at each of seeds 1-3 (12.44 → 13.44 ns), so a tie is not
+enough.
+
+The 13 designs of the corpus with such machines (the examples have none), routed by the app's flow, before → after:
+
+| design | LUTs | slices | flip-flops | period (ns), seed 1 | seeds 1-3, mean |
+|---|---:|---:|---:|---:|---:|
+| secworks-aes | 8691 → 7225 | 4346 → 3613 | 2996 → 2989 | 32.36 → 30.88 | |
+| secworks-sha256 | 2868 → 2677 | 1434 → 1339 | 1809 → 1808 | 31.04 → 26.43 | |
+| secworks-sha1 | 2046 → 2009 | 1024 → 1006 | 1528 → 1527 | 17.31 → 14.99 | 17.69 → 14.98 |
+| vtr-stereovision3 | 144 → 126 | 73 → 64 | 120 → 99 | 8.47 → 7.75 | 7.72 → 7.44 |
+| iwls05-usb-phy | 127 → 115 | 68 → 67 | 106 → 96 | 5.15 → 5.02 | |
+| the other 8 (picorv32, the FPUs, siphash, T80, light8080, vtr-ch-intrinsics, iwls05-sasc, iwls05-i2c) | the same netlists | | | | |
+
+By the estimate on the designs alone at High: usb-phy 104 → 85 LUTs, 64 → 61 slices, 4.17 → 4.21 ns (kept for its
+size); stereovision3 119 → 101 LUTs at the same 6.47 ns; sha1 16.41 → 14.18 ns. The levels themselves are unchanged:
+stereovision3's critical end is still its I2C data line (now a function of 7 bits of `iic_state` and the 5 of
+`reg_prog_state`, 5 LUT levels; split on 4 bits of `iic_state` into MUXF5 … MUXF8, some cofactors still read two of the
+13 data bits, so not 2 levels), usb-phy's a clock enable at 3. The synthesis at High takes 3 to 30 s more on these 13
+designs (picorv32 10 → 27 s, secworks-aes 106 → 136 s).
+
 ### A long adder as carry-select segments (#1361, 2026-10-26)
 
 epfl-adder (128 bits) was 1.09× ISE by trce at both efforts: one carry chain of 64 slices (10.59 ns of logic, 2.80 of

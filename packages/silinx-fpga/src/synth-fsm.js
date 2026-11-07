@@ -138,6 +138,16 @@ export const fsmProbeCommands = (read, synth) => `${read}${synth} -run :prepare;
 export const refusedForUsers = (text, top) => parseDetect((text || '').split('\n'), top).refused
   .filter(r => r.reasons.length === 1 && r.reasons[0] === USERS_REASON).map(r => r.wire);
 
+/** The machines the usual run extracts itself, one-hot (Yosys's `auto`): those run 1's fsm_detect marks (its
+ *  FSM_DETECT_FILE) whose register has no init value in run 1's netlist `pre` (a Verilog register written without
+ *  one). Tried as written too (#652: XST keeps iwls05-usb-phy's fs_state in its author's codes and
+ *  vtr-stereovision3's reg_prog_state in 5 bits, sequential): marked fsm_encoding "none" (markWires), they keep their
+ *  codes. */
+export function fsmExtracted(pre, detect, top) {
+  const inits = wireInits(pre);
+  return parseDetect((detect || '').split('\n'), top).marked.filter(w => !inits[rtlilName(w)]);
+}
+
 /** Run 1b, when some were refused for their users alone: run 1's netlist with them marked one-hot by hand
  *  (FSM_FORCED_FILE: markWires), quietly extracted with the others (run 1's way): every machine's codes in
  *  FSM_ENC_FILE. */

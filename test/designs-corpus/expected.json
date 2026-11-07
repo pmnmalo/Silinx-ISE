@@ -637,10 +637,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 68,
-   "luts": 127,
-   "ffs": 106,
-   "period": 5.149
+   "slices": 67,
+   "luts": 115,
+   "ffs": 96,
+   "period": 5.015
   }
  },
  "light8080": {
@@ -880,10 +880,10 @@
   },
   "quality": {
    "part": "xc3s500efg320-4",
-   "slices": 4346,
-   "luts": 8691,
-   "ffs": 2996,
-   "period": 28.877
+   "slices": 3613,
+   "luts": 7225,
+   "ffs": 2989,
+   "period": 30.875
   }
  },
  "secworks-sha1": {
@@ -902,10 +902,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1024,
-   "luts": 2046,
-   "ffs": 1528,
-   "period": 17.306
+   "slices": 1006,
+   "luts": 2009,
+   "ffs": 1527,
+   "period": 14.991
   }
  },
  "secworks-sha256": {
@@ -927,10 +927,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1434,
-   "luts": 2868,
-   "ffs": 1809,
-   "period": 24.389
+   "slices": 1339,
+   "luts": 2677,
+   "ffs": 1808,
+   "period": 26.428
   }
  },
  "secworks-siphash": {
@@ -1319,10 +1319,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 73,
-   "luts": 144,
-   "ffs": 120,
-   "period": 7.538
+   "slices": 64,
+   "luts": 126,
+   "ffs": 99,
+   "period": 7.75
   }
  }
 }

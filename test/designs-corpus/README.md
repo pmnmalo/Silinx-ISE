@@ -232,17 +232,17 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | spi-fpga-slave | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 14 | 26 | 21 | 5.033 | 0 |
 | nandland-spi-verilog | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 31 | 59 | 37 | 5.676 | 1 (frontend 1) |
 | nandland-spi-vhdl | VHDL | MIT | pass | - | pass | pass | complete | XC3S250E | 30 | 57 | 37 | 5.674 | 2 (frontend 2) |
-| secworks-sha1 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1024 | 2046 | 1528 | 17.306 | 2 (frontend 1, synth 1) |
-| secworks-sha256 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1434 | 2868 | 1809 | 24.389 | 3 (frontend 1, synth 1, flow 1) |
+| secworks-sha1 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1006 | 2009 | 1527 | 14.991 | 2 (frontend 1, synth 1) |
+| secworks-sha256 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1339 | 2677 | 1808 | 26.428 | 3 (frontend 1, synth 1, flow 1) |
 | secworks-siphash | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 686 | 1370 | 798 | 15.465 | 0 |
-| secworks-aes | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S500E | 4346 | 8691 | 2996 | 28.877 | 4 (synth 3, flow 1) |
+| secworks-aes | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S500E | 3613 | 7225 | 2989 | 30.875 | 4 (synth 3, flow 1) |
 | fpu-adder | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 338 | 671 | 389 | 11.673 | 0 |
 | fpu-multiplier | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 231 | 456 | 404 | 14.194 | 0 |
 | vtr-sha | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 798 | 1594 | 893 | 15.608 | 0 |
 | vtr-diffeq1 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S500E | 260 | 409 | 451 | 36.627 | 1 (flow 1) |
 | vtr-diffeq2 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S500E | 142 | 278 | 96 | 27.446 | 1 (flow 1) |
 | vtr-ch-intrinsics | Verilog | VTR benchmarks | pass | - | pass | mismatch | complete | XC3S250E | 266 | 166 | 509 | 6.165 | 21 (frontend 13, synth 8) |
-| vtr-stereovision3 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 73 | 144 | 120 | 7.538 | 3 (frontend 2, synth 1) |
+| vtr-stereovision3 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 64 | 126 | 99 | 7.750 | 3 (frontend 2, synth 1) |
 | vtr-mkPktMerge | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 719 | 751 | 962 | 6.941 | 33 (frontend 33) |
 | epfl-ctrl | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 25 | 49 | 0 |  | 0 |
 | epfl-int2float | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 41 | 82 | 0 |  | 0 |
@@ -282,7 +282,7 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | iwls05-spi | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 356 | 706 | 229 | 15.920 | 1 (frontend 1) |
 | iwls05-i2c | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 123 | 245 | 130 | 7.170 | 0 |
 | iwls05-ss-pcm | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 42 | 39 | 79 | 4.694 | 1 (frontend 1) |
-| iwls05-usb-phy | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 68 | 127 | 106 | 5.149 | 1 (frontend 1) |
+| iwls05-usb-phy | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 67 | 115 | 96 | 5.015 | 1 (frontend 1) |
 
 Summary: 67 designs; front end 67 / 67; own testbenches 8 / 8 pass; synthesis 67; netlist = RTL 66; fully open bitstream complete for 63 designs (57 on the XC3S250E, 5 on the XC3S500E, 1 on the XC3S1200E), 4 failing.
 <!-- end of the results table -->

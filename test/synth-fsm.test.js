@@ -6,14 +6,15 @@
 // RTL from power-up and with the resets, in VHDL and in Verilog; 7 states, Normal and an integer'left start left
 // as they are; a failed run said and the usual netlist kept. The machines fsm_detect refuses for their users alone
 // (#652), marked by hand at both efforts: in VHDL and in Verilog, with and without a power-up value, equal to the RTL,
-// no warning.
+// no warning. The machines Yosys extracts itself (a Verilog register without an initial value, one-hot) tried as
+// written too at High (#652), equal to the RTL, no warning.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
 import { parseDetect, chosen, markWires, parseEncfile, newInit, setInits, fsmRun, detectTable, resultsTable, WAYS } from '../research/synth-quality/fsm.mjs';
 import { parseSyrFsms } from '../research/synth-quality/fsm-ise.mjs';
 import { compareNetlist } from './diff-synth.js';
-import { wireInits, fsmChosen, fsmInits, fsmProbeCommands, fsmExtractCommands, fsmForceCommands, fsmRestCommands, refusedForUsers, quietForced, oldStateInits, FSM_RULE, PREP_HEAD, PREP_TAIL, USERS_REASON } from '../packages/silinx-fpga/src/synth-fsm.js';
+import { wireInits, fsmChosen, fsmInits, fsmProbeCommands, fsmExtractCommands, fsmForceCommands, fsmRestCommands, refusedForUsers, quietForced, oldStateInits, fsmExtracted, FSM_RULE, PREP_HEAD, PREP_TAIL, USERS_REASON } from '../packages/silinx-fpga/src/synth-fsm.js';
 
 test('FSM measurement: fsm_detect\'s messages, the registers each way extracts', () => {
   const lines = [
@@ -535,4 +536,62 @@ test('One-hot state machines (#652) with Yosys: a machine refused for its users 
     assert.deepEqual(normal.warnings, []);
     simulated(design, normal, `${lang} forced, Normal`);
   }
+});
+
+test('State machines as written (#652): the machines the usual run extracts itself, those without an init value', () => {
+  const detect = [
+    'Found FSM state register top.u.fs_state.',
+    'Found FSM state register top.st.',
+    'Not marking top.cnt as FSM state register:',
+    `    ${USERS_REASON}`,
+    'Found FSM state register top.dpll.',
+  ].join('\n');
+  // st has an init value (the front end's power-up value): Yosys refuses it in the usual run, #539 tries it one-hot
+  const pre = "module \\top\n  wire width 3 \\u.fs_state\n  attribute \\init 3'010\n  wire width 3 \\st\n  wire width 2 \\dpll\n  wire width 4 \\cnt\nend";
+  assert.deepEqual(fsmExtracted(pre, detect, 'top'), ['u.fs_state', 'dpll']);
+  assert.deepEqual(fsmExtracted(pre, '', 'top'), []);
+  assert.deepEqual(fsmExtracted(pre, undefined, 'top'), []);
+  // marked "none": fsm_detect leaves them as they are
+  const { il } = markWires(pre, ['u.fs_state', 'dpll'], 'none');
+  assert.match(il, /attribute \\fsm_encoding "none"\n {2}wire width 3 \\u\.fs_state/);
+  assert.match(il, /attribute \\fsm_encoding "none"\n {2}wire width 2 \\dpll/);
+  assert.doesNotMatch(il, /fsm_encoding "none"\n {2}wire width 3 \\st/);
+});
+
+test('State machines as written (#652) with Yosys: a Verilog machine without an initial value kept in its codes at High, equal to the RTL; Normal, fsm false and VHDL left', { timeout: 600000 }, async () => {
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { utilization } = await import('../packages/silinx-fpga/src/synth-open.js');
+  const src = machineVerilog(8).replace("reg [3:0] st = 4'd2;", 'reg [3:0] st;');
+  assert.notEqual(src, machineVerilog(8));
+  const design = elaborate(compile([{ path: 'top.v', lang: 'verilog', text: src }]), 'top');
+  const withReset = (syn, name) => {
+    const r = compareNetlist(design, syn, { name, seed: name, sim: SIM });
+    assert.equal(r.status, 'pass', `${name}: ${r.report || r.reason}`);
+  };
+  // the usual run: Yosys's one-hot, 8 flip-flops; kept whatever the rule says ('always'): the 3 bits as written
+  const one = await synthesizeOpen(design, { run: yosysNode, effort: 'normal', smallRule: { maxLuts: -1 } });
+  assert.equal(one.depth.written, undefined, 'Normal: not tried');
+  assert.equal(utilization(one.cells).flipFlops, 8);
+  assert.deepEqual(one.warnings, []);
+  const written = await synthesizeOpen(design, { run: yosysNode, fsm: 'always' });
+  assert.deepEqual(written.warnings, [], 'no warnings');
+  assert.ok(!written.log.some(l => /fsm_encoding/.test(l)));
+  assert.deepEqual(written.depth.written.machines, ['st']);
+  assert.equal(written.depth.written.kept, true);
+  assert.equal(utilization(written.cells).flipFlops, 3);
+  withReset(written, 'as written');
+  // by the rule (DEPTH_RULE): tried, kept or not, the netlist kept equal to the RTL
+  const high = await synthesizeOpen(design, { run: yosysNode });
+  assert.deepEqual(high.warnings, []);
+  assert.deepEqual(high.depth.written.machines, ['st']);
+  for (const k of ['ns', 'luts', 'slices']) assert.ok(Number.isFinite(high.depth.written[k]), k);
+  assert.equal(utilization(high.cells).flipFlops, high.depth.written.kept ? 3 : 8);
+  withReset(high, 'High');
+  // fsm false: no candidate; a VHDL machine always has a power-up value: never extracted by the usual run
+  const off = await synthesizeOpen(design, { run: yosysNode, fsm: false });
+  assert.equal(off.depth.written, undefined);
+  const vhdl = elaborate(compile([{ path: 'top.vhd', lang: 'vhdl', text: machineVhdl(8) }]), 'top');
+  const v = await synthesizeOpen(vhdl, { run: yosysNode });
+  assert.equal(v.depth.written, undefined, 'VHDL');
 });
