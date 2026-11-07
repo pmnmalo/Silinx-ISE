@@ -115,6 +115,12 @@ async function checkLocalSettings(file) {
 /** A settings script in the docker image or on the ssh host: an absolute path, not in the folder
  *  the build is copied to (whose files come from the project). */
 function checkRemoteSettings(cfg) {
+  // another spelling of the build folder (/proc/self/cwd/…, a '..') would pass the checks below (#3032)
+  for (const key of ['docker.settings', 'ssh.settings']) {
+    const v = String(at(cfg, key) || '');
+    if (v && (v.split('/').some(p => p === '.' || p === '..') || /^\/+(proc|dev|sys)(\/|$)/i.test(v)))
+      throw bad(`${key} must be a plain path: no . or .. in it, not under /proc, /dev or /sys`);
+  }
   const d = cfg.docker.settings ? path.posix.normalize(String(cfg.docker.settings)) : '';
   if (d && (!d.startsWith('/') || d === '/work' || d.startsWith('/work/'))) throw bad('docker.settings must be an absolute path outside /work (the build folder)');
   const s = cfg.ssh.settings ? path.posix.normalize(String(cfg.ssh.settings)).toLowerCase() : '';
