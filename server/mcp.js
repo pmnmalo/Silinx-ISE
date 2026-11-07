@@ -7,7 +7,8 @@
 // startImplementation / projectReports, ise.js viewSources) and core/ (compile, elaborate, the design
 // checks of core/lint.js, the simulator): the results are the application's. The projects are the
 // workspace's (SILINX_WORKSPACE, as for `silinx-ise serve`): every path stays inside its project
-// (symbolic links included); nothing runs but Silinx's own processes; programming a board is left out.
+// (symbolic links included); the processes run the Silinx toolchain, or Xilinx ISE (local, Docker, ssh: run_process's
+// toolchain 'ise') only for a trusted project, as the interface's (SECURITY.md); programming a board is left out.
 // The ISE machine's address never appears in a result (the logs are redacted).
 import readline from 'node:readline';
 import { VERSION } from '../core/version.js';
