@@ -86,6 +86,7 @@ export function moduleRegistry({ make }) {
         const m = { callee, depths, module: `${portOf(hdlName(callee))}${same ? `_${same}` : ''}`, gen: null };
         mods.set(key, m);
         m.gen = make(callee, depths, m.module);
+        if (m.gen?.module) m.module = m.gen.module;   // (a module of its own name: an RTL blackbox's process, #2340)
         made.push(m);
       }
       return mods.get(key);

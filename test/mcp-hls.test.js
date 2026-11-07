@@ -5,7 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { scratchEnv } from './server-helpers.js';
-import { MSUM_C, MSUM_V, MDESC, EXT } from './hls-blackbox-ports-lib.mjs';
+import { MSUM_C, MSUM_V, MDESC, EXT, INC_C, INC_V, IDESC, CHAIN } from './hls-blackbox-ports-lib.mjs';
 
 let tmp;
 const { handle } = await import('../server/mcp.js');
@@ -114,4 +114,18 @@ test('#2339 an RTL blackbox with a memory port: the project\'s description, modu
   const r = await ok('c_synthesis_report', { project: 'bbmem', path: 'src/top.cpp' });
   assert.match(r.text, /RTL blackbox: msum is the module msum \(msum\.v\)/);
   assert.match(r.text, /a_address0 +out +3 bits/);
+});
+
+test('#2340 an RTL blackbox in a DATAFLOW region: two processes of its module, a stream between them; C Simulation and C/RTL Co-simulation PASS in VHDL and in Verilog; the report\'s processes', async () => {
+  await ok('new_project', { name: 'bbdf' });
+  for (const [path, text] of [['src/inc.json', JSON.stringify(IDESC(), null, 2)], ['src/inc.cpp', INC_C], ['src/inc.v', INC_V], ['src/top.cpp', CHAIN]]) await ok('write_file', { project: 'bbdf', path, text });
+  const s = await ok('c_simulation', { project: 'bbdf', path: 'src/top.cpp' });
+  assert.deepEqual([s.data.exitCode, s.data.calls, s.data.top], [0, 5, 'top']);
+  for (const language of ['vhdl', 'verilog']) {
+    const c = await ok('c_cosimulation', { project: 'bbdf', path: 'src/top.cpp', language });
+    assert.deepEqual([c.data.pass, c.data.calls, c.data.mismatches], [true, 5, []], language);
+  }
+  const r = await ok('c_synthesis_report', { project: 'bbdf', path: 'src/top.cpp' });
+  assert.match(r.text, /\nRTL blackbox: inc is the module inc \(inc\.v\)\n/);
+  assert.match(r.text, /\n {2}inc_bb_U0 {8}inc: the RTL blackbox inc, ended by its ap_done\n {2}inc_bb_U1 {8}inc: the RTL blackbox inc, ended by its ap_done\n\nFIFOs:\n {2}t {16}2 words\n/);
 });

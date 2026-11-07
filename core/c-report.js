@@ -47,7 +47,8 @@ export function cReportLines(r, { path, lang, clock }) {
     L.push('', 'Processes:');
     // (the region's latency and interval, each process's, #1706)
     L[L.length - 1] = `Processes (the region's latency: ${cycles(rep.latency)}; its interval: ${cycles(rep.interval)}):`;
-    for (const p of rep.processes) L.push(`  ${p.instance.padEnd(16)} ${p.name}: ${p.states} states, ${p.registerBits} register bits${p.latency ? `, latency ${cycles(p.latency)}` : ''}${p.after.length ? `; starts once ${p.after.join(', ')} ${p.after.length > 1 ? 'are' : 'is'} done` : ''}`);
+    // (an RTL blackbox's process: its module, its latency the description's or its ap_done's, #2340)
+    for (const p of rep.processes) L.push(`  ${p.instance.padEnd(16)} ${p.name}: ${p.blackbox ? `the RTL blackbox ${p.blackbox}, ${p.latency.max === null ? 'ended by its ap_done' : `latency ${cycles(p.latency)}`}` : `${p.states} states, ${p.registerBits} register bits${p.latency ? `, latency ${cycles(p.latency)}` : ''}`}${p.after.length ? `; starts once ${p.after.join(', ')} ${p.after.length > 1 ? 'are' : 'is'} done` : ''}`);
     if (rep.fifos.length) { L.push('', 'FIFOs:'); for (const f of rep.fifos) L.push(`  ${f.name.padEnd(16)} ${f.depth} words`); }
   }
   // (a function not inlined, a sub-module: its calls, its latency and resources, #1960)

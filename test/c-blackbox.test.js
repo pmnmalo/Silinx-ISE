@@ -233,11 +233,11 @@ for (const [name, unit, desc, re, top] of MISMATCH) {
   });
 }
 
-test('#1903 an array described as a scalar, said (#2339: a memory port); what is not supported yet: a DATAFLOW region', () => {
+test('#1903 an array described as a scalar, said (#2339: a memory port); in a DATAFLOW region, an output said (#2340: a process of its own, its channels streams and arrays)', () => {
   const mem = UNIT('void top(data_t a, data_t b, data_t &s) { data_t m[2], t; adder(a, m, t); s = t; }', 'void adder(data_t a, data_t b[2], data_t &z);');
   assert.match(errs(cToHdl(mem, { ...OPTS(), lang: 'vhdl' })).join(), /the argument 'b' is an array: its description needs 'RAM_type' RAM_1P and a memory's ports \(RAM_…\)/);
   const df = UNIT('void top(data_t a, data_t b, data_t &s) {\n#pragma HLS DATAFLOW\n  adder(a, b, s);\n}');
-  assert.match(errs(cToHdl(df, { ...OPTS(), lang: 'vhdl' })).join(), /an RTL blackbox in a DATAFLOW region is not supported yet/);
+  assert.match(errs(cToHdl(df, { ...OPTS(), lang: 'vhdl' })).join(), /syn\.blackbox: adder\.json: 'adder' is called in a DATAFLOW region: its argument 'z' is an output, not supported there \(a stream or an array\)/);
 });
 
 test('#1903 the warnings: a cflag, a key not known, an input not described', () => {

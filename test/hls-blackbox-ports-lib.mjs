@@ -169,3 +169,64 @@ int main() {
 }
 `;
 export const FILES = { 'msum.cpp': MSUM_C, 'rsum.cpp': RSUM_C, 'msum.v': MSUM_V, 'msum.vhd': MSUM_VHD, 'inc.cpp': INC_C, 'inc.v': INC_V, 'inc.vhd': INC_VHD };
+
+// (#2340) a memory's 8 words read, each one more written to a stream; a stream's word plus an input written to another
+export const MOUT_V = `module mout(input ap_clk, ap_rst, ap_start, output reg ap_done, output ap_idle, ap_ready,
+  output reg [2:0] m_address0, output reg m_ce0, input [9:0] m_q0, input o_full_n, output o_write, output [9:0] o_din);
+  reg [1:0] st; reg [2:0] i; reg [9:0] v;
+  assign ap_idle = st == 0; assign ap_ready = ap_done;
+  assign o_write = st == 3 && o_full_n; assign o_din = v + 1;
+  always @(posedge ap_clk) begin
+    ap_done <= 0; m_ce0 <= 0;
+    if (ap_rst) begin st <= 0; i <= 0; v <= 0; m_address0 <= 0; end
+    else case (st)
+      0: if (ap_start) begin i <= 0; m_address0 <= 0; m_ce0 <= 1; st <= 1; end
+      1: st <= 2;
+      2: begin v <= m_q0; st <= 3; end
+      3: if (o_full_n) begin
+           if (i == 7) begin ap_done <= 1; st <= 0; end
+           else begin i <= i + 1; m_address0 <= i + 1; m_ce0 <= 1; st <= 1; end
+         end
+    endcase
+  end
+endmodule
+`;
+export const MOUT_C = `${H}void mout(data_t m[8], hls::stream<data_t> &o) { for (int i = 0; i < 8; i++) o.write(m[i] + 1); }\n`;
+export const ADDK_V = `module addk(input ap_clk, ap_rst, ap_start, output reg ap_done, output ap_idle, ap_ready, input [9:0] k,
+  input i_empty_n, output i_read, input [9:0] i_dout, input o_full_n, output o_write, output [9:0] o_din);
+  reg [1:0] st; reg [9:0] v;
+  assign i_read = st == 1 && i_empty_n; assign o_write = st == 2 && o_full_n; assign o_din = v + k;
+  assign ap_idle = st == 0; assign ap_ready = ap_done;
+  always @(posedge ap_clk) begin
+    ap_done <= 0;
+    if (ap_rst) begin st <= 0; v <= 0; end
+    else case (st)
+      0: if (ap_start) st <= 1;
+      1: if (i_empty_n) begin v <= i_dout; st <= 2; end
+      2: if (o_full_n) begin ap_done <= 1; st <= 0; end
+    endcase
+  end
+endmodule
+`;
+export const ADDK_C = `${H}void addk(hls::stream<data_t> &i, hls::stream<data_t> &o, data_t k) { o.write(i.read() + k); }\n`;
+export const MOUT_DESC = () => ({
+  c_function_name: 'mout', rtl_top_module_name: 'mout', c_files: ['mout.cpp'], rtl_files: ['mout.v'],
+  c_parameters: [{ c_name: 'm', c_port_direction: 'in', RAM_type: 'RAM_1P', rtl_ports: { RAM_address: 'm_address0', RAM_clock_enable: 'm_ce0', RAM_data_read_in: 'm_q0' } },
+    { c_name: 'o', c_port_direction: 'out', rtl_ports: FOUT }],
+  rtl_common_signal: CTRL,
+});
+export const ADDK_DESC = () => ({ ...IDESC({ c_function_name: 'addk', rtl_top_module_name: 'addk', c_files: ['addk.cpp'], rtl_files: ['addk.v'] }), c_parameters: [...IDESC().c_parameters, { c_name: 'k', c_port_direction: 'in', rtl_ports: { data_read_in: 'k' } }] });
+// two blackbox processes, a stream of the region between them
+export const CHAIN = `${H}void inc(hls::stream<data_t> &i, hls::stream<data_t> &o);
+void top(hls::stream<data_t> &a, hls::stream<data_t> &b) {
+#pragma HLS DATAFLOW
+  hls::stream<data_t> t;
+  inc(a, t);
+  inc(t, b);
+}
+int main() {
+  hls::stream<data_t> a, b;
+  for (int k = 0; k < 5; k++) { a.write(k * 9 - 20); top(a, b); if (b.read() != k * 9 - 18) return 1; }
+  return 0;
+}
+`;

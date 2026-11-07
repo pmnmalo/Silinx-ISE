@@ -6,7 +6,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { pickSourceType, waitNewSourcePage } from './new-source-helpers.js';
-import { MSUM_C, MSUM_V, MDESC, EXT } from '../hls-blackbox-ports-lib.mjs';
+import { MSUM_C, MSUM_V, MDESC, EXT, INC_C, INC_V, IDESC, CHAIN } from '../hls-blackbox-ports-lib.mjs';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -126,5 +126,26 @@ uiTest('#2339 Silinx HLS: an RTL blackbox with a memory port: the top\'s memory 
   await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
   await page.waitConsole(/Process "C\/RTL Co-simulation" (completed successfully|failed)/, { timeout: 60000 });
   assert.match(await page.consoleText(), /C simulation: 2 call\(s\) of 'top' replayed on its VHDL\.[\s\S]*C\/RTL co-simulation PASS: 2 call\(s\), the same results/);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// (#2340) a blackbox in a DATAFLOW region: a process of its own, its module inside; the report says it
+uiTest('#2340 Silinx HLS: an RTL blackbox in a DATAFLOW region: two processes of its module, the report\'s processes; C Simulation and C/RTL Co-simulation PASS; no warnings', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxDf', top: '', files: { 'src/top.cpp': CHAIN, 'src/inc.json': JSON.stringify(IDESC(), null, 2), 'src/inc.v': INC_V, 'src/inc.cpp': INC_C } });
+  await page.openProject('CBlackboxDf');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the module top' });
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.viewSources.map((s) => [s.path, s.errors])), [['src/top.cpp', 0]]);
+  await page.treeRow('#hier', 'top');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
+  assert.match(await page.consoleText(), /\n {2}inc_bb_U0 {8}inc: the RTL blackbox inc, ended by its ap_done\n {2}inc_bb_U1 {8}inc: the RTL blackbox inc, ended by its ap_done\n/);
+  await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C Simulation" completed successfully/);
+  assert.match(await page.consoleText(), /main\(\) returned 0; 5 call\(s\) of 'top'\./);
+  await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C\/RTL Co-simulation" (completed successfully|failed)/, { timeout: 60000 });
+  assert.match(await page.consoleText(), /C\/RTL co-simulation PASS: 5 call\(s\), the same results/);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });
