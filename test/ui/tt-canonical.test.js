@@ -1,6 +1,6 @@
 // UI: the Boolean Algebra editor's canonical forms (#2927): the canonical SOP (the sum of the minterms) and POS (the
 // product of the maxterms) as full expressions, in the chosen notation, after the least gates / delay and the minimal
-// forms (#3065), each with the list of its terms under it (Σm / ΠM, #2952) and its HDL logic tick box (#2951). A constant
+// forms (#3065), each the list of its terms (Σm / ΠM, #2952) first, its full expression under it (#3069), with its HDL logic tick box (#2951). A constant
 // output; a table of 8 inputs, whose 256-term expressions wrap in the panel; in Portuguese (SdP and PdS, #3066).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,13 @@ const open = async (page, file) => {
   await page.waitFor((f) => window.Silinx.active?.id === `tt:${f}` && document.querySelector('.doc:not([hidden]) .tt-editor .tt-canon'), [file], { what: 'truth table editor' });
 };
 /** The canonical rows: [class, label, expression, list] each. */
-const canon = (page) => page.eval((t) => [...document.querySelectorAll(`${t} .tt-canon > div`)].map((d) => [d.className, d.querySelector('b').textContent, ...[...d.querySelectorAll('code')].map((c) => c.textContent)]), T);
+// (each form: its class, its name, its full expression, its list)
+const canon = (page) => page.eval((t) => [...document.querySelectorAll(`${t} .tt-canon > div`)].map((d) => [d.className, d.querySelector('b').textContent, d.querySelector('.tt-expr').textContent, d.querySelector('.tt-canon-list').textContent]), T);
+/** The list beside the form's name, its full expression under it (#3069): the codes in that order, each on its own line. */
+const listFirst = (page) => page.eval((t) => [...document.querySelectorAll(`${t} .tt-canon > div`)].map((d) => {
+  const [a, b] = [...d.querySelectorAll('code')], name = d.querySelector('b').getBoundingClientRect();
+  return [a.className, b.className, Math.abs(a.getBoundingClientRect().top - name.top) < 4, b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 1];
+}), T);
 const order = (page) => page.eval((t) => [...document.querySelectorAll(`${t} .tt-results > .tt-res`)].map((d) => d.classList[1]), T);
 
 uiTest('#2927 #2952 Truth Table: the canonical SOP and POS in full, in the notation chosen, each with its list (Σm, ΠM); a constant; 8 inputs wrapped; Portuguese', E, async (page) => {
@@ -34,18 +40,19 @@ uiTest('#2927 #2952 Truth Table: the canonical SOP and POS in full, in the notat
     ['tt-canon-sop', 'Canonical SOP', 'f = /a./b.c + /a.b.c + a.b./c', 'f = Σm(1, 3, 6) + d(2, 5)'],
     ['tt-canon-pos', 'Canonical POS', 'f = (a + b + c).(/a + b + c).(/a + /b + /c)', 'f = ΠM(0, 4, 7) · D(2, 5)'],
   ]);
+  assert.deepEqual(await listFirst(page), [['tt-canon-list', 'tt-expr', true, true], ['tt-canon-list', 'tt-expr', true, true]], 'the list first, the expression under it (#3069)');
   // no row of the lists of their own (#2952); each canonical form its tick box (#2951), not ticked (least gates)
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-canon-minterms, ${t} .tt-canon-maxterms, ${t} .tt-canon-lists`).length, T), 0);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-canon .tt-hdl`)].map((c) => c.checked), T), [false, false]);
-  // the list under the expression: on a line of its own
-  assert.ok(await page.eval((t) => { const [e, l] = document.querySelectorAll(`${t} .tt-canon-sop code`); return l.getBoundingClientRect().top >= e.getBoundingClientRect().bottom - 1; }, T));
+  // the expression under the list: on a line of its own (#3069)
+  assert.ok(await page.eval((t) => { const [l, e] = document.querySelectorAll(`${t} .tt-canon-sop code`); return e.getBoundingClientRect().top >= l.getBoundingClientRect().bottom - 1; }, T));
   // another notation: the canonical forms follow it, the lists stay
   await page.fill(`${T} .tt-notation`, 'textbook');
-  await page.waitFor((t) => document.querySelector(`${t} .tt-canon-sop code`)?.textContent === "f = a'·b'·c + a'·b·c + a·b·c'", [T], { what: 'textbook notation' });
+  await page.waitFor((t) => document.querySelector(`${t} .tt-canon-sop .tt-expr`)?.textContent === "f = a'·b'·c + a'·b·c + a·b·c'", [T], { what: 'textbook notation' });
   assert.deepEqual((await canon(page)).map((r) => r.slice(2)), [["f = a'·b'·c + a'·b·c + a·b·c'", 'f = Σm(1, 3, 6) + d(2, 5)'], ["f = (a + b + c)·(a' + b + c)·(a' + b' + c')", 'f = ΠM(0, 4, 7) · D(2, 5)']]);
   // a constant output: no minterm, the SOP is 0
   await page.click(`${T} .tt-tab[data-out=z]`);
-  await page.waitFor((t) => document.querySelector(`${t} .tt-canon-sop code`)?.textContent === 'z = 0', [T], { what: 'output z' });
+  await page.waitFor((t) => document.querySelector(`${t} .tt-canon-sop .tt-expr`)?.textContent === 'z = 0', [T], { what: 'output z' });
   assert.deepEqual((await canon(page)).map((r) => r.slice(2)), [['z = 0', 'z = Σm()'], ["z = (a + b + c)·(a + b + c')·(a + b' + c)·(a + b' + c')·(a' + b + c)·(a' + b + c')·(a' + b' + c)·(a' + b' + c')", 'z = ΠM(0, 1, 2, 3, 4, 5, 6, 7)']]);
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
@@ -66,8 +73,8 @@ uiTest('#2927 #2952 Truth Table: the canonical SOP and POS in full, in the notat
   // 8 inputs: 255 minterms of 8 literals, one maxterm; the expressions wrap, the panel does not scroll sideways
   await open(page, 'src/w.bool.json');
   const w = await page.eval((t) => {
-    const r = document.querySelector(`${t} .tt-results`), sop = document.querySelector(`${t} .tt-canon-sop code`);
-    return { terms: sop.textContent.split(' + ').length, pos: document.querySelector(`${t} .tt-canon-pos code`).textContent,
+    const r = document.querySelector(`${t} .tt-results`), sop = document.querySelector(`${t} .tt-canon-sop .tt-expr`);
+    return { terms: sop.textContent.split(' + ').length, pos: document.querySelector(`${t} .tt-canon-pos .tt-expr`).textContent,
       lines: sop.getClientRects().length, wide: r.scrollWidth - r.clientWidth,
       inside: [...r.querySelectorAll('.tt-canon code')].every((c) => c.getBoundingClientRect().right <= r.getBoundingClientRect().right + 1) };
   }, T);
