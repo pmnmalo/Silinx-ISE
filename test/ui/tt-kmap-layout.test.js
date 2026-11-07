@@ -1,7 +1,8 @@
 // UI: the Karnaugh map's place in its section (#3059): the minimal solutions' row ("2 minimal solutions exist. ◀ Solution 1
 // of 2 ▶") a line of its own, the map under it at the section's left (the options' left), its groups' legend right
 // after it (beside it, or just under it when there is no room); with 2 to 6 inputs, one solution (no row) or several,
-// SOP and POS, flat and in 3D, on a wide and a narrow screen.
+// SOP and POS, flat and in 3D, on a wide and a narrow screen. Its options: SOP / POS groups, then Order and 3D (Reset view)
+// on a line of their own at the same left (#3063).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -80,6 +81,53 @@ uiTest('#3059 Karnaugh map: under the minimal solutions\' row, at the section\'s
       await d3(); laidOut(await place(page), `${at} ${k} in 3D`, await several());
       await d3();   // (the 3D box is shared by every table: left as it was found)
     }
+  }
+  await page.setViewport(1400, 900);
+});
+
+/** The options' lines: each a list of [left, top, bottom] of its parts, SOP / POS first, then Order and 3D. */
+const optionLines = (page) => page.eval((t) => {
+  const parts = [...document.querySelector(`${t} .tt-groups`).children].filter((e) => !e.matches('.tt-groups-br')).map((e) => {
+    const r = e.getBoundingClientRect();
+    return { what: e.querySelector('input[type=radio]')?.value ?? (e.querySelector('.tt-kmap-order') || e.matches('.tt-kmap-order') ? 'order' : e.querySelector('.tt-k3d-on') ? '3d' : e.matches('.tt-k3d-reset') ? 'reset' : e.tagName), left: Math.round(r.left), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+  });
+  const lines = [];
+  for (const p of parts) { const l = lines.find((x) => p.top < x.bottom && p.bottom > x.top); if (l) { l.what.push(p.what); l.bottom = Math.max(l.bottom, p.bottom); } else lines.push({ what: [p.what], left: p.left, top: p.top, bottom: p.bottom }); }
+  return lines;
+}, T);
+
+uiTest('#3063 Karnaugh map: Order and 3D on a line of their own, under SOP / POS groups, at the same left', E, async (page) => {
+  const tables = {
+    k1: newTable('k1', ['a'], ['f']),
+    k2: { ...newTable('k2', ['a', 'b'], ['f']), table: { f: '0111' } },
+    k3: { ...newTable('k3', ['a', 'b', 'c'], ['f']), table: { f: '1XX0XXX1' } },
+    k6: { ...newTable('k6', ['a', 'b', 'c', 'd', 'e', 'h'], ['f']), table: { f: Array.from({ length: 64 }, (_, m) => (m % 3 ? '1' : '0')).join('') } },
+  };
+  await makeProject(env, { name: 'TtKmapOptions', files: Object.fromEntries(Object.entries(tables).map(([k, v]) => [`src/${k}.bool.json`, JSON.stringify(v)])) });
+  await page.openProject('TtKmapOptions');
+  const open = async (k) => {
+    await page.eval((p) => window.SilinxApp.openTt(p), `src/${k}.bool.json`);
+    await page.waitFor((p) => window.Silinx.active?.id === `tt:${p}` && document.querySelector('.doc:not([hidden]) .tt-editor .tt-groups label'), [`src/${k}.bool.json`], { what: k });
+  };
+  // (wide: SOP / POS on one line, the rest on the next; narrow: SOP / POS may wrap, Order still starts a line of its own)
+  const two = (l, rest, what, wide) => {
+    const i = l.findIndex((x) => x.what[0] === 'order');
+    assert.deepEqual([l.slice(0, i).flatMap((x) => x.what), l.slice(i).flatMap((x) => x.what)], [['sop', 'pos'], rest], `${what}: SOP / POS, then ${rest.join(', ')} below`);
+    if (wide) assert.equal(l.length, 2, `${what}: two lines`);
+    assert.ok(l[i].top >= l[i - 1].bottom, `${what}: Order's line under SOP / POS`);
+    assert.ok(Math.abs(l[i].left - l[0].left) <= 1, `${what}: Order at the left of SOP`);
+  };
+  for (const [w, h] of [[1400, 900], [760, 1000]]) {
+    await page.setViewport(w, h);
+    await open('k1');
+    assert.deepEqual((await optionLines(page)).flatMap((x) => x.what), ['sop', 'pos'], `${w}px 1 input: no Order nor 3D`);
+    await open('k2'); two(await optionLines(page), ['order'], `${w}px 2 inputs`, w > 1000);
+    await open('k3'); two(await optionLines(page), ['order', '3d'], `${w}px 3 inputs`, w > 1000);
+    await open('k6'); two(await optionLines(page), ['order', '3d'], `${w}px 6 inputs`, w > 1000);
+    await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T);
+    await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d-reset`), [T], { what: 'Reset view' });
+    two(await optionLines(page), ['order', '3d', 'reset'], `${w}px 6 inputs in 3D`, w > 1000);
+    await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T);   // (the 3D box is shared by every table)
   }
   await page.setViewport(1400, 900);
 });

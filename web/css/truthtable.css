@@ -39,7 +39,8 @@
 .tt-tabs { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 4px; }
 .tt-tab { border: 1px solid var(--border, #aaa); background: var(--tab-inactive, #eee); padding: 2px 14px; font-family: var(--mono, monospace); font-weight: bold; cursor: pointer; border-radius: 3px 3px 0 0; }
 .tt-tab.active { background: var(--tab-active, #fff); border-bottom-color: var(--tab-active, #fff); color: var(--title-fg, #15428b); }
-.tt-groups { display: flex; gap: 14px; margin-bottom: 4px; }
+.tt-groups { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; margin-bottom: 4px; }
+.tt-groups-br { flex-basis: 100%; height: 0; }   /* SOP / POS, then Order and 3D on a line of their own (#3063) */
 .tt-kmap-host { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
 .tt-kmap { background: #fff; }
 .tt-kmap .tt-kcell rect { fill: #fff; stroke: #999; cursor: pointer; }
