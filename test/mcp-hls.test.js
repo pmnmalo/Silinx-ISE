@@ -5,6 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { scratchEnv } from './server-helpers.js';
+import { MSUM_C, MSUM_V, MDESC, EXT } from './hls-blackbox-ports-lib.mjs';
 
 let tmp;
 const { handle } = await import('../server/mcp.js');
@@ -99,4 +100,18 @@ test('the C tools: a C with an error, the errors', async () => {
     assert.equal(e.isError, true);
     assert.equal(e.text, `${name}: ${message}`);
   }
+});
+
+test('#2339 an RTL blackbox with a memory port: the project\'s description, module and C model; C Simulation and C/RTL Co-simulation PASS in VHDL and in Verilog; the report names it', async () => {
+  await ok('new_project', { name: 'bbmem' });
+  for (const [path, text] of [['src/msum.json', JSON.stringify(MDESC(), null, 2)], ['src/msum.cpp', MSUM_C], ['src/msum.v', MSUM_V], ['src/top.cpp', EXT]]) await ok('write_file', { project: 'bbmem', path, text });
+  const s = await ok('c_simulation', { project: 'bbmem', path: 'src/top.cpp' });
+  assert.deepEqual([s.data.exitCode, s.data.calls, s.data.top], [0, 2, 'top']);
+  for (const language of ['vhdl', 'verilog']) {
+    const c = await ok('c_cosimulation', { project: 'bbmem', path: 'src/top.cpp', language });
+    assert.deepEqual([c.data.pass, c.data.calls, c.data.mismatches], [true, 2, []], language);
+  }
+  const r = await ok('c_synthesis_report', { project: 'bbmem', path: 'src/top.cpp' });
+  assert.match(r.text, /RTL blackbox: msum is the module msum \(msum\.v\)/);
+  assert.match(r.text, /a_address0 +out +3 bits/);
 });

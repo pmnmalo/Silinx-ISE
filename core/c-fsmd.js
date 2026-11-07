@@ -282,7 +282,7 @@ class SeqFlow extends Flow {
       this.ptrFifoAccesses(inl);   // (a pointer with ap_fifo or ap_hs: a stream's accesses, #1901)
       const { body, decls } = this.renameLocals(inl);
       this.insts = new Map();
-      this.memArgs = this.subArrays(body);
+      this.memArgs = new Set([...this.subArrays(body), ...this.bbArrays(body)]);   // (a blackbox's memory port too, #2339)
       this.makeRegisters(inl, decls);
       this.fnDeps = this.markDependences(body);
       markAutoPipeline(body.items, { threshold: this.pipelineLoops, trip: (l) => this.tripOf(l), why: (l) => this.pipeWhy(l), autoWhy: (l) => this.pipeWhy(l) || (innerLoops(l.body).some((x) => this.hasMem(x)) ? 'a loop that accesses a memory is in it' : null), never: (l) => hasSub(l.body) });
@@ -683,7 +683,7 @@ class SeqFlow extends Flow {
         continue;
       }
       const banks = this.slots?.get(pa.name)?.banks;
-      if (banks) { for (const b of banks) this.memIface(b, this.mems.find((x) => x.name === b), ports, outputs); continue; }
+      if (banks) { for (const b of this.mems ? banks : []) this.memIface(b, this.mems.find((x) => x.name === b), ports, outputs); continue; }   // (none made: an error before, #2339)
       const mem = this.mems?.find((x) => x.ext && x.name === pa.name);
       if (mem) { this.memIface(pa.name, mem, ports, outputs); continue; }
       if (!o) {

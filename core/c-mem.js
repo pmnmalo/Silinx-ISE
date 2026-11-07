@@ -170,6 +170,7 @@ export const memMethods = {
     if (!x || typeof x !== 'object') return;
     if (Array.isArray(x)) { x.forEach((y) => this.bareMem(y)); return; }
     if (this.isMem(x)) { this.bareMem(x.i); return; }
+    if (this.isBlackbox?.(x)) { this.bbScalarArgs(x).forEach((a) => this.bareMem(a)); return; }   // (a memory port's array by its name, #2339)
     if (x.kind === 'id' && this.slots.get(x.name)?.kind === 'mem') this.error(x.loc, `the memory '${x.name}' can only be indexed here (${x.name}[i]): it cannot be passed to a function`);
     for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') this.bareMem(v);
   },
