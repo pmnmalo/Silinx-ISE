@@ -160,6 +160,39 @@ test('run.sh fails cleanly without ISE and runs selected steps with stub tools',
   assert.match(r3.stderr.toString(), /ISE tools \(xst\) not found/);
 });
 
+test('run.sh sources ISE_SETTINGS only when its real path is outside the build folder (#3032)', { skip: POSIX_ONLY }, async () => {
+  const root = path.join(tmp, 'settings-guard');
+  const build = path.join(root, 'build'), bin = path.join(root, 'bin'), outside = path.join(root, 'ise');
+  for (const d of [path.join(build, 'src'), bin, outside, path.join(root, 'links')]) await fs.mkdir(d, { recursive: true });
+  await fs.writeFile(path.join(bin, 'xst'), '#!/bin/sh\necho "stub xst"\n', { mode: 0o755 });
+  // a settings script puts the tools on PATH: the project's one would run anything
+  const script = `export PATH="${bin}:$PATH"\n`;
+  await fs.writeFile(path.join(outside, 'settings64.sh'), script);
+  await fs.writeFile(path.join(build, 'src', 'settings64.sh'), script);
+  await fs.writeFile(path.join(build, 'run.sh'), ise.generateRunSh({ top: 'top', device: DEVICE, hasUcf: true }));
+  await fs.symlink(path.join(build, 'src', 'settings64.sh'), path.join(root, 'links', 'file.sh'));   // a link to the project's file
+  await fs.symlink(path.join(build, 'src'), path.join(root, 'links', 'dir'));                         // a link to the build's folder
+  await fs.symlink('../build/src/settings64.sh', path.join(root, 'links', 'rel.sh'));                  // a relative link
+  await fs.symlink(path.join(outside, 'settings64.sh'), path.join(root, 'links', 'ise.sh'));           // a link to the real script
+  await fs.symlink(build, path.join(root, 'build-link'));
+  const run = (settings, cwd = build) => spawnSync('bash', ['run.sh', 'synth'], { cwd, env: { PATH: '/usr/bin:/bin', ISE_SETTINGS: settings } });
+  for (const s of [path.join(build, 'src', 'settings64.sh'), 'src/settings64.sh', path.join(root, 'links', 'file.sh'),
+    path.join(root, 'links', 'dir', 'settings64.sh'), path.join(root, 'links', 'rel.sh'), path.join(root, 'build-link', 'src', 'settings64.sh')]) {
+    const r = run(s);
+    assert.equal(r.status, 126, s);
+    assert.equal(r.stderr.toString(), `ERROR: ISE_SETTINGS (${s}) is a file of the build folder: not sourced.\n`);
+    assert.equal(r.stdout.toString(), '');
+  }
+  // run through a link to the build folder: its real path all the same
+  assert.equal(run(path.join(build, 'src', 'settings64.sh'), path.join(root, 'build-link')).status, 126);
+  for (const s of [path.join(outside, 'settings64.sh'), path.join(root, 'links', 'ise.sh')]) {
+    const r = run(s);
+    assert.equal(r.status, 0, r.stderr.toString());
+    assert.equal(r.stderr.toString(), '');
+    assert.match(r.stdout.toString(), /=== SILINX STEP synth ===\nstub xst\n[\s\S]*=== SILINX DONE ===/);
+  }
+});
+
 async function makeProject(name) {
   const dir = path.join(tmp, name);
   await fs.mkdir(path.join(dir, 'src'), { recursive: true });
@@ -527,11 +560,21 @@ test('toolchain config through the API: the settings scripts the project files c
     assert.equal((await api({ mode: 'local', local: { settings: path.join(ws, 'x', 'settings64.sh') } })).mode, 'local');
     assert.equal((await api({ local: { settings: '' } })).local.settings, '');
     // in the image or on the ssh host: absolute, not in the folder the build is copied to
-    for (const s of ['/work/settings64.sh', '/work/../work/src/settings64.sh', 'opt/settings64.sh'])
+    for (const s of ['/work/settings64.sh', 'opt/settings64.sh'])
       await assert.rejects(api({ mode: 'docker', docker: { image: 'my/ise:14.7', settings: s } }), /^Error: docker.settings must be an absolute path outside \/work \(the build folder\)$/);
     assert.equal((await api({ mode: 'docker', docker: { image: 'my/ise:14.7', settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } })).docker.settings, '/opt/Xilinx/14.7/ISE_DS/settings64.sh');
-    for (const s of ['/home/me/silinx-build/y/src/settings64.sh', '/Users/Me/Silinx-Build/y/settings64.sh', '/home/me/./silinx-build/y/settings64.sh', 'silinx-build/y/settings64.sh'])
+    for (const s of ['/home/me/silinx-build/y/src/settings64.sh', '/Users/Me/Silinx-Build/y/settings64.sh', 'silinx-build/y/settings64.sh'])
       await assert.rejects(api({ mode: 'ssh', ssh: { host: 'h', remoteDir: 'silinx-build', settings: s } }), /^Error: ssh.settings must be an absolute path outside ssh.remoteDir \(the build folder\)$/);
+    // the build folder by another spelling: /proc/self/cwd (the build's own folder), /dev/fd, /sys, a . or .. (#3032)
+    const spellings = ['/proc/self/cwd/src/settings64.sh', '//proc/self/cwd/settings64.sh', '/PROC/1/cwd/settings64.sh', '/dev/fd/3/settings64.sh', '/sys/x/settings64.sh',
+      '/work/../work/src/settings64.sh', '/opt/../work/settings64.sh', '/opt/./ise/settings64.sh', '/home/me/./silinx-build/y/settings64.sh'];
+    for (const s of spellings) {
+      await assert.rejects(api({ mode: 'docker', docker: { image: 'my/ise:14.7', settings: s } }), /^Error: docker.settings must be a plain path: no \. or \.\. in it, not under \/proc, \/dev or \/sys$/);
+      await assert.rejects(api({ mode: 'ssh', ssh: { host: 'h', remoteDir: 'silinx-build', settings: s } }), /^Error: ssh.settings must be a plain path: no \. or \.\. in it, not under \/proc, \/dev or \/sys$/);
+    }
+    // a folder whose name only begins so is a plain one
+    for (const s of ['/opt/procs/settings64.sh', '/device/ise/settings64.sh', '/system/..ise/settings64.sh'])
+      assert.equal((await api({ mode: 'ssh', ssh: { host: 'h', remoteDir: 'silinx-build', settings: s } })).ssh.settings, s);
     // an absolute build folder: config.json's only (#2958), and the script outside it all the same
     await assert.rejects(api({ mode: 'ssh', ssh: { host: 'h', remoteDir: '/srv/b' } }), /^Error: ssh.remoteDir: an absolute folder can only be set in .*config\.json$/);
     await tc.saveConfig({ mode: 'ssh', ssh: { host: 'h', remoteDir: '/srv/b', settings: '/opt/ise/settings64.sh' } });

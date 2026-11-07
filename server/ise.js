@@ -235,6 +235,27 @@ STEPS="\${*:-${defaultSteps.join(' ')}}"
 if ! command -v xst >/dev/null 2>&1; then
   ISE_SETTINGS="\${ISE_SETTINGS:-${DEFAULT_SETTINGS_SH}}"
   if [ -f "$ISE_SETTINGS" ]; then
+    # never a file of the build folder (its files come from the project, #3032): its real path,
+    # every link followed, outside this folder's real path
+    real_path() {
+      f="$1"; n=0
+      while :; do
+        d="$(cd -P "$(dirname "$f")" 2>/dev/null && pwd -P)" || return 1
+        f="$d/$(basename "$f")"
+        [ -L "$f" ] || break
+        l="$(readlink "$f")" || return 1
+        case "$l" in /*) f="$l" ;; *) f="$d/$l" ;; esac
+        n=$((n + 1)); [ "$n" -lt 40 ] || return 1
+      done
+      printf '%s\\n' "$f"
+    }
+    here="$(pwd -P)"
+    real="$(real_path "$ISE_SETTINGS")" || real=""
+    case "$real" in
+      ""|"$here"/*)
+        echo "ERROR: ISE_SETTINGS ($ISE_SETTINGS) is a file of the build folder: not sourced." >&2
+        exit 126 ;;
+    esac
     # settings64.sh takes $1 as the install dir: source it with no positional arguments.
     set --
     # shellcheck disable=SC1090
