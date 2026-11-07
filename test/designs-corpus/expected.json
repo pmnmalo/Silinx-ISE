@@ -146,7 +146,7 @@
    "slices": 4360,
    "luts": 8719,
    "ffs": 257,
-   "period": 72.51
+   "period": 75.704
   }
  },
  "epfl-priority": {
@@ -478,6 +478,9 @@
    ],
    "synth": [
     "Warning: Replacing memory \\p1_v0 with list of registers. See b15_syn.v:739, b15_syn.v:641"
+   ],
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
   "quality": {
@@ -485,7 +488,7 @@
    "slices": 1233,
    "luts": 2457,
    "ffs": 546,
-   "period": 19.976
+   "period": 20.024
   }
  },
  "itc99-b17": {
@@ -521,7 +524,19 @@
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error: Routing design failed: router 2 did not converge in 500 iterations (router2/maxIter), 2 wire(s) still overused: X11Y8/G3_B_PINWIRE2 (net $techmap38480$abc$38319"
+  "flow": "complete",
+  "warnings": {
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
+   ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 1335,
+   "luts": 2649,
+   "ffs": 492,
+   "period": 37.391
+  }
  },
  "itc99-b21": {
   "frontend": "pass",
@@ -593,10 +608,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 80,
-   "luts": 159,
+   "slices": 52,
+   "luts": 95,
    "ffs": 54,
-   "period": 5.198
+   "period": 4.81
   }
  },
  "iwls05-simple-spi": {
@@ -614,10 +629,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 111,
-   "luts": 220,
+   "slices": 79,
+   "luts": 156,
    "ffs": 67,
-   "period": 6.699
+   "period": 6.162
   }
  },
  "iwls05-spi": {

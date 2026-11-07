@@ -256,7 +256,7 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | epfl-max | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 672 | 1344 | 643 | 25.806 | 1 (flow 1) |
 | epfl-sin | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 1064 | 2128 | 0 |  | 0 |
 | epfl-voter | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 1162 | 2323 | 1003 | 26.288 | 1 (flow 1) |
-| epfl-multiplier | Verilog | MIT | pass | - | pass | pass | complete | XC3S500E | 4360 | 8719 | 257 | 72.510 | 1 (flow 1) |
+| epfl-multiplier | Verilog | MIT | pass | - | pass | pass | complete | XC3S500E | 4360 | 8719 | 257 | 75.704 | 1 (flow 1) |
 | epfl-log2 | Verilog | MIT | pass | - | pass | pass | complete | XC3S1200E | 5385 | 10682 | 0 |  | 0 |
 | itc99-b01 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 5 | 9 | 5 | 2.559 | 0 |
 | itc99-b02 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 2 | 4 | 4 | 2.075 | 0 |
@@ -272,19 +272,19 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | itc99-b12 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 178 | 354 | 119 | 9.167 | 1 (synth 1) |
 | itc99-b13 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 42 | 82 | 64 | 6.090 | 0 |
 | itc99-b14 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 657 | 1300 | 334 | 35.424 | 1 (flow 1) |
-| itc99-b15 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1233 | 2457 | 546 | 19.976 | 3 (frontend 2, synth 1) |
+| itc99-b15 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1233 | 2457 | 546 | 20.024 | 4 (frontend 2, synth 1, flow 1) |
 | itc99-b17 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S500E | 3801 | 7575 | 1380 | 22.055 | 6 (frontend 2, synth 3, flow 1) |
-| itc99-b20 | VHDL | ITC'99 notice | pass | - | pass | pass | fail |  |  |  |  |  | 0 |
+| itc99-b20 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1335 | 2649 | 492 | 37.391 | 1 (flow 1) |
 | itc99-b21 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1363 | 2702 | 492 | 38.190 | 1 (flow 1) |
 | itc99-b22 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 2030 | 4026 | 706 | 39.372 | 2 (frontend 1, flow 1) |
-| iwls05-sasc | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 80 | 159 | 54 | 5.198 | 3 (frontend 3) |
-| iwls05-simple-spi | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 111 | 220 | 67 | 6.699 | 3 (frontend 3) |
+| iwls05-sasc | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 52 | 95 | 54 | 4.810 | 3 (frontend 3) |
+| iwls05-simple-spi | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 79 | 156 | 67 | 6.162 | 3 (frontend 3) |
 | iwls05-spi | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 356 | 706 | 229 | 15.920 | 1 (frontend 1) |
 | iwls05-i2c | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 123 | 245 | 130 | 7.170 | 0 |
 | iwls05-ss-pcm | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 42 | 39 | 79 | 4.694 | 1 (frontend 1) |
 | iwls05-usb-phy | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 67 | 115 | 96 | 5.015 | 1 (frontend 1) |
 
-Summary: 67 designs; front end 67 / 67; own testbenches 8 / 8 pass; synthesis 67; netlist = RTL 66; fully open bitstream complete for 66 designs (60 on the XC3S250E, 5 on the XC3S500E, 1 on the XC3S1200E), 1 failing.
+Summary: 67 designs; front end 67 / 67; own testbenches 8 / 8 pass; synthesis 67; netlist = RTL 66; fully open bitstream complete for 67 designs (61 on the XC3S250E, 5 on the XC3S500E, 1 on the XC3S1200E).
 <!-- end of the results table -->
 
 The epfl-priority / adder / max periods are those of the I/O wrapper around a combinational
