@@ -2,7 +2,8 @@
 // larger than the names, inputs on the left, a small circle for an inversion, flip-flops as boxes with their pins'
 // labels (#1083), square wires, a name at each input's and output's wire end — and Silinx's own recognizer (core/ink/schematic.js, offline) reads it after each stroke.
 // The circuit read is listed, each gate's type and each name to correct, then made into the schematic
-// (core/ink/schematic-doc.js: Silinx's symbols where they were drawn, the wires routed).
+// (core/ink/schematic-doc.js: Silinx's symbols where they were drawn, the wires routed). A gate's type chosen in the
+// list keeps its outline as a sample of that type, a name corrected its letters (#1751, core/ink/learn.js).
 //
 //   await handwrittenSchematic({ name, lang, replaces }) -> { doc, circuit } | null
 //     replaces: the schematic has a drawing already (the dialog says it is replaced, Undo bringing it back)
@@ -11,7 +12,8 @@ import { h, dialog } from './ui.js';
 import { mountInkPad, padButtons } from './ink-pad.js';
 import { drawingButtons } from './ink-drawing.js';
 import { circuitText } from '/core/ink/corpus.js';
-import { inkTemplates } from './ink-dialog.js';
+import { inkTemplates, inkGateTemplates, keepSamples } from './ink-dialog.js';
+import { schematicSamples } from '/core/ink/learn.js';
 import { readSchematic, circuitErrors, gateName } from '/core/ink/schematic.js';
 import { schematicFromCircuit } from '/core/ink/schematic-doc.js';
 import { InkError } from '/core/ink/segment.js';
@@ -22,8 +24,9 @@ const KINDS = [['and', 'AND'], ['or', 'OR'], ['xor', 'XOR'], ['nand', 'NAND'], [
 const typesFor = n => (n === 1 ? [['buf', 'BUF'], ['inv', 'NOT']] : KINDS.map(([k, l]) => [`${k}${n}`, l])).filter(([t]) => SYMBOLS[t]);
 
 export function handwrittenSchematic({ name = 'schematic', lang = 'vhdl', replaces = false, title = 'Handwritten Schematic' } = {}) {
-  const templates = inkTemplates();
-  let timer = null, circuit = null;
+  const templates = inkTemplates(), gates = inkGateTemplates();
+  // read: the circuit as read, before the user's corrections; strokes: the drawing it was read from
+  let timer = null, circuit = null, read = null, strokes = [];
   const msg = h('div', { class: 'ink-msg' });
   const list = h('div', { class: 'ink-circuit' });
   const showMsg = (lines, kind = 'warn') => { msg.className = `ink-msg ink-${kind}`; msg.replaceChildren(...lines.map(l => h('div', {}, l))); };
@@ -58,11 +61,12 @@ export function handwrittenSchematic({ name = 'schematic', lang = 'vhdl', replac
   }
   function recognize() {
     timer = null;
-    const strokes = pad.strokes();
-    circuit = null;
+    strokes = pad.strokes();
+    circuit = null; read = null;
     if (!strokes.length) { pad.setLabels([]); renderList(); showMsg([]); return; }
     try {
-      circuit = readSchematic(strokes, { templates });
+      circuit = readSchematic(strokes, { templates, gates });
+      read = structuredClone(circuit);
       pad.setLabels(circuit.gates.map(g => ({ ch: `${g.id} ${gateName(g)}`, box: g.box })));
       renderList();
       check();
@@ -71,6 +75,10 @@ export function handwrittenSchematic({ name = 'schematic', lang = 'vhdl', replac
       pad.setLabels([]); renderList(); showMsg([e.message]);
     }
   }
+  // the gates' types and the names the user corrected, of the drawing on the pad (#1751)
+  const learn = () => {
+    if (read && JSON.stringify(strokes) === JSON.stringify(pad.strokes())) keepSamples(schematicSamples(read, circuit, strokes), 'schematic');
+  };
   // Undo, Redo, Clear; Copy Drawing and Paste Drawing (#1749)
   const padRow = padButtons(pad);
   padRow.append(...drawingButtons(pad, { kind: 'schematic', read: () => (circuit ? circuitText(circuit) : '') }));
@@ -88,7 +96,7 @@ export function handwrittenSchematic({ name = 'schematic', lang = 'vhdl', replac
     title, width: '100vw', body, className: 'ink-dlg ink-full',
     onOpen: () => setTimeout(() => { if (body.contains(document.activeElement)) document.activeElement.blur(); }, 0),
     buttons: [
-      { label: 'Create Schematic', primary: true, validate: () => { flush(); return check(); }, value: () => ({ ...schematicFromCircuit(circuit, { name, lang }), circuit }) },
+      { label: 'Create Schematic', primary: true, validate: () => { flush(); return check(); }, value: () => { learn(); return { ...schematicFromCircuit(circuit, { name, lang }), circuit }; } },
       { label: 'Cancel', value: null },
     ],
   }).finally(() => { clearTimeout(timer); pad.destroy(); });

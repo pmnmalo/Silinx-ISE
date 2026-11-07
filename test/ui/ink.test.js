@@ -3,7 +3,8 @@
 // dialog's pad with the mouse, a finger and a pen (CDP input: pointer events of each type), its column; two equations
 // with names of their own, a line each, the editor's inputs, outputs and expressions (one step of Undo); an expression with a stroke drawn by page.touchDrag; Undo, Redo (their keys too), Clear undone, a hand
 // resting on the screen while the pen writes (ignored); Teach Silinx my handwriting (a sample saved, used,
-// forgotten); the dialog in Portuguese, its warnings and its errors; the pad zoomed and moved. The console's lines are
+// forgotten); a character corrected before Insert kept as a sample (#1751), read so the next time, said in the console;
+// the dialog in Portuguese, its warnings and its errors; the pad zoomed and moved. The console's lines are
 // asserted; no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -450,5 +451,59 @@ uiTest('Handwritten expressions: Copy Drawing and Paste Drawing; a drawing of an
   await page.waitDialog('Handwritten Expression');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
+  assert.deepEqual(warnings(page), []);
+}, { skip: chromeOnly });
+
+uiTest('Handwritten expressions: a character corrected before Insert is a sample of the user\'s handwriting, read so the next time (#1751)', E, async (page) => {
+  await page.eval(() => localStorage.removeItem('silinx.ink.samples'));
+  const open = async () => {
+    void page.eval(async () => { window.__ink = (await import('/js/ink-dialog.js')).handwrittenExpression(); });
+    await page.waitDialog('Handwritten Expression');
+  };
+  // the user's A, a star, then + B
+  const writeStarPlusB = async () => {
+    const c = await canvasAt(page);
+    const at = (x0, y0, r, a) => ({ x: c.x + x0 + r * Math.cos(a), y: c.y + y0 + r * Math.sin(a) });
+    for (let j = 0; j < 5; j++) {
+      const [p, q] = [at(60, 70, 32, j * 1.2566), at(60, 70, 32, j * 1.2566 + 2.5)];
+      await stroke(page, Array.from({ length: 9 }, (_, k) => ({ x: p.x + (q.x - p.x) * k / 8, y: p.y + (q.y - p.y) * k / 8 })), 'pen');
+    }
+    for (const s of writeText('+B', { seed: 2, amount: 0.3, size: 64, x: 120, y: 38 }).strokes) await stroke(page, s.map((q) => ({ x: c.x + q.x, y: c.y + q.y })), 'pen');
+  };
+  await open();
+  await writeStarPlusB();
+  await waitText(page, '? + B');
+  // corrected, inserted: the star kept as the user's A, the console says so
+  await page.fill(`${D} .ink-text`, 'A + B');
+  await page.dialogButton('Insert');
+  await page.waitNoDialog();
+  assert.equal(await page.eval(async () => (await window.__ink).text), 'A + B');
+  const line = "A sample of your handwriting kept from your corrections of the expression ('A'): Silinx now reads your way of writing it; Forget My Samples, in Teach Silinx my handwriting, forgets it.";
+  await page.waitFor((l) => window.__console().includes(l), [line], { what: 'the console\'s line' });
+  assert.ok((await page.consoleText()).split('\n').includes(line));
+  const kept = await page.eval(() => JSON.parse(localStorage.getItem('silinx.ink.samples')));
+  assert.deepEqual([kept.length, kept[0].c, kept[0].s.length], [1, 'A', 5]);
+  // the next time: read as A at once, nothing to correct, nothing more kept
+  await open();
+  assert.equal(await page.eval((d) => document.querySelector(`${d} .ink-count`).textContent, D), 'Samples of your handwriting: 1');
+  await writeStarPlusB();
+  await waitText(page, 'A + B');
+  assert.equal(await message(page), '');
+  await page.dialogButton('Insert');
+  await page.waitNoDialog();
+  assert.equal(await page.eval(() => JSON.parse(localStorage.getItem('silinx.ink.samples')).length), 1);
+  // forgotten: the star unknown again
+  await open();
+  await page.click(`${D} .ink-teach summary`);
+  await page.click(`${D} .ink-forget`);
+  assert.equal(await page.eval(() => localStorage.getItem('silinx.ink.samples')), '[]');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await open();
+  await writeStarPlusB();
+  await waitText(page, '? + B');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  assert.equal((await page.consoleText()).split('\n').filter((l) => l === line).length, 1);
   assert.deepEqual(warnings(page), []);
 }, { skip: chromeOnly });

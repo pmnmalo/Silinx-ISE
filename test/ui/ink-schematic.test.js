@@ -1,7 +1,8 @@
 // UI: hand-drawn schematics (#1067, flip-flops #1083), Development ▸ Handwritten Schematic… while a preview
 // (#1098): a half adder drawn on the pad with the mouse, a finger and a pen (CDP input) is read (its gates listed with their types, its names), a gate's type and a
 // name corrected, and made into the editor's drawing in one edit (Undo brings the drawing before back): its netlist
-// clean, its HDL simulating to the corrected circuit's truth table. The dialog in Portuguese, with a drawing that is
+// clean, its HDL simulating to the corrected circuit's truth table; the gate's outline kept as a sample of its type
+// chosen (#1751), said in the console, the same drawing read so the next time. The dialog in Portuguese, with a drawing that is
 // not a circuit (its errors) and a name at no wire's end (its warning). No console warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,6 +69,7 @@ async function openSchematic(page, project) {
 }
 
 uiTest('Handwritten… (schematic): a half adder drawn with the mouse, a finger and a pen, corrected, made into the drawing; Undo', E, async (page) => {
+  await page.eval(() => localStorage.removeItem('silinx.ink.samples'));
   await openSchematic(page, 'InkSch');
   await page.menu('Development', 'Handwritten Schematic…');
   await page.waitDialog('Handwritten Schematic');
@@ -101,6 +103,11 @@ uiTest('Handwritten… (schematic): a half adder drawn with the mouse, a finger 
   assert.deepEqual(netlist(doc).diagnostics, []);
   const tt = truthTableFromModule([{ path: 'hand.vhd', text: generateHdl(doc, { lang: 'vhdl' }).code }], 'hand');
   assert.deepEqual([tt.inputs, tt.table], [['a', 'b'], { s: '0110', cout: '0111' }]);
+  // the AND's outline kept as the user's OR (#1751; Cout, of other letters than the C read, is no sample)
+  const line = 'A sample of your handwriting kept from your corrections of the schematic (OR): Silinx now reads your way of writing it; Forget My Samples, in Teach Silinx my handwriting, forgets it.';
+  await page.waitFor((l) => window.__console().includes(l), [line], { what: 'the console\'s line' });
+  assert.ok((await page.consoleText()).split('\n').includes(line));
+  assert.deepEqual(await page.eval(() => JSON.parse(localStorage.getItem('silinx.ink.samples')).map((x) => x.c)), ['or']);
   // saved, then one Undo: the empty schematic again
   await page.waitFor(async () => JSON.parse(await (await fetch('/api/projects/InkSch/file?path=src%2Fhand.sch.json')).text()).symbols.length === 2, [], { what: 'saved', timeout: 15000 });
   await page.click(`#toolbar [data-cmd=undo]`);
@@ -110,9 +117,14 @@ uiTest('Handwritten… (schematic): a half adder drawn with the mouse, a finger 
   await page.menu('Development', 'Handwritten Schematic…');
   await page.waitDialog('Handwritten Schematic');
   assert.equal(await page.eval((d) => document.querySelector(`${d} .ink-replaces`).textContent, D), 'The schematic drawn replaces the one in the editor (Undo brings it back).');
+  // the same drawing: its second gate read as the user's OR
+  await draw(page, writeSchematic(HALF_ADDER, { seed: 9, amount: 0.4, size: 60, x: 30, y: 30 }).strokes);
+  await page.waitFor((d) => [...document.querySelectorAll(`${d} .ink-gate code`)].map((c) => c.textContent).join() === '(A, B) → S,(A, B) → C', [D], { what: 'the circuit read again', timeout: 15000 });
+  assert.deepEqual((await listed(page)).gates, ['U1 xor2 (A, B) → S', 'U2 or2 (A, B) → C']);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   assert.equal(await page.eval(() => window.Silinx.active.schEditor.getDoc().symbols.length), 2);
+  await page.eval(() => localStorage.removeItem('silinx.ink.samples'));
   assert.deepEqual(warnings(page), []);
 }, { skip: chromeOnly, build: DEV });
 

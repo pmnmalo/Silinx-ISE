@@ -12,7 +12,8 @@
 //     without '=');
 //     chars: [{ ch, box, ink, alts }] (ink: the indexes of its strokes); warnings: what to check; error: the
 //     parser's message, if the text does not parse
-//   recognizeWords(strokes, { templates, gap, capH }) -> [{ text, box, ink }] names on a line (letters, digits, _)
+//   recognizeWords(strokes, { templates, gap, capH }) -> [{ text, box, ink, chars: [{ ch, ink }] }] names on a line
+//     (letters, digits, _)
 //   splitEquation(text) -> { name, expr }; expressionInputs(expr) -> the inputs of an expression
 import { segment, boxOf, InkError } from './segment.js';
 import { classify } from './pdollar.js';
@@ -28,7 +29,7 @@ const LOOKALIKE = [['O', 'o', '0'], ['l', '1', '|', 'I'], ['C', 'c', '('], ['(',
   ['B', '8'], ['g', '9', 'q'], ['b', '6'], ['A', '^'], ['V', 'v', 'U', 'u'], ['P', 'p'], ['K', 'k'], ['W', 'w'], ['Y', 'y'], ['¬', '7']];
 const MARKS = ["'", '·'];
 // the letters whose capital is the small letter drawn larger
-const SAME_SHAPE = new Set('copsuvwxyz');   // (a k is as tall as a K)
+export const SAME_SHAPE = new Set('copsuvwxyz');   // (a k is as tall as a K)
 const TALL = /[A-Z0-9bdfhklt]/;
 const DESCENDS = /^[gjpqyY]$/;
 const SHORT = /[acemnorsuvwxz]/;
@@ -257,7 +258,7 @@ export function recognizeWords(strokes, { templates = builtinTemplates(), gap = 
   if (capH) words.forEach(w => { w.gs.capH = capH; fixCase(w.gs); }); else fixCase(gs);
   return words.map(w => {
     const ink = w.gs.flatMap(g => g.ink);
-    return { text: w.gs.map(g => g.ch).join(''), box: boxOf(ink.map(k => live[k])), ink };
+    return { text: w.gs.map(g => g.ch).join(''), box: boxOf(ink.map(k => live[k])), ink, chars: w.gs.map(g => ({ ch: g.ch, ink: g.ink })) };
   });
 }
 

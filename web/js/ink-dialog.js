@@ -1,18 +1,22 @@
 // The Handwritten Expression dialog (#1056): the user writes Boolean expressions on a drawing pad (ink-pad.js), one a
 // line, with any names (#2010), with a pen, a finger or the mouse; Silinx's own recognizer (core/ink/equations.js,
 // expression.js, offline) reads them after each stroke and shows the text, which the user corrects before inserting it. "Teach Silinx my handwriting" keeps the
-// user's samples of a symbol in the browser (localStorage), used as templates of their own.
+// user's samples of a symbol in the browser (localStorage), used as templates of their own; on Insert, the characters
+// the user corrected become samples too (#1751, core/ink/learn.js), said in the console.
 //
 //   await handwrittenExpression({ name, check, title }) -> { text, inputs, outputs, table, exprs } | null
 //     name: the output of a single expression with no name; check(table): the host's error of the table they make,
 //     or null (core/ink/equations.js tableFromEquations)
+//   keepSamples(list, what) -> how many were kept: samples learnt from a correction (the schematic dialog's too)
 // Styles: web/css/ink.css.
 import { h, dialog } from './ui.js';
 import { mountInkPad, padButtons } from './ink-pad.js';
 import { drawingButtons } from './ink-drawing.js';
 import { InkError } from '/core/ink/expression.js';
 import { recognizeEquations, tableFromEquations } from '/core/ink/equations.js';
-import { builtinTemplates, userTemplates, encodeSample, validSamples } from '/core/ink/templates.js';
+import { builtinTemplates, userTemplates, userGateTemplates, encodeSample, validSamples } from '/core/ink/templates.js';
+import { gateTemplates } from '/core/ink/gates.js';
+import { expressionSamples } from '/core/ink/learn.js';
 import { boxOf } from '/core/ink/segment.js';
 import { SYMBOLS } from '/core/ink/font.js';
 import { LogicError } from '/core/logic.js';
@@ -28,6 +32,17 @@ function saveSamples(list) {
   try { localStorage.setItem(SAMPLES_KEY, JSON.stringify(list.slice(-MAX_SAMPLES))); return true; } catch { return false; }
 }
 
+/** Samples learnt from the user's corrections (#1751) added to theirs, a line in the console saying so; how many were
+ *  kept (none: the browser's storage unavailable). */
+export function keepSamples(list, what) {
+  if (!list.length || !saveSamples([...loadSamples(), ...list])) return 0;
+  const chars = [...new Set(list.map(x => x.c))].map(c => (c.length > 1 ? c.toUpperCase() : `'${c}'`)).join(', ');
+  const it = list.length === 1 ? 'it' : 'them';
+  import('./console.js').then(m => m.log(`${list.length === 1 ? 'A sample' : `${list.length} samples`} of your handwriting kept from your corrections of the ${what} (${chars}): Silinx now reads your way of writing ${it}; Forget My Samples, in Teach Silinx my handwriting, forgets ${it}.`, 'ok'))
+    .catch(() => { /* (no console: a page of its own) */ });
+  return list.length;
+}
+
 /** The error of a text of equations, one a line (null: they make a table, and check finds nothing wrong with it). */
 export function expressionError(text, { name = 'F', check = () => null } = {}) {
   try { return check(tableFromEquations(text, { name })); } catch (e) { if (e instanceof LogicError) return e.message; throw e; }
@@ -35,11 +50,13 @@ export function expressionError(text, { name = 'F', check = () => null } = {}) {
 
 /** The templates of the recognizer: the built-in ones and the user's samples kept by the browser. */
 export const inkTemplates = () => [...builtinTemplates(), ...userTemplates(loadSamples())];
+/** The gates' outlines of the recognizer (#1751): the built-in ones and the user's, from their corrections. */
+export const inkGateTemplates = () => [...gateTemplates(), ...userGateTemplates(loadSamples())];
 
 export function handwrittenExpression({ name = 'F', check = () => null, title = 'Handwritten Expression' } = {}) {
   let samples = loadSamples();
   let templates = inkTemplates();
-  let timer = null;
+  let timer = null, last = null;
   const text = h('textarea', { class: 'ink-text', rows: 3, spellcheck: 'false', placeholder: 'The recognized text appears here, an expression a line' });
   const error = () => expressionError(text.value, { name, check });
   const msg = h('div', { class: 'ink-msg' });
@@ -53,9 +70,11 @@ export function handwrittenExpression({ name = 'F', check = () => null, title = 
   function recognize() {
     timer = null;
     const strokes = pad.strokes();
+    last = null;
     if (!strokes.length) { text.value = ''; pad.setLabels([]); showMsg([]); return; }
     try {
       const r = recognizeEquations(strokes, { templates });
+      last = { r, strokes };
       text.value = r.text;
       pad.setLabels(r.lines.flatMap(l => l.chars).map(c => ({ ch: c.ch, box: boxOf(c.ink.map(k => strokes[k])) })));
       const e = error(), warnings = [...new Set(r.lines.flatMap(l => l.warnings))];
@@ -99,6 +118,11 @@ export function handwrittenExpression({ name = 'F', check = () => null, title = 
       h('button', { type: 'button', class: 'btn ink-forget', onclick: forget }, 'Forget My Samples'), count),
     teachMsg);
 
+  // the characters the user corrected, of the reading of the strokes on the pad (#1751)
+  const learn = () => {
+    if (last && JSON.stringify(last.strokes) === JSON.stringify(pad.strokes())) keepSamples(expressionSamples(last.r, text.value, last.strokes), 'expression');
+  };
+
   // Undo, Redo, Clear; Copy Drawing and Paste Drawing (#1749)
   const padRow = padButtons(pad);
   padRow.append(...drawingButtons(pad, { kind: 'expression', read: () => text.value }));
@@ -114,7 +138,7 @@ export function handwrittenExpression({ name = 'F', check = () => null, title = 
     // no text field in focus: on a pen display or a tablet it would open the on-screen keyboard over the pad
     onOpen: () => setTimeout(() => { if (body.contains(document.activeElement)) document.activeElement.blur(); }, 0),
     buttons: [
-      { label: 'Insert', primary: true, validate: () => { flush(); const e = error(); if (e) showMsg([e]); return !e; }, value: () => ({ text: text.value.trim(), ...tableFromEquations(text.value, { name }) }) },
+      { label: 'Insert', primary: true, validate: () => { flush(); const e = error(); if (e) showMsg([e]); return !e; }, value: () => { learn(); return { text: text.value.trim(), ...tableFromEquations(text.value, { name }) }; } },
       { label: 'Cancel', value: null },
     ],
   }).finally(() => { clearTimeout(timer); pad.destroy(); });
