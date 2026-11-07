@@ -3,7 +3,7 @@ import { api, followJob } from './api.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, alertDlg, confirmDlg, promptDlg, popupMenu, splitter, toast } from './ui.js';
 import { createEditor, instTemplate, snippetsFor, typeText } from './editor.js';
-import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC } from './c-source.js';
+import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC, noteFailedC } from './c-source.js';
 import { compile, implRoots, topCandidates } from '/core/compile.js';
 import { primitiveSources } from '/core/unisim.js';
 import * as wiz from './wizards.js';
@@ -79,6 +79,7 @@ export function compileProject() {
   const views = Object.entries(S.viewTexts || {}).filter(([f]) => !S.schOwners?.[f]);
   // the modules of the HDL files, compiled once for the drawings below (#402)
   let hdlModules = null;
+  const failedC = [];   // (a C source whose HDL cannot be made: its row and its errors, #2995)
   if (views.length) {
     let mods = {}, lib0 = null;
     try { lib0 = compile(srcs); mods = modulesFromLibrary(lib0, { sources: Object.fromEntries(srcs.map(s => [s.path, s.text])) }); } catch { /* none */ }
@@ -89,12 +90,13 @@ export function compileProject() {
     // (a drawing whose HDL file is gone, deleted or removed from the project, is one without it: #231)
     for (const [f, t] of views) {
       const r = viewHdl(f, t, { modules: mods, linked: hdlInProject, lang: S.project.preferredLanguage, clock: hlsClock(), family: hlsFamily(), hls: S.hls, mults: hlsMults() });
-      if (!r?.text) continue;
+      if (!r?.text) { if (isC(f)) failedC.push([f, r]); continue; }
       if (!hdlMods.has(String(r.module).toLowerCase())) { S.viewSources.push({ path: f, lang: r.lang, text: r.text, role: 'design', view: true, module: r.module, errors: r.errors.length, lost: r.lost || null, ...(r.sequential ? { sequential: true } : {}) }); continue; }
       const m = !r.errors.length && [...(lib0?.modules.values() || [])].find(x => x.name.toLowerCase() === String(r.module).toLowerCase());
       if (m) S.viewElsewhere[f] = { module: r.module, lang: r.lang, file: m.archFile || m.file, lost: r.lost || null };
     }
   }
+  noteFailedC(failedC);
   // the linked drawings that cannot generate their HDL file (errors: a project opened with one, #303), each
   // text once (an edit in its editor says it as it syncs)
   let lazyMods = hdlModules;
@@ -156,11 +158,13 @@ export function viewRoots(sim) {
 export async function fixMissingTops() {
   const pj = S.project;
   const declared = name => (S.sources || []).some(f => new RegExp(`\\b(entity|module)\\s+${String(name).replace(/[^\w$]/g, '')}\\b`, 'i').test(f.text || ''));
+  // (the module of a C source whose HDL cannot be made for now, #2995: still its top)
+  const cMade = name => Object.values(S.cFailed || {}).some(c => String(c.module || '').toLowerCase() === String(name).toLowerCase());
   let changed = false;
   for (const sim of [false, true]) {
     const key = sim ? 'simTop' : 'top';
     const old = pj[key];
-    if (!old || moduleInfo(old) || declared(old)) continue;
+    if (!old || moduleInfo(old) || declared(old) || cMade(old)) continue;
     const roots = viewRoots(sim);
     pj[key] = roots.length === 1 ? roots[0] : '';
     changed = true;

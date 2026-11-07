@@ -250,6 +250,17 @@ export function applyBlackboxes(checked, list, report) {
   return anyCall;
 }
 
+/** Check Syntax of a C source (#2995): the descriptions of the blackboxes it declares (not its top) checked as its
+ *  synthesis checks them, against its functions and their RTL modules: their errors and warnings, each in its description.
+ *  checked: a check of the source of its own (checkC's), its described functions made blackboxes. */
+export function blackboxChecks(checked, { blackboxes = [], headers = {} } = {}) {
+  const nameOf = (b) => { try { return JSON.parse(b.text)?.c_function_name; } catch { return null; } };
+  const mine = (blackboxes || []).filter((b) => { const n = nameOf(b); return typeof n === 'string' && n !== checked.top && checked.funcs.has(n); });
+  const { list, diagnostics } = loadBlackboxes(mine, headers);
+  applyBlackboxes(checked, list, (d) => diagnostics.push(d));
+  return diagnostics;
+}
+
 /** A project's blackboxes (the app's, the server's): its JSON files that are descriptions, with what the flows read
  *  (the headers, the descriptions' files); null when it has none. read(path) gives a file's text. */
 export async function blackboxesIn(paths, read) {

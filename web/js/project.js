@@ -22,7 +22,7 @@ const prepareDelay = () => globalThis.SILINX_PREPARE_DELAY ?? 2000;
 // per-project UI state (cleared when another project is opened or the project is closed)
 function resetProjectState() {
   S.diagsCleared++;   // (the start-up checks' lines coming later: not in the tabs, #339)
-  S.status = {}; S.sel = null; S.selKey = null; S.selProc = null; S.diags = []; S.outOfSync = {}; S.staleHdl = {}; S.staleSeen = new Map(); S.ucfText = null; S.hdlClash = {}; S.hdlClashWarned = new Set();
+  S.status = {}; S.sel = null; S.selKey = null; S.selProc = null; S.diags = []; S.outOfSync = {}; S.staleHdl = {}; S.staleSeen = new Map(); S.cFailed = {}; S.cFailedSaid = new Map(); S.ucfText = null; S.hdlClash = {}; S.hdlClashWarned = new Set();
   renderDiagnostics();
   renderProcesses();   // (not the last project's processes and states, until a state of this one is restored: #1162)
 }
