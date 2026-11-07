@@ -11,7 +11,7 @@ import { axisArgs, axisTop } from './c-axis.js';
 import { dataflow } from './c-dataflow.js';
 import { portOf, renamedWhy } from './c-names.js';
 import { scheduled } from './c-schedule.js';
-import { vhdlSeq, verilogSeq, seqRoots } from './c-hdl-seq.js';
+import { vhdlSeq, verilogSeq, seqRoots, liveRegs } from './c-hdl-seq.js';
 import { aggregate, aggregable, structPragmas, wordGroups } from './c-aggregate.js';
 import { cProcesses } from './c-processes.js';
 import { regionLoops } from './c-dataflow-loops.js';
@@ -220,6 +220,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const src = file.split('/').pop();
   // (each operation only as wide as its users read it, #2290)
   df.graph.narrow(df.seq ? seqRoots(df) : [...df.outputs.values()]);
+  if (df.seq) df.regs = liveRegs(df);
   const text = df.seq ? (lang === 'vhdl' ? vhdlSeq : verilogSeq)(name, src, ports, df, agg) : (lang === 'vhdl' ? vhdl : verilog)(name, src, ports, df, agg);
   // (a design: its sub-modules first)
   const hdl = modules ? text : [...subs.modules().map((m) => m.gen.hdl), text].join('\n');

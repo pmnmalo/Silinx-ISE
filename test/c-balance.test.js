@@ -138,8 +138,8 @@ test('#2613 co-simulated in VHDL and Verilog: a function\'s sum of 32 products i
     assert.deepEqual([c.errors, c.pass, c.gen.diagnostics, c.latency.max], [[], true, [], 4], lang);
     const p = cosimulate(PIPE, { file: 'f.c', lang });
     assert.deepEqual([p.errors, p.pass, p.gen.diagnostics], [[], true, []], lang);
-    // (were 18 stages and 12908 bits of registers)
-    assert.deepEqual([p.gen.report.loops.map((l) => [l.ii, l.depth ?? null]), p.gen.report.registerBits], [[[1, 4], [0, null]], 732], lang);
+    // (were 18 stages and 12908 bits of registers; 732 with the body's own variables' registers, never written, #2990)
+    assert.deepEqual([p.gen.report.loops.map((l) => [l.ii, l.depth ?? null]), p.gen.report.registerBits], [[[1, 4], [0, null]], 540], lang);
   }
 });
 
