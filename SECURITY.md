@@ -40,11 +40,15 @@ can read that user's files has the server too.
 - The pages carry a Content Security Policy with the hashes of their scripts and styles.
 - Every path a request names is confined to the project it belongs to; a project's zip is limited in
   size when it is unpacked.
-- The programs the toolchain runs (Docker, ssh, ISE's tools) are spawned without a shell, and the
-  settings that choose which program runs, and with what arguments, are read from the user's
-  configuration file only, never from the page. The ISE settings script and the Docker image the
-  page may choose are checked: the script is a file outside the projects and the build folders,
-  writable only by its owner (root or the user), and Docker never pulls an image Silinx runs. The ISE
+- The programs the toolchain and the board programming run (Docker, ssh, ISE's tools, the programming tools) are
+  spawned without a shell. The programs' paths and the arguments given to Docker and ssh come from the user's
+  configuration file only: the page cannot change them (the settings `server/toolchain.js` names `FILE_ONLY`, which
+  the API refuses unless sent unchanged). The page picks the rest among checked values: the build's mode, the ssh
+  machine and its user, the Docker image, and for the programming one of the known tools with its options (a cable, a
+  device, a board, a position, the bitstream: `server/programmer-values.js`, no value that starts with `-`); so whoever
+  holds the token can send a project's build to an ssh machine of its choosing, the token being the server (Scope).
+  An ISE settings script and a Docker image the page chooses are checked: the script is a file outside the projects
+  and the build folders, writable only by its owner (root or the user), and Docker never pulls an image Silinx runs. The ISE
   container runs with no network, no capability, no way to gain privileges and a bound on its processes
   (`--network none --cap-drop ALL --security-opt no-new-privileges --pids-limit`), and a memory limit
   when the configuration sets one (`docker.memory`).
@@ -65,7 +69,13 @@ can read that user's files has the server too.
 - The self-hosted runner with Xilinx ISE (the maintainer's machine) runs only `ise.yml` and `quality.yml`,
   scheduled or started by hand, on `main`, with a read-only token and no credentials kept; never a pull
   request's code. Every workflow's jobs are checked for it in `test/workflows.test.js`; a pull request from
-  a fork waits for the maintainer's approval before any of its workflows runs.
+  a fork waits for the maintainer's approval before any of its workflows runs. Its jobs run as a user of their
+  own, but that user reaches Docker Desktop's socket (`scripts/ise-runner/install.sh --docker-acl`), and Docker
+  Desktop runs as the maintainer: that socket is the runner's real boundary. Code run in those jobs (a dependency of
+  `main`'s lockfile, a parser led astray by a design of the corpus) could start a container of its own that mounts
+  any folder Docker Desktop shares; Silinx's own `docker run` options protect only its own containers. So the
+  machine's Docker Desktop must share only the runner's work and cache folders (Settings ▸ Resources ▸ File sharing),
+  never the whole of `/Users`.
 - On GitHub, secret scanning and push protection refuse a token or key at push time, and private
   vulnerability reporting is on.
 
@@ -94,9 +104,11 @@ board or a PROM) without the user's say.
      another only by its case. A refused entry is never inflated.
    - XML (`.xise`, `.sch`, `.sym`, PNML, `.wcfg`, `.svg`): no DTD and no entity declaration, so no external entity
      and no entity expansion, whatever parser reads it next (Silinx's own XML readers expand none either).
-   - Types by extension and content: a web page, a script or a program is refused; a text file (a source, a drawing,
-     constraints, a memory's data) that holds a NUL byte or is an HTML page is refused; text is read as UTF-8, its
-     invalid bytes replaced with a warning.
+   - Types by extension and content: a text file (a source, a drawing, constraints, a memory's data) that holds a
+     NUL byte or is an HTML page is refused; text is read as UTF-8, its invalid bytes replaced with a warning. Any
+     other file (a document, an image, a page or a script under its own extension, `.html`, `.js`) is kept as it is,
+     opaque, and an `.svg` as XML: Silinx never renders such a file as a page nor runs it (the server sends a file as
+     `text/plain`, with `nosniff`).
    - The result: the files accepted, and each refusal with its reason, in the console and in the MCP tools' results.
      A file refused is left out and the import goes on; a bomb refuses the whole import.
 2. **Safe output:** what a file names (a module, a port, a label, a comment, a file) reaches the page only as text:
@@ -116,7 +128,10 @@ board or a PROM) without the user's say.
    install) and programming a board or a PROM are refused (the server's 403, the browser edition's error, the MCP
    tool's) until the user trusts it: the console says so when the project opens, with a **Trust Project** button.
    Saving the project's description does not make it trusted; only that button does. The MCP server has no tool to
-   trust a project, by design: an assistant led astray by what it read cannot. A project made in Silinx is trusted
+   trust a project, by design: an assistant led astray by what it read cannot. Nor has it a tool to program a board
+   or a PROM; its `run_process` runs the Silinx toolchain, or Xilinx ISE as Toolchain Settings configure it (a local
+   install, Docker, ssh) when asked for (`toolchain: 'ise'`), under the same trust gate: an assistant's writes into a
+   project the user made, which is trusted, can reach ISE. A project made in Silinx is trusted
    from the start, but for one the MCP server makes (`new_project`, `new_project_from_example`, `open_link` of an
    example): it holds what an assistant writes, so it is untrusted too, its console line and refusals saying it was made
    through the MCP server (#2981).
@@ -135,6 +150,8 @@ What it cannot do:
 - **Reach this computer or a local network, or send anything:** `open=` takes an `https:` address only, with no user
   name or password, never `localhost`, a loopback, private, link-local or carrier-grade address, an IPv6 local one or
   a `.local` / `.lan` / `.internal` name (also a decimal or hexadecimal address, read as the browser reads it). The
+  check reads the host's name, not its DNS: a public name that resolves to a private address passes, but being
+  `https:` it cannot reach the local server, which serves plain `http:`. The
   zip is fetched by the browser, never by the local server, only after the user agrees in a dialog that names its
   address, with no cookies and no referrer. The MCP server's `open_link` fetches nothing: it opens a design inside
   the link or an example. The link's hash is never sent to a server (a browser sends no hash in a request; the site's page count
