@@ -16,6 +16,7 @@
 import { browserCodec, createZip } from './zip.js';
 import { VIEW_RE, isCSource, viewHdl } from './view-hdl.js';
 import { gateEntries, gateMessages } from './import-gate.js';
+import { foldsToProjectFile, PROJECT_FILE } from './fold-name.js';
 
 /** The limits of a link: the design's encoded length (characters), its JSON inflated (bytes), its files; `slides`:
  *  the length above which some slide tools cut a link (it is still made, with a warning). */
@@ -156,10 +157,12 @@ export async function decodeDesign(design, { codec = browserCodec() } = {}) {
 }
 
 // a file's path inside the project: relative, forward slashes, no '..', no hidden part (.git, settings), not silinx.json
+// nor a name a case-insensitive file system takes for it (SILINX.JSON, ſilinx.json; src/silinx.json is a file, #3034)
 // (the import checks the paths again: project-store.js projectFromZip, server/project-zip.js)
 function safePath(p) {
-  const parts = p.split('/');
-  return p.length > 0 && p.length <= 255 && !/[\\:\0-\x1f]/.test(p) && p.toLowerCase() !== 'silinx.json'
+  const parts = p.split('/'), last = parts[parts.length - 1];
+  return p.length > 0 && p.length <= 255 && !/[\\:\0-\x1f]/.test(p) && !foldsToProjectFile(p)
+    && !(last !== PROJECT_FILE && foldsToProjectFile(last))
     && parts.every(s => s && s !== '..' && !s.startsWith('.'));
 }
 

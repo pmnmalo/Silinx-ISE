@@ -11,6 +11,7 @@ import { resolveBoard } from './devices.js';
 import { realOf, within } from './paths.js';
 import { topNameError } from './ident.js';
 import { normalizePath } from '../core/import-gate.js';
+import { foldName } from '../core/fold-name.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
@@ -290,9 +291,8 @@ export async function deleteProject(name) {
 
 // project-relative path normalised to forward slashes, without './' or a trailing '/'
 export const relKey = (dir, full) => path.relative(dir, full).split(path.sep).join('/');
-// a name as a case-insensitive file system may read it: full case folding (ſ is s, K is k) and NFKC, not
-// toLowerCase alone ('ſilinx.json' is silinx.json on APFS, #2956)
-export const foldName = s => String(s).normalize('NFKC').toUpperCase().toLowerCase();
+// a name as a case-insensitive file system may read it (core/fold-name.js, shared with the browser, #3034)
+export { foldName };
 // (whatever its case: on a case-insensitive file system SILINX.JSON is the same file)
 export const isProjectFile = key => foldName(key) === PROJECT_FILE;
 // a path of the project that is its silinx.json, by its name or as the very same file on disk (#2956)

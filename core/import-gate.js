@@ -19,12 +19,16 @@
 //   depth (brackets, XML elements, JSON; an HDL's if … elsif chain, #2577);
 // - names: relative to the project, no '..', absolute path, drive letter, backslash, control character, character
 //   Windows refuses (< > : " | ? *), hidden file or folder (.git, .silinx), reserved name (build/, CON, NUL, …),
-//   symbolic link, or a name that differs from another only by its case;
+//   symbolic link, a name that differs from another only by its case or its Unicode form (the full case fold and
+//   NFKC: core/fold-name.js), or one a case-insensitive file system takes for silinx.json but silinx.json itself
+//   (SILINX.JSON, ſilinx.json, #3034);
 // - XML (.xise, .sch, .sym, PNML, .wcfg, .svg): no DTD (<!DOCTYPE>, <!ENTITY>), so no external entity and no entity
 //   expansion (XXE, billion laughs), whatever the parser that reads it next;
 // - types: by the extension and the content: a text file (an HDL source, a drawing, constraints…) that holds a NUL
 //   byte or is a web page is refused; text is decoded as UTF-8 (invalid sequences replaced, with a warning); any other
 //   file (a document, an image, a script) is kept as it is, opaque: Silinx never renders it as a page nor runs it.
+
+import { foldName, foldsToProjectFile, PROJECT_FILE } from './fold-name.js';
 
 /** The caps of an import (bytes, counts). */
 export const GATE_LIMITS = Object.freeze({
@@ -84,7 +88,10 @@ export function normalizePath(p, { limits = GATE_LIMITS } = {}) {
     if (s.length > limits.maxSegment) return { reason: `name longer than ${limits.maxSegment} characters` };
   }
   // (by its full case fold: what a case-insensitive file system may take for build, #2956)
-  if (parts[0].normalize('NFKC').toUpperCase().toLowerCase() === 'build') return { reason: "the project's build folder (build/) is Silinx's own" };
+  if (foldName(parts[0]) === 'build') return { reason: "the project's build folder (build/) is Silinx's own" };
+  // (another spelling of the project's description would overwrite it once saved, #3034)
+  const last = parts[parts.length - 1];
+  if (last !== PROJECT_FILE && foldsToProjectFile(last)) return { reason: `another spelling of ${PROJECT_FILE}, the project's description ('${last}')` };
   return { path: parts.join('/') };
 }
 
@@ -172,14 +179,14 @@ function screen(path, data, limits) {
   return reason ? { reason } : { file: { path, data: bytes, kind, text }, warning };
 }
 
-// a batch's names: each normalised, a name that differs from an earlier one only by its case refused
+// a batch's names: each normalised, a name that differs from an earlier one only by its case or form refused
 function nameCheck(limits) {
   const seen = new Map();
   return (p, { symlink = false } = {}) => {
     if (symlink) return { reason: 'symbolic link' };
     const n = normalizePath(p, { limits });
     if (n.reason) return n;
-    const key = n.path.toLowerCase();
+    const key = foldName(n.path);
     if (seen.has(key)) return { reason: seen.get(key) === n.path ? 'twice in the import' : `same name as '${seen.get(key)}' but for its case` };
     seen.set(key, n.path);
     return n;

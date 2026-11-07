@@ -117,6 +117,18 @@ test('decodeDesign: names that are not a project\'s, paths that leave the projec
   }
 });
 
+test('#3034 decodeDesign: every spelling of silinx.json a case-insensitive file system takes for it refused; src/silinx.json and an ordinary file kept', async () => {
+  for (const p of ['\u017filinx.json', 'Silinx.Json', '\uff53ilinx.json', 'src/SILINX.JSON', 'src/\u017filinx.json']) {
+    await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { [p]: '{"trusted":true}' } })), `the link's design has a file outside the project ('${p}')`);
+    await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: {}, bin: { [p]: '' } })), `the link's design has a file outside the project ('${p}')`);
+  }
+  const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/silinx.json': '{}', 'src/a.vhd': 'entity a is end;\n' } }));
+  assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/silinx.json', 'src/a.vhd']);
+  assert.deepEqual(d.warnings, []);
+  // (a view's tab on one is dropped as well)
+  assert.deepEqual(decodeUi(encodeUi({ open: ['file:\u017filinx.json', 'file:src/a.vhd'] })).view.open, ['file:src/a.vhd']);
+});
+
 test('decodeDesign: through the import gate (#2830): a file it refuses left out, said in the warnings', async () => {
   const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/a.vhd': 'entity a is end;\n', 'src/page.vhd': '<script>alert(1)</script>', 'src/A.VHD': '' } }));
   assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/a.vhd']);
