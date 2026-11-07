@@ -6,6 +6,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { pickSourceType, waitNewSourcePage } from './new-source-helpers.js';
+import { MSUM_C, MSUM_V, MDESC, EXT } from '../hls-blackbox-ports-lib.mjs';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -104,5 +105,26 @@ uiTest('#1903 Silinx HLS: an RTL blackbox of the project (syn.blackbox): its Ver
   assert.deepEqual(await page.eval(() => window.SilinxApp.S.viewSources.map((s) => [s.path, s.errors])), [['src/top.cpp', 0]]);
   assert.deepEqual(await page.eval(() => window.SilinxApp.S.modules.map((m) => m.name).filter((n) => /adder/.test(n))), ['adder_rtl']);
   assert.doesNotMatch(await page.eval(() => document.querySelector('#hier')?.textContent || ''), /adder_model|'adder' is the top function/);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// (#2339) a blackbox's memory port: the top's array the module's ap_memory during the call; (#2989) C Simulation and
+// C/RTL Co-simulation of the project's C, its top the C source's (not the C model's function, the last one defined)
+uiTest('#2339 Silinx HLS: an RTL blackbox with a memory port: the top\'s memory joined to the module; C Simulation and C/RTL Co-simulation of the top, PASS; no warnings', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxMem', top: '', files: { 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxMem');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the module top' });
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('top').ports.map((p) => p.name)), ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a_address0', 'a_ce0', 'a_we0', 'a_d0', 'a_q0', 's', 's_ap_vld']);
+  assert.match(await page.eval(() => window.SilinxApp.S.viewSources.find((s) => s.path === 'src/top.cpp').text), /ap_bb0 : msum port map \([^)]*m_address0 => ap_bb0_m_address0, m_ce0 => ap_bb0_m_ce0, m_we0 => ap_bb0_m_we0, m_d0 => ap_bb0_m_d0, m_q0 => ap_bb0_m_q0\)/);
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.viewSources.map((s) => [s.path, s.errors])), [['src/top.cpp', 0]]);
+  await page.treeRow('#hier', 'top');
+  await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C Simulation" completed successfully/);
+  assert.match(await page.consoleText(), /main\(\) returned 0; 2 call\(s\) of 'top'\./);
+  await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C\/RTL Co-simulation" (completed successfully|failed)/, { timeout: 60000 });
+  assert.match(await page.consoleText(), /C simulation: 2 call\(s\) of 'top' replayed on its VHDL\.[\s\S]*C\/RTL co-simulation PASS: 2 call\(s\), the same results/);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });
