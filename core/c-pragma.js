@@ -12,6 +12,7 @@
 //   unrollBy(loop, n) -> the loop with n copies of its body (a 'for'), each after the first if its condition holds
 //   constArgs(pragma, value) -> its numeric arguments given by constants (factor=N) their values, in place (#2750)
 
+import { localReshapeIn, reshapeOf } from './c-reshape.js';
 import { checkOpPragma } from './c-op-pragmas.js';
 
 // what Silinx makes of the pragmas it knows
@@ -152,7 +153,11 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (name === 'ARRAY_RESHAPE') {
       const pa = funcs.get(fname)?.params.some((x) => x.name === args.variable);
       if (!args.variable) { report(loc, '#pragma HLS ARRAY_RESHAPE needs variable=<the array>'); return; }
-      report(loc, pa ? `#pragma HLS ARRAY_RESHAPE of the argument '${args.variable}': not made: its port's words kept, one element each`
+      // (the top's argument, block or cyclic of one dimension: one memory of wide words, core/c-reshape.js, #2424)
+      if (pa && fname === top && reshapeOf(funcs.get(fname), String(args.variable))) return;
+      // (a local memory's: one memory of wide words too; a small one, registers as a partition's)
+      if (!pa && localReshapeIn(funcs.get(fname), String(args.variable), args)) return;
+      report(loc, pa ? `#pragma HLS ARRAY_RESHAPE of the argument '${args.variable}': not made (only block or cyclic, factor 2 or more, of an array of integers of one dimension of the top function): its port's words kept, one element each`
         : `#pragma HLS ARRAY_RESHAPE of '${args.variable}': made as ARRAY_PARTITION, its elements at once as in one wide word, in memories side by side`, 'warning');
       if (pa) return;
     }

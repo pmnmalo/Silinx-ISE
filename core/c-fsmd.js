@@ -18,6 +18,7 @@ import { hdlName } from './c-graph.js';
 import { BOOL, typeOf } from './c-types.js';
 import { memMethods, MEM_MIN } from './c-mem.js';
 import { partitionMethods } from './c-partition.js';
+import { reshapeMethods } from './c-reshape.js';
 import { fifoMethods, fifoSuffix } from './c-fifo.js';
 import { wordMethods } from './c-agg-mem.js';
 import { loopPragma, tripcountArgs, unrollBy } from './c-pragma.js';
@@ -360,7 +361,9 @@ class SeqFlow extends Flow {
       this.slots.set(pa.name, { kind: 'var', t: et, reg: r, name: pa.name });
     }
     // the locals (statics: their initial value at the reset), the globals written
-    for (const v of decls) this.slots.set(v.name, v.type.kind === 'array' && this.partOf(v) ? this.bankSlot(v, this.partOf(v), { used }) : this.regSlot(v));
+    // (ARRAY_RESHAPE of a memory: one of wide words, core/c-reshape.js, #2424)
+    const isMem = (v) => this.arrayLength(v) > MEM_MIN || !!this.storage?.has(v.orig ?? v.name);
+    for (const v of decls) this.slots.set(v.name, (v.type.kind === 'array' && this.reshapeSlot(v, isMem(v))) || (v.type.kind === 'array' && this.partOf(v) ? this.bankSlot(v, this.partOf(v), { used }) : this.regSlot(v)));
     for (const [name, gv] of this.globals) {
       const plan = gv.type.kind === 'array' ? this.partOf(gv) : null;
       if (plan) this.slots.set(name, this.bankSlot({ ...gv, static: !gv.const }, plan, { used }));
@@ -721,4 +724,4 @@ class SeqFlow extends Flow {
     };
   }
 }
-Object.assign(SeqFlow.prototype, memMethods, partitionMethods, fifoMethods, wordMethods, pipelineMethods, pipelineSchedMethods, blackboxMethods, outFirstMethods, subMethods);
+Object.assign(SeqFlow.prototype, memMethods, partitionMethods, reshapeMethods, fifoMethods, wordMethods, pipelineMethods, pipelineSchedMethods, blackboxMethods, outFirstMethods, subMethods);

@@ -22,6 +22,7 @@ import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
 import { makeStencils } from './c-stencil.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
+import { reshapeGroups } from './c-reshape.js';
 import { axiPlan, axiWrap } from './c-axi.js';
 import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
 import { latencyPragma, markFabric, mulLimit } from './c-op-pragmas.js';
@@ -123,7 +124,8 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const sargs = checked.ast.structArgs?.get(checked.top) || [];
   // (a stream or an array of structs one of its words, #1668; AGGREGATE / DISAGGREGATE: how, or not)
   const prag = flat ? { how: new Map(), named: [] } : structPragmas(fn);
-  const groups = flat ? [] : wordGroups(sargs, fn, prag.how);
+  // (an array argument's ARRAY_RESHAPE a memory of wide words, its elements their slices, #2424)
+  const groups = flat ? [] : [...wordGroups(sargs, fn, prag.how), ...reshapeGroups(fn)];
   // not combinational (a loop whose count depends on the inputs, a static or global variable): a sequential module,
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
@@ -212,7 +214,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // the report (#1529): a sequential module's states, registers, memories and loops (each one's II and cycles)
   const report = df.seq
     ? { sequential: true, states: df.states.length + 2, registerBits: df.regs.reduce((a, r) => a + r.w, 0) + df.stateT.w,
-      memories: [...df.mems.map((x) => ({ name: x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
+      memories: [...df.mems.map((x) => ({ name: x.port ?? x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
       loops: df.loops, ...(df.fnPipe ? { pipeline: df.fnPipe } : {}), slowLoops: df.slowLoops || [], units: df.units || [], blocks: blocksOf(df), unitsNs: df.unitsNs || 0, ...hierarchyReport(df) }
     : { sequential: false };
   return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, ...(df.freeRun ? { freeRun: true } : {}), states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };

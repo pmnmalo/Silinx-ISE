@@ -65,13 +65,21 @@ export const wordMethods = {
     return name;
   },
   /** A member's index: its word's and its element in the word (a member array's: the index c-struct.js makes,
-   *  (i) * (k) + (j), or i / k and i % k). */
-  wordIndex(i, k) {
+   *  (i) * (k) + (j), or i / k and i % k; a reshaped array's of type block, i % block and i / block, #2424). */
+  wordIndex(i, k, block = 0) {
     if (k === 1) return { word: i, sub: null, at: 0 };
     const num = (v) => ({ kind: 'num', value: BigInt(v), text: String(v), loc: i.loc });
+    // (by a power of 2: a shift and a mask, as core/c-partition.js's)
+    const div = (n) => ((n & (n - 1)) === 0 ? { kind: 'binary', op: '>>', l: i, r: num(Math.log2(n)), loc: i.loc } : { kind: 'binary', op: '/', l: i, r: num(n), loc: i.loc });
+    const mod = (n) => ((n & (n - 1)) === 0 ? { kind: 'binary', op: '&', l: i, r: num(n - 1), loc: i.loc } : { kind: 'binary', op: '%', l: i, r: num(n), loc: i.loc });
     let word, sub;
-    if (i.kind === 'binary' && i.op === '+' && i.l.kind === 'binary' && i.l.op === '*' && this.constOf(i.l.r, INT) === BigInt(k)) { word = i.l.l; sub = i.r; }
-    else { word = { kind: 'binary', op: '/', l: i, r: num(k), loc: i.loc }; sub = { kind: 'binary', op: '%', l: i, r: num(k), loc: i.loc }; }
+    // (an ARRAY_RESHAPE of type block, #2424: `block` words, element i in word i % block, at slice i / block)
+    // (x * k or k * x: element 0 of word x; plus j: element j, #2424)
+    const scaled = (e) => (e.kind !== 'binary' || e.op !== '*' ? null : this.constOf(e.r, INT) === BigInt(k) ? e.l : this.constOf(e.l, INT) === BigInt(k) ? e.r : null);
+    if (block) { word = mod(block); sub = div(block); }
+    else if (i.kind === 'binary' && i.op === '+' && scaled(i.l)) { word = scaled(i.l); sub = i.r; }
+    else if (scaled(i)) { word = scaled(i); sub = num(0); }
+    else { word = div(k); sub = mod(k); }
     const c = this.constOf(sub, INT);
     return { word, sub, at: c === null ? null : Number(c) };
   },
@@ -113,7 +121,7 @@ export const wordMethods = {
     const G = this.slots.get(mem.group);
     const i = this.hoist(e.i, at);
     if (this.hasSide(i)) this.error(e.loc, `the index of the memory '${G.port}' must have no side effect (no ++, --, assignment or call)`);
-    const w = this.wordIndex(i, mem.field.k);
+    const w = this.wordIndex(i, mem.field.k, mem.field.block);
     const ent = this.wordAt(G, w.word, at, w.at === null ? null : fieldMask(mem.field, w.at));
     const tmp = this.memberTmp(mem);
     at.cur.stmts.push({ kind: 'wordget', reg: ent.reg, tmp, field: mem.field, sub: w.sub, at: w.at, loc: e.loc });
@@ -123,7 +131,7 @@ export const wordMethods = {
   lowerFieldWrite(target, rhs, e, at) {
     const mem = this.slots.get(target.e.name), G = this.slots.get(mem.group);
     const i = this.hoist(target.i, at), v = this.hoist(rhs, at);
-    const w = this.wordIndex(i, mem.field.k);
+    const w = this.wordIndex(i, mem.field.k, mem.field.block);
     const ent = this.wordAt(G, w.word, at, w.at === null ? null : undefined);
     at.cur.stmts.push({ kind: 'wordset', reg: ent.reg, field: mem.field, sub: w.sub, at: w.at, v, t: mem.t, loc: e.loc });
     ent.dirty = true;
