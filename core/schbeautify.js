@@ -7,8 +7,9 @@
 // connections, the netlist and the generated HDL are the same, and the drawing never gets worse by these measures.
 //
 // Isomorphic ES module (browser + Node).
-import { GRID, key, netlist, symbolBox } from './schdoc.js';
+import { GRID, key, netlist, symbolBox, symbolPins } from './schdoc.js';
 import { cleanPath, pathViolations, routePath, segPoints, wireGrid } from './schpath.js';
+import { spreadChannels } from './schchannels.js';
 
 const onGrid = p => p.x % GRID === 0 && p.y % GRID === 0;
 const diagonal = pts => pts.some((a, i) => i + 1 < pts.length && a.x !== pts[i + 1].x && a.y !== pts[i + 1].y);
@@ -143,10 +144,11 @@ function ripUp(doc, list, modules, maxNodes) {
  * Beautify: the wires of `only` (ids; null: every wire of the sheet) drawn again (the document mutated): all of them
  * routed again from scratch when that makes the sheet better, then each one in turn while one gets better. A wire
  * whose new path would change a connection is never changed: the nets are compared at the end, and if they are not the
- * same the document is left as it was. A rerouted wire's own curve (Curved wires, #1144) is dropped: it is drawn from
- * the new path. Returns { changed: [ids] }.
+ * same the document is left as it was. Then the wires side by side in a channel are ordered with the fewest crossings
+ * and spread at an even pitch (core/schchannels.js, #1994). A rerouted wire's own curve (Curved wires, #1144) is
+ * dropped: it is drawn from the new path. (channels: false, the channels as they come: to compare.) Returns { changed: [ids] }.
  */
-export function beautifyWires(doc, { modules = {}, only = null, passes = 3, maxNodes = 60000 } = {}) {
+export function beautifyWires(doc, { modules = {}, only = null, passes = 3, maxNodes = 60000, channels = true } = {}) {
   const ids = only ? new Set(only) : null;
   const before = nets(doc, modules);
   const saved = doc.wires.map(w => ({ w, points: w.points, curve: w.curve }));
@@ -176,11 +178,33 @@ export function beautifyWires(doc, { modules = {}, only = null, passes = 3, maxN
     }
     if (!any) break;
   }
-  const out = saved.filter(s => changed.has(s.w.id) && JSON.stringify(s.w.points) !== JSON.stringify(s.points));
-  if (out.length && nets(doc, modules) !== before) {
+  const moved = () => saved.some(s => changed.has(s.w.id) && JSON.stringify(s.w.points) !== JSON.stringify(s.points));
+  if (moved() && nets(doc, modules) !== before) {
     for (const s of saved) s.w.points = s.points;
     return { changed: [] };
   }
+  // then the wires side by side in a channel ordered with the fewest crossings and spread evenly (#1994; not taken if
+  // it changed a connection)
+  const pre = doc.wires.map(w => [w, w.points]);
+  const spread = !channels ? [] : spreadChannels(doc, { modules, only: new Set(mine().map(w => w.id)) });
+  if (spread.length && nets(doc, modules) !== before) for (const [w, p] of pre) w.points = p;
+  else spread.forEach(id => changed.add(id));
+  const out = saved.filter(s => changed.has(s.w.id) && JSON.stringify(s.w.points) !== JSON.stringify(s.points));
   for (const s of out) delete s.w.curve;
   return { changed: out.map(s => s.w.id) };
 }
+
+/**
+ * The wires a selection takes in for Rearrange Wires: its wires (ids), and the wires that end on a pin of its symbols or
+ * on its I/O markers (ids). Returns a Set of wire ids.
+ */
+export function selectionWires(doc, { wires = [], symbols = [], ports = [] } = {}, modules = {}) {
+  const ids = new Set(wires), at = new Set();
+  for (const id of symbols) { const s = doc.symbols.find(x => x.id === id); if (s) for (const p of symbolPins(s, modules)) at.add(key(p.x, p.y)); }
+  for (const id of ports) { const p = doc.ports.find(x => x.id === id); if (p) at.add(key(p.x, p.y)); }
+  for (const w of doc.wires) if ([w.points[0], w.points[w.points.length - 1]].some(p => at.has(key(p.x, p.y)))) ids.add(w.id);
+  return ids;
+}
+
+/** Rearrange Wires' message (the interface's and the MCP server's): `what`: the command, n: the wires drawn again. */
+export const wiresNote = (what, n) => (n ? `${what}: ${n} wire${n === 1 ? '' : 's'} drawn again` : `${what}: the wires are already as clear as they can be`);

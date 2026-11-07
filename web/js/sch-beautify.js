@@ -5,29 +5,21 @@
 //   Rearrange Schematic  the whole sheet laid out again (#1506, core/schbeautify-sheet.js: the inputs on the left, the
 //                        outputs on the right, the symbols moved by the flow of the signals, with ELK's layout when the
 //                        page has it), then its wires drawn again
-import { beautifyWires } from '/core/schbeautify.js';
-import { beautifySheet } from '/core/schbeautify-sheet.js';
-import { symbolPins } from '/core/schdoc.js';
+import { beautifyWires, selectionWires, wiresNote } from '/core/schbeautify.js';
+import { beautifySheet, sheetNote } from '/core/schbeautify-sheet.js';
 
 /** { rearrangeWires, rearrangeSheet } of mountSchEditor (doc(), modules(), sel(): its current values). */
 export function mountSchBeautify(ctx) {
   const { doc, edit, fit, flash, modules, sel, snapshot } = ctx;
   let busy = false;
 
-  // the wires the selection takes in (null: no selection, the whole sheet)
+  // the wires the selection takes in (null: no selection, the whole sheet; core/schbeautify.js, as the MCP server's)
   function scope() {
     if (!sel().size) return null;
-    const ids = new Set(), at = new Set();
-    for (const k of sel()) {
-      const [kind, id] = k.split(/:(.*)/s);
-      if (kind === 'wire') ids.add(id);
-      else if (kind === 'sym') { const s = doc().symbols.find(x => x.id === id); if (s) for (const p of symbolPins(s, modules())) at.add(`${p.x},${p.y}`); }
-      else if (kind === 'port') { const p = doc().ports.find(x => x.id === id); if (p) at.add(`${p.x},${p.y}`); }
-    }
-    for (const w of doc().wires) if ([w.points[0], w.points[w.points.length - 1]].some(p => at.has(`${p.x},${p.y}`))) ids.add(w.id);
-    return ids;
+    const by = { wire: [], sym: [], port: [] };
+    for (const k of sel()) { const [kind, id] = k.split(/:(.*)/s); by[kind]?.push(id); }
+    return selectionWires(doc(), { wires: by.wire, symbols: by.sym, ports: by.port }, modules());
   }
-  const wiresNote = (what, n) => (n ? `${what}: ${n} wire${n === 1 ? '' : 's'} drawn again` : `${what}: the wires are already as clear as they can be`);
   function rearrangeWires() {
     const only = scope();
     if (only && !only.size) { flash('Rearrange Wires: no wire in the selection', 3000); return; }
@@ -45,11 +37,10 @@ export function mountSchBeautify(ctx) {
       const r = await beautifySheet(d, { modules: modules(), layout: elk ? g => elk.layout(g) : undefined });
       if (snapshot() !== before) return;
       edit(() => { for (const k of ['symbols', 'ports', 'wires', 'labels', 'sheet']) doc()[k] = d[k]; }, { keepProps: true });
-      // (not laid out again: it would not mean the same, or its symbols would overlap; its wires drawn again only)
-      if (!r.sheet) { flash(`Rearrange Schematic: the symbols kept where they were; ${wiresNote('wires', r.changed.length).replace(/^wires: /, '')}`, 4000); return; }
-      if (snapshot() === before) { flash('Rearrange Schematic: the schematic is already laid out this way', 3000); return; }
+      if (!r.sheet) { flash(sheetNote(r), 4000); return; }
+      if (snapshot() === before) { flash(sheetNote(r, true), 3000); return; }
       fit();
-      flash('Rearrange Schematic: the schematic laid out again', 3000);
+      flash(sheetNote(r, false), 3000);
     } finally { busy = false; }
   }
 
