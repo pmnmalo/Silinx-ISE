@@ -83,6 +83,37 @@ test('names: duplicates by case, twice the same, a symbolic link in a zip', asyn
   assert.deepEqual(gateMessages(g), ['src/passwd: not imported: symbolic link']);
 });
 
+// the spellings a case-insensitive file system (APFS, NTFS) takes for silinx.json: its case, the long s, fullwidth (NFKC)
+const LONG_S = '\u017f';
+const DESCRIPTOR_TWINS = ['SILINX.JSON', 'Silinx.json', `${LONG_S}ilinx.json`, '\uff53ilinx.json', 'src/SILINX.JSON', `proj/${LONG_S}ilinx.json`];
+const twinReason = s => `another spelling of silinx.json, the project's description ('${s.split('/').pop()}')`;
+
+test('#3034 names: another spelling of silinx.json refused (a zip, entries, one file); silinx.json and ordinary files kept', async () => {
+  for (const p of DESCRIPTOR_TWINS) {
+    assert.deepEqual(normalizePath(p), { reason: twinReason(p) }, p);
+    assert.throws(() => gateFile(p, '{"trusted":true}'), e => e instanceof GateError && e.message === `${p}: ${twinReason(p)}` && e.reason === twinReason(p), p);
+  }
+  for (const p of ['silinx.json', 'src/silinx.json', 'silinx.json5', 'xsilinx.json', 'silinx.jsonx', 'src/silinx_test.vhd'])
+    assert.deepEqual(normalizePath(p), { path: p }, p);
+  const files = [{ path: 'silinx.json', data: '{"name":"p"}' }, { path: 'src/top.vhd', data: 'entity top is end;\n' },
+    ...DESCRIPTOR_TWINS.map(path => ({ path, data: '{"trusted":true}' }))];
+  const expected = DESCRIPTOR_TWINS.map(p => `${p}: not imported: ${twinReason(p)}`);
+  const g = await gateZip(await createZip(files, codec), codec);
+  assert.deepEqual(g.files.map(f => f.path), ['silinx.json', 'src/top.vhd']);
+  assert.deepEqual(gateMessages(g), expected);
+  const e = gateEntries(files);
+  assert.deepEqual(e.files.map(f => f.path), ['silinx.json', 'src/top.vhd']);
+  assert.deepEqual(gateMessages(e), expected);
+});
+
+test('#3034 names: twins by the full case fold and NFKC (ſ, NFC / NFD), not toLowerCase alone', () => {
+  const nfc = 'src/caf\u00e9.vhd', nfd = nfc.normalize('NFD');
+  const r = gateEntries([{ path: 'src/sel.vhd', data: 'a' }, { path: `src/${LONG_S}el.vhd`, data: 'b' }, { path: nfc, data: 'c' }, { path: nfd, data: 'd' },
+    { path: 'src/nfd.vhd', data: 'e' }]);
+  assert.deepEqual(r.files.map(f => f.path), ['src/sel.vhd', nfc, 'src/nfd.vhd']);
+  assert.deepEqual(gateMessages(r), [`src/${LONG_S}el.vhd: not imported: same name as 'src/sel.vhd' but for its case`, `${nfd}: not imported: same name as '${nfc}' but for its case`]);
+});
+
 test('a traversal zip: its bad entries left out, never inflated, the rest imported', async () => {
   const files = [
     { path: 'p.xise', data: '<?xml version="1.0"?><project/>' },

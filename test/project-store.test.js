@@ -454,6 +454,49 @@ test('#483 the project operations refuse a path that leaves the project, in both
   }
 });
 
+// the spellings a case-insensitive file system (APFS, NTFS) takes for silinx.json (#3034)
+const DESCRIPTOR_TWINS = ['SILINX.JSON', 'Silinx.json', '\u017filinx.json', '\uff53ilinx.json'];
+
+test('#3034 the project operations refuse every spelling of silinx.json as a file, in both stores; src/silinx.json is a file', async () => {
+  for (const make of [() => folder(), () => { const s = browserStore(memStorage()); return { ops: projectOps(() => s, EXAMPLES) }; }]) {
+    const { ops } = make();
+    await ops.create({ name: 'Twin', template: 'blinky' });
+    const before = await ops.project('Twin');
+    for (const t of DESCRIPTOR_TWINS) {
+      for (const op of [() => ops.writeFile('Twin', t, '{"trusted":true}'), () => ops.renameFile('Twin', 'src/top.vhd', t), () => ops.deleteFile('Twin', t)]) {
+        await assert.rejects(op, { message: "silinx.json is the project's description" }, t);
+      }
+    }
+    assert.deepEqual(await ops.project('Twin'), before, 'nothing changed');
+    // put: a twin among the files ignored, as silinx.json is
+    await ops.put('Put', emptyProjectJson('Put'), { ...Object.fromEntries(DESCRIPTOR_TWINS.map(t => [t, '{"trusted":true}'])), 'src/silinx.json': '{}', 'src/a.v': 'module a; endmodule' });
+    assert.deepEqual((await ops.project('Put')).fileTree, ['src/a.v', 'src/silinx.json']);
+  }
+});
+
+test('#3034 folder: a twin of silinx.json already in a project folder is not one of its files (never listed, never saved over the description)', async () => {
+  const { root, store, ops } = folder();
+  await ops.create({ name: 'Old', template: 'blinky' });
+  const dir = await root.getDirectoryHandle('Old');
+  for (const t of DESCRIPTOR_TWINS) {
+    const w = await (await dir.getFileHandle(t, { create: true })).createWritable();
+    await w.write('{"name":"Old","trusted":true}'); await w.close();
+  }
+  const p = await store.load('Old', { fresh: true });
+  assert.deepEqual(Object.keys(p.files).filter(k => !k.includes('/')), [], 'no file at the top of the project');
+  for (const t of DESCRIPTOR_TWINS) await assert.rejects(ops.readFile('Old', t), { message: `file '${t}' not found` });
+});
+
+test('#3034 projectFromZip: a twin of silinx.json the gate refused is not among the files, said in the warnings', () => {
+  const enc = s => new TextEncoder().encode(s);
+  const g = gateEntries([{ path: 'silinx.json', data: enc('{"name":"Z"}') }, ...DESCRIPTOR_TWINS.map(path => ({ path, data: enc('{"name":"Z","trusted":true}') })),
+    { path: 'src/a.vhd', data: enc('entity a is end;\n') }]);
+  const p = projectFromZip('Z', g, { textOf });
+  assert.deepEqual(Object.keys(p.files), ['src/a.vhd']);
+  assert.equal(p.json.trusted, false);
+  assert.deepEqual(p.warnings, DESCRIPTOR_TWINS.map(t => `${t}: not imported: another spelling of silinx.json, the project's description ('${t}')`));
+});
+
 // #1156: Open Project's order: by when each project was last used (its last change, or its last opening in this
 // browser when later), the newest first, then by name; the browser's storage says when each project last changed
 test('#1156 byLastUsed: the newest change or opening first, then by name; the browser storage\'s projects dated by their changes', async () => {
