@@ -718,7 +718,10 @@ uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups a
   await page.waitFor((t) => document.querySelector(`${t} .tt-k3d-cell[data-row="0"]`)?.classList.contains('v0'), [T], { what: 'cell 0 back to 0' });
   // 6 inputs: 4 layers in Gray order, the group on all four, a box between each neighbouring pair
   await open('src/k6.bool.json');
-  await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d`), [T], { what: '3D kept' });
+  // (each table its own 3D box, #3074: k6 opened flat, put in 3D)
+  assert.ok(await page.eval((t) => !document.querySelector(`${t} .tt-k3d`) && !document.querySelector(`${t} .tt-k3d-on`).checked, T), 'k6 flat at first');
+  await page.click(`${T} .tt-k3d-on`);
+  await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d`), [T], { what: 'k6 in 3D' });
   const s6 = await shape();
   assert.deepEqual([s6.layers, s6.groups, s6.sides], [['ab = 00', 'ab = 01', 'ab = 11', 'ab = 10'], ['0', '1', '2', '3'], 12]);
   // in Portuguese
@@ -755,7 +758,7 @@ uiTest('#2206 Truth Table: the 3D Karnaugh map stays inside the page and off the
     assert.deepEqual(await fit(), f0, `turned with ${key}: nothing moved, nothing out of the scene`);
   }
   await page.click(`${T} .tt-k3d-reset`);
-  // the box left as it was found: the 3D box is shared by every table
+  // the box left as it was found
   await page.click(`${T} .tt-k3d-on`);
 });
 
