@@ -3,8 +3,7 @@
 // (core/asm-sim.js: its state, the path taken through its decisions, its Moore and Mealy outputs, its registers, the
 // next state) and a state diagram's (core/fsm.js stepFsm: its state, the transition taken, its outputs, the next state).
 // A drawing that cannot be simulated says why, as the panel does in the console.
-import * as P from './projects.js';
-import { clip, toolError, STR, PROJECT } from './mcp-util.js';
+import { clip, toolError, STR, PROJECT, projectText } from './mcp-util.js';
 
 const MAX_CYCLES = 1000;
 
@@ -98,7 +97,8 @@ export const SIMULATE_DRAWING_TOOLS = [
       const asm = /\.asm\.json$/i.test(file), fsm = /\.fsm\.json$/i.test(file);
       if (!asm && !fsm) throw toolError(`'${file}' is not an ASM chart or a state diagram (.asm.json, .fsm.json)`);
       let m;
-      try { m = JSON.parse(await P.readFile(name, file)); } catch { throw toolError(`no drawing '${file}' in the project '${name}'`); }
+      const text = await projectText(name, file, `no drawing '${file}' in the project '${name}'`);
+      try { m = JSON.parse(text); } catch { throw toolError(`no drawing '${file}' in the project '${name}'`); }
       const base = file.split('/').pop();
       const { lines, rows } = asm ? await simulateAsmFile(m, cycles, base) : await simulateFsmFile(m, cycles, base);
       return { text: clip(lines.join('\n')), data: { project: name, file, kind: asm ? 'asm' : 'fsm', cycles: rows }, isError: false };

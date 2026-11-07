@@ -8,7 +8,7 @@ import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { boardAutoAssign, boardConstraintsText, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
 import { resolveBoard } from './devices.js';
-import { within } from './paths.js';
+import { realOf, within } from './paths.js';
 import { topNameError } from './ident.js';
 import { normalizePath } from '../core/import-gate.js';
 
@@ -318,6 +318,10 @@ export async function writeFile(name, rel0, text) {
   const rel = relKey(dir, full);
   if (!rel) throw new HttpError(400, 'missing path');
   if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
+  // a hidden file or folder (.git/hooks, .vscode) is no part of a project (#3036), by its name or once its symbolic
+  // links are followed; build/ is written here too (the browser's open synthesis saves its netlists in build/open/)
+  const hidden = [rel, relKey(realOf(dir), realOf(full))].flatMap(k => k.split('/')).find(s => s.startsWith('.'));
+  if (hidden) throw new HttpError(400, `'${rel0}': not written: hidden file or folder ('${hidden}')`);
   await fs.mkdir(path.dirname(full), { recursive: true });
   // atomic: a reader (or a crash) never sees a half-written / empty file
   const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed

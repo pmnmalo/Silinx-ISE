@@ -2,8 +2,7 @@
 // Validate (core/asm.js), a state diagram's Check (core/fsm.js validateFsm), a Petri net's Check (core/petri-analysis.js
 // checkPetri: its validation and its token game's transitions that never fire and deadlocks). The schematics' check is
 // check_syntax's (the HDL generated from them).
-import * as P from './projects.js';
-import { toolError, STR, PROJECT } from './mcp-util.js';
+import { toolError, STR, PROJECT, projectText } from './mcp-util.js';
 
 const KINDS = [
   { re: /\.asm\.json$/i, what: 'Validate', check: async m => (await import('../core/asm.js')).validate(m) },
@@ -23,7 +22,8 @@ export const CHECK_TOOLS = [
       const kind = KINDS.find(k => k.re.test(file));
       if (!kind) throw toolError(`'${file}' is not an ASM chart, a state diagram or a Petri net (.asm.json, .fsm.json, .pn.json)`);
       let m;
-      try { m = JSON.parse(await P.readFile(name, file)); } catch { throw toolError(`no drawing '${file}' in the project '${name}'`); }
+      const text = await projectText(name, file, `no drawing '${file}' in the project '${name}'`);
+      try { m = JSON.parse(text); } catch { throw toolError(`no drawing '${file}' in the project '${name}'`); }
       const diags = (await kind.check(m)).filter(d => d.severity === 'error' || d.severity === 'warning');
       const errors = diags.filter(d => d.severity === 'error'), warnings = diags.filter(d => d.severity === 'warning');
       const base = file.split('/').pop();

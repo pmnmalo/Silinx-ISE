@@ -4,7 +4,7 @@
 // it; a state diagram to a new ASM chart, an ASM chart to a new state diagram (not linked to it), a state diagram to
 // the Boolean algebra of its next-state and output logic. A file that exists is not replaced.
 import * as P from './projects.js';
-import { toolError, readProject, viewSourcesOf, STR, PROJECT } from './mcp-util.js';
+import { toolError, readProject, viewSourcesOf, STR, PROJECT, projectText } from './mcp-util.js';
 
 const VIEW_RE = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
 const dirOf = p => (p.includes('/') ? p.replace(/\/[^/]*$/, '') : 'src');
@@ -104,7 +104,8 @@ export const CONVERT_TOOLS = [
       const isFsm = /\.fsm\.json$/i.test(rel), isAsm = /\.asm\.json$/i.test(rel);
       if ((to === 'fsm' && !isAsm) || (to !== 'fsm' && !isFsm)) throw toolError(to === 'fsm' ? `${rel}: an ASM chart (.asm.json) becomes a state diagram` : `${rel}: a state diagram (.fsm.json) becomes an ASM chart or Boolean algebra`);
       let m;
-      try { m = JSON.parse(await P.readFile(name, rel)); } catch { throw toolError(`no drawing '${rel}' in the project '${name}'`); }
+      const text = await projectText(name, rel, `no drawing '${rel}' in the project '${name}'`);
+      try { m = JSON.parse(text); } catch { throw toolError(`no drawing '${rel}' in the project '${name}'`); }
       const F = await import('../core/fsm.js');
       const dir = dirOf(rel);
       if (to === 'asm') {

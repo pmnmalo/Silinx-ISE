@@ -27,8 +27,10 @@ export async function redactor() {
   return text => secrets.reduce((t, s) => t.split(s).join('<ISE host>'), String(text));
 }
 
-// a file of a project: inside its folder, also once its symbolic links are followed
-export async function projectPath(name, rel) {
+// a file of a project: inside its folder, also once its symbolic links are followed, and not hidden (.git, .env, an
+// editor's settings: no part of a project, #3035; a report of build/ is not hidden); verb: what the tool does with it
+// (null: a new name P.renameFile's import gate checks, its message the interface's Rename's)
+export async function projectPath(name, rel, verb = 'read') {
   const dir = P.projectDir(name);
   const full = P.safeJoin(dir, rel);
   const root = await fsp.realpath(dir).catch(() => { throw toolError(`no project '${name}' in the workspace`); });
@@ -37,7 +39,17 @@ export async function projectPath(name, rel) {
   while (!fs.existsSync(probe) && probe !== dir) probe = path.dirname(probe);
   const real = await fsp.realpath(probe);
   if (real !== root && !real.startsWith(root + path.sep)) throw toolError(`'${rel}' is outside the project '${name}'`);
+  const hidden = p => p.split(/[\\/]/).some(s => s.startsWith('.') && s !== '.' && s !== '..');
+  if (verb !== null && (hidden(P.relKey(dir, full)) || hidden(path.relative(root, real)))) throw Object.assign(toolError(`'${rel}': a hidden file or folder cannot be ${verb}`), { hidden: true });
   return full;
+}
+
+// the text of a file of a project a tool names, through projectPath (a hidden one refused, #3035); missing: the
+// tool's message when it is not there (or not in the project)
+export async function projectText(name, rel, missing) {
+  let full;
+  try { full = await projectPath(name, rel); } catch (e) { throw e.hidden ? e : toolError(missing); }
+  try { return await fsp.readFile(full, 'utf8'); } catch { throw toolError(missing); }
 }
 
 export async function readProject(name) {
