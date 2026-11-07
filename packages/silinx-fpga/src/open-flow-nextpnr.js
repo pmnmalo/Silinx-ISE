@@ -151,7 +151,7 @@ const LUT_MEMORY = /^(RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
  * The constant inputs of the distributed RAMs and shift registers (an address bit a small memory does not use, a fixed
  * length) on one net of 0 and one of 1, each driven by a GND / VCC cell, as ISE's GLOBAL_LOGIC0 / 1 (#2940). nextpnr's
  * front end makes a constant cell of each such bit, and the micro-architecture a LUT of each (a LUT's own constant
- * inputs it folds): iwls05-sasc's 16 RAM16X1D had 64 LUTs of 0, its 49 slices 81 and its critical path 16 % longer.
+ * inputs it folds): iwls05-sasc's 16 RAM16X1D had 64 LUTs of 0, and 80 slices where Silinx's packer made 49.
  * In place.
  */
 export function shareMemoryConstants(mod) {

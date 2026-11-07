@@ -1,7 +1,7 @@
 In short:
 
-- **Smaller and faster designs with small memories:** a FIFO's distributed RAM or a fixed-length shift register no
-  longer takes a slice for each unused address bit (iwls05-sasc: 81 slices -> 52, its clock 9.5 % faster).
+- **Smaller designs with small memories:** a FIFO's distributed RAM or a fixed-length shift register no longer takes a
+  slice for each unused address bit (iwls05-sasc: 80 slices -> 52).
 
 In detail:
 
