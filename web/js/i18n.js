@@ -107,7 +107,7 @@ const PT = {
   'Generated from the state diagram': 'Gerado a partir do diagrama de estados', 'Generated from the Boolean algebra': 'Gerado a partir da álgebra booleana',
   'Generated from the Petri net': 'Gerado a partir da rede de Petri',
   // a drawing without its HDL file, a file in the way (#230)
-  'No HDL': 'Sem HDL', 'Generate HDL File…': 'Gerar Ficheiro HDL…', 'Generate HDL File': 'Gerar Ficheiro HDL',
+  'No HDL': 'Sem HDL', 'Its HDL cannot be made: its errors are in the Console': 'O seu HDL não pode ser gerado: os seus erros estão na Consola', 'Generate HDL File…': 'Gerar Ficheiro HDL…', 'Generate HDL File': 'Gerar Ficheiro HDL',
   'Design hierarchy': 'Hierarquia do projeto',
   // toolbar / panels
   'New Project': 'Novo Projeto', 'Open Project': 'Abrir Projeto', 'Cut': 'Cortar', 'Copy': 'Copiar',

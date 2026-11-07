@@ -7,6 +7,7 @@ import { h, dialog, popupMenu, toast, longPressMenu } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
 import { reservedModuleDiags } from '/core/reserved.js';
 import { checkC } from '/core/c-check.js';
+import { blackboxChecks } from '/core/c-blackbox.js';
 import * as wiz from './wizards.js';
 import { designDiags, sevWord } from './diaghelp.js';
 import { S, flushDoc, openFile, openFpgaView, openImpact, openPinPlanner, openSummary, openUcf,
@@ -18,7 +19,7 @@ import { isAsm, isFsm, isPn, isTt, openAsm, openFsm, openPetri, openSch, openTt 
 import { inView, setTop, testBench } from './design.js';
 import { openWizardModule, wizardProcessOf } from './wizard-modules.js';
 import { openEmulator, openSchematic, openTechSchematic, runSimulation } from './viewers.js';
-import { cProcesses, isC } from './c-source.js';
+import { cProcesses, failedCDiags, isC } from './c-source.js';
 import { openCModel } from './c-model.js';
 import { EXTRA_STEPS, FLOW_PROCS, IMPL_IDS, buildProcesses, toolOf } from './tool-descriptors.js';
 
@@ -276,14 +277,17 @@ async function checkSyntaxInner(mod, sim, id) {
   const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, sim));
   for (const s of srcs) log(`${s.lang === 'vhdl' ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${s.path}" into library work`);
   const lib = compile(withPrimitives(srcs));
-  const design = elaborate(lib, mod);
+  // (a C source whose HDL cannot be made, #2995: its errors; its module, the top, then not elaborated)
+  const cErrs = failedCDiags();
+  const cTop = Object.values(S.cFailed || {}).some(c => String(c.module || '').toLowerCase() === String(mod).toLowerCase());
+  const design = cTop ? null : elaborate(lib, mod);
   // (an HDL file its drawing could not generate again, #303: an error of the file, the drawing's errors in it)
   const stale = srcs.filter(s => S.staleHdl?.[s.path]).map(s => {
     const { from, why } = S.staleHdl[s.path];
     return { severity: 'error', file: s.path, line: 1, col: 1, tool: 'Silinx', message: `${s.path} is not up to date: ${from} cannot generate it, ${why}. Fix ${from} (its HDL is then generated again).` };
   });
   // (+ the modules named with a reserved word, #679)
-  const diags = diagsFor(lib, design, [...designDiags(lib, design), ...stale, ...reservedNameDiags()]);   // + design checks (core/lint.js)
+  const diags = diagsFor(lib, design, [...(design ? designDiags(lib, design) : []), ...stale, ...cErrs, ...reservedNameDiags()]);   // + design checks (core/lint.js)
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
   for (const d of diags) log(`${sevWord(d)}:${d.tool || 'HDLCompiler'} - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
@@ -339,7 +343,9 @@ async function cDiagnostics(path, info) {
   const text = await api.readFile(S.project.name, path);
   const r = checkC(text, path);
   if (r.top) info.push(`Top function: ${r.top}`);
-  return r.diagnostics.map(d => ({ ...d, file: path, tool: 'SilinxC' }));
+  // (the descriptions of the RTL blackboxes it calls too, as its synthesis checks them, #2995: in their own files)
+  const bb = r.ok && S.hls ? blackboxChecks(r, S.hls) : [];
+  return [...r.diagnostics.map(d => ({ ...d, file: path, tool: 'SilinxC' })), ...bb.map(d => ({ ...d, tool: 'SilinxC' }))];
 }
 
 // ------------------------------------------------------------------ process status persistence

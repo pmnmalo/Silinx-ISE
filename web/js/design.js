@@ -125,6 +125,17 @@ export function renderHierarchy() {
     const it = treeItem({ label: f.split('/').pop(), ico: 'petri', key: `pn:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'pn', file: f }), onOpen: () => openPetri(f), onContext: e => petriContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
+  // a C source whose HDL cannot be made (#2995: a C error, a blackbox refused): its row, marked, its errors in the Console;
+  // [No HDL] opens the first one's file
+  for (const [f, c] of Object.entries(S.cFailed || {})) {
+    if (S.modules.some(m => m.file === f)) continue;
+    const at = c.diagnostics[0], menu = e => fileContextMenu(e, f);
+    const it = treeItem({ label: c.module || f.split('/').pop(), meta: `(${f.split('/').pop()})`, ico: 'err', cls: c.module && isTopName(c.module) ? 'top-mod' : '', key: `c:${f}`,
+      badges: [{ text: cBadge(f), base: true, title: 'Open', open: () => openFile(f), context: menu },
+        { text: 'No HDL', warn: true, title: 'Its HDL cannot be made: its errors are in the Console', open: () => openFile(at?.file || f, at?.line), context: menu }],
+      onSelect: () => select({ type: 'file', file: f }), onOpen: () => openFile(f), onContext: menu });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
   // files that failed to parse into any unit
   const withUnits = new Set(lib.parsed.filter(p => p.units.length).map(p => p.file));
   for (const f of S.project.files.filter(f => !withUnits.has(f.path) && (one || inView(f.role, sim)))) {
