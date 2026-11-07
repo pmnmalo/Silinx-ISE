@@ -184,14 +184,7 @@ export async function placeAndRoute(doc, conns, { layout, modules, nk }) {
           if (w0) labelAt.push({ L: w0[0].x === a.x && w0[0].y === a.y ? w0 : w0.slice().reverse(), ids, net: n.name });
         }
       });
-      for (const { L, ids, net } of labelAt) {
-        const g = wireGrid({ symbols: doc.symbols, ports: doc.ports, labels, wires: wires.filter(w => !ids.has(w.id)) }, { modules });
-        const pts = [];
-        for (let i = 0; i + 1 < L.length; i++) for (const q of segPoints(L[i], L[i + 1])) if (!pts.some(p => p.x === q.x && p.y === q.y)) pts.push(q);
-        const free = pts.slice(1).filter(q => { const k = key(q.x, q.y); return !g.h.has(k) && !g.v.has(k) && !g.vtx.has(k) && !g.labels.has(k) && !g.fixed.has(k); });
-        const q = free.find(p => Math.abs(p.x - L[0].x) + Math.abs(p.y - L[0].y) >= 20) || free[0] || pts[Math.min(2, pts.length - 1)];
-        labels.push({ id: `L${labels.length + 1}`, x: q.x, y: q.y, net });
-      }
+      labels.push(...netLabels(doc, wires, labelAt, modules));
       doc.wires = wires; doc.labels = labels;
       // each net's wires joined where they branch and at its pins (#678)
       for (const [n, ids] of netWires) joinWires(doc, n.eps.map(e => epPos(doc, e, modules, cache)), ids);
@@ -218,6 +211,31 @@ export async function placeAndRoute(doc, conns, { layout, modules, nk }) {
   for (const p of doc.ports) { const b = portBox(p); mx = Math.max(mx, b.x + b.w); my = Math.max(my, b.y + b.h); }
   for (const w of doc.wires) for (const p of w.points) { mx = Math.max(mx, p.x); my = Math.max(my, p.y); }
   doc.sheet = { w: Math.max(1700, r10(mx + 120)), h: Math.max(1100, r10(my + 120)) };
+}
+
+/**
+ * The net names of a drawing made from HDL, one per entry of labelAt ({ L: the wire's points from the driver, ids: its
+ * net's wire ids, net }), in that order: each on the first point of L at least 20 away from the driver that is on no
+ * other net's wire, end or bend, no pin or marker and no net name placed before (else the first such point, else L's
+ * third point). One grid of all the wires, a net's own taken out while its name is placed (#2970: a grid built for
+ * each name made the time grow as the names times the wires).
+ */
+export function netLabels(doc, wires, labelAt, modules) {
+  const labels = [];
+  const g = wireGrid({ symbols: doc.symbols, ports: doc.ports, labels: [], wires }, { modules });
+  const byId = new Map(wires.map(w => [w.id, w]));
+  for (const { L, ids, net } of labelAt) {
+    const own = [...ids].map(id => byId.get(id)).filter(Boolean);
+    for (const w of own) g.removeWire(w.points);
+    const pts = [];
+    for (let i = 0; i + 1 < L.length; i++) for (const q of segPoints(L[i], L[i + 1])) if (!pts.some(p => p.x === q.x && p.y === q.y)) pts.push(q);
+    const free = pts.slice(1).filter(q => { const k = key(q.x, q.y); return !g.h.has(k) && !g.v.has(k) && !g.vtx.has(k) && !g.labels.has(k) && !g.fixed.has(k); });
+    const q = free.find(p => Math.abs(p.x - L[0].x) + Math.abs(p.y - L[0].y) >= 20) || free[0] || pts[Math.min(2, pts.length - 1)];
+    for (const w of own) g.addWire(w.points);
+    labels.push({ id: `L${labels.length + 1}`, x: q.x, y: q.y, net });
+    g.labels.set(key(q.x, q.y), (g.labels.get(key(q.x, q.y)) || 0) + 1);
+  }
+  return labels;
 }
 
 function verifyImport(doc, conns, modules, nk) {
