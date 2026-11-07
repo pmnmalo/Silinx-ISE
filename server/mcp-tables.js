@@ -3,7 +3,7 @@
 // solution used, #2950) do, through the same function (core/logic-choice.js setOutputLogic); the table written and its
 // HDL file made again, as write_file does.
 import * as P from './projects.js';
-import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
+import { toolError, readProject, STR, PROJECT, projectText } from './mcp-util.js';
 
 const FORMS_TEXT = 'sop (minimal SOP), pos (minimal POS), xor (the XOR form when simpler, else the minimal SOP), nand, nor (NAND / NOR gates only), gates (the form of least gates), delay (of least delay), csop, cpos (the canonical SOP / POS)';
 
@@ -21,8 +21,7 @@ export const TABLE_TOOLS = [
       await readProject(name);
       if (!/\.(tt|bool)\.json$/i.test(rel)) throw toolError(`${rel}: a truth table (.bool.json, .tt.json) has outputs`);
       if (form === undefined && solution === undefined) throw toolError('form or solution: what to set');
-      let text;
-      try { text = await P.readFile(name, rel); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
+      const text = await projectText(name, rel, `no file '${rel}' in the project '${name}'`);
       const L = await import('../core/logic.js');
       let doc;
       try { doc = L.setOutputLogic(JSON.parse(text), output, { form, solution }); } catch (e) { throw toolError(`${rel}: ${e.message}`); }

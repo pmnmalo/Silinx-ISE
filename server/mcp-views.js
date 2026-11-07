@@ -5,14 +5,14 @@
 // truth table's schematic (core/logic.js, #694) and its results, the editor's results panel (#2927). The others are read_file's (a drawing's HDL), c_generated's and
 // c_synthesis_report's (a C source's).
 import * as P from './projects.js';
-import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
+import { toolError, readProject, STR, PROJECT, projectText } from './mcp-util.js';
 
 const VIEWS = ['translation', 'asm', 'fsm', 'schematic', 'results'];
 const NOTATIONS = ['slash', 'slash-compact', 'textbook', 'compact', 'ascii', 'vhdl', 'verilog'];
 const base = p => p.split('/').pop();
 
 async function source(name, rel) {
-  try { return await P.readFile(name, rel); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
+  return projectText(name, rel, `no file '${rel}' in the project '${name}'`);
 }
 const json = (text, rel) => { try { return JSON.parse(text); } catch (e) { throw toolError(`${rel}: ${e.message}`); } };
 

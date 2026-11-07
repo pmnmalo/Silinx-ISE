@@ -80,6 +80,20 @@ test('#1234 a symbolic link in a project to a folder outside it: not read, writt
   assert.equal(await P.readFile('Linked', 'alias/top.vhd'), await P.readFile('Linked', 'src/top.vhd'));
 });
 
+test('#3036 writeFile: a hidden file or folder refused, by its name or through a symbolic link in the project; build/ written', async () => {
+  await P.createProject({ name: 'Hidden' });
+  const dir = path.join(ws, 'Hidden');
+  fs.mkdirSync(path.join(dir, '.git/hooks'), { recursive: true });
+  link(path.join(dir, '.git'), path.join(dir, 'gitlink'));
+  for (const [p, seg] of [['.git/hooks/pre-commit', '.git'], ['src/.vscode/tasks.json', '.vscode'], ['.env', '.env'], ['gitlink/hooks/pre-commit', '.git']])
+    await assert.rejects(P.writeFile('Hidden', p, 'x'), e => e.status === 400 && e.message === `'${p}': not written: hidden file or folder ('${seg}')`, p);
+  assert.deepEqual(fs.readdirSync(path.join(dir, '.git/hooks')), []);
+  assert.ok(!fs.existsSync(path.join(dir, 'src/.vscode')) && !fs.existsSync(path.join(dir, '.env')));
+  await P.writeFile('Hidden', 'build/open/top.v', 'module top; endmodule\n');   // (not a source of the project)
+  assert.equal(fs.readFileSync(path.join(dir, 'build/open/top.v'), 'utf8'), 'module top; endmodule\n');
+  assert.deepEqual((await P.readProject('Hidden')).files, []);
+});
+
 test('#1234 a symbolic link to a file outside the project', { skip: !canLinkFiles && 'no rights to make links to files' }, async () => {
   await P.createProject({ name: 'FileLink' });
   fs.writeFileSync(path.join(tmp, 'id_rsa'), 'KEY');

@@ -191,6 +191,19 @@ test('files: write (text and JSON bodies) registers HDL with a role, read back, 
   assert.equal((await call('GET', '/projects/Nope/sources')).status, 404);
 });
 
+test('files: a hidden file or folder is not written through the file route (#3036); build/ is (the open synthesis\'s netlists)', async () => {
+  await call('POST', '/projects', { name: 'Hid' });
+  const listed = () => fss.readdirSync(P.projectDir('Hid'), { recursive: true }).sort();
+  const before = listed();
+  for (const [p, seg] of [['.git/hooks/pre-commit', '.git'], ['.vscode/tasks.json', '.vscode'], ['src/.env', '.env'], ['./.git/config', '.git']]) {
+    const r = await call('PUT', `/projects/Hid/file?path=${encodeURIComponent(p)}`, '#!/bin/sh\n');
+    assert.deepEqual([r.status, r.body.error], [400, `'${p}': not written: hidden file or folder ('${seg}')`], p);
+  }
+  assert.deepEqual(listed(), before);
+  assert.deepEqual((await call('PUT', '/projects/Hid/file?path=build/open/top.json', '{}\n')).body, { ok: true });
+  assert.equal((await call('GET', '/projects/Hid/file?path=build/open/top.json')).body, '{}\n');
+});
+
 test('files: missing / traversing / absolute paths are refused, missing files are 404, I/O errors are 500', async () => {
   await call('POST', '/projects', { name: 'Trav' });
   const bad = ['../Files/src/top.v', '../../etc/passwd', '/etc/passwd', 'src/../../x', '..'];

@@ -3,7 +3,7 @@
 // beautifyWires and selectionWires, core/schbeautify-sheet.js beautifySheet) with the same messages; the schematic
 // written and its HDL file made again, as write_file does.
 import * as P from './projects.js';
-import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
+import { toolError, readProject, STR, PROJECT, projectText } from './mcp-util.js';
 
 const IDS = what => ({ type: 'array', items: { type: 'string' }, description: what });
 
@@ -11,8 +11,7 @@ const IDS = what => ({ type: 'array', items: { type: 'string' }, description: wh
 async function openSchematic(name, rel) {
   await readProject(name);
   if (!/\.sch\.json$/i.test(rel)) throw toolError(`${rel}: not a schematic (.sch.json)`);
-  let text;
-  try { text = await P.readFile(name, rel); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
+  const text = await projectText(name, rel, `no file '${rel}' in the project '${name}'`);
   const { projectModules } = await import('./drawing-sync.js');
   const modules = await projectModules(P, name);
   const sd = await import('../core/schdoc.js');
