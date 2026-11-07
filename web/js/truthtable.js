@@ -263,7 +263,7 @@ export function mountTtEditor(container, opts = {}) {
     if (n >= 2) grpSel.append(kmapOrderSelect(M.kmapOrder, o => { if (o === 'rows') M.kmapOrder = 'rows'; else delete M.kmapOrder; changed(); }));
     const L = kmapLayout(n, M.kmapOrder || 'cols');
     const res = groups === 'pos' ? A.pos : A.sop, k = res.alternatives.length;
-    if (res.several) kmapHost.append(solutionPicker(res, d => { M = setOutputLogic(M, out, { solution: { [groups]: (res.pick + d + k) % k } }); changed(); }));
+    const picker = res.several && solutionPicker(res, d => { M = setOutputLogic(M, out, { solution: { [groups]: (res.pick + d + k) % k } }); changed(); });   // (under the map, #3067)
     const C = 40, rowsN = L.rowCodes.length, colsN = L.colCodes.length;
     const gw = colsN * C, gh = rowsN * C;
     const left0 = 18 + 12 * Math.max(1, L.rowVars.length), top0 = 46;
@@ -321,6 +321,7 @@ export function mountTtEditor(container, opts = {}) {
     });
     if (!res.terms.length) leg.append(h('div', { class: 'hint' }, groups === 'pos' ? 'No 0s: no groups (the output is always 1).' : 'No 1s: no groups (the output is always 0).'));
     kmapHost.append(leg);
+    if (picker) kmapHost.append(picker);
   }
   const termAst = r => { const lit = l => (l.neg ? { t: 'not', a: { t: 'var', name: M.inputs[l.v] } } : { t: 'var', name: M.inputs[l.v] }); const ls = r.terms[0].literals; return ls.length === 0 ? { t: 'const', v: 1 } : ls.length === 1 ? lit(ls[0]) : { t: 'and', args: ls.map(lit) }; };
   const clauseAst = r => { const lit = l => (l.neg ? { t: 'var', name: M.inputs[l.v] } : { t: 'not', a: { t: 'var', name: M.inputs[l.v] } }); const ls = r.terms[0].literals; return ls.length === 0 ? { t: 'const', v: 0 } : ls.length === 1 ? lit(ls[0]) : { t: 'or', args: ls.map(lit) }; };

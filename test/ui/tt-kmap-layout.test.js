@@ -1,8 +1,8 @@
-// UI: the Karnaugh map's place in its section (#3059): the minimal solutions' row ("2 minimal solutions exist. ◀ Solution 1
-// of 2 ▶") a line of its own, the map under it at the section's left (the options' left), its groups' legend right
-// after it (beside it, or just under it when there is no room); with 2 to 6 inputs, one solution (no row) or several,
-// SOP and POS, flat and in 3D, on a wide and a narrow screen. Its options: SOP / POS groups, then Order and 3D (Reset view)
-// on a line of their own at the same left (#3063). The legend beside the map centred on its cells (#3064).
+// UI: the Karnaugh map's place in its section (#3059): the map at the section's left (the options' left), its groups'
+// legend right after it (beside it, centred on its cells, #3064, or just under it when there is no room), the minimal
+// solutions' row ("2 minimal solutions exist. ◀ Solution 1 of 2 ▶") a line of its own under them (#3067); with 2 to 6
+// inputs, one solution (no row) or several, SOP and POS, flat and in 3D, on a wide and a narrow screen. Its options:
+// SOP / POS groups, then Order and 3D (Reset view) on a line of their own at the same left (#3063).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -25,12 +25,13 @@ const place = (page) => page.eval((t) => {
   return { cells, options: box(document.querySelector(`${t} .tt-groups`)), sol: box(host.querySelector(':scope > .tt-sol')), map: box(map), mapClass: map?.getAttribute('class'), legend: box(host.querySelector(':scope > .tt-legend')) };
 }, T);
 
-/** The map under the solutions' row (when there is one), at the section's left; the legend right after it. */
+/** The map at the section's left, the legend right after it; the solutions' row (when there is one) under both (#3067). */
 function laidOut(p, what, several) {
   assert.ok(p.map, `${what}: a map`);
   assert.equal(!!p.sol, several, `${what}: the solutions' row ${several ? 'shown' : 'not shown'}`);
   if (p.sol) {
-    assert.ok(p.map.top >= p.sol.bottom, `${what}: the map (top ${p.map.top}) under the solutions' row (bottom ${p.sol.bottom})`);
+    assert.ok(p.sol.top >= Math.max(p.map.bottom, p.legend.bottom), `${what}: the solutions' row (top ${p.sol.top}) under the map (bottom ${p.map.bottom}) and its legend (${p.legend.bottom})`);
+    assert.ok(p.map.top - p.options.bottom <= 20, `${what}: the map right under the options`);
     assert.ok(Math.abs(p.sol.left - p.options.left) <= 1, `${what}: the solutions' row at the section's left`);
   }
   assert.ok(Math.abs(p.map.left - p.options.left) <= 1, `${what}: the map (left ${p.map.left}) at the section's left (${p.options.left})`);
@@ -42,7 +43,7 @@ function laidOut(p, what, several) {
   if (beside && p.legend.bottom - p.legend.top < p.cells.bottom - p.cells.top) assert.ok(Math.abs(mid(p.legend) - mid(p.cells)) <= 2, `${what}: the legend (middle ${mid(p.legend)}) centred on the map's cells (${mid(p.cells)})`);
 }
 
-uiTest('#3059 Karnaugh map: under the minimal solutions\' row, at the section\'s left, the legend right after it', E, async (page) => {
+uiTest('#3059 #3067 Karnaugh map: at the section\'s left, the legend right after it, the minimal solutions\' row under them', E, async (page) => {
   const tables = {
     k2: { ...newTable('k2', ['a', 'b'], ['f']), table: { f: '0111' } },
     // g = m(0, 7) + d(1, 2, 4, 5, 6): two minimal SOPs; f one

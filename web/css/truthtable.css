@@ -134,7 +134,7 @@ html[data-theme="dark"] .tt-ks-v.vX { fill: #e0a040; }
 :is(.tt-menu-item, .tb-menu-item:not(:disabled)):is(:hover, :focus-visible), .tt-toolbar .tb-more-btn:hover { border-color: #a8c8eb; background: linear-gradient(#f3f8fd, #d5e6f8); }
 .pn-toolbar, .fsm-toolbar, .asm-chart-toolbar { position: relative; padding-right: 40px; }
 .tt-sol { display: flex; align-items: center; gap: 6px; }   /* the minimal solutions browsed (#2928), on the K-map (#2950) */
-.tt-kmap-host > .tt-sol { flex-basis: 100%; }   /* (a line of its own, the map under it at the left, #3059) */
+.tt-kmap-host > .tt-sol { flex-basis: 100%; }   /* (a line of its own at the left, #3059, under the map and its legend, #3067) */
 .tt-sol-count { color: var(--muted, #666); }
 .tt-hdl { margin: 0 4px 0 0; vertical-align: middle; }   /* a result's tick box: the output's HDL logic (#2951) */
 .tt-sol-btn { padding: 0 6px; line-height: 1.4; }
