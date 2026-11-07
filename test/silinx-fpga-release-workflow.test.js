@@ -65,11 +65,16 @@ test('#1681 silinx-fpga release: the commit on main, its version and changelog, 
   // runs git ls-remote on it (#2915)
   assert.match(publishStep, /npm publish \.\/out\/silinx-fpga-\*\.tgz --provenance --access public --ignore-scripts\n/);
   assert.doesNotMatch(publishStep, /npm publish (?!\.\/|\/)/, 'npm publish of a relative path without ./');
-  // npm's trusted publishing (#2428): GitHub's OIDC token, no secret, no npmrc; npm 11.5.1 or later, pinned, before publishing
+  // npm's trusted publishing (#2428): GitHub's OIDC token, no secret, no npmrc; npm 11.5.1 or later, pinned by its
+  // tarball's integrity (#3049): the registry's tarball downloaded, checked, installed from the file checked, then the publish
   assert.doesNotMatch(yml, /secrets\.|NODE_AUTH_TOKEN|_authToken|npmrc/i);
-  const npm = /run: \|\n\s+npm install --global npm@(\d+)\.(\d+)\.(\d+) --ignore-scripts --no-audit --no-fund\n\s+npm publish /.exec(publishStep);
-  assert.ok(npm, 'npm installed, pinned, then the publish');
-  const [maj, min, pat] = npm.slice(1).map(Number);
+  const npm = new RegExp(String.raw`\n {8}env:\n {10}NPM_TARBALL: https://registry\.npmjs\.org/npm/-/npm-(\d+)\.(\d+)\.(\d+)\.tgz\n {10}NPM_INTEGRITY: (sha512-[A-Za-z0-9+/]{86}==)\n {8}run: \|\n`
+    + String.raw` {10}curl -fsSL -o "\$RUNNER_TEMP/npm\.tgz" "\$NPM_TARBALL"\n`
+    + String.raw` {10}test "sha512-\$\(openssl dgst -sha512 -binary "\$RUNNER_TEMP/npm\.tgz" \| base64 -w0\)" = "\$NPM_INTEGRITY" \|\| \{ echo "::error::.*"; exit 1; \}\n`
+    + String.raw` {10}npm install --global "\$RUNNER_TEMP/npm\.tgz" --ignore-scripts --no-audit --no-fund\n {10}npm publish `).exec(publishStep);
+  assert.ok(npm, 'npm downloaded, checked against its integrity, installed from that file, then the publish');
+  assert.doesNotMatch(jobs.publish, /npm install --global npm@/, 'not npm from the registry by its version alone');
+  const [maj, min, pat] = npm.slice(1, 4).map(Number);
   assert.ok(maj > 11 || (maj === 11 && (min > 5 || (min === 5 && pat >= 1))), npm.slice(1).join('.'));
   // the tests are CI's, not run again here; no GitHub Release (the Pages site serves the IDE's latest)
   assert.doesNotMatch(yml, /npm test\b|gh release/);
