@@ -225,3 +225,39 @@ int main() { hls::stream<int> a, r; for (int c = 1; c <= 3; c++) { for (int i = 
     assert.deepEqual(r.gen.ports.filter((p) => p.name === 'k').map((p) => `${p.dir} ${p.w}`), ['in 32']);
   }
 });
+
+// (#2992: each process's ap_ready left open, the region's top reading its ap_done: no signal assigned and never read)
+const READY = `#include "hls_stream.h"
+static void f(hls::stream<int> &i, hls::stream<int> &o) { o.write(i.read() + 1); }
+void top(hls::stream<int> &a, hls::stream<int> &b) {
+#pragma HLS DATAFLOW
+  hls::stream<int> t;
+  f(a, t);
+  f(t, b);
+}
+int main() {
+  hls::stream<int> a, b;
+  for (int k = 0; k < 3; k++) { a.write(5 * k - 4); top(a, b); if (b.read() != 5 * k - 2) return 1; }
+  return 0;
+}
+`;
+
+test('#2992 DATAFLOW: each process\'s ap_ready left open (open, .ap_ready()), no design check message, in VHDL and Verilog; co-simulated, no warning', async () => {
+  const { compile, elaborate } = await import('../core/compile.js');
+  const { designChecks } = await import('../core/lint.js');
+  for (const lang of ['vhdl', 'verilog']) {
+    const g = cToHdl(READY, { file: 'f.cpp', lang });
+    assert.deepEqual(g.diagnostics.map((d) => d.message), [], lang);
+    assert.deepEqual(g.report.processes.map((p) => p.instance), ['f_U0', 'f_U1'], lang);
+    assert.equal((g.hdl.match(lang === 'vhdl' ? /ap_ready => open/g : /\.ap_ready\(\)/g) || []).length, 2, lang);
+    assert.doesNotMatch(g.hdl, /f_U\d_ap_ready/i, lang);
+    const lib = compile([{ path: `top.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.hdl }]);
+    const design = elaborate(lib, 'top');
+    assert.deepEqual([...lib.errors, ...design.diags].map((d) => `${d.severity}: ${d.message}`), [], lang);
+    assert.deepEqual(designChecks(lib, design).map((d) => d.message), [], lang);
+    const c = cosimulate(READY, { file: 'f.cpp', lang });
+    assert.deepEqual(c.errors, [], lang);
+    assert.equal(c.pass, true, `${lang}: ${JSON.stringify(c.mismatches, big)}`);
+    assert.equal(c.calls, 3, lang);
+  }
+});
