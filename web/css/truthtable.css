@@ -58,6 +58,9 @@
 .tt-kmap .tt-k-frame { fill: none; stroke: #333; stroke-width: 1.5; pointer-events: none; }
 .tt-kmap .tt-k-groups { pointer-events: none; }
 .tt-legend { display: flex; flex-direction: column; gap: 3px; min-width: 200px; }
+/* beside the map, centred on it (#3064): the flat map's on its cells (its labels 46 px above them, 18 px below: 14 px lower) */
+.tt-kmap-host > .tt-legend { align-self: center; }
+.tt-kmap-host > svg.tt-kmap + .tt-legend { position: relative; top: 14px; }
 .tt-leg { display: flex; align-items: center; gap: 6px; }
 .tt-swatch { display: inline-block; width: 18px; height: 12px; border: 2.5px solid; border-radius: 5px; }
 .tt-leg-cells { color: var(--muted, #777); }
