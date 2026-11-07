@@ -521,11 +521,16 @@ test('security: bound to another address than loopback, the API needs the token 
     assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'fpga-lab.local:8642', 'x-silinx-token': token } })).status, 200);
     assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'fpga-lab.local:8642', 'x-silinx-token': 'j'.repeat(24) } })).status, 403);
     assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'fpga-lab.local:8642', 'x-silinx-token': 'short' } })).status, 403);
-    // ?token= only on the download links (a GET a link opens: export.xise, export.zip), never on another
-    // GET nor on a write (#1434: an address stays in the browser's history and in proxies' logs)
+    // never ?token= (#3045: an address stays in the browser's history and in proxies' logs), the download links
+    // (export.xise, export.zip) too: the page sends the header
     assert.equal((await call('POST', '/projects', { name: 'Tok' })).status, 200);
     for (const url of [`/api/projects/Tok/export.xise?token=${token}`, `/api/projects/Tok/export.zip?token=${token}`, `/api/projects/Tok/export.zip?kind=silinx&token=${token}`]) {
       r = await any.raw('GET', url, { headers: { host: 'fpga-lab.local' } });
+      assert.deepEqual([r.status, r.body], [403, refused], url);
+      assert.equal(r.headers['cache-control'], 'no-store');
+    }
+    for (const url of [`/api/projects/Tok/export.xise`, `/api/projects/Tok/export.zip`, `/api/projects/Tok/export.zip?kind=silinx`]) {
+      r = await any.raw('GET', url, { headers: { host: 'fpga-lab.local', 'x-silinx-token': token } });
       assert.equal(r.status, 200, url);
       assert.match(r.headers['content-disposition'], /^attachment; filename=Tok/);
       assert.equal(r.headers['cache-control'], 'no-store');

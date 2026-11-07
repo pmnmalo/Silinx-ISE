@@ -397,8 +397,8 @@ is `try` (a schematic's Try it; a state diagram's, a Petri net's or an ASM chart
 `emulate` (the board emulator); `top=` names the module (with `simulate`, the test bench). Opening a link makes a project named after the design;
 clicked again, that project is opened as it is when it has the same files, and one the student changed is replaced
 only when they say so. A zip from another site is fetched only once you agree (its address shown), and only from an
-https address that is not of this computer or a local network; a broken link is said in the console, the workspace as
-it was.
+https address that is not of this computer or a local network, the zip's own (a redirection is not followed); a
+broken link is said in the console, the workspace as it was.
 
 Copy Link… includes Silinx as it is when the link is copied (**Include the current view**): the open tabs, the one in
 front, the split and, in the Silinx interface, the task, the side panel, the messages and a maximized document; the

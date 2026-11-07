@@ -434,16 +434,25 @@ uiTest('#2829 a zip at another site is asked first (Cancel: nothing fetched); br
   assert.equal(await exists('nothere'), false);
 });
 
-uiTest('#2962 a zip at another site that redirects to this computer or a local network: refused, said in the console, nothing made', E, async (page) => {
+uiTest('#3042 a zip at another site that redirects: the redirection not followed (fetched with redirect: manual), refused, said in the console, nothing made', E, async (page) => {
   const before = await projects();
-  for (const [to, n] of [['https://[::7f00:1]/a.zip', 1], ['https://[64:ff9b::a00:1]/a.zip', 2], ['https://192.168.1.1/a.zip', 3], ['http://example.org/a.zip', 4]]) {
+  const msg = 'ERROR: Open from a link: https://example.org/lecture3.zip redirects to another address, not followed: the link must give the zip\'s own address.';
+  // (the site's answer as the browser's fetch reports it: an opaque redirection with redirect: 'manual' (#3042);
+  // a redirection followed (#2962), to this computer, a local network or http, refused too)
+  for (const [answer, n] of [['manual', 1], ['https://[::7f00:1]/a.zip', 2], ['https://192.168.1.1/a.zip', 3], ['http://example.org/a.zip', 4]]) {
     await openLink(page, 'open=https://example.org/lecture3.zip', `r=${n}`);
     await page.waitDialog('Open from a Link');
-    // (the site's answer: a redirection to `to`, as the browser's fetch reports it)
-    await page.eval((u) => { window.fetch = async () => ({ ok: true, status: 200, statusText: 'OK', redirected: true, url: u, body: new Response(new Uint8Array([80, 75, 5, 6])).body }); }, to);
+    await page.eval((a) => {
+      window.__fetched = [];
+      window.fetch = async (u, o) => {
+        window.__fetched.push([String(u), o.redirect, o.credentials]);
+        return a === 'manual' ? { type: 'opaqueredirect', ok: false, status: 0, statusText: '', redirected: false, url: String(u), body: null }
+          : { type: 'cors', ok: true, status: 200, statusText: 'OK', redirected: true, url: a, body: new Response(new Uint8Array([80, 75, 5, 6])).body };
+      };
+    }, answer);
     await page.dialogButton('Open');
-    const msg = `ERROR: Open from a link: https://example.org/lecture3.zip leads to an address of this computer or of a local network, or not an https one ('${to}').`;
     await page.waitFor((m) => window.__console().includes(m), [msg], { what: msg, timeout: 30000 }).catch(async (e) => { throw new Error(`${e.message}\n${await page.consoleText()}`); });
+    assert.deepEqual(await page.eval(() => window.__fetched), [['https://example.org/lecture3.zip', 'manual', 'omit']]);
     assert.deepEqual(await consoleWarnings(page), [], 'no warnings');
   }
   assert.deepEqual(await projects(), before);

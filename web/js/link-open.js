@@ -9,7 +9,7 @@ import { confirmDlg, dialog, h } from './ui.js';
 import { S, app } from './app.js';
 import { applyViewState } from './view-state.js';
 import { applyLayout } from './tasks.js';
-import { TRY_DRAWING, decodeDesign, decodeUi, designZip, freeName, parseLink, privateHost, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
+import { TRY_DRAWING, decodeDesign, decodeUi, designZip, freeName, parseLink, sameFiles, tryDrawing, viewProblem } from '/core/design-link.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateMessages, gateZip } from '/core/import-gate.js';
 
@@ -32,16 +32,16 @@ export function linkOptions(hash = location.hash) {
 async function fetchZip(url) {
   const ok = await confirmDlg('Open from a Link', `This link opens a project from another site:\n\n${url}\n\nOpen it? Its files are copied into a new project of your workspace; nothing runs until you run it.`, { yes: 'Open', no: 'Cancel' });
   if (!ok) return null;
+  // a redirection is not followed (#3042): following it would send the request to its address before any check (one
+  // of this computer or of a local network); the link's own address is checked (parseLink), the zip's must be it
+  // (a GitHub release's download, redirected to another site without CORS, could not be fetched either)
   let r;
-  try { r = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' }); } catch (e) { throw fail(`cannot fetch ${url} (${e.message}; the site must allow it)`); }
-  if (!r.ok) throw fail(`cannot fetch ${url} (${r.status} ${r.statusText})`);
-  // a redirection checked as the link's own address is (#2962): https, not this computer's nor a local network's
-  let to = null;
-  try { to = new URL(r.url || url); } catch { /* checked below */ }
-  if (!to || to.protocol !== 'https:' || privateHost(to.hostname)) {
+  try { r = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'manual' }); } catch (e) { throw fail(`cannot fetch ${url} (${e.message}; the site must allow it)`); }
+  if (r.type === 'opaqueredirect' || r.redirected) {
     r.body?.cancel().catch(() => {});
-    throw fail(`${url} leads to an address of this computer or of a local network, or not an https one ('${String(r.url).slice(0, 120)}')`);
+    throw fail(`${url} redirects to another address, not followed: the link must give the zip's own address`);
   }
+  if (!r.ok) throw fail(`cannot fetch ${url} (${r.status} ${r.statusText})`);
   // (read with a running total: no more than the limit, whatever the site says it sends)
   const reader = r.body.getReader(), parts = [];
   let n = 0;
