@@ -13,6 +13,7 @@
 //
 //   scheduled(checked, opts, { clock, family, mults }) -> fsmd's result, its states split; subStates: Map state id -> [ids
 //     of the states after it in its chain]; units: core/c-bind.js's
+import { balanceSums } from './c-balance.js';
 import { bindable, bindMuls } from './c-bind.js';
 import { fsmd } from './c-fsmd.js';
 import { hdlName } from './c-graph.js';
@@ -78,7 +79,9 @@ function longestOf(g, states, family) {
 /** The states of the machine core/c-fsmd.js makes, split by the clock: { states, regs, subStates, slow: Map pipelined
  *  loop's state -> its path, when over the budget }, or { overflow: the states added } when the state's register is too
  *  narrow for them. */
-function schedule({ graph: g, states, stateT, done, piped }, budget, family, mults) {
+function schedule({ graph: g, states, stateT, done, piped, balance = true }, budget, family, mults) {
+  // (a sum of many terms a tree, as Vitis HLS's EXPRESSION_BALANCE, #2613)
+  if (balance) balanceSums(g, states.flatMap((st) => [st.next, st.stall, ...rootsOf(g, st)]));
   // (a wide multiplication of a state split: 18 x 18 ones, chained as the other operations, core/c-mul-split.js)
   const sts = states.map((st) => {
     if (piped.has(st.id) || !splittable(g, st)) return st;

@@ -16,10 +16,10 @@ import { checkOpPragma } from './c-op-pragmas.js';
 
 // what Silinx makes of the pragmas it knows
 // (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY', 'ARRAY_RESHAPE', 'STREAM', 'ARRAY_STENCIL']);
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY', 'ARRAY_RESHAPE', 'STREAM', 'ARRAY_STENCIL', 'EXPRESSION_BALANCE']);
 // Vitis HLS's others: accepted, ignored with a warning
 export const IGNORED = new Set(['DATAFLOW', 'RESOURCE',
-  'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
+  'OCCURRENCE', 'PROTOCOL', 'FUNCTION_INSTANTIATE',
   'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
 export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite', 'm_axi', 'ap_fifo', 'ap_hs']);
@@ -142,6 +142,13 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (name === 'AGGREGATE' && args.compact !== undefined && !['bit', 'byte', 'none', 'auto'].includes(String(args.compact).toLowerCase())) report(loc, `#pragma HLS AGGREGATE compact=${args.compact} is not one of bit, byte, none and auto: ignored (its default made)`, 'warning');
     if (name === 'INLINE') { const other = Object.keys(args).find((k) => k !== 'off' && k !== 'recursive'); if (other) report(loc, `#pragma HLS INLINE ${other}: not one of off and recursive: ignored`, 'warning'); }
     if (name === 'STREAM') { checkStream(p, loc, report, funcs.get(fname)); return; }
+    // (the sums of the function's machine balanced, by default, or not, #2613)
+    if (name === 'EXPRESSION_BALANCE') {
+      const other = Object.keys(args).find((k) => k !== 'off');
+      if (where !== 'function' || fname !== top) report(loc, '#pragma HLS EXPRESSION_BALANCE applies to the top function (in its body, not in a loop or a block): ignored here', 'warning');
+      else if (other) report(loc, `#pragma HLS EXPRESSION_BALANCE ${other}: not off: ignored (its sums balanced)`, 'warning');
+      return;
+    }
     if (name === 'ARRAY_RESHAPE') {
       const pa = funcs.get(fname)?.params.some((x) => x.name === args.variable);
       if (!args.variable) { report(loc, '#pragma HLS ARRAY_RESHAPE needs variable=<the array>'); return; }
