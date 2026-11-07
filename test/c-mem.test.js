@@ -139,3 +139,25 @@ test('#1527 a memory inside the module is a block RAM: the open synthesis (Yosys
     assert.deepEqual(r.warnings, [], lang);
   }
 });
+
+// (constant tables of more than MEM_MIN words: ROMs; a memory argument)
+const rom = (n, f) => `{ ${Array.from({ length: n }, (_, k) => f(k)).join(', ')} }`;
+const TABLES = `static const int A[100] = ${rom(100, (k) => k * 3)};
+static const int B[100] = ${rom(100, (k) => 100 - k)};
+`;
+
+test('#2968 the reads of different memories in one state, each its own port; a read whose address another read gives, and two of one memory, a state apart', () => {
+  const latency = (body, main) => {
+    const [vhdl, verilog] = passes(`${TABLES}${body}\nint main() {\n${main}\n  return 0;\n}\n`, 'f.c');
+    assert.deepEqual(verilog.latency, vhdl.latency);
+    return [vhdl.latency.max, vhdl.gen.states];
+  };
+  // (were 3 cycles and 5 states: B read in the state that took A's value)
+  assert.deepEqual(latency('int f(int i) {\n  return A[i] + B[i];\n}', '  for (int i = 0; i < 100; i++) if (f(i) != i * 2 + 100) return 1;'), [2, 4]);
+  // (three memories, two ROMs and an argument: were 5 cycles)
+  assert.deepEqual(latency('int f(int m[100], int i) {\n  return A[i] + B[99 - i] * m[i];\n}',
+    '  int m[100];\n  for (int i = 0; i < 100; i++) m[i] = i % 5;\n  for (int i = 0; i < 100; i++) if (f(m, i) != i * 3 + (1 + i) * (i % 5)) return 1;'), [3, 5]);
+  // (B's address is A's value: after it; A twice: its one port, a state each)
+  assert.deepEqual(latency('int f(int i) {\n  return A[i] + B[A[i] >> 2];\n}', '  for (int i = 0; i < 100; i++) if (f(i) != i * 3 + 100 - (i * 3 >> 2)) return 1;'), [4, 6]);
+  assert.deepEqual(latency('int f(int i, int j) {\n  return A[i] + A[j];\n}', '  for (int i = 0; i < 100; i++) if (f(i, 99 - i) != 297) return 1;'), [3, 5]);
+});

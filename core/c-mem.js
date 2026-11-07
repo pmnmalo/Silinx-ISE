@@ -142,12 +142,22 @@ export const memMethods = {
         at.cur.stmts.push({ kind: 'memlatch', mem: mem.name, tmp, port: 1, loc: e.loc });
         return { kind: 'id', name: tmp, loc: e.loc };
       }
+      // (another memory's read just before: in its state, its port free there, if this address is known there, #2968)
+      const before = this.otherRead(mem, i, at.cur);
+      if (before) {
+        before.stmts.push({ kind: 'memread', mem: mem.name, i, loc: e.loc });
+        (before.acc ||= new Set()).add(mem.name);
+        at.cur.stmts.push({ kind: 'memlatch', mem: mem.name, tmp, loc: e.loc });
+        if (mem.storage === 't2p') (at.cur.readOf ||= new Map()).set(mem.name, before);
+        return { kind: 'id', name: tmp, loc: e.loc };
+      }
       if (at.cur.acc?.has(mem.name)) at.next();
       const read = at.cur;
       at.cur.stmts.push({ kind: 'memread', mem: mem.name, i, loc: e.loc });
       (at.cur.acc ||= new Set()).add(mem.name);
       at.next();
       at.cur.stmts.push({ kind: 'memlatch', mem: mem.name, tmp, loc: e.loc });
+      at.cur.readFrom = read;
       if (mem.storage === 't2p') (at.cur.readOf ||= new Map()).set(mem.name, read);
       return { kind: 'id', name: tmp, loc: e.loc };
     }
@@ -162,6 +172,14 @@ export const memMethods = {
     const b = cur.readOf?.get(mem.name);
     if (!b || !cur.stmts.every((x) => x.kind === 'memlatch')) return null;
     if (b.stmts.filter((x) => x.mem === mem.name && (x.kind === 'memread' || x.kind === 'memwrite')).length !== 1) return null;
+    const names = namesIn(i);
+    return cur.stmts.some((x) => names.has(x.tmp)) ? null : b;
+  },
+  /** The state of the reads whose values cur takes, where a read of another memory at address i can go too: cur only
+   *  takes values read (nothing it holds is known before it), mem not accessed there; not in a pipelined loop. */
+  otherRead(mem, i, cur) {
+    const b = cur.readFrom;
+    if (!b || this.inPipe || b.acc?.has(mem.name) || !cur.stmts.every((x) => x.kind === 'memlatch')) return null;
     const names = namesIn(i);
     return cur.stmts.some((x) => names.has(x.tmp)) ? null : b;
   },
