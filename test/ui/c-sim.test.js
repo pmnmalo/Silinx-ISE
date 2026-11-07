@@ -305,9 +305,10 @@ uiTest('#1897 C Simulation of a test bench with files: the project\'s data files
 
 // #1924: a function's HDL scheduled for the board's clock (Basys2: 50 MHz, 20 ns) with its family's delays (a Spartan-3E,
 // #2080: an addition 4.06 ns): three additions in a row fit it, a combinational module; four do not, a sequential one
-// (at Vitis HLS's 10 ns on an Artix-7, three fit); the report says the clock
+// (at Vitis HLS's 10 ns on an Artix-7, three fit); the report says the clock. (#3026: the four in a row, not balanced into
+// a tree, #2613's EXPRESSION_BALANCE off: the clock's and the delays' test, not the balancing's)
 uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), the Spartan-3E\'s delays: three additions combinational there, four sequential', E, async (page) => {
-  await makeProject(env, { name: 'CClock', top: 'sum4', files: { 'src/sum4.c': 'int sum4(int a, int b, int c, int d, int e) {\n  return a + b + c + d + e;\n}\n', 'src/sum3.c': 'int sum3(int a, int b, int c, int d) {\n  return a + b + c + d;\n}\n' } });
+  await makeProject(env, { name: 'CClock', top: 'sum4', files: { 'src/sum4.c': 'int sum4(int a, int b, int c, int d, int e) {\n#pragma HLS EXPRESSION_BALANCE off\n  return a + b + c + d + e;\n}\n', 'src/sum3.c': 'int sum3(int a, int b, int c, int d) {\n  return a + b + c + d;\n}\n' } });
   await page.openProject('CClock');
   await page.showMessages();
   for (const [top, module] of [['sum3', 'combinational'], ['sum4', 'sequential, ap_ctrl_hs \\(ap_clk, ap_rst, ap_start \\/ ap_done \\/ ap_idle \\/ ap_ready\\), 4 states, \\d+ register bits']]) {
