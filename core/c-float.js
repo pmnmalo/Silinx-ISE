@@ -12,7 +12,7 @@ import { JS_MATH } from './c-mathlib.js';
 
 export const F64 = { fl: 64, w: 64, s: true };
 export const F32 = { fl: 32, w: 32, s: true };
-export const floatType = (t) => (t.name === 'float' ? F32 : F64);
+export const floatType = (t) => ((t.base ?? t.name) === 'float' ? F32 : F64);   // (a typedef's: its base, #3009)
 export const BITCASTS = { ap_float_bits: { fl: 32, bits: true }, ap_double_bits: { fl: 64, bits: true }, ap_bits_float: { fl: 32 }, ap_bits_double: { fl: 64 } };
 
 /** x = m * 2^e exactly (m a BigInt, x finite and positive). */

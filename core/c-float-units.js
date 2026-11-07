@@ -17,6 +17,8 @@
 //   shareUnits(checked)         each asked operation in its scope a call of its unit; -> { used: Set(op), warnings }
 //   unitSource(ops, have)       the C of the units of ops not in have (a Map of the functions)
 
+import { floatType } from './c-float.js';
+
 const OPS = { add: '+', sub: '-', mul: '*', div: '/' };
 export const FLOAT_OPS = new Set(['fadd', 'fsub', 'fmul', 'fdiv', 'fsqrt', 'dadd', 'dsub', 'dmul', 'ddiv', 'dsqrt']);
 export const unitName = (op) => `ap_unit_${op}`;
@@ -31,7 +33,7 @@ const walk = (x, f) => {
 };
 
 /** The C type's precision: 32 a float, 64 a double, 0 neither (core/c-float.js's floatType's). */
-const flOf = (t) => (t?.kind === 'float' ? (t.name === 'float' ? 32 : 64) : 0);
+const flOf = (t) => (t?.kind === 'float' ? floatType(t).fl : 0);
 
 export function asked(checked) {
   const out = [];
