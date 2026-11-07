@@ -4,8 +4,8 @@
 // the values crossing from one to the next in registers of their own. The C's registers are written in the chain's last
 // state only, and a memory is accessed there (its address, enables and data computed by then; a value read before the
 // chain held on its q0, no other access to it in between), and a stream too (the machine waits for its FIFO in that last
-// state, not computing again): every state of the chain reads the same values, so the machine does what it did, in more
-// cycles. Not split: a pipelined loop's state, its II kept, and reported when its path does not fit (`slow`). The split is made
+// state, not computing again; a read with what computes with its value waits in the first, #2967): every state of the
+// chain reads the same values, so the machine does what it did, in more cycles. Not split: a pipelined loop's state, its II kept, and reported when its path does not fit (`slow`). The split is made
 // inside core/c-fsmd.js (its `split`), before the ports the states drive. The multiplications of different states are then
 // bound to one unit (core/c-bind.js, #2125), and with `mults` (the device's multiplier blocks) a cycle takes no more than
 // that many: the others wait for a later cycle, every multiplication split to 18 x 18.
@@ -47,7 +47,8 @@ const waits = (g, st) => {
   const n = g.get(st.next);
   return n.op === 'mux' && g.isConst(n.args[1]) && g.k(n.args[1]) === BigInt(st.id) && [...st.fifo.values()].every((a) => g.isConst(a.g));
 };
-const splittable = (g, st) => !st.gate && g.isConst(st.stall) && !g.k(st.stall) && (!st.fifo?.size || waits(g, st));
+// (a stream's read with what computes with its value: held while it waits, #2967)
+const splittable = (g, st) => (st.chain || (!st.gate && g.isConst(st.stall) && !g.k(st.stall))) && (!st.fifo?.size || waits(g, st));
 const onward = (g, st) => (st.fifo?.size ? g.get(st.next).args[2] : st.next);
 // (a state's roots: where it goes, its registers' next values, its memories' accesses, the values it writes to streams)
 const ACC = ['addr', 'ce', 'we', 'd'];
@@ -171,7 +172,11 @@ function split(g, sts, plans, stateT, done) {
     for (let c = 0; c < last; c++) {
       const u = new Map();
       for (const [v, val] of handOn[c]) u.set(cut.get(v).reg.name, val);
-      states.push({ ...st, id: ids[c], updates: u, next: g.const(ids[c + 1], stateT), access: new Map(), fifo: new Map(), stall: g.const(0, BOOL), sub: c > 0 });
+      // (a stream's read with what computes with its value, #2967: the wait in the first, the value then there until
+      // the last takes it)
+      const wait = c === 0 && st.chain;
+      const next = wait ? g.add('mux', [st.stall, g.const(ids[0], stateT), g.const(ids[1], stateT)], stateT) : g.const(ids[c + 1], stateT);
+      states.push({ ...st, id: ids[c], updates: u, next, access: new Map(), fifo: new Map(), stall: wait ? st.stall : g.const(0, BOOL), sub: c > 0 });
     }
     states.push({ ...end, id: ids[last], sub: true });
   });

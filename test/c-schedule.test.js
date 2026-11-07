@@ -162,7 +162,7 @@ int main() {
 `;
 
 test('#2080 a state that writes a stream split: the handshake in the chain\'s last state, the value computed by then, waiting there and not computing again', () => {
-  for (const [clock, cycles] of [[5, 62], [10, 41], [20, 33]]) {
+  for (const [clock, cycles] of [[5, 53], [10, 33], [20, 27]]) {   // (the read and the loop's step in one state, #2967)
     for (const lang of ['vhdl', 'verilog']) {
       const c = cosimulate(STREAM, { file: 't.cpp', top: 'f', lang, clock });
       assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, cycles, []], `${clock} ns, ${lang}`);
@@ -183,6 +183,46 @@ test('#2080 a state that writes a stream split: the handshake in the chain\'s la
     }
   }
   assert.ok(writers.length >= 2);
+});
+
+const READ = `#include "hls_stream.h"
+void f(hls::stream<int> &xs, hls::stream<int> &ys, int k) {
+  for (int i = 0; i < 4; i++) {
+#pragma HLS PIPELINE off
+    int v = xs.read();
+    int w = v * k + k * k + v + k + v + k + v;
+    ys.write(w);
+  }
+}
+int main() {
+  hls::stream<int> xs, ys;
+  for (int i = 0; i < 4; i++) xs.write(i * 3 - 2);
+  f(xs, ys, 7);
+  int r = 0;
+  for (int i = 0; i < 4; i++) { int v = i * 3 - 2; if (ys.read() != v * 7 + 49 + v + 7 + v + 7 + v) r = 1; }
+  return r;
+}
+`;
+
+test('#2967 a stream\'s read in the state of what computes with its value; split by the clock: the wait in the chain\'s first state, the handshake in its last', () => {
+  for (const [clock, cycles] of [[5, 53], [10, 33], [20, 27]]) {   // (was 62, 41, 33: a state for the read, another for its value)
+    for (const lang of ['vhdl', 'verilog']) {
+      const c = cosimulate(READ, { file: 't.cpp', top: 'f', lang, clock });
+      assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, cycles, []], `${clock} ns, ${lang}`);
+    }
+  }
+  const m = scheduled(checkC(READ, 't.cpp', { top: 'f', synthesis: true }), {}, { clock: 5 });
+  const g = m.graph;
+  const reader = m.states.find((st) => st.chain && st.fifo.has('xs'));
+  assert.ok(reader, 'the read in a state that computes');
+  const [first, rest] = [...m.subStates].find(([, ids]) => ids.at(-1) === reader.id) ?? [];
+  assert.ok(rest?.length, 'its state split');
+  const chain = [first, ...rest].map((id) => m.states.find((st) => st.id === id));
+  // (while the FIFO is empty: the first state again; the others go on, the value read there until the last takes it)
+  const head = g.get(chain[0].next);
+  assert.deepEqual([head.op, g.k(head.args[1]), g.k(head.args[2])], ['mux', BigInt(first), BigInt(chain[1].id)]);
+  assert.ok(chain.slice(1, -1).every((st) => g.isConst(st.next) && g.isConst(st.stall) && !g.k(st.stall)));
+  assert.ok(chain.slice(0, -1).every((st) => !st.fifo.size));
 });
 
 test('#2080 a pipelined loop that does not fit the clock: its II kept, its path in the report, no warning; one that fits, none', () => {

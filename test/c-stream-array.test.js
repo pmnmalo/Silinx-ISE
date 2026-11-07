@@ -77,9 +77,10 @@ test('#1739 arrays of streams co-simulated in VHDL and Verilog: a stream per ele
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(SRC, { file: 'dut.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], JSON.stringify(r.mismatches, big));
-    // (the inner loop pipelined automatically, #1919: s_out[j] written in both branches of its if, each element twice)
+    // (the inner loop pipelined automatically, #1919: s_out[j] written in both branches of its if, each element twice;
+    // II 20, was 23: a read's value used in its state, #2967)
     assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), [
-      '8 this loop is pipelined automatically, as Vitis HLS does (II=1): II=23 made (it accesses a stream in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off']);
+      '8 this loop is pipelined automatically, as Vitis HLS does (II=1): II=20 made (it accesses a stream in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off']);
     assert.deepEqual(r.gen.ports.filter((p) => /_TDATA$|_din$/.test(p.name)).map((p) => p.name), ['s_in_0_TDATA', 's_in_1_TDATA', 's_in_2_TDATA', 's_out_0_din', 's_out_1_din', 's_out_2_din']);
   }
 });

@@ -421,11 +421,13 @@ class SeqFlow extends Flow {
     return { kind: 'var', t: et, reg: this.reg(v.name, et, reset), name: v.name, static: !!v.static };
   }
   arrayLength(v) { return Number(v.type.length ?? (v.init?.kind === 'init' ? v.init.items.length : 0)); }
-  /** A goto-only block with no statement is skipped (its predecessors go where it goes). */
+  /** A goto-only block with no statement is skipped (its predecessors go where it goes), and so is one that ends the
+   *  function after a goto (its predecessor ends it, #2967: no state of nothing before ap_done). */
   thread() {
     const target = (b) => { const seen = new Set(); while (b && !b.stmts.length && b.term?.goto && !seen.has(b)) { seen.add(b); b = b.term.goto; } return b; };
     for (const b of this.blocks) {
       if (b.term?.goto) b.term.goto = target(b.term.goto);
+      if (b.term?.goto && !b.term.goto.stmts.length && b.term.goto.term?.done && !b.term.goto.loop && !b.pipe) b.term = { done: true };
       if (b.term?.cond) { b.term.t = target(b.term.t); b.term.f = target(b.term.f); }
       if (b.loop) b.loop = { exit: target(b.loop.exit), cont: target(b.loop.cont) };
     }
@@ -611,7 +613,7 @@ class SeqFlow extends Flow {
           updates.set(k, r.t === BOOL && k.endsWith('_vld_reg') ? this.and(this.not(stall), v) : this.mux(stall, this.regNode(r), v, r.t));
         }
       }
-      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall, ...(b.gate ? { gate: true } : {}), ...(this.callNow ? { call: this.callNow } : {}) });
+      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall, ...(b.gate ? { gate: true } : {}), ...(b.chain ? { chain: true } : {}), ...(this.callNow ? { call: this.callNow } : {}) });
     }
     // (a pointer written before it is read, on every path: no input, #2241)
     this.outFirstDone();

@@ -88,6 +88,16 @@ test('#1901 ap_hs on scalar pointers: sequential, each access a handshake (_ap_v
   assert.equal(g.sequential, true);
 });
 
+test('#2967 an access a cycle: a read in the state of what computes with its value, the first in the first state, none of nothing before ap_done', () => {
+  // (stream_good's and stream_better's shapes, test/hls-corpus: Vitis HLS's 6 and 5; were 13 and 13-14)
+  const good = GOOD('#pragma HLS INTERFACE ap_fifo port=o\n#pragma HLS INTERFACE mode=ap_fifo port=in');
+  assert.deepEqual(both(good, FIFO, [RENAMED], { file: 'f.c' }), { min: 6, max: 6, avg: 6 });
+  // (ap_hs: the co-simulation's _ap_ack not always there when _ap_vld is)
+  assert.deepEqual(both(HS, ['o', 'o_ap_vld', 'o_ap_ack', 'a', 'a_ap_vld', 'a_ap_ack'], [], { file: 'f.c' }), { min: 6, max: 9, avg: 7.5 });
+  // (four reads, two writes, the idle and done states)
+  for (const src of [good, HS]) assert.equal(cToHdl(src, { file: 'f.c' }).states, 8);
+});
+
 test('#1901 a co-simulation that differs from the C is found on a handshake', () => {
   const c = cosimulate(HS, { file: 'f.c', lang: 'verilog', alter: (h) => h.replace(/assign o = /, 'assign o = 1 + ') });
   assert.equal(c.errors.length, 0);
