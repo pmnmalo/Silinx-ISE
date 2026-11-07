@@ -1,7 +1,7 @@
 // UI: each Boolean algebra table its own Karnaugh map 3D box (#3074): a table's map put in 3D leaves every other open
 // table's map flat, and a cell clicked on that flat map changes the cell, not the view (it turned 3D: one box shared
 // by every table, read at the next redraw); for the maps of 3 or 4 inputs (the cylinder, the torus) and of 5 or 6 (the
-// stack); a table opened afterwards is flat; its own box kept when it is shown again.
+// stack); a table opened afterwards is flat; its own box kept when it is shown again; the 3D map's turn each table's too.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -52,6 +52,31 @@ uiTest('#3074 Karnaugh map: the 3D box each table\'s own; a click on a flat map 
     assert.deepEqual(await shown(), d3, `${one} still in 3D`);
     await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T);
     await page.waitFor((t) => !!document.querySelector(`${t} .tt-kmap-host > svg.tt-kmap`), [T], { what: `${one} flat again` });
+  }
+  // the turn each table's too: one map turned, another's first shown as its Reset view leaves it, and kept after an edit
+  // (the stack's transform; the surface's: a face's corners on the screen)
+  const pose = (sel) => page.eval((t, s) => { const e = document.querySelector(`${t} ${s}`); return e.style.transform || e.getAttribute('points'); }, T, sel);
+  for (const [one, other, sel] of [['e6', 'd5', '.tt-k3d-stack'], ['a3', 'b3', '.tt-ks-face[data-row="5"]']]) {
+    const homes = {};
+    for (const k of [other, one]) {
+      await open(k);
+      await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T);
+      await page.waitFor((t) => !!document.querySelector(`${t} .tt-kmap-host > .tt-k3d`), [T], { what: `${k} in 3D` });
+      homes[k] = await pose(sel);
+    }
+    const home = homes[one];
+    await page.eval((t) => { const s = document.querySelector(`${t} .tt-k3d`); for (let i = 0; i < 8; i++) s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); }, T);
+    const turned = await pose(sel);
+    assert.notEqual(turned, home, `${one} turned`);
+    await open(other);
+    assert.equal(await pose(sel), homes[other], `${other} not turned by ${one}'s turn`);
+    await page.click(`${T} .tt-k3d [data-row="0"]`);   // (an edit: the map drawn again)
+    await page.waitFor((t) => window.Silinx.active.ttEditor.getModel().table.f[0] !== '0', [T], { what: `${other}'s cell 0 changed` });
+    assert.equal(await pose(sel), homes[other], `${other} still not turned after an edit`);
+    await page.eval(() => window.Silinx.active.ttEditor.undo());
+    await open(one);
+    assert.equal(await pose(sel), turned, `${one} still turned`);
+    for (const k of [one, other]) { await open(k); await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).click(), T); }
   }
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });

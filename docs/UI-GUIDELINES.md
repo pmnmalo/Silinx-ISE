@@ -31,6 +31,13 @@ answer here.
 - **No Undo, Redo or Print in a document's toolbar**: the main toolbar's, the Edit and File menus' and Ctrl+Z,
   Ctrl+Y, Ctrl+P act on the document in front (#2505, #2514).
 - **The side panels** are all alike (see below).
+- **Its view is its own** (#3074): what a document shows and how is kept in its editor, one per open document: a
+  check box of its options (the Karnaugh map's 3D), a choice (SOP / POS groups, the variables' order), a turn, a zoom,
+  a scroll. Never in a module's variable shared by every open document: one document's change would reach the others
+  only when they are drawn again (a click on a cell), their check box then saying the opposite of what they show. A
+  setting remembered for every document (the schematic's options, a panel folded) is read when an editor opens; the
+  editor's box and what it shows always agree. A UI test opens two documents, changes one, and checks the other
+  unchanged, also after an edit in it.
 - **No hint line** under the document (#2735): what the mouse does is in the tools' tips and the Help (the Schematic
   editor's tool tip at the left of its status line, as it was); the zoom is the zoom tools'; a status message is the
   console's.

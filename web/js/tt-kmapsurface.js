@@ -12,7 +12,6 @@ import { kmapSurface, kmapPatch, turn, project, facesViewer, surfaceSceneSide } 
 const CELL = 80;           // a cell's side along the surface (px)
 const PERSPECTIVE = 900;
 const HOME = { rx: -30, ry: 20 };
-let view = { ...HOME };    // (kept between redraws, as the viewer left it)
 
 /** The 3D box of a map of 3 or 4 inputs: `d3` the editor's ({ on }, #3074), `changed` the map drawn again. */
 export function surfaceBox(n, d3, changed) {
@@ -25,7 +24,8 @@ export function surfaceBox(n, d3, changed) {
  * The map on its surface in `host`: { layout, col (the output's column), terms (the groups), groups ('sop' | 'pos'),
  * colors, onCell(mt), cellText(v, groups) }.
  */
-export function mountKmapSurface(host, { layout: L, col, terms, groups, colors, onCell, cellText }) {
+export function mountKmapSurface(host, { layout: L, col, terms, groups, colors, onCell, cellText, d3 }) {
+  let view = d3.surface || { ...HOME };   // (this table's, kept between its redraws as the viewer left it, #3074)
   const S = kmapSurface(L, { cell: CELL });
   const side = surfaceSceneSide(S.radius + 4, PERSPECTIVE), mid = side / 2;
   const svg = sv('svg', { class: 'tt-ks-svg', width: side, height: side, viewBox: `0 0 ${side} ${side}` });
@@ -83,7 +83,7 @@ export function mountKmapSurface(host, { layout: L, col, terms, groups, colors, 
     if (!drag) return;
     if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 3) return;
     if (!drag.moved) { drag.moved = true; scene.setPointerCapture?.(e.pointerId); }
-    view = { ry: drag.ry + (e.clientX - drag.x) / 2, rx: Math.max(-85, Math.min(85, drag.rx - (e.clientY - drag.y) / 2)) };
+    view = d3.surface = { ry: drag.ry + (e.clientX - drag.x) / 2, rx: Math.max(-85, Math.min(85, drag.rx - (e.clientY - drag.y) / 2)) };
     apply();
   });
   // (a drag is not a click on the cell it started on)
@@ -93,11 +93,11 @@ export function mountKmapSurface(host, { layout: L, col, terms, groups, colors, 
     const d = { ArrowLeft: [0, -10], ArrowRight: [0, 10], ArrowUp: [10, 0], ArrowDown: [-10, 0] }[e.key];
     if (!d) return;
     e.preventDefault();
-    view = { rx: Math.max(-85, Math.min(85, view.rx + d[0])), ry: view.ry + d[1] };
+    view = d3.surface = { rx: Math.max(-85, Math.min(85, view.rx + d[0])), ry: view.ry + d[1] };
     apply();
   });
   // (Reset view: placed by its caller, beside the 3D box, #1567)
-  const reset = h('button', { type: 'button', class: 'btn tt-k3d-reset', onclick: () => { view = { ...HOME }; apply(); } }, 'Reset view');
+  const reset = h('button', { type: 'button', class: 'btn tt-k3d-reset', onclick: () => { view = d3.surface = { ...HOME }; apply(); } }, 'Reset view');
   host.append(scene);
   return { view: () => ({ ...view }), reset };
 }
