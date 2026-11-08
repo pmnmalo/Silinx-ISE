@@ -9,6 +9,10 @@ import { checkRoutingS6 } from '../src/fpga/s6/route-check.js';
 import { placementOf, siteBel, siteNetlist, timingParam } from '../src/fpga/s6/nextpnr.js';
 import { unknownPipsS6, timingExportS6 } from '../src/fpga/s6/nextpnr-export.js';
 import { nextpnrIo } from '../src/nextpnr-io.js';
+import { S6_HARD_BY_NEXTPNR } from '../src/open-flow-nextpnr-s6.js';
+import { wireDelay, pathCounts } from '../src/fpga/s6/timing.js';
+import { netTree, treePath } from '../src/fpga/timing.js';
+import { S6_SPEED_3 } from '../src/fpga/s6/timing-model.js';
 
 const PART = 'xc6slx16csg324-3';
 const device = loadDeviceCache(PART);
@@ -80,7 +84,42 @@ test('the chip database\'s exports: the unknown PIPs are real PIPs of their tile
   const t = timingExportS6(device);
   assert.equal(t.wire.length, 9);
   device.templates.forEach((tp, i) => assert.equal(t.pipClass[i].length, tp.from.length));
+  // (#3137) a class per node: those of several wires in the graph's order, a single wire's by its template's wire
+  const multi = Array.from({ length: device.nodeCount }, (_, n) => device.nodeStart[n + 1] - device.nodeStart[n] > 1).filter(Boolean).length;
+  assert.equal(t.node.length, multi);
+  device.templates.forEach((tp, i) => { if (t.tileWire[i]) assert.equal(t.tileWire[i].length, tp.wires.length); });
+  assert.ok([...t.node, ...Object.values(t.tileWire).flat()].every(c => Number.isInteger(t.nodeClass[c])));
+  assert.ok(t.nodeClass.every(ps => Number.isInteger(ps) && ps >= 0 && ps < 1000));
 });
+
+/** A node's delay in the chip database (ps): its class's (timingExportS6). */
+const nodePs = (t, dv, n) => t.nodeClass[dv.nodeStart[n + 1] - dv.nodeStart[n] > 1 ? t.node[n]
+  : t.tileWire[dv.tileTemplate[dv.wireTile[dv.nodeWires[dv.nodeStart[n]]]]][dv.nodeWires[dv.nodeStart[n]] - dv.tileWireBase[dv.wireTile[dv.nodeWires[dv.nodeStart[n]]]]]];
+
+/**
+ * (#3137) Each routed connection's delay in nextpnr's chip database (the nodes' after the driver's, as nextpnr adds a
+ * node's delay to the PIP driving it) against Silinx's timing analysis (wireDelay): the same but for the fanout's term,
+ * 2 ps a load beyond one, and the rounding to ps; and above it by at most the load's terms where the model's sum is
+ * below 0 there (the chip database's node delays are not below 0). Returns the connections compared.
+ */
+function checkNodeDelays(routed, dv) {
+  const t = timingExportS6(dv), inst = new Map(routed.insts.map(i => [i.name, i]));
+  let compared = 0;
+  for (const n of routed.nets) {
+    const src = n.outpins[0], si = src && inst.get(src.inst), s = si ? dv.sitePinNode(si.site, src.pin) : -1;
+    if (s < 0 || !n.pips?.length) continue;
+    const tree = netTree(n.pips, [s], dv);
+    for (const p of n.inpins) {
+      const k = dv.sitePinNode(inst.get(p.inst).site, p.pin), nodes = k >= 0 ? treePath(tree, k) : null;
+      if (!nodes || nodes.length < 2) continue;
+      const model = wireDelay(S6_SPEED_3.wires, { ...pathCounts(dv, nodes), fanout: 1 }), db = nodes.slice(1).reduce((a, x) => a + nodePs(t, dv, x), 0) / 1000;
+      assert.ok(db >= model - 0.0005 * nodes.length, `${n.name} -> ${p.inst}.${p.pin}: ${db} ns, the model's ${model}`);
+      assert.ok(db <= model + 0.0005 * nodes.length + Math.max(0, -S6_SPEED_3.wires.base), `${n.name} -> ${p.inst}.${p.pin}: ${db} ns, the model's ${model}`);
+      if (db <= model + 0.0005 * nodes.length) compared++;
+    }
+  }
+  return compared;
+}
 
 const COUNTER = `module top(input clk, input rst, output reg [3:0] led);
   reg [23:0] c = 0;
@@ -113,6 +152,8 @@ for (const [dev, pkg] of [['xc6slx16', 'csg324'], ['xc6slx45', 'csg324']]) {
     assert.equal(r.report.par.engine, 'nextpnr');
     assert.ok(r.report.par.routed);
     assert.ok(Object.keys(files).some(n => /\.bit$/.test(n)));
+    // (#3137) the chip database's node delays add up to Silinx's on its routed connections
+    if (dev === 'xc6slx16') assert.ok(checkNodeDelays(routed, dv) > 20);
   });
 }
 
@@ -132,6 +173,47 @@ test('Place & Route with no Map step: the design packed first, placed and routed
   assert.equal(r.report.par.engine, 'nextpnr');
   assert.ok(checkRoutingS6(parseXdl(files['open/routed.xdl']), dv).ok);
 });
+
+// (#3137) who places the block RAMs and DSP48A1s: Silinx (their sites fixed for nextpnr, attribute BEL), or nextpnr
+// (spec.hardByNextpnr; S6_HARD_BY_NEXTPNR once the package pinned has the delays and the tuning); the pads and global
+// buffers are Silinx's either way
+const RAM_MUL = `module top(input clk, input we, output reg [3:0] led);
+  reg [7:0] mem [0:1023];
+  reg [9:0] a = 0; reg [17:0] x = 0, y = 0; reg [7:0] q; reg [35:0] p;
+  always @(posedge clk) begin
+    a <= a + 1; x <= {x[16:0], we}; y <= {y[16:0], x[17]};
+    if (we) mem[a] <= a[7:0] ^ p[7:0];
+    q <= mem[a]; p <= x * y; led <= q[3:0] ^ p[35:32];
+  end
+endmodule
+`;
+for (const byNextpnr of [undefined, true]) {
+  test(`a block RAM and a DSP48A1 placed by ${byNextpnr ? 'nextpnr (hardByNextpnr)' : 'Silinx, fixed for nextpnr (the default)'}; the pads by Silinx; routed, no warnings`, { timeout: 600000 }, async () => {
+    const part = 'xc6slx16csg324-3', dv = loadDeviceCache(part), files = {}, lines = [], inputs = [];
+    const np = nextpnrS6Node();
+    const io = {
+      log: l => lines.push(String(l)), sources: () => [{ path: 'top.v', lang: 'verilog', text: RAM_MUL }], ucf: UCF.xc6slx16csg324.replace('"rst"', '"we"'), ucfName: 't.ucf',
+      device: () => dv, bitDb: () => loadBitDbS6(part), yosys: yosysNode,
+      nextpnr: { spartan6: { ...np, run: (args, f, onLine) => { if (args.includes('--no-route')) inputs.push(JSON.parse(f['design.json'])); return np.run(args, f, onLine); } } },
+      write: (n, d) => { files[n] = d; return n; }, read: n => files[n] ?? null, save: () => {},
+    };
+    assert.equal(S6_HARD_BY_NEXTPNR, false);
+    const r = await runFlow({ top: 'top', part, device: 'xc6slx16', pkg: 'csg324', family: 'spartan6', steps: ['synth', 'translate', 'map', 'par'], seed: 1, effort: 1,
+      synthEffort: 'normal', startupClk: 'JtagClk', hardByNextpnr: byNextpnr }, io);
+    assert.ok(r.ok, `${r.error}\n${lines.filter(l => /ERROR|nextpnr, seed/.test(l)).join('\n')}`);
+    assert.deepEqual(lines.filter(l => /^WARNING/.test(l)), []);
+    assert.equal(inputs.length, 3);
+    for (const input of inputs) {
+      const cells = Object.values(Object.values(input.modules)[0].cells);
+      const fixed = type => cells.filter(c => c.type === type).map(c => !!c.attributes?.BEL);
+      assert.deepEqual(fixed('RAMB16BWER').concat(fixed('RAMB8BWER')), [!byNextpnr]);
+      assert.deepEqual(fixed('DSP48A1'), Array(3).fill(!byNextpnr));   // (Yosys's unsigned 18 x 18 product in three)
+      assert.deepEqual(fixed('IOB'), Array(6).fill(true));
+      assert.deepEqual(fixed('BUFGMUX'), [true]);
+    }
+    assert.ok(checkRoutingS6(parseXdl(files['open/routed.xdl']), dv).ok);
+  });
+}
 
 // (#2131) a seed nextpnr cannot route: the next one, the step failing only when none routes; nextpnr's WebAssembly
 // exception has no message, so its own ERROR line says why

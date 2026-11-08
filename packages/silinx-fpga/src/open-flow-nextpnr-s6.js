@@ -12,6 +12,10 @@ import { analyzeTimingS6 } from './fpga/s6/timing.js';
 import { placementOf, routedDesignS6, siteNetlist } from './fpga/s6/nextpnr.js';
 
 const PLACE_SEEDS = 3;
+// who places the block RAMs and DSP48A1s (#3137): Silinx (placeS6, timing-driven, the sites fixed for nextpnr) until the
+// nextpnr package pinned has the timing model's delays in its chip database and its placer's tuning for them (the
+// fork's spartan6 0.2.0); then nextpnr (spec.hardByNextpnr overrides it)
+export const S6_HARD_BY_NEXTPNR = false;
 // a routed design's minimum period by Silinx's timing model (ns; 0: no clocked paths)
 const periodOf = (routed, device) => analyzeTimingS6(parseXdl(writeXdl(routed)), device).clocks.reduce((a, c) => Math.max(a, c.period), 0);
 
@@ -44,14 +48,15 @@ export function mountNextpnrS6(ctx) {
     const db = await loadChipdb(io.nextpnr.spartan6, part, log, StepError);
     // the pads and the global buffers, by Silinx's rules (the banks' VCCO, a clock pad's dedicated path); the block RAMs
     // and DSP48A1s from its timing-driven placement (nextpnr's analytical placer left them columns apart: the stopwatch
-    // on the Atlys missed its 10 ns on every seed), a DSP48A1 cascade with them
-    const hard = phys.insts.some(i => i.kind === 'bram' || i.kind === 'dsp');
+    // on the Atlys missed its 10 ns on every seed), a DSP48A1 cascade with them, unless nextpnr places them (#3137)
+    const byNextpnr = spec.hardByNextpnr ?? S6_HARD_BY_NEXTPNR;
+    const hard = !byNextpnr && phys.insts.some(i => i.kind === 'bram' || i.kind === 'dsp');
     let legal;
     try { legal = placeS6(phys, sites, { seed: spec.seed || 1, effort: hard ? 1 : 0, timing: hard ? 0.1 : 0, nl }); } catch (e) { throw new StepError(`placement failed: ${e.message}`, [], e.hint); }
     for (const w of legal.warnings || []) log(`WARNING:Place - ${w}`);
     const fixed = new Map(), generalOk = new Set();
     phys.insts.forEach((inst, i) => {
-      if (!['iob', 'bufg', 'bram', 'dsp'].includes(inst.kind)) return;
+      if (!(hard ? ['iob', 'bufg', 'bram', 'dsp'] : ['iob', 'bufg']).includes(inst.kind)) return;
       fixed.set(inst.name, legal.site[i]);
       if (inst.kind === 'iob' && !sites.pads.get(legal.site[i])?.bufg.length) generalOk.add(inst.name);
     });
