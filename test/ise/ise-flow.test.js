@@ -26,7 +26,7 @@ const haveImage = enabled && (HOST
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE flow tests'
   : !haveImage ? `docker image ${IMAGE} not available${HOST ? ' on the remote host (ssh)' : ''}` : false;
 const TOOLCHAIN = HOST
-  ? { mode: 'ssh', ssh: { host: HOST[2], user: HOST[1] || '', remoteDir: 'silinx-ise-tests', image: IMAGE, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }
+  ? { mode: 'ssh', ssh: { host: HOST[2], user: HOST[1] || '', remoteDir: 'silinx-tests', image: IMAGE, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }
   : { mode: 'docker', docker: { image: IMAGE, platform: 'linux/amd64', settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } };
 
 let tmp, srv, base, jobs;

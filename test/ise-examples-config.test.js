@@ -27,29 +27,29 @@ const remoteDir = env => iseExamplesConfig({ host: HOST, image: IMAGE, env }).ss
 
 test('over ssh: a folder of its own in the configured remoteDir (the folder Docker shares on the host)', () => {
   userConfig({ host: 'x', remoteDir: '/Users/Shared/silinx-ise/build' });
-  assert.equal(remoteDir({}), '/Users/Shared/silinx-ise/build/silinx-ise-examples');
+  assert.equal(remoteDir({}), '/Users/Shared/silinx-ise/build/silinx-examples');
   userConfig({ host: 'x', remoteDir: '~/shared/build/' });
-  assert.equal(remoteDir({}), 'shared/build/silinx-ise-examples');
+  assert.equal(remoteDir({}), 'shared/build/silinx-examples');
 });
 
 test('SILINX_ISE_REMOTE_DIR takes precedence over the configuration', () => {
   userConfig({ host: 'x', remoteDir: '/Users/Shared/silinx-ise/build' });
-  assert.equal(remoteDir({ SILINX_ISE_REMOTE_DIR: '/srv/ise/' }), '/srv/ise/silinx-ise-examples');
+  assert.equal(remoteDir({ SILINX_ISE_REMOTE_DIR: '/srv/ise/' }), '/srv/ise/silinx-examples');
 });
 
-test('no configuration, or one with no remoteDir: ~/silinx-ise-examples, as before', () => {
+test('no configuration, or one with no remoteDir: ~/silinx-examples', () => {
   userConfig(null);
-  assert.equal(remoteDir({}), 'silinx-ise-examples');
+  assert.equal(remoteDir({}), 'silinx-examples');
   userConfig({ host: 'x' });
-  assert.equal(remoteDir({}), 'silinx-ise-examples');
+  assert.equal(remoteDir({}), 'silinx-examples');
   fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), '{ not json');
-  assert.equal(remoteDir({}), 'silinx-ise-examples');
+  assert.equal(remoteDir({}), 'silinx-examples');
 });
 
 test('the rest of the ssh configuration, and the image on this machine', () => {
   userConfig(null);
   assert.deepEqual(iseExamplesConfig({ host: HOST, image: IMAGE, env: {} }),
-    { mode: 'ssh', ssh: { host: 'build-box', user: 'me', remoteDir: 'silinx-ise-examples', image: IMAGE, settings: ISE_SETTINGS } });
+    { mode: 'ssh', ssh: { host: 'build-box', user: 'me', remoteDir: 'silinx-examples', image: IMAGE, settings: ISE_SETTINGS } });
   assert.equal(iseExamplesConfig({ host: { host: 'build-box' }, image: IMAGE, env: {} }).ssh.user, '');
   assert.deepEqual(iseExamplesConfig({ host: null, image: IMAGE, env: {} }),
     { mode: 'docker', docker: { image: IMAGE, platform: 'linux/amd64', settings: ISE_SETTINGS } });

@@ -67,8 +67,8 @@ test('hook: every other job is refused before its first step, saying why', { ski
     [{ GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/ci.yml@refs/heads/main` }, `workflow '${REPO}/.github/workflows/ci.yml@refs/heads/main'`],
     [{ GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/ise.yml@refs/heads/other` }, `workflow '${REPO}/.github/workflows/ise.yml@refs/heads/other'`],
     [{ GITHUB_REF: 'refs/heads/other' }, "ref 'refs/heads/other'"],
-    [{ GITHUB_WORKFLOW_REF: `someone/Silinx-ISE/.github/workflows/ise.yml@refs/heads/main` }, "workflow 'someone/Silinx-ISE/.github/workflows/ise.yml@refs/heads/main'"],
-    [{ GITHUB_REPOSITORY: 'someone/Silinx-ISE', GITHUB_REPOSITORY_ID: '42' }, "repository 'someone/Silinx-ISE' (ID '42')"],
+    [{ GITHUB_WORKFLOW_REF: `someone/Silinx/.github/workflows/ise.yml@refs/heads/main` }, "workflow 'someone/Silinx/.github/workflows/ise.yml@refs/heads/main'"],
+    [{ GITHUB_REPOSITORY: 'someone/Silinx', GITHUB_REPOSITORY_ID: '42' }, "repository 'someone/Silinx' (ID '42')"],
     // #2624: a repository given this one's old name after its rename is another repository (another ID)
     [{ GITHUB_REPOSITORY_ID: '42' }, `repository '${REPO}' (ID '42')`],
     [{ GITHUB_REPOSITORY_ID: '' }, `repository '${REPO}' (ID '')`],
@@ -103,6 +103,10 @@ test('scripts: the shell scripts parse; install.sh sets the hook and the agent',
  * install.sh in a scratch folder: a configured runner (bin/runsvc.sh, .runner, externals/node*), the
  * Library and the home in the scratch folder, launchctl and chown recorded instead of run.
  */
+// the names before the rename (#2624), which install.sh removes
+const OLD_LABEL = ['com.github.pmnmalo.silinx', 'ise'].join('-');
+const OLD_FOLDER = ['Silinx', 'ISE', 'runner'].join('-');
+
 function installIn(args, { env = {}, runner = true } = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ise-runner-'));
   const dir = path.join(tmp, 'runner'), lib = path.join(tmp, 'Library'), home = path.join(tmp, 'home'), bin = path.join(tmp, 'bin');
@@ -114,8 +118,12 @@ function installIn(args, { env = {}, runner = true } = {}) {
     fs.writeFileSync(path.join(dir, 'externals/node24/bin/node'), 'node 24');
     fs.writeFileSync(path.join(dir, '.env'), 'LANG=en_US.UTF-8\nTMPDIR=/old\n');
     // a previous install's folder, whose path had a space (#891)
-    fs.mkdirSync(path.join(lib, 'Application Support/Silinx-ISE-runner'), { recursive: true });
+    fs.mkdirSync(path.join(lib, `Application Support/${OLD_FOLDER}`), { recursive: true });
   }
+  // the install before the rename (#2624): its folders, daemons and agents
+  for (const d of [path.join(lib, OLD_FOLDER), path.join(lib, 'LaunchDaemons'), path.join(home, 'Library', OLD_FOLDER), path.join(home, 'Library/LaunchAgents')]) fs.mkdirSync(d, { recursive: true });
+  for (const f of ['LaunchDaemons/X.runner.plist', 'LaunchDaemons/X.runner-window.plist']) fs.writeFileSync(path.join(lib, f.replace('X', OLD_LABEL)), 'old');
+  for (const f of ['Library/LaunchAgents/X.runner-window.plist', 'Library/LaunchAgents/X.docker-acl.plist']) fs.writeFileSync(path.join(home, f.replace('X', OLD_LABEL)), 'old');
   const log = path.join(tmp, 'calls');
   for (const t of ['launchctl', 'chown']) fs.writeFileSync(path.join(bin, t), `#!/bin/sh\necho "${t} $*" >> "${log}"\n`, { mode: 0o755 });
   // the runner's svc.sh (the mode without --system starts and stops the service through it)
@@ -133,7 +141,7 @@ test('install.sh --system: the runner a daemon of its own user, the window root\
   const r = installIn(['--system', 'iserunner', 'RUNNER']);
   assert.equal(r.code, 0, r.err);
   assert.equal(r.err, '');
-  const dest = path.join(r.lib, 'Silinx-ISE-runner');
+  const dest = path.join(r.lib, 'Silinx-runner');
   // root's copies of the scripts and of the newest Node.js, owned by root
   assert.deepEqual(fs.readdirSync(dest).sort(), ['job-started.sh', 'node', 'window.mjs', 'window.sh']);
   assert.equal(fs.readFileSync(path.join(dest, 'node'), 'utf8'), 'node 24');
@@ -144,30 +152,35 @@ test('install.sh --system: the runner a daemon of its own user, the window root\
   assert.ok(fs.statSync(path.join(r.dir, '_tmp')).isDirectory());
   // the runner runs its hook unquoted: no whitespace in its path (#891)
   assert.match(r.read(path.join(r.dir, '.env')), /^ACTIONS_RUNNER_HOOK_JOB_STARTED=\S+$/m);
-  assert.equal(fs.existsSync(path.join(r.lib, 'Application Support/Silinx-ISE-runner')), false, 'the old folder removed');
+  assert.equal(fs.existsSync(path.join(r.lib, `Application Support/${OLD_FOLDER}`)), false, 'the old folder removed');
+  // the install before the rename (#2624): its folder and its daemons gone
+  assert.equal(fs.existsSync(path.join(r.lib, OLD_FOLDER)), false, "the old name's folder removed");
+  assert.deepEqual(fs.readdirSync(path.join(r.lib, 'LaunchDaemons')).sort(), ['com.github.pmnmalo.silinx.runner-window.plist', 'com.github.pmnmalo.silinx.runner.plist']);
   assert.equal(r.read(path.join(r.dir, 'runsvc.sh')), '#!/bin/bash\n', 'runsvc.sh from bin/, as svc.sh install makes it');
   // the PATH runsvc.sh exports to the runner: Docker's CLI in /usr/local/bin (#904), not sudo's secure_path
   assert.equal(r.read(path.join(r.dir, '.path')), '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin\n');
   // the runner's daemon: its own user, not loaded by the installer (the window starts it)
-  const runner = r.read(path.join(r.lib, 'LaunchDaemons/com.github.pmnmalo.silinx-ise.runner.plist'));
+  const runner = r.read(path.join(r.lib, 'LaunchDaemons/com.github.pmnmalo.silinx.runner.plist'));
   assert.match(runner, /<key>UserName<\/key><string>iserunner<\/string>/);
   assert.match(runner, new RegExp(`<array><string>/bin/bash</string><string>${r.dir}/runsvc\\.sh</string></array>`));
   assert.match(runner, /<key>HOME<\/key><string>\/var\/empty\/runner-home<\/string>/);
   assert.match(runner, /<key>KeepAlive<\/key><dict><key>SuccessfulExit<\/key><false\/><\/dict>/);
   // the window: root's daemon (no UserName), root's copies, the runner's daemon to start and stop
-  const win = r.read(path.join(r.lib, 'LaunchDaemons/com.github.pmnmalo.silinx-ise.runner-window.plist'));
+  const win = r.read(path.join(r.lib, 'LaunchDaemons/com.github.pmnmalo.silinx.runner-window.plist'));
   assert.doesNotMatch(win, /UserName/);
   assert.match(win, new RegExp(`<string>${dest}/window\\.sh</string><string>tick</string>`));
-  assert.match(win, new RegExp(`<key>RUNNER_DAEMON</key><string>${r.lib}/LaunchDaemons/com\\.github\\.pmnmalo\\.silinx-ise\\.runner\\.plist</string>`));
+  assert.match(win, new RegExp(`<key>RUNNER_DAEMON</key><string>${r.lib}/LaunchDaemons/com\\.github\\.pmnmalo\\.silinx\\.runner\\.plist</string>`));
   assert.match(win, new RegExp(`<key>STATE_DIR</key><string>${dest}</string>`));
   assert.match(win, /<key>StartInterval<\/key><integer>900<\/integer>/);
   assert.deepEqual(r.calls(), [
-    'launchctl bootout system/com.github.pmnmalo.silinx-ise.runner-window',
-    'launchctl bootout system/com.github.pmnmalo.silinx-ise.runner',
+    'launchctl bootout system/com.github.pmnmalo.silinx.runner-window',
+    'launchctl bootout system/com.github.pmnmalo.silinx.runner',
+    `launchctl bootout system/${OLD_LABEL}.runner-window`,
+    `launchctl bootout system/${OLD_LABEL}.runner`,
     `chown -R root:wheel ${dest}`,
     `chown iserunner ${r.dir}/_tmp ${r.dir}/_diag ${r.dir}/runsvc.sh ${r.dir}/.path ${r.dir}/.env`,
-    `chown root:wheel ${r.lib}/LaunchDaemons/com.github.pmnmalo.silinx-ise.runner.plist ${r.lib}/LaunchDaemons/com.github.pmnmalo.silinx-ise.runner-window.plist`,
-    `launchctl bootstrap system ${r.lib}/LaunchDaemons/com.github.pmnmalo.silinx-ise.runner-window.plist`,
+    `chown root:wheel ${r.lib}/LaunchDaemons/com.github.pmnmalo.silinx.runner.plist ${r.lib}/LaunchDaemons/com.github.pmnmalo.silinx.runner-window.plist`,
+    `launchctl bootstrap system ${r.lib}/LaunchDaemons/com.github.pmnmalo.silinx.runner-window.plist`,
   ]);
   // installed again: one entry each in .env; uninstalled: the daemons and the copies gone, .env without them
   assert.equal(installIn(['--system', 'iserunner', 'RUNNER']).code, 0);
@@ -197,10 +210,14 @@ test('install.sh without --system: the hook and the window as the logged-in user
   const r = installIn(['RUNNER']);
   assert.equal(r.code, 0, r.err);
   assert.match(r.err, /^WARNING: without --system the hook and the runner's \.env belong to \S+, the user the jobs run as; use 'sudo sh \S+install\.sh --system <user> <the runner's folder>' \(see the header\) on the machine that runs the nightly\.\n$/);
-  const dest = path.join(r.home, 'Library/Silinx-ISE-runner');
+  const dest = path.join(r.home, 'Library/Silinx-runner');
   assert.deepEqual(fs.readdirSync(dest).sort(), ['job-started.sh', 'window.mjs', 'window.sh']);
+  // the install before the rename (#2624): its agent unloaded, its file and folder removed
+  assert.ok(r.calls().includes(`launchctl bootout gui/${process.getuid()}/${OLD_LABEL}.runner-window`));
+  assert.equal(fs.existsSync(path.join(r.home, `Library/LaunchAgents/${OLD_LABEL}.runner-window.plist`)), false);
+  assert.equal(fs.existsSync(path.join(r.home, 'Library', OLD_FOLDER)), false);
   assert.equal(r.read(path.join(r.dir, '.env')), `LANG=en_US.UTF-8\nTMPDIR=/old\nACTIONS_RUNNER_HOOK_JOB_STARTED=${dest}/job-started.sh\n`);
-  assert.match(r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx-ise.runner-window.plist')), new RegExp(`<key>RUNNER_DIR</key><string>${r.dir}</string>`));
+  assert.match(r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx.runner-window.plist')), new RegExp(`<key>RUNNER_DIR</key><string>${r.dir}</string>`));
   // the service restarted through svc.sh, the window's agent loaded
   assert.deepEqual(r.calls().filter(c => c.startsWith('svc.sh')), ['svc.sh stop', 'svc.sh start']);
   assert.match(r.calls().at(-1), /^launchctl bootstrap gui\/\d+ .*runner-window\.plist$/);
@@ -214,15 +231,18 @@ test('install.sh without --system: the hook and the window as the logged-in user
 test('install.sh --docker-acl: the runner\'s user on Docker Desktop\'s socket, again each time it is made', { skip: !posix }, () => {
   const r = installIn(['--docker-acl', 'iserunner']);
   assert.equal(r.code, 0, r.err);
-  const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx-ise.docker-acl.plist'));
+  const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx.docker-acl.plist'));
   const sock = path.join(r.home, '.docker/run/docker.sock');
   assert.match(plist, new RegExp(`<string>i=0; until \\[ -S '${sock}' \\] \\|\\| \\[ \\$i -ge 60 \\]; do sleep 1; i=\\$\\(\\(i\\+1\\)\\); done; ls -le '${sock}' \\| grep -qF 'user:iserunner allow read,write' \\|\\| chmod \\+a 'user:iserunner allow read,write' '${sock}'</string>`));
   assert.match(plist, new RegExp(`<key>WatchPaths</key><array><string>${path.dirname(sock)}</string></array>`));
   assert.match(plist, /<key>StartInterval<\/key><integer>300<\/integer>/);
   assert.match(plist, /<key>RunAtLoad<\/key><true\/>/);
-  assert.equal(r.calls().length, 2);
-  assert.match(r.calls()[0], /^launchctl bootout gui\/\d+\/com\.github\.pmnmalo\.silinx-ise\.docker-acl$/);
-  assert.match(r.calls()[1], new RegExp(`^launchctl bootstrap gui/\\d+ ${r.home}/Library/LaunchAgents/com\\.github\\.pmnmalo\\.silinx-ise\\.docker-acl\\.plist$`));
+  assert.equal(r.calls().length, 3);
+  assert.match(r.calls()[0], /^launchctl bootout gui\/\d+\/com\.github\.pmnmalo\.silinx\.docker-acl$/);
+  // the agent of before the rename (#2624): unloaded, its file removed
+  assert.equal(r.calls()[1], `launchctl bootout gui/${process.getuid()}/${OLD_LABEL}.docker-acl`);
+  assert.equal(fs.existsSync(path.join(r.home, `Library/LaunchAgents/${OLD_LABEL}.docker-acl.plist`)), false);
+  assert.match(r.calls()[2], new RegExp(`^launchctl bootstrap gui/\\d+ ${r.home}/Library/LaunchAgents/com\\.github\\.pmnmalo\\.silinx\\.docker-acl\\.plist$`));
   // what it prints: the check, and that the socket gives the runner's user Docker Desktop's shared folders (#3033)
   assert.equal(r.out, `Installed: iserunner may use ${sock} (again after each start of Docker Desktop). Check:\n`
     + `  sudo -u iserunner docker -H unix://${sock} version\n`
@@ -239,7 +259,7 @@ test('install.sh --docker-acl: the runner\'s user on Docker Desktop\'s socket, a
 test('install.sh --docker-acl: the agent waits for the socket Docker Desktop makes anew, then sets the ACL (#1799)', { skip: !posix }, async () => {
   const r = installIn(['--docker-acl', 'iserunner']);
   assert.equal(r.code, 0, r.err);
-  const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx-ise.docker-acl.plist'));
+  const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx.docker-acl.plist'));
   const cmd = /<string>-c<\/string><string>(.*?)<\/string>/.exec(plist)[1].replace(/&gt;/g, '>');
   const sock = path.join(r.home, '.docker/run/docker.sock');
   fs.mkdirSync(path.dirname(sock), { recursive: true });
@@ -263,7 +283,7 @@ test('install.sh --docker-acl: the agent waits for the socket Docker Desktop mak
 test('install.sh --docker-acl: the agent leaves an ACL that is there alone, never taking it away (#2268)', { skip: !posix }, async () => {
   const r = installIn(['--docker-acl', 'iserunner']);
   assert.equal(r.code, 0, r.err);
-  const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx-ise.docker-acl.plist'));
+  const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx.docker-acl.plist'));
   const cmd = /<string>-c<\/string><string>(.*?)<\/string>/.exec(plist)[1].replace(/&gt;/g, '>');
   const sock = path.join(r.home, '.docker/run/docker.sock');
   fs.mkdirSync(path.dirname(sock), { recursive: true });
@@ -285,14 +305,14 @@ test('install.sh --docker-acl: the agent leaves an ACL that is there alone, neve
 test('window: the runner\'s service started and stopped through svc.sh, or as root\'s daemon', () => {
   assert.deepEqual(serviceCommands('start', { RUNNER_DIR: '/r' }), [{ cmd: './svc.sh', args: ['start'], cwd: '/r', optional: false }]);
   assert.deepEqual(serviceCommands('stop', { RUNNER_DIR: '/r' }), [{ cmd: './svc.sh', args: ['stop'], cwd: '/r', optional: false }]);
-  const env = { RUNNER_DIR: '/r', RUNNER_DAEMON: '/Library/LaunchDaemons/com.github.pmnmalo.silinx-ise.runner.plist' };
+  const env = { RUNNER_DIR: '/r', RUNNER_DAEMON: '/Library/LaunchDaemons/com.github.pmnmalo.silinx.runner.plist' };
   assert.deepEqual(serviceCommands('start', env), [
-    { cmd: 'launchctl', args: ['bootout', 'system/com.github.pmnmalo.silinx-ise.runner'], cwd: '/', optional: true },
+    { cmd: 'launchctl', args: ['bootout', 'system/com.github.pmnmalo.silinx.runner'], cwd: '/', optional: true },
     // launchd refused the bootstrap of a daemon still exiting (5: Input/output error, 22 October): waited for
-    { cmd: '/bin/sh', args: ['-c', 'i=0; while launchctl print system/com.github.pmnmalo.silinx-ise.runner >/dev/null 2>&1 && [ $i -lt 30 ]; do sleep 1; i=$((i+1)); done'], cwd: '/', optional: true },
+    { cmd: '/bin/sh', args: ['-c', 'i=0; while launchctl print system/com.github.pmnmalo.silinx.runner >/dev/null 2>&1 && [ $i -lt 30 ]; do sleep 1; i=$((i+1)); done'], cwd: '/', optional: true },
     { cmd: 'launchctl', args: ['bootstrap', 'system', env.RUNNER_DAEMON], cwd: '/', optional: false },
   ]);
-  assert.deepEqual(serviceCommands('stop', env), [{ cmd: 'launchctl', args: ['bootout', 'system/com.github.pmnmalo.silinx-ise.runner'], cwd: '/', optional: false }]);
+  assert.deepEqual(serviceCommands('stop', env), [{ cmd: 'launchctl', args: ['bootout', 'system/com.github.pmnmalo.silinx.runner'], cwd: '/', optional: false }]);
   assert.throws(() => serviceCommands('restart', env), /service: start or stop, not 'restart'/);
 });
 

@@ -34,7 +34,7 @@ before(() => {
   fs.mkdirSync(process.env.SILINX_CONFIG_DIR, { recursive: true });
   fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify({
     ...(LOCAL ? { mode: 'docker', docker: { image: IMAGE, platform: 'linux/amd64', settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }
-      : { mode: 'ssh', ssh: { host: HOST[2], user: HOST[1] || '', remoteDir: 'silinx-ise-timesim', image: IMAGE, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }) }));
+      : { mode: 'ssh', ssh: { host: HOST[2], user: HOST[1] || '', remoteDir: 'silinx-timesim', image: IMAGE, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }) }));
 });
 
 test('ISE\'s post-place & route model of blinky with its SDF: the test bench passes, no timing violation, no warning', { skip, timeout: 30 * 60000 }, async () => {
