@@ -174,9 +174,9 @@ test('Place & Route with no Map step: the design packed first, placed and routed
   assert.ok(checkRoutingS6(parseXdl(files['open/routed.xdl']), dv).ok);
 });
 
-// (#3137) who places the block RAMs and DSP48A1s: Silinx (their sites fixed for nextpnr, attribute BEL), or nextpnr
-// (spec.hardByNextpnr; S6_HARD_BY_NEXTPNR once the package pinned has the delays and the tuning); the pads and global
-// buffers are Silinx's either way
+// (#3137) who places the block RAMs and DSP48A1s: nextpnr (S6_HARD_BY_NEXTPNR, since its spartan6 0.2.0), or Silinx
+// with spec.hardByNextpnr false (their sites fixed for nextpnr, attribute BEL); the pads and global buffers are
+// Silinx's either way
 const RAM_MUL = `module top(input clk, input we, output reg [3:0] led);
   reg [7:0] mem [0:1023];
   reg [9:0] a = 0; reg [17:0] x = 0, y = 0; reg [7:0] q; reg [35:0] p;
@@ -187,8 +187,9 @@ const RAM_MUL = `module top(input clk, input we, output reg [3:0] led);
   end
 endmodule
 `;
-for (const byNextpnr of [undefined, true]) {
-  test(`a block RAM and a DSP48A1 placed by ${byNextpnr ? 'nextpnr (hardByNextpnr)' : 'Silinx, fixed for nextpnr (the default)'}; the pads by Silinx; routed, no warnings`, { timeout: 600000 }, async () => {
+for (const option of [undefined, false]) {
+  const byNextpnr = option ?? true;
+  test(`a block RAM and a DSP48A1 placed by ${byNextpnr ? 'nextpnr (the default)' : 'Silinx, fixed for nextpnr (hardByNextpnr false)'}; the pads by Silinx; routed, no warnings`, { timeout: 600000 }, async () => {
     const part = 'xc6slx16csg324-3', dv = loadDeviceCache(part), files = {}, lines = [], inputs = [];
     const np = nextpnrS6Node();
     const io = {
@@ -197,9 +198,9 @@ for (const byNextpnr of [undefined, true]) {
       nextpnr: { spartan6: { ...np, run: (args, f, onLine) => { if (args.includes('--no-route')) inputs.push(JSON.parse(f['design.json'])); return np.run(args, f, onLine); } } },
       write: (n, d) => { files[n] = d; return n; }, read: n => files[n] ?? null, save: () => {},
     };
-    assert.equal(S6_HARD_BY_NEXTPNR, false);
+    assert.equal(S6_HARD_BY_NEXTPNR, true);
     const r = await runFlow({ top: 'top', part, device: 'xc6slx16', pkg: 'csg324', family: 'spartan6', steps: ['synth', 'translate', 'map', 'par'], seed: 1, effort: 1,
-      synthEffort: 'normal', startupClk: 'JtagClk', hardByNextpnr: byNextpnr }, io);
+      synthEffort: 'normal', startupClk: 'JtagClk', hardByNextpnr: option }, io);
     assert.ok(r.ok, `${r.error}\n${lines.filter(l => /ERROR|nextpnr, seed/.test(l)).join('\n')}`);
     assert.deepEqual(lines.filter(l => /^WARNING/.test(l)), []);
     assert.equal(inputs.length, 3);
