@@ -14,8 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SELF = 'test/old-name.test.js';
-// built from two parts, so that this file does not count itself
-const OLD = () => new RegExp('silinx[ _-]' + 'ise', 'gi');
+// built from two parts, so that this file does not count itself; a line break may come between the two words, with
+// the next line's comment marks or indentation (a comment, a Markdown quote or list)
+const OLD = () => new RegExp('silinx(?:[ _-]|[ \\t]*\\r?\\n[ \\t/#*>-]*)' + 'ise', 'gi');
 // Xilinx ISE's own names, kept: the ISE host's environment variables and its shared folder (#482)
 const KEEP = [/SILINX_ISE_(?:HOST|TESTS|REMOTE_DIR|IMAGE|KEEP)\b/g, /\/Users\/Shared\/silinx-ise\//g];
 // history, kept as it was written; the rename's own changelog fragments, which name the old names to say what
@@ -60,6 +61,9 @@ test('#2624 old name: how it is counted', () => {
   const n = ['Silinx', 'ISE'];
   assert.equal(countOld(`${n.join(' ')} and ${n.join('-')}, ${n.join('-').toLowerCase()}, ${n.join('_').toUpperCase()}_X`), 4);
   assert.equal(countOld(`${n.join(' ').toLowerCase()} ${n.join('_').toLowerCase()}`), 2);
+  // across a line break, in a comment, a Markdown quote or list, or plain text
+  assert.equal(countOld(`needs ${n[0]}\n// ${n[1]}. Then ${n[0]}\n> ${n[1]}, ${n[0]}\r\n  - ${n[1]} and ${n[0]}\n${n[1]}`), 4);
+  assert.equal(countOld(`${n[0]}\n\n${n[1]}`), 0);   // a paragraph between them: not one name
   // Xilinx ISE's own names are not the project's
   assert.equal(countOld('SILINX_ISE_HOST=user@host SILINX_ISE_IMAGE SILINX_ISE_TESTS=1 SILINX_ISE_REMOTE_DIR SILINX_ISE_KEEP'), 0);
   assert.equal(countOld('RWBASE=/Users/Shared/silinx-ise/build'), 0);

@@ -1,7 +1,7 @@
 // silinx-fpga's command line (#1679, step 8 of the toolchain's separation, #1651): a design from Verilog or a Yosys
 // JSON netlist and its UCF to the .bit, through the flow (runFlow) with its io on the disk, as Silinx's server
-// runs it (server/open-flow-run.js) without its front end: the Verilog is synthesized as it is, VHDL needs Silinx
-// ISE. bin/silinx-fpga.js runs main(); the tests call it with their own output.
+// runs it (server/open-flow-run.js) without its front end: the Verilog is synthesized as it is, VHDL needs
+// Silinx. bin/silinx-fpga.js runs main(); the tests call it with their own output.
 //   silinx-fpga build <file.v ...|netlist.json> --part xc3s250e-cp132-4 [--top name] [--ucf pins.ucf] [-o top.bit]
 //     [--out-dir build] [--effort normal|high] [--seed N] [--quiet]
 // Writes into the out folder the synthesis's netlist (<top>.json), the routed design (routed.xdl, by nextpnr), the timing
