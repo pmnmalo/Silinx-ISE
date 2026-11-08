@@ -425,10 +425,9 @@ const PT_PATTERNS = [
   [/^Read-only, the C model of (.+)$/, 'Só de leitura, o modelo C de $1'],
   [/^Translated to (VHDL|Verilog) \(read-only\)$/, 'Traduzido para $1 (só de leitura)'],
   // the Development menu (#707)
-  [/^Features \((\d+)\)$/, 'Funcionalidades ($1)'], [/^Bug fixes \((\d+)\)$/, 'Correções ($1)'], [/^Other \((\d+)\)$/, 'Outras ($1)'],
   [/^All Changes since (\d+\.\d+\.\d+)…$/, 'Todas as Alterações desde a $1…'], [/^Changes since (\d+\.\d+\.\d+)$/, 'Alterações desde a $1'],
   [/^Pointers down at once: (\d+) \(most: (\d+)\)$/, 'Ponteiros premidos ao mesmo tempo: $1 (máximo: $2)'],
-  [/^This Build on GitHub \(commit (\w+)\)$/, 'Esta Versão no GitHub (commit $1)'], [/^Open Issue #(\d+) on GitHub$/, 'Abrir a Issue #$1 no GitHub'],
+  [/^This Build on GitHub \(commit (\w+)\)$/, 'Esta Versão no GitHub (commit $1)'],
   // the tip of a drawing's link banner, shortened on a narrow screen (#266)
   // the HDL editor's banner of a file generated from a drawing, out of sync (#1176)
   [/^— the (schematic|state machine|Petri net) has errors: ([\s\S]*)$/, (m, w, why) => `— ${{ schematic: 'o esquemático tem', 'state machine': 'a máquina de estados tem', 'Petri net': 'a rede de Petri tem' }[w]} erros: ${why}`],
