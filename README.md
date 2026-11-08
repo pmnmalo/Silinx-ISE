@@ -473,7 +473,7 @@ notices, executable launchers) and size, starts it with its own launcher (`PORT`
 `SILINX_NO_BROWSER=1` are honoured by the launchers) and runs *Synthesize - Yosys (open)* on the
 blinky example in headless Chrome, with every request to another host refused and reported (the
 app must work offline; the update check at start-up is the only one allowed). CI runs the unit
-tests and a UI smoke test on Linux, macOS and Windows, the release zip test, and the main UI flows
+tests and a UI smoke test on Linux, macOS and Windows (the toolchain's heaviest tests on Linux only), the release zip test, and the main UI flows
 in Firefox and WebKit.
 
 ### Silinx for an AI assistant (MCP)
