@@ -6,8 +6,8 @@ tiles) are today computed from ISE's device report (`xdl -report -pips -all_conn
 `research/s3e-route/build-device.mjs`). The bit database (`packages/silinx-fpga/bitdb`) was instead
 measured: designs written by Silinx, implemented by ISE, their outputs compared. This folder works
 out how to obtain the device descriptions the same way, from what Silinx observes when ISE runs on
-designs it writes, so that what ships derives from Silinx's own measurements (the open legal
-question in [docs/OPEN-TOOLCHAIN.md](../../../../docs/OPEN-TOOLCHAIN.md)).
+designs it writes, so that what ships derives from Silinx's own measurements
+([docs/OPEN-TOOLCHAIN.md](../../../../docs/OPEN-TOOLCHAIN.md)).
 
 **Rule kept here:** no measurement reads the device report or anything built from it. The shipped
 graph is used only afterwards, locally, to score how complete and how right a measured description

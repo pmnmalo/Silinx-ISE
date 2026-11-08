@@ -29,8 +29,9 @@ Tools: ISE 14.7 (`xdl` P.20131013, `drc`, `bitgen`, `trce`) in the private Docke
 
 **Source.** `xdl -report -pips -all_conns xc3s250ecp132-4 dev-full.xdlrc` (1 min 50 s): 204 MB of
 text, 1419 tiles, 4615 sites, 569 094 tile wires, 2 139 368 PIPs. It comes from each user's own ISE
-installation and is **not in the repository**, nor is anything derived from it (open legal question
-in docs/OPEN-TOOLCHAIN.md): each user builds the cache once.
+installation and is **not in the repository**. The description Silinx computes from it is shipped for the supported
+boards' devices (`packages/silinx-fpga/devices/`, docs/OPEN-TOOLCHAIN.md); for any other device each user builds the
+cache once.
 
 ```
 node research/s3e-route/build-device.mjs dev-full.xdlrc      # -> ~/.silinx/devices/xc3s250ecp132-4.json.gz
