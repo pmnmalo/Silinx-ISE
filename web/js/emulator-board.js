@@ -4,6 +4,7 @@
 import { h } from './dom.js';
 import { vgaPins } from '/core/vga.js';
 import { BOARD_LAYOUTS, makeDigit } from './emulator.js';
+import { pressEnd } from '/core/emulate-press.js';
 
 /** { digits, leds, powerSwitches, vgaWired } of mountEmulator (compiled(), knobEnd(), lcdView(), powered(), running(): its current values). */
 /** No context menu over the emulated board: on a tablet a long press is one, and it released a push button held down
@@ -12,8 +13,8 @@ export const noMenu = (el) => el.addEventListener('contextmenu', (e) => e.preven
 
 export function mountBoardParts(ctx) {
   const {
-    board, title, after, bitFor, compiled, hasLcd, inVal, knobEnd, lcdView, main, manual, period, powered, refresh,
-    resLabel, resOf, runCycles, running, setInputBit, setPower, sim, tip, wiring, setKnobEnd, setLcdView
+    board, title, after, bitFor, compiled, hasLcd, holds, inVal, knobEnd, lcdView, main, manual, period, powered, refresh,
+    resLabel, resOf, runCycles, running, setInputBit, setPower, sim, speed, tip, wiring, setKnobEnd, setLcdView
   } = ctx;
 
   // ---- interactive parts (placed by the board layout below)
@@ -31,11 +32,21 @@ export function mountBoardParts(ctx) {
   const mkButton = (k, cls = 'emu-btn', res = 'btn') => {
     const b = bitFor(res, k);
     const el = h('div', { class: cls, title: `${tip(res, k)} — press and hold (Shift+click keeps it pressed)` });
-    let latched = false;
+    let latched = false, from = 0;
     const set = (on) => { el.classList.toggle('on', on); setInputBit(b, on !== low(b)); };
-    el.addEventListener('pointerdown', (e) => { e.preventDefault(); if (e.shiftKey) { latched = !latched; set(latched); } else { latched = false; set(true); el.setPointerCapture(e.pointerId); } });
-    el.addEventListener('pointerup', () => { if (!latched) set(false); });
-    el.addEventListener('pointercancel', () => { if (!latched) set(false); });
+    // (let go: held down, lit, until the design saw a real press, #3109; at once while paused)
+    const up = () => {
+      if (latched) return;
+      if (!running()) { holds.press(el); set(false); return; }
+      holds.release(el, { until: pressEnd({ from, speed: speed(), period }), now: sim.now, go: () => set(false) });
+    };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      holds.press(el);
+      if (e.shiftKey) { latched = !latched; set(latched); } else { latched = false; from = sim.now; set(true); el.setPointerCapture(e.pointerId); }
+    });
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
     return el;
   };
   const portLabel = (res, k = 0) => { const b = bitFor(res, k); return b ? b.bit : '—'; };
