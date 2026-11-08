@@ -318,10 +318,14 @@ export function bankVccoConflicts(ios, device) {
 // four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement. At High, a small
 // design (up to 100 slices, about 2 s a placement) gets 32 (#2940): its seeds spread widely (iwls05-sasc 4.76 to 5.22 ns,
 // itc99-b10 4.75 to 5.56 ns over 16), and the best of 32 is 1 to 4 % shorter than the best of 8 (sasc 4.763 -> 4.563 ns,
-// b10 4.751 -> 4.659, usb-phy 4.889 -> 4.819), Place & Route two to three times as long.
-export const NEXTPNR_TRIES = { normal: 4, high: 8, highSmall: 32, smallSlices: 100, maxSlices: 500 };
-/** The placements at an Optimization Effort ('high', else Normal) for a design of `slices` slices: one for a large one at Normal. */
-export const nextpnrTries = (effort, slices) => (effort === 'high' ? (slices <= NEXTPNR_TRIES.smallSlices ? NEXTPNR_TRIES.highSmall : NEXTPNR_TRIES.high)
+// b10 4.751 -> 4.659, usb-phy 4.889 -> 4.819), Place & Route two to three times as long. A large design (over 500 slices)
+// gets 4 (#3095): a placement takes minutes (itc99-b20, 1335 slices, about 6 min; secworks-siphash, 686, about 2.5), and
+// its best of 8 was its best of 4 (b20 36.802 ns, siphash 15.397), the second four only adding 25 to 45 minutes; a
+// smaller one keeps 8 (vtr-diffeq1, 260 slices: 37.224 -> 37.076 ns from the second four).
+export const NEXTPNR_TRIES = { normal: 4, high: 8, highSmall: 32, smallSlices: 100, maxSlices: 500, highLarge: 4 };
+/** The placements at an Optimization Effort ('high', else Normal) for a design of `slices` slices: one for a large one at Normal, four at High. */
+export const nextpnrTries = (effort, slices) => (effort === 'high'
+  ? (slices <= NEXTPNR_TRIES.smallSlices ? NEXTPNR_TRIES.highSmall : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.high : NEXTPNR_TRIES.highLarge)
   : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
 
 /**
