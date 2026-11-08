@@ -7,7 +7,7 @@ import { icons } from './icons.js';
 import { log, showConsolePage } from './console.js';
 import { showCommandLines } from './messages.js';
 import { cReportLines, hlsClockOf, hlsFamilyOf, hlsMultsOf } from '/core/c-report.js';
-import { blackboxModels } from '/core/c-blackbox.js';
+import { blackboxModels, undeclaredBlackboxes } from '/core/c-blackbox.js';
 
 export const isC = (p) => /\.(c|cpp|cc|cxx)$/i.test(p || '');
 // (its badge: C or C++, #1590)
@@ -77,9 +77,12 @@ export function cBadges(file, lang, context) {
 
 /** The C sources whose HDL cannot be made (#2995: a C error, a blackbox refused): S.cFailed[path] = { module, diagnostics }
  *  (failed: [[path, viewHdl's result]] of compileProject), each said in the Console once for its errors; their Design rows
- *  marked (web/js/design.js), their errors Check Syntax's. A blackbox's C model is not a module (#2854): not one. */
-export function noteFailedC(failed) {
+ *  marked (web/js/design.js), their errors Check Syntax's. A blackbox's C model is not a module (#2854): not one.
+ *  sources: the project's C sources, { path: text }. */
+export function noteFailedC(failed, sources = {}) {
   const models = blackboxModels(S.hls);
+  // (a blackbox no C source declares: a warning of its description, Check Syntax's, #3022)
+  S.bbUndeclared = undeclaredBlackboxes(S.hls, sources);
   S.cFailed = {};
   for (const [f, r] of failed) if (r?.errors?.length && !models.has(f)) S.cFailed[f] = { module: r.module || null, diagnostics: r.diagnostics || [] };
   const said = (S.cFailedSaid ||= new Map());
@@ -92,8 +95,9 @@ export function noteFailedC(failed) {
     for (const d of c.diagnostics) log(`ERROR:SilinxC - "${d.file}" Line ${d.line}: ${d.message}`, 'err', { diag: false });   // (the Errors tab: Check Syntax's)
   }
 }
-/** The errors of the C sources whose HDL cannot be made, as Check Syntax's diagnostics. */
-export const failedCDiags = () => Object.values(S.cFailed || {}).flatMap((c) => c.diagnostics.map((d) => ({ ...d, tool: 'SilinxC' })));
+/** The errors of the C sources whose HDL cannot be made, and the blackboxes no C source declares (#3022), as Check
+ *  Syntax's diagnostics. */
+export const failedCDiags = () => [...Object.values(S.cFailed || {}).flatMap((c) => c.diagnostics), ...(S.bbUndeclared || [])].map((d) => ({ ...d, tool: 'SilinxC' }));
 
 // ------------------------------------------------------------------ C simulation and C/RTL co-simulation (#1528)
 const text = async (path) => { const d = findDoc(`file:${path}`); if (d?.editor) return d.editor.getValue(); return (await import('./api.js')).api.readFile(S.project.name, path); };

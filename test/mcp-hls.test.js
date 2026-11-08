@@ -1,6 +1,6 @@
 // The MCP server's tools of a C or C++ source (#2674, server/mcp-hls.js), as the C module's processes: C Simulation and
 // C/RTL Co-simulation of the test designs (fir, gcd, sort, popcount; stream_sum in C++), the co-simulation in VHDL and
-// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox.
+// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox; #3022: a C source that does not declare a blackbox's function, made; a description no C source declares, a warning of check_syntax.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -177,4 +177,22 @@ test('#2995 an RTL blackbox refused: check_syntax of the C\'s module says the de
   assert.equal(b.text, `ERROR:SilinxC - "src/msum.json" Line 1: syn.blackbox: msum.json: the argument 'm': the module 'msum' has no port 'm_q0'\nProcess "Check Syntax" of <top> failed (1 error(s), 0 warning(s)).`);
   await ok('write_file', { project: 'bbcheck', path: 'src/msum.v', text: MSUM_V });
   assert.equal((await ok('check_syntax', { project: 'bbcheck' })).data.ok, true);
+});
+
+// (#3022) a project with a blackbox and a C source that does not declare its function: that source's module made; with no
+// C source of the design declaring it (its C model not one), check_syntax's warning in the description, once
+test('#3022 a C source that calls no RTL blackbox: its module made, c_synthesis_report as the interface\'s; a description no C source declares, check_syntax\'s warning', async () => {
+  await ok('new_project', { name: 'bbother' });
+  for (const [path, text] of [['src/msum.json', JSON.stringify(MDESC(), null, 2)], ['src/msum.cpp', MSUM_C], ['src/msum.v', MSUM_V], ['src/other.c', 'int f(int a) { return a + 1; }\n']]) await ok('write_file', { project: 'bbother', path, text });
+  await ok('set_top', { project: 'bbother', top: 'f' });
+  const r = await ok('c_synthesis_report', { project: 'bbother', path: 'src/other.c' });
+  assert.match(r.text, /^C Synthesis Report of 'f' \(src\/other.c, VHDL\)\n\nModule: combinational\n[\s\S]*completed successfully$/);
+  const W = { severity: 'warning', file: 'src/msum.json', line: 1, col: 1, tool: 'SilinxC', message: "syn.blackbox: msum.json: the function 'msum' is not declared in the C sources: not used" };
+  const a = await ok('check_syntax', { project: 'bbother' });
+  assert.deepEqual([a.data.ok, a.data.errors, a.data.warnings], [true, [], [W]]);
+  // (a C source that calls it: no warning, both modules made)
+  await ok('write_file', { project: 'bbother', path: 'src/top.cpp', text: EXT });
+  const b = await ok('check_syntax', { project: 'bbother' });
+  assert.deepEqual([b.data.ok, b.data.errors, b.data.warnings], [true, [], []]);
+  assert.match((await ok('c_synthesis_report', { project: 'bbother', path: 'src/top.cpp' })).text, /^C Synthesis Report of 'top' \(src\/top.cpp, VHDL\)\n[\s\S]*completed successfully$/);
 });
