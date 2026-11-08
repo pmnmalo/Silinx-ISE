@@ -5,14 +5,13 @@ Xilinx ISE 14.7, following the method in [docs/OPEN-TOOLCHAIN.md](../../../../do
 
 - `packages/silinx-fpga/src/fpga/device.js`: the routing graph of the device (browser + Node).
 - `packages/silinx-fpga/src/fpga/device-node.js`: its cache file (Node only).
-- `packages/silinx-fpga/src/fpga/route.js`: the router (PathFinder) and a routing check.
+- `packages/silinx-fpga/src/fpga/route-check.js`: the routing check (the router, PathFinder, `route.js`: removed in #2137).
 - `packages/silinx-fpga/src/xdl.js` `writeXdl()`: a design back to XDL text.
 
 | Script | What it does |
 |---|---|
 | `build-device.mjs` | Builds the graph cache from the full device report; prints sizes and load time |
 | `timing-fit.mjs` | Fits the wire delay model of `packages/silinx-fpga/src/fpga/timing.js` to ISE's `reportgen -delay` of routed designs |
-| `route.mjs` | Removes a design's PIPs, routes it, writes the XDL, checks it against the graph (`--known`: only PIPs of known bits) |
 | `open-flow.mjs` | The fully open flow for a project: synthesis (Silinx + Yosys), the flow's nextpnr engine (pack, place, route on known PIPs, #2756), Silinx's bitgen |
 | `ise-open-check.sh` | Inside the ISE container, the oracle of the open flow: `xdl -xdl2ncd`, `drc`, `bitgen` (CRC on / off), `trce -a`, `reportgen -delay` |
 | `check.mjs` | Checks the routing of an XDL design (ISE's or Silinx's) against the graph |

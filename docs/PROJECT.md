@@ -23,12 +23,11 @@ A project is a directory under the workspace (default `~/Silinx-projects`, overr
 ```
 
 * `role: design` files go to synthesis; `role: sim` files are only used for simulation.
-* `synthTool`: `'silinx'` (the Silinx toolchain: Yosys, Silinx's place & route and bitstream) or
+* `synthTool`: `'silinx'` (the Silinx toolchain: Yosys, nextpnr's place & route, Silinx's bitstream) or
   `'xst'` (Xilinx ISE 14.7); without it, the mode of Toolchain Settings.
 * `impl.optMode` and `impl.optLevel`: ISE's Optimization Goal and Effort, and the project's Optimization (#2470):
   `Speed` and 1 **Fast** (one mapping, one placement: a project with none is Fast too), `Area` and 2 **Area** (the
-  default of a new project: the smaller of the usual mapping's netlist and Speed's, one placement, no register
-  replication), `Speed` and 2 **Speed** (every mapping for speed, the state machines of 8 states or more one-hot, the
+  default of a new project: the smaller of the usual mapping's netlist and Speed's, one placement), `Speed` and 2 **Speed** (every mapping for speed, the state machines of 8 states or more one-hot, the
   fastest kept; several placements, the fastest kept). `Area` at 1, of a project made before, is Area.
 * Generated implementation output lives in `<project>/build/` (ISE work dir), bitstream `build/<top>.bit`.
 

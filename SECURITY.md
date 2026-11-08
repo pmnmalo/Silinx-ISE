@@ -17,7 +17,7 @@ patched: update to the latest.
 ## Scope
 
 In scope: the local server and its API (`server/`), the browser editions (`web/`, the single-file
-edition and the Pages site), the open toolchain (`packages/silinx-fpga/`: synthesis, pack, place, route, bitgen),
+edition and the Pages site), the open toolchain (`packages/silinx-fpga/`: synthesis with Yosys, pack, place and route with nextpnr, bitgen),
 the core (`core/`: the simulators and the board programming), the GitHub workflows (`.github/workflows/`), the scripts
 (`scripts/`) and the launchers (`Start Silinx.command`, `Start Silinx.bat`,
 `start-silinx.sh`).
@@ -33,10 +33,12 @@ can read that user's files has the server too.
 
 - The server listens on this computer only (loopback) unless told otherwise, and a token made at every
   start is the only way in, on loopback too (another user of the same computer has none, #2564); it
-  checks the Host and Origin headers of every request. The browser a launcher opens is given a one-time code
+  refuses an API request another site's page made (`Sec-Fetch-Site`), one that changes something from another Origin,
+  and, bound to loopback, one whose Host is not local. The browser a launcher opens is given a one-time code
   (single use, for a minute), which the page exchanges for the token, so that the token is on no command line; a
   second launch opens a server already on its port only when that server proves it holds the token of its file
-  (#2955). The token travels in a request's `X-Silinx-Token` header only, never in an address (#3045).
+  (#2955). The token travels in a request's `X-Silinx-Token` header only, never in a request's address (the printed `#token=` stays in the
+  browser, #3045).
 - The pages carry a Content Security Policy with the hashes of their scripts and styles.
 - Every path a request names is confined to the project it belongs to; a project's zip is limited in
   size when it is unpacked. A hidden file or folder (`.git`, `.env`, an editor's settings) is no part of a project:
@@ -45,7 +47,8 @@ can read that user's files has the server too.
   spawned without a shell. The programs' paths and the arguments given to Docker and ssh come from the user's
   configuration file only: the page cannot change them (the settings `server/toolchain.js` names `FILE_ONLY`, which
   the API refuses unless sent unchanged). The page picks the rest among checked values: the build's mode, the ssh
-  machine and its user, the Docker image, and for the programming one of the known tools with its options (a cable, a
+  machine and its user, the ssh build folder (inside the remote home; an absolute one in the configuration file only), ISE's
+  settings script (`settings64.sh` or `settings32.sh`), the Docker image, its memory and platform, and for the programming one of the known tools with its options (a cable, a
   device, a board, a position, the bitstream: `server/programmer-values.js`, no value that starts with `-`); so whoever
   holds the token can send a project's build to an ssh machine of its choosing, the token being the server (Scope).
   An ISE settings script and a Docker image the page chooses are checked: the script is a file outside the projects
@@ -69,7 +72,7 @@ can read that user's files has the server too.
   published. The Docker images' bases are pinned by digest.
 - The self-hosted runner with Xilinx ISE (the maintainer's machine) runs only `ise.yml` and `quality.yml`,
   scheduled or started by hand, on `main`, with a read-only token and no credentials kept; never a pull
-  request's code. Every workflow's jobs are checked for it in `test/workflows.test.js`; a pull request from
+  request's code. Every workflow's jobs are checked for it in `test/workflows.test.js` and `test/ise-runner.test.js`; a pull request from
   a fork waits for the maintainer's approval before any of its workflows runs. Its jobs run as a user of their
   own, but that user reaches Docker Desktop's socket (`scripts/ise-runner/install.sh --docker-acl`), and Docker
   Desktop runs as the maintainer: that socket is the runner's real boundary. Code run in those jobs (a dependency of

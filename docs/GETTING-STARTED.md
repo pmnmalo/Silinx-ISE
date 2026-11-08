@@ -21,9 +21,13 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, its projects kept apart) and go to st
 1. Open the **[latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
 2. Under **Assets**, click **`Silinx.html`** to download it.
 3. Double-click the downloaded file. It opens in your browser (Chrome, Edge, Firefox or Safari).
-4. On the Start page click **New Project…** and choose in *Start from* **Example: gates** (logic gates drawn as a schematic: a good first example), **Example: traffic** (a pedestrian crossing: a state diagram and a Boolean algebra), **Example: blinky** (or *pong*, a game for two, *stopwatch*, *clock*, *vga*, a picture on a VGA monitor, or *isqrt*, a C function made into hardware) or **Empty project**. After the examples come the **Test design: …** entries: designs Silinx itself is tested with (schematics, state diagrams, C programs for Silinx HLS), each with its test (a test bench, or the C program's `main()`), to see what Silinx does with each kind of source.
+4. On the Start page click **New Project…** and choose in *Start from* **Example: gates** (logic gates drawn as a schematic: a good first example), **Example: traffic** (a pedestrian crossing: a state diagram and a Boolean algebra), **Example: blinky** (or *pong*, a game for two, *stopwatch*, *clock*, *vga*, a picture on a VGA monitor, *isqrt*, a C function made into hardware, *uart*, an echo over the serial port to a terminal, or *micro80*, an 8080-compatible microprocessor running a program) or **Empty project**. After the examples come the **Test design: …** entries: designs Silinx itself is tested with (schematics, state diagrams, C programs for Silinx HLS), each with its test (a test bench, or the C program's `main()`), to see what Silinx does with each kind of source.
 
 That's all. Things to know:
+
+- The menus named below (**File ▸ …**, **Tools ▸ …**) are the ISE style interface's; in the Silinx interface (the
+  default) the same commands are on the Start page, under the header's **Settings** (⚙), and in the command palette
+  (**Ctrl+K**: type the command's name).
 
 - Your projects are saved **inside this browser** on this computer. To keep a copy or move it to
   another computer use **File ▸ Download Project Bundle** (and **File ▸ Open Project Bundle** to
@@ -38,8 +42,8 @@ That's all. Things to know:
   and **File ▸ Use Browser Storage** goes back to the browser. The status bar shows where the projects
   are kept. Firefox and Safari cannot open a folder: there the projects stay in the browser.
 - **Implement Design** and **Generate Programming File** run the Silinx toolchain in the browser
-  (Basys2, Nexys2, Nexys3 and Atlys boards; the first run downloads its tools from the site, about 100 MB, then the
-  browser keeps them; the downloaded `Silinx.html` too): the bitstream (`top.bit`) is downloaded.
+  (Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards; the first run downloads its tools from the site, about 100 MB, then the
+  browser keeps them; the downloaded `Silinx.html` too): the bitstream (`<top module>.bit`, e.g. `blinky.bit`) is downloaded.
 - **Program the board from the browser** (Chrome or Edge, or Chrome on an Android tablet; Firefox
   and Safari cannot reach USB devices; the page opened from the site's address, not from the
   downloaded file): connect the board's USB cable, switch it on, then **Configure Target Device ▸ Program
@@ -55,8 +59,8 @@ That's all. Things to know:
   the downloaded `.bit` from a computer or an Android tablet). The projects stay in the browser, which iPadOS may clear after some weeks
   without use: keep a copy with **File ▸ Export Silinx Project (.zip)…**. A tablet has less
   memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
-  (hold a finger still for half a second); two fingers move a drawing and a pinch zooms it. In portrait the Design pane is a drawer (the button at
-  the left of the header), and the editors' properties open over the drawing (**Properties**).
+  (hold a finger still for half a second); two fingers move a drawing and a pinch zooms it. In portrait the side panel (Design) is shown or hidden
+  with the header's side panel button (in the ISE style interface it is a drawer, the button at the left of the header), and the editors' properties open over the drawing (**Properties**).
 - **A link for your slides**: right-click the project in the Design pane, **Copy Link to Project…**: the link opens
   Silinx on the design, in Try it, the simulation or the board emulator, the whole project inside it (see the README,
   *A design in a link*).
@@ -85,7 +89,7 @@ Silinx runs on **Node.js**, a free program.
 ### Step 2: download Silinx
 
 1. Open the **[latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Under **Assets**, download **`silinx-<version>.zip`** (for example `silinx-15.10.21.zip`).
+2. Under **Assets**, download **`silinx-<version>.zip`** (for example `silinx-15.22.1.zip`).
    - Don't use the green **Code ▸ Download ZIP** button or "Source code": that version does not
      include everything Silinx needs (it still works, but the first start needs Internet to
      download the missing parts).
@@ -157,7 +161,8 @@ In the browser (Way 1) nothing more is needed for the Basys2 and Nexys2. Running
    display or VGA of its own, so Silinx puts them on its VHDCI connector (as a Digilent VmodBB wires
    them). For the other boards (or the
    processes that need ISE), **Xilinx ISE 14.7** (free WebPACK licence); on any computer it runs
-   inside **Docker**, then choose an ISE mode in *Tools ▸ Toolchain Settings*:
+   inside **Docker**, then choose an ISE mode in *Settings (⚙) ▸ Toolchain Settings (ISE / Programmers)…* (ISE style:
+   *Tools ▸ …*):
    - install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (on Apple Silicon
      Macs, OrbStack is a faster alternative);
    - download `silinx-docker-kit-<version>.zip` from the release and follow its `ise/README.md`:
@@ -169,7 +174,7 @@ In the browser (Way 1) nothing more is needed for the Basys2 and Nexys2. Running
      `brew install libusb python` and `./scripts/install-adepttool.sh` (needs [Homebrew](https://brew.sh)).
    - **Linux:** Digilent Adept, or openFPGALoader from your package manager.
 
-In Silinx, **Tools ▸ Toolchain Settings** shows what was found.
+In Silinx, **Settings (⚙) ▸ Toolchain Settings (ISE / Programmers)…** (ISE style: **Tools ▸ …**) shows what was found.
 
 ---
 

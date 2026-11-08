@@ -52,7 +52,7 @@ Every editor and viewer has one status line, its last line, the Schematic editor
   Binary"), its tokens (a Petri net), a table's inputs, outputs and rows, the schematic's cursor and zoom; a text
   editor's line and column and its language; a viewer's selection or what is under the mouse (I/O Pin Planning's I/Os
   assigned, top, device and board; the FPGA view's selection and the slices used; the Board Emulator's time, right below
-  the board in the Tasks interface; the waveform viewer's simulated time, cursor and marker, #2785).
+  the board in the Silinx interface; the waveform viewer's simulated time, cursor and marker, #2785).
 - **What it never says:** errors, warnings or information (the console's, #2718: the Schematic's check, I/O Pin
   Planning's pins assigned more than once, #2784), that the document was saved (the tab's mark), the read-only notice
   and "Not in sync with …" (the toolbar's), a title or a path (the tab's).
