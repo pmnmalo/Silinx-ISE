@@ -138,8 +138,7 @@ export function qualityPage(res, { epfl = null } = {}) {
     `  critical path ${pct(gPeriodH)}, as fast or faster on ${fasterH} of ${timedH.length}.`);
   if (xstCannot) L.push(`- **Reading the design:** XST (ISE 14.7's synthesis, from 2013) cannot read ${xstCannot} of the designs (\`$clog2\`, VHDL-2008`,
     '  and other constructs it predates, listed below); Silinx reads them.');
-  L.push('- These numbers are tracked to improve the Silinx toolchain (the GitHub',
-    '  [issues](https://github.com/pmnmalo/Silinx-ISE/issues) labelled *synthesis* and *place & route*).', '');
+  L.push(...TRACKED, '');
   L.push('## Size', '');
   L.push('4-input LUTs used as logic (not the LUTs a route passes through), flip-flops and occupied slices',
     `after packing / map; SRL16 shift registers, block RAMs and multipliers. *${N.ab} / I*: ${N.col} / ISE, the`,
@@ -211,6 +210,9 @@ function pageEnd(res, epfl) {
 // The page of the results since #3070: each design built at each goal (Silinx's Optimizations Area, Speed, Fast) by both
 // flows, ISE at the same goal (XST's opt_mode and opt_level of the goal's Process Properties); per goal, its summary line,
 // its size and speed tables and its critical paths' breakdown
+// (the summary's last item, the same in both forms of the page)
+const TRACKED = ['- These numbers are tracked to improve the Silinx toolchain (the GitHub',
+  '  [issues](https://github.com/pmnmalo/Silinx-ISE/issues) labelled *synthesis* and *place & route*).'];
 const XST_OF = g => `XST's \`-opt_mode ${GOAL_IMPL[g].optMode} -opt_level ${GOAL_IMPL[g].optLevel}\``;
 const ABOUT_ISE = { area: '', speed: ', ISE\'s *Timing Performance*', fast: ', XST\'s default' };
 
@@ -296,8 +298,7 @@ function goalsPage(res, epfl) {
   const xstCannot = rows.filter(r => Object.values(r.builds).some(b => XST_CANNOT.test(b.ise?.error || ''))).length;
   if (xstCannot) L.push(`- **Reading the design:** XST (ISE 14.7's synthesis, from 2013) cannot read ${xstCannot} of the designs (\`$clog2\`, VHDL-2008`,
     '  and other constructs it predates, listed below); Silinx reads them.');
-  L.push('- These numbers are tracked to improve the Silinx toolchain (the GitHub',
-    '  [issues](https://github.com/pmnmalo/Silinx-ISE/issues) labelled *synthesis* and *place & route*).');
+  L.push(...TRACKED);
   for (const g of res.goals) L.push(...goalSection(rows, g));
   const notes = [];
   for (const r of rows) {
