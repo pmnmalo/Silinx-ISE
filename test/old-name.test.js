@@ -135,6 +135,7 @@ const OLD_NAME = new Map([
   ["test/pwa.test.js", 7],
   ["test/release-workflow.test.js", 1],
   ["test/release/release.test.js", 10],
+  ["test/server-open-code.test.js", 1],
   ["test/silinx-fpga-cli.test.js", 1],
   ["test/silinx-fpga-package.test.js", 1],
   ["test/silinx.test.js", 4],
