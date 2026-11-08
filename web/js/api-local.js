@@ -1,5 +1,5 @@
 // Standalone (server-less) backend: same interface as api.js. Used by the single-file build
-// (dist/Silinx-ISE.html, on GitHub Pages). The projects are kept in the browser's localStorage, or,
+// (dist/Silinx.html, on GitHub Pages). The projects are kept in the browser's localStorage, or,
 // in Chrome / Edge, in a folder on the disk that the user picks (File ▸ Open Workspace Folder…: the
 // File System Access API), each project a normal project folder in the full application's format
 // (web/js/project-store.js: one storage layer for both).

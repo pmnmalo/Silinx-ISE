@@ -1,16 +1,16 @@
-// Builds dist/Silinx-ISE.html: the whole Project Navigator in one self-contained HTML file
+// Builds dist/Silinx.html: the whole Project Navigator in one self-contained HTML file
 // (no server). Projects live in the browser's localStorage; the examples are embedded.
 //   node scripts/build-standalone.mjs [--site <dir>] [--assets-url <site URL>]
 //   node scripts/build-standalone.mjs --assets-only <assets dir>
 // --site also writes the GitHub Pages site (.github/workflows/pages.yml): the page as index.html and
-// Silinx-ISE.html, index.html's web app manifest and service worker (scripts/pwa.mjs, #1051), and assets/ with what the Silinx toolchain fetches in the browser
+// Silinx.html, index.html's web app manifest and service worker (scripts/pwa.mjs, #1051), and assets/ with what the Silinx toolchain fetches in the browser
 // (web/js/open-flow-browser.js): the device descriptions (packages/silinx-fpga/devices), the bit database
 // (packages/silinx-fpga/bitdb) and Yosys in WebAssembly (node_modules/@yowasp/yosys/gen).
 // The assets are versioned (#487): assets/<version>/ (a development build: assets/dev-<commit>/) holds
 // the device descriptions and the bit database, assets/vendor/yowasp-yosys/<its version>/ Yosys (the
 // versions with the same Yosys share it); the page knows its folder, and the single file the site it
 // fetches them from (--assets-url, default the published site; dev/ for a development build), so a
-// downloaded Silinx-ISE.html keeps the assets it was built with. --assets-only writes this version's
+// downloaded Silinx.html keeps the assets it was built with. --assets-only writes this version's
 // assets alone into an assets folder (the Pages build keeps the last releases' assets with it).
 // The page carries a Content-Security-Policy (server/csp.js) with the hashes of its inline scripts.
 import crypto from 'node:crypto';
@@ -24,7 +24,7 @@ import { contentSecurityPolicy, inlineScriptHashes, withMetaCsp } from '../serve
 import { withManifestLink, writePwa } from './pwa.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'dist', 'Silinx-ISE.html');
+const OUT = path.join(ROOT, 'dist', 'Silinx.html');
 const rd = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const arg = name => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : undefined; };
 
@@ -174,7 +174,9 @@ if (html.includes('importmap')) throw new Error('web/index.html: the import map 
 // replacer functions: the inserted code may contain `$'`, `$&`… which a replacement string would expand
 html = html.replace('<script type="module" src="/js/app.js"></script>',
   () => `<script>window.SILINX_STANDALONE = true;\nwindow.SILINX_ASSET_LAYOUT = ${safeJs(JSON.stringify(LAYOUT))};\nwindow.SILINX_FLOW_WORKER_SRC = ${safeJs(JSON.stringify(workerJs))};\nwindow.SILINX_EMU_WORKER_SRC = ${safeJs(JSON.stringify(emuWorkerJs))};</script>\n<script type="module">${safeJs(appJs)}</script>`);
-html = html.replace('<title>Silinx ISE Project Navigator</title>', () => '<title>Silinx ISE Project Navigator (standalone)</title>');
+const TITLE = '<title>Silinx Project Navigator</title>';
+if (!html.includes(TITLE)) throw new Error(`web/index.html: no ${TITLE} to mark (standalone)`);
+html = html.replace(TITLE, () => '<title>Silinx Project Navigator (standalone)</title>');
 if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inserted verbatim into the page');
 // copyright and the licences of the components embedded in this single file (NOTICE + their texts
 // from THIRD-PARTY-NOTICES.md), kept in the page as plain text
@@ -204,9 +206,9 @@ if (siteArg > 0) {
   const site = path.resolve(process.argv[siteArg + 1] || 'site');
   fs.rmSync(site, { recursive: true, force: true });
   fs.mkdirSync(site, { recursive: true });
-  // the page opened on the site, installable as an app (#1051); Silinx-ISE.html, the file people download, is not
+  // the page opened on the site, installable as an app (#1051); Silinx.html, the file people download, is not
   fs.writeFileSync(path.join(site, 'index.html'), withManifestLink(html));
-  fs.writeFileSync(path.join(site, 'Silinx-ISE.html'), html);
+  fs.writeFileSync(path.join(site, 'Silinx.html'), html);
   await writePwa(site, { esbuild, label: versionLabel(BUILD, VERSION), dev: !!BUILD });
   // what this site serves (its page's version and build): on the site, Check for Updates compares the
   // page open with it, not with GitHub's latest release (published minutes before the site is rebuilt)

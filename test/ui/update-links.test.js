@@ -13,8 +13,8 @@ const E = () => env;
 const RELEASE = {
   tag_name: 'v99.0.0', name: 'v99.0.0', html_url: 'javascript:alert(1)', published_at: '2026-10-26T00:00:00Z',
   assets: [
-    { name: 'silinx-ise-99.0.0.zip', browser_download_url: 'https://github.com/pmnmalo/Silinx-ISE/releases/download/v99.0.0/silinx-ise-99.0.0.zip', size: 4096 },
-    { name: 'Silinx-ISE.html', browser_download_url: 'http://evil.test/Silinx-ISE.html', size: 2048 },
+    { name: 'silinx-99.0.0.zip', browser_download_url: 'https://github.com/pmnmalo/Silinx-ISE/releases/download/v99.0.0/silinx-99.0.0.zip', size: 4096 },
+    { name: 'Silinx.html', browser_download_url: 'http://evil.test/Silinx.html', size: 2048 },
     { name: 'notes.txt', browser_download_url: 'data:text/html,<b>x</b>', size: 10 },
   ],
 };
@@ -40,8 +40,8 @@ uiTest('#1444 Check for Updates: anchors only to GitHub\'s URLs; a javascript: p
       };
     });
     // the one GitHub download is a link; the page (javascript:), the http: and the data: downloads are text
-    assert.deepEqual(out.anchors, [['silinx-ise-99.0.0.zip', 'https://github.com/pmnmalo/Silinx-ISE/releases/download/v99.0.0/silinx-ise-99.0.0.zip']]);
-    assert.deepEqual(out.items, ['silinx-ise-99.0.0.zip (4 KB)', 'Silinx-ISE.html (2 KB)', 'notes.txt (1 KB)']);
+    assert.deepEqual(out.anchors, [['silinx-99.0.0.zip', 'https://github.com/pmnmalo/Silinx-ISE/releases/download/v99.0.0/silinx-99.0.0.zip']]);
+    assert.deepEqual(out.items, ['silinx-99.0.0.zip (4 KB)', 'Silinx.html (2 KB)', 'notes.txt (1 KB)']);
     assert.match(out.text, /Release notes and downloads: v99\.0\.0/);
     assert.doesNotMatch(out.text, /javascript:|evil\.test/);
     await page.dialogButton('OK');

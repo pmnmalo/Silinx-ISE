@@ -10,8 +10,8 @@ Silinx is one web application. The same pages and the same `core/` modules run i
 
 | Edition | Host | The projects | Runs ISE | Programs the board |
 |---|---|---|---|---|
-| **Local server** (`npm start`, `bin/silinx-ise.js serve`) | Node: `server/server.js` serves the pages and a REST API | Folders on disk, `~/Silinx-projects` ([PROJECT.md](PROJECT.md)) | Yes (Docker, SSH or native: `server/toolchain.js`) | Through local tools (`server/programmer.js`) or WebUSB |
-| **Browser edition**: one file (`dist/Silinx-ISE.html`) and the site, installable as an app | The browser alone: no server | The browser's storage or a folder the user picks (`web/js/project-store.js`) | No | WebUSB (`core/adept.js`, `core/xcf.js`) |
+| **Local server** (`npm start`, `bin/silinx.js serve`) | Node: `server/server.js` serves the pages and a REST API | Folders on disk, `~/Silinx-projects` ([PROJECT.md](PROJECT.md)) | Yes (Docker, SSH or native: `server/toolchain.js`) | Through local tools (`server/programmer.js`) or WebUSB |
+| **Browser edition**: one file (`dist/Silinx.html`) and the site, installable as an app | The browser alone: no server | The browser's storage or a folder the user picks (`web/js/project-store.js`) | No | WebUSB (`core/adept.js`, `core/xcf.js`) |
 
 The interface does not know which host it has: it talks to `web/js/api.js` (the server's REST API) or `web/js/api-local.js`
 (the same interface, in the browser). `scripts/build-standalone.mjs` bundles the pages, `core/`, the examples and the
@@ -122,7 +122,7 @@ and the board's Platform Flash: in the browser over WebUSB, with Silinx's own JT
 
 ### Around the application
 
-- **The command line**: `bin/silinx-ise.js` (check, simulate, constraints, the toolchain's settings); the toolchain's own:
+- **The command line**: `bin/silinx.js` (check, simulate, constraints, the toolchain's settings); the toolchain's own:
   `packages/silinx-fpga/bin/silinx-fpga.js`.
 - **An MCP server** for an AI assistant on the projects of the workspace (`server/mcp.js`); what it changes in a project open in the
   interface the local server tells the page (`server/project-watch.js`, `web/js/project-watch.js`, #2843).

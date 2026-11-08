@@ -777,8 +777,8 @@ Object.assign(PT, {
   'This is the development edition, built from the latest code (main): it is updated after every change, before the releases.': 'Esta é a edição de desenvolvimento, construída a partir do código mais recente (main): é atualizada a cada alteração, antes das versões.',
   'Releases:': 'Versões:', 'Reload': 'Recarregar', "What's new:": 'Novidades:', 'Release notes and downloads:': 'Notas da versão e transferências:',
   'release notes': 'notas da versão', 'You are running a development version newer than the latest release.': 'Está a usar uma versão de desenvolvimento mais recente do que a última versão publicada.',
-  'To update: download silinx-ise-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx-ISE.html for the standalone edition.':
-    'Para atualizar: descarregue o silinx-ise-<versão>.zip e substitua a pasta do Silinx (os projetos da área de trabalho mantêm-se), ou descarregue o novo Silinx-ISE.html para a edição autónoma.',
+  'To update: download silinx-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx.html for the standalone edition.':
+    'Para atualizar: descarregue o silinx-<versão>.zip e substitua a pasta do Silinx (os projetos da área de trabalho mantêm-se), ou descarregue o novo Silinx.html para a edição autónoma.',
 });
 const ptLabel = v => v;   // a version label in a sentence (dev:<commit> (<date>): the same in Portuguese)
 PT_PATTERNS.push(

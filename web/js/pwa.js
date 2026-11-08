@@ -1,6 +1,6 @@
 // The browser edition installable as an app (#1051): the site's index.html links its web app manifest
 // (scripts/pwa.mjs), and this registers the service worker beside it (web/js/sw.js), scoped to the
-// edition's folder (the stable edition's root, dev/). Not in the downloaded Silinx-ISE.html (no manifest
+// edition's folder (the stable edition's root, dev/). Not in the downloaded Silinx.html (no manifest
 // link; a page opened from a file has no service worker) nor in the application (its page has none).
 
 /** The service worker of the page ({ url, scope }), null where there is none. */

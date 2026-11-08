@@ -47,16 +47,16 @@ test('addAnalytics: a page whose code names the loader\'s id (the application\'s
   assert.equal(addAnalytics(out, 'silinx'), out, 'once');
 });
 
-test('addAnalyticsToSite: index.html of the root and of dev/, not the downloaded Silinx-ISE.html nor the assets', () => {
+test('addAnalyticsToSite: index.html of the root and of dev/, not the downloaded Silinx.html nor the assets', () => {
   const site = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-site-'));
   try {
-    for (const f of ['index.html', 'Silinx-ISE.html', 'dev/index.html', 'dev/Silinx-ISE.html', 'assets/x/index.html']) {
+    for (const f of ['index.html', 'Silinx.html', 'dev/index.html', 'dev/Silinx.html', 'assets/x/index.html']) {
       fs.mkdirSync(path.dirname(path.join(site, f)), { recursive: true });
       fs.writeFileSync(path.join(site, f), PAGE);
     }
     assert.deepEqual(addAnalyticsToSite(site, 'silinx').sort(), ['dev/index.html', 'index.html']);
     const has = f => fs.readFileSync(path.join(site, f), 'utf8').includes('goatcounter');
-    assert.deepEqual(['index.html', 'dev/index.html', 'Silinx-ISE.html', 'dev/Silinx-ISE.html', 'assets/x/index.html'].map(has), [true, true, false, false, false]);
+    assert.deepEqual(['index.html', 'dev/index.html', 'Silinx.html', 'dev/Silinx.html', 'assets/x/index.html'].map(has), [true, true, false, false, false]);
   } finally { fs.rmSync(site, { recursive: true, force: true }); }
 });
 

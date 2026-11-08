@@ -79,7 +79,7 @@ test('#487 the assets\' URLs of a built page: its version\'s folder next to the 
   delete globalThis.SILINX_ASSETS;
   try {
     const { assetsBase, yosysBundleUrl, assetsRoot } = await import('../web/js/open-flow-browser.js?layout=1');
-    assert.equal(assetsBase({ protocol: 'file:', href: 'file:///tmp/Downloads/Silinx-ISE.html' }), 'https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/');
+    assert.equal(assetsBase({ protocol: 'file:', href: 'file:///tmp/Downloads/Silinx.html' }), 'https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/');
     assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx-ISE/' }), 'https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/');
     assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx-ISE/dev/index.html' }), 'https://pmnmalo.github.io/Silinx-ISE/dev/assets/15.12.0/');
     assert.equal(yosysBundleUrl('https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx-ISE/assets/vendor/yowasp-yosys/0.70.1258/gen/bundle.js');

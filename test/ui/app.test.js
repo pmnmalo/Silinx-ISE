@@ -423,10 +423,10 @@ uiTest('Check for Updates: newer release, up to date and a GitHub error (fetch s
     };
   }, release, status);
   await stub({ tag_name: 'v99.1.0', name: 'v99.1.0', html_url: `https://github.com/${REPOSITORY}/releases/tag/v99.1.0`, published_at: '2026-01-02T00:00:00Z',
-    assets: [{ name: 'silinx-ise-99.1.0.zip', browser_download_url: `https://github.com/${REPOSITORY}/releases/download/v99.1.0/silinx-ise-99.1.0.zip`, size: 4096 }] });
+    assets: [{ name: 'silinx-99.1.0.zip', browser_download_url: `https://github.com/${REPOSITORY}/releases/download/v99.1.0/silinx-99.1.0.zip`, size: 4096 }] });
   await page.menu('Help', 'Check for Updates…');
   await page.waitFor(() => /A new version is available: Silinx 99\.1\.0/.test(document.querySelector('.dlg-overlay')?.innerText || ''));
-  assert.ok(await page.eval(() => [...document.querySelectorAll('.dlg-overlay a')].some((a) => a.textContent === 'silinx-ise-99.1.0.zip')));
+  assert.ok(await page.eval(() => [...document.querySelectorAll('.dlg-overlay a')].some((a) => a.textContent === 'silinx-99.1.0.zip')));
   // the release, then its changelog (What's new; refused here: the dialog shows without it)
   assert.deepEqual(await page.eval(() => window.__ghCalls), [`https://api.github.com/repos/${REPOSITORY}/releases/latest`, `https://raw.githubusercontent.com/${REPOSITORY}/v99.1.0/CHANGELOG.md`]);
   await page.key('Escape');

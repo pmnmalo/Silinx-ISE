@@ -1,4 +1,4 @@
-// The Silinx toolchain in the browser edition (the single-file Silinx-ISE.html, on GitHub Pages):
+// The Silinx toolchain in the browser edition (the single-file Silinx.html, on GitHub Pages):
 // Implement Design / Generate Programming File without any server or Xilinx tool. The flow is
 // packages/silinx-fpga/src/open-flow-core.js, run in a Web Worker (web/js/open-flow-worker.js); the device descriptions,
 // the bit database and Yosys (WebAssembly) are fetched from the site's assets/ folder (published
@@ -29,7 +29,7 @@ export const BROWSER_DEVICES = {
 // its version; a development build: dev-<commit>), Yosys's bundle relative to it (shared by the
 // versions with the same Yosys: ../vendor/yowasp-yosys/<its version>/gen/bundle.js), and the site the
 // page opened from a file fetches them from (the site keeps the older releases' folders, so that a
-// downloaded Silinx-ISE.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
+// downloaded Silinx.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
 const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
 // (and each asset's SHA-256, checked by the cache, web/js/asset-cache.js #1237: here, in the flow worker's messages
 // and in the Yosys workers' code)

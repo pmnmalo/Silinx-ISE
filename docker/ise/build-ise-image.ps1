@@ -67,7 +67,7 @@ if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
 # Stage the installer in its own folder (hard link on the same NTFS volume, else copy) so that
 # BuildKit transfers only the tarball, then pass installer + license folders as build contexts.
 # The folder is a new one of this run (#1442): the cleanup at the end removes nothing that was there before.
-$Stage = Join-Path (Split-Path -Parent $Installer) (".silinx-ise-stage." + [guid]::NewGuid().ToString("N").Substring(0, 8))
+$Stage = Join-Path (Split-Path -Parent $Installer) (".silinx-stage." + [guid]::NewGuid().ToString("N").Substring(0, 8))
 New-Item -ItemType Directory -Path $Stage | Out-Null
 $StagedTar = Join-Path $Stage "Xilinx_ISE_DS_Lin_14.7_1015_1.tar"
 try { New-Item -ItemType HardLink -Path $StagedTar -Target $Installer | Out-Null }
@@ -97,8 +97,8 @@ try {
   Write-Host "XST synthesis with your license: OK"
   Remove-Item -Recurse -Force $Tmp
 
-  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $SilinxDir "bin\silinx-ise.js"))) {
-    node (Join-Path $SilinxDir "bin\silinx-ise.js") toolchain --docker $Tag
+  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $SilinxDir "bin\silinx.js"))) {
+    node (Join-Path $SilinxDir "bin\silinx.js") toolchain --docker $Tag
   } else {
     Write-Host "Configure Silinx: Tools > Toolchain Settings > Docker image = $Tag"
   }

@@ -43,7 +43,7 @@ test('regression #3014: a second launch opens the code only when it is one issue
   for (const x of [undefined, null, '', 42, {}, ['a'], 'short', `${code}x`, `${code.slice(0, 23)}&`, 'a&calc|b"c^d%e<f>g(h)i!jk',
     `${code.slice(0, 12)} ${code.slice(13)}`, `${code.slice(0, 23)}\n`]) assert.equal(OC.openCodeUrl(url, x), url, String(x));
   // the launcher builds its URL with it, not from the answer as it is
-  const bin = fs.readFileSync(new URL('../bin/silinx-ise.js', import.meta.url), 'utf8');
+  const bin = fs.readFileSync(new URL('../bin/silinx.js', import.meta.url), 'utf8');
   assert.match(bin, /openBrowser\(openCodeUrl\(url, code\)\)/);
   assert.doesNotMatch(bin, /#code=\$\{code\}/);
 });

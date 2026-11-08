@@ -1,5 +1,5 @@
-// The launchers users double-click (start-silinx-ise.sh on Linux, Start Silinx-ISE.command on macOS,
-// Start Silinx-ISE.bat on Windows): each one of this platform starts Silinx from the repository on
+// The launchers users double-click (start-silinx.sh on Linux, Start Silinx.command on macOS,
+// Start Silinx.bat on Windows): each one of this platform starts Silinx from the repository on
 // the port it is given, and the files keep the line endings and modes their systems need.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,20 +34,20 @@ for (const launcher of launchersOf()) {
 }
 
 test('launchers: CRLF for the Windows one, LF for the others, which git keeps executable', () => {
-  const bat = fs.readFileSync(path.join(ROOT, 'Start Silinx-ISE.bat'), 'latin1');
+  const bat = fs.readFileSync(path.join(ROOT, 'Start Silinx.bat'), 'latin1');
   assert.equal(bat.split('\n').length - 1, bat.split('\r\n').length - 1, '.bat: every line ends with CRLF');
-  for (const f of ['Start Silinx-ISE.command', 'start-silinx-ise.sh']) {
+  for (const f of ['Start Silinx.command', 'start-silinx.sh']) {
     const text = fs.readFileSync(path.join(ROOT, f), 'latin1');
     assert.ok(!text.includes('\r'), `${f}: LF line endings`);
     assert.match(text, /^#!\/bin\/(ba)?sh\n/, `${f}: shebang`);
   }
-  const modes = execFileSync('git', ['ls-files', '-s', '--', 'Start Silinx-ISE.command', 'start-silinx-ise.sh', 'Start Silinx-ISE.bat'], { cwd: ROOT, encoding: 'utf8' });
-  assert.match(modes, /^100755 \S+ 0\tStart Silinx-ISE\.command$/m);
-  assert.match(modes, /^100755 \S+ 0\tstart-silinx-ise\.sh$/m);
+  const modes = execFileSync('git', ['ls-files', '-s', '--', 'Start Silinx.command', 'start-silinx.sh', 'Start Silinx.bat'], { cwd: ROOT, encoding: 'utf8' });
+  assert.match(modes, /^100755 \S+ 0\tStart Silinx\.command$/m);
+  assert.match(modes, /^100755 \S+ 0\tstart-silinx\.sh$/m);
 });
 
 test('launchers: the first start installs from the lock file, without the dependencies\' install scripts (#479)', () => {
-  for (const f of ['Start Silinx-ISE.command', 'start-silinx-ise.sh', 'Start Silinx-ISE.bat']) {
+  for (const f of ['Start Silinx.command', 'start-silinx.sh', 'Start Silinx.bat']) {
     const text = fs.readFileSync(path.join(ROOT, f), 'latin1');
     assert.match(text, /npm ci --omit=dev --ignore-scripts/, f);
     assert.doesNotMatch(text, /npm install/, `${f}: npm install may rewrite the lock file`);
