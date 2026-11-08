@@ -22,6 +22,7 @@ import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
 import { makeStencils } from './c-stencil.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
+import { balanceSums, balances } from './c-balance.js';
 import { reshapeGroups } from './c-reshape.js';
 import { axiPlan, axiWrap } from './c-axi.js';
 import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
@@ -142,11 +143,16 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
   if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults }), seq: true };
-  // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
-  // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
-  else if ((!flat || isUnit(checked.top)) && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && (!fitsClock(df.graph, clock, family) || lat?.min > 0 || (limit !== null && mulsIn(df.graph) > limit))) {
-    const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults });
-    if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
+  else {
+    // (its sums balanced first, as the scheduler balances them, unless EXPRESSION_BALANCE off: the path decided on is
+    // the one made, combinational or not, #3028)
+    if (balances(fn) && !df.diagnostics.some((d) => d.severity === 'error')) balanceSums(df.graph, [...df.outputs.values()]);
+    // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
+    // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
+    if ((!flat || isUnit(checked.top)) && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && (!fitsClock(df.graph, clock, family) || lat?.min > 0 || (limit !== null && mulsIn(df.graph) > limit))) {
+      const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults });
+      if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
+    }
   }
   // (LATENCY min=: the machine made again with the wait states it lacks; max=: said if a path takes more)
   if (lat && df.seq && !df.diagnostics.some((d) => d.severity === 'error')) {

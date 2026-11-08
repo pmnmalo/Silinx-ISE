@@ -45,8 +45,9 @@ test('#1924 fitsClock: within the period less Vitis HLS\'s 27 % uncertainty; 10 
   assert.deepEqual([7, 8].map((n) => fitsClock(chain(n), 20)), [true, false]);
 });
 
-// four additions in a row: 8.3 ns, more than 10 ns allows; at 20 ns they fit
-const SUM4 = 'int sum4(int a, int b, int c, int d, int e) {\n  return a + b + c + d + e;\n}\n';
+// four additions in a row: 8.3 ns, more than 10 ns allows; at 20 ns they fit (as the C writes them, EXPRESSION_BALANCE
+// off: balanced, three deep, they fit 10 ns too, #3028; the clock's test, not the balancing's)
+const SUM4 = 'int sum4(int a, int b, int c, int d, int e) {\n#pragma HLS EXPRESSION_BALANCE off\n  return a + b + c + d + e;\n}\n';
 const TB = `${SUM4}int main() {\n  int s = 0;\n  for (int i = 0; i < 8; i++) s += sum4(i, 2 * i, -i, 7, i * i);\n  return s == 0 ? 1 : 0;\n}\n`;
 
 test('#1924 a function too slow for the clock: a sequential module (ap_clk, ap_rst), co-simulated; at a slower clock combinational', () => {

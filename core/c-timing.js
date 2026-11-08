@@ -55,7 +55,8 @@ export function nodeDelay(graph, n, family = 'artix7') {
 export function pathDelay(graph, family = 'artix7') {
   const at = new Array(graph.nodes.length).fill(0);
   let worst = 0;
-  for (const n of graph.nodes) {
+  // (in an order where each node comes after its operands: a sum balanced in place reads nodes made after it, #3028)
+  for (const n of graph.needed(graph.nodes.map((x) => x.id))) {
     const start = (n.args || []).reduce((m, a) => Math.max(m, at[a] ?? 0), 0);
     at[n.id] = start + nodeDelay(graph, n, family);
     if (at[n.id] > worst) worst = at[n.id];
