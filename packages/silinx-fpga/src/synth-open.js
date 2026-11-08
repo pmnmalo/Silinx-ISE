@@ -15,13 +15,13 @@ import { pack } from './fpga/pack.js';
 import { fsmProbeCommands, fsmChosen, fsmExtracted, fsmExtractCommands, fsmForceCommands, fsmInits, fsmRestCommands, markWires, setInits, oldStateInits, refusedForUsers, quietForced, FSM_PRE_FILE, FSM_MARKED_FILE, FSM_POST_FILE, FSM_ENC_FILE, FSM_DETECT_FILE, FSM_FORCED_FILE } from './synth-fsm.js';
 import { asText } from './synth-open-yosys.js';
 import {
-  DEEP_RULE, criticalDelay, deepDesign, logicLevels, pathEnds
+  DEEP_RULE, criticalDelay, deepDesign, domainDelays, logicLevels, pathEnds
 } from './synth-open-path.js';
 import { mountDepth } from './synth-open-depth.js';
 import { bddStage } from './synth-open-resynth.js';
 import { s6SynthCommands, BRAMS_S6_FILE, BRAMS_S6 } from './synth-brams-s6.js';
 export {
-  DEEP_RULE, criticalDelay, deepDesign, logicLevels, pathEnds
+  DEEP_RULE, criticalDelay, deepDesign, domainDelays, logicLevels, pathEnds
 };
 export { asText, lineStream, readableBlobs, runYosysOnce, verifiedYosysUrl, yosysError, yosysWorkerSource } from './synth-open-yosys.js';
 

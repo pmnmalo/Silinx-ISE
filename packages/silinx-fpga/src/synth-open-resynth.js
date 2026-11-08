@@ -3,7 +3,7 @@
 // (lut-resynth.js), then with its critical path's wide decodes collapsed and mapped again (#1360,
 // synth-open-bdd.js).
 import { asText } from './synth-open-yosys.js';
-import { criticalDelay, pathEnds } from './synth-open-path.js';
+import { criticalDelay, domainDelays, pathEnds } from './synth-open-path.js';
 import { resynthCritical } from './lut-resynth.js';
 import { bddRemap } from './synth-open-bdd.js';
 import {
@@ -36,8 +36,36 @@ export async function resynthStage({ run, speed, top, withResynth }, { chosen, c
       info.resynth = { kept: false, failed: e.message };
       sayNew(`Warning: the critical path's LUTs could not be made shallower (${e.message}): the netlist chosen before is kept`);
     }
+    if (!info.resynth?.failed) ({ chosen, cells } = await domainStage({ run, top }, { chosen, cells, info, slices }));
   }
   return { chosen, cells };
+}
+
+// A design of several clocks (#652, synth-open-path.js domainDelays): the critical LUTs of each clock's own critical path
+// made shallower too, the slowest clock's left as the resynthesis above made them (the latches' not: their gates are
+// often logic), each clock after the other; kept when no clock's path is longer and the geometric mean of the clocks'
+// paths is shorter by DEPTH_RULE (its LUTs and slices bounded as for any candidate)
+const geomean = xs => Math.exp(xs.reduce((a, x) => a + Math.log(x), 0) / xs.length);
+async function domainStage({ run, top }, { chosen, cells, info, slices }) {
+  const j0 = chosen[`${top}.json`];
+  const doms = domainDelays(asText(j0) || j0, top);
+  if (doms.length < 2) return { chosen, cells };
+  let nl = JSON.parse(asText(j0) || j0), rounds = 0, changed = 0;
+  for (const { clock } of doms.slice(1).filter(d => d.clock !== 'latch')) {
+    const r = resynthCritical(nl, top, x => { const d = domainDelays(x, top).find(z => z.clock === clock); return d ? d.ends.filter(e => e.ns >= d.ns - 1e-9) : []; });
+    if (r) { nl = r.json; rounds += r.rounds; changed += r.luts; }
+  }
+  if (!changed) return { chosen, cells };
+  const outD = await run(['-q', '-p', resynthCommands(top)], { [RESYNTH_FILE]: JSON.stringify(nl), [SRL_CELLS_FILE]: SRL_CELLS }, () => {});
+  const jD = outD[`${top}.json`];
+  if (!jD) return { chosen, cells };
+  const cellsD = cellCounts(jD, top);
+  const after = new Map(domainDelays(jD, top).map(d => [d.clock, d.ns]));
+  const ns = [geomean(doms.map(d => d.ns)), geomean(doms.map(d => after.get(d.clock) ?? d.ns))];
+  const luts = [utilization(cells).luts, utilization(cellsD).luts], sl = [slices(j0), slices(jD)];
+  const kept = doms.every(d => (after.get(d.clock) ?? d.ns) <= d.ns + 1e-9) && keepDepth(ns, luts, DEPTH_RULE, sl);
+  info.domains = { clocks: doms.length, ns: doms.map(d => after.get(d.clock) ?? d.ns), rounds, changed, luts: luts[1], slices: sl[1], kept };
+  return kept ? { chosen: { ...chosen, ...outD }, cells: cellsD } : { chosen, cells };
 }
 
 /** The critical path's wide decodes of withDepth's chosen netlist collapsed and mapped again (its ctx: run, speed, top,
