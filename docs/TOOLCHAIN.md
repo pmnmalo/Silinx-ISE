@@ -33,9 +33,9 @@ everything on the way from a design to a programmed board is in it:
                  ┌────────────────────────▼─────────────────────────┐
                  │ runFlow (silinx-fpga)                            │
                  │                                                  │
-                 │ synth      Yosys synth_xilinx        netlist.json│
+                 │ synth      Yosys synth_xilinx        <top>.json  │
                  │ translate  the netlist and the UCF read          │
-                 │ map        pack into slices and I/O sites        │
+                 │ map        pack: Silinx's (S6), nextpnr's (S3E)  │
                  │ par        place, route, check       routed.xdl  │
                  │ trce       static timing             timing.txt  │
                  │ bitgen     from the bit database     <top>.bit   │
@@ -61,8 +61,9 @@ Map and Place & Route have one engine in the application, nextpnr (#2137); a pro
 | Spartan-6 | Silinx's packer (`fpga/s6/`) | nextpnr; the pads, global buffers, block RAMs and DSPs placed by Silinx's rules first |
 
 There is no fallback: where nextpnr cannot start (its chip database not downloaded yet, offline) Place & Route fails,
-saying so. **nextpnr replaced Silinx's placer and router** (decided in #2131; parity in #2135, #2797; removed in #2137,
-the Spartan-3E's: their parts other modules use are in `fpga/device-sites.js`, `fpga/place-common.js`,
+saying so. **nextpnr replaced Silinx's placer and router** (decided in #2131; parity in #2135, #2797; removed in #2137, the
+Spartan-3E's placer and router, and #2824, the Spartan-6's router, its placer kept for the sites nextpnr is given fixed:
+pads, global buffers, block RAMs, DSPs; their parts other modules use are in `fpga/device-sites.js`, `fpga/place-common.js`,
 `fpga/route-check.js`, `fpga/clock-reach.js`). Silinx's packer stays: the open synthesis counts the slices with it (#2529), the Post-Map model is written
 from it (#2530).
 The micro-architectures live in the fork `pmnmalo/nextpnr-spartan`. What stays Silinx's in any case: the timing, the bitstream
@@ -77,7 +78,7 @@ and their data. nextpnr's routed design is converted to XDL (`fpga/nextpnr-xdl.j
                      │ backendOf(spec.family).mount(ctx)
  The back ends    spartan3e │ spartan6 │ (a new family)
                      │
- The tools        Yosys │ nextpnr │ Silinx's pack, place, route │ timing │ bitgen
+ The tools        Yosys │ nextpnr │ Silinx's packer (S6, the slice count) │ timing │ bitgen
                      │
  The data         device descriptions │ bit databases
 ```
@@ -133,7 +134,7 @@ other formats are #2296. The synthesis is the back end's (#2386): the Xilinx fam
 another family's Yosys script (`scriptSynthesis`), and the report's names; `FAMILY_INFO` needs only a family's name. The steps are the back end's (#2387): its list, each step's label and what it
 needs (`orderSteps`), ISE's names for the Xilinx families. A fake family runs in Node and in the browser's worker (#2388,
 `web/js/open-flow-worker-io.js`). The iCE40 is the first family on them (#2295, `src/open-flow-ice40.js`): YoWASP's
-`@yowasp/nextpnr-ice40` (about 80 MB, every iCE40's chip database) is an optional dependency of the package and a development
+`@yowasp/nextpnr-ice40` (about 80 MB, every iCE40's chip database) is an optional peer dependency of the package and a development
 one of the IDE: the release zip and the published site download it from npm's registry on the first iCE40 run, at
 `package-lock.json`'s version and SHA-512, and keep it (`server/nextpnr-ice40-fetch.js`, `web/js/nextpnr-ice40-browser.js`, #2444).
 

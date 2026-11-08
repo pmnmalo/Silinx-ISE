@@ -67,8 +67,8 @@ Most of the project's rules come from that way of working:
 - **2026-10-18**: the MCP server: what the interface does, an AI assistant can do too (#134, then #2674).
 - **2026-10-26**: C to HDL, a C specification compatible with Vitis HLS.
 - **2026-10-28**: contributors from outside: the maintainer merges and releases, a code owner reviews (#1872).
-- **2026-10-29 onwards**: place and route move to **nextpnr** (#2137): Silinx's own placer and router are removed
-  once nextpnr reaches parity, the bitstream writer stays Silinx's.
+- **2026-10-29 onwards**: place and route move to **nextpnr** (#2137): Silinx's own placer and router were removed
+  once nextpnr reached parity (#2137, #2824); the Spartan-6's packer and the bitstream writer stay Silinx's.
 
 The [CHANGELOG](../CHANGELOG.md) has every release in detail.
 

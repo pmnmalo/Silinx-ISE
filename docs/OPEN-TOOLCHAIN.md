@@ -27,9 +27,9 @@ or to get around any protection.
 |---|---|---|
 | VHDL / Verilog front end | Silinx (AGPL-3.0): the elaborated design as one flat module | written for Silinx |
 | Synthesis | Yosys `synth_xilinx -family xc3se` (ISC), compiled to WebAssembly by YoWASP: it runs in the browser | independent open-source projects |
-| Place and route | Silinx (AGPL-3.0) | written for Silinx |
+| Pack, place and route | nextpnr-himbaechel, the fork pmnmalo/nextpnr-spartan (`@silinx/nextpnr-himbaechel-spartan3e` / `-spartan6`, ISC), compiled to WebAssembly; on the Spartan-6, Silinx's packer (AGPL-3.0) first | an independent open-source project, its Spartan micro-architectures written for Silinx |
 | Bitstream | Silinx (AGPL-3.0), from the bit database below | written for Silinx |
-| Device description (the chip's wires and routing switches) | The Spartan-3E boards' devices (XC3S100E-CP132, XC3S250E-CP132, XC3S500E-FG320, XC3S1200E-FG320) and the Spartan-6 boards' (XC6SLX16-CSG324, XC6SLX45-CSG324, for the toolchain under development, #1): shipped with Silinx (`packages/silinx-fpga/devices/`). Other devices: each user builds it once from their own ISE | computed by Silinx from the output of ISE's documented `xdl -report` command |
+| Device description (the chip's wires and routing switches) | The Spartan-3E boards' devices (XC3S100E-CP132, XC3S250E-CP132, XC3S500E-FG320, XC3S1200E-FG320) and the Spartan-6 boards' (XC6SLX16-CSG324, XC6SLX45-CSG324): shipped with Silinx (`packages/silinx-fpga/devices/`). Other devices: each user builds it once from their own ISE | computed by Silinx from the output of ISE's documented `xdl -report` command |
 
 The bitstream generator needs a **bit database**: which configuration bits set each feature of the
 chip (each LUT memory bit, each multiplexer setting inside a slice, each I/O setting, each routing
@@ -38,7 +38,7 @@ switch). It is built by black-box observation, as described below.
 **Devices.** The Silinx toolchain is developed for the Spartan-3E: the XC3S250E (Basys2-250) first,
 then the other Spartan-3E boards (XC3S100E, XC3S500E, XC3S1200E: their bit databases share the
 tile types' bits with the XC3S250E's; packages/silinx-fpga/research/s3e-bitstream/README.md, stage F). **The Spartan-6 boards** (Nexys3,
-Atlys) are in the Silinx toolchain of the local server and the browser (the browser with the Silinx engine, #2103): it synthesizes, maps, places, routes, times and writes the
+Atlys) are in the Silinx toolchain of the local server and the browser (the browser too, #2103; nextpnr places and routes, #2824): it synthesizes, maps, places, routes, times and writes the
 bitstream of a design for the XC6SLX16 and the XC6SLX45 (#732). Its bit database (`packages/silinx-fpga/bitdb/s6`)
 was measured the same way against ISE 14.7's bitgen; the seven examples on both boards, routed by the Silinx
 toolchain, give byte for byte the bitstream ISE's bitgen writes for the same routing, which ISE's DRC finds no error
