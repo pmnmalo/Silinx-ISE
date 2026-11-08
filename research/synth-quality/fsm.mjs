@@ -370,7 +370,11 @@ async function main(argv) {
 function iseNumbers() {
   const out = {};
   try {
-    for (const d of JSON.parse(fs.readFileSync(path.join(ROOT, 'test/designs-corpus/ise-comparison.json'), 'utf8')).designs) if (d.ise) out[d.name] = { ...d.ise };
+    for (const d of JSON.parse(fs.readFileSync(path.join(ROOT, 'test/designs-corpus/ise-comparison.json'), 'utf8')).designs) {
+      // (XST at its default: the Fast goal's ISE run since #3070)
+      const ise = d.goals ? d.goals.fast?.ise : d.ise;
+      if (ise) out[d.name] = { ...ise };
+    }
   } catch { /* none */ }
   try {
     for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(HERE, 'fsm-ise.json'), 'utf8')))) {

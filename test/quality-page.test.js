@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { qualityPage } from './designs-corpus/quality-page.mjs';
-import { lastError, newFailures, parseClocks, constrainedPeriod, trcePaths, criticalPath, remoteWork, silinxSides, mergeable, OPTIMIZATIONS } from './designs-corpus/compare-lib.mjs';
+import { lastError, newFailures, parseClocks, constrainedPeriod, trcePaths, criticalPath, remoteWork, silinxSides, mergeable, OPTIMIZATIONS, GOALS, buildsOf } from './designs-corpus/compare-lib.mjs';
 import { GOAL_IMPL, synthGoal } from '../packages/silinx-fpga/src/synth-open.js';
 import os from 'node:os';
 import { iseWorkBase } from '../server/toolchain.js';
@@ -131,7 +131,7 @@ test('ISE comparison: Silinx at Optimizations Area and Speed, by their ISE prope
   const src = fs.readFileSync(path.join(ROOT, 'test/designs-corpus/compare-ise.mjs'), 'utf8');
   assert.match(src, /project\.impl = \{ \.\.\.\(project\.impl \|\| \{\}\), \.\.\.GOAL_IMPL\[goal\] \};/);
   assert.doesNotMatch(src, /optLevel: EFFORTS/);
-  assert.match(src, /optimizations: OPTIMIZATIONS, notBuilt/);
+  assert.match(src, /isePeriodNs: PERIOD, goals, notBuilt/);
   assert.deepEqual(silinxSides({ optimizations: ['area', 'speed'] }), { main: 'Area', second: 'Speed' });
   assert.deepEqual(silinxSides({}), { main: 'Normal', second: 'High' });
   const p = (levels, logic, route) => ({ levels, lut: logic - 1.5, carry: 0, ff: 1.5, other: 0, logic, route });
@@ -235,4 +235,63 @@ test('#1774 compare-ise.mjs over SSH: the trce of Silinx\'s routings in the ssh 
     if (saved === undefined) delete process.env.SILINX_CONFIG_DIR; else process.env.SILINX_CONFIG_DIR = saved;
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// #3070: each design at Silinx's Optimizations Area, Speed and Fast, and ISE at the same goal (XST's opt_mode and opt_level of
+// the goal's Process Properties); the page has a summary line, size and speed tables (with the run times) per goal
+test('ISE comparison: each Optimization against ISE at the same goal, per goal in the page (#3070)', () => {
+  assert.deepEqual(GOALS, ['area', 'speed', 'fast']);
+  assert.deepEqual(GOAL_IMPL.fast, { optMode: 'Speed', optLevel: 1 });
+  const src = fs.readFileSync(path.join(ROOT, 'test/designs-corpus/compare-ise.mjs'), 'utf8');
+  // ISE's project takes the goal's Process Properties, as Silinx's (map packing as tightly as it can in both)
+  assert.match(src, /async function iseRun\(name, goal\) \{[^]*?project\.impl = \{ \.\.\.\(project\.impl \|\| \{\}\), \.\.\.GOAL_IMPL\[goal\], mapPackFactor: 1 \};/);
+  // (each goal's ISE project its own name: the ISE host's folder, two goals of a design at once)
+  assert.match(src, /project\.name = `\$\{project\.name \|\| name\}-\$\{goal\}`;/);
+  assert.match(src, /silinxRun\(n, g\)/);
+  assert.match(src, /iseRun\(n, g\)/);
+  const p = (levels, logic, route) => ({ levels, lut: logic - 1.5, carry: 0, ff: 1.5, other: 0, logic, route });
+  const b = (luts, slices, periodNs, seconds, extra = {}) => ({ luts, slices, ffs: 10, srl16: 0, bram: 0, mult: 0, periodNs, seconds, ...extra });
+  const res = { generatedAt: '2026-11-07T10:00:00Z', silinxVersion: 'x', isePeriodNs: 5, goals: GOALS, notBuilt: ['neorv32'], designs: [
+    { name: 'a', goals: {
+      area: { silinx: b(80, 40, 10, 20, { estimateNs: 9.9 }), ise: b(100, 50, 8, 40) },
+      speed: { silinx: b(90, 45, 8, 60, { path: p(4, 4, 4) }), ise: b(110, 55, 7, 40, { path: p(3, 3.5, 3.5) }) },
+      fast: { silinx: b(85, 42, 9, 10), ise: b(100, 50, 9, 20) } } },
+    { name: 'b', goals: {
+      area: { silinx: { error: 'ERROR:Silinx - no room' }, ise: { error: 'ERROR:HDLCompilers:26 - $clog2' } },
+      speed: { silinx: { error: 'ERROR:Silinx - no room' }, ise: { error: 'ERROR:HDLCompilers:26 - $clog2' } },
+      fast: { silinx: b(10, 5, 3, 5), ise: { error: 'ERROR:HDLCompilers:26 - $clog2' } } } },
+  ] };
+  const page = qualityPage(res);
+  assert.match(page, /nextpnr's\npack, place and route/);
+  assert.match(page, /^- \*\*Area\*\* \(the default of a new project: .*\), against ISE at XST's `-opt_mode Area -opt_level 2`;$/m);
+  assert.match(page, /^- \*\*Speed\*\* .*, against ISE at XST's `-opt_mode Speed -opt_level 2`, ISE's \*Timing Performance\*;$/m);
+  assert.match(page, /^- \*\*Fast\*\* \(the usual mapping alone, one placement\), against ISE at XST's `-opt_mode Speed -opt_level 1`, XST's default;$/m);
+  // a's ratios: Area LUTs 0.8, slices 0.8, period 1.25, time 0.5
+  assert.match(page, /^- \*\*Area:\*\* 1 designs built by both\. Logic LUTs −20%, flip-flops \+0%, slices\n {2}−20%; as few LUTs or fewer on 1 of 1\. Critical path \+25% \(1 designs timed\n {2}by both\), as fast or faster on 0 of 1\. Run time −50%\.$/m);
+  assert.match(page, /^- \*\*Speed:\*\* .*\n.*\n {2}by both\), as fast or faster on 0 of 1\. Run time \+50%\.$/m);
+  assert.match(page, /^## Area: Silinx at Optimization Area against ISE at XST's `-opt_mode Area -opt_level 2`$/m);
+  assert.match(page, /^## Fast: Silinx at Optimization Fast against ISE at XST's `-opt_mode Speed -opt_level 1`$/m);
+  assert.ok(page.includes('| a | 80 | 100 | 0.80 | 10 | 10 | 40 | 50 | 0.80 | 0 / 0 | 0 / 0 | 0 / 0 |'), page);
+  assert.ok(page.includes('| a | 10.00 | 8.00 | 1.25 | 9.90 | 20 | 40 |'));
+  assert.ok(page.includes('| b | 3.00 | – | – | – | 5 | – |'));
+  // the critical paths of the goal that measured them, against ISE's at that goal
+  assert.match(page, /^1 design slower than ISE; against ISE's critical paths, on average, logic \+0\.50 ns, routing \+0\.50 ns\.$/m);
+  assert.ok(page.includes('| a | 4 | 3 | 4.00 | 3.50 | 2.50 | 2.00 | 0.00 | 0.00 | 4.00 | 3.50 |'));
+  // one line per error, its goals together; XST's cannot-read once
+  assert.match(page, /^- b, Silinx at Area, Speed: `ERROR:Silinx - no room`$/m);
+  assert.equal(page.match(/- b: XST cannot read it/g).length, 1);
+  assert.match(page, /^- neorv32: Silinx cannot read or synthesize it yet/m);
+  // the guard per goal and side; a --filter run merged only into results of the same goals
+  const before = { goals: GOALS, designs: [{ name: 'a', goals: { area: { silinx: {}, ise: {} }, speed: { silinx: {}, ise: {} }, fast: { silinx: {}, ise: {} } } }] };
+  const now = { goals: GOALS, designs: [{ name: 'a', goals: { area: { silinx: { error: 'x' }, ise: {} }, speed: { silinx: {}, ise: { error: 'y' } }, fast: { silinx: {}, ise: {} } } }] };
+  assert.deepEqual(newFailures(before, now), ['a (Silinx, Area): x', 'a (ISE, Speed): y']);
+  assert.equal(mergeable(before, { goals: GOALS }), true);
+  assert.equal(mergeable({ optimizations: ['area', 'speed'] }, { goals: GOALS }), false);
+  assert.equal(mergeable(before, { goals: ['area'] }), false);
+  // the results before (#2941's, one ISE run): read by goal, ISE's run on both sides
+  const old = { optimizations: ['area', 'speed'] }, d = { silinx: { luts: 1 }, silinxHigh: { luts: 2 }, ise: { luts: 3 } };
+  assert.deepEqual(buildsOf(d, old), { area: { silinx: { luts: 1 }, ise: { luts: 3 } }, speed: { silinx: { luts: 2 }, ise: { luts: 3 } } });
+  assert.deepEqual(Object.keys(buildsOf(d, {})), ['normal', 'high']);
+  // the guard across the change of form: the old results' builds by goal (their one ISE run on both)
+  assert.deepEqual(newFailures({ optimizations: ['area', 'speed'], designs: [{ name: 'a', ...d }] }, now), ['a (Silinx, Area): x', 'a (ISE, Speed): y']);
 });
