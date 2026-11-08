@@ -323,7 +323,7 @@ export function mountTtEditor(container, opts = {}) {
       const one = { ...res, terms: [t] };
       const text = formatExpr(groups === 'pos' ? clauseAst(one) : termAst(one), notation);
       leg.append(h('div', { class: 'tt-leg' }, h('span', { class: 'tt-swatch', style: { borderColor: COLORS[ti % COLORS.length], background: `${COLORS[ti % COLORS.length]}22` } }), h('code', { 'data-no-i18n': '' }, text),
-        h('span', { class: 'tt-leg-cells' }, ` ${groups === 'pos' ? 'M' : 'm'}(${t.minterms.join(', ')})`), t.essential ? h('span', { class: 'tt-ess' }, ' essential') : null));
+        h('span', { class: 'tt-leg-cells' }, ` ${groups === 'pos' ? 'M' : 'm'}(${t.minterms.join(', ')})`)));   // (no "essential" mark, #3080)
     });
     if (!res.terms.length) leg.append(h('div', { class: 'hint' }, groups === 'pos' ? 'No 0s: no groups (the output is always 1).' : 'No 1s: no groups (the output is always 0).'));
     kmapHost.append(leg);

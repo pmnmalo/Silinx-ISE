@@ -49,7 +49,6 @@ export const TT_PT = {
   'Notation:': 'Notação:', 'Notation of the expressions': 'Notação das expressões', 'Canonical SOP': 'Forma canónica SdP', 'Canonical POS': 'Forma canónica PdS',
   'The sum of the minterms: every input in every term, the don\'t cares left out': 'A soma dos mintermos: todas as entradas em todos os termos, sem as indiferenças',
   'The product of the maxterms: every input in every term, the don\'t cares left out': 'O produto dos maxtermos: todas as entradas em todos os termos, sem as indiferenças',
-  'essential': 'essencial',
   'No 1s: no groups (the output is always 0).': 'Sem 1s: sem grupos (a saída é sempre 0).',
   'No 0s: no groups (the output is always 1).': 'Sem 0s: sem grupos (a saída é sempre 1).',
   'The exact search was cut short: this solution may not be minimal.': 'A procura exata foi interrompida: esta solução pode não ser mínima.',

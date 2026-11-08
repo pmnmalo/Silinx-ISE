@@ -84,8 +84,9 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-caption`)].map((c) => c.textContent), T), ['Truth table', 'Notes', 'Expression', 'Karnaugh map', 'Results']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-mine-in, ${t} .tt-mine-out`).length, T), 0);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Least number of gates', 'Least delay', 'Minimal SOP', 'Minimal POS', 'Canonical SOP', 'XOR form', 'NAND form', 'NOR form']);   // (the first two: #1427; in this order: #3065)
-  // no list of the essential prime implicants below them (#705): the K-map's legend marks them
+  // no list of the essential prime implicants below them (#705), nor an "essential" mark in the K-map's legend (#3080)
   assert.deepEqual(await page.eval((t) => [document.querySelectorAll(`${t} .tt-ess-list`).length, /Essential prime implicants/.test(document.querySelector(t).textContent)], T), [0, false]);
+  assert.deepEqual(await page.eval((t) => [document.querySelectorAll(`${t} .tt-legend .tt-leg`).length > 0, /essential/i.test(document.querySelector(`${t} .tt-legend`).textContent)], T), [true, false]);
   assert.deepEqual(await page.eval((t) => [`${t} .tt-nand`, `${t} .tt-nor`].map((q) => [document.querySelector(`${q} .tt-expr`).textContent, document.querySelector(`${q} .tt-cost`).textContent]), T), [
     ['f = /(/(b.c)./(a.c)./(a.b))', '4 gate(s), 0 of them inverter(s)'], ['f = /(/(a + b) + /(a + c) + /(b + c))', '4 gate(s), 0 of them inverter(s)']]);
   // the table is saved (autosave)
