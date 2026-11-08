@@ -20,7 +20,7 @@ import {
 import { mountDepth } from './synth-open-depth.js';
 import { bddStage } from './synth-open-resynth.js';
 import { s6SynthCommands, BRAMS_S6_FILE, BRAMS_S6 } from './synth-brams-s6.js';
-import { cmpStep, cmpProbeCommands, sharedComparisons, cmpSet, CMP_FILE, CMP_MAP, CMP_SET_FILE, CMP_PROBE_FILE } from './synth-cmp.js';
+import { cmpStep, cmpSet, probeComparisons, cmpChoice, CMP_FILE, CMP_MAP, CMP_SET_FILE } from './synth-cmp.js';
 export {
   DEEP_RULE, criticalDelay, deepDesign, domainDelays, logicLevels, pathEnds
 };
@@ -607,19 +607,9 @@ export function yosysScript(top, family, opts = {}) {
  *  (and its carry-select map, opts.csel; the comparisons mapped as logic and their map, opts.cmp, #3097). */
 export const yosysFiles = (top, text, opts = {}) => ({ [`${top}_syn.v`]: text, [SRL_MAP_FILE]: SRL_MAP, [SRL_CELLS_FILE]: SRL_CELLS, [BRAMS_S6_FILE]: BRAMS_S6, ...(opts.csel && { [CSEL_FILE]: CSEL_MAP }),
   ...(opts.cmp?.length && { [CMP_FILE]: CMP_MAP, [CMP_SET_FILE]: cmpSet(top, opts.cmp) }) });
-/** The comparisons with a constant to map as logic (#3097, synth-cmp.js): a run up to synth_xilinx's coarse step, those of a
- *  signal compared with two constants or more; none on a 6-input-LUT family (synth_xilinx as it is), none without a < or >
- *  in the text but those of a `<=` (no run: a design without comparisons keeps its runs), none when the run fails (the
- *  synthesis's own runs say why). */
-export async function cmpProbe(top, text, family, run) {
-  const fam = YOSYS_FAMILY[family];
-  if (!LUT4_FAMILIES.has(fam) || !/[<>]/.test(String(text).replaceAll('<=', ''))) return [];
-  try {
-    const out = await run(['-q', '-p', cmpProbeCommands(`read_verilog -lib ${SRL_CELLS_FILE}; read_verilog -sv ${top}_syn.v; `, `synth_xilinx -family ${fam} -ise -flatten -top ${top}`)],
-      { [`${top}_syn.v`]: text, [SRL_CELLS_FILE]: SRL_CELLS }, () => {});
-    return out?.[CMP_PROBE_FILE] ? sharedComparisons(asText(out[CMP_PROBE_FILE]), top) : [];
-  } catch { return []; }
-}
+/** The comparisons with a constant to map as logic (#3097, synth-cmp.js probeComparisons): none on a 6-input-LUT family. */
+export const cmpProbe = (top, text, family, run) => probeComparisons(top, text, LUT4_FAMILIES.has(YOSYS_FAMILY[family]) ? YOSYS_FAMILY[family] : null, run,
+  `read_verilog -lib ${SRL_CELLS_FILE}; `, { [SRL_CELLS_FILE]: SRL_CELLS });
 
 /** Cells of a Yosys JSON netlist by type: { LUT4: 286, FDRE: 48, … } (the top module's). */
 export function cellCounts(json, top) {
@@ -726,9 +716,18 @@ export const FAST_SYNTH = { effort: 'normal', depth: false, speed: false, abc9: 
  * luts, slices, kept } (csel: false leaves it out).
  */
 export async function synthesizeVerilog(input, options = {}) {
-  // (the comparisons with a constant mapped as logic, #3097: found once, the same in every run; cmp: false, none)
-  if (options.cmp === undefined) options = { ...options, cmp: await cmpProbe(input.top, input.text, options.family || 'spartan3e', options.run) };
-  else if (!options.cmp) options = { ...options, cmp: null };
+  // the comparisons with a constant to map as logic (#3097, synth-cmp.js): found once; the design synthesized with them so
+  // and as before, side by side, the one cmpChoice keeps (cmp: false, none; a list, those, no choice)
+  if (options.cmp !== undefined) return withCarrySelect(input, { ...options, cmp: options.cmp || null });
+  const cmp = await cmpProbe(input.top, input.text, options.family || 'spartan3e', options.run);
+  if (!cmp.length) return withCarrySelect(input, { ...options, cmp: null });
+  const [base, cand] = await Promise.all([withCarrySelect(input, { ...options, cmp: null }), withCarrySelect(input, { ...options, cmp, onLine: () => {} }).catch(() => null)]);
+  const measure = r => [criticalDelay(r.files[`${r.top}.json`], r.top), sliceCount(r.files[`${r.top}.json`], r.top)];
+  return cmpChoice(base, cand, cmp.length, measure);
+}
+
+// synthesizeVerilog's synthesis but the choice of the comparisons as logic: the usual one, and the carry-select candidate
+async function withCarrySelect(input, options) {
   const r = await synthesizeOnce(input, options);
   // a carry chain of CSEL_RULE.chain stages or more: synthesized again with carry-select segments (#1361), kept by DEPTH_RULE
   const { family = 'spartan3e', depth = true, csel = true } = options;
