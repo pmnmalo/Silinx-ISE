@@ -9,6 +9,14 @@ Silinx was started by **Pedro Maló**, who teaches Digital Systems at **FCT NOVA
 Technology, Lisbon). He is the project's maintainer: he decides what it does, reviews and merges its pull requests and
 makes its releases ([CONTRIBUTING.md](../CONTRIBUTING.md)).
 
+## When
+
+Silinx began on the afternoon of **6 October 2026**, during a Digital Systems lab class of the Degree in Computer
+Science and Engineering. Pedro had had enough. Installing Xilinx ISE and keeping it running was slow, hard work for
+the students, and on Apple silicon Macs it would not run at all. He had found a way round that, ISE running emulated
+in Docker, but even then it could not program the board, because Apple's Rosetta emulation does not support it. Class
+time meant for digital design was going into installing and debugging the tools.
+
 ## Why
 
 The Digital Systems courses teach FPGA design on Spartan-3E boards, the Digilent **Basys2** and **Nexys2**, with the
