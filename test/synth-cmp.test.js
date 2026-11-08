@@ -4,7 +4,7 @@
 // differ), the comparisons of 4 bits or fewer and of two signals left alone, and cmpStep's commands.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CMP_FILE, CMP_MAP, CMP_SET_FILE, cmpStep, cmpSet, sharedComparisons } from '../packages/silinx-fpga/src/synth-cmp.js';
+import { CMP_FILE, CMP_MAP, CMP_SET_FILE, cmpStep, cmpSet, sharedComparisons, keepCmp, cmpChoice, probeComparisons } from '../packages/silinx-fpga/src/synth-cmp.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const OPS = ['<', '<=', '>', '>='];
@@ -129,6 +129,36 @@ endmodule
   assert.deepEqual(await cmpProbe(top, text, 'spartan6', yosysNode), []);
 });
 
+test('keepCmp: fewer slices, the gain at least the loss in speed by the estimate (the corpus\'s estimates with and without)', () => {
+  // [estimate ns, slices] as before and with the comparisons as logic
+  for (const [name, n, sl, yes] of [['itc99-b05', [9.53, 10.29], [255, 194], true], ['verilog-uart', [6.92, 5.77], [125, 119], true],
+    ['itc99-b11', [7.91, 7.46], [100, 94], true], ['itc99-b15', [18.51, 17.4], [1303, 1317], false], ['secworks-sha1', [14.18, 16.12], [979, 934], false],
+    ['verilog-i2c-master', [8.85, 8.38], [114, 121], false], ['itc99-b22', [34.26, 35.79], [2030, 1949], false], ['same', [10, 10], [100, 100], false],
+    ['no slices', [10, 9], [100, NaN], false]]) assert.equal(keepCmp(n, sl), yes, name);
+});
+
+test('cmpChoice: the one kept, r.depth.cmp said on it; a candidate that failed, the base', () => {
+  const r = (ns, slices, luts) => ({ ns, slices, util: { luts }, depth: { tried: true } });
+  const measure = x => [x.ns, x.slices];
+  const base = r(9.53, 255, 282), cand = r(10.29, 194, 272);
+  assert.deepEqual(cmpChoice(base, cand, 27, measure), { ...cand, depth: { tried: true, cmp: { comparisons: 27, kept: true, ns: 10.29, luts: 272, slices: 194 } } });
+  const worse = r(17.4, 1317, 1907);
+  assert.deepEqual(cmpChoice(base, worse, 4, measure).depth.cmp, { comparisons: 4, kept: false, ns: 17.4, luts: 1907, slices: 1317 });
+  assert.equal(cmpChoice(base, worse, 4, measure).ns, 9.53);
+  assert.deepEqual(cmpChoice(base, null, 4, measure), { ...base, depth: { tried: true, cmp: { comparisons: 4, kept: false } } });
+});
+
+test('probeComparisons: no family or no comparison, no run; a run that fails or writes nothing, none', async () => {
+  let runs = 0;
+  const count = async () => { runs++; return {}; };
+  assert.deepEqual(await probeComparisons('t', 'module t; assign a = b > 3; endmodule', null, count), []);
+  assert.deepEqual(await probeComparisons('t', 'module t; always @(posedge c) q <= d; endmodule', 'xc3se', count), []);
+  assert.equal(runs, 0);
+  assert.deepEqual(await probeComparisons('t', 'module t; assign a = b > 3; endmodule', 'xc3se', count), []);
+  assert.equal(runs, 1);
+  assert.deepEqual(await probeComparisons('t', 'module t; assign a = b > 3; endmodule', 'xc3se', async () => { throw new Error('crash'); }), []);
+});
+
 // #3097: a 9-bit signal compared with ten constants (as itc99's b05 compares TM with 99, 89, …), in Verilog and in VHDL.
 // On carry chains (synth_xilinx's cmp2lcu): 30 MUXCY, 26 LUTs, 27 slices; as logic: no carry, 22 LUTs, 11 slices.
 const CMP_V = `module cmpc(input clk, input signed [8:0] x, output reg [9:0] d);
@@ -162,6 +192,9 @@ for (const [lang, file, text] of [['Verilog', 'cmpc.v', CMP_V], ['VHDL', 'cmpc.v
     assert.deepEqual([...lib.errors, ...design.diags].map(d => d.message), []);
     const r = await synthesizeOpen(design, { family: 'spartan3e', run: yosysNode });
     assert.deepEqual(r.warnings, []);
+    // (the synthesis with them as logic kept against the one as before: fewer slices, no slower)
+    assert.equal(r.depth.cmp.comparisons, 10);
+    assert.equal(r.depth.cmp.kept, true, JSON.stringify(r.depth.cmp));
     assert.equal(r.util.carry, 0);
     assert.ok(r.util.luts <= 22, `${r.util.luts} LUTs`);
     const packed = pack(readYosysJson(r.files[`${r.top}.json`]));

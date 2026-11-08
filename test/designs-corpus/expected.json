@@ -485,10 +485,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1394,
-   "luts": 2780,
-   "ffs": 528,
-   "period": 22.286
+   "slices": 1233,
+   "luts": 2457,
+   "ffs": 546,
+   "period": 20.024
   }
  },
  "itc99-b17": {
@@ -513,10 +513,10 @@
   },
   "quality": {
    "part": "xc3s500efg320-4",
-   "slices": 3827,
-   "luts": 7627,
+   "slices": 3801,
+   "luts": 7575,
    "ffs": 1380,
-   "period": 23.45
+   "period": 21.997
   }
  },
  "itc99-b20": {
@@ -573,10 +573,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1949,
-   "luts": 3872,
+   "slices": 2030,
+   "luts": 4026,
    "ffs": 706,
-   "period": 40.4
+   "period": 39.372
   }
  },
  "iwls05-i2c": {
@@ -951,10 +951,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 962,
-   "luts": 1921,
+   "slices": 1006,
+   "luts": 2009,
    "ffs": 1527,
-   "period": 17.285
+   "period": 14.991
   }
  },
  "secworks-sha256": {
@@ -1154,10 +1154,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 120,
-   "luts": 238,
+   "slices": 113,
+   "luts": 223,
    "ffs": 72,
-   "period": 9.797
+   "period": 9.98
   }
  },
  "verilog-lfsr-crc": {

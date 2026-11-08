@@ -11,7 +11,10 @@
 // before the coarse step: from the lowest bit up, the signal greater (or not less) than the constant on the bits so
 // far, signed operands with their sign bits inverted. The comparisons mapped (the file CMP_SET_FILE) are those of a
 // signal compared with two constants or more, and those that are an OR of the signal's high bits (sharedComparisons),
-// found by a run up to the coarse step (cmpProbeCommands).
+// found by a run up to the coarse step (probeComparisons); the design is synthesized with them so and as before, and
+// the one keepCmp prefers kept (cmpChoice).
+import { asText } from './synth-open-yosys.js';
+
 export const CMP_FILE = 'silinx_cmp_map.v';
 export const CMP_MAP = `// Silinx: a comparison of a signal with a constant as gates (#3097)
 (* techmap_celltype = "$lt $le $gt $ge" *)
@@ -106,6 +109,35 @@ export function sharedComparisons(json, top) {
     bySignal.set(key, [...(bySignal.get(key) || []), name]);
   }
   return [...new Set([...[...bySignal.values()].filter(g => g.length > 1).flat(), ...reductions])].sort();
+}
+/** The comparisons with a constant to map as logic (`fam`: the Yosys family, null for none): a run up to the coarse step,
+ *  read and the files of the reads given (`read`, `files`), sharedComparisons of its netlist; none without a < or > in the
+ *  text but those of a `<=` (no run: a design without comparisons keeps its runs), none when the run fails (the
+ *  synthesis's own runs say why). */
+export async function probeComparisons(top, text, fam, run, read = '', files = {}) {
+  if (!fam || !/[<>]/.test(String(text).replaceAll('<=', ''))) return [];
+  try {
+    const out = await run(['-q', '-p', cmpProbeCommands(`${read}read_verilog -sv ${top}_syn.v; `, `synth_xilinx -family ${fam} -ise -flatten -top ${top}`)],
+      { [`${top}_syn.v`]: text, ...files }, () => {});
+    return out?.[CMP_PROBE_FILE] ? sharedComparisons(asText(out[CMP_PROBE_FILE]), top) : [];
+  } catch { return []; }
+}
+// The synthesis with the comparisons as logic is kept when it has fewer slices (by Silinx's packer, as the netlists are
+// weighed by DEPTH_RULE) and its gain in slices is at least what it loses in speed by the estimate (the mirror of the
+// carry-select rule, #1361): the comparisons' carry chains gone change which of the mappings after them is kept, and
+// those choices, made on the estimate, may give more slices (itc99-b15: 1303 -> 1317 by the packer, 1233 -> 1394 once
+// placed) or a slower path for fewer slices (secworks-sha1: -4.6 % slices, +13.7 % by the estimate, +15 % by the STA);
+// itc99-b05 -24 % slices for +8 %, verilog-uart, itc99-b11 smaller and faster.
+export const keepCmp = ([n0, n1], [s0, s1]) => [n0, n1, s0, s1].every(Number.isFinite) && s1 < s0 && 1 - s1 / s0 >= n1 / n0 - 1;
+/** Of the synthesis as before (`base`) and the one with the comparisons as logic (`cand`, null when it failed), the one
+ *  keepCmp keeps, `measure(r)`: [its estimate, its slices]; r.depth.cmp { comparisons, ns, luts, slices, kept }. */
+export function cmpChoice(base, cand, comparisons, measure) {
+  const info = { comparisons, kept: false };
+  if (cand) {
+    const [n0, s0] = measure(base), [n1, s1] = measure(cand);
+    Object.assign(info, { ns: n1, luts: cand.util.luts, slices: s1, kept: keepCmp([n0, n1], [s0, s1]) });
+  }
+  return info.kept ? { ...cand, depth: { ...cand.depth, cmp: info } } : { ...base, depth: { ...base.depth, cmp: info } };
 }
 /** The file of the comparisons to map (CMP_SET_FILE: module/cell, a line each). */
 export const cmpSet = (top, names) => names.map(n => `${top}/${n}\n`).join('');

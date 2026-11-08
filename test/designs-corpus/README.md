@@ -223,7 +223,7 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | light8080 | VHDL | LGPL-2.1 | pass | pass | pass | pass | complete | XC3S250E | 189 | 374 | 206 | 11.787 | 17 (frontend 17) |
 | t80 | VHDL | BSD-3-Clause-style | pass | - | pass | pass | complete | XC3S250E | 1065 | 2121 | 233 | 19.110 | 5 (frontend 5) |
 | verilog-uart | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 111 | 218 | 79 | 6.938 | 0 |
-| verilog-i2c-master | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 120 | 238 | 72 | 9.797 | 4 (frontend 4) |
+| verilog-i2c-master | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 113 | 223 | 72 | 9.980 | 4 (frontend 4) |
 | verilog-lfsr-crc | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 50 | 99 | 64 | 3.756 | 0 |
 | verilog-lfsr-prbs | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 16 | 16 | 31 | 2.192 | 1 (frontend 1) |
 | verilog-axis-fifo | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 20 | 33 | 32 | 5.406 | 11 (frontend 10, synth 1) |
@@ -232,7 +232,7 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | spi-fpga-slave | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 14 | 26 | 21 | 5.033 | 0 |
 | nandland-spi-verilog | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 31 | 59 | 37 | 5.676 | 1 (frontend 1) |
 | nandland-spi-vhdl | VHDL | MIT | pass | - | pass | pass | complete | XC3S250E | 30 | 57 | 37 | 5.674 | 2 (frontend 2) |
-| secworks-sha1 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 962 | 1921 | 1527 | 17.285 | 2 (frontend 1, synth 1) |
+| secworks-sha1 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1006 | 2009 | 1527 | 14.991 | 2 (frontend 1, synth 1) |
 | secworks-sha256 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1339 | 2677 | 1808 | 26.428 | 3 (frontend 1, synth 1, flow 1) |
 | secworks-siphash | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 686 | 1370 | 798 | 15.465 | 0 |
 | secworks-aes | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S500E | 3613 | 7225 | 2989 | 30.875 | 4 (synth 3, flow 1) |
@@ -272,11 +272,11 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | itc99-b12 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 178 | 354 | 119 | 9.167 | 1 (synth 1) |
 | itc99-b13 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 42 | 82 | 64 | 6.090 | 0 |
 | itc99-b14 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 657 | 1300 | 334 | 35.424 | 1 (flow 1) |
-| itc99-b15 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1394 | 2780 | 528 | 22.286 | 4 (frontend 2, synth 1, flow 1) |
-| itc99-b17 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S500E | 3827 | 7627 | 1380 | 23.450 | 6 (frontend 2, synth 3, flow 1) |
+| itc99-b15 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1233 | 2457 | 546 | 20.024 | 4 (frontend 2, synth 1, flow 1) |
+| itc99-b17 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S500E | 3801 | 7575 | 1380 | 21.997 | 6 (frontend 2, synth 3, flow 1) |
 | itc99-b20 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1325 | 2635 | 492 | 37.394 | 1 (flow 1) |
 | itc99-b21 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1361 | 2706 | 492 | 35.217 | 1 (flow 1) |
-| itc99-b22 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 1949 | 3872 | 706 | 40.400 | 2 (frontend 1, flow 1) |
+| itc99-b22 | VHDL | ITC'99 notice | pass | - | pass | pass | complete | XC3S250E | 2030 | 4026 | 706 | 39.372 | 2 (frontend 1, flow 1) |
 | iwls05-sasc | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 52 | 95 | 54 | 4.810 | 3 (frontend 3) |
 | iwls05-simple-spi | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 79 | 156 | 67 | 6.162 | 3 (frontend 3) |
 | iwls05-spi | Verilog | OpenCores notice in each file | pass | - | pass | pass | complete | XC3S250E | 356 | 706 | 229 | 15.920 | 1 (frontend 1) |
