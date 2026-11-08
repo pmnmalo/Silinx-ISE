@@ -955,7 +955,7 @@ uiTest('#282 #2470 open mode: Optimization Fast (an example\'s) synthesizes once
     await page.waitFor((b, re) => new RegExp(re).test(window.__console().slice(b)), [before, DONE(proc).source], { what: proc, timeout: 120000 });
     return (await page.consoleText()).slice(before);
   };
-  const FAST = 'Optimization Fast: one mapping, none of the mappings for speed; one placement, no register replication.';
+  const FAST = 'Optimization Fast: one mapping, none of the mappings for speed but for a design limited by its logic depth; one placement, no register replication.';
   const HIGH = 'Optimization Effort High: the mappings for speed tried too, the fastest kept.';
   let log = await run('Synthesize - Yosys');
   assert.match(log, /Process "Synthesize - Yosys" completed successfully/, log.slice(-2000));
