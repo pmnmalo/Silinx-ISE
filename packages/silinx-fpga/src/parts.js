@@ -1,6 +1,6 @@
 // silinx-fpga's light entry (#1678): the parts, their families and resources, the constraints (UCF), the flow's
 // steps by name and the placed and routed design's format (XDL), without the toolchain behind them, for an
-// interface that shows a design and its board (Silinx ISE's pages) and loads the toolchain only when it runs.
+// interface that shows a design and its board (Silinx's pages) and loads the toolchain only when it runs.
 // ./index.js gives all of it too.
 
 // the parts: their families and resources

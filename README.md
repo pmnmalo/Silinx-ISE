@@ -1,12 +1,12 @@
-# Silinx ISE (Integrated Synthesis Environment)
+# Silinx
 
-> Silinx ISE is an independent open-source project. It is not affiliated with, endorsed by or
+> Silinx is an independent open-source project. It is not affiliated with, endorsed by or
 > supported by AMD/Xilinx. Xilinx, ISE, ISim, iMPACT, Spartan and Virtex are trademarks of AMD.
 > Silinx has its own toolchain (Yosys synthesis, nextpnr place & route, Silinx's bitstream writer) for the
 > Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards; for the other boards and the ISE-only processes it can use the free
 > Xilinx ISE 14.7 WebPACK tools, which you install yourself.
 
-> **Purpose.** Silinx ISE was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago. Who
+> **Purpose.** Silinx was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago. Who
 > started it, why, and how it grew: [docs/HISTORY.md](docs/HISTORY.md).
 
 > **About the name.** *Silinx* = **SI** + **linx**. **SI** stands for *Super Intelligence*: the tool
@@ -491,7 +491,7 @@ test bench: its vectors, their expected outputs given or from the design) and `c
 diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `save_wave_config` and `load_wave_config` (a simulation's wave configuration saved as a .wcfg of the project, and loaded), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
-`export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
+`export_project` and `import_project` (a Xilinx ISE or a Silinx project, as a .zip; a .xise or a project folder too;
 only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `project_link` and `open_link` (a project's
 link, the project inside it, opening Try it, the simulation or the board emulator, for slides; a project made from such a link
 or from an example's, one that differs never replaced), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
@@ -509,10 +509,10 @@ Every path stays inside its project; programming a board is not one of its tools
 address never appears in a result. In Claude Desktop's `claude_desktop_config.json`:
 
 ```json
-{ "mcpServers": { "silinx": { "command": "node", "args": ["/path/to/silinx-ise/bin/silinx.js", "mcp"] } } }
+{ "mcpServers": { "silinx": { "command": "node", "args": ["/path/to/silinx/bin/silinx.js", "mcp"] } } }
 ```
 
-and in Claude Code: `claude mcp add silinx -- node /path/to/silinx-ise/bin/silinx.js mcp`. To keep the
+and in Claude Code: `claude mcp add silinx -- node /path/to/silinx/bin/silinx.js mcp`. To keep the
 assistant's projects apart, give it a workspace of its own: `"env": { "SILINX_WORKSPACE": "/path/to/folder" }`
 in Claude Desktop's entry, or `claude mcp add silinx -e SILINX_WORKSPACE=/path/to/folder -- node …` (the
 server's name before `-e`, which takes several values).
@@ -709,7 +709,7 @@ Using Silinx in a course, a school or on your own? Tell us on
 
 ## Licence
 
-Silinx ISE is Copyright 2026 Pedro Maló and is free software, licensed under the
+Silinx is Copyright 2026 Pedro Maló and is free software, licensed under the
 [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only), with an additional permission
 to combine it with elkjs (EPL-2.0) — see [NOTICE](NOTICE). Modified versions, including ones offered
 to users over a network, must make their source code available under the same licence. Your

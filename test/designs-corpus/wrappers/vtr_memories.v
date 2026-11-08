@@ -1,7 +1,7 @@
 // Silinx design corpus: behavioural models of the memory blocks the VTR benchmarks instantiate
 // (single_port_ram, dual_port_ram: VTR's architecture files define them as hard blocks, its
 // synthesis infers nothing), as VTR documents them: synchronous write, registered read (the old
-// word when the same port writes). Part of Silinx ISE (AGPL-3.0-only).
+// word when the same port writes). Part of Silinx (AGPL-3.0-only).
 module single_port_ram #(parameter ADDR_WIDTH = 1, parameter DATA_WIDTH = 1) (
   input wire clk,
   input wire [ADDR_WIDTH-1:0] addr,

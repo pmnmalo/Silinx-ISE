@@ -14,5 +14,5 @@ export { yosysNode, yosysWorkers } from './synth-open-node.js';
 export { nextpnrNode } from './nextpnr-node.js';
 export { nextpnrS6Node } from './nextpnr-s6-node.js';
 export { nextpnrIce40Node } from './nextpnr-ice40-node.js';
-// a nextpnr package without its chip databases, fetched on first use (Silinx ISE's release zip, #2329)
+// a nextpnr package without its chip databases, fetched on first use (Silinx's release zip, #2329)
 export { leaveOutChipdbs } from './nextpnr-chipdb-node.js';

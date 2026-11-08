@@ -1,6 +1,6 @@
 # Silinx's architecture
 
-How Silinx ISE is built, as a whole: the editions, the layers, and each part with its files and the documents that go
+How Silinx is built, as a whole: the editions, the layers, and each part with its files and the documents that go
 deeper. For the toolchain alone (from a design to a `.bit`), read [TOOLCHAIN.md](TOOLCHAIN.md); for where to start
 changing the code, [ONBOARDING.md](../ONBOARDING.md); for the rules, [CLAUDE.md](../CLAUDE.md).
 

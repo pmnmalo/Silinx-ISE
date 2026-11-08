@@ -47,7 +47,7 @@ const ISE_S6_WARNINGS = { micro80: MICRO80_S6_WARNINGS };
 let tmp;
 before(() => {
   if (skip) return;
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-examples-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-examples-'));
   // the user's remoteDir, read before the test's own configuration replaces theirs (#1916)
   const config = iseExamplesConfig({ host: LOCAL ? null : { user: HOST[1], host: HOST[2] }, image: IMAGE });
   process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');

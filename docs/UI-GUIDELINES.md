@@ -1,6 +1,6 @@
 # The interface: rules for its editors and viewers
 
-Every document of Silinx ISE (a text editor, a drawing editor, a read-only view) is laid out the same way, so that a
+Every document of Silinx (a text editor, a drawing editor, a read-only view) is laid out the same way, so that a
 student who knows one knows them all. These are the rules a change to the interface follows, whoever makes it, a
 person or an AI agent; [CLAUDE.md](../CLAUDE.md) points here. When a rule does not fit a new case, ask, and add the
 answer here.

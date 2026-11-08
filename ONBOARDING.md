@@ -1,6 +1,6 @@
-# Onboarding: programming Silinx ISE with Claude Code
+# Onboarding: programming Silinx with Claude Code
 
-Silinx ISE is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E: Basys2, Nexys2; Spartan-6: Nexys3, Atlys; iCE40:
+Silinx is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E: Basys2, Nexys2; Spartan-6: Nexys3, Atlys; iCE40:
 iCEBreaker). It runs in
 the browser (the site, the standalone `Silinx.html`) or as a local Node server, with its own open
 toolchain (Yosys WebAssembly, then nextpnr's pack, place and route — the fork pmnmalo/nextpnr-spartan — and Silinx's

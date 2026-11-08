@@ -1,6 +1,6 @@
 -- Silinx design corpus: light8080's mcu80 with the 'hello' program of its repository (the program
 -- the repository's own testbench runs), as a top level with no generic of an array type.
--- Part of Silinx ISE (AGPL-3.0-only); mcu80 and obj_code_pkg are fetched, never committed.
+-- Part of Silinx (AGPL-3.0-only); mcu80 and obj_code_pkg are fetched, never committed.
 library ieee;
 use ieee.std_logic_1164.all;
 use work.obj_code_pkg.all;

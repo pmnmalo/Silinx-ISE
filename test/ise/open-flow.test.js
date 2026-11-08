@@ -39,7 +39,7 @@ const DEVICES = [['xc3s100e', 'cp132'], ['xc3s250e', 'cp132'], ['xc3s500e', 'fg3
 const CLOCK_FIXTURES = ['feat_dcm_bufgin', 'feat_clocks12'];
 
 test('the clock fixtures on every device: Silinx\'s bitstream byte-identical to ISE\'s, ISE\'s DRC clean, no warning', { skip, timeout: 60 * 60000 }, () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-clocks-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-clocks-'));
   const names = [];
   for (const f of CLOCK_FIXTURES) for (const [part, pkg] of DEVICES) {
     const name = `${f}-${part}`, dir = path.join(tmp, name);
@@ -68,7 +68,7 @@ function twoPairs(part, pkg) {
 }
 
 test('feat_iob_pair LOC\'d on two pairs of every device: the second flip-flops alone, byte-identical to ISE\'s, DRC clean, no warning', { skip, timeout: 60 * 60000 }, () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-iobpair-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-iobpair-'));
   const names = [];
   for (const [part, pkg] of DEVICES) {
     const name = `feat_iob_pair_loc-${part}`, dir = path.join(tmp, name);
@@ -95,7 +95,7 @@ test('feat_iob_pair LOC\'d on two pairs of every device: the second flip-flops a
 const DDR_FIXTURES = [['feat_iob_ddr', 'top.vhd'], ['feat_iob_ddr_v', 'top.v'], ['feat_iob_bidir', 'top.vhd'], ['feat_iob_bidir_v', 'top.v']];
 
 test('feat_iob_ddr (IDDR2, ODDR2) and feat_iob_bidir (IOBUF) on every device, in VHDL and Verilog: Silinx\'s bitstream byte-identical to ISE\'s, ISE\'s DRC clean, no warning', { skip, timeout: 60 * 60000 }, () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-ddr-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ddr-'));
   const names = [];
   for (const [f, file] of DDR_FIXTURES) for (const [part, pkg] of DEVICES) {
     const name = `${f}-${part}`, dir = path.join(tmp, name);
@@ -142,7 +142,7 @@ function sidePads(part, pkg) {
 }
 
 test('feat_iob_lines on every device: IOB registers of left and right pads on the eight global lines, byte-identical to ISE\'s, DRC clean, no warning', { skip, timeout: 60 * 60000 }, () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-ioblines-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ioblines-'));
   const names = [];
   for (const [part, pkg] of DEVICES) {
     const name = `feat_iob_lines-${part}`, dir = path.join(tmp, name);
@@ -170,7 +170,7 @@ test('feat_iob_lines on every device: IOB registers of left and right pads on th
 // feat_iob_lone on the XC3S1200E too (#751): its inputs B3, E17, F14 and G13 there are B3's tile, the input-only pad E17
 // above F14's tile, F14 with F15 and E17 unused, G13 with G14 and E18 unused
 test('feat_iob_lone on the XC3S1200E: input registers on pads whose neighbouring pad is unused, byte-identical to ISE\'s, DRC clean, no warning', { skip, timeout: 60 * 60000 }, () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-ioblone-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ioblone-'));
   const name = 'feat_iob_lone-xc3s1200e', dir = path.join(tmp, name);
   fs.cpSync(path.join(ROOT, 'test/fixtures/open-flow/feat_iob_lone'), dir, { recursive: true });
   const proj = JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8'));
@@ -185,7 +185,7 @@ test('feat_iob_lone on the XC3S1200E: input registers on pads whose neighbouring
 // feat_iob_owners on the XC3S1200E too (#897): A3, C9, B9 and C15 are the pads whose bits there had gone to B3, E9, D9 and
 // A16 (D13's to E12 on the XC3S500E only)
 test('feat_iob_owners on the XC3S1200E: IDDR2s on pads whose neighbour held some of their bits, byte-identical to ISE\'s, DRC clean, no warning', { skip, timeout: 60 * 60000 }, () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-iobowners-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-iobowners-'));
   const name = 'feat_iob_owners-xc3s1200e', dir = path.join(tmp, name);
   fs.cpSync(path.join(ROOT, 'test/fixtures/open-flow/feat_iob_owners'), dir, { recursive: true });
   const proj = JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8'));

@@ -1,4 +1,4 @@
-# Getting started with Silinx ISE (step by step)
+# Getting started with Silinx (step by step)
 
 No programming tools or git needed. **Way 1, in the browser, does it all**: Way 2 is another way of
 running the same Silinx, on your own computer.
@@ -96,7 +96,7 @@ Silinx runs on **Node.js**, a free program.
 3. **Unzip it** (extract it) to a folder you will find again, e.g. *Documents*:
    - **Windows:** right-click the zip ▸ **Extract All…** ▸ Extract. Don't run it from inside the zip.
    - **macOS:** double-click the zip.
-   - You get a folder called **`silinx-ise`**.
+   - You get a folder called **`silinx`**.
 
 *Optional, to make sure the file is the release's (for example one you got from a course page):* the
 release lists each file's SHA-256 checksum in its notes and in the file **`SHA256SUMS`**. Download
@@ -109,7 +109,7 @@ workflow from the version's tag): with the [GitHub CLI](https://cli.github.com),
 
 ### Step 3: start Silinx
 
-Open the `silinx-ise` folder and double-click the launcher for your system:
+Open the `silinx` folder and double-click the launcher for your system:
 
 | System | Double-click |
 |---|---|
@@ -170,7 +170,7 @@ In the browser (Way 1) nothing more is needed for the Basys2 and Nexys2. Running
      (it takes 20–60 minutes, once). ISE cannot be shared, so everyone builds their own copy.
 2. **The board's USB driver** to program it:
    - **Windows:** install Digilent **Adept 2** (Runtime + Utilities) from digilent.com.
-   - **macOS (Basys2):** in a Terminal, inside the `silinx-ise` folder, run
+   - **macOS (Basys2):** in a Terminal, inside the `silinx` folder, run
      `brew install libusb python` and `./scripts/install-adepttool.sh` (needs [Homebrew](https://brew.sh)).
    - **Linux:** Digilent Adept, or openFPGALoader from your package manager.
 
@@ -184,10 +184,10 @@ In Silinx, **Settings (⚙) ▸ Toolchain Settings (ISE / Programmers)…** (ISE
 |---|---|
 | The launcher says **Node.js is not installed** | Install it (Step 1). Then close the window and double-click the launcher again. |
 | Browser: **"This site can't be reached"** | The Silinx window was closed: double-click the launcher again. |
-| **"Port 8642 is used by another program"** | Another program uses that port. Open a terminal in the `silinx-ise` folder and run `node bin/silinx.js serve --port 8643 --open`. |
+| **"Port 8642 is used by another program"** | Another program uses that port. Open a terminal in the `silinx` folder and run `node bin/silinx.js serve --port 8643 --open`. |
 | Console: **"the Silinx server is not running"** | Same as above: start Silinx again. Your unsaved changes are saved as soon as it is back. |
 | macOS: the `.command` file **opens in a text editor** | Right-click it ▸ Open With ▸ Terminal. |
-| The window flashes and closes | Open a terminal in the `silinx-ise` folder and run `node bin/silinx.js serve --open` to read the message. |
+| The window flashes and closes | Open a terminal in the `silinx` folder and run `node bin/silinx.js serve --open` to read the message. |
 
 **Opening a terminal in a folder:** Windows: open the folder, click the address bar, type `cmd`
 and press Enter. macOS: right-click the folder ▸ *New Terminal at Folder* (or open Terminal, type
