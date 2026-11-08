@@ -173,7 +173,6 @@ html[data-ui="ise"][data-theme="dark"] .tt-table td.tt-cell.sel { background: #2
 html[data-ui="ise"][data-theme="dark"] .tt-table td.v1 { color: var(--m-info); }
 html[data-ui="ise"][data-theme="dark"] .tt-table td.v0 { color: var(--muted); }
 html[data-ui="ise"][data-theme="dark"] .tt-table td.vX { color: var(--m-warning); }
-html[data-ui="ise"][data-theme="dark"] .tt-ess { color: var(--m-danger); }
 html[data-ui="ise"][data-theme="dark"] .tt-note { color: var(--m-warning); }
 html[data-ui="ise"][data-theme="dark"] .tt-tab { border-color: var(--ise-line); background: var(--m-surface-2); color: var(--muted); }
 html[data-ui="ise"][data-theme="dark"] .tt-tab.active { background: var(--panel); color: var(--ise-link); border-bottom-color: var(--panel); }

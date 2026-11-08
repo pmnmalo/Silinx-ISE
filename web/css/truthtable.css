@@ -64,7 +64,6 @@
 .tt-leg { display: flex; align-items: center; gap: 6px; }
 .tt-swatch { display: inline-block; width: 18px; height: 12px; border: 2.5px solid; border-radius: 5px; }
 .tt-leg-cells { color: var(--muted, #777); }
-.tt-ess { color: #a00; font-style: italic; }
 .tt-results { display: flex; flex-direction: column; gap: 6px; }
 .tt-res code, .tt-expr { font-family: var(--mono, monospace); font-size: 13px; }
 /* a canonical form of 8 inputs (256 terms) wraps in the panel (#2927) */
