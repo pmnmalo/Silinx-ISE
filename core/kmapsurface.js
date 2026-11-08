@@ -82,7 +82,8 @@ function axisRun(codes, vars, cube, n) {
 
 /**
  * A group's patch on the surface: { cells (its minterms), faces (as the surface's, raised by `lift` px, each with the
- * key of the cell's face under it), edges (its outline: polylines, { pts, keys (the cell's face under each segment) }) }. The patch is its rows × its columns, one piece: round a circle where the group goes
+ * key of the cell's face under it), edges (its outline: polylines, { pts, keys (the cell's face under each segment), around (the keys of the faces
+ * round each segment) }) }. The patch is its rows × its columns, one piece: round a circle where the group goes
  * round it whole (no outline there), inset by `inset` (px) from its cells' sides elsewhere, as the flat map's groups.
  */
 export function kmapPatch(surface, layout, cube, { cell = 64, steps = 4, inset = 4, lift = 1.5 } = {}) {
@@ -97,10 +98,13 @@ export function kmapPatch(surface, layout, cube, { cell = 64, steps = 4, inset =
   const faces = mesh(surface.at, U.a, U.b, V.a, V.b, nu, nv, lift);
   for (const f of faces) f.key = surface.faceKey(...f.uv);
   const pt = (u, v) => { const { p, n: nn } = surface.at(u, v); return p.map((x, i) => x + (lift + 0.5) * nn[i]); };
-  // a line of k segments from `from` to `to` (uv of each point: f), each segment's key the face under its middle
+  // a line of k segments from `from` to `to` (uv of each point: f), each segment's key the face under its middle, and
+  // the keys of the faces round it (#3120: drawn after them all, not cut into dashes by a neighbour nearer the eye)
+  const du = 0.5 / (surface.wrapCols ? steps : 1), dv = 0.5 / (surface.wrapRows ? steps : 1);
   const line = (from, to, k, f) => {
-    const t = i => from + (to - from) * i / k;
-    return { pts: Array.from({ length: k + 1 }, (_, i) => pt(...f(t(i)))), keys: Array.from({ length: k }, (_, i) => surface.faceKey(...f((t(i) + t(i + 1)) / 2))) };
+    const t = i => from + (to - from) * i / k, mid = i => f((t(i) + t(i + 1)) / 2);
+    const round = ([u, v]) => [...new Set([[u, v], [u - du, v], [u + du, v], [u, v - dv], [u, v + dv]].filter(([x, y]) => (surface.wrapCols || (x >= 0 && x <= surface.cols)) && (surface.wrapRows || (y >= 0 && y <= surface.rows))).map(q => surface.faceKey(...q)))];
+    return { pts: Array.from({ length: k + 1 }, (_, i) => pt(...f(t(i)))), keys: Array.from({ length: k }, (_, i) => surface.faceKey(...mid(i))), around: Array.from({ length: k }, (_, i) => round(mid(i))) };
   };
   const edges = [];
   if (!U.closed) for (const u of [U.a, U.b]) edges.push(line(V.a, V.b, nv, v => [u, v]));
@@ -132,4 +136,80 @@ export function facesViewer(pts, normal, perspective) {
 /** The side of the square scene that holds the surface at any rotation (the projection of the sphere around it). */
 export function surfaceSceneSide(radius, perspective) {
   return 2 * Math.ceil(perspective * radius / Math.sqrt(perspective * perspective - radius * radius));
+}
+
+/**
+ * The surface at u, v with its tangents: { p, n, tu, tv } (tu, tv: unit vectors along the columns and the rows, tu × tv
+ * the outward normal), for a cell's text on the surface (#3119).
+ */
+export function surfaceFrame(surface, u, v) {
+  const e = 1e-3, { p, n } = surface.at(u, v);
+  const unit = (a, b) => { const d = a.map((x, i) => x - b[i]), l = Math.hypot(...d); return d.map(x => x / l); };
+  return { p, n, tu: unit(surface.at(u + e, v).p, surface.at(u - e, v).p), tv: unit(surface.at(u, v + e).p, surface.at(u, v - e).p) };
+}
+
+/** How squarely a point (turned) with its normal (turned) faces the eye at (0, 0, perspective): the cosine, > 0 in front. */
+export function facing(p, n, perspective) {
+  const d = [-p[0], -p[1], perspective - p[2]], l = Math.hypot(...d);
+  return (n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / l;
+}
+
+/**
+ * Where a cell's text may go in the view (#3119): the spots { u, v } of the cell that face the viewer, the best first
+ * (none when no part of it does). Its centre first while that faces the viewer well (at least 60° from edge-on); then the
+ * others by how squarely they face it (a cell of a torus or a cylinder bends: its centre may be away while its side is in
+ * front). The view takes the first that textFits.
+ */
+export function labelSpots(surface, cell, view, perspective) {
+  const score = (u, v) => { const { p, n } = surface.at(u, v); return facing(turn(p, view), turn(n, view), perspective); };
+  const us = surface.wrapCols ? [0.2, 0.5, 0.8] : [0.5], vs = surface.wrapRows ? [0.2, 0.5, 0.8] : [0.5];
+  const spots = us.flatMap(a => vs.map(b => ({ u: cell.c + a, v: cell.r + b, s: score(cell.c + a, cell.r + b), centre: a === 0.5 && b === 0.5 })));
+  return spots.filter(x => x.s > 0).sort((x, y) => ((y.centre && y.s >= 0.5) - (x.centre && x.s >= 0.5)) || y.s - x.s).map(({ u, v }) => ({ u, v }));
+}
+
+/** A spot of the screen inside a polygon ([{ x, y }]): its sides all turn the same way round it. */
+export function inPolygon({ x, y }, pr) {
+  let s = 0;
+  for (let i = 0; i < pr.length; i++) { const a = pr[i], b = pr[(i + 1) % pr.length]; s += Math.sign((b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x)); }
+  return Math.abs(s) === pr.length;
+}
+
+/**
+ * Whether a text fits where it is (#3119): each corner of its box ([{ x, y }], on the screen) on a face seen from the
+ * front (`front`: [{ pr (its corners on the screen), z (its depth, larger nearer) }]) and under none more than `margin`
+ * nearer than the text (`z`, its depth): on the surface, not beside it, nor hidden behind another part of it (the torus's
+ * tube in front of its hole).
+ */
+export function textFits(corners, z, front, margin) {
+  return corners.every(q => {
+    let on = false;
+    for (const f of front) if (inPolygon(q, f.pr)) { if (f.z > z + margin) return false; on = true; }
+    return on;
+  });
+}
+
+/**
+ * The text's place on the screen (#3119): the affine map [a, b, c, d, e, f] (as SVG's matrix(), about the scene's
+ * centre) of a text at the frame's point on the surface, seen in perspective: upright, at the point's projection, and
+ * shrunk as the surface there is foreshortened (the square root of the projected area of a unit square of the surface,
+ * none for a face seen edge-on), so that it stays on its cell however the map is turned.
+ */
+export function textMatrix(frame, view, perspective) {
+  const p = turn(frame.p, view), s = perspective / (perspective - p[2]);
+  // the projection's derivative along a turned direction t
+  const d = t => [s * t[0] + s * s / perspective * t[2] * p[0], s * t[1] + s * s / perspective * t[2] * p[1]];
+  const a = d(turn(frame.tu, view)), b = d(turn(frame.tv, view));
+  const k = Math.sqrt(Math.max(0, a[0] * b[1] - a[1] * b[0]));
+  return [k, 0, 0, k, p[0] * s, p[1] * s];
+}
+
+/**
+ * The painter's order of what is drawn (#3120): [{ z (depth, larger nearer), back (on a face seen from behind) }] →
+ * sorted, everything on a face seen from behind first, then the rest, each farthest first. On a closed surface (the
+ * torus) a face seen from behind is always behind one seen from the front; on the open cylinder it is its inside, seen
+ * through the open end or behind its outside: in both drawn under the outside, which a sort by depth alone gets wrong
+ * along the silhouette (a group's outline on a hidden cell over the surface in front of it).
+ */
+export function paintOrder(items) {
+  return [...items].sort((x, y) => (x.back === y.back ? x.z - y.z : x.back ? -1 : 1));
 }

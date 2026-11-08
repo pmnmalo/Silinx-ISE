@@ -1,17 +1,18 @@
 // The Karnaugh map of 3 or 4 variables in 3D (#2925): the map on a cylinder (3 variables: the axis of four codes round
 // it) or a torus (4: both axes round), so that a group across the flat map's edges is one continuous patch. Drawn in an
-// SVG from the surface's faces (core/kmapsurface.js), turned and seen in perspective, farthest first; the faces seen
-// from behind dimmed. Turned by dragging (or the arrow keys); Reset view; a cell clicked as in the flat map, its title
+// SVG from the surface's faces (core/kmapsurface.js), turned and seen in perspective: the faces seen from behind first
+// (dimmed: the cylinder's inside), then farthest first (#3120); each cell's text where the cell is seen (#3119). Turned by dragging (or the arrow keys); Reset view; a cell clicked as in the flat map, its title
 // its minterm. The truth table editor (web/js/truthtable.js) shows it for 3 or 4 inputs when its 3D box is ticked, as
 // the 3D map of 5 or 6 (web/js/tt-kmap3d.js). Styles: web/css/truthtable.css (.tt-ks).
 
 import { h } from './ui.js';
 import { sv } from './dom.js';
-import { kmapSurface, kmapPatch, turn, project, facesViewer, surfaceSceneSide } from '/core/kmapsurface.js';
+import { kmapSurface, kmapPatch, turn, project, facesViewer, surfaceSceneSide, surfaceFrame, labelSpots, textFits, textMatrix, paintOrder } from '/core/kmapsurface.js';
 
 const CELL = 80;           // a cell's side along the surface (px)
 const PERSPECTIVE = 900;
 const HOME = { rx: -30, ry: 20 };
+const BOX = [[-5.5, -18], [5.5, -18], [5.5, 6], [-5.5, 6]];   // a cell's text's box about its spot: its number over its value
 
 /** The 3D box of a map of 3 or 4 inputs: `d3` the editor's ({ on }, #3074), `changed` the map drawn again. */
 export function surfaceBox(n, d3, changed) {
@@ -32,17 +33,18 @@ export function mountKmapSurface(host, { layout: L, col, terms, groups, colors, 
   // what is drawn: faces (a cell's, a group's), outlines' segments and the cells' texts, each with its 3D points
   const items = [], under = new Map();   // (the cells' faces by their keys)
   for (const c of S.cells) {
-    const v = col[c.mt];
+    const v = col[c.mt], mine = [];
     for (const f of c.faces) {
       const el = sv('polygon', { class: `tt-ks-face v${v}`, 'data-row': c.mt }, sv('title', {}, `m${c.mt}`));
       el.addEventListener('click', () => onCell(c.mt));
       const it = { el, pts: f.pts, n: f.n, kind: 'face' };
       under.set(f.key, it);
       items.push(it);
+      mine.push(it);
     }
     const t = sv('g', { class: 'tt-ks-text', 'data-row': c.mt },
       sv('text', { class: 'tt-ks-m', 'text-anchor': 'middle', y: -11 }, c.mt), sv('text', { class: `tt-ks-v v${v}`, 'text-anchor': 'middle', y: 6 }, cellText(v, groups)));
-    items.push({ el: t, pts: [c.centre.p.map((x, i) => x + 3 * c.centre.n[i])], n: c.centre.n, kind: 'text', on: under.get(S.faceKey(c.c + 0.5, c.r + 0.5)), dz: 1 });
+    items.push({ el: t, cell: c, faces: mine, kind: 'text', dz: 1 });
   }
   terms.forEach((term, ti) => {
     const color = colors[ti % colors.length];
@@ -50,29 +52,56 @@ export function mountKmapSurface(host, { layout: L, col, terms, groups, colors, 
     // (each drawn right after the cell's face under it: the groups over their cells whatever the faces' sizes)
     for (const f of p.faces) items.push({ el: sv('polygon', { class: 'tt-ks-group', 'data-term': ti, 'data-cells': p.cells.join(','), fill: color }), pts: f.pts, n: f.n, kind: 'face', on: under.get(f.key), dz: 0.1 + ti * 0.01 });
     for (const line of p.edges) for (let i = 0; i + 1 < line.pts.length; i++) {
-      items.push({ el: sv('line', { class: 'tt-ks-edge', 'data-term': ti, stroke: color }), pts: [line.pts[i], line.pts[i + 1]], kind: 'edge', on: under.get(line.keys[i]), dz: 0.5 + ti * 0.01 });
+      items.push({ el: sv('line', { class: 'tt-ks-edge', 'data-term': ti, stroke: color }), pts: [line.pts[i], line.pts[i + 1]], kind: 'edge', on: under.get(line.keys[i]), around: line.around[i].map(k => under.get(k)), dz: 0.5 + ti * 0.01 });
     }
   });
-  // turned, projected and drawn farthest first (the painter's order: the faces are small)
+  // turned, projected and drawn: what is on a face seen from behind first, then farthest first (core paintOrder, #3120)
   const apply = () => {
     for (const it of items) {
+      if (it.kind === 'text') continue;
       const tp = it.pts.map(q => turn(q, view)), pr = tp.map(q => project(q, PERSPECTIVE));
       it.z = pr.reduce((a, q) => a + q.z, 0) / pr.length + (it.kind === 'face' ? 0 : 0.5);
       if (it.kind === 'face') {
         it.el.setAttribute('points', pr.map(q => `${(mid + q.x).toFixed(1)},${(mid + q.y).toFixed(1)}`).join(' '));
-        it.el.classList.toggle('back', !facesViewer(tp, turn(it.n, view), PERSPECTIVE));
-      } else if (it.kind === 'edge') {
+        it.pr = pr;
+        it.back = !facesViewer(tp, turn(it.n, view), PERSPECTIVE);
+        it.el.classList.toggle('back', it.back);
+      } else {
         it.el.setAttribute('x1', (mid + pr[0].x).toFixed(1)); it.el.setAttribute('y1', (mid + pr[0].y).toFixed(1));
         it.el.setAttribute('x2', (mid + pr[1].x).toFixed(1)); it.el.setAttribute('y2', (mid + pr[1].y).toFixed(1));
-      } else {
-        // a cell's text: at its centre, shown from the front only
-        const n = turn(it.n, view);
-        it.el.setAttribute('transform', `translate(${(mid + pr[0].x).toFixed(1)} ${(mid + pr[0].y).toFixed(1)})`);
-        it.el.style.display = facesViewer(tp, n, PERSPECTIVE) && n[2] > 0.25 ? '' : 'none';
       }
     }
-    for (const it of items) if (it.on) it.z = it.on.z + it.dz;
-    for (const it of [...items].sort((a, b) => a.z - b.z)) svg.append(it.el);
+    // a cell's text where the cell faces the viewer and the text fits on it, shrunk as the surface is foreshortened there
+    // (#3119); drawn after the nearest of its cell's faces in front, not under the cell's own faces however it bends
+    const front = items.filter(it => it.kind === 'face' && !it.on && !it.back);
+    for (const it of items) if (it.kind === 'text') placeText(it, front);
+    // (a group's face just after the cell's face under it, an outline after the faces round it, on its side of the surface)
+    for (const it of items) if (it.on) {
+      it.z = Math.max(...(it.around || [it.on]).filter(f => f.back === it.on.back).map(f => f.z)) + it.dz;
+      it.back = it.on.back;
+      // (the torus is closed: what is on its faces seen from behind is never seen, and a group's lifted outline there
+      // would show past its silhouette; the cylinder's inside is seen through its open ends)
+      if (it.kind === 'text') continue;
+      it.el.classList.toggle('back', it.back);
+      if (S.kind === 'torus') it.el.style.display = it.back ? 'none' : '';
+    }
+    for (const it of paintOrder(items)) svg.append(it.el);
+  };
+  const placeText = (it, front) => {
+    it.on = null;
+    // (each spot tried at full size, then smaller: a cell at the silhouette keeps its text)
+    spots: for (const at of labelSpots(S, it.cell, view, PERSPECTIVE)) {
+      const m = textMatrix(surfaceFrame(S, at.u, at.v), view, PERSPECTIVE), z = turn(S.at(at.u, at.v).p, view)[2];
+      for (const f of [1, 0.7, 0.5]) {
+        const k = m[0] * f;
+        if (!textFits(BOX.map(([x, y]) => ({ x: m[4] + k * x, y: m[5] + k * y })), z, front, CELL / 2)) continue;
+        it.el.setAttribute('transform', `matrix(${k.toFixed(3)} 0 0 ${k.toFixed(3)} ${(mid + m[4]).toFixed(1)} ${(mid + m[5]).toFixed(1)})`);
+        it.on = it.faces.filter(g => !g.back).reduce((a, g) => (!a || g.z > a.z ? g : a), null);
+        break spots;
+      }
+    }
+    it.el.style.display = it.on ? '' : 'none';
+    if (!it.on) { it.back = true; it.z = -Infinity; }
   };
   apply();
   const scene = h('div', { class: `tt-k3d tt-ks tt-ks-${S.kind}`, tabindex: '0', title: 'Drag (or the arrow keys) to turn the map', style: { width: `${side}px`, height: `${side}px` } }, svg);
