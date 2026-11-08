@@ -83,7 +83,7 @@ export async function runs(since, fetchJson = getJson, scheduled = false) {
 }
 
 async function getJson(url) {
-  const r = await fetch(url, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'silinx-ise-runner-window' } });
+  const r = await fetch(url, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'silinx-runner-window' } });
   if (!r.ok) throw new Error(`${url}: ${r.status}`);
   return r.json();
 }
@@ -136,7 +136,7 @@ export function serviceCommands(action, env = process.env) {
 function machine(env = process.env) {
   const dir = env.RUNNER_DIR;
   if (!dir) throw new Error('RUNNER_DIR: the runner\'s folder');
-  const stateFile = path.join(env.STATE_DIR || path.join(os.homedir(), 'Library', 'Silinx-ISE-runner'), 'window.json');
+  const stateFile = path.join(env.STATE_DIR || path.join(os.homedir(), 'Library', 'Silinx-runner'), 'window.json');
   const pgrep = p => { try { execFileSync('pgrep', ['-f', p], { stdio: 'ignore' }); return true; } catch { return false; } };
   return {
     now: () => new Date(),

@@ -33,17 +33,22 @@ if [ "${1:-}" = --uninstall ]; then uninstall=yes; shift; fi
 SRC=$(cd "$(dirname "$0")" && pwd)
 LAUNCHCTL=${SILINX_RUNNER_LAUNCHCTL:-launchctl}
 LIBRARY=${SILINX_RUNNER_LIBRARY:-/Library}
-WINDOW=com.github.pmnmalo.silinx-ise.runner-window
+WINDOW=com.github.pmnmalo.silinx.runner-window
+# the names before the rename (#2624): their agents and daemons unloaded, their files removed
+OLDP=com.github.pmnmalo.silinx-ise
+OLDF=Silinx-ISE-runner
 PATHS=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin
 
 # ---------------------------------------------------------------- Docker's socket for the runner's user
 if [ "${1:-}" = --docker-acl ]; then
   RUSER=${2:?usage: install.sh [--uninstall] --docker-acl USER}
   SOCK=${SILINX_DOCKER_SOCKET:-$HOME/.docker/run/docker.sock}
-  LABEL=com.github.pmnmalo.silinx-ise.docker-acl
+  LABEL=com.github.pmnmalo.silinx.docker-acl
   PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
   ACE="user:$RUSER allow read,write"
   $LAUNCHCTL bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  $LAUNCHCTL bootout "gui/$(id -u)/$OLDP.docker-acl" 2>/dev/null || true
+  rm -f "$HOME/Library/LaunchAgents/$OLDP.docker-acl.plist"
   if [ $uninstall = yes ]; then
     rm -f "$PLIST"
     chmod -a "$ACE" "$SOCK" 2>/dev/null || true
@@ -87,18 +92,20 @@ if [ "${1:-}" = --system ]; then
   CHOWN=${SILINX_RUNNER_CHOWN:-chown}
   RHOME=${SILINX_RUNNER_HOME:-$(dscl . -read "/Users/$RUSER" NFSHomeDirectory | sed 's/^NFSHomeDirectory: //')}
   # no whitespace in the path: the runner runs its hook unquoted (#891)
-  DEST="$LIBRARY/Silinx-ISE-runner"
-  OLD="$LIBRARY/Application Support/Silinx-ISE-runner"
-  RUNNER=com.github.pmnmalo.silinx-ise.runner
+  DEST="$LIBRARY/Silinx-runner"
+  RUNNER=com.github.pmnmalo.silinx.runner
   RPLIST="$LIBRARY/LaunchDaemons/$RUNNER.plist"
   WPLIST="$LIBRARY/LaunchDaemons/$WINDOW.plist"
   ENVF="$RUNNER_DIR/.env"
   $LAUNCHCTL bootout "system/$WINDOW" 2>/dev/null || true
   $LAUNCHCTL bootout "system/$RUNNER" 2>/dev/null || true
+  $LAUNCHCTL bootout "system/$OLDP.runner-window" 2>/dev/null || true
+  $LAUNCHCTL bootout "system/$OLDP.runner" 2>/dev/null || true
+  rm -f "$LIBRARY/LaunchDaemons/$OLDP.runner.plist" "$LIBRARY/LaunchDaemons/$OLDP.runner-window.plist"
+  rm -rf "$LIBRARY/$OLDF" "$LIBRARY/Application Support/$OLDF"
   touch "$ENVF"
   grep -v -E '^(ACTIONS_RUNNER_HOOK_JOB_STARTED|TMPDIR|DOCKER_HOST)=' "$ENVF" > "$ENVF.tmp" || true
   mv "$ENVF.tmp" "$ENVF"
-  rm -rf "$OLD"
   if [ $uninstall = yes ]; then
     rm -f "$RPLIST" "$WPLIST"
     rm -rf "$DEST"
@@ -174,13 +181,15 @@ fi
 RUNNER_DIR=$(cd "${1:?usage: install.sh [--uninstall] RUNNER_FOLDER}" && pwd)
 [ -x "$RUNNER_DIR/svc.sh" ] && [ -f "$RUNNER_DIR/.runner" ] || { echo "$RUNNER_DIR: not a configured runner (no svc.sh / .runner)" >&2; exit 1; }
 # no whitespace in the path: the runner runs its hook unquoted (#891)
-DEST="$HOME/Library/Silinx-ISE-runner"
+DEST="$HOME/Library/Silinx-runner"
 LABEL=$WINDOW
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 ENVF="$RUNNER_DIR/.env"
 
 $LAUNCHCTL bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-rm -rf "$HOME/Library/Application Support/Silinx-ISE-runner"
+$LAUNCHCTL bootout "gui/$(id -u)/$OLDP.runner-window" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/$OLDP.runner-window.plist"
+rm -rf "$HOME/Library/$OLDF" "$HOME/Library/Application Support/$OLDF"
 touch "$ENVF"
 grep -v '^ACTIONS_RUNNER_HOOK_JOB_STARTED=' "$ENVF" > "$ENVF.tmp" || true
 mv "$ENVF.tmp" "$ENVF"
