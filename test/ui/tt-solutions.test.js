@@ -1,5 +1,5 @@
 // UI: the Boolean Algebra editor's minimal solutions (#2928): a minimal SOP or POS with several has its selector in the
-// Karnaugh map's section, for the groups the map shows (#2950): "N minimal solutions exist.", previous / next (round),
+// Karnaugh map's section, for the groups the map shows (#2950): previous / next (round), "N minimal solutions exist." its tip (#3077),
 // "Solution 2 of N" (there only, not in the results, #3060); the solution chosen is the one used: its expression, cost, circuit, NAND / NOR form, the map's groups
 // (flat, 3D, the cylinder, #2925; in either variable order, #2924), saved in the table and in its HDL module; a cell changed: the first again; "Many" at the cap, its first
 // 64 browsed; printed as shown; Undo; in Portuguese.
@@ -22,7 +22,7 @@ const shownOf = (page, f = 'sop') => page.eval((t, f) => {
   const k = document.querySelector(`${t} .tt-kmap-host`);
   return {
     expr: q(r, '.tt-expr'), cost: q(r, '.tt-cost'), circuit: q(r, '.tt-circuit'), notes: [...r.querySelectorAll('.tt-note')].map(n => n.textContent),
-    count: q(k, '.tt-sol-count'), sol: q(k, '.tt-sol-n'), inResults: !!r.querySelector('.tt-sol-btn'),
+    count: k.querySelector('.tt-sol-n')?.title ?? null, shownCount: /exist/.test(k.textContent), sol: q(k, '.tt-sol-n'), inResults: !!r.querySelector('.tt-sol-btn'),
     groups: [...document.querySelectorAll(`${t} .tt-legend .tt-leg code`)].map(c => c.textContent),
     nand: document.querySelector(`${t} .tt-res.tt-nand .tt-expr`).textContent,
   };
@@ -47,7 +47,7 @@ uiTest('#2950 several minimal solutions: the selector on the Karnaugh map; the o
   await capturePrints(page);
   await open(page, 'src/cyc.bool.json');
   const s1 = await shownOf(page);
-  assert.deepEqual([s1.expr, s1.count, s1.sol, s1.notes, s1.inResults], ['f = /a./b + b./c + a.c', '2 minimal solutions exist.', 'Solution 1 of 2', [], false]);
+  assert.deepEqual([s1.expr, s1.count, s1.sol, s1.notes, s1.inResults, s1.shownCount], ['f = /a./b + b./c + a.c', '2 minimal solutions exist.', 'Solution 1 of 2', [], false, false]);
   assert.deepEqual(s1.groups, ['/a./b', 'b./c', 'a.c'], 'the map\'s groups: the first solution');
   assert.equal(s1.cost, '3 term(s), 6 literal(s); gates: 3 AND, 1 OR, 3 NOT (9 gate inputs)');
   const flat1 = await groupRects(page);
@@ -68,7 +68,8 @@ uiTest('#2950 several minimal solutions: the selector on the Karnaugh map; the o
   await confirmPrint(page);
   const html = await printed(page, 1), body = html.slice(html.indexOf('<main'));
   assert.ok(body.includes('f = /a./c + /b.c + a.b'), 'the solution used');
-  assert.ok(body.includes('<span class="tt-sol-n">Solution 2 of 2</span>'), 'its number, the map\'s');
+  assert.match(body, /<span class="tt-sol-n"[^>]*>Solution 2 of 2<\/span>/, 'its number, the map\'s');
+  assert.ok(!/minimal solutions exist\.</.test(body), 'not the count (#3077)');
   assert.ok(!body.includes('tt-sol-of'), 'not in the results (#3060)');
   assert.ok(!body.includes('tt-sol-btn'), 'not the selector\'s buttons');
   // with the map's variable order (#2924): the selector and the solution used kept, the groups drawn in that order
@@ -107,7 +108,7 @@ uiTest('#2950 several minimal solutions: the selector on the Karnaugh map; the o
   assert.deepEqual([(await shownOf(page)).sol, (await model(page)).solutions], ['Solution 1 of 2', undefined]);
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  const pt = await page.eval((t) => { const k = document.querySelector(`${t} .tt-kmap-host`); return [k.querySelector('.tt-sol-count').textContent, k.querySelector('.tt-sol-n').textContent, k.querySelector('.tt-sol-prev').title, k.querySelector('.tt-sol-next').title]; }, T);
+  const pt = await page.eval((t) => { const k = document.querySelector(`${t} .tt-kmap-host`); return [k.querySelector('.tt-sol-n').title, k.querySelector('.tt-sol-n').textContent, k.querySelector('.tt-sol-prev').title, k.querySelector('.tt-sol-next').title]; }, T);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(pt, ['Existem 2 soluções mínimas.', 'Solução 1 de 2', 'Solução anterior', 'Solução seguinte']);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
@@ -118,7 +119,7 @@ uiTest('#2928 #2950 the cap: "Many" minimal solutions, the first 64 browsed; the
   await page.openProject('TtMany');
   await open(page, 'src/many.bool.json');
   const s1 = await shownOf(page);
-  assert.deepEqual([s1.count, s1.sol], ['Many minimal solutions exist; the first 64 can be browsed.', 'Solution 1 of 64']);
+  assert.deepEqual([s1.count, s1.sol, s1.shownCount], ['Many minimal solutions exist; the first 64 can be browsed.', 'Solution 1 of 64', false]);
   await solClick(page, 'prev');
   const s64 = await shownOf(page);
   assert.equal(s64.sol, 'Solution 64 of 64');

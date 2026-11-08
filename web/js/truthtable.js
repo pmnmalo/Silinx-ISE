@@ -80,9 +80,9 @@ function canonForms(A, out, n, notation, tick) {
 // of 5", the one of its HDL and results), previous / next (round: `go(±1)`)
 function solutionPicker(r, go) {
   return h('div', { class: 'tt-sol' },
-    h('span', { class: 'tt-sol-count' }, r.solutions >= 64 ? 'Many minimal solutions exist; the first 64 can be browsed.' : `${r.solutions} minimal solutions exist.`),
     h('button', { type: 'button', class: 'tt-sol-btn tt-sol-prev', title: 'Previous solution', onclick: () => go(-1) }, '◀'),
-    h('span', { class: 'tt-sol-n' }, `Solution ${r.pick + 1} of ${r.alternatives.length}`),
+    // (how many: its tip, #3077)
+    h('span', { class: 'tt-sol-n', title: r.solutions >= 64 ? 'Many minimal solutions exist; the first 64 can be browsed.' : `${r.solutions} minimal solutions exist.` }, `Solution ${r.pick + 1} of ${r.alternatives.length}`),
     h('button', { type: 'button', class: 'tt-sol-btn tt-sol-next', title: 'Next solution', onclick: () => go(1) }, '▶'));
 }
 
@@ -269,7 +269,7 @@ export function mountTtEditor(container, opts = {}) {
     if (n >= 2) grpSel.append(kmapOrderSelect(M.kmapOrder, o => { if (o === 'rows') M.kmapOrder = 'rows'; else delete M.kmapOrder; changed(); }));
     const L = kmapLayout(n, M.kmapOrder || 'cols');
     const res = groups === 'pos' ? A.pos : A.sop, k = res.alternatives.length;
-    const picker = res.several && solutionPicker(res, d => { M = setOutputLogic(M, out, { solution: { [groups]: (res.pick + d + k) % k } }); changed(); });   // (under the map, #3067)
+    const picker = res.several && solutionPicker(res, d => { M = setOutputLogic(M, out, { solution: { [groups]: (res.pick + d + k) % k } }); changed(); });   // (beside the map, above its groups, #3077)
     const C = 40, rowsN = L.rowCodes.length, colsN = L.colCodes.length;
     const gw = colsN * C, gh = rowsN * C;
     const left0 = 18 + 12 * Math.max(1, L.rowVars.length), top0 = 46;
@@ -318,7 +318,7 @@ export function mountTtEditor(container, opts = {}) {
     });
     placeKmap({ host: kmapHost, options: grpSel, svg, changed: () => renderKmap(), d3, layout: L, col: M.table[out], terms: res.terms, groups, colors: COLORS, onCell: mt => cycle(out, mt), title: c => `${vn(L.mapVars)} = ${bits(c, L.mapVars.length)}` });   // (3D: #1407)
     // legend: one line per group
-    const leg = h('div', { class: 'tt-legend' });
+    const leg = h('div', { class: 'tt-legend' }, picker || null);
     res.terms.forEach((t, ti) => {
       const one = { ...res, terms: [t] };
       const text = formatExpr(groups === 'pos' ? clauseAst(one) : termAst(one), notation);
@@ -327,7 +327,6 @@ export function mountTtEditor(container, opts = {}) {
     });
     if (!res.terms.length) leg.append(h('div', { class: 'hint' }, groups === 'pos' ? 'No 0s: no groups (the output is always 1).' : 'No 1s: no groups (the output is always 0).'));
     kmapHost.append(leg);
-    if (picker) kmapHost.append(picker);
   }
   const termAst = r => { const lit = l => (l.neg ? { t: 'not', a: { t: 'var', name: M.inputs[l.v] } } : { t: 'var', name: M.inputs[l.v] }); const ls = r.terms[0].literals; return ls.length === 0 ? { t: 'const', v: 1 } : ls.length === 1 ? lit(ls[0]) : { t: 'and', args: ls.map(lit) }; };
   const clauseAst = r => { const lit = l => (l.neg ? { t: 'var', name: M.inputs[l.v] } : { t: 'not', a: { t: 'var', name: M.inputs[l.v] } }); const ls = r.terms[0].literals; return ls.length === 0 ? { t: 'const', v: 0 } : ls.length === 1 ? lit(ls[0]) : { t: 'or', args: ls.map(lit) }; };
