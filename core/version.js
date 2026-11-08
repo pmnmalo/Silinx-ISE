@@ -9,7 +9,7 @@ export const VERSION = '15.22.1';
 export const BUILD = typeof __SILINX_BUILD__ !== 'undefined' ? __SILINX_BUILD__ : null;
 export const versionLabel = (build = BUILD, version = VERSION) => (build ? `dev:${build.commit}${build.date ? ` (${build.date})` : ''}` : version);
 export const VERSION_LABEL = versionLabel();
-export const REPOSITORY = 'pmnmalo/Silinx-ISE';   // GitHub owner/name (About, Check for Updates)
+export const REPOSITORY = 'pmnmalo/Silinx';   // GitHub owner/name (About, Check for Updates)
 
 /** Compare dotted versions ("15.3.0" vs "v15.10.1"): negative, 0 or positive. */
 export function compareVersions(a, b) {

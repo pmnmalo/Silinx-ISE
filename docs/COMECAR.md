@@ -14,11 +14,11 @@ outra maneira de correr o mesmo Silinx, no seu computador.
 
 ## Forma 1: no browser (a mais simples)
 
-O mais rápido: abra **https://pmnmalo.github.io/Silinx-ISE/** no browser (a última versão lançada; os seus
+O mais rápido: abra **https://pmnmalo.github.io/Silinx/** no browser (a última versão lançada; os seus
 projetos ficam nesse browser. A versão em desenvolvimento, com as alterações ainda não lançadas, está em
-https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao passo 4. Ou descarregue-o, para trabalhar sem Internet:
+https://pmnmalo.github.io/Silinx/dev/, com os projetos à parte) e passe ao passo 4. Ou descarregue-o, para trabalhar sem Internet:
 
-1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
+1. Abra a **[última versão](https://github.com/pmnmalo/Silinx/releases/latest)**.
 2. Em **Assets**, clique em **`Silinx.html`** para o descarregar.
 3. Faça duplo clique no ficheiro descarregado. Abre no browser (Chrome, Edge, Firefox ou Safari).
 4. Na página inicial clique em **Novo Projeto…** (New Project…) e escolha em *Começar a partir de* (Start from) **Example: gates** (portas lógicas desenhadas num esquemático: um bom primeiro exemplo), **Example: traffic** (uma passadeira para peões: um diagrama de estados e uma álgebra booleana), **Example: blinky** (ou *pong*, um jogo para dois, *stopwatch*, *clock*, *vga*, uma imagem num monitor VGA, *isqrt*, uma função em C feita em hardware, *uart*, um eco pela porta série para um terminal, ou *micro80*, um microprocessador compatível com o 8080 a correr um programa) ou **Projeto vazio** (Empty project). Depois dos exemplos vêm os **Test design: …**: projetos com que o próprio Silinx é testado (esquemáticos, diagramas de estados, programas em C para o Silinx HLS), cada um com o seu teste (uma bancada de teste, ou o `main()` do programa em C), para ver o que o Silinx faz com cada tipo de fonte.
@@ -91,7 +91,7 @@ O Silinx corre no **Node.js**, um programa gratuito.
 
 ### Passo 2: descarregar o Silinx
 
-1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
+1. Abra a **[última versão](https://github.com/pmnmalo/Silinx/releases/latest)**.
 2. Em **Assets**, descarregue **`silinx-<versão>.zip`** (por exemplo `silinx-15.22.1.zip`).
    - Não use o botão verde **Code ▸ Download ZIP** nem o "Source code": essa versão não traz tudo
      o que o Silinx precisa (funciona na mesma, mas o primeiro arranque precisa de Internet para
@@ -108,7 +108,7 @@ cadeira):* a versão lista o checksum SHA-256 de cada ficheiro nas suas notas e 
 (macOS): o ficheiro tem de dizer `OK`. No Windows, `Get-FileHash silinx-<versão>.zip` no PowerShell
 mostra o checksum, a comparar com o das notas. Cada ficheiro tem também a atestação de proveniência do
 GitHub (foi construído pelo workflow Release do repositório a partir da tag da versão): com o
-[GitHub CLI](https://cli.github.com), `gh attestation verify silinx-<versão>.zip --repo pmnmalo/Silinx-ISE`.
+[GitHub CLI](https://cli.github.com), `gh attestation verify silinx-<versão>.zip --repo pmnmalo/Silinx`.
 
 ### Passo 3: arrancar o Silinx
 
@@ -206,8 +206,8 @@ Terminal, escreva `cd `, arraste a pasta para a janela e carregue em Enter).
 ## Para quem usa git
 
 ```bash
-git clone https://github.com/pmnmalo/Silinx-ISE.git
-cd Silinx-ISE
+git clone https://github.com/pmnmalo/Silinx.git
+cd Silinx
 npm install
 npm start            # mostra o endereço a abrir: http://127.0.0.1:8642/#token=…
 ```

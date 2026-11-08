@@ -28,7 +28,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pmnmalo/Silinx-ISE.git",
+    "url": "git+https://github.com/pmnmalo/Silinx.git",
     "directory": "packages/silinx-fpga"
   },
   "license": "Apache-2.0",

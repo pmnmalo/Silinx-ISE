@@ -758,7 +758,7 @@ export function aboutDialog() {
           h('tr', { class: 'about-counts' }, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Usage counts:'),
             h('td', {}, ...(siteCounts()
               ? ['This page counts its visits and what is used (a new project, a simulation, a bitstream…) with ', gcLink(), ': no cookies, no personal data, never the content of a project.']
-              : ['None: this copy sends nothing.', ' Only the site (pmnmalo.github.io/Silinx-ISE) counts its visits, with ', gcLink(), ' (no cookies, no personal data).']))),
+              : ['None: this copy sends nothing.', ' Only the site (pmnmalo.github.io/Silinx) counts its visits, with ', gcLink(), ' (no cookies, no personal data).']))),
           // what the start-up check for updates reaches (#488), and where it is turned off
           h('tr', { class: 'about-updates' }, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Update check:'),
             h('td', {}, updateCheckEnabled()

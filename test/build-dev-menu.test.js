@@ -75,7 +75,7 @@ test('a development build: its changes since the last release typed by their lab
   assert.match(dev.log, /development build dev:[0-9a-f]{7}, 3 change\(s\) since 15\.0\.0/);
   assert.match(dev.html, /since:"15\.0\.0",changes:\[/);
   assert.deepEqual(changesOf(dev.html), [[7, 'other'], [6, 'feature'], [5, 'bugfix']]);
-  assert.deepEqual(asked.map(a => a[0]).sort(), ['/repos/pmnmalo/Silinx-ISE/issues/5', '/repos/pmnmalo/Silinx-ISE/issues/6', '/repos/pmnmalo/Silinx-ISE/issues/7']);
+  assert.deepEqual(asked.map(a => a[0]).sort(), ['/repos/pmnmalo/Silinx/issues/5', '/repos/pmnmalo/Silinx/issues/6', '/repos/pmnmalo/Silinx/issues/7']);
   assert.ok(asked.every(a => a[1] === `Bearer ${TOKEN}`));
   assert.ok(!dev.html.includes(TOKEN), 'the token is not in the file');
   assert.match(dev.html, /Development/);

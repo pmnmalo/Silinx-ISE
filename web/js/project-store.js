@@ -18,7 +18,7 @@ import { foldsToProjectFile, PROJECT_FILE } from '../../core/fold-name.js';
 
 export const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
-// the site's development edition (https://pmnmalo.github.io/Silinx-ISE/dev/, built from main): its
+// the site's development edition (https://pmnmalo.github.io/Silinx/dev/, built from main): its
 // own browser storage, so that a development build never touches the stable edition's projects
 // (a workspace folder on the disk can still be opened by both); its settings too (web/js/prefs.js)
 export { DEV_SITE };

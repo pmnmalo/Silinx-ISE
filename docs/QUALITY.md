@@ -41,7 +41,7 @@ Geometric means of the ratios Silinx / ISE (below 0: Silinx is smaller, faster, 
 - **Reading the design:** XST (ISE 14.7's synthesis, from 2013) cannot read 15 of the designs (`$clog2`, VHDL-2008
   and other constructs it predates, listed below); Silinx reads them.
 - These numbers are tracked to improve the Silinx toolchain (the GitHub
-  [issues](https://github.com/pmnmalo/Silinx-ISE/issues) labelled *synthesis* and *place & route*).
+  [issues](https://github.com/pmnmalo/Silinx/issues) labelled *synthesis* and *place & route*).
 
 ## Area: Silinx at Optimization Area against ISE at XST's `-opt_mode Area -opt_level 2`
 

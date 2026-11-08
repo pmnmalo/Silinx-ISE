@@ -212,7 +212,7 @@ function pageEnd(res, epfl) {
 // its size and speed tables and its critical paths' breakdown
 // (the summary's last item, the same in both forms of the page)
 const TRACKED = ['- These numbers are tracked to improve the Silinx toolchain (the GitHub',
-  '  [issues](https://github.com/pmnmalo/Silinx-ISE/issues) labelled *synthesis* and *place & route*).'];
+  '  [issues](https://github.com/pmnmalo/Silinx/issues) labelled *synthesis* and *place & route*).'];
 const XST_OF = g => `XST's \`-opt_mode ${GOAL_IMPL[g].optMode} -opt_level ${GOAL_IMPL[g].optLevel}\``;
 const ABOUT_ISE = { area: '', speed: ', ISE\'s *Timing Performance*', fast: ', XST\'s default' };
 

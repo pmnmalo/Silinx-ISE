@@ -44,7 +44,7 @@ uiTest('Development menu (#707): after Help; no submenu by type (#3079); all the
     return { heads: [...b.querySelectorAll('h4')].map((x) => x.textContent), links: [...b.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')]),
       items: [...b.querySelectorAll('li')].map((x) => x.textContent), bold: [...b.querySelectorAll('b')].map((x) => x.textContent), code: [...b.querySelectorAll('code')].map((x) => x.textContent),
       img: b.querySelectorAll('img').length, xss: window.__xss ?? null };
-  }), { heads: ['Features', 'Bug fixes'], links: [['#30', 'https://github.com/pmnmalo/Silinx-ISE/issues/30'], ['#12', 'https://github.com/pmnmalo/Silinx-ISE/issues/12']],
+  }), { heads: ['Features', 'Bug fixes'], links: [['#30', 'https://github.com/pmnmalo/Silinx/issues/30'], ['#12', 'https://github.com/pmnmalo/Silinx/issues/12']],
     items: ['#30 A menu: with code and <img src=x onerror="window.__xss = 1">', '#12 The router (#12): fixed.'], bold: ['A menu:', 'The router (#12):'], code: ['code'], img: 0, xss: null });
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Close']);
   await page.dialogButton('Close');

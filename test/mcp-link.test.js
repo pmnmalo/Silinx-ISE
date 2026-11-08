@@ -53,7 +53,7 @@ test('project_link / open_link: gates (a schematic) round trip into Try it, the 
 test('project_link: the views a design has, the default base, the errors', async () => {
   await ok('new_project_from_example', { name: 'traffic', example: 'traffic' });
   const s = await ok('project_link', { project: 'traffic', view: 'simulate', top: 'tb_traffic' });
-  assert.match(s.data.link, /^https:\/\/pmnmalo\.github\.io\/Silinx-ISE\/#design=[A-Za-z0-9_-]+&top=tb_traffic&view=simulate$/);
+  assert.match(s.data.link, /^https:\/\/pmnmalo\.github\.io\/Silinx\/#design=[A-Za-z0-9_-]+&top=tb_traffic&view=simulate$/);
   assert.deepEqual(s.data.left.sort(), ['src/lamps.vhd', 'src/traffic.vhd']);
   const e = await ok('project_link', { project: 'traffic' });
   assert.doesNotMatch(e.data.link, /view=|top=/);
@@ -86,7 +86,7 @@ test('project_link: a project too large for a link', async () => {
 });
 
 test('open_link: an example, on its board and on another (its pins the board\'s), in the emulator', async () => {
-  const r = await ok('open_link', { link: 'https://pmnmalo.github.io/Silinx-ISE/#open=example:pong&view=emulate' });
+  const r = await ok('open_link', { link: 'https://pmnmalo.github.io/Silinx/#open=example:pong&view=emulate' });
   assert.equal(r.text, 'Opened the link as the new project \'pong\': top pong, basys2; the link opens the board emulator (run_process bitstream builds it for the board).');
   const n = await ok('open_link', { link: '#open=example:blinky&board=nexys2', name: 'blinky_n2' });
   assert.equal(n.data.board, 'nexys2');
@@ -105,7 +105,7 @@ test('open_link: an example, on its board and on another (its pins the board\'s)
 
 test('open_link: a broken or hostile link is refused, nothing made (#2829)', async () => {
   const before = (await P.listProjects()).length;
-  await fails('open_link', { link: 'https://pmnmalo.github.io/Silinx-ISE/' }, 'the link has no design (#design=… or #open=…)');
+  await fails('open_link', { link: 'https://pmnmalo.github.io/Silinx/' }, 'the link has no design (#design=… or #open=…)');
   await fails('open_link', { link: '#token=abc' }, 'the link has no design (#design=… or #open=…)');
   await fails('open_link', { link: '#open=https://example.org/lecture3.zip' }, 'the link opens a zip at https://example.org/lecture3.zip: the MCP server fetches nothing from the network (download it into the exchange folder, then import_project)');
   await fails('open_link', { link: '#open=http://192.168.1.1/a.zip' }, 'the link\'s open= is not an https address (\'http://192.168.1.1/a.zip\')');

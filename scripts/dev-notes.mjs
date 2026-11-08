@@ -13,14 +13,14 @@ import { parseChangelog, mergeFragments } from '../core/changelog.js';
 import { readFragments } from './changelog-release.mjs';
 
 export const LIMIT = 120000;
-export const FULL_LIST = 'https://github.com/pmnmalo/Silinx-ISE/tree/main/changes';
+export const FULL_LIST = 'https://github.com/pmnmalo/Silinx/tree/main/changes';
 
 export function devNotes({ commit, date, changelog, tags, fragments = [], limit = LIMIT }) {
   const top = parseChangelog(changelog)[0];
   const open = top && !tags.includes(`v${top.version}`) ? top : null;
   const out = [`**Development build** of main, commit ${commit} (${date}): not a release, for testing.`,
     'The latest release is under Releases; this one is replaced after every change that passes the tests.',
-    'In the browser: https://pmnmalo.github.io/Silinx-ISE/dev/', ''];
+    'In the browser: https://pmnmalo.github.io/Silinx/dev/', ''];
   if (open || fragments.length)
     out.push(`## Not released yet${open ? ` (${open.version})` : ''}`, '', mergeFragments(open ? open.body : '', fragments), '');
   const text = out.join('\n');

@@ -1,4 +1,4 @@
-// Usage counts of the published site (https://pmnmalo.github.io/Silinx-ISE/, its dev/ edition):
+// Usage counts of the published site (https://pmnmalo.github.io/Silinx/, its dev/ edition):
 // GoatCounter (goatcounter.com: no cookies, no personal data), loaded only there by the site's build
 // (scripts/site-analytics.mjs, .github/workflows/pages.yml). countEvent() counts what was done, never
 // its content (no project or file names); elsewhere (the application, the downloaded file, the

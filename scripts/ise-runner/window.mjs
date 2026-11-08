@@ -21,7 +21,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-export const REPO = 'pmnmalo/Silinx-ISE';
+export const REPO = 'pmnmalo/Silinx';
 export const WORKFLOWS = ['ise.yml', 'quality.yml'];
 export const OPEN = { hour: 21, minute: 15 };
 export const HARD_CLOSE = 18;               // hours after the opening

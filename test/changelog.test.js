@@ -50,7 +50,7 @@ test('release notes: the files\' checksums and how to check a download, at the e
   const notes = releaseNotes(md, '2.1.0', 'COMMON', sums);
   assert.ok(notes.startsWith('## What\'s new in 2.1.0\n\n- c\n\nCOMMON\n\n## Checking a download\n\nThe files\' SHA-256 checksums (the file SHA256SUMS):\n\n```\n'
     + `${'a'.repeat(64)}  Silinx.html\n${'b'.repeat(64)}  silinx-2.1.0.zip\n\`\`\`\n\n`), notes);
-  for (const cmd of ['sha256sum -c SHA256SUMS --ignore-missing', 'shasum -a 256 -c SHA256SUMS --ignore-missing', 'Get-FileHash <file>', 'gh attestation verify <file> --repo pmnmalo/Silinx-ISE'])
+  for (const cmd of ['sha256sum -c SHA256SUMS --ignore-missing', 'shasum -a 256 -c SHA256SUMS --ignore-missing', 'Get-FileHash <file>', 'gh attestation verify <file> --repo pmnmalo/Silinx'])
     assert.ok(notes.includes(`\`${cmd}\``), cmd);
   assert.ok(notes.endsWith('.\n'));
   // without the checksums, as before
@@ -103,7 +103,7 @@ test('#2685 a release\'s notes stay under GitHub\'s 125,000 characters: "In deta
   const left = Number(/(\d+) more entries of "In detail" left out/.exec(notes)?.[1]);
   assert.ok(left > 0 && left < 4000, `some entries left out: ${left}`);
   assert.equal(notes.split('\n- **Change ').length - 1 + left, 4000, 'every entry kept or counted');
-  assert.match(notes, /https:\/\/github\.com\/pmnmalo\/Silinx-ISE\/blob\/v3\.0\.0\/CHANGELOG\.md/);
+  assert.match(notes, /https:\/\/github\.com\/pmnmalo\/Silinx\/blob\/v3\.0\.0\/CHANGELOG\.md/);
   assert.match(notes, /COMMON\n\n## Checking a download/);
   // a short section is unchanged
   assert.equal(releaseNotes('## 1.0.0\n\nIn detail:\n\n- x\n', '1.0.0', 'C'), '## What\'s new in 1.0.0\n\nIn detail:\n\n- x\n\nC\n');

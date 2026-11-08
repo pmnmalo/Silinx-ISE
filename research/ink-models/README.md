@@ -1,6 +1,6 @@
 # Small vision models for hand drawings, in the browser: a spike (2026-10-22)
 
-Issue [#1060](https://github.com/pmnmalo/Silinx-ISE/issues/1060). Silinx's own template recognizer
+Issue [#1060](https://github.com/pmnmalo/Silinx/issues/1060). Silinx's own template recognizer
 ($P/$Q, offline, no download) is the default way hand-drawn expressions, truth tables and schematics will
 become modules. This spike asks whether an optional "smart recognition" model, downloaded on demand like
 Yosys's WebAssembly (kept in Cache Storage, #967), would be worth adding later for what templates cannot
