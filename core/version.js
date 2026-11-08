@@ -1,7 +1,7 @@
 // Product name and version, shown in the UI (title bar, About, Design Summary).
 // VERSION is kept equal to package.json by scripts/sync-version.mjs (run by `npm version`).
-export const PRODUCT = 'Silinx ISE';
-export const PRODUCT_FULL = 'Silinx ISE (Integrated Synthesis Environment)';
+export const PRODUCT = 'Silinx';
+export const PRODUCT_FULL = 'Silinx';
 export const VERSION = '15.22.1';
 // the commit of a development build (scripts/build-standalone.mjs defines __SILINX_BUILD__ when the
 // commit built is not the release's tag, #135): { commit }, else null (a release, or the server)

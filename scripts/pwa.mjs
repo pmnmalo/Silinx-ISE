@@ -21,7 +21,7 @@ export const ICONS = [
 export function webManifest({ dev = false } = {}) {
   return {
     id: './',
-    name: dev ? 'Silinx ISE (development)' : 'Silinx ISE',
+    name: dev ? 'Silinx (development)' : 'Silinx',
     short_name: dev ? 'Silinx dev' : 'Silinx',
     description: 'An ISE-like FPGA IDE for teaching digital systems: design, simulate and implement for Spartan-3E boards, in the browser.',
     lang: 'en',

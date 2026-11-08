@@ -8,7 +8,7 @@ const M = await import('../web/js/messages.js');
 
 // the Console of a session with the pong example (the lines the app wrote, in order), each with its source
 const SESSION = [
-  ['Silinx ISE 15.11.3 Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.', 'app'],
+  ['Silinx 15.11.3 Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.', 'app'],
   ['Toolchain: Silinx toolchain (no ISE): synthesis, place and route and bitstream by Silinx and Yosys.', 'app'],
   ['Programmers found: none (install openFPGALoader, xc3sprog, Digilent Adept or ISE iMPACT)', 'app'],
   ['Project "pong" opened (xc3s250e-4-cp132).', 'app'],
@@ -41,7 +41,7 @@ const SESSION = [
   ['\'1\': Programmed successfully.', 'impl'],
   ['Programming XCF02S...', 'impl'],
   ['ERROR: Board Emulator: cannot build the design', 'emu'],
-  ['Silinx ISE 15.11.3 is up to date (latest release on GitHub: 15.11.3).', 'app'],   // (the update check, at any time)
+  ['Silinx 15.11.3 is up to date (latest release on GitHub: 15.11.3).', 'app'],   // (the update check, at any time)
 ];
 
 test('sourceOf: each line of a session\'s Console is its process\'s (the lines after a header are its own)', () => {

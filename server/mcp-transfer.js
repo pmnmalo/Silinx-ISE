@@ -1,5 +1,5 @@
-// The MCP server's tools of a project's import and export (server/mcp.js, #2674), as the File menu's: Export Silinx ISE
-// Project and Export Xilinx ISE Project (a .zip written on the disk), Import Silinx ISE Project and Import Xilinx ISE
+// The MCP server's tools of a project's import and export (server/mcp.js, #2674), as the File menu's: Export Silinx
+// Project and Export Xilinx ISE Project (a .zip written on the disk), Import Silinx Project and Import Xilinx ISE
 // Project (from a .zip, a .xise with its folder, or a project folder), through the server's own functions
 // (server/project-zip.js, as the export.zip and import-zip routes). A file written is a new one: an export never
 // replaces a file; an import makes a new project. Where the interface has the user choose the file, the client
@@ -13,7 +13,7 @@ import path from 'node:path';
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
 
-const KINDS = { xilinx: 'a Xilinx ISE project', silinx: 'a Silinx ISE project' };
+const KINDS = { xilinx: 'a Xilinx ISE project', silinx: 'a Silinx project' };
 const MAX_FILES = 5000;
 
 /** The exchange folder: SILINX_MCP_FOLDER, else the user's Downloads. */
@@ -62,7 +62,7 @@ async function folderEntries(dir) {
 export const TRANSFER_TOOLS = [
   {
     name: 'export_project', title: 'Export a project (.zip)',
-    description: 'Write a project as a .zip into the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names), as the File menu\'s Export does: kind xilinx (Export Xilinx ISE Project: its .xise, its sources, the schematics as ISE schematics, a C source as its HDL; no Silinx-only file) or silinx (Export Silinx ISE Project: the whole project, silinx.json and every file, for Import Silinx ISE Project). The file must not exist: an export never replaces one.',
+    description: 'Write a project as a .zip into the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names), as the File menu\'s Export does: kind xilinx (Export Xilinx ISE Project: its .xise, its sources, the schematics as ISE schematics, a C source as its HDL; no Silinx-only file) or silinx (Export Silinx Project: the whole project, silinx.json and every file, for Import Silinx Project). The file must not exist: an export never replaces one.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, kind: { type: 'string', enum: Object.keys(KINDS), description: 'xilinx (default) or silinx.' },
       path: STR('The .zip to write, in the exchange folder: its name (e.g. traffic.zip), a path in it, or an absolute path inside it; a file that does not exist yet.'),
@@ -85,7 +85,7 @@ export const TRANSFER_TOOLS = [
   },
   {
     name: 'import_project', title: 'Import a project',
-    description: 'Make a new project in the workspace from a project in the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names), as the File menu\'s Import does: a .zip (a Xilinx ISE project with its .xise, or a Silinx ISE project exported with its silinx.json), an ISE project\'s .xise (its folder\'s files with it) or a project folder. Its sources, constraints and other files are copied (not ISE\'s own outputs, nor hidden files); returns the files the project lists but were not found, and the import\'s warnings.',
+    description: 'Make a new project in the workspace from a project in the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names), as the File menu\'s Import does: a .zip (a Xilinx ISE project with its .xise, or a Silinx project exported with its silinx.json), an ISE project\'s .xise (its folder\'s files with it) or a project folder. Its sources, constraints and other files are copied (not ISE\'s own outputs, nor hidden files); returns the files the project lists but were not found, and the import\'s warnings.',
     inputSchema: { type: 'object', properties: {
       name: STR('The new project\'s name (letters, digits, - and _).'),
       from: STR('The .zip, the .xise or the project folder, in the exchange folder: its name, a path in it, or an absolute path inside it.'),
@@ -123,7 +123,7 @@ export const TRANSFER_TOOLS = [
         throw toolError(e.message);
       }
       const pj = r.project;
-      const kind = gated.files.some(e => /\.xise$/i.test(e.path)) ? 'Xilinx ISE' : 'Silinx ISE';
+      const kind = gated.files.some(e => /\.xise$/i.test(e.path)) ? 'Xilinx ISE' : 'Silinx';
       const lines = [...r.warnings.map(w => `WARNING: ${w}`), ...r.missing.map(m => `WARNING: ${m}: listed by the project, not found`),
         `Imported the ${kind} project as '${name}': top ${pj.top || '(none)'}, test bench ${pj.simTop || '(none)'}, ${pj.board || 'no board'} (${pj.device ? `${pj.device.part}${pj.device.package}${pj.device.speed}` : 'no device'}), ${(pj.files || []).length} source(s)${r.extra.length ? `, ${r.extra.length} other file(s)` : ''}.`];
       return { text: lines.join('\n'), data: { project: name, kind: kind === 'Xilinx ISE' ? 'xilinx' : 'silinx', top: pj.top || null, simTop: pj.simTop || null, board: pj.board || null, device: pj.device || null, files: (pj.files || []).map(f => f.path), extra: r.extra, missing: r.missing, warnings: r.warnings } };

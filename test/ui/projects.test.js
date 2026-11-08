@@ -325,7 +325,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   await page.click('.dlg-overlay table.grid tr', { text: 'Alpha' });
   await page.dialogButton('Open');
   await page.waitFor(() => window.Silinx.project?.name === 'Alpha' && document.querySelector('#hier .row .lbl')?.textContent === 'Alpha');
-  assert.match(await page.eval(() => document.title), /^Alpha — Silinx ISE/);
+  assert.match(await page.eval(() => document.title), /^Alpha — Silinx/);
   await page.waitFor(() => window.SilinxApp.findDoc('summary'));
   await page.eval(() => window.SilinxApp.openFile('src/alpha.vhd'));
   await page.waitFor(() => window.SilinxApp.findDoc('file:src/alpha.vhd')?.editor);
@@ -372,7 +372,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   assert.equal(await page.eval(() => window.Silinx.docs.length), 0);
   const file = await page.openMenu('File');
   assert.equal(file.find((i) => i.label === 'Close Project').disabled, true);
-  assert.equal(file.find((i) => i.label === 'Export Silinx ISE Project (.zip)…').disabled, true);
+  assert.equal(file.find((i) => i.label === 'Export Silinx Project (.zip)…').disabled, true);
   await page.closeMenus();
   // the Start page opens a recent project
   await page.waitFor(() => [...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Beta'));
@@ -670,7 +670,7 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.leftTab('start');
   await page.waitFor(() => document.querySelectorAll('#start-page .start-btns .btn').length === 2, [], { what: 'the Start page' });
   assert.deepEqual(await startPage(page), { buttons: ['New Project…', 'Open Project…'], top: true, halves: true, commands: [
-    'Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)… (disabled)', 'Copy Link to Project… (disabled)', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)'] });
+    'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)… (disabled)', 'Copy Link to Project… (disabled)', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)'] });
   // drawn again with a project open (a late drawing while one opens): the same page kept, only its host's attribute
   // changes, so that a click pressed before is not lost (#494, #1222)
   assert.deepEqual(await page.eval(async () => {
@@ -696,8 +696,8 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.openProject('StartZip');
   await page.leftTab('start');
   await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the exports enabled' });
-  assert.deepEqual((await startPage(page)).commands, ['Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)…', 'Copy Link to Project…', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…']);
-  await page.click('#start-page .entry a', { text: 'Export Silinx ISE Project (.zip)…' });
+  assert.deepEqual((await startPage(page)).commands, ['Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Copy Link to Project…', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…']);
+  await page.click('#start-page .entry a', { text: 'Export Silinx Project (.zip)…' });
   await waitDownload(page, 'StartZip-silinx.zip');
   await page.click('#start-page .entry a', { text: 'Export Xilinx ISE Project (.zip)…' });
   await waitDownload(page, 'StartZip.zip');
@@ -726,15 +726,15 @@ uiTest('#1300 the Design tree: the project\'s row and the device\'s right-click 
 uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing import keeps the existing project', E, async (page) => {
   await makeProject(env, { name: 'ZipSrc', template: 'blinky', board: 'basys2' });
   await page.openProject('ZipSrc');
-  await page.menu('File', 'Export Silinx ISE Project (.zip)…');
+  await page.menu('File', 'Export Silinx Project (.zip)…');
   const silinxZip = await waitDownload(page, 'ZipSrc-silinx.zip');
   await page.menu('File', 'Export Xilinx ISE Project (.zip)…');
   const xilinxZip = await waitDownload(page, 'ZipSrc.zip');
   const srcTree = (await env.server.api('GET', '/api/projects/ZipSrc')).fileTree;
 
   // import the Silinx zip under a new name: every file and the settings come back
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [silinxZip]);
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=text]').value), 'ZipSrc', 'name suggested from the zip');
   await page.fill('.dlg-overlay input[type=text]', 'ZipCopy');
@@ -764,8 +764,8 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
   await page.openProject('ZipCopy');
   const bad = path.join(env.tmp, 'broken.zip');
   await fs.writeFile(bad, 'this is not a zip file');
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [bad]);
   await page.fill('.dlg-overlay input[type=text]', 'ZipCopy');
   await page.dialogButton('Import');
@@ -785,7 +785,7 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
 
 // #2830: the import gate on the local server: a zip's refused entries (a hidden folder, a script in a name, an XXE
 // schematic, a traversal) are left out and said in the console; the sound files are imported
-uiTest('#2830 Import Silinx ISE Project: the import gate leaves out what it refuses and says why in the console', E, async (page) => {
+uiTest('#2830 Import Silinx Project: the import gate leaves out what it refuses and says why in the console', E, async (page) => {
   const { createZip } = await import('../../core/zip.js');
   const zlib = await import('node:zlib');
   const codec = { deflate: (d) => zlib.deflateRawSync(d), inflate: (d, l) => zlib.inflateRawSync(d, { maxOutputLength: l }) };
@@ -796,8 +796,8 @@ uiTest('#2830 Import Silinx ISE Project: the import gate leaves out what it refu
     { path: '../evil.vhd', data: top }], codec);
   const file = path.join(env.tmp, 'gate-silinx.zip');
   await fs.writeFile(file, zip);
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [file]);
   await page.fill('.dlg-overlay input[type=text]', 'Gated');
   await page.dialogButton('Import');
@@ -850,8 +850,8 @@ uiTest('#2830 an imported project waits for the user\'s trust: the console line 
   const pj = { name: 'O', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }], device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, trusted: true };
   const file = path.join(env.tmp, 'outside-silinx.zip');
   await fs.writeFile(file, await createZip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/top.vhd', data: top }], codec));
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [file]);
   await page.fill('.dlg-overlay input[type=text]', 'Outside');
   await page.dialogButton('Import');

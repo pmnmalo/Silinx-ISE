@@ -620,7 +620,7 @@ export function runDocker(job, cfg, gen, steps, onLine) {
   if (d.memory) args.push('--memory', String(d.memory));
   if (d.platform) args.push('--platform', d.platform);
   args.push('-v', `${gen.buildDir}:/work`, '-w', '/work');
-  // Linux: run as the calling user so build outputs are not owned by root (the Silinx ISE
+  // Linux: run as the calling user so build outputs are not owned by root (Silinx's ISE
   // image works under any UID). Docker Desktop on macOS/Windows maps ownership by itself.
   if (process.platform === 'linux' && typeof process.getuid === 'function' && !(d.extraArgs || []).some(a => String(a) === '--user' || String(a).startsWith('--user=')))
     args.push('--user', `${process.getuid()}:${process.getgid()}`);

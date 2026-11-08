@@ -184,7 +184,7 @@ uiTest('#1054 Development ▸ Pen and Touch Test: the mouse, a finger, a long pr
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .ptr-copied').textContent), 'Report copied to the clipboard');
   const ua = await page.eval(() => navigator.userAgent), screen = own.map(([k, v]) => `${k} ${v}`).join(' · ');
   const version = await page.eval(async () => (await import('/core/version.js')).VERSION);
-  assert.equal(report, ['Silinx ISE: pen and touch test', `Silinx ISE ${version} (commit abc1234)`, `Browser: ${ua}`, `Screen: ${screen}`, 'Pointers down at once (most): 1', 'Pointers (1):',
+  assert.equal(report, ['Silinx: pen and touch test', `Silinx ${version} (commit abc1234)`, `Browser: ${ua}`, `Screen: ${screen}`, 'Pointers down at once (most): 1', 'Pointers (1):',
     `  pen #7 primary · pressure 0.7 · contact 1 × 1 · tilt 20 / -10 · buttons 1 · 9 events · Lifted · Silinx: ${HELD}`, ''].join('\n'));
   assert.equal(await page.eval(async () => (await import('/js/clipboard.js')).readClip('text')), report);
 

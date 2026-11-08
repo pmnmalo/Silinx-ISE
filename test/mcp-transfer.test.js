@@ -1,5 +1,5 @@
 // The MCP server's tools of a project's import and export (#2674, server/mcp-transfer.js): export_project (a Xilinx ISE
-// or a Silinx ISE .zip, never over a file) and import_project (a .zip, a .xise with its folder, a project folder),
+// or a Silinx .zip, never over a file) and import_project (a .zip, a .xise with its folder, a project folder),
 // only in the exchange folder (SILINX_MCP_FOLDER; the symbolic links that leave it refused); round trips of the
 // examples with Check Syntax after them (no warnings), a hostile zip's warnings, and the errors.
 // The zip's own format and the routes are tested in server-api.test.js and server-hardening.test.js.
@@ -53,19 +53,19 @@ test('export_project / import_project: traffic as a Xilinx ISE project and back,
   assert.equal((await ok('check_syntax', { project: 'traffic_ise', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (42 signals, 32 processes).');
 });
 
-test('export_project / import_project: a Silinx ISE project, its drawings and board kept; a project folder', async () => {
+test('export_project / import_project: a Silinx project, its drawings and board kept; a project folder', async () => {
   await ok('new_project_from_example', { name: 'gates', example: 'gates' });
   const x = await ok('export_project', { project: 'gates', kind: 'silinx', path: out('gates-silinx.zip') });
-  assert.equal(x.text, `Exported 'gates' as a Silinx ISE project: ${out('gates-silinx.zip')} (${fs.statSync(out('gates-silinx.zip')).size} bytes).`);
+  assert.equal(x.text, `Exported 'gates' as a Silinx project: ${out('gates-silinx.zip')} (${fs.statSync(out('gates-silinx.zip')).size} bytes).`);
   assert.ok((await entryNames(out('gates-silinx.zip'))).includes('silinx.json'));
   const i = await ok('import_project', { name: 'gates_s', from: out('gates-silinx.zip') });
-  assert.match(i.text, /^Imported the Silinx ISE project as 'gates_s': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
+  assert.match(i.text, /^Imported the Silinx project as 'gates_s': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
   assert.ok(i.data.extra.includes('src/gates.sch.json'));
   assert.equal((await ok('check_syntax', { project: 'gates_s' })).text, 'Process "Check Syntax" of <gates> completed successfully (22 signals, 21 processes).');
   // a project folder (a workspace's, copied into the exchange folder)
   fs.cpSync(P.projectDir('gates'), out('gates-folder'), { recursive: true });
   const d = await ok('import_project', { name: 'gates_f', from: 'gates-folder' });
-  assert.match(d.text, /^Imported the Silinx ISE project as 'gates_f': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
+  assert.match(d.text, /^Imported the Silinx project as 'gates_f': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
   assert.deepEqual((await P.readProject('gates_f')).files, (await P.readProject('gates')).files);
 });
 
@@ -76,7 +76,7 @@ test('import_project: a hostile zip, what is sound imported, what was dropped sa
   const r = await ok('import_project', { name: 'hostile', from: out('hostile.zip') });
   // (the import gate's refusals first, #2830)
   assert.equal(r.text, ["WARNING: .git/config: not imported: hidden file or folder ('.git')", 'WARNING: silinx.json: file path outside the project dropped (../evil.vhd)', 'WARNING: silinx.json: constraints path outside the project dropped (../x.ucf)',
-    'WARNING: src/gone.vhd: listed by the project, not found', 'Imported the Silinx ISE project as \'hostile\': top top, test bench (none), no board (xc3s250ecp132-4), 2 source(s), 1 other file(s).'].join('\n'));
+    'WARNING: src/gone.vhd: listed by the project, not found', 'Imported the Silinx project as \'hostile\': top top, test bench (none), no board (xc3s250ecp132-4), 2 source(s), 1 other file(s).'].join('\n'));
   assert.ok(!fs.existsSync(path.join(P.projectDir('hostile'), '.git')));
   assert.ok(!fs.existsSync(path.join(P.workspaceDir(), 'evil.vhd')));
   assert.deepEqual(r.data.warnings, [".git/config: not imported: hidden file or folder ('.git')", 'silinx.json: file path outside the project dropped (../evil.vhd)',

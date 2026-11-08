@@ -40,7 +40,7 @@ const themeMenu = () => ({ label: 'Theme', submenu: [
 const updateAtStartItem = () => ({ label: 'Check for Updates at Start-up', checked: wiz.updateCheckEnabled(), action: () => { wiz.setUpdateCheckEnabled(!wiz.updateCheckEnabled()); toast(wiz.updateCheckEnabled() ? 'Check for updates at start-up on: the latest release is asked of GitHub when the app starts' : 'Check for updates at start-up off: Help > Check for Updates… checks by hand'); } });
 /** The header's Settings menu (the Silinx interface, #1314). */
 export const settingsItems = () => [
-  { label: 'About Silinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
+  { label: 'About Silinx', icon: icon('help'), action: () => wiz.aboutDialog() },
   '-',
   interfaceMenu(), languageMenu(), themeMenu(),
   '-',
@@ -62,8 +62,8 @@ export function setupMenus() {
       { label: 'New Project…', icon: icon('newProject'), action: () => wiz.newProjectWizard() },
       { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
       '-',
-      { label: 'Import Silinx ISE Project (.zip)…', action: () => wiz.importSilinxDialog() },
-      { label: 'Export Silinx ISE Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
+      { label: 'Import Silinx Project (.zip)…', action: () => wiz.importSilinxDialog() },
+      { label: 'Export Silinx Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
       { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()), disabled: hasPj },   // (#2826)
       '-',
       { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
@@ -159,7 +159,7 @@ export function setupMenus() {
       { label: 'Close All Documents', action: () => [...S.docs].forEach(closeDoc), disabled: () => !S.docs.length },
     ].filter(Boolean) },
     { label: 'Help', items: () => [
-      { label: 'About Silinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
+      { label: 'About Silinx', icon: icon('help'), action: () => wiz.aboutDialog() },
       { label: 'Keyboard Shortcuts', action: () => wiz.shortcutsDialog() },
       '-',
       { label: 'Check for Updates…', action: () => wiz.checkUpdatesDialog() },
@@ -248,7 +248,7 @@ export function downloadUrl(url, filename) {
 // kind 'silinx': the whole Silinx project (silinx.json + every file, ASM charts and schematics included)
 export async function exportProjectZip(kind = 'xilinx') {
   await saveAll();
-  const title = kind === 'silinx' ? 'Export Silinx ISE Project' : 'Export Xilinx ISE Project';
+  const title = kind === 'silinx' ? 'Export Silinx Project' : 'Export Xilinx ISE Project';
   try {
     const { blob, filename, warnings = [] } = await api.exportZip(S.project.name, kind);
     const url = URL.createObjectURL(blob);

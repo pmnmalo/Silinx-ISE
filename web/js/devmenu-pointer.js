@@ -45,8 +45,8 @@ function silinxAction(type, isPrimary, otherTouches) {
 /** The report: the build, the browser, the screen's facts, the most pointers down at once and every pointer seen. */
 function pointerReport({ facts, pointers, most, build = BUILD, version = VERSION, ua = navigator.userAgent }) {
   return [
-    'Silinx ISE: pen and touch test',
-    `Silinx ISE ${version}${build?.commit ? ` (commit ${build.commit})` : ''}`,
+    'Silinx: pen and touch test',
+    `Silinx ${version}${build?.commit ? ` (commit ${build.commit})` : ''}`,
     `Browser: ${ua}`,
     `Screen: ${facts.map(([k, v]) => `${k} ${v}`).join(' · ')}`,
     `Pointers down at once (most): ${most}`,

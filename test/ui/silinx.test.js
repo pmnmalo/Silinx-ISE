@@ -52,9 +52,9 @@ async function subMenu(page, menu, item, sub) {
 // the keyboard shortcuts, Tell Us Who You Are; in Portuguese
 uiTest('#1314 the header\'s Settings: About, Interface, Language, Theme, Check for Updates, Keyboard Shortcuts, Tell Us Who You Are; Portuguese', E, async (page) => {
   assert.equal(await page.eval(() => document.getElementById('theme-btn')), null, 'no light / dark switch');
-  assert.deepEqual(await settingsMenu(page), ['About Silinx ISE', 'Interface', 'Language', 'Theme', 'Toolchain Settings (ISE / Programmers)…', 'Check for Updates…', 'Check for Updates at Start-up', 'Keyboard Shortcuts', 'Tell Us Who You Are…']);
-  await settingsMenu(page, 'About Silinx ISE');
-  await page.waitDialog('About Silinx ISE');
+  assert.deepEqual(await settingsMenu(page), ['About Silinx', 'Interface', 'Language', 'Theme', 'Toolchain Settings (ISE / Programmers)…', 'Check for Updates…', 'Check for Updates at Start-up', 'Keyboard Shortcuts', 'Tell Us Who You Are…']);
+  await settingsMenu(page, 'About Silinx');
+  await page.waitDialog('About Silinx');
   await page.key('Escape');
   await page.waitNoDialog();
   await settingsMenu(page, 'Toolchain Settings (ISE / Programmers)…');
@@ -69,7 +69,7 @@ uiTest('#1314 the header\'s Settings: About, Interface, Language, Theme, Check f
   await page.waitFor(() => document.documentElement.dataset.theme === 'light');
   assert.deepEqual(await settingsMenu(page, 'Language', 'Português'), ['English', 'Português']);
   await page.waitFor(() => document.getElementById('settings-btn').title === 'Definições', [], { what: 'Portuguese' });
-  assert.deepEqual(await settingsMenu(page), ['Acerca do Silinx ISE', 'Interface', 'Idioma', 'Tema', 'Definições da Toolchain (ISE / Programadores)…', 'Procurar Atualizações…', 'Procurar Atualizações no Arranque', 'Atalhos de Teclado', 'Diga-nos Quem É…']);
+  assert.deepEqual(await settingsMenu(page), ['Acerca do Silinx', 'Interface', 'Idioma', 'Tema', 'Definições da Toolchain (ISE / Programadores)…', 'Procurar Atualizações…', 'Procurar Atualizações no Arranque', 'Atalhos de Teclado', 'Diga-nos Quem É…']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // Interface ▸ ISE style: the ISE style interface (no header buttons there), its menus
   await settingsMenu(page, 'Interface', 'ISE style');
@@ -155,7 +155,7 @@ uiTest('View ▸ Interface: the ISE style look and back, live and remembered aft
   await page.closeMenus();
 }, O);
 
-// #987: neither interface's header shows the product and version (Silinx ISE 15.12.0): the ISE style title bar the project
+// #987: neither interface's header shows the product and version (Silinx 15.12.0): the ISE style title bar the project
 // and its document, the Silinx header the logo and the project; the product and version the logo's tooltip and the
 // window's title
 uiTest('#987 the header: the project and its document, not the product and version, in the Silinx and ISE style interfaces', E, async (page) => {
@@ -166,8 +166,8 @@ uiTest('#987 the header: the project and its document, not the product and versi
     await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'ISE style' ? 'ise' : 'silinx']);
     const none = await head();
     assert.doesNotMatch(none.text, /Silinx|\d+\.\d+\.\d+/, look);
-    assert.match(none.logo, /^Silinx ISE \S/, look);
-    assert.match(none.window, /^Silinx ISE \S.* Project Navigator$/, look);
+    assert.match(none.logo, /^Silinx \S/, look);
+    assert.match(none.window, /^Silinx \S.* Project Navigator$/, look);
     if (look === 'ISE style') assert.equal(none.text, 'S Project Navigator');
   }
   await makeProject(env, { name: 'HeadPj', template: 'gates' });
@@ -177,7 +177,7 @@ uiTest('#987 the header: the project and its document, not the product and versi
     await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'ISE style' ? 'ise' : 'silinx']);
     const pj = await head();
     assert.doesNotMatch(pj.text, /Silinx|\d+\.\d+\.\d+/, look);
-    assert.match(pj.window, /^HeadPj — Silinx ISE \S/, look);
+    assert.match(pj.window, /^HeadPj — Silinx \S/, look);
     assert.match(pj.text, look === 'ISE style' ? /^S HeadPj - \[.+\]$/ : /^S$/, look);   // (Silinx: no project chip, #1042; the project in the window's title and in Design)
   }
   // in Portuguese the ISE style title bar's Design Summary too (#1007)
@@ -269,7 +269,7 @@ uiTest('#2676 the ISE style interface\'s theme: View ▸ Theme ▸ System / Ligh
   await page.eval(LUM);
   assert.ok((await lums()).every((l) => l < 0.3), 'dark after a reload');
   // a dialog and the HDL editor dark
-  await page.menu('Help', 'About Silinx ISE');
+  await page.menu('Help', 'About Silinx');
   await page.waitDialog();
   assert.ok((await lumsOf(['.dlg', '.dlg-title', '.dlg .btn'])).every((l) => l < 0.3), 'a dark dialog');
   await page.eval(() => document.querySelectorAll('.dlg-overlay').forEach((d) => d.remove()));
@@ -299,9 +299,9 @@ uiTest('command palette: Ctrl+K, search, arrow keys, Enter runs a command or ope
   assert.equal(await page.eval(() => document.querySelector('.pal-input').getAttribute('aria-activedescendant')), 'pal-0');
   // a command: About
   await page.type('about');
-  await page.waitFor(() => document.querySelector('.pal-item.sel .pal-label')?.textContent === 'About Silinx ISE', [], { what: 'About first' });
+  await page.waitFor(() => document.querySelector('.pal-item.sel .pal-label')?.textContent === 'About Silinx', [], { what: 'About first' });
   await page.key('Enter');
-  await page.waitDialog('About Silinx ISE');
+  await page.waitDialog('About Silinx');
   assert.equal(await page.eval(() => document.querySelectorAll('.pal-overlay').length), 0);
   await page.key('Escape');
   await page.waitNoDialog();

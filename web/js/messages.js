@@ -38,7 +38,7 @@ export function sourceOf(line, cur = 'app') {
   if (/^=== SILINX STEP \w+/.test(s)) return 'impl';
   if (/^(ERROR: )?Board Emulator:/.test(s)) return 'emu';
   if (/^(Scanning JTAG chain|Programming |Verifying |Erasing |Backing up |Reloading the FPGA from the PROM)\S*.*\.\.\.$/.test(s)) return 'impl';   // (the board's: Implementation's, #1173)
-  if (/^Project ".*" (opened|closed)|^Toolchain: |^Programmers found: |^Silinx ISE \S+ (is up to date|Project Navigator)|^Browser edition: /.test(s)) return 'app';
+  if (/^Project ".*" (opened|closed)|^Toolchain: |^Programmers found: |^Silinx \S+ (is up to date|Project Navigator)|^Browser edition: /.test(s)) return 'app';
   return cur;
 }
 

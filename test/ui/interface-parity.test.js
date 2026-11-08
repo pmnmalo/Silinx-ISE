@@ -33,7 +33,7 @@ const OPEN = ['src/traffic.fsm.json', 'src/lamps.bool.json', 'src/net.pn.json', 
 
 // the same action under another label in the other interface: [its key there, the key it is reached by here]
 const SAME = [
-  ['about', 'about silinx ise'],   // the ISE style's toolbar; the Silinx interface's Settings, both interfaces' Help
+  ['about', 'about silinx'],   // the ISE style's toolbar; the Silinx interface's Settings, both interfaces' Help
   ['toolchain settings', 'toolchain settings (ise / programmers)'],   // (the same)
   ['configure target device (impact)', 'impact (configure target device)'],   // the toolbar's; Tools ▸ iMPACT
   ['stop the running process', 'stop'],   // the toolbar's; Process ▸ Stop
