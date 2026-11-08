@@ -328,6 +328,16 @@ function netsOf(mod, insts, device, v) {
       const x = device.pip(k, pi);
       net.pips.push({ tile: x.tile, from: x.from, dir: x.dir, to: x.to });
     }
+    // a carry read by logic mid-chain (#3076), out by YB and on up the column by COUT: two nets, as Silinx's packer
+    // writes them (pack-nets.js): the logic's from YB, `<net>_COUT` from COUT to the next slice's CIN
+    const cout = net.outpins.find(p => p.pin === 'COUT');
+    if (cout && net.outpins.some(p => p.pin === 'YB' && p.inst === cout.inst)) {
+      const up = x => /^COUT\d$/.test(x.from);
+      nets.push({ name: `${name}_COUT`, type: 'wire', outpins: [cout], inpins: net.inpins.filter(p => p.pin === 'CIN'), pips: net.pips.filter(up) });
+      net.outpins = net.outpins.filter(p => p !== cout);
+      net.inpins = net.inpins.filter(p => p.pin !== 'CIN');
+      net.pips = net.pips.filter(x => !up(x));
+    }
     if (net.outpins.length || net.inpins.length) nets.push(net);
   }
   return nets;
@@ -336,7 +346,8 @@ function netsOf(mod, insts, device, v) {
 /** The check of the LUTs' pins: each input's net is the net on the site pin its equation reads it from. */
 function checkLutPins(mod, insts, nets) {
   const netAt = new Map();   // "inst pin" -> the net's first bit
-  for (const net of nets) for (const p of net.inpins) netAt.set(`${p.inst} ${p.pin}`, mod.netnames[net.name].bits[0]);
+  // (a carry's `<net>_COUT` is not the netlist's: it reaches only a CIN)
+  for (const net of nets) if (mod.netnames[net.name]) for (const p of net.inpins) netAt.set(`${p.inst} ${p.pin}`, mod.netnames[net.name].bits[0]);
   for (const inst of insts.values()) {
     for (const [side, lut] of [['F', inst.cells.FLUT], ['G', inst.cells.GLUT]]) {
       if (!lut) continue;

@@ -255,6 +255,43 @@ test('#2196 the carry out\'s XDL implements its netlist; one taken away is caugh
     assert.equal(simCheck(json, parseXdl(text.replaceAll(`${attr}::0`, '')), { cycles: 2000, starts: 100 }).ok, false, attr);
 });
 
+// nextpnr 1.4.1's routed chain_mid_carry (the fork's test netlist, seed 1): a 6-stage carry chain whose carries after
+// stages 0 (F's), 1 and 3 (G's COUT, which goes on up the column too) and 5 are read by a LUT, as Silinx's synthesis of
+// the EPFL multiplier at Optimization Area leaves them; 1.4.0's packer stopped on it ("not supported yet", #3076)
+const midRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/carry-mid-routed.json.gz', import.meta.url))));
+const mid = nextpnrToXdl(midRouted(), device, PART);
+
+test('#3076 nextpnrToXdl: a carry read mid-chain out by XB / YB, a G stage\'s on up by COUT on a net of its own', () => {
+  assert.deepEqual(xdlSize(mid), { slices: 10, luts: 7, ffs: 19 });
+  const pinsOf = name => mid.nets.find(n => n.name === name), at = name => mid.insts.find(i => i.name === name);
+  assert.deepEqual(pinsOf('co0').outpins, [{ inst: 'q0_ff', pin: 'XB' }]);
+  // a G stage's carry: YB for the logic, and (as Silinx's packer writes it) COUT to the next slice's CIN on `<net>_COUT`
+  for (const [co, slice, next] of [['co1', 'q0_ff', 'q2_ff'], ['co3', 'q2_ff', 'q4_ff']]) {
+    assert.deepEqual(pinsOf(co).outpins, [{ inst: slice, pin: 'YB' }], co);
+    assert.ok(pinsOf(co).inpins.every(p => p.pin !== 'CIN'), co);
+    assert.deepEqual(pinsOf(`${co}_COUT`).outpins, [{ inst: slice, pin: 'COUT' }], co);
+    assert.deepEqual(pinsOf(`${co}_COUT`).inpins, [{ inst: next, pin: 'CIN' }], co);
+    assert.ok(cfg(at(slice), 'YBUSED') && cfg(at(slice), 'COUTUSED'), slice);
+  }
+  // the chain's last carry: YB only, no COUT
+  assert.deepEqual(pinsOf('co5').outpins, [{ inst: 'q4_ff', pin: 'YB' }]);
+  assert.equal(cfg(at('q4_ff'), 'COUTUSED'), undefined);
+  assert.equal(count(mid, /^XBUSED::0$/), 1);
+  assert.equal(count(mid, /^YBUSED::0$/), 3);
+  assert.deepEqual(checkRouting(mid, device).problems, []);
+  assert.deepEqual(bitgen(mid, loadDb(PART), { name: 'mid.ncd', crc: true, startupClk: 'JtagClk', part: PART }).unknown, []);
+});
+
+test('#3076 the mid-chain carries\' XDL implements its netlist; XBUSED, YBUSED or a COUTUSED taken away is caught', () => {
+  const json = midRouted();
+  const r = simCheck(json, mid, { cycles: 2000, starts: 100 });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 19);
+  const text = writeXdl(mid);
+  for (const attr of ['XBUSED', 'YBUSED', 'COUTUSED'])
+    assert.equal(simCheck(json, parseXdl(text.replaceAll(`${attr}::0`, '')), { cycles: 2000, starts: 100 }).ok, false, attr);
+});
+
 test('#2196 a global buffer\'s clock pins are on its global lines, none on general routing', () => {
   const clocks = vga.nets.filter(n => n.inpins.some(p => p.pin === 'CLK'));
   assert.equal(clocks.length, 1);
