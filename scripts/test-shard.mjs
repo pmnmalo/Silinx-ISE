@@ -7,6 +7,7 @@
 //   node scripts/test-shard.mjs <i>/<n> [--ui] [node --test options …]
 //   → runs node --test with those options on the files of part i of n (the unit tests, UNIT_DIRS; with --ui the UI
 //     tests, test/ui/*.test.js, #912); --dry-run prints the parts and their estimated times instead
+//     (--light: the unit tests but the toolchain's heaviest, HEAVY, which CI runs on Linux only, #3124)
 //
 // The options go before the files: after them node --test takes no option (CI's UI tests were given
 // --test-concurrency=1 after their files, and ran three files at a time, #912). The UI tests' timings are in
@@ -25,6 +26,22 @@ export const TIMINGS = 'test/timings.json';
 export const UNIT_DIRS = ['test', 'packages/silinx-fpga/test'];
 /** A unit test file's path. */
 export const UNIT_TESTS = /^(?:test|packages\/silinx-fpga\/test)\/[^/]+\.test\.js$/;
+
+/** The toolchain's heaviest unit tests (#3124): the whole open flow on every feature, device and example, the
+ *  post-place & route and the Spartan-6 models of the examples, the synthesis compared on the corpus, nextpnr's engine.
+ *  About half the unit tests' time; CI runs them on Linux only, macOS and Windows the others (--light), with
+ *  test/open-flow.test.js (blinky to a bitstream, the shipped devices) and the small tests of each step as their smoke test. */
+export const HEAVY = [
+  'packages/silinx-fpga/test/nextpnr-engine.test.js', 'packages/silinx-fpga/test/nextpnr-hard.test.js',
+  'test/blockram-flow.test.js', 'test/carry-chain.test.js', 'test/carry-select.test.js', 'test/clocking-flow.test.js',
+  'test/examples-nextpnr-s3e.test.js', 'test/examples-nextpnr-s6.test.js', 'test/examples.test.js', 'test/lut-resynth.test.js',
+  'test/nextpnr-size.test.js', 'test/open-flow-clocks.test.js', 'test/open-flow-core.test.js', 'test/open-flow-features.test.js',
+  'test/open-flow-io.test.js', 'test/s6-place.test.js', 'test/sim-model-examples.test.js', 'test/sim-model-impl.test.js',
+  'test/sim-model-par-examples.test.js', 'test/sim-model-par-micro80.test.js', 'test/sim-model-par-vga-verilog.test.js',
+  'test/sim-model-par-vga.test.js', 'test/sim-model-par.test.js', 'test/sim-model-s6-vga.test.js', 'test/sim-model-s6.test.js',
+  'test/synth-diff-fixtures.test.js', 'test/synth-diff.test.js', 'test/synth-fsm.test.js', 'test/synth-goal.test.js',
+  'test/synth-open.test.js', 'test/synth-quality.test.js',
+];
 
 /** The test files of a folder (dir 'test', the UI tests' 'test/ui'), relative to the root with '/', sorted. */
 export function testFiles(root = ROOT, dir = 'test') {
@@ -74,10 +91,10 @@ function main() {
   const [arg, ...args] = process.argv.slice(2);
   let shard;
   try { shard = parseShard(arg); } catch (e) { console.error(e.message); process.exit(2); }
-  const ui = args.includes('--ui');
-  const rest = args.filter(a => a !== '--ui');
+  const ui = args.includes('--ui'), light = args.includes('--light');
+  const rest = args.filter(a => a !== '--ui' && a !== '--light');
   const dry = rest.includes('--dry-run');
-  const files = ui ? testFiles(ROOT, 'test/ui') : unitFiles(ROOT);
+  const files = ui ? testFiles(ROOT, 'test/ui') : unitFiles(ROOT).filter(f => !light || !HEAVY.includes(f));
   const w = weights(files, readTimings());
   const parts = balance(files, w, shard.n);
   if (dry) {

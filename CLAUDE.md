@@ -119,11 +119,14 @@ the code and the lessons learnt.
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
 - **CI** (`.github/workflows/ci.yml`) runs everything when a version tag `v*` is pushed, and by hand
-  (Actions ▸ CI ▸ Run workflow): the unit tests on Linux, macOS and Windows, the UI tests in both
+  (Actions ▸ CI ▸ Run workflow): the unit tests on Linux, macOS and Windows (the toolchain's heaviest, `HEAVY` in
+  `scripts/test-shard.mjs`, on Linux only, #3124), the UI tests in both
   interfaces, Firefox / WebKit, the operating systems' smoke tests, WebKit memory, the standalone build,
-  the release zip. The unit tests run in three parts of about the same time, and the UI tests in three parts
+  the release zip; the tags' runs one at a time. The unit tests run in parts of about the same time (five on Linux, three
+  on macOS and Windows), and the UI tests in three parts
   per interface, one file at a time (`scripts/test-shard.mjs`, `--ui` for the UI tests, by
-  `test/timings.json`; refresh it now and then with `node scripts/update-test-timings.mjs <run id>`). The
+  `test/timings.json`; refresh it after a release with `node scripts/update-test-timings.mjs <run id>`). A test file
+  takes at most 15 minutes (its tests run one after another and set its part's time): a longer one is split. The
   development build and the site's `dev/` are published after every push to `main` (no tests).
   The security checks
   (#498, `SECURITY.md`): CodeQL analyses the JavaScript (`codeql.yml`, a workflow of its own, nightly
