@@ -15,6 +15,7 @@ import { h } from './dom.js';
 import { mountBoardParts } from './emulator-board.js';
 import { mountEmuSerial } from './emulator-serial.js';
 import { UART_GROUPS } from '/core/uart.js';
+import { pressHolds } from '/core/emulate-press.js';
 import { mountEmuSide } from './emulator-side.js';
 import { mountEmuPaint } from './emulator-paint.js';
 import { mountEmuToolbar } from './emulator-toolbar.js';
@@ -293,11 +294,12 @@ export function mountEmulator(container, { design, board, assignments, title = '
     applyInput(b.sig, m);
   };
 
+  const holds = pressHolds();   // (a push button let go held down until the design saw a real press, #3109)
   // ---- interactive parts (placed by the board layout below) (emulator-board.js)
   const { digits, leds, powerSwitches, vgaWired } = mountBoardParts({
-    board, title, after: (...a) => after(...a), bitFor, compiled: () => compiled, hasLcd, inVal, knobEnd: () => knobEnd,
+    board, title, after: (...a) => after(...a), bitFor, compiled: () => compiled, hasLcd, holds, inVal, knobEnd: () => knobEnd,
     lcdView: () => lcdView, main, manual, period, powered: () => powered, refresh: (...a) => refresh(...a), resLabel,
-    resOf, runCycles: (...a) => runCycles(...a), running: () => running, setInputBit,
+    resOf, runCycles: (...a) => runCycles(...a), running: () => running, setInputBit, speed: () => speed,
     setPower: (...a) => setPower(...a), sim, tip, wiring, setKnobEnd: (v) => { knobEnd = v; },
     setLcdView: (v) => { lcdView = v; }
   });
@@ -384,6 +386,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   function step() { setRunning(false); after(runCycles(1)); }
   function setRunning(on) {
     running = on && powered && !sim.finished;
+    if (!running) holds.flush();   // (paused, powered off: the buttons let go held down released)
     runBtn.textContent = running ? '⏸ Pause' : '▶ Run';
     stepBtn.disabled = running || !powered;
     runBtn.disabled = !powered;
@@ -486,7 +489,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   // what the board shows is to be drawn: at once when paused (a step, a power cycle), else by the next frame,
   // at most once per displayed frame; nothing while it is not seen (drawn when it is again, #719)
   function refresh() {
-    dirty = true;
+    dirty = true; holds.tick(sim.now);   // (after every run: a button let go whose press the design saw released)
     if (!running) paint();
     else if (!raf && !paintRaf && shown()) paintRaf = requestAnimationFrame(() => { paintRaf = 0; paint(); });
   }
