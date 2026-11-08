@@ -87,15 +87,16 @@ export async function runFlow(spec, io) {
     if (fe.errors.length) throw new StepError('the design has errors', fe.errors, 'Fix them (Check Syntax shows them in the Errors tab).');
     log(`Writing <${top}> as one flat module for Yosys; Yosys (WebAssembly) maps it onto the ${spec.family} cells.`);
     // (the synthesis's Optimization Effort, #282)
-    if (goal === 'fast') log('Optimization Fast: one mapping, none of the mappings for speed; one placement, no register replication.');
+    if (goal === 'fast') log('Optimization Fast: one mapping, none of the mappings for speed but for a design limited by its logic depth; one placement, no register replication.');
     else if (area && backend.areaSynth) log('Optimization Area: the usual mapping and the mappings for speed, the smaller netlist kept; one placement, no register replication.');
     else if (spec.synthEffort) log(spec.synthEffort === 'normal' ? 'Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).'
       : 'Optimization Effort High: the mappings for speed tried too, the fastest kept.');
     let r;
     try {
       // (a family of Yosys's own script has one mapping: Area as Speed)
-      const synth = (area && backend.areaSynth) || backend.synth;
-      r = await synth(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(goal === 'fast' && FAST_SYNTH), ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
+      const fast = goal === 'fast' && backend.fastSynth;
+      const synth = (area && backend.areaSynth) || fast || backend.synth;
+      r = await synth(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(goal === 'fast' && !fast && FAST_SYNTH), ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
     } catch (e) {
       for (const l of e.lines || []) if (/ERROR/.test(l)) log(l);
       throw new StepError(`synthesis failed: ${e.message}`);
@@ -105,6 +106,8 @@ export async function runFlow(spec, io) {
       const n = x => (x.slices != null ? `${x.slices} slices, ${x.luts} LUTs` : `${x.luts} LUTs`);
       log(`Optimization Area: the usual mapping ${n(r.area.usual)}, the mappings for speed ${n(r.area.speed)}: ${r.area.kept === 'usual' ? 'the usual mapping' : 'the mappings for speed\''} kept.`);
     }
+    // (Fast: a design limited by its depth synthesized as at Speed too, #3096)
+    if (r.fast) log(`Optimization Fast: ${r.fast.levels} levels of logic: the mappings for speed tried too, ${r.fast.kept === 'speed' ? `kept (${r.fast.speed.ns.toFixed(1)} ns estimated against ${r.fast.usual.ns.toFixed(1)}).` : `not ${Math.round(100 * (spec.deepRule || DEEP_RULE).gain)} % faster (${r.fast.speed.ns.toFixed(1)} ns estimated against ${r.fast.usual.ns.toFixed(1)}): the usual mapping kept.`}`);
     // (Normal: a small design synthesized as at High, #652)
     if (r.depth?.small) log(`Optimization Effort Normal: a small design (${r.depth.small.luts} LUTs): the mappings for speed tried too, ${r.depth.small.kept ? 'the fastest kept.' : `not faster (${r.depth.small.ns[1].toFixed(1)} ns estimated against ${r.depth.small.ns[0].toFixed(1)}): the one mapping kept.`}`);
     // (Normal: a design limited by its depth got the mappings for speed too, #468)
