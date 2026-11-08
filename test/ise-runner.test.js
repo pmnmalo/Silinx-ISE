@@ -36,14 +36,23 @@ function hook(env) {
   const r = spawnSync('sh', [path.join(DIR, 'job-started.sh')], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8' });
   return { code: r.status, out: r.stdout, err: r.stderr };
 }
-const OK = { GITHUB_REPOSITORY: REPO, GITHUB_EVENT_NAME: 'schedule', GITHUB_REF: 'refs/heads/main', GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/ise.yml@refs/heads/main` };
+const ID = '1407836659';   // the repository's ID, which its renames keep (#2624)
+const OK = { GITHUB_REPOSITORY: REPO, GITHUB_REPOSITORY_ID: ID, GITHUB_EVENT_NAME: 'schedule', GITHUB_REF: 'refs/heads/main', GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/ise.yml@refs/heads/main` };
 
 test('hook: the ISE and Quality workflows of main, on schedule or by hand, run', { skip: !posix }, () => {
   for (const wf of WORKFLOWS) for (const ev of ['schedule', 'workflow_dispatch']) {
     const r = hook({ ...OK, GITHUB_EVENT_NAME: ev, GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/${wf}@refs/heads/main` });
     assert.equal(r.code, 0, `${wf} ${ev}: ${r.err}`);
-    assert.equal(r.out, `Silinx ISE runner: ${REPO}/.github/workflows/${wf}@refs/heads/main (${ev}) allowed\n`);
+    assert.equal(r.out, `Silinx runner: ${REPO}/.github/workflows/${wf}@refs/heads/main (${ev}) allowed\n`);
     assert.equal(r.err, '');
+  }
+});
+
+// #2624: the repository renamed (pmnmalo/Silinx-ISE to pmnmalo/Silinx), its ID kept: its two workflows still run
+test("#2624 hook: the renamed repository's workflows run, by its ID and its new name", { skip: !posix }, () => {
+  for (const wf of WORKFLOWS) {
+    const r = hook({ ...OK, GITHUB_REPOSITORY: 'pmnmalo/Silinx', GITHUB_WORKFLOW_REF: `pmnmalo/Silinx/.github/workflows/${wf}@refs/heads/main` });
+    assert.deepEqual(r, { code: 0, out: `Silinx runner: pmnmalo/Silinx/.github/workflows/${wf}@refs/heads/main (schedule) allowed\n`, err: '' }, wf);
   }
 });
 
@@ -59,16 +68,22 @@ test('hook: every other job is refused before its first step, saying why', { ski
     [{ GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/ise.yml@refs/heads/other` }, `workflow '${REPO}/.github/workflows/ise.yml@refs/heads/other'`],
     [{ GITHUB_REF: 'refs/heads/other' }, "ref 'refs/heads/other'"],
     [{ GITHUB_WORKFLOW_REF: `someone/Silinx-ISE/.github/workflows/ise.yml@refs/heads/main` }, "workflow 'someone/Silinx-ISE/.github/workflows/ise.yml@refs/heads/main'"],
-    [{ GITHUB_REPOSITORY: 'someone/Silinx-ISE' }, "repository 'someone/Silinx-ISE'"],
+    [{ GITHUB_REPOSITORY: 'someone/Silinx-ISE', GITHUB_REPOSITORY_ID: '42' }, "repository 'someone/Silinx-ISE' (ID '42')"],
+    // #2624: a repository given this one's old name after its rename is another repository (another ID)
+    [{ GITHUB_REPOSITORY_ID: '42' }, `repository '${REPO}' (ID '42')`],
+    [{ GITHUB_REPOSITORY_ID: '' }, `repository '${REPO}' (ID '')`],
+    [{ GITHUB_REPOSITORY: '' }, `repository '' (ID '${ID}')`],
+    // the renamed repository's jobs name their workflows by its new name
+    [{ GITHUB_REPOSITORY: 'pmnmalo/Silinx' }, `workflow '${REPO}/.github/workflows/ise.yml@refs/heads/main'`],
     [{ GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/ise.yml@refs/heads/main.evil` }, `workflow '${REPO}/.github/workflows/ise.yml@refs/heads/main.evil'`],
     // nothing set (an old runner): refused, not allowed
-    [{ GITHUB_REPOSITORY: '', GITHUB_EVENT_NAME: '', GITHUB_REF: '', GITHUB_WORKFLOW_REF: '' }, "repository ''"],
+    [{ GITHUB_REPOSITORY: '', GITHUB_REPOSITORY_ID: '', GITHUB_EVENT_NAME: '', GITHUB_REF: '', GITHUB_WORKFLOW_REF: '' }, "repository '' (ID '')"],
   ];
   for (const [env, why] of cases) {
     const r = hook({ ...OK, ...env });
     assert.equal(r.code, 1, JSON.stringify(env));
     assert.equal(r.out, '');
-    assert.equal(r.err, `Silinx ISE runner: refused, ${why} (only ${REPO}'s ise.yml and quality.yml of main, on schedule or by hand, run here)\n`);
+    assert.equal(r.err, `Silinx runner: refused, ${why} (only repository ${ID}'s ise.yml and quality.yml of main, on schedule or by hand, run here)\n`);
   }
 });
 
@@ -314,7 +329,9 @@ test('workflows: only ise.yml and quality.yml reach the ISE runner, as the hook 
   assert.deepEqual(WORKFLOWS, [...new Set(reach.map(j => j.split(':')[0]))]);
   const hookText = fs.readFileSync(path.join(DIR, 'job-started.sh'), 'utf8');
   for (const f of WORKFLOWS) assert.ok(hookText.includes(`"$REPO/.github/workflows/${f}@refs/heads/main"`), f);
-  assert.match(hookText, /^REPO=pmnmalo\/Silinx-ISE$/m);
+  // the hook and the two workflows name the repository by the same ID (#2624: its renames keep it)
+  assert.match(hookText, new RegExp(`^REPO_ID=${ID}$`, 'm'));
+  for (const f of WORKFLOWS) assert.ok(fs.readFileSync(path.join(WF, f), 'utf8').includes(`github.repository_id == '${ID}'`), f);
   // the window opens before ise.yml's cron in every season (Lisbon: UTC+0 or +1)
   assert.match(fs.readFileSync(path.join(WF, 'ise.yml'), 'utf8'), /cron: '47 21 \* \* \*'/);
   assert.ok(OPEN.hour * 60 + OPEN.minute < 21 * 60 + 47);
