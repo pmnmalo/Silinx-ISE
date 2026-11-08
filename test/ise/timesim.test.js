@@ -29,7 +29,7 @@ const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST &&
 let tmp;
 before(() => {
   if (skip) return;
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-timesim-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-timesim-'));
   process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');
   fs.mkdirSync(process.env.SILINX_CONFIG_DIR, { recursive: true });
   fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify({

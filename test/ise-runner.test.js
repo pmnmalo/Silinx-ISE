@@ -301,6 +301,14 @@ test('window.sh: root\'s own Node.js copy first, then the runner\'s', { skip: !p
   assert.match(text, /^node="\$\(dirname "\$0"\)\/node"\n\[ -x "\$node" \] \|\| node=\$\(ls -d "\$RUNNER_DIR"\/externals\/node\*\/bin\/node/m);
 });
 
+// #2624: the installer's check ("its log says …") quotes the hook's own message, not an older name of it
+test("install.sh: the log line it tells to look for is the hook's", () => {
+  const hook = fs.readFileSync(path.join(DIR, 'job-started.sh'), 'utf8');
+  const said = [...fs.readFileSync(path.join(DIR, 'install.sh'), 'utf8').matchAll(/its log says '([^']+)'/g)].map(m => m[1]);
+  assert.deepEqual(said, ['Silinx runner: ... allowed', 'Silinx runner: ... allowed']);
+  assert.match(hook, /^echo "Silinx runner: \$\{GITHUB_WORKFLOW_REF\} \(\$\{GITHUB_EVENT_NAME\}\) allowed"$/m);
+});
+
 // ---------------------------------------------------------------- the label
 
 test('workflows: only ise.yml and quality.yml reach the ISE runner, as the hook and the window say', () => {

@@ -1,6 +1,6 @@
 // Silinx design corpus, Basys2 board top: SERV, Olof Kindgren's bit-serial RISC-V CPU (serv_rf_top,
 // RV32I, fetched, never committed), running a program of 8 instructions from a ROM written here: a
-// counter shown on the LEDs. Part of Silinx ISE (AGPL-3.0-only).
+// counter shown on the LEDs. Part of Silinx (AGPL-3.0-only).
 //   LD7..LD0: a binary counter, one step about every second (the CPU's delay loop)
 //   BTN0: reset (the counter starts again from 1)
 // The program (RV32I, hand-assembled):

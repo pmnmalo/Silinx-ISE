@@ -13,7 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE = 'xilinx/ise:14.7';
 const HOST = { user: 'me', host: 'build-box' };
 let tmp, saved;
-before(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-cfg-')); saved = process.env.SILINX_CONFIG_DIR; });
+before(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-cfg-')); saved = process.env.SILINX_CONFIG_DIR; });
 after(() => {
   if (saved === undefined) delete process.env.SILINX_CONFIG_DIR; else process.env.SILINX_CONFIG_DIR = saved;
   fs.rmSync(tmp, { recursive: true, force: true });

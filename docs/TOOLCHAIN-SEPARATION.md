@@ -275,7 +275,7 @@ VHDL / Verilog ─▶ Silinx front end (the IDE) ─▶ flat Verilog ─▶ sili
 
 Decided (27 October 2026): the front end becomes **`silinx-hdl`**, a package of this repository (an npm
 workspace) that stays here when `silinx-fpga` leaves; Apache-2.0, as `silinx-fpga`; published to npm from this
-repository with its own semver (the name was free on npm). The IDE (Silinx ISE) is then the editors, the
+repository with its own semver (the name was free on npm). The IDE (Silinx) is then the editors, the
 drawings, the simulation, HLS, ISE and the board around the two packages, and `silinx-fpga` never depends on
 `silinx-hdl` (an optional peer dependency of its command line):
 
@@ -283,7 +283,7 @@ drawings, the simulation, HLS, ISE and the board around the two packages, and `s
 silinx-hdl (this repository)      silinx-fpga (its own repository)
 VHDL / Verilog ─▶ flat Verilog ─▶ Yosys, pack, place, route, bitgen ─▶ .bit, reports
         ▲                                     ▲
-        └──── Silinx ISE (the IDE) uses both ─┘
+        └────── Silinx (the IDE) uses both ───┘
 ```
 
 The front end imports nothing else of the IDE today (its 40 modules include the interpreter and the event

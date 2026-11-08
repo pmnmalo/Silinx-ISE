@@ -68,7 +68,7 @@ test('#1678 the API (its entry) imports nothing of Node: it runs in the browser 
   for (const f of seen) assert.ok(f.startsWith(path.join(DIR, 'src') + path.sep), f);
 });
 
-// what Silinx ISE's pages load before the toolchain runs (#1678: these 7 modules, not the toolchain's 58)
+// what Silinx's pages load before the toolchain runs (#1678: these 7 modules, not the toolchain's 58)
 test('#1678 ./parts: light, nothing of Node and none of the synthesis, pack, place, route, timing or bitgen', () => {
   const { seen, nodeOnly } = modulesOf('parts.js');
   assert.deepEqual(nodeOnly, []);

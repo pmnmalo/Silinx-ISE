@@ -34,7 +34,7 @@ test('silinx-fpga\'s fragments: well formed, README.md apart; its CHANGELOG.md',
   assert.deepEqual(fs.readdirSync(dir).filter(f => !f.endsWith('.md')), []);
   const md = fs.readFileSync(path.join(ROOT, 'packages/silinx-fpga/CHANGELOG.md'), 'utf8');
   assert.match(md, /^# Changelog\n\nWhat changed in each version of silinx-fpga/);
-  // its versions are its own, 0.x, with their own notes: a number Silinx ISE once had too (its early 0.1.0) is no
+  // its versions are its own, 0.x, with their own notes: a number Silinx once had too (its early 0.1.0) is no
   // clash (the tags differ, silinx-fpga-v0.1.0 and v0.1.0), a section copied from its changelog is
   const ide = new Map(parseChangelog(fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8')).map(s => [s.version, s.body]));
   const own = parseChangelog(md);

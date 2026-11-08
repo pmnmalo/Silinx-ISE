@@ -1,9 +1,9 @@
 # silinx-fpga's changelog fragments
 
-What changed in silinx-fpga since its last release, one file per change, in the format of Silinx ISE's
+What changed in silinx-fpga since its last release, one file per change, in the format of Silinx's
 fragments ([changes/README.md](../../../changes/README.md): `<issue>-<slug>.md`, an optional "In short:" for
 what the package's users notice, the "In detail:" items naming the issue). A pull request that changes the
-package (`packages/silinx-fpga`) adds its fragment here; it adds one to Silinx ISE's `changes/` too when the
+package (`packages/silinx-fpga`) adds its fragment here; it adds one to Silinx's `changes/` too when the
 IDE's users notice the change.
 
 A release of the package assembles them into [CHANGELOG.md](../CHANGELOG.md) and deletes them:

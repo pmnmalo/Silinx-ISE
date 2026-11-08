@@ -27,7 +27,7 @@ export function addAnalytics(html, code) {
   const loader = `<script id="${MARK}">
 /* usage counts of the published site: GoatCounter, no cookies, no personal data (web/js/analytics.js); its title fixed and
    no referrer: the page's title names the project, the referrer may name a course */
-if (/\\.github\\.io$/.test(location.hostname)) { var s = document.createElement('script'); s.async = true; s.src = '${COUNT_JS}'; s.integrity = '${COUNT_JS_INTEGRITY}'; s.crossOrigin = 'anonymous'; s.dataset.goatcounter = 'https://${code}.goatcounter.com/count'; s.dataset.goatcounterSettings = '{"title":"Silinx ISE","referrer":""}'; document.head.appendChild(s); }
+if (/\\.github\\.io$/.test(location.hostname)) { var s = document.createElement('script'); s.async = true; s.src = '${COUNT_JS}'; s.integrity = '${COUNT_JS_INTEGRITY}'; s.crossOrigin = 'anonymous'; s.dataset.goatcounter = 'https://${code}.goatcounter.com/count'; s.dataset.goatcounterSettings = '{"title":"Silinx","referrer":""}'; document.head.appendChild(s); }
 </script>
 `;
   const i = html.lastIndexOf('</body>');

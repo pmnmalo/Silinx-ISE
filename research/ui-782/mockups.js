@@ -1,4 +1,4 @@
-// Silinx ISE, a third interface (#782): clickable mock-ups of three directions, each task at four
+// Silinx, a third interface (#782): clickable mock-ups of three directions, each task at four
 // screen sizes. Static: no build step, no server; the content is the pong example's (examples/pong)
 // and the messages are the ones the app printed for it. Nothing here is the app's code.
 
@@ -472,7 +472,7 @@ function dirA(c) {
   const [lv, lt] = LAST[t];
   const showLeft = leftHas && left && !max;
   return `
-  <header class="topbar"><span class="logo">S</span>${c.size === 'tabp' ? '' : '<span class="brand">Silinx ISE</span>'}<span class="chip">pong</span>
+  <header class="topbar"><span class="logo">S</span>${c.size === 'tabp' ? '' : '<span class="brand">Silinx</span>'}<span class="chip">pong</span>
     <span class="spacer"></span><nav class="tasks" aria-label="Tasks">${tasks}</nav><span class="spacer"></span>
     ${tab ? `<button class="ibtn" title="${T('Search commands and files…')}">${I('search')}</button>` : `<span class="search">${I('search')}<span>${T('Search commands and files…')}</span><kbd>Ctrl K</kbd></span>`}
   </header>
@@ -530,7 +530,7 @@ function dirB(c) {
   const flowtop = `<nav class="flowtop">${FLOW.map((f, i) => `<button data-act="task:${f.task}" aria-current="${f.task === t}"><span class="dot ${f.st}"></span>${i + 1} ${T(f.name)}</button>`).join('')}</nav>`;
   const watch = t === 'emu' && c.size === 'desk' && !max ? `<aside class="side right">${watchPanel()}</aside>` : '<div></div>';
   return `
-  <header class="topbar"><span class="logo">S</span>${c.size === 'tabp' ? '' : '<span class="brand">Silinx ISE</span>'}<span class="chip">pong</span>
+  <header class="topbar"><span class="logo">S</span>${c.size === 'tabp' ? '' : '<span class="brand">Silinx</span>'}<span class="chip">pong</span>
     <div class="crumb" style="margin-left:6px">${I(TASK_ICON[t])}<b>${T(cur.name)}</b><span>▸</span><span>${T(placeName)}</span></div><span class="spacer"></span>
     ${tab ? `<button class="ibtn">${I('search')}</button>` : `<span class="search">${I('search')}<span>${T('Search commands and files…')}</span><kbd>Ctrl K</kbd></span>`}
   </header>
@@ -569,7 +569,7 @@ function dirC(c) {
   const sheet = c.size === 'tabp';
   const toast = t === 'impl' || t === 'prog' ? `<div class="toast"><span class="ok">${I('check')}</span><span>${esc(LAST[t][1])}</span><button class="ibtn" data-act="dock:messages">${T('Log')}</button></div>` : '';
   return `
-  <header class="topbar"><span class="logo">S</span>${c.size === 'tabp' ? '' : '<span class="brand">Silinx ISE</span>'}<span class="chip">pong</span><span class="spacer"></span>
+  <header class="topbar"><span class="logo">S</span>${c.size === 'tabp' ? '' : '<span class="brand">Silinx</span>'}<span class="chip">pong</span><span class="spacer"></span>
     <label class="cmdbar"><span class="caret">›</span><span>${t === 'sim' ? 'run 8 us' : T('Type a command, a file or an ISim command')}</span>${tab ? '' : '<span class="spacer"></span><kbd>Ctrl K</kbd>'}</label><span class="spacer"></span>
     ${c.size === 'tabp' ? '' : quick}
     <button class="ibtn ${dockOpen && !max ? 'on' : ''}" data-act="toggle:right" title="${T('Show or hide the panel')}">${I('rpanel')}</button>

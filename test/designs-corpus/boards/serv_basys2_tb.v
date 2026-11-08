@@ -1,5 +1,5 @@
 // Silinx design corpus: testbench of serv_basys2 (SERV running the LED counter) with a short delay
-// loop (addi x3, x0, 3 instead of lui x3, 0x80): the LEDs must count 1, 2, 3, 4. Part of Silinx ISE
+// loop (addi x3, x0, 3 instead of lui x3, 0x80): the LEDs must count 1, 2, 3, 4. Part of Silinx
 // (AGPL-3.0-only).
 `timescale 1ns / 1ps
 module serv_basys2_tb;

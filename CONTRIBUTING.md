@@ -1,4 +1,4 @@
-# Contributing to Silinx ISE
+# Contributing to Silinx
 
 Contributions are welcome: bug reports, ideas and pull requests.
 

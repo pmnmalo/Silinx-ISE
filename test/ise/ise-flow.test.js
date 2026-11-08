@@ -32,7 +32,7 @@ const TOOLCHAIN = HOST
 let tmp, srv, base, jobs;
 before(async () => {
   if (skip) return;
-  tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'silinx-ise-flow-'));
+  tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'silinx-flow-'));
   process.env.SILINX_WORKSPACE = path.join(tmp, 'ws');
   process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');
   jobs = await import('../../server/jobs.js');

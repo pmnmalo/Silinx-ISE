@@ -1,6 +1,6 @@
 // Silinx design corpus, Basys2 board top: nandland's SPI master (spi-master, Verilog version,
 // fetched, never committed) with MISO looped back to MOSI: a press of BTN1 sends the switches'
-// byte, the byte received back is shown on the LEDs. Part of Silinx ISE (AGPL-3.0-only).
+// byte, the byte received back is shown on the LEDs. Part of Silinx (AGPL-3.0-only).
 //   SW7..SW0: the byte to send; BTN1: send; BTN0: reset
 //   LD7..LD0: the last byte received (the switches at the last press of BTN1)
 module spi_basys2 (input wire mclk, input wire [1:0] btn, input wire [7:0] sw, output reg [7:0] led = 8'h00);

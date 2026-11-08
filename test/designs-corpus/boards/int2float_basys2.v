@@ -1,5 +1,5 @@
 // Silinx design corpus, Basys2 board top: the EPFL benchmark int2float (an 11-bit integer to a
-// 7-bit float: 3-bit exponent, 4-bit mantissa), fetched, never committed. Part of Silinx ISE
+// 7-bit float: 3-bit exponent, 4-bit mantissa), fetched, never committed. Part of Silinx
 // (AGPL-3.0-only).
 //   integer = {BTN2, BTN1, BTN0, SW7..SW0}
 //   LD3..LD0 = mantissa, LD6..LD4 = exponent, LD7 = 1 (the board is configured)
