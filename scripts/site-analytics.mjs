@@ -3,7 +3,7 @@
 // to the pages of the site built by scripts/build-standalone.mjs --site (the stable root, dev/), by
 // .github/workflows/pages.yml when the repository variable GOATCOUNTER_CODE is set:
 //   node scripts/site-analytics.mjs <site folder> <GoatCounter code>
-// Only index.html (the page opened on the site): Silinx-ISE.html, the file people download and open
+// Only index.html (the page opened on the site): Silinx.html, the file people download and open
 // from their disk, never counts. The counter runs only on the published host (*.github.io).
 import fs from 'node:fs';
 import path from 'node:path';

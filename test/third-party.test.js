@@ -1,6 +1,6 @@
 // Licence notices: THIRD-PARTY-NOTICES.md and core/third-party.js list every production dependency
 // with its licence text (and are up to date), NOTICE carries the copyright, and the standalone
-// Silinx-ISE.html embeds the notices of the components it contains.
+// Silinx.html embeds the notices of the components it contains.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -47,12 +47,14 @@ test('licence: GNU AGPL-3.0 (LICENSE, package.json), NOTICE with the copyright a
   assert.match(fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8'), /## Licence[\s\S]*THIRD-PARTY-NOTICES\.md/);
 });
 
-test('the standalone Silinx-ISE.html embeds the copyright, the Apache licence and the licences of the editor\'s modules and elkjs', () => {
-  const dist = path.join(ROOT, 'dist', 'Silinx-ISE.html');
+test('the standalone Silinx.html embeds the copyright, the Apache licence and the licences of the editor\'s modules and elkjs', () => {
+  const dist = path.join(ROOT, 'dist', 'Silinx.html');
   const before = fs.existsSync(dist) ? fs.readFileSync(dist) : null;
   try {
     execFileSync(process.execPath, ['scripts/build-standalone.mjs'], { cwd: ROOT, stdio: 'pipe' });
     const html = fs.readFileSync(dist, 'utf8');
+    // #2624: its title marked (standalone), the product's name as web/index.html writes it
+    assert.match(html, /<title>Silinx Project Navigator \(standalone\)<\/title>/);
     const m = /<script type="text\/plain" id="silinx-notices">([\s\S]*?)<\/script>/.exec(html);
     assert.ok(m, 'notices block');
     assert.match(m[1], /Copyright 2026 Pedro Maló/);

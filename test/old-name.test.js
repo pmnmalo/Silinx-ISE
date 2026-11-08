@@ -18,51 +18,43 @@ const SELF = 'test/old-name.test.js';
 const OLD = () => new RegExp('silinx[ _-]' + 'ise', 'gi');
 // Xilinx ISE's own names, kept: the ISE host's environment variables and its shared folder (#482)
 const KEEP = [/SILINX_ISE_(?:HOST|TESTS|REMOTE_DIR|IMAGE|KEEP)\b/g, /\/Users\/Shared\/silinx-ise\//g];
-// history, kept as it was written
+// history, kept as it was written; the rename's own changelog fragments, which name the old names to say what
+// became of them (they join CHANGELOG.md's history at the next release)
 const HISTORY = new Set(['CHANGELOG.md', 'packages/silinx-fpga/CHANGELOG.md']);
+const isHistory = (f) => HISTORY.has(f) || /^(packages\/silinx-fpga\/)?changes\/2624-[a-z0-9-]+\.md$/.test(f);
 
 // the files named with the old name on 2026-11-08 (renamed by #2624's pull requests, never added to)
 const OLD_PATHS = new Set([
-  'Start Silinx-ISE.bat',
-  'Start Silinx-ISE.command',
-  'bin/silinx-ise.js',
-  'start-silinx-ise.sh',
+  'bin/silinx-ise.js',   // the command's old name, kept for two releases (#2624)
 ]);
 // the old name's count in each file on 2026-11-08: lower an entry when it shrinks, never raise one or add one
 const OLD_NAME = new Map([
-  [".github/release-notes.md", 10],
-  [".github/workflows/dev-release.yml", 3],
+  [".github/release-notes.md", 4],
+  [".github/workflows/dev-release.yml", 2],
   [".github/workflows/ise.yml", 1],
-  [".github/workflows/pages.yml", 4],
+  [".github/workflows/pages.yml", 2],
   [".github/workflows/quality.yml", 1],
-  [".github/workflows/release.yml", 5],
-  ["CLAUDE.md", 3],
+  [".github/workflows/release.yml", 1],
+  ["CLAUDE.md", 2],
   ["CONTRIBUTING.md", 2],
   ["NOTICE", 3],
-  ["ONBOARDING.md", 6],
-  ["README.md", 41],
-  ["SECURITY.md", 5],
-  ["Start Silinx-ISE.bat", 1],
-  ["Start Silinx-ISE.command", 1],
-  ["THIRD-PARTY-NOTICES.md", 4],
-  ["bin/silinx-ise.js", 10],
+  ["ONBOARDING.md", 5],
+  ["README.md", 20],
+  ["SECURITY.md", 2],
+  ["bin/silinx-ise.js", 3],
   ["core/changelog.js", 2],
   ["core/design-link.js", 1],
   ["core/version.js", 1],
-  ["docker/ise/Dockerfile", 4],
-  ["docker/ise/build-ise-image.ps1", 3],
-  ["docker/ise/build-ise-image.sh", 3],
-  ["docker/ise/entrypoint.sh", 1],
-  ["docs/ARCHITECTURE.md", 4],
-  ["docs/COMECAR.md", 28],
-  ["docs/GETTING-STARTED.md", 28],
+  ["docs/ARCHITECTURE.md", 1],
+  ["docs/COMECAR.md", 13],
+  ["docs/GETTING-STARTED.md", 13],
   ["docs/HISTORY.md", 3],
   ["docs/OPEN-TOOLCHAIN.md", 4],
   ["docs/QUALITY.md", 1],
-  ["docs/TOOLCHAIN-SEPARATION.md", 18],
+  ["docs/TOOLCHAIN-SEPARATION.md", 17],
   ["docs/UI-GUIDELINES.md", 1],
-  ["package-lock.json", 4],
-  ["package.json", 6],
+  ["package-lock.json", 2],
+  ["package.json", 3],
   ["packages/silinx-fpga/NOTICE", 1],
   ["packages/silinx-fpga/README.md", 5],
   ["packages/silinx-fpga/changes/README.md", 2],
@@ -78,24 +70,18 @@ const OLD_NAME = new Map([
   ["research/ui-782/index.html", 3],
   ["research/ui-782/mockups.css", 1],
   ["research/ui-782/mockups.js", 4],
-  ["scripts/build-standalone.mjs", 9],
+  ["scripts/build-standalone.mjs", 1],
   ["scripts/dev-notes.mjs", 2],
   ["scripts/ise-runner/install.sh", 9],
   ["scripts/ise-runner/job-started.sh", 3],
   ["scripts/ise-runner/window.mjs", 3],
-  ["scripts/package-release.mjs", 12],
-  ["scripts/pwa.mjs", 1],
-  ["scripts/site-analytics.mjs", 2],
-  ["scripts/third-party.mjs", 6],
-  ["server/mcp.js", 4],
-  ["server/project-watch.js", 1],
-  ["start-silinx-ise.sh", 2],
+  ["scripts/site-analytics.mjs", 1],
   ["test/asset-cache.test.js", 1],
-  ["test/build-dev-menu.test.js", 4],
+  ["test/build-dev-menu.test.js", 3],
   ["test/build-info.test.js", 2],
   ["test/changelog-fragments.test.js", 1],
-  ["test/changelog.test.js", 7],
-  ["test/cli.test.js", 11],
+  ["test/changelog.test.js", 2],
+  ["test/cli.test.js", 4],
   ["test/design-link.test.js", 3],
   ["test/designs-corpus.test.js", 1],
   ["test/designs-corpus/boards/int2float_basys2.v", 1],
@@ -108,10 +94,8 @@ const OLD_NAME = new Map([
   ["test/designs-corpus/wrappers/mcu80_hello.vhd", 1],
   ["test/designs-corpus/wrappers/vtr_memories.v", 1],
   ["test/dev-notes.test.js", 1],
-  ["test/downloaded-packages.test.js", 1],
   ["test/ise-examples-config.mjs", 3],
   ["test/ise-examples-config.test.js", 9],
-  ["test/ise-image-kit.test.js", 3],
   ["test/ise-runner.test.js", 29],
   ["test/ise/examples.test.js", 1],
   ["test/ise/hls-blackbox.test.js", 1],
@@ -119,41 +103,27 @@ const OLD_NAME = new Map([
   ["test/ise/open-flow.test.js", 6],
   ["test/ise/timesim.test.js", 2],
   ["test/ise/xise-interop.test.js", 1],
-  ["test/launch.js", 7],
-  ["test/launchers.test.js", 14],
   ["test/mcp-link.test.js", 3],
-  ["test/mcp.test.js", 3],
-  ["test/private-data.test.js", 1],
-  ["test/pwa.test.js", 5],
-  ["test/release-workflow.test.js", 1],
-  ["test/release/release.test.js", 9],
-  ["test/server-open-code.test.js", 1],
+  ["test/mcp.test.js", 5],
+  ["test/pwa.test.js", 2],
   ["test/silinx-fpga-cli.test.js", 1],
   ["test/silinx-fpga-package.test.js", 1],
-  ["test/site-analytics.test.js", 8],
-  ["test/static-editions.test.js", 13],
+  ["test/site-analytics.test.js", 3],
+  ["test/static-editions.test.js", 12],
   ["test/tasks.test.js", 3],
-  ["test/third-party.test.js", 3],
-  ["test/ui/app.test.js", 4],
+  ["test/ui/app.test.js", 1],
   ["test/ui/dev-menu.test.js", 2],
-  ["test/ui/standalone.test.js", 5],
-  ["test/ui/update-links.test.js", 11],
-  ["test/web-open-flow-browser.test.js", 2],
-  ["test/web-own-error.test.js", 4],
+  ["test/ui/standalone.test.js", 1],
+  ["test/ui/update-links.test.js", 3],
+  ["test/web-own-error.test.js", 2],
   ["test/web-prefs.test.js", 2],
-  ["test/web-release-url.test.js", 4],
+  ["test/web-release-url.test.js", 3],
   ["test/workflows.test.js", 2],
   ["web/js/analytics.js", 1],
-  ["web/js/api-local.js", 1],
-  ["web/js/api.js", 1],
-  ["web/js/i18n.js", 6],
-  ["web/js/open-flow-browser.js", 3],
-  ["web/js/open-flow-worker.js", 1],
+  ["web/js/i18n.js", 2],
+  ["web/js/open-flow-browser.js", 1],
   ["web/js/project-store.js", 1],
-  ["web/js/project-watch.js", 1],
-  ["web/js/pwa.js", 1],
-  ["web/js/sw-policy.js", 1],
-  ["web/js/wizards.js", 4],
+  ["web/js/wizards.js", 1],
 ]);
 
 /** The old name's count in a text, the kept names left out. */
@@ -175,6 +145,9 @@ test('#2624 old name: how it is counted', () => {
   assert.equal(countOld('SILINX_ISE_HOST=user@host SILINX_ISE_IMAGE SILINX_ISE_TESTS=1 SILINX_ISE_REMOTE_DIR SILINX_ISE_KEEP'), 0);
   assert.equal(countOld('RWBASE=/Users/Shared/silinx-ise/build'), 0);
   assert.equal(countOld('SILINX_ISE_HOSTS'), 1);
+  // history: the changelogs, and the rename's own fragments only
+  assert.ok(isHistory('CHANGELOG.md') && isHistory('changes/2624-package-silinx.md') && isHistory('packages/silinx-fpga/changes/2624-x.md'));
+  assert.ok(!isHistory('changes/2625-other.md') && !isHistory('changes/2624-x.md.bak') && !isHistory('docs/changes/2624-x.md'));
   // nor the ISE-style interface, the Xilinx ISE image or Silinx alone
   assert.equal(countOld('SILINX_UI_INTERFACE=ise, silinx/ise:14.7, Silinx, ISE, Xilinx ISE, silinx.ise'), 0);
 });
@@ -182,7 +155,7 @@ test('#2624 old name: how it is counted', () => {
 test('#2624 old name: no new file holds it, no count grew, every shrunk count lowered', () => {
   const now = new Map();
   for (const f of tracked()) {
-    if (f === SELF || HISTORY.has(f)) continue;
+    if (f === SELF || isHistory(f)) continue;
     const full = path.join(ROOT, f);
     if (!fs.existsSync(full)) continue;   // deleted in the working tree, not committed yet
     const buf = fs.readFileSync(full);

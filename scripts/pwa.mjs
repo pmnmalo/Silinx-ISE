@@ -2,7 +2,7 @@
 // index.html the web app manifest (manifest.webmanifest), its icons (web/icons, drawn by
 // scripts/pwa-icons.mjs) and the service worker (sw.js: web/js/sw.js bundled, the build's label in it);
 // the page links the manifest (web/js/pwa.js registers the worker it finds beside it). Only the site's
-// index.html: the downloaded Silinx-ISE.html has none of it.
+// index.html: the downloaded Silinx.html has none of it.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

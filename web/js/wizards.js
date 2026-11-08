@@ -839,7 +839,7 @@ function changesNode(sections) {
 // version.json next to the page (scripts/build-standalone.mjs --site). There the question is whether
 // the site serves another page than the one open (a reload gets it), not GitHub's latest release: a
 // release is published minutes before the site is rebuilt from it, and dev/ is built from main (#198).
-// null: not on such a site (the application, a downloaded Silinx-ISE.html): GitHub's releases.
+// null: not on such a site (the application, a downloaded Silinx.html): GitHub's releases.
 async function siteVersion() {
   if (!/^https?:$/.test(globalThis.location?.protocol || '')) return null;
   try {
@@ -954,7 +954,7 @@ export async function checkUpdatesDialog({ rel: known = null, served = undefined
       news?.length ? h('div', {}, h('b', {}, "What's new:"), changesNode(news)) : null,
       h('p', {}, 'Release notes and downloads: ', releaseLink(rel.html_url, rel.name || `v${latest}`)),
       assets.length ? h('ul', { style: { margin: '4px 0 8px 18px', padding: 0 } }, ...assets) : null,
-      h('p', { class: 'hint' }, 'To update: download silinx-ise-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx-ISE.html for the standalone edition.')].filter(Boolean));
+      h('p', { class: 'hint' }, 'To update: download silinx-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx.html for the standalone edition.')].filter(Boolean));
   } else {
     body.replaceChildren(...[
       h('p', {}, h('b', {}, `${PRODUCT} ${VERSION} is up to date.`)),

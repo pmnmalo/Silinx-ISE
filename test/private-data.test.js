@@ -144,7 +144,7 @@ test('the allow-list (#498): XPower\'s section numbers in the history, read as a
   assert.deepEqual(kinds('scripts/measure.mjs', sections), [`IP address: ${dot(3, 3, 1, 1)}`, `IP address: ${dot(3, 3, 1, 2)}`]);
   assert.deepEqual(kinds('scripts/measure-power.mjs', `at ${dot(3, 3, 1, 3)}`), [`IP address: ${dot(3, 3, 1, 3)}`]);
   // #545's made-up path, in its history (#555); a real user name in that file is still found
-  const home = (u) => `href: 'file://${['', 'Users', u, 'Downloads', 'Silinx-ISE.html'].join('/')}'`;
+  const home = (u) => `href: 'file://${['', 'Users', u, 'Downloads', 'Silinx.html'].join('/')}'`;
   assert.deepEqual(kinds('test/static-editions.test.js', home('x')), []);
   assert.deepEqual(kinds('test/static-editions.test.js', home('alice')), ['home folder with a user name: /Users/alice']);
   assert.deepEqual(kinds('test/other.test.js', home('x')), ['home folder with a user name: /Users/x']);

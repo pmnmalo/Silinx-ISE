@@ -25,7 +25,7 @@ test('#1051 route: the page network-first, the manifest and icons kept, the vers
   assert.equal(nav(`${SITE}index.html`), 'page');
   assert.equal(nav(`${SITE}?project=x`), 'page');
   assert.equal(get(SITE), 'network', 'the page fetched, not opened (the update check reads version.json)');
-  assert.equal(nav(`${SITE}Silinx-ISE.html`), 'network', 'the downloaded file');
+  assert.equal(nav(`${SITE}Silinx.html`), 'network', 'the downloaded file');
   for (const f of SHELL) assert.equal(get(`${SITE}${f}`), 'shell', f);
   assert.equal(get(`${SITE}icons/other.png`), 'network');
   assert.equal(get(`${SITE}version.json`), 'network');
@@ -65,8 +65,8 @@ test('#1051 serviceWorkerOf / registerServiceWorker: only a page served over HTT
   const loc = (href) => new URL(href);
   assert.deepEqual(serviceWorkerOf(doc(`${SITE}manifest.webmanifest`), loc(SITE)), { url: `${SITE}sw.js`, scope: SITE });
   assert.deepEqual(serviceWorkerOf(doc(`${DEV}manifest.webmanifest`), loc(`${DEV}index.html`)), { url: `${DEV}sw.js`, scope: DEV });
-  assert.equal(serviceWorkerOf(doc(null), loc(`${SITE}Silinx-ISE.html`)), null, 'no manifest: the downloaded file');
-  assert.equal(serviceWorkerOf(doc('file:///x/manifest.webmanifest'), loc('file:///x/Silinx-ISE.html')), null, 'a file');
+  assert.equal(serviceWorkerOf(doc(null), loc(`${SITE}Silinx.html`)), null, 'no manifest: the downloaded file');
+  assert.equal(serviceWorkerOf(doc('file:///x/manifest.webmanifest'), loc('file:///x/Silinx.html')), null, 'a file');
   assert.equal(serviceWorkerOf(undefined, undefined), null);
   const calls = [];
   const nav = { serviceWorker: { register: async (url, opts) => { calls.push([url, opts]); return { scope: opts.scope }; } } };

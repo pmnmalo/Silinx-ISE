@@ -1,5 +1,5 @@
 // The open project kept as it is on disk (#2843): what another process changes in its folder (the MCP server,
-// `silinx-ise mcp`, working in the same workspace) the local server tells (GET /api/projects/:p/events,
+// `silinx mcp`, working in the same workspace) the local server tells (GET /api/projects/:p/events,
 // server/project-watch.js), and the page reloads it: the Design pane's rows, the processes' marks, the Design
 // Summary, and an open document with no changes of its own in the editor. A document changed in the editor and on
 // disk asks which to keep. The page's own writes are not told back to it. The browser edition has no events.

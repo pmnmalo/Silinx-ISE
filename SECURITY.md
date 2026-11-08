@@ -19,8 +19,8 @@ patched: update to the latest.
 In scope: the local server and its API (`server/`), the browser editions (`web/`, the single-file
 edition and the Pages site), the open toolchain (`packages/silinx-fpga/`: synthesis, pack, place, route, bitgen),
 the core (`core/`: the simulators and the board programming), the GitHub workflows (`.github/workflows/`), the scripts
-(`scripts/`) and the launchers (`Start Silinx-ISE.command`, `Start Silinx-ISE.bat`,
-`start-silinx-ise.sh`).
+(`scripts/`) and the launchers (`Start Silinx.command`, `Start Silinx.bat`,
+`start-silinx.sh`).
 
 Out of scope: Xilinx ISE itself and its Docker image (the project only drives them; report their
 problems to their vendors); the user's operating system and browser; a server the user exposed to

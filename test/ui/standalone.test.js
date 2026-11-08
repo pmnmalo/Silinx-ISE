@@ -1,4 +1,4 @@
-// UI: the standalone single-file edition (scripts/build-standalone.mjs -> Silinx-ISE.html, built
+// UI: the standalone single-file edition (scripts/build-standalone.mjs -> Silinx.html, built
 // here into a temp directory): it loads from file:// without a server, creates a project from an
 // example and simulates it; the site (--site: the page and the assets of the Silinx toolchain, as
 // GitHub Pages publishes it), served over HTTP, implements blinky in the browser down to the bitstream and programs it into a
@@ -82,7 +82,7 @@ before(async () => {
   // its Content-Security-Policy names (--assets-url, #487)
   const r = spawnSync(process.execPath, [path.join(root, 'scripts/build-standalone.mjs'), '--site', site, '--assets-url', siteUrl], { cwd: root, encoding: 'utf8', timeout: 180000, env: devEnv() });
   if (r.status !== 0) throw new Error(`standalone build failed: ${r.stderr || r.stdout}`);
-  html = path.join(root, 'dist', 'Silinx-ISE.html');
+  html = path.join(root, 'dist', 'Silinx.html');
 });
 after(async () => { server?.close(); await env?.teardown?.(); await plain?.teardown?.(); });
 const E = () => (skip ? { skip } : env);
@@ -703,7 +703,7 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
   await boot(`${siteUrl}dev/`);
   assert.equal(await page.eval(async () => (await navigator.serviceWorker.ready).scope), `${siteUrl}dev/`);
   // the downloaded file's copy on the site: no manifest
-  await boot(`${siteUrl}Silinx-ISE.html`);
+  await boot(`${siteUrl}Silinx.html`);
   assert.equal(await page.eval(() => document.querySelector('link[rel="manifest"]')), null);
   // a project: what Implement needs is kept when it opens (#967)
   await boot();
@@ -1372,7 +1372,7 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
   const dir = `dev-${build.commit}/`;
   const origin = new URL(siteUrl).origin;
   let layout;
-  for (const file of [html, path.join(site, 'index.html'), path.join(site, 'Silinx-ISE.html')]) {
+  for (const file of [html, path.join(site, 'index.html'), path.join(site, 'Silinx.html')]) {
     const text = await fs.readFile(file, 'utf8');
     const metas = [...text.matchAll(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/g)];
     assert.equal(metas.length, 1, `${file}: one policy`);

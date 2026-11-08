@@ -1,5 +1,5 @@
 #!/bin/bash
-# Silinx ISE image entrypoint: works under any UID (docker run --user), loads the ISE
+# The ISE image's entrypoint (Silinx): works under any UID (docker run --user), loads the ISE
 # environment, then runs the given command (default: bash). Example:
 #   docker run --rm -v "$PWD:/work" xilinx/ise:14.7 bash run.sh
 if [ -z "${HOME:-}" ] || [ "$HOME" = "/" ] || [ ! -w "$HOME" ]; then

@@ -2,11 +2,11 @@
 // any MCP client) opens and inspects the projects of the Silinx workspace, reads and writes their
 // files, checks their syntax, simulates them and runs the processes (synthesis, implementation,
 // bitstream, timing, power, pins), then reads their reports, warnings and errors.
-//   silinx-ise mcp        (bin/silinx-ise.js): JSON-RPC 2.0 over stdin / stdout, one message a line
+//   silinx mcp        (bin/silinx.js): JSON-RPC 2.0 over stdin / stdout, one message a line
 // A thin layer over the server's own functions (server/projects.js, impl-routes.js
 // startImplementation / projectReports, ise.js viewSources) and core/ (compile, elaborate, the design
 // checks of core/lint.js, the simulator): the results are the application's. The projects are the
-// workspace's (SILINX_WORKSPACE, as for `silinx-ise serve`): every path stays inside its project
+// workspace's (SILINX_WORKSPACE, as for `silinx serve`): every path stays inside its project
 // (symbolic links included); the processes run the Silinx toolchain, or Xilinx ISE (local, Docker, ssh: run_process's
 // toolchain 'ise') only for a trusted project, as the interface's (SECURITY.md); programming a board is left out.
 // The ISE machine's address never appears in a result (the logs are redacted).
@@ -97,7 +97,7 @@ export function serveMcp({ input = process.stdin, output = process.stdout } = {}
       const batch = Array.isArray(msg) ? msg : [msg];
       const out = (await Promise.all(batch.map(m => handle(m, state)))).filter(Boolean);
       if (out.length) send(Array.isArray(msg) ? out : out[0]);
-    }).catch(e => process.stderr.write(`silinx-ise mcp: ${e?.stack || e}\n`));
+    }).catch(e => process.stderr.write(`silinx mcp: ${e?.stack || e}\n`));
   });
   return new Promise(resolve => rl.on('close', () => pending.then(resolve)));
 }

@@ -1,5 +1,5 @@
 // The open projects watched (#2843): what another process changes in a project's folder (the MCP server,
-// `silinx-ise mcp`, an editor, git) is told to the pages that have it open (GET /api/projects/:p/events), so
+// `silinx mcp`, an editor, git) is told to the pages that have it open (GET /api/projects/:p/events), so
 // that they show it without opening the project again.
 //
 // A project is watched while a page listens to it: its files are looked at every `interval` ms (their size and

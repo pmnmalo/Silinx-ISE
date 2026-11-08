@@ -1,5 +1,5 @@
-// Command line (bin/silinx-ise.js): every subcommand, help, exit codes and error messages.
-// Each run is a real `node bin/silinx-ise.js ...` with HOME, SILINX_WORKSPACE and SILINX_CONFIG_DIR in a
+// Command line (bin/silinx.js): every subcommand, help, exit codes and error messages.
+// Each run is a real `node bin/silinx.js ...` with HOME, SILINX_WORKSPACE and SILINX_CONFIG_DIR in a
 // scratch directory and a PATH of fake tools only, so nothing touches ~/Silinx-projects or ~/.silinx.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +11,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { scratchEnv, makeFakes, isolatedPath, startApp, sleep, ROOT, POSIX_ONLY } from './server-helpers.js';
 
-const CLI = path.join(ROOT, 'bin', 'silinx-ise.js');
+const CLI = path.join(ROOT, 'bin', 'silinx.js');
 // lets a killed `serve` exit normally (so its coverage is written)
 const EXIT_ON_TERM = `--import=data:text/javascript,process.on('SIGTERM',()=>process.exit(0))`;
 
@@ -34,9 +34,9 @@ before(async () => {
 after(async () => { await fs.rm(tmp, { recursive: true, force: true }); });
 
 /** Run the CLI to completion: { code, out, err }. */
-function cli(args, { extraEnv = {}, cwd = tmp, nodeArgs = [] } = {}) {
+function cli(args, { extraEnv = {}, cwd = tmp, nodeArgs = [], bin = CLI } = {}) {
   return new Promise((resolve, reject) => {
-    const p = spawn(process.execPath, [...nodeArgs, CLI, ...args], { cwd, env: { ...env, ...extraEnv } });
+    const p = spawn(process.execPath, [...nodeArgs, bin, ...args], { cwd, env: { ...env, ...extraEnv } });
     let out = '', err = '';
     p.stdout.on('data', d => { out += d; });
     p.stderr.on('data', d => { err += d; });
@@ -101,17 +101,31 @@ test('help: `help`, --help, -h and `<command> --help` print the usage and run no
   const runs = await Promise.all([['help'], ['--help'], ['-h'], ['serve', '--help'], ['check', '--help'], ['sim', '-h'], ['ucf', '--help'], ['toolchain', '--help']].map(a => cli(a)));
   for (const r of runs) {
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /^usage:\n {2}silinx-ise serve/);
-    for (const c of ['check', 'sim', 'ucf', 'toolchain']) assert.match(r.out, new RegExp(`silinx-ise ${c} `));
+    assert.match(r.out, /^usage:\n {2}silinx serve/);
+    for (const c of ['check', 'sim', 'ucf', 'toolchain']) assert.match(r.out, new RegExp(`silinx ${c} `));
     assert.equal(r.err, '');
   }
   assert.ok(!fss.existsSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json')), 'toolchain --help changed nothing');
 });
 
+// #2624: the command's old name runs the same command, after a warning on stderr (stdout and the exit code as bin/silinx.js's)
+test('#2624 bin/silinx-ise.js: bin/silinx.js under its old name, with a warning on stderr', async () => {
+  const OLD = path.join(ROOT, 'bin', 'silinx-ise.js');
+  const WARN = 'silinx-ise is now called silinx: run node bin/silinx.js (bin/silinx-ise.js will be removed in a later release)\n';
+  const [now, old] = await Promise.all([cli(['help']), cli(['help'], { bin: OLD })]);
+  assert.deepEqual(old, { ...now, err: WARN });
+  assert.equal(now.err, '');
+  const bad = await cli(['frobnicate'], { bin: OLD });
+  assert.equal(bad.code, 1);
+  assert.equal(bad.out, '');
+  assert.match(bad.err, new RegExp(`^${WARN.replace(/[.()]/g, '\\$&')}silinx: unknown command 'frobnicate'\nusage:`));
+  assert.equal((fss.statSync(OLD).mode & 0o111) !== 0 || process.platform === 'win32', true, 'executable');
+});
+
 test('unknown command: error message + usage on stderr, exit code 1', async () => {
   const r = await cli(['frobnicate']);
   assert.equal(r.code, 1);
-  assert.match(r.err, /^silinx-ise: unknown command 'frobnicate'\nusage:/);
+  assert.match(r.err, /^silinx: unknown command 'frobnicate'\nusage:/);
   assert.equal(r.out, '');
 });
 
@@ -139,13 +153,13 @@ test('check: OK design (exit 0), --top, errors (exit 1), missing project (exit 1
 
   r = await cli(['check', path.join(tmp, 'nowhere')]);
   assert.equal(r.code, 1);
-  assert.match(r.err, /^silinx-ise: no Silinx project in .*nowhere \(silinx.json not found\)$/m);
+  assert.match(r.err, /^silinx: no Silinx project in .*nowhere \(silinx.json not found\)$/m);
   assert.doesNotMatch(r.err, /\n\s+at /, 'no stack trace');
   await fs.mkdir(path.join(tmp, 'broken'), { recursive: true });
   await fs.writeFile(path.join(tmp, 'broken', 'silinx.json'), '{nope');
   r = await cli(['check', path.join(tmp, 'broken')]);
   assert.equal(r.code, 1);
-  assert.match(r.err, /^silinx-ise: cannot read .*silinx.json: /);
+  assert.match(r.err, /^silinx: cannot read .*silinx.json: /);
   r = await cli(['check', path.join(tmp, 'broken')], { extraEnv: { SILINX_DEBUG: '1' } });
   assert.match(r.err, /\n\s+at /, 'SILINX_DEBUG shows the stack');
 });
@@ -315,7 +329,7 @@ test('serve: port already used by another program -> exit 1, a server that answe
       await fs.rm(env.FAKE_OPEN_LOG, { force: true });
       const r = await cli(['serve', '--port', String(port), '--open']);
       assert.equal(r.code, 1);
-      assert.match(r.err, new RegExp(`^Port ${port} is used by another program\\. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}$`, 'm'));
+      assert.match(r.err, new RegExp(`^Port ${port} is used by another program\\. Start Silinx on another port: node bin/silinx.js serve --port ${port + 1}$`, 'm'));
       assert.doesNotMatch(r.out, /already running/);
       assert.ok(!fss.existsSync(env.FAKE_OPEN_LOG), 'no browser opened');
     }
@@ -333,7 +347,7 @@ test('serve: port already used by another program -> exit 1, a server that answe
   try {
     const r = await cli(['serve', '--port', String(port)]);
     assert.equal(r.code, 1);
-    assert.match(r.err, new RegExp(`Port ${port} is used by another program\\. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}`));
+    assert.match(r.err, new RegExp(`Port ${port} is used by another program\\. Start Silinx on another port: node bin/silinx.js serve --port ${port + 1}`));
   } finally {
     other.closeAllConnections?.();
     await new Promise(r => other.close(r));
@@ -341,5 +355,5 @@ test('serve: port already used by another program -> exit 1, a server that answe
   // any other listen error is fatal (exit 1, message on stderr)
   const r = await cli(['serve', '--port', '99999']);
   assert.equal(r.code, 1);
-  assert.match(r.err, /^silinx-ise: .*(port|99999)/im);
+  assert.match(r.err, /^silinx: .*(port|99999)/im);
 });

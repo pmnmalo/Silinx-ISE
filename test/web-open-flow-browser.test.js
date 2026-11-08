@@ -130,7 +130,7 @@ test('#1450 prepareBrowserFlow: nothing in a page opened from a file, though it 
   globalThis.isSecureContext = true;   // (a file:// page is a secure context)
   try {
     const n = FakeWorker.all.length, sent = FakeWorker.all.reduce((k, w) => k + w.posted.length, 0);
-    for (const href of ['file:///Users/me/Silinx-ISE.html', 'file:///C:/Users/me/Downloads/Silinx-ISE.html']) {
+    for (const href of ['file:///Users/me/Silinx.html', 'file:///C:/Users/me/Downloads/Silinx.html']) {
       globalThis.location = new URL(href);
       const p = prepareBrowserFlow(dev);
       assert.equal(FakeWorker.all.length, n, `${href}: no worker`);
