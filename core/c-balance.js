@@ -8,6 +8,7 @@
 // Isomorphic ES module: no DOM and no Node APIs.
 //
 //   balanceSums(g, roots, min = 4)   the sums of `min` terms or more the roots need, balanced in g
+//   balances(fn)                     whether a top function's sums are balanced: not under its EXPRESSION_BALANCE off
 
 /** The most additions on a path from the node down. */
 function depthOf(g, id, memo) {
@@ -52,4 +53,9 @@ export function balanceSums(g, all, min = 4) {
     top.args = level.map((x) => x.id);
     deep.set(top.id, Math.max(level[0].d, level[1].d) + 1);
   }
+}
+
+/** Whether a top function's sums are balanced: by default, not under `#pragma HLS EXPRESSION_BALANCE off` in its body. */
+export function balances(fn) {
+  return !fn.body.items.some((x) => x.kind === 'pragma' && x.pragma.name === 'EXPRESSION_BALANCE' && x.pragma.args.off !== undefined);
 }
