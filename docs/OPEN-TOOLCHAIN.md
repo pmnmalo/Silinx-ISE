@@ -1,14 +1,13 @@
 # How the Silinx toolchain is developed
 
-This document records how Silinx develops its Silinx toolchain for the Xilinx Spartan-3E: synthesis,
-place and route, and bitstream generation without Xilinx ISE. It describes the method, the
+This document records how Silinx develops its Silinx toolchain for the Xilinx Spartan-3E and
+Spartan-6: synthesis, place and route, and bitstream generation without Xilinx ISE. It describes the method, the
 limits the project keeps to, and the legal basis it relies on. It is kept up to date as the
 work progresses, and the experiments it describes are kept in the repository so that anyone can
 check and repeat them.
 
 > This document is not legal advice. It records the method and the legal basis the project relies
-> on, so that a lawyer can review them. Before the bit database or the open flow is published, the
-> method should be reviewed by a qualified lawyer.
+> on.
 
 ## Why
 
@@ -96,9 +95,23 @@ documentation: the Spartan-3 Generation Configuration User Guide (UG332) and XAP
 - Each database file states how it was obtained: which experiment, which tool versions, and when.
 - This document and the repository history are the record of the method over time.
 
+### The device descriptions
+
+The device descriptions are shipped for the devices of the supported boards, so that the Silinx toolchain works
+without ISE on them: the four Spartan-3E ones since 2026-10-11, the two Spartan-6 ones since 2026-10-21
+([#723](https://github.com/pmnmalo/Silinx/issues/723)). For every other device each user builds one from their own
+ISE installation. Project X-Ray publishes the equivalent description of the Xilinx 7-series chips, obtained from
+Vivado. The four Spartan-3E dies are also measured by black-box observation, as the bit database is
+([#3](https://github.com/pmnmalo/Silinx/issues/3), the XC3S1200E's long-line splitters
+[#2483](https://github.com/pmnmalo/Silinx/issues/2483), the grid, the sites and the layout
+[#2502](https://github.com/pmnmalo/Silinx/issues/2502)): each fact shown by an experiment on ISE, and the examples and
+the open-flow designs routed on each measured description pass ISE's DRC with a `.bit` byte for byte ISE's bitgen's.
+The shipped files are still the computed ones. The method and the results:
+[packages/silinx-fpga/research/s3e-device/README.md](../packages/silinx-fpga/research/s3e-device/README.md).
+
 ## Legal basis (EU and Portugal)
 
-The method relies on the following provisions. They are listed for a lawyer to check.
+The method relies on the following provisions.
 
 - **Directive 2009/24/EC on the legal protection of computer programs, Article 5(3):** a person
   who has the right to use a copy of a program may, without the rightholder's authorisation,
@@ -126,30 +139,6 @@ The method relies on the following provisions. They are listed for a lawyer to c
 Xilinx, ISE, Spartan, Vivado and Basys are trademarks of their owners (AMD and Digilent). Silinx
 uses these names only to say which products it works with. It is not affiliated with AMD, Xilinx
 or Digilent, or endorsed by them.
-
-## Open questions for the legal review
-
-- Whether publishing the bit database (facts about the Spartan-3E devices) needs any further care, for
-  example under the EU sui generis database right. The database is created by Silinx itself, from
-  its own experiments.
-- Whether the device description computed from `xdl -report` (the chip's tiles, sites, wires and
-  routing switches) may be redistributed. Project X-Ray publishes the equivalent description of
-  the Xilinx 7-series chips, obtained from Vivado. The author decided (2026-10-11) to ship it for
-  the devices of the Spartan-3E boards Silinx supports (XC3S100E-CP132, XC3S250E-CP132,
-  XC3S500E-FG320, XC3S1200E-FG320), so that the Silinx toolchain works without ISE on them; the
-  same was done for the two Spartan-6 boards' devices (XC6SLX16-CSG324 of the Nexys3, XC6SLX45-CSG324 of the
-  Atlys) on 2026-10-21, for the Spartan-6 toolchain under development
-  ([#723](https://github.com/pmnmalo/Silinx/issues/723)); for
-  every other device each user builds it from their own ISE installation. Measuring it instead by
-  black-box observation, as the bit database is, would remove the question. The four Spartan-3E dies are now
-  measured so ([#3](https://github.com/pmnmalo/Silinx/issues/3), the XC3S1200E's long-line splitters
-  [#2483](https://github.com/pmnmalo/Silinx/issues/2483)): their wires, routing switches, site pins and the
-  joins between tiles, each fact shown by an experiment on ISE, and the examples and the open-flow designs routed on
-  each measured description pass ISE's DRC with a `.bit` byte for byte ISE's bitgen's. What still comes from the
-  device report is the grid of tiles, the sites and the layout, and the candidates the bit database's PIPs were asked
-  of ([#2502](https://github.com/pmnmalo/Silinx/issues/2502)); the shipped descriptions are still the computed ones,
-  until they are replaced. The method and the results:
-  [packages/silinx-fpga/research/s3e-device/README.md](../packages/silinx-fpga/research/s3e-device/README.md).
 
 ## Author
 
