@@ -14,7 +14,10 @@ permissions:
 # The runs of the tags one at a time (#3124): the IDE's tag and the toolchain package's pushed together shared the 20 jobs
 # a public repository runs at once (5 on macOS), their jobs queued up to 50 minutes; the second now waits for the first,
 # and its release does not even need it on the same commit (scripts/wait-for-ci.mjs takes any tag's run of the commit).
-# A run by hand, on its ref and commit.
+# GitHub keeps one run waiting per group: a third tag pushed while one runs and one waits cancels the waiting one. Its
+# release then fails, unless another tag's run of the same commit passed ("CI did not pass (cancelled)"): run CI on that
+# tag again (Actions ▸ CI ▸ the cancelled run ▸ Re-run all jobs) and then its release. Push the tags of a release two at a
+# time at most. A run by hand, on its ref and commit.
 concurrency:
   group: ${{ github.event_name == 'push' && 'ci-tags' || format('ci-{0}-{1}', github.ref, github.sha) }}
   cancel-in-progress: false
