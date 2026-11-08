@@ -30,6 +30,8 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
   assert.doesNotMatch(ci, /pull_request|branches:|paths(-ignore)?:/, 'not on pull requests nor on pushes to main');
   assert.ok(!fs.existsSync(path.join(ROOT, 'scripts/ci-changes.mjs')), 'no change detection: everything runs');
   // the tags' runs one at a time (#3124: two tags' runs together queued their jobs up to 50 minutes); a run by hand on its ref
+  // (a third tag cancels the waiting run: the comment says so, and what to do)
+  assert.match(ci, /a third tag pushed while one runs and one waits cancels the waiting one[\s\S]*?Re-run all jobs/);
   assert.match(ci, /^concurrency:\n  group: \$\{\{ github\.event_name == 'push' && 'ci-tags' \|\| format\('ci-\{0\}-\{1\}', github\.ref, github\.sha\) \}\}\n  cancel-in-progress: false\n/m);
   const j = jobs(ci);
   assert.deepEqual(Object.keys(j), ['unit', 'ui', 'webkit-standalone', 'release-zip', 'browsers', 'os', 'private-data-history', 'ci-ok']);
