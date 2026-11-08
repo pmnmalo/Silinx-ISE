@@ -14,8 +14,9 @@ import { toVerilog } from '../core/synth-verilog.js';
 // Normal's own synthesis (its mappings on these small designs), not a small design's as at High (SMALL_RULE, #652: its
 // own test in open-flow-core.test.js)
 const synthesizeOpen = (d, o = {}) => synthesizeOpenAll(d, { smallRule: { maxLuts: -1 }, ...o });
-// the search for state machines (#539, #652: its runs at Normal too), apart from the runs the tests count
-const FSM_PROBE = /silinx_fsm_(pre|forced)\.il/;
+// the search for state machines (#539, #652: its runs at Normal too), and for the comparisons to map as logic (#3097),
+// apart from the runs the tests count
+const FSM_PROBE = /silinx_fsm_(pre|forced)\.il|silinx_cmp\.json/;
 
 const COUNTER = `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
 entity counter is port (clk, rst, en : in std_logic; q : out std_logic_vector(3 downto 0)); end counter;
@@ -1084,7 +1085,7 @@ test('logic depth: a comparator written as a chain of gates is mapped again for 
   assert.equal(d.status, 'pass', d.report || JSON.stringify(d));
   // without it: the usual mapping, one Yosys run
   let runs = 0;
-  const r0 = await synthesizeOpen(chain, { family: 'spartan3e', run: (...a) => { runs++; return yosysNode(...a); }, depth: false });
+  const r0 = await synthesizeOpen(chain, { family: 'spartan3e', run: (...a) => { if (!FSM_PROBE.test(a[0].join(' '))) runs++; return yosysNode(...a); }, depth: false });
   assert.deepEqual([runs, r0.depth.tried, r0.util.luts], [1, false, r.depth.luts[0]]);
   assert.equal(criticalDelay(r0.files['chain.json'], 'chain'), r.depth.ns[0]);
   // the counter: tried, not kept (no faster)
