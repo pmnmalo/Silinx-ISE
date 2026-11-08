@@ -53,7 +53,7 @@ That's all. Things to know:
   **Generate Programming File** work. **Chrome on an Android tablet also programs the board**, as
   on a computer (checked on a Samsung tablet; the board on the tablet's USB port); Safari on an iPad cannot reach USB devices (program
   the downloaded `.bit` from a computer or an Android tablet). The projects stay in the browser, which iPadOS may clear after some weeks
-  without use: keep a copy with **File ▸ Export Silinx ISE Project (.zip)…**. A tablet has less
+  without use: keep a copy with **File ▸ Export Silinx Project (.zip)…**. A tablet has less
   memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
   (hold a finger still for half a second); two fingers move a drawing and a pinch zooms it. In portrait the Design pane is a drawer (the button at
   the left of the header), and the editors' properties open over the drawing (**Properties**).
@@ -137,7 +137,7 @@ A black window (the Silinx server) opens and then your browser shows Silinx at
 - Your projects are saved as normal folders in **`Silinx-projects`** in your user folder
   (Windows: `C:\Users\<you>\Silinx-projects`, macOS: `/Users/<you>/Silinx-projects`).
   You can copy them, back them up, or zip them to hand in.
-- **File ▸ Export Xilinx ISE Project (.zip)** produces a zip that opens in Xilinx ISE 14.7; **File ▸ Export Silinx ISE Project (.zip)** saves the whole Silinx project (ASM charts and schematics included), reopened with **Import Silinx ISE Project**. An imported project came from outside: it runs Xilinx ISE and programs a board only once you press **Trust Project** in the console, where it says so when the project opens.
+- **File ▸ Export Xilinx ISE Project (.zip)** produces a zip that opens in Xilinx ISE 14.7; **File ▸ Export Silinx Project (.zip)** saves the whole Silinx project (ASM charts and schematics included), reopened with **Import Silinx Project**. An imported project came from outside: it runs Xilinx ISE and programs a board only once you press **Trust Project** in the console, where it says so when the project opens.
 
 ### Updating Silinx
 

@@ -112,7 +112,7 @@ vga) and `docs/GETTING-STARTED.md`:
 7. **Constraints**: the UCF from the board (I/O Pin Planning, auto-assign), Check Constraints.
 8. **Implement**: Implement / Generate Programming File; read the Design Summary (utilization, timing).
 9. **Program**: the board on USB, Initialize Chain, Program FPGA (or the PROM to keep it).
-10. **Hand in**: Export Silinx ISE Project (.zip).
+10. **Hand in**: Export Silinx Project (.zip).
 
 Screens (the answers in #782): lab desktops (taken here as 1920 × 1080), the students' laptops (1280–1440 ×
 768–900) and tablets in both orientations, with touch.
