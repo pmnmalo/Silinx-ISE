@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { testFiles, unitFiles, UNIT_DIRS, UNIT_TESTS, weights, balance, parseShard, readTimings, TIMINGS } from '../scripts/test-shard.mjs';
+import { testFiles, unitFiles, UNIT_DIRS, UNIT_TESTS, HEAVY, weights, balance, parseShard, readTimings, TIMINGS } from '../scripts/test-shard.mjs';
 import { merge, readParts } from '../scripts/update-test-timings.mjs';
 import { addFileTime } from '../scripts/test-times-reporter.mjs';
 
@@ -43,6 +43,20 @@ test('test shard: the heaviest first into the lightest part; every file in one p
   for (const n of [0, 1.5, -1]) assert.throws(() => balance(['x'], { x: 1 }, n), /the number of parts must be a whole number from 1/);
 });
 
+// #3124: the toolchain's heaviest unit tests, on Linux only in CI (macOS and Windows: --light): test files that exist, sorted;
+// about half the unit tests' time, none of the open flow's smoke test (blinky to a bitstream) nor a file over a part's time
+test('test shard: the heaviest unit tests (HEAVY): existing files, about half the time, the smoke test left in', () => {
+  const files = unitFiles(), t = readTimings();
+  assert.deepEqual(HEAVY, [...new Set(HEAVY)].sort(), 'sorted, each once');
+  for (const f of HEAVY) assert.ok(files.includes(f), `${f}: not a unit test file`);
+  for (const f of ['test/open-flow.test.js', 'test/s6-devices.test.js', 'test/ice40.test.js', 'test/mcp-link.test.js']) assert.ok(!HEAVY.includes(f), f);
+  const w = weights(files, t), sum = l => l.reduce((s, f) => s + w[f], 0);
+  const share = sum(HEAVY) / sum(files);
+  assert.ok(share > 0.4 && share < 0.7, `${Math.round(share * 100)}% of the time`);
+  // every file within a fifteen minutes' budget but the few that hold one long test (#566, scripts/test-file-times.mjs)
+  for (const f of ['test/open-flow.test.js', 'test/sim-model-par.test.js']) assert.ok(w[f] < 15 * 60, `${f}: ${w[f]} s, split it (#3124)`);
+});
+
 // the parts of the repository's files by its timings: within a fifth of each other, or the longest file's time
 function assertBalanced(files, t, n) {
   const w = weights(files, t);
@@ -53,7 +67,7 @@ function assertBalanced(files, t, n) {
   assert.ok(hi <= Math.max(lo * 1.2, longest + lo * 0.2), `parts ${parts.map(p => Math.round(p.time)).join(' / ')} s`);
 }
 
-test('test shard: the repository\'s timings — measured files that exist, in seconds; the unit tests\' three parts and each interface\'s three UI parts within a fifth of each other or one file long', () => {
+test('test shard: the repository\'s timings — measured files that exist, in seconds; the unit tests\' parts (five on Linux, three but the heaviest on macOS and Windows) and each interface\'s three UI parts within a fifth of each other or one file long', () => {
   // the unit tests: the IDE's and the toolchain package's (#1680)
   const files = unitFiles(), uiFiles = testFiles(ROOT, 'test/ui');
   assert.deepEqual(UNIT_DIRS, ['test', 'packages/silinx-fpga/test']);
@@ -75,7 +89,8 @@ test('test shard: the repository\'s timings — measured files that exist, in se
     assert.ok(typeof t[f] === 'number' && t[f] >= 0, `${f}: ${t[f]}`);
   }
   assert.deepEqual(keys, [...keys].sort(), 'sorted (a refresh changes only the times)');
-  assertBalanced(files, t, 3);
+  assertBalanced(files, t, 5);
+  assertBalanced(files.filter(f => !HEAVY.includes(f)), t, 3);
   assertBalanced(uiFiles, t, 3);
   // a UI file not measured weighs the UI files' median, not the unit files'
   const w = weights([...uiFiles, 'test/ui/new.test.js'], t);
@@ -92,6 +107,13 @@ test('test shard: the command line — the dry run lists the parts, a part runs 
   assert.equal(lines.length, 4);
   lines.forEach((l, k) => assert.match(l, new RegExp(`^${k + 1}/4: \\d+ files, ~\\d+ min$`)));
   assert.equal(lines.reduce((s, l) => s + Number(/: (\d+) files/.exec(l)[1]), 0), unitFiles().length);
+  // --light (#3124): the parts of the unit tests but HEAVY
+  const light = run('1/3', '--light', '--dry-run');
+  assert.equal(light.status, 0, light.stderr);
+  assert.equal(light.stderr, '', 'no warnings');
+  const lightLines = light.stdout.trim().split('\n');
+  assert.equal(lightLines.length, 3);
+  assert.equal(lightLines.reduce((s, l) => s + Number(/: (\d+) files/.exec(l)[1]), 0), unitFiles().filter(f => !HEAVY.includes(f)).length);
   // the UI tests' parts (#912): every UI file in one of them
   const uiDry = run('2/3', '--ui', '--dry-run');
   assert.equal(uiDry.status, 0, uiDry.stderr);

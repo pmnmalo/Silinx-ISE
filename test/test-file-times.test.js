@@ -61,5 +61,5 @@ test('test file times: as node --test\'s reporter, the files of a run and their 
 test('test file times: CI\'s unit tests report them, TAP the tests as before', () => {
   const ci = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
   // (the parts of about the same time, #573: scripts/test-shard.mjs passes the reporters on to node --test)
-  assert.match(ci, /node scripts\/test-shard\.mjs "\$SHARD\/3"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-file-times\.mjs --test-reporter-destination=stdout\n/);
+  assert.match(ci, /node scripts\/test-shard\.mjs "\$SHARD\/\$PARTS" \$LIGHT\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-file-times\.mjs --test-reporter-destination=stdout\n/);
 });
