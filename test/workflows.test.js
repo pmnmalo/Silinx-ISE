@@ -60,7 +60,7 @@ test('workflows: the self-hosted runner only for main, read-only, without the ch
       selfHosted.push(`${f}:${name}`);
       // never a pull request's code: scheduled or by hand, main only
       assert.doesNotMatch(yml.slice(0, yml.indexOf('\njobs:\n')), /pull_request|push:|workflow_run/, f);
-      assert.ok(lines.some(l => l.includes("github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'")), `${f}:${name} main only`);
+      assert.ok(lines.some(l => l.includes("github.repository_id == '1407836659' && github.ref == 'refs/heads/main'")), `${f}:${name} main only`);
       // a read-only token, none kept in the work folder
       for (const [scope, level] of Object.entries(permissions(lines) || {})) assert.equal(level, 'read', `${f}:${name} ${scope}`);
       assert.doesNotMatch(yml.slice(0, yml.indexOf('\njobs:\n')), /^ {2}[\w-]+: write$/m, `${f}: no writing permission for the workflow`);
@@ -80,7 +80,7 @@ const SELF_HOSTED = '[self-hosted, ise]';
 // the events that run only code already on the repository's branches (a pull request's own workflow files
 // run on pull_request, pull_request_target, and on push / workflow_run / workflow_call from its branch)
 const SELF_HOSTED_EVENTS = ['schedule', 'workflow_dispatch'];
-const SELF_HOSTED_IF = "(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'";
+const SELF_HOSTED_IF = "(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository_id == '1407836659' && github.ref == 'refs/heads/main'";
 
 /** The line of the key a job's line i is under (the nearest line above it with less indentation), '' if none. */
 function parentOf(lines, i) {
