@@ -214,7 +214,8 @@ for (const [name, desc, re] of BAD) {
 const P = (n, dir, ports) => ({ c_name: n, c_port_direction: dir, rtl_ports: ports });
 const [A, B, Z] = DESC().c_parameters;
 const MISMATCH = [
-  ['the function not declared', UNIT(TOP).replace('void adder(data_t a, data_t b, data_t &z);', 'void adder2(data_t a, data_t b, data_t &z);').replace('adder(a, b, t)', 'adder2(a, b, t)'), DESC(), /the function 'adder' is not declared/],
+  // (#3022: the function not declared, the description not the source's: the source's own error, nothing of the description)
+  ['the function not declared', UNIT(TOP).replace('void adder(data_t a, data_t b, data_t &z);', 'void adder2(data_t a, data_t b, data_t &z);').replace('adder(a, b, t)', 'adder2(a, b, t)'), DESC(), /^'adder2' is declared but not defined$/],
   ['the top', UNIT('void adder(data_t a, data_t b, data_t &z) { z = a + b; }').replace(/int main[\s\S]*/, ''), DESC({ c_function_name: 'adder', top: undefined }), /is the top function/, 'adder'],
   ['an argument not described', UNIT(TOP), DESC({ c_parameters: [A, Z] }), /the argument 'b' of 'adder' is not described/],
   ['an argument unknown', UNIT(TOP), DESC({ c_parameters: [A, B, Z, P('w', 'in', { data_read_in: 'a' })] }), /'adder' has no argument 'w'/],
@@ -230,6 +231,7 @@ for (const [name, unit, desc, re, top] of MISMATCH) {
     const g = cToHdl(unit, { ...OPTS(desc), lang: 'vhdl', top: top || 'top' });
     assert.equal(g.ok, false);
     assert.ok(errs(g).some((m) => re.test(m)), errs(g).join('\n'));
+    if (name === 'the function not declared') assert.deepEqual(errs(g), ["'adder2' is declared but not defined"]);
   });
 }
 

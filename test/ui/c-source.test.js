@@ -231,3 +231,31 @@ uiTest('#2995 Silinx HLS: an RTL blackbox refused: the C\'s Design row marked, i
   assert.equal(await said(), 1);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });
+
+// (#3022) a project with an RTL blackbox and a C source that does not declare its function: that source's module made (its
+// Design row the C's, not [No HDL]); Check Syntax says once that no C source declares the description's function (its C
+// model not one), a warning in the description; a C source that calls it added: no warning
+uiTest('#3022 Silinx HLS: a C source that calls no RTL blackbox made in a project with one; Check Syntax\'s warning for a description no C source declares', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxOther', top: 'f', files: { 'src/other.c': 'int f(int a) { return a + 1; }\n', 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxOther');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'f'), [], { what: 'the C\'s module' });
+  assert.deepEqual(await row(page, 'f'), { badges: ['C*', 'VHDL'], meta: '(other.c)' });
+  const W = `WARNING:SilinxC - "src/msum.json" Line 1: syn.blackbox: msum.json: the function 'msum' is not declared in the C sources: not used`;
+  const check = async () => {
+    const at = (await page.consoleText()).length;
+    await page.eval(async () => (await import('/js/processes.js')).checkSyntax('f'));
+    await page.waitConsole(/Started : "Check Syntax"\.[\s\S]*Process "Check Syntax" (completed successfully|failed)[^\n]*$/);
+    return (await page.consoleText()).slice(at);
+  };
+  assert.match(await check(), new RegExp(`\\n${W.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n[\\s\\S]*\\nProcess "Check Syntax" completed successfully with 1 warning\\(s\\)$`));
+  // (a C source that calls it: no warning)
+  await makeProject(env, { name: 'CBlackboxBoth', top: 'f', files: { 'src/other.c': 'int f(int a) { return a + 1; }\n', 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxBoth');
+  await page.leftTab('design');
+  await page.waitFor(() => ['f', 'top'].every((n) => window.SilinxApp.S.modules.some((m) => m.name === n)), [], { what: 'both modules' });
+  const both = await check();
+  assert.ok(!both.includes('WARNING') && /\nProcess "Check Syntax" completed successfully$/.test(both), both.slice(-600));
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});

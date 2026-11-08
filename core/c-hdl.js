@@ -25,7 +25,7 @@ import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
 import { balanceSums, balances } from './c-balance.js';
 import { reshapeGroups } from './c-reshape.js';
 import { axiPlan, axiWrap } from './c-axi.js';
-import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
+import { loadBlackboxes, applyBlackboxes, blackboxHdl, declaredBlackboxes } from './c-blackbox.js';
 import { latencyPragma, markFabric, mulLimit } from './c-op-pragmas.js';
 import { isUnit, shareUnits, unitSource } from './c-float-units.js';
 import { bindable } from './c-bind.js';
@@ -78,8 +78,9 @@ export function cToHdl(source, opts = {}) {
 
 function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null, taken = null, host = null } = {}) {
   const diagnostics = [...checked.diagnostics];
-  // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
-  const bbs = loadBlackboxes(blackboxes, headers);
+  // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903; those this source declares,
+  // #3022)
+  const bbs = loadBlackboxes(declaredBlackboxes(blackboxes, checked.funcs), headers);
   diagnostics.push(...bbs.diagnostics);
   applyBlackboxes(checked, bbs.list, (d) => diagnostics.push(d));
   if (diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };

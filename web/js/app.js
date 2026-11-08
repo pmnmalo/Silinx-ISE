@@ -96,7 +96,7 @@ export function compileProject() {
       if (m) S.viewElsewhere[f] = { module: r.module, lang: r.lang, file: m.archFile || m.file, lost: r.lost || null };
     }
   }
-  noteFailedC(failedC);
+  noteFailedC(failedC, Object.fromEntries(views.filter(([f]) => isC(f))));
   // the linked drawings that cannot generate their HDL file (errors: a project opened with one, #303), each
   // text once (an edit in its editor says it as it syncs)
   let lazyMods = hdlModules;
