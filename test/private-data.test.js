@@ -149,6 +149,11 @@ test('the allow-list (#498): XPower\'s section numbers in the history, read as a
   assert.deepEqual(kinds('(message of fda526c)', sections), [`IP address: ${dot(3, 3, 1, 2)}`]);   // one number, two messages
   assert.deepEqual(kinds('(message of dc20cc0)', `see ${dot(3, 3, 1, 1)}`), []);
   assert.deepEqual(kinds('(message of 0000000)', `see ${dot(3, 3, 1, 1)}`), [`IP address: ${dot(3, 3, 1, 1)}`]);
+  // #3121's fix names two of #2962's ranges in its message (#3117); another commit's message still caught
+  const ranges = `the ranges ${dot(198, 18, 0, 0)}/15 and ${dot(192, 0, 0, 0)}/24`;
+  assert.deepEqual(kinds('(message of e37c940)', ranges), []);
+  assert.deepEqual(kinds('(message of 0000000)', ranges), [`IP address: ${dot(198, 18, 0, 0)}`, `IP address: ${dot(192, 0, 0, 0)}`]);
+  assert.deepEqual(kinds('(message of e37c940)', `at ${dot(192, 168, 1, 20)}`), [`IP address: ${dot(192, 168, 1, 20)}`]);
   assert.deepEqual(kinds('scripts/measure.mjs', sections), [`IP address: ${dot(3, 3, 1, 1)}`, `IP address: ${dot(3, 3, 1, 2)}`]);
   assert.deepEqual(kinds('scripts/measure-power.mjs', `at ${dot(3, 3, 1, 3)}`), [`IP address: ${dot(3, 3, 1, 3)}`]);
   // #545's made-up path, in its history (#555); a real user name in that file is still found
