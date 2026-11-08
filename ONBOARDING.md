@@ -2,7 +2,7 @@
 
 Silinx ISE is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E: Basys2, Nexys2; Spartan-6: Nexys3, Atlys; iCE40:
 iCEBreaker). It runs in
-the browser (the site, the standalone `Silinx-ISE.html`) or as a local Node server, with its own open
+the browser (the site, the standalone `Silinx.html`) or as a local Node server, with its own open
 toolchain (Yosys WebAssembly, then nextpnr's pack, place and route — the fork pmnmalo/nextpnr-spartan — and Silinx's
 timing and bitgen) and, optionally, Xilinx ISE
 14.7. It is Pedro Maló's project (AGPL-3.0-only), used at FCT NOVA. Its story, and where its rules come from:

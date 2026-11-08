@@ -84,7 +84,7 @@ from the IDE. It imports neither `core/version.js` nor `core/third-party.js` nor
 
 - **server/**: `open-flow.js` (the processes, the devices, the bit database), `open-flow-run.js` (the flow's
   process), `impl-routes.js` (the FPGA view's data), and `devices.js`, `ise.js`, `programmer.js`,
-  `projects.js`, `xise.js` (for `packages/silinx-fpga/src/family.js`, `packages/silinx-fpga/src/ucf.js`, `packages/silinx-fpga/src/resources.js`); `bin/silinx-ise.js`
+  `projects.js`, `xise.js` (for `packages/silinx-fpga/src/family.js`, `packages/silinx-fpga/src/ucf.js`, `packages/silinx-fpga/src/resources.js`); `bin/silinx.js`
   (its `ucf` command).
 - **web/js** (by absolute URL, `/core/…`, served by `server/server.js`, bundled by the standalone build):
   `open-flow-worker.js` (the flow, the device, the bit database, Yosys), `open-flow-browser.js`,

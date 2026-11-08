@@ -1,7 +1,7 @@
 # Publishes a GitHub Release when a version tag (v1.2.3) is pushed:
-#   Silinx-ISE.html                         single-file edition (no install, runs in the browser)
-#   silinx-ise-<version>.zip                full app (server + UI + examples), production node_modules included
-#   silinx-ise-docker-kit-<version>.zip builder kit for the private Xilinx ISE 14.7 Docker image
+#   Silinx.html                         single-file edition (no install, runs in the browser)
+#   silinx-<version>.zip                full app (server + UI + examples), production node_modules included
+#   silinx-docker-kit-<version>.zip builder kit for the private Xilinx ISE 14.7 Docker image
 #   SHA256SUMS                              the files' SHA-256 checksums (also in the notes), each file with
 #                                           GitHub's build provenance attestation (#485)
 # The tests are not run here (#416): CI runs at a release only (#607), started by the same tag, and the
@@ -80,4 +80,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           V="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" out/* --title "Silinx ISE $V" --notes-file notes.md
+          gh release create "$GITHUB_REF_NAME" out/* --title "Silinx $V" --notes-file notes.md

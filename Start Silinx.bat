@@ -26,5 +26,5 @@ if not exist "node_modules\express" (
 )
 if "%PORT%"=="" set PORT=8642
 echo Starting Silinx... your browser opens at http://127.0.0.1:%PORT%
-node bin\silinx-ise.js serve --open
+node bin\silinx.js serve --open
 pause

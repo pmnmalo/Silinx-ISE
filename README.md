@@ -337,7 +337,7 @@ In short:
   Chrome or Edge can **install the site as an app** (*Install app*, or *Add to Home screen* on Android: a
   tablet, a classroom's interactive display): it opens in a window of its own, and once a project has
   been opened it also opens and implements with no network.
-  **`Silinx-ISE.html`** from the [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)
+  **`Silinx.html`** from the [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)
   is the same page in one file, to keep or open offline (its synthesis tools come from the site the
   first time; programming the board needs the site's address). For a course page (Moodle…), link the site's address as a URL: an HTML file uploaded to
   Moodle does not work (Moodle's filtering of uploaded HTML files removes its scripts).
@@ -345,25 +345,25 @@ In short:
   the *Silinx toolchain (no ISE)*, the default mode, synthesizes (Yosys), places and
   routes (nextpnr) and writes the bitstream, in the browser or locally.
 - **Or run Silinx locally, with Node.js (an alternative):** install [Node.js](https://nodejs.org)
-  (LTS), download **`silinx-ise-<version>.zip`** from the
+  (LTS), download **`silinx-<version>.zip`** from the
   [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest), unzip it and double-click
-  **`Start Silinx-ISE.bat`** (Windows), **`Start Silinx-ISE.command`** (macOS) or
-  **`start-silinx-ise.sh`** (Linux). Your browser opens Silinx; projects are folders in
+  **`Start Silinx.bat`** (Windows), **`Start Silinx.command`** (macOS) or
+  **`start-silinx.sh`** (Linux). Your browser opens Silinx; projects are folders in
   `Silinx-projects` in your user folder. The same Silinx, running on your computer: it synthesizes
   offline, programs boards with the installed tools too (openFPGALoader, xc3sprog, Digilent Adept,
   ISE iMPACT, adepttool) and from any browser, and runs **Xilinx ISE 14.7** (free WebPACK) for the
   other boards and the ISE-only processes (simulation models of the implementation, XPower, …): build
-  your own Docker image with **`silinx-ise-docker-kit-<version>.zip`** (see
+  your own Docker image with **`silinx-docker-kit-<version>.zip`** (see
   [below](#synthesis-and-bitstreams-xilinx-ise-147)) and choose an ISE mode in *Toolchain Settings*.
 - **Checking a download:** each release lists its files' SHA-256 checksums in its notes and in
   **`SHA256SUMS`**: in the folder of the downloads, `sha256sum -c SHA256SUMS --ignore-missing` (Linux) or
   `shasum -a 256 -c SHA256SUMS --ignore-missing` (macOS), `Get-FileHash <file>` (Windows PowerShell). Each
   file also has GitHub's build provenance attestation (built by the Release workflow from the version's
-  tag): `gh attestation verify silinx-ise-<version>.zip --repo pmnmalo/Silinx-ISE`.
+  tag): `gh attestation verify silinx-<version>.zip --repo pmnmalo/Silinx-ISE`.
 
 ### On an iPad or a tablet
 
-The site (and `Silinx-ISE.html`) runs in Safari on an iPad (WebKit) and in a tablet's browser: the HDL
+The site (and `Silinx.html`) runs in Safari on an iPad (WebKit) and in a tablet's browser: the HDL
 editors and the drawings, simulation, and the Silinx toolchain (synthesis, place and route, the
 `.bit`), and in Chrome on an Android tablet board programming too. What is different from a computer:
 
@@ -411,7 +411,7 @@ link opens it so, for that page only (the viewer's own layout is not changed).
 ```bash
 git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
 npm install
-npm start          # prints the address to open, http://127.0.0.1:8642/#token=…  (node bin/silinx-ise.js serve --open opens it)
+npm start          # prints the address to open, http://127.0.0.1:8642/#token=…  (node bin/silinx.js serve --open opens it)
 ```
 
 How Silinx is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the application as a whole, and
@@ -449,11 +449,11 @@ main has not changed since their last successful run, documentation aside
 ### Command line
 
 ```bash
-node bin/silinx-ise.js check <projectDir>                           # parse + elaborate the top
-node bin/silinx-ise.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the simulation top
-node bin/silinx-ise.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
-node bin/silinx-ise.js toolchain [--docker xilinx/ise:14.7]          # show / set the ISE toolchain
-node bin/silinx-ise.js mcp                                         # an MCP server for an AI assistant (below)
+node bin/silinx.js check <projectDir>                           # parse + elaborate the top
+node bin/silinx.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the simulation top
+node bin/silinx.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
+node bin/silinx.js toolchain [--docker xilinx/ise:14.7]          # show / set the ISE toolchain
+node bin/silinx.js mcp                                         # an MCP server for an AI assistant (below)
 npm test                                                         # test suite
 SILINX_ISE_TESTS=1 npm run test:ise                              # the real ISE flow (Docker image; SILINX_ISE_HOST=user@host: on another machine)
 SILINX_ISE_HOST=user@host npm run check:open-flow [projects…]   # the open flow vs ISE: DRC, byte-identical bitstreams (SILINX_ISE_HOST=local: the image here)
@@ -467,7 +467,7 @@ npm run test:release                                             # the release z
 node scripts/package-release.mjs [version]                       # the release files into out/ (as release.yml)
 ```
 
-`npm run test:release` builds `silinx-ise-<version>.zip` with the release script, unzips it into a
+`npm run test:release` builds `silinx-<version>.zip` with the release script, unzips it into a
 clean folder, checks its contents (production dependencies only, Yosys's WebAssembly, licence and
 notices, executable launchers) and size, starts it with its own launcher (`PORT` and
 `SILINX_NO_BROWSER=1` are honoured by the launchers) and runs *Synthesize - Yosys (open)* on the
@@ -478,7 +478,7 @@ in Firefox and WebKit.
 
 ### Silinx for an AI assistant (MCP)
 
-`node bin/silinx-ise.js mcp` serves the projects of the Silinx workspace to an AI assistant (Claude
+`node bin/silinx.js mcp` serves the projects of the Silinx workspace to an AI assistant (Claude
 Desktop, Claude Code, any client of the Model Context Protocol) over stdin / stdout. Its tools:
 `list_examples` (the examples, then the test designs: the designs Silinx is tested with), `new_project_from_example`, `new_project` (an empty one, for a board), `set_top` (the top
 module and the test bench, as *Set as Top Module*; the constraints from the board's pins, as *Update
@@ -509,22 +509,22 @@ Every path stays inside its project; programming a board is not one of its tools
 address never appears in a result. In Claude Desktop's `claude_desktop_config.json`:
 
 ```json
-{ "mcpServers": { "silinx": { "command": "node", "args": ["/path/to/silinx-ise/bin/silinx-ise.js", "mcp"] } } }
+{ "mcpServers": { "silinx": { "command": "node", "args": ["/path/to/silinx-ise/bin/silinx.js", "mcp"] } } }
 ```
 
-and in Claude Code: `claude mcp add silinx -- node /path/to/silinx-ise/bin/silinx-ise.js mcp`. To keep the
+and in Claude Code: `claude mcp add silinx -- node /path/to/silinx-ise/bin/silinx.js mcp`. To keep the
 assistant's projects apart, give it a workspace of its own: `"env": { "SILINX_WORKSPACE": "/path/to/folder" }`
 in Claude Desktop's entry, or `claude mcp add silinx -e SILINX_WORKSPACE=/path/to/folder -- node …` (the
 server's name before `-e`, which takes several values).
 
-With the same workspace, the interface of `silinx-ise serve` follows what the assistant does in the project it has
+With the same workspace, the interface of `silinx serve` follows what the assistant does in the project it has
 open: a source written or made, a run (the Design pane, an open editor, the processes' marks and the Design Summary
 update at once); a file changed in its editor and by the assistant asks which version to keep.
 
 ### Standalone edition (a single HTML file)
 
 ```bash
-npm run build:standalone    # writes dist/Silinx-ISE.html (~5 MB)
+npm run build:standalone    # writes dist/Silinx.html (~5 MB)
 ```
 
 One file, no server: open it in a browser or share it. It includes the editor, schematics, ASM
@@ -701,7 +701,7 @@ with them.
 The site (https://pmnmalo.github.io/Silinx-ISE/ and its dev/ edition) counts its visits and what is
 used in it (a new project, a simulation, Implement Design, a bitstream, a board programmed) with
 [GoatCounter](https://www.goatcounter.com): no cookies, no personal data, never the content of a
-project. The application and the downloaded `Silinx-ISE.html` send nothing. The counter is added by the
+project. The application and the downloaded `Silinx.html` send nothing. The counter is added by the
 site's build (`scripts/site-analytics.mjs`, when the repository variable `GOATCOUNTER_CODE` is set).
 
 Using Silinx in a course, a school or on your own? Tell us on

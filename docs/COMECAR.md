@@ -19,7 +19,7 @@ projetos ficam nesse browser. A versão em desenvolvimento, com as alterações 
 https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao passo 4. Ou descarregue-o, para trabalhar sem Internet:
 
 1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Em **Assets**, clique em **`Silinx-ISE.html`** para o descarregar.
+2. Em **Assets**, clique em **`Silinx.html`** para o descarregar.
 3. Faça duplo clique no ficheiro descarregado. Abre no browser (Chrome, Edge, Firefox ou Safari).
 4. Na página inicial clique em **Novo Projeto…** (New Project…) e escolha em *Começar a partir de* (Start from) **Example: gates** (portas lógicas desenhadas num esquemático: um bom primeiro exemplo), **Example: traffic** (uma passadeira para peões: um diagrama de estados e uma álgebra booleana), **Example: blinky** (ou *pong*, um jogo para dois, *stopwatch*, *clock*, *vga*, uma imagem num monitor VGA, *isqrt*, uma função em C feita em hardware, *uart*, um eco pela porta série para um terminal, ou *micro80*, um microprocessador compatível com o 8080 a correr um programa) ou **Projeto vazio** (Empty project). Depois dos exemplos vêm os **Test design: …**: projetos com que o próprio Silinx é testado (esquemáticos, diagramas de estados, programas em C para o Silinx HLS), cada um com o seu teste (uma bancada de teste, ou o `main()` do programa em C), para ver o que o Silinx faz com cada tipo de fonte.
 
@@ -43,7 +43,7 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   projetos. O Firefox e o Safari não abrem pastas: aí os projetos ficam no browser.
 - **Implement Design** e **Generate Programming File** correm a cadeia de ferramentas Silinx no
   browser (placas Basys2, Nexys2, Nexys3, Atlys e iCEBreaker; a primeira vez descarrega as ferramentas do site, cerca de 100 MB,
-  que o browser guarda; também no `Silinx-ISE.html` descarregado): o bitstream (`<módulo de topo>.bit`, por exemplo
+  que o browser guarda; também no `Silinx.html` descarregado): o bitstream (`<módulo de topo>.bit`, por exemplo
   `blinky.bit`) é descarregado.
 - **Programar a placa a partir do browser** (Chrome ou Edge, ou o Chrome num tablet Android; o
   Firefox e o Safari não acedem a dispositivos USB; com a página aberta a partir do endereço do site,
@@ -92,7 +92,7 @@ O Silinx corre no **Node.js**, um programa gratuito.
 ### Passo 2: descarregar o Silinx
 
 1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Em **Assets**, descarregue **`silinx-ise-<versão>.zip`** (por exemplo `silinx-ise-15.22.1.zip`).
+2. Em **Assets**, descarregue **`silinx-<versão>.zip`** (por exemplo `silinx-15.22.1.zip`).
    - Não use o botão verde **Code ▸ Download ZIP** nem o "Source code": essa versão não traz tudo
      o que o Silinx precisa (funciona na mesma, mas o primeiro arranque precisa de Internet para
      descarregar o que falta).
@@ -105,10 +105,10 @@ O Silinx corre no **Node.js**, um programa gratuito.
 cadeira):* a versão lista o checksum SHA-256 de cada ficheiro nas suas notas e no ficheiro
 **`SHA256SUMS`**. Descarregue o `SHA256SUMS` para a mesma pasta e, num terminal aí, corra
 `sha256sum -c SHA256SUMS --ignore-missing` (Linux) ou `shasum -a 256 -c SHA256SUMS --ignore-missing`
-(macOS): o ficheiro tem de dizer `OK`. No Windows, `Get-FileHash silinx-ise-<versão>.zip` no PowerShell
+(macOS): o ficheiro tem de dizer `OK`. No Windows, `Get-FileHash silinx-<versão>.zip` no PowerShell
 mostra o checksum, a comparar com o das notas. Cada ficheiro tem também a atestação de proveniência do
 GitHub (foi construído pelo workflow Release do repositório a partir da tag da versão): com o
-[GitHub CLI](https://cli.github.com), `gh attestation verify silinx-ise-<versão>.zip --repo pmnmalo/Silinx-ISE`.
+[GitHub CLI](https://cli.github.com), `gh attestation verify silinx-<versão>.zip --repo pmnmalo/Silinx-ISE`.
 
 ### Passo 3: arrancar o Silinx
 
@@ -116,9 +116,9 @@ Abra a pasta `silinx-ise` e faça duplo clique no ficheiro do seu sistema:
 
 | Sistema | Duplo clique em |
 |---|---|
-| Windows | **`Start Silinx-ISE.bat`** |
-| macOS | **`Start Silinx-ISE.command`** |
-| Linux | **`start-silinx-ise.sh`** (ou `./start-silinx-ise.sh` num terminal) |
+| Windows | **`Start Silinx.bat`** |
+| macOS | **`Start Silinx.command`** |
+| Linux | **`start-silinx.sh`** (ou `./start-silinx.sh` num terminal) |
 
 Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Silinx em
 **http://127.0.0.1:8642**.
@@ -134,7 +134,7 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 - **Firewall do Windows** pergunta pelo Node.js: clique em **Permitir** (o Silinx só aceita
   ligações do próprio computador).
 - **macOS: "não pode ser aberto porque é de um programador não identificado"**: botão direito
-  (ou Ctrl-clique) em `Start Silinx-ISE.command` ▸ **Abrir** ▸ **Abrir**. Das vezes seguintes basta
+  (ou Ctrl-clique) em `Start Silinx.command` ▸ **Abrir** ▸ **Abrir**. Das vezes seguintes basta
   o duplo clique.
 
 ### Passo 4: usar
@@ -152,7 +152,7 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 
 ### Atualizar o Silinx
 
-Descarregue o novo `silinx-ise-<versão>.zip`, descompacte-o e use a nova pasta (pode apagar a
+Descarregue o novo `silinx-<versão>.zip`, descompacte-o e use a nova pasta (pode apagar a
 antiga). **Os seus projetos não estão dentro dessa pasta**, por isso mantêm-se.
 
 ---
@@ -172,7 +172,7 @@ localmente (Forma 2), precisam de até mais duas coisas. O seu professor pode j�
    *Tools ▸ …*):
    - instale o [Docker Desktop](https://www.docker.com/products/docker-desktop/) (nos Mac com
      Apple Silicon, o OrbStack é uma alternativa mais rápida);
-   - descarregue `silinx-ise-docker-kit-<versão>.zip` da mesma página e siga o seu
+   - descarregue `silinx-docker-kit-<versão>.zip` da mesma página e siga o seu
      `ise/README.md`: descarrega o instalador do ISE e a licença com a sua conta AMD gratuita e
      corre um script (demora 20–60 minutos, uma vez). O ISE não pode ser partilhado, por isso cada
      pessoa cria a sua cópia.
@@ -192,10 +192,10 @@ No Silinx, **Definições (⚙) ▸ Definições da Toolchain (ISE / Programador
 |---|---|
 | O arranque diz **Node.js is not installed** | Instale-o (Passo 1). Feche a janela e faça duplo clique outra vez. |
 | Browser: **"Não é possível aceder a este site"** | A janela do Silinx foi fechada: faça duplo clique outra vez no ficheiro de arranque. |
-| **"Port 8642 is used by another program"** | Outro programa usa essa porta. Abra um terminal na pasta `silinx-ise` e execute `node bin/silinx-ise.js serve --port 8643 --open`. |
+| **"Port 8642 is used by another program"** | Outro programa usa essa porta. Abra um terminal na pasta `silinx-ise` e execute `node bin/silinx.js serve --port 8643 --open`. |
 | Consola: **"the Silinx server is not running"** | O mesmo: volte a arrancar o Silinx. As alterações por guardar são guardadas assim que ele voltar. |
 | macOS: o ficheiro `.command` **abre num editor de texto** | Botão direito ▸ Abrir com ▸ Terminal. |
-| A janela abre e fecha logo | Abra um terminal na pasta `silinx-ise` e execute `node bin/silinx-ise.js serve --open` para ler a mensagem. |
+| A janela abre e fecha logo | Abra um terminal na pasta `silinx-ise` e execute `node bin/silinx.js serve --open` para ler a mensagem. |
 
 **Abrir um terminal numa pasta:** Windows: abra a pasta, clique na barra de endereço, escreva
 `cmd` e carregue em Enter. macOS: botão direito na pasta ▸ *Novo Terminal na Pasta* (ou abra o

@@ -1,5 +1,5 @@
 name: Pages
-# The single-file edition (Silinx-ISE.html: no install, runs in the browser) published on GitHub
+# The single-file edition (Silinx.html: no install, runs in the browser) published on GitHub
 # Pages, so that a course page (e.g. Moodle, as a URL resource) can link to it:
 #   https://pmnmalo.github.io/Silinx-ISE/       the stable edition: the latest release
 #   https://pmnmalo.github.io/Silinx-ISE/dev/   the development edition: main, after every push
@@ -74,7 +74,7 @@ jobs:
           git log -1 --format='Development edition: %h %s (%ci)'
           npm ci
           node scripts/build-standalone.mjs --site site/dev
-      # the older releases' assets (#487): a Silinx-ISE.html downloaded from the site fetches its own
+      # the older releases' assets (#487): a Silinx.html downloaded from the site fetches its own
       # version's assets (assets/<version>/, Yosys in assets/vendor/yowasp-yosys/<its version>/): the
       # site keeps those of its last releases, each built from its tag (its own script, with
       # --assets-only); and the unversioned assets/ of the files downloaded before versioned assets

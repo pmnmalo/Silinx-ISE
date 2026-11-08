@@ -65,7 +65,7 @@ async function build() {
     p.stdout.on('data', d => { log += d; }); p.stderr.on('data', d => { log += d; });
     p.on('close', code => (code === 0 ? ok(log) : fail(new Error(`build failed (${code}):\n${log}`))));
   });
-  return { log: out, html: await fs.readFile(path.join(root, 'dist', 'Silinx-ISE.html'), 'utf8') };
+  return { log: out, html: await fs.readFile(path.join(root, 'dist', 'Silinx.html'), 'utf8') };
 }
 // the build's data in the bundle (core/version.js BUILD, minified: unquoted keys)
 const changesOf = html => [...html.matchAll(/issue:(\d+),type:"(feature|bugfix|other)"/g)].map(m => [+m[1], m[2]]);
