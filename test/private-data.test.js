@@ -21,6 +21,14 @@ test('the tracked files hold no private data, secrets or Xilinx files', () => {
     'remove these (or, for a harmless match, add it with its reason to ALLOW in scripts/check-private-data.mjs)');
 });
 
+// #3121: #2962's special-purpose ranges are allowed in its fragment and in CHANGELOG.md, where a release moves it
+test("#2962's special-purpose addresses: allowed in its fragment and the CHANGELOG, not elsewhere (#3121)", () => {
+  const c = (...p) => p.join(':');
+  const text = `NAT64 \`${c('64', 'ff9b', '')}:/96\` and \`${c('64', 'ff9b', '1', '')}:/48\`, \`${dot(198, 18, 0, 0)}/15\`, \`${dot(192, 0, 0, 0)}/24\``;
+  for (const f of ['changes/2962-link-addresses.md', 'CHANGELOG.md']) assert.deepEqual(kinds(f, text), [], f);
+  assert.equal(kinds('README.md', text).length, 4);
+});
+
 test('personal data: e-mail addresses, home folders with a user name, logins', () => {
   assert.deepEqual(kinds('a.md', `write to jane.doe${at}${dot('mail', 'pt')}`), [`e-mail address: jane.doe${at}mail.pt`]);
   assert.deepEqual(kinds('a.md', `jane${at}${dot('example', 'com')} and bot${at}${dot('lab', 'test')}`), []);   // example domains
