@@ -50,7 +50,7 @@ async function main() {
         // already running (e.g. the launcher was double-clicked twice): opened, with a one-time code it gives for
         // the token it wrote for its owner (#2564), only when it proves it holds that token (#2955): a server
         // another user started on the port first is another program
-        const { holdsToken } = await import('../server/open-code.js');
+        const { holdsToken, openCodeUrl } = await import('../server/open-code.js');
         let token = null;
         try { token = fs.readFileSync(tokenFile(port), 'utf8').trim(); } catch { /* none written */ }
         if (!await holdsToken(url, token)) { console.error(`Port ${port} is used by another program. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}`); process.exit(1); }
@@ -58,7 +58,7 @@ async function main() {
         if (args.includes('--open')) {
           const code = await fetch(`${url}/api/open-code`, { method: 'POST', headers: { 'X-Silinx-Token': token } })
             .then(r => (r.ok ? r.json() : {})).then(j => j.code, () => null);
-          await openBrowser(code ? `${url}/#code=${code}` : url);
+          await openBrowser(openCodeUrl(url, code));
         }
         process.exit(0);
       }
