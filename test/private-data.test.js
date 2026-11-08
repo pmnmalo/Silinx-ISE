@@ -150,6 +150,15 @@ test('the allow-list (#498): XPower\'s section numbers in the history, read as a
   assert.deepEqual(kinds('test/other.test.js', home('x')), ['home folder with a user name: /Users/x']);
 });
 
+test('the allow-list (#3117): the special-purpose ranges of #2962 in its fragment and in CHANGELOG.md, not elsewhere', () => {
+  const ranges = `NAT64 \`64:ff9b::/96\` and \`64:ff9b:1::/48\`, the reserved IPv4 ranges (\`${dot(198, 18, 0, 0)}/15\`, \`${dot(192, 0, 0, 0)}/24\`)`;
+  assert.deepEqual(kinds('changes/2962-link-addresses.md', ranges), []);
+  assert.deepEqual(kinds('CHANGELOG.md', ranges), []);
+  assert.deepEqual(kinds('README.md', ranges),
+    [`IP address: ${dot(198, 18, 0, 0)}`, `IP address: ${dot(192, 0, 0, 0)}`, 'IPv6 address: 64:ff9b::', 'IPv6 address: 64:ff9b:1::']);
+  assert.deepEqual(kinds('CHANGELOG.md', `the server at ${dot(192, 168, 1, 20)}`), [`IP address: ${dot(192, 168, 1, 20)}`]);   // a real address still found
+});
+
 test('the history scan (#555): the history of HEAD (main), not the other branches', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-private-'));
   const git = (...args) => execFileSync('git', ['-c', 'user.name=T', `-c`, `user.email=t${at}${dot('example', 'com')}`, '-c', 'commit.gpgsign=false', ...args], { cwd: dir, encoding: 'utf8' });
