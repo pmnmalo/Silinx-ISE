@@ -3,7 +3,9 @@
 // (wire and gate delays, the glitches a gate filters, the setup checks), in VHDL and in Verilog; the model of a
 // placed and routed design against its static timing (every connection's delay in the SDF; simulated with a
 // clock a little slower than the timing's minimum period it works with no violation, a clock faster than it
-// reports violations); and every example's test bench passes on the model with its timing, in both languages.
+// reports violations). Every example's test bench on the model with its timing, in both languages, in files of their own
+// run beside this one (#3124): test/sim-model-par-examples.test.js, micro80's in sim-model-par-micro80.test.js, vga's in
+// sim-model-par-vga.test.js and sim-model-par-vga-verilog.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
@@ -12,8 +14,7 @@ import { orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { writeSdf, parseSdf, annotateSdf, CHECKS_FROM } from '../core/sdf.js';
 import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
 import { analyzeTiming } from '../packages/silinx-fpga/src/fpga/timing.js';
-import { device, flow, simulate, sdfPeriod, exampleTimesim } from './timesim-lib.mjs';
-import { EXAMPLES } from './examples-lib.mjs';
+import { device, flow, simulate, sdfPeriod } from './timesim-lib.mjs';
 
 // ------------------------------------------------------------------ the SDF
 test('writeSdf: per instance its connections\' delays, its paths (from an input, from the clock\'s edge) and its setup checks, in ps', () => {
@@ -269,10 +270,3 @@ test('the flow\'s postpar step: the routed design\'s model, its SDF with every c
     assert.ok(fast.events.filter(e => /Timing violation/.test(e.text)).every(e => e.time >= CHECKS_FROM));
   }
 });
-
-// every example's test bench, on the post-place & route model of the example (its generics the test bench's: the
-// the longest, in test/sim-model-par-vga.test.js and test/sim-model-par-vga-verilog.test.js: run beside these)
-// the longest, in test/sim-model-par-vga.test.js: run beside these)
-for (const name of EXAMPLES.filter(n => n !== 'vga')) {
-  test(`example ${name}: its test bench passes on the post-place & route model with its timing (SDF), VHDL and Verilog (#122)`, { timeout: 1800000 }, () => exampleTimesim(name));
-}
