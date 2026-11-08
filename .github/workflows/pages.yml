@@ -1,8 +1,8 @@
 name: Pages
 # The single-file edition (Silinx.html: no install, runs in the browser) published on GitHub
 # Pages, so that a course page (e.g. Moodle, as a URL resource) can link to it:
-#   https://pmnmalo.github.io/Silinx-ISE/       the stable edition: the latest release
-#   https://pmnmalo.github.io/Silinx-ISE/dev/   the development edition: main, after every push
+#   https://pmnmalo.github.io/Silinx/       the stable edition: the latest release
+#   https://pmnmalo.github.io/Silinx/dev/   the development edition: main, after every push
 #                                               (its title says "dev:<commit> (<date>)";
 #                                               its browser storage is its own)
 # Built after every push to main (the dev edition: that commit; no tests, CI runs at a release only,

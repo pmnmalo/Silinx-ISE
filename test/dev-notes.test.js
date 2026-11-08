@@ -12,7 +12,7 @@ const CL = '# Changelog\n\n## 15.10.9\n\nIn detail:\n\n- **New thing** (#1).\n\n
 test('dev notes: the commit, the dev site, the newest section when it is not released yet', () => {
   const t = devNotes({ commit: 'abc1234', date: '2026-10-13', changelog: CL, tags: ['v15.10.8'] });
   assert.match(t, /^\*\*Development build\*\* of main, commit abc1234 \(2026-10-13\): not a release/);
-  assert.match(t, /https:\/\/pmnmalo\.github\.io\/Silinx-ISE\/dev\//);
+  assert.match(t, /https:\/\/pmnmalo\.github\.io\/Silinx\/dev\//);
   assert.match(t, /## Not released yet \(15\.10\.9\)\n\nIn detail:\n\n- \*\*New thing\*\* \(#1\)\./);
   assert.doesNotMatch(t, /Old thing/);
   // released already: no "not released yet" part

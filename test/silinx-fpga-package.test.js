@@ -20,7 +20,7 @@ test('#1677 silinx-fpga: a workspace package of this repository, public on npm, 
   assert.equal(pkg.private, undefined);
   assert.deepEqual(pkg.publishConfig, { access: 'public', provenance: true });
   // npm checks the provenance against the package's repository (#2382: E422 with none)
-  assert.deepEqual(pkg.repository, { type: 'git', url: 'git+https://github.com/pmnmalo/Silinx-ISE.git', directory: 'packages/silinx-fpga' });
+  assert.deepEqual(pkg.repository, { type: 'git', url: 'git+https://github.com/pmnmalo/Silinx.git', directory: 'packages/silinx-fpga' });
   assert.equal(pkg.license, 'Apache-2.0');
   assert.equal(pkg.type, 'module');
   assert.match(pkg.version, /^0\.\d+\.\d+$/, 'its own semver, 0.x');

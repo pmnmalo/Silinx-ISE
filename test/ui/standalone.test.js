@@ -63,7 +63,7 @@ before(async () => {
     '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
   server = http.createServer(async (req, res) => {
     if (unreachable) { served.push(`unreachable ${req.url}`); req.socket.destroy(); return; }
-    // (dev/: the same site as the development edition of GitHub Pages, https://pmnmalo.github.io/Silinx-ISE/dev/)
+    // (dev/: the same site as the development edition of GitHub Pages, https://pmnmalo.github.io/Silinx/dev/)
     const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '').replace(/^dev\//, '').replace(/^$/, 'index.html') || 'index.html';
     // (the simulated Digilent board of the programming test, the fake folder of the workspace folder tests)
     const TEST = { '__test/adept-sim.js': 'adept-sim.js', '__test/fs-access-fake.js': 'fs-access-fake.js' };

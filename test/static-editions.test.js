@@ -74,18 +74,18 @@ test('#487 the usage counter added to a page with a policy: its loader\'s hash, 
 });
 
 test('#487 the assets\' URLs of a built page: its version\'s folder next to the page served, on the site it names opened from a file; Yosys shared', async () => {
-  const layout = { dir: '15.12.0/', yosys: '../vendor/yowasp-yosys/0.70.1258/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
+  const layout = { dir: '15.12.0/', yosys: '../vendor/yowasp-yosys/0.70.1258/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
   globalThis.SILINX_ASSET_LAYOUT = layout;
   delete globalThis.SILINX_ASSETS;
   try {
     const { assetsBase, yosysBundleUrl, assetsRoot } = await import('../web/js/open-flow-browser.js?layout=1');
-    assert.equal(assetsBase({ protocol: 'file:', href: 'file:///tmp/Downloads/Silinx.html' }), 'https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/');
-    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx-ISE/' }), 'https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/');
-    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx-ISE/dev/index.html' }), 'https://pmnmalo.github.io/Silinx-ISE/dev/assets/15.12.0/');
-    assert.equal(yosysBundleUrl('https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx-ISE/assets/vendor/yowasp-yosys/0.70.1258/gen/bundle.js');
+    assert.equal(assetsBase({ protocol: 'file:', href: 'file:///tmp/Downloads/Silinx.html' }), 'https://pmnmalo.github.io/Silinx/assets/15.12.0/');
+    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx/' }), 'https://pmnmalo.github.io/Silinx/assets/15.12.0/');
+    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx/dev/index.html' }), 'https://pmnmalo.github.io/Silinx/dev/assets/15.12.0/');
+    assert.equal(yosysBundleUrl('https://pmnmalo.github.io/Silinx/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx/assets/vendor/yowasp-yosys/0.70.1258/gen/bundle.js');
     // the folder of every version's assets (the cache's other versions pruned under it, #967): each edition's own
-    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx-ISE/assets/');
-    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx-ISE/dev/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx-ISE/dev/assets/');
+    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx/assets/');
+    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx/dev/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx/dev/assets/');
     // a test's SILINX_ASSETS replaces them
     globalThis.SILINX_ASSETS = 'http://127.0.0.1:9/assets/x/';
     assert.equal(assetsBase({ protocol: 'file:', href: 'file:///x.html' }), 'http://127.0.0.1:9/assets/x/');

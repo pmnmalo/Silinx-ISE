@@ -81,7 +81,7 @@ const PT = {
     'Desligada: nada é pedido no arranque. Ajuda > Procurar Atualizações… procura manualmente; Ajuda > Procurar Atualizações no Arranque volta a ligá-la.',
   'Check for updates at start-up on: the latest release is asked of GitHub when the app starts': 'Procura de atualizações no arranque ligada: a última versão é pedida ao GitHub quando a aplicação arranca',
   'Check for updates at start-up off: Help > Check for Updates… checks by hand': 'Procura de atualizações no arranque desligada: Ajuda > Procurar Atualizações… procura manualmente',
-  'Only the site (pmnmalo.github.io/Silinx-ISE) counts its visits, with': 'Só o site (pmnmalo.github.io/Silinx-ISE) conta as visitas, com o',
+  'Only the site (pmnmalo.github.io/Silinx) counts its visits, with': 'Só o site (pmnmalo.github.io/Silinx) conta as visitas, com o',
   '(no cookies, no personal data).': '(sem cookies nem dados pessoais).',
   'Silinx is free and asks for nothing. If you use it, in a course, a school or on your own, we would like to know: it helps to decide what to improve.': 'O Silinx é gratuito e não pede nada. Se o usa, numa disciplina, numa escola ou por conta própria, gostávamos de saber: ajuda a decidir o que melhorar.',
   'Say hello on GitHub Discussions (a GitHub account is needed): your school or course, your role (teacher, student…), the boards you use. Only what you write there is seen.': 'Deixe uma mensagem no GitHub Discussions (é preciso uma conta GitHub): a sua escola ou disciplina, o seu papel (professor, estudante…), as placas que usa. Só se vê o que escrever lá.', 'Keyboard Shortcuts': 'Atalhos de Teclado',

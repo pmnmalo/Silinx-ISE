@@ -36,7 +36,7 @@ const YOSYS_VERSION = JSON.parse(rd('node_modules/@yowasp/yosys/package.json')).
 const NEXTPNR_VERSION = JSON.parse(rd('node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json')).version;
 // (the Spartan-6's, nextpnr-himbaechel-spartan6, in a folder of its own: #2288)
 const NEXTPNR_S6_VERSION = JSON.parse(rd('node_modules/@silinx/nextpnr-himbaechel-spartan6/package.json')).version;
-const PUBLISHED = 'https://pmnmalo.github.io/Silinx-ISE/';
+const PUBLISHED = 'https://pmnmalo.github.io/Silinx/';
 const LAYOUT = {
   dir: BUILD ? `dev-${BUILD.commit}/` : `${VERSION}/`,
   yosys: `../vendor/yowasp-yosys/${YOSYS_VERSION}/gen/bundle.js`,

@@ -24,7 +24,7 @@ test('prefKey: the stable edition and the application keep their keys; the devel
 test('DEV_SITE: a page under dev/ (the site\'s development edition), not the stable edition\'s root', async () => {
   const saved = Object.getOwnPropertyDescriptor(globalThis, 'location');
   try {
-    for (const [pathname, dev] of [['/Silinx-ISE/dev/', true], ['/dev/index.html', true], ['/Silinx-ISE/', false], ['/', false], ['/devices/', false]]) {
+    for (const [pathname, dev] of [['/Silinx/dev/', true], ['/dev/index.html', true], ['/Silinx/', false], ['/', false], ['/devices/', false]]) {
       Object.defineProperty(globalThis, 'location', { value: { pathname }, configurable: true });
       const m = await import(`../web/js/prefs.js?${encodeURIComponent(pathname)}`);
       assert.equal(m.DEV_SITE, dev, pathname);

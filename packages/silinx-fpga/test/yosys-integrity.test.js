@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { verifiedYosysUrl, yosysWorkerSource } from '../src/synth-open-yosys.js';
 import { verifiedYosysUrl as reexported } from '../src/synth-open.js';
 
-const SITE = 'https://pmnmalo.github.io/Silinx-ISE/';
+const SITE = 'https://pmnmalo.github.io/Silinx/';
 const KEY = 'vendor/yowasp-yosys/0.70.1258/gen/bundle.js';
 const URL_ = `${SITE}assets/${KEY}`;
 const BUNDLE = 'export async function runYosys() { return {}; }\n';
@@ -51,7 +51,7 @@ test('#1445 nothing checked, no request: no digest written for the bundle (unbui
 
 test('#1445 the Yosys Blob workers\' code checks the bundle before importing it, with the integrity its scope was given', async () => {
   const src = yosysWorkerSource(URL_);
-  assert.match(src, /^const yosys = \(async function verifiedYosysUrl\(url, scope = globalThis\) \{[\s\S]*?\n\}\)\("https:\/\/pmnmalo\.github\.io\/Silinx-ISE\/assets\/vendor\/yowasp-yosys\/0\.70\.1258\/gen\/bundle\.js", self\)\.then\(u => import\(u\)\);$/m);
+  assert.match(src, /^const yosys = \(async function verifiedYosysUrl\(url, scope = globalThis\) \{[\s\S]*?\n\}\)\("https:\/\/pmnmalo\.github\.io\/Silinx\/assets\/vendor\/yowasp-yosys\/0\.70\.1258\/gen\/bundle\.js", self\)\.then\(u => import\(u\)\);$/m);
   assert.doesNotMatch(src, /^const yosys = import\(/m, 'never imported unchecked');
   // the check's text, run as the worker runs it (its scope's self), against the fake network
   const fn = /^const yosys = \((async function verifiedYosysUrl[\s\S]*?\n\})\)\(/m.exec(src)[1];

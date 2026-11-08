@@ -4,7 +4,7 @@
 # the job before any of its steps. The repository is public: a pull request from a fork can bring a
 # workflow of its own with runs-on: self-hosted, so only the ISE and Quality workflows of main, run
 # on schedule or by hand, may run here. GITHUB_* are set by the runner, a workflow cannot change them.
-# The repository by its ID, which its renames keep (pmnmalo/Silinx-ISE, renamed Silinx: #2624), not by its name;
+# The repository by its ID, which its renames keep (pmnmalo/Silinx, renamed Silinx: #2624), not by its name;
 # its name (GITHUB_REPOSITORY, set by the runner as the ID) then names its two workflows.
 REPO_ID=1407836659
 REPO="${GITHUB_REPOSITORY:-}"

@@ -48,7 +48,7 @@ test('hook: the ISE and Quality workflows of main, on schedule or by hand, run',
   }
 });
 
-// #2624: the repository renamed (pmnmalo/Silinx-ISE to pmnmalo/Silinx), its ID kept: its two workflows still run
+// #2624: the repository renamed (pmnmalo/Silinx to pmnmalo/Silinx), its ID kept: its two workflows still run
 test("#2624 hook: the renamed repository's workflows run, by its ID and its new name", { skip: !posix }, () => {
   for (const wf of WORKFLOWS) {
     const r = hook({ ...OK, GITHUB_REPOSITORY: 'pmnmalo/Silinx', GITHUB_WORKFLOW_REF: `pmnmalo/Silinx/.github/workflows/${wf}@refs/heads/main` });
@@ -73,8 +73,8 @@ test('hook: every other job is refused before its first step, saying why', { ski
     [{ GITHUB_REPOSITORY_ID: '42' }, `repository '${REPO}' (ID '42')`],
     [{ GITHUB_REPOSITORY_ID: '' }, `repository '${REPO}' (ID '')`],
     [{ GITHUB_REPOSITORY: '' }, `repository '' (ID '${ID}')`],
-    // the renamed repository's jobs name their workflows by its new name
-    [{ GITHUB_REPOSITORY: 'pmnmalo/Silinx' }, `workflow '${REPO}/.github/workflows/ise.yml@refs/heads/main'`],
+    // the renamed repository's jobs name their workflows by its new name, not by the old one
+    [{ GITHUB_REPOSITORY: 'pmnmalo/Silinx-ISE' }, `workflow '${REPO}/.github/workflows/ise.yml@refs/heads/main'`],
     [{ GITHUB_WORKFLOW_REF: `${REPO}/.github/workflows/ise.yml@refs/heads/main.evil` }, `workflow '${REPO}/.github/workflows/ise.yml@refs/heads/main.evil'`],
     // nothing set (an old runner): refused, not allowed
     [{ GITHUB_REPOSITORY: '', GITHUB_REPOSITORY_ID: '', GITHUB_EVENT_NAME: '', GITHUB_REF: '', GITHUB_WORKFLOW_REF: '' }, "repository '' (ID '')"],

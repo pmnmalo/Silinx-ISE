@@ -327,9 +327,9 @@ for Xilinx FPGAs supported by ISE 14.7.
 In short:
 
 - **In the browser: design, simulate, synthesize and program the board.** Open
-  **https://pmnmalo.github.io/Silinx-ISE/** (the latest release; the development version of main is at
-  https://pmnmalo.github.io/Silinx-ISE/dev/, and its files, the app zip included, in the pre-release
-  [Development build](https://github.com/pmnmalo/Silinx-ISE/releases/tag/dev)). Nothing to install.
+  **https://pmnmalo.github.io/Silinx/** (the latest release; the development version of main is at
+  https://pmnmalo.github.io/Silinx/dev/, and its files, the app zip included, in the pre-release
+  [Development build](https://github.com/pmnmalo/Silinx/releases/tag/dev)). Nothing to install.
   The site synthesizes, places, routes and writes the bitstream (below), and programs the board's FPGA,
   or its Platform Flash PROM so that the design starts at power-up, over USB (WebUSB: Chrome or Edge on
   a computer, Chrome on an Android tablet). Projects are kept in the browser, or (Chrome / Edge) in a
@@ -337,7 +337,7 @@ In short:
   Chrome or Edge can **install the site as an app** (*Install app*, or *Add to Home screen* on Android: a
   tablet, a classroom's interactive display): it opens in a window of its own, and once a project has
   been opened it also opens and implements with no network.
-  **`Silinx.html`** from the [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)
+  **`Silinx.html`** from the [latest release](https://github.com/pmnmalo/Silinx/releases/latest)
   is the same page in one file, to keep or open offline (its synthesis tools come from the site the
   first time; programming the board needs the site's address). For a course page (Moodle…), link the site's address as a URL: an HTML file uploaded to
   Moodle does not work (Moodle's filtering of uploaded HTML files removes its scripts).
@@ -346,7 +346,7 @@ In short:
   routes (nextpnr) and writes the bitstream, in the browser or locally.
 - **Or run Silinx locally, with Node.js (an alternative):** install [Node.js](https://nodejs.org)
   (LTS), download **`silinx-<version>.zip`** from the
-  [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest), unzip it and double-click
+  [latest release](https://github.com/pmnmalo/Silinx/releases/latest), unzip it and double-click
   **`Start Silinx.bat`** (Windows), **`Start Silinx.command`** (macOS) or
   **`start-silinx.sh`** (Linux). Your browser opens Silinx; projects are folders in
   `Silinx-projects` in your user folder. The same Silinx, running on your computer: it synthesizes
@@ -359,7 +359,7 @@ In short:
   **`SHA256SUMS`**: in the folder of the downloads, `sha256sum -c SHA256SUMS --ignore-missing` (Linux) or
   `shasum -a 256 -c SHA256SUMS --ignore-missing` (macOS), `Get-FileHash <file>` (Windows PowerShell). Each
   file also has GitHub's build provenance attestation (built by the Release workflow from the version's
-  tag): `gh attestation verify silinx-<version>.zip --repo pmnmalo/Silinx-ISE`.
+  tag): `gh attestation verify silinx-<version>.zip --repo pmnmalo/Silinx`.
 
 ### On an iPad or a tablet
 
@@ -393,8 +393,8 @@ style's File menu) or **Copy Link to This Module…** (a module's right-click me
 chosen. The whole project goes inside the link (`#design=…`, compressed: 5 to 25 KB for the examples; anyone with the
 link has every file, its comments too), so nothing has to be hosted. Some slide tools cut a link longer than about 2
 000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
-`…/Silinx-ISE/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
-(`…/Silinx-ISE/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
+`…/Silinx/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
+(`…/Silinx/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
 is `try` (a schematic's Try it; a state diagram's, a Petri net's or an ASM chart's Simulate panel), `simulate` (the test bench) or
 `emulate` (the board emulator); `top=` names the module (with `simulate`, the test bench). Opening a link makes a project named after the design;
 clicked again, that project is opened as it is when it has the same files, and one the student changed is replaced
@@ -409,7 +409,7 @@ link opens it so, for that page only (the viewer's own layout is not changed).
 ## For developers
 
 ```bash
-git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
+git clone https://github.com/pmnmalo/Silinx.git && cd Silinx
 npm install
 npm start          # prints the address to open, http://127.0.0.1:8642/#token=…  (node bin/silinx.js serve --open opens it)
 ```
@@ -605,7 +605,7 @@ The examples run on it with their seven-segment display and switches on its Pmod
 **1BitSquared iCEBreaker + PmodVGA**, a Digilent PmodVGA in those Pmods.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
-what is planned: the [issues](https://github.com/pmnmalo/Silinx-ISE/issues).
+what is planned: the [issues](https://github.com/pmnmalo/Silinx/issues).
 
 **Recommended on Windows, macOS (Intel / Apple Silicon) and Linux:** build a private Docker image
 once with the kit in [`docker/ise/`](docker/ise/README.md), from your own installer and WebPACK
@@ -698,14 +698,14 @@ with them.
 
 ## Privacy and usage counts
 
-The site (https://pmnmalo.github.io/Silinx-ISE/ and its dev/ edition) counts its visits and what is
+The site (https://pmnmalo.github.io/Silinx/ and its dev/ edition) counts its visits and what is
 used in it (a new project, a simulation, Implement Design, a bitstream, a board programmed) with
 [GoatCounter](https://www.goatcounter.com): no cookies, no personal data, never the content of a
 project. The application and the downloaded `Silinx.html` send nothing. The counter is added by the
 site's build (`scripts/site-analytics.mjs`, when the repository variable `GOATCOUNTER_CODE` is set).
 
 Using Silinx in a course, a school or on your own? Tell us on
-[GitHub Discussions](https://github.com/pmnmalo/Silinx-ISE/discussions/151) (Help ▸ Tell Us Who You Are…).
+[GitHub Discussions](https://github.com/pmnmalo/Silinx/discussions/151) (Help ▸ Tell Us Who You Are…).
 
 ## Licence
 

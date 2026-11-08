@@ -14,11 +14,11 @@ running the same Silinx, on your own computer.
 
 ## Way 1: in the browser (simplest)
 
-The quickest: open **https://pmnmalo.github.io/Silinx-ISE/** in your browser (the latest release; your
+The quickest: open **https://pmnmalo.github.io/Silinx/** in your browser (the latest release; your
 projects are kept in that browser. The development version, with the changes not released yet, is at
-https://pmnmalo.github.io/Silinx-ISE/dev/, its projects kept apart) and go to step 4. Or download it, to work offline:
+https://pmnmalo.github.io/Silinx/dev/, its projects kept apart) and go to step 4. Or download it, to work offline:
 
-1. Open the **[latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
+1. Open the **[latest release](https://github.com/pmnmalo/Silinx/releases/latest)**.
 2. Under **Assets**, click **`Silinx.html`** to download it.
 3. Double-click the downloaded file. It opens in your browser (Chrome, Edge, Firefox or Safari).
 4. On the Start page click **New Project…** and choose in *Start from* **Example: gates** (logic gates drawn as a schematic: a good first example), **Example: traffic** (a pedestrian crossing: a state diagram and a Boolean algebra), **Example: blinky** (or *pong*, a game for two, *stopwatch*, *clock*, *vga*, a picture on a VGA monitor, *isqrt*, a C function made into hardware, *uart*, an echo over the serial port to a terminal, or *micro80*, an 8080-compatible microprocessor running a program) or **Empty project**. After the examples come the **Test design: …** entries: designs Silinx itself is tested with (schematics, state diagrams, C programs for Silinx HLS), each with its test (a test bench, or the C program's `main()`), to see what Silinx does with each kind of source.
@@ -88,7 +88,7 @@ Silinx runs on **Node.js**, a free program.
 
 ### Step 2: download Silinx
 
-1. Open the **[latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
+1. Open the **[latest release](https://github.com/pmnmalo/Silinx/releases/latest)**.
 2. Under **Assets**, download **`silinx-<version>.zip`** (for example `silinx-15.22.1.zip`).
    - Don't use the green **Code ▸ Download ZIP** button or "Source code": that version does not
      include everything Silinx needs (it still works, but the first start needs Internet to
@@ -105,7 +105,7 @@ release lists each file's SHA-256 checksum in its notes and in the file **`SHA25
 `Get-FileHash silinx-<version>.zip` in PowerShell prints the checksum to compare with the notes'.
 Each file also has GitHub's build provenance attestation (it was built by the repository's Release
 workflow from the version's tag): with the [GitHub CLI](https://cli.github.com),
-`gh attestation verify silinx-<version>.zip --repo pmnmalo/Silinx-ISE`.
+`gh attestation verify silinx-<version>.zip --repo pmnmalo/Silinx`.
 
 ### Step 3: start Silinx
 
@@ -198,8 +198,8 @@ and press Enter. macOS: right-click the folder ▸ *New Terminal at Folder* (or 
 ## For those who use git
 
 ```bash
-git clone https://github.com/pmnmalo/Silinx-ISE.git
-cd Silinx-ISE
+git clone https://github.com/pmnmalo/Silinx.git
+cd Silinx
 npm install
 npm start            # prints the address to open: http://127.0.0.1:8642/#token=…
 ```

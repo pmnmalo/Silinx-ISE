@@ -1,6 +1,6 @@
 # Spartan-3E device descriptions measured black-box (2026-10-11)
 
-Issue [#3](https://github.com/pmnmalo/Silinx-ISE/issues/3). The device descriptions that ship with
+Issue [#3](https://github.com/pmnmalo/Silinx/issues/3). The device descriptions that ship with
 Silinx (`packages/silinx-fpga/devices/*.json.gz`: tiles, sites, wires, PIPs and the nodes that join wires across
 tiles) are today computed from ISE's device report (`xdl -report -pips -all_conns`,
 `research/s3e-route/build-device.mjs`). The bit database (`packages/silinx-fpga/bitdb`) was instead

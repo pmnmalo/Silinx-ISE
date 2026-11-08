@@ -3,7 +3,7 @@
 The Silinx toolchain for Spartan-3E (Basys2, Nexys2), Spartan-6 (Nexys3, Atlys) and iCE40 (iCEBreaker) FPGAs without
 vendor tools: synthesis with Yosys in WebAssembly, then pack, place and route by nextpnr, Silinx's timing and bitstream,
 with the device data. The command line builds the Spartan-3E parts. It is being separated from
-Silinx, the IDE that uses it ([#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651), the plan:
+Silinx, the IDE that uses it ([#1651](https://github.com/pmnmalo/Silinx/issues/1651), the plan:
 [docs/TOOLCHAIN-SEPARATION.md](../../docs/TOOLCHAIN-SEPARATION.md)). Its code is in `src/`, the device graphs of the
 supported boards in `devices/`, their bit databases in `bitdb/`. It is published on npm from its own tags
 (`npm install silinx-fpga`), with npm's provenance.

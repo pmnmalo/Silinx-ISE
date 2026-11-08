@@ -15,7 +15,7 @@ import { serviceWorkerOf, registerServiceWorker } from '../web/js/pwa.js';
 import { ICONS, THEME, webManifest, withManifestLink, writePwa } from '../scripts/pwa.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SITE = 'https://pmnmalo.github.io/Silinx-ISE/';
+const SITE = 'https://pmnmalo.github.io/Silinx/';
 const DEV = `${SITE}dev/`;
 
 test('#1051 route: the page network-first, the manifest and icons kept, the versioned assets from their cache, nothing else intercepted', () => {
@@ -35,7 +35,7 @@ test('#1051 route: the page network-first, the manifest and icons kept, the vers
   assert.equal(get(`${SITE}assets/dev-83fea1b/bitdb/s3e-tiles.json`), 'asset');
   assert.equal(get(`${SITE}assets/devices/xc3s250ecp132-4.json.gz`), 'network', 'the unversioned assets of before #487');
   // another origin (GitHub's API, the usage counter), another method
-  assert.equal(get('https://api.github.com/repos/pmnmalo/Silinx-ISE/releases/latest'), 'network');
+  assert.equal(get('https://api.github.com/repos/pmnmalo/Silinx/releases/latest'), 'network');
   assert.equal(get('https://gc.zgo.at/count.js'), 'network');
   assert.equal(route({ url: `${SITE}manifest.webmanifest`, method: 'POST' }, SITE), 'network');
   assert.equal(route({}, SITE), 'network');

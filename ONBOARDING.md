@@ -15,7 +15,7 @@ together, where things are, and the lessons learnt.
 ## 1. Set up
 
 ```bash
-git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
+git clone https://github.com/pmnmalo/Silinx.git && cd Silinx
 npm ci
 npm start          # prints the address to open: http://127.0.0.1:8642/#token=…
 ```

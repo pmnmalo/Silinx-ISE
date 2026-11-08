@@ -120,7 +120,7 @@ test('updatedExpectations: results recorded, stages that did not run and other d
 });
 
 test('warnings: one line, no absolute paths or cache folders, no Yosys numbers; repeats counted', () => {
-  const cache = `/home/user/src/Silinx-ISE/.cache/designs-corpus/olofk__serv/${SHA}/rtl/serv_top.v`;
+  const cache = `/home/user/src/Silinx/.cache/designs-corpus/olofk__serv/${SHA}/rtl/serv_top.v`;
   assert.equal(normalizeWarning(`Warning:  wire '\\x' in ${cache}:12\n  is   unused`), "Warning: wire '\\x' in rtl/serv_top.v:12 is unused");
   assert.equal(normalizeWarning('Warning: /tmp/build/a/b.v:3: x'), 'Warning: b.v:3: x');
   assert.equal(normalizeWarning('Warning: Replacing memory \\m with list of registers. $auto$proc_rom.cc:155:do_switch$1234'), 'Warning: Replacing memory \\m with list of registers. $auto');

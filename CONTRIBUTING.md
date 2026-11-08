@@ -3,7 +3,7 @@
 Contributions are welcome: bug reports, ideas and pull requests.
 
 - **Report a bug or propose a feature** by opening an issue on
-  [GitHub](https://github.com/pmnmalo/Silinx-ISE/issues). Say what you did, what you expected and
+  [GitHub](https://github.com/pmnmalo/Silinx/issues). Say what you did, what you expected and
   what happened (the version, from Help ▸ About, and the console's messages help). Issues are
   public: leave out personal data and code you may not share. A vulnerability is reported privately
   instead, as [SECURITY.md](SECURITY.md) says.

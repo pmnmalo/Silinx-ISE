@@ -3,14 +3,14 @@
 ## Reporting a vulnerability
 
 Report a vulnerability privately, not in a public issue: on GitHub, Security ▸ Report a
-vulnerability, at <https://github.com/pmnmalo/Silinx-ISE/security/advisories/new>. Say what you
+vulnerability, at <https://github.com/pmnmalo/Silinx/security/advisories/new>. Say what you
 found, how to reproduce it (the version, from Help ▸ About, the edition and how the server was
 started) and what it allows. You get an answer within two weeks. A confirmed vulnerability is fixed
 in the next release, which names it in [CHANGELOG.md](CHANGELOG.md) once the fix is published.
 
 ## Supported versions
 
-The latest release (the zip of the [releases page](https://github.com/pmnmalo/Silinx-ISE/releases)
+The latest release (the zip of the [releases page](https://github.com/pmnmalo/Silinx/releases)
 and the Pages site's root) and `main` (the development site, under `dev/`). Older releases are not
 patched: update to the latest.
 

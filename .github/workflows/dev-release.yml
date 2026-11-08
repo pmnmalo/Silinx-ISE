@@ -2,10 +2,10 @@ name: Development build
 # A pre-release "Development build" (tag dev) with the files of main as a release has them (the app zip,
 # the Docker builder kit, Silinx.html), updated in place after every push to main (no tests: CI runs at
 # a release only, #607; the build itself must work):
-#   https://github.com/pmnmalo/Silinx-ISE/releases/tag/dev
+#   https://github.com/pmnmalo/Silinx/releases/tag/dev
 # One pre-release, moved and its files replaced (no new release, no notification each time); a
 # pre-release is never "Latest", so Check for Updates and the stable site keep to the releases.
-# Its browser edition is also on the site: https://pmnmalo.github.io/Silinx-ISE/dev/ (pages.yml).
+# Its browser edition is also on the site: https://pmnmalo.github.io/Silinx/dev/ (pages.yml).
 on:
   push:
     branches: [main]

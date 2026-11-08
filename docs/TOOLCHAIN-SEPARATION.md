@@ -1,6 +1,6 @@
 # Separating the Silinx toolchain from the IDE
 
-The plan for [#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651): the Silinx toolchain (Yosys in
+The plan for [#1651](https://github.com/pmnmalo/Silinx/issues/1651): the Silinx toolchain (Yosys in
 WebAssembly, then Silinx's pack, place, route, timing, DRC and bitgen, with the device data) becomes a
 package that works without the IDE, as a library and a command line, and the IDE uses it like any other user.
 This document is the analysis (October 2026, version 15.18.4) and the steps, each an issue of its own. Its tables describe the
@@ -150,26 +150,26 @@ the code moves as it is, the old modules re-export what moved, the importers sta
 that changes them, the moved modules are checked against `main`'s on the corpus. Steps 1 to 5 change nothing
 in the layout and can start now; the decisions steps 6 and 10 needed are taken (section 4).
 
-1. **A boundary test** ([#1672](https://github.com/pmnmalo/Silinx-ISE/issues/1672)): the toolchain's
+1. **A boundary test** ([#1672](https://github.com/pmnmalo/Silinx/issues/1672)): the toolchain's
    modules, and the modules of the IDE they may import today (the four above), listed in a test; a new import
    across fails, and the list only shrinks (as `test/code-size.test.js`). Done: `test/toolchain-boundary.test.js`.
-2. **The technology view out of `core/fpga/`** ([#1673](https://github.com/pmnmalo/Silinx-ISE/issues/1673)):
+2. **The technology view out of `core/fpga/`** ([#1673](https://github.com/pmnmalo/Silinx/issues/1673)):
    `core/fpga/techview.js` moves to `core/`, the old path re-exporting. Done: `core/techview.js`.
-3. **Synthesis from flat Verilog** ([#1674](https://github.com/pmnmalo/Silinx-ISE/issues/1674)):
+3. **Synthesis from flat Verilog** ([#1674](https://github.com/pmnmalo/Silinx/issues/1674)):
    `synthesizeOpen(design)` becomes the front end (`toVerilog`, the gate count) followed by a synthesis of the
    flat Verilog; `synthesizeOpen` keeps its signature. The same netlists on the corpus. Done: `core/synth-front.js`
    (`synthesisInput`, `synthesizeOpen`) and `synthesizeVerilog` in `packages/silinx-fpga/src/synth-open.js`.
 4. **The flow's front end and simulation models as hooks**
-   ([#1675](https://github.com/pmnmalo/Silinx-ISE/issues/1675)): `runOpenFlow` gets the HDL front end and the
+   ([#1675](https://github.com/pmnmalo/Silinx/issues/1675)): `runOpenFlow` gets the HDL front end and the
    simulation models through `io`; a wrapper in the IDE gives them, so `server/open-flow-run.js` and
    `web/js/open-flow-worker.js` run as before. After it the boundary test's list is empty. Done: `runFlow` with
    `io.frontEnd` and `io.simModels`; `core/flow-ide.js` `runOpenFlow` gives the IDE's (`core/synth-front.js`
    `flowFrontEnd`, `core/flow-models.js`, moved from `open-flow-models.js`); the list keeps only the old
    paths' re-exports, which go with step 7.
-5. **The bit database out of research/** ([#1676](https://github.com/pmnmalo/Silinx-ISE/issues/1676)): the
+5. **The bit database out of research/** ([#1676](https://github.com/pmnmalo/Silinx/issues/1676)): the
    data the application ships moves next to the graphs; research re-exports its path (`test/layering.test.js`);
    the standalone build and the related tests' data map (#772) follow. Done: `packages/silinx-fpga/bitdb/`.
-6. **The workspace package** ([#1677](https://github.com/pmnmalo/Silinx-ISE/issues/1677)): `packages/silinx-fpga/`
+6. **The workspace package** ([#1677](https://github.com/pmnmalo/Silinx/issues/1677)): `packages/silinx-fpga/`
    with its `package.json` (private until step 10) and its Apache-2.0 LICENSE, the root's `workspaces`; `core/fpga/` (the
    Spartan-6 part, the graphs and the bit database included) and the toolchain's modules of `core/` move there
    as they are, in a few PRs; every old path re-exports, the server serves the package to the browser, the
@@ -177,7 +177,7 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    (a move conflicts with every open change there). Started: `packages/silinx-fpga/` with its
    `package.json` and LICENSE, then its data (`devices/`, `bitdb/`), then the toolchain's 75 modules (`src/`, `core/`'s
    old paths re-exporting them; the boundary test's list empty).
-7. **The public API** ([#1678](https://github.com/pmnmalo/Silinx-ISE/issues/1678)): the package's entry
+7. **The public API** ([#1678](https://github.com/pmnmalo/Silinx/issues/1678)): the package's entry
    (`exports`): netlist and UCF in, `.bit`, XDL and the reports out, the devices and bit databases, the flow
    with its `io`; the IDE's importers switch to it, the re-exporting shims go, and the boundary test then says
    that the IDE imports nothing but the API. Started: the entries `silinx-fpga` (`src/index.js`, Node and the
@@ -188,12 +188,12 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    the tests and the research the package's modules; `core/`'s old paths are gone. The IDE and the server reach
    the package by its path (the release zip has no workspace link, #1677), so `scripts/related-tests.mjs` follows
    the imports as before.
-8. **The command line** ([#1679](https://github.com/pmnmalo/Silinx-ISE/issues/1679)): `silinx-fpga build`,
+8. **The command line** ([#1679](https://github.com/pmnmalo/Silinx/issues/1679)): `silinx-fpga build`,
    from `packages/silinx-fpga/research/s3e-route/open-flow.mjs`, and a README with a blinky for the Basys2. A new feature with its
    tests. Done: `packages/silinx-fpga/bin/silinx-fpga.js` (`src/cli.js`): Verilog or a Yosys JSON netlist and a UCF
    to the `.bit`, through `runFlow`; the Verilog checked by Yosys first, file by file (the flow has no front end to
    say where an error is); the README's blinky byte for byte the IDE's `.bit` (`test/silinx-fpga-cli.test.js`).
-9. **Its tests, oracle and research with it** ([#1680](https://github.com/pmnmalo/Silinx-ISE/issues/1680)):
+9. **Its tests, oracle and research with it** ([#1680](https://github.com/pmnmalo/Silinx/issues/1680)):
    the 64 unit test files, `check:open-flow`, the data-building research; the test globs, the shards,
    related-tests and the workflows (ISE, Quality, Yosys update) follow.
    Started: of the 101 test files that import the toolchain, the 16 that import the package alone, its simulators
@@ -208,7 +208,7 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    make their designs with the IDE's front end (`core/compile.js`, `core/synth-front.js`): they stay the IDE's
    until the front end is a package of its own (`silinx-hdl`).
 10. **Licence, notices, versioning and publishing**
-    ([#1681](https://github.com/pmnmalo/Silinx-ISE/issues/1681)): as decided (section 4): the package's NOTICE
+    ([#1681](https://github.com/pmnmalo/Silinx/issues/1681)): as decided (section 4): the package's NOTICE
     and THIRD-PARTY-NOTICES, the IDE's NOTICE naming it, its changelog fragments and 0.x version, a publishing
     workflow from its own tag in this repository.
     First part: the package's NOTICE and THIRD-PARTY-NOTICES.md (written by `scripts/third-party.mjs` with the
@@ -220,7 +220,7 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
     `silinx-fpga-vX` starts CI and the workflow, which checks that the commit is on `main`, that the package's version
     is X with its changelog section, waits for that CI run to pass and publishes with npm's provenance (npm's trusted
     publishing, no token, #2428); the package is no longer `private`.
-11. **Its own repository** ([#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651)): `silinx-fpga` moves
+11. **Its own repository** ([#1651](https://github.com/pmnmalo/Silinx/issues/1651)): `silinx-fpga` moves
     to a GitHub repository of its own (decided, section 4), once steps 1 to 10 are done: `git filter-repo` keeps
     the moved files' history; there, its CI, the ISE oracle (the self-hosted runner registered for it too), CodeQL,
     Dependabot and the Yosys update, its releases and npm publishing; here, the IDE depends on the published
@@ -289,12 +289,12 @@ VHDL / Verilog ─▶ flat Verilog ─▶ Yosys, pack, place, route, bitgen ─�
 The front end imports nothing else of the IDE today (its 40 modules include the interpreter and the event
 simulator that `compile` uses), so its steps are the toolchain's, shorter:
 
-1. **A boundary test** ([#1709](https://github.com/pmnmalo/Silinx-ISE/issues/1709)): its modules listed, no
+1. **A boundary test** ([#1709](https://github.com/pmnmalo/Silinx/issues/1709)): its modules listed, no
    import from them into the rest of the IDE. Done: `test/hdl-boundary.test.js`.
-2. **The workspace package** ([#1710](https://github.com/pmnmalo/Silinx-ISE/issues/1710)):
+2. **The workspace package** ([#1710](https://github.com/pmnmalo/Silinx/issues/1710)):
    `packages/silinx-hdl/`, the modules moved as they are, the old paths re-exporting; after the toolchain's
    workspace (step 6, #1677), which sets the workspaces up.
-3. **Its API and publishing** ([#1711](https://github.com/pmnmalo/Silinx-ISE/issues/1711)): `compile`,
+3. **Its API and publishing** ([#1711](https://github.com/pmnmalo/Silinx/issues/1711)): `compile`,
    `elaborate`, the flat Verilog with its hints, the UNISIM sources; the IDE's importers switch to it; its
    publishing from its own tag; VHDL in `silinx-fpga`'s command line through it.
 

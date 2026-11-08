@@ -262,7 +262,7 @@ function cModule(path, text) {
 }
 
 /** The address of the Silinx site (its latest release), the base of a link made away from the app (the MCP server). */
-export const SITE_URL = 'https://pmnmalo.github.io/Silinx-ISE/';
+export const SITE_URL = 'https://pmnmalo.github.io/Silinx/';
 
 // ------------------------------------------------------------------ the link's hash
 const KEYS = ['design', 'open', 'view', 'top', 'board', 'ui'];
