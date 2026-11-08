@@ -41,3 +41,8 @@ export async function holdsToken(url, token, { fetch: f = fetch } = {}) {
     return typeof proof === 'string' && proof.length === want.length && crypto.timingSafeEqual(Buffer.from(proof), Buffer.from(want));
   } catch { return false; }
 }
+
+/** The URL a second launch opens: the server's, with the code it gave when that code is one `issue()` makes
+ *  (base64url, as long as its 18 bytes), else the server's alone: an answer of any other form never reaches the
+ *  command line that opens the browser (`cmd /c start` reads `&` and `|`, #3014). */
+export const openCodeUrl = (url, code) => (typeof code === 'string' && /^[A-Za-z0-9_-]{24}$/.test(code) ? `${url}/#code=${code}` : url);
