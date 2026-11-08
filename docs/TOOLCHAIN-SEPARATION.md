@@ -32,7 +32,7 @@ separation starts.
 | Parts and resources `packages/silinx-fpga/src/resources.js`, `resource-check.js`, `family.js`, `power.js` | 4 | 764 | 46 | `test/resources.test.js`, `test/resource-check.test.js`, `test/power.test.js` |
 
 About 75 files and 15 700 lines, 64 unit test files. The routing graphs are checked against ISE by DRC; the DRC
-is ISE's (the oracle), the toolchain's own checks are `checkRouting` (`packages/silinx-fpga/src/fpga/route.js`) and the resource
+is ISE's (the oracle), the toolchain's own checks are `checkRouting` (`packages/silinx-fpga/src/fpga/route-check.js`) and the resource
 check.
 
 Around it, outside the toolchain: the technology view (`core/fpga/techview.js`, which draws with the schematic
@@ -182,7 +182,8 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    with its `io`; the IDE's importers switch to it, the re-exporting shims go, and the boundary test then says
    that the IDE imports nothing but the API. Started: the entries `silinx-fpga` (`src/index.js`, Node and the
    browser) and `silinx-fpga/node` (the disk's loaders, Yosys in Node), documented in the package's README; the
-   flow places and routes through `io.placeRoute` when given (nextpnr: #1953, #1954). Done: the light entry
+   flow placed and routed through `io.placeRoute` when given (nextpnr: #1953, #1954), since replaced by `io.nextpnr`, the
+   one engine (#2137). Done: the light entry
    `silinx-fpga/parts` for the IDE's pages; the IDE imports the entries only (`test/toolchain-boundary.test.js`),
    the tests and the research the package's modules; `core/`'s old paths are gone. The IDE and the server reach
    the package by its path (the release zip has no workspace link, #1677), so `scripts/related-tests.mjs` follows

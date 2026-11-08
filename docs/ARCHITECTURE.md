@@ -87,8 +87,8 @@ toolchain receives that, and reads no VHDL itself.
 The processes (`web/js/processes.js`, `web/js/implement.js`) run the project's flow, chosen in Toolchain Settings, and
 the Design Summary (`web/js/summary.js`) shows its reports, as ISE's do:
 
-- **The Silinx toolchain**, `packages/silinx-fpga`: Yosys, pack, place and route (Silinx's or nextpnr), timing,
-  bitstream, with no Xilinx software. The server runs it in a process of its own (`server/open-flow.js`), the browser in
+- **The Silinx toolchain**, `packages/silinx-fpga`: Yosys, then nextpnr's pack, place and route (Silinx's packer
+  first on the Spartan-6), Silinx's timing and bitstream, with no Xilinx software. The server runs it in a process of its own (`server/open-flow.js`), the browser in
   a Web Worker (`web/js/open-flow-worker.js`), both through `core/flow-ide.js` (the toolchain with the IDE's front end
   and simulation models). Everything about it: [TOOLCHAIN.md](TOOLCHAIN.md).
 - **Xilinx ISE 14.7**, which the user installs: XST, NGDBuild, MAP, PAR, TRCE, BitGen, run by `server/ise.js` in a
@@ -122,7 +122,8 @@ and the board's Platform Flash: in the browser over WebUSB, with Silinx's own JT
 
 ### Around the application
 
-- **The command line**: `bin/silinx-ise.js` (check, simulate, constraints, the toolchain's settings); the toolchain's own:
+- **The command line**: `bin/silinx-ise.js` (serve, check, simulate, constraints, the toolchain's settings, the MCP
+  server); the toolchain's own:
   `packages/silinx-fpga/bin/silinx-fpga.js`.
 - **An MCP server** for an AI assistant on the projects of the workspace (`server/mcp.js`); what it changes in a project open in the
   interface the local server tells the page (`server/project-watch.js`, `web/js/project-watch.js`, #2843).
@@ -133,8 +134,8 @@ and the board's Platform Flash: in the browser over WebUSB, with Silinx's own JT
 
 - **Unit tests** (`test/*.test.js`, node:test) on `core/`, the server and the toolchain; **UI tests** (`test/ui/`) on a
   headless Chrome (`test/ui/harness.js`), Firefox and WebKit, in both interfaces.
-- **The examples are the test designs** (`examples/`, `test/examples-lib.mjs`): each runs on every device of the
-  Silinx toolchain and builds with ISE with no warnings.
+- **The examples are the test designs** (`examples/`, `test/examples-lib.mjs`): each runs on every board of the
+  Silinx toolchain (`TARGETS`, the iCEBreaker's `ICE40_TARGETS`); the Spartan-3E's also build with ISE with no warnings.
 - **The oracles**: ISE 14.7 for the toolchain (bitstream, DRC) and XST's Spartan-3E behaviour for the language; the C
   itself for Silinx HLS, Vitis HLS for its ports and interfaces.
 - CI runs at a release; a pull request runs the tests of the modules it changes (CLAUDE.md).

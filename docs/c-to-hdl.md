@@ -60,7 +60,9 @@ of a function that only writes its arrays from constants (no argument read, no g
 Vitis HLS computes one; so is such a loop in the function's own body, its writes depending only on constants and its own
 index, the array used only by reading its elements after it (#2151: the loop is not made); `math.h` and a division of constants are folded the same way. Of other
 values: a division (`/`), `sqrt` / `sqrtf` and `fabs` / `fabsf` are made (#1783), and `floor`, `ceil`, `trunc`,
-`round`, `fmin`, `fmax`, `copysign` (and their `…f`) on the value's bits (#1843); the others not yet (#1761).
+`round`, `fmin`, `fmax`, `copysign` (and their `…f`) on the value's bits (#1843); `exp`, `log`, `sin`, `cos`, `tan`, `pow`, `log2`, `log10`,
+`exp2`, `atan`, `asin`, `acos`, `sinh`, `cosh`, `tanh`, `cbrt`, `hypot`, `fmod` (and their `…f`) by Silinx's own
+algorithms, the same in the hardware and the C simulation (core/c-mathlib.js, #1761).
 
 `ap_fixed<W, I, Q, O>` / `ap_ufixed` (`#include "ap_fixed.h"`, #1643) run in the C
 simulation as AMD's `ap_fixed.h` computes them: full-precision results, the quantization modes (`AP_TRN`,
@@ -126,7 +128,7 @@ so its hardware is the C's:
 - Macros are expanded in pragmas (`#define F 4` … `#pragma HLS UNROLL factor=F`), as Vitis HLS does.
 
 Not synthesizable, as in Vitis HLS: `new` / `delete`, exceptions, RTTI, virtual functions, recursion, the STL
-(but the headers above). Not yet: operators other than `()`, `ap_fixed`, floating point.
+(but the headers above). Not yet: operators other than `()`.
 
 ## Structs and enums (C and C++)
 
@@ -288,8 +290,8 @@ The report lists each function's calls, latency (from `ap_start` to `ap_done`; a
 resources (states, register bits, memories), a sub-module's own below it. The same modules serve DATAFLOW's processes.
 Five cases stay inlined, with a warning: a function of latency 0 called by a top of latency 0 (no clock to start it
 with: its ports are Vitis HLS's), one sharing a global variable with its caller (Vitis HLS makes it a port of the
-sub-module), one with a struct argument, an `hls::vector` too (not yet), one with `ap_ctrl_chain`, and one called by a module that waits for an AXI master (`ap_ce`) (not yet). `ALLOCATION` and `FUNCTION_INSTANTIATE` are not made: a function is one instance per caller and size of
-its arrays. With no pragma a function is inlined, where Vitis HLS keeps a large one (#2244).
+sub-module), one with a struct argument, an `hls::vector` too (not yet), one with `ap_ctrl_chain`, and one called by a module that waits for an AXI master (`ap_ce`) (not yet). `FUNCTION_INSTANTIATE` is not made: a function is one instance per caller and size of
+its arrays (`ALLOCATION`, below, shares an `INLINE off` function's and the floating-point operations' units). With no pragma a function is inlined, where Vitis HLS keeps a large one (#2244).
 
 **Arrays and memories** (#1527). A local array of up to 64 elements is registers (one per element; an index that
 is not a constant a multiplexer). An array argument is a memory outside the module, `ap_memory`: one port, its
@@ -522,7 +524,7 @@ void top(ap_uint<1> dir, ap_uint<15> scaling, cx xn[1024], cx xk[1024], bool *st
 | `DATAFLOW` (the top function's, #1707) | its calls processes running at once (below); a region of other statements: a warning, made sequential |
 | `STREAM variable= depth=` | a DATAFLOW region's stream: its FIFO's depth (else `hls::stream<T, D>`'s D, else 2) |
 | `BIND_STORAGE variable= type=` (#1901) | a local array a memory (a small one too) of `ram_1p`, `ram_2p`, `ram_s2p`, `ram_t2p`, `rom_1p` or `rom_2p`'s ports; another type: a warning. `impl=` (#1961): `lutram` and `bram` told to the tools (`ram_style`, `rom_style`), `register` its elements registers, no memory; `uram`, `srl`, `latency=` and an argument's: a warning |
-| `ARRAY_RESHAPE variable= type= [factor=] [dim=]` (#1961) | a local array made as `ARRAY_PARTITION`: its elements accessed at once, as in one wide word, in memories side by side, a warning saying so; an argument: a warning, its port's words kept |
+| `ARRAY_RESHAPE variable= type= [factor=] [dim=]` (#1961) | `type=cyclic factor=N`: element k in word k / N at slice k % N; `type=block`: word k % S at slice k / S, as Vitis HLS packs them (core/c-reshape.js, #2424). The top's argument of one dimension (integers, factor 2 or more) is one `ap_memory` of the words, the co-simulation packing the C's elements; a local memory is one memory of the words, its initial values packed; a small local array is registers, as a partition's. Otherwise made as `ARRAY_PARTITION` (a local) or its port's words kept (an argument), with a warning |
 | `DEPENDENCE [variable=] [class=array] inter\|intra [RAW\|WAR\|WAW] false` (#1961) | a pipelined loop's or function's memory, in the loop the pragma is in and those in it: `inter` a read need not come after another iteration's write, so the II is no longer bound by it (the C's results then only if the dependence really is false, as in Vitis HLS); `intra` a read and a write of one iteration in the same stage. `true` or no `false`: no effect. A variable's dependence is kept: a warning |
 | `LOOP_FLATTEN [off]` (in a loop's body, #1961) | the loop made one with the loop around it (and on up, each with its own pragma), of the product of their counts, when the one around holds nothing else, both counts are constants and no `break`, `continue`, `return` or `goto` is in it; else a warning, its loops kept. `off`: left alone |
 | `LOOP_MERGE [force]` (in a body, #1961) | its consecutive `for` loops made one, of the largest count (each body while its own lasts), or of their common bound; not when a value crosses them in another order than the C's (only an array at each one's own variable is safe), a warning; `force` merges them all the same, on the designer's word |
@@ -530,6 +532,7 @@ void top(ap_uint<1> dir, ap_uint<15> scaling, cx xn[1024], cx xk[1024], bool *st
 | `BIND_OP variable= op=mul impl=fabric\|dsp\|auto` (#1961) | `fabric`: the multiplications assigned to the variable made of LUTs (a shift and an addition a bit), no multiplier block; `dsp`, `auto`: a block, as with no pragma. `latency=`, another operation on `dsp`, a floating-point operation: a warning |
 | `ALLOCATION instances=mul limit=N operation` (#1961) | a cycle takes at most N multiplier blocks (a wide multiplication counts its 18 x 18 blocks), the others waiting for a later cycle and sharing them; a pipeline's II is kept, with a warning if it takes more. `instances=f limit=1 function` of an `INLINE off` function: its one instance. `instances=dmul limit=1 operation` (and `dadd`, `dsub`, `ddiv`, `dsqrt`, `fadd`, `fsub`, `fmul`, `fdiv`, `fsqrt`, #2273): the operations of that kind in the pragma's scope (its function, or its loop's body) one shared unit, a sub-module of the soft-float's operation scheduled over the clock, each operation a call of it (its alignment, normalization and rounding made once: much less area, a few cycles more each, and a loop calling it not pipelined); without the pragma each operation is inlined where it is; one in a loop's header, after `&&` / `\|\|` or in a branch of `?:` stays inlined. Other operations and an inlined function: a warning |
 | `LATENCY [min=] [max=]` (of the top function, #1961) | `min=`: wait states at its start, a combinational top made sequential; `max=`: a warning if a path takes more. Of a loop or a region, or of a pipelined function: a warning |
+| `EXPRESSION_BALANCE off` (in the top's body, #2613) | by default a sum of four terms or more of one width is balanced into a tree (core/c-balance.js), before the states and a pipeline's stages are made: the same value, log2 of its terms deep; `off` keeps the chains as written. Elsewhere, or not `off`: a warning |
 | `STREAM` outside a DATAFLOW region; `type=shared` / `unsync`, or `depth=` of an array, in one (#1961) | a warning saying why: a stream is a FIFO, a local array a buffer (PIPO) |
 | Vitis HLS's other pragmas, and AXI4-Stream (`axis`) on what is not a stream or an array | accepted and ignored, with a warning; an unknown pragma: a warning |
 
@@ -575,7 +578,8 @@ With the device's multiplier blocks known (the IDE gives them: a Spartan-3E's MU
 `cToHdl(…, { mults: N })`), a cycle takes no more than that many, every multiplication made of 18 x 18 ones: the
 others wait for a later cycle (`pow` in double on a Basys2-100's 4). The report's `units` give each unit's widths, its
 blocks, its uses and its inputs, `blocks` their sum and `unitsNs` the longest path with their multiplexers; the View
-C Synthesis Report lists them, and warns when that path is over the clock (no registers are added on them yet). A sub-module
+C Synthesis Report lists them, and, when that path is over the clock, the machine is scheduled again with each multiplication's operands held in
+registers written the cycle before (core/c-schedule.js, #2273); the report warns if it is still over. A sub-module
 (#1960) has its own units and its own limit: the module's `blocks` do not count its sub-modules'.
 
 ## HDL to C (the other way)

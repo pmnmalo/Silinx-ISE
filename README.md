@@ -2,8 +2,8 @@
 
 > Silinx ISE is an independent open-source project. It is not affiliated with, endorsed by or
 > supported by AMD/Xilinx. Xilinx, ISE, ISim, iMPACT, Spartan and Virtex are trademarks of AMD.
-> Silinx has its own toolchain (Yosys synthesis, Silinx's place & route and bitstream writer) for the
-> Basys2 and Nexys2 boards; for the other boards and the ISE-only processes it can use the free
+> Silinx has its own toolchain (Yosys synthesis, nextpnr place & route, Silinx's bitstream writer) for the
+> Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards; for the other boards and the ISE-only processes it can use the free
 > Xilinx ISE 14.7 WebPACK tools, which you install yourself.
 
 > **Purpose.** Silinx ISE was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago. Who
@@ -225,9 +225,11 @@ for Xilinx FPGAs supported by ISE 14.7.
   `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; the variables MSB → LSB by columns then rows, or by rows then
   columns, chosen beside the map; 5–6 inputs as two/four 4×4 maps, the most significant picking the map) with the groups of the minimal SOP
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
-  the canonical SOP and POS in full (the sum of the minterms, the product of the maxterms), each with its Σm / ΠM list; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
-  essential prime implicants marked; several minimal solutions browsed on the map, the one chosen used) with literal and gate
-  counts; the *XOR form* when it is simpler than both (fewer literals, or as many and fewer
+  then the results, in this order: the least gates and the least delay; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
+  essential prime implicants marked; several minimal solutions browsed with *◀ Solution k of N ▶* beside the map, the one chosen used);
+  the canonical SOP and POS, each with its Σm / ΠM list beside its name and in full under it (the sum of the minterms, the product of the
+  maxterms); each with its terms, literals and gates and its circuit (SdP / PdS in Portuguese). Each table's map can also be shown in 3D
+  (3 inputs on a cylinder, 4 on a torus). After them come the *XOR form*, when it is simpler than both (fewer literals, or as many and fewer
   two-input operators): `a ⊕ b ⊕ c`, a full adder's carry `a·b + c·(a ⊕ b)`, a comparator's
   `/(a1 ⊕ b1)·/(a0 ⊕ b0)`, `a ⊕ b·c` (sums of products of literals and XOR / XNOR factors, or a
   variable XOR one; up to 6 inputs, don't cares used, checked on the whole table); and the *NAND
@@ -235,8 +237,8 @@ for Xilinx FPGAs supported by ISE 14.7.
   (double negation: `/(/(a.b)./(c.d))`), with their gate counts. The expressions are written with `/` as NOT and `.` as AND (`/a.b + c`, `/(a + b)`), or, chosen, as
   `/ab + c`, `a·b' + c`, `ab' + c`, VHDL or Verilog; each reads back as typed. A tick box on
   each result picks that output's logic in the module and the schematic (its *HDL logic*; the least gates' by default):
-  the canonical SOP or POS, the minimal SOP, POS, the XOR form where it is simpler
-  (`xor` / `xnor`, `^` / `~^`), NAND gates only (`a nand b`, `~(a & b)`), NOR gates only, the least gates or delay. The table always has its HDL module, made with it in the project's
+  the least gates or delay, the minimal SOP or POS, the canonical SOP or POS, the XOR form where it is simpler
+  (`xor` / `xnor`, `^` / `~^`), NAND gates only (`a nand b`, `~(a & b)`), NOR gates only. The table always has its HDL module, made with it in the project's
   preferred language, kept in sync with the table both ways (like ASM charts: editing the table
   rewrites it; editing and saving the HDL updates the table by exhaustive simulation, don't cares
   kept in its comments; a module that no longer fits — sequential, too many inputs — shows the
@@ -285,7 +287,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   both ways like ASM charts (an HDL edit that is no longer a plain state machine shows the reason); *Convert to State Diagram (FSM)* reads an HDL module or an
   ASM chart, *Convert to ASM chart* goes the other way; *Simulate* steps through the diagram (set
   the inputs, clock edges, current state and the transition about to be taken highlighted).
-- **Implementation** with the **Silinx toolchain** (the Basys2 and Nexys2 boards, the default; in the
+- **Implementation** with the **Silinx toolchain** (the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards, the default; in the
   browser or locally) or with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
   locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel
   (restored when the project is reopened), *Stop*, every warning/error in the Warnings/Errors tabs,
@@ -295,7 +297,7 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Devices**: every FPGA family ISE 14.7 WebPACK implements — Spartan-3, Spartan-3E,
   Spartan-3A/3AN, Spartan-3A DSP, Spartan-6, Virtex-4/5/6, Artix-7, Kintex-7 and Zynq-7000
   (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6. Beyond ISE, the
-  Lattice iCE40 (LP, HX, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack.
+  Lattice iCE40 (LP, HX, Ultra, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack.
 - **Boards and I/O Pin Planning**: Digilent Basys2, Nexys2, Nexys3, Atlys, Cmod S6; Xilinx
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One;
   1BitSquared iCEBreaker (iCE40, its pins written as a PCF; a 1BitSquared iCEBreaker + PmodVGA for VGA).
@@ -339,9 +341,9 @@ In short:
   is the same page in one file, to keep or open offline (its synthesis tools come from the site the
   first time; programming the board needs the site's address). For a course page (Moodle…), link the site's address as a URL: an HTML file uploaded to
   Moodle does not work (Moodle's filtering of uploaded HTML files removes its scripts).
-- **Synthesis and bitstreams need no Xilinx tool** for the **Basys2-100 / 250 and Nexys2-500 / 1200**:
-  the *Silinx toolchain (no ISE)*, the default mode, synthesizes (Yosys), places,
-  routes and writes the bitstream itself, in the browser or locally.
+- **Synthesis and bitstreams need no Xilinx tool** for the **Basys2-100 / 250, Nexys2-500 / 1200, Nexys3, Atlys and iCEBreaker**:
+  the *Silinx toolchain (no ISE)*, the default mode, synthesizes (Yosys), places and
+  routes (nextpnr) and writes the bitstream, in the browser or locally.
 - **Or run Silinx locally, with Node.js (an alternative):** install [Node.js](https://nodejs.org)
   (LTS), download **`silinx-ise-<version>.zip`** from the
   [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest), unzip it and double-click
@@ -433,7 +435,7 @@ inside the remote home, #2958).
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
 publishes a release with the files above (`.github/workflows/release.yml`), once CI, which the tag
 starts, has passed on the tagged commit (`scripts/wait-for-ci.mjs`). CI runs at a release only, not on
-pull requests nor on pushes to main (#607).
+pushes to main (#607); a pull request runs the test files of the modules it changes (`.github/workflows/pr-tests.yml`, #637).
 The tests against ISE (`test/ise/`) run nightly, and on demand (Actions ▸ ISE ▸ Run workflow), on
 a self-hosted runner with the ISE Docker image (label `ise`, `.github/workflows/ise.yml`); only code
 already on main runs there, never a pull request's: the runner refuses every other job before its
@@ -486,7 +488,7 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
 Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `test_bench_wizard` (a self-checking
 test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins), `convert_module` (an HDL module to a schematic, ASM chart or state
-diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `save_wave_config` and `load_wave_config` (a simulation's wave configuration saved as a .wcfg of the project, and loaded), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
 `export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
@@ -535,7 +537,7 @@ descriptions, the bit database and Yosys in WebAssembly, ~115 MB), with which th
 Silinx toolchain in the browser: *Implement Design* and *Generate Programming File* for the
 Spartan-3E and Spartan-6 boards and the iCE40 (the bitstream is downloaded), and *Configure Target Device* programs the FPGA of
 a Basys2 / Nexys2 over WebUSB (Chrome / Edge; core/adept.js, a port of adepttool's Adept USB
-protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`). XST (Xilinx ISE)
+protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`), and the iCEBreaker's SPI flash (core/ftdi-ice40.js). XST (Xilinx ISE)
 needs the full application (`npm start`).
 
 ## Synthesis and bitstreams (Xilinx ISE 14.7)
@@ -547,24 +549,23 @@ Implementation uses the Silinx toolchain by default (below), or the ISE 14.7 com
 the project's synthesis tool; *Synthesize - Yosys (open)* in a project that synthesizes with XST)
 synthesizes any design with Yosys compiled to WebAssembly, in parallel Web Workers. Its *Optimization* (Process Properties) is **Fast**, **Area** or
 **Speed**. Fast maps the design once and Place & Route makes one placement: the quickest build. Area, the default of a
-new project, also synthesizes as Speed does and keeps the smaller netlist (by slices, then LUTs), with one placement and no
-register replication. Speed tries the mappings for speed, its state machines of 8 states or more one-hot, and keeps the
+new project, also synthesizes as Speed does and keeps the smaller netlist (by slices, then LUTs), with one placement. Speed tries the mappings for speed, its state machines of 8 states or more one-hot, and keeps the
 fastest; Place & Route makes several placements and keeps the fastest (by nextpnr on the Spartan-3E 32 for a design of up to
-100 slices, eight above; three on the Spartan-6). A project made before these three is Fast (its Speed and Normal). ISE gets
+100 slices, eight above). On the Spartan-6, Place & Route makes three placements and keeps the fastest at every Optimization. A project made before these three is Fast (its Speed and Normal). ISE gets
 them as its Optimization Goal and Effort: Speed / Normal, Area / High and Speed / High. Implement Design and Generate Programming File do not
 synthesize again while the synthesis is up to date (the design's sources, top, device and Optimization
 unchanged). For the **Basys2-100 and Basys2-250
 (XC3S100E / XC3S250E-CP132) and the Nexys2-500 and Nexys2-1200 (XC3S500E / XC3S1200E-FG320)**
-Silinx also places, routes and writes the bitstream itself: the device descriptions ship with
-Silinx, and the bitstreams it writes for the tested designs are byte-identical to ISE's. The same holds in the
+Silinx also places and routes (nextpnr) and writes the bitstream: the device descriptions ship with
+Silinx, and the bitstreams it writes for the tested designs are byte for byte those ISE's bitgen writes for the same routing (ISE's DRC finds no error in them). The same holds in the
 local server for the Spartan-6 boards, the **Nexys3 and the Atlys** (XC6SLX16 / XC6SLX45-CSG324; the Atlys's
-seven-segment display and VGA on its VHDCI connector), and in the browser edition with the Silinx engine (#2103). It is the
+seven-segment display and VGA on its VHDCI connector), and in the browser edition (#2103). It is the
 default execution mode of a new installation, so students need nothing else for these boards; for
 the other boards choose an ISE mode in *Tools ▸ Toolchain Settings ▸ Execution mode*. The
 usual processes then run Silinx's own flow on this machine: *Synthesize - Yosys* (Yosys),
 *Translate* and *Map* (the netlist and the constraints read, then packed into slices and I/O
-sites), *Place & Route* (placement, routing on the routing switches whose bits are known, static
-timing against the UCF's PERIOD constraints), *Generate Programming File* (`build/<top>.bit`, and
+sites: by nextpnr on the Spartan-3E, by Silinx on the Spartan-6), *Place & Route* (nextpnr's placement and routing, checked against
+the bit database's routing switches, static timing against the UCF's PERIOD constraints), *Generate Programming File* (`build/<top>.bit`, and
 `build/<top>_prom.bit` for the PROM), with the same console, process icons, Stop and *Design
 Summary* (utilization, timing) as with ISE; *Configure Target Device* programs the board as usual
 and *View Implemented Design (FPGA)* shows the routed design; *Back-annotate Pin Locations* adds the
@@ -596,7 +597,7 @@ package). Developers can build another package's description from an ISE
 (`packages/silinx-fpga/research/s3e-route/build-device.mjs`, into `~/.silinx/devices/`) once its pads are in the bit
 database. The open
 toolchain also takes **the Spartan-6 boards (Nexys3, Atlys)** in the local server, to a bitstream ISE's bitgen
-writes byte for byte for the same routing (in the browser edition too, with the Silinx engine, #2103: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
+writes byte for byte for the same routing (in the browser edition too, #2103: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
 folder> <out folder>`.
 Beyond Xilinx, it takes **the 1BitSquared iCEBreaker** (Lattice iCE40UP5K-SG48): Yosys's `synth_ice40`,
 nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programmed into its SPI flash from Silinx: over WebUSB in the browser, or with openFPGALoader locally, #2298).
@@ -669,7 +670,8 @@ server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
 web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/silinx.css): editor, SSim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
 scripts/    adepttool installer/patch, Platform Flash programmer, standalone build
-examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's devices): gates (the first one: logic
+examples/   example projects (for the Basys2; each built by the Silinx toolchain on every Basys2, Nexys2, Nexys3, Atlys and
+            the iCEBreaker): gates (the first one: logic
             gates drawn as a schematic, a 4-bit prime-number detector with NOT / AND / OR and with NAND gates only),
             traffic (a pedestrian crossing: a state diagram, a Boolean algebra, VHDL and a Verilog display),
             blinky (VHDL + Verilog, an ASM chart, its steps counted on the display),
@@ -684,7 +686,8 @@ docs/       ARCHITECTURE.md (Silinx's architecture as a whole: the editions, the
             Spartan-3E toolchain is developed), TOOLCHAIN.md (the toolchain's architecture, from the design to the
             .bit), QUALITY.md (the Silinx toolchain against ISE)
 packages/silinx-fpga/
-            the Silinx toolchain (pack, place, route, timing, bitstream); its research/ builds the
+            the Silinx toolchain (Yosys synthesis, the Spartan-6's packing, nextpnr's place and route, timing,
+            bitstream); its research/ builds the
             bit database and the device descriptions
 research/   synthesis quality, handwriting models, other experiments
 test/       node:test suites

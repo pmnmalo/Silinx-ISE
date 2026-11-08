@@ -21,9 +21,13 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
 1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
 2. Em **Assets**, clique em **`Silinx-ISE.html`** para o descarregar.
 3. Faça duplo clique no ficheiro descarregado. Abre no browser (Chrome, Edge, Firefox ou Safari).
-4. Na página inicial clique em **New Project…** e escolha em *Start from* **Example: gates** (portas lógicas desenhadas num esquemático: um bom primeiro exemplo), **Example: traffic** (uma passadeira para peões: um diagrama de estados e uma álgebra booleana), **Example: blinky** (ou *pong*, um jogo para dois, *stopwatch*, *clock*, *vga*, uma imagem num monitor VGA, ou *isqrt*, uma função em C feita em hardware) ou **Empty project**. Depois dos exemplos vêm os **Test design: …**: projetos com que o próprio Silinx é testado (esquemáticos, diagramas de estados, programas em C para o Silinx HLS), cada um com o seu teste (uma bancada de teste, ou o `main()` do programa em C), para ver o que o Silinx faz com cada tipo de fonte.
+4. Na página inicial clique em **Novo Projeto…** (New Project…) e escolha em *Começar a partir de* (Start from) **Example: gates** (portas lógicas desenhadas num esquemático: um bom primeiro exemplo), **Example: traffic** (uma passadeira para peões: um diagrama de estados e uma álgebra booleana), **Example: blinky** (ou *pong*, um jogo para dois, *stopwatch*, *clock*, *vga*, uma imagem num monitor VGA, *isqrt*, uma função em C feita em hardware, *uart*, um eco pela porta série para um terminal, ou *micro80*, um microprocessador compatível com o 8080 a correr um programa) ou **Projeto vazio** (Empty project). Depois dos exemplos vêm os **Test design: …**: projetos com que o próprio Silinx é testado (esquemáticos, diagramas de estados, programas em C para o Silinx HLS), cada um com o seu teste (uma bancada de teste, ou o `main()` do programa em C), para ver o que o Silinx faz com cada tipo de fonte.
 
 É tudo. A saber:
+
+- Os menus indicados a seguir (**File ▸ …**, **Tools ▸ …**) são os da interface Estilo ISE; na interface Silinx (a por
+  omissão) os mesmos comandos estão na página inicial, nas **Definições** (⚙) do cabeçalho e na paleta de comandos
+  (**Ctrl+K**: escreva o nome do comando).
 
 - Os projetos ficam guardados **dentro deste browser**, neste computador. Para guardar uma cópia
   ou passar para outro computador use **File ▸ Download Project Bundle** (e **File ▸ Open Project
@@ -38,9 +42,9 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   e **File ▸ Use Browser Storage** volta ao browser. A barra de estado mostra onde ficam os
   projetos. O Firefox e o Safari não abrem pastas: aí os projetos ficam no browser.
 - **Implement Design** e **Generate Programming File** correm a cadeia de ferramentas Silinx no
-  browser (placas Basys2, Nexys2, Nexys3 e Atlys; a primeira vez descarrega as ferramentas do site, cerca de 100 MB,
-  que o browser guarda; também no `Silinx-ISE.html` descarregado): o bitstream (`top.bit`) é
-  descarregado.
+  browser (placas Basys2, Nexys2, Nexys3, Atlys e iCEBreaker; a primeira vez descarrega as ferramentas do site, cerca de 100 MB,
+  que o browser guarda; também no `Silinx-ISE.html` descarregado): o bitstream (`<módulo de topo>.bit`, por exemplo
+  `blinky.bit`) é descarregado.
 - **Programar a placa a partir do browser** (Chrome ou Edge, ou o Chrome num tablet Android; o
   Firefox e o Safari não acedem a dispositivos USB; com a página aberta a partir do endereço do site,
   não a partir do ficheiro descarregado): ligue o cabo USB da placa, ligue-a, e depois **Configure Target Device ▸ Program
@@ -56,12 +60,13 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   (programe o `.bit` descarregado a partir de um computador ou de um tablet Android). Os projetos ficam no browser, que o iPadOS pode apagar ao fim de algumas
   semanas sem uso: guarde uma cópia com **File ▸ Export Silinx ISE Project (.zip)…**. Um tablet tem
   menos memória, por isso um desenho grande pode falhar na síntese. Os menus do botão direito abrem
-  com um **toque longo** (o dedo parado meio segundo); dois dedos movem um desenho e o gesto de pinça faz zoom. Na vertical o painel Projeto é uma gaveta (o botão à esquerda do
-  cabeçalho) e as propriedades dos editores abrem por cima do desenho (**Propriedades**).
-- **Uma ligação para os diapositivos**: clique com o botão direito no projeto, no painel Design, **Copiar Ligação
+  com um **toque longo** (o dedo parado meio segundo); dois dedos movem um desenho e o gesto de pinça faz zoom. Na vertical o painel lateral (Projeto) mostra-se ou esconde-se com o
+  botão do painel lateral no cabeçalho (na interface Estilo ISE é uma gaveta, o botão à esquerda do cabeçalho) e as propriedades dos editores abrem por cima do desenho (**Propriedades**).
+- **Uma ligação para os diapositivos**: clique com o botão direito no projeto, no painel Projeto, **Copiar Ligação
   para o Projeto…**: a ligação abre o Silinx no circuito, em Experimentar, na simulação ou no emulador da placa, com o
   projeto inteiro lá dentro (ver o README, *A design in a link*).
-- A interface pode ser posta em português em **View ▸ Language**.
+- A interface abre em português quando o browser está em português; muda-se em **Definições (⚙) ▸ Idioma** (na interface
+  Estilo ISE, **View ▸ Language**).
 
 ---
 
@@ -87,7 +92,7 @@ O Silinx corre no **Node.js**, um programa gratuito.
 ### Passo 2: descarregar o Silinx
 
 1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Em **Assets**, descarregue **`silinx-ise-<versão>.zip`** (por exemplo `silinx-ise-15.10.21.zip`).
+2. Em **Assets**, descarregue **`silinx-ise-<versão>.zip`** (por exemplo `silinx-ise-15.22.1.zip`).
    - Não use o botão verde **Code ▸ Download ZIP** nem o "Source code": essa versão não traz tudo
      o que o Silinx precisa (funciona na mesma, mas o primeiro arranque precisa de Internet para
      descarregar o que falta).
@@ -134,15 +139,16 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 
 ### Passo 4: usar
 
-- Página inicial ▸ **New Project…**, *Start from* **Example: gates** para começar (portas AND, OR, NOT e NAND
+- Página inicial ▸ **Novo Projeto…** (New Project…), *Começar a partir de* **Example: gates** para começar (portas AND, OR, NOT e NAND
   num esquemático: um detetor de números primos de 4 bits nos interruptores e em dois LEDs), **Example: traffic**
   a seguir (uma passadeira para peões: o controlador é um diagrama de estados, as luzes uma álgebra
-  booleana), **Example: blinky** para explorar um projeto completo, ou **Empty project**.
+  booleana), **Example: blinky** para explorar um projeto completo, ou **Projeto vazio** (Empty project).
 - Os projetos ficam em pastas normais em **`Silinx-projects`**, na sua pasta de utilizador
   (Windows: `C:\Users\<você>\Silinx-projects`, macOS: `/Users/<você>/Silinx-projects`).
   Pode copiá-los, fazer cópias de segurança, ou comprimi-los para entregar.
 - **File ▸ Export Xilinx ISE Project (.zip)** cria um zip que abre no Xilinx ISE 14.7; **File ▸ Export Silinx ISE Project (.zip)** guarda o projeto Silinx completo (com os diagramas ASM e esquemáticos), que se reabre com **Import Silinx ISE Project**. Um projeto importado veio de fora: só corre o Xilinx ISE e só programa uma placa depois de carregar em **Confiar no Projeto** (Trust Project) na consola, que o diz quando o projeto abre.
-- A interface pode ser posta em português em **View ▸ Language**.
+- A interface abre em português quando o browser está em português; muda-se em **Definições (⚙) ▸ Idioma** (na interface
+  Estilo ISE, **View ▸ Language**).
 
 ### Atualizar o Silinx
 
@@ -162,7 +168,8 @@ localmente (Forma 2), precisam de até mais duas coisas. O seu professor pode j�
    segmentos nem VGA próprios, e o Silinx põe-nos no seu conector VHDCI (como os liga uma Digilent
    VmodBB). Para as outras placas (ou os processos que
    precisam do ISE), o **Xilinx ISE 14.7** (licença WebPACK gratuita); em qualquer computador corre
-   dentro do **Docker**, e depois escolha um modo ISE em *Tools ▸ Toolchain Settings*:
+   dentro do **Docker**, e depois escolha um modo ISE em *Definições (⚙) ▸ Definições da Toolchain (ISE / Programadores)…* (Estilo ISE:
+   *Tools ▸ …*):
    - instale o [Docker Desktop](https://www.docker.com/products/docker-desktop/) (nos Mac com
      Apple Silicon, o OrbStack é uma alternativa mais rápida);
    - descarregue `silinx-ise-docker-kit-<versão>.zip` da mesma página e siga o seu
@@ -175,7 +182,7 @@ localmente (Forma 2), precisam de até mais duas coisas. O seu professor pode j�
      `brew install libusb python` e `./scripts/install-adepttool.sh` (precisa do [Homebrew](https://brew.sh)).
    - **Linux:** Digilent Adept, ou o openFPGALoader do gestor de pacotes.
 
-No Silinx, **Tools ▸ Toolchain Settings** mostra o que foi encontrado.
+No Silinx, **Definições (⚙) ▸ Definições da Toolchain (ISE / Programadores)…** (Estilo ISE: **Tools ▸ …**) mostra o que foi encontrado.
 
 ---
 
