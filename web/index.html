@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Silinx ISE Project Navigator</title>
+<title>Silinx Project Navigator</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='2' fill='%23c4161c'/%3E%3Ctext x='8' y='12' font-size='10' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3ES%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/css/theme.css">
 <link rel="stylesheet" href="/css/app.css">
@@ -35,8 +35,8 @@
     var pt = lang === 'pt' || (lang !== 'en' && /^pt\b/i.test(navigator.language || ''));
     var b = document.createElement('body'), p = document.createElement('p'), a = document.createElement('a');
     b.className = 'framed-notice'; b.setAttribute('style', 'margin: 0; padding: 24px; font: 14px sans-serif; background: Canvas; color: CanvasText');
-    p.textContent = pt ? 'O Silinx ISE não abre dentro da página de outro site.' : 'Silinx ISE does not open inside another site\'s page.';
-    a.textContent = pt ? 'Abrir o Silinx ISE num separador próprio' : 'Open Silinx ISE in a tab of its own';
+    p.textContent = pt ? 'O Silinx não abre dentro da página de outro site.' : 'Silinx does not open inside another site\'s page.';
+    a.textContent = pt ? 'Abrir o Silinx num separador próprio' : 'Open Silinx in a tab of its own';
     a.href = location.href; a.target = '_blank'; a.rel = 'noopener noreferrer';
     b.appendChild(p); b.appendChild(a); d.appendChild(b); d.lang = pt ? 'pt' : 'en';
     return;
@@ -125,7 +125,7 @@
     <div id="v-split"></div>
     <div id="drawer-scrim"></div>
     <div id="center">
-      <div id="workspace"><div id="ws-empty"><div class="ws-logo">S</div><h2>Silinx ISE</h2>
+      <div id="workspace"><div id="ws-empty"><div class="ws-logo">S</div><h2>Silinx</h2>
         <p>Open a source from the Design panel, or search for any command or file.</p>
         <div class="ws-keys"><span><kbd data-no-i18n class="pal-key">Ctrl K</kbd> <span>Search commands and files</span></span></div></div></div>
       <div id="doc-tabs" class="bottom-tabs"></div>

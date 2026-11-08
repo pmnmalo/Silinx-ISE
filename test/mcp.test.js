@@ -51,7 +51,7 @@ after(async () => { await srv?.close(); fs.rmSync(tmp, { recursive: true, force:
 test('the handshake: the protocol version, the server, its tools with their schemas; ping', async () => {
   const init = await srv.send('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
   assert.equal(init.result.protocolVersion, '2025-06-18');
-  assert.deepEqual(init.result.serverInfo, { name: 'silinx-ise', title: 'Silinx ISE', version: VERSION });
+  assert.deepEqual(init.result.serverInfo, { name: 'silinx', title: 'Silinx', version: VERSION });
   assert.deepEqual(init.result.capabilities, { tools: { listChanged: false } });
   assert.match(init.result.instructions, /The Silinx toolchain needs no Xilinx ISE\./);
   // an older client's version is answered with it; an unknown one with the newest

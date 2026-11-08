@@ -94,7 +94,7 @@ function header(lang, name, project, description) {
     `${c} Description:    ${d[0] || ''}`.replace(/\s+$/, ''),
     ...d.slice(1).map(l => `${c}                 ${l}`.replace(/\s+$/, '')),
     c,
-    `${c} Created with the Module Wizard of Silinx ISE.`,
+    `${c} Created with the Module Wizard of Silinx.`,
     c,
     `${c} Revision:`,
     `${c} Revision 0.01 - File Created`,

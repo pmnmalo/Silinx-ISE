@@ -100,8 +100,8 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   // the version: a development build's (#135), with its date and time, not its commit (#204)
   assert.match(build?.commit || '', /^[0-9a-f]{7,}$/);
   assert.match(versionLabel(build), /^dev:[0-9a-f]{7,} \(\d{4}-\d\d-\d\d \d\d:\d\d\)$/);
-  assert.equal(await page.eval(() => document.title), `Silinx ISE ${versionLabel(build)} Project Navigator`);
-  assert.equal(await page.eval(() => document.querySelector('#titlebar .app-logo').title), `Silinx ISE ${versionLabel(build)}`);   // (not in the header, #987)
+  assert.equal(await page.eval(() => document.title), `Silinx ${versionLabel(build)} Project Navigator`);
+  assert.equal(await page.eval(() => document.querySelector('#titlebar .app-logo').title), `Silinx ${versionLabel(build)}`);   // (not in the header, #987)
   await page.waitConsole(/Browser edition: projects are stored in this browser/);
   // File menu: the bundle commands of the standalone edition
   const file = (await page.openMenu('File')).map((i) => i.label);
@@ -227,7 +227,7 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
   // the bitstream is downloaded
   assert.deepEqual(await page.eval(() => window.__gc), ['event/new-project', 'event/bitstream'], 'what was used, counted once');
   // Help ▸ About says that this page counts (the site's counter there)
-  await page.menu('Help', 'About Silinx ISE');
+  await page.menu('Help', 'About Silinx');
   await page.waitDialog('About');
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .about-counts').innerText),
     /^Usage counts:\s+This page counts its visits and what is used \(a new project, a simulation, a bitstream…\) with GoatCounter: no cookies, no personal data, never the content of a project\.$/);
@@ -684,7 +684,7 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
   });
   assert.equal(manifest.href, `${siteUrl}manifest.webmanifest`);
   assert.equal(manifest.theme, '#a5121a');
-  assert.deepEqual([manifest.m.id, manifest.m.start_url, manifest.m.scope, manifest.m.display, manifest.m.name, manifest.m.short_name], ['./', './', './', 'standalone', 'Silinx ISE (development)', 'Silinx dev']);
+  assert.deepEqual([manifest.m.id, manifest.m.start_url, manifest.m.scope, manifest.m.display, manifest.m.name, manifest.m.short_name], ['./', './', './', 'standalone', 'Silinx (development)', 'Silinx dev']);
   assert.deepEqual(manifest.icons, ['icons/silinx-192.png 192x192 any', 'icons/silinx-512.png 512x512 any', 'icons/silinx-maskable-512.png 512x512 maskable']);
   // its service worker, scoped to the edition's folder, controls the page once reloaded
   const scope = await page.eval(async () => (await navigator.serviceWorker.ready).scope);
@@ -725,7 +725,7 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
     served.length = 0;
     await boot();
     await page.waitFor(() => window.Silinx.project?.name === 'Away');
-    assert.equal(await page.eval(() => document.title), `Away — Silinx ISE ${versionLabel(build)}`);
+    assert.equal(await page.eval(() => document.title), `Away — Silinx ${versionLabel(build)}`);
     await page.setView('impl');
     await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
     await page.waitFor(() => /Process "Generate Programming File" (completed successfully|failed)/.test(window.__console()), [], { what: 'the flow', timeout: 120000 });
@@ -1136,7 +1136,7 @@ uiTest('the site\'s Check for Updates (#198): the page open against the one the 
     await page.waitDialog('Check for Updates');
     await page.waitFor(() => /is up to date/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'up to date' });
     const text = await page.eval(() => document.querySelector('.dlg-overlay .dlg-body, .dlg-overlay').innerText);
-    assert.match(text, new RegExp(`Silinx ISE ${label.replace(/[.()]/g, '\\$&')} is up to date\\.\\s+It is the version this site serves\\.`));
+    assert.match(text, new RegExp(`Silinx ${label.replace(/[.()]/g, '\\$&')} is up to date\\.\\s+It is the version this site serves\\.`));
     assert.match(text, /This is the development edition, built from the latest code \(main\)/);
     assert.doesNotMatch(text, /A new version is available|99\.9\.9/);
     assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay button')].some((b) => b.textContent === 'Reload')), false);
@@ -1149,7 +1149,7 @@ uiTest('the site\'s Check for Updates (#198): the page open against the one the 
     await page.waitDialog('Check for Updates');
     await page.waitFor(() => /This site now serves/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'newer page served' });
     const text2 = await page.eval(() => document.querySelector('.dlg-overlay').innerText);
-    assert.match(text2, /This site now serves Silinx ISE 99\.0\.0\./);
+    assert.match(text2, /This site now serves Silinx 99\.0\.0\./);
     assert.match(text2, new RegExp(`This page is ${label.replace(/[.()]/g, '\\$&')}: reload the page to get the new version \\(your projects are kept\\)\\.`));
     await page.eval(() => { window.__before = true; });
     await page.dialogButton('Reload');
@@ -1158,13 +1158,13 @@ uiTest('the site\'s Check for Updates (#198): the page open against the one the 
     const s2 = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.SILINX_NO_UPDATE_CHECK = false;' });
     await page.reload();
     await page.waitDialog('Check for Updates');
-    await page.waitFor(() => /This site now serves Silinx ISE 99\.0\.0\./.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the start-up dialog' });
+    await page.waitFor(() => /This site now serves Silinx 99\.0\.0\./.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the start-up dialog' });
     await page.dialogButton('OK');
     await page.waitNoDialog();
     // the same build served again: at start-up only a line in the console
     await fs.writeFile(vfile, `${JSON.stringify(served)}\n`);
     await page.reload();
-    await page.waitConsole(new RegExp(`Silinx ISE ${label.replace(/[.()]/g, '\\$&')} is the version this site serves\\.`));
+    await page.waitConsole(new RegExp(`Silinx ${label.replace(/[.()]/g, '\\$&')} is the version this site serves\\.`));
     assert.equal(await page.dialogCount(), 0);
     assert.equal(await page.eval(() => window.__gh), 0, 'GitHub never asked on the site');
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: s2.identifier });
@@ -1231,8 +1231,8 @@ uiTest('#483 browser edition: a hostile zip (paths leaving the project, a broken
   await fs.writeFile(zipFile, zip);
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [zipFile]);
   await page.fill('.dlg-overlay input[type=text]', 'Hostile');
   await page.dialogButton('Import');
@@ -1344,8 +1344,8 @@ uiTest('#2320 browser edition: Export Xilinx ISE Project writes a C source as it
   await fs.writeFile(zipFile, await createZip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/twice.c', data: 'int twice(int a) {\n  return a + a;\n}\n' }], codec));
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [zipFile]);
   await page.fill('.dlg-overlay input[type=text]', 'CMod');
   await page.dialogButton('Import');

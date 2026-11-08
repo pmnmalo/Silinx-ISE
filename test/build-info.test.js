@@ -39,9 +39,9 @@ test('version label: the version alone, or the development commit (English and P
   assert.equal(versionLabel(null), VERSION);
   assert.equal(versionLabel({ commit: 'abc1234' }), 'dev:abc1234');
   assert.equal(versionLabel({ commit: 'abc1234', date: '2026-10-13 11:12' }), 'dev:abc1234 (2026-10-13 11:12)');
-  assert.equal(t('Silinx ISE dev:abc1234 (2026-10-13 11:12)'), 'Silinx ISE dev:abc1234 (2026-10-13 11:12)');
+  assert.equal(t('Silinx dev:abc1234 (2026-10-13 11:12)'), 'Silinx dev:abc1234 (2026-10-13 11:12)');
   assert.equal(t(versionLabel({ commit: 'abc1234' })), 'dev:abc1234');
-  assert.equal(t('Silinx ISE dev:abc1234 (2026-10-13 11:12) Project Navigator'), 'Silinx ISE dev:abc1234 (2026-10-13 11:12) Project Navigator');
+  assert.equal(t('Silinx dev:abc1234 (2026-10-13 11:12) Project Navigator'), 'Silinx dev:abc1234 (2026-10-13 11:12) Project Navigator');
 });
 
 // #707: a development build's changes since the last release, typed by their issues' labels (GitHub's API faked here)

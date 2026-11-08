@@ -20,7 +20,7 @@ uiTest('the app loads without console errors and shows the Start page', E, async
     start: document.getElementById('start-page').innerText,
     console: window.__console(),
   }));
-  assert.match(s.title, /Silinx ISE/);
+  assert.match(s.title, /Silinx/);
   assert.deepEqual(s.menus, ['File', 'Edit', 'View', 'Project', 'Process', 'Tools', 'Window', 'Help']);
   assert.ok(s.toolbar >= 15, 'toolbar buttons');
   assert.match(s.start, /New Project/);
@@ -195,13 +195,13 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
   // (the Silinx interface: they open from the processes and the toolbar, not from a menu, #1217)
   // (no Window menu in the Silinx interface: its documents in their tabs, #1253)
   for (const w of silinx ? [] : ['SSim (', 'Board Emulator (top)', 'I/O Pin Planning', 'iMPACT', 'Design Summary']) assert.ok(windows.some((x) => x === w || (w.endsWith('(') && x.startsWith(w))), `Window menu lists ${w}: ${windows}`);
-  for (const must of ['File ▸ New Project…', 'File ▸ Open Project…', 'File ▸ Import Silinx ISE Project (.zip)…', 'File ▸ Export Silinx ISE Project (.zip)…',
+  for (const must of ['File ▸ New Project…', 'File ▸ Open Project…', 'File ▸ Import Silinx Project (.zip)…', 'File ▸ Export Silinx Project (.zip)…',
     'File ▸ Import Xilinx ISE Project (.zip)…', 'File ▸ Export Xilinx ISE Project (.zip)…', 'File ▸ Recent Projects', 'Edit ▸ Undo', 'Edit ▸ Redo', 'Edit ▸ Find…',
     'Edit ▸ Replace…', 'Edit ▸ Go to Line…', 'View ▸ Implementation', 'View ▸ Simulation', 'View ▸ Design Summary', 'View ▸ Language',
     'Project ▸ New Source…', `Project ▸ ${IMPORT}…`, 'Project ▸ Design Properties…',
     'Process ▸ Implement Top Module', 'Process ▸ Check Syntax', 'Process ▸ Simulate Behavioral Model',
     'Tools ▸ ASM State Machine Editor…', 'Tools ▸ I/O Pin Planning', 'Tools ▸ iMPACT (Configure Target Device)', 'Tools ▸ Board Emulator', 'Tools ▸ RTL Schematic',
-    'Tools ▸ Toolchain Settings (ISE / Programmers)…', 'Help ▸ About Silinx ISE', 'Help ▸ Keyboard Shortcuts', 'Help ▸ Check for Updates…', 'Window ▸ Close All Documents'].filter((m) => !silinx || !GONE.some((g) => m.startsWith(`${g} ▸`)))) {
+    'Tools ▸ Toolchain Settings (ISE / Programmers)…', 'Help ▸ About Silinx', 'Help ▸ Keyboard Shortcuts', 'Help ▸ Check for Updates…', 'Window ▸ Close All Documents'].filter((m) => !silinx || !GONE.some((g) => m.startsWith(`${g} ▸`)))) {
     assert.ok(acted.some((a) => a.startsWith(must)), `${must} acted (acted: ${acted.join(', ')}; disabled: ${disabled.join(', ')})`);
   }
   // no Project ▸ Sync with .xise (#1248): it only wrote the .xise, File ▸ Export Xilinx ISE Project gives ISE the project
@@ -287,7 +287,7 @@ uiTest('Toolchain Settings opens at once, filled in when the detection answers: 
   await page.waitNoDialog();
   await page.eval(() => window.__releaseToolchain());
   const help = await page.openMenu('Help');
-  assert.ok(help.some((i) => i.label === 'About Silinx ISE'));
+  assert.ok(help.some((i) => i.label === 'About Silinx'));
   await page.closeMenus();
   assert.equal(await page.dialogCount(), 0);
 });
@@ -326,7 +326,7 @@ uiTest('the test harness opens a menu even when its first click is lost (as on s
   // the next press on the menu bar is swallowed before the app sees it
   await page.eval(() => document.getElementById('menubar').addEventListener('mousedown', (e) => e.stopImmediatePropagation(), { capture: true, once: true }));
   const items = await page.openMenu('Help');
-  assert.ok(items.some((i) => i.label === 'About Silinx ISE'), JSON.stringify(items));
+  assert.ok(items.some((i) => i.label === 'About Silinx'), JSON.stringify(items));
   await page.closeMenus();
 });
 
@@ -365,7 +365,7 @@ uiTest('the test harness: a page the browser ends is said at once, not as a time
 }, { skip: BROWSER === 'chrome' ? 'Firefox / WebKit (Playwright) only' : undefined });
 
 uiTest('About shows the version and the GitHub link', E, async (page) => {
-  await page.menu('Help', 'About Silinx ISE');
+  await page.menu('Help', 'About Silinx');
   await page.waitDialog('About');
   const info = await page.eval(() => {
     const d = document.querySelector('.dlg-overlay');
@@ -400,7 +400,7 @@ uiTest('About shows the version and the GitHub link', E, async (page) => {
   // in Portuguese (#299)
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
-    await page.menu('Ajuda', 'Acerca do Silinx ISE');
+    await page.menu('Ajuda', 'Acerca do Silinx');
     await page.waitDialog('Acerca');
     const pt = await page.eval(() => document.querySelector('.dlg-overlay').innerText);
     assert.ok(pt.includes('um emulador da placa; síntese, place & route e bitstreams com a toolchain Silinx (as placas Basys2 e Nexys2) ou com o ISE 14.7; programação da FPGA e da sua Platform Flash, também a partir do browser por USB.'), pt);
@@ -425,7 +425,7 @@ uiTest('Check for Updates: newer release, up to date and a GitHub error (fetch s
   await stub({ tag_name: 'v99.1.0', name: 'v99.1.0', html_url: `https://github.com/${REPOSITORY}/releases/tag/v99.1.0`, published_at: '2026-01-02T00:00:00Z',
     assets: [{ name: 'silinx-ise-99.1.0.zip', browser_download_url: `https://github.com/${REPOSITORY}/releases/download/v99.1.0/silinx-ise-99.1.0.zip`, size: 4096 }] });
   await page.menu('Help', 'Check for Updates…');
-  await page.waitFor(() => /A new version is available: Silinx ISE 99\.1\.0/.test(document.querySelector('.dlg-overlay')?.innerText || ''));
+  await page.waitFor(() => /A new version is available: Silinx 99\.1\.0/.test(document.querySelector('.dlg-overlay')?.innerText || ''));
   assert.ok(await page.eval(() => [...document.querySelectorAll('.dlg-overlay a')].some((a) => a.textContent === 'silinx-ise-99.1.0.zip')));
   // the release, then its changelog (What's new; refused here: the dialog shows without it)
   assert.deepEqual(await page.eval(() => window.__ghCalls), [`https://api.github.com/repos/${REPOSITORY}/releases/latest`, `https://raw.githubusercontent.com/${REPOSITORY}/v99.1.0/CHANGELOG.md`]);
@@ -472,9 +472,9 @@ uiTest('Portuguese: View ▸ Language switches the UI; menus, dialogs and the ma
     await compare(`menu ${m}`, () => page.eval(() => window.__uiTexts(document.querySelector('body > .menu-popup'))));
     await page.closeMenus();
   }
-  const dialogs = [['File', 'New Project…', 3, 'Zz9'], ['File', 'Open Project…'], ['File', 'Import Silinx ISE Project (.zip)…'], ['File', 'Import Xilinx ISE Project (.zip)…'],
+  const dialogs = [['File', 'New Project…', 3, 'Zz9'], ['File', 'Open Project…'], ['File', 'Import Silinx Project (.zip)…'], ['File', 'Import Xilinx ISE Project (.zip)…'],
     ['Project', 'New Source…', 3, 'zz9'], ['Project', `${IMPORT}…`], ['Project', 'Design Properties…'], ['Tools', 'Toolchain Settings (ISE / Programmers)…'],
-    ['Help', 'About Silinx ISE'], ['Help', 'Keyboard Shortcuts']];
+    ['Help', 'About Silinx'], ['Help', 'Keyboard Shortcuts']];
   for (const [m, it, pages = 1, name] of dialogs) {
     await setLang('en');
     await page.menu(m, it);
@@ -548,7 +548,7 @@ uiTest('Check for Updates opens its dialog at once, then fills it in when the si
   // a site serving another page: the same dialog, now with Reload
   await opened();
   await page.eval(() => window.__answer(new Response(JSON.stringify({ version: '99.0.0', build: null }), { status: 200, headers: { 'content-type': 'application/json' } })));
-  await page.waitFor(() => /This site now serves Silinx ISE 99\.0\.0\./.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'newer page served' });
+  await page.waitFor(() => /This site now serves Silinx 99\.0\.0\./.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'newer page served' });
   assert.equal(await page.dialogCount(), 1);
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons button')].map((b) => b.textContent)), ['Reload', 'Refresh', 'OK']);   // (Refresh, #2013)
   await page.key('Escape');
@@ -573,7 +573,7 @@ uiTest('at start-up the app checks for updates: a newer release opens the update
   await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   await page.waitDialog('Check for Updates');
-  await page.waitFor(() => /A new version is available: Silinx ISE 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'update dialog text' });
+  await page.waitFor(() => /A new version is available: Silinx 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'update dialog text' });
   await page.dialogButton('OK');
   await page.waitNoDialog();
   // the version running is the latest: no dialog, one line in the console
@@ -608,7 +608,7 @@ uiTest('#488 Help ▸ Check for Updates at Start-up off: no request to GitHub at
     return c;
   };
   const aboutText = async () => {
-    await page.menu('Help', 'About Silinx ISE');
+    await page.menu('Help', 'About Silinx');
     await page.waitDialog();
     const t = await page.eval(() => document.querySelector('.dlg-overlay .about-updates').innerText);
     await page.key('Escape');
@@ -642,7 +642,7 @@ uiTest('#488 Help ▸ Check for Updates at Start-up off: no request to GitHub at
     // by hand: Help ▸ Check for Updates… asks GitHub and reports the newer release
     await page.menu('Help', 'Check for Updates…');
     await page.waitDialog('Check for Updates');
-    await page.waitFor(() => /A new version is available: Silinx ISE 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'update dialog text' });
+    await page.waitFor(() => /A new version is available: Silinx 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'update dialog text' });
     assert.ok(await page.eval(() => window.__gh) >= 1, 'GitHub asked by hand');
     await page.dialogButton('OK');
     await page.waitNoDialog();
@@ -652,7 +652,7 @@ uiTest('#488 Help ▸ Check for Updates at Start-up off: no request to GitHub at
     await page.menu('Ajuda', 'Procurar Atualizações no Arranque');
     await page.waitFor(() => /Procura de atualizações no arranque ligada: a última versão é pedida ao GitHub quando a aplicação arranca/.test(document.querySelector('.toasts')?.innerText || ''), [], { what: 'Portuguese toast' });
     assert.equal(await checkMark('Procurar Atualizações no Arranque', 'Ajuda'), '✓');
-    await page.menu('Ajuda', 'Acerca do Silinx ISE');
+    await page.menu('Ajuda', 'Acerca do Silinx');
     await page.waitDialog();
     assert.match(await page.eval(() => document.querySelector('.dlg-overlay .about-updates').innerText), /^Procura de atualizações:\s+No arranque, a última versão é pedida ao GitHub \(api\.github\.com e raw\.githubusercontent\.com, no máximo uma vez por hora\): só a versão, nada sobre si ou sobre os seus projetos; o site publicado só pergunta a si próprio\. Ajuda > Procurar Atualizações no Arranque desliga-a\.$/);
     await page.key('Escape');
@@ -664,7 +664,7 @@ uiTest('#488 Help ▸ Check for Updates at Start-up off: no request to GitHub at
     await page.reload();
     await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
     await page.waitDialog('Check for Updates');
-    await page.waitFor(() => /A new version is available: Silinx ISE 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'start-up update dialog' });
+    await page.waitFor(() => /A new version is available: Silinx 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'start-up update dialog' });
     assert.ok(await page.eval(() => window.__gh) >= 1, 'GitHub asked at start-up');
     await page.dialogButton('OK');
     await page.waitNoDialog();
@@ -749,7 +749,7 @@ uiTest("update dialog: What's new lists the changes of every version newer than 
     const b = document.querySelector('.dlg-overlay .whats-new');
     return { text: b.innerText, bold: [...b.querySelectorAll('b')].map(x => x.textContent), code: [...b.querySelectorAll('code')].map(x => x.textContent), imgs: b.querySelectorAll('img').length };
   });
-  assert.match(box.text, /Silinx ISE 99\.1\.0[\s\S]*Big feature with code and style[\s\S]*Silinx ISE 99\.0\.0[\s\S]*Another change continued line/);
+  assert.match(box.text, /Silinx 99\.1\.0[\s\S]*Big feature with code and style[\s\S]*Silinx 99\.0\.0[\s\S]*Another change continued line/);
   assert.doesNotMatch(box.text, /already running/);   // the running version is not listed
   assert.deepEqual(box.bold, ['Big']);
   assert.deepEqual(box.code, ['code']);
@@ -758,6 +758,31 @@ uiTest("update dialog: What's new lists the changes of every version newer than 
   assert.equal(await page.eval(() => window.__pwned ?? null), null);
   await page.dialogButton('OK');
   await page.waitNoDialog();
+});
+
+// #2624: with no CHANGELOG.md in the release, What's new is the release's notes up to their description, which
+// starts with the product's name in bold: a release of the old name ("Silinx" then "ISE") or of the new one
+uiTest("update dialog: What's new from the release's notes, of a release with the old name and of one with the new", E, async (page) => {
+  for (const name of ['Silinx' + ' ISE (Integrated Synthesis Environment)', 'Silinx']) {
+    const body = `## What's new in 99.1.0\n\n- Notes change one\n- Notes change two\n\n**${name}** is an ISE-style FPGA design environment.\n\n## Downloads\n\n| a | b |`;
+    await page.eval((text) => {
+      window.__origFetch ??= window.fetch;
+      window.fetch = (u, o) => {
+        const s = String(u);
+        if (s.includes('api.github.com')) return Promise.resolve(new Response(JSON.stringify({ tag_name: 'v99.1.0', name: 'v99.1.0', html_url: 'https://github.com/x/y/releases/tag/v99.1.0', assets: [], body: text }), { status: 200 }));
+        if (s.includes('raw.githubusercontent.com')) return Promise.resolve(new Response('', { status: 404 }));
+        return window.__origFetch(u, o);
+      };
+    }, body);
+    await page.menu('Help', 'Check for Updates…');
+    await page.waitDialog('Check for Updates');
+    await page.waitFor(() => document.querySelector('.dlg-overlay .whats-new'), [], { what: `What's new (${name})` });
+    const text = await page.eval(() => document.querySelector('.dlg-overlay .whats-new').innerText);
+    assert.match(text, /Notes change one[\s\S]*Notes change two/, name);
+    assert.doesNotMatch(text, /ISE-style FPGA design environment|Downloads|Integrated/, name);
+    await page.dialogButton('OK');
+    await page.waitNoDialog();
+  }
 });
 
 uiTest('Design Summary: once closed it reopens from the Processes panel whatever is selected, in both views, and from the toolbar', E, async (page) => {

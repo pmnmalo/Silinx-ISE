@@ -88,12 +88,12 @@ test('#1051 serviceWorkerOf / registerServiceWorker: only a page served over HTT
 test('#1051 the manifest: each edition an app of its own, standalone, started and scoped in its folder; icons the files the worker keeps', () => {
   const m = webManifest();
   assert.deepEqual(m, {
-    id: './', name: 'Silinx ISE', short_name: 'Silinx',
+    id: './', name: 'Silinx', short_name: 'Silinx',
     description: 'An ISE-like FPGA IDE for teaching digital systems: design, simulate and implement for Spartan-3E boards, in the browser.',
     lang: 'en', start_url: './', scope: './', display: 'standalone', background_color: '#ffffff', theme_color: THEME, icons: ICONS,
   });
   const d = webManifest({ dev: true });
-  assert.deepEqual([d.name, d.short_name], ['Silinx ISE (development)', 'Silinx dev']);
+  assert.deepEqual([d.name, d.short_name], ['Silinx (development)', 'Silinx dev']);
   assert.deepEqual(ICONS.map((i) => [i.sizes, i.purpose]), [['192x192', 'any'], ['512x512', 'any'], ['512x512', 'maskable']]);
   assert.deepEqual(ICONS.map((i) => i.src), SHELL.filter((f) => f.startsWith('icons/')));
   // the PNGs at the sizes they are said to have (their IHDR's width and height)

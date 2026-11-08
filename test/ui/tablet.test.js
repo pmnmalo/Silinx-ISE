@@ -56,7 +56,7 @@ for (const orientation of ['landscape', 'portrait']) {
     if (await page.eval(() => !!document.getElementById('settings-btn')?.getClientRects().length)) {
       await page.tap('#settings-btn');
       await page.waitFor(() => document.querySelector('body > .menu-popup:not(.sub) .mi'), [], { what: 'Settings open' });
-      await page.tap('body > .menu-popup:not(.sub) > .mi .lbl', { text: 'About Silinx ISE' });
+      await page.tap('body > .menu-popup:not(.sub) > .mi .lbl', { text: 'About Silinx' });
       await page.waitDialog();
       assert.equal(await onScreen(page, '.dlg-overlay .dlg'), true, 'About on the screen');
       await page.tap('.dlg-overlay .dlg-buttons .btn', { text: 'OK' });

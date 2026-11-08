@@ -1,6 +1,6 @@
 # Third-party notices
 
-Silinx ISE (Copyright 2026 Pedro Maló, AGPL-3.0-only) includes the open-source components listed
+Silinx (Copyright 2026 Pedro Maló, AGPL-3.0-only) includes the open-source components listed
 below. The app (silinx-ise-<version>.zip) ships all of them but the ones it downloads on their first use;
 the single-file Silinx-ISE.html embeds the ones marked *standalone*. Each one keeps its own licence,
 reproduced in full here.
