@@ -30,6 +30,7 @@ import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from '.
 import { outFirstMethods } from './c-out-first.js';
 import { pipelineSchedMethods } from './c-pipe-sched.js';
 import { mergeLoops } from './c-loop-merge.js';
+import { balances } from './c-balance.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
 // (split: core/c-schedule.js's, the states split by the clock; spare: the states it adds, room for them in the state's
@@ -255,7 +256,7 @@ class SeqFlow extends Flow {
     const fn = funcs.get(top);
     this.fn = fn;
     // (#pragma HLS EXPRESSION_BALANCE off: its sums as the C writes them, #2613)
-    this.balance = !fn.body.items.some((x) => x.kind === 'pragma' && x.pragma.name === 'EXPRESSION_BALANCE' && x.pragma.args.off !== undefined);
+    this.balance = balances(fn);
     this.ctrl = 'ap_ctrl_hs';
     this.modes = new Map();
     this.globals = new Map();

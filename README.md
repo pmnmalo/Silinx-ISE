@@ -372,7 +372,7 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
   port (a USB-C to USB adapter if needed). Safari on an iPad has no WebUSB: generate the `.bit` there, then program the board from a
   computer or an Android tablet.
 - **No workspace folder on the disk**: the projects are kept in the browser's storage, which iPadOS
-  may clear after some weeks without use. Keep a copy with *File ▸ Export Silinx ISE Project (.zip)…*.
+  may clear after some weeks without use. Keep a copy with *File ▸ Export Silinx Project (.zip)…*.
 - **Less memory per tab**: a large design may fail in synthesis or implementation.
 - **The right-click menus open with a long press** (a finger or a pen held still for half a second)
   on a Design-pane row or badge, a document tab, a Files view row, a symbol of the schematic
@@ -392,7 +392,7 @@ or import: **Copy Link to Project…** (the project's right-click menu in the De
 style's File menu) or **Copy Link to This Module…** (a module's right-click menu) makes it, the view and the module
 chosen. The whole project goes inside the link (`#design=…`, compressed: 5 to 25 KB for the examples; anyone with the
 link has every file, its comments too), so nothing has to be hosted. Some slide tools cut a link longer than about 2
-000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx ISE Project*, then
+000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
 `…/Silinx-ISE/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
 (`…/Silinx-ISE/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
 is `try` (a schematic's Try it; a state diagram's, a Petri net's or an ASM chart's Simulate panel), `simulate` (the test bench) or

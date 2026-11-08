@@ -30,7 +30,7 @@ uiTest('#1444 Check for Updates: anchors only to GitHub\'s URLs; a javascript: p
     await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
     await page.menu('Help', 'Check for Updates…');
     await page.waitDialog('Check for Updates');
-    await page.waitFor(() => /A new version is available: Silinx ISE 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'update dialog text' });
+    await page.waitFor(() => /A new version is available: Silinx 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'update dialog text' });
     const out = await page.eval(() => {
       const dlg = [...document.querySelectorAll('.dlg-overlay')].pop();
       return {

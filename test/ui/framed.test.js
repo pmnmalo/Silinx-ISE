@@ -34,11 +34,11 @@ uiTest('#3041 the site in another page\'s frame: the app does not start, a notic
   await page.goto(`${site.url}framer.html`);
   const href = `${site.url}index.html#open=example:gates&view=try`;
   const app = [false, false, false, '#open=example:gates&view=try'];
-  assert.deepEqual(await notice(page), { text: 'Silinx ISE does not open inside another site\'s page.', link: 'Open Silinx ISE in a tab of its own', href, target: '_blank', rel: 'noopener noreferrer', lang: 'en', app });
+  assert.deepEqual(await notice(page), { text: 'Silinx does not open inside another site\'s page.', link: 'Open Silinx in a tab of its own', href, target: '_blank', rel: 'noopener noreferrer', lang: 'en', app });
   // the language of the interface's preference (web/js/i18n.js's, not loaded yet)
   await page.eval(() => localStorage.setItem('silinx.lang', 'pt'));
   await page.goto(`${site.url}framer.html`);
-  assert.deepEqual(await notice(page), { text: 'O Silinx ISE não abre dentro da página de outro site.', link: 'Abrir o Silinx ISE num separador próprio', href, target: '_blank', rel: 'noopener noreferrer', lang: 'pt', app });
+  assert.deepEqual(await notice(page), { text: 'O Silinx não abre dentro da página de outro site.', link: 'Abrir o Silinx num separador próprio', href, target: '_blank', rel: 'noopener noreferrer', lang: 'pt', app });
   // nothing of the link opened (no project made)
   assert.deepEqual(await page.eval(() => Object.keys(localStorage).filter((k) => /gates/.test(k + localStorage.getItem(k)))), []);
   await page.eval(() => localStorage.removeItem('silinx.lang'));

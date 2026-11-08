@@ -35,8 +35,8 @@ import { TABLE_TOOLS } from './mcp-tables.js';
 export { OPEN_REPORTS } from './mcp-processes.js';
 
 export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
-const SERVER_INFO = { name: 'silinx-ise', title: 'Silinx ISE', version: VERSION };
-const INSTRUCTIONS = 'Silinx ISE: FPGA design for teaching (Spartan-3E; Basys2, Nexys2). Projects live in the Silinx workspace: '
+const SERVER_INFO = { name: 'silinx', title: 'Silinx', version: VERSION };
+const INSTRUCTIONS = 'Silinx: FPGA design for teaching (Spartan-3E; Basys2, Nexys2). Projects live in the Silinx workspace: '
   + 'list_projects, new_project_from_example, or new_project (empty) then new_source (clock_manager, block_memory, test_bench_wizard, constraints_wizard) / write_file and set_top; then read_file / write_file, check_syntax, simulate (the project\'s test bench; its wave configurations: save_wave_config / load_wave_config), '
   + 'set_design_properties (board, device: list_devices) and set_process_properties, remove_from_project / add_to_project, rename_file / rename_module, delete_file, import_project / export_project, project_link / open_link (a design\'s link, for slides), '
   + 'run_process (synthesize, implement, bitstream, timing, power, pins) and get_report. The Silinx toolchain needs no Xilinx ISE.';

@@ -406,8 +406,8 @@ export async function importXiseDialog() {
   } catch (e) { alertDlg('Import Xilinx ISE Project', e.message, 'error'); }
 }
 
-// ------------------------------------------------------------------ Import Silinx ISE Project
-// A .zip made with File ▸ Export Silinx ISE Project (silinx.json + every project file).
+// ------------------------------------------------------------------ Import Silinx Project
+// A .zip made with File ▸ Export Silinx Project (silinx.json + every project file).
 export async function importSilinxDialog() {
   const fileInp = h('input', { type: 'file', accept: '.zip' });
   const name = h('input', { type: 'text', placeholder: 'project name' });
@@ -416,9 +416,9 @@ export async function importSilinxDialog() {
     if (f && !name.value) name.value = f.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
   });
   const r = await dialog({
-    title: 'Import Silinx ISE Project', width: 520,
+    title: 'Import Silinx Project', width: 520,
     body: h('div', {},
-      h('div', { class: 'hint' }, 'Import a whole Silinx project from a .zip made with File ▸ Export Silinx ISE Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).'),
+      h('div', { class: 'hint' }, 'Import a whole Silinx project from a .zip made with File ▸ Export Silinx Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         ...field('.zip file:', fileInp),
         ...field('Project name:', name))),
@@ -426,7 +426,7 @@ export async function importSilinxDialog() {
   });
   if (!r) return;
   const zf = fileInp.files[0];
-  if (!zf) return alertDlg('Import Silinx ISE Project', 'Select the .zip of the Silinx project.', 'error');
+  if (!zf) return alertDlg('Import Silinx Project', 'Select the .zip of the Silinx project.', 'error');
   const pname = name.value.trim() || zf.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
   if (!await askReplaceProject(pname)) return;
   try {
@@ -437,7 +437,7 @@ export async function importSilinxDialog() {
     if (res?.missing?.length) app.log(`WARNING: files listed in silinx.json but not in the zip: ${res.missing.join(', ')}`, 'warn');
     // (what the import dropped: an entry that would leave the project, a broken silinx.json field, #483)
     for (const w of res?.warnings || []) app.log(`WARNING: ${w}`, 'warn');
-  } catch (e) { alertDlg('Import Silinx ISE Project', e.message, 'error'); }
+  } catch (e) { alertDlg('Import Silinx Project', e.message, 'error'); }
 }
 
 // ------------------------------------------------------------------ replacing an existing file
@@ -747,7 +747,7 @@ export function aboutDialog() {
       h('div', { style: { width: '64px', height: '64px', background: '#c4161c', color: '#fff', font: 'bold 40px Arial', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' } }, 'S'),
       h('div', {}, h('div', { style: { fontSize: '16px', fontWeight: 'bold' } }, PRODUCT_FULL), h('div', {}, `Version ${VERSION}`),
         h('p', {}, 'Digital design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7), made for teaching: mixed VHDL/Verilog projects; schematics with live simulation; FSM and ASM state machine editors; Boolean algebra: truth tables, expressions and Karnaugh maps; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2 and Nexys2 boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'),
-        h('p', { style: { fontStyle: 'italic' } }, 'Silinx ISE was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.'),
+        h('p', { style: { fontStyle: 'italic' } }, 'Silinx was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.'),
         h('table', { class: 'about-info', style: { borderSpacing: '0 3px', margin: '6px 0 10px' } },
           h('tr', {}, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Project:'),
             h('td', {}, link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`))),
@@ -768,7 +768,7 @@ export function aboutDialog() {
         h('p', { class: 'hint' }, 'This program comes with ABSOLUTELY NO WARRANTY. Source code: ', link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`), '.'),
         h('p', { class: 'hint' }, 'Using Silinx in a course? ', link(WHO_URL, 'Tell us who you are'), '.'),
         componentsNode(),
-        h('p', { style: { color: 'var(--grey-4)' } }, 'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, and the place & route and bitstream writer of Silinx) for the Spartan-3E boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
+        h('p', { style: { color: 'var(--grey-4)' } }, 'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, and the place & route and bitstream writer of Silinx) for the Spartan-3E boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
 }
@@ -779,14 +779,14 @@ const gcLink = () => { const a = link(GOATCOUNTER_URL, 'GoatCounter'); a.dataset
 
 // ------------------------------------------------------------------ Tell us who you are
 // the users who want to say so (school, course, role): a GitHub Discussions thread, nothing collected
-export const WHO_URL = `https://github.com/${REPOSITORY}/discussions/151`;   // "Who is using Silinx ISE?"
+export const WHO_URL = `https://github.com/${REPOSITORY}/discussions/151`;   // "Who is using Silinx?"
 export function whoAreYou() {
   return dialog({
     title: 'Tell Us Who You Are', width: 480,
     body: h('div', {},
-      h('p', {}, 'Silinx ISE is free and asks for nothing. If you use it, in a course, a school or on your own, we would like to know: it helps to decide what to improve.'),
+      h('p', {}, 'Silinx is free and asks for nothing. If you use it, in a course, a school or on your own, we would like to know: it helps to decide what to improve.'),
       h('p', {}, 'Say hello on GitHub Discussions (a GitHub account is needed): your school or course, your role (teacher, student…), the boards you use. Only what you write there is seen.'),
-      h('p', {}, link(WHO_URL, 'Who is using Silinx ISE? (GitHub Discussions)'))),
+      h('p', {}, link(WHO_URL, 'Who is using Silinx? (GitHub Discussions)'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
 }
@@ -804,7 +804,7 @@ async function whatsNew(latest, rel) {
     const r = await fetch(`https://raw.githubusercontent.com/${REPO}/v${latest}/CHANGELOG.md`, { cache: 'no-store', signal: ctl.signal }).finally(() => clearTimeout(timer));
     if (r.ok) { const secs = changesSince(await r.text(), VERSION, latest); if (secs.length) return secs; }
   } catch { /* offline / no changelog in that release */ }
-  const m = /## What's new in (\S+)\s*\n([\s\S]*?)(?=\n## |\n\*\*Silinx ISE|$)/.exec(rel?.body || '');
+  const m = /## What's new in (\S+)\s*\n([\s\S]*?)(?=\n## |\n\*\*Silinx\b|$)/.exec(rel?.body || '');
   return m ? parseChangelog(`## ${m[1]}\n${m[2]}`) : null;
 }
 

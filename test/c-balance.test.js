@@ -161,3 +161,22 @@ test('#2613 #pragma HLS EXPRESSION_BALANCE off: the sums as the C writes them; i
     assert.deepEqual([c.errors, c.pass, c.gen.diagnostics, c.latency.max], [[], true, [], 12], lang);
   }
 });
+
+test('#3028 a top kept combinational on its balanced path, as it is made: sum4 at 20 ns on the Spartan-3E; sequential under EXPRESSION_BALANCE off; its HDL the tree; co-simulated in VHDL and Verilog', () => {
+  const sum4 = (prag) => `int sum4(int a, int b, int c, int d, int e) {\n${prag}  return a + b + c + d + e;\n}\nint main() { return sum4(1, 2, 3, 4, 5) == 15 ? 0 : 1; }\n`;
+  const opts = { file: 'f.c', top: 'sum4', clock: 20, family: 'spartan3e' };
+  // (an addition 4.06 ns, the clock less its uncertainty 14.6 ns: four in a row do not fit, the tree's three do)
+  const on = cToHdl(sum4(''), opts), off = cToHdl(sum4('#pragma HLS EXPRESSION_BALANCE off\n'), opts);
+  assert.deepEqual([on.ok, on.states, on.diagnostics], [true, 0, []]);
+  assert.deepEqual([off.ok, off.states, off.diagnostics], [true, 4, []]);
+  // (the combinational module's four additions the tree's: two of them read two others)
+  const adds = on.hdl.match(/^ {2}ap_t\d+ <= ap_t\d+ \+ ap_t\d+;$/gm);
+  const made = new Set(adds.map((l) => l.match(/ap_t\d+/)[0]));
+  assert.deepEqual([adds.length, adds.filter((l) => l.match(/ap_t\d+/g).slice(1).every((t) => made.has(t))).length], [4, 1]);
+  for (const lang of ['vhdl', 'verilog']) {
+    for (const prag of ['', '#pragma HLS EXPRESSION_BALANCE off\n']) {
+      const c = cosimulate(sum4(prag), { ...opts, lang });
+      assert.deepEqual([c.errors, c.pass, c.gen.diagnostics, c.latency?.max ?? null], [[], true, [], prag ? 2 : null], `${lang} ${prag}`);
+    }
+  }
+});

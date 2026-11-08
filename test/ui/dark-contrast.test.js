@@ -121,7 +121,7 @@ for (const theme of ['dark', 'light']) {
     await page.waitForSelector('.menu-popup.sub .mi');
     await check('View ▸ Theme');
     await page.closeMenus();
-    for (const [menu, item] of [['Help', 'About Silinx ISE'], ['Help', 'Keyboard Shortcuts'], ['Help', 'Check for Updates…'], ['Help', 'Tell Us Who You Are…'], ['Tools', 'Toolchain Settings (ISE / Programmers)…'], ['File', 'Open Project…']]) {
+    for (const [menu, item] of [['Help', 'About Silinx'], ['Help', 'Keyboard Shortcuts'], ['Help', 'Check for Updates…'], ['Help', 'Tell Us Who You Are…'], ['Tools', 'Toolchain Settings (ISE / Programmers)…'], ['File', 'Open Project…']]) {
       await page.menu(menu, item);
       await page.waitDialog();
       // Check for Updates: its answer (here: no network, the failure)

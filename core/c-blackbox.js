@@ -11,7 +11,10 @@
 //   withModels(source, headers, list) -> { source, headers }: the C models added, for the C simulation
 //   applyBlackboxes(checked, list, report): the functions replaced, for the synthesis
 //   blackboxModels(hls) -> Set of paths: the project's C models, not modules of the design (#2341)
+//   declaredBlackboxes(blackboxes, funcs) -> the descriptions of a C source's functions (#3022)
+//   undeclaredBlackboxes(hls, sources) -> [diagnostic]: a warning for each description no C source declares (#3022)
 import { BOOL, typeOf } from './c-types.js';
+import { checkC } from './c-check.js';
 import { parse as parseVerilog } from './verilog/parser.js';
 import { parse as parseVhdl } from './vhdl/parser.js';
 
@@ -25,6 +28,8 @@ const COMMON = { module_clock: 'clock', module_reset: 'reset', module_clock_enab
 const IDENT = /^[A-Za-z_][A-Za-z0-9_$]*$/;
 const dirOf = (p) => (p.includes('/') ? p.replace(/[^/]*$/, '') : '');
 const isObject = (x) => x && typeof x === 'object' && !Array.isArray(x);
+/** A description's function's name, or null when it has none (its errors then loadBlackboxes's). */
+const nameOf = (b) => { try { const n = JSON.parse(b.text)?.c_function_name; return typeof n === 'string' ? n : null; } catch { return null; } };
 
 function norm(p) {
   const out = [];
@@ -175,7 +180,7 @@ export function applyBlackboxes(checked, list, report) {
   for (const d of list) {
     const fn = checked.funcs.get(d.name);
     const say = (message) => report({ file: d.file, line: 1, col: 1, message: `syn.blackbox: ${d.file.split('/').pop()}: ${message}`, severity: 'error' });
-    if (!fn) { say(`the function '${d.name}' is not declared in the C sources`); continue; }
+    if (!fn) continue;   // (not this source's: undeclaredBlackboxes says it once for the project, #3022)
     if (d.name === checked.top) { say(`'${d.name}' is the top function: a blackbox is a function the top calls`); continue; }
     const n = [...d.params.keys()].filter((p) => !fn.params.some((x) => x.name === p));
     if (n.length) say(`'${d.name}' has no argument '${n[0]}'`);
@@ -254,11 +259,30 @@ export function applyBlackboxes(checked, list, report) {
  *  synthesis checks them, against its functions and their RTL modules: their errors and warnings, each in its description.
  *  checked: a check of the source of its own (checkC's), its described functions made blackboxes. */
 export function blackboxChecks(checked, { blackboxes = [], headers = {} } = {}) {
-  const nameOf = (b) => { try { return JSON.parse(b.text)?.c_function_name; } catch { return null; } };
-  const mine = (blackboxes || []).filter((b) => { const n = nameOf(b); return typeof n === 'string' && n !== checked.top && checked.funcs.has(n); });
+  const mine = (blackboxes || []).filter((b) => { const n = nameOf(b); return n !== null && n !== checked.top && checked.funcs.has(n); });
   const { list, diagnostics } = loadBlackboxes(mine, headers);
   applyBlackboxes(checked, list, (d) => diagnostics.push(d));
   return diagnostics;
+}
+
+/** The synthesis of a C source (#3022): the descriptions of the functions it declares, and those whose function cannot be
+ *  read (their errors loadBlackboxes's); another source's blackbox is not its own. funcs: checkC's. */
+export function declaredBlackboxes(blackboxes, funcs) {
+  return (blackboxes || []).filter((b) => { const n = nameOf(b); return n === null || funcs.has(n); });
+}
+
+/** Check Syntax of a project (#3022): a warning, in the description, for each blackbox whose function no C source of the
+ *  design declares (its C models not counted: a model is the C simulation's). hls: blackboxesIn's result; sources: the
+ *  project's C sources, { path: text }. */
+export function undeclaredBlackboxes(hls, sources) {
+  if (!hls?.blackboxes?.length) return [];
+  const models = blackboxModels(hls), declared = new Set();
+  for (const [path, text] of Object.entries(sources || {})) {
+    if (models.has(path)) continue;
+    try { for (const n of checkC(String(text ?? ''), path, { headers: hls.headers || {} }).funcs.keys()) declared.add(n); } catch { /* not read */ }
+  }
+  return hls.blackboxes.filter((b) => nameOf(b) !== null && !declared.has(nameOf(b))).map((b) => ({ file: b.file, line: 1, col: 1, severity: 'warning',
+    message: `syn.blackbox: ${b.file.split('/').pop()}: the function '${nameOf(b)}' is not declared in the C sources: not used` }));
 }
 
 /** A project's blackboxes (the app's, the server's): its JSON files that are descriptions, with what the flows read
