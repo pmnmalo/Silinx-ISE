@@ -56,12 +56,14 @@ export const SETTINGS_TOOLS = [
       const D = await devices();
       const fams = family ? [D.findFamily(family)].filter(Boolean) : D.FAMILIES;
       if (family && !fams.length) throw toolError(`unknown family '${family}' (${D.FAMILIES.map(f => f.id).join(', ')})`);
-      const boards = D.BOARDS.map(b => ({ id: b.id, name: b.name, device: deviceName(D.resolveBoard(b.id).device),
+      // (an experimental family's boards and devices, #3142: listed and marked, as the dialogs show them; no flow runs them yet)
+      const R = await parts(), exp = o => (o ? { experimental: true } : {}), mark = o => (o.experimental ? ' [experimental: no implementation flow yet]' : '');
+      const boards = D.BOARDS.map(b => ({ id: b.id, name: b.name, device: deviceName(D.resolveBoard(b.id).device), ...exp(R.experimentalDevice(b.device)),
         variants: (b.variants || []).map(v => ({ id: v.id, label: v.label, device: deviceName(v.device), ...(v.default ? { default: true } : {}) })) }));
-      const families = fams.map(f => ({ id: f.id, name: f.displayName || f.name,
+      const families = fams.map(f => ({ id: f.id, name: f.displayName || f.name, ...exp(f.experimental),
         parts: D.partsOfFamily(f.id).map(p => ({ part: p.part, packages: Object.fromEntries(Object.entries(p.packages).map(([k, v]) => [k, v.speeds || p.speeds])) })) }));
-      const text = [...(family ? [] : ['Boards:', ...boards.map(b => `  ${b.id}: ${b.name} (${b.variants.length ? b.variants.map(v => `${v.id} ${v.device}${v.default ? ', the default' : ''}`).join('; ') : b.device})`), '']),
-        'Devices:', ...families.flatMap(f => [`  ${f.name} (${f.id}):`, ...f.parts.map(p => `    ${p.part}: ${Object.entries(p.packages).map(([k, s]) => `${k}${s.length ? ` ${s.join(' ')}` : ''}`).join(', ')}`)])];
+      const text = [...(family ? [] : ['Boards:', ...boards.map(b => `  ${b.id}: ${b.name} (${b.variants.length ? b.variants.map(v => `${v.id} ${v.device}${v.default ? ', the default' : ''}`).join('; ') : b.device})${mark(b)}`), '']),
+        'Devices:', ...families.flatMap(f => [`  ${f.name} (${f.id})${mark(f)}:`, ...f.parts.map(p => `    ${p.part}: ${Object.entries(p.packages).map(([k, s]) => `${k}${s.length ? ` ${s.join(' ')}` : ''}`).join(', ')}`)])];
       return { text: text.join('\n'), data: { ...(family ? {} : { boards }), families } };
     },
   },
@@ -113,13 +115,16 @@ export const SETTINGS_TOOLS = [
       // a family ISE does not implement: the Silinx toolchain's only (as the dialog locks it)
       const tool = synthTool || pj.synthTool || null;
       if (R.openOnlyDevice(next) && tool === 'xst') throw toolError(`the ${next.part.toUpperCase()} is the Silinx toolchain's only: no XST`);
+      // (an experimental family, #3142: no flow runs it yet, the synthesis tool locked as the dialog locks it)
+      const experimental = R.experimentalDevice(next);
+      if (experimental && synthTool === 'xst') throw toolError(`${R.noFlowMessage(next)}: no XST`);
       const warnings = [];
       const deviceChanged = next.part !== pj.device?.part || next.package !== pj.device?.package;
       if (deviceChanged) for (const m of await deviceChangeMessages(name, pj, next)) warnings.push(`WARNING: ${next.part.toUpperCase()}: ${m}`);
       const changed = nextBoard !== (pj.board || null) || deviceChanged;
       if (constraints && !(changed && nextBoard && pj.top)) throw toolError(nextBoard ? (pj.top ? 'update_constraints: the board did not change' : `the project '${name}' has no top module: its constraints cannot come from a board's pins`) : 'update_constraints: the project has no board');
-      // the constraints of the new device's format (UCF, or the iCE40's PCF)
-      const ext = R.openOnlyDevice(next) ? '.pcf' : '.ucf';
+      // the constraints of the new device's format (UCF, the iCE40's PCF, the 7-series' XDC)
+      const ext = R.constraintsExtOf(next);
       let constraintsFile = pj.constraints;
       if (constraintsFile && !constraintsFile.toLowerCase().endsWith(ext)) {
         const old = constraintsFile;
@@ -127,7 +132,7 @@ export const SETTINGS_TOOLS = [
         if (fs.existsSync(path.join(P.projectDir(name), old))) warnings.push(`WARNING: this device's constraints are ${ext.slice(1).toUpperCase()}: ${constraintsFile} is the project's now, ${old} was not converted.`);
       }
       const oldLang = pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl';
-      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...(R.openOnlyDevice(next) ? { synthTool: 'silinx' } : synthTool ? { synthTool } : {}), ...(language ? { preferredLanguage: language } : {}) }));
+      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...(R.openOnlyDevice(next) || experimental ? { synthTool: 'silinx' } : synthTool ? { synthTool } : {}), ...(language ? { preferredLanguage: language } : {}) }));
       // every drawing in the new language, its HDL file made again in it (#1477)
       const languageLines = [];
       if (language && language !== oldLang) {
@@ -141,7 +146,10 @@ export const SETTINGS_TOOLS = [
       if (constraints) await P.boardConstraints(P.projectDir(name), after);
       else if (changed && !nextBoard && after.constraints && fs.existsSync(path.join(P.projectDir(name), after.constraints))) pins.push(`WARNING: check the pin locations in ${after.constraints} — they must exist on the ${next.package.toUpperCase()} package.`);
       warnings.push(...pins);
-      const text = [...warnings.filter(w => !pins.includes(w) && !languageLines.includes(w)), ...languageLines, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`, ...pins];
+      // (after the device, as the dialog's console says it)
+      const noFlow = experimental ? [`WARNING: ${R.noFlowMessage(next)}.`] : [];
+      warnings.push(...noFlow);
+      const text = [...warnings.filter(w => !pins.includes(w) && !languageLines.includes(w) && !noFlow.includes(w)), ...languageLines, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`, ...pins, ...noFlow];
       return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, preferredLanguage: after.preferredLanguage || 'vhdl', constraints: after.constraints || null, constraintsUpdated: constraints, warnings } };
     },
   },

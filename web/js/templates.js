@@ -215,6 +215,17 @@ export function pcfTemplate(project) {
 `;
 }
 
+export function xdcTemplate(project) {
+  return `# Xilinx Design Constraints for ${project.name}
+# Target: ${project.device.part}${project.device.speed}-${project.device.package}
+#
+# Example:
+# set_property -dict { PACKAGE_PIN W5 IOSTANDARD LVCMOS33 } [get_ports {clk}]
+# set_property -dict { PACKAGE_PIN U16 IOSTANDARD LVCMOS33 } [get_ports {led[0]}]
+# create_clock -add -name clk -period 10.000 -waveform {0.000 5.000} [get_ports {clk}]
+`;
+}
+
 export function ucfTemplate(project) {
   return `# User Constraints File for ${project.name}
 # Target: ${project.device.part}${project.device.speed}-${project.device.package}

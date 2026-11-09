@@ -17,7 +17,8 @@ import { log } from './console.js';
 import { openProject, closeProject, recent, clearRecent, storageMenuItems } from './project.js';
 import { runImpl, stopProcesses } from './implement.js';
 import { setViewAsTop, topOfView, viewSel } from './drawings.js';
-import { checkSyntax, runProcess, saveAll, topConfirmed } from './processes.js';
+import { checkSyntax, projectTool, runProcess, saveAll, topConfirmed } from './processes.js';
+import { hasTask } from './tool-descriptors.js';
 import { addFromFolderDialog, setTop, unsetTop } from './design.js';
 import { openEmulator, openSchematic, runSimulation } from './viewers.js';
 import { printActive, printable } from './print-doc.js';
@@ -134,7 +135,7 @@ export function setupMenus() {
       { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
     ] },
     { label: 'Process', items: () => [
-      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy },
+      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy || !toolHas('impl') },
       { label: 'Stop', icon: icon('stop'), action: () => stopProcesses(), disabled: () => !S.currentJob },
       { label: 'Run', action: () => S.selProc && runProcess(S.selProc), disabled: () => !S.selProc?.run },
       { label: 'Check Syntax', action: () => S.sel?.module && checkSyntax(S.sel.module, S.view === 'sim'), disabled: () => !S.sel?.module },
@@ -220,12 +221,15 @@ export function setupToolbar() {
   tb.append(h('div', { class: 'm-steps', role: 'group', 'aria-label': 'Design flow' },
     step('mCheck', 'Check', 'Check Syntax of the selected module', () => checkSyntax(mod(), S.view === 'sim'), () => !!S.project && !!mod()),
     step('mWave', 'Simulate', 'Simulate Behavioral Model of the selected module', () => runSimulation(mod()), () => !!S.project && !!mod()),
-    step('mBolt', 'Implement', 'Implement Top Module', async () => await topConfirmed('Implement', 'implements') && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), () => !!S.project?.top && !S.busy),
-    step('mBoard', 'Emulate', 'Board Emulator', async () => await topConfirmed('Emulate', 'emulates') && openEmulator(S.project.top), () => !!S.project?.top),
-    step('mUpload', 'Program', 'Configure Target Device (iMPACT)', () => openImpact(), () => true),
+    step('mBolt', 'Implement', 'Implement Top Module', async () => await topConfirmed('Implement', 'implements') && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), () => !!S.project?.top && !S.busy && toolHas('impl')),
+    step('mBoard', 'Emulate', 'Board Emulator', async () => await topConfirmed('Emulate', 'emulates') && openEmulator(S.project.top), () => !!S.project?.top && toolHas('emu')),
+    step('mUpload', 'Program', 'Configure Target Device (iMPACT)', () => openImpact(), () => !S.project || !!projectTool().program),
   ));
   refreshSteps();
 }
+
+// the project's tool has this task (an experimental family's no Implement, no Emulate, nothing to program: #3142)
+const toolHas = task => !S.project || hasTask(projectTool(), task);
 
 // enable / disable the labelled buttons of the Silinx toolbar (cheap: run on clicks and changes)
 export function refreshSteps() {

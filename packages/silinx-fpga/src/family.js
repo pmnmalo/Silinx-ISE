@@ -11,7 +11,8 @@ export const FAMILY_INFO = {
   virtex4:      { name: 'Virtex-4',           xise: 'Virtex4',                  pm: 'virtex4' },
   virtex5:      { name: 'Virtex-5',           xise: 'Virtex5',                  pm: 'virtex5' },
   virtex6:      { name: 'Virtex-6',           xise: 'Virtex6',                  pm: 'virtex6' },
-  artix7:       { name: 'Artix-7',            xise: 'Artix7',                   pm: 'artix7' },
+  // (#1648: an experimental family, its constraints XDC, its flows to come: Vivado #1649, the Silinx toolchain #3146)
+  artix7:       { name: 'Artix-7',            xise: 'Artix7',                   pm: 'artix7', experimental: true, constraints: 'xdc' },
   kintex7:      { name: 'Kintex-7',           xise: 'Kintex7',                  pm: 'kintex7' },
   virtex7:      { name: 'Virtex-7',           xise: 'Virtex7',                  pm: 'virtex7' },
   zynq:         { name: 'Zynq-7000',          xise: 'Zynq',                     pm: 'zynq' },
@@ -46,6 +47,14 @@ export function deviceFamily(device) {
 export const isIseFamily = f => !!FAMILY_INFO[f]?.xise;
 /** Is this project device's family one only the open toolchain implements? (An unknown family is not: it stays with ISE's flow.) */
 export const openOnlyDevice = device => { const f = deviceFamily(device); return !!FAMILY_INFO[f] && !isIseFamily(f); };
+/** Is this project device's family an experimental one (#1648): its boards and constraints, no flow that runs yet? */
+export const experimentalDevice = device => !!FAMILY_INFO[deviceFamily(device)]?.experimental;
+/** Why an experimental family's device has no implementation (the interface offers none; a request gets this error). */
+export const noFlowMessage = device => `the ${String(device?.part || '').toUpperCase()} (${familyName(deviceFamily(device))}, an experimental family) has no implementation flow yet: its boards and its XDC constraints only`;
+/** The format of a project device's constraints: 'pcf' (the iCE40's), 'xdc' (the 7-series', #3142) or 'ucf'. */
+export const constraintsFormatOf = device => (openOnlyDevice(device) ? 'pcf' : FAMILY_INFO[deviceFamily(device)]?.constraints || 'ucf');
+/** The extension of a project device's constraints file: '.ucf', '.pcf' or '.xdc'. */
+export const constraintsExtOf = device => `.${constraintsFormatOf(device)}`;
 export const familyName = f => FAMILY_INFO[f]?.name || f || 'unknown family';
 export const isSpartan3Like = f => /^spartan3/.test(f || '');
 export const familyFromXise = text => {

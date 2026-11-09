@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ISE, SILINX, SILINX_ICE40, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
+import { ISE, NO_FLOW, SILINX, SILINX_ICE40, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
 import { XILINX_STEPS, orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { ICE40_STEPS } from '../packages/silinx-fpga/src/open-flow-ice40.js';
 
@@ -130,7 +130,20 @@ test('#2311 each descriptor\'s constraints: UCF, or PCF on the iCE40, as a new p
   assert.deepEqual([ISE, SILINX, SILINX_ICE40].map(t => t.constraints.format), ['ucf', 'ucf', 'pcf']);
   assert.deepEqual([ISE, SILINX, SILINX_ICE40].map(t => t.constraints.ext), ['.ucf', '.ucf', '.pcf']);
   const src = read('web/js/constraints-format.js');
-  assert.match(src, /openOnlyDevice\(device\) \? '\.pcf' : '\.ucf'/);
+  assert.match(src, /export const constraintsExt = device => constraintsExtOf\(device\);/);
+  // (the experimental family's descriptor: its constraints XDC, #3142)
+  assert.deepEqual(NO_FLOW.constraints, { format: 'xdc', ext: '.xdc', label: 'XDC' });
+});
+
+test('#3142 an experimental family\'s tool: no step, no report, nothing to program; its tree the constraints and the checks', () => {
+  for (const part of ['xc7a35t', 'xc7a100t']) for (const open of [false, true]) assert.equal(toolOf({ part }, open), NO_FLOW, part);
+  assert.equal(toolOf({ part: 'xc7k70t' }, false), ISE, 'another 7-series family: ISE\'s as before');
+  assert.deepEqual([NO_FLOW.steps, NO_FLOW.reports, NO_FLOW.program, NO_FLOW.open], [[], [], null, false]);
+  assert.deepEqual(built(NO_FLOW).map(shape), ['summary', 'constraints', 'rtl', 'check']);
+  assert.deepEqual(NO_FLOW.tasks.map(t => t.id), ['edit', 'sim']);
+  assert.ok(!TOOLS.includes(NO_FLOW) && NO_FLOW.tasks.every(t => allTasks().includes(t)), 'its tasks the others\'');
+  assert.equal(hasTask(NO_FLOW, 'impl'), false);
+  assert.equal(NO_FLOW.messages.line, MESSAGE_LINE);
 });
 
 test('#2311 each descriptor\'s messages: the log\'s lines read, the markers the step tracker reads', () => {

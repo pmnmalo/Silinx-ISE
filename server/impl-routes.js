@@ -9,7 +9,7 @@ import { getDeviceDb, resolveBoard } from './devices.js';
 import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
-import { deviceFamily, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
+import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
@@ -60,6 +60,7 @@ export async function startImplementation(name, body = {}) {
   let steps;
   try { steps = normalizeSteps(body.steps); } catch (e) { throw bad(e.message); }
   if (!topOf(project)) throw bad('set the top module of the project before implementing');
+  if (experimentalDevice(project.device)) throw bad(noFlowMessage(project.device));   // (the 7-series' flows to come: #1649, #3146)
   // one ISE run per project: two runs would share (and wipe) the same build/ folder
   const key = name.toLowerCase();   // case-insensitive file systems: one folder
   const running = implJobs.get(key);

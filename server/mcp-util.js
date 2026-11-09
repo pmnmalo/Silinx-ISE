@@ -121,5 +121,5 @@ export async function boardDevice(board, variant) {
   const r = resolveBoard(board, { variant });
   if (!r) throw toolError(`unknown board '${board}' (basys2, nexys2)`);
   if (variant && r.variant?.id !== variant) throw toolError(`the ${r.board.name} has no variant '${variant}'`);
-  return { board: r.board.id, device: { family: 'spartan3e', part: r.device.part, package: r.device.package, speed: r.device.speed } };
+  return { board: r.board.id, device: { family: r.device.family || 'spartan3e', part: r.device.part, package: r.device.package, speed: r.device.speed } };
 }
