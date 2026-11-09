@@ -3,6 +3,171 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.24.0
+
+The 7-series arrive, as an experimental family: the Basys 3 and Nexys A7 boards, implemented by AMD Vivado as
+the Spartan-3E is by ISE. The Spartan-6's nextpnr places the block RAMs and DSPs itself, with shorter periods, and
+several of its Map and Place & Route failures are fixed.
+
+In short:
+
+- **The nextpnr engine's placements a little faster:** the placer knows that a LUT on a SLICEM is slower than one on a
+  SLICEL, and keeps the critical paths' LUTs off the SLICEMs.
+- **Spartan-6 (Nexys3, Atlys):** a design whose outputs have no LOC routes again. Place & Route had failed on every seed
+  when Silinx put such an output on a pad of the top bank that nextpnr cannot reach.
+- **Boards:** the Digilent Basys 3 and Nexys A7 (the 7-series' Artix-7), an experimental family: their pins, their
+  constraints written as an XDC; no flow implements them yet.
+- **Spartan-6 (Nexys3, Atlys):** Place & Route gives shorter clock periods, about 3 % on average over the examples and
+  up to 15 %. nextpnr now places the block RAMs and DSP48A1s itself.
+- **The 3D Karnaugh map of 3 and 4 inputs:** every cell in view shows its number and value on the cylinder and the
+  torus, smaller where the surface is seen at a slant, never beside it. A group's outline on cells hidden behind the
+  surface is no longer drawn over the surface in front of them.
+- **A short click on an emulated push button counts:** the Board Emulator holds a button down until the design has
+  seen a real press, so the clock, pong, stopwatch and blinky examples' debounced buttons react to a short click,
+  not only to a long one.
+- **Help ▸ About Silinx** names the open toolchain's boards of today (Basys2, Nexys2, Nexys3, Atlys, iCEBreaker)
+  and its engines (Yosys, nextpnr, the bitstream writer of Silinx or icepack).
+- **Smaller designs that compare a signal with several constants:** such comparisons are made of LUTs instead of carry
+  chains (the vga example 143 → 122 slices, 10.2 → 9.2 ns).
+- **AMD Vivado for the Artix-7 boards:** a project on the Basys 3 or the Nexys A7 is synthesized, implemented and
+  made into a bitstream by AMD Vivado ML Standard 2025.2, in its Docker image, over ssh or on this computer, as Xilinx
+  ISE is for the Spartan-3E: its processes in the Processes pane, its utilization, timing and design rule check in the
+  Design Summary, its warnings in the console, the board programmed with openFPGALoader.
+- **Synthesis:** in a design of several clocks, each clock's critical path is made shorter, not only the slowest clock's.
+
+In detail:
+
+- **test/compiled-words.test.js: the word-level models of the stopwatch, the clock and the vga examples expected as #3097's
+  comparisons as logic (384b7456) synthesize them (#3161):** their cells and their tables' counts; the test failed on main
+  since.
+- **The Spartan-3E's nextpnr engine at 1.4.2 (#3157).** nextpnr-himbaechel-spartan3e 1.4.2 (nextpnr-spartan PR 30,
+  40a7f9b3): the placer's estimate of a connection from a SLICEM's LUT is 55 ps longer (Tilo 0.759 ns against a SLICEL's
+  0.704 at -4, `fpga/timing.js` SPEED_4); the chip database's LUT4 has a SLICEL's arc on every site. Natively, XC3S1200E,
+  the mean period of one placement per seed: fpu-adder 10.975 -> 10.714 ns (-2.4 %, seeds 1-4), iwls05-sasc 4.780 ->
+  4.731 ns (-1.0 %) and iwls05-simple-spi 6.548 -> 6.478 ns (-1.1 %, seeds 1-16). Part of #2982, which stays open.
+- **The nextpnr and Yosys update comparisons measure the base's package on the base's side (#3156):**
+  `nextpnr-update.yml` and `yosys-update.yml` installed the base's package at the repository's root only, and npm kept
+  the pull request's nested in `packages/silinx-fpga/node_modules`, which the toolchain resolves first: both sides
+  measured the pull request's package. The base's is now installed into the toolchain's workspace and the root both,
+  and a step on each side prints the version resolved from `packages/silinx-fpga` and from the root and fails when it
+  is not the side's (`scripts/resolved-package.mjs`).
+- **A port without a LOC takes a pad whose I/O path is known (#3152).** nextpnr's chip database leaves out the PIPs
+  whose bits Silinx's bit database does not know. One of them is the slave OLOGIC2's D1 -> OQ route-through in the top
+  bank's TIOI_INNER tiles (the master's is known), so 30 pads of the XC6SLX16 and 23 of the XC6SLX45 can take no
+  output, and 4 pads of each can take no input. Silinx's placer gave such pads to ports without a LOC, and nextpnr
+  failed on every seed: `Failed to route arc 0.0 of net …, from X6Y4/L_AQ to X5Y0/TIOB_O3_PINW`. The new module
+  `fpga/s6/pad-paths.js` (`padPathsS6`) finds each pad's paths through the known PIPs, in about 0.1 s. Probed
+  pad by pad, nextpnr agrees on both parts. The placer now gives ports without a LOC only pads with their path. The examples, all
+  of their ports LOC'd, are placed as before, so their bitstreams are unchanged.
+- **The Spartan-6's Map packs a product of two counters (#3151):** it stopped with "its pin BMUX carries two nets"
+  when a carry chain's sums left their slice (to the DSP48A1s) by the multiplexed outputs a 5FF had been given too;
+  such a flip-flop now goes to another position (the toolchain's fragment has the detail).
+- **The Basys 3 and the Nexys A7 boards, their constraints as XDC (#3142):** the Digilent Basys 3 (xc7a35tcpg236-1) and
+  Nexys A7 (xc7a100tcsg324-1) in the board choice of New Project and Design Properties, marked "(experimental)", as is
+  their family, Artix-7: their clock, LEDs, switches, buttons, seven-segment display, VGA, USB-UART, PS/2 and Pmods,
+  from Digilent's master XDCs (every pin checked against them). A project of the family has its constraints in
+  `constraints/top.xdc`: Update Constraints, New Source and an example made for the board write the board's pins as
+  Vivado reads them (each pin's `PACKAGE_PIN` and `IOSTANDARD`, the clock's `create_clock`, the board's `CFGBVS` and
+  `CONFIG_VOLTAGE`), and Check Constraints reads it. No flow runs the family yet (Vivado #1649, the Silinx toolchain
+  #3146): its process tree has the constraints and the checks only, the synthesis tool is locked, Implement and
+  Program are not offered, and the console says so when the board is chosen. The XC7A35T joins the device database;
+  Artix-7's constraints were UCFs for ISE before. The MCP server's `list_devices` marks the family and its boards
+  experimental, `set_design_properties`, `new_project`, `new_source` write XDC and `run_process` refuses with the
+  interface's message. `new_source` now writes an iCE40's constraints with the PCF template (it wrote the UCF's).
+- **The Spartan-6's nextpnr engine: nextpnr-himbaechel-spartan6 0.2.0, which places the block RAMs and DSP48A1s (#3137).**
+  Its chip database has each routing node's delay from Silinx's timing model (#3149). The annealing refinement after
+  its analytical placer reaches 40 tiles, so a block RAM or DSP48A1 moves next to its logic. Silinx no longer places
+  them and fixes them for nextpnr (`S6_HARD_BY_NEXTPNR` true). The examples' periods (Optimization Speed, best of
+  3 seeds) are 3.2 % shorter on average on the Nexys3 and the Atlys, with every PERIOD met; for example the stopwatch on
+  the Nexys3 went from 9.959 to 8.941 ns and micro80 on the Atlys from 8.843 to 8.613 ns.
+- **The Spartan-6's nextpnr engine: nextpnr-himbaechel-spartan6 0.3.0 (#3135, #3136).** The package can pack Yosys's
+  netlist into sites and place its pads and global buffers as Silinx's Map and placer do
+  (pmnmalo/nextpnr-spartan#29); Silinx's flow still hands it its own Map's sites, placed and routed as before (#3138
+  will hand it Yosys's netlist).
+- **The unit tests' timings refreshed (#3131):** test/timings.json from v15.23.0's release run, the first with five Linux
+  parts (#3124): the split files' measured times replace their estimated shares, the parts balanced again.
+- **The private-data check allows #2962's special-purpose addresses in #3123's commit message too (#3129):** that
+  message names two of the reserved ranges, and the history check of the release's CI failed on it.
+- **A release's CI in about 45 minutes instead of 80 to 120 (#3124):** the unit tests in five parts on Linux, all of
+  them; on macOS and Windows in three parts, but the toolchain's heaviest (`HEAVY` in scripts/test-shard.mjs, its new
+  option `--light`: the whole open flow on every feature, device and example, the post-place & route and Spartan-6
+  models of the examples, the synthesis on the corpus, nextpnr's engine), about half the time, which took their parts
+  to 60 to 80 minutes there; test/open-flow.test.js (blinky to a bitstream, the shipped devices) stays their smoke test.
+  The runs of the tags one at a time: the IDE's and the toolchain package's tags pushed together shared the 20 jobs a
+  public repository runs at once and queued them up to 50 minutes (v15.22.0). test/timings.json refreshed from
+  15.23.0's run (schbeautify-sheet.test.js weighed 30 seconds, took 22 minutes). CLAUDE.md says so.
+- **The two longest unit test files split (#3124):** test/open-flow.test.js (34 to 50 minutes in CI, its tests one after
+  another) into open-flow.test.js (the shipped device descriptions, blinky), open-flow-features.test.js (block RAMs,
+  multipliers, shift registers), open-flow-io.test.js (DCMs, global buffers, IOBs) and open-flow-clocks.test.js, their
+  helpers and fixtures' table in test/open-flow-lib.mjs; test/sim-model-par.test.js (21 to 38 minutes) into
+  sim-model-par.test.js, sim-model-par-examples.test.js and sim-model-par-micro80.test.js. The same tests, moved as they
+  were; test/timings.json gives the new files their share of the old ones' times.
+- **The private-data check allows #2962's special-purpose addresses in CHANGELOG.md (#3121):** the NAT64 and reserved
+  ranges that a link's zip address is checked against were allowed in their fragment only, so the release that moved
+  the fragment into CHANGELOG.md failed its CI.
+- **The cells' texts on the 3D map of 3 and 4 inputs (#3119):** a cell's text is shown wherever the cell faces the
+  viewer. That is its centre while the centre faces the viewer well, else the part of the cell that does (before, the
+  centre's normal had to point at least a quarter towards the screen, which hid cells in plain view: on the torus only
+  7, 11 and 14 showed a value). The text is upright and shrinks with the surface's foreshortening. It is drawn after
+  its own cell's faces (the cell's nearer faces covered it), only where its box lies on the surface and nothing nearer
+  hides it, shrunk or moved within the cell when it does not fit. The 0s of an SOP map stay blank, as on the flat map
+  (`core/kmapsurface.js`: labelSpots, textFits, textMatrix, surfaceFrame).
+- **The group outlines of the 3D map of 3 and 4 inputs (#3120):** what lies on the faces seen from behind is drawn
+  first: on the closed torus such a face is always behind a face seen from the front, and on the open cylinder it is
+  the inside. On the torus it is not drawn at all. A sort by depth alone drew, along the silhouette, the outlines of
+  hidden groups over the surface in front (the torus's m(4, 5), the cylinder's a.c). An outline segment is drawn after
+  the faces round it, so a neighbouring face no longer cuts it into dashes (`core/kmapsurface.js`: paintOrder,
+  kmapPatch's `around`). Tests: kmapsurface-view (the groups' cells against the flat map's, the texts' spots, size and
+  fit, the order on the torus in six views); ui/tt-kmapsurface-view (the two maps of the issues, in two views).
+- **docs/OPEN-TOOLCHAIN.md without its "Open questions for the legal review" (#3114):** the section is removed; its
+  facts on the device descriptions (shipped for the supported boards' six devices, the Spartan-3E dies also measured
+  black-box) are a paragraph of the method, no longer saying the Spartan-6 toolchain is under development. The
+  introduction covers the Spartan-6 too and no longer asks for a review before publishing; the research notes of
+  s3e-route and s3e-device no longer cite an open legal question, and s3e-route's says the computed descriptions ship.
+- **Push buttons held as long as a real press (#3109):** a design's debouncer takes a press once the button has
+  stayed down for some milliseconds of the board's time (the examples': 20 ms, a million cycles), and the emulator,
+  slower than real time (the event-driven engine much slower), let a short click go after fewer cycles. A button let
+  go now stays down, lit, until 100 ms of the board's time have passed since it was pressed (at a set clock rate,
+  100 ms of its cycles, at least one); a longer press is let go at once, a button let go while paused at once, and
+  Shift+click still keeps it pressed (`core/emulate-press.js`).
+- **The About's open toolchain (#3108):** the About dialog said the Silinx toolchain covered the Basys2 and Nexys2
+  only, with a place and route of its own for the Spartan-3E; it now names the five boards, the Lattice iCE40 beside
+  the Xilinx FPGAs, and nextpnr, in English and in Portuguese.
+- **A signal compared with several constants as LUTs (#3097):** the Silinx toolchain's synthesis maps the comparisons with
+  a constant of a signal compared with two constants or more, and those that test the signal's high bits (`count > 0`),
+  as logic before Yosys's coarse step, not as carry chains whose LUTs Place & Route had to copy for each chain (itc99-b05
+  252 → 194 slices, verilog-uart 117 → 111 slices and 8.7 → 6.9 ns); silinx-fpga's changelog has the details.
+- **The old name split by a line break (#2624, part of the rename to Silinx):** `test/old-name.test.js` counts the
+  old name when a line break comes between its two words (in a comment, a Markdown quote or list, or plain text),
+  which it missed; the one such place left, a comment of the silinx-fpga package's command line, says Silinx.
+- **The ISE runner's names say Silinx (#2624):** its launchd daemons and agents are `com.github.pmnmalo.silinx.*`,
+  its scripts' folder `Library/Silinx-runner`; `scripts/ise-runner/install.sh` unloads and removes the old ones. The
+  ISE tests' work folders on the ISE host are `silinx-examples`, `silinx-tests` and `silinx-timesim`. The old-name
+  guard lists only what stays on purpose: the old command `bin/silinx-ise.js` (removed later, #3133) and the runner's
+  clean-up of its old names.
+- **Vivado as the Artix-7's back end (#1649):** `server/vivado.js` writes a batch Tcl flow in non-project mode
+  (`synth_design`, `opt_design`, `place_design`, `route_design`, `write_bitstream`, each step's checkpoint, the
+  reports), with ISE's step names so the Processes and the MCP server's processes run it unchanged; CFGBVS and
+  CONFIG_VOLTAGE set unless the board's XDC sets them (no DRC CFGBVS-1). Toolchain Settings' `vivado` (its mode:
+  docker, ssh or local; its image; its settings64.sh), its container with ISE's isolation and sysfs's buses, classes
+  and devices hidden (Vivado's licence manager crashes without, #2305). `server/vivado-reports.js` parses
+  report_utilization, report_route_status, report_timing_summary, report_drc, report_power and the log (each
+  command's own messages) into the Design Summary's shape. The interface: the Artix-7's tool descriptor (VIVADO:
+  Synthesize - Vivado, the implementation, the timing, the power, the pins, the programming file; no simulation
+  model, no Emulate), a run without Vivado configured says so and writes the scripts; the browser edition keeps
+  #3142's "no implementation flow yet". The MCP server's run_process (toolchain vivado) and get_report (Vivado's
+  reports, a drc report). The other 7-series families keep ISE's flow.
+- **The examples on the Basys 3 through Vivado (#1649):** `test/vivado/examples.test.js` (SILINX_VIVADO_TESTS=1, on
+  the ISE machine): all ten routed, the 10 ns clock met, a .bit for the xc7a35t, the design rule check with no error;
+  the warnings asserted: none, but synthesis's on traffic's and pong's outputs driven by a constant and on micro80's
+  light8080 core's unread bits (#2544), and the design rule check's DSP pipelining advice on stopwatch.
+- **MCP get_report's schema (#3158):** its `report` argument lists the reports (summary, power, timing, synthesis,
+  map, par, pins, drc), not the toolchains.
+- **Each clock's own critical path made shorter by the open synthesis (#652):** a design of several clocks has the
+  critical LUTs of every clock made shallower, not only the slowest clock's. vtr-stereovision3's `tm3_clk_v0` 10.9 %
+  shorter at Speed by ISE's trce (5.958 -> 5.306 ns) and 9.0 % at Area, its counter's enable on 2 levels of LUTs as
+  XST's, with the same size; the toolchain's package's changelog has the details.
+
 ## 15.23.0
 
 Silinx ISE is now **Silinx**: the app, its command, its downloads, its repository and its site. The Boolean Algebra
