@@ -8,20 +8,22 @@
 // SLICEM one a SLICEM only. A RAMB16BWER takes a block RAM tile, a RAMB8BWER one of its halves. IOBs with a LOC
 // are on their pads (bonded, one each, the banks' VCCO the same for all their I/Os); a global buffer driven by a pad
 // is on the BUFGMUX that pad's dedicated clock path reaches (a GCLK pin; a clock input without a LOC takes such a
-// pad), other ones on the free BUFGMUX in order; a clock on a pad no dedicated path leaves is a warning.
+// pad), other ones on the free BUFGMUX in order; a clock on a pad no dedicated path leaves is a warning. An IOB without
+// a LOC takes a pad whose I/O path the bit database knows (pad-paths.js, #3152: nextpnr cannot route the others).
 // The cost: the half-perimeter wirelength of the nets (clocks and power nets left out; VPR's correction for the
 // nets of many pins), in tiles, and (timing, the weight lambda) the estimated delay of every connection weighted by
 // its criticality (place-timing.js), each normalised and mixed, the criticalities recomputed at each temperature.
 // A move takes an object to a site in a window around it (swapping with what is there when that fits); the
 // window shrinks to keep about 44 % of the moves accepted. One seeded random generator: a seed, one placement.
 //
-//   const r = placeS6(phys, s6Sites(device), { seed, effort, timing, nl })
+//   const r = placeS6(phys, s6Sites(device), { seed, effort, timing, nl, padPaths })
 //     r = { site: [site name by inst], tile: [tile name by inst], pos: [[px, py]], wirelength, delay (the estimate's
 //           critical path, ns), warnings, stats: { moves, temps, seconds, objects, initialWirelength, initialDelay } }
 import { PlaceError, crossing, rng } from '../place-common.js';
 import { vccoOfStandard } from '../device-sites.js';
 import { timingGraphS6, analyzeS6 } from './place-timing.js';
 import { mountMovesS6 } from './place-moves.js';
+import { padFits } from './pad-paths.js';
 
 export { PlaceError };
 
@@ -44,9 +46,10 @@ export function chainSites(base, n, next) {
  * Place a physical design. Options: seed (1), effort (4: the moves per temperature scale with it), timing (0.1:
  * the weight lambda of the timing cost, 0: the wirelength only; heavier weights gave the examples longer wires and
  * no shorter estimated critical path, whose carry chains decide it), nl (the netlist, for the timing estimate;
- * without it the placement is wirelength-driven), log (a function for progress lines).
+ * without it the placement is wirelength-driven), log (a function for progress lines), padPaths (padPathsS6's: the
+ * pads an IOB without a LOC may take; null: every bonded pad).
  */
-export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = null, log = null } = {}) {
+export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = null, log = null, padPaths = null } = {}) {
   const t0 = Date.now();
   const random = rng(seed);
   const ri = n => Math.floor(random() * n);
@@ -113,7 +116,8 @@ export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = 
     if (!bankOk(pad, vccoOfIob(inst))) throw new PlaceError(`place: ${inst.name}: pad ${pad.name} is in bank ${pad.bank}, whose other I/Os need VCCO ${bankV.get(pad.bank).v} V, not ${vccoOfIob(inst)} V (I/O standards)`);
     placePad(i, pad);
   }
-  const freePads = inst => [...padOf.values()].filter(p => !owner.has(p.name) && bankOk(p, vccoOfIob(inst)));
+  const fits = (inst, pad) => padFits(padPaths, pad.name, inst.dir);
+  const freePads = inst => [...padOf.values()].filter(p => !owner.has(p.name) && bankOk(p, vccoOfIob(inst)) && fits(inst, p));
 
   // ---------------------------------------------------------------- the global buffers
   const bufgs = objs.filter(o => o.kind === 'bufg');
@@ -227,7 +231,7 @@ export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = 
   const rmax = rlim;
   const { propose, delta, commit, revert } = mountMovesS6({
     insts, objs, objOf, movable, site, pos, owner, setAt, slices, sliceNames, padOf, bramSite, bramFree, bramSites, dspBy,
-    chainSites, needOf, ri, rlim: () => rlim, bankOk, bankAdd, vccoOfIob, netsOf, netCost, netCostOf, connsOf, cW, cD, cdelay,
+    chainSites, needOf, ri, rlim: () => rlim, fits, bankOk, bankAdd, vccoOfIob, netsOf, netCost, netCostOf, connsOf, cW, cD, cdelay,
     lambda, bb: () => bb, bbNorm: () => bbNorm, tc: () => tc, tcNorm: () => tcNorm,
     setBb: v => { bb = v; }, setTc: v => { tc = v; },
   });
