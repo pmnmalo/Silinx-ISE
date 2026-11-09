@@ -10,6 +10,7 @@ import { placedXdlS6 } from './fpga/s6/xdl.js';
 import { checkRoutingS6 } from './fpga/s6/route-check.js';
 import { analyzeTimingS6 } from './fpga/s6/timing.js';
 import { placementOf, routedDesignS6, siteNetlist } from './fpga/s6/nextpnr.js';
+import { forkBinary, forkInput, runFork } from './fork-s6-proto.js';
 
 const PLACE_SEEDS = 3;
 // a routed design's minimum period by Silinx's timing model (ns; 0: no clocked paths)
@@ -17,7 +18,7 @@ const periodOf = (routed, device) => analyzeTimingS6(parseXdl(writeXdl(routed)),
 
 /** runPar of the Spartan-6 by nextpnr. ctx: mountS6Steps's, and its state() ({ packed, phys, sites }) after Map. */
 export function mountNextpnrS6(ctx) {
-  const { io, spec, log, report, now, ms, netlist, constraints, StepError, setRouted, state } = ctx;
+  const { io, spec, log, report, now, ms, netlist, netlistText, constraints, StepError, setRouted, state } = ctx;
   const part = `${spec.device}${spec.pkg}`;
 
   // one run of nextpnr: { json, lines } (its problems: StepError, with nextpnr's ERROR lines, e.nextpnr)
@@ -66,7 +67,9 @@ export function mountNextpnrS6(ctx) {
     // (a seed nextpnr cannot route, #2131: the next one; the step fails only when none routes)
     let best = null, failed = null;
     const seedOf = async seed => {
-      const placedRun = await run('placement', ['--no-route', '--seed', seed, ...freq], netlistIn, db);
+      // (PROTOTYPE #3135/#3136: the fork packs and places Yosys's netlist itself)
+      const placedRun = forkBinary() ? (() => { try { return runFork(['--device', part, '--no-route', '--seed', seed, ...freq], forkInput(netlistText(), phys), db); } catch (e) { throw Object.assign(new StepError(e.message, (e.lines || []).filter(l => /ERROR/.test(l))), { nextpnr: true }); } })()
+        : await run('placement', ['--no-route', '--seed', seed, ...freq], netlistIn, db);
       let placement, placed;
       try {
         placement = placementOf(placedRun.json, phys, device);

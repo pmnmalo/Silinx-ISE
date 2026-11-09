@@ -30,6 +30,7 @@ import { cellCounts, DEEP_RULE, FAST_SYNTH } from './synth-open.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
 import { UCF, readConstraints } from './constraints.js';
 import { readYosysJson } from './fpga/netlist.js';
+import { sortedNetlist } from './fork-s6-proto.js';
 import { backendOf } from './open-flow-backends.js';
 
 // without the HDL front end (io.frontEnd): the sources are the flat Verilog given to Yosys, its top module `top` (#1675)
@@ -159,8 +160,8 @@ export async function runFlow(spec, io) {
     // the netlist of an earlier run: its name may differ from the project's top in case (VHDL, #31)
     const text = synth ? synth.files[`${synth.top}.json`] : io.read(`open/${top}.json`);
     if (text == null) throw new StepError('no netlist: run Synthesize first', [], '');
-    netlist = readYosysJson(text);
-    netlistText = text;
+    netlist = readYosysJson(sortedNetlist(text));
+    netlistText = sortedNetlist(text);
     let ucf = null;
     try { ucf = constraints(); } catch (e) { throw new StepError(`the constraints cannot be read: ${e.message}`, [], 'Fix the constraints (Check Constraints).'); }
     const locs = Object.values(ucf?.assignments || {}).filter(a => a.loc).length;
