@@ -238,6 +238,7 @@ function packSlices(nl, combine) {
   const sameClock = s => !s.mem;
   const fits = (s, key, latch) => (s.ctrl === null || s.ctrl === key) && sameClock(s, key) && !(latch && POS.some(p => s.pos[p].ff5 !== null));
   const fitsFf5 = (s, key) => (s.ctrl === null || s.ctrl === key) && sameClock(s, key) && !(s.ctrl && s.ctrl.endsWith(':L'));
+  const { usedOutside, muxNeeded } = muxUses(cells, ix, where, slices);
   const placeFf = (si, p, ci, five, x = null) => {
     const s = slices[si];
     s.pos[p][five ? 'ff5' : 'ff'] = ci; put(ci, si);
@@ -264,7 +265,7 @@ function packSlices(nl, combine) {
       const [si, p, how] = src, s = slices[si];
       if (fits(s, key, latch) && s.pos[p].ff === null) { placeFf(si, p, ci, false); continue; }
       // (the 5FF takes O5 or the bypass input only)
-      if (how === 'o5' && !latch && fitsFf5(s, key) && s.pos[p].ff5 === null && s.pos[p].mux === null) { placeFf(si, p, ci, true); continue; }
+      if (how === 'o5' && !latch && fitsFf5(s, key) && s.pos[p].ff5 === null && s.pos[p].mux === null && !muxNeeded(si, p, ci)) { placeFf(si, p, ci, true); continue; }
     }
     rest.push(ci);
   }
@@ -312,7 +313,7 @@ function packSlices(nl, combine) {
         const pos = s.pos[p];
         if (pos.x !== null && pos.x !== dnet) continue;
         if (pos.ff === null) { placeFf(si, p, ci, false, dnet); done = true; break; }
-        if (!latch && pos.ff5 === null && pos.mux === null && fitsFf5(s, key) && o5Thru(pos, dnet)) { placeFf(si, p, ci, true); pos.o5 = `thru:${dnet}`; done = true; break; }
+        if (!latch && pos.ff5 === null && pos.mux === null && fitsFf5(s, key) && o5Thru(pos, dnet) && !muxNeeded(si, p, ci)) { placeFf(si, p, ci, true); pos.o5 = `thru:${dnet}`; done = true; break; }
       }
     }
     if (!done) { const si = slice('X'); placeFf(si, 'A', ci, false, dnet); }
@@ -357,10 +358,8 @@ function packSlices(nl, combine) {
     }
   }
 
-  // ---- the multiplexed outputs: what leaves a position by AMUX … (O5, the carry's XOR or carry out, F7 / F8)
-  // (inside a slice: a storage element's D, the carry's CI, DI and S, a wide multiplexer's inputs; a LUT's input
-  // is outside, its inputs come from the interconnect)
-  const usedOutside = (net, si) => ix.loads(net).some(l => where.get(l.cell) !== si || !/^(D|CI|DI<\d>|S<\d>|I[01])$/.test(l.pin) || isLut(cells[l.cell]));
+  // ---- the multiplexed outputs: what leaves a position by AMUX … (O5, the carry's XOR or carry out, F7 / F8,
+  // usedOutside and muxNeeded above)
   for (let si = 0; si < slices.length; si++) {
     const s = slices[si];
     if (s.carry !== null) {
@@ -405,6 +404,29 @@ function packSlices(nl, combine) {
   };
   const renum = new Map(slices.map((s, i) => [i, live.indexOf(s)]));
   return { slices: live, chains: chains.map(ch => ch.map(i => renum.get(i))), others, stats, warnings };
+}
+
+// the uses of a slice's multiplexed outputs, on the slices packed so far
+function muxUses(cells, ix, where, slices) {
+  // a net used outside slice si (inside a slice: a storage element's D, the carry's CI, DI and S, a wide multiplexer's
+  // inputs; a LUT's input is outside, its inputs come from the interconnect); `also`: a cell taken as in si already
+  const usedOutside = (net, si, also = -1) => ix.loads(net).some(l => (l.cell === also ? si : where.get(l.cell)) !== si || !/^(D|CI|DI<\d>|S<\d>|I[01])$/.test(l.pin) || isLut(cells[l.cell]));
+  // a position's multiplexed output needed by its logic (the carry's sum or carry out, an F7 / F8, O5 leaving the
+  // slice), as packSlices's pass of the multiplexed outputs sets it: a 5FF, which leaves by it too, cannot take the position
+  // (the storage elements not placed yet counted outside, but `also`; #3151)
+  const muxNeeded = (si, p, also = -1) => {
+    const s = slices[si], q = s.pos[p], i = POS.indexOf(p);
+    if (s.carry !== null) {
+      const c = cells[s.carry], o = c.pins[`O<${i}>`], co = c.pins[`CO<${i}>`];
+      if (q.ff === AND2L || (o > 1 && usedOutside(o, si, also))) return true;
+      if (co > 1 && ix.loads(co).some(l => !(cells[l.cell].type === 'CARRY4' && l.pin === 'CI') && ((l.cell === also ? si : where.get(l.cell)) !== si || l.pin !== 'D'))) return true;
+    }
+    const f7 = p === 'A' ? s.f7.A : p === 'C' ? s.f7.B : null;
+    if (typeof f7 === 'number' && usedOutside(cells[f7].pins.O, si, also)) return true;
+    if (p === 'B' && typeof s.f8 === 'number' && usedOutside(cells[s.f8].pins.O, si, also)) return true;
+    return typeof q.o5 === 'number' && usedOutside(cells[q.o5].pins.O, si, also);
+  };
+  return { usedOutside, muxNeeded };
 }
 
 // a chain's CYINIT on AX; DI<0>, which needed AX too, then through A's O5 as a route-through of its net (map's
