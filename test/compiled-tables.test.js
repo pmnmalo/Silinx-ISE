@@ -49,14 +49,15 @@ test('#659 a Post-Synthesis Simulation Model\'s comparisons, decoder and state m
   const design = designOf(sources, 'tabs');
   const raw = await netlistOf(design, { run: yosysNode, words: false });
   const g = gateModel(raw.json, raw.top);
+  // (#3097's comparisons as logic: 15 cells fewer, one table less, #3186)
   assert.deepEqual(g.stats, {
-    words: { chains: 2, registers: 2, cells: [201, 87] },
-    equalities: { equalities: 2, cells: [87, 79] },
-    tables: { tables: 6, inputs: 12, words: 4208, outputs: 13, cells: [79, 38] },
+    words: { chains: 2, registers: 2, cells: [186, 72] },
+    equalities: { equalities: 2, cells: [72, 64] },
+    tables: { tables: 5, inputs: 12, words: 4232, outputs: 11, cells: [64, 39] },
     registers: 2,
   });
   const types = Object.values(g.json.modules[raw.top].cells).map(c => c.type);
-  assert.equal(types.filter(t => t === '$mem_v2').length, 6);
+  assert.equal(types.filter(t => t === '$mem_v2').length, 5);
   assert.equal(types.filter(t => t === '$eq').length, 2);
   // (no net listed whose bits are no longer computed; those of the design's names all kept)
   const mod = g.json.modules[raw.top], driven = new Set(Object.values(mod.ports).filter(p => p.direction === 'input').flatMap(p => p.bits));
