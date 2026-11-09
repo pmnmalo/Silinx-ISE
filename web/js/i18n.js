@@ -497,6 +497,7 @@ const PT_PATTERNS = [
   [/^no device description of (\S+) ships with Silinx \(the Silinx toolchain supports the (.+)\): use an ISE mode for this device$/, 'o Silinx não inclui a descrição do dispositivo $1 (a toolchain Silinx suporta o $2): use um modo ISE para este dispositivo'],
   [/^the Silinx toolchain does not support the (\S+) family yet \(only the Spartan-3E (.+)\): use an ISE mode$/, 'a toolchain Silinx ainda não suporta a família $1 (só o Spartan-3E $2): use um modo ISE'],
   [/^Not met \((\d+) constraints\)$/, 'Não cumpridas ($1 restrições)'],
+  [/^Not met \((\d+) failing endpoints\)$/, 'Não cumpridas ($1 terminais em falha)'],
   [/^Version (\d[\w.-]*)$/, 'Versão $1'],
   // schematic palette: "<SYMBOL>: <description>"
   [/^([A-Z][A-Z0-9_]*(?: [A-Z]+)?): (.+)$/, (m, a, b) => `${a}: ${t(b)}`],
@@ -537,6 +538,13 @@ Object.assign(PT, {
   'Timing (post Place & Route, Silinx toolchain estimate)': 'Temporização (após Posicionar e Encaminhar, estimativa da toolchain Silinx)',
   'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)',
   'Static Timing Report': 'Relatório de Temporização Estática',
+  // AMD Vivado's reports (the 7-series, #1649)
+  'Synthesize - Vivado': 'Sintetizar - Vivado',
+  'Device Utilization Summary (AMD Vivado)': 'Resumo da Utilização do Dispositivo (AMD Vivado)', 'Design Rule Check': 'Verificação das Regras de Projeto',
+  'No violations': 'Sem violações', 'Synthesis Utilization Report': 'Relatório de Utilização da Síntese', 'Utilization Report': 'Relatório de Utilização',
+  'Route Status Report': 'Relatório do Estado do Encaminhamento', 'Timing Summary Report': 'Relatório Resumo da Temporização', 'DRC Report': 'Relatório de DRC', 'Vivado Log': 'Registo do Vivado',
+  'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation of the 7-series use AMD Vivado 2025.2 (Toolchain Settings (the gear in the toolbar)).':
+    'Dica: faça duplo clique num processo no painel Processos para o executar. A simulação corre inteiramente no Silinx; a síntese e a implementação da série 7 usam o AMD Vivado 2025.2 (Definições da Toolchain (a roda dentada da barra de ferramentas)).',
   'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation use the Silinx toolchain (no ISE): Toolchain Settings (the gear in the toolbar).':
     'Dica: faça duplo clique num processo no painel Processos para o executar. A simulação corre inteiramente no Silinx; a síntese e a implementação usam a toolchain Silinx (sem ISE): Definições da Toolchain (a roda dentada da barra de ferramentas).',
   // board emulator

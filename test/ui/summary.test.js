@@ -108,3 +108,45 @@ uiTest('#1103 Design Summary: a PERIOD on a clock with no path between two flip-
     .querySelectorAll('tr').values().map((r) => [...r.children].map((c) => c.textContent)).toArray());
   assert.deepEqual(rows, [['Timing Constraints', 'All constraints met'], ['PERIOD clk', 'PERIOD 20 ns on clk — met, no path between flip-flops to time']]);
 });
+
+// an AMD Vivado run's reports (#1649, server/vivado.js collectVivadoReports) on the Nexys A7's XC7A100T: Vivado's rows, its
+// timing summary, its DRC and its reports' names
+const VIVADO_UTIL = [['Slice LUTs', 85, 63400], ['Slice Registers', 130, 126800], ['Slice', 51, 15850], ['Bonded IOB', 29, 210], ['BUFGCTRL', 1, 32]]
+  .map(([name, used, total]) => ({ name, used, total, percent: +(100 * used / total).toFixed(2), level: 0 }));
+const vivadoReports = (drc) => JSON.stringify({ source: 'vivado', top: 'top', synthesis: { utilization: [...VIVADO_UTIL, { name: 'LUT as Logic', used: 85, total: 63400, percent: 0.13, level: 1 }], warnings: 0, errors: 0 },
+  map: { utilization: VIVADO_UTIL }, par: { routed: true, unroutedSignals: 0 }, drc,
+  timing: { met: false, timingErrors: 3, minPeriodNs: 10.62, maxFreqMHz: 94.162, constraints: [{ name: 'sys_clk_pin', constraint: 'create_clock sys_clk_pin period 10 ns', timingErrors: 3, minPeriodNs: 10.62 }] },
+  summary: { synthesized: true, mapped: true, routed: true } });
+const TABLE = (title) => [...document.querySelectorAll('.doc:not([hidden]) .summary-table')].find((t) => t.caption?.textContent === title)
+  ?.querySelectorAll('tr').values().map((r) => [...r.children].map((c) => c.textContent)).toArray();
+
+uiTest('#1649 Design Summary of an AMD Vivado run (a 7-series device): Vivado\'s rows, its timing, its DRC, its reports; in Portuguese too', E, async (page) => {
+  await makeProject(env, { name: 'Viv7', template: 'blinky', device: { family: 'artix7', part: 'xc7a100t', package: 'csg324', speed: '-1' } });
+  await writeWs(env, 'Viv7', 'build/reports.json', vivadoReports({ checks: 1, rules: [{ rule: 'CFGBVS-1', severity: 'Warning', description: 'Missing CFGBVS and CONFIG_VOLTAGE Design Properties', checks: 1 }] }));
+  await page.openProject('Viv7');
+  await page.waitFor(() => window.SilinxApp.findDoc('summary') && /AMD Vivado\)/.test(document.querySelector('.doc:not([hidden])')?.innerText || ''), [], { what: 'the summary of the Vivado run' });
+  assert.equal(await page.eval(CAPTION), 'Device Utilization Summary (AMD Vivado)');
+  assert.deepEqual(await page.eval(ROWS), [['Slice LUTs', '85', '63400', '0.13%', false], ['Slice Registers', '130', '126800', '0.1%', false], ['Slice', '51', '15850', '0.32%', false],
+    ['Bonded IOB', '29', '210', '13.81%', false], ['BUFGCTRL', '1', '32', '3.13%', false]]);
+  assert.deepEqual(await page.eval(TABLE, 'Timing (post Place & Route)'), [['Timing Constraints', 'Not met (3 failing endpoints)'], ['Minimum period', '10.62 ns (maximum frequency 94.162 MHz)'],
+    ['sys_clk_pin', 'create_clock sys_clk_pin period 10 ns — 3 errors, 10.62 ns']]);
+  assert.deepEqual(await page.eval(TABLE, 'Design Rule Check'), [['CFGBVS-1', 'Warning: Missing CFGBVS and CONFIG_VOLTAGE Design Properties (1)']]);
+  assert.deepEqual((await page.eval(TABLE, 'Detailed Reports')).map((r) => r[0]), ['Report Name', 'Synthesis Utilization Report', 'Utilization Report', 'Route Status Report', 'Timing Summary Report', 'DRC Report', 'Vivado Log']);
+  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden])').innerText), /AMD Vivado 2025\.2 flow[\s\S]*synthesis and implementation of the 7-series use AMD Vivado 2025\.2/);
+  await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
+  try {
+    await page.waitFor(() => /AMD Vivado\)/.test(document.querySelector('.doc:not([hidden])')?.innerText || '') && /Resumo da Utilização/.test(document.querySelector('.doc:not([hidden])')?.innerText || ''), [], { what: 'the summary in Portuguese' });
+    assert.equal(await page.eval(CAPTION), 'Resumo da Utilização do Dispositivo (AMD Vivado)');
+    assert.deepEqual(await page.eval(TABLE, 'Verificação das Regras de Projeto'), [['CFGBVS-1', 'Warning: Missing CFGBVS and CONFIG_VOLTAGE Design Properties (1)']]);
+    const text = await page.eval(() => document.querySelector('.doc:not([hidden])').innerText);
+    for (const s of ['Não cumpridas (3 terminais em falha)', 'Relatório de Utilização da Síntese', 'Relatório do Estado do Encaminhamento', 'Relatório Resumo da Temporização', 'Relatório de DRC', 'Registo do Vivado', 'a síntese e a implementação da série 7 usam o AMD Vivado 2025.2'])
+      assert.ok(text.includes(s), s);
+  } finally {
+    await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+  }
+  // a DRC with nothing found
+  await writeWs(env, 'Viv7', 'build/reports.json', vivadoReports({ checks: 0, rules: [] }));
+  await page.openProject('Viv7');
+  await page.waitFor((t) => /No violations/.test(document.querySelector('.doc:not([hidden])')?.innerText || ''), [], { what: 'the DRC with no violation' });
+  assert.deepEqual(await page.eval(TABLE, 'Design Rule Check'), [['DRC', 'No violations']]);
+});

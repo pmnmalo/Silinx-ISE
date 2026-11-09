@@ -11,6 +11,8 @@
 //            Yosys + Silinx's pack, place, route and bitgen) for the devices with a device
 //            description and a bit database. ISE is still used (open.iseMode: local / docker / ssh,
 //            with the settings of that mode) to build the description of another device.
+// AMD Vivado (the 7-series' back end, #1649, server/vivado.js) runs in a mode of its own, vivado.mode (docker, ssh or
+// local: ISE's ways, with ISE's docker command and ssh host), in its own image (vivado.image).
 // Programmers always run locally (they need the USB device).
 
 import fs from 'node:fs/promises';
@@ -52,6 +54,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   docker: { command: 'docker', image: '', platform: 'linux/amd64', settings: DEFAULT_SETTINGS, extraArgs: [], memory: '' },   // memory: docker run --memory (8g; '' = no limit, #1435)
   ssh: { host: '', user: '', port: 22, identity: '', remoteDir: 'silinx-build', settings: DEFAULT_SETTINGS, image: '', sshArgs: [] },   // image: docker image on the host ('' = ISE installed there)
   open: { iseMode: 'docker' },                  // Silinx toolchain mode: the ISE that builds device descriptions (developers) (local|docker|ssh)
+  vivado: { mode: 'docker', image: '', settings: '' },   // AMD Vivado (7-series): its mode (local|docker|ssh), image, settings64.sh ('' = found)
   programmer: { tool: '', cable: '' },          // global defaults (board defaults take precedence when empty)
   paths: {},                                    // explicit binary paths, e.g. { djtgcfg: '/usr/local/bin/djtgcfg' }
 });
@@ -90,23 +93,23 @@ const bad = msg => Object.assign(new Error(msg), { status: 400 });
 
 /** This computer's settings script, set through the API: an existing file outside the workspace
  *  (whose files the API writes), owned by root or this user and writable by nobody else, its folders too. Its real path, the one to keep: a link could be changed after this check. */
-async function checkLocalSettings(file) {
-  if (!path.isAbsolute(file)) throw bad('local.settings must be an absolute path');
+async function checkLocalSettings(file, key = 'local.settings', tool = "ISE's") {
+  if (!path.isAbsolute(file)) throw bad(`${key} must be an absolute path`);
   let real;
-  try { real = await fs.realpath(file); } catch { throw bad(`local.settings: ${file} does not exist`); }
+  try { real = await fs.realpath(file); } catch { throw bad(`${key}: ${file} does not exist`); }
   const { workspaceDir } = await import('./projects.js');
   let ws = path.resolve(workspaceDir());
   try { ws = await fs.realpath(ws); } catch { /* no workspace yet */ }
-  if (real === ws || real.startsWith(ws + path.sep)) throw bad('local.settings cannot be a file of the workspace');
-  if (!(await fs.stat(real)).isFile()) throw bad(`local.settings: ${file} is not a file`);
-  if (!SETTINGS.test(real)) throw bad(`local.settings: ${file} is not ISE's settings64.sh (or settings32.sh)`);
+  if (real === ws || real.startsWith(ws + path.sep)) throw bad(`${key} cannot be a file of the workspace`);
+  if (!(await fs.stat(real)).isFile()) throw bad(`${key}: ${file} is not a file`);
+  if (!SETTINGS.test(real)) throw bad(`${key}: ${file} is not ${tool} settings64.sh (or settings32.sh)`);
   if (typeof process.getuid !== 'function') return real;   // Windows: no owners and modes to check
   const me = process.getuid();
   for (let p = real, leaf = true; ; p = path.dirname(p), leaf = false) {
     const st = await fs.stat(p);
     const sticky = !leaf && (st.mode & 0o1000);
     if ((st.uid !== 0 && st.uid !== me) || ((st.mode & 0o022) && !sticky))
-      throw bad(`local.settings: ${p} may be changed by other users (it must belong to root or to you, and be writable by its owner only)`);
+      throw bad(`${key}: ${p} may be changed by other users (it must belong to root or to you, and be writable by its owner only)`);
     if (p === path.dirname(p)) break;
   }
   return real;
@@ -128,6 +131,16 @@ function checkRemoteSettings(cfg) {
   if (base === '.' || base === '/') throw bad('ssh.remoteDir must name a folder of its own for the builds');
   if (s && (!s.startsWith('/') || (base.startsWith('/') ? s.startsWith(base + '/') : s.includes(`/${base}/`))))
     throw bad('ssh.settings must be an absolute path outside ssh.remoteDir (the build folder)');
+}
+
+/** Vivado's settings in its image or on the ssh host: an absolute plain path, outside the build folder (/work, ssh.remoteDir). */
+function checkVivadoRemoteSettings(cfg) {
+  const v = String(cfg.vivado.settings);
+  if (v.split('/').some(p => p === '.' || p === '..') || /^\/+(proc|dev|sys)(\/|$)/i.test(v)) throw bad('vivado.settings must be a plain path: no . or .. in it, not under /proc, /dev or /sys');
+  const n = path.posix.normalize(v);
+  if (!n.startsWith('/') || n === '/work' || n.startsWith('/work/')) throw bad('vivado.settings must be an absolute path outside /work (the build folder)');
+  const base = path.posix.normalize(String(cfg.ssh.remoteDir || 'silinx-build').replace(/^~\/?/, '') || 'silinx-build').replace(/\/$/, '').toLowerCase();
+  if (base.startsWith('/') ? n.toLowerCase().startsWith(base + '/') : n.toLowerCase().includes(`/${base}/`)) throw bad('vivado.settings must be a path outside ssh.remoteDir (the build folder)');
 }
 
 /** ssh.remoteDir set through the API: a folder inside the remote home (every run removes and remakes
@@ -156,6 +169,8 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
       const v = at(partial, key);
       if (v && !SETTINGS.test(String(v))) throw Object.assign(new Error(`${key} must be ISE's settings64.sh (or settings32.sh)`), { status: 400 });
     }
+    const vs = at(partial, 'vivado.settings');
+    if (vs && !/(^|\/)settings64\.sh$/.test(String(vs))) throw bad("vivado.settings must be Vivado's settings64.sh");
   }
   const cfg = modeAlias(merge(current, partial));
   // the settings scripts run as the user who started the server: through the API (any process of
@@ -165,6 +180,11 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
     if (changed('local.settings') && cfg.local.settings) cfg.local.settings = await checkLocalSettings(String(cfg.local.settings));
     if (changed('ssh.remoteDir')) checkApiRemoteDir(cfg.ssh.remoteDir);
     if (['docker.settings', 'ssh.settings', 'ssh.remoteDir'].some(changed)) checkRemoteSettings(cfg);
+    // Vivado's settings: this computer's (local mode) as local.settings, else a path in the image or on the host as theirs
+    if ((changed('vivado.settings') || changed('vivado.mode')) && cfg.vivado.settings) {
+      if (cfg.vivado.mode === 'local') cfg.vivado.settings = await checkLocalSettings(String(cfg.vivado.settings), 'vivado.settings', "Vivado's");
+      else checkVivadoRemoteSettings(cfg);
+    }
   }
   if (cfg.docker.image && !IMAGE.test(cfg.docker.image)) throw Object.assign(new Error('docker.image contains invalid characters'), { status: 400 });
   if (cfg.docker.memory && !DOCKER_MEMORY.test(String(cfg.docker.memory))) throw Object.assign(new Error('docker.memory must be a size (8g, 512m) or empty'), { status: 400 });
@@ -174,6 +194,9 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
   if (pg.tool && !PROGRAMMER_TOOLS.includes(pg.tool)) throw bad(`programmer.tool must be one of ${PROGRAMMER_TOOLS.join(', ')} or empty`);
   for (const k of ['cable', 'device']) if (pg[k] != null && pg[k] !== '' && (typeof pg[k] !== 'string' || !PROGRAMMER_VALUE.test(pg[k]))) throw bad(`programmer.${k} contains invalid characters`);
   if (!MODES.includes(cfg.mode)) throw Object.assign(new Error(`invalid mode '${cfg.mode}' (${MODES.join('|')})`), { status: 400 });
+  if (!ISE_MODES.includes(cfg.vivado?.mode)) throw bad(`invalid vivado.mode '${cfg.vivado?.mode}' (${ISE_MODES.join('|')})`);
+  if (cfg.vivado.image && !IMAGE.test(cfg.vivado.image)) throw bad('vivado.image contains invalid characters');
+  if (cfg.vivado.settings && (typeof cfg.vivado.settings !== 'string' || /[\x00-\x1f]/.test(cfg.vivado.settings))) throw bad('vivado.settings must be a path');
   if (!ISE_MODES.includes(cfg.open.iseMode)) throw Object.assign(new Error(`invalid open.iseMode '${cfg.open.iseMode}' (${ISE_MODES.join('|')})`), { status: 400 });
   for (const k of ['extraArgs']) if (!Array.isArray(cfg.docker[k])) throw Object.assign(new Error(`docker.${k} must be an array of strings`), { status: 400 });
   if (!Array.isArray(cfg.ssh.sshArgs)) throw Object.assign(new Error('ssh.sshArgs must be an array of strings'), { status: 400 });
@@ -298,11 +321,13 @@ export async function detectToolchain() {
   const status = iseStatus(cfg, { ise, helpers, dockerImage });
   // Silinx toolchain mode: can ISE still build device descriptions (with the settings of open.iseMode)?
   const builder = cfg.mode === 'silinx' ? iseStatus({ ...cfg, mode: iseModeOf(cfg) }, { ise, helpers, dockerImage }) : status;
+  const { detectVivadoToolchain } = await import('./vivado.js');
   return {
     platform: process.platform,
     config: cfg,
     configPath: configPath(),
     ise: { ...ise, ...status },
+    vivado: await detectVivadoToolchain(cfg, helpers),
     deviceBuilder: { mode: iseModeOf(cfg), available: builder.available, reason: builder.reason },
     programmers,
     helpers,
