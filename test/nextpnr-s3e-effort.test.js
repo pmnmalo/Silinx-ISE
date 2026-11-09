@@ -55,10 +55,10 @@ test('#2912 router 1 routes vga within its effort, the budget in force: 30000 wi
   assert.ok(r.ok, r.error);
   const visited = log.map(l => /Router 1 visited (\d+) wires, (\d+) per arc \(at most (\d+)\)/.exec(l)).find(Boolean);
   assert.ok(visited, 'nextpnr\'s log has router 1\'s visits and its budget');
-  // (the budget: 30000 per arc to route, of the whole design: 1164 arcs on 1.1.0)
+  // (the budget: 30000 per arc to route, of the whole design: 1164 arcs on 1.1.0, 990 on 1.4.2's placement, #3157)
   const [, total, perArc, budget] = visited.map(Number);
   assert.equal(budget % 30000, 0, visited[0]);
-  assert.ok(budget / 30000 > 1000, visited[0]);
+  assert.ok(budget / 30000 > 900, visited[0]);
   assert.ok(total <= budget && perArc < 30000, visited[0]);
   assert.ok(!log.some(l => /Routing with router 2/.test(l)), 'router 1 finished it');
   assert.ok(lines.includes('All signals are completely routed.'));
