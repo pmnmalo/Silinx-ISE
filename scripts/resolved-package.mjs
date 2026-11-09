@@ -54,7 +54,8 @@ export function checkResolved(dir, args, root = process.cwd()) {
   let ok = true;
   for (const [name, spec] of want) {
     const expected = specVersion(spec);
-    const from = [[path.relative(root, path.resolve(dir)) || '.', dir], ['root', root]].map(([label, d]) => [label, resolvedPackage(name, d)?.version ?? 'not found']);
+    // the folder as a POSIX path on every system (#3186)
+    const from = [[path.relative(root, path.resolve(dir)).split(path.sep).join('/') || '.', dir], ['root', root]].map(([label, d]) => [label, resolvedPackage(name, d)?.version ?? 'not found']);
     const bad = !expected || from.some(([, v]) => v !== expected);
     if (bad) ok = false;
     lines.push(`${bad ? 'error: ' : ''}${name} ${from.map(([l, v]) => `${v} (${l})`).join(', ')}, expected ${expected ?? `an exact version, not ${spec}`}`);
