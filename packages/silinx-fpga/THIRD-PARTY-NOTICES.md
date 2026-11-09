@@ -7,7 +7,7 @@ which npm installs with it. Each one keeps its own licence, reproduced in full h
 | Component | Version | Licence | Project |
 |---|---|---|---|
 | @silinx/nextpnr-himbaechel-spartan3e | 1.4.2 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
-| @silinx/nextpnr-himbaechel-spartan6 | 0.2.0 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
+| @silinx/nextpnr-himbaechel-spartan6 | 0.3.0 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @yowasp/nextpnr-ice40 | 0.11.96-dev.805 | ISC | https://yowasp.org/ |
 | @yowasp/yosys | 0.70.1258 | ISC | https://yowasp.org/ |
 
@@ -481,7 +481,7 @@ The WASI SDK 34's runtime libraries (wasi-libc, libc++, libc++abi, libunwind; li
 Licensed under the Apache License v2.0 with LLVM Exceptions (wasi-libc also MIT and CC0 parts): https://github.com/WebAssembly/wasi-libc/blob/main/LICENSE and https://llvm.org/LICENSE.txt
 ```
 
-## @silinx/nextpnr-himbaechel-spartan6 0.2.0 — ISC
+## @silinx/nextpnr-himbaechel-spartan6 0.3.0 — ISC
 
 https://github.com/pmnmalo/nextpnr-spartan
 
