@@ -6,6 +6,7 @@ import { parseXdl, writeXdl } from './xdl.js';
 import { loadChipdb } from './nextpnr-io.js';
 import { s6Sites } from './fpga/s6/sites.js';
 import { placeS6 } from './fpga/s6/place.js';
+import { padPathsS6 } from './fpga/s6/pad-paths.js';
 import { placedXdlS6 } from './fpga/s6/xdl.js';
 import { checkRoutingS6 } from './fpga/s6/route-check.js';
 import { analyzeTimingS6 } from './fpga/s6/timing.js';
@@ -49,11 +50,11 @@ export function mountNextpnrS6(ctx) {
     // the pads and the global buffers, by Silinx's rules (the banks' VCCO, a clock pad's dedicated path); the block RAMs
     // and DSP48A1s by nextpnr (#3137), or with hardByNextpnr false from Silinx's timing-driven placement, a DSP48A1
     // cascade with them (nextpnr 0.1's analytical placer left them columns apart: the stopwatch on the Atlys missed its
-    // 10 ns on every seed)
+    // 10 ns on every seed); a port without a LOC on a pad whose I/O path the bit database knows (#3152)
     const byNextpnr = spec.hardByNextpnr ?? S6_HARD_BY_NEXTPNR;
     const hard = !byNextpnr && phys.insts.some(i => i.kind === 'bram' || i.kind === 'dsp');
     let legal;
-    try { legal = placeS6(phys, sites, { seed: spec.seed || 1, effort: hard ? 1 : 0, timing: hard ? 0.1 : 0, nl }); } catch (e) { throw new StepError(`placement failed: ${e.message}`, [], e.hint); }
+    try { legal = placeS6(phys, sites, { seed: spec.seed || 1, effort: hard ? 1 : 0, timing: hard ? 0.1 : 0, nl, padPaths: padPathsS6(device, io.bitDb(), sites) }); } catch (e) { throw new StepError(`placement failed: ${e.message}`, [], e.hint); }
     for (const w of legal.warnings || []) log(`WARNING:Place - ${w}`);
     const fixed = new Map(), generalOk = new Set();
     phys.insts.forEach((inst, i) => {

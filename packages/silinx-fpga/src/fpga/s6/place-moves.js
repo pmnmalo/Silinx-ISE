@@ -6,7 +6,7 @@ import { sliceFits } from './place.js';
 export function mountMovesS6(ctx) {
   const {
     insts, objs, objOf, movable, site, owner, setAt, slices, padOf, bramSite, bramFree, bramSites, dspBy,
-    chainSites, needOf, ri, rlim, bankOk, bankAdd, netsOf, netCost, netCostOf, connsOf, cW, cD, cdelay,
+    chainSites, needOf, ri, rlim, fits, bankOk, bankAdd, netsOf, netCost, netCostOf, connsOf, cW, cD, cdelay,
     lambda, bb, bbNorm, tc, tcNorm, setBb, setTc,
   } = ctx;
   let move = null;      // [[inst, new site]]
@@ -76,11 +76,11 @@ export function mountMovesS6(ctx) {
   };
   const proposeIob = o => {
     const i = o.members[0], all = [...padOf.values()], to = all[ri(all.length)];
-    if (to.name === site[i]) return false;
+    if (to.name === site[i] || !fits(insts[i], to)) return false;
     const j = owner.get(to.name), here = padOf.get(site[i]);
     const v = ctxV(i);
     if (j !== undefined) {
-      if (objs[objOf[j]].kind !== 'iob' || objs[objOf[j]].fixed || ctxV(j) !== v) return false;
+      if (objs[objOf[j]].kind !== 'iob' || objs[objOf[j]].fixed || ctxV(j) !== v || !fits(insts[j], here)) return false;
       move = [[i, to.name], [j, here.name]];
       return true;
     }
