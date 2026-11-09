@@ -10,7 +10,7 @@
 // - tasks: the tasks of the Tasks interface, each with its main action and its state dot's processes.
 // What a tool does not have is not in its descriptor, and so not in the interface. No DOM here: unit tested
 // (test/tool-descriptors.test.js).
-import { deviceFamily, experimentalDevice } from '../../packages/silinx-fpga/src/parts.js';
+import { deviceFamily, experimentalDevice, vivadoDevice } from '../../packages/silinx-fpga/src/parts.js';
 
 export const OPEN_SYNTH = 'Synthesize - Yosys';
 export const SYNTH_OPEN = 'Synthesize - Yosys (open)';   // (ISE's tree: the open synthesis beside XST's)
@@ -197,12 +197,39 @@ export const NO_FLOW = {
   tasks: LAB_TASKS.filter(t => t.id === 'edit' || t.id === 'sim'),
 };
 
+/** AMD Vivado on the 7-series (#1649, server/vivado.js): ISE's step names, each a Vivado command (synth_design, opt_design as
+ *  Map, place_design and route_design, report_timing_summary, report_io, report_power, write_bitstream), no simulation models,
+ *  no technology schematic, no FPGA view; its reports Vivado's; the board programmed with openFPGALoader (iMPACT's page);
+ *  no Emulate (the 7-series' boards have no emulator yet). The local server's only: the browser edition has NO_FLOW. */
+export const VIVADO = {
+  id: 'vivado', name: 'AMD Vivado', open: false,
+  steps: withProducts([step('synth', 'Synthesize - Vivado'), step('translate', 'Translate', ['synth']), step('map', 'Map', ['translate']), step('par', 'Place & Route', ['map']),
+    step('trce', EXTRA_STEPS.trce, ['par']), step('pin2ucf', EXTRA_STEPS.pin2ucf, ['par']), step('xpwr', EXTRA_STEPS.xpwr, ['par']), step('bitgen', 'Generate Programming File', ['par'])], {
+    synth: ['post_synth.dcp', '{top}_synth_util.rpt'], map: ['post_opt.dcp'], par: ['post_route.dcp', '{top}_route.rpt', '{top}_drc.rpt', '{top}_util.rpt'],
+    trce: ['{top}_timing.rpt'], pin2ucf: ['{top}_io.rpt'], xpwr: ['{top}_power.rpt'], bitgen: ['{top}.bit'],
+  }),
+  reports: [
+    { id: 'synthesis', label: 'Synthesis Utilization Report', step: 'synth', file: '{top}_synth_util.rpt' },
+    { id: 'map', label: 'Utilization Report', step: 'par', file: '{top}_util.rpt' },
+    { id: 'par', label: 'Route Status Report', step: 'par', file: '{top}_route.rpt' },
+    { id: 'drc', label: 'DRC Report', step: 'par', file: '{top}_drc.rpt' },
+    { id: 'timing', label: 'Timing Summary Report', step: 'trce', file: '{top}_timing.rpt' },
+  ],
+  constraints: XDC,
+  messages: LOG_MESSAGES,
+  program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit' },
+  tree: treeOf(['synth-open', 'tech', 'postsynth', 'posttrans', 'postmap', 'postpar', 'fpgaview'], { synth: { label: 'Synthesize - Vivado', title: 'AMD Vivado' }, impl: { title: 'AMD Vivado' }, bitgen: { title: 'AMD Vivado' } })
+    .filter(n => n.part !== 'emulate'),
+  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+};
+
 // (the tools that implement: NO_FLOW's tasks are some of theirs)
 export const TOOLS = [ISE, SILINX, SILINX_ICE40];
 const OPEN_BY_FAMILY = { ice40: SILINX_ICE40 };
-/** The tool of a project device: an experimental family's none yet; `open`, the Silinx toolchain (its back end by the
- *  family), else ISE. */
-export const toolOf = (device, open) => (experimentalDevice(device) ? NO_FLOW : open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
+/** The tool of a project device: a 7-series one's AMD Vivado on the local server (#1649; `standalone`, the browser edition:
+ *  none); another experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE. */
+export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) && !standalone ? VIVADO
+  : experimentalDevice(device) ? NO_FLOW : open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
 
 /** Every tool's tasks, in their order: the kept state's and the switchers'. */
 export const allTasks = (tools = TOOLS) => [...new Map(tools.flatMap(t => t.tasks).map(t => [t.id, t])).values()];

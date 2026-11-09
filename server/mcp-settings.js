@@ -117,7 +117,9 @@ export const SETTINGS_TOOLS = [
       if (R.openOnlyDevice(next) && tool === 'xst') throw toolError(`the ${next.part.toUpperCase()} is the Silinx toolchain's only: no XST`);
       // (an experimental family, #3142: no flow runs it yet, the synthesis tool locked as the dialog locks it)
       const experimental = R.experimentalDevice(next);
-      if (experimental && synthTool === 'xst') throw toolError(`${R.noFlowMessage(next)}: no XST`);
+      // (the Artix-7: AMD Vivado's on this server, #1649)
+      const vivado = R.vivadoDevice(next);
+      if (experimental && synthTool === 'xst') throw toolError(vivado ? `the ${next.part.toUpperCase()} is implemented by AMD Vivado: no XST` : `${R.noFlowMessage(next)}: no XST`);
       const warnings = [];
       const deviceChanged = next.part !== pj.device?.part || next.package !== pj.device?.package;
       if (deviceChanged) for (const m of await deviceChangeMessages(name, pj, next)) warnings.push(`WARNING: ${next.part.toUpperCase()}: ${m}`);
@@ -147,7 +149,7 @@ export const SETTINGS_TOOLS = [
       else if (changed && !nextBoard && after.constraints && fs.existsSync(path.join(P.projectDir(name), after.constraints))) pins.push(`WARNING: check the pin locations in ${after.constraints} — they must exist on the ${next.package.toUpperCase()} package.`);
       warnings.push(...pins);
       // (after the device, as the dialog's console says it)
-      const noFlow = experimental ? [`WARNING: ${R.noFlowMessage(next)}.`] : [];
+      const noFlow = experimental && !vivado ? [`WARNING: ${R.noFlowMessage(next)}.`] : [];
       warnings.push(...noFlow);
       const text = [...warnings.filter(w => !pins.includes(w) && !languageLines.includes(w) && !noFlow.includes(w)), ...languageLines, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`, ...pins, ...noFlow];
       return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, preferredLanguage: after.preferredLanguage || 'vhdl', constraints: after.constraints || null, constraintsUpdated: constraints, warnings } };

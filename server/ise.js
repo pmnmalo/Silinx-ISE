@@ -402,14 +402,16 @@ export async function viewSources(project, projectDir, hdl = []) {
   return res;
 }
 
-export async function generateBuild(project, projectDir, { steps } = {}) {
+/** sourcesOnly: the sources alone (another back end's build, server/vivado.js): no device check, no constraints, no
+ *  ISE script. */
+export async function generateBuild(project, projectDir, { steps, sourcesOnly = false } = {}) {
   const warnings = [];
   const top = project.top;
   if (!top) throw Object.assign(new Error('project has no top module set (project.top)'), { status: 400 });
   if (!IDENT.test(top)) throw Object.assign(new Error(`invalid top module name '${top}'`), { status: 400 });
   const device = project.device || {};
   const fam = deviceFamily(device);
-  const ise = !FAMILY_INFO[fam] || isIseFamily(fam);   // (a family the open toolchain alone implements: its sources and constraints only, #2295)
+  const ise = !sourcesOnly && (!FAMILY_INFO[fam] || isIseFamily(fam));   // (a family the open toolchain alone implements: its sources and constraints only, #2295)
   const devErr = ise ? validateDevice(device) : [];
   if (devErr.length) throw Object.assign(new Error(devErr.join('; ')), { status: 400 });
 
@@ -471,7 +473,7 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   for (const s of sources) if (s.lang === 'verilog') includeDirs.add(path.posix.dirname(s.buildPath));
 
   if (!ise) {
-    const name = project.constraints && fss.existsSync(inside(project.constraints)) ? path.basename(project.constraints) : null;
+    const name = !sourcesOnly && project.constraints && fss.existsSync(inside(project.constraints)) ? path.basename(project.constraints) : null;
     if (name) await fs.copyFile(inside(project.constraints), path.join(buildDir, name));
     return { buildDir, top, device, files: name ? [name] : [], sources, hasUcf: !!name, constraintsFile: name, warnings, steps: [] };
   }
@@ -651,8 +653,8 @@ export function remoteDirFor(cfg, projectName) {
 }
 
 /** Run run.sh on the ssh host: upload build/, run, download the results. cleanup: remove the
- *  remote folder afterwards (the device report job: its report is large). */
-export async function runSsh(job, cfg, det, project, gen, steps, onLine, { cleanup = false } = {}) {
+ *  remote folder afterwards (the device report job: its report is large); dockerArgs, env: remoteFlowCommand's. */
+export async function runSsh(job, cfg, det, project, gen, steps, onLine, { cleanup = false, dockerArgs = [], env = {} } = {}) {
   const { target, opts } = sshParts(cfg);
   const rdir = remoteDirFor(cfg, project.name);
   const rq = shQuote(rdir);
@@ -662,7 +664,7 @@ export async function runSsh(job, cfg, det, project, gen, steps, onLine, { clean
     ['tar', ['-C', gen.buildDir, '-cf', '-', '.']],
     ['ssh', [...opts, '--', target, `rm -rf ${rq} && mkdir -p ${rq} && tar -C ${rq} -xf -`]]);
   if (code !== 0) return code;
-  const flow = await runCommand(job, 'ssh', [...opts, '--', target, remoteFlowCommand(cfg, rdir, steps)], { onLine });
+  const flow = await runCommand(job, 'ssh', [...opts, '--', target, remoteFlowCommand(cfg, rdir, steps, { dockerArgs, env })], { onLine });
   job.log(`Downloading results from the ssh host (${rdir})`);
   // Download everything except the sources we uploaded.
   code = await runPipe(job,
@@ -675,16 +677,19 @@ export async function runSsh(job, cfg, det, project, gen, steps, onLine, { clean
 
 /**
  * The shell command that runs the flow on the ssh host, in `rdir` (relative to the remote home):
- * run.sh with the ISE installed there, or (ssh.image) inside that docker image, folder at /work.
+ * run.sh with the ISE installed there, or (ssh.image) inside that docker image, folder at /work. dockerArgs: the
+ * container's other arguments; env: other variables of run.sh's (Vivado's, server/vivado.js).
  */
-export function remoteFlowCommand(cfg, rdir, steps) {
+export function remoteFlowCommand(cfg, rdir, steps, { dockerArgs = [], env: vars = {} } = {}) {
   const s = cfg.ssh, rq = shQuote(rdir), args = steps.map(shQuote).join(' ');
+  const more = Object.entries(vars).filter(([k]) => /^[A-Z_][A-Z0-9_]*$/.test(k));
   if (s.image) {
     // a non-interactive ssh shell may lack Docker Desktop's /usr/local/bin (macOS) on PATH
-    const env = s.settings ? `-e ISE_SETTINGS=${shQuote(s.settings)} ` : '';
-    return `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd ${rq} && docker run --rm --pull=never ${DOCKER_ISOLATION.join(' ')} -v "$PWD":/work -w /work ${env}${shQuote(s.image)} bash run.sh ${args}`;
+    const env = [...(s.settings ? [['ISE_SETTINGS', s.settings]] : []), ...more].map(([k, v]) => `-e ${shQuote(`${k}=${v}`)} `).join('');
+    const extra = dockerArgs.map(a => `${shQuote(a)} `).join('');
+    return `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd ${rq} && docker run --rm --pull=never ${DOCKER_ISOLATION.join(' ')} ${extra}-v "$PWD":/work -w /work ${env}${shQuote(s.image)} bash run.sh ${args}`;
   }
-  const settings = s.settings ? `ISE_SETTINGS=${shQuote(s.settings)} ` : '';
+  const settings = [...(s.settings ? [['ISE_SETTINGS', s.settings]] : []), ...more].map(([k, v]) => `${k}=${shQuote(v)} `).join('');
   return `cd ${rq} && ${settings}bash run.sh ${args}`;
 }
 

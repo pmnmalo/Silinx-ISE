@@ -9,6 +9,7 @@ import { getDeviceDb, resolveBoard } from './devices.js';
 import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
+import { runVivado, isVivadoDevice, vivadoSteps, collectVivadoReports } from './vivado.js';
 import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
@@ -50,7 +51,8 @@ async function checkWorkspaceBit(full) {
 
 /**
  * Start an implementation of a project: POST /projects/:p/implement, and the MCP server's run_process
- * (server/mcp.js). body: { steps, toolchain ('silinx' | 'ise'), synthUpToDate, generateOnly }. Returns the job.
+ * (server/mcp.js). body: { steps, toolchain ('silinx' | 'ise' | 'vivado'), synthUpToDate, generateOnly }. A 7-series device's
+ * flow is AMD Vivado's (#1649, server/vivado.js). Returns the job.
  */
 export async function startImplementation(name, body = {}) {
   const P = Projects;
@@ -60,7 +62,8 @@ export async function startImplementation(name, body = {}) {
   let steps;
   try { steps = normalizeSteps(body.steps); } catch (e) { throw bad(e.message); }
   if (!topOf(project)) throw bad('set the top module of the project before implementing');
-  if (experimentalDevice(project.device)) throw bad(noFlowMessage(project.device));   // (the 7-series' flows to come: #1649, #3146)
+  // (an experimental family with no back end: its flows to come; the 7-series' is Vivado's, #1649, the Silinx toolchain's #3146)
+  if (experimentalDevice(project.device) && !isVivadoDevice(project.device)) throw bad(noFlowMessage(project.device));
   // one ISE run per project: two runs would share (and wipe) the same build/ folder
   const key = name.toLowerCase();   // case-insensitive file systems: one folder
   const running = implJobs.get(key);
@@ -69,6 +72,17 @@ export async function startImplementation(name, body = {}) {
   // request's toolchain, else the project's synthesis tool (synthTool: 'silinx' | 'xst'), else the
   // execution mode of Toolchain Settings
   const choice = body.toolchain || ({ silinx: 'silinx', xst: 'ise' })[project.synthTool];
+  // (a 7-series device: Vivado's, the only toolchain that implements it yet, #1649; a toolchain asked for Vivado: its)
+  const vivado = body.toolchain === 'vivado' || (isVivadoDevice(project.device) && !['silinx', 'open', 'ise'].includes(body.toolchain));
+  if (body.toolchain === 'vivado' && !isVivadoDevice(project.device)) throw bad(`AMD Vivado implements the Artix-7 devices, not the ${String(project.device?.part || '').toUpperCase()}`);
+  if (vivado) {
+    try { steps = vivadoSteps(steps); } catch (e) { throw bad(e.message); }
+    if (!isTrusted(project)) throw bad(untrustedMessage(name, 'AMD Vivado', project), 403);
+    const board = project.board ? resolveBoard(project.board, { variant: project.boardVariant, part: project.device?.part })?.board || null : null;
+    const job = createJob('implement', j => runVivado(j, { project, projectDir, steps, board, generateOnly: !!body.generateOnly }), { meta: { project: name, steps, toolchain: 'vivado' } });
+    implJobs.set(key, job.id);
+    return job;
+  }
   const open = openOnlyDevice(project.device) || (choice ? ['silinx', 'open'].includes(choice) : (await loadConfig()).mode === 'silinx');
   // (the synthesis up to date, #280: the run starts at Translate from its netlist)
   const synthUpToDate = !!body.synthUpToDate;
@@ -91,6 +105,7 @@ export async function projectReports(name) {
   try { return JSON.parse(await fs.readFile(path.join(buildDir, 'reports.json'), 'utf8')); }
   catch { /* not saved yet */ }
   if (!fss.existsSync(buildDir) || !topOf(project)) return { available: false };
+  if (isVivadoDevice(project.device) && fss.existsSync(path.join(buildDir, 'run.tcl'))) return collectVivadoReports(buildDir, project.top, project.device);
   return collectReports(buildDir, project.top, project.device);
 }
 

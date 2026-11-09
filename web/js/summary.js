@@ -25,26 +25,30 @@ export function mountSummary(el) {
     const board = S.devices?.boards.find(b => b.id === pj.board);
     // made by the Silinx toolchain (no ISE): its reports are in build/open/
     const open = rep?.source === 'open';
+    // made by AMD Vivado (a 7-series device, #1649): its reports are build/<top>_*.rpt
+    const vivado = rep?.source === 'vivado';
     // (its caption the Tasks interface's only, where the tables are cards side by side: their tops in line, #1409)
     page.append(h('table', { class: 'summary-table' }, h('caption', { class: 'summary-status' }, 'Project Status'),
       row('Project File:', `${pj.name}/silinx.json`, 'Parser Errors:', h('span', { class: errs ? 'status-bad' : 'status-good' }, errs ? `${errs} Errors` : 'No Errors')),
       row('Module Name:', pj.top || '(not set)', 'Implementation State:', implState),
       row('Target Device:', `${pj.device.part}${pj.device.speed}-${pj.device.package}`, 'Warnings:', warns ? `${warns} Warnings` : 'No Warnings'),
       row('Board:', board ? board.name : 'None Specified', 'Test Benches:', String((pj.files || []).filter(f => f.role === 'sim').length)),
-      row('Product Version:', `${PRODUCT} ${VERSION_LABEL} (${open ? 'Silinx toolchain, no ISE' : 'Xilinx ISE 14.7 flow'})`, 'Constraints:', pj.constraints || '(none)'),
+      row('Product Version:', `${PRODUCT} ${VERSION_LABEL} (${open ? 'Silinx toolchain, no ISE' : vivado ? 'AMD Vivado 2025.2 flow' : 'Xilinx ISE 14.7 flow'})`, 'Constraints:', pj.constraints || '(none)'),
       row('Design Goal:', `Balanced (${pj.impl?.optMode || 'Speed'})`, 'Sources:', `${pj.files.length} HDL files`),
     ));
     // utilization: every resource of the part (packages/silinx-fpga/src/resources.js, #790), used of available (#795): MAP's report's
     // lines (and the part's resources it does not list, ISE's leaves the unused ones out), or before an
     // implementation the synthesis's (the Silinx toolchain's), or the part's counts alone
-    const syn = open ? (rep?.synthesis?.utilization || []).filter(u => u.total) : [];
-    const caption = rep?.map ? (open ? ' (Silinx toolchain)' : '') : syn.length ? ' (after synthesis)' : ' (not yet implemented)';
+    const syn = open || vivado ? (rep?.synthesis?.utilization || []).filter(u => u.total && !u.level) : [];
+    const caption = rep?.map ? (open ? ' (Silinx toolchain)' : vivado ? ' (AMD Vivado)' : '') : syn.length ? ' (after synthesis)' : ' (not yet implemented)';
     const tbl = h('table', { class: 'summary-table' }, h('caption', {}, `Device Utilization Summary${caption}`),
       h('tr', {}, h('th', {}, 'Logic Utilization'), h('th', {}, 'Used'), h('th', {}, 'Available'), h('th', {}, 'Utilization'), h('th', {}, '')));
     const res = part ? resourcesOf(part, pj.device.package).filter(r => r.report && r.count) : [];
     let lines = (rep?.map?.utilization || []).filter(u => u.total).map(u => [u.name, u.used, u.total, u.percent]);
-    if (lines.length) lines.push(...res.filter(r => !lines.some(l => l[0] === r.report)).map(r => [r.report, 0, r.count]));
-    else {
+    // (Vivado's rows name the 7-series' resources its own way: its rows alone, after routing or after synthesis)
+    if (vivado && !lines.length) lines = syn.map(u => [u.name, u.used, u.total, u.percent]);
+    if (lines.length && !vivado) lines.push(...res.filter(r => !lines.some(l => l[0] === r.report)).map(r => [r.report, 0, r.count]));
+    else if (!lines.length) {
       const used = r => syn.find(u => u.id === r.id || u.name === r.report)?.used ?? (syn.length && r.id !== 'slices' ? 0 : '-');
       lines = res.map(r => [r.report, used(r), r.count]);
     }
@@ -58,9 +62,16 @@ export function mountSummary(el) {
     const tm = rep?.timing;
     if (tm) {
       page.append(h('table', { class: 'summary-table' }, h('caption', {}, open ? 'Timing (post Place & Route, Silinx toolchain estimate)' : 'Timing (post Place & Route)'),
-        h('tr', {}, h('th', {}, 'Timing Constraints'), h('td', { class: tm.met === false ? 'status-bad' : 'status-good' }, tm.met === false ? (open ? `Not met (${tm.timingErrors} constraints)` : `Not met (${tm.timingErrors} errors, score ${tm.score})`) : 'All constraints met')),
+        h('tr', {}, h('th', {}, 'Timing Constraints'), h('td', { class: tm.met === false ? 'status-bad' : 'status-good' }, tm.met === false ? (open ? `Not met (${tm.timingErrors} constraints)` : vivado ? `Not met (${tm.timingErrors} failing endpoints)` : `Not met (${tm.timingErrors} errors, score ${tm.score})`) : 'All constraints met')),
         tm.minPeriodNs ? h('tr', {}, h('th', {}, 'Minimum period'), h('td', {}, `${tm.minPeriodNs} ns (maximum frequency ${tm.maxFreqMHz} MHz)`)) : null,
         ...(tm.constraints || []).map(c => h('tr', {}, h('th', {}, c.name), h('td', {}, `${c.constraint} — ${c.timingErrors ? `${c.timingErrors} errors` : 'met'}, ${c.minPeriodNs == null ? 'no path between flip-flops to time' : `${c.minPeriodNs} ns`}`)))));
+    }
+    // Vivado's design rule check (report_drc): its rules found, or none
+    const drc = vivado && rep?.drc;
+    if (drc) {
+      page.append(h('table', { class: 'summary-table' }, h('caption', {}, 'Design Rule Check'),
+        ...(drc.rules.length ? drc.rules.map(r => h('tr', {}, h('th', {}, r.rule), h('td', { class: /error/i.test(r.severity) ? 'status-bad' : '' }, `${r.severity}: ${r.description} (${r.checks})`)))
+          : [h('tr', {}, h('th', {}, 'DRC'), h('td', { class: 'status-good' }, 'No violations'))])));
     }
     const bh = rep?.bit?.header;
     if (bh) {
@@ -74,12 +85,16 @@ export function mountSummary(el) {
     // reports list
     page.append(h('table', { class: 'summary-table' }, h('caption', {}, 'Detailed Reports'),
       h('tr', {}, h('th', {}, 'Report Name'), h('th', {}, 'Status')),
-      ...(open ? [['Synthesis Report (Yosys)', `open/${pj.top}_stat.txt`, rep?.synthesis], ['Placed Design (XDL)', 'open/placed.xdl', rep?.files?.placed], ['Routed Design (XDL)', 'open/routed.xdl', rep?.files?.routed], ['Static Timing Report', 'open/timing.txt', rep?.timing]]
+      ...(vivado ? [['Synthesis Utilization Report', `${pj.top}_synth_util.rpt`, rep?.synthesis], ['Utilization Report', `${pj.top}_util.rpt`, rep?.map], ['Route Status Report', `${pj.top}_route.rpt`, rep?.par],
+        ['Timing Summary Report', `${pj.top}_timing.rpt`, rep?.timing], ['DRC Report', `${pj.top}_drc.rpt`, rep?.drc], ['Vivado Log', 'vivado.log', rep?.synthesis]]
+        : open ? [['Synthesis Report (Yosys)', `open/${pj.top}_stat.txt`, rep?.synthesis], ['Placed Design (XDL)', 'open/placed.xdl', rep?.files?.placed], ['Routed Design (XDL)', 'open/routed.xdl', rep?.files?.routed], ['Static Timing Report', 'open/timing.txt', rep?.timing]]
         : [['Synthesis Report', `${pj.top}.syr`, rep?.synthesis], ['Map Report', `${pj.top}_map.mrp`, rep?.map], ['Place and Route Report', `${pj.top}.par`, rep?.par], ['Post-PAR Static Timing Report', `${pj.top}.twr`, rep?.timing], ['Bitgen Report', `${pj.top}.bgn`, rep?.bit]])
         .map(([n, f, r]) => h('tr', {}, h('td', {}, n), h('td', {}, r ? h('a', { onclick: () => app.openFile(`build/${f}`) }, 'Current') : '')))));
     // quick links (ISE sidebar style)
     page.append(h('div', { style: { color: 'var(--grey-3)', marginTop: '8px' } },
-      app.openMode?.() ? 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation use the Silinx toolchain (no ISE): Toolchain Settings (the gear in the toolbar).'
+      // (a 7-series device: AMD Vivado's, #1649)
+      vivado || /^xc7/i.test(pj.device?.part || '') ? 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation of the 7-series use AMD Vivado 2025.2 (Toolchain Settings (the gear in the toolbar)).'
+      : app.openMode?.() ? 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation use the Silinx toolchain (no ISE): Toolchain Settings (the gear in the toolbar).'
         : 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis/implementation require Xilinx ISE 14.7 (Toolchain Settings (the gear in the toolbar)).'));
   };
   return { refresh, onActivate: refresh };

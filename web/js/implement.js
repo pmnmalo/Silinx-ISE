@@ -13,7 +13,7 @@ import { log, logLine, showConsolePage, showProblems, setDiagnostics } from './c
 import { showCommandLines } from './messages.js';
 import { reloadProject } from './project.js';
 import { refreshOpenEditor, topUcfPorts, ucfPort } from './drawings.js';
-import { EXTRA_STEPS, IMPL_IDS, SIM_MODEL_NAMES, checkSyntax, loadUcfText, openMode, renderProcesses,
+import { EXTRA_STEPS, IMPL_IDS, SIM_MODEL_NAMES, checkSyntax, loadUcfText, openMode, projectTool, renderProcesses, vivadoMode,
   saveAll, saveImplStatus, setStatus, synthFingerprint } from './processes.js';
 import { inView, saveProjectJson, setTop } from './design.js';
 import { OPEN_SYNTH, SYNTH_OPEN } from './tool-descriptors.js';
@@ -200,7 +200,7 @@ export async function runImpl(mod, steps, opts = {}) {
   // one ISE run at a time (one build directory): checked and taken before any await
   if (S.busy) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return false; }
   // (an experimental family: no flow runs it yet, #3142; the server and the MCP server refuse it too)
-  if (noFlowWarning(S.project?.device)) { log(noFlowWarning(S.project.device).replace(/^WARNING/, 'ERROR'), 'err'); return false; }
+  if (projectTool().id === 'no-flow' && noFlowWarning(S.project?.device)) { log(noFlowWarning(S.project.device).replace(/^WARNING/, 'ERROR'), 'err'); return false; }
   S.busy = true;
   const pjName = S.project.name;
   try { return await runImplInner(mod, steps, opts, pjName); }
@@ -215,7 +215,7 @@ async function runImplInner(mod, steps, opts, pjName) {
   S.diags = S.diags.filter(d => d.source !== 'console');   // new run: drop the previous run's messages
   const extra = [...steps].reverse().find(st => EXTRA_STEPS[st] && st !== 'trce') || (opts.timing ? 'trce' : null);
   const procId = extra || (steps.includes('bitgen') ? 'bitgen' : steps.includes('translate') ? 'impl' : 'synth');
-  const procName = EXTRA_STEPS[procId] || { synth: openMode() ? OPEN_SYNTH : 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId];
+  const procName = EXTRA_STEPS[procId] || { synth: openMode() ? OPEN_SYNTH : vivadoMode() ? 'Synthesize - Vivado' : 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId];
   // Synthesize - XST always starts with Check Syntax (same messages as the Check Syntax process)
   if (!await checkSyntax(mod)) {
     setStatus('synth', 'err');
@@ -262,9 +262,14 @@ async function runImplInner(mod, steps, opts, pjName) {
   for (const l of ucfWarnings) track.line(l, { diag: false });
   try {
     const tc = S.toolchain || await api.toolchain();
-    // (the Silinx toolchain runs without ISE: a project whose synthesis is Silinx's, or a family ISE does not implement)
-    const ran = openMode() || tc.ise.available;
-    if (!ran) {
+    // (the Silinx toolchain runs without ISE: a project whose synthesis is Silinx's, or a family ISE does not implement;
+    // a device of Vivado's runs AMD Vivado, #1649)
+    const vivado = vivadoMode();
+    const ran = openMode() || (vivado ? !!tc.vivado?.available : tc.ise.available);
+    if (!ran && vivado) {
+      log(`AMD Vivado not available (${tc.vivado?.mode} mode): ${tc.vivado?.reason}`, 'warn');
+      log('The build directory, run.tcl and run.sh are still generated so they can be run on a machine with Vivado 2025.2. Configure it in Toolchain Settings (the gear in the toolbar).', 'info');
+    } else if (!ran) {
       log(`Xilinx ISE toolchain not available (${tc.ise.mode} mode): ${tc.ise.reason}`, 'warn');
       log('The build directory and run.sh are still generated so they can be run on a machine with ISE 14.7. Configure it in Toolchain Settings (the gear in the toolbar).', 'info');
     }

@@ -241,7 +241,7 @@ test('run_process and get_report: the power estimate of blinky with the Silinx t
   assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'timing' })).structuredContent.path, 'build/open/timing.txt');
   assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'pins' })).content[0].text, 'No pins report for \'Blinky\' from its last run (Silinx toolchain: build/top_pins.ucf): run_process pins first.');
   assert.equal((await srv.call('get_report', { project: 'TrafficN', report: 'map' })).content[0].text, 'No map report for \'TrafficN\': no process has run yet (run_process implement).');
-  assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'netlist' })).content[0].text, 'get_report: report: summary or one of power, timing, synthesis, map, par, pins');
+  assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'netlist' })).content[0].text, 'get_report: report: summary or one of power, timing, synthesis, map, par, pins, drc');
   assert.equal((await srv.call('run_process', { project: 'Nope', process: 'implement' })).content[0].text, 'run_process: no project \'Nope\' in the workspace');
   assert.equal((await srv.call('run_process', { project: 'Blinky', process: 'erase' })).content[0].text, 'run_process: process: one of synthesize, implement, bitstream, timing, power, pins, post_synthesis_model, post_translate_model, post_map_model, post_par_model');
   // a report that names the ISE machine (as an ISE run's log would): its address replaced

@@ -28,6 +28,7 @@ export const REPORT_FILES = {
     map: null,
     par: null,
     pins: top => `build/${top}_pins.ucf`,
+    drc: null,
   },
   ise: {
     power: top => `build/${top}.pwr`,
@@ -36,8 +37,21 @@ export const REPORT_FILES = {
     map: top => `build/${top}_map.mrp`,
     par: top => `build/${top}.par`,
     pins: top => `build/${top}_pins.ucf`,
+    drc: null,
+  },
+  // AMD Vivado's (the 7-series, #1649, server/vivado.js): report_utilization after synthesis and after routing,
+  // report_route_status, report_timing_summary, report_power, report_io, report_drc
+  vivado: {
+    power: top => `build/${top}_power.rpt`,
+    timing: top => `build/${top}_timing.rpt`,
+    synthesis: top => `build/${top}_synth_util.rpt`,
+    map: top => `build/${top}_util.rpt`,
+    par: top => `build/${top}_route.rpt`,
+    pins: top => `build/${top}_io.rpt`,
+    drc: top => `build/${top}_drc.rpt`,
   },
 };
+const TOOLCHAIN_NAMES = { silinx: 'Silinx toolchain', ise: 'Xilinx ISE', vivado: 'AMD Vivado' };
 // the map and par reports of a Silinx toolchain run, from its Design Summary (build/reports.json); the router's passes
 // only when the engine counts them (nextpnr's do not, #2420)
 export const OPEN_REPORTS = {
@@ -72,33 +86,35 @@ export async function runProcess(name, proc, { toolchain, timeoutS = 1800 } = {}
   }
   const redact = await redactor();
   const lines = job.lines.map(redact);
-  const errors = lines.filter(l => /^ERROR/.test(l)), warnings = lines.filter(l => /^WARNING/.test(l));
-  return { top: pj.top, lines, errors, warnings, ok: job.status === 'ok', silinx: job.meta?.toolchain === 'silinx' };
+  // (Vivado's critical warnings too, #1649)
+  const errors = lines.filter(l => /^ERROR/.test(l)), warnings = lines.filter(l => /^(CRITICAL )?WARNING/.test(l));
+  const tc = ['silinx', 'vivado'].includes(job.meta?.toolchain) ? job.meta.toolchain : 'ise';
+  return { top: pj.top, lines, errors, warnings, ok: job.status === 'ok', silinx: tc === 'silinx', toolchain: tc };
 }
 
 export const PROCESS_TOOLS = [
   {
     name: 'run_process', title: 'Run a process',
-    description: 'Run a process of the project\'s top module and wait for it: synthesize, implement (translate, map, place & route), bitstream (Generate Programming File), timing (static timing), power (an estimate in the Silinx toolchain), pins (Back-annotate Pin Locations), post_synthesis_model / post_translate_model / post_map_model / post_par_model (Generate Post-… Simulation Model: simulate it with simulate model). With the Silinx toolchain (no ISE) by default when it is the configured one; toolchain: ise to use Xilinx ISE when it is configured. Returns the errors, the warnings and the end of the log.',
+    description: 'Run a process of the project\'s top module and wait for it: synthesize, implement (translate, map, place & route), bitstream (Generate Programming File), timing (static timing), power (an estimate in the Silinx toolchain), pins (Back-annotate Pin Locations), post_synthesis_model / post_translate_model / post_map_model / post_par_model (Generate Post-… Simulation Model: simulate it with simulate model). With the Silinx toolchain (no ISE) by default when it is the configured one; toolchain: ise to use Xilinx ISE when it is configured. A 7-series device (Basys 3, Nexys A7) is implemented by AMD Vivado (toolchain vivado: its synth_design, opt_design, place_design, route_design, write_bitstream; no simulation models). Returns the errors, the warnings and the end of the log.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, process: { type: 'string', enum: Object.keys(PROCESSES), description: 'The process.' },
-      toolchain: { type: 'string', enum: ['silinx', 'ise'], description: 'The toolchain (default: the project\'s synthesis tool, else Toolchain Settings).' },
+      toolchain: { type: 'string', enum: ['silinx', 'ise', 'vivado'], description: 'The toolchain (default: the project\'s synthesis tool, else Toolchain Settings).' },
       log_lines: { type: 'integer', description: 'The lines of the end of the log returned (default 40).' },
       timeout_s: { type: 'integer', description: 'How long to wait, in seconds (default 1800).' },
     }, required: ['project', 'process'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     async run({ project: name, process: proc, toolchain, log_lines: logLines = 40, timeout_s: timeoutS = 1800 }) {
-      const { top, lines, errors, warnings, ok, silinx } = await runProcess(name, proc, { toolchain, timeoutS });
+      const { top, lines, errors, warnings, ok, toolchain: tc } = await runProcess(name, proc, { toolchain, timeoutS });
       const pj = { top };
-      const head = `Process "${proc}" of <${pj.top}> ${ok ? `completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}` : `failed (${errors.length} error(s), ${warnings.length} warning(s))`}${silinx ? ' (Silinx toolchain)' : ' (Xilinx ISE)'}.`;
+      const head = `Process "${proc}" of <${pj.top}> ${ok ? `completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}` : `failed (${errors.length} error(s), ${warnings.length} warning(s))`} (${TOOLCHAIN_NAMES[tc]}).`;
       return { text: processText({ errors, warnings, lines, head, logLines }),
-        data: { project: name, process: proc, toolchain: silinx ? 'silinx' : 'ise', ok, errors, warnings, log: lines.slice(-Math.max(1, logLines)) }, isError: !ok };
+        data: { project: name, process: proc, toolchain: tc, ok, errors, warnings, log: lines.slice(-Math.max(1, logLines)) }, isError: !ok };
     },
   },
   {
     name: 'get_report', title: 'Read a report',
-    description: 'The Design Summary of the last run (summary: the utilization, the timing, the files, as JSON), or the text of a report of the last run: synthesis, map, par, timing, power, pins (with the Silinx toolchain: Yosys\'s statistics for synthesis, the pack and route summaries for map and par).',
-    inputSchema: { type: 'object', properties: { project: PROJECT, report: { type: 'string', enum: ['summary', ...Object.keys(REPORT_FILES)], description: 'The report (default summary).' } }, required: ['project'], additionalProperties: false },
+    description: 'The Design Summary of the last run (summary: the utilization, the timing, the files, as JSON), or the text of a report of the last run: synthesis, map, par, timing, power, pins, drc (with the Silinx toolchain: Yosys\'s statistics for synthesis, the pack and route summaries for map and par; with AMD Vivado: its utilization after synthesis and after routing, its route status, timing summary, power, I/O and DRC reports).',
+    inputSchema: { type: 'object', properties: { project: PROJECT, report: { type: 'string', enum: ['summary', ...Object.keys(REPORT_FILES.ise)], description: 'The report (default summary).' } }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
     async run({ project: name, report = 'summary' }) {
       const pj = await readProject(name);
@@ -114,19 +130,21 @@ export const PROCESS_TOOLS = [
       const { projectReports } = await import('./impl-routes.js');
       const summary = await projectReports(name).catch(() => ({ available: false }));
       const top = pj.top || 'top';
-      const open = summary.available !== false ? summary.source === 'open' : !fs.existsSync(path.join(P.projectDir(name), 'build', `${top}.syr`));
-      const who = open ? 'Silinx toolchain' : 'Xilinx ISE';
-      const file = REPORT_FILES[open ? 'open' : 'ise'][report]?.(top);
+      const build = path.join(P.projectDir(name), 'build');
+      const tc = summary.available !== false ? ({ open: 'silinx', vivado: 'vivado' })[summary.source] || 'ise'
+        : fs.existsSync(path.join(build, 'run.tcl')) ? 'vivado' : fs.existsSync(path.join(build, `${top}.syr`)) ? 'ise' : 'silinx';
+      const open = tc === 'silinx', who = TOOLCHAIN_NAMES[tc];
+      const file = REPORT_FILES[open ? 'open' : tc][report]?.(top);
       if (!file) {
-        const text = summary.available !== false && OPEN_REPORTS[report](summary);
+        const text = summary.available !== false && OPEN_REPORTS[report]?.(summary);
         if (text) return { text: redact(text), data: { project: name, report, toolchain: 'silinx', path: 'build/reports.json', available: true } };
       } else {
         const full = await projectPath(name, file);
-        if (fs.existsSync(full)) { const text = redact(await fsp.readFile(full, 'latin1')); return { text: clip(text), data: { project: name, report, toolchain: open ? 'silinx' : 'ise', path: file, available: true } }; }
+        if (fs.existsSync(full)) { const text = redact(await fsp.readFile(full, 'latin1')); return { text: clip(text), data: { project: name, report, toolchain: tc, path: file, available: true } }; }
       }
-      const proc = { synthesis: 'synthesize', map: 'implement', par: 'implement', timing: 'timing', power: 'power', pins: 'pins' }[report];
+      const proc = { synthesis: 'synthesize', map: 'implement', par: 'implement', timing: 'timing', power: 'power', pins: 'pins', drc: 'implement' }[report];
       return { text: summary.available === false && !fs.existsSync(path.join(P.projectDir(name), 'build')) ? `No ${report} report for '${name}': no process has run yet (run_process ${proc}).`
-        : `No ${report} report for '${name}' from its last run (${who}${file ? `: ${file}` : ''}): run_process ${proc} first.`, data: { project: name, report, toolchain: open ? 'silinx' : 'ise', available: false } };
+        : `No ${report} report for '${name}' from its last run (${who}${file ? `: ${file}` : ''}): run_process ${proc} first.`, data: { project: name, report, toolchain: tc, available: false } };
     },
   },
 ];

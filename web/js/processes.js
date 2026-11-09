@@ -1,6 +1,6 @@
 // The Processes panel (#405: out of app.js): the processes of the selected source and what runs them, Check Syntax
 // and the elaboration's diagnostics, and the processes' status kept in the project's build folder.
-import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
+import { openOnlyDevice, vivadoDevice } from '/packages/silinx-fpga/src/parts.js';
 import { api } from './api.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, popupMenu, toast, longPressMenu } from './ui.js';
@@ -36,9 +36,11 @@ const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'sum
 // the project's synthesis tool (Design Properties: Silinx or XST), else Toolchain Settings' mode; never
 // in the single-file edition (no server: the Silinx toolchain runs on it)
 // (the browser edition: the Silinx toolchain, unless the project chose XST)
-export const openMode = () => openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx');
+// (a device of Vivado's, on the local server: not the Silinx toolchain's, whatever the synthesis tool says, #1649)
+export const vivadoMode = () => !api.standalone && vivadoDevice(S.project?.device);
+export const openMode = () => !vivadoMode() && (openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx'));
 /** The project's tool (its descriptor, web/js/tool-descriptors.js): what the process tree and the tasks are built from. */
-export const projectTool = () => toolOf(S.project?.device, openMode());
+export const projectTool = () => toolOf(S.project?.device, openMode(), { standalone: api.standalone });
 // Tasks ▸ Implement: the top module's processes, whatever the Design pane has selected since (#1208)
 const implTop = () => { const d = document.documentElement.dataset; return d.layout === 'tasks' && d.task === 'impl'; };
 /** The item whose processes are shown and the view: the selection's, or in Implement the top module's. */

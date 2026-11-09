@@ -1,5 +1,6 @@
 // Silinx - the device picker of the New Project and Design Properties dialogs (#405: out of web/js/wizards.js).
-import { experimentalDevice, noFlowMessage, openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
+import { experimentalDevice, noFlowMessage, openOnlyDevice, vivadoDevice } from '/packages/silinx-fpga/src/parts.js';
+import { api } from './api.js';
 import { h } from './ui.js';
 
 // an experimental family's (#3142: the 7-series, no flow runs it yet) family and boards, so marked in the lists
@@ -7,8 +8,9 @@ const FAMILY_MARK = ' (experimental)';
 /** The Evaluation Development Board list's options: none, then the boards, an experimental family's marked. */
 export const boardOptions = db => [['', 'None Specified'], ...db.boards.map(b => [b.id, `${b.name}${experimentalDevice(b.device) ? FAMILY_MARK : ''}`])];
 
-/** The console's warning for a device of an experimental family (set_design_properties says the same), else null. */
-export const noFlowWarning = device => (experimentalDevice(device) ? `WARNING: ${noFlowMessage(device)}.` : null);
+/** The console's warning for a device of an experimental family with no back end here (set_design_properties says the same),
+ *  else null: the Artix-7's is AMD Vivado's on the local server (#1649), none in the browser edition. */
+export const noFlowWarning = device => (experimentalDevice(device) && !(vivadoDevice(device) && !api.standalone) ? `WARNING: ${noFlowMessage(device)}.` : null);
 
 // Cascading Family -> Device -> Package -> Speed selectors over the device database.
 export function devicePicker(db, device) {

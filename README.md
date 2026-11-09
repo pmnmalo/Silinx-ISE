@@ -633,6 +633,24 @@ Only the project's `build/` folder is mounted in the container (at `/work`); no 
 mount is needed for command-line builds. Without ISE, the implementation processes still write
 `build/` with `run.sh`, `.prj`, `.xst`, `.ut` and the UCF, ready to run on another machine.
 
+### The Artix-7 boards with AMD Vivado
+
+The Basys 3 and the Nexys A7 (Artix-7, an experimental family) are synthesized, implemented and made into a bitstream by
+**AMD Vivado ML Standard 2025.2** (free for these parts), as ISE does for the Spartan-3E: a batch Tcl flow
+(`build/run.tcl`: `synth_design`, `opt_design`, `place_design`, `route_design`, `write_bitstream`) with the board's
+XDC, its utilization, timing summary and design rule check in the Design Summary, its warnings in the console. It runs
+in a mode of its own, `vivado` in `~/.silinx/config.json` (`PUT /api/toolchain`):
+
+```json
+{ "vivado": { "mode": "docker", "image": "xilinx/vitis-hls:2025.2", "settings": "" } }
+```
+
+- `docker`: an x86-64 image with Vivado under `/tools/Xilinx` (`scripts/vitis-hls-image/` makes one); `ssh`: on the
+  ssh host of the ISE settings, in that image there (or with Vivado installed there when `image` is empty); `local`:
+  Vivado on this Linux or Windows machine (`settings`: its `settings64.sh`, else found).
+- Under x86 emulation (an Apple-silicon Mac) an example takes 2 to 10 minutes from synthesis to bitstream.
+- The board is programmed with openFPGALoader (`-b basys3`). Vivado runs on the local server only, not in the browser.
+
 ## Programming the board
 
 Programming loads the `.bit` into the FPGA's configuration SRAM (volatile). In the browser it goes
