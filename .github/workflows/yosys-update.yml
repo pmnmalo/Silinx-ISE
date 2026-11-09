@@ -93,12 +93,15 @@ jobs:
         if: matrix.side == 'base'
         env:
           BASE_VERSION: ${{ needs.check.outputs.base }}
-        run: |
-          npm install --no-save --ignore-scripts "@yowasp/yosys@$BASE_VERSION"
-          # not npm ls: the installed version is "invalid" against the pull request's package.json (exit 1)
-          v=$(node -p "require('./node_modules/@yowasp/yosys/package.json').version")
-          echo "@yowasp/yosys $v"
-          test "$v" = "$BASE_VERSION"
+        # into the toolchain's workspace and the root both (#3156): installed at the root only, npm kept the pull
+        # request's Yosys nested in packages/silinx-fpga/node_modules, which the toolchain resolves first
+        run: npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root "@yowasp/yosys@$BASE_VERSION"
+      # the version the toolchain loads (from packages/silinx-fpga and from the root), the side's or the job fails; not
+      # npm ls: the base's version is "invalid" against the pull request's package.json (exit 1)
+      - name: Yosys resolved
+        env:
+          BASE_SPEC: ${{ matrix.side == 'base' && format('@yowasp/yosys@{0}', needs.check.outputs.base) || '@yowasp/yosys' }}
+        run: node scripts/resolved-package.mjs packages/silinx-fpga "$BASE_SPEC"
       - name: The examples
         run: |
           mkdir -p "out/examples"

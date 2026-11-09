@@ -178,7 +178,7 @@ test('yosys update: the workflow on pull requests that change @yowasp/yosys, Git
   assert.match(yml, /\n  report:\n    needs: \[check, measure, corpus\]\n    if: always\(\) && needs\.check\.outputs\.changed == 'true'\n/);
   // both sides, the base's Yosys installed over the same code
   assert.match(yml, /side: \[base, head\]/);
-  assert.match(yml, /if: matrix\.side == 'base'\n\s+env:\n\s+BASE_VERSION: \$\{\{ needs\.check\.outputs\.base \}\}\n\s+run: \|\n\s+npm install --no-save --ignore-scripts "@yowasp\/yosys@\$BASE_VERSION"/);
+  assert.match(yml, /if: matrix\.side == 'base'\n\s+env:\n\s+BASE_VERSION: \$\{\{ needs\.check\.outputs\.base \}\}\n(\s+#.*\n)*\s+run: npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root "@yowasp\/yosys@\$BASE_VERSION"\n/);
   // every example, in their order, through the open flow with --quality
   const ex = /for ex in ([\w ]+); do/.exec(yml)[1].split(' ');
   assert.deepEqual(ex, EXAMPLE_ORDER);
@@ -230,7 +230,7 @@ test('yosys update: the steps with a writing token run the base\'s code, and the
   // the measure job: the version checked by a step of the workflow (a version, nothing else) before the install
   const m = j.measure;
   const checked = m.indexOf('      - name: The base\'s version checked');
-  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts "@yowasp/yosys@$BASE_VERSION"'));
+  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root "@yowasp/yosys@$BASE_VERSION"'));
   assert.ok(checked > 0 && install > checked, 'the check step before the install');
   const step = m.slice(checked, install).join('\n');
   assert.match(step, /^        if: matrix\.side == 'base'\n        env:\n          BASE_VERSION: \$\{\{ needs\.check\.outputs\.base \}\}\n        run: \|\n          \[\[ "\$BASE_VERSION" =~ \^\[0-9\]\+\(\\\.\[0-9\]\+\)\*\$ \]\] \|\| \{ .*exit 1; \}\n/m);
@@ -238,6 +238,19 @@ test('yosys update: the steps with a writing token run the base\'s code, and the
   const re = /^[0-9]+(\.[0-9]+)*$/;
   for (const v of ['0.70.1258', '1.0', '12']) assert.ok(re.test(v), v);
   for (const v of ['npm:evil@1', 'latest', '^0.70.1258', '0.70.1258 x', '', '0.70.1258-rc1']) assert.ok(!re.test(v), v);
+  // into the toolchain's workspace too, and the version it resolves checked on both sides (#3156): installed at the root
+  // only, npm kept the pull request's Yosys nested in packages/silinx-fpga/node_modules
+  assert.ok(!m.some(l => /npm install(?!.*--workspace silinx-fpga --include-workspace-root)/.test(l.replace(/#.*$/, ''))), 'every install into the workspace');
+  const resolved = m.indexOf('      - name: Yosys resolved');
+  const examples = m.indexOf('      - name: The examples');
+  assert.ok(resolved > install && examples > resolved, 'the check after the install, before the examples');
+  assert.equal(m.slice(resolved, examples).join('\n'), [
+    '      - name: Yosys resolved',
+    '        env:',
+    "          BASE_SPEC: ${{ matrix.side == 'base' && format('@yowasp/yosys@{0}', needs.check.outputs.base) || '@yowasp/yosys' }}",
+    '        run: node scripts/resolved-package.mjs packages/silinx-fpga "$BASE_SPEC"',
+  ].join('\n'), 'both sides');
+  assert.ok(!m.some(l => l.includes("require('./node_modules/")), 'no version read from the root\'s node_modules alone');
 });
 
 test('yosys update: Dependabot weekly, npm grouped but for Yosys, the majors with issues of their own ignored', () => {

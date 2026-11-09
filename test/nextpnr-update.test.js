@@ -202,7 +202,7 @@ test('nextpnr update: the steps with a writing token run the base\'s code; the b
   // the measure job: the check step before the install, the base's side only
   const m = j.measure;
   const checked = m.indexOf('      - name: The base\'s packages checked');
-  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts $BASE_INSTALL'));
+  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root $BASE_INSTALL'));
   assert.ok(checked > 0 && install > checked, 'the check step before the install');
   const step = m.slice(checked, install).join('\n');
   assert.match(step, /^        if: matrix\.side == 'base'\n        env:\n          BASE_INSTALL: \$\{\{ needs\.check\.outputs\.base \}\}\n/m);
@@ -211,6 +211,19 @@ test('nextpnr update: the steps with a writing token run the base\'s code; the b
   for (const s of [`${S3E}@1.0.0`, `${S6}@${url('0.1.3')}`]) assert.ok(re.test(s), s);
   for (const s of [`${S3E}@^1.0.0`, `${S3E}@latest`, `${S3E}@npm:evil@1`, `${S6}@${url('0.1.3').replace('pmnmalo', 'x')}`, `@yowasp/yosys@0.70.1258`, `${S6}@${url('0.1.3').replace('.tgz', '.sh')}`])
     assert.ok(!re.test(s), s);
+  // the base's packages into the toolchain's workspace too, and the versions it resolves checked on both sides (#3156):
+  // installed at the root only, npm kept the pull request's nested in packages/silinx-fpga/node_modules
+  assert.ok(!m.some(l => /npm install(?!.*--workspace silinx-fpga --include-workspace-root)/.test(l.replace(/#.*$/, ''))), 'every install into the workspace');
+  const resolved = m.indexOf('      - name: The nextpnr packages resolved');
+  const examples = m.indexOf('      - name: The examples');
+  assert.ok(resolved > install && examples > resolved, 'the check after the install, before the examples');
+  assert.equal(m.slice(resolved, examples).join('\n'), [
+    '      - name: The nextpnr packages resolved',
+    '        env:',
+    "          BASE_INSTALL: ${{ matrix.side == 'base' && needs.check.outputs.base || '' }}",
+    `        run: node scripts/resolved-package.mjs packages/silinx-fpga ${PACKAGES.join(' ')} $BASE_INSTALL`,
+  ].join('\n'), 'both sides, every package');
+  assert.ok(!yml.includes("require('./node_modules/"), 'no version read from the root\'s node_modules alone');
 });
 
 test('nextpnr update: Dependabot never groups the nextpnr packages; CLAUDE.md says such a pull request is never merged on green alone', () => {
