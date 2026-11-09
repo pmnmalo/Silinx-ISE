@@ -17,6 +17,12 @@ const S3A_UCF = 'Xilinx UG334 Spartan-3A/3AN Starter Kit UCF listings';
 const S3_UCF = 'Xilinx UG130 Spartan-3 Starter Kit board pin tables';
 const PAPILIO_UCF = 'Gadget Factory BPC3003_2.03+.ucf (Papilio_One.ucf)';
 const ELBERTV2_UCF = 'Numato Lab Elbertv2.ucf (numato/samplecode)';
+// (#3142) the 7-series' boards: Digilent's master XDCs, github.com/Digilent/digilent-xdc (commit c8644a9, MIT)
+const BASYS3_XDC = 'Digilent Basys-3-Master.xdc (rev B board)';
+const NEXYSA7_XDC = 'Digilent Nexys-A7-100T-Master.xdc';
+const DIGILENT_XDC = 'https://github.com/Digilent/digilent-xdc/blob/c8644a9fe31cc803789643124545d56b3bef4600/';
+// the configuration's properties both master XDCs give "for all designs" (Vivado's DRC CFGBVS-1 without the first two)
+const DIGILENT_XDC_CONFIG = { CONFIG_VOLTAGE: '3.3', CFGBVS: 'VCCO', 'BITSTREAM.GENERAL.COMPRESS': 'TRUE', 'BITSTREAM.CONFIG.CONFIGRATE': '33', CONFIG_MODE: 'SPIx4' };
 const ICEBREAKER_PCF = 'icebreaker.pcf of IceStorm\'s iCEBreaker example (YosysHQ/icestorm)';
 // the iCEBreaker's own resources, its Pmods' apart: the board's (icebreaker) and with a PmodVGA (icebreaker-vga), #2517
 const ICEBREAKER_BOARD = [
@@ -528,6 +534,91 @@ export const BOARDS = [
       { name: 'io_p4', label: 'Header P4 IO_P4[0..7]', pins: ['P141', 'P143', 'P138', 'P139', 'P134', 'P135', 'P130', 'P132'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Headers' },
       { name: 'io_p5', label: 'Header P5 IO_P5[0..7]', pins: ['P125', 'P123', 'P127', 'P126', 'P131', 'P91', 'P142', 'P140'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Headers' },
       { name: 'io_p6', label: 'Header P6 IO_P6[0..7]', pins: ['P19', 'P21', 'P18', 'P20', 'P15', 'P16', 'P12', 'P13'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Headers' },
+    ],
+  },
+  // ===========================================================================================
+  // (#3142) the 7-series (#1648), an experimental family: its boards and their XDC, no flow that runs yet (Vivado #1649,
+  // the Silinx toolchain #3146). The VGA's 4 bits of each colour: the examples' 3/3/2 on the most significant ones, as the
+  // iCEBreaker's PmodVGA (#2517).
+  // ===========================================================================================
+  {
+    id: 'basys3',
+    name: 'Digilent Basys 3',
+    vendor: 'Digilent',
+    device: { family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' },
+    jtagChain: [{ name: 'xc7a35t', role: 'fpga' }],
+    flash: { type: 'spi', part: 'Quad-SPI flash, 32 Mbit', sizeMbit: 32, xcf: false, verified: false, note: 'The quad-SPI flash the FPGA loads at power-up (JP1 on QSPI); written by Vivado\'s hardware manager or openFPGALoader.' },
+    programmer: {
+      preferred: 'openFPGALoader',
+      tools: {
+        openFPGALoader: { board: 'basys3', onboard: true, verified: false, note: 'The on-board USB-JTAG (FTDI FT2232HQ).' },
+      },
+    },
+    source: BASYS3_XDC,
+    sourceUrl: `${DIGILENT_XDC}Basys-3-Master.xdc`,
+    xdc: { config: DIGILENT_XDC_CONFIG },
+    resources: [
+      { name: 'clk', label: '100 MHz oscillator (CLK)', pins: ['W5'], dir: 'in', iostandard: 'LVCMOS33', group: 'Clock', extra: { period: '10 ns' } },
+      { name: 'led', label: 'LEDs LD0..LD15', pins: ['U16', 'E19', 'U19', 'V19', 'W18', 'U15', 'U14', 'V14', 'V13', 'V3', 'W3', 'U3', 'P3', 'N3', 'P1', 'L1'], dir: 'out', iostandard: 'LVCMOS33', group: 'LEDs', extra: { activeHigh: true } },
+      { name: 'sw', label: 'Slide switches SW0..SW15', pins: ['V17', 'V16', 'W16', 'W17', 'W15', 'V15', 'W14', 'W13', 'V2', 'T3', 'T2', 'R3', 'W2', 'U1', 'T1', 'R2'], dir: 'in', iostandard: 'LVCMOS33', group: 'Switches' },
+      { name: 'btn', label: 'Push buttons BTNC (centre), BTNU, BTNL, BTND, BTNR', pins: ['U18', 'T18', 'W19', 'U17', 'T17'], dir: 'in', iostandard: 'LVCMOS33', group: 'Buttons', extra: { activeHigh: true, order: 'btn[0]=BTNC btn[1]=BTNU btn[2]=BTNL btn[3]=BTND btn[4]=BTNR' } },
+      { name: 'seg', label: '7-segment cathodes CA..CG (active low)', pins: ['W7', 'W6', 'U8', 'V8', 'U5', 'V5', 'U7'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment', extra: { activeLow: true, order: 'seg[0]=CA ... seg[6]=CG' } },
+      { name: 'dp', label: '7-segment decimal point (active low)', pins: ['V7'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment', extra: { activeLow: true } },
+      { name: 'an', label: '7-segment anodes AN0..AN3 (active low)', pins: ['U2', 'U4', 'V4', 'W4'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment', extra: { activeLow: true } },
+      { name: 'vga_red', label: 'VGA red vgaRed1..vgaRed3 (the 3 most significant of 4)', pins: ['H19', 'J19', 'N19'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_green', label: 'VGA green vgaGreen1..vgaGreen3 (the 3 most significant of 4)', pins: ['H17', 'G17', 'D17'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_blue', label: 'VGA blue vgaBlue2..vgaBlue3 (the 2 most significant of 4)', pins: ['K18', 'J18'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_hsync', label: 'VGA HSYNC', pins: ['P19'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_vsync', label: 'VGA VSYNC', pins: ['R19'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'uart_rx', label: 'USB-UART RXD (RsRx, into the FPGA)', pins: ['B18'], dir: 'in', iostandard: 'LVCMOS33', group: 'USB-UART' },
+      { name: 'uart_tx', label: 'USB-UART TXD (RsTx, from the FPGA)', pins: ['A18'], dir: 'out', iostandard: 'LVCMOS33', group: 'USB-UART' },
+      { name: 'ps2_clk', label: 'USB HID host (PIC24) PS/2 clock', pins: ['C17'], dir: 'inout', iostandard: 'LVCMOS33', pull: 'up', group: 'PS/2 (USB HID)' },
+      { name: 'ps2_data', label: 'USB HID host (PIC24) PS/2 data', pins: ['B17'], dir: 'inout', iostandard: 'LVCMOS33', pull: 'up', group: 'PS/2 (USB HID)' },
+      { name: 'ja', label: 'Pmod JA (JA1-4, JA7-10)', pins: ['J1', 'L2', 'J2', 'G2', 'H1', 'K2', 'H2', 'G3'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      { name: 'jb', label: 'Pmod JB (JB1-4, JB7-10)', pins: ['A14', 'A16', 'B15', 'B16', 'A15', 'A17', 'C15', 'C16'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      { name: 'jc', label: 'Pmod JC (JC1-4, JC7-10)', pins: ['K17', 'M18', 'N17', 'P18', 'L17', 'M19', 'P17', 'R18'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      { name: 'jxadc', label: 'Pmod JXADC (XA1_P..XA4_P, XA1_N..XA4_N)', pins: ['J3', 'L3', 'M2', 'N2', 'K3', 'M3', 'M1', 'N1'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+    ],
+  },
+  {
+    id: 'nexys-a7',
+    name: 'Digilent Nexys A7',
+    vendor: 'Digilent',
+    device: { family: 'artix7', part: 'xc7a100t', package: 'csg324', speed: '-1' },
+    deviceNotes: 'The Nexys A7-100T (the Nexys 4 DDR before it). SW8 and SW9 are on bank 34, at 1.8 V: LVCMOS18.',
+    jtagChain: [{ name: 'xc7a100t', role: 'fpga' }],
+    flash: { type: 'spi', part: 'Quad-SPI flash, 128 Mbit', sizeMbit: 128, xcf: false, verified: false, note: 'The quad-SPI flash the FPGA loads at power-up (JP1 on QSPI); written by Vivado\'s hardware manager or openFPGALoader.' },
+    programmer: {
+      preferred: 'openFPGALoader',
+      tools: {
+        openFPGALoader: { board: 'nexys_a7_100', onboard: true, verified: false, note: 'The on-board USB-JTAG (FTDI FT2232HQ).' },
+      },
+    },
+    source: NEXYSA7_XDC,
+    sourceUrl: `${DIGILENT_XDC}Nexys-A7-100T-Master.xdc`,
+    xdc: { config: DIGILENT_XDC_CONFIG },
+    resources: [
+      { name: 'clk', label: '100 MHz oscillator (CLK100MHZ)', pins: ['E3'], dir: 'in', iostandard: 'LVCMOS33', group: 'Clock', extra: { period: '10 ns' } },
+      { name: 'led', label: 'LEDs LD0..LD15', pins: ['H17', 'K15', 'J13', 'N14', 'R18', 'V17', 'U17', 'U16', 'V16', 'T15', 'U14', 'T16', 'V15', 'V14', 'V12', 'V11'], dir: 'out', iostandard: 'LVCMOS33', group: 'LEDs', extra: { activeHigh: true } },
+      { name: 'sw', label: 'Slide switches SW0..SW15 (SW8, SW9 at 1.8 V)', pins: ['J15', 'L16', 'M13', 'R15', 'R17', 'T18', 'U18', 'R13', 'T8', 'U8', 'R16', 'T13', 'H6', 'U12', 'U11', 'V10'], dir: 'in', iostandard: 'LVCMOS33', pinIostandards: { T8: 'LVCMOS18', U8: 'LVCMOS18' }, group: 'Switches' },
+      { name: 'btn', label: 'Push buttons BTNC (centre), BTNU, BTNL, BTND, BTNR', pins: ['N17', 'M18', 'P17', 'P18', 'M17'], dir: 'in', iostandard: 'LVCMOS33', group: 'Buttons', extra: { activeHigh: true, order: 'btn[0]=BTNC btn[1]=BTNU btn[2]=BTNL btn[3]=BTND btn[4]=BTNR' } },
+      { name: 'cpu_resetn', label: 'CPU RESET button (active low)', pins: ['C12'], dir: 'in', iostandard: 'LVCMOS33', group: 'Buttons', extra: { activeLow: true } },
+      { name: 'seg', label: '7-segment cathodes CA..CG (active low)', pins: ['T10', 'R10', 'K16', 'K13', 'P15', 'T11', 'L18'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment', extra: { activeLow: true, order: 'seg[0]=CA ... seg[6]=CG' } },
+      { name: 'dp', label: '7-segment decimal point (active low)', pins: ['H15'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment', extra: { activeLow: true } },
+      { name: 'an', label: '7-segment anodes AN0..AN7 (active low)', pins: ['J17', 'J18', 'T9', 'J14', 'P14', 'T14', 'K2', 'U13'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment', extra: { activeLow: true } },
+      { name: 'vga_red', label: 'VGA red VGA_R1..VGA_R3 (the 3 most significant of 4)', pins: ['B4', 'C5', 'A4'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_green', label: 'VGA green VGA_G1..VGA_G3 (the 3 most significant of 4)', pins: ['A5', 'B6', 'A6'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_blue', label: 'VGA blue VGA_B2..VGA_B3 (the 2 most significant of 4)', pins: ['D7', 'D8'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_hsync', label: 'VGA HSYNC (VGA_HS)', pins: ['B11'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'vga_vsync', label: 'VGA VSYNC (VGA_VS)', pins: ['B12'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
+      { name: 'uart_rx', label: 'USB-UART RXD (UART_TXD_IN, into the FPGA)', pins: ['C4'], dir: 'in', iostandard: 'LVCMOS33', group: 'USB-UART' },
+      { name: 'uart_tx', label: 'USB-UART TXD (UART_RXD_OUT, from the FPGA)', pins: ['D4'], dir: 'out', iostandard: 'LVCMOS33', group: 'USB-UART' },
+      { name: 'ps2_clk', label: 'USB HID host (PIC24) PS/2 clock', pins: ['F4'], dir: 'inout', iostandard: 'LVCMOS33', group: 'PS/2 (USB HID)' },
+      { name: 'ps2_data', label: 'USB HID host (PIC24) PS/2 data', pins: ['B2'], dir: 'inout', iostandard: 'LVCMOS33', group: 'PS/2 (USB HID)' },
+      { name: 'ja', label: 'Pmod JA (JA1-4, JA7-10)', pins: ['C17', 'D18', 'E18', 'G17', 'D17', 'E17', 'F18', 'G18'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      { name: 'jb', label: 'Pmod JB (JB1-4, JB7-10)', pins: ['D14', 'F16', 'G16', 'H14', 'E16', 'F13', 'G13', 'H16'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      { name: 'jc', label: 'Pmod JC (JC1-4, JC7-10)', pins: ['K1', 'F6', 'J2', 'G6', 'E7', 'J3', 'J4', 'E6'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      { name: 'jd', label: 'Pmod JD (JD1-4, JD7-10)', pins: ['H4', 'H1', 'G1', 'G3', 'H2', 'G4', 'G2', 'F3'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
     ],
   },
   {

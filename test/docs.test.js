@@ -154,8 +154,11 @@ test('docs: the Silinx toolchain\'s name and default mode are the code\'s', () =
   for (const f of DOCS) assert.doesNotMatch(read(f), /Open toolchain \(experimental/, f);
   // a production toolchain (#675): neither the docs nor the interface's labels call it experimental (the bit
   // database's experiments are another word)
+  // (#3142: the 7-series is an experimental family, its boards and its family so marked; that is the device's, not the
+  // toolchain's: its words left out)
+  const family = t => t.replace(/\bexperimentalDevice\b|\bexperimental family\b|\bexperimental: true\b|' \(experimental\)'|\.experimental\b|experimental mark|an experimental one/g, '');
   for (const f of [...DOCS, ...fs.readdirSync(path.join(ROOT, 'web/js')).filter(x => x.endsWith('.js')).map(x => `web/js/${x}`), 'server/toolchain.js', 'server/open-flow.js']) {
-    assert.doesNotMatch(read(f), /\bexperimental\b/i, f);
+    assert.doesNotMatch(family(read(f)), /\bexperimental\b/i, f);
   }
   const readme = read('README.md');
   assert.ok(readme.includes(`*${MODE_LABEL}*`), 'README names the mode by its label');

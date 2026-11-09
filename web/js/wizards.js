@@ -1,5 +1,5 @@
 // Wizards and dialogs modelled on ISE (New Project Wizard, New Source, properties...).
-import { devicePicker } from './device-picker.js';
+import { boardOptions, devicePicker, noFlowWarning } from './device-picker.js';
 import { constraintsForDevice } from './constraints-format.js';
 import { api } from './api.js';
 import { PRODUCT, PRODUCT_FULL, VERSION, VERSION_LABEL, BUILD, REPOSITORY, compareVersions, versionLabel } from '/core/version.js';
@@ -180,7 +180,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       return null;
     },
   };
-  const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], '');
+  const boardSel = select(boardOptions(db), '');
   const dp = devicePicker(db, st.device);
   boardSel.addEventListener('change', () => {
     const b = db.boards.find(x => x.id === boardSel.value);
@@ -255,6 +255,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
     // a diagram / table top: its document and its synchronized HDL module 'top'
     const top = topType.value !== 'hdl' && tplSel.value === 'empty' ? await createTopSource(pj.name, topType.value, langSel.value) : null;
     await app.openProject(pj.name);
+    if (noFlowWarning(pj.device)) app.log(noFlowWarning(pj.device), 'warn');
     if (api.standalone && tplSel.value !== 'empty') await app.boardUcf();   // (the chosen board's pins, as the server's, #2430)
     app.showLeftPage('design');
     if (top) {
@@ -497,7 +498,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
   const written = [];
   for (const f of inp.files) {
     const ext = f.name.split('.').pop().toLowerCase();
-    const dir = ext === 'ucf' || ext === 'pcf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
+    const dir = ['ucf', 'pcf', 'xdc'].includes(ext) ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
     // through the import gate (#2830): a file it refuses is not added, said in the console
     let text;
@@ -520,7 +521,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg(title, `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, text);
     written.push(path);
-    if ((ext === 'ucf' || ext === 'pcf') && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
+    if (['ucf', 'pcf', 'xdc'].includes(ext) && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
   }
   if (!written.length) return;
   // the association (role) of exactly the files written
@@ -556,7 +557,7 @@ export async function projectProperties() {
   if (!db) return alertDlg("Design Properties", "The device database could not be loaded (is the Silinx server running?).", "error");
   const pj0 = S.project;
   let pj = pj0;
-  const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], pj.board || '');
+  const boardSel = select(boardOptions(db), pj.board || '');
   const dp = devicePicker(db, pj.device);
   dp.disable(!!pj.board);
   boardSel.addEventListener('change', () => {
@@ -601,6 +602,7 @@ export async function projectProperties() {
   }
   await app.reloadProject();
   app.log(`Device set to ${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` (board ${pj.board})` : ''}.`, 'info');
+  if (noFlowWarning(pj.device)) app.log(noFlowWarning(pj.device), 'warn');
   const changed = pj.board !== oldBoard || `${pj.device.part}-${pj.device.package}` !== oldDev;
   const board = app.projectBoard();
   if (changed && board && pj.top && await confirmDlg('Update Constraints',

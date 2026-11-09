@@ -10,7 +10,7 @@
 // FileSystemDirectoryHandle (test/fixtures/fs-access-fake.js).
 
 import { DEV_SITE } from './prefs.js';
-import { openOnlyDevice } from '../../packages/silinx-fpga/src/parts.js';
+import { constraintsExtOf } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
 import { gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
 import { markUntrusted } from '../../core/trust.js';
@@ -25,7 +25,7 @@ export { DEV_SITE };
 const BROWSER_KEY = DEV_SITE ? 'silinx.dev.standalone.fs' : 'silinx.standalone.fs';
 
 const fail = msg => { throw new Error(msg); };
-const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(ucf|pcf)$/i.test(p) ? 'ucf' : 'text');
+const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(ucf|pcf|xdc)$/i.test(p) ? 'ucf' : 'text');
 /**
  * A project-relative path normalised: forward slashes, no empty or '.' segments. null when it would
  * leave the project (#483): not a string, empty, absolute ('/x', '\\\\host\\x', 'C:\\x'), a '..' segment,
@@ -54,7 +54,7 @@ export function projectJsonText(name, pj) {
 /** A new empty project's silinx.json (server/projects.js createProject). */
 export const emptyProjectJson = (name, { device, board } = {}) => ({
   name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null, top: '', simTop: '', files: [],
-  constraints: `constraints/top${openOnlyDevice(device) ? '.pcf' : '.ucf'}`, stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
+  constraints: `constraints/top${constraintsExtOf(device)}`, stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
 });
 const under = (k, dir) => k === dir || k.startsWith(`${dir}/`);
 const plain = o => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -398,7 +398,14 @@ export function projectOps(getStore, examples = {}) {
         if (device) json.device = device;
         if (board !== undefined) json.board = board;
         json.files ||= [];
-        await S().create(name, json, clone(ex.files));
+        // a device whose constraints are of another format (the 7-series' XDC, #3142): the example's file left out, the
+        // board's written when the project opens (implement.js boardUcf), as the server does
+        const files = clone(ex.files), ext = constraintsExtOf(json.device);
+        if (json.constraints && !json.constraints.toLowerCase().endsWith(ext)) {
+          delete files[json.constraints];
+          json.constraints = json.constraints.replace(/\.[^./]*$/, '') + ext;
+        }
+        await S().create(name, json, files);
         return clone(json);
       }
       const json = emptyProjectJson(name, { device, board });
