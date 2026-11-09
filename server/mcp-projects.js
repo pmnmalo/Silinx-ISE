@@ -151,8 +151,9 @@ export const PROJECT_TOOLS = [
       try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }
       const added = !existed && (await P.readProject(name)).files.some(f => f.path === rel);
       // a drawing: its HDL file made again from it (#2674), as its editor does when it is saved
-      const { syncDrawing } = await import('./drawing-sync.js');
-      const sync = await syncDrawing(P, name, rel);
+      const { adoptDrawing, syncDrawing } = await import('./drawing-sync.js');
+      // (one with no HDL file yet gets it, #3184)
+      const sync = await syncDrawing(P, name, rel) || await adoptDrawing(P, name, rel);
       return { text: [...(gated.warning ? [`WARNING: ${gated.warning}`] : []), `${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`, ...(sync?.messages || [])].join('\n'),
         data: { project: name, path: rel, created: !existed, addedToProject: added, ...(sync ? { hdl: { file: sync.target, written: !!sync.written, removed: sync.removed, stale: sync.stale } } : {}) } };
     },

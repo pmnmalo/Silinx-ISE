@@ -139,8 +139,11 @@ export const NEW_SOURCE_TOOLS = [
       const noConstraints = !pj.constraints || !tree.includes(pj.constraints);
       try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }
       if (type === 'constraints' && noConstraints) await P.updateProject(name, p => ({ ...p, constraints: rel }));
-      const entry = (await P.readProject(name)).files.find(f => f.path === rel);
-      return { text: `Created ${t.label}${t.ext ? '' : ` (${lang === 'verilog' ? 'Verilog' : 'VHDL'})`} '${rel}'.`, data: { project: name, type, path: rel, language: lang, role: entry?.role || null, ...(type === 'constraints' ? { constraints: (await P.readProject(name)).constraints } : {}) } };
+      // a drawing: its HDL file, as the interface gives it (#3184; an empty state diagram or ASM chart has none yet)
+      const adopted = DRAWN.includes(type) ? await (await import('./drawing-sync.js')).adoptDrawing(P, name, rel) : null;
+      const entry = (await P.readProject(name)).files.find(f => f.path === (adopted?.target || rel));
+      return { text: [`Created ${t.label}${t.ext ? '' : ` (${lang === 'verilog' ? 'Verilog' : 'VHDL'})`} '${rel}'.`, ...(adopted?.messages || [])].join('\n'),
+        data: { project: name, type, path: rel, language: lang, role: entry?.role || null, ...(adopted ? { hdl: adopted.target } : {}), ...(type === 'constraints' ? { constraints: (await P.readProject(name)).constraints } : {}) } };
     },
   },
 ];

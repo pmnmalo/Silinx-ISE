@@ -8,7 +8,7 @@
 // HDL (base 'hdl') is a view of it, not its base: none of this.
 import { compile } from '../core/compile.js';
 import { modulesFromLibrary } from '../core/schdoc.js';
-import { VIEW_RE, drawingInLanguage, modelLanguage, viewHdl } from '../core/view-hdl.js';
+import { VIEW_RE, definesModule, drawingInLanguage, drawnHdlPath, modelLanguage, viewHdl } from '../core/view-hdl.js';
 
 const kindOf = path => VIEW_RE.exec(path)?.[1].toLowerCase();
 const indent = path => (kindOf(path) === 'sch' ? 1 : 2);
@@ -59,6 +59,27 @@ export async function syncDrawing(P, name, path, modules = null) {
   if (await P.readFile(name, target) === r.text) return { target, written: null, removed: null, stale: null, messages: [] };
   await P.writeFile(name, target, r.text);
   return { target, written: target, removed: null, stale: null, messages: [`${target} updated from ${path}`] };
+}
+
+/** A drawing with no HDL file gets it (#207, #3184), as the interface's adoptDrawnHdl gives it when the project is
+ *  loaded: the HDL made from it written next to it (drawnHdlPath, which registers the module in the project) and the
+ *  drawing linked to it (generatedFile). Not when it has errors (a module by itself until it has none), when that file
+ *  is there already or another HDL file of the project defines its module (#230: resolved from its menu), nor for a
+ *  drawing made from its HDL. { target, written, removed: null, stale: null, messages }, or null when it gets none. */
+export async function adoptDrawing(P, name, path) {
+  if (!kindOf(path)) return null;
+  let m;
+  try { m = JSON.parse(await P.readFile(name, path)); } catch { return null; }
+  if (!m || typeof m !== 'object' || m.base === 'hdl' || m.generatedFile) return null;
+  const r = viewHdl(path, JSON.stringify(m), { modules: kindOf(path) === 'sch' ? await projectModules(P, name) : {}, linked: () => false });
+  if (!r || r.errors.length || !r.module || !r.text) return null;
+  const target = drawnHdlPath(path, r.module, r.lang);
+  if ((await P.fileTree(name)).includes(target)) return null;
+  const hdl = (await P.readSources(name)).filter(s => !s.missing && (s.lang === 'vhdl' || s.lang === 'verilog'));
+  if (hdl.some(s => definesModule(s.text, r.module, s.path))) return null;
+  await P.writeFile(name, target, r.text);
+  await P.writeFile(name, path, JSON.stringify({ ...m, generatedFile: target }, null, indent(path)));
+  return { target, written: target, removed: null, stale: null, messages: [`${target} generated from ${path}`] };
 }
 
 /** The HDL files of the project their drawing cannot make again (errors): [{ target, from, why }] (app.js's
