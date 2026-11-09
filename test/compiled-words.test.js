@@ -175,9 +175,9 @@ const EXPECTED = {
   traffic: { chains: 1, registers: 1, cells: [194, 141] },
   blinky: { chains: 4, registers: 4, cells: [543, 326] },
   pong: { chains: 9, registers: 8, cells: [1115, 433] },
-  stopwatch: { chains: 3, registers: 3, cells: [403, 261] },
-  clock: { chains: 6, registers: 6, cells: [872, 450] },
-  vga: { chains: 2, registers: 2, cells: [498, 426] },
+  stopwatch: { chains: 3, registers: 3, cells: [406, 264] },   // (#3161: 403, 261 before #3097's comparisons as logic)
+  clock: { chains: 6, registers: 6, cells: [870, 448] },   // (#3161: [872, 450] before #3097)
+  vga: { chains: 2, registers: 2, cells: [454, 382] },   // (#3161: [498, 426] before #3097)
   isqrt: { chains: 0, registers: 0, cells: [277, 277] },
   uart: { chains: 1, registers: 1, cells: [360, 339] },
   micro80: { chains: 1, registers: 1, cells: [657, 620] },
@@ -189,9 +189,9 @@ const TABLES = {
   traffic: [1, { tables: 8, inputs: 12, words: 7632, outputs: 42, cells: [137, 39] }, 4],
   blinky: [3, { tables: 28, inputs: 12, words: 16272, outputs: 63, cells: [322, 138] }, 8],
   pong: [9, { tables: 39, inputs: 12, words: 42212, outputs: 94, cells: [379, 202] }, 6],
-  stopwatch: [1, { tables: 33, inputs: 12, words: 12440, outputs: 63, cells: [257, 167] }, 9],
-  clock: [9, { tables: 28, inputs: 12, words: 15148, outputs: 75, cells: [414, 153] }, 4],
-  vga: [2, { tables: 19, inputs: 12, words: 48864, outputs: 55, cells: [425, 110] }, 2],
+  stopwatch: [1, { tables: 34, inputs: 12, words: 9112, outputs: 64, cells: [260, 168] }, 9],   // (#3161: 33, 12440, 63, [257, 167] before #3097)
+  clock: [7, { tables: 31, inputs: 12, words: 15664, outputs: 83, cells: [419, 148] }, 4],   // (#3161: 9, 28, 15148, 75, [414, 153] before #3097)
+  vga: [2, { tables: 20, inputs: 12, words: 38368, outputs: 54, cells: [381, 107] }, 3],   // (#3161: 19, 48864, 55, [425, 110], 2 before #3097)
   isqrt: [0, { tables: 34, inputs: 12, words: 22504, outputs: 78, cells: [277, 123] }, 6],
   uart: [0, { tables: 33, inputs: 11, words: 25328, outputs: 77, cells: [339, 167] }, 7],
   micro80: [0, { tables: 118, inputs: 10, words: 48224, outputs: 195, cells: [620, 441] }, 5],
