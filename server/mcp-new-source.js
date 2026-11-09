@@ -36,7 +36,8 @@ async function sourceText(type, { file, lang, pj, entity, arch, ports, uut }) {
     case 'module': return lang === 'vhdl' ? T.vhdlModule(entity, arch, ports, pj) : T.vlogModule(entity, ports, pj);
     case 'package': return T.vhdlPackage(file, pj);
     case 'test_bench': return lang === 'vhdl' ? T.vhdlTestbench(file, uut, pj) : T.vlogTestbench(file, uut, pj);
-    case 'constraints': return /\.pcf$/.test(file) ? T.pcfTemplate(pj) : T.ucfTemplate(pj);
+    // (the device's format, as New Source's: UCF, the iCE40's PCF, the 7-series' XDC)
+    case 'constraints': return ({ pcf: T.pcfTemplate, xdc: T.xdcTemplate }[(await import('../packages/silinx-fpga/src/parts.js')).constraintsFormatOf(pj.device)] || T.ucfTemplate)(pj);
     case 'mem': return '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n';
     case 'c': return (await import('../web/js/c-templates.js')).cTemplate(n);
     case 'cpp': return (await import('../web/js/c-templates.js')).cppTemplate(n);
@@ -82,15 +83,15 @@ export const NEW_SOURCE_TOOLS = [
       const t = TYPES[type];
       if (!t) throw toolError(`type: one of ${Object.keys(TYPES).join(', ')}`);
       const { reservedError } = await import('../core/reserved.js');
-      const { openOnlyDevice } = await import('../packages/silinx-fpga/src/parts.js');
-      file = String(file || '').trim().replace(/\.(vhd|vhdl|v|ucf|pcf|mem|c|cpp|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json)$/i, '');
+      const { constraintsExtOf } = await import('../packages/silinx-fpga/src/parts.js');
+      file = String(file || '').trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|c|cpp|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json)$/i, '');
       if (!FILE_RE.test(file)) throw toolError('Enter a valid file name (letters, digits, _ and -).');
       const loc = String(location ?? t.dir).trim().replace(/\/+$/, '');
       if (!/^[A-Za-z0-9_/-]+$/.test(loc) || loc.split('/').some(s => !s || s.startsWith('.'))) throw toolError('Invalid location.');
       if (/^build(\/|$)/i.test(loc)) throw toolError('build/ is written by Silinx itself');
       if (type === 'package' && language === 'verilog') throw toolError('a package is VHDL\'s');
       const lang = type === 'package' ? 'vhdl' : language || (pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
-      const ext = type === 'constraints' && openOnlyDevice(pj.device) ? '.pcf' : t.ext ?? (lang === 'verilog' ? '.v' : '.vhd');
+      const ext = type === 'constraints' ? constraintsExtOf(pj.device) : t.ext ?? (lang === 'verilog' ? '.v' : '.vhd');
       const rel = `${loc}/${file}${ext}`;
       const tree = await P.fileTree(name);
       if (fs.existsSync(path.join(P.projectDir(name), rel))) throw toolError(`${rel} already exists: choose another name.`);

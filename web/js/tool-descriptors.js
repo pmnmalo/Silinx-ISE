@@ -1,5 +1,6 @@
 // The tool descriptors (#2311, the plan #2315): what each back end does, as data. One per back end: ISE, the Silinx
-// toolchain on the Xilinx families, the Silinx toolchain on the iCE40 (nextpnr). Each says
+// toolchain on the Xilinx families, the Silinx toolchain on the iCE40 (nextpnr); and an experimental family's, none yet
+// (#3142: the 7-series, its flows to come, Vivado #1649 and the Silinx toolchain #3146). Each says
 // - steps: its steps (id, label, needs: the back end's own list) and what each produces, `{top}` the top module;
 // - reports: the reports of the Design Summary, each of a step;
 // - constraints: its constraints' format;
@@ -9,7 +10,7 @@
 // - tasks: the tasks of the Tasks interface, each with its main action and its state dot's processes.
 // What a tool does not have is not in its descriptor, and so not in the interface. No DOM here: unit tested
 // (test/tool-descriptors.test.js).
-import { deviceFamily } from '../../packages/silinx-fpga/src/parts.js';
+import { deviceFamily, experimentalDevice } from '../../packages/silinx-fpga/src/parts.js';
 
 export const OPEN_SYNTH = 'Synthesize - Yosys';
 export const SYNTH_OPEN = 'Synthesize - Yosys (open)';   // (ISE's tree: the open synthesis beside XST's)
@@ -117,6 +118,7 @@ const withProducts = (steps, products) => steps.map(s => ({ ...s, produces: prod
 
 const UCF = { format: 'ucf', ext: '.ucf', label: 'UCF' };
 const PCF = { format: 'pcf', ext: '.pcf', label: 'PCF' };
+const XDC = { format: 'xdc', ext: '.xdc', label: 'XDC' };
 
 /** Xilinx ISE 14.7. */
 export const ISE = {
@@ -183,10 +185,24 @@ export const SILINX_ICE40 = {
   tasks: LAB_TASKS,
 };
 
+/** An experimental family's (#3142): its constraints (XDC) and the design's checks, no implementation, no programming yet:
+ *  no step, no report, and the tasks without Implement (nor Emulate: its boards have no emulator yet). */
+export const NO_FLOW = {
+  id: 'no-flow', name: 'No implementation flow yet (experimental family)', open: false,
+  steps: [], reports: [],
+  constraints: XDC,
+  messages: LOG_MESSAGES,
+  program: null,
+  tree: [{ part: 'summary' }, { part: 'constraints' }, proc('rtl', 'View RTL Schematic', { ico: 'schematic' }), proc('check', 'Check Syntax')],
+  tasks: LAB_TASKS.filter(t => t.id === 'edit' || t.id === 'sim'),
+};
+
+// (the tools that implement: NO_FLOW's tasks are some of theirs)
 export const TOOLS = [ISE, SILINX, SILINX_ICE40];
 const OPEN_BY_FAMILY = { ice40: SILINX_ICE40 };
-/** The tool of a project device: `open`, the Silinx toolchain (its back end by the family), else ISE. */
-export const toolOf = (device, open) => (open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
+/** The tool of a project device: an experimental family's none yet; `open`, the Silinx toolchain (its back end by the
+ *  family), else ISE. */
+export const toolOf = (device, open) => (experimentalDevice(device) ? NO_FLOW : open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
 
 /** Every tool's tasks, in their order: the kept state's and the switchers'. */
 export const allTasks = (tools = TOOLS) => [...new Map(tools.flatMap(t => t.tasks).map(t => [t.id, t])).values()];

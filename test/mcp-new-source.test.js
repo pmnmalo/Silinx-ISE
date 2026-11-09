@@ -89,6 +89,8 @@ test('new_source: a package, a constraints file (the project\'s, having none), a
   await ok('new_project', { name: 'ice' });
   await ok('set_design_properties', { project: 'ice', board: 'none', part: 'ice40hx1k', package: 'vq100' });
   assert.equal((await ok('new_source', { project: 'ice', type: 'constraints', name: 'pins' })).text, 'Created Implementation Constraints File \'constraints/pins.pcf\'.');
+  // (its text New Source's PCF template, not the UCF's: #3142)
+  assert.match(fs.readFileSync(path.join(P.projectDir('ice'), 'constraints/pins.pcf'), 'utf8'), /^# Physical constraints for ice\n# Target: ice40hx1k-vq100\n/);
 });
 
 test('new_source: the wizard\'s refusals; an existing file not replaced', async () => {

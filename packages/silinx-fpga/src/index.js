@@ -26,6 +26,7 @@ export { nextpnrIo } from './nextpnr-io.js';
 export { ice40Io } from './nextpnr-ice40-io.js';
 export { ICE40_PARTS, ICE40_STEPS } from './open-flow-ice40.js';
 export { PCF } from './pcf.js';
+export { XDC, readXdc, writeXdc } from './xdc.js';
 export { gateAssignments, rewriteCarryChains } from './carry-chain.js';
 
 // the netlist in (the constraints: ./parts.js)
