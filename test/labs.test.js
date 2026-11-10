@@ -56,7 +56,7 @@ test('a lab file\'s problems: its version, id, title, steps, each step\'s fields
     ['the lab: step 2: the id \'s\' is another step\'s', 'the lab: step 2: "title": a text', 'the lab: step 2: "hint": a text', 'the lab: step 2: "checks": a list']);
   assert.deepEqual(labProblems({ ...good, steps: [{ id: 's', title: 'S', text: 'T', checks: [{ check: 'grade' }, { check: 'file' }, { check: 'syntax', warnings: ['/(/'] },
     { check: 'simulate', time_ns: -1, values: [{ signal: 'a' }], messages: 'x' }, { check: 'project' }, { check: 'module', ports: [{}] }] }] }), [
-    'the lab: step 1, check 1: "check": one of project, file, module, syntax, simulate, process',
+    'the lab: step 1, check 1: "check": one of project, file, module, syntax, simulate, drawing, pins, process',
     'the lab: step 1, check 2 (file): "path": the file',
     'the lab: step 1, check 3 (syntax): "warnings": \'/(/\' is not a regular expression',
     'the lab: step 1, check 4 (simulate): "time_ns": from 0 to 1000000 ns', 'the lab: step 1, check 4 (simulate): "values": a list of { "signal", "at_ns", "value" }', 'the lab: step 1, check 4 (simulate): "messages": a list of patterns',
@@ -69,7 +69,7 @@ test('a lab file\'s problems: its version, id, title, steps, each step\'s fields
 });
 
 test('the shipped labs: valid, each on an example, every text in English and Portuguese, the ids their own', () => {
-  assert.deepEqual(LABS.map(l => [l.id, l.example]), [['gates-first-steps', 'gates'], ['traffic-state-machine', 'traffic'], ['blinky-clock-board', 'blinky']], 'in the examples\' order');
+  assert.deepEqual(LABS.map(l => [l.id, l.example]), [['gates-first-steps', 'gates'], ['traffic-state-machine', 'traffic'], ['blinky-clock-board', 'blinky'], ['stopwatch-emulator', 'stopwatch']], 'in the examples\' order');
   assert.equal(new Set(LABS.map(l => l.id)).size, LABS.length);
   for (const lab of LABS) {
     assert.deepEqual(labProblems(lab, lab.id), []);
@@ -275,7 +275,7 @@ test('the traffic lab on its example: the diagram and its simulation as it is, t
   assert.deepEqual(await done(lab, exampleIo('traffic', walking(), { reports: runReports('synthesize') })), [true, true, true, true]);
   // wrong: walking only in WALK (0 at 5 us, in WALK_END); the synthesis out of date
   const wrong = await checkStep(stepOf(lab, 'output'), exampleIo('traffic', walking(['WALK'])));
-  assert.deepEqual(wrong.results.map(r => r.reasons), [[], ['uut/u_fsm/walking is 0 at 5000 ns, not 1']]);
+  assert.deepEqual(wrong.results.map(r => r.reasons), [[], [], [], ['uut/u_fsm/walking is 0 at 5000 ns, not 1']]);
   assert.deepEqual(await done(lab, exampleIo('traffic', walking(), { reports: runReports('synthesize'), current: false })), [true, true, true, false]);
 });
 
@@ -289,4 +289,49 @@ test('the blinky lab on its example: the board, the clock, the simulation as it 
   assert.deepEqual((await checkStep(stepOf(lab, 'speed'), exampleIo('blinky', fast('208_333')))).results[0].reasons, ['src/top.vhd has nothing like \'/\\bDIV\\s*:\\s*integer\\s*:=\\s*312_?500\\b/i\'']);
   assert.deepEqual((await checkStep(stepOf(lab, 'board'), exampleIo('blinky', {}, { board: 'nexys2' }))).results[0].reasons, ['the project\'s board is \'nexys2\', not \'basys2\'']);
   assert.equal((await checkStep(stepOf(lab, 'clock'), exampleIo('blinky', { 'constraints/top.ucf': v => v.replace('LOC = "B8"', 'LOC = "M6"') }))).ok, false);
+});
+
+test('check drawing: a state diagram, an ASM chart, a truth table, a Petri net as their editors check them; its errors, exactly its warnings', async () => {
+  const traffic = exampleIo('traffic');
+  assert.deepEqual(await run({ check: 'drawing', path: 'src/traffic.fsm.json' }, traffic), [], 'its notes are not warnings');
+  assert.deepEqual(await run({ check: 'drawing', path: 'src/lamps.bool.json' }, traffic), []);
+  assert.deepEqual(await run({ check: 'drawing', path: 'src/speed_ctrl.asm.json' }, exampleIo('blinky')), []);
+  assert.deepEqual(await run({ check: 'drawing', path: 'src/x.fsm.json' }, traffic), ['the project has no file src/x.fsm.json']);
+  assert.deepEqual(await run({ check: 'drawing', path: 'src/traffic.fsm.json' }, exampleIo('traffic', { 'src/traffic.fsm.json': '{' })), ['src/traffic.fsm.json is not a drawing Silinx reads']);
+  // an error: a state with no name
+  const noName = exampleIo('traffic', { 'src/traffic.fsm.json': t => { const m = JSON.parse(t); m.states[0].name = ''; return JSON.stringify(m); } });
+  assert.deepEqual((await run({ check: 'drawing', path: 'src/traffic.fsm.json' }, noName))[0], 'src/traffic.fsm.json: State has no name');
+  // a Petri net whose token game ends: its deadlock, a warning; exactly that warning
+  const { newPetri } = await import('../core/petri.js');
+  const pn = newPetri('ctl');
+  pn.arcs = pn.arcs.slice(0, -1);
+  const io = exampleIo('traffic', { 'src/ctl.pn.json': JSON.stringify(pn) });
+  const w = await run({ check: 'drawing', path: 'src/ctl.pn.json' }, io);
+  assert.ok(w.length >= 1 && w.every(x => x.startsWith('a warning of src/ctl.pn.json: ')), JSON.stringify(w));
+  assert.deepEqual(await run({ check: 'drawing', path: 'src/ctl.pn.json', warnings: w.map(x => x.replace('a warning of src/ctl.pn.json: ', '')) }, io), []);
+  assert.deepEqual(CHECKS.drawing.problems({ check: 'drawing', path: 'src/top.sch.json' }), ['"path": an ASM chart, a state diagram, a truth table or a Petri net (.asm.json, .fsm.json, .bool.json, .pn.json)']);
+});
+
+test('check pins: a port or a bus\'s bit on its pin, in the project\'s constraints (case and the bit\'s brackets as written)', async () => {
+  const sw = exampleIo('stopwatch');
+  assert.deepEqual(await run({ check: 'pins', pins: [{ port: 'sw<0>', loc: 'P11' }, { port: 'btn(3)', loc: 'a7' }, { port: 'CLK', loc: 'B8' }, { port: 'led[7]', loc: 'G1' }] }, sw), []);
+  assert.deepEqual(await run({ check: 'pins', pins: [{ port: 'sw<0>', loc: 'N3' }, { port: 'sw<1>', loc: 'L3' }] }, sw), ['sw<0> is on the pin P11, not N3', 'sw<1> has no pin in constraints/top.ucf']);
+  assert.deepEqual(await run({ check: 'pins', pins: [{ port: 'sw<0>', loc: 'N3' }] }, exampleIo('stopwatch', { 'constraints/top.ucf': u => u.replace('NET "sw<0>"  LOC = "P11"', 'NET "sw<0>"  LOC = "N3"') })), []);
+  assert.deepEqual(await run({ check: 'pins', pins: [{ port: 'sw<0>', loc: 'N3' }] }, exampleIo('stopwatch', { 'constraints/top.ucf': null })), ['the project has no constraints file']);
+  assert.deepEqual(CHECKS.pins.problems({ check: 'pins', pins: [{ port: 'a' }] }), ['"pins": a list of { "port", "loc" }']);
+  assert.deepEqual(CHECKS.pins.problems({ check: 'pins' }), ['"pins": a list of { "port", "loc" }']);
+});
+
+test('the stopwatch lab on its example: the project, the emulator (a step to try), the test bench as it is; the reset on SW7 after its action, not a wrong one', async () => {
+  const lab = LABS.find(l => l.id === 'stopwatch-emulator');
+  const sw7 = loc => ({ 'constraints/top.ucf': u => u.replace('NET "sw<0>"  LOC = "P11"', `NET "sw<0>"  LOC = "${loc}"`) });
+  assert.deepEqual(await done(lab, exampleIo('stopwatch')), [true, true, true, false, false]);
+  // the right pin: the first step's check of SW0 fails then (the project's pins as the example has them)
+  assert.deepEqual(await done(lab, exampleIo('stopwatch', sw7('N3'))), [false, true, true, true, true]);
+  // wrong: SW6 (E2)
+  assert.deepEqual((await checkStep(stepOf(lab, 'pin'), exampleIo('stopwatch', sw7('E2')))).results[0].reasons, ['sw<0> is on the pin E2, not N3']);
+  // the traffic lab's output step: the diagram changed (not only its VHDL), and valid
+  const traffic = LABS.find(l => l.id === 'traffic-state-machine');
+  const onlyVhd = { 'src/traffic.vhd': walking()['src/traffic.vhd'] };
+  assert.deepEqual((await checkStep(stepOf(traffic, 'output'), exampleIo('traffic', onlyVhd))).results.map(r => r.ok), [false, true, true, true]);
 });

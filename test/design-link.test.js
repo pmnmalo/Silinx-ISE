@@ -218,6 +218,16 @@ test('makeLink: the link of a design, an example, a zip; parseLink reads it back
   throws(() => makeLink(base, { example: 'a/b' }), 'example: \'a/b\' is not an example\'s name');
 });
 
+test('#3179 a link that opens a guided lab: lab=<its id>, made and read back; one that is not a lab\'s id refused', () => {
+  const l = makeLink('https://pmnmalo.github.io/Silinx/', { example: 'stopwatch', view: 'emulate', lab: 'stopwatch-emulator' });
+  assert.equal(l, 'https://pmnmalo.github.io/Silinx/#open=example:stopwatch&view=emulate&lab=stopwatch-emulator');
+  assert.deepEqual(parseLink(new URL(l).hash), { source: { kind: 'example', name: 'stopwatch' }, view: 'emulate', top: null, board: null, lab: 'stopwatch-emulator' });
+  assert.equal(parseLink('#open=example:gates&lab=').lab, undefined, 'an empty lab= is none');
+  throws(() => parseLink('#open=example:gates&lab=%3Cscript%3E'), 'the link\'s lab \'<script>\' is not a lab\'s id');
+  throws(() => parseLink('#open=example:gates&lab=a&lab=b'), 'the link has two lab=');
+  throws(() => makeLink('https://x/', { example: 'gates', lab: '../x' }), 'lab: \'../x\' is not a lab\'s id');
+});
+
 test('sameFiles: silinx.json left out, any other difference counts', () => {
   assert.ok(sameFiles({ 'silinx.json': '1', a: 'x' }, { 'silinx.json': '2', a: 'x' }));
   assert.ok(!sameFiles({ a: 'x' }, { a: 'y' }));

@@ -13,6 +13,7 @@ import { primitiveSources } from './unisim.js';
 import { designChecks } from './lint.js';
 import { Simulator } from './simulator.js';
 import { toBin } from './values.js';
+import { parseUcf } from '../packages/silinx-fpga/src/parts.js';
 
 const MAX_NS = 1e6;   // (a lab's simulation: at most 1 ms of simulated time)
 const str = v => typeof v === 'string' && v.length > 0;
@@ -93,6 +94,17 @@ export const PROCESSES = {
   implement: { label: 'Implement Design', marks: ['synth', 'translate', 'map', 'par'], ran: s => s.routed !== null && s.routed !== undefined, warns: ['synthesis', 'map', 'par'] },
   bitstream: { label: 'Generate Programming File', marks: ['synth', 'translate', 'map', 'par', 'bitgen'], ran: s => s.bitstream, warns: ['synthesis', 'map', 'par'] },
 };
+// a drawing's check, as its editor's (the MCP server's check_drawing, server/mcp-check.js; a truth table's as its
+// editor's too): the messages of an ASM chart, a state diagram, a truth table, a Petri net ({ severity, message })
+const DRAWINGS = [
+  { re: /\.asm\.json$/i, check: async m => (await import('./asm.js')).validate(m) },
+  { re: /\.fsm\.json$/i, check: async m => (await import('./fsm.js')).validateFsm(m) },
+  { re: /\.bool\.json$/i, check: async m => (await import('./logic.js')).validateTable(m) },
+  { re: /\.pn\.json$/i, check: async m => (await import('./petri-analysis.js')).checkPetri(m) },
+];
+// a port's bit as the constraints name it: led<3> (led(3), led[3] written as VHDL or Verilog do)
+const netName = p => String(p).trim().replace(/[([](\d+)[)\]]$/, '<$1>');
+
 // a step's warnings in build/reports.json: its count, or the map report's "Number of warnings" line (ISE's)
 const warningsOf = (r, k) => r?.[k]?.warnings ?? Number((r?.[k]?.utilization || []).find(u => /warnings/i.test(u.name))?.used) ?? 0;
 
@@ -179,6 +191,37 @@ export const CHECKS = {
       for (const p of c.messages || []) if (!lines.some(t => pattern(p).test(t))) out.push(`the simulation printed nothing like '${p}'`);
       if (!c.errors) for (const e of log.filter(e => e.kind === 'error' || e.kind === 'failure').slice(0, 3)) out.push(`the simulation reported an error at ${e.time / 1000} ns: ${e.text}`);
       return out;
+    },
+  },
+  // a drawing (an ASM chart, a state diagram, a truth table, a Petri net) its editor's check passes, with exactly these
+  // warnings (none when not given)
+  drawing: {
+    problems: c => [...(str(c.path) && DRAWINGS.some(k => k.re.test(c.path)) ? [] : ['"path": an ASM chart, a state diagram, a truth table or a Petri net (.asm.json, .fsm.json, .bool.json, .pn.json)']),
+      ...patternProblems('warnings', c.warnings)],
+    async run(c, io) {
+      if (!(await io.files()).includes(c.path)) return [`the project has no file ${c.path}`];
+      let m;
+      try { m = JSON.parse(await io.read(c.path)); } catch { return [`${c.path} is not a drawing Silinx reads`]; }
+      const diags = await DRAWINGS.find(k => k.re.test(c.path)).check(m);
+      const errs = diags.filter(d => d.severity === 'error');
+      if (errs.length) return errs.slice(0, 3).map(d => `${c.path}: ${d.message}`);
+      return exactly(diags.filter(d => d.severity === 'warning').map(d => d.message), c.warnings || [], `warning of ${c.path}`);
+    },
+  },
+  // the project's constraints put each { port, loc } on that pin (port: a scalar, or a bus's bit, led<3>)
+  pins: {
+    problems: c => (Array.isArray(c.pins) && c.pins.length && c.pins.every(x => str(x?.port) && str(x?.loc)) ? [] : ['"pins": a list of { "port", "loc" }']),
+    async run(c, io) {
+      const pj = await io.project();
+      if (!pj.constraints || !(await io.files()).includes(pj.constraints)) return ['the project has no constraints file'];
+      let asg;
+      try { asg = parseUcf(await io.read(pj.constraints)).assignments || {}; } catch (e) { return [`${pj.constraints} cannot be read: ${e.message}`]; }
+      const byName = new Map(Object.entries(asg).map(([n, a]) => [n.toLowerCase(), a]));
+      return c.pins.flatMap(({ port, loc }) => {
+        const have = byName.get(netName(port).toLowerCase())?.loc;
+        if (!have) return [`${netName(port)} has no pin in ${pj.constraints}`];
+        return have.toUpperCase() === loc.toUpperCase() ? [] : [`${netName(port)} is on the pin ${have.toUpperCase()}, not ${loc.toUpperCase()}`];
+      });
     },
   },
   // a process (synthesize, implement, bitstream) ran on the project's top and its sources as they are now, with

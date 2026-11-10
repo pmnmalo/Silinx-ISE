@@ -42,9 +42,18 @@ export function projectIo(name) {
 }
 
 const readProgress = async name => { try { return parseProgress(await api.readFile(name, PROGRESS_FILE)); } catch { return {}; } };
-async function projectLabs(name) {
+/** The labs the project `name` can run (core/labs.js listLabs): { labs, problems }. */
+export async function projectLabs(name) {
   const pj = await api.project(name);
   return listLabs(pj.fileTree || [], rel => api.readFile(name, rel), { example: name });
+}
+
+/** Opens the lab `id` of the project in front (a link's lab=, web/js/link-open.js): false when it has none of that id. */
+export async function openLabById(id) {
+  const entry = S.project && (await projectLabs(S.project.name)).labs.find(l => l.id === id);
+  if (!entry) return false;
+  await openLab(entry);
+  return true;
 }
 
 /** Project ▸ Guided Labs…: the labs of the project in a list, the one picked opened. */
