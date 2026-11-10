@@ -30,6 +30,7 @@ const SOURCE_TYPES = [
   { id: 'pcf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.pcf', dir: 'constraints', hidden: true },   // (the iCE40's: its device shows it for UCF's, #2296)
   { id: 'xdc', label: 'Implementation Constraints File', ico: 'ucf', ext: '.xdc', dir: 'constraints', hidden: true },   // (the 7-series', #3142)
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
+  { id: 'lab', label: 'Guided Lab', ico: 'help', ext: '.lab.json', dir: 'labs' },   // (a teacher's, its steps checked: #3179)
   { id: 'c', label: 'C Function (HLS)', ico: 'file', ext: '.c', dir: 'src' },   // (Silinx HLS, compatible with Vitis HLS: #1531)
   { id: 'cpp', label: 'C++ Function (HLS)', ico: 'file', ext: '.cpp', dir: 'src' },   // (#1590)
   // not in the list any more; newSourceWizard({ type: 'vhdl-pkg' }) still creates one
@@ -73,7 +74,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     validate: () => null,
   };
   // the file name and the location; Wizard (#958) opens the type's wizard with them (it asks the rest on its pages)
-  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json)$/i, '');
+  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json|lab\.json)$/i, '');
   const fileError = () => {
     if (!FILE_RE.test(nameOf())) return 'Enter a valid file name (letters, digits, _ and -).';
     if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
@@ -99,7 +100,9 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
       const p = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
       // the module named as the file (a drawing, a test bench, a package): not a reserved word of VHDL or
       // Verilog, in any letter case (#679; a module's own name is asked on the next page)
-      if (!['hdl', ...CONSTRAINTS, 'mem'].includes(st.id)) {
+      // a guided lab: in the project's labs folder, the file's name its id (core/labs.js isLabFile)
+      if (st.id === 'lab' && loc.value.trim().replace(/\/+$/, '') !== 'labs') return 'A guided lab is in the labs folder: Location labs.';
+      if (!['hdl', ...CONSTRAINTS, 'mem', 'lab'].includes(st.id)) {
         const r = reservedError(n.split('/').pop().replace(/[^A-Za-z0-9_]/g, '_'));
         if (r) return `${r}: choose another name.`;
       }
@@ -240,6 +243,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     case 'pcf': text = T.pcfTemplate(pj); break;
     case 'xdc': text = T.xdcTemplate(pj); break;
     case 'mem': text = '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n'; break;
+    case 'lab': { const { newLab } = await import('/core/labs.js'); text = `${JSON.stringify(newLab(n, { top: pj.top, simTop: pj.simTop }), null, 2)}\n`; break; }
     case 'c': text = cTemplate(n.replace(/[^A-Za-z0-9_]/g, '_')); break;
     case 'cpp': text = cppTemplate(n.replace(/[^A-Za-z0-9_]/g, '_')); break;
     case 'sch': {

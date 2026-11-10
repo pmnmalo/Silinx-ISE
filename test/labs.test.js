@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LAB_VERSION, PROGRESS_FILE, checkLines, checkStep, isLabFile, labProblems, labProgress, listLabs, localize, nextOpen, parseLab, parseProgress, progressText, recordTry, stepOf } from '../core/labs.js';
+import { LAB_VERSION, PROGRESS_FILE, checkLines, checkStep, isLabFile, labFileLines, newLab, labProblems, labProgress, listLabs, localize, nextOpen, parseLab, parseProgress, progressText, recordTry, stepOf } from '../core/labs.js';
 import { CHECKS, PROCESSES, exactly, expectedBits, pattern } from '../core/labs-check.js';
 import { generateFsm } from '../core/fsm-hdl.js';
 import { LABS } from '../core/labs-shipped.js';
@@ -334,4 +334,20 @@ test('the stopwatch lab on its example: the project, the emulator (a step to try
   const traffic = LABS.find(l => l.id === 'traffic-state-machine');
   const onlyVhd = { 'src/traffic.vhd': walking()['src/traffic.vhd'] };
   assert.deepEqual((await checkStep(stepOf(traffic, 'output'), exampleIo('traffic', onlyVhd))).results.map(r => r.ok), [false, true, true, true]);
+});
+
+test('#3179 a new lab (New Source ▸ Guided Lab): valid, its id the file\'s name, a reading step then Check Syntax and the test bench; its file\'s lines', async () => {
+  const lab = newLab('my-lab', { top: 'gates', simTop: 'tb_gates' });
+  assert.deepEqual(labProblems(lab, 'labs/my-lab.lab.json'), []);
+  assert.deepEqual([lab.id, lab.steps.map(s => s.id), lab.steps.map(s => (s.checks || []).map(c => c.check))], ['my-lab', ['read', 'syntax', 'simulate'], [[], ['syntax'], ['simulate']]]);
+  for (const t of [lab.title, lab.intro, ...lab.steps.flatMap(s => [s.title, s.text, ...(s.hint ? [s.hint] : [])])]) assert.ok(t.en && t.pt, JSON.stringify(t));
+  assert.match(localize(lab.steps[0].text, 'en'), /top module, `gates`/);
+  assert.deepEqual(newLab('x').steps.map(s => s.id), ['read', 'syntax'], 'no test bench: no simulation step');
+  // the template run on the gates example: every step done
+  assert.deepEqual(await done(lab, gates), [true, true, true]);
+  // its file's lines: none, then its problems
+  assert.deepEqual(labFileLines('labs/a.lab.json', []), ['The lab labs/a.lab.json can be run (Project ▸ Guided Labs…).']);
+  const { problems } = parseLab('{ "silinxLab": 1, "id": "a", "title": "A", "steps": [{ "id": "s", "title": "S", "text": "T", "checks": [{ "check": "pins" }] }] }', 'labs/a.lab.json');
+  assert.deepEqual(labFileLines('labs/a.lab.json', problems), ['ERROR: labs/a.lab.json: step 1, check 1 (pins): "pins": a list of { "port", "loc" }',
+    'The lab labs/a.lab.json has 1 problem(s): Project ▸ Guided Labs… leaves it out until they are fixed.']);
 });

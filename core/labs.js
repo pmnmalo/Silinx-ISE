@@ -53,6 +53,34 @@ export function labProblems(lab, where = 'the lab') {
   return out;
 }
 
+/** A new lab for New Source ▸ Guided Lab (#3179): its id `id` (the file's name), a reading step, then Check Syntax of
+ *  the project's top and its test bench's simulation, as a teacher starts one; every text in English and Portuguese. */
+export function newLab(id, { top = null, simTop = null } = {}) {
+  const steps = [{
+    id: 'read', title: { en: 'The project', pt: 'O projeto' },
+    text: { en: `Open the project's top module${top ? `, \`${top}\`` : ''}, and read it. This step has no check: Check Step ticks it.`,
+      pt: `Abra o módulo de topo do projeto${top ? `, \`${top}\`` : ''}, e leia-o. Este passo não tem verificação: Verificar Passo marca-o.` },
+  }, {
+    id: 'syntax', title: { en: 'Check Syntax', pt: 'Verificar a sintaxe' },
+    text: { en: 'Run **Check Syntax** on the top module: no errors and no warnings.', pt: 'Execute **Check Syntax** no módulo de topo: sem erros nem avisos.' },
+    hint: { en: 'The console\'s Errors and Warnings tabs say what is wrong and where.', pt: 'Os separadores Errors e Warnings da consola dizem o que está errado e onde.' },
+    checks: [{ check: 'syntax', warnings: [] }],
+  }];
+  if (simTop) steps.push({
+    id: 'simulate', title: { en: 'Simulate', pt: 'Simular' },
+    text: { en: `Simulate the test bench \`${simTop}\`: it reports no error.`, pt: `Simule a bancada de teste \`${simTop}\`: não reporta nenhum erro.` },
+    hint: { en: 'An error in the console says what the test bench expected.', pt: 'Um erro na consola diz o que a bancada de teste esperava.' },
+    checks: [{ check: 'simulate', time_ns: 1000 }],
+  });
+  return { silinxLab: LAB_VERSION, id, title: { en: id, pt: id },
+    intro: { en: 'What the student does in this lab, step by step. Press Check Step when a step is done.', pt: 'O que o aluno faz neste laboratório, passo a passo. Carregue em Verificar Passo quando acabar um passo.' }, steps };
+}
+
+/** A teacher's lab file checked (its Check Syntax, in the interface and the MCP server's lab validate): the lines said. */
+export const labFileLines = (path, problems) => (problems.length
+  ? [...problems.map(m => `ERROR: ${m}`), `The lab ${path} has ${problems.length} problem(s): Project ▸ Guided Labs… leaves it out until they are fixed.`]
+  : [`The lab ${path} can be run (Project ▸ Guided Labs…).`]);
+
 /** A lab of a file's text: { lab, problems } (lab null when it cannot be read). */
 export function parseLab(text, where = 'the lab') {
   let lab;
