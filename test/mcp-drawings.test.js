@@ -56,6 +56,26 @@ test('write_file of a drawing: its HDL file made again; with errors, stale, and 
   assert.equal((await ok('check_syntax', { project: 't' })).text, 'Process "Check Syntax" of <top> completed successfully (41 signals, 30 processes).');
 });
 
+// #3286: a state diagram's transitions as its editor draws a stroke: a transition's bend, a self-loop's angle, written
+// with write_file, kept, its HDL the same as without them
+test('#3286 write_file of a state diagram with a transition\'s bend and a self-loop\'s angle: kept, its HDL the same', async () => {
+  await ok('new_project_from_example', { name: 'f', example: 'traffic' });
+  const fsm = JSON.parse(read('f', 'src/traffic.fsm.json'));
+  fsm.transitions.push({ id: 't9', from: 's2', to: 's2', cond: '!done', outputs: {} });   // (waiting in CARS_YELLOW)
+  await ok('write_file', { project: 'f', path: 'src/traffic.fsm.json', text: JSON.stringify(fsm, null, 2) });
+  const hdl = read('f', 'src/traffic.vhd');
+  fsm.transitions.find(t => t.id === 't2').bend = -45;
+  fsm.transitions.find(t => t.id === 't9').angle = 90;
+  const text = JSON.stringify(fsm, null, 2);
+  const w = await ok('write_file', { project: 'f', path: 'src/traffic.fsm.json', text });
+  assert.equal(w.text, `Wrote src/traffic.fsm.json (${text.length} characters).`);
+  const back = JSON.parse((await ok('read_file', { project: 'f', path: 'src/traffic.fsm.json' })).text);
+  assert.deepEqual(back.transitions.filter(t => ['t2', 't9'].includes(t.id)).map(t => [t.id, t.bend, t.angle]), [['t2', -45, undefined], ['t9', undefined, 90]]);
+  assert.equal(read('f', 'src/traffic.vhd'), hdl);
+  const c = await ok('check_drawing', { project: 'f', file: 'src/traffic.fsm.json' });
+  assert.deepEqual([c.text, c.data.errors, c.data.warnings], ['Process "Check State Diagram" of traffic.fsm.json completed successfully.', [], []]);
+});
+
 // #2924: the Karnaugh maps' order of a truth table, the interface's selector, is the document's kmapOrder: written with
 // write_file, kept, its HDL unchanged
 test('#2924 write_file of a truth table with its Karnaugh maps\' order: kept, its HDL the same', async () => {
