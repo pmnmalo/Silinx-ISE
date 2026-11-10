@@ -798,7 +798,8 @@ export function* exec(s, ctx) {
     }
     case 'assert': {
       const c = V.truth(evalE(s.c, ctx));
-      if (c !== 1) {
+      // (quiet: a Verilog assertion's else action reports it)
+      if (c !== 1 && !s.quiet) {
         const msg = s.msg ? toStr(evalE(s.msg, ctx), s.msg.t) : 'Assertion violation.';
         ctx.sim?.report(s.sev, msg, s.loc);
         if (severities[s.sev] >= 3) { ctx.sim?.finish('failure'); if (ctx.sim && !ctx.inFn) yield { forever: true }; }

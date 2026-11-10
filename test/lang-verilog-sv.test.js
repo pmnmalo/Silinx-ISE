@@ -120,7 +120,7 @@ endmodule`);
   assert.deepEqual(r, ['FOO 1 1 0 yes']);
 });
 
-test('immediate assertions: assert (e), assert (e) else …, labels; concurrent assertions are ignored', () => {
+test('immediate assertions: assert (e), assert (e) else …, labels; a concurrent assertion with no clock is not checked (a warning)', () => {
   const r = sim(`
 module tb;
   reg [3:0] a = 4;
@@ -133,9 +133,42 @@ module tb;
     $finish;
   end
 endmodule`, 'tb', { allowErrors: true });
-  assert.deepEqual(warningsOf(r), []);
+  assert.deepEqual(warningsOf(r), ['4: assert property with no clocking event (@(posedge clk)): not checked by the simulation nor by Verify']);
   assert.deepEqual(r.out, ['a is not 5', 'Assertion violation.', 'pass']);
   assert.deepEqual(r.log.filter(l => l.kind === 'error').map(l => l.text), ['Assertion violation.']);
+});
+
+// #3177: a concurrent assertion of one clock is a process on its edge (core/verilog/parser-assert.js), checked by the
+// simulation as by Verify: the values before the edge, |-> in the same cycle, |=> in the next, disable iff, the else
+// action instead of the default message; sequences, $past, cover and no clock are not checked, with a warning each
+test('concurrent assertions: assert property (@(posedge clk) [disable iff (r)] a |-> b, a |=> b, e), checked at each edge', () => {
+  const r = sim(`
+module tb;
+  reg clk = 0, rst = 1, req = 0, ack = 0;
+  reg [3:0] n = 0;
+  always #5 clk = ~clk;
+  always @(posedge clk) n <= n + 1;
+  hs: assert property (@(posedge clk) disable iff (rst) req |=> ack) else $display("no ack at %0t", $time);
+  assert property (@(posedge clk) req |-> !ack);
+  assert property (@(negedge clk) n != 4'd3) else $display("n is 3 at %0t", $time);
+  assume property (@(posedge clk) !(req && rst));
+  assert property (@(posedge clk) req ##1 ack);
+  assert property (@(posedge clk) $rose(req));
+  cover property (@(posedge clk) ack);
+  initial begin
+    #12 rst = 0; req = 1;      // the edge at 15: req, ack 0; at 25 no ack (|=>)
+    #20 ack = 1; req = 0;      // the edge at 35: ack, no req
+    #10 req = 1;               // the edge at 45: req and ack (|->); at 55: ack (|=>) holds
+    #20 $finish;
+  end
+endmodule`, 'tb', { allowErrors: true });
+  assert.deepEqual(warningsOf(r), [
+    '11: assert property with a sequence or a sampled-value function: not checked by the simulation nor by Verify',
+    '12: assert property with a sequence or a sampled-value function: not checked by the simulation nor by Verify',
+    '13: cover property: not checked by the simulation nor by Verify',
+  ]);
+  assert.deepEqual(r.out, ['no ack at 25', 'n is 3 at 30', 'Assertion violation.', 'Assertion violation.']);
+  assert.deepEqual(r.log.filter(l => l.kind === 'error').map(l => [l.time / 1000, l.line, l.text]), [[45, 8, 'Assertion violation.'], [55, 8, 'Assertion violation.']]);
 });
 
 test('function and task ports without a direction take the one before (input first)', () => {

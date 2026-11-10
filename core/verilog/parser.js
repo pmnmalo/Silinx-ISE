@@ -1,10 +1,11 @@
 // Verilog-2001 (+ a few SystemVerilog conveniences) recursive-descent parser producing the Silinx IR.
 // See docs/IR.md.
 import { tokenize, tokenText } from './lexer.js';
-import { ASSERTIONS, ATOMS, GATES, PORT_NETS, SYS_NOARG, Sync, TYPEWORDS, WIRED, lit1 } from './parser-defs.js';
+import { ATOMS, GATES, PORT_NETS, SYS_NOARG, Sync, TYPEWORDS, WIRED, lit1 } from './parser-defs.js';
 import { itemMethods } from './parser-items.js';
 import { stmtMethods } from './parser-stmts.js';
 import { exprMethods } from './parser-exprs.js';
+import { assertMethods } from './parser-assert.js';
 
 // opts.include(name): the text of a project file for `include (null when there is none)
 export function parse(source, file = 'input', opts = {}) {
@@ -496,17 +497,8 @@ class Parser {
         this.expect(';');
         return;
       }
-      // concurrent assertions (assert property (…);): not checked by simulation
-      if ((t.t === 'id' && ASSERTIONS.has(t.v)) || (t.t === 'id' && this.is(':', this.peek()) && this.peek(2).t === 'id' && ASSERTIONS.has(this.peek(2).v))) {
-        let depth = 0;
-        while (this.tok.t !== 'eof' && !(depth === 0 && this.is(';'))) {
-          if (this.is('(')) depth++;
-          else if (this.is(')')) depth--;
-          this.next();
-        }
-        this.expect(';');
-        return;
-      }
+      // concurrent assertions (assert property (@(posedge clk) …);): processes (parser-assert.js)
+      if (this.isConcurrentAssertion()) return this.concurrentAssertion(items, decls);
       // elaboration system tasks ($info, $warning, $error, $fatal): messages of the elaboration
       if (t.t === 'sys' && ['$info', '$warning', '$error', '$fatal'].includes(t.v)) {
         const loc = this.loc();
@@ -777,4 +769,4 @@ class Parser {
   }
 }
 // (its generate blocks, functions and instances, statements and expressions: parser-items.js, parser-stmts.js, parser-exprs.js)
-Object.assign(Parser.prototype, itemMethods, stmtMethods, exprMethods);
+Object.assign(Parser.prototype, itemMethods, stmtMethods, exprMethods, assertMethods);
