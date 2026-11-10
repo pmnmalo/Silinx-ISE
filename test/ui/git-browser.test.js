@@ -5,7 +5,7 @@
 // "GitHub"); the Design pane's marks; Commit and Push… (several files in one commit, pushed at once: no Push in the menu);
 // Pull from GitHub (an open document read again); a rejected commit and a conflict as ERROR lines with their hint;
 // History… and a file as it was; Sign out of GitHub; the token never in a URL nor in the console, kept in the
-// browser's storage only. In Portuguese; no OAuth App set up said as an ERROR. Both interfaces; no warnings.
+// browser's storage only. In Portuguese; with no relay nor OAuth App set up, the sign-in with a pasted token (its steps, a refusal). Both interfaces; no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -147,7 +147,7 @@ uiTest('#3196 the browser edition: Open from Repository…, Sign in with GitHub�
   assert.deepEqual(warnings(page), []);
 }, { url: () => 'about:blank', timeout: 240000 });
 
-uiTest('#3196 the browser edition in Portuguese: the Git commands; Initialize Repository… on an empty repository, its first commit; no OAuth App set up', E, async (page) => {
+uiTest('#3196 the browser edition in Portuguese: the Git commands; Initialize Repository… on an empty repository, its first commit; the sign-in with a pasted token', E, async (page) => {
   gh.seed('pmalo/fresh');
   await boot(page);
   await page.menu('File', 'New Project…');
@@ -190,10 +190,30 @@ uiTest('#3196 the browser edition in Portuguese: the Git commands; Initialize Re
   assert.deepEqual(Object.keys(gh.filesAt('pmalo/fresh', 'main')).sort(), ['.gitignore', 'constraints/gates.ucf', 'silinx.json', 'sim/tb_gates.vhd', 'src/gates.sch.json', 'src/gates.vhd']);
   await ptMenu(page, 'Terminar sessão no GitHub', 'Sign out of GitHub');
   await page.waitConsole(/Signed out of GitHub/);
-  // no OAuth App set up (the placeholder): the sign-in says so
+  // no OAuth App nor relay set up (the placeholders): the sign-in is a pasted token, its steps and permissions said
   await ptMenu(page, 'Iniciar sessão no GitHub…', 'Sign in with GitHub…');
-  await page.waitConsole(/ERROR: no GitHub OAuth App is set up for this edition of Silinx\nHint: Its client ID is a setting of the edition \(the maintainer registers the OAuth App\)\./);
+  await page.waitDialog('Iniciar sessão no GitHub');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .git-token-steps li')].map((l) => l.textContent)), [
+    'Abra a página do GitHub para um novo token: https://github.com/settings/personal-access-tokens/new',
+    'Acesso aos repositórios: Only select repositories (os que vai abrir no Silinx).',
+    'Permissões dos repositórios: Contents, Read and write (Metadata, Read-only, vem com ela).',
+    'Gere o token, copie-o e cole-o aqui.']);
+  assert.deepEqual(await page.eval(() => { const a = document.querySelector('.dlg-overlay .git-new-token'); return [a.target, a.rel, document.querySelector('.dlg-overlay .git-token').type]; }), ['_blank', 'noopener noreferrer', 'password']);
+  // (not a token; one GitHub refuses: said beside the field, nothing kept)
+  await page.fill('.dlg-overlay .git-token', 'not a token');
+  await page.dialogButton('Iniciar Sessão');
+  await page.waitFor(() => /^that is not a GitHub token/.test(document.querySelector('.dlg-overlay .git-token-error').textContent), [], { what: 'the token\'s error' });
+  await page.fill('.dlg-overlay .git-token', 'github_pat_11AAAAAAA0_refusedrefusedrefused');
+  await page.dialogButton('Iniciar Sessão');
+  await page.waitFor(() => /^GitHub refused the sign-in \(Bad credentials\): GitHub refused this token/.test(document.querySelector('.dlg-overlay .git-token-error').textContent), [], { what: 'the refusal' });
+  assert.equal(await page.eval(() => localStorage.getItem('silinx.github-token')), null);
+  await page.fill('.dlg-overlay .git-token', gh.token);
+  await page.dialogButton('Iniciar Sessão');
   await page.waitNoDialog();
+  await page.waitConsole(/Signed in to GitHub as student: the sign-in is kept in this browser only \(Sign out of GitHub forgets it\)\./);
+  assert.equal(await page.eval(() => localStorage.getItem('silinx.github-token')), gh.token);
+  assert.ok(!(await page.eval(() => window.__console())).includes(gh.token));
+  assert.ok(!(await page.eval(() => window.__console())).includes('refusedrefused'));
   await page.eval(() => localStorage.removeItem('silinx.lang'));
   assert.deepEqual(warnings(page), []);
 }, { url: () => 'about:blank', timeout: 180000 });

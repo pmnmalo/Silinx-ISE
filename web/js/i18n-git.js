@@ -29,6 +29,13 @@ export const GIT_PT = {
   'Compare': 'Comparar', 'Resolve Conflicts': 'Resolver Conflitos', 'Mine': 'O meu', 'Theirs': 'O deles',
   'Not there yet.': 'Ainda não existia.', 'Deleted.': 'Apagado.', 'Read-only': 'Só de leitura',
   'as it is now': 'como está agora', 'before the first commit': 'antes do primeiro commit',
+  // the sign-in with a token (#3196)
+  'Sign in with a fine-grained personal access token of your GitHub account:': 'Inicie sessão com um token de acesso pessoal de granularidade fina da sua conta do GitHub:',
+  'Open GitHub\'s page for a new token:': 'Abra a página do GitHub para um novo token:',
+  'Repository access: Only select repositories (the ones to open in Silinx).': 'Acesso aos repositórios: Only select repositories (os que vai abrir no Silinx).',
+  'Repository permissions: Contents, Read and write (Metadata, Read-only, comes with it).': 'Permissões dos repositórios: Contents, Read and write (Metadata, Read-only, vem com ela).',
+  'Generate the token, copy it and paste it here.': 'Gere o token, copie-o e cole-o aqui.',
+  'Sign In': 'Iniciar Sessão',
 };
 
 export const GIT_PT_PATTERNS = [

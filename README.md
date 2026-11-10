@@ -440,9 +440,10 @@ SSH key): Silinx never asks for, stores or logs a password or a token. A server'
 
 In the browser edition the same commands go through GitHub's API (there is no git in a browser):
 - **Open from Repository…** opens a public repository with no sign-in.
-- **Sign in with GitHub…** (with the Git commands) gives a code to enter at github.com/login/device; a private
-  repository, a commit and a pull need it. The sign-in is kept in this browser only, and **Sign out of GitHub**
-  forgets it.
+- **Sign in with GitHub…** (with the Git commands): a private repository, a commit and a pull need it. Where the
+  site has Silinx's sign-in relay, it gives a code to enter at github.com/login/device; elsewhere, it asks for a
+  fine-grained personal access token of yours (github.com/settings/personal-access-tokens/new: the repositories to
+  open, Contents read and write). The sign-in is kept in this browser only, and **Sign out of GitHub** forgets it.
 - **Commit and Push…** commits and pushes in one step. A commit GitHub rejects (someone pushed meanwhile) says to
   pull first.
 - **Initialize Repository…** takes an empty GitHub repository (make it at github.com/new); the first commit is the

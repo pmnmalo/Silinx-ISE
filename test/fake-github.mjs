@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 const sha1 = s => crypto.createHash('sha1').update(s).digest('hex');
 const blobHash = buf => sha1(Buffer.concat([Buffer.from(`blob ${buf.length}\0`), buf]));
 
-export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fake-token-of-the-tests'], user = 'student', interval = 5 } = {}) {
+export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_faketokenofthetests0123456789'], user = 'student', interval = 5 } = {}) {
   const repos = new Map();   // 'owner/repo' -> { private, branch, blobs, trees, commits, refs, writers }
   const valid = new Set(tokens);
   const requests = [];
@@ -65,6 +65,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
     const auth = /^Bearer (.+)$/.exec(headers.authorization || '');
     if (auth && !valid.has(auth[1])) return json(401, { message: 'Bad credentials' });
     const signed = !!auth;
+    if (url.pathname === '/user' && method === 'GET') return signed ? json(200, { login: user }) : json(401, { message: 'Requires authentication' });
     const m = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(url.pathname);
     if (!m) return nope();
     const full = `${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}`, rest = m[3] || '';
