@@ -271,6 +271,14 @@ test('#3192 a check test: the guided labs\' checks on the submission (#3179), it
   assert.equal((await grade(fsm, drawing())).verdict, 'AC');
 });
 
+test('#3192 Grading Error: a synthesis the grader cannot run (a read Node\'s permission model refuses: its path said), never no verdict', async () => {
+  const ex = counterExercise();
+  ex.tests = [{ id: 'impl', points: 1, kind: 'synthesis', latches: false }];
+  const synthesize = async () => { throw Object.assign(new Error('Access to this API has been restricted'), { code: 'ERR_ACCESS_DENIED', permission: 'FileSystemRead', resource: '/tmp/x' }); };
+  const r = await grade(ex, hdl(COUNTER_V), { synthesize });
+  assert.deepEqual([r.verdict, r.verdictName, r.tests[0].messages], ['GE', 'Grading Error', ['the synthesis could not run: Access to this API has been restricted (FileSystemRead /tmp/x)']]);
+});
+
 test('#3192 --visible: the visible tests only, the maximum theirs', async () => {
   const r = await grade(counterExercise(), hdl(COUNTER_V), { visible: true });
   assert.deepEqual([r.visible, r.points, r.max, r.tests.map(t => t.id)], [true, 30, 30, ['count']]);
@@ -307,5 +315,5 @@ test('#3192 the CSV: a row per submission, each test\'s verdict and points; a ce
     '"\'=HYPERLINK(""x"")",30,100,WA,WA,0,WA,0,AC,30',
     '',
   ].join('\n'));
-  assert.deepEqual(Object.keys(VERDICTS), ['AC', 'WA', 'CE', 'IE', 'NS', 'LI', 'TLE', 'MLE', 'RE', 'RL']);
+  assert.deepEqual(Object.keys(VERDICTS), ['AC', 'WA', 'CE', 'IE', 'NS', 'LI', 'TLE', 'MLE', 'RE', 'RL', 'GE']);
 });

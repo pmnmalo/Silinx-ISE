@@ -94,6 +94,7 @@ A test is hidden unless it has `"visible": true`. Each test is worth `points` (1
 | MLE | Memory Limit Exceeded | the heap of the submission's process |
 | RE | Runtime Error | the design's own error stops the simulation ($fatal, an index out of range) |
 | RL | Resource / Timing Limit | more LUTs, flip-flops or slices than allowed |
+| GE | Grading Error | the grader could not run the test (its setup's fault, not the submission's): the message says why |
 
 A Compile Error or an Interface Error applies to every test. The total is the sum of the Accepted tests' points.
 

@@ -28,6 +28,7 @@ export const VERDICTS = Object.freeze({
   MLE: 'Memory Limit Exceeded',
   RE: 'Runtime Error',
   RL: 'Resource / Timing Limit',
+  GE: 'Grading Error',   // (the grader could not run the test: its setup's, not the submission's; the teacher's to fix)
 });
 export const TEST_KINDS = ['vectors', 'reference', 'testbench', 'synthesis', 'check'];
 export const DRAWINGS = ['sch', 'asm', 'fsm', 'tt', 'pn'];

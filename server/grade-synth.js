@@ -1,10 +1,10 @@
 // Automatic grading (#3192): a synthesis test's numbers from the Silinx toolchain, in memory (core/flow-ide.js
 // runOpenFlow, Yosys compiled to WebAssembly; Map, nextpnr's, for the slices): { errors, warnings, latches, luts, ffs,
-// slices }. It runs in the submission's worker (server/grade-worker.js), within its limits.
+// slices }. It runs in the submission's process (server/grade-run.js), within its limits; the device's status (its
+// routing graph's path) is given by the grader (server/grade.js synthesisStatus), which may look in the user's folders.
 import { runOpenFlow } from '../core/flow-ide.js';
 import { yosysNode, nextpnrNode, loadDeviceCache } from '../packages/silinx-fpga/src/node.js';
 import { resourcesOf } from '../packages/silinx-fpga/src/parts.js';
-import { openStatus } from './open-flow.js';
 import { findPart } from './devices.js';
 
 /** The device of an exercise's synthesis tests: its own, else the Basys2's XC3S250E. */
@@ -12,8 +12,8 @@ export const GRADE_DEVICE = Object.freeze({ family: 'spartan3e', part: 'xc3s250e
 
 const used = (items, re) => items?.find(i => re.test(i.name))?.used ?? 0;
 
-export async function synthesize(sources, top, test, { device = GRADE_DEVICE } = {}) {
-  const status = openStatus(device);
+export async function synthesize(sources, top, test, { device = GRADE_DEVICE, status = null } = {}) {
+  status ||= (await import('./open-flow.js')).openStatus(device);
   if (!status.part) return { errors: [`the Silinx toolchain cannot synthesize for ${device.part}: ${status.reason}`] };
   const lines = [], store = {};
   let dev = null;
