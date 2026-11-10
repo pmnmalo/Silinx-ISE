@@ -58,6 +58,9 @@ export const FEATURES = {
   // before, only line 4 reached a CLKB or a multiplier's CLK, and the placer refused the design)
   feat_bram_clocks: [SLICES, 'RAMB16', [/^ {2}pip BRAM1_SMALL_X\d+Y\d+ GCLK[0-35-7] -> BRAM_CLK3 ,$/m, /^ {2}pip BRAM2_SMALL_X\d+Y\d+ GCLK[0-35-7] -> BRAM_CLK0 ,$/m]],
   feat_mult: [SLICES, 'MULT18X18SIO'],
+  // the logic analyzer's link (#3176): BSCAN_SPARTAN3 in the corner tile, as ISE's XDL writes it, its pins to the capture
+  // core through the corner's switches (nextpnr 1.5.0)
+  feat_bscan: [SLICES, 'BSCAN', [/^inst "silinx_bscan" "BSCAN",placed UR_X27Y35 BSCAN +,\n {2}cfg " BSCAN_BLACKBOX:silinx_bscan: "/m, /^ {2}pip UR_X27Y35 UR_DRCK1 -> CNR_D_O_FAN_B0 ,$/m]],
   // three multipliers cascaded through BCOUT -> BCIN (#2): one above the other in a column, the dedicated switches
   feat_mult_chain: [SLICES, 'MULT18X18SIO', [/B_INPUT::CASCADE /, /^net "[^"]+" , \n {2}outpin "u_m0" BCOUT5 ,\n {2}inpin "u_m1" BCIN5 ,\n {2}pip BRAMSITE2\w* MULT_CCARRY_BCOUT5 -> MULT_CARRYB_BCOUT5 ,$/m,
     /^net "[^"]+" , \n {2}outpin "u_m1" BCOUT17 ,\n {2}inpin "u_m2" BCIN17 ,\n/m]],
