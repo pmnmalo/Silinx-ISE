@@ -59,8 +59,8 @@ test('#3192 the exercise: a right one has no problem; each kind of wrong one say
   const checks = counterExercise();
   checks.tests = [{ id: 'c', kind: 'check' }, { id: 'd', kind: 'check', checks: [{ check: 'fly' }, { check: 'syntax', warnings: ['/[/'] }] }, { id: 't', kind: 'testbench', top: 'tb', files: [{ path: 'tb.v', text: '' }], done: '/(/' }];
   assert.deepEqual(exerciseProblems(checks, 'e.exercise.json'), [
-    'e.exercise.json: test 1: "checks": a list of the guided labs\' checks (project, file, module, syntax, simulate)',
-    'e.exercise.json: test 2: check 1: "check": one of project, file, module, syntax, simulate',
+    'e.exercise.json: test 1: "checks": a list of the guided labs\' checks (project, file, module, syntax, simulate, process)',
+    'e.exercise.json: test 2: check 1: "check": one of project, file, module, syntax, simulate, process',
     'e.exercise.json: test 2: check 2 (syntax): "warnings": \'/[/\' is not a regular expression',
     'e.exercise.json: test 3: "done": a message the test bench prints at its end (a text, or "/regex/flags")',
   ]);
