@@ -14,6 +14,7 @@ import { renderProcesses, restoreImplStatus, reservedNameDiags } from './process
 import { projectSaved, renderHierarchy } from './design.js';
 import { prefKey } from './prefs.js';
 import { watchProject, stopWatching } from './project-watch.js';
+import { hasGit, openFromRepositoryDialog } from './git.js';
 
 const $ = id => document.getElementById(id);
 // how long after a project opens the browser edition fetches what Implement needs (#967): after the opening's own work
@@ -237,6 +238,8 @@ export async function renderStartPage() {
       h('button', { class: 'btn', type: 'button', onclick: () => wiz.openProjectDialog() }, 'Open Project…')),   // (Close Project: under the Design tree, #1309)
     // the Silinx and the Xilinx imports and exports, as the File menu has them, a line between (#1216)
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
+      // (a GitHub repository, a Classroom assignment's: the server editions, #3195)
+      ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
       ...[['Import Silinx Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx Project (.zip)…', 'save', exportZip('silinx'), true],
         ['Copy Link to Project…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]].map(command),   // (#2826)
       h('hr', { class: 'start-sep' }),

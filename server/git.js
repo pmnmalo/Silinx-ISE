@@ -16,42 +16,28 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import * as P from './projects.js';
+import { checkUrl as checkGithubUrl, redact, nameFromRepo } from '../core/github-url.js';
 
 /** A git command's failure: its message (git's own line), a hint for the user, the HTTP status; files: a conflict's. */
 export class GitError extends Error {
   constructor(message, hint = null, status = 400, extra = {}) { super(message); Object.assign(this, { hint, status }, extra); }
 }
 
-// the tests' remotes (a local bare repository, no network): a folder's absolute path taken for a URL; never set by the
-// server or the MCP
-export const GIT_TESTING = { localRemotes: false };
+// the tests' remotes (a local bare repository, no network): a folder's absolute path taken for a URL; remoteOf: the
+// folder a GitHub address is cloned from (the UI tests', test/ui/serve.js); never set by the server or the MCP
+export const GIT_TESTING = { localRemotes: false, remoteOf: null };
 
 /** git turned off (SILINX_GIT=off: a hosted server whose operator does not want its account's credentials used). */
 export const gitEnabled = () => String(process.env.SILINX_GIT || '').toLowerCase() !== 'off';
 
-// ------------------------------------------------------------------ the URLs
-const OWNER = '([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))', REPO = '([A-Za-z0-9._-]{1,100}?)';
-const URL_FORMS = [
-  new RegExp(`^https://github\\.com/${OWNER}/${REPO}(?:\\.git)?/?$`),
-  new RegExp(`^ssh://git@github\\.com(?::22)?/${OWNER}/${REPO}(?:\\.git)?/?$`),
-  new RegExp(`^git@github\\.com:${OWNER}/${REPO}(?:\\.git)?$`),
-];
-const URL_HINT = 'Give the repository\'s address on GitHub: https://github.com/owner/repository, or git@github.com:owner/repository.git.';
-
+// ------------------------------------------------------------------ the URLs (core/github-url.js, the interface's too)
 /** A remote's URL, checked: github.com's, https or ssh -> { url, owner, repo }; or a GitError. */
 export function checkUrl(url) {
   const u = String(url ?? '').trim();
   if (GIT_TESTING.localRemotes && path.isAbsolute(u)) return { url: u, owner: 'local', repo: path.basename(u).replace(/\.git$/, '') };
-  if (/^https:\/\/classroom\.github\.com\//i.test(u)) throw new GitError('a GitHub Classroom invitation, not a repository', 'Accept the assignment on GitHub first, then give its repository\'s address (https://github.com/…).');
-  for (const re of URL_FORMS) {
-    const m = re.exec(u);
-    if (m && m[2] !== '.' && m[2] !== '..') return { url: u, owner: m[1], repo: m[2] };
-  }
-  throw new GitError(`not a GitHub repository's address: ${redact(u) || '(none)'}`, URL_HINT);
+  try { return checkGithubUrl(u); } catch (e) { throw new GitError(e.message, e.hint); }
 }
-
-/** A text with its URLs' credentials removed (a user:token@ after the scheme). */
-export const redact = s => String(s ?? '').replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/gi, '$1');
+export { redact, nameFromRepo };
 
 // ------------------------------------------------------------------ running git
 const noHooksDir = async () => {
@@ -349,12 +335,6 @@ export async function gitShow(name, commit, rel) {
   return { project: name, commit, path: key, text: r.stdout };
 }
 
-// a project's name from a repository's (letters, digits, - and _; a letter first)
-export const nameFromRepo = repo => {
-  const n = String(repo).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
-  return /^[A-Za-z]/.test(n) ? n : `p${n}`.slice(0, 64);
-};
-
 // the files of a clone (its hidden ones apart: .git, .github, .gitignore are no part of the project), for the gate
 async function cloneEntries(dir, base = '') {
   const out = [];
@@ -378,7 +358,7 @@ export async function gitClone({ url, name = null, madeBy = null }) {
   await fsp.mkdir(ws, { recursive: true });
   const tmp = path.join(ws, `.silinx-clone-${crypto.randomBytes(6).toString('hex')}`);
   try {
-    const r = await git(['clone', '--quiet', '--no-recurse-submodules', '--', remote.url, tmp], { cwd: ws, timeout: 300_000 });
+    const r = await git(['clone', '--quiet', '--no-recurse-submodules', '--', GIT_TESTING.remoteOf?.(remote) || remote.url, tmp], { cwd: ws, timeout: 300_000 });
     if (r.code) throw explain('clone', r);
     if (!fs.existsSync(path.join(tmp, P.PROJECT_FILE))) {
       const inside = (await fsp.readdir(tmp, { withFileTypes: true })).filter(d => d.isDirectory() && !d.name.startsWith('.') && fs.existsSync(path.join(tmp, d.name, P.PROJECT_FILE))).map(d => d.name).sort();
