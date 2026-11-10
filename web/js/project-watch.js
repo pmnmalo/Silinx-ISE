@@ -44,7 +44,9 @@ async function listen(name, signal) {
 export async function applyChanges({ project, changes = [], by = null }) {
   if (!S.project || S.project.name !== project || !changes.length) return;
   if (!by) dispatchEvent(new CustomEvent('silinx:disk-changes', { detail: { project, changes } }));   // (a project shared: read again, #3181)
-  const files = changes.filter(c => !c.path.startsWith('build/'));
+  let files = changes.filter(c => !c.path.startsWith('build/'));
+  // (a project followed: a text file whose open editor shows it live already, #3182, not reloaded nor said again)
+  if (by) files = (await Promise.all(files.map(async c => (c.kind === 'changed' && await shownLive(c.path) ? null : c)))).filter(Boolean);
   const run = changes.some(c => c.path === REPORTS);
   if (files.length) {
     log(`${by ? `Changed by ${by}` : 'Changed outside Silinx'}: ${files.map(c => `${c.path}${c.kind === 'changed' ? '' : ` (${c.kind})`}`).join(', ')}.`, 'info');
@@ -59,6 +61,13 @@ export async function applyChanges({ project, changes = [], by = null }) {
     if (run) { log('A run made outside Silinx: the processes\' marks and the Design Summary updated.', 'info'); await saveImplStatus(); }
   }
   if (run) refreshSummary();
+}
+
+// whether an open text editor of `path` shows its file's text already
+async function shownLive(path) {
+  const d = S.docs.find(o => docPath(o) === path && o.editor);
+  if (!d) return false;
+  try { return d.editor.getValue() === await api.readFile(S.project.name, path); } catch { return false; }
 }
 
 // an open document whose file changed on disk: reloaded, or the user asked when it has changes of its own

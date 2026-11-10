@@ -36,7 +36,7 @@ import { prefKey } from './prefs.js';
 import { keepCursor, keptCursor } from './doc-cursor.js';
 import { mountSplit, placeSplit, splitClosed, splitItems, tabTip } from './split-view.js';
 import { closeAllDocs, restoreViewState, saveViewState, viewKept } from './view-state.js';
-import { following, followNotice } from './collab-state.js';
+import { following, followNotice, editsHere } from './collab-state.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -463,7 +463,7 @@ export async function openFile(path, line, col, { task } = {}) {
       id, path, task, title: path.split('/').pop(), tooltip: path, icon: lang === 'vhdl' ? 'vhdl' : lang === 'verilog' ? 'verilog' : lang === 'ucf' ? 'ucf' : 'file',
       create(el, d) {
         // the HDL generated from a drawing is read-only: the drawing is the base, edited instead (#1176)
-        const generated = () => !!S.hdlToSch?.[path] || following();   // (a project followed, #3181: read only too)
+        const generated = () => !!S.hdlToSch?.[path] || (following() && !editsHere(path));   // (a project followed, #3181: read only too, but an editor's text files, #3182)
         const tplBtn = h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Language Templates' }, 'Templates ▾');
         // (no Undo / Redo, the main toolbar's; no path, the tab's tip: #2514)
         const editing = [];
@@ -473,7 +473,7 @@ export async function openFile(path, line, col, { task } = {}) {
           ...(lang === 'c' ? cRunButtons(path) : []),   // (C Simulation, C/RTL Co-simulation: #1528)
           (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf' || lang === 'c' || isLabFile(path)) ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file',   // (a guided lab's: #3179)
             onclick: () => (lang === 'ucf' ? checkUcfFile(path) : isLabFile(path) ? import('./lab-view.js').then(m => m.checkLabFile(path)) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
-          syncBanner(path), followNotice());
+          syncBanner(path), followNotice(path));
         if (lang === 'vhdl' || lang === 'verilog' || lang === 'c') editing.push(tplBtn);
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
@@ -889,7 +889,7 @@ async function boot() {
 
   updateTitle();
   // a shared project's link (#3181): followed, read only, instead of the workspace's projects
-  const followed = location.hash.startsWith('#follow=') && await (await import('./collab-follow.js')).startFollowing();
+  const followed = /^#(follow|edit)=/.test(location.hash) && await (await import('./collab-follow.js')).startFollowing();
   log(`${PRODUCT} ${VERSION_LABEL} Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.`, 'info');
   if (api.standalone) {
     const st = await api.initStorage().catch(() => api.storage());

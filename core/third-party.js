@@ -641,6 +641,13 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
+    "name": "y-codemirror.next",
+    "version": "0.3.6",
+    "license": "MIT",
+    "url": "https://github.com/yjs/y-codemirror.next#readme",
+    "standalone": true
+  },
+  {
     "name": "y-protocols",
     "version": "1.0.7",
     "license": "MIT",
