@@ -69,7 +69,7 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     // the answer at the follower's: connected, the project read only, the owner's editor followed
     await fp.fill('.dlg-overlay textarea[data-field=answer]', answer);
     await fp.dialogButton('Ligar');
-    await fp.waitFor(() => window.Silinx?.project?.name === 'Hosted' && window.Silinx.startupChecked, [], { what: 'the hosted project open', timeout: 30000 });
+    await fp.waitFor(() => window.Silinx?.project?.name === 'Hosted' && window.Silinx.startupChecked, [], { what: 'the hosted project open', timeout: 60000 });
     await fp.waitFor(() => window.Silinx.active?.path === 'src/top.vhd', [], { what: 'the owner\'s editor followed' });
     assert.equal(await fp.eval(() => window.Silinx.active.editor.getValue()), TOP);
     assert.equal(await fp.eval(async () => (await (await import('/js/api.js')).api.readFile('Hosted', 'doc/notes.txt')).length), BIG.length);

@@ -12,14 +12,15 @@ import { prefKey } from './prefs.js';
 import { sealCode, openCode } from '/core/collab-codes.js';
 import { keyOf } from '/core/collab-crypto.js';
 import { splitFrame, frameJoiner } from '/core/collab-frag.js';
+import { FOLLOWER_JOIN } from '/core/collab-loop.js';
 
 /** The STUN servers: a public one, or this browser's own list (JSON, [] for none: a classroom's one network). */
 export const STUN_KEY = prefKey('silinx.collab.stun');
 export const STUN = Object.freeze(['stun:stun.l.google.com:19302']);
 const LABEL = 'silinx-collab';
 const GATHER_MS = 4000, CONNECT_MS = 60_000;
-// (a frame joined again at most: the owner's, the whole project, as on the relay; a follower's, an editor's largest)
-const OWNER_MAX = 16 << 20, FOLLOWER_MAX = 2 << 20;
+// (a frame joined again at most: the owner's, the whole project, as on the relay; a follower's, a follower's frame)
+const OWNER_MAX = 16 << 20, FOLLOWER_MAX = FOLLOWER_JOIN;
 // a channel's sending: a frame in parts when it is larger than a message
 const sendOn = (dc, d) => { if (typeof d === 'string') dc.send(d); else for (const p of splitFrame(d)) dc.send(p); };
 
