@@ -1692,8 +1692,8 @@ uiTest('#1218 Tasks: the layout buttons at the top right, after the theme button
   await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-view')), null);
-  // (the Split button: at the ISE style toolbar's right end, #1652)
-  assert.equal(await page.eval(() => document.getElementById('split-btn').parentNode.id), 'toolbar');
+  // (no Split button in the ISE style toolbar, whose right end is a shared project's: View ▸ Split Editor, #3315)
+  assert.equal(await page.eval(() => document.getElementById('split-btn')?.isConnected || false), false);
   await noWarnings(page);
 }, { build: DEV });
 

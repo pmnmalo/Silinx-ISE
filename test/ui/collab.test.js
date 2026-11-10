@@ -51,7 +51,7 @@ uiTest('#3181 share and follow: the follower sees the project, the owner\'s edit
   const link = await share(page, 'Ana');
   assert.match(link, /^http:\/\/[^/]+\/#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/);
   await page.waitConsole(/Sharing project "Shared": anyone with its link follows it live, read only/);
-  assert.equal(await page.eval(() => document.querySelector('#toolbar .collab-btn')?.textContent), 'Sharing');
+  assert.equal(await page.eval(() => document.querySelector('.collab-presence .collab-btn')?.textContent), 'Sharing');
   const fp = await follow(link, 'Rui');
   try {
     // the project, the owner's open editor and cursor
@@ -70,10 +70,10 @@ uiTest('#3181 share and follow: the follower sees the project, the owner\'s edit
     assert.equal(await fp.eval(() => !!window.Silinx.active.dirty), false);
     // the presence: both participants, in both toolbars; the follower in the owner's console
     await page.waitConsole(/^Rui follows your project "Shared"\.$/m);
-    await page.waitFor(() => document.querySelector('#toolbar .collab-btn')?.textContent === 'Sharing (1)', [], { what: 'Sharing (1)' });
-    assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#toolbar .collab-badge')].map((b) => [b.title, b.textContent])), [['Ana', 'A'], ['Rui', 'R']]);
-    assert.deepEqual(await fp.eval(() => [...document.querySelectorAll('#toolbar .collab-badge')].map((b) => b.title)), ['Ana', 'Rui']);
-    assert.equal(await fp.eval(() => document.querySelector('#toolbar .collab-btn').textContent), 'Following Ana');
+    await page.waitFor(() => document.querySelector('.collab-presence .collab-btn')?.textContent === 'Sharing (1)', [], { what: 'Sharing (1)' });
+    assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.collab-presence .collab-badge')].map((b) => [b.title, b.textContent])), [['Ana', 'A'], ['Rui', 'R']]);
+    assert.deepEqual(await fp.eval(() => [...document.querySelectorAll('.collab-presence .collab-badge')].map((b) => b.title)), ['Ana', 'Rui']);
+    assert.equal(await fp.eval(() => document.querySelector('.collab-presence .collab-btn').textContent), 'Following Ana');
     // the follower's cursor in the owner's editor
     await page.waitFor(() => document.querySelector('.doc:not([hidden]) .cm-peer-name')?.textContent === 'Rui', [], { what: 'Rui\'s cursor at the owner\'s' });
     // an edit of the owner arrives
@@ -86,12 +86,12 @@ uiTest('#3181 share and follow: the follower sees the project, the owner\'s edit
     await fp.waitFor(() => window.Silinx.active?.path === 'src/pass1.vhd', [], { what: 'the owner\'s new editor followed' });
     await fp.eval(() => window.SilinxApp.openFile('src/top.vhd'));
     await fp.waitConsole(/^Browsing alone: Ana's editor is no longer followed \(Follow Ana, in the toolbar, follows it again\)\.$/m);
-    assert.equal(await fp.eval(() => document.querySelector('#toolbar .collab-btn').textContent), 'Follow Ana');
+    assert.equal(await fp.eval(() => document.querySelector('.collab-presence .collab-btn').textContent), 'Follow Ana');
     await page.eval(() => window.Silinx.active.editor.setCursor({ line: 5, ch: 0 }));
     await new Promise((r) => setTimeout(r, 600));
     assert.equal(await active(fp), 'src/top.vhd', 'not followed while browsing alone');
     // following again from the presence's menu
-    await fp.click('#toolbar .collab-btn');
+    await fp.click('.collab-presence .collab-btn');
     await fp.waitForSelector('body > .menu-popup');
     assert.deepEqual(await fp.eval(() => [...document.querySelectorAll('body > .menu-popup .mi')].map((m) => [m.querySelector('.lbl').textContent, m.querySelector('.sc').textContent])),
       [['Ana', 'owner'], ['Rui', 'you'], ['Follow Ana', ''], ['Stop Following', '']]);
@@ -99,13 +99,13 @@ uiTest('#3181 share and follow: the follower sees the project, the owner\'s edit
     await fp.waitFor(() => window.Silinx.active?.path === 'src/pass1.vhd', [], { what: 'following again' });
     await fp.waitConsole(/^Following Ana's editor\.$/m);
     // Stop Sharing, from the owner's presence menu: the follower told, the project left as it was, read only
-    await page.click('#toolbar .collab-btn');
+    await page.click('.collab-presence .collab-btn');
     await page.waitForSelector('body > .menu-popup');
     await page.click('body > .menu-popup .mi', { text: 'Stop Sharing' });
     await page.waitConsole(/^Stopped sharing "Shared": its followers no longer see it\.$/m);
-    assert.equal(await page.eval(() => !!document.querySelector('#toolbar .collab-presence')), false);
+    assert.equal(await page.eval(() => !!document.querySelector('.collab-presence')), false);
     await fp.waitConsole(/^WARNING: Ana's project "Shared" is no longer followed \(the owner stopped sharing\): what you see is as it was then\.$/m);
-    assert.equal(await fp.eval(() => document.querySelector('#toolbar .collab-btn').textContent), 'Not shared any more');
+    assert.equal(await fp.eval(() => document.querySelector('.collab-presence .collab-btn').textContent), 'Not shared any more');
     assert.equal(await fp.eval(() => window.Silinx.active.editor.readOnly()), true);
     // the warnings: the end of sharing only, at the follower's; none at the owner's
     assert.deepEqual(await consoleWarnings(fp), ['WARNING: Ana\'s project "Shared" is no longer followed (the owner stopped sharing): what you see is as it was then.']);
@@ -129,7 +129,7 @@ uiTest('#3181 a drawing followed read only (traffic\'s FSM): its read-only mode,
     const notice = await fp.waitFor(() => window.Silinx.active.el.querySelector('[data-follow-notice]')?.textContent, [], { what: 'the notice' });
     assert.equal(notice, 'Só de leitura, a seguir o projeto de Ana');
     assert.equal(await fp.eval(() => !!window.Silinx.active.el.querySelector('.asm-readonly')), true, 'the FSM editor in its read-only mode');
-    assert.equal(await fp.eval(() => document.querySelector('#toolbar .collab-btn').textContent), 'A seguir Ana');
+    assert.equal(await fp.eval(() => document.querySelector('.collab-presence .collab-btn').textContent), 'A seguir Ana');
     await page.waitConsole(/^Rui follows your project "TrafficShared"\.$/m);
     // a change refused at the follower's backend (nothing reaches the server)
     const err = await fp.eval(async () => { try { await (await import('/js/api.js')).api.writeFile('TrafficShared', 'src/x.vhd', 'x'); return null; } catch (e) { return e.message; } });
@@ -167,4 +167,54 @@ uiTest('#3318 a follow link pasted into an open tab is followed; in the page tha
   } finally { await fp.close(); }
   await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());
   assert.deepEqual(await consoleWarnings(page), ['WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window.']);
+});
+
+// (#3315) Share Project… in the Start page's Project Commands, below Copy Link to Project… (the Silinx interface has no
+// File menu); who is in, at the Silinx interface's top bar before Search commands and files, at the ISE style toolbar's
+// right end, which has no Split button any more (View ▸ Split Editor); moved when the interface changes; in Portuguese
+const presencePlace = (page) => page.eval(() => {
+  const box = document.querySelector('.collab-presence');
+  const ui = document.documentElement.dataset.ui;
+  // (the ISE style: no Split button)
+  return box && { ui, parent: box.parentNode.id, next: box.nextElementSibling?.id || null, ...(ui === 'ise' ? { split: !!document.getElementById('split-btn')?.isConnected } : {}) };
+});
+const PLACE = { silinx: { ui: 'silinx', parent: 'top-actions', next: 'palette-btn' }, ise: { ui: 'ise', parent: 'toolbar', next: null, split: false } };
+uiTest('#3315 Share Project… in the Start page\'s Project Commands; who is in, at the top bar\'s right end (Silinx) or the toolbar\'s (ISE style, no Split button)', E, async (page) => {
+  await makeProject(env, { name: 'StartShared', top: 'top', files: { 'src/top.vhd': TOP } });
+  await page.openProject('StartShared');
+  await page.leftTab('start');
+  const commands = () => page.eval(() => [...document.querySelectorAll('#start-page .entry a')].map((a) => a.textContent));
+  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project') && [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Share Project…'), [], { what: 'the Start page\'s Share Project…' });
+  const cmds = await commands();
+  assert.equal(cmds[cmds.indexOf('Copy Link to Project…') + 1], 'Share Project…');
+  await page.click('#start-page .entry a', { text: 'Share Project…' });
+  await page.waitDialog('Share Project');
+  await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
+  await page.dialogButton('Share');
+  await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });
+  await page.dialogButton('Close');
+  await page.waitNoDialog();
+  await page.waitFor(() => document.querySelector('.collab-presence .collab-btn')?.textContent === 'Sharing', [], { what: 'Sharing' });
+  const first = await presencePlace(page);
+  assert.deepEqual(first, PLACE[first.ui]);
+  // the other interface, and back: moved with it
+  for (const ui of first.ui === 'silinx' ? ['ise', 'silinx'] : ['silinx', 'ise']) {
+    await page.eval(async (u) => (await import('/js/silinx.js')).setInterface(u), ui);
+    await page.waitFor((u) => document.documentElement.dataset.ui === u && document.querySelector('.collab-presence')?.parentNode.id === (u === 'silinx' ? 'top-actions' : 'toolbar'), [ui], { what: `who is in, in the ${ui} interface` });
+    assert.deepEqual(await presencePlace(page), PLACE[ui]);
+  }
+  // (the ISE style: Split Editor in the View menu)
+  if (first.ui === 'ise') {
+    assert.ok((await page.openMenu('View')).some((i) => i.label === 'Split Editor'));
+    await page.closeMenus();
+  }
+  // in Portuguese: the Start page's command
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Partilhar Projeto…'), [], { what: 'Partilhar Projeto…' });
+  const pt = await commands();
+  assert.equal(pt[pt.indexOf('Copiar Ligação para o Projeto…') + 1], 'Partilhar Projeto…');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());
+  await page.waitConsole(/^Stopped sharing "StartShared": its followers no longer see it\.$/m);
+  assert.deepEqual(await consoleWarnings(page), []);
 });

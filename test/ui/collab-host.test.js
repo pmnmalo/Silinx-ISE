@@ -54,7 +54,7 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     assert.deepEqual(await fp.eval(() => [...document.querySelectorAll('.dlg-overlay label, .dlg-overlay .collab-copy, .dlg-overlay .dlg-buttons .btn')].map((e) => e.textContent)),
       ['O seu código:', 'Copiar Código', 'O código do dono:', 'Ligar', 'Cancelar']);
     // a code that is not one, at the owner's: refused, in the console
-    await page.click('#toolbar .collab-btn');
+    await page.click('.collab-presence .collab-btn');
     await page.waitForSelector('body > .menu-popup');
     await page.click('body > .menu-popup .mi', { text: 'Add a Follower…' });
     await page.waitDialog('Add a Follower');
@@ -62,7 +62,7 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     await page.dialogButton('Connect');
     await page.waitConsole(/^ERROR: Add a Follower: a follower's code is not of this shared project \(or not whole\)\.$/m);
     // the follower's code, at the owner's: the answer's code
-    await page.click('#toolbar .collab-btn');
+    await page.click('.collab-presence .collab-btn');
     await page.waitForSelector('body > .menu-popup');
     await page.click('body > .menu-popup .mi', { text: 'Add a Follower…' });
     await page.waitDialog('Add a Follower');
@@ -83,7 +83,7 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     assert.equal(await fp.eval(() => window.Silinx.active.editor.readOnly()), true);
     assert.equal(await fp.eval(() => window.Silinx.active.el.querySelector('[data-follow-notice]')?.textContent), 'Só de leitura, a seguir o projeto de Ana');
     await page.waitConsole(/^Rui follows your project "Hosted"\.$/m);
-    await page.waitFor(() => document.querySelector('#toolbar .collab-btn')?.textContent === 'Sharing (1)', [], { what: 'Sharing (1)' });
+    await page.waitFor(() => document.querySelector('.collab-presence .collab-btn')?.textContent === 'Sharing (1)', [], { what: 'Sharing (1)' });
     // an edit of the owner arrives
     await page.eval(() => { const ed = window.Silinx.active.editor; ed.setCursor({ line: 0, ch: 0 }); ed.replaceSelection('-- by Ana\n'); });
     await fp.waitFor((t) => window.Silinx.active.editor.getValue() === t, [`-- by Ana\n${TOP}`], { what: 'the edit arrived' });

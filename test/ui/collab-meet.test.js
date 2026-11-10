@@ -59,13 +59,13 @@ uiTest('#3227 the meeting point: a follower opens the link and is in, an imposto
     assert.equal(await fp.eval(() => window.Silinx.active.editor.getValue()), TOP);
     assert.equal(await fp.eval(() => window.Silinx.active.editor.readOnly()), true);
     await page.waitConsole(/^Rui follows your project "Met"\.$/m);
-    await page.waitFor(() => document.querySelector('#toolbar .collab-btn')?.textContent === 'Sharing (1)', [], { what: 'Sharing (1)' });
+    await page.waitFor(() => document.querySelector('.collab-presence .collab-btn')?.textContent === 'Sharing (1)', [], { what: 'Sharing (1)' });
     await page.eval(() => { const ed = window.Silinx.active.editor; ed.setCursor({ line: 0, ch: 0 }); ed.replaceSelection('-- by Ana\n'); });
     await fp.waitFor((t) => window.Silinx.active.editor.getValue() === t, [`-- by Ana\n${TOP}`], { what: 'the edit arrived' });
     // the impostor met the follower (and the owner), and got nothing from the follower
     const imp = await page.eval(() => ({ met: window.__impostor.met.length, got: window.__impostor.got.length }));
     assert.ok(imp.met >= 2, `the impostor met ${imp.met}`);
-    assert.equal(await fp.eval(() => document.querySelector('#toolbar .collab-btn')?.textContent), 'Following Ana');
+    assert.equal(await fp.eval(() => document.querySelector('.collab-presence .collab-btn')?.textContent), 'Following Ana');
     // the owner gone from the meeting point (Stop Sharing): the follower told
     await page.eval(async () => { await window.__impostor.m.leave(); await (await import('/js/collab-share.js')).stopSharing(); });
     await fp.waitConsole(/^WARNING: Ana's project "Met" is no longer followed \(the owner stopped sharing\): what you see is as it was then\.$/m);

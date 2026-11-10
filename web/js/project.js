@@ -246,6 +246,8 @@ export async function renderStartPage() {
       ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
       ...[['Import Silinx Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx Project (.zip)…', 'save', exportZip('silinx'), true],
         ['Copy Link to Project…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]].map(command),   // (#2826)
+      // (Share Project…, as the File menu's: the editions that share, not while following another's, #3315)
+      ...((api.collab || api.standalone) && !api.following ? [command(['Share Project…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true])] : []),
       h('hr', { class: 'start-sep' }),
       ...[['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command)),
     // (where the projects are kept above the recent ones, #2029)

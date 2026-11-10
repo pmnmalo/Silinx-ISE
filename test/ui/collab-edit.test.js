@@ -61,7 +61,7 @@ uiTest('#3182 an editor edits a text file live with the owner: the same text on 
     const big = `${'-- a line of a large paste\n'.repeat(4000)}`;
     await ep.eval((t) => { const ed = window.Silinx.active.editor; ed.setCursor({ line: 0, ch: 0 }); ed.replaceSelection(t); }, big);
     await page.waitFor((t) => window.Silinx.active.editor.getValue() === t, [big + TOP], { what: 'the paste at the owner\'s', timeout: 15000 });
-    assert.equal(await ep.eval(() => window.SilinxApp.S && !document.querySelector('#toolbar .collab-btn')?.textContent.startsWith('Not shared')), true);
+    assert.equal(await ep.eval(() => window.SilinxApp.S && !document.querySelector('.collab-presence .collab-btn')?.textContent.startsWith('Not shared')), true);
     for (let t = Date.now(); Date.now() - t < 8000 && await readWs(env, 'Live', 'src/top.vhd') !== big + TOP;) await new Promise((r) => setTimeout(r, 100));
     assert.equal(await readWs(env, 'Live', 'src/top.vhd'), big + TOP);
     // the owner renames a file the editor has open: told in the editor's console
@@ -72,7 +72,7 @@ uiTest('#3182 an editor edits a text file live with the owner: the same text on 
     await ep.waitFor(() => window.SilinxApp.S.fileTree.includes('src/pass2.vhd'), [], { what: 'the renamed file at the editor\'s' });
     // the owner's presence, in Portuguese: the editor as an editor, Copy Editor Link among its commands
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-    await page.click('#toolbar .collab-btn');
+    await page.click('.collab-presence .collab-btn');
     await page.waitForSelector('body > .menu-popup');
     assert.deepEqual(await page.eval(() => [...document.querySelectorAll('body > .menu-popup .mi')].map((m) => [m.querySelector('.lbl').textContent, m.querySelector('.sc').textContent])),
       [['Ana', 'você'], ['Rui', 'editor'], ['Copiar Ligação', ''], ['Copiar Ligação de Editor', ''], ['Parar de Partilhar', '']]);
