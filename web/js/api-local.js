@@ -26,6 +26,7 @@ import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from 
 import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ice40.js';
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
+import { browserGit } from './git-browser.js';
 import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, normalizeProjectJson, projectFromZip, safePath, NAME_RE, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
 
 const fail = msg => { throw new Error(msg); };
@@ -220,8 +221,12 @@ function xiseProject(name, xise, files = {}) {
   return { json, files: pfiles, warnings };
 }
 
+// git through GitHub's REST API (#3196)
+const git = browserGit({ store: () => store, ops, prefix: DEV_SITE ? 'silinx.dev.' : 'silinx.' });
+
 export const api = {
   standalone: true,
+  ...git,
   devSite: DEV_SITE,
   // ---- where the projects are kept
   storage: () => storageInfo(),
@@ -280,7 +285,7 @@ export const api = {
   saveProject: (name, pj) => ops.saveProject(name, pj),
   trustProject: name => ops.trustProject(name),
   renameFile: (name, from, to) => ops.renameFile(name, from, to),
-  deleteProject: name => ops.deleteProject(name),
+  deleteProject: async name => { const r = await ops.deleteProject(name); await git.gitForget(name); return r; },
   // a file of the build (build/…: not among the project's files): this session's, else (a
   // workspace folder) the one in the project's build/ folder
   readFile: async (name, path) => {
