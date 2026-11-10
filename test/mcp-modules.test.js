@@ -16,6 +16,7 @@ const { TEST_BENCH_TOOLS } = await import('../server/mcp-test-bench.js');
 const { CONVERT_TOOLS } = await import('../server/mcp-convert.js');
 const { VIEW_TOOLS } = await import('../server/mcp-views.js');
 const { TABLE_TOOLS } = await import('../server/mcp-tables.js');
+const { GRADE_TOOLS } = await import('../server/mcp-grade.js');
 const { CHECK_TOOLS } = await import('../server/mcp-check.js');
 const { SCHEMATIC_TOOLS } = await import('../server/mcp-schematic.js');
 const { SIMULATE_DRAWING_TOOLS } = await import('../server/mcp-simulate-drawing.js');
@@ -57,7 +58,8 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(HLS_TOOLS), ['c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
   assert.deepEqual(names(LAB_TOOLS), ['lab']);   // (the guided labs, #3179)
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS]);
+  assert.deepEqual(names(GRADE_TOOLS), ['grade']);   // (automatic grading, #3192)
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);
