@@ -158,7 +158,8 @@ test('the build folder of a 7-series project: its sources, its XDC as <top>.xdc,
   assert.match(tcl, /read_vhdl -library work \{src\/src\/top\.vhd\}/);
   assert.match(tcl, /read_xdc \{top\.xdc\}/);
   assert.doesNotMatch(tcl, /set_property CFGBVS/);   // (the XDC's)
-  assert.ok(fs.statSync(path.join(b, 'run.sh')).mode & 0o100);
+  // (executable where the file system has the bit: not on Windows, #3189)
+  if (process.platform !== 'win32') assert.ok(fs.statSync(path.join(b, 'run.sh')).mode & 0o100);
   // a project whose constraints are still a UCF
   const u = blinkyProject('B3ucf', { constraints: 'constraints/top.ucf', text: 'NET "clk" LOC = "W5";\n' });
   await assert.rejects(V.generateVivadoBuild(u.project, u.dir), /^Error: constraints\/top\.ucf is a UCF: Vivado reads an XDC\. Update the constraints for the board \(Design Properties\) or write constraints\/top\.xdc\.$/);
