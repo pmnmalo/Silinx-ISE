@@ -50,7 +50,7 @@ export function checkUrl(url) {
   throw new GitError(`not a GitHub repository's address: ${redact(u) || '(none)'}`, URL_HINT);
 }
 
-/** A text with its URLs' credentials removed (https://user:token@github.com -> https://github.com). */
+/** A text with its URLs' credentials removed (a user:token@ after the scheme). */
 export const redact = s => String(s ?? '').replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/gi, '$1');
 
 // ------------------------------------------------------------------ running git
