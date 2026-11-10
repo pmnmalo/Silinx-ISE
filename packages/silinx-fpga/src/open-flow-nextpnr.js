@@ -25,8 +25,9 @@ import { paramBits, paramInt } from './fpga/netlist.js';
  *  (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE) and the latches (LD, LDE, LDCE, LDPE), of the falling edge too
  *  (_1, #2457), the carry chains (MUXCY, XORCY), the wide multiplexers, the constants (GND, VCC), the I/O buffers, the IOBs'
  *  DDR registers (IDDR2, ODDR2), BUFG and the clock switches (BUFGMUX, BUFGMUX_1), the DCMs, the block RAMs, the multipliers
- *  (not chained), the distributed RAMs and the shift registers. (A RAM64X1S: lowerRam64's; a BUF, a LUT1.) */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|BUFGMUX(_1)?|DCM|DCM_SP|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
+ *  (not chained), the distributed RAMs, the shift registers and the JTAG's user access (BSCAN_SPARTAN3, #3176: nextpnr
+ *  1.5.0's). (A RAM64X1S: lowerRam64's; a BUF, a LUT1.) */
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|BUFGMUX(_1)?|DCM|DCM_SP|BSCAN_SPARTAN3|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the

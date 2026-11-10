@@ -94,7 +94,7 @@ export const THIRD_PARTY = [
   },
   {
     "name": "@silinx/nextpnr-himbaechel-spartan3e",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "license": "ISC",
     "url": "https://github.com/pmnmalo/nextpnr-spartan",
     "standalone": false

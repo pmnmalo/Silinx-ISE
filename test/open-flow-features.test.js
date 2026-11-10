@@ -3,4 +3,4 @@
 // settings: FEATURES in test/open-flow-lib.mjs.
 import { testFeatures } from './open-flow-lib.mjs';
 
-testFeatures(['RAMB16', 'MULT18X18SIO', 'SLICEM']);
+testFeatures(['RAMB16', 'MULT18X18SIO', 'SLICEM', 'BSCAN']);
