@@ -150,3 +150,35 @@ uiTest('#1649 Design Summary of an AMD Vivado run (a 7-series device): Vivado\'s
   await page.waitFor((t) => /No violations/.test(document.querySelector('.doc:not([hidden])')?.innerText || ''), [], { what: 'the DRC with no violation' });
   assert.deepEqual(await page.eval(TABLE, 'Design Rule Check'), [['DRC', 'No violations']]);
 });
+
+// the logic analyzer inserted at Implement (#3176): its table, from the report's capture (core/flow-ide.js captureReport)
+const CAPTURE = { probes: [{ path: 'u_knight.count', width: 8 }, { path: 'u_knight.dir', width: 1 }], clock: 'clk', width: 9, depth: 1024, pre: 64,
+  trigger: 'u_knight.dir rises and u_knight.count = 20', combine: 'and', conditions: [{ path: 'u_knight.dir', op: 'rise' }, { path: 'u_knight.count', op: '=', value: '20' }],
+  blocks: 1, link: 'JTAG USER1 (BSCAN_SPARTAN3)' };
+const CAPTURE_ROWS = () => {
+  const t = document.querySelector('.summary-capture');
+  return t && [t.querySelector('caption').textContent, ...[...t.querySelectorAll('tr')].map((r) => [r.cells[0].textContent, r.cells[1].textContent])];
+};
+
+uiTest('#3176 Design Summary: the logic analyzer inserted at Implement, its probes, samples, trigger, block RAMs and link; in Portuguese too; none without a capture', E, async (page) => {
+  await makeProject(env, { name: 'Capture', template: 'blinky', board: 'basys2' });
+  await writeWs(env, 'Capture', 'build/reports.json', reports({ map: MAP, capture: CAPTURE }));
+  await page.openProject('Capture');
+  await page.waitFor(() => window.SilinxApp.findDoc('summary') && document.querySelector('.summary-capture'), [], { what: 'the logic analyzer\'s table' });
+  assert.deepEqual(await page.eval(CAPTURE_ROWS), ['Logic Analyzer', ['Probes', 'u_knight.count [8], u_knight.dir'], ['Samples', '9 bits × 1024 samples on clk, 64 before the trigger'],
+    ['Trigger', 'u_knight.dir rises and u_knight.count = 20'], ['Block RAMs', '1 block RAM(s), in the utilization above'], ['Link', 'JTAG USER1 (BSCAN_SPARTAN3)']]);
+  await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
+  try {
+    await page.waitFor(() => /Analisador Lógico/.test(document.querySelector('.doc:not([hidden])')?.innerText || ''), [], { what: 'the table in Portuguese' });
+    assert.deepEqual(await page.eval(CAPTURE_ROWS), ['Analisador Lógico', ['Sondas', 'u_knight.count [8], u_knight.dir'], ['Amostras', '9 bits × 1024 amostras em clk, 64 antes do disparo'],
+      ['Disparo', 'u_knight.dir sobe e u_knight.count = 20'], ['Block RAMs (memórias)', '1 block RAM(s), na utilização acima'], ['Ligação', 'JTAG USER1 (BSCAN_SPARTAN3)']]);
+  } finally {
+    await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+  }
+  // (a run with no capture: no table)
+  await makeProject(env, { name: 'NoCapture', template: 'blinky', board: 'basys2' });
+  await writeWs(env, 'NoCapture', 'build/reports.json', reports({ map: MAP }));
+  await page.openProject('NoCapture');
+  await page.waitFor(() => window.SilinxApp.findDoc('summary') && /Silinx toolchain\)/.test(document.querySelector('.doc:not([hidden])')?.innerText || ''), [], { what: 'the summary' });
+  assert.equal(await page.eval(() => document.querySelector('.summary-capture')), null);
+});

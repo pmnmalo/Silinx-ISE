@@ -30,6 +30,7 @@ import { RESOURCES_PT, RESOURCES_PT_PATTERNS } from './i18n-resources.js';
 import { PINS_PT, PINS_PT_PATTERNS } from './i18n-pins.js';
 import { LABS_PT, LABS_PT_PATTERNS } from './i18n-labs.js';
 import { GRADE_PT, GRADE_PT_PATTERNS } from './i18n-grade.js';
+import { CAPTURE_PT, CAPTURE_PT_PATTERNS } from './i18n-capture.js';
 import { prefKey } from './prefs.js';
 
 const PT = {
@@ -842,6 +843,8 @@ for (const [k, v] of Object.entries(LABS_PT)) if (!(k in PT)) PT[k] = v;   // th
 PT_PATTERNS.unshift(...LABS_PT_PATTERNS);
 for (const [k, v] of Object.entries(GRADE_PT)) if (!(k in PT)) PT[k] = v;   // the graded exercises (#3192)
 PT_PATTERNS.unshift(...GRADE_PT_PATTERNS);
+for (const [k, v] of Object.entries(CAPTURE_PT)) if (!(k in PT)) PT[k] = v;   // the logic analyzer (#3176)
+PT_PATTERNS.unshift(...CAPTURE_PT_PATTERNS);
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },

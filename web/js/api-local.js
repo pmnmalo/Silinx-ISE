@@ -170,7 +170,7 @@ function keepModels(rep, earlier, b) {
 }
 // build/reports.json's shape (server/open-flow.js openReports) from the flow's report
 function reportsOf(pj, r) {
-  const out = { generatedAt: new Date().toISOString(), top: pj.top, device: pj.device || null, source: 'open', synthesis: r.synthesis, map: r.map, par: r.par, timing: r.timing,
+  const out = { generatedAt: new Date().toISOString(), top: pj.top, device: pj.device || null, source: 'open', synthesis: r.synthesis, map: r.map, par: r.par, timing: r.timing, capture: r.capture,
     bit: r.bit ? { ...r.bit, header: { design: `${pj.top}.ncd`, part: `${String(pj.device.part).replace(/^xc/i, '')}${pj.device.package}` } } : undefined,
     prom: r.prom, pinsUcf: r.pinsUcf, simModels: r.simModels || {}, files: r.files || {} };
   out.summary = { synthesized: !!out.synthesis, mapped: !!out.map, routed: out.par ? out.par.routed : null, timingMet: out.timing ? out.timing.met : null,

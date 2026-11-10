@@ -170,6 +170,8 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   if (missing.length) throw new Error(`the Silinx toolchain has no ${missing.join(', ')} for ${st.part} yet (only ${st.steps.join(', ')})`);
   const spec = { top, part: st.part, device: dev, pkg, family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), ...(resources && { resources }) };
   if (synthUpToDate && !spec.steps.includes('synth')) spec.synthUpToDate = synthUpToDate;
+  // (the logic analyzer's capture, inserted by the front end: core/flow-ide.js, #3176)
+  if (project.capture) spec.capture = project.capture;
   // the test benches, for the post-synthesis model's generics (#120)
   const simSources = (project.files || []).filter(f => f.role === 'sim' && (f.lang === 'verilog' || f.lang === 'vhdl') && typeof files[f.path] === 'string')
     .map(f => ({ path: f.path, lang: f.lang, text: files[f.path] }));

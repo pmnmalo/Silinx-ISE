@@ -58,6 +58,19 @@ export function mountSummary(el) {
         h('td', {}, p === null ? '' : h('span', { class: 'util-bar' }, h('div', { style: { width: `${Math.min(100, p)}%` } })))));
     }
     page.append(tbl);
+    // the logic analyzer inserted at Implement (#3176): its probes, samples, trigger, block RAMs and link
+    const cap = open && rep?.capture;
+    if (cap) {
+      const words = { rise: 'rises', fall: 'falls', change: 'changes' };
+      const cond = c => (words[c.op] ? [h('code', {}, c.path), ' ', h('span', {}, words[c.op])] : [h('code', {}, c.path), ` ${c.op} ${c.value}`]);
+      const trigger = cap.conditions.length ? cap.conditions.flatMap((c, i) => [...(i ? [' ', h('span', {}, cap.combine === 'or' ? 'or' : 'and'), ' '] : []), ...cond(c)]) : [h('span', {}, 'the first sample')];
+      page.append(h('table', { class: 'summary-table summary-capture' }, h('caption', {}, 'Logic Analyzer'),
+        h('tr', {}, h('th', {}, 'Probes'), h('td', {}, ...cap.probes.flatMap((p, i) => [...(i ? [', '] : []), h('code', {}, p.path), p.width > 1 ? ` [${p.width}]` : '']))),
+        h('tr', {}, h('th', {}, 'Samples'), h('td', {}, `${cap.width} bits × ${cap.depth} samples on ${cap.clock}, ${cap.pre} before the trigger`)),
+        h('tr', {}, h('th', {}, 'Trigger'), h('td', {}, ...trigger)),
+        h('tr', {}, h('th', {}, 'Block RAMs'), h('td', {}, `${cap.blocks} block RAM(s), in the utilization above`)),
+        h('tr', {}, h('th', {}, 'Link'), h('td', {}, cap.link))));
+    }
     // timing
     const tm = rep?.timing;
     if (tm) {

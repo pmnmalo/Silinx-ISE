@@ -6,6 +6,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
 
 let tmp;
@@ -63,4 +64,32 @@ test('capture_settings\'s refusals: a signal not in the design, the XC3S100E\'s 
   await fails('capture_settings', { project: 'b', probes: ['u_pre.cnt', 'u_display.count'], clock: 'clk', depth: 4096 },
     "The capture takes 8 block RAM(s) of the device's 4: at most 3, one block kept for the design (fewer samples or fewer probes).");
   assert.equal((await P.readProject('b')).capture, undefined);
+});
+
+test('#3176 Implement inserts the capture (Silinx toolchain): blinky\'s bitstream with the core on BSCAN_SPARTAN3, no warning; the Design Summary\'s capture; the Spartan-6 refused', { timeout: 600000 }, async () => {
+  await ok('new_project_from_example', { name: 'bi', example: 'blinky' });
+  await ok('capture_settings', { project: 'bi', probes: ['u_knight.count', 'u_knight.dir'], clock: 'clk', depth: 1024, pre: 64,
+    trigger: { combine: 'and', conditions: [{ probe: 'u_knight.dir', op: 'rise' }, { probe: 'u_knight.count', op: '=', value: 20 }] } });
+  const run = await ok('run_process', { project: 'bi', process: 'bitstream', toolchain: 'silinx' });
+  assert.deepEqual(run.data.warnings, []);
+  assert.match(run.text, /^Logic analyzer: u_knight\.count\[8\], u_knight\.dir; 9 bits x 1024 samples on clk, 64 before the trigger \(u_knight\.dir rises and u_knight\.count = 20\); 1 block RAM\(s\), read over JTAG USER1 \(BSCAN_SPARTAN3\)\.$/m);
+  const routed = fs.readFileSync(path.join(P.projectDir('bi'), 'build', 'open', 'routed.xdl'), 'utf8');
+  assert.match(routed, /^inst "silinx_bscan" "BSCAN",placed UR_X27Y35 BSCAN +,$/m);
+  assert.ok(fs.existsSync(path.join(P.projectDir('bi'), 'build', 'top.bit')));
+  const summary = (await ok('get_report', { project: 'bi' })).data.summary;
+  assert.deepEqual(summary.capture, { probes: [{ path: 'u_knight.count', width: 8 }, { path: 'u_knight.dir', width: 1 }], clock: 'clk', width: 9, depth: 1024, pre: 64,
+    trigger: 'u_knight.dir rises and u_knight.count = 20', combine: 'and', conditions: [{ path: 'u_knight.dir', op: 'rise' }, { path: 'u_knight.count', op: '=', value: '20' }],
+    blocks: 1, link: 'JTAG USER1 (BSCAN_SPARTAN3)' });
+  // (the synthesis counted the core: its block RAM among the design's)
+  assert.equal(summary.synthesis.utilization.find(u => u.id === 'ramb16').used, 1);
+  // the Spartan-6: the Silinx toolchain has no BSCAN there yet
+  await ok('set_design_properties', { project: 'bi', board: 'nexys3' });
+  await ok('capture_settings', { project: 'bi', probes: ['u_knight.count'], clock: 'clk', depth: 1024, trigger: {} });
+  const s6 = await call('run_process', { project: 'bi', process: 'synthesize', toolchain: 'silinx' });
+  assert.match(s6.text, /capture: the Silinx toolchain inserts the logic analyzer on the Spartan-3E only \(not yet the spartan6\); clear the capture \(capture_settings\) to implement the design/);
+});
+
+test('#3176 the capture in an ISE or Vivado run: said, the design implemented without it', async () => {
+  const { CAPTURE_LEFT_OUT } = await import('../server/impl-routes.js');
+  assert.equal(CAPTURE_LEFT_OUT('Xilinx ISE'), 'WARNING:Silinx - the logic analyzer\'s capture is inserted by the Silinx toolchain only: Xilinx ISE implements the design without it.');
 });
