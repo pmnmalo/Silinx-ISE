@@ -197,3 +197,20 @@ test('timing_paths after a Vivado run: report_timing_summary\'s paths, back to t
   fs.utimesSync(path.join(build, 'top_timing.rpt'), t - 60, t - 60);
   assert.equal((await ok('timing_paths', { project: 'v1' })).data.toolchain, 'silinx');
 });
+
+// #3178 with the logic analyzer (#3176): the paths read the netlist the run routed, its wrapper's (silinx_capture_top,
+// the design at dut), not the build folder's netlist of the project's top, an earlier run's without the capture, which
+// matched no cell of the routed design (every path "could not be traced back to its source lines")
+test('timing_paths after a timing run with a capture: every path back to the clock example\'s source lines', { timeout: 600000 }, async () => {
+  await ok('new_project_from_example', { name: 'c1', example: 'clock' });
+  await ok('run_process', { project: 'c1', process: 'timing', toolchain: 'silinx' });
+  await ok('capture_settings', { project: 'c1', probes: ['led'], clock: 'clk', depth: 1024, pre: 0 });
+  const run = await ok('run_process', { project: 'c1', process: 'timing', toolchain: 'silinx' });
+  assert.deepEqual(run.data.warnings, []);
+  const build = path.join(P.projectDir('c1'), 'build', 'open');
+  assert.ok(fs.existsSync(path.join(build, 'silinx_capture_top.json')) && fs.existsSync(path.join(build, 'digital_clock.json')), 'both netlists there');
+  const list = await ok('timing_paths', { project: 'c1', count: 20 });
+  assert.equal(list.data.paths.length, 20);
+  for (const p of list.data.paths) assert.ok(p.lines.length, `${p.to} traced back`);
+  assert.ok(list.data.paths.some(p => p.lines.some(l => /^src\//.test(l.file))), 'the design\'s own files');
+});
