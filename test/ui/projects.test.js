@@ -710,6 +710,49 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
 
+// #3333: the Start page's Teaching box, the Silinx interface's: Guided Labs… and Exercise…, disabled with no project, each
+// opening its dialog with one; in Portuguese; none in the ISE style (its Start page is ISE's, its menus have both)
+uiTest('#3333 Start page: Guided Labs and Exercise in a Teaching box (the Silinx interface), disabled with no project; Portuguese', E, async (page) => {
+  await page.eval(() => window.SilinxApp.closeProject?.());
+  await page.leftTab('start');
+  await page.waitFor(() => document.querySelectorAll('#start-page .start-btns .btn').length === 2, [], { what: 'the Start page' });
+  const teach = () => page.eval(() => {
+    const box = document.querySelector('#start-page .start-teach');
+    return box && { shown: box.getClientRects().length > 0, title: box.querySelector('h3').textContent,
+      commands: [...box.querySelectorAll('.entry')].map((e) => `${e.querySelector('a').textContent}${getComputedStyle(e.querySelector('a')).pointerEvents === 'none' ? ' (disabled)' : ''}`) };
+  });
+  if (await page.eval(() => document.documentElement.dataset.ui) === 'ise') {
+    assert.equal((await teach()).shown, false, 'the ISE style\'s Start page: no Teaching box');
+    return;
+  }
+  assert.deepEqual(await teach(), { shown: true, title: 'Teaching', commands: ['Guided Labs… (disabled)', 'Exercise… (disabled)'] });
+  // (after Project Commands)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#start-page .start-box h3')].slice(0, 2).map((e) => e.textContent)), ['Project Commands', 'Teaching']);
+  await makeProject(env, { name: 'StartTeach', template: 'gates' });
+  await page.openProject('StartTeach');
+  await page.leftTab('start');
+  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the commands enabled' });
+  assert.deepEqual((await teach()).commands, ['Guided Labs…', 'Exercise…']);
+  await page.click('#start-page .start-teach .entry a', { text: 'Guided Labs…' });
+  await page.waitDialog('Guided Labs');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .lab-pick')?.dataset.lab), 'gates-first-steps');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await page.click('#start-page .start-teach .entry a', { text: 'Exercise…' });
+  await page.waitDialog('Exercise');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent.trim())), ['New Exercise', 'Cancel']);
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  try {
+    await page.waitFor(() => document.querySelector('#start-page .start-teach h3')?.textContent === 'Ensino', [], { what: 'Portuguese' });
+    assert.deepEqual((await teach()).commands, ['Laboratórios Guiados…', 'Exercício…']);
+  } finally {
+    await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  }
+});
+
 // #1300: Close Project in the right-click menu of the project's row (and the device's) in the Design tree
 uiTest('#1300 the Design tree: the project\'s row and the device\'s right-click menus close the project', E, async (page) => {
   await makeProject(env, { name: 'CloseRow', template: 'gates' });

@@ -238,6 +238,7 @@ table.grid tr.sel td { background: #dbe8fb; }
 /* an export with no project open: disabled (#1222: by the page's host, the page itself the same either way) */
 #start-page:not([data-project]) .start-export { color: #888; }
 #start-page:not([data-project]) .start-export a { color: inherit; cursor: default; pointer-events: none; text-decoration: none; }
+html[data-ui="ise"] #start-page .start-teach { display: none; }   /* (the labs and exercises: the Silinx interface's Start page, #3333) */
 .summary-table { border-collapse: collapse; margin-bottom: 16px; min-width: 640px; }
 .summary-table caption.summary-status { display: none; }   /* (the Tasks interface's only: web/css/tasks.css) */
 .summary-table caption { text-align: left; font-weight: bold; background: linear-gradient(#e9eff8, #c9d7ed); color: #15428b; padding: 3px 8px; border: 1px solid #99bbe8; border-bottom: none; }
