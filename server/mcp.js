@@ -34,6 +34,7 @@ import { GIT_TOOLS } from './mcp-git.js';
 import { TABLE_TOOLS } from './mcp-tables.js';
 import { LAB_TOOLS } from './mcp-labs.js';
 import { VERIFY_TOOLS } from './mcp-verify.js';
+import { GRADE_TOOLS } from './mcp-grade.js';
 
 export { OPEN_REPORTS } from './mcp-processes.js';
 
@@ -46,7 +47,7 @@ const INSTRUCTIONS = 'Silinx: FPGA design for teaching (Spartan-3E; Basys2, Nexy
 
 // the tools, by area: the projects and their files (mcp-projects.js), their settings (mcp-settings.js), their
 // new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), the conversions (mcp-convert.js), the read-only views related to a source (mcp-views.js), a drawing's Check (mcp-check.js), a schematic's Rearrange Wires / Schematic (mcp-schematic.js), a state machine's drawing stepped as its Simulate panel does (mcp-simulate-drawing.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), git (mcp-git.js), the HDL (mcp-hdl.js), Verify (mcp-verify.js), the wave configurations (mcp-wcfg.js), the C / C++ of Silinx HLS (mcp-hls.js), the processes (mcp-processes.js), the guided labs (mcp-labs.js)
-export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS];
+export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS];
 
 // ------------------------------------------------------------------ the protocol
 /** One request (or notification) of a client: its answer, or null for a notification. */
