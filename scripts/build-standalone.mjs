@@ -174,9 +174,9 @@ if (html.includes('importmap')) throw new Error('web/index.html: the import map 
 // replacer functions: the inserted code may contain `$'`, `$&`… which a replacement string would expand
 html = html.replace('<script type="module" src="/js/app.js"></script>',
   () => `<script>window.SILINX_STANDALONE = true;\nwindow.SILINX_ASSET_LAYOUT = ${safeJs(JSON.stringify(LAYOUT))};\nwindow.SILINX_FLOW_WORKER_SRC = ${safeJs(JSON.stringify(workerJs))};\nwindow.SILINX_EMU_WORKER_SRC = ${safeJs(JSON.stringify(emuWorkerJs))};</script>\n<script type="module">${safeJs(appJs)}</script>`);
-const TITLE = '<title>Silinx Project Navigator</title>';
+const TITLE = '<title>Silinx</title>';
 if (!html.includes(TITLE)) throw new Error(`web/index.html: no ${TITLE} to mark (standalone)`);
-html = html.replace(TITLE, () => '<title>Silinx Project Navigator (standalone)</title>');
+html = html.replace(TITLE, () => '<title>Silinx (standalone)</title>');
 if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inserted verbatim into the page');
 // copyright and the licences of the components embedded in this single file (NOTICE + their texts
 // from THIRD-PARTY-NOTICES.md), kept in the page as plain text

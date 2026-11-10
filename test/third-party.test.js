@@ -54,7 +54,7 @@ test('the standalone Silinx.html embeds the copyright, the Apache licence and th
     execFileSync(process.execPath, ['scripts/build-standalone.mjs'], { cwd: ROOT, stdio: 'pipe' });
     const html = fs.readFileSync(dist, 'utf8');
     // #2624: its title marked (standalone), the product's name as web/index.html writes it
-    assert.match(html, /<title>Silinx Project Navigator \(standalone\)<\/title>/);
+    assert.match(html, /<title>Silinx \(standalone\)<\/title>/);
     const m = /<script type="text\/plain" id="silinx-notices">([\s\S]*?)<\/script>/.exec(html);
     assert.ok(m, 'notices block');
     assert.match(m[1], /Copyright 2026 Pedro Maló/);

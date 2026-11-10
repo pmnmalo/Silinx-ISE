@@ -100,7 +100,7 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   // the version: a development build's (#135), with its date and time, not its commit (#204)
   assert.match(build?.commit || '', /^[0-9a-f]{7,}$/);
   assert.match(versionLabel(build), /^dev:[0-9a-f]{7,} \(\d{4}-\d\d-\d\d \d\d:\d\d\)$/);
-  assert.equal(await page.eval(() => document.title), `Silinx ${versionLabel(build)} Project Navigator`);
+  assert.equal(await page.eval(() => document.title), `Silinx ${versionLabel(build)}`);
   assert.equal(await page.eval(() => document.querySelector('#titlebar .app-logo').title), `Silinx ${versionLabel(build)}`);   // (not in the header, #987)
   await page.waitConsole(/Browser edition: projects are stored in this browser/);
   // File menu: the bundle commands of the standalone edition
