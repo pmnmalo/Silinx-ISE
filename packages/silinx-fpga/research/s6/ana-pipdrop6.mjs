@@ -5,8 +5,9 @@
 // ([minor, bit]), are its dropped PIPs' together. They are taken apart: a tile with no bits gives its PIPs none; a
 // tile with one PIP not known yet gives that PIP's bits (its others' taken away); then a PIP's bits are those every
 // tile it is in has (the intersection), less the known PIPs'; each the same in every tile of the type (checked).
-//   node research/s6/ana-pipdrop6.mjs <dir>[=part] …   -> packages/silinx-fpga/bitdb/s6/s6-pips-other.json (the parts' tile types
-//     the same: both boards' designs taken apart together; part default the XC6SLX16)
+//   node research/s6/ana-pipdrop6.mjs [--out file] <dir>[=part] …   -> packages/silinx-fpga/bitdb/s6/s6-pips-other.json
+//     (the parts' tile types the same: both boards' designs taken apart together; part default the XC6SLX16), or the
+//     file --out names (#3176's BSCAN measurement: the PIPs the database had not, then kept in s6-pips-bscan.json)
 // { pips: { 'TYPE from dir to': [[minor, bit]] }, unresolved: ['TYPE from dir to'] }
 import fs from 'node:fs';
 import path from 'node:path';
@@ -96,7 +97,7 @@ export function peel(tiles) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const dirs = process.argv.slice(2);
+  const args = process.argv.slice(2), o = args.indexOf('--out'), outFile = o >= 0 ? args.splice(o, 2)[1] : null, dirs = args;
   if (!dirs.length) { console.error('usage: node research/s6/ana-pipdrop6.mjs <dir>[=part] …'); process.exit(1); }
   const tiles = [], unplaced = [];
   for (const d of dirs) {
@@ -118,5 +119,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const { pips, problems, unresolved } = peel(tiles), none = Object.values(pips).filter(b => !b.length).length;
   console.log(`${Object.keys(pips).length} PIPs resolved (${none} with no bits), ${unresolved.length} not; ${problems.length} tiles inconsistent${problems.length ? `: ${problems.slice(0, 4).join('; ')}` : ''}; ${unplaced.length} bits near no tile${unplaced.length ? `: ${unplaced.slice(0, 6).join('; ')}` : ''}`);
-  fs.writeFileSync(new URL('../../bitdb/s6/s6-pips-other.json', import.meta.url), `${JSON.stringify({ pips, unresolved })}\n`);
+  fs.writeFileSync(outFile ?? new URL('../../bitdb/s6/s6-pips-other.json', import.meta.url), `${JSON.stringify({ pips, unresolved })}\n`);
 }
