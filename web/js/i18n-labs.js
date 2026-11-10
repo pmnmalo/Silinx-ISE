@@ -4,6 +4,8 @@
 export const LABS_PT = {
   'Guided Labs…': 'Laboratórios Guiados…',
   'Guided Labs': 'Laboratórios Guiados',
+  'Guided Lab': 'Laboratório Guiado',   // (New Source's type)
+  'A guided lab is in the labs folder: Location labs.': 'Um laboratório guiado fica na pasta labs: Localização labs.',
   'This project has no lab.': 'Este projeto não tem laboratórios.',
   'Check Step': 'Verificar Passo',
   'Check this step on the project': 'Verificar este passo no projeto',

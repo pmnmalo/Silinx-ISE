@@ -1,7 +1,7 @@
 // The MCP server's lab tool (server/mcp-labs.js, #3179): the labs of a project listed, a step shown, checked on a right
 // and a wrong project (the reasons and the hint, the try recorded in labs/progress.json), resumed, restarted; a
 // process's step on the project's last run (run_process); a link that opens a lab (project_link, open_link); a teacher's
-// lab of the project; its wrong arguments.
+// lab of the project, written with new_source and checked as it is edited (validate); its wrong arguments.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -141,10 +141,39 @@ test('lab: a teacher\'s lab in the project (a step with no checks marked done), 
   const top = await ok('lab', { project: 't', action: 'check', lab: 'mine' });
   assert.deepEqual(top.data.results, [{ check: 'project', ok: false, reasons: ['the project\'s top module is \'gates\', not \'other\''] }]);
   for (const [args, msg] of [[{ action: 'show' }, /^lab: lab: the lab's id \(mine, gates-first-steps, traffic-state-machine, blinky-clock-board, stopwatch-emulator: action list\)$/], [{ action: 'show', lab: 'x' }, /^lab: no lab 'x' in the project 't' \(mine, gates-first-steps, traffic-state-machine, blinky-clock-board, stopwatch-emulator\)$/],
-    [{ action: 'show', lab: 'mine', step: 9 }, /^lab: step: the lab 'mine' has steps 1 to 2 \(read, top\)$/], [{ action: 'x' }, /^lab: action: one of list, show, check, restart$/]]) {
+    [{ action: 'show', lab: 'mine', step: 9 }, /^lab: step: the lab 'mine' has steps 1 to 2 \(read, top\)$/], [{ action: 'x' }, /^lab: action: one of list, show, check, restart, validate$/]]) {
     const r = await call('lab', { project: 't', ...args });
     assert.equal(r.isError, true);
     assert.match(r.text, msg);
   }
   assert.match((await call('lab', { project: 'none', action: 'list' })).text, /no project 'none' in the workspace/);
+});
+
+test('#3179 a teacher\'s lab: new_source type lab writes its template, validate checks the file as it is edited, the lab runs', async () => {
+  await ok('new_project_from_example', { name: 'w', example: 'gates' });
+  const made = await ok('new_source', { project: 'w', type: 'lab', name: 'week1' });
+  assert.equal(made.text, 'Created Guided Lab \'labs/week1.lab.json\'.');
+  assert.equal(made.data.path, 'labs/week1.lab.json');
+  const v = await ok('lab', { project: 'w', action: 'validate', file: 'labs/week1.lab.json' });
+  assert.deepEqual([v.text, v.data.ok, v.data.lab, v.data.problems], ['The lab labs/week1.lab.json can be run (Project ▸ Guided Labs…).', true, 'week1', []]);
+  assert.equal((await ok('lab', { project: 'w', action: 'list' })).data.labs[0].id, 'week1', 'the project\'s own lab first');
+  // edited: a check of an unknown kind, a step with no title
+  const lab = JSON.parse(fs.readFileSync(`${tmp}/ws/w/labs/week1.lab.json`, 'utf8'));
+  lab.steps[1].checks = [{ check: 'board' }];
+  delete lab.steps[0].title;
+  fs.writeFileSync(`${tmp}/ws/w/labs/week1.lab.json`, JSON.stringify(lab));
+  const bad = await ok('lab', { project: 'w', action: 'validate', file: 'labs/week1.lab.json' });
+  assert.equal(bad.data.ok, false);
+  assert.equal(bad.text, ['ERROR: labs/week1.lab.json: step 1: "title": a text', 'ERROR: labs/week1.lab.json: step 2, check 1: "check": one of project, file, module, syntax, simulate, drawing, pins, process',
+    'The lab labs/week1.lab.json has 2 problem(s): Project ▸ Guided Labs… leaves it out until they are fixed.'].join('\n'));
+  fs.writeFileSync(`${tmp}/ws/w/labs/week1.lab.json`, '{');
+  assert.match((await ok('lab', { project: 'w', action: 'validate', file: 'labs/week1.lab.json' })).text, /^ERROR: labs\/week1\.lab\.json: not JSON \(/);
+  // the wrong ones: not a lab file, none there, another folder, a lab of that name already
+  for (const [args, msg] of [[{ action: 'validate', file: 'src/gates.vhd' }, /^lab: file: a lab file of the project, labs\/<name>\.lab\.json$/], [{ action: 'validate', file: 'labs/none.lab.json' }, /^lab: no file labs\/none\.lab\.json in the project 'w'$/]]) {
+    const r = await call('lab', { project: 'w', ...args });
+    assert.equal(r.isError, true);
+    assert.match(r.text, msg);
+  }
+  assert.match((await call('new_source', { project: 'w', type: 'lab', name: 'x', location: 'src' })).text, /A guided lab is in the labs folder: Location labs\.$/);
+  assert.match((await call('new_source', { project: 'w', type: 'lab', name: 'week1' })).text, /labs\/week1\.lab\.json already exists: choose another name\.$/);
 });

@@ -136,7 +136,7 @@ test('new_source: the wizard\'s refusals; an existing file not replaced', async 
   await fails({ type: 'test_bench', name: 'tb_x', module: 'nosuch' }, 'no module \'nosuch\' in the project\'s HDL files');
   await fails({ type: 'test_bench', name: 'tb_y' }, 'module: the module the test bench tests (the project has no top)');
   await fails({ type: 'package', name: 'pk', language: 'verilog' }, 'a package is VHDL\'s');
-  await fails({ type: 'netlist', name: 'n' }, 'type: one of module, test_bench, package, constraints, mem, c, cpp, schematic, fsm, asm, petri, boolean');
+  await fails({ type: 'netlist', name: 'n' }, 'type: one of module, test_bench, package, constraints, mem, c, cpp, schematic, fsm, asm, petri, boolean, lab');
   // a drawing's HDL file taken
   await ok('write_file', { project: 'p', path: 'src/spare.vhd', text: '-- a file\n' });
   await fails({ type: 'asm', name: 'spare' }, 'src/spare.vhd already exists: the HDL generated from the new source would be written there. Choose another name.');

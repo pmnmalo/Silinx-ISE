@@ -18,7 +18,8 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
 const TYPES = ['Boolean Algebra', 'Module (HDL)', 'Schematic', 'Finite State Machine (FSM)', 'Algorithmic State Machine (ASM)', 'Petri Net',
-  'Clock Manager (DCM / PLL)', 'Block Memory', 'Test Bench', 'Implementation Constraints File', 'Memory Initialization File (.mem)', 'C Function (HLS)', 'C++ Function (HLS)'];
+  'Clock Manager (DCM / PLL)', 'Block Memory', 'Test Bench', 'Implementation Constraints File', 'Memory Initialization File (.mem)', 'Guided Lab',
+  'C Function (HLS)', 'C++ Function (HLS)'];
 // each type: its wizard's dialog (null: none), only a wizard (Next > disabled)
 const WIZARD = {
   'Boolean Algebra': 'Boolean Algebra Wizard', 'Module (HDL)': 'Module Wizard', 'Schematic': 'Schematic Wizard', 'Finite State Machine (FSM)': 'FSM Wizard',
@@ -148,7 +149,7 @@ uiTest('New Source (#958, #2082) in Portuguese: Assistente > | < Anterior | Segu
     await page.menu('Projeto', 'Nova Fonte…');
     await page.waitFor(() => /Nova Fonte/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'the wizard in Portuguese' });
     const list = await listed(page);
-    for (const s of ['Módulo (HDL)', 'Esquemático', 'Máquina de Estados Finitos (FSM)', 'Máquina de Estados Algorítmica (ASM)', 'Rede de Petri', 'Gestor de Relógio (DCM / PLL)', 'Memória de Bloco', 'Bancada de Teste']) assert.ok(list.includes(s), `${s} in ${list}`);
+    for (const s of ['Módulo (HDL)', 'Esquemático', 'Máquina de Estados Finitos (FSM)', 'Máquina de Estados Algorítmica (ASM)', 'Rede de Petri', 'Gestor de Relógio (DCM / PLL)', 'Memória de Bloco', 'Bancada de Teste', 'Laboratório Guiado']) assert.ok(list.includes(s), `${s} in ${list}`);
     assert.ok(!list.some((s) => /Assistente/.test(s)), list.join(' | '));
     await pickSourceType(page, 'Gestor de Relógio (DCM / PLL)');
     await page.dialogButton('Seguinte >');

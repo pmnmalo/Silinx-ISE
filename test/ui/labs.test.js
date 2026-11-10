@@ -9,6 +9,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs, writeWs } from './harness.js';
 import { generateFsm } from '../../core/fsm-hdl.js';
+import { pickSourceType, waitNewSourcePage } from './new-source-helpers.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -313,3 +314,79 @@ uiTest('#3179 the stopwatch lab: the emulator (a step to try), the test bench, t
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   await page.waitConsole(/WARNING: Open from a link: the project has no lab 'nope' \(Project ▸ Guided Labs… lists its labs\)\./, { timeout: 60000 });
 }, { timeout: 240000 });
+
+uiTest('#3179 a teacher\'s lab: New Source ▸ Guided Lab (its template, in labs/ only), listed and run; checked as it is edited (each save, Check Syntax); in Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'teach', template: 'gates' });
+  await page.setViewport(1366, 768);
+  await page.openProject('teach');
+  const newLab = async (name, location = null) => {
+    await page.menu('Project', 'New Source…');
+    await page.waitDialog('New Source');
+    await pickSourceType(page, 'Guided Lab');
+    await page.dialogButton('Next >');
+    await waitNewSourcePage(page, 'File Name and Location');
+    assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')[1].value), 'labs', 'its folder');
+    await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
+    if (location !== null) await page.fill('.dlg-overlay .wiz-main input[type=text]', location, { index: 1 });
+    await page.dialogButton('Next >');
+  };
+  // another folder: refused
+  await newLab('w0', 'src');
+  await page.waitFor(() => /A guided lab is in the labs folder: Location labs\./.test(document.querySelector('.dlg-overlay').innerText), [], { what: 'the folder refused' });
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  // labs/week1.lab.json: the template, opened in the editor, with its Check Syntax
+  await newLab('week1');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent !== 'File Name and Location', [], { what: 'the summary' });
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.active?.id === 'file:labs/week1.lab.json' && window.Silinx.active.editor, [], { what: 'the lab file opened' });
+  await page.waitConsole(/Created Guided Lab 'labs\/week1\.lab\.json'\./);
+  const lab = JSON.parse(await readWs(env, 'teach', 'labs/week1.lab.json'));
+  assert.deepEqual([lab.id, lab.steps.map((s) => s.id)], ['week1', ['read', 'syntax', 'simulate']]);
+  const check = async () => {
+    const before = await page.eval(() => window.__console().length);
+    await page.click('.doc:not([hidden]) .editor-bar .btn', { text: 'Check Syntax' });
+    await page.waitFor((n) => /Process "Check Syntax" (completed successfully|failed)/.test(window.__console().slice(n)), [before], { what: 'the lab file checked' });
+    return page.eval((n) => window.__console().slice(n), before);
+  };
+  assert.match(await check(), /Started : "Check Syntax" of labs\/week1\.lab\.json\.\n[^]*The lab labs\/week1\.lab\.json can be run \(Project ▸ Guided Labs…\)\.\n[^]*Process "Check Syntax" completed successfully/);
+  // edited: a wrong check saved: said at once; Guided Labs leaves it out
+  const edit = async (text) => {
+    const before = await page.eval(() => window.__console().length);
+    await page.eval((t) => window.Silinx.active.editor.setValue(t), text);
+    await page.eval(() => window.SilinxApp.saveAll());
+    return before;
+  };
+  const wrong = { ...lab, steps: [...lab.steps.slice(0, 2), { ...lab.steps[2], checks: [{ check: 'pins' }] }] };
+  let n = await edit(JSON.stringify(wrong, null, 2));
+  await page.waitFor((c) => /has 1 problem\(s\)/.test(window.__console().slice(c)), [n], { what: 'the problem said' });
+  assert.match(await page.eval((c) => window.__console().slice(c), n), /ERROR: labs\/week1\.lab\.json: step 3, check 1 \(pins\): "pins": a list of \{ "port", "loc" \}\nThe lab labs\/week1\.lab\.json has 1 problem\(s\): Project ▸ Guided Labs… leaves it out until they are fixed\./);
+  assert.match(await check(), /Process "Check Syntax" failed \(1 error\(s\), 0 warning\(s\)\)/);
+  await page.menu('Project', 'Guided Labs…');
+  await page.waitDialog('Guided Labs');
+  assert.ok(!(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .lab-pick')].map((b) => b.dataset.lab))).includes('week1'));
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openFile('labs/week1.lab.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:labs/week1.lab.json' && window.Silinx.active.editor, [], { what: 'the lab file again' });
+  // fixed and titled: said once, listed first, run
+  n = await edit(JSON.stringify({ ...lab, title: { en: 'Week 1', pt: 'Semana 1' } }, null, 2));
+  await page.waitConsole(/The lab labs\/week1\.lab\.json can be run \(Project ▸ Guided Labs…\)\.\n?$/);
+  await edit(JSON.stringify({ ...lab, title: { en: 'Week 1', pt: 'Semana 1' }, intro: { en: 'Go.', pt: 'Vamos.' } }, null, 2));
+  await page.eval(() => new Promise((r) => setTimeout(r, 300)));
+  assert.equal((await page.eval((c) => window.__console().slice(c), n)).split('can be run').length - 1, 1, 'said when it changed only');
+  assert.equal((await openLab(page, 'week1'))[0], 'Week 1labs/week1.lab.json0 of 3 steps done');
+  for (const k of [1, 2, 3]) assert.match(await checkStepOf(page, k, 3), /Step done\./);
+  // in Portuguese: New Source's type
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
+  try {
+    await page.menu('Projeto', 'Nova Fonte…');
+    await page.waitFor(() => /Nova Fonte/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'New Source in Portuguese' });
+    assert.ok((await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.lastChild.textContent.trim()))).includes('Laboratório Guiado'));
+    await page.dialogButton('Cancelar');
+    await page.waitNoDialog();
+  } finally {
+    await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
+  }
+}, { timeout: 180000 });

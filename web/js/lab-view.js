@@ -18,7 +18,7 @@ import { panelToggle } from './narrow.js';
 import { statusLine } from './status-line.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import { PROCESSES } from '/core/labs-check.js';
-import { PROGRESS_FILE, checkLines, checkStep, labProgress, listLabs, localize, nextOpen, parseProgress, progressText, recordTry } from '/core/labs.js';
+import { PROGRESS_FILE, checkLines, checkStep, labFileLines, labProgress, listLabs, localize, nextOpen, parseLab, parseProgress, progressText, recordTry } from '/core/labs.js';
 
 export const STEPS_KEY = 'silinx.narrow.labsteps';   // (the Steps panel shown on a narrow screen)
 const lang = () => (getLanguage() === 'pt' ? 'pt' : 'en');
@@ -54,6 +54,34 @@ export async function openLabById(id) {
   if (!entry) return false;
   await openLab(entry);
   return true;
+}
+
+// A teacher's lab file (New Source ▸ Guided Lab, labs/<name>.lab.json) checked as it is edited (core/labs.js parseLab):
+// Check Syntax of the file says its problems, and each save says them when they change (none: the lab can be run)
+const saidProblems = new Map();   // (a lab file's problems last said, by its path)
+
+/** Check Syntax of a lab file: its problems in the console. Resolves to true when it has none. */
+export async function checkLabFile(path) {
+  await saveAll();
+  log(`\nStarted : "Check Syntax" of ${path}.\n`, 'hdr');
+  const { problems } = parseLab(await api.readFile(S.project.name, path), path);
+  saidProblems.set(path, problems.join('\n'));
+  const lines = labFileLines(path, problems);
+  for (const l of lines.slice(0, -1)) log(l, 'err');
+  log(lines.at(-1), problems.length ? 'err' : 'ok', { diag: false });
+  log(problems.length ? `\nProcess "Check Syntax" failed (${problems.length} error(s), 0 warning(s))` : '\nProcess "Check Syntax" completed successfully', problems.length ? 'err' : 'ok', { diag: false });
+  return !problems.length;
+}
+
+/** A lab file saved (app.js flushDoc): its problems said when they changed since they were last. */
+export async function labFileSaved(path) {
+  const { problems } = parseLab(await api.readFile(S.project.name, path), path);
+  const key = problems.join('\n');
+  if (saidProblems.get(path) === key || (!saidProblems.has(path) && !problems.length)) { saidProblems.set(path, key); return; }
+  saidProblems.set(path, key);
+  const lines = labFileLines(path, problems);
+  for (const l of lines.slice(0, -1)) log(l, 'err');
+  log(lines.at(-1), problems.length ? 'warn' : 'ok', { diag: false });
 }
 
 /** Project ▸ Guided Labs…: the labs of the project in a list, the one picked opened. */
