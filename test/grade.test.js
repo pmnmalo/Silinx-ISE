@@ -294,6 +294,17 @@ test('#3192 Grading Error: a synthesis the grader cannot run (a read Node\'s per
   assert.deepEqual([r.verdict, r.verdictName, r.tests[0].messages], ['GE', 'Grading Error', ['the synthesis could not run: Access to this API has been restricted (FileSystemRead /tmp/x)']]);
 });
 
+test('#3215 a synthesis test\'s slices not checked (no chip database): the other limits\' verdict, said why', async () => {
+  const ex = counterExercise();
+  ex.tests = [{ id: 'impl', points: 1, kind: 'synthesis', luts: 4, ffs: 4, slices: 2 }];
+  const why = 'the slices are not checked here: nextpnr\'s chip database of xc3s250e is not in this installation and could not be downloaded (fetch failed)';
+  const synthesize = async () => ({ errors: [], warnings: [], latches: 0, luts: 0, ffs: 4, slices: null, notes: [why] });
+  const ok = await grade(ex, hdl(COUNTER_V), { synthesize });
+  assert.deepEqual([ok.verdict, ok.tests[0].messages, ok.tests[0].used], ['AC', [why], { luts: 0, ffs: 4, slices: null, latches: 0 }]);
+  const over = await grade(ex, hdl(COUNTER_V), { synthesize: async () => ({ ...(await synthesize()), ffs: 8 }) });
+  assert.deepEqual([over.verdict, over.tests[0].messages], ['RL', ['8 flip-flops, at most 4', why]]);
+});
+
 test('#3192 --visible: the visible tests only, the maximum theirs', async () => {
   const r = await grade(counterExercise(), hdl(COUNTER_V), { visible: true });
   assert.deepEqual([r.visible, r.points, r.max, r.tests.map(t => t.id)], [true, 30, 30, ['count']]);

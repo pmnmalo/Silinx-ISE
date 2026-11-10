@@ -70,7 +70,9 @@ A test is hidden unless it has `"visible": true`. Each test is worth `points` (1
 - **synthesis**: the open synthesis (Yosys, then Place & Route for the slices) on the exercise's `device` (the
   Basys2's XC3S250E by default), with these requirements:
   - `latches: false`: no latch;
-  - `luts`, `ffs` and `slices`: at most that many;
+  - `luts`, `ffs` and `slices`: at most that many. The slices need nextpnr's chip database of the device, which the
+    release zip leaves out. The grader downloads it once, checks it and keeps it, before a submission runs. Offline, the
+    slices are not checked: the report says so, and the other requirements give the verdict;
   - `warnings: false`: no warning from Check Syntax or the synthesis.
 
 - **check**: the guided labs' step checks (`core/labs-check.js`, #3179: `project`, `file`, `module`, `syntax`,

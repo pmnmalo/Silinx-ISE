@@ -132,7 +132,7 @@ export function expandSubmissions(paths) {
 // ---------------------------------------------------------------- the grading process
 /** The flags of a grading process: its heap, and Node's permission model where this Node has it: reading Silinx's own
  *  files only (its folder, its packages' and `read`'s: the routing graph of the synthesis tests' device when it is
- *  the user's, built from their ISE), writing none. Nothing else of the user's folders: the process never looks for
+ *  the user's, built from their ISE, and nextpnr's chip database downloaded for it), writing none. Nothing else of the user's folders: the process never looks for
  *  what it needs (a lookup of a folder it may not read is refused, as an error), it is given (synthesisStatus). */
 export function processFlags(memoryMb, { read = [] } = {}) {
   const flags = [`--max-old-space-size=${Math.max(32, Math.round(memoryMb))}`];
@@ -148,19 +148,23 @@ export function processFlags(memoryMb, { read = [] } = {}) {
 }
 
 /** The synthesis tests' device status, as the grading process uses it ({ part, device, graph, reason }: server/
- *  open-flow.js openStatus, its routing graph found here, Silinx's or the user's), or null when no test synthesizes. */
-export async function synthesisStatus(ex) {
+ *  open-flow.js openStatus, its routing graph found here, Silinx's or the user's), or null when no test synthesizes;
+ *  when a test limits the slices, nextpnr's chip database got here too (grade-synth.js slicesChipdb: chipdbDir, the
+ *  folder the process may read, or slicesReason, #3215). nextpnr: the chip databases' io (a test's stand-in). */
+export async function synthesisStatus(ex, { nextpnr } = {}) {
   if (!ex.tests.some(t => t.kind === 'synthesis')) return null;
-  const [{ openStatus }, { GRADE_DEVICE }] = await Promise.all([import('./open-flow.js'), import('./grade-synth.js')]);
-  const st = openStatus(ex.device || GRADE_DEVICE);
-  return { part: st.part, device: st.device, graph: st.graph || null, reason: st.reason };
+  const [{ openStatus }, { GRADE_DEVICE, slicesChipdb }] = await Promise.all([import('./open-flow.js'), import('./grade-synth.js')]);
+  const device = ex.device || GRADE_DEVICE, st = openStatus(device);
+  const out = { part: st.part, device: st.device, graph: st.graph || null, reason: st.reason };
+  if (out.part && out.graph && ex.tests.some(t => t.kind === 'synthesis' && t.slices !== undefined)) Object.assign(out, await slicesChipdb(device, { nextpnr }));
+  return out;
 }
 
 // one run of server/grade-run.js on a job: its messages one by one (onMessage, which returns the seconds the process
 // has from then on, null for no limit, undefined to keep the clock as it is), then { code, timedOut, outOfMemory }
 function runProcess(job, { memoryMb, seconds, onMessage }) {
   return new Promise(resolve => {
-    const read = job.synthesis?.graph ? [path.dirname(job.synthesis.graph)] : [];
+    const read = [job.synthesis?.graph && path.dirname(job.synthesis.graph), job.synthesis?.chipdbDir].filter(Boolean);
     const child = spawn(process.execPath, [...processFlags(memoryMb, { read }), path.join(HERE, 'grade-run.js')], { stdio: ['pipe', 'pipe', 'pipe'], cwd: ROOT, env: { PATH: process.env.PATH || '', ...(process.env.SILINX_CONFIG_DIR && { SILINX_CONFIG_DIR: process.env.SILINX_CONFIG_DIR }) } });
     let buf = '', errText = '', timer = null, timedOut = false;
     const arm = s => { clearTimeout(timer); timer = s ? setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, s * 1000) : null; };
