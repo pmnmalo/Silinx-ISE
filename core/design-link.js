@@ -266,7 +266,14 @@ function cModule(path, text) {
 export const SITE_URL = 'https://pmnmalo.github.io/Silinx/';
 
 // ------------------------------------------------------------------ the link's hash
-const KEYS = ['design', 'open', 'view', 'top', 'board', 'ui', 'lab'];
+const KEYS = ['design', 'open', 'gist', 'view', 'top', 'board', 'ui', 'lab'];
+
+/** A short link's `gist=` value (#3223, core/gist-link.js) checked -> { id, key }; or an Error (linkError). */
+export function parseGistRef(value) {
+  const [id, key, ...rest] = String(value ?? '').split('.');
+  if (rest.length || !/^[0-9a-f]{20,40}$/.test(id || '') || !/^[A-Za-z0-9_-]{43}$/.test(key || '')) throw linkError('the link\'s gist= is not a short link\'s (<gist>.<key>)');
+  return { id, key };
+}
 
 /**
  * The options of a link's hash ('#design=…&view=try'): null when it has none of them (the plain address, a token);
@@ -289,8 +296,9 @@ export function parseLink(hash) {
   }
   if (!Object.keys(opts).length) return null;
   let source;
-  if (opts.design !== undefined && opts.open !== undefined) throw linkError('the link has both design= and open=');
-  if (opts.design !== undefined) {
+  if ([opts.design, opts.open, opts.gist].filter(v => v !== undefined).length > 1) throw linkError(opts.gist === undefined ? 'the link has both design= and open=' : 'the link has more than one of design=, open= and gist=');
+  if (opts.gist !== undefined) source = { kind: 'gist', ...parseGistRef(opts.gist) };
+  else if (opts.design !== undefined) {
     if (!opts.design) throw linkError('the link\'s design= is empty');
     source = { kind: 'design', design: opts.design };
   } else if (opts.open !== undefined) {
@@ -306,7 +314,7 @@ export function parseLink(hash) {
       if (privateHost(url.hostname)) throw linkError(`the link's open= is an address of this computer or of a local network ('${url.hostname.slice(0, 64)}')`);
       source = { kind: 'zip', url: url.href };
     }
-  } else throw linkError('the link names no design (design= or open=)');
+  } else throw linkError('the link names no design (design=, open= or gist=)');
   if (opts.view !== undefined && opts.view !== '' && !LINK_VIEWS.includes(opts.view)) throw linkError(`the link's view '${opts.view.slice(0, 32)}' is not one of ${LINK_VIEWS.join(', ')}`);
   if (opts.top && !MODULE_RE.test(opts.top)) throw linkError(`the link's top '${opts.top.slice(0, 64)}' is not a module name`);
   if (opts.board && !BOARD_RE.test(opts.board)) throw linkError(`the link's board '${opts.board.slice(0, 32)}' is not a board name`);
@@ -367,15 +375,16 @@ function ipv6Groups(h) {
 /**
  * A link: base (the app's address, its hash dropped) + the hash of { design | example | zip, view, top, board, ui, lab }.
  */
-export function makeLink(base, { design, example, zip, view, top, board, ui, lab } = {}) {
-  const sources = [design, example, zip].filter(v => v !== undefined && v !== null);
-  if (sources.length !== 1) throw linkError('a link has one design: design, example or zip');
+export function makeLink(base, { design, example, zip, gist, view, top, board, ui, lab } = {}) {
+  const sources = [design, example, zip, gist].filter(v => v !== undefined && v !== null);
+  if (sources.length !== 1) throw linkError('a link has one design: design, example, zip or gist');
+  if (gist) parseGistRef(gist);
   if (view && !LINK_VIEWS.includes(view)) throw linkError(`view: one of ${LINK_VIEWS.join(', ')}`);
   if (top && !MODULE_RE.test(top)) throw linkError(`top: '${top}' is not a module name`);
   if (board && !BOARD_RE.test(board)) throw linkError(`board: '${board}' is not a board name`);
   if (example !== undefined && example !== null && !EXAMPLE_RE.test(example)) throw linkError(`example: '${example}' is not an example's name`);
   if (lab && !LAB_RE.test(lab)) throw linkError(`lab: '${lab}' is not a lab's id`);
-  const parts = [design ? `design=${design}` : example ? `open=example:${example}` : `open=${encodeURI(zip).replace(/[#&]/g, encodeURIComponent)}`];
+  const parts = [design ? `design=${design}` : gist ? `gist=${gist}` : example ? `open=example:${example}` : `open=${encodeURI(zip).replace(/[#&]/g, encodeURIComponent)}`];
   if (top) parts.push(`top=${top}`);
   if (board) parts.push(`board=${board}`);
   if (view) parts.push(`view=${view}`);
