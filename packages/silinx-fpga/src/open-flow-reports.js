@@ -36,9 +36,11 @@ export function mountFlowReports(ctx) {
     const lines = timingReport(sta, checks);
     report.files.timing = io.write('open/timing.txt', `Static timing analysis of ${top} (Silinx toolchain, delay model of ${reports.model})\n\n${lines.join('\n')}\n`);
     // (#3178: the slowest paths, stage by stage, back to the source lines: the timing report's Paths panel, the MCP's timing_paths)
-    const json = io.read(`open/${top}.json`);
+    // (the netlist this run routed, its top the synthesis's: a logic analyzer's wrapper, #3176; else the build folder's)
+    const json = ctx.netlistText?.() ?? io.read(`open/${top}.json`);
     const netlist = json == null ? null : typeof json === 'string' ? JSON.parse(json) : json;
-    const paths = timingPaths(sta, design, { n: PATHS, periods, netlist, synText: io.read(`open/${top}_syn.v`) || '', top, between: true });
+    const synTop = Object.entries(netlist?.modules || {}).find(([, m]) => m.attributes?.top)?.[0] ?? top;
+    const paths = timingPaths(sta, design, { n: PATHS, periods, netlist, synText: io.read(`open/${synTop}_syn.v`) || '', top: synTop, between: true });
     report.files.paths = io.write('open/paths.json', JSON.stringify(paths));
     const failed = periods.filter(c => !c.missing && !c.met), offFailed = offsets.filter(c => !c.missing && !c.unsupported && !c.met);
     const crossFailed = cross.filter(c => c.related && !c.met);
