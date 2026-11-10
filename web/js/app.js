@@ -34,7 +34,7 @@ import { renameSymbolIn } from './rename.js';
 import { writeClip, readClip, noteCopy, canPasteText } from './clipboard.js';
 import { prefKey } from './prefs.js';
 import { keepCursor, keptCursor } from './doc-cursor.js';
-import { mountSplit, placeSplit, splitClosed, splitItems, tabTip } from './split-view.js';
+import { mountSplit, placeSplit, splitClosed, splitItems, tabInSight, tabTip } from './split-view.js';
 import { closeAllDocs, restoreViewState, saveViewState, viewKept } from './view-state.js';
 import { following, followNotice, editsHere } from './collab-state.js';
 
@@ -360,8 +360,8 @@ export function activateDoc(doc, { background = false } = {}) {
   S.active = doc;
   for (const d of S.docs) { d.el.hidden = d !== doc; d.tab.classList.toggle('active', d === doc); }
   placeSplit(doc);   // (on its side, the other side's document shown beside it, #1619, #1652)
-  // (its tab in sight in a full strip, once the Tasks layout and the split have placed it)
-  requestAnimationFrame(() => doc.tab.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+  // (its tab in sight in a full strip, once the Tasks layout and the split have placed it: web/js/tab-sight.js, #3304)
+  tabInSight();
   doc.onActivate?.();
   if (!viewKept() && !background) drawerGiveWay();   // a narrow screen: the drawer gives way to the document (#266)
   updateTitle();
