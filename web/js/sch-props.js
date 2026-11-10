@@ -16,6 +16,7 @@ import { clone, snap, KEYS } from './sch-editor.js';
 import { mountMultiProps } from './sch-multi.js';
 import { mountCompareTicks } from './sch-compare.js';
 import { setMarkerWidth } from '/core/schmarker.js';
+import { instName } from '/core/schname.js';
 import { graphicProps } from './sch-graphics.js';
 
 /** { renderProps, openSelected, renamed, joinByName, renameLabel } of a schematic editor (doc(), sel(), nl(), live(), modules(): its current ones). */
@@ -154,7 +155,8 @@ export function mountProps(ctx) {
     const sum = s.type === 'module' ? (S?.description || '') : symbolSummary(s.type, s.params, getLanguage());
     propBody.append(h('div', { class: 'se-ptitle', text: title }), h('div', { class: 'se-note se-sum', 'data-no-i18n': '', text: sum }),
       h('div', { class: 'se-pbtns' }, h('button', { class: 'btn ro-ok se-infobtn', type: 'button', text: 'Symbol Info…', title: 'Symbol Info (F1)', onclick: () => openInfo(infoTarget()) })));
-    propBody.append(field('Instance name', inp(s.name, v => { s.name = newName(v, s.name); })));
+    // (cleared: a fresh automatic name, inst_n, not drawn, #3300)
+    propBody.append(field('Instance name', inp(s.name, v => { s.name = String(v).trim() ? newName(v, s.name) : instName(doc(), s.id, ''); })));
     for (const p of symbolParams(s)) {
       const v = s.params[p.name];
       let el;

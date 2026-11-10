@@ -5,7 +5,7 @@
 // #2170), in one edit: one undo step, the HDL generated again.
 import { dialog } from './ui.js';
 import { h } from './dom.js';
-import { renameError } from '/core/schname.js';
+import { instName, renameError } from '/core/schname.js';
 import { setMarkerWidth } from '/core/schmarker.js';
 import { KEYS } from './sch-editor.js';
 
@@ -31,7 +31,8 @@ export function mountSchRename(ctx) {
       buttons: [{ label: 'Rename', primary: true, value: true, validate: () => { const m = check(); err.textContent = m || ''; return !m; } }, { label: 'Cancel', value: null }],
       onOpen: () => setTimeout(() => input.select(), 0),
     });
-    const name = input.value.trim();
+    // (an instance's name cleared: a fresh automatic one, not drawn, #3300)
+    const name = it.kind === 'sym' ? instName(doc(), it.id, input.value) : input.value.trim();
     if (!ok || name === old) return;
     if (it.kind === 'label') {
       const l = find(it);

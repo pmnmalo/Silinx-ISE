@@ -1,7 +1,8 @@
 // UI (#1546): the schematic editor's right-click menu on a symbol, an I/O marker and a net name: Rename…, a small
 // dialog with the name; an invalid identifier, a reserved word, another instance's or I/O marker's name refused in the
 // dialog, which stays open; a good name given in one undo step, the generated HDL with it; no menu on a wire. In
-// English and in Portuguese.
+// English and in Portuguese. An instance's name cleared (#3300), in Properties or in Rename…: a fresh automatic inst_n,
+// not drawn, undone in one step; an I/O marker's empty name still refused.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
@@ -155,4 +156,100 @@ uiTest('#1546 schematic: Rename… in the right-click menu of a symbol, an I/O m
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   }
   assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), false, 'nothing to undo');
+});
+
+uiTest('#3300 schematic: an instance\'s name cleared, in Properties and in Rename…, is a fresh inst_n, not drawn; Undo; an I/O marker\'s still refused', E, async (page) => {
+  // a -> inv_a -> s -> M1 (sub) -> y; inst_2 another inverter, of an automatic name
+  const doc = newDoc('top', 'vhdl');
+  doc.symbols.push({ id: 'S1', type: 'inv', name: 'inv_a', x: 80, y: 90, rot: 0, mirror: false, params: { width: 1 } },
+    { id: 'S2', type: 'inv', name: 'inst_2', x: 80, y: 290, rot: 0, mirror: false, params: { width: 1 } },
+    { id: 'S3', type: 'module', name: 'M1', x: 300, y: 100, rot: 0, mirror: false, params: { module: 'sub', ports: [{ name: 'i', dir: 'in', width: 1 }, { name: 'o', dir: 'out', width: 1 }] } });
+  doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 480, y: 120 },
+    { id: 'P3', name: 'b', dir: 'in', width: 1, x: 60, y: 300 }, { id: 'P4', name: 'z', dir: 'out', width: 1, x: 200, y: 300 });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(240, 100), P(240, 120), P(300, 120)] },
+    { id: 'W3', points: [P(420, 120), P(480, 120)] }, { id: 'W4', points: [P(60, 300), P(80, 300)] }, { id: 'W5', points: [P(160, 300), P(200, 300)] });
+  doc.labels.push({ id: 'L1', x: 200, y: 100, net: 's' });
+  await makeProject(env, { name: 'RenAutoPj', top: 'top', files: { 'src/sub.vhd': SUB, 'src/top.sch.json': JSON.stringify(doc) } });
+  await page.openProject('RenAutoPj');
+  await page.eval(() => window.SilinxApp.openSch('src/top.sch.json'));
+  await page.waitFor((ed) => document.querySelectorAll(`${ed} svg .sym`).length === 3, [ED], { what: 'drawn' });
+  const MODS = { sub: { name: 'sub', lang: 'vhdl', ports: [{ name: 'i', dir: 'in', width: 1 }, { name: 'o', dir: 'out', width: 1 }] } };
+  const getDoc = () => page.eval(() => window.Silinx.active.schEditor.getDoc());
+  const clean = async (what) => {
+    const d = await getDoc();
+    assert.deepEqual(netlist(d, { modules: MODS }).diagnostics.map((x) => x.message), [], `${what}: no warnings`);
+    for (const lang of ['vhdl', 'verilog']) assert.deepEqual(generateHdl(d, { lang, modules: MODS }).diagnostics.map((x) => x.message), [], `${what}: no ${lang} warnings`);
+  };
+  const names = async () => (await getDoc()).symbols.map((s) => s.name);
+  const drawn = (id, name) => page.eval((ed, i, n) => [...document.querySelectorAll(`${ed} svg .sym[data-id="${i}"] text`)].some((t) => t.textContent === n), ED, id, name);
+  const hdlHas = (re, what) => page.waitFor(async (src) => new RegExp(src).test(await (await fetch('/api/projects/RenAutoPj/file?path=src%2Ftop.vhd')).text()), [re.source], { what, timeout: 15000 });
+  // the Properties panel's field of that label: its value, or set (change)
+  const propField = (label) => page.eval((ed, l) => [...document.querySelectorAll(`${ed} .se-props .se-field`)].find((f) => f.querySelector('label')?.textContent === l)?.querySelector('input')?.value, ED, label);
+  const setField = (label, v) => page.eval((ed, l, x) => { const i = [...document.querySelectorAll(`${ed} .se-props .se-field`)].find((f) => f.querySelector('label')?.textContent === l).querySelector('input'); i.value = x; i.dispatchEvent(new Event('change', { bubbles: true })); }, ED, label, v);
+  const undo = async () => { await page.key('Escape'); await page.menu('Edit', 'Undo'); };
+  await clean('as opened');
+  assert.equal(await drawn('S2', 'inst_2'), false, 'an automatic name not drawn');
+
+  // Properties: inv_a's name cleared: inst_3 (after inst_2), not drawn, the field showing it; Undo: inv_a again
+  await page.click(`${ED} svg .sym[data-id="S1"] .hitbox`);
+  await page.waitFor((ed) => [...document.querySelectorAll(`${ed} .se-props .se-field input`)].some((i) => i.value === 'inv_a'), [ED], { what: 'inv_a selected' });
+  assert.equal(await propField('Instance name'), 'inv_a');
+  assert.equal(await drawn('S1', 'inv_a'), true);
+  await setField('Instance name', '   ');
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[0].name === 'inst_3', [], { what: 'inv_a named inst_3' });
+  assert.deepEqual(await names(), ['inst_3', 'inst_2', 'M1']);
+  assert.equal(await propField('Instance name'), 'inst_3', 'the field shows it');
+  assert.equal(await drawn('S1', 'inst_3'), false, 'not drawn');
+  assert.equal(await drawn('S1', 'inv_a'), false);
+  await clean('inv_a cleared');
+  await undo();
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[0].name === 'inv_a', [], { what: 'inv_a undone' });
+  assert.equal(await drawn('S1', 'inv_a'), true, 'inv_a drawn again');
+  assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), false, 'one undo step');
+
+  // Properties: an I/O marker's name cleared keeps its name
+  await page.key('Escape');
+  await page.click(`${ED} svg .port[data-id="P1"] .hitbox`);
+  await page.waitFor((ed) => document.querySelector(`${ed} .se-ptitle`)?.textContent === 'I/O Marker', [ED], { what: 'a selected' });
+  await setField('Name', '');
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal((await getDoc()).ports[0].name, 'a', "a marker's empty name refused");
+
+  // Rename…: M1's name cleared: no refusal, inst_3, not drawn, the HDL with it; Undo: M1 again
+  await page.key('Escape');
+  await page.rightClick(`${ED} svg .sym[data-id="S3"] .hitbox`);
+  await page.waitFor(() => document.querySelector('body > .menu-popup'), [], { what: 'the menu' });
+  await page.click('body > .menu-popup > .mi');
+  await page.waitDialog('Rename Instance');
+  await page.eval(() => { const i = [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.dlg-body input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.se-rename-err').textContent), '', 'no refusal');
+  await page.dialogButton('Rename');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[2].name === 'inst_3', [], { what: 'M1 named inst_3' });
+  assert.deepEqual(await names(), ['inv_a', 'inst_2', 'inst_3']);
+  assert.equal(await drawn('S3', 'inst_3'), false, 'not drawn');
+  assert.equal(await drawn('S3', 'M1'), false);
+  await clean('M1 cleared');
+  await hdlHas(/\binst_3 : entity work\.sub\b/, 'the HDL with inst_3');
+  await undo();
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[2].name === 'M1', [], { what: 'M1 undone' });
+  assert.equal(await drawn('S3', 'M1'), true, 'M1 drawn again');
+  await hdlHas(/\bM1 : entity work\.sub\b/, 'the HDL with M1 again');
+  assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), false, 'one undo step');
+
+  // Portuguese: the dialog takes an empty name with no refusal either
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  try {
+    await page.rightClick(`${ED} svg .sym[data-id="S3"] .hitbox`);
+    await page.waitFor(() => document.querySelector('body > .menu-popup'), [], { what: 'the menu' });
+    await page.click('body > .menu-popup > .mi');
+    await page.waitDialog('Mudar o Nome da Instância');
+    await page.eval(() => { const i = [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.dlg-body input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
+    assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.se-rename-err').textContent), '');
+    await page.dialogButton('Mudar o Nome');
+    await page.waitNoDialog();
+    await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[2].name === 'inst_3', [], { what: 'M1 named inst_3 (pt)' });
+  } finally {
+    await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  }
 });
