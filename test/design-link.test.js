@@ -156,7 +156,7 @@ test('parseLink: the options of a link', () => {
 });
 
 test('parseLink: a broken or hostile link is refused (#2829)', () => {
-  throws(() => parseLink('#view=try'), 'the link names no design (design= or open=)');
+  throws(() => parseLink('#view=try'), 'the link names no design (design=, open= or gist=)');
   throws(() => parseLink('#design=&view=try'), 'the link\'s design= is empty');
   throws(() => parseLink('#design=a&open=example:gates'), 'the link has both design= and open=');
   throws(() => parseLink('#open=example:gates&open=example:pong'), 'the link has two open=');
@@ -210,8 +210,8 @@ test('makeLink: the link of a design, an example, a zip; parseLink reads it back
   const z = makeLink(base, { zip: 'https://example.org/a b.zip?x=1&y=2#z' });
   assert.equal(z, 'https://pmnmalo.github.io/Silinx/#open=https://example.org/a%20b.zip?x=1%26y=2%23z');
   assert.equal(parseLink(new URL(z).hash).source.url, 'https://example.org/a%20b.zip?x=1&y=2#z');
-  throws(() => makeLink(base, {}), 'a link has one design: design, example or zip');
-  throws(() => makeLink(base, { example: 'a', design: 'b' }), 'a link has one design: design, example or zip');
+  throws(() => makeLink(base, {}), 'a link has one design: design, example, zip or gist');
+  throws(() => makeLink(base, { example: 'a', design: 'b' }), 'a link has one design: design, example, zip or gist');
   throws(() => makeLink(base, { example: 'a', view: 'x' }), 'view: one of try, simulate, emulate');
   throws(() => makeLink(base, { example: 'a', top: '1x' }), 'top: \'1x\' is not a module name');
   throws(() => makeLink(base, { example: 'a', board: 'a b' }), 'board: \'a b\' is not a board name');

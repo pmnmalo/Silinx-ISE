@@ -52,3 +52,17 @@ test('a pasted token: one that is not a token, one GitHub refuses, never kept; a
   await git.githubSignOut();
   assert.equal(store.has('silinx.github-token'), false);
 });
+
+test('a short link\'s gist (#3223) in the browser edition: with the sign-in only, a secret gist of the user, read back with no token', async () => {
+  globalThis.SILINX_GITHUB = { api: 'https://api.github.com' };
+  assert.equal(await git.gistAvailable(), false);
+  await assert.rejects(git.gistSave('the design'), { message: 'GitHub refused the sign-in (Requires authentication)' });
+  await git.githubSetToken(gh.token);
+  assert.equal(await git.gistAvailable(), true);
+  const g = await git.gistSave('the design');
+  assert.deepEqual(Object.keys(g).sort(), ['id', 'key']);
+  assert.equal(gh.gists.get(g.id).public, false);
+  const { loadGist } = await import('../core/gist-link.js');
+  assert.equal(await loadGist(g, { fetch: gh.fetch }), 'the design');
+  await git.githubSignOut();
+});

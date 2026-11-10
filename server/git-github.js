@@ -102,3 +102,20 @@ export const gitPull = async (name, { resolve = null } = {}) => backend().pull(a
 export const gitLog = async (name, { limit = 100 } = {}) => backend().log(await known(name), { limit });
 export const gitShow = async (name, commit, rel) => backend().show(await known(name), commit, rel);
 export const gitClone = ({ url, name = null, madeBy = null }) => backend({ madeBy }).clone({ url, name });
+
+// ------------------------------------------------------------------ a short link's gist (#3223, core/gist-link.js)
+/** Whether this server can make a short link: a GitHub token in its environment (GH_TOKEN, GITHUB_TOKEN). */
+export const gistAvailable = () => !!token();
+/** A short link's secret gist, made with the environment's token -> { id, key, url }. */
+export async function makeGist(design) {
+  if (!token()) throw new GitHubError('a short link needs a GitHub token on this server', `Set GH_TOKEN before starting Silinx (with GitHub's command line: GH_TOKEN=$(gh auth token)), or copy the full link; Silinx never stores it.`, 409);
+  const { saveGist } = await import('../core/gist-link.js');
+  const f = GITHUB_TESTING.fetch || globalThis.fetch;
+  return saveGist(githubClient({ fetch: (...a) => f(...a), token, hints: HINTS }), design);
+}
+/** A short link's design, read from its gist (no token needed). */
+export async function readGist(ref) {
+  const { loadGist } = await import('../core/gist-link.js');
+  const f = GITHUB_TESTING.fetch || globalThis.fetch;
+  return loadGist(ref, { fetch: (...a) => f(...a) });
+}

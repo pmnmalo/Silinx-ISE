@@ -2,7 +2,10 @@
 // (core/design-link.js encodeDesign), and what it opens: the project only, Try it (a schematic's), the simulation (the
 // test bench), the board emulator; the module. The link is shown as it is made, its length with it; one too large
 // for a link (a zip hosted elsewhere then) or a view the design does not have is said in the dialog, and the copy in
-// the console. Anyone with the link has the whole project, its comments too: the dialog says so (#2829).
+// the console. Anyone with the link has the whole project, its comments too: the dialog says so (#2829). The link is
+// the full one (the project inside it) or a short one (#3223, core/gist-link.js): the project encrypted here and saved
+// as a secret gist of the user's GitHub account, made when it is copied, its key in the link; with no GitHub sign-in
+// (the browser edition's) or token (a server's GH_TOKEN), the dialog offers the sign-in, or the full link.
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app } from './app.js';
@@ -53,7 +56,11 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   // Silinx as it is now (#2886): the open tabs, the one in front, the split, the panels, the task
   const ui = encodeUi(currentViewState(), layoutNow());
   const withView = h('input', { type: 'checkbox', 'data-field': 'ui', checked: true });
-  let link = null;
+  // the link's form: full, or short (a gist, made on Copy Link)
+  const short = h('input', { type: 'radio', name: 'link-form', value: 'short', 'data-field': 'short' });
+  const full = h('input', { type: 'radio', name: 'link-form', value: 'full', checked: true, 'data-field': 'full' });
+  const signIn = h('a', { href: '#', class: 'link-signin', style: { display: 'none' }, onclick: async e => { e.preventDefault(); if (await (await import('./git-signin.js')).signInDialog()) update(); } }, 'Sign in with GitHub…');
+  let link = null, opts = null;
   const update = () => {
     link = null;
     out.value = ''; info.textContent = ''; err.textContent = '';
@@ -65,13 +72,22 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     const top = !modSel.value || isEmu() || (!viewSel.value && !module) ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
-    link = makeLink(linkBase(), { design, view: viewSel.value || null, top, ui: withView.checked ? ui : null });
+    opts = { view: viewSel.value || null, top, ui: withView.checked ? ui : null };
+    link = makeLink(linkBase(), { design, ...opts });
+    signIn.style.display = 'none';
+    if (short.checked) {
+      out.value = '';
+      info.textContent = 'A short link, about 140 characters: the project encrypted in this browser and saved as a secret gist of your GitHub account when you copy it; only the link opens it. Your links are your gists, which you list and delete on GitHub.';
+      return;
+    }
     out.value = link;
     info.textContent = link.length > LINK_LIMITS.slides
       ? `${link.length} characters: some slide tools cut a link longer than ${LINK_LIMITS.slides} (export the project as a .zip, host it, and link to it with #open=).`
       : `${link.length} characters.`;
   };
   viewSel.addEventListener('change', () => { fillModules(); update(); });
+  short.addEventListener('change', update);
+  full.addEventListener('change', update);
   withView.addEventListener('change', update);
   modSel.addEventListener('change', () => { if (!isEmu()) chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
   update();
@@ -83,12 +99,31 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
         h('label', {}, 'Open in:'), viewSel,
         h('label', {}, 'Module:'), modSel,
         h('label', {}, 'Board:'), h('span', { class: 'link-board' }, S.project.board || 'none'),
-        h('span'), h('label', { class: 'link-ui' }, withView, h('span', {}, 'Include the current view: the open tabs, the split, the panels'))),
-      out, info, err),
-    buttons: [{ label: 'Copy Link', primary: true, value: true, validate: () => !!link }, { label: 'Cancel', value: null }],
+        h('span'), h('label', { class: 'link-ui' }, withView, h('span', {}, 'Include the current view: the open tabs, the split, the panels')),
+        h('label', {}, 'Link:'), h('div', { class: 'link-forms' },
+          h('label', { class: 'link-full' }, full, h('span', {}, 'The full link: the project inside it (needs nothing, but long)')), h('br'),
+          h('label', { class: 'link-short' }, short, h('span', {}, 'A short link: the project encrypted in a secret gist of your GitHub account')))),
+      out, info, err, signIn),
+    buttons: [{ label: 'Copy Link', primary: true, value: true, validate: async () => {
+      if (!link) return false;
+      if (!short.checked) return true;
+      // the gist made now: with the browser's sign-in, or the server's token
+      if (!await api.gistAvailable()) {
+        err.textContent = api.standalone ? 'A short link needs your GitHub sign-in: sign in, or choose the full link.' : 'A short link needs a GitHub token on the Silinx server (GH_TOKEN): choose the full link, or start the server with one.';
+        if (api.standalone) signIn.style.display = '';
+        return false;
+      }
+      try {
+        const g = await api.gistSave(design);
+        link = makeLink(linkBase(), { gist: `${g.id}.${g.key}`, ...opts });
+        out.value = link;
+        return true;
+      } catch (e) { err.textContent = e.hint ? `${e.message}: ${e.hint}` : e.message; return false; }
+    } }, { label: 'Cancel', value: null }],
   });
   if (!r || !link) return null;
   writeClip('text', link);
+  if (short.checked) { app.log(`Copy Link: the short link of '${name}' copied, ${link.length} characters (the project in a secret gist of your GitHub account).`, 'ok'); return link; }
   app.log(`Copy Link: the link of '${name}'${viewSel.value ? ` (${VIEWS.find(([v]) => v === viewSel.value)[1]}, ${modSel.value})` : ''} copied, ${link.length} characters.`, 'ok');
   if (link.length > LINK_LIMITS.slides) app.log(`WARNING: Copy Link: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides}.`, 'warn');
   return link;
