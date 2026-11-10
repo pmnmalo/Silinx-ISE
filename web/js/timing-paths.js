@@ -15,6 +15,7 @@ import { markLines } from './editor.js';
 import { S, findDoc, openFile, openFpgaView } from './app.js';
 import { betweenPaths, pathHighlight } from '/packages/silinx-fpga/src/index.js';
 import { showInDrawings } from './drawing-path.js';
+import { iseTimingPaths } from '/core/twr-paths.js';
 
 export const TIMING_REPORT = 'build/open/timing.txt';
 export const PATHS_FILE = 'build/open/paths.json';
@@ -44,11 +45,19 @@ export async function showPath(p, { fpga = false } = {}) {
   return hl;
 }
 
-/** The Paths panel beside the timing report's editor (none when the analysis wrote no paths: an older run). */
+// the paths of a timing report: the Silinx toolchain's (its analysis's paths.json), ISE's (its trce report's, back to the
+// project's HDL by XST's names: core/twr-paths.js)
+async function pathsOf(pj, file) {
+  if (file !== TIMING_REPORT) return iseTimingPaths(await api.readFile(pj, file), S.sources.filter(s => !s.view && s.role !== 'sim'), S.project.top);
+  return JSON.parse(await api.readFile(pj, PATHS_FILE));
+}
+
+/** The Paths panel beside a timing report's editor (the Silinx toolchain's, ISE's .twr; none when the analysis wrote no
+ *  paths: an older run). */
 export async function mountTimingPaths(d, el, host) {
   const pj = S.project?.name;
   let r;
-  try { r = JSON.parse(await api.readFile(pj, PATHS_FILE)); } catch { return null; }
+  try { r = await pathsOf(pj, d.path || TIMING_REPORT); } catch { return null; }
   if (!r?.paths || S.project?.name !== pj) return null;
   const root = h('div', { class: 'tp' });
   const side = h('aside', { class: 'tp-side' }, h('div', { class: 'asm-cap' }, 'Paths'));

@@ -118,7 +118,7 @@ test('run.sh contents and syntax', async () => {
   assert.match(sh, /ngdbuild -intstyle xflow -dd _ngo -nt timestamp -uc top\.ucf -p xc3s500e-fg320-4 top\.ngc top\.ngd/);
   assert.match(sh, /map -intstyle xflow -p xc3s500e-fg320-4 -cm area -ir off -pr off -c 100 -o top_map\.ncd top\.ngd top\.pcf/);
   assert.match(sh, /par -w -intstyle xflow -ol high -t 1 top_map\.ncd top\.ncd top\.pcf/);
-  assert.match(sh, /trce -intstyle xflow -v 3 -s 4 -n 3 -fastpaths -xml top\.twx top\.ncd -o top\.twr top\.pcf -ucf top\.ucf/);
+  assert.match(sh, /trce -intstyle xflow -v 1 -s 4 -n 20 -fastpaths -xml top\.twx top\.ncd -o top\.twr top\.pcf -ucf top\.ucf/);
   assert.match(sh, /bitgen -intstyle xflow -f top\.ut top\.ncd/);
   // impl.mapPackFactor: map's -c (1 .. 100)
   assert.match(ise.generateRunSh({ top: 'top', device: DEVICE, hasUcf: true, impl: { mapPackFactor: 1 } }), / -c 1 -o top_map\.ncd/);

@@ -42,7 +42,7 @@ test('timing_paths: the list, one path\'s stages and highlight, count; none befo
   await ok('new_project_from_example', { name: 't1', example: 'gates' });
   const none = await ok('timing_paths', { project: 't1' });
   assert.equal(none.text, 'No timing paths for \'t1\': run_process timing first (the Silinx toolchain\'s timing analysis).');
-  assert.deepEqual(none.data, { project: 't1', available: false });
+  assert.deepEqual(none.data, { project: 't1', toolchain: 'silinx', available: false });
   fs.mkdirSync(path.join(P.projectDir('t1'), 'build', 'open'), { recursive: true });
   fs.writeFileSync(path.join(P.projectDir('t1'), 'build', 'open', 'paths.json'), JSON.stringify(PATHS));
   const list = await ok('timing_paths', { project: 't1' });
@@ -131,4 +131,41 @@ test('timing_paths on blinky after run_process timing: the timing report\'s crit
   // (each register's worst path into ticks no slower than the slowest into it)
   const into = await ok('timing_paths', { project: 'b1', to: 'u_speed.ticks', count: 100 });
   assert.ok(into.data.paths.length > 1 && into.data.paths.every(p => p.toRegister === 'u_speed.ticks' && p.delay <= lt.data.paths[0].delay));
+});
+
+// Xilinx ISE's paths (#3178): the last run ISE's (its synthesis report there), its trce report read (blinky's, ISE 14.7's:
+// test/fixtures/trce), each stage back to the project's HDL by XST's names; the drawings; no paths between two registers
+test('timing_paths after an ISE run: trce\'s paths, back to the project\'s processes and its ASM chart; no registers to choose', async () => {
+  await ok('new_project_from_example', { name: 'i1', example: 'blinky' });
+  const build = path.join(P.projectDir('i1'), 'build');
+  assert.equal((await ok('timing_paths', { project: 'i1' })).data.toolchain, 'silinx', 'no run yet: the Silinx toolchain\'s, none');
+  fs.mkdirSync(build, { recursive: true });
+  fs.writeFileSync(path.join(build, 'top.syr'), 'Release 14.7 - xst P.20131013 (lin64)\n');
+  const none = await ok('timing_paths', { project: 'i1' });
+  assert.deepEqual([none.text, none.data], ['No timing paths for \'i1\': run_process timing first (Xilinx ISE\'s trce).', { project: 'i1', toolchain: 'ise', available: false }]);
+  const twr = fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'trce', 'blinky-ise-paths.twr.txt'), 'utf8');
+  fs.writeFileSync(path.join(build, 'top.twr'), twr);
+  const list = await ok('timing_paths', { project: 'i1', count: 20 });
+  assert.equal(list.data.toolchain, 'ise');
+  assert.equal(list.data.paths.length, 20);
+  assert.equal(list.data.paths[0].period, +/Minimum period is +([\d.]+)ns/.exec(twr)[1]);
+  assert.ok(list.data.paths.every(p => p.lines.length && p.fromRegister && p.toRegister), 'every path back to the HDL');
+  assert.match(list.text.split('\n')[0], /^path 1: \S+ -> \S+ \(SLICE_\w+\.\w+ -> SLICE_\w+\.\w+\), clock clk_BUFGP: [\d.]+ ns, required 20\.000 ns, slack [\d.]+ ns$/);
+  // a path through speed_ctrl (its HDL generated from its ASM chart): its boxes
+  const n = list.data.paths.findIndex(p => p.lines.some(l => l.file === 'src/speed_ctrl.vhd'));
+  assert.ok(n >= 0);
+  const one = await ok('timing_paths', { project: 'i1', path: n + 1 });
+  assert.ok(one.data.highlight.drawings['src/speed_ctrl.asm.json'].length);
+  assert.match(one.text, /^ {2}in src\/speed_ctrl\.asm\.json: box /m);
+  assert.ok(Object.keys(one.data.highlight.files).every(f => fs.existsSync(path.join(P.projectDir('i1'), f))));
+  await fails('timing_paths', { project: 'i1', from: 'level' }, 'from: Xilinx ISE\'s timing paths name no registers: the paths between two are the Silinx toolchain\'s (run_process timing with toolchain silinx)');
+  // both analyses there: the newer one's
+  fs.mkdirSync(path.join(build, 'open'), { recursive: true });
+  fs.writeFileSync(path.join(build, 'open', 'paths.json'), JSON.stringify(PATHS));
+  const t = Date.now() / 1000;
+  fs.utimesSync(path.join(build, 'open', 'paths.json'), t - 60, t - 60);
+  assert.equal((await ok('timing_paths', { project: 'i1' })).data.toolchain, 'ise');
+  fs.utimesSync(path.join(build, 'top.twr'), t - 120, t - 120);
+  const open = await ok('timing_paths', { project: 'i1' });
+  assert.deepEqual([open.data.toolchain, open.data.paths.length], ['silinx', 2]);
 });
