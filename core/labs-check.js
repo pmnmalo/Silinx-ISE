@@ -3,6 +3,8 @@
 // through `io`, the same in the interface (web/js/lab-view.js, either backend) and the MCP server (server/mcp-labs.js):
 //   project()    its silinx.json        files()    its files' paths        read(path)    a file's text
 //   sources(sim) the HDL of the implementation view (false) or the simulation view (true): [{ path, lang, text, role }]
+//   reports(process) the last run's build/reports.json (null: none) and whether it is still the sources' (each backend
+//                knows it its own way: the page by its processes' marks, the server by the files' times): { reports, current }
 // The HDL is compiled, elaborated and checked as Check Syntax does (core/compile.js, core/lint.js designChecks), and a
 // test bench run as Simulate does (core/simulator.js). A pattern is a text (found in the message, case ignored) or
 // "/regex/flags". Isomorphic.
@@ -83,6 +85,16 @@ function valueAt(sig, ps) {
   for (let i = 0; i < w.t.length && w.t[i] <= ps; i++) k = i;
   return k < 0 ? null : toBin(w.v[k]).toUpperCase();
 }
+
+// a process of a lab: its name in the Processes pane, the steps it runs (their marks, web/js/processes.js), what of the
+// Design Summary says it ran (build/reports.json's summary) and the steps whose warnings it counts
+export const PROCESSES = {
+  synthesize: { label: 'Synthesize', marks: ['synth'], ran: s => s.synthesized, warns: ['synthesis'] },
+  implement: { label: 'Implement Design', marks: ['synth', 'translate', 'map', 'par'], ran: s => s.routed !== null && s.routed !== undefined, warns: ['synthesis', 'map', 'par'] },
+  bitstream: { label: 'Generate Programming File', marks: ['synth', 'translate', 'map', 'par', 'bitgen'], ran: s => s.bitstream, warns: ['synthesis', 'map', 'par'] },
+};
+// a step's warnings in build/reports.json: its count, or the map report's "Number of warnings" line (ISE's)
+const warningsOf = (r, k) => r?.[k]?.warnings ?? Number((r?.[k]?.utilization || []).find(u => /warnings/i.test(u.name))?.used) ?? 0;
 
 export const CHECKS = {
   // the project's settings: its top, its test bench, its board, its part
@@ -166,6 +178,26 @@ export const CHECKS = {
       const lines = log.map(e => e.text);
       for (const p of c.messages || []) if (!lines.some(t => pattern(p).test(t))) out.push(`the simulation printed nothing like '${p}'`);
       if (!c.errors) for (const e of log.filter(e => e.kind === 'error' || e.kind === 'failure').slice(0, 3)) out.push(`the simulation reported an error at ${e.time / 1000} ns: ${e.text}`);
+      return out;
+    },
+  },
+  // a process (synthesize, implement, bitstream) ran on the project's top and its sources as they are now, with
+  // `warnings` warnings (0 when not given); timing_met: its timing constraints met (Implement Design's static timing)
+  process: {
+    problems: c => [...(PROCESSES[c.process] ? [] : [`"process": one of ${Object.keys(PROCESSES).join(', ')}`]),
+      ...(c.warnings === undefined || (Number.isInteger(c.warnings) && c.warnings >= 0) ? [] : ['"warnings": a number of warnings'])],
+    async run(c, io) {
+      const P = PROCESSES[c.process], pj = await io.project();
+      const { reports: r, current } = await io.reports(c.process);
+      const sum = r?.summary;
+      if (!sum || !P.ran(sum)) return [`${P.label} has not run: run it (the Processes pane)`];
+      if (pj.top && r.top && String(r.top).toLowerCase() !== String(pj.top).toLowerCase()) return [`${P.label} ran on the top module '${r.top}', not on the project's, '${pj.top}': run it again`];
+      if (!current) return [`the sources changed since ${P.label} ran: run it again`];
+      const out = [];
+      if (c.process !== 'synthesize' && sum.routed === false) out.push(`${P.label}: ${r.par?.unroutedSignals ?? 'some'} signal(s) not routed`);
+      const n = P.warns.reduce((a, k) => a + (warningsOf(r, k) || 0), 0), want = c.warnings ?? 0;
+      if (n !== want) out.push(`${P.label} gave ${n} warning(s), ${want ? `not ${want}` : 'none expected'}: see its reports (the Design Summary)`);
+      if (c.timing_met && sum.timingMet !== true) out.push(sum.timingMet === false ? `the timing constraints are not met${sum.maxFreqMHz ? ` (at most ${sum.maxFreqMHz} MHz)` : ''}` : 'no static timing analysis: the design has no timing constraint');
       return out;
     },
   },

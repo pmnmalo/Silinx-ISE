@@ -3,9 +3,9 @@
 // its toolbar (Check Step, Previous, Next, ☰ Steps on a narrow screen, the ⋮ menu's Restart the Lab), the step shown,
 // its hint after a failed try, the Steps side panel on the right (each step with its tick, a click shows it; folded as
 // the editors' Properties, side-fold.js; over the page behind ☰ Steps under 1024 px, narrow.js), its status line, and
-// every check's result in the console. A step is checked on the project as it is saved (core/labs-check.js, the
-// checks the MCP server's `lab` tool runs, server/mcp-labs.js); the progress is the project's labs/progress.json, so a
-// lab resumes where it was left. Its texts are in the interface's language (a lab's own, not the dictionary's).
+// every check's result in the console. A step is checked on the project as it is saved, a process on its last run
+// (core/labs-check.js, the checks the MCP server's `lab` tool runs, server/mcp-labs.js); the progress is the project's
+// labs/progress.json, so a lab resumes where it was left. Its texts are in the interface's language (a lab's own, not the dictionary's).
 import { h, dialog } from './ui.js';
 import { api } from './api.js';
 import { S, findDoc, openDoc } from './app.js';
@@ -17,6 +17,7 @@ import { mountSideFold } from './side-fold.js';
 import { panelToggle } from './narrow.js';
 import { statusLine } from './status-line.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { PROCESSES } from '/core/labs-check.js';
 import { PROGRESS_FILE, checkLines, checkStep, labProgress, listLabs, localize, nextOpen, parseProgress, progressText, recordTry } from '/core/labs.js';
 
 export const STEPS_KEY = 'silinx.narrow.labsteps';   // (the Steps panel shown on a narrow screen)
@@ -32,6 +33,11 @@ export function projectIo(name) {
     read: rel => api.readFile(name, rel),
     sources: async sim => [...(await api.sources(name)).filter(s => !s.missing && !s.view), ...(S.viewSources || [])]
       .filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role || 'design', sim)),
+    // the last run's reports, current while the Processes pane marks none of its steps out of date or failed
+    reports: async process => {
+      const r = await api.reports(name).catch(() => null);
+      return { reports: r?.summary ? r : null, current: !PROCESSES[process].marks.some(m => S.status?.[m] === 'stale' || S.status?.[m] === 'err') };
+    },
   };
 }
 

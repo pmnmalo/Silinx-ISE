@@ -3,9 +3,12 @@
 // Steps panel's tick, the next step shown, the console's lines), not one whose action is wrong (its hint shown then);
 // the progress kept in the project (the lab reopened where it was left, its list saying so), restarted from its ⋮
 // menu; its Steps panel folded to a strip (remembered), over the page behind ☰ Steps on a narrow window; in Portuguese.
+// The traffic and blinky labs: a step on the state diagram, the processes' steps checked on their last run (Synthesize,
+// Implement Design, Generate Programming File run in the page; out of date after a change of the sources).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs, writeWs } from './harness.js';
+import { generateFsm } from '../../core/fsm-hdl.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -17,6 +20,34 @@ const LAB = 'gates-first-steps';
 // gates.vhd with an output even: the step "Add an output"'s action (right: even = not d; wrong: even = d)
 const withEven = (vhd, expr) => vhd.replace('led : out std_logic_vector(1 downto 0)', 'led : out std_logic_vector(1 downto 0);\n    even : out std_logic')
   .replace('begin\n  d <=', `begin\n  even <= ${expr};\n  d <=`);
+const SHIPPED = ['First stepsSilinx\'s, for the gates example', 'A state machineSilinx\'s, for the traffic example', 'The clock and the boardSilinx\'s, for the blinky example'];
+
+// Project ▸ Guided Labs…: the lab `id` opened (its rows' texts returned)
+async function openLab(page, id) {
+  await page.menu('Project', 'Guided Labs…');
+  await page.waitDialog('Guided Labs');
+  const rows = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .lab-pick')].map((b) => b.textContent));
+  await page.click(`.dlg-overlay .lab-pick[data-lab="${id}"]`);
+  await page.waitNoDialog();
+  await page.waitFor((d, i) => window.Silinx.active?.id === `lab:${i}` && document.querySelector(d)?.dataset.ready === '1', [D, id], { what: 'the lab' });
+  return rows;
+}
+// Check Step on step k of n: the console's lines it wrote
+async function checkStepOf(page, k, n) {
+  const before = await page.eval(() => window.__console().length);
+  await page.click(`${D} .lab-bar .asm-btn`, { text: 'Check Step' });
+  await page.waitFor((c, k0, n0) => window.__console().length > c && new RegExp(`step ${k0} of ${n0}[^]*(Step done\\.|Not done yet)`).test(window.__console().slice(c)), [before, k, n], { what: `step ${k} checked` });
+  await page.waitFor((d) => !document.querySelector(`${d} .lab-bar [data-cmd="check-step"]`).disabled, [D], { what: 'the lab shown again' });
+  return page.eval((c) => window.__console().slice(c), before);
+}
+const ticks = (page) => page.eval((d) => [...document.querySelectorAll(`${d} .lab-step`)].map((s) => (s.classList.contains('done') ? '✓' : '·') + (s.classList.contains('current') ? '<' : '')).join(' '), D);
+// a process run from the Processes pane (its row's name starting with `name`), to its end (not the processes it runs first)
+async function runProcess(page, name) {
+  const before = await page.eval(() => window.__console().length);
+  await page.treeRow('#procs', name, { dbl: true });
+  await page.waitFor((c, n) => new RegExp(`Process "${n}[^"]*" (completed successfully|failed)`).test(window.__console().slice(c)), [before, name], { what: `${name} run`, timeout: 120000 });
+  return page.eval((c) => window.__console().slice(c), before);
+}
 
 uiTest('#3179 a guided lab: the gates example\'s first steps run step by step (the right action ticks a step, a wrong one does not, its hint then), resumed, restarted; its Steps panel folded and on a narrow window; Portuguese', E, async (page) => {
   await makeProject(env, { name: 'gates', template: 'gates' });
@@ -26,15 +57,7 @@ uiTest('#3179 a guided lab: the gates example\'s first steps run step by step (t
     localStorage.removeItem(prefKey('silinx.lab.steps.folded')); localStorage.removeItem(STEPS_KEY);
   });
   await page.openProject('gates');
-  const open = async () => {
-    await page.menu('Project', 'Guided Labs…');
-    await page.waitDialog('Guided Labs');
-    const rows = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .lab-pick')].map((b) => b.textContent));
-    await page.click(`.dlg-overlay .lab-pick[data-lab="${LAB}"]`);
-    await page.waitNoDialog();
-    await page.waitFor((d, id) => window.Silinx.active?.id === `lab:${id}` && document.querySelector(d)?.dataset.ready === '1', [D, LAB], { what: 'the lab' });
-    return rows;
-  };
+  const open = () => openLab(page, LAB);
   const look = () => page.eval((d) => {
     const lab = document.querySelector(d), side = lab.querySelector('.lab-side'), shown = (e) => !!e && e.getClientRects().length > 0;
     return {
@@ -47,15 +70,10 @@ uiTest('#3179 a guided lab: the gates example\'s first steps run step by step (t
       shown: shown(side), width: side.offsetWidth, over: getComputedStyle(side).position === 'absolute', folded: lab.classList.contains('props-folded'), page: lab.querySelector('.lab-page').offsetWidth,
     };
   }, D);
-  const checkStep = async (k) => {
-    const before = await page.eval(() => window.__console().length);
-    await page.click(`${D} .lab-bar .asm-btn`, { text: 'Check Step' });
-    await page.waitFor((n, k0) => window.__console().length > n && new RegExp(`step ${k0} of 5[^]*(Step done\\.|Not done yet)`).test(window.__console().slice(n)), [before, k], { what: `step ${k} checked` });
-    return page.eval((n) => window.__console().slice(n), before);
-  };
+  const checkStep = (k) => checkStepOf(page, k, 5);
 
   // the list: the example's lab, none done; opened at its first step, its intro first
-  assert.deepEqual(await open(), ['First stepsSilinx\'s, for the gates example0 of 5 steps done']);
+  assert.deepEqual(await open(), [`${SHIPPED[0]}0 of 5 steps done`, `${SHIPPED[1]}0 of 4 steps done`, `${SHIPPED[2]}0 of 6 steps done`]);
   let L = await look();
   assert.deepEqual({ tab: L.tab, buttons: L.buttons, num: L.num, title: L.title, hint: L.hint, status: L.status, cap: L.cap },
     { tab: 'Lab: First steps', buttons: ['Check Step', '◀ Previous (off)', 'Next ▶'], num: 'Step 1 of 5', title: 'The project', hint: null, status: 'Step 1 of 5 · 0 done', cap: 'Steps' });
@@ -104,7 +122,7 @@ uiTest('#3179 a guided lab: the gates example\'s first steps run step by step (t
   await page.click(`${D} .lab-step`, { index: 1 });
   assert.equal((await look()).num, 'Step 2 of 5', 'a step of the panel shown');
   await page.eval((id) => window.SilinxApp.closeDoc(window.SilinxApp.findDoc(`lab:${id}`), { force: true }), LAB);
-  assert.deepEqual(await open(), ['First stepsSilinx\'s, for the gates example5 of 5 steps done']);
+  assert.deepEqual((await open())[0], `${SHIPPED[0]}5 of 5 steps done`);
   L = await look();
   assert.deepEqual([L.num, L.steps.filter((s) => s.startsWith('✓')).length], ['Step 2 of 5', 5]);
 
@@ -151,3 +169,91 @@ uiTest('#3179 a guided lab: the gates example\'s first steps run step by step (t
   await page.waitConsole(/Lab "First steps" restarted: no step done\./);
   assert.doesNotMatch(await page.consoleText(), /ERROR/);
 }, { timeout: 180000 });
+
+// the processes run by the Silinx toolchain (no ISE)
+async function silinxToolchain(page) {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await page.eval(async () => { window.SilinxApp.S.toolchain = await (await import('/js/api.js')).api.toolchain(); window.SilinxApp.renderProcesses(); });
+}
+
+// traffic's state diagram with the output walking (1 in the states `on`), and the VHDL the FSM editor saves beside it
+function walking(fsmText, on) {
+  const fsm = JSON.parse(fsmText);
+  fsm.outputs.push({ name: 'walking', width: 1, default: '0' });
+  for (const st of fsm.states) if (on.includes(st.name)) st.outputs.walking = '1';
+  return { fsm: `${JSON.stringify(fsm, null, 2)}\n`, vhd: generateFsm(fsm, 'vhdl', { source: 'traffic.fsm.json' }).code };
+}
+
+uiTest('#3179 the traffic lab: the state diagram, its simulation, a new output (a wrong one not ticked), Synthesize checked on its last run (not run, run, out of date, run again)', E, async (page) => {
+  await makeProject(env, { name: 'traffic', template: 'traffic' });
+  await page.setViewport(1366, 768);
+  await page.openProject('traffic');
+  await silinxToolchain(page);
+  assert.deepEqual(await openLab(page, 'traffic-state-machine'), [`${SHIPPED[1]}0 of 4 steps done`, `${SHIPPED[0]}0 of 5 steps done`, `${SHIPPED[2]}0 of 6 steps done`], 'the example\'s lab first');
+  assert.equal(await page.eval(() => window.Silinx.active.tab.querySelector('.tlabel').textContent), 'Lab: A state machine');
+  for (const [k, title] of [[1, 'The state diagram'], [2, 'Simulate']]) {
+    const out = await checkStepOf(page, k, 4);
+    assert.ok(out.includes(`Lab "A state machine", step ${k} of 4: ${title}`) && /Step done\./.test(out) && !/WARNING/.test(out), out);
+  }
+  assert.equal(await ticks(page), '✓ ✓ ·< ·');
+  // the output: not there; in WALK only (wrong: 0 in WALK_END); in both
+  assert.match(await checkStepOf(page, 3, 4), /WARNING: module traffic has no port walking\nWARNING: there is no signal uut\/u_fsm\/walking in tb_traffic\nHint: A Moore output takes its default/);
+  const fsm = await readWs(env, 'traffic', 'src/traffic.fsm.json');
+  let w = walking(fsm, ['WALK']);
+  await writeWs(env, 'traffic', 'src/traffic.fsm.json', w.fsm);
+  await writeWs(env, 'traffic', 'src/traffic.vhd', w.vhd);
+  let out = await checkStepOf(page, 3, 4);
+  assert.match(out, /\nWARNING: uut\/u_fsm\/walking is 0 at 5000 ns, not 1\n/);
+  assert.match(out, /Not done yet \(1 problem\(s\)\)\./);
+  w = walking(fsm, ['WALK', 'WALK_END']);
+  await writeWs(env, 'traffic', 'src/traffic.fsm.json', w.fsm);
+  await writeWs(env, 'traffic', 'src/traffic.vhd', w.vhd);
+  out = await checkStepOf(page, 3, 4);
+  assert.ok(/Step done\./.test(out) && !/WARNING/.test(out), out);
+  assert.equal(await ticks(page), '✓ ✓ ✓ ·<');
+  // Synthesize: not run; run (no warnings): done
+  assert.match(await checkStepOf(page, 4, 4), /WARNING: Synthesize has not run: run it \(the Processes pane\)\nHint: Run Synthesize after the last change/);
+  out = await runProcess(page, 'Synthesize');
+  assert.match(out, /Process "Synthesize[^"]*" completed successfully/);
+  out = await checkStepOf(page, 4, 4);
+  assert.match(out, /Step done\.\nEvery step of the lab "A state machine" is done\./);
+  // a source changed after it: out of date, the step not done any more; run again: done
+  await writeWs(env, 'traffic', 'src/timer.vhd', `${await readWs(env, 'traffic', 'src/timer.vhd')}\n`);
+  await page.waitFor(() => window.SilinxApp.S.status.synth === 'stale', [], { what: 'Synthesize out of date', timeout: 30000 });
+  assert.match(await checkStepOf(page, 4, 4), /WARNING: the sources changed since Synthesize ran: run it again\n/);
+  assert.equal(await ticks(page), '✓ ✓ ✓ ·<');
+  await runProcess(page, 'Synthesize');
+  assert.match(await checkStepOf(page, 4, 4), /Step done\./);
+  const progress = JSON.parse(await readWs(env, 'traffic', 'labs/progress.json'))['traffic-state-machine'];
+  assert.deepEqual([Object.keys(progress.done), progress.tries], [['diagram', 'simulate', 'output', 'synthesize'], { output: 2, synthesize: 2 }]);
+  assert.doesNotMatch(await page.consoleText(), /ERROR/);
+}, { timeout: 240000 });
+
+uiTest('#3179 the blinky lab: the board, the clock, the simulation, the speed (a wrong one not ticked), Implement Design with its timing met, the bitstream', E, async (page) => {
+  await makeProject(env, { name: 'blinky', template: 'blinky' });
+  await page.setViewport(1366, 768);
+  await page.openProject('blinky');
+  await silinxToolchain(page);
+  assert.deepEqual((await openLab(page, 'blinky-clock-board'))[0], `${SHIPPED[2]}0 of 6 steps done`);
+  for (const [k, title] of [[1, 'The board'], [2, 'The clock'], [3, 'Simulate']]) {
+    const out = await checkStepOf(page, k, 6);
+    assert.ok(out.includes(`Lab "The clock and the board", step ${k} of 6: ${title}`) && /Step done\./.test(out) && !/WARNING/.test(out), out);
+  }
+  // the speed: three times as fast (wrong), then twice
+  const top = await readWs(env, 'blinky', 'src/top.vhd');
+  await writeWs(env, 'blinky', 'src/top.vhd', top.replace('DIV      : integer := 625_000;', 'DIV      : integer := 208_333;'));
+  assert.match(await checkStepOf(page, 4, 6), /WARNING: src\/top\.vhd has nothing like '[^']*312_\?500[^']*'\nHint: Twice as fast is half/);
+  await writeWs(env, 'blinky', 'src/top.vhd', top.replace('DIV      : integer := 625_000;', 'DIV      : integer := 312_500;'));
+  assert.match(await checkStepOf(page, 4, 6), /Step done\./);
+  assert.equal(await ticks(page), '✓ ✓ ✓ ✓ ·< ·');
+  // Implement Design: not run, then run: no warnings, its timing met; the bitstream after it
+  assert.match(await checkStepOf(page, 5, 6), /WARNING: Implement Design has not run: run it \(the Processes pane\)\n/);
+  assert.match(await runProcess(page, 'Implement Design'), /Process "Implement Design" completed successfully/);
+  assert.match(await checkStepOf(page, 5, 6), /Step done\./);
+  assert.match(await checkStepOf(page, 6, 6), /WARNING: Generate Programming File has not run: run it \(the Processes pane\)\n/);
+  assert.match(await runProcess(page, 'Generate Programming File'), /Process "Generate Programming File" completed successfully/);
+  assert.match(await checkStepOf(page, 6, 6), /Step done\.\nEvery step of the lab "The clock and the board" is done\./);
+  assert.equal(await ticks(page), '✓ ✓ ✓ ✓ ✓ ✓<');
+  assert.equal(await page.eval((d) => [...document.querySelectorAll(`${d} .doc-status .ds-f`)].map((f) => f.textContent).join(' · '), D), 'Step 6 of 6 · 6 done');
+  assert.doesNotMatch(await page.consoleText(), /ERROR/);
+}, { timeout: 240000 });
