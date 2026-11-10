@@ -167,7 +167,7 @@ uiTest('#987 the header: the project and its document, not the product and versi
     const none = await head();
     assert.doesNotMatch(none.text, /Silinx|\d+\.\d+\.\d+/, look);
     assert.match(none.logo, /^Silinx \S/, look);
-    assert.match(none.window, /^Silinx \S.* Project Navigator$/, look);
+    assert.match(none.window, /^Silinx \S+( \(.*\))?$/, look);   // (no \"Project Navigator\" in the tab, #3224)
     if (look === 'ISE style') assert.equal(none.text, 'S Project Navigator');
   }
   await makeProject(env, { name: 'HeadPj', template: 'gates' });

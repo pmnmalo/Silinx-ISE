@@ -197,7 +197,8 @@ export function updateTitle() {
   // window's title, Help ▸ About
   $('title-text').textContent = pj ? `${pj.name} - [${S.active?.title || 'Design Summary'}]` : 'Project Navigator';
   document.querySelector('#titlebar .app-logo').title = `${PRODUCT} ${VERSION_LABEL}`;
-  document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION_LABEL}` : `${PRODUCT} ${VERSION_LABEL} Project Navigator`;
+  // (the browser tab: the product and its version, no "Project Navigator", #3224)
+  document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION_LABEL}` : `${PRODUCT} ${VERSION_LABEL}`;
   $('status-device').textContent = pj ? `${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` · ${pj.board}` : ''}` : '';
 }
 

@@ -149,7 +149,7 @@ for (const launcher of launchersOf()) {
     const srv = await startLauncher(APP, launcher, t);
     try {
       const html = await (await fetch(srv.url)).text();
-      assert.match(html, /<title>Silinx Project Navigator<\/title>/);
+      assert.match(html, /<title>Silinx<\/title>/);
       for (const asset of ['/js/app.js', '/core/version.js', '/vendor/yowasp-yosys/gen/bundle.js']) assert.equal((await fetch(srv.url + asset)).status, 200, asset);
       assert.ok((await (await fetch(`${srv.url}/api/templates`, { headers: srv.headers() })).json()).includes('blinky'));
       const r = await fetch(`${srv.url}/api/projects`, { method: 'POST', headers: srv.headers({ 'content-type': 'application/json' }), body: JSON.stringify({ name: 'Blinky', template: 'blinky' }) });
