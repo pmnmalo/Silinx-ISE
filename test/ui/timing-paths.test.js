@@ -252,3 +252,32 @@ uiTest('#3178 the Paths panel between two registers: From and To choose the pair
   await choose(1, '');
   assert.equal((await look(page)).rows.length, 3);
 });
+
+// ISE's report (#3178): its Paths panel beside build/<top>.twr, trce's paths (blinky's, ISE 14.7's: test/fixtures/trce)
+// back to the project's HDL by XST's names; Show Path marks the prescaler's always block
+uiTest('#3178 the Paths panel beside ISE\'s timing report: trce\'s paths, Show Path in the HDL back through XST\'s names', E, async (page) => {
+  const dir = path.join(ROOT, 'examples', 'blinky'), pj = JSON.parse(await fs.readFile(path.join(dir, 'silinx.json'), 'utf8'));
+  const files = {};
+  for (const f of pj.files.filter((x) => /\.(vhd|v)$/.test(x.path))) files[f.path] = await fs.readFile(path.join(dir, f.path), 'utf8');
+  await makeProject(env, { name: 'PathsIse', files, top: pj.top });
+  const build = path.join(env.server.workspace, 'PathsIse', 'build');
+  await fs.mkdir(build, { recursive: true });
+  const twr = await fs.readFile(path.join(ROOT, 'test', 'fixtures', 'trce', 'blinky-ise-paths.twr.txt'), 'utf8');
+  await fs.writeFile(path.join(build, `${pj.top}.twr`), twr);
+  await page.setViewport(1600, 800);
+  await page.openProject('PathsIse');
+  await page.eval((f) => window.SilinxApp.openFile(f), `build/${pj.top}.twr`);
+  await page.waitFor((r) => document.querySelector(`${r} .tp-row`), [R], { what: 'ISE\'s Paths panel' });
+  const L = await look(page);
+  assert.equal(L.rows.length, 20);
+  assert.equal(L.rows[0].split(' ')[2], /Minimum period is +([\d.]+)ns/.exec(twr)[1]);
+  assert.equal(await page.eval((r) => document.querySelectorAll(`${r} .tp-pick`).length, R), 0, 'no registers to choose: the Silinx toolchain\'s');
+  // Show Path on the slowest: its lines marked, as core/twr-paths.js gives them here (each file its lines)
+  const { iseTimingPaths } = await import('../../core/twr-paths.js');
+  const want = {};
+  for (const l of iseTimingPaths(twr, Object.entries(files).map(([p, text]) => ({ path: p, lang: /\.v$/.test(p) ? 'verilog' : 'vhdl', text })), pj.top).paths[0].lines) (want[l.file] ||= []).push(l.line);
+  assert.ok(Object.keys(want).length);
+  await page.click(`${R} .tp-actions .btn`, { text: 'Show Path' });
+  await page.waitFor((f) => window.Silinx.active?.id === `file:${f}`, [Object.keys(want)[0]], { what: 'the first file in front' });
+  for (const [f, l] of Object.entries(want)) assert.deepEqual(await marked(page, f), l.sort((a, b) => a - b), f);
+});

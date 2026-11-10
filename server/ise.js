@@ -331,7 +331,7 @@ if has par; then
   run_step par par -w -intstyle xflow ${parOpts} ${shQuote(top + '_map.ncd')} ${shQuote(top + '.ncd')} ${shQuote(top + '.pcf')}
 fi
 if has trce; then
-  run_step trce trce -intstyle xflow -v 3 -s ${ps.speedNum} -n 3 -fastpaths -xml ${shQuote(top + '.twx')} ${shQuote(top + '.ncd')} -o ${shQuote(top + '.twr')} ${shQuote(top + '.pcf')}${hasUcf ? ` -ucf ${shQuote(top + '.ucf')}` : ''}
+  run_step trce trce -intstyle xflow -v 1 -s ${ps.speedNum} -n 20 -fastpaths -xml ${shQuote(top + '.twx')} ${shQuote(top + '.ncd')} -o ${shQuote(top + '.twr')} ${shQuote(top + '.pcf')}${hasUcf ? ` -ucf ${shQuote(top + '.ucf')}` : ''}
 fi
 if has postpar; then
   mkdir -p netgen/par
