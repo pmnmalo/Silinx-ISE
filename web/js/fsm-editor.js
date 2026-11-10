@@ -189,8 +189,8 @@ export function mountFsmEditor(container, opts = {}) {
     renderSide();
     return s;
   }
-  function addTransition(from, to) {
-    const t = { id: newId('t'), from, to, cond: '', outputs: {} };
+  function addTransition(from, to, shape = {}) {
+    const t = { id: newId('t'), from, to, cond: '', outputs: {}, ...shape };
     M.transitions.push(t);
     sel = { type: 'trans', id: t.id };
     commit();

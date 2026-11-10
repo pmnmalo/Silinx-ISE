@@ -1,10 +1,12 @@
 // The state diagram editor's pointer and keys (#405: out of mountFsmEditor in fsm-editor.js): a press on a state
 // (select, move, or connect from it with Shift or the transition tool), on a transition (select, bend), on the
 // background (pan, or a new state with its tool), the second finger's zoom (#674), the wheel, the double clicks that
-// edit a name or a condition, and the editor's keys.
+// edit a name or a condition, and the editor's keys. A transition is drawn as a stroke (#3286): its preview is the
+// path drawn, and the arc takes its shape (core/fsm-stroke.js: a bend, a self-loop's angle).
 import { pasteFromKey } from './clipboard.js';
 import { twoFingerView } from './ui.js';
 import { radiusOf, sv } from './fsm-editor.js';
+import { fitStroke, snapAngle, snapBend } from '/core/fsm-stroke.js';
 
 /** The pointer's and the keys' handlers of mountFsmEditor, attached to its drawing (M(), drag(), fitted(), sel(), view(): its current values). */
 export function mountFsmPointer(ctx) {
@@ -57,8 +59,9 @@ export function mountFsmPointer(ctx) {
       const r = radiusOf(s);
       setSel({ type: 'state', id: s.id }); render(); renderSide();
       if (readOnly) return;
-      if (d > r - 7) {
-        setDrag({ kind: 'connect', sel0, from: s, start: w });
+      // (a pen's or a finger's rim is wider: a stroke started on its edge, #3286)
+      if (d > r - (ev.pointerType === 'mouse' ? 7 : 12)) {
+        setDrag({ kind: 'connect', sel0, from: s, start: w, pts: [w] });
         svg.classList.add('connecting');
       } else setDrag({ kind: 'move', sel0, s, x: s.x, y: s.y, dx: w.x - s.x, dy: w.y - s.y, moved: false });
       capture(ev);
@@ -85,11 +88,8 @@ export function mountFsmPointer(ctx) {
       if (!drag().moved && Math.hypot(w.x - drag().start.x, w.y - drag().start.y) < 4) return;
       drag().moved = true;
       const a = stateById(t.from);
-      if (g.self) t.angle = Math.round(Math.atan2(w.y - a.y, w.x - a.x) * 180 / Math.PI / 5) * 5;
-      else {
-        const b = (w.x - g.mid.x) * g.n.x + (w.y - g.mid.y) * g.n.y;
-        t.bend = Math.abs(b) < 8 ? 0 : Math.round(b);
-      }
+      if (g.self) t.angle = snapAngle(Math.atan2(w.y - a.y, w.x - a.x) * 180 / Math.PI);
+      else t.bend = snapBend((w.x - g.mid.x) * g.n.x + (w.y - g.mid.y) * g.n.y);
       render();
     } else if (drag().kind === 'connect') {
       gOverlay.textContent = '';
@@ -97,9 +97,16 @@ export function mountFsmPointer(ctx) {
       const a = drag().from;
       for (const el of gStates.querySelectorAll('.fsm-state.drop')) el.classList.remove('drop');
       if (target) gStates.querySelector(`[data-state="${CSS.escape(target.id)}"]`)?.classList.add('drop');
-      const u = Math.hypot(w.x - a.x, w.y - a.y) || 1;
-      const p0 = { x: a.x + (w.x - a.x) / u * radiusOf(a), y: a.y + (w.y - a.y) / u * radiusOf(a) };
-      gOverlay.append(sv('path', { class: 'asm-edge-temp', d: `M${p0.x},${p0.y} L${w.x},${w.y}`, 'marker-end': `url(#${uid}-arr-sel)` }));
+      // the stroke as drawn (a point every 2 px), from where it left the state's circle
+      const pts = drag().pts, last = pts[pts.length - 1];
+      if (Math.hypot(w.x - last.x, w.y - last.y) >= 2) pts.push(w);
+      const out = pts.filter((p) => Math.hypot(p.x - a.x, p.y - a.y) > radiusOf(a));
+      if (out.length) {
+        const p = out[0], u = Math.hypot(p.x - a.x, p.y - a.y);
+        const p0 = { x: a.x + (p.x - a.x) / u * radiusOf(a), y: a.y + (p.y - a.y) / u * radiusOf(a) };
+        const d = [p0, ...pts.slice(pts.indexOf(p)), w].map((q, i) => `${i ? 'L' : 'M'}${q.x},${q.y}`).join(' ');
+        gOverlay.append(sv('path', { class: 'asm-edge-temp', d, 'marker-end': `url(#${uid}-arr-sel)` }));
+      }
       drag().target = target;
       drag().end = w;
     }
@@ -115,8 +122,12 @@ export function mountFsmPointer(ctx) {
     else if (d.kind === 'bend' && d.moved) commit('bend');
     else if (d.kind === 'connect') {
       for (const el of gStates.querySelectorAll('.fsm-state.drop')) el.classList.remove('drop');
-      const moved = d.end && Math.hypot(d.end.x - d.start.x, d.end.y - d.start.y) > 6;
-      if (d.target && moved) addTransition(d.from.id, d.target.id);
+      // the arc in the stroke's shape; a self-loop once the stroke left the state, whatever its size (#3286)
+      if (d.target && d.end) {
+        const at = (s) => ({ x: s.x, y: s.y, r: radiusOf(s) }), from = at(d.from);
+        const shape = fitStroke([...d.pts, d.end], from, d.target.id === d.from.id ? from : at(d.target));
+        if (shape) addTransition(d.from.id, d.target.id, shape);
+      }
     }
   }
   // a second finger (#674): what the first one started undone, the selection as it was
