@@ -221,11 +221,17 @@ function xiseProject(name, xise, files = {}) {
   return { json, files: pfiles, warnings };
 }
 
+// the relays a shared project may go through (#3227): the site's, set when it is built (scripts/build-standalone.mjs,
+// SILINX_SITE_RELAYS; none by default), its Content-Security-Policy's too
+/* global __SILINX_SITE_RELAYS__ */
+const SITE_RELAYS = typeof __SILINX_SITE_RELAYS__ !== 'undefined' ? __SILINX_SITE_RELAYS__ : [];
+
 // git through GitHub's REST API (#3196)
 const git = browserGit({ store: () => store, ops, prefix: DEV_SITE ? 'silinx.dev.' : 'silinx.' });
 
 export const api = {
   standalone: true,
+  collabRelays: async () => [...SITE_RELAYS],
   ...git,
   devSite: DEV_SITE,
   // ---- where the projects are kept

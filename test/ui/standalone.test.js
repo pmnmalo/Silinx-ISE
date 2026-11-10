@@ -545,6 +545,8 @@ uiTest('#3227 browser edition: Share Project… hosts the room in the page (its 
   await page.waitFor(() => window.Silinx.project?.name === 'WebShare');
   await page.menu('File', 'Share Project…');
   await page.waitDialog('Share Project');
+  // (a relay of the site's, #3227: none in a build without SILINX_SITE_RELAYS, so no such choice; this page hosts it)
+  assert.equal(await page.eval(() => !!document.querySelector('.dlg-overlay .collab-relay')), false);
   await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
   await page.dialogButton('Share');
   const link = await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });

@@ -19,12 +19,22 @@ import { renderPresence, setPresenceCommands } from './collab-presence.js';
 import { projectDoc, publishProject, putFile, putProject, sharedPath, watchDoc, docFile, editablePath } from '/core/collab-doc.js';
 import { keepBound, unbindAll } from './collab-bind.js';
 import { shareRoom, colorOf } from '/core/collab-client.js';
-import { followLink, relayUrl } from '/core/collab-link.js';
+import { followLink, relayUrl, relayAddress } from '/core/collab-link.js';
 
 export const NAME_KEY = prefKey('silinx.collab.name');
 const TRACK_MS = 300;
 const savedName = () => { try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; } };
 const keepName = n => { try { localStorage.setItem(NAME_KEY, n); } catch { /* this page only */ } };
+// the browser edition's relay (#3227): another Silinx's, that lets this site in, among the site's (its address, its key),
+// this browser's
+export const RELAY_KEY = prefKey('silinx.collab.relay');
+/** The relays this Silinx's pages may share and follow through (their Content-Security-Policy's too): the site's, set
+ *  when it is built, or config.json's relay.relays. */
+export const relaysHere = async () => { try { return (await api.collabRelays?.()) || []; } catch { return []; } };
+/** Why a relay is refused here. */
+export const notHere = r => `the relay at ${new URL(r).host} is not among this Silinx's relays (${api.standalone ? 'the site\'s, set when it is built' : 'config.json\'s relay.relays'})`;
+const savedRelay = () => { try { const r = JSON.parse(localStorage.getItem(RELAY_KEY) || 'null'); return { on: !!r?.on, address: String(r?.address || ''), key: String(r?.key || '') }; } catch { return { on: false, address: '', key: '' }; } };
+const keepRelay = r => { try { localStorage.setItem(RELAY_KEY, JSON.stringify(r)); } catch { /* this page only */ } };
 /** The name of a participant, as the others see it (trimmed, at most 40 characters). */
 export const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim().slice(0, 40);
 
@@ -37,16 +47,26 @@ export async function shareProjectDialog() {
   // (a page opened from a file has no address the followers could open: the site's has, #3227)
   if (location.protocol === 'file:') { app.log('ERROR: Share Project: a Silinx opened from a file has no address that others can open; open Silinx from its site to share a project.', 'err'); return null; }
   const input = h('input', { type: 'text', value: savedName(), 'data-field': 'name', maxlength: 40, style: { width: '100%' } });
+  // (the browser edition: this page hosts the room, or a relay of the settings does, #3227)
+  const r0 = savedRelay(), relays = api.collab ? [] : await relaysHere();
+  const viaRelay = h('input', { type: 'checkbox', 'data-field': 'via-relay', checked: r0.on && relays.includes(r0.address) });
+  const address = h('select', { 'data-field': 'relay', 'data-no-i18n': '', style: { width: '100%' } }, ...relays.map(r => h('option', { value: r, selected: r === r0.address }, r)));
+  const key = h('input', { type: 'password', 'data-field': 'relay-key', value: r0.key, autocomplete: 'off', style: { width: '100%' } });
+  const relayPart = !relays.length ? null : h('div', { class: 'collab-relay' },
+    h('label', { class: 'collab-check' }, viaRelay, ' Through a relay (a Silinx server that lets this site in); else this page hosts it'),
+    h('label', {}, 'The relay\'s address:'), address, h('label', {}, 'Its key (from its administrator):'), key);
   const ok = await dialog({
     title: 'Share Project',
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, 'Others follow this project live with its link, read only: its files and drawings as they change, the editor you have open and your cursor. Its builds are not shared.'),
-      h('label', {}, 'Your name, as they see it:'), input),
-    buttons: [{ label: 'Share', primary: true, value: () => cleanName(input.value) }, { label: 'Cancel', value: null }],
+      h('label', {}, 'Your name, as they see it:'), input, relayPart),
+    buttons: [{ label: 'Share', primary: true, value: () => ({ name: cleanName(input.value), relay: { on: viaRelay.checked, address: address.value.trim(), key: key.value } }) }, { label: 'Cancel', value: null }],
   });
-  if (!ok) return null;
-  keepName(ok);
-  try { await startSharing(ok); } catch (e) { app.log(`ERROR: Share Project: ${e.message}.`, 'err'); return null; }
+  if (!ok?.name) return null;
+  keepName(ok.name);
+  if (!api.collab) keepRelay(ok.relay);
+  const how = !api.collab && ok.relay.on ? { via: 'relay', relay: ok.relay } : {};
+  try { await startSharing(ok.name, how); } catch (e) { app.log(`ERROR: Share Project: ${e.message}.`, 'err'); return null; }
   return linkDialog();
 }
 
@@ -61,18 +81,23 @@ async function readAll(name) {
   return { project: pj, files };
 }
 
-/** Shares the open project as `name` (the link: share.link); via: 'relay' (the server's: a server edition's default)
- *  or 'host' (this page hosts the room: the browser edition's, #3227). */
-export async function startSharing(name, { via = api.collab ? 'relay' : 'host' } = {}) {
+/** Shares the open project as `name` (the link: share.link); via: 'relay' (the server's: a server edition's default;
+ *  with `relay`, { address, key }, another Silinx's, that lets this site in: the browser edition's, #3227) or 'host'
+ *  (this page hosts the room: the browser edition's default). */
+export async function startSharing(name, { via = api.collab ? 'relay' : 'host', relay = null } = {}) {
+  const other = relay ? relayAddress(relay.address) : null;
+  if (relay && !other) throw new Error(`the relay's address is not an http(s) address: '${relay.address}'`);
+  if (other && !(await relaysHere()).includes(other)) throw new Error(notHere(other));
+  if (via === 'relay' && !other && !api.collab) throw new Error('the browser edition shares through a relay of its settings, or its own page');
   const project = S.project.name;
   const doc = projectDoc();
   publishProject(doc, { ...await readAll(project), owner: name });
   const host = via === 'host' ? (await import('./collab-host.js')).hostRoom() : null;
   const session = host
     ? await shareRoom({ url: 'silinx-host:', WebSocket: host.WebSocket, doc, user: { name }, editors: true, onEvent: ev => onEvent(ev) })
-    : await shareRoom({ url: relayUrl(location.href, 'share'), token: await api.collabToken(), doc, user: { name }, editors: true, onEvent: ev => onEvent(ev) });
+    : await shareRoom({ url: relayUrl(other || location.href, 'share'), token: other ? relay.key || null : await api.collabToken(), doc, user: { name }, editors: true, onEvent: ev => onEvent(ev) });
   const base = location.origin + location.pathname;
-  share = { name, project, session, doc, link: followLink(base, session.room, session.key, via), editLink: followLink(base, session.room, session.key, via, session.editKey), known: new Map(), view: null, hosted: host?.hosted || null, bound: new Map() };
+  share = { name, project, session, doc, link: followLink(base, session.room, session.key, via, null, other), editLink: followLink(base, session.room, session.key, via, session.editKey, other), known: new Map(), view: null, hosted: host?.hosted || null, bound: new Map() };
   Object.assign(collab, { role: 'owner', owner: name, project, session });
   ({ restore: share.restore, orig: share.orig } = hookApi(project, doc));
   share.unwatch = watchDoc(doc, ev => onEdits(share, ev));
@@ -81,6 +106,7 @@ export async function startSharing(name, { via = api.collab ? 'relay' : 'host' }
   setPresenceCommands(commands);
   draw();
   app.log(`Sharing project "${project}": anyone with its link follows it live, read only (Share Project… shows the link; Stop Sharing ends it).`, 'ok');
+  if (other) app.log(`Shared through the relay at ${new URL(other).host}: it sees no file, only who is in.`, 'info');
   if (host) app.log('This page hosts the shared project: each follower sends you a code when they open the link (Add a Follower…, in the toolbar, takes it); it lasts while this page is open.', 'info');
   return share.link;
 }

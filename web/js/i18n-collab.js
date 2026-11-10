@@ -18,6 +18,8 @@ export const COLLAB_PT = {
   'Anyone with the editors\' link changes its text files with you, live; its drawings stay yours.':
     'Quem tiver a ligação de editores altera os ficheiros de texto consigo, em direto; os desenhos continuam seus.',
   // (a room the owner's page hosts, #3227: web/js/collab-host.js)
+  'Through a relay (a Silinx server that lets this site in); else this page hosts it': 'Através de um retransmissor (um servidor Silinx que deixa entrar este sítio); senão, esta página aloja-o',
+  'The relay\'s address:': 'O endereço do retransmissor:', 'Its key (from its administrator):': 'A sua chave (do seu administrador):',
   'Add a Follower…': 'Adicionar um Seguidor…', 'Add a Follower': 'Adicionar um Seguidor', 'Connect': 'Ligar',
   'Connect to the Owner': 'Ligar ao Dono', 'Copy Code': 'Copiar Código', 'Your code:': 'O seu código:', 'The owner\'s code:': 'O código do dono:',
   'A follower gets a code when they open the link: paste it here.': 'Um seguidor recebe um código ao abrir a ligação: cole-o aqui.',
@@ -31,6 +33,7 @@ export const COLLAB_PT = {
 export const COLLAB_PT_PATTERNS = [
   [/^Read-only, following (.+)'s project$/, 'Só de leitura, a seguir o projeto de $1'],
   [/^Sharing \((\d+)\)$/, 'A partilhar ($1)'],
+  [/^Through the relay at (.+)\.$/, 'Através do retransmissor em $1.'],
   [/^Anyone with this link follows "(.+)" live, read only, as long as you share it\.$/, 'Quem tiver esta ligação segue "$1" em direto, só de leitura, enquanto o partilhar.'],
   // (the presence's button: the owner's name)
   [/^Following ([^."():]+)$/, 'A seguir $1'],

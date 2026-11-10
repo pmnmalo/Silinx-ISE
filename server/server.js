@@ -8,8 +8,8 @@ import * as P from './projects.js';
 import { orderExamples } from '../core/examples.js';
 import { orderTestDesigns } from '../core/test-designs.js';
 import { importMapPackages } from './import-map.js';
-import { contentSecurityPolicy, inlineScriptHashes } from './csp.js';
-import { configDir } from './toolchain.js';
+import { contentSecurityPolicy, inlineScriptHashes, relaySources } from './csp.js';
+import { configDir, relayConfig } from './toolchain.js';
 import { createProjectWatcher } from './project-watch.js';
 import { listJobs } from './jobs.js';
 import { createOpenCodes, tokenProof } from './open-code.js';
@@ -28,17 +28,19 @@ export function pageCsp(file) {
   if (!file.startsWith(path.join(ROOT, 'web') + path.sep)) return null;
   let st;
   try { st = fs.statSync(file); } catch { return null; }
+  // (the other relays config.json lets its pages use, #3227: connected to by these only)
+  const relays = relayConfig().relays;
   const hit = cspCache.get(file);
-  if (hit && hit.mtime === st.mtimeMs) return hit.csp;
-  const csp = contentSecurityPolicy({ hashes: inlineScriptHashes(fs.readFileSync(file, 'utf8')) });
-  cspCache.set(file, { mtime: st.mtimeMs, csp });
+  if (hit && hit.mtime === st.mtimeMs && hit.relays === relays.join(' ')) return hit.csp;
+  const csp = contentSecurityPolicy({ hashes: inlineScriptHashes(fs.readFileSync(file, 'utf8')), connect: relaySources(relays) });
+  cspCache.set(file, { mtime: st.mtimeMs, relays: relays.join(' '), csp });
   return csp;
 }
 
 /** A loopback address (the server only reachable from this machine). */
 export const isLoopback = host => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(String(host).toLowerCase()) || /^127\./.test(String(host)) || /^::ffff:127\./.test(String(host));
 
-export async function createApp({ host = '127.0.0.1', token = null, codes = createOpenCodes() } = {}) {
+export async function createApp({ host = '127.0.0.1', token = null, codes = createOpenCodes(), relay = relayConfig() } = {}) {
   const app = express();
   // The API changes files and runs the ISE flow: only the Silinx page itself may call it.
   // A request from another web origin (a malicious page in the same browser) is refused, and when
@@ -77,7 +79,10 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
     next();
   });
   // the relay of shared projects (#3181, server/collab-relay.js): on the server that app.listen makes, behind the same
-  // checks of the host and the origin; a room opened with the token only (a follower joins one with its link)
+  // checks of the host and the origin; a room opened with the token only (a follower joins one with its link). With
+  // config.json's relay (#3227): the pages of its origins let in on the relay's endpoints too (never the API's), and its
+  // key opening a room as the token does
+  const relayKeyOk = t => !!relay.key && typeof t === 'string' && crypto.timingSafeEqual(digest(t), digest(relay.key));
   const listen = app.listen.bind(app);
   app.listen = (...a) => {
     const srv = listen(...a);
@@ -88,11 +93,11 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
         if (req.headers.origin) {
           let oh = '';
           try { oh = new URL(req.headers.origin).host.toLowerCase(); } catch { /* invalid origin */ }
-          if (oh !== String(req.headers.host || '').toLowerCase()) return 'cross-origin request refused';
+          if (oh !== String(req.headers.host || '').toLowerCase() && !relay.origins.includes(req.headers.origin)) return 'cross-origin request refused';
         }
         return null;
       },
-      tokenOk: t => !token || tokenOk(t),
+      tokenOk: t => !token || tokenOk(t) || relayKeyOk(t),
     });
     return srv;
   };
@@ -165,6 +170,8 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   api.get('/projects', wrap(() => P.listProjects()));
   // where the projects are kept: the Start page says it (#1297)
   api.get('/workspace', wrap(() => ({ folder: P.workspaceDir() })));
+  // the other relays this server's pages may share and follow through (config.json's relay.relays, #3227)
+  api.get('/collab/relays', wrap(() => ({ relays: relayConfig().relays })));
   api.post('/projects', wrap(req => P.createProject(req.body || {})));
   api.get('/projects/:p', wrap(async req => ({ ...await P.readProject(req.params.p), fileTree: await P.fileTree(req.params.p) })));
   api.put('/projects/:p', wrap(req => {

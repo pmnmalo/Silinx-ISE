@@ -13,7 +13,7 @@ import { S, app, activateDoc } from './app.js';
 import { collab } from './collab-state.js';
 import { renderPresence, setPresenceCommands } from './collab-presence.js';
 import { followApi } from './collab-follow-api.js';
-import { NAME_KEY, cleanName } from './collab-share.js';
+import { NAME_KEY, cleanName, relaysHere, notHere } from './collab-share.js';
 import { docProject } from '/core/collab-doc.js';
 import { keepBound } from './collab-bind.js';
 import { followRoom, colorOf } from '/core/collab-client.js';
@@ -32,7 +32,9 @@ export async function startFollowing(hash = location.hash) {
   try { link = parseFollowLink(hash); } catch (e) { history.replaceState(null, '', location.pathname + location.search); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   if (!link) return null;
   history.replaceState(null, '', location.pathname + location.search);
-  if (api.standalone && link.via === 'relay') { app.log('ERROR: Follow a shared project: open its link at the address of the Silinx that shares it (the browser edition has no relay).', 'err'); return null; }
+  // (another Silinx's relay, #3227: one of this Silinx's relays only, as its Content-Security-Policy lets it connect to)
+  if (link.relay && !(await relaysHere()).includes(link.relay)) { app.log(`ERROR: Follow a shared project: ${notHere(link.relay)}: not followed.`, 'err'); return null; }
+  if (api.standalone && link.via === 'relay' && !link.relay) { app.log('ERROR: Follow a shared project: open its link at the address of the Silinx that shares it (the browser edition has no relay).', 'err'); return null; }
   let saved = '';
   try { saved = localStorage.getItem(NAME_KEY) || ''; } catch { /* none */ }
   const input = h('input', { type: 'text', value: saved, 'data-field': 'name', maxlength: 40, style: { width: '100%' } });
@@ -40,6 +42,7 @@ export async function startFollowing(hash = location.hash) {
     title: 'Follow a Shared Project',
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, 'This link follows a project someone shares: you see its files and drawings as they change, read only, and where its owner is.'),
+      link.relay ? h('p', {}, `Through the relay at ${new URL(link.relay).host}.`) : null,
       h('label', {}, 'Your name, as they see it:'), input),
     buttons: [{ label: 'Follow', primary: true, value: () => cleanName(input.value) || 'Guest' }, { label: 'Cancel', value: null }],
   });
@@ -49,7 +52,7 @@ export async function startFollowing(hash = location.hash) {
   if (link.via === 'host' && !WS) return null;
   let session;
   try {
-    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, sign: link.sign, user: { name }, onEvent: ev => onEvent(ev) });
+    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(link.relay || location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, sign: link.sign, user: { name }, onEvent: ev => onEvent(ev) });
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);

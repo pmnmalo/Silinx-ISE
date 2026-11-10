@@ -12,6 +12,10 @@ export const scriptHash = text => `'sha256-${crypto.createHash('sha256').update(
 /** The hash sources of every inline script of a page. */
 export const inlineScriptHashes = html => [...html.matchAll(INLINE)].map(m => scriptHash(m[1]));
 
+/** A relay's sources for connect-src (#3227): its origin and its WebSockets' (wss: for https, ws: for http), which an
+ *  http(s) source does not cover. */
+export const relaySources = origins => origins.flatMap(o => [o, o.replace(/^http/, 'ws')]);
+
 /**
  * The policy: `hashes` (the inline scripts), `scripts` (other origins scripts load from: the assets'
  * site of a single file), `connect` (other origins fetched), `meta` (in a <meta> element: without the

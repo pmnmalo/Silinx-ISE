@@ -86,9 +86,10 @@ export const COLLAB_TOOLS = [
       name: STR('The name the followers see (default: "MCP agent").'),
       server: STR(`The address of the Silinx server whose relay shares it (default ${DEFAULT_SERVER}).`),
       editors: { type: 'boolean', description: 'start: editors may change its text files too (the result: an editor\'s link besides the follower\'s; what they change written to the disk).' },
+      key: STR('start: the key of a relay on another computer (its config.json\'s relay.key, #3227), instead of the token of a Silinx server on this one.'),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    async run({ project: name, action = 'start', name: who, server, editors = false }) {
+    async run({ project: name, action = 'start', name: who, server, editors = false, key }) {
       if (!['start', 'status', 'stop'].includes(action)) throw toolError('action: start, status or stop');
       const cur = shares.get(name);
       if (action === 'stop') {
@@ -111,7 +112,7 @@ export const COLLAB_TOOLS = [
       publishProject(doc, { ...await readAll(name), owner });
       let session;
       try {
-        session = await shareRoom({ url: relayUrl(origin, 'share'), token: await tokenOf(origin), doc, user: { name: owner }, editors: !!editors, WebSocket: await WebSocketImpl() });
+        session = await shareRoom({ url: relayUrl(origin, 'share'), token: key ? String(key) : await tokenOf(origin), doc, user: { name: owner }, editors: !!editors, WebSocket: await WebSocketImpl() });
       } catch (e) { throw toolError(`cannot share through ${origin}: ${e.message} (is Silinx running there? silinx serve)`); }
       // (what changes on disk, published again; the relay's end, the share's)
       const { createProjectWatcher } = await import('./project-watch.js');
@@ -145,7 +146,8 @@ export const COLLAB_TOOLS = [
       if (!l || !l.base) throw toolError('link: a link to follow (http(s)://…/#follow=…)');
       // (a room the owner's page hosts, #3227: reached over WebRTC, which this server has not)
       if (l.via === 'host') throw toolError('link: a project its owner\'s page hosts (…#follow=….host) is followed in a browser, over WebRTC: open the link in Silinx');
-      const origin = serverOf(l.base);
+      // (through the relay the link names, #3227, else the link's own Silinx)
+      const origin = serverOf(l.relay || l.base);
       const slot = `${l.room}:${l.sign ? 'edit' : 'follow'}`;   // (a room followed and edited: two participants)
       let cur = follows.get(slot);
       if (cur?.session.closed()) { follows.delete(slot); cur = null; }

@@ -10,7 +10,7 @@ import { scratchEnv } from './server-helpers.js';
 import * as Y from 'yjs';
 import { followRoom } from '../core/collab-client.js';
 import { docFile, docProject } from '../core/collab-doc.js';
-import { parseFollowLink, relayUrl } from '../core/collab-link.js';
+import { parseFollowLink, relayUrl, followLink } from '../core/collab-link.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, what, ms = 5000) => { const t0 = Date.now(); for (;;) { const v = await fn(); if (v) return v; if (Date.now() - t0 > ms) throw new Error(`timed out: ${what}`); await sleep(25); } };
@@ -163,4 +163,20 @@ test('#3182 editors: share_project gives an editor\'s link; follow_project write
   await ok('follow_project', { link: editLink, stop: true });
   await ok('share_project', { project: 'trafficEd', action: 'stop' });
   await until(() => page.closed(), 'the page told');
+});
+
+test('#3227 through a relay on another computer: share_project with its key; follow_project of a site\'s link that names the relay', async () => {
+  await ok('new_project_from_example', { name: 'gatesRelay', example: 'gates' });
+  // (the key given, not the token file of this computer: here this server's token, as a relay's key opens a room the same way)
+  const { data: { link } } = await ok('share_project', { project: 'gatesRelay', name: 'Ana', server: base, key: 'tok-mcp' });
+  const l = parseFollowLink(link);
+  // the browser edition's link: the site's address, the relay's in it
+  const site = followLink('https://site.example/', l.room, l.key, 'relay', null, base);
+  const f = await ok('follow_project', { link: site, name: 'Bot' });
+  assert.equal(f.data.project, 'gatesRelay');
+  assert.equal(f.data.owner, 'Ana');
+  await ok('follow_project', { link: site, stop: true });
+  await ok('share_project', { project: 'gatesRelay', action: 'stop' });
+  // (a wrong key: refused, the relay's own message)
+  await fails('share_project', { project: 'gatesRelay', server: base, key: 'not-the-key' }, `cannot share through ${base}: sharing a project needs this Silinx server's token (is Silinx running there? silinx serve)`);
 });

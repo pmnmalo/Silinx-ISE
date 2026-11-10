@@ -57,7 +57,27 @@ export const DEFAULT_CONFIG = Object.freeze({
   vivado: { mode: 'docker', image: '', settings: '' },   // AMD Vivado (7-series): its mode (local|docker|ssh), image, settings64.sh ('' = found)
   programmer: { tool: '', cable: '' },          // global defaults (board defaults take precedence when empty)
   paths: {},                                    // explicit binary paths, e.g. { djtgcfg: '/usr/local/bin/djtgcfg' }
+  relay: { origins: [], key: '', relays: [] },  // shared projects (#3227): the sites whose pages use this relay, the key that opens a room; the other relays this server's pages use
 });
+
+// http(s) origins, as a browser sends them (no user nor password), once each
+function originsOf(list) {
+  const out = [];
+  for (const o of Array.isArray(list) ? list : []) {
+    try { const u = new URL(String(o)); if ((u.protocol === 'https:' || u.protocol === 'http:') && !u.username && !u.password) out.push(u.origin); } catch { /* not an address */ }
+  }
+  return [...new Set(out)];
+}
+/** The relay's settings (#3227; config.json only): { origins (the sites whose pages may use this server's relay),
+ *  key (opens a room on it besides the server's token: 24 characters at least, else none), relays (the other Silinx
+ *  relays this server's pages may share and follow through: their Content-Security-Policy lets them connect to these
+ *  only) }. */
+export function relayConfig(cfg = null) {
+  let r = cfg?.relay;
+  if (cfg === null) try { r = JSON.parse(fss.readFileSync(configPath(), 'utf8')).relay; } catch { r = null; }
+  const key = typeof r?.key === 'string' && r.key.length >= 24 ? r.key : '';
+  return { origins: originsOf(r?.origins), key, relays: originsOf(r?.relays) };
+}
 
 function merge(base, over) {
   const out = { ...base };
@@ -76,7 +96,7 @@ export async function loadConfig() {
 
 /** The settings that name a program to run or its arguments: set in config.json (or with the
  *  command line) only, never through the API (Toolchain Settings does not show them). */
-export const FILE_ONLY = ['docker.command', 'docker.extraArgs', 'ssh.sshArgs', 'ssh.identity', 'paths'];
+export const FILE_ONLY = ['docker.command', 'docker.extraArgs', 'ssh.sshArgs', 'ssh.identity', 'paths', 'relay'];
 /** A settings script ISE's way: …/settings64.sh or …/settings32.sh ('' = auto-detect). */
 const SETTINGS = /(^|[\\/])settings(32|64)\.sh$/;
 
