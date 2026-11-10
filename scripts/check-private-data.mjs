@@ -28,7 +28,7 @@ const ALLOW = [
   [/./, /@(example\.(com|org|net)|[\w.-]+\.(example|test|invalid))$/, 'example domains (RFC 2606)'],
   [/./, /^(noreply@anthropic\.com|[\w.+-]+@users\.noreply\.github\.com)$/, 'no-reply addresses (the Co-Authored-By line of commits)'],
   [/./, 'git@github.com', 'GitHub\'s ssh login, in a repository\'s ssh address (#3195): no one\'s address'],
-  ['test/git.test.js', /^(ghp_secret@gitlab\.com|tok@github\.com|https:\/\/user:ghp_secret@gitlab\.com\/a\/b|https:\/\/ana:tok@github\.com\/a\/b\/\\?)$/,
+  [/^test\/git(-core)?\.test\.js$/, /^(https:\/\/x:y@host\/a|ghp_secret@gitlab\.com|tok@github\.com|https:\/\/user:ghp_secret@gitlab\.com\/a\/b|https:\/\/ana:tok@github\.com\/a\/b\/\\?)$/,
     'made-up credentials in URLs, which git\'s messages lose (#3195)'],
   ['test/corpus/vloghammer-gen.mjs', 'claire@yosyshq.com', 'the copyright notice of VlogHammer (ISC licence), which a port must keep'],
   ['test/lang-vhdl-types.test.js', '6.4.2.3', 'a section of the VHDL standard'],
