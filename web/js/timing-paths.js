@@ -12,7 +12,7 @@ import { prefKey } from './prefs.js';
 import { log } from './console.js';
 import { markLines } from './editor.js';
 import { S, findDoc, openFile, openFpgaView } from './app.js';
-import { pathHighlight } from '/packages/silinx-fpga/src/fpga/timing-paths.js';
+import { pathHighlight } from '/packages/silinx-fpga/src/index.js';
 
 export const TIMING_REPORT = 'build/open/timing.txt';
 export const PATHS_FILE = 'build/open/paths.json';
