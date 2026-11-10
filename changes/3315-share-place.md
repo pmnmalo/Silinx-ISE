@@ -14,5 +14,5 @@ In detail:
   - **The ISE style toolbar** has no Split button any more: View ▸ Split Editor splits the editor there.
   - **Tests:** collab (Share Project… from the Start page, who is in at its place in both interfaces and after a change
     of interface, View ▸ Split Editor, Portuguese); projects (the Start page's commands); split-view, tasks, app,
-    tab-order, tab-sight (the split from View ▸ Split Editor in the ISE style); the collab tests find who is in wherever
-    it is.
+    tab-order, tab-sight (the split from View ▸ Split Editor in the ISE style); interface-parity (the Silinx header's
+    Split button, the ISE style's View ▸ Split Editor); the collab tests find who is in wherever it is.
