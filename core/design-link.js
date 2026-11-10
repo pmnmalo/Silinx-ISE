@@ -27,6 +27,7 @@ const FORMAT = 1;
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;   // (a project's: server/projects.js, web/js/project-store.js)
 const MODULE_RE = /^[A-Za-z_][\w$]{0,127}$/;
 const BOARD_RE = /^[a-z0-9_-]{1,32}$/i;
+const LAB_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;   // (a guided lab's id, core/labs.js)
 const EXAMPLE_RE = /^[a-z0-9_-]{1,64}$/i;
 
 const enc = new TextEncoder();
@@ -265,11 +266,12 @@ function cModule(path, text) {
 export const SITE_URL = 'https://pmnmalo.github.io/Silinx/';
 
 // ------------------------------------------------------------------ the link's hash
-const KEYS = ['design', 'open', 'view', 'top', 'board', 'ui'];
+const KEYS = ['design', 'open', 'view', 'top', 'board', 'ui', 'lab'];
 
 /**
  * The options of a link's hash ('#design=…&view=try'): null when it has none of them (the plain address, a token);
- * else { source: { kind: 'design', design } | { kind: 'example', name } | { kind: 'zip', url }, view, top, board }.
+ * else { source: { kind: 'design', design } | { kind: 'example', name } | { kind: 'zip', url }, view, top, board, lab } (lab:
+ * a guided lab opened once the project is, #3179).
  * Throws (error.linkError) on a broken one.
  */
 export function parseLink(hash) {
@@ -309,7 +311,8 @@ export function parseLink(hash) {
   if (opts.top && !MODULE_RE.test(opts.top)) throw linkError(`the link's top '${opts.top.slice(0, 64)}' is not a module name`);
   if (opts.board && !BOARD_RE.test(opts.board)) throw linkError(`the link's board '${opts.board.slice(0, 32)}' is not a board name`);
   if (opts.ui !== undefined && (opts.ui.length > UI_LIMITS.maxEncoded || !/^[A-Za-z0-9_-]+$/.test(opts.ui))) throw linkError('the link\'s view (ui=) is not one');
-  return { source, view: opts.view || null, top: opts.top || null, board: opts.board || null, ...(opts.ui ? { ui: opts.ui } : {}) };
+  if (opts.lab && !LAB_RE.test(opts.lab)) throw linkError(`the link's lab '${opts.lab.slice(0, 64)}' is not a lab's id`);
+  return { source, view: opts.view || null, top: opts.top || null, board: opts.board || null, ...(opts.ui ? { ui: opts.ui } : {}), ...(opts.lab ? { lab: opts.lab } : {}) };
 }
 
 // a host of this computer or of a local network (a literal address, localhost, .local / .internal / .lan names):
@@ -362,20 +365,22 @@ function ipv6Groups(h) {
 }
 
 /**
- * A link: base (the app's address, its hash dropped) + the hash of { design | example | zip, view, top, board }.
+ * A link: base (the app's address, its hash dropped) + the hash of { design | example | zip, view, top, board, ui, lab }.
  */
-export function makeLink(base, { design, example, zip, view, top, board, ui } = {}) {
+export function makeLink(base, { design, example, zip, view, top, board, ui, lab } = {}) {
   const sources = [design, example, zip].filter(v => v !== undefined && v !== null);
   if (sources.length !== 1) throw linkError('a link has one design: design, example or zip');
   if (view && !LINK_VIEWS.includes(view)) throw linkError(`view: one of ${LINK_VIEWS.join(', ')}`);
   if (top && !MODULE_RE.test(top)) throw linkError(`top: '${top}' is not a module name`);
   if (board && !BOARD_RE.test(board)) throw linkError(`board: '${board}' is not a board name`);
   if (example !== undefined && example !== null && !EXAMPLE_RE.test(example)) throw linkError(`example: '${example}' is not an example's name`);
+  if (lab && !LAB_RE.test(lab)) throw linkError(`lab: '${lab}' is not a lab's id`);
   const parts = [design ? `design=${design}` : example ? `open=example:${example}` : `open=${encodeURI(zip).replace(/[#&]/g, encodeURIComponent)}`];
   if (top) parts.push(`top=${top}`);
   if (board) parts.push(`board=${board}`);
   if (view) parts.push(`view=${view}`);
   if (ui) parts.push(`ui=${ui}`);
+  if (lab) parts.push(`lab=${lab}`);
   return `${String(base).replace(/#.*$/, '')}#${parts.join('&')}`;
 }
 
