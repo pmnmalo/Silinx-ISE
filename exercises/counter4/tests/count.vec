@@ -1,0 +1,11 @@
+# The counter4 exercise's visible vectors: one row per clock cycle (inputs | the outputs after its rising edge).
+rst en | q
+1 0 | 0
+0 1 | 1
+0 1 | 2
+0 1 | 3
+0 0 | 3
+0 0 | 3
+0 1 | 4
+1 1 | 0
+0 1 | 1
