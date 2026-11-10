@@ -60,6 +60,10 @@ const errorText = (page, cls) => page.eval((c) => document.querySelector(`.dlg-o
 
 uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a rejected push and a conflict in the console', E, async (page) => {
   const remote = bare('lab1');
+  // (the File menu: Open from Repository… after Copy Link to Project…, #3323; from the menus' definitions, the Silinx
+  // interface showing no File menu)
+  const file = await page.eval(() => window.SilinxApp.S.menus.find((m) => m.label === 'File').items().filter(Boolean).map((x) => (x === '-' ? '—' : x.label)));
+  assert.deepEqual(file.slice(0, file.indexOf('Import Xilinx ISE Project (.zip)…')), ['New Project…', 'Open Project…', '—', 'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Copy Link to Project…', 'Open from Repository…', 'Share Project…', '—']);
   await page.menu('File', 'Open from Repository…');
   await page.waitDialog('Open from Repository');
   // a URL that is not GitHub's: said beside the field, the dialog open
