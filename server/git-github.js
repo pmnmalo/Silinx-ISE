@@ -70,6 +70,8 @@ function backend({ madeBy = null } = {}) {
       await fsp.writeFile(full, text);
     },
     remove: async (name, rel) => { if (rel !== P.PROJECT_FILE) await fsp.rm(P.safeJoin(P.projectDir(name), rel), { force: true }); },
+    // a merged drawing's HDL file made from it again (#3197)
+    regenerate: async (name, rel) => (await import('./drawing-sync.js')).syncDrawing(P, name, rel),
   };
   // (one folder per workspace: the same project name in two workspaces is two projects)
   const metaFile = async name => {
@@ -96,7 +98,7 @@ export const gitStatus = async name => backend().status(await known(name));
 export const gitInit = async (name, { remote = null } = {}) => backend().init(await known(name), { remote });
 export const gitCommit = async (name, message) => backend().commit(await known(name), message);
 export const gitPush = async name => backend().push(await known(name));
-export const gitPull = async name => backend().pull(await known(name));
+export const gitPull = async (name, { resolve = null } = {}) => backend().pull(await known(name), { resolve });
 export const gitLog = async (name, { limit = 100 } = {}) => backend().log(await known(name), { limit });
 export const gitShow = async (name, commit, rel) => backend().show(await known(name), commit, rel);
 export const gitClone = ({ url, name = null, madeBy = null }) => backend({ madeBy }).clone({ url, name });

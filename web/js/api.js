@@ -51,7 +51,7 @@ async function req(method, url, body, { text = false } = {}) {
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`, more = {};
     // (git's failures carry a hint for the console, and a conflict its files: #3195)
-    try { const j = await r.json(); if (j.error) msg = j.error; if (j.hint) more.hint = j.hint; if (j.files) more.files = j.files; } catch { /* not json */ }
+    try { const j = await r.json(); if (j.error) msg = j.error; if (j.hint) more.hint = j.hint; if (j.files) more.files = j.files; if (j.drawings) more.drawings = j.drawings; } catch { /* not json */ }
     throw Object.assign(new Error(msg), { status: r.status }, more);
   }
   if (text) return r.text();
@@ -87,7 +87,7 @@ export const api = {
   gitInit: (name, remote = null) => req('POST', `/api/projects/${enc(name)}/git/init`, remote ? { remote } : {}),
   gitCommit: (name, message) => req('POST', `/api/projects/${enc(name)}/git/commit`, { message }),
   gitPush: name => req('POST', `/api/projects/${enc(name)}/git/push`, {}),
-  gitPull: name => req('POST', `/api/projects/${enc(name)}/git/pull`, {}),
+  gitPull: (name, { resolve = null } = {}) => req('POST', `/api/projects/${enc(name)}/git/pull`, resolve ? { resolve } : {}),
   gitLog: (name, limit = 100) => req('GET', `/api/projects/${enc(name)}/git/log?limit=${limit}`),
   gitShow: (name, commit, path) => req('GET', `/api/projects/${enc(name)}/git/show?commit=${enc(commit)}&path=${enc(path)}`),
   devices: () => req('GET', '/api/devices'),

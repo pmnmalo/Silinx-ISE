@@ -136,7 +136,10 @@ export async function commitDialog() {
   if (!s) { log(`ERROR: the project '${S.project.name}' is not in a git repository`, 'err'); log('Hint: Initialize Repository… makes one, or Open from Repository… opens a project from GitHub.', 'info'); return null; }
   const STATE = { modified: 'changed', new: 'new', deleted: 'deleted', conflict: 'in conflict' };
   const msg = h('textarea', { class: 'git-message', rows: 4, style: { width: '100%' } });
-  const list = h('ul', { class: 'git-changes' }, ...s.files.map(f => h('li', { 'data-state': f.state }, h('span', { 'data-no-i18n': '' }, f.path), ` (${STATE[f.state]})`)));
+  // (Compare: the file against the last commit, #3197; the dialog closed for it)
+  let compare = null, closeIt = null;
+  const list = h('ul', { class: 'git-changes' }, ...s.files.map(f => h('li', { 'data-state': f.state }, h('span', { 'data-no-i18n': '' }, f.path), ` (${STATE[f.state]}) `,
+    h('a', { href: '#', class: 'git-compare', 'data-path': f.path, onclick: e => { e.preventDefault(); compare = f.path; closeIt?.(); } }, 'Compare'))));
   const err = fieldError('git-message-error');
   msg.addEventListener('input', () => { err.textContent = ''; });
   const r = await dialog({
@@ -147,7 +150,9 @@ export async function commitDialog() {
     buttons: [{ label: api.standalone ? 'Commit and Push' : 'Commit', primary: true, disabled: !s.files.length, value: () => msg.value,
       validate: () => { if (msg.value.trim()) return true; err.textContent = 'Say in a few words what changed.'; return false; } },
     { label: 'Cancel', value: null }],
+    onOpen: ({ close }) => { closeIt = () => close(null); },
   });
+  if (compare) return import('./git-history.js').then(m => m.compareNow(compare));
   if (r === null || r === undefined) return null;
   try {
     const c = await api.gitCommit(S.project.name, r);
@@ -164,14 +169,17 @@ export async function gitPush() {
   try { const p = await api.gitPush(S.project.name); log(pushText(p), 'ok'); return p; } catch (e) { logGitError(e); return null; } finally { await refreshGitStatus(); }
 }
 
-/** File ▸ Git ▸ Pull: GitHub's commits merged in; the project read again (its open documents, by the watcher). */
-export async function gitPull() {
+/** File ▸ Git ▸ Pull: GitHub's commits merged in; the project read again (its open documents, by the watcher). A
+ *  drawing's objects changed on both sides (#3197): Mine or Theirs asked for each (web/js/git-resolve-dialog.js), then
+ *  pulled again with the choices. */
+export async function gitPull({ resolve = null } = {}) {
   if (!S.project) return null;
   await saveAll();
   const name = S.project.name;
   try {
-    const p = await api.gitPull(name);
+    const p = await api.gitPull(name, resolve ? { resolve } : {});
     log(pullText(p), 'ok');
+    for (const f of p.resolved || []) log(`${f}: merged by its objects, its HDL made again.`, 'info');
     // (the server's watcher tells the page what changed; the browser edition has none: its open documents told here)
     if (!p.upToDate && S.project?.name === name) {
       if (api.standalone) await applyChanges({ project: name, changes: p.files.map(f => ({ path: f, kind: S.diskTree?.includes(f) ? 'changed' : 'added' })) });
@@ -180,6 +188,11 @@ export async function gitPull() {
     return p;
   } catch (e) {
     logGitError(e);
+    // (only drawings' objects in conflict: the choices asked, then the pull again)
+    if (e.drawings?.length && /choose mine or theirs/.test(e.hint || '') && S.project?.name === name) {
+      const choices = await (await import('./git-resolve-dialog.js')).resolveDialog(e.drawings);
+      if (choices) return gitPull({ resolve: { ...(resolve || {}), ...choices } });
+    }
     return null;
   } finally { await refreshGitStatus(); }
 }

@@ -4,7 +4,10 @@
 // credential helper's: no tool takes or gives one.
 import * as Git from './git.js';
 import * as GH from './git-github.js';
-import { toolError, clip, readProject, STR, PROJECT } from './mcp-util.js';
+import { toolError, clip, readProject, STR, PROJECT, projectText } from './mcp-util.js';
+import { drawingKind, diffDrawings } from '../core/drawing-merge.js';
+import { unifiedDiff } from '../core/text-diff.js';
+import { checkChoices } from '../core/git-resolve.js';
 import { cloneText, initText, commitText, pushText, pullText, fileLines, shortCommit as short } from '../core/git-messages.js';
 
 // the back end: the system's git, or GitHub's API (SILINX_GIT=github, #3196)
@@ -14,7 +17,11 @@ const B = () => (GH.githubBackend() ? GH : Git);
 const run = async fn => {
   if (!Git.gitEnabled()) throw toolError('git is turned off on this server (SILINX_GIT=off)');
   try { return await fn(); } catch (e) {
-    if (e instanceof Git.GitError || e.status) throw Object.assign(toolError([e.message, ...(e.hint ? [`Hint: ${e.hint}`] : [])].join('\n')), e.files ? { files: e.files } : {});
+    if (e instanceof Git.GitError || e.status) {
+      // (a drawing's conflicts: each object's id, for git_pull's resolve)
+      const conflicts = (e.drawings || []).flatMap(d => d.conflicts.map(c => `  ${d.path}: ${c.id} (${c.label}): mine ${c.mine}, theirs ${c.theirs}`));
+      throw Object.assign(toolError([e.message, ...conflicts, ...(e.hint ? [`Hint: ${e.hint}`] : [])].join('\n')), e.files ? { files: e.files } : {}, e.drawings ? { drawings: e.drawings } : {});
+    }
     throw e;
   }
 };
@@ -79,13 +86,15 @@ export const GIT_TOOLS = [
   },
   {
     name: 'git_pull', title: 'Pull a project from GitHub',
-    description: 'Pull the commits of the project\'s GitHub repository into it (a merge), as File ▸ Git ▸ Pull does. A conflict pulls nothing: the project\'s files stay as they were, and the files in conflict are named.',
-    inputSchema: { type: 'object', properties: { project: PROJECT }, required: ['project'], additionalProperties: false },
+    description: 'Pull the commits of the project\'s GitHub repository into it (a merge), as File ▸ Git ▸ Pull does. A drawing changed on both sides is merged by its objects (never as text), its HDL made again; an object both sides changed differently is a conflict, named with its id: Pull again with resolve, "mine" or "theirs" for each (the result checked as Check Drawing checks it). Any other conflict pulls nothing: the project\'s files stay as they were, and the files in conflict are named.',
+    inputSchema: { type: 'object', properties: { project: PROJECT, resolve: { type: 'object', description: 'The choices of a drawing\'s conflicts: { "src/ctl.fsm.json": { "transitions/t1": "theirs", "states/s2": "mine" } }.', additionalProperties: { type: 'object', additionalProperties: { type: 'string', enum: ['mine', 'theirs'] } } } }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-    async run({ project }) {
+    async run({ project, resolve }) {
       await readProject(project);
-      const r = await run(() => B().gitPull(project));
-      return { text: pullText(r), data: r };
+      let choices;
+      try { choices = checkChoices(resolve); } catch (e) { throw toolError(e.message); }
+      const r = await run(() => B().gitPull(project, { resolve: choices }));
+      return { text: [pullText(r), ...(r.resolved || []).map(p => `${p}: merged by its objects, its HDL made again.`)].join('\n'), data: r };
     },
   },
   {
@@ -104,4 +113,32 @@ export const GIT_TOOLS = [
       return { text: log.length ? log.map(c => `${short(c.commit)} ${c.date} ${c.author}: ${c.message}${c.files.length ? ` (${c.files.map(f => f.path).join(', ')})` : ''}`).join('\n') : `'${project}' has no commit yet.`, data: { project, commits: log } };
     },
   },
+  {
+    name: 'git_diff', title: 'What changed in a file',
+    description: 'A file of the project between two versions, as the history\'s Compare shows it: a drawing (schematic, ASM chart, state diagram, truth table, Boolean function, Petri net) by its objects (added, removed, moved, changed: each by its id), any other file by its lines (a unified diff). from: a commit (default: the last one); to: a commit (default: the project as it is now).',
+    inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('A file of the project, e.g. src/ctl.fsm.json.'), from: STR('A commit\'s hash (default: the last commit).'), to: STR('A commit\'s hash (default: the project now).') }, required: ['project', 'path'], additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    async run({ project, path: rel, from, to }) {
+      await readProject(project);
+      const at = async c => { try { return (await B().gitShow(project, c, rel)).text; } catch (e) { if (e.status === 404) return null; throw e; } };
+      const a = await run(async () => at(from || (await B().gitLog(project, { limit: 1 }))[0]?.commit || toolErrorOf('the project has no commit yet')));
+      const b = to ? await run(() => at(to)) : await projectText(project, rel, `no file '${rel}' in the project '${project}'`).catch(() => null);
+      const fromL = from ? short(from) : 'the last commit', toL = to ? short(to) : 'now';
+      if (a === null && b === null) throw toolError(`no file '${rel}' in ${fromL} nor ${toL}`);
+      if (drawingKind(rel)) {
+        let A = null, Bm = null;
+        try { A = a === null ? {} : JSON.parse(a); Bm = b === null ? {} : JSON.parse(b); } catch { A = null; }
+        if (A) {
+          const d = diffDrawings(A, Bm);
+          const name = (coll, key) => { const o = [...(Bm[coll] || []), ...(A[coll] || [])].find(x => String(x?.id ?? x?.name) === key); return o?.name && o.name !== key ? ` (${o.name})` : ''; };
+          const lines = [...d.added.map(x => `added ${x.coll}/${x.key}${name(x.coll, x.key)}`), ...d.removed.map(x => `removed ${x.coll}/${x.key}${name(x.coll, x.key)}`),
+            ...d.moved.map(x => `moved ${x.coll}/${x.key}${name(x.coll, x.key)}`), ...d.changed.map(x => `changed ${x.coll}/${x.key}${name(x.coll, x.key)}${x.fields.length ? `: ${x.fields.join(', ')}` : ''}`), ...d.props.map(p => `changed ${p}`)];
+          return { text: [`${rel}, ${fromL} to ${toL}: ${lines.length ? `${lines.length} change(s)` : 'no change'}.`, ...lines.map(l => `  ${l}`)].join('\n'), data: { project, path: rel, from: from || null, to: to || null, diff: d } };
+        }
+      }
+      const u = unifiedDiff(a ?? '', b ?? '', { from: `${rel} (${fromL})`, to: `${rel} (${toL})` });
+      return { text: u ? clip(u) : `${rel}, ${fromL} to ${toL}: no change.`, data: { project, path: rel, from: from || null, to: to || null, changed: !!u } };
+    },
+  },
 ];
+const toolErrorOf = m => { throw toolError(m); };

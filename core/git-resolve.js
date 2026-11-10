@@ -58,3 +58,17 @@ export async function resolveConflict(path, baseText, mineText, theirsText, choi
   const indent = kind === 'sch' ? 1 : 2;
   return { text: `${JSON.stringify(model, null, indent)}\n`, model };
 }
+
+/** The choices of a pull (resolve: { path: { id: 'mine' | 'theirs' } }), checked: a copy, or an Error (400). */
+export function checkChoices(resolve) {
+  if (resolve == null) return null;
+  const bad = () => Object.assign(new Error('resolve: give { "<drawing>": { "<object>": "mine" | "theirs" } }'), { status: 400 });
+  if (typeof resolve !== 'object' || Array.isArray(resolve)) throw bad();
+  const out = {};
+  for (const [p, c] of Object.entries(resolve)) {
+    if (!drawingKind(p) || !c || typeof c !== 'object' || Array.isArray(c)) throw bad();
+    out[p] = {};
+    for (const [id, side] of Object.entries(c)) { if (side !== 'mine' && side !== 'theirs') throw bad(); out[p][id] = side; }
+  }
+  return out;
+}
