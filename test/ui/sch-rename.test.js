@@ -221,7 +221,10 @@ uiTest('#3300 schematic: an instance\'s name cleared, in Properties and in Renam
   await page.key('Escape');
   await page.rightClick(`${ED} svg .sym[data-id="S3"] .hitbox`);
   await page.waitFor(() => document.querySelector('body > .menu-popup'), [], { what: 'the menu' });
-  await page.click('body > .menu-popup > .mi');
+  // (a symbol's menu has Symbol Info… first, #2953)
+  const ren = await page.eval(() => [...document.querySelectorAll('body > .menu-popup > .mi')].findIndex((m) => /^(Rename|Mudar o Nome)/.test(m.textContent.trim())));
+  assert.ok(ren >= 0, 'Rename… in the menu');
+  await page.click('body > .menu-popup > .mi', { index: ren });
   await page.waitDialog('Rename Instance');
   await page.eval(() => { const i = [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.dlg-body input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
   assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.se-rename-err').textContent), '', 'no refusal');
@@ -244,7 +247,7 @@ uiTest('#3300 schematic: an instance\'s name cleared, in Properties and in Renam
   try {
     await page.rightClick(`${ED} svg .sym[data-id="S3"] .hitbox`);
     await page.waitFor(() => document.querySelector('body > .menu-popup'), [], { what: 'the menu' });
-    await page.click('body > .menu-popup > .mi');
+    await page.click('body > .menu-popup > .mi', { index: await page.eval(() => [...document.querySelectorAll('body > .menu-popup > .mi')].findIndex((m) => /^Mudar o Nome/.test(m.textContent.trim()))) });
     await page.waitDialog('Mudar o Nome da Instância');
     await page.eval(() => { const i = [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.dlg-body input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
     assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.se-rename-err').textContent), '');
