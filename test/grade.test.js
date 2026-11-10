@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { gradeTests, summarize, referenceVectors, VERDICTS } from '../core/grade.js';
-import { exerciseProblems, parseExercise, parseVectors, valueBits, visibleCopy, limitsOf, vectorsText, localize, DEFAULT_LIMITS } from '../core/grade-format.js';
+import { exerciseProblems, parseExercise, parseVectors, valueBits, visibleCopy, limitsOf, vectorsText, localize, withFileTexts, newExercise, exerciseFileOf, DEFAULT_LIMITS } from '../core/grade-format.js';
 import { exerciseUnitNames, submissionSources } from '../core/grade-design.js';
 import { runVectors, seededRandom, randomRows } from '../core/grade-sim.js';
 import { textReport, csvReport } from '../core/grade-report.js';
@@ -112,6 +112,21 @@ test('#3192 the student\'s copy: no hidden test, no reference; the visible tests
   assert.deepEqual(exerciseProblems(copy), []);
   // (a visible reference test needs the reference: not in the copy either)
   assert.deepEqual(visibleCopy(trafficExercise()).tests, []);
+});
+
+test('#3192 the files beside an exercise read (inside its folder only); a new exercise of a top', async () => {
+  const files = { 'ex/tests/a.vec': 'rst en | q\n1 0 | 0\n', 'ex/ref/r.vhd': 'R', 'secret.v': 'S' };
+  const read = async p => { if (!(p in files)) throw new Error('none'); return files[p]; };
+  const ex = { ...counterExercise(), reference: { files: [{ path: 'ref/r.vhd', file: 'ref/r.vhd' }] } };
+  ex.tests = [{ id: 'a', kind: 'vectors', clock: 'clk', file: 'tests/a.vec' }, { id: 'b', kind: 'testbench', top: 'tb', files: [{ path: 'tb.v', file: '../secret.v' }, { path: 'x.v', file: 'none.v' }] }];
+  const r = await withFileTexts(ex, read, 'ex');
+  assert.deepEqual(r.problems, ['../secret.v is not inside the exercise\'s folder', 'no file none.v beside the exercise']);
+  assert.deepEqual([r.exercise.tests[0].vectors, 'file' in r.exercise.tests[0], r.exercise.reference.files[0].text], ['rst en | q\n1 0 | 0\n', false, 'R']);
+  assert.deepEqual((await withFileTexts(ex, read, '')).problems.slice(0, 1), ['no file ref/r.vhd beside the exercise']);
+  const n = newExercise({ top: 'Counter4', ports: PORTS });
+  assert.deepEqual(exerciseProblems(n), ['the exercise: test 1: the vectors have no row']);
+  assert.deepEqual([n.id, n.tests[0].clock, n.tests[0].vectors], ['counter4', 'clk', 'rst en | q\n']);
+  assert.equal(exerciseFileOf('c', ['c.exercise.json', 'c-2.exercise.json']), 'c-3.exercise.json');
 });
 
 test('#3192 seeded random inputs: the same on every run, held and fixed inputs as given', () => {

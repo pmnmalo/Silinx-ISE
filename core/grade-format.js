@@ -169,6 +169,49 @@ export function parseExercise(text, where = 'the exercise') {
   return { exercise: problems.length ? null : ex, problems };
 }
 
+/** An exercise with the texts of its files beside it read (`read(path)`: a path from the exercise's folder, `dir`,
+ *  joined; a path that leaves it, or one not read, is a problem): { exercise, problems }. server/grade.js reads them
+ *  from the disk (and follows no link out of the folder), the interface from the project. */
+export async function withFileTexts(ex, read, dir = '') {
+  const problems = [];
+  const join = rel => {
+    const parts = [...(dir ? dir.split('/') : []), ...String(rel).split('/')], out = [];
+    for (const s of parts) { if (s === '..') { if (!out.length) return null; out.pop(); } else if (s && s !== '.') out.push(s); }
+    return String(rel).startsWith('/') || !out.length ? null : out.join('/');
+  };
+  const text = async rel => {
+    const p = join(rel);
+    if (p === null || (dir && !p.startsWith(`${dir}/`))) { problems.push(`${rel} is not inside the exercise's folder`); return ''; }
+    try { return await read(p); } catch { problems.push(`no file ${rel} beside the exercise`); return ''; }
+  };
+  const files = async list => (Array.isArray(list) ? Promise.all(list.map(async f => (f && typeof f.text !== 'string' && typeof f.file === 'string' ? { path: f.path, text: await text(f.file) } : f))) : list);
+  const out = { ...ex };
+  if (ex.reference?.files) out.reference = { ...ex.reference, files: await files(ex.reference.files) };
+  if (Array.isArray(ex.tests)) out.tests = await Promise.all(ex.tests.map(async t => (!t || typeof t !== 'object' ? t
+    : t.kind === 'vectors' && typeof t.vectors !== 'string' && typeof t.file === 'string' ? (({ file, ...rest }) => text(file).then(v => ({ ...rest, vectors: v })))(t)
+    : t.kind === 'testbench' ? { ...t, files: await files(t.files) } : t)));
+  return { exercise: out, problems };
+}
+
+/** A new exercise of a project's top (Project ▸ Exercise…'s New Exercise, the MCP server's grade new): its ports, one visible vectors test of its inputs and outputs to fill in. */
+export function newExercise({ top, ports }) {
+  const id = top.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const ins = ports.filter(p => p.dir === 'in').map(p => p.name), outs = ports.filter(p => p.dir !== 'in').map(p => p.name);
+  const clock = ins.find(n => /^(clk|clock)$/i.test(n));
+  return {
+    silinxExercise: 1, id, title: { en: top, pt: top }, statement: { en: '', pt: '' }, top, ports,
+    tests: [{ id: 'vectors', title: { en: 'Vectors', pt: 'Vetores' }, visible: true, points: 10, kind: 'vectors', ...(clock && { clock }),
+      vectors: `${ins.filter(n => n !== clock).join(' ')} | ${outs.join(' ')}\n` }],
+  };
+}
+
+/** The file of a new exercise of `top`: <top>.exercise.json, else the first <top>-N.exercise.json not in `tree`. */
+export function exerciseFileOf(top, tree) {
+  let file = `${top}.exercise.json`;
+  for (let k = 2; tree.includes(file); k++) file = `${top}-${k}.exercise.json`;
+  return file;
+}
+
 /** The student's copy of an exercise: its hidden tests and its reference design left out (nothing of them stays in
  *  it). A test of the copy keeps its own files (a visible test bench). */
 export function visibleCopy(ex) {
