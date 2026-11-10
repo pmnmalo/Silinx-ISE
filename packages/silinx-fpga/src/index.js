@@ -44,6 +44,8 @@ export { readBit, writeBit, S3E_DEVICES } from './fpga/bitstream.js';
 export { analyzeTiming, SPEED_4 } from './fpga/timing.js';
 export { instArcs } from './fpga/timing-arcs.js';
 export { timingReport } from './fpga/timing-checks.js';
+// the slowest paths, stage by stage, back to their source lines (#3178)
+export { pathHighlight, pathsText, timingPaths } from './fpga/timing-paths.js';
 export { estimatePower, powerReport } from './power.js';
 
 // the devices and their bit databases, from their files' contents (./node.js reads them from the disk)

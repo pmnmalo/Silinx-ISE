@@ -25,10 +25,10 @@ const API = ['FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'ICE40_PARTS', 'ICE40_STE
   'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsExtOf', 'constraintsFormatOf',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'experimentalDevice', 'familyFromXise', 'familyName',
   'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
-  'nextpnrIo', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'powerReport',
+  'nextpnrIo', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'pathHighlight', 'pathsText', 'periodNs', 'powerReport',
   'primitiveInstances', 'readBit', 'readXdc', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
   'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea', 'synthesizeFast',
-  'synthesizeVerilog', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeBit', 'writeXdc', 'writeXdl', 'yosysWorkerSource'];
+  'synthesizeVerilog', 'timingPaths', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeBit', 'writeXdc', 'writeXdl', 'yosysWorkerSource'];
 const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'leaveOutChipdbs', 'loadBitDbS6', 'loadDb',
   'loadDeviceCache', 'nextpnrIce40Node', 'nextpnrNode', 'nextpnrS6Node', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];   // (nextpnrNode: the nextpnr engine's io.nextpnr, #2136; nextpnrS6Node: its io.nextpnrS6, #2138; leaveOutChipdbs: the release zip's, #2356)
 
