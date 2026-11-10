@@ -7,7 +7,7 @@
 // (GIT_CEILING_DIRECTORIES), and every command limited to the project's folder (the pathspec '.').
 // How git runs (the security notes of #3195): spawned with an argument array, never through a shell, with a timeout;
 // no prompt (GIT_TERMINAL_PROMPT=0, ssh in batch mode); no hook of a repository runs (core.hooksPath, an empty folder of
-// Silinx's), nor its fsmonitor; https and ssh only (protocol.allow), the remotes github.com's (checkUrl); no symbolic link
+// Silinx's), nor its fsmonitor, nor git-lfs's filter; no submodule is fetched; https and ssh only (protocol.allow), the remotes github.com's (checkUrl); no symbolic link
 // checked out. The credentials are the system's credential helper's: Silinx never asks for, stores or logs one (an
 // error's URLs lose their user:password@).
 import { spawn } from 'node:child_process';
@@ -78,7 +78,10 @@ const MAX_OUT = 16 << 20;
 /** Run git: { code, stdout, stderr }; ENOENT (no git) a GitError. */
 export async function git(args, { cwd, timeout = 60_000 } = {}) {
   const base = ['-c', `core.hooksPath=${await noHooksDir()}`, '-c', 'core.fsmonitor=false', '-c', 'core.symlinks=false',
-    '-c', 'core.quotePath=false', '-c', 'color.ui=false', '-c', 'submodule.recurse=false',
+    '-c', 'core.quotePath=false', '-c', 'color.ui=false', '-c', 'submodule.recurse=false', '-c', 'fetch.recurseSubmodules=false',
+    // (a repository's .gitattributes names a filter; its command is git's configuration's, never the repository's: the
+    // user's git-lfs, the one such filter commonly set, off, its pointer files kept)
+    '-c', 'filter.lfs.smudge=', '-c', 'filter.lfs.clean=', '-c', 'filter.lfs.process=', '-c', 'filter.lfs.required=false',
     '-c', 'protocol.allow=never', '-c', 'protocol.https.allow=always', '-c', 'protocol.ssh.allow=always',
     ...(GIT_TESTING.localRemotes ? ['-c', 'protocol.file.allow=always'] : [])];
   return new Promise((resolve, reject) => {

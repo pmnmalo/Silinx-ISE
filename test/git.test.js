@@ -211,6 +211,22 @@ test('no hook of a repository runs: its .git/hooks, a core.hooksPath of its own;
   await G.gitCommit('team', 'Hooks');
   await G.gitPull('team').catch(() => {});
   assert.equal(fs.existsSync(flag), false);
+  // a filter of git's configuration (git-lfs's) that a repository's .gitattributes names: never run, by clone, commit or
+  // pull; nor a submodule fetched
+  const lfs = path.join(tmp, 'lfs-filter.sh');
+  write(lfs, `#!/bin/sh\necho ran > '${flag}'\ncat\n`); fs.chmodSync(lfs, 0o755);
+  const withLfs = bareWith('lfs', d => { gates(d); write(path.join(d, '.gitattributes'), '*.vhd filter=lfs\n'); write(path.join(d, '.gitmodules'), `[submodule "x"]\n\tpath = x\n\turl = ${remote}\n`); });
+  const global = fs.readFileSync(process.env.GIT_CONFIG_GLOBAL, 'utf8');
+  fs.appendFileSync(process.env.GIT_CONFIG_GLOBAL, `[filter "lfs"]\n\tsmudge = ${lfs}\n\tclean = ${lfs}\n\trequired = true\n`);
+  try {
+    await G.gitClone({ url: withLfs, name: 'lfs' });
+    write(path.join(ws, 'lfs', 'src', 'gates.vhd'), '-- changed\n');
+    await G.gitCommit('lfs', 'Through no filter');
+    await G.gitPush('lfs');
+    await G.gitPull('lfs');
+  } finally { fs.writeFileSync(process.env.GIT_CONFIG_GLOBAL, global); }
+  assert.equal(fs.existsSync(flag), false);
+  assert.equal(fs.existsSync(path.join(ws, 'lfs', 'x', 'silinx.json')), false);
   // (the hooks folder of Silinx's is empty)
   const { configDir } = await import('../server/toolchain.js');
   assert.deepEqual(fs.readdirSync(path.join(configDir(), 'git-no-hooks')), []);
