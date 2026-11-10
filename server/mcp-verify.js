@@ -21,7 +21,7 @@ export const VERIFY_TOOLS = [
       const pj = await readProject(name);
       const V = await import('../core/verify.js');
       const { counterexampleBench, benchName } = await import('../core/verify-bench.js');
-      const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+      const { yosysNode } = await import('../packages/silinx-fpga/src/node.js');
       const top = a.module ?? pj.top;
       if (!top) throw toolError('module: the project has no top module: name the module to verify');
       const depth = a.depth ?? V.VERIFY_DEPTH;

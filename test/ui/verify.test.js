@@ -66,11 +66,11 @@ uiTest('#3177 Verify Equivalence: the reference asked, a counterexample simulate
     'Reference module:', 'Depth (clock cycles):'], options: ['cnt_ref', 'hex'], reference: 'cnt_ref', depth: '20', buttons: ['Verify', 'Cancel'] });
   await page.click('.dlg-buttons .btn.primary');
   await page.waitConsole(/Process "Verify Equivalence" failed/, { timeout: 60000 });
-  assert.deepEqual(await lines(page, 'Started : "Verify Equivalence".'), ['Started : "Verify Equivalence".', '',
+  assert.deepEqual((await lines(page, 'Started : "Verify Equivalence".')).slice(0, 7), ['Started : "Verify Equivalence".', '',
     'Verifying \'cnt\' against its reference \'cnt_ref\': Yosys\'s SAT solver, at most 20 clock cycle(s), then a proof by induction.',
     'ERROR:Verify - \'cnt\' differs from its reference \'cnt_ref\' at clock cycle 11: q = 1010, the reference\'s q = 0000.',
     'The counterexample\'s test bench: sim/verify_cnt.vhd (it replays the 11 clock cycle(s) in the simulator, both modules side by side).', '',
-    'Process "Verify Equivalence" failed'].concat(await page.eval(() => { const l = window.__console().split('\n'); return l.slice(l.indexOf('Process "Verify Equivalence" failed') + 1); })));
+    'Process "Verify Equivalence" failed']);
   // the test bench in the project, a simulation source; SSim open on it, its messages the same difference
   assert.match(await readWs(env, 'VerifyUi', 'sim/verify_cnt.vhd'), /^-- Counterexample of Verify \(Silinx\): 'cnt' differs from its reference 'cnt_ref' at clock cycle 11 \(q\)\./);
   await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'isim:verify_cnt'), [], { what: 'SSim on verify_cnt', timeout: 60000 });
