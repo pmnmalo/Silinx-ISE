@@ -151,32 +151,9 @@ async function needRepo(name) {
   return repo;
 }
 
-// the tools' outputs, never committed whatever the repository's .gitignore says (pathspecs, relative to the project)
-const OUTPUTS = ['build', 'xst', '_xmsgs', 'iseconfig', 'isim', '.Xil', '*.bit', '*.ncd', '*.ngc', '*.ngd', '*.xdl', '*.xdlrc', '*.wdb'];
-const GLOBS = OUTPUTS.map(p => (p.startsWith('*') ? `**/${p}` : `${p}/**`));
-const EXCLUDE = GLOBS.map(g => `:(exclude,glob)${g}`);
-const isOutput = rel => {
-  const parts = rel.split('/');
-  return OUTPUTS.some(p => (p.startsWith('*') ? rel.toLowerCase().endsWith(p.slice(1)) : parts[0] === p));
-};
-
-/** The .gitignore Silinx writes into a project (Initialize Repository…, and before a commit when it has none). */
-export const GITIGNORE = `# Silinx (#3195): what the tools make again from the sources is not committed
-build/
-xst/
-_xmsgs/
-iseconfig/
-isim/
-.Xil/
-*.bit
-*.ncd
-*.ngc
-*.ngd
-*.xdl
-*.xdlrc
-*.wdb
-.DS_Store
-`;
+// the tools' outputs and Silinx's .gitignore (core/git-ignore.js, the browser's back end's too)
+import { GLOBS, EXCLUDE, isOutput, GITIGNORE } from '../core/git-ignore.js';
+export { GITIGNORE };
 
 async function ensureGitignore(dir) {
   const f = path.join(dir, '.gitignore');
