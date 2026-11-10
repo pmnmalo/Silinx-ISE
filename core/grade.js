@@ -28,7 +28,8 @@ export function referenceVectors(ex, test) {
   return r.problems.length ? { problems: r.problems } : { inputs: ins.inputs, outputs: r.outputs, rows: r.rows, problems: [] };
 }
 
-// a synthesis test from the open synthesis's results ({ errors, warnings, latches, luts, ffs, slices })
+// a synthesis test from the open synthesis's results ({ errors, warnings, latches, luts, ffs, slices, notes: what it
+// could not check, as the slices without nextpnr's chip database, #3215 })
 async function runSynthesis(ex, test, design, synthesize) {
   if (!synthesize) return { verdict: null, messages: ['the synthesis tests run where the open synthesis is (silinx grade, the server)'] };
   const r = await synthesize(design.sources, ex.top, test);
@@ -38,8 +39,9 @@ async function runSynthesis(ex, test, design, synthesize) {
   if (test.warnings === false && (r.warnings?.length || design.warnings.length)) return { verdict: 'NS', messages: ['this exercise allows no warning', ...design.warnings, ...(r.warnings || [])].slice(0, 6) };
   const over = [['luts', 'LUTs'], ['ffs', 'flip-flops'], ['slices', 'slices']].filter(([k]) => test[k] !== undefined && (r[k] ?? 0) > test[k])
     .map(([k, n]) => `${r[k]} ${n}, at most ${test[k]}`);
-  if (over.length) return { verdict: 'RL', messages: over };
-  return { verdict: 'AC', messages: [], used: { luts: r.luts, ffs: r.ffs, slices: r.slices, latches } };
+  const notes = r.notes || [];
+  if (over.length) return { verdict: 'RL', messages: [...over, ...notes] };
+  return { verdict: 'AC', messages: notes, used: { luts: r.luts, ffs: r.ffs, slices: r.slices, latches } };
 }
 
 // the submission as the guided labs' checks read a project (core/labs-check.js `io`): its silinx.json, its files, the

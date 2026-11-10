@@ -11,7 +11,8 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { spawnSync } from 'node:child_process';
-import { loadExercise, readSubmission, expandSubmissions, gradeAll, processFlags, MAX_FILE } from '../server/grade.js';
+import { loadExercise, readSubmission, expandSubmissions, gradeAll, gradeSubmission, synthesisStatus, processFlags, MAX_FILE } from '../server/grade.js';
+import { slicesChipdb, GRADE_DEVICE } from '../server/grade-synth.js';
 import { gradeCommand } from '../server/grade-cli.js';
 import { createZip } from '../core/zip.js';
 import { COUNTER_V, COUNTER_VHD, counterExercise } from './grade-fixtures.mjs';
@@ -203,4 +204,27 @@ endmodule
   assert.deepEqual(results[2].tests[0].messages, ['ERROR:Silinx - synthesis failed: \'wait\' cannot be synthesized here (only one clock edge or sensitivity list per process) (line 4)']);
   const r = await gradeAll(fileBig, [path.join(subs, 'c-big')]);
   assert.deepEqual([r.results[0].tests[0].verdict, r.results[0].tests[0].messages], ['RL', ['8 flip-flops, at most 4']]);
+});
+
+test('#3215 the slices\' chip database got by the grader: an installation with it reads its own; offline, the slices not checked, said so', { timeout: 300000 }, async () => {
+  // (a full installation: the package's own database, no folder of downloads to read)
+  assert.deepEqual(await slicesChipdb(GRADE_DEVICE), { chipdbDir: null });
+  // (the release zip's, offline: Place & Route's fetch fails as it says)
+  const offline = { chipdb: async part => { throw new Error(`nextpnr's chip database of ${part} is not in this installation (the release zip leaves it out, #2329) and could not be downloaded from https://github.com/x/chipdb-xc3s250e.bin.gz (fetch failed): connect to the Internet once, or choose the Silinx engine (Process Properties ▸ Place & Route Engine)`); } };
+  const why = 'the slices are not checked here: nextpnr\'s chip database of xc3s250e is not in this installation and could not be downloaded (fetch failed)';
+  assert.deepEqual(await slicesChipdb(GRADE_DEVICE, { nextpnr: offline }), { chipdbDir: null, slicesReason: why });
+  const dir = path.join(tmp, 'ex6');
+  const ex = counterExercise();
+  ex.tests = [{ id: 'impl', visible: true, points: 10, kind: 'synthesis', latches: false, luts: 4, ffs: 4, slices: 4 }, { id: 'luts', visible: true, points: 1, kind: 'synthesis', luts: 4 }];
+  const file = write(path.join(dir, 'syn.exercise.json'), JSON.stringify(ex));
+  const loaded = loadExercise(file).exercise;
+  // (no test of the slices: no chip database asked for)
+  let asked = 0;
+  const counting = { chipdb: async () => { asked++; } };
+  assert.equal((await synthesisStatus({ ...loaded, tests: [loaded.tests[1]] }, { nextpnr: counting })).slicesReason, undefined);
+  assert.equal(asked, 0);
+  const synthesis = await synthesisStatus(loaded, { nextpnr: offline });
+  assert.equal(synthesis.slicesReason, why);
+  const r = await gradeSubmission(loaded, await readSubmission(project(path.join(tmp, 'subs6', 'a-ok'), COUNTER_V)), { synthesis });
+  assert.deepEqual(r.tests.map(t => [t.verdict, t.messages, t.used]), [['AC', [why], { luts: 0, ffs: 4, slices: null, latches: 0 }], ['AC', [], { luts: 0, ffs: 4, slices: null, latches: 0 }]]);
 });
