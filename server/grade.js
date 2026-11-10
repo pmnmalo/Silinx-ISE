@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseExercise, limitsOf, testsOf, localize, pointsOf } from '../core/grade-format.js';
 import { summarize } from '../core/grade.js';
-import { readZip } from '../core/zip.js';
+import { gateEntries, gateZip } from '../core/import-gate.js';
 import { within } from './paths.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -58,9 +58,15 @@ export function loadExercise(file) {
 // ---------------------------------------------------------------- submissions
 const err = (name, message) => ({ name, error: message });
 
-// a project folder's files: every regular file under it (no symbolic link, no hidden folder, not build/), its texts
+// the import gate's limits for a submission (core/import-gate.js, #2830: its names, sizes and kinds checked as every
+// import's), and its texts by path (a file it refuses, or one not text, left out: a listed source missing is a
+// Compile Error then)
+const LIMITS = { maxArchive: MAX_TOTAL, maxTotal: MAX_TOTAL, maxFiles: MAX_FILES, maxFile: MAX_FILE, maxText: MAX_FILE };
+const textsOf = gated => new Map(gated.files.filter(f => typeof f.text === 'string').map(f => [f.path, f.text]));
+
+// a project folder's files: every regular file under it (no symbolic link, no hidden folder, not build/), through the gate
 function readFolder(dir, name) {
-  const files = new Map();
+  const files = [];
   let total = 0;
   const walk = rel => {
     for (const e of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
@@ -72,25 +78,23 @@ function readFolder(dir, name) {
       const size = fs.statSync(path.join(dir, p)).size;
       if (size > MAX_FILE) throw new Error(`${p} is larger than ${MAX_FILE >> 20} MB`);
       if ((total += size) > MAX_TOTAL) throw new Error(`the submission is larger than ${MAX_TOTAL >> 20} MB`);
-      if (files.size >= MAX_FILES) throw new Error(`the submission has more than ${MAX_FILES} files`);
-      files.set(p, fs.readFileSync(path.join(dir, p), 'utf8'));
+      if (files.length >= MAX_FILES) throw new Error(`the submission has more than ${MAX_FILES} files`);
+      files.push({ path: p, data: new Uint8Array(fs.readFileSync(path.join(dir, p))) });
     }
   };
-  try { walk(''); } catch (e) { return err(name, `the submission cannot be read: ${e.message}`); }
-  return { name, files };
+  try { walk(''); return { name, files: textsOf(gateEntries(files, { limits: LIMITS })) }; } catch (e) { return err(name, `the submission cannot be read: ${e.message}`); }
 }
 
-// a zip's files, with the same limits (its silinx.json at its root or in its one folder)
+// a zip's files through the gate, with the same limits (its silinx.json at its root or in its one folder)
 async function readZipFile(file, name) {
-  let entries;
+  let all;
   try {
     if (fs.statSync(file).size > MAX_TOTAL) throw new Error(`larger than ${MAX_TOTAL >> 20} MB`);
-    entries = await readZip(fs.readFileSync(file), CODEC, { maxEntry: MAX_FILE, maxTotal: MAX_TOTAL, maxFiles: MAX_FILES, onEntry: e => (e.symlink ? true : null) });
-  } catch (e) { return err(name, `the submission cannot be read: ${e.message}`); }
-  const dec = new TextDecoder();
-  const all = entries.filter(e => isText(e.path) && !e.path.split('/').some(s => s === '..' || s.startsWith('.')));
-  const root = all.some(e => e.path === 'silinx.json') ? '' : (all.find(e => /^[^/]+\/silinx\.json$/.test(e.path))?.path.replace(/silinx\.json$/, '') ?? '');
-  return { name, files: new Map(all.filter(e => e.path.startsWith(root)).map(e => [e.path.slice(root.length), dec.decode(e.data)])) };
+    all = textsOf(await gateZip(fs.readFileSync(file), CODEC, { limits: LIMITS }));
+  } catch (e) { return err(name, `the submission cannot be read: ${e.message.replace(/^cannot read zip: /, '')}`); }
+  const paths = [...all.keys()].filter(isText);
+  const root = paths.includes('silinx.json') ? '' : (paths.find(p => /^[^/]+\/silinx\.json$/.test(p))?.replace(/silinx\.json$/, '') ?? '');
+  return { name, files: new Map(paths.filter(p => p.startsWith(root)).map(p => [p.slice(root.length), all.get(p)])) };
 }
 
 /** A submission of a path (a project folder or a zip): { name, project, files } or { name, error }. */
