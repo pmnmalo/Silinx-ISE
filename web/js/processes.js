@@ -78,6 +78,7 @@ function selectionProcesses(sel, view) {
       ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `sim-${step}`, label: `Simulate ${name} Model`, ico: 'wave', run: () => runSimulation(mod, step) })),
     ] },
     { id: 'verify', label: 'Verify Equivalence…', ico: 'process', run: async () => (await import('./verify.js')).verifyProcess(mod) },   // (#3177)
+    { id: 'verify-assert', label: 'Verify Assertions…', ico: 'process', run: async () => (await import('./verify.js')).assertProcess(mod) },
     { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
     { id: 'tb-wiz', label: 'Create Test Bench (Wizard)…', ico: 'template', run: () => testBench(mod) },
     ...(cp.length ? [] : [{ id: 'cmodel-sim', label: 'View C Model', ico: 'process', run: () => openCModel(mod) }]),   // (#1530)

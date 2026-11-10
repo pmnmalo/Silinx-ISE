@@ -1,6 +1,7 @@
 // Silinx - the Verilog parser's statements (#405: out of core/verilog/parser.js): blocks, assignments, if / case /
 // loops, event and delay controls, task calls (hierarchical too), the lvalues and hierarchical names.
 import { ASSERTIONS, SYS_NOARG, Sync } from './parser-defs.js';
+import { assertStmt } from './parser-assert.js';
 
 /** Parser's methods of this part, assigned to its prototype by parser.js. */
 export const stmtMethods = {
@@ -48,8 +49,7 @@ export const stmtMethods = {
         const cond = this.expr(); this.expect(')');
         const pass = this.is('else') ? null : this.stmt();
         const fail = this.accept('else') ? this.stmt() : null;
-        if (!fail) return pass && pass.kind !== 'null' ? { kind: 'block', label: null, decls: [], stmts: [{ kind: 'assert', cond, message: null, severity: 'error' }, { kind: 'if', cond, then: pass, else: null }] } : { kind: 'assert', cond, message: null, severity: 'error' };
-        return { kind: 'if', cond, then: pass || { kind: 'null' }, else: fail };
+        return assertStmt(t.v, cond, pass, fail, this.loc(t));
       }
       if (this.is('begin')) {
         this.next();

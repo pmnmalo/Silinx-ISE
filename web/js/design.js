@@ -329,6 +329,7 @@ function moduleContextMenu(e, mod, file) {
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
     // (its equivalence with a reference module, #3177: the Silinx interface's way to it, the ISE style's Processes too)
     { label: 'Verify Equivalence…', action: () => import('./verify.js').then(m => m.verifyProcess(mod)) },
+    { label: 'Verify Assertions…', action: () => import('./verify.js').then(m => m.assertProcess(mod)) },
     // (the Tasks interface: its test benches on the Test page, New; not here)
     document.documentElement.dataset.layout === 'tasks' ? null : { label: 'Create Test Bench (Wizard)…', action: () => testBench(mod) },
     // a plain HDL module can be drawn (the drawing then its base); a drawing's module has the drawing's commands

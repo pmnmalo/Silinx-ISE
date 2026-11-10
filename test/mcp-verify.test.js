@@ -2,6 +2,8 @@
 // sources, through core/verify.js as the interface's Verify Equivalence: proved, bounded, a counterexample written as
 // sim/verify_<module> (VHDL or Verilog), replayed by the simulator with the same difference (and simulate shows it
 // too), written again by the next check; the refusals (a file of the user's in its place, wrong ports, no reference).
+// With no reference: the module's own assertions proved (core/verify-assert.js), a failure's test bench (the module
+// alone) replayed, the assertion's message in its simulation.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -96,6 +98,28 @@ test('verify: the refusals', async () => {
   const m = await call('verify', { project: 'v', reference: 'cnt_ref' });
   assert.deepEqual([m.isError, m.text], [true, 'verify: sim/verify_cnt.vhd exists and is not a test bench of Verify: rename it, or give test_bench false']);
   assert.equal(await P.readFile('v', 'sim/verify_cnt.vhd'), '-- mine\n');
-  assert.equal((await call('verify', { project: 'v' })).text, 'verify: missing reference');
+  const none = await call('verify', { project: 'v' });
+  assert.deepEqual([none.isError, none.text], [true, ['Started : "Verify Assertions".', 'ERROR:Verify - \'cnt\' has no assertion to prove (VHDL: assert … severity warning, error or failure; Verilog: assert (…) or assert property (@(posedge clk) …))', 'Process "Verify Assertions" failed'].join('\n')]);
   assert.equal((await call('verify', { project: 'nope', reference: 'x' })).text, 'verify: no project \'nope\' in the workspace');
+});
+
+test('verify with no reference: the module\'s assertions; one that fails replayed, its message; fixed: proved', async () => {
+  await ok('new_project', { name: 'a' });
+  const text = CNT.replace('    if rising_edge(clk) then\n', '    if rising_edge(clk) then\n      assert c /= 9 report "c reached 9" severity error;\n');
+  await ok('write_file', { project: 'a', path: 'src/cnt.vhd', text });
+  await ok('set_top', { project: 'a', top: 'cnt' });
+  const r = await ok('verify', { project: 'a' });
+  assert.equal(r.text, ['Started : "Verify Assertions".', 'Proving the 1 assertion(s) of \'cnt\': Yosys\'s SAT solver, at most 20 clock cycle(s), then a proof by induction.',
+    'ERROR:Verify - an assertion of \'cnt\' fails at clock cycle 10: src/cnt.vhd:8: c reached 9.',
+    'The counterexample\'s test bench: sim/verify_cnt.vhd (it replays the 10 clock cycle(s) in the simulator).', 'Process "Verify Assertions" failed',
+    'Simulation of verify_cnt:', '  c reached 9', '  VERIFY: 10 clock cycle(s) replayed'].join('\n'));
+  assert.deepEqual([r.data.reference, r.data.status, r.data.cycle, r.data.failure, r.data.asserts, r.data.assumes, r.data.testBench, r.data.counterexample.length, r.data.warnings],
+    [null, 'failed', 10, { file: 'src/cnt.vhd', line: 8, text: 'c reached 9' }, 1, 0, 'sim/verify_cnt.vhd', 10, []]);
+  const s = await ok('simulate', { project: 'a', top: 'verify_cnt', time_ns: 1000, signals: ['q'] });
+  assert.deepEqual(s.data.log.map(l => l.text), r.data.replay);
+  // saturating at 9: proved
+  await ok('write_file', { project: 'a', path: 'src/cnt.vhd', text: text.replace("elsif en = '1' then", "elsif en = '1' and c /= 9 then").replace('assert c /= 9 report "c reached 9"', 'assert c <= 9 report "c above 9"') });
+  const p = await ok('verify', { project: 'a', module: 'cnt', depth: 8 });
+  assert.deepEqual(p.data, { project: 'a', module: 'cnt', reference: null, status: 'proved', depth: 8, asserts: 1, assumes: 0, induction: 2, errors: [], warnings: [] });
+  assert.equal(p.text.split('\n')[2], 'Proved: the assertions of \'cnt\' hold for every input sequence (by induction over 2 clock cycle(s)).');
 });

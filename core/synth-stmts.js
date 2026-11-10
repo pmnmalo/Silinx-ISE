@@ -9,7 +9,7 @@ import { lit, sameExpr } from './synth-verilog.js';
 /** { stmt } of toVerilog. */
 export function mountStatements(ctx) {
   const {
-    name, S, e, fail, firstWrites, fit, frameCtx, isMem, localName, nullVec, packVal, place, placeText, posExpr,
+    name, S, e, fail, firstWrites, fit, formal, frameCtx, isMem, localName, nullVec, packVal, place, placeText, posExpr,
     sigName, truth, wOf, wiredDrv
   } = ctx;
 
@@ -179,7 +179,11 @@ export function mountStatements(ctx) {
         const v = e(s.value, ctx), rw = wOf(ctx.fn.retT);
         return `${ind}${ctx.base} = ${fitTarget(v, { t: ctx.fn.retT }, rw)};\n${ind}__ret = 1;\n`;
       }
-      case 'null': case 'report': case 'assert': case 'textio': return '';   // (messages: not synthesized)
+      case 'null': case 'report': case 'textio': return '';   // (messages: not synthesized)
+      // (an assertion: for the formal verification only, a VHDL note's a message; in a function, not checked)
+      case 'assert':
+        if (!formal || mode === 'fn' || s.sev === 'note') return '';
+        return `${ind}${s.form === 'assume' ? 'assume' : 'assert'} (${truth(s.c, ctx)});\n`;
       case 'task': return inlineTask(s, ctx, ind, mode, loop);
       case 'sys':
         if (/^\$(display|write|strobe|monitor|info|warning|error|fatal|finish|stop)/.test(s.name || '')) return '';

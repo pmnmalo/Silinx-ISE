@@ -40,8 +40,18 @@ export function verifyScript(depth = VERIFY_DEPTH) {
   ].join('; ');
 }
 
+/** The Yosys script of the proof of module `top`'s assertions (read with -formal), at most `depth` clock cycles. */
+export function assertScript(depth = VERIFY_DEPTH) {
+  return [
+    `read_verilog -sv -formal ${UUT}.sv`,
+    // (a clocked assertion: its condition sampled at the edge, a register's worth later, as chformal lowers it)
+    'proc', 'memory', 'opt_clean', 'async2sync', 'chformal -lower', `hierarchy -top ${UUT}`, 'opt_clean',
+    `sat -tempinduct -prove-asserts -set-assumes -set-init-zero -maxsteps ${depth} -show-inputs -show-outputs ${UUT}`,
+  ].join('; ');
+}
+
 // the elaborated module `name` of library `lib`, its ports as the test bench sees them, its clock ports
-function moduleOf(lib, name, what) {
+export function moduleOf(lib, name, what) {
   const unit = [...lib.modules.values()].find(m => m.kind !== 'package' && m.name.toLowerCase() === String(name).toLowerCase());
   if (!unit) return { error: `${what} '${name}' is not a module of the project` };
   const design = elaborate(lib, unit.name);
@@ -87,7 +97,7 @@ export function portDifferences(uut, ref) {
  * Yosys's log of the check read: { status, induction, cycles, cycle, differs, warnings }. The counterexample is the
  * table printed after "model found for base case" (the induction steps' tables before it are of states not reached).
  */
-export function readVerifyLog(lines, outputs = []) {
+export function readVerifyLog(lines, outputs = [], { inputs = null } = {}) {
   const warnings = lines.filter(l => /^Warning: /.test(l)).map(l => l.replace(/^Warning: /, ''));
   const proved = lines.findIndex(l => /^Induction step proven: SUCCESS!/.test(l));
   const failed = lines.findIndex(l => /model found for base case: FAIL!/.test(l));
@@ -104,10 +114,13 @@ export function readVerifyLog(lines, outputs = []) {
     const k = +m[1] - 1, [, , sig, bits] = m;
     const c = cycles[k] || (cycles[k] = { in: {}, uut: {}, ref: {}, trigger: false });
     const at = /^(in|gold|gate)_(.*)$/.exec(sig);
-    if (sig === 'trigger') c.trigger = bits === '1';
+    // (a module's own assertions, inputs: its ports, inputs and outputs, by their names)
+    if (inputs) c[inputs.includes(sig) ? 'in' : 'uut'][sig] = bits.toLowerCase();
+    else if (sig === 'trigger') c.trigger = bits === '1';
     else if (at) c[{ in: 'in', gold: 'ref', gate: 'uut' }[at[1]]][at[2]] = bits.toLowerCase();
   }
   for (let k = 0; k < cycles.length; k++) cycles[k] ||= { in: {}, uut: {}, ref: {}, trigger: false };
+  if (inputs) return { status: 'failed', cycles: cycles.map(({ trigger, ...c }) => c), cycle: cycles.length, differs: [], warnings };
   const at = cycles.findIndex(c => c.trigger);
   const cycle = at >= 0 ? at + 1 : cycles.length;
   const last = cycles[cycle - 1] || { uut: {}, ref: {} };

@@ -25,7 +25,9 @@
 //   cell, name and given generics as Verilog literals ({ cell, name, params }); to simulate the text,
 //   compile it with core/unisim.js's UNISIM_SOURCE; option tables: false writes every operator as
 //   an operator, see tabulate; option simprim: the cell of a SIMPRIM primitive, for the compiled
-//   simulator (core/compiled-prims.js simprimCell, #627), whose instances are then kept too)
+//   simulator (core/compiled-prims.js simprimCell, #627), whose instances are then kept too; option formal: the
+//   assertions written too, as SystemVerilog's immediate assert (…) / assume (…), for Yosys's read_verilog -formal and
+//   its SAT solver (core/verify.js, #3177): VHDL's of severity warning, error or failure, Verilog's assert and assume)
 import * as V from './values.js';
 import { bitpos, psliceLo, exec, evalE, sameDeep } from './interp.js';
 import { writeModule } from './synth-module.js';
@@ -108,7 +110,7 @@ export function yosysCell(name, ports) {
   return { name: `${full[0]}${m[3] || ''}`, tie };
 }
 
-export function toVerilog(design, { name, tables = true, simprim = null } = {}) {
+export function toVerilog(design, { name, tables = true, simprim = null, formal = false } = {}) {
   let shiftMems = Object.assign(new Set(), { srcs: new Set() });   // the arrays that are shift chains (findShiftMems), their tap wires
   const tapWires = new Map();
   const top = design.top;
@@ -273,7 +275,7 @@ export function toVerilog(design, { name, tables = true, simprim = null } = {}) 
 
   // ---------------- statements (synth-stmts.js)
   const { stmt } = mountStatements({
-    name, S, e, fail, firstWrites, fit, frameCtx, isMem, localName, nullVec, packVal, place, placeText, posExpr,
+    name, S, e, fail, firstWrites, fit, formal, frameCtx, isMem, localName, nullVec, packVal, place, placeText, posExpr,
     sigName, truth, wOf, wiredDrv
   });
 

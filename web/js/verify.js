@@ -2,10 +2,13 @@
 // reference module proved by Yosys's SAT solver in the page's Yosys worker (core/verify.js, as the MCP server's verify),
 // its messages in the console; a difference: the counterexample's test bench written into the project
 // (core/verify-bench.js, sim/verify_<module>) and simulated, the waveform viewer showing where the outputs differ.
+// Verify Assertions: the module's own assertions proved (core/verify-assert.js), a failure's counterexample in the same
+// way (the module alone, its failing assertion reported by the simulation).
 import { api } from './api.js';
 import { h, dialog, toast } from './ui.js';
 import { verifyEquivalence, verifyMessages, isVerifyBench, VERIFY_DEPTH, MAX_DEPTH, VERIFY_PROCESS } from '/core/verify.js';
 import { counterexampleBench, benchName } from '/core/verify-bench.js';
+import { verifyAssertions, assertMessages, ASSERT_PROCESS } from '/core/verify-assert.js';
 import { S, app } from './app.js';
 import { log } from './console.js';
 import { inView } from './design.js';
@@ -39,6 +42,22 @@ async function askReference(mod) {
   return { reference: sel.value, depth: +depth.value };
 }
 
+// the depth asked (Verify Assertions): a number, or null (cancelled)
+async function askDepth() {
+  const depth = h('input', { type: 'number', min: 1, max: MAX_DEPTH, value: last.depth || VERIFY_DEPTH, style: { width: '6em' } });
+  const r = await dialog({
+    title: ASSERT_PROCESS, width: 460,
+    body: h('div', { class: 'verify-dlg' },
+      h('p', {}, 'Proves that the module\'s assertions hold for every input sequence, or shows the first clock cycle where one fails.'),
+      h('label', {}, 'Depth (clock cycles):'), depth),
+    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => { const n = +depth.value; if (Number.isInteger(n) && n >= 1 && n <= MAX_DEPTH) return true; toast(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`, 'err'); return false; } },
+      { label: 'Cancel', value: null }],
+  });
+  if (!r) return null;
+  last.depth = +depth.value;
+  return +depth.value;
+}
+
 /** Verify Equivalence of module `mod`: the reference asked, the check run, a counterexample simulated. */
 export async function verifyProcess(mod, { reference, depth } = {}) {
   if (!reference) {
@@ -46,18 +65,26 @@ export async function verifyProcess(mod, { reference, depth } = {}) {
     if (!a) return null;
     ({ reference, depth } = a);
   }
-  try { return await verifyInner(mod, reference, depth ?? VERIFY_DEPTH); }
+  try { return await verifyInner(mod, { reference, depth: depth ?? VERIFY_DEPTH }); }
   catch (e) { setStatus('verify', 'err'); log(`ERROR:Verify - ${e.message}`, 'err'); return null; }
 }
 
-async function verifyInner(mod, reference, depth) {
+/** Verify Assertions of module `mod`: the depth asked, its assertions proved, a counterexample simulated. */
+export async function assertProcess(mod, { depth } = {}) {
+  if (depth == null) { depth = await askDepth(); if (depth == null) return null; }
+  try { return await verifyInner(mod, { depth }); }
+  catch (e) { setStatus('verify-assert', 'err'); log(`ERROR:Verify - ${e.message}`, 'err'); return null; }
+}
+
+async function verifyInner(mod, { reference = null, depth }) {
+  const id = reference ? 'verify' : 'verify-assert';
   await saveAll();
-  setStatus('verify', 'running');
+  setStatus(id, 'running');
   // the simulation view's sources (the reference may be a simulation-only one), but a counterexample's test bench
   const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, true) && !isVerifyBench(s.text));
   // (Yosys: the page's workers, or the browser edition's own, as the emulator's compiled engine runs it)
   const run = await (await import('./emulator.js')).emulatorYosys(api.standalone);
-  const r = await verifyEquivalence(srcs, { top: mod, reference, depth, run });
+  const r = reference ? await verifyEquivalence(srcs, { top: mod, reference, depth, run }) : await verifyAssertions(srcs, { top: mod, depth, run });
   let bench = null;
   if (r.status === 'failed') {
     const tb = benchName(r.top);
@@ -75,8 +102,8 @@ async function verifyInner(mod, reference, depth) {
       await app.reloadProject();
     }
   }
-  for (const m of verifyMessages(r, { bench })) log(m.text, m.kind === 'info' ? undefined : m.kind);
-  setStatus('verify', r.status === 'proved' && !r.warnings.length ? 'ok' : r.status === 'proved' || r.status === 'bounded' ? 'warn' : 'err');
+  for (const m of (reference ? verifyMessages : assertMessages)(r, { bench })) log(m.text, m.kind === 'info' ? undefined : m.kind);
+  setStatus(id, r.status === 'proved' && !r.warnings.length ? 'ok' : r.status === 'proved' || r.status === 'bounded' ? 'warn' : 'err');
   // the counterexample replayed: the waveform viewer shows it, the console the same difference
   if (bench) await runSimulation(benchName(r.top));
   return r;
