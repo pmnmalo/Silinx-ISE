@@ -1,4 +1,5 @@
-// Portuguese texts of View Implemented Design (FPGA) (web/js/fpgaview.js), merged into web/js/i18n.js.
+// Portuguese texts of View Implemented Design (FPGA) (web/js/fpgaview.js) and of the timing report's Paths panel
+// (web/js/timing-paths.js, #3178), merged into web/js/i18n.js.
 export const FPGA_PT = {
   'View Implemented Design (FPGA)': 'Ver Projeto Implementado (FPGA)',
   'Implemented Design (FPGA View)': 'Projeto Implementado (Vista da FPGA)',
@@ -32,6 +33,16 @@ export const FPGA_PT = {
   'Route-thru: the LUT only passes a signal through (used as a wire).': 'Route-thru: a LUT só deixa passar um sinal (usada como fio).',
   "The LUT's memory: one bit per combination of its inputs (address = the inputs A4…A1 as a binary number)": 'A memória da LUT: um bit por combinação das entradas (endereço = as entradas A4…A1 como número binário)',
   'Memory contents': 'Conteúdo da memória', 'No net matches.': 'Nenhuma rede corresponde.',
+  // the timing report's Paths panel (#3178)
+  'Paths': 'Caminhos', '☰ Paths': '☰ Caminhos', 'Collapse the Paths panel': 'Recolher o painel Caminhos', 'Expand the Paths panel': 'Expandir o painel Caminhos',
+  'Show / hide the Paths panel': 'Mostrar / esconder o painel Caminhos', 'Slack': 'Folga', 'Delay': 'Atraso', 'To': 'Até',
+  'No path between two flip-flops of a clock to time.': 'Nenhum caminho entre dois flip-flops de um relógio para analisar.',
+  "The path's stages against the PERIOD": 'As etapas do caminho face ao PERIOD', "The path's stages (no PERIOD constraint on its clock)": 'As etapas do caminho (sem restrição PERIOD no seu relógio)',
+  'Between the two edges of the clock: half its period.': 'Entre os dois flancos do relógio: metade do seu período.',
+  'clock-to-out': 'relógio-saída', 'logic': 'lógica', 'net': 'rede', 'setup': 'setup',
+  'Show Path': 'Mostrar Caminho', 'Show in FPGA View': 'Mostrar na Vista da FPGA',
+  "Mark the source lines of the path's logic, and the path in the FPGA view when it is open": 'Marcar as linhas de código da lógica do caminho, e o caminho na vista da FPGA quando estiver aberta',
+  'Open the FPGA view on the path: its sites and its nets': 'Abrir a vista da FPGA no caminho: os seus sítios e as suas redes',
 };
 export const FPGA_PT_PATTERNS = [
   [/^Hierarchy level (\d+)$/, 'Nível $1 da hierarquia'],
@@ -44,4 +55,11 @@ export const FPGA_PT_PATTERNS = [
   [/^Inside (\S+)$/, 'Dentro de $1'],
   [/^(\d+) of (\d+) slices · (\d+) I\/Os$/, '$1 de $2 slices · $3 E/S'],   // (the status line's, #2763)
   [/^The implemented design could not be read: (.*)$/s, 'Não foi possível ler o projeto implementado: $1'],
+  // the timing report's Paths panel (#3178)
+  [/^Path (\d+)$/, 'Caminho $1'],
+  [/^Delay (\S+) ns of (\S+) ns, slack (\S+) ns$/, 'Atraso $1 ns de $2 ns, folga $3 ns'],
+  [/^Delay (\S+) ns, no PERIOD constraint$/, 'Atraso $1 ns, sem restrição PERIOD'],
+  [/^(clock-to-out|logic|net|setup) (\S+) ns$/, (m, k, x) => `${{ 'clock-to-out': 'relógio-saída', logic: 'lógica', net: 'rede', setup: 'setup' }[k]} ${x} ns`],
+  [/^slack (\S+) ns$/, 'folga $1 ns'],
+  [/^The logic of the path to (\S+) could not be traced back to its source lines\.$/, 'Não foi possível ligar a lógica do caminho até $1 às suas linhas de código.'],
 ];

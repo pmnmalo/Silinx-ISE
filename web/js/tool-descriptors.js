@@ -149,7 +149,7 @@ export const SILINX = {
   steps: withProducts(XILINX_STEPS, {
     synth: ['open/{top}.json', 'open/{top}_stat.txt'], postsynth: ['netgen/synthesis/{top}_synthesis.vhd'],
     posttrans: ['netgen/translate/{top}_translate.vhd'], postmap: ['netgen/map/{top}_map.vhd'], postpar: ['netgen/par/{top}_timesim.vhd'],
-    par: ['open/placed.xdl', 'open/routed.xdl'], trce: ['open/timing.txt'],
+    par: ['open/placed.xdl', 'open/routed.xdl'], trce: ['open/timing.txt', 'open/paths.json'],
     pin2ucf: ['{top}_pins.ucf'], xpwr: ['{top}.pwr'], bitgen: ['{top}.bit'], prombit: ['{top}_prom.bit'],
   }),
   reports: [
