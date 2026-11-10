@@ -1,7 +1,7 @@
 // The Properties side panel of an exercise document (#3192, web/js/exercise-view.js): the exercise's title and
 // statement in English and Portuguese and its top, then the selected test's settings by its kind (vectors: the clock,
 // the period, the vectors' text; reference: the cycles, the seed; testbench: its module, its end message; synthesis:
-// no latches, the LUTs, flip-flops and slices at most). A change is the exercise's at once (`changed`), saved as every
+// no latches, the LUTs, flip-flops and slices at most; equivalence: the depth, #3217). A change is the exercise's at once (`changed`), saved as every
 // document is (its tab's mark, saved after a moment). Its problems are the console's when the tests run.
 import { h } from './ui.js';
 import { TEST_KINDS } from '/core/grade-format.js';
@@ -42,6 +42,7 @@ export function mountExerciseProps(side, { exercise, selected, changed }) {
     }
     if (x.kind === 'vectors') out.push(field('Vectors', area(x.vectors, set(x, 'vectors'), { rows: 10, 'data-prop': 'test-vectors' })));
     if (x.kind === 'reference') out.push(field('Cycles', numberIn(x.cycles, set(x, 'cycles'), { 'data-prop': 'test-cycles' })), field('Seed', numberIn(x.seed, set(x, 'seed'), { 'data-prop': 'test-seed' })));
+    if (x.kind === 'equivalence') out.push(field('Depth (clock cycles)', numberIn(x.depth, set(x, 'depth'), { 'data-prop': 'test-depth' })));
     if (x.kind === 'testbench') out.push(field('Test bench', input(x.top, set(x, 'top'), { 'data-prop': 'test-top' })), field('End message', input(x.done, set(x, 'done'), { 'data-prop': 'test-done' })));
     if (x.kind === 'synthesis') {
       out.push(field('No latches', check(x.latches === false, v => { if (v) x.latches = false; else delete x.latches; changed(); }, { 'data-prop': 'test-latches' }), 'check'),

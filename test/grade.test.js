@@ -54,7 +54,7 @@ test('#3192 the exercise: a right one has no problem; each kind of wrong one say
     'e.exercise.json: test 3: "files": a list of { "path", "text" } (or { "path", "file" })',
     'e.exercise.json: test 4: "luts": a whole number from 0',
     'e.exercise.json: test 4: "latches": true or false',
-    'e.exercise.json: test 5: "kind": one of vectors, reference, testbench, synthesis, check',
+    'e.exercise.json: test 5: "kind": one of vectors, reference, testbench, synthesis, equivalence, check',
   ]);
   const checks = counterExercise();
   checks.tests = [{ id: 'c', kind: 'check' }, { id: 'd', kind: 'check', checks: [{ check: 'fly' }, { check: 'syntax', warnings: ['/[/'] }] }, { id: 't', kind: 'testbench', top: 'tb', files: [{ path: 'tb.v', text: '' }], done: '/(/' }];

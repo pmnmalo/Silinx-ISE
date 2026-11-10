@@ -208,8 +208,9 @@ export async function gradeSubmission(ex, sub, { visible = false, vectors = {}, 
   if (sub.error) return summarize(ex, sub.name, { design: { verdict: 'CE', messages: [sub.error], warnings: [] }, tests: [] }, { visible });
   const results = [];
   let design = null, from = 0;
-  // (only what the tests run need: a hidden test's data never reaches a visible run's process)
-  const exercise = { ...ex, reference: undefined, tests };
+  // (only what the tests run need: a hidden test's data never reaches a visible run's process; the reference design only
+  // for an equivalence test, #3217, whose check joins it with the submission's in Yosys)
+  const exercise = { ...ex, reference: tests.some(t => t.kind === 'equivalence') ? ex.reference : undefined, tests };
   const need = Object.fromEntries(Object.entries(vectors).filter(([id]) => tests.some(t => t.id === id)));
   const submission = { project: sub.project, files: [...sub.files] };
   if (synthesis === undefined) synthesis = await synthesisStatus(exercise);
