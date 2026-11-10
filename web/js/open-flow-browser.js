@@ -177,6 +177,11 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   const earlier = {};
   for (const [k, v] of Object.entries(files)) if (k.startsWith('build/') && typeof v === 'string') earlier[k.slice(6)] = v;
   if (signal?.aborted) throw cancelled();
+  return workerRun({ spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null }, { onLine, onWrite, onReport, signal });
+}
+
+// one run in the worker: its lines, files and report to the handlers; resolves its done ({ ok, report, error, view })
+function workerRun(message, { onLine, onWrite = () => {}, onReport = () => {}, signal = null }) {
   const w = getWorker(), id = ++runSeq;
   return new Promise((resolve, reject) => {
     const end = () => { runs.delete(id); signal?.removeEventListener('abort', abort); };
@@ -191,8 +196,18 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
       fail: e => { end(); reject(e); },
     });
     signal?.addEventListener('abort', abort, { once: true });
-    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, ...message });
   });
+}
+
+/**
+ * The flow on a spec made elsewhere (core/grade-synth.js synthesisSpec: a synthesis test's, #3216) and design sources,
+ * in the worker as Implement's runs: onLine(line); signal stops it (rejects with { cancelled: true }). Resolves
+ * { ok, report, error }.
+ */
+export function runBrowserSpec({ spec, sources, onLine, signal = null }) {
+  if (signal?.aborted) return Promise.reject(cancelled());
+  return workerRun({ spec, sources, simSources: [], ucf: null, ucfName: null, files: {}, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: null, integrity: LAYOUT.integrity || null }, { onLine, signal });
 }
 
 /**
