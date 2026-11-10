@@ -1455,6 +1455,13 @@ node probe-run.mjs cand.json probe.json
 PART=xc3s250ecp132-4 node ../s3e-bitstream/gen-pipcover.mjs measured out --types CENTER_SMALL
 ```
 
+**The BSCAN's switches (#3176, 2026-11-10).** The bit database learnt the corner tile UR's BSCAN_SPARTAN3 switches
+(research/s3e-bitstream `measure-3176.sh`), and every measured description rebuilt from it gains them: 50 per die, plus
+one CLKT switch on the XC3S100E and two on the XC3S500E, which the capture core's routes took. No PIP is lost and no
+site changes; the BSCAN site stays among those the measured grid leaves out. ISE's routes of the measurement show only
+some of them on each die, so the arc probe asked each one (`candidates.mjs types`, `probe-run.mjs`: one round of 8
+designs per die), and all 203 exist: the probe `bscanprobe` of each `probes.json.gz`.
+
 ## 17. The designs through ISE on the measured descriptions, with nextpnr (2026-11-06, #2502)
 
 Silinx's own placer and router were removed (#2823). nextpnr places and routes now, on a chip database built from a
