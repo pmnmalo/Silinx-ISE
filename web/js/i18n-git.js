@@ -14,10 +14,12 @@ export const GIT_PT = {
     'O git autentica-se no GitHub com as suas próprias credenciais (a linha de comandos do GitHub, o Git Credential Manager ou uma chave SSH): o Silinx nunca pede uma palavra-passe nem um token.',
   'A .gitignore leaves build/ and the tools\' outputs out of the commits.': 'Um .gitignore deixa build/ e os resultados das ferramentas fora dos commits.',
   'In conflict': 'Em conflito', 'New: not committed yet': 'Novo: ainda sem commit', 'Changed since the last commit': 'Alterado desde o último commit',
-  'Committed': 'Registado',
+  'Committed': 'Registado', 'History…': 'Histórico…', 'History': 'Histórico', 'No commit yet.': 'Ainda sem commits.',
 };
 
 export const GIT_PT_PATTERNS = [
+  [/^(\d+) commit\(s\), the newest first: a file opens as it was then, read only\.$/, '$1 commit(s), o mais recente primeiro: um ficheiro abre-se como era então, só de leitura.'],
+  [/^Read-only, as it was in the commit ([0-9a-f]{7})( \(.+\))?$/, 'Só de leitura, como era no commit $1$2'],
   [/^(\d+) change\(s\) on (.+):$/, '$1 alteração(ões) em $2:'],
   [/^not a GitHub repository's address: (.*)$/, 'não é o endereço de um repositório do GitHub: $1'],
   [/^a GitHub Classroom invitation, not a repository$/, 'um convite do GitHub Classroom, não um repositório'],

@@ -415,6 +415,23 @@ Copy Link… includes Silinx as it is when the link is copied (**Include the cur
 front, the split and, in the Silinx interface, the task, the side panel, the messages and a maximized document; the
 link opens it so, for that page only (the viewer's own layout is not changed).
 
+### A project on GitHub (git, a GitHub Classroom assignment)
+
+On your computer or a Silinx server, a project can live in a GitHub repository, through the system's git:
+- **Open from Repository…** (the Start page, the ISE style's File menu) opens a project from a GitHub repository, a
+  GitHub Classroom assignment's too.
+- **Commit…, Push to GitHub and Pull from GitHub** (the project's right-click menu in the Design pane, under Git; the
+  File menu) send it back and bring the others' changes in. A pull that conflicts pulls nothing and leaves the files as
+  they were.
+- **The Design pane** marks what changed (M) or is new (N) since the last commit.
+- **History…** lists the commits, and opens a file as it was in one, read only.
+- **Initialize Repository…** makes a repository of a project, with a `.gitignore` that leaves `build/` and the tools'
+  outputs out.
+
+git signs in to GitHub with its own credentials (GitHub's command line `gh auth login`, Git Credential Manager or an
+SSH key): Silinx never asks for, stores or logs a password or a token. A server's operator can turn git off with
+`SILINX_GIT=off`. The browser edition does not have git yet (it comes through GitHub's API).
+
 ## For developers
 
 ```bash
@@ -500,6 +517,7 @@ test bench: its vectors, their expected outputs given or from the design) and `c
 diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `save_wave_config` and `load_wave_config` (a simulation's wave configuration saved as a .wcfg of the project, and loaded), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `verify` (a module's equivalence with a reference module, as *Verify Equivalence*: proved, or the first clock cycle where an output differs, its counterexample written as a test bench and replayed), `set_process_properties` (the Optimization, the start-up clock),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
+`git_clone`, `git_init`, `git_status`, `git_commit`, `git_push`, `git_pull` and `git_log` (a project in a GitHub repository, as the interface's git: its history, a file as it was in a commit),
 `export_project` and `import_project` (a Xilinx ISE or a Silinx project, as a .zip; a .xise or a project folder too;
 only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `project_link` and `open_link` (a project's
 link, the project inside it, opening Try it, the simulation or the board emulator, for slides; a project made from such a link
