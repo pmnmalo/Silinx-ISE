@@ -1,7 +1,8 @@
 // The MCP server's logic analyzer tools (server/mcp.js, #2674, #3176): a project's capture settings (silinx.json
 // `capture`: the signals to watch, the clock, the depth, the samples before the trigger, the trigger), checked on the
 // design's top as Implement inserts the capture (core/ila-insert.js planInsertion, captureCost: each probe's signal
-// and width, the core's block RAMs against the device's), shown, changed or cleared.
+// and width, the core's block RAMs against the device's), shown, changed or cleared; and the capture on the board
+// (server/ila-board.js captureProject: armed, its trigger waited for, read, saved in build/capture.json).
 import * as P from './projects.js';
 import { toolError, readProject, viewSourcesOf, PROJECT } from './mcp-util.js';
 
@@ -90,6 +91,32 @@ export const CAPTURE_TOOLS = [
       if (r.errors.length) throw toolError(r.errors.join('\n'));
       await P.updateProject(name, p => ({ ...p, capture: settings }));
       return { text: summary(settings, r).join('\n'), data: dataOf(name, settings, r) };
+    },
+  },
+  {
+    name: 'capture', title: 'Logic Analyzer Capture',
+    description: 'Capture the design\'s signals on the board with its logic analyzer: the board must be programmed with the design Implement built with its capture (capture_settings). Arms the capture over the JTAG cable (the Digilent Adept USB of the Basys2 / Nexys2, through adepttool), waits for its trigger (timeout_s), reads the samples and saves them in build/capture.json: each probe\'s values, oldest first, the trigger\'s sample at index pre. arm: false waits again for a capture already armed (after a timeout). Returns each probe\'s samples around the trigger, and all of them in its data.',
+    inputSchema: { type: 'object', properties: {
+      project: PROJECT,
+      arm: { type: 'boolean', description: 'Arm a new capture (default true); false: wait for the one armed.' },
+      timeout_s: { type: 'number', description: 'How long to wait for the trigger (seconds, default 10).' },
+      device: { type: 'integer', description: 'The Adept board\'s index when several are connected (default 0).' },
+    }, required: ['project'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    async run({ project: name, arm = true, timeout_s: timeout = 10, device = 0 }, { link = null } = {}) {
+      await readProject(name);
+      if (!(timeout > 0)) throw toolError('timeout_s: a number of seconds above 0');
+      const { captureProject } = await import('./ila-board.js');
+      const log = [];
+      let r;
+      try { r = await captureProject(name, { arm, timeoutMs: timeout * 1000, device, log: l => log.push(l), link }); } catch (e) { throw toolError(e.message); }
+      const { capture: c } = r, at = c.trigger, from = Math.max(0, at - 2), to = Math.min(c.depth, at + 3);
+      const around = c.probes.map(p => `  ${p.path}: ${p.samples.slice(from, to).map(v => BigInt(v).toString(10)).join(' ')}`);
+      return {
+        text: [...log, `Captured ${c.depth} samples of ${c.probes.map(p => p.path).join(', ')} on ${c.clock}; the trigger at sample ${at}. Saved in ${r.file}.`,
+          `Samples ${from} to ${to - 1}:`, ...around].join('\n'),
+        data: { project: name, file: r.file, trigger: at, polls: c.polls, depth: c.depth, pre: c.pre, probes: c.probes },
+      };
     },
   },
 ];

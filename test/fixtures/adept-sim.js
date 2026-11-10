@@ -35,7 +35,10 @@ class Fpga {
     if (this.ir === 0x05) this.fromProm = false;   // CFG_IN
     if (this.ir === 0x0c) this.startClocks = 0;   // JSTART
   }
-  captureDr() { return this.ir === this.idInstr ? [this.idcode, 32] : [0, 1]; }
+  // (USER1, 0x02: the design's BSCAN_SPARTAN3 register when the board has one, user1: { bits, capture() -> BigInt,
+  // update(bits) }: the logic analyzer's core, #3176; else BYPASS)
+  captureDr() { return this.ir === this.idInstr ? [this.idcode, 32] : this.ir === 0x02 && this.user1 ? [this.user1.capture(), this.user1.bits] : [0, 1]; }
+  updateDr(bits) { if (this.ir === 0x02 && this.user1) this.user1.update(bits); }
   shiftedIn(bit) { if (this.ir === 0x05 && this.init) this.stream.push(bit); }   // CFG_IN
   clock(state) {
     if (!this.init && --this.initDelay <= 0) {
@@ -182,8 +185,10 @@ export class SimAdeptBoard {
   /** promOptions: the Platform Flash's (writeProtected, eraseClocks, programClocks: the TCK clocks in Run-Test/Idle a block takes,
       or a function of the block, failBlock); mode: the jumper ('rom' / 'jtag'). */
   /** tckHz: the JTAG port's TCK rate, as GET_SPEED says it (null: a firmware without the command). */
-  constructor({ fpga = 'xc3s250e', prom = 'xcf02s', product = 'Basys2', serial = '10146A2B3C4D', inUse = false, promOptions = {}, mode = 'rom', tckHz = 4_000_000 } = {}) {
+  /** user1: the FPGA's USER1 data register (a design's BSCAN_SPARTAN3), { bits, capture(), update(bits) }, #3176. */
+  constructor({ fpga = 'xc3s250e', prom = 'xcf02s', product = 'Basys2', serial = '10146A2B3C4D', inUse = false, promOptions = {}, mode = 'rom', tckHz = 4_000_000, user1 = null } = {}) {
     this.fpgaDev = new Fpga(fpga);
+    this.fpgaDev.user1 = user1;
     this.promDev = prom ? Object.assign(new Prom(prom, promOptions), { fpga: this.fpgaDev, mode }) : null;
     this.fpgaDev.prom = this.promDev;
     this.chain = [this.fpgaDev, ...(prom ? [this.promDev] : [])];
