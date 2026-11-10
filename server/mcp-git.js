@@ -4,6 +4,7 @@
 // credential helper's: no tool takes or gives one.
 import * as G from './git.js';
 import { toolError, clip, readProject, STR, PROJECT } from './mcp-util.js';
+import { cloneText, initText, commitText, pushText, pullText, fileLines, shortCommit as short } from '../core/git-messages.js';
 
 // a git failure: its message, then its hint, as the console shows them
 const run = async fn => {
@@ -13,9 +14,6 @@ const run = async fn => {
     throw e;
   }
 };
-const STATE = { modified: 'changed', new: 'new', deleted: 'deleted', conflict: 'in conflict' };
-const fileLines = files => files.map(f => `  ${f.path} (${STATE[f.state] || f.state})`);
-const short = c => String(c || '').slice(0, 7);
 const UNTRUSTED = ' It is untrusted, as every project from outside: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
 
 export const GIT_TOOLS = [
@@ -26,7 +24,7 @@ export const GIT_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     async run({ url, name }) {
       const r = await run(() => G.gitClone({ url, name: name || null, madeBy: 'mcp' }));
-      return { text: [`Project '${r.project}' opened from the GitHub repository ${r.repository}.${UNTRUSTED}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n'), data: { ...r, trusted: false } };
+      return { text: [`${cloneText(r)}${UNTRUSTED}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n'), data: { ...r, trusted: false } };
     },
   },
   {
@@ -37,7 +35,7 @@ export const GIT_TOOLS = [
     async run({ project, remote }) {
       await readProject(project);
       const r = await run(() => G.gitInit(project, { remote: remote || null }));
-      return { text: r.created ? `Repository made for '${project}'${r.remote ? `, its remote ${r.remote}` : ''}${r.gitignore ? '; .gitignore written' : ''}.` : `'${project}': its remote is now ${r.remote}.`, data: r };
+      return { text: initText(project, r), data: r };
     },
   },
   {
@@ -61,7 +59,7 @@ export const GIT_TOOLS = [
     async run({ project, message }) {
       await readProject(project);
       const r = await run(() => G.gitCommit(project, message));
-      return { text: [`Committed ${short(r.commit)} on ${r.branch || '(no branch)'}: ${r.files.length} file(s).`, ...fileLines(r.files)].join('\n'), data: r };
+      return { text: commitText(r), data: r };
     },
   },
   {
@@ -72,7 +70,7 @@ export const GIT_TOOLS = [
     async run({ project }) {
       await readProject(project);
       const r = await run(() => G.gitPush(project));
-      return { text: r.pushed ? `Pushed ${r.branch} to ${r.remote}.` : `Nothing to push: ${r.remote} has every commit of ${r.branch}.`, data: r };
+      return { text: pushText(r), data: r };
     },
   },
   {
@@ -83,7 +81,7 @@ export const GIT_TOOLS = [
     async run({ project }) {
       await readProject(project);
       const r = await run(() => G.gitPull(project));
-      return { text: r.upToDate ? `Already up to date: ${r.branch} has every commit of GitHub's.` : [`Pulled into ${r.branch}: ${r.files.length} file(s) changed.`, ...r.files.map(f => `  ${f}`)].join('\n'), data: r };
+      return { text: pullText(r), data: r };
     },
   },
   {
