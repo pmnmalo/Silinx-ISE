@@ -107,8 +107,13 @@ test('simCheck: the XDL implements the netlist, a wrong LUT equation is caught',
 test('unknownPips: the PIPs Silinx\'s router is kept off, by tile', () => {
   const { pips, total, unknown } = unknownPips(device, loadDb(PART));
   assert.equal(total, 2108744);
-  assert.equal(unknown, 28030);
+  // (28030 before the BSCAN's switches were measured, #3176: the corner tile UR's 52)
+  assert.equal(unknown, 27978);
   assert.equal(Object.keys(pips).length, 800);
+  const ur = device.tile('UR_X27Y35');
+  const bscan = ['UR_DRCK1->CNR_D_O_FAN_B0', 'CNR_D_O_FAN_B0->OMUX4', 'N2END6->CNR_DATA_IN0', 'CNR_DATA_IN0->UR_TDO1'].map(p => device.findPip(ur, ...p.split('->')));
+  assert.ok(bscan.every(i => i >= 0));
+  assert.deepEqual(bscan.filter(i => (pips.UR_X27Y35 || []).includes(i)), []);
   // the clock buffer's input nextpnr took before they were left out: its bits are not known
   const k = device.tile('CLKT_X13Y35');
   const i = device.findPip(k, 'CLKV_E2BEG4', 'CLKT_CLKDUB2');

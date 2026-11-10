@@ -858,10 +858,13 @@ traffic, blinky and pong on the Atlys):
   register that TDO reads; and chain 1 again with its logic far from the corner (f1). `measure-3176-s6.sh` implements
   them with ISE from HDL on the XC6SLX16, then drops their non-INT tiles' PIPs (`gen-pipdrop6.mjs`, `--split 4` too):
   50 xdl + bitgen runs. `ana-pipdrop6.mjs` resolves 121 PIPs, 113 with no bits (the pins' wires onto the interface
-  tile's LOGICOUT wires), 35 of them known already with the same bits. The 86 new ones are in `db/s6-pips-bscan.json`.
+  tile's LOGICOUT wires), 35 of them known already with the same bits. 85 of the 86 new ones are in `db/s6-pips-bscan.json`; the slave OLOGIC2's
+  `D1 -> OQ` of a top inner I/O tile (TIOI_INNER, three bits), which c3's and c4's output took, is left out while
+  nextpnr's released chip database has not got it: Silinx would give the 30 (23) top-bank pads of #3152 outputs that
+  nextpnr cannot route. It comes with the fork's next Spartan-6 chip database.
   With them every design is one bit from ISE's bitgen: the instance's JTAG_CHAIN, one bit per chain in UR_UPPER's
   region (frame 22, bits 31 … 28 for chains 1 … 4) whichever site holds it. That is `db/s6-bscan.json`, which
-  `bitgen.js` reads. The five designs are then byte-identical with ISE's bitgen, and on the XC6SLX45 too (c1, c3: its
+  `bitgen.js` reads. The five designs are then byte-identical with ISE's bitgen but for c3's and c4's output path, and on the XC6SLX45 too (c1, c3: its
   corner's region at frame 9056, the same offsets). The open flow does not place a BSCAN yet (nextpnr's chip database).
 
 ## Trying the parts that exist

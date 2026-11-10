@@ -4,16 +4,18 @@
 # routed design again without the PIPs of its tiles other than the INT-like and CLB ones (gen-pipdrop6.mjs, --split 4
 # too), turned into bitstreams by ISE (ise-xdl-bits.sh), on the ISE machine; then node research/s6/ana-pipdrop6.mjs on
 # the folder (the bits by tile and PIP: $W/bscan-pips.json). ISE's outputs stay in W, out of the repository.
-#   SILINX_ISE_HOST=user@host [RW=/Users/Shared/silinx-ise/build/silinx-3176-s6] [PART=xc6slx16-csg324-3] sh research/s6/measure-3176-s6.sh W
-# (RW: the folder on the ISE machine, one Docker Desktop shares, #482; the host on the command line only)
+#   SILINX_ISE_HOST=user@host [RW=<folder>] [PART=xc6slx16-csg324-3] sh research/s6/measure-3176-s6.sh W
+# (RW: the folder on the ISE machine, absolute (one Docker Desktop shares, #482) or in its home, default silinx-3176-s6;
+# the host on the command line only)
 set -e
 : "${SILINX_ISE_HOST:?set SILINX_ISE_HOST=user@host}"
 cd "$(dirname "$0")"
 W=${1:?W}; W=${W%/}; mkdir -p "$W"
-RW=${RW:-/Users/Shared/silinx-ise/build/silinx-3176-s6}; PART=${PART:-xc6slx16-csg324-3}
+RW=${RW:-silinx-3176-s6}; PART=${PART:-xc6slx16-csg324-3}
+case "$RW" in /*) MNT=$RW ;; *) MNT='$HOME/'$RW ;; esac
 SSHO="ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30"
 SSH=($SSHO "$SILINX_ISE_HOST")
-DOCKER="export PATH=\"\$PATH:/usr/local/bin\"; docker run --rm --network none -v \"$RW\":/w xilinx/ise:14.7 bash"
+DOCKER="export PATH=\"\$PATH:/usr/local/bin\"; docker run --rm --network none -v \"$MNT\":/w xilinx/ise:14.7 bash"
 DESIGNS=$(node gen-bscan6.mjs "$W/impl" "$PART")
 "${SSH[@]}" "mkdir -p $RW"
 rsync -a -e "$SSHO" ise-s6.sh ise-xdl-bits.sh "$SILINX_ISE_HOST:$RW/"
