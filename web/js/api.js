@@ -80,6 +80,8 @@ export const api = {
   renameFile: (name, from, to) => req('POST', `/api/projects/${enc(name)}/rename`, { from, to }),
   deleteFile: (name, path) => req('DELETE', `/api/projects/${enc(name)}/file?path=${enc(path)}`),
   sources: name => req('GET', `/api/projects/${enc(name)}/sources`),
+  // a synthesis test of the project's exercise, graded on the server (#3216, server/grade-routes.js): { result }
+  gradeSynthesis: (name, exercise, test) => req('POST', `/api/projects/${enc(name)}/grade/synthesis`, { exercise, test }),
   // git (#3195, the server editions: server/git-routes.js)
   gitEnabled: () => req('GET', '/api/git'),
   gitClone: (url, name = null) => req('POST', '/api/git/clone', { url, ...(name ? { name } : {}) }),

@@ -126,7 +126,8 @@ the interface's language, the ports, and the tests with their verdicts and point
 
 - **For a student**:
   - **Run Visible Tests** runs the visible tests on the project as it is saved, and the console gives the report.
-  - The synthesis tests run with `silinx grade`, not in the page.
+  - The synthesis tests run in the page too, with the open synthesis that Synthesize uses, and give the same verdicts
+    as `silinx grade`.
 - **For a teacher**:
   - **Run All Tests** (in the ⋮ menu) runs the hidden tests too.
   - **Ports from the Top** takes the top and its ports from the project's top module, so the teacher's reference

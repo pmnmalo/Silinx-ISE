@@ -29,10 +29,15 @@ export function referenceVectors(ex, test) {
 }
 
 // a synthesis test from the open synthesis's results ({ errors, warnings, latches, luts, ffs, slices, notes: what it
-// could not check, as the slices without nextpnr's chip database, #3215 })
+// could not check, as the slices without nextpnr's chip database, #3215 }, { timedOut: its limit's seconds }, or the
+// test's { result } graded elsewhere)
 async function runSynthesis(ex, test, design, synthesize) {
   if (!synthesize) return { verdict: null, messages: ['the synthesis tests run where the open synthesis is (silinx grade, the server)'] };
   const r = await synthesize(design.sources, ex.top, test);
+  // (the test graded elsewhere: the local server's page asks its server, #3216)
+  if (r.result) return r.result;
+  // (the page's: its worker stopped at the test's time limit, #3216; the server's process is stopped instead)
+  if (r.timedOut) return { verdict: 'TLE', messages: [`the test took more than ${r.timedOut} s`] };
   if (r.errors?.length) return { verdict: 'NS', messages: r.errors.slice(0, 5) };
   const latches = Math.max(r.latches || 0, design.warnings.filter(w => LATCH_RE.test(w)).length ? 1 : 0);
   if (test.latches === false && latches) return { verdict: 'LI', messages: [...design.warnings.filter(w => LATCH_RE.test(w)), ...(r.latches ? [`the synthesis inferred ${r.latches} latch${r.latches > 1 ? 'es' : ''}`] : [])] };

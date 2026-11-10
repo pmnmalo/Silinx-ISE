@@ -72,24 +72,31 @@ uiTest('#3192 an exercise: run its visible tests and all of them on a wrong desi
   assert.deepEqual([L.shown, L.over, L.folded], [true, false, false]);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 
-  // the wrong design (en not read): the visible tests, its first difference in the console; the synthesis test not run here
+  // the wrong design (en not read): the visible tests, its first difference in the console; the synthesis test run too (#3216)
   let out = await runTests(false);
   assert.match(out, /Started : "Run Visible Tests" \(counter4\.exercise\.json\)\./);
-  assert.match(out, /cnt: 0 \/ 40 points \(Wrong Answer\), the visible tests\n {2}WARNING: "src\/counter4\.vhd" Line 10: Input <en> is never used\.\n {2}- count \(Counting and the reset\): WA Wrong Answer, 0 \/ 30\n {6}cycle 4 \(vectors line 7\): q is 0100, expected 0011\n/);
-  assert.match(out, / {2}- impl \(Synthesis: no latch, at most 4 flip-flops\): not run, 0 \/ 10\n {6}the synthesis tests run where the open synthesis is \(silinx grade, the server\)\n/);
-  assert.match(out, /Process "Run Visible Tests" completed: 0 \/ 40 points\./);
+  assert.match(out, /cnt: 10 \/ 40 points \(Wrong Answer\), the visible tests\n {2}WARNING: "src\/counter4\.vhd" Line 10: Input <en> is never used\.\n {2}- count \(Counting and the reset\): WA Wrong Answer, 0 \/ 30\n {6}cycle 4 \(vectors line 7\): q is 0100, expected 0011\n/);
+  assert.match(out, / {2}\+ impl \(Synthesis: no latch, at most 4 flip-flops\): AC Accepted, 10 \/ 10\nProcess "Run Visible Tests" completed: 10 \/ 40 points\./);
   L = await look();
-  assert.deepEqual([L.tests[1], L.tests[4], L.status], ['Counting and the reset | vectors | visible | 0 / 30 | WA', 'Synthesis: no latch, at most 4 flip-flops | synthesis | visible | 0 / 10 | –', '4 test(s), 2 visible · 0 / 40 points']);
+  assert.deepEqual([L.tests[1], L.tests[4], L.status], ['Counting and the reset | vectors | visible | 0 / 30 | WA', 'Synthesis: no latch, at most 4 flip-flops | synthesis | visible | 10 / 10 | AC', '4 test(s), 2 visible · 10 / 40 points']);
   // the right design: the visible test Accepted; then all of them, the hidden ones too
   await writeWs(env, 'cnt', 'src/counter4.vhd', RIGHT);
   out = await runTests(false);
-  assert.match(out, /Process "Run Visible Tests" completed: 30 \/ 40 points\./);
+  assert.match(out, /Process "Run Visible Tests" completed: 40 \/ 40 points\./);
   assert.doesNotMatch(out, /WARNING/);
   out = await runTests(true);
-  assert.match(out, /cnt: 90 \/ 100 points \(Accepted\)\n {2}\+ count \(Counting and the reset\): AC Accepted, 30 \/ 30\n {2}\+ random \(Random inputs against the reference\): AC Accepted, 40 \/ 40 \[hidden\]\n {2}\+ bench \(The wrap and the reset while counting\): AC Accepted, 20 \/ 20 \[hidden\]\n/);
+  assert.match(out, /cnt: 100 \/ 100 points \(Accepted\)\n {2}\+ count \(Counting and the reset\): AC Accepted, 30 \/ 30\n {2}\+ random \(Random inputs against the reference\): AC Accepted, 40 \/ 40 \[hidden\]\n {2}\+ bench \(The wrap and the reset while counting\): AC Accepted, 20 \/ 20 \[hidden\]\n {2}\+ impl \(Synthesis: no latch, at most 4 flip-flops\): AC Accepted, 10 \/ 10\n/);
   L = await look();
-  assert.deepEqual(L.tests.slice(1).map((r) => r.split(' | ').slice(3).join(' | ')), ['30 / 30 | AC', '40 / 40 | AC', '20 / 20 | AC', '0 / 10 | –']);
-  assert.equal(L.status, '4 test(s), 2 visible · 90 / 100 points');
+  assert.deepEqual(L.tests.slice(1).map((r) => r.split(' | ').slice(3).join(' | ')), ['30 / 30 | AC', '40 / 40 | AC', '20 / 20 | AC', '10 / 10 | AC']);
+  assert.equal(L.status, '4 test(s), 2 visible · 100 / 100 points');
+  // the synthesis test past its limit: Resource / Timing Limit, the numbers said (the teacher's edit, then back)
+  await page.click(`${D} .ex-test`, { index: 3 });
+  await page.fill(`${D} [data-prop="test-ffs"]`, '2');
+  await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
+  out = await runTests(false);
+  assert.match(out, / {2}- impl \(Synthesis: no latch, at most 4 flip-flops\): RL Resource \/ Timing Limit, 0 \/ 10\n {6}4 flip-flops, at most 2\nProcess "Run Visible Tests" completed: 30 \/ 40 points\./);
+  await page.fill(`${D} [data-prop="test-ffs"]`, '4');
+  await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
 
   // the teacher's edits: the selected test's points (saved), a test added then deleted, the ports from the top
   await page.click(`${D} .ex-test`, { index: 0 });
