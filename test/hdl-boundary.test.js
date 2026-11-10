@@ -21,7 +21,7 @@ const FRONT_END = new Set([
   'core/native.js', 'core/util.js', 'core/values.js',
   'core/synth-module.js', 'core/synth-operators.js', 'core/synth-stmts.js', 'core/synth-tables.js',
   'core/synth-values.js', 'core/synth-verilog.js',
-  'core/unisim-s6.js', 'core/unisim.js',
+  'core/unisim-jtag.js', 'core/unisim-s6.js', 'core/unisim.js',
   'core/verilog/lexer.js', 'core/verilog/parser-defs.js', 'core/verilog/parser-exprs.js',
   'core/verilog/parser-assert.js', 'core/verilog/parser-items.js', 'core/verilog/parser-stmts.js', 'core/verilog/parser.js',
   'core/vhdl/actual.js', 'core/vhdl/labels.js', 'core/vhdl/lexer.js', 'core/vhdl/math-real.js', 'core/vhdl/nodes.js',

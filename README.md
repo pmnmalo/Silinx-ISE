@@ -556,7 +556,9 @@ implement, bitstream, timing, power, pins, the simulation models: the Silinx too
 MCP server made or imported runs ISE, or programs a board or a PROM, only once you trust it in the interface: *Trust Project*, #2981) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
 statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
-checked on the project and recorded, as *Guided Labs…* does; a lab restarted) and `timing_paths` (the Silinx toolchain's,
+checked on the project and recorded, as *Guided Labs…* does; a lab restarted), `capture_settings` (the logic analyzer's
+capture: the signals of the design to watch on the board, the clock, the depth, the trigger, checked on the design with the block
+RAMs it takes) and `timing_paths` (the Silinx toolchain's,
 Xilinx ISE's or AMD Vivado's slowest paths, as the Static Timing Report's Paths panel: a path's stages, their delays against the PERIOD, and the
 source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from; with `from` and `to`, the worst paths between two registers). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
