@@ -46,6 +46,8 @@ const SAME = [
   ['new test bench', 'create test bench (wizard)'],   // Simulate's New Test Bench…: the Test Bench wizard
   ['import test bench', 'add copy of source'],   // Simulate's Import Test Bench…: a source imported
   ['add copy to project', 'add copy of source'],   // the Silinx interface's Files page: Add Copy to Project… (#1214)
+  // the Silinx header's Split button; the ISE style's View ▸ Split Editor, its toolbar's right end a shared project's (#3315)
+  ['split the editor: two documents side by side, each side with its tabs', 'split editor'],
 ];
 
 // the differences that are the interfaces' own: [the interface that alone has it, its key, why]
