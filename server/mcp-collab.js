@@ -108,6 +108,8 @@ export const COLLAB_TOOLS = [
       let l;
       try { l = parseFollowLink(link); } catch (e) { throw toolError(e.message); }
       if (!l || !l.base) throw toolError('link: a link to follow (http(s)://…/#follow=…)');
+      // (a room the owner's page hosts, #3227: reached over WebRTC, which this server has not)
+      if (l.via === 'host') throw toolError('link: a project its owner\'s page hosts (…#follow=….host) is followed in a browser, over WebRTC: open the link in Silinx');
       const origin = serverOf(l.base);
       let cur = follows.get(l.room);
       if (cur?.session.closed()) { follows.delete(l.room); cur = null; }
