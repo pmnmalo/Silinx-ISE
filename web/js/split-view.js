@@ -14,8 +14,10 @@ import { relatedViews } from './related-views.js';
 import { DESIGN_ICON, taskOfDoc } from './tasks.js';
 import { prefKey } from './prefs.js';
 import { moveTab, mountTabOrder, orderTabs } from './tab-order.js';
+import { mountTabSight } from './tab-sight.js';
 
 export { tabTip } from './tab-order.js';
+export { tabInSight } from './tab-sight.js';
 
 const RATIO_KEY = 'silinx.split.ratio';
 const NARROW = 720;   // (a workspace narrower than this: the sides one above the other)
@@ -284,4 +286,4 @@ function drag(e) {
 }
 
 /** On the page from the start: the Split button. */
-export function mountSplit() { placeButton(); mountTabOrder(); const ws = $('workspace'); if (ws) watch(ws); }
+export function mountSplit() { placeButton(); mountTabOrder(); mountTabSight(); const ws = $('workspace'); if (ws) watch(ws); }
