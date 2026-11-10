@@ -32,19 +32,27 @@ export function logGitError(e) {
 }
 
 // ------------------------------------------------------------------ the status and the Design pane's marks
-let timer = null, asked = 0;
+let timer = null, seq = 0, newest = null;
 /** The project's status read again soon (several writes in a row: once). */
 export function scheduleGitStatus(ms = 400) {
   if (api.standalone || enabled === false || !S.project) return;
   clearTimeout(timer);
   timer = setTimeout(() => refreshGitStatus(), ms);
 }
-export async function refreshGitStatus() {
+/** The project's status read again: S.git ({ files, byPath, branch… } or null), the Design pane's marks drawn again. A
+ *  read that a later one overtakes gives the later one's answer (Commit… asks while a save's read is in flight). */
+export function refreshGitStatus() {
+  const n = ++seq;
+  const run = readStatus(n).then(r => (n === seq ? r : newest));
+  newest = run;
+  return run;
+}
+async function readStatus(n) {
   if (!await gitAvailable() || !S.project) { S.git = null; return null; }
-  const name = S.project.name, n = ++asked;
+  const name = S.project.name;
   let s;
   try { s = await api.gitStatus(name); } catch { s = null; }
-  if (n !== asked || S.project?.name !== name) return null;   // (a later one, or another project, wins)
+  if (n !== seq || S.project?.name !== name) return null;   // (a later read, or another project: not this answer)
   const before = JSON.stringify(S.git?.files || []);
   S.git = s?.repository ? { ...s, byPath: new Map(s.files.map(f => [f.path, f.state])) } : null;
   if (JSON.stringify(S.git?.files || []) !== before) renderHierarchy();
