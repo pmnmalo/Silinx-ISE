@@ -3,19 +3,25 @@
 // owner's answer, exchanged as codes (core/collab-codes.js: sealed with the link's key, so only someone with the link
 // connects, and the codes reveal no address to whoever carries them); each description is gathered whole (its network
 // candidates in it, no trickle), through a public STUN server for the addresses behind a NAT. Over the channel go the
-// room's messages, as over the relay's WebSocket: sealed frames and the control's JSON (core/collab-client.js).
+// room's messages, as over the relay's WebSocket: sealed frames and the control's JSON (core/collab-client.js); a frame
+// larger than a data channel's message goes as parts, joined again at the other end (core/collab-frag.js).
 //   followerOffer({ key, room }) -> { code, accept(answerCode) -> the channel, open; close() }
 //   ownerAnswer({ key, room, code }) -> { code (the answer), channel (a promise: the channel, open), close() }
 //   channelSocket(dc, pc): a channel as a WebSocket (followRoom's); channelEnd(dc, pc): as a room's socket (the host's)
 import { prefKey } from './prefs.js';
 import { sealCode, openCode } from '/core/collab-codes.js';
 import { keyOf } from '/core/collab-crypto.js';
+import { splitFrame, frameJoiner } from '/core/collab-frag.js';
 
 /** The STUN servers: a public one, or this browser's own list (JSON, [] for none: a classroom's one network). */
 export const STUN_KEY = prefKey('silinx.collab.stun');
 export const STUN = Object.freeze(['stun:stun.l.google.com:19302']);
 const LABEL = 'silinx-collab';
 const GATHER_MS = 4000, CONNECT_MS = 60_000;
+// (a frame joined again at most: the owner's, the whole project, as on the relay; a follower's, an editor's largest)
+const OWNER_MAX = 16 << 20, FOLLOWER_MAX = 2 << 20;
+// a channel's sending: a frame in parts when it is larger than a message
+const sendOn = (dc, d) => { if (typeof d === 'string') dc.send(d); else for (const p of splitFrame(d)) dc.send(p); };
 
 function iceServers() {
   let list = STUN;
@@ -88,8 +94,14 @@ export function channelSocket(dc, pc) {
   const ws = new EventTarget();
   const fire = (type, props = {}) => ws.dispatchEvent(Object.assign(new Event(type), props));
   Object.defineProperty(ws, 'readyState', { get: () => STATES[dc.readyState] });
-  Object.assign(ws, { binaryType: 'arraybuffer', protocol: '', send: d => dc.send(d), close: () => { dc.close(); pc?.close(); } });
-  dc.addEventListener('message', e => fire('message', { data: e.data }));
+  Object.assign(ws, { binaryType: 'arraybuffer', protocol: '', send: d => sendOn(dc, d), close: () => { dc.close(); pc?.close(); } });
+  const join = frameJoiner(OWNER_MAX);
+  dc.addEventListener('message', e => {
+    if (typeof e.data === 'string') { fire('message', { data: e.data }); return; }
+    let f;
+    try { f = join.push(new Uint8Array(e.data)); } catch { ws.close(); return; }
+    if (f) fire('message', { data: f.buffer.byteLength === f.length ? f.buffer : f.slice().buffer });
+  });
   dc.addEventListener('close', () => fire('close', { code: 1000, reason: '' }), { once: true });
   dc.addEventListener('error', () => fire('error'));
   if (dc.readyState === 'open') setTimeout(() => fire('open'), 0);
@@ -101,9 +113,15 @@ export function channelSocket(dc, pc) {
 export function channelEnd(dc, pc) {
   const end = { onmessage: () => {}, onclose: () => {} };
   Object.defineProperty(end, 'readyState', { get: () => STATES[dc.readyState] });
-  end.send = d => { if (dc.readyState === 'open') dc.send(d); };
+  end.send = d => { if (dc.readyState === 'open') sendOn(dc, d); };
   end.close = () => { dc.close(); pc?.close(); };
-  dc.addEventListener('message', e => end.onmessage(typeof e.data === 'string' ? e.data : new Uint8Array(e.data), typeof e.data !== 'string'));
+  const join = frameJoiner(FOLLOWER_MAX);
+  dc.addEventListener('message', e => {
+    if (typeof e.data === 'string') { end.onmessage(e.data, false); return; }
+    let f;
+    try { f = join.push(new Uint8Array(e.data)); } catch { end.close(); return; }
+    if (f) end.onmessage(f, true);   // (whole: the room's own limit then, a follower's)
+  });
   dc.addEventListener('close', () => end.onclose(), { once: true });
   return end;
 }
