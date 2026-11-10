@@ -25,7 +25,7 @@ if (job.type === 'reference') {
   let synth = null;
   const synthesize = async (sources, top, test) => {
     synth ||= await import('./grade-synth.js');
-    return synth.synthesize(sources, top, test, ex.device ? { device: ex.device } : {});
+    return synth.synthesize(sources, top, test, { ...(ex.device && { device: ex.device }), status: job.synthesis });
   };
   await gradeTests(ex, submission, { from: job.from || 0, vectors: job.vectors || {}, exerciseUnits, synthesize, prepared: prep,
     onStart: k => send({ type: 'start', k }), onTest: (k, result) => send({ type: 'test', k, result }) });

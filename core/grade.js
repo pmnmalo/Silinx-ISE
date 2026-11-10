@@ -92,7 +92,11 @@ export async function gradeTests(ex, submission, { visible = false, from = 0, ve
     else {
       const v = vectors[t.id];
       try { r = await runTest(ex, t, prep, { files, synthesize, project: submission.project || {}, vectors: v && (v.rows ? { ...v, problems: v.problems || [] } : testVectors(ex, t, { text: v.text })) }); }
-      catch (e) { r = t.kind === 'synthesis' ? { verdict: null, messages: [`the synthesis could not run: ${e.message}`] } : { verdict: 'RE', messages: [`the simulation failed: ${e.message}`] }; }
+      catch (e) {
+        // (the grader's own failure, not the submission's: a Grading Error, with what failed: a refused read names its path)
+        const why = `${e.message}${e.resource ? ` (${e.permission || 'access'} ${e.resource})` : ''}`;
+        r = t.kind === 'synthesis' ? { verdict: 'GE', messages: [`the synthesis could not run: ${why}`] } : { verdict: 'RE', messages: [`the simulation failed: ${why}`] };
+      }
     }
     const res = resultOf(t, r);
     out[k] = res;
