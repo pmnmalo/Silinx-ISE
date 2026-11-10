@@ -25,11 +25,20 @@ export const GIT_PT = {
   'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub…, kept in this browser only.':
     'Um repositório público abre-se tal como está; um privado (o de um trabalho do Classroom) depois de Iniciar sessão no GitHub…, guardada só neste navegador.',
   'GitHub repository (an empty one: where the commits go):': 'Repositório do GitHub (um vazio: para onde vão os commits):',
+  // the drawings' diffs and conflicts (#3197)
+  'Compare': 'Comparar', 'Resolve Conflicts': 'Resolver Conflitos', 'Mine': 'O meu', 'Theirs': 'O deles',
+  'Not there yet.': 'Ainda não existia.', 'Deleted.': 'Apagado.', 'Read-only': 'Só de leitura',
+  'as it is now': 'como está agora', 'before the first commit': 'antes do primeiro commit',
 };
 
 export const GIT_PT_PATTERNS = [
   [/^(\d+) commit\(s\), the newest first: a file opens as it was then, read only\.$/, '$1 commit(s), o mais recente primeiro: um ficheiro abre-se como era então, só de leitura.'],
   [/^Read-only, as it was in the commit ([0-9a-f]{7})( \(.+\))?$/, 'Só de leitura, como era no commit $1$2'],
+  [/^Read-only, as it is now$/, 'Só de leitura, como está agora'], [/^Read-only, before the first commit$/, 'Só de leitura, antes do primeiro commit'],
+  [/^(\d+) added$/, '$1 acrescentado(s)'], [/^(\d+) removed$/, '$1 removido(s)'], [/^(\d+) moved or changed$/, '$1 movido(s) ou alterado(s)'],
+  [/^(\d+) line\(s\) changed$/, '$1 linha(s) alterada(s)'],
+  [/^(\d+) object\(s\) changed both here and on GitHub: choose whose version each one keeps\. The rest of each drawing is merged by itself\.$/, '$1 objeto(s) alterado(s) aqui e no GitHub: escolha a versão que cada um mantém. O resto de cada desenho junta-se por si.'],
+  [/^Choose Mine or Theirs for (\d+) object\(s\) more\.$/, 'Escolha O meu ou O deles para mais $1 objeto(s).'],
   [/^(\d+) change\(s\) on (.+):$/, '$1 alteração(ões) em $2:'],
   [/^not a GitHub repository's address: (.*)$/, 'não é o endereço de um repositório do GitHub: $1'],
   [/^a GitHub Classroom invitation, not a repository$/, 'um convite do GitHub Classroom, não um repositório'],

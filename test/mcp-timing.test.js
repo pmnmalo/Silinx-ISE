@@ -34,7 +34,7 @@ const PATHS = { top: 'top', paths: [
 test('timing_paths: listed with the read-only tools; its schema', () => {
   const t = TOOLS.find(x => x.name === 'timing_paths');
   assert.equal(t.annotations.readOnlyHint, true);
-  assert.deepEqual(Object.keys(t.inputSchema.properties), ['project', 'count', 'path']);
+  assert.deepEqual(Object.keys(t.inputSchema.properties), ['project', 'count', 'path', 'from', 'to']);
   assert.deepEqual(t.inputSchema.required, ['project']);
 });
 
@@ -74,6 +74,28 @@ test('timing_paths: the list, one path\'s stages and highlight, count; none befo
   assert.deepEqual(sch.data.highlight.drawings, { 'src/gates.sch.json': want });
   assert.equal(sch.text.split('\n').at(-1), '  in src/gates.sch.json: symbol and_p1; wire p1');
   assert.equal((await ok('timing_paths', { project: 't1', path: 2 })).text.split('\n').at(-1), '  in src/gates.sch.json: none of its elements by name');
+  // between two registers: the pairs' worst paths from one and / or into one, by its name or its last part
+  const pair = (from, to, delay) => ({ ...PATHS.paths[0], from, to, delay, period: delay, slack: +(20 - delay).toFixed(3) });
+  const PAIRS = { top: 'top', paths: PATHS.paths, points: ['u_a.cnt', 'u_a.q', 'u_b.cnt'],
+    pairs: [pair('u_a.cnt', 'u_a.q', 3.3), pair('u_a.cnt', 'u_b.cnt', 2.5), pair('u_b.cnt', 'u_a.q', 2.9)] };
+  fs.writeFileSync(path.join(P.projectDir('t1'), 'build', 'open', 'paths.json'), JSON.stringify(PAIRS));
+  const fromA = await ok('timing_paths', { project: 't1', from: 'u_a.cnt' });
+  assert.deepEqual(fromA.data.paths.map(p => [p.fromRegister, p.toRegister, p.delay, p.from]), [['u_a.cnt', 'u_a.q', 3.3, 'a.XQ'], ['u_a.cnt', 'u_b.cnt', 2.5, 'a.XQ']]);
+  assert.deepEqual([fromA.data.from, fromA.data.to, fromA.data.registers], ['u_a.cnt', undefined, PAIRS.points]);
+  assert.equal(fromA.text.split('\n')[0], 'path 1: u_a.cnt -> u_a.q (a.XQ -> b.F1), clock clk: 3.300 ns, required 20.000 ns, slack 16.700 ns');
+  assert.deepEqual((await ok('timing_paths', { project: 't1', to: 'q' })).data.paths.map(p => p.fromRegister), ['u_a.cnt', 'u_b.cnt'], 'into u_a.q, by its last part; slowest first');
+  const both = await ok('timing_paths', { project: 't1', from: 'u_b.cnt', to: 'u_a.q', path: 1 });
+  assert.deepEqual([both.data.path.number, both.data.path.from, both.data.path.to, both.data.path.delay], [1, 'u_b.cnt', 'u_a.q', 2.9]);
+  assert.equal((await ok('timing_paths', { project: 't1', from: 'u_b.cnt', to: 'u_b.cnt' })).text, 'No path from u_b.cnt to u_b.cnt in \'t1\'.');
+  await fails('timing_paths', { project: 't1', from: 'u_b.cnt', to: 'u_b.cnt', path: 1 }, 'path: no path from u_b.cnt to u_b.cnt');
+  await fails('timing_paths', { project: 't1', from: 'cnt' }, 'from: \'cnt\' is several registers: u_a.cnt, u_b.cnt');
+  await fails('timing_paths', { project: 't1', to: 'nope' }, 'to: no register \'nope\' (the registers: u_a.cnt, u_a.q, u_b.cnt)');
+  await fails('timing_paths', { project: 't1', from: 'u_a.cnt', path: 3 }, 'path: from 1 to 2');
+  // (the slowest paths as before when neither is given)
+  assert.equal((await ok('timing_paths', { project: 't1', from: '' })).data.paths.length, 2);
+  // an older analysis: no registers
+  fs.writeFileSync(path.join(P.projectDir('t1'), 'build', 'open', 'paths.json'), JSON.stringify(PATHS));
+  await fails('timing_paths', { project: 't1', from: 'u_a.cnt' }, 'from: the timing paths of \'t1\' name no registers (an older analysis): run_process timing again');
   // no path to time (a design with no two flip-flops on a clock)
   fs.writeFileSync(path.join(P.projectDir('t1'), 'build', 'open', 'paths.json'), JSON.stringify({ top: 'top', paths: [] }));
   assert.equal((await ok('timing_paths', { project: 't1' })).text, 'No path between two flip-flops of a clock to time in \'t1\'.');
@@ -101,4 +123,12 @@ test('timing_paths on blinky after run_process timing: the timing report\'s crit
   assert.deepEqual(Object.keys(one.data.highlight.drawings), ['src/speed_ctrl.asm.json']);
   assert.ok(asm.some(x => x.type === 'node' && x.label === 'ticks >= (1 << level) - 1'), JSON.stringify(asm));
   assert.match(one.text, /^ {2}in src\/speed_ctrl\.asm\.json: box level != 0; .*box ticks >= \(1 << level\) - 1; /m);
+  // between two of its registers: speed_ctrl's level into its ticks, the slowest path's (the same delay)
+  assert.ok(list.data.registers.includes('u_speed.level') && list.data.registers.includes('u_speed.ticks'));
+  const lt = await ok('timing_paths', { project: 'b1', from: 'level', to: 'ticks' });
+  assert.deepEqual(lt.data.paths.map(p => [p.fromRegister, p.toRegister]), [['u_speed.level', 'u_speed.ticks']]);
+  assert.equal(lt.data.paths[0].delay, list.data.paths[0].delay);
+  // (each register's worst path into ticks no slower than the slowest into it)
+  const into = await ok('timing_paths', { project: 'b1', to: 'u_speed.ticks', count: 100 });
+  assert.ok(into.data.paths.length > 1 && into.data.paths.every(p => p.toRegister === 'u_speed.ticks' && p.delay <= lt.data.paths[0].delay));
 });

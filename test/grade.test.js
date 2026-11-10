@@ -55,7 +55,7 @@ test('#3192 the exercise: a right one has no problem; each kind of wrong one say
     'e.exercise.json: test 3: "files": a list of { "path", "text" } (or { "path", "file" })',
     'e.exercise.json: test 4: "luts": a whole number from 0',
     'e.exercise.json: test 4: "latches": true or false',
-    'e.exercise.json: test 5: "kind": one of vectors, reference, testbench, synthesis, check',
+    'e.exercise.json: test 5: "kind": one of vectors, reference, testbench, synthesis, equivalence, check',
   ]);
   // (the guided labs' check kinds, core/labs-check.js: whatever kinds it has, #3179)
   const KINDS = Object.keys(CHECKS).join(', ');

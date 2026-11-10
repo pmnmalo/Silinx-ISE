@@ -428,6 +428,11 @@ On your computer or a Silinx server, a project can live in a GitHub repository, 
   they were.
 - **The Design pane** marks what changed (M) or is new (N) since the last commit.
 - **History…** lists the commits, and opens a file as it was in one, read only.
+- **Compare** (in History… and Commit…) shows a drawing's two versions side by side, what was added, removed, moved
+  or changed marked on them, and an HDL file's lines side by side.
+- **A drawing changed on both sides** is merged by its objects on Pull, never as text, and its HDL made again; for an
+  object both sides changed, Pull asks whose version it keeps (Mine or Theirs), and checks the result as Check Drawing
+  does.
 - **Initialize Repository…** makes a repository of a project, with a `.gitignore` that leaves `build/` and the tools'
   outputs out.
 
@@ -551,7 +556,7 @@ MCP server made or imported runs ISE, or programs a board or a PROM, only once y
 statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
 checked on the project and recorded, as *Guided Labs…* does; a lab restarted) and `timing_paths` (the Silinx toolchain's
 slowest paths, as the Static Timing Report's Paths panel: a path's stages, their delays against the PERIOD, and the
-source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from). The projects are those of the Project Navigator
+source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from; with `from` and `to`, the worst paths between two registers). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
 the same), so what the assistant does is seen in the interface when the project is opened again.
 Every path stays inside its project; programming a board is not one of its tools; the ISE machine's

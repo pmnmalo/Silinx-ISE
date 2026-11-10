@@ -8,6 +8,8 @@
 //              lines: [{ file, line }] }]
 //   pathsText(r)                                            // the paths as text (the MCP's timing_paths)
 //   pathHighlight(r.paths[i])                               // what Show Path highlights: { files, insts, sites, nets }
+//   (between: true) r.points [the registers: a flip-flop's named signal], r.pairs [the worst path of each two, as r.paths'
+//              with from, to]; betweenPaths(r, from, to)  // those from a register and / or into one, slowest first
 //
 // Back to the source: an instance of the routed design (a slice, a block RAM, a multiplier) holds Yosys's cells (its
 // cfg's `F:<cell>:#LUT`, `FFY:<cell>:#FF`, the names' ':' written '_'); a cell's `src` attribute points into the flat
@@ -149,14 +151,14 @@ function signalCells(inst, s, cells) {
  * The n slowest paths (sta.paths(n), the worst into each end) as stages, back to the source. opts: { n (10), periods
  * (checkPeriods' results: each clock's PERIOD), netlist (Yosys's JSON), synText (<top>_syn.v), top }.
  */
-export function timingPaths(sta, design, { n = 10, periods = [], netlist = null, synText = '', top = '' } = {}) {
+export function timingPaths(sta, design, { n = 10, periods = [], netlist = null, synText = '', top = '', between = false } = {}) {
   const insts = new Map(design.insts.map(i => [i.name, i]));
   const netInto = new Map();
   for (const net of design.nets) for (const p of net.inpins) netInto.set(`${p.inst}\u0000${p.pin}`, net.name);
   const sourcesOf = cellSources(netlist, synText, top);
   const req = new Map(periods.filter(c => c.clock && !c.missing).map(c => [c.clock, c]));
   const r3 = x => +x.toFixed(3);
-  const paths = (sta.paths ? sta.paths(n) : []).map(p => {
+  const asPath = p => {
     const c = req.get(p.clock);
     const required = c ? (p.half ? c.required / 2 : c.required) : null;
     const stages = p.path.map(s => {
@@ -173,13 +175,43 @@ export function timingPaths(sta, design, { n = 10, periods = [], netlist = null,
     for (const s of stages) for (const x of s.sources) { const k = `${x.file}:${x.line}`; if (!seen.has(k)) { seen.add(k); lines.push({ file: x.file, line: x.line }); } }
     return { clock: p.clock, port: c?.port ?? null, required, delay: r3(p.delay), period: r3(p.period), half: p.half,
       slack: required == null ? null : r3(required - p.delay), stages, lines };
-  });
-  return { top, paths };
+  };
+  const paths = (sta.paths ? sta.paths(n) : []).map(asPath);
+  if (!between || !sta.paths) return { top, paths };
+  // the paths between two points (#3178): a point is a register, the named signal of a flip-flop (its instance's name
+  // when it has none); the worst path from each to each other it reaches
+  const memo = new Map();
+  const pointsOf = ({ inst, pin }) => {
+    const k = `${inst}\u0000${pin}`;
+    if (!memo.has(k)) {
+      const i = insts.get(inst), lane = pinLane(pin);
+      const flops = (i?.cfg || []).filter(c => c.name && isFlop(c) && (!lane || belLane(c.attr) === lane)).map(c => c.name);
+      const sigs = [...new Set(flops.flatMap(sourcesOf.signals))];
+      memo.set(k, sigs.length ? sigs : [inst]);
+    }
+    return memo.get(k);
+  };
+  const starts = new Set(sta.pins ? sta.pins().starts.flatMap(pointsOf) : []);
+  const pairs = [];
+  for (const a of [...starts].sort()) {
+    const worst = new Map();
+    for (const q of sta.paths(Infinity, { from: x => pointsOf(x).includes(a) })) for (const b of pointsOf(q.path.at(-1))) if (!worst.has(b) || q.period > worst.get(b).period) worst.set(b, q);
+    for (const [b, q] of [...worst].sort((x, y) => y[1].period - x[1].period)) pairs.push({ from: a, to: b, ...asPath(q) });
+  }
+  return { top, paths, points: [...new Set(pairs.flatMap(p => [p.from, p.to]))].sort(), pairs };
+}
+
+/** The paths between two registers (#3178, timingPaths' pairs: their worst paths, from `from` and into `to`, either ''
+ *  for any register), slowest first. */
+export function betweenPaths(r, from = '', to = '') {
+  return (r.pairs || []).filter(p => (!from || p.from === from) && (!to || p.to === to)).sort((a, b) => b.period - a.period);
 }
 
 /** The paths as text: one line per path, then its stages when `detail` (the index of one path). */
 export function pathsText(r, detail = null) {
-  const head = (p, i) => `path ${i + 1}: ${p.stages[0].inst}.${p.stages[0].pin} -> ${p.stages.at(-1).inst}.${p.stages.at(-1).pin}, clock ${p.clock}${p.half ? ' (between its two edges)' : ''}: ${p.delay.toFixed(3)} ns${p.required == null ? ' (no PERIOD constraint)' : `, required ${p.required.toFixed(3)} ns, slack ${p.slack.toFixed(3)} ns`}`;
+  const ends = p => `${p.stages[0].inst}.${p.stages[0].pin} -> ${p.stages.at(-1).inst}.${p.stages.at(-1).pin}`;
+  // (a path between two registers: their names first)
+  const head = (p, i) => `path ${i + 1}: ${p.from ? `${p.from} -> ${p.to} (${ends(p)})` : ends(p)}, clock ${p.clock}${p.half ? ' (between its two edges)' : ''}: ${p.delay.toFixed(3)} ns${p.required == null ? ' (no PERIOD constraint)' : `, required ${p.required.toFixed(3)} ns, slack ${p.slack.toFixed(3)} ns`}`;
   if (detail == null) return r.paths.map(head);
   const p = r.paths[detail];
   return [head(p, detail), ...p.stages.map(s => `  ${s.kind.padEnd(12)} ${s.delay.toFixed(3).padStart(7)} ${s.arrival.toFixed(3).padStart(8)}  ${s.inst}.${s.pin}${s.site ? ` (${s.site})` : ''}${s.net ? `, net ${s.net}` : ''}${s.sources.length ? `  <- ${s.sources.map(x => `${x.file}:${x.line}`).join(', ')}` : ''}`)];

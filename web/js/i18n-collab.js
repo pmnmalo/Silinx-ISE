@@ -1,5 +1,6 @@
 // Portuguese strings of a shared project (#3181): Share Project… (web/js/collab-share.js), following one
-// (web/js/collab-follow.js), who is in it (web/js/collab-presence.js), the follower's notice (web/js/collab-state.js);
+// (web/js/collab-follow.js), who is in it (web/js/collab-presence.js), the follower's notice (web/js/collab-state.js),
+// a room the owner's page hosts (web/js/collab-host.js);
 // merged into the dictionary of i18n.js. (The console's lines are not translated, as every tool's output.)
 export const COLLAB_PT = {
   'Share Project…': 'Partilhar Projeto…', 'Share Project': 'Partilhar Projeto', 'Share': 'Partilhar',
@@ -12,6 +13,15 @@ export const COLLAB_PT = {
     'Outros seguem este projeto em direto com a sua ligação, só de leitura: os ficheiros e os desenhos à medida que mudam, o editor que tem aberto e o seu cursor. As compilações não são partilhadas.',
   'This link follows a project someone shares: you see its files and drawings as they change, read only, and where its owner is.':
     'Esta ligação segue um projeto que alguém partilha: vê os ficheiros e os desenhos à medida que mudam, só de leitura, e onde está o seu dono.',
+  // (a room the owner's page hosts, #3227: web/js/collab-host.js)
+  'Add a Follower…': 'Adicionar um Seguidor…', 'Add a Follower': 'Adicionar um Seguidor', 'Connect': 'Ligar',
+  'Connect to the Owner': 'Ligar ao Dono', 'Copy Code': 'Copiar Código', 'Your code:': 'O seu código:', 'The owner\'s code:': 'O código do dono:',
+  'A follower gets a code when they open the link: paste it here.': 'Um seguidor recebe um código ao abrir a ligação: cole-o aqui.',
+  'Send this code back to the follower: they paste it to connect.': 'Envie este código de volta ao seguidor: ele cola-o para se ligar.',
+  'The owner\'s page shares this project itself. Send them your code (Add a Follower…, in their toolbar), then paste the code they send back.':
+    'A página do dono partilha este projeto ela própria. Envie-lhe o seu código (Adicionar um Seguidor…, na barra de ferramentas dele) e cole depois o código que ele lhe enviar.',
+  'This page hosts it: each follower sends you a code when they open the link, which Add a Follower… takes.':
+    'Esta página aloja-o: cada seguidor envia-lhe um código ao abrir a ligação, que Adicionar um Seguidor… recebe.',
 };
 
 export const COLLAB_PT_PATTERNS = [

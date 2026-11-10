@@ -1,13 +1,14 @@
 // Automatic grading (#3191, #3192), as Mooshak does for programming: a submission's design is checked (it compiles, its
 // top is the statement's: core/grade-design.js), then each test of the exercise (core/grade-format.js) gives its
 // verdict and its points (core/grade-sim.js; the synthesis's through `synthesize`, the open synthesis where there is
-// one). A Compile Error or an Interface Error is every test's. gradeTests runs in one place, synchronously but for the
-// synthesis: server/grade-worker.js runs it in a worker with its limits, the interface on the student's own design.
-// Isomorphic.
+// one; the equivalence's through `yosys`, Yosys's run, core/verify.js). A Compile Error or an Interface Error is every
+// test's. gradeTests runs in one place, synchronously but for the synthesis and the equivalence: server/grade-worker.js
+// runs it in a worker with its limits, the interface on the student's own design. Isomorphic.
 import { VERDICTS, parseVectors, valueBits, limitsOf, testsOf, pointsOf, localize } from './grade-format.js';
 import { prepareDesign } from './grade-design.js';
 import { runVectors, runTestbench, randomRows, referenceRows } from './grade-sim.js';
 import { CHECKS } from './labs-check.js';
+import { verifyEquivalence, VERIFY_DEPTH } from './verify.js';
 
 export { VERDICTS };
 const LATCH_RE = /^"[^"]*" Line \d+: Found \d+-bit latch for signal/;
@@ -29,10 +30,15 @@ export function referenceVectors(ex, test) {
 }
 
 // a synthesis test from the open synthesis's results ({ errors, warnings, latches, luts, ffs, slices, notes: what it
-// could not check, as the slices without nextpnr's chip database, #3215 })
+// could not check, as the slices without nextpnr's chip database, #3215 }, { timedOut: its limit's seconds }, or the
+// test's { result } graded elsewhere)
 async function runSynthesis(ex, test, design, synthesize) {
   if (!synthesize) return { verdict: null, messages: ['the synthesis tests run where the open synthesis is (silinx grade, the server)'] };
   const r = await synthesize(design.sources, ex.top, test);
+  // (the test graded elsewhere: the local server's page asks its server, #3216)
+  if (r.result) return r.result;
+  // (the page's: its worker stopped at the test's time limit, #3216; the server's process is stopped instead)
+  if (r.timedOut) return { verdict: 'TLE', messages: [`the test took more than ${r.timedOut} s`] };
   if (r.errors?.length) return { verdict: 'NS', messages: r.errors.slice(0, 5) };
   const latches = Math.max(r.latches || 0, design.warnings.filter(w => LATCH_RE.test(w)).length ? 1 : 0);
   if (test.latches === false && latches) return { verdict: 'LI', messages: [...design.warnings.filter(w => LATCH_RE.test(w)), ...(r.latches ? [`the synthesis inferred ${r.latches} latch${r.latches > 1 ? 'es' : ''}`] : [])] };
@@ -42,6 +48,32 @@ async function runSynthesis(ex, test, design, synthesize) {
   const notes = r.notes || [];
   if (over.length) return { verdict: 'RL', messages: [...over, ...notes] };
   return { verdict: 'AC', messages: notes, used: { luts: r.luts, ffs: r.ffs, slices: r.slices, latches } };
+}
+
+// an equivalence test (#3217): the submission's top proved equivalent to the exercise's reference by Verify Equivalence
+// (core/verify.js, Yosys's SAT, `yosys` its run), the two compiled apart. The reference meets the submission only in
+// Yosys's miter, as netlists: nothing of the submission runs there, nothing reads a file. A difference: the first cycle
+// that differs, its outputs as a vectors test's, and the inputs that lead to it.
+async function runEquivalence(ex, test, design, yosys) {
+  if (!yosys) return { verdict: null, messages: ['the equivalence tests run where Yosys is (silinx grade, the server, the page)'] };
+  const referenceSources = (ex.reference?.files || []).map(f => ({ path: f.path, lang: /\.(vhd|vhdl)$/i.test(f.path) ? 'vhdl' : 'verilog', text: f.text }));
+  if (!referenceSources.length) return { verdict: null, messages: ['the exercise: an equivalence test needs the reference design'] };
+  // (Yosys failing, or giving no result, is the grader's: a Grading Error)
+  let failed = null;
+  const run = async (...a) => { try { return await yosys(...a); } catch (e) { failed = e; throw e; } };
+  const r = await verifyEquivalence(design.sources, { top: ex.top, reference: ex.top, referenceSources, depth: test.depth ?? VERIFY_DEPTH, run });
+  if (failed || (r.status === 'error' && r.log)) return { verdict: 'GE', messages: [`the equivalence check could not run: ${failed?.message || r.errors[0]}`] };
+  if (r.status === 'proved') return { verdict: 'AC', messages: [`equivalent to the reference for every input sequence (proved by induction over ${r.induction} clock cycle(s))`] };
+  if (r.status === 'bounded') return { verdict: 'AC', messages: [`no difference from the reference in the first ${r.depth} clock cycle(s) (not proved beyond them)`] };
+  if (r.status === 'failed') {
+    const last = r.cycles[r.cycle - 1], clocks = new Set(r.clocks.map(c => c.toLowerCase()));
+    // (the inputs in the statement's order, the clock's left out: one edge per cycle)
+    const names = ex.ports.filter(p => p.dir === 'in' && !clocks.has(p.name.toLowerCase())).map(p => p.name);
+    const inputs = c => names.map(n => [n, c.in[n] ?? c.in[Object.keys(c.in).find(k => k.toLowerCase() === n.toLowerCase())]]).filter(([, v]) => v !== undefined).map(([n, v]) => `${n}=${v}`).join(' ');
+    return { verdict: 'WA', messages: [`cycle ${r.cycle}: ${r.differs.map(n => `${n} is ${last.uut[n]}, expected ${last.ref[n]}`).join(', ')}`,
+      `the inputs, cycle by cycle: ${r.cycles.map((c, k) => `${k + 1}: ${inputs(c) || '-'}`).join('; ')}`] };
+  }
+  return { verdict: 'NS', messages: r.errors.slice(0, 5) };
 }
 
 // the submission as the guided labs' checks read a project (core/labs-check.js `io`): its silinx.json, its files, the
@@ -62,11 +94,12 @@ async function runChecks(test, io) {
 
 /** One test of a prepared design (prepareDesign): its { verdict, messages, detail? }. `project`: the submission's
  *  silinx.json (the check tests'). */
-export async function runTest(ex, test, design, { files = new Map(), vectors = null, synthesize = null, project = {} } = {}) {
+export async function runTest(ex, test, design, { files = new Map(), vectors = null, synthesize = null, yosys = null, project = {} } = {}) {
   const limits = limitsOf(ex, test);
   if (test.kind === 'testbench') return runTestbench(design.sources, test, { files, limits });
   if (test.kind === 'check') return runChecks(test, submissionIo(project, files, design));
   if (test.kind === 'synthesis') return runSynthesis(ex, test, design, synthesize);
+  if (test.kind === 'equivalence') return runEquivalence(ex, test, design, yosys);
   const vec = vectors || testVectors(ex, test);
   if (vec.problems.length) return { verdict: null, messages: vec.problems.map(m => `the exercise: ${m}`) };
   return runVectors(design.design, vec, { clock: test.clock, periodNs: test.periodNs ?? 20, files, limits });
@@ -80,7 +113,7 @@ const resultOf = (test, r) => ({ id: test.id, title: localize(test.title) || tes
  * reports them one by one, so that a test past its time limit is that test's). `vectors`: a test's by its id (the
  * reference tests' expected rows, a vectors test's file); `prepared`: the design's prepareDesign, made already. Returns { design: { verdict, messages, warnings }, tests }.
  */
-export async function gradeTests(ex, submission, { visible = false, from = 0, vectors = {}, synthesize = null, exerciseUnits, prepared = null, onTest = () => {}, onStart = () => {} } = {}) {
+export async function gradeTests(ex, submission, { visible = false, from = 0, vectors = {}, synthesize = null, yosys = null, exerciseUnits, prepared = null, onTest = () => {}, onStart = () => {} } = {}) {
   const tests = testsOf(ex, { visible });
   const prep = prepared || prepareDesign(ex, submission, { exerciseUnits });
   const design = { verdict: prep.verdict, messages: prep.messages, warnings: prep.warnings };
@@ -93,11 +126,11 @@ export async function gradeTests(ex, submission, { visible = false, from = 0, ve
     if (prep.verdict) r = { verdict: prep.verdict, messages: [] };
     else {
       const v = vectors[t.id];
-      try { r = await runTest(ex, t, prep, { files, synthesize, project: submission.project || {}, vectors: v && (v.rows ? { ...v, problems: v.problems || [] } : testVectors(ex, t, { text: v.text })) }); }
+      try { r = await runTest(ex, t, prep, { files, synthesize, yosys, project: submission.project || {}, vectors: v && (v.rows ? { ...v, problems: v.problems || [] } : testVectors(ex, t, { text: v.text })) }); }
       catch (e) {
         // (the grader's own failure, not the submission's: a Grading Error, with what failed: a refused read names its path)
         const why = `${e.message}${e.resource ? ` (${e.permission || 'access'} ${e.resource})` : ''}`;
-        r = t.kind === 'synthesis' ? { verdict: 'GE', messages: [`the synthesis could not run: ${why}`] } : { verdict: 'RE', messages: [`the simulation failed: ${why}`] };
+        r = t.kind === 'synthesis' || t.kind === 'equivalence' ? { verdict: 'GE', messages: [`the ${t.kind === 'synthesis' ? 'synthesis' : 'equivalence check'} could not run: ${why}`] } : { verdict: 'RE', messages: [`the simulation failed: ${why}`] };
       }
     }
     const res = resultOf(t, r);

@@ -9,12 +9,16 @@
 // GitHub moved meanwhile rejects it: Pull first). A pull is a merge of the files: one changed on GitHub only is taken,
 // one changed here only is kept, one changed on both sides is a conflict, and a conflict pulls nothing. Only the
 // project's text files are its own (what passes the import gate, core/import-gate.js); the repository's other files (its
-// hidden ones: .gitignore, .github; its binary ones) stay on GitHub as they are, never deleted by a commit.
+// hidden ones: .gitignore, .github; its binary ones) stay on GitHub as they are, never deleted by a commit. A drawing
+// changed on both sides is merged by its objects (#3197, core/git-resolve.js): at once when no object is in conflict,
+// else by the user's choices; its HDL file made from it again (projects.regenerate).
 // Isomorphic: the project's files and the meta are the caller's (adapters), GitHub's client core/github-api.js.
 import { GitHubError, HINT, blobSha, fromBase64, textOf } from './github-api.js';
 import { checkUrl, nameFromRepo } from './github-url.js';
 import { isOutput, GITIGNORE } from './git-ignore.js';
 import { gateEntries, gateMessages, GateError, GATE_LIMITS } from './import-gate.js';
+import { DRAWING_RE } from './drawing-merge.js';
+import { drawingConflicts, resolveConflict } from './git-resolve.js';
 
 export const GitError = GitHubError;
 export const PROJECT_FILE = 'silinx.json';
@@ -35,7 +39,7 @@ async function each(items, fn, n = 8) {
 
 /** The back end: client (core/github-api.js githubClient); projects: { exists(name), files(name) -> { path: text } (with
  *  silinx.json, as committed), create(name, files) (a clone: untrusted, the caller's), write(name, path, text),
- *  remove(name, path) }; meta: { get(name), set(name, m) }. */
+ *  remove(name, path), regenerate(name, drawing) (its HDL file made from it again) }; meta: { get(name), set(name, m) }. */
 export function restGit({ client, projects, meta }) {
   const { request, repo: R, pathOf } = client;
 
@@ -183,9 +187,32 @@ export function restGit({ client, projects, meta }) {
     return { project: name, branch: m.branch, remote: `${m.owner}/${m.repo}`, pushed: false };
   }
 
-  /** Pull GitHub's commits into the project (a merge of its files): { branch, upToDate, files }; a conflict pulls nothing
-   *  and is a GitError with its files. */
-  async function pull(name) {
+  // a blob's text (a drawing's version in a merge)
+  const blobText = async (m, sha) => {
+    if (!sha) return null;
+    const b = await request('GET', `${R(m.owner, m.repo)}/git/blobs/${sha}`);
+    return textOf(b.encoding === 'base64' ? fromBase64(b.content) : new TextEncoder().encode(b.content || ''));
+  };
+  // the drawings among a pull's conflicts merged by their objects: { merged: [{ path, text }], generated, pending, left }
+  async function mergeConflicts(m, head, mine, conflicts, resolve) {
+    const drawings = [], pending = [];
+    for (const p of conflicts.filter(x => DRAWING_RE.test(x))) {
+      const v = { base: await blobText(m, m.paths[p]?.remote), mine: mine[p] ?? null, theirs: await blobText(m, head.blobs[p]?.sha) };
+      const c = v.mine !== null && v.theirs !== null ? drawingConflicts(p, v.base, v.mine, v.theirs) : null;
+      if (!c) continue;
+      drawings.push({ ...c, v });
+      if (c.conflicts.length && !c.conflicts.every(x => resolve?.[p]?.[x.id] === 'mine' || resolve?.[p]?.[x.id] === 'theirs')) pending.push(c);
+    }
+    const generated = new Set();
+    for (const d of drawings) for (const t of [d.v.mine, d.v.theirs]) { try { const g = JSON.parse(t).generatedFile; if (g) generated.add(g); } catch { /* none */ } }
+    const left = conflicts.filter(p => !drawings.some(d => d.path === p) && !generated.has(p));
+    return { drawings, pending, left, generated: [...generated].filter(g => conflicts.includes(g)) };
+  }
+
+  /** Pull GitHub's commits into the project (a merge of its files): { branch, upToDate, files, resolved }; a conflict
+   *  (not a drawing's that its objects merge) pulls nothing and is a GitError with its files, and the drawings'
+   *  conflicts still to choose (`drawings`). resolve: { path: { id: 'mine' | 'theirs' } }. */
+  async function pull(name, { resolve = null } = {}) {
     const m = await need(name);
     const head = await headOf(m);
     if (!head) throw new GitError('git pull: the GitHub repository has nothing on this branch yet', 'The GitHub repository has nothing on this branch yet: Push first.', 409);
@@ -203,14 +230,31 @@ export function restGit({ client, projects, meta }) {
       if (changedHere) conflicts.push(p);
       else if (remote) take.push(p); else drop.push(p);
     }
+    conflicts.sort();
+    let merge = { drawings: [], generated: [] };
     if (conflicts.length) {
-      conflicts.sort();
-      throw new GitError(`git pull: a conflict in ${conflicts.join(', ')}: nothing was pulled, the project's files are as they were`,
-        'The same file changed here and on GitHub. Commit your version under another name, or ask the other author, then Pull again.', 409, { files: conflicts });
+      merge = await mergeConflicts(m, head, mine, conflicts, resolve);
+      if (merge.pending.length || merge.left.length) {
+        throw new GitError(`git pull: a conflict in ${conflicts.join(', ')}: nothing was pulled, the project's files are as they were`,
+          merge.left.length ? 'The same file changed here and on GitHub. Commit your version under another name, or ask the other author, then Pull again.'
+            : 'The same objects of a drawing changed here and on GitHub: choose mine or theirs for each, then Pull again.', 409, { files: conflicts, drawings: merge.pending });
+      }
+      for (const d of merge.drawings) {
+        try { d.out = await resolveConflict(d.path, d.v.base, d.v.mine, d.v.theirs, resolve?.[d.path] || {}); }
+        catch (e) { throw new GitError(`git pull: ${e.message}: nothing was pulled`, 'Choose the other side for an object, then Pull again.', e.status || 422, { files: conflicts }); }
+      }
     }
     const { files } = await fetchOwn(m, head.blobs, take);
     for (const p of take) if (files[p] !== undefined) await projects.write(name, p, files[p]);
     for (const p of drop) await projects.remove(name, p);
+    for (const d of merge.drawings) await projects.write(name, d.path, d.out.text);
+    for (const d of merge.drawings) await projects.regenerate?.(name, d.path);
+    // (what GitHub has of the merged files, as the project would hold it: the base of their change, which a commit pushes)
+    const theirsLocal = {};
+    for (const p of [...merge.drawings.map(d => d.path), ...merge.generated]) {
+      const t = merge.drawings.find(d => d.path === p)?.v.theirs ?? await blobText(m, head.blobs[p]?.sha);
+      if (t !== null) theirsLocal[p] = await blobSha(t);
+    }
     // the new base: a file taken from GitHub (or the same on both sides) at GitHub's; one changed here only keeps its
     // base, so that it stays a change (a file GitHub's version of which is no text of the project's: left out, as at
     // the clone)
@@ -218,8 +262,10 @@ export function restGit({ client, projects, meta }) {
     const paths = {};
     for (const [p, base] of Object.entries(m.paths)) if (head.blobs[p]?.sha === base.remote) paths[p] = base;
     for (const p of theirs) if (!paths[p] && after[p] !== undefined && (take.includes(p) || now[p] === head.blobs[p].sha)) paths[p] = { remote: head.blobs[p].sha, local: after[p] };
+    for (const [p, l] of Object.entries(theirsLocal)) paths[p] = { remote: head.blobs[p].sha, local: l };
     await meta.set(name, { ...m, commit: head.commit, tree: head.tree, paths, gitignore: !!head.blobs['.gitignore'] });
-    return { project: name, branch: m.branch, upToDate: false, files: [...take.filter(p => files[p] !== undefined), ...drop].sort() };
+    const resolved = merge.drawings.map(d => d.path);
+    return { project: name, branch: m.branch, upToDate: false, files: [...new Set([...take.filter(p => files[p] !== undefined), ...drop, ...resolved, ...merge.generated])].sort(), ...(resolved.length ? { resolved } : {}) };
   }
 
   /** The project's commits, the newest first: [{ commit, author, date, message, files }] (the subject: the first line). */

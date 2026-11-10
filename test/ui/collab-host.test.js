@@ -1,0 +1,92 @@
+// UI: a shared project hosted by the owner's page (#3227, the browser edition's way: no relay), two participants in one
+// test, in both interfaces: the owner shares the open project from their page (its link …#follow=<room>.<key>.host);
+// the follower opens the link (their name), gets their code (Connect to the Owner); the owner takes it (Add a
+// Follower…, in the presence's menu) and gives the answer's code; the follower pastes it: connected over WebRTC (two
+// pages of one browser, no STUN server: the same machine), the project read only, the owner's editor followed, an edit
+// arriving, the presence on both sides; a code that is not one refused at the owner's, in the console; Stop Sharing
+// tells the follower. The follower's page in Portuguese (the dialog's labels; the console is not translated). No
+// warnings but those asserted.
+import { before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { setupUi, uiTest, makeProject } from './harness.js';
+
+let env;
+before(async () => { env = await setupUi(); });
+after(async () => { await env?.teardown?.(); });
+const E = () => env;
+
+const TOP = 'library ieee;\nuse ieee.std_logic_1164.all;\n\nentity top is\n  port (a : in std_logic; y : out std_logic);\nend top;\n\narchitecture rtl of top is\nbegin\n  y <= not a;\nend rtl;\n';
+const BIG = `${'a line of the notes of a large project\n'.repeat(10500)}`;
+const warnings = async (page) => (await page.consoleText()).split('\n').map((l) => l.trim()).filter((l) => /^(WARNING|AVISO|ERROR|ERRO)/.test(l));
+// (no STUN server: the two pages on this machine reach each other by their own addresses)
+const noStun = (page) => page.eval(async () => { const { STUN_KEY } = await import('/js/collab-rtc.js'); localStorage.setItem(STUN_KEY, '[]'); });
+const dialogField = (page, field) => page.waitFor((f) => document.querySelector(`.dlg-overlay textarea[data-field=${f}]`)?.value || null, [field], { what: `the ${field}`, timeout: 15000 });
+
+uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, the follower connected over WebRTC, read only; an edit arrives; a wrong code refused; Stop Sharing; the follower in Portuguese', E, async (page) => {
+  // (a file of 400 KB: the owner's first message to a follower, the whole project, past a data channel's 256 KB)
+  await makeProject(env, { name: 'Hosted', top: 'top', files: { 'src/top.vhd': TOP, 'doc/notes.txt': BIG } });
+  await page.openProject('Hosted');
+  await noStun(page);
+  await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
+  const link = await page.eval(async () => { const m = await import('/js/collab-share.js'); await m.startSharing('Ana', { via: 'host' }); return m.sharedLink(); });
+  assert.match(link, /^http:\/\/[^/]+\/#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host$/);
+  await page.waitConsole(/^This page hosts the shared project: each follower sends you a code when they open the link \(Add a Follower…, in the toolbar, takes it\); it lasts while this page is open\.$/m);
+  // the follower opens the link: their name, then their code
+  const fp = await env.newPage(env.server.url);
+  try {
+    await fp.waitFor(() => window.SilinxApp && window.Silinx?.startupChecked, [], { what: 'app boot' });
+    await noStun(fp);
+    await fp.eval(() => localStorage.setItem('silinx.lang', 'pt'));
+    await fp.goto(`${new URL(link).origin}/?f=1${new URL(link).hash}`);
+    await fp.waitDialog('Seguir um Projeto Partilhado');
+    await fp.fill('.dlg-overlay input[data-field=name]', 'Rui');
+    await fp.dialogButton('Seguir');
+    await fp.waitDialog('Ligar ao Dono');
+    const code = await dialogField(fp, 'code');
+    assert.match(code, /^S1\.[A-Za-z0-9_-]+$/);
+    assert.deepEqual(await fp.eval(() => [...document.querySelectorAll('.dlg-overlay label, .dlg-overlay .collab-copy, .dlg-overlay .dlg-buttons .btn')].map((e) => e.textContent)),
+      ['O seu código:', 'Copiar Código', 'O código do dono:', 'Ligar', 'Cancelar']);
+    // a code that is not one, at the owner's: refused, in the console
+    await page.click('#toolbar .collab-btn');
+    await page.waitForSelector('body > .menu-popup');
+    await page.click('body > .menu-popup .mi', { text: 'Add a Follower…' });
+    await page.waitDialog('Add a Follower');
+    await page.fill('.dlg-overlay textarea[data-field=code]', 'S1.not-a-code');
+    await page.dialogButton('Connect');
+    await page.waitConsole(/^ERROR: Add a Follower: a follower's code is not of this shared project \(or not whole\)\.$/m);
+    // the follower's code, at the owner's: the answer's code
+    await page.click('#toolbar .collab-btn');
+    await page.waitForSelector('body > .menu-popup');
+    await page.click('body > .menu-popup .mi', { text: 'Add a Follower…' });
+    await page.waitDialog('Add a Follower');
+    await page.fill('.dlg-overlay textarea[data-field=code]', code);
+    await page.dialogButton('Connect');
+    const answer = await dialogField(page, 'answer');
+    assert.match(answer, /^S1\.[A-Za-z0-9_-]+$/);
+    await page.waitConsole(/^Add a Follower: send your code back to the follower; they are in once they paste it\.$/m);
+    await page.dialogButton('Close');
+    await page.waitNoDialog();
+    // the answer at the follower's: connected, the project read only, the owner's editor followed
+    await fp.fill('.dlg-overlay textarea[data-field=answer]', answer);
+    await fp.dialogButton('Ligar');
+    await fp.waitFor(() => window.Silinx?.project?.name === 'Hosted' && window.Silinx.startupChecked, [], { what: 'the hosted project open', timeout: 30000 });
+    await fp.waitFor(() => window.Silinx.active?.path === 'src/top.vhd', [], { what: 'the owner\'s editor followed' });
+    assert.equal(await fp.eval(() => window.Silinx.active.editor.getValue()), TOP);
+    assert.equal(await fp.eval(async () => (await (await import('/js/api.js')).api.readFile('Hosted', 'doc/notes.txt')).length), BIG.length);
+    assert.equal(await fp.eval(() => window.Silinx.active.editor.readOnly()), true);
+    assert.equal(await fp.eval(() => window.Silinx.active.el.querySelector('[data-follow-notice]')?.textContent), 'Só de leitura, a seguir o projeto de Ana');
+    await page.waitConsole(/^Rui follows your project "Hosted"\.$/m);
+    await page.waitFor(() => document.querySelector('#toolbar .collab-btn')?.textContent === 'Sharing (1)', [], { what: 'Sharing (1)' });
+    // an edit of the owner arrives
+    await page.eval(() => { const ed = window.Silinx.active.editor; ed.setCursor({ line: 0, ch: 0 }); ed.replaceSelection('-- by Ana\n'); });
+    await fp.waitFor((t) => window.Silinx.active.editor.getValue() === t, [`-- by Ana\n${TOP}`], { what: 'the edit arrived' });
+    // Stop Sharing: the follower told
+    await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());
+    await page.waitConsole(/^Stopped sharing "Hosted": its followers no longer see it\.$/m);
+    await fp.waitConsole(/^WARNING: Ana's project "Hosted" is no longer followed \(the owner stopped sharing\): what you see is as it was then\.$/m);
+    // the warnings and errors: the follower's end of sharing; the owner's refused code
+    assert.deepEqual(await warnings(fp), ['WARNING: Ana\'s project "Hosted" is no longer followed (the owner stopped sharing): what you see is as it was then.']);
+    assert.deepEqual(await warnings(page), ['ERROR: Add a Follower: a follower\'s code is not of this shared project (or not whole).']);
+    assert.deepEqual(fp.errors, []);
+  } finally { await fp.close(); }
+});
