@@ -50,7 +50,7 @@ export function scanPage(where, { menus = true, panes = true, editor = true } = 
   const mores = [...document.querySelectorAll('.tb-more-menu[hidden], .se-more-menu[hidden]')].filter((m) => shown(m.parentElement));
   for (const m of mores) m.hidden = false;
   try {
-    for (const e of document.querySelectorAll('button, .btn, [role=button], .tb-btn, .m-step, .task-btn, a.se-more, select, input[type=radio], input[type=checkbox]')) {
+    for (const e of document.querySelectorAll('button, .btn, [role=button], .tb-btn, .m-step, .task-btn, a.se-syminfo-more, select, input[type=radio], input[type=checkbox]')) {
       if (!shown(e) || e.closest('.dlg-overlay, .menu-popup, .pal-overlay, #doc-tabs')) continue;
       // (a radio button or a check box: by its label's text, its icon's left out)
       if (e.matches('input')) { add(placeOf(e), [...(e.closest('label')?.childNodes || [])].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('') || e.value); continue; }

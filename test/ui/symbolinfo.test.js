@@ -76,8 +76,17 @@ uiTest('Symbol Info: palette menu and More… link, placed symbol (F1, Propertie
   await page.click(`${ED} .se-symrow`, { text: 'DECODER' });
   await page.waitFor((sel) => /^DECODER: The 2:4 binary decoder activates exactly one of its 4 outputs/.test(document.querySelector(`${sel} .se-syminfo`).textContent), [ED], { what: 'info box' });
   assert.match(await page.eval((sel) => document.querySelector(`${sel} .se-syminfo`).textContent, ED), /More…$/);
+  // the link is drawn in the info box, after the summary, not over the toolbar's ⋮ menu (#3301)
+  const place = await page.eval((sel) => {
+    const r = (e) => e.getBoundingClientRect(), box = r(document.querySelector(`${sel} .se-syminfo`));
+    const link = r(document.querySelector(`${sel} .se-syminfo a`)), bar = r(document.querySelector(`${sel} .se-toolbar`));
+    const inBox = link.width > 0 && link.left >= box.left - 1 && link.right <= box.right + 1 && link.top >= box.top - 1 && link.bottom <= box.bottom + 1;
+    const overBar = link.left < bar.right && link.right > bar.left && link.top < bar.bottom && link.bottom > bar.top;
+    return { inBox, overBar, position: getComputedStyle(document.querySelector(`${sel} .se-syminfo a`)).position };
+  }, ED);
+  assert.deepEqual(place, { inBox: true, overBar: false, position: 'static' });
   await page.key('Escape');      // stop placing
-  await page.click(`${ED} .se-syminfo .se-more`);
+  await page.click(`${ED} .se-syminfo .se-syminfo-more`);
   await page.waitFor((d) => document.querySelector(d)?.dataset.type === 'decoder', [DLG], { what: 'D2_4E datasheet' });
   await waitTable(page, 'exhaustive');
   assert.deepEqual(await page.eval((d) => [...document.querySelectorAll(`${d} .sd-truth thead tr:last-child th`)].map((c) => c.textContent), DLG), ['A1', 'A0', 'E', 'D3', 'D2', 'D1', 'D0']);
