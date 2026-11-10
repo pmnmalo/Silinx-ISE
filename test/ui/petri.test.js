@@ -32,7 +32,7 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   assert.match(await count(), /2 places/);
   // the simulation: start is enabled but its guard (go) is false; go: it is ready, a click fires it
   await page.click(`${ED} [data-act=select]`);
-  await page.click(`${ED} .pn-tab-btn`, { text: 'Simulate' });
+  await page.click(`${ED} .pn-tab-btn`, { text: 'Try it' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-trans[data-id=t1]`)?.classList.contains('enabled'), [ED], { what: 'start enabled, guard false' });
   await page.click(`${ED} .pn-sim-ins input[type=checkbox]`);
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-trans[data-id=t1]`).classList.contains('ready'), [ED], { what: 'start ready' });
@@ -46,7 +46,7 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=1  work=0', [ED], { what: 'done fired at the clock step' });
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .pn-log`).textContent, ED), /clock: done/);
   // no </> HDL button (#2250): the HDL is the linked file
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['Simulate', '∑ Analysis']);
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['Try it', '∑ Analysis']);
   // the net is a module of the project with its HDL file, made with it (every source has its HDL, #207): Set as Top Module
   assert.match(await page.consoleText(), /src\/ctl\.vhd generated from src\/ctl\.pn\.json \(every source has its HDL\)/);
   await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'ctl'), [], { what: 'ctl in the hierarchy' });
@@ -57,7 +57,11 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   // in Portuguese
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
   await page.waitFor((ed) => [...document.querySelectorAll(`${ed} .pn-tool`)].some((b) => b.textContent.trim() === 'Lugar'), [ED], { what: 'the toolbar in Portuguese' });
+  // (Try it, as the schematic's: Experimentar, its button and its panel's title, #3295)
+  const tryIt = () => page.eval((ed) => [document.querySelector(`${ed} .pn-tab-btn`).textContent.trim(), document.querySelector(`${ed} .asm-codebar .asm-code-title`).textContent], ED);
+  assert.deepEqual(await tryIt(), ['Experimentar', 'Experimentar']);
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+  assert.deepEqual(await tryIt(), ['Try it', 'Try it']);
 });
 
 // a new net in a project, opened in the editor
@@ -159,7 +163,7 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
 
 uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (undone); the HDL file generated and kept in sync', E, async (page) => {
   await newNet(page, 'PnSim');
-  await page.click(`${ED} .pn-tab-btn`, { text: 'Simulate' });
+  await page.click(`${ED} .pn-tab-btn`, { text: 'Try it' });
   const marking = () => page.eval((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent, ED);
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=1  work=0', [ED]);
   // Random: go off, nothing can fire; go on: start fires

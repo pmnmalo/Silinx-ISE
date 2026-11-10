@@ -1,4 +1,4 @@
-// The ASM chart editor's Simulate panel (#2880), built as the state diagram's (fsm-bottom.js; its inputs' controls and
+// The ASM chart editor's Try it panel (#2880, named as the schematic's, #3295), built as the state diagram's (fsm-bottom.js; its inputs' controls and
 // its trace sim-panel.js's): the inputs and the reset, a clock edge (Clock ↑), Run and Stop at a chosen rate, a step
 // back, Reset; on the chart the present state, the decisions tested and the exits followed this cycle, the conditional
 // outputs reached and the next state (asm-render.js draws them from view()); the Moore and Mealy outputs, the registers
@@ -29,7 +29,7 @@ export function mountAsmSim({ M, btn, render, layout, destroyed, onErrors, simBt
   let folded = readFold();
 
   // ------------------------------------------------------------------------ the panel
-  const title = h('span', { class: 'asm-code-title' }, 'Simulation');
+  const title = h('span', { class: 'asm-code-title' }, 'Try it');
   const runBtn = btn('▶ Run', 'Apply clock edges at the chosen rate', () => { if (sim.timer) stop(); else run(); update(); }, 'asm-small asm-sim-run');
   const rateSel = h('select', { class: 'asm-select asm-sim-rate', title: 'Clock edges per second of Run',
     onchange: () => { sim.rate = Number(rateSel.value); if (sim.timer) { stop(); run(); } } },

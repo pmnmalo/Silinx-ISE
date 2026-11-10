@@ -1,5 +1,5 @@
 // The Petri net editor's toolbar (#405: out of mountPetriEditor in web/js/petri-editor.js, #3218): the tools (select,
-// place, transition, arc, inhibitor arc), Delete, the zoom, Check, Simulate, the ☰ Properties toggle, the ⋮ menu
+// place, transition, arc, inhibitor arc), Delete, the zoom, Check, Try it, the ☰ Properties toggle, the ⋮ menu
 // (Analysis, PNML export and import, through the import gate) and the link to its HDL; the status line of its counts.
 import { h, downloadText } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
@@ -25,7 +25,7 @@ export function mountPetriToolbar(ctx) {
   const delBtn = toolIcon('delete', 'del', 'Delete the selection (Del)', () => deleteSelection(), 'asm-danger');
   const checkBtn = toolWide('check', 'Check', 'Check the net for errors and warnings (its token game too: transitions that never fire, deadlocks)', () => opts.onCheck?.(check()), 'pn-check');
   const tabBtns = {
-    sim: toolWide('sim', 'Simulate', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
+    sim: toolWide('sim', 'Try it', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
     analysis: btn('∑ Analysis', 'Reachable markings, bounds, deadlocks, liveness, invariants', () => togglePanel('analysis'), 'pn-tab-btn'),
   };
   const pnmlIn = h('input', { type: 'file', accept: '.pnml,.xml', hidden: true });

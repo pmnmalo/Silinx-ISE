@@ -81,7 +81,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   signal (e.g. an `opcode`), one exit per value (`00100`, `0|1`, `others`), generated as a
   `case` statement; conditions can test bits and slices (`opcode[4]`, `opcode[4:3]`).
   Charts and schematics print on one page or tiled over several, or save as PNG / SVG.
-  *Simulate* steps through the chart: set its inputs (and its reset), apply clock edges (one, or *Run* at a chosen
+  *Try it* steps through the chart: set its inputs (and its reset), apply clock edges (one, or *Run* at a chosen
   rate; *Back* undoes one), and see the present state, the decisions tested and the exits followed, the conditional
   outputs reached and the next state drawn on the chart, its Moore and Mealy outputs, its registers and their next
   values, and the last cycles, exactly as its generated HDL behaves.
@@ -412,7 +412,7 @@ gists, which you list and delete on GitHub. Some slide tools cut a link longer t
 000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
 `…/Silinx/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
 (`…/Silinx/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
-is `try` (a schematic's Try it; a state diagram's Try it panel; a Petri net's or an ASM chart's Simulate panel), `simulate` (the test bench) or
+is `try` (the Try it of a schematic, a state diagram, a Petri net or an ASM chart), `simulate` (the test bench) or
 `emulate` (the board emulator); `top=` names the module (with `simulate`, the test bench). Opening a link makes a project named after the design;
 clicked again, that project is opened as it is when it has the same files, and one the student changed is replaced
 only when they say so. A zip from another site is fetched only once you agree (its address shown), and only from an

@@ -1,5 +1,5 @@
 // The MCP server's simulate_drawing (server/mcp-simulate-drawing.js, #2880, #2674): an ASM chart and a state diagram
-// stepped from their reset as their Simulate panels step them (the same core functions: core/asm-sim.js, core/fsm.js),
+// stepped from their reset as their Try it panels step them (the same core functions: core/asm-sim.js, core/fsm.js),
 // its text and its data; a drawing with errors, inputs that are not the drawing's, a file that is not such a drawing.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';

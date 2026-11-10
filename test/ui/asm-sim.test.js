@@ -1,4 +1,4 @@
-// UI (#2880): the ASM chart editor's Simulate panel (web/js/asm-sim.js), in both interfaces: the inputs and the reset,
+// UI (#2880): the ASM chart editor's Try it panel (#3295) (web/js/asm-sim.js), in both interfaces: the inputs and the reset,
 // Clock ↑, ▶ Run / ■ Stop at a chosen rate, ↶ Back, ⟲ Reset; on the chart the present state, the decisions tested and
 // the exits followed, the conditional outputs lit, the next state; the outputs and the registers; the trace; the panel
 // folded (kept when the chart is opened again; showPanel('sim'), as a design link's view=try opens it, #2881), closed,
@@ -54,14 +54,14 @@ async function openChart(page, name, model) {
   await page.waitFor((d) => document.querySelector(`${d} .asm-sim-btn`), [D], { what: 'the editor' });
 }
 
-uiTest('#2880 the ASM chart\'s Simulate panel: inputs, Clock ↑, Run / Stop, Back, Reset, the path on the chart, fold, narrow', E, async (page) => {
+uiTest('#2880 the ASM chart\'s Try it panel: inputs, Clock ↑, Run / Stop, Back, Reset, the path on the chart, fold, narrow', E, async (page) => {
   await page.setViewport(1600, 900);
   await openChart(page, 'AsmSim', tiny());
   await page.eval(() => { try { localStorage.removeItem('silinx.asm.sim.folded'); } catch { /* none */ } });
   await page.click(`${D} .asm-sim-btn`);
   await page.waitFor((p) => document.querySelector(p) && !document.querySelector(p).hidden, [P], { what: 'the panel' });
   assert.ok(await page.eval((d) => document.querySelector(`${d} .asm-sim-btn`).classList.contains('active'), D));
-  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-sim-btn`).closest('.asm-group').textContent, D), 'ValidateSimulate');
+  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-sim-btn`).closest('.asm-group').textContent, D), 'ValidateTry it');
   // the reset state, go = 0: d1 tested, its 0 exit to [y = 2] lit, back to IDLE
   assert.deepEqual(await shown(page), { state: 'IDLE', next: 'next clock edge → IDLE', outputs: ['busy = 0', 'y = 10'], registers: ['n = 000'],
     cur: ['s1'], next2: ['s1'], path: ['d1', 'o2'], lit: ['o2'], edges: ['e1', 'e3', 'e5'], trace: 0 });
@@ -149,7 +149,7 @@ uiTest('#2880 a chart with errors is not simulated: its errors in the console, t
   assert.deepEqual(await warningsOf(page), ['WARNING:ASM - "src/tiny.asm.json": Conditional output box \'y = 2\' cannot be reached from any state or every-cycle block']);
 });
 
-uiTest('#2880 the Simulate panel in Portuguese: every label translated', E, async (page) => {
+uiTest('#2880 the Try it panel in Portuguese: every label translated, named Experimentar (#3295)', E, async (page) => {
   await page.setViewport(1600, 900);
   await openChart(page, 'AsmSimPt', tiny());
   await page.eval(TEXTS);
@@ -161,6 +161,12 @@ uiTest('#2880 the Simulate panel in Portuguese: every label translated', E, asyn
   await setLang('en'); const en = await page.eval((p) => window.__uiTexts(document.querySelector(p)), P);
   await setLang('pt'); const pt = await page.eval((p) => window.__uiTexts(document.querySelector(p)), P);
   assert.deepEqual(untranslated(en, pt, SAME), []);
+  // (named as the schematic's: Try it, Experimentar, its button and its panel's title, #3295)
+  const names = () => page.eval((d, p) => [document.querySelector(`${d} .asm-sim-btn`).textContent.trim(), document.querySelector(`${p} .asm-code-title`).textContent], D, P);
+  assert.deepEqual(await names(), ['Experimentar', 'Experimentar']);
+  await setLang('en');
+  assert.deepEqual(await names(), ['Try it', 'Try it']);
+  await setLang('pt');
   assert.equal(await page.eval((p) => document.querySelector(`${p} .asm-sim-next`).textContent, P), 'próximo flanco de relógio → IDLE');
   assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-sim-btn`).title, D), 'Percorrer o fluxograma passo a passo: definir as entradas, aplicar flancos de relógio, ver o estado, o caminho seguido e as saídas');
   await setLang('en');
