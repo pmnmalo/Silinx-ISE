@@ -107,6 +107,8 @@ uiTest('#3289 FSM editor: the Encoding and the Coding Style choices of the ⋮ m
   const ENC = ['Encoding', '✓ Binary', 'Gray', 'One-hot', 'Enumerated'];
   const menu = async () => (await choices(page)).slice(-8);
   assert.deepEqual(await menu(), [...ENC, 'Coding Style', '✓ 3 processes', '2 processes']);
+  // a line above each title, Encoding's after the commands as Coding Style's after the encodings (#3306)
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .tb-more-menu .tb-menu-title`)].map((t) => getComputedStyle(t).borderTopStyle), ED), ['solid', 'solid']);
   const model = await page.eval(() => window.Silinx.active.fsmEditor.getModel());
   const hdl = (m) => generateFsm({ ...model, ...m }, 'vhdl', { source: 'traffic.fsm.json' }).code;
   const vhdl = async (want, what) => {
