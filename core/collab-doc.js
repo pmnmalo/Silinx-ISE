@@ -41,6 +41,40 @@ export function setText(yt, text) {
 
 const shareable = (path, text) => sharedPath(path) && typeof text === 'string' && text.length <= FILE_MAX;
 
+/** The text files an editor may change (#3182, phase 2): HDL, constraints, C / C++ (Silinx HLS), notes; never a
+ *  drawing (phase 3, #3183) nor the project's settings. */
+export const EDITABLE_RE = /\.(vhd|vhdl|v|vh|sv|ucf|xdc|c|cc|cpp|h|hpp|txt|md)$/i;
+export const editablePath = p => sharedPath(p) && EDITABLE_RE.test(String(p));
+
+/** An editor's change of an existing file's text (an error for a file an editor may not change, or too large): what
+ *  is deleted in one update, what is inserted in parts of `part` characters at most, each an update of its own, so
+ *  that each frame stays as small as a follower's must (core/collab-room.js; a pair of surrogates never split). */
+export function editFile(doc, path, text, { part = 8192 } = {}) {
+  const yt = doc.getMap('files').get(path);
+  if (!editablePath(path) || !(yt instanceof Y.Text)) throw new Error(`${path}: not a text file of the project that an editor can change`);
+  if (typeof text !== 'string' || text.length > FILE_MAX) throw new Error(`${path}: too large to share (${FILE_MAX >> 20} MB at most)`);
+  const old = yt.toString();
+  if (old === text) return false;
+  let a = 0;
+  const n = Math.min(old.length, text.length);
+  while (a < n && old.charCodeAt(a) === text.charCodeAt(a)) a++;
+  let b = 0;
+  while (b < n - a && old.charCodeAt(old.length - 1 - b) === text.charCodeAt(text.length - 1 - b)) b++;
+  // (the common ends not cut in a pair of surrogates)
+  if (a > 0 && /[\uD800-\uDBFF]/.test(old[a - 1])) a--;
+  if (b > 0 && /[\uDC00-\uDFFF]/.test(old[old.length - b])) b--;
+  if (old.length - a - b > 0) doc.transact(() => yt.delete(a, old.length - a - b));
+  const mid = text.slice(a, text.length - b);
+  for (let i = 0; i < mid.length;) {
+    let j = Math.min(mid.length, i + part);
+    if (j < mid.length && /[\uD800-\uDBFF]/.test(mid[j - 1])) j--;
+    const piece = mid.slice(i, j), at = a + i;
+    doc.transact(() => yt.insert(at, piece));
+    i = j;
+  }
+  return true;
+}
+
 /** A file's text in the document (a new path added; one that may not be shared, or too large, left out: false). */
 export function putFile(doc, path, text) {
   if (!shareable(path, text)) { dropFile(doc, path); return false; }
