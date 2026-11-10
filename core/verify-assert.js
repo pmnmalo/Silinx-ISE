@@ -15,6 +15,7 @@
 import { compile, simulate } from './compile.js';
 import { primitiveSources } from './unisim.js';
 import { toVerilog } from './synth-verilog.js';
+import { clocksOf } from './schematic.js';
 import { VERIFY_DEPTH, MAX_DEPTH, assertScript, readVerifyLog, moduleOf } from './verify.js';
 import { counterexampleBench, benchName, PERIOD } from './verify-bench.js';
 
@@ -71,14 +72,16 @@ export async function verifyAssertions(sources, { top, depth = VERIFY_DEPTH, run
   const out = { ...r, steps: r.cycle, errors: [], warnings: [...warnings, ...r.warnings], depth, top: uut.unit.name, reference: null,
     lang: uut.unit.lang, ports, clocks: uut.clocks, asserts, assumes, log: lines };
   if (r.status !== 'failed') return out;
-  // the counterexample replayed: the first assertion the simulator reports, its clock cycle (a clocked assertion fails
-  // at the rising edge of the cycle whose values it reads, which Yosys reports a cycle later)
+  // the counterexample replayed: the first assertion the simulator reports, and its clock cycle: a clocked assertion
+  // fails at the rising edge of the cycle whose values it reads (which Yosys reports a cycle later), a combinational one
+  // when its values change: at an input change, in that cycle, at a rising edge, in the next one (its values then)
   const failure = replayFailure(sources, out);
   if (!failure) {
     out.warnings.push(`the simulator does not reproduce the counterexample (${out.cycle} clock cycle(s)): a signal with no initial value may start at 'U' in the simulation and at 0 in the proof`);
     return out;
   }
-  out.cycle = Math.min(out.cycle, Math.floor(failure.time / 1000 / PERIOD) + 1);
+  const ns = failure.time / 1000, atEdge = out.clocks.length && ns % PERIOD === PERIOD / 2;
+  out.cycle = Math.min(out.cycle, Math.floor(ns / PERIOD) + (atEdge && !failure.clocked ? 2 : 1));
   out.cycles = out.cycles.slice(0, out.cycle);
   out.failure = { file: failure.file, line: failure.line, text: failure.text };
   return out;
@@ -92,7 +95,13 @@ function replayFailure(sources, r) {
   let s;
   try { s = simulate(srcs, benchName(r.top), { until: (r.cycles.length + 1) * PERIOD * 1000 }); } catch { return null; }
   if (!s.sim) return null;
-  return s.sim.log.find(l => ['warning', 'error', 'failure'].includes(l.kind) && l.file && l.file !== tb.path && !/^VERIFY/.test(l.text)) || null;
+  const l = s.sim.log.find(e => ['warning', 'error', 'failure'].includes(e.kind) && e.file && e.file !== tb.path && !/^VERIFY/.test(e.text));
+  if (!l) return null;
+  // (its process: clocked or not)
+  const pr = (s.design.procs || []).find(p => p.name === l.proc && p.file === l.file);
+  let clocked = false;
+  try { clocked = !!pr && clocksOf(pr).clocks.size > 0; } catch { /* not a clocked process */ }
+  return { ...l, clocked };
 }
 
 /** The console's messages of a proof of assertions (the interface's and the MCP tool's alike), as verifyMessages'. */
