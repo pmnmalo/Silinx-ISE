@@ -385,6 +385,15 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
   editors' properties (and the schematic's symbols) open over the drawing with their toolbar's
   *Properties* (*Symbols*) button, so the drawing keeps the whole width.
 
+### Guided labs
+
+*Project ▸ Guided Labs…* opens a step-by-step tutorial on the project, beside its documents: each step says what to
+do, and *Check Step* checks it on the project (a file, a module's ports, Check Syntax with exactly the expected
+warnings, the simulation's values at given times), ticking it in the Steps panel, or giving its hint and the reasons
+in the console. Silinx ships "First steps" on the gates example (in English and Portuguese); a teacher writes a lab as
+a `labs/<name>.lab.json` file of a project (its format: `core/labs.js`), and shares it with the project. The progress
+is the project's (`labs/progress.json`): a lab resumes where it was left.
+
 ### A design in a link (for lecture slides)
 
 A link opens Silinx on a design, straight in Try it, the simulation or the board emulator, with no project to create
@@ -502,7 +511,8 @@ and the ASM chart made from it), `run_process` (synthesize,
 implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured; a project the
 MCP server made or imported runs ISE, or programs a board or a PROM, only once you trust it in the interface: *Trust Project*, #2981) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
-statistics for the synthesis and the pack and route summaries for map and par). The projects are those of the Project Navigator
+statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
+checked on the project and recorded, as *Guided Labs…* does; a lab restarted). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
 the same), so what the assistant does is seen in the interface when the project is opened again.
 Every path stays inside its project; programming a board is not one of its tools; the ISE machine's
