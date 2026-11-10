@@ -270,6 +270,7 @@ table.grid tr.sel td { background: #dbe8fb; }
 .editor-host .xl-editor .cm-panels { font-family: var(--font); font-size: 12px; }
 .editor-host .xl-editor .cm-tooltip.cm-tooltip-autocomplete { font-family: var(--font); font-size: 12px; border-radius: 2px; }
 .xl-flash-line { background: #ffe680 !important; transition: background .5s; }
+.xl-path-line { background: rgba(232, 89, 12, .14); box-shadow: inset 3px 0 #e8590c; }   /* a timing path's lines (#3178) */
 .editor-bar { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-bottom: 1px solid #ddd; background: #fafafa; flex: none; }
 .editor-bar .path { color: #555; margin-left: 6px; }
 .editor-bar select { height: 20px; }

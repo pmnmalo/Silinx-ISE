@@ -178,7 +178,7 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
   if (!st.includes('synth')) {
     try { const r = JSON.parse(await fs.readFile(path.join(outDir, 'report.json'), 'utf8')); earlier = { synthesis: r.synthesis || null, files: { netlist: r.files?.netlist, synthesis: r.files?.synthesis } }; } catch { /* none */ }
   }
-  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'timing.txt', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
+  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'timing.txt', 'paths.json', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
   const spec = {
     top: gen.top, part: status.part, device: status.device, family: deviceFamily(project.device) || 'spartan3e',
     pkg: String(project.device.package).toLowerCase(), graph: status.graph, bitDbDir: BIT_DB_DIR,

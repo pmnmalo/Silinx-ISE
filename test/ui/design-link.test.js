@@ -444,7 +444,10 @@ uiTest('#3042 a zip at another site that redirects: the redirection not followed
     await page.waitDialog('Open from a Link');
     await page.eval((a) => {
       window.__fetched = [];
+      // (the application's own requests, such as a late /api/workspace, go to the real fetch and are not recorded, #3174)
+      const real = window.__realFetch || (window.__realFetch = window.fetch);
       window.fetch = async (u, o) => {
+        if (String(u).startsWith('/api/')) return real(u, o);
         window.__fetched.push([String(u), o.redirect, o.credentials]);
         return a === 'manual' ? { type: 'opaqueredirect', ok: false, status: 0, statusText: '', redirected: false, url: String(u), body: null }
           : { type: 'cors', ok: true, status: 200, statusText: 'OK', redirected: true, url: a, body: new Response(new Uint8Array([80, 75, 5, 6])).body };

@@ -83,9 +83,11 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   });
   app.locals.watcher = watcher;
   const WRITING_GET = /^\/projects\/[^/]+\/(export\.xise|fpga-view)$/;
+  // (a pull writes what GitHub had, not what the page sent: told to the page, its open documents read again, #3195)
+  const TOLD = /^\/projects\/[^/]+\/git\/pull$/;
   app.use('/api', (req, res, next) => {
     const m = /^\/projects\/([^/]+)/.exec(req.path);
-    if (m && (!['GET', 'HEAD'].includes(req.method) || WRITING_GET.test(req.path))) {
+    if (m && !TOLD.test(req.path) && (!['GET', 'HEAD'].includes(req.method) || WRITING_GET.test(req.path))) {
       let name = '';
       try { name = decodeURIComponent(m[1]); } catch { /* a bad name: refused by its route */ }
       const release = watcher.hold(name);
@@ -190,6 +192,9 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   // Implementation (ISE) + programming routes live in impl-routes.js.
   const { registerImplRoutes } = await import('./impl-routes.js');
   registerImplRoutes(api, { wrap, projects: P });
+  // git (#3195): a project in a GitHub repository
+  const { registerGitRoutes } = await import('./git-routes.js');
+  registerGitRoutes(api);
 
   app.use('/api', api);
   // an error no route answered (a bad body, a bad address): its message, never a stack trace with the server's paths

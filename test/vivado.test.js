@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { scratchEnv, writeConfig } from './server-helpers.js';
 
 let tmp;
@@ -19,7 +20,7 @@ const tc = await import('../server/toolchain.js');
 const jobs = await import('../server/jobs.js');
 const P = await import('../server/projects.js');
 const { handle } = await import('../server/mcp.js');
-const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASYS3 = { family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' };
 const XDC = `set_property -dict { PACKAGE_PIN W5 IOSTANDARD LVCMOS33 } [get_ports {clk}]
 create_clock -add -name sys_clk_pin -period 10.000 -waveform {0.000 5.000} [get_ports {clk}]
@@ -157,7 +158,8 @@ test('the build folder of a 7-series project: its sources, its XDC as <top>.xdc,
   assert.match(tcl, /read_vhdl -library work \{src\/src\/top\.vhd\}/);
   assert.match(tcl, /read_xdc \{top\.xdc\}/);
   assert.doesNotMatch(tcl, /set_property CFGBVS/);   // (the XDC's)
-  assert.ok(fs.statSync(path.join(b, 'run.sh')).mode & 0o100);
+  // (executable where the file system has the bit: not on Windows, #3189)
+  if (process.platform !== 'win32') assert.ok(fs.statSync(path.join(b, 'run.sh')).mode & 0o100);
   // a project whose constraints are still a UCF
   const u = blinkyProject('B3ucf', { constraints: 'constraints/top.ucf', text: 'NET "clk" LOC = "W5";\n' });
   await assert.rejects(V.generateVivadoBuild(u.project, u.dir), /^Error: constraints\/top\.ucf is a UCF: Vivado reads an XDC\. Update the constraints for the board \(Design Properties\) or write constraints\/top\.xdc\.$/);
@@ -217,6 +219,10 @@ test('Vivado\'s container: ISE\'s isolation, sysfs\'s buses, classes and devices
   assert.equal(ise.remoteFlowCommand({ ssh: { settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh', image: '' } }, 'b/p', ['synth']), 'cd b/p && ISE_SETTINGS=/opt/Xilinx/14.7/ISE_DS/settings64.sh bash run.sh synth');
 });
 
+// Vivado's docker mode on a machine with no docker (the CI's macOS and Windows runners) stops at the command, before the
+// image (#3186)
+const NOT_READY = tc.which('docker') ? 'no Vivado docker image configured (vivado.image)' : "'docker' command not found";
+
 test('a 7-series project is implemented by Vivado (POST implement, run_process): its job, its refusals; Vivado not configured: the job\'s error and its help', async () => {
   const { startImplementation } = await import('../server/impl-routes.js');
   await writeConfig({ mode: 'silinx' });
@@ -225,8 +231,8 @@ test('a 7-series project is implemented by Vivado (POST implement, run_process):
   assert.equal(job.meta.toolchain, 'vivado');
   assert.deepEqual(job.meta.steps, ['synth', 'map']);
   assert.equal(job.status, 'error');
-  assert.equal(job.error, `AMD Vivado not available (docker mode): no Vivado docker image configured (vivado.image). Configure it in Toolchain Settings (vivado in ~/.silinx/config.json, PUT /api/toolchain), or run ${path.join(P.projectDir('Basys3Blinky'), 'build', 'run.sh')} on a machine with Vivado.`);
-  assert.deepEqual(job.lines.filter(l => /^(How to fix|Vivado is not)/.test(l)), ["Vivado is not available in mode 'docker': no Vivado docker image configured (vivado.image)", `How to fix: ${V.VIVADO_HELP.docker}`]);
+  assert.equal(job.error, `AMD Vivado not available (docker mode): ${NOT_READY}. Configure it in Toolchain Settings (vivado in ~/.silinx/config.json, PUT /api/toolchain), or run ${path.join(P.projectDir('Basys3Blinky'), 'build', 'run.sh')} on a machine with Vivado.`);
+  assert.deepEqual(job.lines.filter(l => /^(How to fix|Vivado is not)/.test(l)), [`Vivado is not available in mode 'docker': ${NOT_READY}`, `How to fix: ${V.VIVADO_HELP.docker}`]);
   assert.ok(fs.existsSync(path.join(P.projectDir('Basys3Blinky'), 'build', 'run.tcl')));
   // generate only: the scripts, no Vivado
   const gen = await wait(await startImplementation('Basys3Blinky', { generateOnly: true }));
@@ -243,7 +249,7 @@ test('a 7-series project is implemented by Vivado (POST implement, run_process):
   assert.equal(r.isError, true);
   assert.equal(r.data.toolchain, 'vivado');
   assert.match(r.text, /Process "synthesize" of <top> failed \(1 error\(s\), 0 warning\(s\)\) \(AMD Vivado\)\.$/);
-  assert.deepEqual(r.data.errors, [`ERROR: AMD Vivado not available (docker mode): no Vivado docker image configured (vivado.image). Configure it in Toolchain Settings (vivado in ~/.silinx/config.json, PUT /api/toolchain), or run ${path.join(P.projectDir('Basys3Blinky'), 'build', 'run.sh')} on a machine with Vivado.`]);
+  assert.deepEqual(r.data.errors, [`ERROR: AMD Vivado not available (docker mode): ${NOT_READY}. Configure it in Toolchain Settings (vivado in ~/.silinx/config.json, PUT /api/toolchain), or run ${path.join(P.projectDir('Basys3Blinky'), 'build', 'run.sh')} on a machine with Vivado.`]);
   assert.match((await call('run_process', { project: 'Basys3Blinky', process: 'post_par_model' })).text, /^run_process: Vivado's flow has no post-place & route simulation model \(postpar\)$/);
 });
 

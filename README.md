@@ -385,6 +385,15 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
   editors' properties (and the schematic's symbols) open over the drawing with their toolbar's
   *Properties* (*Symbols*) button, so the drawing keeps the whole width.
 
+### Guided labs
+
+*Project ▸ Guided Labs…* opens a step-by-step tutorial on the project, beside its documents: each step says what to
+do, and *Check Step* checks it on the project (a file, a module's ports, Check Syntax with exactly the expected
+warnings, the simulation's values at given times), ticking it in the Steps panel, or giving its hint and the reasons
+in the console. Silinx ships "First steps" on the gates example (in English and Portuguese); a teacher writes a lab as
+a `labs/<name>.lab.json` file of a project (its format: `core/labs.js`), and shares it with the project. The progress
+is the project's (`labs/progress.json`): a lab resumes where it was left.
+
 ### A design in a link (for lecture slides)
 
 A link opens Silinx on a design, straight in Try it, the simulation or the board emulator, with no project to create
@@ -405,6 +414,23 @@ broken link is said in the console, the workspace as it was.
 Copy Link… includes Silinx as it is when the link is copied (**Include the current view**): the open tabs, the one in
 front, the split and, in the Silinx interface, the task, the side panel, the messages and a maximized document; the
 link opens it so, for that page only (the viewer's own layout is not changed).
+
+### A project on GitHub (git, a GitHub Classroom assignment)
+
+On your computer or a Silinx server, a project can live in a GitHub repository, through the system's git:
+- **Open from Repository…** (the Start page, the ISE style's File menu) opens a project from a GitHub repository, a
+  GitHub Classroom assignment's too.
+- **Commit…, Push to GitHub and Pull from GitHub** (the project's right-click menu in the Design pane, under Git; the
+  File menu) send it back and bring the others' changes in. A pull that conflicts pulls nothing and leaves the files as
+  they were.
+- **The Design pane** marks what changed (M) or is new (N) since the last commit.
+- **History…** lists the commits, and opens a file as it was in one, read only.
+- **Initialize Repository…** makes a repository of a project, with a `.gitignore` that leaves `build/` and the tools'
+  outputs out.
+
+git signs in to GitHub with its own credentials (GitHub's command line `gh auth login`, Git Credential Manager or an
+SSH key): Silinx never asks for, stores or logs a password or a token. A server's operator can turn git off with
+`SILINX_GIT=off`. The browser edition does not have git yet (it comes through GitHub's API).
 
 ## For developers
 
@@ -454,6 +480,8 @@ node bin/silinx.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the
 node bin/silinx.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
 node bin/silinx.js toolchain [--docker xilinx/ise:14.7]          # show / set the ISE toolchain
 node bin/silinx.js mcp                                         # an MCP server for an AI assistant (below)
+node bin/silinx.js grade <exercise.json> <submissions…> --csv grades.csv   # grade exercises (docs/GRADING.md)
+node bin/silinx.js classroom template|grade …                  # GitHub Classroom assignments (docs/CLASSROOM.md)
 npm test                                                         # test suite
 SILINX_ISE_TESTS=1 npm run test:ise                              # the real ISE flow (Docker image; SILINX_ISE_HOST=user@host: on another machine)
 SILINX_ISE_HOST=user@host npm run check:open-flow [projects…]   # the open flow vs ISE: DRC, byte-identical bitstreams (SILINX_ISE_HOST=local: the image here)
@@ -488,9 +516,10 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
 Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `test_bench_wizard` (a self-checking
 test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins), `convert_module` (an HDL module to a schematic, ASM chart or state
-diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `save_wave_config` and `load_wave_config` (a simulation's wave configuration saved as a .wcfg of the project, and loaded), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock),
+diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `save_wave_config` and `load_wave_config` (a simulation's wave configuration saved as a .wcfg of the project, and loaded), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `verify` (a module's equivalence with a reference module, as *Verify Equivalence*: proved, or the first clock cycle where an output differs, its counterexample written as a test bench and replayed), `set_process_properties` (the Optimization, the start-up clock),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
+`git_clone`, `git_init`, `git_status`, `git_commit`, `git_push`, `git_pull` and `git_log` (a project in a GitHub repository, as the interface's git: its history, a file as it was in a commit),
 `export_project` and `import_project` (a Xilinx ISE or a Silinx project, as a .zip; a .xise or a project folder too;
 only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `project_link` and `open_link` (a project's
 link, the project inside it, opening Try it, the simulation or the board emulator, for slides; a project made from such a link
@@ -502,7 +531,10 @@ and the ASM chart made from it), `run_process` (synthesize,
 implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured; a project the
 MCP server made or imported runs ISE, or programs a board or a PROM, only once you trust it in the interface: *Trust Project*, #2981) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
-statistics for the synthesis and the pack and route summaries for map and par). The projects are those of the Project Navigator
+statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
+checked on the project and recorded, as *Guided Labs…* does; a lab restarted) and `timing_paths` (the Silinx toolchain's
+slowest paths, as the Static Timing Report's Paths panel: a path's stages, their delays against the PERIOD, and the
+source lines, sites and nets its Show Path highlights). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
 the same), so what the assistant does is seen in the interface when the project is opened again.
 Every path stays inside its project; programming a board is not one of its tools; the ISE machine's

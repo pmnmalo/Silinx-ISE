@@ -9,6 +9,7 @@
 //
 //   const v = mountFpgaView(el, { model, top, entities, onSelectModule });   // model: packages/silinx-fpga/src/xdl.js fpgaModel
 //   v.highlightModule('Inst_data' | null); v.select(instIndex); v.showNet(netIndex); v.destroy();
+//   v.showPath({ insts: [name…], nets: [name…] } | null)   // a timing path (#3178): its sites lit, its nets drawn
 // Styles: web/css/fpgaview.css.
 import { h } from './ui.js';
 import { mountSiteDetails } from './fpgaview-details.js';
@@ -149,7 +150,7 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
   const tilePos = new Map(model.device.tiles.map(([r, c, name]) => [name, [c * TW + TW / 2, r * TH + TH / 2]]));
   const W = model.device.cols * TW, H = model.device.rows * TH;
   const maxLevel = Math.max(1, ...model.insts.map(i => (i.module ? i.module.split('/').length : 0)));
-  let level = 1, selInst = -1, selNet = -1, hlModule = null, showClocks = false;
+  let level = 1, selInst = -1, selNet = -1, hlModule = null, showClocks = false, path = null;
 
   // ------------------------------------------------------------------ DOM
   const root = h('div', { class: 'fv' });
@@ -234,11 +235,12 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
   }
   // dim everything outside the highlighted module (and its submodules)
   function highlight() {
-    svg.classList.toggle('fv-dim', hlModule !== null);
+    svg.classList.toggle('fv-dim', hlModule !== null || !!path);
     model.insts.forEach((inst, i) => {
       if (!rects[i]) return;
       const inMod = hlModule !== null && (hlModule === '' ? !inst.module : inst.module === hlModule || inst.module.startsWith(`${hlModule}/`));
-      rects[i].classList.toggle('hl', inMod);
+      rects[i].classList.toggle('hl', inMod || !!path?.insts.has(i));
+      rects[i].classList.toggle('fv-on-path', !!path?.insts.has(i));
       rects[i].classList.toggle('sel', i === selInst);
     });
     legendBox.querySelectorAll('.fv-mod').forEach((r, n) => r.classList.toggle('sel', hlModule !== null && modulesAtLevel()[n]?.[0] === moduleAt(hlModule, level)));
@@ -318,10 +320,12 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
     if (showClocks) model.nets.forEach((n, i) => { if (n.kind === 'clock') drawNet(i, 'fv-clock'); });
     if (selInst >= 0 && selNet < 0) for (const ni of new Set(Object.values(model.insts[selInst].pins))) if (model.nets[ni]?.kind !== 'power' && (!showClocks || model.nets[ni].kind !== 'clock')) drawNet(ni, 'fv-conn');
     if (selNet >= 0) drawNet(selNet, model.nets[selNet].kind === 'clock' ? 'fv-clock fv-picked' : 'fv-picked');
+    if (path) for (const ni of path.nets) drawNet(ni, 'fv-path');
     status();
   }
   function status() {
     const parts = [];
+    if (path) parts.push(`Path: ${path.insts.size} site(s), ${path.nets.length} net(s)`);
     if (selNet >= 0) { const n = model.nets[selNet]; parts.push(`Net ${n.name}: ${n.loads.length} load(s), ${n.pips} routing switch(es) in ${n.tiles.length} tile(s)`); }
     else if (selInst >= 0) parts.push(`${model.insts[selInst].site}: ${Object.keys(model.insts[selInst].pins).length} connection(s)`);
     else if (hlModule !== null) parts.push(`${moduleLabel(hlModule)}: ${rects.filter(r => r?.classList.contains('hl')).length} site(s)`);
@@ -341,6 +345,18 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
     if (pts.length) {
       const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
       fitBox(Math.min(...xs) - 2 * TW, Math.min(...ys) - 2 * TH, Math.max(...xs) - Math.min(...xs) + 4 * TW, Math.max(...ys) - Math.min(...ys) + 4 * TH);
+    }
+  }
+
+  // a timing path (#3178): its instances and nets by name, zoomed to; null clears it
+  function showPath(p) {
+    const instIx = new Map(model.insts.map((x, i) => [x.name, i])), netIx = new Map(model.nets.map((x, i) => [x.name, i]));
+    path = p ? { insts: new Set(p.insts.map(n => instIx.get(n)).filter(i => i !== undefined)), nets: p.nets.map(n => netIx.get(n)).filter(i => i !== undefined) } : null;
+    highlight(); overlay();
+    const pts = path ? [...path.insts].map(centre).filter(Boolean) : [];
+    if (pts.length) {
+      const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+      fitBox(Math.min(...xs) - 3 * TW, Math.min(...ys) - 3 * TH, Math.max(...xs) - Math.min(...xs) + 6 * TW, Math.max(...ys) - Math.min(...ys) + 6 * TH);
     }
   }
 
@@ -400,8 +416,8 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
   return {
     highlightModule: p => { highlightModule(p); legend(); highlight(); },
     select: i => select(i, { center: true }),
-    showNet,
-    get state() { return { level, selInst, selNet, hlModule, showClocks, viewBox: { ...vb } }; },
+    showNet, showPath,
+    get state() { return { level, selInst, selNet, hlModule, showClocks, path: path && { insts: [...path.insts], nets: [...path.nets] }, viewBox: { ...vb } }; },
     destroy() { ro.disconnect(); root.remove(); },
   };
 }

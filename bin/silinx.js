@@ -13,6 +13,14 @@ const USAGE = `usage:
   silinx check <projectDir> [--top name]            parse + elaborate the design
   silinx sim   <projectDir> [--top tb] [--time ns] [--vcd out.vcd]   run a behavioural simulation
   silinx ucf   <projectDir> --board basys2|nexys2|s3e-starter [--part xc3s100e]   pins from the board
+  silinx grade <exercise.json> <submission…> [--visible] [--json out.json] [--csv out.csv] [--quiet]
+                                                    grade submissions (project folders, zips, or a folder of
+                                                        them) on an exercise's tests: a report per submission
+  silinx grade <exercise.json> --student-copy <out.exercise.json>   the exercise without its hidden tests
+  silinx classroom template <exercise.json> <starter project> <out folder> [--silinx-version x.y.z]
+                                                    a GitHub Classroom assignment's template (docs/CLASSROOM.md)
+  silinx classroom grade <exercise.json> --org <org> --assignment <name> --out <folder> [--before <date>]
+                         [--csv grades.csv] [--json grades.json] [--issues]   every test on the students' repositories
   silinx toolchain [--docker <image>]                show / set the ISE toolchain (docker image)
   silinx mcp                                        an MCP server on stdin / stdout: the workspace's
                                                         projects for an AI assistant (Claude Desktop…)
@@ -115,6 +123,16 @@ async function main() {
       fs.writeFileSync(tmpPj, JSON.stringify(pj, null, 2) + '\n');
       fs.renameSync(tmpPj, path.join(dir, 'silinx.json'));
       console.log(`${pj.constraints}: ${matched.join(', ')} assigned for ${board.name}${unmatched.length ? `; NOT assigned: ${unmatched.join(', ')}` : ''}`);
+      break;
+    }
+    case 'grade': {
+      const { gradeCommand } = await import('../server/grade-cli.js');
+      process.exitCode = await gradeCommand(args, { out: t => process.stdout.write(t), err: t => process.stderr.write(t) });
+      break;
+    }
+    case 'classroom': {
+      const { classroomCommand } = await import('../server/classroom-cli.js');
+      process.exitCode = await classroomCommand(args, { out: t => process.stdout.write(t), err: t => process.stderr.write(t) });
       break;
     }
     case 'toolchain': {
