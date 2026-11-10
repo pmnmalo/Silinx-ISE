@@ -4,7 +4,7 @@
 // Simulate / Design / Implement, the ISE style's Implementation / Simulation) and a resize of the window. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject } from './harness.js';
+import { setupUi, uiTest, makeProject, toggleSplitEditor } from './harness.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -43,7 +43,7 @@ uiTest('#3304 the document in use: its tab active and in sight after a click (bo
   await expectInSight(page, 'file:src/m11.vhd', 'a click in the document in front');
 
   // split: the right side's documents, more than fit in its row
-  await page.click('#split-btn');
+  await toggleSplitEditor(page);
   for (let i = 12; i < N; i++) await page.eval((p) => window.SilinxApp.openFile(p), `src/m${i}.vhd`);
   await expectInSight(page, `file:src/m${N - 1}.vhd`, 'opened on the right side');
   assert.equal(await page.eval(() => document.querySelectorAll('#doc-tabs > .tab-group').length), 2);

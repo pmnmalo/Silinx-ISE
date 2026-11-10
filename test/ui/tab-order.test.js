@@ -6,7 +6,7 @@
 // chosen place of the other side's row or to its pane's row end, kept by a reload. Portuguese. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject } from './harness.js';
+import { setupUi, uiTest, makeProject, toggleSplitEditor } from './harness.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -145,7 +145,7 @@ uiTest('#2887 in a split: reordered within a side, moved to a chosen place of th
   await makeProject(env, { name: 'TabOrderSplit', top: 'a', files: FILES });
   await page.openProject('TabOrderSplit');
   for (const f of ['src/a.vhd', 'src/b.vhd', 'src/c.vhd']) await open(page, f);
-  await page.click('#split-btn');
+  await toggleSplitEditor(page);
   await page.waitFor(() => document.getElementById('workspace').classList.contains('split'), [], { what: 'split' });
   assert.deepEqual(await rows(page), { a: ['a.vhd', 'b.vhd', 'c.vhd*'], b: [] });
 
