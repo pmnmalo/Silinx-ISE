@@ -19,7 +19,7 @@
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
 
 import { h, linkModel, linkSnapshot } from './ui.js';
-import { toolbarMenu } from './toolbar-menu.js';
+import { menuChoice, setChoice, toolbarMenu } from './toolbar-menu.js';
 import { mountSideFold } from './side-fold.js';
 import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
@@ -54,11 +54,11 @@ export function radiusOf(s) {
   return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, Math.ceil(textW(outs) / 2) + 10);
 }
 
-// (read-only, #2696: the tools that change the diagram, its HDL's settings, Check, Layout and conversion hidden, with their
-// separators; its notice, `banner`, at the right end of the toolbar, #2710)
+// (read-only, #2696: the tools that change the diagram, Check, the ⋮ menu (Layout and conversion, the HDL's settings)
+// hidden, with their separators; its notice, `banner`, at the right end of the toolbar, #2710)
 function readOnlyChrome({ root, toolbar, banner }) {
   root.classList.add('asm-readonly');
-  const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-enc, .fsm-check'));
+  const groups = [...toolbar.children].filter((g) => g.querySelector('.fsm-ico-state, .asm-danger, .fsm-check'));
   for (const g of [...groups, ...groups.map((g) => g.nextElementSibling), toolbar.querySelector('.fsm-link').previousElementSibling]) g.hidden = true;
   if (banner) toolbar.querySelector('.fsm-link').after(banner);
 }
@@ -87,17 +87,17 @@ export function mountFsmEditor(container, opts = {}) {
   container.append(root);
   const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `asm-btn ${cls}`, title, onclick }, label);
   const sep = () => h('span', { class: 'asm-sep' });
-  const select = (cls, title, items, onchange) => {
-    const s = h('select', { class: `asm-select ${cls}`, title, onchange: () => onchange(s.value) }, ...items.map(([v, l]) => h('option', { value: v }, l)));
-    return s;
-  };
 
   // ---------------------------------------------------------------------------- toolbar
-  const encSel = select('fsm-enc', 'State encoding', FSM_ENCODINGS.map((e) => [e, FSM_ENCODING_NAMES[e]]),
-    (v) => { M.encoding = v; commit('enc'); });
-  const styleSel = select('fsm-style', 'Style of the generated HDL', [['3process', '3 processes'], ['2process', '2 processes']], (v) => { M.style = v; commit('style'); });
+  // (the state encoding and the generated HDL's style, rarely changed: choices of the ⋮ menu, #3289; encSel.value = …
+  // and styleSel.value = … move their ✓; the encoding stays in the status line, #2763)
+  const encItems = menuChoice('Encoding', FSM_ENCODINGS.map((e) => ({ value: e, label: FSM_ENCODING_NAMES[e] })),
+    { value: M.encoding, title: 'State encoding', onChange: (v) => { M.encoding = v; commit('enc'); } });
+  const encSel = { set value(v) { setChoice(encItems, v); } };
+  const styleItems = menuChoice('Coding Style', [{ value: '3process', label: '3 processes' }, { value: '2process', label: '2 processes' }],
+    { value: M.style, title: 'Style of the generated HDL', onChange: (v) => { M.style = v; commit('style'); } });
+  const styleSel = { set value(v) { setChoice(styleItems, v); } };
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
-  const tbLabel = (text) => h('span', { class: 'fsm-tb-label' }, text);
   // (what the diagram is, its states and transitions, Moore or Mealy, its encoding: in its status line, #2763)
   const status = statusLine();
   const delBtn = toolIcon('delete', 'del', 'Delete the selected state or transition (Del)', () => deleteSelection(), 'asm-danger');
@@ -116,8 +116,6 @@ export function mountFsmEditor(container, opts = {}) {
     sep(),
     h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBy(f), () => fit()), zoomLbl),
     sep(),
-    h('div', { class: 'asm-group' }, tbLabel('Encoding:'), encSel, tbLabel('Coding Style:'), styleSel),
-    sep(),
     h('div', { class: 'asm-group' }, checkBtn),
     sep(),
     h('div', { class: 'asm-group' }, tabBtns.tables, tabBtns.sim),
@@ -128,6 +126,7 @@ export function mountFsmEditor(container, opts = {}) {
       btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.()),
       // (Verify Property, #3177: web/js/verify-props.js)
       ...(opts.onVerify ? [btn('Verify Property…', 'Prove a property of the state machine: a state never reached, a state reached, outputs never 1 together', () => opts.onVerify(clone(M)))] : []),
+      ...encItems, ...styleItems,
     ], { title: 'Layout and conversion', btnClass: 'asm-btn' }).el,
     linkHost);
   const readOnly = !!opts.readOnly;
