@@ -443,6 +443,10 @@ In the browser edition the same commands go through GitHub's API (there is no gi
 - **Initialize Repository…** takes an empty GitHub repository (make it at github.com/new); the first commit is the
   project's.
 
+A computer or a server with no git can use GitHub's API the same way, for the interface and the MCP's git tools:
+start Silinx with `SILINX_GIT=github` and a token in `GH_TOKEN` (`GH_TOKEN=$(gh auth token)`), which Silinx never
+stores.
+
 ## For developers
 
 ```bash

@@ -27,8 +27,10 @@ export const HINT = {
 const seg = s => encodeURIComponent(String(s));
 const pathOf = p => String(p).split('/').map(seg).join('/');
 
-/** The client: request(method, path, body) -> GitHub's answer (JSON), or a GitHubError. token(): the user's, or null. */
-export function githubClient({ fetch: f = globalThis.fetch, token = () => null, api = API } = {}) {
+/** The client: request(method, path, body) -> GitHub's answer (JSON), or a GitHubError. token(): the user's, or null;
+ *  hints: the edition's own (signIn, again: a server's token is the environment's). */
+export function githubClient({ fetch: f = globalThis.fetch, token = () => null, api = API, hints = {} } = {}) {
+  const H = { ...HINT, ...hints };
   async function request(method, path, body, { allow = [] } = {}) {
     const t = token();
     const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
@@ -40,7 +42,7 @@ export function githubClient({ fetch: f = globalThis.fetch, token = () => null, 
     let j = null;
     try { j = await r.json(); } catch { /* no body */ }
     if (r.ok || allow.includes(r.status)) return r.ok ? j : { status: r.status, ...(j || {}) };
-    throw failure(r.status, j, !!t, r.headers);
+    throw failure(r.status, j, !!t, r.headers, H);
   }
   return {
     request,
@@ -50,7 +52,7 @@ export function githubClient({ fetch: f = globalThis.fetch, token = () => null, 
 }
 
 // GitHub's answer, as the console says it (GitHub's own message: never the token, which is never in one)
-function failure(status, j, signedIn, headers) {
+function failure(status, j, signedIn, headers, HINT) {
   const said = String(j?.message || '').slice(0, 300);
   if (status === 401) return new GitHubError(`GitHub refused the sign-in (${said || 'Bad credentials'})`, signedIn ? HINT.again : HINT.signIn, 401);
   if (status === 403 || status === 429) {

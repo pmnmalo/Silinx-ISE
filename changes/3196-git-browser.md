@@ -18,3 +18,7 @@ In detail:
   stand-in for GitHub (`test/fake-github.mjs`: the device flow, a clone, a commit of several files, a rejected commit,
   a pull and its conflict, the history, the token never in a URL nor a message); UI git-browser on the built site in
   both interfaces and in Portuguese.
+- **The server's second git back end (#3196):** `SILINX_GIT=github` sends the interface's git routes and the MCP's git
+  tools (git_clone, git_status, git_commit, git_push, git_pull, git_log, git_init) through GitHub's API
+  (`server/git-github.js`, the same `core/git-rest.js`), for a computer with no git, with the token of `GH_TOKEN`.
+  Tests: mcp-git-github.
