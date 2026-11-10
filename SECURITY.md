@@ -67,7 +67,10 @@ can read that user's files has the server too.
   credentials: `SILINX_GIT=off` turns git off.
 - Git in the browser edition (#3196, `core/git-rest.js`, `web/js/git-browser.js`): no git, GitHub's REST API only
   (api.github.com, which the page's Content-Security-Policy allows). The sign-in is OAuth's device flow with the public
-  client ID of Silinx's GitHub OAuth App and no secret. Its token is kept in the user's browser only (localStorage),
+  client ID of Silinx's GitHub OAuth App and no secret, through Silinx's relay (`relay/github-device-flow`, a Cloudflare
+  Worker: only the device flow's two POSTs, with only their own fields, only Silinx's origins, nothing kept nor
+  logged; the page's policy allows its origin), or, with no relay, a fine-grained personal access token the user pastes
+  (checked with GitHub's API before it is kept, never shown again). Its token is kept in the user's browser only (localStorage),
   sent only to GitHub's API in the `Authorization` header, never in a URL nor in a message; Sign out of GitHub forgets
   it. A repository's address is checked as the server's (github.com's only), the sign-in page linked is github.com's
   only, and an opened or pulled file passes the import gate; the repository's hidden and binary files stay on GitHub,
