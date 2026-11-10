@@ -16,13 +16,15 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
 const TOP = 'library ieee;\nuse ieee.std_logic_1164.all;\n\nentity top is\n  port (a : in std_logic; y : out std_logic);\nend top;\n\narchitecture rtl of top is\nbegin\n  y <= not a;\nend rtl;\n';
+const BIG = `${'a line of the notes of a large project\n'.repeat(10500)}`;
 const warnings = async (page) => (await page.consoleText()).split('\n').map((l) => l.trim()).filter((l) => /^(WARNING|AVISO|ERROR|ERRO)/.test(l));
 // (no STUN server: the two pages on this machine reach each other by their own addresses)
 const noStun = (page) => page.eval(async () => { const { STUN_KEY } = await import('/js/collab-rtc.js'); localStorage.setItem(STUN_KEY, '[]'); });
 const dialogField = (page, field) => page.waitFor((f) => document.querySelector(`.dlg-overlay textarea[data-field=${f}]`)?.value || null, [field], { what: `the ${field}`, timeout: 15000 });
 
 uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, the follower connected over WebRTC, read only; an edit arrives; a wrong code refused; Stop Sharing; the follower in Portuguese', E, async (page) => {
-  await makeProject(env, { name: 'Hosted', top: 'top', files: { 'src/top.vhd': TOP } });
+  // (a file of 400 KB: the owner's first message to a follower, the whole project, past a data channel's 256 KB)
+  await makeProject(env, { name: 'Hosted', top: 'top', files: { 'src/top.vhd': TOP, 'doc/notes.txt': BIG } });
   await page.openProject('Hosted');
   await noStun(page);
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
@@ -70,6 +72,7 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     await fp.waitFor(() => window.Silinx?.project?.name === 'Hosted' && window.Silinx.startupChecked, [], { what: 'the hosted project open', timeout: 30000 });
     await fp.waitFor(() => window.Silinx.active?.path === 'src/top.vhd', [], { what: 'the owner\'s editor followed' });
     assert.equal(await fp.eval(() => window.Silinx.active.editor.getValue()), TOP);
+    assert.equal(await fp.eval(async () => (await (await import('/js/api.js')).api.readFile('Hosted', 'doc/notes.txt')).length), BIG.length);
     assert.equal(await fp.eval(() => window.Silinx.active.editor.readOnly()), true);
     assert.equal(await fp.eval(() => window.Silinx.active.el.querySelector('[data-follow-notice]')?.textContent), 'Só de leitura, a seguir o projeto de Ana');
     await page.waitConsole(/^Rui follows your project "Hosted"\.$/m);
