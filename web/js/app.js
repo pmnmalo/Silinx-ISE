@@ -444,6 +444,7 @@ export async function openFile(path, line, col, { task } = {}) {
   if (/\.(tt|bool)\.json$/.test(path)) return openTt(path);
   if (path.endsWith('.fsm.json')) return openFsm(path);
   if (path.endsWith('.pn.json')) return openPetri(path);
+  if (path.endsWith('.exercise.json')) return (await import('./exercise-view.js')).openExercise(path);   // (#3192)
   const id = `file:${path}`;
   let doc = findDoc(id);
   const fresh = !doc;

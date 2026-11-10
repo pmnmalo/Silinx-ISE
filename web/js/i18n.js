@@ -26,6 +26,7 @@ import { MEMORY_PT, MEMORY_PT_PATTERNS } from './i18n-memory.js';
 import { RESOURCES_PT, RESOURCES_PT_PATTERNS } from './i18n-resources.js';
 import { PINS_PT, PINS_PT_PATTERNS } from './i18n-pins.js';
 import { LABS_PT, LABS_PT_PATTERNS } from './i18n-labs.js';
+import { GRADE_PT, GRADE_PT_PATTERNS } from './i18n-grade.js';
 import { prefKey } from './prefs.js';
 
 const PT = {
@@ -830,6 +831,8 @@ for (const [k, v] of Object.entries(PINS_PT)) if (!(k in PT)) PT[k] = v;   // I/
 PT_PATTERNS.unshift(...PINS_PT_PATTERNS);
 for (const [k, v] of Object.entries(LABS_PT)) if (!(k in PT)) PT[k] = v;   // the guided labs (#3179)
 PT_PATTERNS.unshift(...LABS_PT_PATTERNS);
+for (const [k, v] of Object.entries(GRADE_PT)) if (!(k in PT)) PT[k] = v;   // the graded exercises (#3192)
+PT_PATTERNS.unshift(...GRADE_PT_PATTERNS);
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },

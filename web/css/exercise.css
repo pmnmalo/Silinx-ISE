@@ -1,0 +1,54 @@
+/* A graded exercise (#3192, web/js/exercise-view.js): its toolbar (the editors', asm-editor.css), the statement, the
+   ports and the tests with their verdicts, the Properties side panel on the right (folded by side-fold.js; on a narrow
+   window over the page, shown by the toolbar's ☰ Properties, narrow.js), its status line (status-line.css). */
+.ex { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--panel); color: var(--fg); }
+.ex-main { flex: 1; display: flex; min-height: 0; position: relative; }
+.ex-page { flex: 1; min-width: 0; overflow: auto; padding: 16px 24px; line-height: 1.5; font-size: 13px; }
+.ex-title { margin: 0 0 8px; font-size: 17px; }
+.ex-statement { margin: 0 0 14px; white-space: pre-wrap; max-width: 760px; }
+.ex-page h3 { margin: 14px 0 6px; font-size: 13px; color: var(--title-fg); }
+.ex-table { border-collapse: collapse; font-size: 12px; }
+.ex-table th, .ex-table td { border: 1px solid var(--border-light); padding: 3px 8px; text-align: left; }
+.ex-table th { background: var(--panel-alt); font-weight: bold; }
+.ex-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ex-test { cursor: pointer; }
+.ex-test:hover { background: var(--hover); }
+.ex-test.current { outline: 1px solid var(--accent); outline-offset: -1px; background: var(--hover); }
+.ex-verdict { font-weight: bold; }
+.ex-verdict.AC { color: var(--success); }
+.ex-verdict:not(.AC):not(:empty) { color: var(--danger); }
+.ex-hidden { color: var(--muted); }
+.ex-side { width: 280px; flex: none; overflow: auto; border-left: 1px solid var(--border-light); font-size: 12px; background: var(--panel); }
+.ex-side .asm-cap {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: 20px; padding: 2px 6px;
+  background: var(--title-grad); color: var(--title-fg); font-weight: bold; border-bottom: 1px solid #99bbe8; white-space: nowrap;
+}
+.ex-side .asm-cap .sp { flex: 1; }
+.ex-side .asm-fold { border: 0; background: none; padding: 0 2px; margin-right: -2px; color: inherit; display: inline-flex; align-items: center; cursor: pointer; opacity: .75; }
+.ex-side .asm-fold:hover { opacity: 1; }
+.ex-section { border-bottom: 1px solid var(--border-light); padding: 6px 8px; }
+.ex-section h3 { margin: 2px 0 4px; font-size: inherit; font-weight: bold; color: var(--title-fg); }
+.ex-field { display: block; margin: 6px 0; }
+.ex-field > span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.ex-field input:not([type=checkbox]), .ex-field select, .ex-field textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.ex-field textarea { font-family: var(--mono); min-height: 60px; resize: vertical; }
+.ex-field.check { display: flex; align-items: center; gap: 6px; }
+.ex-field.check > span { display: inline; margin: 0; color: inherit; font-size: inherit; }
+@media (min-width: 1024px) {
+  .ex.props-folded .ex-side { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+  .ex.props-folded .ex-side > :not(.asm-cap) { display: none; }
+  .ex.props-folded .ex-side .asm-cap {
+    flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px; border-bottom: 0; align-items: center;
+  }
+  .ex.props-folded .ex-side .asm-cap .sp { display: none; }
+  .ex.props-folded .ex-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+}
+@media (max-width: 1023px) {
+  .ex-side .asm-fold { display: none; }
+  .ex-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(280px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
+  .ex:not(.side-open) .ex-side { display: none; }
+  .ex-page { padding: 12px 14px; }
+}
+.ex-list { display: flex; flex-direction: column; gap: 6px; }
+.ex-pick { text-align: left; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; }
+.ex-pick:hover { background: var(--hover); border-color: var(--accent); }

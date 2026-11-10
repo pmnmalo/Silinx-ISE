@@ -136,6 +136,8 @@ export function setupMenus() {
       '-',
       // (step-by-step tutorials on the project, each step checked on it, #3179)
       { label: 'Guided Labs…', icon: icon('help'), action: async () => (await import('./lab-view.js')).guidedLabsDialog(), disabled: hasPj },
+      // (an exercise graded by its tests, a student's visible ones run on the project, #3192)
+      { label: 'Exercise…', icon: icon('run'), action: async () => (await import('./exercise-view.js')).exerciseDialog(), disabled: hasPj },
     ] },
     { label: 'Process', items: () => [
       { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy || !toolHas('impl') },
