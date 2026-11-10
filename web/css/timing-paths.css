@@ -48,3 +48,9 @@
   .tp-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(330px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
   .tp:not(.side-open) .tp-side { display: none; }
 }
+
+/* a timing path in a drawing (#3178, web/js/drawing-path.js): its states, transitions, boxes, arrows, symbols and wires */
+.fsm-editor .fsm-state.on-path .fsm-circle, .asm-editor .asm-node.on-path .asm-shape { stroke: #e8590c; stroke-width: 3; }
+.fsm-editor .fsm-edge.on-path .fsm-edge-line, .asm-editor .asm-edge.on-path .asm-edge-line { stroke: #e8590c; stroke-width: 3; }
+.sch-editor svg .wire.on-path .wline { stroke: #e8590c; stroke-width: 2.4; }
+.sch-editor svg .sym.on-path .gate, .sch-editor svg .sym.on-path .box { stroke: #e8590c; stroke-width: 2.4; }

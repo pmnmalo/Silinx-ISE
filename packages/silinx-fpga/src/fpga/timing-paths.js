@@ -4,7 +4,8 @@
 //
 //   const r = timingPaths(sta, design, { n: 10, periods, netlist, synText, top })   // sta: analyzeTiming's result
 //   r.paths   [{ clock, port, required, delay, period, half, slack, stages: [{ kind, inst, pin, site, net, delay,
-//              arrival, sources: [{ file, line, block }] }], lines: [{ file, line }] }]
+//              arrival, sources: [{ file, line, block }], signals: [the named signals its cells drive] }],
+//              lines: [{ file, line }] }]
 //   pathsText(r)                                            // the paths as text (the MCP's timing_paths)
 //   pathHighlight(r.paths[i])                               // what Show Path highlights: { files, insts, sites, nets }
 //
@@ -48,7 +49,7 @@ const xdlName = n => n.replace(/:/g, '_');
  *  compute for), a few levels on. */
 export function cellSources(netlist, synText, top) {
   const mod = netlist?.modules?.[top] || Object.values(netlist?.modules || {}).find(m => m.attributes?.top) || null;
-  if (!mod) return () => [];
+  if (!mod) return Object.assign(() => [], { signals: () => [] });
   const blocks = synBlocks(synText);
   const cells = new Map(), byBit = new Map(), readers = new Map();
   for (const [name, c] of Object.entries(mod.cells || {})) {
@@ -87,10 +88,11 @@ export function cellSources(netlist, synText, top) {
     return found;
   };
   const cache = new Map();
-  return (cellName) => {
+  // (the XDL's names of a cell's parts: a block RAM's `laps_ram.0.0.RAMB16`, a carry's `….muxcy$s`)
+  const cellOf = n => cells.get(n) ?? cells.get(n.replace(/\$[a-z]+$/, '')) ?? cells.get(n.replace(/\.[^.]*$/, ''));
+  const sourcesOf = (cellName) => {
     if (cache.has(cellName)) return cache.get(cellName);
-    // (the XDL's names of a cell's parts: a block RAM's `laps_ram.0.0.RAMB16`, a carry's `….muxcy$s`)
-    const c = cells.get(cellName) ?? cells.get(cellName.replace(/\$[a-z]+$/, '')) ?? cells.get(cellName.replace(/\.[^.]*$/, ''));
+    const c = cellOf(cellName);
     let found = c ? own(c) : new Set();
     // (forward, breadth first, up to 4 levels: the first level that finds any)
     for (let level = 0, front = c && !found.size ? [c] : [], seen = new Set([c]); level < 4 && front.length && !found.size; level++) {
@@ -103,6 +105,9 @@ export function cellSources(netlist, synText, top) {
     cache.set(cellName, out);
     return out;
   };
+  // the named signals a cell drives (a flip-flop's: its register; #3178's drawings find their elements by them)
+  sourcesOf.signals = (cellName) => { const c = cellOf(cellName); return c ? [...new Set(outBits(c).flatMap(b => byBit.get(b) || []))] : []; };
+  return sourcesOf;
 }
 
 // The lane of a slice's pin and of its elements: the Spartan-3E's F / X half or G / Y half, the Spartan-6's A … D
@@ -130,6 +135,15 @@ export function stageCells(inst, pin) {
   // (a block RAM, a multiplier: the instance is its cell)
   return own.length || cells.length ? [...new Set((own.length ? own : cells).map(c => c.name))] : inst ? [inst.name] : [];
 }
+// the cells whose signals a stage drives: a clock-to-out's flip-flop (the register it reads, not the LUT beside it), a
+// logic stage's cells but the flip-flops (it goes through the LUT), a setup's all (the logic before the register, and it)
+const isFlop = c => /^#(FF|LATCH)/.test(c.value || '');
+function signalCells(inst, s, cells) {
+  if (s.kind === 'setup') return cells;
+  const flop = new Set((inst?.cfg || []).filter(c => c.name && isFlop(c)).map(c => c.name));
+  const own = cells.filter(n => flop.has(n) === (s.kind === 'clock-to-out'));
+  return own.length ? own : cells;
+}
 
 /**
  * The n slowest paths (sta.paths(n), the worst into each end) as stages, back to the source. opts: { n (10), periods
@@ -150,7 +164,9 @@ export function timingPaths(sta, design, { n = 10, periods = [], netlist = null,
       const stage = { kind: s.kind, inst: s.inst, pin: s.pin, site: inst?.site || null, delay: r3(s.delay), arrival: r3(s.arrival) };
       if (s.kind === 'net') stage.net = netInto.get(`${s.inst}\u0000${s.pin}`) || null;
       const seen = new Set();
-      stage.sources = s.kind === 'net' ? [] : stageCells(inst, s.pin).flatMap(sourcesOf).filter(x => { const k = `${x.file}:${x.line}`; return !seen.has(k) && seen.add(k); });
+      const cellsOf = s.kind === 'net' ? [] : stageCells(inst, s.pin);
+      stage.sources = cellsOf.flatMap(sourcesOf).filter(x => { const k = `${x.file}:${x.line}`; return !seen.has(k) && seen.add(k); });
+      stage.signals = [...new Set(signalCells(inst, s, cellsOf).flatMap(sourcesOf.signals))];
       return stage;
     });
     const seen = new Set(), lines = [];

@@ -1,7 +1,8 @@
 // The MCP server's timing_paths (#3178, #2674: what the interface's Paths panel does): the slowest paths of the Silinx
 // toolchain's timing analysis, one path's stages and what Show Path highlights, through the same functions
-// (packages/silinx-fpga/src/fpga/timing-paths.js); its refusals; blinky's paths after run_process timing, against
-// get_report's timing report.
+// (packages/silinx-fpga/src/fpga/timing-paths.js), and the elements of the drawings its lines are generated from
+// (core/path-drawing.js: gates' schematic, blinky's ASM chart); its refusals; blinky's paths after run_process timing,
+// against get_report's timing report.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -57,10 +58,22 @@ test('timing_paths: the list, one path\'s stages and highlight, count; none befo
     '  net            2.000    3.000  b.F1 (S_b), net n1',
     '  setup          0.300    3.300  b.F1 (S_b)  <- src/b.v:4'].join('\n'));
   assert.equal(one.data.path.number, 1);
-  assert.deepEqual(one.data.highlight, { files: { 'src/a.vhd': [12], 'src/b.v': [4] }, insts: ['a', 'b'], sites: ['S_a', 'S_b'], nets: ['n1'] });
+  assert.deepEqual(one.data.highlight, { files: { 'src/a.vhd': [12], 'src/b.v': [4] }, insts: ['a', 'b'], sites: ['S_a', 'S_b'], nets: ['n1'], drawings: {} });
   await fails('timing_paths', { project: 't1', path: 3 }, 'path: from 1 to 2');
   await fails('timing_paths', { project: 't1', path: 0 }, 'path: from 1 to 2');
   await fails('timing_paths', { project: 't1', count: 0 }, 'count: a whole number from 1');
+  // a path through the module generated from gates' schematic: its wire and the symbol that drives it, as
+  // core/path-drawing.js finds them (by the net p1, in the module of src/gates.vhd); a drawing none of whose names is on it
+  const { drawingPath, pathNames } = await import('../core/path-drawing.js');
+  const SCH_PATH = { ...PATHS.paths[0], lines: [{ file: 'src/gates.vhd', line: 44 }], stages: [stage('clock-to-out', 'a', 'XQ', 1, 1),
+    stage('net', 'b', 'F1', 2, 3, { net: 'p1' }), stage('setup', 'b', 'F1', 0.3, 3.3, { sources: [{ file: 'src/gates.vhd', line: 44, block: 'assign_44' }] })] };
+  fs.writeFileSync(path.join(P.projectDir('t1'), 'build', 'open', 'paths.json'), JSON.stringify({ top: 'gates', paths: [SCH_PATH, { ...SCH_PATH, stages: SCH_PATH.stages.map(x => (x.net ? { ...x, net: 'n7' } : x)) }] }));
+  const sch = await ok('timing_paths', { project: 't1', path: 1 });
+  const want = drawingPath('sch', JSON.parse(fs.readFileSync(path.join(P.projectDir('t1'), 'src', 'gates.sch.json'), 'utf8')), pathNames(SCH_PATH, 'src/gates.vhd'));
+  assert.deepEqual(want.map(x => `${x.type} ${x.label}`), ['sym and_p1', 'wire p1']);
+  assert.deepEqual(sch.data.highlight.drawings, { 'src/gates.sch.json': want });
+  assert.equal(sch.text.split('\n').at(-1), '  in src/gates.sch.json: symbol and_p1; wire p1');
+  assert.equal((await ok('timing_paths', { project: 't1', path: 2 })).text.split('\n').at(-1), '  in src/gates.sch.json: none of its elements by name');
   // no path to time (a design with no two flip-flops on a clock)
   fs.writeFileSync(path.join(P.projectDir('t1'), 'build', 'open', 'paths.json'), JSON.stringify({ top: 'top', paths: [] }));
   assert.equal((await ok('timing_paths', { project: 't1' })).text, 'No path between two flip-flops of a clock to time in \'t1\'.');
@@ -80,7 +93,12 @@ test('timing_paths on blinky after run_process timing: the timing report\'s crit
   assert.ok(list.data.paths.every(p => p.required === 20 && p.lines.length && p.slack === +(20 - p.delay).toFixed(3)));
   const one = await ok('timing_paths', { project: 'b1', path: 1 });
   const crit = report.split('\n').filter(l => /^ {2}(clock-to-out|net|logic|setup) /.test(l)).slice(0, one.data.path.stages.length);
-  assert.deepEqual(one.text.split('\n').slice(1).map(l => l.replace(/ \(\S+\)(, net \S+)?( {2}<- .*)?$/, '')), crit);
+  assert.deepEqual(one.text.split('\n').slice(1, 1 + one.data.path.stages.length).map(l => l.replace(/ \(\S+\)(, net \S+)?( {2}<- .*)?$/, '')), crit);
   assert.ok(Object.keys(one.data.highlight.files).every(f => fs.existsSync(path.join(P.projectDir('b1'), f))), 'the highlighted files are the project\'s');
   assert.ok(one.data.highlight.nets.length && one.data.highlight.sites.length);
+  // (through speed_ctrl, generated from its ASM chart: the boxes of level and ticks, the comparison's among them)
+  const asm = one.data.highlight.drawings['src/speed_ctrl.asm.json'];
+  assert.deepEqual(Object.keys(one.data.highlight.drawings), ['src/speed_ctrl.asm.json']);
+  assert.ok(asm.some(x => x.type === 'node' && x.label === 'ticks >= (1 << level) - 1'), JSON.stringify(asm));
+  assert.match(one.text, /^ {2}in src\/speed_ctrl\.asm\.json: box level != 0; .*box ticks >= \(1 << level\) - 1; /m);
 });

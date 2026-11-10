@@ -2,7 +2,8 @@
 // timing analysis beside the report (build/open/paths.json, made here by hand on the FPGA view's routed fixture), the
 // selected path's stages as bars against the PERIOD; Show Path marks its source lines in their editors (the previous
 // path's unmarked), Show in FPGA View lights its sites and draws its nets; a path with no source line says so in the
-// console; the panel folds (remembered) and, on a narrow window, goes over the report behind ☰ Paths; in Portuguese.
+// console; a path through a state diagram's module marks the diagram's elements; the panel folds (remembered) and, on
+// a narrow window, goes over the report behind ☰ Paths; in Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -167,4 +168,56 @@ uiTest('#3178 the Paths panel: folded to a strip and remembered, over the report
   const pt = await page.eval(`window.__uiTexts(document.querySelector('${R} .tp-side'))`);
   assert.deepEqual(untranslated(en, pt, [/^@?(#|setup)$/, /^@?setup [\d.]+ ns$/]), []);
   assert.ok(await page.eval((r) => [...document.querySelectorAll(`${r} .tp-actions .btn`)].map((b) => b.textContent).join(',') === 'Mostrar Caminho,Mostrar na Vista da FPGA', R));
+});
+
+// a path through a module generated from a state diagram (the traffic example's): the diagram opened in front of its
+// HDL, its states (the path starts in the state register) and the transitions that read `night` marked, as
+// core/path-drawing.js finds them, kept over a redraw; the next path's Show Path takes them off
+const TRAFFIC = path.join(ROOT, 'examples', 'traffic', 'src');
+const FSM_PATHS = { top: 'traffic', paths: [
+  { clock: 'clk_BUFGP', port: 'clk', required: 20, delay: 3.1, period: 3.1, half: false, slack: 16.9, lines: [{ file: 'src/traffic.vhd', line: 77 }, { file: 'src/traffic.vhd', line: 89 }],
+    stages: [st('clock-to-out', 'u_s', 'XQ', 'SLICE_X1Y5', 0.6, 0.6, { sources: [{ file: 'src/traffic.vhd', line: 77, block: 'state_register' }], signals: ['state_reg'] }),
+      st('net', 'u_n', 'F1', 'SLICE_X2Y5', 0.8, 1.4, { net: 'night' }),
+      st('logic', 'u_n', 'X', 'SLICE_X2Y5', 0.7, 2.1, { sources: [{ file: 'src/traffic.vhd', line: 89, block: 'next_state_logic' }], signals: ['state_next'] }),
+      st('net', 'u_s', 'BX', 'SLICE_X1Y5', 0.6, 2.7, { net: 'state_next[0]' }),
+      st('setup', 'u_s', 'BX', 'SLICE_X1Y5', 0.4, 3.1, { sources: [{ file: 'src/traffic.vhd', line: 77, block: 'state_register' }], signals: ['state_reg'] })] },
+  { clock: 'clk_BUFGP', port: 'clk', required: 20, delay: 1.2, period: 1.2, half: false, slack: 18.8, lines: [],
+    stages: [st('clock-to-out', 'u_r', 'XQ', 'SLICE_X0Y4', 0.6, 0.6), st('net', 'u_r', 'BY', 'SLICE_X0Y4', 0.2, 0.8, { net: 'n9' }), st('setup', 'u_r', 'BY', 'SLICE_X0Y4', 0.4, 1.2)] }] };
+
+uiTest('#3178 Show Path in a state diagram: its states and the transitions on the path marked, kept over a redraw, cleared by the next path', E, async (page) => {
+  const fsm = await fs.readFile(path.join(TRAFFIC, 'traffic.fsm.json'), 'utf8');
+  await makeProject(env, { name: 'PathsFsm', files: { 'src/traffic.fsm.json': fsm, 'src/traffic.vhd': await fs.readFile(path.join(TRAFFIC, 'traffic.vhd'), 'utf8') }, top: 'traffic' });
+  const build = path.join(env.server.workspace, 'PathsFsm', 'build');
+  await fs.mkdir(path.join(build, 'open'), { recursive: true });
+  await fs.writeFile(path.join(build, 'open', 'timing.txt'), 'Static timing analysis of traffic (Silinx toolchain)\n\nclock clk_BUFGP: minimum period 3.100 ns (322.6 MHz)\n');
+  await fs.writeFile(path.join(build, 'open', 'paths.json'), JSON.stringify(FSM_PATHS));
+  const { drawingPath, pathNames } = await import('../../core/path-drawing.js');
+  const want = drawingPath('fsm', JSON.parse(fsm), pathNames(FSM_PATHS.paths[0], 'src/traffic.vhd'));
+  assert.deepEqual(want.filter((x) => x.type === 'trans').map((x) => x.label), ['CARS -> NIGHT (night)', 'CARS -> CARS_YELLOW (!night && req && done)', 'NIGHT -> CARS (!night)']);
+  assert.equal(want.filter((x) => x.type === 'state').length, 7);
+  await page.setViewport(1600, 800);
+  await page.openProject('PathsFsm');
+  await openReport(page);
+  await page.click(`${R} .tp-actions .btn`, { text: 'Show Path' });
+  await page.waitFor(() => window.Silinx.active?.id === 'fsm:src/traffic.fsm.json' && document.querySelectorAll('.doc:not([hidden]) .on-path').length, [], { what: 'the state diagram in front, marked' });
+  const onPath = () => page.eval(() => {
+    const el = document.querySelector('.doc:not([hidden])');
+    return { states: [...el.querySelectorAll('.fsm-state.on-path')].map((x) => x.dataset.state), trans: [...el.querySelectorAll('.fsm-edge.on-path')].map((x) => x.dataset.trans) };
+  });
+  const ids = (t) => want.filter((x) => x.type === t).map((x) => x.id).sort();
+  let on = await onPath();
+  assert.deepEqual([on.states.sort(), on.trans.sort()], [ids('state'), ids('trans')]);
+  // its HDL's two processes marked too, behind it
+  assert.deepEqual(await marked(page, 'src/traffic.vhd'), [77, 89]);
+  // drawn again (a selection): still marked
+  await page.eval(() => { const ed = window.SilinxApp.findDoc('fsm:src/traffic.fsm.json').fsmEditor; ed.setModel(ed.getModel()); });
+  on = await onPath();
+  assert.deepEqual([on.states.sort(), on.trans.sort()], [ids('state'), ids('trans')]);
+  // the next path (no source line): the diagram's marks taken off
+  await page.eval(() => window.SilinxApp.openFile('build/open/timing.txt'));
+  await page.click(`${R} .tp-row`, { text: '2' });
+  await page.click(`${R} .tp-actions .btn`, { text: 'Show Path' });
+  await page.waitFor(() => /The logic of the path to u_r\.BY could not be traced back to its source lines\./.test(window.__console()), [], { what: 'the console\'s line' });
+  assert.equal(await page.eval(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json').el.querySelectorAll('.on-path').length), 0);
+  assert.deepEqual(await marked(page, 'src/traffic.vhd'), []);
 });

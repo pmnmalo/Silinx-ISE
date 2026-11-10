@@ -1,7 +1,8 @@
 // The Static Timing Report's Paths panel (#3178): the slowest paths of the Silinx toolchain's timing analysis
 // (build/open/paths.json, packages/silinx-fpga/src/fpga/timing-paths.js), each one's stages as bars against its clock's
-// PERIOD, and Show Path: the source lines its logic comes from marked in their editors, its sites and nets in the FPGA
-// view (Show in FPGA View opens it on the path). The MCP's timing_paths gives the same (server/mcp-timing.js).
+// PERIOD, and Show Path: the source lines its logic comes from marked in their editors, the elements of the drawings
+// that generate them in theirs (web/js/drawing-path.js), its sites and nets in the FPGA view (Show in FPGA View opens it
+// on the path). The MCP's timing_paths gives the same (server/mcp-timing.js).
 //
 //   mountTimingPaths(doc, el, host)   // the report's editor document: its editor's host, the panel beside it
 import { h } from './ui.js';
@@ -13,6 +14,7 @@ import { log } from './console.js';
 import { markLines } from './editor.js';
 import { S, findDoc, openFile, openFpgaView } from './app.js';
 import { pathHighlight } from '/packages/silinx-fpga/src/index.js';
+import { showInDrawings } from './drawing-path.js';
 
 export const TIMING_REPORT = 'build/open/timing.txt';
 export const PATHS_FILE = 'build/open/paths.json';
@@ -23,8 +25,8 @@ const end = s => `${s.inst}.${s.pin}`;
 // the editors whose lines a path marked (unmarked by the next Show Path)
 let marked = [];
 
-/** Show Path: the path's source lines marked in their editors (the first file in front), its sites and nets in the FPGA
- *  view when it is open (fpga: open it on the path). */
+/** Show Path: the path's source lines marked in their editors (the first file in front), the elements of the drawings
+ *  they are generated from in theirs, its sites and nets in the FPGA view when it is open (fpga: open it on the path). */
 export async function showPath(p, { fpga = false } = {}) {
   const hl = pathHighlight(p);
   for (const d of marked) if (d.editor) markLines(d.editor, []);
@@ -35,6 +37,8 @@ export async function showPath(p, { fpga = false } = {}) {
     const d = await openFile(f);
     if (d?.editor) { markLines(d.editor, hl.files[f]); marked.push(d); }
   }
+  // (a file generated from a drawing: the drawing's elements on the path, the drawing in front of its HDL)
+  hl.drawings = await showInDrawings(p, [...files].reverse());
   if (fpga && !findDoc('fpgaview')) await openFpgaView();
   findDoc('fpgaview')?.view?.showPath?.(hl);
   return hl;

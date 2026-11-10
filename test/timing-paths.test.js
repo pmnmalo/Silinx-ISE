@@ -63,6 +63,27 @@ test('cellSources: a cell\'s own src (in a function: its callers), the named sig
   assert.deepEqual(at('lonely'), [], 'nothing named on its output, nothing fed');
   assert.deepEqual(at('nowhere'), []);
   assert.deepEqual(cellSources(null, SYN, 't')('x'), []);
+  // the named signals a cell drives (#3178's drawings): a register's, none of Yosys's own names, a block RAM's part's
+  assert.deepEqual(of.signals('$auto$ff.cc_337_slice$1'), ['q']);
+  assert.deepEqual(of.signals('$abc$9$lut$o1'), []);
+  assert.deepEqual(of.signals('ram.0.0.RAMB16'), ['u.y']);
+  assert.deepEqual([of.signals('lonely'), of.signals('nowhere'), cellSources(null, SYN, 't').signals('x')], [[], [], []]);
+});
+
+test('timingPaths: each stage\'s signals, its cells\': a clock-to-out\'s flip-flop\'s, a logic stage\'s LUT\'s (not the flip-flop beside it), a setup\'s both', () => {
+  const cell = (conns, dirs) => ({ attributes: {}, connections: conns, port_directions: dirs });
+  const netlist = { modules: { t: { attributes: { top: '1' }, cells: {
+    ffa: cell({ D: [3], Q: [1] }, { D: 'input', Q: 'output' }), lutb: cell({ I0: [1], O: [2] }, { I0: 'input', O: 'output' }),
+    ffb: cell({ D: [2], Q: [3] }, { D: 'input', Q: 'output' }) },
+  netnames: { 'u.a': { bits: [1] }, 'u.b_next': { bits: [2] }, 'u.b': { bits: [3] } } } } };
+  const cfg = s => s.split(' ').map(x => { const [attr, name, value] = x.split(':'); return { attr, name, value }; });
+  const design = { insts: [{ name: 'sa', site: 'S0', cfg: cfg('FFX:ffa:#FF') }, { name: 'sb', site: 'S1', cfg: cfg('F:lutb:#LUT FFX:ffb:#FF') }],
+    nets: [{ name: 'u/a', inpins: [{ inst: 'sb', pin: 'F1' }] }] };
+  const path = [{ kind: 'clock-to-out', inst: 'sa', pin: 'XQ', delay: 1, arrival: 1 }, { kind: 'net', inst: 'sb', pin: 'F1', delay: 1, arrival: 2 },
+    { kind: 'logic', inst: 'sb', pin: 'X', delay: 1, arrival: 3 }, { kind: 'setup', inst: 'sb', pin: 'F1', delay: 0.5, arrival: 3.5 }];
+  const sta = { paths: () => [{ clock: 'clk', delay: 3.5, period: 3.5, half: false, path }] };
+  const r = timingPaths(sta, design, { netlist, top: 't' });
+  assert.deepEqual(r.paths[0].stages.map(s => [s.kind, s.signals]), [['clock-to-out', ['u.a']], ['net', []], ['logic', ['u.b_next']], ['setup', ['u.b_next', 'u.b']]]);
 });
 
 test('stageCells: the cells of the pin\'s lane (the Spartan-3E\'s F / X and G / Y, the Spartan-6\'s A … D), else all; an instance that is its cell', () => {
@@ -166,6 +187,9 @@ async function checkExample(name, srcLine, { allTraced = true } = {}) {
 test('the open flow: blinky\'s (VHDL, a Verilog counter) paths.json, the timing report\'s critical path first, every stage back to a process', { timeout: 300000 }, async () => {
   const r = await checkExample('blinky', SRC_LINE);
   assert.deepEqual(r.lines.filter(l => /WARNING/.test(l)), []);
+  // (the slowest path: from speed_ctrl's level, the register it reads, into its ticks, the one it writes)
+  const worst = JSON.parse(r.store['open/paths.json']).paths[0];
+  assert.deepEqual([worst.stages[0].signals, worst.stages.at(-1).signals], [['u_speed.level'], ['u_speed.ticks']]);
 });
 
 test('the open flow: pong\'s (Verilog) paths.json, every path back to an always block or an assignment', { timeout: 300000 }, async () => {
