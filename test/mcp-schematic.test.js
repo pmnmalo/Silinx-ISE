@@ -71,3 +71,27 @@ test('rearrange_wires: a channel spread evenly with no crossing; a marker\'s wir
   const e = await call('rearrange_schematic', { project: 'g', path: 'src/gates.vhd' });
   assert.deepEqual([e.isError, e.text], [true, 'rearrange_schematic: src/gates.vhd: not a schematic (.sch.json)']);
 });
+
+// #3300: write_file of a schematic whose instance has an empty name gives it its automatic name, inst_n, as its
+// editor does when the name is cleared: the file written with it, said; its HDL the same (a gate's is an expression
+// there), Check Syntax with no warning
+test('write_file: a schematic\'s instance with an empty name is given its automatic name, inst_n', async () => {
+  await ok('new_project_from_example', { name: 'n', example: 'gates' });
+  const sch = JSON.parse((await ok('read_file', { project: 'n', path: 'src/gates.sch.json' })).text);
+  const hdl0 = (await ok('read_file', { project: 'n', path: 'src/gates.vhd' })).text;
+  sch.symbols.find(s => s.id === 'S13').name = '';
+  sch.symbols.find(s => s.id === 'S14').name = '  ';
+  const r = await ok('write_file', { project: 'n', path: 'src/gates.sch.json', text: JSON.stringify(sch) });
+  assert.deepEqual(r.text.split('\n').slice(1), ['The instance S13, its name empty, named inst_1 (an automatic name, not drawn).',
+    'The instance S14, its name empty, named inst_2 (an automatic name, not drawn).']);
+  assert.deepEqual(r.data.named, [{ id: 'S13', name: 'inst_1' }, { id: 'S14', name: 'inst_2' }]);
+  const back = JSON.parse((await ok('read_file', { project: 'n', path: 'src/gates.sch.json' })).text);
+  assert.deepEqual(back.symbols.filter(s => /^S1[345]$/.test(s.id)).map(s => s.name), ['inst_1', 'inst_2', 'nand_a']);
+  assert.equal((await ok('read_file', { project: 'n', path: 'src/gates.vhd' })).text, hdl0);
+  const c = await ok('check_syntax', { project: 'n' });
+  assert.doesNotMatch(c.text, /WARNING|ERROR/i, c.text);
+  // a schematic with every instance named: written as is, nothing said
+  const again = await ok('write_file', { project: 'n', path: 'src/gates.sch.json', text: JSON.stringify(back) });
+  assert.equal(again.data.named, undefined);
+  assert.doesNotMatch(again.text, /automatic name/);
+});
