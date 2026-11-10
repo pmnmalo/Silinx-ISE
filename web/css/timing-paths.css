@@ -1,0 +1,50 @@
+/* The Static Timing Report's Paths panel (#3178, web/js/timing-paths.js): beside the report's editor, the diagram
+   editors' side panel (asm-editor.css, fpgaview.css), folded as theirs (side-fold.js); on a narrow window over the
+   report, shown by the toolbar's ☰ Paths */
+.tp { flex: 1; display: flex; min-height: 0; position: relative; }
+.tp > .editor-host { flex: 1; min-width: 0; }
+.tp-side { width: 330px; flex: none; overflow: auto; border-left: 1px solid var(--border-light, #ccc); font-size: 12px; background: var(--panel, #fff); }
+.tp-side .asm-cap {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: 20px; padding: 2px 6px;
+  background: var(--title-grad, linear-gradient(#e9eff8, #c9d7ed)); color: var(--title-fg, #15428b); font-weight: bold; border-bottom: 1px solid #99bbe8; white-space: nowrap;
+}
+.tp-side .asm-cap .sp { flex: 1; }
+.tp-side .asm-fold { border: 0; background: none; padding: 0 2px; margin-right: -2px; color: inherit; display: inline-flex; align-items: center; cursor: pointer; opacity: .75; }
+.tp-side .asm-fold:hover { opacity: 1; }
+.tp-list, .tp-stages { width: 100%; border-collapse: collapse; }
+.tp-list th { text-align: left; font-weight: normal; color: var(--grey-3, #666); padding: 3px 6px; }
+.tp-list td, .tp-stages td { padding: 2px 6px; white-space: nowrap; }
+.tp-list .num, .tp-stages .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tp-row { cursor: pointer; }
+.tp-row:hover { background: var(--hover, #e5f1fb); }
+.tp-row.sel { background: var(--selection, #cce4f7); }
+.tp-row.tp-fail td:nth-child(2) { color: #c62828; font-weight: bold; }
+.tp-to { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.tp-detail { padding: 6px 8px 10px; border-top: 1px solid var(--border-light, #d4d0c8); }
+.tp-detail h4 { margin: 2px 0 4px; color: var(--title-fg, #15428b); }
+.tp-sum { margin: 2px 0; word-break: break-all; }
+.tp-none { padding: 6px 8px; margin: 0; }
+.tp-bar { display: flex; height: 14px; margin: 6px 0; border: 1px solid var(--border-light, #bbb); border-radius: 3px; overflow: hidden; background: var(--panel, #fff); }
+.tp-seg { height: 100%; flex: none; }
+.tp-seg + .tp-seg { box-shadow: inset 1px 0 rgba(255, 255, 255, .7); }
+.tp-seg.tp-clock-to-out { background: #7b61c4; } .tp-seg.tp-logic { background: #e8590c; } .tp-seg.tp-net { background: #4e79a7; }
+.tp-seg.tp-setup { background: #59a14f; } .tp-seg.tp-slack { background: repeating-linear-gradient(45deg, transparent 0 3px, rgba(89, 161, 79, .25) 3px 6px); }
+.tp-stages td:first-child { color: var(--grey-3, #666); }
+.tp-stages td:last-child { white-space: normal; word-break: break-all; }
+.tp-src { color: var(--accent, #0645ad); text-decoration: none; }
+.tp-src:hover { text-decoration: underline; }
+.tp-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+@media (min-width: 1024px) {
+  .tp.props-folded .tp-side { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+  .tp.props-folded .tp-side > :not(.asm-cap) { display: none; }
+  .tp.props-folded .tp-side .asm-cap {
+    flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px; border-bottom: 0; align-items: center;
+  }
+  .tp.props-folded .tp-side .asm-cap .sp { display: none; }
+  .tp.props-folded .tp-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+}
+@media (max-width: 1023px) {
+  .tp-side .asm-fold { display: none; }
+  .tp-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(330px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
+  .tp:not(.side-open) .tp-side { display: none; }
+}
