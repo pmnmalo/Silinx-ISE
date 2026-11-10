@@ -5,7 +5,8 @@
 // by <owner>" in the console); the follower follows the owner's editor, the document they have in front and their
 // cursor, or browses alone (opening another document); the toolbar shows who is in (collab-presence.js), its menu
 // follows the owner again or stops following. Every message in the console. A room the owner's page hosts (#3227, a
-// link …/#follow=<room>.<key>.host) is reached over WebRTC, with codes exchanged by hand (collab-host.js).
+// link …/#follow=<room>.<key>.host) is reached over WebRTC, with codes exchanged by hand (collab-host.js). An editor's
+// link (#3182, …#edit=…) also edits the project's text files: their editors bound live (collab-bind.js).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app, activateDoc } from './app.js';
@@ -14,12 +15,14 @@ import { renderPresence, setPresenceCommands } from './collab-presence.js';
 import { followApi } from './collab-follow-api.js';
 import { NAME_KEY, cleanName } from './collab-share.js';
 import { docProject } from '/core/collab-doc.js';
+import { keepBound } from './collab-bind.js';
 import { followRoom, colorOf } from '/core/collab-client.js';
 import { parseFollowLink, relayUrl } from '/core/collab-link.js';
 
 const TRACK_MS = 300, ARRIVE_MS = 20_000;
 let fol = null;   // { name, session, following, driven (the owner's view last followed), mine (the follower's) }
 
+const d0 = p => S.docs.find(x => x.path === p && x.editor?.view);
 const docPath = d => d?.path || (/^(sch|asm|tt|fsm|pn):/.test(String(d?.id || '')) ? String(d.id).replace(/^[a-z]+:/, '') : null);
 
 /** At start-up, an address to follow (#follow=…): joined, the project's name returned once it arrived (null: not a
@@ -46,17 +49,18 @@ export async function startFollowing(hash = location.hash) {
   if (link.via === 'host' && !WS) return null;
   let session;
   try {
-    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, user: { name }, onEvent: ev => onEvent(ev) });
+    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, sign: link.sign, user: { name }, onEvent: ev => onEvent(ev) });
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);
-  fol = { name, session, following: true, driven: null, mine: null };
-  Object.assign(collab, { role: 'follower', owner: owner || session.owner()?.name || '?', project: project.name, session });
+  fol = { name, session, following: true, driven: null, mine: null, bound: new Map() };
+  Object.assign(collab, { role: 'follower', owner: owner || session.owner()?.name || '?', project: project.name, session, editor: session.editor });
   Object.assign(api, followApi(api, session.doc));
   setPresenceCommands(commands);
   setInterval(track, TRACK_MS);
   draw();
-  app.log(`Following ${collab.owner}'s project "${project.name}", read only: their changes appear as they make them, and their open editor while you follow them (Following ${collab.owner}, in the toolbar).`, 'ok');
+  if (session.editor) app.log(`Editing ${collab.owner}'s project "${project.name}" with them: its text files change as you all type them, its drawings stay theirs, read only (Following ${collab.owner}, in the toolbar).`, 'ok');
+  else app.log(`Following ${collab.owner}'s project "${project.name}", read only: their changes appear as they make them, and their open editor while you follow them (Following ${collab.owner}, in the toolbar).`, 'ok');
   return project.name;
 }
 
@@ -117,6 +121,8 @@ async function track() {
       }
     }
     fol.mine = docPath(S.active);
+    // (the open text editors, live, #3182: an editor's own files to edit, the others read only)
+    keepBound(fol.bound, S.docs, fol.session.doc.getMap('files'), p => !!d0(p));
     fol.session.setView(fol.mine ? { path: fol.mine, line: S.active?.editor?.getCursor?.().line ?? null, ch: S.active?.editor?.getCursor?.().ch ?? null } : null);
     const peers = fol.session.peers();
     for (const d of S.docs) {

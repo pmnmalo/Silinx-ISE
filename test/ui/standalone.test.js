@@ -549,7 +549,7 @@ uiTest('#3227 browser edition: Share Project… hosts the room in the page (its 
   await page.dialogButton('Share');
   const link = await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });
   assert.ok(link.startsWith(siteUrl) && /#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host$/.test(link), link);
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Copy Link', 'Add a Follower…', 'Stop Sharing', 'Close']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Copy Link', 'Copy Editor Link', 'Add a Follower…', 'Stop Sharing', 'Close']);
   await page.waitConsole(/^This page hosts the shared project: each follower sends you a code when they open the link/m);
   await page.dialogButton('Stop Sharing');
   await page.waitConsole(/^Stopped sharing "WebShare": its followers no longer see it\.$/m);

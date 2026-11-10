@@ -1,9 +1,10 @@
 // A follower's backend (#3181): the interface of api.js, read from the shared project's Yjs document as it arrives
 // (core/collab-doc.js), so that the whole Project Navigator shows the owner's project as it shows one of its own.
 // It reaches nothing of the server: a follower has no token, and needs none. Every change (a file written, renamed,
-// deleted, a process run) is refused, read only; the processes run in the owner's Silinx.
-import { docFile, docProject, watchDoc } from '/core/collab-doc.js';
-import { collab, readOnlyError } from './collab-state.js';
+// deleted, a process run) is refused, read only; the processes run in the owner's Silinx. An editor (#3182) writes a
+// text file's text: merged into the shared document as its edit (core/collab-doc.js editFile), which the owner writes.
+import { docFile, docProject, watchDoc, editFile } from '/core/collab-doc.js';
+import { collab, readOnlyError, editsHere } from './collab-state.js';
 
 const notFound = what => Object.assign(new Error(what), { status: 404 });
 
@@ -47,6 +48,12 @@ export function followApi(api, doc) {
       });
     },
     reports: async () => ({ available: false }),
+    writeFile: async (name, path, text) => {
+      check(name);
+      if (!editsHere(path)) throw readOnlyError();
+      editFile(doc, path, String(text));
+      return { ok: true };
+    },
     // what the owner changes, as the local server's events of a change on disk (web/js/project-watch.js)
     events: (name, onEvent, signal) => new Promise(resolve => {
       const off = watchDoc(doc, ({ changes, project }) => {

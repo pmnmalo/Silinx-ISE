@@ -13,7 +13,8 @@ import { importMap, importMapPackages } from '../server/import-map.js';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fileOf = url => path.join(ROOT, 'node_modules', url.replace(/^\/vendor\/npm\//, ''));
 // the bare specifiers a module imports (import … from 'x', export … from 'x', import 'x'), not the relative or absolute ones
-const bareImports = src => [...src.matchAll(/(?:^|[\s;}])(?:import|export)\s*(?:[\w*{}\s,$]+\sfrom\s*)?['"]([@\w][\w@./-]*)['"]/g)].map(m => m[1]);
+// (doc comments, /** … */ at a line's start, left out: their examples import nothing)
+const bareImports = text => [...text.replace(/^\s*\/\*\*[\s\S]*?\*\//gm, '').matchAll(/(?:^|[\s;}])(?:import|export)\s*(?:[\w*{}\s,$]+\sfrom\s*)?['"]([@\w][\w@./-]*)['"]/g)].map(m => m[1]);
 
 test('importMap / importMapPackages: a page\'s map, its packages (scoped or not, once each); no map, none', () => {
   const html = `<head><script type="importmap">
@@ -35,13 +36,14 @@ test('the import map of web/index.html: every target installed; the editor\'s wh
     assert.match(url, /^\/vendor\/npm\//, spec);
     assert.ok(fs.existsSync(fileOf(url)), `${spec} -> ${url} installed`);
   }
-  // from the editor's own imports, and a shared project's (core/collab-*.js, #3181), through every module they load: no
+  // from the editor's own imports, and a shared project's (core/collab-*.js, #3181; web/js/collab-bind.js, #3182), through every module they load: no
   // bare specifier the map does not name
   const seen = new Set(), missing = [];
   const todo = bareImports(fs.readFileSync(path.join(ROOT, 'web/js/editor.js'), 'utf8'));
   assert.ok(todo.includes('@codemirror/view') && todo.includes('@codemirror/legacy-modes/mode/vhdl'), todo.join(', '));
-  const collab = ['core/collab-client.js', 'core/collab-doc.js'].flatMap(f => bareImports(fs.readFileSync(path.join(ROOT, f), 'utf8')));
-  assert.deepEqual([...new Set(collab)].sort(), ['y-protocols/awareness', 'yjs']);
+  const collab = ['core/collab-client.js', 'core/collab-doc.js', 'web/js/collab-bind.js'].flatMap(f => bareImports(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+  // (the text editors bound live, #3182: y-codemirror.next)
+  assert.deepEqual([...new Set(collab)].sort(), ['@codemirror/state', '@codemirror/view', 'y-codemirror.next', 'y-protocols/awareness', 'yjs']);
   todo.push(...collab);
   const relative = src => [...src.matchAll(/(?:^|[\s;}])(?:import|export)\s*(?:[\w*{}\s,$]+\sfrom\s*)?['"](\.\.?\/[^'"]+)['"]/g)].map(m => m[1]);
   const files = new Set();
@@ -63,9 +65,10 @@ test('the import map of web/index.html: every target installed; the editor\'s wh
     if (seen.has(spec)) continue;
     seen.add(spec);
     if (!map[spec]) { missing.push(spec); continue; }
-    // (each target a whole module, the packages' dist/index.js bundles, the legacy modes' files; or lib0's modules)
+    // (each target a whole module, the packages' dist/index.js bundles, the legacy modes' files; or lib0's modules, and
+    // y-codemirror.next's, whose ES modules are its src/ files: each package served whole, bundled in the standalone)
     const src = fs.readFileSync(fileOf(map[spec]), 'utf8');
-    if (!spec.startsWith('lib0/')) assert.deepEqual(relative(src), [], `${spec}: no relative import`);
+    if (!spec.startsWith('lib0/') && spec !== 'y-codemirror.next') assert.deepEqual(relative(src), [], `${spec}: no relative import`);
     load(fileOf(map[spec]), spec);
   }
   assert.deepEqual(missing, []);
