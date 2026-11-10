@@ -32,6 +32,7 @@ import { TRANSFER_TOOLS } from './mcp-transfer.js';
 import { LINK_TOOLS } from './mcp-link.js';
 import { TABLE_TOOLS } from './mcp-tables.js';
 import { LAB_TOOLS } from './mcp-labs.js';
+import { COLLAB_TOOLS, endCollab } from './mcp-collab.js';
 
 export { OPEN_REPORTS } from './mcp-processes.js';
 
@@ -39,12 +40,12 @@ export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'silinx', title: 'Silinx', version: VERSION };
 const INSTRUCTIONS = 'Silinx: FPGA design for teaching (Spartan-3E; Basys2, Nexys2). Projects live in the Silinx workspace: '
   + 'list_projects, new_project_from_example, or new_project (empty) then new_source (clock_manager, block_memory, test_bench_wizard, constraints_wizard) / write_file and set_top; then read_file / write_file, check_syntax, simulate (the project\'s test bench; its wave configurations: save_wave_config / load_wave_config), '
-  + 'set_design_properties (board, device: list_devices) and set_process_properties, remove_from_project / add_to_project, rename_file / rename_module, delete_file, import_project / export_project, project_link / open_link (a design\'s link, for slides), '
+  + 'set_design_properties (board, device: list_devices) and set_process_properties, remove_from_project / add_to_project, rename_file / rename_module, delete_file, import_project / export_project, project_link / open_link (a design\'s link, for slides), share_project / follow_project (a project shared live, read only, through a running Silinx server), '
   + 'run_process (synthesize, implement, bitstream, timing, power, pins) and get_report; lab (the guided labs: list, show and check a step). The Silinx toolchain needs no Xilinx ISE.';
 
 // the tools, by area: the projects and their files (mcp-projects.js), their settings (mcp-settings.js), their
-// new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), the conversions (mcp-convert.js), the read-only views related to a source (mcp-views.js), a drawing's Check (mcp-check.js), a schematic's Rearrange Wires / Schematic (mcp-schematic.js), a state machine's drawing stepped as its Simulate panel does (mcp-simulate-drawing.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), the HDL (mcp-hdl.js), the wave configurations (mcp-wcfg.js), the C / C++ of Silinx HLS (mcp-hls.js), the processes (mcp-processes.js), the guided labs (mcp-labs.js)
-export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS];
+// new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), the conversions (mcp-convert.js), the read-only views related to a source (mcp-views.js), a drawing's Check (mcp-check.js), a schematic's Rearrange Wires / Schematic (mcp-schematic.js), a state machine's drawing stepped as its Simulate panel does (mcp-simulate-drawing.js), their sources (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), their sharing live (mcp-collab.js), the HDL (mcp-hdl.js), the wave configurations (mcp-wcfg.js), the C / C++ of Silinx HLS (mcp-hls.js), the processes (mcp-processes.js), the guided labs (mcp-labs.js)
+export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS];
 
 // ------------------------------------------------------------------ the protocol
 /** One request (or notification) of a client: its answer, or null for a notification. */
@@ -100,5 +101,6 @@ export function serveMcp({ input = process.stdin, output = process.stdout } = {}
       if (out.length) send(Array.isArray(msg) ? out : out[0]);
     }).catch(e => process.stderr.write(`silinx mcp: ${e?.stack || e}\n`));
   });
-  return new Promise(resolve => rl.on('close', () => pending.then(resolve)));
+  // (its shared projects end with it, #3181)
+  return new Promise(resolve => rl.on('close', () => pending.then(endCollab).then(resolve)));
 }

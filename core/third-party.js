@@ -382,6 +382,20 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
+    "name": "isomorphic.js",
+    "version": "0.2.5",
+    "license": "MIT",
+    "url": "https://github.com/dmonad/isomorphic.js#readme",
+    "standalone": false
+  },
+  {
+    "name": "lib0",
+    "version": "0.2.120",
+    "license": "MIT",
+    "url": "https://github.com/dmonad/lib0#readme",
+    "standalone": true
+  },
+  {
     "name": "light8080",
     "version": "57163bc",
     "license": "LGPL-2.1",
@@ -618,5 +632,26 @@ export const THIRD_PARTY = [
     "license": "ISC",
     "url": "https://github.com/npm/wrappy",
     "standalone": false
+  },
+  {
+    "name": "ws",
+    "version": "8.22.2",
+    "license": "MIT",
+    "url": "https://github.com/websockets/ws",
+    "standalone": false
+  },
+  {
+    "name": "y-protocols",
+    "version": "1.0.7",
+    "license": "MIT",
+    "url": "https://github.com/yjs/y-protocols#readme",
+    "standalone": true
+  },
+  {
+    "name": "yjs",
+    "version": "13.6.33",
+    "license": "MIT",
+    "url": "https://docs.yjs.dev",
+    "standalone": true
   }
 ];

@@ -58,8 +58,11 @@ async function openProjectNow(name, { startup = false } = {}) {
   try {
     S.project = await api.project(name);
   } catch (e) { alertDlg('Open Project', e.message, 'error'); return; }
-  try { localStorage.setItem(prefKey('silinx.lastProject'), name); } catch { /* ignore */ }
-  rememberRecent(name);
+  // (a project followed, #3181: not one of this workspace's, neither the last nor a recent one)
+  if (!api.following) {
+    try { localStorage.setItem(prefKey('silinx.lastProject'), name); } catch { /* ignore */ }
+    rememberRecent(name);
+  }
   await reloadProject();
   await fixMissingTops();   // (a project saved with a top it no longer has, #253)
   log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
