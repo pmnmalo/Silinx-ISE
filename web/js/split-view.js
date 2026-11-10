@@ -158,15 +158,16 @@ export function restoreSplit(kept, find, open = []) {
 
 // ---- on the page
 /** The Split button: in the Tasks interface's header between the messages' button and Maximize (#1657), in the Silinx one's at its right
- *  end, in the ISE style one's toolbar at its right end. */
+ *  end; none in the ISE style one's toolbar, whose right end is the shared project's (#3315: View ▸ Split Editor). */
+const buttonPlace = () => $('task-view') || (document.documentElement.dataset.ui === 'silinx' ? $('top-actions') : null);
 function placeButton() {
   if (!button) {
     button = h('button', { id: 'split-btn', type: 'button', 'data-cmd': 'split', title: 'Split the editor: two documents side by side, each side with its tabs', html: ICON, onclick: () => toggleSplit() });
     button.setAttribute('aria-label', button.title);
   }
   const view = $('task-view'), silinx = document.documentElement.dataset.ui === 'silinx';
-  const where = view || (silinx ? $('top-actions') : $('toolbar'));
-  if (!where) return;
+  const where = buttonPlace();
+  if (!where) { button.remove(); return; }
   button.className = view || !silinx ? 'tb-btn' : 'm-icon-btn';
   const max = view?.querySelector('[data-act=max]');
   if (button.parentNode !== where || (max && button.nextElementSibling !== max)) { if (max) max.before(button); else where.append(button); }
@@ -252,7 +253,7 @@ function watch(ws) {
   let wasV = null;
   new ResizeObserver(() => { const v = ws.clientWidth < NARROW; if (sides() && (v !== wasV || v)) { wasV = v; layout(); } }).observe(ws);
   // (the header rebuilt: the Tasks interface on or off, View ▸ Interface)
-  const replace = () => { if (button?.parentNode !== ($('task-view') || (document.documentElement.dataset.ui === 'silinx' ? $('top-actions') : $('toolbar')))) placeButton(); };
+  const replace = () => { if (button && button.parentNode !== buttonPlace()) placeButton(); };
   new MutationObserver(replace).observe(document.documentElement, { attributes: true, attributeFilter: ['data-ui', 'data-layout'] });
   new MutationObserver(replace).observe($('topbar'), { childList: true, subtree: true });
   // (the Tasks interface's task changed: its documents on each side)
