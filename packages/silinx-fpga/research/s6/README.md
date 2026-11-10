@@ -852,6 +852,18 @@ traffic, blinky and pong on the Atlys):
   inner I/O tile's `D1_OLOGIC_SITE -> OQ_OLOGIC_SITE` (3 bits) and a BTERM's
   `IOI_BTERM_SR1B0 -> IOI_BTERM_NR1E0` (no bits), into `db/s6-pips-flow.json`.
 
+- **The JTAG's user access primitive, BSCAN_SPARTAN6** (#3176, 2026-11-10; for the logic analyzer). The four BSCAN
+  sites are in the top-right corner's tiles: BSCAN_X0Y0 / Y1 in UR_UPPER, Y2 / Y3 in UR_LOWER, one per JTAG_CHAIN 1-4.
+  `gen-bscan6.mjs` writes the designs: one per chain, every output sampled by flip-flops, DRCK clocking a shift
+  register that TDO reads; and chain 1 again with its logic far from the corner (f1). `measure-3176-s6.sh` implements
+  them with ISE from HDL on the XC6SLX16, then drops their non-INT tiles' PIPs (`gen-pipdrop6.mjs`, `--split 4` too):
+  50 xdl + bitgen runs. `ana-pipdrop6.mjs` resolves 121 PIPs, 113 with no bits (the pins' wires onto the interface
+  tile's LOGICOUT wires), 35 of them known already with the same bits. The 86 new ones are in `db/s6-pips-bscan.json`.
+  With them every design is one bit from ISE's bitgen: the instance's JTAG_CHAIN, one bit per chain in UR_UPPER's
+  region (frame 22, bits 31 … 28 for chains 1 … 4) whichever site holds it. That is `db/s6-bscan.json`, which
+  `bitgen.js` reads. The five designs are then byte-identical with ISE's bitgen, and on the XC6SLX45 too (c1, c3: its
+  corner's region at frame 9056, the same offsets). The open flow does not place a BSCAN yet (nextpnr's chip database).
+
 ## Trying the parts that exist
 
 The Spartan-6 parts of the flow are behind a developer flag (#722): with `SILINX_SPARTAN6_OPEN=1` in the server's
@@ -895,6 +907,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `check-pips6.mjs` | The INT PIP database checked against ISE's implemented examples, tile by tile (#726) |
 | `gen-pipdrop6.mjs` | The examples routed by ISE without the other tiles' PIPs (`--split`: a quarter at a time) (#726) |
 | `ana-pipdrop6.mjs` | Their bits by tile and PIP: `db/s6-pips-other.json` (#726) |
+| `gen-bscan6.mjs`, `measure-3176-s6.sh` | #3176: BSCAN_SPARTAN6 on each JTAG chain, implemented by ISE from HDL, its corner tiles' PIPs dropped: `db/s6-pips-bscan.json`, the chain's bit `db/s6-bscan.json` |
 | `residual6.mjs` | Every bit of ISE's implemented examples predicted from the databases; what is left, by tile type (#725, #726) |
 | `gen-iob6.mjs` | The pads' designs: every bonded pad an IOB of one setting, the id designs (#727) |
 | `gen-clock6.mjs` | The clock path's designs (ISE implements them): one or more clocks to fixed flip-flops, k16 (#727) |

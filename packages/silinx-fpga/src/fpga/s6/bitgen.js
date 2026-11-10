@@ -130,6 +130,16 @@ export function predictDesign(design, device, dev, db) {
       for (const u of p.unknown) note(u);
     }
   }
+  // a BSCAN_SPARTAN6's JTAG chain: one bit per chain in the corner tile UR_UPPER's region, whichever of the four
+  // sites holds it (db/s6-bscan.json, #3176)
+  for (const inst of design.insts) {
+    if (inst.type !== 'BSCAN' || !inst.placed) continue;
+    const chain = String(inst.cfg.find(c => c.attr === 'JTAG_CHAIN')?.value ?? '1'), off = db.bscan?.chains?.[chain];
+    const ur = device.tileNames.find(t => /^UR_UPPER_X/.test(t));
+    if (!off || !ur) { note(`BSCAN JTAG_CHAIN=${chain}`); continue; }
+    const [f0, b0] = gridRegion(device, dev, ur);
+    for (const x of off) { const [f, b] = x.split(',').map(Number); bits.add(`${f0 + f},${b0 + b}`); }
+  }
   for (const net of design.nets) {
     const dirs = (net.pips || []).some(p => p.dir === '=-') ? pipDirections(device, net, design) : null;
     (net.pips || []).forEach((p, i) => {

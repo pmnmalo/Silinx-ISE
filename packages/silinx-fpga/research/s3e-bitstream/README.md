@@ -53,6 +53,7 @@ reference design implemented by ISE (`top.xdl`, `top.bit`, from `top.v` / `top.u
 | `gen-bram.mjs`, `ana-bram.mjs`, `packages/silinx-fpga/bitdb/<device>-bram.json` | Stage D: every memory bit of the block RAMs, by binary codes |
 | `gen-sitevar.mjs`, `ana-sitevar.mjs`, `sitevar-features.mjs`, `bram-features.mjs` | Stage D: the settings of block RAMs, multipliers and DCMs, changed one at a time in designs implemented by ISE |
 | `packages/silinx-fpga/bitdb/<device>-layout.json`, `packages/silinx-fpga/bitdb/s3e-tiles.json`, `packages/silinx-fpga/bitdb/<device>-<package>-pads.json` | Result of stages C-F: where every tile is in the frame data and the bitstream format, per device; the bits of every measured feature (PIPs, site settings) per tile type, shared by the devices (`packages/silinx-fpga/bitdb/<device>-tiles.json`, if present, adds or replaces features of one device); the pads' own bits per device and package |
+| `gen-bscan.mjs`, `measure-3176.sh` | #3176: designs of every pin of BSCAN_SPARTAN3 (the corner tile UR), implemented by ISE from HDL and measured by PIP drop; the logic analyzer's capture core among them |
 | `gen-dcmvcc.mjs` | #190: the DCM tiles' switches from their VCC site, one constant-1 net per DCM tile (then `gen-pipdrop.mjs`) |
 | `gen-iobreg.mjs`, `gen-iobrand.mjs`, `ana-iobreg.mjs` | Stage G: designs with registers in the IOBs of every pad (implemented by ISE), their settings and input delays at random (xdl variants), the bits of each pad's settings solved |
 | `gen-dcmhdl.mjs`, `gen-sidebufg.mjs` | Stage G: designs of several DCMs with settings of their own, and of subsets of the side global buffers, implemented by ISE from HDL (settings xdl refuses in an edited design; inputs in combination); `gen-sitevar.mjs` variants with other values on each instance (`perSite`) |
@@ -1173,6 +1174,37 @@ were unknown: 288 on the XC3S250E's DCM and clock tiles, 348 on the XC3S1200E's 
   DCM output read as data) and the DCM and clock fixtures (feat_dcm, feat_dcm2, feat_dcm_fx, feat_dcm_phase,
   feat_clkwiz, feat_clocks12) are byte-identical, DRC 0 errors, 0 warnings. (Main routed such a design already, on the
   few switches it knew: the router now has every line, and ISE's own routings of these designs are byte-identical.)
+
+### The JTAG's user access primitive, BSCAN_SPARTAN3 (2026-11-10, #3176)
+
+The logic analyzer (#3176) reads its capture core through the JTAG cable, by BSCAN_SPARTAN3's user registers.
+The BSCAN site is in the top-right corner tile (UR). Its outputs CAPTURE, DRCK1, DRCK2, RESET, SEL1, SEL2, SHIFT,
+TDI and UPDATE each leave through a wire of their own (CNR_D_O_FAN_B0-7, CNR_D_OUT_B11), and switches take that
+wire onto the tile's OMUX and onto the double and hex lines. TDO1 and TDO2 come from CNR_DATA_IN0 and
+CNR_DATA_IN1, which switches feed from the lines. The database had no bits for any of these switches.
+
+`gen-bscan.mjs` writes the designs. In five of them every BSCAN pin feeds a flip-flop of the design's clock, and
+DRCK1 / DRCK2 clock shift registers that TDO1 / TDO2 read. The flip-flops are kept to one of five regions of the
+chip (AREA_GROUP: near the corner, the top left, the bottom right, the bottom left, the centre), so ISE routes the
+pins different ways. The sixth design, `core`, is the logic analyzer's capture core itself (`core/ila.js`) on USER1.
+
+`measure-3176.sh` implements the designs with ISE from HDL (XST, map, par: no warnings). It runs `gen-pipdrop.mjs`
+on each routed design (20 variants), xdl and bitgen on the ISE machine, then `ana-pipdrop.mjs` and
+`pips-to-db.mjs`. The six designs were measured on the XC3S250E, and the core on the XC3S100E and the XC3S500E
+too: 8 designs, 168 xdl + bitgen runs, about 40 minutes. The result is `measured/learn-20bscan-pips.json`:
+
+- 587 features in 32 tile types, those not in the database already (merged with `--keep`). A feature measured with
+  different bits on two devices would have been left out; there was none.
+- In the corner tile: every BSCAN output's switches into the fabric, and TDO1's and TDO2's from it. A pin's wire
+  onto its fan wire (UR_DRCK1 -> CNR_D_O_FAN_B0…) and CNR_DATA_IN0 -> UR_TDO1 have no bits.
+- The site's own `BSCAN:USED`: two bits, frames 19 and 20 of the tile at bit 63. These are the only bits the five
+  first designs alike left unexplained once their PIPs were known. The core, on USER1 only, sets the same two.
+- The other switches the designs' routes took, in the I/O, terminal, block-RAM and clock tiles.
+
+**Silinx's writer is byte-identical with ISE's bitgen on all eight designs**, with and without the CRC
+(`check-writer.mjs`). Before, it missed 22 to 25 bits on each. `test/s3e-devices.test.js` checks the four devices:
+every BSCAN pin reaches the fabric through known switches, and a lone BSCAN sets its two bits. The open flow does not
+place or route a BSCAN yet: nextpnr's chip database and packer come next, in the fork.
 
 ### Register bits a neighbouring pad held (2026-10-24, #897)
 
