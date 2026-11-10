@@ -240,8 +240,9 @@ export async function gradeSubmission(ex, sub, { visible = false, vectors = {}, 
 }
 
 /** An exercise's grading of many submissions (paths: expandSubmissions'): { results, problems } (problems: the
- *  exercise's, nothing graded). onResult(result) after each. */
-export async function gradeAll(exerciseFile, paths, { visible = false, onResult = () => {} } = {}) {
+ *  exercise's, nothing graded). onResult(result) after each; expand false: each path a submission, none a folder of
+ *  them (a folder with no project is one with no submission). */
+export async function gradeAll(exerciseFile, paths, { visible = false, expand = true, onResult = () => {} } = {}) {
   const { exercise: ex, problems } = loadExercise(exerciseFile);
   if (!ex) return { results: [], problems, exercise: null };
   const run = testsOf(ex, { visible });
@@ -252,7 +253,7 @@ export async function gradeAll(exerciseFile, paths, { visible = false, onResult 
   const exerciseUnits = [...exerciseUnitNames(ex)];
   const results = [];
   const synthesis = await synthesisStatus({ ...ex, tests: run });
-  for (const p of expandSubmissions(paths)) {
+  for (const p of expand ? expandSubmissions(paths) : paths) {
     const r = await gradeSubmission(ex, await readSubmission(p), { visible, vectors, exerciseUnits, synthesis });
     results.push(r);
     onResult(r);

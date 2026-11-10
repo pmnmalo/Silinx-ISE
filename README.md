@@ -481,6 +481,7 @@ node bin/silinx.js ucf   <projectDir> --board basys2              # constraints 
 node bin/silinx.js toolchain [--docker xilinx/ise:14.7]          # show / set the ISE toolchain
 node bin/silinx.js mcp                                         # an MCP server for an AI assistant (below)
 node bin/silinx.js grade <exercise.json> <submissions…> --csv grades.csv   # grade exercises (docs/GRADING.md)
+node bin/silinx.js classroom template|grade …                  # GitHub Classroom assignments (docs/CLASSROOM.md)
 npm test                                                         # test suite
 SILINX_ISE_TESTS=1 npm run test:ise                              # the real ISE flow (Docker image; SILINX_ISE_HOST=user@host: on another machine)
 SILINX_ISE_HOST=user@host npm run check:open-flow [projects…]   # the open flow vs ISE: DRC, byte-identical bitstreams (SILINX_ISE_HOST=local: the image here)
