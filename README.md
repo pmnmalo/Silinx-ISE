@@ -389,11 +389,13 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
 
 *Project ▸ Guided Labs…* opens a step-by-step tutorial on the project, beside its documents: each step says what to
 do, and *Check Step* checks it on the project (a file, a module's ports, Check Syntax with exactly the expected
-warnings, the simulation's values at given times, a process run on the sources as they are), ticking it in the Steps
-panel, or giving its hint and the reasons in the console. Silinx ships "First steps" on the gates example, "A state
-machine" on traffic and "The clock and the board" on blinky (in English and Portuguese); a teacher writes a lab as
-a `labs/<name>.lab.json` file of a project (its format: `core/labs.js`), and shares it with the project. The progress
-is the project's (`labs/progress.json`): a lab resumes where it was left.
+warnings, the simulation's values at given times, a drawing's check, a port's pin, a process run on the sources as
+they are), ticking it in the Steps panel, or giving its hint and the reasons in the console. Silinx ships "First steps"
+on the gates example, "A state machine" on traffic, "The clock and the board" on blinky and "The emulator" on stopwatch
+(in English and Portuguese); a teacher writes a lab as a `labs/<name>.lab.json` file of a project (its format:
+`core/labs.js`), and shares it with the project. A link opens a lab beside the project (`lab=<its id>`: *Copy Link*'s
+Lab, e.g. `…/Silinx/#open=example:stopwatch&lab=stopwatch-emulator`). The progress is the project's
+(`labs/progress.json`): a lab resumes where it was left.
 
 ### A design in a link (for lecture slides)
 
@@ -440,9 +442,10 @@ SSH key): Silinx never asks for, stores or logs a password or a token. A server'
 
 In the browser edition the same commands go through GitHub's API (there is no git in a browser):
 - **Open from Repository…** opens a public repository with no sign-in.
-- **Sign in with GitHub…** (with the Git commands) gives a code to enter at github.com/login/device; a private
-  repository, a commit and a pull need it. The sign-in is kept in this browser only, and **Sign out of GitHub**
-  forgets it.
+- **Sign in with GitHub…** (with the Git commands): a private repository, a commit and a pull need it. Where the
+  site has Silinx's sign-in relay, it gives a code to enter at github.com/login/device; elsewhere, it asks for a
+  fine-grained personal access token of yours (github.com/settings/personal-access-tokens/new: the repositories to
+  open, Contents read and write). The sign-in is kept in this browser only, and **Sign out of GitHub** forgets it.
 - **Commit and Push…** commits and pushes in one step. A commit GitHub rejects (someone pushed meanwhile) says to
   pull first.
 - **Initialize Repository…** takes an empty GitHub repository (make it at github.com/new); the first commit is the
@@ -554,7 +557,7 @@ MCP server made or imported runs ISE, or programs a board or a PROM, only once y
 statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
 checked on the project and recorded, as *Guided Labs…* does; a lab restarted) and `timing_paths` (the Silinx toolchain's
 slowest paths, as the Static Timing Report's Paths panel: a path's stages, their delays against the PERIOD, and the
-source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from). The projects are those of the Project Navigator
+source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from; with `from` and `to`, the worst paths between two registers). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
 the same), so what the assistant does is seen in the interface when the project is opened again.
 Every path stays inside its project; programming a board is not one of its tools; the ISE machine's

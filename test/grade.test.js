@@ -11,6 +11,7 @@ import { exerciseUnitNames, submissionSources } from '../core/grade-design.js';
 import { runVectors, seededRandom, randomRows } from '../core/grade-sim.js';
 import { textReport, csvReport } from '../core/grade-report.js';
 import { compile, elaborate } from '../core/compile.js';
+import { CHECKS } from '../core/labs-check.js';
 import { COUNTER_V, COUNTER_VHD, VECTORS, PORTS, counterExercise, hdl, trafficExercise, drawing } from './grade-fixtures.mjs';
 
 async function grade(ex, sub, opts = {}) {
@@ -54,13 +55,16 @@ test('#3192 the exercise: a right one has no problem; each kind of wrong one say
     'e.exercise.json: test 3: "files": a list of { "path", "text" } (or { "path", "file" })',
     'e.exercise.json: test 4: "luts": a whole number from 0',
     'e.exercise.json: test 4: "latches": true or false',
-    'e.exercise.json: test 5: "kind": one of vectors, reference, testbench, synthesis, check',
+    'e.exercise.json: test 5: "kind": one of vectors, reference, testbench, synthesis, equivalence, check',
   ]);
+  // (the guided labs' check kinds, core/labs-check.js: whatever kinds it has, #3179)
+  const KINDS = Object.keys(CHECKS).join(', ');
+  assert.ok(['project', 'file', 'module', 'syntax', 'simulate'].every(k => CHECKS[k]), KINDS);
   const checks = counterExercise();
   checks.tests = [{ id: 'c', kind: 'check' }, { id: 'd', kind: 'check', checks: [{ check: 'fly' }, { check: 'syntax', warnings: ['/[/'] }] }, { id: 't', kind: 'testbench', top: 'tb', files: [{ path: 'tb.v', text: '' }], done: '/(/' }];
   assert.deepEqual(exerciseProblems(checks, 'e.exercise.json'), [
-    'e.exercise.json: test 1: "checks": a list of the guided labs\' checks (project, file, module, syntax, simulate, process)',
-    'e.exercise.json: test 2: check 1: "check": one of project, file, module, syntax, simulate, process',
+    `e.exercise.json: test 1: "checks": a list of the guided labs' checks (${KINDS})`,
+    `e.exercise.json: test 2: check 1: "check": one of ${KINDS}`,
     'e.exercise.json: test 2: check 2 (syntax): "warnings": \'/[/\' is not a regular expression',
     'e.exercise.json: test 3: "done": a message the test bench prints at its end (a text, or "/regex/flags")',
   ]);

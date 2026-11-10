@@ -111,10 +111,10 @@ test('read only in the page\'s room: a follower\'s edit refused, never at the ow
 test('the codes exchanged by hand: sealed, opened by their project\'s key and kind only, their size capped', async () => {
   const { key, text } = await newKey();
   const room = 'R'.repeat(22);
-  const sdp = `v=0\r\no=- 46117 2 IN IP4 127.0.0.1\r\ns=-\r\n${'a=candidate:1 1 udp 2122260223 192.168.1.20 54321 typ host\r\n'.repeat(4)}`;
+  const sdp = `v=0\r\no=- 46117 2 IN IP4 127.0.0.1\r\ns=-\r\n${'a=candidate:1 1 udp 2122260223 192.0.2.20 54321 typ host\r\n'.repeat(4)}`;
   const offer = await sealCode(key, room, 'offer', sdp);
   assert.match(offer, /^S1\.[A-Za-z0-9_-]+$/);
-  assert.ok(!offer.includes('192.168') && offer.length < sdp.length + 100, 'sealed, compressed');
+  assert.ok(!offer.includes('192.0.2') && offer.length < sdp.length + 100, 'sealed, compressed');
   assert.equal(await openCode(await keyOf(text), room, 'offer', `  ${offer.slice(0, 40)}\n${offer.slice(40)} `), sdp);   // (spaces and line breaks of a paste)
   await assert.rejects(openCode(key, room, 'answer', offer), /^Error: not the owner's code: a follower's instead$/);
   const answer = await sealCode(key, room, 'answer', 'v=0\r\n');

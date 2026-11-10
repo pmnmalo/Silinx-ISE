@@ -120,6 +120,11 @@ export async function openFromLink(opts) {
     // the link's module selected in the Design pane, its source open when no view opens (#2871)
     if ((top || view) && view !== 'simulate') await showModule(top || S.project.top, !view);   // (after the link's view: the module's source in front, #2871)
     if (view) await openView(view, top || S.project.top, d.files);
+    // the link's guided lab (#3179), beside the rest
+    if (opts.lab) {
+      const { openLabById } = await import('./lab-view.js');
+      if (!await openLabById(opts.lab)) app.log(`WARNING: Open from a link: the project has no lab '${opts.lab}' (Project ▸ Guided Labs… lists its labs).`, 'warn');
+    }
     return true;
   } catch (e) {
     app.log(`ERROR: Open from a link: ${e.message}.`, 'err');

@@ -1,8 +1,8 @@
 // The MCP server's tools of a design's link (#2826, server/mcp.js, #2674), as the interface's Copy Link… and the
 // opening of a link: project_link makes a project's link (the project inside it, core/design-link.js; the view, the
-// module), open_link makes a project of a link (the design inside it, or an example), as the interface does when it
-// is opened at that address: a project of the workspace that differs is never replaced (#2829), one that is the same
-// is the link's. A zip at an address is not fetched (the MCP server reaches nothing on the network): the client
+// module, a guided lab opened beside it), open_link makes a project of a link (the design inside it, or an example),
+// as the interface does when it is opened at that address: a project of the workspace that differs is never replaced
+// (#2829), one that is the same is the link's. A zip at an address is not fetched (the MCP server reaches nothing on the network): the client
 // downloads it into the exchange folder and imports it (import_project).
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -22,6 +22,11 @@ async function projectFiles(name) {
   return out;
 }
 const linkFail = e => (e.linkError ? toolError(e.message) : e);
+// the ids of the guided labs a project can run (core/labs.js listLabs, #3179)
+async function labIds(name) {
+  const { listLabs } = await import('../core/labs.js');
+  return (await listLabs(await P.fileTree(name), rel => P.readFile(name, rel), { example: name })).labs.map(l => l.id);
+}
 
 export const LINK_TOOLS = [
   {
@@ -31,9 +36,10 @@ export const LINK_TOOLS = [
       project: PROJECT, view: { type: 'string', enum: LINK_VIEWS, description: 'What the link opens: try, simulate or emulate (default: the project only).' },
       top: STR('The module to open (default: the project\'s top); with view simulate, the test bench to simulate (default: the project\'s); a test bench only with simulate.'),
       base: STR(`The address of Silinx the link opens (default ${SITE_URL}, the site's latest release; e.g. a local server's http://localhost:3000/).`),
+      lab: STR('A guided lab of the project to open beside it (its id: lab action list).'),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
-    async run({ project: name, view, top, base = SITE_URL }) {
+    async run({ project: name, view, top, base = SITE_URL, lab }) {
       const pj = await readProject(name);
       if (view !== undefined && !LINK_VIEWS.includes(view)) throw toolError(`view: one of ${LINK_VIEWS.join(', ')}`);
       let url;
@@ -42,6 +48,7 @@ export const LINK_TOOLS = [
       const files = await projectFiles(name);
       const problem = viewProblem(pj, files, { view, top });
       if (problem) throw toolError(problem);
+      if (lab !== undefined) { const ids = await labIds(name); if (!ids.includes(lab)) throw toolError(`lab: no lab '${lab}' in the project '${name}' (${ids.join(', ') || 'none'})`); }
       const { exportProjectZip } = await import('./project-zip.js');
       const { gateZip } = await import('../core/import-gate.js');
       const { NODE_CODEC } = await import('./impl-routes.js');
@@ -49,16 +56,16 @@ export const LINK_TOOLS = [
       let e, link;
       try {
         e = await encodeDesign(entries);
-        link = makeLink(url.href, { design: e.design, view, top });
+        link = makeLink(url.href, { design: e.design, view, top, lab });
       } catch (err) { throw linkFail(err); }
       const warnings = link.length > LINK_LIMITS.slides ? [`WARNING: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides} (a zip hosted elsewhere makes a short one)`] : [];
-      const lines = [...warnings, `The link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''} (${link.length} characters${e.left.length ? `; ${e.left.join(', ')} made again from ${e.left.length > 1 ? 'their drawings' : 'its drawing'}` : ''}):`, link];
-      return { text: lines.join('\n'), data: { project: name, link, length: link.length, view: view || null, top: top || null, left: e.left, warnings } };
+      const lines = [...warnings, `The link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters${e.left.length ? `; ${e.left.join(', ')} made again from ${e.left.length > 1 ? 'their drawings' : 'its drawing'}` : ''}):`, link];
+      return { text: lines.join('\n'), data: { project: name, link, length: link.length, view: view || null, top: top || null, ...(lab ? { lab } : {}), left: e.left, warnings } };
     },
   },
   {
     name: 'open_link', title: 'Open a design from a link',
-    description: 'Make a project of the workspace from a Silinx link (#design=… with the project inside it, or #open=example:<name>), as the interface does when opened at that link; returns what the link opens (view, top). The project is named after the design (or name); one of that name with the same files is the link\'s already (kept as it is), one that differs is never replaced (give another name, or delete_project first). A link to a zip at an address (#open=https://…) is not fetched: download it into the exchange folder and import_project it.',
+    description: 'Make a project of the workspace from a Silinx link (#design=… with the project inside it, or #open=example:<name>), as the interface does when opened at that link; returns what the link opens (view, top, lab: a guided lab). The project is named after the design (or name); one of that name with the same files is the link\'s already (kept as it is), one that differs is never replaced (give another name, or delete_project first). A link to a zip at an address (#open=https://…) is not fetched: download it into the exchange folder and import_project it.',
     inputSchema: { type: 'object', properties: {
       link: STR('The link (the whole address, or its part from #).'),
       name: STR('The new project\'s name (default: the design\'s, or the example\'s).'),
@@ -69,7 +76,7 @@ export const LINK_TOOLS = [
       let opts;
       try { opts = parseLink(link.includes('#') ? link.slice(link.indexOf('#')) : link); } catch (e) { throw linkFail(e); }
       if (!opts) throw toolError('the link has no design (#design=… or #open=…)');
-      const { source, view, top, board } = opts;
+      const { source, view, top, board, lab = null } = opts;
       if (source.kind === 'zip') throw toolError(`the link opens a zip at ${source.url}: the MCP server fetches nothing from the network (download it into the exchange folder, then import_project)`);
       if (name !== undefined && !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(String(name))) throw toolError(`name: '${name}' is not a project name (a letter, then letters, digits, - and _)`);
       const warnings = [];
@@ -112,8 +119,9 @@ export const LINK_TOOLS = [
         if (!same) throw toolError(`project '${pjName}' exists and differs from the link's design: it is not replaced (give another name, or delete_project first)`);
       } else { await make(); created = true; }
       const pj = await P.readProject(pjName);
-      const lines = [...warnings, `${created ? 'Opened the link as the new project' : 'The link\'s design is the project'} '${pjName}'${created ? '' : ' already (unchanged)'}: top ${pj.top || '(none)'}, ${pj.board || 'no board'}${view ? `; the link opens ${VIEW_NAMES[view]}${top ? ` of ${top}` : ''} (${NEXT[view]})` : ''}.`];
-      return { text: lines.join('\n'), data: { project: pjName, created, view, top, board: pj.board || null, warnings } };
+      if (lab && !(await labIds(pjName)).includes(lab)) warnings.push(`WARNING: the project has no lab '${lab}' (lab action list)`);
+      const lines = [...warnings, `${created ? 'Opened the link as the new project' : 'The link\'s design is the project'} '${pjName}'${created ? '' : ' already (unchanged)'}: top ${pj.top || '(none)'}, ${pj.board || 'no board'}${view ? `; the link opens ${VIEW_NAMES[view]}${top ? ` of ${top}` : ''} (${NEXT[view]})` : ''}${lab ? `; the link opens the lab '${lab}' (lab action show)` : ''}.`];
+      return { text: lines.join('\n'), data: { project: pjName, created, view, top, board: pj.board || null, ...(lab ? { lab } : {}), warnings } };
     },
   },
 ];

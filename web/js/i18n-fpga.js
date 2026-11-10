@@ -41,6 +41,8 @@ export const FPGA_PT = {
   'Between the two edges of the clock: half its period.': 'Entre os dois flancos do relógio: metade do seu período.',
   'clock-to-out': 'relógio-saída', 'logic': 'lógica', 'net': 'rede', 'setup': 'setup',
   'Show Path': 'Mostrar Caminho', 'Show in FPGA View': 'Mostrar na Vista da FPGA',
+  'Any register': 'Qualquer registo', 'The register the paths start from': 'O registo onde os caminhos começam',
+  'The register the paths end in': 'O registo onde os caminhos terminam', 'No path between these registers.': 'Nenhum caminho entre estes registos.',
   "Mark the source lines of the path's logic, and the path in the FPGA view when it is open": 'Marcar as linhas de código da lógica do caminho, e o caminho na vista da FPGA quando estiver aberta',
   'Open the FPGA view on the path: its sites and its nets': 'Abrir a vista da FPGA no caminho: os seus sítios e as suas redes',
 };
