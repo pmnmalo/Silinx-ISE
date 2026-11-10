@@ -79,7 +79,7 @@ export async function startImplementation(name, body = {}) {
     try { steps = vivadoSteps(steps); } catch (e) { throw bad(e.message); }
     if (!isTrusted(project)) throw bad(untrustedMessage(name, 'AMD Vivado', project), 403);
     const board = project.board ? resolveBoard(project.board, { variant: project.boardVariant, part: project.device?.part })?.board || null : null;
-    const job = createJob('implement', j => runVivado(j, { project, projectDir, steps, board, generateOnly: !!body.generateOnly }), { meta: { project: name, steps, toolchain: 'vivado' } });
+    const job = createJob('implement', j => { captureLeftOut(j, project, 'AMD Vivado'); return runVivado(j, { project, projectDir, steps, board, generateOnly: !!body.generateOnly }); }, { meta: { project: name, steps, toolchain: 'vivado' } });
     implJobs.set(key, job.id);
     return job;
   }
@@ -92,9 +92,16 @@ export async function startImplementation(name, body = {}) {
   if (!open && !isTrusted(project)) throw bad(untrustedMessage(name, 'Xilinx ISE', project), 403);
   const job = open
     ? createJob('implement', j => runOpenImplementation(j, { project, projectDir, steps, synthUpToDate }), { meta: { project: name, steps, toolchain: 'silinx' } })
-    : createJob('implement', j => runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }), { meta: { project: name, steps } });
+    : createJob('implement', j => { captureLeftOut(j, project, 'Xilinx ISE'); return runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }); }, { meta: { project: name, steps } });
   implJobs.set(key, job.id);
   return job;
+}
+
+// the logic analyzer's capture (#3176) is inserted by the Silinx toolchain only: its wrapper reads the probes through
+// hierarchical names, which XST and Vivado's synthesis do not take
+export const CAPTURE_LEFT_OUT = tool => `WARNING:Silinx - the logic analyzer's capture is inserted by the Silinx toolchain only: ${tool} implements the design without it.`;
+function captureLeftOut(job, project, tool) {
+  if (project.capture) job.log(CAPTURE_LEFT_OUT(tool));
 }
 
 /** A project's reports (GET /projects/:p/reports; the MCP server's get_report): { available: false } before any run. */
