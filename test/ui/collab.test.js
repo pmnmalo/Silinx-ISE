@@ -147,7 +147,8 @@ uiTest('#3318 a follow link pasted into an open tab is followed; in the page tha
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   const link = await share(page, 'Ana');
   const hash = new URL(link).hash;
-  // the owner pastes it into their own tab: still sharing, the link cleared, told
+  // the owner pastes it into their own tab: still sharing, the link cleared, told (once the app watches the links, #3331)
+  await page.waitFor(() => window.Silinx.linksWatched, [], { what: 'the links watched' });
   await page.eval((h) => { location.hash = h; }, hash);
   await page.waitConsole(/^WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window\.$/m);
   assert.equal(await page.eval(() => location.hash), '');

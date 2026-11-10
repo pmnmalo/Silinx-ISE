@@ -938,6 +938,7 @@ async function boot() {
   delete document.documentElement.dataset.starting;   // (no project reopened: the app shown at once, #1403)
   if (link) await (await import('./link-open.js')).openFromLink(link).finally(() => { S.linkOpened = true; });   // (the UI tests wait for it)
   (await import('./link-hash.js')).watchLinks();   // a link given to the running app: opened as at start-up (#3316)
+  S.linksWatched = true;   // (the UI tests wait for it before they change the hash, #3331)
   // check for updates at start-up (a newer release opens the update dialog) unless the setting is off; not awaited
   if (!window.SILINX_NO_UPDATE_CHECK) wiz.checkUpdatesOnStart().catch(() => {});
 }
