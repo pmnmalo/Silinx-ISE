@@ -317,6 +317,7 @@ html[data-ui="silinx"] input:is(:not([type]), [type=text], [type=number], [type=
   background: var(--m-surface); color: var(--m-fg); border: 1px solid var(--m-border-strong); border-radius: 6px; }
 /* a field as high as the buttons beside it, in a dialog and on a page (Find in Project, #1409) */
 html[data-ui="silinx"] :is(.dlg, .page) :is(input:is(:not([type]), [type=text], [type=number], [type=search]), select) { height: var(--m-field-h); padding: 0 8px; }
+html[data-ui="silinx"] :is(.dlg, .page) select[multiple] { height: auto; padding: 4px; }   /* (a list: its rows, #3326) */
 html[data-ui="silinx"] .dlg textarea { padding: 6px 8px; }
 html[data-ui="silinx"] .dlg input:focus, html[data-ui="silinx"] .dlg select:focus, html[data-ui="silinx"] .dlg textarea:focus { outline: none; border-color: var(--m-accent); box-shadow: var(--m-focus); }
 html[data-ui="silinx"] .form-grid { gap: 8px 12px; }

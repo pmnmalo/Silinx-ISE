@@ -53,7 +53,7 @@ export async function captureSettings() {
   const total = part ? (resourcesOf(part, pj.device.package).find(r => r.id === (family === 'spartan6' ? 'ramb8bwer' : 'ramb16'))?.count ?? null) : null;
   const old = pj.capture || {};
   const { probes, clocks } = signalsOf(design);
-  const list = h('select', { class: 'capture-probes', multiple: true, size: 8 },
+  const list = h('select', { class: 'capture-probes', multiple: true, size: 12 },
     ...probes.map(p => h('option', { value: p.path, selected: (old.probes || []).includes(p.path) }, `${p.path}${p.width > 1 ? ` [${p.width}]` : ''}`)));
   const clock = select(clocks.map(c => [c, c]), old.clock || clocks.find(c => /clk/i.test(c)) || clocks[0]);
   const depth = select(DEPTHS.map(d => [String(d), String(d)]), String(old.depth || 1024));

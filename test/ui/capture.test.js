@@ -58,6 +58,9 @@ uiTest('#3176 the logic analyzer: its settings (a problem beside the fields, the
   await page.treeRow('#procs', 'Logic Analyzer Settings', { dbl: true });
   await page.waitFor(d => document.querySelector(d), [D], { what: 'the settings dialog' });
   assert.equal(await page.eval(d => document.querySelector(`${d} .dlg-title span`).textContent, D), 'Logic Analyzer Settings');
+  // (the signals' list: its 12 rows, not a field's height, #3326)
+  const [listH, fieldH] = await page.eval(d => [document.querySelector(`${d} .capture-probes`).clientHeight, document.querySelector(`${d} .capture-depth`).offsetHeight], D);
+  assert.ok(listH > 8 * fieldH / 2, `the list ${listH} px, a field ${fieldH} px`);
   await fill(page, { probes: ['u_knight.count', 'u_knight.dir'], depth: 16, pre: 20, conds: [['u_knight.dir', 'rise']] });
   assert.deepEqual(await state(page), ['', 'The samples before the trigger are a whole number from 0 to 15.', false]);
   await page.eval(d => { const p = document.querySelector(`${d} .capture-pre`); p.value = '2'; p.dispatchEvent(new Event('input')); }, D);
@@ -72,6 +75,10 @@ uiTest('#3176 the logic analyzer: its settings (a problem beside the fields, the
   await page.treeRow('#procs', 'Analyze Design Using the Logic Analyzer', { dbl: true });
   await page.waitFor(() => window.SilinxApp.findDoc('capture') && document.querySelector('.doc:not([hidden]) .isim'), [], { what: 'the capture\'s window', timeout: 60000 });
   const lines = await page.eval(c => window.__console().slice(c), before);
+  // (in Implement, the task of Configure Target Device, #3327)
+  // (in Implement, the task of Configure Target Device, its tab shown there: the Tasks layout's, #3327; ISE's has none)
+  const task = await page.eval(() => { const tab = window.SilinxApp.findDoc('capture').tab; return [document.documentElement.dataset.task ?? null, tab.dataset.task ?? null, getComputedStyle(tab).display !== 'none']; });
+  assert.deepEqual(task, process.env.SILINX_UI_INTERFACE === 'ise' ? [null, null, true] : ['impl', 'impl', true]);
   assert.match(lines, /Armed: 16 samples, 2 before the trigger\.[^]*Triggered \(2 polls\); reading 16 samples\.[^]*Logic analyzer: 16 samples of u_knight\.dir, u_knight\.count, the trigger at sample 2/);
   assert.doesNotMatch(lines, /ERROR|WARNING/);
   await page.waitFor(() => window.Silinx.active?.view?.getState().markers.length && !window.Silinx.active.view.state?.running, [], { what: 'the capture run' });
