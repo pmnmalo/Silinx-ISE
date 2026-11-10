@@ -39,7 +39,7 @@
     "@yowasp/yosys": "0.70.1258"
   },
   "peerDependencies": {
-    "@yowasp/nextpnr-ice40": "0.11.96-dev.805"
+    "@yowasp/nextpnr-ice40": "0.11.825"
   },
   "peerDependenciesMeta": {
     "@yowasp/nextpnr-ice40": {
