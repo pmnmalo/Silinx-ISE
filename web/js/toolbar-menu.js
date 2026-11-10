@@ -67,16 +67,20 @@ export function setChecked(item, on) {
 export function menuChoice(label, options, { value, onChange, title = null }) {
   const head = menuTitle(label);
   if (title) head.title = title;
-  const items = options.map((o) => checkItem('menuitemradio', o.label, {
+  const items = options.map((o, i) => checkItem('menuitemradio', o.label, {
     checked: o.value === value, disabled: !!o.disabled, title: o.title ?? title, onclick: () => {
-      if (o.value === value) return;
-      value = o.value;
-      items.forEach((it, i) => setChecked(it, options[i].value === value));
-      onChange(value);
+      if (items[i].getAttribute('aria-checked') === 'true') return;   // (the ✓, which setChoice may have moved)
+      items.forEach((it, j) => setChecked(it, j === i));
+      onChange(o.value);
     }
   }));
   items.forEach((it, i) => { it.dataset.value = String(options[i].value); });   // (its option's value: the tests')
   return [head, ...items];
+}
+
+/** A menuChoice's ✓ moved to the item of value, without onChange (the setting changed elsewhere: an undo, #3289). */
+export function setChoice(entries, value) {
+  for (const it of entries) if (it.dataset?.value !== undefined) setChecked(it, it.dataset.value === String(value));
 }
 
 /** A setting on or off in a toolbar menu: one item, ✓ when on; onChange(on) when clicked. */

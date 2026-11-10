@@ -17,7 +17,7 @@ export const FSM_PT = {
   'Arrange': 'Organizar', 'Automatic layout of the states': 'Disposição automática dos estados', 'Zoom out': 'Reduzir', 'Zoom in': 'Ampliar',
   'Fit': 'Ajustar',
   'Make an ASM chart (.asm.json) of this state machine': 'Fazer um fluxograma ASM (.asm.json) desta máquina de estados',
-  'Encoding:': 'Codificação:', 'Coding Style:': 'Estilo de Código:',
+  'Encoding:': 'Codificação:', 'Coding Style': 'Estilo de Código', 'Encoding': 'Codificação',
   'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas',
   // selection
   'State (Moore outputs inside)': 'Estado (saídas de Moore lá dentro)', 'Initial (reset) state': 'Estado inicial (de reset)',
