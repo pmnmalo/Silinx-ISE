@@ -23,6 +23,7 @@ test('#405 ISE project routes: mounted alone, the .xise and zip routes', () => {
 test('#405 ISE project routes: registerImplRoutes registers them last, after its own', () => {
   const { api, calls } = recorder();
   registerImplRoutes(api, { wrap: f => f, projects });
-  assert.equal(calls.length, 20);
+  assert.equal(calls.length, 21);
+  assert.ok(calls.includes('post /projects/:p/capture'), 'the capture of the logic analyzer (#3176)');
   assert.deepEqual(calls.slice(-5), ['get /projects/:p/export.xise', 'post /projects/import-xise', 'get /projects/:p/export.zip', 'post /projects/import-zip', 'post /projects/:p/sync-xise']);
 });
