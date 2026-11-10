@@ -3,6 +3,14 @@
 export const LINK_PT = {
   'Copy Link to Project…': 'Copiar Ligação para o Projeto…', 'Copy Link to This Module…': 'Copiar Ligação para Este Módulo…',
   'Copy Link': 'Copiar Ligação', 'Open from a Link': 'Abrir a partir de uma Ligação',
+  // Copy Link's short link (#3223)
+  'Link:': 'Ligação:',
+  'The full link: the project inside it (needs nothing, but long)': 'A ligação completa: o projeto dentro dela (não precisa de nada, mas é longa)',
+  'A short link: the project encrypted in a secret gist of your GitHub account': 'Uma ligação curta: o projeto cifrado num gist secreto da sua conta do GitHub',
+  'A short link, about 140 characters: the project encrypted in this browser and saved as a secret gist of your GitHub account when you copy it; only the link opens it. Your links are your gists, which you list and delete on GitHub.':
+    'Uma ligação curta, com cerca de 140 carateres: o projeto cifrado neste navegador e guardado num gist secreto da sua conta do GitHub quando a copia; só a ligação o abre. As suas ligações são os seus gists, que lista e apaga no GitHub.',
+  'A short link needs your GitHub sign-in: sign in, or choose the full link.': 'Uma ligação curta precisa da sua sessão no GitHub: inicie-a, ou escolha a ligação completa.',
+  'A short link needs a GitHub token on the Silinx server (GH_TOKEN): choose the full link, or start the server with one.': 'Uma ligação curta precisa de um token do GitHub no servidor do Silinx (GH_TOKEN): escolha a ligação completa, ou inicie o servidor com um.',
   'Open in:': 'Abrir em:', 'Open the project only': 'Abrir só o projeto', 'Try it': 'Experimentar', 'Try it (a drawing\'s simulation)': 'Experimentar (a simulação de um desenho)', 'Simulation': 'Simulação', 'Board Emulator': 'Emulador da Placa',
   'Keep Mine': 'Manter o Meu', 'Open': 'Abrir',
   'Include the current view: the open tabs, the split, the panels': 'Incluir a vista atual: os separadores abertos, a divisão, os painéis',

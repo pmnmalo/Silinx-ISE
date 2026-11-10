@@ -78,6 +78,12 @@ can read that user's files has the server too.
   On a server, `SILINX_GIT=github` (`server/git-github.js`) uses the same back end with the environment's token
   (`GH_TOKEN`), never stored nor logged; what a project was at its last commit is kept in Silinx's configuration
   folder, out of the workspace, so that the MCP's file tools cannot point its commits at another repository.
+- A short link (#3223, `core/gist-link.js`): the project is encrypted where the link is made (AES-GCM, a random
+  256-bit key and 96-bit IV each time) and saved as a secret gist of the user's account; the key is only in the link's
+  fragment, which a browser never sends, so GitHub keeps only the ciphertext. Opening it reads the gist through GitHub's
+  API with no credentials, checks it is a Silinx link's, decrypts it (a wrong key or a changed gist refused by AES-GCM's
+  tag) and imports it as a design link: the same import gate and limits. A secret gist is unlisted, not private:
+  anyone with the link opens the project, as with the full link.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
   paths, keys and tokens, Xilinx files, a bitstream under any name) the tracked files, text, compressed
   and binary, and every line ever added to `main`; CodeQL analyses

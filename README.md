@@ -404,7 +404,11 @@ A link opens Silinx on a design, straight in Try it, the simulation or the board
 or import: **Copy Link to Project…** (the project's right-click menu in the Design pane, the Start page, the ISE
 style's File menu) or **Copy Link to This Module…** (a module's right-click menu) makes it, the view and the module
 chosen. The whole project goes inside the link (`#design=…`, compressed: 5 to 25 KB for the examples; anyone with the
-link has every file, its comments too), so nothing has to be hosted. Some slide tools cut a link longer than about 2
+link has every file, its comments too), so nothing has to be hosted. Copy Link can make a **short link** instead
+(`#gist=…`, about 140 characters, for a chat that refuses a long message): the project is encrypted in your browser and
+saved as a secret gist of your GitHub account (the browser edition's Sign in with GitHub…; a server's `GH_TOKEN`), and
+the key is in the link, so GitHub keeps only what it cannot read; opening it needs no sign-in, and your links are your
+gists, which you list and delete on GitHub. Some slide tools cut a link longer than about 2
 000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
 `…/Silinx/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
 (`…/Silinx/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`

@@ -12,6 +12,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
   const repos = new Map();   // 'owner/repo' -> { private, branch, blobs, trees, commits, refs, writers }
   const valid = new Set(tokens);
   const requests = [];
+  const gists = new Map();   // id -> { public, description, owner, files }
   const devices = new Map();   // device_code -> { userCode, state: 'pending' | 'authorized' | 'denied', polls }
   let clock = 0;
 
@@ -66,6 +67,16 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
     if (auth && !valid.has(auth[1])) return json(401, { message: 'Bad credentials' });
     const signed = !!auth;
     if (url.pathname === '/user' && method === 'GET') return signed ? json(200, { login: user }) : json(401, { message: 'Requires authentication' });
+    // gists (#3223): a secret one made by the signed-in user, read by anyone with its id
+    if (url.pathname === '/gists' && method === 'POST') {
+      if (!signed) return json(401, { message: 'Requires authentication' });
+      const id = crypto.randomBytes(16).toString('hex');
+      gists.set(id, { public: !!body.public, description: body.description, owner: user, files: Object.fromEntries(Object.entries(body.files || {}).map(([n, f]) => [n, { filename: n, content: f.content, truncated: false }])) });
+      return json(201, { id, html_url: `https://gist.github.com/${user}/${id}`, public: !!body.public });
+    }
+    const gm = /^\/gists\/([0-9a-f]+)$/.exec(url.pathname);
+    if (gm && method === 'GET') { const g = gists.get(gm[1]); return g ? json(200, { id: gm[1], ...g }) : nope(); }
+    if (gm && method === 'DELETE') { if (!signed) return json(401, { message: 'Requires authentication' }); return gists.delete(gm[1]) ? json(204, null) : nope(); }
     const m = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(url.pathname);
     if (!m) return nope();
     const full = `${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}`, rest = m[3] || '';
@@ -205,7 +216,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
 
   const deviceOf = userCode => [...devices.values()].find(d => d.userCode === userCode);
   return {
-    clientId, token: tokens[0], repos, requests, seed, commitFiles, filesAt, handle, fetch, route,
+    clientId, token: tokens[0], repos, requests, gists, seed, commitFiles, filesAt, handle, fetch, route,
     codes: () => [...devices.values()].map(d => d.userCode),
     head: (full, branch) => repos.get(full).refs.get(branch || repos.get(full).branch),
     commitOf: (full, sha) => repos.get(full).commits.get(sha),
