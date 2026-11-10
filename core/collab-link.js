@@ -48,8 +48,8 @@ export function followLink(base, room, key, via = 'relay', sign = null, relay = 
 }
 
 /** A link's (or an address's hash's) room: { base (the address without its fragment), room, key, via, sign (an
- *  editor's link's key, or null), relay (another Silinx's relay's address, or null) }, or null when it is not a link to
- *  follow; an error when it is one but broken. */
+ *  editor's link's key, or null), relay (another Silinx's relay's address: only when the link names one) }, or null
+ *  when it is not a link to follow; an error when it is one but broken. */
 export function parseFollowLink(text) {
   const s = String(text || '').trim();
   const at = s.indexOf('#');
@@ -60,7 +60,7 @@ export function parseFollowLink(text) {
   let relay = null;
   if (m?.[6] !== undefined) { try { relay = relayAddress(decodeURIComponent(m[6])); } catch { relay = null; } }
   if (!m || !ROOM_RE.test(m[2]) || !KEY_RE.test(m[3]) || (m[1] === 'edit' ? !SIGN_RE.test(sign || '') : m[4] !== undefined) || (m[6] !== undefined && (!relay || m[5]))) throw new Error('the link to follow is broken (copy it again from the owner\'s Share Project)');
-  return { base: at > 0 ? s.slice(0, at) : null, room: m[2], key: m[3], via: m[5] ? 'host' : 'relay', sign, relay };
+  return { base: at > 0 ? s.slice(0, at) : null, room: m[2], key: m[3], via: m[5] ? 'host' : 'relay', sign, ...(relay ? { relay } : {}) };
 }
 
 /** The relay's WebSocket address of a Silinx address (http -> ws, https -> wss), for a role: 'share' (the owner's) or

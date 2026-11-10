@@ -79,7 +79,7 @@ test('a link through another relay: its address an http(s) origin, no user nor p
   const room = 'R'.repeat(22), key = 'K'.repeat(43);
   assert.equal(followLink('https://site.example/app/', room, key, 'relay', null, 'https://relay.example.org:8642/some/path?q'),
     `https://site.example/app/#follow=${room}.${key}&relay=${encodeURIComponent('https://relay.example.org:8642')}`);
-  assert.equal(parseFollowLink(`#follow=${room}.${key}`).relay, null);
+  assert.equal('relay' in parseFollowLink(`#follow=${room}.${key}`), false, 'no relay named: none in the link\'s room');
   for (const bad of [`#follow=${room}.${key}&relay=${encodeURIComponent('ftp://x.example')}`, `#follow=${room}.${key}.host&relay=${encodeURIComponent('https://x.example')}`,
     `#follow=${room}.${key}&relay=${encodeURIComponent('https://u:p@x.example')}`, `#follow=${room}.${key}&relay=%E0`, `#follow=${room}.${key}&relay=`, `#follow=${room}.${key}&other=1`]) {
     assert.throws(() => parseFollowLink(bad), /the link to follow is broken/, bad);
