@@ -2,6 +2,8 @@
 // (web/js/lab-view.js): the labs a project can run (the shipped ones and its labs/*.lab.json), a step shown, a step
 // checked on the project (core/labs.js checkStep, core/labs-check.js: the same checks, the project read through the
 // same `io`), the try recorded in its labs/progress.json as the interface records it, and a lab restarted.
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import * as P from './projects.js';
 import { toolError, readProject, viewSourcesOf, STR, PROJECT } from './mcp-util.js';
 import { PROGRESS_FILE, checkLines, checkStep, labProgress, listLabs, localize, nextOpen, parseProgress, progressText, recordTry, stepOf } from '../core/labs.js';
@@ -15,7 +17,22 @@ export function projectIo(name) {
     files: () => P.fileTree(name),
     read: rel => P.readFile(name, rel),
     sources: async sim => viewSourcesOf(name, await P.readProject(name), sim),
+    reports: () => lastRun(name),
   };
+}
+
+/** The last run's build/reports.json (null: none) and whether it is newer than every file the implementation reads (the
+ *  project's files but its test benches, its build/ and labs/ folders): { reports, current }. */
+export async function lastRun(name) {
+  const { projectReports } = await import('./impl-routes.js');
+  const r = await projectReports(name).catch(() => null);
+  if (!r?.summary) return { reports: null, current: false };
+  const pj = await P.readProject(name), dir = P.projectDir(name);
+  const sim = new Set((pj.files || []).filter(f => f.role === 'sim').map(f => f.path));
+  const inputs = ['silinx.json', ...(await P.fileTree(name)).filter(f => !/^(build|labs)\//.test(f) && !sim.has(f))];
+  const times = await Promise.all(inputs.map(f => fs.stat(path.join(dir, f)).then(s => s.mtimeMs, () => 0)));
+  const at = Date.parse(r.generatedAt);
+  return { reports: r, current: !(at < Math.max(0, ...times)) };
 }
 
 async function readProgress(name) {

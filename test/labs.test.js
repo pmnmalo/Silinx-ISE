@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LAB_VERSION, PROGRESS_FILE, checkLines, checkStep, isLabFile, labProblems, labProgress, listLabs, localize, nextOpen, parseLab, parseProgress, progressText, recordTry, stepOf } from '../core/labs.js';
-import { CHECKS, exactly, expectedBits, pattern } from '../core/labs-check.js';
+import { CHECKS, PROCESSES, exactly, expectedBits, pattern } from '../core/labs-check.js';
+import { generateFsm } from '../core/fsm-hdl.js';
 import { LABS } from '../core/labs-shipped.js';
 import { EXAMPLE_ORDER } from '../core/examples.js';
 
@@ -29,6 +30,7 @@ function exampleIo(name, edits = {}, json = {}) {
   return {
     project: async () => pj, files: async () => [...files].sort(), read: async f => read(f),
     sources: async sim => pj.files.filter(f => /^(vhdl|verilog)$/.test(f.lang) && files.has(f.path) && (sim || f.role !== 'sim')).map(f => ({ ...f, role: f.role || 'design', text: read(f.path) })),
+    reports: async () => ({ reports: json.reports ?? null, current: json.current ?? true }),
   };
 }
 const run = async (c, io) => { assert.deepEqual(CHECKS[c.check].problems(c), [], `${c.check}: a valid check`); return CHECKS[c.check].run(c, io); };
@@ -54,7 +56,7 @@ test('a lab file\'s problems: its version, id, title, steps, each step\'s fields
     ['the lab: step 2: the id \'s\' is another step\'s', 'the lab: step 2: "title": a text', 'the lab: step 2: "hint": a text', 'the lab: step 2: "checks": a list']);
   assert.deepEqual(labProblems({ ...good, steps: [{ id: 's', title: 'S', text: 'T', checks: [{ check: 'grade' }, { check: 'file' }, { check: 'syntax', warnings: ['/(/'] },
     { check: 'simulate', time_ns: -1, values: [{ signal: 'a' }], messages: 'x' }, { check: 'project' }, { check: 'module', ports: [{}] }] }] }), [
-    'the lab: step 1, check 1: "check": one of project, file, module, syntax, simulate',
+    'the lab: step 1, check 1: "check": one of project, file, module, syntax, simulate, process',
     'the lab: step 1, check 2 (file): "path": the file',
     'the lab: step 1, check 3 (syntax): "warnings": \'/(/\' is not a regular expression',
     'the lab: step 1, check 4 (simulate): "time_ns": from 0 to 1000000 ns', 'the lab: step 1, check 4 (simulate): "values": a list of { "signal", "at_ns", "value" }', 'the lab: step 1, check 4 (simulate): "messages": a list of patterns',
@@ -67,7 +69,7 @@ test('a lab file\'s problems: its version, id, title, steps, each step\'s fields
 });
 
 test('the shipped labs: valid, each on an example, every text in English and Portuguese, the ids their own', () => {
-  assert.ok(LABS.length >= 1);
+  assert.deepEqual(LABS.map(l => [l.id, l.example]), [['gates-first-steps', 'gates'], ['traffic-state-machine', 'traffic'], ['blinky-clock-board', 'blinky']], 'in the examples\' order');
   assert.equal(new Set(LABS.map(l => l.id)).size, LABS.length);
   for (const lab of LABS) {
     assert.deepEqual(labProblems(lab, lab.id), []);
@@ -223,4 +225,68 @@ test('the gates lab on its example: the first three steps pass as it is, the las
   // wrong: even = d; the pin of LD1 (M11); the port named odd
   assert.deepEqual(await done(exampleIo('gates', { 'src/gates.vhd': EVEN('d'), 'constraints/gates.ucf': v => `${v}NET "even" LOC = "M11" ;\n` })), [true, true, true, false, false]);
   assert.deepEqual(await done(exampleIo('gates', { 'src/gates.vhd': v => EVEN()(v).replace(/even/g, 'odd') })), [true, true, true, false, false]);
+});
+
+// a run's build/reports.json as the Silinx toolchain writes it (server/open-flow.js openReports): synthesized, then
+// implemented (routed, its timing), then the bitstream
+const runReports = (upTo, { top = 'top', warnings = {}, routed = true, timingMet = true } = {}) => {
+  const k = ['synthesize', 'implement', 'bitstream'].indexOf(upTo);
+  return { generatedAt: '2026-11-10T08:00:00.000Z', top, source: 'open', synthesis: { warnings: warnings.synthesis ?? 0 },
+    ...(k >= 1 ? { map: { warnings: warnings.map ?? 0 }, par: { routed, unroutedSignals: routed ? 0 : 3, ...(warnings.par ? { warnings: warnings.par } : {}) } } : {}),
+    summary: { synthesized: true, mapped: k >= 1, routed: k >= 1 ? routed : null, timingMet: k >= 1 ? timingMet : null, maxFreqMHz: k >= 1 ? 41.2 : null, bitstream: k >= 2 } };
+};
+
+test('check process: ran on the top and the sources as they are, its warnings counted, its timing; its problems', async () => {
+  const io = (upTo, opts, more = {}) => exampleIo('blinky', {}, { reports: upTo ? runReports(upTo, opts) : null, ...more });
+  assert.deepEqual(Object.keys(PROCESSES), ['synthesize', 'implement', 'bitstream']);
+  assert.deepEqual(await run({ check: 'process', process: 'synthesize' }, io('synthesize')), []);
+  assert.deepEqual(await run({ check: 'process', process: 'implement', timing_met: true }, io('bitstream')), []);
+  assert.deepEqual(await run({ check: 'process', process: 'bitstream' }, io('bitstream')), []);
+  assert.deepEqual(await run({ check: 'process', process: 'synthesize' }, io(null)), ['Synthesize has not run: run it (the Processes pane)']);
+  assert.deepEqual(await run({ check: 'process', process: 'implement' }, io('synthesize')), ['Implement Design has not run: run it (the Processes pane)']);
+  assert.deepEqual(await run({ check: 'process', process: 'bitstream' }, io('implement')), ['Generate Programming File has not run: run it (the Processes pane)']);
+  assert.deepEqual(await run({ check: 'process', process: 'synthesize' }, io('synthesize', { top: 'knight' })), ['Synthesize ran on the top module \'knight\', not on the project\'s, \'top\': run it again']);
+  assert.deepEqual(await run({ check: 'process', process: 'implement' }, io('implement', {}, { current: false })), ['the sources changed since Implement Design ran: run it again']);
+  // the warnings of its steps: the synthesis's, the map's, the place and route's (an ISE map report's line too)
+  assert.deepEqual(await run({ check: 'process', process: 'synthesize' }, io('implement', { warnings: { synthesis: 2, map: 1 } })), ['Synthesize gave 2 warning(s), none expected: see its reports (the Design Summary)']);
+  assert.deepEqual(await run({ check: 'process', process: 'implement', warnings: 2 }, io('implement', { warnings: { synthesis: 2, map: 1 } })), ['Implement Design gave 3 warning(s), not 2: see its reports (the Design Summary)']);
+  assert.deepEqual(await run({ check: 'process', process: 'implement', warnings: 3 }, io('implement', { warnings: { synthesis: 2, map: 1 } })), []);
+  const ise = runReports('implement');
+  ise.map = { utilization: [{ name: 'Number of warnings', used: '4' }] };
+  assert.deepEqual(await run({ check: 'process', process: 'implement', warnings: 4 }, exampleIo('blinky', {}, { reports: ise })), []);
+  assert.deepEqual(await run({ check: 'process', process: 'implement', timing_met: true }, io('implement', { routed: false, timingMet: false })),
+    ['Implement Design: 3 signal(s) not routed', 'the timing constraints are not met (at most 41.2 MHz)']);
+  assert.deepEqual(await run({ check: 'process', process: 'implement', timing_met: true }, io('implement', { timingMet: null })), ['no static timing analysis: the design has no timing constraint']);
+  assert.deepEqual(CHECKS.process.problems({ check: 'process', process: 'route', warnings: -1 }), ['"process": one of synthesize, implement, bitstream', '"warnings": a number of warnings']);
+});
+
+// traffic's state diagram with the output walking (1 in the states `on`), and the VHDL the editor makes of it
+function walking(on = ['WALK', 'WALK_END']) {
+  const fsm = JSON.parse(fs.readFileSync(path.join(EX, 'traffic', 'src', 'traffic.fsm.json'), 'utf8'));
+  fsm.outputs.push({ name: 'walking', width: 1, default: '0' });
+  for (const s of fsm.states) if (on.includes(s.name)) s.outputs.walking = '1';
+  return { 'src/traffic.fsm.json': JSON.stringify(fsm, null, 2), 'src/traffic.vhd': generateFsm(fsm, 'vhdl', { source: 'traffic.fsm.json' }).code };
+}
+const done = async (lab, io) => { const out = []; for (const s of lab.steps) out.push((await checkStep(s, io)).ok); return out; };
+
+test('the traffic lab on its example: the diagram and its simulation as it is, the output walking after its action, not a wrong one; the synthesis', async () => {
+  const lab = LABS.find(l => l.id === 'traffic-state-machine');
+  assert.deepEqual(await done(lab, exampleIo('traffic', {}, { reports: null })), [true, true, false, false]);
+  assert.deepEqual(await done(lab, exampleIo('traffic', walking(), { reports: runReports('synthesize') })), [true, true, true, true]);
+  // wrong: walking only in WALK (0 at 5 us, in WALK_END); the synthesis out of date
+  const wrong = await checkStep(stepOf(lab, 'output'), exampleIo('traffic', walking(['WALK'])));
+  assert.deepEqual(wrong.results.map(r => r.reasons), [[], ['uut/u_fsm/walking is 0 at 5000 ns, not 1']]);
+  assert.deepEqual(await done(lab, exampleIo('traffic', walking(), { reports: runReports('synthesize'), current: false })), [true, true, true, false]);
+});
+
+test('the blinky lab on its example: the board, the clock, the simulation as it is; the speed after its action, not a wrong one; implemented, its bitstream', async () => {
+  const lab = LABS.find(l => l.id === 'blinky-clock-board');
+  const fast = (div = '312_500') => ({ 'src/top.vhd': v => v.replace('DIV      : integer := 625_000;', `DIV      : integer := ${div};`) });
+  assert.deepEqual(await done(lab, exampleIo('blinky', {}, { reports: null })), [true, true, true, false, false, false]);
+  assert.deepEqual(await done(lab, exampleIo('blinky', fast(), { reports: runReports('implement') })), [true, true, true, true, true, false]);
+  assert.deepEqual(await done(lab, exampleIo('blinky', fast(), { reports: runReports('bitstream') })), [true, true, true, true, true, true]);
+  // wrong: three times as fast; the board changed; the clock's pin moved
+  assert.deepEqual((await checkStep(stepOf(lab, 'speed'), exampleIo('blinky', fast('208_333')))).results[0].reasons, ['src/top.vhd has nothing like \'/\\bDIV\\s*:\\s*integer\\s*:=\\s*312_?500\\b/i\'']);
+  assert.deepEqual((await checkStep(stepOf(lab, 'board'), exampleIo('blinky', {}, { board: 'nexys2' }))).results[0].reasons, ['the project\'s board is \'nexys2\', not \'basys2\'']);
+  assert.equal((await checkStep(stepOf(lab, 'clock'), exampleIo('blinky', { 'constraints/top.ucf': v => v.replace('LOC = "B8"', 'LOC = "M6"') }))).ok, false);
 });

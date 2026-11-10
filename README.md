@@ -389,8 +389,9 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
 
 *Project ▸ Guided Labs…* opens a step-by-step tutorial on the project, beside its documents: each step says what to
 do, and *Check Step* checks it on the project (a file, a module's ports, Check Syntax with exactly the expected
-warnings, the simulation's values at given times), ticking it in the Steps panel, or giving its hint and the reasons
-in the console. Silinx ships "First steps" on the gates example (in English and Portuguese); a teacher writes a lab as
+warnings, the simulation's values at given times, a process run on the sources as they are), ticking it in the Steps
+panel, or giving its hint and the reasons in the console. Silinx ships "First steps" on the gates example, "A state
+machine" on traffic and "The clock and the board" on blinky (in English and Portuguese); a teacher writes a lab as
 a `labs/<name>.lab.json` file of a project (its format: `core/labs.js`), and shares it with the project. The progress
 is the project's (`labs/progress.json`): a lab resumes where it was left.
 
