@@ -19,7 +19,7 @@ const consoleLines = async (page, re) => (await page.consoleText()).split('\n').
 const projects = async () => (await fs.readdir(env.server.workspace)).filter((f) => !f.startsWith('.')).sort();
 async function boot(page, hash = '', query = 'h=1') {
   await page.goto(`${env.server.url}/?${query}${hash ? `#${hash}` : ''}`);
-  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.startupChecked, [], { what: 'app boot' });
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.startupChecked && window.Silinx.linksWatched, [], { what: 'app boot' });
 }
 // the hash changed in the running app (as a link pasted in the address bar): no load of the page
 async function setHash(page, hash) {
