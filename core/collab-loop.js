@@ -12,6 +12,9 @@ import { collabRooms, ROOM_LIMITS } from './collab-room.js';
 
 /** A hosted room's limits: one room (the page's own project), a follower's frames as small as on the relay. */
 export const HOST_LIMITS = Object.freeze({ ...ROOM_LIMITS, rooms: 1, followerFrame: 64 << 10 });
+/** A follower's parts (core/collab-frag.js) joined at most: their frame's maximum, and a part's room (its channel
+ *  dropped as soon as the parts pass it: the owner's page never holds more of a follower's). */
+export const FOLLOWER_JOIN = HOST_LIMITS.followerFrame + 64;
 
 const later = f => setTimeout(f, 0);   // (as a network would: never within the call that sent)
 const copy = d => (typeof d === 'string' ? d : new Uint8Array(d));

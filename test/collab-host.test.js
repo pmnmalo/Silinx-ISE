@@ -7,7 +7,7 @@
 import { test, after } from 'node:test';
 import * as Y from 'yjs';
 import assert from 'node:assert/strict';
-import { socketPair, hostedRooms, HOST_LIMITS } from '../core/collab-loop.js';
+import { socketPair, hostedRooms, HOST_LIMITS, FOLLOWER_JOIN } from '../core/collab-loop.js';
 import { sealCode, openCode, CODE_KINDS, CODE_MAX, SDP_MAX } from '../core/collab-codes.js';
 import { shareRoom, followRoom, KIND } from '../core/collab-client.js';
 import { newKey, keyOf, seal, b64url } from '../core/collab-crypto.js';
@@ -157,4 +157,21 @@ test('a frame larger than a data channel\'s message: sent as parts, joined again
   assert.throws(() => k.push(small), /a frame within the parts of another/);
   assert.throws(() => frameJoiner(10).push(Uint8Array.from([PART, 2, 0])), /a broken part/);
   assert.throws(() => frameJoiner(10).push(Uint8Array.from([PART, 0])), /a broken part/);
+});
+
+test('a follower\'s parts at the owner\'s page: joined up to a follower\'s frame, refused at the part that passes it (never more held)', async () => {
+  const { splitFrame, frameJoiner, PART_SIZE } = await import('../core/collab-frag.js');
+  assert.ok(FOLLOWER_JOIN >= HOST_LIMITS.followerFrame && FOLLOWER_JOIN <= HOST_LIMITS.followerFrame + PART_SIZE, 'a follower\'s frame, and a part\'s room at most');
+  // (a frame of a follower's maximum: joined whole)
+  const ok = new Uint8Array(HOST_LIMITS.followerFrame); ok[0] = KIND.awareness;
+  const j = frameJoiner(FOLLOWER_JOIN);
+  const parts = splitFrame(ok);
+  assert.deepEqual(parts.map(p => j.push(p)).at(-1), ok);
+  // (2 MB in parts: refused at the first part past the maximum, the rest never held)
+  const big = new Uint8Array(2 << 20); big[0] = KIND.awareness;
+  const k = frameJoiner(FOLLOWER_JOIN);
+  const bigParts = splitFrame(big);
+  let taken = 0;
+  assert.throws(() => { for (const p of bigParts) { k.push(p); taken++; } }, /a message too large/);
+  assert.equal(taken, Math.floor(FOLLOWER_JOIN / (PART_SIZE - 2)), `refused at part ${taken + 1} of ${bigParts.length}`);
 });
