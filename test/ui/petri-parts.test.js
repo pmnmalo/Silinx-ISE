@@ -2,6 +2,7 @@
 // (petri-draw.js: the places with their tokens, the transitions, the arcs), the side panel (petri-side.js: a place
 // selected and its fields, its tokens changed and drawn, the net's fields, the problems) and the bottom panel
 // (petri-sim.js: the simulation's marking and outputs after a clock step, the analysis) on a new net.
+// The toolbar (petri-toolbar.js, #3218): its tools, Delete, the zoom, Check, the ⋮ menu.
 // The editor's whole use: test/ui/petri.test.js.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,4 +61,39 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-an-props`), [ED], { what: 'the analysis' });
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-an-props th`)].map((t) => t.textContent)), ['Bounded', 'Deadlocks', 'Live', 'Reversible', 'Conservative']);
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-an-places tr`)].slice(1).map((r) => r.firstChild.textContent)), ['idle', 'work']);
+});
+
+uiTest('#3218 the Petri net editor\'s toolbar (petri-toolbar.js): its tools, Delete, the zoom, Check, the ⋮ menu, Undo', E, async (page) => {
+  await makeProject(env, { name: 'PnToolbar', top: '', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
+  await page.openProject('PnToolbar');
+  await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
+  await page.waitFor((ed) => window.Silinx.active?.id === 'pn:src/ctl.pn.json' && document.querySelector(`${ed} .pn-place`), [ED], { what: 'the Petri net editor' });
+  const ev = (fn, ...a) => page.eval(fn, ED, ...a);
+  // ---- its groups in order: the tools (select active), Delete, the zoom, Check, Simulate; then ☰ Properties and the ⋮ menu
+  assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-toolbar .pn-tool`)].map((b) => [b.textContent, b.classList.contains('active')])),
+    [['', true], ['Place', false], ['Transition', false], ['Arc', false], ['Inhibitor', false]]);
+  const zoom = await ev((ed) => document.querySelector(`${ed} .asm-zoom`).textContent);   // (the net fitted when it opened)
+  assert.match(zoom, /^\d+%$/);
+  assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-toolbar > .asm-group`)].map((g) => g.textContent)),
+    ['PlaceTransitionArcInhibitor', '', zoom, 'Check', 'Simulate', '☰ Properties']);
+  // ---- the Place tool: a click on the drawing adds a place (p3, named p1), selected; Delete removes it; Undo brings it back
+  await page.click(`${ED} .pn-tool`, { text: 'Place' });
+  assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-tool.active`).textContent), 'Place');
+  const at = await ev((ed) => { const r = document.querySelector(`${ed} .pn-canvas`).getBoundingClientRect(); return { x: r.left + 40, y: r.bottom - 40 }; });
+  await page.click(at);
+  await page.waitFor((ed) => document.querySelector(`${ed} .pn-place[data-id=p3]`) && document.querySelector(`${ed} .pn-selection h3`)?.textContent === 'Place p1', [ED], { what: 'the place added' });
+  await page.click(`${ED} .asm-danger`);
+  await page.waitFor((ed) => !document.querySelector(`${ed} .pn-place[data-id=p3]`), [ED], { what: 'the place deleted' });
+  await page.eval(() => window.Silinx.active.petriEditor.undo());
+  await page.waitFor((ed) => !!document.querySelector(`${ed} .pn-place[data-id=p3]`), [ED], { what: 'Undo' });
+  // ---- the zoom: zoom in, its level shown
+  await page.click(`${ED} [title^="Zoom In"]`);
+  await page.waitFor((ed, z) => parseInt(document.querySelector(`${ed} .asm-zoom`).textContent, 10) > parseInt(z, 10), [ED, zoom], { what: 'zoomed in' });
+  // ---- Check: its lines in the console, the place added joined to nothing its only warning
+  await page.click(`${ED} .pn-check`);
+  await page.waitConsole(/Process "Check Petri Net" completed successfully with 1 warning\(s\)/);
+  assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /^WARNING/.test(l.trim())).map((l) => l.trim()), ['WARNING: place p1 is not connected']);
+  // ---- the ⋮ menu: Analysis, PNML ⇩, PNML ⇧
+  await page.click(`${ED} .tb-more-btn`);
+  assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .tb-more-menu button`)].map((b) => b.textContent)), ['∑ Analysis', 'PNML ⇩', 'PNML ⇧']);
 });
