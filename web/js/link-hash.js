@@ -26,7 +26,10 @@ export async function linkChanged(hash = location.hash) {
   await app.saveAll();
   const unsaved = S.docs.filter(d => d.dirty);
   if (unsaved.length) { app.log(`ERROR: ${what}: ${unsaved.map(d => d.path || d.title).join(', ')} could not be saved: the link was not opened; your changes are kept.`, 'err'); return false; }
-  if (FOLLOW.test(hash) || api.following) { location.reload(); return true; }
+  // (a shared project's link: collab-follow.js followPasted, which loads the page again, but not in the page that shares
+  // one, which the console warns about, #3318, #3331)
+  if (FOLLOW.test(hash)) { (await import('./collab-follow.js')).followPasted(); return true; }
+  if (api.following) { location.reload(); return true; }
   const { linkOptions, openFromLink } = await import('./link-open.js');
   const opts = linkOptions(hash);
   if (!opts) return false;
