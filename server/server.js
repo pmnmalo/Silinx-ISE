@@ -83,9 +83,11 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   });
   app.locals.watcher = watcher;
   const WRITING_GET = /^\/projects\/[^/]+\/(export\.xise|fpga-view)$/;
+  // (a pull writes what GitHub had, not what the page sent: told to the page, its open documents read again, #3195)
+  const TOLD = /^\/projects\/[^/]+\/git\/pull$/;
   app.use('/api', (req, res, next) => {
     const m = /^\/projects\/([^/]+)/.exec(req.path);
-    if (m && (!['GET', 'HEAD'].includes(req.method) || WRITING_GET.test(req.path))) {
+    if (m && !TOLD.test(req.path) && (!['GET', 'HEAD'].includes(req.method) || WRITING_GET.test(req.path))) {
       let name = '';
       try { name = decodeURIComponent(m[1]); } catch { /* a bad name: refused by its route */ }
       const release = watcher.hold(name);

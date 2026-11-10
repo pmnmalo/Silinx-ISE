@@ -22,6 +22,7 @@ import { hasTask } from './tool-descriptors.js';
 import { addFromFolderDialog, setTop, unsetTop } from './design.js';
 import { openEmulator, openSchematic, runSimulation } from './viewers.js';
 import { printActive, printable } from './print-doc.js';
+import { hasGit, hookGitStatus, openFromRepositoryDialog, gitMenuItems } from './git.js';
 import { besideItems, splitState, toggleSplit } from './split-view.js';
 // (Print: the document in front, whichever it is, #1509)
 export { printActive, printable };
@@ -58,10 +59,12 @@ export const settingsItems = () => [
 
 export function setupMenus() {
   const hasPj = () => !S.project;
+  hookGitStatus();   // (git, the server editions: the Design pane's marks, #3195)
   menuBar($('menubar'), S.menus = [
     { label: 'File', items: () => [
       { label: 'New Project…', icon: icon('newProject'), action: () => wiz.newProjectWizard() },
       { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
+      hasGit() ? { label: 'Open from Repository…', action: () => openFromRepositoryDialog() } : null,   // (a GitHub repository, a Classroom assignment's: #3195)
       '-',
       { label: 'Import Silinx Project (.zip)…', action: () => wiz.importSilinxDialog() },
       { label: 'Export Silinx Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
@@ -74,6 +77,8 @@ export function setupMenus() {
       api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,
       api.standalone ? '-' : null,
       ...(api.standalone ? storageMenuItems() : []),
+      // git (#3195): the project's commit, push, pull; a repository made
+      ...(hasGit() ? [...gitMenuItems().map(it => (it === '-' ? it : { ...it, disabled: hasPj() || it.disabled })), '-'] : []),
       { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
       '-',
       { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !printable() },
