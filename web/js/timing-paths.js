@@ -16,6 +16,7 @@ import { S, findDoc, openFile, openFpgaView } from './app.js';
 import { betweenPaths, pathHighlight } from '/packages/silinx-fpga/src/index.js';
 import { showInDrawings } from './drawing-path.js';
 import { iseTimingPaths } from '/core/twr-paths.js';
+import { vivadoTimingPaths } from '/core/vivado-paths.js';
 
 export const TIMING_REPORT = 'build/open/timing.txt';
 export const PATHS_FILE = 'build/open/paths.json';
@@ -45,15 +46,17 @@ export async function showPath(p, { fpga = false } = {}) {
   return hl;
 }
 
-// the paths of a timing report: the Silinx toolchain's (its analysis's paths.json), ISE's (its trce report's, back to the
-// project's HDL by XST's names: core/twr-paths.js)
+// the paths of a timing report: the Silinx toolchain's (its analysis's paths.json), ISE's and Vivado's (their reports',
+// back to the project's HDL by their netlists' names: core/twr-paths.js, core/vivado-paths.js)
 async function pathsOf(pj, file) {
-  if (file !== TIMING_REPORT) return iseTimingPaths(await api.readFile(pj, file), S.sources.filter(s => !s.view && s.role !== 'sim'), S.project.top);
+  const sources = () => S.sources.filter(s => !s.view && s.role !== 'sim');
+  if (file.endsWith('.twr')) return iseTimingPaths(await api.readFile(pj, file), sources(), S.project.top);
+  if (file.endsWith('_timing.rpt')) return vivadoTimingPaths(await api.readFile(pj, file), sources(), S.project.top);
   return JSON.parse(await api.readFile(pj, PATHS_FILE));
 }
 
-/** The Paths panel beside a timing report's editor (the Silinx toolchain's, ISE's .twr; none when the analysis wrote no
- *  paths: an older run). */
+/** The Paths panel beside a timing report's editor (the Silinx toolchain's, ISE's .twr, Vivado's _timing.rpt; none when
+ *  the analysis wrote no paths: an older run). */
 export async function mountTimingPaths(d, el, host) {
   const pj = S.project?.name;
   let r;
@@ -111,7 +114,8 @@ export async function mountTimingPaths(d, el, host) {
           ...s.sources.map(x => h('a', { href: '#', class: 'tp-src', onclick: e => { e.preventDefault(); openFile(x.file, x.line); } }, ` ${x.file.split('/').pop()}:${x.line}`)))))),
       h('div', { class: 'tp-actions' },
         h('button', { class: 'btn', title: 'Mark the source lines of the path\'s logic, and the path in the FPGA view when it is open', onclick: () => showPath(p) }, 'Show Path'),
-        h('button', { class: 'btn', title: 'Open the FPGA view on the path: its sites and its nets', onclick: () => showPath(p, { fpga: true }) }, 'Show in FPGA View'))].filter(Boolean));
+        // (Vivado's sites: a 7-series device's, not the FPGA view's)
+        r.toolchain === 'vivado' ? null : h('button', { class: 'btn', title: 'Open the FPGA view on the path: its sites and its nets', onclick: () => showPath(p, { fpga: true }) }, 'Show in FPGA View'))].filter(Boolean));
   }
   renderList(); renderDetail();
   return { paths: r.paths, between: (a = '', b = '') => { from.value = a; to.value = b; choose(); return shown; },
