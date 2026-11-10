@@ -14,6 +14,7 @@
 //   const cap = await runCapture(link, spec, { timeoutMs, pollMs, now, sleep, log })
 //     cap: readCapture's { samples, probes, trigger, status, errors } and polls (the status scans the trigger took)
 //   const link = await adeptLink(usb, spec, { log });  …  await link.close();
+//   captureRecord({ top, clock, spec, probes, cap })   the capture as build/capture.json has it
 import { CAPTURE_CMD, scanWord, readStatus, readoutCommands, readCapture } from './ila-capture.js';
 import { planCapture } from './ila.js';
 import { Adept, Djtg, Chain, JtagSeq } from './adept.js';
@@ -56,6 +57,17 @@ export async function runCapture(link, spec, { timeoutMs = 10000, pollMs = 50, n
   const cap = readCapture(spec, await link.scan(readoutCommands(spec)));
   if (cap.errors.length) fail(cap.errors.join(' '));
   return { ...cap, polls };
+}
+
+/**
+ * A capture as build/capture.json keeps it (the server's and the browser's, the waveform viewer's): { takenAt, top,
+ * clock, depth, pre, trigger, polls, probes: [{ path, width, samples: ['0x…'] }] }; probes: planInsertion's (the core's
+ * names and the design's paths), cap: runCapture's.
+ */
+export function captureRecord({ top, clock, spec, probes, cap }) {
+  const hex = v => `0x${v.toString(16)}`;
+  return { takenAt: new Date().toISOString(), top, clock, depth: +spec.depth, pre: +spec.pre, trigger: cap.trigger, polls: cap.polls,
+    probes: probes.map(p => ({ path: p.path, width: p.width, samples: cap.probes[p.name].map(hex) })) };
 }
 
 /**

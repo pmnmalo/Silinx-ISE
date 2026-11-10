@@ -1,8 +1,7 @@
 # a stand-in for adepttool.jtag (test/fixtures/adepttool-stub/README.md): the chain's FPGA (a Spartan3) and PROM; the
 # FPGA's USER1 register the logic analyzer's core as test/ila-lib.mjs CoreModel has it: a scan's command runs at the next
 # scan's capture, the arm acknowledged at the next capture, the capture complete `fill` captures after the arm
-import json
-import os
+from adepttool.stubcfg import stub_config
 
 USER1 = 0x02
 
@@ -16,7 +15,7 @@ class JtagDev:
 class Spartan3(JtagDev):
     def __init__(self):
         super().__init__('xc3s250e')
-        c = json.loads(os.environ['SILINX_ILA_STUB'])
+        c = stub_config()
         self.samples = [int(s, 16) for s in c['samples']]
         self.width, self.depth, self.fill = c['width'], c['depth'], c.get('fill', 3)
         self.cmd = self.arm_t = self.ack = self.armed = self.triggered = self.done = self.raddr = self.captures = 0

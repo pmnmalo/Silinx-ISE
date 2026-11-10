@@ -159,6 +159,17 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
 
   api.get('/projects/:p/reports', wrap(req => projectReports(req.params.p)));
 
+  // the logic analyzer's capture on the board (#3176, server/ila-board.js: adepttool, the MCP tool capture's): a job, its
+  // lines the run's, its result { capture, file }
+  api.post('/projects/:p/capture', wrap(async req => {
+    const name = req.params.p, { arm = true, timeoutS = 10, device = 0 } = req.body || {};
+    await Projects.readProject(name);
+    const { captureProject } = await import('./ila-board.js');
+    const job = createJob('capture', async j => { const r = await captureProject(name, { arm: arm !== false, timeoutMs: Math.max(0.1, +timeoutS || 10) * 1000, device: +device || 0, log: l => j.log(l) }); return { capture: r.capture, file: r.file }; },
+      { meta: { project: name } });
+    return { job: job.id };
+  }));
+
   // the implemented design inside the FPGA (web/js/fpgaview.js): build/<top>.xdl + build/device.xdlrc,
   // written by the 'fpgaview' step; the model is cached in build/fpga-view.json. The Silinx toolchain's
   // routed design (build/open/routed.xdl) with the device description when it is newer than ISE's.

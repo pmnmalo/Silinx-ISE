@@ -15,13 +15,15 @@ const shape = n => (n.children ? { [n.id]: n.children.map(shape) } : n.id);
 const built = (tool, more = {}) => buildProcesses(tool, { parts: PARTS, actions: allActions(tool), runFlow: s => s, ...more });
 const find = (t, id) => { for (const n of t) { if (n.id === id) return n; const c = find(n.children || [], id); if (c) return c; } return null; };
 
-const XILINX_SHAPE = extra => [
+const XILINX_SHAPE = (extra, config = ['impact']) => [
   'summary', 'constraints',
   { synth: ['rtl', 'tech', 'check', 'cmodel', 'postsynth'] },
   ...extra,
   { impl: [{ translate: ['posttrans'] }, { map: ['postmap'] }, { par: ['trce', 'xpwr', 'postpar', 'pin2ucf', 'fpgaview'] }] },
-  'bitgen', 'emulate', { config: ['impact'] },
+  'bitgen', 'emulate', { config },
 ];
+// (the Silinx toolchain's Configure Target Device: the logic analyzer too, #3176; not ISE's, Vivado's or the iCE40's)
+const SILINX_CONFIG = ['impact', { capture: ['capture-settings', 'capture-view'] }];
 
 test('#2311 ISE: its process tree, Synthesize - XST and the open synthesis beside it, nothing with a tooltip', () => {
   const t = built(ISE);
@@ -34,7 +36,8 @@ test('#2311 ISE: its process tree, Synthesize - XST and the open synthesis besid
 
 test('#2311 the Silinx toolchain: ISE\'s tree without the open synthesis, Synthesize is Yosys, its runs say the toolchain', () => {
   const t = built(SILINX);
-  assert.deepEqual(t.map(shape), XILINX_SHAPE([]));
+  assert.deepEqual(t.map(shape), XILINX_SHAPE([], SILINX_CONFIG));
+  assert.deepEqual(['capture', 'capture-settings', 'capture-view'].map(id => find(t, id).label), ['Analyze Design Using the Logic Analyzer', 'Logic Analyzer Settings', 'View the Last Capture']);
   assert.equal(find(t, 'synth').label, 'Synthesize - Yosys');
   for (const id of ['synth', 'impl', 'bitgen']) assert.equal(find(t, id).title, 'Silinx toolchain (no ISE)', id);
   assert.equal(find(t, 'translate').title, undefined);

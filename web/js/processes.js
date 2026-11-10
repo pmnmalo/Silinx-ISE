@@ -105,6 +105,10 @@ function selectionProcesses(sel, view) {
         ...simModelActions(top),
         'synth-open': () => synthOpen(top), trce: () => postParTiming(top), xpwr: () => textPowerReport(top),
         pin2ucf: () => backAnnotatePins(top), fpgaview: () => openFpgaView(top), config: () => openImpact(), impact: () => openImpact(),
+        // (the logic analyzer, #3176: web/js/capture-ui.js)
+        capture: async () => (await import('./capture-ui.js')).runCaptureOnBoard(),
+        'capture-settings': async () => (await import('./capture-ui.js')).captureSettings(),
+        'capture-view': async () => (await import('./capture-ui.js')).openCaptureView(),
       },
     }),
   ];

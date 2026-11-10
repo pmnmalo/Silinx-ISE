@@ -102,6 +102,8 @@ export const api = {
   saveToolchain: (cfg, project = null) => req('PUT', `/api/toolchain${project ? `?project=${enc(project)}` : ''}`, cfg),
   openStatus: name => req('GET', `/api/projects/${enc(name)}/open-status`),
   implement: (name, body) => req('POST', `/api/projects/${enc(name)}/implement`, body),
+  // the logic analyzer's capture on the board (#3176): { job }, its result { capture, file }
+  capture: (name, body) => req('POST', `/api/projects/${enc(name)}/capture`, body),
   reports: name => req('GET', `/api/projects/${enc(name)}/reports`),
   fpgaView: name => req('GET', `/api/projects/${enc(name)}/fpga-view`),
   bitinfo: name => req('GET', `/api/projects/${enc(name)}/bitinfo`),
