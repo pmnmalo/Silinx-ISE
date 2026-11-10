@@ -123,7 +123,8 @@ html[data-theme="dark"] .tt-ks-v.vX { fill: #e0a040; }
 /* its items (#2846): a command, or a choice's options and a setting on or off (checkable, a ✓ in their own column), under a
    section title; the Boolean algebra's look (.tt-menu-item) for every viewer's */
 .tb-menu-title { padding: 3px 6px 1px 4px; color: var(--muted, #666); font-size: 11px; font-weight: 600; white-space: nowrap; cursor: default; }
-.tb-menu-item + .tb-menu-title { margin-top: 3px; padding-top: 5px; border-top: 1px solid var(--border, #aaa); }
+/* a choice's title, after a command or another choice (not the menu's first entry): a line above it (#3306) */
+.tb-more-menu > * + .tb-menu-title { margin-top: 3px; padding-top: 5px; border-top: 1px solid var(--border, #aaa); }
 .tb-menu-tick { width: 14px; flex: none; text-align: center; }
 .tb-menu-item:disabled { opacity: .5; }
 /* the Boolean algebra's menu and its button as the schematic editor's (#2505): flat, an icon and a label */
