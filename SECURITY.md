@@ -56,6 +56,15 @@ can read that user's files has the server too.
   container runs with no network, no capability, no way to gain privileges and a bound on its processes
   (`--network none --cap-drop ALL --security-opt no-new-privileges --pids-limit`), and a memory limit
   when the configuration sets one (`docker.memory`).
+- Git (#3195, `server/git.js`): the system's git is spawned with an argument array, never through a shell, with a
+  timeout and no prompt (`GIT_TERMINAL_PROMPT=0`, ssh in batch mode). No hook of a repository runs (`core.hooksPath`
+  is an empty folder of Silinx's), nor a repository's fsmonitor; no symbolic link is checked out; only https and ssh
+  are allowed (`protocol.allow`), and a remote is github.com's (checked before a clone, a push and a pull: the fetch
+  and the push URLs). The repository is the project's folder or the workspace, never one above it
+  (`GIT_CEILING_DIRECTORIES`), and every command is limited to the project's folder. The credentials are the system's
+  credential helper's: Silinx never asks for, stores or logs one (an error's URLs lose their `user:password@`). A
+  cloned project passes the import gate and is untrusted (#2830). On a hosted server git uses the server account's
+  credentials: `SILINX_GIT=off` turns git off.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
   paths, keys and tokens, Xilinx files, a bitstream under any name) the tracked files, text, compressed
   and binary, and every line ever added to `main`; CodeQL analyses
