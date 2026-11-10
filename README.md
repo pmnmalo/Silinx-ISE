@@ -562,7 +562,8 @@ MCP server made or imported runs ISE, or programs a board or a PROM, only once y
 statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
 checked on the project and recorded, as *Guided Labs…* does; a lab restarted), `capture_settings` (the logic analyzer's
 capture: the signals of the design to watch on the board, the clock, the depth, the trigger, checked on the design with the block
-RAMs it takes) and `timing_paths` (the Silinx toolchain's,
+RAMs it takes), `capture` (a capture on the board over the JTAG cable, the Basys2's / Nexys2's Digilent Adept USB through
+adepttool: armed, its trigger waited for, the samples read and saved in `build/capture.json`) and `timing_paths` (the Silinx toolchain's,
 Xilinx ISE's or AMD Vivado's slowest paths, as the Static Timing Report's Paths panel: a path's stages, their delays against the PERIOD, and the
 source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from; with `from` and `to`, the worst paths between two registers). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
