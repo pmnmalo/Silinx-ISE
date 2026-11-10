@@ -1,5 +1,5 @@
 // The MCP server's modules (#2674): server/mcp.js split by area, the projects' tools (mcp-projects.js), their
-// settings' (mcp-settings.js), their sources' (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), the
+// settings' (mcp-settings.js), their sources' (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), their sharing (mcp-collab.js, #3181), the
 // HDL's (mcp-hdl.js), the wave configurations' (mcp-wcfg.js, #2839), the processes' (mcp-processes.js) and their helpers (mcp-util.js). The server's tools are
 // those of the modules, the ones of before the split in their order; server/mcp.js still exports what it did. The
 // tools themselves are tested through the protocol in mcp.test.js, mcp-settings.test.js, mcp-sources.test.js and
@@ -22,6 +22,7 @@ const { SIMULATE_DRAWING_TOOLS } = await import('../server/mcp-simulate-drawing.
 const { SOURCE_TOOLS } = await import('../server/mcp-sources.js');
 const { TRANSFER_TOOLS } = await import('../server/mcp-transfer.js');
 const { LINK_TOOLS } = await import('../server/mcp-link.js');
+const { COLLAB_TOOLS } = await import('../server/mcp-collab.js');
 const { HDL_TOOLS } = await import('../server/mcp-hdl.js');
 const { WCFG_TOOLS } = await import('../server/mcp-wcfg.js');
 const { HLS_TOOLS } = await import('../server/mcp-hls.js');
@@ -52,12 +53,13 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(SOURCE_TOOLS), ['unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project']);
   assert.deepEqual(names(TRANSFER_TOOLS), ['export_project', 'import_project']);
   assert.deepEqual(names(LINK_TOOLS), ['project_link', 'open_link']);
+  assert.deepEqual(names(COLLAB_TOOLS), ['share_project', 'follow_project']);
   assert.deepEqual(names(HDL_TOOLS), ['check_syntax', 'simulate']);
   assert.deepEqual(names(WCFG_TOOLS), ['save_wave_config', 'load_wave_config']);
   assert.deepEqual(names(HLS_TOOLS), ['c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
   assert.deepEqual(names(LAB_TOOLS), ['lab']);   // (the guided labs, #3179)
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS]);
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);
