@@ -107,6 +107,8 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   const file = (await page.openMenu('File')).map((i) => i.label);
   assert.ok(file.includes('Open Project Bundle…') && file.includes('Download Project Bundle…'), file.join(' | '));
   await page.closeMenus();
+  // Share Project… (#3227): here, from a file, refused with its reason (the site's hosts the room in the page)
+  assert.ok(file.includes('Share Project…'), file.join(' | '));
   // New Project wizard from the embedded blinky example
   // (what Implement needs would be fetched as soon as the project opens: not from a file, #1450)
   await page.eval(() => { window.SILINX_PREPARE_DELAY = 0; });
@@ -127,6 +129,8 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   await page.waitFor(() => window.Silinx.project?.name === 'Solo' && [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'u_knight - knight'));
   // the project lives in localStorage
   assert.ok(await page.eval(() => Object.keys(localStorage).some((k) => (localStorage.getItem(k) || '').includes('"Solo"'))));
+  await page.menu('File', 'Share Project…');
+  await page.waitConsole(/^ERROR: Share Project: a Silinx opened from a file has no address that others can open; open Silinx from its site to share a project\.$/m);
   // nothing of what Implement needs downloaded in the background from a page opened from a file (#1450): WebKit and
   // Firefox give it a Cache Storage, and the download, cancelled by the reload below, was a console error in WebKit
   const fetched = () => served.filter((p) => /^assets\//.test(p));
@@ -526,6 +530,32 @@ uiTest('standalone edition (file://) in a user\'s browser (Chrome without --allo
 }, { url: () => 'about:blank', timeout: 300000 });
 
 // #418: the Board Emulator in the browser edition compiles the design with the site's Yosys (its assets)
+uiTest('#3227 browser edition: Share Project… hosts the room in the page (its link …#follow=<room>.<key>.host), Add a Follower… among its commands', E, async (page) => {
+  await page.goto(siteUrl);
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'WebShare');
+  await page.fill('.dlg-overlay .wiz-main select', 'gates', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.fill('.dlg-overlay .wiz-main select', 'basys2', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.project?.name === 'WebShare');
+  await page.menu('File', 'Share Project…');
+  await page.waitDialog('Share Project');
+  await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
+  await page.dialogButton('Share');
+  const link = await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });
+  assert.ok(link.startsWith(siteUrl) && /#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host$/.test(link), link);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Copy Link', 'Add a Follower…', 'Stop Sharing', 'Close']);
+  await page.waitConsole(/^This page hosts the shared project: each follower sends you a code when they open the link/m);
+  await page.dialogButton('Stop Sharing');
+  await page.waitConsole(/^Stopped sharing "WebShare": its followers no longer see it\.$/m);
+  assert.doesNotMatch(await page.consoleText(), /^(WARNING|ERROR)/m);
+}, { url: () => 'about:blank', timeout: 120000 });
+
 uiTest('browser edition: the Board Emulator runs blinky on the compiled engine, Yosys from the site\'s assets', E, async (page) => {
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });

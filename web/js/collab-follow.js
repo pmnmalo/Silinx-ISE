@@ -4,7 +4,8 @@
 // the server). The project changes as the owner changes it (web/js/project-watch.js reloads what changed, "Changed
 // by <owner>" in the console); the follower follows the owner's editor, the document they have in front and their
 // cursor, or browses alone (opening another document); the toolbar shows who is in (collab-presence.js), its menu
-// follows the owner again or stops following. Every message in the console.
+// follows the owner again or stops following. Every message in the console. A room the owner's page hosts (#3227, a
+// link …/#follow=<room>.<key>.host) is reached over WebRTC, with codes exchanged by hand (collab-host.js).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app, activateDoc } from './app.js';
@@ -28,7 +29,7 @@ export async function startFollowing(hash = location.hash) {
   try { link = parseFollowLink(hash); } catch (e) { history.replaceState(null, '', location.pathname + location.search); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   if (!link) return null;
   history.replaceState(null, '', location.pathname + location.search);
-  if (api.standalone) { app.log('ERROR: Follow a shared project: open its link at the address of the Silinx that shares it (the browser edition has no relay yet).', 'err'); return null; }
+  if (api.standalone && link.via === 'relay') { app.log('ERROR: Follow a shared project: open its link at the address of the Silinx that shares it (the browser edition has no relay).', 'err'); return null; }
   let saved = '';
   try { saved = localStorage.getItem(NAME_KEY) || ''; } catch { /* none */ }
   const input = h('input', { type: 'text', value: saved, 'data-field': 'name', maxlength: 40, style: { width: '100%' } });
@@ -41,9 +42,11 @@ export async function startFollowing(hash = location.hash) {
   });
   if (!name) return null;
   try { localStorage.setItem(NAME_KEY, name); } catch { /* this page only */ }
+  const WS = link.via === 'host' ? await (await import('./collab-host.js')).hostSocket(link) : undefined;
+  if (link.via === 'host' && !WS) return null;
   let session;
   try {
-    session = await followRoom({ url: relayUrl(location.href, 'follow'), room: link.room, key: link.key, user: { name }, onEvent: ev => onEvent(ev) });
+    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, user: { name }, onEvent: ev => onEvent(ev) });
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);

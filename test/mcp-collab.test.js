@@ -104,7 +104,7 @@ test('follow_project: an MCP client follows the MCP\'s share (two participants),
   await fails('follow_project', { link }, 'cannot follow: this shared project is no longer shared (its owner stopped sharing it)');
 });
 
-test('the errors: a project not shared, a bad action, no project, a bad server, no server there, a broken link', async () => {
+test('the errors: a project not shared, a bad action, no project, a bad server, no server there, a broken link, a link of a page\'s host', async () => {
   await fails('share_project', { project: 'traffic', action: 'stop' }, '\'traffic\' is not shared');
   await fails('share_project', { project: 'traffic', action: 'pause' }, 'action: start, status or stop');
   const r = await call('share_project', { project: 'nope', server: base });
@@ -117,6 +117,8 @@ test('the errors: a project not shared, a bad action, no project, a bad server, 
   assert.equal(d.isError, true);
   assert.match(d.text, /^share_project: cannot share through http:\/\/127\.0\.0\.1:1: cannot reach the relay at ws:\/\/127\.0\.0\.1:1\/api\/collab\/share \(is Silinx running there\? silinx serve\)$/);
   await fails('follow_project', { link: 'http://x/#follow=abc' }, 'the link to follow is broken (copy it again from the owner\'s Share Project)');
+  // (a project its owner's page hosts, #3227: a browser's, over WebRTC)
+  await fails('follow_project', { link: `http://x/#follow=${'R'.repeat(22)}.${'K'.repeat(43)}.host` }, 'link: a project its owner\'s page hosts (…#follow=….host) is followed in a browser, over WebRTC: open the link in Silinx');
   await fails('follow_project', { link: 'http://x/#design=abc' }, 'link: a link to follow (http(s)://…/#follow=…)');
   await fails('follow_project', { link: `#follow=${'a'.repeat(22)}.${'b'.repeat(43)}` }, 'link: a link to follow (http(s)://…/#follow=…)');
 });
