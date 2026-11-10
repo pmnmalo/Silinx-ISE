@@ -1,5 +1,6 @@
 // Git in the interface of the server editions (#3195, server/git.js; the browser edition's is phase 2, #3196): File ▸
-// Open from Repository…, File ▸ Git ▸ (Commit…, Push to GitHub, Pull from GitHub, Initialize Repository…), the same in the Design pane's
+// Open from Repository…, File ▸ Git ▸ (Commit…, Push to GitHub, Pull from GitHub, History… (web/js/git-history.js),
+// Initialize Repository…), the same in the Design pane's
 // project menu (the Silinx interface has no File menu), and the Design pane's marks of the files changed or new since
 // the last commit (S.git, refreshed when the project opens, after its files are written and after each command).
 // Every message goes to the console: git's line as an ERROR, its hint after it (docs/UI-GUIDELINES.md).
@@ -199,6 +200,7 @@ export const gitMenuItems = () => [
   { label: 'Commit…', action: () => commitDialog(), disabled: !S.git },
   { label: 'Push to GitHub', action: () => gitPush(), disabled: !S.git },
   { label: 'Pull from GitHub', action: () => gitPull(), disabled: !S.git },
+  { label: 'History…', action: () => import('./git-history.js').then(m => m.historyDialog()), disabled: !S.git },
   '-',
   { label: 'Initialize Repository…', action: () => initDialog() },
 ];

@@ -115,6 +115,22 @@ uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a re
   await page.menu('File', 'Pull from GitHub');
   await page.waitConsole(/ERROR: git pull: a conflict in src\/sevenseg\.v: nothing was pulled, the project's files are as they were\nHint: The same lines changed here and on GitHub\./);
   assert.equal(await readWs(env, 'lab1', 'src/sevenseg.v'), '// mine\n');
+  // History…: the commits, the newest first; a file of the first opens as it was, read only, the notice at the right end
+  // of its toolbar
+  await page.menu('File', 'History…');
+  await page.waitDialog('History');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .git-commit .git-subject')].map((e) => e.textContent)), ['Mine', 'Theirs: src/sevenseg.v', 'Counter changed', 'Starter']);
+  const first = await page.eval(() => document.querySelector('.dlg-overlay .git-commit:last-child').dataset.commit);
+  await page.click('.dlg-overlay .git-commit:last-child a[data-path="src/counter.v"]');
+  await page.waitNoDialog();
+  const id = `git:${first}:src/counter.v`;
+  await page.waitFor((i) => !!window.SilinxApp.S.docs.find((d) => d.id === i)?.editor, [id], { what: 'the file as it was' });
+  assert.equal(await page.eval((i) => window.SilinxApp.S.docs.find((d) => d.id === i).editor.getValue(), id), fs.readFileSync(path.join(ROOT, 'examples', 'blinky', 'src', 'counter.v'), 'utf8'));
+  assert.deepEqual(await page.eval(() => {
+    const b = [...document.querySelectorAll('.gen-banner.read-only')].find((e) => /as it was/.test(e.textContent));
+    return [b.textContent.replace(/[0-9a-f]{7} \(\d{4}-\d\d-\d\d\)/, 'X'), b === b.parentElement.lastElementChild, b.parentElement.classList.contains('editor-bar')];
+  }), ['Read-only, as it was in the commit X', true, true]);
+  assert.equal(await page.eval((i) => window.SilinxApp.S.docs.find((d) => d.id === i).editor.readOnly(), id), true);
   assert.deepEqual(warnings(page), []);
 }, { timeout: 120000 });
 
