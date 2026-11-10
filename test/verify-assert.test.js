@@ -98,6 +98,14 @@ test('a clocked VHDL assertion that fails: at clock cycle 10, its message, repla
   assert.doesNotMatch(tb, /reference/);
 });
 
+test('a concurrent VHDL assertion on a register: the cycle where its value is 9, as the clocked one\'s (simulated at the edge before)', async () => {
+  const CC = { ...CNT, text: CNT.text.replace('      assert c /= 9 report "c reached 9" severity error;\n', '').replace('  q <= c;', '  assert c /= 9 report "c is 9" severity error;\n  q <= c;') };
+  const r = await check([CC], 'cnt');
+  assert.deepEqual([r.status, r.cycle, r.steps, r.failure], ['failed', 10, 10, { file: 'src/cnt.vhd', line: 12, text: 'c is 9' }]);
+  // (c becomes 9 at the rising edge of cycle 9, 170 ns: its value in cycle 10)
+  for (const lang of ['vhdl', 'verilog']) assert.deepEqual(replay(r, lang, [CC]), [[170, 12, 'c is 9']], lang);
+});
+
 test('a concurrent VHDL assertion of a saturating counter: proved by induction; a smaller depth too', async () => {
   for (const depth of [20, 2]) {
     const r = await check([SAT], 'sat9', depth);
