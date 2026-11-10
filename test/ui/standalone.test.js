@@ -558,6 +558,20 @@ uiTest('#3227 browser edition: Share Project… hosts the room in the page (its 
   await page.waitConsole(/^This page hosts the shared project: its followers find it at the meeting point when they open the link, or send you a code/m);
   // (the meeting point's Trystero in the site's bundle, #3227)
   assert.ok((await fs.readFile(path.join(site, 'index.html'), 'utf8')).includes('Trystero'), 'Trystero bundled');
+  // a follower opens the link in the site: the project opened, read only (#3320: the start-up's storage refused it)
+  await page.eval(() => { localStorage.setItem('silinx.collab.stun', '[]'); localStorage.setItem('silinx.dev.collab.stun', '[]'); });
+  const fp = await env.newPage(siteUrl, { sibling: page });
+  try {
+    await fp.waitFor(() => window.SilinxApp && window.Silinx?.devices, [], { what: 'the follower\'s site boot' });
+    await fp.goto(`${siteUrl}?f=1${new URL(link).hash}`);
+    await fp.waitDialog('Follow a Shared Project');
+    await fp.fill('.dlg-overlay input[data-field=name]', 'Rui');
+    await fp.dialogButton('Follow');
+    await fp.waitFor(() => window.Silinx?.project?.name === 'WebShare' && window.Silinx.startupChecked, [], { what: 'the shared project open', timeout: 30000 });
+    await page.waitConsole(/^Rui follows your project "WebShare"\.$/m);
+    assert.doesNotMatch(await fp.consoleText(), /^(WARNING|ERROR)/m);
+    assert.deepEqual(fp.errors, []);
+  } finally { await fp.close(); }
   await page.dialogButton('Stop Sharing');
   await page.waitConsole(/^Stopped sharing "WebShare": its followers no longer see it\.$/m);
   assert.doesNotMatch(await page.consoleText(), /^(WARNING|ERROR)/m);
