@@ -285,7 +285,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   next-state bits and outputs for the K-map exercise. Its HDL: readable VHDL or Verilog (2- or
   3-process style; changing the language in the editor makes it again in that one) kept in sync
   both ways like ASM charts (an HDL edit that is no longer a plain state machine shows the reason); *Convert to State Diagram (FSM)* reads an HDL module or an
-  ASM chart, *Convert to ASM chart* goes the other way; *Simulate* steps through the diagram (set
+  ASM chart, *Convert to ASM chart* goes the other way; *Try it* steps through the diagram (set
   the inputs, clock edges, current state and the transition about to be taken highlighted).
 - **Implementation** with the **Silinx toolchain** (the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards, the default; in the
   browser or locally) or with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
@@ -412,7 +412,7 @@ gists, which you list and delete on GitHub. Some slide tools cut a link longer t
 000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
 `…/Silinx/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
 (`…/Silinx/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
-is `try` (a schematic's Try it; a state diagram's, a Petri net's or an ASM chart's Simulate panel), `simulate` (the test bench) or
+is `try` (a schematic's Try it; a state diagram's Try it panel; a Petri net's or an ASM chart's Simulate panel), `simulate` (the test bench) or
 `emulate` (the board emulator); `top=` names the module (with `simulate`, the test bench). Opening a link makes a project named after the design;
 clicked again, that project is opened as it is when it has the same files, and one the student changed is replaced
 only when they say so. A zip from another site is fetched only once you agree (its address shown), and only from an

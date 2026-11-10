@@ -61,7 +61,7 @@ uiTest('#2696 a Petri net\'s state machine, read-only: its [FSM] badge and comma
   await page.eval((ed) => document.querySelector(`${ed} .fsm-canvas`).dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 30, clientY: 30 })), ED);
   assert.equal(await model(), before0);
   // its simulation: a clock edge with go = 0 stays in idle (the state highlighted)
-  await page.click(`${ED} .fsm-tab-btn`, { text: 'Simulate' });
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Try it' });
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-sim-step`), [ED], { what: 'the simulation' });
   await page.click(`${ED} .fsm-sim-step`);
   assert.equal(await model(), before0);

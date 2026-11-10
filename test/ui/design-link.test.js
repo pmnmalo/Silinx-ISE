@@ -47,10 +47,10 @@ uiTest('#2826 an example\'s link opens it into Try it: the schematic\'s live sim
   assert.deepEqual(warnings(page), []);
 });
 
-uiTest('#2869 view=try on a state diagram: traffic\'s FSM opened in its Simulate panel', E, async (page) => {
+uiTest('#2869 view=try on a state diagram: traffic\'s FSM opened in its Try it panel', E, async (page) => {
   await openLink(page, 'open=example:traffic&top=traffic&view=try');
   await linkOpened(page);
-  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
+  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Try it panel', timeout: 30000 });
   assert.equal(await page.eval(() => window.Silinx.active?.id), 'fsm:src/traffic.fsm.json');
   await page.waitConsole(/Opened 'traffic' from a link( \(a new project\))?: Try it\./);
   assert.deepEqual(await consoleWarnings(page), []);
@@ -176,7 +176,7 @@ uiTest('#2871 regression, Copy Link to This Module… with Open the project only
   // with a view: the module selected, its view open
   await openLink(page, 'open=example:traffic&top=traffic&view=try', 'm=3');
   await linkOpened(page);
-  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
+  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Try it panel', timeout: 30000 });
   assert.equal(await selected(), 'traffic');
 });
 

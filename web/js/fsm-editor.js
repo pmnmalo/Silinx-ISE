@@ -105,7 +105,7 @@ export function mountFsmEditor(container, opts = {}) {
   const checkBtn = toolWide('check', 'Check', 'Check the diagram for errors and warnings', () => { runValidate(); opts.onCheck?.(diags.slice()); }, 'fsm-check');
   const tabBtns = {
     tables: btn('Tables', 'State table, transition table and encoded transition table', () => togglePanel('tables'), 'fsm-tab-btn'),
-    sim: toolWide('sim', 'Simulate', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs', () => togglePanel('sim'), 'fsm-tab-btn'),
+    sim: toolWide('sim', 'Try it', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs', () => togglePanel('sim'), 'fsm-tab-btn'),
   };
   const linkHost = h('span', { class: 'fsm-link' });
   const toolbar = h('div', { class: 'asm-toolbar fsm-toolbar' },
