@@ -43,6 +43,15 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
       return store().saveJson(name, json);
     },
     remove: (name, path) => (path === 'silinx.json' ? null : store().removePath(name, path)),
+    // a merged drawing's HDL file made from it again (#3197), as the server's (server/drawing-sync.js) on this storage
+    regenerate: async (name, path) => {
+      const { syncDrawing } = await import('../../server/drawing-sync.js');
+      const P = {
+        readProject: n => ops.project(n), fileTree: async n => (await ops.project(n)).fileTree,
+        readFile: ops.readFile, writeFile: ops.writeFile, deleteFile: ops.deleteFile, readSources: ops.sources,
+      };
+      return syncDrawing(P, name, path);
+    },
   };
   const meta = {
     get: async name => { try { return JSON.parse(get(metaKey(name))); } catch { return null; } },
@@ -63,7 +72,7 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
     gitInit: (name, remote = null) => backend().init(name, { remote }),
     gitCommit: (name, message) => backend().commit(name, message),
     gitPush: name => backend().push(name),
-    gitPull: name => backend().pull(name),
+    gitPull: (name, opts = {}) => backend().pull(name, opts),
     gitLog: (name, limit = 100) => backend().log(name, { limit }),
     gitShow: (name, commit, path) => backend().show(name, commit, path),
     // a project deleted: what it was in its repository forgotten (a new one of its name is no clone)

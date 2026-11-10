@@ -132,6 +132,23 @@ button, input, select, textarea { font: inherit; }
 .tree .git-mark { flex: none; margin-left: auto; padding: 0 4px; font-size: 10px; font-weight: bold; color: var(--warning); }
 .tree .git-mark.git-new { color: var(--success); }
 .tree .git-mark.git-conflict { color: var(--error-fg); }
+/* Compare (#3197, web/js/drawing-diff-view.js): a drawing's two versions side by side, its objects marked by their
+   colours (the theme's: dark too); an HDL file's lines side by side */
+:root { --diff-added: var(--success); --diff-removed: var(--error-fg); --diff-changed: var(--warning); }
+.diff-split { display: flex; flex: 1; min-height: 0; }
+.diff-split > .diff-pane { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.diff-split > .diff-pane + .diff-pane { border-left: 1px solid var(--border); }
+.diff-none { padding: 12px; }
+.diff-key-added { color: var(--diff-added); font-weight: bold; }
+.diff-key-removed { color: var(--diff-removed); font-weight: bold; }
+.diff-key-changed { color: var(--diff-changed); font-weight: bold; }
+.diff-scroll { overflow: auto; }
+.diff-text { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: var(--fs); }
+.diff-text td { padding: 0 6px; white-space: pre; vertical-align: top; }
+.diff-text .diff-ln { color: var(--muted); text-align: right; user-select: none; width: 1%; }
+.diff-text .diff-old { box-shadow: inset 3px 0 var(--diff-removed); }
+.diff-text .diff-new { box-shadow: inset 3px 0 var(--diff-added); }
+.diff-text .diff-changed .diff-old, .diff-text .diff-changed .diff-new { box-shadow: inset 3px 0 var(--diff-changed); }
 .tree .badge:focus-visible { outline: 1px dotted currentColor; outline-offset: 1px; }
 .tree:focus { outline: none; }
 .tree:focus-visible .row.sel { outline: 1px dotted var(--accent-fg); outline-offset: -1px; }

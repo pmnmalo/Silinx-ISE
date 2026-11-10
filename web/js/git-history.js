@@ -1,7 +1,8 @@
 // A project's history (#3195, server/git.js gitLog / gitShow): File ▸ History… lists its commits, newest first (the
 // hash, the date, the author, the message, the files each changed); a file of a commit opens as it was then, read only,
 // in a document of its own: the project's editor in its read-only mode, the notice at the right end of its toolbar
-// (docs/UI-GUIDELINES.md, "A read-only view").
+// (docs/UI-GUIDELINES.md, "A read-only view"). Compare (#3197, web/js/drawing-diff-view.js): a file of a commit against
+// the commit before, a drawing by its objects, any other file by its lines.
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, findDoc, activateDoc, openDoc } from './app.js';
@@ -40,12 +41,14 @@ export async function historyDialog() {
   if (!S.project) return null;
   let log;
   try { log = await api.gitLog(S.project.name, 200); } catch (e) { logGitError(e); return null; }
-  let picked = null, close = null;
+  let picked = null, compare = null, close = null;
+  const parentOf = c => log[log.indexOf(c) + 1]?.commit || null;
   const fileItem = (c, f) => h('li', {},
     f.state === 'deleted'
       ? h('span', { 'data-no-i18n': '' }, f.path)
       : h('a', { href: '#', 'data-path': f.path, 'data-no-i18n': '', onclick: e => { e.preventDefault(); picked = { commit: c.commit, path: f.path, date: c.date }; close?.(); } }, f.path),
-    ` (${stateWord(f.state)})`);
+    ` (${stateWord(f.state)}) `,
+    h('a', { href: '#', class: 'git-compare', 'data-path': f.path, onclick: e => { e.preventDefault(); compare = { commit: c.commit, parent: parentOf(c), path: f.path }; close?.(); } }, 'Compare'));
   const commitRow = c => h('li', { class: 'git-commit', 'data-commit': c.commit },
     h('div', { class: 'git-commit-head' }, h('code', { 'data-no-i18n': '' }, shortCommit(c.commit)), ` ${day(c.date)} `,
       h('span', { class: 'git-author', 'data-no-i18n': '' }, c.author), ': ', h('span', { class: 'git-subject', 'data-no-i18n': '' }, c.message)),
@@ -58,5 +61,29 @@ export async function historyDialog() {
     buttons: [{ label: 'Close', value: null, primary: true }],
     onOpen: ({ close: c }) => { close = () => c(null); },
   });
+  if (compare) return compareAt(compare);
   return picked ? openFileAt(picked.commit, picked.path, picked.date) : null;
+}
+
+// a file's text in a commit (null: not there)
+const textAt = (commit, path) => (commit ? api.gitShow(S.project.name, commit, path).then(r => r.text, e => { if (e.status === 404) return null; throw e; }) : Promise.resolve(null));
+
+/** Compare a file of a commit with the commit before (none: the file is new). */
+export async function compareAt({ commit, parent, path }) {
+  let a, b;
+  try { [a, b] = await Promise.all([textAt(parent, path), textAt(commit, path)]); } catch (e) { logGitError(e); return null; }
+  const { openCompare } = await import('./drawing-diff-view.js');
+  return openCompare(path, { text: a, label: parent ? `as it was in the commit ${shortCommit(parent)}` : 'before the first commit' }, { text: b, label: `as it was in the commit ${shortCommit(commit)}` });
+}
+
+/** Compare a file of the project as it is now with the last commit. */
+export async function compareNow(path) {
+  let last, a, b;
+  try {
+    last = (await api.gitLog(S.project.name, 1))[0]?.commit || null;
+    a = await textAt(last, path);
+    b = await api.readFile(S.project.name, path).catch(() => null);
+  } catch (e) { logGitError(e); return null; }
+  const { openCompare } = await import('./drawing-diff-view.js');
+  return openCompare(path, { text: a, label: last ? `as it was in the commit ${shortCommit(last)}` : 'before the first commit' }, { text: b, label: 'as it is now' });
 }

@@ -22,7 +22,7 @@ test('#1678 silinx-fpga: its entries, the API, its light part and the API in Nod
 
 // the API's names: a change to them is a change of the API (its version, #1681), made on purpose
 const API = ['FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'PCF', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError', 'XDC',
-  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsExtOf', 'constraintsFormatOf',
+  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'betweenPaths', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsExtOf', 'constraintsFormatOf',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'experimentalDevice', 'familyFromXise', 'familyName',
   'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
   'nextpnrIo', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'pathHighlight', 'pathsText', 'periodNs', 'powerReport',

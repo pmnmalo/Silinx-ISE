@@ -13,7 +13,7 @@ export function registerGitRoutes(api) {
     return fn(req);
   }).then(
     out => { if (!res.headersSent) res.json(out); },
-    err => res.status(err.status || 500).json({ error: err.status ? err.message : 'internal server error', ...(err.hint ? { hint: err.hint } : {}), ...(err.files ? { files: err.files } : {}), ...(err.projects ? { projects: err.projects } : {}) }),
+    err => res.status(err.status || 500).json({ error: err.status ? err.message : 'internal server error', ...(err.hint ? { hint: err.hint } : {}), ...(err.files ? { files: err.files } : {}), ...(err.projects ? { projects: err.projects } : {}), ...(err.drawings ? { drawings: err.drawings } : {}) }),
   );
   const body = req => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
   // (whether git is there: the interface shows its menu)
@@ -23,7 +23,7 @@ export function registerGitRoutes(api) {
   api.post('/projects/:p/git/init', route(req => B().gitInit(req.params.p, { remote: body(req).remote || null })));
   api.post('/projects/:p/git/commit', route(req => B().gitCommit(req.params.p, body(req).message)));
   api.post('/projects/:p/git/push', route(req => B().gitPush(req.params.p)));
-  api.post('/projects/:p/git/pull', route(req => B().gitPull(req.params.p)));
+  api.post('/projects/:p/git/pull', route(async req => B().gitPull(req.params.p, { resolve: (await import('../core/git-resolve.js')).checkChoices(body(req).resolve) })));
   api.get('/projects/:p/git/log', route(req => B().gitLog(req.params.p, { limit: req.query.limit })));
   api.get('/projects/:p/git/show', route(req => B().gitShow(req.params.p, req.query.commit, req.query.path)));
 }

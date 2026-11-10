@@ -54,3 +54,8 @@
 .fsm-editor .fsm-edge.on-path .fsm-edge-line, .asm-editor .asm-edge.on-path .asm-edge-line { stroke: #e8590c; stroke-width: 3; }
 .sch-editor svg .wire.on-path .wline { stroke: #e8590c; stroke-width: 2.4; }
 .sch-editor svg .sym.on-path .gate, .sch-editor svg .sym.on-path .box { stroke: #e8590c; stroke-width: 2.4; }
+
+/* between two chosen registers (#3178): From, To above the list */
+.tp-between { display: grid; grid-template-columns: auto 1fr; gap: 4px 6px; padding: 6px 8px; border-bottom: 1px solid var(--border-light, #d4d0c8); }
+.tp-between label { display: contents; }
+.tp-pick { min-width: 0; font: inherit; }

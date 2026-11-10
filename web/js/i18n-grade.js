@@ -42,6 +42,7 @@ export const GRADE_PT = {
   'Period (ns)': 'Período (ns)',
   'Vectors': 'Vetores',
   'Cycles': 'Ciclos',
+  'Depth (clock cycles)': 'Profundidade (ciclos de relógio)',
   'Seed': 'Semente',
   'Test bench': 'Banco de teste',
   'End message': 'Mensagem do fim',

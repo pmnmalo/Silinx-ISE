@@ -2,7 +2,8 @@
 // timing analysis beside the report (build/open/paths.json, made here by hand on the FPGA view's routed fixture), the
 // selected path's stages as bars against the PERIOD; Show Path marks its source lines in their editors (the previous
 // path's unmarked), Show in FPGA View lights its sites and draws its nets; a path with no source line says so in the
-// console; a path through a state diagram's module marks the diagram's elements; the panel folds (remembered) and, on
+// console; From and To choose the worst paths between two registers; a path through a state diagram's module marks
+// the diagram's elements; the panel folds (remembered) and, on
 // a narrow window, goes over the report behind ☰ Paths; in Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,6 +46,10 @@ const PATHS = { top: 'top', paths: [
       st('setup', 'u1/q', 'F2', 'SLICE_X1Y5', 0.4, 1.9, { sources: [{ file: 'src/sub.vhd', line: 6, block: 'process_6' }] })] },
   { clock: 'clk_BUFGP', port: null, required: null, delay: 1.2, period: 1.2, half: false, slack: null, lines: [],
     stages: [st('clock-to-out', 'u1/r', 'XQ', 'SLICE_X0Y4', 0.6, 0.6), st('net', 'u1/r', 'BY', 'SLICE_X0Y4', 0.2, 0.8, { net: 'unused_net' }), st('setup', 'u1/r', 'BY', 'SLICE_X0Y4', 0.4, 1.2)] }] };
+
+// the registers and the worst path of each pair (#3178's paths between two points): u1/r into u1/q, u1/q into y
+PATHS.points = ['u1.q', 'u1.r', 'y_reg'];
+PATHS.pairs = [{ ...PATHS.paths[0], from: 'u1.q', to: 'y_reg' }, { ...PATHS.paths[1], from: 'u1.r', to: 'u1.q' }];
 
 async function timedProject(name) {
   await makeProject(env, { name, files: { 'src/top.vhd': TOP, 'src/sub.vhd': SUB }, top: 'top' });
@@ -220,4 +225,30 @@ uiTest('#3178 Show Path in a state diagram: its states and the transitions on th
   await page.waitFor(() => /The logic of the path to u_r\.BY could not be traced back to its source lines\./.test(window.__console()), [], { what: 'the console\'s line' });
   assert.equal(await page.eval(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json').el.querySelectorAll('.on-path').length), 0);
   assert.deepEqual(await marked(page, 'src/traffic.vhd'), []);
+});
+
+uiTest('#3178 the Paths panel between two registers: From and To choose the pairs\' paths, Show Path on one; none between two', E, async (page) => {
+  await timedProject('PathsBetween');
+  await page.setViewport(1600, 800);
+  await page.openProject('PathsBetween');
+  await openReport(page);
+  const picks = () => page.eval((r) => [...document.querySelectorAll(`${r} .tp-pick`)].map((x) => [x.title, [...x.options].map((o) => o.textContent).join(',')]), R);
+  assert.deepEqual(await picks(), [['The register the paths start from', 'Any register,u1.q,u1.r,y_reg'], ['The register the paths end in', 'Any register,u1.q,u1.r,y_reg']]);
+  const choose = (i, v) => page.eval((r, i, v) => { const s = document.querySelectorAll(`${r} .tp-pick`)[i]; s.value = v; s.dispatchEvent(new Event('change')); }, R, i, v);
+  // from u1.r: its one pair, into u1.q (the slowest list's path 2)
+  await choose(0, 'u1.r');
+  let L = await look(page);
+  assert.deepEqual(L.rows, ['1 0.100 1.900 u1/q *']);
+  assert.deepEqual(L.sums, ['u1/r.YQ → u1/q.F2', 'Delay 1.900 ns of 2.000 ns, slack 0.100 ns']);
+  await page.click(`${R} .tp-actions .btn`, { text: 'Show Path' });
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/sub.vhd', [], { what: 'sub.vhd in front' });
+  assert.deepEqual(await marked(page, 'src/sub.vhd'), [6]);
+  // to u1.r: none reaches it
+  await page.eval(() => window.SilinxApp.openFile('build/open/timing.txt'));
+  await choose(0, ''); await choose(1, 'u1.r');
+  assert.equal(await page.eval((r) => document.querySelector(`${r} .tp-list`).hidden, R), true);
+  assert.equal(await page.eval((r) => document.querySelector(`${r} .tp-none`).textContent, R), 'No path between these registers.');
+  // any to any: the slowest paths again
+  await choose(1, '');
+  assert.equal((await look(page)).rows.length, 3);
 });

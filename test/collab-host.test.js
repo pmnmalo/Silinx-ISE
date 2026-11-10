@@ -111,10 +111,10 @@ test('read only in the page\'s room: a follower\'s edit refused, never at the ow
 test('the codes exchanged by hand: sealed, opened by their project\'s key and kind only, their size capped', async () => {
   const { key, text } = await newKey();
   const room = 'R'.repeat(22);
-  const sdp = `v=0\r\no=- 46117 2 IN IP4 127.0.0.1\r\ns=-\r\n${'a=candidate:1 1 udp 2122260223 192.168.1.20 54321 typ host\r\n'.repeat(4)}`;
+  const sdp = `v=0\r\no=- 46117 2 IN IP4 127.0.0.1\r\ns=-\r\n${'a=candidate:1 1 udp 2122260223 192.0.2.20 54321 typ host\r\n'.repeat(4)}`;
   const offer = await sealCode(key, room, 'offer', sdp);
   assert.match(offer, /^S1\.[A-Za-z0-9_-]+$/);
-  assert.ok(!offer.includes('192.168') && offer.length < sdp.length + 100, 'sealed, compressed');
+  assert.ok(!offer.includes('192.0.2') && offer.length < sdp.length + 100, 'sealed, compressed');
   assert.equal(await openCode(await keyOf(text), room, 'offer', `  ${offer.slice(0, 40)}\n${offer.slice(40)} `), sdp);   // (spaces and line breaks of a paste)
   await assert.rejects(openCode(key, room, 'answer', offer), /^Error: not the owner's code: a follower's instead$/);
   const answer = await sealCode(key, room, 'answer', 'v=0\r\n');
@@ -131,4 +131,30 @@ test('the codes exchanged by hand: sealed, opened by their project\'s key and ki
   // (a description that is not text: broken too)
   const notText = new Uint8Array(await new Response(new Blob([Uint8Array.from([0xff, 0xfe, 0xfd])]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
   await assert.rejects(openCode(key, room, 'offer', `S1.${b64url(await seal(key, room, CODE_KINDS.offer, notText))}`), /is broken/);
+});
+
+test('a frame larger than a data channel\'s message: sent as parts, joined again whole, in order; a frame too large, or a part out of place, refused', async () => {
+  const { splitFrame, frameJoiner, PART, PART_SIZE } = await import('../core/collab-frag.js');
+  const small = Uint8Array.from([KIND.update, 1, 2, 3]);
+  assert.deepEqual(splitFrame(small), [small]);
+  const big = Uint8Array.from({ length: 3 * PART_SIZE + 7 }, (_, i) => (i * 7) & 255);
+  big[0] = KIND.update;
+  const parts = splitFrame(big);
+  assert.equal(parts.length, 4);
+  assert.ok(parts.every(p => p.length <= PART_SIZE && p[0] === PART));
+  assert.deepEqual(parts.map(p => p[1]), [1, 1, 1, 0]);
+  const j = frameJoiner(1 << 20);
+  assert.deepEqual(parts.slice(0, 3).map(p => j.push(p)), [null, null, null]);
+  assert.deepEqual(j.push(parts[3]), big);
+  assert.deepEqual(j.push(small), small, 'a whole frame after them');
+  // (too large: refused, and the next frame whole again)
+  const tight = frameJoiner(2 * PART_SIZE);
+  assert.throws(() => { for (const p of parts) tight.push(p); }, /a message too large/);
+  assert.deepEqual(tight.push(small), small);
+  // (a frame within the parts of another; a broken part)
+  const k = frameJoiner(1 << 20);
+  k.push(parts[0]);
+  assert.throws(() => k.push(small), /a frame within the parts of another/);
+  assert.throws(() => frameJoiner(10).push(Uint8Array.from([PART, 2, 0])), /a broken part/);
+  assert.throws(() => frameJoiner(10).push(Uint8Array.from([PART, 0])), /a broken part/);
 });
