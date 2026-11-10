@@ -28,18 +28,25 @@ export function referenceVectors(ex, test) {
   return r.problems.length ? { problems: r.problems } : { inputs: ins.inputs, outputs: r.outputs, rows: r.rows, problems: [] };
 }
 
-// a synthesis test from the open synthesis's results ({ errors, warnings, latches, luts, ffs, slices })
+// a synthesis test from the open synthesis's results ({ errors, warnings, latches, luts, ffs, slices, notes: what it
+// could not check, as the slices without nextpnr's chip database, #3215 }, { timedOut: its limit's seconds }, or the
+// test's { result } graded elsewhere)
 async function runSynthesis(ex, test, design, synthesize) {
   if (!synthesize) return { verdict: null, messages: ['the synthesis tests run where the open synthesis is (silinx grade, the server)'] };
   const r = await synthesize(design.sources, ex.top, test);
+  // (the test graded elsewhere: the local server's page asks its server, #3216)
+  if (r.result) return r.result;
+  // (the page's: its worker stopped at the test's time limit, #3216; the server's process is stopped instead)
+  if (r.timedOut) return { verdict: 'TLE', messages: [`the test took more than ${r.timedOut} s`] };
   if (r.errors?.length) return { verdict: 'NS', messages: r.errors.slice(0, 5) };
   const latches = Math.max(r.latches || 0, design.warnings.filter(w => LATCH_RE.test(w)).length ? 1 : 0);
   if (test.latches === false && latches) return { verdict: 'LI', messages: [...design.warnings.filter(w => LATCH_RE.test(w)), ...(r.latches ? [`the synthesis inferred ${r.latches} latch${r.latches > 1 ? 'es' : ''}`] : [])] };
   if (test.warnings === false && (r.warnings?.length || design.warnings.length)) return { verdict: 'NS', messages: ['this exercise allows no warning', ...design.warnings, ...(r.warnings || [])].slice(0, 6) };
   const over = [['luts', 'LUTs'], ['ffs', 'flip-flops'], ['slices', 'slices']].filter(([k]) => test[k] !== undefined && (r[k] ?? 0) > test[k])
     .map(([k, n]) => `${r[k]} ${n}, at most ${test[k]}`);
-  if (over.length) return { verdict: 'RL', messages: over };
-  return { verdict: 'AC', messages: [], used: { luts: r.luts, ffs: r.ffs, slices: r.slices, latches } };
+  const notes = r.notes || [];
+  if (over.length) return { verdict: 'RL', messages: [...over, ...notes] };
+  return { verdict: 'AC', messages: notes, used: { luts: r.luts, ffs: r.ffs, slices: r.slices, latches } };
 }
 
 // the submission as the guided labs' checks read a project (core/labs-check.js `io`): its silinx.json, its files, the

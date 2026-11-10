@@ -59,8 +59,8 @@ test('#3192 the exercise: a right one has no problem; each kind of wrong one say
   const checks = counterExercise();
   checks.tests = [{ id: 'c', kind: 'check' }, { id: 'd', kind: 'check', checks: [{ check: 'fly' }, { check: 'syntax', warnings: ['/[/'] }] }, { id: 't', kind: 'testbench', top: 'tb', files: [{ path: 'tb.v', text: '' }], done: '/(/' }];
   assert.deepEqual(exerciseProblems(checks, 'e.exercise.json'), [
-    'e.exercise.json: test 1: "checks": a list of the guided labs\' checks (project, file, module, syntax, simulate)',
-    'e.exercise.json: test 2: check 1: "check": one of project, file, module, syntax, simulate',
+    'e.exercise.json: test 1: "checks": a list of the guided labs\' checks (project, file, module, syntax, simulate, process)',
+    'e.exercise.json: test 2: check 1: "check": one of project, file, module, syntax, simulate, process',
     'e.exercise.json: test 2: check 2 (syntax): "warnings": \'/[/\' is not a regular expression',
     'e.exercise.json: test 3: "done": a message the test bench prints at its end (a text, or "/regex/flags")',
   ]);
@@ -292,6 +292,17 @@ test('#3192 Grading Error: a synthesis the grader cannot run (a read Node\'s per
   const synthesize = async () => { throw Object.assign(new Error('Access to this API has been restricted'), { code: 'ERR_ACCESS_DENIED', permission: 'FileSystemRead', resource: '/tmp/x' }); };
   const r = await grade(ex, hdl(COUNTER_V), { synthesize });
   assert.deepEqual([r.verdict, r.verdictName, r.tests[0].messages], ['GE', 'Grading Error', ['the synthesis could not run: Access to this API has been restricted (FileSystemRead /tmp/x)']]);
+});
+
+test('#3215 a synthesis test\'s slices not checked (no chip database): the other limits\' verdict, said why', async () => {
+  const ex = counterExercise();
+  ex.tests = [{ id: 'impl', points: 1, kind: 'synthesis', luts: 4, ffs: 4, slices: 2 }];
+  const why = 'the slices are not checked here: nextpnr\'s chip database of xc3s250e is not in this installation and could not be downloaded (fetch failed)';
+  const synthesize = async () => ({ errors: [], warnings: [], latches: 0, luts: 0, ffs: 4, slices: null, notes: [why] });
+  const ok = await grade(ex, hdl(COUNTER_V), { synthesize });
+  assert.deepEqual([ok.verdict, ok.tests[0].messages, ok.tests[0].used], ['AC', [why], { luts: 0, ffs: 4, slices: null, latches: 0 }]);
+  const over = await grade(ex, hdl(COUNTER_V), { synthesize: async () => ({ ...(await synthesize()), ffs: 8 }) });
+  assert.deepEqual([over.verdict, over.tests[0].messages], ['RL', ['8 flip-flops, at most 4', why]]);
 });
 
 test('#3192 --visible: the visible tests only, the maximum theirs', async () => {

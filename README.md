@@ -426,6 +426,11 @@ On your computer or a Silinx server, a project can live in a GitHub repository, 
   they were.
 - **The Design pane** marks what changed (M) or is new (N) since the last commit.
 - **History…** lists the commits, and opens a file as it was in one, read only.
+- **Compare** (in History… and Commit…) shows a drawing's two versions side by side, what was added, removed, moved
+  or changed marked on them, and an HDL file's lines side by side.
+- **A drawing changed on both sides** is merged by its objects on Pull, never as text, and its HDL made again; for an
+  object both sides changed, Pull asks whose version it keeps (Mine or Theirs), and checks the result as Check Drawing
+  does.
 - **Initialize Repository…** makes a repository of a project, with a `.gitignore` that leaves `build/` and the tools'
   outputs out.
 

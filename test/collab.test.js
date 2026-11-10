@@ -60,8 +60,14 @@ test('link: made and parsed; another hash is not one; a broken one is said', () 
   const room = 'A'.repeat(22), key = 'b'.repeat(43);
   const l = followLink('http://localhost:8642/?x=1#old', room, key);
   assert.equal(l, `http://localhost:8642/#follow=${room}.${key}`);
-  assert.deepEqual(parseFollowLink(l), { base: 'http://localhost:8642/', room, key });
-  assert.deepEqual(parseFollowLink(`#follow=${room}.${key}`), { base: null, room, key });
+  assert.deepEqual(parseFollowLink(l), { base: 'http://localhost:8642/', room, key, via: 'relay' });
+  assert.deepEqual(parseFollowLink(`#follow=${room}.${key}`), { base: null, room, key, via: 'relay' });
+  // (a room the owner's page hosts, #3227)
+  const hl = followLink('https://silinx.example.org/app/', room, key, 'host');
+  assert.equal(hl, `https://silinx.example.org/app/#follow=${room}.${key}.host`);
+  assert.deepEqual(parseFollowLink(hl), { base: 'https://silinx.example.org/app/', room, key, via: 'host' });
+  assert.throws(() => followLink('http://x/', room, key, 'peer'), /through a relay or its host/);
+  assert.throws(() => parseFollowLink(`#follow=${room}.${key}.peer`), /broken/);
   assert.equal(parseFollowLink('http://x/#design=abc'), null);
   assert.equal(parseFollowLink('http://x/'), null);
   assert.throws(() => parseFollowLink('http://x/#follow=abc'), /the link to follow is broken/);

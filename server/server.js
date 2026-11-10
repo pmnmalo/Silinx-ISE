@@ -216,6 +216,9 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   // git (#3195): a project in a GitHub repository
   const { registerGitRoutes } = await import('./git-routes.js');
   registerGitRoutes(api);
+  // automatic grading's synthesis tests (#3216)
+  const { registerGradeRoutes } = await import('./grade-routes.js');
+  registerGradeRoutes(api, { wrap, projects: P });
 
   app.use('/api', api);
   // an error no route answered (a bad body, a bad address): its message, never a stack trace with the server's paths

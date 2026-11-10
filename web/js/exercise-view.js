@@ -5,8 +5,8 @@
 // tests with their verdicts and points once run, the Properties side panel on the right (the exercise's title,
 // statement and top, the selected test's settings: web/js/exercise-props.js), its status line, and every message in the
 // console. The tests run on the project as it is saved, in the page (core/grade.js, the grading of `silinx grade` and of
-// the MCP server's `grade` tool, its step limit; the synthesis tests are silinx grade's); the student's copy of an
-// exercise has its visible tests only, the teacher's all.
+// the MCP server's `grade` tool, its step limit; the synthesis tests in the flow's worker, web/js/grade-synth-browser.js,
+// #3216); the student's copy of an exercise has its visible tests only, the teacher's all.
 import { h, dialog } from './ui.js';
 import { api } from './api.js';
 import { S, findDoc, openDoc, setDirty } from './app.js';
@@ -18,6 +18,7 @@ import { panelToggle } from './narrow.js';
 import { statusLine } from './status-line.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import { mountExerciseProps } from './exercise-props.js';
+import { browserSynthesize } from './grade-synth-browser.js';
 import { isExerciseFile, exerciseProblems, localize, testsOf, pointsOf, withFileTexts, newExercise, exerciseFileOf, VERDICTS } from '/core/grade-format.js';
 import { gradeTests, summarize, referenceVectors } from '/core/grade.js';
 import { exerciseUnitNames, submissionSources } from '/core/grade-design.js';
@@ -184,7 +185,7 @@ export function mountExercise(el, doc, path, ex) {
         vectors[x.id] = v;
       }
       const sub = await projectSubmission(name);
-      const r = summarize(full, name, await gradeTests(full, sub, { visible, vectors, exerciseUnits: exerciseUnitNames(full) }), { visible });
+      const r = summarize(full, name, await gradeTests(full, sub, { visible, vectors, exerciseUnits: exerciseUnitNames(full), synthesize: browserSynthesize(full, { name, file: path }) }), { visible });
       results = r;
       for (const l of textReport(r).trimEnd().split('\n')) log(l, /^\s*(-|WARNING|Compile|Interface)/.test(l) ? 'warn' : '', { diag: /WARNING/.test(l) });
       log(`Process "${visible ? 'Run Visible Tests' : 'Run All Tests'}" completed: ${num(r.points)} / ${num(r.max)} points.`, r.verdict === 'AC' ? 'ok' : 'warn', { diag: false });

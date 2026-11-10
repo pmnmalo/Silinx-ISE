@@ -70,7 +70,9 @@ A test is hidden unless it has `"visible": true`. Each test is worth `points` (1
 - **synthesis**: the open synthesis (Yosys, then Place & Route for the slices) on the exercise's `device` (the
   Basys2's XC3S250E by default), with these requirements:
   - `latches: false`: no latch;
-  - `luts`, `ffs` and `slices`: at most that many;
+  - `luts`, `ffs` and `slices`: at most that many. The slices need nextpnr's chip database of the device, which the
+    release zip leaves out. The grader downloads it once, checks it and keeps it, before a submission runs. Offline, the
+    slices are not checked: the report says so, and the other requirements give the verdict;
   - `warnings: false`: no warning from Check Syntax or the synthesis.
 
 - **check**: the guided labs' step checks (`core/labs-check.js`, #3179: `project`, `file`, `module`, `syntax`,
@@ -124,7 +126,8 @@ the interface's language, the ports, and the tests with their verdicts and point
 
 - **For a student**:
   - **Run Visible Tests** runs the visible tests on the project as it is saved, and the console gives the report.
-  - The synthesis tests run with `silinx grade`, not in the page.
+  - The synthesis tests run in the page too, with the open synthesis that Synthesize uses, and give the same verdicts
+    as `silinx grade`.
 - **For a teacher**:
   - **Run All Tests** (in the ⋮ menu) runs the hidden tests too.
   - **Ports from the Top** takes the top and its ports from the project's top module, so the teacher's reference
