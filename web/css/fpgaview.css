@@ -28,6 +28,9 @@
 .fv-conn .fv-wire { stroke: #7cc4ff; } .fv-conn .fv-load { fill: #7cc4ff; } .fv-conn .fv-route { fill: rgba(124, 196, 255, .10); stroke: rgba(124, 196, 255, .35); } .fv-conn .fv-drv { stroke: #7cc4ff; }
 .fv-clock .fv-wire { stroke: #ff6b6b; stroke-width: .8; opacity: .7; } .fv-clock .fv-load { fill: #ff6b6b; } .fv-clock .fv-route { fill: rgba(255, 107, 107, .10); stroke: rgba(255, 107, 107, .35); } .fv-clock .fv-drv { stroke: #ff6b6b; }
 .fv-picked .fv-wire { stroke-width: 1.6; opacity: 1; }
+/* a timing path (#3178): its sites and nets in the warning colour */
+.fv-site.fv-on-path { stroke: #e8590c; stroke-width: 1.6; }
+.fv-path .fv-wire { stroke: #e8590c; stroke-width: 1.8; opacity: 1; } .fv-path .fv-load { fill: #e8590c; } .fv-path .fv-route { fill: rgba(232, 89, 12, .10); stroke: rgba(232, 89, 12, .40); } .fv-path .fv-drv { stroke: #e8590c; }
 .fv-tip { position: absolute; z-index: 3; pointer-events: none; background: rgba(13, 17, 23, .92); color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 4px 8px; font: 11px var(--mono, monospace); white-space: pre; }
 /* the side panel: the diagram editors' Properties (asm-editor.css), folded as theirs (side-fold.js), each section folded
    by its title; on a narrow window over the chip, shown by the toolbar's ☰ Properties (#2668) */

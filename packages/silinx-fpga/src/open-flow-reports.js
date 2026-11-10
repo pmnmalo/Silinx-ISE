@@ -3,9 +3,13 @@
 // (pin2ucf) and the power estimate (#123).
 import { ESTIMATE_ERROR_PERCENT, estimatePower, powerReport } from './power.js';
 import { checkCross, checkOffsets, checkPeriods, clockPort, parseOffsets, switchingLine, timingReport } from './fpga/timing.js';
+import { timingPaths } from './fpga/timing-paths.js';
 import { pinsUcf } from './ucf.js';
 import { parseXdl, placedPins } from './xdl.js';
 import { StepError } from './open-flow-core.js';
+
+// the slowest paths kept (#3178)
+export const PATHS = 20;
 
 /** { bitfile, runFpgaView, runPins, runPower, runTiming } of runOpenFlow (routedText(): the routed design's XDL, read
  *  again from an earlier run by routedOrEarlier, #2384). reports: the family's { analyze, switching, model, bitstream }
@@ -31,6 +35,11 @@ export function mountFlowReports(ctx) {
     const checks = [...periods, ...switching, ...cross, ...offsets];
     const lines = timingReport(sta, checks);
     report.files.timing = io.write('open/timing.txt', `Static timing analysis of ${top} (Silinx toolchain, delay model of ${reports.model})\n\n${lines.join('\n')}\n`);
+    // (#3178: the slowest paths, stage by stage, back to the source lines: the timing report's Paths panel, the MCP's timing_paths)
+    const json = io.read(`open/${top}.json`);
+    const netlist = json == null ? null : typeof json === 'string' ? JSON.parse(json) : json;
+    const paths = timingPaths(sta, design, { n: PATHS, periods, netlist, synText: io.read(`open/${top}_syn.v`) || '', top });
+    report.files.paths = io.write('open/paths.json', JSON.stringify(paths));
     const failed = periods.filter(c => !c.missing && !c.met), offFailed = offsets.filter(c => !c.missing && !c.unsupported && !c.met);
     const crossFailed = cross.filter(c => c.related && !c.met);
     const swFailed = switching.filter(c => !c.met);

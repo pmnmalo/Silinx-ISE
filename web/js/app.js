@@ -491,6 +491,7 @@ export async function openFile(path, line, col, { task } = {}) {
           onFix: () => recheckFile(path),
         });
         el.append(d.editor.status);   // (its status line: the line and column, the language, #2763)
+        if (path === 'build/open/timing.txt') d.paths = import('./timing-paths.js').then(m => m.mountTimingPaths(d, el, host));   // (its Paths panel, #3178)
         d.editor.setDiagnostics(S.diags.filter(x => x.file === path));
         let ucfTimer = null;
         const liveUcf = () => { clearTimeout(ucfTimer); ucfTimer = setTimeout(async () => { if (d.editor) d.editor.setDiagnostics(await ucfDiagnostics(d.editor.getValue(), path)); }, 400); };
