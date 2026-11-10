@@ -29,7 +29,14 @@ test('a capture\'s plan: the probes\' bits in the sample word, the register, the
   assert.equal(planCapture(capSpec({ probes: WIDE })).regBits, 21);
   const blocks = (w, d, family = 'spartan3e') => planCapture(capSpec({ family, depth: d, pre: 0, probes: [{ name: 'x', width: w }] })).memory.blocks;
   // the issue's examples on the XC3S100E (4 RAMB16): 16 x 1024, 32 x 512, 8 x 2048 take one block each
-  assert.deepEqual([blocks(16, 1024), blocks(32, 512), blocks(8, 2048), blocks(36, 1024), blocks(64, 4096)], [1, 1, 1, 2, 16]);
+  assert.deepEqual([blocks(16, 1024), blocks(32, 512), blocks(8, 2048), blocks(9, 1024), blocks(64, 4096)], [1, 1, 1, 1, 16]);
+  // (no probe bit in a parity bit the write port alone has, PhysDesignRules:1060: the word in arrays of the data bits of
+  // the widest block holding the depth, a block more when the probes would fill its parity: 17 or 18 bits of 1024 samples,
+  // 9 of 2048, 36 of 512; the open flow's routes as many blocks)
+  const chunks = (w, d) => planCapture(capSpec({ depth: d, pre: 0, probes: [{ name: 'x', width: w }] })).chunks;
+  assert.deepEqual([blocks(17, 1024), blocks(18, 1024), blocks(24, 1024), blocks(9, 2048), blocks(36, 512), blocks(36, 1024)], [2, 2, 2, 2, 2, 3]);
+  assert.deepEqual([chunks(16, 1024), chunks(24, 1024), chunks(9, 2048), chunks(36, 512)], [[[0, 15]], [[0, 15], [16, 23]], [[0, 7], [8, 8]], [[0, 31], [32, 35]]]);
+  assert.deepEqual(planCapture(capSpec({ family: 'spartan6', depth: 1024, pre: 0, probes: [{ name: 'x', width: 24 }] })).chunks, [[0, 23]]);
   assert.equal(planCapture(capSpec({ family: 'artix7' })).memory, null);
   assert.deepEqual(triggerText(capSpec()), 'the first sample');
   assert.equal(triggerText(capSpec({ trigger: { combine: 'or', conditions: [cond('count', '=', 20), cond('tick', 'rise'), cond('count', 'change')] } })), 'count = 20 or tick rises or count changes');
@@ -85,7 +92,8 @@ test('the status word and the readout read back: the flags, the shape, a capture
 
 // ------------------------------------------------------------------ simulation
 // The probes: count (8 bits) held at 0 until `en`, then counting on clk; tick = count(2); wide = count & "1010".
-const probeOf = (spec, c) => {
+const probeOf = (spec, c0) => {
+  const c = c0 & 255;   // (the 8-bit counter wraps: a window past 256 samples)
   const vals = { count: BigInt(c), tick: BigInt((c >> 2) & 1), wide: BigInt((c << 4) | 0xA) };
   const plan = planCapture(spec);
   return spec.probes.reduce((w, p) => w | (vals[p.name] << BigInt(plan.slices[p.name][0])), 0n);
@@ -107,11 +115,13 @@ function expectedCounts(spec) {
 }
 
 const SCANS = spec => [CAPTURE_CMD.arm, CAPTURE_CMD.status, CAPTURE_CMD.status, ...readoutCommands(spec)];
+// the wait for the capture after en: 1 us, or the depth's clocks of 10 ns and some
+const fillNs = spec => Math.max(1000, +spec.depth * 10 + 600);
 // the test bench: clk 10 ns; tck 40 ns; the scans [arm, status], then en (counting), a status (the poll: its shifts
 // clock the flags across, tck running only during a scan as a BSCAN's DRCK does), then the readout, whose first word
 // is the status after the poll; each scan's word reported "S <bits>" (bit 0 first, as tdo gives them)
 function bench(spec, plan) {
-  const R = plan.regBits, W = plan.width, cmds = SCANS(spec), v = spec.lang === 'verilog';
+  const R = plan.regBits, W = plan.width, cmds = SCANS(spec), v = spec.lang === 'verilog', fill = fillNs(spec);
   const cat = spec.probes.slice().reverse().map(p => (p.name === 'count' ? 'count' : p.name === 'tick' ? (v ? 'count[2]' : 'count(2)') : v ? "{count, 4'b1010}" : 'std_logic_vector(count) & "1010"'));
   if (!v) {
     return `library IEEE; use IEEE.STD_LOGIC_1164.ALL; use IEEE.NUMERIC_STD.ALL;
@@ -132,7 +142,7 @@ begin
   begin
     wait for 100 ns;
     for k in 0 to ${cmds.length - 1} loop
-      if k = 2 then wait for 400 ns; en <= '1'; wait for 1000 ns; end if;
+      if k = 2 then wait for 400 ns; en <= '1'; wait for ${fill} ns; end if;
       sel <= '1'; capture <= '1'; wait for 20 ns; tck <= '1'; wait for 20 ns; tck <= '0'; capture <= '0'; shift <= '1';
       for i in 0 to ${R - 1} loop
         if i < 2 then tdi <= cmds(k)(i); else tdi <= '0'; end if;
@@ -164,7 +174,7 @@ module tb;
 ${cmds.map((c, k) => `    cmds[${k}] = 2'd${c};`).join('\n')}
     #100;
     for (k = 0; k < ${cmds.length}; k = k + 1) begin
-      if (k == 2) begin #400 en = 1; #1000; end
+      if (k == 2) begin #400 en = 1; #${fill}; end
       sel = 1; capture = 1; #20 tck = 1; #20 tck = 0; capture = 0; shift = 1;
       for (i = 0; i < ${R}; i = i + 1) begin
         tdi = i < 2 ? cmds[k][i] : 1'b0;
@@ -188,7 +198,7 @@ function simulateCapture(spec) {
   const v = spec.lang === 'verilog';
   const sources = [{ path: `src/${spec.name}.${v ? 'v' : 'vhd'}`, text: code }, { path: `sim/tb.${v ? 'v' : 'vhd'}`, text: bench(spec, plan) }];
   // (the bench's time: its scans of R + 3 tck periods of 40 ns, the wait for the counting; then 1 us more)
-  const r = simulate(sources, 'tb', { until: (100 + SCANS(spec).length * (plan.regBits + 3) * 40 + 1400 + 1000) * 1000 });
+  const r = simulate(sources, 'tb', { until: (100 + SCANS(spec).length * (plan.regBits + 3) * 40 + 400 + fillNs(spec) + 1000) * 1000 });
   assert.deepEqual(r.errors.map(e => `${e.file}:${e.line}: ${e.message}`), [], 'compile errors');
   const warnings = [...(r.lib?.errors || []), ...(r.design?.diags || [])].filter(d => /^(src|sim)\//.test(d.file || '')).map(d => `${d.file}:${d.line}: ${d.message}`);
   assert.deepEqual(warnings, [], 'no warnings');
@@ -218,6 +228,15 @@ const CASES = [
 for (const lang of ['vhdl', 'verilog']) {
   test(`the capture core simulated (${lang}): armed, triggered, read through the JTAG register into the model's window`, () => {
     for (const c of CASES) simulateCapture(capSpec({ lang, ...c }));
+  });
+}
+// (1024 samples of 21 bits on the Spartan-3E: the memory in two arrays, 16 and 5 bits, planCapture's chunks)
+for (const lang of ['vhdl', 'verilog']) {
+  test(`the capture core in two arrays simulated (${lang}): the readout the model's window`, () => {
+    const spec = capSpec({ lang, depth: 1024, pre: 10, probes: WIDE, trigger: { combine: 'and', conditions: [cond('count', '=', 30)] } });
+    assert.deepEqual(planCapture(spec).chunks, [[0, 15], [16, 20]]);
+    assert.match(captureModule(spec).code, lang === 'verilog' ? /reg \[4:0\] mem1 \[0:1023\];/ : /type mem1_t is array \(0 to 1023\) of std_logic_vector\(4 downto 0\);/);
+    simulateCapture(spec);
   });
 }
 
