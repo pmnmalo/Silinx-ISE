@@ -66,7 +66,7 @@ test('every module that reads a file from outside imports the import gate, or sa
   // the list stays exact: an entry whose module no longer reads such a file leaves it
   assert.deepEqual(Object.keys(ALLOW).filter(f => !seen.has(f)), []);
   // the importers known today are among those found (the scan sees them)
-  for (const f of ['web/js/wizards.js', 'web/js/petri-editor.js', 'web/js/api-local.js', 'server/xise-routes.js', 'server/mcp-transfer.js']) assert.ok(seen.has(f), f);
+  for (const f of ['web/js/wizards.js', 'web/js/petri-toolbar.js', 'web/js/api-local.js', 'server/xise-routes.js', 'server/mcp-transfer.js']) assert.ok(seen.has(f), f);
 });
 
 test('the project importers take only a gate\'s result; the MCP\'s write_file gates what it writes', () => {
