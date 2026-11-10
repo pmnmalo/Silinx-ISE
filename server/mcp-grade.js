@@ -8,10 +8,10 @@ import fsp from 'node:fs/promises';
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT, projectText, projectPath, elaborateView } from './mcp-util.js';
 import { exchangePath } from './mcp-transfer.js';
-import { isExerciseFile, exerciseProblems, visibleCopy, localize } from '../core/grade-format.js';
+import { isExerciseFile, exerciseProblems, visibleCopy, localize, newExercise, exerciseFileOf } from '../core/grade-format.js';
 import { textReport, csvReport } from '../core/grade-report.js';
 
-const ACTIONS = ['run', 'check', 'ports', 'student_copy'];
+const ACTIONS = ['run', 'check', 'ports', 'student_copy', 'new'];
 
 // the exercise of the project the tool names: its file (by default the project's only *.exercise.json)
 async function exerciseFile(name, given) {
@@ -42,9 +42,9 @@ async function writeNew(p, text, what) {
 export const GRADE_TOOLS = [
   {
     name: 'grade', title: 'Grade an exercise',
-    description: 'Automatic grading, as `silinx grade` and the Exercise document (Project ▸ Exercise…): run (the exercise\'s tests on the project itself, or on submissions of the exchange folder: project folders, zips, or a folder of them; each test\'s verdict, Accepted, Wrong Answer, Compile Error, Interface Error, Not Synthesizable, Latch Inferred, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Resource / Timing Limit or Grading Error (the grader could not run it), and its points; visible: the visible tests only, as a student runs them; csv: the results written to a new file of the exchange folder), check (the exercise\'s problems), ports (the project\'s top and its ports written into the exercise, as "Ports from the Top"), student_copy (the exercise without its hidden tests and its reference, written to a new file of the exchange folder).',
+    description: 'Automatic grading, as `silinx grade` and the Exercise document (Project ▸ Exercise…): run (the exercise\'s tests on the project itself, or on submissions of the exchange folder: project folders, zips, or a folder of them; each test\'s verdict, Accepted, Wrong Answer, Compile Error, Interface Error, Not Synthesizable, Latch Inferred, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Resource / Timing Limit or Grading Error (the grader could not run it), and its points; visible: the visible tests only, as a student runs them; csv: the results written to a new file of the exchange folder), check (the exercise\'s problems), ports (the project\'s top and its ports written into the exercise, as "Ports from the Top"), student_copy (the exercise without its hidden tests and its reference, written to a new file of the exchange folder), new (a new exercise of the project\'s top, as New Exercise: its ports and a first visible test, <top>.exercise.json).',
     inputSchema: { type: 'object', properties: {
-      project: PROJECT, action: { type: 'string', enum: ACTIONS, description: 'run (default), check, ports or student_copy.' },
+      project: PROJECT, action: { type: 'string', enum: ACTIONS, description: 'run (default), check, ports, student_copy or new.' },
       exercise: STR('The exercise: a .exercise.json of the project (default: its only one).'),
       submissions: { type: 'array', items: { type: 'string' }, description: 'run: submissions in the exchange folder (project folders, zips, or folders of them); none: the project itself.' },
       visible: { type: 'boolean', description: 'run: the visible tests only (a student\'s run).' },
@@ -56,6 +56,12 @@ export const GRADE_TOOLS = [
     async run({ project: name, action = 'run', exercise, submissions, visible = false, csv, file, language: lang = 'en' }) {
       await readProject(name);
       if (!ACTIONS.includes(action)) throw toolError(`action: one of ${ACTIONS.join(', ')}`);
+      if (action === 'new') {
+        const tp = await topPorts(name);
+        const out = exerciseFileOf(tp.top, await P.fileTree(name));
+        await P.writeFile(name, out, `${JSON.stringify(newExercise(tp), null, 2)}\n`);
+        return { text: `${out}: a new exercise of ${tp.top}, its ports from the top and a first visible test.`, data: { project: name, exercise: out, top: tp.top, ports: tp.ports } };
+      }
       const rel = await exerciseFile(name, exercise);
       const full = await projectPath(name, rel);
       const { loadExercise, gradeAll, gradeSubmission, readSubmission, referenceVectorsOf } = await import('./grade.js');

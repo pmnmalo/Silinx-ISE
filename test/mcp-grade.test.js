@@ -76,7 +76,7 @@ test('grade: a wrong submission\'s first difference; wrong arguments', { timeout
   assert.equal(r.text.split('\n').slice(1, 5).join('\n'), 'w: 0 / 30 points (Wrong Answer), the visible tests\n  WARNING: "src/counter4.v" Line 1: Input <en> is never used.\n  - count (Counting): WA Wrong Answer, 0 / 30\n      cycle 3 (vectors line 6): q is 0011, expected 0010');
   const err = async (args, text) => { const x = await call('grade', args); assert.deepEqual([x.isError, x.text], [true, text]); };
   await err({ project: 'nope' }, 'grade: no project \'nope\' in the workspace');
-  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, student_copy');
+  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, student_copy, new');
   await err({ project: 'w', exercise: 'x.json' }, 'grade: exercise: \'x.json\' is not a .exercise.json');
   await err({ project: 'w', action: 'student_copy' }, 'grade: file: the new file of the exchange folder for the student\'s copy');
   await err({ project: 'w', submissions: ['../../etc'] }, `grade: submissions: '../../etc' is outside the exchange folder ${xchg} (SILINX_MCP_FOLDER sets another)`);

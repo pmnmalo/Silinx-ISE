@@ -1,0 +1,10 @@
+{
+  "name": "counter4",
+  "version": 1,
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "board": "basys2",
+  "top": "counter4",
+  "files": [
+    { "path": "src/counter4.vhd", "lang": "vhdl", "role": "design" }
+  ]
+}

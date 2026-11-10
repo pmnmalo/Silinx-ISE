@@ -115,6 +115,36 @@ silinx grade counter4.exercise.json --student-copy student/counter4.exercise.jso
 - `--student-copy` writes the exercise without its hidden tests and its reference. This copy goes to the students.
 - Through MCP, the `grade` tool does the same (run, check, ports, student_copy).
 
+## In the interface
+
+**Project ▸ Exercise…** opens the project's exercise, or makes one with **New Exercise**: its top's ports, and a first
+visible test to fill in. A `.exercise.json` opened from the Files opens the same way. The document shows the statement in
+the interface's language, the ports, and the tests with their verdicts and points once run.
+
+- **For a student**:
+  - **Run Visible Tests** runs the visible tests on the project as it is saved, and the console gives the report.
+  - The synthesis tests run with `silinx grade`, not in the page.
+- **For a teacher**:
+  - **Run All Tests** (in the ⋮ menu) runs the hidden tests too.
+  - **Ports from the Top** takes the top and its ports from the project's top module, so the teacher's reference
+    project states them.
+  - **Add Test** and **Delete Test**, and the **Properties** panel, edit the title, the statement, the top and the
+    selected test's settings.
+
+The MCP server's `grade` tool does each of these (run, ports, new).
+
+## The example
+
+`exercises/counter4/` is a 4-bit counter with a synchronous reset and an enable. It has:
+
+- its statement;
+- visible vectors (`tests/count.vec`);
+- a hidden reference (`ref/`) and test bench (`tb/`);
+- a synthesis test;
+- `starter/`, the project a student starts from.
+
+Its students' copy is `silinx grade exercises/counter4/counter4.exercise.json --student-copy …`.
+
 ## Security
 
 A submission is untrusted.
