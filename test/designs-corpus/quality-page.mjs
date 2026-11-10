@@ -2,6 +2,7 @@
 // results of test/designs-corpus/compare-ise.mjs (ise-comparison.json).
 import { silinxSides, buildsOf, goalName } from './compare-lib.mjs';
 import { GOAL_IMPL } from '../../packages/silinx-fpga/src/synth-open.js';
+import { buildsText } from './quality-cache.mjs';
 const fmt = (v, d = 0) => (v == null ? '–' : typeof v === 'number' ? v.toFixed(d) : String(v));
 const ratio = (a, b) => (a != null && b ? a / b : null);
 const geomean = xs => (xs.length ? Math.exp(xs.reduce((s, x) => s + Math.log(x), 0) / xs.length) : null);
@@ -289,6 +290,13 @@ function goalsPage(res, epfl) {
     'indication, not a benchmark.', '');
   L.push('## Summary', '');
   L.push('Geometric means of the ratios Silinx / ISE (below 0: Silinx is smaller, faster, quicker).', '');
+  // (a comparison its run's deadline cut short, #3292: what it has, the rest below)
+  const missing = res.missing || [];
+  if (missing.length) {
+    const total = res.designs.length * res.goals.length * 2;
+    L.push(`- **Partial:** ${total - missing.length} of the ${total} builds are measured; the other ${missing.length} (under *Not measured yet*)`,
+      '  are made by the next run of the comparison, which resumes this one.');
+  }
   for (const g of res.goals) {
     const st = goalStats(rows, g);
     L.push(`- **${goalName(g)}:** ${st.both.length} designs built by both. Logic LUTs ${pct(st.luts)}, flip-flops ${pct(st.ffs)}, slices`,
@@ -316,6 +324,12 @@ function goalsPage(res, epfl) {
   if (notes.length || res.notBuilt?.length) {
     L.push('', '## Not built by one of the flows', '', ...notes);
     if (res.notBuilt?.length) L.push(`- ${res.notBuilt.join(', ')}: Silinx cannot read or synthesize ${res.notBuilt.length > 1 ? 'them' : 'it'} yet (the design corpus's [results](../test/designs-corpus/README.md)), so neither flow was compared.`);
+  }
+  if (missing.length) {
+    L.push('', '## Not measured yet', '', 'The builds this run did not reach before its deadline, made by the next run:', '');
+    const by = new Map();
+    for (const m of missing) by.set(m.design, [...(by.get(m.design) || []), { name: m.design, goal: m.goal, side: m.side }]);
+    for (const builds of by.values()) L.push(`- ${buildsText(builds)}`);
   }
   L.push(...pageEnd(res, epfl));
   return L.join('\n');

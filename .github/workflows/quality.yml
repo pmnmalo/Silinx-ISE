@@ -32,8 +32,13 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository_id == '1407836659' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, ise]
-    # the comparison took 14h13m on 2026-10-25 and passed 15 hours on 2026-10-31 (#2498); the runner's window does
-    # not close while a job runs (scripts/ise-runner/window.mjs)
+    # the comparison took 14h13m on 2026-10-25 and passed 15 hours on 2026-10-31 (#2498); with the three Optimizations
+    # (#2941) and nextpnr, about 40 hours (#3292: Area alone 10.5 h, the projects 7 h). So no build starts after
+    # DEADLINE_MINUTES (a build started then ends, at its BUILD_TIMEOUT_MINUTES, before the job's timeout; the longest
+    # measured, 1.4 h), each build is kept on the runner as soon as it
+    # is measured (compare-ise.mjs --cache), the partial results are published, and the next run resumes the comparison
+    # (the same commit, what is kept taken again). The runner's window does not close while a job runs
+    # (scripts/ise-runner/window.mjs)
     timeout-minutes: 1200
     permissions:
       contents: read
@@ -41,10 +46,30 @@ jobs:
       SILINX_ISE_HOST: local    # ISE from the Docker image on the runner itself
       # the dependencies' install scripts do not run on this machine (npm ci --ignore-scripts, #479)
       NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+      # (#3292: no build starts after DEADLINE_MINUTES from the job's start; a build stops after BUILD_TIMEOUT_MINUTES)
+      DEADLINE_MINUTES: 1050
+      BUILD_TIMEOUT_MINUTES: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # the commit to compare: a comparison left partial (~/silinx-cache/quality/builds/pending, the builds kept between
+      # runs by compare-ise.mjs --cache; of the last 14 days) is resumed when it is a commit of main's, one before the
+      # checkout (main's history fetched without credentials, git's own check), else main's (#3292)
+      - name: What to compare
+        id: what
+        run: |
+          echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+          P="$HOME/silinx-cache/quality/builds/pending"
+          if [ -f "$P" ] && [ -n "$(find "$P" -mtime -14)" ]; then
+            c=$(head -c 40 "$P" | tr -cd 0-9a-f)
+            git fetch -q --no-tags --shallow-since="$(date -v-15d +%Y-%m-%d 2>/dev/null || date -d '15 days ago' +%Y-%m-%d)" origin "$GITHUB_SHA" || true
+            if [ ${#c} -eq 40 ] && [ "$c" != "$(git rev-parse HEAD)" ] && git merge-base --is-ancestor "$c" HEAD 2>/dev/null; then
+              git checkout -q --detach "$c"
+              echo "::notice::Resuming the comparison of $c (left partial by an earlier run)"
+            fi
+          fi
+          git log -1 --format='comparing %H (%cs)'
       - uses: ./.github/actions/setup
         with:
           npm-cache: false
@@ -54,16 +79,29 @@ jobs:
           mkdir -p "$HOME/silinx-cache/designs-corpus" .cache
           ln -sfn "$HOME/silinx-cache/designs-corpus" .cache/designs-corpus
           npm run fetch:designs
+      # the projects of the commit compared, kept for a run that resumes it (they take hours: #3292)
       - name: A Silinx project per design
         run: |
-          rm -rf "$RUNNER_TEMP/quality"
-          # (the nightly checks the corpus's expectations: here only the projects are needed)
-          node test/designs-corpus/run.mjs --stages frontend,synth,flow --sizes "$RUNNER_TEMP/quality" --sizes-only --jobs 1 || true
-          ls "$RUNNER_TEMP/quality" | wc -l
+          C="$HOME/silinx-cache/quality/projects" P="$HOME/silinx-cache/quality/projects/$(git rev-parse HEAD)"
+          mkdir -p "$C"
+          find "$C" -mindepth 1 -maxdepth 1 ! -path "$P" -exec rm -rf {} +
+          if [ -f "$P/.done" ]; then echo "the projects of an earlier run of this commit"; else
+            rm -rf "$P"
+            # (the nightly checks the corpus's expectations: here only the projects are needed)
+            node test/designs-corpus/run.mjs --stages frontend,synth,flow --sizes "$P" --sizes-only --jobs 1 || true
+            touch "$P/.done"
+          fi
+          ls "$P" | wc -l
+          echo "QUALITY_PROJECTS=$P" >> "$GITHUB_ENV"
       - name: Silinx toolchain vs ISE
-        # one build at a time, the ISE ones after the Silinx ones (8 GB of memory: a large design needs
-        # some GB on each side); --guard: nothing published when a design built before fails now
-        run: node test/designs-corpus/compare-ise.mjs "$RUNNER_TEMP/quality" --jobs 1 --ise-jobs 1 --serial --guard
+        # one build at a time, design after design, Silinx's then ISE's (8 GB of memory: a large design needs some GB on
+        # each side); --guard: nothing published when a design built before fails now; --cache, --deadline,
+        # --build-timeout: the builds kept as they finish, none started after the deadline, none longer than its limit
+        env:
+          START: ${{ steps.what.outputs.start }}
+        run: |
+          node test/designs-corpus/compare-ise.mjs "$QUALITY_PROJECTS" --jobs 1 --ise-jobs 1 --serial --guard \
+            --cache "$HOME/silinx-cache/quality/builds" --deadline $((START + DEADLINE_MINUTES * 60)) --build-timeout "$BUILD_TIMEOUT_MINUTES"
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -108,8 +146,11 @@ jobs:
           cp "$RUNNER_TEMP/quality-results/docs/QUALITY.md" docs/
           git add test/designs-corpus/ise-comparison.json docs/QUALITY.md
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          # (a partial comparison says so, #3292: the next run makes the builds it left)
+          n=$(jq '.missing // [] | length' test/designs-corpus/ise-comparison.json)
+          part=""; [ "$n" -gt 0 ] && part=", partial: $n builds left for the next run"
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Quality: the weekly Silinx toolchain vs ISE comparison (docs/QUALITY.md)"
+            commit -m "Quality: the weekly Silinx toolchain vs ISE comparison (docs/QUALITY.md$part)"
           # main requires CI's checks (a ruleset), which a workflow's push cannot pass: the results go to the
           # branch quality-results, to be merged into main by a maintainer (CLAUDE.md, Integration)
           # the token as git's authorization header for github.com (as actions/checkout sets it), for this step's pushes only

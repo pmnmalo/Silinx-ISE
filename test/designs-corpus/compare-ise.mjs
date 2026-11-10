@@ -19,6 +19,12 @@
 //
 //   node test/designs-corpus/run.mjs --stages frontend,synth,flow --sizes <dir>     (the projects)
 //   node test/designs-corpus/compare-ise.mjs <dir> [--filter a,b] [--jobs n] [--ise-jobs n] [--period ns] [--goals area,speed,fast] [--serial] [--guard]
+//       [--cache dir] [--deadline s] [--build-timeout min]
+//   --cache: each build's result kept in dir as soon as it is measured, and taken from there by a later run
+//   (quality-cache.mjs, #3292); --deadline (seconds since the epoch): no build starts after it, the ones left are the
+//   results' `missing`, which the page lists and the next run makes; --build-timeout: a build still running after so
+//   many minutes is stopped, reported as timed out (and made again by the next run). The builds run design after design,
+//   each at every goal, so a run stopped part-way has whole designs.
 //   --serial: the ISE builds after the Silinx ones, not at the same time (a machine with little memory:
 //   a large design needs some GB on each side); --guard: the results are not written when a design
 //   that was built before (test/designs-corpus/ise-comparison.json) fails now, on either side (exit 1)
@@ -31,12 +37,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { qualityPage } from './quality-page.mjs';
 import { DOCKER_ISOLATION } from '../../server/ise.js';
 import { lastError, newFailures, parseClocks, constrainedPeriod, criticalPath, remoteWork, mergeable, GOALS } from './compare-lib.mjs';
 import { GOAL_IMPL } from '../../packages/silinx-fpga/src/synth-open.js';
+import { hashTree, hashFiles, cachePrune, buildOrder, runBuilds, markPending, runSummary } from './quality-cache.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
@@ -51,6 +58,9 @@ function epflResults() {
 }
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
+const VALUED = ['--filter', '--jobs', '--ise-jobs', '--period', '--goals', '--cache', '--deadline', '--build-timeout'];
+// (a --build-one process's result, its output's last line)
+const RESULT = '@@compare-result ';
 
 if (args.includes('--report')) {
   const res = JSON.parse(fs.readFileSync(RESULTS, 'utf8'));
@@ -66,14 +76,56 @@ if (args.includes('--report')) {
   process.exit(0);
 }
 
+// ----------------------------------------------------- one Silinx build, in a process of its own (--build-timeout, #3292)
+const createJobOf = async () => (await import('../../server/jobs.js')).createJob;
+const runJob = async (fn) => {
+  const createJob = await createJobOf();
+  return new Promise(resolve => {
+    const t = Date.now();
+    const job = createJob('compare', fn);
+    const iv = setInterval(() => {
+      if (job.status === 'running') return;
+      clearInterval(iv);
+      resolve({ job, ms: Date.now() - t });
+    }, 500);
+  });
+};
+const used = x => (x && typeof x === 'object' ? x.used : x) ?? null;
+const item = (items, re) => used((items || []).find(i => re.test(i.name)));
+
+// Silinx at one of its Optimizations (#2941), the Process Properties' ISE properties of each (GOAL_IMPL, #2470): Area (a new
+// project's default: the smaller of the usual mapping's netlist and Speed's, one placement), Speed (the mappings for speed,
+// several placements) or Fast (the usual mapping, one placement). The toolchain runs in this process (WebAssembly), which a
+// job's cancel does not stop: the parent kills the process at its time limit.
+if (args[0] === '--build-one') {
+  const [, projectDir, goal] = args;
+  const { runOpenImplementation } = await import('../../server/open-flow.js');
+  const project = JSON.parse(fs.readFileSync(path.join(projectDir, 'silinx.json'), 'utf8'));
+  project.impl = { ...(project.impl || {}), ...GOAL_IMPL[goal] };
+  const { job, ms } = await runJob(j => runOpenImplementation(j, { project, projectDir, steps: STEPS }));
+  let rep = {};
+  try { rep = JSON.parse(fs.readFileSync(path.join(projectDir, 'build', 'open', 'report.json'), 'utf8')); } catch { /* nothing written */ }
+  const syn = rep.synthesis?.utilization;
+  const r = {
+    slices: used(rep.map?.summary?.slices), luts: item(syn, /4 input LUTs/), ffs: used(rep.map?.summary?.ffs),
+    srl16: item(syn, /shift registers/i) ?? (syn ? 0 : null), bram: item(syn, /RAMB16/) ?? (syn ? 0 : null), mult: item(syn, /MULT18X18/) ?? (syn ? 0 : null),
+    estimateNs: rep.timing?.minPeriodNs ?? null, seconds: +(ms / 1000).toFixed(1),
+    error: job.status === 'ok' ? undefined : lastError(job),
+  };
+  process.stdout.write(`\n${RESULT}${JSON.stringify(r)}\n`);
+  process.exit(0);
+}
+
 // ---------------------------------------------------------------------------------------- the runs
-const dir = args.find((a, k) => !a.startsWith('--') && !['--filter', '--jobs', '--ise-jobs', '--period', '--goals'].includes(args[k - 1]));
+const dir = args.find((a, k) => !a.startsWith('--') && !VALUED.includes(args[k - 1]));
 const SERIAL = args.includes('--serial'), GUARD = args.includes('--guard');
 const PERIOD = +opt('--period', 5);
-if (!dir || !fs.existsSync(dir)) { console.error('usage: compare-ise.mjs <dir of projects from run.mjs --sizes> [--filter a,b] [--jobs n] [--ise-jobs n] | --report'); process.exit(2); }
+if (!dir || !fs.existsSync(dir)) { console.error('usage: compare-ise.mjs <dir of projects from run.mjs --sizes> [--filter a,b] [--jobs n] [--ise-jobs n] [--cache dir] [--deadline s] [--build-timeout min] | --report'); process.exit(2); }
 const filter = opt('--filter', null)?.split(',');
 const goals = opt('--goals', GOALS.join(',')).split(',');
 if (goals.some(g => !GOAL_IMPL[g])) { console.error(`--goals: of ${Object.keys(GOAL_IMPL).join(', ')}`); process.exit(2); }
+const CACHE = opt('--cache', null) && path.resolve(opt('--cache'));
+const DEADLINE = +opt('--deadline', 0) || 0, BUILD_MIN = +opt('--build-timeout', 0) || 0;
 const names = fs.readdirSync(dir).filter(n => fs.existsSync(path.join(dir, n, 'silinx.json')) && (!filter || filter.includes(n))).sort();
 // (a --filter run merges into the earlier results: not those of other Optimizations, the results before #2941, in one table)
 if (filter && fs.existsSync(RESULTS)) {
@@ -93,9 +145,7 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-compare-'));
 process.env.SILINX_CONFIG_DIR = path.join(work, 'config');
 fs.mkdirSync(process.env.SILINX_CONFIG_DIR, { recursive: true });
 fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify({ ...userCfg, mode: LOCAL ? 'docker' : 'ssh' }));
-const { createJob } = await import('../../server/jobs.js');
 const { runImplementation } = await import('../../server/ise.js');
-const { runOpenImplementation } = await import('../../server/open-flow.js');
 const { iseWorkBase } = await import('../../server/toolchain.js');
 
 const copyProject = (name, side) => {
@@ -103,36 +153,25 @@ const copyProject = (name, side) => {
   fs.cpSync(path.join(dir, name), to, { recursive: true, filter: f => !/[\\/](build|size\.json)$/.test(f) });
   return to;
 };
-const runJob = (fn) => new Promise(resolve => {
-  const t = Date.now();
-  const job = createJob('compare', fn);
-  const iv = setInterval(() => {
-    if (job.status === 'running') return;
-    clearInterval(iv);
-    resolve({ job, ms: Date.now() - t });
-  }, 500);
-});
-const used = x => (x && typeof x === 'object' ? x.used : x) ?? null;
-const item = (items, re) => used((items || []).find(i => re.test(i.name)));
 
-// Silinx at one of its Optimizations (#2941), the Process Properties' ISE properties of each (GOAL_IMPL, #2470): Area (a new
-// project's default: the smaller of the usual mapping's netlist and Speed's, one placement), Speed (the mappings for speed,
-// several placements) or Fast (the usual mapping, one placement)
-async function silinxRun(name, goal) {
-  const projectDir = copyProject(name, `silinx-${goal}`);
-  const project = JSON.parse(fs.readFileSync(path.join(projectDir, 'silinx.json'), 'utf8'));
-  project.impl = { ...(project.impl || {}), ...GOAL_IMPL[goal] };
-  const { job, ms } = await runJob(j => runOpenImplementation(j, { project, projectDir, steps: STEPS }));
-  let rep = {};
-  try { rep = JSON.parse(fs.readFileSync(path.join(projectDir, 'build', 'open', 'report.json'), 'utf8')); } catch { /* nothing written */ }
-  const syn = rep.synthesis?.utilization;
-  return {
-    slices: used(rep.map?.summary?.slices), luts: item(syn, /4 input LUTs/), ffs: used(rep.map?.summary?.ffs),
-    srl16: item(syn, /shift registers/i) ?? (syn ? 0 : null), bram: item(syn, /RAMB16/) ?? (syn ? 0 : null), mult: item(syn, /MULT18X18/) ?? (syn ? 0 : null),
-    estimateNs: rep.timing?.minPeriodNs ?? null, seconds: +(ms / 1000).toFixed(1),
-    routed: path.join(projectDir, 'build', 'open', 'routed.xdl'),
-    error: job.status === 'ok' ? undefined : lastError(job),
-  };
+// a Silinx build in a child process (--build-one), killed at --build-timeout minutes
+function silinxBuild(projectDir, goal) {
+  const t = Date.now();
+  return new Promise(resolve => {
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--build-one', projectDir, goal], { stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
+    let out = '', err = '', timedOut = false;
+    child.stdout.on('data', d => { out = (out + d).slice(-1e6); });
+    child.stderr.on('data', d => { err = (err + d).slice(-4000); });
+    const timer = BUILD_MIN && setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, BUILD_MIN * 60e3);
+    child.on('close', code => {
+      clearTimeout(timer);
+      const seconds = +((Date.now() - t) / 1000).toFixed(1);
+      const line = out.split('\n').reverse().find(l => l.startsWith(RESULT));
+      if (timedOut) resolve({ error: `timed out after ${BUILD_MIN} min (--build-timeout)`, timedOut: true, seconds });
+      else if (line) resolve(JSON.parse(line.slice(RESULT.length)));
+      else resolve({ error: `the build's process ended (code ${code}): ${err.trim().split('\n').pop() || 'no result'}`, seconds });
+    });
+  });
 }
 
 // ISE's 4-input LUTs used as logic: map's breakdown when it prints one, else the total less the LUTs
@@ -150,7 +189,8 @@ async function iseRun(name, goal) {
   project.name = `${project.name || name}-${goal}`;
   const ucf = project.constraints && path.join(projectDir, project.constraints);
   if (ucf && fs.existsSync(ucf)) fs.writeFileSync(ucf, fs.readFileSync(ucf, 'utf8').replace(/PERIOD "(\w+)" [\d.]+ ns/g, `PERIOD "$1" ${PERIOD} ns`));
-  const { job, ms } = await runJob(j => runImplementation(j, { project, projectDir, steps: STEPS }));
+  const { job, ms } = await runJobTimed(j => runImplementation(j, { project, projectDir, steps: STEPS }));
+  if (job.timedOut) return { error: `timed out after ${BUILD_MIN} min (--build-timeout)`, timedOut: true, seconds: +(ms / 1000).toFixed(1) };
   const r = job.result?.reports || {};
   const mu = r.map?.utilization;
   const periodNs = r.timing?.minPeriodNs ?? r.trce?.minPeriodNs ?? null;
@@ -162,94 +202,128 @@ async function iseRun(name, goal) {
     error: job.status === 'ok' ? undefined : lastError(job),
   };
 }
+// (ISE's job runs Docker or ssh, child processes its cancel kills)
+const runJobTimed = async fn => {
+  const { cancelJob } = await import('../../server/jobs.js');
+  let job = null, timedOut = false;
+  const timer = BUILD_MIN && setTimeout(() => { if (job) { timedOut = true; cancelJob(job.id); } }, BUILD_MIN * 60e3);
+  const r = await runJob(j => { job = j; return fn(j); });
+  clearTimeout(timer);
+  r.job.timedOut = timedOut;
+  return r;
+};
 
-async function pool(items, n, fn) {
-  const out = new Array(items.length);
-  let next = 0;
-  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
-    while (next < items.length) { const k = next++; out[k] = await fn(items[k], k); }
-  }));
-  return out;
-}
-
-console.log(`${names.length} designs at ${goals.join(', ')}; work folder ${work}`);
-// every design at every goal, a goal after the other (the first goal's results first)
-const builds = goals.flatMap(g => names.map(n => ({ n, g })));
-const at = (list, n, g) => list[builds.findIndex(b => b.n === n && b.g === g)];
-const silinxAll = () => pool(builds, +opt('--jobs', 3), async ({ n, g }) => { const r = await silinxRun(n, g); console.log(`silinx ${g.padEnd(6)} ${n}: ${r.error ? `FAILED ${r.error}` : `${r.slices} slices, ${r.estimateNs} ns (estimate), ${r.seconds} s`}`); return r; });
-const iseAll = () => pool(builds, +opt('--ise-jobs', 2), async ({ n, g }) => { const r = await iseRun(n, g); console.log(`ise    ${g.padEnd(6)} ${n}: ${r.error ? `FAILED ${r.error}` : `${r.slices} slices, ${r.periodNs} ns, ${r.seconds} s`}`); return r; });
-const [sil, ise] = SERIAL ? [await silinxAll(), await iseAll()] : await Promise.all([silinxAll(), iseAll()]);
-
-// ISE's trce on Silinx's routed designs (ise-open-check.sh: xdl -xdl2ncd, drc, bitgen, trce)
+// ISE's trce on Silinx's routed design (ise-open-check.sh: xdl -xdl2ncd, drc, bitgen, trce), as soon as it is routed:
+// { periodNs, path } of the design's routing at a goal (<name>__<goal>); throws when the check could not run
 const host = LOCAL ? null : `${userCfg.ssh.user ? `${userCfg.ssh.user}@` : ''}${userCfg.ssh.host}`;
 const image = LOCAL ? IMAGE : userCfg.ssh.image || 'xilinx/ise:14.7';
-const tdir = path.join(work, 'trce');
-// (each design's routing at each goal: <name>__<goal>)
-const timedName = (n, g) => `${n}__${g}`;
-const designOf = t => t.replace(/__\w+$/, '');
-const timedNames = builds.filter((b, k) => !sil[k].error && fs.existsSync(sil[k].routed)).map(b => timedName(b.n, b.g));
-for (const t of timedNames) {
-  const [, n, g] = /^(.*)__(\w+)$/.exec(t), r = at(sil, n, g);
-  fs.mkdirSync(path.join(tdir, t), { recursive: true }); fs.copyFileSync(r.routed, path.join(tdir, t, 'routed.xdl'));
-}
-fs.copyFileSync(path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/ise-open-check.sh'), path.join(tdir, 'ise-open-check.sh'));
 const sshArgs = LOCAL ? [] : ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=4', '-o', 'ConnectTimeout=30', ...(userCfg.ssh.port && userCfg.ssh.port !== 22 ? ['-p', String(userCfg.ssh.port)] : [])];
 const ssh = cmd => execFileSync('ssh', [...sshArgs, '--', host, `export PATH="$PATH:/usr/local/bin"; ${cmd}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
-// (the host's folder for ISE work, #1774: the ssh config's remoteDir, which Docker Desktop shares, else ~/silinx-compare)
-const { remote, mount } = remoteWork(iseWorkBase('silinx-compare'), path.basename(work));
-const trce = {}, paths = {};
-if (timedNames.length) {
-  try {
-    let out;
-    if (LOCAL) out = execFileSync('docker', ['run', '--rm', ...DOCKER_ISOLATION, '--platform', 'linux/amd64', '-v', `${tdir}:/w`, image, 'bash', '/w/ise-open-check.sh', '/w', ...timedNames], { encoding: 'utf8', maxBuffer: 64 << 20 });
-    else {
-      ssh(`rm -rf ${remote} && mkdir -p ${remote}`);
-      execFileSync('rsync', ['-a', '-e', `ssh ${sshArgs.join(' ')}`, `${tdir}/`, `${host}:${remote}/`]);
-      out = ssh(`docker run --rm ${DOCKER_ISOLATION.join(' ')} --platform linux/amd64 -v "${mount}":/w ${image} bash /w/ise-open-check.sh /w ${timedNames.join(' ')}`);
-      // (trce's reports back, for the critical paths' breakdown)
-      execFileSync('rsync', ['-a', '-e', `ssh ${sshArgs.join(' ')}`, '--include=*/', '--include=routed.twr', '--exclude=*', `${host}:${remote}/`, `${tdir}/`]);
-    }
-    process.stdout.write(out.split('\n').map(l => (l ? `  ISE ${l}\n` : '')).join(''));
-    const clocks = {};
-    for (const l of out.split('\n')) {
-      const c = /^(\S+): clocks: (.*)$/.exec(l);
-      if (c) clocks[c[1]] = parseClocks(c[2]);
-      const m = /^(\S+): timing: .*?Minimum period:\s+([\d.]+)ns/.exec(l);
-      if (m) trce[m[1]] = +m[2];
-      const p = /^(\S+): timing: .*?Maximum path delay from\/to any node:\s+([\d.]+)ns/.exec(l);
-      if (p && !trce[p[1]]) trce[p[1]] = +p[2];
-    }
-    // the clocks ISE's flow times, the UCF's (#53): a design's other clocks are not in ISE's period
-    for (const n of Object.keys(clocks)) {
-      if (trce[n] === undefined) continue;
-      const d = designOf(n);
-      const pj = JSON.parse(fs.readFileSync(path.join(dir, d, 'silinx.json'), 'utf8'));
-      const ucf = pj.constraints && fs.existsSync(path.join(dir, d, pj.constraints)) ? fs.readFileSync(path.join(dir, d, pj.constraints), 'utf8') : '';
-      trce[n] = constrainedPeriod(clocks[n], ucf, trce[n]);
-    }
-    for (const n of Object.keys(trce)) {
-      const twr = path.join(tdir, n, 'routed.twr');
-      if (fs.existsSync(twr)) paths[n] = criticalPath(fs.readFileSync(twr, 'latin1'), trce[n]);
-    }
-    if (!LOCAL) ssh(`rm -rf ${remote}`);
-  } catch (e) { console.error(`trce of Silinx's routing on the ISE host failed: ${e.message.split('\n')[0]}`); }
+function trceOf(name, goal, routed) {
+  const t = `${name}__${goal}`, tdir = path.join(work, 'trce', t);
+  fs.mkdirSync(path.join(tdir, t), { recursive: true });
+  fs.copyFileSync(routed, path.join(tdir, t, 'routed.xdl'));
+  fs.copyFileSync(path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/ise-open-check.sh'), path.join(tdir, 'ise-open-check.sh'));
+  let out;
+  if (LOCAL) out = execFileSync('docker', ['run', '--rm', ...DOCKER_ISOLATION, '--platform', 'linux/amd64', '-v', `${tdir}:/w`, image, 'bash', '/w/ise-open-check.sh', '/w', t], { encoding: 'utf8', maxBuffer: 64 << 20 });
+  else {
+    // (the host's folder for ISE work, #1774: the ssh config's remoteDir, which Docker Desktop shares, else ~/silinx-compare)
+    const { remote, mount } = remoteWork(iseWorkBase('silinx-compare'), `${path.basename(work)}-${t}`);
+    ssh(`rm -rf ${remote} && mkdir -p ${remote}`);
+    execFileSync('rsync', ['-a', '-e', `ssh ${sshArgs.join(' ')}`, `${tdir}/`, `${host}:${remote}/`]);
+    out = ssh(`docker run --rm ${DOCKER_ISOLATION.join(' ')} --platform linux/amd64 -v "${mount}":/w ${image} bash /w/ise-open-check.sh /w ${t}`);
+    // (trce's report back, for the critical path's breakdown)
+    execFileSync('rsync', ['-a', '-e', `ssh ${sshArgs.join(' ')}`, '--include=*/', '--include=routed.twr', '--exclude=*', `${host}:${remote}/`, `${tdir}/`]);
+    ssh(`rm -rf ${remote}`);
+  }
+  process.stdout.write(out.split('\n').map(l => (l ? `  ISE ${l}\n` : '')).join(''));
+  let periodNs = null, clocks = null;
+  for (const l of out.split('\n')) {
+    const c = /^(\S+): clocks: (.*)$/.exec(l);
+    if (c && c[1] === t) clocks = parseClocks(c[2]);
+    const m = /^(\S+): timing: .*?Minimum period:\s+([\d.]+)ns/.exec(l);
+    if (m && m[1] === t) periodNs = +m[2];
+    const p = /^(\S+): timing: .*?Maximum path delay from\/to any node:\s+([\d.]+)ns/.exec(l);
+    if (p && p[1] === t && !periodNs) periodNs = +p[2];
+  }
+  // the clocks ISE's flow times, the UCF's (#53): a design's other clocks are not in ISE's period
+  if (clocks && periodNs !== null) {
+    const pj = JSON.parse(fs.readFileSync(path.join(dir, name, 'silinx.json'), 'utf8'));
+    const ucf = pj.constraints && fs.existsSync(path.join(dir, name, pj.constraints)) ? fs.readFileSync(path.join(dir, name, pj.constraints), 'utf8') : '';
+    periodNs = constrainedPeriod(clocks, ucf, periodNs);
+  }
+  const twr = path.join(tdir, t, 'routed.twr');
+  return { periodNs, path: periodNs !== null && fs.existsSync(twr) ? criticalPath(fs.readFileSync(twr, 'latin1'), periodNs) : null };
 }
 
+// a Silinx build and trce's timing of its routing: { ...result, periodNs, path }; `unchecked` when trce could not run (not kept)
+async function silinxRun(name, goal) {
+  const projectDir = copyProject(name, `silinx-${goal}`);
+  const r = await silinxBuild(projectDir, goal);
+  const routed = path.join(projectDir, 'build', 'open', 'routed.xdl');
+  let timing = { periodNs: null, path: null }, unchecked = false;
+  if (!r.error && fs.existsSync(routed)) {
+    try { timing = trceOf(name, goal, routed); } catch (e) { unchecked = true; console.error(`trce of Silinx's routing of ${name} at ${goal} failed: ${e.message.split('\n')[0]}`); }
+  }
+  fs.rmSync(projectDir, { recursive: true, force: true });
+  return { ...r, ...timing, ...(unchecked ? { unchecked } : {}) };
+}
+
+// ------------------------------------------------------------------------------- the builds, kept as they finish (#3292)
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+let commit = process.env.GITHUB_SHA || null;
+try { commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { /* not a checkout */ }
+// (an ISE build's key: the build scripts Silinx writes for it and this comparison's code)
+const iseCode = hashFiles(['server/ise.js', 'test/designs-corpus/compare-ise.mjs', 'test/designs-corpus/compare-lib.mjs'].map(f => path.join(ROOT, f)));
+const projectHash = Object.fromEntries(names.map(n => [n, hashTree(path.join(dir, n))]));
+const keyParts = ({ name, goal, side }) => (side === 'silinx'
+  ? { side, design: name, project: projectHash[name], goal, impl: GOAL_IMPL[goal], device: 'xc3s1200efg320-4', steps: STEPS, commit, trceImage: image }
+  : { side, design: name, project: projectHash[name], goal, impl: GOAL_IMPL[goal], device: 'xc3s1200efg320-4', steps: STEPS, period: PERIOD, image, code: iseCode });
+if (CACHE) {
+  const pruned = cachePrune(CACHE, 30);
+  if (pruned) console.log(`cache: ${pruned} entries unused for 30 days removed`);
+  // (marked before the builds: a run killed by its job's timeout leaves it, and the next run resumes this commit)
+  if (commit && !filter) markPending(CACHE, commit, true);
+}
+
+const builds = buildOrder(names, goals);
+console.log(`${names.length} designs at ${goals.join(', ')}; work folder ${work}${DEADLINE ? `; no build starts after ${new Date(DEADLINE * 1000).toISOString()}` : ''}${BUILD_MIN ? `; a build stops after ${BUILD_MIN} min` : ''}`);
+// design after design (--serial: one build at a time, Silinx's then ISE's); else Silinx's and ISE's at the same time
+const { results, account } = await runBuilds({
+  builds, cache: CACHE, keyParts, deadline: DEADLINE, serial: SERIAL,
+  concurrency: side => (side === 'ise' ? +opt('--ise-jobs', 2) : +opt('--jobs', 3)),
+  build: ({ name: n, goal: g, side }) => (side === 'silinx' ? silinxRun(n, g) : iseRun(n, g)),
+  log: (b, r, cached) => {
+    const label = `${b.side === 'silinx' ? 'silinx' : 'ise   '} ${b.goal.padEnd(6)} ${b.name}`;
+    const sz = b.side === 'silinx' ? `${r.slices} slices, ${r.estimateNs} ns (estimate)` : `${r.slices} slices, ${r.periodNs} ns`;
+    console.log(`${label}: ${cached ? 'from the cache' : r.error ? `FAILED ${r.error}` : `${sz}, ${r.seconds} s`}`);
+  },
+});
+const at = (n, g, side) => results[builds.findIndex(b => b.name === n && b.goal === g && b.side === side)];
+
 // the corpus's designs that have no project: Silinx cannot read or synthesize them yet
 const manifest = JSON.parse(fs.readFileSync(path.join(HERE, 'manifest.json'), 'utf8'));
 const notBuilt = filter ? undefined : manifest.designs.map(d => d.name).filter(n => !fs.existsSync(path.join(dir, n, 'silinx.json')));
+const missing = account.missing.map(({ name, goal, side }) => ({ design: name, goal, side }));
 const res = {
-  generatedAt: new Date().toISOString(), silinxVersion: pkg.version, device: 'xc3s1200efg320-4', steps: STEPS, isePeriodNs: PERIOD, goals, notBuilt,   // (no `pending`: every design built)
+  generatedAt: new Date().toISOString(), silinxVersion: pkg.version, commit: commit || undefined, device: 'xc3s1200efg320-4', steps: STEPS, isePeriodNs: PERIOD, goals, notBuilt,   // (no `pending`: every design built)
+  // (the builds this comparison has not made yet: past the run's deadline, made by the next run, #3292)
+  missing: missing.length ? missing : undefined,
   designs: names.map(name => {
     const size = JSON.parse(fs.readFileSync(path.join(dir, name, 'size.json'), 'utf8'));
+    // (a build not made: its side left out)
     const byGoal = Object.fromEntries(goals.map(g => {
-      const { routed, ...s } = at(sil, name, g), t = timedName(name, g);
-      return [g, { silinx: { ...s, periodNs: trce[t] ?? null, path: paths[t] ?? null }, ise: at(ise, name, g) }];
+      const s = at(name, g, 'silinx'), i = at(name, g, 'ise');
+      return [g, { silinx: s && (({ unchecked, ...x }) => x)(s), ise: i }];
     }));
     return { name, wrapper: size.wrapper || undefined, goals: byGoal };
   }),
 };
+const summary = runSummary(account);
+console.log(summary.join('\n'));
+if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Quality: Silinx toolchain vs ISE\n\n${summary.map(l => `- ${l}`).join('\n')}\n`);
+if (missing.length && process.env.GITHUB_ACTIONS) console.log(`::notice::Partial comparison: ${missing.length} of ${builds.length} builds left for the next run (Actions ▸ Quality ▸ Run workflow resumes it)`);
+if (CACHE && commit && !filter) markPending(CACHE, commit, missing.length > 0);
 // merge into the earlier results (a --filter run updates only its designs)
 let all = res;
 if (filter && fs.existsSync(RESULTS)) {
@@ -257,7 +331,7 @@ if (filter && fs.existsSync(RESULTS)) {
   all = { ...res, notBuilt: old.notBuilt, designs: [...old.designs.filter(d => !names.includes(d.name)), ...res.designs].sort((a, b) => a.name.localeCompare(b.name)) };
 }
 // the guard: a design built before that fails now (on either side) is a problem of this run or a
-// regression, not a result to publish
+// regression, not a result to publish (a build not made or timed out is not a failure: the page says so)
 if (GUARD && fs.existsSync(RESULTS)) {
   const regressions = newFailures(JSON.parse(fs.readFileSync(RESULTS, 'utf8')), all);
   if (regressions.length) {
