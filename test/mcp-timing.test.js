@@ -169,3 +169,31 @@ test('timing_paths after an ISE run: trce\'s paths, back to the project\'s proce
   const open = await ok('timing_paths', { project: 'i1' });
   assert.deepEqual([open.data.toolchain, open.data.paths.length], ['silinx', 2]);
 });
+
+// AMD Vivado's paths (#3178): its report_timing_summary (blinky's, Vivado 2025.2's: test/fixtures/vivado), the newest
+// analysis; each stage back to the project's HDL by Vivado's names; none before its run; no registers to choose
+test('timing_paths after a Vivado run: report_timing_summary\'s paths, back to the project\'s processes; the newest analysis', async () => {
+  await ok('new_project_from_example', { name: 'v1', example: 'blinky' });
+  const build = path.join(P.projectDir('v1'), 'build');
+  fs.mkdirSync(build, { recursive: true });
+  fs.writeFileSync(path.join(build, 'run.tcl'), '# Vivado\n');
+  const none = await ok('timing_paths', { project: 'v1' });
+  assert.deepEqual([none.text, none.data.toolchain], ['No timing paths for \'v1\': run_process timing first (AMD Vivado\'s report_timing_summary).', 'vivado']);
+  const rpt = fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'vivado', 'blinky-timing.rpt.txt'), 'utf8');
+  fs.writeFileSync(path.join(build, 'top_timing.rpt'), rpt);
+  const list = await ok('timing_paths', { project: 'v1', count: 20 });
+  assert.equal(list.data.toolchain, 'vivado');
+  assert.ok(list.data.paths.length >= 3 && list.data.paths.every(p => p.lines.length));
+  assert.equal(list.data.paths[0].slack, Math.min(...list.data.paths.map(p => p.slack)), 'the slowest first');
+  assert.match(list.text.split('\n')[0], /^path 1: u_speed\/step_reg_reg -> u_count\/thousands_reg\[\d\] \(u_speed\/step_reg_reg\.Q -> u_count\/thousands_reg\[\d\]\.R\), clock clk: [\d.]+ ns, required 10\.000 ns, slack 5\.071 ns$/);
+  const one = await ok('timing_paths', { project: 'v1', path: 1 });
+  assert.deepEqual(Object.keys(one.data.highlight.files).sort(), ['src/bcd_counter.vhd', 'src/speed_ctrl.vhd']);
+  assert.ok(one.data.highlight.drawings['src/speed_ctrl.asm.json'].length, 'speed_ctrl\'s ASM chart: step');
+  await fails('timing_paths', { project: 'v1', to: 'tens' }, 'to: AMD Vivado\'s timing paths name no registers: the paths between two are the Silinx toolchain\'s (run_process timing with toolchain silinx)');
+  // (the Silinx toolchain's paths written after it: theirs)
+  fs.mkdirSync(path.join(build, 'open'), { recursive: true });
+  fs.writeFileSync(path.join(build, 'open', 'paths.json'), JSON.stringify(PATHS));
+  const t = Date.now() / 1000;
+  fs.utimesSync(path.join(build, 'top_timing.rpt'), t - 60, t - 60);
+  assert.equal((await ok('timing_paths', { project: 'v1' })).data.toolchain, 'silinx');
+});

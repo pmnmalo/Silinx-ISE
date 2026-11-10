@@ -281,3 +281,31 @@ uiTest('#3178 the Paths panel beside ISE\'s timing report: trce\'s paths, Show P
   await page.waitFor((f) => window.Silinx.active?.id === `file:${f}`, [Object.keys(want)[0]], { what: 'the first file in front' });
   for (const [f, l] of Object.entries(want)) assert.deepEqual(await marked(page, f), l.sort((a, b) => a - b), f);
 });
+
+// Vivado's report (#3178): its Paths panel beside build/<top>_timing.rpt, report_timing_summary's paths (blinky's,
+// Vivado 2025.2's: test/fixtures/vivado) back to the project's HDL by Vivado's names; Show Path marks their lines
+uiTest('#3178 the Paths panel beside Vivado\'s timing summary: its paths, Show Path in the HDL back through Vivado\'s names', E, async (page) => {
+  const dir = path.join(ROOT, 'examples', 'blinky'), pj = JSON.parse(await fs.readFile(path.join(dir, 'silinx.json'), 'utf8'));
+  const files = {};
+  for (const f of pj.files.filter((x) => /\.(vhd|v)$/.test(x.path))) files[f.path] = await fs.readFile(path.join(dir, f.path), 'utf8');
+  await makeProject(env, { name: 'PathsVivado', files, top: pj.top });
+  const build = path.join(env.server.workspace, 'PathsVivado', 'build');
+  await fs.mkdir(build, { recursive: true });
+  const rpt = await fs.readFile(path.join(ROOT, 'test', 'fixtures', 'vivado', 'blinky-timing.rpt.txt'), 'utf8');
+  await fs.writeFile(path.join(build, `${pj.top}_timing.rpt`), rpt);
+  await page.setViewport(1600, 800);
+  await page.openProject('PathsVivado');
+  await page.eval((f) => window.SilinxApp.openFile(f), `build/${pj.top}_timing.rpt`);
+  await page.waitFor((r) => document.querySelector(`${r} .tp-row`), [R], { what: 'Vivado\'s Paths panel' });
+  const { vivadoTimingPaths } = await import('../../core/vivado-paths.js');
+  const r = vivadoTimingPaths(rpt, Object.entries(files).map(([p, text]) => ({ path: p, lang: /\.v$/.test(p) ? 'verilog' : 'vhdl', text })), pj.top);
+  const L = await look(page);
+  assert.equal(L.rows.length, r.paths.length);
+  assert.deepEqual(L.sums.slice(1), [`Delay ${r.paths[0].delay.toFixed(3)} ns of 10.000 ns, slack 5.071 ns`]);
+  const want = {};
+  for (const l of r.paths[0].lines) (want[l.file] ||= []).push(l.line);
+  assert.deepEqual(await page.eval((r) => [...document.querySelectorAll(`${r} .tp-actions .btn`)].map((b) => b.textContent), R), ['Show Path'], 'no FPGA view of a 7-series device');
+  await page.click(`${R} .tp-actions .btn`, { text: 'Show Path' });
+  await page.waitFor((f) => window.Silinx.docs.some((d) => d.path === f), [Object.keys(want)[0]], { what: 'the path\'s files open' });
+  for (const [f, l] of Object.entries(want)) assert.deepEqual(await marked(page, f), l.sort((a, b) => a - b), f);
+});

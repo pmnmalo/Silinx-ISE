@@ -9,6 +9,7 @@ import * as P from './projects.js';
 import { betweenPaths, pathHighlight, pathsText } from '../packages/silinx-fpga/src/index.js';
 import { drawingPath, pathNames } from '../core/path-drawing.js';
 import { iseTimingPaths } from '../core/twr-paths.js';
+import { vivadoTimingPaths } from '../core/vivado-paths.js';
 import { join } from 'node:path';
 
 export const PATHS_FILE = 'build/open/paths.json';
@@ -26,7 +27,7 @@ async function drawingsOf(name, p, files) {
 }
 // a register of the analysis (one of its points) by its name, or by its last part when that is one register's
 function register({ points, toolchain }, arg, value, name) {
-  if (!points && toolchain === 'ise') throw toolError(`${arg}: Xilinx ISE's timing paths name no registers: the paths between two are the Silinx toolchain's (run_process timing with toolchain silinx)`);
+  if (!points && (toolchain === 'ise' || toolchain === 'vivado')) throw toolError(`${arg}: ${toolchain === 'ise' ? 'Xilinx ISE' : 'AMD Vivado'}'s timing paths name no registers: the paths between two are the Silinx toolchain's (run_process timing with toolchain silinx)`);
   if (!points) throw toolError(`${arg}: the timing paths of '${name}' name no registers (an older analysis): run_process timing again`);
   if (points.includes(value)) return value;
   const want = String(value).toLowerCase();
@@ -35,34 +36,34 @@ function register({ points, toolchain }, arg, value, name) {
   if (by.length > 1) throw toolError(`${arg}: '${value}' is several registers: ${by.join(', ')}`);
   throw toolError(`${arg}: no register '${value}' (the registers: ${points.join(', ')})`);
 }
-// the toolchain of the project's last timing analysis: of the Silinx toolchain's paths and ISE's trce report, the newer;
+// the toolchain of the project's last timing analysis: of the Silinx toolchain's paths, ISE's trce report and Vivado's
+// timing summary, the newest;
 // else the build folder's (an ISE synthesis report, a Vivado run)
 function lastToolchain(name, pj) {
   const build = join(P.projectDir(name), 'build'), top = pj.top || 'top';
   const at = f => { try { return fs.statSync(join(build, f)).mtimeMs; } catch { return null; } };
-  const open = at('open/paths.json'), ise = at(`${top}.twr`);
-  if (open != null || ise != null) return (ise ?? -1) > (open ?? -1) ? 'ise' : 'silinx';
+  const by = [['silinx', at('open/paths.json')], ['ise', at(`${top}.twr`)], ['vivado', at(`${top}_timing.rpt`)]].filter(x => x[1] != null);
+  if (by.length) return by.sort((a, b) => b[1] - a[1])[0][0];
   return at('run.tcl') != null ? 'vivado' : at(`${top}.syr`) != null ? 'ise' : 'silinx';
 }
-// the last timing analysis's paths: the Silinx toolchain's (build/open/paths.json), ISE's (its trce report, back to the
-// project's HDL: core/twr-paths.js); null when there are none
+// the last timing analysis's paths: the Silinx toolchain's (build/open/paths.json), ISE's and Vivado's (their reports,
+// back to the project's HDL: core/twr-paths.js, core/vivado-paths.js); null when there are none
 async function analysisOf(name, pj, tc) {
   if (tc === 'silinx') {
     const full = await projectPath(name, PATHS_FILE);
     return fs.existsSync(full) ? JSON.parse(await fsp.readFile(full, 'utf8')) : null;
   }
-  if (tc !== 'ise') return null;
-  const top = pj.top || 'top', full = await projectPath(name, `build/${top}.twr`);
+  const top = pj.top || 'top', full = await projectPath(name, tc === 'ise' ? `build/${top}.twr` : `build/${top}_timing.rpt`);
   if (!fs.existsSync(full)) return null;
   const sources = (await P.readSources(name)).filter(x => !x.missing && x.role !== 'sim');
-  return iseTimingPaths(await fsp.readFile(full, 'latin1'), sources, top);
+  return (tc === 'ise' ? iseTimingPaths : vivadoTimingPaths)(await fsp.readFile(full, 'latin1'), sources, top);
 }
 const ITEM = { state: 'state', trans: 'transition', node: 'box', edge: 'arrow', sym: 'symbol', wire: 'wire' };
 
 export const TIMING_TOOLS = [
   {
     name: 'timing_paths', title: 'Timing paths (Show Path)',
-    description: 'The slowest paths of the last timing analysis (run_process timing: the Silinx toolchain\'s, or Xilinx ISE\'s trce, each stage back to the project\'s HDL by XST\'s names), as the Static Timing Report\'s Paths panel: the worst path into each flip-flop, slowest first, with its clock, its delay, its PERIOD and its slack; or, with from and / or to, the worst path between two registers. With path (1 = the slowest), that path\'s stages (clock-to-out, net, logic, setup: each one\'s delay and arrival, its instance, site and net, and the source lines of its logic) and what Show Path highlights: the source lines by file, the sites and the nets, and the elements of the drawings those lines are generated from (a state diagram\'s states and transitions, an ASM chart\'s boxes and arrows, a schematic\'s symbols and wires).',
+    description: 'The slowest paths of the last timing analysis (run_process timing: the Silinx toolchain\'s, Xilinx ISE\'s trce or AMD Vivado\'s report_timing_summary, the newest; each stage of ISE\'s and Vivado\'s back to the project\'s HDL by their netlists\' names), as the Static Timing Report\'s Paths panel: the worst path into each flip-flop, slowest first, with its clock, its delay, its PERIOD and its slack; or, with from and / or to, the worst path between two registers. With path (1 = the slowest), that path\'s stages (clock-to-out, net, logic, setup: each one\'s delay and arrival, its instance, site and net, and the source lines of its logic) and what Show Path highlights: the source lines by file, the sites and the nets, and the elements of the drawings those lines are generated from (a state diagram\'s states and transitions, an ASM chart\'s boxes and arrows, a schematic\'s symbols and wires).',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       count: { type: 'integer', description: 'How many paths to list (default 10, at most the 20 the analysis keeps).' },
@@ -76,8 +77,7 @@ export const TIMING_TOOLS = [
       const tc = lastToolchain(name, pj);
       const r = await analysisOf(name, pj, tc);
       if (!r) {
-        return { text: tc === 'vivado' ? `No timing paths for '${name}' from AMD Vivado yet: its timing summary is get_report timing.`
-          : `No timing paths for '${name}': run_process timing first (${tc === 'ise' ? 'Xilinx ISE\'s trce' : 'the Silinx toolchain\'s timing analysis'}).`, data: { project: name, toolchain: tc, available: false } };
+        return { text: `No timing paths for '${name}': run_process timing first (${({ ise: 'Xilinx ISE\'s trce', vivado: 'AMD Vivado\'s report_timing_summary' })[tc] || 'the Silinx toolchain\'s timing analysis'}).`, data: { project: name, toolchain: tc, available: false } };
       }
       if (!Number.isInteger(count) || count < 1) throw toolError('count: a whole number from 1');
       // (between two registers: the worst path of each pair, from and / or to the ones chosen)
