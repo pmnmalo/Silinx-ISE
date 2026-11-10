@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { toolError, readProject, projectPath, PROJECT } from './mcp-util.js';
 import * as P from './projects.js';
-import { pathHighlight, pathsText } from '../packages/silinx-fpga/src/index.js';
+import { betweenPaths, pathHighlight, pathsText } from '../packages/silinx-fpga/src/index.js';
 import { drawingPath, pathNames } from '../core/path-drawing.js';
 
 export const PATHS_FILE = 'build/open/paths.json';
@@ -22,35 +22,54 @@ async function drawingsOf(name, p, files) {
   }
   return out;
 }
+// a register of the analysis (one of its points) by its name, or by its last part when that is one register's
+function register(points, arg, value, name) {
+  if (!points) throw toolError(`${arg}: the timing paths of '${name}' name no registers (an older analysis): run_process timing again`);
+  if (points.includes(value)) return value;
+  const want = String(value).toLowerCase();
+  const by = points.filter(x => x.toLowerCase() === want || x.split('.').pop().toLowerCase() === want);
+  if (by.length === 1) return by[0];
+  if (by.length > 1) throw toolError(`${arg}: '${value}' is several registers: ${by.join(', ')}`);
+  throw toolError(`${arg}: no register '${value}' (the registers: ${points.join(', ')})`);
+}
 const ITEM = { state: 'state', trans: 'transition', node: 'box', edge: 'arrow', sym: 'symbol', wire: 'wire' };
 
 export const TIMING_TOOLS = [
   {
     name: 'timing_paths', title: 'Timing paths (Show Path)',
-    description: 'The slowest paths of the last timing analysis of the Silinx toolchain (run_process timing), as the Static Timing Report\'s Paths panel: the worst path into each flip-flop, slowest first, with its clock, its delay, its PERIOD and its slack. With path (1 = the slowest), that path\'s stages (clock-to-out, net, logic, setup: each one\'s delay and arrival, its instance, site and net, and the source lines of its logic) and what Show Path highlights: the source lines by file, the sites and the nets, and the elements of the drawings those lines are generated from (a state diagram\'s states and transitions, an ASM chart\'s boxes and arrows, a schematic\'s symbols and wires).',
+    description: 'The slowest paths of the last timing analysis of the Silinx toolchain (run_process timing), as the Static Timing Report\'s Paths panel: the worst path into each flip-flop, slowest first, with its clock, its delay, its PERIOD and its slack; or, with from and / or to, the worst path between two registers. With path (1 = the slowest), that path\'s stages (clock-to-out, net, logic, setup: each one\'s delay and arrival, its instance, site and net, and the source lines of its logic) and what Show Path highlights: the source lines by file, the sites and the nets, and the elements of the drawings those lines are generated from (a state diagram\'s states and transitions, an ASM chart\'s boxes and arrows, a schematic\'s symbols and wires).',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       count: { type: 'integer', description: 'How many paths to list (default 10, at most the 20 the analysis keeps).' },
       path: { type: 'integer', description: 'A path\'s number in the list (1 = the slowest): its stages and its highlight.' },
+      from: { type: 'string', description: 'Between two registers: the register the paths start from (a flip-flop\'s signal, as the list\'s registers name it, or its last part: level for u_speed.level). The list is then the worst path from it into each register it reaches (with to: into that one).' },
+      to: { type: 'string', description: 'Between two registers: the register the paths end in (the worst path into it from each register that reaches it; with from: from that one).' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
-    async run({ project: name, count = 10, path }) {
+    async run({ project: name, count = 10, path, from, to }) {
       await readProject(name);
       const full = await projectPath(name, PATHS_FILE);
       if (!fs.existsSync(full)) return { text: `No timing paths for '${name}': run_process timing first (the Silinx toolchain's timing analysis).`, data: { project: name, available: false } };
       const r = JSON.parse(await fsp.readFile(full, 'utf8'));
       if (!Number.isInteger(count) || count < 1) throw toolError('count: a whole number from 1');
-      if (path !== undefined && (!Number.isInteger(path) || path < 1 || path > r.paths.length)) throw toolError(r.paths.length ? `path: from 1 to ${r.paths.length}` : `path: '${name}' has no path between two flip-flops to time`);
-      if (!r.paths.length) return { text: `No path between two flip-flops of a clock to time in '${name}'.`, data: { project: name, available: true, paths: [] } };
-      const list = { ...r, paths: r.paths.slice(0, count) };
-      if (path === undefined) {
-        return { text: pathsText(list).join('\n'), data: { project: name, available: true, paths: list.paths.map(({ stages, ...p }) => ({ ...p, from: `${stages[0].inst}.${stages[0].pin}`, to: `${stages.at(-1).inst}.${stages.at(-1).pin}` })) } };
+      // (between two registers: the worst path of each pair, from and / or to the ones chosen)
+      const a = from === undefined || from === '' ? '' : register(r.points, 'from', from, name);
+      const b = to === undefined || to === '' ? '' : register(r.points, 'to', to, name);
+      const all = a || b ? betweenPaths(r, a, b) : r.paths;
+      const head = { project: name, available: true, ...(r.points ? { registers: r.points } : {}), ...(a ? { from: a } : {}), ...(b ? { to: b } : {}) };
+      if (path !== undefined && (!Number.isInteger(path) || path < 1 || path > all.length)) {
+        throw toolError(all.length ? `path: from 1 to ${all.length}` : a || b ? `path: no path ${[a && `from ${a}`, b && `to ${b}`].filter(Boolean).join(' ')}` : `path: '${name}' has no path between two flip-flops to time`);
       }
-      const p = r.paths[path - 1];
+      if (!all.length) return { text: a || b ? `No path ${[a && `from ${a}`, b && `to ${b}`].filter(Boolean).join(' ')} in '${name}'.` : `No path between two flip-flops of a clock to time in '${name}'.`, data: { ...head, paths: [] } };
+      const list = { ...r, paths: all.slice(0, count) };
+      if (path === undefined) {
+        return { text: pathsText(list).join('\n'), data: { ...head, paths: list.paths.map(({ stages, from: fr, to: t, ...p }) => ({ ...p, ...(fr ? { fromRegister: fr, toRegister: t } : {}), from: `${stages[0].inst}.${stages[0].pin}`, to: `${stages.at(-1).inst}.${stages.at(-1).pin}` })) } };
+      }
+      const p = all[path - 1];
       const highlight = pathHighlight(p);
       highlight.drawings = await drawingsOf(name, p, Object.keys(highlight.files));
-      const text = [...pathsText(r, path - 1), ...Object.entries(highlight.drawings).map(([f, items]) => `  in ${f}: ${items.length ? items.map(x => `${ITEM[x.type]} ${x.label}`).join('; ') : 'none of its elements by name'}`)];
-      return { text: text.join('\n'), data: { project: name, available: true, path: { number: path, ...p }, highlight } };
+      const text = [...pathsText({ ...r, paths: all }, path - 1), ...Object.entries(highlight.drawings).map(([f, items]) => `  in ${f}: ${items.length ? items.map(x => `${ITEM[x.type]} ${x.label}`).join('; ') : 'none of its elements by name'}`)];
+      return { text: text.join('\n'), data: { ...head, path: { number: path, ...p }, highlight } };
     },
   },
 ];

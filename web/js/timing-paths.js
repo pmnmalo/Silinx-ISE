@@ -1,6 +1,6 @@
 // The Static Timing Report's Paths panel (#3178): the slowest paths of the Silinx toolchain's timing analysis
 // (build/open/paths.json, packages/silinx-fpga/src/fpga/timing-paths.js), each one's stages as bars against its clock's
-// PERIOD, and Show Path: the source lines its logic comes from marked in their editors, the elements of the drawings
+// PERIOD (or the worst path between two chosen registers: From, To), and Show Path: the source lines its logic comes from marked in their editors, the elements of the drawings
 // that generate them in theirs (web/js/drawing-path.js), its sites and nets in the FPGA view (Show in FPGA View opens it
 // on the path). The MCP's timing_paths gives the same (server/mcp-timing.js).
 //
@@ -13,7 +13,7 @@ import { prefKey } from './prefs.js';
 import { log } from './console.js';
 import { markLines } from './editor.js';
 import { S, findDoc, openFile, openFpgaView } from './app.js';
-import { pathHighlight } from '/packages/silinx-fpga/src/index.js';
+import { betweenPaths, pathHighlight } from '/packages/silinx-fpga/src/index.js';
 import { showInDrawings } from './drawing-path.js';
 
 export const TIMING_REPORT = 'build/open/timing.txt';
@@ -57,18 +57,32 @@ export async function mountTimingPaths(d, el, host) {
   mountSideFold({ root, side, key: 'silinx.timing.paths.folded', titles: { fold: 'Collapse the Paths panel', unfold: 'Expand the Paths panel' } });
   el.querySelector('.editor-bar')?.append(panelToggle(root, h('button', { class: 'btn', title: 'Show / hide the Paths panel' }, '☰ Paths'), { key: prefKey('silinx.narrow.paths') }));
 
-  let sel = 0;
+  let sel = 0, shown = r.paths;
   const list = h('table', { class: 'tp-list' });
   const detail = h('div', { class: 'tp-detail' });
-  side.append(r.paths.length ? list : h('p', { class: 'tp-none' }, 'No path between two flip-flops of a clock to time.'), detail);
+  const none = h('p', { class: 'tp-none' }, 'No path between two flip-flops of a clock to time.');
+  // between two chosen registers (the analysis's points and the worst path of each pair: an older run has none)
+  const pick = (title) => h('select', { class: 'tp-pick', title, onchange: () => choose() },
+    h('option', { value: '' }, 'Any register'), ...(r.points || []).map(x => h('option', { value: x, 'data-no-i18n': '' }, x)));
+  const from = pick('The register the paths start from'), to = pick('The register the paths end in');
+  const between = r.pairs ? h('div', { class: 'tp-between' }, h('label', {}, 'From', from), h('label', {}, 'To', to)) : null;
+  function choose() {
+    shown = !from.value && !to.value ? r.paths : betweenPaths(r, from.value, to.value);
+    sel = 0;
+    none.textContent = from.value || to.value ? 'No path between these registers.' : 'No path between two flip-flops of a clock to time.';
+    list.hidden = !shown.length; none.hidden = !!shown.length;
+    renderList(); renderDetail();
+  }
+  side.append(...[between, list, none, detail].filter(Boolean));
+  list.hidden = !shown.length; none.hidden = !!shown.length;
   function renderList() {
     list.replaceChildren(h('tr', {}, h('th', {}, '#'), h('th', {}, 'Slack'), h('th', {}, 'Delay'), h('th', {}, 'To')),
-      ...r.paths.map((p, i) => h('tr', { class: `tp-row${i === sel ? ' sel' : ''}${p.slack != null && p.slack < 0 ? ' tp-fail' : ''}`, 'data-i': i, onclick: () => { sel = i; renderList(); renderDetail(); } },
+      ...shown.map((p, i) => h('tr', { class: `tp-row${i === sel ? ' sel' : ''}${p.slack != null && p.slack < 0 ? ' tp-fail' : ''}`, 'data-i': i, onclick: () => { sel = i; renderList(); renderDetail(); } },
         h('td', { 'data-no-i18n': '' }, String(i + 1)), h('td', { class: 'num', 'data-no-i18n': '' }, p.slack == null ? '—' : p.slack.toFixed(3)),
         h('td', { class: 'num', 'data-no-i18n': '' }, p.delay.toFixed(3)), h('td', { class: 'tp-to', 'data-no-i18n': '', title: end(p.stages.at(-1)) }, p.stages.at(-1).inst))));
   }
   function renderDetail() {
-    const p = r.paths[sel];
+    const p = shown[sel];
     if (!p) { detail.replaceChildren(); return; }
     // the bar: each stage's share of the PERIOD (of the delay with no PERIOD), the slack after them
     const span = Math.max(p.required ?? 0, p.delay) || 1;
@@ -91,5 +105,6 @@ export async function mountTimingPaths(d, el, host) {
         h('button', { class: 'btn', title: 'Open the FPGA view on the path: its sites and its nets', onclick: () => showPath(p, { fpga: true }) }, 'Show in FPGA View'))].filter(Boolean));
   }
   renderList(); renderDetail();
-  return { paths: r.paths, select: i => { sel = i; renderList(); renderDetail(); }, show: (i, o) => showPath(r.paths[i], o) };
+  return { paths: r.paths, between: (a = '', b = '') => { from.value = a; to.value = b; choose(); return shown; },
+    select: i => { sel = i; renderList(); renderDetail(); }, show: (i, o) => showPath(shown[i], o) };
 }

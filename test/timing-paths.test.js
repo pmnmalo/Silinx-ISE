@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { timingGraph } from '../packages/silinx-fpga/src/fpga/timing.js';
-import { synBlocks, cellSources, stageCells, timingPaths, pathsText, pathHighlight } from '../packages/silinx-fpga/src/fpga/timing-paths.js';
+import { synBlocks, cellSources, stageCells, timingPaths, pathsText, pathHighlight, betweenPaths } from '../packages/silinx-fpga/src/fpga/timing-paths.js';
 import { PATHS } from '../packages/silinx-fpga/src/open-flow-reports.js';
 import { flow } from './timesim-lib.mjs';
 import { example, exampleUcf } from './examples-lib.mjs';
@@ -126,6 +126,49 @@ test('analyze().paths: the worst path into each end, slowest first (a path betwe
   assert.deepEqual(r.paths(0), []);
 });
 
+// two starts into one end through a gate (a: 1 + 0.5 + 1 + ..., e: slower), for the paths between two points
+function twoStarts() {
+  const design = { insts: ['a', 'e', 'm', 'c'].map(name => ({ name, type: 'X', site: `S_${name}`, placed: true, cfg: [] })), nets: [
+    { name: 'clk', outpins: [{ inst: 'g', pin: 'O' }], inpins: ['a', 'e', 'c'].map(i => ({ inst: i, pin: 'CLK' })) },
+    { name: 'n1', outpins: [{ inst: 'a', pin: 'Q' }], inpins: [{ inst: 'm', pin: 'A' }] },
+    { name: 'n2', outpins: [{ inst: 'e', pin: 'Q' }], inpins: [{ inst: 'm', pin: 'B' }] },
+    { name: 'n3', outpins: [{ inst: 'm', pin: 'O' }], inpins: [{ inst: 'c', pin: 'D' }] }] };
+  const arcs = i => (i.name === 'm' ? { comb: [['A', 'O', 0.5], ['B', 'O', 0.5]], setup: [], clkToOut: [], input: [], output: [], clock: false }
+    : { comb: [], setup: [['D', 0.3]], clkToOut: [['Q', 1]], input: [], output: [], clock: true });
+  const tg = timingGraph(design, { clock: { minScale: 1, hold: 0 } }, { arcs });
+  const conn = new Map(tg.conns.map((c, i) => [c.net, i]));
+  const delays = new Array(tg.conns.length).fill(0);
+  delays[conn.get('n1')] = 1; delays[conn.get('n2')] = 2; delays[conn.get('n3')] = 0.7;
+  return { design, r: tg.analyze(delays) };
+}
+
+test('analyze().paths between two points: from some starts (their own pass), into some ends; none when they do not meet', () => {
+  const { r } = twoStarts();
+  const at = p => p.map(x => `${x.path[0].inst}->${x.path.at(-1).inst} ${+x.delay.toFixed(6)}`);
+  // (into c: e's path is the worst, 1 + 2 + 0.5 + 0.7 + 0.3; from a only: 1 + 1 + 0.5 + 0.7 + 0.3)
+  assert.deepEqual(at(r.paths(10)), ['e->c 4.5']);
+  assert.deepEqual(at(r.paths(10, { from: x => x.inst === 'a' })), ['a->c 3.5']);
+  assert.deepEqual(r.paths(10, { from: x => x.inst === 'a' })[0].path.map(s => `${s.inst}.${s.pin} ${s.kind}`), ['a.Q clock-to-out', 'm.A net', 'm.O logic', 'c.D net', 'c.D setup']);
+  assert.deepEqual(at(r.paths(10, { from: x => x.inst === 'e', to: x => x.inst === 'c' })), ['e->c 4.5']);
+  assert.deepEqual(r.paths(10, { from: x => x.inst === 'c' }), [], 'c reaches no end');
+  assert.deepEqual(r.paths(10, { from: x => x.inst === 'nobody' }), []);
+  assert.deepEqual(r.paths(10, { to: x => x.inst === 'a' }), []);
+});
+
+test('timingPaths between: the registers (a flip-flop\'s signal, else its instance) and the worst path of each pair; betweenPaths', () => {
+  const { design, r } = twoStarts();
+  const t = timingPaths(r, design, { between: true });
+  assert.deepEqual(t.points, ['a', 'c', 'e']);
+  assert.deepEqual(t.pairs.map(p => `${p.from}->${p.to} ${p.delay}`), ['a->c 3.5', 'e->c 4.5']);
+  assert.deepEqual(betweenPaths(t, '', 'c').map(p => p.from), ['e', 'a'], 'slowest first');
+  assert.deepEqual(betweenPaths(t, 'a').map(p => p.to), ['c']);
+  assert.deepEqual(betweenPaths(t, 'a', 'c')[0].stages.map(s => s.inst), ['a', 'm', 'm', 'c', 'c']);
+  assert.deepEqual(betweenPaths(t, 'c'), []);
+  assert.deepEqual(betweenPaths({ paths: [] }, 'a'), [], 'an older analysis: no pairs');
+  assert.equal(pathsText({ paths: betweenPaths(t, 'a') })[0], 'path 1: a -> c (a.Q -> c.D), clock clk: 3.500 ns (no PERIOD constraint)');
+  assert.equal(timingPaths(r, design).pairs, undefined, 'only when asked');
+});
+
 test('timingPaths: the stages with their sites and nets, the slack against the PERIOD (half of it between the edges); the text; the highlight', () => {
   const { design, tg } = smallGraph();
   const r0 = tg.analyze(tg.conns.map(c => (c.toPin.inst === 'c' ? 2 : 0.5)));
@@ -190,6 +233,17 @@ test('the open flow: blinky\'s (VHDL, a Verilog counter) paths.json, the timing 
   // (the slowest path: from speed_ctrl's level, the register it reads, into its ticks, the one it writes)
   const worst = JSON.parse(r.store['open/paths.json']).paths[0];
   assert.deepEqual([worst.stages[0].signals, worst.stages.at(-1).signals], [['u_speed.level'], ['u_speed.ticks']]);
+  // between two registers: level into ticks is that path; the slowest pair the slowest path; a pair's path from a flip-flop
+  // of its register into one of the other; each register into ticks no slower than level
+  const t = JSON.parse(r.store['open/paths.json']);
+  assert.ok(t.points.includes('u_speed.level') && t.points.includes('u_speed.ticks'));
+  const lt = betweenPaths(t, 'u_speed.level', 'u_speed.ticks');
+  assert.deepEqual([lt.length, lt[0].delay, lt[0].stages.length], [1, worst.delay, worst.stages.length]);
+  assert.equal(Math.max(...t.pairs.map(p => p.period)), worst.period);
+  const on = (s, x) => s.signals.includes(x) || s.inst === x;   // (a register, or an instance with no named signal)
+  for (const p of t.pairs) assert.ok(on(p.stages[0], p.from) && on(p.stages.at(-1), p.to), `${p.from} -> ${p.to}`);
+  assert.ok(betweenPaths(t, '', 'u_speed.ticks').every(p => p.delay <= worst.delay));
+  assert.equal(new Set(t.pairs.map(p => `${p.from}>${p.to}`)).size, t.pairs.length, 'one path a pair');
 });
 
 test('the open flow: pong\'s (Verilog) paths.json, every path back to an always block or an assignment', { timeout: 300000 }, async () => {
