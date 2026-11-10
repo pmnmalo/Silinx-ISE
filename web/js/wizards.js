@@ -1,5 +1,5 @@
 // Wizards and dialogs modelled on ISE (New Project Wizard, New Source, properties...).
-import { devicePicker } from './device-picker.js';
+import { boardOptions, devicePicker, noFlowWarning } from './device-picker.js';
 import { constraintsForDevice } from './constraints-format.js';
 import { api } from './api.js';
 import { PRODUCT, PRODUCT_FULL, VERSION, VERSION_LABEL, BUILD, REPOSITORY, compareVersions, versionLabel } from '/core/version.js';
@@ -180,7 +180,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       return null;
     },
   };
-  const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], '');
+  const boardSel = select(boardOptions(db), '');
   const dp = devicePicker(db, st.device);
   boardSel.addEventListener('change', () => {
     const b = db.boards.find(x => x.id === boardSel.value);
@@ -255,6 +255,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
     // a diagram / table top: its document and its synchronized HDL module 'top'
     const top = topType.value !== 'hdl' && tplSel.value === 'empty' ? await createTopSource(pj.name, topType.value, langSel.value) : null;
     await app.openProject(pj.name);
+    if (noFlowWarning(pj.device)) app.log(noFlowWarning(pj.device), 'warn');
     if (api.standalone && tplSel.value !== 'empty') await app.boardUcf();   // (the chosen board's pins, as the server's, #2430)
     app.showLeftPage('design');
     if (top) {
@@ -406,8 +407,8 @@ export async function importXiseDialog() {
   } catch (e) { alertDlg('Import Xilinx ISE Project', e.message, 'error'); }
 }
 
-// ------------------------------------------------------------------ Import Silinx ISE Project
-// A .zip made with File ▸ Export Silinx ISE Project (silinx.json + every project file).
+// ------------------------------------------------------------------ Import Silinx Project
+// A .zip made with File ▸ Export Silinx Project (silinx.json + every project file).
 export async function importSilinxDialog() {
   const fileInp = h('input', { type: 'file', accept: '.zip' });
   const name = h('input', { type: 'text', placeholder: 'project name' });
@@ -416,9 +417,9 @@ export async function importSilinxDialog() {
     if (f && !name.value) name.value = f.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
   });
   const r = await dialog({
-    title: 'Import Silinx ISE Project', width: 520,
+    title: 'Import Silinx Project', width: 520,
     body: h('div', {},
-      h('div', { class: 'hint' }, 'Import a whole Silinx project from a .zip made with File ▸ Export Silinx ISE Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).'),
+      h('div', { class: 'hint' }, 'Import a whole Silinx project from a .zip made with File ▸ Export Silinx Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         ...field('.zip file:', fileInp),
         ...field('Project name:', name))),
@@ -426,7 +427,7 @@ export async function importSilinxDialog() {
   });
   if (!r) return;
   const zf = fileInp.files[0];
-  if (!zf) return alertDlg('Import Silinx ISE Project', 'Select the .zip of the Silinx project.', 'error');
+  if (!zf) return alertDlg('Import Silinx Project', 'Select the .zip of the Silinx project.', 'error');
   const pname = name.value.trim() || zf.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
   if (!await askReplaceProject(pname)) return;
   try {
@@ -437,7 +438,7 @@ export async function importSilinxDialog() {
     if (res?.missing?.length) app.log(`WARNING: files listed in silinx.json but not in the zip: ${res.missing.join(', ')}`, 'warn');
     // (what the import dropped: an entry that would leave the project, a broken silinx.json field, #483)
     for (const w of res?.warnings || []) app.log(`WARNING: ${w}`, 'warn');
-  } catch (e) { alertDlg('Import Silinx ISE Project', e.message, 'error'); }
+  } catch (e) { alertDlg('Import Silinx Project', e.message, 'error'); }
 }
 
 // ------------------------------------------------------------------ replacing an existing file
@@ -497,7 +498,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
   const written = [];
   for (const f of inp.files) {
     const ext = f.name.split('.').pop().toLowerCase();
-    const dir = ext === 'ucf' || ext === 'pcf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
+    const dir = ['ucf', 'pcf', 'xdc'].includes(ext) ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
     // through the import gate (#2830): a file it refuses is not added, said in the console
     let text;
@@ -520,7 +521,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg(title, `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, text);
     written.push(path);
-    if ((ext === 'ucf' || ext === 'pcf') && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
+    if (['ucf', 'pcf', 'xdc'].includes(ext) && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
   }
   if (!written.length) return;
   // the association (role) of exactly the files written
@@ -556,7 +557,7 @@ export async function projectProperties() {
   if (!db) return alertDlg("Design Properties", "The device database could not be loaded (is the Silinx server running?).", "error");
   const pj0 = S.project;
   let pj = pj0;
-  const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], pj.board || '');
+  const boardSel = select(boardOptions(db), pj.board || '');
   const dp = devicePicker(db, pj.device);
   dp.disable(!!pj.board);
   boardSel.addEventListener('change', () => {
@@ -601,6 +602,7 @@ export async function projectProperties() {
   }
   await app.reloadProject();
   app.log(`Device set to ${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` (board ${pj.board})` : ''}.`, 'info');
+  if (noFlowWarning(pj.device)) app.log(noFlowWarning(pj.device), 'warn');
   const changed = pj.board !== oldBoard || `${pj.device.part}-${pj.device.package}` !== oldDev;
   const board = app.projectBoard();
   if (changed && board && pj.top && await confirmDlg('Update Constraints',
@@ -746,8 +748,8 @@ export function aboutDialog() {
     body: h('div', { style: { display: 'flex', gap: '16px' } },
       h('div', { style: { width: '64px', height: '64px', background: '#c4161c', color: '#fff', font: 'bold 40px Arial', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' } }, 'S'),
       h('div', {}, h('div', { style: { fontSize: '16px', fontWeight: 'bold' } }, PRODUCT_FULL), h('div', {}, `Version ${VERSION}`),
-        h('p', {}, 'Digital design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7), made for teaching: mixed VHDL/Verilog projects; schematics with live simulation; FSM and ASM state machine editors; Boolean algebra: truth tables, expressions and Karnaugh maps; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2 and Nexys2 boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'),
-        h('p', { style: { fontStyle: 'italic' } }, 'Silinx ISE was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.'),
+        h('p', {}, 'Digital design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7) and the Lattice iCE40, made for teaching: mixed VHDL/Verilog projects; schematics with live simulation; FSM and ASM state machine editors; Boolean algebra: truth tables, expressions and Karnaugh maps; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'),
+        h('p', { style: { fontStyle: 'italic' } }, 'Silinx was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.'),
         h('table', { class: 'about-info', style: { borderSpacing: '0 3px', margin: '6px 0 10px' } },
           h('tr', {}, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Project:'),
             h('td', {}, link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`))),
@@ -758,7 +760,7 @@ export function aboutDialog() {
           h('tr', { class: 'about-counts' }, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Usage counts:'),
             h('td', {}, ...(siteCounts()
               ? ['This page counts its visits and what is used (a new project, a simulation, a bitstream…) with ', gcLink(), ': no cookies, no personal data, never the content of a project.']
-              : ['None: this copy sends nothing.', ' Only the site (pmnmalo.github.io/Silinx-ISE) counts its visits, with ', gcLink(), ' (no cookies, no personal data).']))),
+              : ['None: this copy sends nothing.', ' Only the site (pmnmalo.github.io/Silinx) counts its visits, with ', gcLink(), ' (no cookies, no personal data).']))),
           // what the start-up check for updates reaches (#488), and where it is turned off
           h('tr', { class: 'about-updates' }, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Update check:'),
             h('td', {}, updateCheckEnabled()
@@ -768,7 +770,7 @@ export function aboutDialog() {
         h('p', { class: 'hint' }, 'This program comes with ABSOLUTELY NO WARRANTY. Source code: ', link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`), '.'),
         h('p', { class: 'hint' }, 'Using Silinx in a course? ', link(WHO_URL, 'Tell us who you are'), '.'),
         componentsNode(),
-        h('p', { style: { color: 'var(--grey-4)' } }, 'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, and the place & route and bitstream writer of Silinx) for the Spartan-3E boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
+        h('p', { style: { color: 'var(--grey-4)' } }, 'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, nextpnr, and the bitstream writer of Silinx or icepack for the iCE40) for the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
 }
@@ -779,14 +781,14 @@ const gcLink = () => { const a = link(GOATCOUNTER_URL, 'GoatCounter'); a.dataset
 
 // ------------------------------------------------------------------ Tell us who you are
 // the users who want to say so (school, course, role): a GitHub Discussions thread, nothing collected
-export const WHO_URL = `https://github.com/${REPOSITORY}/discussions/151`;   // "Who is using Silinx ISE?"
+export const WHO_URL = `https://github.com/${REPOSITORY}/discussions/151`;   // "Who is using Silinx?"
 export function whoAreYou() {
   return dialog({
     title: 'Tell Us Who You Are', width: 480,
     body: h('div', {},
-      h('p', {}, 'Silinx ISE is free and asks for nothing. If you use it, in a course, a school or on your own, we would like to know: it helps to decide what to improve.'),
+      h('p', {}, 'Silinx is free and asks for nothing. If you use it, in a course, a school or on your own, we would like to know: it helps to decide what to improve.'),
       h('p', {}, 'Say hello on GitHub Discussions (a GitHub account is needed): your school or course, your role (teacher, student…), the boards you use. Only what you write there is seen.'),
-      h('p', {}, link(WHO_URL, 'Who is using Silinx ISE? (GitHub Discussions)'))),
+      h('p', {}, link(WHO_URL, 'Who is using Silinx? (GitHub Discussions)'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
 }
@@ -804,7 +806,7 @@ async function whatsNew(latest, rel) {
     const r = await fetch(`https://raw.githubusercontent.com/${REPO}/v${latest}/CHANGELOG.md`, { cache: 'no-store', signal: ctl.signal }).finally(() => clearTimeout(timer));
     if (r.ok) { const secs = changesSince(await r.text(), VERSION, latest); if (secs.length) return secs; }
   } catch { /* offline / no changelog in that release */ }
-  const m = /## What's new in (\S+)\s*\n([\s\S]*?)(?=\n## |\n\*\*Silinx ISE|$)/.exec(rel?.body || '');
+  const m = /## What's new in (\S+)\s*\n([\s\S]*?)(?=\n## |\n\*\*Silinx\b|$)/.exec(rel?.body || '');
   return m ? parseChangelog(`## ${m[1]}\n${m[2]}`) : null;
 }
 
@@ -839,7 +841,7 @@ function changesNode(sections) {
 // version.json next to the page (scripts/build-standalone.mjs --site). There the question is whether
 // the site serves another page than the one open (a reload gets it), not GitHub's latest release: a
 // release is published minutes before the site is rebuilt from it, and dev/ is built from main (#198).
-// null: not on such a site (the application, a downloaded Silinx-ISE.html): GitHub's releases.
+// null: not on such a site (the application, a downloaded Silinx.html): GitHub's releases.
 async function siteVersion() {
   if (!/^https?:$/.test(globalThis.location?.protocol || '')) return null;
   try {
@@ -954,7 +956,7 @@ export async function checkUpdatesDialog({ rel: known = null, served = undefined
       news?.length ? h('div', {}, h('b', {}, "What's new:"), changesNode(news)) : null,
       h('p', {}, 'Release notes and downloads: ', releaseLink(rel.html_url, rel.name || `v${latest}`)),
       assets.length ? h('ul', { style: { margin: '4px 0 8px 18px', padding: 0 } }, ...assets) : null,
-      h('p', { class: 'hint' }, 'To update: download silinx-ise-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx-ISE.html for the standalone edition.')].filter(Boolean));
+      h('p', { class: 'hint' }, 'To update: download silinx-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx.html for the standalone edition.')].filter(Boolean));
   } else {
     body.replaceChildren(...[
       h('p', {}, h('b', {}, `${PRODUCT} ${VERSION} is up to date.`)),

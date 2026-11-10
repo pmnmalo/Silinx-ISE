@@ -142,12 +142,22 @@ export const memMethods = {
         at.cur.stmts.push({ kind: 'memlatch', mem: mem.name, tmp, port: 1, loc: e.loc });
         return { kind: 'id', name: tmp, loc: e.loc };
       }
+      // (another memory's read just before: in its state, its port free there, if this address is known there, #2968)
+      const before = this.otherRead(mem, i, at.cur);
+      if (before) {
+        before.stmts.push({ kind: 'memread', mem: mem.name, i, loc: e.loc });
+        (before.acc ||= new Set()).add(mem.name);
+        at.cur.stmts.push({ kind: 'memlatch', mem: mem.name, tmp, loc: e.loc });
+        if (mem.storage === 't2p') (at.cur.readOf ||= new Map()).set(mem.name, before);
+        return { kind: 'id', name: tmp, loc: e.loc };
+      }
       if (at.cur.acc?.has(mem.name)) at.next();
       const read = at.cur;
       at.cur.stmts.push({ kind: 'memread', mem: mem.name, i, loc: e.loc });
       (at.cur.acc ||= new Set()).add(mem.name);
       at.next();
       at.cur.stmts.push({ kind: 'memlatch', mem: mem.name, tmp, loc: e.loc });
+      at.cur.readFrom = read;
       if (mem.storage === 't2p') (at.cur.readOf ||= new Map()).set(mem.name, read);
       return { kind: 'id', name: tmp, loc: e.loc };
     }
@@ -165,11 +175,20 @@ export const memMethods = {
     const names = namesIn(i);
     return cur.stmts.some((x) => names.has(x.tmp)) ? null : b;
   },
+  /** The state of the reads whose values cur takes, where a read of another memory at address i can go too: cur only
+   *  takes values read (nothing it holds is known before it), mem not accessed there; not in a pipelined loop. */
+  otherRead(mem, i, cur) {
+    const b = cur.readFrom;
+    if (!b || this.inPipe || b.acc?.has(mem.name) || !cur.stmts.every((x) => x.kind === 'memlatch')) return null;
+    const names = namesIn(i);
+    return cur.stmts.some((x) => names.has(x.tmp)) ? null : b;
+  },
   /** A memory named but not indexed (passed to a function): an error. */
   bareMem(x) {
     if (!x || typeof x !== 'object') return;
     if (Array.isArray(x)) { x.forEach((y) => this.bareMem(y)); return; }
     if (this.isMem(x)) { this.bareMem(x.i); return; }
+    if (this.isBlackbox?.(x)) { this.bbScalarArgs(x).forEach((a) => this.bareMem(a)); return; }   // (a memory port's array by its name, #2339)
     if (x.kind === 'id' && this.slots.get(x.name)?.kind === 'mem') this.error(x.loc, `the memory '${x.name}' can only be indexed here (${x.name}[i]): it cannot be passed to a function`);
     for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') this.bareMem(v);
   },

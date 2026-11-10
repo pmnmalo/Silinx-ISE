@@ -1,5 +1,5 @@
 // The MCP server's modules (#2674): server/mcp.js split by area, the projects' tools (mcp-projects.js), their
-// settings' (mcp-settings.js), their sources' (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), the
+// settings' (mcp-settings.js), their sources' (mcp-sources.js), their import and export (mcp-transfer.js), their links (mcp-link.js), their sharing (mcp-collab.js, #3181), the
 // HDL's (mcp-hdl.js), the wave configurations' (mcp-wcfg.js, #2839), the processes' (mcp-processes.js) and their helpers (mcp-util.js). The server's tools are
 // those of the modules, the ones of before the split in their order; server/mcp.js still exports what it did. The
 // tools themselves are tested through the protocol in mcp.test.js, mcp-settings.test.js, mcp-sources.test.js and
@@ -15,15 +15,24 @@ const { WIZARD_TOOLS } = await import('../server/mcp-wizards.js');
 const { TEST_BENCH_TOOLS } = await import('../server/mcp-test-bench.js');
 const { CONVERT_TOOLS } = await import('../server/mcp-convert.js');
 const { VIEW_TOOLS } = await import('../server/mcp-views.js');
+const { TABLE_TOOLS } = await import('../server/mcp-tables.js');
+const { GRADE_TOOLS } = await import('../server/mcp-grade.js');
 const { CHECK_TOOLS } = await import('../server/mcp-check.js');
+const { SCHEMATIC_TOOLS } = await import('../server/mcp-schematic.js');
 const { SIMULATE_DRAWING_TOOLS } = await import('../server/mcp-simulate-drawing.js');
 const { SOURCE_TOOLS } = await import('../server/mcp-sources.js');
 const { TRANSFER_TOOLS } = await import('../server/mcp-transfer.js');
 const { LINK_TOOLS } = await import('../server/mcp-link.js');
+const { COLLAB_TOOLS } = await import('../server/mcp-collab.js');
+const { GIT_TOOLS } = await import('../server/mcp-git.js');
 const { HDL_TOOLS } = await import('../server/mcp-hdl.js');
 const { WCFG_TOOLS } = await import('../server/mcp-wcfg.js');
 const { HLS_TOOLS } = await import('../server/mcp-hls.js');
+const { VERIFY_TOOLS } = await import('../server/mcp-verify.js');
 const { PROCESS_TOOLS, PROCESSES, REPORT_FILES, OPEN_REPORTS } = await import('../server/mcp-processes.js');
+const { LAB_TOOLS } = await import('../server/mcp-labs.js');
+const { TIMING_TOOLS } = await import('../server/mcp-timing.js');
+const { CAPTURE_TOOLS } = await import('../server/mcp-capture.js');
 const U = await import('../server/mcp-util.js');
 
 const names = tools => tools.map(t => t.name);
@@ -42,16 +51,25 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(TEST_BENCH_TOOLS), ['test_bench_wizard']);
   assert.deepEqual(names(CONVERT_TOOLS), ['convert_module', 'convert_drawing']);
   assert.deepEqual(names(VIEW_TOOLS), ['related_view']);
+  assert.deepEqual(names(TABLE_TOOLS), ['set_output_logic']);
   assert.deepEqual(names(CHECK_TOOLS), ['check_drawing']);
+  assert.deepEqual(names(SCHEMATIC_TOOLS), ['rearrange_wires', 'rearrange_schematic']);
   assert.deepEqual(names(SIMULATE_DRAWING_TOOLS), ['simulate_drawing']);
   assert.deepEqual(names(SOURCE_TOOLS), ['unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project']);
   assert.deepEqual(names(TRANSFER_TOOLS), ['export_project', 'import_project']);
   assert.deepEqual(names(LINK_TOOLS), ['project_link', 'open_link']);
+  assert.deepEqual(names(COLLAB_TOOLS), ['share_project', 'follow_project']);
+  assert.deepEqual(names(GIT_TOOLS), ['git_clone', 'git_init', 'git_status', 'git_commit', 'git_push', 'git_pull', 'git_log', 'git_diff']);
   assert.deepEqual(names(HDL_TOOLS), ['check_syntax', 'simulate']);
+  assert.deepEqual(names(VERIFY_TOOLS), ['verify']);
   assert.deepEqual(names(WCFG_TOOLS), ['save_wave_config', 'load_wave_config']);
   assert.deepEqual(names(HLS_TOOLS), ['c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...CHECK_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS]);
+  assert.deepEqual(names(CAPTURE_TOOLS), ['capture_settings', 'capture']);   // (the logic analyzer, #3176)
+  assert.deepEqual(names(TIMING_TOOLS), ['timing_paths']);
+  assert.deepEqual(names(LAB_TOOLS), ['lab']);   // (the guided labs, #3179)
+  assert.deepEqual(names(GRADE_TOOLS), ['grade']);   // (automatic grading, #3192)
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);

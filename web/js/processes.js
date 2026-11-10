@@ -1,12 +1,13 @@
 // The Processes panel (#405: out of app.js): the processes of the selected source and what runs them, Check Syntax
 // and the elaboration's diagnostics, and the processes' status kept in the project's build folder.
-import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
+import { openOnlyDevice, vivadoDevice } from '/packages/silinx-fpga/src/parts.js';
 import { api } from './api.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, popupMenu, toast, longPressMenu } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
 import { reservedModuleDiags } from '/core/reserved.js';
 import { checkC } from '/core/c-check.js';
+import { blackboxChecks } from '/core/c-blackbox.js';
 import * as wiz from './wizards.js';
 import { designDiags, sevWord } from './diaghelp.js';
 import { S, flushDoc, openFile, openFpgaView, openImpact, openPinPlanner, openSummary, openUcf,
@@ -18,7 +19,7 @@ import { isAsm, isFsm, isPn, isTt, openAsm, openFsm, openPetri, openSch, openTt 
 import { inView, setTop, testBench } from './design.js';
 import { openWizardModule, wizardProcessOf } from './wizard-modules.js';
 import { openEmulator, openSchematic, openTechSchematic, runSimulation } from './viewers.js';
-import { cProcesses, isC } from './c-source.js';
+import { cProcesses, failedCDiags, isC } from './c-source.js';
 import { openCModel } from './c-model.js';
 import { EXTRA_STEPS, FLOW_PROCS, IMPL_IDS, buildProcesses, toolOf } from './tool-descriptors.js';
 
@@ -35,9 +36,11 @@ const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'sum
 // the project's synthesis tool (Design Properties: Silinx or XST), else Toolchain Settings' mode; never
 // in the single-file edition (no server: the Silinx toolchain runs on it)
 // (the browser edition: the Silinx toolchain, unless the project chose XST)
-export const openMode = () => openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx');
+// (a device of Vivado's, on the local server: not the Silinx toolchain's, whatever the synthesis tool says, #1649)
+export const vivadoMode = () => !api.standalone && vivadoDevice(S.project?.device);
+export const openMode = () => !vivadoMode() && (openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx'));
 /** The project's tool (its descriptor, web/js/tool-descriptors.js): what the process tree and the tasks are built from. */
-export const projectTool = () => toolOf(S.project?.device, openMode());
+export const projectTool = () => toolOf(S.project?.device, openMode(), { standalone: api.standalone });
 // Tasks ▸ Implement: the top module's processes, whatever the Design pane has selected since (#1208)
 const implTop = () => { const d = document.documentElement.dataset; return d.layout === 'tasks' && d.task === 'impl'; };
 /** The item whose processes are shown and the view: the selection's, or in Implement the top module's. */
@@ -74,6 +77,8 @@ function selectionProcesses(sel, view) {
       { id: 'sim-run', label: 'Simulate Behavioral Model', ico: 'wave', run: () => runSimulation(mod) },
       ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `sim-${step}`, label: `Simulate ${name} Model`, ico: 'wave', run: () => runSimulation(mod, step) })),
     ] },
+    { id: 'verify', label: 'Verify Equivalence…', ico: 'process', run: async () => (await import('./verify.js')).verifyProcess(mod) },   // (#3177)
+    { id: 'verify-assert', label: 'Verify Assertions…', ico: 'process', run: async () => (await import('./verify.js')).assertProcess(mod) },
     { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
     { id: 'tb-wiz', label: 'Create Test Bench (Wizard)…', ico: 'template', run: () => testBench(mod) },
     ...(cp.length ? [] : [{ id: 'cmodel-sim', label: 'View C Model', ico: 'process', run: () => openCModel(mod) }]),   // (#1530)
@@ -276,14 +281,17 @@ async function checkSyntaxInner(mod, sim, id) {
   const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, sim));
   for (const s of srcs) log(`${s.lang === 'vhdl' ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${s.path}" into library work`);
   const lib = compile(withPrimitives(srcs));
-  const design = elaborate(lib, mod);
+  // (a C source whose HDL cannot be made, #2995: its errors; its module, the top, then not elaborated)
+  const cErrs = failedCDiags();
+  const cTop = Object.values(S.cFailed || {}).some(c => String(c.module || '').toLowerCase() === String(mod).toLowerCase());
+  const design = cTop ? null : elaborate(lib, mod);
   // (an HDL file its drawing could not generate again, #303: an error of the file, the drawing's errors in it)
   const stale = srcs.filter(s => S.staleHdl?.[s.path]).map(s => {
     const { from, why } = S.staleHdl[s.path];
     return { severity: 'error', file: s.path, line: 1, col: 1, tool: 'Silinx', message: `${s.path} is not up to date: ${from} cannot generate it, ${why}. Fix ${from} (its HDL is then generated again).` };
   });
   // (+ the modules named with a reserved word, #679)
-  const diags = diagsFor(lib, design, [...designDiags(lib, design), ...stale, ...reservedNameDiags()]);   // + design checks (core/lint.js)
+  const diags = diagsFor(lib, design, [...(design ? designDiags(lib, design) : []), ...stale, ...cErrs, ...reservedNameDiags()]);   // + design checks (core/lint.js)
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
   for (const d of diags) log(`${sevWord(d)}:${d.tool || 'HDLCompiler'} - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
@@ -339,7 +347,9 @@ async function cDiagnostics(path, info) {
   const text = await api.readFile(S.project.name, path);
   const r = checkC(text, path);
   if (r.top) info.push(`Top function: ${r.top}`);
-  return r.diagnostics.map(d => ({ ...d, file: path, tool: 'SilinxC' }));
+  // (the descriptions of the RTL blackboxes it calls too, as its synthesis checks them, #2995: in their own files)
+  const bb = r.ok && S.hls ? blackboxChecks(r, S.hls) : [];
+  return [...r.diagnostics.map(d => ({ ...d, file: path, tool: 'SilinxC' })), ...bb.map(d => ({ ...d, tool: 'SilinxC' }))];
 }
 
 // ------------------------------------------------------------------ process status persistence
@@ -364,7 +374,7 @@ function sourcesFingerprint() {
 // Translate while they are the same
 export function synthFingerprint(sources) {
   const ucf = S.project.constraints;
-  const parts = sources.filter(f => f.role !== 'sim' && f.path !== ucf && !/\.(ucf|pcf)$/i.test(f.path)).map(f => `${f.path}\n${f.text}`).sort();
+  const parts = sources.filter(f => f.role !== 'sim' && f.path !== ucf && !/\.(ucf|pcf|xdc)$/i.test(f.path)).map(f => `${f.path}\n${f.text}`).sort();
   parts.push(`top\n${S.project.top}`, `dev\n${JSON.stringify(S.project.device)}`, `tool\n${S.project.synthTool || ''}\n${openMode()}`, `effort\n${S.project.impl?.optLevel ?? ''}\n${S.project.impl?.optMode ?? ''}`);
   let h = 2166136261;
   for (const c of parts.join('\0')) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }

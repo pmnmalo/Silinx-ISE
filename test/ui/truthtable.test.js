@@ -28,6 +28,14 @@ const consoleAfterOpen = async (page) => {
   return lines.slice(lines.findIndex((l) => /^Project ".*" opened/.test(l)) + 1);
 };
 const problemRows = (page) => page.eval(() => [...document.querySelectorAll('#console-errors .diag, #console-warnings .diag')].map((d) => d.textContent));
+/** An output's HDL logic (#2951): the tick box of its result (`form`: tt-sop, tt-xor, tt-nand, …), each of `outs` in turn. */
+const tickForm = async (page, form, outs) => {
+  for (const o of outs) {
+    await page.click(`.doc:not([hidden]) .tt-editor .tt-tab[data-out=${o}]`);
+    await page.eval((f) => document.querySelector(`.doc:not([hidden]) .tt-editor .tt-res.tt-${f} .tt-hdl`).scrollIntoView({ block: 'center' }), form);
+    await page.click(`.doc:not([hidden]) .tt-editor .tt-res.tt-${form} .tt-hdl`);
+  }
+};
 
 const ADDER = `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
 entity add1 is port (a, b : in std_logic_vector(1 downto 0); s : out std_logic_vector(2 downto 0)); end add1;
@@ -70,14 +78,15 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   assert.match(await page.eval((t) => document.querySelector(`${t} .tt-canon`).textContent, T), /f = Σm\(3, 5, 6, 7\)[\s\S]*f = ΠM\(0, 1, 2, 4\)/);
   // POS groups: the 0s
   await page.click(`${T} .tt-groups input[value=pos]`);
-  // (a + c), the 0s of rows 0 and 2, wraps around the left and right edges: drawn as two parts
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} svg.tt-kmap .tt-group`)].map((g) => g.dataset.term), T), ["0", "1", "1", "2"]);
+  // (b + c), the 0s of rows 0 and 4 (columns ab = 00 and 10, #2924), wraps around the left and right edges: drawn as two parts
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} svg.tt-kmap .tt-group`)].map((g) => g.dataset.term), T), ["0", "1", "2", "2"]);
   // no Check my answer, no My expression (#694); the NAND and NOR forms below the minimal ones
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-caption`)].map((c) => c.textContent), T), ['Truth table', 'Notes', 'Expression', 'Karnaugh map', 'Results']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-mine-in, ${t} .tt-mine-out`).length, T), 0);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Canonical SOP', 'Minimal SOP', 'Minimal POS', 'XOR form', 'NAND form', 'NOR form', 'Least number of gates', 'Least delay']);   // (the last two: #1427)
-  // no list of the essential prime implicants below them (#705): the K-map's legend marks them
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Least number of gates', 'Least delay', 'Minimal SOP', 'Minimal POS', 'Canonical SOP', 'XOR form', 'NAND form', 'NOR form']);   // (the first two: #1427; in this order: #3065)
+  // no list of the essential prime implicants below them (#705), nor an "essential" mark in the K-map's legend (#3080)
   assert.deepEqual(await page.eval((t) => [document.querySelectorAll(`${t} .tt-ess-list`).length, /Essential prime implicants/.test(document.querySelector(t).textContent)], T), [0, false]);
+  assert.deepEqual(await page.eval((t) => [document.querySelectorAll(`${t} .tt-legend .tt-leg`).length > 0, /essential/i.test(document.querySelector(`${t} .tt-legend`).textContent)], T), [true, false]);
   assert.deepEqual(await page.eval((t) => [`${t} .tt-nand`, `${t} .tt-nor`].map((q) => [document.querySelector(`${q} .tt-expr`).textContent, document.querySelector(`${q} .tt-cost`).textContent]), T), [
     ['f = /(/(b.c)./(a.c)./(a.b))', '4 gate(s), 0 of them inverter(s)'], ['f = /(/(a + b) + /(a + c) + /(b + c))', '4 gate(s), 0 of them inverter(s)']]);
   // the table is saved (autosave)
@@ -145,7 +154,9 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   assert.ok([...'0X10100X'].every((c, i) => c === 'X' || c === sim[i]), sim);
 
   // ---- its schematic (#694): the Schematic badge of its row opens it, generated from the table (a view, no file),
-  // the minimal SOP's gates (the HDL logic form)
+  // the minimal SOP's gates (the HDL logic form, ticked: a new table's is the least gates', here its XOR form, #2951)
+  await tickForm(page, 'sop', ['f']);
+  await page.waitFor(async () => /\(minimal SOP, /.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'the HDL in minimal SOP', timeout: 15000 });
   const badge = (mod, text) => page.eval((m, x) => { const r = [...document.querySelectorAll('#hier .row')].find((e) => e.querySelector('.lbl').textContent === m); [...r.querySelectorAll('.badge')].find((b) => b.textContent === x).click(); }, mod, text);
   await badge('maj3', 'Schematic');
   await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/maj3.bool.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
@@ -158,10 +169,10 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   const careSim = (st) => assert.ok([...'0X10100X'].every((c, i) => c === 'X' || c === st[i]), st);
   careSim(simTable(generateHdl(sch).code, 'maj3.vhd', 'maj3').f);
   assert.ok(!(await page.eval(() => window.Silinx.fileTree)).some((f) => /\.sch\.json$/.test(f)), 'no schematic file');
-  // HDL logic: NAND gates only: the HDL and the open schematic follow, NAND gates only
+  // HDL logic: NAND gates only (its result's tick box, #2951): the HDL and the open schematic follow, NAND gates only
   await page.eval(() => window.SilinxApp.openTt('src/maj3.bool.json'));
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.bool.json');
-  await page.fill(`${T} .tt-form`, 'nand');
+  await tickForm(page, 'nand', ['f']);
   await page.waitFor(async () => /\(NAND gates only, from the minimal SOP/.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'the NAND-only HDL', timeout: 15000 });
   vhd = await readWs(env, 'TtPj', 'src/maj3.vhd');
   assert.doesNotMatch(vhd.slice(vhd.indexOf('begin')), /\b(or|nor|xor|xnor)\b/);
@@ -221,9 +232,10 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   assert.ok(await page.eval((t) => document.querySelector(`${t} .tt-tab.active`).dataset.out === 'y5' && document.querySelector(`${t} .tt-table th.tt-out.sel`).textContent === 'y5', T));
   // (SOP groups: the 1s and the don't cares written, the 0s blank; POS groups: the 0s and X, the 1s blank, #1494)
   const kcells = () => page.eval((t) => [...document.querySelectorAll(`${t} svg.tt-kmap .tt-kcell`)].map((g) => `${g.dataset.row}:${g.querySelector('.tt-k-v').textContent}`), T);
-  assert.deepEqual(await kcells(), ['0:1', '1:X', '3:', '2:', '4:', '5:', '7:', '6:1']);
+  // (a b on the columns, c on the rows, #2924)
+  assert.deepEqual(await kcells(), ['0:1', '2:', '6:1', '4:', '1:X', '3:', '7:', '5:']);
   await page.click(`${T} input[name^=tt-grp][value=pos]`);
-  assert.deepEqual(await kcells(), ['0:', '1:X', '3:0', '2:0', '4:0', '5:0', '7:0', '6:']);
+  assert.deepEqual(await kcells(), ['0:', '2:0', '6:', '4:0', '1:X', '3:0', '7:0', '5:0']);
   await page.click(`${T} input[name^=tt-grp][value=sop]`);
   assert.match(await page.eval((t) => document.querySelector(`${t} .tt-canon`).textContent, T), /y5 = Σm\(0, 6\) \+ d\(1\)/);
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-sop .tt-expr`).textContent, T), "y5 = /a./b + a.b./c");
@@ -310,7 +322,7 @@ uiTest('Algebra from Module: a vector adder read into a table (exhaustive simula
   // a module is made from a truth table, not a truth table from a module: the module's menu has none (#220)
   await page.treeRow('#hier', 'add1', { right: true });
   assert.deepEqual(await page.waitFor(() => { const m = [...document.querySelectorAll('body > .menu-popup .mi')].map((i) => i.textContent.trim()); return m.length ? m : null; }), [
-    'Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', ...TB,
+    'Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Verify Equivalence…', 'Verify Assertions…', ...TB,
     'Convert to Schematic (editable)…', 'Convert to State Machine (ASM)…', 'Convert to State Diagram (FSM)…',
     'Copy Link to This Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…',
   ]);
@@ -460,7 +472,7 @@ end rtl;
   assert.deepEqual((await texts()).groups, ['a + b + c', 'a + /b + /c', '/a + b + /c', '/a + /b + c']);
   await page.click(`${T} .tt-groups input[value=sop]`);
   // below the XOR form, the NAND and NOR forms (#694), then those of the fewest gates and of the least delay (#1427)
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Canonical SOP', 'Minimal SOP', 'Minimal POS', 'XOR form', 'NAND form', 'NOR form', 'Least number of gates', 'Least delay']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-res > div:first-child b`)].map((b) => b.textContent), T), ['Least number of gates', 'Least delay', 'Minimal SOP', 'Minimal POS', 'Canonical SOP', 'XOR form', 'NAND form', 'NOR form']);
   // co: the carry a·b + c·(a ⊕ b), 5 literals against 6
   await page.click(`${T} .tt-tab[data-out=co]`);
   let x = await texts();
@@ -489,19 +501,18 @@ end rtl;
   await page.fill(`${T} .tt-notation`, 'slash');
   assert.equal((await texts()).xor, 'co = a.b + c.(a ⊕ b)');
 
-  // ---- the HDL: the minimal SOP by default; "XOR form (when simpler)" puts it in the module
+  // ---- the HDL: the table's minimal SOP; the XOR form ticked (s, co; x has none simpler, #2951) puts it in the module
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/fa.vhd'] === 'src/fa.bool.json', [], { what: 'linked HDL' });
   await page.waitFor(async () => /co = Σm\(3, 5, 6, 7\)/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the HDL of the table', timeout: 15000 });
   assert.doesNotMatch(await readWs(env, 'TtXor', 'src/fa.vhd'), /xor/);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-form option`)].map((o) => `${o.value}:${o.textContent}`), T), ['sop:Minimal SOP', 'pos:Minimal POS', 'xor:XOR form (when simpler)', 'nand:NAND gates only', 'nor:NOR gates only', 'gates:Least number of gates', 'delay:Least delay']);
-  await page.fill(`${T} .tt-form`, 'xor');
+  await tickForm(page, 'xor', ['s', 'co']);
   await page.waitFor(async () => /s <= a xor b xor c;/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the HDL with the XOR form', timeout: 15000 });
   const vhd = await readWs(env, 'TtXor', 'src/fa.vhd');
   assert.match(vhd, /^ {4}co <= \(a and b\) or \(c and \(a xor b\)\);$/m);
   assert.match(vhd, /^ {4}x <= c or \(a and b\);$/m);
   assert.match(vhd, /^-- co = a·b \+ c·\(a ⊕ b\) {3}\(XOR form, 5 literal\(s\), 4 gate\(s\), delay 3\)$/m);
   assert.deepEqual(simTable(vhd, 'fa.vhd', 'fa'), fa.table);
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.bool.json')).json()).form === 'xor', [], { what: 'saved' });
+  await page.waitFor(async () => JSON.stringify((await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.bool.json')).json()).forms) === '{"s":"xor","co":"xor"}', [], { what: 'saved' });
   await page.eval(() => window.SilinxApp.openFile('src/fa.vhd'));
   assert.deepEqual(await problemRows(page), []);
   // its schematic in the XOR form too (#694): s an XOR3; then NOR gates only, the HDL and the schematic
@@ -513,7 +524,7 @@ end rtl;
   assert.deepEqual(simTable(generateHdl(sch).code, 'fa.vhd', 'fa'), fa.table);
   await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json');
-  await page.fill(`${T} .tt-form`, 'nor');
+  await tickForm(page, 'nor', ['s', 'co', 'x']);
   await page.waitFor(async () => /\(NOR gates only, from the minimal POS/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the NOR-only HDL', timeout: 15000 });
   const nor = await readWs(env, 'TtXor', 'src/fa.vhd');
   assert.doesNotMatch(nor.slice(nor.indexOf('begin')), /\b(and|nand|xor|xnor)\b/);
@@ -533,7 +544,7 @@ end rtl;
     await page.waitFor((h, o) => window.Silinx.hdlToSch?.[h] === 'src/fa.bool.json' && !window.Silinx.fileTree.includes(o), [`src/fa.${ext}`, `src/fa.${other}`], { what: `fa in ${L}`, timeout: 15000 });
     await page.waitConsole(new RegExp(`src/fa\\.bool\\.json: its HDL is now in ${L}, src/fa\\.${ext} \\(src/fa\\.${other} removed\\)`));
     const d = await ttFile('TtXor', 'src/fa.bool.json');
-    assert.deepEqual([d.lang, d.generatedFile, d.form], [lang, `src/fa.${ext}`, 'nor']);
+    assert.deepEqual([d.lang, d.generatedFile, d.forms], [lang, `src/fa.${ext}`, { s: 'nor', co: 'nor', x: 'nor' }]);
     const code = await readWs(env, 'TtXor', `src/fa.${ext}`);
     assert.match(code, lang === 'verilog' ? /^module fa \(/m : /^entity fa is/m);
     assert.match(code, /\(NOR gates only, from the minimal POS/);
@@ -564,9 +575,7 @@ end rtl;
   assert.deepEqual(untranslated(en, pt, [/^@?(\/a.b \+ c|\/ab \+ c|a.b' \+ c|ab' \+ c|[a-z]+ =|s|co|x|a, b, c|s, co, x|fa\.vhd)$/]), []);
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-xor b`).textContent, T), 'Forma XOR');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-xor .tt-cost`).textContent, T), '3 literal(is), 2 operador(es) de duas entradas: 2 XOR / XNOR, 0 AND, 0 OR');
-  assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-form option[value=xor]`).textContent, T), 'Forma XOR (quando mais simples)');
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-form option`)].slice(3).map((o) => o.textContent), T), ['Só portas NAND', 'Só portas NOR', 'Menor número de portas', 'Menor atraso']);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar label`)].map((l) => l.textContent), T), ['Entradas:', 'Saídas:', 'Lógica do HDL:']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar label`)].map((l) => l.textContent), T), ['Entradas:', 'Saídas:']);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Preencher a tabela', 'Álgebra de um Módulo…', 'Álgebra Manuscrita…']);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-nand b, ${t} .tt-nor b, ${t} .tt-nand .tt-cost`)].map((b) => b.textContent), T), ['Forma NAND', '8 porta(s), 3 delas inversora(s)', 'Forma NOR']);
   // the Design pane's badges and the schematic's bar
@@ -609,7 +618,7 @@ uiTest('#1427 Truth Table: Least number of gates and Least delay, every form\'s 
   assert.deepEqual(await page.eval((t) => ['gates', 'delay'].map((g) => [document.querySelector(`${t} .tt-${g} b`).textContent, document.querySelector(`${t} .tt-${g} .tt-best-form`).textContent, document.querySelector(`${t} .tt-${g} .tt-expr`).textContent]), T),
     [['Least number of gates', 'XOR form', 's = a ⊕ b ⊕ c'], ['Least delay', 'XOR form', 's = a ⊕ b ⊕ c']]);
   // the module in the form of the fewest gates: s its XOR, co its minimal SOP; it simulates to the table
-  await page.fill(`${T} .tt-form`, 'gates');
+  await tickForm(page, 'gates', ['co', 's']);
   await page.waitFor(async () => /least gates/.test(await (await fetch('/api/projects/TtCost/file?path=src%2Ffa.vhd')).text()), [], { what: 'the HDL of least gates', timeout: 15000 });
   const vhd = await readWs(env, 'TtCost', 'src/fa.vhd');
   assert.match(vhd, /^-- s = a ⊕ b ⊕ c {3}\(least gates: XOR form, 3 literal\(s\), 1 gate\(s\), delay 1\)$/m);
@@ -618,8 +627,8 @@ uiTest('#1427 Truth Table: Least number of gates and Least delay, every form\'s 
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor((t) => document.querySelector(`${t} .tt-gates b`)?.textContent === 'Menor número de portas', [T], { what: 'Portuguese' });
-  assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-delay b`).textContent, document.querySelector(`${t} .tt-xor .tt-circuit`).textContent, [...document.querySelectorAll(`${t} .tt-form option`)].slice(-2).map((o) => o.textContent)], T),
-    ['Menor atraso', 'Como circuito: 1 porta(s), atraso 1', ['Menor número de portas', 'Menor atraso']]);
+  assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-delay b`).textContent, document.querySelector(`${t} .tt-xor .tt-circuit`).textContent], T),
+    ['Menor atraso', 'Como circuito: 1 porta(s), atraso 1']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
 });
 
@@ -648,23 +657,23 @@ uiTest('#1492 Truth Table: the Notes box keeps its height under a table of 5 or 
 
 // #1407: the K-map of 5 or 6 inputs in 3D: its maps stacked (2 or 4 layers, Gray order), a group on each layer it
 // covers and a box between neighbouring layers; turned by dragging and the arrow keys, Reset view; a cell clicked
-// cycles its value; no 3D box under 5 inputs; Portuguese
+// cycles its value; no 3D box under 3 inputs (3 and 4: a cylinder and a torus, #2925); Portuguese
 uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups as boxes through the layers; turned; Portuguese', E, async (page) => {
   // f = c·e over 5 inputs (a b c d e): one group across both maps (a = 0, 1)
   const col5 = Array.from({ length: 32 }, (_, m) => ((m & 0b00101) === 0b00101 ? '1' : '0')).join('');
   const k5 = { version: 1, name: 'k5', inputs: ['a', 'b', 'c', 'd', 'e'], outputs: ['f'], table: { f: col5 }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
-  const k3 = { version: 1, name: 'k3', inputs: ['a', 'b', 'c'], outputs: ['f'], table: { f: '00010111' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
+  const k2 = { version: 1, name: 'k2', inputs: ['a', 'b'], outputs: ['f'], table: { f: '0111' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
   const col6 = Array.from({ length: 64 }, (_, m) => ((m & 0b000101) === 0b000101 ? '1' : '0')).join('');
   const k6 = { version: 1, name: 'k6', inputs: ['a', 'b', 'c', 'd', 'e', 'g'], outputs: ['f'], table: { f: col6 }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
-  await makeProject(env, { name: 'Tt3d', files: { 'src/k5.bool.json': JSON.stringify(k5), 'src/k3.bool.json': JSON.stringify(k3), 'src/k6.bool.json': JSON.stringify(k6) } });
+  await makeProject(env, { name: 'Tt3d', files: { 'src/k5.bool.json': JSON.stringify(k5), 'src/k2.bool.json': JSON.stringify(k2), 'src/k6.bool.json': JSON.stringify(k6) } });
   await page.openProject('Tt3d');
   const T = '.doc:not([hidden]) .tt-editor';
   const open = async (f) => {
     await page.eval((p) => window.SilinxApp.openTt(p), f);
     await page.waitFor((p) => window.Silinx.active?.id === `tt:${p}` && document.querySelector('.doc:not([hidden]) .tt-editor .tt-kmap-host'), [f], { what: f });
   };
-  // under 5 inputs: no 3D box
-  await open('src/k3.bool.json');
+  // under 3 inputs: no 3D box
+  await open('src/k2.bool.json');
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-k3d-on`).length, T), 0);
   // 5 inputs: flat at first; ticked, 2 layers, the group on both and a box (its 4 sides) between them
   await open('src/k5.bool.json');
@@ -710,7 +719,10 @@ uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups a
   await page.waitFor((t) => document.querySelector(`${t} .tt-k3d-cell[data-row="0"]`)?.classList.contains('v0'), [T], { what: 'cell 0 back to 0' });
   // 6 inputs: 4 layers in Gray order, the group on all four, a box between each neighbouring pair
   await open('src/k6.bool.json');
-  await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d`), [T], { what: '3D kept' });
+  // (each table its own 3D box, #3074: k6 opened flat, put in 3D)
+  assert.ok(await page.eval((t) => !document.querySelector(`${t} .tt-k3d`) && !document.querySelector(`${t} .tt-k3d-on`).checked, T), 'k6 flat at first');
+  await page.click(`${T} .tt-k3d-on`);
+  await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d`), [T], { what: 'k6 in 3D' });
   const s6 = await shape();
   assert.deepEqual([s6.layers, s6.groups, s6.sides], [['ab = 00', 'ab = 01', 'ab = 11', 'ab = 10'], ['0', '1', '2', '3'], 12]);
   // in Portuguese
@@ -747,7 +759,7 @@ uiTest('#2206 Truth Table: the 3D Karnaugh map stays inside the page and off the
     assert.deepEqual(await fit(), f0, `turned with ${key}: nothing moved, nothing out of the scene`);
   }
   await page.click(`${T} .tt-k3d-reset`);
-  // the box left as it was found: the 3D box is shared by every table
+  // the box left as it was found
   await page.click(`${T} .tt-k3d-on`);
 });
 
@@ -760,7 +772,7 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
   const tables = {
     corners: table('corners', I5, (m) => !(m & 0b00100) && !(m & 0b00001)),   // c'·e': the four corners of both layers
     ends: table('ends', I6, (m) => !(m & 0b010000) && !!(m & 0b000100)),      // b'·d: the first and last of four layers
-    sides: table('sides', I6, (m) => !(m & 0b100000) && !(m & 0b000001)),     // a'·g': the left and right edges of layers 0 and 1
+    sides: table('sides', I6, (m) => !(m & 0b100000) && !(m & 0b000100)),     // a'·d': the left and right edges of layers 0 and 1 (c d the columns, #2924)
   };
   await makeProject(env, { name: 'Tt3dShape', files: Object.fromEntries(Object.entries(tables).map(([k, d]) => [`src/${k}.bool.json`, JSON.stringify(d)])) });
   await page.openProject('Tt3dShape');
@@ -778,10 +790,11 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
   }), T);
   // the flat map's cells on a layer: the 1s whose map variables (the bits above the rows and columns') are the layer's
   const cellsOf = (d, map) => [...d.table.f].flatMap((v, m) => (v === '1' && m >> 4 === [0, 1, 3, 2][map] ? [m] : []));
-  // 5 inputs, c'·e': on each layer the four corners apart (each open on its two edges), joined by their 8 walls
+  // 5 inputs, c'·e': on each layer the four corners apart (each open on its two edges), joined by their 8 walls (b c on
+  // the columns, d e on the rows, #2924: cell 2, d e = 10, at the bottom left)
   await open('src/corners.bool.json');
   const c = await solid();
-  assert.deepEqual(c.pieces, ['0@0:0:TopLeft', '0@0:10:BottomRight', '0@0:2:TopRight', '0@0:8:BottomLeft', '0@1:16:TopLeft', '0@1:18:TopRight', '0@1:24:BottomLeft', '0@1:26:BottomRight']);
+  assert.deepEqual(c.pieces, ['0@0:0:TopLeft', '0@0:10:BottomRight', '0@0:2:BottomLeft', '0@0:8:TopRight', '0@1:16:TopLeft', '0@1:18:BottomLeft', '0@1:24:TopRight', '0@1:26:BottomRight']);
   assert.deepEqual([0, 1].map((m) => c.pieces.filter((p) => p.startsWith(`0@${m}:`)).map((p) => +p.split(':')[1]).sort((a, b) => a - b)), [cellsOf(tables.corners, 0), cellsOf(tables.corners, 1)]);
   assert.deepEqual(c.walls, ['0@0-1:0-0,0-0:bottom', '0@0-1:0-0,0-0:right', '0@0-1:0-0,3-3:bottom', '0@0-1:0-0,3-3:left', '0@0-1:3-3,0-0:right', '0@0-1:3-3,0-0:top', '0@0-1:3-3,3-3:left', '0@0-1:3-3,3-3:top']);
   // 6 inputs, b'·d: on the first and last layers (neighbours in Gray order), no walls through the two between
@@ -790,7 +803,7 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
   assert.deepEqual(e.pieces.map((p) => p.split(':').slice(0, 1).concat(p.split(':')[2]).join(':')), ['0@0:', '0@3:']);
   assert.deepEqual(e.pieces.map((p) => p.split(':')[1]), [0, 3].map((m) => cellsOf(tables.ends, m).join(',')));
   assert.deepEqual(e.walls, []);
-  // 6 inputs, a'·g': on layers 0 and 1 the left and right columns apart, each open on its edge, joined by 3 walls each
+  // 6 inputs, a'·d': on layers 0 and 1 the left and right columns apart, each open on its edge, joined by 3 walls each
   await open('src/sides.bool.json');
   const s = await solid();
   assert.deepEqual(s.pieces.map((p) => p.replace(/:[\d,]+:/, ':')), ['0@0:Left', '0@0:Right', '0@1:Left', '0@1:Right']);

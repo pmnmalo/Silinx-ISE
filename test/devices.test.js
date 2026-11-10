@@ -37,8 +37,11 @@ test('parts: every part has a known family, packages with user I/O and speed gra
     assert.ok(p.slices > 0 && p.luts > 0 && p.ffs > 0 && (p.brams > 0 || p.part === 'ice40lp384'), p.part);
   }
   // WebPACK limits (UG631 Table 2-1): parts outside WebPACK must not be offered.
-  for (const missing of ['xc6slx100', 'xc6slx150t', 'xc3s2000', 'xc3sd3400a', 'xc4vlx40', 'xc5vsx35t', 'xc6vlx130t', 'xc7a35t', 'xc7k325t', 'xc7z015', 'xc7z045'])
+  for (const missing of ['xc6slx100', 'xc6slx150t', 'xc3s2000', 'xc3sd3400a', 'xc4vlx40', 'xc5vsx35t', 'xc6vlx130t', 'xc7k325t', 'xc7z015', 'xc7z045'])
     assert.equal(dev.findPart(missing), null, missing);
+  // (but the Basys 3's XC7A35T, Vivado's only: the 7-series' experimental family, #3142)
+  assert.equal(dev.findPart('xc7a35t').webpack, false);
+  assert.deepEqual(dev.PARTS.filter(p => p.webpack === false).map(p => p.part), ['xc7a35t']);
   assert.equal(dev.partsOfFamily('spartan6').length, 9);
   assert.equal(dev.partsOfFamily('Spartan3E').length, 5);
   assert.equal(dev.familyOf('xc7a35t'), 'artix7', 'name-based fallback for parts outside the DB');

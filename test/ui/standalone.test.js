@@ -1,4 +1,4 @@
-// UI: the standalone single-file edition (scripts/build-standalone.mjs -> Silinx-ISE.html, built
+// UI: the standalone single-file edition (scripts/build-standalone.mjs -> Silinx.html, built
 // here into a temp directory): it loads from file:// without a server, creates a project from an
 // example and simulates it; the site (--site: the page and the assets of the Silinx toolchain, as
 // GitHub Pages publishes it), served over HTTP, implements blinky in the browser down to the bitstream and programs it into a
@@ -24,6 +24,7 @@ import { VERSION, versionLabel } from '../../core/version.js';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { createZip, readZip } from '../../core/zip.js';
+import { TRACKER_SOURCES } from '../../server/csp.js';
 import { EXAMPLE_ORDER } from '../../core/examples.js';
 import { TEST_DESIGN_ORDER } from '../../core/test-designs.js';
 
@@ -63,7 +64,7 @@ before(async () => {
     '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
   server = http.createServer(async (req, res) => {
     if (unreachable) { served.push(`unreachable ${req.url}`); req.socket.destroy(); return; }
-    // (dev/: the same site as the development edition of GitHub Pages, https://pmnmalo.github.io/Silinx-ISE/dev/)
+    // (dev/: the same site as the development edition of GitHub Pages, https://pmnmalo.github.io/Silinx/dev/)
     const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '').replace(/^dev\//, '').replace(/^$/, 'index.html') || 'index.html';
     // (the simulated Digilent board of the programming test, the fake folder of the workspace folder tests)
     const TEST = { '__test/adept-sim.js': 'adept-sim.js', '__test/fs-access-fake.js': 'fs-access-fake.js' };
@@ -82,7 +83,7 @@ before(async () => {
   // its Content-Security-Policy names (--assets-url, #487)
   const r = spawnSync(process.execPath, [path.join(root, 'scripts/build-standalone.mjs'), '--site', site, '--assets-url', siteUrl], { cwd: root, encoding: 'utf8', timeout: 180000, env: devEnv() });
   if (r.status !== 0) throw new Error(`standalone build failed: ${r.stderr || r.stdout}`);
-  html = path.join(root, 'dist', 'Silinx-ISE.html');
+  html = path.join(root, 'dist', 'Silinx.html');
 });
 after(async () => { server?.close(); await env?.teardown?.(); await plain?.teardown?.(); });
 const E = () => (skip ? { skip } : env);
@@ -100,13 +101,15 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   // the version: a development build's (#135), with its date and time, not its commit (#204)
   assert.match(build?.commit || '', /^[0-9a-f]{7,}$/);
   assert.match(versionLabel(build), /^dev:[0-9a-f]{7,} \(\d{4}-\d\d-\d\d \d\d:\d\d\)$/);
-  assert.equal(await page.eval(() => document.title), `Silinx ISE ${versionLabel(build)} Project Navigator`);
-  assert.equal(await page.eval(() => document.querySelector('#titlebar .app-logo').title), `Silinx ISE ${versionLabel(build)}`);   // (not in the header, #987)
+  assert.equal(await page.eval(() => document.title), `Silinx ${versionLabel(build)}`);
+  assert.equal(await page.eval(() => document.querySelector('#titlebar .app-logo').title), `Silinx ${versionLabel(build)}`);   // (not in the header, #987)
   await page.waitConsole(/Browser edition: projects are stored in this browser/);
   // File menu: the bundle commands of the standalone edition
   const file = (await page.openMenu('File')).map((i) => i.label);
   assert.ok(file.includes('Open Project Bundle…') && file.includes('Download Project Bundle…'), file.join(' | '));
   await page.closeMenus();
+  // Share Project… (#3227): here, from a file, refused with its reason (the site's hosts the room in the page)
+  assert.ok(file.includes('Share Project…'), file.join(' | '));
   // New Project wizard from the embedded blinky example
   // (what Implement needs would be fetched as soon as the project opens: not from a file, #1450)
   await page.eval(() => { window.SILINX_PREPARE_DELAY = 0; });
@@ -127,6 +130,8 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   await page.waitFor(() => window.Silinx.project?.name === 'Solo' && [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'u_knight - knight'));
   // the project lives in localStorage
   assert.ok(await page.eval(() => Object.keys(localStorage).some((k) => (localStorage.getItem(k) || '').includes('"Solo"'))));
+  await page.menu('File', 'Share Project…');
+  await page.waitConsole(/^ERROR: Share Project: a Silinx opened from a file has no address that others can open; open Silinx from its site to share a project\.$/m);
   // nothing of what Implement needs downloaded in the background from a page opened from a file (#1450): WebKit and
   // Firefox give it a Cache Storage, and the download, cancelled by the reload below, was a console error in WebKit
   const fetched = () => served.filter((p) => /^assets\//.test(p));
@@ -227,7 +232,7 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
   // the bitstream is downloaded
   assert.deepEqual(await page.eval(() => window.__gc), ['event/new-project', 'event/bitstream'], 'what was used, counted once');
   // Help ▸ About says that this page counts (the site's counter there)
-  await page.menu('Help', 'About Silinx ISE');
+  await page.menu('Help', 'About Silinx');
   await page.waitDialog('About');
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .about-counts').innerText),
     /^Usage counts:\s+This page counts its visits and what is used \(a new project, a simulation, a bitstream…\) with GoatCounter: no cookies, no personal data, never the content of a project\.$/);
@@ -526,6 +531,38 @@ uiTest('standalone edition (file://) in a user\'s browser (Chrome without --allo
 }, { url: () => 'about:blank', timeout: 300000 });
 
 // #418: the Board Emulator in the browser edition compiles the design with the site's Yosys (its assets)
+uiTest('#3227 browser edition: Share Project… hosts the room in the page (its link …#follow=<room>.<key>.host.<owner\'s key>), Add a Follower… among its commands', E, async (page) => {
+  await page.goto(siteUrl);
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'WebShare');
+  await page.fill('.dlg-overlay .wiz-main select', 'gates', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.fill('.dlg-overlay .wiz-main select', 'basys2', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.project?.name === 'WebShare');
+  // (the meeting point between this browser's pages: the tests never reach the public trackers)
+  await page.eval(() => { localStorage.setItem('silinx.collab.meeting', 'local'); localStorage.setItem('silinx.dev.collab.meeting', 'local'); });
+  await page.menu('File', 'Share Project…');
+  await page.waitDialog('Share Project');
+  // (a relay of the site's, #3227: none in a build without SILINX_SITE_RELAYS, so no such choice; this page hosts it)
+  assert.equal(await page.eval(() => !!document.querySelector('.dlg-overlay .collab-relay')), false);
+  await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
+  await page.dialogButton('Share');
+  const link = await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });
+  assert.ok(link.startsWith(siteUrl) && /#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host\.[A-Za-z0-9_-]{86}$/.test(link), link);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Copy Link', 'Copy Editor Link', 'Add a Follower…', 'Stop Sharing', 'Close']);
+  await page.waitConsole(/^This page hosts the shared project: its followers find it at the meeting point when they open the link, or send you a code/m);
+  // (the meeting point's Trystero in the site's bundle, #3227)
+  assert.ok((await fs.readFile(path.join(site, 'index.html'), 'utf8')).includes('Trystero'), 'Trystero bundled');
+  await page.dialogButton('Stop Sharing');
+  await page.waitConsole(/^Stopped sharing "WebShare": its followers no longer see it\.$/m);
+  assert.doesNotMatch(await page.consoleText(), /^(WARNING|ERROR)/m);
+}, { url: () => 'about:blank', timeout: 120000 });
+
 uiTest('browser edition: the Board Emulator runs blinky on the compiled engine, Yosys from the site\'s assets', E, async (page) => {
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
@@ -684,7 +721,7 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
   });
   assert.equal(manifest.href, `${siteUrl}manifest.webmanifest`);
   assert.equal(manifest.theme, '#a5121a');
-  assert.deepEqual([manifest.m.id, manifest.m.start_url, manifest.m.scope, manifest.m.display, manifest.m.name, manifest.m.short_name], ['./', './', './', 'standalone', 'Silinx ISE (development)', 'Silinx dev']);
+  assert.deepEqual([manifest.m.id, manifest.m.start_url, manifest.m.scope, manifest.m.display, manifest.m.name, manifest.m.short_name], ['./', './', './', 'standalone', 'Silinx (development)', 'Silinx dev']);
   assert.deepEqual(manifest.icons, ['icons/silinx-192.png 192x192 any', 'icons/silinx-512.png 512x512 any', 'icons/silinx-maskable-512.png 512x512 maskable']);
   // its service worker, scoped to the edition's folder, controls the page once reloaded
   const scope = await page.eval(async () => (await navigator.serviceWorker.ready).scope);
@@ -703,7 +740,7 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
   await boot(`${siteUrl}dev/`);
   assert.equal(await page.eval(async () => (await navigator.serviceWorker.ready).scope), `${siteUrl}dev/`);
   // the downloaded file's copy on the site: no manifest
-  await boot(`${siteUrl}Silinx-ISE.html`);
+  await boot(`${siteUrl}Silinx.html`);
   assert.equal(await page.eval(() => document.querySelector('link[rel="manifest"]')), null);
   // a project: what Implement needs is kept when it opens (#967)
   await boot();
@@ -725,7 +762,7 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
     served.length = 0;
     await boot();
     await page.waitFor(() => window.Silinx.project?.name === 'Away');
-    assert.equal(await page.eval(() => document.title), `Away — Silinx ISE ${versionLabel(build)}`);
+    assert.equal(await page.eval(() => document.title), `Away — Silinx ${versionLabel(build)}`);
     await page.setView('impl');
     await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
     await page.waitFor(() => /Process "Generate Programming File" (completed successfully|failed)/.test(window.__console()), [], { what: 'the flow', timeout: 120000 });
@@ -1136,7 +1173,7 @@ uiTest('the site\'s Check for Updates (#198): the page open against the one the 
     await page.waitDialog('Check for Updates');
     await page.waitFor(() => /is up to date/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'up to date' });
     const text = await page.eval(() => document.querySelector('.dlg-overlay .dlg-body, .dlg-overlay').innerText);
-    assert.match(text, new RegExp(`Silinx ISE ${label.replace(/[.()]/g, '\\$&')} is up to date\\.\\s+It is the version this site serves\\.`));
+    assert.match(text, new RegExp(`Silinx ${label.replace(/[.()]/g, '\\$&')} is up to date\\.\\s+It is the version this site serves\\.`));
     assert.match(text, /This is the development edition, built from the latest code \(main\)/);
     assert.doesNotMatch(text, /A new version is available|99\.9\.9/);
     assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay button')].some((b) => b.textContent === 'Reload')), false);
@@ -1149,7 +1186,7 @@ uiTest('the site\'s Check for Updates (#198): the page open against the one the 
     await page.waitDialog('Check for Updates');
     await page.waitFor(() => /This site now serves/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'newer page served' });
     const text2 = await page.eval(() => document.querySelector('.dlg-overlay').innerText);
-    assert.match(text2, /This site now serves Silinx ISE 99\.0\.0\./);
+    assert.match(text2, /This site now serves Silinx 99\.0\.0\./);
     assert.match(text2, new RegExp(`This page is ${label.replace(/[.()]/g, '\\$&')}: reload the page to get the new version \\(your projects are kept\\)\\.`));
     await page.eval(() => { window.__before = true; });
     await page.dialogButton('Reload');
@@ -1158,13 +1195,13 @@ uiTest('the site\'s Check for Updates (#198): the page open against the one the 
     const s2 = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.SILINX_NO_UPDATE_CHECK = false;' });
     await page.reload();
     await page.waitDialog('Check for Updates');
-    await page.waitFor(() => /This site now serves Silinx ISE 99\.0\.0\./.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the start-up dialog' });
+    await page.waitFor(() => /This site now serves Silinx 99\.0\.0\./.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the start-up dialog' });
     await page.dialogButton('OK');
     await page.waitNoDialog();
     // the same build served again: at start-up only a line in the console
     await fs.writeFile(vfile, `${JSON.stringify(served)}\n`);
     await page.reload();
-    await page.waitConsole(new RegExp(`Silinx ISE ${label.replace(/[.()]/g, '\\$&')} is the version this site serves\\.`));
+    await page.waitConsole(new RegExp(`Silinx ${label.replace(/[.()]/g, '\\$&')} is the version this site serves\\.`));
     assert.equal(await page.dialogCount(), 0);
     assert.equal(await page.eval(() => window.__gh), 0, 'GitHub never asked on the site');
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: s2.identifier });
@@ -1231,8 +1268,8 @@ uiTest('#483 browser edition: a hostile zip (paths leaving the project, a broken
   await fs.writeFile(zipFile, zip);
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [zipFile]);
   await page.fill('.dlg-overlay input[type=text]', 'Hostile');
   await page.dialogButton('Import');
@@ -1344,8 +1381,8 @@ uiTest('#2320 browser edition: Export Xilinx ISE Project writes a C source as it
   await fs.writeFile(zipFile, await createZip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/twice.c', data: 'int twice(int a) {\n  return a + a;\n}\n' }], codec));
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [zipFile]);
   await page.fill('.dlg-overlay input[type=text]', 'CMod');
   await page.dialogButton('Import');
@@ -1372,7 +1409,7 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
   const dir = `dev-${build.commit}/`;
   const origin = new URL(siteUrl).origin;
   let layout;
-  for (const file of [html, path.join(site, 'index.html'), path.join(site, 'Silinx-ISE.html')]) {
+  for (const file of [html, path.join(site, 'index.html'), path.join(site, 'Silinx.html')]) {
     const text = await fs.readFile(file, 'utf8');
     const metas = [...text.matchAll(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/g)];
     assert.equal(metas.length, 1, `${file}: one policy`);
@@ -1383,7 +1420,7 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
     const hashes = [...text.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
     assert.ok(hashes.length >= 4, `${hashes.length} inline scripts`);
     assert.deepEqual(d['script-src'], ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", origin, ...hashes]);
-    assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', origin]);
+    assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES, origin]);
     // the iCE40's nextpnr from npm's registry at package-lock.json's SHA-512 (#2444)
     const ice40 = JSON.parse(await fs.readFile(path.join(ROOT, 'package-lock.json'), 'utf8')).packages['node_modules/@yowasp/nextpnr-ice40'];
     assert.ok(text.includes(JSON.stringify({ url: ice40.resolved, integrity: ice40.integrity })), 'the page has the package\'s URL and SHA-512');

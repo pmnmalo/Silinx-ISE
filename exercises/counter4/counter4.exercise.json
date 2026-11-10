@@ -1,0 +1,29 @@
+{
+  "silinxExercise": 1,
+  "id": "counter4",
+  "title": { "en": "4-bit counter with enable", "pt": "Contador de 4 bits com enable" },
+  "statement": {
+    "en": "Make counter4, a 4-bit binary counter. On each rising edge of clk: when rst is 1, q becomes 0 (a synchronous reset); else, when en is 1, q counts up by one, from 15 back to 0; else q keeps its value. Write it in VHDL or Verilog, or draw it.",
+    "pt": "Faça o counter4, um contador binário de 4 bits. Em cada flanco ascendente de clk: quando rst é 1, q passa a 0 (um reset síncrono); senão, quando en é 1, q conta mais um, de 15 de volta a 0; senão q mantém o valor. Escreva-o em VHDL ou Verilog, ou desenhe-o."
+  },
+  "top": "counter4",
+  "ports": [
+    { "name": "clk", "dir": "in", "width": 1 },
+    { "name": "rst", "dir": "in", "width": 1 },
+    { "name": "en", "dir": "in", "width": 1 },
+    { "name": "q", "dir": "out", "width": 4 }
+  ],
+  "allow": { "languages": ["vhdl", "verilog"], "drawings": ["fsm", "asm", "sch"], "primitives": false },
+  "limits": { "seconds": 10 },
+  "reference": { "files": [{ "path": "ref/counter4.vhd", "file": "ref/counter4.vhd" }] },
+  "tests": [
+    { "id": "count", "title": { "en": "Counting and the reset", "pt": "A contagem e o reset" }, "visible": true, "points": 30,
+      "kind": "vectors", "clock": "clk", "periodNs": 20, "file": "tests/count.vec" },
+    { "id": "random", "title": { "en": "Random inputs against the reference", "pt": "Entradas aleatórias contra a referência" }, "points": 40,
+      "kind": "reference", "clock": "clk", "cycles": 300, "seed": 2026, "hold": { "rst": ["1"] } },
+    { "id": "bench", "title": { "en": "The wrap and the reset while counting", "pt": "A volta e o reset durante a contagem" }, "points": 20,
+      "kind": "testbench", "top": "tb_counter4", "done": "TB DONE", "files": [{ "path": "tb/tb_counter4.vhd", "file": "tb/tb_counter4.vhd" }] },
+    { "id": "impl", "title": { "en": "Synthesis: no latch, at most 4 flip-flops", "pt": "Síntese: sem latches, no máximo 4 flip-flops" }, "visible": true, "points": 10,
+      "kind": "synthesis", "latches": false, "ffs": 4, "luts": 8 }
+  ]
+}

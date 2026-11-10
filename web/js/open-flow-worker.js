@@ -26,7 +26,7 @@ assetFetch(self);
 const fetchOk = async (url, what) => {
   const r = await fetch(url);
   // (a page downloaded long ago: the site keeps the assets of its last releases only, #487)
-  if (r.status === 404) throw new Error(`${what} could not be loaded (${url}: HTTP 404): the site no longer has this version's files; download the current Silinx-ISE.html`);
+  if (r.status === 404) throw new Error(`${what} could not be loaded (${url}: HTTP 404): the site no longer has this version's files; download the current Silinx.html`);
   if (!r.ok) throw new Error(`${what} could not be loaded (${url}: HTTP ${r.status})`);
   return r;
 };

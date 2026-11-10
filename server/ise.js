@@ -235,6 +235,27 @@ STEPS="\${*:-${defaultSteps.join(' ')}}"
 if ! command -v xst >/dev/null 2>&1; then
   ISE_SETTINGS="\${ISE_SETTINGS:-${DEFAULT_SETTINGS_SH}}"
   if [ -f "$ISE_SETTINGS" ]; then
+    # never a file of the build folder (its files come from the project, #3032): its real path,
+    # every link followed, outside this folder's real path
+    real_path() {
+      f="$1"; n=0
+      while :; do
+        d="$(cd -P "$(dirname "$f")" 2>/dev/null && pwd -P)" || return 1
+        f="$d/$(basename "$f")"
+        [ -L "$f" ] || break
+        l="$(readlink "$f")" || return 1
+        case "$l" in /*) f="$l" ;; *) f="$d/$l" ;; esac
+        n=$((n + 1)); [ "$n" -lt 40 ] || return 1
+      done
+      printf '%s\\n' "$f"
+    }
+    here="$(pwd -P)"
+    real="$(real_path "$ISE_SETTINGS")" || real=""
+    case "$real" in
+      ""|"$here"/*)
+        echo "ERROR: ISE_SETTINGS ($ISE_SETTINGS) is a file of the build folder: not sourced." >&2
+        exit 126 ;;
+    esac
     # settings64.sh takes $1 as the install dir: source it with no positional arguments.
     set --
     # shellcheck disable=SC1090
@@ -310,7 +331,7 @@ if has par; then
   run_step par par -w -intstyle xflow ${parOpts} ${shQuote(top + '_map.ncd')} ${shQuote(top + '.ncd')} ${shQuote(top + '.pcf')}
 fi
 if has trce; then
-  run_step trce trce -intstyle xflow -v 3 -s ${ps.speedNum} -n 3 -fastpaths -xml ${shQuote(top + '.twx')} ${shQuote(top + '.ncd')} -o ${shQuote(top + '.twr')} ${shQuote(top + '.pcf')}${hasUcf ? ` -ucf ${shQuote(top + '.ucf')}` : ''}
+  run_step trce trce -intstyle xflow -v 1 -s ${ps.speedNum} -n 20 -fastpaths -xml ${shQuote(top + '.twx')} ${shQuote(top + '.ncd')} -o ${shQuote(top + '.twr')} ${shQuote(top + '.pcf')}${hasUcf ? ` -ucf ${shQuote(top + '.ucf')}` : ''}
 fi
 if has postpar; then
   mkdir -p netgen/par
@@ -381,14 +402,16 @@ export async function viewSources(project, projectDir, hdl = []) {
   return res;
 }
 
-export async function generateBuild(project, projectDir, { steps } = {}) {
+/** sourcesOnly: the sources alone (another back end's build, server/vivado.js): no device check, no constraints, no
+ *  ISE script. */
+export async function generateBuild(project, projectDir, { steps, sourcesOnly = false } = {}) {
   const warnings = [];
   const top = project.top;
   if (!top) throw Object.assign(new Error('project has no top module set (project.top)'), { status: 400 });
   if (!IDENT.test(top)) throw Object.assign(new Error(`invalid top module name '${top}'`), { status: 400 });
   const device = project.device || {};
   const fam = deviceFamily(device);
-  const ise = !FAMILY_INFO[fam] || isIseFamily(fam);   // (a family the open toolchain alone implements: its sources and constraints only, #2295)
+  const ise = !sourcesOnly && (!FAMILY_INFO[fam] || isIseFamily(fam));   // (a family the open toolchain alone implements: its sources and constraints only, #2295)
   const devErr = ise ? validateDevice(device) : [];
   if (devErr.length) throw Object.assign(new Error(devErr.join('; ')), { status: 400 });
 
@@ -420,7 +443,8 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   for (const f of design) {
     const from = inside(scriptSafe(f.path));
     if (!fss.existsSync(from)) { warnings.push(`missing source file ${f.path} (skipped)`); continue; }
-    const rel = f.path.split(/[\\/]/).join('/');
+    // (its path inside the project, as resolved: a '..' of silinx.json's never reaches past build/src/, #2956)
+    const rel = path.relative(projectDir, from).split(path.sep).join('/');
     const to = path.join(srcDir, rel);
     await fs.mkdir(path.dirname(to), { recursive: true });
     await fs.copyFile(from, to);
@@ -428,7 +452,7 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   }
   for (const v of drawn) {
     if (!v.text) continue;
-    const rel = `${v.path.split(/[\\/]/).join('/')}.${v.lang === 'vhdl' ? 'vhd' : 'v'}`;   // e.g. src/top.sch.json.vhd
+    const rel = `${scriptSafe(v.path).split(/[\\/]/).join('/')}.${v.lang === 'vhdl' ? 'vhd' : 'v'}`;   // e.g. src/top.sch.json.vhd (#2956)
     const to = path.join(srcDir, rel);
     await fs.mkdir(path.dirname(to), { recursive: true });
     await fs.writeFile(to, v.text);
@@ -449,7 +473,7 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   for (const s of sources) if (s.lang === 'verilog') includeDirs.add(path.posix.dirname(s.buildPath));
 
   if (!ise) {
-    const name = project.constraints && fss.existsSync(inside(project.constraints)) ? path.basename(project.constraints) : null;
+    const name = !sourcesOnly && project.constraints && fss.existsSync(inside(project.constraints)) ? path.basename(project.constraints) : null;
     if (name) await fs.copyFile(inside(project.constraints), path.join(buildDir, name));
     return { buildDir, top, device, files: name ? [name] : [], sources, hasUcf: !!name, constraintsFile: name, warnings, steps: [] };
   }
@@ -598,7 +622,7 @@ export function runDocker(job, cfg, gen, steps, onLine) {
   if (d.memory) args.push('--memory', String(d.memory));
   if (d.platform) args.push('--platform', d.platform);
   args.push('-v', `${gen.buildDir}:/work`, '-w', '/work');
-  // Linux: run as the calling user so build outputs are not owned by root (the Silinx ISE
+  // Linux: run as the calling user so build outputs are not owned by root (Silinx's ISE
   // image works under any UID). Docker Desktop on macOS/Windows maps ownership by itself.
   if (process.platform === 'linux' && typeof process.getuid === 'function' && !(d.extraArgs || []).some(a => String(a) === '--user' || String(a).startsWith('--user=')))
     args.push('--user', `${process.getuid()}:${process.getgid()}`);
@@ -623,13 +647,14 @@ function sshParts(cfg) {
 export function remoteDirFor(cfg, projectName) {
   let base = String(cfg.ssh.remoteDir || 'silinx-build').replace(/^~\/?/, '') || 'silinx-build';
   base = base.replace(/\/+$/, '');
-  if (!/^[\w./-]+$/.test(base) || base.split('/').includes('..')) throw new Error(`invalid ssh.remoteDir '${cfg.ssh.remoteDir}'`);
+  // no leading '-': the folder is an argument of rm -rf on the host (#2958)
+  if (!/^[\w./][\w./-]*$/.test(base) || base.split('/').includes('..')) throw new Error(`invalid ssh.remoteDir '${cfg.ssh.remoteDir}'`);
   return `${base}/${projectName}`;
 }
 
 /** Run run.sh on the ssh host: upload build/, run, download the results. cleanup: remove the
- *  remote folder afterwards (the device report job: its report is large). */
-export async function runSsh(job, cfg, det, project, gen, steps, onLine, { cleanup = false } = {}) {
+ *  remote folder afterwards (the device report job: its report is large); dockerArgs, env: remoteFlowCommand's. */
+export async function runSsh(job, cfg, det, project, gen, steps, onLine, { cleanup = false, dockerArgs = [], env = {} } = {}) {
   const { target, opts } = sshParts(cfg);
   const rdir = remoteDirFor(cfg, project.name);
   const rq = shQuote(rdir);
@@ -639,7 +664,7 @@ export async function runSsh(job, cfg, det, project, gen, steps, onLine, { clean
     ['tar', ['-C', gen.buildDir, '-cf', '-', '.']],
     ['ssh', [...opts, '--', target, `rm -rf ${rq} && mkdir -p ${rq} && tar -C ${rq} -xf -`]]);
   if (code !== 0) return code;
-  const flow = await runCommand(job, 'ssh', [...opts, '--', target, remoteFlowCommand(cfg, rdir, steps)], { onLine });
+  const flow = await runCommand(job, 'ssh', [...opts, '--', target, remoteFlowCommand(cfg, rdir, steps, { dockerArgs, env })], { onLine });
   job.log(`Downloading results from the ssh host (${rdir})`);
   // Download everything except the sources we uploaded.
   code = await runPipe(job,
@@ -652,16 +677,19 @@ export async function runSsh(job, cfg, det, project, gen, steps, onLine, { clean
 
 /**
  * The shell command that runs the flow on the ssh host, in `rdir` (relative to the remote home):
- * run.sh with the ISE installed there, or (ssh.image) inside that docker image, folder at /work.
+ * run.sh with the ISE installed there, or (ssh.image) inside that docker image, folder at /work. dockerArgs: the
+ * container's other arguments; env: other variables of run.sh's (Vivado's, server/vivado.js).
  */
-export function remoteFlowCommand(cfg, rdir, steps) {
+export function remoteFlowCommand(cfg, rdir, steps, { dockerArgs = [], env: vars = {} } = {}) {
   const s = cfg.ssh, rq = shQuote(rdir), args = steps.map(shQuote).join(' ');
+  const more = Object.entries(vars).filter(([k]) => /^[A-Z_][A-Z0-9_]*$/.test(k));
   if (s.image) {
     // a non-interactive ssh shell may lack Docker Desktop's /usr/local/bin (macOS) on PATH
-    const env = s.settings ? `-e ISE_SETTINGS=${shQuote(s.settings)} ` : '';
-    return `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd ${rq} && docker run --rm --pull=never ${DOCKER_ISOLATION.join(' ')} -v "$PWD":/work -w /work ${env}${shQuote(s.image)} bash run.sh ${args}`;
+    const env = [...(s.settings ? [['ISE_SETTINGS', s.settings]] : []), ...more].map(([k, v]) => `-e ${shQuote(`${k}=${v}`)} `).join('');
+    const extra = dockerArgs.map(a => `${shQuote(a)} `).join('');
+    return `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd ${rq} && docker run --rm --pull=never ${DOCKER_ISOLATION.join(' ')} ${extra}-v "$PWD":/work -w /work ${env}${shQuote(s.image)} bash run.sh ${args}`;
   }
-  const settings = s.settings ? `ISE_SETTINGS=${shQuote(s.settings)} ` : '';
+  const settings = [...(s.settings ? [['ISE_SETTINGS', s.settings]] : []), ...more].map(([k, v]) => `${k}=${shQuote(v)} `).join('');
   return `cd ${rq} && ${settings}bash run.sh ${args}`;
 }
 

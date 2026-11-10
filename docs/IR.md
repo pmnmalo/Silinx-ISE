@@ -139,7 +139,7 @@ VHDL `component` declarations, `attribute` declarations/specs and `alias` may be
 { kind: 'forrange', var, range: Range, body: Stmt }              // VHDL `for i in 0 to 7 loop`
 { kind: 'while', cond, body }  { kind: 'repeat', count, body }  { kind: 'forever', body }
     // VHDL plain `loop ... end loop` -> forever
-{ kind: 'exit', cond: Expr|null }  { kind: 'next', cond: Expr|null }    // VHDL (labels ignored)
+{ kind: 'exit', cond: Expr|null, label? }  { kind: 'next', cond: Expr|null, label? }    // VHDL (label: the loop's, when given)
 { kind: 'delay', amount: Expr, stmt: Stmt|null }       // Verilog `#10 stmt;` (amount in module time units)
 { kind: 'event', events: 'all' | [{ edge, expr }], stmt: Stmt|null }   // Verilog `@(posedge clk) stmt;`
 { kind: 'wait', on: Expr[]|null, until: Expr|null, for: Expr|null, level: bool }

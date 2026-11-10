@@ -6,10 +6,12 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { boardAutoAssign, boardConstraintsText, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
+import { boardAutoAssign, boardConstraintsText, constraintsExtOf } from '../packages/silinx-fpga/src/parts.js';
 import { resolveBoard } from './devices.js';
-import { within } from './paths.js';
+import { realOf, within } from './paths.js';
 import { topNameError } from './ident.js';
+import { normalizePath } from '../core/import-gate.js';
+import { foldName } from '../core/fold-name.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
@@ -56,7 +58,7 @@ export class HttpError extends Error {
 }
 
 export function projectDir(name) {
-  if (!NAME_RE.test(name || '')) throw new HttpError(400, `invalid project name '${name}'`);
+  if (typeof name !== 'string' || !NAME_RE.test(name)) throw new HttpError(400, `invalid project name '${name}'`);
   return path.join(workspaceDir(), name);
 }
 
@@ -72,7 +74,7 @@ export function langOf(p) {
   const ext = path.extname(p).toLowerCase();
   if (ext === '.v' || ext === '.vh' || ext === '.sv') return 'verilog';
   if (ext === '.vhd' || ext === '.vhdl') return 'vhdl';
-  if (ext === '.ucf' || ext === '.pcf') return 'ucf';
+  if (ext === '.ucf' || ext === '.pcf' || ext === '.xdc') return 'ucf';
   return 'text';
 }
 
@@ -105,11 +107,18 @@ export async function listProjects() {
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// a project cloned from a repository (#3195, server/git.js): untrusted until the user trusts it (#2830), its mark kept in
+// .git, not in silinx.json, which stays the repository's (a clone shows no change)
+export const CLONE_TRUST = path.join('.git', 'silinx-trust.json');
+const cloneTrust = dir => { try { return JSON.parse(fsSync.readFileSync(path.join(dir, CLONE_TRUST), 'utf8')); } catch { return null; } };
+
 export async function readProject(name) {
   const dir = projectDir(name);
   let pj;
   try { pj = JSON.parse(await fs.readFile(await projectFile(dir), 'utf8')); }
   catch { throw new HttpError(404, `project '${name}' not found`); }
+  const ct = cloneTrust(dir);
+  if (ct) Object.assign(pj, { trusted: false }, ct.madeBy ? { madeBy: ct.madeBy } : {});
   pj.name = name;
   pj.files ||= [];
   return pj;
@@ -147,6 +156,8 @@ async function writeProjectUnlocked(name, pj) {
   if (badTop) throw new HttpError(400, badTop);
   const clean = { ...pj, name };
   delete clean.fileTree;
+  const ct = cloneTrust(dir);
+  if (ct) { delete clean.trusted; delete clean.madeBy; }   // (a clone's: in .git, #3195)
   const file = path.join(dir, PROJECT_FILE);
   const tmp = path.join(dir, `.${PROJECT_FILE}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);
   try {
@@ -156,7 +167,7 @@ async function writeProjectUnlocked(name, pj) {
     await fs.rm(tmp, { force: true }).catch(() => {});
     throw e;
   }
-  return clean;
+  return ct ? { ...clean, trusted: false, ...(ct.madeBy ? { madeBy: ct.madeBy } : {}) } : clean;
 }
 
 export function writeProject(name, pj) {
@@ -166,13 +177,16 @@ export function writeProject(name, pj) {
     // interface's) does not make it trusted
     let cur = null;
     try { cur = await readProject(name); } catch { /* a new project */ }
-    return writeProjectUnlocked(name, cur?.trusted === false ? { ...pj, trusted: false } : pj);
+    // (and who made it, the MCP server: its messages, #2981)
+    return writeProjectUnlocked(name, cur?.trusted === false ? { ...pj, trusted: false, ...(cur.madeBy ? { madeBy: cur.madeBy } : {}) } : pj);
   });
 }
 
 /** The user trusts a project from outside (#2830): Xilinx ISE and programming may run for it. */
-export function trustProject(name) {
-  return updateProject(name, pj => { const { trusted, ...rest } = pj; return rest; });
+export async function trustProject(name) {
+  const out = await updateProject(name, pj => { const { trusted, madeBy, ...rest } = pj; return rest; });   // eslint-disable-line no-unused-vars
+  await fs.rm(path.join(projectDir(name), CLONE_TRUST), { force: true });
+  return out;
 }
 
 /** Read silinx.json, let `fn(pj)` change it (or return a new object), write it back, all under the project lock. */
@@ -213,7 +227,10 @@ async function copyDir(src, dst) {
   }
 }
 
-export async function createProject({ name, template = 'empty', device, board }) {
+// fromOutside: an import's project, trusted: false from its first write, so an import that fails halfway leaves no
+// trusted project (#2956, core/trust.js)
+// madeBy 'mcp': a project the MCP server makes, untrusted too, its messages saying so (#2981)
+export async function createProject({ name, template = 'empty', device, board, fromOutside = false, madeBy = null }) {
   const dir = projectDir(name);
   if (await exists(dir)) throw new HttpError(409, `project '${name}' already exists`);
   if (template && template !== 'empty') {
@@ -226,6 +243,14 @@ export async function createProject({ name, template = 'empty', device, board })
     const was = `${pj.board}|${pj.device?.part}|${pj.device?.package}`;
     if (device) pj.device = device;
     if (board !== undefined) pj.board = board;
+    // a device whose constraints are of another format (the 7-series' XDC, #3142): the example's file replaced by the board's
+    const ext = constraintsExtOf(pj.device);
+    if (pj.constraints && !pj.constraints.toLowerCase().endsWith(ext)) {
+      await fs.rm(safeJoin(dir, pj.constraints), { force: true });
+      pj.constraints = pj.constraints.replace(/\.[^./]*$/, '') + ext;
+    }
+    if (fromOutside) pj.trusted = false;
+    if (madeBy === 'mcp') Object.assign(pj, { trusted: false, madeBy });
     const out = await writeProject(name, pj);
     // another board or device than the example's: its pins are the chosen board's (#36)
     if (pj.board && `${pj.board}|${pj.device?.part}|${pj.device?.package}` !== was) await boardConstraints(dir, pj);
@@ -236,8 +261,10 @@ export async function createProject({ name, template = 'empty', device, board })
   await fs.mkdir(path.join(dir, 'constraints'), { recursive: true });
   return writeProject(name, {
     name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null,
-    top: '', simTop: '', files: [], constraints: `constraints/top${openOnlyDevice(device) ? '.pcf' : '.ucf'}`,
+    top: '', simTop: '', files: [], constraints: `constraints/top${constraintsExtOf(device)}`,
     stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
+    ...(fromOutside ? { trusted: false } : {}),
+    ...(madeBy === 'mcp' ? { trusted: false, madeBy } : {}),
   });
 }
 
@@ -264,9 +291,9 @@ export async function boardConstraints(dir, pj) {
     return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null };
   });
   const { assignments, clocks } = boardAutoAssign(ports, { name: r.board.name, device: r.device, resources: r.resources });
-  const text = boardConstraintsText({ device: r.device, ports, assignments, clocks, header: `UCF for top '${pj.top}' on ${r.board.name} (${r.device.part}${r.device.speed}-${r.device.package}), generated by Silinx` });
+  const text = boardConstraintsText({ device: r.device, board: { ...r.board, resources: r.resources }, ports, assignments, clocks, header: `UCF for top '${pj.top}' on ${r.board.name} (${r.device.part}${r.device.speed}-${r.device.package}), generated by Silinx` });
   // (the project's own paths, as every other: inside its folder, #479; its folder made, as a test design has none, #1746)
-  const file = safeJoin(dir, pj.constraints || constraintsFile(r.device));
+  const file = safeJoin(dir, pj.constraints || `constraints/top${constraintsExtOf(r.device)}`);
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, text);
 }
@@ -281,8 +308,18 @@ export async function deleteProject(name) {
 
 // project-relative path normalised to forward slashes, without './' or a trailing '/'
 export const relKey = (dir, full) => path.relative(dir, full).split(path.sep).join('/');
+// a name as a case-insensitive file system may read it (core/fold-name.js, shared with the browser, #3034)
+export { foldName };
 // (whatever its case: on a case-insensitive file system SILINX.JSON is the same file)
-const isProjectFile = key => key.toLowerCase() === PROJECT_FILE;
+export const isProjectFile = key => foldName(key) === PROJECT_FILE;
+// a path of the project that is its silinx.json, by its name or as the very same file on disk (#2956)
+export async function isProjectFileAt(dir, full) {
+  if (isProjectFile(relKey(dir, full))) return true;
+  try {
+    const [a, b] = await Promise.all([fs.stat(full), fs.stat(path.join(dir, PROJECT_FILE))]);
+    return a.dev === b.dev && a.ino === b.ino;
+  } catch { return false; }
+}
 
 export async function readFile(name, rel) {
   const full = safeJoin(projectDir(name), rel);
@@ -297,7 +334,11 @@ export async function writeFile(name, rel0, text) {
   // project's description, written by the project's own routes (as the browser store refuses it)
   const rel = relKey(dir, full);
   if (!rel) throw new HttpError(400, 'missing path');
-  if (isProjectFile(rel)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
+  if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
+  // a hidden file or folder (.git/hooks, .vscode) is no part of a project (#3036), by its name or once its symbolic
+  // links are followed; build/ is written here too (the browser's open synthesis saves its netlists in build/open/)
+  const hidden = [rel, relKey(realOf(dir), realOf(full))].flatMap(k => k.split('/')).find(s => s.startsWith('.'));
+  if (hidden) throw new HttpError(400, `'${rel0}': not written: hidden file or folder ('${hidden}')`);
   await fs.mkdir(path.dirname(full), { recursive: true });
   // atomic: a reader (or a crash) never sees a half-written / empty file
   const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed
@@ -326,12 +367,16 @@ export async function writeFile(name, rel0, text) {
 
 
 /** Move/rename a project file (or folder), keeping the project's file list and constraints path. */
-export async function renameFile(name, from, to) {
+// checkName: the new name by the import gate's rules for a name (the interface's Rename and MCP rename_file alike,
+// #2973); false only to put a file back at the name it had (a rename undone)
+export async function renameFile(name, from, to, { checkName = true } = {}) {
   const dir = projectDir(name);
   const src = safeJoin(dir, from), dst = safeJoin(dir, to);
   if (src === dir || dst === dir) throw new HttpError(400, 'cannot rename the project folder itself');
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
-  if (isProjectFile(fromKey) || isProjectFile(toKey)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
+  if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
+  const gated = checkName ? normalizePath(toKey) : {};
+  if (gated.reason) throw new HttpError(400, `'${to}': not renamed: ${gated.reason}`);
   return withProjectLock(name, async () => {
     let st;
     try { st = await fs.stat(src); } catch { throw new HttpError(404, `file '${from}' not found`); }
@@ -367,7 +412,7 @@ export async function deleteFile(name, rel) {
   const full = safeJoin(dir, rel);
   if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
   const key = relKey(dir, full);
-  if (isProjectFile(key)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
+  if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
   await withProjectLock(name, async () => {
     await fs.rm(full, { recursive: true, force: true });
     const pj = await readProject(name);

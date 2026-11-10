@@ -189,8 +189,9 @@ const BAD = [
   ['an RTL file missing', DESC({ rtl_files: ['gone.v'] }), /the RTL file 'gone\.v' is not in the project/],
   ['a C model missing', DESC({ c_files: [{ c_file: 'gone.cpp' }] }), /the C model 'gone\.cpp' is not in the project/],
   ['a direction', DESC({ c_parameters: [{ c_name: 'a', c_port_direction: 'up', rtl_ports: {} }] }), /'c_port_direction' must be in, out or inout/],
-  ['a memory', DESC({ c_parameters: [{ c_name: 'a', c_port_direction: 'in', RAM_type: 'RAM_1P', rtl_ports: {} }] }), /'RAM_type' \(a memory\) is not supported yet/],
-  ['a stream', DESC({ c_parameters: [{ c_name: 'a', c_port_direction: 'in', rtl_ports: { FIFO_data_read_in: 'a' } }] }), /'FIFO_data_read_in' \(a memory or a stream\) is not supported yet/],
+  // (a memory's and a stream's ports, #2339: their missing ones said)
+  ['a memory', DESC({ c_parameters: [{ c_name: 'a', c_port_direction: 'in', RAM_type: 'RAM_1P', rtl_ports: {} }] }), /the argument 'a': a memory 'in' needs 'RAM_address'/],
+  ['a stream', DESC({ c_parameters: [{ c_name: 'a', c_port_direction: 'in', rtl_ports: { FIFO_data_read_in: 'a' } }] }), /the argument 'a': a stream 'in' needs 'FIFO_empty_flag'/],
   ['an in with no port', DESC({ c_parameters: [{ c_name: 'a', c_port_direction: 'in', rtl_ports: {} }] }), /needs 'data_read_in'/],
   ['twice', DESC({ c_parameters: [DESC().c_parameters[0], DESC().c_parameters[0]] }), /is described twice/],
   ['a signal unknown', DESC({ rtl_common_signal: { clock: 'x' } }), /'clock' is not one of/],
@@ -213,7 +214,8 @@ for (const [name, desc, re] of BAD) {
 const P = (n, dir, ports) => ({ c_name: n, c_port_direction: dir, rtl_ports: ports });
 const [A, B, Z] = DESC().c_parameters;
 const MISMATCH = [
-  ['the function not declared', UNIT(TOP).replace('void adder(data_t a, data_t b, data_t &z);', 'void adder2(data_t a, data_t b, data_t &z);').replace('adder(a, b, t)', 'adder2(a, b, t)'), DESC(), /the function 'adder' is not declared/],
+  // (#3022: the function not declared, the description not the source's: the source's own error, nothing of the description)
+  ['the function not declared', UNIT(TOP).replace('void adder(data_t a, data_t b, data_t &z);', 'void adder2(data_t a, data_t b, data_t &z);').replace('adder(a, b, t)', 'adder2(a, b, t)'), DESC(), /^'adder2' is declared but not defined$/],
   ['the top', UNIT('void adder(data_t a, data_t b, data_t &z) { z = a + b; }').replace(/int main[\s\S]*/, ''), DESC({ c_function_name: 'adder', top: undefined }), /is the top function/, 'adder'],
   ['an argument not described', UNIT(TOP), DESC({ c_parameters: [A, Z] }), /the argument 'b' of 'adder' is not described/],
   ['an argument unknown', UNIT(TOP), DESC({ c_parameters: [A, B, Z, P('w', 'in', { data_read_in: 'a' })] }), /'adder' has no argument 'w'/],
@@ -229,20 +231,31 @@ for (const [name, unit, desc, re, top] of MISMATCH) {
     const g = cToHdl(unit, { ...OPTS(desc), lang: 'vhdl', top: top || 'top' });
     assert.equal(g.ok, false);
     assert.ok(errs(g).some((m) => re.test(m)), errs(g).join('\n'));
+    if (name === 'the function not declared') assert.deepEqual(errs(g), ["'adder2' is declared but not defined"]);
   });
 }
 
-test('#1903 what is not supported yet: a memory or a stream argument, a DATAFLOW region, each said', () => {
+test('#1903 an array described as a scalar, said (#2339: a memory port); in a DATAFLOW region, an output said (#2340: a process of its own, its channels streams and arrays)', () => {
   const mem = UNIT('void top(data_t a, data_t b, data_t &s) { data_t m[2], t; adder(a, m, t); s = t; }', 'void adder(data_t a, data_t b[2], data_t &z);');
-  assert.match(errs(cToHdl(mem, { ...OPTS(), lang: 'vhdl' })).join(), /the argument 'b': a memory, a stream or a struct is not supported yet/);
+  assert.match(errs(cToHdl(mem, { ...OPTS(), lang: 'vhdl' })).join(), /the argument 'b' is an array: its description needs 'RAM_type' RAM_1P and a memory's ports \(RAM_…\)/);
   const df = UNIT('void top(data_t a, data_t b, data_t &s) {\n#pragma HLS DATAFLOW\n  adder(a, b, s);\n}');
-  assert.match(errs(cToHdl(df, { ...OPTS(), lang: 'vhdl' })).join(), /an RTL blackbox in a DATAFLOW region is not supported yet/);
+  assert.match(errs(cToHdl(df, { ...OPTS(), lang: 'vhdl' })).join(), /syn\.blackbox: adder\.json: 'adder' is called in a DATAFLOW region: its argument 'z' is an output, not supported there \(a stream or an array\)/);
 });
 
 test('#1903 the warnings: a cflag, a key not known, an input not described', () => {
   const g = cToHdl(UNIT(TOP), { ...OPTS(DESC({ c_files: [{ c_file: 'adder.cpp', cflag: '-DX' }], extra: 1, rtl_common_signal: { ...DESC().rtl_common_signal, module_clock_enable: undefined } })), lang: 'verilog' });
   assert.equal(g.ok, true);
   assert.deepEqual(warns(g), ["syn.blackbox: adder.json: the key 'extra' is not one Silinx HLS knows: ignored", "syn.blackbox: adder.json: the cflag of 'adder.cpp' is ignored", "syn.blackbox: adder.json: the input 'ap_ce' of 'adder_rtl' is not in the description: left unconnected"]);
+});
+
+test('#2989 no top given (the interface\'s, the MCP\'s): the C source\'s, not the C model\'s function, the last one defined; the co-simulation passes', () => {
+  const { top, ...o } = OPTS();
+  const sim = simulateC(UNIT(TOP), o);
+  assert.deepEqual([sim.top, sim.calls.length], ['top', 6]);
+  for (const lang of ['vhdl', 'verilog']) {
+    const c = cosimulate(UNIT(TOP), { ...o, lang });
+    assert.deepEqual([c.sim.top, c.gen.top, c.pass, c.calls], ['top', 'top', true, 6], lang);
+  }
 });
 
 test('#1903 no description: as before, the prototype said', () => {

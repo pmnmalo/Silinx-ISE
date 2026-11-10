@@ -4,6 +4,10 @@
 // adds the usage counter's script to it). Scripts only from the page's origin, the assets' site and the
 // page's own inline scripts by their hashes: a script injected into a page cannot run.
 import crypto from 'node:crypto';
+import { TRACKERS } from '../core/collab-meet.js';
+
+/** The meeting point's trackers, as the CSP's sources (a shared project the owner's page hosts, #3227). */
+export const TRACKER_SOURCES = Object.freeze(TRACKERS.map(u => new URL(u).origin));
 
 // an inline <script> (no src): its text, as the browser hashes it
 const INLINE = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -11,6 +15,10 @@ const INLINE = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
 export const scriptHash = text => `'sha256-${crypto.createHash('sha256').update(text).digest('base64')}'`;
 /** The hash sources of every inline script of a page. */
 export const inlineScriptHashes = html => [...html.matchAll(INLINE)].map(m => scriptHash(m[1]));
+
+/** A relay's sources for connect-src (#3227): its origin and its WebSockets' (wss: for https, ws: for http), which an
+ *  http(s) source does not cover. */
+export const relaySources = origins => origins.flatMap(o => [o, o.replace(/^http/, 'ws')]);
 
 /**
  * The policy: `hashes` (the inline scripts), `scripts` (other origins scripts load from: the assets'
@@ -26,8 +34,9 @@ export function contentSecurityPolicy({ hashes = [], scripts = [], connect = [],
     ["script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'", ...scripts, ...hashes].join(' '),
     // the Silinx toolchain, Yosys and the board emulator run in workers started from Blobs
     "worker-src 'self' blob:",
-    // the update check (GitHub's releases and the CHANGELOG), the iCE40's nextpnr from npm's registry (#2444), the assets of a single file
-    ["connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://registry.npmjs.org", ...connect].join(' '),
+    // the update check (GitHub's releases and the CHANGELOG), the iCE40's nextpnr from npm's registry (#2444), a shared
+    // project's meeting point (#3227), the assets of a single file
+    ["connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://registry.npmjs.org", ...TRACKER_SOURCES, ...connect].join(' '),
     "img-src 'self' data: blob:",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",

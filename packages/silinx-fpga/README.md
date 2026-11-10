@@ -1,8 +1,9 @@
 # silinx-fpga
 
-The Silinx toolchain for Spartan-3E FPGAs (Basys2, Nexys2) without Xilinx tools: synthesis with Yosys in
-WebAssembly, then pack, place, route, timing and bitstream, with the device data. It is being separated from
-Silinx ISE, the IDE that uses it ([#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651), the plan:
+The Silinx toolchain for Spartan-3E (Basys2, Nexys2), Spartan-6 (Nexys3, Atlys) and iCE40 (iCEBreaker) FPGAs without
+vendor tools: synthesis with Yosys in WebAssembly, then pack, place and route by nextpnr, Silinx's timing and bitstream,
+with the device data. The command line builds the Spartan-3E parts. It is being separated from
+Silinx, the IDE that uses it ([#1651](https://github.com/pmnmalo/Silinx/issues/1651), the plan:
 [docs/TOOLCHAIN-SEPARATION.md](../../docs/TOOLCHAIN-SEPARATION.md)). Its code is in `src/`, the device graphs of the
 supported boards in `devices/`, their bit databases in `bitdb/`. It is published on npm from its own tags
 (`npm install silinx-fpga`), with npm's provenance.
@@ -20,7 +21,7 @@ the Basys2 (`xc3s250e-cp132-4`, `xc3s100e-cp132-4`) and of the Nexys2 (`xc3s500e
 out folder (`build`) gets the netlist, the routed design (`routed.xdl`) and the
 timing report (`timing.txt`); the warnings and errors go to stderr. It exits with 0 when the `.bit` is written, 1
 when the flow fails (the design, the constraints, the routing) and 2 when the command line is wrong. VHDL needs
-Silinx ISE, whose front end turns it into Verilog.
+Silinx, whose front end turns it into Verilog.
 
 A blinky for the Basys2: `blinky.v`,
 
@@ -48,7 +49,7 @@ NET "led<6>" LOC = "P4";
 NET "led<7>" LOC = "G1";
 ```
 
-and its bitstream, for the board's programmer (Digilent Adept, or Silinx ISE's iMPACT):
+and its bitstream, for the board's programmer (Digilent Adept, or Silinx's iMPACT):
 
 ```
 silinx-fpga build blinky.v --part xc3s250e-cp132-4 --ucf basys2.ucf -o blinky.bit
@@ -96,8 +97,9 @@ const { ok, report } = await runFlow({ top: 'blinky', part, device: 'xc3s250e', 
 // build/blinky.bit, build/open/routed.xdl, build/open/timing.txt; report: the utilisation, the timing
 ```
 
-The sources are flat Verilog; VHDL needs an HDL front end (`io.frontEnd`, Silinx ISE's). The place and route is
-nextpnr's, `io.nextpnr` (in Node `nextpnrNode()` and `nextpnrS6Node()` of `silinx-fpga/node`).
+The sources are flat Verilog; VHDL needs an HDL front end (`io.frontEnd`, Silinx's). The place and route is
+nextpnr's, `io.nextpnr.spartan3e`, `.spartan6` and `.ice40` (in Node `nextpnrNode()`, `nextpnrS6Node()` and `nextpnrIce40Node()` of
+`silinx-fpga/node`).
 
 Licence: Apache-2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)), its code and its data; its dependencies' licences are in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The npm package holds `src/`, `bin/`, `bitdb/` and `devices/`; the research

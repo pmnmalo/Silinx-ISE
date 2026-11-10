@@ -13,7 +13,7 @@
 //
 // The chart's problems and notes are not shown in the editor (docs/UI-GUIDELINES.md "Messages"): `onProblems(diags)` after every
 // validation, `onValidate(diags)` on Validate, `onMessage(text)` for a note (drawings.js: the console, editor-problems.js).
-// Its Simulate panel (asm-sim.js, #2880) steps through the chart; a chart with errors is not simulated (its errors go
+// Its Try it panel (asm-sim.js, #2880; named Try it, #3295) steps through the chart; a chart with errors is not simulated (its errors go
 // to onValidate, as Validate's).
 
 import { linkModel, linkSnapshot } from './ui.js';
@@ -153,7 +153,7 @@ function readOnlyChrome({ root, toolbar, hide, banner }) {
 const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button:not(.asm-fold)')) x.disabled = true; };
 /** The encodings' names, in the toolbar's select and the status line (#2763). */
 export const ENCODING_NAMES = { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enum / auto' };
-export function mountAsmEditor(container, { model, onChange, onProblems, onValidate, onMessage, readOnly = false, banner } = {}) {
+export function mountAsmEditor(container, { model, onChange, onProblems, onValidate, onMessage, onVerify, readOnly = false, banner } = {}) {
   const uid = `asm${++instanceCounter}`;
   let M = normalizeModel(model || newModel('fsm', 'vhdl'));
   let sel = { nodes: new Set(), edge: null };
@@ -187,7 +187,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   const delBtn = toolIcon('delete', 'del', 'Delete selection (Del)', () => deleteSelection(), 'asm-danger');
 
   // (Simulate, #2880: its panel below the canvas, as the state diagram's)
-  const simBtn = toolWide('sim', 'Simulate', 'Step through the chart: set the inputs, apply clock edges, see the state, the path taken and the outputs', () => simApi.toggle(), 'asm-sim-btn');
+  const simBtn = toolWide('sim', 'Try it', 'Step through the chart: set the inputs, apply clock edges, see the state, the path taken and the outputs', () => simApi.toggle(), 'asm-sim-btn');
   const simApi = mountAsmSim({
     M: () => M, btn, render: () => render(), layout: () => applyView(), destroyed: () => destroyed, simBtn,
     onErrors: (diags) => { onMessage?.('The chart cannot be simulated: correct its errors first'); onValidate?.(diags); },
@@ -196,6 +196,8 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   const more = toolbarMenu([
     btn('Arrange', 'Automatic layout (states top-down, every-cycle blocks on the right)', () => autoArrange()),
     snapBtn,
+    // (Verify Property, #3177: web/js/verify-props.js)
+    ...(onVerify ? [btn('Verify Property…', 'Prove a property of the chart\'s state machine: a state never reached, a state reached, outputs never 1 together', () => onVerify(normalizeModel(M)))] : []),
   ], { title: 'Layout', btnClass: 'asm-btn' });
   const toolbar = h('div', { class: 'asm-toolbar asm-chart-toolbar' },
     h('div', { class: 'asm-group' },
@@ -387,7 +389,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     validate: () => { runValidate(); return diags.slice(); },
     // the box a problem is about selected and shown (a click on its line in the console)
     focusNode: (id) => focusNode(id),
-    // the Simulate panel ('sim', a design link's view=try opens it, #2881) or none (null)
+    // the Try it panel ('sim', a design link's view=try opens it, #2881) or none (null)
     showPanel: (p) => simApi.show(p === 'sim'),
     get panel() { return simApi.isOpen() ? 'sim' : null; },
     fit,

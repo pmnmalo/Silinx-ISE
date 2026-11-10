@@ -27,8 +27,10 @@ export async function redactor() {
   return text => secrets.reduce((t, s) => t.split(s).join('<ISE host>'), String(text));
 }
 
-// a file of a project: inside its folder, also once its symbolic links are followed
-export async function projectPath(name, rel) {
+// a file of a project: inside its folder, also once its symbolic links are followed, and not hidden (.git, .env, an
+// editor's settings: no part of a project, #3035; a report of build/ is not hidden); verb: what the tool does with it
+// (null: a new name P.renameFile's import gate checks, its message the interface's Rename's)
+export async function projectPath(name, rel, verb = 'read') {
   const dir = P.projectDir(name);
   const full = P.safeJoin(dir, rel);
   const root = await fsp.realpath(dir).catch(() => { throw toolError(`no project '${name}' in the workspace`); });
@@ -37,7 +39,17 @@ export async function projectPath(name, rel) {
   while (!fs.existsSync(probe) && probe !== dir) probe = path.dirname(probe);
   const real = await fsp.realpath(probe);
   if (real !== root && !real.startsWith(root + path.sep)) throw toolError(`'${rel}' is outside the project '${name}'`);
+  const hidden = p => p.split(/[\\/]/).some(s => s.startsWith('.') && s !== '.' && s !== '..');
+  if (verb !== null && (hidden(P.relKey(dir, full)) || hidden(path.relative(root, real)))) throw Object.assign(toolError(`'${rel}': a hidden file or folder cannot be ${verb}`), { hidden: true });
   return full;
+}
+
+// the text of a file of a project a tool names, through projectPath (a hidden one refused, #3035); missing: the
+// tool's message when it is not there (or not in the project)
+export async function projectText(name, rel, missing) {
+  let full;
+  try { full = await projectPath(name, rel); } catch (e) { throw e.hidden ? e : toolError(missing); }
+  try { return await fsp.readFile(full, 'utf8'); } catch { throw toolError(missing); }
 }
 
 export async function readProject(name) {
@@ -46,13 +58,16 @@ export async function readProject(name) {
 }
 
 // the HDL of a view (the project's sources of that view and the HDL of its drawings), as the
-// application's Check Syntax and simulation take it; sim: the simulation view
-export async function viewSourcesOf(name, project, sim) {
+// application's Check Syntax and simulation take it; sim: the simulation view (failed: the C sources whose HDL cannot be
+// made, viewHdl's results, added to it, #2995)
+export async function viewSourcesOf(name, project, sim, failed = null) {
   const { viewSources } = await import('./ise.js');
   const inView = role => (role === 'sim' ? sim : role === 'impl' ? !sim : true);
   const hdl = (await P.readSources(name)).filter(s => !s.missing && (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role || 'design'));
   let drawn = [];
-  try { drawn = (await viewSources(project, P.projectDir(name), hdl)).filter(v => v.text); } catch { /* none */ }
+  try { drawn = await viewSources(project, P.projectDir(name), hdl); } catch { /* none */ }
+  if (failed) failed.push(...drawn.filter(v => !v.text && /\.(c|cpp|cc|cxx)$/i.test(v.path)));
+  drawn = drawn.filter(v => v.text);
   return [...hdl, ...drawn.map(v => ({ path: v.path, lang: v.lang, text: v.text, role: 'design' }))];
 }
 
@@ -67,10 +82,22 @@ export async function elaborateView(name, { top, sim = false } = {}) {
   const { compile, elaborate } = await import('../core/compile.js');
   const { primitiveSources } = await import('../core/unisim.js');
   const { designChecks } = await import('../core/lint.js');
-  const srcs = await viewSourcesOf(name, project, sim);
+  const failed = [];
+  const srcs = await viewSourcesOf(name, project, sim, failed);
   const lib = compile([...primitiveSources(srcs), ...srcs]);
+  // (a C source whose HDL cannot be made, #2995: its errors, as the Design pane's; its module, the top, then not elaborated)
+  const cErrs = failed.flatMap(v => (v.diagnostics || []).map(d => ({ ...d, tool: 'SilinxC' })));
+  const cTop = failed.some(v => String(v.module || '').toLowerCase() === String(mod).toLowerCase());
+  // (a blackbox no C source declares, #3022: a warning of its description, as the interface's Check Syntax)
+  const { blackboxesIn, undeclaredBlackboxes } = await import('../core/c-blackbox.js');
+  const tree = await P.fileTree(name);
+  const hls = await blackboxesIn(tree, f => P.readFile(name, f)).catch(() => null);
+  // (the C sources as the build takes them, server/ise.js viewSources: the project folder's, not excluded, not build/'s)
+  const cPaths = hls ? tree.filter(p => /\.(c|cpp|cc|cxx)$/i.test(p) && !(project.excluded || []).includes(p) && !/^build\//.test(p)) : [];
+  const cTexts = Object.fromEntries(await Promise.all(cPaths.map(async p => [p, await P.readFile(name, p).catch(() => '')])));
+  const bbWarn = undeclaredBlackboxes(hls, cTexts).map(d => ({ ...d, tool: 'SilinxC' }));
   let design = null, extra = [];
-  try { design = elaborate(lib, mod); } catch (e) { extra = [{ severity: 'error', file: srcs[0]?.path || '', line: 1, col: 1, message: e.message }]; }
+  if (!cTop) { try { design = elaborate(lib, mod); } catch (e) { extra = [{ severity: 'error', file: srcs[0]?.path || '', line: 1, col: 1, message: e.message }]; } }
   if (design) { try { extra = designChecks(lib, design, { lint: true }); } catch { /* no checks */ } }
   // (an HDL file its drawing cannot make again, #303: an error of the file, the drawing's errors in it, as Check Syntax's)
   const { staleDrawings } = await import('./drawing-sync.js');
@@ -78,7 +105,7 @@ export async function elaborateView(name, { top, sim = false } = {}) {
   const stale = (await staleDrawings(P, name)).filter(s => inView.has(s.target)).map(({ target, from, why }) => ({ severity: 'error', file: target, line: 1, col: 1, tool: 'Silinx',
     message: `${target} is not up to date: ${from} cannot generate it, ${why}. Fix ${from} (its HDL is then generated again).` }));
   const seen = new Set();
-  const diags = [...lib.errors, ...(design?.diags || []), ...extra, ...stale]
+  const diags = [...lib.errors, ...(design?.diags || []), ...extra, ...stale, ...cErrs, ...bbWarn]
     .filter(d => { const k = `${d.file}:${d.line}:${d.message}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map(d => ({ ...d, tool: d.tool || 'HDLCompiler' }));
   return { project, srcs, lib, design, top: mod, diags };
@@ -94,5 +121,5 @@ export async function boardDevice(board, variant) {
   const r = resolveBoard(board, { variant });
   if (!r) throw toolError(`unknown board '${board}' (basys2, nexys2)`);
   if (variant && r.variant?.id !== variant) throw toolError(`the ${r.board.name} has no variant '${variant}'`);
-  return { board: r.board.id, device: { family: 'spartan3e', part: r.device.part, package: r.device.package, speed: r.device.speed } };
+  return { board: r.board.id, device: { family: r.device.family || 'spartan3e', part: r.device.part, package: r.device.package, speed: r.device.speed } };
 }

@@ -1,16 +1,16 @@
-// Builds dist/Silinx-ISE.html: the whole Project Navigator in one self-contained HTML file
+// Builds dist/Silinx.html: the whole Project Navigator in one self-contained HTML file
 // (no server). Projects live in the browser's localStorage; the examples are embedded.
 //   node scripts/build-standalone.mjs [--site <dir>] [--assets-url <site URL>]
 //   node scripts/build-standalone.mjs --assets-only <assets dir>
 // --site also writes the GitHub Pages site (.github/workflows/pages.yml): the page as index.html and
-// Silinx-ISE.html, index.html's web app manifest and service worker (scripts/pwa.mjs, #1051), and assets/ with what the Silinx toolchain fetches in the browser
+// Silinx.html, index.html's web app manifest and service worker (scripts/pwa.mjs, #1051), and assets/ with what the Silinx toolchain fetches in the browser
 // (web/js/open-flow-browser.js): the device descriptions (packages/silinx-fpga/devices), the bit database
 // (packages/silinx-fpga/bitdb) and Yosys in WebAssembly (node_modules/@yowasp/yosys/gen).
 // The assets are versioned (#487): assets/<version>/ (a development build: assets/dev-<commit>/) holds
 // the device descriptions and the bit database, assets/vendor/yowasp-yosys/<its version>/ Yosys (the
 // versions with the same Yosys share it); the page knows its folder, and the single file the site it
 // fetches them from (--assets-url, default the published site; dev/ for a development build), so a
-// downloaded Silinx-ISE.html keeps the assets it was built with. --assets-only writes this version's
+// downloaded Silinx.html keeps the assets it was built with. --assets-only writes this version's
 // assets alone into an assets folder (the Pages build keeps the last releases' assets with it).
 // The page carries a Content-Security-Policy (server/csp.js) with the hashes of its inline scripts.
 import crypto from 'node:crypto';
@@ -20,11 +20,12 @@ import { fileURLToPath } from 'node:url';
 import { buildInfo, devChanges } from './build-info.mjs';
 import { VERSION, versionLabel } from '../core/version.js';
 import { THIRD_PARTY } from '../core/third-party.js';
-import { contentSecurityPolicy, inlineScriptHashes, withMetaCsp } from '../server/csp.js';
+import { contentSecurityPolicy, inlineScriptHashes, withMetaCsp, relaySources } from '../server/csp.js';
 import { withManifestLink, writePwa } from './pwa.mjs';
+import { relayList } from '../core/collab-link.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'dist', 'Silinx-ISE.html');
+const OUT = path.join(ROOT, 'dist', 'Silinx.html');
 const rd = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const arg = name => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : undefined; };
 
@@ -36,7 +37,7 @@ const YOSYS_VERSION = JSON.parse(rd('node_modules/@yowasp/yosys/package.json')).
 const NEXTPNR_VERSION = JSON.parse(rd('node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json')).version;
 // (the Spartan-6's, nextpnr-himbaechel-spartan6, in a folder of its own: #2288)
 const NEXTPNR_S6_VERSION = JSON.parse(rd('node_modules/@silinx/nextpnr-himbaechel-spartan6/package.json')).version;
-const PUBLISHED = 'https://pmnmalo.github.io/Silinx-ISE/';
+const PUBLISHED = 'https://pmnmalo.github.io/Silinx/';
 const LAYOUT = {
   dir: BUILD ? `dev-${BUILD.commit}/` : `${VERSION}/`,
   yosys: `../vendor/yowasp-yosys/${YOSYS_VERSION}/gen/bundle.js`,
@@ -135,7 +136,10 @@ const plugin = {
 // a development build's changes since the last release, its Development menu (#707): a release has none
 if (BUILD) Object.assign(BUILD, await devChanges(ROOT));
 console.log(`Version: ${VERSION}${BUILD ? ` (development build dev:${BUILD.commit}, ${BUILD.changes.length} change(s) since ${BUILD.since})` : ''}`);
-const define = { __SILINX_BUILD__: JSON.stringify(BUILD) };
+// the relays the edition's shared projects may go through (#3227): set when it is built, none by default; in its
+// Content-Security-Policy and its page's list (web/js/api-local.js collabRelays)
+const SITE_RELAYS = relayList(process.env.SILINX_SITE_RELAYS, 'SILINX_SITE_RELAYS');
+const define = { __SILINX_BUILD__: JSON.stringify(BUILD), __SILINX_SITE_RELAYS__: JSON.stringify(SITE_RELAYS) };
 const res = await esbuild.build({
   entryPoints: [path.join(ROOT, 'web/js/app.js')],
   bundle: true, format: 'esm', minify: true, write: false, target: 'es2022', plugins: [plugin], logLevel: 'warning', define,
@@ -174,7 +178,9 @@ if (html.includes('importmap')) throw new Error('web/index.html: the import map 
 // replacer functions: the inserted code may contain `$'`, `$&`… which a replacement string would expand
 html = html.replace('<script type="module" src="/js/app.js"></script>',
   () => `<script>window.SILINX_STANDALONE = true;\nwindow.SILINX_ASSET_LAYOUT = ${safeJs(JSON.stringify(LAYOUT))};\nwindow.SILINX_FLOW_WORKER_SRC = ${safeJs(JSON.stringify(workerJs))};\nwindow.SILINX_EMU_WORKER_SRC = ${safeJs(JSON.stringify(emuWorkerJs))};</script>\n<script type="module">${safeJs(appJs)}</script>`);
-html = html.replace('<title>Silinx ISE Project Navigator</title>', () => '<title>Silinx ISE Project Navigator (standalone)</title>');
+const TITLE = '<title>Silinx</title>';
+if (!html.includes(TITLE)) throw new Error(`web/index.html: no ${TITLE} to mark (standalone)`);
+html = html.replace(TITLE, () => '<title>Silinx (standalone)</title>');
 if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inserted verbatim into the page');
 // copyright and the licences of the components embedded in this single file (NOTICE + their texts
 // from THIRD-PARTY-NOTICES.md), kept in the page as plain text
@@ -192,7 +198,10 @@ if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inser
 // single file also loads Yosys from the assets' site and fetches the assets from it
 {
   const origin = new URL(LAYOUT.site).origin;
-  html = withMetaCsp(html, contentSecurityPolicy({ hashes: inlineScriptHashes(html), scripts: [origin], connect: [origin], meta: true }));
+  // (the GitHub sign-in's relay, when the edition has one: web/js/github-app.js, #3196)
+  const { GITHUB_DEVICE_RELAY, relayOrigin } = await import('../web/js/github-app.js');
+  const relay = relayOrigin(GITHUB_DEVICE_RELAY);
+  html = withMetaCsp(html, contentSecurityPolicy({ hashes: inlineScriptHashes(html), scripts: [origin], connect: [origin, ...(relay ? [relay] : []), ...relaySources(SITE_RELAYS)], meta: true }));
 }
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);
@@ -204,9 +213,9 @@ if (siteArg > 0) {
   const site = path.resolve(process.argv[siteArg + 1] || 'site');
   fs.rmSync(site, { recursive: true, force: true });
   fs.mkdirSync(site, { recursive: true });
-  // the page opened on the site, installable as an app (#1051); Silinx-ISE.html, the file people download, is not
+  // the page opened on the site, installable as an app (#1051); Silinx.html, the file people download, is not
   fs.writeFileSync(path.join(site, 'index.html'), withManifestLink(html));
-  fs.writeFileSync(path.join(site, 'Silinx-ISE.html'), html);
+  fs.writeFileSync(path.join(site, 'Silinx.html'), html);
   await writePwa(site, { esbuild, label: versionLabel(BUILD, VERSION), dev: !!BUILD });
   // what this site serves (its page's version and build): on the site, Check for Updates compares the
   // page open with it, not with GitHub's latest release (published minutes before the site is rebuilt)

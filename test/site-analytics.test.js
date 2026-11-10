@@ -29,7 +29,7 @@ test('addAnalytics: GoatCounter\'s loader before the last </body>, once; only on
   assert.match(out, /<script id="silinx-site-analytics">[\s\S]*https:\/\/silinx\.goatcounter\.com\/count[\s\S]*<\/script>\n<\/body><\/html>$/);
   assert.match(out, /if \(\/\\\.github\\\.io\$\/\.test\(location\.hostname\)\)/);
   assert.equal(addAnalytics(out, 'silinx'), out, 'once');
-  assert.ok(out.includes(`s.dataset.goatcounterSettings = '{"title":"Silinx ISE","referrer":""}'`), 'the title fixed, no referrer: a project\'s name is never counted (#2551)');
+  assert.ok(out.includes(`s.dataset.goatcounterSettings = '{"title":"Silinx","referrer":""}'`), 'the title fixed, no referrer: a project\'s name is never counted (#2551)');
   for (const bad of ['', 'Silinx', 'a.b', 'x"><script>', '-x']) assert.throws(() => addAnalytics(PAGE, bad), /not a GoatCounter code/);
   assert.throws(() => addAnalytics('<html></html>', 'silinx'), /no <\/body>/);
 });
@@ -47,16 +47,16 @@ test('addAnalytics: a page whose code names the loader\'s id (the application\'s
   assert.equal(addAnalytics(out, 'silinx'), out, 'once');
 });
 
-test('addAnalyticsToSite: index.html of the root and of dev/, not the downloaded Silinx-ISE.html nor the assets', () => {
+test('addAnalyticsToSite: index.html of the root and of dev/, not the downloaded Silinx.html nor the assets', () => {
   const site = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-site-'));
   try {
-    for (const f of ['index.html', 'Silinx-ISE.html', 'dev/index.html', 'dev/Silinx-ISE.html', 'assets/x/index.html']) {
+    for (const f of ['index.html', 'Silinx.html', 'dev/index.html', 'dev/Silinx.html', 'assets/x/index.html']) {
       fs.mkdirSync(path.dirname(path.join(site, f)), { recursive: true });
       fs.writeFileSync(path.join(site, f), PAGE);
     }
     assert.deepEqual(addAnalyticsToSite(site, 'silinx').sort(), ['dev/index.html', 'index.html']);
     const has = f => fs.readFileSync(path.join(site, f), 'utf8').includes('goatcounter');
-    assert.deepEqual(['index.html', 'dev/index.html', 'Silinx-ISE.html', 'dev/Silinx-ISE.html', 'assets/x/index.html'].map(has), [true, true, false, false, false]);
+    assert.deepEqual(['index.html', 'dev/index.html', 'Silinx.html', 'dev/Silinx.html', 'assets/x/index.html'].map(has), [true, true, false, false, false]);
   } finally { fs.rmSync(site, { recursive: true, force: true }); }
 });
 
@@ -80,7 +80,7 @@ test('About\'s usage counts in Portuguese (web/js/i18n.js)', async () => {
   Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (k) => (k === 'silinx.lang' ? 'pt' : null), setItem() {}, removeItem() {} }, configurable: true, writable: true });
   const { t } = await import('../web/js/i18n.js');
   for (const [en, pt] of [['Usage counts:', 'Contagem de utilização:'], ['None: this copy sends nothing.', 'Nenhuma: esta cópia não envia nada.'],
-    ['Only the site (pmnmalo.github.io/Silinx-ISE) counts its visits, with', 'Só o site (pmnmalo.github.io/Silinx-ISE) conta as visitas, com o'],
+    ['Only the site (pmnmalo.github.io/Silinx) counts its visits, with', 'Só o site (pmnmalo.github.io/Silinx) conta as visitas, com o'],
     ['(no cookies, no personal data).', '(sem cookies nem dados pessoais).'], ['Using Silinx in a course?', 'Usa o Silinx numa disciplina?'],
     ['This page counts its visits and what is used (a new project, a simulation, a bitstream…) with', 'Esta página conta as visitas e o que é usado (um projeto novo, uma simulação, um bitstream…) com o'],
     [': no cookies, no personal data, never the content of a project.', ': sem cookies, sem dados pessoais, nunca o conteúdo de um projeto.']]) assert.equal(t(en), pt);

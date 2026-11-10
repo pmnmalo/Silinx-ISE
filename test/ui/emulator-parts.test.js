@@ -1,6 +1,7 @@
 // UI: the parts of the Board Emulator (#405: out of mountEmulator in web/js/emulator.js), on a counter on a Basys2: the
 // toolbar (emulator-toolbar.js: Pause / Run, Step, the engine, the clock rate, When hidden), the board
-// (emulator-board.js: its LEDs, switches, buttons and power switch; a switch flips its LED), the side panel
+// (emulator-board.js: its LEDs, switches, buttons and power switch; a switch flips its LED; a short click held down as
+// a real press, #3109), the side panel
 // (emulator-side.js: a signal watched, its value), and the painting (emulator-paint.js: the status line, the LEDs
 // drawn, Power off). The emulator's whole use: test/ui/sim-emu.test.js, emu-hidden.test.js, emu-engine.test.js.
 import { before, after } from 'node:test';
@@ -103,3 +104,68 @@ uiTest('#1985 a tablet\'s long press on a push button: no context menu over the 
   assert.deepEqual(r, { onBtn: true, onBoard: true, stillHeld: true, touchAction: 'none' });
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 }, { skip: chromeOnly });   // (CDP touch: Chrome only, #2038)
+
+// a debouncer of 50 cycles on BTN0 (the examples': 20 ms, a million cycles at 50 MHz), LED0 toggled per press
+const DEBOUNCED = `library ieee; use ieee.std_logic_1164.all;
+entity deb is
+  port (clk : in std_logic;
+        btn : in std_logic_vector(3 downto 0);
+        led : out std_logic_vector(7 downto 0));
+end deb;
+architecture rtl of deb is
+  constant STABLE : integer := 50;
+  signal s0, s1, level, toggle : std_logic := '0';
+  signal count : integer range 0 to STABLE := 0;
+begin
+  process (clk) begin
+    if rising_edge(clk) then
+      s0 <= btn(0); s1 <= s0;
+      if s1 = level then count <= 0;
+      elsif count = STABLE - 1 then
+        count <= 0; level <= s1;
+        if s1 = '1' then toggle <= not toggle; end if;
+      else count <= count + 1;
+      end if;
+    end if;
+  end process;
+  led <= "0000000" & toggle;
+end rtl;
+`;
+
+uiTest('#3109 a short click on a push button: held down until the design saw a real press, taken by its debouncer; at once while paused or by a power cycle', E, async (page) => {
+  await makeProject(env, { name: 'EmuClick', board: 'basys2', files: { 'src/deb.vhd': DEBOUNCED }, top: 'deb' });
+  await page.openProject('EmuClick');
+  assert.equal(await page.eval(() => window.SilinxApp.regenerateUcf()), true);
+  await page.eval(() => window.SilinxApp.openFile('src/deb.vhd'));
+  await openEmulator(page);
+  // 1 kHz: a real press, 100 cycles; a click of a few milliseconds, a few cycles (the old emulator: missed)
+  await page.eval(() => { const s = document.querySelectorAll('.emu-bar > select')[1]; s.value = '1000'; s.dispatchEvent(new Event('change')); });
+  const at = await page.eval(() => { const b = document.querySelector('[data-part=btn0] .emu-btn').getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; });
+  const btn0 = () => page.eval(() => document.querySelector('[data-part=btn0] .emu-btn').classList.contains('on'));
+  const led0 = () => page.eval(() => document.querySelector('[data-part=led0] .emu-led').style.background);
+  const off = await led0();
+  const t0 = await settledNow(page);
+  await page.mouse('mouseMoved', at.x, at.y);
+  await page.mouse('mousePressed', at.x, at.y);
+  await page.mouse('mouseReleased', at.x, at.y);
+  // let go but still down (lit) until 100 cycles on, then up; LED0 toggled by the press
+  assert.equal(await btn0(), true, 'held down after the click');
+  await page.waitFor(() => !document.querySelector('[data-part=btn0] .emu-btn').classList.contains('on'), [], { what: 'BTN0 let go' });
+  assert.ok(await emu(page, 'sim.now') >= t0 + 100 * 20000, 'down for 100 cycles at least');
+  await page.waitFor((b) => document.querySelector('[data-part=led0] .emu-led').style.background !== b, [off], { what: 'LED0 toggled by the press' });
+  // let go, then a power cycle (the board's time from 0 again) before the 100 cycles: let go then
+  await page.mouse('mousePressed', at.x, at.y);
+  await page.mouse('mouseReleased', at.x, at.y);
+  await page.click('.emu-bar button', { text: '⟲ Power cycle' });
+  await page.waitFor(() => !document.querySelector('[data-part=btn0] .emu-btn').classList.contains('on'), [], { what: 'BTN0 let go by the power cycle' });
+  // paused: a click let go at once (nothing runs to see it), LED0 as it was
+  await page.click('.emu-bar button', { text: '⏸ Pause' });
+  await page.mouse('mousePressed', at.x, at.y);
+  assert.equal(await btn0(), true, 'pressed');
+  await page.mouse('mouseReleased', at.x, at.y);
+  assert.equal(await btn0(), false, 'let go at once while paused');
+  await page.click('.emu-bar button', { text: '⏭ Step' });
+  await settledNow(page);
+  assert.equal(await led0(), off, 'LED0 off since the power cycle, the paused click not seen');
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});

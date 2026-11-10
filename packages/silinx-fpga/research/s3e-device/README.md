@@ -1,13 +1,13 @@
 # Spartan-3E device descriptions measured black-box (2026-10-11)
 
-Issue [#3](https://github.com/pmnmalo/Silinx-ISE/issues/3). The device descriptions that ship with
+Issue [#3](https://github.com/pmnmalo/Silinx/issues/3). The device descriptions that ship with
 Silinx (`packages/silinx-fpga/devices/*.json.gz`: tiles, sites, wires, PIPs and the nodes that join wires across
 tiles) are today computed from ISE's device report (`xdl -report -pips -all_conns`,
 `research/s3e-route/build-device.mjs`). The bit database (`packages/silinx-fpga/bitdb`) was instead
 measured: designs written by Silinx, implemented by ISE, their outputs compared. This folder works
 out how to obtain the device descriptions the same way, from what Silinx observes when ISE runs on
-designs it writes, so that what ships derives from Silinx's own measurements (the open legal
-question in [docs/OPEN-TOOLCHAIN.md](../../../../docs/OPEN-TOOLCHAIN.md)).
+designs it writes, so that what ships derives from Silinx's own measurements
+([docs/OPEN-TOOLCHAIN.md](../../../../docs/OPEN-TOOLCHAIN.md)).
 
 **Rule kept here:** no measurement reads the device report or anything built from it. The shipped
 graph is used only afterwards, locally, to score how complete and how right a measured description
@@ -1454,6 +1454,13 @@ PART=xc3s250ecp132-4 node candidates.mjs types data/xc3s250e/measured.json.gz ca
 node probe-run.mjs cand.json probe.json
 PART=xc3s250ecp132-4 node ../s3e-bitstream/gen-pipcover.mjs measured out --types CENTER_SMALL
 ```
+
+**The BSCAN's switches (#3176, 2026-11-10).** The bit database learnt the corner tile UR's BSCAN_SPARTAN3 switches
+(research/s3e-bitstream `measure-3176.sh`), and every measured description rebuilt from it gains them: 50 per die, plus
+one CLKT switch on the XC3S100E and two on the XC3S500E, which the capture core's routes took. No PIP is lost and no
+site changes; the BSCAN site stays among those the measured grid leaves out. ISE's routes of the measurement show only
+some of them on each die, so the arc probe asked each one (`candidates.mjs types`, `probe-run.mjs`: one round of 8
+designs per die), and all 203 exist: the probe `bscanprobe` of each `probes.json.gz`.
 
 ## 17. The designs through ISE on the measured descriptions, with nextpnr (2026-11-06, #2502)
 

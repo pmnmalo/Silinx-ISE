@@ -34,12 +34,14 @@ async function fixMissingTops(name) {
   return lines;
 }
 
-// a path of the project as the project lists it, inside it; not silinx.json nor build/
-async function sourcePath(name, rel) {
+// a path of the project as the project lists it, inside it, not hidden; not silinx.json nor build/ (verb: what the
+// tool does with it)
+async function sourcePath(name, rel, verb) {
   if (typeof rel !== 'string' || !rel) throw toolError('path: a file\'s path in the project (project_info)');
-  const key = P.relKey(P.projectDir(name), await projectPath(name, rel));
+  const full = await projectPath(name, rel, verb);
+  const key = P.relKey(P.projectDir(name), full);
   if (!key) throw toolError('path: a file\'s path in the project, not the project\'s folder');
-  if (key.toLowerCase() === P.PROJECT_FILE) throw toolError(`${P.PROJECT_FILE} is the project's description`);
+  if (await P.isProjectFileAt(P.projectDir(name), full)) throw toolError(`${P.PROJECT_FILE} is the project's description`);
   return key;
 }
 
@@ -67,7 +69,7 @@ export const SOURCE_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     async run({ project: name, path: rel, with_hdl: withHdl = true }) {
       await readProject(name);
-      const file = await sourcePath(name, rel);
+      const file = await sourcePath(name, rel, 'removed');
       const tree = await P.fileTree(name);
       if (!tree.includes(file)) throw toolError(`no file '${file}' in the project '${name}'`);
       const pj0 = await P.readProject(name);
@@ -98,7 +100,7 @@ export const SOURCE_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     async run({ project: name, path: rel }) {
       await readProject(name);
-      const file = await sourcePath(name, rel);
+      const file = await sourcePath(name, rel, 'added');
       if (/^build(\/|$)/i.test(file)) throw toolError(`'${file}' is written by Silinx itself`);
       if (!(await P.fileTree(name)).includes(file)) throw toolError(`no file '${file}' in the project folder of '${name}'`);
       const lang = /\.vhdl?$/i.test(file) ? 'vhdl' : /\.(v|sv)$/i.test(file) ? 'verilog' : null;
@@ -121,9 +123,9 @@ export const SOURCE_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ project: name, from, to }) {
       await readProject(name);
-      const a = await sourcePath(name, from), b = await sourcePath(name, to);
+      const a = await sourcePath(name, from, 'renamed'), b = await sourcePath(name, to, null);
       if (/^build(\/|$)/i.test(a) || /^build(\/|$)/i.test(b)) throw toolError('build/ is written by Silinx itself');
-      if (b.split('/').some(s => s.startsWith('.'))) throw toolError(`'${to}': a hidden file or folder`);
+      // (the new name by the import gate's rules: P.renameFile, as the interface's Rename, #2973)
       if (a === b) return { text: `${a}: the same path, nothing renamed.`, data: { project: name, from: a, to: b, links: [] } };
       try { await P.renameFile(name, a, b); } catch (e) { throw toolError(e.message); }
       // the drawings linked to a renamed HDL file (or to one in a renamed folder) follow it
@@ -155,7 +157,7 @@ export const SOURCE_TOOLS = [
       if (!mod) throw toolError(`no module '${oldName}' in the project's HDL files (a drawing with no HDL file: write_file its name)`);
       let to = null;
       if (file === undefined) to = R.followingFile(mod.file, mod.name, newName);
-      else if (file !== 'keep') to = await sourcePath(name, file);
+      else if (file !== 'keep') to = await sourcePath(name, file, 'renamed');
       let r;
       try { r = await R.renameModule(P, name, mod.name, newName, { to }); } catch (e) { throw toolError(e.message); }
       return { text: [r.message, ...r.hdl].join('\n'), data: { project: name, module: r.module, file: r.file, changed: r.changed, moved: r.moved.map(([a, b]) => ({ from: a, to: b })), ...await tops(name) } };
@@ -168,7 +170,7 @@ export const SOURCE_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: true },
     async run({ project: name, path: rel }) {
       await readProject(name);
-      const file = await sourcePath(name, rel);
+      const file = await sourcePath(name, rel, 'deleted');
       const tree = await P.fileTree(name);
       const folder = !tree.includes(file);
       if (folder && !tree.some(f => f.startsWith(`${file}/`))) throw toolError(`no file or folder '${file}' in the project '${name}'`);

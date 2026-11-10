@@ -21,21 +21,21 @@ test('#1678 silinx-fpga: its entries, the API, its light part and the API in Nod
 });
 
 // the API's names: a change to them is a change of the API (its version, #1681), made on purpose
-const API = ['FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'PCF', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError',
-  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf',
-  'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'familyFromXise', 'familyName',
+const API = ['FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'PCF', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError', 'XDC',
+  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'betweenPaths', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsExtOf', 'constraintsFormatOf',
+  'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'experimentalDevice', 'familyFromXise', 'familyName',
   'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
-  'nextpnrIo', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'powerReport',
-  'primitiveInstances', 'readBit', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
-  'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea',
-  'synthesizeVerilog', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'writeBit', 'writeXdl', 'yosysWorkerSource'];
-const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'leaveOutChipdbs', 'loadBitDbS6', 'loadDb',
-  'loadDeviceCache', 'nextpnrIce40Node', 'nextpnrNode', 'nextpnrS6Node', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];   // (nextpnrNode: the nextpnr engine's io.nextpnr, #2136; nextpnrS6Node: its io.nextpnrS6, #2138; leaveOutChipdbs: the release zip's, #2356)
+  'nextpnrIo', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'pathHighlight', 'pathsText', 'periodNs', 'powerReport',
+  'primitiveInstances', 'readBit', 'readXdc', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
+  'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea', 'synthesizeFast',
+  'synthesizeVerilog', 'timingPaths', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeBit', 'writeXdc', 'writeXdl', 'yosysWorkerSource'];
+const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'chipdbCacheDir', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'leaveOutChipdbs', 'loadBitDbS6', 'loadDb',
+  'loadDeviceCache', 'nextpnrIce40Node', 'nextpnrNode', 'nextpnrS6Node', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];   // (nextpnrNode: the nextpnr engine's io.nextpnr, #2136; nextpnrS6Node: its io.nextpnrS6, #2138; leaveOutChipdbs: the release zip's, #2356; chipdbCacheDir: its downloads' folder, #3215)
 
-const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PCF', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'boardConstraintsText', 'checkUcf',
-  'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'familyFromXise', 'familyName', 'familyOfPart', 'fpgaModel', 'generateUcf',
-  'isIseFamily', 'locsNotOnBoard', 'lutTable', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'primitiveInstances', 'resourceCount',
-  'resourceOfPrimitive', 'resourcesOf', 'splitBitPart', 'ucfPlacesPins', 'usedOfReport', 'writeXdl'];
+const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PCF', 'XDC', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'boardConstraintsText', 'checkUcf',
+  'constraintsExtOf', 'constraintsFormatOf', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'experimentalDevice', 'familyFromXise', 'familyName', 'familyOfPart', 'fpgaModel', 'generateUcf',
+  'isIseFamily', 'locsNotOnBoard', 'lutTable', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'primitiveInstances',
+  'readXdc', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf', 'splitBitPart', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeXdc', 'writeXdl'];
 
 test('#1678 the API\'s names, each defined; ./parts: some of them; ./node: all and the loaders', () => {
   assert.deepEqual(Object.keys(parts).sort(), [...PARTS].sort());
@@ -68,12 +68,12 @@ test('#1678 the API (its entry) imports nothing of Node: it runs in the browser 
   for (const f of seen) assert.ok(f.startsWith(path.join(DIR, 'src') + path.sep), f);
 });
 
-// what Silinx ISE's pages load before the toolchain runs (#1678: these 7 modules, not the toolchain's 58)
+// what Silinx's pages load before the toolchain runs (#1678: these 7 modules, not the toolchain's 58)
 test('#1678 ./parts: light, nothing of Node and none of the synthesis, pack, place, route, timing or bitgen', () => {
   const { seen, nodeOnly } = modulesOf('parts.js');
   assert.deepEqual(nodeOnly, []);
   const rel = [...seen].map(f => path.relative(path.join(DIR, 'src'), f).split(path.sep).join('/')).sort();
-  assert.deepEqual(rel, ['board-constraints.js', 'family.js', 'open-steps.js', 'parts.js', 'pcf.js', 'resource-check.js', 'resources.js', 'ucf.js', 'xdl.js']);
+  assert.deepEqual(rel, ['board-constraints.js', 'family.js', 'open-steps.js', 'parts.js', 'pcf.js', 'resource-check.js', 'resources.js', 'ucf.js', 'xdc.js', 'xdl.js']);   // (xdc.js: the 7-series' constraints, #3142)
 });
 
 const COUNTER = 'module cnt(input clk, input rst, output reg [3:0] q);\n  always @(posedge clk) if (rst) q <= 0; else q <= q + 1;\nendmodule\n';

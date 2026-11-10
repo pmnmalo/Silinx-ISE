@@ -1,8 +1,10 @@
-# Onboarding: programming Silinx ISE with Claude Code
+# Onboarding: programming Silinx with Claude Code
 
-Silinx ISE is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E: Basys2, Nexys2). It runs in
-the browser (the site, the standalone `Silinx-ISE.html`) or as a local Node server, with its own open
-toolchain (Yosys WebAssembly, then Silinx's pack, place, route and bitgen) and, optionally, Xilinx ISE
+Silinx is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E: Basys2, Nexys2; Spartan-6: Nexys3, Atlys; iCE40:
+iCEBreaker). It runs in
+the browser (the site, the standalone `Silinx.html`) or as a local Node server, with its own open
+toolchain (Yosys WebAssembly, then nextpnr's pack, place and route — the fork pmnmalo/nextpnr-spartan — and Silinx's
+timing and bitgen) and, optionally, Xilinx ISE
 14.7. It is Pedro Maló's project (AGPL-3.0-only), used at FCT NOVA. Its story, and where its rules come from:
 [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -13,15 +15,15 @@ together, where things are, and the lessons learnt.
 ## 1. Set up
 
 ```bash
-git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
+git clone https://github.com/pmnmalo/Silinx.git && cd Silinx
 npm ci
 npm start          # prints the address to open: http://127.0.0.1:8642/#token=…
 ```
 
 - **No ISE is needed** for almost everything: the browser edition and the Silinx toolchain run without it.
 - **ISE (optional):** Pedro's ISE runs in a Docker image on a Mac mini on his network. Its ssh `user@host`
-  goes only in your machine's local configuration (`~/.silinx/config.json`, the *ssh* mode of
-  Toolchain Settings, or the `SILINX_ISE_HOST` environment variable). Ask Pedro for it. **Never write it
+  goes only in your machine's local configuration (`~/.silinx/config.json` or the *ssh* mode of
+  Toolchain Settings for the app; the `SILINX_ISE_HOST` environment variable for the scripts and the ISE tests). Ask Pedro for it. **Never write it
   into any file of the repository, a commit, an issue, a PR or a GitHub comment.**
 - **Board programming:** Chrome or Edge over WebUSB (desktop, or an Android tablet), or the server with
   adepttool (`scripts/install-adepttool.sh`).
@@ -99,12 +101,12 @@ core/          parsers (vhdl/, verilog/), elaborator, simulator, lint, quick fix
                drawings: schdoc.js (schematics), asm.js, fsm.js, petri.js, truth tables (logic.js);
                hdl-to-sch.js (Convert to Schematic); synth-front.js (the toolchain's input); c-*.js (Silinx
                HLS); adept.js + xcf.js (WebUSB JTAG, FPGA and Platform Flash)
-packages/silinx-fpga/  the Silinx toolchain: Yosys, pack, place, route, timing, bitstream (docs/TOOLCHAIN.md)
+packages/silinx-fpga/  the Silinx toolchain: Yosys, nextpnr's pack, place and route, timing, bitstream (docs/TOOLCHAIN.md)
 web/js/        the Project Navigator: app.js (the shell, Design pane, processes, documents), editor.js
                (CodeMirror), sch-editor.js, asm-editor.js, fsm-editor.js, petri-editor.js, truthtable.js,
                isim.js (simulator UI), impact.js, pinplanner.js, i18n*.js (Portuguese), ui.js (menus,
                dialogs, long press), narrow.js (tablet portrait)
-server/        the local server: projects, the ISE flow, the Silinx flow, programmers
+server/        the local server: projects, the ISE flow, the Silinx flow, programmers, the MCP server (mcp*.js)
 test/ui/       UI tests on headless Chrome over CDP (harness.js); Firefox / WebKit via Playwright
 examples/      gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt, uart, micro80: the test designs
 research/      synthesis quality, handwriting models; the toolchain's research is in packages/silinx-fpga/research
@@ -117,9 +119,9 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
   table and Petri net has its HDL file (`[Schematic] [VHDL]` badges in the Design pane). A drawing's
   HDL is regenerated from it, and edits to the HDL flow back where supported. Convert to Schematic
   works for any HDL module.
-- **The examples are the test designs.** Each runs on every Silinx-toolchain board and builds with ISE
-  with no warnings. A new feature should be exercised by an example where it fits.
-- **ISE is the oracle:** Silinx's `.bit` must be byte-identical to ISE's bitgen for the same design,
+- **The examples are the test designs.** Each runs on every Silinx-toolchain board (on the iCEBreaker, the
+  ports with no pin warned) and builds with ISE with no warnings (but micro80's XST warnings on the light8080 core, #2544). A new feature should be exercised by an example where it fits.
+- **ISE is the oracle:** Silinx's `.bit` must be byte-identical to ISE's bitgen for the same routed design (nextpnr's, as XDL),
   with ISE's DRC clean. For language questions, XST's Spartan-3E behaviour is the reference.
 - **Two interfaces** (Silinx and ISE style), **light and dark themes**, **Portuguese**, **touch
   screens** (long press opens the right-click menus) and **narrow screens** (a tablet in portrait: the
@@ -129,10 +131,15 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
 - **Never commit Xilinx files:** not ISE, its Docker image, or ISE's raw outputs (`.bit`, `.ncd`,
   `.xdl`, logs).
 - **Yosys updates** come from Dependabot with a comparison table. They are never merged on green alone:
-  the synthesis owner reviews the table and Pedro decides.
+  the synthesis owner reviews the table and Pedro decides. **nextpnr updates** the same: `nextpnr-update.yml`'s
+  table, then `npm run check:open-flow` after merging.
 
 ## 6. Lessons learnt (things that bit us)
 
+- **A worktree runs `npm ci` of its own.** Node looks for a package in the `node_modules` of every folder above
+  the script's, so a worktree under `.claude/worktrees/` with none of its own runs on the main checkout's, which may
+  be far behind: #2949's "regression" of the design corpus was nextpnr 0.15.0 measured against 1.1.0's expectations.
+  `test/designs-corpus/run.mjs` says so (`scripts/installed-packages.mjs`) and refuses `--update` then.
 - **Intermittent UI tests are usually real races in the app.** The usual causes:
   - a DOM rebuilt between a press and its release (a click lost);
   - a view refit after the user started dragging;
@@ -143,7 +150,7 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
 - **Windows:** import modules by URL (`pathToFileURL`), not by path. File renames can hit EPERM, so retry.
 - **WebUSB is slow per transfer** (about 1 ms). Batch JTAG work into few commands. JTAG ISC operations
   only start in Run-Test/Idle.
-- **Yosys 0.70** colours its log and splits lines; `packages/silinx-fpga/src/synth-open.js` `lineStream` handles it.
+- **Yosys 0.70** colours its log and splits lines; `packages/silinx-fpga/src/synth-open-yosys.js` `lineStream` handles it.
 - **The ISE tests and the quality comparison** run on the self-hosted runner (the Mac mini).
   - They run only on code from `main`, never a PR's.
   - The runner refuses every other job before its first step, and is on line only in the two workflows'
@@ -167,13 +174,13 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
 - **The workflows' building blocks:** `.github/actions/setup` (Node.js 22 and `npm ci`, after the job's
   checkout), `scheduled-changes.yml` (whether main changed since a scheduled workflow's last successful
   run) and `failure-report.yml` (a scheduled job's failure as an issue), called by the nightly, ISE and
-  Quality workflows.
+  Quality workflows (scheduled-changes by CodeQL too).
 - **Before pushing,** `node scripts/check-private-data.mjs` checks that no private data goes into the
   repository; the release's CI scans the history too (`--history`: the tagged commit's, never the other
   branches, #555), so a harmless match in an old
   commit goes to the script's `ALLOW` list with its reason.
 - **The security checks** (#498, [SECURITY.md](SECURITY.md)): CodeQL (`.github/workflows/codeql.yml`)
-  analyses the JavaScript nightly on main and at every release (a tag `v*`), its findings under Security ▸ Code scanning; Dependabot's
+  analyses the JavaScript nightly on main when its code changed, and at every release (a tag `v*`), its findings under Security ▸ Code scanning; Dependabot's
   alerts report a dependency with a known vulnerability (licences are tracked by `scripts/third-party.mjs`).
   Secret scanning, push protection and Dependabot's alerts are the repository's settings, on.
 

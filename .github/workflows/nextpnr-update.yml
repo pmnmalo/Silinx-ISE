@@ -21,8 +21,9 @@ concurrency:
   cancel-in-progress: true
 jobs:
   # whether the pull request changes a nextpnr package: the base's package.json / package-lock.json against the pull
-  # request's, by the base's script (#1440: the steps that hold a writing token run the base's code, checked out under
-  # base/); labelled "nextpnr update"
+  # request's, by the base's script (#1440: the steps that hold a writing token run the base's code); labelled
+  # "nextpnr update". The base at the workspace's root and the pull request under head/, read as data (#3038): a bare
+  # import of the base's script resolves upward from the root, never into the pull request's tree
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,17 +38,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base
+          path: head
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      # no node_modules the base's script could import from (none installed: the base's checkout is its code alone)
+      - run: test ! -e node_modules
       - id: v
-        run: node base/scripts/nextpnr-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json
+        run: node scripts/nextpnr-update-report.mjs versions package.json package-lock.json head/package.json head/package-lock.json
       - if: steps.v.outputs.changed == 'true'
         continue-on-error: true
         run: gh pr edit "$PR_NUMBER" --add-label "nextpnr update"
@@ -82,13 +85,19 @@ jobs:
           for s in $BASE_INSTALL; do
             [[ "$s" =~ ^@silinx/nextpnr-himbaechel-spartan(3e|6)@([0-9]+\.[0-9]+\.[0-9]+|https://github\.com/pmnmalo/nextpnr-spartan/releases/download/[a-z0-9]+-v[0-9]+\.[0-9]+\.[0-9]+/[A-Za-z0-9._-]+\.tgz)$ ]] || { echo "::error::not a nextpnr package's version: $s"; exit 1; }
           done
+      # into the toolchain's workspace and the root both (#3156): installed at the root only, npm kept the pull request's
+      # package nested in packages/silinx-fpga/node_modules, which the toolchain resolves first
       - name: The base's nextpnr
         if: matrix.side == 'base'
         env:
           BASE_INSTALL: ${{ needs.check.outputs.base }}
         run: |
-          [ -z "$BASE_INSTALL" ] || npm install --no-save --ignore-scripts $BASE_INSTALL
-          for p in spartan3e spartan6; do echo "@silinx/nextpnr-himbaechel-$p $(node -p "require('./node_modules/@silinx/nextpnr-himbaechel-$p/package.json').version")"; done
+          [ -z "$BASE_INSTALL" ] || npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root $BASE_INSTALL
+      # the versions the toolchain loads (from packages/silinx-fpga and from the root), the side's or the job fails
+      - name: The nextpnr packages resolved
+        env:
+          BASE_INSTALL: ${{ matrix.side == 'base' && needs.check.outputs.base || '' }}
+        run: node scripts/resolved-package.mjs packages/silinx-fpga @silinx/nextpnr-himbaechel-spartan3e @silinx/nextpnr-himbaechel-spartan6 $BASE_INSTALL
       - name: The examples
         env:
           BOARD: ${{ matrix.board }}

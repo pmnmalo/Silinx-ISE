@@ -305,9 +305,10 @@ uiTest('#1897 C Simulation of a test bench with files: the project\'s data files
 
 // #1924: a function's HDL scheduled for the board's clock (Basys2: 50 MHz, 20 ns) with its family's delays (a Spartan-3E,
 // #2080: an addition 4.06 ns): three additions in a row fit it, a combinational module; four do not, a sequential one
-// (at Vitis HLS's 10 ns on an Artix-7, three fit); the report says the clock
+// (at Vitis HLS's 10 ns on an Artix-7, three fit); the report says the clock. (#3026: the four in a row, not balanced into
+// a tree, #2613's EXPRESSION_BALANCE off: the clock's and the delays' test, not the balancing's)
 uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), the Spartan-3E\'s delays: three additions combinational there, four sequential', E, async (page) => {
-  await makeProject(env, { name: 'CClock', top: 'sum4', files: { 'src/sum4.c': 'int sum4(int a, int b, int c, int d, int e) {\n  return a + b + c + d + e;\n}\n', 'src/sum3.c': 'int sum3(int a, int b, int c, int d) {\n  return a + b + c + d;\n}\n' } });
+  await makeProject(env, { name: 'CClock', top: 'sum4', files: { 'src/sum4.c': 'int sum4(int a, int b, int c, int d, int e) {\n#pragma HLS EXPRESSION_BALANCE off\n  return a + b + c + d + e;\n}\n', 'src/sum3.c': 'int sum3(int a, int b, int c, int d) {\n  return a + b + c + d;\n}\n' } });
   await page.openProject('CClock');
   await page.showMessages();
   for (const [top, module] of [['sum3', 'combinational'], ['sum4', 'sequential, ap_ctrl_hs \\(ap_clk, ap_rst, ap_start \\/ ap_done \\/ ap_idle \\/ ap_ready\\), 4 states, \\d+ register bits']]) {
@@ -317,6 +318,29 @@ uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), th
     const log = await page.consoleText();
     assert.match(log, new RegExp(`C Synthesis Report of '${top}' \\(src\\/${top}\\.c, VHDL\\)\\n\\nModule: ${module}\\nTarget clock: 20 ns \\(the board's oscillator\\)\\n`));
     assert.doesNotMatch(log, /WARNING|ERROR/);
+  }
+});
+
+// #2783: the device's multiplier blocks a limit: six multiplications in one state on an XC3S100E (4 MULT18X18s) take 4
+// blocks, on an XC3S250E (12) six; C/RTL Co-simulation PASS
+uiTest('#2783 View C Synthesis Report: the multiplications within the device\'s multiplier blocks (4 on an XC3S100E); C/RTL Co-simulation PASS', E, async (page) => {
+  const six = 'int six(short a, short b, short c, short d, short e, short g) {\n  return a * b + c * d + e * g + a * c + b * d + e * a;\n}\nint main() {\n  return six(3, -4, 5, 6, -7, 8) == 3 * -4 + 5 * 6 + -7 * 8 + 3 * 5 + -4 * 6 + -7 * 3 ? 0 : 1;\n}\n';
+  for (const [part, n] of [['xc3s100e', 4], ['xc3s250e', 6]]) {
+    const name = `CMul${n}`;
+    await makeProject(env, { name, top: 'six', device: { family: 'spartan3e', part, package: 'cp132', speed: '-4' }, files: { 'src/six.c': six } });
+    await page.openProject(name);
+    await page.showMessages();
+    await page.treeRow('#hier', 'six');
+    await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+    // (the lines of this project's run: the Console keeps the other's)
+    const since = `Project "${name}" opened`;
+    await page.waitConsole(new RegExp(`${since}[\\s\\S]*Process "View C Synthesis Report" completed successfully`));
+    const mine = async () => (await page.consoleText()).split(since)[1];
+    assert.match(await mine(), new RegExp(`\\nMultipliers: ${n} units, ${n} multiplier blocks\\n`), part);
+    await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
+    await page.waitConsole(new RegExp(`${since}[\\s\\S]*Process "C\\/RTL Co-simulation" completed successfully`), { timeout: 60000 });
+    assert.match(await mine(), /C\/RTL co-simulation PASS: 1 call\(s\), the same results/);
+    assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
   }
 });
 

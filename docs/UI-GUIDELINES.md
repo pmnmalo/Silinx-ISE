@@ -1,6 +1,6 @@
 # The interface: rules for its editors and viewers
 
-Every document of Silinx ISE (a text editor, a drawing editor, a read-only view) is laid out the same way, so that a
+Every document of Silinx (a text editor, a drawing editor, a read-only view) is laid out the same way, so that a
 student who knows one knows them all. These are the rules a change to the interface follows, whoever makes it, a
 person or an AI agent; [CLAUDE.md](../CLAUDE.md) points here. When a rule does not fit a new case, ask, and add the
 answer here.
@@ -31,6 +31,13 @@ answer here.
 - **No Undo, Redo or Print in a document's toolbar**: the main toolbar's, the Edit and File menus' and Ctrl+Z,
   Ctrl+Y, Ctrl+P act on the document in front (#2505, #2514).
 - **The side panels** are all alike (see below).
+- **Its view is its own** (#3074): what a document shows and how is kept in its editor, one per open document: a
+  check box of its options (the Karnaugh map's 3D), a choice (SOP / POS groups, the variables' order), a turn, a zoom,
+  a scroll. Never in a module's variable shared by every open document: one document's change would reach the others
+  only when they are drawn again (a click on a cell), their check box then saying the opposite of what they show. A
+  setting remembered for every document (the schematic's options, a panel folded) is read when an editor opens; the
+  editor's box and what it shows always agree. A UI test opens two documents, changes one, and checks the other
+  unchanged, also after an edit in it.
 - **No hint line** under the document (#2735): what the mouse does is in the tools' tips and the Help (the Schematic
   editor's tool tip at the left of its status line, as it was); the zoom is the zoom tools'; a status message is the
   console's.
@@ -45,7 +52,7 @@ Every editor and viewer has one status line, its last line, the Schematic editor
   Binary"), its tokens (a Petri net), a table's inputs, outputs and rows, the schematic's cursor and zoom; a text
   editor's line and column and its language; a viewer's selection or what is under the mouse (I/O Pin Planning's I/Os
   assigned, top, device and board; the FPGA view's selection and the slices used; the Board Emulator's time, right below
-  the board in the Tasks interface; the waveform viewer's simulated time, cursor and marker, #2785).
+  the board in the Silinx interface; the waveform viewer's simulated time, cursor and marker, #2785).
 - **What it never says:** errors, warnings or information (the console's, #2718: the Schematic's check, I/O Pin
   Planning's pins assigned more than once, #2784), that the document was saved (the tab's mark), the read-only notice
   and "Not in sync with …" (the toolbar's), a title or a path (the tab's).

@@ -13,7 +13,7 @@ import { VERSIONED_ASSET, isVersionedAsset, assetFetch, assetFetchSource, assetC
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const SITE = 'https://pmnmalo.github.io/Silinx-ISE/';
+const SITE = 'https://pmnmalo.github.io/Silinx/';
 const WASM = `${SITE}assets/vendor/yowasp-yosys/0.70.1258/gen/yosys.core.wasm`;
 const GRAPH = `${SITE}assets/15.12.0/devices/xc3s250ecp132-4.json.gz`;
 

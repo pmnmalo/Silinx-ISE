@@ -28,7 +28,10 @@ export function simulateC(source, { file = 'input.c', maxSteps = MAX_STEPS, entr
   // (syn.blackbox: its C model, the C simulation's, #1903)
   const bbs = loadBlackboxes(blackboxes, headers);
   if (bbs.diagnostics.some((d) => d.severity === 'error')) return { ok: false, output: '', exitCode: null, calls: [], error: null, steps: 0, top: null, diagnostics: bbs.diagnostics };
-  source = withModels(source, headers, bbs.list).source;
+  // (the top the C source's, not a C model's function, the last one defined once they are added, #2989)
+  const own = withModels(source, headers, bbs.list).source;
+  if (!top && own !== source) top = checkC(source, file, { headers, ...(directives ? { directives } : {}) }).top;
+  source = own;
   const checked = checkC(source, file, { headers, top, ...(directives ? { directives } : {}) });
   // (a test bench with no function to synthesize still runs)
   const errors = checked.diagnostics.filter((d) => d.severity === 'error' && !/^no function to synthesize/.test(d.message));

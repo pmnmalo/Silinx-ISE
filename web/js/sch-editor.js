@@ -164,7 +164,7 @@ export function mountSchEditor(container, opts = {}) {
     if (!it) return;
     const lang = getLanguage();
     const sum = it.type === 'module' ? it.desc : symbolSummary(it.type, { ...defaultParams(it.type), ...it.params }, lang, it.preset || undefined);
-    const more = h('a', { href: '#', class: 'se-more', text: 'More…', title: 'Datasheet of the symbol: pins, parameters, truth table, equivalent HDL' });
+    const more = h('a', { href: '#', class: 'se-syminfo-more', text: 'More…', title: 'Datasheet of the symbol: pins, parameters, truth table, equivalent HDL' });
     more.addEventListener('click', e => { e.preventDefault(); openInfo(itemTarget(it)); });
     symInfo.append(h('b', { 'data-no-i18n': '', text: it.title }), ': ', h('span', { class: 'se-sum', 'data-no-i18n': '', text: sum }), ' ', more);
   }

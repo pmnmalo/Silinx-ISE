@@ -92,6 +92,10 @@ export function checkBitPart(header, device) {
   return `bitstream was built for '${header.part}' but the target device is '${device.part}-${device.package}'`;
 }
 
+// a bitstream for another device than the project's (or the board's) is refused, as the browser's programming
+// refuses it (core/adept.js programAdept); the request's force: true programs it anyway, warned (#3040)
+export const mismatchRefusal = mismatch => `${mismatch}: not programmed`;
+
 export async function readBitInfo(file) {
   const fd = await fs.open(file, 'r');
   try {
@@ -207,7 +211,7 @@ export const PROM_OPS = ['program', 'verify', 'erase', 'read', 'reconfigure'];
 
 /**
  * Platform Flash (XCF0xS) operations through the board's Adept USB (adepttool + scripts/xcf_prog.py).
- * req: { op, bitfile?, outfile?, verify?, reconfigure?, device?, board?, expectDevice? }
+ * req: { op, bitfile?, outfile?, verify?, reconfigure?, device?, board?, expectDevice?, force? }
  */
 export async function promJob(job, req) {
   const cfg = await loadConfig();
@@ -220,6 +224,7 @@ export async function promJob(job, req) {
     const info = await readBitInfo(req.bitfile);
     job.log(`PROM image ${req.bitfile}: design ${info.designName}, part ${info.part}, built ${info.date} ${info.time}`);
     const mismatch = checkBitPart(info, req.expectDevice);
+    if (mismatch && !req.force) throw new Error(mismatchRefusal(mismatch));
     if (mismatch) job.log(`WARNING: ${mismatch}`);
     if (!/_prom\.bit$/i.test(req.bitfile)) job.log('WARNING: this does not look like a PROM bitstream (built with StartUpClk:Cclk); a JTAG-clock bitstream will not boot from flash.');
     args.push(req.bitfile);
@@ -354,7 +359,7 @@ async function programIce40(job, o, cfg, req) {
 
 /**
  * Job body for POST /program.
- * @param {object} req  { tool?, cable?, device?, position?, board?, bitfile (absolute), expectDevice? }
+ * @param {object} req  { tool?, cable?, device?, position?, board?, bitfile (absolute), expectDevice?, force? }
  */
 export async function programJob(job, req) {
   const cfg = await loadConfig();
@@ -367,6 +372,7 @@ export async function programJob(job, req) {
   job.log(`  design ${info.designName}  part ${info.part}  built ${info.date} ${info.time}  (${info.dataLength} bytes of configuration data)`);
   const warnings = [];
   const mismatch = checkBitPart(info, req.expectDevice);
+  if (mismatch && !req.force) throw new Error(mismatchRefusal(mismatch));
   if (mismatch) { warnings.push(mismatch); job.log(`WARNING: ${mismatch}`); }
   const bp = splitBitPart(info.part);
   if (!bp || !familyOfPart(bp.part)) { const w = `unrecognised part '${info.part}' in the bitstream header`; warnings.push(w); job.log(`WARNING: ${w}`); }

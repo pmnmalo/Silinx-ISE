@@ -13,14 +13,14 @@ export function s6DbNames(part) {
   return [
     ...['lut', 'pips-cmt', 'iob', 'hard', 'cmt-settings', 'cmt-input'].map(n => `${device}-${n}`),
     ...['slice-full', 'slice-nets', 'slice', 'slice-full-clexl13', 'slice-full-clexm', 'int', 'int-cover', 'int-own'].map(n => `xc6slx16-${n}`),
-    ...['pips-other', 'pips-io', 'pips-clock', 'pips-probe', 'pips-flow', 'clocks', 'hard-base', 'ologic'].map(n => `s6-${n}`),
+    ...['pips-other', 'pips-io', 'pips-clock', 'pips-probe', 'pips-bscan', 'pips-flow', 'clocks', 'hard-base', 'ologic', 'bscan'].map(n => `s6-${n}`),
   ].filter((n, i, all) => all.indexOf(n) === i);
 }
 
 /**
  * A part's databases ('xc6slx16csg324-3') from read(name): a file's object, or null for a file the part has not;
  * cmtInput: false leaves the CMTs' input bits out. { part, slices: { lut, rounds, sliceX }, int, other: { pips }, iob,
- * clocks, hard, hardBase, cmtSettings, cmtInput, ologic }.
+ * clocks, hard, hardBase, cmtSettings, cmtInput, ologic, bscan }.
  */
 export function bitDbS6(read, part, { cmtInput = true } = {}) {
   const dev = n => read(`${deviceOf(part)}-${n}`);
@@ -33,11 +33,12 @@ export function bitDbS6(read, part, { cmtInput = true } = {}) {
       sliceX: { CLEXL: read('xc6slx16-slice-full-clexl13'), CLEXM: read('xc6slx16-slice-full-clexm') },
     },
     int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
-    // the other tiles' PIPs (the PIP drop), the I/O path's, the clocks', the probed ones, the CMT paths' and the open
-    // flow's (#732) one at a time
-    other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...(dev('pips-cmt')?.pips ?? {}), ...pips('s6-pips-flow') } },
+    // the other tiles' PIPs (the PIP drop), the I/O path's, the clocks', the probed ones, the CMT paths', the BSCANs'
+    // (#3176) and the open flow's (#732) one at a time
+    other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...(dev('pips-cmt')?.pips ?? {}), ...pips('s6-pips-bscan'), ...pips('s6-pips-flow') } },
     iob: dev('iob'), clocks: read('s6-clocks'), hard: dev('hard'), hardBase: read('s6-hard-base'),
     cmtSettings: dev('cmt-settings'), cmtInput: cmtInput ? dev('cmt-input') : null, ologic: read('s6-ologic'),
+    bscan: read('s6-bscan'),
   };
 }
 

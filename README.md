@@ -1,12 +1,12 @@
-# Silinx ISE (Integrated Synthesis Environment)
+# Silinx
 
-> Silinx ISE is an independent open-source project. It is not affiliated with, endorsed by or
+> Silinx is an independent open-source project. It is not affiliated with, endorsed by or
 > supported by AMD/Xilinx. Xilinx, ISE, ISim, iMPACT, Spartan and Virtex are trademarks of AMD.
-> Silinx has its own toolchain (Yosys synthesis, Silinx's place & route and bitstream writer) for the
-> Basys2 and Nexys2 boards; for the other boards and the ISE-only processes it can use the free
+> Silinx has its own toolchain (Yosys synthesis, nextpnr place & route, Silinx's bitstream writer) for the
+> Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards; for the other boards and the ISE-only processes it can use the free
 > Xilinx ISE 14.7 WebPACK tools, which you install yourself.
 
-> **Purpose.** Silinx ISE was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago. Who
+> **Purpose.** Silinx was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago. Who
 > started it, why, and how it grew: [docs/HISTORY.md](docs/HISTORY.md).
 
 > **About the name.** *Silinx* = **SI** + **linx**. **SI** stands for *Super Intelligence*: the tool
@@ -81,7 +81,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   signal (e.g. an `opcode`), one exit per value (`00100`, `0|1`, `others`), generated as a
   `case` statement; conditions can test bits and slices (`opcode[4]`, `opcode[4:3]`).
   Charts and schematics print on one page or tiled over several, or save as PNG / SVG.
-  *Simulate* steps through the chart: set its inputs (and its reset), apply clock edges (one, or *Run* at a chosen
+  *Try it* steps through the chart: set its inputs (and its reset), apply clock edges (one, or *Run* at a chosen
   rate; *Back* undoes one), and see the present state, the decisions tested and the exits followed, the conditional
   outputs reached and the next state drawn on the chart, its Moore and Mealy outputs, its registers and their next
   values, and the last cycles, exactly as its generated HDL behaves.
@@ -222,19 +222,23 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Boolean Algebra / Karnaugh Map** (it was Truth Table; *Tools ▸ Boolean Algebra / Karnaugh Map…*, New Source ▸
   *Boolean Algebra (.bool.json)*): name 1–6 inputs and any number of outputs, click the cells (0 → 1 → X don't care)
   or type an expression per output (`ab' + c`, `a·b + c`, `/a.b + a./b`, `~a & b`,
-  `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; 5–6 inputs as two/four 4×4 maps) with the groups of the minimal SOP
+  `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; the variables MSB → LSB by columns then rows, or by rows then
+  columns, chosen beside the map; 5–6 inputs as two/four 4×4 maps, the most significant picking the map) with the groups of the minimal SOP
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
-  the canonical SOP and POS in full (the sum of the minterms, the product of the maxterms) and their Σm / ΠM lists; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
-  essential prime implicants marked, several minimal solutions browsed one by one, #2928) with literal and gate
-  counts; the *XOR form* when it is simpler than both (fewer literals, or as many and fewer
+  then the results, in this order: the least gates and the least delay; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
+  essential prime implicants marked; several minimal solutions browsed with *◀ Solution k of N ▶* beside the map, the one chosen used);
+  the canonical SOP and POS, each with its Σm / ΠM list beside its name and in full under it (the sum of the minterms, the product of the
+  maxterms); each with its terms, literals and gates and its circuit (SdP / PdS in Portuguese). Each table's map can also be shown in 3D
+  (3 inputs on a cylinder, 4 on a torus). After them come the *XOR form*, when it is simpler than both (fewer literals, or as many and fewer
   two-input operators): `a ⊕ b ⊕ c`, a full adder's carry `a·b + c·(a ⊕ b)`, a comparator's
   `/(a1 ⊕ b1)·/(a0 ⊕ b0)`, `a ⊕ b·c` (sums of products of literals and XOR / XNOR factors, or a
   variable XOR one; up to 6 inputs, don't cares used, checked on the whole table); and the *NAND
   form* and *NOR form*, the minimal SOP with NAND gates only and the minimal POS with NOR gates only
   (double negation: `/(/(a.b)./(c.d))`), with their gate counts. The expressions are written with `/` as NOT and `.` as AND (`/a.b + c`, `/(a + b)`), or, chosen, as
-  `/ab + c`, `a·b' + c`, `ab' + c`, VHDL or Verilog; each reads back as typed. *HDL logic* picks the
-  logic of its module and of its schematic: the minimal SOP, POS, the XOR form where it is simpler
-  (`xor` / `xnor`, `^` / `~^`), NAND gates only (`a nand b`, `~(a & b)`) or NOR gates only. The table always has its HDL module, made with it in the project's
+  `/ab + c`, `a·b' + c`, `ab' + c`, VHDL or Verilog; each reads back as typed. A tick box on
+  each result picks that output's logic in the module and the schematic (its *HDL logic*; the least gates' by default):
+  the least gates or delay, the minimal SOP or POS, the canonical SOP or POS, the XOR form where it is simpler
+  (`xor` / `xnor`, `^` / `~^`), NAND gates only (`a nand b`, `~(a & b)`), NOR gates only. The table always has its HDL module, made with it in the project's
   preferred language, kept in sync with the table both ways (like ASM charts: editing the table
   rewrites it; editing and saving the HDL updates the table by exhaustive simulation, don't cares
   kept in its comments; a module that no longer fits — sequential, too many inputs — shows the
@@ -281,9 +285,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   next-state bits and outputs for the K-map exercise. Its HDL: readable VHDL or Verilog (2- or
   3-process style; changing the language in the editor makes it again in that one) kept in sync
   both ways like ASM charts (an HDL edit that is no longer a plain state machine shows the reason); *Convert to State Diagram (FSM)* reads an HDL module or an
-  ASM chart, *Convert to ASM chart* goes the other way; *Simulate* steps through the diagram (set
+  ASM chart, *Convert to ASM chart* goes the other way; *Try it* steps through the diagram (set
   the inputs, clock edges, current state and the transition about to be taken highlighted).
-- **Implementation** with the **Silinx toolchain** (the Basys2 and Nexys2 boards, the default; in the
+- **Implementation** with the **Silinx toolchain** (the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards, the default; in the
   browser or locally) or with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
   locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel
   (restored when the project is reopened), *Stop*, every warning/error in the Warnings/Errors tabs,
@@ -293,7 +297,7 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Devices**: every FPGA family ISE 14.7 WebPACK implements — Spartan-3, Spartan-3E,
   Spartan-3A/3AN, Spartan-3A DSP, Spartan-6, Virtex-4/5/6, Artix-7, Kintex-7 and Zynq-7000
   (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6. Beyond ISE, the
-  Lattice iCE40 (LP, HX, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack.
+  Lattice iCE40 (LP, HX, Ultra, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack.
 - **Boards and I/O Pin Planning**: Digilent Basys2, Nexys2, Nexys3, Atlys, Cmod S6; Xilinx
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One;
   1BitSquared iCEBreaker (iCE40, its pins written as a PCF; a 1BitSquared iCEBreaker + PmodVGA for VGA).
@@ -323,9 +327,9 @@ for Xilinx FPGAs supported by ISE 14.7.
 In short:
 
 - **In the browser: design, simulate, synthesize and program the board.** Open
-  **https://pmnmalo.github.io/Silinx-ISE/** (the latest release; the development version of main is at
-  https://pmnmalo.github.io/Silinx-ISE/dev/, and its files, the app zip included, in the pre-release
-  [Development build](https://github.com/pmnmalo/Silinx-ISE/releases/tag/dev)). Nothing to install.
+  **https://pmnmalo.github.io/Silinx/** (the latest release; the development version of main is at
+  https://pmnmalo.github.io/Silinx/dev/, and its files, the app zip included, in the pre-release
+  [Development build](https://github.com/pmnmalo/Silinx/releases/tag/dev)). Nothing to install.
   The site synthesizes, places, routes and writes the bitstream (below), and programs the board's FPGA,
   or its Platform Flash PROM so that the design starts at power-up, over USB (WebUSB: Chrome or Edge on
   a computer, Chrome on an Android tablet). Projects are kept in the browser, or (Chrome / Edge) in a
@@ -333,33 +337,33 @@ In short:
   Chrome or Edge can **install the site as an app** (*Install app*, or *Add to Home screen* on Android: a
   tablet, a classroom's interactive display): it opens in a window of its own, and once a project has
   been opened it also opens and implements with no network.
-  **`Silinx-ISE.html`** from the [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)
+  **`Silinx.html`** from the [latest release](https://github.com/pmnmalo/Silinx/releases/latest)
   is the same page in one file, to keep or open offline (its synthesis tools come from the site the
   first time; programming the board needs the site's address). For a course page (Moodle…), link the site's address as a URL: an HTML file uploaded to
   Moodle does not work (Moodle's filtering of uploaded HTML files removes its scripts).
-- **Synthesis and bitstreams need no Xilinx tool** for the **Basys2-100 / 250 and Nexys2-500 / 1200**:
-  the *Silinx toolchain (no ISE)*, the default mode, synthesizes (Yosys), places,
-  routes and writes the bitstream itself, in the browser or locally.
+- **Synthesis and bitstreams need no Xilinx tool** for the **Basys2-100 / 250, Nexys2-500 / 1200, Nexys3, Atlys and iCEBreaker**:
+  the *Silinx toolchain (no ISE)*, the default mode, synthesizes (Yosys), places and
+  routes (nextpnr) and writes the bitstream, in the browser or locally.
 - **Or run Silinx locally, with Node.js (an alternative):** install [Node.js](https://nodejs.org)
-  (LTS), download **`silinx-ise-<version>.zip`** from the
-  [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest), unzip it and double-click
-  **`Start Silinx-ISE.bat`** (Windows), **`Start Silinx-ISE.command`** (macOS) or
-  **`start-silinx-ise.sh`** (Linux). Your browser opens Silinx; projects are folders in
+  (LTS), download **`silinx-<version>.zip`** from the
+  [latest release](https://github.com/pmnmalo/Silinx/releases/latest), unzip it and double-click
+  **`Start Silinx.bat`** (Windows), **`Start Silinx.command`** (macOS) or
+  **`start-silinx.sh`** (Linux). Your browser opens Silinx; projects are folders in
   `Silinx-projects` in your user folder. The same Silinx, running on your computer: it synthesizes
   offline, programs boards with the installed tools too (openFPGALoader, xc3sprog, Digilent Adept,
   ISE iMPACT, adepttool) and from any browser, and runs **Xilinx ISE 14.7** (free WebPACK) for the
   other boards and the ISE-only processes (simulation models of the implementation, XPower, …): build
-  your own Docker image with **`silinx-ise-docker-kit-<version>.zip`** (see
+  your own Docker image with **`silinx-docker-kit-<version>.zip`** (see
   [below](#synthesis-and-bitstreams-xilinx-ise-147)) and choose an ISE mode in *Toolchain Settings*.
 - **Checking a download:** each release lists its files' SHA-256 checksums in its notes and in
   **`SHA256SUMS`**: in the folder of the downloads, `sha256sum -c SHA256SUMS --ignore-missing` (Linux) or
   `shasum -a 256 -c SHA256SUMS --ignore-missing` (macOS), `Get-FileHash <file>` (Windows PowerShell). Each
   file also has GitHub's build provenance attestation (built by the Release workflow from the version's
-  tag): `gh attestation verify silinx-ise-<version>.zip --repo pmnmalo/Silinx-ISE`.
+  tag): `gh attestation verify silinx-<version>.zip --repo pmnmalo/Silinx`.
 
 ### On an iPad or a tablet
 
-The site (and `Silinx-ISE.html`) runs in Safari on an iPad (WebKit) and in a tablet's browser: the HDL
+The site (and `Silinx.html`) runs in Safari on an iPad (WebKit) and in a tablet's browser: the HDL
 editors and the drawings, simulation, and the Silinx toolchain (synthesis, place and route, the
 `.bit`), and in Chrome on an Android tablet board programming too. What is different from a computer:
 
@@ -368,7 +372,7 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
   port (a USB-C to USB adapter if needed). Safari on an iPad has no WebUSB: generate the `.bit` there, then program the board from a
   computer or an Android tablet.
 - **No workspace folder on the disk**: the projects are kept in the browser's storage, which iPadOS
-  may clear after some weeks without use. Keep a copy with *File ▸ Export Silinx ISE Project (.zip)…*.
+  may clear after some weeks without use. Keep a copy with *File ▸ Export Silinx Project (.zip)…*.
 - **Less memory per tab**: a large design may fail in synthesis or implementation.
 - **The right-click menus open with a long press** (a finger or a pen held still for half a second)
   on a Design-pane row or badge, a document tab, a Files view row, a symbol of the schematic
@@ -381,33 +385,87 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
   editors' properties (and the schematic's symbols) open over the drawing with their toolbar's
   *Properties* (*Symbols*) button, so the drawing keeps the whole width.
 
+### Guided labs
+
+*Project ▸ Guided Labs…* opens a step-by-step tutorial on the project, beside its documents: each step says what to
+do, and *Check Step* checks it on the project (a file, a module's ports, Check Syntax with exactly the expected
+warnings, the simulation's values at given times, a drawing's check, a port's pin, a process run on the sources as
+they are), ticking it in the Steps panel, or giving its hint and the reasons in the console. Silinx ships "First steps"
+on the gates example, "A state machine" on traffic, "The clock and the board" on blinky and "The emulator" on stopwatch
+(in English and Portuguese); a teacher writes a lab as a `labs/<name>.lab.json` file of a project (*New Source ▸
+Guided Lab* starts one from a template; its format: `core/labs.js`), checked as it is edited (each save, and its Check
+Syntax, say its problems), and shares it with the project. A link opens a lab beside the project (`lab=<its id>`: *Copy Link*'s
+Lab, e.g. `…/Silinx/#open=example:stopwatch&lab=stopwatch-emulator`). The progress is the project's
+(`labs/progress.json`): a lab resumes where it was left.
+
 ### A design in a link (for lecture slides)
 
 A link opens Silinx on a design, straight in Try it, the simulation or the board emulator, with no project to create
 or import: **Copy Link to Project…** (the project's right-click menu in the Design pane, the Start page, the ISE
 style's File menu) or **Copy Link to This Module…** (a module's right-click menu) makes it, the view and the module
 chosen. The whole project goes inside the link (`#design=…`, compressed: 5 to 25 KB for the examples; anyone with the
-link has every file, its comments too), so nothing has to be hosted. Some slide tools cut a link longer than about 2
-000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx ISE Project*, then
-`…/Silinx-ISE/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
-(`…/Silinx-ISE/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
-is `try` (a schematic's Try it; a state diagram's, a Petri net's or an ASM chart's Simulate panel), `simulate` (the test bench) or
+link has every file, its comments too), so nothing has to be hosted. Copy Link can make a **short link** instead
+(`#gist=…`, about 140 characters, for a chat that refuses a long message): the project is encrypted in your browser and
+saved as a secret gist of your GitHub account (the browser edition's Sign in with GitHub…; a server's `GH_TOKEN`), and
+the key is in the link, so GitHub keeps only what it cannot read; opening it needs no sign-in, and your links are your
+gists, which you list and delete on GitHub. Some slide tools cut a link longer than about 2
+000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
+`…/Silinx/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
+(`…/Silinx/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
+is `try` (the Try it of a schematic, a state diagram, a Petri net or an ASM chart), `simulate` (the test bench) or
 `emulate` (the board emulator); `top=` names the module (with `simulate`, the test bench). Opening a link makes a project named after the design;
 clicked again, that project is opened as it is when it has the same files, and one the student changed is replaced
 only when they say so. A zip from another site is fetched only once you agree (its address shown), and only from an
-https address that is not of this computer or a local network; a broken link is said in the console, the workspace as
-it was.
+https address that is not of this computer or a local network, the zip's own (a redirection is not followed); a
+broken link is said in the console, the workspace as it was.
 
 Copy Link… includes Silinx as it is when the link is copied (**Include the current view**): the open tabs, the one in
 front, the split and, in the Silinx interface, the task, the side panel, the messages and a maximized document; the
 link opens it so, for that page only (the viewer's own layout is not changed).
 
+### A project on GitHub (git, a GitHub Classroom assignment)
+
+On your computer or a Silinx server, a project can live in a GitHub repository, through the system's git:
+- **Open from Repository…** (the Start page, the ISE style's File menu) opens a project from a GitHub repository, a
+  GitHub Classroom assignment's too.
+- **Commit…, Push to GitHub and Pull from GitHub** (the project's right-click menu in the Design pane, under Git; the
+  File menu) send it back and bring the others' changes in. A pull that conflicts pulls nothing and leaves the files as
+  they were.
+- **The Design pane** marks what changed (M) or is new (N) since the last commit.
+- **History…** lists the commits, and opens a file as it was in one, read only.
+- **Compare** (in History… and Commit…) shows a drawing's two versions side by side, what was added, removed, moved
+  or changed marked on them, and an HDL file's lines side by side.
+- **A drawing changed on both sides** is merged by its objects on Pull, never as text, and its HDL made again; for an
+  object both sides changed, Pull asks whose version it keeps (Mine or Theirs), and checks the result as Check Drawing
+  does.
+- **Initialize Repository…** makes a repository of a project, with a `.gitignore` that leaves `build/` and the tools'
+  outputs out.
+
+git signs in to GitHub with its own credentials (GitHub's command line `gh auth login`, Git Credential Manager or an
+SSH key): Silinx never asks for, stores or logs a password or a token. A server's operator can turn git off with
+`SILINX_GIT=off`.
+
+In the browser edition the same commands go through GitHub's API (there is no git in a browser):
+- **Open from Repository…** opens a public repository with no sign-in.
+- **Sign in with GitHub…** (with the Git commands): a private repository, a commit and a pull need it. Where the
+  site has Silinx's sign-in relay, it gives a code to enter at github.com/login/device; elsewhere, it asks for a
+  fine-grained personal access token of yours (github.com/settings/personal-access-tokens/new: the repositories to
+  open, Contents read and write). The sign-in is kept in this browser only, and **Sign out of GitHub** forgets it.
+- **Commit and Push…** commits and pushes in one step. A commit GitHub rejects (someone pushed meanwhile) says to
+  pull first.
+- **Initialize Repository…** takes an empty GitHub repository (make it at github.com/new); the first commit is the
+  project's.
+
+A computer or a server with no git can use GitHub's API the same way, for the interface and the MCP's git tools:
+start Silinx with `SILINX_GIT=github` and a token in `GH_TOKEN` (`GH_TOKEN=$(gh auth token)`), which Silinx never
+stores.
+
 ## For developers
 
 ```bash
-git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
+git clone https://github.com/pmnmalo/Silinx.git && cd Silinx
 npm install
-npm start          # prints the address to open, http://127.0.0.1:8642/#token=…  (node bin/silinx-ise.js serve --open opens it)
+npm start          # prints the address to open, http://127.0.0.1:8642/#token=…  (node bin/silinx.js serve --open opens it)
 ```
 
 How Silinx is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the application as a whole, and
@@ -419,17 +477,19 @@ Security: report a vulnerability privately, as [SECURITY.md](SECURITY.md) says (
 in scope and what the project does to protect its users).
 
 The server listens on this computer only (`127.0.0.1`), and answers only the browser that has its token: it
-makes one at every start and prints the address with it (`…/#token=…`), which the launchers and `--open` open;
+makes one at every start and prints the address with it (`…/#token=…`); the launchers and `--open` open it with a
+one-time code instead (`…/#code=…`, which the page exchanges for the token: no token on a command line, #2955);
 the page keeps it, so the plain address works afterwards in the same browser (#2564). Another user of the
 same computer has no token. With `serve --host 0.0.0.0` (or another address) other computers can reach it:
 it then prints a warning, and the address with the token is the only way they can use it. The toolchain settings that run a program
 (`docker.command`, `docker.extraArgs`, `ssh.sshArgs`, `ssh.identity`, `paths`) are set in
-`~/.silinx/config.json` only, never from the page.
+`~/.silinx/config.json` only, never from the page; so is an absolute `ssh.remoteDir` (from the page, a folder
+inside the remote home, #2958).
 
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
 publishes a release with the files above (`.github/workflows/release.yml`), once CI, which the tag
 starts, has passed on the tagged commit (`scripts/wait-for-ci.mjs`). CI runs at a release only, not on
-pull requests nor on pushes to main (#607).
+pushes to main (#607); a pull request runs the test files of the modules it changes (`.github/workflows/pr-tests.yml`, #637).
 The tests against ISE (`test/ise/`) run nightly, and on demand (Actions ▸ ISE ▸ Run workflow), on
 a self-hosted runner with the ISE Docker image (label `ise`, `.github/workflows/ise.yml`); only code
 already on main runs there, never a pull request's: the runner refuses every other job before its
@@ -443,11 +503,13 @@ main has not changed since their last successful run, documentation aside
 ### Command line
 
 ```bash
-node bin/silinx-ise.js check <projectDir>                           # parse + elaborate the top
-node bin/silinx-ise.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the simulation top
-node bin/silinx-ise.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
-node bin/silinx-ise.js toolchain [--docker xilinx/ise:14.7]          # show / set the ISE toolchain
-node bin/silinx-ise.js mcp                                         # an MCP server for an AI assistant (below)
+node bin/silinx.js check <projectDir>                           # parse + elaborate the top
+node bin/silinx.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the simulation top
+node bin/silinx.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
+node bin/silinx.js toolchain [--docker xilinx/ise:14.7]          # show / set the ISE toolchain
+node bin/silinx.js mcp                                         # an MCP server for an AI assistant (below)
+node bin/silinx.js grade <exercise.json> <submissions…> --csv grades.csv   # grade exercises (docs/GRADING.md)
+node bin/silinx.js classroom template|grade …                  # GitHub Classroom assignments (docs/CLASSROOM.md)
 npm test                                                         # test suite
 SILINX_ISE_TESTS=1 npm run test:ise                              # the real ISE flow (Docker image; SILINX_ISE_HOST=user@host: on another machine)
 SILINX_ISE_HOST=user@host npm run check:open-flow [projects…]   # the open flow vs ISE: DRC, byte-identical bitstreams (SILINX_ISE_HOST=local: the image here)
@@ -461,18 +523,18 @@ npm run test:release                                             # the release z
 node scripts/package-release.mjs [version]                       # the release files into out/ (as release.yml)
 ```
 
-`npm run test:release` builds `silinx-ise-<version>.zip` with the release script, unzips it into a
+`npm run test:release` builds `silinx-<version>.zip` with the release script, unzips it into a
 clean folder, checks its contents (production dependencies only, Yosys's WebAssembly, licence and
 notices, executable launchers) and size, starts it with its own launcher (`PORT` and
 `SILINX_NO_BROWSER=1` are honoured by the launchers) and runs *Synthesize - Yosys (open)* on the
 blinky example in headless Chrome, with every request to another host refused and reported (the
 app must work offline; the update check at start-up is the only one allowed). CI runs the unit
-tests and a UI smoke test on Linux, macOS and Windows, the release zip test, and the main UI flows
+tests and a UI smoke test on Linux, macOS and Windows (the toolchain's heaviest tests on Linux only), the release zip test, and the main UI flows
 in Firefox and WebKit.
 
 ### Silinx for an AI assistant (MCP)
 
-`node bin/silinx-ise.js mcp` serves the projects of the Silinx workspace to an AI assistant (Claude
+`node bin/silinx.js mcp` serves the projects of the Silinx workspace to an AI assistant (Claude
 Desktop, Claude Code, any client of the Model Context Protocol) over stdin / stdout. Its tools:
 `list_examples` (the examples, then the test designs: the designs Silinx is tested with), `new_project_from_example`, `new_project` (an empty one, for a board), `set_top` (the top
 module and the test bench, as *Set as Top Module*; the constraints from the board's pins, as *Update
@@ -482,10 +544,11 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
 Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `test_bench_wizard` (a self-checking
 test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins), `convert_module` (an HDL module to a schematic, ASM chart or state
-diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `set_process_properties` (the Optimization, the start-up clock, the place and route engine),
+diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `save_wave_config` and `load_wave_config` (a simulation's wave configuration saved as a .wcfg of the project, and loaded), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `verify` (a module's equivalence with a reference module, as *Verify Equivalence*, or with no reference its own assertions, as *Verify Assertions*, or with a property a state diagram's or an ASM chart's, as *Verify Property*: a state never reached, a state reached, outputs never 1 together; proved, or the first clock cycle where an output differs, an assertion fails or the property does, its counterexample written as a test bench and replayed), `set_process_properties` (the Optimization, the start-up clock),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file`, `delete_project`,
-`export_project` and `import_project` (a Xilinx ISE or a Silinx ISE project, as a .zip; a .xise or a project folder too;
+`git_clone`, `git_init`, `git_status`, `git_commit`, `git_push`, `git_pull` and `git_log` (a project in a GitHub repository, as the interface's git: its history, a file as it was in a commit),
+`export_project` and `import_project` (a Xilinx ISE or a Silinx project, as a .zip; a .xise or a project folder too;
 only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `project_link` and `open_link` (a project's
 link, the project inside it, opening Try it, the simulation or the board emulator, for slides; a project made from such a link
 or from an example's, one that differs never replaced), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
@@ -493,31 +556,38 @@ or from an example's, one that differs never replaced), `check_syntax` (the erro
 post-place & route model too, with its timing; signals forced, a value or a clock, as SSim's Force; its waves as a VCD file), `c_simulation`, `c_cosimulation`,
 `c_synthesis_report` and `c_generated` (a C / C++ source of Silinx HLS: its main() run, its C/RTL co-simulation, its report, the HDL
 and the ASM chart made from it), `run_process` (synthesize,
-implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured) and
+implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured; a project the
+MCP server made or imported runs ISE, or programs a board or a PROM, only once you trust it in the interface: *Trust Project*, #2981) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
-statistics for the synthesis and the pack and route summaries for map and par). The projects are those of the Project Navigator
+statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
+checked on the project and recorded, as *Guided Labs…* does; a lab restarted), `capture_settings` (the logic analyzer's
+capture: the signals of the design to watch on the board, the clock, the depth, the trigger, checked on the design with the block
+RAMs it takes), `capture` (a capture on the board over the JTAG cable, the Basys2's / Nexys2's Digilent Adept USB through
+adepttool: armed, its trigger waited for, the samples read and saved in `build/capture.json`) and `timing_paths` (the Silinx toolchain's,
+Xilinx ISE's or AMD Vivado's slowest paths, as the Static Timing Report's Paths panel: a path's stages, their delays against the PERIOD, and the
+source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from; with `from` and `to`, the worst paths between two registers). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
 the same), so what the assistant does is seen in the interface when the project is opened again.
 Every path stays inside its project; programming a board is not one of its tools; the ISE machine's
 address never appears in a result. In Claude Desktop's `claude_desktop_config.json`:
 
 ```json
-{ "mcpServers": { "silinx": { "command": "node", "args": ["/path/to/silinx-ise/bin/silinx-ise.js", "mcp"] } } }
+{ "mcpServers": { "silinx": { "command": "node", "args": ["/path/to/silinx/bin/silinx.js", "mcp"] } } }
 ```
 
-and in Claude Code: `claude mcp add silinx -- node /path/to/silinx-ise/bin/silinx-ise.js mcp`. To keep the
+and in Claude Code: `claude mcp add silinx -- node /path/to/silinx/bin/silinx.js mcp`. To keep the
 assistant's projects apart, give it a workspace of its own: `"env": { "SILINX_WORKSPACE": "/path/to/folder" }`
 in Claude Desktop's entry, or `claude mcp add silinx -e SILINX_WORKSPACE=/path/to/folder -- node …` (the
 server's name before `-e`, which takes several values).
 
-With the same workspace, the interface of `silinx-ise serve` follows what the assistant does in the project it has
+With the same workspace, the interface of `silinx serve` follows what the assistant does in the project it has
 open: a source written or made, a run (the Design pane, an open editor, the processes' marks and the Design Summary
 update at once); a file changed in its editor and by the assistant asks which version to keep.
 
 ### Standalone edition (a single HTML file)
 
 ```bash
-npm run build:standalone    # writes dist/Silinx-ISE.html (~5 MB)
+npm run build:standalone    # writes dist/Silinx.html (~5 MB)
 ```
 
 One file, no server: open it in a browser or share it. It includes the editor, schematics, ASM
@@ -530,7 +600,7 @@ descriptions, the bit database and Yosys in WebAssembly, ~115 MB), with which th
 Silinx toolchain in the browser: *Implement Design* and *Generate Programming File* for the
 Spartan-3E and Spartan-6 boards and the iCE40 (the bitstream is downloaded), and *Configure Target Device* programs the FPGA of
 a Basys2 / Nexys2 over WebUSB (Chrome / Edge; core/adept.js, a port of adepttool's Adept USB
-protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`). XST (Xilinx ISE)
+protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`), and the iCEBreaker's SPI flash (core/ftdi-ice40.js). XST (Xilinx ISE)
 needs the full application (`npm start`).
 
 ## Synthesis and bitstreams (Xilinx ISE 14.7)
@@ -542,24 +612,23 @@ Implementation uses the Silinx toolchain by default (below), or the ISE 14.7 com
 the project's synthesis tool; *Synthesize - Yosys (open)* in a project that synthesizes with XST)
 synthesizes any design with Yosys compiled to WebAssembly, in parallel Web Workers. Its *Optimization* (Process Properties) is **Fast**, **Area** or
 **Speed**. Fast maps the design once and Place & Route makes one placement: the quickest build. Area, the default of a
-new project, also synthesizes as Speed does and keeps the smaller netlist (by slices, then LUTs), with one placement and no
-register replication. Speed tries the mappings for speed, its state machines of 8 states or more one-hot, and keeps the
-fastest; Place & Route makes several placements and keeps the fastest (eight by nextpnr on the Spartan-3E, three on the
-Spartan-6). A project made before these three is Fast (its Speed and Normal). ISE gets
+new project, also synthesizes as Speed does and keeps the smaller netlist (by slices, then LUTs), with one placement. Speed tries the mappings for speed, its state machines of 8 states or more one-hot, and keeps the
+fastest; Place & Route makes several placements and keeps the fastest (by nextpnr on the Spartan-3E 32 for a design of up to
+100 slices, eight above). On the Spartan-6, Place & Route makes three placements and keeps the fastest at every Optimization. A project made before these three is Fast (its Speed and Normal). ISE gets
 them as its Optimization Goal and Effort: Speed / Normal, Area / High and Speed / High. Implement Design and Generate Programming File do not
 synthesize again while the synthesis is up to date (the design's sources, top, device and Optimization
 unchanged). For the **Basys2-100 and Basys2-250
 (XC3S100E / XC3S250E-CP132) and the Nexys2-500 and Nexys2-1200 (XC3S500E / XC3S1200E-FG320)**
-Silinx also places, routes and writes the bitstream itself: the device descriptions ship with
-Silinx, and the bitstreams it writes for the tested designs are byte-identical to ISE's. The same holds in the
+Silinx also places and routes (nextpnr) and writes the bitstream: the device descriptions ship with
+Silinx, and the bitstreams it writes for the tested designs are byte for byte those ISE's bitgen writes for the same routing (ISE's DRC finds no error in them). The same holds in the
 local server for the Spartan-6 boards, the **Nexys3 and the Atlys** (XC6SLX16 / XC6SLX45-CSG324; the Atlys's
-seven-segment display and VGA on its VHDCI connector), and in the browser edition with the Silinx engine (#2103). It is the
+seven-segment display and VGA on its VHDCI connector), and in the browser edition (#2103). It is the
 default execution mode of a new installation, so students need nothing else for these boards; for
 the other boards choose an ISE mode in *Tools ▸ Toolchain Settings ▸ Execution mode*. The
 usual processes then run Silinx's own flow on this machine: *Synthesize - Yosys* (Yosys),
 *Translate* and *Map* (the netlist and the constraints read, then packed into slices and I/O
-sites), *Place & Route* (placement, routing on the routing switches whose bits are known, static
-timing against the UCF's PERIOD constraints), *Generate Programming File* (`build/<top>.bit`, and
+sites: by nextpnr on the Spartan-3E, by Silinx on the Spartan-6), *Place & Route* (nextpnr's placement and routing, checked against
+the bit database's routing switches, static timing against the UCF's PERIOD constraints), *Generate Programming File* (`build/<top>.bit`, and
 `build/<top>_prom.bit` for the PROM), with the same console, process icons, Stop and *Design
 Summary* (utilization, timing) as with ISE; *Configure Target Device* programs the board as usual
 and *View Implemented Design (FPGA)* shows the routed design; *Back-annotate Pin Locations* adds the
@@ -591,7 +660,7 @@ package). Developers can build another package's description from an ISE
 (`packages/silinx-fpga/research/s3e-route/build-device.mjs`, into `~/.silinx/devices/`) once its pads are in the bit
 database. The open
 toolchain also takes **the Spartan-6 boards (Nexys3, Atlys)** in the local server, to a bitstream ISE's bitgen
-writes byte for byte for the same routing (in the browser edition too, with the Silinx engine, #2103: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
+writes byte for byte for the same routing (in the browser edition too, #2103: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
 folder> <out folder>`.
 Beyond Xilinx, it takes **the 1BitSquared iCEBreaker** (Lattice iCE40UP5K-SG48): Yosys's `synth_ice40`,
 nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programmed into its SPI flash from Silinx: over WebUSB in the browser, or with openFPGALoader locally, #2298).
@@ -599,7 +668,7 @@ The examples run on it with their seven-segment display and switches on its Pmod
 **1BitSquared iCEBreaker + PmodVGA**, a Digilent PmodVGA in those Pmods.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
-what is planned: the [issues](https://github.com/pmnmalo/Silinx-ISE/issues).
+what is planned: the [issues](https://github.com/pmnmalo/Silinx/issues).
 
 **Recommended on Windows, macOS (Intel / Apple Silicon) and Linux:** build a private Docker image
 once with the kit in [`docker/ise/`](docker/ise/README.md), from your own installer and WebPACK
@@ -626,6 +695,24 @@ Other execution modes (*Tools ▸ Toolchain Settings*):
 Only the project's `build/` folder is mounted in the container (at `/work`); no X11 or `$HOME`
 mount is needed for command-line builds. Without ISE, the implementation processes still write
 `build/` with `run.sh`, `.prj`, `.xst`, `.ut` and the UCF, ready to run on another machine.
+
+### The Artix-7 boards with AMD Vivado
+
+The Basys 3 and the Nexys A7 (Artix-7, an experimental family) are synthesized, implemented and made into a bitstream by
+**AMD Vivado ML Standard 2025.2** (free for these parts), as ISE does for the Spartan-3E: a batch Tcl flow
+(`build/run.tcl`: `synth_design`, `opt_design`, `place_design`, `route_design`, `write_bitstream`) with the board's
+XDC, its utilization, timing summary and design rule check in the Design Summary, its warnings in the console. It runs
+in a mode of its own, `vivado` in `~/.silinx/config.json` (`PUT /api/toolchain`):
+
+```json
+{ "vivado": { "mode": "docker", "image": "xilinx/vitis-hls:2025.2", "settings": "" } }
+```
+
+- `docker`: an x86-64 image with Vivado under `/tools/Xilinx` (`scripts/vitis-hls-image/` makes one); `ssh`: on the
+  ssh host of the ISE settings, in that image there (or with Vivado installed there when `image` is empty); `local`:
+  Vivado on this Linux or Windows machine (`settings`: its `settings64.sh`, else found).
+- Under x86 emulation (an Apple-silicon Mac) an example takes 2 to 10 minutes from synthesis to bitstream.
+- The board is programmed with openFPGALoader (`-b basys3`). Vivado runs on the local server only, not in the browser.
 
 ## Programming the board
 
@@ -664,7 +751,8 @@ server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
 web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/silinx.css): editor, SSim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
 scripts/    adepttool installer/patch, Platform Flash programmer, standalone build
-examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's devices): gates (the first one: logic
+examples/   example projects (for the Basys2; each built by the Silinx toolchain on every Basys2, Nexys2, Nexys3, Atlys and
+            the iCEBreaker): gates (the first one: logic
             gates drawn as a schematic, a 4-bit prime-number detector with NOT / AND / OR and with NAND gates only),
             traffic (a pedestrian crossing: a state diagram, a Boolean algebra, VHDL and a Verilog display),
             blinky (VHDL + Verilog, an ASM chart, its steps counted on the display),
@@ -679,7 +767,8 @@ docs/       ARCHITECTURE.md (Silinx's architecture as a whole: the editions, the
             Spartan-3E toolchain is developed), TOOLCHAIN.md (the toolchain's architecture, from the design to the
             .bit), QUALITY.md (the Silinx toolchain against ISE)
 packages/silinx-fpga/
-            the Silinx toolchain (pack, place, route, timing, bitstream); its research/ builds the
+            the Silinx toolchain (Yosys synthesis, the Spartan-6's packing, nextpnr's place and route, timing,
+            bitstream); its research/ builds the
             bit database and the device descriptions
 research/   synthesis quality, handwriting models, other experiments
 test/       node:test suites
@@ -690,18 +779,18 @@ with them.
 
 ## Privacy and usage counts
 
-The site (https://pmnmalo.github.io/Silinx-ISE/ and its dev/ edition) counts its visits and what is
+The site (https://pmnmalo.github.io/Silinx/ and its dev/ edition) counts its visits and what is
 used in it (a new project, a simulation, Implement Design, a bitstream, a board programmed) with
 [GoatCounter](https://www.goatcounter.com): no cookies, no personal data, never the content of a
-project. The application and the downloaded `Silinx-ISE.html` send nothing. The counter is added by the
+project. The application and the downloaded `Silinx.html` send nothing. The counter is added by the
 site's build (`scripts/site-analytics.mjs`, when the repository variable `GOATCOUNTER_CODE` is set).
 
 Using Silinx in a course, a school or on your own? Tell us on
-[GitHub Discussions](https://github.com/pmnmalo/Silinx-ISE/discussions/151) (Help ▸ Tell Us Who You Are…).
+[GitHub Discussions](https://github.com/pmnmalo/Silinx/discussions/151) (Help ▸ Tell Us Who You Are…).
 
 ## Licence
 
-Silinx ISE is Copyright 2026 Pedro Maló and is free software, licensed under the
+Silinx is Copyright 2026 Pedro Maló and is free software, licensed under the
 [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only), with an additional permission
 to combine it with elkjs (EPL-2.0) — see [NOTICE](NOTICE). Modified versions, including ones offered
 to users over a network, must make their source code available under the same licence. Your

@@ -47,10 +47,10 @@ uiTest('#2826 an example\'s link opens it into Try it: the schematic\'s live sim
   assert.deepEqual(warnings(page), []);
 });
 
-uiTest('#2869 view=try on a state diagram: traffic\'s FSM opened in its Simulate panel', E, async (page) => {
+uiTest('#2869 view=try on a state diagram: traffic\'s FSM opened in its Try it panel', E, async (page) => {
   await openLink(page, 'open=example:traffic&top=traffic&view=try');
   await linkOpened(page);
-  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
+  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Try it panel', timeout: 30000 });
   assert.equal(await page.eval(() => window.Silinx.active?.id), 'fsm:src/traffic.fsm.json');
   await page.waitConsole(/Opened 'traffic' from a link( \(a new project\))?: Try it\./);
   assert.deepEqual(await consoleWarnings(page), []);
@@ -67,7 +67,7 @@ uiTest('#2881 view=try on an ASM chart: blinky\'s speed_ctrl opened, its simulat
   assert.deepEqual(await consoleWarnings(page), []);
 });
 
-uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link opens the net in its Simulate panel', E, async (page) => {
+uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link opens the net in its Try it panel', E, async (page) => {
   await makeProject(env, { name: 'PnLink', top: 'ctl', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject('PnLink');
   const row = await page.waitFor(() => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => /\bctl\b/.test(r.textContent)); return i > 0 ? i : null; }, [], { what: 'the net\'s row' });
@@ -79,7 +79,7 @@ uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link 
   await page.waitNoDialog();
   await openLink(page, new URL(link).hash.slice(1), 'pn=1');
   await linkOpened(page);
-  await page.waitFor(() => window.SilinxApp.findDoc('pn:src/ctl.pn.json')?.petriEditor?.panel === 'sim', [], { what: 'the net\'s Simulate panel', timeout: 30000 });
+  await page.waitFor(() => window.SilinxApp.findDoc('pn:src/ctl.pn.json')?.petriEditor?.panel === 'sim', [], { what: 'the net\'s Try it panel', timeout: 30000 });
   await page.waitConsole(/Opened 'PnLink' from a link: Try it\./);
   assert.equal(await page.dialogCount(), 0, 'the same project: no question');
   assert.deepEqual(await consoleWarnings(page), []);
@@ -95,7 +95,7 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   await page.menu('File', 'Copy Link to Project…');
   assert.equal(await page.waitDialog('Copy Link'), 'Copy Link');
   const plain = await dialogLink(page);
-  assert.match(plain, new RegExp(`^${env.server.url.replace(/[.]/g, '\\.')}/#design=[A-Za-z0-9_-]+(&ui=[A-Za-z0-9_-]+)?$`));
+  assert.match(plain, new RegExp(`^${env.server.url.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}/#design=[A-Za-z0-9_-]+(&ui=[A-Za-z0-9_-]+)?$`));
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-info').textContent), /^\d+ characters: some slide tools cut a link longer than 2000 \(export the project as a \.zip, host it, and link to it with #open=\)\.$/);
   // a view the design does not have: said in the dialog, no link
   await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = 'try'; s.dispatchEvent(new Event('change')); });
@@ -124,6 +124,27 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   await page.waitFor(() => window.Silinx.docs.some((d) => /^isim:/.test(d.id)), [], { what: 'the simulation open', timeout: 60000 });
   assert.deepEqual((await projects()).filter((p) => /^traffic/.test(p)), ['traffic']);
   assert.equal(await page.dialogCount(), 0, 'no question: the project is the link\'s');
+});
+
+uiTest('#3230 regression, the project\'s Copy Link… with Open the project only: no module in the link (its list disabled), the project opened with no source', E, async (page) => {
+  await openLink(page, 'open=example:traffic');
+  await linkOpened(page);
+  await page.menu('File', 'Copy Link to Project…');
+  await page.waitDialog('Copy Link');
+  const field = (f) => `.dlg-overlay [data-field=${f}]`;
+  assert.equal(await page.eval((s) => document.querySelector(s).value, field('view')), '');
+  assert.equal(await page.eval((s) => document.querySelector(s).disabled, field('module')), true);
+  // (a module other than the top set in the list anyway, and the view left out: still no module in the link)
+  await page.eval((s, u) => { const m = document.querySelector(s); m.value = 'timer'; m.dispatchEvent(new Event('change')); const c = document.querySelector(u); c.checked = false; c.dispatchEvent(new Event('change')); }, field('module'), field('ui'));
+  const link = await page.waitFor(() => document.querySelector('.dlg-overlay .link-out').value || null, [], { what: 'the link' });
+  assert.match(link, /#design=[A-Za-z0-9_-]+$/);
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await openLink(page, new URL(link).hash.slice(1), 'n=1');
+  await linkOpened(page);
+  await page.waitFor(() => document.querySelector('#hier .row'), [], { what: 'the Design tree' });
+  assert.equal(await page.eval(() => window.Silinx.active?.path ?? null), null, 'no source open');
+  assert.deepEqual(await consoleWarnings(page), [], 'no warnings');
 });
 
 uiTest('#2871 regression, Copy Link to This Module… with Open the project only: the link opens the project on that module, selected, its source open; the top too; with a view', E, async (page) => {
@@ -155,7 +176,7 @@ uiTest('#2871 regression, Copy Link to This Module… with Open the project only
   // with a view: the module selected, its view open
   await openLink(page, 'open=example:traffic&top=traffic&view=try', 'm=3');
   await linkOpened(page);
-  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Simulate panel', timeout: 30000 });
+  await page.waitFor(() => window.SilinxApp.findDoc('fsm:src/traffic.fsm.json')?.fsmEditor?.panel === 'sim', [], { what: 'the FSM\'s Try it panel', timeout: 30000 });
   assert.equal(await selected(), 'traffic');
 });
 
@@ -432,6 +453,34 @@ uiTest('#2829 a zip at another site is asked first (Cancel: nothing fetched); br
   }
   assert.deepEqual(await projects(), before);
   assert.equal(await exists('nothere'), false);
+});
+
+uiTest('#3042 a zip at another site that redirects: the redirection not followed (fetched with redirect: manual), refused, said in the console, nothing made', E, async (page) => {
+  const before = await projects();
+  const msg = 'ERROR: Open from a link: https://example.org/lecture3.zip redirects to another address, not followed: the link must give the zip\'s own address.';
+  // (the site's answer as the browser's fetch reports it: an opaque redirection with redirect: 'manual' (#3042);
+  // a redirection followed (#2962), to this computer, a local network or http, refused too)
+  for (const [answer, n] of [['manual', 1], ['https://[::7f00:1]/a.zip', 2], ['https://192.168.1.1/a.zip', 3], ['http://example.org/a.zip', 4]]) {
+    await openLink(page, 'open=https://example.org/lecture3.zip', `r=${n}`);
+    await page.waitDialog('Open from a Link');
+    await page.eval((a) => {
+      window.__fetched = [];
+      // (the application's own requests, such as a late /api/workspace, go to the real fetch and are not recorded, #3174)
+      const real = window.__realFetch || (window.__realFetch = window.fetch);
+      window.fetch = async (u, o) => {
+        if (String(u).startsWith('/api/')) return real(u, o);
+        window.__fetched.push([String(u), o.redirect, o.credentials]);
+        return a === 'manual' ? { type: 'opaqueredirect', ok: false, status: 0, statusText: '', redirected: false, url: String(u), body: null }
+          : { type: 'cors', ok: true, status: 200, statusText: 'OK', redirected: true, url: a, body: new Response(new Uint8Array([80, 75, 5, 6])).body };
+      };
+    }, answer);
+    await page.dialogButton('Open');
+    await page.waitFor((m) => window.__console().includes(m), [msg], { what: msg, timeout: 30000 }).catch(async (e) => { throw new Error(`${e.message}\n${await page.consoleText()}`); });
+    assert.deepEqual(await page.eval(() => window.__fetched), [['https://example.org/lecture3.zip', 'manual', 'omit']]);
+    assert.deepEqual(await consoleWarnings(page), [], 'no warnings');
+  }
+  assert.deepEqual(await projects(), before);
+  assert.equal(await exists('lecture3'), false);
 });
 
 uiTest('#2829 a link never sets the local server\'s token: only its own address (the token alone) does; the link still opened', E, async (page) => {

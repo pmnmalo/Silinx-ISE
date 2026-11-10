@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { contentSecurityPolicy, inlineScriptHashes, scriptHash, withMetaCsp, metaCsp, addSources } from '../server/csp.js';
+import { contentSecurityPolicy, inlineScriptHashes, scriptHash, withMetaCsp, metaCsp, addSources, relaySources, TRACKER_SOURCES } from '../server/csp.js';
+import { relayList } from '../core/collab-link.js';
 import { addAnalytics } from '../scripts/site-analytics.mjs';
 import './ui/core-hooks.js';   // (/core/… of the browser's modules)
 
@@ -22,11 +23,13 @@ test('#487 scriptHash / inlineScriptHashes: SHA-256 in base64 of each inline scr
 
 test('#487 contentSecurityPolicy: the server\'s header and a page\'s <meta> (no frame-ancestors), extra origins', () => {
   const header = directives(contentSecurityPolicy({ hashes: ["'sha256-x'"] }));
+  // (a shared project's meeting point, #3227: the WebTorrent trackers' origins, with no path)
+  assert.deepEqual(TRACKER_SOURCES, ['wss://open.ftorrent.com', 'wss://tracker.webtorrent.dev', 'wss://tracker.openwebtorrent.com', 'wss://tracker.btorrent.xyz', 'wss://tracker.files.fm:7073']);
   assert.deepEqual(header, {
     'default-src': ["'self'"],
     'script-src': ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", "'sha256-x'"],
     'worker-src': ["'self'", 'blob:'],
-    'connect-src': ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org'],
+    'connect-src': ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES],
     'img-src': ["'self'", 'data:', 'blob:'],
     'style-src': ["'self'", "'unsafe-inline'"],
     'font-src': ["'self'", 'data:'],
@@ -38,7 +41,7 @@ test('#487 contentSecurityPolicy: the server\'s header and a page\'s <meta> (no 
   const meta = directives(contentSecurityPolicy({ hashes: ["'sha256-y'"], scripts: ['https://a.test'], connect: ['https://a.test'], meta: true }));
   assert.equal(meta['frame-ancestors'], undefined);
   assert.deepEqual(meta['script-src'], ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'https://a.test', "'sha256-y'"]);
-  assert.deepEqual(meta['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', 'https://a.test']);
+  assert.deepEqual(meta['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES, 'https://a.test']);
 });
 
 test('#487 withMetaCsp / metaCsp / addSources: the <meta> first in <head>, replaced in place, quotes escaped', () => {
@@ -66,7 +69,7 @@ test('#487 the usage counter added to a page with a policy: its loader\'s hash, 
   // every inline script of the page is allowed by its hash: the application's and the loader; the counter's script by
   // its one versioned URL (#1439), not its host
   assert.deepEqual(d['script-src'], ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", ...inlineScriptHashes(out), 'https://gc.zgo.at/count.v5.js']);
-  assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', 'https://silinx.goatcounter.com']);
+  assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES, 'https://silinx.goatcounter.com']);
   assert.deepEqual(d['img-src'], ["'self'", 'data:', 'blob:', 'https://silinx.goatcounter.com']);
   assert.equal(addAnalytics(out, 'silinx'), out, 'once');
   // a page without a policy: none added
@@ -74,18 +77,18 @@ test('#487 the usage counter added to a page with a policy: its loader\'s hash, 
 });
 
 test('#487 the assets\' URLs of a built page: its version\'s folder next to the page served, on the site it names opened from a file; Yosys shared', async () => {
-  const layout = { dir: '15.12.0/', yosys: '../vendor/yowasp-yosys/0.70.1258/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
+  const layout = { dir: '15.12.0/', yosys: '../vendor/yowasp-yosys/0.70.1258/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
   globalThis.SILINX_ASSET_LAYOUT = layout;
   delete globalThis.SILINX_ASSETS;
   try {
     const { assetsBase, yosysBundleUrl, assetsRoot } = await import('../web/js/open-flow-browser.js?layout=1');
-    assert.equal(assetsBase({ protocol: 'file:', href: 'file:///tmp/Downloads/Silinx-ISE.html' }), 'https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/');
-    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx-ISE/' }), 'https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/');
-    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx-ISE/dev/index.html' }), 'https://pmnmalo.github.io/Silinx-ISE/dev/assets/15.12.0/');
-    assert.equal(yosysBundleUrl('https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx-ISE/assets/vendor/yowasp-yosys/0.70.1258/gen/bundle.js');
+    assert.equal(assetsBase({ protocol: 'file:', href: 'file:///tmp/Downloads/Silinx.html' }), 'https://pmnmalo.github.io/Silinx/assets/15.12.0/');
+    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx/' }), 'https://pmnmalo.github.io/Silinx/assets/15.12.0/');
+    assert.equal(assetsBase({ protocol: 'https:', href: 'https://pmnmalo.github.io/Silinx/dev/index.html' }), 'https://pmnmalo.github.io/Silinx/dev/assets/15.12.0/');
+    assert.equal(yosysBundleUrl('https://pmnmalo.github.io/Silinx/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx/assets/vendor/yowasp-yosys/0.70.1258/gen/bundle.js');
     // the folder of every version's assets (the cache's other versions pruned under it, #967): each edition's own
-    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx-ISE/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx-ISE/assets/');
-    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx-ISE/dev/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx-ISE/dev/assets/');
+    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx/assets/');
+    assert.equal(assetsRoot('https://pmnmalo.github.io/Silinx/dev/assets/15.12.0/'), 'https://pmnmalo.github.io/Silinx/dev/assets/');
     // a test's SILINX_ASSETS replaces them
     globalThis.SILINX_ASSETS = 'http://127.0.0.1:9/assets/x/';
     assert.equal(assetsBase({ protocol: 'file:', href: 'file:///x.html' }), 'http://127.0.0.1:9/assets/x/');
@@ -95,4 +98,13 @@ test('#487 the assets\' URLs of a built page: its version\'s folder next to the 
   assert.equal(assetsBase({ protocol: 'http:', href: 'http://127.0.0.1:8/' }), 'http://127.0.0.1:8/assets/');
   assert.equal(assetsRoot('http://127.0.0.1:8/assets/'), 'http://127.0.0.1:8/assets/');
   assert.equal(yosysBundleUrl('http://127.0.0.1:8/assets/'), 'http://127.0.0.1:8/assets/vendor/yowasp-yosys/gen/bundle.js');
+});
+
+test('#3227 the relays a page may use: each its origin and its WebSockets\' in connect-src, as the build lists them (SILINX_SITE_RELAYS); none by default', () => {
+  assert.deepEqual(relaySources([]), []);
+  assert.deepEqual(relaySources(relayList('https://relay.example.org/x http://127.0.0.1:8642')), ['https://relay.example.org', 'wss://relay.example.org', 'http://127.0.0.1:8642', 'ws://127.0.0.1:8642']);
+  const page = directives(contentSecurityPolicy({ connect: ['https://site.example', ...relaySources(relayList('https://relay.example.org'))], meta: true }));
+  assert.deepEqual(page['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES, 'https://site.example', 'https://relay.example.org', 'wss://relay.example.org']);
+  // (never a scheme alone: no other WebSocket server reached)
+  for (const csp of [contentSecurityPolicy({}), contentSecurityPolicy({ connect: relaySources(relayList('https://relay.example.org')) })]) assert.ok(!directives(csp)['connect-src'].some((c) => /^wss?:$/.test(c)));
 });

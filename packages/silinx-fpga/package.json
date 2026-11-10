@@ -28,14 +28,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pmnmalo/Silinx-ISE.git",
+    "url": "git+https://github.com/pmnmalo/Silinx.git",
     "directory": "packages/silinx-fpga"
   },
   "license": "Apache-2.0",
   "author": "Pedro Maló",
   "dependencies": {
-    "@silinx/nextpnr-himbaechel-spartan3e": "1.1.0",
-    "@silinx/nextpnr-himbaechel-spartan6": "https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-v0.1.3/silinx-nextpnr-himbaechel-spartan6-0.1.3.tgz",
+    "@silinx/nextpnr-himbaechel-spartan3e": "1.5.0",
+    "@silinx/nextpnr-himbaechel-spartan6": "https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-v0.3.0/silinx-nextpnr-himbaechel-spartan6-0.3.0.tgz",
     "@yowasp/yosys": "0.70.1258"
   },
   "peerDependencies": {

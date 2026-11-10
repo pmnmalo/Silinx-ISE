@@ -145,7 +145,7 @@ function bindStmt0(E, s, loc) {
     case 'report': return { k: 'report', msg: bindExpr(E, s.message, null, loc), sev: s.severity || 'note', loc };
     case 'assert': return {
       k: 'assert', c: bindExpr(E, s.cond, null, loc), msg: s.message ? bindExpr(E, s.message, null, loc) : null,
-      sev: s.severity || 'error', loc,
+      sev: s.severity || 'error', loc, ...(s.form === 'assume' ? { form: 'assume' } : {}), ...(s.quiet ? { quiet: true } : {}),
     };
   }
   throw new ElabError(`unsupported statement '${s.kind}'`, loc);

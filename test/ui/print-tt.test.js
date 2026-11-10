@@ -33,10 +33,14 @@ uiTest('#1510 a truth table prints its table, the Karnaugh map of the output in 
   assert.doesNotMatch(body, /class="tt-tab[^"]*" data-out="g"/, 'the other output\'s tab left out');
   assert.equal((body.match(/<svg class="tt-kmap"/g) || []).length, 1);
   assert.match(body, /a = 0[\s\S]*a = 1/);
+  // its cells in the default order (#2924): b c on the columns, d e on the rows
+  assert.deepEqual([...body.matchAll(/class="tt-kcell[^"]*" data-row="(\d+)"/g)].slice(0, 4).map((x) => +x[1]), [0, 4, 12, 8]);
+  assert.doesNotMatch(body, /class="tt-kmap-order"/, 'its order\'s selector left out');
   assert.match(body, /Minimal SOP/);
   assert.match(body, /f = d\.e \+ c\.e \+ c\.d \+ a\.b/);
-  // the minterm and maxterm lists, each on a line of its own (#2947)
-  assert.match(body, /<div class="tt-canon-minterms"><b>Minterm list<\/b>: <code[^>]*>f = Σm\([^<]*<\/code><\/div><div class="tt-canon-maxterms"><b>Maxterm list<\/b>: <code[^>]*>f = ΠM\(/);
+  // the minterm list in the canonical SOP's row, the maxterm list in the POS's (#2952)
+  assert.match(body, /<div class="tt-canon-sop"[^>]*>(?:(?!<\/div>)[\s\S])*<code class="tt-canon-list"[^>]*>f = Σm\(/);
+  assert.match(body, /<div class="tt-canon-pos"[^>]*>(?:(?!<\/div>)[\s\S])*<code class="tt-canon-list"[^>]*>f = ΠM\(/);
   // not its commands, its expression's field, its hints, its options, its empty notes
   assert.doesNotMatch(body, /class="tt-toolbar"|class="tt-expr-in"|class="hint|class="tt-groups"|class="tt-notes"|class="tt-notation"/);
   // the 3D map, as shown

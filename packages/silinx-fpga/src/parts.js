@@ -1,10 +1,10 @@
 // silinx-fpga's light entry (#1678): the parts, their families and resources, the constraints (UCF), the flow's
 // steps by name and the placed and routed design's format (XDL), without the toolchain behind them, for an
-// interface that shows a design and its board (Silinx ISE's pages) and loads the toolchain only when it runs.
+// interface that shows a design and its board (Silinx's pages) and loads the toolchain only when it runs.
 // ./index.js gives all of it too.
 
 // the parts: their families and resources
-export { FAMILY_INFO, familyOfPart, deviceFamily, isIseFamily, openOnlyDevice, familyName, familyFromXise, splitBitPart } from './family.js';
+export { FAMILY_INFO, familyOfPart, deviceFamily, isIseFamily, openOnlyDevice, experimentalDevice, vivadoDevice, noFlowMessage, constraintsFormatOf, constraintsExtOf, familyName, familyFromXise, splitBitPart } from './family.js';
 export { resourcesOf, resourceCount, resourceOfPrimitive } from './resources.js';
 export { usedOfReport, primitiveInstances, deviceChangeIssues } from './resource-check.js';
 
@@ -13,6 +13,7 @@ export { boardConstraintsText } from './board-constraints.js';
 export { parseUcf, generateUcf, checkUcf, bitName, boardAutoAssign, periodNs, ucfPlacesPins, backAnnotateUcf, locsNotOnBoard } from './ucf.js';
 
 export { PCF } from './pcf.js';
+export { XDC, readXdc, writeXdc } from './xdc.js';
 
 // the flow's steps
 export { OPEN_STEPS, OPEN_CHAIN, orderOpenSteps, orderSteps, engineOf } from './open-steps.js';

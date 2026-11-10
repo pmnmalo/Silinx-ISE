@@ -2,7 +2,7 @@
 //
 //   import { mountPetriEditor } from './petri-editor.js';
 //   const ed = mountPetriEditor(container, { model, onChange(model), linkInfo() -> { file } | null, onOpenFile(path),
-//     onProblems(diags), onCheck(diags), onMessage(text, isError) });
+//     onProblems(diags), onCheck(diags), onMessage(text, isError), readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.print();
 //   ed.select({ kind, id }); ed.destroy();
 //
@@ -18,14 +18,10 @@
 // its tools; its problems (`onProblems`, after every change; `onCheck`, its Check's: the token game's too, #2803) and its messages (`onMessage`: an arc that cannot be,
 // a PNML not read, a transition not enabled) go to the console (drawings.js, editor-problems.js; #2718).
 
-import { h, downloadText, linkModel, linkSnapshot, twoFingerView } from './ui.js';
-import { toolbarMenu } from './toolbar-menu.js';
+import { h, linkModel, linkSnapshot, twoFingerView } from './ui.js';
 import { mountSideFold } from './side-fold.js';
-import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
-import { panelToggle, PROPS_KEY } from './narrow.js';
-import { normalizePetri, newPetri, fire, toPnml, fromPnml } from '/core/petri.js';
-import { GateError, gateFile, kindOf } from '/core/import-gate.js';
+import { normalizePetri, newPetri, fire } from '/core/petri.js';
 import { copyDrawing, pasteDrawing, drawingClipEmpty } from '/core/drawclip.js';
 import { writeClip, readClip, pasteFromKey, hasClip } from './clipboard.js';
 import { mountPetriSim } from './petri-sim.js';
@@ -33,7 +29,8 @@ import { mountPetriSide } from './petri-side.js';
 import { mountPetriDraw } from './petri-draw.js';
 import { clone } from '/core/util.js';
 import { printDiagram, svgSnapshot } from './print.js';
-import { statusLine } from './status-line.js';
+import { mountPetriToolbar } from './petri-toolbar.js';
+import { petriReadOnlyChrome, lockPetriSide } from './petri-readonly.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const GRID = 20;
@@ -51,6 +48,7 @@ export function mountPetriEditor(container, opts = {}) {
   let drag = null;
   let fitted = false;                   // the view fitted once, or set by the user
   let destroyed = false;
+  const readOnly = !!opts.readOnly;     // (a net to read, a shared project followed, #3181: petri-readonly.js)
   let panel = null;                     // 'sim' | 'analysis' | null
   let sim = null;                       // { marking, fired: [], inputs: {}, log: [], timer }
   const hist = [JSON.stringify(M)];
@@ -62,47 +60,11 @@ export function mountPetriEditor(container, opts = {}) {
   const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `asm-btn ${cls}`, title, onclick }, label);
   const sep = () => h('span', { class: 'asm-sep' });
 
-  // ---------------------------------------------------------------- toolbar
-  const tools = {
-    select: toolIcon('select', 'select', 'Select and move (drag the background to pan, wheel to zoom)', () => setTool('select'), 'pn-tool'),
-    place: btn([h('span', { class: 'pn-ico-place' }), 'Place'], 'Click the drawing to add a place', () => setTool('place'), 'pn-tool asm-wide'),
-    transition: btn([h('span', { class: 'pn-ico-trans' }), 'Transition'], 'Click the drawing to add a transition', () => setTool('transition'), 'pn-tool asm-wide'),
-    arc: toolWide('arc', 'Arc', 'Click a place then a transition (or a transition then a place)', () => setTool('arc'), 'pn-tool'),
-    inhibitor: toolWide('inhibitor', 'Inhibitor', 'Click a place then a transition: the transition fires only while the place holds fewer tokens than the weight', () => setTool('inhibitor'), 'pn-tool'),
-  };
-  const delBtn = toolIcon('delete', 'del', 'Delete the selection (Del)', () => deleteSelection(), 'asm-danger');
-  const checkBtn = toolWide('check', 'Check', 'Check the net for errors and warnings (its token game too: transitions that never fire, deadlocks)', () => opts.onCheck?.(check()), 'pn-check');
-  const tabBtns = {
-    sim: toolWide('sim', 'Simulate', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
-    analysis: btn('∑ Analysis', 'Reachable markings, bounds, deadlocks, liveness, invariants', () => togglePanel('analysis'), 'pn-tab-btn'),
-  };
-  const pnmlIn = h('input', { type: 'file', accept: '.pnml,.xml', hidden: true });
-  pnmlIn.addEventListener('change', async () => {
-    const f = pnmlIn.files[0]; pnmlIn.value = '';
-    if (!f) return;
-    // (through the import gate, #2830: no DTD, its size and nesting; its name only said, never part of a path)
-    try {
-      const g = gateFile(f.name.replace(/[^\w.-]/g, '_'), new Uint8Array(await f.arrayBuffer()));
-      if (kindOf(g.path) !== 'xml') throw new Error(`${f.name}: not a PNML file (.pnml or .xml)`);
-      const n = fromPnml(g.text, { name: M.name }); M = normalizePetri({ ...n, lang: M.lang, generatedFile: M.generatedFile }); sel = null; commit(); fit();
-    } catch (e) { status(`PNML: ${e instanceof GateError ? `${f.name}: ${e.reason}` : e.message}`, true); }
+  // ---------------------------------------------------------------- toolbar (petri-toolbar.js)
+  const { tools, delBtn, tabBtns, linkHost, zoomLbl, info, toolbar } = mountPetriToolbar({
+    opts, root, btn, sep, M: () => M, setM: (m) => { M = m; }, setSel: (v) => { sel = v; }, setTool, deleteSelection,
+    check: (...a) => check(...a), togglePanel: (...a) => togglePanel(...a), zoomBtn, fit, commit, status: (...a) => status(...a)
   });
-  const linkHost = h('span', { class: 'pn-link' });
-  const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
-  const info = statusLine();   // (the net's counts and its tokens: in its status line, #2763)
-  const more = toolbarMenu([tabBtns.analysis,
-    btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
-    btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()),
-  ], { title: 'Analysis and PNML', btnClass: 'asm-btn' });
-  const toolbar = h('div', { class: 'asm-toolbar pn-toolbar' },
-    h('div', { class: 'asm-group' }, ...Object.values(tools)), sep(),
-    h('div', { class: 'asm-group' }, delBtn), sep(),
-    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBtn(f), () => fit()), zoomLbl), sep(),
-    h('div', { class: 'asm-group' }, checkBtn), sep(),
-    h('div', { class: 'asm-group' }, tabBtns.sim, pnmlIn),
-    h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
-    more.el, linkHost);
 
   // ---------------------------------------------------------------- canvas, panels
   const defs = sv('defs', {},
@@ -123,6 +85,7 @@ export function mountPetriEditor(container, opts = {}) {
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection);
   mountSideFold({ root, side, key: 'silinx.petri.props.folded' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), info.el);
+  if (readOnly) petriReadOnlyChrome({ root, toolbar, banner: opts.banner });
   const status = (msg, err = false) => { if (msg) opts.onMessage?.(msg, err); };   // (in the console)
 
   // ---------------------------------------------------------------- model edits, history
@@ -132,6 +95,7 @@ export function mountPetriEditor(container, opts = {}) {
   const newId = pfx => { const used = new Set([...M.places, ...M.transitions, ...M.arcs].map(x => x.id)); let i = 1; while (used.has(`${pfx}${i}`)) i++; return `${pfx}${i}`; };
   const newName = (pfx, list) => { const used = new Set(list.map(x => x.name.toLowerCase())); let i = 1; while (used.has(`${pfx}${i}`)) i++; return `${pfx}${i}`; };
   function commit() {
+    if (readOnly) { M = normalizePetri(JSON.parse(hist[hi])); render(); return; }   // (read only: nothing changes)
     M = normalizePetri(M);
     const s = JSON.stringify(M);
     if (s !== hist[hi]) { hist.length = hi + 1; hist.push(s); if (hist.length > 200) hist.shift(); hi = hist.length - 1; opts.onChange?.(clone(M)); }
@@ -199,7 +163,7 @@ export function mountPetriEditor(container, opts = {}) {
     M: () => M, arcFrom: () => arcFrom, delBtn, destroyed: () => destroyed, drag: () => drag,
     envOf: (...a) => envOf(...a), nodeOf, placeOf,
     refreshLink: (...a) => refreshLink(...a), renderPanel: (...a) => renderPanel(...a),
-    renderSide: (...a) => renderSide(...a), sel: () => sel, sim: () => sim, info, svg, uid,
+    renderSide: (...a) => { renderSide(...a); lockPetriSide(readOnly, side); }, sel: () => sel, sim: () => sim, info, svg, uid,
     view: () => view, world, zoomLbl
   });
 
@@ -247,7 +211,7 @@ export function mountPetriEditor(container, opts = {}) {
     if (t) {
       sel = { kind: t.kind, id: t.id };
       const n = nodeOf(t.id);
-      if (n) drag = { kind: 'move', sel0, id: n.id, x: n.x, y: n.y, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+      if (n && !readOnly) drag = { kind: 'move', sel0, id: n.id, x: n.x, y: n.y, dx: w.x - n.x, dy: w.y - n.y, moved: false };
       render();
     } else {
       sel = null;
@@ -280,6 +244,7 @@ export function mountPetriEditor(container, opts = {}) {
   root.addEventListener('keydown', e => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+    if (readOnly && (mod ? /^[zyxv]$/.test(k) : /^(Delete|Backspace)$/.test(e.key))) return;   // (read only: Copy, the zoom and the view kept)
     if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); undo(); }
     else if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); e.stopPropagation(); redo(); }
     else if (mod && k === 'c') { e.preventDefault(); copySel(); }
@@ -331,7 +296,7 @@ export function mountPetriEditor(container, opts = {}) {
     undo, redo, canUndo: () => hi > 0, canRedo: () => hi < hist.length - 1,
     // Edit ▸ Cut / Copy / Paste / Delete (#677): a place or a transition (an arc: Delete only)
     copy: () => copySel(), cut: () => copySel(true), paste: () => paste(), deleteSelection: () => deleteSelection(),
-    canCopy: () => !!sel && sel.kind !== 'arc', canDelete: () => !!sel, canPaste: () => hasClip('petri'),
+    canCopy: () => !!sel && sel.kind !== 'arc', canDelete: () => !readOnly && !!sel, canPaste: () => !readOnly && hasClip('petri'),
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file, normalizePetri); }); refreshLink(); },
     fit, refreshLink, print,

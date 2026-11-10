@@ -1,7 +1,8 @@
 // Silinx HLS (#1590): an hls::stream argument of a sequential module (core/c-fsmd.js): Vitis HLS's ap_fifo interface,
 // a FIFO outside the module (first-word fall-through): read, <s>_dout, <s>_empty_n, <s>_read (the value taken in the
-// cycle _read is 1); written, <s>_din, <s>_full_n, <s>_write. Each access a state of its own that waits while the FIFO
-// is empty (a read) or full (a write); the value read kept in a register. s.empty() and s.full() read _empty_n and
+// cycle _read is 1); written, <s>_din, <s>_full_n, <s>_write. Each access a state that waits while the FIFO is empty (a
+// read) or full (a write); a read's state also computes what comes before it and after it, with the value read (#2967),
+// kept in a register. s.empty() and s.full() read _empty_n and
 // _full_n. A pointer or an array argument with #pragma HLS INTERFACE ap_fifo is one too (#1901): each *p, p[i] a read,
 // each *p = v, p[i] = v a write, in the order of the code; with ap_hs, the same handshake named as Vitis HLS names it:
 // read, <p>, <p>_ap_vld, <p>_ap_ack; written, <p>, <p>_ap_vld, <p>_ap_ack, its _ap_vld not waiting for its _ap_ack.
@@ -12,6 +13,8 @@ import { exprMethods } from './c-dataflow-expr.js';
 const HS = { dout: '', empty_n: '_ap_vld', read: '_ap_ack', din: '', full_n: '_ap_ack', write: '_ap_vld' };
 /** A port's suffix: ap_fifo's, or ap_hs's. */
 export const fifoSuffix = (f, port) => (f.hs ? HS[port] : `_${port}`);
+// (a statement that only computes: no access of a memory, a stream, a sub-module or a blackbox)
+const computes = (x) => !/^(fifo|mem|word)|^(subcall|bbcall)$/.test(x.kind);
 const replace = (n, m) => { for (const k of Object.keys(n)) if (k !== 'loc') delete n[k]; Object.assign(n, m); };
 
 /** s.write(e) with x++ or x-- in e, x named once there, on the checked tree: s.write(e with x); x++; (C's order, the value
@@ -102,8 +105,8 @@ export const fifoMethods = {
     if (e?.kind !== 'call' || e.callee.kind !== 'member' || e.callee.e.kind !== 'id') return null;
     return this.slots.get(e.callee.e.name)?.kind === 'fifo' ? e.callee.name : null;
   },
-  /** A read of a stream, in e: a state that waits for a value (its _read the cycle it takes it), the value then in a
-   *  register (the expression reads it). */
+  /** A read of a stream, in e: a state that waits for a value (its _read the cycle it takes it), the value read there
+   *  and kept in a register (the expression reads it). */
   hoistFifoRead(e, at) {
     const f = this.slots.get(e.callee.e.name);
     if (f.group) return this.hoistFifoField(e, f, at);   // (a member of a stream of structs: its word's field, #1668)
@@ -111,10 +114,11 @@ export const fifoMethods = {
     const tmp = `ap_fifo_${f.name}_${f.reads++}`;
     this.slots.set(tmp, { kind: 'var', t: f.t, reg: this.reg(tmp, f.t), name: tmp });
     f.read = true;
-    // (its own state: nothing else waits with it)
-    if (at.cur.stmts.length) at.next();
+    // (in the state of the statements before it when they only compute, and of those after it, its value chained into
+    // them: an access a cycle, as Vitis HLS; the state held while it waits, nothing written, #2967)
+    if (!at.cur.stmts.every(computes)) at.next();
     at.cur.stmts.push({ kind: 'fiforead', fifo: f.name, tmp, loc: e.loc });
-    at.next();
+    at.cur.gate = at.cur.chain = true;
     return { kind: 'id', name: tmp, loc: e.loc };
   },
   /** s.write(v); as a statement: v's reads first, then a state that waits while the FIFO is full. */

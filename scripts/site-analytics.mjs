@@ -3,7 +3,7 @@
 // to the pages of the site built by scripts/build-standalone.mjs --site (the stable root, dev/), by
 // .github/workflows/pages.yml when the repository variable GOATCOUNTER_CODE is set:
 //   node scripts/site-analytics.mjs <site folder> <GoatCounter code>
-// Only index.html (the page opened on the site): Silinx-ISE.html, the file people download and open
+// Only index.html (the page opened on the site): Silinx.html, the file people download and open
 // from their disk, never counts. The counter runs only on the published host (*.github.io).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,7 +27,7 @@ export function addAnalytics(html, code) {
   const loader = `<script id="${MARK}">
 /* usage counts of the published site: GoatCounter, no cookies, no personal data (web/js/analytics.js); its title fixed and
    no referrer: the page's title names the project, the referrer may name a course */
-if (/\\.github\\.io$/.test(location.hostname)) { var s = document.createElement('script'); s.async = true; s.src = '${COUNT_JS}'; s.integrity = '${COUNT_JS_INTEGRITY}'; s.crossOrigin = 'anonymous'; s.dataset.goatcounter = 'https://${code}.goatcounter.com/count'; s.dataset.goatcounterSettings = '{"title":"Silinx ISE","referrer":""}'; document.head.appendChild(s); }
+if (/\\.github\\.io$/.test(location.hostname)) { var s = document.createElement('script'); s.async = true; s.src = '${COUNT_JS}'; s.integrity = '${COUNT_JS_INTEGRITY}'; s.crossOrigin = 'anonymous'; s.dataset.goatcounter = 'https://${code}.goatcounter.com/count'; s.dataset.goatcounterSettings = '{"title":"Silinx","referrer":""}'; document.head.appendChild(s); }
 </script>
 `;
   const i = html.lastIndexOf('</body>');

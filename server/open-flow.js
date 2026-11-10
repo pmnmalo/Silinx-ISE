@@ -178,7 +178,7 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
   if (!st.includes('synth')) {
     try { const r = JSON.parse(await fs.readFile(path.join(outDir, 'report.json'), 'utf8')); earlier = { synthesis: r.synthesis || null, files: { netlist: r.files?.netlist, synthesis: r.files?.synthesis } }; } catch { /* none */ }
   }
-  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'timing.txt', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
+  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'timing.txt', 'paths.json', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
   const spec = {
     top: gen.top, part: status.part, device: status.device, family: deviceFamily(project.device) || 'spartan3e',
     pkg: String(project.device.package).toLowerCase(), graph: status.graph, bitDbDir: BIT_DB_DIR,
@@ -190,6 +190,8 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
     ...(findPart(project.device.part) && { resources: resourcesOf(findPart(project.device.part), project.device.package) }),
     // the test bench, for the simulation models' generics (#120, #121)
     simTop: project.simTop || null,
+    // the logic analyzer's capture, inserted by the front end (core/flow-ide.js, #3176)
+    ...(project.capture && { capture: project.capture }),
     simSources: (project.files || []).filter(f => f.role === 'sim' && (f.lang === 'vhdl' || f.lang === 'verilog')).map(f => ({ path: f.path, lang: f.lang, file: safeJoin(projectDir, f.path) })),
   };
   await fs.writeFile(path.join(outDir, 'flow.json'), JSON.stringify(spec, null, 2) + '\n');
@@ -232,7 +234,7 @@ export async function openReports(buildDir, top, device) {
   let r = {};
   try { r = JSON.parse(await fs.readFile(path.join(buildDir, 'open', 'report.json'), 'utf8')); } catch { /* the flow wrote nothing */ }
   const out = { generatedAt: base.generatedAt, top, device: device || null, source: 'open',
-    synthesis: r.synthesis || undefined, map: r.map || undefined, par: r.par || undefined, timing: r.timing || undefined,
+    synthesis: r.synthesis || undefined, map: r.map || undefined, par: r.par || undefined, timing: r.timing || undefined, capture: r.capture || undefined,
     bit: r.bit && (base.bit || (fss.existsSync(r.bit.path) ? r.bit : null)) || undefined,   // (the iCE40's .bin: no .bit header, #2295) prom: r.prom || undefined,
     pinsUcf: r.pinsUcf && base.pinsUcf ? base.pinsUcf : undefined, simModels: {}, files: r.files || {} };
   // the simulation models (#120, #121, #122): this run's, or an earlier run's still in build/ (as the ISE flow's);

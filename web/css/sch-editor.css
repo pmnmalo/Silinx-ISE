@@ -264,8 +264,8 @@
 .sch-editor .se-code .tk-com { color: #008000; }
 
 /* ------------------------------------------------------------------ Symbol Info (datasheet) */
-.sch-editor .se-syminfo .se-more { color: var(--se-accent); text-decoration: none; white-space: nowrap; }
-.sch-editor .se-syminfo .se-more:hover { text-decoration: underline; }
+.sch-editor .se-syminfo .se-syminfo-more { color: var(--se-accent); text-decoration: none; white-space: nowrap; }
+.sch-editor .se-syminfo .se-syminfo-more:hover { text-decoration: underline; }
 .sch-editor .se-syminfo b { color: var(--se-fg); }
 .sch-editor .se-symdoc { width: min(1040px, 96%); height: min(760px, 94%); }
 .sch-editor .se-symdoc .sd-body { flex: 1; min-height: 0; overflow: auto; display: flex; gap: 14px; padding: 10px 12px; background: #fff; color: #000; }

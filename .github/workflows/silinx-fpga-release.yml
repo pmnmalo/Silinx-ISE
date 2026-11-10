@@ -5,7 +5,8 @@
 # waits for that run (scripts/wait-for-ci.mjs). The tagged commit must be on main, its package's version the tag's,
 # with its changelog section and no fragment left (scripts/sync-version.mjs --package). No token: npm's trusted
 # publishing (#2428) authenticates this workflow by GitHub's OIDC token, the package's trusted publisher on npmjs.com
-# being this repository and this workflow; it needs npm 11.5.1 or later (Node 22's is npm 10), pinned here. No
+# being this repository and this workflow; it needs npm 11.5.1 or later (Node 22's is npm 10), pinned here by its
+# tarball's integrity (#3049). No
 # GitHub Release: the Pages site serves the IDE's latest one. The OIDC token is the publish job's only (#2644): the
 # build job, which installs the dependencies and runs the repository's code, packs the package and holds none; the
 # publish job runs only npm, on that tarball.
@@ -59,7 +60,14 @@ jobs:
         with:
           name: silinx-fpga
           path: out
+      # npm 11.21.0 (its dependencies bundled in its tarball): the tarball checked against the integrity pinned here
+      # (npm view npm@11.21.0 dist.integrity), then installed from that file, before the job's token publishes (#3049)
       - name: Publish
+        env:
+          NPM_TARBALL: https://registry.npmjs.org/npm/-/npm-11.21.0.tgz
+          NPM_INTEGRITY: sha512-Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg==
         run: |
-          npm install --global npm@11.21.0 --ignore-scripts --no-audit --no-fund
+          curl -fsSL -o "$RUNNER_TEMP/npm.tgz" "$NPM_TARBALL"
+          test "sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/npm.tgz" | base64 -w0)" = "$NPM_INTEGRITY" || { echo "::error::$NPM_TARBALL is not the tarball of its pinned integrity"; exit 1; }
+          npm install --global "$RUNNER_TEMP/npm.tgz" --ignore-scripts --no-audit --no-fund
           npm publish ./out/silinx-fpga-*.tgz --provenance --access public --ignore-scripts

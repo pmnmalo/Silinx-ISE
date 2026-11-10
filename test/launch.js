@@ -1,4 +1,4 @@
-// Runs a Silinx launcher (start-silinx-ise.sh, Start Silinx-ISE.command, Start Silinx-ISE.bat) the
+// Runs a Silinx launcher (start-silinx.sh, Start Silinx.command, Start Silinx.bat) the
 // way a user does (double-click), on a free port, with a temporary workspace, configuration
 // directory and HOME, and without opening a browser (SILINX_NO_BROWSER). Used by the launcher test
 // (from the repository) and the release test (from the unzipped release).
@@ -12,9 +12,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** The launchers of this platform (file names, in the app folder). */
 export function launchersOf(platform = process.platform) {
-  if (platform === 'win32') return ['Start Silinx-ISE.bat'];
-  if (platform === 'darwin') return ['Start Silinx-ISE.command', 'start-silinx-ise.sh'];
-  return ['start-silinx-ise.sh'];
+  if (platform === 'win32') return ['Start Silinx.bat'];
+  if (platform === 'darwin') return ['Start Silinx.command', 'start-silinx.sh'];
+  return ['start-silinx.sh'];
 }
 
 export function freePort() {

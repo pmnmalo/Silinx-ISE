@@ -10,22 +10,22 @@
 // FileSystemDirectoryHandle (test/fixtures/fs-access-fake.js).
 
 import { DEV_SITE } from './prefs.js';
-import { openOnlyDevice } from '../../packages/silinx-fpga/src/parts.js';
+import { constraintsExtOf } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
-import { gateMessages, requireGated } from '../../core/import-gate.js';
+import { gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
 import { markUntrusted } from '../../core/trust.js';
+import { foldsToProjectFile, PROJECT_FILE } from '../../core/fold-name.js';
 
-const PROJECT_FILE = 'silinx.json';
 export const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
-// the site's development edition (https://pmnmalo.github.io/Silinx-ISE/dev/, built from main): its
+// the site's development edition (https://pmnmalo.github.io/Silinx/dev/, built from main): its
 // own browser storage, so that a development build never touches the stable edition's projects
 // (a workspace folder on the disk can still be opened by both); its settings too (web/js/prefs.js)
 export { DEV_SITE };
 const BROWSER_KEY = DEV_SITE ? 'silinx.dev.standalone.fs' : 'silinx.standalone.fs';
 
 const fail = msg => { throw new Error(msg); };
-const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(ucf|pcf)$/i.test(p) ? 'ucf' : 'text');
+const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(ucf|pcf|xdc)$/i.test(p) ? 'ucf' : 'text');
 /**
  * A project-relative path normalised: forward slashes, no empty or '.' segments. null when it would
  * leave the project (#483): not a string, empty, absolute ('/x', '\\\\host\\x', 'C:\\x'), a '..' segment,
@@ -41,8 +41,10 @@ export function safePath(p) {
 }
 /** safePath, or the error 'invalid path'. */
 export function cleanPath(p) { return safePath(p) ?? fail('invalid path'); }
-// (silinx.json is the project's description, not one of its files: never written, renamed or deleted as one)
-const notDescriptor = p => (p === PROJECT_FILE ? fail(`${PROJECT_FILE} is the project's description`) : p);
+// (silinx.json is the project's description, not one of its files: never written, renamed or deleted as one; by its
+// folded name, as a case-insensitive file system reads it: SILINX.JSON, ſilinx.json are the same file, #3034)
+const isDescriptor = foldsToProjectFile;
+const notDescriptor = p => (isDescriptor(p) ? fail(`${PROJECT_FILE} is the project's description`) : p);
 /** silinx.json's text, as server/projects.js writes it (2-space JSON, a final newline, no fileTree). */
 export function projectJsonText(name, pj) {
   const clean = { ...pj, name };
@@ -52,7 +54,7 @@ export function projectJsonText(name, pj) {
 /** A new empty project's silinx.json (server/projects.js createProject). */
 export const emptyProjectJson = (name, { device, board } = {}) => ({
   name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null, top: '', simTop: '', files: [],
-  constraints: `constraints/top${openOnlyDevice(device) ? '.pcf' : '.ucf'}`, stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
+  constraints: `constraints/top${constraintsExtOf(device)}`, stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
 });
 const under = (k, dir) => k === dir || k.startsWith(`${dir}/`);
 const plain = o => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -78,7 +80,7 @@ export function normalizeProjectJson(saved, name) {
   json.files = [];
   for (const f of Array.isArray(saved.files) ? saved.files : []) {
     const path = plain(f) ? safePath(f.path) : null;
-    if (!path || path === PROJECT_FILE) { warnings.push(`${PROJECT_FILE}: file path outside the project dropped (${plain(f) ? f.path : JSON.stringify(f)})`); continue; }
+    if (!path || isDescriptor(path)) { warnings.push(`${PROJECT_FILE}: file path outside the project dropped (${plain(f) ? f.path : JSON.stringify(f)})`); continue; }
     if (seen.has(path)) continue;
     seen.add(path);
     const lang = ['vhdl', 'verilog', 'ucf', 'text'].includes(f.lang) ? f.lang : langOf(path);
@@ -133,7 +135,7 @@ export function projectFromZip(name, gated, { xiseProject, textOf }) {
   // (an ISE project's sources are xiseProject's already; a Silinx export's files are all the zip's: the empty project's
   // default constraints path is not a file, and constraints/top.ucf, the pins, is one to keep, #2894)
   const known = new Set(xe ? p.json.files.map(f => f.path).concat(p.json.constraints) : []);
-  for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && k !== PROJECT_FILE) p.files[k] = v;
+  for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && !isDescriptor(k)) p.files[k] = v;
   const missing = [];
   if (pe) {
     let saved = null;
@@ -238,7 +240,7 @@ async function walk(dir, base = '', out = {}) {
     if (name.startsWith('.') || (base === '' && name === 'build')) continue;
     const rel = base ? `${base}/${name}` : name;
     if (h.kind === 'directory') await walk(h, rel, out);
-    else if (rel !== PROJECT_FILE) out[rel] = await (await h.getFile()).text();
+    else if (!isDescriptor(rel)) out[rel] = await (await h.getFile()).text();
   }
   return out;
 }
@@ -290,7 +292,7 @@ export function folderStore(root) {
       if (await store.exists(name)) fail(`project '${name}' already exists`);
       const dir = await projectDir(name, true);
       for (const d of dirs) await dirAt(dir, d.split('/'), true);
-      for (const [path, data] of Object.entries(files)) if (cleanPath(path) !== PROJECT_FILE) await writeAt(dir, path, data);
+      for (const [path, data] of Object.entries(files)) if (!isDescriptor(cleanPath(path))) await writeAt(dir, path, data);
       await writeAt(dir, PROJECT_FILE, projectJsonText(name, json));
       return read(name);
     }),
@@ -396,7 +398,14 @@ export function projectOps(getStore, examples = {}) {
         if (device) json.device = device;
         if (board !== undefined) json.board = board;
         json.files ||= [];
-        await S().create(name, json, clone(ex.files));
+        // a device whose constraints are of another format (the 7-series' XDC, #3142): the example's file left out, the
+        // board's written when the project opens (implement.js boardUcf), as the server does
+        const files = clone(ex.files), ext = constraintsExtOf(json.device);
+        if (json.constraints && !json.constraints.toLowerCase().endsWith(ext)) {
+          delete files[json.constraints];
+          json.constraints = json.constraints.replace(/\.[^./]*$/, '') + ext;
+        }
+        await S().create(name, json, files);
         return clone(json);
       }
       const json = emptyProjectJson(name, { device, board });
@@ -409,7 +418,7 @@ export function projectOps(getStore, examples = {}) {
       if (!NAME_RE.test(name || '')) fail(`invalid project name '${name}'`);
       const clean = normalizeProjectJson(json, name).json;
       const out = {};
-      for (const [k, v] of Object.entries(files)) { const p = cleanPath(k); if (p !== PROJECT_FILE) out[p] = v; }
+      for (const [k, v] of Object.entries(files)) { const p = cleanPath(k); if (!isDescriptor(p)) out[p] = v; }
       await S().create(name, clean, out);
       return clone(clean);
     },
@@ -455,6 +464,9 @@ export function projectOps(getStore, examples = {}) {
     },
     renameFile: async (name, from, to) => {
       from = notDescriptor(cleanPath(from)); to = notDescriptor(cleanPath(to));
+      // the new name by the import gate's rules for a name, as the local server's Rename (#2973)
+      const gated = normalizePath(to);
+      if (gated.reason) fail(`'${to}': not renamed: ${gated.reason}`);
       const p = await S().load(name);
       const json = clone(p.json);
       const inside = Object.keys(p.files).filter(k => k.startsWith(`${from}/`));

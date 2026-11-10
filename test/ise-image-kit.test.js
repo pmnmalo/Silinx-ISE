@@ -64,11 +64,11 @@ test('ise image kit: the inputs from ~/Downloads only when no argument says, and
 
 test('ise image kit: the staging folder is a new one of the run, the only one the trap removes (#1442)', () => {
   const sh = fs.readFileSync(SH, 'utf8');
-  assert.match(sh, /\nINSTALLER_DIR="\$\(mktemp -d "\$\(cd "\$\(dirname "\$INSTALLER"\)" && pwd\)\/\.silinx-ise-stage\.XXXXXX" 2>\/dev\/null \|\| mktemp -d\)"\ntrap 'rm -rf "\$INSTALLER_DIR"' EXIT\n/);
+  assert.match(sh, /\nINSTALLER_DIR="\$\(mktemp -d "\$\(cd "\$\(dirname "\$INSTALLER"\)" && pwd\)\/\.silinx-stage\.XXXXXX" 2>\/dev\/null \|\| mktemp -d\)"\ntrap 'rm -rf "\$INSTALLER_DIR"' EXIT\n/);
   assert.doesNotMatch(sh, /mkdir -p "\$INSTALLER_DIR"/);
-  assert.doesNotMatch(sh, /\.silinx-ise-stage"/);
+  assert.doesNotMatch(sh, /\.silinx-stage"/);
   for (const m of sh.matchAll(/trap '([^']*)' EXIT/g)) assert.match(m[1], /^rm -rf (?:"\$(?:LICENSE_DIR|INSTALLER_DIR|tmp)" ?)+$/, m[1]);
   const ps1 = fs.readFileSync(PS1, 'utf8').replace(/\r\n/g, '\n');   // CRLF
-  assert.match(ps1, /\$Stage = Join-Path \(Split-Path -Parent \$Installer\) \("\.silinx-ise-stage\." \+ \[guid\]::NewGuid\(\)\.ToString\("N"\)\.Substring\(0, 8\)\)\nNew-Item -ItemType Directory -Path \$Stage \| Out-Null\n/);
+  assert.match(ps1, /\$Stage = Join-Path \(Split-Path -Parent \$Installer\) \("\.silinx-stage\." \+ \[guid\]::NewGuid\(\)\.ToString\("N"\)\.Substring\(0, 8\)\)\nNew-Item -ItemType Directory -Path \$Stage \| Out-Null\n/);
   assert.doesNotMatch(ps1, /-Force -Path \$Stage/);
 });

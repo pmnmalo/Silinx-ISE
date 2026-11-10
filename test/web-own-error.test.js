@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { isOwnFailure, isOwnUrl, stackFrames } from '../web/js/own-error.js';
 
 const SERVER = { href: 'http://localhost:8080/', origin: 'http://localhost:8080' };
-const SITE = { href: 'https://example.github.io/Silinx-ISE/dev/?p=1#x', origin: 'https://example.github.io' };
-const FILE = { href: 'file:///Users/me/Downloads/Silinx-ISE.html', origin: 'null' };
+const SITE = { href: 'https://example.github.io/Silinx/dev/?p=1#x', origin: 'https://example.github.io' };
+const FILE = { href: 'file:///Users/me/Downloads/Silinx.html', origin: 'null' };
 const withStack = (msg, stack, E = Error) => { const e = new E(msg); e.stack = stack; return e; };
 
 test('a Silinx stack: Chrome, Firefox and Safari frames on the page\'s origin', () => {
@@ -20,8 +20,8 @@ test('a Silinx stack: Chrome, Firefox and Safari frames on the page\'s origin', 
 });
 
 test('the published site, the standalone single file (file://) and the workers\' blobs', () => {
-  assert.equal(isOwnFailure(withStack('b', 'Error: b\n    at https://example.github.io/Silinx-ISE/dev/:3:100'), SITE), true);
-  assert.equal(isOwnFailure(withStack('b', 'f@file:///Users/me/Downloads/Silinx-ISE.html:12:3400'), FILE), true);
+  assert.equal(isOwnFailure(withStack('b', 'Error: b\n    at https://example.github.io/Silinx/dev/:3:100'), SITE), true);
+  assert.equal(isOwnFailure(withStack('b', 'f@file:///Users/me/Downloads/Silinx.html:12:3400'), FILE), true);
   assert.equal(isOwnFailure(withStack('b', 'Error: b\n    at blob:null/1f2e-33:1:20'), FILE), true);
   assert.equal(isOwnUrl('blob:http://localhost:8080/9a8b', SERVER), true);
   assert.equal(isOwnUrl('blob:https://evil.example/9a8b', SERVER), false);

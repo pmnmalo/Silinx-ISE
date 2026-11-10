@@ -171,9 +171,10 @@ test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) bui
   assert.equal(cfg('CYINIT', 'CIN'), 11);
 });
 
-test('#2196 nextpnrTries: four placements at Normal up to 500 slices, one above; eight at High', () => {
-  assert.deepEqual(NEXTPNR_TRIES, { normal: 4, high: 8, maxSlices: 500 });
-  for (const [effort, slices, n] of [['normal', 1, 4], ['normal', 500, 4], ['normal', 501, 1], ['high', 1, 8], ['high', 4000, 8], [undefined, 100, 4]]) assert.equal(nextpnrTries(effort, slices), n);
+test('#2196 #2940 #3095 nextpnrTries: four placements at Normal up to 500 slices, one above; at High 32 up to 100 slices, eight up to 500, four above', () => {
+  assert.deepEqual(NEXTPNR_TRIES, { normal: 4, high: 8, highSmall: 32, smallSlices: 100, maxSlices: 500, highLarge: 4 });
+  for (const [effort, slices, n] of [['normal', 1, 4], ['normal', 100, 4], ['normal', 500, 4], ['normal', 501, 1], ['high', 1, 32], ['high', 100, 32],
+    ['high', 101, 8], ['high', 500, 8], ['high', 501, 4], ['high', 4000, 4], [undefined, 100, 4]]) assert.equal(nextpnrTries(effort, slices), n);
 });
 
 test('#2196 --seed 5: placements from that seed on, each reported, the fastest kept; the design with no clock takes one', { timeout: 300000 }, async () => {
@@ -722,6 +723,34 @@ test('#2137 nextpnr not starting (its chip database unreachable): Place & Route 
   assert.ok(!lines.some(l => /Silinx engine|All signals are completely routed/.test(l)), lines.join('\n'));
   assert.ok(lines.includes('=== SILINX FAILED par (exit 1) ==='), lines.join('\n'));
   assert.ok(!store['gates.bit']);
+});
+
+// #2818: nextpnr stopping on an exception of its own (a WebAssembly exception has no message) with no ERROR line: its
+// last line says where it stopped
+test('#2818 nextpnr stopping with no ERROR line: Place & Route fails, its last line said', { timeout: 300000 }, async () => {
+  const lines = [], store = { 'open/gates.json': gates() };
+  let device, db;
+  const crash = async (args, files, onLine) => {
+    onLine('Info: Running main analytical placer, max placement attempts per cell = 732655.');
+    onLine('Info:     at iteration #11, type ALL: wirelen solved = 2092, spread = 11208, legal = 15230; time = 0.04s');
+    onLine('');
+    throw new (class Exception {})();   // (as WebAssembly.Exception: no message)
+  };
+  const io = { log: l => lines.push(l), sources: () => [], ucf: ucf(), ucfName: 'gates.ucf',
+    device: () => (device ||= loadDeviceCache(findDeviceGraph('xc3s250ecp132-4'))), bitDb: () => (db ||= loadDb('xc3s250ecp132', { graph: io.device() })),
+    nextpnr: { spartan3e: { chipdb: async () => new Uint8Array(1), run: crash } },
+    write: (name, data) => { store[name] = data; return name; }, read: name => store[name] ?? null, save: () => {} };
+  const r = await runFlow({ top: 'gates', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
+    startupClk: 'JtagClk', engine: 'nextpnr', steps: ['translate', 'map', 'par'] }, io);
+  assert.equal(r.ok, false);
+  const at = lines.findIndex(l => l.startsWith('ERROR:'));
+  assert.deepEqual(lines.slice(at), [
+    'ERROR:Silinx - nextpnr failed: it stopped on an error',
+    '  nextpnr stopped with no error message, after: Info:     at iteration #11, type ALL: wirelen solved = 2092, spread = 11208, legal = 15230; time = 0.04s',
+    'The Silinx toolchain does not support this yet: implement the design in an ISE mode (Toolchain Settings).',
+    '=== SILINX FAILED par (exit 1) ===',
+  ]);
+  assert.deepEqual(lines.filter(l => /warning/i.test(l)), []);
 });
 
 test('#2137 engineOf: nextpnr, whatever a project saved (silinx, auto, nextpnr: #2136\'s choice) or none', () => {

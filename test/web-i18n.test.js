@@ -100,7 +100,7 @@ function sourceLabels() {
 test('every UI label in the web/js sources has a Portuguese translation', () => {
   // the same in both languages: names, codes, abbreviations
   const SAME = new Set(['work', 'iMPACT', 'OK', 'MSB', 'LSB', 'Bitstream', 'labels', 'Slew', 'Pull', 'Case', 'Flip-Flops', 'VHDL', 'Verilog', 'ISim', 'Bidir',
-    'schematic' /* default architecture name */, 'iMPACT — Boundary Scan', 'Interface' /* the same word in Portuguese */, 'Silinx' /* the Silinx interface: a proper name, #2451 */]);
+    'schematic' /* default architecture name */, 'iMPACT — Boundary Scan', 'Interface' /* the same word in Portuguese */, 'Silinx' /* the Silinx interface: a proper name, #2451 */, 'AMD Vivado' /* a product's name, #1649 */]);
   const labels = sourceLabels();
   assert.ok(labels.size > 200, `${labels.size} labels found`);
   const missing = [...labels].filter(([s]) => !SAME.has(s) && !/^[^a-z]*$/.test(s) && t(s) === s).map(([s, f]) => `${f}: ${s}`);
@@ -157,7 +157,7 @@ test('SSim (#920): the simulator\'s labels translated with its name, SSim; no la
 test('the Development menu\'s Pen and Touch Test (#1054): its labels, its states and Silinx\'s actions translated; the report in English', async () => {
   // every capitalised text of web/js/devmenu-pointer.js but the report's (English, pasted into an issue) and the name
   const src = fs.readFileSync(path.join(WEB, 'devmenu-pointer.js'), 'utf8');
-  const texts = [...new Set([...src.matchAll(/'([A-Z][^'$`]*[a-z][^'$`]*)'/g)].map((m) => m[1]))].filter((s) => !['Silinx', 'Silinx ISE: pen and touch test'].includes(s));
+  const texts = [...new Set([...src.matchAll(/'([A-Z][^'$`]*[a-z][^'$`]*)'/g)].map((m) => m[1]))].filter((s) => !['Silinx', 'Silinx: pen and touch test'].includes(s));
   assert.ok(texts.length >= 20, texts.join(', '));
   assert.deepEqual(texts.filter((s) => t(s) === s), []);
   assert.equal(t('Pen and Touch Test…'), 'Teste de Caneta e Toque…');

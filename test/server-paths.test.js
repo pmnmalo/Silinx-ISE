@@ -80,6 +80,20 @@ test('#1234 a symbolic link in a project to a folder outside it: not read, writt
   assert.equal(await P.readFile('Linked', 'alias/top.vhd'), await P.readFile('Linked', 'src/top.vhd'));
 });
 
+test('#3036 writeFile: a hidden file or folder refused, by its name or through a symbolic link in the project; build/ written', async () => {
+  await P.createProject({ name: 'Hidden' });
+  const dir = path.join(ws, 'Hidden');
+  fs.mkdirSync(path.join(dir, '.git/hooks'), { recursive: true });
+  link(path.join(dir, '.git'), path.join(dir, 'gitlink'));
+  for (const [p, seg] of [['.git/hooks/pre-commit', '.git'], ['src/.vscode/tasks.json', '.vscode'], ['.env', '.env'], ['gitlink/hooks/pre-commit', '.git']])
+    await assert.rejects(P.writeFile('Hidden', p, 'x'), e => e.status === 400 && e.message === `'${p}': not written: hidden file or folder ('${seg}')`, p);
+  assert.deepEqual(fs.readdirSync(path.join(dir, '.git/hooks')), []);
+  assert.ok(!fs.existsSync(path.join(dir, 'src/.vscode')) && !fs.existsSync(path.join(dir, '.env')));
+  await P.writeFile('Hidden', 'build/open/top.v', 'module top; endmodule\n');   // (not a source of the project)
+  assert.equal(fs.readFileSync(path.join(dir, 'build/open/top.v'), 'utf8'), 'module top; endmodule\n');
+  assert.deepEqual((await P.readProject('Hidden')).files, []);
+});
+
 test('#1234 a symbolic link to a file outside the project', { skip: !canLinkFiles && 'no rights to make links to files' }, async () => {
   await P.createProject({ name: 'FileLink' });
   fs.writeFileSync(path.join(tmp, 'id_rsa'), 'KEY');
@@ -88,4 +102,12 @@ test('#1234 a symbolic link to a file outside the project', { skip: !canLinkFile
   await assert.rejects(P.readFile('FileLink', 'src/top.vhd'), e => e.message === 'path escapes project');
   await assert.rejects(P.writeFile('FileLink', 'src/top.vhd', 'overwritten'), e => e.message === 'path escapes project');
   assert.equal(fs.readFileSync(path.join(tmp, 'id_rsa'), 'utf8'), 'KEY');
+});
+
+test('#2917 projectDir: a project name that is not a string is refused as invalid (400), never joined into a path', () => {
+  for (const name of [['demo'], { toString: () => 'demo' }, 7, null, undefined]) {
+    assert.throws(() => P.projectDir(name), e => e instanceof P.HttpError && e.status === 400 && /^invalid project name/.test(e.message), String(name));
+  }
+  assert.equal(P.projectDir('demo'), path.join(ws, 'demo'));
+  assert.throws(() => P.projectDir('../demo'), e => e.status === 400);
 });

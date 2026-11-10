@@ -176,6 +176,14 @@ export function parseNetName(s) {
   return { base: m[1], width: m[2] != null ? Math.abs(+m[2] - +m[3]) + 1 : null, ...(m[2] != null ? { msb: +m[2], lsb: +m[3] } : {}) };
 }
 
+// The range of an I/O marker's type, constant bounds only (#2961): std_logic_vector(4 downto 1), (1 to 4), [4:1] ->
+// { msb, lsb } as written (left, right); null for a scalar, a range of generics or no type.
+export function portRange(p) {
+  const t = String(p?.type ?? '');
+  const m = /\(\s*(\d+)\s+(?:downto|to)\s+(\d+)\s*\)\s*$/i.exec(t) || /^\s*(?:signed\s+)?\[\s*(\d+)\s*:\s*(\d+)\s*\]\s*$/.exec(t);
+  return m ? { msb: +m[1], lsb: +m[2] } : null;
+}
+
 // The net, other than `except`, that a net name would join (#689): net names (labels) and I/O markers of
 // the same name are one net, connected by name without a wire, as in ISE (case-insensitive in VHDL). The
 // name's base counts (d(7:0): d). nl: netlist(doc). Returns that net, or null.
@@ -414,9 +422,10 @@ export function netlist(docIn, { modules = {} } = {}) {
     net.drivers = drv;
     net.width = portW[0] ?? lw[0] ?? drv.find(e => isNum(e.width))?.width ?? (cands.length ? Math.max(...cands) : (wires.some(id => doc.wires.find(w => w.id === id)?.bus) ? null : 1));
     if (net.width == null) net.width = 1;
-    // a bus named with its indices, not from 0 (d(7:4), #1689): declared with them; an I/O marker's net keeps 0
-    const rng = !ports.length && labels.find(L => L.lsb != null && L.msb > L.lsb && L.width === net.width);
-    if (rng && rng.lsb > 0) net.range = { msb: rng.msb, lsb: rng.lsb };
+    // a bus named with its indices, not from 0 (d(7:4), #1689): declared with them (named ascending, d(4:7), #2903: its
+    // bits the same, 7 downto 4); an I/O marker's net by its port's type, a(4 downto 1) / [4:1] (#2961), else from 0
+    const rng = ports.length ? portRange(doc.ports.find(p => p.id === ports[0].port)) : labels.find(L => L.lsb != null && L.msb !== L.lsb && L.width === net.width);
+    if (rng && Math.min(rng.msb, rng.lsb) > 0 && Math.abs(rng.msb - rng.lsb) + 1 === net.width) net.range = { msb: Math.max(rng.msb, rng.lsb), lsb: Math.min(rng.msb, rng.lsb) };
     const mism = new Set(cands);
     if (mism.size > 1) {
       const where = pinW.find(e => e.width !== net.width) || eps[0];

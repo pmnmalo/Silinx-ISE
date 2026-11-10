@@ -39,9 +39,9 @@ test('version label: the version alone, or the development commit (English and P
   assert.equal(versionLabel(null), VERSION);
   assert.equal(versionLabel({ commit: 'abc1234' }), 'dev:abc1234');
   assert.equal(versionLabel({ commit: 'abc1234', date: '2026-10-13 11:12' }), 'dev:abc1234 (2026-10-13 11:12)');
-  assert.equal(t('Silinx ISE dev:abc1234 (2026-10-13 11:12)'), 'Silinx ISE dev:abc1234 (2026-10-13 11:12)');
+  assert.equal(t('Silinx dev:abc1234 (2026-10-13 11:12)'), 'Silinx dev:abc1234 (2026-10-13 11:12)');
   assert.equal(t(versionLabel({ commit: 'abc1234' })), 'dev:abc1234');
-  assert.equal(t('Silinx ISE dev:abc1234 (2026-10-13 11:12) Project Navigator'), 'Silinx ISE dev:abc1234 (2026-10-13 11:12) Project Navigator');
+  assert.equal(t('Silinx dev:abc1234 (2026-10-13 11:12) Project Navigator'), 'Silinx dev:abc1234 (2026-10-13 11:12) Project Navigator');
 });
 
 // #707: a development build's changes since the last release, typed by their issues' labels (GitHub's API faked here)
@@ -52,7 +52,7 @@ test('devChanges: the last release, the changes with their labels; the token onl
   const r = await devChanges('.', { env: { GITHUB_TOKEN: 'secret-token' }, fetch, files, tags: ['v15.9.0', 'v15.11.3', 'v15.11.2', 'vnope'] });
   assert.equal(r.since, '15.11.3');
   assert.deepEqual(r.changes.map(c => [c.issue, c.type]), [[6, 'other'], [5, 'bugfix']]);
-  assert.deepEqual(asked.map(a => a[0]).sort(), ['https://api.github.com/repos/pmnmalo/Silinx-ISE/issues/5', 'https://api.github.com/repos/pmnmalo/Silinx-ISE/issues/6']);
+  assert.deepEqual(asked.map(a => a[0]).sort(), ['https://api.github.com/repos/pmnmalo/Silinx/issues/5', 'https://api.github.com/repos/pmnmalo/Silinx/issues/6']);
   assert.ok(asked.every(a => a[1] === 'Bearer secret-token'));
   assert.doesNotMatch(JSON.stringify(r), /secret-token/);
   // a request that fails: its change 'other'

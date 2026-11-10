@@ -2,7 +2,8 @@
 
 `<part>.json.gz`: the routing graph of a device (its tiles, sites, wires and routing switches) in
 Silinx's own packed format (`packages/silinx-fpga/src/fpga/device.js`, `packDevice`), used by the Silinx toolchain's
-placer, router and bitstream writer (`packages/silinx-fpga/src/fpga/`).
+timing, routing check and bitstream writer (`packages/silinx-fpga/src/fpga/`), and by the Spartan-6's packer and the placer of
+its fixed sites.
 
 | File | Device | Board |
 |---|---|---|
@@ -10,7 +11,7 @@ placer, router and bitstream writer (`packages/silinx-fpga/src/fpga/`).
 | `xc3s250ecp132-4.json.gz` | XC3S250E, CP132 package (any speed grade) | Digilent Basys2-250 |
 | `xc3s500efg320-4.json.gz` | XC3S500E, FG320 package (any speed grade) | Digilent Nexys2-500, Xilinx Spartan-3E Starter Kit |
 | `xc3s1200efg320-4.json.gz` | XC3S1200E, FG320 package (any speed grade) | Digilent Nexys2-1200 |
-| `xc6slx16csg324-3.json.gz` | XC6SLX16, CSG324 package (any speed grade) | Digilent Nexys3 (the Spartan-6 toolchain under development, #1) |
+| `xc6slx16csg324-3.json.gz` | XC6SLX16, CSG324 package (any speed grade) | Digilent Nexys3 |
 | `xc6slx45csg324-3.json.gz` | XC6SLX45, CSG324 package (any speed grade) | Digilent Atlys (the same) |
 
 The Silinx toolchain writes bitstreams for the devices that also have a bit database

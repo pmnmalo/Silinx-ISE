@@ -57,6 +57,6 @@ test('#2570 the notices: the downloaded packages listed and marked, with a note'
   assert.match(md, /ships all of them but the ones it downloads on their first use;/);
   for (const c of THIRD_PARTY.filter(c => c.downloaded)) {
     const section = md.slice(md.indexOf(`## ${c.name} ${c.version} `));
-    assert.match(section.slice(0, section.indexOf('\n## ', 1)), /\nNot in silinx-ise-<version>\.zip: Silinx downloads it from npm's registry on its first use\.\n/, c.name);
+    assert.match(section.slice(0, section.indexOf('\n## ', 1)), /\nNot in silinx-<version>\.zip: Silinx downloads it from npm's registry on its first use\.\n/, c.name);
   }
 });

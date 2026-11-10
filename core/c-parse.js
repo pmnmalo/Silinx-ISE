@@ -10,7 +10,7 @@
 //   Var     { kind: 'var', name, type, init: Expr | { kind: 'init', items: [Expr | init] } | null, static, const, loc }
 //   Typedef { kind: 'typedef', name, type, loc }
 //   Type    { kind: 'int', name, signed, bits | null, widthExpr?, ap?: true } | { kind: 'void' } |
-//           { kind: 'float', name } (refused by the checks) | { kind: 'array', of, size: Expr | null } |
+//           { kind: 'float', name, base? (a typedef's: float / double) } | { kind: 'array', of, size: Expr | null } |
 //           { kind: 'ptr', to } | { kind: 'struct', name } (refused) ; const / volatile flags on it
 //   Stmt    block { items } | decl { vars } | expr { e } | if { cond, then, else } | for { init, cond, step, body } |
 //           while { cond, body } | do { body, cond } | switch { e, body } | case { value } | default |
@@ -363,7 +363,8 @@ function stmtParser(T, E, typedefs) {
     for (;;) {
       const d = declarator(s.type);
       if (s.typedef) {
-        typedefs.set(d.name, { ...d.type, name: d.name });
+        // (a float's or a double's: which of the two kept as its base, the name the typedef's, #3009)
+        typedefs.set(d.name, { ...d.type, name: d.name, ...(d.type.kind === 'float' && { base: d.type.base ?? d.type.name }) });
         out.push({ kind: 'typedef', name: d.name, type: d.type, loc: d.loc });
       } else if (d.params) {
         const fn = { kind: 'func', name: d.name, ret: d.type, params: d.params, body: null, static: s.static, loc: d.loc };

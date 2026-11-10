@@ -1,4 +1,4 @@
-Silinx ISE
+Silinx
 Copyright 2026 Pedro Maló
 
 This program is free software: you can redistribute it and/or modify it under the terms of the
@@ -7,7 +7,7 @@ LICENSE). It is distributed in the hope that it will be useful, but WITHOUT ANY 
 even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 Affero General Public License for more details.
 
-Source code: https://github.com/pmnmalo/Silinx-ISE
+Source code: https://github.com/pmnmalo/Silinx
 
 Additional permission under GNU AGPL version 3 section 7:
 If you modify this program, or any covered work, by linking or combining it with elkjs (the
@@ -21,7 +21,8 @@ Its toolchain, silinx-fpga (packages/silinx-fpga: synthesis, pack, place, route,
 device data), is Copyright 2026 Pedro Maló too, under the Apache License 2.0 (its LICENSE and NOTICE).
 
 It includes open-source components from other projects, each under its own licence:
-CodeMirror (MIT), Express and its dependencies (MIT, ISC, BSD-3-Clause), Yosys (YoWASP, ISC),
+CodeMirror (MIT), Express and its dependencies (MIT, ISC, BSD-3-Clause), Yjs, y-protocols, y-codemirror.next, lib0, ws and Trystero (MIT: shared
+projects), Yosys (YoWASP, ISC),
 nextpnr with the Spartan-3E and the Spartan-6 (nextpnr-spartan, ISC; with Boost, BSL-1.0, and Eigen, MPL-2.0: source code at
 https://gitlab.com/libeigen/eigen), a port of adepttool (MIT) and elkjs (Eclipse Public License 2.0, or GNU GPL 3.0 or later; source code:
 https://github.com/kieler/elkjs). The micro80 example includes light8080 (LGPL-2.1, https://github.com/jaruiz/light8080).
@@ -29,6 +30,6 @@ Their licence texts are in THIRD-PARTY-NOTICES.md.
 
 Your designs, and the HDL Silinx generates for them, are not covered by this licence.
 
-Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.
+Silinx is an independent project, not affiliated with or endorsed by AMD/Xilinx.
 Xilinx, ISE, ISim, iMPACT, Spartan and Virtex are trademarks of AMD. Xilinx ISE itself is
 not included and must not be redistributed.

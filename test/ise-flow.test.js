@@ -170,7 +170,7 @@ test('local mode: run.sh runs the ISE tools found on PATH; ports without LOC get
   assert.match(calls, /^partgen -v xc3s250ecp132$/m);
   assert.match(calls, /^ngdbuild -intstyle xflow -dd _ngo -nt timestamp -uc top.ucf -p xc3s250e-cp132-4 top.ngc top.ngd$/m);
   assert.match(calls, /^par -w -intstyle xflow -ol high -t 1 top_map.ncd top.ncd top.pcf$/m);
-  assert.match(calls, /^trce -intstyle xflow -v 3 -s 4 -n 3 -fastpaths -xml top.twx top.ncd -o top.twr top.pcf -ucf top.ucf$/m);
+  assert.match(calls, /^trce -intstyle xflow -v 1 -s 4 -n 20 -fastpaths -xml top.twx top.ncd -o top.twr top.pcf -ucf top.ucf$/m);
 });
 
 // #34: the EPFL benchmarks' escaped port names (\opcode[0] ): XST calls them _opcode[0]_, the

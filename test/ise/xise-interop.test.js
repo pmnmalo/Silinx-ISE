@@ -41,7 +41,7 @@ exit 0
 let tmp, cfg, srv, base, NODE_CODEC;
 before(async () => {
   if (skip) return;
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-interop-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-interop-'));
   // the user's remoteDir, read before the test's own configuration replaces theirs (#1916)
   cfg = iseExamplesConfig({ host: LOCAL ? null : { user: HOST[1], host: HOST[2] }, image: IMAGE });
   process.env.SILINX_WORKSPACE = path.join(tmp, 'ws');

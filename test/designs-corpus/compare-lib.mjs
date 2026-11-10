@@ -17,16 +17,28 @@ export function lastError(job) {
 // names (the Process Properties' Optimization of #2470: Area, a new project's default, and Speed); results without it
 // (before #2941) are of the Optimization Efforts Normal and High
 export const OPTIMIZATIONS = ['area', 'speed'];
-const OPTIMIZATION_NAMES = { area: 'Area', speed: 'Speed', fast: 'Fast' };
+const OPTIMIZATION_NAMES = { area: 'Area', speed: 'Speed', fast: 'Fast', normal: 'Normal', high: 'High' };
 /** The names of the results' two Silinx builds: { main, second } ('Area', 'Speed'; 'Normal', 'High' before #2941). */
 export function silinxSides(res) {
   const [main, second] = res?.optimizations || [];
   return main ? { main: OPTIMIZATION_NAMES[main], second: OPTIMIZATION_NAMES[second] } : { main: 'Normal', second: 'High' };
 }
-/** Whether a run's results (a --filter run's) can be merged into the earlier ones: both of the same Optimizations. */
-export const mergeable = (old, now) => String(old?.optimizations || '') === String(now?.optimizations || '');
+// Since #3070 each design is built at each of the results' `goals` (Silinx's Optimizations Area, Speed and Fast) by both
+// flows, ISE at the same goal (its XST properties of GOAL_IMPL: opt_mode and opt_level): a design's `goals` hold
+// { [goal]: { silinx, ise } }
+export const GOALS = ['area', 'speed', 'fast'];
+export const goalName = g => OPTIMIZATION_NAMES[g] || g;
+/** A design's builds by goal ({ [goal]: { silinx, ise } }), also of the results before #3070 (`silinx`, `silinxHigh`, one `ise`). */
+export function buildsOf(d, res) {
+  if (d.goals) return d.goals;
+  const [main, second] = res?.optimizations || ['normal', 'high'];
+  return { [main]: { silinx: d.silinx, ise: d.ise }, ...(d.silinxHigh ? { [second]: { silinx: d.silinxHigh, ise: d.ise } } : {}) };
+}
+/** Whether a run's results (a --filter run's) can be merged into the earlier ones: both of the same Optimizations (goals). */
+export const mergeable = (old, now) => String(old?.goals || '') === String(now?.goals || '') && String(old?.optimizations || '') === String(now?.optimizations || '');
 
-/** The designs built before (no error on a side) that fail now on that side: ['name (Silinx): error', …]. */
+/** The designs built before (no error on a side) that fail now on that side: ['name (Silinx): error', …]; a build not made
+ *  (left out) or timed out is not one. */
 export function newFailures(before, now) {
   const old = new Map((before?.designs || []).map(d => [d.name, d]));
   const out = [];
@@ -34,6 +46,16 @@ export function newFailures(before, now) {
   for (const d of now.designs || []) {
     const o = old.get(d.name);
     if (!o) continue;
+    if (now.goals) {
+      const was = buildsOf(o, before), is = buildsOf(d, now);
+      for (const g of now.goals) {
+        for (const [side, label] of [['silinx', 'Silinx'], ['ise', 'ISE']]) {
+          // (a build stopped at its time limit is a gap of this run's, as one not made, #3292: not a failure)
+          if (was[g]?.[side] && !was[g][side].error && is[g]?.[side]?.error && !is[g][side].timedOut) out.push(`${d.name} (${label}, ${goalName(g)}): ${is[g][side].error}`);
+        }
+      }
+      continue;
+    }
     for (const [side, label] of [['silinx', opt ? `Silinx, ${opt.main}` : 'Silinx'], ['silinxHigh', opt ? `Silinx, ${opt.second}` : 'Silinx, effort High'], ['ise', 'ISE']]) {
       if (o[side] && !o[side].error && d[side]?.error) out.push(`${d.name} (${label}): ${d[side].error}`);
     }

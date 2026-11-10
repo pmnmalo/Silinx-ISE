@@ -1,0 +1,837 @@
+Release 14.7 Trace  (lin64)
+trce -intstyle xflow -v 1 -s 4 -n 20 -fastpaths (ISE 14.7 on the Silinx example, its setup paths only)
+(…)
+Timing constraint: TS_clk = PERIOD TIMEGRP "clk" 20 ns HIGH 50%;
+For more information, see Period Analysis in the Timing Closure User Guide (UG612).
+
+ 5773 paths analyzed, 291 endpoints analyzed, 0 failing endpoints
+ 0 timing errors detected. (0 setup errors, 0 hold errors, 0 component switching limit errors)
+ Minimum period is   9.539ns.
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/seconds_0 (SLICE_X35Y15.CE), 98 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     10.461ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/seconds_0 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      9.539ns (Levels of Logic = 4)
+  Clock Path Skew:      0.000ns
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/seconds_0
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X34Y15.F1      net (fanout=11)       1.795   u_timer/last_cmp_eq0000
+    SLICE_X34Y15.X       Tilo                  0.759   u_timer/seconds_not0001
+                                                       u_timer/seconds_not00011
+    SLICE_X35Y15.CE      net (fanout=3)        1.133   u_timer/seconds_not0001
+    SLICE_X35Y15.CLK     Tceck                 0.555   u_timer/seconds<0>
+                                                       u_timer/seconds_0
+    -------------------------------------------------  ---------------------------
+    Total                                      9.539ns (3.724ns logic, 5.815ns route)
+                                                       (39.0% logic, 61.0% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/seconds_2 (SLICE_X34Y17.CE), 98 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     10.716ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/seconds_2 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      9.284ns (Levels of Logic = 4)
+  Clock Path Skew:      0.000ns
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/seconds_2
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X34Y15.F1      net (fanout=11)       1.795   u_timer/last_cmp_eq0000
+    SLICE_X34Y15.X       Tilo                  0.759   u_timer/seconds_not0001
+                                                       u_timer/seconds_not00011
+    SLICE_X34Y17.CE      net (fanout=3)        0.878   u_timer/seconds_not0001
+    SLICE_X34Y17.CLK     Tceck                 0.555   u_timer/seconds<2>
+                                                       u_timer/seconds_2
+    -------------------------------------------------  ---------------------------
+    Total                                      9.284ns (3.724ns logic, 5.560ns route)
+                                                       (40.1% logic, 59.9% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/seconds_1 (SLICE_X35Y17.CE), 98 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     10.992ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/seconds_1 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      9.008ns (Levels of Logic = 4)
+  Clock Path Skew:      0.000ns
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/seconds_1
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X34Y15.F1      net (fanout=11)       1.795   u_timer/last_cmp_eq0000
+    SLICE_X34Y15.X       Tilo                  0.759   u_timer/seconds_not0001
+                                                       u_timer/seconds_not00011
+    SLICE_X35Y17.CE      net (fanout=3)        0.602   u_timer/seconds_not0001
+    SLICE_X35Y17.CLK     Tceck                 0.555   u_timer/seconds<1>
+                                                       u_timer/seconds_1
+    -------------------------------------------------  ---------------------------
+    Total                                      9.008ns (3.724ns logic, 5.284ns route)
+                                                       (41.3% logic, 58.7% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_16 (SLICE_X33Y24.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.008ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_16 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.985ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_16
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y24.SR      net (fanout=12)       1.172   u_timer/cycles_or0000
+    SLICE_X33Y24.CLK     Tsrck                 0.910   u_timer/cycles<16>
+                                                       u_timer/cycles_16
+    -------------------------------------------------  ---------------------------
+    Total                                      8.985ns (4.024ns logic, 4.961ns route)
+                                                       (44.8% logic, 55.2% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_17 (SLICE_X33Y24.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.008ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_17 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.985ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_17
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y24.SR      net (fanout=12)       1.172   u_timer/cycles_or0000
+    SLICE_X33Y24.CLK     Tsrck                 0.910   u_timer/cycles<16>
+                                                       u_timer/cycles_17
+    -------------------------------------------------  ---------------------------
+    Total                                      8.985ns (4.024ns logic, 4.961ns route)
+                                                       (44.8% logic, 55.2% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_18 (SLICE_X33Y25.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.008ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_18 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.985ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_18
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y25.SR      net (fanout=12)       1.172   u_timer/cycles_or0000
+    SLICE_X33Y25.CLK     Tsrck                 0.910   u_timer/cycles<18>
+                                                       u_timer/cycles_18
+    -------------------------------------------------  ---------------------------
+    Total                                      8.985ns (4.024ns logic, 4.961ns route)
+                                                       (44.8% logic, 55.2% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_19 (SLICE_X33Y25.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.008ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_19 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.985ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_19
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y25.SR      net (fanout=12)       1.172   u_timer/cycles_or0000
+    SLICE_X33Y25.CLK     Tsrck                 0.910   u_timer/cycles<18>
+                                                       u_timer/cycles_19
+    -------------------------------------------------  ---------------------------
+    Total                                      8.985ns (4.024ns logic, 4.961ns route)
+                                                       (44.8% logic, 55.2% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_4 (SLICE_X33Y18.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.041ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_4 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.956ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.003ns (0.027 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_4
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y18.SR      net (fanout=12)       1.143   u_timer/cycles_or0000
+    SLICE_X33Y18.CLK     Tsrck                 0.910   u_timer/cycles<4>
+                                                       u_timer/cycles_4
+    -------------------------------------------------  ---------------------------
+    Total                                      8.956ns (4.024ns logic, 4.932ns route)
+                                                       (44.9% logic, 55.1% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_5 (SLICE_X33Y18.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.041ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_5 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.956ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.003ns (0.027 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_5
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y18.SR      net (fanout=12)       1.143   u_timer/cycles_or0000
+    SLICE_X33Y18.CLK     Tsrck                 0.910   u_timer/cycles<4>
+                                                       u_timer/cycles_5
+    -------------------------------------------------  ---------------------------
+    Total                                      8.956ns (4.024ns logic, 4.932ns route)
+                                                       (44.9% logic, 55.1% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_6 (SLICE_X33Y19.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.041ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_6 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.956ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.003ns (0.027 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_6
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y19.SR      net (fanout=12)       1.143   u_timer/cycles_or0000
+    SLICE_X33Y19.CLK     Tsrck                 0.910   u_timer/cycles<6>
+                                                       u_timer/cycles_6
+    -------------------------------------------------  ---------------------------
+    Total                                      8.956ns (4.024ns logic, 4.932ns route)
+                                                       (44.9% logic, 55.1% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_7 (SLICE_X33Y19.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.041ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_7 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.956ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.003ns (0.027 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_7
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y19.SR      net (fanout=12)       1.143   u_timer/cycles_or0000
+    SLICE_X33Y19.CLK     Tsrck                 0.910   u_timer/cycles<6>
+                                                       u_timer/cycles_7
+    -------------------------------------------------  ---------------------------
+    Total                                      8.956ns (4.024ns logic, 4.932ns route)
+                                                       (44.9% logic, 55.1% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_20 (SLICE_X33Y26.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.050ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_20 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.943ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_20
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y26.SR      net (fanout=12)       1.130   u_timer/cycles_or0000
+    SLICE_X33Y26.CLK     Tsrck                 0.910   u_timer/cycles<20>
+                                                       u_timer/cycles_20
+    -------------------------------------------------  ---------------------------
+    Total                                      8.943ns (4.024ns logic, 4.919ns route)
+                                                       (45.0% logic, 55.0% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_21 (SLICE_X33Y26.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.050ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_21 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.943ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_21
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y26.SR      net (fanout=12)       1.130   u_timer/cycles_or0000
+    SLICE_X33Y26.CLK     Tsrck                 0.910   u_timer/cycles<20>
+                                                       u_timer/cycles_21
+    -------------------------------------------------  ---------------------------
+    Total                                      8.943ns (4.024ns logic, 4.919ns route)
+                                                       (45.0% logic, 55.0% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_22 (SLICE_X33Y27.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.050ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_22 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.943ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_22
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y27.SR      net (fanout=12)       1.130   u_timer/cycles_or0000
+    SLICE_X33Y27.CLK     Tsrck                 0.910   u_timer/cycles<22>
+                                                       u_timer/cycles_22
+    -------------------------------------------------  ---------------------------
+    Total                                      8.943ns (4.024ns logic, 4.919ns route)
+                                                       (45.0% logic, 55.0% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_23 (SLICE_X33Y27.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.050ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_23 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.943ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.007ns (0.023 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_23
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y27.SR      net (fanout=12)       1.130   u_timer/cycles_or0000
+    SLICE_X33Y27.CLK     Tsrck                 0.910   u_timer/cycles<22>
+                                                       u_timer/cycles_23
+    -------------------------------------------------  ---------------------------
+    Total                                      8.943ns (4.024ns logic, 4.919ns route)
+                                                       (45.0% logic, 55.0% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/quarters_1 (SLICE_X35Y13.CE), 66 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.133ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/quarters_1 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.867ns (Levels of Logic = 4)
+  Clock Path Skew:      0.000ns
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/quarters_1
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X34Y12.G3      net (fanout=11)       1.416   u_timer/last_cmp_eq0000
+    SLICE_X34Y12.Y       Tilo                  0.759   led_1_OBUF
+                                                       u_timer/quarters_not00011
+    SLICE_X35Y13.CE      net (fanout=1)        0.840   u_timer/quarters_not0001
+    SLICE_X35Y13.CLK     Tceck                 0.555   u_timer/quarters<1>
+                                                       u_timer/quarters_1
+    -------------------------------------------------  ---------------------------
+    Total                                      8.867ns (3.724ns logic, 5.143ns route)
+                                                       (42.0% logic, 58.0% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/quarters_0 (SLICE_X35Y13.CE), 66 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.133ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/quarters_0 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.867ns (Levels of Logic = 4)
+  Clock Path Skew:      0.000ns
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/quarters_0
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X34Y12.G3      net (fanout=11)       1.416   u_timer/last_cmp_eq0000
+    SLICE_X34Y12.Y       Tilo                  0.759   led_1_OBUF
+                                                       u_timer/quarters_not00011
+    SLICE_X35Y13.CE      net (fanout=1)        0.840   u_timer/quarters_not0001
+    SLICE_X35Y13.CLK     Tceck                 0.555   u_timer/quarters<1>
+                                                       u_timer/quarters_0
+    -------------------------------------------------  ---------------------------
+    Total                                      8.867ns (3.724ns logic, 5.143ns route)
+                                                       (42.0% logic, 58.0% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_fsm/state_reg_FSM_FFd3 (SLICE_X31Y19.G2), 59 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.312ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_fsm/state_reg_FSM_FFd3 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.688ns (Levels of Logic = 6)
+  Clock Path Skew:      0.000ns
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_fsm/state_reg_FSM_FFd3
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X34Y16.G2      net (fanout=23)       0.984   u_fsm/state_reg_FSM_FFd3
+    SLICE_X34Y16.Y       Tilo                  0.759   u_timer/Madd_done_addsub0001_lut<1>
+                                                       u_timer/qtr_cmp_ne0000_SW0_1
+    SLICE_X34Y16.F4      net (fanout=2)        0.044   u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X34Y16.X       Tilo                  0.759   u_timer/Madd_done_addsub0001_lut<1>
+                                                       u_timer/secs<1>1
+    SLICE_X36Y15.F1      net (fanout=10)       0.582   u_timer/Madd_done_addsub0001_lut<1>
+    SLICE_X36Y15.X       Tilo                  0.759   N13
+                                                       u_timer/done_cmp_ge00001_SW0
+    SLICE_X34Y15.G2      net (fanout=4)        0.480   N13
+    SLICE_X34Y15.Y       Tilo                  0.759   u_timer/seconds_not0001
+                                                       u_timer/done_cmp_ge00001
+    SLICE_X31Y18.BX      net (fanout=7)        1.324   u_timer/done_cmp_ge0000
+    SLICE_X31Y18.X       Tbxx                  0.739   N61
+                                                       u_timer/done_or000094_SW5
+    SLICE_X31Y19.G2      net (fanout=1)        0.075   N61
+    SLICE_X31Y19.CLK     Tgck                  0.837   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3-In
+                                                       u_fsm/state_reg_FSM_FFd3
+    -------------------------------------------------  ---------------------------
+    Total                                      8.688ns (5.199ns logic, 3.489ns route)
+                                                       (59.8% logic, 40.2% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_fsm/state_reg_FSM_FFd2_1 (SLICE_X32Y16.BY), 227 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.446ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_fsm/state_reg_FSM_FFd2_1 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.554ns (Levels of Logic = 6)
+  Clock Path Skew:      0.000ns
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_fsm/state_reg_FSM_FFd2_1
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X34Y16.G2      net (fanout=23)       0.984   u_fsm/state_reg_FSM_FFd3
+    SLICE_X34Y16.Y       Tilo                  0.759   u_timer/Madd_done_addsub0001_lut<1>
+                                                       u_timer/qtr_cmp_ne0000_SW0_1
+    SLICE_X34Y16.F4      net (fanout=2)        0.044   u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X34Y16.X       Tilo                  0.759   u_timer/Madd_done_addsub0001_lut<1>
+                                                       u_timer/secs<1>1
+    SLICE_X36Y15.F1      net (fanout=10)       0.582   u_timer/Madd_done_addsub0001_lut<1>
+    SLICE_X36Y15.X       Tilo                  0.759   N13
+                                                       u_timer/done_cmp_ge00001_SW0
+    SLICE_X34Y15.G2      net (fanout=4)        0.480   N13
+    SLICE_X34Y15.Y       Tilo                  0.759   u_timer/seconds_not0001
+                                                       u_timer/done_cmp_ge00001
+    SLICE_X32Y14.G4      net (fanout=7)        0.478   u_timer/done_cmp_ge0000
+    SLICE_X32Y14.Y       Tilo                  0.759   u_fsm/state_reg_FSM_FFd2
+                                                       u_timer/done_or000094_SW3
+    SLICE_X32Y14.F4      net (fanout=1)        0.023   u_timer/done_or000094_SW3/O
+    SLICE_X32Y14.X       Tilo                  0.759   u_fsm/state_reg_FSM_FFd2
+                                                       u_fsm/state_reg_FSM_FFd2-In
+    SLICE_X32Y16.BY      net (fanout=1)        0.440   u_fsm/state_reg_FSM_FFd2-In
+    SLICE_X32Y16.CLK     Tdick                 0.382   u_fsm/state_reg_FSM_FFd2_1
+                                                       u_fsm/state_reg_FSM_FFd2_1
+    -------------------------------------------------  ---------------------------
+    Total                                      8.554ns (5.523ns logic, 3.031ns route)
+                                                       (64.6% logic, 35.4% route)
+
+--------------------------------------------------------------------------------
+
+Paths for end point u_timer/cycles_8 (SLICE_X33Y20.SR), 60 paths
+--------------------------------------------------------------------------------
+Slack (setup path):     11.537ns (requirement - (data path - clock path skew + uncertainty))
+  Source:               u_fsm/state_reg_FSM_FFd3 (FF)
+  Destination:          u_timer/cycles_8 (FF)
+  Requirement:          20.000ns
+  Data Path Delay:      8.459ns (Levels of Logic = 4)
+  Clock Path Skew:      -0.004ns (0.026 - 0.030)
+  Source Clock:         clk_BUFGP rising at 0.000ns
+  Destination Clock:    clk_BUFGP rising at 20.000ns
+  Clock Uncertainty:    0.000ns
+
+  Maximum Data Path: u_fsm/state_reg_FSM_FFd3 to u_timer/cycles_8
+    Location             Delay type         Delay(ns)  Physical Resource
+                                                       Logical Resource(s)
+    -------------------------------------------------  -------------------
+    SLICE_X31Y19.YQ      Tcko                  0.587   u_fsm/state_reg_FSM_FFd3
+                                                       u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.G4      net (fanout=23)       1.175   u_fsm/state_reg_FSM_FFd3
+    SLICE_X35Y16.Y       Tilo                  0.704   u_timer/Madd_done_addsub0001_lut<2>
+                                                       u_timer/qtr_cmp_ne0000_SW0
+    SLICE_X31Y22.G1      net (fanout=34)       1.712   N32
+    SLICE_X31Y22.COUT    Topcyg                1.001   u_timer/last_cmp_eq0000_wg_cy<3>
+                                                       u_timer/last_cmp_eq0000_wg_lut<3>
+                                                       u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.CIN     net (fanout=1)        0.000   u_timer/last_cmp_eq0000_wg_cy<3>
+    SLICE_X31Y23.COUT    Tbyp                  0.118   u_timer/last_cmp_eq0000
+                                                       u_timer/last_cmp_eq0000_wg_cy<4>
+                                                       u_timer/last_cmp_eq0000_wg_cy<5>
+    SLICE_X31Y19.F2      net (fanout=11)       0.902   u_timer/last_cmp_eq0000
+    SLICE_X31Y19.X       Tilo                  0.704   u_fsm/state_reg_FSM_FFd3
+                                                       u_timer/cycles_or00001
+    SLICE_X33Y20.SR      net (fanout=12)       0.646   u_timer/cycles_or0000
+    SLICE_X33Y20.CLK     Tsrck                 0.910   u_timer/cycles<8>
+                                                       u_timer/cycles_8
+    -------------------------------------------------  ---------------------------
+    Total                                      8.459ns (4.024ns logic, 4.435ns route)
+                                                       (47.6% logic, 52.4% route)
+
+--------------------------------------------------------------------------------
+(…)

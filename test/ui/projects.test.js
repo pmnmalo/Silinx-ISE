@@ -325,7 +325,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   await page.click('.dlg-overlay table.grid tr', { text: 'Alpha' });
   await page.dialogButton('Open');
   await page.waitFor(() => window.Silinx.project?.name === 'Alpha' && document.querySelector('#hier .row .lbl')?.textContent === 'Alpha');
-  assert.match(await page.eval(() => document.title), /^Alpha — Silinx ISE/);
+  assert.match(await page.eval(() => document.title), /^Alpha — Silinx/);
   await page.waitFor(() => window.SilinxApp.findDoc('summary'));
   await page.eval(() => window.SilinxApp.openFile('src/alpha.vhd'));
   await page.waitFor(() => window.SilinxApp.findDoc('file:src/alpha.vhd')?.editor);
@@ -372,7 +372,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   assert.equal(await page.eval(() => window.Silinx.docs.length), 0);
   const file = await page.openMenu('File');
   assert.equal(file.find((i) => i.label === 'Close Project').disabled, true);
-  assert.equal(file.find((i) => i.label === 'Export Silinx ISE Project (.zip)…').disabled, true);
+  assert.equal(file.find((i) => i.label === 'Export Silinx Project (.zip)…').disabled, true);
   await page.closeMenus();
   // the Start page opens a recent project
   await page.waitFor(() => [...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Beta'));
@@ -504,6 +504,26 @@ uiTest('Add Copy of Source: new files, association, overwrite confirmation (No k
   const rows = await page.eval(() => [...document.querySelectorAll('#files-page tr')].slice(1).map((r) => [...r.cells].map((c) => c.textContent).join('|')));
   assert.ok(rows.includes('src/inv.vhd|All|vhdl') && rows.includes('src/buf2.v|All|verilog') && rows.includes('sim/tb_buf2.v|Simulation|verilog'), rows.join('\n'));
 }, { ui: 'ise' });
+
+uiTest('#2973 Files view: Rename to a name the import gate refuses (CON.vhd): the error, the file as it was', E, async (page) => {
+  await makeProject(env, { name: 'GateRen', top: 'a', files: { 'src/a.vhd': 'entity a is end;\narchitecture r of a is begin end r;\n' } });
+  await page.openProject('GateRen');
+  await page.leftTab('files');
+  const i = await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].findIndex((tr) => tr.cells[0]?.textContent === 'src/a.vhd') + 1) - 1;
+  await page.rightClick('#files-page tr', { index: i });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Rename…' });
+  await page.waitDialog('Rename');
+  await page.fill('.dlg-overlay input[type=text]', 'src/CON.vhd', { index: 1 });
+  await page.dialogButton('Rename');
+  await page.waitFor(() => /not renamed/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the refusal' });
+  assert.match(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().innerText),
+    /could not rename src\/a\.vhd → src\/CON\.vhd: 'src\/CON\.vhd': not renamed: reserved name \('CON\.vhd'\)\. Nothing was changed\./);
+  await page.dialogButton('OK');
+  await page.waitNoDialog();
+  assert.match(await readWs(env, 'GateRen', 'src/a.vhd'), /entity a is/);
+  assert.deepEqual(await page.eval(() => window.Silinx.project.files.map((f) => f.path)), ['src/a.vhd']);
+});
 
 uiTest('Files view: rename a file into another folder, remove a file (right-click)', E, async (page) => {
   await makeProject(env, {
@@ -650,7 +670,8 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.leftTab('start');
   await page.waitFor(() => document.querySelectorAll('#start-page .start-btns .btn').length === 2, [], { what: 'the Start page' });
   assert.deepEqual(await startPage(page), { buttons: ['New Project…', 'Open Project…'], top: true, halves: true, commands: [
-    'Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)… (disabled)', 'Copy Link to Project… (disabled)', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)'] });
+    // (Open from Repository…: the server editions' git, #3195)
+    'Open from Repository…', 'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)… (disabled)', 'Copy Link to Project… (disabled)', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)'] });
   // drawn again with a project open (a late drawing while one opens): the same page kept, only its host's attribute
   // changes, so that a click pressed before is not lost (#494, #1222)
   assert.deepEqual(await page.eval(async () => {
@@ -676,8 +697,8 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.openProject('StartZip');
   await page.leftTab('start');
   await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the exports enabled' });
-  assert.deepEqual((await startPage(page)).commands, ['Import Silinx ISE Project (.zip)…', 'Export Silinx ISE Project (.zip)…', 'Copy Link to Project…', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…']);
-  await page.click('#start-page .entry a', { text: 'Export Silinx ISE Project (.zip)…' });
+  assert.deepEqual((await startPage(page)).commands, ['Open from Repository…', 'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Copy Link to Project…', '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…']);
+  await page.click('#start-page .entry a', { text: 'Export Silinx Project (.zip)…' });
   await waitDownload(page, 'StartZip-silinx.zip');
   await page.click('#start-page .entry a', { text: 'Export Xilinx ISE Project (.zip)…' });
   await waitDownload(page, 'StartZip.zip');
@@ -706,15 +727,15 @@ uiTest('#1300 the Design tree: the project\'s row and the device\'s right-click 
 uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing import keeps the existing project', E, async (page) => {
   await makeProject(env, { name: 'ZipSrc', template: 'blinky', board: 'basys2' });
   await page.openProject('ZipSrc');
-  await page.menu('File', 'Export Silinx ISE Project (.zip)…');
+  await page.menu('File', 'Export Silinx Project (.zip)…');
   const silinxZip = await waitDownload(page, 'ZipSrc-silinx.zip');
   await page.menu('File', 'Export Xilinx ISE Project (.zip)…');
   const xilinxZip = await waitDownload(page, 'ZipSrc.zip');
   const srcTree = (await env.server.api('GET', '/api/projects/ZipSrc')).fileTree;
 
   // import the Silinx zip under a new name: every file and the settings come back
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [silinxZip]);
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=text]').value), 'ZipSrc', 'name suggested from the zip');
   await page.fill('.dlg-overlay input[type=text]', 'ZipCopy');
@@ -744,8 +765,8 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
   await page.openProject('ZipCopy');
   const bad = path.join(env.tmp, 'broken.zip');
   await fs.writeFile(bad, 'this is not a zip file');
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [bad]);
   await page.fill('.dlg-overlay input[type=text]', 'ZipCopy');
   await page.dialogButton('Import');
@@ -765,7 +786,7 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
 
 // #2830: the import gate on the local server: a zip's refused entries (a hidden folder, a script in a name, an XXE
 // schematic, a traversal) are left out and said in the console; the sound files are imported
-uiTest('#2830 Import Silinx ISE Project: the import gate leaves out what it refuses and says why in the console', E, async (page) => {
+uiTest('#2830 Import Silinx Project: the import gate leaves out what it refuses and says why in the console', E, async (page) => {
   const { createZip } = await import('../../core/zip.js');
   const zlib = await import('node:zlib');
   const codec = { deflate: (d) => zlib.deflateRawSync(d), inflate: (d, l) => zlib.inflateRawSync(d, { maxOutputLength: l }) };
@@ -776,8 +797,8 @@ uiTest('#2830 Import Silinx ISE Project: the import gate leaves out what it refu
     { path: '../evil.vhd', data: top }], codec);
   const file = path.join(env.tmp, 'gate-silinx.zip');
   await fs.writeFile(file, zip);
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [file]);
   await page.fill('.dlg-overlay input[type=text]', 'Gated');
   await page.dialogButton('Import');
@@ -830,8 +851,8 @@ uiTest('#2830 an imported project waits for the user\'s trust: the console line 
   const pj = { name: 'O', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }], device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, trusted: true };
   const file = path.join(env.tmp, 'outside-silinx.zip');
   await fs.writeFile(file, await createZip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/top.vhd', data: top }], codec));
-  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
-  await page.waitDialog('Import Silinx ISE Project');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
   await page.setFiles('.dlg-overlay input[type=file]', [file]);
   await page.fill('.dlg-overlay input[type=text]', 'Outside');
   await page.dialogButton('Import');
@@ -857,6 +878,24 @@ uiTest('#2830 an imported project waits for the user\'s trust: the console line 
   // opened again: no line
   await page.openProject('Outside');
   assert.equal(await page.eval(() => document.querySelectorAll('#console-log .ln-action').length), 2);
+  assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /^(WARNING|ERROR)/.test(l)), []);
+});
+
+uiTest('#2981 a project the MCP server made waits for the user\'s trust too: the console line says so, Trust Project', E, async (page) => {
+  await makeProject(env, { name: 'ByMcp', top: 'top', files: { 'src/top.vhd': 'entity top is end;\narchitecture rtl of top is begin end;\n' } });
+  // (its silinx.json as the MCP server writes it: server/mcp-projects.js, createProject's madeBy)
+  const file = path.join(env.server.workspace, 'ByMcp', 'silinx.json');
+  await fs.writeFile(file, JSON.stringify({ ...JSON.parse(await fs.readFile(file, 'utf8')), trusted: false, madeBy: 'mcp' }, null, 2));
+  await page.openProject('ByMcp');
+  await page.waitConsole(/was made through the MCP server/);
+  const line = () => page.eval(() => { const b = [...document.querySelectorAll('#console-log .ln .ln-action')].at(-1); return b && { line: b.parentElement.firstChild.textContent, label: b.textContent, disabled: b.disabled }; });
+  assert.deepEqual(await line(), { line: 'Project "ByMcp" was made through the MCP server (by an assistant): it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.', label: 'Trust Project', disabled: false });
+  await assert.rejects(env.server.api('POST', '/api/projects/ByMcp/implement', { toolchain: 'ise' }),
+    (e) => e.message.includes("project 'ByMcp' was made through the MCP server (by an assistant): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)"));
+  await page.eval(() => [...document.querySelectorAll('#console-log .ln-action')].at(-1).click());
+  await page.waitConsole(/Project "ByMcp" trusted: Xilinx ISE and programming a board or a PROM may run for it\./);
+  const pj = await env.server.api('GET', '/api/projects/ByMcp');
+  assert.deepEqual(['trusted' in pj, 'madeBy' in pj], [false, false]);
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /^(WARNING|ERROR)/.test(l)), []);
 });
 

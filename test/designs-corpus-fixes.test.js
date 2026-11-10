@@ -234,13 +234,33 @@ endmodule`, 'm', 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\n');
   }
 });
 
-test('nextpnr: two LOC\'d I/Os of one bank at different voltages are refused, as ISE refuses them', { timeout: 300000, todo: '#2813' }, async () => {
+test('nextpnr: two LOC\'d I/Os of one bank at different voltages are refused at Place & Route, as ISE refuses them (#2813)', { timeout: 300000 }, async () => {
   const run = await vccoFlow(`module m (input clk, input [15:0] a, output reg [31:0] q);
   always @(posedge clk) q <= {a, ~a};
 endmodule`, 'm', 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\nNET "q<0>" LOC = "A10" | IOSTANDARD = LVCMOS25 ;\n');
   const r = await run();
   assert.equal(r.ok, false);
-  assert.ok(r.errors.some(l => /bank 0.*3\.3 V.*2\.5 V|bank 0.*2\.5 V.*3\.3 V/.test(l)), r.errors.join('\n'));
+  assert.equal(r.error, '1 I/O(s) in a bank of another VCCO (PhysDesignRules:755)');
+  assert.deepEqual(r.errors, ['ERROR:Silinx - 1 I/O(s) in a bank of another VCCO (PhysDesignRules:755)']);
+  assert.deepEqual(r.lines.filter(l => /^  place:/.test(l)), ['  place: q<0>: pad A10 is in bank 0, whose other I/Os (clk on B8, LVCMOS33) need VCCO 3.3 V, not 2.5 V (LVCMOS25)']);
+  assert.ok(r.lines.some(l => /=== SILINX FAILED par /.test(l)), 'at Place & Route');
+  assert.deepEqual(r.warnings, []);
+  // the same standards in another bank each (A10: bank 0, C14: bank 1): placed and routed
+  const fixed = await run('NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\nNET "q<0>" LOC = "C14" | IOSTANDARD = LVCMOS25 ;\n');
+  assert.equal(fixed.ok, true, fixed.error);
+  assert.deepEqual(fixed.warnings, []);
+});
+
+test('bankVccoConflicts: each LOC\'d I/O against its bank\'s first; the default LVCMOS25, an unknown standard or pad no constraint (#2813)', async () => {
+  const { bankVccoConflicts } = await import('../packages/silinx-fpga/src/open-flow-nextpnr.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const device = loadDeviceCache('xc3s250ecp132-4');
+  assert.deepEqual(bankVccoConflicts([], device), []);
+  // B8, A10: bank 0; C14: bank 1
+  assert.deepEqual(bankVccoConflicts([{ name: 'a', loc: 'B8', iostandard: 'LVCMOS33' }, { name: 'b', loc: 'a10', iostandard: 'lvttl' }, { name: 'c', loc: 'C14' }], device), []);
+  assert.deepEqual(bankVccoConflicts([{ name: 'a', loc: 'B8' }, { name: 'b', loc: 'A10', iostandard: 'LVCMOS33' }, { name: 'c', loc: 'A10', iostandard: 'FOO' }, { name: 'd', loc: 'Z99', iostandard: 'LVCMOS18' }], device),
+    ['place: b: pad A10 is in bank 0, whose other I/Os (a on B8, LVCMOS25) need VCCO 2.5 V, not 3.3 V (LVCMOS33)']);
+  assert.equal(bankVccoConflicts([{ name: 'a', loc: 'B8', iostandard: 'LVCMOS33' }, { name: 'b', loc: 'A10' }, { name: 'c', loc: 'A10', iostandard: 'LVCMOS18' }], device).length, 2);
 });
 
 test('nextpnr: no pad for an I/O because of the banks\' VCCO (every bank holds LVCMOS33 pins, the others LVCMOS25) is said with its standard (#128)', { timeout: 300000 }, async () => {

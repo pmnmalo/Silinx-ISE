@@ -84,7 +84,7 @@ fi
 # The installer gets its own folder (hard link: instant, no extra space), so BuildKit only
 # transfers the tarball and not everything else that sits next to it (e.g. ~/Downloads). The folder
 # is a new one of this run (mktemp, #1442): the trap at the end removes nothing that was there before.
-INSTALLER_DIR="$(mktemp -d "$(cd "$(dirname "$INSTALLER")" && pwd)/.silinx-ise-stage.XXXXXX" 2>/dev/null || mktemp -d)"
+INSTALLER_DIR="$(mktemp -d "$(cd "$(dirname "$INSTALLER")" && pwd)/.silinx-stage.XXXXXX" 2>/dev/null || mktemp -d)"
 trap 'rm -rf "$INSTALLER_DIR"' EXIT
 ln "$INSTALLER" "$INSTALLER_DIR/Xilinx_ISE_DS_Lin_14.7_1015_1.tar" 2>/dev/null \
   || { info "copying the installer to a staging folder (different disk)"; cp "$INSTALLER" "$INSTALLER_DIR/Xilinx_ISE_DS_Lin_14.7_1015_1.tar"; }
@@ -121,8 +121,8 @@ else
 fi
 
 # --- configure Silinx
-if command -v node >/dev/null && [ -f "$SILINX_DIR/bin/silinx-ise.js" ]; then
-  node "$SILINX_DIR/bin/silinx-ise.js" toolchain --docker "$TAG"
+if command -v node >/dev/null && [ -f "$SILINX_DIR/bin/silinx.js" ]; then
+  node "$SILINX_DIR/bin/silinx.js" toolchain --docker "$TAG"
 else
   echo "Configure Silinx: Tools > Toolchain Settings > Docker image = $TAG"
 fi

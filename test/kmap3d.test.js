@@ -5,7 +5,7 @@
 // grid without wrapping) and on the shapes named one by one.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { kmapLayout, kmapRects, cubeMinterms } from '../core/logic.js';
+import { kmapLayout, kmapRects, cubeMinterms, KMAP_ORDERS } from '../core/logic.js';
 import { kmapSolid, kmapSceneSide } from '../core/kmap3d.js';
 
 // a cube from its literals: { a: 0, c: 1 } over the inputs `names`
@@ -51,8 +51,8 @@ const shape = s => s.layers.map(l => ({ map: l.map, parts: l.pieces.map(p => p.c
 const joins = s => s.joins.map(j => `${j.from}-${j.to}`);
 
 test('#1491 kmapSolid: on every cube of 5 and 6 variables, the pieces are the flat map\'s cells, the joins the neighbouring layers covered', () => {
-  for (const n of [5, 6]) {
-    const L = kmapLayout(n);
+  for (const n of [5, 6]) for (const order of KMAP_ORDERS) {   // (both orders of the variables, #2924)
+    const L = kmapLayout(n, order);
     for (const c of allCubes(n)) {
       const s = kmapSolid(L, c), ref = reference(L, c);
       assert.deepEqual(shape(s), ref, `pieces, cube ${JSON.stringify(c)}`);
@@ -77,7 +77,7 @@ test('#1491 kmapSolid: on every cube of 5 and 6 variables, the pieces are the fl
 });
 
 test('#1491 kmapSolid: the shapes one by one, in 5 and 6 variables', () => {
-  const L5 = kmapLayout(5), L6 = kmapLayout(6);
+  const L5 = kmapLayout(5, 'rows'), L6 = kmapLayout(6, 'rows');   // (b c on the rows, d e on the columns of each layer)
   const pieces = (L, names, lits) => kmapSolid(L, cube(names, lits)).layers.map(l => [l.map, l.pieces.map(p => `${p.r0}${p.r1}${p.c0}${p.c1}:${p.walls.join('')}`)]);
   // a single cell: one piece on one layer, closed, no join
   assert.deepEqual(pieces(L5, N5, { a: 1, b: 0, c: 1, d: 1, e: 0 }), [[1, ['1133:topbottomleftright']]]);
@@ -114,6 +114,12 @@ test('#1491 kmapSolid: the shapes one by one, in 5 and 6 variables', () => {
   const cells = s => s.layers.flatMap(l => l.pieces.flatMap(p => p.cells));
   assert.ok(cells(g1).includes(5) && cells(g2).includes(5));
   assert.deepEqual([joins(g1), joins(g2)], [['0-1'], []]);
+  // the default order (#2924): b c on the columns, d e on the rows; a pair across the left and right edges is now c = 0
+  // (columns 00 and 10), across the top and bottom edges e = 0
+  const C5 = kmapLayout(5);
+  assert.deepEqual(pieces(C5, N5, { a: 0, c: 0, d: 0, e: 0 }), [[0, ['0000:topbottomright', '0033:topbottomleft']]]);
+  assert.deepEqual(pieces(C5, N5, { a: 1, b: 0, c: 0, e: 0 }), [[1, ['0000:bottomleftright', '3300:topleftright']]]);
+  assert.deepEqual(pieces(C5, N5, { a: 1, b: 0, c: 1, d: 1, e: 0 }), [[1, ['3311:topbottomleftright']]]);
 });
 
 // #2206: the scene holds the stack at any rotation: every corner of the stack, turned and projected as the browser does

@@ -109,7 +109,7 @@ export function mountFsmBottom(ctx) {
   const simInputs = simInputControls({ inputs: () => M().inputs, values: () => sim().inputs, changed: () => { render(); renderPanel(); } });
   let simView = null;   // the panel's body while simulating: its rows, kept
   function renderSim() {
-    panelTitle.textContent = 'Simulation';
+    panelTitle.textContent = 'Try it';   // (an interactive try-out, as the schematic's Try it, #3287)
     if (!sim()) resetSim();
     for (const i of M().inputs) if (!(i.name in sim().inputs)) sim().inputs[i.name] = 0;
     const errs = diags().filter((d) => d.severity === 'error');

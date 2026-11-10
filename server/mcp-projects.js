@@ -6,7 +6,20 @@ import path from 'node:path';
 import * as P from './projects.js';
 import { orderExamples } from '../core/examples.js';
 import { TEST_DESIGNS, orderTestDesigns } from '../core/test-designs.js';
+import { nameUnnamed } from '../core/schname.js';
 import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice } from './mcp-util.js';
+
+// a project the MCP server makes is untrusted (#2981): its tools' results say so
+const UNTRUSTED = ' It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
+
+// a schematic's text with its unnamed instances named (#3300): { text, names }, or null when none is (or not JSON)
+function nameInstances(text) {
+  let m;
+  try { m = JSON.parse(text); } catch { return null; }
+  if (!m || !Array.isArray(m.symbols)) return null;
+  const names = nameUnnamed(m);
+  return names.length ? { text: JSON.stringify(m, null, 1), names } : null;
+}
 
 export const PROJECT_TOOLS = [
   {
@@ -58,9 +71,9 @@ export const PROJECT_TOOLS = [
         const ex = JSON.parse(fs.readFileSync(path.join(dir, example, 'silinx.json'), 'utf8'));
         ({ board, device } = await boardDevice(board || ex.board, variant));
       }
-      try { await P.createProject({ name, template: example, device, board }); } catch (e) { throw toolError(e.message); }
+      try { await P.createProject({ name, template: example, device, board, madeBy: 'mcp' }); } catch (e) { throw toolError(e.message); }
       const pj = await P.readProject(name);
-      return { text: `Project '${name}' made from the ${dir === P.EXAMPLES_DIR ? 'example' : 'test design'} ${example}: top ${pj.top}, ${pj.board || 'no board'} (${pj.device.part}${pj.device.package}${pj.device.speed}).`, data: { project: name, top: pj.top, simTop: pj.simTop || null, board: pj.board, device: pj.device } };
+      return { text: `Project '${name}' made from the ${dir === P.EXAMPLES_DIR ? 'example' : 'test design'} ${example}: top ${pj.top}, ${pj.board || 'no board'} (${pj.device.part}${pj.device.package}${pj.device.speed}).${UNTRUSTED}`, data: { project: name, top: pj.top, simTop: pj.simTop || null, board: pj.board, device: pj.device, trusted: false } };
     },
   },
   {
@@ -71,9 +84,9 @@ export const PROJECT_TOOLS = [
     async run({ name, board, variant }) {
       let device;
       if (board || variant) ({ board, device } = await boardDevice(board, variant));
-      try { await P.createProject({ name, device, board }); } catch (e) { throw toolError(e.message); }
+      try { await P.createProject({ name, device, board, madeBy: 'mcp' }); } catch (e) { throw toolError(e.message); }
       const pj = await P.readProject(name);
-      return { text: `Empty project '${name}' made: ${pj.board || 'no board'} (${deviceName(pj.device)}). Write its sources with write_file, then set_top.`, data: { project: name, board: pj.board || null, device: pj.device } };
+      return { text: `Empty project '${name}' made: ${pj.board || 'no board'} (${deviceName(pj.device)}). Write its sources with write_file, then set_top.${UNTRUSTED}`, data: { project: name, board: pj.board || null, device: pj.device, trusted: false } };
     },
   },
   {
@@ -128,30 +141,35 @@ export const PROJECT_TOOLS = [
   },
   {
     name: 'write_file', title: 'Write a file of a project',
-    description: 'Write (create or replace) a file of a project. A new VHDL or Verilog file is added to the project (a test bench in sim/ or named tb_… as a simulation source). A drawing (a .sch, .asm, .fsm, .tt, .bool or .pn .json) makes its HDL file again, as its editor does when it is saved; one with errors leaves it as it was (Check Syntax then stops on it). The application\'s open editor of that file keeps its own text until it is reopened.',
+    description: 'Write (create or replace) a file of a project. A new VHDL or Verilog file is added to the project (a test bench in sim/ or named tb_… as a simulation source). A drawing (a .sch, .asm, .fsm, .tt, .bool or .pn .json) makes its HDL file again, as its editor does when it is saved; one with errors leaves it as it was (Check Syntax then stops on it). A truth table\'s view options are in it too: "kmapOrder": "rows" lays its Karnaugh maps\' variables out MSB → LSB by rows, then columns (left out: by columns, then rows). A state diagram\'s transition is drawn as its editor draws a stroke (#3286): "bend" (px: its arc\'s bow from the straight line, signed; left out: straight, or beside a transition the other way) and a self-loop\'s "angle" (degrees: the direction of its loop from the state; left out: away from the other arrows); neither changes its HDL. A schematic\'s instance with an empty "name" is given its automatic name, inst_n (the next free one, not drawn), as its editor gives it when its name is cleared. The application\'s open editor of that file keeps its own text until it is reopened.',
     inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The file\'s path in the project, e.g. src/counter.vhd.'), text: STR('The whole text of the file.') }, required: ['project', 'path', 'text'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     async run({ project: name, path: rel, text }) {
       await readProject(name);
       if (typeof text !== 'string') throw toolError('text: the whole text of the file');
       // the path as the project lists it: ./silinx.json is silinx.json (#1233)
-      const key = P.relKey(P.projectDir(name), await projectPath(name, rel));
-      const low = key.toLowerCase();
-      if (low === P.PROJECT_FILE || low === 'build' || low.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
-      if (key.split('/').some(s => s.startsWith('.'))) throw toolError(`'${rel}': a hidden file or folder cannot be written`);
+      const full = await projectPath(name, rel, 'written');
+      const key = P.relKey(P.projectDir(name), full);
+      const low = P.foldName(key);   // (ſilinx.json is silinx.json on a case-insensitive file system, #2956)
+      if (await P.isProjectFileAt(P.projectDir(name), full) || low === 'build' || low.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
       // what an assistant writes comes from outside: through the import gate (#2830), as a file added to a project
       const { GateError, gateFile } = await import('../core/import-gate.js');
       let gated;
       try { gated = gateFile(key, text); } catch (e) { throw e instanceof GateError ? toolError(`${e.path}: not written: ${e.reason}`) : e; }
       rel = key;
+      // a schematic's instance with an empty name: its automatic name, inst_n, as the editor gives it (#3300)
+      const named = /\.sch\.json$/i.test(rel) ? nameInstances(text) : null;
+      if (named) text = named.text;
       const existed = (await P.fileTree(name)).includes(rel);
       try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }
       const added = !existed && (await P.readProject(name)).files.some(f => f.path === rel);
       // a drawing: its HDL file made again from it (#2674), as its editor does when it is saved
-      const { syncDrawing } = await import('./drawing-sync.js');
-      const sync = await syncDrawing(P, name, rel);
-      return { text: [...(gated.warning ? [`WARNING: ${gated.warning}`] : []), `${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`, ...(sync?.messages || [])].join('\n'),
-        data: { project: name, path: rel, created: !existed, addedToProject: added, ...(sync ? { hdl: { file: sync.target, written: !!sync.written, removed: sync.removed, stale: sync.stale } } : {}) } };
+      const { adoptDrawing, syncDrawing } = await import('./drawing-sync.js');
+      // (one with no HDL file yet gets it, #3184)
+      const sync = await syncDrawing(P, name, rel) || await adoptDrawing(P, name, rel);
+      return { text: [...(gated.warning ? [`WARNING: ${gated.warning}`] : []), `${existed ? 'Wrote' : 'Created'} ${rel} (${text.length} characters)${added ? ', added to the project' : ''}.`,
+        ...(named?.names || []).map(n => `The instance ${n.id}, its name empty, named ${n.name} (an automatic name, not drawn).`), ...(sync?.messages || [])].join('\n'),
+        data: { project: name, path: rel, created: !existed, addedToProject: added, ...(named ? { named: named.names } : {}), ...(sync ? { hdl: { file: sync.target, written: !!sync.written, removed: sync.removed, stale: sync.stale } } : {}) } };
     },
   },
 ];

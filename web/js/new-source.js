@@ -1,7 +1,7 @@
 // The New Source wizard (moved from wizards.js, #405): the source type, its file name and location, then the
 // type's pages; Finish writes the skeleton source. The Wizard > button of the File Name and Location page opens the
 // type's wizard instead (#958), at its own pages: the name, the location and the language are this page's (#2082).
-import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
+import { constraintsFormatOf } from '/packages/silinx-fpga/src/parts.js';
 import { api } from './api.js';
 import { icons, icon } from './icons.js';
 import { h } from './ui.js';
@@ -28,12 +28,16 @@ const SOURCE_TYPES = [
   { id: 'tb', label: 'Test Bench', ico: 'vhdl', ext: null, dir: 'sim', wiz: 'testbench' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints', wiz: 'ucf' },
   { id: 'pcf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.pcf', dir: 'constraints', hidden: true },   // (the iCE40's: its device shows it for UCF's, #2296)
+  { id: 'xdc', label: 'Implementation Constraints File', ico: 'ucf', ext: '.xdc', dir: 'constraints', hidden: true },   // (the 7-series', #3142)
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
+  { id: 'lab', label: 'Guided Lab', ico: 'help', ext: '.lab.json', dir: 'labs' },   // (a teacher's, its steps checked: #3179)
   { id: 'c', label: 'C Function (HLS)', ico: 'file', ext: '.c', dir: 'src' },   // (Silinx HLS, compatible with Vitis HLS: #1531)
   { id: 'cpp', label: 'C++ Function (HLS)', ico: 'file', ext: '.cpp', dir: 'src' },   // (#1590)
   // not in the list any more; newSourceWizard({ type: 'vhdl-pkg' }) still creates one
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src', hidden: true },
 ];
+// the constraints files' types: one shown, the device's format's
+const CONSTRAINTS = ['ucf', 'pcf', 'xdc'];
 
 // name, location, lang, atFile: a wizard's < Back (#2082): New Source again at the File Name and Location page, as left
 export async function newSourceWizard({ type, name = '', location = null, lang = null, atFile = false } = {}) {
@@ -42,9 +46,9 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   // (modwiz, schwiz, pnwiz, tbwiz) select the type whose Wizard button opens that wizard (#958)
   const LEGACY = { vhdl: ['hdl', 'vhdl'], verilog: ['hdl', 'verilog'], 'vhdl-tb': ['tb', 'vhdl'], 'verilog-tb': ['tb', 'verilog'],
     modwiz: ['hdl'], schwiz: ['sch'], pnwiz: ['petri'], tbwiz: ['tb'] };
-  const pcf = openOnlyDevice(S.project.device), consType = id => (pcf && id === 'ucf' ? 'pcf' : id);
+  const cons = constraintsFormatOf(S.project.device), consType = id => (id === 'ucf' ? cons : id);   // (the device's format: UCF, PCF or XDC)
   let st = SOURCE_TYPES.find(t => t.id === consType(LEGACY[type]?.[0] || type)) || SOURCE_TYPES.find(t => t.id === 'hdl');   // default: Module (HDL)
-  const shown = () => SOURCE_TYPES.filter(t => (t.id === 'ucf' ? !pcf : t.id === 'pcf' ? pcf : !t.hidden || t === st));
+  const shown = () => SOURCE_TYPES.filter(t => (CONSTRAINTS.includes(t.id) ? t.id === cons : !t.hidden || t === st));
   // language of HDL modules and test benches (Define Module / Associate Source pages)
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], lang || LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
   const extOf = t => t.ext ?? (langSel.value === 'verilog' ? '.v' : '.vhd');
@@ -70,7 +74,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     validate: () => null,
   };
   // the file name and the location; Wizard (#958) opens the type's wizard with them (it asks the rest on its pages)
-  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|mem|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json)$/i, '');
+  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json|lab\.json)$/i, '');
   const fileError = () => {
     if (!FILE_RE.test(nameOf())) return 'Enter a valid file name (letters, digits, _ and -).';
     if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
@@ -96,7 +100,9 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
       const p = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
       // the module named as the file (a drawing, a test bench, a package): not a reserved word of VHDL or
       // Verilog, in any letter case (#679; a module's own name is asked on the next page)
-      if (!['hdl', 'ucf', 'pcf', 'mem'].includes(st.id)) {
+      // a guided lab: in the project's labs folder, the file's name its id (core/labs.js isLabFile)
+      if (st.id === 'lab' && loc.value.trim().replace(/\/+$/, '') !== 'labs') return 'A guided lab is in the labs folder: Location labs.';
+      if (!['hdl', ...CONSTRAINTS, 'mem', 'lab'].includes(st.id)) {
         const r = reservedError(n.split('/').pop().replace(/[^A-Za-z0-9_]/g, '_'));
         if (r) return `${r}: choose another name.`;
       }
@@ -116,7 +122,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   // names after it (a test bench's is asked on its wizard's first page; a UCF names no module)
   const wizardError = () => {
     const e = fileError();
-    if (e || ['tb', 'ucf', 'pcf'].includes(st.id)) return e;
+    if (e || ['tb', ...CONSTRAINTS].includes(st.id)) return e;
     const mod = identOf(nameOf().split('/').pop());
     const r = reservedError(mod);
     if (r) return `${r}: choose another name.`;
@@ -197,7 +203,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     title: 'Summary',
     render: () => summary,
     onShow: () => {
-      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|mem|asm\.json|tt\.json|bool\.json|sch\.json)$/i, '');
+      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json)$/i, '');
       const lg = langSel.value === 'verilog' ? 'Verilog' : 'VHDL';
       summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}${st.ext ? '' : ` (${lg})`}\nSource Name: ${n}${extOf(st)}\n` +
         (st.id === 'hdl' ? `\nEntity name: ${entName.value}\n${langSel.value === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +
@@ -235,7 +241,9 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     }
     case 'ucf': text = T.ucfTemplate(pj); break;
     case 'pcf': text = T.pcfTemplate(pj); break;
+    case 'xdc': text = T.xdcTemplate(pj); break;
     case 'mem': text = '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n'; break;
+    case 'lab': { const { newLab } = await import('/core/labs.js'); text = `${JSON.stringify(newLab(n, { top: pj.top, simTop: pj.simTop }), null, 2)}\n`; break; }
     case 'c': text = cTemplate(n.replace(/[^A-Za-z0-9_]/g, '_')); break;
     case 'cpp': text = cppTemplate(n.replace(/[^A-Za-z0-9_]/g, '_')); break;
     case 'sch': {
@@ -269,7 +277,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   await api.writeFile(pj.name, path, text);   // registers the new file in silinx.json
   // reload first: saving the project settings from the old copy would drop that registration
   await app.reloadProject();
-  if ((st.id === 'ucf' || st.id === 'pcf') && noUcf) { S.project.constraints = path; await app.saveProjectJson(); await app.reloadProject(); }
+  if (CONSTRAINTS.includes(st.id) && noUcf) { S.project.constraints = path; await app.saveProjectJson(); await app.reloadProject(); }
   if (st.id === 'tb') app.showInSim(n);   // selected in the Simulation view, ready to simulate
   app.log(`Created ${st.label}${st.ext ? '' : ` (${langSel.value === 'verilog' ? 'Verilog' : 'VHDL'})`} '${path}'.`, 'ok');
   if (st.id === 'fsm') { app.openFsm(path); return; }

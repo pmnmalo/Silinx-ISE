@@ -1,6 +1,6 @@
-# Working on Silinx ISE
+# Working on Silinx
 
-Silinx ISE is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E boards: Basys2,
+Silinx is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E boards: Basys2,
 Nexys2). It runs in the browser or as a local server, with its own open toolchain (Yosys WASM,
 pack, place, route, bitgen) and optionally Xilinx ISE 14.7. These are the project's rules for
 anyone changing it, people and AI agents alike. The README and docs/ describe the product;
@@ -64,7 +64,7 @@ the code and the lessons learnt.
 - Every label of the interface has a Portuguese translation in `web/js/i18n.js` (anchored patterns,
   `^…$`); `test/web-i18n.test.js` checks it.
 - **What the interface does, the MCP server does too** (#2674): every action of the interface is a tool of the MCP
-  server (`server/mcp*.js`, `silinx-ise mcp`), or part of one, that does it through the same functions, with the same
+  server (`server/mcp*.js`, `silinx mcp`), or part of one, that does it through the same functions, with the same
   checks and messages; a new feature or a changed one ships with its MCP tool and that tool's tests
   (`test/mcp*.test.js`), in the same pull request. Logic the tool needs that lives in `web/js/` moves to `core/` or
   `server/` first (a move, as below). Only what is the view alone stays out (zoom, layout, theme, language, tabs);
@@ -119,11 +119,14 @@ the code and the lessons learnt.
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
 - **CI** (`.github/workflows/ci.yml`) runs everything when a version tag `v*` is pushed, and by hand
-  (Actions ▸ CI ▸ Run workflow): the unit tests on Linux, macOS and Windows, the UI tests in both
+  (Actions ▸ CI ▸ Run workflow): the unit tests on Linux, macOS and Windows (the toolchain's heaviest, `HEAVY` in
+  `scripts/test-shard.mjs`, on Linux only, #3124), the UI tests in both
   interfaces, Firefox / WebKit, the operating systems' smoke tests, WebKit memory, the standalone build,
-  the release zip. The unit tests run in three parts of about the same time, and the UI tests in three parts
+  the release zip; the tags' runs one at a time. The unit tests run in parts of about the same time (five on Linux, three
+  on macOS and Windows), and the UI tests in three parts
   per interface, one file at a time (`scripts/test-shard.mjs`, `--ui` for the UI tests, by
-  `test/timings.json`; refresh it now and then with `node scripts/update-test-timings.mjs <run id>`). The
+  `test/timings.json`; refresh it after a release with `node scripts/update-test-timings.mjs <run id>`). A test file
+  takes at most 15 minutes (its tests run one after another and set its part's time): a longer one is split. The
   development build and the site's `dev/` are published after every push to `main` (no tests).
   The security checks
   (#498, `SECURITY.md`): CodeQL analyses the JavaScript (`codeql.yml`, a workflow of its own, nightly

@@ -4,7 +4,8 @@
 // secworks-aes over 15); the designs it routes within the budget route as before. The vga example through Silinx's flow
 // (open-flow-nextpnr.js, as the design corpus's lib.mjs nextpnrPlaceRoute runs it), nextpnr's own log kept: the budget in
 // force on the default run, and router 2's routes, past a budget made small (-o max-visits-per-arc=1000), read back as a
-// complete routed design with no warning.
+// complete routed design with no warning. Router 2 routes with its alternate weights (1.1.1, #3002: an estimate weight of
+// 1.0, not 1.25), whose critical paths are shorter: on that run nextpnr's maximum frequency above the default weights'.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -54,21 +55,25 @@ test('#2912 router 1 routes vga within its effort, the budget in force: 30000 wi
   assert.ok(r.ok, r.error);
   const visited = log.map(l => /Router 1 visited (\d+) wires, (\d+) per arc \(at most (\d+)\)/.exec(l)).find(Boolean);
   assert.ok(visited, 'nextpnr\'s log has router 1\'s visits and its budget');
-  // (the budget: 30000 per arc to route, of the whole design: 1164 arcs on 1.1.0)
+  // (the budget: 30000 per arc to route, of the whole design: 1164 arcs on 1.1.0, 990 on 1.4.2's placement, #3157)
   const [, total, perArc, budget] = visited.map(Number);
   assert.equal(budget % 30000, 0, visited[0]);
-  assert.ok(budget / 30000 > 1000, visited[0]);
+  assert.ok(budget / 30000 > 900, visited[0]);
   assert.ok(total <= budget && perArc < 30000, visited[0]);
   assert.ok(!log.some(l => /Routing with router 2/.test(l)), 'router 1 finished it');
   assert.ok(lines.includes('All signals are completely routed.'));
   assert.deepEqual(warnings, []);
 });
 
-test('#2912 past router 1\'s effort router 2 routes vga: a complete routed design, no warning', { timeout: 600000 }, async () => {
+test('#2912 #3002 past router 1\'s effort router 2 routes vga, with its alternate weights: a complete routed design, no warning', { timeout: 600000 }, async () => {
   const { r, lines, log, warnings } = await placeRoute(['-o', 'max-visits-per-arc=1000']);
   assert.ok(r.ok, r.error);
   assert.ok(log.some(l => /Router 1 stopped after/.test(l)), 'router 1 stopped at its budget');
-  assert.ok(log.some(l => /Routing with router 2/.test(l)), 'router 2 took over');
+  const route = log.findIndex(l => /Routing with router 2/.test(l));
+  assert.ok(route >= 0, 'router 2 took over');
+  // (nextpnr's last timing report, after router 2: 87.7 MHz with the default weights, 103.98 with the alternate ones)
+  const fmax = log.slice(route).map(l => /Max frequency for clock .*: ([\d.]+) MHz/.exec(l)).filter(Boolean).map(m => Number(m[1])).pop();
+  assert.ok(fmax > 95, `router 2's maximum frequency ${fmax} MHz`);
   assert.ok(lines.includes('All signals are completely routed.'));
   assert.deepEqual(warnings, []);
 });

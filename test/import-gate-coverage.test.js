@@ -28,10 +28,12 @@ const MARKERS = [
 const ALLOW = {
   'core/import-gate.js': { why: 'the gate itself' },
   'core/zip.js': { why: 'the zip reader the gate calls (gateZip), with its caps and its check of each entry' },
+  'core/collab-codes.js': { why: 'a WebRTC session description a follower or the owner pastes (#3227): sealed with the link\'s key, its size capped inflated; never a project\'s file' },
   'web/js/menus.js': { why: 'Open Project Bundle hands the file\'s text to api.importBundle', via: 'web/js/api-local.js' },
   'web/js/api.js': { why: 'the local server\'s client: it sends the zip or the .xise to the server, which gates them', via: 'server/xise-routes.js' },
   'web/js/impact.js': { why: 'a bitstream programmed into a board, never kept in a project' },
   'server/mcp-hdl.js': { why: 'simulate writes a VCD into the exchange folder: an output, nothing read' },
+  'server/mcp-grade.js': { why: 'grade\'s submissions of the exchange folder are read by server/grade.js, through the gate; its CSV and student\'s copy are outputs', via: 'server/grade.js' },
 };
 
 const GATE = /core\/import-gate\.js['"]/;
@@ -65,7 +67,7 @@ test('every module that reads a file from outside imports the import gate, or sa
   // the list stays exact: an entry whose module no longer reads such a file leaves it
   assert.deepEqual(Object.keys(ALLOW).filter(f => !seen.has(f)), []);
   // the importers known today are among those found (the scan sees them)
-  for (const f of ['web/js/wizards.js', 'web/js/petri-editor.js', 'web/js/api-local.js', 'server/xise-routes.js', 'server/mcp-transfer.js']) assert.ok(seen.has(f), f);
+  for (const f of ['web/js/wizards.js', 'web/js/petri-toolbar.js', 'web/js/api-local.js', 'server/xise-routes.js', 'server/mcp-transfer.js']) assert.ok(seen.has(f), f);
 });
 
 test('the project importers take only a gate\'s result; the MCP\'s write_file gates what it writes', () => {

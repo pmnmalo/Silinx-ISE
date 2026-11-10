@@ -1,5 +1,5 @@
 // A design opened from a link at start-up (#2826): the address's hash (core/design-link.js parseLink) names the design
-// (inside the link, an example, a zip at an https address) and what it opens: Try it (a schematic's), the test bench's
+// (inside the link, an example, a zip at an https address, an encrypted secret gist: #3223) and what it opens: Try it (a schematic's), the test bench's
 // simulation, the board emulator. A link comes from anywhere (#2829): a zip at an address is fetched only once the
 // user agrees (its address shown), with no credentials nor referrer, its size capped; the design is imported as a
 // Silinx zip (the import's checks); the student's work is kept: a project of that name with the same files is opened
@@ -24,7 +24,7 @@ const texts = entries => Object.fromEntries(entries.map(e => [e.path, typeof e.d
 export function linkOptions(hash = location.hash) {
   let opts = null;
   try { opts = parseLink(hash); } catch (e) { app.log(`ERROR: Open from a link: ${e.message}.`, 'err'); return null; }
-  if (opts || /(?:^#|&)(?:design|open|view|top|board)=/.test(hash)) history.replaceState(null, '', location.pathname + location.search);
+  if (opts || /(?:^#|&)(?:design|open|gist|view|top|board)=/.test(hash)) history.replaceState(null, '', location.pathname + location.search);
   return opts;
 }
 
@@ -32,8 +32,15 @@ export function linkOptions(hash = location.hash) {
 async function fetchZip(url) {
   const ok = await confirmDlg('Open from a Link', `This link opens a project from another site:\n\n${url}\n\nOpen it? Its files are copied into a new project of your workspace; nothing runs until you run it.`, { yes: 'Open', no: 'Cancel' });
   if (!ok) return null;
+  // a redirection is not followed (#3042): following it would send the request to its address before any check (one
+  // of this computer or of a local network); the link's own address is checked (parseLink), the zip's must be it
+  // (a GitHub release's download, redirected to another site without CORS, could not be fetched either)
   let r;
-  try { r = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' }); } catch (e) { throw fail(`cannot fetch ${url} (${e.message}; the site must allow it)`); }
+  try { r = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'manual' }); } catch (e) { throw fail(`cannot fetch ${url} (${e.message}; the site must allow it)`); }
+  if (r.type === 'opaqueredirect' || r.redirected) {
+    r.body?.cancel().catch(() => {});
+    throw fail(`${url} redirects to another address, not followed: the link must give the zip's own address`);
+  }
   if (!r.ok) throw fail(`cannot fetch ${url} (${r.status} ${r.statusText})`);
   // (read with a running total: no more than the limit, whatever the site says it sends)
   const reader = r.body.getReader(), parts = [];
@@ -57,6 +64,12 @@ async function fetchZip(url) {
 // the link's design: { name, project (null: not known before its import), files ({ path: text }: null, not known),
 // make(as): its import or creation, as the project `as` (default its name) } (null: the user did not agree)
 async function designOf(source) {
+  // a short link (#3223): its gist read through GitHub's API, decrypted with the link's key, opened as a design link's
+  if (source.kind === 'gist') {
+    app.log('Open from a link: reading its gist from GitHub…', 'info');
+    const { loadGist } = await import('/core/gist-link.js');
+    source = { kind: 'design', design: await loadGist(source, { fetch: (...a) => fetch(...a), api: globalThis.SILINX_GITHUB?.api || 'https://api.github.com' }) };
+  }
   if (source.kind === 'example') {
     const { name } = source;
     if (!(await api.templates()).includes(name)) throw fail(`no example '${name}'`);
@@ -113,6 +126,11 @@ export async function openFromLink(opts) {
     // the link's module selected in the Design pane, its source open when no view opens (#2871)
     if ((top || view) && view !== 'simulate') await showModule(top || S.project.top, !view);   // (after the link's view: the module's source in front, #2871)
     if (view) await openView(view, top || S.project.top, d.files);
+    // the link's guided lab (#3179), beside the rest
+    if (opts.lab) {
+      const { openLabById } = await import('./lab-view.js');
+      if (!await openLabById(opts.lab)) app.log(`WARNING: Open from a link: the project has no lab '${opts.lab}' (Project ▸ Guided Labs… lists its labs).`, 'warn');
+    }
     return true;
   } catch (e) {
     app.log(`ERROR: Open from a link: ${e.message}.`, 'err');

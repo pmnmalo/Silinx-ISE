@@ -1,13 +1,14 @@
 {
-  "name": "silinx-ise",
-  "version": "15.22.1",
-  "description": "Silinx ISE (Integrated Synthesis Environment): HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, synthesis, place & route and bitstreams (its own toolchain for the Basys2 / Nexys2, or Xilinx ISE 14.7) and board programming from the browser",
+  "name": "silinx",
+  "version": "15.24.0",
+  "description": "Silinx: HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, synthesis, place & route and bitstreams (its own toolchain for the Basys2 / Nexys2, or Xilinx ISE 14.7) and board programming from the browser",
   "type": "module",
   "bin": {
+    "silinx": "bin/silinx.js",
     "silinx-ise": "bin/silinx-ise.js"
   },
   "scripts": {
-    "start": "node bin/silinx-ise.js serve",
+    "start": "node bin/silinx.js serve",
     "test": "node --test test/*.test.js packages/silinx-fpga/test/*.test.js",
     "test:ui": "node --test test/ui/*.test.js",
     "test:ise": "SILINX_ISE_TESTS=1 node --test test/ise/*.test.js",
@@ -42,11 +43,16 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "@lezer/highlight": "^1.2.5",
-    "@silinx/nextpnr-himbaechel-spartan3e": "1.1.0",
-    "@silinx/nextpnr-himbaechel-spartan6": "https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-v0.1.3/silinx-nextpnr-himbaechel-spartan6-0.1.3.tgz",
+    "@silinx/nextpnr-himbaechel-spartan3e": "1.5.0",
+    "@silinx/nextpnr-himbaechel-spartan6": "https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-v0.3.0/silinx-nextpnr-himbaechel-spartan6-0.3.0.tgz",
+    "@trystero-p2p/torrent": "^0.26.0",
     "@yowasp/yosys": "0.70.1258",
-    "elkjs": "^0.12.0",
-    "express": "^5.3.0"
+    "elkjs": "^0.12.1",
+    "express": "^5.3.0",
+    "ws": "^8.22.2",
+    "y-codemirror.next": "^0.3.6",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.33"
   },
   "devDependencies": {
     "@yowasp/nextpnr-ice40": "0.11.96-dev.805",
@@ -55,7 +61,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pmnmalo/Silinx-ISE.git"
+    "url": "https://github.com/pmnmalo/Silinx.git"
   },
   "author": "Pedro Maló"
 }

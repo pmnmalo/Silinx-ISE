@@ -18,9 +18,10 @@ const isFF = t => /^(FD|LD)/.test(t);
 const isLutCell = t => /^(LUT[1-6]|INV|BUF)$/.test(t);
 /** The estimated critical path (ns) of a Yosys JSON netlist (its top module). */
 export const criticalDelay = (json, top) => pathEnds(json, top).worst;
-/** The estimate of criticalDelay with its ends: worst (ns), and each end { cell (its name), type, port, ns } (the
- *  setup included) of the paths between sequential cells (or, a design without them, from inputs to outputs); and
- *  arrival(bit), the estimated arrival at a signal (ns, -Infinity when no path reaches it; #1360). */
+/** The estimate of criticalDelay with its ends: worst (ns), and each end { cell (its name), type, port, ns, clock } (the
+ *  setup included; clock: the end's clock signal, its bit as a string, 'latch' for a latch, 'io' for an output; #652) of the paths between
+ *  sequential cells (or, a design without them, from inputs to outputs); and arrival(bit), the estimated arrival at a
+ *  signal (ns, -Infinity when no path reaches it; #1360). */
 export function pathEnds(json, top) {
   const nl = typeof json === 'string' ? JSON.parse(json) : json;
   const mod = nl.modules[top] || Object.values(nl.modules).find(m => m.attributes?.top) || Object.values(nl.modules)[0];
@@ -82,6 +83,14 @@ export function pathEnds(json, top) {
     return null;
   };
   const names = new Map(Object.entries(mod?.cells || {}).map(([n, c]) => [c, n]));
+  // (an end's clock: its cell's clock pin, a block RAM's port's own; the latches one group, 'latch', their gates often
+  // logic, no clock's: picorv32's 68; #652)
+  const clockOf = (c, p) => {
+    if (/^LD/.test(c.type)) return 'latch';
+    const k = c.connections?.CLKA ? (/B$/.test(p) ? 'CLKB' : 'CLKA') : ['C', 'CLK', 'WCLK'].find(q => c.connections?.[q]);
+    const b = k && c.connections?.[k]?.[0];
+    return b === undefined ? 'io' : String(b);
+  };
   const worst = () => {
     let w = 0;
     const ends = [];
@@ -91,7 +100,7 @@ export function pathEnds(json, top) {
         if (s === null) continue;
         let t = -Infinity;
         for (const b of bits) t = Math.max(t, arrIn(c, p, b) + s);
-        if (t > 0) { w = Math.max(w, t); ends.push({ cell: names.get(c), type: c.type, port: p, ns: t }); }
+        if (t > 0) { w = Math.max(w, t); ends.push({ cell: names.get(c), type: c.type, port: p, ns: t, clock: clockOf(c, p) }); }
       }
     }
     const arrival = bit => { const d = typeof bit === 'number' ? driver.get(bit) : null; return d ? arrOut(d, bit) : -Infinity; };
@@ -102,6 +111,24 @@ export function pathEnds(json, top) {
   withIO = true;
   memo.clear();
   return worst();
+}
+
+// The clock domains of the estimate (#652): a design of several clocks has a critical path per clock, each its clock's
+// period (a PERIOD per clock; trce times no path between unrelated clocks), where the one estimate is the slowest's.
+// The mappings make the slowest clock's path shorter (ABC's depth, the critical LUTs' resynthesis) and leave the others'
+// to area: vtr-stereovision3's tm3_clk_v0, the one clock of the ISE comparison's PERIOD, 3 levels of LUTs into a counter's
+// enable where XST has 2, 15 % slower by trce, under tm3_clk_v2's I2C logic, 6.47 ns against 5.04 by the estimate.
+/** Each clock domain's estimated critical path of a Yosys JSON netlist (its top module): [{ clock, ns, ends }] (pathEnds'
+ *  ends by their clock, the slowest first). */
+export function domainDelays(json, top) {
+  const by = new Map();
+  for (const e of pathEnds(json, top).ends) {
+    const d = by.get(e.clock) || { clock: e.clock, ns: 0, ends: [] };
+    d.ends.push(e);
+    d.ns = Math.max(d.ns, e.ns);
+    by.set(e.clock, d);
+  }
+  return [...by.values()].sort((a, b) => b.ns - a.ns);
 }
 
 // The logic levels of a mapped netlist: the LUTs (and MUXF5s, a LUT of 5 inputs) on its deepest path

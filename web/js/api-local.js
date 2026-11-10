@@ -1,5 +1,5 @@
 // Standalone (server-less) backend: same interface as api.js. Used by the single-file build
-// (dist/Silinx-ISE.html, on GitHub Pages). The projects are kept in the browser's localStorage, or,
+// (dist/Silinx.html, on GitHub Pages). The projects are kept in the browser's localStorage, or,
 // in Chrome / Edge, in a folder on the disk that the user picks (File ▸ Open Workspace Folder…: the
 // File System Access API), each project a normal project folder in the full application's format
 // (web/js/project-store.js: one storage layer for both).
@@ -11,7 +11,7 @@
 // Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
 import { getDeviceDb, findPart } from '../../server/devices.js';
-import { resourcesOf, openOnlyDevice, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
+import { resourcesOf, openOnlyDevice, experimentalDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
 import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
 import EXAMPLES from 'silinx-examples';
 import { isCSource } from '../../core/view-hdl.js';
@@ -26,6 +26,7 @@ import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from 
 import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ice40.js';
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
+import { browserGit } from './git-browser.js';
 import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, normalizeProjectJson, projectFromZip, safePath, NAME_RE, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
 
 const fail = msg => { throw new Error(msg); };
@@ -169,7 +170,7 @@ function keepModels(rep, earlier, b) {
 }
 // build/reports.json's shape (server/open-flow.js openReports) from the flow's report
 function reportsOf(pj, r) {
-  const out = { generatedAt: new Date().toISOString(), top: pj.top, device: pj.device || null, source: 'open', synthesis: r.synthesis, map: r.map, par: r.par, timing: r.timing,
+  const out = { generatedAt: new Date().toISOString(), top: pj.top, device: pj.device || null, source: 'open', synthesis: r.synthesis, map: r.map, par: r.par, timing: r.timing, capture: r.capture,
     bit: r.bit ? { ...r.bit, header: { design: `${pj.top}.ncd`, part: `${String(pj.device.part).replace(/^xc/i, '')}${pj.device.package}` } } : undefined,
     prom: r.prom, pinsUcf: r.pinsUcf, simModels: r.simModels || {}, files: r.files || {} };
   out.summary = { synthesized: !!out.synthesis, mapped: !!out.map, routed: out.par ? out.par.routed : null, timingMet: out.timing ? out.timing.met : null,
@@ -220,8 +221,18 @@ function xiseProject(name, xise, files = {}) {
   return { json, files: pfiles, warnings };
 }
 
+// the relays a shared project may go through (#3227): the site's, set when it is built (scripts/build-standalone.mjs,
+// SILINX_SITE_RELAYS; none by default), its Content-Security-Policy's too
+/* global __SILINX_SITE_RELAYS__ */
+const SITE_RELAYS = typeof __SILINX_SITE_RELAYS__ !== 'undefined' ? __SILINX_SITE_RELAYS__ : [];
+
+// git through GitHub's REST API (#3196)
+const git = browserGit({ store: () => store, ops, prefix: DEV_SITE ? 'silinx.dev.' : 'silinx.' });
+
 export const api = {
   standalone: true,
+  collabRelays: async () => [...SITE_RELAYS],
+  ...git,
   devSite: DEV_SITE,
   // ---- where the projects are kept
   storage: () => storageInfo(),
@@ -280,7 +291,7 @@ export const api = {
   saveProject: (name, pj) => ops.saveProject(name, pj),
   trustProject: name => ops.trustProject(name),
   renameFile: (name, from, to) => ops.renameFile(name, from, to),
-  deleteProject: name => ops.deleteProject(name),
+  deleteProject: async name => { const r = await ops.deleteProject(name); await git.gitForget(name); return r; },
   // a file of the build (build/…: not among the project's files): this session's, else (a
   // workspace folder) the one in the project's build/ folder
   readFile: async (name, path) => {
@@ -306,6 +317,7 @@ export const api = {
   openStatus: async name => browserOpenStatus((await projectJson(name)).device || {}),
   implement: async (name, { steps, synthUpToDate = false } = {}) => {
     const p = await store.load(name);
+    if (experimentalDevice(p.json.device)) return fakeJob('implement', [`ERROR: ${noFlowMessage(p.json.device)}`], 'error', noFlowMessage(p.json.device));
     if (p.json.synthTool === 'xst' && !openOnlyDevice(p.json.device)) return fakeJob('implement', NEED_ISE, 'error', 'XST needs Xilinx ISE 14.7 (choose Silinx as the synthesis tool in Design Properties)');
     const id = `local-${++jobSeq}`;
     const job = addJob({ id, kind: 'implement', status: 'running', lines: [], next: 0, error: null });
@@ -370,7 +382,8 @@ export const api = {
   },
   // { project, bitfile, bitData? (a .bit chosen from the disk) }
   program: async ({ project, bitfile, bitData } = {}) => usbJob('program', async log => {
-    if (project && !isTrusted(await projectJson(project))) fail(untrustedMessage(project, 'programming the board'));   // (#2830)
+    const pjb = project && await projectJson(project);
+    if (project && !isTrusted(pjb)) fail(untrustedMessage(project, 'programming the board', pjb));   // (#2830)
     // an iCE40's .bin: into its board's SPI flash, through its FT2232H (#2298)
     if (/\.bin$/i.test(bitfile || '')) {
       const bin = await bitOf(project, bitfile);
@@ -388,7 +401,8 @@ export const api = {
   // verify, reconfigure }; the lines of the full application's (server/programmer.js promJob); a
   // backup (read) is downloaded
   prom: async ({ project, op, bitfile, bitData, verify = true, reconfigure = false } = {}) => usbJob('prom', async (log, job) => {
-    if (project && !isTrusted(await projectJson(project))) fail(untrustedMessage(project, 'programming the PROM'));   // (#2830)
+    const pjp = project && await projectJson(project);
+    if (project && !isTrusted(pjp)) fail(untrustedMessage(project, 'programming the PROM', pjp));   // (#2830)
     if (!PROM_OPS.includes(op)) fail(`unknown PROM operation '${op}' (valid: ${PROM_OPS.join(', ')})`);
     let bit = null;
     if (op === 'program' || op === 'verify') {

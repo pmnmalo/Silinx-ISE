@@ -6,12 +6,17 @@ import { parseXdl, writeXdl } from './xdl.js';
 import { loadChipdb } from './nextpnr-io.js';
 import { s6Sites } from './fpga/s6/sites.js';
 import { placeS6 } from './fpga/s6/place.js';
+import { padPathsS6 } from './fpga/s6/pad-paths.js';
 import { placedXdlS6 } from './fpga/s6/xdl.js';
 import { checkRoutingS6 } from './fpga/s6/route-check.js';
 import { analyzeTimingS6 } from './fpga/s6/timing.js';
 import { placementOf, routedDesignS6, siteNetlist } from './fpga/s6/nextpnr.js';
 
 const PLACE_SEEDS = 3;
+// who places the block RAMs and DSP48A1s (#3137): nextpnr, since its spartan6 0.2.0 (the timing model's delays in its
+// chip database, its annealing refinement reaching 40 tiles: the examples' periods 3 % shorter on average than with
+// Silinx's placement, every PERIOD met); spec.hardByNextpnr false: Silinx's (placeS6, timing-driven, the sites fixed)
+export const S6_HARD_BY_NEXTPNR = true;
 // a routed design's minimum period by Silinx's timing model (ns; 0: no clocked paths)
 const periodOf = (routed, device) => analyzeTimingS6(parseXdl(writeXdl(routed)), device).clocks.reduce((a, c) => Math.max(a, c.period), 0);
 
@@ -43,15 +48,17 @@ export function mountNextpnrS6(ctx) {
     const t = now();
     const db = await loadChipdb(io.nextpnr.spartan6, part, log, StepError);
     // the pads and the global buffers, by Silinx's rules (the banks' VCCO, a clock pad's dedicated path); the block RAMs
-    // and DSP48A1s from its timing-driven placement (nextpnr's analytical placer left them columns apart: the stopwatch
-    // on the Atlys missed its 10 ns on every seed), a DSP48A1 cascade with them
-    const hard = phys.insts.some(i => i.kind === 'bram' || i.kind === 'dsp');
+    // and DSP48A1s by nextpnr (#3137), or with hardByNextpnr false from Silinx's timing-driven placement, a DSP48A1
+    // cascade with them (nextpnr 0.1's analytical placer left them columns apart: the stopwatch on the Atlys missed its
+    // 10 ns on every seed); a port without a LOC on a pad whose I/O path the bit database knows (#3152)
+    const byNextpnr = spec.hardByNextpnr ?? S6_HARD_BY_NEXTPNR;
+    const hard = !byNextpnr && phys.insts.some(i => i.kind === 'bram' || i.kind === 'dsp');
     let legal;
-    try { legal = placeS6(phys, sites, { seed: spec.seed || 1, effort: hard ? 1 : 0, timing: hard ? 0.1 : 0, nl }); } catch (e) { throw new StepError(`placement failed: ${e.message}`, [], e.hint); }
+    try { legal = placeS6(phys, sites, { seed: spec.seed || 1, effort: hard ? 1 : 0, timing: hard ? 0.1 : 0, nl, padPaths: padPathsS6(device, io.bitDb(), sites) }); } catch (e) { throw new StepError(`placement failed: ${e.message}`, [], e.hint); }
     for (const w of legal.warnings || []) log(`WARNING:Place - ${w}`);
     const fixed = new Map(), generalOk = new Set();
     phys.insts.forEach((inst, i) => {
-      if (!['iob', 'bufg', 'bram', 'dsp'].includes(inst.kind)) return;
+      if (!(hard ? ['iob', 'bufg', 'bram', 'dsp'] : ['iob', 'bufg']).includes(inst.kind)) return;
       fixed.set(inst.name, legal.site[i]);
       if (inst.kind === 'iob' && !sites.pads.get(legal.site[i])?.bufg.length) generalOk.add(inst.name);
     });

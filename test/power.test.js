@@ -160,7 +160,9 @@ test('measure-power --only: the runs measured merged into the JSON\'s', () => {
 // the estimate of the Silinx toolchain's own routed design (its flow, through xpwr) against XPower's of
 // ISE's implementation: four examples on the Basys2-250 here, one placement each (the four of Normal took over
 // five minutes on CI's runners, #2828); all of them: scripts/measure-power.mjs --compare
-test('the estimate on the examples: the total within ESTIMATE_ERROR_PERCENT of XPower\'s, the dynamic power within DYNAMIC_RANGE; the flow\'s report and log', { timeout: 300000 }, async () => {
+// (a slow runner: 265 s on CI's Windows at 15.23.0, past 300 s since #3097 synthesizes a design with comparisons both
+// ways, #3186)
+test('the estimate on the examples: the total within ESTIMATE_ERROR_PERCENT of XPower\'s, the dynamic power within DYNAMIC_RANGE; the flow\'s report and log', { timeout: 600000 }, async () => {
   const { runs } = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
   for (const example of ['traffic', 'blinky', 'pong', 'vga']) {
     const x = runs.find(r => r.example === example && r.board === 'basys2' && r.variant === '250');

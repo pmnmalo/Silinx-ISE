@@ -9,8 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { checkoutLayout } from './workflows-lib.mjs';
 import { PACKAGES, FORK, MARK, BOARDS, METRICS, TOLERANCE, packageVersion, installSpec, nextpnrChanges, changeSummary, measurementOf, readSide, reportMarkdown } from '../scripts/nextpnr-update-report.mjs';
-import { qualityRows } from '../scripts/yosys-update-report.mjs';
+import { qualityRows, githubOutputLines } from '../scripts/yosys-update-report.mjs';
 import { TARGETS, S3E_TARGETS, S6_TARGETS, targetName } from './examples-lib.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -85,7 +86,22 @@ test('nextpnr update: the "versions" command writes the step\'s outputs; a spec 
     assert.equal(r.status, 1);
     assert.match(r.stderr, /@silinx\/nextpnr-himbaechel-spartan3e: the head's is not a version or a release of pmnmalo\/nextpnr-spartan: "npm:evil@1\.0\.0"/);
     assert.ok(!fs.existsSync(out));
+    // a version package-lock.json resolves that is not one (a line break would write outputs of its own) refused, nothing written (#2959)
+    for (const v of ['0.1.4\nbase=x', '0.1.4\r\nchanged=false', '0.1.4 x']) {
+      const lock = write('lock.json', { packages: { [`node_modules/${S3E}`]: { version: '1.0.0' }, [`node_modules/${S6}`]: { version: v } } });
+      r = run([files[0], files[1], files[2], lock]);
+      assert.equal(r.status, 1, JSON.stringify(v));
+      assert.equal(r.stderr.trim(), `${S6}: the head's package-lock.json version is not a version: ${JSON.stringify(v)}`);
+      assert.equal(r.stdout, '');
+      assert.ok(!fs.existsSync(out));
+    }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('nextpnr and Yosys updates: a step\'s outputs never hold a line break (#2959)', () => {
+  assert.equal(githubOutputLines({ changed: true, base: 'a@1 b@2', summary: 'spartan6 0.1.3 → 0.1.4' }), 'changed=true\nbase=a@1 b@2\nsummary=spartan6 0.1.3 → 0.1.4\n');
+  assert.equal(githubOutputLines({ changed: false, base: '', summary: '' }), 'changed=false\nbase=\nsummary=\n');
+  for (const v of ['x\ny', 'x\r', '\n']) assert.throws(() => githubOutputLines({ changed: false, summary: v }), new RegExp(`^Error: the output summary holds a line break: ${JSON.stringify(v).replace(/\\/g, '\\\\')}$`));
 });
 
 test('nextpnr update: an example\'s measurement from the flow\'s job; none when it did not complete', () => {
@@ -172,19 +188,21 @@ test('nextpnr update: the steps with a writing token run the base\'s code; the b
     else if (name && /^ {4}/.test(line)) j[name].push(line);
   }
   assert.deepEqual(Object.keys(j), ['check', 'measure', 'report']);
+  // the check job's base at the root, the pull request under head/, read as data (#3038); the report job's base under base/
+  assert.deepEqual(checkoutLayout(j.check.join('\n')), { base: '', head: 'head', clean: true });
   const baseCheckout = /\n      - uses: actions\/checkout@[0-9a-f]{40} # v[\d.]+\n        with:\n          ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}\n          path: base\n          persist-credentials: false\n/;
-  for (const job of ['check', 'report']) {
-    assert.match(`\n${j[job].join('\n')}\n`, baseCheckout, job);
-    assert.ok(!j[job].some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), `${job}: the base's scripts only`);
+  assert.match(`\n${j.report.join('\n')}\n`, baseCheckout, 'report');
+  assert.ok(!j.check.some(l => /\bhead\/(?!package(-lock)?\.json\b)/.test(l.replace(/#.*$/, ''))), 'check: the pull request\'s package files only');
+  assert.ok(!j.report.some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), 'report: the base\'s scripts only');
+  for (const job of ['check', 'report'])
     assert.ok(!j[job].some(l => /uses: \.\/\.github\/actions\/setup|\bnpm (ci|install)\b/.test(l)), `${job}: no dependency installed`);
-  }
   assert.equal(j.report.filter(l => /uses: actions\/checkout@/.test(l)).length, 1, 'report: the base\'s checkout only');
-  assert.ok(j.check.includes('        run: node base/scripts/nextpnr-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json'));
+  assert.ok(j.check.includes('        run: node scripts/nextpnr-update-report.mjs versions package.json package-lock.json head/package.json head/package-lock.json'));
   assert.ok(j.report.some(l => /^ {10}node base\/scripts\/nextpnr-update-report\.mjs report --base results\/base --head results\/head --summary "\$SUMMARY"/.test(l)));
   // the measure job: the check step before the install, the base's side only
   const m = j.measure;
   const checked = m.indexOf('      - name: The base\'s packages checked');
-  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts $BASE_INSTALL'));
+  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root $BASE_INSTALL'));
   assert.ok(checked > 0 && install > checked, 'the check step before the install');
   const step = m.slice(checked, install).join('\n');
   assert.match(step, /^        if: matrix\.side == 'base'\n        env:\n          BASE_INSTALL: \$\{\{ needs\.check\.outputs\.base \}\}\n/m);
@@ -193,6 +211,19 @@ test('nextpnr update: the steps with a writing token run the base\'s code; the b
   for (const s of [`${S3E}@1.0.0`, `${S6}@${url('0.1.3')}`]) assert.ok(re.test(s), s);
   for (const s of [`${S3E}@^1.0.0`, `${S3E}@latest`, `${S3E}@npm:evil@1`, `${S6}@${url('0.1.3').replace('pmnmalo', 'x')}`, `@yowasp/yosys@0.70.1258`, `${S6}@${url('0.1.3').replace('.tgz', '.sh')}`])
     assert.ok(!re.test(s), s);
+  // the base's packages into the toolchain's workspace too, and the versions it resolves checked on both sides (#3156):
+  // installed at the root only, npm kept the pull request's nested in packages/silinx-fpga/node_modules
+  assert.ok(!m.some(l => /npm install(?!.*--workspace silinx-fpga --include-workspace-root)/.test(l.replace(/#.*$/, ''))), 'every install into the workspace');
+  const resolved = m.indexOf('      - name: The nextpnr packages resolved');
+  const examples = m.indexOf('      - name: The examples');
+  assert.ok(resolved > install && examples > resolved, 'the check after the install, before the examples');
+  assert.equal(m.slice(resolved, examples).join('\n'), [
+    '      - name: The nextpnr packages resolved',
+    '        env:',
+    "          BASE_INSTALL: ${{ matrix.side == 'base' && needs.check.outputs.base || '' }}",
+    `        run: node scripts/resolved-package.mjs packages/silinx-fpga ${PACKAGES.join(' ')} $BASE_INSTALL`,
+  ].join('\n'), 'both sides, every package');
+  assert.ok(!yml.includes("require('./node_modules/"), 'no version read from the root\'s node_modules alone');
 });
 
 test('nextpnr update: Dependabot never groups the nextpnr packages; CLAUDE.md says such a pull request is never merged on green alone', () => {

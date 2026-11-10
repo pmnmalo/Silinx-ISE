@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseExpr, formatExpr, exprVars, exprColumn, canonical, canonicalAsts, minimize, minimalAst, gateCount, primeImplicants,
-  cubeMinterms, kmapLayout, kmapRects, gray, newTable, normalizeTable, validateTable, reshapeTable, analyzeOutput,
+  cubeMinterms, kmapLayout, kmapRects, KMAP_ORDERS, gray, newTable, normalizeTable, validateTable, reshapeTable, analyzeOutput,
   generateTableHdl, dontCaresInHdl, truthTableFromModule, schematicFromTable, schematicErrors, LogicError,
   minimizeXor, exprCost, MAX_XOR_INPUTS, gateForm, outputForm, FORMS,
 } from '../core/logic.js';
@@ -388,8 +388,8 @@ test('textbook examples: minimal literal counts, essential primes, several solut
 // ------------------------------------------------------------------ Karnaugh maps
 test('K-map layout: Gray order, cell <-> minterm for 1–6 variables', () => {
   assert.deepEqual(gray(2), [0, 1, 3, 2]);
-  for (let n = 1; n <= 6; n++) {
-    const L = kmapLayout(n);
+  for (let n = 1; n <= 6; n++) for (const order of KMAP_ORDERS) {
+    const L = kmapLayout(n, order);
     const seen = new Set();
     L.maps.forEach((_, mi) => L.rowCodes.forEach((_, r) => L.colCodes.forEach((_, c) => seen.add(L.minterm(mi, r, c)))));
     assert.equal(seen.size, 1 << n, `n=${n}`);
@@ -400,7 +400,7 @@ test('K-map layout: Gray order, cell <-> minterm for 1–6 variables', () => {
       if (L.rowCodes.length > 1) { const d = m ^ L.minterm(mi, (r + 1) % L.rowCodes.length, c); assert.equal(d & (d - 1), 0); }
     })));
   }
-  const L4 = kmapLayout(4);
+  const L4 = kmapLayout(4, 'rows');
   assert.deepEqual([L4.rowVars, L4.colVars, L4.maps.length], [[0, 1], [2, 3], 1]);
   assert.equal(L4.minterm(0, 2, 3), 0b1110);   // row AB=11, column CD=10
   assert.equal(kmapLayout(5).maps.length, 2);
@@ -409,16 +409,16 @@ test('K-map layout: Gray order, cell <-> minterm for 1–6 variables', () => {
 
 test('K-map groups cover exactly the implicant\'s cells; wrap-around groups are split with open sides', () => {
   const r = rng(5);
-  for (let k = 0; k < 400; k++) {
+  for (let k = 0; k < 800; k++) {
     const n = 1 + (k % 6);
     const mask = Math.floor(r() * (1 << n)), value = Math.floor(r() * (1 << n)) & ~mask;
-    const L = kmapLayout(n);
+    const L = kmapLayout(n, KMAP_ORDERS[(k >> 3) % 2]);
     const cells = [];
     for (const rc of kmapRects(L, { value, mask })) for (let i = rc.r0; i <= rc.r1; i++) for (let j = rc.c0; j <= rc.c1; j++) cells.push(L.minterm(rc.map, i, j));
     assert.deepEqual(cells.sort((a, b) => a - b), cubeMinterms({ value, mask }, n), `n=${n} ${value}/${mask}`);
   }
-  // B'D' of A,B,C,D: the four corners
-  const L4 = kmapLayout(4);
+  // B'D' of A,B,C,D: the four corners (A,B on the rows, C,D on the columns)
+  const L4 = kmapLayout(4, 'rows');
   const corners = kmapRects(L4, { value: 0, mask: 0b1010 });
   assert.equal(corners.length, 4);
   assert.deepEqual(corners.map(c => [c.r0, c.c0, c.open.top, c.open.bottom, c.open.left, c.open.right]),
@@ -430,6 +430,41 @@ test('K-map groups cover exactly the implicant\'s cells; wrap-around groups are 
   assert.deepEqual(kmapRects(L4, { value: 0b0010, mask: 0b1101 }).map(c => [c.r0, c.r1, c.c0, c.c1, c.open.left, c.open.right]), [[0, 3, 2, 3, false, false]]);
   // 5 variables: E alone (no A): the same rectangle in both maps
   assert.deepEqual(kmapRects(kmapLayout(5), { value: 1, mask: 0b11110 }).map(c => c.map), [0, 1]);
+  // the default order (#2924), A,B on the columns, C,D on the rows: B·D' (columns 01 and 11, rows 00 and 10) split
+  // top / bottom; C (rows 11 and 10) adjacent
+  const C4 = kmapLayout(4);
+  assert.deepEqual(kmapRects(C4, { value: 0b0100, mask: 0b1010 }).map(c => [c.r0, c.r1, c.c0, c.c1, c.open.top, c.open.bottom]), [[0, 0, 1, 2, true, false], [3, 3, 1, 2, false, true]]);
+  assert.deepEqual(kmapRects(C4, { value: 0b0010, mask: 0b1101 }).map(c => [c.r0, c.r1, c.c0, c.c1, c.open.top, c.open.bottom]), [[2, 3, 0, 3, false, false]]);
+});
+
+// #2924: the variables' order of a Karnaugh map, MSB → LSB by columns then rows (the default) or by rows then columns
+test('#2924 K-map order: the variables of the maps, rows and columns, and every cell\'s minterm, for both orders and 1–6 variables', () => {
+  assert.deepEqual(KMAP_ORDERS, ['cols', 'rows']);
+  // the variables by hand: [map, rows, columns]
+  const VARS = {
+    cols: { 1: [[], [], [0]], 2: [[], [1], [0]], 3: [[], [2], [0, 1]], 4: [[], [2, 3], [0, 1]], 5: [[0], [3, 4], [1, 2]], 6: [[0, 1], [4, 5], [2, 3]] },
+    rows: { 1: [[], [], [0]], 2: [[], [0], [1]], 3: [[], [0], [1, 2]], 4: [[], [0, 1], [2, 3]], 5: [[0], [1, 2], [3, 4]], 6: [[0, 1], [2, 3], [4, 5]] },
+  };
+  // an axis's labels in Gray order, as written on the map
+  const LABELS = { 0: [''], 1: ['0', '1'], 2: ['00', '01', '11', '10'] };
+  for (const order of KMAP_ORDERS) for (let n = 1; n <= 6; n++) {
+    const L = kmapLayout(n, order), [mv, rv, cv] = VARS[order][n];
+    assert.equal(L.order, order);
+    assert.deepEqual([L.mapVars, L.rowVars, L.colVars], [mv, rv, cv], `${order} ${n}`);
+    // the shape is the order's alone: as wide as tall or one column wider
+    assert.deepEqual([L.maps.length, L.rowCodes.length, L.colCodes.length], [LABELS[mv.length].length, LABELS[rv.length].length, LABELS[cv.length].length]);
+    L.maps.forEach((_, mi) => LABELS[rv.length].forEach((rl, r) => LABELS[cv.length].forEach((cl, c) => {
+      // the row of the truth table: each variable's bit read off its label, the bits joined x0 … x(n-1)
+      const bit = Array(n).fill('?');
+      [[mv, LABELS[mv.length][mi]], [rv, rl], [cv, cl]].forEach(([vs, label]) => vs.forEach((v, i) => { bit[v] = label[i]; }));
+      assert.equal(L.minterm(mi, r, c), parseInt(bit.join(''), 2), `${order} n=${n} map ${mi} (${r}, ${c})`);
+    })));
+  }
+  // the default
+  const vars = L => [L.order, L.mapVars, L.rowVars, L.colVars];
+  for (let n = 1; n <= 6; n++) assert.deepEqual(vars(kmapLayout(n)), vars(kmapLayout(n, 'cols')), 'cols by default');
+  assert.equal(kmapLayout(4).minterm(0, 2, 3), 0b1011);   // column AB=10, row CD=11
+  assert.throws(() => kmapLayout(4, 'diagonal'), /order is one of cols, rows/);
 });
 
 // ------------------------------------------------------------------ documents
@@ -553,7 +588,7 @@ test('analyzeOutput: everything shown for an output', () => {
 
 // ------------------------------------------------------------------ any number of outputs (#176)
 const SIX = () => ({ ...newTable('six', ['a', 'b', 'c'], ['y0', 'y1', 'y2', 'y3', 'y4', 'y5']),
-  table: { y0: '00000001', y1: '01111111', y2: '01101001', y3: '00010111', y4: '10100000', y5: '1X0X0X1X' } });
+  table: { y0: '00000001', y1: '01111111', y2: '01101001', y3: '00010111', y4: '10100000', y5: '1X0X0X1X' }, form: 'sop' });   // (a table in minimal SOP: a new one's form is the least gates', #2951)
 
 test('tables of more than 4 outputs: validated, saved and loaded, reshaped, K-map and SOP of each output (#176)', () => {
   const doc = normalizeTable(SIX());
@@ -575,8 +610,9 @@ test('tables of more than 4 outputs: validated, saved and loaded, reshaped, K-ma
   const a5 = analyzeOutput(doc, 'y4');
   assert.deepEqual([a5.sigma, a5.pi, formatExpr(a5.sop.ast), formatExpr(a5.pos.ast)], ['Σm(0, 2)', 'ΠM(1, 3, 4, 5, 6, 7)', "a'·c'", "c'·a'"]);
   assert.deepEqual(a5.sop.gates, { and: 1, or: 0, not: 2, literals: 2, inputs: 2 });
-  const L = kmapLayout(3);
-  assert.deepEqual(a5.sop.terms.map(t => kmapRects(L, t).map(c => [c.r0, c.r1, c.c0, c.c1, c.open.left, c.open.right])), [[[0, 0, 0, 0, true, false], [0, 0, 3, 3, false, true]]]);
+  const rects = L => a5.sop.terms.map(t => kmapRects(L, t).map(c => [c.r0, c.r1, c.c0, c.c1, c.open.left, c.open.right]));
+  assert.deepEqual(rects(kmapLayout(3, 'rows')), [[[0, 0, 0, 0, true, false], [0, 0, 3, 3, false, true]]]);   // (a on the rows, b c on the columns)
+  assert.deepEqual(rects(kmapLayout(3)), [[[0, 0, 0, 1, false, false]]]);   // (a b on the columns, c on the rows, #2924)
   const a6 = analyzeOutput(doc, 'y5');
   assert.deepEqual([a6.sigma, a6.pi, formatExpr(a6.sop.ast), formatExpr(a6.pos.ast)], ['Σm(0, 6) + d(1, 3, 5, 7)', 'ΠM(2, 4) · D(1, 3, 5, 7)', "a'·b' + a·b", "(a + b')·(a' + b)"]);
   assert.deepEqual(a6.sop.terms.map(t => t.minterms), [[0, 1], [6, 7]]);
@@ -807,6 +843,8 @@ test('XOR forms (#435): random functions of 2–6 inputs with don\'t cares: equi
 test("HDL with the XOR form (#435): form 'xor' uses it where it is simpler, else the minimal SOP; exact VHDL and Verilog, no warnings, simulates to the table", () => {
   const doc = { ...SIX(), form: 'xor' };
   assert.equal(normalizeTable(doc).form, 'xor');
+  // the Karnaugh maps' order (#2924): 'rows' kept, the default (by columns) or anything else not written
+  assert.deepEqual(['rows', 'cols', 'diagonal', undefined].map(kmapOrder => 'kmapOrder' in normalizeTable({ ...doc, kmapOrder }) && normalizeTable({ ...doc, kmapOrder }).kmapOrder), ['rows', false, false, false]);
   assert.equal(normalizeTable({ ...doc, form: 'esop' }).form, 'sop');
   const vhd = generateTableHdl(doc, 'vhdl');
   assert.equal(vhd.code.slice(vhd.code.indexOf('-- y0 =')), `-- y0 = Σm(7)
@@ -867,7 +905,7 @@ endmodule
     for (const o of doc.outputs) assert.ok(careEqual(doc.table[o], t.table[o]), `${g.lang} ${o}`);
     assert.deepEqual(dontCaresInHdl(g.code), { y5: [1, 3, 5, 7] });
   }
-  // the default (SOP) is unchanged: no XOR in the module
+  // a table in minimal SOP: no XOR in the module
   assert.doesNotMatch(generateTableHdl(SIX(), 'vhdl').code, /xor|xnor|⊕/);
   // random tables of 2–6 inputs with form 'xor': simulate to the table in both languages
   const r = rng(4350);

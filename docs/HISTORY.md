@@ -1,11 +1,11 @@
-# The history of Silinx ISE
+# The history of Silinx
 
 Who started Silinx, why, and how it came to be what it is. Written for the people who join the project, so they
 know where its rules and its choices come from.
 
 ## Who
 
-Silinx ISE was started by **Pedro Maló**, who teaches Digital Systems at **FCT NOVA** (NOVA School of Science and
+Silinx was started by **Pedro Maló**, who teaches Digital Systems at **FCT NOVA** (NOVA School of Science and
 Technology, Lisbon). He is the project's maintainer: he decides what it does, reviews and merges its pull requests and
 makes its releases ([CONTRIBUTING.md](../CONTRIBUTING.md)).
 
@@ -67,8 +67,9 @@ Most of the project's rules come from that way of working:
 - **2026-10-18**: the MCP server: what the interface does, an AI assistant can do too (#134, then #2674).
 - **2026-10-26**: C to HDL, a C specification compatible with Vitis HLS.
 - **2026-10-28**: contributors from outside: the maintainer merges and releases, a code owner reviews (#1872).
-- **2026-10-29 onwards**: place and route move to **nextpnr** (#2137): Silinx's own placer and router are removed
-  once nextpnr reaches parity, the bitstream writer stays Silinx's.
+- **2026-10-29 onwards**: place and route move to **nextpnr** (#2137): Silinx's own placer and router were removed
+  once nextpnr reached parity (#2137, #2824); the Spartan-6's packer and the bitstream writer stay Silinx's.
+- **2026-11-08**: renamed *Silinx* (#2624): the app, its command (`silinx`) and its release files.
 
 The [CHANGELOG](../CHANGELOG.md) has every release in detail.
 

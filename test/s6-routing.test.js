@@ -9,7 +9,7 @@ import { placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';
 import { routingResources } from '../packages/silinx-fpga/src/fpga/s6/route-nets.js';
 import { checkRoutingS6 } from '../packages/silinx-fpga/src/fpga/s6/route-check.js';
 import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
-import { s6Device, s6Phys, s6Verilog, s6RouteNextpnr, NEXYS3_SW, NEXYS3_LD } from './s6-lib.mjs';
+import { s6Device, s6Phys, s6Netlist, s6Verilog, s6RouteNextpnr, NEXYS3_SW, NEXYS3_LD } from './s6-lib.mjs';
 
 const LX16 = 'xc6slx16csg324-3';
 // placed, routed by nextpnr, the routed design read back from its XDL, checked
@@ -59,6 +59,43 @@ test('an accumulator routed: complete, no node of two nets, the carry COUT -> CI
   assert.ok(vcc.length >= 1 && vcc.every(n => /^GLOBAL_LOGIC1_\d+$/.test(n.name) && n.outpins[0].pin === 'HARD1'));
   assert.ok(vcc.every(n => out.insts.find(i => i.name === n.outpins[0].inst)?.type === 'TIEOFF'));
 });
+
+// a product of two counters (#3151): the counters' sums leave their carry slices by BMUX / CMUX for the DSP48A1s, and
+// the 5FFs of the product's registers took those positions, their multiplexed outputs two nets ("its pin BMUX carries
+// two nets"); in Verilog and in VHDL
+const PRODUCT = {
+  verilog: `module m(input clk, output reg [3:0] led);
+  reg [17:0] x = 0, y = 0; reg [35:0] p;
+  always @(posedge clk) begin x <= x + 3; y <= y + 5; p <= x * y; led <= p[35:32]; end
+endmodule`,
+  vhdl: `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
+entity m is port (clk : in std_logic; led : out std_logic_vector(3 downto 0)); end m;
+architecture rtl of m is
+  signal x, y : unsigned(17 downto 0) := (others => '0'); signal p : unsigned(35 downto 0);
+begin
+  process (clk) begin
+    if rising_edge(clk) then x <= x + 3; y <= y + 5; p <= x * y; led <= std_logic_vector(p(35 downto 32)); end if;
+  end process;
+end rtl;`,
+};
+for (const [lang, text] of Object.entries(PRODUCT)) {
+  test(`a product of two counters (${lang}) packed, placed and routed: no 5FF on a position whose multiplexed output the carry's sum needs (#3151)`, async () => {
+    const nl = await s6Netlist([{ path: lang === 'vhdl' ? 'm.vhd' : 'm.v', lang, text }], 'm');
+    const d = s6Phys(nl, ucfOf([['clk', 'V10'], ...NEXYS3_LD.slice(0, 4).map((l, i) => [`led<${i}>`, l])]));
+    assert.deepEqual(d.packed.warnings, []);
+    assert.deepEqual(d.phys.warnings, []);
+    assert.equal(nl.cells.filter(c => c.type === 'DSP48A1').length, 3);
+    for (const s of d.packed.slices) {
+      if (s.carry === null) continue;
+      ['A', 'B', 'C', 'D'].forEach((p, i) => {
+        const o = nl.cells[s.carry].pins[`O<${i}>`];
+        if (nl.nets[o]?.loads.some(l => nl.cells[l.cell].type === 'DSP48A1')) assert.equal(s.pos[p].mux, 'xor', `${p}MUX: the sum to the DSP48A1s`);
+      });
+    }
+    const { check } = await routed(d);
+    assert.deepEqual(check.problems, []);
+  });
+}
 
 test('checkRoutingS6: the errors of routings that break the rules', async () => {
   const nl = await s6Verilog('module m(input clk, input a, input b, output reg y); always @(posedge clk) y <= a ^ b; endmodule');

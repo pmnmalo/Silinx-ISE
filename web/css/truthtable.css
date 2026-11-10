@@ -39,7 +39,8 @@
 .tt-tabs { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 4px; }
 .tt-tab { border: 1px solid var(--border, #aaa); background: var(--tab-inactive, #eee); padding: 2px 14px; font-family: var(--mono, monospace); font-weight: bold; cursor: pointer; border-radius: 3px 3px 0 0; }
 .tt-tab.active { background: var(--tab-active, #fff); border-bottom-color: var(--tab-active, #fff); color: var(--title-fg, #15428b); }
-.tt-groups { display: flex; gap: 14px; margin-bottom: 4px; }
+.tt-groups { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; margin-bottom: 4px; }
+.tt-groups-br { flex-basis: 100%; height: 0; }   /* SOP / POS, then Order and 3D on a line of their own (#3063) */
 .tt-kmap-host { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
 .tt-kmap { background: #fff; }
 .tt-kmap .tt-kcell rect { fill: #fff; stroke: #999; cursor: pointer; }
@@ -57,14 +58,17 @@
 .tt-kmap .tt-k-frame { fill: none; stroke: #333; stroke-width: 1.5; pointer-events: none; }
 .tt-kmap .tt-k-groups { pointer-events: none; }
 .tt-legend { display: flex; flex-direction: column; gap: 3px; min-width: 200px; }
+/* beside the map, centred on it (#3064): the flat map's on its cells (its labels 46 px above them, 18 px below: 14 px lower) */
+.tt-kmap-host > .tt-legend { align-self: center; }
+.tt-kmap-host > svg.tt-kmap + .tt-legend { position: relative; top: 14px; }
 .tt-leg { display: flex; align-items: center; gap: 6px; }
 .tt-swatch { display: inline-block; width: 18px; height: 12px; border: 2.5px solid; border-radius: 5px; }
 .tt-leg-cells { color: var(--muted, #777); }
-.tt-ess { color: #a00; font-style: italic; }
 .tt-results { display: flex; flex-direction: column; gap: 6px; }
 .tt-res code, .tt-expr { font-family: var(--mono, monospace); font-size: 13px; }
 /* a canonical form of 8 inputs (256 terms) wraps in the panel (#2927) */
 .tt-canon code { overflow-wrap: anywhere; }
+.tt-canon { display: flex; flex-direction: column; gap: 6px; }   /* (its two forms spaced as the results, #3071) */
 .tt-cost, .tt-circuit { color: var(--muted, #666); }   /* (a form as a circuit: its gates and delay, #1427) */
 .tt-note { display: block; color: #8a5a00; }
 
@@ -87,6 +91,29 @@ html[data-theme="dark"] .tt-k3d-cell:hover { background: #26324a; }
 html[data-theme="dark"] .tt-k3d-cell.v1 { background: #1d2738; }
 html[data-theme="dark"] .tt-k3d-cell.v1 .tt-k3d-v { color: #8fb4ff; }
 
+/* the map of 3 or 4 inputs on a cylinder or a torus (#2925, web/js/tt-kmapsurface.js): its faces drawn farthest first,
+   seen from behind dimmed; the groups as patches over the cells, their outlines in their colours */
+.tt-ks-svg { overflow: visible; }
+.tt-ks-face { fill: #fff; stroke: #b4b4b4; stroke-width: .6; cursor: pointer; }
+.tt-ks-face:hover { fill: #eef5ff; }
+.tt-ks-face.v1 { fill: #eef3ff; }
+.tt-ks-face.back { fill: #dcdcdc; }
+.tt-ks-group { fill-opacity: .24; stroke: none; pointer-events: none; }
+.tt-ks-group.back { fill-opacity: .12; }
+.tt-ks-edge { stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
+.tt-ks-text { pointer-events: none; }
+.tt-ks-m { font-size: 9px; fill: #999; }
+.tt-ks-v { font: bold 15px var(--mono, monospace); fill: #666; }
+.tt-ks-v.v1 { fill: #0040c0; }
+.tt-ks-v.vX { fill: #a06000; }
+html[data-theme="dark"] .tt-ks-face { fill: #1e2228; stroke: #555; }
+html[data-theme="dark"] .tt-ks-face:hover { fill: #26324a; }
+html[data-theme="dark"] .tt-ks-face.v1 { fill: #1d2738; }
+html[data-theme="dark"] .tt-ks-face.back { fill: #121417; }
+html[data-theme="dark"] .tt-ks-v { fill: #aaa; }
+html[data-theme="dark"] .tt-ks-v.v1 { fill: #8fb4ff; }
+html[data-theme="dark"] .tt-ks-v.vX { fill: #e0a040; }
+
 /* a toolbar's menu (web/js/toolbar-menu.js) */
 .tb-more { position: absolute; top: 5px; right: 8px; }
 .tb-more .tb-more-btn { box-sizing: border-box; width: 28px; min-width: 0; padding-left: 0; padding-right: 0; justify-content: center; text-align: center; }   /* (inside the place its toolbar keeps free, #2331) */
@@ -106,5 +133,10 @@ html[data-theme="dark"] .tt-k3d-cell.v1 .tt-k3d-v { color: #8fb4ff; }
 .tt-menu-item svg { width: 16px; height: 16px; flex: none; }
 :is(.tt-menu-item, .tb-menu-item:not(:disabled)):is(:hover, :focus-visible), .tt-toolbar .tb-more-btn:hover { border-color: #a8c8eb; background: linear-gradient(#f3f8fd, #d5e6f8); }
 .pn-toolbar, .fsm-toolbar, .asm-chart-toolbar { position: relative; padding-right: 40px; }
-.tt-sol { display: flex; align-items: center; gap: 6px; margin-top: 2px; }   /* the minimal solutions browsed (#2928) */
+.tt-sol { display: flex; align-items: center; gap: 6px; }   /* the minimal solutions browsed (#2928), on the K-map (#2950) */
+.tt-legend > .tt-sol { margin-bottom: 3px; }   /* (beside the map, above its groups, #3077) */
+.tt-hdl { margin: 0 4px 0 0; vertical-align: middle; }   /* a result's tick box: the output's HDL logic (#2951) */
 .tt-sol-btn { padding: 0 6px; line-height: 1.4; }
+/* read only (a shared project followed, #3181: tt-readonly.js): what changes the table hidden, its cells not clickable */
+.tt-editor.tt-readonly [hidden] { display: none; }
+.tt-editor.tt-readonly .tt-table td.tt-cell, .tt-editor.tt-readonly .tt-kmap .tt-kcell rect { cursor: default; }

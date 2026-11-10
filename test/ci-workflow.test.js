@@ -29,19 +29,26 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
   assert.equal(on(ci).replace(/^#.*\n/gm, ''), "on:\n  push:\n    tags: ['v*', 'silinx-fpga-v*']\n  workflow_dispatch:\n");
   assert.doesNotMatch(ci, /pull_request|branches:|paths(-ignore)?:/, 'not on pull requests nor on pushes to main');
   assert.ok(!fs.existsSync(path.join(ROOT, 'scripts/ci-changes.mjs')), 'no change detection: everything runs');
-  assert.match(ci, /^concurrency:\n  group: ci-\$\{\{ github\.ref \}\}-\$\{\{ github\.sha \}\}\n  cancel-in-progress: false\n/m);
+  // the tags' runs one at a time (#3124: two tags' runs together queued their jobs up to 50 minutes); a run by hand on its ref
+  // (a third tag cancels the waiting run: the comment says so, and what to do)
+  assert.match(ci, /a third tag pushed while one runs and one waits cancels the waiting one[\s\S]*?Re-run all jobs/);
+  assert.match(ci, /^concurrency:\n  group: \$\{\{ github\.event_name == 'push' && 'ci-tags' \|\| format\('ci-\{0\}-\{1\}', github\.ref, github\.sha\) \}\}\n  cancel-in-progress: false\n/m);
   const j = jobs(ci);
   assert.deepEqual(Object.keys(j), ['unit', 'ui', 'webkit-standalone', 'release-zip', 'browsers', 'os', 'private-data-history', 'ci-ok']);
   for (const [name, lines] of Object.entries(j)) {
     if (name === 'ci-ok') continue;
     assert.ok(!lines.some(l => /^    (needs|if):/.test(l)), `${name}: not gated`);
   }
-  // the unit tests on every system, in three parts of about the same time (#573), each Linux part's file times uploaded
+  // the unit tests on every system in parts of about the same time (#573), each Linux part's file times uploaded: on
+  // Linux all of them in five parts, on macOS and Windows in three but the toolchain's heaviest (--light, #3124)
   const unit = j.unit.join('\n');
-  assert.match(unit, /^        os: \[ubuntu-latest, macos-latest, windows-latest\]\n        shard: \[1, 2, 3\]$/m);
-  assert.match(unit, /node scripts\/test-shard\.mjs "\$SHARD\/3"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-file-times\.mjs --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-times-reporter\.mjs --test-reporter-destination=test-times\.json\n\s+shell: bash/);
+  assert.match(unit, /^        os: \[ubuntu-latest, macos-latest, windows-latest\]\n        shard: \[1, 2, 3, 4, 5\]\n        exclude:\n(?: {10}- \{ os: (?:macos|windows)-latest, shard: [45] \}\n){4}/m);
+  for (const os of ['macos', 'windows']) for (const k of [4, 5]) assert.ok(unit.includes(`- { os: ${os}-latest, shard: ${k} }`), `${os} ${k}`);
+  assert.match(unit, /^    name: unit \(\$\{\{ matrix\.os \}\}, \$\{\{ matrix\.shard \}\}\/\$\{\{ matrix\.os == 'ubuntu-latest' && 5 \|\| 3 \}\}\)$/m);
+  assert.match(unit, /^ {10}SHARD: \$\{\{ matrix\.shard \}\}\n {10}PARTS: \$\{\{ matrix\.os == 'ubuntu-latest' && 5 \|\| 3 \}\}\n {10}LIGHT: \$\{\{ matrix\.os != 'ubuntu-latest' && '--light' \|\| '' \}\}$/m);
+  assert.match(unit, /node scripts\/test-shard\.mjs "\$SHARD\/\$PARTS" \$LIGHT\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-file-times\.mjs --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-times-reporter\.mjs --test-reporter-destination=test-times\.json\n\s+shell: bash/);
   assert.match(unit, /- if: always\(\) && matrix\.os == 'ubuntu-latest'\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: unit-times-\$\{\{ matrix\.shard \}\}\n\s+path: test-times\.json\n/);
-  assert.match(unit, /^    timeout-minutes: 90$/m, 'a Windows part takes up to 45 minutes and more (#1582), macOS and Windows over 60 (#2665)');
+  assert.match(unit, /^    timeout-minutes: 90$/m, 'a part about 40 minutes since #3124 (before, up to 80 on macOS and Windows, #2665)');
   assert.doesNotMatch(unit, /--test-shard=/, "node's own shards split by order, not time");
   for (const t of ['docs', 'changelog', 'quality-page']) assert.ok(fs.existsSync(path.join(ROOT, `test/${t}.test.js`)), t);
   // the UI tests in both interfaces, each in three parts of about the same time, one file at a time (#912;
@@ -57,7 +64,8 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
   assert.match(ui, /^    timeout-minutes: 45$/m, 'the job holds the step and its setup');
   // Firefox and WebKit, one after the other (#1126)
   const br = j.browsers.join('\n');
-  assert.match(br, /^ {4}timeout-minutes: 60$/m);
+  // (past its steps' own: the install's 25 minutes, the tests' 40, #2939)
+  assert.match(br, /^ {4}timeout-minutes: 70$/m);
   assert.match(br, /- run: npm run test:browsers\n {8}timeout-minutes: 40$/m);
   // the macOS and Windows smoke tests
   assert.ok(j.os.includes('        os: [macos-latest, windows-latest]'));
@@ -130,7 +138,8 @@ test('CodeQL (#498): a workflow of its own, nightly on main when its code change
 
 test('CI: WebKit and its system packages installed in a step of their own, its time apart from the tests\' (#1559)', () => {
   const w = jobs(read('.github/workflows/ci.yml'))['webkit-standalone'].join('\n');
-  assert.match(w, /- name: WebKit and its system packages\n\s+run: npx playwright install --with-deps webkit\n\s+timeout-minutes: 25\n/);
+  // (an install that stalls stopped at 10 minutes and run once more, within the step's 25, #2921)
+  assert.match(w, /- name: WebKit and its system packages\n\s+run: \|\n(?:.*\n)*?\s+if timeout 10m npx playwright install --with-deps webkit; then .*\n(?:.*\n){3}\s+exit 1\n\s+timeout-minutes: 25\n/);
   assert.match(w, /- name: Memory in WebKit \(Safari's engine\)\n\s+run: npm run test:webkit\n\s+timeout-minutes: 15\n/);
   const job = +w.match(/^    timeout-minutes: (\d+)$/m)[1];
   assert.ok(job >= 25 + 15, `the job's ${job} minutes hold both steps`);

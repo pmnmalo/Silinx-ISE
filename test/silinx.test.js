@@ -175,15 +175,15 @@ test('rankEntries: best first, ties in their order, English text also matches, l
   const es = [
     { text: 'Ver Simulação', en: 'View Simulation' },
     { text: 'Processo Simular Modelo Comportamental', en: 'Process Simulate Behavioral Model' },
-    { text: 'Ajuda Acerca do Silinx ISE', en: 'Help About Silinx ISE' },
+    { text: 'Ajuda Acerca do Silinx', en: 'Help About Silinx' },
     { text: 'src/sim_top.vhd' },
   ];
   assert.deepEqual(M.rankEntries(es, ''), es, 'empty query: everything, in order');
   assert.deepEqual(M.rankEntries(es, '   ', 2), es.slice(0, 2));
   const r = M.rankEntries(es, 'simul');
   assert.deepEqual(r.map((e) => e.en || e.text), ['View Simulation', 'Process Simulate Behavioral Model']);
-  assert.deepEqual(M.rankEntries(es, 'about').map((e) => e.en), ['Help About Silinx ISE'], 'English text in the Portuguese interface');
-  assert.deepEqual(M.rankEntries(es, 'acerca').map((e) => e.en), ['Help About Silinx ISE'], 'translated text');
+  assert.deepEqual(M.rankEntries(es, 'about').map((e) => e.en), ['Help About Silinx'], 'English text in the Portuguese interface');
+  assert.deepEqual(M.rankEntries(es, 'acerca').map((e) => e.en), ['Help About Silinx'], 'translated text');
   assert.deepEqual(M.rankEntries(es, 'sim_top').map((e) => e.text), ['src/sim_top.vhd']);
   assert.deepEqual(M.rankEntries(es, 'zzz'), []);
 });

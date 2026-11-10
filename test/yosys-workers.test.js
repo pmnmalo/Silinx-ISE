@@ -81,7 +81,8 @@ function recorder(parallel) {
     const p = args.join(' ');
     // (ABC9's remap, #377: the cells' models read before the RTLIL)
     // (High's search for state machines to try one-hot, #539: started first, beside the usual run)
-    const r = { kind: /silinx_fold_ce/.test(p) ? 'fold' : /speedup/.test(p) ? 'speed' : /write_rtlil silinx_fsm_pre\.il/.test(p) ? 'fsm' : / -abc9 -nowidelut /.test(p) ? 'abc9' : /^-q -p read_rtlil/.test(p) ? (/silinx_lut\.lib/.test(p) ? (p.split('if,-g').length > 3 ? 'third' : 'second-delays') : files['silinx_depth.abc'] === DEPTH_ABC2_LUT4 && /abc -luts 1,1,1,1 /.test(p) ? 'second-lut4' : files['silinx_depth.abc'] === DEPTH_ABC2 ? 'second' : 'first') : 'synth', start: ++tick, end: null };
+    // (the search for the comparisons to map as logic, #3097: before them all)
+    const r = { kind: /silinx_cmp\.json/.test(p) ? 'cmp' : /silinx_fold_ce/.test(p) ? 'fold' : /speedup/.test(p) ? 'speed' : /write_rtlil silinx_fsm_pre\.il/.test(p) ? 'fsm' : / -abc9 -nowidelut /.test(p) ? 'abc9' : /^-q -p read_rtlil/.test(p) ? (/silinx_lut\.lib/.test(p) ? (p.split('if,-g').length > 3 ? 'third' : 'second-delays') : files['silinx_depth.abc'] === DEPTH_ABC2_LUT4 && /abc -luts 1,1,1,1 /.test(p) ? 'second-lut4' : files['silinx_depth.abc'] === DEPTH_ABC2 ? 'second' : 'first') : 'synth', start: ++tick, end: null };
     runs.push(r);
     return yosysNode(args, files, onLine).then(o => { r.end = ++tick; return o; });
   };
@@ -109,8 +110,9 @@ test('#277 with 4 Yosys at a time the second balancing (and ABC9\'s remap, #377)
   // (the second balancing with and without the LUT delays, the third, and the second onto LUT4s alone, #370)
   // ABC9's remap (#377): with two last, after the others; with four right after the first ones, before the second
   // balancing (its run the longest); the critical path's remap (#652) after them all, measured against their choice
-  assert.deepEqual(kinds(few.runs), ['fsm', 'synth', 'first', 'first', 'second', 'second-delays', 'third', 'second-lut4', 'abc9', 'speed']);
-  assert.deepEqual(kinds(many.runs), ['fsm', 'synth', 'first', 'first', 'abc9', 'second', 'second-delays', 'third', 'second-lut4', 'speed']);
+  // (the chain's text has a `<`, its loop's: the search for comparisons to map as logic first, none found, #3097)
+  assert.deepEqual(kinds(few.runs), ['cmp', 'fsm', 'synth', 'first', 'first', 'second', 'second-delays', 'third', 'second-lut4', 'abc9', 'speed']);
+  assert.deepEqual(kinds(many.runs), ['cmp', 'fsm', 'synth', 'first', 'first', 'abc9', 'second', 'second-delays', 'third', 'second-lut4', 'speed']);
   const firstEnd = rs => Math.max(...rs.filter(r => r.kind === 'first').map(r => r.end));
   const secondStart = rs => Math.min(...rs.filter(r => /^second/.test(r.kind)).map(r => r.start));
   // two: after the first ones ended (the depth-oriented one kept); four: before

@@ -780,7 +780,7 @@ uiTest('ASM chart editor: Zoom / Fit, Reset route / Delete connection, Swap 1 / 
 
   // ---- (#2261) no Language, no </> Code; Arrange and # Snap in the menu at the right of the first line
   const barMenu = () => page.eval((d) => { const m = document.querySelector(`${d} .tb-more-menu`), b = document.querySelector(`${d} .tb-more-btn`).getBoundingClientRect(), t = document.querySelector(`${d} .asm-toolbar`).getBoundingClientRect(); return { open: !m.hidden, buttons: [...m.querySelectorAll('button')].map((x) => x.textContent), right: t.right - b.right < 20, firstLine: b.top - t.top < 20, tools: [...document.querySelectorAll(`${d} .asm-toolbar .asm-btn`)].map((x) => x.textContent).filter((x) => x === '</> Code').length, selects: document.querySelectorAll(`${d} .asm-toolbar select`).length, panel: !!document.querySelector(`${d} .asm-code`) }; }, D);
-  assert.deepEqual(await barMenu(), { open: false, buttons: ['Arrange', '# Snap'], right: true, firstLine: true, tools: 0, selects: 1, panel: false });
+  assert.deepEqual(await barMenu(), { open: false, buttons: ['Arrange', '# Snap', 'Verify Property…'], right: true, firstLine: true, tools: 0, selects: 1, panel: false });
   await page.click(`${D} .tb-more-btn`);
   assert.equal((await barMenu()).open, true);
   await page.key('Escape');

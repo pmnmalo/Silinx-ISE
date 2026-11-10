@@ -12,16 +12,17 @@
 import { rewriteCarryChains, GATE_MIN, ADDER_MIN } from './carry-chain.js';
 import { readYosysJson } from './fpga/netlist.js';
 import { pack } from './fpga/pack.js';
-import { fsmProbeCommands, fsmChosen, fsmExtractCommands, fsmForceCommands, fsmInits, fsmRestCommands, markWires, setInits, oldStateInits, refusedForUsers, quietForced, FSM_PRE_FILE, FSM_MARKED_FILE, FSM_POST_FILE, FSM_ENC_FILE, FSM_DETECT_FILE, FSM_FORCED_FILE } from './synth-fsm.js';
+import { fsmProbeCommands, fsmChosen, fsmExtracted, fsmExtractCommands, fsmForceCommands, fsmInits, fsmRestCommands, markWires, setInits, oldStateInits, refusedForUsers, quietForced, FSM_PRE_FILE, FSM_MARKED_FILE, FSM_POST_FILE, FSM_ENC_FILE, FSM_DETECT_FILE, FSM_FORCED_FILE } from './synth-fsm.js';
 import { asText } from './synth-open-yosys.js';
 import {
-  DEEP_RULE, criticalDelay, deepDesign, logicLevels, pathEnds
+  DEEP_RULE, criticalDelay, deepDesign, domainDelays, logicLevels, pathEnds
 } from './synth-open-path.js';
 import { mountDepth } from './synth-open-depth.js';
 import { bddStage } from './synth-open-resynth.js';
 import { s6SynthCommands, BRAMS_S6_FILE, BRAMS_S6 } from './synth-brams-s6.js';
+import { cmpStep, cmpSet, probeComparisons, cmpChoice, CMP_FILE, CMP_MAP, CMP_SET_FILE } from './synth-cmp.js';
 export {
-  DEEP_RULE, criticalDelay, deepDesign, logicLevels, pathEnds
+  DEEP_RULE, criticalDelay, deepDesign, domainDelays, logicLevels, pathEnds
 };
 export { asText, lineStream, readableBlobs, runYosysOnce, verifiedYosysUrl, yosysError, yosysWorkerSource } from './synth-open-yosys.js';
 
@@ -303,13 +304,14 @@ export function logicMemories(out) {
 }
 /** synth_xilinx up to its fine step: lutram, its memory step at LUTRAM_COST; count (or lutram), the memories it
  *  leaves to logic counted into MEMORIES_FILE. */
-export function memorySteps(synth, { lutram = false, count = false } = {}) {
-  if (lutram) return `${synth} -run :map_memory; memory_libmap -lib +/xilinx/lutrams_xcv.txt -lib +/xilinx/brams_xc2v.txt -logic-cost-ram ${LUTRAM_COST}; `
-    + `techmap -map +/xilinx/lutrams_xcv_map.v; techmap -map +/xilinx/brams_xc2v_map.v; ${MEMORIES_COUNT}; ${synth} -run map_ffram:fine`;
-  if (count) return `${synth} -run :map_ffram; ${MEMORIES_COUNT}; ${synth} -run map_ffram:fine`;
-  return `${synth} -run :fine`;
+export function memorySteps(synth, { lutram = false, count = false, cmp = null } = {}) {
+  // (cmp: the comparisons with a constant mapped as logic before the coarse step, #3097: synth-cmp.js)
+  if (lutram) return cmpStep(`${synth} -run :map_memory; memory_libmap -lib +/xilinx/lutrams_xcv.txt -lib +/xilinx/brams_xc2v.txt -logic-cost-ram ${LUTRAM_COST}; `
+    + `techmap -map +/xilinx/lutrams_xcv_map.v; techmap -map +/xilinx/brams_xc2v_map.v; ${MEMORIES_COUNT}; ${synth} -run map_ffram:fine`, cmp);
+  if (count) return cmpStep(`${synth} -run :map_ffram; ${MEMORIES_COUNT}; ${synth} -run map_ffram:fine`, cmp);
+  return cmpStep(`${synth} -run :fine`, cmp);
 }
-const memoryOpts = (fam, { premap = null, lutram = false } = {}) => ({ lutram: lutram && LUTRAM_FAMILIES.has(fam), count: !!premap && !lutram && LUTRAM_FAMILIES.has(fam) });
+const memoryOpts = (fam, { premap = null, lutram = false, cmp = null } = {}) => ({ lutram: lutram && LUTRAM_FAMILIES.has(fam), count: !!premap && !lutram && LUTRAM_FAMILIES.has(fam), cmp });
 
 /**
  * The Yosys commands that map the module `top` onto the cells of the family (synth_xilinx, with
@@ -348,7 +350,7 @@ export function longestCarryChain(json, top) {
   for (const c of byOut.values()) m = Math.max(m, len(c));
   return m;
 }
-export function synthCommands(top, family, { srl = true, premap = null, lutram = false, csel = null } = {}) {
+export function synthCommands(top, family, { srl = true, premap = null, lutram = false, csel = null, cmp = null } = {}) {
   const fam = YOSYS_FAMILY[family];
   if (!fam) throw new Error(`open synthesis: no Yosys mapping for the device family '${family}'`);
   const synth = `synth_xilinx -family ${fam} -ise -flatten -top ${top}`;
@@ -358,7 +360,7 @@ export function synthCommands(top, family, { srl = true, premap = null, lutram =
   // fine step maps it to multiplexers: memory_map (a shift-chain array's words as flip-flops), then
   // xilinx_srl and the map to SRL16E (before map_cells, whose own map writes SRLC32E), then the step;
   // fine's own opt -full run first made t80 7 % larger)
-  const shreg = srl ? `${memorySteps(synth, memoryOpts(fam, { premap, lutram }))}; memory_map; xilinx_srl -variable -minlen 3; techmap -map ${SRL_MAP_FILE}; ${cselStep(csel)}${synth} -run fine:map_ffs; xilinx_srl -fixed -minlen 3; techmap -map ${SRL_MAP_FILE}; ${synth} -run map_ffs:map_luts` : `${synth} -run :map_luts`;
+  const shreg = srl ? `${memorySteps(synth, memoryOpts(fam, { premap, lutram, cmp }))}; memory_map; xilinx_srl -variable -minlen 3; techmap -map ${SRL_MAP_FILE}; ${cselStep(csel)}${synth} -run fine:map_ffs; xilinx_srl -fixed -minlen 3; techmap -map ${SRL_MAP_FILE}; ${synth} -run map_ffs:map_luts` : cmpStep(`${synth} -run :map_luts`, cmp);
   return `${shreg}; opt_expr -mux_undef -noclkinv; ${premap ? `write_rtlil ${premap}; ${MUX_COUNT}; ` : ''}abc -luts ${LUT4_ONLY}; ${lutsToCells(synth)}`;
 }
 // The clock enables on the critical path (#653): Yosys gives a flip-flop whose next state is held under a
@@ -602,8 +604,12 @@ export function yosysScript(top, family, opts = {}) {
 }
 
 /** The files yosysScript reads: the flat module, Silinx's shift-register map and cells and the Spartan-6's block-RAM rule
- *  (and its carry-select map, opts.csel). */
-export const yosysFiles = (top, text, opts = {}) => ({ [`${top}_syn.v`]: text, [SRL_MAP_FILE]: SRL_MAP, [SRL_CELLS_FILE]: SRL_CELLS, [BRAMS_S6_FILE]: BRAMS_S6, ...(opts.csel && { [CSEL_FILE]: CSEL_MAP }) });
+ *  (and its carry-select map, opts.csel; the comparisons mapped as logic and their map, opts.cmp, #3097). */
+export const yosysFiles = (top, text, opts = {}) => ({ [`${top}_syn.v`]: text, [SRL_MAP_FILE]: SRL_MAP, [SRL_CELLS_FILE]: SRL_CELLS, [BRAMS_S6_FILE]: BRAMS_S6, ...(opts.csel && { [CSEL_FILE]: CSEL_MAP }),
+  ...(opts.cmp?.length && { [CMP_FILE]: CMP_MAP, [CMP_SET_FILE]: cmpSet(top, opts.cmp) }) });
+/** The comparisons with a constant to map as logic (#3097, synth-cmp.js probeComparisons): none on a 6-input-LUT family. */
+export const cmpProbe = (top, text, family, run) => probeComparisons(top, text, LUT4_FAMILIES.has(YOSYS_FAMILY[family]) ? YOSYS_FAMILY[family] : null, run,
+  `read_verilog -lib ${SRL_CELLS_FILE}; `, { [SRL_CELLS_FILE]: SRL_CELLS });
 
 /** Cells of a Yosys JSON netlist by type: { LUT4: 286, FDRE: 48, … } (the top module's). */
 export function cellCounts(json, top) {
@@ -697,7 +703,9 @@ export const FAST_SYNTH = { effort: 'normal', depth: false, speed: false, abc9: 
  * design whose state machines of FSM_RULE.states states or more the init values keep out of Yosys's fsm is
  * synthesized once more with them one-hot (#539, synth-fsm.js), and at both efforts a design whose machines of as many
  * states fsm_detect refuses for their users alone (#652), that netlist kept when better by DEPTH_RULE:
- * r.depth.fsm { machines: [{ wire, states }], ns, luts, slices, kept } (fsm: false leaves it out, 'always' keeps it). A design
+ * r.depth.fsm { machines: [{ wire, states }], ns, luts, slices, kept } (fsm: false leaves it out, 'always' keeps it); at High
+ * a design whose machines Yosys's fsm extracts itself (one-hot: a Verilog register without an initial value) once more with
+ * them as written (#652), kept so too: r.depth.written { machines: [wire], ns, luts, slices, kept }. A design
  * whose usual run left memories written to in logic is synthesized once more with them as distributed RAM (#54, LUTRAM_COST),
  * High's mappings made from it (at Normal without them: its usual mapping and the one balanced onto LUT4s alone), its netlist
  * of fewest slices no slower than the one chosen kept: r.depth.lutram { memories, left (those still in logic), netlist (the
@@ -708,6 +716,18 @@ export const FAST_SYNTH = { effort: 'normal', depth: false, speed: false, abc9: 
  * luts, slices, kept } (csel: false leaves it out).
  */
 export async function synthesizeVerilog(input, options = {}) {
+  // the comparisons with a constant to map as logic (#3097, synth-cmp.js): found once; the design synthesized with them so
+  // and as before, side by side, the one cmpChoice keeps (cmp: false, none; a list, those, no choice)
+  if (options.cmp !== undefined) return withCarrySelect(input, { ...options, cmp: options.cmp || null });
+  const cmp = await cmpProbe(input.top, input.text, options.family || 'spartan3e', options.run);
+  if (!cmp.length) return withCarrySelect(input, { ...options, cmp: null });
+  const [base, cand] = await Promise.all([withCarrySelect(input, { ...options, cmp: null }), withCarrySelect(input, { ...options, cmp, onLine: () => {} }).catch(() => null)]);
+  const measure = r => [criticalDelay(r.files[`${r.top}.json`], r.top), sliceCount(r.files[`${r.top}.json`], r.top)];
+  return cmpChoice(base, cand, cmp.length, measure);
+}
+
+// synthesizeVerilog's synthesis but the choice of the comparisons as logic: the usual one, and the carry-select candidate
+async function withCarrySelect(input, options) {
   const r = await synthesizeOnce(input, options);
   // a carry chain of CSEL_RULE.chain stages or more: synthesized again with carry-select segments (#1361), kept by DEPTH_RULE
   const { family = 'spartan3e', depth = true, csel = true } = options;
@@ -728,14 +748,14 @@ export async function synthesizeVerilog(input, options = {}) {
 }
 
 // synthesizeVerilog's synthesis but the carry-select candidate (carrySelect: CSEL_RULE when making it)
-async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () => {}, depth = true, effort = 'high', abc9: withAbc9 = true, deepRule = DEEP_RULE, smallRule = SMALL_RULE, fsm: withFsm = true, speed: withSpeed = true, wide = true, resynth: withResynth = true, bdd: withBdd = true, lutram: withLutram = true, carrySelect = null } = {}) {
+async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () => {}, depth = true, effort = 'high', abc9: withAbc9 = true, deepRule = DEEP_RULE, smallRule = SMALL_RULE, fsm: withFsm = true, speed: withSpeed = true, wide = true, resynth: withResynth = true, bdd: withBdd = true, lutram: withLutram = true, carrySelect = null, cmp = null } = {}) {
   const { text, top, warnings = [], shiftArrays = [], gates: gateCount = 0 } = input;
   const lut4 = LUT4_FAMILIES.has(YOSYS_FAMILY[family]);
   const normal = effort === 'normal';
   const speed = withSpeed && depth && lut4;
   let tryDepth = !normal && depth && lut4;
   // (Normal: the design as it is before the LUT mapping written too, for High's mappings if it is deep)
-  const opts = { ...((tryDepth || (normal && depth && lut4)) && { premap: PREMAP_FILE }), ...(carrySelect && { csel: carrySelect }) };
+  const opts = { ...((tryDepth || (normal && depth && lut4)) && { premap: PREMAP_FILE }), ...(carrySelect && { csel: carrySelect }), ...(cmp?.length && { cmp }) };
   const log = [];
   const quiet = l => QUIET.some(re => re.test(l));
   const line = l => { if (!quiet(l)) { log.push(l); onLine(l); } };
@@ -775,7 +795,9 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
           : null;
         const all = enc === null ? fsmChosen(pre, asText(out[FSM_ENC_FILE])) : fsmChosen(pre, enc, undefined, forced);
         const machines = normal ? all.filter(m => forced.includes(m.wire)) : all;
-        return { out, machines, forced: machines.map(m => m.wire).filter(w => forced.includes(w)) };
+        // (High: the machines the usual run makes one-hot itself, tried as written too, #652)
+        const written = normal ? [] : fsmExtracted(pre, asText(out[FSM_DETECT_FILE]), top);
+        return { out, machines, written, forced: machines.map(m => m.wire).filter(w => forced.includes(w)) };
       }, () => null)
     : null;
   if (probe && !normal) {
@@ -795,7 +817,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
     // its messages said, #652)
     const luts = json ? utilization(cellCounts(json, top)).luts : Infinity;
     if (!deep?.deep && luts <= smallRule.maxLuts) {
-      const both = { family, run, depth, abc9: withAbc9, deepRule, fsm: withFsm, speed: withSpeed, wide, resynth: withResynth, bdd: withBdd, lutram: withLutram, carrySelect };
+      const both = { family, run, depth, abc9: withAbc9, deepRule, fsm: withFsm, speed: withSpeed, wide, resynth: withResynth, bdd: withBdd, lutram: withLutram, carrySelect, cmp };
       const linesN = [], linesH = [];
       // (side by side: Yosys runs in workers of their own)
       const [own, high] = await Promise.all([
@@ -825,8 +847,11 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
   // (with machines to try one-hot, the usual netlist's messages are said once the choice is made)
   const fsmFound = probe && await probe;
   const machines = fsmFound?.machines.length ? fsmFound.machines : null;
+  const written = fsmFound?.written.length ? fsmFound.written : null;
+  // (the lines of the netlist kept, said once the encodings are chosen)
   const linesU = [];
-  const emit = machines ? l => { if (!quiet(l)) linesU.push(l); } : line;
+  let said = linesU;
+  const emit = machines || written ? l => { if (!quiet(l)) linesU.push(l); } : line;
   let res = null, chains = [];
   if (lut4 && gates) {
     // (Normal, not deep: an adder's chains only, its first run started beside the usual one, #377)
@@ -849,7 +874,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
       else { for (const l of linesN) emit(l); res = resN; }
     }
   }
-  if (!res) res = machines ? await withDepth(await usualRun(emit), () => {}, linesU) : await withDepth(await usualRun(line), line, [...log]);
+  if (!res) res = machines || written ? await withDepth(await usualRun(emit), () => {}, linesU) : await withDepth(await usualRun(line), line, [...log]);
   const memories = res.memories || 0;
   if (machines) {
     // the machines one-hot (#539): marked, extracted and re-encoded, their new power-up codes written back, the
@@ -864,7 +889,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
       const inits = fsmInits(machines, asText(out2[FSM_ENC_FILE]));
       const cmds = synthCommands(top, family, opts), first = `${memorySteps(synth, memoryOpts(YOSYS_FAMILY[family], opts))}; `;
       if (inits && cmds.startsWith(first)) {
-        const out3 = await run(['-q', '-p', `${fsmRestCommands(synth, cmds.slice(first.length))}; ${outputs(top)}`],
+        const out3 = await run(['-q', '-p', `${cmpStep(fsmRestCommands(synth, cmds.slice(first.length)), opts.cmp)}; ${outputs(top)}`],
           { ...yosysFiles(top, text, opts), [FSM_POST_FILE]: setInits(asText(out2[FSM_POST_FILE]), { ...inits, ...oldStateInits(machines, asText(out2[FSM_POST_FILE])) }) }, say);
         resF = await withDepth(out3, () => {}, linesF);
       }
@@ -872,14 +897,32 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
     const lutsOf = r => utilization(r.cells).luts;
     const kept = !!resF && (withFsm === 'always' || keepDepth([res.ns, resF.ns], [lutsOf(res), lutsOf(resF)], DEPTH_RULE, [res.slices(), resF.slices()]));
     const fsmInfo = { machines: machines.map(({ wire, states }) => ({ wire, states })), ns: resF?.ns ?? null, luts: resF ? lutsOf(resF) : null, slices: resF ? resF.slices() : null, kept };
-    if (kept) { res = resF; chains = []; }
-    for (const l of kept ? linesF : linesU) line(l);
+    if (kept) { res = resF; chains = []; said = linesF; }
     if (failed) {
       fsmInfo.failed = failed;
-      line(`Warning: the one-hot encoding of the state machines failed (${failed}): the usual encoding is kept`);
+      said.push(`Warning: the one-hot encoding of the state machines failed (${failed}): the usual encoding is kept`);
     }
     res.info.fsm = fsmInfo;
   }
+  if (written) {
+    // the machines the usual run makes one-hot itself, as written (#652, synth-fsm.js fsmExtracted): marked
+    // fsm_encoding "none", the rest of the script and High's mappings from that netlist; kept when better by DEPTH_RULE
+    const linesW = [...linesP], say = l => { if (!quiet(l)) linesW.push(l); };
+    try {
+      const out2 = await run(['-q', '-p', fsmExtractCommands()], { [FSM_MARKED_FILE]: markWires(asText(fsmFound.out[FSM_PRE_FILE]), written, 'none').il }, say);
+      const cmds = synthCommands(top, family, opts), first = `${memorySteps(synth, memoryOpts(YOSYS_FAMILY[family], opts))}; `;
+      if (cmds.startsWith(first)) {
+        const out3 = await run(['-q', '-p', `${cmpStep(fsmRestCommands(synth, cmds.slice(first.length)), opts.cmp)}; ${outputs(top)}`], { ...yosysFiles(top, text, opts), [FSM_POST_FILE]: asText(out2[FSM_POST_FILE]) }, say);
+        const resW = await withDepth(out3, () => {}, linesW), luts = r => utilization(r.cells).luts;
+        // (by DEPTH_RULE, and by its gain or its area at least: picorv32's, as fast by the estimate and 8 LUTs fewer, routed 8 % slower)
+        const n = [res.ns, resW.ns], l = [luts(res), luts(resW)], k = [res.slices(), resW.slices()], less = x => x[1] <= x[0] * (1 - DEPTH_RULE.area);
+        const kept = withFsm === 'always' || (keepDepth(n, l, DEPTH_RULE, k) && (n[1] <= n[0] * (1 - DEPTH_RULE.gain) || less(l) || less(k)));
+        res.info.written = { machines: written, ns: resW.ns, luts: luts(resW), slices: resW.slices(), kept };
+        if (kept) { res = { ...resW, info: { ...resW.info, fsm: res.info.fsm, written: res.info.written } }; chains = []; said = linesW; }
+      }
+    } catch { /* (an optional candidate: the netlist chosen above kept) */ }
+  }
+  if (machines || written) for (const l of said) line(l);
   if (withLutram && memories && (highMappings || (depth && lut4))) {
     // the memories as distributed RAM (#54, LUTRAM_COST), when the usual run left some to logic: the design synthesized
     // again so and, when that took some of them, High's mappings from its netlist (at Normal, a design that gets none
@@ -940,7 +983,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
   // (Normal, a deep design: High's mappings kept only when DEEP_RULE.gain faster than Normal's own netlist, #611;
   // else that one, its levels and the time High's took said)
   if (deep?.deep) {
-    const plain = await synthesizeOnce(input, { family, run, depth: false, effort, abc9: withAbc9, carrySelect });
+    const plain = await synthesizeOnce(input, { family, run, depth: false, effort, abc9: withAbc9, carrySelect, cmp });
     const ns = [criticalDelay(plain.files[`${top}.json`], top), criticalDelay(files[`${top}.json`], top)];
     info.normal = { ns: ns[0], luts: plain.util.luts, kept: !(ns[1] <= ns[0] * (1 - deepRule.gain)) };
     if (info.normal.kept) return { ...plain, depth: { ...plain.depth, levels: deep.levels, auto: true, high: { ns: ns[1], luts: result.util.luts }, normal: info.normal } };

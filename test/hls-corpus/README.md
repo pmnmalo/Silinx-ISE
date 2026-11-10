@@ -19,7 +19,8 @@ Not part of `npm test` (it needs the network once).
   synthesis (VHDL and Verilog), the C/RTL co-simulation (its calls of the top function replayed on the VHDL), its
   latency; a C++ example is skipped (#1590). The first reason a design stops is recorded.
 - **The expectations**: `expected.json`; a run fails on any difference (a design that passes a stage it did not, or
-  no longer passes one): record an improvement with `--update`, and make an issue of a loss.
+  no longer passes one, or a co-simulation's latency that changed, #2614): record an improvement with `--update`, and
+  make an issue of a loss.
 
 ## The results
 
@@ -46,38 +47,38 @@ Not part of `npm test` (it needs the network once).
 | interface-memory-lmem-2rw | C++ | pass | pass | pass | 77965 |  |
 | interface-memory-manual-burst-manual-burst-example-auto-burst-inference-failure | C++ | pass | pass | pass | 38812 |  |
 | interface-memory-manual-burst-manual-burst-example-manual-burst-inference-success | C++ | pass | pass | pass | 38812 |  |
-| interface-memory-manual-burst-manual-burst-with-conditionals | C++ | pass | pass | pass | 13283 |  |
+| interface-memory-manual-burst-manual-burst-with-conditionals | C++ | pass | pass | pass | 12872 |  |
 | interface-memory-max-widen-port-width | C++ | pass | pass | pass | 772 |  |
 | interface-memory-ram-uram | C++ | pass | pass | pass | 10-20 |  |
 | interface-memory-rom-lookup-table-math | C++ | pass | pass | pass | 2 |  |
 | interface-memory-using-axi-master | C++ | pass | pass | pass | 706 |  |
 | interface-register-using-axi-lite-with-user-defined-offset | C++ | pass | pass | pass | 24 |  |
-| interface-streaming-axi-stream-custom-side-channel-data-2 | C++ | pass | pass | pass | 6-7 |  |
-| interface-streaming-axi-stream-to-master | C++ | pass | pass | pass | 24619 |  |
+| interface-streaming-axi-stream-custom-side-channel-data-2 | C++ | pass | pass | pass | 6 |  |
+| interface-streaming-axi-stream-to-master | C++ | pass | pass | pass | 18648 |  |
 | interface-streaming-axis-array-stream-no-side-channel-data | C++ | pass | pass | pass | 101 |  |
 | interface-streaming-using-array-of-streams | C++ | pass | pass | pass | 71 |  |
-| interface-streaming-using-axi-stream-with-side-channel-data | C++ | pass | pass | pass | 6-7 |  |
+| interface-streaming-using-axi-stream-with-side-channel-data | C++ | pass | pass | pass | 6 |  |
 | interface-streaming-using-axi-stream-with-struct | C++ | pass | pass | pass | 32 |  |
 | migration-python-scripts | C | pass | pass | pass | 22-23 |  |
 | migration-vitis-unified-cli | C | pass | pass | pass | 22-23 |  |
-| misc-initialization-and-reset-static-array-rom | C++ | pass | pass | pass | 1 |  |
+| misc-initialization-and-reset-static-array-rom | C++ | pass | pass | pass | 2 |  |
 | misc-malloc-removed | C | pass | pass | pass | 67 |  |
 | misc-rtl-as-blackbox | C++ | pass | pass | pass | 5 |  |
 | modeling-pointers-basic-arithmetic | C | pass | pass | pass | 60 |  |
 | modeling-pointers-multiple-pointers | C | pass | pass | pass | 1 |  |
 | modeling-pointers-native-casts | C | pass | pass | pass | 411 |  |
-| modeling-pointers-stream-better | C | pass | pass | pass | 2 |  |
-| modeling-pointers-stream-good | C | pass | pass | pass | 5 |  |
+| modeling-pointers-stream-better | C | pass | pass | pass | 6-9 |  |
+| modeling-pointers-stream-good | C | pass | pass | pass | 6 |  |
 | modeling-pointers-using-double | C | pass | pass | pass | 21-23 |  |
 | modeling-conditional-control-of-pragmas-using-defines | C++ | pass | pass | pass | 31 |  |
 | modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 60 |  |
-| modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 23-28 |  |
+| modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 22-25 |  |
 | modeling-fixed-point-sqrt | C++ | pass | pass | pass | 35 |  |
 | modeling-free-running-kernel-remerge-ii4to1 | C++ | pass | pass | pass | 80 |  |
 | modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | 73-78 |  |
 | modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | 4 |  |
 | modeling-using-array-stencil-1d | C++ | pass | pass | pass | 113983 |  |
-| modeling-using-array-stencil-2d | C++ | pass | pass | pass | 385359-385383 |  |
+| modeling-using-array-stencil-2d | C++ | pass | pass | pass | 385329-385351 |  |
 | modeling-using-cpp-templates | C++ | pass | pass | pass | 2 |  |
 | modeling-using-fixed-point | C++ | pass | pass | pass | 1 |  |
 | modeling-using-float-and-double | C | pass | pass | pass | 2 |  |
@@ -89,16 +90,16 @@ Not part of `npm test` (it needs the network once).
 | pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-using-free-running-pipeline | C++ | pass | pass | pass | 107 |  |
 | task-level-parallelism-control-driven-channels-autorestart | C++ | pass | pass | pass | 322-325 |  |
-| task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | pass | pass | pass | 594 |  |
-| task-level-parallelism-control-driven-channels-merge-split-merge-round-robin | C++ | pass | pass | pass | 594 |  |
-| task-level-parallelism-control-driven-channels-merge-split-split-load-balance | C++ | pass | pass | pass | 152 |  |
-| task-level-parallelism-control-driven-channels-merge-split-split-round-robin | C++ | pass | pass | pass | 152 |  |
+| task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | pass | pass | pass | 530 |  |
+| task-level-parallelism-control-driven-channels-merge-split-merge-round-robin | C++ | pass | pass | pass | 530 |  |
+| task-level-parallelism-control-driven-channels-merge-split-split-load-balance | C++ | pass | pass | pass | 120 |  |
+| task-level-parallelism-control-driven-channels-merge-split-split-round-robin | C++ | pass | pass | pass | 120 |  |
 | task-level-parallelism-control-driven-channels-simple-fifos | C++ | pass | pass | pass | 315 |  |
 | task-level-parallelism-control-driven-channels-using-fifos | C++ | pass | pass | pass | 5922-5938 |  |
-| task-level-parallelism-control-driven-channels-using-stream-of-blocks | C++ | pass | pass | pass | 602-603 |  |
-| task-level-parallelism-data-driven-mixed-control-and-data-driven | C++ | pass | pass | pass | 157 |  |
-| task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
-| task-level-parallelism-data-driven-unique-task-regions | C++ | pass | pass | pass | 108-110 |  |
+| task-level-parallelism-control-driven-channels-using-stream-of-blocks | C++ | pass | pass | pass | 430-431 |  |
+| task-level-parallelism-data-driven-mixed-control-and-data-driven | C++ | pass | pass | pass | 139 |  |
+| task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 45 |  |
+| task-level-parallelism-data-driven-unique-task-regions | C++ | pass | pass | pass | 76-77 |  |
 
 73 designs: 73 through co-simulation.
 <!-- /results -->

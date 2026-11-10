@@ -419,6 +419,12 @@ if (!isMainThread) {
     process.exit(0);
   }
   if (update && opts.seed !== 1) { console.error('--update records seed 1 (the expectations\' seed): not with --seed'); process.exit(2); }
+  // the packages it runs on against package-lock.json (#2949): a worktree with no node_modules runs on the main checkout's
+  const { installMismatches, mismatchLines } = await import(pathToFileURL(path.join(ROOT, 'scripts', 'installed-packages.mjs')).href);
+  const installNote = mismatchLines(ROOT, installMismatches(ROOT));
+  const sayInstall = () => installNote.length && console.error(`\nTHE INSTALLED PACKAGES ARE NOT package-lock.json'S (npm ci): the results are not comparable with expected.json's\n  ${installNote.join('\n  ')}`);
+  if (installNote.length && update) { sayInstall(); console.error('--update records the expectations on package-lock.json\'s packages only'); process.exit(2); }
+  sayInstall();
   const pctOpt = (k, def) => { const v = opt(k, null); return v === null ? def : +v / 100; };
   const tolerance = { slices: pctOpt('--size-tolerance', QUALITY_TOLERANCE.slices), luts: pctOpt('--size-tolerance', QUALITY_TOLERANCE.luts),
     ffs: pctOpt('--size-tolerance', QUALITY_TOLERANCE.ffs), period: pctOpt('--period-tolerance', QUALITY_TOLERANCE.period) };
@@ -530,4 +536,5 @@ if (!isMainThread) {
     console.log(`\nwrote ${path.relative(process.cwd(), EXPECTED)} and the results table of ${path.relative(process.cwd(), README)}`);
     if (fullRun) writeTimes(allTimes, ran);
   } else if (cmp.failed || qc.failed) process.exitCode = 1;
+  sayInstall();
 }

@@ -14,6 +14,7 @@ import { renderProcesses, restoreImplStatus, reservedNameDiags } from './process
 import { projectSaved, renderHierarchy } from './design.js';
 import { prefKey } from './prefs.js';
 import { watchProject, stopWatching } from './project-watch.js';
+import { hasGit, openFromRepositoryDialog } from './git.js';
 
 const $ = id => document.getElementById(id);
 // how long after a project opens the browser edition fetches what Implement needs (#967): after the opening's own work
@@ -22,7 +23,7 @@ const prepareDelay = () => globalThis.SILINX_PREPARE_DELAY ?? 2000;
 // per-project UI state (cleared when another project is opened or the project is closed)
 function resetProjectState() {
   S.diagsCleared++;   // (the start-up checks' lines coming later: not in the tabs, #339)
-  S.status = {}; S.sel = null; S.selKey = null; S.selProc = null; S.diags = []; S.outOfSync = {}; S.staleHdl = {}; S.staleSeen = new Map(); S.ucfText = null; S.hdlClash = {}; S.hdlClashWarned = new Set();
+  S.status = {}; S.sel = null; S.selKey = null; S.selProc = null; S.diags = []; S.outOfSync = {}; S.staleHdl = {}; S.staleSeen = new Map(); S.cFailed = {}; S.cFailedSaid = new Map(); S.ucfText = null; S.hdlClash = {}; S.hdlClashWarned = new Set();
   renderDiagnostics();
   renderProcesses();   // (not the last project's processes and states, until a state of this one is restored: #1162)
 }
@@ -58,13 +59,16 @@ async function openProjectNow(name, { startup = false } = {}) {
   try {
     S.project = await api.project(name);
   } catch (e) { alertDlg('Open Project', e.message, 'error'); return; }
-  try { localStorage.setItem(prefKey('silinx.lastProject'), name); } catch { /* ignore */ }
-  rememberRecent(name);
+  // (a project followed, #3181: not one of this workspace's, neither the last nor a recent one)
+  if (!api.following) {
+    try { localStorage.setItem(prefKey('silinx.lastProject'), name); } catch { /* ignore */ }
+    rememberRecent(name);
+  }
   await reloadProject();
   await fixMissingTops();   // (a project saved with a top it no longer has, #253)
   log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
   // a project from outside (#2830): what waits for the user's trust, and the button that gives it
-  if (!isTrusted(S.project)) log(untrustedNotice(name), 'info', { action: { label: 'Trust Project', run: () => trustProject(name) } });
+  if (!isTrusted(S.project)) log(untrustedNotice(name, S.project), 'info', { action: { label: 'Trust Project', run: () => trustProject(name) } });
   warnReservedNames();
   // the processes' status of the last run, its synthesis up to date or not (#280), restored before the project is
   // used: not awaited, it drew the Processes panel again under a double-click on a process and Implement Design
@@ -139,8 +143,7 @@ async function reloadProjectNow(render = true, depth = 0) {
     } catch { /* unreadable */ }
   }
   // (the RTL blackboxes of its C functions, as it opens, #1903)
-  const { blackboxesIn } = await import('/core/c-blackbox.js');
-  const hls = await blackboxesIn(S.diskTree, f => api.readFile(pj.name, f)).catch(() => null);
+  const hls = await readBlackboxes(pj.name);
   Object.assign(S, { schOwners, hdlToSch, viewModule, viewTexts, hls });
   compileProject();
   // a drawing whose base was its HDL (before #220) is made the base; a drawn source without its HDL
@@ -158,6 +161,22 @@ async function reloadProjectNow(render = true, depth = 0) {
   renderFilesPage();
   renderLibsPage();
   if (!render) return;
+}
+
+// the project's RTL blackboxes (core/c-blackbox.js, #1903): its descriptions, with the files they name and its headers
+async function readBlackboxes(name) {
+  const { blackboxesIn } = await import('/core/c-blackbox.js');
+  return blackboxesIn(S.diskTree, f => api.readFile(name, f)).catch(() => null);
+}
+
+/** A file saved in its editor that a blackbox reads (its description, its RTL module, its C model): the descriptions
+ *  read again, so that the C sources' HDL and their C simulation are made with it (#2342). (A file added, removed or
+ *  renamed, or changed outside, reloads the project, which reads them.) */
+export async function refreshBlackboxes(path) {
+  const h = S.hls;
+  if (!S.project || !h || !(path in (h.headers || {}) || h.blackboxes.some(b => b.file === path))) return false;
+  S.hls = await readBlackboxes(S.project.name);
+  return true;
 }
 
 async function closeProjectNow() {
@@ -178,7 +197,8 @@ export function updateTitle() {
   // window's title, Help ▸ About
   $('title-text').textContent = pj ? `${pj.name} - [${S.active?.title || 'Design Summary'}]` : 'Project Navigator';
   document.querySelector('#titlebar .app-logo').title = `${PRODUCT} ${VERSION_LABEL}`;
-  document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION_LABEL}` : `${PRODUCT} ${VERSION_LABEL} Project Navigator`;
+  // (the browser tab: the product and its version, no "Project Navigator", #3224)
+  document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION_LABEL}` : `${PRODUCT} ${VERSION_LABEL}`;
   $('status-device').textContent = pj ? `${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` · ${pj.board}` : ''}` : '';
 }
 
@@ -222,7 +242,9 @@ export async function renderStartPage() {
       h('button', { class: 'btn', type: 'button', onclick: () => wiz.openProjectDialog() }, 'Open Project…')),   // (Close Project: under the Design tree, #1309)
     // the Silinx and the Xilinx imports and exports, as the File menu has them, a line between (#1216)
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
-      ...[['Import Silinx ISE Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx ISE Project (.zip)…', 'save', exportZip('silinx'), true],
+      // (a GitHub repository, a Classroom assignment's: the server editions, #3195)
+      ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
+      ...[['Import Silinx Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx Project (.zip)…', 'save', exportZip('silinx'), true],
         ['Copy Link to Project…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]].map(command),   // (#2826)
       h('hr', { class: 'start-sep' }),
       ...[['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command)),

@@ -3,7 +3,7 @@ import { api, followJob } from './api.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, alertDlg, confirmDlg, promptDlg, popupMenu, splitter, toast } from './ui.js';
 import { createEditor, instTemplate, snippetsFor, typeText } from './editor.js';
-import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC } from './c-source.js';
+import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC, noteFailedC } from './c-source.js';
 import { compile, implRoots, topCandidates } from '/core/compile.js';
 import { primitiveSources } from '/core/unisim.js';
 import * as wiz from './wizards.js';
@@ -16,12 +16,13 @@ import { registerServiceWorker } from './pwa.js';
 import { createHistory } from './history.js';
 import { viewHdl } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
+import { isLabFile } from '/core/labs.js';
 import { primitiveTemplates } from '/core/prim-templates.js';
 import { deviceFamily, openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
 import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
-import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus } from './project.js';
+import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus, refreshBlackboxes } from './project.js';
 import { FLOW_UP_TO, boardUcf, checkUcfFile, regenerateUcf, runImpl, stepTracker, ucfDiagnostics } from './implement.js';
 import { adoptDrawnHdl, drawnHdlClashes, freshHdl, openAsm, openFsm, openPetri, openSch,
   openTt, openTtSchematic, openView, projectPart, refreshSyncBanner, schModules, staleHdl, syncBanner, viewTitle } from './drawings.js';
@@ -35,6 +36,7 @@ import { prefKey } from './prefs.js';
 import { keepCursor, keptCursor } from './doc-cursor.js';
 import { mountSplit, placeSplit, splitClosed, splitItems, tabTip } from './split-view.js';
 import { closeAllDocs, restoreViewState, saveViewState, viewKept } from './view-state.js';
+import { following, followNotice, editsHere } from './collab-state.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -79,6 +81,7 @@ export function compileProject() {
   const views = Object.entries(S.viewTexts || {}).filter(([f]) => !S.schOwners?.[f]);
   // the modules of the HDL files, compiled once for the drawings below (#402)
   let hdlModules = null;
+  const failedC = [];   // (a C source whose HDL cannot be made: its row and its errors, #2995)
   if (views.length) {
     let mods = {}, lib0 = null;
     try { lib0 = compile(srcs); mods = modulesFromLibrary(lib0, { sources: Object.fromEntries(srcs.map(s => [s.path, s.text])) }); } catch { /* none */ }
@@ -89,12 +92,13 @@ export function compileProject() {
     // (a drawing whose HDL file is gone, deleted or removed from the project, is one without it: #231)
     for (const [f, t] of views) {
       const r = viewHdl(f, t, { modules: mods, linked: hdlInProject, lang: S.project.preferredLanguage, clock: hlsClock(), family: hlsFamily(), hls: S.hls, mults: hlsMults() });
-      if (!r?.text) continue;
+      if (!r?.text) { if (isC(f)) failedC.push([f, r]); continue; }
       if (!hdlMods.has(String(r.module).toLowerCase())) { S.viewSources.push({ path: f, lang: r.lang, text: r.text, role: 'design', view: true, module: r.module, errors: r.errors.length, lost: r.lost || null, ...(r.sequential ? { sequential: true } : {}) }); continue; }
       const m = !r.errors.length && [...(lib0?.modules.values() || [])].find(x => x.name.toLowerCase() === String(r.module).toLowerCase());
       if (m) S.viewElsewhere[f] = { module: r.module, lang: r.lang, file: m.archFile || m.file, lost: r.lost || null };
     }
   }
+  noteFailedC(failedC, Object.fromEntries(views.filter(([f]) => isC(f))));
   // the linked drawings that cannot generate their HDL file (errors: a project opened with one, #303), each
   // text once (an edit in its editor says it as it syncs)
   let lazyMods = hdlModules;
@@ -156,11 +160,13 @@ export function viewRoots(sim) {
 export async function fixMissingTops() {
   const pj = S.project;
   const declared = name => (S.sources || []).some(f => new RegExp(`\\b(entity|module)\\s+${String(name).replace(/[^\w$]/g, '')}\\b`, 'i').test(f.text || ''));
+  // (the module of a C source whose HDL cannot be made for now, #2995: still its top)
+  const cMade = name => Object.values(S.cFailed || {}).some(c => String(c.module || '').toLowerCase() === String(name).toLowerCase());
   let changed = false;
   for (const sim of [false, true]) {
     const key = sim ? 'simTop' : 'top';
     const old = pj[key];
-    if (!old || moduleInfo(old) || declared(old)) continue;
+    if (!old || moduleInfo(old) || declared(old) || cMade(old)) continue;
     const roots = viewRoots(sim);
     pj[key] = roots.length === 1 ? roots[0] : '';
     changed = true;
@@ -369,6 +375,7 @@ export function activateDoc(doc, { background = false } = {}) {
 // user (the text editor says it, #534): true, the change is the user's own in the editor; false, written
 // by the application; undefined (the other editors), judged by the timing below.
 export function setDirty(doc, dirty, { user } = {}) {
+  if (following()) dirty = false;   // (a project followed, #3181: read only, nothing of it saved)
   doc.dirty = dirty;
   // (an edit of the user: a change right after their action in the document, while no command,
   // Undo or Redo writes; a document opened or updated by a command is not edited by the user. The text
@@ -395,6 +402,7 @@ export async function flushDoc(doc, opts) {
     // a drawn source without an HDL file: its module follows (#177), and it gets its HDL file as soon
     // as it has no errors (#207)
     const vp = docPath(doc);
+    if (isLabFile(vp) && S.project) import('./lab-view.js').then(m => m.labFileSaved(vp)).catch(() => {});   // (a guided lab checked as it is edited, #3179)
     if (vp && /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(vp) && !S.schOwners?.[vp] && S.project) {
       try {
         S.viewTexts = { ...(S.viewTexts || {}), [vp]: await api.readFile(S.project.name, vp) }; compileProject();
@@ -440,6 +448,7 @@ export async function openFile(path, line, col, { task } = {}) {
   if (/\.(tt|bool)\.json$/.test(path)) return openTt(path);
   if (path.endsWith('.fsm.json')) return openFsm(path);
   if (path.endsWith('.pn.json')) return openPetri(path);
+  if (path.endsWith('.exercise.json')) return (await import('./exercise-view.js')).openExercise(path);   // (#3192)
   const id = `file:${path}`;
   let doc = findDoc(id);
   const fresh = !doc;
@@ -454,7 +463,7 @@ export async function openFile(path, line, col, { task } = {}) {
       id, path, task, title: path.split('/').pop(), tooltip: path, icon: lang === 'vhdl' ? 'vhdl' : lang === 'verilog' ? 'verilog' : lang === 'ucf' ? 'ucf' : 'file',
       create(el, d) {
         // the HDL generated from a drawing is read-only: the drawing is the base, edited instead (#1176)
-        const generated = () => !!S.hdlToSch?.[path];
+        const generated = () => !!S.hdlToSch?.[path] || (following() && !editsHere(path));   // (a project followed, #3181: read only too, but an editor's text files, #3182)
         const tplBtn = h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Language Templates' }, 'Templates ▾');
         // (no Undo / Redo, the main toolbar's; no path, the tab's tip: #2514)
         const editing = [];
@@ -462,8 +471,9 @@ export async function openFile(path, line, col, { task } = {}) {
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findToggle') }),   // (again: closed, #1328)
           snippetsFor(lang, path) && lang !== 'ucf' ? tplBtn : null,   // (C / C++ too, #1855)
           ...(lang === 'c' ? cRunButtons(path) : []),   // (C Simulation, C/RTL Co-simulation: #1528)
-          (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf' || lang === 'c') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => (lang === 'ucf' ? checkUcfFile(path) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
-          syncBanner(path));
+          (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf' || lang === 'c' || isLabFile(path)) ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file',   // (a guided lab's: #3179)
+            onclick: () => (lang === 'ucf' ? checkUcfFile(path) : isLabFile(path) ? import('./lab-view.js').then(m => m.checkLabFile(path)) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
+          syncBanner(path), followNotice(path));
         if (lang === 'vhdl' || lang === 'verilog' || lang === 'c') editing.push(tplBtn);
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
@@ -487,6 +497,7 @@ export async function openFile(path, line, col, { task } = {}) {
           onFix: () => recheckFile(path),
         });
         el.append(d.editor.status);   // (its status line: the line and column, the language, #2763)
+        if (path === 'build/open/timing.txt' || path === `build/${S.project?.top}.twr` || path === `build/${S.project?.top}_timing.rpt`) d.paths = import('./timing-paths.js').then(m => m.mountTimingPaths(d, el, host));   // (its Paths panel, #3178: ISE's and Vivado's too)
         d.editor.setDiagnostics(S.diags.filter(x => x.file === path));
         let ucfTimer = null;
         const liveUcf = () => { clearTimeout(ucfTimer); ucfTimer = setTimeout(async () => { if (d.editor) d.editor.setDiagnostics(await ucfDiagnostics(d.editor.getValue(), path)); }, 400); };
@@ -559,6 +570,7 @@ export async function openFile(path, line, col, { task } = {}) {
             const src = S.sources.find(s => s.path === path && !s.view);
             if (isC(path)) S.viewTexts[path] = text; else if (src) src.text = text;   // (a C source: its HDL made again, #1531)
             else await reloadProject(false);
+            await refreshBlackboxes(path);   // (an RTL blackbox's module or C model: the C sources' HDL made with it, #2342)
             compileProject(); renderHierarchy(); markStale();
             status(`Saved ${path}`);
             // the other open editors depend on this file (ports, instances): check them again
@@ -876,6 +888,8 @@ async function boot() {
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
 
   updateTitle();
+  // a shared project's link (#3181): followed, read only, instead of the workspace's projects
+  const followed = /^#(follow|edit)=/.test(location.hash) && await (await import('./collab-follow.js')).startFollowing();
   log(`${PRODUCT} ${VERSION_LABEL} Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.`, 'info');
   if (api.standalone) {
     const st = await api.initStorage().catch(() => api.storage());
@@ -898,7 +912,7 @@ async function boot() {
     else log(`Toolchain: ISE ${tc.ise.available ? 'available' : 'not available'} (${tc.ise.mode}: ${tc.ise.reason}).`, tc.ise.available ? 'ok' : 'warn', opts);
     renderProcesses();
     // (the browser edition reaches no programmer: it says so in its own startup line)
-    if (api.standalone) return;
+    if (api.standalone || api.following) return;
     const progs = Object.entries(tc.programmers).filter(([, v]) => v.found).map(([k]) => k);
     log(`Programmers found: ${progs.length ? progs.join(', ') : 'none (install openFPGALoader, xc3sprog, Digilent Adept or ISE iMPACT)'}`, progs.length ? 'ok' : 'warn', opts);
   }).catch(() => {}).finally(() => { S.startupChecked = true; });   // (the start-up lines all written: the UI tests wait for it)
@@ -911,7 +925,8 @@ async function boot() {
   const asked = projectRequested();
   const link = location.hash.length > 1 && (await import('./link-open.js')).linkOptions();   // a design's link: its project, not the last (#2826)
   // (a workspace folder waiting for its permission: its last project is not the browser's one of that name)
-  if (!asked && !link && last && projects.some(p => p.name === last) && !(api.standalone && api.storage().needsPermission)) {
+  if (followed) await openProject(followed);
+  else if (!asked && !link && last && projects.some(p => p.name === last) && !(api.standalone && api.storage().needsPermission)) {
     try {
       await openProject(last, { startup: true });   // (where the user was: its tasks too, #1191)
       await new Promise(r => setTimeout(r, 0));   // (the reopened documents' tasks followed first)

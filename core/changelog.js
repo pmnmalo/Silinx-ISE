@@ -35,7 +35,7 @@ export function releaseNotes(md, version, common, sums) {
     + 'In the folder of the downloads: `sha256sum -c SHA256SUMS --ignore-missing` (Linux), '
     + '`shasum -a 256 -c SHA256SUMS --ignore-missing` (macOS), `Get-FileHash <file>` (Windows PowerShell, compared by eye). '
     + 'Each file also has a build provenance attestation (it was built by this repository\'s Release workflow from this tag): '
-    + '`gh attestation verify <file> --repo pmnmalo/Silinx-ISE`.' : '';
+    + '`gh attestation verify <file> --repo pmnmalo/Silinx`.' : '';
   const notes = `${head}${String(common || '').trim()}${check}\n`;
   return s && bytes(notes) > NOTES_LIMIT ? shortenNotes(notes, s, head, NOTES_LIMIT) : notes;
 }
@@ -51,7 +51,7 @@ function shortenNotes(notes, s, head, limit) {
   if (at < 0) return notes;
   const top = head.slice(0, at), items = head.slice(at + mark.length).replace(/\n+$/, '').split(/\n(?=- )/);
   const note = n => `${n} more entr${n === 1 ? 'y' : 'ies'} of "In detail" left out (a release's notes hold at most 125,000 characters): ` +
-    `the full list is in CHANGELOG.md, https://github.com/pmnmalo/Silinx-ISE/blob/v${s.version}/CHANGELOG.md\n\n`;
+    `the full list is in CHANGELOG.md, https://github.com/pmnmalo/Silinx/blob/v${s.version}/CHANGELOG.md\n\n`;
   for (let keep = items.length - 1; keep > 0; keep--) {
     const t = `${top}${mark}${items.slice(0, keep).join('\n')}\n\n${note(items.length - keep)}${rest}`;
     if (bytes(t) <= limit) return t;

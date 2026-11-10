@@ -139,7 +139,7 @@ function buildMenu(items) {
         sub.style.left = `${r.right - 2}px`; sub.style.top = `${r.top - 3}px`;
         sub.style.position = 'fixed';
         // kept inside the window (#767): on the menu's left when there is no room on its right (the last menu of the
-        // bar, long labels: the Development menu's changes), else against the window's edge; moved up when it runs
+        // bar, long labels), else against the window's edge; moved up when it runs
         // past the bottom
         const W = window.innerWidth, H = window.innerHeight, b = sub.getBoundingClientRect();
         if (b.right > W) {

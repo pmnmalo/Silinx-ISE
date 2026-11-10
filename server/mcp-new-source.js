@@ -1,6 +1,7 @@
 // The MCP server's New Source (server/mcp.js, #2674), as the interface's New Source wizard makes each type
 // (web/js/new-source.js): a module (its ports), a VHDL package, a test bench of a module, a constraints file, a .mem
-// file, a C or C++ function (Silinx HLS), an empty schematic, state diagram, ASM chart, Petri net or truth table; from
+// file, a C or C++ function (Silinx HLS), an empty schematic, state diagram, ASM chart, Petri net or truth table, a
+// guided lab (#3179: core/labs.js newLab); from
 // the wizard's own templates (web/js/templates.js, c-templates.js: they import nothing) and the drawings' models, with
 // its checks: a file name, a name that is not a reserved word, a module or a drawing's HDL file that is not taken. A
 // file that exists is not replaced.
@@ -22,6 +23,7 @@ const TYPES = {
   asm: { label: 'Algorithmic State Machine (ASM)', ext: '.asm.json', dir: 'src' },
   petri: { label: 'Petri Net', ext: '.pn.json', dir: 'src' },
   boolean: { label: 'Boolean Algebra', ext: '.bool.json', dir: 'src' },
+  lab: { label: 'Guided Lab', ext: '.lab.json', dir: 'labs' },
 };
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 const FILE_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -36,7 +38,8 @@ async function sourceText(type, { file, lang, pj, entity, arch, ports, uut }) {
     case 'module': return lang === 'vhdl' ? T.vhdlModule(entity, arch, ports, pj) : T.vlogModule(entity, ports, pj);
     case 'package': return T.vhdlPackage(file, pj);
     case 'test_bench': return lang === 'vhdl' ? T.vhdlTestbench(file, uut, pj) : T.vlogTestbench(file, uut, pj);
-    case 'constraints': return /\.pcf$/.test(file) ? T.pcfTemplate(pj) : T.ucfTemplate(pj);
+    // (the device's format, as New Source's: UCF, the iCE40's PCF, the 7-series' XDC)
+    case 'constraints': return ({ pcf: T.pcfTemplate, xdc: T.xdcTemplate }[(await import('../packages/silinx-fpga/src/parts.js')).constraintsFormatOf(pj.device)] || T.ucfTemplate)(pj);
     case 'mem': return '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n';
     case 'c': return (await import('../web/js/c-templates.js')).cTemplate(n);
     case 'cpp': return (await import('../web/js/c-templates.js')).cppTemplate(n);
@@ -45,6 +48,7 @@ async function sourceText(type, { file, lang, pj, entity, arch, ports, uut }) {
     case 'fsm': return JSON.stringify((await import('../core/fsm.js')).normalizeFsm({ name: n, lang }), null, 2);
     case 'petri': return JSON.stringify((await import('../core/petri.js')).normalizePetri({ name: n, lang }), null, 2);
     case 'boolean': return JSON.stringify({ ...(await import('../core/logic.js')).newTable(n, ['a', 'b', 'c'], ['f']), lang }, null, 2);
+    case 'lab': return `${JSON.stringify((await import('../core/labs.js')).newLab(file, { top: pj.top, simTop: pj.simTop }), null, 2)}\n`;
     default: throw toolError(`type: one of ${Object.keys(TYPES).join(', ')}`);
   }
 }
@@ -66,7 +70,7 @@ function portsOf(list) {
 export const NEW_SOURCE_TOOLS = [
   {
     name: 'new_source', title: 'New Source',
-    description: 'Add a new source to a project, as the New Source wizard does: module (an HDL module with its ports), test_bench (a test bench of a module of the project), package (a VHDL package), constraints (the device\'s UCF, or PCF for an iCE40), mem, c or cpp (a C / C++ function for Silinx HLS), or an empty drawing: schematic, fsm, asm, petri, boolean (a truth table). In VHDL or Verilog (default: the project\'s Preferred Language). It is written from the wizard\'s templates (a header with the date), added to the project; then edit it with write_file. A file that exists is not replaced.',
+    description: 'Add a new source to a project, as the New Source wizard does: module (an HDL module with its ports), test_bench (a test bench of a module of the project), package (a VHDL package), constraints (the device\'s UCF, or PCF for an iCE40), mem, c or cpp (a C / C++ function for Silinx HLS), or an empty drawing: schematic, fsm, asm, petri, boolean (a truth table), or lab (a guided lab, labs/<name>.lab.json: a template of its steps to edit, then the lab tool runs it). In VHDL or Verilog (default: the project\'s Preferred Language). It is written from the wizard\'s templates (a header with the date), added to the project; then edit it with write_file. A file that exists is not replaced.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, type: { type: 'string', enum: Object.keys(TYPES), description: 'The source\'s type.' },
       name: STR('Its file name, without the extension (letters, digits, _ and -; a letter first).'),
@@ -82,15 +86,16 @@ export const NEW_SOURCE_TOOLS = [
       const t = TYPES[type];
       if (!t) throw toolError(`type: one of ${Object.keys(TYPES).join(', ')}`);
       const { reservedError } = await import('../core/reserved.js');
-      const { openOnlyDevice } = await import('../packages/silinx-fpga/src/parts.js');
-      file = String(file || '').trim().replace(/\.(vhd|vhdl|v|ucf|pcf|mem|c|cpp|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json)$/i, '');
+      const { constraintsExtOf } = await import('../packages/silinx-fpga/src/parts.js');
+      file = String(file || '').trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|c|cpp|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json|lab\.json)$/i, '');
       if (!FILE_RE.test(file)) throw toolError('Enter a valid file name (letters, digits, _ and -).');
       const loc = String(location ?? t.dir).trim().replace(/\/+$/, '');
       if (!/^[A-Za-z0-9_/-]+$/.test(loc) || loc.split('/').some(s => !s || s.startsWith('.'))) throw toolError('Invalid location.');
       if (/^build(\/|$)/i.test(loc)) throw toolError('build/ is written by Silinx itself');
+      if (type === 'lab' && loc !== 'labs') throw toolError('A guided lab is in the labs folder: Location labs.');
       if (type === 'package' && language === 'verilog') throw toolError('a package is VHDL\'s');
       const lang = type === 'package' ? 'vhdl' : language || (pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
-      const ext = type === 'constraints' && openOnlyDevice(pj.device) ? '.pcf' : t.ext ?? (lang === 'verilog' ? '.v' : '.vhd');
+      const ext = type === 'constraints' ? constraintsExtOf(pj.device) : t.ext ?? (lang === 'verilog' ? '.v' : '.vhd');
       const rel = `${loc}/${file}${ext}`;
       const tree = await P.fileTree(name);
       if (fs.existsSync(path.join(P.projectDir(name), rel))) throw toolError(`${rel} already exists: choose another name.`);
@@ -102,7 +107,7 @@ export const NEW_SOURCE_TOOLS = [
       const mods = lib ? [...lib.modules.values()] : [];
       const taken = m => mods.find(x => x.name.toLowerCase() === m.toLowerCase());
       // the module named as the file (a drawing, a test bench, a package, a C function): not a reserved word
-      if (!['module', 'constraints', 'mem'].includes(type)) {
+      if (!['module', 'constraints', 'mem', 'lab'].includes(type)) {
         const r = reservedError(ident(file));
         if (r) throw toolError(`${r}: choose another name.`);
       }
@@ -138,8 +143,11 @@ export const NEW_SOURCE_TOOLS = [
       const noConstraints = !pj.constraints || !tree.includes(pj.constraints);
       try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }
       if (type === 'constraints' && noConstraints) await P.updateProject(name, p => ({ ...p, constraints: rel }));
-      const entry = (await P.readProject(name)).files.find(f => f.path === rel);
-      return { text: `Created ${t.label}${t.ext ? '' : ` (${lang === 'verilog' ? 'Verilog' : 'VHDL'})`} '${rel}'.`, data: { project: name, type, path: rel, language: lang, role: entry?.role || null, ...(type === 'constraints' ? { constraints: (await P.readProject(name)).constraints } : {}) } };
+      // a drawing: its HDL file, as the interface gives it (#3184; an empty state diagram or ASM chart has none yet)
+      const adopted = DRAWN.includes(type) ? await (await import('./drawing-sync.js')).adoptDrawing(P, name, rel) : null;
+      const entry = (await P.readProject(name)).files.find(f => f.path === (adopted?.target || rel));
+      return { text: [`Created ${t.label}${t.ext ? '' : ` (${lang === 'verilog' ? 'Verilog' : 'VHDL'})`} '${rel}'.`, ...(adopted?.messages || [])].join('\n'),
+        data: { project: name, type, path: rel, language: lang, role: entry?.role || null, ...(adopted ? { hdl: adopted.target } : {}), ...(type === 'constraints' ? { constraints: (await P.readProject(name)).constraints } : {}) } };
     },
   },
 ];

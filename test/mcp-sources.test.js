@@ -96,7 +96,7 @@ test('rename_file: a file and a folder, the project\'s files, the drawings\' lin
   await fails('rename_file', { project: 'n', from: 'silinx.json', to: 'x.json' }, 'silinx.json is the project\'s description');
   await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '../top.vhd' }, 'path escapes project');
   await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: 'build/top.vhd' }, 'build/ is written by Silinx itself');
-  await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '.hidden/top.vhd' }, '\'.hidden/top.vhd\': a hidden file or folder');
+  await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '.hidden/top.vhd' }, '\'.hidden/top.vhd\': not renamed: hidden file or folder (\'.hidden\')');   // (the import gate's message, as Rename's, #2973)
 });
 
 test('delete_file: a drawing\'s HDL file (the drawing\'s HDL made from it then), a folder; delete_project', async () => {
@@ -118,6 +118,47 @@ test('delete_file: a drawing\'s HDL file (the drawing\'s HDL made from it then),
   assert.ok(!fs.existsSync(P.projectDir('d')));
   assert.ok(fs.readdirSync(path.join(P.workspaceDir(), '.trash')).some(n => /^d-\d+$/.test(n)));
   await fails('delete_project', { project: 'd' }, 'no project \'d\' in the workspace');
+});
+
+test('a hidden file or folder of a project (.git, .env, .vscode) refused by every tool that takes a path (#3035); an ordinary file and a report of build/ read as before', async () => {
+  await ok('new_project_from_example', { name: 'h', example: 'traffic' });
+  const dir = P.projectDir('h');
+  fs.mkdirSync(path.join(dir, '.git/hooks'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.git/config'), '[remote "origin"]\n\turl = https://token@example.com/r.git\n');
+  fs.writeFileSync(path.join(dir, '.env'), 'KEY=1\n');
+  fs.mkdirSync(path.join(dir, '.vscode'));
+  fs.writeFileSync(path.join(dir, '.vscode/x.fsm.json'), fs.readFileSync(path.join(dir, 'src/traffic.fsm.json')));
+  fs.writeFileSync(path.join(dir, '.git/x.c'), 'int f(int a) { return a; }\n');
+  fs.symlinkSync('.git', path.join(dir, 'gitlink'), process.platform === 'win32' ? 'junction' : 'dir');   // (a link in the project to it)
+  for (const p of ['.git/config', './.git/config', 'src/../.git/config', '.env', 'gitlink/config'])
+    await fails('read_file', { project: 'h', path: p }, `'${p}': a hidden file or folder cannot be read`);
+  await fails('write_file', { project: 'h', path: '.git/hooks/pre-commit', text: 'x' }, '\'.git/hooks/pre-commit\': a hidden file or folder cannot be written');
+  await fails('write_file', { project: 'h', path: 'gitlink/hooks/pre-commit', text: 'x' }, '\'gitlink/hooks/pre-commit\': a hidden file or folder cannot be written');
+  await fails('rename_file', { project: 'h', from: '.git', to: 'gitcopy' }, '\'.git\': a hidden file or folder cannot be renamed');
+  await fails('rename_file', { project: 'h', from: '.git/config', to: 'config' }, '\'.git/config\': a hidden file or folder cannot be renamed');
+  await fails('delete_file', { project: 'h', path: '.git' }, '\'.git\': a hidden file or folder cannot be deleted');
+  await fails('delete_file', { project: 'h', path: '.git/config' }, '\'.git/config\': a hidden file or folder cannot be deleted');
+  await fails('remove_from_project', { project: 'h', path: '.env' }, '\'.env\': a hidden file or folder cannot be removed');
+  await fails('add_to_project', { project: 'h', path: '.git/x.vhd' }, '\'.git/x.vhd\': a hidden file or folder cannot be added');
+  await fails('rename_module', { project: 'h', module: 'timer', to: 'tick', file: '.git/tick.vhd' }, '\'.git/tick.vhd\': a hidden file or folder cannot be renamed');
+  // the tools that read a drawing or a source a path names
+  await fails('check_drawing', { project: 'h', file: '.vscode/x.fsm.json' }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
+  await fails('simulate_drawing', { project: 'h', file: '.vscode/x.fsm.json', cycles: 2 }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
+  await fails('related_view', { project: 'h', path: '.vscode/x.fsm.json', view: 'translation' }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
+  await fails('convert_drawing', { project: 'h', path: '.vscode/x.fsm.json', to: 'asm' }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
+  await fails('c_simulation', { project: 'h', path: '.git/x.c' }, '\'.git/x.c\': a hidden file or folder cannot be read');
+  // nothing renamed, deleted or written; the git folder as it was
+  assert.deepEqual(fs.readdirSync(path.join(dir, '.git')).sort(), ['config', 'hooks', 'x.c']);
+  assert.deepEqual(fs.readdirSync(path.join(dir, '.git/hooks')), []);
+  assert.ok(!fs.existsSync(path.join(dir, 'gitcopy')));
+  // an ordinary file, a report of build/, a drawing: read as before
+  assert.equal((await ok('read_file', { project: 'h', path: 'src/timer.vhd' })).text, fs.readFileSync(path.join(dir, 'src/timer.vhd'), 'utf8'));
+  fs.mkdirSync(path.join(dir, 'build/open'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'build/open/top_stat.txt'), 'Number of cells: 12\n');
+  assert.equal((await ok('read_file', { project: 'h', path: 'build/open/top_stat.txt' })).text, 'Number of cells: 12\n');
+  assert.equal((await ok('check_drawing', { project: 'h', file: 'src/traffic.fsm.json' })).isError, false);
+  await fails('read_file', { project: 'h', path: 'src/none.vhd' }, 'no file \'src/none.vhd\' in the project \'h\'');
+  await fails('check_drawing', { project: 'h', file: 'src/none.fsm.json' }, 'no drawing \'src/none.fsm.json\' in the project \'h\'');
 });
 
 test('rename_module: its references, the drawing it is made from, the top; the file following or kept; Check Syntax and the test bench after', async () => {

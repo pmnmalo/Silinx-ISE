@@ -264,6 +264,11 @@ function instanceCfg(inst, mod, part) {
     bramCfg(inst, add);
   } else if (c.MULT18X18SIO) {
     multCfg(inst, add);
+  } else if (c.BSCAN) {
+    // the JTAG's user access (#3176): a BSCAN_SPARTAN3 as ISE's XDL writes it (BSCAN_BLACKBOX, its name)
+    inst.type = 'BSCAN';
+    inst.name = esc(c.BSCAN.name);
+    add('BSCAN_BLACKBOX', inst.name, '');
   } else if (c.IOB) {
     // the IOB's name: its port bit, as the UCF names it (led<3>: nextpnr writes a bus's bits as one port again)
     const pad = portNet(c.IOB, 'PAD');
@@ -311,7 +316,7 @@ function netsOf(mod, insts, device, v) {
         const inst = p && insts.get(device.tileSites[k][p.site][0]);
         // (an F5 / FX pin only when the net leaves the site there: to X / Y it stays inside)
         // (a block RAM's or multiplier's pins: its cell's ports only, the pair's sites share nodes)
-        const hard = inst && (inst.cells.RAMB16 || inst.cells.MULT18X18SIO || inst.cells.DCM);
+        const hard = inst && (inst.cells.RAMB16 || inst.cells.MULT18X18SIO || inst.cells.DCM || inst.cells.BSCAN);
         // (COUT only when the carry goes on up the column: out by YB, that is the net's pin)
         if (inst && !(p.pin === 'F5' && !inst.f5out) && !(p.pin === 'FX' && !inst.fxout) && !(p.pin === 'COUT' && inst.yb && !inst.coutUp) && (!hard || portNet(hard, p.pin) !== undefined))
           (p.dir === 'o' ? net.outpins : net.inpins).push({ inst: inst.name, pin: p.pin });
@@ -328,6 +333,16 @@ function netsOf(mod, insts, device, v) {
       const x = device.pip(k, pi);
       net.pips.push({ tile: x.tile, from: x.from, dir: x.dir, to: x.to });
     }
+    // a carry read by logic mid-chain (#3076), out by YB and on up the column by COUT: two nets, as Silinx's packer
+    // writes them (pack-nets.js): the logic's from YB, `<net>_COUT` from COUT to the next slice's CIN
+    const cout = net.outpins.find(p => p.pin === 'COUT');
+    if (cout && net.outpins.some(p => p.pin === 'YB' && p.inst === cout.inst)) {
+      const up = x => /^COUT\d$/.test(x.from);
+      nets.push({ name: `${name}_COUT`, type: 'wire', outpins: [cout], inpins: net.inpins.filter(p => p.pin === 'CIN'), pips: net.pips.filter(up) });
+      net.outpins = net.outpins.filter(p => p !== cout);
+      net.inpins = net.inpins.filter(p => p.pin !== 'CIN');
+      net.pips = net.pips.filter(x => !up(x));
+    }
     if (net.outpins.length || net.inpins.length) nets.push(net);
   }
   return nets;
@@ -336,7 +351,8 @@ function netsOf(mod, insts, device, v) {
 /** The check of the LUTs' pins: each input's net is the net on the site pin its equation reads it from. */
 function checkLutPins(mod, insts, nets) {
   const netAt = new Map();   // "inst pin" -> the net's first bit
-  for (const net of nets) for (const p of net.inpins) netAt.set(`${p.inst} ${p.pin}`, mod.netnames[net.name].bits[0]);
+  // (a carry's `<net>_COUT` is not the netlist's: it reaches only a CIN)
+  for (const net of nets) if (mod.netnames[net.name]) for (const p of net.inpins) netAt.set(`${p.inst} ${p.pin}`, mod.netnames[net.name].bits[0]);
   for (const inst of insts.values()) {
     for (const [side, lut] of [['F', inst.cells.FLUT], ['G', inst.cells.GLUT]]) {
       if (!lut) continue;
@@ -383,7 +399,7 @@ function tieSelects(xdlInsts, nets, device) {
 /**
  * nextpnr-himbaechel's routed design (spartan3e micro-architecture, its --write JSON) as an XDL design (parseXdl's
  * structure: writeXdl writes it): one instance per used site with its settings, each net's site pins and PIPs.
- * Its cells: LUT4, MEM16, FF, MUXCY, XORCY, MUXF5 .. MUXF8, IOB (with its registers IFF, OFF, TFF), BUFGMUX, DCM. Throws when a LUT input
+ * Its cells: LUT4, MEM16, FF, MUXCY, XORCY, MUXF5 .. MUXF8, IOB (with its registers IFF, OFF, TFF), BUFGMUX, DCM, BSCAN. Throws when a LUT input
  * is not on the pin its equation reads.
  */
 export function nextpnrToXdl(json, device, part = device.part) {

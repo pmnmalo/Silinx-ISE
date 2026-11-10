@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isWorkflowFile, workflowFiles } from './workflows-lib.mjs';
+import { isWorkflowFile, workflowFiles, checkoutLayout } from './workflows-lib.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, '.github/workflows');
@@ -55,11 +55,12 @@ test('workflows: the self-hosted runner only for main, read-only, without the ch
   for (const f of FILES) {
     const yml = read(f);
     for (const [name, lines] of Object.entries(jobs(yml))) {
-      if (!lines.some(l => /^ {4}runs-on: .*self-hosted/.test(l))) continue;
+      // (runs-on as a mapping, labels: / group: under it: the self-hosted check below refuses it, #3037)
+      if (!lines.some(l => /^ {4}runs-on: .*self-hosted/.test(l) || /^ {4}runs-on:\s*(#.*)?$/.test(l))) continue;
       selfHosted.push(`${f}:${name}`);
       // never a pull request's code: scheduled or by hand, main only
       assert.doesNotMatch(yml.slice(0, yml.indexOf('\njobs:\n')), /pull_request|push:|workflow_run/, f);
-      assert.ok(lines.some(l => l.includes("github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'")), `${f}:${name} main only`);
+      assert.ok(lines.some(l => l.includes("github.repository_id == '1407836659' && github.ref == 'refs/heads/main'")), `${f}:${name} main only`);
       // a read-only token, none kept in the work folder
       for (const [scope, level] of Object.entries(permissions(lines) || {})) assert.equal(level, 'read', `${f}:${name} ${scope}`);
       assert.doesNotMatch(yml.slice(0, yml.indexOf('\njobs:\n')), /^ {2}[\w-]+: write$/m, `${f}: no writing permission for the workflow`);
@@ -79,7 +80,14 @@ const SELF_HOSTED = '[self-hosted, ise]';
 // the events that run only code already on the repository's branches (a pull request's own workflow files
 // run on pull_request, pull_request_target, and on push / workflow_run / workflow_call from its branch)
 const SELF_HOSTED_EVENTS = ['schedule', 'workflow_dispatch'];
-const SELF_HOSTED_IF = "(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'";
+const SELF_HOSTED_IF = "(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository_id == '1407836659' && github.ref == 'refs/heads/main'";
+
+/** The line of the key a job's line i is under (the nearest line above it with less indentation), '' if none. */
+function parentOf(lines, i) {
+  const indent = lines[i].search(/\S/);
+  for (let k = i - 1; k >= 0; k--) if (lines[k].trim() && lines[k].search(/\S/) < indent) return lines[k];
+  return '';
+}
 
 /** What could send a pull request's code to the self-hosted ISE runner in a workflow: [problem] (#482). */
 export function selfHostedProblems(f, yml) {
@@ -89,6 +97,11 @@ export function selfHostedProblems(f, yml) {
   for (const [name, lines] of Object.entries(jobs(yml))) {
     const body = lines.join('\n');
     const runsOn = lines.map(l => /^ {4}runs-on: (.*)$/.exec(l)?.[1]).filter(Boolean);
+    // runs-on as a mapping (its labels: / group: on the lines below it, or { … } on its line): a runner group or
+    // labels the checks below do not read, refused whatever it names (#3037)
+    const mapping = lines.some(l => /^ {4}runs-on:\s*(#.*)?$/.test(l)) || runsOn.some(r => r.trim().startsWith('{'))
+      || lines.some((l, i) => /^\s+(labels|group):/.test(l) && /^ {4}\S/.test(parentOf(lines, i)) && !/^ {4}concurrency:\s*$/.test(parentOf(lines, i)));
+    if (mapping) { problems.push(`${f}:${name}: runs-on as a mapping (labels:, group:): GitHub's runners, or ${SELF_HOSTED}, on its line`); continue; }
     // a job calling a reusable workflow: one of the repository's (checked on its own: those have no self-hosted job)
     const uses = lines.map(l => /^ {4}uses: (.*)$/.exec(l)?.[1]).find(Boolean);
     if (uses && !/^\.\/\.github\/workflows\/[\w-]+\.yml$/.test(uses)) problems.push(`${f}:${name}: a reusable workflow from elsewhere (${uses})`);
@@ -143,6 +156,32 @@ test('workflows: no pull request\'s code can reach the self-hosted ISE runner (#
   assert.deepEqual(selfHostedProblems('m.yml', wf('  pull_request:\n', `    strategy:\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n${job('${{ matrix.os }}')}`)), []);
   assert.deepEqual(selfHostedProblems('x.yml', wf('  pull_request:\n', job('${{ inputs.runner }}'))), ['x.yml:j0: runs-on from an expression (${{ inputs.runner }})']);
   assert.deepEqual(selfHostedProblems('u.yml', wf('  pull_request:\n', '    uses: someone/else/.github/workflows/x.yml@main\n')), ['u.yml:j0: a reusable workflow from elsewhere (someone/else/.github/workflows/x.yml@main)']);
+  // runs-on as a mapping: its labels or its runner group on the lines below it, or { … } on its line (#3037)
+  const MAPPING = 'runs-on as a mapping (labels:, group:): GitHub\'s runners, or [self-hosted, ise], on its line';
+  for (const runsOn of ['\n      labels: [self-hosted, ise]', '\n      group: ise', '\n      group: ise\n      labels: [self-hosted]', '  # the runner\n      labels: ise', '{ group: ise }', '{ labels: [self-hosted, ise] }']) {
+    assert.deepEqual(selfHostedProblems('g.yml', wf('  pull_request:\n', job(runsOn))), [`g.yml:j0: ${MAPPING}`], runsOn);
+    assert.deepEqual(selfHostedProblems('g.yml', wf(SCHED, job(runsOn, GUARD))), [`g.yml:j0: ${MAPPING}`], runsOn);
+  }
+  // not one: a job's own concurrency group, the labels of a step's input, on GitHub's runner
+  assert.deepEqual(selfHostedProblems('c.yml', wf('  pull_request:\n', job('ubuntu-latest', '    concurrency:\n      group: x-${{ github.ref }}\n      cancel-in-progress: true\n'))), []);
+  assert.deepEqual(selfHostedProblems('c.yml', wf(SCHED, job(SELF_HOSTED, GUARD + '    concurrency:\n      group: ise\n'))), []);
+  assert.deepEqual(selfHostedProblems('c.yml', wf('  pull_request:\n', job('ubuntu-latest') + '      - uses: actions/labeler@x\n        with:\n          labels: a\n          group: b\n')), []);
+});
+
+test('workflows: a pull request\'s job with a writing token runs the base\'s scripts at the root, the pull request under head/ (#3038)', () => {
+  for (const f of ['yosys-update.yml', 'nextpnr-update.yml'])
+    assert.deepEqual(checkoutLayout(jobs(read(f)).check.join('\n')), { base: '', head: 'head', clean: true }, f);
+  // the checker itself: the old layout (the pull request at the root, where a bare import of base/scripts resolves),
+  // the check missing or after node, the check of another folder
+  const co = (ref, at) => `      - uses: actions/checkout@x\n        with:\n${ref ? '          ref: ${{ github.event.pull_request.base.sha }}\n' : ''}${at ? `          path: ${at}\n` : ''}          persist-credentials: false\n`;
+  const job = (...steps) => `    runs-on: ubuntu-latest\n    steps:\n${steps.join('')}`;
+  const TEST = '      - run: test ! -e node_modules\n', NODE = '      - run: node scripts/x.mjs versions package.json head/package.json\n';
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), TEST, NODE)), { base: '', head: 'head', clean: true });
+  assert.deepEqual(checkoutLayout(job(co(false), co(true, 'base'), '      - run: node base/scripts/x.mjs\n')), { base: 'base', head: '', clean: false });
+  assert.deepEqual(checkoutLayout(job(co(false), co(true, 'base'), '      - run: test ! -e base/node_modules\n', '      - run: node base/scripts/x.mjs\n')), { base: 'base', head: '', clean: true });
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), NODE)), { base: '', head: 'head', clean: false });
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), NODE, TEST)), { base: '', head: 'head', clean: false });
+  assert.deepEqual(checkoutLayout(job(co(true), co(false, 'head'), '      - run: test ! -e head/node_modules\n', NODE)), { base: '', head: 'head', clean: false });
 });
 
 test('workflows: the weekly comparison\'s results pushed from GitHub\'s runner, after a passing comparison (#412)', () => {
@@ -210,12 +249,26 @@ test('workflows: every job has a time limit; the Playwright browsers cached by i
   assert.deepEqual(installs.map(([n]) => n).sort(), ['browsers', 'webkit-standalone']);
   for (const [name, lines] of installs) {
     const body = lines.join('\n');
-    const browsers = /npx playwright install --with-deps ([\w ]+?)(?: &&|\n|$)/.exec(body)[1].split(' ');
+    const browsers = /npx playwright install --with-deps ([\w ]+?)(?: &&|;|\n|$)/.exec(body)[1].split(' ');
     const cache = /uses: actions\/cache@.+\n\s+with:\n\s+path: ~\/\.cache\/ms-playwright\n\s+key: (.+)/.exec(body);
     assert.ok(cache, name);
     assert.equal(cache[1], `playwright-\${{ runner.os }}-${browsers.join('-')}-\${{ hashFiles('node_modules/playwright-core/package.json') }}`, name);
     assert.ok(body.indexOf('ms-playwright') > body.indexOf('npm ci') && body.indexOf('ms-playwright') < body.indexOf('npx playwright install'), `${name}: after npm ci (the key's file), before the install`);
+    // the system's packages: apt's downloads restored for the runner's image before the install, saved after it
+    // (before the tests, which may fail), and an install that stalls stopped and run once more (#2921, #2939)
+    const key = `apt-${browsers.join('-')}-\${{ steps.image.outputs.key }}`;
+    const restore = body.indexOf(`uses: actions/cache/restore@`), install = body.indexOf('npx playwright install');
+    const save = body.indexOf(`- if: steps.apt.outputs.cache-hit != 'true'\n        uses: actions/cache/save@`), tests = body.search(/run: npm run test:/);
+    assert.match(body, /- id: image\n\s+run: echo "key=\$ImageOS-\$ImageVersion" >> "\$GITHUB_OUTPUT"/, name);
+    assert.ok(restore > 0 && restore < install && install < save && save < tests, `${name}: restore, install, save, tests`);
+    assert.ok(body.slice(restore, install).includes(`path: ~/apt-archives\n          key: ${key}\n          restore-keys: apt-${browsers.join('-')}-\n`), name);
+    assert.ok(body.slice(save, tests).includes(`path: ~/apt-archives\n          key: ${key}\n`), name);
+    assert.match(body, /Dir::Cache::Archives "%s";.*' ~\/apt-archives/, name);
+    assert.match(body, /for attempt in 1 2; do\n\s+if timeout 10m npx playwright install /, name);
+    assert.match(body, /npx playwright install [^\n]+\n(?:.*\n){3}\s+exit 1\n\s+timeout-minutes: 25\n/, `${name}: the step's limit past its two attempts`);
   }
+  // the browsers job's limit past its steps' own (the install's 25 minutes, the tests' 40), so a step's fires
+  assert.match(j.browsers.join('\n'), /^ {4}timeout-minutes: 70$/m);
 });
 
 test('workflows: one setup for the jobs that run the repository\'s code, the action of the repository (#417)', () => {

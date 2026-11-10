@@ -7,6 +7,7 @@ import { icons } from './icons.js';
 import { log, showConsolePage } from './console.js';
 import { showCommandLines } from './messages.js';
 import { cReportLines, hlsClockOf, hlsFamilyOf, hlsMultsOf } from '/core/c-report.js';
+import { blackboxModels, undeclaredBlackboxes } from '/core/c-blackbox.js';
 
 export const isC = (p) => /\.(c|cpp|cc|cxx)$/i.test(p || '');
 // (its badge: C or C++, #1590)
@@ -73,6 +74,30 @@ export function cBadges(file, lang, context) {
     { text: lang === 'verilog' ? 'Verilog' : 'VHDL', base: false, title: 'Generated from the C', open: () => openCHdl(file), context },
   ];
 }
+
+/** The C sources whose HDL cannot be made (#2995: a C error, a blackbox refused): S.cFailed[path] = { module, diagnostics }
+ *  (failed: [[path, viewHdl's result]] of compileProject), each said in the Console once for its errors; their Design rows
+ *  marked (web/js/design.js), their errors Check Syntax's. A blackbox's C model is not a module (#2854): not one.
+ *  sources: the project's C sources, { path: text }. */
+export function noteFailedC(failed, sources = {}) {
+  const models = blackboxModels(S.hls);
+  // (a blackbox no C source declares: a warning of its description, Check Syntax's, #3022)
+  S.bbUndeclared = undeclaredBlackboxes(S.hls, sources);
+  S.cFailed = {};
+  for (const [f, r] of failed) if (r?.errors?.length && !models.has(f)) S.cFailed[f] = { module: r.module || null, diagnostics: r.diagnostics || [] };
+  const said = (S.cFailedSaid ||= new Map());
+  for (const f of [...said.keys()]) if (!S.cFailed[f]) said.delete(f);
+  for (const [f, c] of Object.entries(S.cFailed)) {
+    const key = c.diagnostics.map((d) => `${d.file}:${d.line}:${d.message}`).join('\n');
+    if (said.get(f) === key) continue;
+    said.set(f, key);
+    log(`The HDL of ${f} cannot be made${c.module ? ` (its module ${c.module} is not in the design)` : ''}:`, 'err', { diag: false });
+    for (const d of c.diagnostics) log(`ERROR:SilinxC - "${d.file}" Line ${d.line}: ${d.message}`, 'err', { diag: false });   // (the Errors tab: Check Syntax's)
+  }
+}
+/** The errors of the C sources whose HDL cannot be made, and the blackboxes no C source declares (#3022), as Check
+ *  Syntax's diagnostics. */
+export const failedCDiags = () => [...Object.values(S.cFailed || {}).flatMap((c) => c.diagnostics), ...(S.bbUndeclared || [])].map((d) => ({ ...d, tool: 'SilinxC' }));
 
 // ------------------------------------------------------------------ C simulation and C/RTL co-simulation (#1528)
 const text = async (path) => { const d = findDoc(`file:${path}`); if (d?.editor) return d.editor.getValue(); return (await import('./api.js')).api.readFile(S.project.name, path); };
@@ -143,7 +168,8 @@ export function hlsFamily() {
 
 /** The multiplier blocks a cycle may take (#2125): the project's device's, else no limit. */
 export function hlsMults() {
-  return hlsMultsOf(S.project?.device);
+  const d = S.project?.device;
+  return hlsMultsOf(d, d && S.devices?.parts?.find((p) => p.part === d.part));
 }
 
 /** View C Synthesis Report (#1531): what the C was made into (core/c-hdl.js's report): the module, its ports, its

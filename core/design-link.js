@@ -7,7 +7,7 @@
 //   #open=<url of a .zip>                    a Silinx (or Xilinx ISE) project's zip hosted elsewhere (https, not
 //                                            this computer nor a local network: #2829), fetched once the user agrees
 //   #open=example:<name>                     one of the examples
-//   &view=try|simulate|emulate               Try it (a schematic's; a state diagram's or a Petri net's Simulate, #2869),
+//   &view=try|simulate|emulate               Try it (a schematic's, a state diagram's, a Petri net's or an ASM chart's: #2869, #3287, #3295),
 //                                            the test bench's simulation, the board emulator
 //   &top=<module>  &board=<board>            the module to open, the board to emulate
 // A link comes from anywhere: everything here is untrusted input, sizes capped (the link, the design inflated, its
@@ -16,6 +16,7 @@
 import { browserCodec, createZip } from './zip.js';
 import { VIEW_RE, isCSource, viewHdl } from './view-hdl.js';
 import { gateEntries, gateMessages } from './import-gate.js';
+import { foldsToProjectFile, PROJECT_FILE } from './fold-name.js';
 
 /** The limits of a link: the design's encoded length (characters), its JSON inflated (bytes), its files; `slides`:
  *  the length above which some slide tools cut a link (it is still made, with a warning). */
@@ -26,6 +27,7 @@ const FORMAT = 1;
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;   // (a project's: server/projects.js, web/js/project-store.js)
 const MODULE_RE = /^[A-Za-z_][\w$]{0,127}$/;
 const BOARD_RE = /^[a-z0-9_-]{1,32}$/i;
+const LAB_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;   // (a guided lab's id, core/labs.js)
 const EXAMPLE_RE = /^[a-z0-9_-]{1,64}$/i;
 
 const enc = new TextEncoder();
@@ -98,7 +100,7 @@ export async function encodeDesign(entries, { codec = browserCodec() } = {}) {
   for (const p of Object.keys(gen)) delete files[p];
   const payload = { v: FORMAT, project, files, ...(Object.keys(bin).length ? { bin } : {}), ...(Object.keys(gen).length ? { made: Object.keys(gen) } : {}) };
   const design = toB64url(new Uint8Array(await codec.deflate(enc.encode(JSON.stringify(payload)))));
-  if (design.length > LINK_LIMITS.maxEncoded) throw linkError(`the design is too large for a link (${design.length} characters, at most ${LINK_LIMITS.maxEncoded}): export it as a .zip (Export Silinx ISE Project) and link to that`);
+  if (design.length > LINK_LIMITS.maxEncoded) throw linkError(`the design is too large for a link (${design.length} characters, at most ${LINK_LIMITS.maxEncoded}): export it as a .zip (Export Silinx Project) and link to that`);
   return { design, length: design.length, name: project.name, left: Object.keys(gen) };
 }
 
@@ -156,10 +158,12 @@ export async function decodeDesign(design, { codec = browserCodec() } = {}) {
 }
 
 // a file's path inside the project: relative, forward slashes, no '..', no hidden part (.git, settings), not silinx.json
+// nor a name a case-insensitive file system takes for it (SILINX.JSON, ſilinx.json; src/silinx.json is a file, #3034)
 // (the import checks the paths again: project-store.js projectFromZip, server/project-zip.js)
 function safePath(p) {
-  const parts = p.split('/');
-  return p.length > 0 && p.length <= 255 && !/[\\:\0-\x1f]/.test(p) && p.toLowerCase() !== 'silinx.json'
+  const parts = p.split('/'), last = parts[parts.length - 1];
+  return p.length > 0 && p.length <= 255 && !/[\\:\0-\x1f]/.test(p) && !foldsToProjectFile(p)
+    && !(last !== PROJECT_FILE && foldsToProjectFile(last))
     && parts.every(s => s && s !== '..' && !s.startsWith('.'));
 }
 
@@ -259,14 +263,22 @@ function cModule(path, text) {
 }
 
 /** The address of the Silinx site (its latest release), the base of a link made away from the app (the MCP server). */
-export const SITE_URL = 'https://pmnmalo.github.io/Silinx-ISE/';
+export const SITE_URL = 'https://pmnmalo.github.io/Silinx/';
 
 // ------------------------------------------------------------------ the link's hash
-const KEYS = ['design', 'open', 'view', 'top', 'board', 'ui'];
+const KEYS = ['design', 'open', 'gist', 'view', 'top', 'board', 'ui', 'lab'];
+
+/** A short link's `gist=` value (#3223, core/gist-link.js) checked -> { id, key }; or an Error (linkError). */
+export function parseGistRef(value) {
+  const [id, key, ...rest] = String(value ?? '').split('.');
+  if (rest.length || !/^[0-9a-f]{20,40}$/.test(id || '') || !/^[A-Za-z0-9_-]{43}$/.test(key || '')) throw linkError('the link\'s gist= is not a short link\'s (<gist>.<key>)');
+  return { id, key };
+}
 
 /**
  * The options of a link's hash ('#design=…&view=try'): null when it has none of them (the plain address, a token);
- * else { source: { kind: 'design', design } | { kind: 'example', name } | { kind: 'zip', url }, view, top, board }.
+ * else { source: { kind: 'design', design } | { kind: 'example', name } | { kind: 'zip', url }, view, top, board, lab } (lab:
+ * a guided lab opened once the project is, #3179).
  * Throws (error.linkError) on a broken one.
  */
 export function parseLink(hash) {
@@ -284,8 +296,9 @@ export function parseLink(hash) {
   }
   if (!Object.keys(opts).length) return null;
   let source;
-  if (opts.design !== undefined && opts.open !== undefined) throw linkError('the link has both design= and open=');
-  if (opts.design !== undefined) {
+  if ([opts.design, opts.open, opts.gist].filter(v => v !== undefined).length > 1) throw linkError(opts.gist === undefined ? 'the link has both design= and open=' : 'the link has more than one of design=, open= and gist=');
+  if (opts.gist !== undefined) source = { kind: 'gist', ...parseGistRef(opts.gist) };
+  else if (opts.design !== undefined) {
     if (!opts.design) throw linkError('the link\'s design= is empty');
     source = { kind: 'design', design: opts.design };
   } else if (opts.open !== undefined) {
@@ -301,44 +314,82 @@ export function parseLink(hash) {
       if (privateHost(url.hostname)) throw linkError(`the link's open= is an address of this computer or of a local network ('${url.hostname.slice(0, 64)}')`);
       source = { kind: 'zip', url: url.href };
     }
-  } else throw linkError('the link names no design (design= or open=)');
+  } else throw linkError('the link names no design (design=, open= or gist=)');
   if (opts.view !== undefined && opts.view !== '' && !LINK_VIEWS.includes(opts.view)) throw linkError(`the link's view '${opts.view.slice(0, 32)}' is not one of ${LINK_VIEWS.join(', ')}`);
   if (opts.top && !MODULE_RE.test(opts.top)) throw linkError(`the link's top '${opts.top.slice(0, 64)}' is not a module name`);
   if (opts.board && !BOARD_RE.test(opts.board)) throw linkError(`the link's board '${opts.board.slice(0, 32)}' is not a board name`);
   if (opts.ui !== undefined && (opts.ui.length > UI_LIMITS.maxEncoded || !/^[A-Za-z0-9_-]+$/.test(opts.ui))) throw linkError('the link\'s view (ui=) is not one');
-  return { source, view: opts.view || null, top: opts.top || null, board: opts.board || null, ...(opts.ui ? { ui: opts.ui } : {}) };
+  if (opts.lab && !LAB_RE.test(opts.lab)) throw linkError(`the link's lab '${opts.lab.slice(0, 64)}' is not a lab's id`);
+  return { source, view: opts.view || null, top: opts.top || null, board: opts.board || null, ...(opts.ui ? { ui: opts.ui } : {}), ...(opts.lab ? { lab: opts.lab } : {}) };
 }
 
 // a host of this computer or of a local network (a literal address, localhost, .local / .internal / .lan names):
-// a link from anywhere does not make the browser fetch from them (#2829)
+// a link from anywhere does not make the browser fetch from them (#2829); the IPv6 forms that carry an IPv4 address
+// (IPv4-compatible ::a.b.c.d, mapped, NAT64, 6to4) and the reserved ranges too (#2962)
 export function privateHost(host) {
   const h = String(host).toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   if (!h || h === 'localhost' || /\.(localhost|local|internal|lan|home|arpa)$/.test(h) || !h.includes('.') && !h.includes(':')) return true;
   const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (v4) {
-    const [a, b] = [+v4[1], +v4[2]];
-    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
-      || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  if (v4) return privateV4(+v4[1], +v4[2], +v4[3]);
+  if (h.includes(':')) {
+    const g = ipv6Groups(h);
+    if (!g) return true;   // not an address: refused
+    const [a, b] = g;
+    return a === 0                                            // ::/16: ::, ::1, IPv4-compatible, mapped (::ffff:0:0/96), translated
+      || (a === 0x100 && !b && !g[2] && !g[3])                // 100::/64, discard only
+      || (a === 0x64 && b === 0xff9b)                         // NAT64: 64:ff9b::/96, 64:ff9b:1::/48
+      || (a & 0xfe00) === 0xfc00 || (a & 0xff80) === 0xfe80   // fc00::/7 unique local; fe80::/10 link-local, fec0::/10 site-local
+      || (a & 0xff00) === 0xff00                              // ff00::/8 multicast
+      || (a === 0x2001 && b === 0xdb8)                        // 2001:db8::/32 documentation
+      || (a === 0x2002 && privateV4(b >> 8, b & 0xff, g[2] >> 8));   // 6to4: the IPv4 address it carries
   }
-  if (h.includes(':')) return h === '::' || h === '::1' || /^(fc|fd|fe[89ab])/.test(h) || /^::ffff:/.test(h);
   return false;
 }
 
+// an IPv4 address of this computer, of a local network or of a reserved range (its first three bytes)
+function privateV4(a, b, c) {
+  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19))
+    || (a === 192 && b === 0 && (c === 0 || c === 2)) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113);
+}
+
+// an IPv6 address's eight 16-bit groups (an IPv4 address at its end as two of them); null: not an address
+function ipv6Groups(h) {
+  let s = h.replace(/%.*$/, '');
+  const tail = /^(.*:)(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(s);
+  if (tail) {
+    const q = tail.slice(2).map(Number);
+    if (q.some(n => n > 255)) return null;
+    s = `${tail[1]}${((q[0] << 8) | q[1]).toString(16)}:${((q[2] << 8) | q[3]).toString(16)}`;
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const part = x => (x ? x.split(':') : []);
+  const [l, r] = [part(halves[0]), part(halves[1])];
+  if ([...l, ...r].some(x => !/^[0-9a-f]{1,4}$/.test(x))) return null;
+  const zeros = 8 - l.length - r.length;
+  if (halves.length === 1 ? zeros !== 0 : zeros < 1) return null;
+  return [...l, ...Array(halves.length === 2 ? zeros : 0).fill('0'), ...r].map(x => parseInt(x, 16));
+}
+
 /**
- * A link: base (the app's address, its hash dropped) + the hash of { design | example | zip, view, top, board }.
+ * A link: base (the app's address, its hash dropped) + the hash of { design | example | zip, view, top, board, ui, lab }.
  */
-export function makeLink(base, { design, example, zip, view, top, board, ui } = {}) {
-  const sources = [design, example, zip].filter(v => v !== undefined && v !== null);
-  if (sources.length !== 1) throw linkError('a link has one design: design, example or zip');
+export function makeLink(base, { design, example, zip, gist, view, top, board, ui, lab } = {}) {
+  const sources = [design, example, zip, gist].filter(v => v !== undefined && v !== null);
+  if (sources.length !== 1) throw linkError('a link has one design: design, example, zip or gist');
+  if (gist) parseGistRef(gist);
   if (view && !LINK_VIEWS.includes(view)) throw linkError(`view: one of ${LINK_VIEWS.join(', ')}`);
   if (top && !MODULE_RE.test(top)) throw linkError(`top: '${top}' is not a module name`);
   if (board && !BOARD_RE.test(board)) throw linkError(`board: '${board}' is not a board name`);
   if (example !== undefined && example !== null && !EXAMPLE_RE.test(example)) throw linkError(`example: '${example}' is not an example's name`);
-  const parts = [design ? `design=${design}` : example ? `open=example:${example}` : `open=${encodeURI(zip).replace(/[#&]/g, encodeURIComponent)}`];
+  if (lab && !LAB_RE.test(lab)) throw linkError(`lab: '${lab}' is not a lab's id`);
+  const parts = [design ? `design=${design}` : gist ? `gist=${gist}` : example ? `open=example:${example}` : `open=${encodeURI(zip).replace(/[#&]/g, encodeURIComponent)}`];
   if (top) parts.push(`top=${top}`);
   if (board) parts.push(`board=${board}`);
   if (view) parts.push(`view=${view}`);
   if (ui) parts.push(`ui=${ui}`);
+  if (lab) parts.push(`lab=${lab}`);
   return `${String(base).replace(/#.*$/, '')}#${parts.join('&')}`;
 }
 

@@ -86,6 +86,7 @@ export function moduleRegistry({ make }) {
         const m = { callee, depths, module: `${portOf(hdlName(callee))}${same ? `_${same}` : ''}`, gen: null };
         mods.set(key, m);
         m.gen = make(callee, depths, m.module);
+        if (m.gen?.module) m.module = m.gen.module;   // (a module of its own name: an RTL blackbox's process, #2340)
         made.push(m);
       }
       return mods.get(key);
@@ -177,7 +178,7 @@ export const subMethods = {
         const ptr = pa.type.kind === 'ptr';
         const et = typeOf(ptr ? pa.type.to : pa.type);
         const target = ptr ? (a.kind === 'unary' && a.op === '&' ? a.e : { kind: 'unary', op: '*', e: a, loc: a.loc }) : a;
-        if (p.dir === 'in') { drive.set(p.name, this.conv(this.expr(target, g), { w: p.w, s: et.s }).id); continue; }
+        if (p.dir === 'in') { drive.set(p.name, this.conv(this.expr(target, g), et.fl ? et : { w: p.w, s: et.s }).id); continue; }   // (a float's: its bits, #2273)
         // (written: taken each time it comes, its _ap_vld; without one, at the end of the call)
         const vld = byName.get(`${p.name}_ap_vld`);
         this.store(target, this.v(I(p.name, et), et), vld ? I(vld.name, BOOL) : done);

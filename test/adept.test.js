@@ -88,6 +88,11 @@ test('bitHeader: the design and part of a .bit; the part checked against the boa
   const { bit } = fakeBit();
   assert.deepEqual(bitHeader(bit), { design: 'top.ncd', part: 'xc3s250e', package: 'cp132', date: '2026/10/12', time: '14:05:00' });
   assert.equal(bitHeader(new Uint8Array([1, 2, 3])), null);
+  // the length word right but not the 9 bytes of the magic (#3048): not a .bit, as the server's parseBitHeader says
+  for (const i of [2, 6, 10]) {
+    const bad = bit.slice(); bad[i] ^= 0xff;
+    assert.equal(bitHeader(bad), null, `byte ${i}`);
+  }
   // the header's part wins over the one given
   await assert.rejects(programAdept(new SimAdeptBoard({ fpga: 'xc3s500e' }), bit, { part: 'xc3s500e' }), /the board's FPGA is a XC3S500E, the bitstream is for a XC3S250E/);
 });

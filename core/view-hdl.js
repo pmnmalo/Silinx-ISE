@@ -42,11 +42,13 @@ export function viewHdl(path, text, { modules = {}, linked = null, lang = 'vhdl'
 
 // a C source's HDL: its top function's module, in the project's language, scheduled for the clock (ns, #1924) with the
 // device family's delays (#2080) and its multiplier blocks (#2125); its errors as a drawing's
-// (hls: the project's RTL blackboxes, core/c-blackbox.js, #1903)
+// (hls: the project's RTL blackboxes, core/c-blackbox.js, #1903; diagnostics: its errors, each in its own file, a
+// blackbox's description's its own, #2995)
 function cHdl(path, text, lang, clock, family, hls, mults) {
   const r = cToHdl(String(text ?? ''), { file: path, lang: lang === 'verilog' ? 'verilog' : 'vhdl', clock, family, mults, ...(hls || {}) });
-  const errors = r.diagnostics.filter((d) => d.severity === 'error').map((d) => `${path}: line ${d.line}: ${d.message}`);
-  return { path, lang: lang === 'verilog' ? 'verilog' : 'vhdl', text: r.ok ? r.hdl : '', module: r.top, errors, sequential: !!r.sequential };
+  const diagnostics = r.diagnostics.filter((d) => d.severity === 'error').map((d) => ({ ...d, file: d.file || path }));
+  const errors = diagnostics.map((d) => `${path}: line ${d.line}: ${d.message}`);
+  return { path, lang: lang === 'verilog' ? 'verilog' : 'vhdl', text: r.ok ? r.hdl : '', module: r.top, errors, diagnostics, sequential: !!r.sequential };
 }
 
 function drawnHdl(path, m, modules) {

@@ -83,7 +83,7 @@ test('encodeDesign: a file that is not text goes as base64 and comes back; a dra
 test('encodeDesign: too large for a link, not a project', async () => {
   const big = [{ path: 'silinx.json', data: JSON.stringify({ name: 'big', files: [] }) },
     { path: 'src/noise.vhd', data: Array.from({ length: 60000 }, (_, i) => ((i * 2654435761) >>> 0).toString(36)).join(' ') }];
-  await assert.rejects(encodeDesign(big), e => e.linkError && /^the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Silinx ISE Project\) and link to that$/.test(e.message));
+  await assert.rejects(encodeDesign(big), e => e.linkError && /^the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Silinx Project\) and link to that$/.test(e.message));
   await rejects(encodeDesign([{ path: 'src/a.vhd', data: 'x' }]), 'not a Silinx project: no silinx.json');
 });
 
@@ -117,6 +117,18 @@ test('decodeDesign: names that are not a project\'s, paths that leave the projec
   }
 });
 
+test('#3034 decodeDesign: every spelling of silinx.json a case-insensitive file system takes for it refused; src/silinx.json and an ordinary file kept', async () => {
+  for (const p of ['\u017filinx.json', 'Silinx.Json', '\uff53ilinx.json', 'src/SILINX.JSON', 'src/\u017filinx.json']) {
+    await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { [p]: '{"trusted":true}' } })), `the link's design has a file outside the project ('${p}')`);
+    await rejects(decodeDesign(raw({ v: 1, project: { name: 'a' }, files: {}, bin: { [p]: '' } })), `the link's design has a file outside the project ('${p}')`);
+  }
+  const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/silinx.json': '{}', 'src/a.vhd': 'entity a is end;\n' } }));
+  assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/silinx.json', 'src/a.vhd']);
+  assert.deepEqual(d.warnings, []);
+  // (a view's tab on one is dropped as well)
+  assert.deepEqual(decodeUi(encodeUi({ open: ['file:\u017filinx.json', 'file:src/a.vhd'] })).view.open, ['file:src/a.vhd']);
+});
+
 test('decodeDesign: through the import gate (#2830): a file it refuses left out, said in the warnings', async () => {
   const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, files: { 'src/a.vhd': 'entity a is end;\n', 'src/page.vhd': '<script>alert(1)</script>', 'src/A.VHD': '' } }));
   assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/a.vhd']);
@@ -144,7 +156,7 @@ test('parseLink: the options of a link', () => {
 });
 
 test('parseLink: a broken or hostile link is refused (#2829)', () => {
-  throws(() => parseLink('#view=try'), 'the link names no design (design= or open=)');
+  throws(() => parseLink('#view=try'), 'the link names no design (design=, open= or gist=)');
   throws(() => parseLink('#design=&view=try'), 'the link\'s design= is empty');
   throws(() => parseLink('#design=a&open=example:gates'), 'the link has both design= and open=');
   throws(() => parseLink('#open=example:gates&open=example:pong'), 'the link has two open=');
@@ -168,24 +180,52 @@ test('parseLink: a broken or hostile link is refused (#2829)', () => {
 });
 
 test('privateHost: the public names and addresses are not', () => {
-  for (const h of ['example.org', 'raw.githubusercontent.com', '8.8.8.8', '172.32.0.1', '192.169.0.1', '[2606:4700::1111]']) assert.equal(privateHost(h), false, h);
+  for (const h of ['example.org', 'raw.githubusercontent.com', '8.8.8.8', '172.32.0.1', '192.169.0.1', '[2606:4700::1111]', '2606:4700::1111',
+    '[2002:808:808::1]', '[64:ff9a::1]', '[fbff::1]', '198.20.0.1', '192.0.3.1', '203.0.114.1']) assert.equal(privateHost(h), false, h);
+});
+
+test('privateHost: the IPv6 forms that carry an IPv4 address, the reserved IPv6 and IPv4 ranges, what is not an address (#2962)', () => {
+  for (const h of [
+    '[::]', '[::1]', '[0:0:0:0:0:0:0:1]', '[::7f00:1]', '[::127.0.0.1]', '[::a00:5]', '[::8.8.8.8]',   // ::/16: IPv4-compatible among them
+    '[::ffff:7f00:1]', '[::ffff:127.0.0.1]', '[::ffff:0:a00:1]',                                        // mapped, translated
+    '[64:ff9b::7f00:1]', '[64:ff9b::127.0.0.1]', '[64:ff9b::808:808]', '[64:ff9b:1::1]',                 // NAT64
+    '[2002:7f00:1::1]', '[2002:c0a8:101::1]', '[2002:a00:1::]',                                         // 6to4 of a private IPv4 address
+    '[fc00::1]', '[fd12:3456::1]', '[fe80::1]', '[fe80::1%25en0]', '[febf::1]', '[fec0::1]', '[ff02::1]', '[100::1]', '[2001:db8::1]',
+    '[1::2::3]', '[gggg::1]', '[1:2:3]', '[::1.2.3.256]',                                              // not an address
+    '198.18.0.1', '198.19.255.255', '192.0.0.8', '192.0.2.1', '198.51.100.7', '203.0.113.9',          // reserved IPv4
+  ]) assert.equal(privateHost(h), true, h);
+  // the link's own check, on the address as the browser reads it (new URL writes ::127.0.0.1 as ::7f00:1)
+  for (const [u, host] of [['https://[::127.0.0.1]/a.zip', '[::7f00:1]'], ['https://[::7f00:1]/a.zip', '[::7f00:1]'], ['https://[64:ff9b::127.0.0.1]/a.zip', '[64:ff9b::7f00:1]'],
+    ['https://[::ffff:10.0.0.1]/a.zip', '[::ffff:a00:1]'], ['https://[fe80::1]/a.zip', '[fe80::1]'], ['https://[0:0::0:1]/a.zip', '[::1]']]) {
+    assert.throws(() => parseLink(`#open=${u}`), { message: `the link's open= is an address of this computer or of a local network ('${host}')` }, u);
+  }
 });
 
 test('makeLink: the link of a design, an example, a zip; parseLink reads it back', async () => {
-  const base = 'https://pmnmalo.github.io/Silinx-ISE/#token=x';
-  assert.equal(makeLink(base, { example: 'traffic', view: 'try' }), 'https://pmnmalo.github.io/Silinx-ISE/#open=example:traffic&view=try');
+  const base = 'https://pmnmalo.github.io/Silinx/#token=x';
+  assert.equal(makeLink(base, { example: 'traffic', view: 'try' }), 'https://pmnmalo.github.io/Silinx/#open=example:traffic&view=try');
   const { design } = await encodeDesign(exampleEntries('gates'));
   const l = makeLink('http://localhost:3000/', { design, top: 'gates', board: 'nexys2', view: 'emulate' });
   assert.deepEqual(parseLink(new URL(l).hash), { source: { kind: 'design', design }, view: 'emulate', top: 'gates', board: 'nexys2' });
   const z = makeLink(base, { zip: 'https://example.org/a b.zip?x=1&y=2#z' });
-  assert.equal(z, 'https://pmnmalo.github.io/Silinx-ISE/#open=https://example.org/a%20b.zip?x=1%26y=2%23z');
+  assert.equal(z, 'https://pmnmalo.github.io/Silinx/#open=https://example.org/a%20b.zip?x=1%26y=2%23z');
   assert.equal(parseLink(new URL(z).hash).source.url, 'https://example.org/a%20b.zip?x=1&y=2#z');
-  throws(() => makeLink(base, {}), 'a link has one design: design, example or zip');
-  throws(() => makeLink(base, { example: 'a', design: 'b' }), 'a link has one design: design, example or zip');
+  throws(() => makeLink(base, {}), 'a link has one design: design, example, zip or gist');
+  throws(() => makeLink(base, { example: 'a', design: 'b' }), 'a link has one design: design, example, zip or gist');
   throws(() => makeLink(base, { example: 'a', view: 'x' }), 'view: one of try, simulate, emulate');
   throws(() => makeLink(base, { example: 'a', top: '1x' }), 'top: \'1x\' is not a module name');
   throws(() => makeLink(base, { example: 'a', board: 'a b' }), 'board: \'a b\' is not a board name');
   throws(() => makeLink(base, { example: 'a/b' }), 'example: \'a/b\' is not an example\'s name');
+});
+
+test('#3179 a link that opens a guided lab: lab=<its id>, made and read back; one that is not a lab\'s id refused', () => {
+  const l = makeLink('https://pmnmalo.github.io/Silinx/', { example: 'stopwatch', view: 'emulate', lab: 'stopwatch-emulator' });
+  assert.equal(l, 'https://pmnmalo.github.io/Silinx/#open=example:stopwatch&view=emulate&lab=stopwatch-emulator');
+  assert.deepEqual(parseLink(new URL(l).hash), { source: { kind: 'example', name: 'stopwatch' }, view: 'emulate', top: null, board: null, lab: 'stopwatch-emulator' });
+  assert.equal(parseLink('#open=example:gates&lab=').lab, undefined, 'an empty lab= is none');
+  throws(() => parseLink('#open=example:gates&lab=%3Cscript%3E'), 'the link\'s lab \'<script>\' is not a lab\'s id');
+  throws(() => parseLink('#open=example:gates&lab=a&lab=b'), 'the link has two lab=');
+  throws(() => makeLink('https://x/', { example: 'gates', lab: '../x' }), 'lab: \'../x\' is not a lab\'s id');
 });
 
 test('sameFiles: silinx.json left out, any other difference counts', () => {

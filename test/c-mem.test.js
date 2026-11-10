@@ -139,3 +139,54 @@ test('#1527 a memory inside the module is a block RAM: the open synthesis (Yosys
     assert.deepEqual(r.warnings, [], lang);
   }
 });
+
+// (constant tables of more than MEM_MIN words: ROMs; a memory argument)
+const rom = (n, f) => `{ ${Array.from({ length: n }, (_, k) => f(k)).join(', ')} }`;
+const TABLES = `static const int A[100] = ${rom(100, (k) => k * 3)};
+static const int B[100] = ${rom(100, (k) => 100 - k)};
+`;
+
+test('#2968 the reads of different memories in one state, each its own port; a read whose address another read gives, and two of one memory, a state apart', () => {
+  const latency = (body, main) => {
+    const [vhdl, verilog] = passes(`${TABLES}${body}\nint main() {\n${main}\n  return 0;\n}\n`, 'f.c');
+    assert.deepEqual(verilog.latency, vhdl.latency);
+    return [vhdl.latency.max, vhdl.gen.states];
+  };
+  // (were 3 cycles and 5 states: B read in the state that took A's value)
+  assert.deepEqual(latency('int f(int i) {\n  return A[i] + B[i];\n}', '  for (int i = 0; i < 100; i++) if (f(i) != i * 2 + 100) return 1;'), [2, 4]);
+  // (three memories, two ROMs and an argument: were 5 cycles)
+  assert.deepEqual(latency('int f(int m[100], int i) {\n  return A[i] + B[99 - i] * m[i];\n}',
+    '  int m[100];\n  for (int i = 0; i < 100; i++) m[i] = i % 5;\n  for (int i = 0; i < 100; i++) if (f(m, i) != i * 3 + (1 + i) * (i % 5)) return 1;'), [3, 5]);
+  // (B's address is A's value: after it; A twice: its one port, a state each)
+  assert.deepEqual(latency('int f(int i) {\n  return A[i] + B[A[i] >> 2];\n}', '  for (int i = 0; i < 100; i++) if (f(i) != i * 3 + 100 - (i * 3 >> 2)) return 1;'), [4, 6]);
+  assert.deepEqual(latency('int f(int i, int j) {\n  return A[i] + A[j];\n}', '  for (int i = 0; i < 100; i++) if (f(i, 99 - i) != 297) return 1;'), [3, 5]);
+});
+
+// (#2990: a pipelined loop's read of a local memory and its body's own variable: their values in the pipeline's
+// registers, no register of their own left never written; the design checks' messages gone)
+const PIPED = (body) => `void top(int base, int *s) {
+  int m[80];
+  for (int i = 0; i < 80; i++) m[i] = base + i;
+  int u = 0;
+  for (int i = 0; i < 80; i++) ${body}
+  *s = u;
+}
+int main(void) { int s; top(7, &s); return s == 80 * 7 + 3160 ? 0 : 1; }
+`;
+
+test('#2990 a local memory read in a pipelined loop, alone or into the body\'s own variable: no register of the read nor of the variable, no design check message, in VHDL and Verilog; co-simulated, no warning', async () => {
+  const { designChecks } = await import('../core/lint.js');
+  for (const body of ['u += m[i];', '{ int x = m[i]; u += x; }']) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const g = cToHdl(PIPED(body), { file: 'f.c', lang, top: 'top' });
+      assert.deepEqual(g.diagnostics, [], `${body} ${lang}`);
+      assert.deepEqual(g.report.loops.map((l) => [l.ii, l.depth]), [[1, 1], [1, 2]], `${body} ${lang}`);
+      assert.doesNotMatch(g.hdl, /ap_r_ap_mem_m_0|ap_r_x\b/, `${body} ${lang}`);
+      const lib = compile([{ path: `top.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.hdl }]);
+      const design = elaborate(lib, 'top');
+      assert.deepEqual([...lib.errors, ...design.diags].map((d) => `${d.severity}: ${d.message}`), [], `${body} ${lang}`);
+      assert.deepEqual(designChecks(lib, design).map((d) => d.message), [], `${body} ${lang}`);
+    }
+    passes(PIPED(body), 'f.c');
+  }
+});

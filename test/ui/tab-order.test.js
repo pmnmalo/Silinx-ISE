@@ -120,7 +120,7 @@ uiTest('#2887 a tab dragged between two others, clicked, closed, cancelled, move
     await page.click('#task-switch .task-btn[data-task="edit"]');
     await page.waitFor(() => document.documentElement.dataset.task === 'edit', [], { what: 'Design' });
   } else { await page.setView('sim'); await page.setView('impl'); }
-  assert.deepEqual((await rows(page)).one.map((t) => t.replace('*', '')).filter((t) => t !== 'tb_a.vhd'), ['c.vhd', 'b.vhd', 'a.vhd']);
+  assert.deepEqual((await rows(page)).one.map((t) => t.replace(/\*$/, '')).filter((t) => t !== 'tb_a.vhd'), ['c.vhd', 'b.vhd', 'a.vhd']);
   await page.eval(() => window.SilinxApp.activateDoc(window.Silinx.docs.find((d) => d.title === 'b.vhd')));
 
   // kept with the project: a reload opens them in that order

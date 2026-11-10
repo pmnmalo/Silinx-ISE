@@ -1,4 +1,4 @@
-/* Silinx ISE, a third interface (#782): clickable mock-ups. Static, no build step.
+/* Silinx, a third interface (#782): clickable mock-ups. Static, no build step.
    The page around the mock-ups (the viewer) uses --v-*; the mocked app uses the modern
    interface's own tokens (--m-*, web/css/modern.css) so that it reads as Silinx. */
 

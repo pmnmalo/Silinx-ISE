@@ -19,11 +19,14 @@ import { firHdl } from './hls-fir-hdl.js';
 import { moduleRegistry } from './c-submodule.js';
 import { structPragmas, wordGroups } from './c-aggregate.js';
 import { wordAdapter, wordPorts } from './c-processes-word.js';
+import { blackboxProcess } from './c-blackbox-process.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
 // (ap_ce: an AXI master's wait, the whole module's, core/c-axi-master.js, #1893)
 const SHARED = ['ap_clk', 'ap_rst', 'ap_ce'];
+// (a process's ap_ready: the region's top reads its ap_done, its ap_ready left open, no signal never read, #2992)
+const OPEN = ['ap_ready'];
 const SAID = /^#pragma HLS (DATAFLOW|STREAM) is accepted and ignored/;
 
 /** Whether name is assigned in body (=, op=, ++, --) or its address taken. */
@@ -88,7 +91,7 @@ function streamWords(checked, fn, use, rn, flat) {
   });
 }
 
-export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module = null, stall = false, flat = false, taken = null }) {
+export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module = null, stall = false, flat = false, taken = null, blackboxes = null }) {
   const fn = checked.funcs.get(checked.top);
   const rg = region(fn, checked.consts);
   // (a top running an hls::FIR has none, #1942)
@@ -107,8 +110,10 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const elem = (t) => typeOf(t.kind === 'ptr' ? t.to : t.kind === 'array' || t.kind === 'stream' ? t.of : t);
   const reg = moduleRegistry({ make: (callee, depths, module) => {
     const fir = checked.ast.firs?.get(callee), f = checked.funcs.get(callee);
+    // (an RTL blackbox: its module inside a process's, core/c-blackbox-process.js, #2340)
+    if (f?.blackbox) return blackboxProcess(f, { lang, module: `${module}_bb`, file });
     return fir ? firHdl(fir, { lang, module, src: file.split('/').pop(), types: Object.fromEntries(f.params.map((pa) => [pa.name, elem(pa.type)])) })
-      : cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, stall, modules: reg, ...(/^Loop_\d+_proc$/.test(callee) ? { host: checked.top } : {}) });
+      : cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, stall, modules: reg, blackboxes, ...(/^Loop_\d+_proc$/.test(callee) ? { host: checked.top } : {}) });
   } });
   const sizeOf = (a) => {
     if (a?.kind !== 'id') return null;
@@ -118,7 +123,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const locals = (n) => rg.locals.get(n);
   rg.calls.forEach((c, k) => {
     const f = checked.funcs.get(c.callee);
-    if (!f?.body) { fail(c.loc, `'${c.callee}' is not defined`); return; }
+    if (!f?.body && !f?.blackbox) { fail(c.loc, `'${c.callee}' is not defined`); return; }
     const depths = {};
     f.params.forEach((pa, i) => { const n = sizeOf(c.args[i]); if (n && pa.name) depths[pa.name] = n; });
     const m = reg.of(c.callee, depths);
@@ -249,10 +254,12 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const net = { stall, name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free, ties, inner, words };
   const top = lang === 'vhdl' ? vhdlTop(net) : verilogTop(net);
   const hdl = [...reg.modules().map((m) => m.gen.hdl), ...top].join('\n');
-  const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), ...regionTiming(procs), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, latency: p.mod.gen.report.latency ?? null, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
+  const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), ...regionTiming(procs), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, latency: p.mod.gen.report.latency ?? null, ...(p.mod.gen.report.blackbox ? { blackbox: p.mod.gen.report.blackbox } : {}), after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
     memories: [...memories.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' })), ...[...rg.locals].filter(([, l]) => l.kind === 'array').map(([n, l]) => ({ name: n, words: Number(l.type.length), bits: typeOf(l.type.of)?.w ?? 0, kind: 'RAM (PIPO)' }))],
     fifos: [...rg.locals].filter(([, l]) => l.kind === 'stream').map(([n, l]) => ({ name: n, depth: l.depth })), waits, loops: [] };
-  return { ok: true, hdl, top: name, ports, diagnostics: diagnostics.sort(byLine), sequential: true, states: 0, memories, fifos, report, dataflow: true };
+  // (the RTL blackboxes, a process's or in one, #2340: their files the co-simulation's)
+  const bbs = [...new Map(reg.modules().flatMap((m) => m.gen.blackboxes || []).map((d) => [d.file, d])).values()];
+  return { ok: true, ...(bbs.length ? { blackboxes: bbs } : {}), hdl, top: name, ports, diagnostics: diagnostics.sort(byLine), sequential: true, states: 0, memories, fifos, report, dataflow: true };
 }
 
 /** The report's region (#1706): its latency, the longest chain of processes one waiting for another's buffers (streams
@@ -285,7 +292,7 @@ function pieces(net) {
   const { procs, use, locals, params, rn } = net;
   const sig = (p, port) => `${p.inst}_${port.name}`;
   const sigs = [], links = [], fifos = [], bufs = [];
-  for (const p of procs) for (const port of p.mod.gen.ports) if (!SHARED.includes(port.name)) sigs.push({ name: sig(p, port), w: port.w });
+  for (const p of procs) for (const port of p.mod.gen.ports) if (!SHARED.includes(port.name) && !OPEN.includes(port.name)) sigs.push({ name: sig(p, port), w: port.w });
   for (const p of procs) {
     for (const x of p.wires) {
       if (x.top !== undefined) { const tp = net.ports.find((q) => q.param === x.top); links.push({ dst: sig(p, x.port), dw: x.port.w, src: tp.name, sw: tp.w, s: tp.s }); }
@@ -359,7 +366,7 @@ function vhdlTop(net) {
   L.push('begin');
   for (const p of procs) {
     // (a process's own ap_ctrl_chain: the top's machine takes its ap_done at once)
-    const m = p.mod.gen.ports.map((port) => `${port.name} => ${port.name === 'ap_continue' ? "'1'" : SHARED.includes(port.name) ? port.name : sig(p, port)}`);
+    const m = p.mod.gen.ports.map((port) => `${port.name} => ${port.name === 'ap_continue' ? "'1'" : SHARED.includes(port.name) ? port.name : OPEN.includes(port.name) ? 'open' : sig(p, port)}`);
     L.push(`  ${p.inst} : entity work.${p.mod.module} port map (${m.join(', ')});`);
   }
   net.words.forEach((g, i) => L.push(`  ap_word${i} : entity work.${name}_ap_word${i} port map (${wordMap(net, g).map(([a, b]) => `${a} => ${b}`).join(', ')});`));
@@ -436,7 +443,7 @@ function verilogTop(net) {
   if (chain) L.push("  reg ap_done_reg = 1'b0;");
   if (net.free) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
   for (const b of bufs) L.push(`  reg [${b.w - 1}:0] ${b.name} [0:${b.n - 1}];`, `  reg [${b.w - 1}:0] ${b.name}_q;`, `  wire [${b.aw - 1}:0] ${b.name}_addr;`, `  wire ${b.name}_ce, ${b.name}_we;`, `  wire [${b.w - 1}:0] ${b.name}_d;`);
-  for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${port.name === 'ap_continue' ? "1'b1" : SHARED.includes(port.name) ? port.name : sig(p, port)})`).join(', ')});`);
+  for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${port.name === 'ap_continue' ? "1'b1" : SHARED.includes(port.name) ? port.name : OPEN.includes(port.name) ? '' : sig(p, port)})`).join(', ')});`);
   net.words.forEach((g, i) => L.push(`  ${name}_ap_word${i} ap_word${i} (${wordMap(net, g).map(([a, b]) => `.${a}(${b})`).join(', ')});`));
   const conv = (s0, sw, dw, sg = false) => (dw > sw && sg && sw > 1 ? `{{${dw - sw}{${s0}[${sw - 1}]}}, ${s0}}` : dw < sw ? (dw === 1 ? `${s0}[0]` : `${s0}[${dw - 1}:0]`) : s0);
   for (const t of net.ties) L.push(`  assign ${t.name} = ${t.w}'d0;`);

@@ -156,58 +156,74 @@ test('lutFunction: a LUT\'s INIT as an equation (ISE\'s notation) and a truth ta
   assert.deepEqual(initBits('"10"', 4), [0, 1, 0, 0]);
 });
 
-test('the examples blinky and pong, synthesized by Yosys: technology netlists by instance that compile and are drawn', { timeout: 300000 }, async () => {
+// an example synthesized by Yosys, its technology netlist by instance compiled and elaborated, then drawn: its top
+// level (in `asWritten` only: as View Technology Schematic draws it, #131; and with the names in lower case too) and
+// one instance's (u_pre, dbL) both ways. One test per example (#2392: the two in one test neared its 300 s in CI),
+// pong's top level drawn once (its drawing, 69 symbols and 395 wires, most of the test's time, #2970)
+async function technologyExample(name, { inst: instName, groups, lowerTop }) {
   const ELK = (await import('elkjs/lib/elk.bundled.js')).default;
   const elk = new ELK();
-  // (blinky's BCD counter u_count drives the top's signal digits, and u_speed its step: their cells in them, #1003)
-  for (const [name, want] of [['blinky', { u_pre: 67, u_speed: 212, u_knight: 52, u_count: 84, u_display: 61 }], ['pong', null]]) {
-    const ex = example(name);
-    const design = elaborate(compile([...primitiveSources(ex.design), ...ex.design]), ex.project.top);
-    const syn = await synthesizeOpen(design, { run: yosysNode });
-    const r = technologyNetlist(syn.files[`${syn.top}.json`], { groups: design.top.children.map(c => c.name) });
-    assert.equal(r.cells, syn.util.cells, name);
-    if (want) assert.deepEqual(r.groups, want);
-    else {
-      // pong: the instances of the design, and the top module's own logic by signal (more than 100 cells)
-      for (const g of ['display', 'dbL', 'dbR', 'db1', 'db2']) assert.ok(r.groups[g] > 50, `${g}: ${r.groups[g]}`);
-      assert.ok(Object.keys(r.groups).some(g => /_logic$/.test(g)), Object.keys(r.groups).join(' '));
-    }
-    const net = { path: 'build/open/tech.vhd', lang: 'vhdl', text: r.text, role: 'design' };
-    const srcs = [...primitiveSources([net]), net];
-    const lib = compile(srcs);
-    assert.deepEqual(lib.errors.filter(e => e.severity === 'error'), [], name);
-    const d = elaborate(lib, r.name);
-    assert.deepEqual(d.diags.filter(e => e.severity === 'error'), [], name);
-    const sources = Object.fromEntries(srcs.map(x => [x.path, x.text]));
-    const modules = modulesFromLibrary(lib, { sources });
-    const doc = await schematicFromHdl(d.top, { sources, modules, layout: g => elk.layout(g), lang: 'vhdl' });
+  const layout = g => elk.layout(g);
+  const ex = example(name);
+  const design = elaborate(compile([...primitiveSources(ex.design), ...ex.design]), ex.project.top);
+  const syn = await synthesizeOpen(design, { run: yosysNode });
+  const r = technologyNetlist(syn.files[`${syn.top}.json`], { groups: design.top.children.map(c => c.name) });
+  assert.equal(r.cells, syn.util.cells, name);
+  groups(r.groups);
+  const net = { path: 'build/open/tech.vhd', lang: 'vhdl', text: r.text, role: 'design' };
+  const srcs = [...primitiveSources([net]), net];
+  const lib = compile(srcs);
+  assert.deepEqual(lib.errors.filter(e => e.severity === 'error'), [], name);
+  const d = elaborate(lib, r.name);
+  assert.deepEqual(d.diags.filter(e => e.severity === 'error'), [], name);
+  const sources = Object.fromEntries(srcs.map(x => [x.path, x.text]));
+  const modules = modulesFromLibrary(lib, { sources });
+  if (lowerTop) {
+    const doc = await schematicFromHdl(d.top, { sources, modules, layout, lang: 'vhdl' });
     const mods = doc.symbols.map(s => s.params?.module);
     for (const t of ['ibuf', 'obuf', 'bufg']) assert.ok(mods.includes(t), `${name}: ${t} on the top level`);
     for (const g of Object.keys(r.groups)) assert.ok(mods.includes(g.toLowerCase()), `${name}: block ${g}`);
-    // inside an instance: LUTs (with their INIT), flip-flops, carry chains
-    const inst = d.top.children.find(c => c.name.toLowerCase() === (name === 'blinky' ? 'u_pre' : 'dbl'));
-    const sub = await schematicFromHdl(inst, { sources, modules, layout: g => elk.layout(g), lang: 'vhdl' });
-    const types = new Set(sub.symbols.map(s => s.params?.module));
-    for (const t of ['fdre', 'muxcy', 'xorcy']) assert.ok(types.has(t), `${name}/${inst.name}: ${t} (${[...types].join(' ')})`);
-    const lut = sub.symbols.find(s => /^lut[1-4]$/.test(s.params?.module));
-    assert.ok(lutFunction(lut.params.generics.init, +lut.params.module.slice(3)), JSON.stringify(lut.params));
-    // as View Technology Schematic draws it: the names as the netlist writes them, like ISE's (#131):
-    // the primitives (IBUF, LUT4), the instances (dbL), the cells (LUT4_119) and the nets (pressL, N566)
-    const shown = modulesFromLibrary(lib, { sources, asWritten: true });
-    const top2 = await schematicFromHdl(d.top, { sources, modules: shown, layout: g => elk.layout(g), lang: 'vhdl' });
-    const mods2 = new Set(top2.symbols.map(s => s.params?.module));
-    for (const t of ['IBUF', 'OBUF', 'BUFG', ...Object.keys(r.groups)]) assert.ok(mods2.has(t), `${name}: ${t} as written (${[...mods2].join(' ')})`);
-    assert.deepEqual(top2.ports.map(p => p.name), d.top.ports.map(p => p.name));   // (lower case in both examples)
-    const names = top2.symbols.map(s => s.name);
-    assert.ok(names.includes(name === 'blinky' ? 'u_pre' : 'dbL'), names.join(' '));
-    assert.ok(names.some(n => /^(IBUF|OBUF|BUFG)_|_(IBUF|OBUF)$/.test(n)), names.join(' '));
-    if (name === 'pong') assert.ok(top2.labels.some(l => l.net === 'pressL'), top2.labels.map(l => l.net).join(' '));
-    assert.ok(!top2.labels.some(l => /^n\d+$/.test(l.net)), 'no lower-case nNNN nets');
-    const sub2 = await schematicFromHdl(inst, { sources, modules: shown, layout: g => elk.layout(g), lang: 'vhdl' });
-    const lut2 = sub2.symbols.find(s => /^LUT[1-4]$/.test(s.params?.module));
-    assert.match(lut2.name, /^LUT[1-4]_\d+$/);
-    assert.ok(lutFunction(lut2.params.generics.INIT, +lut2.params.module.slice(3)), JSON.stringify(lut2.params));
   }
+  // inside an instance: LUTs (with their INIT), flip-flops, carry chains
+  const inst = d.top.children.find(c => c.name.toLowerCase() === instName.toLowerCase());
+  const sub = await schematicFromHdl(inst, { sources, modules, layout, lang: 'vhdl' });
+  const types = new Set(sub.symbols.map(s => s.params?.module));
+  for (const t of ['fdre', 'muxcy', 'xorcy']) assert.ok(types.has(t), `${name}/${inst.name}: ${t} (${[...types].join(' ')})`);
+  const lut = sub.symbols.find(s => /^lut[1-4]$/.test(s.params?.module));
+  assert.ok(lutFunction(lut.params.generics.init, +lut.params.module.slice(3)), JSON.stringify(lut.params));
+  // as View Technology Schematic draws it: the names as the netlist writes them, like ISE's (#131):
+  // the primitives (IBUF, LUT4), the instances (dbL), the cells (LUT4_119) and the nets (pressL, N566)
+  const shown = modulesFromLibrary(lib, { sources, asWritten: true });
+  const top2 = await schematicFromHdl(d.top, { sources, modules: shown, layout, lang: 'vhdl' });
+  const mods2 = new Set(top2.symbols.map(s => s.params?.module));
+  for (const t of ['IBUF', 'OBUF', 'BUFG', ...Object.keys(r.groups)]) assert.ok(mods2.has(t), `${name}: ${t} as written (${[...mods2].join(' ')})`);
+  assert.deepEqual(top2.ports.map(p => p.name), d.top.ports.map(p => p.name));   // (lower case in both examples)
+  const names = top2.symbols.map(s => s.name);
+  assert.ok(names.includes(instName), names.join(' '));
+  assert.ok(names.some(n => /^(IBUF|OBUF|BUFG)_|_(IBUF|OBUF)$/.test(n)), names.join(' '));
+  assert.ok(!top2.labels.some(l => /^n\d+$/.test(l.net)), 'no lower-case nNNN nets');
+  const sub2 = await schematicFromHdl(inst, { sources, modules: shown, layout, lang: 'vhdl' });
+  const lut2 = sub2.symbols.find(s => /^LUT[1-4]$/.test(s.params?.module));
+  assert.match(lut2.name, /^LUT[1-4]_\d+$/);
+  assert.ok(lutFunction(lut2.params.generics.INIT, +lut2.params.module.slice(3)), JSON.stringify(lut2.params));
+  return top2;
+}
+
+test('the example blinky, synthesized by Yosys: a technology netlist by instance that compiles and is drawn', { timeout: 300000 }, async () => {
+  // (blinky's BCD counter u_count drives the top's signal digits, and u_speed its step: their cells in them, #1003)
+  await technologyExample('blinky', { inst: 'u_pre', lowerTop: true, groups: g => assert.deepEqual(g, { u_pre: 67, u_speed: 212, u_knight: 52, u_count: 84, u_display: 61 }) });
+});
+
+test('the example pong, synthesized by Yosys: a technology netlist by instance that compiles and is drawn', { timeout: 300000 }, async () => {
+  const top2 = await technologyExample('pong', {
+    inst: 'dbL',
+    groups: g => {
+      // the instances of the design, and the top module's own logic by signal (more than 100 cells)
+      for (const k of ['display', 'dbL', 'dbR', 'db1', 'db2']) assert.ok(g[k] > 50, `${k}: ${g[k]}`);
+      assert.ok(Object.keys(g).some(k => /_logic$/.test(k)), Object.keys(g).join(' '));
+    },
+  });
+  assert.ok(top2.labels.some(l => l.net === 'pressL'), top2.labels.map(l => l.net).join(' '));
 });
 
 test('#1673 core/fpga/techview.js re-exports the module moved to core/techview.js', async () => {

@@ -502,3 +502,32 @@ test('a clock into the fabric (#957): every DCM output\'s and every top / bottom
     assert.deepEqual(missing, [], part);
   }
 });
+
+test('the JTAG user access (#3176): every BSCAN_SPARTAN3 pin reaches the fabric through known switches of the corner tile, and the site\'s USED bits, on the four devices', () => {
+  const OUTS = ['CAPTURE', 'DRCK1', 'DRCK2', 'RESET', 'SEL1', 'SEL2', 'SHIFT', 'TDI', 'UPDATE'];
+  for (const part of ['xc3s100ecp132-4', 'xc3s250ecp132-4', 'xc3s500efg320-4', 'xc3s1200efg320-4']) {
+    const dev = loadDeviceCache(part), db = loadDb(part, { graph: dev }), known = knownRouting(db);
+    const site = dev.sites('BSCAN')[0], k = site.tile, tile = site.tileName, tp = dev.templates[dev.tileTemplate[k]];
+    const pips = Array.from({ length: tp.from.length }, (_, i) => dev.pipWires(k, i)).filter(([a, b]) => known.allowPip(tile, a, b));
+    const from = w => pips.filter(([a]) => a === w).map(([, b]) => b);
+    // an output: its pin's wire, the corner's fan wire, then a known switch onto an output multiplexer or a line
+    for (const pin of OUTS) {
+      const fans = from(dev.sitePin(site.name, pin).wire);
+      assert.equal(fans.length, 1, `${part} ${pin}: its fan wire`);
+      assert.ok(from(fans[0]).some(w => /^(OMUX\d+|[NSEW][26]BEG\d)$/.test(w)), `${part} ${pin}: ${fans[0]} into the fabric`);
+    }
+    // an input: a known switch from a line into the data wire that drives the pin
+    for (const pin of ['TDO1', 'TDO2']) {
+      const w = dev.sitePin(site.name, pin).wire, data = pips.filter(([, b]) => b === w).map(([a]) => a);
+      assert.equal(data.length, 1, `${part} ${pin}: its data wire`);
+      assert.ok(pips.some(([a, b]) => b === data[0] && /^[NSEW][26](END|MID)\d$/.test(a)), `${part} ${pin}: ${data[0]} from the fabric`);
+    }
+    // the site used: its two bits, nothing unknown
+    const xdl = inst => parseXdl(`design "t" ${part} v3.2 , cfg "";\n${inst}`);
+    const empty = bitgen(xdl(''), db), used = bitgen(xdl(`inst "b" "BSCAN",placed ${tile} BSCAN ,\n  cfg " BSCAN_BLACKBOX:b: " ;\n`), db);
+    assert.deepEqual(used.unknown, [], part);
+    const base = tileBase(tileOf(tile, db), db);
+    assert.deepEqual(diffFrames(readBit(used.bytes).frames, readBit(empty.bytes).frames, db.format.frameWords).map(d => [d.frame - base.frame, d.bit - base.bit]),
+      [[19, 63], [20, 63]], part);
+  }
+});

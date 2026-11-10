@@ -11,7 +11,7 @@ import { axisArgs, axisTop } from './c-axis.js';
 import { dataflow } from './c-dataflow.js';
 import { portOf, renamedWhy } from './c-names.js';
 import { scheduled } from './c-schedule.js';
-import { vhdlSeq, verilogSeq, seqRoots } from './c-hdl-seq.js';
+import { vhdlSeq, verilogSeq, seqRoots, liveRegs } from './c-hdl-seq.js';
 import { aggregate, aggregable, structPragmas, wordGroups } from './c-aggregate.js';
 import { cProcesses } from './c-processes.js';
 import { regionLoops } from './c-dataflow-loops.js';
@@ -22,9 +22,12 @@ import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
 import { makeStencils } from './c-stencil.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
+import { balanceSums, balances } from './c-balance.js';
+import { reshapeGroups } from './c-reshape.js';
 import { axiPlan, axiWrap } from './c-axi.js';
-import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
+import { loadBlackboxes, applyBlackboxes, blackboxHdl, declaredBlackboxes } from './c-blackbox.js';
 import { latencyPragma, markFabric, mulLimit } from './c-op-pragmas.js';
+import { isUnit, shareUnits, unitSource } from './c-float-units.js';
 import { bindable } from './c-bind.js';
 import { hierarchy, inlineMode, latencyOf, moduleRegistry } from './c-submodule.js';
 import { fftTop } from './hls-fft-hdl.js';
@@ -43,8 +46,19 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 export function cToHdl(source, opts = {}) {
   const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true, directives = null, host = null } = opts;
   // (host: a loop of that top's DATAFLOW region made a process, core/c-dataflow-loops.js, #1706)
-  const checked = checkC(source, file, { headers, top: host ?? top, depths: host ? null : depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+  const check = (src, t = host ?? top) => checkC(src, file, { headers, top: t, depths: host ? null : depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+  let checked = check(source);
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
+  // (ALLOCATION of a floating-point operation: its unit a function of the source's, a sub-module, its operations its calls, #2273)
+  let units = shareUnits(checked);
+  const more = unitSource(units.used, checked.funcs);
+  if (more) {
+    source += more;
+    checked = check(source, host ?? checked.top);   // (the same top: the units are not)
+    if (!checked.ok) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
+    units = shareUnits(checked);
+  }
+  for (const w of units.warnings) checked.diagnostics.push({ file, line: w.loc.line, col: w.loc.col, message: w.message, severity: 'warning' });
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
   const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
   // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js;
@@ -64,11 +78,11 @@ export function cToHdl(source, opts = {}) {
 
 function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null, taken = null, host = null } = {}) {
   const diagnostics = [...checked.diagnostics];
-  // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
-  const bbs = loadBlackboxes(blackboxes, headers);
+  // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903; those this source declares,
+  // #3022)
+  const bbs = loadBlackboxes(declaredBlackboxes(blackboxes, checked.funcs), headers);
   diagnostics.push(...bbs.diagnostics);
   applyBlackboxes(checked, bbs.list, (d) => diagnostics.push(d));
-  if (checked.dataflow && bbs.list.length) diagnostics.push({ file, line: 1, col: 1, message: 'syn.blackbox: an RTL blackbox in a DATAFLOW region is not supported yet', severity: 'error' });
   if (diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
   foldTables(checked, diagnostics);
@@ -99,7 +113,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall, flat, taken });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall, flat, taken, blackboxes });
     if (!r.fallback) return r;
     if (hasStreams(checked.funcs.get(checked.top))) {
       const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };
@@ -124,16 +138,22 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const sargs = checked.ast.structArgs?.get(checked.top) || [];
   // (a stream or an array of structs one of its words, #1668; AGGREGATE / DISAGGREGATE: how, or not)
   const prag = flat ? { how: new Map(), named: [] } : structPragmas(fn);
-  const groups = flat ? [] : wordGroups(sargs, fn, prag.how);
+  // (an array argument's ARRAY_RESHAPE a memory of wide words, its elements their slices, #2424)
+  const groups = flat ? [] : [...wordGroups(sargs, fn, prag.how), ...reshapeGroups(fn)];
   // not combinational (a loop whose count depends on the inputs, a static or global variable): a sequential module,
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
   if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults }), seq: true };
-  // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
-  // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
-  else if (!flat && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && (!fitsClock(df.graph, clock, family) || lat?.min > 0 || (limit !== null && mulsIn(df.graph) > limit))) {
-    const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults });
-    if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
+  else {
+    // (its sums balanced first, as the scheduler balances them, unless EXPRESSION_BALANCE off: the path decided on is
+    // the one made, combinational or not, #3028)
+    if (balances(fn) && !df.diagnostics.some((d) => d.severity === 'error')) balanceSums(df.graph, [...df.outputs.values()]);
+    // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
+    // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
+    if ((!flat || isUnit(checked.top)) && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && (!fitsClock(df.graph, clock, family) || lat?.min > 0 || (limit !== null && mulsIn(df.graph) > limit))) {
+      const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults });
+      if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
+    }
   }
   // (LATENCY min=: the machine made again with the wait states it lacks; max=: said if a path takes more)
   if (lat && df.seq && !df.diagnostics.some((d) => d.severity === 'error')) {
@@ -207,13 +227,14 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const src = file.split('/').pop();
   // (each operation only as wide as its users read it, #2290)
   df.graph.narrow(df.seq ? seqRoots(df) : [...df.outputs.values()]);
+  if (df.seq) df.regs = liveRegs(df);
   const text = df.seq ? (lang === 'vhdl' ? vhdlSeq : verilogSeq)(name, src, ports, df, agg) : (lang === 'vhdl' ? vhdl : verilog)(name, src, ports, df, agg);
   // (a design: its sub-modules first)
   const hdl = modules ? text : [...subs.modules().map((m) => m.gen.hdl), text].join('\n');
   // the report (#1529): a sequential module's states, registers, memories and loops (each one's II and cycles)
   const report = df.seq
     ? { sequential: true, states: df.states.length + 2, registerBits: df.regs.reduce((a, r) => a + r.w, 0) + df.stateT.w,
-      memories: [...df.mems.map((x) => ({ name: x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
+      memories: [...df.mems.map((x) => ({ name: x.port ?? x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
       loops: df.loops, ...(df.fnPipe ? { pipeline: df.fnPipe } : {}), slowLoops: df.slowLoops || [], units: df.units || [], blocks: blocksOf(df), unitsNs: df.unitsNs || 0, ...hierarchyReport(df) }
     : { sequential: false };
   return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, ...(df.freeRun ? { freeRun: true } : {}), states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };

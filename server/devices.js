@@ -217,6 +217,8 @@ export const FAMILIES = [
   {
     id: 'artix7', name: 'Artix7', displayName: 'Artix-7', xiseFamily: 'Artix7', xiseVerified: false,
     datasheet: 'DS180 / DS181', webpack: true, webpackParts: 'XC7A100T, XC7A200T (smaller Artix-7 parts are Vivado-only)', bitgen: MODERN_BITGEN,
+    // (#1648, #3142) the Basys 3 and the Nexys A7, their constraints XDC: no flow runs it yet (Vivado #1649, the Silinx toolchain #3146)
+    experimental: true,
     speeds: { '-1': 'Standard', '-2': 'Mid', '-3': 'High performance' },
     note: 'Artix-7 has only High-Range (1.2V-3.3V) I/O banks. Low-power grades (-2L/-1L) exist but are not listed here (not verified in ISE 14.7).',
     ioStandards: ['LVTTL', 'LVCMOS33', 'LVCMOS25', 'LVCMOS18', 'LVCMOS15', 'LVCMOS12', 'PCI33_3', 'MOBILE_DDR', 'HSUL_12',
@@ -382,6 +384,9 @@ const NEW_PARTS = [
     packages: { ff484: pk(240, { gts: 8 }), ff784: pk(360, { gts: 12 }) }, speeds: ['-1', '-2', '-3', '-1L'] }),
 
   // ---- Artix-7 / Kintex-7 (DS180 Tables 4-7, 12). CMT = 1 MMCM + 1 PLL. HR/HP = bank types. ----
+  // (#3142) the Basys 3's: Vivado's only (no ISE 14.7), DS180 Tables 4 and 7
+  modern('artix7', 'xc7a35t', { cells: 33280, slices: 5200, distKb: 400, bramSize: 36, brams: 50, dsp: 90, dspType: 'DSP48E1', clock: { cmt: 5, mmcm: 5, pll: 5 }, maxIo: 250, pcie: 1, gtp: 4, xadc: 1,
+    packages: { cpg236: pk(106, { gts: 2 }), csg324: pk(210) }, speeds: ['-1', '-2', '-3'], webpack: false }),
   modern('artix7', 'xc7a100t', { cells: 101440, slices: 15850, distKb: 1188, bramSize: 36, brams: 135, dsp: 240, dspType: 'DSP48E1', clock: { cmt: 6, mmcm: 6, pll: 6 }, maxIo: 300, pcie: 1, gtp: 8, xadc: 1,
     packages: { csg324: pk(210), ftg256: pk(170), fgg484: pk(285, { gts: 4 }), fgg676: pk(300, { gts: 8 }) }, speeds: ['-1', '-2', '-3'] }),
   modern('artix7', 'xc7a200t', { cells: 215360, slices: 33650, distKb: 2888, bramSize: 36, brams: 365, dsp: 740, dspType: 'DSP48E1', clock: { cmt: 10, mmcm: 10, pll: 10 }, maxIo: 500, pcie: 1, gtp: 16, xadc: 1,
@@ -416,7 +421,7 @@ export const PACKAGES = {
   tqg144: '144-pin Thin Quad Flat Pack, Pb-free (TQFP)', ftg256: '256-ball Fine-Pitch Thin BGA, Pb-free',
   fgg400: '400-ball Fine-Pitch BGA, Pb-free', fgg484: '484-ball Fine-Pitch BGA, Pb-free', fgg676: '676-ball Fine-Pitch BGA, Pb-free',
   cs484: '484-ball Chip-Scale BGA (0.8 mm)', cpg196: '196-ball Chip-Scale BGA, 0.5 mm, Pb-free', csg225: '225-ball Chip-Scale BGA, 0.8 mm, Pb-free',
-  csg324: '324-ball Chip-Scale BGA, 0.8 mm, Pb-free', csg484: '484-ball Chip-Scale BGA, 0.8 mm, Pb-free',
+  cpg236: '236-ball Chip-Scale BGA, 0.5 mm, Pb-free', csg324: '324-ball Chip-Scale BGA, 0.8 mm, Pb-free', csg484: '484-ball Chip-Scale BGA, 0.8 mm, Pb-free',
   sf363: '363-ball Flip-Chip Fine-Pitch BGA', ff323: '323-ball Flip-Chip BGA', ff324: '324-ball Flip-Chip BGA', ff484: '484-ball Flip-Chip BGA',
   ff665: '665-ball Flip-Chip BGA', ff668: '668-ball Flip-Chip BGA', ff676: '676-ball Flip-Chip BGA', ff784: '784-ball Flip-Chip BGA',
   ff1136: '1136-ball Flip-Chip BGA', ff1153: '1153-ball Flip-Chip BGA',

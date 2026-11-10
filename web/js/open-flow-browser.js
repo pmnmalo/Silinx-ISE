@@ -1,4 +1,4 @@
-// The Silinx toolchain in the browser edition (the single-file Silinx-ISE.html, on GitHub Pages):
+// The Silinx toolchain in the browser edition (the single-file Silinx.html, on GitHub Pages):
 // Implement Design / Generate Programming File without any server or Xilinx tool. The flow is
 // packages/silinx-fpga/src/open-flow-core.js, run in a Web Worker (web/js/open-flow-worker.js); the device descriptions,
 // the bit database and Yosys (WebAssembly) are fetched from the site's assets/ folder (published
@@ -29,8 +29,8 @@ export const BROWSER_DEVICES = {
 // its version; a development build: dev-<commit>), Yosys's bundle relative to it (shared by the
 // versions with the same Yosys: ../vendor/yowasp-yosys/<its version>/gen/bundle.js), and the site the
 // page opened from a file fetches them from (the site keeps the older releases' folders, so that a
-// downloaded Silinx-ISE.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
-const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
+// downloaded Silinx.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
+const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
 // (and each asset's SHA-256, checked by the cache, web/js/asset-cache.js #1237: here, in the flow worker's messages
 // and in the Yosys workers' code)
 if (LAYOUT.integrity) globalThis.SILINX_ASSET_INTEGRITY ||= LAYOUT.integrity;
@@ -170,6 +170,8 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   if (missing.length) throw new Error(`the Silinx toolchain has no ${missing.join(', ')} for ${st.part} yet (only ${st.steps.join(', ')})`);
   const spec = { top, part: st.part, device: dev, pkg, family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), ...(resources && { resources }) };
   if (synthUpToDate && !spec.steps.includes('synth')) spec.synthUpToDate = synthUpToDate;
+  // (the logic analyzer's capture, inserted by the front end: core/flow-ide.js, #3176)
+  if (project.capture) spec.capture = project.capture;
   // the test benches, for the post-synthesis model's generics (#120)
   const simSources = (project.files || []).filter(f => f.role === 'sim' && (f.lang === 'verilog' || f.lang === 'vhdl') && typeof files[f.path] === 'string')
     .map(f => ({ path: f.path, lang: f.lang, text: files[f.path] }));
@@ -177,6 +179,11 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   const earlier = {};
   for (const [k, v] of Object.entries(files)) if (k.startsWith('build/') && typeof v === 'string') earlier[k.slice(6)] = v;
   if (signal?.aborted) throw cancelled();
+  return workerRun({ spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null }, { onLine, onWrite, onReport, signal });
+}
+
+// one run in the worker: its lines, files and report to the handlers; resolves its done ({ ok, report, error, view })
+function workerRun(message, { onLine, onWrite = () => {}, onReport = () => {}, signal = null }) {
   const w = getWorker(), id = ++runSeq;
   return new Promise((resolve, reject) => {
     const end = () => { runs.delete(id); signal?.removeEventListener('abort', abort); };
@@ -191,8 +198,18 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
       fail: e => { end(); reject(e); },
     });
     signal?.addEventListener('abort', abort, { once: true });
-    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, ...message });
   });
+}
+
+/**
+ * The flow on a spec made elsewhere (core/grade-synth.js synthesisSpec: a synthesis test's, #3216) and design sources,
+ * in the worker as Implement's runs: onLine(line); signal stops it (rejects with { cancelled: true }). Resolves
+ * { ok, report, error }.
+ */
+export function runBrowserSpec({ spec, sources, onLine, signal = null }) {
+  if (signal?.aborted) return Promise.reject(cancelled());
+  return workerRun({ spec, sources, simSources: [], ucf: null, ucfName: null, files: {}, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: null, integrity: LAYOUT.integrity || null }, { onLine, signal });
 }
 
 /**

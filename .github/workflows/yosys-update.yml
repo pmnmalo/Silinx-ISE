@@ -26,9 +26,11 @@ jobs:
   # whether the pull request changes @yowasp/yosys (the paths above are any change of package.json): its
   # version in the base's package.json / package-lock.json against the pull request's; labelled
   # "yosys update" (Dependabot's labels are per ecosystem: the label is set here; with a read-only token it
-  # is not, which changes nothing else). The steps that hold a writing token run the base's code, checked
-  # out under base/ (#1440): the pull request's own scripts run only where the token reads, and what they
-  # write (the versions) is checked by a step of this file before it reaches a command.
+  # is not, which changes nothing else). The steps that hold a writing token run the base's code (#1440): the
+  # pull request's own scripts run only where the token reads, and what they write (the versions) is checked
+  # by a step of this file before it reaches a command. Here the base is at the workspace's root and the pull
+  # request under head/, read as data (#3038): a bare import of the base's script resolves upward from the
+  # root, never into the pull request's tree, which may hold a node_modules of its own.
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -43,15 +45,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base
+          path: head
           persist-credentials: false
+      # no node_modules the base's script could import from (none installed: the base's checkout is its code alone)
+      - run: test ! -e node_modules
       # the base's script reads both sides' package.json / package-lock.json
       - id: v
-        run: node base/scripts/yosys-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json
+        run: node scripts/yosys-update-report.mjs versions package.json package-lock.json head/package.json head/package-lock.json
       - if: steps.v.outputs.changed == 'true'
         continue-on-error: true
         run: gh pr edit "$PR_NUMBER" --add-label "yosys update"
@@ -89,12 +93,15 @@ jobs:
         if: matrix.side == 'base'
         env:
           BASE_VERSION: ${{ needs.check.outputs.base }}
-        run: |
-          npm install --no-save --ignore-scripts "@yowasp/yosys@$BASE_VERSION"
-          # not npm ls: the installed version is "invalid" against the pull request's package.json (exit 1)
-          v=$(node -p "require('./node_modules/@yowasp/yosys/package.json').version")
-          echo "@yowasp/yosys $v"
-          test "$v" = "$BASE_VERSION"
+        # into the toolchain's workspace and the root both (#3156): installed at the root only, npm kept the pull
+        # request's Yosys nested in packages/silinx-fpga/node_modules, which the toolchain resolves first
+        run: npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root "@yowasp/yosys@$BASE_VERSION"
+      # the version the toolchain loads (from packages/silinx-fpga and from the root), the side's or the job fails; not
+      # npm ls: the base's version is "invalid" against the pull request's package.json (exit 1)
+      - name: Yosys resolved
+        env:
+          BASE_SPEC: ${{ matrix.side == 'base' && format('@yowasp/yosys@{0}', needs.check.outputs.base) || '@yowasp/yosys' }}
+        run: node scripts/resolved-package.mjs packages/silinx-fpga "$BASE_SPEC"
       - name: The examples
         run: |
           mkdir -p "out/examples"

@@ -1,4 +1,4 @@
-// The MCP server (#134): `silinx-ise mcp` spoken to over stdin / stdout as an MCP client does
+// The MCP server (#134): `silinx mcp` spoken to over stdin / stdout as an MCP client does
 // (JSON-RPC 2.0, one message a line): the handshake, the tools and their schemas, each tool on the
 // examples with the exact results (Check Syntax's errors and warnings, a simulation, the power process
 // and its report), the protocol's errors, the paths kept inside their project (symbolic links too) and
@@ -16,9 +16,9 @@ import { VERSION } from '../core/version.js';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 let tmp, ws, srv;
 
-// a client of `silinx-ise mcp`: send(msg) -> its answer (by id); call(tool, args) -> the result
-function startMcp(env) {
-  const p = spawn(process.execPath, [path.join(ROOT, 'bin/silinx-ise.js'), 'mcp'], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+// a client of `silinx mcp`: send(msg) -> its answer (by id); call(tool, args) -> the result
+function startMcp(env, bin = 'bin/silinx.js') {
+  const p = spawn(process.execPath, [path.join(ROOT, bin), 'mcp'], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
   const waiting = new Map(), lines = [];
   let buf = '', stderr = '', id = 0;
   p.stdout.on('data', d => {
@@ -48,10 +48,23 @@ before(async () => {
 });
 after(async () => { await srv?.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
 
+// #2624: the command's old name, bin/silinx-ise.js (the MCP configurations written before the rename), still serves:
+// its warning on stderr only, every line of stdout a JSON-RPC message
+test("#2624 bin/silinx-ise.js mcp: the same server, the old name's warning on stderr, stdout only JSON-RPC", async () => {
+  const old = startMcp({ SILINX_WORKSPACE: ws, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') }, 'bin/silinx-ise.js');
+  try {
+    const init = await old.send('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
+    assert.deepEqual(init.result.serverInfo, { name: 'silinx', title: 'Silinx', version: VERSION });
+    assert.ok((await old.send('tools/list')).result.tools.some((t) => t.name === 'list_projects'));
+    assert.equal(old.lines.length, 2);   // (each one parsed as JSON by startMcp)
+  } finally { await old.close(); }
+  assert.equal(old.stderr(), 'silinx-ise is now called silinx: run node bin/silinx.js (bin/silinx-ise.js will be removed in a later release)\n');
+});
+
 test('the handshake: the protocol version, the server, its tools with their schemas; ping', async () => {
   const init = await srv.send('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
   assert.equal(init.result.protocolVersion, '2025-06-18');
-  assert.deepEqual(init.result.serverInfo, { name: 'silinx-ise', title: 'Silinx ISE', version: VERSION });
+  assert.deepEqual(init.result.serverInfo, { name: 'silinx', title: 'Silinx', version: VERSION });
   assert.deepEqual(init.result.capabilities, { tools: { listChanged: false } });
   assert.match(init.result.instructions, /The Silinx toolchain needs no Xilinx ISE\./);
   // an older client's version is answered with it; an unknown one with the newest
@@ -60,10 +73,10 @@ test('the handshake: the protocol version, the server, its tools with their sche
   srv.p.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n');   // (a notification: no answer)
   const { tools } = (await srv.send('tools/list')).result;
   assert.deepEqual(tools.map(t => t.name), ['list_examples', 'list_projects', 'new_project_from_example', 'new_project', 'set_top', 'project_info', 'read_file', 'write_file',
-    'list_devices', 'set_design_properties', 'set_process_properties', 'set_source_properties', 'new_source', 'clock_manager', 'block_memory', 'constraints_wizard', 'test_bench_wizard', 'convert_module', 'convert_drawing', 'related_view', 'check_drawing', 'simulate_drawing', 'unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project',
-    'export_project', 'import_project', 'project_link', 'open_link', 'check_syntax', 'simulate', 'save_wave_config', 'load_wave_config', 'c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated', 'run_process', 'get_report']);
+    'list_devices', 'set_design_properties', 'set_process_properties', 'set_source_properties', 'new_source', 'clock_manager', 'block_memory', 'constraints_wizard', 'test_bench_wizard', 'convert_module', 'convert_drawing', 'related_view', 'set_output_logic', 'check_drawing', 'rearrange_wires', 'rearrange_schematic', 'simulate_drawing', 'unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project',
+    'export_project', 'import_project', 'project_link', 'open_link', 'git_clone', 'git_init', 'git_status', 'git_commit', 'git_push', 'git_pull', 'git_log', 'git_diff', 'share_project', 'follow_project', 'check_syntax', 'simulate', 'verify', 'save_wave_config', 'load_wave_config', 'c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated', 'run_process', 'get_report', 'capture_settings', 'capture', 'timing_paths', 'lab', 'grade']);
   // (a tool that deletes or replaces what is in the workspace says so: the client asks before it runs)
-  assert.deepEqual(tools.filter(t => t.annotations.destructiveHint).map(t => t.name), ['set_top', 'write_file', 'set_design_properties', 'set_source_properties', 'clock_manager', 'block_memory', 'convert_module', 'delete_file', 'delete_project']);
+  assert.deepEqual(tools.filter(t => t.annotations.destructiveHint).map(t => t.name), ['set_top', 'write_file', 'set_design_properties', 'set_source_properties', 'clock_manager', 'block_memory', 'convert_module', 'delete_file', 'delete_project', 'git_pull', 'grade']);
   for (const t of tools) {
     assert.equal(t.inputSchema.type, 'object', t.name);
     assert.ok(t.description.length > 40 && t.title, t.name);
@@ -88,7 +101,7 @@ test('the examples, a new project from one (for another board too), the projects
   assert.deepEqual(ex.structuredContent.examples.find(e => e.name === 'blinky'), { name: 'blinky', top: 'top', simTop: 'tb_top', board: 'basys2', device: 'xc3s250ecp132-4', files: 7 });
   assert.equal((await srv.call('list_projects')).content[0].text, 'No project in the workspace (new_project_from_example makes one).');
   const made = await srv.call('new_project_from_example', { name: 'Blinky', example: 'blinky' });
-  assert.equal(made.content[0].text, 'Project \'Blinky\' made from the example blinky: top top, basys2 (xc3s250ecp132-4).');
+  assert.equal(made.content[0].text, 'Project \'Blinky\' made from the example blinky: top top, basys2 (xc3s250ecp132-4). It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   assert.ok(fs.existsSync(path.join(ws, 'Blinky', 'silinx.json')));
   // for the Nexys2-500: its device and its pins
   const nx = await srv.call('new_project_from_example', { name: 'TrafficN', example: 'traffic', board: 'nexys2', variant: '500' });
@@ -228,7 +241,7 @@ test('run_process and get_report: the power estimate of blinky with the Silinx t
   assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'timing' })).structuredContent.path, 'build/open/timing.txt');
   assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'pins' })).content[0].text, 'No pins report for \'Blinky\' from its last run (Silinx toolchain: build/top_pins.ucf): run_process pins first.');
   assert.equal((await srv.call('get_report', { project: 'TrafficN', report: 'map' })).content[0].text, 'No map report for \'TrafficN\': no process has run yet (run_process implement).');
-  assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'netlist' })).content[0].text, 'get_report: report: summary or one of power, timing, synthesis, map, par, pins');
+  assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'netlist' })).content[0].text, 'get_report: report: summary or one of power, timing, synthesis, map, par, pins, drc');
   assert.equal((await srv.call('run_process', { project: 'Nope', process: 'implement' })).content[0].text, 'run_process: no project \'Nope\' in the workspace');
   assert.equal((await srv.call('run_process', { project: 'Blinky', process: 'erase' })).content[0].text, 'run_process: process: one of synthesize, implement, bitstream, timing, power, pins, post_synthesis_model, post_translate_model, post_map_model, post_par_model');
   // a report that names the ISE machine (as an ISE run's log would): its address replaced
@@ -241,13 +254,13 @@ test('run_process and get_report: the power estimate of blinky with the Silinx t
 
 test('new_project and set_top: an empty project for a board, its source written, its top and test bench chosen, its constraints from the board\'s pins; implemented (#460)', { timeout: 120000 }, async () => {
   const made = await srv.call('new_project', { name: 'Counter4', board: 'basys2', variant: '100' });
-  assert.equal(made.content[0].text, 'Empty project \'Counter4\' made: basys2 (xc3s100ecp132-4). Write its sources with write_file, then set_top.');
+  assert.equal(made.content[0].text, 'Empty project \'Counter4\' made: basys2 (xc3s100ecp132-4). Write its sources with write_file, then set_top. It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   assert.deepEqual(made.structuredContent.device, { family: 'spartan3e', part: 'xc3s100e', package: 'cp132', speed: '-4' });
   assert.equal((await srv.call('new_project', { name: 'Counter4' })).content[0].text, 'new_project: project \'Counter4\' already exists');
   assert.equal((await srv.call('new_project', { name: 'X', board: 'zedboard' })).content[0].text, 'new_project: unknown board \'zedboard\' (basys2, nexys2)');
   assert.equal((await srv.call('new_project', { name: 'X', board: 'nexys2', variant: '250' })).content[0].text, 'new_project: the Digilent Nexys2 has no variant \'250\'');
   const bare = await srv.call('new_project', { name: 'Bare' });
-  assert.equal(bare.content[0].text, 'Empty project \'Bare\' made: no board (xc3s250ecp132-4). Write its sources with write_file, then set_top.');
+  assert.equal(bare.content[0].text, 'Empty project \'Bare\' made: no board (xc3s250ecp132-4). Write its sources with write_file, then set_top. It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   await srv.call('write_file', { project: 'Counter4', path: 'src/counter.vhd', text: 'library ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;\nentity counter is\n  port (clk, btn : in std_logic; led : out std_logic_vector(3 downto 0));\nend counter;\narchitecture rtl of counter is\n  signal c : unsigned(3 downto 0) := (others => \'0\');\nbegin\n  process (clk) begin\n    if rising_edge(clk) then\n      if btn = \'1\' then c <= (others => \'0\'); else c <= c + 1; end if;\n    end if;\n  end process;\n  led <= std_logic_vector(c);\nend rtl;\n' });
   await srv.call('write_file', { project: 'Counter4', path: 'sim/tb_counter.vhd', text: 'library ieee;\nuse ieee.std_logic_1164.all;\nentity tb_counter is end;\narchitecture t of tb_counter is\n  signal clk, btn : std_logic := \'0\';\n  signal led : std_logic_vector(3 downto 0);\nbegin\n  uut: entity work.counter port map (clk, btn, led);\n  clk <= not clk after 10 ns;\n  process begin wait for 105 ns; assert led = "0101" report "led wrong" severity error; report "done"; wait; end process;\nend;\n' });
   // refused: nothing to set, a module that is not there, a test bench as the top, constraints without a board

@@ -6,6 +6,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { pickSourceType, waitNewSourcePage } from './new-source-helpers.js';
+import { MSUM_C, MSUM_V, MDESC, EXT, INC_C, INC_V, IDESC, CHAIN } from '../hls-blackbox-ports-lib.mjs';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -104,5 +105,157 @@ uiTest('#1903 Silinx HLS: an RTL blackbox of the project (syn.blackbox): its Ver
   assert.deepEqual(await page.eval(() => window.SilinxApp.S.viewSources.map((s) => [s.path, s.errors])), [['src/top.cpp', 0]]);
   assert.deepEqual(await page.eval(() => window.SilinxApp.S.modules.map((m) => m.name).filter((n) => /adder/.test(n))), ['adder_rtl']);
   assert.doesNotMatch(await page.eval(() => document.querySelector('#hier')?.textContent || ''), /adder_model|'adder' is the top function/);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// (#2339) a blackbox's memory port: the top's array the module's ap_memory during the call; (#2989) C Simulation and
+// C/RTL Co-simulation of the project's C, its top the C source's (not the C model's function, the last one defined)
+uiTest('#2339 Silinx HLS: an RTL blackbox with a memory port: the top\'s memory joined to the module; C Simulation and C/RTL Co-simulation of the top, PASS; no warnings', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxMem', top: '', files: { 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxMem');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the module top' });
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('top').ports.map((p) => p.name)), ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a_address0', 'a_ce0', 'a_we0', 'a_d0', 'a_q0', 's', 's_ap_vld']);
+  assert.match(await page.eval(() => window.SilinxApp.S.viewSources.find((s) => s.path === 'src/top.cpp').text), /ap_bb0 : msum port map \([^)]*m_address0 => ap_bb0_m_address0, m_ce0 => ap_bb0_m_ce0, m_we0 => ap_bb0_m_we0, m_d0 => ap_bb0_m_d0, m_q0 => ap_bb0_m_q0\)/);
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.viewSources.map((s) => [s.path, s.errors])), [['src/top.cpp', 0]]);
+  await page.treeRow('#hier', 'top');
+  await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C Simulation" completed successfully/);
+  assert.match(await page.consoleText(), /main\(\) returned 0; 2 call\(s\) of 'top'\./);
+  await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C\/RTL Co-simulation" (completed successfully|failed)/, { timeout: 60000 });
+  assert.match(await page.consoleText(), /C simulation: 2 call\(s\) of 'top' replayed on its VHDL\.[\s\S]*C\/RTL co-simulation PASS: 2 call\(s\), the same results/);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// (#2340) a blackbox in a DATAFLOW region: a process of its own, its module inside; the report says it
+uiTest('#2340 Silinx HLS: an RTL blackbox in a DATAFLOW region: two processes of its module, the report\'s processes; C Simulation and C/RTL Co-simulation PASS; no warnings', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxDf', top: '', files: { 'src/top.cpp': CHAIN, 'src/inc.json': JSON.stringify(IDESC(), null, 2), 'src/inc.v': INC_V, 'src/inc.cpp': INC_C } });
+  await page.openProject('CBlackboxDf');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the module top' });
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.viewSources.map((s) => [s.path, s.errors])), [['src/top.cpp', 0]]);
+  await page.treeRow('#hier', 'top');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
+  assert.match(await page.consoleText(), /\n {2}inc_bb_U0 {8}inc: the RTL blackbox inc, ended by its ap_done\n {2}inc_bb_U1 {8}inc: the RTL blackbox inc, ended by its ap_done\n/);
+  await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C Simulation" completed successfully/);
+  assert.match(await page.consoleText(), /main\(\) returned 0; 5 call\(s\) of 'top'\./);
+  await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C\/RTL Co-simulation" (completed successfully|failed)/, { timeout: 60000 });
+  assert.match(await page.consoleText(), /C\/RTL co-simulation PASS: 5 call\(s\), the same results/);
+});
+
+// (#2342) a blackbox's files edited while the project is open: its RTL module, its description, its C model, each
+// saved in its editor, seen at once (the C's HDL made again, its C simulation with the new model)
+uiTest('#2342 Silinx HLS: an RTL blackbox\'s module, description and C model edited and saved while the project is open: the C\'s HDL and its C simulation see them', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxEdit', top: '', files: { 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxEdit');
+  await page.showMessages();
+  await page.leftTab('design');
+  const top = () => page.eval(() => window.SilinxApp.S.viewSources.find((s) => s.path === 'src/top.cpp'));
+  await page.waitFor(() => window.SilinxApp.S.viewSources.some((s) => s.path === 'src/top.cpp' && s.errors === 0), [], { what: 'the C\'s module' });
+  const edit = async (path, from, to) => {
+    await page.eval((f) => window.SilinxApp.openFile(f), path);
+    await page.waitFor((f) => window.Silinx.active?.id === `file:${f}` && window.Silinx.active.editor, [path]);
+    await page.eval(([a, b]) => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().split(a).join(b)); }, [from, to]);
+    await page.eval(() => window.SilinxApp.saveAll());
+  };
+  // the module's port renamed: the description's no longer there, the C's module not made (#2995: said, its row marked)
+  await edit('src/msum.v', 'm_q0', 'm_qq');
+  await page.waitFor(() => !window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module gone' });
+  // the description corrected: the module again, joined to the new port
+  await edit('src/msum.json', '"RAM_data_read_in": "m_q0"', '"RAM_data_read_in": "m_qq"');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module again' });
+  assert.match((await top()).text, /m_qq => ap_bb0_m_q0/);
+  // the C model changed: the C simulation runs the new one (main() sees each word written back two more)
+  await edit('src/msum.cpp', 'm[i] = m[i] + 1', 'm[i] = m[i] + 2');
+  await page.treeRow('#hier', 'top');
+  await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C Simulation" (completed successfully|failed)/);
+  assert.match(await page.consoleText(), /main\(\) returned 2; 1 call\(s\) of 'top'\./);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// (#2995) a blackbox refused (its module's port renamed): the C's Design row kept, marked [No HDL], its error in the
+// Console once, the top kept; Check Syntax of the C checks the description too (its error and the new input's warning);
+// the module corrected, the row the C's module's again. Portuguese: the badge's tip.
+uiTest('#2995 Silinx HLS: an RTL blackbox refused: the C\'s Design row marked, its error in the Console, the top kept; Check Syntax of the C checks the description; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxNo', top: 'top', files: { 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxNo');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module' });
+  assert.deepEqual(await row(page, 'top'), { badges: ['C++*', 'ASM', 'VHDL'], meta: '(top.cpp)' });
+  const save = async (path, text) => {
+    await page.eval((f) => window.SilinxApp.openFile(f), path);
+    await page.waitFor((f) => window.Silinx.active?.id === `file:${f}` && window.Silinx.active.editor, [path]);
+    await page.eval((t) => window.Silinx.active.editor.setValue(t), text);
+    await page.eval(() => window.SilinxApp.saveAll());
+  };
+  const NO_PORT = `"src/msum.json" Line 1: syn.blackbox: msum.json: the argument 'm': the module 'msum' has no port 'm_q0'`;
+  const SAID = `The HDL of src/top.cpp cannot be made (its module top is not in the design):\nERROR:SilinxC - ${NO_PORT}`;
+  const said = async () => (await page.consoleText()).split(SAID).length - 1;
+  await save('src/msum.v', MSUM_V.split('m_q0').join('m_qq'));
+  await page.waitFor(() => !window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module not made' });
+  await page.leftTab('design');
+  assert.deepEqual(await row(page, 'top'), { badges: ['C++*', 'No HDL'], meta: '(top.cpp)' });
+  assert.equal(await page.eval(() => [...document.querySelectorAll('#hier .row')].find((x) => x.querySelector('.lbl')?.textContent.trim() === 'top').querySelectorAll('.badge')[1].title), 'Its HDL cannot be made: its errors are in the Console');
+  assert.equal(await said(), 1);
+  assert.equal(await page.eval(() => window.SilinxApp.S.project.top), 'top');
+  // (saved again, the same error: said once)
+  await save('src/msum.v', `${MSUM_V.split('m_q0').join('m_qq')}\n`);
+  assert.equal(await said(), 1);
+  // Check Syntax of the C: the description's error and the module's new input's warning
+  await page.eval(async () => (await import('/js/processes.js')).checkFileSyntax('src/top.cpp'));
+  await page.waitConsole(/Process "Check Syntax" (completed successfully|failed)/);
+  const text = await page.consoleText();
+  assert.ok(text.includes(`Top function: top\nERROR:SilinxC - ${NO_PORT}\nWARNING:SilinxC - "src/msum.json" Line 1: syn.blackbox: msum.json: the input 'm_qq' of 'msum' is not in the description: left unconnected\n\nProcess "Check Syntax" failed (1 error(s), 1 warning(s))`), text.slice(-800));
+  // Check Syntax of the design (the top, the C's module): the same error, not a missing top
+  await page.eval(async () => (await import('/js/processes.js')).checkSyntax('top'));
+  await page.waitConsole(/Started : "Check Syntax"\.[\s\S]*Process "Check Syntax" (completed successfully|failed)/);
+  assert.match(await page.consoleText(), new RegExp(`Started : "Check Syntax"\\.\\n\\n(?:[^\\n]*file "[^"]*" into library work\\n)*ERROR:SilinxC - ${NO_PORT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\nProcess "Check Syntax" failed \\(1 error\\(s\\), 0 warning\\(s\\)\\)$`));
+  // in Portuguese: the badge's tip
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.leftTab('design');
+  assert.equal(await page.eval(() => [...document.querySelectorAll('#hier .row')].find((x) => x.querySelector('.lbl')?.textContent.trim() === 'top').querySelectorAll('.badge')[1].title), 'O seu HDL não pode ser gerado: os seus erros estão na Consola');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  // the module corrected: the C's module again
+  await save('src/msum.v', MSUM_V);
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the C\'s module again' });
+  await page.leftTab('design');
+  assert.deepEqual(await row(page, 'top'), { badges: ['C++*', 'ASM', 'VHDL'], meta: '(top.cpp)' });
+  assert.equal(await said(), 1);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// (#3022) a project with an RTL blackbox and a C source that does not declare its function: that source's module made (its
+// Design row the C's, not [No HDL]); Check Syntax says once that no C source declares the description's function (its C
+// model not one), a warning in the description; a C source that calls it added: no warning
+uiTest('#3022 Silinx HLS: a C source that calls no RTL blackbox made in a project with one; Check Syntax\'s warning for a description no C source declares', E, async (page) => {
+  await makeProject(env, { name: 'CBlackboxOther', top: 'f', files: { 'src/other.c': 'int f(int a) { return a + 1; }\n', 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxOther');
+  await page.showMessages();
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'f'), [], { what: 'the C\'s module' });
+  assert.deepEqual(await row(page, 'f'), { badges: ['C*', 'VHDL'], meta: '(other.c)' });
+  const W = `WARNING:SilinxC - "src/msum.json" Line 1: syn.blackbox: msum.json: the function 'msum' is not declared in the C sources: not used`;
+  const check = async () => {
+    const at = (await page.consoleText()).length;
+    await page.eval(async () => (await import('/js/processes.js')).checkSyntax('f'));
+    await page.waitConsole(/Started : "Check Syntax"\.[\s\S]*Process "Check Syntax" (completed successfully|failed)[^\n]*$/);
+    return (await page.consoleText()).slice(at);
+  };
+  assert.match(await check(), new RegExp(`\\n${W.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n[\\s\\S]*\\nProcess "Check Syntax" completed successfully with 1 warning\\(s\\)$`));
+  // (a C source that calls it: no warning)
+  await makeProject(env, { name: 'CBlackboxBoth', top: 'f', files: { 'src/other.c': 'int f(int a) { return a + 1; }\n', 'src/top.cpp': EXT, 'src/msum.json': JSON.stringify(MDESC(), null, 2), 'src/msum.v': MSUM_V, 'src/msum.cpp': MSUM_C } });
+  await page.openProject('CBlackboxBoth');
+  await page.leftTab('design');
+  await page.waitFor(() => ['f', 'top'].every((n) => window.SilinxApp.S.modules.some((m) => m.name === n)), [], { what: 'both modules' });
+  const both = await check();
+  assert.ok(!both.includes('WARNING') && /\nProcess "Check Syntax" completed successfully$/.test(both), both.slice(-600));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });

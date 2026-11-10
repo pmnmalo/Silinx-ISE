@@ -10,7 +10,8 @@ import { cToHdl } from '../core/c-hdl.js';
 import { cAsm } from '../core/c-asm.js';
 import { cosimulate } from '../core/c-cosim.js';
 
-const chain = (n) => `int f(int a, int b) {\n  int s = a;\n${'  s = s + b;\n'.repeat(n)}  return s;\n}\n`;
+// (its sums as the C writes them, one addition after the other, #2613)
+const chain = (n) => `int f(int a, int b) {\n#pragma HLS EXPRESSION_BALANCE off\n  int s = a;\n${'  s = s + b;\n'.repeat(n)}  return s;\n}\n`;
 const tb = (n) => `${chain(n)}int main() {\n  int e = 0;\n  for (int i = 0; i < 6; i++) if (f(i, 3 * i - 7) != i + ${n} * (3 * i - 7)) e++;\n  return e;\n}\n`;
 const machine = (src, clock, family) => scheduled(checkC(src, 't.c', { top: 'f', synthesis: true }), {}, { clock, family });
 
@@ -74,7 +75,7 @@ test('#2080 the state\'s register wide enough for the states added (from 1 state
 });
 
 test('#2080 a pipelined loop\'s state is not split: its II stays; a family\'s delays change the schedule', () => {
-  const piped = 'int f(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n#pragma HLS PIPELINE II=1\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n';
+  const piped = 'int f(int x) {\n#pragma HLS EXPRESSION_BALANCE off\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n#pragma HLS PIPELINE II=1\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n';
   const m = machine(piped, 10);
   assert.deepEqual(m.loops.map((l) => [l.pipeline, l.ii]), [[1, 1]]);
   assert.equal(m.subStates.size, 0);
@@ -85,11 +86,13 @@ test('#2080 a pipelined loop\'s state is not split: its II stays; a family\'s de
 
 // a static memory read, a long computation of its value, written back; a memory argument read and written in a loop
 const MEM = `int acc(int i, int a, int b) {
+#pragma HLS EXPRESSION_BALANCE off
   static int t[100];
   t[i] = t[i] * a + a * b + b + a + b + a;
   return t[i] + t[(i + 1) % 100] * b;
 }
 int ext(int x[64], int y[64], int k) {
+#pragma HLS EXPRESSION_BALANCE off
   int s = 0;
   for (int j = 0; j < 50; j++) {
 #pragma HLS PIPELINE off
@@ -145,6 +148,7 @@ test('#2080 the ASM chart: a state split its chain, the register transfers in it
 // a stream's value computed by a long path, written; a stream read, its value used after
 const STREAM = `#include "hls_stream.h"
 void f(hls::stream<int> &xs, hls::stream<int> &ys, int k) {
+#pragma HLS EXPRESSION_BALANCE off
   for (int i = 0; i < 4; i++) {
 #pragma HLS PIPELINE off
     int v = xs.read();
@@ -162,7 +166,7 @@ int main() {
 `;
 
 test('#2080 a state that writes a stream split: the handshake in the chain\'s last state, the value computed by then, waiting there and not computing again', () => {
-  for (const [clock, cycles] of [[5, 62], [10, 41], [20, 33]]) {
+  for (const [clock, cycles] of [[5, 53], [10, 33], [20, 27]]) {   // (the read and the loop's step in one state, #2967)
     for (const lang of ['vhdl', 'verilog']) {
       const c = cosimulate(STREAM, { file: 't.cpp', top: 'f', lang, clock });
       assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, cycles, []], `${clock} ns, ${lang}`);
@@ -185,12 +189,53 @@ test('#2080 a state that writes a stream split: the handshake in the chain\'s la
   assert.ok(writers.length >= 2);
 });
 
+const READ = `#include "hls_stream.h"
+void f(hls::stream<int> &xs, hls::stream<int> &ys, int k) {
+#pragma HLS EXPRESSION_BALANCE off
+  for (int i = 0; i < 4; i++) {
+#pragma HLS PIPELINE off
+    int v = xs.read();
+    int w = v * k + k * k + v + k + v + k + v;
+    ys.write(w);
+  }
+}
+int main() {
+  hls::stream<int> xs, ys;
+  for (int i = 0; i < 4; i++) xs.write(i * 3 - 2);
+  f(xs, ys, 7);
+  int r = 0;
+  for (int i = 0; i < 4; i++) { int v = i * 3 - 2; if (ys.read() != v * 7 + 49 + v + 7 + v + 7 + v) r = 1; }
+  return r;
+}
+`;
+
+test('#2967 a stream\'s read in the state of what computes with its value; split by the clock: the wait in the chain\'s first state, the handshake in its last', () => {
+  for (const [clock, cycles] of [[5, 53], [10, 33], [20, 27]]) {   // (was 62, 41, 33: a state for the read, another for its value)
+    for (const lang of ['vhdl', 'verilog']) {
+      const c = cosimulate(READ, { file: 't.cpp', top: 'f', lang, clock });
+      assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, cycles, []], `${clock} ns, ${lang}`);
+    }
+  }
+  const m = scheduled(checkC(READ, 't.cpp', { top: 'f', synthesis: true }), {}, { clock: 5 });
+  const g = m.graph;
+  const reader = m.states.find((st) => st.chain && st.fifo.has('xs'));
+  assert.ok(reader, 'the read in a state that computes');
+  const [first, rest] = [...m.subStates].find(([, ids]) => ids.at(-1) === reader.id) ?? [];
+  assert.ok(rest?.length, 'its state split');
+  const chain = [first, ...rest].map((id) => m.states.find((st) => st.id === id));
+  // (while the FIFO is empty: the first state again; the others go on, the value read there until the last takes it)
+  const head = g.get(chain[0].next);
+  assert.deepEqual([head.op, g.k(head.args[1]), g.k(head.args[2])], ['mux', BigInt(first), BigInt(chain[1].id)]);
+  assert.ok(chain.slice(1, -1).every((st) => g.isConst(st.next) && g.isConst(st.stall) && !g.k(st.stall)));
+  assert.ok(chain.slice(0, -1).every((st) => !st.fifo.size));
+});
+
 test('#2080 a pipelined loop that does not fit the clock: its II kept, its path in the report, no warning; one that fits, none', () => {
-  const src = (prag) => `int f(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n`;
+  const src = (prag) => `int f(int x) {\n#pragma HLS EXPRESSION_BALANCE off\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n`;
   const slow = cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 10 });
   assert.deepEqual(slow.diagnostics, []);
   assert.deepEqual(slow.report.loops.map((l) => [l.pipeline, l.ii]), [[1, 1]]);
-  assert.deepEqual(slow.report.slowLoops.map((l) => [l.line, Math.round(l.ns * 10) / 10]), [[3, 15.6]]);
+  assert.deepEqual(slow.report.slowLoops.map((l) => [l.line, Math.round(l.ns * 10) / 10]), [[4, 15.6]]);
   assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 40 }).report.slowLoops, []);
   assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE off'), { file: 't.c', clock: 10 }).report.slowLoops, []);
 });

@@ -56,18 +56,45 @@ test('new_source: the drawings, empty, in VHDL and in Verilog; their Check Synta
   for (const [lang, ext] of [['vhdl', 'v'], ['verilog', 'g']]) {
     for (const [type, label, fileExt] of [['schematic', 'Schematic', 'sch.json'], ['fsm', 'Finite State Machine (FSM)', 'fsm.json'], ['asm', 'Algorithmic State Machine (ASM)', 'asm.json'], ['petri', 'Petri Net', 'pn.json'], ['boolean', 'Boolean Algebra', 'bool.json']]) {
       const r = await ok('new_source', { project: 'p', type, name: `${type}_${ext}`, language: lang });
-      assert.equal(r.text, `Created ${label} 'src/${type}_${ext}.${fileExt}'.`);
+      // its HDL file, as the interface gives it (#3184): not an empty state diagram's or ASM chart's (no module yet)
+      const hdl = ['fsm', 'asm'].includes(type) ? null : `src/${type}_${ext}.${lang === 'vhdl' ? 'vhd' : 'v'}`;
+      assert.equal(r.text, [`Created ${label} 'src/${type}_${ext}.${fileExt}'.`, ...(hdl ? [`${hdl} generated from src/${type}_${ext}.${fileExt}`] : [])].join('\n'));
+      const d = JSON.parse(read(`src/${type}_${ext}.${fileExt}`));
       // (its language, written into the drawing: its HDL is made in it)
-      assert.equal(JSON.parse(read(`src/${type}_${ext}.${fileExt}`)).lang, lang);
+      assert.equal(d.lang, lang);
+      assert.equal(d.generatedFile, hdl ?? undefined);
+      assert.deepEqual([r.data.hdl, r.data.role], hdl ? [hdl, 'design'] : [undefined, null]);
+      if (hdl) assert.match(read(hdl), lang === 'vhdl' ? new RegExp(`^entity ${type}_${ext} is`, 'm') : new RegExp(`^module ${type}_${ext}\\b`, 'm'));
     }
     assert.equal(await checks(`schematic_${ext}`), `Process "Check Syntax" of <schematic_${ext}> completed successfully (0 signals, 0 processes).`);
     assert.equal(await checks(`petri_${ext}`), `Process "Check Syntax" of <petri_${ext}> completed successfully (2 signals, 1 processes).`);
     const line = lang === 'vhdl' ? 13 : 9;
-    assert.equal(await checks(`boolean_${ext}`), ['a', 'b', 'c'].map(i => `WARNING:Silinx:647 - "src/boolean_${ext}.bool.json" Line ${line}: Input <${i}> is never used.`).join('\n')
+    assert.equal(await checks(`boolean_${ext}`), ['a', 'b', 'c'].map(i => `WARNING:Silinx:647 - "src/boolean_${ext}.${lang === 'vhdl' ? 'vhd' : 'v'}" Line ${line}: Input <${i}> is never used.`).join('\n')
       + `\nProcess "Check Syntax" of <boolean_${ext}> completed successfully with 3 warning(s) (4 signals, 1 processes).`);
     // an empty state diagram or ASM chart: no module until it has a state
     for (const d of [`fsm_${ext}`, `asm_${ext}`]) assert.equal(await checks(d), `ERROR:HDLCompiler - "" Line 1: top module '${d}' not found\nProcess "Check Syntax" of <${d}> failed (1 error(s), 0 warning(s)).`);
   }
+});
+
+test('write_file: a drawing with no HDL file gets it, then follows its drawing (#3184)', async () => {
+  const table = (f, extra = {}) => JSON.stringify({ version: 1, name: 'maj', inputs: ['a', 'b', 'c'], outputs: ['f'], table: { f }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl', ...extra }, null, 2);
+  const w = await ok('write_file', { project: 'p', path: 'src/maj.bool.json', text: table('00010111') });
+  assert.equal(w.text, `Created src/maj.bool.json (${table('00010111').length} characters).\nsrc/maj.vhd generated from src/maj.bool.json`);
+  assert.deepEqual(w.data.hdl, { file: 'src/maj.vhd', written: true, removed: null, stale: null });
+  assert.equal(JSON.parse(read('src/maj.bool.json')).generatedFile, 'src/maj.vhd');
+  assert.match(read('src/maj.vhd'), /f <= \(b and c\) or \(a and c\) or \(a and b\);/);
+  assert.equal((await ok('project_info', { project: 'p' })).data.files.find(f => f.path === 'src/maj.vhd')?.role, 'design');
+  assert.equal(await checks('maj'), 'Process "Check Syntax" of <maj> completed successfully (4 signals, 1 processes).');
+  // written again: its HDL file follows it
+  const again = table('01111111', { generatedFile: 'src/maj.vhd' });
+  assert.deepEqual((await ok('write_file', { project: 'p', path: 'src/maj.bool.json', text: again })).data.hdl, { file: 'src/maj.vhd', written: true, removed: null, stale: null });
+  assert.match(read('src/maj.vhd'), /f <= c or b or a;/);
+  // a drawing whose HDL file name is taken by another file: none (#230, resolved from its menu)
+  await ok('write_file', { project: 'p', path: 'src/taken_tt.vhd', text: '-- not the table\'s\n' });
+  const o = await ok('write_file', { project: 'p', path: 'src/taken_tt.bool.json', text: table('00000001').replace('"maj"', '"taken_tt"') });
+  assert.equal(o.data.hdl, undefined);
+  assert.equal(JSON.parse(read('src/taken_tt.bool.json')).generatedFile, undefined);
+  assert.equal(read('src/taken_tt.vhd'), '-- not the table\'s\n');
 });
 
 test('new_source: a package, a constraints file (the project\'s, having none), a .mem, a C and a C++ function', async () => {
@@ -89,6 +116,8 @@ test('new_source: a package, a constraints file (the project\'s, having none), a
   await ok('new_project', { name: 'ice' });
   await ok('set_design_properties', { project: 'ice', board: 'none', part: 'ice40hx1k', package: 'vq100' });
   assert.equal((await ok('new_source', { project: 'ice', type: 'constraints', name: 'pins' })).text, 'Created Implementation Constraints File \'constraints/pins.pcf\'.');
+  // (its text New Source's PCF template, not the UCF's: #3142)
+  assert.match(fs.readFileSync(path.join(P.projectDir('ice'), 'constraints/pins.pcf'), 'utf8'), /^# Physical constraints for ice\n# Target: ice40hx1k-vq100\n/);
 });
 
 test('new_source: the wizard\'s refusals; an existing file not replaced', async () => {
@@ -107,7 +136,7 @@ test('new_source: the wizard\'s refusals; an existing file not replaced', async 
   await fails({ type: 'test_bench', name: 'tb_x', module: 'nosuch' }, 'no module \'nosuch\' in the project\'s HDL files');
   await fails({ type: 'test_bench', name: 'tb_y' }, 'module: the module the test bench tests (the project has no top)');
   await fails({ type: 'package', name: 'pk', language: 'verilog' }, 'a package is VHDL\'s');
-  await fails({ type: 'netlist', name: 'n' }, 'type: one of module, test_bench, package, constraints, mem, c, cpp, schematic, fsm, asm, petri, boolean');
+  await fails({ type: 'netlist', name: 'n' }, 'type: one of module, test_bench, package, constraints, mem, c, cpp, schematic, fsm, asm, petri, boolean, lab');
   // a drawing's HDL file taken
   await ok('write_file', { project: 'p', path: 'src/spare.vhd', text: '-- a file\n' });
   await fails({ type: 'asm', name: 'spare' }, 'src/spare.vhd already exists: the HDL generated from the new source would be written there. Choose another name.');

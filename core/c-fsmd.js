@@ -18,6 +18,7 @@ import { hdlName } from './c-graph.js';
 import { BOOL, typeOf } from './c-types.js';
 import { memMethods, MEM_MIN } from './c-mem.js';
 import { partitionMethods } from './c-partition.js';
+import { reshapeMethods } from './c-reshape.js';
 import { fifoMethods, fifoSuffix } from './c-fifo.js';
 import { wordMethods } from './c-agg-mem.js';
 import { loopPragma, tripcountArgs, unrollBy } from './c-pragma.js';
@@ -29,6 +30,7 @@ import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from '.
 import { outFirstMethods } from './c-out-first.js';
 import { pipelineSchedMethods } from './c-pipe-sched.js';
 import { mergeLoops } from './c-loop-merge.js';
+import { balances } from './c-balance.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
 // (split: core/c-schedule.js's, the states split by the clock; spare: the states it adds, room for them in the state's
@@ -253,6 +255,8 @@ class SeqFlow extends Flow {
     const { top, funcs, ast } = this.c;
     const fn = funcs.get(top);
     this.fn = fn;
+    // (#pragma HLS EXPRESSION_BALANCE off: its sums as the C writes them, #2613)
+    this.balance = balances(fn);
     this.ctrl = 'ap_ctrl_hs';
     this.modes = new Map();
     this.globals = new Map();
@@ -282,7 +286,7 @@ class SeqFlow extends Flow {
       this.ptrFifoAccesses(inl);   // (a pointer with ap_fifo or ap_hs: a stream's accesses, #1901)
       const { body, decls } = this.renameLocals(inl);
       this.insts = new Map();
-      this.memArgs = this.subArrays(body);
+      this.memArgs = new Set([...this.subArrays(body), ...this.bbArrays(body)]);   // (a blackbox's memory port too, #2339)
       this.makeRegisters(inl, decls);
       this.fnDeps = this.markDependences(body);
       markAutoPipeline(body.items, { threshold: this.pipelineLoops, trip: (l) => this.tripOf(l), why: (l) => this.pipeWhy(l), autoWhy: (l) => this.pipeWhy(l) || (innerLoops(l.body).some((x) => this.hasMem(x)) ? 'a loop that accesses a memory is in it' : null), never: (l) => hasSub(l.body) });
@@ -358,7 +362,9 @@ class SeqFlow extends Flow {
       this.slots.set(pa.name, { kind: 'var', t: et, reg: r, name: pa.name });
     }
     // the locals (statics: their initial value at the reset), the globals written
-    for (const v of decls) this.slots.set(v.name, v.type.kind === 'array' && this.partOf(v) ? this.bankSlot(v, this.partOf(v), { used }) : this.regSlot(v));
+    // (ARRAY_RESHAPE of a memory: one of wide words, core/c-reshape.js, #2424)
+    const isMem = (v) => this.arrayLength(v) > MEM_MIN || !!this.storage?.has(v.orig ?? v.name);
+    for (const v of decls) this.slots.set(v.name, (v.type.kind === 'array' && this.reshapeSlot(v, isMem(v))) || (v.type.kind === 'array' && this.partOf(v) ? this.bankSlot(v, this.partOf(v), { used }) : this.regSlot(v)));
     for (const [name, gv] of this.globals) {
       const plan = gv.type.kind === 'array' ? this.partOf(gv) : null;
       if (plan) this.slots.set(name, this.bankSlot({ ...gv, static: !gv.const }, plan, { used }));
@@ -421,11 +427,13 @@ class SeqFlow extends Flow {
     return { kind: 'var', t: et, reg: this.reg(v.name, et, reset), name: v.name, static: !!v.static };
   }
   arrayLength(v) { return Number(v.type.length ?? (v.init?.kind === 'init' ? v.init.items.length : 0)); }
-  /** A goto-only block with no statement is skipped (its predecessors go where it goes). */
+  /** A goto-only block with no statement is skipped (its predecessors go where it goes), and so is one that ends the
+   *  function after a goto (its predecessor ends it, #2967: no state of nothing before ap_done). */
   thread() {
     const target = (b) => { const seen = new Set(); while (b && !b.stmts.length && b.term?.goto && !seen.has(b)) { seen.add(b); b = b.term.goto; } return b; };
     for (const b of this.blocks) {
       if (b.term?.goto) b.term.goto = target(b.term.goto);
+      if (b.term?.goto && !b.term.goto.stmts.length && b.term.goto.term?.done && !b.term.goto.loop && !b.pipe) b.term = { done: true };
       if (b.term?.cond) { b.term.t = target(b.term.t); b.term.f = target(b.term.f); }
       if (b.loop) b.loop = { exit: target(b.loop.exit), cont: target(b.loop.cont) };
     }
@@ -611,14 +619,14 @@ class SeqFlow extends Flow {
           updates.set(k, r.t === BOOL && k.endsWith('_vld_reg') ? this.and(this.not(stall), v) : this.mux(stall, this.regNode(r), v, r.t));
         }
       }
-      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall, ...(b.gate ? { gate: true } : {}), ...(this.callNow ? { call: this.callNow } : {}) });
+      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall, ...(b.gate ? { gate: true } : {}), ...(b.chain ? { chain: true } : {}), ...(this.callNow ? { call: this.callNow } : {}) });
     }
     // (a pointer written before it is read, on every path: no input, #2241)
     this.outFirstDone();
     // (the states split by the clock, #2080: before the memories' ports, which the states drive)
     if (this.split) {
       const piped = new Set([...(this.loopReport || []).filter((l) => l.pipeline).flatMap((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), ...this.reached.filter((b) => b.pipe).map((b) => b.num)]);
-      const r = this.split({ graph: this.g, states: this.states, stateT: this.stateT, done: this.doneNum, piped });
+      const r = this.split({ graph: this.g, states: this.states, stateT: this.stateT, done: this.doneNum, piped, balance: this.balance });
       if (r.overflow) this.statesAdded = r.overflow;
       else {
         this.states = r.states;
@@ -683,7 +691,7 @@ class SeqFlow extends Flow {
         continue;
       }
       const banks = this.slots?.get(pa.name)?.banks;
-      if (banks) { for (const b of banks) this.memIface(b, this.mems.find((x) => x.name === b), ports, outputs); continue; }
+      if (banks) { for (const b of this.mems ? banks : []) this.memIface(b, this.mems.find((x) => x.name === b), ports, outputs); continue; }   // (none made: an error before, #2339)
       const mem = this.mems?.find((x) => x.ext && x.name === pa.name);
       if (mem) { this.memIface(pa.name, mem, ports, outputs); continue; }
       if (!o) {
@@ -717,4 +725,4 @@ class SeqFlow extends Flow {
     };
   }
 }
-Object.assign(SeqFlow.prototype, memMethods, partitionMethods, fifoMethods, wordMethods, pipelineMethods, pipelineSchedMethods, blackboxMethods, outFirstMethods, subMethods);
+Object.assign(SeqFlow.prototype, memMethods, partitionMethods, reshapeMethods, fifoMethods, wordMethods, pipelineMethods, pipelineSchedMethods, blackboxMethods, outFirstMethods, subMethods);

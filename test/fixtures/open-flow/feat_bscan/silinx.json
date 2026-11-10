@@ -1,0 +1,29 @@
+{
+  "name": "feat_bscan",
+  "description": "Board test: a counter on the LEDs, the logic analyzer's capture core of it on BSCAN_SPARTAN3's USER1 (#3176)",
+  "version": 1,
+  "device": {
+    "family": "spartan3e",
+    "part": "xc3s250e",
+    "package": "cp132",
+    "speed": "-4"
+  },
+  "board": "basys2",
+  "top": "top",
+  "files": [
+    {
+      "path": "top.v",
+      "lang": "verilog",
+      "role": "design"
+    },
+    {
+      "path": "silinx_capture.v",
+      "lang": "verilog",
+      "role": "design"
+    }
+  ],
+  "constraints": "../basys2.ucf",
+  "impl": {
+    "startupClk": "JtagClk"
+  }
+}

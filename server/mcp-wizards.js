@@ -5,7 +5,7 @@
 // editing it reopens the wizard; the UCF Wizard's constraints file, a module's ports on the board's pins
 // (web/js/ucf-wizard.js). The wizards' checks and their messages.
 import * as P from './projects.js';
-import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
+import { toolError, readProject, STR, PROJECT, projectText } from './mcp-util.js';
 
 const mhzText = x => `${(+x).toFixed(3).replace(/\.?0+$/, '')} MHz`;
 
@@ -148,8 +148,7 @@ export const WIZARD_TOOLS = [
       // the initial contents (the wizard's contentsOf)
       let c = { words: [], errors: [] };
       if (spec.init) {
-        let text;
-        try { text = await P.readFile(name, spec.init); } catch { throw toolError(`${spec.init} cannot be read.`); }
+        const text = await projectText(name, spec.init, `${spec.init} cannot be read.`);
         c = readInitFile(text, spec.init, +spec.width, +spec.depth);
       }
       if (c.errors.length) throw toolError(c.errors.join('\n'));
@@ -171,8 +170,9 @@ export const WIZARD_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ project: name, module, name: file, location, pins = {} }) {
       const pj = await readProject(name);
-      const { openOnlyDevice, generateUcf, bitName, boardAutoAssign } = await import('../packages/silinx-fpga/src/parts.js');
-      if (openOnlyDevice(pj.device)) throw toolError(`the ${String(pj.device.part).toUpperCase()}'s constraints are a PCF: new_source constraints writes one`);
+      const { constraintsFormatOf, generateUcf, bitName, boardAutoAssign } = await import('../packages/silinx-fpga/src/parts.js');
+      const format = constraintsFormatOf(pj.device);
+      if (format !== 'ucf') throw toolError(`the ${String(pj.device.part).toUpperCase()}'s constraints are a${format === 'xdc' ? 'n' : ''} ${format.toUpperCase()}: new_source constraints writes one`);
       const { compile, elaborate } = await import('../core/compile.js');
       const { primitiveSources } = await import('../core/unisim.js');
       const { viewSourcesOf } = await import('./mcp-util.js');

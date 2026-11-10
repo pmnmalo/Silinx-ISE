@@ -154,8 +154,11 @@ test('docs: the Silinx toolchain\'s name and default mode are the code\'s', () =
   for (const f of DOCS) assert.doesNotMatch(read(f), /Open toolchain \(experimental/, f);
   // a production toolchain (#675): neither the docs nor the interface's labels call it experimental (the bit
   // database's experiments are another word)
+  // (#3142: the 7-series is an experimental family, its boards and its family so marked; that is the device's, not the
+  // toolchain's: its words left out)
+  const family = t => t.replace(/\bexperimentalDevice\b|\bexperimental family\b|\bexperimental: true\b|' \(experimental\)'|\.experimental\b|experimental mark|an experimental one/g, '');
   for (const f of [...DOCS, ...fs.readdirSync(path.join(ROOT, 'web/js')).filter(x => x.endsWith('.js')).map(x => `web/js/${x}`), 'server/toolchain.js', 'server/open-flow.js']) {
-    assert.doesNotMatch(read(f), /\bexperimental\b/i, f);
+    assert.doesNotMatch(family(read(f)), /\bexperimental\b/i, f);
   }
   const readme = read('README.md');
   assert.ok(readme.includes(`*${MODE_LABEL}*`), 'README names the mode by its label');
@@ -201,9 +204,9 @@ test('docs: the boards the Silinx toolchain supports are the ones the code suppo
   // the Spartan-6 boards (#732), both languages
   assert.match(read('docs/GETTING-STARTED.md'), /\*\*The Spartan-6 boards, the Nexys3 and the\s+Atlys, too\*\*, in the browser and with Silinx running locally;/);
   assert.match(read('docs/COMECAR.md'), /\*\*As placas Spartan-6, a Nexys3 e a Atlys,\s+também\*\*, no browser e com o Silinx a correr localmente;/);
-  // the Spartan-6 boards (#732: no developer flag), in the browser edition too (#2103), which is said so
+  // the Spartan-6 boards (#732: no developer flag), in the browser edition too (#2103, nextpnr the one engine since #2824), which is said so
   assert.deepEqual(SUPPORTED.filter(b => ['nexys3', 'atlys'].includes(b.board)).map(b => b.name), ['Nexys3', 'Atlys']);
-  assert.match(section, /the \*\*Nexys3 and the Atlys\*\* [^.]*and in the browser edition with the Silinx engine \(#2103\)/);
+  assert.match(section, /the \*\*Nexys3 and the Atlys\*\* [^.]*and in the browser edition \(#2103\)/);
 });
 
 test('docs test: the interface\'s labels are read past comments with quotes in them (#127)', () => {

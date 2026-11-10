@@ -23,7 +23,10 @@ export {
   openTt, openTtSchematic, syncHdlFromTt, ttContextMenu
 };
 import { openPetriFsm } from './petri-fsm-doc.js';
+import { following, followNotice } from './collab-state.js';
 export { openPetriFsm };
+// a project followed (#3181): its drawings read only, the follower's notice at the end of their toolbar
+const followOnly = () => (following() ? { readOnly: true, banner: followNotice() } : {});
 
 // ---- ASM
 export async function openAsm(path) {
@@ -43,11 +46,12 @@ export async function openAsm(path) {
       // (its problems in the console's Errors and Warnings, a click selecting the box, #2730)
       const problems = editorProblems({ file: path, tool: 'ASM', goto: (x) => { activateDoc(d); if (x.nodeId) ed.focusNode(x.nodeId); } });
       const ed = mountAsmEditor(host, {
-        model,
+        model, ...followOnly(),
         onChange: () => setDirty(d, true),
         onProblems: (diags) => problems.set(diags),
         onValidate: (diags) => problems.log(diags),
         onMessage: (text) => log(`${path.split('/').pop()}: ${t(text)}`, 'info'),
+        onVerify: (m) => import('./verify-props.js').then(v => v.propertyProcess(m)),
       });
       d.asmEditor = ed;
       return {
@@ -154,12 +158,13 @@ export async function openFsm(path) {
       const setProblems = (diags) => { last = diags; problems.set(inLanguage(diags)); };
       const offLang = onLanguageChange(() => setProblems(last));
       const ed = mountFsmEditor(host, {
-        model,
+        model, ...followOnly(),
         onChange: () => setDirty(d, true),
         linkInfo: () => { const f = S.schOwners?.[path]; return f ? { file: f, why: S.outOfSync?.[f] } : null; },
         onOpenFile: f => openFile(f),
         onTruthTables: () => fsmTruthTables(path),
         onToAsm: () => fsmToAsmChart(path),
+        onVerify: (m) => import('./verify-props.js').then(v => v.propertyProcess(m)),
         onMessage: msg => log(`WARNING: ${path}: ${msg} (not applied)`, 'warn'),
         onProblems: setProblems,
         onCheck: (diags) => problems.log(inLanguage(diags)),   // (Check: in the Console too, #2803)
@@ -331,6 +336,7 @@ export async function openPetri(path) {
         onProblems: (diags) => problems.set(diags),
         onCheck: (diags) => problems.log(diags),   // (Check: in the Console too, #2803)
         onMessage: (text, err) => log(err ? `WARNING: ${path.split('/').pop()}: ${text}` : `${path.split('/').pop()}: ${text}`, err ? 'warn' : 'info'),
+        ...followOnly(),
       });
       d.petriEditor = ed;
       return {
@@ -409,13 +415,14 @@ export async function openSch(path) {
       el.append(host);
       const save = async m => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 1)); setDirty(d, false); };
       const ed = mountSchEditor(host, {
-        doc, modules, device: projectPart(),
+        doc, modules, device: projectPart(), ...followOnly(),
         simSources: () => S.sources,   // live simulation: bodies of the module symbols
         onChange: () => setDirty(d, true),
         // (its drawing when it has one, as its Design row's double-click, else its HDL, #2046)
         onOpenModule: name => openModuleSource(name),
       });
       d.schEditor = ed;
+      if (following()) ed.setBanner(followNotice());
       return {
         save: async () => {
           const m = ed.getDoc();

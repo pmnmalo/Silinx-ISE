@@ -20,6 +20,7 @@ import { renameDialog } from './rename.js';
 import { openWizardModule, wizardLabelOf } from './wizard-modules.js';
 import { cBadge, cBadges, cSequential, isC } from './c-source.js';
 import { translationBadge } from './translation.js';
+import { gitMark, gitMenuItems, hasGit } from './git.js';
 
 const $ = id => document.getElementById(id);
 // the Tasks interface (#799): one tree, no views: the design (as the Implementation view shows it); the test
@@ -42,7 +43,7 @@ export function renderHierarchy() {
   const one = oneTree(), sim = S.view === 'sim' && !one;
   const tree = h('ul', { class: 'tree', tabindex: '0', 'aria-label': 'Design hierarchy', onkeydown: treeKeys });
   const dev = `${pj.device.part}${pj.device.speed}-${pj.device.package}`;
-  const root = treeItem({ label: pj.name, ico: 'project', open: true, onSelect: () => select({ type: 'project' }), key: 'project', onContext: e => projectContextMenu(e) });
+  const root = treeItem({ label: pj.name, ico: 'project', open: true, mark: gitMark(S.git ? S.git.files.map(f => f.path) : []), onSelect: () => select({ type: 'project' }), key: 'project', onContext: e => projectContextMenu(e) });
   tree.append(root.li);
   const devItem = treeItem({ label: !sim ? dev : 'Behavioral', ico: !sim ? 'chip' : 'sim', open: true, key: 'device', onSelect: () => select({ type: 'device' }), onContext: e => projectContextMenu(e) });
   root.ul.append(devItem.li);
@@ -83,7 +84,7 @@ export function renderHierarchy() {
     ].filter(Boolean);
     const it = treeItem({
       label, meta: info ? `(${(sch || file).split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : sch ? viewIcon(sch) : cSrc ? 'file' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
-      cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2, badges, module: modName,
+      cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2, badges, module: modName, mark: info ? gitMark([sch, file]) : null,
       onSelect: () => select(drawn ? { type: viewKind(drawn), file: drawn, module: modName, path, instName } : { type: 'module', module: modName, file, path, instName, sch, wizard: wz }),
       onOpen: () => info && (sch ? openView(sch) : wz ? openWizardModule(file) : openFile(file, info.line)),
       onContext: rowMenu,
@@ -106,29 +107,40 @@ export function renderHierarchy() {
   }
   for (const f of (S.fileTree || []).filter(f => /\.sch\.json$/.test(f) && !S.schOwners?.[f] && !S.modules.some(m => m.file === f))) {
     const owned = null;
-    const it = treeItem({ label: f.split('/').pop(), meta: owned ? `(→ ${owned.split('/').pop()})` : '', ico: 'schematic', key: `sch:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'sch', file: f }), onOpen: () => openSch(f), onContext: e => schContextMenu(e, f) });
+    const it = treeItem({ label: f.split('/').pop(), meta: owned ? `(→ ${owned.split('/').pop()})` : '', ico: 'schematic', key: `sch:${f}`, badges: [clashBadge(f)].filter(Boolean), mark: gitMark([f]), onSelect: () => select({ type: 'sch', file: f }), onOpen: () => openSch(f), onContext: e => schContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
   for (const f of (S.fileTree || []).filter(f => /\.asm\.json$/.test(f) && !S.schOwners?.[f] && !S.modules.some(m => m.file === f))) {
-    const it = treeItem({ label: f.split('/').pop(), ico: 'asm', key: `asm:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'asm', file: f }), onOpen: () => openAsm(f), onContext: e => asmContextMenu(e, f) });
+    const it = treeItem({ label: f.split('/').pop(), ico: 'asm', key: `asm:${f}`, badges: [clashBadge(f)].filter(Boolean), mark: gitMark([f]), onSelect: () => select({ type: 'asm', file: f }), onOpen: () => openAsm(f), onContext: e => asmContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
   for (const f of (S.fileTree || []).filter(f => /\.(tt|bool)\.json$/.test(f) && !S.schOwners?.[f] && !S.modules.some(m => m.file === f))) {
-    const it = treeItem({ label: f.split('/').pop(), ico: 'algebra', key: `tt:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'tt', file: f }), onOpen: () => openTt(f), onContext: e => ttContextMenu(e, f) });
+    const it = treeItem({ label: f.split('/').pop(), ico: 'algebra', key: `tt:${f}`, badges: [clashBadge(f)].filter(Boolean), mark: gitMark([f]), onSelect: () => select({ type: 'tt', file: f }), onOpen: () => openTt(f), onContext: e => ttContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
   for (const f of (S.fileTree || []).filter(f => /\.fsm\.json$/.test(f) && !S.schOwners?.[f] && !S.modules.some(m => m.file === f))) {
-    const it = treeItem({ label: f.split('/').pop(), ico: 'fsm', key: `fsm:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'fsm', file: f }), onOpen: () => openFsm(f), onContext: e => fsmContextMenu(e, f) });
+    const it = treeItem({ label: f.split('/').pop(), ico: 'fsm', key: `fsm:${f}`, badges: [clashBadge(f)].filter(Boolean), mark: gitMark([f]), onSelect: () => select({ type: 'fsm', file: f }), onOpen: () => openFsm(f), onContext: e => fsmContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
   for (const f of (S.fileTree || []).filter(f => /\.pn\.json$/.test(f) && !S.schOwners?.[f] && !S.modules.some(m => m.file === f))) {
-    const it = treeItem({ label: f.split('/').pop(), ico: 'petri', key: `pn:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'pn', file: f }), onOpen: () => openPetri(f), onContext: e => petriContextMenu(e, f) });
+    const it = treeItem({ label: f.split('/').pop(), ico: 'petri', key: `pn:${f}`, badges: [clashBadge(f)].filter(Boolean), mark: gitMark([f]), onSelect: () => select({ type: 'pn', file: f }), onOpen: () => openPetri(f), onContext: e => petriContextMenu(e, f) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
+  // a C source whose HDL cannot be made (#2995: a C error, a blackbox refused): its row, marked, its errors in the Console;
+  // [No HDL] opens the first one's file
+  for (const [f, c] of Object.entries(S.cFailed || {})) {
+    if (S.modules.some(m => m.file === f)) continue;
+    const at = c.diagnostics[0], menu = e => fileContextMenu(e, f);
+    const it = treeItem({ label: c.module || f.split('/').pop(), meta: `(${f.split('/').pop()})`, ico: 'err', cls: c.module && isTopName(c.module) ? 'top-mod' : '', key: `c:${f}`, mark: gitMark([f]),
+      badges: [{ text: cBadge(f), base: true, title: 'Open', open: () => openFile(f), context: menu },
+        { text: 'No HDL', warn: true, title: 'Its HDL cannot be made: its errors are in the Console', open: () => openFile(at?.file || f, at?.line), context: menu }],
+      onSelect: () => select({ type: 'file', file: f }), onOpen: () => openFile(f), onContext: menu });
     it.setLeaf(); devItem.ul.append(it.li);
   }
   // files that failed to parse into any unit
   const withUnits = new Set(lib.parsed.filter(p => p.units.length).map(p => p.file));
   for (const f of S.project.files.filter(f => !withUnits.has(f.path) && (one || inView(f.role, sim)))) {
-    const it = treeItem({ label: f.path.split('/').pop(), meta: '(no units)', ico: f.lang === 'vhdl' ? 'vhdl' : 'verilog', key: `f:${f.path}`, onSelect: () => select({ type: 'file', file: f.path }), onOpen: () => openFile(f.path), onContext: e => fileContextMenu(e, f.path) });
+    const it = treeItem({ label: f.path.split('/').pop(), meta: '(no units)', ico: f.lang === 'vhdl' ? 'vhdl' : 'verilog', key: `f:${f.path}`, mark: gitMark([f.path]), onSelect: () => select({ type: 'file', file: f.path }), onOpen: () => openFile(f.path), onContext: e => fileContextMenu(e, f.path) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
   // a module defined again in another file (#1303): the library uses the last one ("module … redefined", a warning); the
@@ -196,7 +208,8 @@ function viewOfModule(name, file) {
 
 // badges: the views of a module ({ text, base, title, open, context }), after its name: a click opens
 // that view, a right-click shows its commands; the base's is marked. Tab reaches the selected row's badges.
-export function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext, cls = '', key, badges = [], module = null }) {
+// mark: git's (#3195, web/js/git.js gitMark): M changed, N new, C in conflict since the last commit, at the row's end
+export function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext, cls = '', key, badges = [], module = null, mark = null }) {
   const li = h('li');
   // what the user collapsed / expanded is remembered across redraws
   if (key && S.treeOpen.has(key)) open = S.treeOpen.get(key);
@@ -211,7 +224,8 @@ export function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onC
   // (the badges next to the name, the file in brackets last: in a narrow pane it gives way first)
   // (a module's row: its module's name, which a link's top= selects, #2871)
   const row = h('div', { class: `row ${cls}`, 'data-key': key, ...(module ? { 'data-module': module } : {}) }, tw, icon(ico), h('span', { class: 'lbl' }, label),
-    views.length ? h('span', { class: 'badges' }, views) : null, meta ? h('span', { class: 'meta' }, meta) : null);
+    views.length ? h('span', { class: 'badges' }, views) : null, meta ? h('span', { class: 'meta' }, meta) : null,
+    mark ? h('span', { class: `git-mark git-${mark.state}`, title: mark.title }, mark.text) : null);
   const ul = h('ul');
   if (!open) ul.hidden = true;
   li.append(row, ul);
@@ -313,6 +327,9 @@ function moduleContextMenu(e, mod, file) {
     { label: 'Rename…', action: () => renameDialog(file, mod) },
     { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
+    // (its equivalence with a reference module, #3177: the Silinx interface's way to it, the ISE style's Processes too)
+    { label: 'Verify Equivalence…', action: () => import('./verify.js').then(m => m.verifyProcess(mod)) },
+    { label: 'Verify Assertions…', action: () => import('./verify.js').then(m => m.assertProcess(mod)) },
     // (the Tasks interface: its test benches on the Test page, New; not here)
     document.documentElement.dataset.layout === 'tasks' ? null : { label: 'Create Test Bench (Wizard)…', action: () => testBench(mod) },
     // a plain HDL module can be drawn (the drawing then its base); a drawing's module has the drawing's commands
@@ -348,7 +365,7 @@ export function fileContextMenu(e, file) {
     { label: 'Open', action: () => openFile(file) },
     { label: 'Rename…', action: () => renameDialog(file) },
     /\.(vhdl?|v|sv|c)$/i.test(file) ? { label: 'Check Syntax', action: () => checkFileSyntax(file) } : null,   // (.c: Silinx HLS, #1524)
-    /\.(ucf|pcf)$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
+    /\.(ucf|pcf|xdc)$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
     { label: 'Remove from Project', action: () => removeFile(file) },
     { label: 'Delete File…', action: () => deleteFile(file) },
     { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) && S.viewTexts?.[file] === undefined },
@@ -400,9 +417,11 @@ function projectContextMenu(e) {
     '-',
     { label: 'Design Properties…', action: () => wiz.projectProperties() },
     { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()) },   // (#2826)
+    // (git, the server editions: here in both interfaces, the Silinx one having no File menu, #3195)
+    hasGit() ? { label: 'Git', submenu: gitMenuItems() } : null,
     '-',
     { label: 'Close Project', action: () => closeProject() },   // (#1300)
-  ], e.clientX, e.clientY);
+  ].filter(Boolean), e.clientX, e.clientY);
 }
 
 export async function setTop(mod, sim = S.view === 'sim') {

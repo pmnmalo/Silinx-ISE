@@ -1,4 +1,4 @@
-# Getting started with Silinx ISE (step by step)
+# Getting started with Silinx (step by step)
 
 No programming tools or git needed. **Way 1, in the browser, does it all**: Way 2 is another way of
 running the same Silinx, on your own computer.
@@ -14,16 +14,20 @@ running the same Silinx, on your own computer.
 
 ## Way 1: in the browser (simplest)
 
-The quickest: open **https://pmnmalo.github.io/Silinx-ISE/** in your browser (the latest release; your
+The quickest: open **https://pmnmalo.github.io/Silinx/** in your browser (the latest release; your
 projects are kept in that browser. The development version, with the changes not released yet, is at
-https://pmnmalo.github.io/Silinx-ISE/dev/, its projects kept apart) and go to step 4. Or download it, to work offline:
+https://pmnmalo.github.io/Silinx/dev/, its projects kept apart) and go to step 4. Or download it, to work offline:
 
-1. Open the **[latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Under **Assets**, click **`Silinx-ISE.html`** to download it.
+1. Open the **[latest release](https://github.com/pmnmalo/Silinx/releases/latest)**.
+2. Under **Assets**, click **`Silinx.html`** to download it.
 3. Double-click the downloaded file. It opens in your browser (Chrome, Edge, Firefox or Safari).
-4. On the Start page click **New Project…** and choose in *Start from* **Example: gates** (logic gates drawn as a schematic: a good first example), **Example: traffic** (a pedestrian crossing: a state diagram and a Boolean algebra), **Example: blinky** (or *pong*, a game for two, *stopwatch*, *clock*, *vga*, a picture on a VGA monitor, or *isqrt*, a C function made into hardware) or **Empty project**. After the examples come the **Test design: …** entries: designs Silinx itself is tested with (schematics, state diagrams, C programs for Silinx HLS), each with its test (a test bench, or the C program's `main()`), to see what Silinx does with each kind of source.
+4. On the Start page click **New Project…** and choose in *Start from* **Example: gates** (logic gates drawn as a schematic: a good first example), **Example: traffic** (a pedestrian crossing: a state diagram and a Boolean algebra), **Example: blinky** (or *pong*, a game for two, *stopwatch*, *clock*, *vga*, a picture on a VGA monitor, *isqrt*, a C function made into hardware, *uart*, an echo over the serial port to a terminal, or *micro80*, an 8080-compatible microprocessor running a program) or **Empty project**. After the examples come the **Test design: …** entries: designs Silinx itself is tested with (schematics, state diagrams, C programs for Silinx HLS), each with its test (a test bench, or the C program's `main()`), to see what Silinx does with each kind of source.
 
 That's all. Things to know:
+
+- The menus named below (**File ▸ …**, **Tools ▸ …**) are the ISE style interface's; in the Silinx interface (the
+  default) the same commands are on the Start page, under the header's **Settings** (⚙), and in the command palette
+  (**Ctrl+K**: type the command's name).
 
 - Your projects are saved **inside this browser** on this computer. To keep a copy or move it to
   another computer use **File ▸ Download Project Bundle** (and **File ▸ Open Project Bundle** to
@@ -38,8 +42,8 @@ That's all. Things to know:
   and **File ▸ Use Browser Storage** goes back to the browser. The status bar shows where the projects
   are kept. Firefox and Safari cannot open a folder: there the projects stay in the browser.
 - **Implement Design** and **Generate Programming File** run the Silinx toolchain in the browser
-  (Basys2, Nexys2, Nexys3 and Atlys boards; the first run downloads its tools from the site, about 100 MB, then the
-  browser keeps them; the downloaded `Silinx-ISE.html` too): the bitstream (`top.bit`) is downloaded.
+  (Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards; the first run downloads its tools from the site, about 100 MB, then the
+  browser keeps them; the downloaded `Silinx.html` too): the bitstream (`<top module>.bit`, e.g. `blinky.bit`) is downloaded.
 - **Program the board from the browser** (Chrome or Edge, or Chrome on an Android tablet; Firefox
   and Safari cannot reach USB devices; the page opened from the site's address, not from the
   downloaded file): connect the board's USB cable, switch it on, then **Configure Target Device ▸ Program
@@ -53,10 +57,10 @@ That's all. Things to know:
   **Generate Programming File** work. **Chrome on an Android tablet also programs the board**, as
   on a computer (checked on a Samsung tablet; the board on the tablet's USB port); Safari on an iPad cannot reach USB devices (program
   the downloaded `.bit` from a computer or an Android tablet). The projects stay in the browser, which iPadOS may clear after some weeks
-  without use: keep a copy with **File ▸ Export Silinx ISE Project (.zip)…**. A tablet has less
+  without use: keep a copy with **File ▸ Export Silinx Project (.zip)…**. A tablet has less
   memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
-  (hold a finger still for half a second); two fingers move a drawing and a pinch zooms it. In portrait the Design pane is a drawer (the button at
-  the left of the header), and the editors' properties open over the drawing (**Properties**).
+  (hold a finger still for half a second); two fingers move a drawing and a pinch zooms it. In portrait the side panel (Design) is shown or hidden
+  with the header's side panel button (in the ISE style interface it is a drawer, the button at the left of the header), and the editors' properties open over the drawing (**Properties**).
 - **A link for your slides**: right-click the project in the Design pane, **Copy Link to Project…**: the link opens
   Silinx on the design, in Try it, the simulation or the board emulator, the whole project inside it (see the README,
   *A design in a link*).
@@ -84,34 +88,34 @@ Silinx runs on **Node.js**, a free program.
 
 ### Step 2: download Silinx
 
-1. Open the **[latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Under **Assets**, download **`silinx-ise-<version>.zip`** (for example `silinx-ise-15.10.21.zip`).
+1. Open the **[latest release](https://github.com/pmnmalo/Silinx/releases/latest)**.
+2. Under **Assets**, download **`silinx-<version>.zip`** (for example `silinx-15.22.1.zip`).
    - Don't use the green **Code ▸ Download ZIP** button or "Source code": that version does not
      include everything Silinx needs (it still works, but the first start needs Internet to
      download the missing parts).
 3. **Unzip it** (extract it) to a folder you will find again, e.g. *Documents*:
    - **Windows:** right-click the zip ▸ **Extract All…** ▸ Extract. Don't run it from inside the zip.
    - **macOS:** double-click the zip.
-   - You get a folder called **`silinx-ise`**.
+   - You get a folder called **`silinx`**.
 
 *Optional, to make sure the file is the release's (for example one you got from a course page):* the
 release lists each file's SHA-256 checksum in its notes and in the file **`SHA256SUMS`**. Download
 `SHA256SUMS` into the same folder and, in a terminal there, run `sha256sum -c SHA256SUMS --ignore-missing`
 (Linux) or `shasum -a 256 -c SHA256SUMS --ignore-missing` (macOS): the file must say `OK`. On Windows,
-`Get-FileHash silinx-ise-<version>.zip` in PowerShell prints the checksum to compare with the notes'.
+`Get-FileHash silinx-<version>.zip` in PowerShell prints the checksum to compare with the notes'.
 Each file also has GitHub's build provenance attestation (it was built by the repository's Release
 workflow from the version's tag): with the [GitHub CLI](https://cli.github.com),
-`gh attestation verify silinx-ise-<version>.zip --repo pmnmalo/Silinx-ISE`.
+`gh attestation verify silinx-<version>.zip --repo pmnmalo/Silinx`.
 
 ### Step 3: start Silinx
 
-Open the `silinx-ise` folder and double-click the launcher for your system:
+Open the `silinx` folder and double-click the launcher for your system:
 
 | System | Double-click |
 |---|---|
-| Windows | **`Start Silinx-ISE.bat`** |
-| macOS | **`Start Silinx-ISE.command`** |
-| Linux | **`start-silinx-ise.sh`** (or run `./start-silinx-ise.sh` in a terminal) |
+| Windows | **`Start Silinx.bat`** |
+| macOS | **`Start Silinx.command`** |
+| Linux | **`start-silinx.sh`** (or run `./start-silinx.sh` in a terminal) |
 
 A black window (the Silinx server) opens and then your browser shows Silinx at
 **http://127.0.0.1:8642**.
@@ -126,7 +130,7 @@ A black window (the Silinx server) opens and then your browser shows Silinx at
 - **Windows: "Windows protected your PC"**: click **More info ▸ Run anyway**.
 - **Windows Firewall** asks about Node.js: click **Allow** (Silinx only listens on your own computer).
 - **macOS: "cannot be opened because it is from an unidentified developer"**: right-click
-  (or Ctrl-click) `Start Silinx-ISE.command` ▸ **Open** ▸ **Open**. Next time a double-click is enough.
+  (or Ctrl-click) `Start Silinx.command` ▸ **Open** ▸ **Open**. Next time a double-click is enough.
 
 ### Step 4: use it
 
@@ -137,11 +141,11 @@ A black window (the Silinx server) opens and then your browser shows Silinx at
 - Your projects are saved as normal folders in **`Silinx-projects`** in your user folder
   (Windows: `C:\Users\<you>\Silinx-projects`, macOS: `/Users/<you>/Silinx-projects`).
   You can copy them, back them up, or zip them to hand in.
-- **File ▸ Export Xilinx ISE Project (.zip)** produces a zip that opens in Xilinx ISE 14.7; **File ▸ Export Silinx ISE Project (.zip)** saves the whole Silinx project (ASM charts and schematics included), reopened with **Import Silinx ISE Project**. An imported project came from outside: it runs Xilinx ISE and programs a board only once you press **Trust Project** in the console, where it says so when the project opens.
+- **File ▸ Export Xilinx ISE Project (.zip)** produces a zip that opens in Xilinx ISE 14.7; **File ▸ Export Silinx Project (.zip)** saves the whole Silinx project (ASM charts and schematics included), reopened with **Import Silinx Project**. An imported project came from outside: it runs Xilinx ISE and programs a board only once you press **Trust Project** in the console, where it says so when the project opens.
 
 ### Updating Silinx
 
-Download the new `silinx-ise-<version>.zip`, unzip it and use the new folder (you can delete the old
+Download the new `silinx-<version>.zip`, unzip it and use the new folder (you can delete the old
 one). **Your projects are not inside that folder**, so they are kept.
 
 ---
@@ -157,19 +161,20 @@ In the browser (Way 1) nothing more is needed for the Basys2 and Nexys2. Running
    display or VGA of its own, so Silinx puts them on its VHDCI connector (as a Digilent VmodBB wires
    them). For the other boards (or the
    processes that need ISE), **Xilinx ISE 14.7** (free WebPACK licence); on any computer it runs
-   inside **Docker**, then choose an ISE mode in *Tools ▸ Toolchain Settings*:
+   inside **Docker**, then choose an ISE mode in *Settings (⚙) ▸ Toolchain Settings (ISE / Programmers)…* (ISE style:
+   *Tools ▸ …*):
    - install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (on Apple Silicon
      Macs, OrbStack is a faster alternative);
-   - download `silinx-ise-docker-kit-<version>.zip` from the release and follow its `ise/README.md`:
+   - download `silinx-docker-kit-<version>.zip` from the release and follow its `ise/README.md`:
      you download the ISE installer and licence with your own free AMD account and run one script
      (it takes 20–60 minutes, once). ISE cannot be shared, so everyone builds their own copy.
 2. **The board's USB driver** to program it:
    - **Windows:** install Digilent **Adept 2** (Runtime + Utilities) from digilent.com.
-   - **macOS (Basys2):** in a Terminal, inside the `silinx-ise` folder, run
+   - **macOS (Basys2):** in a Terminal, inside the `silinx` folder, run
      `brew install libusb python` and `./scripts/install-adepttool.sh` (needs [Homebrew](https://brew.sh)).
    - **Linux:** Digilent Adept, or openFPGALoader from your package manager.
 
-In Silinx, **Tools ▸ Toolchain Settings** shows what was found.
+In Silinx, **Settings (⚙) ▸ Toolchain Settings (ISE / Programmers)…** (ISE style: **Tools ▸ …**) shows what was found.
 
 ---
 
@@ -179,10 +184,10 @@ In Silinx, **Tools ▸ Toolchain Settings** shows what was found.
 |---|---|
 | The launcher says **Node.js is not installed** | Install it (Step 1). Then close the window and double-click the launcher again. |
 | Browser: **"This site can't be reached"** | The Silinx window was closed: double-click the launcher again. |
-| **"Port 8642 is used by another program"** | Another program uses that port. Open a terminal in the `silinx-ise` folder and run `node bin/silinx-ise.js serve --port 8643 --open`. |
+| **"Port 8642 is used by another program"** | Another program uses that port. Open a terminal in the `silinx` folder and run `node bin/silinx.js serve --port 8643 --open`. |
 | Console: **"the Silinx server is not running"** | Same as above: start Silinx again. Your unsaved changes are saved as soon as it is back. |
 | macOS: the `.command` file **opens in a text editor** | Right-click it ▸ Open With ▸ Terminal. |
-| The window flashes and closes | Open a terminal in the `silinx-ise` folder and run `node bin/silinx-ise.js serve --open` to read the message. |
+| The window flashes and closes | Open a terminal in the `silinx` folder and run `node bin/silinx.js serve --open` to read the message. |
 
 **Opening a terminal in a folder:** Windows: open the folder, click the address bar, type `cmd`
 and press Enter. macOS: right-click the folder ▸ *New Terminal at Folder* (or open Terminal, type
@@ -193,8 +198,8 @@ and press Enter. macOS: right-click the folder ▸ *New Terminal at Folder* (or 
 ## For those who use git
 
 ```bash
-git clone https://github.com/pmnmalo/Silinx-ISE.git
-cd Silinx-ISE
+git clone https://github.com/pmnmalo/Silinx.git
+cd Silinx
 npm install
 npm start            # prints the address to open: http://127.0.0.1:8642/#token=…
 ```

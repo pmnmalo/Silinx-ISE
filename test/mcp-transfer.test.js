@@ -1,5 +1,5 @@
 // The MCP server's tools of a project's import and export (#2674, server/mcp-transfer.js): export_project (a Xilinx ISE
-// or a Silinx ISE .zip, never over a file) and import_project (a .zip, a .xise with its folder, a project folder),
+// or a Silinx .zip, never over a file) and import_project (a .zip, a .xise with its folder, a project folder),
 // only in the exchange folder (SILINX_MCP_FOLDER; the symbolic links that leave it refused); round trips of the
 // examples with Check Syntax after them (no warnings), a hostile zip's warnings, and the errors.
 // The zip's own format and the routes are tested in server-api.test.js and server-hardening.test.js.
@@ -53,19 +53,19 @@ test('export_project / import_project: traffic as a Xilinx ISE project and back,
   assert.equal((await ok('check_syntax', { project: 'traffic_ise', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (42 signals, 32 processes).');
 });
 
-test('export_project / import_project: a Silinx ISE project, its drawings and board kept; a project folder', async () => {
+test('export_project / import_project: a Silinx project, its drawings and board kept; a project folder', async () => {
   await ok('new_project_from_example', { name: 'gates', example: 'gates' });
   const x = await ok('export_project', { project: 'gates', kind: 'silinx', path: out('gates-silinx.zip') });
-  assert.equal(x.text, `Exported 'gates' as a Silinx ISE project: ${out('gates-silinx.zip')} (${fs.statSync(out('gates-silinx.zip')).size} bytes).`);
+  assert.equal(x.text, `Exported 'gates' as a Silinx project: ${out('gates-silinx.zip')} (${fs.statSync(out('gates-silinx.zip')).size} bytes).`);
   assert.ok((await entryNames(out('gates-silinx.zip'))).includes('silinx.json'));
   const i = await ok('import_project', { name: 'gates_s', from: out('gates-silinx.zip') });
-  assert.match(i.text, /^Imported the Silinx ISE project as 'gates_s': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
+  assert.match(i.text, /^Imported the Silinx project as 'gates_s': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
   assert.ok(i.data.extra.includes('src/gates.sch.json'));
   assert.equal((await ok('check_syntax', { project: 'gates_s' })).text, 'Process "Check Syntax" of <gates> completed successfully (22 signals, 21 processes).');
   // a project folder (a workspace's, copied into the exchange folder)
   fs.cpSync(P.projectDir('gates'), out('gates-folder'), { recursive: true });
   const d = await ok('import_project', { name: 'gates_f', from: 'gates-folder' });
-  assert.match(d.text, /^Imported the Silinx ISE project as 'gates_f': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
+  assert.match(d.text, /^Imported the Silinx project as 'gates_f': top gates, test bench tb_gates, basys2 \(xc3s250ecp132-4\), 2 source\(s\), \d+ other file\(s\)\.$/);
   assert.deepEqual((await P.readProject('gates_f')).files, (await P.readProject('gates')).files);
 });
 
@@ -76,7 +76,7 @@ test('import_project: a hostile zip, what is sound imported, what was dropped sa
   const r = await ok('import_project', { name: 'hostile', from: out('hostile.zip') });
   // (the import gate's refusals first, #2830)
   assert.equal(r.text, ["WARNING: .git/config: not imported: hidden file or folder ('.git')", 'WARNING: silinx.json: file path outside the project dropped (../evil.vhd)', 'WARNING: silinx.json: constraints path outside the project dropped (../x.ucf)',
-    'WARNING: src/gone.vhd: listed by the project, not found', 'Imported the Silinx ISE project as \'hostile\': top top, test bench (none), no board (xc3s250ecp132-4), 2 source(s), 1 other file(s).'].join('\n'));
+    'WARNING: src/gone.vhd: listed by the project, not found', 'Imported the Silinx project as \'hostile\': top top, test bench (none), no board (xc3s250ecp132-4), 2 source(s), 1 other file(s).'].join('\n'));
   assert.ok(!fs.existsSync(path.join(P.projectDir('hostile'), '.git')));
   assert.ok(!fs.existsSync(path.join(P.workspaceDir(), 'evil.vhd')));
   assert.deepEqual(r.data.warnings, [".git/config: not imported: hidden file or folder ('.git')", 'silinx.json: file path outside the project dropped (../evil.vhd)',
@@ -168,4 +168,40 @@ test('export_project / import_project: the exchange folder only, its symbolic li
   process.env.SILINX_MCP_FOLDER = path.join(tmp, 'none');
   try { await fails('export_project', { project: 'vga', path: 'vga.zip' }, `no exchange folder ${path.join(tmp, 'none')} (SILINX_MCP_FOLDER sets another)`); }
   finally { process.env.SILINX_MCP_FOLDER = dir; }
+});
+
+test('#2981 a project the MCP server makes is untrusted: no Xilinx ISE for it until the user trusts it, its messages saying who made it', async () => {
+  const UNTRUSTED = ' It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
+  let r = await ok('new_project', { name: 'byai' });
+  assert.equal(r.text, "Empty project 'byai' made: no board (xc3s250ecp132-4). Write its sources with write_file, then set_top." + UNTRUSTED);
+  r = await ok('new_project_from_example', { name: 'byai2', example: 'blinky' });
+  assert.ok(r.text.endsWith(UNTRUSTED), r.text);
+  for (const name of ['byai', 'byai2']) {
+    const pj = await P.readProject(name);
+    assert.deepEqual([pj.trusted, pj.madeBy], [false, 'mcp'], name);
+  }
+  await ok('write_file', { project: 'byai', path: 'src/top.vhd', text: 'entity top is end;\narchitecture a of top is begin end;\n' });
+  await ok('set_top', { project: 'byai', top: 'top' });
+  await fails('run_process', { project: 'byai', process: 'synthesize', toolchain: 'ise' },
+    "project 'byai' was made through the MCP server (by an assistant): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)");
+  // the interface's description written whole keeps it so; the user's trust clears both marks
+  await P.writeProject('byai', { ...(await P.readProject('byai')), trusted: true, madeBy: undefined });
+  assert.deepEqual([(await P.readProject('byai')).trusted, (await P.readProject('byai')).madeBy], [false, 'mcp']);
+  await P.trustProject('byai');
+  const t = await P.readProject('byai');
+  assert.deepEqual(['trusted' in t, 'madeBy' in t], [false, false]);
+  // exported and imported again: an imported project (madeBy gone), as any zip
+  await ok('export_project', { project: 'byai2', kind: 'silinx', path: out('byai2.zip') });
+  await ok('import_project', { name: 'byai3', from: 'byai2.zip' });
+  const i = await P.readProject('byai3');
+  assert.deepEqual([i.trusted, 'madeBy' in i], [false, false]);
+});
+
+test('#2981 the trust messages: who made the project', async () => {
+  const { untrustedMessage, untrustedNotice, markUntrusted, markMadeByMcp } = await import('../core/trust.js');
+  assert.equal(untrustedMessage('p', 'Xilinx ISE'), "project 'p' came from outside (imported): Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)");
+  assert.equal(untrustedMessage('p', 'programming the board', { madeBy: 'mcp' }), "project 'p' was made through the MCP server (by an assistant): programming the board runs only once you trust it (Trust Project, in the console when the project opens)");
+  assert.match(untrustedNotice('p', { madeBy: 'mcp' }), /^Project "p" was made through the MCP server \(by an assistant\): it is edited/);
+  assert.deepEqual(markMadeByMcp({ name: 'p' }), { name: 'p', trusted: false, madeBy: 'mcp' });
+  assert.deepEqual(markUntrusted({ name: 'p', madeBy: 'mcp' }), { name: 'p', trusted: false });
 });

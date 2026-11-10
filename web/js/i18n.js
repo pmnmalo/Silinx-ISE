@@ -22,9 +22,15 @@ import { SCH_PT, SCH_PT_PATTERNS } from './i18n-schematic.js';
 import { CLOCKING_PT, CLOCKING_PT_PATTERNS } from './i18n-clocking.js';
 import { WIZARDS_PT, WIZARDS_PT_PATTERNS } from './i18n-wizards.js';
 import { LINK_PT, LINK_PT_PATTERNS } from './i18n-link.js';
+import { VERIFY_PT, VERIFY_PT_PATTERNS } from './i18n-verify.js';
+import { GIT_PT, GIT_PT_PATTERNS } from './i18n-git.js';
+import { COLLAB_PT, COLLAB_PT_PATTERNS } from './i18n-collab.js';
 import { MEMORY_PT, MEMORY_PT_PATTERNS } from './i18n-memory.js';
 import { RESOURCES_PT, RESOURCES_PT_PATTERNS } from './i18n-resources.js';
 import { PINS_PT, PINS_PT_PATTERNS } from './i18n-pins.js';
+import { LABS_PT, LABS_PT_PATTERNS } from './i18n-labs.js';
+import { GRADE_PT, GRADE_PT_PATTERNS } from './i18n-grade.js';
+import { CAPTURE_PT, CAPTURE_PT_PATTERNS } from './i18n-capture.js';
 import { prefKey } from './prefs.js';
 
 const PT = {
@@ -44,7 +50,7 @@ const PT = {
   'Window': 'Janela', 'Help': 'Ajuda', 'Language': 'Idioma',
   'New Project…': 'Novo Projeto…', 'Open Project…': 'Abrir Projeto…', 'Close Project': 'Fechar Projeto', 'Trust Project': 'Confiar no Projeto', 'Check Design': 'Verificar Projeto', 'Show the waveform': 'Mostrar a forma de onda', 'Open the HDL here, in Simulation': 'Abrir o HDL aqui, na Simulação',
   'Import Xilinx ISE Project (.zip)…': 'Importar Projeto Xilinx ISE (.zip)…', 'Export Xilinx ISE Project (.zip)…': 'Exportar Projeto Xilinx ISE (.zip)…',
-  'Import Silinx ISE Project (.zip)…': 'Importar Projeto Silinx ISE (.zip)…', 'Export Silinx ISE Project (.zip)…': 'Exportar Projeto Silinx ISE (.zip)…',
+  'Import Silinx Project (.zip)…': 'Importar Projeto Silinx (.zip)…', 'Export Silinx Project (.zip)…': 'Exportar Projeto Silinx (.zip)…',
   'Download Project Bundle…': 'Descarregar Pacote do Projeto…', 'Open Project Bundle…': 'Abrir Pacote do Projeto…',
   // the browser edition: where the projects are kept (in the browser storage, or in a folder on the disk)
   'Open Workspace Folder…': 'Abrir Pasta de Trabalho…', 'Open Workspace Folder': 'Abrir Pasta de Trabalho',
@@ -67,8 +73,8 @@ const PT = {
   "The design's pins are not set yet: no port is placed on a pin of the board.": 'Os pinos do projeto ainda não estão definidos: nenhuma porta está ligada a um pino da placa.',
   'Set them before you program the board.': 'Defina-os antes de programar a placa.', 'Set them before you emulate the design.': 'Defina-os antes de emular o projeto.', 'iMPACT (Configure Target Device)': 'iMPACT (Configurar Dispositivo)',
   'RTL Schematic': 'Esquemático RTL', 'Toolchain Settings (ISE / Programmers)…': 'Definições da Toolchain (ISE / Programadores)…',
-  'Close All Documents': 'Fechar Todos os Documentos', 'Digital design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7), made for teaching: mixed VHDL/Verilog projects; schematics with live simulation; FSM and ASM state machine editors; Boolean algebra: truth tables, expressions and Karnaugh maps; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2 and Nexys2 boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.': 'Plataforma de projeto digital para FPGAs Xilinx (Spartan-3/3A/3E/6, Virtex-4/5/6, série 7 com o ISE 14.7), feita para o ensino: projetos VHDL/Verilog mistos; esquemáticos com simulação em tempo real; editores de máquinas de estados FSM e ASM; álgebra booleana: tabelas de verdade, expressões e mapas de Karnaugh; assistentes de módulos e de bancadas de teste; simulação comportamental e de netlist com formas de onda; um emulador da placa; síntese, place & route e bitstreams com a toolchain Silinx (as placas Basys2 e Nexys2) ou com o ISE 14.7; programação da FPGA e da sua Platform Flash, também a partir do browser por USB.', 'Component': 'Componente', ', with an additional permission for elkjs:': ', com uma permissão adicional para o elkjs:', 'This program comes with ABSOLUTELY NO WARRANTY. Source code:': 'Este programa NÃO TEM QUALQUER GARANTIA. Código-fonte:', 'Each keeps its own licence; the full texts are in': 'Cada um mantém a sua própria licença; os textos completos estão em', '. elkjs (EPL-2.0) source code:': '. Código-fonte do elkjs (EPL-2.0):', 'Licence': 'Licença', 'Version': 'Versão', "What's new:": 'Novidades:', 'Undo Remove from Project': 'Anular Remover do Projeto', 'Redo Remove from Project': 'Refazer Remover do Projeto', 'Not in project': 'Fora do projeto', 'Add to Project': 'Acrescentar ao Projeto', 'The example has its own sources.': 'O exemplo tem as suas próprias fontes.', "The test design has its own sources and its test: a test bench (Simulate), or the C program's main() (C Simulation).": 'O projeto de teste tem as suas próprias fontes e o seu teste: uma bancada de teste (Simular), ou o main() do programa em C (Simulação de C).', 'No vectors: a test bench skeleton (clock, reset and the module); I will write the stimulus': 'Sem vetores: um esqueleto de bancada de teste (relógio, reset e o módulo); eu escrevo os estímulos', 'Test Benches:': 'Bancadas de Teste:', 'Implementation only': 'Só implementação', 'Test Bench (Wizard)': 'Bancada de Teste (Assistente)', 'Create Test Bench (Wizard)…': 'Criar Bancada de Teste (Assistente)…', 'Test Bench Wizard': 'Assistente de Bancada de Teste', 'Unit Under Test': 'Unidade em Teste', 'Clock and Reset': 'Relógio e Reset', 'Input Vectors': 'Vetores de Entrada', 'Vectors and Expected Outputs': 'Vetores e Saídas Esperadas', 'Module to test:': 'Módulo a testar:', 'Test bench name:': 'Nome da bancada de teste:', 'Clock port:': 'Porto de relógio:', 'Clock period (ns):': 'Período do relógio (ns):', 'Reset port:': 'Porto de reset:', 'Reset level:': 'Nível do reset:', 'Reset for (clock cycles):': 'Reset durante (ciclos de relógio):', 'Settling time (ns):': 'Tempo de estabilização (ns):', 'Number of vectors:': 'Número de vetores:', 'Random seed:': 'Semente aleatória:', 'Fill Expected from Current Design': 'Preencher Esperados a partir do Projeto Atual', 'Clear Expected': 'Limpar Esperados', 'Add Vector': 'Adicionar Vetor', 'input': 'entrada', 'expected output': 'saída esperada', 'Delete this vector': 'Apagar este vetor', 'Every combination of the inputs (exhaustive test)': 'Todas as combinações das entradas (teste exaustivo)', 'Random vectors': 'Vetores aleatórios', 'Counting (all inputs as one number: 0, 1, 2, …)': 'Contagem (todas as entradas como um número: 0, 1, 2, …)', 'Walking ones and zeros (all 0, all 1, then one bit at a time)': 'Uns e zeros deslizantes (tudo a 0, tudo a 1, depois um bit de cada vez)', 'I will type the vectors in (starts with one empty vector)': 'Vou escrever os vetores (começa com um vetor vazio)', 'Rename Folder…': 'Mudar o Nome da Pasta…', 'Delete Folder…': 'Apagar Pasta…', 'Rename Folder': 'Mudar o Nome da Pasta', 'Delete Folder': 'Apagar Pasta', 'Delete File…': 'Apagar Ficheiro…', 'Delete File': 'Apagar Ficheiro', 'Add to Project…': 'Acrescentar ao Projeto…', 'Add Copy to Project…': 'Acrescentar Cópia ao Projeto…',
-  'Every file of the project folder is in the project.': 'Todos os ficheiros da pasta do projeto estão no projeto.', 'The files of the project folder that are not in the project:': 'Os ficheiros da pasta do projeto que não estão no projeto:', 'About Silinx ISE': 'Acerca do Silinx ISE', 'Tell Us Who You Are…': 'Diga-nos Quem É…', 'Tell Us Who You Are': 'Diga-nos Quem É', 'Tell us who you are': 'Diga-nos quem é', 'Who is using Silinx ISE? (GitHub Discussions)': 'Quem usa o Silinx ISE? (GitHub Discussions)',
+  'Close All Documents': 'Fechar Todos os Documentos', 'Digital design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7) and the Lattice iCE40, made for teaching: mixed VHDL/Verilog projects; schematics with live simulation; FSM and ASM state machine editors; Boolean algebra: truth tables, expressions and Karnaugh maps; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.': 'Plataforma de projeto digital para FPGAs Xilinx (Spartan-3/3A/3E/6, Virtex-4/5/6, série 7 com o ISE 14.7) e a Lattice iCE40, feita para o ensino: projetos VHDL/Verilog mistos; esquemáticos com simulação em tempo real; editores de máquinas de estados FSM e ASM; álgebra booleana: tabelas de verdade, expressões e mapas de Karnaugh; assistentes de módulos e de bancadas de teste; simulação comportamental e de netlist com formas de onda; um emulador da placa; síntese, place & route e bitstreams com a toolchain Silinx (as placas Basys2, Nexys2, Nexys3, Atlys e iCEBreaker) ou com o ISE 14.7; programação da FPGA e da sua Platform Flash, também a partir do browser por USB.', 'Component': 'Componente', ', with an additional permission for elkjs:': ', com uma permissão adicional para o elkjs:', 'This program comes with ABSOLUTELY NO WARRANTY. Source code:': 'Este programa NÃO TEM QUALQUER GARANTIA. Código-fonte:', 'Each keeps its own licence; the full texts are in': 'Cada um mantém a sua própria licença; os textos completos estão em', '. elkjs (EPL-2.0) source code:': '. Código-fonte do elkjs (EPL-2.0):', 'Licence': 'Licença', 'Version': 'Versão', "What's new:": 'Novidades:', 'Undo Remove from Project': 'Anular Remover do Projeto', 'Redo Remove from Project': 'Refazer Remover do Projeto', 'Not in project': 'Fora do projeto', 'Add to Project': 'Acrescentar ao Projeto', 'The example has its own sources.': 'O exemplo tem as suas próprias fontes.', "The test design has its own sources and its test: a test bench (Simulate), or the C program's main() (C Simulation).": 'O projeto de teste tem as suas próprias fontes e o seu teste: uma bancada de teste (Simular), ou o main() do programa em C (Simulação de C).', 'No vectors: a test bench skeleton (clock, reset and the module); I will write the stimulus': 'Sem vetores: um esqueleto de bancada de teste (relógio, reset e o módulo); eu escrevo os estímulos', 'Test Benches:': 'Bancadas de Teste:', 'Implementation only': 'Só implementação', 'Test Bench (Wizard)': 'Bancada de Teste (Assistente)', 'Create Test Bench (Wizard)…': 'Criar Bancada de Teste (Assistente)…', 'Test Bench Wizard': 'Assistente de Bancada de Teste', 'Unit Under Test': 'Unidade em Teste', 'Clock and Reset': 'Relógio e Reset', 'Input Vectors': 'Vetores de Entrada', 'Vectors and Expected Outputs': 'Vetores e Saídas Esperadas', 'Module to test:': 'Módulo a testar:', 'Test bench name:': 'Nome da bancada de teste:', 'Clock port:': 'Porto de relógio:', 'Clock period (ns):': 'Período do relógio (ns):', 'Reset port:': 'Porto de reset:', 'Reset level:': 'Nível do reset:', 'Reset for (clock cycles):': 'Reset durante (ciclos de relógio):', 'Settling time (ns):': 'Tempo de estabilização (ns):', 'Number of vectors:': 'Número de vetores:', 'Random seed:': 'Semente aleatória:', 'Fill Expected from Current Design': 'Preencher Esperados a partir do Projeto Atual', 'Clear Expected': 'Limpar Esperados', 'Add Vector': 'Adicionar Vetor', 'input': 'entrada', 'expected output': 'saída esperada', 'Delete this vector': 'Apagar este vetor', 'Every combination of the inputs (exhaustive test)': 'Todas as combinações das entradas (teste exaustivo)', 'Random vectors': 'Vetores aleatórios', 'Counting (all inputs as one number: 0, 1, 2, …)': 'Contagem (todas as entradas como um número: 0, 1, 2, …)', 'Walking ones and zeros (all 0, all 1, then one bit at a time)': 'Uns e zeros deslizantes (tudo a 0, tudo a 1, depois um bit de cada vez)', 'I will type the vectors in (starts with one empty vector)': 'Vou escrever os vetores (começa com um vetor vazio)', 'Rename Folder…': 'Mudar o Nome da Pasta…', 'Delete Folder…': 'Apagar Pasta…', 'Rename Folder': 'Mudar o Nome da Pasta', 'Delete Folder': 'Apagar Pasta', 'Delete File…': 'Apagar Ficheiro…', 'Delete File': 'Apagar Ficheiro', 'Add to Project…': 'Acrescentar ao Projeto…', 'Add Copy to Project…': 'Acrescentar Cópia ao Projeto…',
+  'Every file of the project folder is in the project.': 'Todos os ficheiros da pasta do projeto estão no projeto.', 'The files of the project folder that are not in the project:': 'Os ficheiros da pasta do projeto que não estão no projeto:', 'About Silinx': 'Acerca do Silinx', 'Tell Us Who You Are…': 'Diga-nos Quem É…', 'Tell Us Who You Are': 'Diga-nos Quem É', 'Tell us who you are': 'Diga-nos quem é', 'Who is using Silinx? (GitHub Discussions)': 'Quem usa o Silinx? (GitHub Discussions)',
   'Using Silinx in a course?': 'Usa o Silinx numa disciplina?', 'Usage counts:': 'Contagem de utilização:',
   'This page counts its visits and what is used (a new project, a simulation, a bitstream…) with': 'Esta página conta as visitas e o que é usado (um projeto novo, uma simulação, um bitstream…) com o',
   ': no cookies, no personal data, never the content of a project.': ': sem cookies, sem dados pessoais, nunca o conteúdo de um projeto.',
@@ -81,9 +87,9 @@ const PT = {
     'Desligada: nada é pedido no arranque. Ajuda > Procurar Atualizações… procura manualmente; Ajuda > Procurar Atualizações no Arranque volta a ligá-la.',
   'Check for updates at start-up on: the latest release is asked of GitHub when the app starts': 'Procura de atualizações no arranque ligada: a última versão é pedida ao GitHub quando a aplicação arranca',
   'Check for updates at start-up off: Help > Check for Updates… checks by hand': 'Procura de atualizações no arranque desligada: Ajuda > Procurar Atualizações… procura manualmente',
-  'Only the site (pmnmalo.github.io/Silinx-ISE) counts its visits, with': 'Só o site (pmnmalo.github.io/Silinx-ISE) conta as visitas, com o',
+  'Only the site (pmnmalo.github.io/Silinx) counts its visits, with': 'Só o site (pmnmalo.github.io/Silinx) conta as visitas, com o',
   '(no cookies, no personal data).': '(sem cookies nem dados pessoais).',
-  'Silinx ISE is free and asks for nothing. If you use it, in a course, a school or on your own, we would like to know: it helps to decide what to improve.': 'O Silinx ISE é gratuito e não pede nada. Se o usa, numa disciplina, numa escola ou por conta própria, gostávamos de saber: ajuda a decidir o que melhorar.',
+  'Silinx is free and asks for nothing. If you use it, in a course, a school or on your own, we would like to know: it helps to decide what to improve.': 'O Silinx é gratuito e não pede nada. Se o usa, numa disciplina, numa escola ou por conta própria, gostávamos de saber: ajuda a decidir o que melhorar.',
   'Say hello on GitHub Discussions (a GitHub account is needed): your school or course, your role (teacher, student…), the boards you use. Only what you write there is seen.': 'Deixe uma mensagem no GitHub Discussions (é preciso uma conta GitHub): a sua escola ou disciplina, o seu papel (professor, estudante…), as placas que usa. Só se vê o que escrever lá.', 'Keyboard Shortcuts': 'Atalhos de Teclado',
   'Close': 'Fechar', 'Close Others': 'Fechar Outros', 'Close All': 'Fechar Todos', 'Open': 'Abrir', 'Remove from Project': 'Remover do Projeto',
   // (two documents side by side, each side with its tabs, #1619, #1652)
@@ -107,7 +113,7 @@ const PT = {
   'Generated from the state diagram': 'Gerado a partir do diagrama de estados', 'Generated from the Boolean algebra': 'Gerado a partir da álgebra booleana',
   'Generated from the Petri net': 'Gerado a partir da rede de Petri',
   // a drawing without its HDL file, a file in the way (#230)
-  'No HDL': 'Sem HDL', 'Generate HDL File…': 'Gerar Ficheiro HDL…', 'Generate HDL File': 'Gerar Ficheiro HDL',
+  'No HDL': 'Sem HDL', 'Its HDL cannot be made: its errors are in the Console': 'O seu HDL não pode ser gerado: os seus erros estão na Consola', 'Generate HDL File…': 'Gerar Ficheiro HDL…', 'Generate HDL File': 'Gerar Ficheiro HDL',
   'Design hierarchy': 'Hierarquia do projeto',
   // toolbar / panels
   'New Project': 'Novo Projeto', 'Open Project': 'Abrir Projeto', 'Cut': 'Cortar', 'Copy': 'Copiar',
@@ -145,7 +151,7 @@ const PT = {
   'Project name must start with a letter and contain only letters, digits and _.': 'O nome do projeto deve começar por uma letra e conter apenas letras, dígitos e _.',
   'No projects found in the workspace.': 'Não foram encontrados projetos na pasta de trabalho.',
   'Import Xilinx ISE Project': 'Importar Projeto Xilinx ISE', 'Export Xilinx ISE Project': 'Exportar Projeto Xilinx ISE',
-  'Import Silinx ISE Project': 'Importar Projeto Silinx ISE', 'Export Silinx ISE Project': 'Exportar Projeto Silinx ISE', 'Project name:': 'Nome do projeto:',
+  'Import Silinx Project': 'Importar Projeto Silinx', 'Export Silinx Project': 'Exportar Projeto Silinx', 'Project name:': 'Nome do projeto:',
   'Project folder:': 'Pasta do projeto:', 'or .zip / .xise file(s):': 'ou ficheiro(s) .zip / .xise:',
   'Select the project folder, a .zip, or a .xise with its sources.': 'Selecione a pasta do projeto, um .zip, ou um .xise com as suas fontes.',
   'ISE output files in the folder (xst, _ngo, netlists, bitstreams, logs) are not imported.': 'Os ficheiros gerados pelo ISE na pasta (xst, _ngo, netlists, bitstreams, logs) não são importados.',
@@ -169,7 +175,7 @@ const PT = {
   'Generate Post-Place & Route Static Timing': 'Gerar Análise Temporal Estática Pós-Place & Route', 'Generate Text Power Report': 'Gerar Relatório de Consumo (Texto)',
   'Back-annotate Pin Locations': 'Anotar a Localização dos Pinos',
   'Simulate Post-Synthesis Model': 'Simular Modelo Pós-Síntese', 'Simulate Post-Translate Model': 'Simular Modelo Pós-Translate',
-  'Simulate Post-Map Model': 'Simular Modelo Pós-Map', 'Simulate Post-Place & Route Model': 'Simular Modelo Pós-Place & Route', 'Board Emulator': 'Emulador da Placa', 'Check for Updates': 'Procurar Atualizações', 'Developers:': 'Programadores:', 'developed with Claude (Anthropic)': 'desenvolvido com Claude (Anthropic)', 'Silinx ISE was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.': 'O Silinx ISE foi desenvolvido para fins educativos, especificamente para apoiar o ensino de Sistemas Digitais, porque a AMD/Xilinx descontinuou o suporte ao Xilinx ISE há muito tempo.', 'Files:': 'Ficheiros:', 'Association:': 'Associação:',
+  'Simulate Post-Map Model': 'Simular Modelo Pós-Map', 'Simulate Post-Place & Route Model': 'Simular Modelo Pós-Place & Route', 'Board Emulator': 'Emulador da Placa', 'Check for Updates': 'Procurar Atualizações', 'Developers:': 'Programadores:', 'developed with Claude (Anthropic)': 'desenvolvido com Claude (Anthropic)', 'Silinx was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.': 'O Silinx foi desenvolvido para fins educativos, especificamente para apoiar o ensino de Sistemas Digitais, porque a AMD/Xilinx descontinuou o suporte ao Xilinx ISE há muito tempo.', 'Files:': 'Ficheiros:', 'Association:': 'Associação:',
   'All (Implementation + Simulation)': 'Todas (Implementação + Simulação)', 'Simulation only': 'Só simulação', 'File:': 'Ficheiro:', 'Language:': 'Linguagem:',
   'Project Preferred Language': 'Linguagem Preferida do Projeto', 'Design Properties': 'Propriedades do Projeto', 'Top Module (implementation):': 'Módulo de Topo (implementação):',
   'Optimization:': 'Otimização:', 'Fast': 'Rápido',
@@ -425,10 +431,9 @@ const PT_PATTERNS = [
   [/^Read-only, the C model of (.+)$/, 'Só de leitura, o modelo C de $1'],
   [/^Translated to (VHDL|Verilog) \(read-only\)$/, 'Traduzido para $1 (só de leitura)'],
   // the Development menu (#707)
-  [/^Features \((\d+)\)$/, 'Funcionalidades ($1)'], [/^Bug fixes \((\d+)\)$/, 'Correções ($1)'], [/^Other \((\d+)\)$/, 'Outras ($1)'],
   [/^All Changes since (\d+\.\d+\.\d+)…$/, 'Todas as Alterações desde a $1…'], [/^Changes since (\d+\.\d+\.\d+)$/, 'Alterações desde a $1'],
   [/^Pointers down at once: (\d+) \(most: (\d+)\)$/, 'Ponteiros premidos ao mesmo tempo: $1 (máximo: $2)'],
-  [/^This Build on GitHub \(commit (\w+)\)$/, 'Esta Versão no GitHub (commit $1)'], [/^Open Issue #(\d+) on GitHub$/, 'Abrir a Issue #$1 no GitHub'],
+  [/^This Build on GitHub \(commit (\w+)\)$/, 'Esta Versão no GitHub (commit $1)'],
   // the tip of a drawing's link banner, shortened on a narrow screen (#266)
   // the HDL editor's banner of a file generated from a drawing, out of sync (#1176)
   [/^— the (schematic|state machine|Petri net) has errors: ([\s\S]*)$/, (m, w, why) => `— ${{ schematic: 'o esquemático tem', 'state machine': 'a máquina de estados tem', 'Petri net': 'a rede de Petri tem' }[w]} erros: ${why}`],
@@ -498,6 +503,7 @@ const PT_PATTERNS = [
   [/^no device description of (\S+) ships with Silinx \(the Silinx toolchain supports the (.+)\): use an ISE mode for this device$/, 'o Silinx não inclui a descrição do dispositivo $1 (a toolchain Silinx suporta o $2): use um modo ISE para este dispositivo'],
   [/^the Silinx toolchain does not support the (\S+) family yet \(only the Spartan-3E (.+)\): use an ISE mode$/, 'a toolchain Silinx ainda não suporta a família $1 (só o Spartan-3E $2): use um modo ISE'],
   [/^Not met \((\d+) constraints\)$/, 'Não cumpridas ($1 restrições)'],
+  [/^Not met \((\d+) failing endpoints\)$/, 'Não cumpridas ($1 terminais em falha)'],
   [/^Version (\d[\w.-]*)$/, 'Versão $1'],
   // schematic palette: "<SYMBOL>: <description>"
   [/^([A-Z][A-Z0-9_]*(?: [A-Z]+)?): (.+)$/, (m, a, b) => `${a}: ${t(b)}`],
@@ -518,14 +524,14 @@ Object.assign(PT, {
     'Dica: faça duplo clique num processo no painel Processos para o executar. A simulação corre inteiramente no Silinx; a síntese/implementação requer o Xilinx ISE 14.7 (Definições da Toolchain (a roda dentada da barra de ferramentas)).',
   'Print…': 'Imprimir…', 'Print': 'Imprimir', 'Source': 'Fonte', 'Source (read-only)': 'Fonte (só de leitura)', 'Marker': 'Marcador', 'Time shown': 'Tempo mostrado', 'Simulation time': 'Tempo de simulação', 'project name': 'nome do projeto', 'new project name': 'nome do novo projeto', 'file name': 'nome do ficheiro',
   'Device': 'Dispositivo', 'Top': 'Topo', 'Board': 'Placa', 'Last Used': 'Último uso', '.zip file:': 'Ficheiro .zip:',
-  'Import a whole Silinx project from a .zip made with File ▸ Export Silinx ISE Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).':
-    'Importe um projeto Silinx completo a partir de um .zip feito com Ficheiro ▸ Exportar Projeto Silinx ISE (silinx.json e todos os ficheiros do projeto: fontes, diagramas ASM, esquemáticos, restrições, ficheiros de simulação).',
+  'Import a whole Silinx project from a .zip made with File ▸ Export Silinx Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).':
+    'Importe um projeto Silinx completo a partir de um .zip feito com Ficheiro ▸ Exportar Projeto Silinx (silinx.json e todos os ficheiros do projeto: fontes, diagramas ASM, esquemáticos, restrições, ficheiros de simulação).',
   'Easiest setup on any OS:': 'Configuração mais simples em qualquer sistema operativo:',
   'build the private Docker image with the Silinx kit (docker/ise/README.md):': 'construa a imagem Docker privada com o kit do Silinx (docker/ise/README.md):',
   '(Windows: build-ise-image.ps1). It configures Silinx automatically.': '(Windows: build-ise-image.ps1). Configura o Silinx automaticamente.',
   'auto-detect (…/14.7/ISE_DS/settings64.sh)': 'deteção automática (…/14.7/ISE_DS/settings64.sh)',
-  'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, and the place & route and bitstream writer of Silinx) for the Spartan-3E boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.':
-    'A síntese, o place & route e a geração do bitstream usam a toolchain Silinx (o Yosys, e o place & route e o gerador de bitstreams do próprio Silinx) para as placas Spartan-3E, ou as ferramentas de linha de comandos do Xilinx ISE 14.7. Xilinx, ISE, ISim, iMPACT e Spartan são marcas registadas da AMD/Xilinx; o Silinx ISE é um projeto independente, sem afiliação nem aprovação da AMD/Xilinx.',
+  'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, nextpnr, and the bitstream writer of Silinx or icepack for the iCE40) for the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx is an independent project, not affiliated with or endorsed by AMD/Xilinx.':
+    'A síntese, o place & route e a geração do bitstream usam a toolchain Silinx (o Yosys, o nextpnr, e o gerador de bitstreams do próprio Silinx ou o icepack para a iCE40) para as placas Basys2, Nexys2, Nexys3, Atlys e iCEBreaker, ou as ferramentas de linha de comandos do Xilinx ISE 14.7. Xilinx, ISE, ISim, iMPACT e Spartan são marcas registadas da AMD/Xilinx; o Silinx é um projeto independente, sem afiliação nem aprovação da AMD/Xilinx.',
   'F12 or Ctrl/Cmd+Click': 'F12 ou Ctrl/Cmd+Clique',
   // the Silinx toolchain (Toolchain Settings, Processes, Design Summary)
   'Silinx toolchain (no ISE)': 'Toolchain Silinx (sem ISE)', 'Synthesize - Yosys': 'Sintetizar - Yosys',
@@ -538,6 +544,13 @@ Object.assign(PT, {
   'Timing (post Place & Route, Silinx toolchain estimate)': 'Temporização (após Posicionar e Encaminhar, estimativa da toolchain Silinx)',
   'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)',
   'Static Timing Report': 'Relatório de Temporização Estática',
+  // AMD Vivado's reports (the 7-series, #1649)
+  'Synthesize - Vivado': 'Sintetizar - Vivado',
+  'Device Utilization Summary (AMD Vivado)': 'Resumo da Utilização do Dispositivo (AMD Vivado)', 'Design Rule Check': 'Verificação das Regras de Projeto',
+  'No violations': 'Sem violações', 'Synthesis Utilization Report': 'Relatório de Utilização da Síntese', 'Utilization Report': 'Relatório de Utilização',
+  'Route Status Report': 'Relatório do Estado do Encaminhamento', 'Timing Summary Report': 'Relatório Resumo da Temporização', 'DRC Report': 'Relatório de DRC', 'Vivado Log': 'Registo do Vivado',
+  'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation of the 7-series use AMD Vivado 2025.2 (Toolchain Settings (the gear in the toolbar)).':
+    'Dica: faça duplo clique num processo no painel Processos para o executar. A simulação corre inteiramente no Silinx; a síntese e a implementação da série 7 usam o AMD Vivado 2025.2 (Definições da Toolchain (a roda dentada da barra de ferramentas)).',
   'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation use the Silinx toolchain (no ISE): Toolchain Settings (the gear in the toolbar).':
     'Dica: faça duplo clique num processo no painel Processos para o executar. A simulação corre inteiramente no Silinx; a síntese e a implementação usam a toolchain Silinx (sem ISE): Definições da Toolchain (a roda dentada da barra de ferramentas).',
   // board emulator
@@ -778,17 +791,17 @@ Object.assign(PT, {
   'This is the development edition, built from the latest code (main): it is updated after every change, before the releases.': 'Esta é a edição de desenvolvimento, construída a partir do código mais recente (main): é atualizada a cada alteração, antes das versões.',
   'Releases:': 'Versões:', 'Reload': 'Recarregar', "What's new:": 'Novidades:', 'Release notes and downloads:': 'Notas da versão e transferências:',
   'release notes': 'notas da versão', 'You are running a development version newer than the latest release.': 'Está a usar uma versão de desenvolvimento mais recente do que a última versão publicada.',
-  'To update: download silinx-ise-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx-ISE.html for the standalone edition.':
-    'Para atualizar: descarregue o silinx-ise-<versão>.zip e substitua a pasta do Silinx (os projetos da área de trabalho mantêm-se), ou descarregue o novo Silinx-ISE.html para a edição autónoma.',
+  'To update: download silinx-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx.html for the standalone edition.':
+    'Para atualizar: descarregue o silinx-<versão>.zip e substitua a pasta do Silinx (os projetos da área de trabalho mantêm-se), ou descarregue o novo Silinx.html para a edição autónoma.',
 });
 const ptLabel = v => v;   // a version label in a sentence (dev:<commit> (<date>): the same in Portuguese)
 PT_PATTERNS.push(
-  [/^Running Silinx ISE (.+)\. Checking for a newer version…$/, (m, v) => `A executar o Silinx ISE ${ptLabel(v)}. A procurar uma versão mais recente…`],
-  [/^Running Silinx ISE (.+)\.$/, (m, v) => `A executar o Silinx ISE ${ptLabel(v)}.`],
-  [/^Silinx ISE (.+) is up to date\.$/, (m, v) => `O Silinx ISE ${ptLabel(v)} está atualizado.`],
-  [/^This site now serves Silinx ISE (.+)\.$/, (m, v) => `Este site serve agora o Silinx ISE ${ptLabel(v)}.`],
+  [/^Running Silinx (.+)\. Checking for a newer version…$/, (m, v) => `A executar o Silinx ${ptLabel(v)}. A procurar uma versão mais recente…`],
+  [/^Running Silinx (.+)\.$/, (m, v) => `A executar o Silinx ${ptLabel(v)}.`],
+  [/^Silinx (.+) is up to date\.$/, (m, v) => `O Silinx ${ptLabel(v)} está atualizado.`],
+  [/^This site now serves Silinx (.+)\.$/, (m, v) => `Este site serve agora o Silinx ${ptLabel(v)}.`],
   [/^This page is (.+): reload the page to get the new version \(your projects are kept\)\.$/, (m, v) => `Esta página é a ${ptLabel(v)}: recarregue a página para obter a nova versão (os projetos mantêm-se).`],
-  [/^A new version is available: Silinx ISE (.+)$/, 'Está disponível uma nova versão: Silinx ISE $1'],
+  [/^A new version is available: Silinx (.+)$/, 'Está disponível uma nova versão: Silinx $1'],
   [/^\(released (.+)\)$/, '(publicada a $1)'],
   [/^You are running (.+)\.$/, (m, v) => `Está a usar a ${ptLabel(v)}.`],
   [/^Latest release on GitHub: (.+) —$/, 'Última versão no GitHub: $1 —'],
@@ -816,10 +829,22 @@ for (const [k, v] of Object.entries(WIZARDS_PT)) if (!(k in PT)) PT[k] = v;   //
 PT_PATTERNS.unshift(...WIZARDS_PT_PATTERNS);
 for (const [k, v] of Object.entries(LINK_PT)) if (!(k in PT)) PT[k] = v;   // a design's link (#2826)
 PT_PATTERNS.unshift(...LINK_PT_PATTERNS);
+for (const [k, v] of Object.entries(VERIFY_PT)) if (!(k in PT)) PT[k] = v;   // Verify Equivalence (#3177)
+PT_PATTERNS.unshift(...VERIFY_PT_PATTERNS);
+for (const [k, v] of Object.entries(GIT_PT)) if (!(k in PT)) PT[k] = v;   // git (#3195)
+PT_PATTERNS.unshift(...GIT_PT_PATTERNS);
+for (const [k, v] of Object.entries(COLLAB_PT)) if (!(k in PT)) PT[k] = v;   // a shared project (#3181)
+PT_PATTERNS.unshift(...COLLAB_PT_PATTERNS);
 for (const [k, v] of Object.entries(RESOURCES_PT)) if (!(k in PT)) PT[k] = v;   // the device's resources checked against the design (#796)
 PT_PATTERNS.unshift(...RESOURCES_PT_PATTERNS);
 for (const [k, v] of Object.entries(PINS_PT)) if (!(k in PT)) PT[k] = v;   // I/O Pin Planning's Board view (#2694)
 PT_PATTERNS.unshift(...PINS_PT_PATTERNS);
+for (const [k, v] of Object.entries(LABS_PT)) if (!(k in PT)) PT[k] = v;   // the guided labs (#3179)
+PT_PATTERNS.unshift(...LABS_PT_PATTERNS);
+for (const [k, v] of Object.entries(GRADE_PT)) if (!(k in PT)) PT[k] = v;   // the graded exercises (#3192)
+PT_PATTERNS.unshift(...GRADE_PT_PATTERNS);
+for (const [k, v] of Object.entries(CAPTURE_PT)) if (!(k in PT)) PT[k] = v;   // the logic analyzer (#3176)
+PT_PATTERNS.unshift(...CAPTURE_PT_PATTERNS);
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },

@@ -208,3 +208,30 @@ test('bitdb-node: the open flow\'s PIPs measured one at a time (#732: a right I/
   for (; i < tp.from.length; i++) { const q = device.pip(k, i); if (q.from === 'D_ILOGIC_SITE' && q.to === 'FABRICOUT_ILOGIC_SITE') break; }
   assert.ok(i < tp.from.length && allow(k, i));
 });
+
+test('bitgen: a BSCAN_SPARTAN6\'s JTAG chain, one bit per chain in the corner\'s region whatever its site; its pins\' switches into the fabric and TDO\'s from it known, on both parts (#3176)', () => {
+  const sites = device.sites('BSCAN').sort((a, b) => a.name.localeCompare(b.name));
+  assert.equal(sites.length, 4);
+  const lone = (site, chain) => ({ insts: [{ name: 'b', type: 'BSCAN', site: site.name, tile: site.tileName, placed: true, cfg: cfg({ JTAG_CHAIN: String(chain), JTAG_TEST: '0' }) }], nets: [] });
+  // (the XC6SLX16's: frame 2966, bits 31 … 28 for the chains 1 … 4, ISE's bitgen on gen-bscan6.mjs's designs)
+  for (const [k, site] of sites.entries()) {
+    const p = predictDesign(lone(site, k + 1), device, dev, db);
+    assert.deepEqual([[...p.bits], [...p.unknown.keys()]], [[`2966,${31 - k}`], []], site.name);
+  }
+  assert.deepEqual([...predictDesign(lone(sites[0], 5), device, dev, db).unknown.keys()], ['BSCAN JTAG_CHAIN=5']);
+  const OUTS = ['CAPTURE', 'DRCK', 'RESET', 'RUNTEST', 'SEL', 'SHIFT', 'TCK', 'TDI', 'TMS', 'UPDATE'];
+  for (const part of [PART, 'xc6slx45csg324-3']) {
+    const d = loadDeviceCache(part), known = knownPipS6(d, loadBitDbS6(part));
+    // each pin's wire one known switch from (an output) or into (TDO) the corner tile's interface wires, on every site
+    for (const site of d.sites('BSCAN')) {
+      const k = site.tile, tp = d.templates[d.tileTemplate[k]];
+      const pips = Array.from({ length: tp.from.length }, (_, i) => [i, ...d.pipWires(k, i)]).filter(([i]) => known(k, i));
+      for (const pin of OUTS) {
+        const w = d.sitePin(site.name, pin).wire;
+        assert.ok(pips.some(([, a, b]) => a === w && /^INT_INTERFACE_LOCAL_LOGICOUT_\d+$/.test(b)), `${part} ${site.name} ${pin}`);
+      }
+      const tdo = d.sitePin(site.name, 'TDO').wire;
+      assert.ok(pips.some(([, , b]) => b === tdo), `${part} ${site.name} TDO`);
+    }
+  }
+});

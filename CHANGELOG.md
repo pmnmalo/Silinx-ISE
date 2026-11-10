@@ -3,6 +3,776 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.24.0
+
+The 7-series arrive, as an experimental family: the Basys 3 and Nexys A7 boards, implemented by AMD Vivado as
+the Spartan-3E is by ISE. The Spartan-6's nextpnr places the block RAMs and DSPs itself, with shorter periods, and
+several of its Map and Place & Route failures are fixed.
+
+In short:
+
+- **The nextpnr engine's placements a little faster:** the placer knows that a LUT on a SLICEM is slower than one on a
+  SLICEL, and keeps the critical paths' LUTs off the SLICEMs.
+- **Spartan-6 (Nexys3, Atlys):** a design whose outputs have no LOC routes again. Place & Route had failed on every seed
+  when Silinx put such an output on a pad of the top bank that nextpnr cannot reach.
+- **Boards:** the Digilent Basys 3 and Nexys A7 (the 7-series' Artix-7), an experimental family: their pins, their
+  constraints written as an XDC; no flow implements them yet.
+- **Spartan-6 (Nexys3, Atlys):** Place & Route gives shorter clock periods, about 3 % on average over the examples and
+  up to 15 %. nextpnr now places the block RAMs and DSP48A1s itself.
+- **The 3D Karnaugh map of 3 and 4 inputs:** every cell in view shows its number and value on the cylinder and the
+  torus, smaller where the surface is seen at a slant, never beside it. A group's outline on cells hidden behind the
+  surface is no longer drawn over the surface in front of them.
+- **A short click on an emulated push button counts:** the Board Emulator holds a button down until the design has
+  seen a real press, so the clock, pong, stopwatch and blinky examples' debounced buttons react to a short click,
+  not only to a long one.
+- **Help ▸ About Silinx** names the open toolchain's boards of today (Basys2, Nexys2, Nexys3, Atlys, iCEBreaker)
+  and its engines (Yosys, nextpnr, the bitstream writer of Silinx or icepack).
+- **Smaller designs that compare a signal with several constants:** such comparisons are made of LUTs instead of carry
+  chains (the vga example 143 → 122 slices, 10.2 → 9.2 ns).
+- **AMD Vivado for the Artix-7 boards:** a project on the Basys 3 or the Nexys A7 is synthesized, implemented and
+  made into a bitstream by AMD Vivado ML Standard 2025.2, in its Docker image, over ssh or on this computer, as Xilinx
+  ISE is for the Spartan-3E: its processes in the Processes pane, its utilization, timing and design rule check in the
+  Design Summary, its warnings in the console, the board programmed with openFPGALoader.
+- **Synthesis:** in a design of several clocks, each clock's critical path is made shorter, not only the slowest clock's.
+
+In detail:
+
+- **test/compiled-words.test.js: the word-level models of the stopwatch, the clock and the vga examples expected as #3097's
+  comparisons as logic (384b7456) synthesize them (#3161):** their cells and their tables' counts; the test failed on main
+  since.
+- **The Spartan-3E's nextpnr engine at 1.4.2 (#3157).** nextpnr-himbaechel-spartan3e 1.4.2 (nextpnr-spartan PR 30,
+  40a7f9b3): the placer's estimate of a connection from a SLICEM's LUT is 55 ps longer (Tilo 0.759 ns against a SLICEL's
+  0.704 at -4, `fpga/timing.js` SPEED_4); the chip database's LUT4 has a SLICEL's arc on every site. Natively, XC3S1200E,
+  the mean period of one placement per seed: fpu-adder 10.975 -> 10.714 ns (-2.4 %, seeds 1-4), iwls05-sasc 4.780 ->
+  4.731 ns (-1.0 %) and iwls05-simple-spi 6.548 -> 6.478 ns (-1.1 %, seeds 1-16). Part of #2982, which stays open.
+- **The nextpnr and Yosys update comparisons measure the base's package on the base's side (#3156):**
+  `nextpnr-update.yml` and `yosys-update.yml` installed the base's package at the repository's root only, and npm kept
+  the pull request's nested in `packages/silinx-fpga/node_modules`, which the toolchain resolves first: both sides
+  measured the pull request's package. The base's is now installed into the toolchain's workspace and the root both,
+  and a step on each side prints the version resolved from `packages/silinx-fpga` and from the root and fails when it
+  is not the side's (`scripts/resolved-package.mjs`).
+- **A port without a LOC takes a pad whose I/O path is known (#3152).** nextpnr's chip database leaves out the PIPs
+  whose bits Silinx's bit database does not know. One of them is the slave OLOGIC2's D1 -> OQ route-through in the top
+  bank's TIOI_INNER tiles (the master's is known), so 30 pads of the XC6SLX16 and 23 of the XC6SLX45 can take no
+  output, and 4 pads of each can take no input. Silinx's placer gave such pads to ports without a LOC, and nextpnr
+  failed on every seed: `Failed to route arc 0.0 of net …, from X6Y4/L_AQ to X5Y0/TIOB_O3_PINW`. The new module
+  `fpga/s6/pad-paths.js` (`padPathsS6`) finds each pad's paths through the known PIPs, in about 0.1 s. Probed
+  pad by pad, nextpnr agrees on both parts. The placer now gives ports without a LOC only pads with their path. The examples, all
+  of their ports LOC'd, are placed as before, so their bitstreams are unchanged.
+- **The Spartan-6's Map packs a product of two counters (#3151):** it stopped with "its pin BMUX carries two nets"
+  when a carry chain's sums left their slice (to the DSP48A1s) by the multiplexed outputs a 5FF had been given too;
+  such a flip-flop now goes to another position (the toolchain's fragment has the detail).
+- **The Basys 3 and the Nexys A7 boards, their constraints as XDC (#3142):** the Digilent Basys 3 (xc7a35tcpg236-1) and
+  Nexys A7 (xc7a100tcsg324-1) in the board choice of New Project and Design Properties, marked "(experimental)", as is
+  their family, Artix-7: their clock, LEDs, switches, buttons, seven-segment display, VGA, USB-UART, PS/2 and Pmods,
+  from Digilent's master XDCs (every pin checked against them). A project of the family has its constraints in
+  `constraints/top.xdc`: Update Constraints, New Source and an example made for the board write the board's pins as
+  Vivado reads them (each pin's `PACKAGE_PIN` and `IOSTANDARD`, the clock's `create_clock`, the board's `CFGBVS` and
+  `CONFIG_VOLTAGE`), and Check Constraints reads it. No flow runs the family yet (Vivado #1649, the Silinx toolchain
+  #3146): its process tree has the constraints and the checks only, the synthesis tool is locked, Implement and
+  Program are not offered, and the console says so when the board is chosen. The XC7A35T joins the device database;
+  Artix-7's constraints were UCFs for ISE before. The MCP server's `list_devices` marks the family and its boards
+  experimental, `set_design_properties`, `new_project`, `new_source` write XDC and `run_process` refuses with the
+  interface's message. `new_source` now writes an iCE40's constraints with the PCF template (it wrote the UCF's).
+- **The Spartan-6's nextpnr engine: nextpnr-himbaechel-spartan6 0.2.0, which places the block RAMs and DSP48A1s (#3137).**
+  Its chip database has each routing node's delay from Silinx's timing model (#3149). The annealing refinement after
+  its analytical placer reaches 40 tiles, so a block RAM or DSP48A1 moves next to its logic. Silinx no longer places
+  them and fixes them for nextpnr (`S6_HARD_BY_NEXTPNR` true). The examples' periods (Optimization Speed, best of
+  3 seeds) are 3.2 % shorter on average on the Nexys3 and the Atlys, with every PERIOD met; for example the stopwatch on
+  the Nexys3 went from 9.959 to 8.941 ns and micro80 on the Atlys from 8.843 to 8.613 ns.
+- **The Spartan-6's nextpnr engine: nextpnr-himbaechel-spartan6 0.3.0 (#3135, #3136).** The package can pack Yosys's
+  netlist into sites and place its pads and global buffers as Silinx's Map and placer do
+  (pmnmalo/nextpnr-spartan#29); Silinx's flow still hands it its own Map's sites, placed and routed as before (#3138
+  will hand it Yosys's netlist).
+- **The unit tests' timings refreshed (#3131):** test/timings.json from v15.23.0's release run, the first with five Linux
+  parts (#3124): the split files' measured times replace their estimated shares, the parts balanced again.
+- **The private-data check allows #2962's special-purpose addresses in #3123's commit message too (#3129):** that
+  message names two of the reserved ranges, and the history check of the release's CI failed on it.
+- **A release's CI in about 45 minutes instead of 80 to 120 (#3124):** the unit tests in five parts on Linux, all of
+  them; on macOS and Windows in three parts, but the toolchain's heaviest (`HEAVY` in scripts/test-shard.mjs, its new
+  option `--light`: the whole open flow on every feature, device and example, the post-place & route and Spartan-6
+  models of the examples, the synthesis on the corpus, nextpnr's engine), about half the time, which took their parts
+  to 60 to 80 minutes there; test/open-flow.test.js (blinky to a bitstream, the shipped devices) stays their smoke test.
+  The runs of the tags one at a time: the IDE's and the toolchain package's tags pushed together shared the 20 jobs a
+  public repository runs at once and queued them up to 50 minutes (v15.22.0). test/timings.json refreshed from
+  15.23.0's run (schbeautify-sheet.test.js weighed 30 seconds, took 22 minutes). CLAUDE.md says so.
+- **The two longest unit test files split (#3124):** test/open-flow.test.js (34 to 50 minutes in CI, its tests one after
+  another) into open-flow.test.js (the shipped device descriptions, blinky), open-flow-features.test.js (block RAMs,
+  multipliers, shift registers), open-flow-io.test.js (DCMs, global buffers, IOBs) and open-flow-clocks.test.js, their
+  helpers and fixtures' table in test/open-flow-lib.mjs; test/sim-model-par.test.js (21 to 38 minutes) into
+  sim-model-par.test.js, sim-model-par-examples.test.js and sim-model-par-micro80.test.js. The same tests, moved as they
+  were; test/timings.json gives the new files their share of the old ones' times.
+- **The private-data check allows #2962's special-purpose addresses in CHANGELOG.md (#3121):** the NAT64 and reserved
+  ranges that a link's zip address is checked against were allowed in their fragment only, so the release that moved
+  the fragment into CHANGELOG.md failed its CI.
+- **The cells' texts on the 3D map of 3 and 4 inputs (#3119):** a cell's text is shown wherever the cell faces the
+  viewer. That is its centre while the centre faces the viewer well, else the part of the cell that does (before, the
+  centre's normal had to point at least a quarter towards the screen, which hid cells in plain view: on the torus only
+  7, 11 and 14 showed a value). The text is upright and shrinks with the surface's foreshortening. It is drawn after
+  its own cell's faces (the cell's nearer faces covered it), only where its box lies on the surface and nothing nearer
+  hides it, shrunk or moved within the cell when it does not fit. The 0s of an SOP map stay blank, as on the flat map
+  (`core/kmapsurface.js`: labelSpots, textFits, textMatrix, surfaceFrame).
+- **The group outlines of the 3D map of 3 and 4 inputs (#3120):** what lies on the faces seen from behind is drawn
+  first: on the closed torus such a face is always behind a face seen from the front, and on the open cylinder it is
+  the inside. On the torus it is not drawn at all. A sort by depth alone drew, along the silhouette, the outlines of
+  hidden groups over the surface in front (the torus's m(4, 5), the cylinder's a.c). An outline segment is drawn after
+  the faces round it, so a neighbouring face no longer cuts it into dashes (`core/kmapsurface.js`: paintOrder,
+  kmapPatch's `around`). Tests: kmapsurface-view (the groups' cells against the flat map's, the texts' spots, size and
+  fit, the order on the torus in six views); ui/tt-kmapsurface-view (the two maps of the issues, in two views).
+- **docs/OPEN-TOOLCHAIN.md without its "Open questions for the legal review" (#3114):** the section is removed; its
+  facts on the device descriptions (shipped for the supported boards' six devices, the Spartan-3E dies also measured
+  black-box) are a paragraph of the method, no longer saying the Spartan-6 toolchain is under development. The
+  introduction covers the Spartan-6 too and no longer asks for a review before publishing; the research notes of
+  s3e-route and s3e-device no longer cite an open legal question, and s3e-route's says the computed descriptions ship.
+- **Push buttons held as long as a real press (#3109):** a design's debouncer takes a press once the button has
+  stayed down for some milliseconds of the board's time (the examples': 20 ms, a million cycles), and the emulator,
+  slower than real time (the event-driven engine much slower), let a short click go after fewer cycles. A button let
+  go now stays down, lit, until 100 ms of the board's time have passed since it was pressed (at a set clock rate,
+  100 ms of its cycles, at least one); a longer press is let go at once, a button let go while paused at once, and
+  Shift+click still keeps it pressed (`core/emulate-press.js`).
+- **The About's open toolchain (#3108):** the About dialog said the Silinx toolchain covered the Basys2 and Nexys2
+  only, with a place and route of its own for the Spartan-3E; it now names the five boards, the Lattice iCE40 beside
+  the Xilinx FPGAs, and nextpnr, in English and in Portuguese.
+- **A signal compared with several constants as LUTs (#3097):** the Silinx toolchain's synthesis maps the comparisons with
+  a constant of a signal compared with two constants or more, and those that test the signal's high bits (`count > 0`),
+  as logic before Yosys's coarse step, not as carry chains whose LUTs Place & Route had to copy for each chain (itc99-b05
+  252 → 194 slices, verilog-uart 117 → 111 slices and 8.7 → 6.9 ns); silinx-fpga's changelog has the details.
+- **The old name split by a line break (#2624, part of the rename to Silinx):** `test/old-name.test.js` counts the
+  old name when a line break comes between its two words (in a comment, a Markdown quote or list, or plain text),
+  which it missed; the one such place left, a comment of the silinx-fpga package's command line, says Silinx.
+- **The ISE runner's names say Silinx (#2624):** its launchd daemons and agents are `com.github.pmnmalo.silinx.*`,
+  its scripts' folder `Library/Silinx-runner`; `scripts/ise-runner/install.sh` unloads and removes the old ones. The
+  ISE tests' work folders on the ISE host are `silinx-examples`, `silinx-tests` and `silinx-timesim`. The old-name
+  guard lists only what stays on purpose: the old command `bin/silinx-ise.js` (removed later, #3133) and the runner's
+  clean-up of its old names.
+- **Vivado as the Artix-7's back end (#1649):** `server/vivado.js` writes a batch Tcl flow in non-project mode
+  (`synth_design`, `opt_design`, `place_design`, `route_design`, `write_bitstream`, each step's checkpoint, the
+  reports), with ISE's step names so the Processes and the MCP server's processes run it unchanged; CFGBVS and
+  CONFIG_VOLTAGE set unless the board's XDC sets them (no DRC CFGBVS-1). Toolchain Settings' `vivado` (its mode:
+  docker, ssh or local; its image; its settings64.sh), its container with ISE's isolation and sysfs's buses, classes
+  and devices hidden (Vivado's licence manager crashes without, #2305). `server/vivado-reports.js` parses
+  report_utilization, report_route_status, report_timing_summary, report_drc, report_power and the log (each
+  command's own messages) into the Design Summary's shape. The interface: the Artix-7's tool descriptor (VIVADO:
+  Synthesize - Vivado, the implementation, the timing, the power, the pins, the programming file; no simulation
+  model, no Emulate), a run without Vivado configured says so and writes the scripts; the browser edition keeps
+  #3142's "no implementation flow yet". The MCP server's run_process (toolchain vivado) and get_report (Vivado's
+  reports, a drc report). The other 7-series families keep ISE's flow.
+- **The examples on the Basys 3 through Vivado (#1649):** `test/vivado/examples.test.js` (SILINX_VIVADO_TESTS=1, on
+  the ISE machine): all ten routed, the 10 ns clock met, a .bit for the xc7a35t, the design rule check with no error;
+  the warnings asserted: none, but synthesis's on traffic's and pong's outputs driven by a constant and on micro80's
+  light8080 core's unread bits (#2544), and the design rule check's DSP pipelining advice on stopwatch.
+- **MCP get_report's schema (#3158):** its `report` argument lists the reports (summary, power, timing, synthesis,
+  map, par, pins, drc), not the toolchains.
+- **Each clock's own critical path made shorter by the open synthesis (#652):** a design of several clocks has the
+  critical LUTs of every clock made shallower, not only the slowest clock's. vtr-stereovision3's `tm3_clk_v0` 10.9 %
+  shorter at Speed by ISE's trce (5.958 -> 5.306 ns) and 9.0 % at Area, its counter's enable on 2 levels of LUTs as
+  XST's, with the same size; the toolchain's package's changelog has the details.
+
+## 15.23.0
+
+Silinx ISE is now **Silinx**: the app, its command, its downloads, its repository and its site. The Boolean Algebra
+editor browses every minimal solution and shows the canonical forms, Karnaugh maps roll into 3D, Silinx HLS comes closer
+to Vitis HLS, and the nextpnr engine places and routes larger designs, faster.
+
+In short:
+
+- **The app is called Silinx:** its title, Help ▸ About Silinx, File ▸ Import / Export Silinx Project, the messages and
+  the installed app's name, in English and in Portuguese. Xilinx ISE, the ISE flow and the ISE-style interface keep
+  their names.
+- **The command is `silinx`** (`node bin/silinx.js serve`; the launchers `Start Silinx.command`, `Start Silinx.bat`,
+  `start-silinx.sh`). The old `bin/silinx-ise.js` still works for two releases, with a warning: an MCP configuration
+  that names it should name `bin/silinx.js` now.
+- **The downloads are `Silinx.html`, `silinx-<version>.zip` and `silinx-docker-kit-<version>.zip`.**
+- **The site is https://pmnmalo.github.io/Silinx/ and the repository https://github.com/pmnmalo/Silinx:** the old
+  addresses (…/Silinx-ISE/) lead to the new ones, a design's link and a lecture's included.
+- **Boolean algebra:** every minimal solution, browsed beside the Karnaugh map, the one chosen used in the results, the
+  HDL and the schematic; the canonical SOP and POS in full, with their cost; the logic of each output chosen with a tick
+  box; Karnaugh maps of 3 and 4 variables in 3D (a cylinder, a torus), the variables' order selectable; SdP and PdS in
+  Portuguese.
+- **Silinx HLS:** closer to Vitis HLS: ARRAY_RESHAPE, ALLOCATION of floating-point operations, sums added as trees, reads
+  of different memories and of streams in fewer cycles, the device's multipliers counted and their operands registered;
+  RTL blackboxes take memories and streams, run in a DATAFLOW region, are seen at once when edited, and a refused one is
+  said.
+- **Place & Route:** the nextpnr engine builds larger designs (ITC'99 b14, b20, b21, b22), routes congested ones in
+  minutes, says where it stopped, and refuses two I/O standards of different VCCO in one bank, as ISE does. Optimization
+  Fast keeps a faster netlist on deep logic, and Speed places a large design in about half the time.
+  [docs/QUALITY.md](docs/QUALITY.md) compares each Optimization with ISE at the same goal.
+- **Schematics:** View RTL / Technology Schematic and Convert to Schematic draw a large module in seconds; Convert to
+  Schematic takes vectors that do not start at 0; Rearrange Wires spaces and orders parallel wires; an I/O marker faces
+  its pin.
+- **Handwriting learns from your corrections**, and a Verilog state machine may keep its own codes when that is smaller
+  or faster.
+- **Security:** a link's zip is never fetched through a redirection, the browser edition does not start inside another
+  site's page, a bitstream built for another device is not programmed, the MCP server leaves a project's hidden files
+  alone and its new projects wait for your trust, and an imported project stays untrusted however its files are renamed.
+
+In detail:
+
+- **Optimization Fast: a deep design synthesized as at Speed too (#3096):** a design of more than 16 levels of logic (1500
+  LUTs at most) also gets Speed's synthesis, kept when 10 % faster by the estimate, as the old Normal did (#468). The log
+  says the levels and both estimates. Other designs are synthesized as before.
+- **Optimization Speed: four placements over 500 slices (#3095):** the nextpnr engine's placements at Speed are 32 up to
+  100 slices, 8 up to 500, and 4 above. On itc99-b20 and secworks-siphash, the best of 8 was the best of 4. itc99-b20's
+  Place & Route goes from 48 to about 24 minutes.
+- **The documentation brought in line with the code (#3082):** nextpnr's pack, place and route where the docs still
+  described Silinx's own engine (README, ONBOARDING, SECURITY, ARCHITECTURE, TOOLCHAIN, PROJECT, HISTORY,
+  OPEN-TOOLCHAIN); the open toolchain's boards (also the Nexys3, the Atlys and the iCEBreaker); the MCP server's
+  tools (`save_wave_config` / `load_wave_config`, no place and route engine); the Boolean algebra's results order,
+  solution selector, canonical forms' cost and 3D map; the getting-started guides' examples (uart, micro80) and the
+  Silinx interface's commands (Settings, Ctrl+K); the C to HDL guide's math.h functions, `ALLOCATION`,
+  `ARRAY_RESHAPE`, `EXPRESSION_BALANCE` and registered multiplier operands; SECURITY.md's request checks and the
+  settings the page may change.
+- **No "essential" in the Karnaugh map's legend (#3080):** each group's line is its colour, its expression and its cells
+  only.
+- **Development menu (#3079):** no Features / Bug fixes / Other submenus any more; the changes since the last
+  release are in All Changes since…, by type, as before.
+- **The minimal solutions' selector beside the Karnaugh map (#3077):** the first line of the groups legend, at the map's
+  right (it was a line of its own under them, #3067), flat and 3D, in the print view too; the number of solutions (or
+  "Many …" at the cap) is the selector's tip.
+- **The Spartan-3E's nextpnr engine at 1.4.1 (#3076).** nextpnr-himbaechel-spartan3e 1.4.1 (nextpnr-spartan PR 26,
+  5369e3ad): a carry read by logic mid-chain leaves the slice the way the chain's last one does, an F stage's by XB, a
+  G stage's COUT by YB beside the next slice's carry in, as ISE's map does. epfl-multiplier at Area and at Fast
+  (XC3S1200E): 3418 slices, 141.797 ns, with its PERIOD 20 ns warning. Such a G stage's carry is written in the XDL as
+  Silinx's packer writes it: the logic's net from YB, `<net>_COUT` from COUT to the next slice's CIN (one net with both
+  pins before, whose COUTUSED the simulation check could not tell). The design corpus is unchanged.
+- **Each table its own 3D box (#3074):** the 3D box (the stacked maps of 5 or 6 inputs, the cylinder and the torus of 3
+  or 4) was one setting for every open table, read when a map was drawn again; it is the editor's now, unticked when a
+  table is opened, kept while it stays open; the 3D map's turn too, each table's (one turned no longer turns another's at
+  its next redraw). The interface's rules say it (docs/UI-GUIDELINES.md: a document's view is its own).
+- **The canonical forms' cost (#3072):** under each canonical form, "N term(s), N literal(s); gates: … AND, … OR, … NOT
+  (… gate inputs)" and "As a circuit: N gate(s), delay N", counted as the minimal forms' (core/logic-canon.js); the MCP
+  server's results view gives their terms and literals, and its data their gates.
+- **The canonical forms spaced as the other results (#3071):** the space between Canonical SOP and Canonical POS is the
+  one between every two results (it was none).
+- **The quality comparison per Optimization (#3070):** `test/designs-corpus/compare-ise.mjs` builds every design at
+  Area, Speed and Fast (`--goals`), and ISE at XST's `-opt_mode Area -opt_level 2`, `-opt_mode Speed -opt_level 2` and
+  `-opt_mode Speed -opt_level 1` (each goal's ISE project of its own name, so that two goals do not share a remote
+  folder); the results (`ise-comparison.json`) hold one Silinx and one ISE build per goal, the page one section per
+  goal (size, speed and run time, the critical paths) and a summary line each; the results of the old form (Normal /
+  High against ISE's default) are still read. Measured 2026-11-08 with nextpnr 1.4.0: at Area, slices −15 % and the
+  critical path −14 % against ISE at Area; at Speed, −21 % and −8 %; at Fast, −20 % and +12 %. The page's text says
+  nextpnr's placements (8 at Speed, or 32 up to 100 slices, the fastest by Silinx's estimate; one at Area and Fast).
+- **The canonical forms' list first (#3069):** Canonical SOP and Canonical POS give the list of their terms beside their
+  name and the full expression on the line under it, in the editor and in the MCP server's results view.
+- **The minimal solutions' row under the Karnaugh map (#3067):** after the map and its groups legend, a line of its own at
+  the section's left (it was above the map, #3059); flat and 3D, in the print view too.
+- **SdP and PdS in Portuguese (#3066):** "SdP mínima", "PdS mínimo", "Grupos SdP (1s)", "Grupos PdS (0s)", "Forma canónica
+  SdP" / "PdS", and the tips of the XOR, NAND and NOR forms.
+- **The results' order (#3065):** Least number of gates, Least delay, Minimal SOP, Minimal POS, Canonical SOP / POS, XOR
+  form, NAND form, NOR form, in the editor and in the MCP server's results view (`related_view`).
+- **The groups legend centred on the map (#3064):** beside the map, the legend is centred on its cells (the flat map's grid,
+  its labels left out; the 3D scene), unless it is the taller of the two; under the map when there is no room, as before.
+- **The Karnaugh map's options on two lines (#3063):** SOP groups / POS groups on the first, Order, 3D and Reset view on
+  the second, at the same left (a line break in `.tt-groups`, which wraps); one input: SOP / POS only.
+- **No solution's number in the results (#3060):** the note "Solution k of N" under a minimal SOP / POS left out; the
+  map's selector ("N minimal solutions exist. ◀ Solution k of N ▶") and its printed "Solution k of N" stay.
+- **The Karnaugh map under its minimal solutions' row (#3059):** the row a line of its own in the map's section, the
+  map (flat, on a cylinder or a torus, or stacked in 3D) under it at the left of the section's options, the legend
+  beside it or just under it; the same on a narrow screen and in the print view.
+- **SECURITY.md says what the security fixes of #3034–#3045 changed (#3057):** the token in the `X-Silinx-Token`
+  header only (#3045); a hidden file or folder no part of a project, for every file route and MCP tool (#3035,
+  #3036); the import gate's fold of names and of `silinx.json`'s spellings, also in the browser's stores and design
+  links (#3034); a workspace bitstream named by its path taking its project's trust, a bitstream of another device not
+  programmed unless forced (#3039, #3040); a link's zip never read through a redirect (#3042); the static editions not
+  started in another site's frame (#3041).
+- **The toolchain package's publishing installs npm 11.21.0 checked by its integrity (#3049):** Node 22's npm (10)
+  is too old for npm's trusted publishing (11.5.1 or later), so the publish job still installs npm, now from its
+  registry tarball checked against the sha512 integrity pinned in `silinx-fpga-release.yml` before the job's
+  OIDC token publishes, instead of `npm install --global npm@11.21.0` by its version alone.
+- **The browser's `.bit` header checks its magic (#3048):** `core/adept.js` bitHeader takes a file as a `.bit` only
+  when its length word and its 9 bytes of magic are a Xilinx bitstream's, as the server's parseBitHeader does.
+- **SECURITY.md: a link's `open=` address judged by its host name (#3047):** a public name that resolves to a private
+  address passes the check, which reads no DNS; being `https:` it cannot reach the local server, which serves plain
+  `http:`.
+- **SECURITY.md: which settings and options the page sets (#3046):** the programs' paths and the arguments given to
+  Docker and ssh come from the configuration file only (`FILE_ONLY` in `server/toolchain.js`); the page picks the
+  build's mode, the ssh machine and user, the Docker image, and a programming tool with its options, all checked
+  values (`server/programmer-values.js`). The text said which program runs, and with what arguments, never came from
+  the page.
+- **The local server's token only in its header (#3045):** `?token=` on the export downloads (`export.xise`,
+  `export.zip`), which the page never used (it downloads them with the `X-Silinx-Token` header), is refused
+  (`server/server.js`): an address stays in the browser's history, a shell's and proxies' logs; test:
+  `test/server-api.test.js` (the query form refused with 403, the header accepted).
+- **SECURITY.md: what the import gate does with a page or a script (#3044):** a text file whose content is an HTML
+  page is refused; a file under its own extension (`.html`, `.js`) is kept opaque and an `.svg` as XML, never rendered
+  as a page nor run (the server sends a file as `text/plain` with `nosniff`); the text said such files were refused.
+- **The MCP server and Xilinx ISE, said as they are (#3043):** `server/mcp.js`'s header and SECURITY.md say that
+  `run_process` runs the Silinx toolchain, or Xilinx ISE (a local install, Docker, ssh) with `toolchain: 'ise'`, for a
+  trusted project only, as the interface does, and that the MCP server has no tool to program a board or a PROM; the
+  header said nothing ran but Silinx's own processes.
+- **Open from a link: a redirection is not followed (#3042):** the zip of an `#open=https://…` link is fetched with
+  `redirect: 'manual'` (`web/js/link-open.js`): a redirection was followed before its address was checked (#2962), the
+  request sent to an address of this computer or of a local network before the refusal; now an opaque redirection
+  is refused (`ERROR: Open from a link: … redirects to another address, not followed: the link must give the zip's own
+  address.`), the link's own address checked before the fetch as before. A GitHub release's download (redirected to
+  another site that sends no CORS header) could not be fetched before either; test: `test/ui/design-link.test.js`
+  (fetched with `redirect: 'manual'`, an opaque redirection and a followed one refused, no warnings).
+- **The static editions refuse a frame (#3041):** their `<meta>` policy cannot carry `frame-ancestors` (the local
+  server's header refuses a frame already), so another site could frame the page with a link (`#open=`, `#design=`)
+  and put its own content over its buttons; `web/index.html`'s first script, in a frame, stops the page (the app
+  never starts, the link is not opened) and shows a notice with a link to the same address in a new tab (noopener),
+  in English or Portuguese by the language preference or the browser's; test: `test/ui/framed.test.js` (the site
+  framed, in both languages; not framed, it starts), in both interfaces.
+- **A device mismatch refused by the server's programming (#3040):** the full application's Program FPGA and Program /
+  Verify PROM refuse a `.bit` whose part is not the project's device (else the board's), "bitstream was built for
+  '…' but the target device is '…': not programmed", before any tool runs, as the browser's programming refuses it
+  (`server/programmer.js` programJob, promJob); a request's `force: true` programs it anyway, warned. The device
+  checked is the project's or the board's only: a request's `expectDevice` is no longer taken
+  (`server/impl-routes.js`).
+- **A bitstream of the workspace named by its absolute path is programmed only when its project is trusted (#3039):** POST /program with an absolute `bitfile` in the workspace (by its name or through a symbolic link)
+  takes the trust of the project the file is in, with or without a project in the request, and refuses it with the
+  project route's message (403); a file of the workspace in no project is refused; a `.bit` outside the workspace
+  (iMPACT's file box: a file from the disk) is programmed as before (`server/impl-routes.js` checkWorkspaceBit).
+- **The Yosys and nextpnr updates' `check` jobs: the base at the workspace's root, the pull request under `head/` (#3038):** the job whose token labels the pull request runs the base's `scripts/…-update-report.mjs versions` on
+  the base's package files and on `head/package.json`, `head/package-lock.json`, after a step that checks no
+  `node_modules` is at the root: a bare import of the base's script never resolves into a tree of the pull request
+  (`yosys-update.yml`, `nextpnr-update.yml`; test/workflows-lib.mjs `checkoutLayout`).
+- **The workflows' check of the self-hosted runner reads `runs-on` as a mapping too (#3037):** a job whose
+  `runs-on:` has no value on its line (its `labels:` or `group:` below it) or is a `{ … }` mapping is refused
+  whatever it names, as is a `labels:` / `group:` key of a job outside its `concurrency:`; before, such a job was
+  neither flagged nor checked for the guard of `main` (test/workflows.test.js).
+- **The interface's file route writes no hidden file or folder (#3036):** `server/projects.js` writeFile (`PUT
+  /api/projects/:p/file`) refuses a path with a hidden segment (`.git/hooks/pre-commit`, `.vscode/tasks.json`), by
+  its name or once its symbolic links are followed, with the import gate's message as Rename's (`'.git/hooks/pre-commit':
+  not written: hidden file or folder ('.git')`); `build/` stays writable through it, the browser's open synthesis
+  saving its netlists in `build/open/` (`web/js/implement.js`).
+- **A project's hidden files and folders refused by every MCP tool that takes a path (#3035):** the hidden-segment
+  rule of write_file is in the tools' shared path function (`server/mcp-util.js` projectPath, by the path's name and
+  once its symbolic links are followed), with write_file's message for each tool's action (`'.git/config': a hidden
+  file or folder cannot be read`, `… cannot be renamed`, `… cannot be deleted`, `… cannot be added`, `… cannot be
+  removed`): read_file, write_file, rename_file, rename_module's file, delete_file, remove_from_project,
+  add_to_project (`server/mcp-sources.js` sourcePath), and the tools that read a drawing or a source a path names
+  (check_drawing, simulate_drawing, related_view, convert_drawing, set_output_logic, rearrange_wires /
+  rearrange_schematic, the C tools, block_memory's initial contents: projectText); rename_file's new name keeps the
+  import gate's message, as Rename's; `build/` is not hidden, its reports read as before.
+- **An imported project's file named as a case-insensitive file system reads silinx.json is refused (#3034):** the
+  import gate (`core/import-gate.js` normalizePath) refuses a path whose last name folds to silinx.json but is not
+  silinx.json itself (`SILINX.JSON`, `ſilinx.json`, a fullwidth `ｓ`: "another spelling of silinx.json, the project's
+  description"), in a zip, a folder, a design link, a file added and a rename, and finds names that differ only by
+  their case by the same fold (the full case fold and NFKC, not toLowerCase alone: `ſel.vhd` beside `sel.vhd`, an NFD
+  name beside its NFC one). The fold is the server's, moved into a module of its own (`core/fold-name.js` foldName,
+  re-exported by `server/projects.js`); the browser's stores (`web/js/project-store.js`: writing, renaming, deleting,
+  listing a folder's files, an import's files) and a link's paths (`core/design-link.js` safePath) compare folded
+  names too, so such a file is never one of the project's files and is never saved over its description.
+- **`install.sh --docker-acl` says what the socket gives the runner (#3033):** after setting the ACL it notes that
+  through Docker Desktop's socket the runner's user may mount every folder Docker Desktop shares (by default
+  `/Users`), and that its file sharing must be restricted to the runner's work and cache folders (Docker Desktop ▸
+  Settings ▸ Resources ▸ File sharing). What it configures is unchanged.
+- **SECURITY.md: the self-hosted ISE runner's Docker Desktop socket (#3033):** the runner's user reaches Docker
+  Desktop's socket, which runs as the maintainer, so the socket is the runner's real boundary; the machine's Docker
+  Desktop must share only the runner's work and cache folders, never the whole of `/Users`.
+- **The ISE settings script of the docker image or the ssh host never a file of the build folder (#3032):**
+  Toolchain Settings refuses a `docker.settings` or `ssh.settings` with a `.` or `..` in it, or under `/proc`, `/dev`
+  or `/sys` (`/proc/self/cwd/…` was the build folder by another spelling); `run.sh` sources `ISE_SETTINGS` only when
+  its real path, every link followed, is outside the build folder, and otherwise stops with an error line.
+- **C to HDL: a top's sums balanced before it is made sequential or not (#3028):** whether a top fits the clock and stays
+  combinational is decided on its balanced sums, as they are scheduled (EXPRESSION_BALANCE, #2613), and its combinational
+  module adds them as that tree; under `#pragma HLS EXPRESSION_BALANCE off`, as the C writes them. `a + b + c + d + e`
+  at 20 ns on the Spartan-3E is now combinational, as `a + b + c + d` is, not 3 states.
+- **Two UI tests of Silinx HLS follow the schedules (#3026):** the ASM chart of a free-running module (c-asm #1927) has
+  no S7 since a stream's read is made in the state that computes with its value (#2967): IDLE, S1, DONE, co-simulated.
+  The View C Synthesis Report test of the board's clock (c-sim #1924) keeps its four additions in a row with
+  `#pragma HLS EXPRESSION_BALANCE off`, so that it tests the clock and the delays, not the balancing (#2613; the
+  combinational decision on the balanced sum is #3028).
+- **A blackbox only its own C sources' (#3022):** the synthesis of a C source takes only the descriptions (syn.blackbox)
+  of the functions it declares; Check Syntax (in the interface and the MCP server's `check_syntax`) warns, once, in the
+  description, of one whose function no C source of the design declares ("not used"; its C model not counted).
+- **A second launch opens only a one-time code of the server's form (#3014):** the launcher that finds Silinx already
+  running puts the code its server gave into the address it opens only when it is a code of the form the server
+  issues (`server/open-code.js` `openCodeUrl`), else it opens the server's address alone; tests:
+  server-open-code (the codes kept, every other answer dropped, the launcher using it).
+- **Silinx HLS: a typedef of float a float (#3009):** a `typedef float r32;` (or C++'s `using r32 = float;`) was made in
+  hardware as a double, its ports 64 bits wide and the co-simulation failing; it is a float again, 32 bits, and
+  `ALLOCATION` of `fmul` shares its multiplications.
+- **The design corpus's `ci` run times recorded on the nextpnr engine 1.1.0 (#3003).** `test/designs-corpus/times.json`'s
+  `ci` baseline (and the README's table) taken from the first Nightly on nextpnr-himbaechel-spartan3e 1.1.0 (#2912),
+  no longer the old engine's of 2026-10-27: 8455 s of synthesis and 20438 s of flow in all (6615 s and 7714 s
+  before); the designs job took 2 h 43 min of its 340 min (#2909). The run's one regression, secworks-sha256's
+  critical path, is #3002.
+  - **Tests:** test/yosys-update.test.js: the "yosys update" workflow's corpus subset now takes 46 min of one job by
+    these times (17 min before), about 15 min with the workflow's 4 jobs of its 90; its bound raised from 40 to 60 min.
+- **The Spartan-3E's nextpnr engine at 1.1.1: router 2 with its alternate weights (#3002).** Past router 1's effort
+  (1.1.0, #2912) nextpnr-himbaechel-spartan3e 1.1.1 routes with router 2's alternate weights (an estimate weight of
+  1.0, not 1.25), which keep the critical paths router 1 had made short, in the same time. The Nightly's design corpus
+  (Silinx's timing analysis): secworks-sha256 24.979 ns (31.041 on 1.1.0, 24.389 by router 1 alone, in about four
+  times the time), secworks-aes 31.005 (32.359), epfl-multiplier 74.869 (77.774), vtr-diffeq1 39.449 (38.074); the
+  designs router 1 routes within its effort, every example among them, route as on 1.1.0.
+  - **Tests:** test/nextpnr-s3e-effort.test.js: router 2's run on vga, its maximum frequency the alternate weights'
+    (above 1.1.0's), no warning.
+- **Silinx HLS, a C source whose HDL cannot be made (#2995):** a C error or a refused RTL blackbox (a port the module
+  does not have, a width that differs, a module not found) left the C's module out of the Design pane with no message.
+  Its row now stays, with the C's badge and a No HDL badge that opens the first error's file, and its errors are written
+  to the Console once. The project's top is kept, and Check Syntax of the design (and the MCP server's `check_syntax`)
+  reports those errors instead of a missing top. Check Syntax of a C source also checks the descriptions of the
+  blackboxes it calls, as its synthesis does, each message in its description.
+- **Silinx HLS DATAFLOW: no unused ap_ready signal (#2992):** the top of a `#pragma HLS DATAFLOW` region left each
+  process's `ap_ready` open (the top reads its `ap_done`) instead of a signal that was never read, so Check Syntax's
+  design checks no longer say `Signal <f_u0_ap_ready> is assigned but never used` once per process.
+- **Silinx HLS: no unused register in a pipelined loop (#2990):** a register the machine never writes nor reads (a
+  pipelined loop's read of a local memory, or a variable of its body, whose values the pipeline's registers hold) is
+  no longer made, so Check Syntax's design checks no longer say `Signal <ap_r_ap_mem_m_0> is assigned but never used`;
+  the report's register bits count them no more.
+- **Safe output's scan covers the pages, core/'s markup and every sink spelling (#2986):** `test/safe-output.test.js`
+  also scans the inline scripts of `web/*.html` and the SVG / HTML templates of `core/` and `server/` whose values are
+  not escaped (each listed with its reason: `graphicSvg`'s kind and coordinates, the ISE `.sch` and PNML files'
+  numbers, the CSP's `<meta>`), and finds the sinks by every spelling: h()'s `{ html }` shorthand, `el['innerHTML'] =`
+  and a property named in a string (`el[prop] =`), `Object.assign`'s `innerHTML:`, an iframe's `srcdoc`,
+  `parseFromString`, `setHTMLUnsafe`, `Document.parseHTMLUnsafe`, `createContextualFragment`; a fixture per new kind
+  of sink. No sink needed escaping: no change of behaviour.
+- **Projects the MCP server makes start untrusted (#2981):** `new_project`, `new_project_from_example` and `open_link`
+  of an example mark the project `trusted: false` with `madeBy: "mcp"` in its silinx.json, so an assistant cannot copy
+  an imported project's sources into a new project and run Xilinx ISE on them without the user; the Silinx toolchain
+  runs as before. The tools' results, the server's refusal and the console's line when the project opens say it was
+  made through the MCP server (by an assistant); Trust Project clears both marks; a description written whole keeps
+  them; such a project exported and imported again is an imported one.
+- **The Spartan-3E's nextpnr engine at 1.3.0 (#2818, #2977, #2982).** nextpnr-himbaechel-spartan3e 1.1.2, 1.2.0 and
+  1.3.0 (nextpnr-spartan PRs 20 and 24, 50328fbb):
+  - 1.1.2 (#2818): a LUT on the S of two stages of one carry chain, their sums not used, is the LUT of one stage only;
+    taken for both, the placer bound it on two BELs and stopped on an assertion, a WebAssembly exception with no
+    message. Such an exception is now said as an ERROR line.
+  - 1.2.0 (#2982): a SLICEM memory's address pin at 0 is routed from a free slice's GND source, no longer a LUT each
+    (iwls05-sasc on the XC3S1200E: 80 -> 52 slices).
+  - 1.3.0 (#2977): a carry stage's DI no longer comes through pin 1 of a LUT whose four inputs are other nets when BX /
+    BY is free (router 2 left the LUT's four nets three pins, overused for ever); router 2 stops after 500 iterations
+    with `Routing design failed: router 2 did not converge in 500 iterations (router2/maxIter), <n> wire(s) still
+    overused: …`.
+  - The design corpus: itc99-b14 complete (657 slices, 35.424 ns), itc99-b21 (1363 slices, 38.190 ns), itc99-b22
+    (2030 slices, 39.372 ns), each with the PERIOD 20 ns warning; itc99-b20 fails with router 2's new error (2 wires
+    overused after 500 iterations), recorded in test/designs-corpus/expected.json.
+- **The Spartan-3E's nextpnr engine at 1.4.0 (#2977).** nextpnr-himbaechel-spartan3e 1.4.0 (nextpnr-spartan PR 25,
+  2e505ef6): router 2's congestion weight, which #19's weights kept from growing, grows once the overuse has not gone
+  down in 20 iterations (`router2-stall-iter`) and from iteration 200 on (`router2-grow-iter`); router 2's error names
+  each overused wire's nets. The design corpus, recorded in test/designs-corpus/expected.json: itc99-b20 complete
+  (1335 slices, 37.391 ns, with the PERIOD 20 ns warning); epfl-multiplier 72.51 -> 75.70 ns; itc99-b15's critical
+  path 19.976 -> 20.024 ns, its PERIOD 20 ns warning; iwls05-sasc 80 -> 52 slices and iwls05-simple-spi 111 -> 79
+  slices, 1.2.0's memory address pins from GND (#2982), not recorded until now.
+- **Rename takes a new name by the import gate's rules (#2973):** `renameFile` (server/projects.js) checks the new
+  name with the import gate's `normalizePath`, so the interface's Rename and the MCP tool `rename_file` refuse the
+  same names with the same message ("'src/CON.vhd': not renamed: reserved name ('CON.vhd')"); the browser edition's
+  store does the same; a rename undone (a module's rename that failed halfway) puts a file back at its old name
+  whatever it was.
+- **A schematic made from HDL places its net names on one wire grid (#2970):** `netLabels` (`core/schdoc-place.js`)
+  builds the grid of the symbols, markers and wires once and takes a net's own wires out while its name is placed (then
+  puts them back and adds the name), where `placeAndRoute` built a whole grid for each name; the names in the same
+  places (every drawing of the examples and of the design corpus the same as before), in a fraction of the time.
+  `test/schdoc-place-labels.test.js` checks the places against the grid built for each name on every example's drawings
+  and the time on micro80's largest.
+- **The reads of different memories in one state (#2968):** a memory's read goes into the state of the read just
+  before it, of another memory, when its address is known there and that memory's port is free there, as #1901's
+  second read of a two-port memory does: each memory's ports kept, a read whose address another read gives still after
+  it, two reads of one port a state apart. Not in a pipelined loop, whose schedule is its own. The HLS corpus's
+  misc-initialization-and-reset-static-array-rom 3 → 2 cycles (Vitis HLS 1);
+  interface-memory-manual-burst-manual-burst-with-conditionals 13282 → 12872 cycles (its third loop's II 9 → 7).
+- **A stream's read in the state of what computes with its value (#2967):** a read of an `hls::stream`, or of a
+  pointer with `INTERFACE ap_fifo` or `ap_hs`, is made in the state of the statements before it that only compute
+  and of those after it, its value chained into them; the state is held while the FIFO is empty (nothing written).
+  Split by the clock, the chain waits in its first state and takes the value in its last. A state with nothing in it
+  before `ap_done` is skipped. The HLS corpus's modeling-pointers-stream-good 13 → 6 cycles (Vitis HLS 6),
+  stream-better 13-14 → 6-9 (Vitis HLS 5: its write in a read's cycle; the co-simulation's `_ap_ack` not always
+  there); the designs with streams faster too, none below Vitis HLS: the task-level-parallelism ones (simple-data-driven
+  60 → 45, using-stream-of-blocks 602-603 → 430-431, …), axi-stream-to-master 24619 → 18648, the side-channel ones
+  6-7 → 6.
+- **Opening from a link: more local and reserved addresses refused, a redirection checked (#2962):** `privateHost`
+  (`core/design-link.js`) reads an IPv6 host as its eight groups (every spelling of an address, one that is not an
+  address refused) and refuses the forms that carry an IPv4 address (IPv4-compatible `::a.b.c.d` and all of `::/16`,
+  mapped, NAT64 `64:ff9b::/96` and `64:ff9b:1::/48`, 6to4 of a private IPv4 address), site-local, multicast,
+  discard-only and documentation IPv6 addresses, and the reserved IPv4 ranges (`198.18.0.0/15`, `192.0.0.0/24`, the
+  documentation ranges); the zip's fetch checks the address it ends at after a redirection as the link's own (https,
+  not local), else refuses it in the console.
+- **A schematic's I/O marker not from 0 (#2961):** its net's bits are those of its type, `std_logic_vector(4 downto 1)` /
+  `(1 to 4)` / `[4:1]`, constant bounds only (`portRange`, `core/schdoc.js`), as a bus named with its indices is (#1689,
+  #2903); a marker of no type, or of a range of generics, is counted from 0 as before. So Convert to Schematic draws a
+  port's bits and slices, an ascending port's slices kept as HDL; the converter's test designs in VHDL and Verilog, the
+  MCP's `convert_module` and the interface's tests.
+- **The nextpnr update's step outputs checked (#2959):** `scripts/nextpnr-update-report.mjs versions` refuses a version
+  resolved by a pull request's (or the base's) `package-lock.json` that is not of a version's shape (`VERSION_SHAPE`, as
+  the Yosys update's), and every value it and `scripts/yosys-update-report.mjs` write to `$GITHUB_OUTPUT` goes through one
+  helper (`githubOutputLines`) that refuses a line break.
+- **The ssh build folder kept inside the remote home (#2958):** every ISE run over ssh removes and remakes
+  `<ssh.remoteDir>/<project>` on the build host; through the API (Toolchain Settings) `ssh.remoteDir` is now a folder
+  inside the remote home (an optional `~/`, then no leading `/` or `-`, no other `~`, no `..`), an absolute folder is
+  set in `~/.silinx/config.json` only (kept when the dialog sends it back unchanged), and a folder starting with `-`
+  is refused whatever sets it.
+- **Imported projects: their trust and their paths hardened (#2956):** the project's description (silinx.json) is
+  recognised by its full Unicode case fold and as the same file on disk, not by its lower case alone, wherever a file
+  is written, renamed or deleted (the server's file routes, the MCP tools, the zip import), since a case-insensitive
+  file system takes other spellings for the same name; an imported project (a zip, an ISE project) is untrusted from
+  its first write, so an import that stops halfway leaves no trusted project; an ISE project's file paths follow the
+  import gate's rules for names (no hidden folder, no `build/`); the build copies a source to its path inside the
+  project as resolved, under `build/src/`, and checks a drawn source's name for XST's script as an HDL file's; the
+  MCP `rename_file` takes a new name by the import gate's rules.
+- **The local server's token kept off command lines (#2955):** the browser a launcher (or `serve --open`) opens is
+  given a one-time code (`…/#code=…`, single use, for a minute), which the page exchanges for the token (POST
+  `/api/token`, from the page itself: its Origin required); the address printed in the terminal keeps its token. A
+  second launch takes the server on its port for a running Silinx only when it proves it holds the token of its file
+  in the configuration folder (an HMAC of a nonce, GET `/api/proof`: the token is not sent to it), and opens it with
+  a code of its own; any other server on the port is another program (exit 1). The page replaces the token it keeps
+  with an address's `#token=…` only when the server accepts it (server/open-code.js, web/js/api.js).
+- **The Σm / ΠM lists in the canonical forms' rows (#2952):** no rows of their own (#2947): the minterm list under the
+  canonical SOP's expression, the maxterm list under the canonical POS's; in the print view and in the MCP's `results`
+  text too.
+- **The HDL logic per output, a tick box on its results (#2951):** the toolbar's *HDL logic* menu is gone; the result
+  ticked is the output's form (`forms` in the table, core/logic-choice.js; the table's `form` for the others). A new
+  table or output: the least gates' form; a table saved before keeps its one form on every output, its module the same
+  (the traffic example's, checked). New forms: `csop`, `cpos`, the canonical SOP and POS (don't cares left out),
+  compiled and simulated in VHDL and Verilog, drawn as a schematic. MCP (#2674): `set_output_logic` sets an output's
+  form and / or its minimal solution, as the editor does, and makes the HDL again; the `results` view says each
+  output's HDL logic.
+- **The minimal solution chosen, on the Karnaugh map, used everywhere (#2950):** the selector of the minimal solutions
+  (#2928) moves from the results to the Karnaugh map's options, for the groups the map shows; the results say "Solution
+  k of N". The choice is saved in the table (`solutions`: per output, SOP and POS) and used by its HDL module (its
+  comment says the solution), its schematic, its NAND / NOR forms and the least gates / delay; a cell or an expression
+  changed goes back to the first; Undo. The MCP's `related_view` results mark the solution used; `set_output_logic`
+  chooses it.
+- **The design corpus checks the packages it runs on (#2949):** `test/designs-corpus/run.mjs` compares the installed
+  packages with package-lock.json (`scripts/installed-packages.mjs`) and says, before and after its results, those
+  of another version and those Node finds in a `node_modules` above the checkout (a worktree with none of its own runs
+  on the main checkout's); `--update` refuses then. verilog-axis-fifo's +50 % slices and uart-for-fpga's +7 % were
+  nextpnr 0.15.0's place and route measured against 1.1.0's expectations: on package-lock.json's packages main gives
+  the recorded results (20 / 33 / 5.406 ns and 41 / 78 / 4.472 ns); ONBOARDING.md's lessons say to run `npm ci` in a
+  worktree.
+- **The minterm and maxterm lists on lines of their own (#2947):** the Boolean Algebra editor's results show "Minterm
+  list" (Σm) and "Maxterm list" (ΠM) as two rows, as the canonical SOP and POS above them, no longer both under
+  "Minterm and maxterm lists"; in its print view and in the MCP server's `related_view` results text too. In Portuguese.
+- **The ISE comparison at the Optimizations Area and Speed (#2941):** `test/designs-corpus/compare-ise.mjs` built Silinx at
+  `optLevel` 1 and 2 and the Quality page called them Normal, the default, and High; since #2470 `optLevel` 1 alone is Fast.
+  It now builds Area (a new project's default) and Speed by their ISE properties (`GOAL_IMPL`), records them in the results
+  (`optimizations`), and the page names its columns, summary and lines after them; a `--filter` run is not merged into
+  results of other Optimizations, and the results before (2026-10-25) still read as Normal and High.
+- **32 placements at Optimization Speed for a small design (#2940):** nextpnr places a Spartan-3E design of up to 100
+  slices 32 times at Speed, eight a larger one, the fastest kept (silinx-fpga's `nextpnrTries`); iwls05-sasc 4.763 →
+  4.563 ns, itc99-b10 4.751 → 4.659 ns, iwls05-usb-phy 4.889 → 4.819 ns on the XC3S1200E. README's Optimization says so.
+- **A nextpnr update measured before it is merged (#2935):** a pull request that changes a nextpnr package
+  (`@silinx/nextpnr-himbaechel-spartan3e`, `-spartan6`) runs `.github/workflows/nextpnr-update.yml`: every example
+  through the application's flow on the Basys2-250, the Nexys3 and the Atlys with the new packages and with the base
+  branch's, and one table of the differences (slices, LUTs, flip-flops, the minimum period, the run time; a change beyond
+  the noise marked) in the job summary, an artifact and a comment, labelled "nextpnr update" and never merged on green
+  alone (CLAUDE.md, scripts/nextpnr-update-report.mjs). Dependabot no longer groups the two packages with the other npm
+  updates: each update is a pull request of its own.
+- **The monthly Pins check follows the Spartan-6 nextpnr package (#2934):** a package pinned by a GitHub release's
+  tarball (`@silinx/nextpnr-himbaechel-spartan6`, `…/releases/download/spartan6-vX.Y.Z/…`, in both package.json
+  files), which Dependabot does not follow, is compared with its repository's latest tag of the same prefix
+  (`spartan6-v*`), and listed in the "Pinned sources" issue when it is behind (scripts/check-pins.mjs).
+- **Boolean algebra: every minimal solution viewable (#2928):** `minimize` (core/logic.js) returns every minimal
+  solution it found (up to 64) in `alternatives`, in a stable order, the first the one used so far; `analyzeOutput`
+  gives each its expression and gates. The editor's minimal SOP and POS with several have a selector beside their
+  note ("N minimal solutions exist."; "Many …: the first 64 can be browsed" at the cap); the choice sets the
+  expression, cost, circuit and the map's groups (flat and 3D), is printed as shown, and goes back to the first when
+  the table changes. The MCP server's `related_view` results list every minimal solution (#2674). In Portuguese; unit tests on cyclic covers against a brute-force enumeration, UI tests in both
+  interfaces.
+- **The canonical forms as expressions (#2927):** `canonicalAsts` (`core/logic.js`) builds the sum of the
+  minterms and the product of the maxterms as expressions (the don't cares left out; no minterm: 0, no maxterm: 1);
+  the editor's results show them first, then "Minterm and maxterm lists", where "Canonical forms" showed only the
+  lists; a table of 8 inputs wraps in the panel. `related_view`'s new view `results` returns a truth table's
+  results as the editor shows them (#2674). In Portuguese: Forma canónica SOP / POS, Listas de mintermos e maxtermos.
+- **An I/O marker added on a pin continues the pin outwards (#2926):** Add I/O Marker on a symbol's pin sets the
+  marker's side from the pin's outward direction on the sheet (`pinSide`, `newMarkerSide` in `core/schmarker.js`):
+  up N (ISE's R270), down S (R90), left W, right E; the direction's default side is not stored. On a wire or on empty
+  space the marker keeps its direction's default side, as before. The HDL is unchanged by the side, and the side
+  goes to ISE's `.sch` as the I/O marker's orientation and back. No MCP tool adds I/O markers (a schematic is
+  written whole with `write_file`).
+- **The Karnaugh map of 3 or 4 variables on a cylinder or a torus (#2925):** the axis of four codes goes round a
+  circle, so its first and last cells meet (3 variables: a cylinder; 4: a torus, the surface on which every Karnaugh
+  neighbour is a neighbour, which a sphere is not). The seam is in front. Each group is one patch in its colour with
+  its outline. The geometry (`core/kmapsurface.js`) is tested without the DOM: two cells share an edge exactly when
+  they are Karnaugh neighbours, and every cube's patch is one connected piece over exactly its cells. The view
+  (`web/js/tt-kmapsurface.js`) is an SVG drawn farthest face first, with the 3D box's drag, arrow keys, Reset view,
+  cell titles, Portuguese, dark theme and print view.
+- **The Karnaugh maps' order of the variables (#2924):** `kmapLayout(n, order)` (core/logic.js, `KMAP_ORDERS`) lays
+  the variables out MSB → LSB by columns then rows (`cols`, the default) or by rows then columns (`rows`); the map's
+  shape is the same in both. With 5 and 6 inputs the most significant pick the map (a; a b) in both orders, and the
+  order lays the other four out on each map. The groups, the cells' minterms, the 3D maps, the print view follow it.
+  The Boolean Algebra editor's *Order:* selector beside the map (both interfaces, Portuguese) saves it in the table
+  as `"kmapOrder": "rows"` (the default not written); through the MCP server, write_file of the table with it.
+- **CI: the browsers' system packages kept between runs, their install bounded (#2921, #2939):** the
+  webkit-standalone and browsers jobs keep apt's downloads of the packages Playwright's browsers need
+  (`--with-deps`) in GitHub's cache, by the runner's image, restored before the install and saved right after
+  it; the install stops at 10 minutes and runs once more with what it downloaded, a warning naming the attempt,
+  within the step's 25 minutes. A slow mirror (31 kB/s) had taken 50 minutes for 114 MB of them, and the browsers
+  job's time ran out 10 s after Firefox's test 125: no test hung (#2939). The browsers job's limit, 70 minutes,
+  is past its steps' own, so the step that runs out is the one named.
+- **Tests: the nextpnr interface test escapes every special character of the package's version in its pattern (#2920)** (`test/nextpnr-s3e-interface.test.js`, a CodeQL finding).
+- **Tests: the design link's UI test escapes every special character of the server's address in its pattern (#2919)** (`test/ui/design-link.test.js`, a CodeQL finding).
+- **Tests: the tab order's UI test strips the changed-document mark at the end of a title only (#2918)**
+  (`test/ui/tab-order.test.js`, a CodeQL finding).
+- **A project name that is not a string is refused (#2917):** the local server's `projectDir` refuses a name that is
+  not a string (an array, a number in a request's JSON) as an invalid project name (400), where an array of one
+  valid name passed the name's check and failed later (500); CodeQL now sees the check that confines a project's
+  folder to the workspace.
+- **The Spartan-3E's nextpnr engine at 1.1.0: router 1's effort bounded (#2912).** nextpnr-himbaechel-spartan3e 1.1.0
+  stops router 1 past 30000 wires visited per arc to route (200 million in all) and routes the design with router 2 from
+  there. A congested design no longer floods the device with router 1's searches: in the design corpus's run (Silinx's
+  flow, nextpnr in WebAssembly, two designs at a time) vtr-diffeq1's flow takes 253 s (946 s on 1.0.0), secworks-aes
+  840 s, epfl-multiplier 1425 s, epfl-log2 375 s (1.0.0's on CI: 6252 s, about 6000 s and 4000 s). A design router 1
+  routes within the budget, every example among them, routes as before; router 2's routes are a little slower
+  (vtr-diffeq1's critical path 38.1 ns, 36.6 before; epfl-multiplier's 77.8 ns, 72.5). The corpus's local run times of
+  the four designs recorded (test/designs-corpus/times.json).
+  - **Tests:** test/nextpnr-s3e-effort.test.js (new): the vga example through Silinx's nextpnr flow, router 1 within its
+    budget with no warning, and router 2 past a budget made small, its routes read back complete with no warning.
+- **Convert to Schematic, an internal vector not from 0 (#2903):** its net is named with the vector's indices, `c(3:1)`
+  / `c[3:1]` (a bus named with its indices, #1689), so its bus taps take its own bits and its HDL declares it as the
+  source did; an ascending one, `d(1 to 3)` / `wire [1:3] d`, is named as written, `d(1:3)`, its bits tapped and its
+  slices (`d(1 to 2)`) kept as HDL, a bus tap taking its bits MSB downto LSB; a net name with its indices in ascending
+  order not from 0 is the bus of those bits (`d(1:3)`: 3 downto 1, was 2 downto 0); the converter's test designs, the
+  MCP's `convert_module` and the interface's tests, in VHDL and Verilog.
+- **nextpnr stopping with no ERROR line (#2818).** When nextpnr stops on an exception of its own, it prints no ERROR
+  line, and in WebAssembly the exception has no message. Place & Route's error now lists nextpnr's last line
+  (`nextpnr stopped with no error message, after: Info: at iteration #11, type ALL: …`): the step it stopped in.
+  (The ITC'99 b14 to b22's crash in the analytical placer, a LUT taken twice by one carry chain, is
+  pmnmalo/nextpnr-spartan#16.)
+- **The LOC'd I/Os of a bank share its VCCO (#2813).** Before nextpnr runs, Place & Route checks the I/Os the
+  constraints LOC on pads (`bankVccoConflicts`, open-flow-nextpnr.js): an I/O whose I/O standard needs another VCCO
+  than the bank's first LOC'd I/O (ISE's default LVCMOS25) stops it, as ISE's PhysDesignRules:755 and Silinx's old
+  placer did: `place: q<0>: pad A10 is in bank 0, whose other I/Os (clk on B8, LVCMOS33) need VCCO 3.3 V, not 2.5 V
+  (LVCMOS25)`. The I/Os nextpnr places itself already went to a bank of their VCCO.
+- **The device's multiplier blocks a limit (#2783):** the interface and the MCP server's C tools gave `resourceCount`
+  the device's part name where it needs its part record (`S.devices.parts`, `findPart`): it threw, and every C function
+  was scheduled with no limit of multiplier blocks. `hlsMultsOf` (core/c-report.js) takes the part record now: six
+  multiplications in one state take the 4 MULT18X18s of an XC3S100E (Basys2-100), two of them used twice, and
+  co-simulate in VHDL and in Verilog with no warnings; View C Synthesis Report, C/RTL Co-simulation and the HDL made
+  from the C follow the device.
+- **The documentation says Silinx (#2624, part of the rename to Silinx):** the README, the getting-started guides
+  (the release zip's folder is `silinx`), ONBOARDING, CONTRIBUTING, CLAUDE.md, NOTICE, the architecture,
+  history and interface documents, the release notes, the silinx-fpga package's README and messages, the site's
+  analytics title, the interface mock-ups and the test designs' headers. The ISE runner's installer quotes the
+  hook's message as it is now ("Silinx runner: … allowed"). The web addresses and the repository's name change
+  with the repository's rename.
+- **The product's name in the app and the MCP server (#2624, part of the rename to Silinx):** `core/version.js`
+  PRODUCT and PRODUCT_FULL are Silinx; the page's title and notices, the menus, the About, Import / Export and
+  "Who is using" dialogs, the update messages and their Portuguese translations, the pen and touch test's
+  report, the web app manifest's name, the HDL header of the Module Wizard and the third-party notices say
+  Silinx; the MCP server's name is `silinx`, its instructions and import / export messages say Silinx. What's
+  new reads the notes of a release under either name.
+- **The project's old name counted (#2624, part of the rename to Silinx):** `test/old-name.test.js` counts the old
+  name (Silinx followed by ISE, in its four spellings) file by file as a ratchet: a new file with it, or a file
+  whose count grew, fails, and a count that shrinks is lowered in the test's list until the list is empty. Xilinx
+  ISE's own names (the ISE host's environment variables, its shared folder) and the changelogs' history are not
+  counted.
+- **The package, its command and the release's files named Silinx (#2624, part of the rename to Silinx):**
+  `package.json`'s name is `silinx`, its commands `silinx` (`bin/silinx.js`) and `silinx-ise` (`bin/silinx-ise.js`,
+  the old name: a warning on stderr, never on stdout where `mcp` writes its messages, then the same command);
+  the launchers, the single-file edition, the app's zip and its folder, the Docker kit and the development
+  build's files are named Silinx, as are the release's title and the ISE image's entrypoint
+  (`/usr/local/bin/ise-entrypoint`; an image built before keeps working). The single-file edition's title says
+  "(standalone)" again (lost when the page's title changed).
+- **The repository renamed Silinx (#2624, the last part of the rename to Silinx):** every web address of the
+  repository and of its site says Silinx (core/version.js's REPOSITORY, the update check, the links of a design,
+  What's new, the docs, the workflows); the clone's folder is `Silinx`. The old site's addresses redirect to the
+  new site (a page of the user site pmnmalo.github.io, with a copy of the toolchain's files for a single-file
+  edition downloaded before).
+- **The ISE runner's jobs by the repository's ID, not its name (#2624, part of the rename to Silinx):** the ISE
+  runner's hook (`scripts/ise-runner/job-started.sh`) and the ISE and Quality workflows' jobs check the repository's
+  ID, which a rename keeps, so they still run once the repository is named Silinx; the hook's messages say "Silinx
+  runner". The hook installed on the runner's machine is updated by running `scripts/ise-runner/install.sh` again.
+- **The HLS corpus compares the co-simulation's latency too (#2614):** `npm run test:hls` fails when a design's latency
+  (its minimum, maximum and average cycles) differs from `expected.json`, no longer only when a stage passes or fails.
+  Three designs had moved unnoticed, all with #1901, which ran the corpus with its configs' `INTERFACE` directives and
+  made a `BIND_STORAGE` array a memory: misc-initialization-and-reset-static-array-rom 1 → 3 cycles (its two arrays
+  ROMs, as Vitis HLS's), modeling-pointers-stream-good 5 → 13 (`ap_fifo`), modeling-pointers-stream-better 2 → 13-14
+  (`ap_hs`); recorded as they are. Not a regression: the earlier numbers were of other interfaces. The gaps against
+  Vitis HLS's 1, 6 and 5 cycles are #2967 (an `ap_fifo` / `ap_hs` access two states) and #2968 (the reads of two
+  memories in one statement in states one after the other).
+- **A sum of many terms balanced into a tree (#2613):** a chain of four terms or more added one after the other, all
+  of one width, is added two by two, the shallowest terms first (core/c-balance.js), before a function's states are
+  scheduled against the clock and before a pipelined loop's stages: the same value, bit for bit (an addition of one
+  width wraps the same in any order), in the logarithm of that many additions. An addition inside the chain that
+  something else reads is a term of its own. Vitis HLS's EXPRESSION_BALANCE, on by default for integers. A function's
+  sum of 32 products: 13 cycles → 4; a pipelined loop's sum of 48 terms: 18 stages → 4. `#pragma HLS
+  EXPRESSION_BALANCE off` in the top function's body keeps its sums as the C writes them (in a loop or another
+  function, or with another argument: a warning, ignored); it was accepted and ignored. The HLS corpus: the 2-D stencil
+  385359-385383 → 385329-385351 cycles (its latency is still the m_axi accesses', #2276), cpp-templates-for-multiple-
+  instances 23-28 → 22-25.
+- **ARRAY_RESHAPE packed into wide words (#2424):** type=cyclic factor=N puts element k in word k / N at slice k % N,
+  type=block factor=N in word k % S at slice k / S (S = ceil(L / N) words), as UG1399 says (core/c-reshape.js). An
+  array argument's `ap_memory` port is of those words (`a_address0` of the words, `a_q0` / `a_d0` N elements wide),
+  the co-simulation packing the C's elements into them; a local memory (more than 64 elements, or with a
+  BIND_STORAGE) is one memory of those words inside the module, its initial values packed. The accesses are a memory
+  of structs' (#1668): an element's word read once and held while its index does not change, its other elements taken
+  from it (`a[2 * i]` and `a[2 * i + 1]` one read); an element written into the held word, the word written whole.
+  The report lists the memory of the words. Its warnings: none when it is made; type=complete, dim=2, factor=1, an
+  array of more than one dimension, said as before; a small local stays registers, as a partition's.
+- **The technology schematic's test of blinky and pong, cheaper (#2392):** `test/techview.test.js` tests each example in
+  a test of its own (they neared the 300 s limit together in CI), one helper synthesizing it once and drawing it; pong's
+  top level drawn once, as View Technology Schematic draws it (its names as written), not also with the names in lower
+  case (blinky's still is): its drawing is most of the test's time, its net names' places rebuilding the wire grid each
+  (#2970).
+- **An RTL blackbox's files saved while the project is open (#2342):** the descriptions were read when the project
+  was (re)loaded, which a description, a header, a file added, removed or renamed, or a change from outside did; a
+  save of the RTL module (an HDL source) or of the C model (a C file) in its editor was not seen. Now such a save
+  reads the descriptions again (`refreshBlackboxes`, web/js/project.js) before the C sources' HDL is made. The MCP's
+  tools read them at each call. Tests: the UI test in both interfaces (the module's port renamed, the C's module
+  gone; the description corrected, back; the C model changed, C Simulation's result with it), the MCP's after
+  `write_file`.
+- **An RTL blackbox in a DATAFLOW region (#2340):** its call is a process of its own (core/c-blackbox-process.js): a
+  module made for it, `<function>_bb`, with a process's ports (the block protocol; a stream's `_dout` `_empty_n`
+  `_read` or `_din` `_full_n` `_write`; a memory's `_address0` `_ce0` `_we0` `_d0` `_q0`; an input), the RTL module
+  inside it, started once a call by the region's handshake (ap_start taken when it is idle), done with its ap_done or
+  its latency, its ap_ce and ap_continue held at 1. Its channels: the region's streams and buffers, the top's streams
+  and arrays, an input of the top's or a constant; an output or a result refused, as Vitis HLS refuses an output
+  pointer there. A process of C that calls a blackbox (a loop of the region's) sees the project's blackboxes too. The
+  C Synthesis Report names the process's RTL module and its latency ("ended by its ap_done" when the description
+  gives none). Tests: two blackbox processes and a stream, of a Verilog and of a VHDL module; a process of C and a
+  blackbox's with an input of the top's; a buffer a process of C writes, read through the blackbox's memory port;
+  the top's array; co-simulated in VHDL and in Verilog, read by Check Syntax's design checks (#2992's messages, of any
+  region, asserted); a module that differs mismatches; the refusals; the MCP's `c_simulation`, `c_cosimulation` and
+  `c_synthesis_report`; the UI test in both interfaces.
+- **An RTL blackbox's memory and stream ports (#2339):** a description's argument with `RAM_type` RAM_1P and Vitis
+  HLS's keys (`RAM_address`, `RAM_clock_enable`, `RAM_write_enable`, `RAM_data_write_out`, `RAM_data_read_in`) is a
+  memory port: the caller's memory (the top's ap_memory, or one of its own, a memory whatever its size) is the
+  module's while the call's state waits for it, as a sub-module's; an argument with `FIFO_empty_flag`,
+  `FIFO_read_enable`, `FIFO_data_read_in` (in) or `FIFO_full_flag`, `FIFO_write_enable`, `FIFO_data_write_out`
+  (out) is a FIFO port, the caller's stream argument the module's. Checked against the C (an array of a known size,
+  a stream, of integers) and the module (each port's direction and width, the address wide enough for the array's
+  words); refused, saying what to correct: RAM_T2P (not yet), a port the direction does not need or one missing, an
+  array partitioned, a BRAM interface or ram_2p written, a constant memory written. Tests: the top's memory, a memory
+  of its own, the top's streams, a memory only read, against a Verilog and a VHDL module, co-simulated in VHDL and in
+  Verilog and read by Check Syntax's design checks; a module that differs mismatches; the MCP's `c_simulation`,
+  `c_cosimulation` and `c_synthesis_report`; the UI test in both interfaces.
+- **C Simulation's top with an RTL blackbox (#2989):** the C models are added after the C source, and the top was
+  the last function defined: with no top given (the interface's C Simulation and C/RTL Co-simulation, the MCP's), it
+  was the C model's function, and the co-simulation failed. The top is now the C source's.
+- **The soft-float's operations as units (#2273):** each operation of the kind ALLOCATION names, in the pragma's scope
+  (its function, or the loop's body it is in), is a call of one function of that operation (core/c-float-units.js),
+  appended to the source, a sub-module (#1960's: one instance, its calls sharing it), its path scheduled over the clock
+  as a top's is. `x *= y` is `x = unit(x, y)`; an operation in a loop's header, after `&&` / `||`, in a branch of `?:`
+  or of constants only stays inlined; a loop that calls a unit is not pipelined. `limit=2` and more: one unit, said; an
+  operation of no such kind there, said and ignored. The report lists the unit, its calls and its latency, and the MCP
+  server's `c_synthesis_report` too. No design of the examples or of the HLS corpus has the pragma: none changes.
+- **A sub-module's float and double arguments (#2273):** they were converted to the port's integer
+  (core/c-submodule.js); now each passes its bits.
+- **Registers on the shared units' operands (#2273):** with the device's multiplier blocks (the IDE passes them),
+  when the units' path is over the period the machine is scheduled again with each multiplication in a cycle of its
+  own, its operands held in registers written the cycle before (core/c-schedule.js), and a unit's uses share two
+  registers, written by the state before each use (core/c-bind.js): the multiplexers on those registers' inputs, not
+  before the multiplication; kept when the path is shorter so, the latency counting the cycles added. The path
+  reported (`unitsNs`) counts those registers' multiplexers too. sinf 15.7 ns → 10.4, pow 25.5 → 18.9 at 10 ns: still
+  over the clock, still said. The soft-float's operations as units are left for later.
+- **Rearrange Wires' channels (#1994):** once the wires are routed again, the runs that can slide sideways without a
+  new bend (a wire's middle segment between two bends that turn the same way), side by side over the same free strip,
+  are a channel (`core/schchannels.js`). A channel's runs take the order with the fewest crossings (every order of up
+  to six runs, swaps of neighbours for more) and are spread over the strip at an even pitch, the gaps between
+  neighbours and to the strip's walls equal within a grid step. A channel changes only when every wire stays clear, no
+  net name is taken in, and the sheet has no more crossings and fewer of them or more even gaps; the connections are
+  checked after. On the examples' schematics and the schematic corpus (67 sheets): the uneven channels 44 -> 9, the
+  bends and crossings never more (1513 both ways: the router had already taken off the crossings a channel's order
+  can); on the examples' top schematics made untidy, a few crossings fewer (blinky 11 -> 9). `test/schchannels.test.js`, the UI test of Rearrange Wires.
+- **The MCP server's `rearrange_wires` and `rearrange_schematic` (#1994, #2674):** what the schematic editor's menu
+  does, through the same functions and with the same messages (the selection's wires, `selectionWires`, and the notes,
+  `wiresNote` and `sheetNote`, moved to `core/`); the schematic written and its HDL file made again.
+  `test/mcp-schematic.test.js`.
+- **The handwriting dialogs learn from the user's corrections (#1751, part of #1055):** on Insert, the characters of
+  the expressions whose text the user changed, where the text still lines up with the ink (the same lines, as many
+  letters, digits and ? on each, not a text written again), become samples of the user's handwriting, kept by the
+  browser with those of Teach Silinx my handwriting; on Create Schematic, a gate's type of another outline chosen in
+  the list keeps the gate's outline as a sample of that one (AND, OR, XOR, BUF), a name corrected of as many letters
+  its letters changed; the console says what was kept. The samples are the user's own templates
+  (`core/ink/templates.js` userTemplates, userGateTemplates for the gates' outlines, readSchematic's `gates`), Forget
+  My Samples forgets them all (`core/ink/learn.js`: expressionSamples, schematicSamples; readSchematic's gates and
+  names give their strokes, recognizeWords its characters').
+- **State machines kept as written (#652):** the open synthesis at High tries the state machines that Yosys makes
+  one-hot by itself in their author's codes too, and keeps the better netlist (secworks-aes 17 % fewer LUTs,
+  secworks-sha1 15 % faster).
+
 ## 15.22.1
 
 In short:

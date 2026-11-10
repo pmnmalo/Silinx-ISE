@@ -508,11 +508,22 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
     const req = new Float64Array(P), prevE = new Int32Array(P);
     const crit = new Float64Array(conns.length), slack = new Float64Array(conns.length).fill(Infinity);
     const perClock = [], passes = [], cross = [];
+    // the arrivals from some starts (each at its clock-to-out, its clock's skew added), each pin's last edge in prev
+    const propagate = (from, prev) => {
+      const arr = new Float64Array(P).fill(-Infinity);
+      prev.fill(-1);
+      for (const [p, d] of from) if (d + at(p) > arr[p]) arr[p] = d + at(p);
+      for (const p of order) {
+        if (arr[p] === -Infinity) continue;
+        for (let x = outStart[p]; x < outStart[p + 1]; x++) { const e = outEdge[x], q = eTo[e], t = arr[p] + delay[e]; if (t > arr[q]) { arr[q] = t; prev[q] = e; } }
+      }
+      return arr;
+    };
     // the critical path, back from its end (an end: [pin, setup, clock, edge]) in a pass's arrivals
-    const traceBack = (arr, wEnd) => {
+    const traceBack = (arr, wEnd, prev = prevE) => {
       const path = [{ ...pinName[wEnd[0]], kind: 'setup', delay: wEnd[1], arrival: arr[wEnd[0]] + wEnd[1] }];
       for (let p = wEnd[0]; ;) {
-        const e = prevE[p];
+        const e = prev[p];
         path.unshift({ ...pinName[p], kind: e < 0 ? 'clock-to-out' : eConn[e] >= 0 ? 'net' : 'logic', delay: e < 0 ? arr[p] : delay[e], arrival: arr[p] });
         if (e < 0) break;
         p = eFrom[e];
@@ -524,14 +535,8 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
       let best = null;
       for (const launch of [0, 1]) {
         if (!starts.some(s => s[2] === clk && s[3] === launch)) continue;
-        const arr = new Float64Array(P).fill(-Infinity);
-        prevE.fill(-1);
-        for (const [p, d, c, ed] of starts) if (c === clk && ed === launch && d + at(p) > arr[p]) arr[p] = d + at(p);
-        for (const p of order) {
-          if (arr[p] === -Infinity) continue;
-          for (let x = outStart[p]; x < outStart[p + 1]; x++) { const e = outEdge[x], q = eTo[e], t = arr[p] + delay[e]; if (t > arr[q]) { arr[q] = t; prevE[q] = e; } }
-        }
-        passes.push({ clock: clk, launch, arr });
+        const arr = propagate(starts.filter(s => s[2] === clk && s[3] === launch), prevE);
+        passes.push({ clock: clk, launch, arr, prev: prevE.slice() });
         // (#601: the slowest path into each other clock's flip-flops of each edge, timed against the two clocks' edges)
         const into = new Map();
         for (const end of ends) {
@@ -568,7 +573,31 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
       }
     }
     for (let ci = 0; ci < conns.length; ci++) crit[ci] = period > 0 && slack[ci] < Infinity ? Math.max(0, Math.min(1, 1 - slack[ci] / period)) : 0;
-    return { period, clocks: perClock.map(c => ({ clock: c.clock, period: c.period, path: c.path, half: c.half })), cross, crit, slack };
+    // the n slowest paths of each clock's flip-flops (#3178): the worst into each end, slowest first; delay: from the
+    // clock's edge to the end's setup, period: what it asks of the clock (twice the delay between its two edges).
+    // Between two chosen points: from (a start's { inst, pin } -> whether it is one: its own passes) and to (an end's)
+    const paths = (n = 10, { from = null, to = null } = {}) => {
+      const worst = new Map();
+      const own = !from ? passes : passes.flatMap(c => {
+        const sel = starts.filter(s => s[2] === c.clock && s[3] === c.launch && from(pinName[s[0]]));
+        if (!sel.length) return [];
+        const prev = new Int32Array(P);
+        return [{ clock: c.clock, launch: c.launch, arr: propagate(sel, prev), prev }];
+      });
+      for (const c of own) {
+        for (const end of ends) {
+          if (end[2] !== c.clock || c.arr[end[0]] === -Infinity || (to && !to(pinName[end[0]]))) continue;
+          const half = end[3] !== c.launch, delay = c.arr[end[0]] + end[1] - at(end[0]), per = delay * (half ? 2 : 1);
+          const k = `${end[0]}\u0000${end[2]}`;
+          if (!worst.has(k) || per > worst.get(k).period) worst.set(k, { clock: c.clock, delay, period: per, half, end, c });
+        }
+      }
+      return [...worst.values()].sort((a, b) => b.period - a.period).slice(0, n)
+        .map(w => ({ clock: w.clock, delay: w.delay, period: w.period, half: w.half, path: traceBack(w.c.arr, w.end, w.c.prev) }));
+    };
+    // (the flip-flops' clock-to-out pins and setup pins: the points the paths go between)
+    const pins = () => ({ starts: starts.map(s => pinName[s[0]]), ends: ends.map(e => pinName[e[0]]) });
+    return { period, clocks: perClock.map(c => ({ clock: c.clock, period: c.period, path: c.path, half: c.half })), cross, crit, slack, paths, pins };
   }
 
   // The paths at the pads and the hold check (#26), apart from the period: clockArr (Map instance -> the arrival of

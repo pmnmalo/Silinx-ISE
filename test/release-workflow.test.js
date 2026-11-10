@@ -48,7 +48,7 @@ test('release workflow: packaged (with SHA256SUMS), checked, the notes written; 
   assert.ok(download < attest && attest < publish && publish === m - 1, 'download, attest, publish');
   // out/* holds SHA256SUMS: it is a file of the release
   assert.match(publishStep, /GH_REPO: \$\{\{ github\.repository \}\}/);
-  assert.match(publishStep, /gh release create "\$GITHUB_REF_NAME" out\/\* --title "Silinx ISE \$V" --notes-file notes\.md/);
+  assert.match(publishStep, /gh release create "\$GITHUB_REF_NAME" out\/\* --title "Silinx \$V" --notes-file notes\.md/);
 });
 
 test('docs: how to check a download (README, docs/)', () => {

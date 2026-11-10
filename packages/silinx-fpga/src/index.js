@@ -18,6 +18,7 @@ export { backendOf, registerBackend } from './open-flow-backends.js';
 // synthesis: Verilog in (synthesisInput's { text, top }), a Yosys JSON netlist out
 export { synthesizeVerilog, synthEffort, synthGoal, GOAL_IMPL, FAST_SYNTH, cellCounts } from './synth-open.js';
 export { synthesizeArea } from './synth-area.js';
+export { synthesizeFast } from './synth-fast.js';
 export { runYosysOnce, yosysWorkerSource, readableBlobs, asText } from './synth-open-yosys.js';
 // nextpnr's WebAssembly package as the flow's io.nextpnr (the nextpnr engine, #2136; in Node: node.js nextpnrNode)
 export { nextpnrIo } from './nextpnr-io.js';
@@ -25,6 +26,7 @@ export { nextpnrIo } from './nextpnr-io.js';
 export { ice40Io } from './nextpnr-ice40-io.js';
 export { ICE40_PARTS, ICE40_STEPS } from './open-flow-ice40.js';
 export { PCF } from './pcf.js';
+export { XDC, readXdc, writeXdc } from './xdc.js';
 export { gateAssignments, rewriteCarryChains } from './carry-chain.js';
 
 // the netlist in (the constraints: ./parts.js)
@@ -42,6 +44,8 @@ export { readBit, writeBit, S3E_DEVICES } from './fpga/bitstream.js';
 export { analyzeTiming, SPEED_4 } from './fpga/timing.js';
 export { instArcs } from './fpga/timing-arcs.js';
 export { timingReport } from './fpga/timing-checks.js';
+// the slowest paths, stage by stage, back to their source lines (#3178)
+export { betweenPaths, pathHighlight, pathsText, timingPaths } from './fpga/timing-paths.js';
 export { estimatePower, powerReport } from './power.js';
 
 // the devices and their bit databases, from their files' contents (./node.js reads them from the disk)

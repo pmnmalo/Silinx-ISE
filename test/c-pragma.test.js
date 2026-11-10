@@ -50,7 +50,7 @@ test('#1529 a loop\'s PIPELINE and UNROLL: the cycles of a call (co-simulated: t
   assert.deepEqual(pipe.loops, [{ line: 4, unroll: null, pipeline: 1, ii: 1, cycles: 17 }]);
   assert.deepEqual(pipe.messages, []);
   const whole = alone(ACC('#pragma HLS UNROLL'));
-  assert.equal(whole.cycles, 7);   // (its 16 multiplications' sum: over several cycles, #2080)
+  assert.equal(whole.cycles, 3);   // (its 16 multiplications' sum: over several cycles, #2080; a tree, #2613: was 7)
   assert.deepEqual(whole.loops, [{ line: 4, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
   const by4 = alone(ACC('#pragma HLS UNROLL factor=4'));
   assert.equal(by4.cycles, 23);
@@ -121,7 +121,7 @@ int main(void) { for (int k = 0; k < 90; k += 7) printf("%d ", shift(k)); return
 `;
   const parted = run(src('#pragma HLS ARRAY_PARTITION variable=d type=complete'), 'shift.c');
   assert.deepEqual(parted.messages, []);
-  assert.equal(parted.cycles, 2);   // (its four additions do not fit 10 ns, #2080)
+  assert.equal(parted.cycles, 1);   // (its four additions, a tree, fit 10 ns, #2613; one after the other they did not, #2080)
   assert.doesNotMatch(parted.r.gen.hdl, /ap_m_d/);
   assert.deepEqual(parted.r.gen.report.memories, []);
   const block = run(src('#pragma HLS ARRAY_PARTITION variable=d type=block factor=4'), 'shift.c');

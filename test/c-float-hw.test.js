@@ -175,3 +175,45 @@ test('#1843 floor, ceil, trunc, round, fmin, fmax, copysign of any value in hard
     assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics], [[], true, 64, []], JSON.stringify(r.mismatches.slice(0, 3), big));
   }
 });
+
+// (#3009: a typedef's float kept a float, its name the typedef's: was taken as a double, 64-bit ports, the co-simulation
+// failing; C's typedef, a typedef of a typedef, C++'s using, a double's typedef 64 bits; ALLOCATION's fmul on it)
+const TYPEDEFS = (pr) => `typedef float r32;
+typedef r32 r32b;
+typedef double r64;
+r32b g(r32 a, r32 b[4], r64 d, r32b *o) {
+${pr}
+  r32 s = 0;
+  for (int i = 0; i < 4; i++) s += b[i] * a;
+  *o = s * s;
+  return (r32)(d * 0.5) + a * a + 0.1f;
+}
+int main() {
+  r32 b[4] = {1.5f, -2.25f, 3.0f, 0.1f}, o, t = 0;
+  for (int k = 0; k < 3; k++) { t += g(k * 0.5f + 0.25f, b, k - 1.5, &o); t += o; }
+  return t > 0 ? 0 : 1;
+}
+`;
+const ports = (r) => r.gen.ports.filter((p) => !/^ap_(clk|rst|start|done|idle|ready)$/.test(p.name)).map((p) => `${p.name}:${p.w}`);
+
+test('#3009 a typedef of float a float in hardware (32-bit ports and operations), a typedef of double a double, C++\'s using too: co-simulated in VHDL and Verilog, no warnings', () => {
+  for (const [file, src] of [['f.c', TYPEDEFS('')], ['f.cpp', TYPEDEFS('').replace('typedef float r32;', 'using r32 = float;')]]) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const r = cosimulate(src, { file, lang, top: 'g' });
+      assert.deepEqual(r.errors, [], `${file} ${lang}`);
+      assert.equal(r.pass, true, `${file} ${lang}: ${JSON.stringify(r.mismatches, big)}`);
+      assert.deepEqual(ports(r), ['a:32', 'b_address0:2', 'b_ce0:1', 'b_q0:32', 'd:64', 'o:32', 'o_ap_vld:1', 'ap_return:32'], `${file} ${lang}`);
+      assert.deepEqual(r.gen.diagnostics, [], `${file} ${lang}`);
+    }
+  }
+});
+
+test('#3009 ALLOCATION of fmul limit=1 on a typedef\'s multiplications: the float unit (was a double\'s), co-simulated in VHDL and Verilog, no warnings', () => {
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(TYPEDEFS('#pragma HLS ALLOCATION operation instances=fmul limit=1'), { file: 'f.c', lang, top: 'g' });
+    assert.deepEqual(r.errors, [], lang);
+    assert.equal(r.pass, true, `${lang}: ${JSON.stringify(r.mismatches, big)}`);
+    assert.deepEqual((r.gen.report.functions || []).map((f) => [f.name, f.calls]), [['ap_unit_fmul', 3]], lang);
+    assert.deepEqual(r.gen.diagnostics, [], lang);
+  }
+});

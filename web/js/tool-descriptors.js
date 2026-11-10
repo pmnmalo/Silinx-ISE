@@ -1,5 +1,6 @@
 // The tool descriptors (#2311, the plan #2315): what each back end does, as data. One per back end: ISE, the Silinx
-// toolchain on the Xilinx families, the Silinx toolchain on the iCE40 (nextpnr). Each says
+// toolchain on the Xilinx families, the Silinx toolchain on the iCE40 (nextpnr); and an experimental family's, none yet
+// (#3142: the 7-series, its flows to come, Vivado #1649 and the Silinx toolchain #3146). Each says
 // - steps: its steps (id, label, needs: the back end's own list) and what each produces, `{top}` the top module;
 // - reports: the reports of the Design Summary, each of a step;
 // - constraints: its constraints' format;
@@ -9,7 +10,7 @@
 // - tasks: the tasks of the Tasks interface, each with its main action and its state dot's processes.
 // What a tool does not have is not in its descriptor, and so not in the interface. No DOM here: unit tested
 // (test/tool-descriptors.test.js).
-import { deviceFamily } from '../../packages/silinx-fpga/src/parts.js';
+import { deviceFamily, experimentalDevice, vivadoDevice } from '../../packages/silinx-fpga/src/parts.js';
 
 export const OPEN_SYNTH = 'Synthesize - Yosys';
 export const SYNTH_OPEN = 'Synthesize - Yosys (open)';   // (ISE's tree: the open synthesis beside XST's)
@@ -117,6 +118,7 @@ const withProducts = (steps, products) => steps.map(s => ({ ...s, produces: prod
 
 const UCF = { format: 'ucf', ext: '.ucf', label: 'UCF' };
 const PCF = { format: 'pcf', ext: '.pcf', label: 'PCF' };
+const XDC = { format: 'xdc', ext: '.xdc', label: 'XDC' };
 
 /** Xilinx ISE 14.7. */
 export const ISE = {
@@ -147,7 +149,7 @@ export const SILINX = {
   steps: withProducts(XILINX_STEPS, {
     synth: ['open/{top}.json', 'open/{top}_stat.txt'], postsynth: ['netgen/synthesis/{top}_synthesis.vhd'],
     posttrans: ['netgen/translate/{top}_translate.vhd'], postmap: ['netgen/map/{top}_map.vhd'], postpar: ['netgen/par/{top}_timesim.vhd'],
-    par: ['open/placed.xdl', 'open/routed.xdl'], trce: ['open/timing.txt'],
+    par: ['open/placed.xdl', 'open/routed.xdl'], trce: ['open/timing.txt', 'open/paths.json'],
     pin2ucf: ['{top}_pins.ucf'], xpwr: ['{top}.pwr'], bitgen: ['{top}.bit'], prombit: ['{top}_prom.bit'],
   }),
   reports: [
@@ -183,10 +185,51 @@ export const SILINX_ICE40 = {
   tasks: LAB_TASKS,
 };
 
+/** An experimental family's (#3142): its constraints (XDC) and the design's checks, no implementation, no programming yet:
+ *  no step, no report, and the tasks without Implement (nor Emulate: its boards have no emulator yet). */
+export const NO_FLOW = {
+  id: 'no-flow', name: 'No implementation flow yet (experimental family)', open: false,
+  steps: [], reports: [],
+  constraints: XDC,
+  messages: LOG_MESSAGES,
+  program: null,
+  tree: [{ part: 'summary' }, { part: 'constraints' }, proc('rtl', 'View RTL Schematic', { ico: 'schematic' }), proc('check', 'Check Syntax')],
+  tasks: LAB_TASKS.filter(t => t.id === 'edit' || t.id === 'sim'),
+};
+
+/** AMD Vivado on the 7-series (#1649, server/vivado.js): ISE's step names, each a Vivado command (synth_design, opt_design as
+ *  Map, place_design and route_design, report_timing_summary, report_io, report_power, write_bitstream), no simulation models,
+ *  no technology schematic, no FPGA view; its reports Vivado's; the board programmed with openFPGALoader (iMPACT's page);
+ *  no Emulate (the 7-series' boards have no emulator yet). The local server's only: the browser edition has NO_FLOW. */
+export const VIVADO = {
+  id: 'vivado', name: 'AMD Vivado', open: false,
+  steps: withProducts([step('synth', 'Synthesize - Vivado'), step('translate', 'Translate', ['synth']), step('map', 'Map', ['translate']), step('par', 'Place & Route', ['map']),
+    step('trce', EXTRA_STEPS.trce, ['par']), step('pin2ucf', EXTRA_STEPS.pin2ucf, ['par']), step('xpwr', EXTRA_STEPS.xpwr, ['par']), step('bitgen', 'Generate Programming File', ['par'])], {
+    synth: ['post_synth.dcp', '{top}_synth_util.rpt'], map: ['post_opt.dcp'], par: ['post_route.dcp', '{top}_route.rpt', '{top}_drc.rpt', '{top}_util.rpt'],
+    trce: ['{top}_timing.rpt'], pin2ucf: ['{top}_io.rpt'], xpwr: ['{top}_power.rpt'], bitgen: ['{top}.bit'],
+  }),
+  reports: [
+    { id: 'synthesis', label: 'Synthesis Utilization Report', step: 'synth', file: '{top}_synth_util.rpt' },
+    { id: 'map', label: 'Utilization Report', step: 'par', file: '{top}_util.rpt' },
+    { id: 'par', label: 'Route Status Report', step: 'par', file: '{top}_route.rpt' },
+    { id: 'drc', label: 'DRC Report', step: 'par', file: '{top}_drc.rpt' },
+    { id: 'timing', label: 'Timing Summary Report', step: 'trce', file: '{top}_timing.rpt' },
+  ],
+  constraints: XDC,
+  messages: LOG_MESSAGES,
+  program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit' },
+  tree: treeOf(['synth-open', 'tech', 'postsynth', 'posttrans', 'postmap', 'postpar', 'fpgaview'], { synth: { label: 'Synthesize - Vivado', title: 'AMD Vivado' }, impl: { title: 'AMD Vivado' }, bitgen: { title: 'AMD Vivado' } })
+    .filter(n => n.part !== 'emulate'),
+  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+};
+
+// (the tools that implement: NO_FLOW's tasks are some of theirs)
 export const TOOLS = [ISE, SILINX, SILINX_ICE40];
 const OPEN_BY_FAMILY = { ice40: SILINX_ICE40 };
-/** The tool of a project device: `open`, the Silinx toolchain (its back end by the family), else ISE. */
-export const toolOf = (device, open) => (open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
+/** The tool of a project device: a 7-series one's AMD Vivado on the local server (#1649; `standalone`, the browser edition:
+ *  none); another experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE. */
+export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) && !standalone ? VIVADO
+  : experimentalDevice(device) ? NO_FLOW : open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
 
 /** Every tool's tasks, in their order: the kept state's and the switchers'. */
 export const allTasks = (tools = TOOLS) => [...new Map(tools.flatMap(t => t.tasks).map(t => [t.id, t])).values()];

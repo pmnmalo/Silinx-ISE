@@ -2,7 +2,7 @@
 
 The Silinx toolchain (synthesis, pack, place, route, static timing, bitgen without Xilinx ISE) works on
 the Spartan-3E boards (Basys2, Nexys2). The Spartan-6 boards, the **Digilent Nexys3 (XC6SLX16-3CSG324)**
-and **Atlys (XC6SLX45-3CSG324)**, are built with ISE only ([#1](https://github.com/pmnmalo/Silinx-ISE/issues/1)).
+and **Atlys (XC6SLX45-3CSG324)**, are built with ISE only ([#1](https://github.com/pmnmalo/Silinx/issues/1)).
 This note is the plan of that work: what the Spartan-6 needs that the Spartan-3E flow lacks, how each part
 is measured with ISE, the order of the work and its issues. It follows the method of
 [docs/OPEN-TOOLCHAIN.md](../../../../docs/OPEN-TOOLCHAIN.md) and of the Spartan-3E notes
@@ -20,16 +20,16 @@ not yet measured it says so; the measurements replace it.
 | Part | Spartan-3E (what Silinx has) | Spartan-6 (what is new) | Issue |
 |---|---|---|---|
 | Synthesis | `synth_xilinx -family xc3se` and Silinx's mappings (depth, LUT6 split, MUXF, FSM…) for 4-input LUTs | `synth_xilinx -family xc6s` already runs (LUT1–LUT6, MUXF7 / MUXF8, CARRY4, FDRE…, DSP48A1, RAMB8BWER / RAMB16BWER); Silinx's own remaps are for LUT4 families only and stay so for now | — |
-| Simulation models | UNISIM models of LUT1–6, MUXCY / XORCY, RAMB16_S*, MULT18X18, DCM… | **CARRY4, DSP48A1, RAMB8BWER, RAMB16BWER, SRLC32E** (the post-synthesis model of a Spartan-6 netlist cannot be simulated today) | [#720](https://github.com/pmnmalo/Silinx-ISE/issues/720) |
-| Slices | one slice kind: 2 LUT4, 2 FF, MUXF5 / MUXF6…, carry (MUXCY / XORCY) | **SLICEX / SLICEL / SLICEM**: 4 LUT6 with O6 / O5 (two 5-input functions of shared inputs), 8 storage elements (AFF–DFF flip-flop or latch, A5FF–D5FF flip-flop), one control set per slice; SLICEL adds CARRY4 and F7AMUX / F7BMUX / F8MUX; SLICEM adds the LUTs as RAM (64 × 1 per LUT) and SRL32 | [#721](https://github.com/pmnmalo/Silinx-ISE/issues/721) |
+| Simulation models | UNISIM models of LUT1–6, MUXCY / XORCY, RAMB16_S*, MULT18X18, DCM… | **CARRY4, DSP48A1, RAMB8BWER, RAMB16BWER, SRLC32E** (the post-synthesis model of a Spartan-6 netlist cannot be simulated today) | [#720](https://github.com/pmnmalo/Silinx/issues/720) |
+| Slices | one slice kind: 2 LUT4, 2 FF, MUXF5 / MUXF6…, carry (MUXCY / XORCY) | **SLICEX / SLICEL / SLICEM**: 4 LUT6 with O6 / O5 (two 5-input functions of shared inputs), 8 storage elements (AFF–DFF flip-flop or latch, A5FF–D5FF flip-flop), one control set per slice; SLICEL adds CARRY4 and F7AMUX / F7BMUX / F8MUX; SLICEM adds the LUTs as RAM (64 × 1 per LUT) and SRL32 | [#721](https://github.com/pmnmalo/Silinx/issues/721) |
 | CLB | 4 slices (2 SLICEM, 2 SLICEL) | 2 slices: SLICEM + SLICEX (CLBLM) or SLICEL + SLICEX (CLBLL); half the slices are SLICEX; carry chains run up the columns of SLICEL / SLICEM | #721, #729 |
 | Block RAM | RAMB16_S* (18 Kb) | RAMB16BWER (18 Kb, byte write enables, output registers) splitting into two RAMB8BWER (9 Kb, TDP or SDP of 36 bits) | #720, #728 |
 | Multipliers | MULT18X18SIO | DSP48A1: pre-adder, 18 × 18 multiplier, 48-bit post-adder / accumulator, OPMODE, its pipeline registers, cascades | #720, #728 |
 | Clocking | BUFGMUX, DCM | 16 BUFGMUX, BUFIO2 / BUFIO2FB from the clock pads (map inserts them), BUFH per clock region, CMTs of 2 DCM_SP + 1 PLL_BASE (2 CMTs in the LX16, 4 in the LX45), BUFPLL | #727 |
 | I/O | IOB with its registers | IOB pairs (master / slave), the IOI tiles with ILOGIC2 / OLOGIC2 (registers, SERDES) and IODELAY2; the boards' banks at 3.3 V (and 1.8 / 2.5 V on the Atlys) | #727 |
 | Routing fabric | singles, doubles, hexes, long lines, the Spartan-3E switch box | a new INT switch box: single, double and quad wires (the device report will say whether there is anything longer), its own logic inputs and outputs, the clock spines and BUFH rows; every tile type new | #723, #726, #730 |
-| Device descriptions | the four Spartan-3E parts' (`packages/silinx-fpga/devices/`) | `xc6slx16csg324-3` and `xc6slx45csg324-3`, from `xdl -report -pips -all_conns`; `packages/silinx-fpga/src/fpga/device.js` taught the new tile types | [#723](https://github.com/pmnmalo/Silinx-ISE/issues/723) |
-| Bitstream | UG332: 32-bit words, frames of 73 words (XC3S250E), FAR one word | UG380: **16-bit configuration words**, Type 1 headers with a 6-bit register address, FAR_MAJ (block type, row, major) and FAR_MIN (minor), frames of 65 words for every part, new registers (COR1 / COR2, CWDT, HC_OPT_REG, MODE_REG, GENERAL1–5…), the block RAM content in frames of its own | [#724](https://github.com/pmnmalo/Silinx-ISE/issues/724) |
+| Device descriptions | the four Spartan-3E parts' (`packages/silinx-fpga/devices/`) | `xc6slx16csg324-3` and `xc6slx45csg324-3`, from `xdl -report -pips -all_conns`; `packages/silinx-fpga/src/fpga/device.js` taught the new tile types | [#723](https://github.com/pmnmalo/Silinx/issues/723) |
+| Bitstream | UG332: 32-bit words, frames of 73 words (XC3S250E), FAR one word | UG380: **16-bit configuration words**, Type 1 headers with a 6-bit register address, FAR_MAJ (block type, row, major) and FAR_MIN (minor), frames of 65 words for every part, new registers (COR1 / COR2, CWDT, HC_OPT_REG, MODE_REG, GENERAL1–5…), the block RAM content in frames of its own | [#724](https://github.com/pmnmalo/Silinx/issues/724) |
 | Bit database | LUT, slice, routing, I/O, block RAM, multiplier, DCM bits of the Spartan-3E tile types | all of it again for the Spartan-6 tile types | #725–#728 |
 | Place, route, timing | `packages/silinx-fpga/src/fpga/place.js`, `route.js`, `timing.js` | placer and router on the new sites and graph, a delay model of the -3 speed grade fitted to trce | #729, #730, #731 |
 
@@ -56,7 +56,7 @@ them and this table is corrected then.
 
 | Stage | What | ISE runs | Estimated time | Scripts | Issue |
 |---|---|---|---|---|---|
-| **S6-0** (night 1) | device reports of both parts; an empty design's bitstream of each, with and without CRC; the seven examples implemented from their HDL on the Nexys3 and the Atlys (map's slice counts, the routed XDL, trce); the open synthesis's netlists of the examples implemented by ISE (the packer comparison) | 2 reports, 4 empty, 14 + 14 implementations | reports 1–3 h (the XC6SLX45's the longest, several GB before gzip); implementations 3–8 min each, 2–3 h at 3 containers | `night1.mjs`, `ise-s6.sh`, `night1-remote.sh`, `summarize-night1.mjs` (this folder) | [#733](https://github.com/pmnmalo/Silinx-ISE/issues/733) |
+| **S6-0** (night 1) | device reports of both parts; an empty design's bitstream of each, with and without CRC; the seven examples implemented from their HDL on the Nexys3 and the Atlys (map's slice counts, the routed XDL, trce); the open synthesis's netlists of the examples implemented by ISE (the packer comparison) | 2 reports, 4 empty, 14 + 14 implementations | reports 1–3 h (the XC6SLX45's the longest, several GB before gzip); implementations 3–8 min each, 2–3 h at 3 containers | `night1.mjs`, `ise-s6.sh`, `night1-remote.sh`, `summarize-night1.mjs` (this folder) | [#733](https://github.com/pmnmalo/Silinx/issues/733) |
 | S6-A | the bitstream format: the packet sequence, the FAR order and the frame count, the CRC, bitgen's options (StartUpClk, the PROM file) | about 20 | 1 h | the empty designs of S6-0, then one design per option | #724 |
 | S6-B | where every LUT is: one design numbering every LUT (as `gen-map.mjs`), its binary-coded variants (64 bits per LUT) | about 15 per part | 1–2 h | to write from `gen-map.mjs` / `decode-map.mjs` | #725 |
 | S6-C | the slice settings, per slice kind (X, L, M), in the slice harnesses of `gen-harness.mjs` | about 300 | 5–8 h | from `gen-slice.mjs`, `gen-hvar.mjs` | #725 |
@@ -760,20 +760,20 @@ XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the par
 
 | Issue | What | Needs ISE |
 |---|---|---|
-| [#720](https://github.com/pmnmalo/Silinx-ISE/issues/720) | simulation models of the open synthesis's Spartan-6 primitives | no |
-| [#721](https://github.com/pmnmalo/Silinx-ISE/issues/721) | the slice model and the packer | the comparison only |
-| [#722](https://github.com/pmnmalo/Silinx-ISE/issues/722) | the open flow's device entries behind a developer flag | no |
-| [#723](https://github.com/pmnmalo/Silinx-ISE/issues/723) | device descriptions of the two parts | yes |
-| [#724](https://github.com/pmnmalo/Silinx-ISE/issues/724) | the bitstream format, reader and writer | yes |
-| [#725](https://github.com/pmnmalo/Silinx-ISE/issues/725) | bit database: LUTs and slices | yes |
-| [#726](https://github.com/pmnmalo/Silinx-ISE/issues/726) | bit database: routing | yes |
-| [#727](https://github.com/pmnmalo/Silinx-ISE/issues/727) | bit database: I/O and clocking | yes |
-| [#728](https://github.com/pmnmalo/Silinx-ISE/issues/728) | bit database: block RAM and DSP48A1 | yes |
-| [#729](https://github.com/pmnmalo/Silinx-ISE/issues/729) | the placer | the check only |
-| [#730](https://github.com/pmnmalo/Silinx-ISE/issues/730) | the router | the check only |
-| [#731](https://github.com/pmnmalo/Silinx-ISE/issues/731) | static timing | yes |
-| [#732](https://github.com/pmnmalo/Silinx-ISE/issues/732) | the flow end to end on both boards | yes |
-| [#733](https://github.com/pmnmalo/Silinx-ISE/issues/733) | this plan and night 1's scripts | the runs |
+| [#720](https://github.com/pmnmalo/Silinx/issues/720) | simulation models of the open synthesis's Spartan-6 primitives | no |
+| [#721](https://github.com/pmnmalo/Silinx/issues/721) | the slice model and the packer | the comparison only |
+| [#722](https://github.com/pmnmalo/Silinx/issues/722) | the open flow's device entries behind a developer flag | no |
+| [#723](https://github.com/pmnmalo/Silinx/issues/723) | device descriptions of the two parts | yes |
+| [#724](https://github.com/pmnmalo/Silinx/issues/724) | the bitstream format, reader and writer | yes |
+| [#725](https://github.com/pmnmalo/Silinx/issues/725) | bit database: LUTs and slices | yes |
+| [#726](https://github.com/pmnmalo/Silinx/issues/726) | bit database: routing | yes |
+| [#727](https://github.com/pmnmalo/Silinx/issues/727) | bit database: I/O and clocking | yes |
+| [#728](https://github.com/pmnmalo/Silinx/issues/728) | bit database: block RAM and DSP48A1 | yes |
+| [#729](https://github.com/pmnmalo/Silinx/issues/729) | the placer | the check only |
+| [#730](https://github.com/pmnmalo/Silinx/issues/730) | the router | the check only |
+| [#731](https://github.com/pmnmalo/Silinx/issues/731) | static timing | yes |
+| [#732](https://github.com/pmnmalo/Silinx/issues/732) | the flow end to end on both boards | yes |
+| [#733](https://github.com/pmnmalo/Silinx/issues/733) | this plan and night 1's scripts | the runs |
 
 ## Decisions
 
@@ -852,6 +852,21 @@ traffic, blinky and pong on the Atlys):
   inner I/O tile's `D1_OLOGIC_SITE -> OQ_OLOGIC_SITE` (3 bits) and a BTERM's
   `IOI_BTERM_SR1B0 -> IOI_BTERM_NR1E0` (no bits), into `db/s6-pips-flow.json`.
 
+- **The JTAG's user access primitive, BSCAN_SPARTAN6** (#3176, 2026-11-10; for the logic analyzer). The four BSCAN
+  sites are in the top-right corner's tiles: BSCAN_X0Y0 / Y1 in UR_UPPER, Y2 / Y3 in UR_LOWER, one per JTAG_CHAIN 1-4.
+  `gen-bscan6.mjs` writes the designs: one per chain, every output sampled by flip-flops, DRCK clocking a shift
+  register that TDO reads; and chain 1 again with its logic far from the corner (f1). `measure-3176-s6.sh` implements
+  them with ISE from HDL on the XC6SLX16, then drops their non-INT tiles' PIPs (`gen-pipdrop6.mjs`, `--split 4` too):
+  50 xdl + bitgen runs. `ana-pipdrop6.mjs` resolves 121 PIPs, 113 with no bits (the pins' wires onto the interface
+  tile's LOGICOUT wires), 35 of them known already with the same bits. 85 of the 86 new ones are in `db/s6-pips-bscan.json`; the slave OLOGIC2's
+  `D1 -> OQ` of a top inner I/O tile (TIOI_INNER, three bits), which c3's and c4's output took, is left out while
+  nextpnr's released chip database has not got it: Silinx would give the 30 (23) top-bank pads of #3152 outputs that
+  nextpnr cannot route. It comes with the fork's next Spartan-6 chip database.
+  With them every design is one bit from ISE's bitgen: the instance's JTAG_CHAIN, one bit per chain in UR_UPPER's
+  region (frame 22, bits 31 … 28 for chains 1 … 4) whichever site holds it. That is `db/s6-bscan.json`, which
+  `bitgen.js` reads. The five designs are then byte-identical with ISE's bitgen but for c3's and c4's output path, and on the XC6SLX45 too (c1, c3: its
+  corner's region at frame 9056, the same offsets). The open flow does not place a BSCAN yet (nextpnr's chip database).
+
 ## Trying the parts that exist
 
 The Spartan-6 parts of the flow are behind a developer flag (#722): with `SILINX_SPARTAN6_OPEN=1` in the server's
@@ -895,6 +910,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `check-pips6.mjs` | The INT PIP database checked against ISE's implemented examples, tile by tile (#726) |
 | `gen-pipdrop6.mjs` | The examples routed by ISE without the other tiles' PIPs (`--split`: a quarter at a time) (#726) |
 | `ana-pipdrop6.mjs` | Their bits by tile and PIP: `db/s6-pips-other.json` (#726) |
+| `gen-bscan6.mjs`, `measure-3176-s6.sh` | #3176: BSCAN_SPARTAN6 on each JTAG chain, implemented by ISE from HDL, its corner tiles' PIPs dropped: `db/s6-pips-bscan.json`, the chain's bit `db/s6-bscan.json` |
 | `residual6.mjs` | Every bit of ISE's implemented examples predicted from the databases; what is left, by tile type (#725, #726) |
 | `gen-iob6.mjs` | The pads' designs: every bonded pad an IOB of one setting, the id designs (#727) |
 | `gen-clock6.mjs` | The clock path's designs (ISE implements them): one or more clocks to fixed flip-flops, k16 (#727) |

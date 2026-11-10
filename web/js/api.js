@@ -3,32 +3,56 @@
 import { prefKey } from './prefs.js';
 
 // The server answers only with its token, made at every start (#2564) and given in the address it
-// prints and opens (…/#token=…): kept for this browser (another tab opened at the plain address has it
-// too, until the server restarts), sent with every request. Only an address whose hash is the token alone sets it: a
-// link with other options (#2826) does not (#2829).
+// prints (…/#token=…); the address a launcher opens has a one-time code instead (…/#code=…, #2955: not the token,
+// on the opener's command line), which the page exchanges for the token. The token is kept for this browser
+// (another tab opened at the plain address has it too, until the server restarts), sent with every request.
+// Only an address whose hash is the token alone, or the code alone, sets it: a link with other options (#2826) does
+// not (#2829); and an address's token replaces the one kept only if the server accepts it (#2955).
 const TOKEN_KEY = prefKey('silinx-token');
-const TOKEN = (() => {
-  try {
-    const m = /^#token=([\w-]+)$/.exec(location.hash);
-    if (m) { localStorage.setItem(TOKEN_KEY, m[1]); history.replaceState(null, '', location.pathname + location.search); }
-    return localStorage.getItem(TOKEN_KEY);
-  } catch { return null; }
+const store = {
+  get: () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } },
+  set: t => { try { localStorage.setItem(TOKEN_KEY, t); } catch { /* not kept: this page only */ } },
+};
+let TOKEN = store.get();
+const READY = (async () => {
+  let m;
+  try { m = /^#(token|code)=([\w-]+)$/.exec(location.hash); } catch { return; }
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  const token = await tokenOf(m[1], m[2], fetch);
+  if (token) { TOKEN = token; store.set(token); }
 })();
 const auth = (headers = {}) => (TOKEN ? { ...headers, 'X-Silinx-Token': TOKEN } : headers);
+const authed = async (headers = {}) => { await READY; return auth(headers); };
+
+/** The token an address gives (null when refused or the server is not reached): a one-time code exchanged for it
+ *  (POST /api/token), or a token the server accepts (GET /api/workspace with it). */
+export async function tokenOf(kind, value, f = fetch) {
+  try {
+    if (kind === 'code') {
+      const r = await f('/api/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: value }) });
+      const j = r.ok ? await r.json() : null;
+      return typeof j?.token === 'string' ? j.token : null;
+    }
+    const r = await f('/api/workspace', { headers: { 'X-Silinx-Token': value } });
+    return r.ok ? value : null;
+  } catch { return null; }
+}
 
 async function req(method, url, body, { text = false } = {}) {
-  const opts = { method, headers: auth() };
+  const opts = { method, headers: await authed() };
   if (body !== undefined) {
     if (typeof body === 'string') { opts.body = body; opts.headers['Content-Type'] = 'text/plain'; }
     else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
   }
   let r;
   try { r = await fetch(url, opts); }
-  catch { throw Object.assign(new Error('the Silinx server is not running (start it with: node bin/silinx-ise.js serve)'), { offline: true }); }
+  catch { throw Object.assign(new Error('the Silinx server is not running (start it with: node bin/silinx.js serve)'), { offline: true }); }
   if (!r.ok) {
-    let msg = `${r.status} ${r.statusText}`;
-    try { const j = await r.json(); if (j.error) msg = j.error; } catch { /* not json */ }
-    throw Object.assign(new Error(msg), { status: r.status });
+    let msg = `${r.status} ${r.statusText}`, more = {};
+    // (git's failures carry a hint for the console, and a conflict its files: #3195)
+    try { const j = await r.json(); if (j.error) msg = j.error; if (j.hint) more.hint = j.hint; if (j.files) more.files = j.files; if (j.drawings) more.drawings = j.drawings; } catch { /* not json */ }
+    throw Object.assign(new Error(msg), { status: r.status }, more);
   }
   if (text) return r.text();
   const ct = r.headers.get('content-type') || '';
@@ -38,6 +62,11 @@ async function req(method, url, body, { text = false } = {}) {
 const enc = encodeURIComponent;
 
 export const api = {
+  // shared projects (#3181): this server's relay (server/collab-relay.js) opens a room with the token
+  collab: true,
+  collabToken: async () => { await READY; return TOKEN; },
+  // (the other relays its pages may use: config.json's relay.relays, #3227)
+  collabRelays: async () => (await req('GET', '/api/collab/relays')).relays,
   projects: () => req('GET', '/api/projects'),
   workspace: () => req('GET', '/api/workspace'),
   templates: () => req('GET', '/api/templates'),
@@ -53,6 +82,21 @@ export const api = {
   renameFile: (name, from, to) => req('POST', `/api/projects/${enc(name)}/rename`, { from, to }),
   deleteFile: (name, path) => req('DELETE', `/api/projects/${enc(name)}/file?path=${enc(path)}`),
   sources: name => req('GET', `/api/projects/${enc(name)}/sources`),
+  // a synthesis test of the project's exercise, graded on the server (#3216, server/grade-routes.js): { result }
+  gradeSynthesis: (name, exercise, test) => req('POST', `/api/projects/${enc(name)}/grade/synthesis`, { exercise, test }),
+  // a short link's gist (#3223): made by the server with its GitHub token
+  gistAvailable: () => req('GET', '/api/gist').then(r => !!r.available, () => false),
+  gistSave: design => req('POST', '/api/gist', { design }),
+  // git (#3195, the server editions: server/git-routes.js)
+  gitEnabled: () => req('GET', '/api/git'),
+  gitClone: (url, name = null) => req('POST', '/api/git/clone', { url, ...(name ? { name } : {}) }),
+  gitStatus: name => req('GET', `/api/projects/${enc(name)}/git/status`),
+  gitInit: (name, remote = null) => req('POST', `/api/projects/${enc(name)}/git/init`, remote ? { remote } : {}),
+  gitCommit: (name, message) => req('POST', `/api/projects/${enc(name)}/git/commit`, { message }),
+  gitPush: name => req('POST', `/api/projects/${enc(name)}/git/push`, {}),
+  gitPull: (name, { resolve = null } = {}) => req('POST', `/api/projects/${enc(name)}/git/pull`, resolve ? { resolve } : {}),
+  gitLog: (name, limit = 100) => req('GET', `/api/projects/${enc(name)}/git/log?limit=${limit}`),
+  gitShow: (name, commit, path) => req('GET', `/api/projects/${enc(name)}/git/show?commit=${enc(commit)}&path=${enc(path)}`),
   devices: () => req('GET', '/api/devices'),
   toolchain: (project = null) => req('GET', `/api/toolchain${project ? `?project=${enc(project)}` : ''}`),
   saveToolchain: (cfg, project = null) => req('PUT', `/api/toolchain${project ? `?project=${enc(project)}` : ''}`, cfg),
@@ -69,14 +113,14 @@ export const api = {
   importXise: body => req('POST', '/api/projects/import-xise', body),
   // whole project as a zip (.xise + silinx.json + all files)
   exportZip: async (name, kind = 'xilinx') => {
-    const r = await fetch(`/api/projects/${enc(name)}/export.zip?kind=${enc(kind)}`, { headers: auth() });
+    const r = await fetch(`/api/projects/${enc(name)}/export.zip?kind=${enc(kind)}`, { headers: await authed() });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
     let warnings = [];
     try { warnings = JSON.parse(decodeURIComponent(r.headers.get('X-Silinx-Warnings') || '[]')); } catch { /* none */ }
     return { blob: await r.blob(), filename: kind === 'silinx' ? `${name}-silinx.zip` : `${name}.zip`, warnings };
   },
   importZip: async (name, file) => {
-    const r = await fetch(`/api/projects/import-zip?name=${enc(name)}`, { method: 'POST', headers: auth({ 'Content-Type': 'application/zip' }), body: file });
+    const r = await fetch(`/api/projects/import-zip?name=${enc(name)}`, { method: 'POST', headers: await authed({ 'Content-Type': 'application/zip' }), body: file });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
     return j;
@@ -85,7 +129,7 @@ export const api = {
   // what another process changes in the project (#2843): onEvent({ project, changes: [{ path, kind }] }) for each,
   // until the stream ends or `signal` aborts (server-sent events read through fetch: the token in a header, not in the URL)
   events: async (name, onEvent, signal) => {
-    const r = await fetch(`/api/projects/${enc(name)}/events`, { headers: auth(), signal });
+    const r = await fetch(`/api/projects/${enc(name)}/events`, { headers: await authed(), signal });
     if (!r.ok || !r.body) throw Object.assign(new Error(`${r.status} ${r.statusText}`), { status: r.status });
     const reader = r.body.getReader(), dec = new TextDecoder();
     let buf = '';

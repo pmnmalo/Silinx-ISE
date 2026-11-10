@@ -15,7 +15,7 @@ import { serviceWorkerOf, registerServiceWorker } from '../web/js/pwa.js';
 import { ICONS, THEME, webManifest, withManifestLink, writePwa } from '../scripts/pwa.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SITE = 'https://pmnmalo.github.io/Silinx-ISE/';
+const SITE = 'https://pmnmalo.github.io/Silinx/';
 const DEV = `${SITE}dev/`;
 
 test('#1051 route: the page network-first, the manifest and icons kept, the versioned assets from their cache, nothing else intercepted', () => {
@@ -25,7 +25,7 @@ test('#1051 route: the page network-first, the manifest and icons kept, the vers
   assert.equal(nav(`${SITE}index.html`), 'page');
   assert.equal(nav(`${SITE}?project=x`), 'page');
   assert.equal(get(SITE), 'network', 'the page fetched, not opened (the update check reads version.json)');
-  assert.equal(nav(`${SITE}Silinx-ISE.html`), 'network', 'the downloaded file');
+  assert.equal(nav(`${SITE}Silinx.html`), 'network', 'the downloaded file');
   for (const f of SHELL) assert.equal(get(`${SITE}${f}`), 'shell', f);
   assert.equal(get(`${SITE}icons/other.png`), 'network');
   assert.equal(get(`${SITE}version.json`), 'network');
@@ -35,7 +35,7 @@ test('#1051 route: the page network-first, the manifest and icons kept, the vers
   assert.equal(get(`${SITE}assets/dev-83fea1b/bitdb/s3e-tiles.json`), 'asset');
   assert.equal(get(`${SITE}assets/devices/xc3s250ecp132-4.json.gz`), 'network', 'the unversioned assets of before #487');
   // another origin (GitHub's API, the usage counter), another method
-  assert.equal(get('https://api.github.com/repos/pmnmalo/Silinx-ISE/releases/latest'), 'network');
+  assert.equal(get('https://api.github.com/repos/pmnmalo/Silinx/releases/latest'), 'network');
   assert.equal(get('https://gc.zgo.at/count.js'), 'network');
   assert.equal(route({ url: `${SITE}manifest.webmanifest`, method: 'POST' }, SITE), 'network');
   assert.equal(route({}, SITE), 'network');
@@ -65,8 +65,8 @@ test('#1051 serviceWorkerOf / registerServiceWorker: only a page served over HTT
   const loc = (href) => new URL(href);
   assert.deepEqual(serviceWorkerOf(doc(`${SITE}manifest.webmanifest`), loc(SITE)), { url: `${SITE}sw.js`, scope: SITE });
   assert.deepEqual(serviceWorkerOf(doc(`${DEV}manifest.webmanifest`), loc(`${DEV}index.html`)), { url: `${DEV}sw.js`, scope: DEV });
-  assert.equal(serviceWorkerOf(doc(null), loc(`${SITE}Silinx-ISE.html`)), null, 'no manifest: the downloaded file');
-  assert.equal(serviceWorkerOf(doc('file:///x/manifest.webmanifest'), loc('file:///x/Silinx-ISE.html')), null, 'a file');
+  assert.equal(serviceWorkerOf(doc(null), loc(`${SITE}Silinx.html`)), null, 'no manifest: the downloaded file');
+  assert.equal(serviceWorkerOf(doc('file:///x/manifest.webmanifest'), loc('file:///x/Silinx.html')), null, 'a file');
   assert.equal(serviceWorkerOf(undefined, undefined), null);
   const calls = [];
   const nav = { serviceWorker: { register: async (url, opts) => { calls.push([url, opts]); return { scope: opts.scope }; } } };
@@ -88,12 +88,12 @@ test('#1051 serviceWorkerOf / registerServiceWorker: only a page served over HTT
 test('#1051 the manifest: each edition an app of its own, standalone, started and scoped in its folder; icons the files the worker keeps', () => {
   const m = webManifest();
   assert.deepEqual(m, {
-    id: './', name: 'Silinx ISE', short_name: 'Silinx',
+    id: './', name: 'Silinx', short_name: 'Silinx',
     description: 'An ISE-like FPGA IDE for teaching digital systems: design, simulate and implement for Spartan-3E boards, in the browser.',
     lang: 'en', start_url: './', scope: './', display: 'standalone', background_color: '#ffffff', theme_color: THEME, icons: ICONS,
   });
   const d = webManifest({ dev: true });
-  assert.deepEqual([d.name, d.short_name], ['Silinx ISE (development)', 'Silinx dev']);
+  assert.deepEqual([d.name, d.short_name], ['Silinx (development)', 'Silinx dev']);
   assert.deepEqual(ICONS.map((i) => [i.sizes, i.purpose]), [['192x192', 'any'], ['512x512', 'any'], ['512x512', 'maskable']]);
   assert.deepEqual(ICONS.map((i) => i.src), SHELL.filter((f) => f.startsWith('icons/')));
   // the PNGs at the sizes they are said to have (their IHDR's width and height)

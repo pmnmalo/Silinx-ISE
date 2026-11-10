@@ -143,7 +143,8 @@ test('#1927 the ASM chart of a free-running function (ap_ctrl_none): IDLE goes o
       'S2 -next-> <in_r_empty_n>', '<in_r_empty_n> -false-> S2', '<in_r_empty_n> -true-> (in_r_read = 1; ap_fifo_in_0 = in_r_dout; s += ap_fifo_in_0; i++)',
       '(in_r_read = 1; ap_fifo_in_0 = in_r_dout; s += ap_fifo_in_0; i++) -next-> <i < 3>', '<i < 3> -true-> S2', '<i < 3> -false-> S3',
       'S3 -next-> <out_r_full_n>', '<out_r_full_n> -false-> S3', '<out_r_full_n> -true-> (out_r_din = s; out_r_write = 1)',
-      '(out_r_din = s; out_r_write = 1) -next-> S4', 'S4 -next-> DONE',
+      // (no state of nothing before DONE, #2967)
+      '(out_r_din = s; out_r_write = 1) -next-> DONE',
     ], lang);
     const st = (n) => r.model.nodes.find((x) => x.name === n);
     assert.deepEqual([st('IDLE').actions, st('DONE').actions], [[], []], lang);
@@ -206,27 +207,26 @@ test('#1941 a stream\'s read and write in the ASM chart in the C\'s terms (ap_fi
     const r = cAsm(STREAMS, { file: 'sums.cpp', lang });
     assert.equal(r.ok, true, lang);
     assert.deepEqual(r.diagnostics, [], lang);
-    const rd = (k, from, to) => [`${from} -next-> <xs_empty_n>`, `<xs_empty_n> -false-> ${from}`, `<xs_empty_n> -true-> (xs_read = 1; ap_fifo_xs_${k} = xs_dout)`,
-      `(xs_read = 1; ap_fifo_xs_${k} = xs_dout) -next-> ${to}`];
-    // each read: its state, then the wait (back to the state while xs_empty_n is 0), the value taken under it; the write
-    // the same with ys_full_n; the loop pipelined automatically (#1919): its iteration one state, S2, its add and step
-    // after the read's handshake
+    const rd = (k, from, then, to) => [`${from} -next-> <xs_empty_n>`, `<xs_empty_n> -false-> ${from}`, `<xs_empty_n> -true-> (xs_read = 1; ap_fifo_xs_${k} = xs_dout; ${then})`,
+      `(xs_read = 1; ap_fifo_xs_${k} = xs_dout; ${then}) -next-> ${to}`];
+    // each read: its state, then the wait (back to the state while xs_empty_n is 0), the value taken under it with what
+    // computes with it (#2967); the write the same with ys_full_n; the loop pipelined automatically (#1919): its
+    // iteration one state, S2, its add and step after the read's handshake
     const loop = '(xs_read = 1; ap_fifo_xs_0 = xs_dout; s += ap_fifo_xs_0; i++)';
     assert.deepEqual(lines(r.model), [
       'IDLE -next-> <ap_start>', '<ap_start> -true-> S1', '<ap_start> -false-> IDLE', 'DONE -next-> IDLE',
       'S1 -next-> <i < 2>', '<i < 2> -true-> S2', '<i < 2> -false-> S3',
       'S2 -next-> <xs_empty_n>', '<xs_empty_n> -false-> S2', `<xs_empty_n> -true-> ${loop}`, `${loop} -next-> <i < 2>`, '<i < 2> -true-> S2', '<i < 2> -false-> S3',
-      ...rd(1, 'S3', 'S4'), 'S4 -next-> S5',
-      ...rd(2, 'S5', 'S6'), 'S6 -next-> <!xs.empty()>', '<!xs.empty()> -true-> S7', '<!xs.empty()> -false-> S9',
-      ...rd(3, 'S7', 'S8'), 'S8 -next-> S9',
-      'S9 -next-> <ys_full_n>', '<ys_full_n> -false-> S9', '<ys_full_n> -true-> (ys_din = s + t; ys_write = 1)', '(ys_din = s + t; ys_write = 1) -next-> S10',
-      'S10 -next-> DONE',
+      ...rd(1, 'S3', 'int t = ap_fifo_xs_1', 'S4'),
+      ...rd(2, 'S4', 't = ap_fifo_xs_2', '<!xs.empty()>'), '<!xs.empty()> -true-> S5', '<!xs.empty()> -false-> S6',
+      ...rd(3, 'S5', 's += ap_fifo_xs_3 * 2', 'S6'),
+      'S6 -next-> <ys_full_n>', '<ys_full_n> -false-> S6', '<ys_full_n> -true-> (ys_din = s + t; ys_write = 1)', '(ys_din = s + t; ys_write = 1) -next-> DONE',
     ], lang);
     const st = (n) => r.model.nodes.find((x) => x.name === n);
-    // the C's statements in their states: the value read in a register, used by the statement after it; read(t) as t = …
-    assert.deepEqual(['S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9'].map((n) => st(n).actions), [
-      ['ap_fifo_xs_0 = xs.read()'], ['ap_fifo_xs_1 = xs.read()'], ['int t = ap_fifo_xs_1'], ['ap_fifo_xs_2 = xs.read()'],
-      ['t = ap_fifo_xs_2'], ['ap_fifo_xs_3 = xs.read()'], ['s += ap_fifo_xs_3 * 2'], ['ys.write(s + t)']], lang);
+    // the C's statements in their states: the value read in a register, used by the statements after it, in its state;
+    // read(t) as t = …
+    assert.deepEqual(['S2', 'S3', 'S4', 'S5', 'S6'].map((n) => st(n).actions), [
+      ['ap_fifo_xs_0 = xs.read()'], ['ap_fifo_xs_1 = xs.read()'], ['ap_fifo_xs_2 = xs.read()'], ['ap_fifo_xs_3 = xs.read()'], ['ys.write(s + t)']], lang);
     assert.deepEqual(st('DONE').actions, ['ap_done = 1', 'ap_ready = 1'], lang);
     // the handshake's ports among the chart's; as many states as the module; every box placed apart
     assert.deepEqual([r.model.inputs.map((p) => p.name), r.model.outputs.map((p) => p.name)], [
@@ -264,13 +264,12 @@ test('#1941 streams named in and out: t = in.read() and out.write(t + 1) as the 
     assert.deepEqual(r.diagnostics, [], lang);
     assert.deepEqual(lines(r.model), [
       'IDLE -next-> <ap_start>', '<ap_start> -true-> S1', '<ap_start> -false-> IDLE', 'DONE -next-> IDLE',
-      'S1 -next-> <in_r_empty_n>', '<in_r_empty_n> -false-> S1', '<in_r_empty_n> -true-> (in_r_read = 1; ap_fifo_in_0 = in_r_dout)', '(in_r_read = 1; ap_fifo_in_0 = in_r_dout) -next-> S2',
-      'S2 -next-> S3',
-      'S3 -next-> <out_r_full_n>', '<out_r_full_n> -false-> S3', '<out_r_full_n> -true-> (out_r_din = t + 1; out_r_write = 1)', '(out_r_din = t + 1; out_r_write = 1) -next-> S4',
-      'S4 -next-> DONE',
+      // (the read's value used in its state, #2967)
+      'S1 -next-> <in_r_empty_n>', '<in_r_empty_n> -false-> S1', '<in_r_empty_n> -true-> (in_r_read = 1; ap_fifo_in_0 = in_r_dout; int t = ap_fifo_in_0)', '(in_r_read = 1; ap_fifo_in_0 = in_r_dout; int t = ap_fifo_in_0) -next-> S2',
+      'S2 -next-> <out_r_full_n>', '<out_r_full_n> -false-> S2', '<out_r_full_n> -true-> (out_r_din = t + 1; out_r_write = 1)', '(out_r_din = t + 1; out_r_write = 1) -next-> DONE',
     ], lang);
     const st = (n) => r.model.nodes.find((x) => x.name === n);
-    assert.deepEqual(['S1', 'S2', 'S3', 'S4'].map((n) => st(n).actions), [['ap_fifo_in_0 = in.read()'], ['int t = ap_fifo_in_0'], ['out.write(t + 1)'], []], lang);
+    assert.deepEqual(['S1', 'S2'].map((n) => st(n).actions), [['ap_fifo_in_0 = in.read()'], ['out.write(t + 1)']], lang);
     // the handshake's names the module's ports
     const gen = cToHdl(INOUT, { file: 'pass2.cpp', lang });
     const names = new Set(gen.ports.map((p) => p.name));

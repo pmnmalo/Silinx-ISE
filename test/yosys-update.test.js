@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { checkoutLayout } from './workflows-lib.mjs';
 import { yosysVersion, yosysChange, yosysTag, qualityRows, designQualities, mergeCorpus, reportMarkdown, readSide, DESIGN_SUBSET, MARK, PACKAGE, CORPUS_SHARDS } from '../scripts/yosys-update-report.mjs';
 import { EXAMPLE_ORDER } from '../core/examples.js';
 
@@ -154,8 +155,9 @@ test('yosys update: the design corpus\'s subset: designs of the manifest whose f
   // VHDL and Verilog, CPUs and benchmarks
   const lang = n => manifest.designs.find(d => d.name === n).files.some(f => /\.vhdl?$/.test(f));
   assert.ok(DESIGN_SUBSET.some(lang) && DESIGN_SUBSET.some(n => !lang(n)));
-  // the stages run (frontend, synth, flow) under 40 min of one job on CI (4 jobs in the workflow)
-  assert.ok(total < 40 * 60000, `${(total / 60000).toFixed(0)} min`);
+  // the stages run (frontend, synth, flow) under 60 min of one job on CI: about 15 min with the workflow's 4 jobs, of
+  // its 90 (46 min on the nextpnr engine 1.1.0's times, #3003)
+  assert.ok(total < 60 * 60000, `${(total / 60000).toFixed(0)} min`);
   const r = spawnSync(process.execPath, [SCRIPT, 'subset'], { encoding: 'utf8' });
   assert.equal(r.stdout.trim(), DESIGN_SUBSET.join(','));
 });
@@ -169,14 +171,14 @@ test('yosys update: the workflow on pull requests that change @yowasp/yosys, Git
   for (const m of yml.matchAll(/runs-on: (.+)/g)) assert.equal(m[1], 'ubuntu-latest');
   assert.match(yml, /\npermissions:\n  contents: read\n/);
   // the check of the diff: the base's versions against the pull request's, by the base's script (#1440); the label
-  assert.match(yml, /\n      - id: v\n        run: node base\/scripts\/yosys-update-report\.mjs versions base\/package\.json base\/package-lock\.json package\.json package-lock\.json\n/);
-  assert.doesNotMatch(yml, /node scripts\/yosys-update-report\.mjs (versions|comment) /);
+  assert.match(yml, /\n      - id: v\n        run: node scripts\/yosys-update-report\.mjs versions package\.json package-lock\.json head\/package\.json head\/package-lock\.json\n/);
+  assert.doesNotMatch(yml, /node (head\/)?scripts\/yosys-update-report\.mjs comment /);
   assert.match(yml, /gh pr edit .* --add-label "yosys update"/);
   for (const job of ['measure', 'corpus']) assert.match(yml, new RegExp(`\\n  ${job}:\\n    needs: check\\n    if: needs\\.check\\.outputs\\.changed == 'true'\\n`), job);
   assert.match(yml, /\n  report:\n    needs: \[check, measure, corpus\]\n    if: always\(\) && needs\.check\.outputs\.changed == 'true'\n/);
   // both sides, the base's Yosys installed over the same code
   assert.match(yml, /side: \[base, head\]/);
-  assert.match(yml, /if: matrix\.side == 'base'\n\s+env:\n\s+BASE_VERSION: \$\{\{ needs\.check\.outputs\.base \}\}\n\s+run: \|\n\s+npm install --no-save --ignore-scripts "@yowasp\/yosys@\$BASE_VERSION"/);
+  assert.match(yml, /if: matrix\.side == 'base'\n\s+env:\n\s+BASE_VERSION: \$\{\{ needs\.check\.outputs\.base \}\}\n(\s+#.*\n)*\s+run: npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root "@yowasp\/yosys@\$BASE_VERSION"\n/);
   // every example, in their order, through the open flow with --quality
   const ex = /for ex in ([\w ]+); do/.exec(yml)[1].split(' ');
   assert.deepEqual(ex, EXAMPLE_ORDER);
@@ -206,28 +208,29 @@ test('yosys update: the steps with a writing token run the base\'s code, and the
     else if (name && /^ {4}/.test(line)) j[name].push(line);
   }
   assert.deepEqual(Object.keys(j), ['check', 'measure', 'corpus', 'report']);
-  // the base checked out under base/ in the two jobs whose token writes (check: the label; report: the comment),
-  // with no credentials kept, and the pull request's script never run there with the token
+  // the base checked out in the two jobs whose token writes (check: the label; report: the comment), with no
+  // credentials kept, and the pull request's script never run there with the token: the check job's base at the
+  // root, the pull request under head/ (#3038), the report job's base under base/
+  assert.deepEqual(checkoutLayout(j.check.join('\n')), { base: '', head: 'head', clean: true });
   const baseCheckout = /\n      - uses: actions\/checkout@[0-9a-f]{40} # v[\d.]+\n        with:\n          ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}\n          path: base\n          persist-credentials: false\n/;
-  for (const job of ['check', 'report']) {
-    assert.match(`\n${j[job].join('\n')}\n`, baseCheckout, job);
-    assert.ok(!j[job].some(l => /run: .*\bnode scripts\//.test(l) && /GITHUB_TOKEN|GH_TOKEN/.test(l)), job);
-  }
+  assert.match(`\n${j.report.join('\n')}\n`, baseCheckout, 'report');
+  for (const job of ['check', 'report'])
+    assert.ok(!j[job].some(l => /run: .*\bnode (head\/)?scripts\//.test(l) && /GITHUB_TOKEN|GH_TOKEN/.test(l)), job);
   // nothing of the pull request runs in them (#2644): only the base's scripts (check reads the pull request's
   // package files as data); the report job does not check the pull request out at all
-  for (const job of ['check', 'report'])
-    assert.ok(!j[job].some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), `${job}: the base's scripts only`);
+  assert.ok(!j.check.some(l => /\bhead\/(?!package(-lock)?\.json\b)/.test(l.replace(/#.*$/, ''))), 'check: the pull request\'s package files only');
+  assert.ok(!j.report.some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), 'report: the base\'s scripts only');
   assert.equal(j.report.filter(l => /uses: actions\/checkout@/.test(l)).length, 1, 'report: the base\'s checkout only');
   assert.ok(j.report.some(l => /^ {10}node base\/scripts\/yosys-update-report\.mjs report --base /.test(l)), 'the table by the base\'s script');
   // the versions by the base's script, the comment by the base's script with the token
-  assert.ok(j.check.some(l => l === '        run: node base/scripts/yosys-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json'));
+  assert.ok(j.check.some(l => l === '        run: node scripts/yosys-update-report.mjs versions package.json package-lock.json head/package.json head/package-lock.json'));
   const comment = j.report.indexOf('        run: node base/scripts/yosys-update-report.mjs comment yosys-update.md');
   assert.ok(comment > 0);
   assert.match(j.report.slice(comment, comment + 4).join('\n'), /GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
   // the measure job: the version checked by a step of the workflow (a version, nothing else) before the install
   const m = j.measure;
   const checked = m.indexOf('      - name: The base\'s version checked');
-  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts "@yowasp/yosys@$BASE_VERSION"'));
+  const install = m.findIndex(l => l.includes('npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root "@yowasp/yosys@$BASE_VERSION"'));
   assert.ok(checked > 0 && install > checked, 'the check step before the install');
   const step = m.slice(checked, install).join('\n');
   assert.match(step, /^        if: matrix\.side == 'base'\n        env:\n          BASE_VERSION: \$\{\{ needs\.check\.outputs\.base \}\}\n        run: \|\n          \[\[ "\$BASE_VERSION" =~ \^\[0-9\]\+\(\\\.\[0-9\]\+\)\*\$ \]\] \|\| \{ .*exit 1; \}\n/m);
@@ -235,6 +238,19 @@ test('yosys update: the steps with a writing token run the base\'s code, and the
   const re = /^[0-9]+(\.[0-9]+)*$/;
   for (const v of ['0.70.1258', '1.0', '12']) assert.ok(re.test(v), v);
   for (const v of ['npm:evil@1', 'latest', '^0.70.1258', '0.70.1258 x', '', '0.70.1258-rc1']) assert.ok(!re.test(v), v);
+  // into the toolchain's workspace too, and the version it resolves checked on both sides (#3156): installed at the root
+  // only, npm kept the pull request's Yosys nested in packages/silinx-fpga/node_modules
+  assert.ok(!m.some(l => /npm install(?!.*--workspace silinx-fpga --include-workspace-root)/.test(l.replace(/#.*$/, ''))), 'every install into the workspace');
+  const resolved = m.indexOf('      - name: Yosys resolved');
+  const examples = m.indexOf('      - name: The examples');
+  assert.ok(resolved > install && examples > resolved, 'the check after the install, before the examples');
+  assert.equal(m.slice(resolved, examples).join('\n'), [
+    '      - name: Yosys resolved',
+    '        env:',
+    "          BASE_SPEC: ${{ matrix.side == 'base' && format('@yowasp/yosys@{0}', needs.check.outputs.base) || '@yowasp/yosys' }}",
+    '        run: node scripts/resolved-package.mjs packages/silinx-fpga "$BASE_SPEC"',
+  ].join('\n'), 'both sides');
+  assert.ok(!m.some(l => l.includes("require('./node_modules/")), 'no version read from the root\'s node_modules alone');
 });
 
 test('yosys update: Dependabot weekly, npm grouped but for Yosys, the majors with issues of their own ignored', () => {

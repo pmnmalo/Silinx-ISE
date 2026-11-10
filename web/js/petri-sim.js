@@ -84,7 +84,7 @@ export function mountPetriSim(ctx) {
     if (!panel()) return;
     if (panel() !== 'sim') { panelTools.replaceChildren(); panelBody.replaceChildren(); }
     if (panel() === 'analysis') { renderAnalysis(); return; }
-    panelTitle.textContent = 'Simulation';
+    panelTitle.textContent = 'Try it';   // (as the schematic's, #3295)
     const runLabel = sim().timer ? '■ Stop' : '▶▶ Run';
     if (runBtn.dataset.label !== runLabel) { runBtn.dataset.label = runLabel; runBtn.textContent = runLabel; }
     if (panelTools.firstChild !== simTools[0]) panelTools.replaceChildren(...simTools);

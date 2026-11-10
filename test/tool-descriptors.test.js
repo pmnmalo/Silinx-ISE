@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ISE, SILINX, SILINX_ICE40, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
+import { ISE, NO_FLOW, SILINX, SILINX_ICE40, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
 import { XILINX_STEPS, orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { ICE40_STEPS } from '../packages/silinx-fpga/src/open-flow-ice40.js';
 
@@ -130,7 +130,21 @@ test('#2311 each descriptor\'s constraints: UCF, or PCF on the iCE40, as a new p
   assert.deepEqual([ISE, SILINX, SILINX_ICE40].map(t => t.constraints.format), ['ucf', 'ucf', 'pcf']);
   assert.deepEqual([ISE, SILINX, SILINX_ICE40].map(t => t.constraints.ext), ['.ucf', '.ucf', '.pcf']);
   const src = read('web/js/constraints-format.js');
-  assert.match(src, /openOnlyDevice\(device\) \? '\.pcf' : '\.ucf'/);
+  assert.match(src, /export const constraintsExt = device => constraintsExtOf\(device\);/);
+  // (the experimental family's descriptor: its constraints XDC, #3142)
+  assert.deepEqual(NO_FLOW.constraints, { format: 'xdc', ext: '.xdc', label: 'XDC' });
+});
+
+test('#3142 an experimental family\'s tool: no step, no report, nothing to program; its tree the constraints and the checks', () => {
+  // (the Artix-7's in the browser edition: no back end there; on the local server it is Vivado's, #1649)
+  for (const part of ['xc7a35t', 'xc7a100t']) for (const open of [false, true]) assert.equal(toolOf({ part }, open, { standalone: true }), NO_FLOW, part);
+  assert.equal(toolOf({ part: 'xc7k70t' }, false), ISE, 'another 7-series family: ISE\'s as before');
+  assert.deepEqual([NO_FLOW.steps, NO_FLOW.reports, NO_FLOW.program, NO_FLOW.open], [[], [], null, false]);
+  assert.deepEqual(built(NO_FLOW).map(shape), ['summary', 'constraints', 'rtl', 'check']);
+  assert.deepEqual(NO_FLOW.tasks.map(t => t.id), ['edit', 'sim']);
+  assert.ok(!TOOLS.includes(NO_FLOW) && NO_FLOW.tasks.every(t => allTasks().includes(t)), 'its tasks the others\'');
+  assert.equal(hasTask(NO_FLOW, 'impl'), false);
+  assert.equal(NO_FLOW.messages.line, MESSAGE_LINE);
 });
 
 test('#2311 each descriptor\'s messages: the log\'s lines read, the markers the step tracker reads', () => {
@@ -192,11 +206,36 @@ test('#2311 the marks kept: every process of a run in IMPL_IDS, for every tool',
 
 test('#2311 #1678 the descriptors import the toolchain\'s light entry only', () => {
   const imports = [...read('web/js/tool-descriptors.js').matchAll(/^import .* from '([^']+)'/gm)].map(m => m[1]);
-  assert.deepEqual(imports, ['../../packages/silinx-fpga/src/parts.js']);
+  assert.deepEqual(imports, ['../../packages/silinx-fpga/src/parts.js']);   // (#1649's vivadoDevice too: the light entry's)
 });
 
 test('#2311 the mechanism of the disabled process is gone: absent, not disabled', () => {
   const src = read('web/js/processes.js');
   assert.doesNotMatch(src, /ISE_ONLY|forOpenMode|OPEN_ONLY_ABSENT/);
   assert.match(src, /buildProcesses\(projectTool\(\)/);
+});
+
+test('#1649 AMD Vivado on the Artix-7 (the local server): ISE\'s step names, Vivado\'s products and reports, no simulation model, no Emulate; the other families as before', () => {
+  for (const part of ['xc7a35t', 'xc7a100t']) for (const open of [false, true]) assert.equal(toolOf({ part }, open), VIVADO, part);
+  for (const part of ['xc7k70t', 'xc7z020']) assert.equal(toolOf({ part }, false), ISE, part);
+  assert.equal(toolOf({ part: 'xc3s250e' }, true, { standalone: false }), SILINX);
+  const t = built(VIVADO);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] },
+    { impl: [{ translate: [] }, { map: [] }, { par: ['trce', 'xpwr', 'pin2ucf'] }] }, 'bitgen', { config: ['impact'] }]);
+  assert.equal(find(t, 'synth').label, 'Synthesize - Vivado');
+  for (const id of ['synth', 'impl', 'bitgen']) assert.equal(find(t, id).title, 'AMD Vivado', id);
+  assert.deepEqual(VIVADO.steps.map(s => s.id), ['synth', 'translate', 'map', 'par', 'trce', 'pin2ucf', 'xpwr', 'bitgen']);
+  assert.ok(orderSteps(VIVADO.steps, ['bitgen']).includes('par'));
+  // what each step produces: run.tcl's files (server/vivado.js)
+  const tcl = read('server/vivado.js');
+  for (const s of VIVADO.steps) for (const f of s.produces) assert.ok(tcl.includes(f.replace(/^\{top\}/, '')), `${s.id}: ${f}`);
+  for (const r of VIVADO.reports) assert.ok(VIVADO.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
+  assert.deepEqual([VIVADO.constraints.format, VIVADO.program.file, VIVADO.program.prom, VIVADO.open], ['xdc', '{top}.bit', undefined, false]);
+  assert.ok(find(VIVADO.tree, VIVADO.program.process));
+  assert.deepEqual(VIVADO.tasks.map(x => x.id), ['edit', 'sim', 'impl']);
+  assert.equal(hasTask(VIVADO, 'emu'), false);
+  assert.ok(VIVADO.tasks.every(x => allTasks().includes(x)), 'its tasks the others\'');
+  assert.equal(VIVADO.messages.line, MESSAGE_LINE);
+  // the run of each node: the chain up to its step
+  assert.deepEqual(find(t, 'bitgen').run(), ['synth', 'translate', 'map', 'par', 'bitgen']);
 });

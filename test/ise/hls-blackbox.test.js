@@ -24,7 +24,7 @@ const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST &&
 let tmp;
 before(() => {
   if (skip) return;
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-hls-blackbox-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-hls-blackbox-'));
   const config = iseExamplesConfig({ host: LOCAL ? null : { user: HOST[1], host: HOST[2] }, image: IMAGE });
   process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');
   fs.mkdirSync(process.env.SILINX_CONFIG_DIR, { recursive: true });

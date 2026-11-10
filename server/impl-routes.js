@@ -9,15 +9,17 @@ import { getDeviceDb, resolveBoard } from './devices.js';
 import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
-import { deviceFamily, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
+import { runVivado, isVivadoDevice, vivadoSteps, collectVivadoReports } from './vivado.js';
+import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
-import { within } from './paths.js';
+import { within, realOf } from './paths.js';
 import * as Projects from './projects.js';
 import { mountXiseRoutes } from './xise-routes.js';
 import { IDENT } from './ident.js';
 import { isTrusted, untrustedMessage } from '../core/trust.js';
+import { normalizePath } from '../core/import-gate.js';
 
 // files that only Silinx understands: not part of an exported Xilinx ISE project
 export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|bool|fsm)\.json)$/i;
@@ -31,9 +33,26 @@ function topOf(project) {
   return project.top;
 }
 
+// An absolute .bit of the workspace is programmed as its project's (#3039): the project it is in, by its name and once
+// its links are followed, must be trusted, as the project's own route asks (#2830); a file outside the workspace
+// (iMPACT's file box: a .bit from the disk) is not any project's
+async function checkWorkspaceBit(full) {
+  const P = Projects, ws = path.resolve(P.workspaceDir()), names = new Set();
+  for (const [dir, f] of [[ws, path.resolve(full)], [realOf(ws), realOf(path.resolve(full))]]) {
+    if (f.startsWith(dir + path.sep)) names.add(path.relative(dir, f).split(path.sep)[0]);
+  }
+  for (const name of names) {
+    let project = null;
+    try { project = await P.readProject(name); } catch { /* not a project's folder */ }
+    if (!project) throw new P.HttpError(403, `${full} is in the workspace but in no project: a workspace's bitstream is programmed from its project`);
+    if (!isTrusted(project)) throw new P.HttpError(403, untrustedMessage(name, 'programming the board', project));
+  }
+}
+
 /**
  * Start an implementation of a project: POST /projects/:p/implement, and the MCP server's run_process
- * (server/mcp.js). body: { steps, toolchain ('silinx' | 'ise'), synthUpToDate, generateOnly }. Returns the job.
+ * (server/mcp.js). body: { steps, toolchain ('silinx' | 'ise' | 'vivado'), synthUpToDate, generateOnly }. A 7-series device's
+ * flow is AMD Vivado's (#1649, server/vivado.js). Returns the job.
  */
 export async function startImplementation(name, body = {}) {
   const P = Projects;
@@ -43,6 +62,8 @@ export async function startImplementation(name, body = {}) {
   let steps;
   try { steps = normalizeSteps(body.steps); } catch (e) { throw bad(e.message); }
   if (!topOf(project)) throw bad('set the top module of the project before implementing');
+  // (an experimental family with no back end: its flows to come; the 7-series' is Vivado's, #1649, the Silinx toolchain's #3146)
+  if (experimentalDevice(project.device) && !isVivadoDevice(project.device)) throw bad(noFlowMessage(project.device));
   // one ISE run per project: two runs would share (and wipe) the same build/ folder
   const key = name.toLowerCase();   // case-insensitive file systems: one folder
   const running = implJobs.get(key);
@@ -51,18 +72,36 @@ export async function startImplementation(name, body = {}) {
   // request's toolchain, else the project's synthesis tool (synthTool: 'silinx' | 'xst'), else the
   // execution mode of Toolchain Settings
   const choice = body.toolchain || ({ silinx: 'silinx', xst: 'ise' })[project.synthTool];
+  // (a 7-series device: Vivado's, the only toolchain that implements it yet, #1649; a toolchain asked for Vivado: its)
+  const vivado = body.toolchain === 'vivado' || (isVivadoDevice(project.device) && !['silinx', 'open', 'ise'].includes(body.toolchain));
+  if (body.toolchain === 'vivado' && !isVivadoDevice(project.device)) throw bad(`AMD Vivado implements the Artix-7 devices, not the ${String(project.device?.part || '').toUpperCase()}`);
+  if (vivado) {
+    try { steps = vivadoSteps(steps); } catch (e) { throw bad(e.message); }
+    if (!isTrusted(project)) throw bad(untrustedMessage(name, 'AMD Vivado', project), 403);
+    const board = project.board ? resolveBoard(project.board, { variant: project.boardVariant, part: project.device?.part })?.board || null : null;
+    const job = createJob('implement', j => { captureLeftOut(j, project, 'AMD Vivado'); return runVivado(j, { project, projectDir, steps, board, generateOnly: !!body.generateOnly }); }, { meta: { project: name, steps, toolchain: 'vivado' } });
+    implJobs.set(key, job.id);
+    return job;
+  }
   const open = openOnlyDevice(project.device) || (choice ? ['silinx', 'open'].includes(choice) : (await loadConfig()).mode === 'silinx');
   // (the synthesis up to date, #280: the run starts at Translate from its netlist)
   const synthUpToDate = !!body.synthUpToDate;
   if (open) { try { steps = openSteps(body.steps, { synthUpToDate, family: deviceFamily(project.device) }); } catch (e) { throw bad(e.message); } }
   // Xilinx ISE (Docker, ssh, the Mac's or the PC's own) runs outside the browser's sandbox: not for a project from
   // outside until the user trusts it (#2830); the Silinx toolchain does
-  if (!open && !isTrusted(project)) throw bad(untrustedMessage(name, 'Xilinx ISE'), 403);
+  if (!open && !isTrusted(project)) throw bad(untrustedMessage(name, 'Xilinx ISE', project), 403);
   const job = open
     ? createJob('implement', j => runOpenImplementation(j, { project, projectDir, steps, synthUpToDate }), { meta: { project: name, steps, toolchain: 'silinx' } })
-    : createJob('implement', j => runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }), { meta: { project: name, steps } });
+    : createJob('implement', j => { captureLeftOut(j, project, 'Xilinx ISE'); return runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }); }, { meta: { project: name, steps } });
   implJobs.set(key, job.id);
   return job;
+}
+
+// the logic analyzer's capture (#3176) is inserted by the Silinx toolchain only: its wrapper reads the probes through
+// hierarchical names, which XST and Vivado's synthesis do not take
+export const CAPTURE_LEFT_OUT = tool => `WARNING:Silinx - the logic analyzer's capture is inserted by the Silinx toolchain only: ${tool} implements the design without it.`;
+function captureLeftOut(job, project, tool) {
+  if (project.capture) job.log(CAPTURE_LEFT_OUT(tool));
 }
 
 /** A project's reports (GET /projects/:p/reports; the MCP server's get_report): { available: false } before any run. */
@@ -73,6 +112,7 @@ export async function projectReports(name) {
   try { return JSON.parse(await fs.readFile(path.join(buildDir, 'reports.json'), 'utf8')); }
   catch { /* not saved yet */ }
   if (!fss.existsSync(buildDir) || !topOf(project)) return { available: false };
+  if (isVivadoDevice(project.device) && fss.existsSync(path.join(buildDir, 'run.tcl'))) return collectVivadoReports(buildDir, project.top, project.device);
   return collectReports(buildDir, project.top, project.device);
 }
 
@@ -175,7 +215,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     let bitfile = null, project = null;
     if (b.project) {
       project = await P.readProject(b.project);
-      if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board'), 403);   // (#2830)
+      if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board', project), 403);   // (#2830)
       const dir = P.projectDir(b.project);
       if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
       else {
@@ -187,6 +227,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       bitfile = b.bitfile;
     } else throw bad('give a project or a bitfile');
     if (!/\.bit$/i.test(bitfile) && !(/\.bin$/i.test(bitfile) && !path.isAbsolute(b.bitfile || ''))) throw bad('only .bit files, or a project\'s .bin (the iCE40), can be programmed');
+    if (path.isAbsolute(b.bitfile || '')) await checkWorkspaceBit(bitfile);
     if (!fss.existsSync(bitfile)) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
     // a file outside the project (iMPACT's file box takes any path): only a real Xilinx bitstream,
     // and the same answer for any other file as for a missing one (no file-existence check by the API)
@@ -197,8 +238,9 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     }
     const board = b.board || project?.board || null;
     if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
-    const expect = b.expectDevice || expectedDevice(project, board);
-    const opts = { tool: b.tool, cable: b.cable, device: b.device, position: b.position, board, bitfile, expectDevice: expect };
+    // the device the bitstream must be built for: the project's, else the board's, never the request's (#3040); a
+    // mismatch refused unless the request says force
+    const opts = { tool: b.tool, cable: b.cable, device: b.device, position: b.position, board, bitfile, expectDevice: expectedDevice(project, board), force: b.force === true };
     const job = createJob('program', j => programJob(j, opts), { meta: { project: b.project || null, bitfile, board } });
     return { job: job.id };
   }));
@@ -208,11 +250,11 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const b = req.body || {};
     if (!b.project) throw bad('give a project');
     const project = await P.readProject(b.project);
-    if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the PROM'), 403);   // (#2830)
+    if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the PROM', project), 403);   // (#2830)
     const dir = P.projectDir(b.project);
     const board = b.board || project.board || null;
     if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
-    const opts = { op: b.op, device: b.device, verify: b.verify !== false, reconfigure: !!b.reconfigure, board, expectDevice: expectedDevice(project, board) };
+    const opts = { op: b.op, device: b.device, verify: b.verify !== false, reconfigure: !!b.reconfigure, board, expectDevice: expectedDevice(project, board), force: b.force === true };
     if (b.op === 'program' || b.op === 'verify') {
       if (!topOf(project) && !b.bitfile) throw bad('project has no top module; cannot locate build/<top>_prom.bit');
       opts.bitfile = b.bitfile ? P.safeJoin(dir, b.bitfile) : path.join(dir, 'build', `${project.top}_prom.bit`);
@@ -257,22 +299,25 @@ export async function importXiseProject(P, name, xiseText, provided) {
   let parsed;
   try { parsed = importXise(xiseText); } catch (e) { throw Object.assign(new Error(e.message), { status: 400 }); }
   const lookup = p => provided[p] ?? provided[path.posix.basename(p)];
-  await P.createProject({ name, template: 'empty' });
+  await P.createProject({ name, template: 'empty', fromOutside: true });
   const files = [];
   const missing = [];
+  const refused = [];   // (a path the import gate refuses, #2956)
   const sources = {};
   for (const f of parsed.files) {
     const target = safeRel(f.path, f.role === 'sim' ? 'sim' : 'src');
+    if (target.reason) { refused.push(`${f.path}: not imported: ${target.reason}`); continue; }
     const text = lookup(f.path);
     if (typeof text === 'string') { await P.writeFile(name, target, text); sources[target] = text; } else missing.push(f.path);
     files.push({ path: target, lang: f.lang, role: f.role });
   }
   // ISE schematics -> Silinx schematics + their synchronized HDL
-  const warnings = [...parsed.warnings];
+  const warnings = [...refused, ...parsed.warnings];
   if (parsed.schematics.length) {
     const schFiles = {}, roles = {};
     for (const x of parsed.schematics) {
       const target = safeRel(x.path, x.role === 'sim' ? 'sim' : 'src');
+      if (target.reason) { warnings.push(`${x.path}: not imported: ${target.reason}`); continue; }
       const text = lookup(x.path);
       if (typeof text !== 'string') { missing.push(x.path); continue; }
       schFiles[target] = text; roles[target] = x.role;
@@ -290,9 +335,13 @@ export async function importXiseProject(P, name, xiseText, provided) {
   }
   let constraints = 'constraints/top.ucf';
   if (parsed.constraints) {
-    constraints = safeRel(parsed.constraints, 'constraints');
-    const text = lookup(parsed.constraints);
-    if (typeof text === 'string') await P.writeFile(name, constraints, text); else missing.push(parsed.constraints);
+    const c = safeRel(parsed.constraints, 'constraints');
+    if (c.reason) warnings.push(`${parsed.constraints}: not imported: ${c.reason}`);
+    else {
+      constraints = c;
+      const text = lookup(parsed.constraints);
+      if (typeof text === 'string') await P.writeFile(name, constraints, text); else missing.push(parsed.constraints);
+    }
   }
   const saved = await P.updateProject(name, pj => Object.assign(pj, {
     device: parsed.device.part ? parsed.device : pj.device,
@@ -309,10 +358,12 @@ export const ISE_OUTPUT = /(^|\/)(build|_ngo|xst|iseconfig|_xmsgs|isim|xlnx_auto
 // inflate stops at the entry's declared size (core/zip.js: a zip bomb is refused, not inflated)
 export const NODE_CODEC = { deflate: d => zlib.deflateRawSync(d), inflate: (d, limit) => zlib.inflateRawSync(d, limit === undefined ? {} : { maxOutputLength: Math.max(1, limit) }) };
 
+// (the path as the import gate takes it, #2830: no hidden folder such as .git/, no build/, #2956; one that leaves the
+// project, or is absolute, is the file's name in <dir>/; a String, else { reason } it is refused)
 function safeRel(p, dir) {
   const norm = String(p).replace(/\\/g, '/');
-  if (!norm || path.posix.isAbsolute(norm) || /^[A-Za-z]:/.test(norm) || norm.split('/').includes('..')) {
-    return `${dir}/${path.posix.basename(norm)}`;
-  }
-  return path.posix.normalize(norm);
+  const n = normalizePath(norm);
+  if (n.path) return n.path;
+  const b = normalizePath(`${dir}/${path.posix.basename(norm)}`);
+  return b.path || { reason: n.reason };
 }

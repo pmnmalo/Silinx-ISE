@@ -29,12 +29,12 @@ const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST &&
 let tmp;
 before(() => {
   if (skip) return;
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-timesim-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-timesim-'));
   process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');
   fs.mkdirSync(process.env.SILINX_CONFIG_DIR, { recursive: true });
   fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify({
     ...(LOCAL ? { mode: 'docker', docker: { image: IMAGE, platform: 'linux/amd64', settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }
-      : { mode: 'ssh', ssh: { host: HOST[2], user: HOST[1] || '', remoteDir: 'silinx-ise-timesim', image: IMAGE, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }) }));
+      : { mode: 'ssh', ssh: { host: HOST[2], user: HOST[1] || '', remoteDir: 'silinx-timesim', image: IMAGE, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }) }));
 });
 
 test('ISE\'s post-place & route model of blinky with its SDF: the test bench passes, no timing violation, no warning', { skip, timeout: 30 * 60000 }, async () => {

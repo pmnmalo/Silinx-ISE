@@ -27,6 +27,7 @@ import { mountCompletion } from './editor-complete.js';
 import { cSnippets } from './c-templates.js';
 import { exprShort, typeText } from '/core/type-text.js';
 import { statusLine } from './status-line.js';
+import { peersField, peerSetter } from './editor-peers.js';
 
 /** A source's Language Templates: an HDL's (SNIPPETS), a C or C++ one's (web/js/c-templates.js, #1855), else none. */
 export const snippetsFor = (lang, path) => (lang === 'c' ? cSnippets(path) : SNIPPETS[lang] || null);
@@ -172,6 +173,30 @@ const flashField = StateField.define({
   },
   provide: f => EditorView.decorations.from(f),
 });
+
+// the lines a timing path goes through (#3178, Show Path): marked until another path or none
+const pathLines = StateEffect.define();
+const pathField = StateField.define({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes);
+    for (const e of tr.effects) if (e.is(pathLines)) deco = Decoration.set(e.value.map(at => Decoration.line({ class: 'xl-path-line' }).range(at)));
+    return deco;
+  },
+  provide: f => EditorView.decorations.from(f),
+});
+
+/** Mark these lines of an editor (createEditor's; 1-based; none: unmarked), the first one scrolled into view (a timing
+ *  path's, #3178); markedLines: the lines marked. */
+export function markLines({ view }, lines = []) {
+  const doc = view.state.doc, at = [...new Set(lines)].filter(l => l >= 1 && l <= doc.lines).sort((x, y) => x - y).map(l => doc.line(l).from);
+  view.dispatch({ effects: [pathLines.of(at), ...(at.length ? [EditorView.scrollIntoView(at[0], { y: 'center' })] : [])] });
+}
+export function markedLines({ view }) {
+  const out = [];
+  view.state.field(pathField).between(0, view.state.doc.length, from => { out.push(view.state.doc.lineAt(from).number); });
+  return out;
+}
 
 // the texts of the editor's own panels (search, go to line, folding), in the interface's language
 const phrases = () => (getLanguage() === 'pt' ? EDITOR_PHRASES_PT : {});
@@ -354,7 +379,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
         lints ? [linter(() => lintAnnotations(), { delay: 400, tooltipFilter: () => [] }), lintGutter({ tooltipFilter: () => [] })] : [],
         lineNumbers(), foldGutter(), indentFold, highlightActiveLineGutter(),
         history(), drawSelection(), highlightActiveLine(), bracketMatching(), closeBrackets(),
-        highlightSelectionMatches({ wholeWords: true }), search({ top: true }), flashField,
+        highlightSelectionMatches({ wholeWords: true }), search({ top: true }), flashField, pathField, peersField,
         languageOf(lang), syntaxHighlighting(highlighter), EditorView.editorAttributes.of({ class: 'xl-editor' }),
         indentUnit.of('  '), EditorState.tabSize.of(2), readOnliness.of(EditorState.readOnly.of(readOnly)), phrasing.of(EditorState.phrases.of(phrases())),
         lang === 'vhdl' || lang === 'verilog' ? autocompletion({ override: [ctx => (ro() ? null : completions(ctx))], icons: false, maxRenderedOptions: 200, addToOptions: [{ render: renderKind, position: 20 }] }) : [],
@@ -483,8 +508,8 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
     quickFixes: d => fixesOf(d),
     applyFix, fixesOnLine, showFixMenu,
     exec: cmd => COMMANDS[cmd]?.(view),
-    // the cursor, the selection and the history, positions as { line, ch } (0-based)
-    getCursor, setCursor, posAt, replaceRanges,
+    // the cursor, the selection and the history, positions as { line, ch } (0-based); the other participants' cursors (#3181)
+    getCursor, setCursor, posAt, replaceRanges, setPeers: peerSetter(() => view, offsetOf),
     somethingSelected: () => view.state.selection.ranges.some(r => !r.empty),
     getSelection: () => view.state.selection.ranges.map(r => view.state.sliceDoc(r.from, r.to)).join('\n'),
     replaceSelection: s => !ro() && view.dispatch(view.state.replaceSelection(s), { userEvent: 'input', scrollIntoView: true }),

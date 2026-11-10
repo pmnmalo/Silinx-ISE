@@ -6,9 +6,9 @@ import fs from 'node:fs';
 import { safeReleaseUrl } from '../web/js/release-url.js';
 
 test('#1444 safeReleaseUrl: https URLs of github.com, api.github.com and objects.githubusercontent.com, as given', () => {
-  for (const u of ['https://github.com/pmnmalo/Silinx-ISE/releases/tag/v15.16.0',
-    'https://github.com/pmnmalo/Silinx-ISE/releases/download/v15.16.0/silinx-ise-15.16.0.zip',
-    'https://api.github.com/repos/pmnmalo/Silinx-ISE/releases/assets/1',
+  for (const u of ['https://github.com/pmnmalo/Silinx/releases/tag/v15.16.0',
+    'https://github.com/pmnmalo/Silinx/releases/download/v15.16.0/silinx-15.16.0.zip',
+    'https://api.github.com/repos/pmnmalo/Silinx/releases/assets/1',
     'https://objects.githubusercontent.com/github-production-release-asset-2e65be/1/2?X-Amz-Algorithm=x',
     'https://github.com:443/x', ' https://github.com/x']) assert.equal(safeReleaseUrl(u), u, u);   // (a browser trims the space too)
 });

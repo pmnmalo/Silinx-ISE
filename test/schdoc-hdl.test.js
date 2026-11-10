@@ -111,6 +111,68 @@ test('#1693 a 1-bit tap into an output read back: msb_int <= a(7), Check Syntax 
   }
 });
 
+// #2903: a bus named with its indices in ascending order, not from 0 (d(4:7), as Convert to Schematic names a vector
+// d(4 to 7)): the bus of those bits, 7 downto 4 (was 3 downto 0, its tap of bit 7 outside it)
+test('#2903 a bus named d(4:7): its bits 7 downto 4, declared (7 downto 4) / [7:4], its tap of bit 7 in it', async () => {
+  const { normalizeDoc, symbolPins, netlist } = await import('../core/schdoc.js');
+  const d = { version: 5, name: 'asc', lang: 'vhdl', sheet: { w: 1700, h: 1100 }, symbols: [], wires: [], labels: [], ports: [] };
+  const V = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] };
+  let n = 0;
+  const sym = (type, params, conn) => {
+    const s = { id: `S${++n}`, type, x: 300, y: 100 + 100 * n, rot: 0, mirror: false, name: `U${n}`, params };
+    d.symbols.push(s);
+    for (const p of symbolPins(normalizeDoc({ ...d, symbols: [s] }).symbols[0])) {
+      if (!conn[p.name]) continue;
+      const e = { x: p.x + 20 * V[p.side][0], y: p.y + 20 * V[p.side][1] };
+      d.wires.push({ id: `W${++n}`, points: [{ x: p.x, y: p.y }, e], ...(/\(/.test(conn[p.name]) ? { bus: true } : {}) });
+      d.labels.push({ id: `L${++n}`, x: e.x, y: e.y, net: conn[p.name] });
+    }
+  };
+  for (const [i, [nm, dir, w]] of [['a', 'in', 4], ['y', 'out', 1]].entries()) {
+    d.ports.push({ id: `P${i}`, name: nm, dir, width: w, x: dir === 'in' ? 100 : 1500, y: 100 + 60 * i });
+    d.wires.push({ id: `WP${i}`, points: [{ x: dir === 'in' ? 100 : 1500, y: 100 + 60 * i }, { x: dir === 'in' ? 120 : 1480, y: 100 + 60 * i }], ...(w > 1 ? { bus: true } : {}) });
+  }
+  sym('buf', { width: 4 }, { I: 'a', O: 'd(4:7)' });
+  sym('slice', { msb: 7, lsb: 7 }, { I: 'd', O: 'y' });
+  const doc = normalizeDoc(d);
+  const nl = netlist(doc);
+  assert.deepEqual(nl.diagnostics, []);
+  assert.deepEqual(nl.nets.find((x) => x.name === 'd').range, { msb: 7, lsb: 4 });
+  for (const lang of ['vhdl', 'verilog']) {
+    const g = generateHdl({ ...doc, lang }, { lang });
+    assert.deepEqual(g.diagnostics, [], lang);
+    assert.match(g.code, lang === 'vhdl' ? /signal d : std_logic_vector\(7 downto 4\);/ : /wire \[7:4\] d;/);
+    assert.match(g.code, lang === 'vhdl' ? /y <= d\(7\);/ : /assign y = d\[7\];/);
+  }
+});
+
+// #2961: an I/O marker's net by its port's type, a(4 downto 1) / [4:1]: its bits 4 downto 1, its tap of bit 4 in it;
+// without a type (or a range of generics) from 0, as before, its tap of bit 4 outside it
+test('#2961 an I/O marker typed (4 downto 1) / [4:1]: its net\'s bits 4 downto 1; portRange of a marker\'s type', async () => {
+  const { normalizeDoc, symbolPins, netlist, portRange } = await import('../core/schdoc.js');
+  assert.deepEqual(portRange({ type: 'std_logic_vector(4 downto 1)' }), { msb: 4, lsb: 1 });
+  assert.deepEqual(portRange({ type: 'unsigned(1 to 4)' }), { msb: 1, lsb: 4 });
+  assert.deepEqual(portRange({ type: '[4:1]' }), { msb: 4, lsb: 1 });
+  assert.deepEqual(portRange({ type: 'signed [7:2]' }), { msb: 7, lsb: 2 });
+  for (const type of ['std_logic', 'std_logic_vector(N-1 downto 1)', '[N:1]', '', undefined]) assert.equal(portRange({ type }), null, String(type));
+  const make = (lang, type) => {
+    const d = { version: 5, name: 'pt', lang, sheet: { w: 1700, h: 1100 }, symbols: [], wires: [], labels: [], ports: [] };
+    d.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 4, x: 100, y: 100, ...(type ? { type } : {}) }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 900, y: 100 });
+    const s = { id: 'S1', type: 'slice', x: 300, y: 300, rot: 0, mirror: false, name: 'U1', params: { msb: 4, lsb: 4 } };
+    d.symbols.push(s);
+    const pins = Object.fromEntries(symbolPins(normalizeDoc({ ...d }).symbols[0]).map((p) => [p.name, p]));
+    d.wires.push({ id: 'W1', points: [{ x: 100, y: 100 }, { x: pins.I.x, y: 100 }, { x: pins.I.x, y: pins.I.y }], bus: true });
+    d.wires.push({ id: 'W2', points: [{ x: pins.O.x, y: pins.O.y }, { x: 900, y: pins.O.y }, { x: 900, y: 100 }] });
+    return netlist(normalizeDoc(d));
+  };
+  for (const [lang, type] of [['vhdl', 'std_logic_vector(4 downto 1)'], ['verilog', '[4:1]']]) {
+    const nl = make(lang, type);
+    assert.deepEqual(nl.diagnostics.map((x) => x.message), [], lang);
+    assert.deepEqual(nl.nets.find((x) => x.name === 'a').range, { msb: 4, lsb: 1 }, lang);
+  }
+  assert.deepEqual(make('vhdl', null).diagnostics.map((x) => x.message), ["bus tap U1 takes bit 4, outside its bus 'a' (3 downto 0)"]);
+});
+
 // #1689: a bus named with its indices, not from 0 (d(7:4)): declared with them (VHDL (7 downto 4), Verilog [7:4]), a
 // tap of its bit 7 its most significant bit; a bus join into e(7:4); the same through the ISE export and import
 test('#1689 a bus named d(7:4): declared (7 downto 4) / [7:4], its taps by their indices, simulated; the ISE round trip keeps them', async () => {

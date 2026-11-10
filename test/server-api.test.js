@@ -191,6 +191,19 @@ test('files: write (text and JSON bodies) registers HDL with a role, read back, 
   assert.equal((await call('GET', '/projects/Nope/sources')).status, 404);
 });
 
+test('files: a hidden file or folder is not written through the file route (#3036); build/ is (the open synthesis\'s netlists)', async () => {
+  await call('POST', '/projects', { name: 'Hid' });
+  const listed = () => fss.readdirSync(P.projectDir('Hid'), { recursive: true }).sort();
+  const before = listed();
+  for (const [p, seg] of [['.git/hooks/pre-commit', '.git'], ['.vscode/tasks.json', '.vscode'], ['src/.env', '.env'], ['./.git/config', '.git']]) {
+    const r = await call('PUT', `/projects/Hid/file?path=${encodeURIComponent(p)}`, '#!/bin/sh\n');
+    assert.deepEqual([r.status, r.body.error], [400, `'${p}': not written: hidden file or folder ('${seg}')`], p);
+  }
+  assert.deepEqual(listed(), before);
+  assert.deepEqual((await call('PUT', '/projects/Hid/file?path=build/open/top.json', '{}\n')).body, { ok: true });
+  assert.equal((await call('GET', '/projects/Hid/file?path=build/open/top.json')).body, '{}\n');
+});
+
 test('files: missing / traversing / absolute paths are refused, missing files are 404, I/O errors are 500', async () => {
   await call('POST', '/projects', { name: 'Trav' });
   const bad = ['../Files/src/top.v', '../../etc/passwd', '/etc/passwd', 'src/../../x', '..'];
@@ -342,6 +355,21 @@ test('devices DB and toolchain configuration', async () => {
     assert.equal(r.status, 400, JSON.stringify(body));
     assert.match(r.body.error, re);
   }
+  // ssh.remoteDir: every run removes <remoteDir>/<project> on the host; through the API a folder of the remote home only (#2958)
+  for (const [dir, status, re] of [['/home/me', 403, /^ssh.remoteDir: an absolute folder can only be set in .*config\.json$/],
+    ['../me', 400, /^ssh.remoteDir must be a folder inside the remote home \(no leading \/ or -, no ~ or \.\.\)$/], ['-rf', 400, /^ssh.remoteDir must be a folder inside the remote home/]]) {
+    r = await call('PUT', '/toolchain', { ssh: { remoteDir: dir } });
+    assert.equal(r.status, status, dir);
+    assert.match(r.body.error, re);
+  }
+  assert.equal(JSON.parse(await fs.readFile(cfgFile, 'utf8')).ssh.remoteDir, 'silinx-build', 'nothing written');
+  assert.equal((await call('PUT', '/toolchain', { ssh: { remoteDir: '~/builds' } })).status, 200);
+  // an absolute folder written in config.json is kept when the whole config is sent back unchanged
+  await fs.writeFile(cfgFile, JSON.stringify({ ...JSON.parse(await fs.readFile(cfgFile, 'utf8')), ssh: { host: 'box.lan', user: 'me', remoteDir: '/Users/Shared/silinx-build' } }));
+  r = await call('PUT', '/toolchain', (await call('GET', '/toolchain')).body.config);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.config.ssh.remoteDir, '/Users/Shared/silinx-build');
+  await call('PUT', '/toolchain', { ssh: { remoteDir: 'silinx-build' } });
   r = await call('PUT', '/toolchain', { ...(await call('GET', '/toolchain')).body.config, ssh: { host: 'box.lan', user: 'me', sshArgs: [] } });
   assert.equal(r.status, 200);
   assert.equal(r.body.config.docker.command, 'docker');
@@ -493,11 +521,16 @@ test('security: bound to another address than loopback, the API needs the token 
     assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'fpga-lab.local:8642', 'x-silinx-token': token } })).status, 200);
     assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'fpga-lab.local:8642', 'x-silinx-token': 'j'.repeat(24) } })).status, 403);
     assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'fpga-lab.local:8642', 'x-silinx-token': 'short' } })).status, 403);
-    // ?token= only on the download links (a GET a link opens: export.xise, export.zip), never on another
-    // GET nor on a write (#1434: an address stays in the browser's history and in proxies' logs)
+    // never ?token= (#3045: an address stays in the browser's history and in proxies' logs), the download links
+    // (export.xise, export.zip) too: the page sends the header
     assert.equal((await call('POST', '/projects', { name: 'Tok' })).status, 200);
     for (const url of [`/api/projects/Tok/export.xise?token=${token}`, `/api/projects/Tok/export.zip?token=${token}`, `/api/projects/Tok/export.zip?kind=silinx&token=${token}`]) {
       r = await any.raw('GET', url, { headers: { host: 'fpga-lab.local' } });
+      assert.deepEqual([r.status, r.body], [403, refused], url);
+      assert.equal(r.headers['cache-control'], 'no-store');
+    }
+    for (const url of [`/api/projects/Tok/export.xise`, `/api/projects/Tok/export.zip`, `/api/projects/Tok/export.zip?kind=silinx`]) {
+      r = await any.raw('GET', url, { headers: { host: 'fpga-lab.local', 'x-silinx-token': token } });
       assert.equal(r.status, 200, url);
       assert.match(r.headers['content-disposition'], /^attachment; filename=Tok/);
       assert.equal(r.headers['cache-control'], 'no-store');

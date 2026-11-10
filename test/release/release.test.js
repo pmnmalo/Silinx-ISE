@@ -23,7 +23,8 @@ const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf
 // zipMB 30 → 32 by Yosys 0.70 (#368, #380): its WebAssembly is 69 MB, its resources 11 MB, all of it
 // needed; the zip 30.4 MB. zipMB 32 → 40 by the Spartan-6 device descriptions (#723, #884: 4.2 MB zipped);
 // the zip 36.6 MB. The measured XC3S250E description in research/ is not packaged (#1541, #1573): the zip 38.0 MB,
-// unzipped 128.0 MB
+// unzipped 128.0 MB. The shared projects' packages took it to 40.4 MB (#3214); their tests and demos, every package's maps
+// and types, and the legacy modes the editor does not load left out (#3232, scripts/zip-trim.mjs): 38.8 MB, unzipped 129.8 MB
 const BUDGET = { zipMB: 40, appMB: 140 };
 
 const has = (cmd) => { try { execFileSync(cmd, ['-v'], { stdio: 'ignore' }); return true; } catch { return false; } };
@@ -37,10 +38,10 @@ before(async () => {
   try {
     execFileSync(process.execPath, [path.join(ROOT, 'scripts/package-release.mjs'), '--app-only', '--out', path.join(tmp, 'out')], { cwd: ROOT, stdio: 'pipe', encoding: 'utf8' });
   } catch (e) { throw new Error(`scripts/package-release.mjs failed:\n${e.stdout}\n${e.stderr}`); }
-  zip = path.join(tmp, 'out', `silinx-ise-${VERSION}.zip`);
+  zip = path.join(tmp, 'out', `silinx-${VERSION}.zip`);
   // a clean folder, as a user's Downloads
   execFileSync('unzip', ['-q', zip, '-d', path.join(tmp, 'unzipped')]);
-  APP = path.join(tmp, 'unzipped', 'silinx-ise');
+  APP = path.join(tmp, 'unzipped', 'silinx');
 });
 after(async () => { if (tmp) await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {}); });
 
@@ -68,7 +69,7 @@ function packages(dir) {
 
 test('release zip: the app with its production dependencies only, Yosys\'s WebAssembly, the licence and notices', { skip: SKIP }, async () => {
   for (const f of ['LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'CHANGELOG.md', 'package.json', 'package-lock.json',
-    'bin/silinx-ise.js', 'server/server.js', 'web/index.html', 'core/version.js', 'examples/blinky',
+    'bin/silinx.js', 'server/server.js', 'web/index.html', 'core/version.js', 'examples/blinky',
     'node_modules/express', 'node_modules/@codemirror/view', 'node_modules/@codemirror/legacy-modes', 'node_modules/elkjs', 'node_modules/@yowasp/yosys/gen/bundle.js']) assert.ok(exists(f), `${f} in the zip`);
   const wasm = fs.readdirSync(path.join(APP, 'node_modules/@yowasp/yosys/gen')).filter((f) => f.endsWith('.wasm'));
   const wasmMB = wasm.reduce((n, f) => n + fs.statSync(path.join(APP, 'node_modules/@yowasp/yosys/gen', f)).size, 0) / 1048576;
@@ -95,12 +96,12 @@ test('release zip: the app with its production dependencies only, Yosys\'s WebAs
 });
 
 test('release zip: the launchers are executable (Linux, macOS) and the Windows one has CRLF line endings', { skip: SKIP }, () => {
-  for (const f of ['start-silinx-ise.sh', 'Start Silinx-ISE.command']) {
+  for (const f of ['start-silinx.sh', 'Start Silinx.command']) {
     assert.ok(fs.statSync(path.join(APP, f)).mode & 0o100, `${f} is executable`);
     assert.ok(!fs.readFileSync(path.join(APP, f), 'latin1').includes('\r'), `${f}: LF`);
   }
-  const bat = fs.readFileSync(path.join(APP, 'Start Silinx-ISE.bat'), 'latin1');
-  assert.equal(bat.split('\n').length - 1, bat.split('\r\n').length - 1, 'Start Silinx-ISE.bat: CRLF');
+  const bat = fs.readFileSync(path.join(APP, 'Start Silinx.bat'), 'latin1');
+  assert.equal(bat.split('\n').length - 1, bat.split('\r\n').length - 1, 'Start Silinx.bat: CRLF');
 });
 
 test('release zip: the device measurements left out, the bit database the app reads kept (#1541)', { skip: SKIP }, () => {
@@ -136,11 +137,11 @@ test('release zip: its SHA-256 checksum in SHA256SUMS, as sha256sum / shasum che
   const sums = fs.readFileSync(path.join(out, 'SHA256SUMS'), 'utf8');
   const [line] = sums.split('\n');
   assert.match(line, /^[0-9a-f]{64} {2}\S+$/);
-  assert.equal(line.slice(66), `silinx-ise-${VERSION}.zip`);
+  assert.equal(line.slice(66), `silinx-${VERSION}.zip`);
   assert.equal(sums, `${line}\n`);
   const gnu = (() => { try { execFileSync('sha256sum', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })();
   const [cmd, args] = gnu ? ['sha256sum', ['-c']] : ['shasum', ['-a', '256', '-c']];
-  assert.equal(execFileSync(cmd, [...args, 'SHA256SUMS'], { cwd: out, encoding: 'utf8' }), `silinx-ise-${VERSION}.zip: OK\n`);
+  assert.equal(execFileSync(cmd, [...args, 'SHA256SUMS'], { cwd: out, encoding: 'utf8' }), `silinx-${VERSION}.zip: OK\n`);
 });
 
 for (const launcher of launchersOf()) {
@@ -149,7 +150,7 @@ for (const launcher of launchersOf()) {
     const srv = await startLauncher(APP, launcher, t);
     try {
       const html = await (await fetch(srv.url)).text();
-      assert.match(html, /<title>Silinx ISE Project Navigator<\/title>/);
+      assert.match(html, /<title>Silinx<\/title>/);
       for (const asset of ['/js/app.js', '/core/version.js', '/vendor/yowasp-yosys/gen/bundle.js']) assert.equal((await fetch(srv.url + asset)).status, 200, asset);
       assert.ok((await (await fetch(`${srv.url}/api/templates`, { headers: srv.headers() })).json()).includes('blinky'));
       const r = await fetch(`${srv.url}/api/projects`, { method: 'POST', headers: srv.headers({ 'content-type': 'application/json' }), body: JSON.stringify({ name: 'Blinky', template: 'blinky' }) });

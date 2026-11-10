@@ -17,6 +17,7 @@
 //     pipeFunction(body, ii, loc)        the function's state; pipeState(b): a pipeline's state, run
 //     markDependences(body)              DEPENDENCE's (#1961) on the loops they are in, and on those in those
 //   moduloSchedule(body, ii)             the stages
+import { balanceSums } from './c-balance.js';
 import { BOOL } from './c-types.js';
 import { nodeDelay } from './c-timing.js';
 import { dependenceOf } from './c-pragma.js';
@@ -301,6 +302,8 @@ export const pipelineSchedMethods = {
     const perMem = new Map();
     for (const op of ops) perMem.set(op.mem, (perMem.get(op.mem) || 0) + 1);
     const dep = (mem, way, dir) => (p.deps || []).some((d) => (d.variable == null || d.variable === mem) && d.inter === (way === 'inter') && d[dir]);
+    // (a sum of many terms a tree, as Vitis HLS's EXPRESSION_BALANCE, #2613)
+    if (this.balance !== false) balanceSums(g, [...ops.flatMap((op) => op.roots), ...updates.map((u) => u[1]), ...(exitNode != null ? [exitNode] : [])]);
     const once = (n, budget, floor) => moduloSchedule({ g, ops, updates, exit: exitNode, pinned: latched.map((r) => this.regNode(r)), own, sameIndex, together, budget, family: this.pipeTiming?.family, dep, floor }, n);
     // (a variable read before the previous iteration has written it: again, each written where its next value is made,
     // its readers no earlier, until none is, #2503; by the clock only when the II needed it)

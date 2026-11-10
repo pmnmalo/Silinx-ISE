@@ -11,18 +11,28 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# The runs of the tags one at a time (#3124): the IDE's tag and the toolchain package's pushed together shared the 20 jobs
+# a public repository runs at once (5 on macOS), their jobs queued up to 50 minutes; the second now waits for the first,
+# and its release does not even need it on the same commit (scripts/wait-for-ci.mjs takes any tag's run of the commit).
+# GitHub keeps one run waiting per group: a third tag pushed while one runs and one waits cancels the waiting one. Its
+# release then fails, unless another tag's run of the same commit passed ("CI did not pass (cancelled)"): run CI on that
+# tag again (Actions ▸ CI ▸ the cancelled run ▸ Re-run all jobs) and then its release. Push the tags of a release two at a
+# time at most. A run by hand, on its ref and commit.
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.sha }}
+  group: ${{ github.event_name == 'push' && 'ci-tags' || format('ci-{0}-{1}', github.ref, github.sha) }}
   cancel-in-progress: false
-# Everything runs: the unit tests on Linux, macOS and Windows, the UI tests in both interfaces, Firefox /
+# Everything runs: the unit tests on Linux (the toolchain's heaviest on Linux only, #3124), macOS and Windows, the UI
+# tests in both interfaces, Firefox /
 # WebKit, the operating systems' smoke tests, WebKit memory and the standalone build, the release zip, the
 # history's private-data scan. ci-ok is green when every job passed.
 jobs:
-  # the unit tests, in three parts at once of about the same time (scripts/test-shard.mjs, by each file's
-  # time in test/timings.json, #573), on Linux, macOS and Windows: about
-  # 105 minutes one after another on Linux, a part about 17 (its files two at a time or so). A part takes
-  # as long as its longest file at least (sim-model.test.js, about 16 minutes, #575): four parts were no
-  # faster. The Linux parts upload each file's time, to refresh the timings now and then:
+  # the unit tests, in parts at once of about the same time (scripts/test-shard.mjs, by each file's time in
+  # test/timings.json, #573): on Linux all of them in five parts; on macOS and Windows in three, but the toolchain's
+  # heaviest tests (HEAVY in scripts/test-shard.mjs, --light: the whole open flow on every feature, device and example,
+  # the post-place & route models, the synthesis on the corpus), about half the time, which ran 60 to 80 minutes there
+  # (#3124). A part takes as long as its longest file at least (its tests one after another): a file over 15 minutes
+  # is split (test/open-flow*.test.js, test/sim-model-par*.test.js, #3124). The Linux parts upload each file's time,
+  # to refresh the timings now and then:
   # node scripts/update-test-timings.mjs <run id>. The end of the output lists each file's time, and a file
   # over 15 minutes is a warning (scripts/test-file-times.mjs, #566)
   unit:
@@ -30,24 +40,32 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5]
+        exclude:
+          - { os: macos-latest, shard: 4 }
+          - { os: macos-latest, shard: 5 }
+          - { os: windows-latest, shard: 4 }
+          - { os: windows-latest, shard: 5 }
     runs-on: ${{ matrix.os }}
-    # (Windows: a part 33 to over 45 minutes, Linux about 12, #1582; macOS and Windows over 60 by 15.21.0, #2665)
+    # (Windows: a part 33 to over 45 minutes, Linux about 12, #1582; macOS and Windows over 60 by 15.21.0, #2665, 80 by
+    # 15.23.0; a part about 40 minutes since #3124, the limit twice that)
     timeout-minutes: 90
-    name: unit (${{ matrix.os }}, ${{ matrix.shard }}/3)
+    name: unit (${{ matrix.os }}, ${{ matrix.shard }}/${{ matrix.os == 'ubuntu-latest' && 5 || 3 }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - run: >-
-          node scripts/test-shard.mjs "$SHARD/3"
+          node scripts/test-shard.mjs "$SHARD/$PARTS" $LIGHT
           --test-reporter=tap --test-reporter-destination=stdout
           --test-reporter=./scripts/test-file-times.mjs --test-reporter-destination=stdout
           --test-reporter=./scripts/test-times-reporter.mjs --test-reporter-destination=test-times.json
         shell: bash   # (Windows: PowerShell would not expand $SHARD)
         env:
           SHARD: ${{ matrix.shard }}
+          PARTS: ${{ matrix.os == 'ubuntu-latest' && 5 || 3 }}
+          LIGHT: ${{ matrix.os != 'ubuntu-latest' && '--light' || '' }}
       - if: always() && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -103,16 +121,39 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      # the browsers kept between runs, for the version of Playwright (#415); the system's libraries
-      # installed every run (--with-deps)
+      # the browsers kept between runs, for the version of Playwright (#415); the system's packages they need
+      # installed every run (--with-deps), from apt's downloads kept between runs too, for the runner's image
+      # (#2921: a slow mirror took 13 minutes for them, #1559, then 50, at 31 kB/s, the job's time gone)
+      - id: image
+        run: echo "key=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
-      # (the system's packages: a slow mirror took 13 minutes, #1559; the tests' time apart)
+      - id: apt
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-webkit-${{ steps.image.outputs.key }}
+          restore-keys: apt-webkit-
+      # an install that stalls stopped at 10 minutes and run once more, with what it downloaded
       - name: WebKit and its system packages
-        run: npx playwright install --with-deps webkit
+        run: |
+          mkdir -p ~/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\nAPT::Sandbox::User "root";\n' ~/apt-archives \
+            | sudo tee /etc/apt/apt.conf.d/90silinx-archives > /dev/null
+          for attempt in 1 2; do
+            if timeout 10m npx playwright install --with-deps webkit; then sudo chown -R "$USER" ~/apt-archives; exit 0; fi
+            echo "::warning::WebKit and its system packages: attempt $attempt stopped or failed (#2921)"
+            sudo dpkg --configure -a
+          done
+          exit 1
         timeout-minutes: 25
+      - if: steps.apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-webkit-${{ steps.image.outputs.key }}
       - name: Memory in WebKit (Safari's engine)
         run: npm run test:webkit
         timeout-minutes: 15
@@ -136,18 +177,46 @@ jobs:
   # the main UI flows in Firefox and in WebKit (Safari's engine)
   browsers:
     runs-on: ubuntu-latest
-    # (Firefox, then WebKit, one file at a time: about 25 minutes, #1126)
-    timeout-minutes: 60
+    # (Firefox, then WebKit, one file at a time: about 25 minutes, #1126; the steps' own limits first, #2939)
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      # the browsers kept between runs, for the version of Playwright (#415); the system's packages they need
+      # installed every run (--with-deps), from apt's downloads kept between runs too, for the runner's image
+      # (#2921: a slow mirror took 13 minutes for them, #1559, then 50, at 31 kB/s, the job's time gone)
+      - id: image
+        run: echo "key=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-firefox-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
-      - run: npx playwright install --with-deps firefox webkit
+      - id: apt
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-firefox-webkit-${{ steps.image.outputs.key }}
+          restore-keys: apt-firefox-webkit-
+      # an install that stalls stopped at 10 minutes and run once more, with what it downloaded
+      - name: Firefox, WebKit and their system packages
+        run: |
+          mkdir -p ~/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\nAPT::Sandbox::User "root";\n' ~/apt-archives \
+            | sudo tee /etc/apt/apt.conf.d/90silinx-archives > /dev/null
+          for attempt in 1 2; do
+            if timeout 10m npx playwright install --with-deps firefox webkit; then sudo chown -R "$USER" ~/apt-archives; exit 0; fi
+            echo "::warning::Firefox, WebKit and their system packages: attempt $attempt stopped or failed (#2921)"
+            sudo dpkg --configure -a
+          done
+          exit 1
+        timeout-minutes: 25
+      - if: steps.apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: apt-firefox-webkit-${{ steps.image.outputs.key }}
       - run: npm run test:browsers
         timeout-minutes: 40
 

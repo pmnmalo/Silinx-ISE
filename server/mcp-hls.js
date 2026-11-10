@@ -4,7 +4,7 @@
 // state machine (an ASM chart) made from it; scheduled for the board's clock, the device's delays and multiplier
 // blocks, the project's RTL blackboxes, as in the interface. Their messages as the Console's.
 import * as P from './projects.js';
-import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
+import { toolError, readProject, STR, PROJECT, projectText } from './mcp-util.js';
 
 const IS_C = /\.(c|cpp|cc|cxx)$/i;
 
@@ -13,15 +13,14 @@ const IS_C = /\.(c|cpp|cc|cxx)$/i;
 async function cContext(name, rel) {
   const pj = await readProject(name);
   if (typeof rel !== 'string' || !IS_C.test(rel)) throw toolError(`path: a C or C++ source of the project (.c, .cpp), not '${rel}'`);
-  let text;
-  try { text = await P.readFile(name, rel); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
+  const text = await projectText(name, rel, `no file '${rel}' in the project '${name}'`);
   const { hlsClockOf, hlsFamilyOf, hlsMultsOf } = await import('../core/c-report.js');
-  const { resolveBoard } = await import('./devices.js');
+  const { resolveBoard, findPart } = await import('./devices.js');
   const { blackboxesIn } = await import('../core/c-blackbox.js');
   const tree = await P.fileTree(name);
   const hls = await blackboxesIn(tree, f => P.readFile(name, f)).catch(() => null);
   const lang = pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl';
-  return { pj, text, tree, lang, clock: hlsClockOf(pj.board ? resolveBoard(pj.board)?.board : null), family: hlsFamilyOf(pj.device), mults: hlsMultsOf(pj.device), hls: hls || {} };
+  return { pj, text, tree, lang, clock: hlsClockOf(pj.board ? resolveBoard(pj.board)?.board : null), family: hlsFamilyOf(pj.device), mults: hlsMultsOf(pj.device, findPart(pj.device?.part)), hls: hls || {} };
 }
 
 // the test bench's files (c-source.js tbFiles): the project's files its strings name

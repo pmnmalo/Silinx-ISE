@@ -1,6 +1,16 @@
 // Silinx - the device picker of the New Project and Design Properties dialogs (#405: out of web/js/wizards.js).
-import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
+import { experimentalDevice, noFlowMessage, openOnlyDevice, vivadoDevice } from '/packages/silinx-fpga/src/parts.js';
+import { api } from './api.js';
 import { h } from './ui.js';
+
+// an experimental family's (#3142: the 7-series, no flow runs it yet) family and boards, so marked in the lists
+const FAMILY_MARK = ' (experimental)';
+/** The Evaluation Development Board list's options: none, then the boards, an experimental family's marked. */
+export const boardOptions = db => [['', 'None Specified'], ...db.boards.map(b => [b.id, `${b.name}${experimentalDevice(b.device) ? FAMILY_MARK : ''}`])];
+
+/** The console's warning for a device of an experimental family with no back end here (set_design_properties says the same),
+ *  else null: the Artix-7's is AMD Vivado's on the local server (#1649), none in the browser edition. */
+export const noFlowWarning = device => (experimentalDevice(device) && !(vivadoDevice(device) && !api.standalone) ? `WARNING: ${noFlowMessage(device)}.` : null);
 
 // Cascading Family -> Device -> Package -> Speed selectors over the device database.
 export function devicePicker(db, device) {
@@ -10,7 +20,7 @@ export function devicePicker(db, device) {
   let cur = { ...device }, fitSynth = null;
   const fillFam = () => {
     famSel.innerHTML = '';
-    for (const f of families) famSel.append(h('option', { value: f.id, selected: f.id === famOf(cur.part) }, f.displayName || f.name));
+    for (const f of families) famSel.append(h('option', { value: f.id, selected: f.id === famOf(cur.part) }, `${f.displayName || f.name}${f.experimental ? FAMILY_MARK : ''}`));
   };
   const fillParts = () => {
     partSel.innerHTML = '';
@@ -40,9 +50,10 @@ export function devicePicker(db, device) {
   set(device);
   return {
     famSel, partSel, pkgSel, spdSel, set,
-    lockSynth(sel) { (fitSynth = () => { const o = openOnlyDevice({ part: partSel.value }); if (o) sel.value = 'silinx'; sel.disabled = o; })(); },   // (no ISE for the family)
+    // (no ISE for the family; an experimental one: no tool runs it yet, the choice kept 'silinx' and locked, #3142)
+    lockSynth(sel) { (fitSynth = () => { const d = { part: partSel.value }, o = openOnlyDevice(d) || experimentalDevice(d); if (o) sel.value = 'silinx'; sel.disabled = o; })(); },
     disable(on) { [famSel, partSel, pkgSel].forEach(e => { e.disabled = on; }); spdSel.disabled = on || !spdSel.options.length; },
     value: () => ({ family: famSel.value, part: partSel.value, package: pkgSel.value, speed: spdSel.value }),
-    familyName: () => famSel.selectedOptions[0]?.textContent || famSel.value,
+    familyName: () => famSel.selectedOptions[0]?.textContent || famSel.value,   // (with its experimental mark)
   };
 }

@@ -17,10 +17,12 @@ import { log } from './console.js';
 import { openProject, closeProject, recent, clearRecent, storageMenuItems } from './project.js';
 import { runImpl, stopProcesses } from './implement.js';
 import { setViewAsTop, topOfView, viewSel } from './drawings.js';
-import { checkSyntax, runProcess, saveAll, topConfirmed } from './processes.js';
+import { checkSyntax, projectTool, runProcess, saveAll, topConfirmed } from './processes.js';
+import { hasTask } from './tool-descriptors.js';
 import { addFromFolderDialog, setTop, unsetTop } from './design.js';
 import { openEmulator, openSchematic, runSimulation } from './viewers.js';
 import { printActive, printable } from './print-doc.js';
+import { hasGit, hookGitStatus, openFromRepositoryDialog, gitMenuItems } from './git.js';
 import { besideItems, splitState, toggleSplit } from './split-view.js';
 // (Print: the document in front, whichever it is, #1509)
 export { printActive, printable };
@@ -40,7 +42,7 @@ const themeMenu = () => ({ label: 'Theme', submenu: [
 const updateAtStartItem = () => ({ label: 'Check for Updates at Start-up', checked: wiz.updateCheckEnabled(), action: () => { wiz.setUpdateCheckEnabled(!wiz.updateCheckEnabled()); toast(wiz.updateCheckEnabled() ? 'Check for updates at start-up on: the latest release is asked of GitHub when the app starts' : 'Check for updates at start-up off: Help > Check for Updates… checks by hand'); } });
 /** The header's Settings menu (the Silinx interface, #1314). */
 export const settingsItems = () => [
-  { label: 'About Silinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
+  { label: 'About Silinx', icon: icon('help'), action: () => wiz.aboutDialog() },
   '-',
   interfaceMenu(), languageMenu(), themeMenu(),
   '-',
@@ -57,14 +59,18 @@ export const settingsItems = () => [
 
 export function setupMenus() {
   const hasPj = () => !S.project;
+  hookGitStatus();   // (git, the server editions: the Design pane's marks, #3195)
   menuBar($('menubar'), S.menus = [
     { label: 'File', items: () => [
       { label: 'New Project…', icon: icon('newProject'), action: () => wiz.newProjectWizard() },
       { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
+      hasGit() ? { label: 'Open from Repository…', action: () => openFromRepositoryDialog() } : null,   // (a GitHub repository, a Classroom assignment's: #3195)
       '-',
-      { label: 'Import Silinx ISE Project (.zip)…', action: () => wiz.importSilinxDialog() },
-      { label: 'Export Silinx ISE Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
+      { label: 'Import Silinx Project (.zip)…', action: () => wiz.importSilinxDialog() },
+      { label: 'Export Silinx Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
       { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()), disabled: hasPj },   // (#2826)
+      // (live, read only, through the server's relay, #3181; the browser edition has none yet)
+      api.collab || api.standalone ? { label: 'Share Project…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => hasPj() || !!api.following } : null,
       '-',
       { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
       { label: 'Export Xilinx ISE Project (.zip)…', action: () => exportProjectZip('xilinx'), disabled: hasPj },
@@ -73,6 +79,8 @@ export function setupMenus() {
       api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,
       api.standalone ? '-' : null,
       ...(api.standalone ? storageMenuItems() : []),
+      // git (#3195): the project's commit, push, pull; a repository made
+      ...(hasGit() ? [...gitMenuItems().map(it => (it === '-' ? it : { ...it, disabled: hasPj() || it.disabled })), '-'] : []),
       { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
       '-',
       { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !printable() },
@@ -132,9 +140,14 @@ export function setupMenus() {
         ? { label: 'Unset as Top Module', action: () => unsetTop() }
         : { label: 'Set as Top Module', action: () => (S.sel?.module ? setTop(S.sel.module, false) : viewSel() && setViewAsTop(viewSel())), disabled: () => !S.sel?.module && !viewSel() }),
       { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
+      '-',
+      // (step-by-step tutorials on the project, each step checked on it, #3179)
+      { label: 'Guided Labs…', icon: icon('help'), action: async () => (await import('./lab-view.js')).guidedLabsDialog(), disabled: hasPj },
+      // (an exercise graded by its tests, a student's visible ones run on the project, #3192)
+      { label: 'Exercise…', icon: icon('run'), action: async () => (await import('./exercise-view.js')).exerciseDialog(), disabled: hasPj },
     ] },
     { label: 'Process', items: () => [
-      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy },
+      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy || !toolHas('impl') },
       { label: 'Stop', icon: icon('stop'), action: () => stopProcesses(), disabled: () => !S.currentJob },
       { label: 'Run', action: () => S.selProc && runProcess(S.selProc), disabled: () => !S.selProc?.run },
       { label: 'Check Syntax', action: () => S.sel?.module && checkSyntax(S.sel.module, S.view === 'sim'), disabled: () => !S.sel?.module },
@@ -159,7 +172,7 @@ export function setupMenus() {
       { label: 'Close All Documents', action: () => [...S.docs].forEach(closeDoc), disabled: () => !S.docs.length },
     ].filter(Boolean) },
     { label: 'Help', items: () => [
-      { label: 'About Silinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
+      { label: 'About Silinx', icon: icon('help'), action: () => wiz.aboutDialog() },
       { label: 'Keyboard Shortcuts', action: () => wiz.shortcutsDialog() },
       '-',
       { label: 'Check for Updates…', action: () => wiz.checkUpdatesDialog() },
@@ -220,12 +233,15 @@ export function setupToolbar() {
   tb.append(h('div', { class: 'm-steps', role: 'group', 'aria-label': 'Design flow' },
     step('mCheck', 'Check', 'Check Syntax of the selected module', () => checkSyntax(mod(), S.view === 'sim'), () => !!S.project && !!mod()),
     step('mWave', 'Simulate', 'Simulate Behavioral Model of the selected module', () => runSimulation(mod()), () => !!S.project && !!mod()),
-    step('mBolt', 'Implement', 'Implement Top Module', async () => await topConfirmed('Implement', 'implements') && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), () => !!S.project?.top && !S.busy),
-    step('mBoard', 'Emulate', 'Board Emulator', async () => await topConfirmed('Emulate', 'emulates') && openEmulator(S.project.top), () => !!S.project?.top),
-    step('mUpload', 'Program', 'Configure Target Device (iMPACT)', () => openImpact(), () => true),
+    step('mBolt', 'Implement', 'Implement Top Module', async () => await topConfirmed('Implement', 'implements') && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), () => !!S.project?.top && !S.busy && toolHas('impl')),
+    step('mBoard', 'Emulate', 'Board Emulator', async () => await topConfirmed('Emulate', 'emulates') && openEmulator(S.project.top), () => !!S.project?.top && toolHas('emu')),
+    step('mUpload', 'Program', 'Configure Target Device (iMPACT)', () => openImpact(), () => !S.project || !!projectTool().program),
   ));
   refreshSteps();
 }
+
+// the project's tool has this task (an experimental family's no Implement, no Emulate, nothing to program: #3142)
+const toolHas = task => !S.project || hasTask(projectTool(), task);
 
 // enable / disable the labelled buttons of the Silinx toolbar (cheap: run on clicks and changes)
 export function refreshSteps() {
@@ -248,7 +264,7 @@ export function downloadUrl(url, filename) {
 // kind 'silinx': the whole Silinx project (silinx.json + every file, ASM charts and schematics included)
 export async function exportProjectZip(kind = 'xilinx') {
   await saveAll();
-  const title = kind === 'silinx' ? 'Export Silinx ISE Project' : 'Export Xilinx ISE Project';
+  const title = kind === 'silinx' ? 'Export Silinx Project' : 'Export Xilinx ISE Project';
   try {
     const { blob, filename, warnings = [] } = await api.exportZip(S.project.name, kind);
     const url = URL.createObjectURL(blob);

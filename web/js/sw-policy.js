@@ -7,7 +7,7 @@
 // - 'asset': the versioned assets (web/js/asset-cache.js, #967), read from their cache: Yosys's bundle,
 //   which the Yosys workers import (an import is not a fetch: assetFetch does not see it), offline too;
 // - 'network': everything else, not intercepted (version.json, GitHub's API, the usage counter, the
-//   downloaded Silinx-ISE.html, the root's dev/: the development edition's own worker).
+//   downloaded Silinx.html, the root's dev/: the development edition's own worker).
 import { isVersionedAsset } from './asset-cache.js';
 
 /** The files the worker keeps beside the page (the site's, scripts/pwa.mjs). */

@@ -3,7 +3,7 @@
 // module's row (the base), its HDL generated from it at once, the other design units kept in a file
 // of their own; the console says what was done; a module that does not elaborate is not converted
 // (the dialog says why, in English and in Portuguese); an escaped internal wire (\\t[0] ) is a wire of the drawing
-// (#1809); a ripple-carry adder whose instances drive bits of vectors, every instance drawn (#2901).
+// (#1809); a ripple-carry adder whose instances drive bits of vectors, every instance drawn (#2901); internal vectors not from 0, c(3 downto 1), d(1 to 3), read by bus taps (#2903); ports not from 0, a(4 downto 1), b(1 to 4) (#2961).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -72,6 +72,45 @@ uiTest('Convert to Schematic of a ripple-carry adder whose instances drive bits 
     "'add4' converted to the schematic src/add4.sch.json (13 symbols drawn, 0 HDL blocks keeping the HDL that is not drawn): it is now the module's base, src/add4.vhd generated from it.",
   ]);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+});
+
+uiTest('#2903 Convert to Schematic of a module whose internal vectors are not from 0, c(3 downto 1) and d(1 to 3), read by bus taps: converted, their nets named with their indices', E, async (page) => {
+  const c = CASES.find((x) => x.name === 'vhdl-vec-not-0');
+  await makeProject(env, { name: 'Conv_vnz', files: c.files, top: 'vnz', simTop: 'tb_vnz' });
+  await page.openProject('Conv_vnz');
+  await convert(page, 'vnz');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/vnz.vhd'] === 'src/vnz.sch.json' && window.Silinx.active?.id === 'sch:src/vnz.sch.json', [], { what: 'converted, linked, open', timeout: 20000 });
+  assert.deepEqual((await linesFrom(page, /^'vnz' converted/)).slice(0, 1), [
+    "'vnz' converted to the schematic src/vnz.sch.json (9 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module's base, src/vnz.vhd generated from it.",
+  ]);
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+  assert.deepEqual(JSON.parse(await readWs(env, 'Conv_vnz', 'src/vnz.sch.json')).labels.map((l) => l.net).sort(), ['c(3:1)', 'd(1:3)']);
+  const gen = await readWs(env, 'Conv_vnz', 'src/vnz.vhd');
+  assert.match(gen, /^ {2}signal c : std_logic_vector\(3 downto 1\);$/m);
+  assert.match(gen, /^ {2}y <= c\(3\);$/m);
+  // the schematic open in its editor: the net names drawn
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .sch-editor g.sym'), [], { what: 'the schematic drawn' });
+  assert.ok(await page.eval(() => ['c(3:1)', 'd(1:3)'].every((t) => document.querySelector('.doc:not([hidden]) .sch-editor').textContent.includes(t))), 'the labels drawn');
+});
+
+uiTest('#2961 Convert to Schematic of a module whose ports are not from 0, a(4 downto 1) and b(1 to 4), read by bus taps: converted, the ports declared as before', E, async (page) => {
+  const c = CASES.find((x) => x.name === 'vhdl-port-not-0');
+  await makeProject(env, { name: 'Conv_pnz', files: c.files, top: 'pnz', simTop: 'tb_pnz' });
+  await page.openProject('Conv_pnz');
+  await convert(page, 'pnz');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/pnz.vhd'] === 'src/pnz.sch.json' && window.Silinx.active?.id === 'sch:src/pnz.sch.json', [], { what: 'converted, linked, open', timeout: 20000 });
+  assert.deepEqual((await linesFrom(page, /^'pnz' converted/)).slice(0, 1), [
+    "'pnz' converted to the schematic src/pnz.sch.json (9 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module's base, src/pnz.vhd generated from it.",
+  ]);
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+  const doc = JSON.parse(await readWs(env, 'Conv_pnz', 'src/pnz.sch.json'));
+  assert.deepEqual(doc.symbols.filter((s) => s.type === 'slice').map((s) => `${s.params.msb}:${s.params.lsb}`).sort(), ['1:1', '1:1', '3:2', '4:2', '4:4', '4:4']);
+  const gen = await readWs(env, 'Conv_pnz', 'src/pnz.vhd');
+  assert.match(gen, /^ {4}a : in std_logic_vector\(4 downto 1\);$/m);
+  assert.match(gen, /^ {4}b : in std_logic_vector\(1 to 4\);$/m);
+  // the schematic open in its editor: the bus taps of a's bits drawn
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .sch-editor g.sym'), [], { what: 'the schematic drawn' });
+  assert.ok(await page.eval(() => ['(4)', '(4:2)'].every((t) => document.querySelector('.doc:not([hidden]) .sch-editor').textContent.includes(t))), 'the taps drawn');
 });
 
 uiTest('Convert to Schematic of a VHDL module whose file holds its package: the package stays, the module in a file of its own; a module that does not elaborate is refused (English, Portuguese)', E, async (page) => {

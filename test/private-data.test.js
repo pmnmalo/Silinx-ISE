@@ -21,6 +21,18 @@ test('the tracked files hold no private data, secrets or Xilinx files', () => {
     'remove these (or, for a harmless match, add it with its reason to ALLOW in scripts/check-private-data.mjs)');
 });
 
+// #3121: #2962's special-purpose ranges are allowed in its fragment and in CHANGELOG.md, where a release moves it, and in #3123's commit message (#3129)
+test("#2962's special-purpose addresses: allowed in its fragment and the CHANGELOG, not elsewhere (#3121)", () => {
+  const c = (...p) => p.join(':');
+  const text = `NAT64 \`${c('64', 'ff9b', '')}:/96\` and \`${c('64', 'ff9b', '1', '')}:/48\`, \`${dot(198, 18, 0, 0)}/15\`, \`${dot(192, 0, 0, 0)}/24\``;
+  for (const f of ['changes/2962-link-addresses.md', 'CHANGELOG.md']) assert.deepEqual(kinds(f, text), [], f);
+  assert.equal(kinds('README.md', text).length, 4);
+  // #3129: #3123's commit message names two of them, and main's history stays as it is
+  const msg = `${dot(198, 18, 0, 0)}/15, ${dot(192, 0, 0, 0)}/24`;
+  assert.deepEqual(kinds('(message of e37c940)', msg), []);
+  assert.deepEqual(kinds('(message of 0000000)', msg), [`IP address: ${dot(198, 18, 0, 0)}`, `IP address: ${dot(192, 0, 0, 0)}`]);
+});
+
 test('personal data: e-mail addresses, home folders with a user name, logins', () => {
   assert.deepEqual(kinds('a.md', `write to jane.doe${at}${dot('mail', 'pt')}`), [`e-mail address: jane.doe${at}mail.pt`]);
   assert.deepEqual(kinds('a.md', `jane${at}${dot('example', 'com')} and bot${at}${dot('lab', 'test')}`), []);   // example domains
@@ -144,7 +156,7 @@ test('the allow-list (#498): XPower\'s section numbers in the history, read as a
   assert.deepEqual(kinds('scripts/measure.mjs', sections), [`IP address: ${dot(3, 3, 1, 1)}`, `IP address: ${dot(3, 3, 1, 2)}`]);
   assert.deepEqual(kinds('scripts/measure-power.mjs', `at ${dot(3, 3, 1, 3)}`), [`IP address: ${dot(3, 3, 1, 3)}`]);
   // #545's made-up path, in its history (#555); a real user name in that file is still found
-  const home = (u) => `href: 'file://${['', 'Users', u, 'Downloads', 'Silinx-ISE.html'].join('/')}'`;
+  const home = (u) => `href: 'file://${['', 'Users', u, 'Downloads', 'Silinx.html'].join('/')}'`;
   assert.deepEqual(kinds('test/static-editions.test.js', home('x')), []);
   assert.deepEqual(kinds('test/static-editions.test.js', home('alice')), ['home folder with a user name: /Users/alice']);
   assert.deepEqual(kinds('test/other.test.js', home('x')), ['home folder with a user name: /Users/x']);

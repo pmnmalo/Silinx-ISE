@@ -408,7 +408,66 @@ const EXPECT = {
   'verilog-inst-slices': { kinds: { module: 3, slice: 6, constant: 1, busjoin: 1 }, moved: false, hdlPath: 'src/add4v.v', writes: ['src/add4v.v'] },
   // (z's instances drawn, joined in z's order; v read by an assignment: its instances one HDL block, as before)
   'vhdl-inst-bits-to': { kinds: { module: 2, slice: 2, hdlblock: 1, buf: 1, busjoin: 1 }, moved: false, hdlPath: 'src/bitsto.vhd', writes: ['src/bitsto.vhd'] },
+  // (#2903: c (3 downto 1) and d (1 to 3) tapped by their own bits; d's slice, ascending, an HDL block)
+  'vhdl-vec-not-0': { kinds: { and2: 1, xor2: 1, slice: 7, hdlblock: 1 }, moved: false, hdlPath: 'src/vnz.vhd', writes: ['src/vnz.vhd'] },
+  'verilog-vec-not-0': { kinds: { and2: 1, xor2: 1, slice: 7, hdlblock: 1 }, moved: false, hdlPath: 'src/vnzv.v', writes: ['src/vnzv.v'] },
+  // (#2961: ports a (4 downto 1) and b (1 to 4) tapped by their own bits; b's slice, ascending, an HDL block)
+  'vhdl-port-not-0': { kinds: { and2: 1, inv: 1, xor2: 1, slice: 6, hdlblock: 1 }, moved: false, hdlPath: 'src/pnz.vhd', writes: ['src/pnz.vhd'] },
+  'verilog-port-not-0': { kinds: { and2: 1, inv: 1, xor2: 1, slice: 6, hdlblock: 1 }, moved: false, hdlPath: 'src/pnzv.v', writes: ['src/pnzv.v'] },
 };
+
+// a port not from 0 read by a bus tap (#2961: "bus tap inst_2 takes bit 4, outside its bus 'a' (3 downto 0)"): its I/O
+// marker's net by the port's type, its taps its own bits, the port declared as the module has it
+test('Convert to Schematic: a port not from 0, a(4 downto 1) / input [4:1] a, read by bus taps (#2961)', async () => {
+  for (const [path, text, decl, taps] of [
+    ['src/m.vhd', `library ieee; use ieee.std_logic_1164.all;
+entity m is port (a : in std_logic_vector(4 downto 1); y : out std_logic); end m;
+architecture r of m is begin y <= a(4) and a(1); end r;
+`, '    a : in std_logic_vector(4 downto 1);', ['  net_1 <= a(4);', '  net_2 <= a(1);']],
+    ['src/m.v', `module m(input [4:1] a, output y); assign y = a[4] & a[1]; endmodule
+`, '  input wire [4:1] a,', ['  assign net_1 = a[4];', '  assign net_2 = a[1];']]]) {
+    const r = await convertModuleToSchematic({ sources: [{ path, text, role: 'design' }], module: 'm', layout });
+    assert.deepEqual(r.warnings, []);
+    assert.deepEqual(kinds(r.doc), { and2: 1, slice: 2 });
+    const nl = netlist(r.doc);
+    assert.deepEqual(nl.diagnostics.map(d => d.message), []);
+    assert.deepEqual(nl.nets.find(n => n.name === 'a')?.range, { msb: 4, lsb: 1 });
+    const code = r.writes[r.hdlPath].split('\n');
+    for (const l of [decl, ...taps]) assert.ok(code.includes(l), `${l}\n${r.writes[r.hdlPath]}`);
+  }
+});
+
+// a vector not from 0 read by a bus tap (#2903: "bus tap inst_4 takes bit 3, outside its bus 'c' (2 downto 0)"): its net
+// named with its indices, c(3:1) / c[3:1], its taps its own bits, declared as the source did
+test('Convert to Schematic: an internal vector not from 0, c(3 downto 1) / wire [3:1] c, read by a bus tap (#2903)', async () => {
+  for (const [path, text, label, decl, tap] of [
+    ['src/m.vhd', `library ieee; use ieee.std_logic_1164.all;
+entity m is port (a : in std_logic_vector(3 downto 0); y : out std_logic); end m;
+architecture r of m is
+  signal c : std_logic_vector(3 downto 1);
+begin
+  c <= a(3 downto 1) and a(2 downto 0);
+  y <= c(3);
+end r;
+`, 'c(3:1)', '  signal c : std_logic_vector(3 downto 1);', '  y <= c(3);'],
+    ['src/m.v', `module m(input [3:0] a, output y);
+  wire [3:1] c;
+  assign c = a[3:1] & a[2:0];
+  assign y = c[3];
+endmodule
+`, 'c[3:1]', '  wire [3:1] c;', '  assign y = c[3];']]) {
+    const r = await convertModuleToSchematic({ sources: [{ path, text, role: 'design' }], module: 'm', layout });
+    assert.deepEqual(r.warnings, []);
+    assert.deepEqual(kinds(r.doc), { and2: 1, slice: 3 });
+    assert.deepEqual(r.doc.labels.map(l => l.net), [label]);
+    assert.deepEqual(r.doc.symbols.filter(s => s.type === 'slice').map(s => [s.params.msb, s.params.lsb]), [[3, 1], [2, 0], [3, 3]]);
+    const nl = netlist(r.doc);
+    assert.deepEqual(nl.diagnostics.map(d => d.message), []);
+    assert.deepEqual(nl.nets.find(n => n.name === 'c')?.range, { msb: 3, lsb: 1 });
+    const code = r.writes[r.hdlPath].split('\n');
+    assert.ok(code.includes(decl) && code.includes(tap), r.writes[r.hdlPath]);
+  }
+});
 
 for (const c of CASES) {
   test(`behavioural module ${c.name}: converted, its generated HDL simulates as the module`, async () => {

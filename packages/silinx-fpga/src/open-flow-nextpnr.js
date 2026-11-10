@@ -13,7 +13,7 @@ import { parseXdl, writeXdl } from './xdl.js';
 import { loadChipdb } from './nextpnr-io.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
 import { checkRouting } from './fpga/route-check.js';
-import { deviceSites } from './fpga/device-sites.js';
+import { deviceSites, bankOfPad, vccoOfStandard } from './fpga/device-sites.js';
 import { analyzeTiming } from './fpga/timing.js';
 import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 import { dcmPeriodFactor, dcmSettings } from './fpga/nextpnr-dcm.js';
@@ -25,8 +25,9 @@ import { paramBits, paramInt } from './fpga/netlist.js';
  *  (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE) and the latches (LD, LDE, LDCE, LDPE), of the falling edge too
  *  (_1, #2457), the carry chains (MUXCY, XORCY), the wide multiplexers, the constants (GND, VCC), the I/O buffers, the IOBs'
  *  DDR registers (IDDR2, ODDR2), BUFG and the clock switches (BUFGMUX, BUFGMUX_1), the DCMs, the block RAMs, the multipliers
- *  (not chained), the distributed RAMs and the shift registers. (A RAM64X1S: lowerRam64's; a BUF, a LUT1.) */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|BUFGMUX(_1)?|DCM|DCM_SP|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
+ *  (not chained), the distributed RAMs, the shift registers and the JTAG's user access (BSCAN_SPARTAN3, #3176: nextpnr
+ *  1.5.0's). (A RAM64X1S: lowerRam64's; a BUF, a LUT1.) */
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|BUFGMUX(_1)?|DCM|DCM_SP|BSCAN_SPARTAN3|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the
@@ -34,12 +35,12 @@ export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|M
  * I/O buffer at its LOC). The UCF's IOB = TRUE / FALSE as the attribute IOB, the micro-architecture's question: NET on the
  * port bit's buffer, INST on the cell; INST LOC on a DCM as its BEL (device: the device's graph, for the site's place). Returns { json, problems }: the cells the micro-architecture does not have, ports without
  * a pad; and sdc, the PERIODs as nextpnr's clock constraints. An input nothing reads is left out, as Silinx's packer does.
- * (The constants: the micro-architecture's, #2135.)
+ * ios: the port bits with a LOC, { name, loc, iostandard } (their banks' VCCO: bankVccoConflicts). (The constants: the micro-architecture's, #2135.)
  */
 export function nextpnrNetlist(text, top, ucf, device = null) {
   const json = JSON.parse(text);
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
-  const problems = [];
+  const problems = [], ios = [];
   lowerRam64(mod);
   lowerClockSwitches(mod);
   lowerControlInverters(mod);
@@ -101,6 +102,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
       if (!buffer) problems.push(`port ${bit}: no I/O buffer (IBUF / OBUF) on it`);
       else {
         const iob = asked('NET', bit);
+        if (a.loc) ios.push({ name: bit, loc: a.loc, iostandard: a.iostandard });
         // (the converter to XDL writes the IOB's settings from them: they stay on the cell in the routed design; a port
         // with no LOC gets its pad from nextpnr, #2625)
         buffer.attributes = { ...buffer.attributes, ...(a.loc ? { LOC: a.loc } : {}), ...(iob ? { IOB: iob } : {}), ...(a.iostandard ? { IOSTANDARD: a.iostandard } : {}),
@@ -140,7 +142,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   for (const [n, period] of clockNets) if (n && !(periods.get(n) <= period)) periods.set(n, period);
   const sdc = [...periods].map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
   json.modules = { [name]: mod };
-  return { json, problems, sdc };
+  return { json, problems, sdc, ios };
 }
 
 /**
@@ -295,11 +297,37 @@ export function hardInputs(mod) {
   });
 }
 
+/**
+ * The I/Os LOC'd on pads of one bank whose I/O standards need different VCCO (ios: nextpnrNetlist's, { name, loc,
+ * iostandard }; ISE's default LVCMOS25): ISE's DRC refuses them (PhysDesignRules:755), and nextpnr gives a bank's VCCO
+ * only to the I/Os it places itself (#2813). Returns the messages, each I/O against the bank's first, as Silinx's placer said them.
+ */
+export function bankVccoConflicts(ios, device) {
+  const pads = deviceSites(device).pads, banks = new Map(), out = [];
+  for (const { name, loc, iostandard } of ios) {
+    const pad = pads.get(String(loc).toUpperCase());
+    const std = String(iostandard || 'LVCMOS25').toUpperCase(), v = vccoOfStandard(std), b = pad ? bankOfPad(pad) : -1;
+    if (v === null || b < 0) continue;
+    const first = banks.get(b);
+    if (!first) banks.set(b, { name, pad: pad.name, std, v });
+    else if (first.v !== v) out.push(`place: ${name}: pad ${pad.name} is in bank ${b}, whose other I/Os (${first.name} on ${first.pad}, ${first.std}) need VCCO ${first.v} V, not ${v} V (${std})`);
+  }
+  return out;
+}
+
 // The placements the nextpnr engine makes, each routed, the fastest kept. Measured on the examples (#2196): the best of
-// four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement.
-export const NEXTPNR_TRIES = { normal: 4, high: 8, maxSlices: 500 };
-/** The placements at an Optimization Effort ('high', else Normal) for a design of `slices` slices: one for a large one at Normal. */
-export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRIES.high : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
+// four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement. At High, a small
+// design (up to 100 slices, about 2 s a placement) gets 32 (#2940): its seeds spread widely (iwls05-sasc 4.76 to 5.22 ns,
+// itc99-b10 4.75 to 5.56 ns over 16), and the best of 32 is 1 to 4 % shorter than the best of 8 (sasc 4.763 -> 4.563 ns,
+// b10 4.751 -> 4.659, usb-phy 4.889 -> 4.819), Place & Route two to three times as long. A large design (over 500 slices)
+// gets 4 (#3095): a placement takes minutes (itc99-b20, 1335 slices, about 6 min; secworks-siphash, 686, about 2.5), and
+// its best of 8 was its best of 4 (b20 36.802 ns, siphash 15.397), the second four only adding 25 to 45 minutes; a
+// smaller one keeps 8 (vtr-diffeq1, 260 slices: 37.224 -> 37.076 ns from the second four).
+export const NEXTPNR_TRIES = { normal: 4, high: 8, highSmall: 32, smallSlices: 100, maxSlices: 500, highLarge: 4 };
+/** The placements at an Optimization Effort ('high', else Normal) for a design of `slices` slices: one for a large one at Normal, four at High. */
+export const nextpnrTries = (effort, slices) => (effort === 'high'
+  ? (slices <= NEXTPNR_TRIES.smallSlices ? NEXTPNR_TRIES.highSmall : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.high : NEXTPNR_TRIES.highLarge)
+  : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
 
 /**
  * { runMap, runPar } of runFlow for the nextpnr engine. ctx: { io, spec, log, report, util, now, ms, netlistText (a
@@ -309,7 +337,7 @@ export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRI
 export function mountNextpnrSteps(ctx) {
   const { io, spec, log, report, util, now, ms, netlistText, top, constraints, StepError, setRouted } = ctx;
   const model = () => { try { return constraints(); } catch { return null; } };   // (checked by translate)
-  let input = null, sdc = '';
+  let input = null, sdc = '', ios = [];
   const part = `${spec.device}${spec.pkg}`;
 
   function runMap() {
@@ -322,6 +350,7 @@ export function mountNextpnrSteps(ctx) {
     hardBlocks(r.json);
     input = JSON.stringify(r.json);
     sdc = r.sdc;
+    ios = r.ios;
     log('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).');
   }
 
@@ -348,6 +377,9 @@ export function mountNextpnrSteps(ctx) {
   async function runPar() {
     if (!input) runMap();
     const t = now();
+    // two LOC'd I/Os of one bank at different VCCO: refused, as ISE's DRC refuses them (#2813)
+    const vcco = bankVccoConflicts(ios, io.device());
+    if (vcco.length) throw new StepError(`${vcco.length} I/O(s) in a bank of another VCCO (PhysDesignRules:755)`, vcco, 'Give the I/Os of each bank I/O standards of one VCCO, or LOC them on pads of another bank (the constraints, UCF).');
     await load();
     // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
@@ -357,7 +389,12 @@ export function mountNextpnrSteps(ctx) {
       const t1 = now(), lines = [];
       const args = ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'routed.json', '--seed', String(seed),
         ...(mhz ? ['--freq', mhz.toFixed(3)] : []), ...(sdc ? ['--sdc', 'design.sdc'] : []), '--timing-allow-fail'];
-      const errors = () => lines.filter(l => /^ERROR:/.test(l)).slice(0, 20);
+      // (none: nextpnr stopped on an exception of its own with no ERROR line, a WebAssembly exception without a message
+      // before nextpnr-spartan 1.1.1: where it stopped, its last line, #2818)
+      const errors = () => {
+        const e = lines.filter(l => /^ERROR:/.test(l)).slice(0, 20), last = lines.filter(l => l.trim()).at(-1);
+        return e.length || !last ? e : [`nextpnr stopped with no error message, after: ${last.trim()}`];
+      };
       let files;
       try {
         files = await io.nextpnr.spartan3e.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => lines.push(l));

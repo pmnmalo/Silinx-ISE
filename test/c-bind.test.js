@@ -146,3 +146,26 @@ test('#2125 a multiplication in a sub-module\'s argument: on the unit, the limit
     assert.deepEqual(c.gen.diagnostics, []);
   }
 });
+
+test('#2273 the units\' multiplexers over the period: each multiplication\'s operands held in its unit\'s registers, written the cycle before, the path within the clock; co-simulated, no warning', async () => {
+  const { cReportLines } = await import('../core/c-report.js');
+  const src = 'double f(double a, double b) {\n  return a * b;\n}\n';
+  const tb = `${src}int main() {\n  return f(1.5, -2.25) == -3.375 && f(1e10, 3e-5) == 1e10 * 3e-5 ? 0 : 1;\n}\n`;
+  const opts = { file: 't.c', top: 'f', family: 'spartan3e', mults: 4, clock: 10 };
+  for (const lang of LANGS) {
+    const g = cToHdl(src, { ...opts, lang });
+    // (were 88 states and a path of 15.7 ns through the multiplexers before the 4 multipliers, over the 10 ns clock)
+    assert.deepEqual([g.diagnostics, g.states, Math.round(g.report.unitsNs * 10) / 10, g.report.units.map((u) => u.inputs)], [[], 89, 8.9, [16, 16, 16, 16]], lang);
+    // (each unit two registers of its own, the operands' registers of each use gone)
+    const regs = [...g.hdl.matchAll(/ap_r_(u\d+_[ab])\b/g)].map((m) => m[1]);
+    assert.deepEqual([...new Set(regs)].sort(), ['u0_a', 'u0_b', 'u1_a', 'u1_b', 'u2_a', 'u2_b', 'u3_a', 'u3_b'], lang);
+    assert.doesNotMatch(g.hdl, /ap_r_s\d+_u\d+_\d/, lang);
+    assert.deepEqual(cReportLines(g, { path: 't.c', lang, clock: 10 }).warnings, [], lang);
+    const c = cosimulate(tb, { ...opts, lang });
+    assert.deepEqual([c.errors, c.pass, c.gen.diagnostics, c.latency.max], [[], true, [], 87], lang);
+  }
+  // (sinf: shorter, 15.7 ns -> 10.4, its registers' multiplexers 17 writers deep: still over, said)
+  const s = cToHdl('#include <math.h>\nfloat f(float a) {\n  return sinf(a);\n}\n', opts);
+  assert.equal(Math.round(s.report.unitsNs * 10) / 10, 10.4);
+  assert.match(cReportLines(s, { path: 't.c', lang: 'vhdl', clock: 10 }).warnings.join('\n'), /multiplexers make a path of about 10\.4 ns, over the 10 ns clock/);
+});

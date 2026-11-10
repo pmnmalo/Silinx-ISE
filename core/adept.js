@@ -359,12 +359,15 @@ function fpgaOf(chain) {
   return f;
 }
 
+const BIT_MAGIC = [0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x00];
+
 /**
  * The header of a .bit (server/programmer.js parseBitHeader, without Node's Buffer):
  * { design, part, package, date, time } (part: 'xc3s250e'), or null when it is not a .bit.
  */
 export function bitHeader(bit) {
-  if (bit.length < 13 || bit[0] !== 0 || bit[1] !== 9) return null;
+  // its length word (9), then the 9 bytes of its magic, as parseBitHeader checks them (#3048)
+  if (bit.length < 13 || bit[0] !== 0 || bit[1] !== 9 || BIT_MAGIC.some((v, i) => bit[2 + i] !== v)) return null;
   let o = 13;
   const out = { design: null, part: null, package: null, date: null, time: null };
   const str = () => { const n = (bit[o] << 8) | bit[o + 1]; o += 2; const v = new TextDecoder('latin1').decode(bit.subarray(o, o + n)).replace(/\0+$/, ''); o += n; return v; };

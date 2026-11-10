@@ -2,12 +2,12 @@
 // Packages the files of a GitHub release (used by .github/workflows/release.yml, and by the release
 // test, test/release/, which unzips the app and runs it: the two cannot drift apart).
 //   node scripts/package-release.mjs [version] [--out out] [--app-only]
-//     silinx-ise-<version>.zip             full app: the tracked files + production node_modules
-//     silinx-ise-docker-kit-<version>.zip  builder kit of the private Xilinx ISE 14.7 Docker image
-//     Silinx-ISE.html                      the single-file edition (copied from dist/, built before
+//     silinx-<version>.zip             full app: the tracked files + production node_modules
+//     silinx-docker-kit-<version>.zip  builder kit of the private Xilinx ISE 14.7 Docker image
+//     Silinx.html                      the single-file edition (copied from dist/, built before
 //                                          with npm run build:standalone; left out when not built)
 //     SHA256SUMS                           the SHA-256 checksums of the files above (#485)
-// version dev: the files of the pre-release "Development build" (silinx-ise-dev.zip, …).
+// version dev: the files of the pre-release "Development build" (silinx-dev.zip, …).
 // --app-only: only the app zip. The version defaults to package.json's. Needs `zip` (Linux, macOS)
 // and npm (the production dependencies are installed from package-lock.json: npm ci --omit=dev).
 import fs from 'node:fs';
@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sha256sums, SUMS_FILE } from './checksums.mjs';
 import { leaveOutDownloaded } from './downloaded-packages.mjs';
+import { leaveOutUnused } from './zip-trim.mjs';
 import { leaveOutChipdbs } from '../packages/silinx-fpga/src/node.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -69,11 +70,11 @@ function unlinkWorkspaces(app) {
   return gone;
 }
 
-/** The full app: tracked files + production dependencies, in a folder silinx-ise/. */
+/** The full app: tracked files + production dependencies, in a folder silinx/. */
 function packageApp() {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-pkg-'));
   try {
-    const app = path.join(work, 'silinx-ise');
+    const app = path.join(work, 'silinx');
     copyTracked(app);
     run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], app);
     unlinkWorkspaces(app);
@@ -81,10 +82,12 @@ function packageApp() {
     leaveOutDownloaded(app);
     // nextpnr's chip databases: downloaded on their first use (#2329)
     for (const pkg of NEXTPNR_PACKAGES) leaveOutChipdbs(path.join(app, 'node_modules', pkg));
+    // the files of the packages the app never reads: source maps, type declarations, tests and demos (#3232)
+    leaveOutUnused(app);
     fs.rmSync(path.join(app, '.github'), { recursive: true, force: true });
-    const zip = path.join(out, `silinx-ise-${version}.zip`);
+    const zip = path.join(out, `silinx-${version}.zip`);
     fs.rmSync(zip, { force: true });
-    run('zip', ['-qr', zip, 'silinx-ise'], work);
+    run('zip', ['-qr', zip, 'silinx'], work);
     return zip;
   } finally {
     fs.rmSync(work, { recursive: true, force: true });
@@ -95,12 +98,12 @@ fs.mkdirSync(out, { recursive: true });
 const made = [packageApp()];
 if (!appOnly) {
   // no Xilinx software or licence inside: only the scripts that build the image from the user's own
-  const kit = path.join(out, `silinx-ise-docker-kit-${version}.zip`);
+  const kit = path.join(out, `silinx-docker-kit-${version}.zip`);
   fs.rmSync(kit, { force: true });
   run('zip', ['-qr', kit, 'ise'], path.join(root, 'docker'));
   made.push(kit);
-  const html = path.join(root, 'dist', 'Silinx-ISE.html');
-  if (fs.existsSync(html)) { fs.copyFileSync(html, path.join(out, 'Silinx-ISE.html')); made.push(path.join(out, 'Silinx-ISE.html')); }
+  const html = path.join(root, 'dist', 'Silinx.html');
+  if (fs.existsSync(html)) { fs.copyFileSync(html, path.join(out, 'Silinx.html')); made.push(path.join(out, 'Silinx.html')); }
 }
 // (sha256sum -c SHA256SUMS checks a download; the Release workflow attests the files it lists)
 fs.writeFileSync(path.join(out, SUMS_FILE), sha256sums(made));

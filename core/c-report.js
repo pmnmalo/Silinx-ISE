@@ -19,10 +19,10 @@ export function hlsFamilyOf(device) {
   return familyOf(device ? deviceFamily(device) : null);
 }
 
-/** The multiplier blocks a cycle may take (#2125): the device's, else no limit. */
-export function hlsMultsOf(device) {
-  const part = device?.part;
-  if (!part) return null;
+/** The multiplier blocks a cycle may take (#2125): the device's, else no limit. part: the device's part record
+ *  (server/devices.js findPart, S.devices.parts; #2783: resourceCount needs the record, not the part's name). */
+export function hlsMultsOf(device, part) {
+  if (!device?.part || !part) return null;
   // (the family's multiplier, #2310; a family with no profile: the Spartan-3 generation's MULT18X18)
   try { return resourceCount(part, familyProfile(deviceFamily(device)).multiplier || 'mult18x18') || null; } catch { return null; }
 }
@@ -47,7 +47,8 @@ export function cReportLines(r, { path, lang, clock }) {
     L.push('', 'Processes:');
     // (the region's latency and interval, each process's, #1706)
     L[L.length - 1] = `Processes (the region's latency: ${cycles(rep.latency)}; its interval: ${cycles(rep.interval)}):`;
-    for (const p of rep.processes) L.push(`  ${p.instance.padEnd(16)} ${p.name}: ${p.states} states, ${p.registerBits} register bits${p.latency ? `, latency ${cycles(p.latency)}` : ''}${p.after.length ? `; starts once ${p.after.join(', ')} ${p.after.length > 1 ? 'are' : 'is'} done` : ''}`);
+    // (an RTL blackbox's process: its module, its latency the description's or its ap_done's, #2340)
+    for (const p of rep.processes) L.push(`  ${p.instance.padEnd(16)} ${p.name}: ${p.blackbox ? `the RTL blackbox ${p.blackbox}, ${p.latency.max === null ? 'ended by its ap_done' : `latency ${cycles(p.latency)}`}` : `${p.states} states, ${p.registerBits} register bits${p.latency ? `, latency ${cycles(p.latency)}` : ''}`}${p.after.length ? `; starts once ${p.after.join(', ')} ${p.after.length > 1 ? 'are' : 'is'} done` : ''}`);
     if (rep.fifos.length) { L.push('', 'FIFOs:'); for (const f of rep.fifos) L.push(`  ${f.name.padEnd(16)} ${f.depth} words`); }
   }
   // (a function not inlined, a sub-module: its calls, its latency and resources, #1960)
@@ -70,7 +71,7 @@ export function cReportLines(r, { path, lang, clock }) {
     for (const [k, u] of rep.units.entries()) L.push(`  mul_${k}`.padEnd(18) + `${u.a} x ${u.b} bits, ${u.blocks} block${u.blocks > 1 ? 's' : ''}; ${u.uses} use${u.uses > 1 ? 's' : ''}, ${u.inputs} input${u.inputs > 1 ? 's' : ''} multiplexed`);
   }
   const warnings = [];
-  if (rep.unitsNs > clock) warnings.push(`WARNING:SilinxC - "${path}": the multipliers' multiplexers make a path of about ${rep.unitsNs.toFixed(1)} ns, over the ${clock} ns clock (Silinx adds no registers on them): a slower clock makes it fit`);
+  if (rep.unitsNs > clock) warnings.push(`WARNING:SilinxC - "${path}": the multipliers' multiplexers make a path of about ${rep.unitsNs.toFixed(1)} ns, over the ${clock} ns clock (their operands held in registers where that makes it shorter, #2273): a slower clock makes it fit`);
   // (a pipelined loop too slow for the clock: its II kept, no pipeline stages, #2080)
   for (const l of rep.slowLoops || []) warnings.push(`WARNING:SilinxC - "${path}" line ${l.line}: this pipelined loop's iteration does not fit the ${clock} ns clock: a path of about ${l.ns.toFixed(1)} ns in one cycle (Silinx adds no pipeline stages); a slower clock, or #pragma HLS PIPELINE off, makes it fit`);
   return { lines: L, warnings };

@@ -43,3 +43,5 @@
 .petri-editor .pn-an-graph ol { margin: 4px 0 0 28px; padding: 0; font-size: 11px; }
 .petri-editor .pn-ok { color: var(--asm-ok); }
 .petri-editor .pn-bad { color: var(--asm-danger); font-weight: 600; }
+/* read only (a shared project followed, #3181: petri-readonly.js): what changes the net hidden */
+.petri-editor.asm-readonly .asm-toolbar > [hidden], .petri-editor.asm-readonly .tb-more-menu [hidden] { display: none; }

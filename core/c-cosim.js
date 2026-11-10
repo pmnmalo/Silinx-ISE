@@ -76,7 +76,10 @@ export function wordCalls(gen, calls0) {
   const words = (src, fields) => {
     const f0 = fields[0];
     if (!src[f0.param]) return undefined;
-    return Array.from({ length: Math.floor(src[f0.param].length / f0.k) }, (_, i) => packWord(fields, (m, j) => src[m]?.[i * (fields.find((f) => f.param === m).k) + j]));
+    // (an ARRAY_RESHAPE's, #2424: its last word's elements past the array 0; of type block, slice j the j-th block)
+    const n = Math.ceil(src[f0.param].length / f0.k);
+    const at = (f, i, j) => (f.block ? j * f.block + i : i * f.k + j);
+    return Array.from({ length: n }, (_, i) => packWord(fields, (m, j) => src[m]?.[at(fields.find((f) => f.param === m), i, j)]));
   };
   return calls.map((c) => {
     const r = { ...c };

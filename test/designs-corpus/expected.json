@@ -146,7 +146,7 @@
    "slices": 4360,
    "luts": 8719,
    "ffs": 257,
-   "period": 72.51
+   "period": 75.704
   }
  },
  "epfl-priority": {
@@ -232,10 +232,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 338,
-   "luts": 671,
+   "slices": 331,
+   "luts": 659,
    "ffs": 389,
-   "period": 11.673
+   "period": 11.347
   }
  },
  "fpu-multiplier": {
@@ -246,10 +246,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 231,
-   "luts": 456,
+   "slices": 227,
+   "luts": 450,
    "ffs": 404,
-   "period": 14.194
+   "period": 14.256
   }
  },
  "itc99-b01": {
@@ -323,10 +323,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 252,
-   "luts": 464,
+   "slices": 194,
+   "luts": 374,
    "ffs": 34,
-   "period": 10.796
+   "period": 12.098
   }
  },
  "itc99-b06": {
@@ -407,10 +407,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 96,
-   "luts": 184,
-   "ffs": 36,
-   "period": 9.131
+   "slices": 89,
+   "luts": 173,
+   "ffs": 31,
+   "period": 8.138
   }
  },
  "itc99-b12": {
@@ -451,7 +451,19 @@
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error"
+  "flow": "complete",
+  "warnings": {
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
+   ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 657,
+   "luts": 1300,
+   "ffs": 334,
+   "period": 35.424
+  }
  },
  "itc99-b15": {
   "frontend": "pass",
@@ -466,6 +478,9 @@
    ],
    "synth": [
     "Warning: Replacing memory \\p1_v0 with list of registers. See b15_syn.v:739, b15_syn.v:641"
+   ],
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
    ]
   },
   "quality": {
@@ -473,7 +488,7 @@
    "slices": 1233,
    "luts": 2457,
    "ffs": 546,
-   "period": 19.976
+   "period": 20.024
   }
  },
  "itc99-b17": {
@@ -501,7 +516,7 @@
    "slices": 3801,
    "luts": 7575,
    "ffs": 1380,
-   "period": 22.055
+   "period": 21.997
   }
  },
  "itc99-b20": {
@@ -509,25 +524,59 @@
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error"
+  "flow": "complete",
+  "warnings": {
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
+   ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 1325,
+   "luts": 2635,
+   "ffs": 492,
+   "period": 37.394
+  }
  },
  "itc99-b21": {
   "frontend": "pass",
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error"
+  "flow": "complete",
+  "warnings": {
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
+   ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 1361,
+   "luts": 2706,
+   "ffs": 492,
+   "period": 35.217
+  }
  },
  "itc99-b22": {
   "frontend": "pass",
   "tb": "skip: no self-checking testbench",
   "synth": "pass",
   "diff": "pass",
-  "flow": "fail: nextpnr failed: it stopped on an error",
+  "flow": "complete",
   "warnings": {
    "frontend": [
     "WARNING:Silinx:646 (unused-signal) - b22.vhd:1609: Signal <datao_3> is assigned but never used. This unconnected signal will be trimmed during the optimization process."
+   ],
+   "flow": [
+    "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
    ]
+  },
+  "quality": {
+   "part": "xc3s250ecp132-4",
+   "slices": 2030,
+   "luts": 4026,
+   "ffs": 706,
+   "period": 39.372
   }
  },
  "iwls05-i2c": {
@@ -559,10 +608,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 80,
-   "luts": 159,
+   "slices": 52,
+   "luts": 95,
    "ffs": 54,
-   "period": 5.198
+   "period": 4.81
   }
  },
  "iwls05-simple-spi": {
@@ -580,10 +629,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 111,
-   "luts": 220,
+   "slices": 79,
+   "luts": 156,
    "ffs": 67,
-   "period": 6.699
+   "period": 6.162
   }
  },
  "iwls05-spi": {
@@ -637,10 +686,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 68,
-   "luts": 127,
-   "ffs": 106,
-   "period": 5.149
+   "slices": 67,
+   "luts": 115,
+   "ffs": 96,
+   "period": 5.015
   }
  },
  "light8080": {
@@ -880,10 +929,10 @@
   },
   "quality": {
    "part": "xc3s500efg320-4",
-   "slices": 4346,
-   "luts": 8691,
-   "ffs": 2996,
-   "period": 28.877
+   "slices": 3613,
+   "luts": 7225,
+   "ffs": 2989,
+   "period": 30.875
   }
  },
  "secworks-sha1": {
@@ -902,10 +951,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1024,
-   "luts": 2046,
-   "ffs": 1528,
-   "period": 17.306
+   "slices": 1006,
+   "luts": 2009,
+   "ffs": 1527,
+   "period": 14.991
   }
  },
  "secworks-sha256": {
@@ -927,10 +976,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1434,
-   "luts": 2868,
-   "ffs": 1809,
-   "period": 24.389
+   "slices": 1339,
+   "luts": 2677,
+   "ffs": 1808,
+   "period": 26.428
   }
  },
  "secworks-siphash": {
@@ -1108,7 +1157,7 @@
    "slices": 113,
    "luts": 223,
    "ffs": 72,
-   "period": 10.105
+   "period": 9.98
   }
  },
  "verilog-lfsr-crc": {
@@ -1152,10 +1201,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 117,
-   "luts": 229,
+   "slices": 111,
+   "luts": 218,
    "ffs": 79,
-   "period": 8.539
+   "period": 6.938
   }
  },
  "vtr-ch-intrinsics": {
@@ -1296,10 +1345,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 798,
-   "luts": 1594,
+   "slices": 796,
+   "luts": 1590,
    "ffs": 893,
-   "period": 15.608
+   "period": 16.479
   }
  },
  "vtr-stereovision3": {
@@ -1319,10 +1368,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 73,
-   "luts": 144,
-   "ffs": 120,
-   "period": 7.538
+   "slices": 64,
+   "luts": 126,
+   "ffs": 99,
+   "period": 7.75
   }
  }
 }

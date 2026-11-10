@@ -90,7 +90,7 @@ test('#1679 the command line: the parts it builds, the files it reads', async ()
   assert.deepEqual(await first(['build', v, '--part', 'xc3s1600e-fg320-4']), [2, 'silinx-fpga: --part xc3s1600e-fg320-4: no device description or bit database of xc3s1600efg320 (the Basys2\'s and the Nexys2\'s parts have them)']);
   assert.deepEqual(await first(['build', path.join(dir, 'none.v'), '--part', 'xc3s250e-cp132-4']), [1, `silinx-fpga: ${path.join(dir, 'none.v')}: no such file`]);
   assert.deepEqual(await first(['build', v, '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'none.ucf')]), [1, `silinx-fpga: ${path.join(dir, 'none.ucf')}: no such file`]);
-  assert.deepEqual(await first(['build', vhd, '--part', 'xc3s250e-cp132-4']), [1, `silinx-fpga: ${vhd}: VHDL needs Silinx ISE's front end; give Verilog or a Yosys JSON netlist`]);
+  assert.deepEqual(await first(['build', vhd, '--part', 'xc3s250e-cp132-4']), [1, `silinx-fpga: ${vhd}: VHDL needs Silinx's front end; give Verilog or a Yosys JSON netlist`]);
   assert.deepEqual(await first(['build', txt, '--part', 'xc3s250e-cp132-4']), [2, `silinx-fpga: ${txt}: not Verilog (.v) or a Yosys JSON netlist (.json)`]);
   assert.deepEqual(await first(['build', net, v, '--part', 'xc3s250e-cp132-4']), [2, 'silinx-fpga: a Yosys JSON netlist alone, or Verilog files']);
   assert.deepEqual(await first(['build', net, '--part', 'xc3s250e-cp132-4']), [2, 'silinx-fpga: the top module is not clear: give it with --top']);

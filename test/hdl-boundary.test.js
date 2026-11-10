@@ -21,9 +21,9 @@ const FRONT_END = new Set([
   'core/native.js', 'core/util.js', 'core/values.js',
   'core/synth-module.js', 'core/synth-operators.js', 'core/synth-stmts.js', 'core/synth-tables.js',
   'core/synth-values.js', 'core/synth-verilog.js',
-  'core/unisim-s6.js', 'core/unisim.js',
+  'core/unisim-jtag.js', 'core/unisim-s6.js', 'core/unisim.js',
   'core/verilog/lexer.js', 'core/verilog/parser-defs.js', 'core/verilog/parser-exprs.js',
-  'core/verilog/parser-items.js', 'core/verilog/parser-stmts.js', 'core/verilog/parser.js',
+  'core/verilog/parser-assert.js', 'core/verilog/parser-items.js', 'core/verilog/parser-stmts.js', 'core/verilog/parser.js',
   'core/vhdl/actual.js', 'core/vhdl/labels.js', 'core/vhdl/lexer.js', 'core/vhdl/math-real.js', 'core/vhdl/nodes.js',
   'core/vhdl/parse-concurrent.js', 'core/vhdl/parse-decls.js', 'core/vhdl/parse-defs.js', 'core/vhdl/parse-expr.js',
   'core/vhdl/parse-helpers.js', 'core/vhdl/parse-seq.js', 'core/vhdl/parser.js', 'core/vhdl/purity.js',
@@ -87,7 +87,7 @@ test('#1709 HDL boundary: how the imports across are found', () => {
 });
 
 test('#1709 HDL boundary: the front end\'s modules exist, and are what the entry points reach', () => {
-  assert.equal(FRONT_END.size, 40);
+  assert.equal(FRONT_END.size, 42);
   for (const f of FRONT_END) assert.ok(fs.existsSync(path.join(ROOT, f)), `${f}: gone, remove it from FRONT_END`);
   for (const f of ENTRIES) assert.ok(FRONT_END.has(f), f);
   // not the front end: the toolchain's synth-*.js, the drawings, the IDE's simulation model
