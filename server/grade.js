@@ -17,7 +17,6 @@ import { parseExercise, limitsOf, testsOf, localize, pointsOf } from '../core/gr
 import { summarize } from '../core/grade.js';
 import { readZip } from '../core/zip.js';
 import { within } from './paths.js';
-import { devicesDir } from '../packages/silinx-fpga/src/node.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -127,13 +126,15 @@ export function expandSubmissions(paths) {
 }
 
 // ---------------------------------------------------------------- the grading process
-/** The flags of a grading process: its heap, and Node's permission model (reading Silinx's own files only: its
- *  folder and its packages', writing none) where this Node has it. */
-export function processFlags(memoryMb) {
+/** The flags of a grading process: its heap, and Node's permission model where this Node has it: reading Silinx's own
+ *  files only (its folder, its packages' and `read`'s: the routing graph of the synthesis tests' device when it is
+ *  the user's, built from their ISE), writing none. Nothing else of the user's folders: the process never looks for
+ *  what it needs (a lookup of a folder it may not read is refused, as an error), it is given (synthesisStatus). */
+export function processFlags(memoryMb, { read = [] } = {}) {
   const flags = [`--max-old-space-size=${Math.max(32, Math.round(memoryMb))}`];
   if (process.allowedNodeEnvironmentFlags.has('--permission')) {
     // (the packages' folder: node_modules, Silinx's own or the one above it that npm installed them in)
-    const dirs = new Set([ROOT, devicesDir()]);   // (and the device descriptions built from the user's ISE)
+    const dirs = new Set([ROOT, ...read]);
     for (const pkg of ['@yowasp/yosys', '@silinx/nextpnr-himbaechel-spartan3e']) {
       try { const f = fileURLToPath(import.meta.resolve(pkg)); dirs.add(f.slice(0, f.lastIndexOf(`${path.sep}node_modules${path.sep}`) + 13)); } catch { /* not installed */ }
     }
@@ -142,11 +143,21 @@ export function processFlags(memoryMb) {
   return flags;
 }
 
+/** The synthesis tests' device status, as the grading process uses it ({ part, device, graph, reason }: server/
+ *  open-flow.js openStatus, its routing graph found here, Silinx's or the user's), or null when no test synthesizes. */
+export async function synthesisStatus(ex) {
+  if (!ex.tests.some(t => t.kind === 'synthesis')) return null;
+  const [{ openStatus }, { GRADE_DEVICE }] = await Promise.all([import('./open-flow.js'), import('./grade-synth.js')]);
+  const st = openStatus(ex.device || GRADE_DEVICE);
+  return { part: st.part, device: st.device, graph: st.graph || null, reason: st.reason };
+}
+
 // one run of server/grade-run.js on a job: its messages one by one (onMessage, which returns the seconds the process
 // has from then on, null for no limit, undefined to keep the clock as it is), then { code, timedOut, outOfMemory }
 function runProcess(job, { memoryMb, seconds, onMessage }) {
   return new Promise(resolve => {
-    const child = spawn(process.execPath, [...processFlags(memoryMb), path.join(HERE, 'grade-run.js')], { stdio: ['pipe', 'pipe', 'pipe'], cwd: ROOT, env: { PATH: process.env.PATH || '', ...(process.env.SILINX_CONFIG_DIR && { SILINX_CONFIG_DIR: process.env.SILINX_CONFIG_DIR }) } });
+    const read = job.synthesis?.graph ? [path.dirname(job.synthesis.graph)] : [];
+    const child = spawn(process.execPath, [...processFlags(memoryMb, { read }), path.join(HERE, 'grade-run.js')], { stdio: ['pipe', 'pipe', 'pipe'], cwd: ROOT, env: { PATH: process.env.PATH || '', ...(process.env.SILINX_CONFIG_DIR && { SILINX_CONFIG_DIR: process.env.SILINX_CONFIG_DIR }) } });
     let buf = '', errText = '', timer = null, timedOut = false;
     const arm = s => { clearTimeout(timer); timer = s ? setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, s * 1000) : null; };
     arm(seconds);
@@ -184,7 +195,7 @@ export async function referenceVectorsOf(ex) {
 }
 
 /** One submission graded: core/grade.js summarize's result. `vectors`: the reference tests' (referenceVectorsOf). */
-export async function gradeSubmission(ex, sub, { visible = false, vectors = {}, exerciseUnits = [] } = {}) {
+export async function gradeSubmission(ex, sub, { visible = false, vectors = {}, exerciseUnits = [], synthesis } = {}) {
   const tests = testsOf(ex, { visible });
   if (sub.error) return summarize(ex, sub.name, { design: { verdict: 'CE', messages: [sub.error], warnings: [] }, tests: [] }, { visible });
   const results = [];
@@ -193,10 +204,11 @@ export async function gradeSubmission(ex, sub, { visible = false, vectors = {}, 
   const exercise = { ...ex, reference: undefined, tests };
   const need = Object.fromEntries(Object.entries(vectors).filter(([id]) => tests.some(t => t.id === id)));
   const submission = { project: sub.project, files: [...sub.files] };
+  if (synthesis === undefined) synthesis = await synthesisStatus(exercise);
   while (from < tests.length) {
     let current = null;
     const limitOf = k => limitsOf(ex, tests[k]);
-    const r = await runProcess({ type: 'grade', exercise, submission, from, vectors: need, exerciseUnits }, {
+    const r = await runProcess({ type: 'grade', exercise, submission, from, vectors: need, exerciseUnits, synthesis }, {
       memoryMb: limitOf(from).memoryMb, seconds: limitOf(from).seconds,
       onMessage: m => {
         if (m.type === 'design') { design = m.design; return undefined; }
@@ -235,8 +247,9 @@ export async function gradeAll(exerciseFile, paths, { visible = false, onResult 
   const { exerciseUnitNames } = await import('../core/grade-design.js');
   const exerciseUnits = [...exerciseUnitNames(ex)];
   const results = [];
+  const synthesis = await synthesisStatus({ ...ex, tests: run });
   for (const p of expandSubmissions(paths)) {
-    const r = await gradeSubmission(ex, await readSubmission(p), { visible, vectors, exerciseUnits });
+    const r = await gradeSubmission(ex, await readSubmission(p), { visible, vectors, exerciseUnits, synthesis });
     results.push(r);
     onResult(r);
   }
