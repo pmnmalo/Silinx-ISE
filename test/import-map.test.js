@@ -43,6 +43,12 @@ test('the import map of web/index.html: every target installed; the editor\'s wh
   const collab = ['core/collab-client.js', 'core/collab-doc.js'].flatMap(f => bareImports(fs.readFileSync(path.join(ROOT, f), 'utf8')));
   assert.deepEqual([...new Set(collab)].sort(), ['y-protocols/awareness', 'yjs']);
   todo.push(...collab);
+  // (a shared project's meeting point, #3227: Trystero, its torrent strategy)
+  const dynamic = src => [...src.matchAll(/\bimport\(['"]([@\w][\w@./-]*)['"]\)/g)].map(m => m[1]);
+  const meetSrc = ['web/js/collab-meet.js', 'core/collab-meet.js'].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8'));
+  const meet = meetSrc.flatMap(src => [...bareImports(src), ...dynamic(src)]);
+  assert.deepEqual([...new Set(meet)].sort(), ['@trystero-p2p/torrent']);
+  todo.push(...meet);
   const relative = src => [...src.matchAll(/(?:^|[\s;}])(?:import|export)\s*(?:[\w*{}\s,$]+\sfrom\s*)?['"](\.\.?\/[^'"]+)['"]/g)].map(m => m[1]);
   const files = new Set();
   // (a module's relative imports: files of its own package, which the server serves whole; lib0's)
@@ -63,9 +69,10 @@ test('the import map of web/index.html: every target installed; the editor\'s wh
     if (seen.has(spec)) continue;
     seen.add(spec);
     if (!map[spec]) { missing.push(spec); continue; }
-    // (each target a whole module, the packages' dist/index.js bundles, the legacy modes' files; or lib0's modules)
+    // (each target a whole module, the packages' dist/index.js bundles, the legacy modes' files; or lib0's modules, and
+    // Trystero's core's)
     const src = fs.readFileSync(fileOf(map[spec]), 'utf8');
-    if (!spec.startsWith('lib0/')) assert.deepEqual(relative(src), [], `${spec}: no relative import`);
+    if (!spec.startsWith('lib0/') && spec !== '@trystero-p2p/core') assert.deepEqual(relative(src), [], `${spec}: no relative import`);
     load(fileOf(map[spec]), spec);
   }
   assert.deepEqual(missing, []);

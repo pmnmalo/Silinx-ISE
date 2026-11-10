@@ -65,7 +65,7 @@ test('an editor\'s link: the signing key after the room\'s key, through a relay 
   for (const via of ['relay', 'host']) {
     const l = followLink('https://silinx.example.org/', room, key, via, s.text);
     assert.equal(l, `https://silinx.example.org/#edit=${room}.${key}.${s.text}${via === 'host' ? '.host' : ''}`);
-    assert.deepEqual(parseFollowLink(l), { base: 'https://silinx.example.org/', room, key, via, sign: s.text });
+    assert.deepEqual(parseFollowLink(l), { base: 'https://silinx.example.org/', room, key, via, sign: s.text, host: null });
   }
   for (const bad of [`#edit=${room}.${key}`, `#edit=${room}.${key}.host`, `#follow=${room}.${key}.${s.text}`, `#edit=${room}.${key}.${s.text.slice(1)}`]) assert.throws(() => parseFollowLink(bad), /the link to follow is broken/, bad);
   assert.throws(() => followLink('http://x/', room, key, 'relay', 'short'), /not an editor's key/);

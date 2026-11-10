@@ -5,7 +5,8 @@
 // its key, so the relay sees nothing of the project. The followers are shown in the toolbar (collab-presence.js),
 // their coming and going in the console; Stop Sharing closes the room for them all. Opening another project stops
 // sharing too. The browser edition, which has no relay, hosts the room in the owner's page (#3227, collab-host.js):
-// each follower connects with codes exchanged by hand (Add a Follower…).
+// each follower finds it at the public meeting point (collab-meet.js: the link carries the owner's key), or connects
+// with codes exchanged by hand (Add a Follower…).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app } from './app.js';
@@ -16,6 +17,7 @@ import { renderPresence, setPresenceCommands } from './collab-presence.js';
 import { projectDoc, publishProject, putFile, putProject, sharedPath } from '/core/collab-doc.js';
 import { shareRoom, colorOf } from '/core/collab-client.js';
 import { followLink, relayUrl } from '/core/collab-link.js';
+import { newHostKey } from '/core/collab-meet.js';
 
 export const NAME_KEY = prefKey('silinx.collab.name');
 const TRACK_MS = 300;
@@ -64,10 +66,11 @@ export async function startSharing(name, { via = api.collab ? 'relay' : 'host' }
   const doc = projectDoc();
   publishProject(doc, { ...await readAll(project), owner: name });
   const host = via === 'host' ? (await import('./collab-host.js')).hostRoom() : null;
+  const hostKey = host ? await newHostKey() : null;
   const session = host
     ? await shareRoom({ url: 'silinx-host:', WebSocket: host.WebSocket, doc, user: { name }, onEvent: ev => onEvent(ev) })
     : await shareRoom({ url: relayUrl(location.href, 'share'), token: await api.collabToken(), doc, user: { name }, onEvent: ev => onEvent(ev) });
-  share = { name, project, session, doc, link: followLink(location.origin + location.pathname, session.room, session.key, via), known: new Map(), view: null, hosted: host?.hosted || null };
+  share = { name, project, session, doc, link: followLink(location.origin + location.pathname, session.room, session.key, via, null, hostKey?.pub ?? null), known: new Map(), view: null, hosted: host?.hosted || null };
   Object.assign(collab, { role: 'owner', owner: name, project, session });
   share.restore = hookApi(project, doc);
   share.timer = setInterval(track, TRACK_MS);
@@ -75,7 +78,11 @@ export async function startSharing(name, { via = api.collab ? 'relay' : 'host' }
   setPresenceCommands(commands);
   draw();
   app.log(`Sharing project "${project}": anyone with its link follows it live, read only (Share Project… shows the link; Stop Sharing ends it).`, 'ok');
-  if (host) app.log('This page hosts the shared project: each follower sends you a code when they open the link (Add a Follower…, in the toolbar, takes it); it lasts while this page is open.', 'info');
+  if (host) {
+    app.log('This page hosts the shared project: its followers find it at the meeting point when they open the link, or send you a code (Add a Follower…, in the toolbar, takes it); it lasts while this page is open.', 'info');
+    const s = share;
+    s.meet = (await import('./collab-meet.js')).meetFollowers(s, hostKey.key);
+  }
   return share.link;
 }
 
@@ -91,6 +98,7 @@ export async function stopSharing(why = null) {
   for (const o of S.docs) o.editor?.setPeers?.([]);
   Object.assign(collab, { role: null, owner: '', project: null, session: null });
   await s.session.close().catch(() => {});
+  s.meet?.then(m => m?.leave()).catch(() => {});   // (once the followers were told)
   draw();
   app.log(why || `Stopped sharing "${s.project}": its followers no longer see it.`, why ? 'warn' : 'info');
 }
@@ -104,7 +112,7 @@ function linkDialog() {
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, `Anyone with this link follows "${share.project}" live, read only, as long as you share it.`),
       field,
-      share.hosted ? h('p', {}, 'This page hosts it: each follower sends you a code when they open the link, which Add a Follower… takes.') : null),
+      share.hosted ? h('p', {}, 'This page hosts it: its followers find it when they open the link, or send you a code, which Add a Follower… takes.') : null),
     buttons: [
       { label: 'Copy Link', primary: true, value: () => { writeClip('text', link); app.log('Shared project\'s link copied.', 'ok'); return link; } },
       ...(share.hosted ? [{ label: 'Add a Follower…', value: () => { addFollower(); return link; } }] : []),

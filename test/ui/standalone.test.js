@@ -24,6 +24,7 @@ import { VERSION, versionLabel } from '../../core/version.js';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { createZip, readZip } from '../../core/zip.js';
+import { TRACKER_SOURCES } from '../../server/csp.js';
 import { EXAMPLE_ORDER } from '../../core/examples.js';
 import { TEST_DESIGN_ORDER } from '../../core/test-designs.js';
 
@@ -530,7 +531,7 @@ uiTest('standalone edition (file://) in a user\'s browser (Chrome without --allo
 }, { url: () => 'about:blank', timeout: 300000 });
 
 // #418: the Board Emulator in the browser edition compiles the design with the site's Yosys (its assets)
-uiTest('#3227 browser edition: Share Project… hosts the room in the page (its link …#follow=<room>.<key>.host), Add a Follower… among its commands', E, async (page) => {
+uiTest('#3227 browser edition: Share Project… hosts the room in the page (its link …#follow=<room>.<key>.host.<owner\'s key>), Add a Follower… among its commands', E, async (page) => {
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
   await page.menu('File', 'New Project…');
@@ -543,14 +544,18 @@ uiTest('#3227 browser edition: Share Project… hosts the room in the page (its 
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.project?.name === 'WebShare');
+  // (the meeting point between this browser's pages: the tests never reach the public trackers)
+  await page.eval(() => { localStorage.setItem('silinx.collab.meeting', 'local'); localStorage.setItem('silinx.dev.collab.meeting', 'local'); });
   await page.menu('File', 'Share Project…');
   await page.waitDialog('Share Project');
   await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
   await page.dialogButton('Share');
   const link = await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });
-  assert.ok(link.startsWith(siteUrl) && /#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host$/.test(link), link);
+  assert.ok(link.startsWith(siteUrl) && /#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host\.[A-Za-z0-9_-]{86}$/.test(link), link);
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Copy Link', 'Add a Follower…', 'Stop Sharing', 'Close']);
-  await page.waitConsole(/^This page hosts the shared project: each follower sends you a code when they open the link/m);
+  await page.waitConsole(/^This page hosts the shared project: its followers find it at the meeting point when they open the link, or send you a code/m);
+  // (the meeting point's Trystero in the site's bundle, #3227)
+  assert.ok((await fs.readFile(path.join(site, 'index.html'), 'utf8')).includes('Trystero'), 'Trystero bundled');
   await page.dialogButton('Stop Sharing');
   await page.waitConsole(/^Stopped sharing "WebShare": its followers no longer see it\.$/m);
   assert.doesNotMatch(await page.consoleText(), /^(WARNING|ERROR)/m);
@@ -1413,7 +1418,7 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
     const hashes = [...text.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
     assert.ok(hashes.length >= 4, `${hashes.length} inline scripts`);
     assert.deepEqual(d['script-src'], ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", origin, ...hashes]);
-    assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', origin]);
+    assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES, origin]);
     // the iCE40's nextpnr from npm's registry at package-lock.json's SHA-512 (#2444)
     const ice40 = JSON.parse(await fs.readFile(path.join(ROOT, 'package-lock.json'), 'utf8')).packages['node_modules/@yowasp/nextpnr-ice40'];
     assert.ok(text.includes(JSON.stringify({ url: ice40.resolved, integrity: ice40.integrity })), 'the page has the package\'s URL and SHA-512');
