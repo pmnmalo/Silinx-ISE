@@ -194,7 +194,7 @@ endmodule
   big.ports = [...big.ports, { name: 'r', dir: 'out', width: 4 }];
   const fileBig = write(path.join(dir, 'big.exercise.json'), JSON.stringify(big));
   const { results } = await gradeAll(file, [path.join(subs, 'a-ok'), path.join(subs, 'b-latch'), path.join(subs, 'd-wait')]);
-  assert.deepEqual(results.map(r => [r.submission, r.tests[0].verdict]), [['a-ok', 'AC'], ['b-latch', 'LI'], ['d-wait', 'NS']]);
+  assert.deepEqual(results.map(r => [r.submission, r.tests[0].verdict]), [['a-ok', 'AC'], ['b-latch', 'LI'], ['d-wait', 'NS']], JSON.stringify(results.map(r => r.tests[0].messages)));
   // (the slices are Place & Route's packing, nextpnr's: 2 or 3 by its version)
   const { slices, ...used } = results[0].tests[0].used;
   assert.deepEqual(used, { luts: 0, ffs: 4, latches: 0 });
