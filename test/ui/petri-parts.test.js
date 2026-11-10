@@ -48,14 +48,14 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
     ['Module name', 'Inputs', 'Outputs', 'Clock', 'Reset (synchronous, to the initial marking)', 'Description']);
   assert.equal(await ev((ed) => document.querySelectorAll(`${ed} .asm-problems li`).length + document.querySelectorAll('#console-errors .diag, #console-warnings .diag').length), 0);
   // ---- the simulation: the marking, go on and a clock step: start fires (idle 3 -> 2, work 1), busy
-  await page.click(`${ED} .pn-tab-btn`, { text: 'Simulate' });
+  await page.click(`${ED} .pn-tab-btn`, { text: 'Try it' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=3  work=0', [ED], { what: 'the initial marking' });
   await page.click(`${ED} .pn-sim-ins input[type=checkbox]`);
   await page.click(`${ED} .asm-codebar .asm-btn`, { text: '⏭ Clock step' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=2  work=1', [ED], { what: 'start fired' });
   assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-log`).textContent), 'clock: start');
   // ---- the analysis (no </> HDL button, #2250)
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['Simulate', '∑ Analysis']);
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['Try it', '∑ Analysis']);
   await page.click(`${ED} .tb-more-btn`);   // (Analysis in the toolbar's menu, #2259)
   await page.click(`${ED} .pn-tab-btn`, { text: '∑ Analysis' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-an-props`), [ED], { what: 'the analysis' });
@@ -69,7 +69,7 @@ uiTest('#3218 the Petri net editor\'s toolbar (petri-toolbar.js): its tools, Del
   await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
   await page.waitFor((ed) => window.Silinx.active?.id === 'pn:src/ctl.pn.json' && document.querySelector(`${ed} .pn-place`), [ED], { what: 'the Petri net editor' });
   const ev = (fn, ...a) => page.eval(fn, ED, ...a);
-  // ---- its groups in order: the tools (select active), Delete, the zoom, Check, Simulate; then ☰ Properties and the ⋮ menu
+  // ---- its groups in order: the tools (select active), Delete, the zoom, Check, Try it; then ☰ Properties and the ⋮ menu
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-toolbar .pn-tool`)].map((b) => [b.textContent, b.classList.contains('active')])),
     [['', true], ['Place', false], ['Transition', false], ['Arc', false], ['Inhibitor', false]]);
   // (the view fitted by its button, the first fit's moment apart: the level read after it)
@@ -78,7 +78,7 @@ uiTest('#3218 the Petri net editor\'s toolbar (petri-toolbar.js): its tools, Del
   const zoom = await ev((ed) => document.querySelector(`${ed} .asm-zoom`).textContent);
   assert.match(zoom, /^\d+%$/);
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-toolbar > .asm-group`)].map((g) => g.textContent)),
-    ['PlaceTransitionArcInhibitor', '', zoom, 'Check', 'Simulate', '☰ Properties']);
+    ['PlaceTransitionArcInhibitor', '', zoom, 'Check', 'Try it', '☰ Properties']);
   // ---- the Place tool: a click on the drawing adds a place (p3, named p1), selected; Delete removes it; Undo brings it back
   await page.click(`${ED} .pn-tool`, { text: 'Place' });
   assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-tool.active`).textContent), 'Place');

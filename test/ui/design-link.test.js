@@ -67,7 +67,7 @@ uiTest('#2881 view=try on an ASM chart: blinky\'s speed_ctrl opened, its simulat
   assert.deepEqual(await consoleWarnings(page), []);
 });
 
-uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link opens the net in its Simulate panel', E, async (page) => {
+uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link opens the net in its Try it panel', E, async (page) => {
   await makeProject(env, { name: 'PnLink', top: 'ctl', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject('PnLink');
   const row = await page.waitFor(() => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => /\bctl\b/.test(r.textContent)); return i > 0 ? i : null; }, [], { what: 'the net\'s row' });
@@ -79,7 +79,7 @@ uiTest('#2869 a Petri net: Copy Link to This Module… chooses Try it; the link 
   await page.waitNoDialog();
   await openLink(page, new URL(link).hash.slice(1), 'pn=1');
   await linkOpened(page);
-  await page.waitFor(() => window.SilinxApp.findDoc('pn:src/ctl.pn.json')?.petriEditor?.panel === 'sim', [], { what: 'the net\'s Simulate panel', timeout: 30000 });
+  await page.waitFor(() => window.SilinxApp.findDoc('pn:src/ctl.pn.json')?.petriEditor?.panel === 'sim', [], { what: 'the net\'s Try it panel', timeout: 30000 });
   await page.waitConsole(/Opened 'PnLink' from a link: Try it\./);
   assert.equal(await page.dialogCount(), 0, 'the same project: no question');
   assert.deepEqual(await consoleWarnings(page), []);

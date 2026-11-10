@@ -24,7 +24,7 @@ export function mountRender(ctx) {
   }
 
   function render() {
-    const { M, sel, diags, sim } = state();   // (sim: the Simulate panel's present cycle, asm-sim.js view(), #2880)
+    const { M, sel, diags, sim } = state();   // (sim: the Try it panel's present cycle, asm-sim.js view(), #2880)
     const diagBy = new Map();
     for (const d of diags) {
       if (!d.nodeId) continue;

@@ -1,5 +1,5 @@
 // The MCP server's simulate_drawing (server/mcp.js, #2674, #2880): a state machine's drawing stepped clock edge by clock
-// edge from its reset, as its editor's panel steps it (the state diagram's Try it, the ASM chart's Simulate), through the same functions: an ASM chart's
+// edge from its reset, as its editor's Try it panel steps it, through the same functions: an ASM chart's
 // (core/asm-sim.js: its state, the path taken through its decisions, its Moore and Mealy outputs, its registers, the
 // next state) and a state diagram's (core/fsm.js stepFsm: its state, the transition taken, its outputs, the next state).
 // A drawing that cannot be simulated says why, as the panel does in the console.
@@ -87,7 +87,7 @@ async function simulateFsmFile(m0, cycles, base) {
 export const SIMULATE_DRAWING_TOOLS = [
   {
     name: 'simulate_drawing', title: 'Simulate a state machine\'s drawing',
-    description: 'Step an ASM chart (.asm.json) or a state diagram (.fsm.json) clock edge by clock edge from its reset, as its editor\'s panel does (the state diagram\'s Try it, the ASM chart\'s Simulate): one object of inputs per cycle ({ name: value }, a value a non-negative integer or binary digits; an input not given is 0; an ASM chart\'s reset by its name, not given: inactive). Per cycle, before its clock edge: the state, the inputs, the outputs (Moore and Mealy), an ASM chart\'s registers and the path taken through its decisions and conditional outputs (a state diagram\'s transition), and the next state. Its semantics are the generated HDL\'s. A drawing with errors is not simulated: its errors are returned.',
+    description: 'Step an ASM chart (.asm.json) or a state diagram (.fsm.json) clock edge by clock edge from its reset, as its editor\'s Try it panel does: one object of inputs per cycle ({ name: value }, a value a non-negative integer or binary digits; an input not given is 0; an ASM chart\'s reset by its name, not given: inactive). Per cycle, before its clock edge: the state, the inputs, the outputs (Moore and Mealy), an ASM chart\'s registers and the path taken through its decisions and conditional outputs (a state diagram\'s transition), and the next state. Its semantics are the generated HDL\'s. A drawing with errors is not simulated: its errors are returned.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, file: STR('The drawing, a path in the project (src/ctl.asm.json).'),
       cycles: { type: 'array', maxItems: MAX_CYCLES, items: { type: 'object', additionalProperties: { type: ['integer', 'string'] } }, description: 'The inputs of each clock cycle, in order, from the reset.' },
