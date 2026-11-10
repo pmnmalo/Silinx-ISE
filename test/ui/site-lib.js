@@ -14,8 +14,9 @@ const devEnv = () => { const e = { ...process.env }; delete e.GITHUB_REF; return
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.gz': 'application/gzip',
   '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
 
-/** The site built into tmp and served: { url, served (the paths asked), close() }, or { skip } without the build's packages. */
-export async function buildSite(tmp) {
+/** The site built into tmp and served: { url, served (the paths asked), close() }, or { skip } without the build's packages.
+ *  route(req, res, body): a test's own requests (a stand-in for GitHub's API, #3196), true when it answered. */
+export async function buildSite(tmp, { route = null } = {}) {
   const require = createRequire(path.join(ROOT, 'package.json'));
   let modules;
   try {
@@ -34,6 +35,11 @@ export async function buildSite(tmp) {
   await fs.symlink(modules, path.join(root, 'node_modules'), 'dir');
   const site = path.join(root, 'site'), served = [];
   const server = http.createServer(async (req, res) => {
+    if (route) {
+      const chunks = [];
+      for await (const c of req) chunks.push(c);
+      if (await route(req, res, Buffer.concat(chunks).toString('utf8'))) return;
+    }
     const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '') || 'index.html';
     served.push(rel);
     const f = path.join(site, rel);

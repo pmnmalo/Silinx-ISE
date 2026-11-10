@@ -1,4 +1,5 @@
-// Git in the interface of the server editions (#3195, server/git.js; the browser edition's is phase 2, #3196): File ▸
+// Git in the interface (#3195: the server editions, through the system's git, server/git.js; #3196: the browser edition,
+// through GitHub's REST API, web/js/git-browser.js, where a commit is pushed at once and the sign-in is Silinx's): File ▸
 // Open from Repository…, File ▸ Git ▸ (Commit…, Push to GitHub, Pull from GitHub, History… (web/js/git-history.js),
 // Initialize Repository…), the same in the Design pane's
 // project menu (the Silinx interface has no File menu), and the Design pane's marks of the files changed or new since
@@ -12,14 +13,14 @@ import { openProject, reloadProject, renderStartPage } from './project.js';
 import { saveAll } from './processes.js';
 import { renderHierarchy } from './design.js';
 import { field } from './wizards.js';
+import { applyChanges } from './project-watch.js';
 import { commitText, pushText, pullText, cloneText, initText } from '/core/git-messages.js';
 import { checkUrl, nameFromRepo } from '/core/github-url.js';
 
 // ------------------------------------------------------------------ git on this server
 let enabled = null;
-/** Whether this edition has git: a server whose git is not turned off (SILINX_GIT=off). */
+/** Whether this edition has git: the browser edition (GitHub's API), a server whose git is not turned off (SILINX_GIT=off). */
 export async function gitAvailable() {
-  if (api.standalone) return false;
   if (enabled === null) enabled = await api.gitEnabled().then(r => !!r.enabled, () => false);
   return enabled;
 }
@@ -36,7 +37,7 @@ export function logGitError(e) {
 let timer = null, seq = 0, newest = null;
 /** The project's status read again soon (several writes in a row: once). */
 export function scheduleGitStatus(ms = 400) {
-  if (api.standalone || enabled === false || !S.project) return;
+  if (enabled === false || !S.project) return;
   clearTimeout(timer);
   timer = setTimeout(() => refreshGitStatus(), ms);
 }
@@ -77,7 +78,7 @@ export function gitMark(paths) {
 // (what another process changed)
 let hooked = false;
 export function hookGitStatus() {
-  if (hooked || api.standalone) return;
+  if (hooked) return;
   hooked = true;
   for (const k of ['writeFile', 'saveProject', 'renameFile', 'deleteFile', 'project']) {
     const f = api[k];
@@ -110,7 +111,9 @@ export async function openFromRepositoryDialog() {
     title: 'Open from Repository', width: 520,
     body: h('div', {},
       h('div', { class: 'form-grid' }, ...field('GitHub repository (a Classroom assignment\'s too):', url), err, ...field('Project name:', name)),
-      h('div', { class: 'hint', style: { marginTop: '10px' } }, 'git signs in to GitHub with its own credentials (GitHub\'s command line, Git Credential Manager or an SSH key): Silinx never asks for a password or a token.')),
+      h('div', { class: 'hint', style: { marginTop: '10px' } }, api.standalone
+        ? 'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub…, kept in this browser only.'
+        : 'git signs in to GitHub with its own credentials (GitHub\'s command line, Git Credential Manager or an SSH key): Silinx never asks for a password or a token.')),
     buttons: [{ label: 'Open', primary: true, value: () => ({ url: url.value.trim(), name: name.value.trim() }),
       validate: () => { try { checkUrl(url.value); return true; } catch (e) { err.textContent = e.message; return false; } } },
     { label: 'Cancel', value: null }],
@@ -137,11 +140,11 @@ export async function commitDialog() {
   const err = fieldError('git-message-error');
   msg.addEventListener('input', () => { err.textContent = ''; });
   const r = await dialog({
-    title: 'Commit', width: 520,
+    title: api.standalone ? 'Commit and Push' : 'Commit', width: 520,
     body: h('div', {},
       h('div', { class: 'form-grid' }, ...field('Message:', msg), err),
       s.files.length ? h('div', {}, h('label', {}, `${s.files.length} change(s) on ${s.branch || 'no branch'}:`), list) : h('div', { class: 'hint' }, 'No change since the last commit.')),
-    buttons: [{ label: 'Commit', primary: true, disabled: !s.files.length, value: () => msg.value,
+    buttons: [{ label: api.standalone ? 'Commit and Push' : 'Commit', primary: true, disabled: !s.files.length, value: () => msg.value,
       validate: () => { if (msg.value.trim()) return true; err.textContent = 'Say in a few words what changed.'; return false; } },
     { label: 'Cancel', value: null }],
   });
@@ -149,6 +152,7 @@ export async function commitDialog() {
   try {
     const c = await api.gitCommit(S.project.name, r);
     log(commitText(c), 'ok');
+    if (c.pushed) log(pushText(c), 'ok');   // (the browser edition's: pushed at once)
     toast('Committed', 'ok');
     return c;
   } catch (e) { logGitError(e); return null; } finally { await refreshGitStatus(); }
@@ -168,7 +172,11 @@ export async function gitPull() {
   try {
     const p = await api.gitPull(name);
     log(pullText(p), 'ok');
-    if (!p.upToDate && S.project?.name === name) await reloadProject();
+    // (the server's watcher tells the page what changed; the browser edition has none: its open documents told here)
+    if (!p.upToDate && S.project?.name === name) {
+      if (api.standalone) await applyChanges({ project: name, changes: p.files.map(f => ({ path: f, kind: S.diskTree?.includes(f) ? 'changed' : 'added' })) });
+      else await reloadProject();
+    }
     return p;
   } catch (e) {
     logGitError(e);
@@ -184,10 +192,10 @@ export async function initDialog() {
   url.addEventListener('input', () => { err.textContent = ''; });
   const r = await dialog({
     title: 'Initialize Repository', width: 520,
-    body: h('div', {}, h('div', { class: 'form-grid' }, ...field('GitHub repository (optional: where Push sends the commits):', url), err),
+    body: h('div', {}, h('div', { class: 'form-grid' }, ...field(api.standalone ? 'GitHub repository (an empty one: where the commits go):' : 'GitHub repository (optional: where Push sends the commits):', url), err),
       h('div', { class: 'hint', style: { marginTop: '10px' } }, 'A .gitignore leaves build/ and the tools\' outputs out of the commits.')),
     buttons: [{ label: 'Initialize', primary: true, value: () => url.value.trim(),
-      validate: () => { if (!url.value.trim()) return true; try { checkUrl(url.value); return true; } catch (e) { err.textContent = e.message; return false; } } },
+      validate: () => { if (!url.value.trim() && !api.standalone) return true; try { checkUrl(url.value); return true; } catch (e) { err.textContent = e.message; return false; } } },
     { label: 'Cancel', value: null }],
   });
   if (r === null) return null;
@@ -195,12 +203,16 @@ export async function initDialog() {
   catch (e) { logGitError(e); return null; } finally { await refreshGitStatus(); }
 }
 
-/** The Git submenu (File ▸ Git ▸, the Design pane's project menu): its commands, for an open project. */
+/** The Git submenu (File ▸ Git ▸, the Design pane's project menu): its commands, for an open project. The browser
+ *  edition's commit is pushed at once (no Push), and it signs in to GitHub itself. */
 export const gitMenuItems = () => [
-  { label: 'Commit…', action: () => commitDialog(), disabled: !S.git },
-  { label: 'Push to GitHub', action: () => gitPush(), disabled: !S.git },
+  { label: api.standalone ? 'Commit and Push…' : 'Commit…', action: () => commitDialog(), disabled: !S.git },
+  ...(api.standalone ? [] : [{ label: 'Push to GitHub', action: () => gitPush(), disabled: !S.git }]),
   { label: 'Pull from GitHub', action: () => gitPull(), disabled: !S.git },
   { label: 'History…', action: () => import('./git-history.js').then(m => m.historyDialog()), disabled: !S.git },
   '-',
   { label: 'Initialize Repository…', action: () => initDialog() },
+  ...(api.standalone ? ['-', api.githubSignedIn()
+    ? { label: 'Sign out of GitHub', action: () => import('./git-signin.js').then(m => m.signOut()) }
+    : { label: 'Sign in with GitHub…', action: () => import('./git-signin.js').then(m => m.signInDialog()) }] : []),
 ];
