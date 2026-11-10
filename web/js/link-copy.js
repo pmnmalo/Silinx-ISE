@@ -44,7 +44,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   const fillModules = () => {
     const [list, sel, mark, tag] = isSim() ? [benches, chosen.bench, pj.simTop, 'the project\'s'] : [isEmu() ? designMods.slice(0, 1) : designMods, isEmu() ? pj.top : chosen.design, pj.top, 'top'];
     modSel.replaceChildren(...list.map(m => h('option', { value: m, selected: m === sel }, m === mark ? `${m} (${tag})` : m)));
-    modSel.disabled = isEmu();
+    modSel.disabled = isEmu() || (!viewSel.value && !module);
   };
   fillModules();
   const out = h('textarea', { class: 'link-out', readonly: true, rows: 4, spellcheck: false, style: { width: '100%', fontFamily: 'var(--mono, monospace)', fontSize: '11px' } });
@@ -60,7 +60,9 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     if (encodeError) { err.textContent = encodeError; return; }
     // (the module: in the link when it is not the project's top, or when the link is a module's: Copy Link to This
     // Module…, the project then opened on it, #2871; a test bench when it is not the project's, #2878)
-    const top = !modSel.value || isEmu() ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
+    // (Open the project only, from the project's Copy Link…: no module, the project opened with no source in front,
+    // #3230; a module's Copy Link to This Module… keeps its module, #2871)
+    const top = !modSel.value || isEmu() || (!viewSel.value && !module) ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
     link = makeLink(linkBase(), { design, view: viewSel.value || null, top, ui: withView.checked ? ui : null });

@@ -72,7 +72,10 @@ uiTest('#3218 the Petri net editor\'s toolbar (petri-toolbar.js): its tools, Del
   // ---- its groups in order: the tools (select active), Delete, the zoom, Check, Simulate; then ☰ Properties and the ⋮ menu
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-toolbar .pn-tool`)].map((b) => [b.textContent, b.classList.contains('active')])),
     [['', true], ['Place', false], ['Transition', false], ['Arc', false], ['Inhibitor', false]]);
-  const zoom = await ev((ed) => document.querySelector(`${ed} .asm-zoom`).textContent);   // (the net fitted when it opened)
+  // (the view fitted by its button, the first fit's moment apart: the level read after it)
+  await page.waitFor((ed) => document.querySelector(`${ed} .pn-canvas`).getBoundingClientRect().width > 10, [ED], { what: 'the canvas sized' });
+  await page.click(`${ED} [title^="Zoom to Full View"]`);
+  const zoom = await ev((ed) => document.querySelector(`${ed} .asm-zoom`).textContent);
   assert.match(zoom, /^\d+%$/);
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-toolbar > .asm-group`)].map((g) => g.textContent)),
     ['PlaceTransitionArcInhibitor', '', zoom, 'Check', 'Simulate', '☰ Properties']);

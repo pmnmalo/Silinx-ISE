@@ -50,7 +50,9 @@ test('set_output_logic: the minimal solution used (a cyclic chart) and the form 
   await call('write_file', { project: 'c', path: 'src/cyc.bool.json', text: JSON.stringify(t, null, 2) });
   const r = await ok({ project: 'c', path: 'src/cyc.bool.json', output: 'f', form: 'sop', solution: { sop: 1 } });
   assert.deepEqual([r.data.form, r.data.solutions, r.data.expr, r.data.what], ['sop', { sop: 1 }, 'f = /a./c + /b.c + a.b', 'minimal SOP (solution 2 of 2), 6 literal(s), 7 gate(s), delay 3']);
-  assert.equal(r.data.hdl, undefined, 'no HDL file linked: none written');
+  // (the table written by write_file has its HDL file since #3184, which set_output_logic writes again, #3234)
+  assert.deepEqual(r.data.hdl, { file: 'src/cyc.vhd', written: true });
+  assert.match(read('c', 'src/cyc.vhd'), /^entity cyc is/m);
   assert.deepEqual(JSON.parse(read('c', 'src/cyc.bool.json')).solutions, { f: { sop: 1 } });
   const v = await call('related_view', { project: 'c', path: 'src/cyc.bool.json', view: 'results' });
   assert.equal(v.data.outputs[0].minimalSop.used, 1);

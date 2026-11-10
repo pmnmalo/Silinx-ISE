@@ -65,6 +65,16 @@ can read that user's files has the server too.
   credential helper's: Silinx never asks for, stores or logs one (an error's URLs lose their `user:password@`). A
   cloned project passes the import gate and is untrusted (#2830). On a hosted server git uses the server account's
   credentials: `SILINX_GIT=off` turns git off.
+- Git in the browser edition (#3196, `core/git-rest.js`, `web/js/git-browser.js`): no git, GitHub's REST API only
+  (api.github.com, which the page's Content-Security-Policy allows). The sign-in is OAuth's device flow with the public
+  client ID of Silinx's GitHub OAuth App and no secret. Its token is kept in the user's browser only (localStorage),
+  sent only to GitHub's API in the `Authorization` header, never in a URL nor in a message; Sign out of GitHub forgets
+  it. A repository's address is checked as the server's (github.com's only), the sign-in page linked is github.com's
+  only, and an opened or pulled file passes the import gate; the repository's hidden and binary files stay on GitHub,
+  never run nor deleted. A cloned project is untrusted (#2830). A commit moves its branch only forward (never forced).
+  On a server, `SILINX_GIT=github` (`server/git-github.js`) uses the same back end with the environment's token
+  (`GH_TOKEN`), never stored nor logged; what a project was at its last commit is kept in Silinx's configuration
+  folder, out of the workspace, so that the MCP's file tools cannot point its commits at another repository.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
   paths, keys and tokens, Xilinx files, a bitstream under any name) the tracked files, text, compressed
   and binary, and every line ever added to `main`; CodeQL analyses

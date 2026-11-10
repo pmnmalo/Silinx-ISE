@@ -431,7 +431,21 @@ On your computer or a Silinx server, a project can live in a GitHub repository, 
 
 git signs in to GitHub with its own credentials (GitHub's command line `gh auth login`, Git Credential Manager or an
 SSH key): Silinx never asks for, stores or logs a password or a token. A server's operator can turn git off with
-`SILINX_GIT=off`. The browser edition does not have git yet (it comes through GitHub's API).
+`SILINX_GIT=off`.
+
+In the browser edition the same commands go through GitHub's API (there is no git in a browser):
+- **Open from Repository…** opens a public repository with no sign-in.
+- **Sign in with GitHub…** (with the Git commands) gives a code to enter at github.com/login/device; a private
+  repository, a commit and a pull need it. The sign-in is kept in this browser only, and **Sign out of GitHub**
+  forgets it.
+- **Commit and Push…** commits and pushes in one step. A commit GitHub rejects (someone pushed meanwhile) says to
+  pull first.
+- **Initialize Repository…** takes an empty GitHub repository (make it at github.com/new); the first commit is the
+  project's.
+
+A computer or a server with no git can use GitHub's API the same way, for the interface and the MCP's git tools:
+start Silinx with `SILINX_GIT=github` and a token in `GH_TOKEN` (`GH_TOKEN=$(gh auth token)`), which Silinx never
+stores.
 
 ## For developers
 

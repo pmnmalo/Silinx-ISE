@@ -2,7 +2,7 @@
 //
 //   import { mountPetriEditor } from './petri-editor.js';
 //   const ed = mountPetriEditor(container, { model, onChange(model), linkInfo() -> { file } | null, onOpenFile(path),
-//     onProblems(diags), onCheck(diags), onMessage(text, isError) });
+//     onProblems(diags), onCheck(diags), onMessage(text, isError), readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.print();
 //   ed.select({ kind, id }); ed.destroy();
 //
@@ -30,6 +30,7 @@ import { mountPetriDraw } from './petri-draw.js';
 import { clone } from '/core/util.js';
 import { printDiagram, svgSnapshot } from './print.js';
 import { mountPetriToolbar } from './petri-toolbar.js';
+import { petriReadOnlyChrome, lockPetriSide } from './petri-readonly.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const GRID = 20;
@@ -47,6 +48,7 @@ export function mountPetriEditor(container, opts = {}) {
   let drag = null;
   let fitted = false;                   // the view fitted once, or set by the user
   let destroyed = false;
+  const readOnly = !!opts.readOnly;     // (a net to read, a shared project followed, #3181: petri-readonly.js)
   let panel = null;                     // 'sim' | 'analysis' | null
   let sim = null;                       // { marking, fired: [], inputs: {}, log: [], timer }
   const hist = [JSON.stringify(M)];
@@ -83,6 +85,7 @@ export function mountPetriEditor(container, opts = {}) {
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection);
   mountSideFold({ root, side, key: 'silinx.petri.props.folded' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), info.el);
+  if (readOnly) petriReadOnlyChrome({ root, toolbar, banner: opts.banner });
   const status = (msg, err = false) => { if (msg) opts.onMessage?.(msg, err); };   // (in the console)
 
   // ---------------------------------------------------------------- model edits, history
@@ -92,6 +95,7 @@ export function mountPetriEditor(container, opts = {}) {
   const newId = pfx => { const used = new Set([...M.places, ...M.transitions, ...M.arcs].map(x => x.id)); let i = 1; while (used.has(`${pfx}${i}`)) i++; return `${pfx}${i}`; };
   const newName = (pfx, list) => { const used = new Set(list.map(x => x.name.toLowerCase())); let i = 1; while (used.has(`${pfx}${i}`)) i++; return `${pfx}${i}`; };
   function commit() {
+    if (readOnly) { M = normalizePetri(JSON.parse(hist[hi])); render(); return; }   // (read only: nothing changes)
     M = normalizePetri(M);
     const s = JSON.stringify(M);
     if (s !== hist[hi]) { hist.length = hi + 1; hist.push(s); if (hist.length > 200) hist.shift(); hi = hist.length - 1; opts.onChange?.(clone(M)); }
@@ -159,7 +163,7 @@ export function mountPetriEditor(container, opts = {}) {
     M: () => M, arcFrom: () => arcFrom, delBtn, destroyed: () => destroyed, drag: () => drag,
     envOf: (...a) => envOf(...a), nodeOf, placeOf,
     refreshLink: (...a) => refreshLink(...a), renderPanel: (...a) => renderPanel(...a),
-    renderSide: (...a) => renderSide(...a), sel: () => sel, sim: () => sim, info, svg, uid,
+    renderSide: (...a) => { renderSide(...a); lockPetriSide(readOnly, side); }, sel: () => sel, sim: () => sim, info, svg, uid,
     view: () => view, world, zoomLbl
   });
 
@@ -207,7 +211,7 @@ export function mountPetriEditor(container, opts = {}) {
     if (t) {
       sel = { kind: t.kind, id: t.id };
       const n = nodeOf(t.id);
-      if (n) drag = { kind: 'move', sel0, id: n.id, x: n.x, y: n.y, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+      if (n && !readOnly) drag = { kind: 'move', sel0, id: n.id, x: n.x, y: n.y, dx: w.x - n.x, dy: w.y - n.y, moved: false };
       render();
     } else {
       sel = null;
@@ -240,6 +244,7 @@ export function mountPetriEditor(container, opts = {}) {
   root.addEventListener('keydown', e => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+    if (readOnly && (mod ? /^[zyxv]$/.test(k) : /^(Delete|Backspace)$/.test(e.key))) return;   // (read only: Copy, the zoom and the view kept)
     if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); undo(); }
     else if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); e.stopPropagation(); redo(); }
     else if (mod && k === 'c') { e.preventDefault(); copySel(); }
@@ -291,7 +296,7 @@ export function mountPetriEditor(container, opts = {}) {
     undo, redo, canUndo: () => hi > 0, canRedo: () => hi < hist.length - 1,
     // Edit ▸ Cut / Copy / Paste / Delete (#677): a place or a transition (an arc: Delete only)
     copy: () => copySel(), cut: () => copySel(true), paste: () => paste(), deleteSelection: () => deleteSelection(),
-    canCopy: () => !!sel && sel.kind !== 'arc', canDelete: () => !!sel, canPaste: () => hasClip('petri'),
+    canCopy: () => !!sel && sel.kind !== 'arc', canDelete: () => !readOnly && !!sel, canPaste: () => !readOnly && hasClip('petri'),
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file, normalizePetri); }); refreshLink(); },
     fit, refreshLink, print,

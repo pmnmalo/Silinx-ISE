@@ -126,6 +126,27 @@ uiTest('#2826 Copy Link…: the project\'s and a module\'s menus, the File menu,
   assert.equal(await page.dialogCount(), 0, 'no question: the project is the link\'s');
 });
 
+uiTest('#3230 regression, the project\'s Copy Link… with Open the project only: no module in the link (its list disabled), the project opened with no source', E, async (page) => {
+  await openLink(page, 'open=example:traffic');
+  await linkOpened(page);
+  await page.menu('File', 'Copy Link to Project…');
+  await page.waitDialog('Copy Link');
+  const field = (f) => `.dlg-overlay [data-field=${f}]`;
+  assert.equal(await page.eval((s) => document.querySelector(s).value, field('view')), '');
+  assert.equal(await page.eval((s) => document.querySelector(s).disabled, field('module')), true);
+  // (a module other than the top set in the list anyway, and the view left out: still no module in the link)
+  await page.eval((s, u) => { const m = document.querySelector(s); m.value = 'timer'; m.dispatchEvent(new Event('change')); const c = document.querySelector(u); c.checked = false; c.dispatchEvent(new Event('change')); }, field('module'), field('ui'));
+  const link = await page.waitFor(() => document.querySelector('.dlg-overlay .link-out').value || null, [], { what: 'the link' });
+  assert.match(link, /#design=[A-Za-z0-9_-]+$/);
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await openLink(page, new URL(link).hash.slice(1), 'n=1');
+  await linkOpened(page);
+  await page.waitFor(() => document.querySelector('#hier .row'), [], { what: 'the Design tree' });
+  assert.equal(await page.eval(() => window.Silinx.active?.path ?? null), null, 'no source open');
+  assert.deepEqual(await consoleWarnings(page), [], 'no warnings');
+});
+
 uiTest('#2871 regression, Copy Link to This Module… with Open the project only: the link opens the project on that module, selected, its source open; the top too; with a view', E, async (page) => {
   await openLink(page, 'open=example:traffic');
   await linkOpened(page);

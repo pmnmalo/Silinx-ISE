@@ -13,7 +13,7 @@ import { scratchEnv } from './server-helpers.js';
 import { newKey, keyOf, seal, unseal, KEY_RE } from '../core/collab-crypto.js';
 import { followLink, parseFollowLink, relayUrl, ROOM_RE } from '../core/collab-link.js';
 import { projectDoc, publishProject, putFile, putProject, moveFile, dropFile, docFile, docProject, setText, sharedPath, watchDoc, FILE_MAX } from '../core/collab-doc.js';
-import { shareRoom, followRoom, KIND, PROTOCOL, colorOf, COLORS } from '../core/collab-client.js';
+import { shareRoom, followRoom, KIND, PROTOCOL, SUBPROTOCOL, colorOf, COLORS } from '../core/collab-client.js';
 import { attachRelay, RELAY_LIMITS } from '../server/collab-relay.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -33,7 +33,7 @@ after(async () => { srv?.closeAllConnections?.(); await new Promise(r => srv.clo
 const PROJECT = { name: 'traffic', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl' }], device: { part: 'xc3s250e' } };
 const FILES = { 'src/top.vhd': 'entity top is end;\n', 'src/top.ucf': 'NET "clk" LOC = "B8";\n' };
 const owned = () => { const doc = projectDoc(); publishProject(doc, { project: { ...PROJECT, fileTree: Object.keys(FILES) }, files: FILES, owner: 'Ana' }); return doc; };
-const url = () => relayUrl(base);
+const url = () => relayUrl(base, 'share'), furl = () => relayUrl(base, 'follow');
 
 test('crypto: a sealed message opens with its key, room and kind only; a key\'s text round trips', async () => {
   const { key, text } = await newKey();
@@ -67,8 +67,9 @@ test('link: made and parsed; another hash is not one; a broken one is said', () 
   assert.throws(() => parseFollowLink('http://x/#follow=abc'), /the link to follow is broken/);
   assert.throws(() => parseFollowLink(`#follow=${room}.${key}&view=try`), /broken/);
   assert.throws(() => followLink('http://x/', 'bad', key), /not a room/);
-  assert.equal(relayUrl('https://silinx.example.org/app/?q#h'), 'wss://silinx.example.org/api/collab');
-  assert.equal(relayUrl('http://127.0.0.1:8642/'), 'ws://127.0.0.1:8642/api/collab');
+  assert.equal(relayUrl('https://silinx.example.org/app/?q#h', 'share'), 'wss://silinx.example.org/api/collab/share');
+  assert.equal(relayUrl('http://127.0.0.1:8642/', 'follow'), 'ws://127.0.0.1:8642/api/collab/follow');
+  assert.throws(() => relayUrl('http://127.0.0.1:8642/'), /a role, share or follow/);
   assert.match('x'.repeat(22), ROOM_RE);
 });
 
@@ -136,7 +137,7 @@ test('two participants on the server\'s relay: the project arrives, an edit arri
   const link = followLink(base, owner.room, owner.key);
   const l = parseFollowLink(link);
   owner.setView({ path: 'src/top.vhd', line: 0, ch: 7 });
-  const fol = await followRoom({ url: relayUrl(l.base), room: l.room, key: l.key, user: { name: 'Rui' } });
+  const fol = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Rui' } });
   await fol.ready;
   assert.deepEqual(docProject(fol.doc), { version: 1, owner: 'Ana', project: PROJECT, fileTree: ['src/top.ucf', 'src/top.vhd'] });
   assert.equal(docFile(fol.doc, 'src/top.vhd'), FILES['src/top.vhd']);
@@ -151,7 +152,7 @@ test('two participants on the server\'s relay: the project arrives, an edit arri
   await until(() => owner.peers()[0]?.view?.path === 'src/top.ucf', 'the follower\'s view');
   assert.deepEqual(owner.peers().map(p => [p.name, p.role]), [['Rui', 'follower']]);
   // a second follower sees the owner and the first
-  const fol2 = await followRoom({ url: url(), room: owner.room, key: owner.key, user: { name: 'Eva' } });
+  const fol2 = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Eva' } });
   await fol2.ready;
   await until(() => fol2.peers().length === 2, 'Eva sees both');
   assert.deepEqual(fol2.peers().map(p => [p.name, p.role]), [['Ana', 'owner'], ['Rui', 'follower']]);
@@ -168,7 +169,7 @@ test('read only: a follower\'s edit is refused by the relay and never reaches th
   const doc = owned();
   const owner = await shareRoom({ url: url(), token: 'the-token', doc, user: { name: 'Ana' } });
   const errors = [];
-  const fol = await followRoom({ url: url(), room: owner.room, key: owner.key, user: { name: 'Rui' }, onEvent: e => { if (e.type === 'error') errors.push(e.message); } });
+  const fol = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Rui' }, onEvent: e => { if (e.type === 'error') errors.push(e.message); } });
   await fol.ready;
   // (a real update made with the room's key, sent as a follower)
   const other = projectDoc();
@@ -190,38 +191,53 @@ test('read only: a follower\'s edit is refused by the relay and never reaches th
 test('a wrong key, an unknown room, a room no longer shared: refused, said', async () => {
   const owner = await shareRoom({ url: url(), token: 'the-token', doc: owned(), user: { name: 'Ana' } });
   const errors = [];
-  const bad = await followRoom({ url: url(), room: owner.room, key: (await newKey()).text, user: { name: 'Eve' }, onEvent: e => { if (e.type === 'error') errors.push(e.message); } });
+  const bad = await followRoom({ url: furl(), room: owner.room, key: (await newKey()).text, user: { name: 'Eve' }, onEvent: e => { if (e.type === 'error') errors.push(e.message); } });
   await assert.rejects(bad.ready, /the link's key does not open/);
   assert.deepEqual(errors, ['a message that the link\'s key does not open']);
   assert.deepEqual(docProject(bad.doc).fileTree, []);
   await bad.close();
-  await assert.rejects(followRoom({ url: url(), room: 'Z'.repeat(22), key: owner.key, user: { name: 'Rui' } }), /no longer shared/);
+  await assert.rejects(followRoom({ url: furl(), room: 'Z'.repeat(22), key: owner.key, user: { name: 'Rui' } }), /no longer shared/);
   const room = owner.room;
   await owner.close();
   await sleep(50);
-  await assert.rejects(followRoom({ url: url(), room, key: owner.key, user: { name: 'Rui' } }), /no longer shared/);
+  await assert.rejects(followRoom({ url: furl(), room, key: owner.key, user: { name: 'Rui' } }), /no longer shared/);
 });
 
-test('the server: opening a room needs its token; the host, the origin and the path checked as the API\'s', async () => {
+test('the server: opening a room needs its token, at the upgrade; the host, the origin and the path checked as the API\'s', async () => {
   await assert.rejects(shareRoom({ url: url(), token: 'wrong', doc: owned(), user: { name: 'x' } }), /sharing a project needs this Silinx server's token/);
   await assert.rejects(shareRoom({ url: url(), token: null, doc: owned(), user: { name: 'x' } }), /needs this Silinx server's token/);
-  const upgrade = (path, headers = {}) => new Promise(resolve => {
-    const ws = new WebSocket(`ws://127.0.0.1:${srv.address().port}${path}`, { headers });
+  const upgrade = (path, headers = {}, protocols = [SUBPROTOCOL]) => new Promise(resolve => {
+    const ws = new WebSocket(`ws://127.0.0.1:${srv.address().port}${path}`, protocols, { headers });
     ws.on('open', () => { ws.close(); resolve('open'); });
     ws.on('unexpected-response', (_, res) => resolve(res.statusCode));
     ws.on('error', () => resolve('error'));
   });
-  assert.equal(await upgrade('/api/collab'), 'open');
-  assert.equal(await upgrade('/api/collab', { Origin: base.replace(/\/$/, '') }), 'open');
-  assert.equal(await upgrade('/api/collab', { Origin: 'https://evil.example' }), 403);
-  assert.equal(await upgrade('/api/collab', { Host: 'evil.example' }), 403);
+  assert.equal(await upgrade('/api/collab/follow'), 'open');
+  assert.equal(await upgrade('/api/collab/share', {}, [SUBPROTOCOL, 'token.the-token']), 'open');
+  assert.equal(await upgrade('/api/collab/follow', { Origin: base.replace(/\/$/, '') }), 'open');
+  for (const p of ['/api/collab/follow', '/api/collab/share']) {
+    assert.equal(await upgrade(p, { Origin: 'https://evil.example' }), 403);
+    assert.equal(await upgrade(p, { Host: 'evil.example' }), 403);
+  }
+  // (the token not in the open message: a socket without it, or with another, refused at once, never an owner's)
+  const refused = async (protocols) => {
+    const ws = new WebSocket(url(), protocols);
+    const got = [];
+    ws.on('message', d => got.push(JSON.parse(String(d))));
+    const code = await new Promise(r => ws.on('close', c => r(c)));
+    return [code, got];
+  };
+  const NO_TOKEN = [1008, [{ type: 'error', message: 'sharing a project needs this Silinx server\'s token' }]];
+  assert.deepEqual(await refused([SUBPROTOCOL]), NO_TOKEN);
+  assert.deepEqual(await refused([SUBPROTOCOL, 'token.wrong']), NO_TOKEN);
+  assert.equal(await upgrade('/api/collab'), 404);
   assert.equal(await upgrade('/api/other'), 404);
   assert.equal(await upgrade('/api/projects'), 404);
 });
 
 test('the relay reads nothing: a participant without the key gets only sealed frames, never a file\'s text; a stranger\'s first message refused', async () => {
   const owner = await shareRoom({ url: url(), token: 'the-token', doc: owned(), user: { name: 'Ana' } });
-  const raw = new WebSocket(url());
+  const raw = new WebSocket(furl(), [SUBPROTOCOL]);
   const frames = [];
   const texts = [];
   raw.on('message', (d, bin) => (bin ? frames.push(Buffer.from(d)) : texts.push(JSON.parse(String(d)))));
@@ -235,9 +251,9 @@ test('the relay reads nothing: a participant without the key gets only sealed fr
   }
   raw.close();
   await owner.close();
-  // (no hello, an old protocol, a binary first: closed with the reason)
-  for (const first of [JSON.stringify({ type: 'join', v: 0, room: 'x', client: 1 }), JSON.stringify({ type: 'hello', v: PROTOCOL, client: 1 }), Buffer.from([1, 2, 3])]) {
-    const ws = new WebSocket(url());
+  // (no hello, an old protocol, a binary first, a room opened at the follow endpoint: closed with the reason)
+  for (const first of [JSON.stringify({ type: 'join', v: 0, room: 'x', client: 1 }), JSON.stringify({ type: 'hello', v: PROTOCOL, client: 1 }), Buffer.from([1, 2, 3]), JSON.stringify({ type: 'open', v: PROTOCOL, client: 1 })]) {
+    const ws = new WebSocket(furl(), [SUBPROTOCOL]);
     const got = [];
     ws.on('message', d => got.push(JSON.parse(String(d))));
     await new Promise(r => ws.on('open', r));
@@ -247,20 +263,31 @@ test('the relay reads nothing: a participant without the key gets only sealed fr
   }
 });
 
-test('the relay\'s limits: followers per room, rooms, a follower\'s message size; a room ends with its owner\'s connection', async () => {
+test('the relay\'s limits: followers per room, rooms, a follower\'s frame size (its connection closed, the room and the others kept); a room ends with its owner\'s connection', async () => {
   const s = http.createServer();
-  const relay = attachRelay(s, { limits: { ...RELAY_LIMITS, followers: 1, rooms: 1, followerFrame: 100 } });
+  const relay = attachRelay(s, { limits: { ...RELAY_LIMITS, followers: 2, rooms: 1, followerFrame: 100 } });
   await new Promise(r => s.listen(0, '127.0.0.1', r));
-  const u = `ws://127.0.0.1:${s.address().port}/api/collab`;
-  const owner = await shareRoom({ url: u, doc: owned(), user: { name: 'Ana' } });
-  await assert.rejects(shareRoom({ url: u, doc: owned(), user: { name: 'Bo' } }), /shares 1 projects already/);
+  const at = role => `ws://127.0.0.1:${s.address().port}/api/collab/${role}`;
+  const owner = await shareRoom({ url: at('share'), doc: owned(), user: { name: 'Ana' } });
+  await assert.rejects(shareRoom({ url: at('share'), doc: owned(), user: { name: 'Bo' } }), /shares 1 projects already/);
   const errors = [];
-  const fol = await followRoom({ url: u, room: owner.room, key: owner.key, user: { name: 'Rui' }, onEvent: e => { if (e.type === 'error') errors.push(e.message); } });
+  const fol = await followRoom({ url: at('follow'), room: owner.room, key: owner.key, user: { name: 'Rui' }, onEvent: e => { if (e.type === 'error') errors.push(e.message); } });
   await fol.ready;
-  await assert.rejects(followRoom({ url: u, room: owner.room, key: owner.key, user: { name: 'Eva' } }), /has 1 followers already/);
-  fol.send(KIND.awareness, new Uint8Array(200));
-  await until(() => errors.length, 'the size refused');
-  assert.deepEqual(errors, ['a message too large for a follower']);
+  // a second follower whose frame is larger than a follower's maximum: closed by the relay (1009), as soon as its
+  // frame's length is read
+  const big = new WebSocket(at('follow'), [SUBPROTOCOL]);
+  await new Promise(r => big.on('open', r));
+  big.send(JSON.stringify({ type: 'join', v: PROTOCOL, room: owner.room, client: 9 }));
+  await until(() => relay.rooms.get(owner.room).followers.size === 2, 'the second follower in');
+  await assert.rejects(followRoom({ url: at('follow'), room: owner.room, key: owner.key, user: { name: 'Eva' } }), /has 2 followers already/);
+  big.send(new Uint8Array(200));
+  assert.equal(await new Promise(r => big.on('close', c => r(c))), 1009);
+  await until(() => relay.rooms.get(owner.room).followers.size === 1, 'the large one gone');
+  // the room, the owner and the other follower kept: an edit still arrives
+  owner.doc.getMap('files').get('src/top.vhd').insert(0, '-- kept\n');
+  await until(() => docFile(fol.doc, 'src/top.vhd')?.startsWith('-- kept'), 'the edit after it');
+  assert.equal(fol.closed(), false);
+  assert.deepEqual(errors, []);
   // (the owner's connection lost, not closed by Stop Sharing: the room ends, the follower told)
   [...relay.rooms.values()][0].owner.terminate();
   await until(() => fol.closed(), 'the follower closed');

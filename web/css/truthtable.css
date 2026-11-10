@@ -137,3 +137,6 @@ html[data-theme="dark"] .tt-ks-v.vX { fill: #e0a040; }
 .tt-legend > .tt-sol { margin-bottom: 3px; }   /* (beside the map, above its groups, #3077) */
 .tt-hdl { margin: 0 4px 0 0; vertical-align: middle; }   /* a result's tick box: the output's HDL logic (#2951) */
 .tt-sol-btn { padding: 0 6px; line-height: 1.4; }
+/* read only (a shared project followed, #3181: tt-readonly.js): what changes the table hidden, its cells not clickable */
+.tt-editor.tt-readonly [hidden] { display: none; }
+.tt-editor.tt-readonly .tt-table td.tt-cell, .tt-editor.tt-readonly .tt-kmap .tt-kcell rect { cursor: default; }

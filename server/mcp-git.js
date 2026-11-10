@@ -2,15 +2,19 @@
 // Repository… and File ▸ Git: clone, init, status, commit, push, pull, the history and a file as it was in a commit,
 // through the same functions (server/git.js), with the same checks and messages. The credentials are the system's
 // credential helper's: no tool takes or gives one.
-import * as G from './git.js';
+import * as Git from './git.js';
+import * as GH from './git-github.js';
 import { toolError, clip, readProject, STR, PROJECT } from './mcp-util.js';
 import { cloneText, initText, commitText, pushText, pullText, fileLines, shortCommit as short } from '../core/git-messages.js';
 
+// the back end: the system's git, or GitHub's API (SILINX_GIT=github, #3196)
+const B = () => (GH.githubBackend() ? GH : Git);
+
 // a git failure: its message, then its hint, as the console shows them
 const run = async fn => {
-  if (!G.gitEnabled()) throw toolError('git is turned off on this server (SILINX_GIT=off)');
+  if (!Git.gitEnabled()) throw toolError('git is turned off on this server (SILINX_GIT=off)');
   try { return await fn(); } catch (e) {
-    if (e instanceof G.GitError || e.status) throw Object.assign(toolError([e.message, ...(e.hint ? [`Hint: ${e.hint}`] : [])].join('\n')), e.files ? { files: e.files } : {});
+    if (e instanceof Git.GitError || e.status) throw Object.assign(toolError([e.message, ...(e.hint ? [`Hint: ${e.hint}`] : [])].join('\n')), e.files ? { files: e.files } : {});
     throw e;
   }
 };
@@ -23,7 +27,7 @@ export const GIT_TOOLS = [
     inputSchema: { type: 'object', properties: { url: STR('The repository\'s address on GitHub.'), name: STR('The project\'s name (default: the repository\'s).') }, required: ['url'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     async run({ url, name }) {
-      const r = await run(() => G.gitClone({ url, name: name || null, madeBy: 'mcp' }));
+      const r = await run(() => B().gitClone({ url, name: name || null, madeBy: 'mcp' }));
       return { text: [`${cloneText(r)}${UNTRUSTED}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n'), data: { ...r, trusted: false } };
     },
   },
@@ -34,7 +38,7 @@ export const GIT_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ project, remote }) {
       await readProject(project);
-      const r = await run(() => G.gitInit(project, { remote: remote || null }));
+      const r = await run(() => B().gitInit(project, { remote: remote || null }));
       return { text: initText(project, r), data: r };
     },
   },
@@ -45,7 +49,7 @@ export const GIT_TOOLS = [
     annotations: { readOnlyHint: true },
     async run({ project }) {
       await readProject(project);
-      const s = await run(() => G.gitStatus(project));
+      const s = await run(() => B().gitStatus(project));
       if (!s.repository) return { text: `'${project}' is not in a git repository (git_init makes one).`, data: s };
       const where = `${s.branch || '(no branch)'}${s.upstream ? `, ${s.ahead} commit(s) ahead of and ${s.behind} behind ${s.upstream}` : ', not pushed yet'}`;
       return { text: [`${project}: ${where}; ${s.files.length ? `${s.files.length} change(s):` : 'no change since the last commit.'}`, ...fileLines(s.files)].join('\n'), data: s };
@@ -58,7 +62,7 @@ export const GIT_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ project, message }) {
       await readProject(project);
-      const r = await run(() => G.gitCommit(project, message));
+      const r = await run(() => B().gitCommit(project, message));
       return { text: commitText(r), data: r };
     },
   },
@@ -69,7 +73,7 @@ export const GIT_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     async run({ project }) {
       await readProject(project);
-      const r = await run(() => G.gitPush(project));
+      const r = await run(() => B().gitPush(project));
       return { text: pushText(r), data: r };
     },
   },
@@ -80,7 +84,7 @@ export const GIT_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     async run({ project }) {
       await readProject(project);
-      const r = await run(() => G.gitPull(project));
+      const r = await run(() => B().gitPull(project));
       return { text: pullText(r), data: r };
     },
   },
@@ -93,10 +97,10 @@ export const GIT_TOOLS = [
       await readProject(project);
       if (rel || commit) {
         if (!rel || !commit) throw toolError('give both commit and path: a file as it was in a commit');
-        const r = await run(() => G.gitShow(project, commit, rel));
+        const r = await run(() => B().gitShow(project, commit, rel));
         return { text: clip(r.text), data: { project, commit: r.commit, path: r.path, length: r.text.length } };
       }
-      const log = await run(() => G.gitLog(project, { limit }));
+      const log = await run(() => B().gitLog(project, { limit }));
       return { text: log.length ? log.map(c => `${short(c.commit)} ${c.date} ${c.author}: ${c.message}${c.files.length ? ` (${c.files.map(f => f.path).join(', ')})` : ''}`).join('\n') : `'${project}' has no commit yet.`, data: { project, commits: log } };
     },
   },

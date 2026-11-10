@@ -117,3 +117,58 @@ uiTest('#2710 a Petri net\'s state machine: the notice at the right of the diagr
   await inPortuguese(page, 'Só de leitura, o espaço de estados da rede de Petri ctl.pn.json (2 estados)', 'the Petri net\'s state machine');
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
+
+// a follower's page of a shared project (#3181): its link opened in a page of its own, Rui's name given
+async function follower(page) {
+  const link = await page.eval(async () => { const m = await import('/js/collab-share.js'); await m.startSharing('Ana'); return m.sharedLink(); });
+  const fp = await env.newPage(env.server.url);
+  await fp.waitFor(() => window.SilinxApp && window.Silinx?.startupChecked, [], { what: 'app boot' });
+  await fp.goto(`${new URL(link).origin}/?f=1${new URL(link).hash}`);
+  await fp.waitDialog('Follow a Shared Project');
+  await fp.fill('.dlg-overlay input[data-field=name]', 'Rui');
+  await fp.dialogButton('Follow');
+  await fp.waitFor(() => window.Silinx?.project && window.Silinx.startupChecked, [], { what: 'the shared project open', timeout: 20000 });
+  return fp;
+}
+
+uiTest('#3181 a project followed: "Read-only, following Ana\'s project" at the right of the toolbar of a text file, a truth table and a Petri net, each in its read-only mode', E, async (page) => {
+  await makeProject(env, { name: 'RoNoteFollow', top: 'ctl', files: { ...ttFiles(), 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2), 'src/neg.v': NEG } });
+  await page.openProject('RoNoteFollow');
+  const fp = await follower(page);
+  const NOTE = 'Read-only, following Ana\'s project';
+  try {
+    // a text file
+    await fp.eval(() => window.SilinxApp.openFile('src/neg.v'));
+    await fp.waitFor(() => window.Silinx.active?.id === 'file:src/neg.v' && document.querySelector('.doc:not([hidden]) [data-follow-notice]'), [], { what: 'the text file' });
+    await check(fp, NOTE, 'a text file followed');
+    // the truth table: its fields read only; Fill Table, the ⋮ menu, the cells' hint and the tick boxes not offered; a cell clicked changes nothing
+    await fp.eval(() => window.SilinxApp.openTt('src/maj.tt.json'));
+    await fp.waitFor(() => window.Silinx.active?.id === 'tt:src/maj.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor.tt-readonly [data-follow-notice]'), [], { what: 'the truth table' });
+    await check(fp, NOTE, 'a truth table followed');
+    const T = '.doc:not([hidden]) .tt-editor';
+    assert.deepEqual(await fp.eval((t) => ({
+      readOnly: [...document.querySelectorAll(`${t} :is(.tt-inputs, .tt-outputs, .tt-notes, .tt-expr-in)`)].map((x) => x.readOnly),
+      shown: ['.tt-toolbar .tb-more', '.tt-row .tt-btn', '.tt-left > .hint'].map((s) => !!document.querySelector(`${t} ${s}`)?.getClientRects().length),
+      ticks: [...document.querySelectorAll(`${t} .tt-hdl`)].every((x) => x.disabled),
+    }), T), { readOnly: [true, true, true, true], shown: [false, false, false], ticks: true });
+    await fp.click(`${T} .tt-cell[data-out=f][data-row="0"]`);
+    assert.equal(await fp.eval((t) => document.querySelector(`${t} .tt-cell[data-out=f][data-row="0"]`).textContent, T), '0');
+    assert.equal(await fp.eval(() => window.Silinx.active.ttEditor.getModel().table.f), '00010111');
+    // the Petri net: no drawing tools, no Delete, no Import PNML; a place selected, its fields disabled, Delete changes nothing
+    await fp.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
+    await fp.waitFor(() => window.Silinx.active?.id === 'pn:src/ctl.pn.json' && document.querySelector('.doc:not([hidden]) .petri-editor.asm-readonly [data-follow-notice]'), [], { what: 'the Petri net' });
+    await check(fp, NOTE, 'a Petri net followed');
+    const P = '.doc:not([hidden]) .petri-editor';
+    assert.deepEqual(await fp.eval((p) => ['.pn-tool', '.asm-danger', '.pn-pnml-in'].map((s) => [...document.querySelectorAll(`${p} ${s}`)].some((x) => x.getClientRects().length)), P), [false, false, false]);
+    const at = await fp.eval((p) => { const r = document.querySelector(`${p} .pn-place[data-id=p1] circle`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 4 }; }, P);
+    await fp.click(at);
+    await fp.waitFor((p) => document.querySelector(`${p} .pn-selection h3`)?.textContent === 'Place idle', [P], { what: 'idle selected' });
+    assert.equal(await fp.eval((p) => [...document.querySelectorAll(`${p} .asm-side :is(input, textarea, select)`)].every((x) => x.disabled), P), true);
+    await fp.key('Delete');
+    assert.equal(await fp.eval((p) => !!document.querySelector(`${p} .pn-place[data-id=p1]`), P), true);
+    assert.equal(await fp.eval(() => window.Silinx.active.petriEditor.canDelete()), false);
+    assert.equal(await fp.eval(() => !!window.Silinx.active.dirty), false);
+    assert.deepEqual(fp.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+    assert.deepEqual(fp.errors, []);
+  } finally { await fp.close(); await page.eval(async () => (await import('/js/collab-share.js')).stopSharing()); }
+});

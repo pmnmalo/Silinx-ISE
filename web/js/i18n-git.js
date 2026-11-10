@@ -15,6 +15,16 @@ export const GIT_PT = {
   'A .gitignore leaves build/ and the tools\' outputs out of the commits.': 'Um .gitignore deixa build/ e os resultados das ferramentas fora dos commits.',
   'In conflict': 'Em conflito', 'New: not committed yet': 'Novo: ainda sem commit', 'Changed since the last commit': 'Alterado desde o último commit',
   'Committed': 'Registado', 'History…': 'Histórico…', 'History': 'Histórico', 'No commit yet.': 'Ainda sem commits.',
+  // the browser edition (#3196: GitHub's API, its own sign-in)
+  'Commit and Push…': 'Registar e Enviar (Commit e Push)…', 'Commit and Push': 'Registar e Enviar (Commit e Push)',
+  'Sign in with GitHub…': 'Iniciar sessão no GitHub…', 'Sign in with GitHub': 'Iniciar sessão no GitHub', 'Sign out of GitHub': 'Terminar sessão no GitHub',
+  'Open this page of GitHub, sign in there and enter the code:': 'Abra esta página do GitHub, inicie lá a sessão e introduza o código:',
+  'Asking GitHub for a code…': 'A pedir um código ao GitHub…',
+  'Waiting for GitHub: enter the code there and authorize Silinx.': 'À espera do GitHub: introduza lá o código e autorize o Silinx.',
+  'The sign-in is kept in this browser only, and sent only to GitHub.': 'A sessão fica guardada só neste navegador, e é enviada só ao GitHub.',
+  'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub…, kept in this browser only.':
+    'Um repositório público abre-se tal como está; um privado (o de um trabalho do Classroom) depois de Iniciar sessão no GitHub…, guardada só neste navegador.',
+  'GitHub repository (an empty one: where the commits go):': 'Repositório do GitHub (um vazio: para onde vão os commits):',
 };
 
 export const GIT_PT_PATTERNS = [
