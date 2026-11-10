@@ -13,6 +13,10 @@ export const COLLAB_PT = {
     'Outros seguem este projeto em direto com a sua ligação, só de leitura: os ficheiros e os desenhos à medida que mudam, o editor que tem aberto e o seu cursor. As compilações não são partilhadas.',
   'This link follows a project someone shares: you see its files and drawings as they change, read only, and where its owner is.':
     'Esta ligação segue um projeto que alguém partilha: vê os ficheiros e os desenhos à medida que mudam, só de leitura, e onde está o seu dono.',
+  // (editors, #3182: web/js/collab-share.js)
+  'Copy Editor Link': 'Copiar Ligação de Editor', 'editor': 'editor',
+  'Anyone with the editors\' link changes its text files with you, live; its drawings stay yours.':
+    'Quem tiver a ligação de editores altera os ficheiros de texto consigo, em direto; os desenhos continuam seus.',
   // (a room the owner's page hosts, #3227: web/js/collab-host.js)
   'Add a Follower…': 'Adicionar um Seguidor…', 'Add a Follower': 'Adicionar um Seguidor', 'Connect': 'Ligar',
   'Connect to the Owner': 'Ligar ao Dono', 'Copy Code': 'Copiar Código', 'Your code:': 'O seu código:', 'The owner\'s code:': 'O código do dono:',

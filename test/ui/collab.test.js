@@ -1,7 +1,7 @@
 // UI: a shared project, phase 1 (#3181), two participants in one test, in both interfaces: the owner shares the open
 // project (File ▸ Share Project…, their name, the link), the follower opens the link (their name) and sees the project,
 // the owner's open editor and cursor, read only (the notice at the right end of the toolbar, an edit refused: the
-// text unchanged, nothing saved); an edit of the owner arrives ("Changed by"); the follower browses alone and follows
+// text unchanged, nothing saved); an edit of the owner arrives (live, #3182); the follower browses alone and follows
 // again; the presence in both toolbars, the follower's arrival in the owner's console; Stop Sharing from the presence's
 // menu tells the follower; a drawing (an FSM) followed read only; in Portuguese (the labels: the console is not
 // translated). No warnings but those asserted.
@@ -79,7 +79,8 @@ uiTest('#3181 share and follow: the follower sees the project, the owner\'s edit
     // an edit of the owner arrives
     await page.eval(() => { const ed = window.Silinx.active.editor; ed.setCursor({ line: 0, ch: 0 }); ed.replaceSelection('-- by Ana\n'); });
     await fp.waitFor((t) => window.Silinx.active.editor.getValue() === t, [`-- by Ana\n${TOP}`], { what: 'the edit arrived' });
-    await fp.waitConsole(/^src\/top\.vhd reloaded: changed by Ana\.$/m);
+    // (live, #3182: its open editor bound to the shared text, not reloaded, nothing said)
+    assert.doesNotMatch(await fp.consoleText(), /src\/top\.vhd reloaded|Changed by Ana/);
     // the owner opens another file: followed; the follower opens one of their own: browsing alone
     await page.eval(() => window.SilinxApp.openFile('src/pass1.vhd'));
     await fp.waitFor(() => window.Silinx.active?.path === 'src/pass1.vhd', [], { what: 'the owner\'s new editor followed' });

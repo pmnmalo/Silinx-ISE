@@ -28,6 +28,6 @@ export function renderPresence({ label = '', me = null, peers = [] } = {}) {
 
 function menuItems(all) {
   // (a name is the participant's, not translated; their role beside it)
-  const people = all.map(p => ({ label: p.name, raw: true, shortcut: p.me ? 'you' : p.role === 'owner' ? 'owner' : 'follower', disabled: true }));
+  const people = all.map(p => ({ label: p.name, raw: true, shortcut: p.me ? 'you' : p.role === 'owner' ? 'owner' : p.role === 'editor' ? 'editor' : 'follower', disabled: true }));
   return [...people, '-', ...commands()];
 }
