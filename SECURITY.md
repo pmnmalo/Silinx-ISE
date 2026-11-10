@@ -72,6 +72,9 @@ can read that user's files has the server too.
   it. A repository's address is checked as the server's (github.com's only), the sign-in page linked is github.com's
   only, and an opened or pulled file passes the import gate; the repository's hidden and binary files stay on GitHub,
   never run nor deleted. A cloned project is untrusted (#2830). A commit moves its branch only forward (never forced).
+  On a server, `SILINX_GIT=github` (`server/git-github.js`) uses the same back end with the environment's token
+  (`GH_TOKEN`), never stored nor logged; what a project was at its last commit is kept in Silinx's configuration
+  folder, out of the workspace, so that the MCP's file tools cannot point its commits at another repository.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
   paths, keys and tokens, Xilinx files, a bitstream under any name) the tracked files, text, compressed
   and binary, and every line ever added to `main`; CodeQL analyses
