@@ -84,7 +84,7 @@ uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a re
   // Commit…: an empty message said beside its field; then committed, the marks gone
   await page.menu('File', 'Commit…');
   await page.waitDialog('Commit');
-  assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .git-changes li')].map((l) => l.textContent).join(', ')), 'src/counter.v (changed)');
+  assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .git-changes li')].map((l) => l.textContent).join(', ')), 'src/counter.v (changed) Compare');
   await page.dialogButton('Commit');
   assert.equal(await errorText(page, 'git-message-error'), 'Say in a few words what changed.');
   await page.fill('.dlg-overlay .git-message', 'Counter changed');

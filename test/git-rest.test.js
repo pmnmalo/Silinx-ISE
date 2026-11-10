@@ -275,3 +275,48 @@ test('GitHub\'s refusals: a sign-in no longer valid, no permission to push, GitH
   assert.ok(authed.length > 0 && authed.every(r => r.headers.authorization === `Bearer ${gh.token}`));
   noToken(gh);
 });
+
+test('pull merges a drawing changed on both sides by its objects (#3197): at once for different objects, by the choices for the same one; its HDL made again', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const dir = path.join(import.meta.dirname, '..', 'examples', 'traffic');
+  const files = {};
+  const walk = (base) => { for (const e of fs.readdirSync(path.join(dir, base), { withFileTypes: true })) { const rel = base ? `${base}/${e.name}` : e.name; if (e.isDirectory()) walk(rel); else files[rel] = fs.readFileSync(path.join(dir, rel), 'utf8'); } };
+  walk('');
+  const FSM = 'src/traffic.fsm.json';
+  const gh = fakeGitHub();
+  gh.seed('pmalo/traffic', files);
+  const mem = memory();
+  const made = [];
+  mem.projects.regenerate = async (n, p) => { made.push(p); };
+  const git = restGit({ client: githubClient({ fetch: gh.fetch, token: () => gh.token }), ...mem });
+  await git.clone({ url: 'https://github.com/pmalo/traffic' });
+  const text = (m) => `${JSON.stringify(m, null, 2)}\n`;
+  const t = (m, id) => m.transitions.find((x) => x.id === id);
+  const edit = (src, fn) => { const m = JSON.parse(src); fn(m); return text(m); };
+  // different objects: merged at once
+  gh.commitFiles('pmalo/traffic', { [FSM]: edit(files[FSM], (m) => { t(m, 't2').cond = 'not req'; }) });
+  mem.P.get('traffic')[FSM] = edit(files[FSM], (m) => { t(m, 't3').cond = 'req and not night'; });
+  const r = await git.pull('traffic');
+  assert.deepEqual(r.resolved, [FSM]);
+  assert.deepEqual(made, [FSM]);
+  const merged = JSON.parse(mem.P.get('traffic')[FSM]);
+  assert.deepEqual([t(merged, 't2').cond, t(merged, 't3').cond], ['not req', 'req and not night']);
+  // (the merged drawing: a change against GitHub's, which the next commit pushes)
+  assert.deepEqual((await git.status('traffic')).files, [{ path: FSM, state: 'modified' }]);
+  await git.commit('traffic', 'Merged');
+  assert.equal(t(JSON.parse(gh.filesAt('pmalo/traffic', 'main')[FSM]), 't3').cond, 'req and not night');
+  // the same object changed differently: nothing pulled, its conflict named; then resolved theirs
+  const base = gh.filesAt('pmalo/traffic', 'main')[FSM];
+  gh.commitFiles('pmalo/traffic', { [FSM]: edit(base, (m) => { t(m, 't1').cond = 'night or req'; }) });
+  mem.P.get('traffic')[FSM] = edit(base, (m) => { t(m, 't1').cond = 'not night'; });
+  await rejects(git.pull('traffic'), `git pull: a conflict in ${FSM}: nothing was pulled, the project's files are as they were`, {
+    hint: 'The same objects of a drawing changed here and on GitHub: choose mine or theirs for each, then Pull again.',
+    drawings: [{ path: FSM, kind: 'fsm', conflicts: [{ id: 'transitions/t1', label: 'transitions t1', mine: 'changed (cond)', theirs: 'changed (cond)' }] }],
+  });
+  assert.equal(t(JSON.parse(mem.P.get('traffic')[FSM]), 't1').cond, 'not night');
+  const p = await git.pull('traffic', { resolve: { [FSM]: { 'transitions/t1': 'theirs' } } });
+  assert.deepEqual(p.resolved, [FSM]);
+  assert.equal(t(JSON.parse(mem.P.get('traffic')[FSM]), 't1').cond, 'night or req');
+  assert.deepEqual((await git.status('traffic')).files, []);
+});

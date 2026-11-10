@@ -261,30 +261,44 @@ export async function gitPush(name) {
   return { project: name, branch, remote: `${remote.owner}/${remote.repo}`, pushed: flag !== '=' };
 }
 
-/** Pull GitHub's commits into the project (a merge, never a rebase): { branch, files, upToDate }. A conflict pulls
- *  nothing (the merge aborted: the files as they were) and is a GitError with its files. */
-export async function gitPull(name) {
+/** Pull GitHub's commits into the project (a merge, never a rebase): { branch, files, upToDate, resolved }. The
+ *  drawings both sides changed are merged by their objects (server/git-merge.js), by the choices of `resolve` where an
+ *  object is in conflict; any other conflict pulls nothing (the merge aborted: the files as they were) and is a
+ *  GitError with its files, and the drawings' conflicts still to choose (`drawings`). */
+export async function gitPull(name, { resolve = null } = {}) {
   const repo = await needRepo(name);
   await origin(repo.dir);
   const branch = await branchOf(repo.dir);
   if (!branch) throw new GitError('the project is on no branch (a detached HEAD)', 'Check out a branch with git, then Pull.', 409);
   const upstream = !(await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], { cwd: repo.dir })).code;
   const before = await headOf(repo.dir);
+  const M = await import('./git-merge.js');
+  await M.ensureDrawingAttributes((await ok('rev-parse', ['rev-parse', '--absolute-git-dir'], { cwd: repo.dir })).trim());
   const r = await git(['pull', '--no-rebase', '--ff', '--no-edit', ...(upstream ? [] : ['origin', branch])], { cwd: repo.dir, timeout: 180_000 });
+  let resolved = [];
   if (r.code) {
     const u = await git(['diff', '--name-only', '--relative', '--diff-filter=U'], { cwd: repo.dir });
     const files = u.stdout.split('\n').filter(Boolean);
-    if (files.length) {
+    if (!files.length) throw explain('pull', r);
+    let m;
+    try { m = await M.resolveOnPull({ run: a => git(a, { cwd: repo.dir }), prefix: repo.prefix, name, files, resolve }); }
+    catch (e) { await git(['merge', '--abort'], { cwd: repo.dir }); throw new GitError(`git pull: ${e.message}: nothing was pulled`, 'Choose the other side for an object, then Pull again.', e.status || 422, { files }); }
+    if (!m.done) {
       await git(['merge', '--abort'], { cwd: repo.dir });
+      const only = !m.others.length;
       throw new GitError(`git pull: a conflict in ${files.join(', ')}: nothing was pulled, the project's files are as they were`,
-        'The same lines changed here and on GitHub. Commit your version under another name, or ask the other author, then Pull again.', 409, { files });
+        only ? 'The same objects of a drawing changed here and on GitHub: choose mine or theirs for each, then Pull again.'
+          : 'The same lines changed here and on GitHub. Commit your version under another name, or ask the other author, then Pull again.',
+        409, { files, drawings: m.drawings });
     }
-    throw explain('pull', r);
+    await ok('add', ['add', '--all', '--', ...new Set([...files, ...m.written])], { cwd: repo.dir });
+    await ok('commit', ['commit', '--quiet', '--no-edit', '--no-verify'], { cwd: repo.dir });
+    resolved = m.resolved;
   }
   const after = await headOf(repo.dir);
   if (!upstream) await git(['branch', `--set-upstream-to=origin/${branch}`], { cwd: repo.dir });
   const files = before === after ? [] : (await ok('diff', before ? ['diff', '--name-only', '--relative', before, after, '--', '.'] : ['ls-files', '--', '.'], { cwd: repo.dir })).split('\n').filter(Boolean);
-  return { project: name, branch, upToDate: before === after, files };
+  return { project: name, branch, upToDate: before === after, files, ...(resolved.length ? { resolved } : {}) };
 }
 
 /** The project's commits, the newest first: [{ commit, author, date, message, files: [{ path, state }] }]. */
