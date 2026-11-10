@@ -8,6 +8,7 @@
 // The Spartan-6 primitives (CARRY4, SRLC32E, DSP48A1, RAMB8BWER / RAMB16BWER…) are core/unisim-s6.js's.
 
 import { UNISIM_S6_VHDL } from './unisim-s6.js';
+import { UNISIM_JTAG_VHDL } from './unisim-jtag.js';
 import { hex2 } from './util.js';
 
 /** True if a VHDL source uses the UNISIM library (e.g. a netgen netlist). */
@@ -814,7 +815,7 @@ end VPKG;`,
   ...FFS.flatMap(([b, p]) => [ff(b, p, false), ff(b, p, true)]),
   ...LATCHES.flatMap(([n, p]) => [latch(n, p, false), latch(n, p, true)]),
   SRLS, DRAMS, MULTS, BRAMS, dcm('DCM_SP'), dcm('DCM'), ...ddrs,
-  UNISIM_S6_VHDL,
+  UNISIM_S6_VHDL, UNISIM_JTAG_VHDL,
 ].join('\n');
 
 const VCOMPONENTS = 'package VCOMPONENTS is\nend VCOMPONENTS;';

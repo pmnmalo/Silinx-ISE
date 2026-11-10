@@ -167,6 +167,8 @@ export function mountDesignRules(ctx) {
       for (const w of writers.get(sig) || []) {
         const inf = pinfo.get(w);
         if (!inf || inf.sim || w.kind === 'native') continue;
+        // (a primitive's model, core/unisim.js: a clock primitive's output, a BSCAN's DRCK, #3176)
+        if (String(fileOf(w) || '').startsWith('<silinx>/')) continue;
         if (w.kind === 'glue') {
           const v = w.body?.value;
           if (v && v.k === 'sig') { const r = logicSource(v.sig, depth + 1); if (r) return r; continue; }
