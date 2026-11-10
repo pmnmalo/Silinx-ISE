@@ -5,10 +5,10 @@
 // its key, so the relay sees nothing of the project. The followers are shown in the toolbar (collab-presence.js),
 // their coming and going in the console; Stop Sharing closes the room for them all. Opening another project stops
 // sharing too. The browser edition, which has no relay, hosts the room in the owner's page (#3227, collab-host.js):
-// each follower connects with codes exchanged by hand (Add a Follower…). Editors (#3182, phase 2): its editors' link
-// (Copy Editor Link) signs their changes; the page's open text editors are bound live to the document (collab-bind.js),
-// and what an editor changes in a text file is written to the disk, anything else undone from it (the disk is the
-// owner's).
+// each follower finds it at the public meeting point (collab-meet.js: the link carries the owner's key), or connects
+// with codes exchanged by hand (Add a Follower…). Editors (#3182, phase 2): its editors' link (Copy Editor Link) signs
+// their changes; the page's open text editors are bound live to the document (collab-bind.js), and what an editor
+// changes in a text file is written to the disk, anything else undone from it (the disk is the owner's).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app } from './app.js';
@@ -20,6 +20,7 @@ import { projectDoc, publishProject, putFile, putProject, sharedPath, watchDoc, 
 import { keepBound, unbindAll } from './collab-bind.js';
 import { shareRoom, colorOf } from '/core/collab-client.js';
 import { followLink, relayUrl, relayAddress } from '/core/collab-link.js';
+import { newHostKey } from '/core/collab-meet.js';
 
 export const NAME_KEY = prefKey('silinx.collab.name');
 const TRACK_MS = 300;
@@ -93,11 +94,12 @@ export async function startSharing(name, { via = api.collab ? 'relay' : 'host', 
   const doc = projectDoc();
   publishProject(doc, { ...await readAll(project), owner: name });
   const host = via === 'host' ? (await import('./collab-host.js')).hostRoom() : null;
+  const hostKey = host ? await newHostKey() : null;
   const session = host
     ? await shareRoom({ url: 'silinx-host:', WebSocket: host.WebSocket, doc, user: { name }, editors: true, onEvent: ev => onEvent(ev) })
     : await shareRoom({ url: relayUrl(other || location.href, 'share'), token: other ? relay.key || null : await api.collabToken(), doc, user: { name }, editors: true, onEvent: ev => onEvent(ev) });
-  const base = location.origin + location.pathname;
-  share = { name, project, session, doc, link: followLink(base, session.room, session.key, via, null, other), editLink: followLink(base, session.room, session.key, via, session.editKey, other), known: new Map(), view: null, hosted: host?.hosted || null, bound: new Map() };
+  const base = location.origin + location.pathname, pub = hostKey?.pub ?? null;
+  share = { name, project, session, doc, link: followLink(base, session.room, session.key, via, null, other, pub), editLink: followLink(base, session.room, session.key, via, session.editKey, other, pub), known: new Map(), view: null, hosted: host?.hosted || null, bound: new Map() };
   Object.assign(collab, { role: 'owner', owner: name, project, session });
   ({ restore: share.restore, orig: share.orig } = hookApi(project, doc));
   share.unwatch = watchDoc(doc, ev => onEdits(share, ev));
@@ -107,7 +109,11 @@ export async function startSharing(name, { via = api.collab ? 'relay' : 'host', 
   draw();
   app.log(`Sharing project "${project}": anyone with its link follows it live, read only (Share Project… shows the link; Stop Sharing ends it).`, 'ok');
   if (other) app.log(`Shared through the relay at ${new URL(other).host}: it sees no file, only who is in.`, 'info');
-  if (host) app.log('This page hosts the shared project: each follower sends you a code when they open the link (Add a Follower…, in the toolbar, takes it); it lasts while this page is open.', 'info');
+  if (host) {
+    app.log('This page hosts the shared project: its followers find it at the meeting point when they open the link, or send you a code (Add a Follower…, in the toolbar, takes it); it lasts while this page is open.', 'info');
+    const s = share;
+    s.meet = (await import('./collab-meet.js')).meetFollowers(s, hostKey.key);
+  }
   return share.link;
 }
 
@@ -125,6 +131,7 @@ export async function stopSharing(why = null) {
   for (const o of S.docs) o.editor?.setPeers?.([]);
   Object.assign(collab, { role: null, owner: '', project: null, session: null });
   await s.session.close().catch(() => {});
+  s.meet?.then(m => m?.leave()).catch(() => {});   // (once the followers were told)
   draw();
   app.log(why || `Stopped sharing "${s.project}": its followers no longer see it.`, why ? 'warn' : 'info');
 }
@@ -142,7 +149,7 @@ function linkDialog() {
       field,
       h('p', {}, 'Anyone with the editors\' link changes its text files with you, live; its drawings stay yours.'),
       editField,
-      share.hosted ? h('p', {}, 'This page hosts it: each follower sends you a code when they open the link, which Add a Follower… takes.') : null),
+      share.hosted ? h('p', {}, 'This page hosts it: its followers find it when they open the link, or send you a code, which Add a Follower… takes.') : null),
     buttons: [
       { label: 'Copy Link', primary: true, value: () => { writeClip('text', link); app.log('Shared project\'s link copied.', 'ok'); return link; } },
       { label: 'Copy Editor Link', value: () => { copyEditorLink(); return link; } },

@@ -1,6 +1,7 @@
 // UI: a shared project hosted by the owner's page (#3227, the browser edition's way: no relay), two participants in one
 // test, in both interfaces: the owner shares the open project from their page (its link …#follow=<room>.<key>.host);
-// the follower opens the link (their name), gets their code (Connect to the Owner); the owner takes it (Add a
+// the follower opens the link (their name), leaves the meeting point for the codes (Exchange Codes Instead, #3227),
+// gets their code (Connect to the Owner); the owner takes it (Add a
 // Follower…, in the presence's menu) and gives the answer's code; the follower pastes it: connected over WebRTC (two
 // pages of one browser, no STUN server: the same machine), the project read only, the owner's editor followed, an edit
 // arriving, the presence on both sides; a code that is not one refused at the owner's, in the console; Stop Sharing
@@ -18,8 +19,9 @@ const E = () => env;
 const TOP = 'library ieee;\nuse ieee.std_logic_1164.all;\n\nentity top is\n  port (a : in std_logic; y : out std_logic);\nend top;\n\narchitecture rtl of top is\nbegin\n  y <= not a;\nend rtl;\n';
 const BIG = `${'a line of the notes of a large project\n'.repeat(10500)}`;
 const warnings = async (page) => (await page.consoleText()).split('\n').map((l) => l.trim()).filter((l) => /^(WARNING|AVISO|ERROR|ERRO)/.test(l));
-// (no STUN server: the two pages on this machine reach each other by their own addresses)
-const noStun = (page) => page.eval(async () => { const { STUN_KEY } = await import('/js/collab-rtc.js'); localStorage.setItem(STUN_KEY, '[]'); });
+// (no STUN server: the two pages on this machine reach each other by their own addresses; the meeting point between
+// this browser's pages, never the public one: two pages of their own browser contexts, which never meet there)
+const noStun = (page) => page.eval(async () => { const { STUN_KEY } = await import('/js/collab-rtc.js'); localStorage.setItem(STUN_KEY, '[]'); const { MEETING_KEY } = await import('/js/collab-meet.js'); localStorage.setItem(MEETING_KEY, 'local'); });
 const dialogField = (page, field) => page.waitFor((f) => document.querySelector(`.dlg-overlay textarea[data-field=${f}]`)?.value || null, [field], { what: `the ${field}`, timeout: 15000 });
 
 uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, the follower connected over WebRTC, read only; an edit arrives; a wrong code refused; Stop Sharing; the follower in Portuguese', E, async (page) => {
@@ -29,8 +31,8 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
   await noStun(page);
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   const link = await page.eval(async () => { const m = await import('/js/collab-share.js'); await m.startSharing('Ana', { via: 'host' }); return m.sharedLink(); });
-  assert.match(link, /^http:\/\/[^/]+\/#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host$/);
-  await page.waitConsole(/^This page hosts the shared project: each follower sends you a code when they open the link \(Add a Follower…, in the toolbar, takes it\); it lasts while this page is open\.$/m);
+  assert.match(link, /^http:\/\/[^/]+\/#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\.host\.[A-Za-z0-9_-]{86}$/);
+  await page.waitConsole(/^This page hosts the shared project: its followers find it at the meeting point when they open the link, or send you a code \(Add a Follower…, in the toolbar, takes it\); it lasts while this page is open\.$/m);
   // the follower opens the link: their name, then their code
   const fp = await env.newPage(env.server.url);
   try {
@@ -41,7 +43,12 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     await fp.waitDialog('Seguir um Projeto Partilhado');
     await fp.fill('.dlg-overlay input[data-field=name]', 'Rui');
     await fp.dialogButton('Seguir');
+    // (the meeting point first: the codes at the follower's choice, #3227)
     await fp.waitDialog('Ligar ao Dono');
+    assert.deepEqual(await fp.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-body p, .dlg-overlay .dlg-buttons .btn')].map((e) => e.textContent)),
+      ['A procurar o dono no ponto de encontro…', 'Se não for encontrado aí, troca códigos com ele em vez disso.', 'Trocar Códigos em Vez Disso', 'Cancelar']);
+    await fp.dialogButton('Trocar Códigos em Vez Disso');
+    await fp.waitConsole(/^Follow a shared project: codes exchanged with the owner instead of the meeting point\.$/m);
     const code = await dialogField(fp, 'code');
     assert.match(code, /^S1\.[A-Za-z0-9_-]+$/);
     assert.deepEqual(await fp.eval(() => [...document.querySelectorAll('.dlg-overlay label, .dlg-overlay .collab-copy, .dlg-overlay .dlg-buttons .btn')].map((e) => e.textContent)),

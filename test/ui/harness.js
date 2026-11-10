@@ -697,7 +697,7 @@ export class Page extends PageBase {
   async close() {
     const t0 = Date.now();
     this.off();
-    try { await this.cdp.send('Target.disposeBrowserContext', { browserContextId: this.contextId }); } catch { /* already gone */ }
+    try { await this.cdp.send(...(this.sibling ? ['Target.closeTarget', { targetId: this.targetId }] : ['Target.disposeBrowserContext', { browserContextId: this.contextId }])); } catch { /* already gone */ }
     debug(`page closed in ${Date.now() - t0} ms`);
   }
 }
@@ -801,7 +801,7 @@ export class PwPage extends PageBase {
   async setFiles(sel, files, { index = 0 } = {}) { await this.page.locator(sel).nth(index).setInputFiles(files); }
   setViewport(width, height) { return pwLimit('setViewportSize', this.page.setViewportSize({ width, height }), this); }
   async screenshot(file) { await this.page.screenshot({ path: file }); return file; }
-  async close() { this.closing = true; await this.context.close().catch(() => {}); }
+  async close() { this.closing = true; await (this.sibling ? this.page.close() : this.context.close()).catch(() => {}); }
 }
 
 // ------------------------------------------------------------------------------------- offline
@@ -898,8 +898,8 @@ function initScripts({ updateCheck, build, ui }) {
  * npm dependencies are missing from <root>/node_modules (root: the checkout; a test's own).
  * `server: false` for tests that do not need the Silinx server (standalone edition, or one started
  * by the test). `offline: true`: the browser's requests to other hosts are refused and recorded in
- * env.external (see startRecordingProxy). env.newPage(url, { updateCheck, build, ui }) opens a page (the
- * update check against GitHub only with updateCheck: true). `fileAccess: false`: Chrome without
+ * env.external (see startRecordingProxy). env.newPage(url, { updateCheck, build, ui, sibling }) opens a page (the
+ * update check against GitHub only with updateCheck: true; sibling: a page whose browser context it shares). `fileAccess: false`: Chrome without
  * --allow-file-access-from-files, as a user opens a file (the standalone edition from file://, #512).
  */
 export async function setupUi({ server = true, offline = false, root = ROOT, fileAccess = true } = {}) {
@@ -920,14 +920,16 @@ export async function setupUi({ server = true, offline = false, root = ROOT, fil
   env.chromeProc = proc;
   env.cdp = cdp;
   env.pageSeq = 0;
-  env.newPage = async (url = env.server?.url, { updateCheck = false, build = null, tablet = null, ui = null } = {}) => {
-    const { browserContextId } = await cdp.send('Target.createBrowserContext', { disposeOnDetach: true });
-    const downloadDir = path.join(tmp, `downloads-${++env.pageSeq}`);
+  env.newPage = async (url = env.server?.url, { updateCheck = false, build = null, tablet = null, ui = null, sibling = null } = {}) => {
+    // (sibling: a page whose browser context the new one shares: its storage, its BroadcastChannels)
+    const { browserContextId } = sibling ? { browserContextId: sibling.contextId } : await cdp.send('Target.createBrowserContext', { disposeOnDetach: true });
+    const downloadDir = sibling ? sibling.downloadDir : path.join(tmp, `downloads-${++env.pageSeq}`);
     await fsp.mkdir(downloadDir, { recursive: true });
-    await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir, browserContextId, eventsEnabled: true });
+    if (!sibling) await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir, browserContextId, eventsEnabled: true });
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', browserContextId });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     const page = new Page(env, sessionId, targetId, browserContextId, downloadDir);
+    page.sibling = !!sibling;
     if (proxy) await page.recordExternal(env.external);
     await page.send('Runtime.enable');
     await page.send('Page.enable');
@@ -979,14 +981,16 @@ async function setupPlaywright({ server, offline }) {
   const browser = await type.launch({ executablePath, ...(proxy ? { proxy: { server: proxy.url } } : {}) });
   env.pw = browser;
   env.pageSeq = 0;
-  env.newPage = async (url = env.server?.url, { updateCheck = false, build = null, tablet = null, ui = null } = {}) => {
-    const downloadDir = path.join(tmp, `downloads-${++env.pageSeq}`);
+  env.newPage = async (url = env.server?.url, { updateCheck = false, build = null, tablet = null, ui = null, sibling = null } = {}) => {
+    const downloadDir = sibling ? sibling.downloadDir : path.join(tmp, `downloads-${++env.pageSeq}`);
     await fsp.mkdir(downloadDir, { recursive: true });
     // (a tablet, #1130: its screen with touch; WebKit as an iPad's Safari, Firefox as an Android tablet's)
     const device = tablet ? { viewport: TABLET[tablet], hasTouch: true, userAgent: BROWSER === 'webkit' ? TABLET_UA.ipad : TABLET_UA.android } : { viewport: { width: 1400, height: 900 } };
-    const context = await browser.newContext({ ...device, acceptDownloads: true });
-    for (const content of initScripts({ updateCheck, build, ui })) await context.addInitScript({ content });
+    // (sibling: a page whose browser context the new one shares, its init scripts already in it)
+    const context = sibling ? sibling.context : await browser.newContext({ ...device, acceptDownloads: true });
+    if (!sibling) for (const content of initScripts({ updateCheck, build, ui })) await context.addInitScript({ content });
     const page = new PwPage(env, context, await context.newPage(), downloadDir);
+    page.sibling = !!sibling;
     if (url) await page.goto(url);
     return page;
   };

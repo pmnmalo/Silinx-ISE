@@ -60,7 +60,7 @@
   if (last) { d.setAttribute('data-starting', ''); setTimeout(function () { d.removeAttribute('data-starting'); }, 10000); } })();
 </script>
 <!-- the editor (CodeMirror 6, web/js/editor.js) and a shared project's document (Yjs, its awareness and lib0:
-     core/collab-*.js, #3181): their ES modules, from node_modules (server/server.js serves these packages only; the
+     core/collab-*.js, #3181; its meeting point, Trystero: web/js/collab-meet.js, #3227): their ES modules, from node_modules (server/server.js serves these packages only; the
      standalone edition bundles them, scripts/build-standalone.mjs) -->
 <script type="importmap">
 { "imports": {
@@ -105,7 +105,9 @@
   "lib0/environment": "/vendor/npm/lib0/environment.js",
   "lib0/webcrypto": "/vendor/npm/lib0/webcrypto.js",
   "lib0/dom": "/vendor/npm/lib0/dom.js",
-  "lib0/pair": "/vendor/npm/lib0/pair.js"
+  "lib0/pair": "/vendor/npm/lib0/pair.js",
+  "@trystero-p2p/torrent": "/vendor/npm/@trystero-p2p/torrent/dist/index.mjs",
+  "@trystero-p2p/core": "/vendor/npm/@trystero-p2p/core/dist/index.mjs"
 } }
 </script>
 <script src="/vendor/elk/elk.bundled.js"></script>
