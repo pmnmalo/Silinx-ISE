@@ -28,6 +28,7 @@ const { HLS_TOOLS } = await import('../server/mcp-hls.js');
 const { VERIFY_TOOLS } = await import('../server/mcp-verify.js');
 const { PROCESS_TOOLS, PROCESSES, REPORT_FILES, OPEN_REPORTS } = await import('../server/mcp-processes.js');
 const { LAB_TOOLS } = await import('../server/mcp-labs.js');
+const { TIMING_TOOLS } = await import('../server/mcp-timing.js');
 const U = await import('../server/mcp-util.js');
 
 const names = tools => tools.map(t => t.name);
@@ -58,8 +59,9 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(WCFG_TOOLS), ['save_wave_config', 'load_wave_config']);
   assert.deepEqual(names(HLS_TOOLS), ['c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
+  assert.deepEqual(names(TIMING_TOOLS), ['timing_paths']);
   assert.deepEqual(names(LAB_TOOLS), ['lab']);   // (the guided labs, #3179)
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...LAB_TOOLS]);
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);

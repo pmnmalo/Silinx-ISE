@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { toolError, readProject, projectPath, PROJECT } from './mcp-util.js';
-import { pathHighlight, pathsText } from '../packages/silinx-fpga/src/fpga/timing-paths.js';
+import { pathHighlight, pathsText } from '../packages/silinx-fpga/src/index.js';
 
 export const PATHS_FILE = 'build/open/paths.json';
 
