@@ -1,6 +1,6 @@
 // Copy Link… (#2826): the link that opens the project in Silinx (for lecture slides), the whole project inside it
 // (core/design-link.js encodeDesign), and what it opens: the project only, Try it (a schematic's), the simulation (the
-// test bench), the board emulator; the module. The link is shown as it is made, its length with it; one too large
+// test bench), the board emulator; the module; a guided lab opened beside it (#3179). The link is shown as it is made, its length with it; one too large
 // for a link (a zip hosted elsewhere then) or a view the design does not have is said in the dialog, and the copy in
 // the console. Anyone with the link has the whole project, its comments too: the dialog says so (#2829).
 import { api } from './api.js';
@@ -53,6 +53,14 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   // Silinx as it is now (#2886): the open tabs, the one in front, the split, the panels, the task
   const ui = encodeUi(currentViewState(), layoutNow());
   const withView = h('input', { type: 'checkbox', 'data-field': 'ui', checked: true });
+  // the guided labs of the project (core/labs.js): the one in front chosen
+  const { projectLabs } = await import('./lab-view.js');
+  const { localize } = await import('/core/labs.js');
+  const { getLanguage } = await import('./i18n.js');
+  const labs = (await projectLabs(name).catch(() => ({ labs: [] }))).labs;
+  const front = /^lab:(.+)$/.exec(S.active?.id || '')?.[1];
+  const labSel = h('select', { 'data-field': 'lab' }, h('option', { value: '' }, 'No lab'),
+    ...labs.map(l => h('option', { value: l.id, selected: l.id === front, 'data-no-i18n': '' }, localize(l.lab.title, getLanguage() === 'pt' ? 'pt' : 'en'))));
   let link = null;
   const update = () => {
     link = null;
@@ -65,7 +73,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     const top = !modSel.value || isEmu() || (!viewSel.value && !module) ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
-    link = makeLink(linkBase(), { design, view: viewSel.value || null, top, ui: withView.checked ? ui : null });
+    link = makeLink(linkBase(), { design, view: viewSel.value || null, top, ui: withView.checked ? ui : null, lab: labSel.value || null });
     out.value = link;
     info.textContent = link.length > LINK_LIMITS.slides
       ? `${link.length} characters: some slide tools cut a link longer than ${LINK_LIMITS.slides} (export the project as a .zip, host it, and link to it with #open=).`
@@ -73,6 +81,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   };
   viewSel.addEventListener('change', () => { fillModules(); update(); });
   withView.addEventListener('change', update);
+  labSel.addEventListener('change', update);
   modSel.addEventListener('change', () => { if (!isEmu()) chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
   update();
   const r = await dialog({
@@ -83,13 +92,14 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
         h('label', {}, 'Open in:'), viewSel,
         h('label', {}, 'Module:'), modSel,
         h('label', {}, 'Board:'), h('span', { class: 'link-board' }, S.project.board || 'none'),
+        h('label', {}, 'Lab:'), labSel,
         h('span'), h('label', { class: 'link-ui' }, withView, h('span', {}, 'Include the current view: the open tabs, the split, the panels'))),
       out, info, err),
     buttons: [{ label: 'Copy Link', primary: true, value: true, validate: () => !!link }, { label: 'Cancel', value: null }],
   });
   if (!r || !link) return null;
   writeClip('text', link);
-  app.log(`Copy Link: the link of '${name}'${viewSel.value ? ` (${VIEWS.find(([v]) => v === viewSel.value)[1]}, ${modSel.value})` : ''} copied, ${link.length} characters.`, 'ok');
+  app.log(`Copy Link: the link of '${name}'${viewSel.value ? ` (${VIEWS.find(([v]) => v === viewSel.value)[1]}, ${modSel.value})` : ''}${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters.`, 'ok');
   if (link.length > LINK_LIMITS.slides) app.log(`WARNING: Copy Link: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides}.`, 'warn');
   return link;
 }

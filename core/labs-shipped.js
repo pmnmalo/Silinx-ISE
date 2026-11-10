@@ -107,6 +107,8 @@ const TRAFFIC_STATE_MACHINE = {
       },
       hint: { en: 'A Moore output takes its default in every state that does not set it: walking must be 1 in both WALK and WALK_END (at 5 µs the machine is in WALK_END).', pt: 'Uma saída de Moore toma o valor por omissão em cada estado que não lhe dá outro: walking tem de estar a 1 em WALK e em WALK_END (aos 5 µs a máquina está em WALK_END).' },
       checks: [
+        { check: 'file', path: 'src/traffic.fsm.json', contains: ['"walking"'] },
+        { check: 'drawing', path: 'src/traffic.fsm.json' },
         { check: 'module', name: 'traffic', ports: [{ name: 'phase', dir: 'out', width: 3 }, { name: 'walking', dir: 'out', width: 1 }] },
         { check: 'simulate', time_ns: 12000, values: [{ signal: 'uut/u_fsm/walking', at_ns: 3800, value: '0' }, { signal: 'uut/u_fsm/walking', at_ns: 4000, value: '1' }, { signal: 'uut/u_fsm/walking', at_ns: 5000, value: '1' }, { signal: 'uut/u_fsm/walking', at_ns: 5200, value: '0' }], messages: ['Simulation finished OK'] },
       ],
@@ -197,4 +199,66 @@ const BLINKY_CLOCK_BOARD = {
   ],
 };
 
-export const LABS = [GATES_FIRST_STEPS, TRAFFIC_STATE_MACHINE, BLINKY_CLOCK_BOARD];
+const STOPWATCH_EMULATOR = {
+  silinxLab: 1,
+  id: 'stopwatch-emulator',
+  example: 'stopwatch',
+  title: { en: 'The emulator', pt: 'O emulador' },
+  intro: {
+    en: 'The stopwatch example counts seconds and hundredths on the Basys2\'s display, and keeps the laps in a block RAM. Before a design goes into the FPGA, the Board Emulator runs it on a drawing of the board: its switches and buttons are clicked, its LEDs and display light as the board\'s would. In this lab you try the stopwatch in the emulator, test it, and move its reset to another switch. Press Check Step when a step is done.',
+    pt: 'O exemplo stopwatch conta segundos e centésimos no mostrador da Basys2, e guarda as voltas numa block RAM. Antes de um projeto ir para a FPGA, o Board Emulator corre-o num desenho da placa: clica-se nos seus interruptores e botões, e os LEDs e o mostrador acendem como os da placa. Neste laboratório experimenta o cronómetro no emulador, testa-o, e passa o seu reset para outro interruptor. Carregue em Verificar Passo quando acabar um passo.',
+  },
+  steps: [
+    {
+      id: 'project',
+      title: { en: 'The project', pt: 'O projeto' },
+      text: {
+        en: 'The top module `stopwatch` has the board\'s 50 MHz clock, the switch SW0 (`sw`, its reset), the four buttons (`btn`), the eight LEDs (`led`) and the display (`seg`, `dp`, `an`). Its constraints, constraints/top.ucf, put each of them on its pin of the Basys2.',
+        pt: 'O módulo de topo `stopwatch` tem o relógio de 50 MHz da placa, o interruptor SW0 (`sw`, o seu reset), os quatro botões (`btn`), os oito LEDs (`led`) e o mostrador (`seg`, `dp`, `an`). As suas restrições, constraints/top.ucf, põem cada um no seu pino da Basys2.',
+      },
+      hint: { en: 'Open the stopwatch example (File ▸ New Project, the stopwatch example): its board is the Basys2.', pt: 'Abra o exemplo stopwatch (File ▸ New Project, o exemplo stopwatch): a sua placa é a Basys2.' },
+      checks: [{ check: 'project', top: 'stopwatch', simTop: 'tb_stopwatch', board: 'basys2' }, { check: 'pins', pins: [{ port: 'sw<0>', loc: 'P11' }, { port: 'btn<0>', loc: 'G12' }] }],
+    },
+    {
+      id: 'emulate',
+      title: { en: 'The Board Emulator', pt: 'O emulador da placa' },
+      text: {
+        en: 'Open **Tools ▸ Board Emulator**. Press BTN0: the display counts the time; BTN1 stores a lap (the LEDs count the laps); BTN0 again stops it, and BTN2 then clears it; BTN3 shows the laps one after the other. SW0 up holds it in reset. Then press Check Step: this step only asks you to try it.',
+        pt: 'Abra **Tools ▸ Board Emulator**. Carregue em BTN0: o mostrador conta o tempo; BTN1 guarda uma volta (os LEDs contam as voltas); BTN0 de novo para-o, e BTN2 depois limpa-o; BTN3 mostra as voltas uma a uma. SW0 para cima mantém-no em reset. Depois carregue em Verificar Passo: este passo só lhe pede que o experimente.',
+      },
+      hint: { en: 'The emulator runs the design as it is saved: Check Syntax first if it does not start.', pt: 'O emulador corre o projeto tal como está guardado: verifique a sintaxe primeiro se ele não arrancar.' },
+    },
+    {
+      id: 'simulate',
+      title: { en: 'The test bench', pt: 'A bancada de teste' },
+      text: {
+        en: 'The emulator shows what the board would do; the test bench checks it. In the Simulation view, run **Simulate Behavioral Model** on `tb_stopwatch` to its end, about 70 µs (it gives the design a fast hundredth, 2 clock cycles): it presses the buttons and checks the display and the LEDs. The console ends with "Simulation finished OK".',
+        pt: 'O emulador mostra o que a placa faria; a bancada de teste verifica-o. Na vista de simulação, execute **Simulate Behavioral Model** em `tb_stopwatch` até ao fim, cerca de 70 µs (dá ao projeto um centésimo rápido, 2 ciclos de relógio): carrega nos botões e verifica o mostrador e os LEDs. A consola acaba com "Simulation finished OK".',
+      },
+      hint: { en: 'An error in the console says what the test bench expected and what the design did.', pt: 'Um erro na consola diz o que a bancada de teste esperava e o que o projeto fez.' },
+      checks: [{ check: 'simulate', time_ns: 70000, messages: ['Simulation finished OK'] }],
+    },
+    {
+      id: 'pin',
+      title: { en: 'The reset on SW7', pt: 'O reset no SW7' },
+      text: {
+        en: 'Move the reset from SW0 to SW7, the switch at the other end: open **Tools ▸ I/O Pin Planning** and give `sw<0>` the pin N3 (SW7) instead of P11 (SW0), or change its line in constraints/top.ucf. Save, and Check Syntax: no warnings.',
+        pt: 'Passe o reset de SW0 para SW7, o interruptor na outra ponta: abra **Tools ▸ I/O Pin Planning** e dê a `sw<0>` o pino N3 (SW7) em vez de P11 (SW0), ou mude a sua linha em constraints/top.ucf. Guarde, e verifique a sintaxe: sem avisos.',
+      },
+      hint: { en: 'On the Basys2, SW7 is the pin N3: the constraints must say NET "sw<0>" LOC = "N3".', pt: 'Na Basys2, o SW7 é o pino N3: as restrições têm de dizer NET "sw<0>" LOC = "N3".' },
+      checks: [{ check: 'pins', pins: [{ port: 'sw<0>', loc: 'N3' }] }, { check: 'syntax', warnings: [] }],
+    },
+    {
+      id: 'try',
+      title: { en: 'Try it again', pt: 'Experimentar de novo' },
+      text: {
+        en: 'Open the Board Emulator again: SW7 now resets the stopwatch, and SW0 does nothing. The design did not change, only where its port is on the board.',
+        pt: 'Abra de novo o Board Emulator: agora é o SW7 que faz o reset do cronómetro, e o SW0 não faz nada. O projeto não mudou, só o lugar do seu porto na placa.',
+      },
+      hint: { en: 'The emulator reads the constraints when it opens: close it and open it again.', pt: 'O emulador lê as restrições quando abre: feche-o e abra-o de novo.' },
+      checks: [{ check: 'pins', pins: [{ port: 'sw<0>', loc: 'N3' }] }],
+    },
+  ],
+};
+
+export const LABS = [GATES_FIRST_STEPS, TRAFFIC_STATE_MACHINE, BLINKY_CLOCK_BOARD, STOPWATCH_EMULATOR];

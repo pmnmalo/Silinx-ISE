@@ -20,7 +20,8 @@ const LAB = 'gates-first-steps';
 // gates.vhd with an output even: the step "Add an output"'s action (right: even = not d; wrong: even = d)
 const withEven = (vhd, expr) => vhd.replace('led : out std_logic_vector(1 downto 0)', 'led : out std_logic_vector(1 downto 0);\n    even : out std_logic')
   .replace('begin\n  d <=', `begin\n  even <= ${expr};\n  d <=`);
-const SHIPPED = ['First stepsSilinx\'s, for the gates example', 'A state machineSilinx\'s, for the traffic example', 'The clock and the boardSilinx\'s, for the blinky example'];
+const SHIPPED = ['First stepsSilinx\'s, for the gates example', 'A state machineSilinx\'s, for the traffic example', 'The clock and the boardSilinx\'s, for the blinky example',
+  'The emulatorSilinx\'s, for the stopwatch example'];
 
 // Project ▸ Guided Labs…: the lab `id` opened (its rows' texts returned)
 async function openLab(page, id) {
@@ -73,7 +74,7 @@ uiTest('#3179 a guided lab: the gates example\'s first steps run step by step (t
   const checkStep = (k) => checkStepOf(page, k, 5);
 
   // the list: the example's lab, none done; opened at its first step, its intro first
-  assert.deepEqual(await open(), [`${SHIPPED[0]}0 of 5 steps done`, `${SHIPPED[1]}0 of 4 steps done`, `${SHIPPED[2]}0 of 6 steps done`]);
+  assert.deepEqual(await open(), [`${SHIPPED[0]}0 of 5 steps done`, `${SHIPPED[1]}0 of 4 steps done`, `${SHIPPED[2]}0 of 6 steps done`, `${SHIPPED[3]}0 of 5 steps done`]);
   let L = await look();
   assert.deepEqual({ tab: L.tab, buttons: L.buttons, num: L.num, title: L.title, hint: L.hint, status: L.status, cap: L.cap },
     { tab: 'Lab: First steps', buttons: ['Check Step', '◀ Previous (off)', 'Next ▶'], num: 'Step 1 of 5', title: 'The project', hint: null, status: 'Step 1 of 5 · 0 done', cap: 'Steps' });
@@ -189,7 +190,7 @@ uiTest('#3179 the traffic lab: the state diagram, its simulation, a new output (
   await page.setViewport(1366, 768);
   await page.openProject('traffic');
   await silinxToolchain(page);
-  assert.deepEqual(await openLab(page, 'traffic-state-machine'), [`${SHIPPED[1]}0 of 4 steps done`, `${SHIPPED[0]}0 of 5 steps done`, `${SHIPPED[2]}0 of 6 steps done`], 'the example\'s lab first');
+  assert.deepEqual(await openLab(page, 'traffic-state-machine'), [`${SHIPPED[1]}0 of 4 steps done`, `${SHIPPED[0]}0 of 5 steps done`, `${SHIPPED[2]}0 of 6 steps done`, `${SHIPPED[3]}0 of 5 steps done`], 'the example\'s lab first');
   assert.equal(await page.eval(() => window.Silinx.active.tab.querySelector('.tlabel').textContent), 'Lab: A state machine');
   for (const [k, title] of [[1, 'The state diagram'], [2, 'Simulate']]) {
     const out = await checkStepOf(page, k, 4);
@@ -256,4 +257,59 @@ uiTest('#3179 the blinky lab: the board, the clock, the simulation, the speed (a
   assert.equal(await ticks(page), '✓ ✓ ✓ ✓ ✓ ✓<');
   assert.equal(await page.eval((d) => [...document.querySelectorAll(`${d} .doc-status .ds-f`)].map((f) => f.textContent).join(' · '), D), 'Step 6 of 6 · 6 done');
   assert.doesNotMatch(await page.consoleText(), /ERROR/);
+}, { timeout: 240000 });
+
+uiTest('#3179 the stopwatch lab: the emulator (a step to try), the test bench, the reset moved to SW7 (a wrong pin not ticked); Copy Link… with the lab, and a link that opens it', E, async (page) => {
+  await makeProject(env, { name: 'stopwatch', template: 'stopwatch' });
+  await page.setViewport(1366, 768);
+  await page.openProject('stopwatch');
+  assert.deepEqual((await openLab(page, 'stopwatch-emulator'))[0], `${SHIPPED[3]}0 of 5 steps done`);
+  for (const [k, title] of [[1, 'The project'], [2, 'The Board Emulator'], [3, 'The test bench']]) {
+    const out = await checkStepOf(page, k, 5);
+    assert.ok(out.includes(`Lab "The emulator", step ${k} of 5: ${title}`) && /Step done\./.test(out) && !/WARNING/.test(out), out);
+  }
+  // the reset on SW6 (wrong), then on SW7
+  const ucf = await readWs(env, 'stopwatch', 'constraints/top.ucf');
+  await writeWs(env, 'stopwatch', 'constraints/top.ucf', ucf.replace('NET "sw<0>"  LOC = "P11"', 'NET "sw<0>"  LOC = "E2"'));
+  assert.match(await checkStepOf(page, 4, 5), /WARNING: sw<0> is on the pin E2, not N3\nHint: On the Basys2, SW7 is the pin N3/);
+  await writeWs(env, 'stopwatch', 'constraints/top.ucf', ucf.replace('NET "sw<0>"  LOC = "P11"', 'NET "sw<0>"  LOC = "N3"'));
+  assert.match(await checkStepOf(page, 4, 5), /Step done\./);
+  assert.match(await checkStepOf(page, 5, 5), /Step done\.\nEvery step of the lab "The emulator" is done\./);
+  assert.equal(await ticks(page), '✓ ✓ ✓ ✓ ✓<');
+
+  // Copy Link…: the lab in front chosen; none, or another
+  await page.menu('File', 'Copy Link to Project…');
+  await page.waitDialog('Copy Link');
+  const linkOut = () => page.waitFor(() => document.querySelector('.dlg-overlay .link-out')?.value || null, [], { what: 'the link' });
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay select[data-field=lab] option')].map((o) => `${o.value}:${o.textContent}${o.selected ? ' <' : ''}`)),
+    [':No lab', 'stopwatch-emulator:The emulator <', 'gates-first-steps:First steps', 'traffic-state-machine:A state machine', 'blinky-clock-board:The clock and the board']);
+  assert.match(await linkOut(), /#design=[A-Za-z0-9_-]+(&ui=[A-Za-z0-9_-]+)?&lab=stopwatch-emulator$/);
+  await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=lab]'); s.value = ''; s.dispatchEvent(new Event('change')); });
+  assert.doesNotMatch(await linkOut(), /lab=/);
+  await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=lab]'); s.value = 'stopwatch-emulator'; s.dispatchEvent(new Event('change')); });
+  // in Portuguese: the dialog's labels, the labs' titles in theirs
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
+  await page.waitFor(() => document.documentElement.lang === 'pt');
+  const labRow = () => page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field=lab]'); return [s.previousElementSibling.textContent, ...[...s.options].slice(0, 2).map((o) => o.textContent)]; });
+  await page.waitFor(() => document.querySelector('.dlg-overlay select[data-field=lab]').options[0].textContent === 'Nenhum laboratório', [], { what: 'the dialog in Portuguese' });
+  assert.deepEqual(await labRow(), ['Laboratório:', 'Nenhum laboratório', 'The emulator']);
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
+  await page.waitFor(() => document.documentElement.lang === 'en');
+  await page.dialogButton('Copy Link');
+  await page.waitNoDialog();
+  await page.waitConsole(/Copy Link: the link of 'stopwatch', opening the lab 'stopwatch-emulator' copied, \d+ characters\./);
+
+  // a link that opens the example with its lab (the student's project kept: the link's in a project of its own), the lab at its first step
+  await page.goto(`${env.server.url}/?l=lab#open=example:stopwatch&lab=stopwatch-emulator`);
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
+  await page.waitDialog();
+  const as = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent.trim()).find((t) => t.startsWith('Open as ')));
+  await page.dialogButton(as);
+  await page.waitFor((d) => window.Silinx.active?.id === 'lab:stopwatch-emulator' && document.querySelector(d)?.dataset.ready === '1', [D], { what: 'the link\'s lab', timeout: 60000 });
+  assert.equal(await page.eval(() => window.Silinx.project.name), as.slice('Open as '.length));
+  assert.equal(await ticks(page), '·< · · · ·');
+  // a lab the project has not: said
+  await page.goto(`${env.server.url}/?l=nolab#open=example:isqrt&lab=nope`);
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
+  await page.waitConsole(/WARNING: Open from a link: the project has no lab 'nope' \(Project ▸ Guided Labs… lists its labs\)\./, { timeout: 60000 });
 }, { timeout: 240000 });
