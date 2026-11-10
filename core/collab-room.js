@@ -3,13 +3,16 @@
 // It reads no message (they are sealed with the link's key, which it never sees). What it checks:
 // - a participant's first message: an owner's `open` (a new room), a follower's `join` (a room's id), of this version;
 // - only the owner's updates are forwarded: a follower's are dropped and answered with an error (read only), only
-//   their awareness (who they are, what they look at) goes through;
+//   their awareness (who they are, what they look at) goes through; and, when the owner lets editors in (its open
+//   gives the room's public key, #3182), an editor's edits whose signature is the room's (core/collab-sign.js),
+//   each sender's in its order;
 // - followers per room, rooms per host, the time to the first message;
 // - a room ends with its owner (stopping sharing, or the connection lost): its followers are told and closed.
 // A participant is a socket: send(data, { binary }), close(code, reason), readyState (1: open), as a WebSocket of
 // `ws`; its transport gives each message to `message(data, binary)` and its end to `close()`.
 import { KIND, PROTOCOL } from './collab-client.js';
 import { b64url } from './collab-crypto.js';
+import { verifierOf, verifyFrame, PUB_RE } from './collab-sign.js';
 
 export const ROOM_LIMITS = Object.freeze({ followers: 64, rooms: 32, helloWait: 10_000 });
 
@@ -18,7 +21,8 @@ const json = (ws, msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)
 export const fail = (ws, message) => { json(ws, { type: 'error', message }); ws.close(1008, 'refused'); };
 const clientId = v => (Number.isSafeInteger(v) && v >= 0 ? v : null);
 
-/** Rooms: { rooms (Map: room -> { owner, ownerClient, followers: Map<socket, client> }), welcome(socket, role)
+/** Rooms: { rooms (Map: room -> { owner, ownerClient, followers: Map<socket, client>, verify (a promise of the
+ *  editors' key, or null) }), welcome(socket, role)
  *  -> { message(data, binary), close() }, closeRoom(id, reason) }. role: 'owner' | 'follower'. */
 export function collabRooms({ limits = ROOM_LIMITS } = {}) {
   const rooms = new Map();   // room -> { owner, ownerClient, followers: Map<ws, client> }
@@ -33,6 +37,7 @@ export function collabRooms({ limits = ROOM_LIMITS } = {}) {
 
   function welcome(ws, role) {
     let me = null;   // { role: 'owner' | 'follower', room, client }
+    let chain = Promise.resolve();   // (an editor's edits, checked in their order)
     const hello = setTimeout(() => { if (!me) fail(ws, 'no open nor join'); }, limits.helloWait);
     const message = (data, binary) => {
       if (!me) {
@@ -43,8 +48,11 @@ export function collabRooms({ limits = ROOM_LIMITS } = {}) {
         if (msg.type !== (role === 'owner' ? 'open' : 'join')) return fail(ws, 'not a Silinx participant of this version');
         if (msg.type === 'open') {
           if (rooms.size >= limits.rooms) return fail(ws, `this Silinx server shares ${limits.rooms} projects already`);
+          if (msg.editors !== undefined && !PUB_RE.test(String(msg.editors))) return fail(ws, 'not a Silinx participant of this version');
+          const verify = msg.editors === undefined ? null : verifierOf(msg.editors);
+          verify?.catch(() => {});
           const room = b64url(crypto.getRandomValues(new Uint8Array(16)));
-          rooms.set(room, { owner: ws, ownerClient: msg.client, followers: new Map() });
+          rooms.set(room, { owner: ws, ownerClient: msg.client, followers: new Map(), verify });
           me = { role: 'owner', room, client: msg.client };
           return json(ws, { type: 'opened', room });
         }
@@ -68,8 +76,16 @@ export function collabRooms({ limits = ROOM_LIMITS } = {}) {
       }
       if (!binary) return;
       // a follower: their awareness only (small: their endpoint's maximum); an edit is refused (read only, #3181)
-      if (data[0] !== KIND.awareness) return json(ws, { type: 'error', message: 'read only: a follower cannot change the shared project' });
-      for (const other of [r.owner, ...r.followers.keys()]) if (other !== ws && other.readyState === 1) other.send(data, { binary: true });
+      const others = () => [r.owner, ...r.followers.keys()].filter(o => o !== ws && o.readyState === 1);
+      if (data[0] === KIND.awareness) { for (const o of others()) o.send(data, { binary: true }); return; }
+      if (data[0] !== KIND.edit || !r.verify) return json(ws, { type: 'error', message: 'read only: a follower cannot change the shared project' });
+      // an editor's edit: forwarded once its signature is the room's (in the order they came)
+      const frame = new Uint8Array(data);
+      chain = chain.then(async () => {
+        const ok = await verifyFrame(await r.verify, me.room, frame).catch(() => null);
+        if (!ok) return json(ws, { type: 'error', message: 'read only: this link cannot change the shared project (not an editor\'s)' });
+        if (rooms.get(me.room) === r) for (const o of others()) o.send(frame, { binary: true });
+      });
     };
     const close = () => {
       clearTimeout(hello);

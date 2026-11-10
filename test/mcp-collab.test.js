@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
+import * as Y from 'yjs';
 import { followRoom } from '../core/collab-client.js';
 import { docFile, docProject } from '../core/collab-doc.js';
 import { parseFollowLink, relayUrl } from '../core/collab-link.js';
@@ -48,7 +49,10 @@ test('the tools are listed, with their schemas', () => {
   assert.deepEqual(byName.share_project.inputSchema.required, ['project']);
   assert.deepEqual(byName.share_project.inputSchema.properties.action.enum, ['start', 'status', 'stop']);
   assert.deepEqual(byName.follow_project.inputSchema.required, ['link']);
-  assert.equal(byName.follow_project.annotations.readOnlyHint, true);
+  // (an editor's link writes, #3182)
+  assert.equal(byName.follow_project.annotations.readOnlyHint, false);
+  assert.deepEqual(byName.follow_project.inputSchema.properties.write.required, ['path', 'text']);
+  assert.equal(byName.share_project.inputSchema.properties.editors.type, 'boolean');
 });
 
 test('share_project start: a page follows it (the project, its files, the owner\'s name); a change on disk arrives; status lists the follower; stop ends it', async () => {
@@ -121,4 +125,42 @@ test('the errors: a project not shared, a bad action, no project, a bad server, 
   await fails('follow_project', { link: `http://x/#follow=${'R'.repeat(22)}.${'K'.repeat(43)}.host` }, 'link: a project its owner\'s page hosts (…#follow=….host) is followed in a browser, over WebRTC: open the link in Silinx');
   await fails('follow_project', { link: 'http://x/#design=abc' }, 'link: a link to follow (http(s)://…/#follow=…)');
   await fails('follow_project', { link: `#follow=${'a'.repeat(22)}.${'b'.repeat(43)}` }, 'link: a link to follow (http(s)://…/#follow=…)');
+});
+
+test('#3182 editors: share_project gives an editor\'s link; follow_project write merges a text file\'s edit, written to the disk by the owner, seen by a follower; what an editor may not change: refused, or undone from the disk', async () => {
+  await ok('new_project_from_example', { name: 'trafficEd', example: 'traffic' });
+  const r = await ok('share_project', { project: 'trafficEd', name: 'Ana', server: base, editors: true });
+  const { link, editLink } = r.data;
+  assert.match(editLink, new RegExp(`^${base}/#edit=${parseFollowLink(link).room}\\.[A-Za-z0-9_-]{43}\\.[A-Za-z0-9_-]{129}$`));
+  assert.equal(r.text, `Sharing 'trafficEd' live, read only, as Ana. Anyone with this link follows it (until share_project stop):\n${link}\nAnyone with this one edits its text files too:\n${editLink}`);
+  const l = parseFollowLink(link);
+  const page = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Eva' } });
+  await page.ready;
+  // the MCP client as an editor: a text file written, merged, on the disk, at the follower's
+  const f = await ok('follow_project', { link: editLink, name: 'Bot' });
+  assert.equal(f.data.editor, true);
+  assert.ok(f.text.startsWith('Following Ana\'s project \'trafficEd\' (an editor: its text files).'), f.text);
+  const timer = await P.readFile('trafficEd', 'src/timer.vhd');
+  const w = await ok('follow_project', { link: editLink, write: { path: 'src/timer.vhd', text: `-- by Bot\n${timer}` } });
+  assert.ok(w.text.includes('Wrote src/timer.vhd (merged as this participant\'s edit).'), w.text);
+  await until(async () => (await P.readFile('trafficEd', 'src/timer.vhd')) === `-- by Bot\n${timer}`, 'the edit on the disk', 8000);
+  await until(() => docFile(page.doc, 'src/timer.vhd') === `-- by Bot\n${timer}`, 'the edit at the follower\'s');
+  // refused: a drawing, a new file, a follower's link
+  await fails('follow_project', { link: editLink, write: { path: 'src/traffic.fsm.json', text: '{}' } }, 'write: src/traffic.fsm.json: not a text file of the project that an editor can change');
+  await fails('follow_project', { link: editLink, write: { path: 'src/new.vhd', text: 'x' } }, 'write: src/new.vhd: not a text file of the project that an editor can change');
+  await fails('follow_project', { link, write: { path: 'src/timer.vhd', text: 'x' } }, 'write: this link follows only (an editor\'s link, …#edit=…, writes)');
+  // undone by the owner, from the disk: the HDL a drawing generates (the drawing's), a file an editor's page made
+  const lamps = await P.readFile('trafficEd', 'src/traffic.vhd');
+  await ok('follow_project', { link: editLink, write: { path: 'src/traffic.vhd', text: `-- mine\n${lamps}` } });
+  const ed = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, sign: parseFollowLink(editLink).sign, user: { name: 'Rui' } });
+  await ed.ready;
+  ed.doc.transact(() => ed.doc.getMap('files').set('src/evil.vhd', new Y.Text('entity evil is end;\n')));
+  await until(() => docFile(page.doc, 'src/traffic.vhd') === lamps && docFile(ed.doc, 'src/evil.vhd') === null && docFile(page.doc, 'src/evil.vhd') === null, 'both undone', 8000);
+  assert.equal(await P.readFile('trafficEd', 'src/traffic.vhd'), lamps);
+  assert.equal(fs.existsSync(path.join(P.projectDir('trafficEd'), 'src/evil.vhd')), false);
+  assert.equal(await P.readFile('trafficEd', 'src/timer.vhd'), `-- by Bot\n${timer}`, 'the allowed edit kept');
+  await ed.close();
+  await ok('follow_project', { link: editLink, stop: true });
+  await ok('share_project', { project: 'trafficEd', action: 'stop' });
+  await until(() => page.closed(), 'the page told');
 });

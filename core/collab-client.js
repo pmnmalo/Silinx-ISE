@@ -9,15 +9,19 @@
 //                                    the relay's { type: 'join' | 'leave', client }, { type: 'closed', reason },
 //                                    { type: 'error', message }; the owner's { type: 'close' }
 //   binary frames, sealed (core/collab-crypto.js): KIND.update (a Yjs update: the owner's only, the relay drops a
-//                                    follower's), KIND.awareness (y-protocols' awareness: who is in, their view)
+//                                    follower's), KIND.awareness (y-protocols' awareness: who is in, their view),
+//                                    KIND.edit (an editor's Yjs update, signed with the editor link's key:
+//                                    core/collab-sign.js; forwarded and applied only when its signature is the room's,
+//                                    #3182; the room's public key in the owner's open, and in the document's meta)
 // The relay never reads them: a hosted one, for the browser edition, can be the same.
 import * as Y from 'yjs';
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
 import { newKey, keyOf, seal, unseal } from './collab-crypto.js';
+import { newSigner, signerOf, verifierOf, signFrame, verifyFrame } from './collab-sign.js';
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;   // (2: an editor's signed edits, #3182)
 export const SUBPROTOCOL = 'silinx-collab';   // (the WebSockets', server/collab-relay.js's)
-export const KIND = Object.freeze({ update: 1, awareness: 2 });
+export const KIND = Object.freeze({ update: 1, awareness: 2, edit: 3 });
 /** The colours of the participants, by their client id. */
 export const COLORS = ['#d9480f', '#1971c2', '#2f9e44', '#9c36b5', '#e8590c', '#0c8599', '#c2255c', '#5c940d'];
 export const colorOf = client => COLORS[Math.abs(Number(client) || 0) % COLORS.length];
@@ -65,7 +69,8 @@ function peersOf(awareness, owner) {
   const out = [];
   for (const [client, st] of awareness.getStates()) {
     if (client === awareness.clientID || !st?.user) continue;
-    out.push({ client, name: String(st.user.name || '').slice(0, 64) || '?', color: colorOf(client), role: client === owner ? 'owner' : 'follower', view: viewOf(st.view) });
+    // (an editor as it says: the room checks its edits, not its name)
+    out.push({ client, name: String(st.user.name || '').slice(0, 64) || '?', color: colorOf(client), role: client === owner ? 'owner' : st.role === 'editor' ? 'editor' : 'follower', view: viewOf(st.view) });
   }
   return out.sort((a, b) => (a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : a.name.localeCompare(b.name)));
 }
@@ -89,14 +94,30 @@ function participant({ c, room, key, doc, awareness, owner, onEvent }) {
       if (JSON.stringify(st?.view ?? null) !== JSON.stringify(v)) awareness.setLocalStateField('view', v);
     },
     closed: () => c.ws.readyState >= 2,
+    /** Once what this participant sent before is on its way. */
+    flush: () => c.frame(() => null),
   };
 }
 
+// an editor's edit, at its arrival: applied when its signature is the room's (the key: `verifier()`)
+async function applyEdit(doc, key, room, verifier, frame) {
+  const v = await verifier();
+  const f = v && await verifyFrame(v, room, frame);
+  if (!f) return false;
+  const { bytes } = await unseal(key, room, f);
+  Y.applyUpdate(doc, bytes, 'remote');
+  return true;
+}
+
 /** The owner shares `doc`: the room opened on the relay at `url` (its share endpoint, with the server's token).
- *  Returns { room, key (the link's), peers(), setView(), close(), ... }. onEvent({ type: 'peers' | 'closed' |
- *  'error', ... }). */
-export async function shareRoom({ url, token = null, doc, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {} }) {
+ *  Returns { room, key (the link's), editKey (an editor link's, with `editors`), peers(), setView(), close(), ... }.
+ *  onEvent({ type: 'peers' | 'closed' | 'error', ... }). editors: editors may change it (their link signs, #3182). */
+export async function shareRoom({ url, token = null, doc, user, editors = false, WebSocket: WS = globalThis.WebSocket, onEvent = () => {} }) {
   const { key, text } = await newKey();
+  const signer = editors ? await newSigner() : null;
+  // (the room's public key, for every participant: in the document)
+  if (signer) doc.getMap('meta').set('editors', signer.pub); else doc.getMap('meta').delete('editors');
+  const verifier = signer ? await verifierOf(signer.pub) : null;
   const awareness = new Awareness(doc);
   awareness.setLocalState({ user, role: 'owner', view: null });
   let p = null;
@@ -109,12 +130,13 @@ export async function shareRoom({ url, token = null, doc, user, WebSocket: WS = 
     else if (msg.type === 'closed') c.closedReason = msg.reason;
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
   }, async frame => {
+    if (frame[0] === KIND.edit) { await applyEdit(doc, key, p.room, () => verifier, frame).catch(() => false); return; }
     const { kind, bytes } = await unseal(key, p.room, frame);
     if (kind === KIND.awareness) applyAwarenessUpdate(awareness, bytes, 'remote');   // (a follower's update: never applied)
   });
   try { await c.opened; } catch (e) { awareness.destroy(); throw e; }
   const answer = firstAnswer(c, 'opened');
-  c.control({ type: 'open', v: PROTOCOL, client: doc.clientID });
+  c.control({ type: 'open', v: PROTOCOL, client: doc.clientID, ...(signer ? { editors: signer.pub } : {}) });
   let room;
   try { ({ room } = await answer); } catch (e) { awareness.destroy(); c.ws.close(); throw e; }
   p = participant({ c, room, key, doc, awareness, owner: doc.clientID, onEvent });
@@ -122,19 +144,29 @@ export async function shareRoom({ url, token = null, doc, user, WebSocket: WS = 
   doc.on('update', onUpdate);
   c.ws.addEventListener('close', () => doc.off('update', onUpdate), { once: true });
   return {
-    ...p, key: text,
+    ...p, key: text, editKey: signer?.text || null,
     /** Stops sharing: the room closed for everyone. */
     close: async () => { c.closedReason = 'sharing stopped'; c.control({ type: 'close' }); await c.frame(() => null); c.ws.close(); },
   };
 }
 
 /** A follower joins a room with its link's key: { doc (the project, as it arrives), ready (resolves once it has
- *  arrived), peers(), owner(), setView(), close() }. Read only: nothing it does reaches the owner but its view. */
-export async function followRoom({ url, room, key: keyText, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {} }) {
+ *  arrived), peers(), owner(), setView(), close() }. Read only: nothing it does reaches the owner but its view. With
+ *  `sign` (an editor link's key, #3182), an editor: what changes in its document (core/collab-doc.js editFile) is
+ *  sent, signed, to everyone. */
+export async function followRoom({ url, room, key: keyText, sign = null, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {} }) {
   const key = await keyOf(keyText);
+  const signer = sign ? await signerOf(sign) : null;
   const doc = new Y.Doc();
   const awareness = new Awareness(doc);
-  awareness.setLocalState({ user, role: 'follower', view: null });
+  awareness.setLocalState({ user, role: signer ? 'editor' : 'follower', view: null });
+  // (the room's public key, from the owner's document: an editor's edit checked with it)
+  let verifier = null, verifierPub = null;
+  const verifierOfDoc = async () => {
+    const pub = doc.getMap('meta').get('editors');
+    if (pub !== verifierPub) { verifierPub = pub; verifier = typeof pub === 'string' ? await verifierOf(pub).catch(() => null) : null; }
+    return verifier;
+  };
   let synced, failed = null;
   const ready = new Promise((resolve, reject) => { synced = resolve; failed = reject; });
   ready.catch(() => {});
@@ -145,6 +177,7 @@ export async function followRoom({ url, room, key: keyText, user, WebSocket: WS 
     else if (msg.type === 'closed') c.closedReason = msg.reason;
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
   }, async frame => {
+    if (frame[0] === KIND.edit) { await applyEdit(doc, key, room, verifierOfDoc, frame).catch(() => false); return; }
     let m;
     try { m = await unseal(key, room, frame); } catch (e) {
       if (!warned) { warned = true; onEvent({ type: 'error', message: e.message }); failed(e); }
@@ -161,8 +194,14 @@ export async function followRoom({ url, room, key: keyText, user, WebSocket: WS 
   const p = participant({ c, room, key, doc, awareness, owner: Number(owner), onEvent });
   c.ws.addEventListener('close', () => failed(new Error(c.closedReason || 'the connection to the relay ended')), { once: true });
   p.send(KIND.awareness, encodeAwarenessUpdate(awareness, [doc.clientID]));
+  // an editor's own changes, signed (what arrives is 'remote': never sent again)
+  if (signer) {
+    const onUpdate = (u, origin) => { if (origin !== 'remote') c.frame(async () => signFrame(signer, room, await seal(key, room, KIND.edit, u))); };
+    doc.on('update', onUpdate);
+    c.ws.addEventListener('close', () => doc.off('update', onUpdate), { once: true });
+  }
   return {
-    ...p, ready,
+    ...p, ready, editor: !!signer,
     owner: () => p.peers().find(x => x.role === 'owner') || null,
     close: async () => { await c.frame(() => null); c.ws.close(); },
   };
