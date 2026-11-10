@@ -133,6 +133,9 @@ export function setupMenus() {
         ? { label: 'Unset as Top Module', action: () => unsetTop() }
         : { label: 'Set as Top Module', action: () => (S.sel?.module ? setTop(S.sel.module, false) : viewSel() && setViewAsTop(viewSel())), disabled: () => !S.sel?.module && !viewSel() }),
       { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
+      '-',
+      // (step-by-step tutorials on the project, each step checked on it, #3179)
+      { label: 'Guided Labs…', icon: icon('help'), action: async () => (await import('./lab-view.js')).guidedLabsDialog(), disabled: hasPj },
     ] },
     { label: 'Process', items: () => [
       { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy || !toolHas('impl') },

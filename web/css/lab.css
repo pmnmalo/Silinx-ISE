@@ -1,0 +1,47 @@
+/* A guided lab (#3179, web/js/lab-view.js): its toolbar (the editors', asm-editor.css), the step shown, the Steps side
+   panel on the right as the editors' Properties (folded by side-fold.js; on a narrow window over the page, shown by the
+   toolbar's ☰ Steps, narrow.js), its status line (status-line.css). The lab list of Project ▸ Guided Labs…. */
+.lab { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--panel); color: var(--fg); }
+.lab-main { flex: 1; display: flex; min-height: 0; position: relative; }
+.lab-page { flex: 1; min-width: 0; overflow: auto; padding: 16px 24px; line-height: 1.5; font-size: 13px; max-width: 760px; }
+.lab-intro { color: var(--muted); margin: 0 0 14px; }
+.lab-num { color: var(--muted); font-size: 12px; }
+.lab-title { margin: 2px 0 10px; font-size: 17px; }
+.lab-done { color: var(--success); font-size: 13px; font-weight: normal; }
+.lab-text code, .lab-hint code, .lab-intro code { font-family: var(--mono); background: var(--panel-alt); border: 1px solid var(--border-light); border-radius: 3px; padding: 0 3px; }
+.lab-hint { margin-top: 12px; padding: 8px 10px; border-left: 3px solid var(--warning); background: var(--panel-alt); }
+.lab-side { width: 260px; flex: none; overflow: auto; border-left: 1px solid var(--border-light); font-size: 12px; background: var(--panel); }
+.lab-side .asm-cap {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: 20px; padding: 2px 6px;
+  background: var(--title-grad); color: var(--title-fg); font-weight: bold; border-bottom: 1px solid #99bbe8; white-space: nowrap;
+}
+.lab-side .asm-cap .sp { flex: 1; }
+.lab-side .asm-fold { border: 0; background: none; padding: 0 2px; margin-right: -2px; color: inherit; display: inline-flex; align-items: center; cursor: pointer; opacity: .75; }
+.lab-side .asm-fold:hover { opacity: 1; }
+.lab-steps { list-style: none; margin: 0; padding: 4px 0; }
+.lab-step { display: flex; align-items: center; gap: 8px; padding: 4px 8px; cursor: pointer; }
+.lab-step:hover { background: var(--hover); }
+.lab-step.current { background: var(--hover); outline: 1px solid var(--accent); outline-offset: -1px; }
+.lab-tick { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); }
+.lab-step.done .lab-tick { background: var(--success); border-color: var(--success); color: #fff; }
+@media (min-width: 1024px) {
+  .lab.props-folded .lab-side { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+  .lab.props-folded .lab-side > :not(.asm-cap) { display: none; }
+  .lab.props-folded .lab-side .asm-cap {
+    flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px; border-bottom: 0; align-items: center;
+  }
+  .lab.props-folded .lab-side .asm-cap .sp { display: none; }
+  .lab.props-folded .lab-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+}
+@media (max-width: 1023px) {
+  .lab-side .asm-fold { display: none; }
+  .lab-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(260px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
+  .lab:not(.side-open) .lab-side { display: none; }
+  .lab-page { padding: 12px 14px; }
+}
+.lab-list { display: flex; flex-direction: column; gap: 6px; }
+.lab-pick { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; text-align: left; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; }
+.lab-pick:hover { background: var(--hover); border-color: var(--accent); }
+.lab-pick-title { font-weight: bold; }
+.lab-pick-from { grid-column: 1; color: var(--muted); font-size: 11px; }
+.lab-pick-done { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--muted); }
