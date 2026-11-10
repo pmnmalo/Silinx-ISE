@@ -65,6 +65,8 @@ export const api = {
   // shared projects (#3181): this server's relay (server/collab-relay.js) opens a room with the token
   collab: true,
   collabToken: async () => { await READY; return TOKEN; },
+  // (the other relays its pages may use: config.json's relay.relays, #3227)
+  collabRelays: async () => (await req('GET', '/api/collab/relays')).relays,
   projects: () => req('GET', '/api/projects'),
   workspace: () => req('GET', '/api/workspace'),
   templates: () => req('GET', '/api/templates'),

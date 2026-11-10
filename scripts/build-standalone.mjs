@@ -20,8 +20,9 @@ import { fileURLToPath } from 'node:url';
 import { buildInfo, devChanges } from './build-info.mjs';
 import { VERSION, versionLabel } from '../core/version.js';
 import { THIRD_PARTY } from '../core/third-party.js';
-import { contentSecurityPolicy, inlineScriptHashes, withMetaCsp } from '../server/csp.js';
+import { contentSecurityPolicy, inlineScriptHashes, withMetaCsp, relaySources } from '../server/csp.js';
 import { withManifestLink, writePwa } from './pwa.mjs';
+import { relayList } from '../core/collab-link.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'dist', 'Silinx.html');
@@ -135,7 +136,10 @@ const plugin = {
 // a development build's changes since the last release, its Development menu (#707): a release has none
 if (BUILD) Object.assign(BUILD, await devChanges(ROOT));
 console.log(`Version: ${VERSION}${BUILD ? ` (development build dev:${BUILD.commit}, ${BUILD.changes.length} change(s) since ${BUILD.since})` : ''}`);
-const define = { __SILINX_BUILD__: JSON.stringify(BUILD) };
+// the relays the edition's shared projects may go through (#3227): set when it is built, none by default; in its
+// Content-Security-Policy and its page's list (web/js/api-local.js collabRelays)
+const SITE_RELAYS = relayList(process.env.SILINX_SITE_RELAYS, 'SILINX_SITE_RELAYS');
+const define = { __SILINX_BUILD__: JSON.stringify(BUILD), __SILINX_SITE_RELAYS__: JSON.stringify(SITE_RELAYS) };
 const res = await esbuild.build({
   entryPoints: [path.join(ROOT, 'web/js/app.js')],
   bundle: true, format: 'esm', minify: true, write: false, target: 'es2022', plugins: [plugin], logLevel: 'warning', define,
@@ -197,7 +201,7 @@ if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inser
   // (the GitHub sign-in's relay, when the edition has one: web/js/github-app.js, #3196)
   const { GITHUB_DEVICE_RELAY, relayOrigin } = await import('../web/js/github-app.js');
   const relay = relayOrigin(GITHUB_DEVICE_RELAY);
-  html = withMetaCsp(html, contentSecurityPolicy({ hashes: inlineScriptHashes(html), scripts: [origin], connect: [origin, ...(relay ? [relay] : [])], meta: true }));
+  html = withMetaCsp(html, contentSecurityPolicy({ hashes: inlineScriptHashes(html), scripts: [origin], connect: [origin, ...(relay ? [relay] : []), ...relaySources(SITE_RELAYS)], meta: true }));
 }
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);

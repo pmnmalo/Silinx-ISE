@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { contentSecurityPolicy, inlineScriptHashes, scriptHash, withMetaCsp, metaCsp, addSources } from '../server/csp.js';
+import { contentSecurityPolicy, inlineScriptHashes, scriptHash, withMetaCsp, metaCsp, addSources, relaySources } from '../server/csp.js';
+import { relayList } from '../core/collab-link.js';
 import { addAnalytics } from '../scripts/site-analytics.mjs';
 import './ui/core-hooks.js';   // (/core/… of the browser's modules)
 
@@ -95,4 +96,13 @@ test('#487 the assets\' URLs of a built page: its version\'s folder next to the 
   assert.equal(assetsBase({ protocol: 'http:', href: 'http://127.0.0.1:8/' }), 'http://127.0.0.1:8/assets/');
   assert.equal(assetsRoot('http://127.0.0.1:8/assets/'), 'http://127.0.0.1:8/assets/');
   assert.equal(yosysBundleUrl('http://127.0.0.1:8/assets/'), 'http://127.0.0.1:8/assets/vendor/yowasp-yosys/gen/bundle.js');
+});
+
+test('#3227 the relays a page may use: each its origin and its WebSockets\' in connect-src, as the build lists them (SILINX_SITE_RELAYS); none by default', () => {
+  assert.deepEqual(relaySources([]), []);
+  assert.deepEqual(relaySources(relayList('https://relay.example.org/x http://127.0.0.1:8642')), ['https://relay.example.org', 'wss://relay.example.org', 'http://127.0.0.1:8642', 'ws://127.0.0.1:8642']);
+  const page = directives(contentSecurityPolicy({ connect: ['https://site.example', ...relaySources(relayList('https://relay.example.org'))], meta: true }));
+  assert.deepEqual(page['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', 'https://site.example', 'https://relay.example.org', 'wss://relay.example.org']);
+  // (never a scheme alone: no other WebSocket server reached)
+  for (const csp of [contentSecurityPolicy({}), contentSecurityPolicy({ connect: relaySources(relayList('https://relay.example.org')) })]) assert.ok(!directives(csp)['connect-src'].some((c) => /^wss?:$/.test(c)));
 });
