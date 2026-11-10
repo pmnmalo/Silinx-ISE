@@ -1,10 +1,11 @@
 // Git in the browser edition (#3196): the api's git functions (as web/js/api.js's of the server editions, #3195) through
 // GitHub's REST API (core/git-rest.js), on the projects of the storage in use (web/js/project-store.js: the browser's,
-// or a folder on the disk); the GitHub sign-in (OAuth's device flow, web/js/github-app.js's OAuth App). The token is kept
+// or a folder on the disk); the GitHub sign-in (OAuth's device flow through web/js/github-app.js's relay, else a pasted
+// fine-grained personal access token, checked with GitHub's API before it is kept). The token is kept
 // in this browser only (localStorage), sent only to GitHub's API in a header; never in a URL, never in a message; Sign
 // out forgets it. What a project was at its last commit or pull is kept beside the storage (localStorage, one key per
 // project of each storage).
-import { githubClient, startDeviceFlow, pollDeviceFlow } from '../../core/github-api.js';
+import { githubClient, startDeviceFlow, pollDeviceFlow, GitHubError } from '../../core/github-api.js';
 import { restGit } from '../../core/git-rest.js';
 import { markUntrusted } from '../../core/trust.js';
 import { githubSettings } from './github-app.js';
@@ -71,6 +72,16 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
 
     // ---- the sign-in
     githubSignedIn: () => !!token(),
+    /** How this edition signs in: 'device' (the device flow, through the relay) or 'token' (a pasted token). */
+    githubSignInWay: () => githubSettings().signIn,
+    /** A pasted fine-grained personal access token: checked with GitHub (its user), then kept -> { login }. */
+    githubSetToken: async (pasted) => {
+      const t = String(pasted ?? '').trim();
+      if (!/^[A-Za-z0-9_]{20,255}$/.test(t)) throw new GitHubError('that is not a GitHub token', 'Paste the token GitHub showed when it was generated (github_pat_…).', 400);
+      const me = await githubClient({ fetch: (...a) => globalThis.fetch(...a), token: () => t, api: githubSettings().api, hints: { again: 'GitHub refused this token: check it was copied whole, and that it has not expired.' } }).request('GET', '/user');
+      put(TOKEN, t);
+      return { signedIn: true, login: String(me?.login || '') };
+    },
     /** Sign in with GitHub (the device flow): onCode({ userCode, verificationUri }) shows the code; signal: Cancel. */
     githubSignIn: async ({ onCode, signal } = {}) => {
       const s = githubSettings();

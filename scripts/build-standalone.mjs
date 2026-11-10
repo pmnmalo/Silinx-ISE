@@ -194,7 +194,10 @@ if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inser
 // single file also loads Yosys from the assets' site and fetches the assets from it
 {
   const origin = new URL(LAYOUT.site).origin;
-  html = withMetaCsp(html, contentSecurityPolicy({ hashes: inlineScriptHashes(html), scripts: [origin], connect: [origin], meta: true }));
+  // (the GitHub sign-in's relay, when the edition has one: web/js/github-app.js, #3196)
+  const { GITHUB_DEVICE_RELAY, relayOrigin } = await import('../web/js/github-app.js');
+  const relay = relayOrigin(GITHUB_DEVICE_RELAY);
+  html = withMetaCsp(html, contentSecurityPolicy({ hashes: inlineScriptHashes(html), scripts: [origin], connect: [origin, ...(relay ? [relay] : [])], meta: true }));
 }
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);

@@ -25,6 +25,13 @@ export const GIT_PT = {
   'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub…, kept in this browser only.':
     'Um repositório público abre-se tal como está; um privado (o de um trabalho do Classroom) depois de Iniciar sessão no GitHub…, guardada só neste navegador.',
   'GitHub repository (an empty one: where the commits go):': 'Repositório do GitHub (um vazio: para onde vão os commits):',
+  // the sign-in with a token (#3196)
+  'Sign in with a fine-grained personal access token of your GitHub account:': 'Inicie sessão com um token de acesso pessoal de granularidade fina da sua conta do GitHub:',
+  'Open GitHub\'s page for a new token:': 'Abra a página do GitHub para um novo token:',
+  'Repository access: Only select repositories (the ones to open in Silinx).': 'Acesso aos repositórios: Only select repositories (os que vai abrir no Silinx).',
+  'Repository permissions: Contents, Read and write (Metadata, Read-only, comes with it).': 'Permissões dos repositórios: Contents, Read and write (Metadata, Read-only, vem com ela).',
+  'Generate the token, copy it and paste it here.': 'Gere o token, copie-o e cole-o aqui.',
+  'Sign In': 'Iniciar Sessão',
 };
 
 export const GIT_PT_PATTERNS = [
