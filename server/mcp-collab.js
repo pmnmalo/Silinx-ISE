@@ -82,7 +82,7 @@ export const COLLAB_TOOLS = [
       publishProject(doc, { ...await readAll(name), owner });
       let session;
       try {
-        session = await shareRoom({ url: relayUrl(origin), token: await tokenOf(origin), doc, user: { name: owner }, WebSocket: await WebSocketImpl() });
+        session = await shareRoom({ url: relayUrl(origin, 'share'), token: await tokenOf(origin), doc, user: { name: owner }, WebSocket: await WebSocketImpl() });
       } catch (e) { throw toolError(`cannot share through ${origin}: ${e.message} (is Silinx running there? silinx serve)`); }
       // (what changes on disk, published again; the relay's end, the share's)
       const { createProjectWatcher } = await import('./project-watch.js');
@@ -120,7 +120,7 @@ export const COLLAB_TOOLS = [
       if (!cur) {
         let session;
         try {
-          session = await followRoom({ url: relayUrl(origin), room: l.room, key: l.key, user: { name: cleanName(who) || 'MCP agent' }, WebSocket: await WebSocketImpl() });
+          session = await followRoom({ url: relayUrl(origin, 'follow'), room: l.room, key: l.key, user: { name: cleanName(who) || 'MCP agent' }, WebSocket: await WebSocketImpl() });
           await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
         } catch (e) { session?.close(); throw toolError(`cannot follow: ${e.message}`); }
         // (who is in it comes right after the project: the owner awaited a little)

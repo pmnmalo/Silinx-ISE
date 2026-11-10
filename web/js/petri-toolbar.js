@@ -44,7 +44,7 @@ export function mountPetriToolbar(ctx) {
   const info = statusLine();   // (the net's counts and its tokens: in its status line, #2763)
   const more = toolbarMenu([tabBtns.analysis,
     btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M().name}.pnml`, toPnml(M()), 'application/xml')),
-    btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()),
+    btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click(), 'pn-pnml-in'),
   ], { title: 'Analysis and PNML', btnClass: 'asm-btn' });
   const toolbar = h('div', { class: 'asm-toolbar pn-toolbar' },
     h('div', { class: 'asm-group' }, ...Object.values(tools)), sep(),

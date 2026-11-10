@@ -16,15 +16,5 @@ export const followNotice = () => (following()
   ? h('span', { class: 'gen-banner read-only', 'data-follow-notice': '' }, `Read-only, following ${collab.owner}'s project`)
   : null);
 
-/** The follower's notice put at the right end of a drawing editor's toolbar that takes none (the truth table's, the
- *  Petri net's: before its ⋮ menu); their edits are not kept (web/js/app.js setDirty), their read-only mode is #3181's
- *  next step. */
-export function placeFollowNotice(root) {
-  const bar = following() && root.querySelector('.tt-toolbar, .pn-toolbar');
-  if (!bar) return;
-  const more = [...bar.children].find(e => e.classList.contains('tb-more'));
-  bar.insertBefore(followNotice(), more || null);
-}
-
 /** The error of a change a follower's page refuses. */
 export const readOnlyError = () => Object.assign(new Error(`read only: you follow ${collab.owner}'s project (its owner edits it)`), { status: 403, readOnly: true });

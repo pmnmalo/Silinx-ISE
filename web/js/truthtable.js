@@ -13,7 +13,8 @@
 // (#2951: its HDL logic; least gates by default); its language is the project's (#696).
 //
 //   const ed = mountTtEditor(host, { model, onChange(model), onFromModule(), linkInfo() -> { file, why } | null,
-//                                    onOpenFile(path) });
+//                                    onOpenFile(path), readOnly, banner });
+//   (readOnly: a table to read, a shared project followed, #3181: tt-readonly.js; its notice, `banner`)
 //   ed.getModel(), ed.setModel(m), ed.setLink(file), ed.destroy()
 // Styles: web/css/truthtable.css.
 import { h, linkModel, linkSnapshot } from './ui.js';
@@ -29,6 +30,7 @@ import { domSnapshot } from './print-view.js';
 import { t as tr } from './i18n.js';
 import { statusLine } from './status-line.js';
 import { renderTtResults } from './tt-results.js';
+import { ttReadOnlyChrome, lockTt } from './tt-readonly.js';
 
 const NEXT = { 0: '1', 1: 'X', X: '0' };
 const COLORS = ['#d62728', '#1f77b4', '#2ca02c', '#9467bd', '#ff7f0e', '#17becf', '#e377c2', '#8c564b', '#bcbd22', '#7f7f7f'];
@@ -80,6 +82,7 @@ export function mountTtEditor(container, opts = {}) {
   let groups = 'sop';            // groups drawn on the K-map: 'sop' (1s) or 'pos' (0s)
   let notation = 'slash';         // of the expressions shown (#434)
   let destroyed = false;
+  const readOnly = !!opts.readOnly;
   // Undo / Redo: snapshots of the table (the notes typed are one step per pause)
   const hist = [JSON.stringify(M)];
   let hi = 0;
@@ -181,6 +184,7 @@ export function mountTtEditor(container, opts = {}) {
     h('div', { class: 'tt-caption' }, 'Results'), results);
   const status = statusLine();   // (its inputs, outputs and rows, #2763)
   root.append(toolbar, h('div', { class: 'tt-body' }, left, right), status.el);
+  if (readOnly) ttReadOnlyChrome({ root, toolbar, fields: [inIn, outIn, notes, exprIn], hide: [more.el, exprRow.querySelector('.tt-btn'), left.querySelector(':scope > .hint')], banner: opts.banner });
   root.tabIndex = -1;
   root.addEventListener('keydown', e => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;   // (their own undo)
@@ -191,7 +195,8 @@ export function mountTtEditor(container, opts = {}) {
 
   // ------------------------------------------------------------------ rendering
   let A = null;   // analysis of the selected output
-  const changed = (user) => { snap(); render(); opts.onChange?.(M, user ? { user: true } : undefined); };   // (user: in a dialog, the main toolbar's Undo's, #2505)
+  const changed = (user) => { if (readOnly) { M = normalizeTable(JSON.parse(hist[hi])); render(); return; }   // (read only: nothing changes)
+    snap(); render(); opts.onChange?.(M, user ? { user: true } : undefined); };   // (user: in a dialog, the main toolbar's Undo's, #2505)
   const cycle = (o, r) => {
     const c = M.table[o][r];
     M.table[o] = M.table[o].slice(0, r) + NEXT[c] + M.table[o].slice(r + 1);
@@ -292,12 +297,13 @@ export function mountTtEditor(container, opts = {}) {
     });
     if (!res.terms.length) leg.append(h('div', { class: 'hint' }, groups === 'pos' ? 'No 0s: no groups (the output is always 1).' : 'No 1s: no groups (the output is always 0).'));
     kmapHost.append(leg);
+    lockTt(readOnly, root);
   }
   const termAst = r => { const lit = l => (l.neg ? { t: 'not', a: { t: 'var', name: M.inputs[l.v] } } : { t: 'var', name: M.inputs[l.v] }); const ls = r.terms[0].literals; return ls.length === 0 ? { t: 'const', v: 1 } : ls.length === 1 ? lit(ls[0]) : { t: 'and', args: ls.map(lit) }; };
   const clauseAst = r => { const lit = l => (l.neg ? { t: 'var', name: M.inputs[l.v] } : { t: 'not', a: { t: 'var', name: M.inputs[l.v] } }); const ls = r.terms[0].literals; return ls.length === 0 ? { t: 'const', v: 0 } : ls.length === 1 ? lit(ls[0]) : { t: 'or', args: ls.map(lit) }; };
 
-  const renderResults = () => renderTtResults({ results, M: () => M, out: () => out, A: () => A, notation: () => notation, setNotation: v => { notation = v; },
-    setM: m => { M = m; }, changed, renderKmap, renderResults });
+  const renderResults = () => { renderTtResults({ results, M: () => M, out: () => out, A: () => A, notation: () => notation, setNotation: v => { notation = v; },
+    setM: m => { M = m; }, changed, renderKmap, renderResults }); lockTt(readOnly, results); };
 
   function renderLink() {
     link.innerHTML = '';

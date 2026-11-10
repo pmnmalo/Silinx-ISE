@@ -60,7 +60,7 @@ export async function startSharing(name) {
   const project = S.project.name;
   const doc = projectDoc();
   publishProject(doc, { ...await readAll(project), owner: name });
-  const session = await shareRoom({ url: relayUrl(location.href), token: await api.collabToken(), doc, user: { name }, onEvent: ev => onEvent(ev) });
+  const session = await shareRoom({ url: relayUrl(location.href, 'share'), token: await api.collabToken(), doc, user: { name }, onEvent: ev => onEvent(ev) });
   share = { name, project, session, doc, link: followLink(location.origin + location.pathname, session.room, session.key), known: new Map(), view: null };
   Object.assign(collab, { role: 'owner', owner: name, project, session });
   share.restore = hookApi(project, doc);

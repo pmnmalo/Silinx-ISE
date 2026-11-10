@@ -26,11 +26,13 @@ export function parseFollowLink(text) {
   return { base: at > 0 ? s.slice(0, at) : null, room: m[1], key: m[2] };
 }
 
-/** The relay's WebSocket address of a Silinx address (http -> ws, https -> wss). */
-export function relayUrl(base) {
+/** The relay's WebSocket address of a Silinx address (http -> ws, https -> wss), for a role: 'share' (the owner's) or
+ *  'follow' (a follower's). */
+export function relayUrl(base, role) {
+  if (role !== 'share' && role !== 'follow') throw new Error(`relayUrl: a role, share or follow (not ${role})`);
   const u = new URL(base);
   u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
-  u.pathname = '/api/collab';
+  u.pathname = `/api/collab/${role}`;
   u.search = '';
   u.hash = '';
   return u.href;
