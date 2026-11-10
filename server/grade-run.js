@@ -27,6 +27,8 @@ if (job.type === 'reference') {
     synth ||= await import('./grade-synth.js');
     return synth.synthesize(sources, top, test, { ...(ex.device && { device: ex.device }), status: job.synthesis });
   };
-  await gradeTests(ex, submission, { from: job.from || 0, vectors: job.vectors || {}, exerciseUnits, synthesize, prepared: prep,
+  // (the equivalence tests' Yosys, #3217)
+  const yosys = async (...a) => (await import('../packages/silinx-fpga/src/node.js')).yosysNode(...a);
+  await gradeTests(ex, submission, { from: job.from || 0, vectors: job.vectors || {}, exerciseUnits, synthesize, yosys, prepared: prep,
     onStart: k => send({ type: 'start', k }), onTest: (k, result) => send({ type: 'test', k, result }) });
 }

@@ -165,3 +165,30 @@ uiTest('#3192 New Exercise: a project with no exercise gets one of its top, its 
   await page.click(`${D} .ex-bar .asm-btn`, { text: 'Run Visible Tests' });
   await page.waitConsole(/ERROR: counter4\.exercise\.json: test 1: the vectors have no row[^]*Process "Run Tests" failed: the exercise has problems\./);
 }, { timeout: 120000 });
+
+uiTest('#3217 an equivalence test: the design proved equivalent to the reference in the page\'s Yosys, a wrong one\'s first difference; its depth in the Properties', E, async (page) => {
+  const ex = JSON.parse(read('counter4.exercise.json'));
+  ex.tests = [{ id: 'same', title: 'Equivalent to the reference', visible: true, points: 20, kind: 'equivalence', depth: 12 }];
+  await makeProject(env, { name: 'eqv', board: 'basys2', top: 'counter4', files: { 'src/counter4.vhd': NO_ENABLE, 'counter4.exercise.json': JSON.stringify(ex, null, 2), 'ref/counter4.vhd': RIGHT } });
+  const pj = await env.server.api('GET', '/api/projects/eqv');
+  delete pj.fileTree;
+  pj.files = pj.files.filter((f) => f.path === 'src/counter4.vhd');
+  await env.server.api('PUT', '/api/projects/eqv', pj);
+  await page.openProject('eqv');
+  await page.menu('Project', 'Exercise…');
+  await page.waitFor((d) => window.Silinx.active?.id === 'exercise:counter4.exercise.json' && document.querySelector(d)?.dataset.ready === '1', [D], { what: 'the exercise' });
+  await page.click(`${D} .ex-test`, { index: 0 });
+  assert.equal(await page.eval((d) => document.querySelector(`${d} [data-prop="test-depth"]`).value, D), '12');
+  const runVisible = async () => {
+    const before = await page.eval(() => window.__console().length);
+    await page.click(`${D} .ex-bar .asm-btn`, { text: 'Run Visible Tests' });
+    await page.waitFor((n) => /Process "Run Visible Tests" (completed|failed)/.test(window.__console().slice(n)), [before], { what: 'the tests run', timeout: 60000 });
+    return page.eval((n) => window.__console().slice(n), before);
+  };
+  let out = await runVisible();
+  assert.match(out, /eqv: 0 \/ 20 points \(Wrong Answer\), the visible tests\n {2}WARNING: "src\/counter4\.vhd" Line 10: Input <en> is never used\.\n {2}- same \(Equivalent to the reference\): WA Wrong Answer, 0 \/ 20\n {6}cycle 2: q is 0001, expected 0000\n {6}the inputs, cycle by cycle: 1: rst=0 en=0; 2: rst=1 en=0\nProcess "Run Visible Tests" completed: 0 \/ 20 points\./, out);
+  await writeWs(env, 'eqv', 'src/counter4.vhd', RIGHT);
+  out = await runVisible();
+  assert.match(out, /eqv: 20 \/ 20 points \(Accepted\), the visible tests\n {2}\+ same \(Equivalent to the reference\): AC Accepted, 20 \/ 20\n {6}equivalent to the reference for every input sequence \(proved by induction over 1 clock cycle\(s\)\)\nProcess "Run Visible Tests" completed: 20 \/ 20 points\./, out);
+  assert.doesNotMatch(out, /WARNING|ERROR/);
+}, { timeout: 120000 });

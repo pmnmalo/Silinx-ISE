@@ -75,6 +75,18 @@ A test is hidden unless it has `"visible": true`. Each test is worth `points` (1
     slices are not checked: the report says so, and the other requirements give the verdict;
   - `warnings: false`: no warning from Check Syntax or the synthesis.
 
+- **equivalence**: the submission's top is proved equivalent to the reference design by Verify Equivalence (Yosys's
+  SAT solver, #3177). The check covers every input sequence, cycle by cycle from the initial state, up to `depth` clock
+  cycles (20 by default, at most 1000), and tries a proof by induction at each depth.
+  - Proved, or no difference within the depth: Accepted, and the report says which.
+  - A difference: a Wrong Answer, with the first cycle that differs, its outputs, and the inputs that lead to it.
+  - A design the check cannot translate: Not Synthesizable.
+  - The test reads the reference, so it is never in the student's copy: the teacher's run grades it.
+
+  ```json
+  { "id": "same", "points": 20, "kind": "equivalence", "depth": 30 }
+  ```
+
 - **check**: the guided labs' step checks (`core/labs-check.js`, #3179: `project`, `file`, `module`, `syntax`,
   `simulate`), as a lab file writes them, in `checks`. The submission passes when every check passes. Otherwise it is a
   Wrong Answer, with the checks' reasons. A lab is an exercise without the grade, so a lab's step can be a graded test.
@@ -88,7 +100,7 @@ A test is hidden unless it has `"visible": true`. Each test is worth `points` (1
 | Code | Verdict | When |
 |------|---------|------|
 | AC | Accepted | the test passes |
-| WA | Wrong Answer | an output differs: the test, the cycle, the signal, expected and obtained, and the cycles around it (a visible test's report only); a test bench's assertion |
+| WA | Wrong Answer | an output differs: the test, the cycle, the signal, expected and obtained, and the cycles around it (a visible test's report only); a test bench's assertion; a difference from the reference that the equivalence check finds |
 | CE | Compile Error | the submission does not compile, a drawing has errors, a listed file is missing |
 | IE | Interface Error | the top's ports are not the statement's, no module of that name, a language, a drawing or the primitives the exercise does not allow, a module named like the exercise's test bench |
 | NS | Not Synthesizable | the open synthesis rejects the design; a warning where none is allowed |

@@ -5,11 +5,14 @@
 //   reference   the exercise's reference design run on seeded random inputs: its outputs are the expected ones
 //   testbench   the teacher's test bench simulated with the submission: its assertions are the test
 //   synthesis   the open synthesis's requirements (synthesizable, no latches, LUTs, flip-flops, slices, warnings)
+//   equivalence the submission's top proved equivalent to the reference design by Verify Equivalence (core/verify.js,
+//               Yosys's SAT: every input sequence, up to `depth` clock cycles or by induction, #3217)
 //   check       the guided labs' step checks (core/labs-check.js CHECKS: project, file, module, syntax, simulate) on the
 //               submission, a lab's step as a test (#3179: a lab is an exercise without the grade)
 // A file's text can be in the exercise ({ path, text }) or in a file beside it ({ path, file }: read relative to the
 // exercise's folder and kept inside it, server/grade.js). The verdicts are VERDICTS. Isomorphic.
 import { CHECKS, pattern } from './labs-check.js';
+import { MAX_DEPTH } from './verify.js';
 
 export const EXERCISE_VERSION = 1;
 export const isExerciseFile = p => /\.exercise\.json$/i.test(String(p || ''));
@@ -30,7 +33,7 @@ export const VERDICTS = Object.freeze({
   RL: 'Resource / Timing Limit',
   GE: 'Grading Error',   // (the grader could not run the test: its setup's, not the submission's; the teacher's to fix)
 });
-export const TEST_KINDS = ['vectors', 'reference', 'testbench', 'synthesis', 'check'];
+export const TEST_KINDS = ['vectors', 'reference', 'testbench', 'synthesis', 'equivalence', 'check'];
 export const DRAWINGS = ['sch', 'asm', 'fsm', 'tt', 'pn'];
 export const LANGUAGES = ['vhdl', 'verilog'];
 /** The limits when the exercise does not give them: simulated time (ns, a test bench's), simulation steps, the
@@ -50,14 +53,14 @@ const isFiles = v => Array.isArray(v) && v.length > 0 && v.every(f => f && typeo
 const posInt = v => Number.isInteger(v) && v > 0;
 const posNum = v => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
-/** A synthesis test's own limits when it gives none: Yosys takes seconds, the simulations a fraction of one. */
+/** A synthesis or equivalence test's own limits when it gives none: Yosys takes seconds, the simulations a fraction of one. */
 export const SYNTH_LIMITS = Object.freeze({ seconds: 120, memoryMb: 1024 });
 
 /** A test's limits: the exercise's, its own over them, the defaults under both (a synthesis test's: SYNTH_LIMITS at
- *  least, but its own). */
+ *  least, but its own; an equivalence test's too, #3217). */
 export function limitsOf(ex, test = {}) {
   const l = { ...DEFAULT_LIMITS, ...(ex?.limits || {}) };
-  if (test.kind === 'synthesis') for (const [k, v] of Object.entries(SYNTH_LIMITS)) l[k] = Math.max(l[k], v);
+  if (test.kind === 'synthesis' || test.kind === 'equivalence') for (const [k, v] of Object.entries(SYNTH_LIMITS)) l[k] = Math.max(l[k], v);
   return { ...l, ...(test.limits || {}) };
 }
 
@@ -93,6 +96,10 @@ function testProblems(t, ex, at) {
       if (!t[k] || typeof t[k] !== 'object' || Array.isArray(t[k])) { bad(`"${k}": an object of inputs`); continue; }
       for (const name of Object.keys(t[k])) if (!inputs.includes(name.toLowerCase())) bad(`"${k}": '${name}' is not an input of ${ex.top}`);
     }
+  }
+  if (t.kind === 'equivalence') {
+    if (!ex.reference) bad('the exercise has no "reference"');
+    if (t.depth !== undefined && !(posInt(t.depth) && t.depth <= MAX_DEPTH)) bad(`"depth": a whole number of clock cycles from 1 to ${MAX_DEPTH}`);
   }
   if (t.kind === 'testbench') {
     if (!NAME_RE.test(String(t.top ?? ''))) bad('"top": the test bench\'s module');
@@ -213,10 +220,10 @@ export function exerciseFileOf(top, tree) {
 }
 
 /** The student's copy of an exercise: its hidden tests and its reference design left out (nothing of them stays in
- *  it). A test of the copy keeps its own files (a visible test bench). */
+ *  it, nor the tests that read it). A test of the copy keeps its own files (a visible test bench). */
 export function visibleCopy(ex) {
   const { reference, ...rest } = ex;
-  const tests = ex.tests.filter(t => t.visible && t.kind !== 'reference');
+  const tests = ex.tests.filter(t => t.visible && t.kind !== 'reference' && t.kind !== 'equivalence');
   return { ...rest, tests };
 }
 
