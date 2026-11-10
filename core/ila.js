@@ -26,12 +26,12 @@
 // Isomorphic ES module (browser + Node), no DOM.
 //
 // API:
-//   planCapture(spec)     { width, regBits, addrBits, slices: { probe: [lo, hi] }, memory (planMemory's), errors }
+//   planCapture(spec)     { width, regBits, addrBits, slices: { probe: [lo, hi] }, memory (planMemory's), chunks, errors }
 //   captureModule(spec)   { code, plan }; code '' when the plan has errors
 //   CAPTURE_OPS           the trigger's operators
 
 import { wizardLine } from './clocking.js';
-import { planMemory } from './blockram.js';
+import { planMemory, bramShapes } from './blockram.js';
 import { identError } from './modgen.js';
 
 export const CAPTURE_OPS = ['=', '!=', 'rise', 'fall', 'change'];
@@ -84,9 +84,27 @@ export function planCapture(spec) {
   }
   if (identError(spec.name, spec.lang)) errors.push(`The module's name: ${identError(spec.name, spec.lang)}.`);
   else if (PORTS.includes(String(spec.name).toLowerCase())) errors.push(`The module's name '${spec.name}' is one of its ports'.`);
-  const memory = errors.length || !['spartan3e', 'spartan6'].includes(spec.family) ? null
-    : planMemory({ family: spec.family, kind: 'ram', ports: 'dual', width, depth: D, style: 'inferred' });
-  return { width, regBits: Math.max(width, STATUS_BITS), addrBits: errors.length ? 0 : log2(D), slices, memory, errors };
+  const mem = w => planMemory({ family: spec.family, kind: 'ram', ports: 'dual', width: w, depth: D, style: 'inferred' });
+  let memory = errors.length || !['spartan3e', 'spartan6'].includes(spec.family) ? null : mem(width);
+  // (the Spartan-3E: the memory in arrays no wider than the data bits of the widest block that holds the depth, so that no
+  // probe bit is a parity bit only the write port has: ISE's DRC warns of a port writing parity bits it does not read,
+  // PhysDesignRules:1060; the packer's parityToData moves such a bit to a free data bit, none left when the probes fill
+  // the block's: 17 to 18 bits of 1024 samples, 9 of 2048, 33 to 36 of 512, measured on the open flow's routes)
+  const deep = memory && spec.family === 'spartan3e' ? bramShapes('spartan3e').filter(x => x.depth >= D).sort((a, b) => b.width - a.width)[0] : null;
+  const chunk = deep?.parity ? deep.data : width;
+  const chunks = [];
+  for (let lo = 0; lo < width; lo += chunk) chunks.push([lo, Math.min(width, lo + chunk) - 1]);
+  if (memory && chunks.length > 1) {
+    const parts = chunks.map(([lo, hi]) => mem(hi - lo + 1));
+    memory = { ...memory, cols: null, rows: null, blocks: parts.reduce((n, m) => n + m.blocks, 0), halves: parts.reduce((n, m) => n + m.halves, 0), parts };
+  }
+  return { width, regBits: Math.max(width, STATUS_BITS), addrBits: errors.length ? 0 : log2(D), slices, memory, chunks, errors };
+}
+
+// the sample memory's arrays: [name, lo, hi] (one, mem, for the whole word; mem0, mem1… for the chunks of planCapture)
+function memsOf(plan) {
+  const whole = plan.chunks.length === 1;
+  return { whole, mems: plan.chunks.map(([lo, hi], k) => [whole ? 'mem' : `mem${k}`, lo, hi]) };
 }
 
 /** The module of a capture spec (its `name`, `lang`, planCapture's settings): { code, plan }. */
@@ -136,6 +154,7 @@ const IDLE = 0, FILL = 1, WAIT = 2, AFTER = 3;
 
 function vhdlOf(spec, plan) {
   const W = plan.width, R = plan.regBits, A = plan.addrBits, D = +spec.depth, pre = +spec.pre, post = D - pre - 1;
+  const { mems, whole } = memsOf(plan);
   const prev = prevProbes(spec).length > 0, t = trigExpr(spec, plan, false);
   const vec = n => `std_logic_vector(${n - 1} downto 0)`;
   const bits = (x, n) => `"${x.toString(2).padStart(n, '0')}"`;
@@ -149,8 +168,7 @@ function vhdlOf(spec, plan) {
     'library IEEE;', 'use IEEE.STD_LOGIC_1164.ALL;', 'use IEEE.NUMERIC_STD.ALL;', '',
     `entity ${spec.name} is`, `  port (${ports.join(';\n        ')});`, `end ${spec.name};`, '',
     `architecture rtl of ${spec.name} is`,
-    `  type mem_t is array (0 to ${D - 1}) of ${vec(W)};`,
-    "  signal mem : mem_t := (others => (others => '0'));",
+    ...mems.flatMap(([n, lo, hi]) => [`  type ${n}_t is array (0 to ${D - 1}) of ${vec(hi - lo + 1)};`, `  signal ${n} : ${n}_t := (others => (others => '0'));`]),
     '  -- the capture clock\'s side: the state (0 idle, 1 filling the samples before the trigger, 2 waiting for it, 3 after it)',
     "  signal state : std_logic_vector(1 downto 0) := \"00\";",
     `  signal wptr, cnt : unsigned(${A - 1} downto 0) := (others => '0');`,
@@ -166,7 +184,8 @@ function vhdlOf(spec, plan) {
     'begin',
     `  we <= '0' when state = ${st(IDLE)} else '1';`,
     t ? `  trig <= '1' when ${t} else '0';` : "  trig <= '1';",
-    '  process (clk)', '  begin', '    if rising_edge(clk) then', "      if we = '1' then mem(to_integer(wptr)) <= probe; end if;", '    end if;', '  end process;', '',
+    '  process (clk)', '  begin', '    if rising_edge(clk) then',
+    ...mems.map(([n, lo, hi]) => `      if we = '1' then ${n}(to_integer(wptr)) <= ${whole ? 'probe' : `probe(${hi} downto ${lo})`}; end if;`), '    end if;', '  end process;', '',
     '  process (clk)', '  begin', '    if rising_edge(clk) then',
     '      arm_s <= arm_s(1 downto 0) & arm_t;',
     ...(prev ? ['      prev <= probe;'] : []),
@@ -194,7 +213,7 @@ function vhdlOf(spec, plan) {
     `      armed_s <= armed_s(0) & we;`,
     '      trig_s <= trig_s(0) & triggered;',
     '      done_s <= done_s(0) & done;',
-    '      rdata <= mem(to_integer(raddr));',
+    ...mems.map(([n, lo, hi]) => `      ${whole ? 'rdata' : `rdata(${hi} downto ${lo})`} <= ${n}(to_integer(raddr));`),
     "      if sel = '1' and capture = '1' then",
     '        if sr(1 downto 0) = "01" then',
     '          arm_t <= not arm_t;',
@@ -218,6 +237,7 @@ function vhdlOf(spec, plan) {
 
 function verilogOf(spec, plan) {
   const W = plan.width, R = plan.regBits, A = plan.addrBits, D = +spec.depth, pre = +spec.pre, post = D - pre - 1;
+  const { mems, whole } = memsOf(plan);
   const prev = prevProbes(spec).length > 0, t = trigExpr(spec, plan, true);
   const after = post ? [`          state <= 2'd${AFTER};`, '          cnt <= 0;'] : ['          done <= 1\'b1;', `          state <= 2'd${IDLE};`];
   const status = `{${[...(R > STATUS_BITS ? [`${R - STATUS_BITS}'b0`] : []), `8'd${W - 1}`, `5'd${A}`, 'ack_s[1]', 'arm_t', 'done_s[1]', 'trig_s[1]', 'armed_s[1]'].join(', ')}}`;
@@ -225,7 +245,8 @@ function verilogOf(spec, plan) {
     wizardLine(spec, 'verilog'), ...describe(spec, plan, '//'), '`timescale 1ns / 1ps', '',
     `module ${spec.name} (`,
     '  input  wire clk,', `  input  wire [${W - 1}:0] probe,`, '  input  wire tck,', '  input  wire sel,', '  input  wire capture,', '  input  wire shift,', '  input  wire tdi,', '  output wire tdo', ');', '',
-    `  reg [${W - 1}:0] mem [0:${D - 1}];`, '  integer i;', `  initial for (i = 0; i < ${D}; i = i + 1) mem[i] = ${W}'h0;`,
+    ...mems.map(([n, lo, hi]) => `  reg [${hi - lo}:0] ${n} [0:${D - 1}];`), '  integer i;',
+    `  initial for (i = 0; i < ${D}; i = i + 1) begin ${mems.map(([n, lo, hi]) => `${n}[i] = ${hi - lo + 1}'h0;`).join(' ')} end`,
     '  // the capture clock\'s side: the state (0 idle, 1 filling the samples before the trigger, 2 waiting for it, 3 after it)',
     "  reg [1:0] state = 2'd0;",
     `  reg [${A - 1}:0] wptr = ${A}'d0, cnt = ${A}'d0;`,
@@ -241,7 +262,7 @@ function verilogOf(spec, plan) {
     "  reg arm_t = 1'b0;",
     "  reg [1:0] ack_s = 2'd0, armed_s = 2'd0, trig_s = 2'd0, done_s = 2'd0;",
     `  wire [${R - 1}:0] status = ${status};`, '',
-    '  always @(posedge clk) if (we) mem[wptr] <= probe;', '',
+    ...mems.map(([n, lo, hi]) => `  always @(posedge clk) if (we) ${n}[wptr] <= ${whole ? 'probe' : `probe[${hi}:${lo}]`};`), '',
     '  always @(posedge clk) begin',
     '    arm_s <= {arm_s[1:0], arm_t};',
     ...(prev ? ['    prev <= probe;'] : []),
@@ -269,7 +290,7 @@ function verilogOf(spec, plan) {
     '    armed_s <= {armed_s[0], we};',
     '    trig_s <= {trig_s[0], triggered};',
     '    done_s <= {done_s[0], done};',
-    '    rdata <= mem[raddr];',
+    ...mems.map(([n, lo, hi]) => `    ${whole ? 'rdata' : `rdata[${hi}:${lo}]`} <= ${n}[raddr];`),
     '    if (sel && capture) begin',
     "      if (sr[1:0] == 2'd1) begin",
     '        arm_t <= ~arm_t;',
