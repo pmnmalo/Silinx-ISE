@@ -12,6 +12,7 @@ import {
   clashItem, drawnHdlLanguage, drawnTop, freshHdl, refreshOpenEditor, refreshSyncBanner, setViewAsTop, staleHdl
 } from './drawings.js';
 import { designSources as ttDesignSources } from './tbwizard.js';
+import { placeFollowNotice } from './collab-state.js';
 
 // ---- truth tables (.bool.json, .tt.json): table -> HDL module, synchronized like ASM charts
 // The generated HDL module is linked by generatedFile: every change of the table rewrites it (its HDL
@@ -39,6 +40,7 @@ export async function openTt(path) {
         onFromModule: () => loadTtFromModule(path),
       });
       d.ttEditor = ed;
+      placeFollowNotice(host);   // (a project followed, #3181)
       return {
         save: async () => {
           const m = ed.getModel();
