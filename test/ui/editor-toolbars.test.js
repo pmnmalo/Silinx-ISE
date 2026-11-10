@@ -60,7 +60,7 @@ uiTest('#2505 the FSM: no HDL button; the Petri net: its zooms; the main toolbar
   await page.setViewport(1440, 900);
   await page.openProject('BarsZ');
   await open(page, 'src/traffic.fsm.json', 'the FSM', '.fsm-toolbar');
-  assert.deepEqual(await page.eval((d) => [...document.querySelectorAll(`${d} .fsm-tab-btn`)].map((b) => b.textContent), D), ['Tables', 'Simulate']);
+  assert.deepEqual(await page.eval((d) => [...document.querySelectorAll(`${d} .fsm-tab-btn`)].map((b) => b.textContent), D), ['Tables', 'Try it']);
   await open(page, 'src/net.pn.json', 'the Petri net', '.pn-toolbar');
   const P = `${D} .pn-toolbar`;
   const zoom = () => page.eval((d) => parseInt(document.querySelector(`${d} .pn-toolbar .asm-zoom`).textContent, 10), D);

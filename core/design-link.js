@@ -7,7 +7,7 @@
 //   #open=<url of a .zip>                    a Silinx (or Xilinx ISE) project's zip hosted elsewhere (https, not
 //                                            this computer nor a local network: #2829), fetched once the user agrees
 //   #open=example:<name>                     one of the examples
-//   &view=try|simulate|emulate               Try it (a schematic's; a state diagram's or a Petri net's Simulate, #2869),
+//   &view=try|simulate|emulate               Try it (a schematic's or a state diagram's, #3287; a Petri net's Simulate, #2869),
 //                                            the test bench's simulation, the board emulator
 //   &top=<module>  &board=<board>            the module to open, the board to emulate
 // A link comes from anywhere: everything here is untrusted input, sizes capped (the link, the design inflated, its

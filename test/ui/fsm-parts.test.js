@@ -91,7 +91,7 @@ uiTest('#405 FSM editor parts: the view, the history, the inline editing, the po
   await page.click(`${ED} .fsm-tab-btn`, { text: 'Tables' });
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-stable`), [ED], { what: 'the tables' });
   assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-tables .fsm-table`)].map((t) => t.className), ED), ['fsm-table fsm-ttable', 'fsm-table fsm-stable', 'fsm-table fsm-etable']);
-  await page.click(`${ED} .fsm-tab-btn`, { text: 'Simulate' });
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Try it' });
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-sim-state`), [ED], { what: 'the simulation' });
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-sim-state`).textContent, ED), /A/);
   await page.click(`${ED} .fsm-sim-inputs .fsm-bit`);

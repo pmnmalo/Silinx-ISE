@@ -241,7 +241,7 @@ uiTest('State diagram (FSM): step-by-step simulation, Mealy labels, module -> di
   // Mealy label "condition / outputs"
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} [data-trans=t2] .fsm-label`).textContent, ED), '!x / z=1');
   // ---- simulation: x = 1, clock -> B; x = 0: z = 1 (Mealy) and the transition back to A is shown
-  await page.click(`${ED} .fsm-tab-btn`, { text: 'Simulate' });
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Try it' });
   await page.waitForSelector(`${ED} .fsm-sim`);
   assert.ok(await page.eval((ed) => document.querySelector(`${ed} [data-state=a]`).classList.contains('current'), ED));
   await page.click(`${ED} .fsm-bit[data-input=x]`);
@@ -334,11 +334,17 @@ uiTest('State diagram (FSM) in Portuguese: every label of the editor, the panels
   await check('state');
   await page.click(`${ED} [data-trans=t3] .fsm-label`);
   await check('transition');
-  for (const tab of ['Tables', 'Simulate']) {
+  for (const tab of ['Tables', 'Try it']) {
     await setLang('en');
     await page.click(`${ED} .fsm-tab-btn`, { text: tab });
     await check(tab);
   }
+  // (the step-through panel named as the schematic's: Try it, Experimentar, #3287)
+  const simNames = () => page.eval((ed) => [[...document.querySelectorAll(`${ed} .fsm-tab-btn`)].map((b) => b.textContent.trim()), document.querySelector(`${ed} .asm-code-title`).textContent], ED);
+  await setLang('en');
+  assert.deepEqual(await simNames(), [['Tables', 'Try it'], 'Try it']);
+  await setLang('pt');
+  assert.deepEqual(await simNames(), [['Tabelas', 'Experimentar'], 'Experimentar']);
   assert.deepEqual(missing, [], `untranslated:\n${missing.join('\n')}`);
   await setLang('pt');
   // (Undo / Redo: the main toolbar's, #220)
@@ -449,7 +455,7 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
   await page.waitFor(async () => (await (await fetch('/api/projects/FsmEd/file?path=src%2Fpri.fsm.json')).json()).transitions.map((t) => t.id).join(',') === 't2,t1,t3,t4', [], { what: 'priority saved', timeout: 15000 });
 
   // ---- simulator: x = y = 1 in A: C (y, now first); Clock ↑ three times, ⟲ Reset back to A with no trace
-  await page.click(`${ED} .fsm-tab-btn`, { text: 'Simulate' });
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Try it' });
   await page.waitForSelector(`${ED} .fsm-sim`);
   await page.click(`${ED} .fsm-bit[data-input=x]`);
   await page.click(`${ED} .fsm-bit[data-input=y]`);
