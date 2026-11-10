@@ -13,6 +13,7 @@ import { configDir } from './toolchain.js';
 import { createProjectWatcher } from './project-watch.js';
 import { listJobs } from './jobs.js';
 import { createOpenCodes, tokenProof } from './open-code.js';
+import { attachRelay } from './collab-relay.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -75,6 +76,26 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
     }
     next();
   });
+  // the relay of shared projects (#3181, server/collab-relay.js): on the server that app.listen makes, behind the same
+  // checks of the host and the origin; a room opened with the token only (a follower joins one with its link)
+  const listen = app.listen.bind(app);
+  app.listen = (...a) => {
+    const srv = listen(...a);
+    app.locals.relay = attachRelay(srv, {
+      allowed: req => {
+        const hostName = String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase();
+        if (!exposed && hostName && !LOCAL.has(hostName) && hostName !== String(host).toLowerCase()) return 'forbidden host';
+        if (req.headers.origin) {
+          let oh = '';
+          try { oh = new URL(req.headers.origin).host.toLowerCase(); } catch { /* invalid origin */ }
+          if (oh !== String(req.headers.host || '').toLowerCase()) return 'cross-origin request refused';
+        }
+        return null;
+      },
+      tokenOk: t => !token || tokenOk(t),
+    });
+    return srv;
+  };
   // the open projects watched (#2843): what another process changes in them is told to the page; this server's
   // own changes are not (a request that may write holds its project while it runs, and a run of its own too)
   const watcher = createProjectWatcher({

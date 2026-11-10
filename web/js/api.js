@@ -62,6 +62,9 @@ async function req(method, url, body, { text = false } = {}) {
 const enc = encodeURIComponent;
 
 export const api = {
+  // shared projects (#3181): this server's relay (server/collab-relay.js) opens a room with the token
+  collab: true,
+  collabToken: async () => { await READY; return TOKEN; },
   projects: () => req('GET', '/api/projects'),
   workspace: () => req('GET', '/api/workspace'),
   templates: () => req('GET', '/api/templates'),

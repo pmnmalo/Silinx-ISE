@@ -35,6 +35,7 @@ import { prefKey } from './prefs.js';
 import { keepCursor, keptCursor } from './doc-cursor.js';
 import { mountSplit, placeSplit, splitClosed, splitItems, tabTip } from './split-view.js';
 import { closeAllDocs, restoreViewState, saveViewState, viewKept } from './view-state.js';
+import { following, followNotice } from './collab-state.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -373,6 +374,7 @@ export function activateDoc(doc, { background = false } = {}) {
 // user (the text editor says it, #534): true, the change is the user's own in the editor; false, written
 // by the application; undefined (the other editors), judged by the timing below.
 export function setDirty(doc, dirty, { user } = {}) {
+  if (following()) dirty = false;   // (a project followed, #3181: read only, nothing of it saved)
   doc.dirty = dirty;
   // (an edit of the user: a change right after their action in the document, while no command,
   // Undo or Redo writes; a document opened or updated by a command is not edited by the user. The text
@@ -459,7 +461,7 @@ export async function openFile(path, line, col, { task } = {}) {
       id, path, task, title: path.split('/').pop(), tooltip: path, icon: lang === 'vhdl' ? 'vhdl' : lang === 'verilog' ? 'verilog' : lang === 'ucf' ? 'ucf' : 'file',
       create(el, d) {
         // the HDL generated from a drawing is read-only: the drawing is the base, edited instead (#1176)
-        const generated = () => !!S.hdlToSch?.[path];
+        const generated = () => !!S.hdlToSch?.[path] || following();   // (a project followed, #3181: read only too)
         const tplBtn = h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Language Templates' }, 'Templates ▾');
         // (no Undo / Redo, the main toolbar's; no path, the tab's tip: #2514)
         const editing = [];
@@ -468,7 +470,7 @@ export async function openFile(path, line, col, { task } = {}) {
           snippetsFor(lang, path) && lang !== 'ucf' ? tplBtn : null,   // (C / C++ too, #1855)
           ...(lang === 'c' ? cRunButtons(path) : []),   // (C Simulation, C/RTL Co-simulation: #1528)
           (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf' || lang === 'c') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => (lang === 'ucf' ? checkUcfFile(path) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
-          syncBanner(path));
+          syncBanner(path), followNotice());
         if (lang === 'vhdl' || lang === 'verilog' || lang === 'c') editing.push(tplBtn);
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
@@ -883,6 +885,8 @@ async function boot() {
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
 
   updateTitle();
+  // a shared project's link (#3181): followed, read only, instead of the workspace's projects
+  const followed = location.hash.startsWith('#follow=') && await (await import('./collab-follow.js')).startFollowing();
   log(`${PRODUCT} ${VERSION_LABEL} Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.`, 'info');
   if (api.standalone) {
     const st = await api.initStorage().catch(() => api.storage());
@@ -905,7 +909,7 @@ async function boot() {
     else log(`Toolchain: ISE ${tc.ise.available ? 'available' : 'not available'} (${tc.ise.mode}: ${tc.ise.reason}).`, tc.ise.available ? 'ok' : 'warn', opts);
     renderProcesses();
     // (the browser edition reaches no programmer: it says so in its own startup line)
-    if (api.standalone) return;
+    if (api.standalone || api.following) return;
     const progs = Object.entries(tc.programmers).filter(([, v]) => v.found).map(([k]) => k);
     log(`Programmers found: ${progs.length ? progs.join(', ') : 'none (install openFPGALoader, xc3sprog, Digilent Adept or ISE iMPACT)'}`, progs.length ? 'ok' : 'warn', opts);
   }).catch(() => {}).finally(() => { S.startupChecked = true; });   // (the start-up lines all written: the UI tests wait for it)
@@ -918,7 +922,8 @@ async function boot() {
   const asked = projectRequested();
   const link = location.hash.length > 1 && (await import('./link-open.js')).linkOptions();   // a design's link: its project, not the last (#2826)
   // (a workspace folder waiting for its permission: its last project is not the browser's one of that name)
-  if (!asked && !link && last && projects.some(p => p.name === last) && !(api.standalone && api.storage().needsPermission)) {
+  if (followed) await openProject(followed);
+  else if (!asked && !link && last && projects.some(p => p.name === last) && !(api.standalone && api.storage().needsPermission)) {
     try {
       await openProject(last, { startup: true });   // (where the user was: its tasks too, #1191)
       await new Promise(r => setTimeout(r, 0));   // (the reopened documents' tasks followed first)

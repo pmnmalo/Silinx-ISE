@@ -31,6 +31,7 @@ function productionDeps(only) {
   const seen = new Map();
   const walk = (deps, dir) => {
     for (const [name, info] of Object.entries(deps || {})) {
+      if (!info.version) continue;   // (an optional peer not installed: ws's bufferutil, utf-8-validate)
       const key = `${name}@${info.version}`;
       if (WORKSPACES.has(name)) { walk(info.dependencies, root); continue; }
       if (!seen.has(key)) {

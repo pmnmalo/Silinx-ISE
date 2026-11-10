@@ -39,16 +39,19 @@ async function listen(name, signal) {
   }
 }
 
-/** The changes another process made in the open project, shown: { project, changes: [{ path, kind }] }. */
-export async function applyChanges({ project, changes = [] }) {
+/** The changes another process made in the open project, shown: { project, changes: [{ path, kind }] } (by: the
+ *  owner of a project followed, #3181, whose changes they are). */
+export async function applyChanges({ project, changes = [], by = null }) {
   if (!S.project || S.project.name !== project || !changes.length) return;
+  if (!by) dispatchEvent(new CustomEvent('silinx:disk-changes', { detail: { project, changes } }));   // (a project shared: read again, #3181)
   const files = changes.filter(c => !c.path.startsWith('build/'));
   const run = changes.some(c => c.path === REPORTS);
   if (files.length) {
-    log(`Changed outside Silinx: ${files.map(c => `${c.path}${c.kind === 'changed' ? '' : ` (${c.kind})`}`).join(', ')}.`, 'info');
-    for (const c of files) for (const d of S.docs.filter(o => docPath(o) === c.path)) await reloadDoc(d, c);
+    log(`${by ? `Changed by ${by}` : 'Changed outside Silinx'}: ${files.map(c => `${c.path}${c.kind === 'changed' ? '' : ` (${c.kind})`}`).join(', ')}.`, 'info');
+    for (const c of files) for (const d of S.docs.filter(o => docPath(o) === c.path)) await reloadDoc(d, c, by);
     await reloadProject();
   }
+  if (by) return;   // (a project followed: its runs are its owner's, not shared)
   if (S.busy || S.currentJob) return;   // (a run of the page's own: its marks are its own)
   if (files.length || run || changes.some(c => c.path === STATUS)) {
     // a run made outside the page: its marks from its summary, kept for the next opening
@@ -59,7 +62,7 @@ export async function applyChanges({ project, changes = [] }) {
 }
 
 // an open document whose file changed on disk: reloaded, or the user asked when it has changes of its own
-async function reloadDoc(d, { path, kind }) {
+async function reloadDoc(d, { path, kind }, by = null) {
   const gone = kind === 'deleted';
   let text = null;
   if (!gone) { try { text = await api.readFile(S.project.name, path); } catch { return; } }
@@ -74,7 +77,7 @@ async function reloadDoc(d, { path, kind }) {
     if (keep) { log(`${path}: the editor's version kept${gone ? ', written again' : ', written over the disk\'s'}.`, 'warn'); await flushDoc(d); return; }
     d.dirty = false;
   }
-  if (gone) { log(`${path} was deleted outside Silinx: closed.`, 'warn'); await closeDoc(d); return; }
+  if (gone) { log(by ? `${path} was deleted by ${by}: closed.` : `${path} was deleted outside Silinx: closed.`, 'warn'); await closeDoc(d); return; }
   if (d.editor) {
     d.editor.setValue(text);
     d.editor.markClean();
@@ -87,7 +90,7 @@ async function reloadDoc(d, { path, kind }) {
     await openFile(path);
     if (front && S.docs.includes(front)) activateDoc(front);
   }
-  log(`${path} reloaded: changed outside Silinx.`, 'info');
+  log(by ? `${path} reloaded: changed by ${by}.` : `${path} reloaded: changed outside Silinx.`, 'info');
 }
 
 /** Changed in the editor and on disk (deleted there): true, keep the editor's (closed: kept too, the user's work). */
