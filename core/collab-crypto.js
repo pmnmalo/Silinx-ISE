@@ -9,7 +9,8 @@ const ALG = 'AES-GCM';
 const IV = 12;
 export const KEY_RE = /^[A-Za-z0-9_-]{43}$/;   // (32 bytes, base64url, no padding)
 
-const b64url = bytes => {
+/** Bytes as base64url, no padding (a key's text, a room's id). */
+export const b64url = bytes => {
   let s = '';
   for (const b of bytes) s += String.fromCharCode(b);
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
