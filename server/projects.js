@@ -107,11 +107,18 @@ export async function listProjects() {
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// a project cloned from a repository (#3195, server/git.js): untrusted until the user trusts it (#2830), its mark kept in
+// .git, not in silinx.json, which stays the repository's (a clone shows no change)
+export const CLONE_TRUST = path.join('.git', 'silinx-trust.json');
+const cloneTrust = dir => { try { return JSON.parse(fsSync.readFileSync(path.join(dir, CLONE_TRUST), 'utf8')); } catch { return null; } };
+
 export async function readProject(name) {
   const dir = projectDir(name);
   let pj;
   try { pj = JSON.parse(await fs.readFile(await projectFile(dir), 'utf8')); }
   catch { throw new HttpError(404, `project '${name}' not found`); }
+  const ct = cloneTrust(dir);
+  if (ct) Object.assign(pj, { trusted: false }, ct.madeBy ? { madeBy: ct.madeBy } : {});
   pj.name = name;
   pj.files ||= [];
   return pj;
@@ -149,6 +156,8 @@ async function writeProjectUnlocked(name, pj) {
   if (badTop) throw new HttpError(400, badTop);
   const clean = { ...pj, name };
   delete clean.fileTree;
+  const ct = cloneTrust(dir);
+  if (ct) { delete clean.trusted; delete clean.madeBy; }   // (a clone's: in .git, #3195)
   const file = path.join(dir, PROJECT_FILE);
   const tmp = path.join(dir, `.${PROJECT_FILE}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);
   try {
@@ -158,7 +167,7 @@ async function writeProjectUnlocked(name, pj) {
     await fs.rm(tmp, { force: true }).catch(() => {});
     throw e;
   }
-  return clean;
+  return ct ? { ...clean, trusted: false, ...(ct.madeBy ? { madeBy: ct.madeBy } : {}) } : clean;
 }
 
 export function writeProject(name, pj) {
@@ -174,8 +183,10 @@ export function writeProject(name, pj) {
 }
 
 /** The user trusts a project from outside (#2830): Xilinx ISE and programming may run for it. */
-export function trustProject(name) {
-  return updateProject(name, pj => { const { trusted, madeBy, ...rest } = pj; return rest; });   // eslint-disable-line no-unused-vars
+export async function trustProject(name) {
+  const out = await updateProject(name, pj => { const { trusted, madeBy, ...rest } = pj; return rest; });   // eslint-disable-line no-unused-vars
+  await fs.rm(path.join(projectDir(name), CLONE_TRUST), { force: true });
+  return out;
 }
 
 /** Read silinx.json, let `fn(pj)` change it (or return a new object), write it back, all under the project lock. */

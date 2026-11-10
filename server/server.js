@@ -190,6 +190,9 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   // Implementation (ISE) + programming routes live in impl-routes.js.
   const { registerImplRoutes } = await import('./impl-routes.js');
   registerImplRoutes(api, { wrap, projects: P });
+  // git (#3195): a project in a GitHub repository
+  const { registerGitRoutes } = await import('./git-routes.js');
+  registerGitRoutes(api);
 
   app.use('/api', api);
   // an error no route answered (a bad body, a bad address): its message, never a stack trace with the server's paths
