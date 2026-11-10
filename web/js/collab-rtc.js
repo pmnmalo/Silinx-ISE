@@ -24,7 +24,8 @@ const OWNER_MAX = 16 << 20, FOLLOWER_MAX = FOLLOWER_JOIN;
 // a channel's sending: a frame in parts when it is larger than a message
 const sendOn = (dc, d) => { if (typeof d === 'string') dc.send(d); else for (const p of splitFrame(d)) dc.send(p); };
 
-function iceServers() {
+/** WebRTC's ICE servers: this browser's STUN list (the meeting point's too, collab-meet.js). */
+export function iceServers() {
   let list = STUN;
   try { const v = localStorage.getItem(STUN_KEY); if (v !== null) list = JSON.parse(v); } catch { /* the public one */ }
   return Array.isArray(list) && list.length ? [{ urls: list.map(String) }] : [];

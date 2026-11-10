@@ -1,6 +1,6 @@
 // Portuguese strings of a shared project (#3181): Share Project… (web/js/collab-share.js), following one
 // (web/js/collab-follow.js), who is in it (web/js/collab-presence.js), the follower's notice (web/js/collab-state.js),
-// a room the owner's page hosts (web/js/collab-host.js);
+// a room the owner's page hosts (web/js/collab-host.js) and its meeting point (web/js/collab-meet.js);
 // merged into the dictionary of i18n.js. (The console's lines are not translated, as every tool's output.)
 export const COLLAB_PT = {
   'Share Project…': 'Partilhar Projeto…', 'Share Project': 'Partilhar Projeto', 'Share': 'Partilhar',
@@ -26,8 +26,12 @@ export const COLLAB_PT = {
   'Send this code back to the follower: they paste it to connect.': 'Envie este código de volta ao seguidor: ele cola-o para se ligar.',
   'The owner\'s page shares this project itself. Send them your code (Add a Follower…, in their toolbar), then paste the code they send back.':
     'A página do dono partilha este projeto ela própria. Envie-lhe o seu código (Adicionar um Seguidor…, na barra de ferramentas dele) e cole depois o código que ele lhe enviar.',
-  'This page hosts it: each follower sends you a code when they open the link, which Add a Follower… takes.':
-    'Esta página aloja-o: cada seguidor envia-lhe um código ao abrir a ligação, que Adicionar um Seguidor… recebe.',
+  'This page hosts it: its followers find it when they open the link, or send you a code, which Add a Follower… takes.':
+    'Esta página aloja-o: os seguidores encontram-na ao abrir a ligação, ou enviam-lhe um código, que Adicionar um Seguidor… recebe.',
+  // (the meeting point, #3227: web/js/collab-meet.js)
+  'Exchange Codes Instead': 'Trocar Códigos em Vez Disso',
+  'Looking for the owner at the meeting point…': 'A procurar o dono no ponto de encontro…',
+  'If they cannot be found there, you exchange codes with them instead.': 'Se não for encontrado aí, troca códigos com ele em vez disso.',
 };
 
 export const COLLAB_PT_PATTERNS = [

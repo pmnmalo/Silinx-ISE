@@ -107,6 +107,20 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
+    "name": "@trystero-p2p/core",
+    "version": "0.26.0",
+    "license": "MIT",
+    "url": "https://www.npmjs.com/package/@trystero-p2p/core",
+    "standalone": true
+  },
+  {
+    "name": "@trystero-p2p/torrent",
+    "version": "0.26.0",
+    "license": "MIT",
+    "url": "https://www.npmjs.com/package/@trystero-p2p/torrent",
+    "standalone": true
+  },
+  {
     "name": "@yowasp/nextpnr-ice40",
     "version": "0.11.96-dev.805",
     "license": "ISC",

@@ -4,7 +4,8 @@
 // owner's answer to it (Add a Follower…). Every message in the console.
 //   hostRoom() -> { hosted, WebSocket }: the room of a share (collab-share.js startSharing), the owner's socket to it
 //   addFollowerDialog(share): a follower's code taken, the answer's shown; the follower in the room once connected
-//   hostSocket(link): the follower's side, its code shown and the owner's asked; a WebSocket class for followRoom
+//   hostSocket(link): the follower's side (the meeting point first, collab-meet.js), its code shown and the owner's
+//                   asked; a WebSocket class for followRoom
 import { h, dialog } from './ui.js';
 import { app } from './app.js';
 import { writeClip } from './clipboard.js';
@@ -47,8 +48,13 @@ export async function addFollowerDialog(share) {
   return ans.code;
 }
 
-/** The follower's side of a room the owner's page hosts: their code shown, the owner's asked; then the socket. */
+/** The follower's side of a room the owner's page hosts: the owner found at the meeting point when the link has their
+ *  key (collab-meet.js); else, or failing that, their code shown and the owner's asked; then the socket. */
 export async function hostSocket(link) {
+  if (link.host) {
+    const met = await (await import('./collab-meet.js')).findOwner(link);
+    if (met !== 'codes') return met;
+  }
   let offer;
   try { offer = await followerOffer({ key: link.key, room: link.room }); } catch (e) { app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const answer = codeField(undefined, 'answer');
