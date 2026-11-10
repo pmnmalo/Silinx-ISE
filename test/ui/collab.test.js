@@ -138,3 +138,33 @@ uiTest('#3181 a drawing followed read only (traffic\'s FSM): its read-only mode,
     assert.deepEqual(fp.errors, []);
   } finally { await fp.close(); }
 });
+
+// (#3318) the link pasted into the address bar of a tab where Silinx is open (only its fragment changes): followed, as in
+// a new tab; in the owner's own page, not (that would stop the sharing), with a warning
+uiTest('#3318 a follow link pasted into an open tab is followed; in the page that shares, a warning', E, async (page) => {
+  await makeProject(env, { name: 'Pasted', top: 'top', files: { 'src/top.vhd': TOP } });
+  await page.openProject('Pasted');
+  await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
+  const link = await share(page, 'Ana');
+  const hash = new URL(link).hash;
+  // the owner pastes it into their own tab: still sharing, the link cleared, told
+  await page.eval((h) => { location.hash = h; }, hash);
+  await page.waitConsole(/^WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window\.$/m);
+  assert.equal(await page.eval(() => location.hash), '');
+  assert.equal(await page.eval(() => document.querySelector('.collab-presence .collab-btn')?.textContent), 'Sharing');
+  // a follower's tab, Silinx open: the link pasted, the page loaded again, followed
+  const fp = await env.newPage(env.server.url);
+  try {
+    await fp.waitFor(() => window.SilinxApp && window.Silinx?.startupChecked, [], { what: 'app boot' });
+    await fp.eval((h) => { location.hash = h; }, hash);
+    await fp.waitDialog('Follow a Shared Project');
+    await fp.fill('.dlg-overlay input[data-field=name]', 'Rui');
+    await fp.dialogButton('Follow');
+    await fp.waitFor(() => window.Silinx?.project?.name === 'Pasted' && window.Silinx.active?.path === 'src/top.vhd', [], { what: 'the project followed', timeout: 20000 });
+    await page.waitConsole(/^Rui follows your project "Pasted"\.$/m);
+    assert.deepEqual(await consoleWarnings(fp), []);
+    assert.deepEqual(fp.errors, []);
+  } finally { await fp.close(); }
+  await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());
+  assert.deepEqual(await consoleWarnings(page), ['WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window.']);
+});
