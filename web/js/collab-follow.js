@@ -67,6 +67,15 @@ export async function startFollowing(hash = location.hash) {
   return project.name;
 }
 
+/** A link to follow pasted into the address bar of this page, already open (#3318): only its fragment changed, so the
+ *  page loads it again, as a new tab does (the browser asks first when a document is not saved). Not in the page that
+ *  shares a project, whose sharing that would end: the console says so. */
+export function followPasted() {
+  if (collab.role !== 'owner') { location.reload(); return; }
+  history.replaceState(null, '', location.pathname + location.search);
+  app.log('WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window.', 'warn');
+}
+
 const commands = () => [
   fol?.session && !fol.session.closed() ? { label: `Follow ${collab.owner}`, checked: fol.following, action: () => setFollowing(!fol.following) } : null,
   fol?.session && !fol.session.closed() ? { label: 'Stop Following', action: () => stopFollowing() } : null,
