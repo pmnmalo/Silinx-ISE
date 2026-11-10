@@ -119,9 +119,10 @@ export function readVerifyLog(lines, outputs = []) {
  * Verify that module `top` of the sources ([{ path, text, lang }]: the design's and the simulation's) gives the outputs
  * of module `reference` for every input sequence: proved (by induction), bounded (no difference in the first `depth`
  * clock cycles) or failed (the counterexample). run(args, files, onLine): Yosys's (packages/silinx-fpga/src/
- * synth-open-node.js yosysNode, web/js/yosys-client.js yosysBrowser).
+ * synth-open-node.js yosysNode, web/js/yosys-client.js yosysBrowser). referenceSources: the reference's own sources,
+ * compiled apart (an exercise's reference design, whose modules have the submission's names: automatic grading, #3217).
  */
-export async function verifyEquivalence(sources, { top, reference, depth = VERIFY_DEPTH, run, onLine = () => {} } = {}) {
+export async function verifyEquivalence(sources, { top, reference, referenceSources = null, depth = VERIFY_DEPTH, run, onLine = () => {} } = {}) {
   const error = (...errors) => ({ status: 'error', errors, warnings: [], depth });
   if (!top) return error('no module to verify');
   if (!reference) return error(`no reference module for '${top}'`);
@@ -129,8 +130,14 @@ export async function verifyEquivalence(sources, { top, reference, depth = VERIF
   const lib = compile([...primitiveSources(sources), ...sources]);
   const libErrs = lib.errors.filter(e => e.severity === 'error');
   if (libErrs.length) return error(...libErrs.slice(0, 5).map(e => `${e.file}:${e.line} ${e.message}`));
+  let refLib = lib;
+  if (referenceSources) {
+    refLib = compile([...primitiveSources(referenceSources), ...referenceSources]);
+    const refErrs = refLib.errors.filter(e => e.severity === 'error');
+    if (refErrs.length) return error(...refErrs.slice(0, 5).map(e => `the reference: ${e.file}:${e.line} ${e.message}`));
+  }
   const uut = moduleOf(lib, top, 'the module');
-  const ref = moduleOf(lib, reference, 'the reference');
+  const ref = moduleOf(refLib, reference, 'the reference');
   if (uut.error || ref.error) return error(...[uut.error, ref.error].filter(Boolean));
   if (uut.unit === ref.unit) return error(`'${uut.unit.name}' cannot be its own reference`);
   const diffs = portDifferences(uut, ref);
