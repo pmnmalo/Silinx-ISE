@@ -75,18 +75,14 @@ export async function captureSpecOf(name, pj) {
  * save it (build/capture.json). link: one given (the tests'), else boardLink's. Returns { capture, file, spec, probes }.
  */
 export async function captureProject(name, { arm = true, timeoutMs = 10000, device = 0, log = () => {}, link = null } = {}) {
-  const { runCapture } = await import('../core/ila-link.js');
+  const { runCapture, captureRecord } = await import('../core/ila-link.js');
   const pj = await P.readProject(name);
   const { spec, probes } = await captureSpecOf(name, pj);
   const own = !link;
   link ||= await boardLink(spec, { device });
   let cap;
   try { cap = await runCapture(link, spec, { arm, timeoutMs, log }); } finally { if (own) await link.close(); }
-  const hex = v => `0x${v.toString(16)}`;
-  const capture = {
-    takenAt: new Date().toISOString(), top: pj.top, clock: pj.capture.clock, depth: +spec.depth, pre: +spec.pre, trigger: cap.trigger, polls: cap.polls,
-    probes: probes.map(p => ({ path: p.path, width: p.width, samples: cap.probes[p.name].map(hex) })),
-  };
+  const capture = captureRecord({ top: pj.top, clock: pj.capture.clock, spec, probes, cap });
   const file = path.join(P.projectDir(name), CAPTURE_FILE);
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, `${JSON.stringify(capture, null, 1)}\n`);

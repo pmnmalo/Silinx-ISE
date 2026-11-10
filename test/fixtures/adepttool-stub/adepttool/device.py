@@ -1,6 +1,5 @@
 # a stand-in for adepttool.device (test/fixtures/adepttool-stub/README.md): one board, or none (SILINX_ILA_STUB's boards: 0)
-import json
-import os
+from adepttool.stubcfg import stub_config
 
 
 class Device:
@@ -11,5 +10,5 @@ class Device:
 
 
 def get_devices(ctx):
-    cfg = json.loads(os.environ.get('SILINX_ILA_STUB', '{}'))
+    cfg = stub_config()
     return [Device() for _ in range(cfg.get('boards', 1))]

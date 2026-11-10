@@ -61,6 +61,11 @@ const XILINX_TREE = [
   { part: 'emulate' },
   proc('config', 'Configure Target Device', { ico: 'impact' }, [
     proc('impact', 'Manage Configuration Project (iMPACT)', { ico: 'impact' }),
+    // the logic analyzer (#3176: the Silinx toolchain's, which inserts its core at Implement; ISE's tree has ChipScope)
+    proc('capture', 'Analyze Design Using the Logic Analyzer', { ico: 'wave' }, [
+      proc('capture-settings', 'Logic Analyzer Settings', { ico: 'process' }),
+      proc('capture-view', 'View the Last Capture', { ico: 'wave' }),
+    ]),
   ]),
 ];
 /** A tree with the nodes `absent` left out and the nodes `change` ({ id: fields }) changed. */
@@ -139,7 +144,7 @@ export const ISE = {
   constraints: UCF,
   messages: LOG_MESSAGES,
   program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit', prom: '{top}_prom.bit' },
-  tree: treeOf([]),
+  tree: treeOf(['capture']),
   tasks: LAB_TASKS,
 };
 
@@ -181,7 +186,7 @@ export const SILINX_ICE40 = {
   // (#2298: no JTAG chain and no PROM; the .bin written into the board's SPI flash: openFPGALoader in the local server, WebUSB
   // in the browser edition)
   program: { process: 'config', page: 'program-ice40', title: 'Program Flash', target: 'spi-flash', file: '{top}.bin' },
-  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech'], SILINX_CHANGE),
+  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
   tasks: LAB_TASKS,
 };
 
@@ -218,7 +223,7 @@ export const VIVADO = {
   constraints: XDC,
   messages: LOG_MESSAGES,
   program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit' },
-  tree: treeOf(['synth-open', 'tech', 'postsynth', 'posttrans', 'postmap', 'postpar', 'fpgaview'], { synth: { label: 'Synthesize - Vivado', title: 'AMD Vivado' }, impl: { title: 'AMD Vivado' }, bitgen: { title: 'AMD Vivado' } })
+  tree: treeOf(['synth-open', 'tech', 'postsynth', 'posttrans', 'postmap', 'postpar', 'fpgaview', 'capture'], { synth: { label: 'Synthesize - Vivado', title: 'AMD Vivado' }, impl: { title: 'AMD Vivado' }, bitgen: { title: 'AMD Vivado' } })
     .filter(n => n.part !== 'emulate'),
   tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
 };

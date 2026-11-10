@@ -12,8 +12,25 @@ export const CAPTURE_PT = {
   'and': 'e',
   'or': 'ou',
   'the first sample': 'a primeira amostra',
+  // the processes (Configure Target Device) and the settings' dialog (web/js/capture-ui.js)
+  'Analyze Design Using the Logic Analyzer': 'Analisar o Projeto com o Analisador Lógico',
+  'Logic Analyzer Settings': 'Definições do Analisador Lógico',
+  'View the Last Capture': 'Ver a Última Captura',
+  'Signals to watch:': 'Sinais a observar:',
+  'Samples:': 'Amostras:',
+  'Before the trigger:': 'Antes do disparo:',
+  'Trigger:': 'Disparo:',
+  'All (and)': 'Todas (e)',
+  'Any (or)': 'Qualquer (ou)',
+  'Add a condition': 'Acrescentar uma condição',
+  'Remove the condition': 'Remover a condição',
+  'Implement inserts the capture core (the Silinx toolchain, the Spartan-3E); program the board, then Analyze Design Using the Logic Analyzer.':
+    'A Implementação insere o núcleo de captura (a cadeia de ferramentas Silinx, o Spartan-3E); programe a placa e depois Analisar o Projeto com o Analisador Lógico.',
 };
 export const CAPTURE_PT_PATTERNS = [
   [/^(\d+) bits × (\d+) samples on (\S+), (\d+) before the trigger$/, '$1 bits × $2 amostras em $3, $4 antes do disparo'],
   [/^(\d+) block RAM\(s\), in the utilization above$/, '$1 block RAM(s), na utilização acima'],
+  [/^(\d+) bits × (\d+) samples: (\d+) block RAM\(s\)( of the device's (\d+))?$/, (m, w, d, b, of, n) => `${w} bits × ${d} amostras: ${b} block RAM(s)${of ? ` das ${n} do dispositivo` : ''}`],
+  // (the window of a capture, its tab)
+  [/^Capture \((.+)\)$/, 'Captura ($1)'],
 ];

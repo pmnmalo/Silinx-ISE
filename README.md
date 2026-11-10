@@ -318,6 +318,10 @@ for Xilinx FPGAs supported by ISE 14.7.
   tablet), with no programming tool to install (see the [guide](docs/GETTING-STARTED.md) for the
   Windows driver and the Linux rule); running Silinx locally also with openFPGALoader,
   xc3sprog, Digilent Adept (`djtgcfg`), ISE iMPACT or **adepttool** (Basys2 on macOS).
+- **Logic analyzer** (ChipScope-like, the Silinx toolchain, the Spartan-3E): *Logic Analyzer Settings* picks the
+  signals of the design to watch, the clock, the samples and the trigger (with the block RAMs it takes); Implement
+  inserts the capture core, read over the board's JTAG cable (BSCAN); *Analyze Design Using the Logic Analyzer* arms it,
+  waits for the trigger and shows the samples in the waveform viewer, the cursor on the trigger.
 
 ## Getting started
 

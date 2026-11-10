@@ -23,6 +23,7 @@ import { GATE_LIMITS, gateEntries, gateMessages, gateZip } from '../../core/impo
 import { isTrusted, markUntrusted, untrustedMessage } from '../../core/trust.js';
 import { runBrowserFlow, browserOpenStatus } from './open-flow-browser.js';
 import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from '../../core/adept.js';
+import { adeptLink, runCapture, captureRecord } from '../../core/ila-link.js';
 import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ice40.js';
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
@@ -37,6 +38,8 @@ let store = browser;
 // (a new project from an example, or from a test design: #1746)
 const ops = projectOps(() => store, { ...TEST_DESIGNS, ...EXAMPLES });
 const projectJson = async name => (await store.load(name)).json;
+// the logic analyzer's captures of this session (#3176), as build/capture.json by project
+const sessionCaptures = new Map();
 
 // the workspace folder's handle, remembered in IndexedDB between visits (a test replaces this with
 // window.SILINX_WORKSPACE_HANDLES = { load, save }: a fake folder cannot be stored in IndexedDB)
@@ -295,6 +298,7 @@ export const api = {
   // a file of the build (build/…: not among the project's files): this session's, else (a
   // workspace folder) the one in the project's build/ folder
   readFile: async (name, path) => {
+    if (path === 'build/capture.json' && sessionCaptures.has(name)) return sessionCaptures.get(name);
     try { return await ops.readFile(name, path); } catch (e) {
       if (!/^build\//.test(path || '')) throw e;
       const t = await buildFileOf(name, path);
@@ -397,6 +401,17 @@ export const api = {
     return programAdept(await adeptDevice(), bit, { part, log });
   }),
   scan: async () => usbJob('scan', async log => scanAdept(await adeptDevice(), { log })),
+  // the logic analyzer's capture (#3176): the core's spec and probes the page made (web/js/capture-ui.js, as Implement
+  // inserts it), over the board's Adept USB; the capture kept as this session's build/capture.json
+  capture: async (name, { spec, probes, top, clock, arm = true, timeoutS = 10 } = {}) => usbJob('capture', async log => {
+    if (!spec) fail('the capture\'s settings do not fit the design: Logic Analyzer Settings');
+    const link = await adeptLink(await adeptDevice(), spec, { log });
+    let cap;
+    try { cap = await runCapture(link, spec, { arm, timeoutMs: timeoutS * 1000, log }); } finally { await link.close(); }
+    const capture = captureRecord({ top, clock, spec, probes, cap });
+    sessionCaptures.set(name, JSON.stringify(capture, null, 1));
+    return { capture, file: 'build/capture.json' };
+  }),
   // the Platform Flash (core/xcf.js): { project, op, bitfile, bitData? (a .bit chosen from the disk),
   // verify, reconfigure }; the lines of the full application's (server/programmer.js promJob); a
   // backup (read) is downloaded
