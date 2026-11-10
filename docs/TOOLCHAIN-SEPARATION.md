@@ -261,7 +261,7 @@ VHDL / Verilog ─▶ Silinx front end (the IDE) ─▶ flat Verilog ─▶ sili
 
 - **The front end** is `core/compile.js` (the VHDL and Verilog parsers, the elaborator), `core/unisim.js` (the
   UNISIM primitives' sources) and `core/synth-verilog.js` with its `synth-*.js` (the elaborated design as one
-  flat Verilog module): 40 modules, about 12 600 lines, with the interpreter and `core/values.js` for the
+  flat Verilog module): 41 modules, about 12 700 lines, with the interpreter and `core/values.js` for the
   constant expressions. It reads VHDL and Verilog alike, so a Verilog design goes through it too in the IDE, as
   today (the same netlists, the same warnings).
 - **Steps 3 and 4 make the joint**: the front end's output (the flat Verilog, its top, its warnings, the gate
@@ -286,7 +286,7 @@ VHDL / Verilog ─▶ flat Verilog ─▶ Yosys, pack, place, route, bitgen ─�
         └────── Silinx (the IDE) uses both ───┘
 ```
 
-The front end imports nothing else of the IDE today (its 40 modules include the interpreter and the event
+The front end imports nothing else of the IDE today (its 41 modules include the interpreter and the event
 simulator that `compile` uses), so its steps are the toolchain's, shorter:
 
 1. **A boundary test** ([#1709](https://github.com/pmnmalo/Silinx/issues/1709)): its modules listed, no
