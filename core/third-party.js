@@ -122,7 +122,7 @@ export const THIRD_PARTY = [
   },
   {
     "name": "@yowasp/nextpnr-ice40",
-    "version": "0.11.96-dev.805",
+    "version": "0.11.825",
     "license": "ISC",
     "url": "https://yowasp.org/",
     "standalone": false,
