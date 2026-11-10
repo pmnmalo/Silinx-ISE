@@ -2,7 +2,7 @@
 // one only), About, Check for Updates, language switch, keyboard shortcuts.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject, chromeOnly, BROWSER, PageGoneError } from './harness.js';
+import { setupUi, uiTest, makeProject, chromeOnly, BROWSER, PageGoneError, toggleSplitEditor } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
@@ -976,10 +976,10 @@ uiTest('document tabs: a document opened in a full strip has its tab in sight, a
   await page.eval((p) => window.SilinxApp.openFile(p), files[0]);
   await inSight(files[0]);
   // (a split: the side's own strip)
-  await page.click('#split-btn');
+  await toggleSplitEditor(page);
   await page.waitFor(() => document.getElementById('doc-tabs').classList.contains('split'), [], { what: 'the split' });
   for (const f of files.slice(1)) { await page.eval((p) => window.SilinxApp.openFile(p), f); await inSight(f); }
-  await page.click('#split-btn');
+  await toggleSplitEditor(page);
 });
 
 // #2027: the toolbar's Close Project (as File ▸ Close Project): off with no project, on with one, closing it

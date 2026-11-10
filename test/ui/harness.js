@@ -1058,6 +1058,13 @@ async function runUiTest(name, env, fn, url, t, build, tablet, ui) {
 export const tick = sleep;
 
 /** Wait for a file downloaded by the page (its browser context's download directory). */
+/** Splits the editor (or joins its sides) as the user does: its button in the Silinx and the Tasks interfaces' header,
+ *  View ▸ Split Editor in the ISE style one, which has no Split button (#3315); `pt`: the menu in Portuguese. */
+export async function toggleSplitEditor(page, { pt = false } = {}) {
+  if (await page.eval(() => !!document.getElementById('split-btn')?.isConnected)) return page.click('#split-btn');
+  return page.menu(pt ? 'Ver' : 'View', pt ? 'Dividir o Editor' : 'Split Editor');
+}
+
 export async function waitDownload(page, name, timeout = 15000) {
   const f = path.join(page.downloadDir, name);
   const t0 = Date.now();

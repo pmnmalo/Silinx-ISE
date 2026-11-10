@@ -3,12 +3,12 @@
 // schematic kept in front; an edit of the schematic reaches the HDL beside it; a click in a pane brings its document to
 // the front; the divider dragged; a document opened goes to the side worked in; kept with the project (a reload comes
 // back split); a side's last document closed leaves the other alone. The Split button (the header's right end, before
-// the side panel's): the right side empty, what to open there, the next document opened there; a tab dragged to the
+// the side panel's; none in the ISE style toolbar, #3315: View ▸ Split Editor there): the right side empty, what to open there, the next document opened there; a tab dragged to the
 // other side, or moved by its menu; View ▸ Split Editor; a narrow workspace stacks the sides, each with its tabs over
 // it; a C source's HDL beside it, made again as the C is saved; Portuguese; the Tasks interface. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject } from './harness.js';
+import { setupUi, uiTest, makeProject, toggleSplitEditor } from './harness.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -146,14 +146,19 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
   assert.ok(!(await tabMenu(page, 'tb_gates.vhd')).some((l) => /Side|Split/.test(l)));
   await page.closeMenus();
 
-  // the button: at the header's right end (in the Tasks interface, between the messages' button and Maximize, #1657)
-  const btn = await page.eval(() => {
-    const b = document.getElementById('split-btn'), r = b?.getBoundingClientRect();
-    return b && { right: r.right > innerWidth * 0.6, top: r.top < 90, shown: !!b.getClientRects().length, next: b.nextElementSibling?.dataset.act || null, pressed: b.getAttribute('aria-pressed'), title: b.title };
-  });
-  assert.deepEqual({ ...btn, next: btn.next === 'max' || btn.next === null }, { right: true, top: true, shown: true, next: true, pressed: 'false', title: 'Split the editor: two documents side by side, each side with its tabs' });
-  if (await page.eval(() => !!document.getElementById('task-view'))) assert.equal(btn.next, 'max');
-  await page.click('#split-btn');
+  // the button: at the header's right end (in the Tasks interface, between the messages' button and Maximize, #1657);
+  // none in the ISE style toolbar, whose right end is a shared project's (#3315)
+  const ise = await page.eval(() => document.documentElement.dataset.ui === 'ise');
+  if (ise) assert.equal(await page.eval(() => document.getElementById('split-btn')?.isConnected || false), false);
+  else {
+    const btn = await page.eval(() => {
+      const b = document.getElementById('split-btn'), r = b?.getBoundingClientRect();
+      return b && { right: r.right > innerWidth * 0.6, top: r.top < 90, shown: !!b.getClientRects().length, next: b.nextElementSibling?.dataset.act || null, pressed: b.getAttribute('aria-pressed'), title: b.title };
+    });
+    assert.deepEqual({ ...btn, next: btn.next === 'max' || btn.next === null }, { right: true, top: true, shown: true, next: true, pressed: 'false', title: 'Split the editor: two documents side by side, each side with its tabs' });
+    if (await page.eval(() => !!document.getElementById('task-view'))) assert.equal(btn.next, 'max');
+  }
+  await toggleSplitEditor(page);
   await page.waitFor(() => document.getElementById('workspace').classList.contains('split'), [], { what: 'split' });
   // the right side empty, worked in: how to bring a document there under a large pen (#1720), the other documents one click away
   assert.deepEqual(await ids(page), [`a:${VHD}*`]);
@@ -161,7 +166,7 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
   const tasks = await page.eval(() => !!document.getElementById('task-view'));
   const empty = await page.eval(() => { const e = document.getElementById('split-empty'); return { side: e.dataset.side, front: e.classList.contains('pane-front'), text: e.querySelector('p').textContent, icon: (() => { const r = e.querySelector('.split-ico svg')?.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height), r.bottom <= e.querySelector('p').getBoundingClientRect().top] : null; })(), picks: [...e.querySelectorAll('.split-picks button')].filter((b) => b.getClientRects().length).map((b) => b.textContent) }; });
   assert.deepEqual(empty, { side: 'b', front: true, text: 'Drag a tab here, or right-click an open tab and choose Move to the Other Side', icon: [48, 48, true], picks: tasks ? ['tb_gates.vhd'] : ['Design Summary', 'tb_gates.vhd'] });
-  assert.equal(await page.eval(() => document.getElementById('split-btn').getAttribute('aria-pressed')), 'true');
+  if (!ise) assert.equal(await page.eval(() => document.getElementById('split-btn').getAttribute('aria-pressed')), 'true');
   assert.deepEqual(await viewItems(), ['Split Editor (checked)', 'Show Schematic Beside', 'Show Verilog Beside']);
   // a document opened (the Design pane's schematic): there
   await page.eval(() => window.SilinxApp.openSch('src/gates.sch.json'));
@@ -200,17 +205,17 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
   const pt = await page.openMenu('Ver');
   for (const l of ['Dividir o Editor', 'Mostrar o Verilog ao Lado', 'Mostrar a Unidade em Teste ao Lado']) assert.ok(pt.some((i) => i.label === l), `${l}: ${pt.map((i) => i.label).join(' | ')}`);
   await page.closeMenus();
-  assert.deepEqual(await page.eval(() => [document.getElementById('split-btn').title, document.getElementById('split-divider').title]),
-    ['Dividir o editor: dois documentos lado a lado, cada lado com os seus separadores', 'Arraste para mudar o tamanho dos lados (duplo clique: metades)']);
+  assert.deepEqual(await page.eval(() => [document.getElementById('split-btn')?.isConnected ? document.getElementById('split-btn').title : null, document.getElementById('split-divider').title]),
+    [ise ? null : 'Dividir o editor: dois documentos lado a lado, cada lado com os seus separadores', 'Arraste para mudar o tamanho dos lados (duplo clique: metades)']);
   await page.eval(() => window.SilinxApp.closeDoc(window.Silinx.docs.find((d) => d.id === 'sch:src/gates.sch.json')));
   await page.waitFor(() => !document.getElementById('workspace').classList.contains('split'), [], { what: 'the right side\'s last closed' });
-  await page.click('#split-btn');
+  await toggleSplitEditor(page, { pt: true });
   await page.waitFor(() => !document.getElementById('split-empty')?.hidden && document.querySelector('#split-empty p')?.textContent.startsWith('Arraste'), [], { what: 'the empty side in Portuguese' });
   assert.equal(await page.eval(() => document.querySelector('#split-empty p').textContent), 'Arraste para aqui um separador, ou clique com o botão direito num separador aberto e escolha Mover para o Outro Lado');
   await page.menu('Ver', 'Dividir o Editor');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await page.waitFor(() => !document.getElementById('workspace').classList.contains('split'), [], { what: 'one side' });
-  assert.equal(await page.eval(() => document.getElementById('split-btn').getAttribute('aria-pressed')), 'false');
+  if (!ise) assert.equal(await page.eval(() => document.getElementById('split-btn').getAttribute('aria-pressed')), 'false');
   assert.deepEqual(await ids(page), ['-:file:sim/tb_gates.vhd*']);
   await noWarnings(page);
 });
