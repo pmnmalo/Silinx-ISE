@@ -61,7 +61,7 @@ test('share_project start: a page follows it (the project, its files, the owner\
   // (again: the same link)
   assert.equal((await ok('share_project', { project: 'traffic', server: base })).text, `'traffic' is shared already: ${link}`);
   const l = parseFollowLink(link);
-  const page = await followRoom({ url: relayUrl(l.base), room: l.room, key: l.key, user: { name: 'Rui' } });
+  const page = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Rui' } });
   await page.ready;
   const d = docProject(page.doc);
   assert.equal(d.owner, 'Teacher');
@@ -115,7 +115,7 @@ test('the errors: a project not shared, a bad action, no project, a bad server, 
   const dead = 'http://127.0.0.1:1';
   const d = await call('share_project', { project: 'traffic', server: dead });
   assert.equal(d.isError, true);
-  assert.match(d.text, /^share_project: cannot share through http:\/\/127\.0\.0\.1:1: cannot reach the relay at ws:\/\/127\.0\.0\.1:1\/api\/collab \(is Silinx running there\? silinx serve\)$/);
+  assert.match(d.text, /^share_project: cannot share through http:\/\/127\.0\.0\.1:1: cannot reach the relay at ws:\/\/127\.0\.0\.1:1\/api\/collab\/share \(is Silinx running there\? silinx serve\)$/);
   await fails('follow_project', { link: 'http://x/#follow=abc' }, 'the link to follow is broken (copy it again from the owner\'s Share Project)');
   await fails('follow_project', { link: 'http://x/#design=abc' }, 'link: a link to follow (http(s)://…/#follow=…)');
   await fails('follow_project', { link: `#follow=${'a'.repeat(22)}.${'b'.repeat(43)}` }, 'link: a link to follow (http(s)://…/#follow=…)');

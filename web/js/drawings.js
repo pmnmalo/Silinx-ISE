@@ -23,7 +23,7 @@ export {
   openTt, openTtSchematic, syncHdlFromTt, ttContextMenu
 };
 import { openPetriFsm } from './petri-fsm-doc.js';
-import { following, followNotice, placeFollowNotice } from './collab-state.js';
+import { following, followNotice } from './collab-state.js';
 export { openPetriFsm };
 // a project followed (#3181): its drawings read only, the follower's notice at the end of their toolbar
 const followOnly = () => (following() ? { readOnly: true, banner: followNotice() } : {});
@@ -334,9 +334,9 @@ export async function openPetri(path) {
         onProblems: (diags) => problems.set(diags),
         onCheck: (diags) => problems.log(diags),   // (Check: in the Console too, #2803)
         onMessage: (text, err) => log(err ? `WARNING: ${path.split('/').pop()}: ${text}` : `${path.split('/').pop()}: ${text}`, err ? 'warn' : 'info'),
+        ...followOnly(),
       });
       d.petriEditor = ed;
-      placeFollowNotice(host);   // (a project followed, #3181)
       return {
         save: async () => {
           const m = ed.getModel();

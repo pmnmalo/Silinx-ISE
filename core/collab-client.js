@@ -1,7 +1,9 @@
 // A shared project's participants (#3180, #3181), in the page and in the MCP server alike: the owner, who shares a
 // project's Yjs document (core/collab-doc.js), and a follower, who receives it read only. Both talk to a relay
 // (server/collab-relay.js) over a WebSocket:
-//   text frames, JSON, the control:  { type: 'open', token, client } -> { type: 'opened', room }   (the owner)
+// at its share endpoint (the owner: the server's token in the subprotocols, `silinx-collab`, `token.<token>`) or its
+// follow endpoint (a follower: `silinx-collab`):
+//   text frames, JSON, the control:  { type: 'open', client }        -> { type: 'opened', room }   (the owner)
 //                                    { type: 'join', room, client }  -> { type: 'joined', owner }  (a follower; the
 //                                                                       owner's client id)
 //                                    the relay's { type: 'join' | 'leave', client }, { type: 'closed', reason },
@@ -14,14 +16,15 @@ import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwareness
 import { newKey, keyOf, seal, unseal } from './collab-crypto.js';
 
 export const PROTOCOL = 1;
+export const SUBPROTOCOL = 'silinx-collab';   // (the WebSockets', server/collab-relay.js's)
 export const KIND = Object.freeze({ update: 1, awareness: 2 });
 /** The colours of the participants, by their client id. */
 export const COLORS = ['#d9480f', '#1971c2', '#2f9e44', '#9c36b5', '#e8590c', '#0c8599', '#c2255c', '#5c940d'];
 export const colorOf = client => COLORS[Math.abs(Number(client) || 0) % COLORS.length];
 const OPEN_WAIT = 10_000;
 
-function connection(url, WS, onControl, onFrame) {
-  const ws = new WS(url);
+function connection(url, WS, protocols, onControl, onFrame) {
+  const ws = new WS(url, protocols);
   ws.binaryType = 'arraybuffer';
   let chain = Promise.resolve();   // (frames opened in their order: unsealing is asynchronous)
   ws.addEventListener('message', ev => {
@@ -89,7 +92,7 @@ function participant({ c, room, key, doc, awareness, owner, onEvent }) {
   };
 }
 
-/** The owner shares `doc`: the room opened on the relay at `url` ({ type: 'open' } with the server's token).
+/** The owner shares `doc`: the room opened on the relay at `url` (its share endpoint, with the server's token).
  *  Returns { room, key (the link's), peers(), setView(), close(), ... }. onEvent({ type: 'peers' | 'closed' |
  *  'error', ... }). */
 export async function shareRoom({ url, token = null, doc, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {} }) {
@@ -97,7 +100,7 @@ export async function shareRoom({ url, token = null, doc, user, WebSocket: WS = 
   const awareness = new Awareness(doc);
   awareness.setLocalState({ user, role: 'owner', view: null });
   let p = null;
-  const c = connection(url, WS, async msg => {
+  const c = connection(url, WS, [SUBPROTOCOL, ...(token ? [`token.${token}`] : [])], async msg => {
     if (c.first?.(msg)) { c.first = null; return; }
     if (msg.type === 'join') {   // (someone joined: the whole document and who is in, for them)
       await p.send(KIND.update, Y.encodeStateAsUpdate(doc));
@@ -111,7 +114,7 @@ export async function shareRoom({ url, token = null, doc, user, WebSocket: WS = 
   });
   try { await c.opened; } catch (e) { awareness.destroy(); throw e; }
   const answer = firstAnswer(c, 'opened');
-  c.control({ type: 'open', v: PROTOCOL, token, client: doc.clientID });
+  c.control({ type: 'open', v: PROTOCOL, client: doc.clientID });
   let room;
   try { ({ room } = await answer); } catch (e) { awareness.destroy(); c.ws.close(); throw e; }
   p = participant({ c, room, key, doc, awareness, owner: doc.clientID, onEvent });
@@ -136,7 +139,7 @@ export async function followRoom({ url, room, key: keyText, user, WebSocket: WS 
   const ready = new Promise((resolve, reject) => { synced = resolve; failed = reject; });
   ready.catch(() => {});
   let warned = false;
-  const c = connection(url, WS, msg => {
+  const c = connection(url, WS, [SUBPROTOCOL], msg => {
     if (c.first?.(msg)) { c.first = null; return; }
     if (msg.type === 'leave') removeAwarenessStates(awareness, [Number(msg.client)], 'relay');
     else if (msg.type === 'closed') c.closedReason = msg.reason;

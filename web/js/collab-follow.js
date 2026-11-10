@@ -43,7 +43,7 @@ export async function startFollowing(hash = location.hash) {
   try { localStorage.setItem(NAME_KEY, name); } catch { /* this page only */ }
   let session;
   try {
-    session = await followRoom({ url: relayUrl(location.href), room: link.room, key: link.key, user: { name }, onEvent: ev => onEvent(ev) });
+    session = await followRoom({ url: relayUrl(location.href, 'follow'), room: link.room, key: link.key, user: { name }, onEvent: ev => onEvent(ev) });
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);
