@@ -79,8 +79,9 @@ export function taskOfDoc(id) {
   const s = String(id || '');
   if (/^isim(:|$)/.test(s)) return 'sim';   // (one per module and model, #1161)
   if (s === 'emulator') return 'emu';
-  // (a build file: a report, #802; the RTL Schematic, Synthesize's view, as the Technology one, #1063; iMPACT, #1172)
-  if (/^(summary|pins|fpgaview|impact)$/.test(s) || /^(text|tech|rtl):/.test(s) || s.startsWith('file:build/')) return 'impl';
+  // (a build file: a report, #802; the RTL Schematic, Synthesize's view, as the Technology one, #1063; iMPACT, #1172; the
+  // logic analyzer's capture, Configure Target Device's, #3327)
+  if (/^(summary|pins|fpgaview|impact|capture)$/.test(s) || /^(text|tech|rtl):/.test(s) || s.startsWith('file:build/')) return 'impl';
   // (the constraints file: Edit Constraints (Text), as I/O Pin Planning, #1265)
   if (/^file:.+\.(ucf|pcf|xdc)$/i.test(s)) return 'impl';
   return 'edit';

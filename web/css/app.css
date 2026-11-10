@@ -178,6 +178,8 @@ html:not([data-ui="silinx"]) .tree .row.sel .twisty { color: #dde; }   /* (reada
 .dlg-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px 10px; border-top: 1px solid #dfdfdf; }
 .dlg label { display: block; margin: 6px 0 2px; }
 .dlg input[type=text], .dlg input[type=number], .dlg select, .dlg textarea { border: 1px solid #abadb3; padding: 2px 4px; background: #fff; height: 22px; }
+/* (a list, its rows: its size's, not a field's height, #3326) */
+.dlg select[multiple] { height: auto; }
 .dlg textarea { height: auto; font-family: var(--mono); }
 .dlg input:focus, .dlg select:focus { outline: 1px solid #3399ff; border-color: #3399ff; }
 .form-grid { display: grid; grid-template-columns: 170px 1fr; gap: 6px 10px; align-items: center; }

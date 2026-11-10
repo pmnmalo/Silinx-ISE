@@ -23,7 +23,7 @@ test('the four tasks, in the order of a lab session, with the names of the Silin
 
 test('taskOfDoc: each kind of document belongs to one task (the editors and the viewers of the design to Edit)', () => {
   const cases = {
-    isim: 'sim', emulator: 'emu', impact: 'impl',
+    isim: 'sim', emulator: 'emu', impact: 'impl', capture: 'impl',
     summary: 'impl', pins: 'impl', fpgaview: 'impl', 'text:pong.pwr': 'impl', 'tech:pong': 'impl', 'rtl:pong': 'impl',
     'file:src/pong.v': 'edit', 'file:constraints/top.ucf': 'impl', 'file:pins.UCF': 'impl', 'file:src/ucf.v': 'edit',   // (the constraints Implement's, #1265)
     'asm:src/speed_ctrl.asm.json': 'edit', 'sch:src/gates.sch.json': 'edit', 'fsm:src/traffic.fsm.json': 'edit',
