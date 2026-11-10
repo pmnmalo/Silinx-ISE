@@ -59,8 +59,9 @@
   var last = null; try { last = localStorage.getItem(k + 'lastProject'); } catch (e) {}
   if (last) { d.setAttribute('data-starting', ''); setTimeout(function () { d.removeAttribute('data-starting'); }, 10000); } })();
 </script>
-<!-- the editor (CodeMirror 6, web/js/editor.js): its ES modules, from node_modules (server/server.js
-     serves these packages only; the standalone edition bundles them, scripts/build-standalone.mjs) -->
+<!-- the editor (CodeMirror 6, web/js/editor.js) and a shared project's document (Yjs, its awareness and lib0:
+     core/collab-*.js, #3181): their ES modules, from node_modules (server/server.js serves these packages only; the
+     standalone edition bundles them, scripts/build-standalone.mjs) -->
 <script type="importmap">
 { "imports": {
   "@codemirror/state": "/vendor/npm/@codemirror/state/dist/index.js",
@@ -79,7 +80,29 @@
   "@marijn/find-cluster-break": "/vendor/npm/@marijn/find-cluster-break/src/index.js",
   "crelt": "/vendor/npm/crelt/index.js",
   "style-mod": "/vendor/npm/style-mod/src/style-mod.js",
-  "w3c-keyname": "/vendor/npm/w3c-keyname/index.js"
+  "w3c-keyname": "/vendor/npm/w3c-keyname/index.js",
+  "yjs": "/vendor/npm/yjs/dist/yjs.mjs",
+  "y-protocols/awareness": "/vendor/npm/y-protocols/awareness.js",
+  "lib0/observable": "/vendor/npm/lib0/observable.js",
+  "lib0/array": "/vendor/npm/lib0/array.js",
+  "lib0/math": "/vendor/npm/lib0/math.js",
+  "lib0/map": "/vendor/npm/lib0/map.js",
+  "lib0/encoding": "/vendor/npm/lib0/encoding.js",
+  "lib0/decoding": "/vendor/npm/lib0/decoding.js",
+  "lib0/random": "/vendor/npm/lib0/random.js",
+  "lib0/promise": "/vendor/npm/lib0/promise.js",
+  "lib0/buffer": "/vendor/npm/lib0/buffer.js",
+  "lib0/error": "/vendor/npm/lib0/error.js",
+  "lib0/binary": "/vendor/npm/lib0/binary.js",
+  "lib0/function": "/vendor/npm/lib0/function.js",
+  "lib0/set": "/vendor/npm/lib0/set.js",
+  "lib0/logging": "/vendor/npm/lib0/logging.js",
+  "lib0/time": "/vendor/npm/lib0/time.js",
+  "lib0/string": "/vendor/npm/lib0/string.js",
+  "lib0/iterator": "/vendor/npm/lib0/iterator.js",
+  "lib0/object": "/vendor/npm/lib0/object.js",
+  "lib0/environment": "/vendor/npm/lib0/environment.js",
+  "lib0/webcrypto": "/vendor/npm/lib0/webcrypto.js"
 } }
 </script>
 <script src="/vendor/elk/elk.bundled.js"></script>
