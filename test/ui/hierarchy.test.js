@@ -206,7 +206,8 @@ uiTest('Design pane (#220, #2872): a badge opens its view; a right-click shows t
   // one menu on the name and on every badge (#2872): the module's, the schematic's commands in it
   const MODULE = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Verify Equivalence…', 'Verify Assertions…', ...TB, 'Copy Link to This Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…'];
   // (gates the top: Unset as Top Module, #1220)
-  const GATES = withDrawing(['Unset as Top Module', ...MODULE.slice(1)], 'Export as ISE Schematic (.sch)…');
+  // (no Export as ISE Schematic (.sch)…, #3313: no drawing commands for a schematic)
+  const GATES = ['Unset as Top Module', ...MODULE.slice(1)];
   assert.deepEqual(await rowMenu(page, 'gates'), GATES);
   assert.deepEqual(await badgeMenu(page, 'gates', 'Schematic'), GATES);
   assert.deepEqual(await badgeMenu(page, 'gates', 'VHDL'), GATES);

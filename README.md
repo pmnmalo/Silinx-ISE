@@ -74,7 +74,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   project HDL; schematic errors refuse the simulation with the list of errors. Esc returns to editing.
 - **ISE schematics (.sch)**: schematics in ISE projects (XML and older text formats) are converted
   on import, with the Xilinx library symbols mapped to equivalent symbols or exact HDL blocks;
-  exporting a project writes them back as ISE `.sch` files (*Export as ISE Schematic* for one).
+  exporting a project writes them back as ISE `.sch` files.
 - **Graphical ASM state-machine editor** (state, decision, case and conditional-output boxes)
   that generates synthesizable VHDL or Verilog (2/3-process style, binary/gray/one-hot/enum
   encoding) and adds it to the project. A *case* box is a multi-way decision on the value of a
