@@ -80,31 +80,37 @@ async function verifyInner(mod, { reference = null, depth }) {
   const id = reference ? 'verify' : 'verify-assert';
   await saveAll();
   setStatus(id, 'running');
-  // the simulation view's sources (the reference may be a simulation-only one), but a counterexample's test bench
-  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, true) && !isVerifyBench(s.text));
+  const srcs = verifySources();
   // (Yosys: the page's workers, or the browser edition's own, as the emulator's compiled engine runs it)
   const run = await (await import('./emulator.js')).emulatorYosys(api.standalone);
   const r = reference ? await verifyEquivalence(srcs, { top: mod, reference, depth, run }) : await verifyAssertions(srcs, { top: mod, depth, run });
-  let bench = null;
-  if (r.status === 'failed') {
-    const tb = benchName(r.top);
-    bench = `sim/${tb}.${r.lang === 'vhdl' ? 'vhd' : 'v'}`;
-    const mine = S.sources.find(s => s.path === bench);
-    const other = S.modules.find(m => m.name.toLowerCase() === tb.toLowerCase() && !isVerifyBench(S.sources.find(x => x.path === m.file)?.text));
-    if ((mine && !isVerifyBench(mine.text)) || other) {
-      log(`WARNING:Verify - the counterexample's test bench is not written: ${other ? `a module named '${tb}' already exists (${other.file})` : `${bench} exists and is not a test bench of Verify`}.`, 'warn');
-      bench = null;
-    } else {
-      // (an earlier one in the other language, the MCP server's: replaced by this one)
-      const twin = S.sources.find(s => s.path === `sim/${tb}.${r.lang === 'vhdl' ? 'v' : 'vhd'}` && isVerifyBench(s.text));
-      if (twin) await api.deleteFile(S.project.name, twin.path);
-      await api.writeFile(S.project.name, bench, counterexampleBench(r, { name: tb }));   // (registers it: a simulation source)
-      await app.reloadProject();
-    }
-  }
+  const tb = benchName(r.top);
+  const bench = r.status === 'failed' ? await writeBench(tb, `sim/${tb}.${r.lang === 'vhdl' ? 'vhd' : 'v'}`, () => counterexampleBench(r, { name: tb })) : null;
   for (const m of (reference ? verifyMessages : assertMessages)(r, { bench })) log(m.text, m.kind === 'info' ? undefined : m.kind);
   setStatus(id, r.status === 'proved' && !r.warnings.length ? 'ok' : r.status === 'proved' || r.status === 'bounded' ? 'warn' : 'err');
   // the counterexample replayed: the waveform viewer shows it, the console the same difference
-  if (bench) await runSimulation(benchName(r.top));
+  if (bench) await runSimulation(tb);
   return r;
 }
+
+/**
+ * A counterexample's test bench `tb` written at `bench` (text(): its text), the project reloaded: its path, or null
+ * when a file or a module of the user's is in its place (a warning).
+ */
+export async function writeBench(tb, bench, text) {
+  const mine = S.sources.find(s => s.path === bench);
+  const other = S.modules.find(m => m.name.toLowerCase() === tb.toLowerCase() && !isVerifyBench(S.sources.find(x => x.path === m.file)?.text));
+  if ((mine && !isVerifyBench(mine.text)) || other) {
+    log(`WARNING:Verify - the counterexample's test bench is not written: ${other ? `a module named '${tb}' already exists (${other.file})` : `${bench} exists and is not a test bench of Verify`}.`, 'warn');
+    return null;
+  }
+  // (an earlier one in the other language, the MCP server's: replaced by this one)
+  const twin = S.sources.find(s => s.path !== bench && s.path.replace(/\.(vhd|v)$/, '') === bench.replace(/\.(vhd|v)$/, '') && isVerifyBench(s.text));
+  if (twin) await api.deleteFile(S.project.name, twin.path);
+  await api.writeFile(S.project.name, bench, text());   // (registers it: a simulation source)
+  await app.reloadProject();
+  return bench;
+}
+
+/** The sources Verify reads: the simulation view's (a reference may be a simulation-only one), but its test benches. */
+export const verifySources = () => S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, true) && !isVerifyBench(s.text));

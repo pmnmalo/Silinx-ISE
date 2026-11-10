@@ -51,6 +51,7 @@ export async function openAsm(path) {
         onProblems: (diags) => problems.set(diags),
         onValidate: (diags) => problems.log(diags),
         onMessage: (text) => log(`${path.split('/').pop()}: ${t(text)}`, 'info'),
+        onVerify: (m) => import('./verify-props.js').then(v => v.propertyProcess(m)),
       });
       d.asmEditor = ed;
       return {
@@ -163,6 +164,7 @@ export async function openFsm(path) {
         onOpenFile: f => openFile(f),
         onTruthTables: () => fsmTruthTables(path),
         onToAsm: () => fsmToAsmChart(path),
+        onVerify: (m) => import('./verify-props.js').then(v => v.propertyProcess(m)),
         onMessage: msg => log(`WARNING: ${path}: ${msg} (not applied)`, 'warn'),
         onProblems: setProblems,
         onCheck: (diags) => problems.log(inLanguage(diags)),   // (Check: in the Console too, #2803)

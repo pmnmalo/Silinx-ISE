@@ -123,3 +123,20 @@ test('verify with no reference: the module\'s assertions; one that fails replaye
   assert.deepEqual(p.data, { project: 'a', module: 'cnt', reference: null, status: 'proved', depth: 8, asserts: 1, assumes: 0, induction: 2, errors: [], warnings: [] });
   assert.equal(p.text.split('\n')[2], 'Proved: the assertions of \'cnt\' hold for every input sequence (by induction over 2 clock cycle(s)).');
 });
+
+test('verify with a property: a state diagram\'s state never reached (failed, replayed), reached (the way there); the refusals', async () => {
+  await ok('new_project_from_example', { example: 'traffic', name: 'tp' });
+  const r = await ok('verify', { project: 'tp', module: 'traffic', property: 'never', state: 'NIGHT' });
+  assert.equal(r.text, ['Started : "Verify Property".', 'Proving that \'traffic\' never reaches state NIGHT: Yosys\'s SAT solver, at most 20 clock cycle(s), then a proof by induction.',
+    'ERROR:Verify - \'traffic\' reaches state NIGHT at clock cycle 2.', 'The counterexample\'s test bench: sim/verify_traffic.vhd (it replays the 2 clock cycle(s) in the simulator).',
+    'Process "Verify Property" failed', 'Simulation of verify_traffic:', '  traffic reaches state NIGHT', '  VERIFY: 2 clock cycle(s) replayed'].join('\n'));
+  assert.deepEqual([r.data.status, r.data.holds, r.data.cycle, r.data.testBench, r.data.property, r.data.warnings], ['failed', false, 2, 'sim/verify_traffic.vhd', { kind: 'never', state: 'NIGHT' }, []]);
+  const s = await ok('simulate', { project: 'tp', top: 'verify_traffic', time_ns: 1000, signals: ['phase'] });
+  assert.deepEqual(s.data.log.map(l => l.text), r.data.replay);
+  const w = await ok('verify', { project: 'tp', module: 'traffic', property: 'reach', state: 'WALK' });
+  assert.deepEqual([w.data.status, w.data.holds, w.data.cycle, w.text.split('\n')[2]], ['failed', true, 4, '\'traffic\' reaches state WALK at clock cycle 4.']);
+  assert.equal((await call('verify', { project: 'tp', module: 'top', property: 'never', state: 'X' })).text, 'verify: property: \'top\' is not the module of a state diagram or an ASM chart of the project');
+  assert.equal((await call('verify', { project: 'tp', module: 'traffic', property: 'never', state: 'X', reference: 'top' })).text, 'verify: give a reference or a property, not both');
+  const x = await call('verify', { project: 'tp', module: 'traffic', property: 'exclusive', outputs: ['phase', 'q'] });
+  assert.deepEqual([x.isError, x.data.errors], [true, ['\'phase\' is not a 1-bit output of \'traffic\' (its 1-bit outputs: none)']]);
+});

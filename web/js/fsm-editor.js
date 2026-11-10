@@ -2,7 +2,7 @@
 //
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
-//                                          onOpenFile(path), onTruthTables(), onToAsm(), onMessage(text), onProblems(diags), onCheck(diags),
+//                                          onOpenFile(path), onTruthTables(), onToAsm(), onVerify(model), onMessage(text), onProblems(diags), onCheck(diags),
 //                                          readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.focus(d); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
@@ -126,6 +126,8 @@ export function mountFsmEditor(container, opts = {}) {
     toolbarMenu([
       btn('Arrange', 'Automatic layout of the states', () => arrange()),
       btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.()),
+      // (Verify Property, #3177: web/js/verify-props.js)
+      ...(opts.onVerify ? [btn('Verify Property…', 'Prove a property of the state machine: a state never reached, a state reached, outputs never 1 together', () => opts.onVerify(clone(M)))] : []),
     ], { title: 'Layout and conversion', btnClass: 'asm-btn' }).el,
     linkHost);
   const readOnly = !!opts.readOnly;

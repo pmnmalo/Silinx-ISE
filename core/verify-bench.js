@@ -20,7 +20,7 @@ export const benchName = top => `verify_${top}`;
  * The test bench text. r: verifyEquivalence's failed result ({ top, reference, ports, clocks, cycles, cycle }); name:
  * the test bench's (benchName); lang: 'vhdl' | 'verilog' (default: the module's language).
  */
-export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang || 'vhdl' } = {}) {
+export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang || 'vhdl', about = null, prelude = '', checks = [] } = {}) {
   if (r.status !== 'failed' || !r.cycles?.length) throw new Error('no counterexample to replay');
   const clocks = new Set(r.clocks || []);
   const ins = r.ports.filter(p => p.dir === 'in' && !clocks.has(p.name));
@@ -36,9 +36,11 @@ export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang 
   const refName = new Map(alone ? [] : r.ports.map(p => [p.name, same(p) ? p.name : own(`ref_${p.name}`)]));
   const timing = clks.length ? ` (clock ${clks.map(p => p.name).join(', ')}, ${PERIOD} ns: the inputs at the start of a cycle, its rising edge at half the period)` : ' (combinational: an input change every 10 ns)';
   const header = c => (alone ? [
-    `${c} Counterexample of Verify (Silinx): an assertion of '${r.top}' fails at clock cycle ${r.cycle}.`,
+    `${c} Counterexample of Verify (Silinx): ${about || `an assertion of '${r.top}' fails at clock cycle ${r.cycle}`}.`,
     `${c} The module gets the counterexample's inputs, cycle by cycle${timing};`,
     `${c} its assertion that fails reports it.`,
+    // (a module of the file's own before the test bench: a drawing's HDL with its property, core/verify-props.js)
+    ...(prelude ? ['', prelude.trimEnd()] : []),
   ] : [
     `${c} Counterexample of Verify (Silinx): '${r.top}' differs from its reference '${r.reference}' at clock cycle ${r.cycle}${r.differs?.length ? ` (${r.differs.join(', ')})` : ''}.`,
     `${c} Both modules get the same inputs, cycle by cycle${clks.length ? ` (clock ${clks.map(p => p.name).join(', ')}, ${PERIOD} ns: the inputs at the start of a cycle, the outputs compared before its rising edge)` : ' (combinational: the outputs compared 10 ns after each input change)'};`,
@@ -108,6 +110,8 @@ export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang 
   // the module alone: the inputs of each cycle, its own assertions checking it
   function vhdlAlone(L) {
     const lit = (p, b) => (p.kind === 'sl' ? `'${b}'` : p.kind === 'int' ? String(intOf(p, b)) : `"${b}"`);
+    // (checks: concurrent statements of the bench's own, on its signals)
+    if (checks.length) L.push('', ...checks.map(c => `  ${c}`));
     L.push('', `  ${N.stim} : process`, '  begin');
     r.cycles.forEach((c, i) => {
       L.push(`    -- clock cycle ${i + 1}`);
@@ -155,7 +159,7 @@ export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang 
     return L.join('\n');
   }
   function verilogAlone(L) {
-    L.push('', `  ${r.top} ${N.uut} (${r.ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, '', '  initial begin');
+    L.push('', `  ${r.top} ${N.uut} (${r.ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, ...checks.map(c => `  ${c}`), '', '  initial begin');
     r.cycles.forEach((c, i) => {
       L.push(`    // clock cycle ${i + 1}`);
       for (const p of clks) L.push(`    ${p.name} = 0;`);
