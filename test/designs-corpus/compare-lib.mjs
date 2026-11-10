@@ -37,7 +37,8 @@ export function buildsOf(d, res) {
 /** Whether a run's results (a --filter run's) can be merged into the earlier ones: both of the same Optimizations (goals). */
 export const mergeable = (old, now) => String(old?.goals || '') === String(now?.goals || '') && String(old?.optimizations || '') === String(now?.optimizations || '');
 
-/** The designs built before (no error on a side) that fail now on that side: ['name (Silinx): error', …]. */
+/** The designs built before (no error on a side) that fail now on that side: ['name (Silinx): error', …]; a build not made
+ *  (left out) or timed out is not one. */
 export function newFailures(before, now) {
   const old = new Map((before?.designs || []).map(d => [d.name, d]));
   const out = [];
@@ -49,7 +50,8 @@ export function newFailures(before, now) {
       const was = buildsOf(o, before), is = buildsOf(d, now);
       for (const g of now.goals) {
         for (const [side, label] of [['silinx', 'Silinx'], ['ise', 'ISE']]) {
-          if (was[g]?.[side] && !was[g][side].error && is[g]?.[side]?.error) out.push(`${d.name} (${label}, ${goalName(g)}): ${is[g][side].error}`);
+          // (a build stopped at its time limit is a gap of this run's, as one not made, #3292: not a failure)
+          if (was[g]?.[side] && !was[g][side].error && is[g]?.[side]?.error && !is[g][side].timedOut) out.push(`${d.name} (${label}, ${goalName(g)}): ${is[g][side].error}`);
         }
       }
       continue;
