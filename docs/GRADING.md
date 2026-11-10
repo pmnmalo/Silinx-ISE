@@ -2,7 +2,8 @@
 
 Silinx grades digital-systems exercises the way Mooshak grades programming ones. A student submits a circuit, the
 exercise's tests simulate it, and each test gives a verdict and its points (#3191). There is no judge server:
-`silinx grade` does the grading, and adapters fit it into the tools a course already has (GitHub Classroom, #3193).
+`silinx grade` does the grading, and adapters fit it into the tools a course already has: GitHub Classroom
+([CLASSROOM.md](CLASSROOM.md), #3193).
 
 ## The exercise
 
