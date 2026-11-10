@@ -2,7 +2,7 @@
 // and schematics opened in their editors, each kept in sync with the HDL module it is the base of; the views of an
 // HDL file (schematic, ASM chart), the conversions between them, and a drawing whose HDL file name is taken.
 import { api } from './api.js';
-import { h, alertDlg, confirmDlg, popupMenu, toast, downloadText } from './ui.js';
+import { h, alertDlg, confirmDlg, popupMenu, toast } from './ui.js';
 import { elaborate } from '/core/compile.js';
 import { viewHdl, drawnHdlPath, drawnHdlClash, drawingInLanguage } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
@@ -14,7 +14,6 @@ import { t, onLanguageChange } from './i18n.js';
 import { reloadProject } from './project.js';
 import { markStale, saveAll } from './processes.js';
 import { openModuleSource, removeModule, renderHierarchy, saveProjectJson, setTop, topMenuItem } from './design.js';
-import { downloadUrl } from './menus.js';
 import { renameDialog } from './rename.js';
 import {
   openTt, openTtSchematic, syncHdlFromTt, ttContextMenu, ttFromHdl
@@ -455,7 +454,6 @@ export function drawingCommands(sch) {
     isAsm(sch) ? { label: 'Convert to State Diagram (FSM)…', action: () => asmToFsmDiagram(sch) } : null,
     isFsm(sch) ? { label: 'Convert to ASM chart', action: () => fsmToAsmChart(sch) } : null,
     isPn(sch) ? { label: 'View State Machine (FSM)', action: () => openPetriFsm(sch) } : null,   // (its state space, #2696)
-    viewKind(sch) === 'sch' ? { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) } : null,
   ].filter(Boolean);
 }
 
@@ -793,36 +791,11 @@ export const viewSel = () => (['sch', 'asm', 'tt', 'fsm', 'pn'].includes(S.sel?.
 export const drawnTop = path => S.modules.find(m => m.file === path && m.kind !== 'package')?.name || topOfView(path);
 export const topOfView = path => { const gen = S.schOwners?.[path] || path; return S.modules.find(m => m.file === gen && m.kind !== 'package')?.name || null; };
 
-// Download a schematic as an ISE 14.7 schematic (.sch); custom symbols come along in a zip.
-async function exportSchAsIse(schPath) {
-  let doc;
-  const od = findDoc(`sch:${schPath}`);
-  try { doc = od?.schEditor ? od.schEditor.getDoc() : JSON.parse(await api.readFile(S.project.name, schPath)); }
-  catch (e) { toast(e.message, 'error'); return; }
-  const { exportIseSch } = await import('/core/isesch.js');
-  const lang = doc.generatedFile && /\.v$/i.test(doc.generatedFile) ? 'verilog' : doc.lang;
-  let r;
-  try { r = exportIseSch(doc, { modules: await schModules(), family: S.project.device?.family || 'spartan3e', lang }); }
-  catch (e) { alertDlg('Export as ISE Schematic', e.message, 'error'); return; }
-  const base = schPath.split('/').pop().replace(/\.sch\.json$/i, '');
-  if (!r.files.length) downloadText(`${base}.sch`, r.xml, 'application/xml');
-  else {
-    const { createZip, browserCodec } = await import('/core/zip.js');
-    const zip = await createZip([{ path: `${base}.sch`, data: r.xml }, ...r.files.map(f => ({ path: f.path, data: f.text }))], browserCodec());
-    const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
-    downloadUrl(url, `${base}_ise_sch.zip`);
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  }
-  log(`Exported ${schPath} as the ISE schematic ${base}.sch${r.files.length ? ` (+ ${r.files.length} symbol/HDL file(s) for custom symbols, in a zip)` : ''}.`, 'ok');
-  for (const w of r.warnings) log(`WARNING: ${w}`, 'warn');
-}
-
 export function schContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openSch(file) },
     S.view === 'sim' ? null : topMenuItem(drawnTop(file), () => setViewAsTop(file)),
     { label: 'Rename…', action: () => renameDialog(file) },
-    { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(file) },
     clashItem(file),
     { label: 'Remove from Project', action: () => removeModule(file) },
   ].filter(Boolean), e.clientX, e.clientY);

@@ -40,7 +40,7 @@ const PARTS = {
     'drawingCommands', 'drawnHdlLanguage', 'adoptDrawnHdl', 'writeDrawnHdl', 'linkOpenEditor', 'clashTip',
     'drawnHdlClashes', 'clashItem', 'resolveHdlClash', 'syncBanner', 'refreshSyncBanner',
     'topUcfPorts', 'ucfPort', 'refreshOpenEditor', 'syncHdlFromSchematic',
-    'convertToSchematic', 'drawingsAsBase', 'setViewAsTop', 'viewSel', 'topOfView', 'exportSchAsIse', 'schContextMenu'],
+    'convertToSchematic', 'drawingsAsBase', 'setViewAsTop', 'viewSel', 'topOfView', 'schContextMenu'],
   'processes.js': ['STATUS_ICON', 'SUMMARY_PROC', 'openMode',
     'processDefs', 'selectionProcesses', 'renderProcesses', 'ISE_PROCS', 'runProcess',
     'topConfirmed', 'setStatus', 'markStale', 'diagsFor', 'saveAll', 'checkSyntax', 'checkSyntaxInner',
