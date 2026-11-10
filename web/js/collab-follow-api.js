@@ -11,6 +11,7 @@ const notFound = what => Object.assign(new Error(what), { status: 404 });
 /** The backend of a followed room's document (`api`: the one it stands for; its other functions refuse). */
 export function followApi(api, doc) {
   const out = {};
+  const storage = api.storage?.bind(api);   // (the one it stands for: Object.assign replaces api's own, collab-follow.js)
   for (const [k, v] of Object.entries(api)) if (typeof v === 'function') out[k] = async () => { throw readOnlyError(); };
   const current = () => {
     const { project, fileTree } = docProject(doc);
@@ -29,6 +30,8 @@ export function followApi(api, doc) {
       return [{ name: project.name, device: project.device, top: project.top, board: project.board, modified: null }];
     },
     workspace: async () => ({ folder: null }),
+    // (the browser edition's storage, as it is: only read, at start-up and by the Start page; none reopened, #3320)
+    ...(storage ? { storage, initStorage: async () => storage() } : {}),
     templates: async () => [],
     testDesigns: async () => [],
     devices: async () => null,
