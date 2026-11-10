@@ -7,8 +7,10 @@
 // quarter of a period later (their values in that cycle, before the rising edge), the rising edge at half a period.
 // Combinational modules (no clock): the inputs applied, the outputs compared 10 ns later.
 // The VHDL is VHDL-93, the Verilog Verilog-2001, as the Test Bench Wizard's (core/testbench.js).
+// A counterexample of the module's own assertions (core/verify-assert.js, no reference): the module alone, the inputs
+// applied in the same way; the module's assertion that fails reports it.
 
-const PERIOD = 20;
+export const PERIOD = 20;
 const SETTLE = 10;
 
 /** The name of a counterexample's test bench of module `top`. */
@@ -25,17 +27,23 @@ export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang 
   const outs = r.ports.filter(p => p.dir === 'out');
   const clks = r.ports.filter(p => clocks.has(p.name));
   const fold = s => (lang === 'verilog' ? s : s.toLowerCase());
-  const taken = new Set([name, r.top, r.reference, ...r.ports.map(p => p.name)].map(fold));
+  const taken = new Set([name, r.top, r.reference, ...r.ports.map(p => p.name)].filter(Boolean).map(fold));
   const own = n => { let m = n; while (taken.has(fold(m))) m = `tb_${m}`; taken.add(fold(m)); return m; };
   const N = Object.fromEntries(['uut', 'reference', 'CLK_PERIOD', 'chr', 'check', 'errors', 'cycle', 'stim'].map(n => [n, own(n)]));
   // the reference's signal of each port: the module's own when both types are written alike, else one of its own
   const same = p => p.dir === 'in' && (lang === 'verilog' || vtype(p.uut) === vtype(p.ref));
-  const refName = new Map(r.ports.map(p => [p.name, same(p) ? p.name : own(`ref_${p.name}`)]));
-  const header = c => [
+  const alone = !r.reference;
+  const refName = new Map(alone ? [] : r.ports.map(p => [p.name, same(p) ? p.name : own(`ref_${p.name}`)]));
+  const timing = clks.length ? ` (clock ${clks.map(p => p.name).join(', ')}, ${PERIOD} ns: the inputs at the start of a cycle, its rising edge at half the period)` : ' (combinational: an input change every 10 ns)';
+  const header = c => (alone ? [
+    `${c} Counterexample of Verify (Silinx): an assertion of '${r.top}' fails at clock cycle ${r.cycle}.`,
+    `${c} The module gets the counterexample's inputs, cycle by cycle${timing};`,
+    `${c} its assertion that fails reports it.`,
+  ] : [
     `${c} Counterexample of Verify (Silinx): '${r.top}' differs from its reference '${r.reference}' at clock cycle ${r.cycle}${r.differs?.length ? ` (${r.differs.join(', ')})` : ''}.`,
     `${c} Both modules get the same inputs, cycle by cycle${clks.length ? ` (clock ${clks.map(p => p.name).join(', ')}, ${PERIOD} ns: the inputs at the start of a cycle, the outputs compared before its rising edge)` : ' (combinational: the outputs compared 10 ns after each input change)'};`,
     `${c} the first difference of their outputs is reported, and the simulation stops with VERIFY FAILED.`,
-  ].join('\n');
+  ]).join('\n');
   return lang === 'verilog' ? verilog() : vhdl();
 
   function vhdl() {
@@ -60,15 +68,16 @@ export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang 
       `entity ${name} is`, `end ${name};`, '', `architecture test of ${name} is`, ''];
     for (const p of r.ports) {
       L.push(`  signal ${p.name} : ${vtype(p.uut, range)}${p.dir === 'in' ? init(p.uut) : ''};`);
-      if (refName.get(p.name) !== p.name) L.push(`  signal ${refName.get(p.name)} : ${vtype(p.ref, range)};`);
+      if (!alone && refName.get(p.name) !== p.name) L.push(`  signal ${refName.get(p.name)} : ${vtype(p.ref, range)};`);
     }
     if (clks.length) L.push(`  constant ${N.CLK_PERIOD} : time := ${PERIOD} ns;`);
     L.push('', '  -- a bit as a character (VHDL-93 has no to_string)',
       `  function ${N.chr}(b : std_logic) return character is`, '  begin',
       "    case b is when '0' => return '0'; when '1' => return '1'; when 'Z' => return 'Z'; when 'U' => return 'U'; when '-' => return '-'; when others => return 'X'; end case;",
       '  end function;', '', 'begin', '',
-      `  ${N.uut} : entity work.${r.top}`, `    port map (${r.ports.map(p => `${p.name} => ${p.name}`).join(', ')});`,
-      `  ${N.reference} : entity work.${r.reference}`, `    port map (${r.ports.map(p => `${p.name} => ${refName.get(p.name)}`).join(', ')});`);
+      `  ${N.uut} : entity work.${r.top}`, `    port map (${r.ports.map(p => `${p.name} => ${p.name}`).join(', ')});`);
+    if (alone) return vhdlAlone(L);
+    L.push(`  ${N.reference} : entity work.${r.reference}`, `    port map (${r.ports.map(p => `${p.name} => ${refName.get(p.name)}`).join(', ')});`);
     const convs = r.ports.filter(p => p.dir === 'in' && refName.get(p.name) !== p.name).map(conv);
     if (convs.length) L.push('  -- the reference\'s inputs (its ports\' types)', ...convs);
     L.push('', `  ${N.stim} : process`, `    variable ${N.errors} : integer := 0;`,
@@ -96,14 +105,30 @@ export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang 
     return L.join('\n');
   }
 
+  // the module alone: the inputs of each cycle, its own assertions checking it
+  function vhdlAlone(L) {
+    const lit = (p, b) => (p.kind === 'sl' ? `'${b}'` : p.kind === 'int' ? String(intOf(p, b)) : `"${b}"`);
+    L.push('', `  ${N.stim} : process`, '  begin');
+    r.cycles.forEach((c, i) => {
+      L.push(`    -- clock cycle ${i + 1}`);
+      for (const p of clks) L.push(`    ${p.name} <= '0';`);
+      for (const p of ins) L.push(`    ${p.name} <= ${lit(p.uut, bitsOf(c, p))};`);
+      if (clks.length) L.push(`    wait for ${N.CLK_PERIOD} / 2;`, ...clks.map(p => `    ${p.name} <= '1';`), `    wait for ${N.CLK_PERIOD} / 2;`);
+      else L.push(`    wait for ${SETTLE} ns;`);
+    });
+    L.push(`    report "VERIFY: ${r.cycles.length} clock cycle(s) replayed" severity note;`, '    wait;', '  end process;', '', 'end test;', '');
+    return L.join('\n');
+  }
+
   function verilog() {
     const decl = p => `${p.width > 1 ? ` [${p.width - 1}:0]` : ''}`;
     const L = [header('//'), '', '`timescale 1ns / 1ps', '', `module ${name};`, ''];
     for (const p of r.ports) {
       if (p.dir === 'in') L.push(`  reg${decl(p)} ${p.name} = 0;`);
-      else L.push(`  wire${decl(p)} ${p.name};`, `  wire${decl(p)} ${refName.get(p.name)};`);
+      else L.push(`  wire${decl(p)} ${p.name};`, ...(alone ? [] : [`  wire${decl(p)} ${refName.get(p.name)};`]));
     }
     if (clks.length) L.push(`  localparam ${N.CLK_PERIOD} = ${PERIOD};`);
+    if (alone) return verilogAlone(L);
     L.push(`  integer ${N.errors} = 0;`, '',
       `  ${r.top} ${N.uut} (${r.ports.map(p => `.${p.name}(${p.name})`).join(', ')});`,
       `  ${r.reference} ${N.reference} (${r.ports.map(p => `.${p.name}(${refName.get(p.name)})`).join(', ')});`, '',
@@ -127,6 +152,18 @@ export function counterexampleBench(r, { name = benchName(r.top), lang = r.lang 
     });
     L.push(`    $display("VERIFY: no difference in ${r.cycles.length} clock cycle(s): the simulation does not show the counterexample");`,
       '    $finish;', '  end', '', 'endmodule', '');
+    return L.join('\n');
+  }
+  function verilogAlone(L) {
+    L.push('', `  ${r.top} ${N.uut} (${r.ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, '', '  initial begin');
+    r.cycles.forEach((c, i) => {
+      L.push(`    // clock cycle ${i + 1}`);
+      for (const p of clks) L.push(`    ${p.name} = 0;`);
+      for (const p of ins) L.push(`    ${p.name} = ${p.width}'b${bitsOf(c, p)};`);
+      if (clks.length) L.push(`    #(${N.CLK_PERIOD} / 2);`, ...clks.map(p => `    ${p.name} = 1;`), `    #(${N.CLK_PERIOD} / 2);`);
+      else L.push(`    #${SETTLE};`);
+    });
+    L.push(`    $display("VERIFY: ${r.cycles.length} clock cycle(s) replayed");`, '    $finish;', '  end', '', 'endmodule', '');
     return L.join('\n');
   }
 }
