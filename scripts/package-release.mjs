@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sha256sums, SUMS_FILE } from './checksums.mjs';
 import { leaveOutDownloaded } from './downloaded-packages.mjs';
+import { leaveOutUnused } from './zip-trim.mjs';
 import { leaveOutChipdbs } from '../packages/silinx-fpga/src/node.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,6 +82,8 @@ function packageApp() {
     leaveOutDownloaded(app);
     // nextpnr's chip databases: downloaded on their first use (#2329)
     for (const pkg of NEXTPNR_PACKAGES) leaveOutChipdbs(path.join(app, 'node_modules', pkg));
+    // the files of the packages the app never reads: source maps, type declarations, tests and demos (#3232)
+    leaveOutUnused(app);
     fs.rmSync(path.join(app, '.github'), { recursive: true, force: true });
     const zip = path.join(out, `silinx-${version}.zip`);
     fs.rmSync(zip, { force: true });

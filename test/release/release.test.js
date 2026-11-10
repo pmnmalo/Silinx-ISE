@@ -23,7 +23,8 @@ const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf
 // zipMB 30 → 32 by Yosys 0.70 (#368, #380): its WebAssembly is 69 MB, its resources 11 MB, all of it
 // needed; the zip 30.4 MB. zipMB 32 → 40 by the Spartan-6 device descriptions (#723, #884: 4.2 MB zipped);
 // the zip 36.6 MB. The measured XC3S250E description in research/ is not packaged (#1541, #1573): the zip 38.0 MB,
-// unzipped 128.0 MB
+// unzipped 128.0 MB. The shared projects' packages took it to 40.4 MB (#3214); their tests and demos, every package's maps
+// and types, and the legacy modes the editor does not load left out (#3232, scripts/zip-trim.mjs): 38.8 MB, unzipped 129.8 MB
 const BUDGET = { zipMB: 40, appMB: 140 };
 
 const has = (cmd) => { try { execFileSync(cmd, ['-v'], { stdio: 'ignore' }); return true; } catch { return false; } };
