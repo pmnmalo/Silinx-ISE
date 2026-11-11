@@ -85,7 +85,8 @@ export function replayBench(spec, capture, { lang = spec.lang, period = 20000 } 
   if (v) {
     return ['`timescale 1ps / 1ps', `// ${head}`, `module ${name};`,
       ...spec.probes.map((p, i) => `  reg ${ws[i] > 1 ? `[${ws[i] - 1}:0] ` : ''}${p.name} = ${lit(0n, ws[i])};`),
-      '  initial begin', ...steps.map((s, k) => `    ${k ? `#${period} ` : ''}${s}`.trimEnd()), '  end', 'endmodule', ''].join('\n');
+      // (a sample with no change: the delay alone, `#…;`, a statement of its own, #3340)
+      '  initial begin', ...steps.map((s, k) => `    ${k ? `#${period}${s ? ' ' : ';'}` : ''}${s}`.trimEnd()), '  end', 'endmodule', ''].join('\n');
   }
   return [`-- ${head}`, 'library IEEE;', 'use IEEE.STD_LOGIC_1164.ALL;', '', `entity ${name} is`, `end ${name};`, '', `architecture capture of ${name} is`,
     ...spec.probes.map((p, i) => `  signal ${p.name} : ${ws[i] > 1 ? `std_logic_vector(${ws[i] - 1} downto 0) := (others => '0')` : "std_logic := '0'"};`),
