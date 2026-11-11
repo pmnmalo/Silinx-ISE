@@ -227,6 +227,18 @@ export function lpfTemplate(project) {
 `;
 }
 
+export function cstTemplate(project) {
+  return `// Physical constraints for ${project.name}
+// Target: ${project.device.part}${project.device.speed || ''}-${project.device.package}
+//
+// Example:
+// IO_LOC "clk" 52;
+// IO_PORT "clk" IO_TYPE=LVCMOS33;
+// IO_LOC "led[0]" 10;
+// create_clock -name clk -period 37.037 [get_ports {clk}]
+`;
+}
+
 export function xdcTemplate(project) {
   return `# Xilinx Design Constraints for ${project.name}
 # Target: ${project.device.part}${project.device.speed}-${project.device.package}

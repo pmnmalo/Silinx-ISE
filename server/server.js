@@ -156,6 +156,7 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   // (the iCE40's nextpnr and icepack, when installed: not in the release zip, #2295)
   app.use('/vendor/nextpnr-ice40', express.static(path.join(ROOT, 'node_modules/@yowasp/nextpnr-ice40')));
   app.use('/vendor/nextpnr-ecp5', express.static(path.join(ROOT, 'node_modules/@yowasp/nextpnr-ecp5')));   // (the ECP5's, #2302)
+  app.use('/vendor/nextpnr-himbaechel-gowin', express.static(path.join(ROOT, 'node_modules/@yowasp/nextpnr-himbaechel-gowin')));   // (the Gowin's, #2303)
 
   const api = express.Router();
   // the token for a one-time code of a launcher's address (#2955); a code for the address a second launch opens

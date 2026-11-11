@@ -10,7 +10,7 @@ import { createEditor } from './editor.js';
 import { logGitError } from './git.js';
 import { shortCommit, stateWord } from '/core/git-messages.js';
 
-const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.vhdl?$/i.test(p) ? 'vhdl' : /\.(ucf|pcf|lpf|xdc)$/i.test(p) ? 'ucf' : /\.(c|cc|cpp|cxx|h|hpp)$/i.test(p) ? 'c' : 'text');
+const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.vhdl?$/i.test(p) ? 'vhdl' : /\.(ucf|pcf|lpf|cst|xdc)$/i.test(p) ? 'ucf' : /\.(c|cc|cpp|cxx|h|hpp)$/i.test(p) ? 'c' : 'text');
 const day = iso => String(iso || '').slice(0, 10);
 
 /** A file of the project as it was in a commit: read only, in a document of its own (one per commit and file). */

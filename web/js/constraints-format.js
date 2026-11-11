@@ -1,14 +1,14 @@
-// Silinx - a project's constraints in its family's format: UCF, the iCE40's PCF (#2296), the ECP5's LPF (#2302) or the 7-series'
-// XDC (#3142). The interface's model is parseUcf's: a bus's bit written x<1>, as PCF, LPF and XDC write x[1]; PCF's and LPF's
+// Silinx - a project's constraints in its family's format: UCF, the iCE40's PCF (#2296), the ECP5's LPF (#2302), the Gowin's CST
+// (#2303) or the 7-series' XDC (#3142). The interface's model is parseUcf's: a bus's bit written x<1>, as PCF, LPF and XDC write x[1]; PCF's and LPF's
 // own text stays nextpnr's.
-import { PCF, LPF, XDC, constraintsExtOf, constraintsFormatOf, generateUcf, parseUcf } from '/packages/silinx-fpga/src/parts.js';
+import { PCF, LPF, CST, XDC, constraintsExtOf, constraintsFormatOf, generateUcf, parseUcf } from '/packages/silinx-fpga/src/parts.js';
 
 export const constraintsExt = device => constraintsExtOf(device);
 
 const toModel = net => net.replace(/\[(\d+)\]$/, '<$1>');
 const toPcf = net => net.replace(/<(\d+)>$/, '[$1]');
 // the formats nextpnr reads, its names (x[1])
-const NEXTPNR = { pcf: PCF, lpf: LPF };
+const NEXTPNR = { pcf: PCF, lpf: LPF, cst: CST };
 const renamed = (o, f) => Object.fromEntries(Object.entries(o).map(([k, v]) => [f(k), v]));
 
 /** The pins of a constraints text: { assignments, clocks, other }. */
@@ -26,13 +26,15 @@ export function writePins(device, { assignments = {}, clocks = [], header, ...re
   if (format === 'ucf') return generateUcf({ assignments, clocks, header, ...rest });
   if (format === 'xdc') return `${header ? `# ${header}\n` : ''}${XDC.write({ assignments, clocks, ...rest })}`;
   const body = NEXTPNR[format].write({ assignments: renamed(assignments, toPcf), clocks: clocks.map(c => ({ ...c, net: toPcf(c.net) })), ...rest });
-  return `${header ? `# ${header}\n` : ''}${body}`;
+  return `${header ? `${NEXTPNR[format].comment || '#'} ${header}\n` : ''}${body}`;
 }
 
 /** A PCF's errors (the line nextpnr would stop at) and its nets that are no port of the top. */
 export const pcfDiagnostics = (text, ports = []) => diagnostics(PCF, 'set_io', text, ports);
 /** An LPF's errors (the statement nextpnr-ecp5 would not apply) and its ports that are no port of the top (#2302). */
 export const lpfDiagnostics = (text, ports = []) => diagnostics(LPF, 'LOCATE COMP', text, ports);
+/** A CST's errors (the statement nextpnr-himbaechel-gowin would not apply) and its ports that are no port of the top (#2303). */
+export const cstDiagnostics = (text, ports = []) => diagnostics(CST, 'IO_LOC', text, ports);
 /** An XDC's errors (the line Vivado would stop at) and its ports that are no port of the top (#3142: Vivado's [Common 17-55]). */
 export const xdcDiagnostics = (text, ports = []) => diagnostics(XDC, 'get_ports', text, ports);
 

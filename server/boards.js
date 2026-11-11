@@ -2,6 +2,7 @@
 // interfaces, clocks, switches, buttons, LEDs, displays and connectors, their pins and the UCF they come from.
 import { FAMILY } from './family.js';
 import { ULX3S_BOARDS } from './boards-ulx3s.js';
+import { TANGNANO9K_BOARDS } from './boards-tangnano9k.js';
 
 // ---------------------------------------------------------------------------------------------
 // Boards
@@ -676,6 +677,8 @@ export const BOARDS = [
   },
   // (#2302) the ECP5's board: the ULX3S (boards-ulx3s.js)
   ...ULX3S_BOARDS,
+  // (#2303) the Gowin's board: the Tang Nano 9K (boards-tangnano9k.js)
+  ...TANGNANO9K_BOARDS,
 ];
 
 // Every resource above was transcribed from the source UCF named on its board; mark them.

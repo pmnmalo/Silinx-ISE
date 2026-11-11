@@ -47,6 +47,8 @@ const LAYOUT = {
   nextpnrIce40Package: (({ resolved: url, integrity }) => ({ url, integrity }))(JSON.parse(rd('package-lock.json')).packages['node_modules/@yowasp/nextpnr-ice40']),
   // (the ECP5's the same way, #2302)
   nextpnrEcp5Package: (({ resolved: url, integrity }) => ({ url, integrity }))(JSON.parse(rd('package-lock.json')).packages['node_modules/@yowasp/nextpnr-ecp5']),
+  // (the Gowin's, #2303)
+  nextpnrGowinPackage: (({ resolved: url, integrity }) => ({ url, integrity }))(JSON.parse(rd('package-lock.json')).packages['node_modules/@yowasp/nextpnr-himbaechel-gowin']),
   site: new URL(arg('--assets-url') || (BUILD ? `${PUBLISHED}dev/` : PUBLISHED)).href,
 };
 // the assets this version publishes (writeAssets): their folder under assets/, where they come from, which files

@@ -101,6 +101,11 @@ const FAMILY_RESOURCES = {
     { id: 'ebr', label: label('Block RAMs (18 Kbit)', 'RAMs de bloco (18 Kbit)'), report: 'Number of DP16KDs', count: p => p.brams, primitives: ['DP16KD', 'PDPW16KD'] },
     { id: 'mult', label: label('Multipliers (18x18)', 'Multiplicadores (18x18)'), report: 'Number of MULT18X18Ds', count: p => p.multipliers, primitives: ['MULT18X18D'] },
     { id: 'pll', label: label('PLLs', 'PLLs'), report: 'Number of EHXPLLLs', count: p => p.plls, primitives: ['EHXPLLL'] }],
+  // (Gowin's data sheet DS117 for the GW1NR-9, #2303: its 18 Kbit block SRAMs, its 18x18 multipliers, its rPLLs)
+  gowin: [...LUT4_COMMON,
+    { id: 'ebr', label: label('Block RAMs (18 Kbit)', 'RAMs de bloco (18 Kbit)'), report: 'Number of BSRAMs', count: p => p.brams, primitives: ['SP', 'SPX9', 'DP', 'DPX9', 'SDPB', 'SDPX9B', 'pROM', 'pROMX9'] },
+    { id: 'mult', label: label('Multipliers (18x18)', 'Multiplicadores (18x18)'), report: 'Number of MULT18X18s', count: p => p.multipliers, primitives: ['MULT18X18'] },
+    { id: 'pll', label: label('PLLs', 'PLLs'), report: 'Number of rPLLs', count: p => p.plls, primitives: ['rPLL', 'PLLVR'] }],
 };
 
 /** The families whose own resources are all described (the Spartan-3, 3A, 3A DSP and Virtex-4 have their

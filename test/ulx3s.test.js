@@ -46,7 +46,7 @@ test('the ULX3S in the board data: its LPF\'s pins, its four sizes, the display 
 });
 
 test('the ECP5 in the device database: after the iCE40, every part of nextpnr-ecp5, the data sheet\'s and nextpnr\'s figures', () => {
-  assert.deepEqual(FAMILIES.slice(-2).map(f => f.id), ['ice40', 'ecp5']);
+  assert.deepEqual(FAMILIES.slice(-3).map(f => f.id), ['ice40', 'ecp5', 'gowin']);
   const ecp5 = partsOfFamily('ecp5');
   assert.deepEqual(ecp5.map(p => p.part).sort(), Object.keys(ECP5_PARTS).sort());
   assert.equal(PARTS.filter(p => p.family === 'ecp5').length, 10);
