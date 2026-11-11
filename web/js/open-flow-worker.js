@@ -10,7 +10,7 @@
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
 import { familyProfile } from '/core/family-profile.js';
-import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, ice40Io, ecp5Io, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
+import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, ice40Io, ecp5Io, gowinIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
@@ -80,10 +80,10 @@ function nextpnrBrowser(url, post, runner, mb = 7) {
   };
 }
 
-// a family's nextpnr and packer of YoWASP's (the iCE40's icepack #2295, the ECP5's ecppack #2302): their bundle served by the
+// a family's nextpnr and packer of YoWASP's (the iCE40's icepack #2295, the ECP5's ecppack #2302; the Gowin's nextpnr alone #2303): their bundle served by the
 // local server (its URL), or their package from npm's registry, kept by this browser (the published editions: its { url,
 // integrity }, #2444); own: { family, where, tools, mb }
-const OWN_IO = { ice40: ice40Io, ecp5: ecp5Io };
+const OWN_IO = { ice40: ice40Io, ecp5: ecp5Io, gowin: gowinIo };
 const owns = new Map();
 function ownBrowser({ family, where, tools, mb }, post) {
   const key = `${family} ${where.url || where}`;

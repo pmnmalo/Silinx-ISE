@@ -36,6 +36,7 @@ import { XILINX_STEPS } from './open-steps.js';
 import { ICE40 } from './open-flow-ice40.js';
 import { XC7 } from './open-flow-xc7.js';
 import { ECP5 } from './open-flow-ecp5.js';
+import { GOWIN } from './open-flow-gowin.js';
 
 const S3E_REPORTS = {
   analyze: analyzeTiming,
@@ -151,7 +152,8 @@ const mapName = (id, resource) => resource?.report || XST_NAMES[id] || id;
 const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, areaSynth: synthesizeArea, fastSynth: synthesizeFast, synthName: xstName };
 const OTHER = { id: 'other', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, areaSynth: synthesizeArea, fastSynth: synthesizeFast, synthName: mapName };
 const backends = new Map([['spartan3e', SPARTAN3E], ['spartan6', { id: 'spartan6', mount: mountS6, steps: XILINX_STEPS, synth: synthesizeVerilog, areaSynth: synthesizeArea, fastSynth: synthesizeFast, synthName: mapName }],
-  ['ice40', ICE40], ['artix7', XC7], ['ecp5', ECP5]]);   // (#2295: open-flow-ice40.js; the 7-series', #3146: open-flow-xc7.js; #2302: open-flow-ecp5.js)
+  ['ice40', ICE40], ['artix7', XC7], ['ecp5', ECP5], ['gowin', GOWIN]]);   // (#2295: open-flow-ice40.js; the 7-series', #3146: open-flow-xc7.js; #2302:
+  // open-flow-ecp5.js; #2303: open-flow-gowin.js)
 // a registered back end's synthesis and report names when it gives none: Yosys's generic synth, its resources' names
 const GENERIC_SYNTH = scriptSynthesis({ script: top => `synth -flatten -top ${top}` });
 const ownName = (id, resource) => resource?.report || id;

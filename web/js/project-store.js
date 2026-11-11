@@ -25,7 +25,7 @@ export { DEV_SITE };
 const BROWSER_KEY = DEV_SITE ? 'silinx.dev.standalone.fs' : 'silinx.standalone.fs';
 
 const fail = msg => { throw new Error(msg); };
-const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(ucf|pcf|lpf|xdc)$/i.test(p) ? 'ucf' : 'text');
+const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(ucf|pcf|lpf|cst|xdc)$/i.test(p) ? 'ucf' : 'text');
 /**
  * A project-relative path normalised: forward slashes, no empty or '.' segments. null when it would
  * leave the project (#483): not a string, empty, absolute ('/x', '\\\\host\\x', 'C:\\x'), a '..' segment,

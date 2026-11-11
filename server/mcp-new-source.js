@@ -38,8 +38,8 @@ async function sourceText(type, { file, lang, pj, entity, arch, ports, uut }) {
     case 'module': return lang === 'vhdl' ? T.vhdlModule(entity, arch, ports, pj) : T.vlogModule(entity, ports, pj);
     case 'package': return T.vhdlPackage(file, pj);
     case 'test_bench': return lang === 'vhdl' ? T.vhdlTestbench(file, uut, pj) : T.vlogTestbench(file, uut, pj);
-    // (the device's format, as New Source's: UCF, the iCE40's PCF, the ECP5's LPF, the 7-series' XDC)
-    case 'constraints': return ({ pcf: T.pcfTemplate, lpf: T.lpfTemplate, xdc: T.xdcTemplate }[(await import('../packages/silinx-fpga/src/parts.js')).constraintsFormatOf(pj.device)] || T.ucfTemplate)(pj);
+    // (the device's format, as New Source's: UCF, the iCE40's PCF, the ECP5's LPF, the Gowin's CST, the 7-series' XDC)
+    case 'constraints': return ({ pcf: T.pcfTemplate, lpf: T.lpfTemplate, cst: T.cstTemplate, xdc: T.xdcTemplate }[(await import('../packages/silinx-fpga/src/parts.js')).constraintsFormatOf(pj.device)] || T.ucfTemplate)(pj);
     case 'mem': return '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n';
     case 'c': return (await import('../web/js/c-templates.js')).cTemplate(n);
     case 'cpp': return (await import('../web/js/c-templates.js')).cppTemplate(n);
@@ -87,7 +87,7 @@ export const NEW_SOURCE_TOOLS = [
       if (!t) throw toolError(`type: one of ${Object.keys(TYPES).join(', ')}`);
       const { reservedError } = await import('../core/reserved.js');
       const { constraintsExtOf } = await import('../packages/silinx-fpga/src/parts.js');
-      file = String(file || '').trim().replace(/\.(vhd|vhdl|v|ucf|pcf|lpf|xdc|mem|c|cpp|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json|lab\.json)$/i, '');
+      file = String(file || '').trim().replace(/\.(vhd|vhdl|v|ucf|pcf|lpf|cst|xdc|mem|c|cpp|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json|lab\.json)$/i, '');
       if (!FILE_RE.test(file)) throw toolError('Enter a valid file name (letters, digits, _ and -).');
       const loc = String(location ?? t.dir).trim().replace(/\/+$/, '');
       if (!/^[A-Za-z0-9_/-]+$/.test(loc) || loc.split('/').some(s => !s || s.startsWith('.'))) throw toolError('Invalid location.');

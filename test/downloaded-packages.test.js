@@ -30,7 +30,7 @@ test('#2570 leaveOutDownloaded: the downloaded packages removed from node_module
 });
 
 test('#2570 the release zip removes them after npm ci, before zipping', () => {
-  assert.deepEqual(DOWNLOADED_PACKAGES, ['@yowasp/nextpnr-ice40', '@yowasp/nextpnr-ecp5']);
+  assert.deepEqual(DOWNLOADED_PACKAGES, ['@yowasp/nextpnr-ice40', '@yowasp/nextpnr-ecp5', '@yowasp/nextpnr-himbaechel-gowin']);
   const src = read('scripts/package-release.mjs');
   const at = (re) => { const m = re.exec(src); assert.ok(m, String(re)); return m.index; };
   const install = at(/run\('npm', \['ci', '--omit=dev'/), leave = at(/\n {4}leaveOutDownloaded\(app\);\n/), zip = at(/run\('zip', \['-qr'/);

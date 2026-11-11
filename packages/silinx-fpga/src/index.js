@@ -31,8 +31,12 @@ export { XC7_STEPS, XC7_TIMING_MODEL } from './open-flow-xc7.js';
 // the ECP5's nextpnr and ecppack, YoWASP's package as io.nextpnr.ecp5 (#2302; in Node: node.js nextpnrEcp5Node)
 export { ecp5Io } from './nextpnr-ecp5-io.js';
 export { ECP5_PARTS, ECP5_STEPS } from './open-flow-ecp5.js';
+// the Gowin's nextpnr, YoWASP's package as io.nextpnr.gowin (#2303; in Node: node.js nextpnrGowinNode); no bitstream yet
+export { gowinIo } from './nextpnr-gowin-io.js';
+export { GOWIN_PARTS, GOWIN_DEVICES, GOWIN_STEPS, GOWIN_NO_BITSTREAM } from './open-flow-gowin.js';
 export { PCF } from './pcf.js';
 export { LPF } from './lpf.js';
+export { CST } from './cst.js';
 export { XDC, readXdc, writeXdc } from './xdc.js';
 export { gateAssignments, rewriteCarryChains } from './carry-chain.js';
 

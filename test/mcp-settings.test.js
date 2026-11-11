@@ -38,7 +38,7 @@ test('list_devices: the boards with their variants, the devices by family', asyn
   assert.match(s3e.text, /^Devices:\n {2}Spartan-3E \(spartan3e\):\n {4}xc3s100e: vq100 -4 -5, cp132 -4 -5, tq144 -4 -5\n/);
   const r = await call('list_devices', { family: 'nosuch' });
   assert.equal(r.isError, true);
-  assert.match(r.text, /^list_devices: unknown family 'nosuch' \(spartan3, spartan3e, .*, ice40, ecp5\)$/);
+  assert.match(r.text, /^list_devices: unknown family 'nosuch' \(spartan3, spartan3e, .*, ice40, ecp5, gowin\)$/);
 });
 
 test('set_design_properties: another board and its variant, its pins written into the constraints', async () => {

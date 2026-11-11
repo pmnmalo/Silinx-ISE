@@ -219,6 +219,16 @@ test('program: an ECP5 project\'s .bit: its size; programming refused, the board
   assert.equal(r.body.error, 'Silinx does not program ECP5 boards yet: build/top.bit is the bitstream, for the board\'s own tools (openFPGALoader)');
 });
 
+// #2303: a Gowin project: no bitstream from Silinx yet, so none to program
+test('program: a Gowin project: no bitstream, programming refused with the reason', async () => {
+  await P.createProject({ name: 'Gw', board: 'tangnano9k', device: { family: 'gowin', part: 'gw1nr-9c', package: 'qn88', speed: '-6' } });
+  await P.updateProject('Gw', pj => { pj.top = 'top'; });
+  assert.deepEqual((await app.call('GET', '/projects/Gw/bitinfo')).body, { available: false, path: path.join(P.projectDir('Gw'), 'build', 'top.fs'), gowin: true });
+  const r = await app.call('POST', '/program', { project: 'Gw' });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error, 'Silinx does not program Gowin GW1N boards: it makes no bitstream for them yet');
+});
+
 test('program: iMPACT success / silent failure / error message; adepttool DONE check; tool exit code', { skip: POSIX_ONLY }, async () => {
   let j = await run('/program', { project: 'Prog', tool: 'impact' });
   assert.equal(j.status, 'ok', j.lines.join('\n'));

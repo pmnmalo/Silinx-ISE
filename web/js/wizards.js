@@ -348,7 +348,7 @@ export async function zipFolderSelection(fileList) { // exported for tests
 }
 
 export async function importXiseDialog() {
-  const fileInp = h('input', { type: 'file', multiple: true, accept: '.zip,.xise,.v,.vhd,.vhdl,.ucf,.pcf,.lpf' });
+  const fileInp = h('input', { type: 'file', multiple: true, accept: '.zip,.xise,.v,.vhd,.vhdl,.ucf,.pcf,.lpf,.cst' });
   const dirInp = h('input', { type: 'file', webkitdirectory: true, multiple: true });
   const name = h('input', { type: 'text', placeholder: 'new project name' });
   const info = h('div', { class: 'hint', style: { minHeight: '16px' } });
@@ -485,7 +485,7 @@ export { newSourceWizard } from './new-source.js';
 export const addSourceTitle = () => (document.documentElement.dataset.layout === 'tasks' ? 'Import Source' : 'Add Copy of Source');
 /** Add Copy of Source… (`role`: the association first chosen; `title`: Import Test Bench, Simulation only, #1385, #1501). */
 export async function addSourceDialog({ role: first = 'design', title = addSourceTitle() } = {}) {
-  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.pcf,.lpf,.mem,.hex,.asm.json,.json' });
+  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.pcf,.lpf,.cst,.mem,.hex,.asm.json,.json' });
   const role = select([['design', 'All (Implementation + Simulation)'], ['impl', 'Implementation only'], ['sim', 'Simulation only']], typeof first === 'string' ? first : 'design');
   // (the Silinx interface asks no association: Import Source's All, Import Test Bench's Simulation only, #1501)
   const ask = document.documentElement.dataset.layout !== 'tasks';
@@ -498,7 +498,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
   const written = [];
   for (const f of inp.files) {
     const ext = f.name.split('.').pop().toLowerCase();
-    const dir = ['ucf', 'pcf', 'lpf', 'xdc'].includes(ext) ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
+    const dir = ['ucf', 'pcf', 'lpf', 'cst', 'xdc'].includes(ext) ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
     // through the import gate (#2830): a file it refuses is not added, said in the console
     let text;
@@ -521,7 +521,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg(title, `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, text);
     written.push(path);
-    if (['ucf', 'pcf', 'lpf', 'xdc'].includes(ext) && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
+    if (['ucf', 'pcf', 'lpf', 'cst', 'xdc'].includes(ext) && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
   }
   if (!written.length) return;
   // the association (role) of exactly the files written

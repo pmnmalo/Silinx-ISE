@@ -36,10 +36,13 @@ export const ICE40_TARGETS = [{ board: 'icebreaker' }];
 // the ECP5's board (#2302): the examples on the ULX3S (its 85F), the display on its GPIO header; vga on its header too, a
 // board of its own (ulx3s-vga). Its ports with no pin on the board, warned (sw<4..7>)
 export const ECP5_TARGETS = [{ board: 'ulx3s' }];
+// the Gowin's board (#2303): the examples on the Tang Nano 9K, every port on a pin of its headers (nextpnr-himbaechel-gowin places
+// none without one); vga on the tangnano9k-vga; placed and routed, no bitstream yet
+export const GOWIN_TARGETS = [{ board: 'tangnano9k' }];
 // the 7-series' boards (#3142): an experimental family, its constraints XDC; built by Vivado (#1649), not in TARGETS
 export const XC7_TARGETS = [{ board: 'basys3' }, { board: 'nexys-a7' }];
 /** The board an example runs on for a target: vga on the iCEBreaker with its PmodVGA, on the ULX3S with its VGA. */
-const VGA_BOARDS = { icebreaker: 'icebreaker-vga', ulx3s: 'ulx3s-vga' };
+const VGA_BOARDS = { icebreaker: 'icebreaker-vga', ulx3s: 'ulx3s-vga', tangnano9k: 'tangnano9k-vga' };
 export const exampleBoard = (name, t) => (name === 'vga' && VGA_BOARDS[t.board] ? { ...t, board: VGA_BOARDS[t.board] } : t);
 /** A target's name: 'basys2-250', 'nexys3'. */
 export const targetName = t => t.variant ? `${t.board}-${t.variant}` : t.board;
@@ -63,7 +66,7 @@ const ucfPort = p => {
   return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null };
 };
 
-/** The constraints of an example's top on a board (a UCF, a PCF on the iCE40, an LPF on the ECP5): { text, board: resolved, unmatched }. */
+/** The constraints of an example's top on a board (a UCF, a PCF on the iCE40, an LPF on the ECP5, a CST on the Gowin): { text, board: resolved, unmatched }. */
 export function exampleUcf(name, { board, variant }) {
   const ex = example(name);
   const r = resolveBoard(board, { variant });
