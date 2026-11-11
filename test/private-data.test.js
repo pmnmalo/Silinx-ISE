@@ -265,3 +265,9 @@ test('the history scan (#555): the history of HEAD (main), not the other branche
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('the allow-list (#3494): #3415\'s commit message names a made-up local address, in that message only', () => {
+  const msg = `so localhost.. and ${dot(192, 168, 1, 1)}.. passed`;
+  assert.deepEqual(kinds('(message of 9973e11)', msg), []);
+  assert.deepEqual(kinds('(message of 0000000)', msg), [`IP address: ${dot(192, 168, 1, 1)}`]);
+});
