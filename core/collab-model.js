@@ -1,13 +1,14 @@
 // A shared project's drawings edited live (#3183, phase 3 of #3180): each drawing as a Yjs structure of its own, in the
 // project's document (core/collab-doc.js), so that several participants edit one drawing at once and their changes merge
 // per object and per field (a Y.Text of its JSON would merge characters, and break it).
-//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm', 'tt', 'asm')
+//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm', 'tt', 'asm', 'pn')
 //                                    settings  Y.Map  key -> value: the drawing's own settings (its name, language,
 //                                                     generatedFile, encoding, inputs, outputs, initial state, …)
 //                                    <coll>    Y.Map  id -> Y.Map  field -> value, one per object of each of its
 //                                                     collections (the FSM: states, transitions; the truth table: its
 //                                                     outputs, by name, a field per cell of its column; the ASM chart:
-//                                                     boxes, links); _o its place
+//                                                     boxes, links; the Petri net: places, transitions, arcs); _o its
+//                                                     place
 // A value is JSON (a field's whole value: last write wins, per field). An editor keeps its "model in, model out"
 // interface: putDrawing applies a new model as the smallest set of changes (a diff by ids against `base`, the model the
 // editor last had: what others changed since is kept), drawingModel reads it back (normalized, as the editor's).
@@ -23,6 +24,7 @@ import * as Y from 'yjs';
 import { normalizeFsm } from './fsm.js';
 import { normalizeTable } from './logic.js';
 import { normalizeModel as normalizeAsm } from './asm.js';
+import { normalizePetri } from './petri.js';
 import { drawingKind, liveDrawing } from './collab-kinds.js';
 export { drawingKind, liveDrawing };
 
@@ -64,6 +66,7 @@ export const DRAWING_KINDS = Object.freeze({
   fsm: { collections: ['states', 'transitions'], refs: { transitions: { from: 'states', to: 'states' } }, setRefs: { initial: 'states' }, shape: normalizeFsm, model: normalizeFsm, ownIds: true },
   tt: { collections: ['outputs'], refs: {}, setRefs: {}, shape: ttShape, model: ttModel, ownIds: false },
   asm: { collections: ['nodes', 'edges'], refs: { edges: { from: 'nodes', to: 'nodes' } }, setRefs: { initial: 'nodes' }, shape: normalizeAsm, model: normalizeAsm, ownIds: true },
+  pn: { collections: ['places', 'transitions', 'arcs'], refs: { arcs: { from: ['places', 'transitions'], to: ['places', 'transitions'] } }, setRefs: {}, shape: normalizePetri, model: normalizePetri, ownIds: true },
 });
 /** What a follower takes of a room's drawings (#3361: the owner may be hostile): their objects, all together. */
 export const DRAWING_OBJECTS_MAX = 100_000;

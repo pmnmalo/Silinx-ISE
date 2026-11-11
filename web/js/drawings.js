@@ -336,7 +336,7 @@ export async function openPetri(path) {
         onProblems: (diags) => problems.set(diags),
         onCheck: (diags) => problems.log(diags),   // (Check: in the Console too, #2803)
         onMessage: (text, err) => log(err ? `WARNING: ${path.split('/').pop()}: ${text}` : `${path.split('/').pop()}: ${text}`, err ? 'warn' : 'info'),
-        ...followOnly(),
+        ...followOnly(path),
       });
       d.petriEditor = ed;
       return {
@@ -350,7 +350,7 @@ export async function openPetri(path) {
     },
   });
 }
-async function syncHdlFromPetri(path, m) {
+export async function syncHdlFromPetri(path, m) {
   if (await drawnHdlLanguage(path, m)) return;
   const { generatePetri } = await import('/core/petri.js');
   let g;
