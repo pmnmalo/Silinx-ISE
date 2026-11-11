@@ -14,8 +14,8 @@ import * as Y from 'yjs';
 import { putDrawing, drawingModel, drawingMap, pruneDrawing } from '/core/collab-model.js';
 
 const RETRY_MS = 120, MERGE_MS = 1500;
-/** The editor of a drawing edited live (#3183: a state diagram's, a truth table's), null: none. */
-export const editorOf = d => d?.fsmEditor || d?.ttEditor || null;
+/** The editor of a drawing edited live (#3183: a state diagram's, a truth table's, an ASM chart's), null: none. */
+export const editorOf = d => d?.fsmEditor || d?.ttEditor || d?.asmEditor || null;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /** A drawing's editor (d: its document, its editor editorOf(d)) bound to its structure; first made the same, the

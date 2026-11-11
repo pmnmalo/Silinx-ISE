@@ -3,6 +3,8 @@
 //   import { mountAsmEditor } from './asm-editor.js';
 //   const ed = mountAsmEditor(container, { model, onChange(model) {} });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.destroy();
+//   edited live (#3183, web/js/collab-drawing.js): ed.setShared({ push(model, key), undo(), redo(), canUndo(), canRedo() } | null)
+//   (each change pushed, Undo / Redo the shared history's), ed.applyModel(m, { renamed, mine }) (in place), ed.busy()
 //
 // Styles: web/css/asm-editor.css (scoped under .asm-editor, themed by --bg/--panel/--fg/...).
 //
@@ -163,7 +165,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   let fitted = false;
   let snap = true;
   let diags = [];
-  let hist = [JSON.stringify(M)], hi = 0, lastKey = null, lastT = 0;
+  let hist = [JSON.stringify(M)], hi = 0, lastKey = null, lastT = 0, shared = null;
   let spaceDown = false;
   let drag = null;
   let destroyed = false;
@@ -280,7 +282,8 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     const snapStr = JSON.stringify(M);
     if (snapStr !== hist[hi]) {
       const now = Date.now();
-      if (key && key === lastKey && now - lastT < 1500 && hi > 0) hist[hi] = snapStr;
+      if (shared) { hist = [snapStr]; hi = 0; shared.push(clone(M), key); }   // (its merge may change M)
+      else if (key && key === lastKey && now - lastT < 1500 && hi > 0) hist[hi] = snapStr;
       else {
         hist = hist.slice(0, hi + 1);
         hist.push(snapStr);
@@ -303,8 +306,8 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     if (sel.edge && !M.edges.some((e) => e.id === sel.edge)) sel.edge = null;
     render(); renderInspector(); renderMachine(); scheduleValidate(); updateToolbar(); scheduleChange(); simApi.refresh();
   }
-  const undo = () => { if (hi > 0) restore(hi - 1); };
-  const redo = () => { if (hi < hist.length - 1) restore(hi + 1); };
+  const undo = () => { if (shared) shared.undo(); else if (hi > 0) restore(hi - 1); };
+  const redo = () => { if (shared) shared.redo(); else if (hi < hist.length - 1) restore(hi + 1); };
 
   function scheduleChange() {
     clearTimeout(timers.change);
@@ -373,7 +376,18 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   return {
     getModel: () => clone(M),
     undo: () => undo(), redo: () => redo(),
-    canUndo: () => hi > 0, canRedo: () => hi < hist.length - 1,
+    canUndo: () => (shared ? shared.canUndo() : hi > 0), canRedo: () => (shared ? shared.canRedo() : hi < hist.length - 1),
+    setShared(s) { shared = s; hist = [JSON.stringify(M)]; hi = 0; lastKey = null; updateToolbar(); },
+    // the merged chart in place: the view and the selection kept (its boxes' ids renamed by the merge, `renamed`)
+    applyModel(m, { renamed = null, mine = false } = {}) {
+      M = normalizeModel(m); hist = [JSON.stringify(M)]; hi = 0;
+      sel.nodes = new Set([...sel.nodes].map((id) => renamed?.get(id) ?? id).filter((id) => nodeById(id)));
+      if (sel.edge && !M.edges.some((e) => e.id === (renamed?.get(sel.edge) ?? sel.edge))) sel.edge = null; else if (sel.edge) sel.edge = renamed?.get(sel.edge) ?? sel.edge;
+      render(); renderInspector(); renderMachine(); scheduleValidate(); updateToolbar(); simApi.refresh();
+      if (mine) scheduleChange();
+    },
+    // (a change under way the merge must wait for: boxes moved or a link drawn, a field of the side panel being typed)
+    busy: () => ['move', 'connect'].includes(drag?.mode) || side.contains(document.activeElement),
     // Edit ▸ Cut / Copy / Paste / Delete (#677)
     copy: () => copySel(), cut: () => copySel(true), paste: () => paste(), deleteSelection: () => deleteSelection(),
     canCopy: () => sel.nodes.size > 0, canDelete: () => sel.nodes.size > 0 || !!sel.edge, canPaste: () => hasClip('asm'),

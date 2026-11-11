@@ -14,6 +14,7 @@ import { projectDoc, publishProject, docTooLarge, FOLLOW_LIMITS } from '../core/
 import { newFsm, normalizeFsm, generateFsm, validateFsm } from '../core/fsm.js';
 import { normalizeTable, reshapeTable, generateTableHdl, truthTableFromModule, validateTable } from '../core/logic.js';
 import { compile, elaborate } from '../core/compile.js';
+import { newModel as newAsm, normalizeModel as normalizeAsm, generate as generateAsm, validate as validateAsm } from '../core/asm.js';
 import { randomVectors, runHdl, runModel } from './fsm-sim.js';
 
 const P = 'src/det.fsm.json';
@@ -30,12 +31,13 @@ function pair() {
 const model = (doc) => drawingModel(doc, P).model;
 const mut = (doc, fn) => { const m = structuredClone(model(doc)); fn(m); return m; };
 
-test('drawingKind: the FSM\'s diagrams, the truth tables (others: not yet, #3183\'s order)', () => {
+test('drawingKind: the FSM\'s diagrams, the truth tables, the ASM charts (others: not yet, #3183\'s order)', () => {
   assert.equal(drawingKind('src/a.fsm.json'), 'fsm');
   assert.equal(drawingKind('src/A.FSM.JSON'), 'fsm');
   assert.equal(drawingKind('src/a.bool.json'), 'tt');
   assert.equal(drawingKind('src/a.tt.json'), 'tt', 'a truth table saved before #2065');
-  for (const p of ['src/a.asm.json', 'src/a.sch.json', 'src/a.pn.json', 'src/a.vhd', 'src/fsm.json', 'src/bool.json']) assert.equal(drawingKind(p), null, p);
+  assert.equal(drawingKind('src/a.asm.json'), 'asm');
+  for (const p of ['src/a.sch.json', 'src/a.pn.json', 'src/a.vhd', 'src/fsm.json', 'src/bool.json']) assert.equal(drawingKind(p), null, p);
   assert.throws(() => putDrawing(new Y.Doc(), 'src/a.vhd', {}), /src\/a\.vhd: not a drawing that is edited live/);
 });
 
@@ -324,4 +326,55 @@ test('a truth table\'s generated HDL: identical from both sides\' merged table, 
     const t = truthTableFromModule([{ path: ga.filename, text: ga.code }], 'maj');
     assert.deepEqual([t.warnings, t.table.y, t.table.z], [[], ma.table.y, ma.table.z], lang);
   }
+});
+
+// ---- the ASM chart (#3183's third editor): its boxes and links, a link to a box deleted going with it
+const A = 'src/ctl.asm.json';
+const amodel = (doc) => drawingModel(doc, A).model;
+const amut = (doc, fn) => { const m = structuredClone(amodel(doc)); fn(m); return m; };
+const node = (m, id) => m.nodes.find((n) => n.id === id);
+
+test('an ASM chart, two participants: a box moved and its actions changed at once both kept; a box deleted while a link to it is drawn: the link goes with it; the same chart on both sides', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, A, newAsm('ctl'));
+  assert.deepEqual(amodel(b), newAsm('ctl'));
+  const base = amodel(a);
+  hold();
+  putDrawing(a, A, amut(a, (m) => { node(m, 's2').x = 420; node(m, 'o1').actions = []; m.nodes = m.nodes.filter((n) => n.id !== 'o1'); m.edges = m.edges.filter((e) => e.from !== 'o1' && e.to !== 'o1'); m.edges.push({ id: 'e9', from: 'd1', to: 's2', port: 'true' }); }), { base, client: a.clientID });
+  const r = putDrawing(b, A, amut(b, (m) => { node(m, 's2').actions = ['busy = 1', 'load = 1']; m.edges.push({ id: 'e9', from: 'o1', to: 's3', port: 'next' }); }), { base, client: b.clientID });
+  release();
+  const ra = drawingModel(a, A), rb = drawingModel(b, A);
+  assert.deepEqual(ra, rb);
+  assert.deepEqual([node(ra.model, 's2').x, node(ra.model, 's2').actions], [420, ['busy = 1', 'load = 1']]);
+  assert.deepEqual(ra.dropped, [{ coll: 'edges', id: r.renamed.get('e9') }], 'B\'s link from the box A deleted');
+  assert.ok(!node(ra.model, 'o1'));
+  pruneDrawing(a, A);
+  assert.deepEqual(drawingModel(b, A).dropped, []);
+  assert.deepEqual(validateAsm(amodel(a)).filter((d) => d.severity === 'error'), []);
+});
+
+test('an ASM chart\'s generated HDL: identical from both sides\' merged chart, compiled and simulated in VHDL and in Verilog the same; each one\'s undo', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, A, newAsm('ctl'));
+  const oa = {}, ob = {};
+  const ua = new Y.UndoManager(a.getMap('drawings').get(A), { trackedOrigins: new Set([oa]), captureTimeout: 0 });
+  const base = amodel(a);
+  hold();
+  putDrawing(a, A, amut(a, (m) => { node(m, 'd2').cond = 'done = 1 and start = 0'; m.encoding = 'gray'; }), { base, client: a.clientID, origin: oa });
+  putDrawing(b, A, amut(b, (m) => { node(m, 's3').actions = ['ready = 1']; m.outputs[0].registered = true; }), { base, client: b.clientID, origin: ob });
+  release();
+  const ma = amodel(a);
+  assert.deepEqual(amodel(b), ma);
+  assert.deepEqual([node(ma, 'd2').cond, ma.encoding, node(ma, 's3').actions, ma.outputs[0].registered], ['done = 1 and start = 0', 'gray', ['ready = 1'], true]);
+  assert.deepEqual(validateAsm(ma).filter((d) => d.severity === 'error'), []);
+  const vectors = randomVectors(ma, 80, 5);
+  const runs = ['vhdl', 'verilog'].map((lang) => {
+    const ga = generateAsm(ma, lang), gb = generateAsm(amodel(b), lang);
+    assert.equal(ga.code, gb.code, lang);
+    return runHdl(ga.code, lang, ma, vectors);
+  });
+  assert.deepEqual(runs[0], runs[1]);
+  assert.equal(runs[0].length, 80);
+  ua.undo();
+  assert.deepEqual([node(amodel(b), 'd2').cond, amodel(b).encoding, node(amodel(b), 's3').actions], ['done', 'binary', ['ready = 1']]);
 });
