@@ -3,6 +3,7 @@
 // strings), as methods of the parser (Object.assign(Parser.prototype, expressionMethods) in parser.js).
 import { ref, int, bin, mapBits, baseName } from './nodes.js';
 import { STD_LIBS } from './parse-defs.js';
+import { MAX_NESTING, NESTING_MESSAGE } from '../util.js';
 
 const LOGIC_CHARS = /^[01uxzwlhUXZWLH-]*$/;
 const TIME_UNITS = { fs: ['fs', 1], ps: ['ps', 1], ns: ['ns', 1], us: ['us', 1], ms: ['ms', 1], sec: ['sec', 1], min: ['sec', 60], hr: ['sec', 3600] };
@@ -91,7 +92,16 @@ export const expressionMethods = {
     return base;
   },
 
+  // (a primary in another, in parentheses, a call, an index or after not / abs, one level deeper: at most MAX_NESTING,
+  // #3395)
   parsePrimary() {
+    try {
+      if (++this.nesting > MAX_NESTING) this.fail(NESTING_MESSAGE);
+      return this.primaryAt();
+    } finally { this.nesting--; }
+  },
+
+  primaryAt() {
     const tok = this.peek();
     switch (tok.type) {
       case 'int': {

@@ -29,7 +29,7 @@ test('#405 Verilog parser parts: the definitions and the methods of each part', 
   assert.ok(GATES.has('nand') && BIN_PREC.length > 5 && new Sync() instanceof Error);
   assert.ok(['genBlock', 'genFor', 'funcDecl', 'instance', 'gateInst'].every(k => typeof itemMethods[k] === 'function'));
   assert.ok(['stmt', 'stmtInner', 'lvalue', 'hierName'].every(k => typeof stmtMethods[k] === 'function'));
-  assert.deepEqual(Object.keys(exprMethods), ['expr', 'binary', 'unary', 'primary', 'postfix']);
+  assert.deepEqual(Object.keys(exprMethods), ['expr', 'deeper', 'binary', 'unary', 'primary', 'postfix']);
 });
 
 test('#405 Verilog parser parts: generate, functions, tasks, instances, statements and expressions parsed with no error', () => {
