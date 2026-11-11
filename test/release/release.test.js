@@ -83,6 +83,9 @@ test('release zip: the app with its production dependencies only, Yosys\'s WebAs
   // this repository's own packages are in it as files, not as npm's links in node_modules (#1874)
   assert.ok(exists('packages/silinx-fpga/package.json') && exists('packages/silinx-fpga/LICENSE'), 'packages/silinx-fpga in the zip');
   assert.ok(!fs.existsSync(path.join(APP, 'node_modules/silinx-fpga')), 'no link to packages/silinx-fpga in node_modules');
+  // (the HDL front end's, #1710: its code, which core/'s old paths re-export)
+  assert.ok(exists('packages/silinx-hdl/package.json') && exists('packages/silinx-hdl/LICENSE') && exists('packages/silinx-hdl/src/vhdl/parser.js'), 'packages/silinx-hdl in the zip');
+  assert.ok(!fs.existsSync(path.join(APP, 'node_modules/silinx-hdl')), 'no link to packages/silinx-hdl in node_modules');
   const { THIRD_PARTY } = await import(pathToFileURL(path.join(APP, 'core/third-party.js')).href);
   // (code ported into Silinx, e.g. adepttool, is listed but is not a package)
   // (and a package downloaded on its first use, the iCE40's nextpnr, is not in it: #2444, #2570)

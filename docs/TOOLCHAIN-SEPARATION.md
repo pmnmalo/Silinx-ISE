@@ -293,7 +293,8 @@ simulator that `compile` uses), so its steps are the toolchain's, shorter:
    import from them into the rest of the IDE. Done: `test/hdl-boundary.test.js`.
 2. **The workspace package** ([#1710](https://github.com/pmnmalo/Silinx/issues/1710)):
    `packages/silinx-hdl/`, the modules moved as they are, the old paths re-exporting; after the toolchain's
-   workspace (step 6, #1677), which sets the workspaces up.
+   workspace (step 6, #1677), which sets the workspaces up. Started: the package (private, Apache-2.0, 0.1.0) with
+   the VHDL and Verilog parsers, `util.js` and the UNISIM models in `packages/silinx-hdl/src/`.
 3. **Its API and publishing** ([#1711](https://github.com/pmnmalo/Silinx/issues/1711)): `compile`,
    `elaborate`, the flat Verilog with its hints, the UNISIM sources; the IDE's importers switch to it; its
    publishing from its own tag; VHDL in `silinx-fpga`'s command line through it.
