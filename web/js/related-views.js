@@ -5,8 +5,8 @@
 //   a view made from a drawing (the generated HDL, the table's schematic, a converted drawing): the drawing, its HDL;
 //   a C source: its HDL, its ASM chart (sequential), its synthesis report; the views made from it: the C, the others;
 //   an HDL source: its translation (#2711); a test bench: its unit under test; a translation: its source;
-//   a waveform: the module it shows (a test bench: the bench and its unit under test); the RTL / technology schematic,
-//     the C model, the power report and the Design Summary: their module (the summary's and the report's, the top).
+//   a waveform: the module it shows (a test bench: the bench and its unit under test); the RTL / technology schematic
+//     and the C model: their module. The Design Summary and the power report cover the whole project: none (#3310).
 // An entry: { label, id: its document's id, find(): that document when open, open(): makes or opens it }.
 import { S, findDoc, instancesOf, moduleInfo, openFile } from './app.js';
 import { cSequential, isC, openCAsm, openCHdl } from './c-source.js';
@@ -109,7 +109,6 @@ export function relatedViews(doc) {
     const name = rest.replace(/@.*$/, '');
     list = isBench(name) ? benchViews(name) : moduleViews(name);
   } else if (['rtl', 'tech', 'cmodel'].includes(kind)) list = moduleViews(rest);
-  else if (doc.id === 'summary' || /^text:.*\.pwr$/.test(doc.id)) list = S.project.top ? moduleViews(S.project.top) : [];
   const seen = new Set([doc.id]);
   return list.filter((e) => e && !seen.has(e.id) && seen.add(e.id));
 }
