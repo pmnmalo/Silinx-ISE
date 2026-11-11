@@ -53,6 +53,10 @@ test('every validation message of core/fsm.js has a Portuguese translation', () 
   assert.equal(t('State IDLE: no transition is true when go=0, op=00 (and 3 other combination(s)); the machine stays in IDLE'),
     'Estado IDLE: nenhuma transição é verdadeira quando go=0, op=00 (e mais 3 combinação(ões)); a máquina fica em IDLE');
   assert.equal(t("Input 'begin' is a reserved word in Verilog and VHDL"), "A entrada 'begin' é uma palavra reservada em Verilog e VHDL");
+  // the Outputs fields' own errors (parseOutputs, #3288)
+  assert.equal(t("'q' is not an output"), "'q' não é uma saída");
+  assert.equal(t("the value '1z=1' of z0 must be a constant (e.g. 0, 1, 4'b1010, 5)"), "o valor '1z=1' de z0 tem de ser uma constante (p.ex. 0, 1, 4'b1010, 5)");
+  assert.equal(t("'3 = z' is not an output assignment (write output=value, e.g. z=1)"), "'3 = z' não é uma atribuição de saída (escreva saída=valor, p.ex. z=1)");
 });
 
 test('table messages, editor texts with names and the out-of-sync reasons are translated; the dictionary does not change other translations', () => {

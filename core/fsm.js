@@ -73,8 +73,10 @@ function normOutputs(o) {
   return out;
 }
 
-/** Parse "z=1, y = 2'b10; w" -> { outputs: { z: '1', y: "2'b10", w: '1' } } or { error }. */
-export function parseOutputs(text) {
+/** Parse "z=1, y = 2'b10; w" -> { outputs: { z: '1', y: "2'b10", w: '1' } } or { error }. Given the machine's
+ *  `outputs` ([{ name }]), each assignment is checked as Check checks it (outputProblems): an output it has, a
+ *  constant value ("z0=1z=1", a comma missing, is not one), #3288. */
+export function parseOutputs(text, outputs = null) {
   const out = {};
   const parts = String(text ?? '').split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
   for (const p of parts) {
@@ -82,7 +84,20 @@ export function parseOutputs(text) {
     if (!m) return { error: `'${p}' is not an output assignment (write output=value, e.g. z=1)` };
     out[m[1]] = m[2] == null ? '1' : m[2].trim();
   }
-  return { outputs: out };
+  const bad = outputs ? outputProblems(out, outputs) : [];
+  return bad.length ? { error: bad[0] } : { outputs: out };
+}
+
+/** The errors of output assignments ({ name: valueText }) of a machine with these `outputs` ([{ name }]): an output
+ *  it does not have, a value that is not a constant. Check's (validateFsm) and the editor's fields' (parseOutputs). */
+export function outputProblems(outs, outputs) {
+  const names = new Set((outputs || []).map((o) => o.name));
+  const out = [];
+  for (const [o, val] of Object.entries(outs || {})) {
+    if (!names.has(o)) out.push(`'${o}' is not an output`);
+    else if (constValue(val) == null) out.push(`the value '${val}' of ${o} must be a constant (e.g. 0, 1, 4'b1010, 5)`);
+  }
+  return out;
 }
 
 /** "z=1, y=2'b10" */
@@ -90,14 +105,15 @@ export function formatOutputs(o) {
   return Object.entries(o || {}).map(([k, v]) => `${k}=${v}`).join(', ');
 }
 
-/** Split a transition label "cond / z=1" into { cond, outputs } (a '/' followed by '=' belongs to the condition). */
-export function parseLabel(text) {
+/** Split a transition label "cond / z=1" into { cond, outputs } (a '/' followed by '=' belongs to the condition);
+ *  given the machine's `outputs`, its assignments checked (parseOutputs). */
+export function parseLabel(text, outputs = null) {
   const s = String(text ?? '');
   let k = -1;
   for (let i = s.length - 1; i >= 0; i--) if (s[i] === '/' && s[i + 1] !== '=') { k = i; break; }
   const cond = (k < 0 ? s : s.slice(0, k)).trim();
   const outs = k < 0 ? '' : s.slice(k + 1);
-  const r = parseOutputs(outs);
+  const r = parseOutputs(outs, outputs);
   return { cond: /^(1|true|always)$/i.test(cond) ? '' : cond, outputs: r.outputs || {}, error: r.error };
 }
 
@@ -381,12 +397,10 @@ export function validateFsm(model) {
   if (m.states.length && !stateById(m, m.initial)) add('error', 'The initial (reset) state is not set', {});
 
   const checkOutputs = (outs, where, ref) => {
+    for (const e of outputProblems(outs, m.outputs)) add('error', `${where}: ${e}`, ref);
     for (const [o, val] of Object.entries(outs)) {
-      const p = outputs.get(o);
-      if (!p) { add('error', `${where}: '${o}' is not an output`, ref); continue; }
-      const v = constValue(val);
-      if (v == null) add('error', `${where}: the value '${val}' of ${o} must be a constant (e.g. 0, 1, 4'b1010, 5)`, ref);
-      else if (widthOf.has(o) && v >= 1n << BigInt(p.width)) add('warning', `${where}: the value ${val} of ${o} does not fit in ${p.width} bit(s)`, ref);
+      const p = outputs.get(o), v = constValue(val);
+      if (p && v != null && widthOf.has(o) && v >= 1n << BigInt(p.width)) add('warning', `${where}: the value ${val} of ${o} does not fit in ${p.width} bit(s)`, ref);
     }
   };
   for (const s of m.states) checkOutputs(s.outputs, `State ${s.name || '?'}`, { state: s.id });
