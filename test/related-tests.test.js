@@ -7,7 +7,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { imports, dataPaths, relatedTests, reexportsOnly, reexported, pageImports, shardOf, planShards, PART_MINUTES, MAX_PARTS, sources } from '../scripts/related-tests.mjs';
+import { readTimings } from '../scripts/test-shard.mjs';
+import { imports, dataPaths, relatedTests, reexportsOnly, reexported, pageImports, shardOf, planShards, PART_MINUTES, MAX_PARTS, sources, REPO_WIDE, withRepoWide } from '../scripts/related-tests.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -284,21 +285,21 @@ test('related tests: the command line, in a repository of its own — the list, 
   fs.writeFileSync(path.join(dir, 'README.md'), 'y\n'); git('commit', '-qam', '2');
   let r = run(base, 'HEAD');
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(r.stdout, '1 file(s) changed; the tests of their modules: 0 unit, 0 UI\n');
+  assert.equal(r.stdout, '1 file(s) changed; the tests of their modules and the repository-wide tests: 0 unit, 0 UI\n');
   // its plan (#1982): no part
   r = run(base, 'HEAD', '--plan');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, 'parts=0\nshards=[]\n');
-  assert.equal(r.stderr, '1 file(s) changed; the tests of their modules: 0 unit, 0 UI, ~0 min: 0 part(s)\n');
+  assert.equal(r.stderr, '1 file(s) changed; the tests of their modules and the repository-wide tests: 0 unit, 0 UI, ~0 min: 0 part(s)\n');
   // the module changed, wrongly: its test listed, then failing
   fs.writeFileSync(path.join(dir, 'core', 'a.js'), 'export const a = 2;\n'); git('commit', '-qam', '3');
   r = run(base, 'HEAD', '--list');
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(r.stdout, '2 file(s) changed; the tests of their modules: 1 unit, 0 UI\n  test/a.test.js\n');
+  assert.equal(r.stdout, '2 file(s) changed; the tests of their modules and the repository-wide tests: 1 unit, 0 UI\n  test/a.test.js\n');
   r = run(base, 'HEAD', '--plan');
   assert.equal(r.stdout, 'parts=1\nshards=[1]\n');
-  assert.equal(r.stderr, '2 file(s) changed; the tests of their modules: 1 unit, 0 UI, ~0 min: 1 part(s)\n');
-  assert.equal(run(base, 'HEAD', '--shard', '2/2', '--list').stdout, '2 file(s) changed; the tests of their modules: 1 unit, 0 UI; part 2/2: 0 unit, 0 UI\n');
+  assert.equal(r.stderr, '2 file(s) changed; the tests of their modules and the repository-wide tests: 1 unit, 0 UI, ~0 min: 1 part(s)\n');
+  assert.equal(run(base, 'HEAD', '--shard', '2/2', '--list').stdout, '2 file(s) changed; the tests of their modules and the repository-wide tests: 1 unit, 0 UI; part 2/2: 0 unit, 0 UI\n');
   r = run(base, 'HEAD', '--test-reporter=tap');
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout, /^not ok 1 - a$/m);
@@ -310,6 +311,39 @@ test('related tests: the command line, in a repository of its own — the list, 
   assert.equal(r.status, 2);
   assert.equal(r.stderr, `the files changed from ${'f'.repeat(40)} to HEAD are not known (is ${'f'.repeat(40)} fetched?)\n`);
   assert.equal(run(base, 'HEAD', '--shard', '4/3').status, 2);
+  // #3461: a repository's check of REPO_WIDE runs for any change, documentation only too
+  fs.writeFileSync(path.join(dir, 'core', 'a.js'), 'export const a = 1;\n');
+  fs.writeFileSync(path.join(dir, 'test', 'old-name.test.js'), "import { test } from 'node:test'; test('scan', () => {});\n");
+  git('add', '.'); git('commit', '-qm', '4');
+  const before = git('rev-parse', 'HEAD');
+  fs.writeFileSync(path.join(dir, 'README.md'), 'z\n'); git('commit', '-qam', '5');
+  r = run(before, 'HEAD', '--list');
+  assert.equal(r.stdout, '1 file(s) changed; the tests of their modules and the repository-wide tests: 1 unit, 0 UI\n  test/old-name.test.js\n');
+  assert.equal(run(before, 'HEAD', '--plan').stdout, 'parts=1\nshards=[1]\n');
+  r = run(before, 'HEAD', '--test-reporter=tap');
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /^ok 1 - scan$/m);
+});
+
+test('#3461 related tests: the repository\'s checks, for every change — each one there and scanning the repository', () => {
+  assert.deepEqual(REPO_WIDE, [...new Set(REPO_WIDE)].sort(), 'sorted, each once');
+  for (const f of REPO_WIDE) {
+    assert.match(f, /^test\/[^/]+\.test\.js$/, f);
+    assert.ok(fs.existsSync(path.join(ROOT, f)), `${f} is there`);
+    // it reads the tracked files or a folder of the repository, not one module
+    assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /\breaddirSync\(|'ls-files'|\bscanRepo\(/, f);
+  }
+  // added to the tests of a change, each once; those not in the repository left out
+  const files = { 'test/a.test.js': '', 'test/old-name.test.js': '', 'test/docs.test.js': '' };
+  assert.deepEqual(withRepoWide({ unit: [], ui: [] }, files), { unit: ['test/docs.test.js', 'test/old-name.test.js'], ui: [] });
+  assert.deepEqual(withRepoWide({ unit: ['test/old-name.test.js', 'test/a.test.js'], ui: ['test/ui/x.test.js'] }, files),
+    { unit: ['test/a.test.js', 'test/docs.test.js', 'test/old-name.test.js'], ui: ['test/ui/x.test.js'] });
+  // the repository: a fragment alone (the changelog's, #3454's break) runs every one, in one part
+  const repo = sources();
+  const all = withRepoWide(relatedTests(repo, ['changes/1-x.md']), repo);
+  for (const f of REPO_WIDE) assert.ok(all.unit.includes(f), f);
+  assert.ok(!all.unit.includes('test/hdl-boundary.test.js'), 'the front end\'s boundary: its modules named in it');
+  assert.equal(planShards(all, readTimings()).n, 1);
 });
 
 test('PR tests: every pull request, its parts planned (#1982), the related-tests verdict main requires', () => {
