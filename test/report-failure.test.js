@@ -116,7 +116,8 @@ test('report-failure: a job cancelled at its time limit is reported, one cancell
 });
 
 test('report-failure: the scheduled workflows end with the job that reports a failure (#251)', () => {
-  for (const [file, jobs] of [['nightly.yml', ['changes', 'corpus', 'vloghammer', 'designs']], ['ise.yml', ['changes', 'ise']], ['quality.yml', ['changes', 'compare', 'publish']]]) {
+  for (const [file, jobs] of [['nightly.yml', ['changes', 'corpus', 'vloghammer', 'designs']], ['ise.yml', ['changes', 'ise']], ['quality.yml', ['changes', 'compare', 'publish']],
+    ['ci.yml', ['changes', 'unit', 'ui', 'webkit-standalone', 'release-zip', 'browsers', 'os', 'private-data-history']]]) {
     const yml = fs.readFileSync(path.join(ROOT, '.github/workflows', file), 'utf8');
     const job = yml.slice(yml.indexOf('\n  report:\n'));
     assert.ok(yml.includes('\n  report:\n'), file);

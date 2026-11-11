@@ -50,7 +50,8 @@ test('changed since the last run: the reusable job, on a GitHub-hosted runner wi
 });
 
 test('changed since the last run: the long scheduled workflows are gated on it, never on the self-hosted runner', () => {
-  for (const [file, gated] of [['nightly.yml', ['corpus', 'vloghammer', 'designs']], ['ise.yml', ['ise']], ['quality.yml', ['compare']]]) {
+  for (const [file, gated] of [['nightly.yml', ['corpus', 'vloghammer', 'designs']], ['ise.yml', ['ise']], ['quality.yml', ['compare']],
+    ['ci.yml', ['unit', 'ui', 'webkit-standalone', 'release-zip', 'browsers', 'os', 'private-data-history']]]) {
     const yml = fs.readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8');
     // the check itself: the reusable workflow (#417), given the workflow's file
     assert.match(yml, new RegExp(`\\n  changes:\\n    uses: \\./\\.github/workflows/scheduled-changes\\.yml\\n    permissions:\\n      actions: read\\n      contents: read\\n    with:\\n      workflow: ${file.replace('.', '\\.')}\\n`), file);
