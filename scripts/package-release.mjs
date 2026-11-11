@@ -33,7 +33,7 @@ const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: ['ignore',
 /** The tracked files the app never reads, left out of the zip: the device measurements (#3, #1541), the tests (#2329). */
 const NOT_RELEASED = /^(packages\/silinx-fpga\/research\/s3e-device\/data|test|packages\/silinx-fpga\/test)\//;
 
-const NEXTPNR_PACKAGES = ['@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6'];
+const NEXTPNR_PACKAGES = ['@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6', '@silinx/nextpnr-himbaechel-xc7'];
 
 /**
  * The tracked files (as `git archive HEAD` gives them in a clean checkout, the release's case) with

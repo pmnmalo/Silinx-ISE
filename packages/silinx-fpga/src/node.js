@@ -8,11 +8,13 @@ export { loadDeviceCache, findDeviceGraph, shippedDevicePath, buildDeviceCache, 
 // the bit databases (bitdb/)
 export { loadDb, hasBitDb, dbPackages, DB_DIR } from './fpga/bitdb-node.js';
 export { loadBitDbS6, S6_DB_DIR } from './fpga/s6/bitdb-node.js';
+export { loadBitDbXc7, xc7Parts, XC7_DB_DIR } from './fpga/xc7/bitdb-node.js';
 // Yosys: one run (yosysNode), or a pool of workers for the synthesis's mappings in parallel (yosysWorkers)
 export { yosysNode, yosysWorkers } from './synth-open-node.js';
 // nextpnr (the nextpnr engine's io.nextpnr, #2136)
 export { nextpnrNode } from './nextpnr-node.js';
 export { nextpnrS6Node } from './nextpnr-s6-node.js';
 export { nextpnrIce40Node } from './nextpnr-ice40-node.js';
+export { nextpnrXc7Node } from './nextpnr-xc7-node.js';
 // a nextpnr package without its chip databases, fetched on first use (Silinx's release zip, #2329)
 export { leaveOutChipdbs, chipdbCacheDir } from './nextpnr-chipdb-node.js';

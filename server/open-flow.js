@@ -24,7 +24,7 @@ import fss from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, synthGoal, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
+import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, synthGoal, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages, xc7Parts, XILINX_STEPS } from '../packages/silinx-fpga/src/node.js';
 import { findPart } from './devices.js';
 import { ice40Package, ice40Present } from './nextpnr-ice40-fetch.js';
 import { runCommand } from './jobs.js';
@@ -84,6 +84,7 @@ export function flowHeapMb(totalBytes = os.totalmem(), nodeOptions = process.env
 export function openStatus(device, { dbDir = BIT_DB_DIR } = {}) {
   const out = { available: false, reason: '', part: null, device: null, graph: null, shipped: false, bitDb: false, canBuild: false };
   if (deviceFamily(device) === 'ice40') return { ...out, ...ice40Status(device) };
+  if (deviceFamily(device) === 'artix7') return { ...out, ...xc7Status(device) };
   let part;
   try { part = reportPart(device || {}); } catch (e) { out.reason = e.message; return out; }
   const dev = String(device.part).toLowerCase();
@@ -128,10 +129,18 @@ function ice40Status(device) {
   return { part, device: dev, available: true, reason: `${part}: nextpnr-ice40 and icepack${ice40Present() ? '' : ' (downloaded by the first run, #2444)'}`, steps: backendOf('ice40').steps.map(s => s.id) };
 }
 
+// the 7-series (#3146): nextpnr's chip database (the package's) and Project X-Ray's bit database of the part (the xc7a35t's
+// so far: the Basys 3's)
+function xc7Status(device) {
+  const dev = String(device.part).toLowerCase(), part = reportPart(device), parts = xc7Parts();
+  if (!parts.includes(part)) return { part, device: dev, reason: `no 7-series bit database for the ${part} yet (only ${parts.join(', ') || 'none'}): use AMD Vivado for this device` };
+  return { part, device: dev, available: true, bitDb: true, reason: `${part}: nextpnr-himbaechel (xilinx) and Project X-Ray's bit database (experimental, #3146)`, steps: backendOf('artix7').steps.map(s => s.id) };
+}
+
 /** Normalise the steps of an open run: the chain from synthesis to the last requested step; a family ISE does not
- *  implement: its back end's list (#2295). */
+ *  implement, or whose back end lists its own steps (the 7-series', #3146): its back end's list (#2295). */
 export function openSteps(steps, { synthUpToDate = false, family = null } = {}) {
-  if (family && !isIseFamily(family) && backendOf(family).id === family) {
+  if (family && backendOf(family).id === family && (!isIseFamily(family) || backendOf(family).steps !== XILINX_STEPS)) {
     const asked = [].concat(steps || []).map(s => String(s).toLowerCase());
     const list = orderSteps(backendOf(family).steps, asked);
     return synthUpToDate && !asked.includes('synth') ? list.filter(s => s !== 'synth') : list;
@@ -178,7 +187,7 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
   if (!st.includes('synth')) {
     try { const r = JSON.parse(await fs.readFile(path.join(outDir, 'report.json'), 'utf8')); earlier = { synthesis: r.synthesis || null, files: { netlist: r.files?.netlist, synthesis: r.files?.synthesis } }; } catch { /* none */ }
   }
-  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'timing.txt', 'paths.json', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
+  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'routed.fasm', 'nextpnr-report.json', 'timing.txt', 'paths.json', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
   const spec = {
     top: gen.top, part: status.part, device: status.device, family: deviceFamily(project.device) || 'spartan3e',
     pkg: String(project.device.package).toLowerCase(), graph: status.graph, bitDbDir: BIT_DB_DIR,

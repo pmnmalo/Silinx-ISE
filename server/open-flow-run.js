@@ -10,7 +10,7 @@
 // build/open/report.json after every step (what the Design Summary shows).
 import fs from 'node:fs';
 import path from 'node:path';
-import { yosysWorkers, nextpnrNode, nextpnrS6Node, ice40Io, loadDeviceCache, loadDb, loadBitDbS6 } from '../packages/silinx-fpga/src/node.js';
+import { yosysWorkers, nextpnrNode, nextpnrS6Node, nextpnrXc7Node, ice40Io, loadDeviceCache, loadDb, loadBitDbS6, loadBitDbXc7 } from '../packages/silinx-fpga/src/node.js';
 import { runOpenFlow } from '../core/flow-ide.js';
 import { loadIce40 } from './nextpnr-ice40-fetch.js';
 
@@ -28,10 +28,10 @@ const io = {
   ucf: spec.ucf ? fs.readFileSync(spec.ucf, 'utf8') : null,
   ucfName: spec.ucf ? path.basename(spec.ucf) : null,
   device: () => (dev ||= loadDeviceCache(spec.graph)),
-  // (the Spartan-6's bit databases, packages/silinx-fpga/bitdb/s6, #732)
-  bitDb: () => (db ||= spec.family === 'spartan6' ? loadBitDbS6(spec.part) : loadDb(`${spec.device}${spec.pkg}`, { graph: io.device(), dir: spec.bitDbDir })),
+  // (the Spartan-6's bit databases, packages/silinx-fpga/bitdb/s6, #732; the 7-series', bitdb/xc7, #3146)
+  bitDb: () => (db ||= spec.family === 'spartan6' ? loadBitDbS6(spec.part) : spec.family === 'artix7' ? loadBitDbXc7(spec.part) : loadDb(`${spec.device}${spec.pkg}`, { graph: io.device(), dir: spec.bitDbDir })),
   yosys: yosysWorkers(),   // (the synthesis's mappings from the same netlist in parallel, #86)
-  nextpnr: { spartan3e: nextpnrNode(), spartan6: nextpnrS6Node(), ice40: ice40Io(() => loadIce40({ log: line => console.log(line) })) },   // (the nextpnr engine's, spec.engine 'nextpnr', #2136, #2138; the iCE40's, #2295)
+  nextpnr: { spartan3e: nextpnrNode(), spartan6: nextpnrS6Node(), ice40: ice40Io(() => loadIce40({ log: line => console.log(line) })), xc7: nextpnrXc7Node() },   // (the nextpnr engine's, spec.engine 'nextpnr', #2136, #2138; the iCE40's, #2295; the 7-series', #3146)
   write: (name, data) => {
     const f = fileOf(name);
     fs.mkdirSync(path.dirname(f), { recursive: true });   // (netgen/synthesis/…)

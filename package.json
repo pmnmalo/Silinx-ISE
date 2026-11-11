@@ -44,6 +44,7 @@
     "@lezer/highlight": "^1.2.5",
     "@silinx/nextpnr-himbaechel-spartan3e": "1.5.0",
     "@silinx/nextpnr-himbaechel-spartan6": "https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-v0.3.0/silinx-nextpnr-himbaechel-spartan6-0.3.0.tgz",
+    "@silinx/nextpnr-himbaechel-xc7": "0.1.1",
     "@trystero-p2p/torrent": "^0.26.0",
     "@yowasp/yosys": "0.70.1258",
     "elkjs": "^0.12.1",

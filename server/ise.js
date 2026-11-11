@@ -14,7 +14,7 @@
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
-import { FAMILY_INFO, deviceFamily, isIseFamily, parseUcf, bitName, resourceCount } from '../packages/silinx-fpga/src/parts.js';
+import { FAMILY_INFO, deviceFamily, isIseFamily, constraintsFormatOf, parseUcf, bitName, resourceCount } from '../packages/silinx-fpga/src/parts.js';
 import { compile, elaborate } from '../core/compile.js';
 import { clocksOf, latchGates } from '../core/schematic.js';
 import { primitiveSources } from '../core/unisim.js';
@@ -411,7 +411,9 @@ export async function generateBuild(project, projectDir, { steps, sourcesOnly = 
   if (!IDENT.test(top)) throw Object.assign(new Error(`invalid top module name '${top}'`), { status: 400 });
   const device = project.device || {};
   const fam = deviceFamily(device);
-  const ise = !sourcesOnly && (!FAMILY_INFO[fam] || isIseFamily(fam));   // (a family the open toolchain alone implements: its sources and constraints only, #2295)
+  // (a family the open toolchain alone implements, #2295, or whose constraints are not UCF, the 7-series' XDC, #3146: its sources and
+  // constraints only)
+  const ise = !sourcesOnly && (!FAMILY_INFO[fam] || (isIseFamily(fam) && constraintsFormatOf(device) === 'ucf'));
   const devErr = ise ? validateDevice(device) : [];
   if (devErr.length) throw Object.assign(new Error(devErr.join('; ')), { status: 400 });
 

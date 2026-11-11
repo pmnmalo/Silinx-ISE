@@ -4,6 +4,7 @@
 // (nextpnr-ice40-io.js: YoWASP's package, @yowasp/nextpnr-ice40).
 import { scriptSynthesis } from './synth-script.js';
 import { PCF } from './pcf.js';
+import { portBits, nextpnrNames } from './nextpnr-ports.js';
 
 /** The iCE40's parts, as nextpnr-ice40 names them (its --<part> option): ice40up5k, ice40hx8k… */
 export const ICE40_PARTS = ['lp384', 'lp1k', 'lp4k', 'lp8k', 'hx1k', 'hx4k', 'hx8k', 'up3k', 'up5k', 'u1k', 'u2k', 'u4k'];
@@ -26,22 +27,6 @@ export const ice40Utilization = counts => ({
 const NAMES = { luts: 'Number of LUT4s', ffs: 'Number of flip-flops', ramb16: 'Number of RAM4Ks', mult18x18: 'Number of DSPs', bufgmux: 'Number of global buffers', dcm: 'Number of PLLs', iob: 'Number of IOs' };
 
 const text = v => (typeof v === 'string' ? v : new TextDecoder().decode(v));
-
-// a port's bits as nextpnr names them: q[0], q[1]… (a bus), clk (a bit); a vector of one bit too: btn, not btn[0] (#2518)
-function portBits(netlistText, top) {
-  const mods = JSON.parse(netlistText).modules || {};
-  const mod = mods[top] || Object.values(mods).find(m => m.attributes?.top) || {};
-  return Object.entries(mod.ports || {}).flatMap(([name, p]) => (p.bits.length > 1 ? p.bits.map((_, i) => `${name}[${(p.offset || 0) + i}]`)
-    : [{ name, bit: `${name}[${p.offset || 0}]` }])).map(b => (typeof b === 'string' ? { name: b } : b));
-}
-
-// (#2518) the PCF's names as nextpnr's: a one-bit port's btn[0] (a board's constraints name every bus's bits so) as btn
-function nextpnrNames(pcf, bits) {
-  const rename = new Map(bits.filter(b => b.bit && !pcf.assignments?.[b.name] && pcf.assignments?.[b.bit]).map(b => [b.bit, b.name]));
-  if (!rename.size) return pcf;
-  const to = n => rename.get(n) || n;
-  return { ...pcf, assignments: Object.fromEntries(Object.entries(pcf.assignments).map(([n, a]) => [to(n), a])), clocks: (pcf.clocks || []).map(c => ({ ...c, net: to(c.net) })) };
-}
 
 function mountIce40(ctx) {
   const { io, spec, log, report, top, ms, now, constraints, netlistText, StepError } = ctx;

@@ -30,6 +30,7 @@ afterEach(() => {
 test('the release of a package\'s version: the tags of each family', () => {
   assert.equal(chipdbReleaseUrl(NAME, '0.11.2'), 'https://github.com/pmnmalo/nextpnr-spartan/releases/download/v0.11.2/');
   assert.equal(chipdbReleaseUrl('@silinx/nextpnr-himbaechel-spartan6', '0.1.0'), 'https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-v0.1.0/');
+  assert.equal(chipdbReleaseUrl('@silinx/nextpnr-himbaechel-xc7', '0.1.1'), 'https://github.com/pmnmalo/nextpnr-spartan/releases/download/xc7-v0.1.1/');   // (the 7-series', #3146)
   assert.throws(() => chipdbReleaseUrl('elkjs', '1.0.0'), /not a nextpnr package/);
 });
 
