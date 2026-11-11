@@ -19,7 +19,7 @@
 //             them (-nobram -nolutram -nosrl -nodsp) to test the rest of the flow.
 //
 //   node test/designs-corpus/run.mjs [--filter name[,name]] [--jobs n] [--cycles n] [--update]
-//        [--stages frontend,tb,…] [--projects dir] [--bits dir] [--sizes dir [--sizes-only]] [--json file]
+//        [--stages frontend,tb,…] [--projects dir] [--bits dir] [--sizes dir [--sizes-only] [--resume]] [--json file]
 //        [--size-tolerance 5] [--period-tolerance 15] [--seed n] [--machine name]
 //   node test/designs-corpus/run.mjs --record-times results.json --machine ci
 //   node test/designs-corpus/run.mjs --table      (the README's results table and run times, from
@@ -389,6 +389,8 @@ if (!isMainThread) {
     projects: opt('--projects', null) && path.resolve(opt('--projects')),
     sizes: opt('--sizes', null) && path.resolve(opt('--sizes')),
     sizesOnly: args.includes('--sizes-only'),
+    // --resume (with --sizes, #3342): the designs a run before processed (<sizes>/.done) skipped, each marked as it is done
+    resume: args.includes('--resume'),
     bits: opt('--bits', null) && path.resolve(opt('--bits')),
     // the placer's seed: fixed (1), so that the circuit's size and speed are reproducible; another
     // seed only to measure the placement noise (the expectations are seed 1's)
@@ -434,7 +436,12 @@ if (!isMainThread) {
   const picked = d => !filter || filter.split(',').some(f => d.name === f || d.name.includes(f));
   const { fetchDesignCorpus, corpusPaths } = await import(pathToFileURL(path.join(ROOT, 'scripts', 'fetch-design-corpus.mjs')).href);
   await fetchDesignCorpus({ manifest: { ...manifest, designs: manifest.designs.filter(picked) } });
-  const todo = manifest.designs.filter(picked).map(d => d.name);
+  const { doneDesigns, markDesignDone } = await import(pathToFileURL(path.join(HERE, 'quality-cache.mjs')).href);
+  const resume = opts.resume && opts.sizes;
+  const kept = resume ? doneDesigns(opts.sizes) : new Set();
+  const todo = manifest.designs.filter(picked).map(d => d.name).filter(n => !kept.has(n));
+  if (kept.size) console.error(`--resume: ${kept.size} designs processed by an earlier run, ${todo.length} to do`);
+  const record = (n, r) => { results[n] = r; if (resume) markDesignDone(opts.sizes, n); };
   const results = {};
   const t0 = Date.now();
   let next = 0, done = 0;
@@ -451,7 +458,7 @@ if (!isMainThread) {
         running = null;
         // (the timeout is the stage's that was running, the stages before it kept, #2909)
         timer = setTimeout(() => {
-          results[cur] = timedOutResult(cur, running, TIMEOUT / 60000);
+          record(cur, timedOutResult(cur, running, TIMEOUT / 60000));
           console.error(`${String(++done).padStart(3)}/${todo.length} ${cur.padEnd(24)} ${running?.progress || 'frontend'} timeout`);
           cur = null; w.terminate();
         }, TIMEOUT);
@@ -460,7 +467,7 @@ if (!isMainThread) {
       w.on('message', r => {
         if (r.progress) { running = r; return; }
         clearTimeout(timer);
-        results[r.name] = r;
+        record(r.name, r);
         done++;
         console.error(`${String(done).padStart(3)}/${todo.length} ${r.name.padEnd(24)} ${STAGES.map(s => `${s} ${kindOf(r[s])}`).join(', ')}`);
         cur = null;
