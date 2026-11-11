@@ -43,7 +43,8 @@ test('the import map of web/index.html: every target installed; the editor\'s wh
   assert.ok(todo.includes('@codemirror/view') && todo.includes('@codemirror/legacy-modes/mode/vhdl'), todo.join(', '));
   const collab = ['core/collab-client.js', 'core/collab-doc.js', 'web/js/collab-bind.js'].flatMap(f => bareImports(fs.readFileSync(path.join(ROOT, f), 'utf8')));
   // (the text editors bound live, #3182: y-codemirror.next)
-  assert.deepEqual([...new Set(collab)].sort(), ['@codemirror/state', '@codemirror/view', 'y-codemirror.next', 'y-protocols/awareness', 'yjs']);
+  // (an awareness update filtered by its sender, #3360: lib0's encoding)
+  assert.deepEqual([...new Set(collab)].sort(), ['@codemirror/state', '@codemirror/view', 'lib0/decoding', 'lib0/encoding', 'y-codemirror.next', 'y-protocols/awareness', 'yjs']);
   todo.push(...collab);
   // (a shared project's meeting point, #3227: Trystero, its torrent strategy)
   const dynamic = src => [...src.matchAll(/\bimport\(['"]([@\w][\w@./-]*)['"]\)/g)].map(m => m[1]);

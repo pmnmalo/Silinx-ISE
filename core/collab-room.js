@@ -1,16 +1,18 @@
 // A shared project's rooms (#3180, #3181, #3227: out of server/collab-relay.js, the server's relay, so that the owner's
 // page can host its room too, the browser edition's): who owns each room, its followers, and what passes between them.
 // It reads no message (they are sealed with the link's key, which it never sees). What it checks:
-// - a participant's first message: an owner's `open` (a new room), a follower's `join` (a room's id), of this version;
+// - a participant's first message: an owner's `open` (a new room), a follower's `join` (a room's id), of this version,
+//   with a client id of its own (#3360: not the owner's nor another follower's);
 // - only the owner's updates are forwarded: a follower's are dropped and answered with an error (read only), only
-//   their awareness (who they are, what they look at) goes through; and, when the owner lets editors in (its open
+//   their awareness (who they are, what they look at) goes through, marked with the client id they joined with (#3360:
+//   a follower's awareness speaks for that follower only, never for the owner nor another); and, when the owner lets editors in (its open
 //   gives the room's public key, #3182), an editor's edits whose signature is the room's (core/collab-sign.js),
 //   each sender's in its order;
 // - followers per room, rooms per host, the time to the first message;
 // - a room ends with its owner (stopping sharing, or the connection lost): its followers are told and closed.
 // A participant is a socket: send(data, { binary }), close(code, reason), readyState (1: open), as a WebSocket of
 // `ws`; its transport gives each message to `message(data, binary)` and its end to `close()`.
-import { KIND, PROTOCOL } from './collab-client.js';
+import { KIND, PROTOCOL, fromFrame } from './collab-client.js';
 import { b64url } from './collab-crypto.js';
 import { verifierOf, verifyFrame, PUB_RE } from './collab-sign.js';
 
@@ -19,7 +21,7 @@ export const ROOM_LIMITS = Object.freeze({ followers: 64, rooms: 32, helloWait: 
 const json = (ws, msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
 /** A participant refused: the reason said, its connection closed. */
 export const fail = (ws, message) => { json(ws, { type: 'error', message }); ws.close(1008, 'refused'); };
-const clientId = v => (Number.isSafeInteger(v) && v >= 0 ? v : null);
+const clientId = v => (Number.isSafeInteger(v) && v >= 0 && v <= 0xFFFFFFFF ? v : null);   // (Yjs's: 32 bits)
 
 /** Rooms: { rooms (Map: room -> { owner, ownerClient, followers: Map<socket, client>, verify (a promise of the
  *  editors' key, or null) }), welcome(socket, role)
@@ -60,6 +62,7 @@ export function collabRooms({ limits = ROOM_LIMITS } = {}) {
           const r = typeof msg.room === 'string' ? rooms.get(msg.room) : null;
           if (!r) return fail(ws, 'this shared project is no longer shared (its owner stopped sharing it)');
           if (r.followers.size >= limits.followers) return fail(ws, `this shared project has ${limits.followers} followers already`);
+          if (msg.client === r.ownerClient || [...r.followers.values()].includes(msg.client)) return fail(ws, 'another participant of this shared project has this client id');
           r.followers.set(ws, msg.client);
           me = { role: 'follower', room: msg.room, client: msg.client };
           json(ws, { type: 'joined', owner: r.ownerClient });
@@ -77,7 +80,7 @@ export function collabRooms({ limits = ROOM_LIMITS } = {}) {
       if (!binary) return;
       // a follower: their awareness only (small: their endpoint's maximum); an edit is refused (read only, #3181)
       const others = () => [r.owner, ...r.followers.keys()].filter(o => o !== ws && o.readyState === 1);
-      if (data[0] === KIND.awareness) { for (const o of others()) o.send(data, { binary: true }); return; }
+      if (data[0] === KIND.awareness) { const f = fromFrame(me.client, new Uint8Array(data)); for (const o of others()) o.send(f, { binary: true }); return; }
       if (data[0] !== KIND.edit || !r.verify) return json(ws, { type: 'error', message: 'read only: a follower cannot change the shared project' });
       // an editor's edit: forwarded once its signature is the room's (in the order they came)
       const frame = new Uint8Array(data);
