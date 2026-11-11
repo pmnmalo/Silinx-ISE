@@ -648,9 +648,14 @@ uiTest('Files view: rename a folder (its files and subfolders follow, still regi
   await page.waitForSelector('body > .menu-popup');
   await page.click('body > .menu-popup .mi', { text: 'Delete Folder…' });
   await page.waitDialog('Delete Folder');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent), 'Delete the folder \'old\' and the 1 file(s) in it from the project?\n(They are moved to the workspace\'s .trash folder, from where you can move them back.)\n\nold/c.v');
   await page.dialogButton('Yes');
   await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'old/c.v'));
   await assert.rejects(fs.access(path.join(env.server.workspace, 'FoldPj', 'old')));
+  // (#3364: into the workspace's .trash, said in the console)
+  const bin = (await fs.readdir(path.join(env.server.workspace, '.trash'))).find((d) => /^FoldPj-\d+(-\d+)?$/.test(d));
+  assert.match(await readWs(env, `.trash/${bin}`, 'old/c.v'), /module/);
+  await page.waitConsole(new RegExp(`Folder old deleted \\(1 file\\(s\\); moved to the workspace's \\.trash folder: \\.trash/${bin}/old\\)\\.`));
 });
 
 // #1216: the Start page: New Project… and Open Project… buttons at the top, half of the page each (Close Project: under the

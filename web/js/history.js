@@ -40,7 +40,7 @@ export function createHistory(api, hooks) {
   }
   const settingsOf = async name => { const pj = await raw.project(name); delete pj.fileTree; return JSON.stringify(pj); };
   api.writeFile = async (name, p, text) => { await note(name, [p]); return raw.writeFile(name, p, text); };
-  api.deleteFile = async (name, p) => { await note(name, [p, ...under(p)]); return raw.deleteFile(name, p); };
+  api.deleteFile = async (name, p, opts) => { await note(name, [p, ...under(p)]); return raw.deleteFile(name, p, opts); };
   api.renameFile = async (name, from, to) => {
     const inside = under(from);
     await note(name, [from, to, ...inside, ...inside.map(f => to + f.slice(from.length))]);

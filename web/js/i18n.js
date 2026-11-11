@@ -753,6 +753,8 @@ PT_PATTERNS.push(
 
   [/^Removed (\S+) from the project$/, 'Removido $1 do projeto'],
   [/^Delete '(\S+)' from the disk\?\n\(It cannot be undone: Remove from Project keeps the file in the project folder\.\)$/, "Apagar '$1' do disco?\n(Não se pode anular: Remover do Projeto mantém o ficheiro na pasta do projeto.)"],
+  [/^Delete '(\S+)'\?\n\(It is moved to the workspace's \.trash folder, from where you can move it back\. Remove from Project keeps the file in the project folder\.\)$/, "Apagar '$1'?\n(É movido para a pasta .trash da área de trabalho, de onde o pode repor. Remover do Projeto mantém o ficheiro na pasta do projeto.)"],
+  [/^Delete the folder '(.+)' and the (\d+) file\(s\) in it from the project\?\n\(They are moved to the workspace's \.trash folder, from where you can move them back\.\)\n\n([\s\S]*)$/, "Apagar a pasta '$1' e o(s) $2 ficheiro(s) que contém do projeto?\n(São movidos para a pasta .trash da área de trabalho, de onde os pode repor.)\n\n$3"],
   // Remove from Project: one file; a drawing with its HDL file, together (#234)
   [/^Remove '(\S+)' from the project\?\n\(The file stays in the project folder: Undo or Add to Project in the Files view brings it back\.\)$/, "Remover '$1' do projeto?\n(O ficheiro fica na pasta do projeto: Anular ou Acrescentar ao Projeto na vista Ficheiros repõe-no.)"],
   [/^Remove '(\S+)' and its HDL file '(\S+)' from the project\?\n\(The files stay in the project folder: Undo or Add to Project in the Files view brings them back\.\)$/, "Remover '$1' e o seu ficheiro HDL '$2' do projeto?\n(Os ficheiros ficam na pasta do projeto: Anular ou Acrescentar ao Projeto na vista Ficheiros repõe-nos.)"],

@@ -223,7 +223,7 @@ function hookApi(project, doc) {
   api.writeFile = async (name, path, text) => { const r = await orig.writeFile(name, path, text); if (mine(name)) { putFile(doc, path, text); if (!doc.getMap('files').has(path)) resync(); } return r; };
   api.saveProject = async (name, pj) => { const r = await orig.saveProject(name, pj); if (mine(name)) { putProject(doc, pj); resync(); } return r; };
   api.renameFile = async (name, from, to) => { const r = await orig.renameFile(name, from, to); if (mine(name)) resync(); return r; };
-  api.deleteFile = async (name, path) => { const r = await orig.deleteFile(name, path); if (mine(name)) resync(); return r; };
+  api.deleteFile = async (name, path, opts) => { const r = await orig.deleteFile(name, path, opts); if (mine(name)) resync(); return r; };
   return { restore: () => Object.assign(api, orig), orig };
 }
 

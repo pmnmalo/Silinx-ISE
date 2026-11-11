@@ -306,11 +306,25 @@ export function folderStore(root) {
       await writeAt(await projectDir(name), path, text);
       p.files[path] = text;
     }),
-    removePath: (name, path) => locked(name, async () => {
+    // (trash: copied to <folder>/.trash/<name>-<time>/<path> first, as the server does, #3364 -> that path)
+    removePath: (name, path, { trash = false } = {}) => locked(name, async () => {
       const p = await get(name);
       const e = await entryAt(await projectDir(name), path);
+      let trashed = null;
+      if (e && trash) {
+        const stamp = `${name}-${Date.now()}`, bin = await root.getDirectoryHandle('.trash', { create: true });
+        let base = stamp;
+        for (let i = 2; await bin.getDirectoryHandle(base).then(() => true, () => false); i++) base = `${stamp}-${i}`;
+        const into = await bin.getDirectoryHandle(base, { create: true });
+        if (e.handle.kind === 'directory') {
+          const { parts, last } = split(path);
+          await copyDir(e.handle, await (await dirAt(into, parts, true)).getDirectoryHandle(last, { create: true }));
+        } else await writeAt(into, path, new Uint8Array(await (await e.handle.getFile()).arrayBuffer()));
+        trashed = `.trash/${base}/${cleanPath(path)}`;
+      }
       if (e) await e.dir.removeEntry(e.name, { recursive: true });
       for (const k of Object.keys(p.files)) if (under(k, path)) delete p.files[k];
+      return trashed;
     }),
     // a file or a folder (copied, then the original removed: a folder handle cannot be moved)
     renamePath: (name, from, to) => locked(name, async () => {
@@ -496,16 +510,17 @@ export function projectOps(getStore, examples = {}) {
       await S().saveJson(name, json);
       return clone(json);
     },
-    deleteFile: async (name, path) => {
+    // (trash: into the folder's .trash, where the store keeps one, the folder's: keepsTrash, #3364)
+    deleteFile: async (name, path, { trash = false } = {}) => {
       path = notDescriptor(cleanPath(path));
       const p = await S().load(name);
-      await S().removePath(name, path);
+      const trashed = (await S().removePath(name, path, { trash })) || null;
       const json = clone(p.json);
       json.files = json.files.filter(f => !under(f.path, path));
       if (json.constraints && under(json.constraints, path)) json.constraints = null;
       if (json.excluded) json.excluded = json.excluded.filter(f => !under(f, path));
       await S().saveJson(name, json);
-      return { ok: true };
+      return { ok: true, ...(trashed ? { trashed } : {}) };
     },
     deleteProject: async name => { await S().deleteProject(name); return { ok: true }; },
     sources: async name => {

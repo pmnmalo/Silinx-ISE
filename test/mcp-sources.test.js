@@ -102,14 +102,16 @@ test('rename_file: a file and a folder, the project\'s files, the drawings\' lin
 test('delete_file: a drawing\'s HDL file (the drawing\'s HDL made from it then), a folder; delete_project', async () => {
   await ok('new_project_from_example', { name: 'd', example: 'gates' });
   const r = await ok('delete_file', { project: 'd', path: 'src/gates.vhd' });
-  assert.equal(r.text, 'src/gates.vhd deleted.');
+  assert.equal(r.text, `src/gates.vhd deleted (moved to the workspace's .trash folder: ${r.data.trashed}).`);
+  assert.match(r.data.trashed, /^\.trash\/d-\d+\/src\/gates\.vhd$/);   // (#3364: into the workspace's .trash)
+  assert.ok(fs.existsSync(path.join(P.workspaceDir(), r.data.trashed)));
   assert.ok(!fs.existsSync(path.join(P.projectDir('d'), 'src/gates.vhd')));
   assert.deepEqual(await files('d'), ['sim/tb_gates.vhd']);
   // the schematic is a module by itself again (#231): the top stays, Check Syntax as before
   assert.equal(r.data.top, 'gates');
   assert.equal((await ok('check_syntax', { project: 'd' })).text, 'Process "Check Syntax" of <gates> completed successfully (22 signals, 21 processes).');
   const f = await ok('delete_file', { project: 'd', path: 'src' });
-  assert.equal(f.text, 'INFO: The top-level module \'gates\' is no longer in the project, nor any other module.\nsrc deleted (a folder: 1 file(s)).');
+  assert.equal(f.text, `INFO: The top-level module 'gates' is no longer in the project, nor any other module.\nsrc deleted (a folder: 1 file(s); moved to the workspace's .trash folder: ${f.data.trashed}).`);
   await fails('delete_file', { project: 'd', path: 'src' }, 'no file or folder \'src\' in the project \'d\'');
   await fails('delete_file', { project: 'd', path: 'silinx.json' }, 'silinx.json is the project\'s description');
   await fails('delete_file', { project: 'd', path: '.' }, 'path: a file\'s path in the project, not the project\'s folder');

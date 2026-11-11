@@ -195,7 +195,11 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
     if (!from || !to) throw Object.assign(new Error('from and to are required'), { status: 400 });
     return P.renameFile(req.params.p, String(from), String(to));
   }));
-  api.delete('/projects/:p/file', wrap(async req => { await P.deleteFile(req.params.p, req.query.path); return { ok: true }; }));
+  // (trash=1: the user's Delete File / Delete Folder, into the workspace's .trash, #3364)
+  api.delete('/projects/:p/file', wrap(async req => {
+    const { trashed } = await P.deleteFile(req.params.p, req.query.path, { trash: req.query.trash === '1' });
+    return { ok: true, ...(trashed ? { trashed } : {}) };
+  }));
   // what changes in the project's folder made by another process (#2843): server-sent events, one { project,
   // changes: [{ path, kind }] } each (a comment now and then keeps the stream open through proxies)
   api.get('/projects/:p/events', wrap(async (req, res) => {

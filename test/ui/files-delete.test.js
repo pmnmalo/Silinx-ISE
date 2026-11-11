@@ -1,6 +1,7 @@
 // UI: the Files page.
 // #1215: Delete File… in a file's menu, in the project or not: asked first (Cancel keeps it), its editor closed, out
-// of the project (the UCF: no constraints file), deleted from the disk; in Portuguese; both interfaces.
+// of the project (the UCF: no constraints file), moved to the workspace's .trash (#3364), said in the console; in
+// Portuguese; both interfaces.
 // #1214: Tasks ▸ Design ▸ Files has Add to Project… (the folder's files not in the project, chosen and added) and
 // Add Copy to Project… (Import Source, #1501) above the list; none in the ISE style interface. No warnings.
 import { before, after } from 'node:test';
@@ -28,7 +29,13 @@ async function fileMenu(page, file, item) {
   return items;
 }
 
-uiTest('#1215 Files: Delete File… deletes a file from the disk, in the project or not; asked first; in Portuguese', E, async (page) => {
+const inTrash = async (pj, f) => {
+  const dirs = (await fs.readdir(path.join(env.server.workspace, '.trash')).catch(() => [])).filter((d) => d.startsWith(`${pj}-`));
+  for (const d of dirs) if (await fs.access(path.join(env.server.workspace, '.trash', d, f)).then(() => true, () => false)) return `.trash/${d}/${f}`;
+  return null;
+};
+
+uiTest('#1215 Files: Delete File… moves a file to the workspace\'s .trash (#3364), in the project or not; asked first; in Portuguese', E, async (page) => {
   await makeProject(env, { name: 'DelPj', top: 'a', files: { 'src/a.vhd': A, 'src/b.v': B, 'constraints/top.ucf': 'NET "x" LOC = "P11";\n' } });
   await page.openProject('DelPj');
   await page.eval(() => window.SilinxApp.openFile('src/b.v'));
@@ -39,7 +46,7 @@ uiTest('#1215 Files: Delete File… deletes a file from the disk, in the project
   // Cancel: kept
   await fileMenu(page, 'src/b.v', 'Delete File…');
   assert.equal(await page.waitDialog('Delete File'), 'Delete File');
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .dlg-body, .dlg-overlay').textContent), /Delete 'src\/b\.v' from the disk\?\s*\(It cannot be undone: Remove from Project keeps the file in the project folder\.\)/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .dlg-body, .dlg-overlay').textContent), /Delete 'src\/b\.v'\?\s*\(It is moved to the workspace's \.trash folder, from where you can move it back\. Remove from Project keeps the file in the project folder\.\)/);
   await page.dialogButton('No');
   await page.waitNoDialog();
   assert.ok(await onDisk('DelPj', 'src/b.v'));
@@ -50,7 +57,11 @@ uiTest('#1215 Files: Delete File… deletes a file from the disk, in the project
   await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v') && !document.querySelector('#files-page tr[data-file="src/b.v"]'), [], { what: 'deleted' });
   assert.equal(await onDisk('DelPj', 'src/b.v'), false);
   assert.equal(await page.eval(() => window.SilinxApp.S.docs.some((d) => d.path === 'src/b.v')), false, 'its editor closed');
-  await page.waitConsole(/src\/b\.v deleted\./);
+  const at = await inTrash('DelPj', 'src/b.v');
+  assert.match(at, /^\.trash\/DelPj-\d+\/src\/b\.v$/);
+  assert.equal(await fs.readFile(path.join(env.server.workspace, at), 'utf8'), B);
+  const line = `src/b.v deleted (moved to the workspace's .trash folder: ${at}).`;
+  await page.waitFor((m) => window.__console().includes(m), [line], { what: line });
   // the UCF: no constraints file any more
   await fileMenu(page, 'constraints/top.ucf', 'Delete File…');
   await page.waitDialog('Delete File');
@@ -69,10 +80,11 @@ uiTest('#1215 Files: Delete File… deletes a file from the disk, in the project
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await fileMenu(page, 'src/a.vhd', 'Apagar Ficheiro…');
   assert.equal(await page.waitDialog('Apagar Ficheiro'), 'Apagar Ficheiro');
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay').textContent), /Apagar 'src\/a\.vhd' do disco\?\s*\(Não se pode anular: Remover do Projeto mantém o ficheiro na pasta do projeto\.\)/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay').textContent), /Apagar 'src\/a\.vhd'\?\s*\(É movido para a pasta \.trash da área de trabalho, de onde o pode repor\. Remover do Projeto mantém o ficheiro na pasta do projeto\.\)/);
   await page.dialogButton('Sim');
   await page.waitFor(() => !document.querySelector('#files-page tr[data-file="src/a.vhd"]'), [], { what: 'deleted' });
   assert.equal(await onDisk('DelPj', 'src/a.vhd'), false);
+  assert.ok(await inTrash('DelPj', 'src/a.vhd'));
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(warnings(page), []);
 });
