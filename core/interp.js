@@ -112,19 +112,7 @@ export function evalE(n, ctx) {
     case 'rfn': return V.real(mathReal(n.f, V.toReal(evalE(n.a, ctx)), n.b ? V.toReal(evalE(n.b, ctx)) : undefined));
     case 'un': return evalUn(n, ctx);
     case 'bin': return evalBin(n, ctx);
-    case 'cond': {
-      const w = n.ew || n.t.w;
-      const c = V.truth(evalE(n.c, ctx));
-      // VHDL, and a Verilog ?: of strings (a parameter = c ? "A" : "B"): the value chosen as it is
-      if (n.vh || n.t.kind === 'str') { const r = evalE(c === 1 ? n.a : n.b, ctx); return Array.isArray(r) || isStr(r) ? r : fit(r, w, n.t.s); }
-      if (n.t.kind === 'real') return evalE(c === 0 ? n.b : n.a, ctx);
-      const s = esign(n);
-      if (c === 1) return fitOp(evalE(n.a, ctx), w, s);
-      if (c === 0) return fitOp(evalE(n.b, ctx), w, s);
-      const a = fitOp(evalE(n.a, ctx), w, s), b = fitOp(evalE(n.b, ctx), w, s);
-      const x = a.x | b.x | (a.v ^ b.v);
-      return V.mk(w, a.v & ~x, x, s);
-    }
+    case 'cond': return evalCond(n, ctx);
     case 'cat': return V.concat(n.parts.map(p => V.resize(evalE(p, ctx), p.t.w)));
     case 'repl': {
       const c = evalE(n.count, ctx);
@@ -243,6 +231,38 @@ export function psliceLo(t, start, w, dir) {
   return Math.min(bitpos(t, a), bitpos(t, b));
 }
 
+// A chain of conditional operators (c0 ? a0 : c1 ? a1 : …, each else another, as deep as the chain is long) in a loop
+// (#3375): down the chain while the conditions choose the else (an unknown one: its then value first, as both are
+// merged), then each operator up with the value below it as its else
+function evalCond(n, ctx) {
+  const up = [];   // [operator, its then value fitted (an unknown condition) or null]
+  let x = n, v;
+  for (;;) {
+    const c = V.truth(evalE(x.c, ctx));
+    // VHDL, and a Verilog ?: of strings (a parameter = c ? "A" : "B"): the value chosen as it is
+    const as = x.vh || x.t.kind === 'str', real = !as && x.t.kind === 'real';
+    if (real ? c !== 0 : c === 1) { v = condValue(x, evalE(x.a, ctx)); break; }
+    up.push([x, !as && !real && c !== 0 ? fitOp(evalE(x.a, ctx), x.ew || x.t.w, esign(x)) : null]);
+    x = x.b;
+    if (x.k !== 'cond') { v = evalE(x, ctx); break; }
+  }
+  for (let i = up.length - 1; i >= 0; i--) {
+    const [x, a] = up[i];
+    if (!a) { v = condValue(x, v); continue; }
+    const w = x.ew || x.t.w, s = esign(x), b = fitOp(v, w, s);
+    const m = a.x | b.x | (a.v ^ b.v);
+    v = V.mk(w, a.v & ~m, m, s);
+  }
+  return v;
+}
+// (the value an operator chose, as it returns it)
+function condValue(x, r) {
+  const w = x.ew || x.t.w;
+  if (x.vh || x.t.kind === 'str') return Array.isArray(r) || isStr(r) ? r : fit(r, w, x.t.s);
+  if (x.t.kind === 'real') return r;
+  return fitOp(r, w, esign(x));
+}
+
 function evalUn(n, ctx) {
   const a = evalE(n.a, ctx);
   if (n.fp) { const x = V.toReal(a); return V.real(n.o === '-' ? -x : Math.abs(x)); }
@@ -260,10 +280,23 @@ function evalUn(n, ctx) {
   }
 }
 
+// A chain of binary operators (a + b + c …, each left operand a binary operator, as deep as the chain is long) in a
+// loop (#3375): every operator evaluates its left operand first, so the deepest one's, then each operator up with the
+// value below it as its left operand
 function evalBin(n, ctx) {
+  if (n.a.k !== 'bin') return evalBin1(n, ctx, evalE(n.a, ctx));
+  const chain = [n];
+  while (chain[chain.length - 1].a.k === 'bin') chain.push(chain[chain.length - 1].a);
+  let v = evalE(chain[chain.length - 1].a, ctx);
+  for (let i = chain.length - 1; i >= 0; i--) v = evalBin1(chain[i], ctx, v);
+  return v;
+}
+
+// one binary operator, a the value of its left operand
+function evalBin1(n, ctx, a) {
   const o = n.o;
   if (o === '&&' || o === '||') {
-    const a = V.truth(evalE(n.a, ctx));
+    a = V.truth(a);
     if (o === '&&' && a === 0) return V.ZERO;
     if (o === '||' && a === 1) return V.ONE;
     const b = V.truth(evalE(n.b, ctx));
@@ -271,11 +304,11 @@ function evalBin(n, ctx) {
     return b === 1 ? V.ONE : (a === 0 && b === 0 ? V.ZERO : V.X1);
   }
   if (n.sc) {   // VHDL boolean and / or / nand / nor: the right operand only when needed
-    const x = V.truth(evalE(n.a, ctx));
+    const x = V.truth(a);
     if (x === 0 && (o === '&' || o === 'nand')) return V.fromBool(o === 'nand');
     if (x === 1 && (o === '|' || o === 'nor')) return V.fromBool(o === '|');
   }
-  let a = evalE(n.a, ctx), b = evalE(n.b, ctx);
+  let b = evalE(n.b, ctx);
   // (arrays, records and strings have no bits: v is undefined)
   if ((a.v === undefined || b.v === undefined) && (Array.isArray(a) || Array.isArray(b))) {   // arrays / records (VHDL): element-wise equality
     if (o === '==' || o === '!=') return V.fromBool(sameDeep(a, b) === (o === '=='));

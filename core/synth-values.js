@@ -72,11 +72,39 @@ export function mountValues(ctx) {
   };
 
   // e(n) -> { x: expression string, w, s } (x is w bits; s = the value's signedness)
+  // A chain of binary operators (a + b + c …, each left operand a binary operator, as deep as the chain is long) or of
+  // conditional ones (c0 ? a0 : c1 ? a1 : …, each else another) is written in a loop (#3375): down the left operands
+  // and the elses as long as each is written as an operator (bin writes its left operand first; a conditional
+  // operator its condition and then value, then its else), then each operator from the deepest up with the one below.
   function e(n, ctx) {
-    // a VHDL null array (std_logic_vector(-1 downto 0)): no bit; Verilog has no zero-width value, so
-    // it is left out of concatenations and assignments (anything else reads it as 0)
-    if (nullVec(n.t)) return { x: "1'b0", w: 0, s: !!n.t.s };
-    return (TAB_ROOT.has(n.k) && tabulate(n, ctx)) || e0(n, ctx);
+    const chain = [];   // [binary operator] | [conditional operator, its condition, its then value]
+    let v;
+    for (let x = n; ;) {
+      // a VHDL null array (std_logic_vector(-1 downto 0)): no bit; Verilog has no zero-width value, so
+      // it is left out of concatenations and assignments (anything else reads it as 0)
+      if (nullVec(x.t)) { v = { x: "1'b0", w: 0, s: !!x.t.s }; break; }
+      v = TAB_ROOT.has(x.k) && tabulate(x, ctx);
+      if (v) break;
+      if (x.k === 'bin' && !x.fp) { chain.push([x]); x = x.a; continue; }
+      if (x.k === 'cond') { chain.push([x, truth(x.c, ctx), e(x.a, ctx)]); x = x.b; continue; }
+      v = e0(x, ctx);
+      break;
+    }
+    for (let i = chain.length - 1; i >= 0; i--) v = chain[i].length === 1 ? bin(chain[i][0], ctx, v) : cond(...chain[i], v);
+    return v;
+  }
+  // a conditional operator, its condition and values written
+  function cond(n, c, a, b) {
+    // each branch cast to the width, even when it has it already: Yosys can size an operation on
+    // a size cast at the width of the cast's operand (4'(d) ^ 4'h3 with an 8-bit d: 8 bits),
+    // which made `oe ? (4'(d) ^ …) : 4'bzzzz` an 8-bit multiplexer with 0000zzzz on the other
+    // side, no longer a tri-state buffer
+    const w = n.ew || (n.t || {}).w, es = esign(n);
+    // (a literal: of its width or the value's in binary digits at most; a longer text not tested, as it may be the
+    // text of a chain of thousands of these, which the test would copy at every one, #3375)
+    const isLit = (x, m) => x.length <= String(m).length + 2 + m && /^\d+'[bh][0-9a-fxz]+$/.test(x);
+    const br = v => { const x = fit(v.x, v.w, es, w, v.s); return isLit(x, Math.max(w, v.w)) ? x : `${w}'(${x})`; };
+    return { x: `(${c} ? ${br(a)} : ${br(b)})`, w, s: es };
   }
   function e0(n, ctx) {
     const t = n.t || {};
@@ -175,15 +203,7 @@ export function mountValues(ctx) {
       }
       case 'un': return un(n, ctx);
       case 'bin': return bin(n, ctx);
-      case 'cond': {
-        // each branch cast to the width, even when it has it already: Yosys can size an operation on
-        // a size cast at the width of the cast's operand (4'(d) ^ 4'h3 with an 8-bit d: 8 bits),
-        // which made `oe ? (4'(d) ^ …) : 4'bzzzz` an 8-bit multiplexer with 0000zzzz on the other
-        // side, no longer a tri-state buffer
-        const w = n.ew || t.w, es = esign(n), c = truth(n.c, ctx), a = e(n.a, ctx), b = e(n.b, ctx);
-        const br = v => { const x = fit(v.x, v.w, es, w, v.s); return /^\d+'[bh][0-9a-fxz]+$/.test(x) ? x : `${w}'(${x})`; };
-        return { x: `(${c} ? ${br(a)} : ${br(b)})`, w, s: es };
-      }
+      case 'cond': return cond(n, truth(n.c, ctx), e(n.a, ctx), e(n.b, ctx));
       case 'cat': {
         const ps = n.parts.filter(p => !nullVec(p.t));
         const vals = ps.map(p => e(p, ctx));

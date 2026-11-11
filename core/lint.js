@@ -24,6 +24,7 @@
 // Testbench files (role 'sim') only get the rules, not the warnings.
 import * as V from './values.js';
 import { clocksOf } from './schematic.js';
+import { walk } from './bound-walk.js';
 import { readsOf } from './elaborate.js';
 import { mountDesignRules } from './lint-design.js';
 
@@ -87,12 +88,11 @@ export function targetIndexExprs(L, out = []) {
   return out;
 }
 
+// (with walk's stack, as an expression of thousands of operators nests as deep, #3375)
 function contains(n, pred) {
-  if (!n || typeof n !== 'object') return false;
-  if (Array.isArray(n)) return n.some(x => contains(x, pred));
-  if (pred(n)) return true;
-  for (const k in n) if (!SKIP.has(k)) { const v = n[k]; if (v && typeof v === 'object' && contains(v, pred)) return true; }
-  return false;
+  let found = false;
+  walk(n, x => { if (found || pred(x)) { found = true; return false; } }, SKIP);
+  return found;
 }
 export const hasEdgeOf = (n, sig) => contains(n, x => (x.k === 'edge' || x.k === 'event') && (!sig || x.sig === sig));
 
@@ -138,13 +138,12 @@ export const addBits = (m, sig, bits) => {
 };
 /** Signals (and bits) read by an expression. */
 export function readBits(n, out = new Map()) {
-  if (!n || typeof n !== 'object') return out;
-  if (Array.isArray(n)) { n.forEach(x => readBits(x, out)); return out; }
-  const sel = selBits(n);
-  if (sel) { addBits(out, sel.sig, sel.bits); return out; }
-  if ((n.k === 'sig' || n.k === 'edge' || n.k === 'event') && n.sig) addBits(out, n.sig, null);
-  if (n.k === 'call' && n.fn) { try { for (const s of readsOf({ k: 'call', fn: n.fn, args: [] })) addBits(out, s, null); } catch { /* ignore */ } }
-  for (const k in n) if (!SKIP.has(k)) { const v = n[k]; if (v && typeof v === 'object') readBits(v, out); }
+  walk(n, x => {
+    const sel = selBits(x);
+    if (sel) { addBits(out, sel.sig, sel.bits); return false; }
+    if ((x.k === 'sig' || x.k === 'edge' || x.k === 'event') && x.sig) addBits(out, x.sig, null);
+    if (x.k === 'call' && x.fn) { try { for (const s of readsOf({ k: 'call', fn: x.fn, args: [] })) addBits(out, s, null); } catch { /* ignore */ } }
+  }, SKIP);
   return out;
 }
 const overlap = (a, b) => a === null || b === null || [...a].some(x => b.has(x));

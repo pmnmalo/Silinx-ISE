@@ -181,15 +181,29 @@ function unaryH(cx, e) {
   }
   return cannot(`the operator ${e.o}`, e);
 }
+// A chain of binary operators (a + b + c …, its left operands nesting as deep as it is long) in a loop (#3375): each
+// operator translates its left operand first (at the width it wants: + and the logic operators pass theirs on), so the
+// deepest one's, then each operator up with the one below it
+const leftWant = (o, want) => (o === '&&' || o === '||' || REL[o] ? null : want);
 function binaryH(cx, e, want) {
+  const chain = [[e, want]];
+  for (let x = e, w = want; x.a?.op === 'binary';) { w = leftWant(x.o, w); x = x.a; chain.push([x, w]); }
+  const [x0, w0] = chain[chain.length - 1];
+  let a = exprH(cx, x0.a, leftWant(x0.o, w0));
+  for (let i = chain.length - 1; i >= 0; i--) a = binary1H(cx, ...chain[i], a);
+  return a;
+}
+// one operator, a its left operand translated
+function binary1H(cx, e, want, a) {
   const o = e.o;
   if (o === '&&' || o === '||') {
-    const a = toBool(exprH(cx, e.a)), b = toBool(exprH(cx, e.b));
+    a = toBool(a);
+    const b = toBool(exprH(cx, e.b));
     const v = o === '&&' ? 'and' : 'or';
     return { c: `${logicOperand(a, v)} ${v} ${logicOperand(b, v)}`, p: P.logic, t: 'bool', op: v };
   }
-  if (REL[o]) return compareH(cx, e);
-  const a = exprH(cx, e.a, want), b = exprH(cx, e.b, want);
+  if (REL[o]) return compareH(cx, e, a);
+  const b = exprH(cx, e.b, want);
   if (LOGIC[o] || o === '~&' || o === '~|') return logicH(e, a, b);
   if (o === '+' || o === '-' || o === '*' || o === '/' || o === '%' || o === '**') return arithH(e, a, b, want);
   if (o === '<<' || o === '>>' || o === '<<<' || o === '>>>') {
@@ -240,9 +254,9 @@ function arithH(e, a, b, want) {
   const p = o === '+' || o === '-' ? P.add : P.mul;
   return { c: `${wrap(x, p)} ${o} ${wrap(y, p + 1)}`, p, t, w };
 }
-function compareH(cx, e) {
+function compareH(cx, e, a) {
   const op = REL[e.o];
-  const a = exprH(cx, e.a), b = exprH(cx, e.b);
+  const b = exprH(cx, e.b);
   const rel = (x, y) => ({ c: `${wrap(x, P.rel + 1)} ${op} ${wrap(y, P.rel + 1)}`, p: P.rel, t: 'bool' });
   if (a.t === 'bool' || b.t === 'bool') {
     if (op !== '=' && op !== '/=') cannot('an ordering of conditions', e);

@@ -201,8 +201,9 @@ test('#2577 Verilog: an error in an else if\'s condition makes that else if a nu
   assert.deepEqual([s.kind, s.else.kind], ['if', 'null']);
 });
 
-test('#2577 an elaboration that throws (an expression of 20 000 terms) is a design error of simulate, not thrown', () => {
-  const text = `module t; integer a = 1, y; initial begin y = ${Array(N).fill('a').join(' + ')}; $display("%0d", y); end endmodule`;
+// (an expression of 20 000 terms no longer throws, #3375: 4000 unary operators, each nesting in the one before, do)
+test('#2577 an elaboration that throws (4000 nested unary operators) is a design error of simulate, not thrown', () => {
+  const text = `module t; integer a = 1, y; initial begin y = ${'~'.repeat(4000)}a; $display("%0d", y); end endmodule`;
   const r = simulate([{ path: 't.v', text }], 't');
   assert.equal(r.sim, null);
   assert.deepEqual(r.errors.map(e => `${e.file}:${e.line} ${e.severity}: ${e.message}`), ["t.v:1 error: internal error elaborating 't': Maximum call stack size exceeded"]);

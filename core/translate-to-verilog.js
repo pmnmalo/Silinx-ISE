@@ -577,8 +577,13 @@ function exprV(cx, e, want = null) {
     case 'concat': return { c: `{${e.parts.map(x => sized(cx, x)).join(', ')}}`, p: ATOM, t: 'vec' };
     case 'aggregate': return aggregateV(cx, e, want);
     case 'cond': {
-      const c = exprV(cx, e.cond), a = exprV(cx, e.then, want), b = exprV(cx, e.else, want);
-      return { c: `${wrap(c, 1)} ? ${wrap(a, 1)} : ${wrap(b, 0)}`, p: 0, t: a.t };
+      // (a chain x when c0 else y when c1 else …, each else another, as deep as it is long: in a loop, #3375)
+      const chain = [];
+      let x = e;
+      for (; x.op === 'cond'; x = x.else) chain.push([exprV(cx, x.cond), exprV(cx, x.then, want)]);
+      let b = exprV(cx, x, want);
+      for (let i = chain.length - 1; i >= 0; i--) { const [c, a] = chain[i]; b = { c: `${wrap(c, 1)} ? ${wrap(a, 1)} : ${wrap(b, 0)}`, p: 0, t: a.t }; }
+      return b;
     }
     case 'unary': return unaryV(cx, e);
     case 'binary': return binaryV(cx, e);
@@ -675,8 +680,17 @@ function unaryV(cx, e) {
   return cannot(`the operator '${e.o}'`, e);
 }
 const VOPS = { mod: '%', rem: '%', sll: '<<', srl: '>>', sla: '<<<', sra: '>>>' };
+// A chain of binary operators (a + b + c …, its left operands nesting as deep as it is long) in a loop (#3375): each
+// operator translates its left operand first, so the deepest one's, then each operator up with the one below it
 function binaryV(cx, e) {
-  let a = exprV(cx, e.a), b = exprV(cx, e.b);
+  const chain = [e];
+  while (chain[chain.length - 1].a?.op === 'binary') chain.push(chain[chain.length - 1].a);
+  let a = exprV(cx, chain[chain.length - 1].a);
+  for (let i = chain.length - 1; i >= 0; i--) a = binary1V(cx, chain[i], a);
+  return a;
+}
+function binary1V(cx, e, a) {
+  let b = exprV(cx, e.b);
   // x = '1' is x, x = '0' is !x (a std_logic in a condition)
   if ((e.o === '==' || e.o === '!=') && a.t === 'bit' && e.b.op === 'lit' && e.b.scalar && /^[01]$/.test(e.b.bits)) {
     return (e.b.bits === '1') === (e.o === '==') ? { ...a, t: 'bool' } : { c: `!${wrap(a, UNARY)}`, p: UNARY, t: 'bool' };
