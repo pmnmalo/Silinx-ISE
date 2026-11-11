@@ -44,7 +44,8 @@ can read that user's files has the server too.
 - Every path a request names is confined to the project it belongs to; a project's zip is limited in
   size when it is unpacked. A hidden file or folder (`.git`, `.env`, an editor's settings) is no part of a project:
   no file route and no MCP tool reads, writes, renames or deletes one, by its name or through a link (#3035, #3036),
-  nor by a short (8.3) name that may be one's (`GIT~1`), nor by a path the system resolves to one (#2830).
+  nor by a short (8.3) name that may be one's (`GIT~1`), nor by a path the system resolves to one (#2830); a folder
+  that holds one (a clone's `.git`, with its untrusted mark) is neither renamed nor deleted (#3354).
 - The programs the toolchain and the board programming run (Docker, ssh, ISE's tools, the programming tools) are
   spawned without a shell. The programs' paths and the arguments given to Docker and ssh come from the user's
   configuration file only: the page cannot change them (the settings `server/toolchain.js` names `FILE_ONLY`, which
