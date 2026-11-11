@@ -17,8 +17,8 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 let tmp, ws, srv;
 
 // a client of `silinx mcp`: send(msg) -> its answer (by id); call(tool, args) -> the result
-function startMcp(env, bin = 'bin/silinx.js') {
-  const p = spawn(process.execPath, [path.join(ROOT, bin), 'mcp'], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+function startMcp(env) {
+  const p = spawn(process.execPath, [path.join(ROOT, 'bin', 'silinx.js'), 'mcp'], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
   const waiting = new Map(), lines = [];
   let buf = '', stderr = '', id = 0;
   p.stdout.on('data', d => {
@@ -47,19 +47,6 @@ before(async () => {
   srv = startMcp({ SILINX_WORKSPACE: ws, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') });
 });
 after(async () => { await srv?.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
-
-// #2624: the command's old name, bin/silinx-ise.js (the MCP configurations written before the rename), still serves:
-// its warning on stderr only, every line of stdout a JSON-RPC message
-test("#2624 bin/silinx-ise.js mcp: the same server, the old name's warning on stderr, stdout only JSON-RPC", async () => {
-  const old = startMcp({ SILINX_WORKSPACE: ws, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') }, 'bin/silinx-ise.js');
-  try {
-    const init = await old.send('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
-    assert.deepEqual(init.result.serverInfo, { name: 'silinx', title: 'Silinx', version: VERSION });
-    assert.ok((await old.send('tools/list')).result.tools.some((t) => t.name === 'list_projects'));
-    assert.equal(old.lines.length, 2);   // (each one parsed as JSON by startMcp)
-  } finally { await old.close(); }
-  assert.equal(old.stderr(), 'silinx-ise is now called silinx: run node bin/silinx.js (bin/silinx-ise.js will be removed in a later release)\n');
-});
 
 test('the handshake: the protocol version, the server, its tools with their schemas; ping', async () => {
   const init = await srv.send('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });

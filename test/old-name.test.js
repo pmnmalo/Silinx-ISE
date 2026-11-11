@@ -20,24 +20,17 @@ const SELF = 'test/old-name.test.js';
 const OLD = () => new RegExp('silinx(?:[ _-]|[ \\t]*\\r?\\n[ \\t/#*>-]*)' + 'ise', 'gi');
 // Xilinx ISE's own names, kept: the ISE host's environment variables and its shared folder (#482)
 const KEEP = [/SILINX_ISE_(?:HOST|TESTS|REMOTE_DIR|IMAGE|KEEP)\b/g, /\/Users\/Shared\/silinx-ise\b/g];
-// history, kept as it was written; the rename's own changelog fragments, which name the old names to say what
-// became of them (they join CHANGELOG.md's history at the next release)
+// history, kept as it was written; the rename's own changelog fragments (#2624, and #3133: the old command removed),
+// which name the old names to say what became of them (they join CHANGELOG.md's history at the next release)
 const HISTORY = new Set(['CHANGELOG.md', 'packages/silinx-fpga/CHANGELOG.md', 'docs/HISTORY.md']);
-const isHistory = (f) => HISTORY.has(f) || /^(packages\/silinx-fpga\/)?changes\/2624-[a-z0-9-]+\.md$/.test(f);
+const isHistory = (f) => HISTORY.has(f) || /^(packages\/silinx-fpga\/)?changes\/(?:2624|3133)-[a-z0-9-]+\.md$/.test(f);
 
 // the files named with the old name on 2026-11-08 (renamed by #2624's pull requests, never added to)
-const OLD_PATHS = new Set([
-  'bin/silinx-ise.js',   // the command's old name, kept for two releases (#2624)
-]);
+// (the command's old name, the last of them, removed by #3133)
+const OLD_PATHS = new Set([]);
 // the old name's count in each file, kept on purpose after the rename: lower an entry when it shrinks, never raise one
-// or add one; the list empties when the old command goes (#3133)
+// or add one (the old command's entries gone with it, #3133)
 const OLD_NAME = new Map([
-  // the command's old name, kept for two releases: the shim, its bin entry and its tests
-  ["bin/silinx-ise.js", 3],
-  ["package-lock.json", 2],
-  ["package.json", 2],
-  ["test/cli.test.js", 4],
-  ["test/mcp.test.js", 5],
   // the ISE runner's launchd labels and folder of before the rename, which install.sh removes
   ["scripts/ise-runner/install.sh", 2],
   // the hook accepts the repository by its ID: a job that names it by its old name is refused
@@ -68,8 +61,8 @@ test('#2624 old name: how it is counted', () => {
   assert.equal(countOld('Docker Desktop shares only `/Users/Shared/silinx-ise`, so'), 0);   // the folder itself
   assert.equal(countOld('SILINX_ISE_HOSTS'), 1);
   // history: the changelogs, and the rename's own fragments only
-  assert.ok(isHistory('CHANGELOG.md') && isHistory('docs/HISTORY.md') && isHistory('changes/2624-package-silinx.md') && isHistory('packages/silinx-fpga/changes/2624-x.md'));
-  assert.ok(!isHistory('changes/2625-other.md') && !isHistory('changes/2624-x.md.bak') && !isHistory('docs/changes/2624-x.md'));
+  assert.ok(isHistory('CHANGELOG.md') && isHistory('docs/HISTORY.md') && isHistory('changes/2624-package-silinx.md') && isHistory('changes/3133-old-command.md') && isHistory('packages/silinx-fpga/changes/2624-x.md'));
+  assert.ok(!isHistory('changes/2625-other.md') && !isHistory('changes/31330-x.md') && !isHistory('changes/2624-x.md.bak') && !isHistory('docs/changes/2624-x.md'));
   // nor the ISE-style interface, the Xilinx ISE image or Silinx alone
   assert.equal(countOld('SILINX_UI_INTERFACE=ise, silinx/ise:14.7, Silinx, ISE, Xilinx ISE, silinx.ise'), 0);
 });
