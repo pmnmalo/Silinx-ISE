@@ -58,3 +58,17 @@ test('run_process: blinky on the Tang Nano 9K to its .fs, nextpnr\'s warnings; g
   assert.ok(fs.existsSync(path.join(P.projectDir('bi'), 'build', 'top.fs')));
   await fails('run_process', { project: 'bi', process: 'timing' }, 'no step trce (the steps: synth, translate, par, bitgen)');
 });
+
+test('run_process and get_report: a CST with no clock, the clock reported with no constraint, not nextpnr\'s 12 MHz (#3488)', { timeout: 600000 }, async () => {
+  await ok('new_project_from_example', { name: 'nc', example: 'blinky' });
+  await ok('set_design_properties', { project: 'nc', board: 'tangnano9k', update_constraints: true });
+  const file = path.join(P.projectDir('nc'), 'constraints/top.cst');
+  const cst = fs.readFileSync(file, 'utf8');
+  await ok('write_file', { project: 'nc', path: 'constraints/top.cst', text: cst.replace(/^\/\/ create_clock .*\n/m, '') });
+  const run = await ok('run_process', { project: 'nc', process: 'implement' });
+  assert.equal(run.data.warnings.length, 8);
+  for (const w of run.data.warnings) assert.match(w, /^WARNING:Place - Failed to route net '[^']+' from \S+ to \S+ using dedicated routing\.$/);
+  const summary = (await ok('get_report', { project: 'nc' })).data.summary;
+  assert.deepEqual(summary.par.fmax.map(f => [f.clock, f.constraint]), [['clk', null]]);
+  assert.equal(summary.par.constraintsMet, true);
+});

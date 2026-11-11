@@ -3,7 +3,7 @@
 //   IO_LOC "led[0]" 10;                                        a port's pin
 //   IO_PORT "led[0]" IO_TYPE=LVCMOS18 PULL_MODE=NONE DRIVE=8;  its I/O standard, pull, drive and the rest
 //   // create_clock -name clk -period 37.037 [get_ports {clk}]   a clock's period: Silinx's, in a comment (a CST has none:
-//                                                               Gowin's tools read it from an SDC), given to nextpnr as --freq
+//                                                               Gowin's tools read it from an SDC), given to nextpnr in an SDC (gowin-clocks.js)
 // '//' starts a comment, ';' ends a statement. The names are nextpnr's (led[0]). Another statement throws, naming its line:
 // nextpnr would not apply it.
 import { periodNs } from './ucf.js';

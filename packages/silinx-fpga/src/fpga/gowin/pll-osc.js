@@ -6,7 +6,7 @@ import { ATTRIDS } from './attrids.js';
 import { addAttrVal } from './chipdb.js';
 
 // { device: [max_in, max_out, min_out, max_vco, min_vco] } (MHz)
-const PERMITTED_FREQS = {
+export const PERMITTED_FREQS = {
   'GW1N-1': [400, 450, 3.125, 900, 400], 'GW1NZ-1': [400, 400, 3.125, 800, 400], 'GW1N-4': [400, 500, 3.125, 1000, 400],
   'GW1NS-4': [400, 600, 4.6875, 1200, 400], 'GW1N-9': [400, 500, 3.125, 1000, 400], 'GW1N-9C': [400, 600, 3.125, 1200, 400],
   'GW1NS-2': [400, 500, 3.125, 1200, 400], 'GW2A-18': [500, 625, 3.90625, 1250, 500], 'GW2A-18C': [500, 625, 3.90625, 1250, 500],
@@ -42,7 +42,7 @@ export function pllPump(device, fref, fvco) {
 }
 
 // the rPLL's parameters by default (the documentation's), and its internal attributes'
-const PLL_DEFAULTS = {
+export const PLL_DEFAULTS = {
   FCLKIN: '100.00', IDIV_SEL: '0', DYN_IDIV_SEL: 'FALSE', FBDIV_SEL: '0', DYN_FBDIV_SEL: 'FALSE', ODIV_SEL: '1000', DYN_ODIV_SEL: 'FALSE',
   PSDA_SEL: '0000 ', DUTYDA_SEL: '1000 ', DYN_DA_EN: 'FALSE', CLKOUT_FT_DIR: '1', CLKOUT_DLY_STEP: '0', CLKOUTP_FT_DIR: '1', CLKOUTP_DLY_STEP: '0',
   DYN_SDIV_SEL: '10', CLKFB_SEL: 'INTERNAL', CLKOUTD_SRC: 'CLKOUT', CLKOUTD3_SRC: 'CLKOUT', CLKOUT_BYPASS: 'FALSE', CLKOUTP_BYPASS: 'FALSE',
