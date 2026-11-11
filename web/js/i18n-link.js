@@ -12,7 +12,7 @@ export const LINK_PT = {
   'A short link needs your GitHub sign-in: sign in, or choose the full link.': 'Uma ligação curta precisa da sua sessão no GitHub: inicie-a, ou escolha a ligação completa.',
   'A short link needs a GitHub token on the Silinx server (GH_TOKEN): choose the full link, or start the server with one.': 'Uma ligação curta precisa de um token do GitHub no servidor do Silinx (GH_TOKEN): escolha a ligação completa, ou inicie o servidor com um.',
   'Open in:': 'Abrir em:', 'Open the project only': 'Abrir só o projeto', 'Try it': 'Experimentar', 'Try it (a drawing\'s simulation)': 'Experimentar (a simulação de um desenho)', 'Simulation': 'Simulação', 'Board Emulator': 'Emulador da Placa',
-  'Keep Mine': 'Manter o Meu', 'Open': 'Abrir',
+  'Keep Mine': 'Manter o Meu', 'Open': 'Abrir', 'Save and Open': 'Guardar e Abrir',
   'Include the current view: the open tabs, the split, the panels': 'Incluir a vista atual: os separadores abertos, a divisão, os painéis',
   'Lab:': 'Laboratório:', 'No lab': 'Nenhum laboratório',
 };
@@ -29,6 +29,8 @@ export const LINK_PT_PATTERNS = [
     'Já existe um projeto chamado \'$1\', com alterações próprias.\n\nSubstituí-lo pelo circuito da ligação? O projeto existente será apagado deste browser. Ou abrir o circuito da ligação num projeto novo, \'$2\', mantendo o seu como está.'],
   [/^A project named '(.+)' already exists, with changes of its own\.\n\nReplace it with the link's design\? The existing project is moved to the workspace \.trash folder\. Or open the link's design as a new project, '(.+)', yours kept as it is\.$/,
     'Já existe um projeto chamado \'$1\', com alterações próprias.\n\nSubstituí-lo pelo circuito da ligação? O projeto existente é movido para a pasta .trash da área de trabalho. Ou abrir o circuito da ligação num projeto novo, \'$2\', mantendo o seu como está.'],
+  [/^This link opens '(.+)'\. Your open documents have changes not saved yet: save them, then open it\?$/,
+    'Esta ligação abre \'$1\'. Os seus documentos abertos têm alterações ainda não guardadas: guardá-las e depois abri-la?'],
   [/^Open as (.+)$/, 'Abrir como $1'],
   [/^(\S+) \(the project's\)$/, '$1 (o do projeto)'],   // (a test bench in Copy Link's Module list, #2878)
   [/^'(.+)' is not a test bench of the design\.$/, '\'$1\' não é um test bench do circuito.'],

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { encryptDesign, decryptDesign, saveGist, loadGist, parseGistRef, GIST_FILE, GIST_FORMAT, GIST_MAX } from '../core/gist-link.js';
+import { encryptDesign, decryptDesign, saveGist, loadGist, parseGistRef, GIST_FILE, GIST_FORMAT, GIST_MAX, GIST_ANSWER_MAX } from '../core/gist-link.js';
 import { LINK_LIMITS, encodeDesign, decodeDesign, makeLink, parseLink } from '../core/design-link.js';
 import { githubClient } from '../core/github-api.js';
 import { fakeGitHub } from './fake-github.mjs';
@@ -118,4 +118,29 @@ test('the server\'s gist (server/git-github.js): made with GH_TOKEN, read with n
     if (keep !== undefined) process.env.GH_TOKEN = keep;
     if (keep2 !== undefined) process.env.GITHUB_TOKEN = keep2;
   }
+});
+
+// #3362: GitHub's answer is read with a running total and refused past its cap before it is parsed: a gist of many large
+// files (its Silinx file whole and valid) is not read in full
+test('#3362 a gist larger than a link\'s is refused before its JSON is parsed, its reading stopped', async () => {
+  const { content, key } = await encryptDesign('design');
+  const id = 'c'.repeat(32);
+  const answer = Buffer.from(JSON.stringify({ id, files: { [GIST_FILE]: { filename: GIST_FILE, content, truncated: false }, 'big.txt': { filename: 'big.txt', content: 'x'.repeat(3 * GIST_ANSWER_MAX), truncated: false } } }));
+  const chunk = 64 << 10, chunks = Math.ceil(answer.length / chunk);
+  let pulled = 0, parsed = 0;
+  const stream = () => new ReadableStream({ pull(c) { if (pulled * chunk >= answer.length) { c.close(); return; } c.enqueue(new Uint8Array(answer.subarray(pulled * chunk, ++pulled * chunk))); } }, { highWaterMark: 0 });
+  const parse = JSON.parse;
+  JSON.parse = (t, ...a) => { if (String(t).length > GIST_MAX) parsed++; return parse(t, ...a); };   // (the answer's parse, not another's)
+  try {
+    await rejects(loadGist({ id, key }, { fetch: async () => new Response(stream(), { status: 200 }) }), 'the link\'s gist is too large for a Silinx link', 413);
+    assert.equal(parsed, 0, 'not parsed');
+    assert.ok(pulled <= Math.ceil(GIST_ANSWER_MAX / chunk) + 2 && pulled < chunks, `${pulled} of ${chunks} chunks read`);
+    // a Content-Length past the cap: refused before any read
+    pulled = 0;
+    await rejects(loadGist({ id, key }, { fetch: async () => new Response(stream(), { status: 200, headers: { 'content-length': String(answer.length) } }) }), 'the link\'s gist is too large for a Silinx link', 413);
+    assert.equal(parsed, 0);
+  } finally { JSON.parse = parse; }
+  // within the cap: read and opened as before
+  const small = Buffer.from(JSON.stringify({ id, files: { [GIST_FILE]: { filename: GIST_FILE, content, truncated: false } } }));
+  assert.equal(await loadGist({ id, key }, { fetch: async () => new Response(small, { status: 200 }) }), 'design');
 });

@@ -1,9 +1,10 @@
 // UI: a link given to a Silinx already running (#3316, web/js/link-hash.js): the address's hash changed without the page
 // loading again opens the link as a fresh load does (web/js/link-open.js), in both interfaces: an example's link into
 // Try it, as a fresh load of the same link; a zip at another site asked first (Cancel: nothing fetched); a refused
-// address said in the console, nothing made; an open document's changes saved before the link opens, and one that
-// cannot be saved keeps the link from opening (the work kept); a shared project's link handled by a load of the page
-// (its start-up messages); an address's token left alone. The console's messages asserted, no warnings.
+// address said in the console, nothing made; an open document's changes saved before the link opens, once the user
+// agrees (#3362), and one that cannot be saved keeps the link from opening (the work kept); a hash that is no link, or a
+// link not agreed to, saves nothing (#3362); a shared project's link handled by a load of the page (its start-up
+// messages); an address's token left alone. The console's messages asserted, no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -96,9 +97,12 @@ uiTest('#3316 an open document\'s changes are saved before the link opens; one t
   await linkOpened(page);
   await page.eval(() => window.SilinxApp.openFile('src/knight.vhd'));
   await page.waitFor(() => window.Silinx.active?.path === 'src/knight.vhd' && window.Silinx.active.editor, [], { what: 'the VHDL open' });
-  // an edit not saved yet (it is saved ~0.8 s after the last change): saved first
-  await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(`-- the student's note\n${ed.getValue()}`); });
+  // an edit not saved yet (its autosave held back): the user asked, then saved first
+  await page.eval(() => { const d = window.Silinx.active; d.editor.setValue(`-- the student's note\n${d.editor.getValue()}`); clearTimeout(d._autosave); });
   await setHash(page, 'open=example:traffic');
+  await page.waitDialog('Open from a Link');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent), 'This link opens \'traffic\'. Your open documents have changes not saved yet: save them, then open it?');
+  await page.dialogButton('Save and Open');
   await linkOpened(page);
   await page.waitConsole(/Opened 'traffic' from a link( \(a new project\))?\./);
   assert.match(await readWs(env, 'blinky', 'src/knight.vhd'), /^-- the student's note\n/);
@@ -106,8 +110,10 @@ uiTest('#3316 an open document\'s changes are saved before the link opens; one t
   // a document that cannot be saved: the link not opened, the document and its changes kept
   await page.eval(() => window.SilinxApp.openFile('src/timer.vhd'));
   const file = await page.waitFor(() => window.Silinx.active?.editor && window.Silinx.active.project === 'traffic' && window.Silinx.active.path, [], { what: 'a source open' });
-  await page.eval(() => { const d = window.Silinx.active; d.save = async () => { throw new Error('the disk is full'); }; d.editor.setValue(`-- kept\n${d.editor.getValue()}`); });
+  await page.eval(() => { const d = window.Silinx.active; d.save = async () => { throw new Error('the disk is full'); }; d.editor.setValue(`-- kept\n${d.editor.getValue()}`); clearTimeout(d._autosave); });
   await page.eval(() => { window.__loaded = true; location.hash = 'open=example:clock'; });
+  await page.waitDialog('Open from a Link');
+  await page.dialogButton('Save and Open');
   const refusal = `ERROR: Open from a link: ${file} could not be saved: the link was not opened; your changes are kept.`;
   await page.waitFor((m) => window.__console().includes(m), [refusal], { what: 'the refusal', timeout: 30000 });
   assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), [`ERROR: cannot save ${file}: the disk is full. Your changes are kept and saved as soon as it is possible again.`, refusal]);
@@ -115,6 +121,55 @@ uiTest('#3316 an open document\'s changes are saved before the link opens; one t
   assert.equal(await page.eval((f) => window.Silinx.docs.some((d) => d.path === f && d.dirty && d.editor.getValue().startsWith('-- kept\n')), file), true);
   assert.equal(await page.dialogCount(), 0);
   assert.equal(await fs.access(`${env.server.workspace}/clock`).then(() => true, () => false), false);
+});
+
+uiTest('#3362 a hash that is no link, or a link the user does not agree to, saves nothing', E, async (page) => {
+  await boot(page, 'open=example:stopwatch');
+  await linkOpened(page);
+  await page.eval(() => window.SilinxApp.openFile('src/debounce.vhd'));
+  await page.waitFor(() => window.Silinx.active?.path === 'src/debounce.vhd' && window.Silinx.active.editor, [], { what: 'the VHDL open' });
+  const disk = await readWs(env, 'stopwatch', 'src/debounce.vhd');
+  // an edit not saved yet (its autosave held back), its saves counted
+  await page.eval(() => {
+    const d = window.Silinx.active, save = d.save.bind(d);
+    window.__saves = 0;
+    d.save = async (...a) => { window.__saves++; return save(...a); };
+    d.editor.setValue(`-- not saved\n${d.editor.getValue()}`);
+    clearTimeout(d._autosave);
+  });
+  const untouched = async () => {
+    assert.equal(await page.eval(() => window.__saves), 0);
+    assert.equal(await page.eval(() => window.Silinx.active.dirty), true);
+    assert.equal(await readWs(env, 'stopwatch', 'src/debounce.vhd'), disk);
+  };
+  // not a link, a broken link, a refused address: said (or nothing to say), nothing saved
+  for (const [hash, line] of [['nothing=1', null], ['design=%%%', 'ERROR: Open from a link: the link\'s design is not well encoded.'],
+    ['open=https://192.168.1.1/a.zip', 'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').']]) {
+    await setHash(page, hash);
+    if (line) await page.waitFor((m) => window.__console().includes(m), [line], { what: line, timeout: 30000 });
+    else await new Promise((r) => setTimeout(r, 300));
+    await untouched();
+  }
+  // a link not agreed to: cancelled, nothing saved, the project as it was (the dialog in Portuguese too)
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await setHash(page, 'open=example:traffic');
+  await page.waitDialog('Abrir a partir de uma Ligação');
+  assert.deepEqual(await page.eval(() => [document.querySelector('.dlg-overlay .msg-text').textContent, [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent.trim())]),
+    ['Esta ligação abre \'traffic\'. Os seus documentos abertos têm alterações ainda não guardadas: guardá-las e depois abri-la?', ['Guardar e Abrir', 'Cancelar']]);
+  await page.dialogButton('Cancelar');
+  await linkOpened(page);
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await untouched();
+  await setHash(page, 'open=example:traffic');
+  await page.waitDialog('Open from a Link');
+  await page.dialogButton('Cancel');
+  await linkOpened(page);
+  await page.waitConsole(/Open from a link: cancelled\./);
+  await untouched();
+  assert.equal(await page.eval(() => window.Silinx.project.name), 'stopwatch');
+  assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), ['ERROR: Open from a link: the link\'s design is not well encoded.',
+    'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').']);
+  assert.deepEqual(warnings(page), []);
 });
 
 uiTest('#3316 a shared project\'s link given to the running app: the page loaded again, the link handled at its start-up (a broken one said); an address\'s token left alone', E, async (page) => {

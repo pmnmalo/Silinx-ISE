@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { EXAMPLE_ORDER } from '../core/examples.js';
-import { UI_LIMITS, benchNames, decodeUi, encodeUi, freeName, LINK_LIMITS, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
+import { UI_LIMITS, benchNames, decodeUi, encodeUi, freeName, LINK_LIMITS, LINK_TESTING, TRY_DRAWING, tryDrawing, viewProblem, decodeDesign, designZip, encodeDesign, makeLink, parseLink, privateHost, sameFiles } from '../core/design-link.js';
 import { readZip, textOf } from '../core/zip.js';
 
 const ROOT = path.join(import.meta.dirname, '..', 'examples');
@@ -367,4 +367,26 @@ test('#2886 decodeUi: a hostile view is left out, said; a broken one refused (#2
   }
   assert.throws(() => parseLink(`#open=example:gates&ui=${'a'.repeat(UI_LIMITS.maxEncoded + 1)}`), e => e.message === 'the link\'s view (ui=) is not one');
   assert.throws(() => parseLink('#open=example:gates&ui=a%24b'), e => e.message === 'the link\'s view (ui=) is not one');
+});
+
+// #3362: the import gate comes before any parser or compiler: a link's HDL that the gate refuses is never compiled (the
+// drawings' HDL made again from the files it passed only), and the HDL made again is gated too
+test('#3362 decodeDesign: the gate first, then the compiler: a file it refuses is never compiled', async () => {
+  const compiled = [];
+  LINK_TESTING.compiled = paths => compiled.push(...paths);
+  try {
+    const d = await decodeDesign(raw({ v: 1, project: { name: 'a' }, made: ['src/x.vhd'], files: {
+      'src/a.vhd': 'entity a is end;\n', 'src/page.vhd': '<script>alert(1)</script>', 'src/deep.v': `module deep; ${'('.repeat(300)}${')'.repeat(300)} endmodule\n`,
+      'src/x.fsm.json': '{broken' } }));
+    assert.deepEqual(compiled, ['src/a.vhd']);
+    assert.deepEqual(d.warnings, ['src/page.vhd: not imported: a web page (HTML), not the file its name says',
+      'src/deep.v: not imported: nesting deeper than 256 brackets', 'src/x.vhd: not made again from its drawing']);
+    assert.deepEqual(d.entries.map(e => e.path), ['silinx.json', 'src/a.vhd', 'src/x.fsm.json']);
+    assert.deepEqual([d.gated.gated, d.gated.files.map(f => f.path), d.gated.refusals.map(r => r.path)], [true, ['silinx.json', 'src/a.vhd', 'src/x.fsm.json'], ['src/page.vhd', 'src/deep.v']]);
+    // a design whose silinx.json the gate refuses compiles nothing
+    compiled.length = 0;
+    const deep = JSON.parse(`${'['.repeat(300)}${']'.repeat(300)}`);
+    await rejects(decodeDesign(raw({ v: 1, project: { name: 'a', deep }, made: ['src/x.vhd'], files: { 'src/a.vhd': 'entity a is end;\n' } })), 'the link\'s design is not a Silinx project');
+    assert.deepEqual(compiled, []);
+  } finally { LINK_TESTING.compiled = null; }
 });

@@ -96,7 +96,7 @@ can read that user's files has the server too.
 - A short link (#3223, `core/gist-link.js`): the project is encrypted where the link is made (AES-GCM, a random
   256-bit key and 96-bit IV each time) and saved as a secret gist of the user's account; the key is only in the link's
   fragment, which a browser never sends, so GitHub keeps only the ciphertext. Opening it reads the gist through GitHub's
-  API with no credentials, checks it is a Silinx link's, decrypts it (a wrong key or a changed gist refused by AES-GCM's
+  API with no credentials (GitHub's answer read to a cap before it is parsed, #3362), checks it is a Silinx link's, decrypts it (a wrong key or a changed gist refused by AES-GCM's
   tag) and imports it as a design link: the same import gate and limits. A secret gist is unlisted, not private:
   anyone with the link opens the project, as with the full link.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
@@ -221,6 +221,11 @@ What it cannot do:
   read (#3042). The MCP server's `open_link` fetches nothing: it opens a design inside
   the link or an example. The link's hash is never sent to a server (a browser sends no hash in a request; the site's page count
   takes the page's path, not its hash), and it is cleared from the address once read.
+- **Save the user's work unasked:** a link given to a Silinx already running (its address's hash changed, which another
+  page holding its window can do) saves the open documents only once the link is read and agreed to: a hash that is
+  no link, or a broken one, saves nothing; a document with changes not saved yet is saved only when the user says so
+  (Save and Open), or once the user agrees to fetch a zip (#3362). A link's files pass the import gate before any of
+  its HDL is compiled or its drawings read (the HDL a drawing makes again: from the files the gate passed, then gated).
 - **Replace the user's work:** a project of the design's name is opened as it is when its files are the link's; one
   that differs is replaced only when the user chooses Replace (the old one to the workspace's `.trash`, or deleted
   from the browser's storage, as the dialog says); Keep Mine leaves it. The MCP server's `open_link` never replaces

@@ -71,10 +71,13 @@ function made(path, text, mods) {
     return r && !r.errors.length ? r.text : null;
   } catch { return null; }
 }
+// the tests' view of what is compiled (#3362: a link's HDL only once the import gate has passed it): compiled(paths)
+export const LINK_TESTING = { compiled: null };
 // the project's modules (the schematics' symbols) from its HDL files, as the editors read them
 async function modulesOf(files) {
   const hdl = Object.entries(files).filter(([p]) => /\.(vhdl?|s?v)$/i.test(p))
     .map(([path, text]) => ({ path, text, lang: /\.s?v$/i.test(path) ? 'verilog' : 'vhdl' }));
+  LINK_TESTING.compiled?.(hdl.map(h => h.path));
   try {
     const [{ compile }, { modulesFromLibrary }] = await Promise.all([import('./compile.js'), import('./schdoc.js')]);
     return modulesFromLibrary(compile(hdl), { sources: Object.fromEntries(hdl.map(s => [s.path, s.text])) });
@@ -130,31 +133,40 @@ export async function decodeDesign(design, { codec = browserCodec() } = {}) {
     files[p] = t;
   }
   const bin = Object.entries(payload.bin || {});
-  // the HDL left out, made again from its drawing (one that cannot be is a warning: the drawing is there)
-  const warnings = [];
-  const made_ = Array.isArray(payload.made) ? payload.made.filter(p => typeof p === 'string' && !(p in files)) : [];
-  if (made_.length) {
-    const mods = await modulesOf(files);
-    for (const target of made_) {
-      const from = Object.keys(files).find(p => VIEW_RE.test(p) && (() => { try { return JSON.parse(files[p])?.generatedFile === target; } catch { return false; } })());
-      const text = from ? made(from, files[from], mods) : null;
-      if (text === null) warnings.push(`${target}: not made again from ${from || 'its drawing'}`);
-      else files[target] = text;
-    }
-  }
   const raw = [{ path: 'silinx.json', data: JSON.stringify(payload.project, null, 2) },
     ...Object.entries(files).map(([path, data]) => ({ path, data })),
     ...bin.map(([path, b]) => { if (typeof b !== 'string') throw linkError(`the link's design: ${path} is not base64url`); return { path, data: fromB64url(b) }; })];
-  // through the import gate (core/import-gate.js, #2830): its sizes, names, types and contents; a file it refuses is
-  // left out, said in the warnings
-  let g;
-  try { g = gateEntries(raw); } catch (e) { throw linkError(`the link's design: ${e.message}`); }
-  warnings.push(...gateMessages(g));
+  // through the import gate (core/import-gate.js, #2830) before any parser or compiler reads a file (#3362): its sizes,
+  // names, types and contents; a file it refuses is left out, said in the warnings
+  const gate = list => { try { return gateEntries(list); } catch (e) { throw linkError(`the link's design: ${e.message}`); } };
+  const g = gate(raw);
+  const warnings = gateMessages(g);
   const kept = new Set(g.files.map(f => f.path));
-  const entries = raw.filter(e => kept.has(e.path));
   if (!kept.has('silinx.json')) throw linkError('the link\'s design is not a Silinx project');
+  const texts = Object.fromEntries(Object.entries(files).filter(([p]) => kept.has(p)));
+  // the HDL left out, made again from its drawing, from the files the gate passed (one that cannot be is a warning: the
+  // drawing is there); then gated as well
+  const madeEntries = [];
+  const made_ = Array.isArray(payload.made) ? payload.made.filter(p => typeof p === 'string' && !(p in files)) : [];
+  if (made_.length) {
+    const mods = await modulesOf(texts);
+    for (const target of made_) {
+      const from = Object.keys(texts).find(p => VIEW_RE.test(p) && (() => { try { return JSON.parse(texts[p])?.generatedFile === target; } catch { return false; } })());
+      const text = from ? made(from, texts[from], mods) : null;
+      if (text === null) warnings.push(`${target}: not made again from ${from || 'its drawing'}`);
+      else madeEntries.push({ path: target, data: text });
+    }
+  }
+  const gm = gate(madeEntries);
+  warnings.push(...gateMessages(gm));
+  const madeKept = new Set(gm.files.map(f => f.path));
+  // (silinx.json, the texts, the HDL made again, the binary files: the order of the link's files)
+  const entries = [...raw.filter(e => kept.has(e.path) && typeof e.data === 'string'), ...madeEntries.filter(e => madeKept.has(e.path)),
+    ...raw.filter(e => kept.has(e.path) && typeof e.data !== 'string')];
+  const order = new Map(entries.map((e, i) => [e.path, i]));
   // (gated: the gate's result, what an importer takes: server/project-zip.js importProjectEntries)
-  return { name, project: payload.project, entries, warnings, gated: g };
+  const gated = { gated: true, files: [...g.files, ...gm.files].sort((x, y) => order.get(x.path) - order.get(y.path)), refusals: [...g.refusals, ...gm.refusals], warnings: [...g.warnings, ...gm.warnings] };
+  return { name, project: payload.project, entries, warnings, gated };
 }
 
 // a file's path inside the project: relative, forward slashes, no '..', no hidden part (.git, settings), not silinx.json
