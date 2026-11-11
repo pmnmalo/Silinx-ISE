@@ -537,6 +537,9 @@ uiTest('#121 open mode: Generate Post-Translate / Post-Map Simulation Model of b
   assert.match(text, /^Post-Translate Simulation Model: build\/netgen\/translate\/top_translate\.vhd \(VHDL, SIMPRIM primitives\) and build\/netgen\/translate\/top_translate\.v \(Verilog\), \d+ primitives$/m);
   assert.match(text, /^Post-Map Simulation Model: build\/netgen\/map\/top_map\.vhd \(VHDL, SIMPRIM primitives\) and build\/netgen\/map\/top_map\.v \(Verilog\), \d+ primitives$/m);
   assert.match(text, /Post-Map simulation model: build\/netgen\/map\/top_map\.vhd \(simulate it in the Simulation view, or emulate it on the board\)\./);
+  // (nextpnr's packing, #2530: the design placed and routed for it, the test bench's design and the board's)
+  assert.deepEqual(text.split('\n').filter((l) => /^Placing and routing/.test(l)), ['Placing and routing the design synthesized with the test bench\'s generics (nextpnr packs at Place & Route), for its Post-Map model.',
+    'Placing and routing the design with its own generics (nextpnr packs at Place & Route), for its Post-Map model.']);
   assert.deepEqual(text.split('\n').filter((l) => /WARNING|ERROR/.test(l)), []);
   // the Simulation view: Simulate Post-Map Model of the test bench
   await page.setView('sim');

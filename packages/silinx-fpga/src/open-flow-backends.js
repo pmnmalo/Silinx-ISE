@@ -2,12 +2,13 @@
 // that it names none. A back end is { id, mount(ctx), steps?, synth?, synthName?, constraints? }:
 //   steps        its steps, [{ id, label, needs }] (#2387): runFlow runs those asked in this order; the Xilinx families'
 //                (open-steps.js XILINX_STEPS, ISE's names) when not given
-//   mount(ctx)   -> { steps: { id: run() }, packed?, routedOrEarlier?, routedText? }: the functions of its steps, with its
+//   mount(ctx)   -> { steps: { id: run() }, packed?, packsAtPar?, routedOrEarlier?, routedText? }: the functions of its steps, with its
 //                engines, but the synthesis's and the simulation models' (runFlow's own: synth, postsynth, posttrans, postmap,
 //                postpar); ctx: runFlow's (its getters: netlist, netlistText; readNetlist, the netlist read and the
 //                constraints checked, for the step that does it). The routed design is the back end's (#2384): its format,
 //                its file, an earlier run's read again by the steps that need it; routedOrEarlier and routedText give it to
-//                the simulation models
+//                the simulation models; packsAtPar: true when its Place & Route packs (nextpnr's, #2530: the Post-Map model
+//                written from the routed design)
 //   synth        the synthesis, as synth-open.js synthesizeVerilog (its signature and result): the Xilinx families' that,
 //                another family's its own Yosys script (synth-script.js scriptSynthesis, #2386); when not given, Yosys's
 //                generic synth into its generic cells
@@ -104,13 +105,14 @@ function xilinxSteps(ctx, runMap, runPar, r) {
 }
 
 // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), the one engine (#2137: Silinx's placer and router
-// removed); the simulation models pack the netlist themselves (no packed design: nextpnr packs at Place & Route)
+// removed); no packed design at Map: nextpnr packs at Place & Route (packsAtPar), the Post-Map model is written from its
+// routed design (#2530)
 function mountS3e(base) {
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
   const np = mountNextpnrSteps(ctx);
   return {
     steps: xilinxSteps(ctx, () => np.runMap(), () => np.runPar(), mountFlowReports({ ...ctx, reports: S3E_REPORTS })),
-    packed: () => null, routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
+    packed: () => null, packsAtPar: true, routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
     placeRouteNetlist: placeRouteNetlist(base, c => mountNextpnrSteps(c)),
   };
 }

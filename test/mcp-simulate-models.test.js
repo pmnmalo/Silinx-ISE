@@ -42,6 +42,10 @@ test('simulate model: gates\' test bench against each model of the flow, made by
     assert.deepEqual(r.data.notes, notes, model);
     assert.deepEqual([r.data.log.map(l => l.text), r.data.failed], [['Simulation finished OK'], false], model);
   }
+  // (the post-map model: nextpnr's packing, as the interface's, #2530: its run's log says the placement, its header the design)
+  const m = await ok('run_process', { project: 'g', process: 'post_map_model' });
+  assert.equal(m.text.split('\n').filter(l => /^Placing and routing/.test(l)).join('\n'), 'Placing and routing the design (nextpnr packs at Place & Route), for its Post-Map model.', m.text);
+  assert.match(fs.readFileSync(path.join(P.projectDir('g'), 'build/netgen/map/gates_map.vhd'), 'utf8'), /^-- Post-Map Simulation Model of 'gates' \([^)]+\): the design nextpnr packed \(its routed design, without the routing\)/);
   // (the post-place & route model with its SDF's delays)
   const t = await ok('simulate', { project: 'g', model: 'postpar', time_ns: 1000, signals: [] });
   assert.match(t.data.notes[0], /^Timing: build\/netgen\/par\/gates_timesim\.sdf \(\d+ instances with their delays\)\.$/);
