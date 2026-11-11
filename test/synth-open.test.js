@@ -729,9 +729,10 @@ endmodule
 test('#54 a barrel rotator written as gates: its 4:1 multiplexers two LUT4s and a MUXF5 each, the wider mapping kept at High (faster, as large), equal to the RTL; at Normal too', { timeout: 300000 }, async () => {
   const rot = elaborate(compile([{ path: 'rotg.v', lang: 'verilog', text: ROT_GATES }]), 'rotg');
   const r = await synthesizeOpen(rot, { family: 'spartan3e', run: yosysNode });
-  // (two levels of 32 4:1 multiplexers: 128 LUTs and 64 MUXF5, 64 slices, and 18 of the 36 input registers, which nextpnr does not put in
-  // the multiplexers' slices: 82, as nextpnr packs it, #2529; before LUT6_MAP the wider mapping was 256 LUTs)
-  assert.deepEqual([r.util.luts, r.util.muxes, r.cells.MUXF6 || 0, r.depth.wide.kept, r.depth.wide.slices], [128, 64, 0, true, 82], JSON.stringify(r.depth));
+  // (two levels of 32 4:1 multiplexers: 128 LUTs and 64 MUXF5, 64 slices, the 36 input registers on their free sides: 64, as
+  // nextpnr packs it since 1.5.1, #3389; 82 before, which did not put them in the multiplexers' slices, #2529; before LUT6_MAP
+  // the wider mapping was 256 LUTs)
+  assert.deepEqual([r.util.luts, r.util.muxes, r.cells.MUXF6 || 0, r.depth.wide.kept, r.depth.wide.slices], [128, 64, 0, true, 64], JSON.stringify(r.depth));
   assert.deepEqual(r.warnings, []);
   const c = compareNetlist(rot, r, { name: 'lut6-rotg', seed: 'rotg', sim: { cycles: 400 } });
   assert.equal(c.status, 'pass', c.report || JSON.stringify(c));
