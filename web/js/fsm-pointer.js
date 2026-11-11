@@ -36,6 +36,14 @@ export function mountFsmPointer(ctx) {
     return true;
   };
   const editAt = (ev, edit) => { editedAt = ev.timeStamp; edit(); };
+  // the transition pressed: a label under the pointer wins over the arcs drawn after it (#3487: a later arc's wide hit
+  // stroke crossing an earlier transition's label took the press, and its condition opened)
+  const transAt = (ev) => {
+    const tEl = ev.target.closest('[data-trans]');
+    if (!tEl) return null;
+    const lab = svg.ownerDocument.elementsFromPoint(ev.clientX, ev.clientY).find((e) => e.matches('.fsm-label-bg, .fsm-label') && svg.contains(e));
+    return lab ? lab.closest('[data-trans]') : tEl;
+  };
   function onPointerDown(ev) {
     setFitted(true);
     const sel0 = sel();
@@ -54,7 +62,7 @@ export function mountFsmPointer(ctx) {
     // the mousedown to the removed element and moves the keyboard focus to the page (Delete did nothing)
     ev.preventDefault();
     const w = toWorld(ev.clientX, ev.clientY);
-    const tEl = ev.target.closest('[data-trans]');
+    const tEl = transAt(ev);
     if (tEl) {
       const t = transById(tEl.dataset.trans);
       setSel({ type: 'trans', id: t.id }); render(); renderSide();
@@ -162,7 +170,7 @@ export function mountFsmPointer(ctx) {
   }
   function onDblClick(ev) {
     if (readOnly || ev.timeStamp - editedAt < 1000) return;   // (opened by the second press, #3459)
-    const tEl = ev.target.closest('[data-trans]');
+    const tEl = transAt(ev);
     if (tEl) { editLabel(transById(tEl.dataset.trans)); return; }
     const sEl = ev.target.closest('[data-state]');
     if (sEl) { editState(stateById(sEl.dataset.state)); return; }

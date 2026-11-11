@@ -88,14 +88,28 @@ uiTest('#405 FSM editor parts: the view, the history, the inline editing, the po
   await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'cancelled' });
   assert.equal((await model()).states.find((s) => s.id === 'a').name, 'A');
   const label = (id) => page.eval((ed, tid) => { const b = document.querySelector(`${ed} [data-trans="${tid}"] .fsm-label`).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, ED, id);
+  // (#3487: t4's arc, drawn after t1, crosses t1's label: its wide hit stroke took the press, t4 selected and its
+  // condition opened; the label under the pointer wins)
+  const selected = () => page.eval((ed) => [...document.querySelectorAll(`${ed} [data-trans].sel`)].map((g) => g.dataset.trans), ED);
+  await page.click(await label('t1'));
+  assert.deepEqual(await selected(), ['t1']);
+  await page.click(await label('t4'));
+  assert.deepEqual(await selected(), ['t4']);
+  await page.key('Escape');
+  await page.dblclick(await label('t1'));
+  await page.waitFor((ed) => document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the inline editor on t1' });
+  assert.equal(await inline(), 'x / ');
+  await page.eval((ed) => { document.querySelector(`${ed} .fsm-inline`).value = 'y'; }, ED);
+  await page.key('Enter');
+  await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the condition applied' });
+  assert.deepEqual((await model()).transitions.map((t) => t.cond), ['y', '!x & y', '', '']);
+  await tool('↶');
+  assert.equal((await model()).transitions.find((t) => t.id === 't1').cond, 'x');
   await page.dblclick(await label('t4'));
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the inline editor on t4' });
   assert.equal(await inline(), ' / z=1');
-  await page.eval((ed) => { document.querySelector(`${ed} .fsm-inline`).value = 'y / z=1'; }, ED);
-  await page.key('Enter');
-  await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the condition applied' });
-  assert.equal((await model()).transitions.find((t) => t.id === 't4').cond, 'y');
-  await tool('↶');
+  await page.key('Escape');
+  await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'cancelled' });
   assert.equal((await model()).transitions.find((t) => t.id === 't4').cond, '');
   assert.deepEqual(page.console.filter((c) => /^(warn|warning|error)$/.test(c.type)).map((c) => c.text), []);
   // ---- the keys: B selected, Delete: B and its transitions gone; undone
