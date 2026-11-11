@@ -12,6 +12,8 @@ import * as Y from 'yjs';
 import { putDrawing, drawingModel, pruneDrawing, syncDrawings, drawingPathsOf, drawingKind, drawingObjects, dropDrawing, DRAWING_OBJECTS_MAX } from '../core/collab-model.js';
 import { projectDoc, publishProject, docTooLarge, FOLLOW_LIMITS } from '../core/collab-doc.js';
 import { newFsm, normalizeFsm, generateFsm, validateFsm } from '../core/fsm.js';
+import { normalizeTable, reshapeTable, generateTableHdl, truthTableFromModule, validateTable } from '../core/logic.js';
+import { compile, elaborate } from '../core/compile.js';
 import { randomVectors, runHdl, runModel } from './fsm-sim.js';
 
 const P = 'src/det.fsm.json';
@@ -28,10 +30,12 @@ function pair() {
 const model = (doc) => drawingModel(doc, P).model;
 const mut = (doc, fn) => { const m = structuredClone(model(doc)); fn(m); return m; };
 
-test('drawingKind: the FSM\'s diagrams (others: not yet, #3183\'s order)', () => {
+test('drawingKind: the FSM\'s diagrams, the truth tables (others: not yet, #3183\'s order)', () => {
   assert.equal(drawingKind('src/a.fsm.json'), 'fsm');
   assert.equal(drawingKind('src/A.FSM.JSON'), 'fsm');
-  for (const p of ['src/a.asm.json', 'src/a.tt.json', 'src/a.sch.json', 'src/a.pn.json', 'src/a.vhd', 'src/fsm.json']) assert.equal(drawingKind(p), null, p);
+  assert.equal(drawingKind('src/a.bool.json'), 'tt');
+  assert.equal(drawingKind('src/a.tt.json'), 'tt', 'a truth table saved before #2065');
+  for (const p of ['src/a.asm.json', 'src/a.sch.json', 'src/a.pn.json', 'src/a.vhd', 'src/fsm.json', 'src/bool.json']) assert.equal(drawingKind(p), null, p);
   assert.throws(() => putDrawing(new Y.Doc(), 'src/a.vhd', {}), /src\/a\.vhd: not a drawing that is edited live/);
 });
 
@@ -236,5 +240,88 @@ test('the generated HDL: identical from both sides\' merged drawing, compiled an
     assert.equal(ga.code, gb.code, lang);
     const vectors = randomVectors(ma, 100, 7);
     assert.deepEqual(runHdl(ga.code, lang, ma, vectors), runModel(ma, vectors), lang);
+  }
+});
+
+// ---- the truth table (#3183's second editor): its outputs by name, a field per cell
+const T = 'src/maj.bool.json';
+const table = () => normalizeTable({ name: 'maj', inputs: ['a', 'b', 'c'], outputs: ['y', 'z'], table: { y: '00010111', z: '01101001' }, notes: 'majority and parity', lang: 'vhdl' });
+const tmodel = (doc) => drawingModel(doc, T).model;
+const tmut = (doc, fn) => { const m = structuredClone(tmodel(doc)); fn(m); return m; };
+const cell = (col, r, c) => col.slice(0, r) + c + col.slice(r + 1);
+
+test('a truth table put and read back: the same table, normalized (its keys in one order whatever the structure\'s); one cell changed: one field', () => {
+  const doc = new Y.Doc();
+  putDrawing(doc, T, table());
+  assert.deepEqual(tmodel(doc), table());
+  assert.deepEqual(Object.keys(tmodel(doc)), ['version', 'name', 'inputs', 'outputs', 'table', 'exprs', 'notes', 'form', 'lang']);
+  assert.equal(drawingObjects(doc), 2);
+  const updates = [];
+  doc.on('update', (u) => updates.push(u));
+  putDrawing(doc, T, tmut(doc, (m) => { m.table.y = cell(m.table.y, 0, 'X'); }));
+  assert.equal(updates.length, 1);
+  assert.ok(updates[0].length < 40, `${updates[0].length} bytes`);
+  assert.equal(tmodel(doc).table.y, 'X0010111');
+  // its typed expression, form and solutions per output; a new output; an output removed
+  putDrawing(doc, T, tmut(doc, (m) => { m.exprs.z = 'a ^ b ^ c'; m.forms = { z: 'xor' }; m.outputs.push('w'); m.table.w = '11110000'; }));
+  assert.deepEqual([tmodel(doc).exprs, tmodel(doc).forms, tmodel(doc).outputs, tmodel(doc).table.w], [{ z: 'a ^ b ^ c' }, { z: 'xor' }, ['y', 'z', 'w'], '11110000']);
+  putDrawing(doc, T, tmut(doc, (m) => { m.outputs = ['y', 'w']; delete m.table.z; delete m.exprs.z; delete m.forms; }));
+  assert.deepEqual([tmodel(doc).outputs, tmodel(doc).exprs, tmodel(doc).forms], [['y', 'w'], {}, undefined]);
+});
+
+test('a truth table, two participants: two cells of one column both kept; one cell, the same value on both; an output added by both: one; the notes, one of the two', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, T, table());
+  const base = tmodel(a);
+  hold();
+  putDrawing(a, T, tmut(a, (m) => { m.table.y = cell(m.table.y, 0, '1'); m.table.z = cell(m.table.z, 7, 'X'); m.notes = 'by Ana'; m.outputs.push('w'); m.table.w = '00000001'; }), { base, client: a.clientID });
+  putDrawing(b, T, tmut(b, (m) => { m.table.y = cell(m.table.y, 1, '1'); m.table.z = cell(m.table.z, 7, '0'); m.notes = 'by Rui'; m.outputs.push('w'); m.table.w = '00000001'; }), { base, client: b.clientID });
+  release();
+  const m = tmodel(a);
+  assert.deepEqual(tmodel(b), m);
+  assert.equal(m.table.y, '11010111');
+  assert.ok(['X', '0'].includes(m.table.z[7]));
+  assert.ok(['by Ana', 'by Rui'].includes(m.notes));
+  assert.deepEqual(m.outputs, ['y', 'z', 'w']);
+  assert.deepEqual(validateTable(m), []);
+});
+
+test('a truth table: one adds an input (every column reshaped) while another changes a cell: one table on both sides; each one\'s undo', () => {
+  const { a, b } = pair();
+  putDrawing(a, T, table());
+  const oa = {}, ob = {};
+  const ua = new Y.UndoManager(a.getMap('drawings').get(T), { trackedOrigins: new Set([oa]), captureTimeout: 0 });
+  const ub = new Y.UndoManager(b.getMap('drawings').get(T), { trackedOrigins: new Set([ob]), captureTimeout: 0 });
+  const wide = reshapeTable(tmodel(a), ['a', 'b', 'c', 'd'], ['y', 'z']);
+  putDrawing(a, T, wide, { client: a.clientID, origin: oa });
+  assert.equal(tmodel(b).table.y.length, 16);
+  putDrawing(b, T, tmut(b, (m) => { m.table.z = cell(m.table.z, 15, '0'); }), { client: b.clientID, origin: ob });
+  assert.deepEqual(tmodel(a), tmodel(b));
+  assert.equal(tmodel(a).table.z[15], '0');
+  ub.undo();
+  assert.deepEqual(tmodel(a), normalizeTable(wide));
+  ua.undo();
+  assert.deepEqual(tmodel(b), table());
+  assert.deepEqual(tmodel(a), tmodel(b));
+});
+
+test('a truth table\'s generated HDL: identical from both sides\' merged table, compiled, elaborated and simulated in VHDL and in Verilog as its columns', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, T, table());
+  const base = tmodel(a);
+  hold();
+  putDrawing(a, T, tmut(a, (m) => { m.table.y = cell(m.table.y, 0, '1'); m.forms = { z: 'xor' }; }), { base, client: a.clientID });
+  putDrawing(b, T, tmut(b, (m) => { m.table.z = cell(m.table.z, 3, '1'); m.lang = 'verilog'; }), { base, client: b.clientID });
+  release();
+  const ma = tmodel(a), mb = tmodel(b);
+  assert.deepEqual(ma, mb);
+  assert.deepEqual([ma.table.y, ma.table.z, ma.forms, ma.lang], ['10010111', '01111001', { z: 'xor' }, 'verilog']);
+  for (const lang of ['vhdl', 'verilog']) {
+    const ga = generateTableHdl(ma, lang, { source: 'maj.bool.json' }), gb = generateTableHdl(mb, lang, { source: 'maj.bool.json' });
+    assert.equal(ga.code, gb.code, lang);
+    const lib = compile([{ path: ga.filename, text: ga.code }]);
+    assert.deepEqual([...lib.errors, ...elaborate(lib, 'maj').diags].map((x) => `${x.severity}: ${x.message}`), [], lang);
+    const t = truthTableFromModule([{ path: ga.filename, text: ga.code }], 'maj');
+    assert.deepEqual([t.warnings, t.table.y, t.table.z], [[], ma.table.y, ma.table.z], lang);
   }
 });
