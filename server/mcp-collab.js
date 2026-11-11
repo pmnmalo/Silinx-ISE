@@ -14,6 +14,7 @@ import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
 import { projectDoc, publishProject, sharedPath, docProject, docFile, watchDoc, editFile, editablePath, gateEdit } from '../core/collab-doc.js';
 import { isTrusted, markEditedByEditor } from '../core/trust.js';
+import { relayConfig } from './toolchain.js';
 import { shareRoom, followRoom } from '../core/collab-client.js';
 import { followLink, parseFollowLink, relayUrl } from '../core/collab-link.js';
 
@@ -25,11 +26,15 @@ const follows = new Map();   // room:role -> { session, link }
 const WebSocketImpl = async () => globalThis.WebSocket || (await import('ws')).WebSocket;
 const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim().slice(0, 40);
 
-// a Silinx address (http(s), its origin only)
-function serverOf(server = DEFAULT_SERVER) {
+// a Silinx address (http(s), its origin only): this computer's (loopback), or a relay the user's settings name
+// (relay.relays in config.json, #3363: never a host an assistant chose alone, a network's or another site's)
+function serverOf(server = DEFAULT_SERVER, what = 'server') {
   let u;
   try { u = new URL(server); } catch { throw toolError(`server: '${server}' is not an address`); }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw toolError(`server: '${server}' is not an http(s) address`);
+  if (!LOOPBACK.has(u.hostname.toLowerCase()) && !relayConfig().relays.includes(u.origin)) {
+    throw toolError(`${what}: ${u.origin} is neither a Silinx server on this computer nor a relay the user's settings name (relay.relays in config.json): the MCP server shares and follows through those only`);
+  }
   return u.origin;
 }
 // the token of the Silinx server on this computer at that port (none: a server started without one, as the tests'),
@@ -97,7 +102,7 @@ const peerLines = peers => (peers.length ? peers.map(p => `${p.name} (${p.role})
 export const COLLAB_TOOLS = [
   {
     name: 'share_project', title: 'Share Project (live, read only)',
-    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project… does: action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
+    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project… does: action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       action: { type: 'string', enum: ['start', 'status', 'stop'], description: 'start (default), status or stop.' },
@@ -121,7 +126,7 @@ export const COLLAB_TOOLS = [
         if (!cur || cur.session.closed()) { if (cur) { shares.delete(name); cur.off(); } return { text: `'${name}' is not shared.`, data: { project: name, shared: false } }; }
         const peers = cur.session.peers();
         const warns = cur.warnings.map(w => `\nWARNING: ${w}`).join('');
-        return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, followers: peers, warnings: [...cur.warnings] } };
+        return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, followers: peers, warnings: [...cur.warnings] }, untrusted: peers.length ? 'the followers\' names and views' : undefined };
       }
       await readProject(name);
       if (cur && !cur.session.closed()) return { text: `'${name}' is shared already: ${cur.link}`, data: { project: name, shared: true, link: cur.link, followers: cur.session.peers() } };
@@ -168,7 +173,7 @@ export const COLLAB_TOOLS = [
       // (a room the owner's page hosts, #3227: reached over WebRTC, which this server has not)
       if (l.via === 'host') throw toolError('link: a project its owner\'s page hosts (…#follow=….host) is followed in a browser, over WebRTC: open the link in Silinx');
       // (through the relay the link names, #3227, else the link's own Silinx)
-      const origin = serverOf(l.relay || l.base);
+      const origin = serverOf(l.relay || l.base, 'link');
       const slot = `${l.room}:${l.sign ? 'edit' : 'follow'}`;   // (a room followed and edited: two participants)
       let cur = follows.get(slot);
       if (cur?.session.closed()) { follows.delete(slot); cur = null; }
@@ -208,7 +213,7 @@ export const COLLAB_TOOLS = [
         ...(write !== undefined ? [`Wrote ${write.path} (merged as this participant's edit).`] : []),
         ...(text !== null ? [`${path}:`, text] : []),
       ];
-      return { text: lines.join('\n'), data: { following: true, editor: cur.session.editor, owner, project: project?.name ?? null, files: fileTree, participants: peers, ownerView: view, ...(text !== null ? { path, text } : {}) } };
+      return { text: lines.join('\n'), data: { following: true, editor: cur.session.editor, owner, project: project?.name ?? null, files: fileTree, participants: peers, ownerView: view, ...(text !== null ? { path, text } : {}) }, untrusted: text !== null ? `the shared project's files, names and the file ${path}` : 'the shared project\'s files and names' };
     },
   },
 ];

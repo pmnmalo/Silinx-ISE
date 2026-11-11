@@ -58,6 +58,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   programmer: { tool: '', cable: '' },          // global defaults (board defaults take precedence when empty)
   paths: {},                                    // explicit binary paths, e.g. { djtgcfg: '/usr/local/bin/djtgcfg' }
   relay: { origins: [], key: '', relays: [] },  // shared projects (#3227): the sites whose pages use this relay, the key that opens a room; the other relays this server's pages use
+  mcp: { remotes: [] },                         // the GitHub repositories the MCP server may make a project's remote (#3363): "owner/repo", "owner/*"
 });
 
 // http(s) origins, as a browser sends them (no user nor password), once each
@@ -96,7 +97,15 @@ export async function loadConfig() {
 
 /** The settings that name a program to run or its arguments: set in config.json (or with the
  *  command line) only, never through the API (Toolchain Settings does not show them). */
-export const FILE_ONLY = ['docker.command', 'docker.extraArgs', 'ssh.sshArgs', 'ssh.identity', 'paths', 'relay'];
+export const FILE_ONLY = ['docker.command', 'docker.extraArgs', 'ssh.sshArgs', 'ssh.identity', 'paths', 'relay', 'mcp'];
+
+/** The GitHub repositories the MCP server may make a project's remote (#3363; config.json only): ["owner/repo",
+ *  "owner/*"], in lower case. */
+export function mcpRemotes(cfg = null) {
+  let list = cfg?.mcp?.remotes;
+  if (cfg === null) try { list = JSON.parse(fss.readFileSync(configPath(), 'utf8')).mcp?.remotes; } catch { list = null; }
+  return (Array.isArray(list) ? list : []).map(x => String(x).trim().toLowerCase()).filter(x => /^[\w.-]+\/(\*|[\w.-]+)$/.test(x));
+}
 /** A settings script ISE's way: …/settings64.sh or …/settings32.sh ('' = auto-detect). */
 const SETTINGS = /(^|[\\/])settings(32|64)\.sh$/;
 

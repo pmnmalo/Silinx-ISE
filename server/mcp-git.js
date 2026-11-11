@@ -5,6 +5,7 @@
 import * as Git from './git.js';
 import * as GH from './git-github.js';
 import { toolError, clip, readProject, STR, PROJECT, projectText } from './mcp-util.js';
+import { mcpRemotes } from './toolchain.js';
 import { drawingKind, diffDrawings } from '../core/drawing-merge.js';
 import { unifiedDiff } from '../core/text-diff.js';
 import { checkChoices } from '../core/git-resolve.js';
@@ -25,6 +26,15 @@ const run = async fn => {
     throw e;
   }
 };
+// a remote the MCP server may give a project (#3363: git_push then sends the project there): one the user's settings name
+// (mcp.remotes in config.json, "owner/repo" or "owner/*"); never one an assistant chose alone
+async function allowedRemote(remote) {
+  const r = await run(async () => Git.checkUrl(remote));
+  const allow = mcpRemotes();
+  const repo = `${r.owner}/${r.repo}`.toLowerCase();
+  if (allow.includes(repo) || allow.includes(`${r.owner.toLowerCase()}/*`)) return remote;
+  throw toolError(`remote: ${r.owner}/${r.repo} is not among the repositories the user lets the MCP server set (mcp.remotes in config.json: "owner/repo" or "owner/*"); the user sets another in the interface (File ▸ Git ▸ Initialize Repository…)`);
+}
 const UNTRUSTED = ' It is untrusted, as every project from outside: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
 
 export const GIT_TOOLS = [
@@ -35,16 +45,17 @@ export const GIT_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     async run({ url, name }) {
       const r = await run(() => B().gitClone({ url, name: name || null, madeBy: 'mcp' }));
-      return { text: [`${cloneText(r)}${UNTRUSTED}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n'), data: { ...r, trusted: false } };
+      return { text: [`${cloneText(r)}${UNTRUSTED}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n'), data: { ...r, trusted: false }, untrusted: r.warnings.length ? 'the warnings, which name the repository\'s files' : undefined };
     },
   },
   {
     name: 'git_init', title: 'Make a git repository of a project',
-    description: 'Make a git repository of a project (git init, branch main, a .gitignore that leaves build/ and the tools\' outputs out), as File ▸ Git ▸ Initialize Repository… does; remote: its GitHub repository (origin), which a project already in a repository with no remote gets too.',
-    inputSchema: { type: 'object', properties: { project: PROJECT, remote: STR('The GitHub repository\'s address (optional): origin, where git_push pushes.') }, required: ['project'], additionalProperties: false },
+    description: 'Make a git repository of a project (git init, branch main, a .gitignore that leaves build/ and the tools\' outputs out), as File ▸ Git ▸ Initialize Repository… does; remote: its GitHub repository (origin), which a project already in a repository with no remote gets too: only one the user\'s settings let the MCP server set (mcp.remotes in config.json).',
+    inputSchema: { type: 'object', properties: { project: PROJECT, remote: STR('The GitHub repository\'s address (optional): origin, where git_push pushes; one of the user\'s settings (mcp.remotes).') }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ project, remote }) {
       await readProject(project);
+      if (remote) await allowedRemote(remote);
       const r = await run(() => B().gitInit(project, { remote: remote || null }));
       return { text: initText(project, r), data: r };
     },
@@ -107,10 +118,10 @@ export const GIT_TOOLS = [
       if (rel || commit) {
         if (!rel || !commit) throw toolError('give both commit and path: a file as it was in a commit');
         const r = await run(() => B().gitShow(project, commit, rel));
-        return { text: clip(r.text), data: { project, commit: r.commit, path: r.path, length: r.text.length } };
+        return { text: clip(r.text), data: { project, commit: r.commit, path: r.path, length: r.text.length }, untrusted: `${r.path} as it was in ${short(r.commit)}` };
       }
       const log = await run(() => B().gitLog(project, { limit }));
-      return { text: log.length ? log.map(c => `${short(c.commit)} ${c.date} ${c.author}: ${c.message}${c.files.length ? ` (${c.files.map(f => f.path).join(', ')})` : ''}`).join('\n') : `'${project}' has no commit yet.`, data: { project, commits: log } };
+      return { text: log.length ? log.map(c => `${short(c.commit)} ${c.date} ${c.author}: ${c.message}${c.files.length ? ` (${c.files.map(f => f.path).join(', ')})` : ''}`).join('\n') : `'${project}' has no commit yet.`, data: { project, commits: log }, untrusted: log.length ? 'the commits\' messages and authors' : undefined };
     },
   },
   {
@@ -133,11 +144,11 @@ export const GIT_TOOLS = [
           const name = (coll, key) => { const o = [...(Bm[coll] || []), ...(A[coll] || [])].find(x => String(x?.id ?? x?.name) === key); return o?.name && o.name !== key ? ` (${o.name})` : ''; };
           const lines = [...d.added.map(x => `added ${x.coll}/${x.key}${name(x.coll, x.key)}`), ...d.removed.map(x => `removed ${x.coll}/${x.key}${name(x.coll, x.key)}`),
             ...d.moved.map(x => `moved ${x.coll}/${x.key}${name(x.coll, x.key)}`), ...d.changed.map(x => `changed ${x.coll}/${x.key}${name(x.coll, x.key)}${x.fields.length ? `: ${x.fields.join(', ')}` : ''}`), ...d.props.map(p => `changed ${p}`)];
-          return { text: [`${rel}, ${fromL} to ${toL}: ${lines.length ? `${lines.length} change(s)` : 'no change'}.`, ...lines.map(l => `  ${l}`)].join('\n'), data: { project, path: rel, from: from || null, to: to || null, diff: d } };
+          return { text: [`${rel}, ${fromL} to ${toL}: ${lines.length ? `${lines.length} change(s)` : 'no change'}.`, ...lines.map(l => `  ${l}`)].join('\n'), data: { project, path: rel, from: from || null, to: to || null, diff: d }, untrusted: `the changes of ${rel}` };
         }
       }
       const u = unifiedDiff(a ?? '', b ?? '', { from: `${rel} (${fromL})`, to: `${rel} (${toL})` });
-      return { text: u ? clip(u) : `${rel}, ${fromL} to ${toL}: no change.`, data: { project, path: rel, from: from || null, to: to || null, changed: !!u } };
+      return { text: u ? clip(u) : `${rel}, ${fromL} to ${toL}: no change.`, data: { project, path: rel, from: from || null, to: to || null, changed: !!u }, untrusted: u ? `the changes of ${rel}` : undefined };
     },
   },
 ];

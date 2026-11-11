@@ -126,7 +126,7 @@ export const TRANSFER_TOOLS = [
       const kind = gated.files.some(e => /\.xise$/i.test(e.path)) ? 'Xilinx ISE' : 'Silinx';
       const lines = [...r.warnings.map(w => `WARNING: ${w}`), ...r.missing.map(m => `WARNING: ${m}: listed by the project, not found`),
         `Imported the ${kind} project as '${name}': top ${pj.top || '(none)'}, test bench ${pj.simTop || '(none)'}, ${pj.board || 'no board'} (${pj.device ? `${pj.device.part}${pj.device.package}${pj.device.speed}` : 'no device'}), ${(pj.files || []).length} source(s)${r.extra.length ? `, ${r.extra.length} other file(s)` : ''}.`];
-      return { text: lines.join('\n'), data: { project: name, kind: kind === 'Xilinx ISE' ? 'xilinx' : 'silinx', top: pj.top || null, simTop: pj.simTop || null, board: pj.board || null, device: pj.device || null, files: (pj.files || []).map(f => f.path), extra: r.extra, missing: r.missing, warnings: r.warnings } };
+      return { text: lines.join('\n'), data: { project: name, kind: kind === 'Xilinx ISE' ? 'xilinx' : 'silinx', top: pj.top || null, simTop: pj.simTop || null, board: pj.board || null, device: pj.device || null, files: (pj.files || []).map(f => f.path), extra: r.extra, missing: r.missing, warnings: r.warnings }, untrusted: r.warnings.length ? 'the import\'s warnings, which name its files' : undefined };
     },
   },
 ];

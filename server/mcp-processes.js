@@ -123,7 +123,7 @@ export const PROCESS_TOOLS = [
         const { projectReports } = await import('./impl-routes.js');
         const r = JSON.parse(redact(JSON.stringify(await projectReports(name))));
         if (r.available === false) return { text: `No report yet for '${name}': run a process (run_process).`, data: { project: name, report, available: false } };
-        return { text: clip(JSON.stringify(r, null, 1)), data: { project: name, report, available: true, summary: r } };
+        return { text: clip(JSON.stringify(r, null, 1)), data: { project: name, report, available: true, summary: r }, untrusted: 'the report' };
       }
       if (!Object.hasOwn(REPORT_FILES.ise, report)) throw toolError(`report: summary or one of ${Object.keys(REPORT_FILES.ise).join(', ')}`);
       // the toolchain of the last run (its Design Summary), else the files there are
@@ -137,10 +137,10 @@ export const PROCESS_TOOLS = [
       const file = REPORT_FILES[open ? 'open' : tc][report]?.(top);
       if (!file) {
         const text = summary.available !== false && OPEN_REPORTS[report]?.(summary);
-        if (text) return { text: redact(text), data: { project: name, report, toolchain: 'silinx', path: 'build/reports.json', available: true } };
+        if (text) return { text: redact(text), data: { project: name, report, toolchain: 'silinx', path: 'build/reports.json', available: true }, untrusted: 'the report' };
       } else {
         const full = await projectPath(name, file);
-        if (fs.existsSync(full)) { const text = redact(await fsp.readFile(full, 'latin1')); return { text: clip(text), data: { project: name, report, toolchain: tc, path: file, available: true } }; }
+        if (fs.existsSync(full)) { const text = redact(await fsp.readFile(full, 'latin1')); return { text: clip(text), data: { project: name, report, toolchain: tc, path: file, available: true }, untrusted: 'the report' }; }
       }
       const proc = { synthesis: 'synthesize', map: 'implement', par: 'implement', timing: 'timing', power: 'power', pins: 'pins', drc: 'implement' }[report];
       return { text: summary.available === false && !fs.existsSync(path.join(P.projectDir(name), 'build')) ? `No ${report} report for '${name}': no process has run yet (run_process ${proc}).`
