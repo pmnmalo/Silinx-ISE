@@ -5,13 +5,15 @@
 // follow_project follows a link, read only, and gives the project's files, who is in it, the owner's view and a file's
 // text. Both through core/collab-*.js, the page's own modules: the document, the encryption, the protocol. With editors
 // (#3182): share_project gives an editor's link too, and writes what an editor changes in a text file to the disk
-// (anything else an editor changes undone: the project published again from the disk); follow_project with an editor's
+// (through the import gate, the project untrusted, #3355; anything else an editor changes undone: the project published
+// again from the disk); follow_project with an editor's
 // link writes a file's text, merged as one participant's edit.
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
-import { projectDoc, publishProject, sharedPath, docProject, docFile, watchDoc, editFile, editablePath } from '../core/collab-doc.js';
+import { projectDoc, publishProject, sharedPath, docProject, docFile, watchDoc, editFile, editablePath, gateEdit } from '../core/collab-doc.js';
+import { isTrusted, markEditedByEditor } from '../core/trust.js';
 import { shareRoom, followRoom } from '../core/collab-client.js';
 import { followLink, parseFollowLink, relayUrl } from '../core/collab-link.js';
 
@@ -67,18 +69,26 @@ function generated(doc) {
   return out;
 }
 // an editor's changes, at the owner's (#3182): a text file's, written to the disk; anything else, undone (the project
-// published again from the disk, the owner's)
-function ownerWrites(name, doc, owner) {
+// published again from the disk, the owner's). The text passes the import gate first, as any file from outside, and the
+// project is untrusted before it is written (#3355): an editor's link reaches no ISE nor board until the user trusts it
+// again; what the gate refuses is not written (undone too), its reason among the share's warnings (`warn`).
+function ownerWrites(name, doc, owner, warn) {
   return watchDoc(doc, async ({ changes, project }) => {
     const gen = generated(doc);
     const write = changes.filter(c => c.kind === 'changed' && editablePath(c.path) && !gen.has(c.path));
+    let refused = false;
     for (const c of write) {
       const text = docFile(doc, c.path);
       const file = P.safeJoin(P.projectDir(name), c.path);
       if (typeof text !== 'string' || !fs.existsSync(file)) continue;
-      try { await fsp.writeFile(file, text); } catch { /* the next change */ }
+      let gated;
+      try { gated = gateEdit(c.path, text); } catch (e) { warn(`${c.path}: an editor's change not written: ${e.reason || e.message}`); refused = true; continue; }
+      try {
+        if (isTrusted(await P.readProject(name))) await P.updateProject(name, markEditedByEditor);
+        await fsp.writeFile(file, gated);
+      } catch { refused = true; /* the next change */ }
     }
-    if (project || changes.length > write.length) { try { publishProject(doc, { ...await readAll(name), owner }); } catch { /* the next change */ } }
+    if (project || refused || changes.length > write.length) { try { publishProject(doc, { ...await readAll(name), owner }); } catch { /* the next change */ } }
   });
 }
 
@@ -93,7 +103,7 @@ export const COLLAB_TOOLS = [
       action: { type: 'string', enum: ['start', 'status', 'stop'], description: 'start (default), status or stop.' },
       name: STR('The name the followers see (default: "MCP agent").'),
       server: STR(`The address of the Silinx server whose relay shares it (default ${DEFAULT_SERVER}).`),
-      editors: { type: 'boolean', description: 'start: editors may change its text files too (the result: an editor\'s link besides the follower\'s; what they change written to the disk).' },
+      editors: { type: 'boolean', description: 'start: editors may change its text files too (the result: an editor\'s link besides the follower\'s; what they change written to the disk, through the import gate, the project untrusted from their first change: Xilinx ISE waits until the user trusts it in the interface).' },
       key: STR('start: the key of a relay on another computer (its config.json\'s relay.key, #3227), instead of the token of a Silinx server on this one.'),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -110,7 +120,8 @@ export const COLLAB_TOOLS = [
       if (action === 'status') {
         if (!cur || cur.session.closed()) { if (cur) { shares.delete(name); cur.off(); } return { text: `'${name}' is not shared.`, data: { project: name, shared: false } }; }
         const peers = cur.session.peers();
-        return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}`, data: { project: name, shared: true, link: cur.link, followers: peers } };
+        const warns = cur.warnings.map(w => `\nWARNING: ${w}`).join('');
+        return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, followers: peers, warnings: [...cur.warnings] } };
       }
       await readProject(name);
       if (cur && !cur.session.closed()) return { text: `'${name}' is shared already: ${cur.link}`, data: { project: name, shared: true, link: cur.link, followers: cur.session.peers() } };
@@ -127,11 +138,12 @@ export const COLLAB_TOOLS = [
       const { createProjectWatcher } = await import('./project-watch.js');
       const watcher = createProjectWatcher({ dirOf: P.projectDir });
       const unsub = watcher.subscribe(name, async () => { try { publishProject(doc, { ...await readAll(name), owner }); } catch { /* the next change */ } });
-      const unwatch = session.editKey ? ownerWrites(name, doc, owner) : () => {};
+      const warnings = [];
+      const unwatch = session.editKey ? ownerWrites(name, doc, owner, w => warnings.push(w)) : () => {};
       const off = () => { unsub(); unwatch(); watcher.close?.(); };
       const link = followLink(`${origin}/`, session.room, session.key);
       const editLink = session.editKey ? followLink(`${origin}/`, session.room, session.key, 'relay', session.editKey) : null;
-      shares.set(name, { session, link, editLink, server: origin, off });
+      shares.set(name, { session, link, editLink, server: origin, off, warnings });
       return {
         text: `Sharing '${name}' live, read only, as ${owner}. Anyone with this link follows it (until share_project stop):\n${link}${editLink ? `\nAnyone with this one edits its text files too:\n${editLink}` : ''}`,
         data: { project: name, shared: true, link, ...(editLink ? { editLink } : {}), followers: [] },

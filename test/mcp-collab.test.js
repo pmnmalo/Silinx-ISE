@@ -167,6 +167,40 @@ test('#3182 editors: share_project gives an editor\'s link; follow_project write
   await until(() => page.closed(), 'the page told');
 });
 
+test('#3355 an editor\'s change of a trusted project: through the import gate, the project untrusted before it is written (Xilinx ISE refused); what the gate refuses not written, said in the status; trusted again, the next change untrusts it again', async () => {
+  // (a project the user made: trusted)
+  await P.createProject({ name: 'trustedEd', template: 'traffic' });
+  assert.equal((await P.readProject('trustedEd')).trusted, undefined);
+  const { data: { link, editLink } } = await ok('share_project', { project: 'trustedEd', name: 'Ana', server: base, editors: true });
+  const timer = await P.readFile('trustedEd', 'src/timer.vhd');
+  // a change the gate refuses (a NUL byte in a text file): not written, undone, the project still trusted
+  await ok('follow_project', { link: editLink, name: 'Bot', write: { path: 'src/timer.vhd', text: `-- \0\n${timer}` } });
+  const page = await followRoom({ url: relayUrl(parseFollowLink(link).base, 'follow'), room: parseFollowLink(link).room, key: parseFollowLink(link).key, user: { name: 'Eva' } });
+  await page.ready;
+  await until(async () => (await ok('share_project', { project: 'trustedEd', action: 'status' })).data.warnings.length, 'the refusal said');
+  await until(() => docFile(page.doc, 'src/timer.vhd') === timer, 'the refused change undone');
+  const st = await ok('share_project', { project: 'trustedEd', action: 'status' });
+  assert.deepEqual(st.data.warnings, ['src/timer.vhd: an editor\'s change not written: binary content (a NUL byte) in a text file']);
+  assert.ok(st.text.endsWith('\nWARNING: src/timer.vhd: an editor\'s change not written: binary content (a NUL byte) in a text file'), st.text);
+  assert.equal(await P.readFile('trustedEd', 'src/timer.vhd'), timer);
+  assert.equal((await P.readProject('trustedEd')).trusted, undefined, 'nothing written: still trusted');
+  // a change it lets through: written, the project untrusted, changed by an editor; Xilinx ISE refused
+  await ok('follow_project', { link: editLink, write: { path: 'src/timer.vhd', text: `-- by Bot\n${timer}` } });
+  await until(async () => (await P.readFile('trustedEd', 'src/timer.vhd')) === `-- by Bot\n${timer}`, 'the edit on the disk', 8000);
+  const pj = await P.readProject('trustedEd');
+  assert.deepEqual([pj.trusted, pj.madeBy], [false, 'editor']);
+  await fails('run_process', { project: 'trustedEd', process: 'synthesize', toolchain: 'ise' },
+    "project 'trustedEd' was changed by an editor of its shared link: Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)");
+  // the user trusts it again (the interface's): the next change untrusts it again
+  await P.trustProject('trustedEd');
+  await ok('follow_project', { link: editLink, write: { path: 'src/timer.vhd', text: `-- again\n${timer}` } });
+  await until(async () => (await P.readFile('trustedEd', 'src/timer.vhd')) === `-- again\n${timer}`, 'the second edit on the disk', 8000);
+  assert.deepEqual([(await P.readProject('trustedEd')).trusted, (await P.readProject('trustedEd')).madeBy], [false, 'editor']);
+  await page.close();
+  await ok('follow_project', { link: editLink, stop: true });
+  await ok('share_project', { project: 'trustedEd', action: 'stop' });
+});
+
 test('#3227 through a relay on another computer: share_project with its key; follow_project of a site\'s link that names the relay', async () => {
   await ok('new_project_from_example', { name: 'gatesRelay', example: 'gates' });
   // (the key given, not the token file of this computer: here this server's token, as a relay's key opens a room the same way)

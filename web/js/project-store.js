@@ -431,13 +431,14 @@ export function projectOps(getStore, examples = {}) {
       const clean = { ...clone(pj), name };
       delete clean.fileTree;
       // a project from outside stays so until the user trusts it (trustProject, #2830), as the server's writeProject
-      if (cur.json?.trusted === false) clean.trusted = false;
+      // (and who made it or changed it: its messages, #2981, #3355)
+      if (cur.json?.trusted === false) Object.assign(clean, { trusted: false }, cur.json.madeBy ? { madeBy: cur.json.madeBy } : {});
       await S().saveJson(name, clean);
       return clone(clean);
     },
     // the user trusts a project from outside (#2830): Xilinx ISE and programming may run for it
     trustProject: async (name) => {
-      const { trusted, ...json } = (await S().load(name)).json;
+      const { trusted, madeBy, ...json } = (await S().load(name)).json;   // eslint-disable-line no-unused-vars
       await S().saveJson(name, json);
       return clone({ ...json, name });
     },
