@@ -256,7 +256,8 @@ test('a 7-series project is implemented by Vivado (POST implement, run_process):
   assert.equal(r.isError, true);
   assert.equal(r.data.toolchain, 'vivado');
   assert.match(r.text, /Process "synthesize" of <top> failed \(1 error\(s\), 0 warning\(s\)\) \(AMD Vivado\)\.$/);
-  assert.deepEqual(r.data.errors, [`ERROR: AMD Vivado not available (docker mode): ${NOT_READY}. Configure it in Toolchain Settings (vivado in ~/.silinx/config.json, PUT /api/toolchain), or run ${path.join(P.projectDir('Basys3Blinky'), 'build', 'run.sh')} on a machine with Vivado.`]);
+  // (the MCP's result names the workspace as such, never its absolute path, #3418)
+  assert.deepEqual(r.data.errors, [`ERROR: AMD Vivado not available (docker mode): ${NOT_READY}. Configure it in Toolchain Settings (vivado in ~/.silinx/config.json, PUT /api/toolchain), or run <workspace>/Basys3Blinky/build/run.sh on a machine with Vivado.`]);
   assert.match((await call('run_process', { project: 'Basys3Blinky', process: 'post_par_model' })).text, /^run_process: Vivado's flow has no post-place & route simulation model \(postpar\)$/);
 });
 

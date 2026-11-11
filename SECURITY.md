@@ -106,6 +106,11 @@ can read that user's files has the server too.
   project's or a remote's text (`read_file`, `git_log`, `git_diff`, `get_report`, the import's and a clone's
   warnings, `follow_project`'s files and names, `share_project`'s followers) is labelled "Untrusted content" after its
   text, and `untrusted` in its structured content: data, never instructions.
+- What the MCP server tells an assistant of the user's folders (#3412, #3418): its results and errors name the
+  workspace and the exchange folder `<workspace>` and `<exchange folder>`, never their absolute paths (the user's name,
+  their folders); a file of `build/` it reads is redacted as a report is (the ISE machine's address); and its
+  `import_project` never takes the exchange folder as a whole (by default the user's Downloads: a `.xise` at its root,
+  or the folder itself), only a project's own folder in it.
 - A short link (#3223, `core/gist-link.js`): the project is encrypted where the link is made (AES-GCM, a random
   256-bit key and 96-bit IV each time) and saved as a secret gist of the user's account; the key is only in the link's
   fragment, which a browser never sends, so GitHub keeps only the ciphertext. Opening it reads the gist through GitHub's

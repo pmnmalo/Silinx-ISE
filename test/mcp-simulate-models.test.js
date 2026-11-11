@@ -57,13 +57,14 @@ test('simulate model: a model older than the sources is said; the VCD of the wav
   fs.utimesSync(src, later, later);
   const s = await ok('simulate', { project: 'g', model: 'postsynth', time_ns: 1000, signals: [], vcd: 'gates.vcd' });
   assert.deepEqual(s.data.notes, ['WARNING: the post-synthesis model is older than the sources (run "post_synthesis_model" again to update it).']);
-  assert.equal(s.data.vcd, path.join(tmp, 'exchange', 'gates.vcd'));
-  const vcd = fs.readFileSync(s.data.vcd, 'utf8');
+  // (the exchange folder named as such, never its absolute path, #3418)
+  assert.equal(s.data.vcd, '<exchange folder>/gates.vcd');
+  const vcd = fs.readFileSync(path.join(tmp, 'exchange', 'gates.vcd'), 'utf8');
   assert.match(vcd, /^\$date .*\$end\n\$version Silinx \$end\n\$timescale 1ps \$end\n\$scope module tb_gates \$end\n/);
   assert.match(vcd, /\$var wire 4 \S+ sw \$end/);
-  await fails('simulate', { project: 'g', time_ns: 100, vcd: 'gates.vcd' }, `'${path.join(tmp, 'exchange', 'gates.vcd')}' exists: a VCD does not replace a file (give another name)`);
+  await fails('simulate', { project: 'g', time_ns: 100, vcd: 'gates.vcd' }, `'<exchange folder>/gates.vcd' exists: a VCD does not replace a file (give another name)`);
   await fails('simulate', { project: 'g', time_ns: 100, vcd: 'gates.txt' }, 'vcd: \'gates.txt\' is not a .vcd');
-  await fails('simulate', { project: 'g', time_ns: 100, vcd: '../out.vcd' }, `vcd: '../out.vcd' is outside the exchange folder ${path.join(tmp, 'exchange')} (SILINX_MCP_FOLDER sets another)`);
+  await fails('simulate', { project: 'g', time_ns: 100, vcd: '../out.vcd' }, `vcd: '../out.vcd' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
   await fails('simulate', { project: 'g', model: 'netlist', time_ns: 100 }, 'model: behavioral or one of postsynth, posttrans, postmap, postpar');
 });
 

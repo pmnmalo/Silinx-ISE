@@ -32,6 +32,26 @@ export async function redactor() {
   return text => secrets.reduce((t, s) => t.split(s).join('<ISE host>'), String(text));
 }
 
+// the server's folders named as such in a tool's result and its errors (#3418): the workspace and the exchange folder
+// (as given and as the system resolves them), never their absolute paths, which tell the user's name and folders to
+// whatever reads the conversation; every string of a value (the text, the structured content)
+export async function pathNamer() {
+  const { exchangeDir } = await import('./mcp-transfer.js');
+  const pairs = [];
+  for (const [dir, label] of [[P.workspaceDir(), '<workspace>'], [exchangeDir(), '<exchange folder>']]) {
+    const real = f => { try { return f(dir); } catch { return dir; } };
+    for (const d of new Set([dir, real(fs.realpathSync), real(fs.realpathSync.native)])) {
+      if (d && d.length > 1) pairs.push([d, label]);
+    }
+  }
+  // (the longest first: a folder inside the other; a folder's name only where it ends, not Downloads2's start)
+  const res = pairs.sort((a, b) => b[0].length - a[0].length)
+    .map(([d, label]) => [new RegExp(`${d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\\\/]|$|[^\\w.-])`, 'g'), label]);
+  const name = v => (typeof v === 'string' ? res.reduce((t, [re, label]) => t.replace(re, label), v)
+    : Array.isArray(v) ? v.map(name) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, name(x)])) : v);
+  return name;
+}
+
 // a file of a project: inside its folder, also once its symbolic links are followed, and not hidden (.git, .env, an
 // editor's settings: no part of a project, #3035; a report of build/ is not hidden); verb: what the tool does with it
 // (null: a new name P.renameFile's import gate checks, its message the interface's Rename's)

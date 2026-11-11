@@ -12,7 +12,7 @@
 // The ISE machine's address never appears in a result (the logs are redacted).
 import readline from 'node:readline';
 import { VERSION } from '../core/version.js';
-import { redactor, untrustedNote } from './mcp-util.js';
+import { pathNamer, redactor, untrustedNote } from './mcp-util.js';
 import { PROJECT_TOOLS } from './mcp-projects.js';
 import { HDL_TOOLS } from './mcp-hdl.js';
 import { WCFG_TOOLS } from './mcp-wcfg.js';
@@ -77,8 +77,12 @@ export async function handle(msg, state = {}) {
       const extra = Object.keys(args).filter(k => !known.includes(k));
       const missing = (tool.inputSchema.required || []).filter(k => args[k] === undefined);
       if (extra.length || missing.length) return reply({ content: [{ type: 'text', text: `${tool.name}: ${[missing.length ? `missing ${missing.join(', ')}` : '', extra.length ? `unknown ${extra.join(', ')}` : ''].filter(Boolean).join('; ')}` }], isError: true });
+      // (the workspace and the exchange folder named as such, never their absolute paths, #3418)
+      const name = await pathNamer();
       try {
         const r = await tool.run(args);
+        r.text = name(r.text);
+        r.data = name(r.data);
         // (text from outside, #3363: labelled, in the text and in the structured content)
         if (r.untrusted) {
           const note = untrustedNote(r.untrusted);
@@ -88,7 +92,7 @@ export async function handle(msg, state = {}) {
       } catch (e) {
         // a tool's failure is the tool's result (the model reads it), not a protocol error
         const redact = await redactor();
-        return reply({ content: [{ type: 'text', text: redact(`${tool.name}: ${e.message || e}`) }], isError: true });
+        return reply({ content: [{ type: 'text', text: name(redact(`${tool.name}: ${e.message || e}`)) }], isError: true });
       }
     }
     default: return fail(-32601, `method not found: ${msg.method}`);
