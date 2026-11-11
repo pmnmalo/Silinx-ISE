@@ -59,7 +59,9 @@ test('#2273 every operation of each precision a unit: +=, a float\'s sqrtf, /, -
   const all = ['dmul', 'dadd', 'fsqrt', 'fdiv', 'fsub', 'dsub'].map((op) => `#pragma HLS ALLOCATION operation instances=${op} limit=1`).join('\n');
   // (s * 2.0 after &&: may not run, inlined; s += a[i] * b[i] and s + r: dadd's two calls)
   assert.deepEqual(run(DOT(all), 'dot'), { units: [['ap_unit_dmul', 1], ['ap_unit_dadd', 2], ['ap_unit_fsqrt', 1], ['ap_unit_fdiv', 1], ['ap_unit_fsub', 1], ['ap_unit_dsub', 1]], cycles: 774, blocks: 0, messages: [] });
-  assert.deepEqual(run(DOT(''), 'dot'), { units: [], cycles: 132, blocks: 64, messages: [] });
+  // (inlined, the loop pipelined: its double sum's recurrence over the clock's stages, the II raised for it, #2182: was
+  // 132 cycles with the iteration's path over the clock)
+  assert.deepEqual(run(DOT(''), 'dot'), { units: [], cycles: 433, blocks: 64, messages: ["5 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=35 made (a dependence at this clock: the next iteration reads 's' before this one has written it); #pragma HLS PIPELINE off in it turns that off"] });
 });
 
 test('#2273 the pragma\'s scope: in a loop\'s body, that body\'s operations; x *= y written x = unit(x, y)', () => {

@@ -7,9 +7,11 @@
 // an addition inside the chain that something else reads ends it, a term of its own (no addition made twice).
 // Isomorphic ES module: no DOM and no Node APIs.
 //
-//   balanceSums(g, roots, min = 4)   the sums of `min` terms or more the roots need, balanced in g
+//   balanceSums(g, roots, min = 4, late)   the sums of `min` terms or more the roots need, balanced in g; late: a Map
+//                                          sum's node -> its term added last
 //   balances(fn)                     whether a top function's sums are balanced: not under its EXPRESSION_BALANCE off
 
+const LATE = 1e6;
 /** The most additions on a path from the node down. */
 function depthOf(g, id, memo) {
   if (memo.has(id)) return memo.get(id);
@@ -20,7 +22,7 @@ function depthOf(g, id, memo) {
 }
 
 /** The additions the roots need: each chain of `min` terms or more of one width (and sign) a tree, in place. */
-export function balanceSums(g, all, min = 4) {
+export function balanceSums(g, all, min = 4, late = null) {
   const roots = all.filter((r) => r != null);   // (a state of a task has no stall)
   const nodes = g.needed(roots);
   const users = new Map(), reader = new Map();
@@ -44,7 +46,8 @@ export function balanceSums(g, all, min = 4) {
     if (terms.length < min || depth <= Math.ceil(Math.log2(terms.length))) continue;
     // (the two shallowest added first, then their sum with the next: a term that is itself a sum added late)
     const t = { w: top.w, s: top.s };
-    const level = terms.map((id) => ({ id, d: depthOf(g, id, deep) }));
+    // (late: a pipeline's variable whose next value the sum is, added last, its recurrence one addition, #2182)
+    const level = terms.map((id) => ({ id, d: late?.get(top.id) === id ? LATE : depthOf(g, id, deep) }));
     while (level.length > 2) {
       level.sort((x, y) => x.d - y.d);
       const [x, y] = level.splice(0, 2);

@@ -288,7 +288,8 @@ test('#1941 every statement the HLS compiler makes and every literal written bac
   assert.equal(stmtText({ kind: 'fifowrite', fifo: 'ys', v: parse('void f(void) { a + 1; }').items[0].body.items[0].e }), 'ys.write(a + 1)');
   const e = (src) => exprText(parse(`void f(void) { x = ${src}; }`).items[0].body.items[0].e.r);
   assert.equal(e('a * 1.5 + 0.5f'), 'a * 1.5 + 0.5f');
-  const r = cAsm('float f(float a[4]) { float s = 0.5f; for (int i = 0; i < 4; i++) s += a[i] * 1.5; return s; }', { file: 'f.c' });
+  // (a clock its double addition fits in: at 10 ns its recurrence raises the II, #2182)
+  const r = cAsm('float f(float a[4]) { float s = 0.5f; for (int i = 0; i < 4; i++) s += a[i] * 1.5; return s; }', { file: 'f.c', clock: 1000 });
   assert.equal(r.ok, true);
   assert.deepEqual(r.diagnostics, []);
   const acts = r.model.nodes.filter((n) => n.type === 'state').flatMap((n) => n.actions);

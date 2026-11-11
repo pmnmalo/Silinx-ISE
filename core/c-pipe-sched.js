@@ -9,7 +9,9 @@
 // The whole is one state of the machine: it holds while the pipeline runs and leaves when it has drained; a function's is
 // the machine's only state, a call starting whenever ap_start finds the first stage free (ap_ready), ap_done a call's end.
 // Inner loops of constant count are unrolled in it, those with a memory's access as statements. An exit known late
-// squashes the iterations started after it. A stream's access is not made here (core/c-pipeline.js's pipeMem). Isomorphic ES module: no DOM and no Node APIs.
+// squashes the iterations started after it. The stages are cut by the clock, the II raised when a recurrence does not fit
+// it (#2182). A loop's stream read or written once an iteration has its access in its stage, every stage held while it
+// waits (#2182); another stream's access is not made here (core/c-pipeline.js's pipeMem). Isomorphic ES module: no DOM and no Node APIs.
 //
 //   pipelineSchedMethods: SeqFlow's (core/c-fsmd.js)
 //     pipeFullWhy(s)                     why this loop or function body cannot be made so, or null
@@ -32,6 +34,8 @@ const isLoop = (s) => s && (s.kind === 'for' || s.kind === 'while' || s.kind ===
 const extraOf = ({ id, op, args, w, s, ...extra }) => extra;
 // (an access's memory, from its key: `a`, or `a#1` on its second port, each port an access a cycle of its own, #1901)
 const memOf = (key) => key.replace(/#1$/, '');
+// (the most the clock raises an II by, past which the iteration's path stays one long path, said in the report)
+const MAX_RAISE = 64;
 
 /**
  * The stages of a body, modulo ii; { fail: why } when the ii does not work.
@@ -39,10 +43,11 @@ const memOf = (key) => key.replace(/#1$/, '');
  *   updates: [[register's node, value]] (a variable's next value); exit: the node saying the loop ends, or null;
  *   sameIndex(r, w): a read and a write that cannot meet across iterations; together: [[register's node, register's node]]
  *   written in one stage (a pointer output and its _ap_vld); budget, family: the clock's; dep(mem, 'inter' | 'intra', 'raw' | 'war'):
- *   whether a #pragma HLS DEPENDENCE says that dependence of the memory false (#1961).
+ *   whether a #pragma HLS DEPENDENCE says that dependence of the memory false (#1961); free: registers whose next value
+ *   no other iteration reads (an array's at the loop's counter, #2182).
  * -> { stage: Map node -> stage, opStage: [stage], read: Map register's node -> its stage, written: Map -> its stage, depth }
  */
-export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new Set(), sameIndex = () => false, together = [], budget = Infinity, family = 'artix7', dep = () => false, floor = null }, ii) {
+export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new Set(), free = new Set(), sameIndex = () => false, together = [], budget = Infinity, family = 'artix7', dep = () => false, floor = null }, ii) {
   const stage = new Map(), at = new Map();
   const ensure = (roots) => {
     for (const n of g.needed(roots)) {
@@ -76,7 +81,8 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
     last.set(op.mem, s);
     (op.write ? lastWrite : lastRead).set(m, s);
     opStage.push(s);
-    for (const q of [op.q, ...(op.alias || [])]) if (q != null) { stage.set(q, s + 1); at.set(q, 0); }
+    // (a memory's value the cycle after its read; a stream's, its dout, in the read's own stage)
+    for (const q of [op.q, ...(op.alias || [])]) if (q != null) { stage.set(q, op.stream ? s : s + 1); at.set(q, 0); }
   }
   ensure([...updates.map((u) => u[1]), ...(exit != null ? [exit] : [])]);
   // (no clock: an operation as late as what uses it, a variable read where its new value is near: s = s * x + a[i])
@@ -123,13 +129,15 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
     }
   }
   for (const [a, b] of together) if (written.has(a) && written.has(b)) { const w = Math.max(written.get(a), written.get(b)); written.set(a, w); written.set(b, w); }
-  const late = [...written].filter(([r, w]) => read.has(r) && w - read.get(r) >= ii);
+  // (free: an array's registers each iteration reads and writes at its own element, a[i], #2182: no other iteration's)
+  const late = [...written].filter(([r, w]) => read.has(r) && w - read.get(r) >= ii && !free.has(r));
   if (late.length) return { fail: { kind: 'var', reg: late[0][0], late } };
   // (the exit known after the next iteration has started: those started then squashed, when none has written anything
   // by then but the loop's own variables, as Vitis HLS speculates)
   const e = exit != null ? Math.max(stage.get(exit), 0) : 0;
   if (e >= ii) {
-    const commits = [...[...written].filter(([r]) => !own.has(r)).map(([, w]) => w), ...opStage.filter((_, k) => ops[k].write)];
+    // (a stream's read takes its element: as a write, never speculative)
+    const commits = [...[...written].filter(([r]) => !own.has(r)).map(([, w]) => w), ...opStage.filter((_, k) => ops[k].write || ops[k].stream)];
     if (commits.some((w) => w < e)) return { fail: { kind: 'exit' } };
   }
   // (a memory's write, then another iteration's read of it: the read after it; with the same index in both, the
@@ -145,6 +153,32 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
   for (const s of [...opStage, ...written.values()]) depth = Math.max(depth, s + 1);
   for (const n of g.needed(roots)) depth = Math.max(depth, stage.get(n.id) + 1);
   return { stage, opStage, read, written, depth, exitStage: e, squash: e >= ii };
+}
+
+// (the variable a for loop's step adds a constant other than 0 to: i++, --i, i += 2)
+const counterOf = (st) => {
+  if (!st) return null;
+  if ((st.kind === 'postfix' || (st.kind === 'unary' && (st.op === '++' || st.op === '--'))) && st.e.kind === 'id') return st.e.name;
+  if (st.kind === 'assign' && (st.op === '+=' || st.op === '-=') && st.l.kind === 'id' && st.r.kind === 'num' && BigInt(st.r.value) !== 0n) return st.l.name;
+  return null;
+};
+/** The arrays a for loop's body reads and writes only at its counter (a[i]), the counter stepped by a constant and written
+ *  nowhere else in it: an element no two iterations in flight share (#2182). */
+export function counterIndexed(s) {
+  const v = s.kind === 'for' ? counterOf(s.step) : null;
+  if (!v) return [];
+  const ok = new Map();
+  let bad = false;
+  walk(s.body, (n) => {
+    const t = n.kind === 'assign' ? n.l : n.kind === 'postfix' || (n.kind === 'unary' && (n.op === '++' || n.op === '--' || n.op === '&')) ? n.e : null;
+    if (t?.kind === 'id' && t.name === v) bad = true;
+    if (n.kind === 'decl' && n.vars.some((x) => x.name === v)) bad = true;
+    if (n.kind !== 'index') return true;
+    if (n.e.kind === 'id') ok.set(n.e.name, (ok.get(n.e.name) ?? true) && n.i.kind === 'id' && n.i.name === v);
+    else { let e = n.e; while (e.kind === 'index') e = e.e; if (e.kind === 'id') ok.set(e.name, false); }
+    return true;
+  });
+  return bad ? [] : [...ok].filter(([, y]) => y).map(([x]) => x);
 }
 
 export const pipelineSchedMethods = {
@@ -171,11 +205,15 @@ export const pipelineSchedMethods = {
   /** Why a loop's or a function's body cannot be made as a pipeline here, or null. */
   pipeFullWhy(x) {
     let why = null;
+    const streams = new Set();
     walk(x, (n) => {
       if (why) return false;
+      const op = this.fifoOp(n), f = op != null ? this.slots.get(n.callee.e.name) : null;
       if (n.kind === 'goto') why = "a 'goto' is in it";
       else if (n.kind === 'return' && !this.fnPiping) why = "a 'return' is in it";
-      else if (this.fifoOp(n) != null) why = 'it reads or writes a stream';
+      // (a loop's stream read or written once an iteration: an access in its stage, the stages held while it waits, #2182)
+      else if (op != null && (this.fnPiping || (op !== 'read' && op !== 'write') || f?.group || f?.ptr || f?.hs || streams.has(f))) why = 'it reads or writes a stream';
+      else if (op != null) streams.add(f);
       else if (n.kind === 'id' && this.slots.get(n.name)?.group) why = 'it accesses a memory of structs';
       else if (n.kind === 'id' && this.slots.get(n.name)?.banks) why = 'it accesses a partitioned array';
       return !why;
@@ -250,6 +288,7 @@ export const pipelineSchedMethods = {
     this.frame = { fn: this.fn, returned: this.F, ret: this.retReg ? this.regNode(this.retReg) : null, rt: this.retType, loops: lr ? [lr] : [] };
     this.scopes = [this.slots];
     this.piping = { qs: new Map() };
+    this.stall = this.F;
     const ops = [];
     for (const blk of p.sts) {
       this.access = new Map();
@@ -262,6 +301,11 @@ export const pipelineSchedMethods = {
         if (op.q === null) op.q = q; else { (op.alias ||= []).push(q); op.more.pop(); }
       }
       this.piping.qs = new Map();
+      // (a stream's access: its value there in its stage, #2182)
+      for (const [name, a] of this.fifoAcc) {
+        const f = this.slots.get(name), read = a.d === undefined;
+        ops.push({ mem: `fifo:${name}`, fifo: name, a, write: !read, roots: read ? [a.g] : [a.g, a.d], q: read ? this.fifoIn(f, 'dout') : null, stream: true });
+      }
       for (const [mem, a] of this.access) {
         // (a read of the element read before, no write of the memory between: that read, its value the same)
         const same = a.d === null && [...ops].reverse().find((o) => (o.write && memOf(o.mem) === memOf(mem)) || (o.mem === mem && o.a.addr === a.addr));
@@ -303,8 +347,18 @@ export const pipelineSchedMethods = {
     for (const op of ops) perMem.set(op.mem, (perMem.get(op.mem) || 0) + 1);
     const dep = (mem, way, dir) => (p.deps || []).some((d) => (d.variable == null || d.variable === mem) && d.inter === (way === 'inter') && d[dir]);
     // (a sum of many terms a tree, as Vitis HLS's EXPRESSION_BALANCE, #2613)
-    if (this.balance !== false) balanceSums(g, [...ops.flatMap((op) => op.roots), ...updates.map((u) => u[1]), ...(exitNode != null ? [exitNode] : [])]);
-    const once = (n, budget, floor) => moduloSchedule({ g, ops, updates, exit: exitNode, pinned: latched.map((r) => this.regNode(r)), own, sameIndex, together, budget, family: this.pipeTiming?.family, dep, floor }, n);
+    if (this.balance !== false) balanceSums(g, [...ops.flatMap((op) => op.roots), ...updates.map((u) => u[1]), ...(exitNode != null ? [exitNode] : [])], 4, new Map(updates.map(([r, v]) => [v, r])));
+    // (an array of registers the body reads and writes only at the loop's counter, each element's next value a choice of
+    // the element written or itself: no iteration reads another's, each writes its element alone, #2182)
+    const free = new Set();
+    for (const name of p.src ? counterIndexed(p.src) : []) {
+      const slot = this.slots.get(name);
+      if (slot?.kind !== 'array') continue;
+      const regs = slot.regs.map((r) => this.regNode(r));
+      const ups = updates.filter(([r]) => regs.includes(r));
+      if (ups.every(([r, v]) => g.get(v).op === 'mux' && g.get(v).args[2] === r)) regs.forEach((r) => free.add(r));
+    }
+    const once = (n, budget, floor) => moduloSchedule({ g, ops, updates, exit: exitNode, pinned: latched.map((r) => this.regNode(r)), own, free, sameIndex, together, budget, family: this.pipeTiming?.family, dep, floor }, n);
     // (a variable read before the previous iteration has written it: again, each written where its next value is made,
     // its readers no earlier, until none is, #2503; by the clock only when the II needed it)
     const sched = (n, budget, retry = true) => {
@@ -324,29 +378,37 @@ export const pipelineSchedMethods = {
       if (!plan.fail) break;
       why ||= plan.fail;
     }
-    // (the stages by the clock when they keep that II; else one long path, said as a pipelined state's is, core/c-schedule.js)
-    const timed = this.pipeTiming ? sched(ii, this.pipeTiming.budget, !!plan.retried) : plan;
+    // (the stages by the clock; when they do not keep that II, a recurrence longer than the clock (s += x through a float
+    // addition), the II raised until they do, as Vitis HLS raises it, #2182)
+    let timed = this.pipeTiming ? sched(ii, this.pipeTiming.budget, !!plan.retried) : plan, slowWhy = null;
+    for (let k = ii; timed.fail && k <= ii + MAX_RAISE; k++) {
+      const t = sched(k, this.pipeTiming.budget, true);
+      if (!t.fail) { if (k > ii) slowWhy = timed.fail; ii = k; timed = t; }
+    }
     if (!timed.fail) plan = timed;
     const crowded = [...perMem].filter(([, n]) => n > asked).sort((x, y) => y[1] - x[1])[0];
+    if (slowWhy) why = slowWhy;
     if (ii > asked) {
+      const clockSaid = slowWhy ? ' at this clock' : '';
       p.info.memII = crowded && crowded[1] >= ii ? `the memory '${memOf(crowded[0])}' has one port, accessed ${crowded[1]} times an iteration`
-        : why?.kind === 'var' ? `a dependence: the next iteration reads '${vals.get(why.reg).name}' before this one has written it`
-          : why?.kind === 'mem' ? `a dependence: another iteration's read of the memory '${why.mem}' must come after this one's write`
-            : why?.kind === 'exit' ? 'a dependence: the next iteration must wait for this one to say the loop goes on' : null;
+        : why?.kind === 'var' ? `a dependence${clockSaid}: the next iteration reads '${vals.get(why.reg).name}' before this one has written it`
+          : why?.kind === 'mem' ? `a dependence${clockSaid}: another iteration's read of the memory '${why.mem}' must come after this one's write`
+            : why?.kind === 'exit' ? `a dependence${clockSaid}: the next iteration must wait for this one to say the loop goes on` : null;
     }
     p.info.pipeII = ii;
     p.info.depth = plan.depth;
-    return this.pipeMachine(b, { ops, updates, exitNode, plan, ii, latched, vals });
+    return this.pipeMachine(b, { ops, updates, exitNode, plan, ii, latched, vals, free });
   },
   /** The state of a pipeline scheduled: its valid bits, its pipeline registers, its accesses and next values. */
-  pipeMachine(b, { ops, updates, exitNode, plan, ii, latched, vals }) {
+  pipeMachine(b, { ops, updates, exitNode, plan, ii, latched, vals, free = new Set() }) {
     const g = this.g, p = b.pipe, D = plan.depth, pre = `ap_pipe${b.num}`;
     const st = (n) => g.const(n, this.stateT);
     const memo = new Map(), upd = new Map();
     const inOf = new Map(latched.map((r) => { const id = r.latch; r.latch = null; return [this.regNode(r), id]; }));
-    const qMem = new Map(ops.flatMap((o) => [o.q, ...(o.alias || [])].filter((q) => q != null).map((q) => [q, o.mem])));
+    const qMem = new Map(ops.filter((o) => !o.stream).flatMap((o) => [o.q, ...(o.alias || [])].filter((q) => q != null).map((q) => [q, o.mem])));
+    const qFifo = new Set(ops.filter((o) => o.stream && o.q != null).map((o) => o.q));
     const stageOf = (v) => {
-      if (qMem.has(v)) return plan.stage.get(v);
+      if (qMem.has(v) || qFifo.has(v)) return plan.stage.get(v);
       if (!g.get(v).args.length) return vals.has(v) || inOf.has(v) ? (plan.read.get(v) ?? 0) : -1;
       return plan.stage.get(v);
     };
@@ -364,6 +426,7 @@ export const pipelineSchedMethods = {
       let out = v;
       if (s < 0) out = v;
       else if (s < c) out = cut(v, c);
+      else if (qFifo.has(v)) out = v;
       else if (qMem.has(v)) out = this.memQ(this.slots.get(memOf(qMem.get(v))), qMem.get(v) === memOf(qMem.get(v)) ? 0 : 1);
       else if (inOf.has(v)) out = inOf.get(v);
       else if (node.args.length) {
@@ -388,10 +451,21 @@ export const pipelineSchedMethods = {
     // (the iterations started after one that ends, the exit known late: squashed)
     const endNow = p.fn ? this.F : this.and(valid[plan.exitStage], at(plan.exitStage, exitNode));
     for (let k = 1; k <= last; k++) updatesOut.set(`${pre}_v${k}`, plan.squash && k <= plan.exitStage ? this.and(valid[k - 1], this.not(endNow)) : valid[k - 1]);
+    // the streams' accesses, each in its stage; while one waits (its FIFO empty or full), every stage held (#2182)
+    const fifo = new Map();
+    let stall = this.F;
+    ops.forEach((op, k) => {
+      if (!op.stream) return;
+      const c = plan.opStage[k], g0 = this.and(valid[c], at(c, op.a.g));
+      fifo.set(op.fifo, { g: g0, ok: op.a.ok, ...(op.write ? { d: at(c, op.a.d) } : {}) });
+      stall = this.or(stall, this.and(g0, this.not(op.a.ok)));
+    });
+    const go = this.not(stall);
     // the memories' accesses, each in its stage (its other stages never in the same cycle: modulo the II)
     const access = new Map();
     ops.forEach((op, k) => {
-      const c = plan.opStage[k], v = valid[c];
+      if (op.stream) return;
+      const c = plan.opStage[k], v = stall === this.F ? valid[c] : this.and(valid[c], go);
       const addr = at(c, op.a.addr), ce = this.and(v, at(c, op.a.ce));
       const prev = access.get(op.mem);
       const w = op.write ? this.and(v, at(c, op.a.we)) : null, d = op.write ? at(c, op.a.d) : null;
@@ -401,7 +475,10 @@ export const pipelineSchedMethods = {
     });
     // the variables' next values, each in its stage
     for (const [r, val] of updates) {
-      const reg = vals.get(r), c = plan.written.get(r), v = valid[c], x = at(c, val);
+      const reg = vals.get(r), c = plan.written.get(r), v = valid[c];
+      // (an element at the counter: written alone, the others as they are now, not as its stage read them)
+      if (free.has(r)) { const [sel, x] = g.get(val).args; updatesOut.set(reg.name, this.mux(this.and(v, at(c, sel)), at(c, x), r, reg.t)); continue; }
+      const x = at(c, val);
       updatesOut.set(reg.name, reg.t === BOOL && /_vld_reg$/.test(reg.name) ? this.and(v, x) : this.mux(v, x, r, reg.t));
     }
     // the loop's end
@@ -422,11 +499,16 @@ export const pipelineSchedMethods = {
       updatesOut.set(`${pre}_ph`, this.mux(this.or(wrap, hold), g.const(0, phT), g.add('add', [ph, g.const(1, phT)], phT), phT));
     }
     for (const [name, v] of upd) updatesOut.set(name, v);
+    // (a stream that waits: every register as it is, the state again)
+    if (stall !== this.F) {
+      for (const [name, v] of updatesOut) { const r = this.regs.get(name); updatesOut.set(name, r.t === BOOL && /_vld_reg$/.test(name) ? this.and(go, v) : this.mux(stall, this.regNode(r), v, r.t)); }
+      next = this.mux(stall, st(b.num), next, this.stateT);
+    }
     if (p.fn) {
       let any = start;
       for (let k = 1; k <= last; k++) any = this.or(any, valid[k]);
       this.freeRun = { ready: v0, done: valid[last], idle: this.not(any), state: b.num };
     }
-    return { id: b.num, updates: updatesOut, next, line: p.loc.line, access, fifo: new Map(), stall: this.F };
+    return { id: b.num, updates: updatesOut, next, line: p.loc.line, access, fifo, stall };
   },
 };

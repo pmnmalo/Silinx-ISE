@@ -73,19 +73,21 @@ int main(void) { for (int x = -2; x < 3; x++) printf("%d ", dot(x)); return 0; }
 `;
 
 test('#1919 the parent of an innermost loop of the threshold\'s count or fewer pipelined, the inner loop unrolled in its state; above it, the inner loop pipelined', () => {
+  // (its iteration, the four products and their sum, over two cycles at 10 ns, #2182: was 9 cycles, its path over the clock)
   const parent = run(NEST());
-  assert.equal(parent.cycles, 9);
-  assert.deepEqual(parent.loops, [{ line: 5, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 7 }, { line: 7, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
+  assert.equal(parent.cycles, 10);
+  assert.deepEqual(parent.loops, [{ line: 5, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 8 }, { line: 7, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
   assert.deepEqual(parent.messages, []);
   // (the threshold 3: the inner loop's 4 iterations more, the inner loop pipelined; the outer as it was)
   const inner = run(NEST(), { pipelineLoops: 3 });
-  assert.deepEqual(inner.loops, [{ line: 5, unroll: null, pipeline: null, ii: 4, cycles: 25 }, { line: 7, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 5 }]);
-  assert.equal(inner.cycles, 51);
+  // (its iteration over three cycles, #2182: was 5 cycles a call, 51 in all)
+  assert.deepEqual(inner.loops, [{ line: 5, unroll: null, pipeline: null, ii: 4, cycles: 25 }, { line: 7, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 6 }]);
+  assert.equal(inner.cycles, 57);
   assert.deepEqual(inner.messages, []);
   // a loop's own PIPELINE unrolls its inner loops too (#1919: before, "a loop is in it")
   const pragma = run(NEST('#pragma HLS PIPELINE II=1'));
-  assert.equal(pragma.cycles, 9);
-  assert.deepEqual(pragma.loops, [{ line: 5, unroll: null, pipeline: 1, ii: 1, cycles: 7 }, { line: 7, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
+  assert.equal(pragma.cycles, 10);
+  assert.deepEqual(pragma.loops, [{ line: 5, unroll: null, pipeline: 1, ii: 1, cycles: 8 }, { line: 7, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
   assert.deepEqual(pragma.messages, []);
 });
 

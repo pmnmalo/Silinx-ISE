@@ -77,11 +77,17 @@ test('#1962 an II larger than asked for a dependence: another iteration reading 
   const r = run(M('int a[8]', `  s = 1;\n  for (int i = 1; i < 8; i++) {\n${P}\n    s = a[s & 7] + i;\n  }`, 'printf("%d", f(t));'));
   assert.deepEqual(r.loops, [{ line: 5, unroll: null, ii: 2, depth: 2, cycles: 14 }]);
   assert.deepEqual(r.messages, ["5 warning: #pragma HLS PIPELINE II=1: II=2 made (a dependence: the next iteration reads 's' before this one has written it)"]);
-  // (each element from the one before: the read after the write, the multiplications in the read's stage, no clock
-  // asked; the one port the bound)
-  const prev = run(M('int a[8]', `  for (int i = 1; i < 8; i++) {\n${P}\n    a[i] = a[i - 1] * a[i - 1] * a[i - 1] + 1;\n  }`, 'f(t);'));
+  // (each element from the one before: the read after the write, the multiplications in the read's stage, a clock they
+  // fit in; the one port the bound)
+  const loop = M('int a[8]', `  for (int i = 1; i < 8; i++) {\n${P}\n    a[i] = a[i - 1] * a[i - 1] * a[i - 1] + 1;\n  }`, 'f(t);');
+  const prev = run(loop, { clock: 40 });
   assert.deepEqual(prev.loops, [{ line: 4, unroll: null, ii: 2, depth: 2, cycles: 14 }]);
   assert.deepEqual(prev.messages, [`4 warning: #pragma HLS PIPELINE II=1: II=2 made (the memory 'a' has one port, accessed 2 times an iteration)`]);
+  // (at 10 ns the two multiplications and the addition do not fit a cycle: the II raised until the stages keep the
+  // write before the next iteration's read, #2182; was II=2 with the iteration's path in one cycle, over the clock)
+  const fast = run(loop);
+  assert.deepEqual(fast.loops, [{ line: 4, unroll: null, ii: 4, depth: 4, cycles: 28 }]);
+  assert.deepEqual(fast.messages, [`4 warning: #pragma HLS PIPELINE II=1: II=4 made (a dependence at this clock: another iteration's read of the memory 'a' must come after this one's write)`]);
 });
 
 test('#1962 a loop with a loop accessing a memory in it: the inner loop unrolled, its accesses over the port', () => {
@@ -279,12 +285,13 @@ ${prag}
 });
 
 test('#1961 DEPENDENCE of what is no memory: its warning, the II kept', () => {
+  // (a clock the recurrence's multiplication and addition fit in, #2182: at 10 ns, II=2)
   const r = run(M('int a[8]', `  for (int i = 0; i < 8; i++) {
 ${P}
 #pragma HLS DEPENDENCE variable=s inter false
 #pragma HLS DEPENDENCE variable=q inter false
     s = s * a[i] + 1;
-  }`, 'f(t);'));
+  }`, 'f(t);'), { clock: 20 });
   assert.deepEqual(r.messages, [
     '6 warning: #pragma HLS DEPENDENCE variable=s: not a memory: its dependence is kept (the next iteration needs its value): ignored',
     '7 warning: #pragma HLS DEPENDENCE variable=q: no such array here: ignored',

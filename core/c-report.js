@@ -62,7 +62,7 @@ export function cReportLines(r, { path, lang, clock }) {
     for (const l of rep.loops) {
       const made = [l.unroll === 'whole' ? 'unrolled' : l.unroll ? `unrolled by ${l.unroll}` : null, l.pipeline ? (l.auto ? 'pipelined automatically, as Vitis HLS does' : `pipelined, II=${l.pipeline} asked`) : null].filter(Boolean).join(', ');
       const count = l.trip !== null ? `${l.trip} iterations` : l.max !== null ? `up to ${l.max} iterations` : 'iterations unknown';
-      L.push(`  ${l.name ? `${l.name} (line ${l.line})` : `line ${String(l.line).padEnd(4)}`} ${count}; ${l.unroll === 'whole' ? 'in the state it is in' : `II=${l.ii}`}${l.cycles !== null ? `, ${l.cycles} cycles` : ''}${made ? `; ${made}` : ''}`);
+      L.push(`  ${l.name ? `${l.name} (line ${l.line})` : `line ${String(l.line).padEnd(4)}`} ${count}; ${l.unroll === 'whole' ? 'in the state it is in' : `II=${l.ii}`}${l.depth > 1 ? ` (an iteration over ${l.depth} cycles)` : ''}${l.cycles !== null ? `, ${l.cycles} cycles` : ''}${made ? `; ${made}` : ''}`);
     }
   }
   if (rep.units?.length) {
@@ -72,7 +72,8 @@ export function cReportLines(r, { path, lang, clock }) {
   }
   const warnings = [];
   if (rep.unitsNs > clock) warnings.push(`WARNING:SilinxC - "${path}": the multipliers' multiplexers make a path of about ${rep.unitsNs.toFixed(1)} ns, over the ${clock} ns clock (their operands held in registers where that makes it shorter, #2273): a slower clock makes it fit`);
-  // (a pipelined loop too slow for the clock: its II kept, no pipeline stages, #2080)
-  for (const l of rep.slowLoops || []) warnings.push(`WARNING:SilinxC - "${path}" line ${l.line}: this pipelined loop's iteration does not fit the ${clock} ns clock: a path of about ${l.ns.toFixed(1)} ns in one cycle (Silinx adds no pipeline stages); a slower clock, or #pragma HLS PIPELINE off, makes it fit`);
+  // (a pipelined loop too slow for the clock that Silinx cannot make in stages, its accesses a state each: its II kept,
+  // #2080; the others' iteration over several cycles, #2182)
+  for (const l of rep.slowLoops || []) warnings.push(`WARNING:SilinxC - "${path}" line ${l.line}: this pipelined loop's iteration does not fit the ${clock} ns clock: a path of about ${l.ns.toFixed(1)} ns in one cycle (its accesses a state each: Silinx adds no pipeline stages to it); a slower clock, or #pragma HLS PIPELINE off, makes it fit`);
   return { lines: L, warnings };
 }

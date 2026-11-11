@@ -3,8 +3,9 @@
 // of the threshold or fewer has its parent pipelined instead (its inner loops then unrolled whole), and an innermost
 // loop with no parent is pipelined whatever its count. A loop with its own #pragma HLS PIPELINE is the pragma's (off:
 // not pipelined); the threshold 0 pipelines none. The parent is taken only if Silinx can make it an iteration a state
-// (core/c-fsmd.js), else its inner loops are taken as innermost ones. A pipelined loop that accesses a stream (its
-// accesses a state each) is made as pipelineMethods.pipeMem makes it; one that accesses a memory, core/c-pipe-sched.js. Isomorphic ES module: no DOM and no Node APIs.
+// (core/c-fsmd.js), else its inner loops are taken as innermost ones. A pipelined loop that accesses a memory, or a stream
+// once an iteration, is made by core/c-pipe-sched.js; one it cannot make (a stream polled or accessed twice, a memory of
+// structs), its accesses a state each, as pipelineMethods.pipeMem makes it. Isomorphic ES module: no DOM and no Node APIs.
 //
 //   markAutoPipeline(items, { threshold, trip, why })   sets autoPipe on the loops pipelined automatically
 //     trip(loop) -> its count (a constant) or null; why(loop) -> why it cannot be pipelined, or null; never(loop): not tried

@@ -341,7 +341,8 @@ const CORPUS_WARNINGS = {
   'interface-aggregation-disaggregation-aggregation-of-nested-structs': [],
   'interface-aggregation-disaggregation-auto-disaggregation-of-struct': ['22 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)', '22 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it reads or writes a stream, an access a state); #pragma HLS PIPELINE off in it turns that off'],
   'interface-memory-rom-lookup-table-math': [],
-  'modeling-fixed-point-sqrt': ['77 warning: assert is ignored by synthesis (the C simulation checks it)'],
+  // (its loop's recurrence through a shift by a variable and a subtraction over the clock: II=2, #2182; Vitis HLS's 33 cycles)
+  'modeling-fixed-point-sqrt': ['77 warning: assert is ignored by synthesis (the C simulation checks it)', "89 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (a dependence at this clock: the next iteration reads 's_l0' before this one has written it); #pragma HLS PIPELINE off in it turns that off"],
   'modeling-using-arbitrary-precision-casting': [],
   'modeling-using-cpp-templates': [],
   // (FUNCTION_INSTANTIATE made, #2244: foo in the top's logic, its constants folded at each call)

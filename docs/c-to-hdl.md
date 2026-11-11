@@ -550,13 +550,20 @@ A loop's pragma is its body's first statements; one elsewhere is ignored with a 
 or holds a `continue` or a `break` overlap, a new one every II cycles, and its cycles are Vitis's count, (N - 1) x II + the
 stages of an iteration (the report's `depth`). Each memory's port takes one access a cycle (a read's value the cycle
 after), the operations are chained while they fit the clock, its inner loops of constant count are unrolled, those
-with accesses too, and an element read twice is one read. The II is the one the ports and the dependences allow; when
-the clock's stages would need a larger one (a recurrence through a long operation, as a `float` sum), the II is kept
-and the iteration's path is longer than the clock, said in the report as for any pipelined loop (#2080). An exit known only after the next iteration has started squashes
+with accesses too, and an element read twice is one read. The II is the one the ports and the dependences allow; the operations are then
+cut into stages by the clock, an iteration over several cycles at that II (#2182: the report's `depth`, and View C
+Synthesis Report's "an iteration N cycles"), a sum's variable that the next iteration reads added last (`s += a + b + c`:
+one addition in the recurrence). When the clock's stages need a larger II (a recurrence through a long operation, as a
+`float` sum), the II is raised until they fit, and a warning says so (`a dependence at this clock: …`), as Vitis HLS
+raises it. A local array of registers that the body reads and writes only at the loop's counter (`b[i] = b[i] + 100`,
+the counter stepped by a constant and written nowhere else) is no dependence: each iteration writes its own element. A loop with no memory, one state an iteration when it fits the clock, is made so too when it does not;
+so is a loop that reads or writes streams (below, a state an access) when its states do not fit the clock and each
+stream is read or written once an iteration (a statement of its own, `empty()` / `full()` not read): its access in its
+stage, the value read there and carried on, every stage held while one waits (its FIFO empty or full). An exit known only after the next iteration has started squashes
 that iteration, if none has written anything by then but the loop's own variables. A warning says the II made only
 when the II asked cannot be met, and why: a memory's one port, or a dependence (a variable or a memory another iteration
-reads, the exit). A loop with a stream, with a memory of structs, a `return` or a `goto` is still made as below, its
-accesses a state each. The top function's `PIPELINE` makes the whole function so, its machine one pipeline: a new call
+reads, the exit). A loop with a stream, a memory of structs, a `return` or a `goto` is made as below, its accesses a state each (a path
+longer than the clock said in View C Synthesis Report, #2080, when it cannot be made in stages). The top function's `PIPELINE` makes the whole function so, its machine one pipeline: a new call
 whenever `ap_start` finds the first stage free (`ap_ready`, ahead of `ap_done`), its loops unrolled, the report's
 `pipeline` its II and depth; one with a stream, or that cannot be made so, runs its calls one after the other, with a
 warning saying why. A function the top calls is inlined: its pragma has no effect (a warning). A top that fits the clock

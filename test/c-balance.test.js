@@ -57,6 +57,25 @@ test('#2613 a sum of 225 products a tree: its value BigInt\'s, wrapped to 32 bit
   }
 });
 
+test('#2182 a pipeline\'s variable in its own sum (s = s + a + b + c + d): added last, one addition between its value and the next; the value the same', () => {
+  const g = new Graph();
+  const s0 = g.add('reg', [], I32, { port: { key: 's' } });
+  const ins = ['a', 'b', 'c', 'd'].map((k) => g.add('in', [], I32, { port: { key: k } }));
+  let s = s0;
+  for (const x of ins) s = g.add('add', [s, x], I32);
+  // (from s to the sum: as written, 4 additions; balanced with s last, 1)
+  const fromReg = (id) => { const n = g.get(id); return id === s0 ? 0 : n.op === 'add' && n.args.some((a) => g.needed([a]).some((m) => m.id === s0)) ? 1 + Math.max(...n.args.map((a) => (g.needed([a]).some((m) => m.id === s0) ? fromReg(a) : -Infinity))) : -Infinity; };
+  assert.equal(fromReg(s), 4);
+  balanceSums(g, [s], 4, new Map([[s, s0]]));
+  assert.equal(fromReg(s), 1);
+  assert.ok(g.get(s).args.includes(s0));
+  const evalReg = (id, v) => { const n = g.get(id); return id === s0 ? v.s : n.op === 'in' ? v[n.port.key] : wrap(evalReg(n.args[0], v) + evalReg(n.args[1], v), I32); };
+  for (let round = 0; round < 20; round++) {
+    const v = { s: rnd(31), a: rnd(31), b: rnd(31), c: rnd(31), d: rnd(31) };
+    assert.equal(evalReg(s, v), wrap(v.s + v.a + v.b + v.c + v.d, I32));
+  }
+});
+
 test('#2613 an overflowing sum the same, wrapped; terms of other widths, constants; unsigned too', () => {
   for (const t of [I32, { w: 16, s: false }, { w: 12, s: true }]) {
     const W = { w: 40, s: true };

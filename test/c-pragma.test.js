@@ -55,9 +55,12 @@ test('#1529 a loop\'s PIPELINE and UNROLL: the cycles of a call (co-simulated: t
   const by4 = alone(ACC('#pragma HLS UNROLL factor=4'));
   assert.equal(by4.cycles, 23);
   assert.deepEqual(by4.loops, [{ line: 4, unroll: 4, pipeline: null, ii: 5, cycles: 21 }]);
+  // (four products and four additions an iteration, s through them: in stages at 10 ns, the II raised for s, #2182: was
+  // II=1, 7 cycles, its path over the clock)
   const both = alone(ACC('#pragma HLS UNROLL factor=4\n#pragma HLS PIPELINE'));
-  assert.equal(both.cycles, 7);
-  assert.deepEqual(both.loops, [{ line: 4, unroll: 4, pipeline: 1, ii: 1, cycles: 5 }]);
+  assert.equal(both.cycles, 12);
+  assert.deepEqual(both.loops, [{ line: 4, unroll: 4, pipeline: 1, ii: 2, cycles: 10 }]);
+  assert.deepEqual(both.messages, ["4 warning: #pragma HLS PIPELINE II=1: II=2 made (a dependence at this clock: the next iteration reads 's' before this one has written it)"]);
   // a factor that does not divide the count: the last iteration's copies skipped
   const by5 = alone(ACC('#pragma HLS UNROLL factor=5'));
   assert.deepEqual(by5.loops, [{ line: 4, unroll: 5, pipeline: null, ii: 5, cycles: 21 }]);

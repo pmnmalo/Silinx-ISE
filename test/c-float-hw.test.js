@@ -39,8 +39,10 @@ test('#1768 float in a sequential module co-simulated in VHDL and Verilog: a flo
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(MAC, { file: 'mac.c', lang });
     assert.deepEqual([r.errors, r.pass, r.calls, r.gen.sequential], [[], true, 4, true], JSON.stringify(r.mismatches, big));
-    // (the loop pipelined automatically, #1919: a[i] read once, an iteration a cycle, #1962)
-    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ["2 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"]);
+    // (the loop pipelined automatically, #1919: a[i] read once, #1962; its float sum's recurrence over the clock's
+    // stages: the II raised for it, #2182)
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ["2 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
+      "4 this loop is pipelined automatically, as Vitis HLS does (II=1): II=32 made (a dependence at this clock: the next iteration reads 's' before this one has written it); #pragma HLS PIPELINE off in it turns that off"]);
     assert.deepEqual(r.gen.ports.filter((p) => !/^ap_(clk|rst|start|done|idle|ready)$/.test(p.name)).map((p) => `${p.name}:${p.w}`),
       ['a_address0:3', 'a_ce0:1', 'a_q0:32', 'b:32', 'k:32', 'out_r:32', 'out_r_ap_vld:1', 'ap_return:32']);
   }
@@ -89,7 +91,9 @@ test('#1773 double in a sequential module (C\'s conversions: float with double a
 test('#1773 double co-simulated in VHDL and Verilog: a double array an ap_memory of 64 bits, the pointer output and the result 64-bit ports, a float argument 32', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(POLY, { file: 'poly.c', lang });
-    assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics], [[], true, 4, []], JSON.stringify(r.mismatches, big));
+    // (the loop's double recurrence over the clock's stages: the II raised for it, #2182)
+    assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics.map((d) => `${d.line} ${d.message}`)], [[], true, 4,
+      ["4 this loop is pipelined automatically, as Vitis HLS does (II=1): II=64 made (a dependence at this clock: the next iteration reads 's' before this one has written it); #pragma HLS PIPELINE off in it turns that off"]], JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.ports.filter((p) => !/^ap_(clk|rst|start|done|idle|ready)$/.test(p.name)).map((p) => `${p.name}:${p.w}`),
       ['c_address0:2', 'c_ce0:1', 'c_q0:64', 'x:32', 'n:32', 'err:64', 'err_ap_vld:1', 'ap_return:64']);
   }
@@ -196,14 +200,15 @@ int main() {
 `;
 const ports = (r) => r.gen.ports.filter((p) => !/^ap_(clk|rst|start|done|idle|ready)$/.test(p.name)).map((p) => `${p.name}:${p.w}`);
 
-test('#3009 a typedef of float a float in hardware (32-bit ports and operations), a typedef of double a double, C++\'s using too: co-simulated in VHDL and Verilog, no warnings', () => {
+test('#3009 a typedef of float a float in hardware (32-bit ports and operations), a typedef of double a double, C++\'s using too: co-simulated in VHDL and Verilog, its loop\'s II warned (#2182)', () => {
   for (const [file, src] of [['f.c', TYPEDEFS('')], ['f.cpp', TYPEDEFS('').replace('typedef float r32;', 'using r32 = float;')]]) {
     for (const lang of ['vhdl', 'verilog']) {
       const r = cosimulate(src, { file, lang, top: 'g' });
       assert.deepEqual(r.errors, [], `${file} ${lang}`);
       assert.equal(r.pass, true, `${file} ${lang}: ${JSON.stringify(r.mismatches, big)}`);
       assert.deepEqual(ports(r), ['a:32', 'b_address0:2', 'b_ce0:1', 'b_q0:32', 'd:64', 'o:32', 'o_ap_vld:1', 'ap_return:32'], `${file} ${lang}`);
-      assert.deepEqual(r.gen.diagnostics, [], `${file} ${lang}`);
+      // (its float sum's recurrence over the clock's stages: the II raised for it, #2182)
+      assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ["7 this loop is pipelined automatically, as Vitis HLS does (II=1): II=16 made (a dependence at this clock: the next iteration reads 's' before this one has written it); #pragma HLS PIPELINE off in it turns that off"], `${file} ${lang}`);
     }
   }
 });
