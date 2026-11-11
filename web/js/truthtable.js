@@ -16,6 +16,8 @@
 //                                    onOpenFile(path), readOnly, banner });
 //   (readOnly: a table to read, a shared project followed, #3181: tt-readonly.js; its notice, `banner`)
 //   ed.getModel(), ed.setModel(m), ed.setLink(file), ed.destroy()
+//   edited live (#3183, web/js/collab-drawing.js): ed.setShared({ push(model), undo(), redo(), canUndo(), canRedo() } | null)
+//   (each change pushed, Undo / Redo the shared history's), ed.applyModel(m, { mine }) (the merged table in place), ed.busy()
 // Styles: web/css/truthtable.css.
 import { h, linkModel, linkSnapshot } from './ui.js';
 import { ICON } from './editor-icons.js';
@@ -85,10 +87,11 @@ export function mountTtEditor(container, opts = {}) {
   const readOnly = !!opts.readOnly;
   // Undo / Redo: snapshots of the table (the notes typed are one step per pause)
   const hist = [JSON.stringify(M)];
-  let hi = 0;
+  let hi = 0, shared = null;
   const snap = () => {
     const s = JSON.stringify(M);
     if (s === hist[hi]) return;
+    if (shared) { hist.length = 0; hist.push(s); hi = 0; shared.push(normalizeTable(M)); return; }   // (its merge may change M)
     hist.length = hi + 1; hist.push(s);
     if (hist.length > 200) hist.shift();
     hi = hist.length - 1;
@@ -99,8 +102,8 @@ export function mountTtEditor(container, opts = {}) {
     if (!M.outputs.includes(out)) out = M.outputs[0];
     render(); opts.onChange?.(M);
   };
-  const undo = () => { if (hi > 0) restore(hi - 1); };
-  const redo = () => { if (hi < hist.length - 1) restore(hi + 1); };
+  const undo = () => { if (shared) shared.undo(); else if (hi > 0) restore(hi - 1); };
+  const redo = () => { if (shared) shared.redo(); else if (hi < hist.length - 1) restore(hi + 1); };
 
   container.innerHTML = '';
   const root = h('div', { class: 'tt-editor' });
@@ -146,7 +149,7 @@ export function mountTtEditor(container, opts = {}) {
   const tableHost = h('div', { class: 'tt-table-host' });
   const notes = h('textarea', { class: 'tt-notes', placeholder: 'Notes (saved with the table)', rows: 3 });
   let notesT = null;
-  notes.addEventListener('input', () => { M.notes = notes.value; opts.onChange?.(M); clearTimeout(notesT); notesT = setTimeout(snap, 600); });
+  notes.addEventListener('input', () => { M.notes = notes.value; opts.onChange?.(M); clearTimeout(notesT); notesT = setTimeout(() => { notesT = null; snap(); }, 600); });
   const left = h('div', { class: 'tt-left' }, h('div', { class: 'tt-caption' }, 'Truth table'), h('div', { class: 'hint' }, 'Click an output cell to change it: 0 → 1 → X (don\'t care).'), tableHost, h('div', { class: 'tt-caption tt-cap-notes' }, 'Notes'), notes);
   const tabs = h('div', { class: 'tt-tabs' });
   const exprIn = h('input', { type: 'text', class: 'tt-expr-in', spellcheck: 'false', placeholder: 'e.g. /a.b + c' });
@@ -334,8 +337,15 @@ export function mountTtEditor(container, opts = {}) {
     getModel: () => normalizeTable(M),   // (a copy; empty choices left out, #2950)
     setModel(m) { M = normalizeTable(m); hist.length = 0; hist.push(JSON.stringify(M)); hi = 0; render(); },
     undo, redo,
-    canUndo: () => hi > 0,
-    canRedo: () => hi < hist.length - 1,
+    canUndo: () => (shared ? shared.canUndo() : hi > 0),
+    canRedo: () => (shared ? shared.canRedo() : hi < hist.length - 1),
+    setShared(sh) { shared = sh; hist.length = 0; hist.push(JSON.stringify(M)); hi = 0; },
+    applyModel(m, { mine = false } = {}) {
+      M = normalizeTable(m); hist.length = 0; hist.push(JSON.stringify(M)); hi = 0;
+      render(); if (mine) opts.onChange?.(M);
+    },
+    // (a change under way the merge must wait for: notes typed, not pushed yet; a name or an expression being typed)
+    busy: () => !!notesT || [[inIn, M.inputs.join(', ')], [outIn, M.outputs.join(', ')], [exprIn, M.exprs[out] || '']].some(([f, v]) => document.activeElement === f && f.value !== v),
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file); }); renderLink(); },
     refreshLink: () => renderLink(),
