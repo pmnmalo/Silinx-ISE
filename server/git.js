@@ -174,6 +174,23 @@ async function origin(cwd) {
   return checkUrl(r.stdout.trim());
 }
 
+// the trust of the projects whose files a git command changes (#2830): an untrusted project's mark kept in the
+// repository's .git first (P.keepTrustInRepo), so that no commit checked out (a pull, a merge) trusts it, whatever its
+// silinx.json says; the workspace's repository: every project of it. -> the projects' names, for broughtUntrusted
+async function keepTrust(name, repo) {
+  const names = repo.root === 'workspace' ? (await P.listProjects()).map(p => p.name) : [name];
+  for (const n of names) {
+    try { await P.keepTrustInRepo(n, repo.root); }
+    catch (e) { throw new GitError(`the project '${n}' is untrusted and its mark could not be kept in the repository's .git (${e.code || e.message}): nothing was done`, null, 500); }
+  }
+  return new Set(names.map(n => n.toLowerCase()));
+}
+// a project that a pull into the workspace's repository brought: from outside, untrusted
+async function broughtUntrusted(repo, had) {
+  if (repo.root !== 'workspace') return;
+  for (const p of await P.listProjects()) if (!had.has(p.name.toLowerCase())) await P.keepTrustInRepo(p.name, 'workspace', { fromOutside: true });
+}
+
 // ------------------------------------------------------------------ the commands
 /** The project's changes: { repository, root, branch, upstream, ahead, behind, files: [{ path, state }] }, the state
  *  'modified', 'new', 'deleted' or 'conflict'; the paths the project's. Not a repository: { repository: false }. */
@@ -218,12 +235,14 @@ export async function gitInit(name, { remote = null } = {}) {
   if (repo) {
     const has = !(await git(['remote', 'get-url', 'origin'], { cwd: repo.dir })).code;
     if (!url || has) throw new GitError(`the project '${name}' is already in a git repository${has ? ' with a remote' : ''}`, null, 409);
+    await keepTrust(name, repo);
     await ok('remote', ['remote', 'add', 'origin', url], { cwd: repo.dir });
     return { project: name, created: false, remote: url, gitignore: false };
   }
   const dir = P.projectDir(name);
   await ok('init', ['init', '--quiet'], { cwd: dir });
   await ok('init', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: dir });
+  await keepTrust(name, { root: 'project' });
   if (url) await ok('remote', ['remote', 'add', 'origin', url], { cwd: dir });
   const gitignore = await ensureGitignore(dir);
   return { project: name, created: true, remote: url, gitignore };
@@ -264,13 +283,20 @@ export async function gitPush(name) {
 /** Pull GitHub's commits into the project (a merge, never a rebase): { branch, files, upToDate, resolved }. The
  *  drawings both sides changed are merged by their objects (server/git-merge.js), by the choices of `resolve` where an
  *  object is in conflict; any other conflict pulls nothing (the merge aborted: the files as they were) and is a
- *  GitError with its files, and the drawings' conflicts still to choose (`drawings`). */
+ *  GitError with its files, and the drawings' conflicts still to choose (`drawings`). An untrusted project stays so,
+ *  whatever the pulled silinx.json says (#2830, keepTrust). */
 export async function gitPull(name, { resolve = null } = {}) {
   const repo = await needRepo(name);
   await origin(repo.dir);
   const branch = await branchOf(repo.dir);
   if (!branch) throw new GitError('the project is on no branch (a detached HEAD)', 'Check out a branch with git, then Pull.', 409);
   const upstream = !(await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], { cwd: repo.dir })).code;
+  const had = await keepTrust(name, repo);
+  try { return await pull(name, repo, branch, upstream, resolve); }
+  finally { await broughtUntrusted(repo, had); }
+}
+// (the pull itself, the trust kept around it)
+async function pull(name, repo, branch, upstream, resolve) {
   const before = await headOf(repo.dir);
   const M = await import('./git-merge.js');
   await M.ensureDrawingAttributes((await ok('rev-parse', ['rev-parse', '--absolute-git-dir'], { cwd: repo.dir })).trim());

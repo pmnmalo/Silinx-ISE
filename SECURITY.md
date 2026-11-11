@@ -63,8 +63,10 @@ can read that user's files has the server too.
   and the push URLs). The repository is the project's folder or the workspace, never one above it
   (`GIT_CEILING_DIRECTORIES`), and every command is limited to the project's folder. The credentials are the system's
   credential helper's: Silinx never asks for, stores or logs one (an error's URLs lose their `user:password@`). A
-  cloned project passes the import gate and is untrusted (#2830). On a hosted server git uses the server account's
-  credentials: `SILINX_GIT=off` turns git off.
+  cloned project passes the import gate and is untrusted (#2830). An untrusted project in a repository keeps its mark in
+  the repository's `.git`, never in what git tracks, so that no pull or merge trusts it whatever the pulled `silinx.json`
+  says; a project a pull brings into the workspace's repository is untrusted. On a hosted server git uses the server
+  account's credentials: `SILINX_GIT=off` turns git off.
 - Git in the browser edition (#3196, `core/git-rest.js`, `web/js/git-browser.js`): no git, GitHub's REST API only
   (api.github.com, which the page's Content-Security-Policy allows). The sign-in is OAuth's device flow with the public
   client ID of Silinx's GitHub OAuth App and no secret, through Silinx's relay (`relay/github-device-flow`, a Cloudflare
