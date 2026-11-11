@@ -337,10 +337,13 @@ export function parseLink(hash) {
 
 // a host of this computer or of a local network (a literal address, localhost, .local / .internal / .lan names):
 // a link from anywhere does not make the browser fetch from them (#2829); the IPv6 forms that carry an IPv4 address
-// (IPv4-compatible ::a.b.c.d, mapped, NAT64, 6to4) and the reserved ranges too (#2962)
+// (IPv4-compatible ::a.b.c.d, mapped, NAT64, 6to4, Teredo) and the reserved ranges too (#2962); a name with its trailing
+// dots taken off, one with an empty label refused, and the names of a private network's own (.corp, a cluster's .svc)
+// or that never resolve (.test, .invalid, .example: RFC 2606) refused too (#3415)
 export function privateHost(host) {
-  const h = String(host).toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
-  if (!h || h === 'localhost' || /\.(localhost|local|internal|lan|home|arpa)$/.test(h) || !h.includes('.') && !h.includes(':')) return true;
+  const h = String(host).toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  if (!h || h === 'localhost' || PRIVATE_NAME.test(h) || !h.includes('.') && !h.includes(':')) return true;
+  if (!h.includes(':') && h.split('.').some(l => !l)) return true;
   const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
   if (v4) return privateV4(+v4[1], +v4[2], +v4[3]);
   if (h.includes(':')) {
@@ -353,10 +356,13 @@ export function privateHost(host) {
       || (a & 0xfe00) === 0xfc00 || (a & 0xff80) === 0xfe80   // fc00::/7 unique local; fe80::/10 link-local, fec0::/10 site-local
       || (a & 0xff00) === 0xff00                              // ff00::/8 multicast
       || (a === 0x2001 && b === 0xdb8)                        // 2001:db8::/32 documentation
+      || (a === 0x2001 && b === 0)                            // 2001::/32 Teredo: an IPv4 address inside (#3415)
       || (a === 0x2002 && privateV4(b >> 8, b & 0xff, g[2] >> 8));   // 6to4: the IPv4 address it carries
   }
   return false;
 }
+
+const PRIVATE_NAME = /\.(localhost|local|internal|lan|home|arpa|corp|intranet|private|localdomain|svc|test|invalid|example)$/;
 
 // an IPv4 address of this computer, of a local network or of a reserved range (its first three bytes)
 function privateV4(a, b, c) {
