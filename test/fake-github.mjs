@@ -14,6 +14,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
   const requests = [];
   const gists = new Map();   // id -> { public, description, owner, files }
   const devices = new Map();   // device_code -> { userCode, state: 'pending' | 'authorized' | 'denied', polls }
+  const scopes = [];           // the scope each device code asked for (#3356)
   let clock = 0;
 
   const json = (status, body, headers = {}) => ({ status, body, headers });
@@ -173,6 +174,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
       if (form.get('client_id') !== clientId) return json(404, { error: 'Not Found' });
       const deviceCode = crypto.randomBytes(10).toString('hex'), userCode = `WDJB-${String(devices.size + 1).padStart(4, '0')}`;
       devices.set(deviceCode, { userCode, state: 'pending', polls: 0, scope: form.get('scope') });
+      scopes.push(form.get('scope'));
       return json(200, { device_code: deviceCode, user_code: userCode, verification_uri: 'https://github.com/login/device', expires_in: 900, interval });
     }
     if (url.pathname === '/login/oauth/access_token') {
@@ -218,6 +220,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
   return {
     clientId, token: tokens[0], repos, requests, gists, seed, commitFiles, filesAt, handle, fetch, route,
     codes: () => [...devices.values()].map(d => d.userCode),
+    scopes: () => [...scopes],
     head: (full, branch) => repos.get(full).refs.get(branch || repos.get(full).branch),
     commitOf: (full, sha) => repos.get(full).commits.get(sha),
     authorize: userCode => { deviceOf(userCode).state = 'authorized'; },

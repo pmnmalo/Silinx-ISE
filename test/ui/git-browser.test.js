@@ -4,8 +4,8 @@
 // private one refused, its hint the sign-in); Sign in with GitHub… (the device flow: the code shown, authorized on
 // "GitHub"); the Design pane's marks; Commit and Push… (several files in one commit, pushed at once: no Push in the menu);
 // Pull from GitHub (an open document read again); a rejected commit and a conflict as ERROR lines with their hint;
-// History… and a file as it was; Sign out of GitHub; the token never in a URL nor in the console, kept in the
-// browser's storage only. In Portuguese; with no relay nor OAuth App set up, the sign-in with a pasted token (its steps, a refusal). Both interfaces; no warnings.
+// History… and a file as it was; Sign out of GitHub; the token never in a URL nor in the console, kept in this tab's
+// storage only, or in the browser's when remembered (#3356; the device flow's scope: the private repositories when asked). In Portuguese; with no relay nor OAuth App set up, the sign-in with a pasted token (its steps, a refusal). Both interfaces; no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -81,12 +81,17 @@ uiTest('#3196 the browser edition: Open from Repository…, Sign in with GitHub�
   // Sign in with GitHub…: the code shown, authorized on GitHub, the dialog closed
   await page.menu('File', 'Sign in with GitHub…');
   await page.waitDialog('Sign in with GitHub');
+  // (#3356: first what it asks for: the private repositories ticked, not remembered)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay input[type=checkbox]')].map((c) => [c.className, c.checked])), [['git-private', false], ['git-remember', false]]);
+  await page.click('.dlg-overlay .git-private');
+  await page.dialogButton('Get a Code');
   await page.waitFor(() => /^WDJB-\d{4}$/.test(document.querySelector('.dlg-overlay .git-user-code')?.textContent || ''), [], { what: 'the code' });
   const code = await page.eval(() => document.querySelector('.dlg-overlay .git-user-code').textContent);
   assert.deepEqual(await page.eval(() => { const a = document.querySelector('.dlg-overlay .git-verify'); return [a.href, a.target, a.rel]; }), ['https://github.com/login/device', '_blank', 'noopener noreferrer']);
   gh.authorize(code);
   await page.waitNoDialog({ timeout: 15000 });
-  await page.waitConsole(/Signed in to GitHub: the sign-in is kept in this browser only \(Sign out of GitHub forgets it\)\./);
+  await page.waitConsole(/Signed in to GitHub: the sign-in is kept in this tab until it is closed \(Sign out of GitHub forgets it\)\./);
+  assert.deepEqual(gh.scopes(), ['repo gist']);
   // the private repository now opens
   await openRepo(page, 'https://github.com/pmalo/secret');
   await page.waitConsole(/Project 'secret' opened from the GitHub repository pmalo\/secret\./);
@@ -131,15 +136,15 @@ uiTest('#3196 the browser edition: Open from Repository…, Sign in with GitHub�
   await page.waitFor((i) => !!window.SilinxApp.S.docs.find((d) => d.id === i)?.editor, [id], { what: 'the file as it was' });
   assert.equal(await page.eval((i) => window.SilinxApp.S.docs.find((d) => d.id === i).editor.getValue(), id), counter);
   assert.equal(await page.eval((i) => window.SilinxApp.S.docs.find((d) => d.id === i).editor.readOnly(), id), true);
-  // the token: in this browser's storage only, never in a URL, never in the console
-  assert.equal(await page.eval(() => localStorage.getItem('silinx.github-token')), gh.token);
+  // the token: in this tab's storage only (not remembered), never in a URL, never in the console
+  assert.deepEqual(await page.eval(() => [sessionStorage.getItem('silinx.github-token'), localStorage.getItem('silinx.github-token')]), [gh.token, null]);
   for (const r of gh.requests) assert.ok(!r.url.includes(gh.token), r.url);
   assert.ok(gh.requests.some((r) => r.headers.authorization === `Bearer ${gh.token}`));
   assert.ok(!(await page.eval(() => window.__console())).includes(gh.token));
   // Sign out of GitHub: forgotten; the menu offers the sign-in again
   await page.menu('File', 'Sign out of GitHub');
   await page.waitConsole(/Signed out of GitHub: this browser no longer keeps the sign-in\./);
-  assert.equal(await page.eval(() => localStorage.getItem('silinx.github-token')), null);
+  assert.deepEqual(await page.eval(() => [sessionStorage.getItem('silinx.github-token'), localStorage.getItem('silinx.github-token')]), [null, null]);
   await page.menu('File', 'Sign in with GitHub…');
   await page.waitDialog('Sign in with GitHub');
   await page.dialogButton('Cancel');
@@ -207,12 +212,15 @@ uiTest('#3196 the browser edition in Portuguese: the Git commands; Initialize Re
   await page.fill('.dlg-overlay .git-token', 'github_pat_11AAAAAAA0_refusedrefusedrefused');
   await page.dialogButton('Iniciar Sessão');
   await page.waitFor(() => /^GitHub refused the sign-in \(Bad credentials\): GitHub refused this token/.test(document.querySelector('.dlg-overlay .git-token-error').textContent), [], { what: 'the refusal' });
-  assert.equal(await page.eval(() => localStorage.getItem('silinx.github-token')), null);
+  assert.deepEqual(await page.eval(() => [sessionStorage.getItem('silinx.github-token'), localStorage.getItem('silinx.github-token')]), [null, null]);
+  // (#3356: Remember me, in Portuguese, ticked: kept in this browser)
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .git-remember').parentElement.textContent.trim()), 'Lembrar-me neste navegador (guardada depois de fechar este separador, onde todas as páginas do endereço deste sítio a podem ler)');
+  await page.click('.dlg-overlay .git-remember');
   await page.fill('.dlg-overlay .git-token', gh.token);
   await page.dialogButton('Iniciar Sessão');
   await page.waitNoDialog();
-  await page.waitConsole(/Signed in to GitHub as student: the sign-in is kept in this browser only \(Sign out of GitHub forgets it\)\./);
-  assert.equal(await page.eval(() => localStorage.getItem('silinx.github-token')), gh.token);
+  await page.waitConsole(/Signed in to GitHub as student: the sign-in is kept in this browser \(Sign out of GitHub forgets it\)\./);
+  assert.deepEqual(await page.eval(() => [sessionStorage.getItem('silinx.github-token'), localStorage.getItem('silinx.github-token')]), [null, gh.token]);
   assert.ok(!(await page.eval(() => window.__console())).includes(gh.token));
   assert.ok(!(await page.eval(() => window.__console())).includes('refusedrefused'));
   await page.eval(() => localStorage.removeItem('silinx.lang'));

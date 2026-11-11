@@ -11,9 +11,11 @@ export class GitHubError extends Error {
 
 export const API = 'https://api.github.com';
 export const LOGIN = 'https://github.com';
-// the OAuth App's scope: the user's repositories, public and private (a Classroom assignment's is private), and their
-// gists (a short link's, #3223)
-export const SCOPE = 'repo gist';
+// the OAuth App's scope (#3356): the user's public repositories and their gists (a short link's, #3223), the narrowest
+// that works; the private ones too (a Classroom assignment's is private) only when the user asks for them at the sign-in
+// (PRIVATE_SCOPE: an OAuth App has no scope narrower than all the user's repositories for a private one)
+export const SCOPE = 'public_repo gist';
+export const PRIVATE_SCOPE = 'repo gist';
 
 export const HINT = {
   signIn: 'Sign in with GitHub first (Sign in with GitHub…, with the Git commands).',

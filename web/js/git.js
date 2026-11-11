@@ -112,7 +112,7 @@ export async function openFromRepositoryDialog() {
     body: h('div', {},
       h('div', { class: 'form-grid' }, ...field('GitHub repository (a Classroom assignment\'s too):', url), err, ...field('Project name:', name)),
       h('div', { class: 'hint', style: { marginTop: '10px' } }, api.standalone
-        ? 'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub…, kept in this browser only.'
+        ? 'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub… with your private repositories included.'
         : 'git signs in to GitHub with its own credentials (GitHub\'s command line, Git Credential Manager or an SSH key): Silinx never asks for a password or a token.')),
     buttons: [{ label: 'Open', primary: true, value: () => ({ url: url.value.trim(), name: name.value.trim() }),
       validate: () => { try { checkUrl(url.value); return true; } catch (e) { err.textContent = e.message; return false; } } },

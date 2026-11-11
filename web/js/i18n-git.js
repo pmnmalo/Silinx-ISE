@@ -21,9 +21,17 @@ export const GIT_PT = {
   'Open this page of GitHub, sign in there and enter the code:': 'Abra esta página do GitHub, inicie lá a sessão e introduza o código:',
   'Asking GitHub for a code…': 'A pedir um código ao GitHub…',
   'Waiting for GitHub: enter the code there and authorize Silinx.': 'À espera do GitHub: introduza lá o código e autorize o Silinx.',
-  'The sign-in is kept in this browser only, and sent only to GitHub.': 'A sessão fica guardada só neste navegador, e é enviada só ao GitHub.',
-  'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub…, kept in this browser only.':
-    'Um repositório público abre-se tal como está; um privado (o de um trabalho do Classroom) depois de Iniciar sessão no GitHub…, guardada só neste navegador.',
+  'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub… with your private repositories included.':
+    'Um repositório público abre-se tal como está; um privado (o de um trabalho do Classroom) depois de Iniciar sessão no GitHub… com os seus repositórios privados incluídos.',
+  // (#3356: the scope asked for, where the sign-in is kept)
+  'The sign-in is sent only to GitHub, and kept in this tab until it is closed, unless you choose to be remembered.':
+    'A sessão é enviada só ao GitHub, e fica guardada neste separador até ser fechado, a menos que escolha ser lembrado.',
+  'Remember me in this browser (kept after this tab closes, where every page of this site\'s address can read it)':
+    'Lembrar-me neste navegador (guardada depois de fechar este separador, onde todas as páginas do endereço deste sítio a podem ler)',
+  'Silinx asks GitHub for your public repositories and your gists.': 'O Silinx pede ao GitHub os seus repositórios públicos e os seus gists.',
+  'Include my private repositories (a Classroom assignment\'s): GitHub then gives Silinx all of them':
+    'Incluir os meus repositórios privados (o de um trabalho do Classroom): o GitHub dá então ao Silinx todos eles',
+  'Get a Code': 'Obter um Código',
   'GitHub repository (an empty one: where the commits go):': 'Repositório do GitHub (um vazio: para onde vão os commits):',
   // the drawings' diffs and conflicts (#3197)
   'Compare': 'Comparar', 'Resolve Conflicts': 'Resolver Conflitos', 'Mine': 'O meu', 'Theirs': 'O deles',
