@@ -134,7 +134,7 @@ function ice40Status(device) {
 function xc7Status(device) {
   const dev = String(device.part).toLowerCase(), part = reportPart(device), parts = xc7Parts();
   if (!parts.includes(part)) return { part, device: dev, reason: `no 7-series bit database for the ${part} yet (only ${parts.join(', ') || 'none'}): use AMD Vivado for this device` };
-  return { part, device: dev, available: true, bitDb: true, reason: `${part}: nextpnr-himbaechel (xilinx) and Project X-Ray's bit database (experimental, #3146)`, steps: backendOf('artix7').steps.map(s => s.id) };
+  return { part, device: dev, available: true, bitDb: true, reason: `${part}: nextpnr-himbaechel (xilinx) and Project X-Ray's bit database (the 7-series, an experimental family, #3146)`, steps: backendOf('artix7').steps.map(s => s.id) };
 }
 
 /** Normalise the steps of an open run: the chain from synthesis to the last requested step; a family ISE does not

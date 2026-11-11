@@ -21,7 +21,7 @@ test('openStatus: the xc7a35t (Basys 3) is available with its steps; the xc7a100
   const st = openStatus(BASYS3);
   assert.deepEqual([st.available, st.part, st.device, st.graph, st.bitDb], [true, 'xc7a35tcpg236-1', 'xc7a35t', null, true]);
   assert.deepEqual(st.steps, ['synth', 'translate', 'par', 'trce', 'bitgen']);
-  assert.match(st.reason, /^xc7a35tcpg236-1: nextpnr-himbaechel \(xilinx\) and Project X-Ray's bit database \(experimental/);
+  assert.match(st.reason, /^xc7a35tcpg236-1: nextpnr-himbaechel \(xilinx\) and Project X-Ray's bit database \(the 7-series, an experimental family, #3146\)$/);
   const a7 = openStatus({ family: 'artix7', part: 'xc7a100t', package: 'csg324', speed: '-1' });
   assert.equal(a7.available, false);
   assert.equal(a7.reason, 'no 7-series bit database for the xc7a100tcsg324-1 yet (only xc7a35tcpg236-1): use AMD Vivado for this device');
