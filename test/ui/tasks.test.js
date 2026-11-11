@@ -1840,7 +1840,8 @@ uiTest('#1409 ISE style: the Start page\'s commands with their icons, the Files 
   await page.openProject('IseAlike');
   await page.leftTab('start');
   await page.waitFor(() => document.querySelector('#start-page .start-box h3')?.getClientRects().length > 0, [], { what: 'the Start page' });
-  assert.deepEqual(await page.eval(() => ({ icons: [...new Set([...document.querySelectorAll('#start-page .entry .ico')].map((e) => Math.round(e.getBoundingClientRect().width)))],
+  // (the entries shown: the Teaching box is the Silinx interface's, hidden here, #3333, #3380)
+  assert.deepEqual(await page.eval(() => ({ icons: [...new Set([...document.querySelectorAll('#start-page .entry .ico')].filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().width)))],
     pad: getComputedStyle(document.querySelector('#start-page > .page')).padding, bar: getComputedStyle(document.querySelector('#start-page .start-btns')).padding })),
   { icons: [16], pad: '14px 18px', bar: '0px' });
   await page.leftTab('files');
