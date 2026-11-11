@@ -141,10 +141,59 @@ export function exportXise(project, { sources, schematics = [], extraFiles = [] 
 /** Attributes of a start tag string, keys with the xil_pn: prefix stripped. */
 function attrs(tag) {
   const out = {};
-  const re = /([\w:.-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
+  const re = /(?<![\w:.-])([\w:.-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;   // a name tried from its start only (#3406)
   let m;
   while ((m = re.exec(tag))) out[m[1].replace(/^xil_pn:/, '')] = unesc(m[3] ?? m[4]);
   return out;
+}
+
+// The .xise's elements found by linear scans (#3406): each terminator is searched once with indexOf from where its
+// construct starts, and one not found is not searched again, so an unclosed construct repeated takes linear time (the
+// regular expressions that read them took quadratic time); the results are the regular expressions' own.
+
+/** The text with its comments removed (an unclosed comment, and what follows it, kept). */
+function stripComments(text) {
+  let out = '', i = 0;
+  for (let s; (s = text.indexOf('<!--', i)) >= 0;) {
+    const e = text.indexOf('-->', s + 4);
+    if (e < 0) break;
+    out += text.slice(i, s);
+    i = e + 3;
+  }
+  return out + text.slice(i);
+}
+
+/** Each `<name …>` / `<name …/>` of the text, those inside another's too: { start, attrs (the text up to its '>'), end (past it) }. */
+function* startTags(text, name) {
+  const open = `<${name}`;
+  let gt = -1;
+  for (let i = text.indexOf(open); i >= 0; i = text.indexOf(open, i + 1)) {
+    const at = i + open.length;
+    if (/\w/.test(text[at] || '')) continue;
+    if (gt < at) gt = text.indexOf('>', at);
+    if (gt < 0) return;
+    yield { start: i, attrs: text.slice(at, gt), end: gt + 1 };
+  }
+}
+
+/** The start tags `<name …>` of the text one after another (as a regular expression's matches). */
+function tags(text, name) {
+  const out = [];
+  for (const t of startTags(text, name)) if (t.start >= (out.at(-1)?.end ?? 0)) out.push(t);
+  return out;
+}
+
+/** Each <file …/> or <file …>body</file> of the text: { attrs, body } (an unclosed <file …> left out). */
+function* fileElements(text) {
+  let noClose = false, from = 0;
+  for (const t of startTags(text, 'file')) {
+    if (t.start < from) continue;
+    if (t.attrs.endsWith('/')) { yield { attrs: t.attrs.slice(0, -1), body: '' }; from = t.end; continue; }
+    const e = noClose ? -1 : text.indexOf('</file>', t.end);
+    if (e < 0) { noClose = true; continue; }
+    yield { attrs: t.attrs, body: text.slice(t.end, e) };
+    from = e + 7;
+  }
 }
 
 /** "Module|top" / "Architecture|top|rtl" / "work.tb" -> unit name. */
@@ -160,21 +209,19 @@ function unitName(v) {
  * { device, top, simTop, files:[{path,lang,role}], constraints, impl, name? }
  */
 export function importXise(xml) {
-  const text = String(xml || '').replace(/<!--[\s\S]*?-->/g, '');
+  const text = stripComments(String(xml || ''));
   if (!/<project\b/.test(text)) throw Object.assign(new Error('not an ISE .xise project file (no <project> element)'), { status: 400 });
 
   const files = [];
   const schematics = [];
   const unsupported = [];
   let constraints = null;
-  const fileRe = /<file\b([^>]*?)(\/>|>([\s\S]*?)<\/file>)/g;
-  let m;
-  while ((m = fileRe.exec(text))) {
-    const a = attrs(m[1]);
+  for (const f of fileElements(text)) {
+    const a = attrs(f.attrs);
     const name = (a.name || '').replace(/\\/g, '/');
     const type = (a.type || '').toUpperCase();
     if (!name) continue;   // an entry without a file name is no file of the project
-    const assoc = [...(m[3] || '').matchAll(/<association\b([^>]*)\/?>/g)].map(x => attrs(x[1]).name);
+    const assoc = tags(f.body, 'association').map(x => attrs(x.attrs).name);
     if (type === 'FILE_UCF' || /\.ucf$/i.test(name)) { if (!constraints) constraints = name; continue; }
     if (type === 'FILE_SCHEMATIC' || /\.sch$/i.test(name)) { schematics.push({ path: name, role: roleOfAssoc(assoc) }); continue; }
     const lang = type === 'FILE_VHDL' || /\.vhdl?$/i.test(name) ? 'vhdl' : type === 'FILE_VERILOG' || /\.(v|sv)$/i.test(name) ? 'verilog' : null;
@@ -183,8 +230,8 @@ export function importXise(xml) {
   }
 
   const props = {};
-  for (const p of text.matchAll(/<property\b([^>]*)\/?>/g)) {
-    const a = attrs(p[1]);
+  for (const p of tags(text, 'property')) {
+    const a = attrs(p.attrs);
     if (a.name) props[a.name] = a.value ?? '';
   }
   const part = String(props['Device'] || '').toLowerCase() || null;
