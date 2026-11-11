@@ -176,8 +176,9 @@ board or a PROM) without the user's say.
    It opens, is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE (Docker, ssh, a local
    install) and programming a board or a PROM are refused (the server's 403, the browser edition's error, the MCP
    tool's) until the user trusts it: the console says so when the project opens, with a **Trust Project** button. A
-   bitstream of the workspace named by its path takes its project's trust (#3039), and a bitstream built for another
-   device than the project's is not programmed, by the server as by the browser, unless the request forces it (#3040).
+   bitstream of the workspace named by its path takes its project's trust (#3039), also when named in another case on a
+   case-insensitive file system (#3358), and a bitstream built for another device than the project's is not
+   programmed, by the server as by the browser, unless the request forces it (#3040).
    Saving the project's description does not make it trusted; only that button does. The MCP server has no tool to
    trust a project, by design: an assistant led astray by what it read cannot. Nor has it a tool to program a board
    or a PROM; its `run_process` runs the Silinx toolchain, or Xilinx ISE as Toolchain Settings configure it (a local
