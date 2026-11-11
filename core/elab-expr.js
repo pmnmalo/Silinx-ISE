@@ -184,23 +184,7 @@ function bindExpr0(E, e, expect, loc) {
       return fold({ k: 'un', o: e.o, a, t });
     }
     case 'binary': return fold(bindBinary(E, e, expect, loc));
-    case 'cond': {
-      const c = bindExpr(E, e.cond, null, loc);
-      let a = bindExpr(E, e.then, expect, loc), b = bindExpr(E, e.else, expect, loc);
-      if (E.lang === 'verilog' && (a.t.kind === 'str' || b.t.kind === 'str')) { a = strVec(E, a); b = strVec(E, b); }
-      if (E.lang === 'verilog' && (a.t.kind === 'real') !== (b.t.kind === 'real')) {
-        // Verilog: an operand of type real makes the whole ?: real (IEEE 1364-2005 4.8.1)
-        const toReal = x => (x.t.kind === 'real' ? x : fold({ k: 'conv', a: x, ext: !!x.t.s, t: REAL }));
-        a = toReal(a); b = toReal(b);
-      }
-      const w = Math.max(a.t.w, b.t.w);
-      // (Verilog: signed only when both operands are, even at the same width)
-      const sameSign = !!a.t.s === !!b.t.s || E.lang === 'vhdl';
-      let t = a.t.kind === b.t.kind && a.t.w === b.t.w && sameSign ? a.t : vecT(w, a.t.s && b.t.s);
-      if (a.t.kind === 'array' || a.t.kind === 'str') t = a.t;
-      // VHDL `x when c else y`: a condition that is not true selects the else value
-      return fold({ k: 'cond', c, a, b, t, vh: E.lang === 'vhdl' });
-    }
+    case 'cond': return bindCond(E, e, expect, loc);
     case 'attr': return bindAttr(E, e, loc);
     case 'field': return fold(fieldNode(E, bindExpr(E, e.base, null, loc), e.name, loc));
     case 'aggregate': return bindAggregate(E, e, expect, loc);
@@ -449,10 +433,63 @@ function harmonizeVhdl(a, b) {
   return [a, b];
 }
 
+// A chain of conditional operators (c0 ? a0 : c1 ? a1 : …, x when c0 else y when c1 else …: each else another, as deep
+// as the chain is long) bound in a loop (#3375): each condition and then value from the top down, the last else, then
+// each operator from the deepest up with the one below it as its else
+function bindCond(E, e, expect, loc) {
+  const chain = [];
+  let x = e, l = loc;
+  for (;;) {
+    chain.push([bindExpr(E, x.cond, null, l), bindExpr(E, x.then, expect, l)]);
+    if (x.else.op !== 'cond') break;
+    x = x.else;
+    l = x.loc || l;
+  }
+  let b = bindExpr(E, x.else, expect, l);
+  for (let i = chain.length - 1; i >= 0; i--) b = cond1(E, ...chain[i], b);
+  return b;
+}
+function cond1(E, c, a, b) {
+  if (E.lang === 'verilog' && (a.t.kind === 'str' || b.t.kind === 'str')) { a = strVec(E, a); b = strVec(E, b); }
+  if (E.lang === 'verilog' && (a.t.kind === 'real') !== (b.t.kind === 'real')) {
+    // Verilog: an operand of type real makes the whole ?: real (IEEE 1364-2005 4.8.1)
+    const toReal = x => (x.t.kind === 'real' ? x : fold({ k: 'conv', a: x, ext: !!x.t.s, t: REAL }));
+    a = toReal(a); b = toReal(b);
+  }
+  const w = Math.max(a.t.w, b.t.w);
+  // (Verilog: signed only when both operands are, even at the same width)
+  const sameSign = !!a.t.s === !!b.t.s || E.lang === 'vhdl';
+  let t = a.t.kind === b.t.kind && a.t.w === b.t.w && sameSign ? a.t : vecT(w, a.t.s && b.t.s);
+  if (a.t.kind === 'array' || a.t.kind === 'str') t = a.t;
+  // VHDL `x when c else y`: a condition that is not true selects the else value
+  return fold({ k: 'cond', c, a, b, t, vh: E.lang === 'vhdl' });
+}
+
+// A chain of binary operators (a + b + c + …: each left operand a binary operator, as deep as the chain is long) bound
+// in a loop (#3375): the left operands' expectations and locations from the top down, then each operator from the
+// deepest up, its left operand the one bound before (folded, as bindExpr folds it)
 function bindBinary(E, e, expect, loc) {
+  const chain = [[e, expect, loc]];
+  for (let x = e, ex = expect, l = loc; x.a.op === 'binary';) {
+    ex = ARITH.has(x.o) || BITWISE.has(x.o) ? ex : null;
+    l = x.a.loc || l;
+    x = x.a;
+    chain.push([x, ex, l]);
+  }
+  let a = null;
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const n = bindBinary1(E, ...chain[i], a);
+    a = i ? fold(n) : n;
+  }
+  return a;
+}
+
+// one binary operator (a: its left operand bound, or null)
+function bindBinary1(E, e, expect, loc, a) {
   const o = e.o;
-  let a, b;
-  if (e.a.op === 'aggregate' && e.b.op !== 'aggregate') { b = bindExpr(E, e.b, null, loc); a = bindExpr(E, e.a, b.t, loc); }
+  let b;
+  if (a) b = bindExpr(E, e.b, a.t.kind === 'logic' || a.t.kind === 'enum' ? a.t : null, loc);
+  else if (e.a.op === 'aggregate' && e.b.op !== 'aggregate') { b = bindExpr(E, e.b, null, loc); a = bindExpr(E, e.a, b.t, loc); }
   else { a = bindExpr(E, e.a, ARITH.has(o) || BITWISE.has(o) ? expect : null, loc); b = bindExpr(E, e.b, a.t.kind === 'logic' || a.t.kind === 'enum' ? a.t : null, loc); }
   if (E.lang === 'vhdl' && (BITWISE.has(o) || ARITH.has(o))) { a = strAsLogic(a, b); b = strAsLogic(b, a); }
   if (E.lang === 'verilog') { a = strVec(E, a); b = strVec(E, b); }

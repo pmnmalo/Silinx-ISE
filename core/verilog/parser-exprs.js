@@ -6,14 +6,17 @@ import { basedToBits } from './lexer.js';
 /** Parser's methods of this part, assigned to its prototype by parser.js. */
 export const exprMethods = {
   // ---------------- expressions ----------------
+  // (a chain c0 ? a0 : c1 ? a1 : …, nesting in its else as deep as it is long: read in a loop, #3375)
   expr() {
-    const c = this.binary(0);
-    if (this.accept('?')) {
+    const conds = [];
+    let e = this.binary(0);
+    while (this.accept('?')) {
       const a = this.expr(); this.expect(':');
-      const b = this.expr();
-      return { op: 'cond', cond: c, then: a, else: b };
+      conds.push([e, a]);
+      e = this.binary(0);
     }
-    return c;
+    for (let i = conds.length - 1; i >= 0; i--) e = { op: 'cond', cond: conds[i][0], then: conds[i][1], else: e };
+    return e;
   },
 
   binary(level) {

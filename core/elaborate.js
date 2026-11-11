@@ -647,18 +647,40 @@ export function constOf(E, n, loc) {
   catch (e) { throw new ElabError(e.message, loc); }
 }
 
-export function isConstNode(n) {
+// (a node's own answer: true or false, or the nodes it depends on)
+function constParts(n) {
   switch (n.k) {
     case 'c': case 'str': return true;
     case 'sig': case 'loc': case 'edge': case 'event': case 'sys': case 'now': case 'sigattr': case 'textio_eof': return false;
-    case 'chr': return isConstNode(n.base) && isConstNode(n.index);
-    case 'strlen': return isConstNode(n.a);
-    case 'call': return !n.fn.impure && n.args.every(isConstNode);
-    default:
-      for (const key of ['a', 'b', 'c', 'base', 'index', 'left', 'right', 'start', 'count']) if (n[key] && typeof n[key] === 'object' && n[key].k && !isConstNode(n[key])) return false;
-      for (const key of ['parts', 'elems', 'args']) if (n[key] && !n[key].every(isConstNode)) return false;
-      return true;
+    case 'chr': return [n.base, n.index];
+    case 'strlen': return [n.a];
+    case 'call': return n.fn.impure ? false : n.args;
+    default: {
+      const parts = [];
+      for (const key of ['a', 'b', 'c', 'base', 'index', 'left', 'right', 'start', 'count']) if (n[key] && typeof n[key] === 'object' && n[key].k) parts.push(n[key]);
+      for (const key of ['parts', 'elems', 'args']) if (n[key]) parts.push(...n[key]);
+      return parts;
+    }
   }
+}
+
+// Whether a bound expression is constant: every node in it. With a stack of its own and each node's answer kept, as
+// fold asks it of every operator of a chain of thousands (a + b + c …, #3375).
+const constness = new WeakMap();
+export function isConstNode(n) {
+  const stack = [n];
+  while (stack.length) {
+    const x = stack[stack.length - 1];
+    if (constness.has(x)) { stack.pop(); continue; }
+    const parts = constParts(x);
+    if (parts === true || parts === false) { constness.set(x, parts); stack.pop(); continue; }
+    if (parts.some(p => constness.get(p) === false)) { constness.set(x, false); stack.pop(); continue; }
+    const open = parts.filter(p => !constness.has(p));
+    if (open.length) { for (let i = open.length - 1; i >= 0; i--) stack.push(open[i]); continue; }
+    constness.set(x, true);
+    stack.pop();
+  }
+  return constness.get(n);
 }
 
 export function fold(n) {
@@ -677,9 +699,26 @@ export function fold(n) {
 // the operands of a context-determined operator take the sign of the whole expression before they
 // are extended (IEEE 1364-2005 5.5.4: in `u + (s1 + s2)` with an unsigned u, s1 and s2 are
 // zero-extended). n.es is that evaluation sign (n.t.s stays the operator's own type).
+// (With a stack of its own, in the same order as a recursive walk: a chain of thousands of operators nests as deep,
+// #3375. A task is [node, width, sign], or [folded constant] to evaluate again once its expression is sized.)
 export function ctxSize(n, w, s = n?.t?.s) {
+  const tasks = [[n, w, s]];
+  while (tasks.length) {
+    const task = tasks.pop();
+    if (task.length === 1) {
+      try { task[0].val = evalE(task[0].src, constCtx()); } catch { /* keep the self-determined value */ }
+      continue;
+    }
+    ctxSize1(...task, tasks);
+  }
+}
+
+// one node sized: what it sizes in it pushed onto tasks, the last one to size first
+function ctxSize1(n, w, s, tasks) {
   if (!n || !n.t) return;
-  const self = x => { if (x && x.t) ctxSize(x, x.t.w, x.t.s); };
+  const sub = [];
+  const self = x => { if (x && x.t) sub.push([x, x.t.w, x.t.s]); };
+  const size = (x, w, s) => sub.push([x, w, s]);
   s = !!s;
   switch (n.k) {
     case 'bin': {
@@ -687,33 +726,33 @@ export function ctxSize(n, w, s = n?.t?.s) {
       if (['==', '!=', '===', '!==', '<', '<=', '>', '>='].includes(o)) {
         // the operands are sized (and signed) with each other, not with the context
         const m = Math.max(n.a.t.w, n.b.t.w), os = !!(n.a.t.s && n.b.t.s);
-        n.cw = m; ctxSize(n.a, m, os); ctxSize(n.b, m, os);
-        return;
+        n.cw = m; size(n.a, m, os); size(n.b, m, os);
+        break;
       }
-      if (o === '&&' || o === '||') { self(n.a); self(n.b); return; }
+      if (o === '&&' || o === '||') { self(n.a); self(n.b); break; }
       n.ew = Math.max(n.t.w, w);
       n.es = s;
-      ctxSize(n.a, n.ew, s);
-      if (!['<<', '>>', '<<<', '>>>', '**', 'rol', 'ror'].includes(o)) ctxSize(n.b, n.ew, s);
+      size(n.a, n.ew, s);
+      if (!['<<', '>>', '<<<', '>>>', '**', 'rol', 'ror'].includes(o)) size(n.b, n.ew, s);
       else self(n.b);
-      return;
+      break;
     }
     case 'un':
-      if (n.o === '~' || n.o === '-') { n.ew = Math.max(n.t.w, w); n.es = s; ctxSize(n.a, n.ew, s); }
+      if (n.o === '~' || n.o === '-') { n.ew = Math.max(n.t.w, w); n.es = s; size(n.a, n.ew, s); }
       else self(n.a);
-      return;
+      break;
     case 'cond':
-      n.ew = Math.max(n.t.w, w); n.es = s; self(n.c); ctxSize(n.a, n.ew, s); ctxSize(n.b, n.ew, s);
-      return;
-    case 'cat': for (const p of n.parts) self(p); return;
-    case 'repl': self(n.a); return;
-    case 'conv': self(n.a); return;
-    case 'bit': case 'elem': self(n.index); return;
+      n.ew = Math.max(n.t.w, w); n.es = s; self(n.c); size(n.a, n.ew, s); size(n.b, n.ew, s);
+      break;
+    case 'cat': for (const p of n.parts) self(p); break;
+    case 'repl': self(n.a); break;
+    case 'conv': self(n.a); break;
+    case 'bit': case 'elem': self(n.index); break;
     case 'c':
       if (n.src) {
         // folded constant: size the original expression and evaluate it again
-        ctxSize(n.src, w, s);
-        try { n.val = evalE(n.src, constCtx()); } catch { /* keep the self-determined value */ }
+        size(n.src, w, s);
+        sub.push([n]);
       } else if (n.fillBit && w > n.val.w) {
         n.val = V.fromBits(n.fillBit.repeat(w));
       } else if (n.xext && w > n.val.w) {
@@ -721,8 +760,9 @@ export function ctxSize(n, w, s = n?.t?.s) {
         const ext = V.mask(w) ^ V.mask(n.val.w);
         n.val = V.mk(w, n.val.v | (n.xext === 'z' ? ext : 0n), n.val.x | ext, n.val.s);
       }
-      return;
+      break;
   }
+  for (let i = sub.length - 1; i >= 0; i--) tasks.push(sub[i]);
 }
 
 // ---------------------------------------------------------------- lvalues

@@ -19,15 +19,24 @@ export function intOf(e) {
   if (e.op === 'lit' && !/[xz]/.test(e.bits) && e.bits.length <= 31) return parseInt(e.bits || '0', 2);
   if (e.op === 'unary' && e.o === '-') { const a = intOf(e.a); return a == null ? null : -a; }
   if (e.op === 'binary') {
-    const a = intOf(e.a), b = intOf(e.b);
-    if (a == null || b == null) return null;
-    switch (e.o) {
-      case '+': return a + b;
-      case '-': return a - b;
-      case '*': return a * b;
-      case '/': return b ? Math.trunc(a / b) : null;
-      case '**': return a ** b;
-    }
+    // (a chain of operators, a + b + c …, its left operands nesting as deep as it is long: in a loop, #3375)
+    const chain = [];
+    let x = e;
+    for (; x?.op === 'binary'; x = x.a) chain.push(x);
+    let a = intOf(x);
+    for (let i = chain.length - 1; i >= 0 && a != null; i--) a = intOp(chain[i].o, a, intOf(chain[i].b));
+    return a;
+  }
+  return null;
+}
+function intOp(o, a, b) {
+  if (b == null) return null;
+  switch (o) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    case '/': return b ? Math.trunc(a / b) : null;
+    case '**': return a ** b;
   }
   return null;
 }

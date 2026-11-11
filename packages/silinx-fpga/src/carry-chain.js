@@ -30,8 +30,18 @@ export function gateAssignments(design) {
   let n = 0;
   const seen = new Set();
   const GATE_OPS = new Set(['&', '|', '^', '~^', '^~', 'and', 'or', 'xor', 'nand', 'nor', 'xnor', '~', '!', 'not']);
-  const gates = v => (!v || typeof v !== 'object' || (v.k !== 'bin' && v.k !== 'un') ? 0
-    : (GATE_OPS.has(String(v.o).toLowerCase()) ? 1 : 0) + gates(v.a) + gates(v.b));
+  // (with a stack of its own: an expression of thousands of operators nests as deep, #3375)
+  const gates = root => {
+    let count = 0;
+    const stack = [root];
+    while (stack.length) {
+      const v = stack.pop();
+      if (!v || typeof v !== 'object' || (v.k !== 'bin' && v.k !== 'un')) continue;
+      if (GATE_OPS.has(String(v.o).toLowerCase())) count++;
+      stack.push(v.b, v.a);
+    }
+    return count;
+  };
   const walk = root => {
     const stack = [root];   // (a stack of its own: an elsif chain of thousands of branches nests as deep, #2577)
     while (stack.length) {

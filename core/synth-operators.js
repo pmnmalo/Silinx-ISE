@@ -59,7 +59,8 @@ export function mountOperators(ctx) {
     return t.desc ? (t.right ? `(${v} - ${t.right})` : v) : `(${t.right} - ${v})`;
   }
 
-  const truth = (n, ctx) => { const v = e(n, ctx); return v.w === 1 ? v.x : `(${v.x} != 0)`; };
+  const truthOf = v => (v.w === 1 ? v.x : `(${v.x} != 0)`);
+  const truth = (n, ctx) => truthOf(e(n, ctx));
 
   function un(n, ctx) {
     const t = n.t, w = n.ew || t.w, es = esign(n), a = e(n.a, ctx);
@@ -79,11 +80,13 @@ export function mountOperators(ctx) {
     return null;
   }
 
-  function bin(n, ctx) {
+  // (a: its left operand written, if it is already: e writes a chain of operators in a loop, #3375)
+  function bin(n, ctx, a = null) {
     const o = n.o, t = n.t;
     if (n.fp) fail('real arithmetic cannot be synthesized', n);
-    if (o === '&&' || o === '||') return { x: `(${truth(n.a, ctx)} ${o} ${truth(n.b, ctx)})`, w: 1, s: false };
-    const a = e(n.a, ctx), b = e(n.b, ctx);
+    if (o === '&&' || o === '||') return { x: `(${a ? truthOf(a) : truth(n.a, ctx)} ${o} ${truth(n.b, ctx)})`, w: 1, s: false };
+    a ??= e(n.a, ctx);
+    const b = e(n.b, ctx);
     const w = n.ew || t.w, s = esign(n);
     if (['==', '!=', '===', '!==', '<', '<=', '>', '>='].includes(o)) {
       const os = !!(n.a.t?.s && n.b.t?.s);
