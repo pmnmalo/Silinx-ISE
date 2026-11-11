@@ -155,11 +155,13 @@ test('Implement Design: ports without a LOC nor an I/O standard (LVCMOS25) where
   const res = await runOpenFlow({ ...spec, steps: ['synth', 'translate', 'map', 'par'] }, io);
   assert.equal(res.ok, false);
   const at = lines.findIndex(l => l.startsWith('ERROR:'));
-  // (nextpnr's own message, #2137; its I/O by its cell's name and the generic hint: #2816)
+  // (nextpnr's error said as Silinx's placer said it, #2816: every such I/O by its port bit, the banks' VCCO and I/Os,
+  // the constraints that fix it, not nextpnr's cell nor the hint of an ISE mode)
   assert.deepEqual(lines.slice(at), [
-    'ERROR:Silinx - nextpnr failed: it stopped on an error',
-    '  ERROR: IO $iopadmap$top.led_4: no free pad in a bank of VCCO 2.5 V (its I/O standard LVCMOS25): the banks with free pads have I/Os of another VCCO. Give it the I/O standard of a bank in the constraints (UCF), or a LOC.',
-    'The Silinx toolchain does not support this yet: implement the design in an ISE mode (Toolchain Settings).',
+    'ERROR:Silinx - placement failed: no pad for 4 I/O(s) of LVCMOS25 (VCCO 2.5 V): led<4>, led<5>, led<6>, led<7>: the banks with free pads need another VCCO: '
+      + 'bank 0 VCCO 3.3 V (LVCMOS33: clk, sw<3>, btn<1>), bank 1 VCCO 3.3 V (LVCMOS33: btn<0>, seg<0>, seg<1> and 8 more), bank 2 VCCO 3.3 V (LVCMOS33: sw<0>, led<0>, led<1> and 4 more), '
+      + 'bank 3 VCCO 3.3 V (LVCMOS33: sw<1>, sw<2>)',
+    'Give them the I/O standard of a bank in the constraints (UCF), e.g. NET "led<4>" IOSTANDARD = LVCMOS33; (or LOC them on pads of a bank of their own).',
     '=== SILINX FAILED par (exit 1) ===',
   ]);
   assert.deepEqual(lines.filter(l => /warning/i.test(l)), []);

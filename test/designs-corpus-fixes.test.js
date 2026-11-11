@@ -272,8 +272,9 @@ test('nextpnr: no pad for an I/O because of the banks\' VCCO (every bank holds L
 endmodule`, 'm', ucf);
   const r = await run();
   assert.equal(r.ok, false);
-  assert.equal(r.error, "nextpnr failed: it stopped on an error");
-  assert.ok(r.errors.some(l => /ERROR: IO \S+: no free pad in a bank of VCCO 2\.5 V \(its I\/O standard LVCMOS25\): the banks with free pads have I\/Os of another VCCO\. Give it the I\/O standard of a bank in the constraints \(UCF\), or a LOC\.$/.test(l)), r.errors.join('\n'));
+  // (said as Silinx's placer said it, #2816: every such I/O by its port bit, each bank's VCCO and I/Os)
+  assert.equal(r.error, 'placement failed: no pad for 8 I/O(s) of LVCMOS25 (VCCO 2.5 V): b<0>, b<1>, b<2>, b<3>, q<0>, q<1>, q<2>, q<3>: the banks with free pads need another VCCO: '
+    + 'bank 0 VCCO 3.3 V (LVCMOS33: clk), bank 1 VCCO 3.3 V (LVCMOS33: a<0>), bank 2 VCCO 3.3 V (LVCMOS33: a<1>), bank 3 VCCO 3.3 V (LVCMOS33: a<2>)');
   // given that standard: placed and routed
   const fixed = await run(ucf + [0, 1, 2, 3].map(k => `NET "b<${k}>" IOSTANDARD = LVCMOS33 ;\nNET "q<${k}>" IOSTANDARD = LVCMOS33 ;\n`).join(''));
   assert.equal(fixed.ok, true, fixed.error);

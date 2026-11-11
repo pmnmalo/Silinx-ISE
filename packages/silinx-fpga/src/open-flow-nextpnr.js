@@ -35,12 +35,13 @@ export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|M
  * I/O buffer at its LOC). The UCF's IOB = TRUE / FALSE as the attribute IOB, the micro-architecture's question: NET on the
  * port bit's buffer, INST on the cell; INST LOC on a DCM as its BEL (device: the device's graph, for the site's place). Returns { json, problems }: the cells the micro-architecture does not have, ports without
  * a pad; and sdc, the PERIODs as nextpnr's clock constraints. An input nothing reads is left out, as Silinx's packer does.
- * ios: the port bits with a LOC, { name, loc, iostandard } (their banks' VCCO: bankVccoConflicts). (The constants: the micro-architecture's, #2135.)
+ * ios: the port bits with a LOC, { name, loc, iostandard } (their banks' VCCO: bankVccoConflicts); free: those with none,
+ * { name, iostandard } (nextpnr's pads for them: padVccoError). (The constants: the micro-architecture's, #2135.)
  */
 export function nextpnrNetlist(text, top, ucf, device = null) {
   const json = JSON.parse(text);
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
-  const problems = [], ios = [];
+  const problems = [], ios = [], free = [];
   lowerRam64(mod);
   lowerClockSwitches(mod);
   lowerControlInverters(mod);
@@ -103,6 +104,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
       else {
         const iob = asked('NET', bit);
         if (a.loc) ios.push({ name: bit, loc: a.loc, iostandard: a.iostandard });
+        else free.push({ name: bit, iostandard: a.iostandard });
         // (the converter to XDL writes the IOB's settings from them: they stay on the cell in the routed design; a port
         // with no LOC gets its pad from nextpnr, #2625)
         buffer.attributes = { ...buffer.attributes, ...(a.loc ? { LOC: a.loc } : {}), ...(iob ? { IOB: iob } : {}), ...(a.iostandard ? { IOSTANDARD: a.iostandard } : {}),
@@ -142,7 +144,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   for (const [n, period] of clockNets) if (n && !(periods.get(n) <= period)) periods.set(n, period);
   const sdc = [...periods].map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
   json.modules = { [name]: mod };
-  return { json, problems, sdc, ios };
+  return { json, problems, sdc, ios, free };
 }
 
 /**
@@ -315,6 +317,45 @@ export function bankVccoConflicts(ios, device) {
   return out;
 }
 
+/**
+ * nextpnr's "no free pad in a bank of VCCO …" (its ERROR line, of the first I/O with no LOC it could not place, by its
+ * cell's name) as Silinx's placer said it (#128, #2816): { message, hint }, or null when nextpnr's lines have no such
+ * error. The I/Os by their port bits: every one with no LOC of that VCCO (free: nextpnrNetlist's, { name, iostandard };
+ * ISE's default LVCMOS25); the banks with free pads (the LOC'd I/Os, ios, taking the others), their VCCO and their I/Os;
+ * the constraints that fix it, the I/O standard of most of those banks' I/Os.
+ */
+export function padVccoError(lines, ios, free, device) {
+  const m = lines.map(l => /^ERROR: IO \S+: no free pad in a bank of VCCO ([0-9.]+) V \(its I\/O standard (\S+)\)/.exec(l)).find(Boolean);
+  if (!m) return null;
+  const v = +m[1], std = m[2];
+  const stdOf = x => String(x.iostandard || 'LVCMOS25').toUpperCase();
+  const ports = free.filter(x => vccoOfStandard(stdOf(x)) === v).map(x => x.name);
+  if (!ports.length) return null;
+  const list = (n, k) => (n.length > k ? `${n.slice(0, k).join(', ')} and ${n.length - k} more` : n.join(', '));
+  // each bank's pads, those the LOC'd I/Os take, and their standards
+  const pads = deviceSites(device).pads, banks = new Map();
+  const bank = b => banks.get(b) || banks.set(b, { pads: 0, taken: 0, stds: new Map() }).get(b);
+  for (const p of pads.values()) if (bankOfPad(p) >= 0) bank(bankOfPad(p)).pads++;
+  for (const x of ios) {
+    const p = pads.get(String(x.loc).toUpperCase());
+    if (!p || bankOfPad(p) < 0) continue;
+    const k = bank(bankOfPad(p)), s = stdOf(x);
+    k.taken++;
+    (k.stds.get(s) || k.stds.set(s, []).get(s)).push(x.name);
+  }
+  const open = [...banks].filter(([, k]) => k.taken < k.pads).sort((a, b) => a[0] - b[0]);
+  const said = open.map(([b, k]) => (k.stds.size
+    ? `bank ${b} VCCO ${vccoOfStandard([...k.stds.keys()][0])} V (${[...k.stds].map(([s, n]) => `${s}: ${list(n, 3)}`).join('; ')})`
+    : `bank ${b} (the VCCO of the I/Os with no LOC nextpnr placed there)`));
+  const count = new Map();
+  for (const [, k] of open) for (const [s, n] of k.stds) count.set(s, (count.get(s) || 0) + n.length);
+  const best = [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'LVCMOS33';
+  return {
+    message: `placement failed: no pad for ${ports.length} I/O(s) of ${std} (VCCO ${v} V): ${list(ports, 8)}: the banks with free pads need another VCCO: ${said.join(', ')}`,
+    hint: `Give them the I/O standard of a bank in the constraints (UCF), e.g. NET "${ports[0]}" IOSTANDARD = ${best}; (or LOC them on pads of a bank of their own).`,
+  };
+}
+
 // The placements the nextpnr engine makes, each routed, the fastest kept. Measured on the examples (#2196): the best of
 // four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement. At High, a small
 // design (up to 100 slices, about 2 s a placement) gets 32 (#2940): its seeds spread widely (iwls05-sasc 4.76 to 5.22 ns,
@@ -337,7 +378,7 @@ export const nextpnrTries = (effort, slices) => (effort === 'high'
 export function mountNextpnrSteps(ctx) {
   const { io, spec, log, report, util, now, ms, netlistText, top, constraints, StepError, setRouted } = ctx;
   const model = () => { try { return constraints(); } catch { return null; } };   // (checked by translate)
-  let input = null, sdc = '', ios = [];
+  let input = null, sdc = '', ios = [], free = [];
   const part = `${spec.device}${spec.pkg}`;
 
   function runMap() {
@@ -351,6 +392,7 @@ export function mountNextpnrSteps(ctx) {
     input = JSON.stringify(r.json);
     sdc = r.sdc;
     ios = r.ios;
+    free = r.free;
     log('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).');
   }
 
@@ -395,15 +437,20 @@ export function mountNextpnrSteps(ctx) {
         const e = lines.filter(l => /^ERROR:/.test(l)).slice(0, 20), last = lines.filter(l => l.trim()).at(-1);
         return e.length || !last ? e : [`nextpnr stopped with no error message, after: ${last.trim()}`];
       };
+      // (an I/O with no pad of its VCCO: by its port bits, with the constraints that fix it, as Silinx's placer said it, #2816)
+      const vccoError = () => {
+        const x = padVccoError(lines, ios, free, io.device());
+        return x && new StepError(x.message, [], x.hint);
+      };
       let files;
       try {
         files = await io.nextpnr.spartan3e.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => lines.push(l));
       } catch (e) {
         // (a WebAssembly exception has no message: nextpnr's own ERROR lines say why)
-        throw new StepError(`nextpnr failed: ${e?.message ?? 'it stopped on an error'}`, errors());
+        throw vccoError() || new StepError(`nextpnr failed: ${e?.message ?? 'it stopped on an error'}`, errors());
       }
       const routedJson = files?.['routed.json'];
-      if (!routedJson) throw new StepError('nextpnr wrote no routed design', errors());
+      if (!routedJson) throw vccoError() || new StepError('nextpnr wrote no routed design', errors());
       const json = typeof routedJson === 'string' ? routedJson : new TextDecoder().decode(routedJson);
       let design;
       try { design = nextpnrToXdl(JSON.parse(json), io.device(), io.device().part); } catch (e) { throw new StepError(`nextpnr's routed design cannot be read: ${e.message}`); }
