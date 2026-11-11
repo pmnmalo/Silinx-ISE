@@ -8,7 +8,7 @@
 //   axiWrap(gen, plan, { name, src, lang }) -> cToHdl's result, gen.axi: { lite: [{ bundle, aw, regs }], ret, core, view }
 import { Rtl } from './c-axi-rtl.js';
 import { liteMap, litePorts, liteSlave } from './c-axi-lite.js';
-import { masterBus, masterPorts, busWidth, wordBytes } from './c-axi-master.js';
+import { masterBus, masterPorts, busWidth, wordBytes, BURST } from './c-axi-master.js';
 
 export const modeOf = (a) => String(a.mode || Object.keys(a).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();
 
@@ -17,7 +17,9 @@ export function axiPlan(fn, consts = new Map()) {
   const made = (st) => st.kind === 'pragma' && st.pragma.name === 'INTERFACE' && ['s_axilite', 'm_axi'].includes(modeOf(st.pragma.args));
   for (const st of fn.body.items.filter(made)) {
     const a = st.pragma.args;
-    if (modeOf(a) === 'm_axi') { if (a.port) masters.set(a.port, { bundle: String(a.bundle ?? 'gmem'), offset: String(a.offset ?? 'slave').toLowerCase(), widen: Number(consts.get(a.max_widen_bitwidth) ?? a.max_widen_bitwidth) || 0, of: st.pragma.of, loc: st.loc }); continue; }
+    // (max_read_burst_length, max_write_burst_length: a burst's beats at most, Vitis HLS's 16 by default, #2276)
+    const burst = (k) => Math.min(256, Math.max(1, Number(consts.get(a[k]) ?? a[k]) || BURST));
+    if (modeOf(a) === 'm_axi') { if (a.port) masters.set(a.port, { bundle: String(a.bundle ?? 'gmem'), offset: String(a.offset ?? 'slave').toLowerCase(), widen: Number(consts.get(a.max_widen_bitwidth) ?? a.max_widen_bitwidth) || 0, rlen: burst('max_read_burst_length'), wlen: burst('max_write_burst_length'), of: st.pragma.of, loc: st.loc }); continue; }
     const b = String(a.bundle ?? 'control');
     if (!bundles.has(b)) bundles.set(b, { args: new Map(), ret: false });
     const x = bundles.get(b);
@@ -80,9 +82,15 @@ export function axiWrap(gen, plan, { name, src, lang, file }) {
   const stalled = has('ap_ce');
   const gated = stalled ? core.filter((p) => p.role === 'fifo' && p.dir === 'out' && /_(read|write)$/.test(p.name)) : [];
   const direct = core.filter((p) => !['ap_clk', 'ap_rst', 'ap_ce'].includes(p.name) && !inLite.has(p.name) && !ofClient.has(p.name) && !(ctl && HS.includes(p.name)));
-  const inner = core.filter((p) => !['ap_clk'].includes(p.name) && (!direct.includes(p) || gated.includes(p)));
+  // (the masters' writes gathered into bursts: ap_done, and ap_ready with it, once they are out, #2276)
+  const late = stalled && clients.length && has('ap_done');
+  const held = late ? direct.filter((p) => p.name === 'ap_done' || p.name === 'ap_ready') : [];
+  const inner = core.filter((p) => !['ap_clk'].includes(p.name) && (!direct.includes(p) || gated.includes(p) || held.includes(p)));
   const coreOut = (n) => r.in(net(n), core.find((p) => p.name === n).w);
-  const ctrl = ctl ? { done: coreOut('ap_done'), ready: coreOut('ap_ready'), idle: coreOut('ap_idle') } : null;
+  const flushedIn = late ? r.in(net('flushed'), 1) : null;
+  const waits = late ? r.and(coreOut('ap_done'), r.not(flushedIn)) : null;
+  const doneOut = (n) => (!late ? coreOut(n) : n === 'ap_done' ? r.and(coreOut(n), flushedIn) : r.and(coreOut(n), r.not(waits)));
+  const ctrl = ctl ? { done: doneOut('ap_done'), ready: doneOut('ap_ready'), idle: coreOut('ap_idle') } : null;
   const given = new Map();
   for (const m of maps) {
     const { start, nodes } = liteSlave(r, m.bundle, m, m.bundle === retB ? ctrl : null, coreOut);
@@ -93,15 +101,20 @@ export function axiWrap(gen, plan, { name, src, lang, file }) {
   const buses = [...new Set(clients.map((c) => c.m.bundle))].map((bundle) => {
     const mine = clients.filter((c) => c.m.bundle === bundle);
     const w = busWidth([...new Set(mine.map((c) => c.key))].map((k) => 8 * mine.find((c) => c.key === k).stride), Math.max(...mine.map((c) => c.m.widen)));
-    return { bundle, w, clients: mine.map(({ x, m, key, off, stride }) => {
+    const rlen = Math.min(...mine.map((c) => c.m.rlen ?? BURST)), wlen = Math.min(...mine.map((c) => c.m.wlen ?? BURST));
+    return { bundle, w, rlen, wlen, clients: mine.map(({ x, m, key, off, stride }) => {
       const P = x.port ?? x.name, cp = (sfx) => coreOut(`${P}${sfx}`);
       const base = m.offset === 'slave' ? given.get(`${key}_base`) : m.offset === 'direct' ? r.in(key, 64) : r.const(0, 64);
-      return { name: P, q0: `${P}_q0`, key, offset: m.offset, w: x.w, bytes: wordBytes(x.w), off, stride, base, ce: cp('_ce0'), we: x.written ? cp('_we0') : null, d: x.written ? cp('_d0') : null, addr: cp('_address0'), read: !!x.read, written: !!x.written };
+      return { name: P, q0: `${P}_q0`, key, offset: m.offset, w: x.w, bytes: wordBytes(x.w), off, stride, n: x.n ?? null, base, ce: cp('_ce0'), we: x.written ? cp('_we0') : null, d: x.written ? cp('_d0') : null, addr: cp('_address0'), read: !!x.read, written: !!x.written };
     }) };
   });
   if (stalled) {
-    const oks = buses.map((b) => masterBus(r, b.bundle, b.w, b.clients, ce));
-    r.out(net('ap_ce'), 1, oks.reduce((a, b) => r.and(a, b), r.const(1, 1)));
+    const made = buses.map((b) => masterBus(r, b.bundle, b.w, b.clients, ce, { done: late ? coreOut('ap_done') : null, rlen: b.rlen, wlen: b.wlen }));
+    const all = (k) => made.reduce((a, b) => r.and(a, b[k]), r.const(1, 1));
+    // (the module waits while an access is not served, and once done while its writes go out)
+    r.out(net('ap_ce'), 1, late ? r.and(all('ok'), r.not(r.and(coreOut('ap_done'), r.not(all('flushed'))))) : all('ok'));
+    if (late) r.out(net('flushed'), 1, all('flushed'));
+    for (const p of held) r.out(p.name, 1, doneOut(p.name));
     for (const b of buses) for (const c of b.clients) if (c.read) r.out(net(c.q0), c.w, c.q);
     for (const p of gated) r.out(p.name, 1, r.and(r.in(net(p.name), 1), ce));
   }
@@ -111,11 +124,11 @@ export function axiWrap(gen, plan, { name, src, lang, file }) {
   for (const [p, v] of [...given].filter(([k]) => has(k))) r.out(net(p), core.find((x) => x.name === p).w, r.ext(v, core.find((x) => x.name === p).w));
   const module = gen.top, top = name;
   const ports = [{ name: 'ap_clk', dir: 'in', w: 1 }, { name: 'ap_rst_n', dir: 'in', w: 1 }, ...(ctl ? [{ name: 'interrupt', dir: 'out', w: 1 }] : []), ...direct, ...clients.filter((c) => c.m.offset === 'direct').map((c) => ({ name: c.key, dir: 'in', w: 64 })), ...maps.flatMap((m) => litePorts(m.bundle, m.aw)), ...buses.flatMap((b) => masterPorts(b.bundle, b.w))];
-  const map = core.map((p) => [p.name, p.name === 'ap_clk' || (direct.includes(p) && !gated.includes(p)) ? p.name : net(p.name)]);
-  const wrapper = r.write(lang, { name: top, src, ports, instance: { module, map }, nets: inner.map((p) => ({ name: net(p.name), w: p.w })) });
+  const map = core.map((p) => [p.name, p.name === 'ap_clk' || (direct.includes(p) && !gated.includes(p) && !held.includes(p)) ? p.name : net(p.name)]);
+  const wrapper = r.write(lang, { name: top, src, ports, instance: { module, map }, nets: [...inner.map((p) => ({ name: net(p.name), w: p.w })), ...(late ? [{ name: net('flushed'), w: 1 }] : [])] });
   // what the co-simulation drives: the function's ports, through a bus's model (core/c-axi-bfm.js)
   const view = core.filter((p) => !HS.includes(p.name) && !['ap_clk', 'ap_rst', 'ap_ce'].includes(p.name));
   const vlds = maps.flatMap((m) => m.regs.filter((g) => g.dir === 'out' && !g.ret && !g.vld).map((g) => ({ name: `${g.port}_ap_vld`, dir: 'out', w: 1, role: 'arg_vld', param: g.param })));
   return { ...gen, top, ports, hdl: `${gen.hdl}\n${wrapper}`, diagnostics: diagnostics.sort((a, b) => a.line - b.line || a.col - b.col),
-    axi: { lite: maps, buses: buses.map((b) => ({ bundle: b.bundle, w: b.w, clients: b.clients.map(({ name, key, w, bytes, off, stride, read, written, offset }) => ({ name, key, w, bytes, off, stride, read, written, offset })) })), ret: ctl ? retB : null, core: module, view: { ...gen, top: 'silinx_axi_bfm', ports: [{ name: 'ap_clk', dir: 'in', w: 1 }, { name: 'ap_rst', dir: 'in', w: 1 }, ...(has('ap_start') ? core.filter((p) => HS.includes(p.name)) : []), ...view, ...vlds] } } };
+    axi: { lite: maps, buses: buses.map((b) => ({ bundle: b.bundle, w: b.w, clients: b.clients.map(({ name, key, w, bytes, off, stride, n, read, written, offset }) => ({ name, key, w, bytes, off, stride, n, read, written, offset })) })), ret: ctl ? retB : null, core: module, view: { ...gen, top: 'silinx_axi_bfm', ports: [{ name: 'ap_clk', dir: 'in', w: 1 }, { name: 'ap_rst', dir: 'in', w: 1 }, ...(has('ap_start') ? core.filter((p) => HS.includes(p.name)) : []), ...view, ...vlds] } } };
 }
