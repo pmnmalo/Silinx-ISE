@@ -3,7 +3,8 @@
 // signs in and enters it, the dialog waiting until GitHub says the code is authorized (or refused, or expired), Cancel
 // stopping it. Without it, a fine-grained personal access token of the user's, pasted: the steps to make one and the
 // permissions it needs said, the token checked with GitHub before it is kept (a refusal said beside the field). The
-// sign-in is kept in this tab until it closes, or in this browser when the user ticks Remember me (#3356); the device
+// sign-in is kept in this browser (Remember me, ticked by default), or in this tab until it closes when the user unticks
+// it (#3356); the device
 // flow asks for the public repositories only, the private ones when the user ticks them. Sign out of GitHub forgets the
 // sign-in. Every message goes to the console; the token is never in one.
 import { api } from './api.js';
@@ -15,9 +16,9 @@ const DEVICE = 'https://github.com/login/device';
 const NEW_TOKEN = 'https://github.com/settings/personal-access-tokens/new';
 // (GitHub's page only: what the sign-in's answer names elsewhere is not linked)
 const pageOf = uri => (/^https:\/\/github\.com\/[\w/-]*$/.test(String(uri || '')) ? uri : DEVICE);
-const KEPT = 'The sign-in is sent only to GitHub, and kept in this tab until it is closed, unless you choose to be remembered.';
+const KEPT = 'The sign-in is sent only to GitHub, and kept in this browser unless you untick Remember me (then in this tab until it is closed).';
 // Remember me: the sign-in kept in this browser (#3356)
-const rememberBox = () => h('input', { type: 'checkbox', class: 'git-remember' });
+const rememberBox = () => h('input', { type: 'checkbox', class: 'git-remember', checked: true });
 const checkLine = (box, label) => h('label', { style: { display: 'block', marginTop: '6px' } }, box, ' ', label);
 const REMEMBER = 'Remember me in this browser (kept after this tab closes, where every page of this site\'s address can read it)';
 // the console's line once signed in

@@ -24,8 +24,8 @@ export const GIT_PT = {
   'A public repository opens as it is; a private one (a Classroom assignment\'s) after Sign in with GitHub… with your private repositories included.':
     'Um repositório público abre-se tal como está; um privado (o de um trabalho do Classroom) depois de Iniciar sessão no GitHub… com os seus repositórios privados incluídos.',
   // (#3356: the scope asked for, where the sign-in is kept)
-  'The sign-in is sent only to GitHub, and kept in this tab until it is closed, unless you choose to be remembered.':
-    'A sessão é enviada só ao GitHub, e fica guardada neste separador até ser fechado, a menos que escolha ser lembrado.',
+  'The sign-in is sent only to GitHub, and kept in this browser unless you untick Remember me (then in this tab until it is closed).':
+    'A sessão é enviada só ao GitHub, e fica guardada neste navegador a menos que desmarque Lembrar-me (então neste separador até ser fechado).',
   'Remember me in this browser (kept after this tab closes, where every page of this site\'s address can read it)':
     'Lembrar-me neste navegador (guardada depois de fechar este separador, onde todas as páginas do endereço deste sítio a podem ler)',
   'Silinx asks GitHub for your public repositories and your gists.': 'O Silinx pede ao GitHub os seus repositórios públicos e os seus gists.',

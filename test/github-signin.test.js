@@ -1,8 +1,9 @@
 // The browser edition's GitHub sign-in, its two ways (#3196, web/js/github-app.js, web/js/git-browser.js): with a relay
 // and the OAuth App's client ID, the device flow; without them (the placeholders), a pasted fine-grained personal access
 // token, checked with GitHub (a stand-in, test/fake-github.mjs) before it is kept in the browser's storage; a token that
-// is not one, or that GitHub refuses, never kept and never in a message. #3356: the token in this tab's storage
-// (sessionStorage) unless the user asks to be remembered (localStorage), under the edition's own key; the device flow
+// is not one, or that GitHub refuses, never kept and never in a message. #3356: the token in the browser's storage
+// (localStorage, Remember me: the default), in this tab's (sessionStorage) when the user unticks it, under the edition's
+// own key; the device flow
 // asks for the public repositories and the gists, the private ones only when the user asks.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,9 +49,9 @@ test('a pasted token: one that is not a token, one GitHub refuses, never kept; a
     return true;
   });
   assert.equal(git.githubSignedIn(), false);
-  // (#3356: in this tab only, unless remembered)
-  assert.deepEqual(await git.githubSetToken(`  ${gh.token}\n`), { signedIn: true, remembered: false, login: 'student' });
-  assert.deepEqual([session.get('silinx.github-token'), store.has('silinx.github-token')], [gh.token, false]);
+  // (#3356: in this browser, Remember me being the default)
+  assert.deepEqual(await git.githubSetToken(`  ${gh.token}\n`), { signedIn: true, remembered: true, login: 'student' });
+  assert.deepEqual([store.get('silinx.github-token'), session.has('silinx.github-token')], [gh.token, false]);
   assert.equal(git.githubSignedIn(), true);
   // (the token only in the Authorization header)
   assert.ok(gh.requests.every((r) => !r.url.includes(gh.token)));
@@ -58,23 +59,23 @@ test('a pasted token: one that is not a token, one GitHub refuses, never kept; a
   assert.equal(session.has('silinx.github-token') || store.has('silinx.github-token'), false);
 });
 
-test('#3356 where the token is kept: this tab, or this browser when remembered (the other place cleared), the edition\'s own key; Sign out forgets both', async () => {
+test('#3356 where the token is kept: this browser (remembered, the default), or this tab when not (the other place cleared), the edition\'s own key; Sign out forgets both', async () => {
   globalThis.SILINX_GITHUB = { api: 'https://api.github.com' };
-  assert.deepEqual(await git.githubSetToken(gh.token, { remember: true }), { signedIn: true, remembered: true, login: 'student' });
-  assert.deepEqual([store.get('silinx.github-token'), session.has('silinx.github-token')], [gh.token, false]);
+  assert.deepEqual(await git.githubSetToken(gh.token, { remember: false }), { signedIn: true, remembered: false, login: 'student' });
+  assert.deepEqual([session.get('silinx.github-token'), store.has('silinx.github-token')], [gh.token, false]);
   assert.equal(git.githubSignedIn(), true);
   await git.githubSetToken(gh.token);
-  assert.deepEqual([session.get('silinx.github-token'), store.has('silinx.github-token')], [gh.token, false], 'not remembered now: the browser\'s copy cleared');
-  await git.githubSetToken(gh.token, { remember: true });
+  assert.deepEqual([store.get('silinx.github-token'), session.has('silinx.github-token')], [gh.token, false], 'remembered now: the tab\'s copy cleared');
+  await git.githubSetToken(gh.token, { remember: false });
   await git.githubSignOut();
   assert.equal(session.has('silinx.github-token') || store.has('silinx.github-token'), false);
   assert.equal(git.githubSignedIn(), false);
   // the development site's edition: its own key, the release's sign-in not its
   const { browserGit } = await import('../web/js/git-browser.js');
   const dev = browserGit({ store: () => ({ kind: 'browser', label: null }), ops: {}, prefix: 'silinx.dev.' });
-  await git.githubSetToken(gh.token);
+  await git.githubSetToken(gh.token, { remember: false });
   assert.equal(dev.githubSignedIn(), false);
-  await dev.githubSetToken(gh.token, { remember: true });
+  await dev.githubSetToken(gh.token);
   assert.deepEqual([...store.keys()].filter((k) => /github-token/.test(k)), ['silinx.dev.github-token']);
   await dev.githubSignOut();
   await git.githubSignOut();
@@ -87,10 +88,10 @@ test('#3356 the device flow asks for the public repositories and the gists, the 
     globalThis.SILINX_GITHUB = { relay: 'https://silinx-github-relay.example.workers.dev', clientId: g2.clientId };
     assert.equal(git.githubSignInWay(), 'device');
     const authorize = ({ userCode }) => g2.authorize(userCode);
-    assert.deepEqual(await git.githubSignIn({ onCode: authorize }), { signedIn: true, remembered: false });
-    assert.deepEqual([session.get('silinx.github-token'), store.has('silinx.github-token')], [g2.token, false]);
-    assert.deepEqual(await git.githubSignIn({ onCode: authorize, privateRepos: true, remember: true }), { signedIn: true, remembered: true });
+    assert.deepEqual(await git.githubSignIn({ onCode: authorize }), { signedIn: true, remembered: true });
     assert.deepEqual([store.get('silinx.github-token'), session.has('silinx.github-token')], [g2.token, false]);
+    assert.deepEqual(await git.githubSignIn({ onCode: authorize, privateRepos: true, remember: false }), { signedIn: true, remembered: false });
+    assert.deepEqual([session.get('silinx.github-token'), store.has('silinx.github-token')], [g2.token, false]);
     assert.deepEqual(g2.scopes(), ['public_repo gist', 'repo gist']);
     await git.githubSignOut();
   } finally { globalThis.fetch = gh.fetch; }

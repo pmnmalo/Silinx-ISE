@@ -81,10 +81,10 @@ can read that user's files has the server too.
   repositories chosen (#3356). Its token is kept in the user's browser only, sent only to GitHub's API in the
   `Authorization` header, never in a URL nor in a message; Sign out of GitHub forgets it. Where it is kept is the
   trade-off (#3356): the site is served from `pmnmalo.github.io`, an origin that every GitHub Pages site of the account
-  shares (the development build's `dev/` too), and a page of that origin reads its storage. So the token is kept in the
-  tab's `sessionStorage` (forgotten when the tab closes, read only by a page of the origin loaded in that same tab), and
-  in `localStorage` (kept across sessions, readable by any page of the origin) only when the user ticks **Remember me**,
-  which says so; each edition has its own key (`silinx.github-token`, the development site's `silinx.dev.github-token`).
+  shares (the development build's `dev/` too), and a page of that origin reads its storage. The sign-in dialog's **Remember me in this browser**,
+  ticked by default (the maintainer's choice: a student signs in once), keeps the token in `localStorage` (kept across
+  sessions, readable by any page of the origin, as its label says); unticked, the token is kept in the tab's
+  `sessionStorage` only (forgotten when the tab closes, read only by a page of the origin loaded in that same tab); each edition has its own key (`silinx.github-token`, the development site's `silinx.dev.github-token`).
   A key is no boundary between pages of one origin, so the remaining exposure is the account's other Pages sites,
   which are the maintainer's; an origin of its own (a custom domain) would remove it. A repository's address is checked as the server's (github.com's only), the sign-in page linked is github.com's
   only, and an opened or pulled file passes the import gate; the repository's hidden and binary files stay on GitHub,
