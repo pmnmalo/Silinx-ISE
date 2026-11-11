@@ -149,12 +149,15 @@ for (const lang of ['vhdl', 'verilog']) {
     assert.deepEqual(checkSyntax(file(lang), make(lang, N, { comb: true, noElse: true })), latch);
   });
 
-  test(`#2577 ${lang}: the synthesis input of a chain of ${N} branches is one else if chain`, () => {
+  // (halved down to else if chains of 19 or 20 branches, #3374: 1023 halvings, each half but the last with its last
+  // branch as its else; test/long-if-synth.test.js)
+  test(`#2577 ${lang}: the synthesis input of a chain of ${N} branches is else if chains`, () => {
     const lib = compile([{ path: file(lang), text: make(lang, N) }]);
     const { text, warnings } = synthesisInput(elaborate(lib, 'chain'));
     assert.deepEqual(warnings, []);
-    assert.equal(text.match(/^ *end else if \(/gm).length, N - 1);
-    assert.equal(text.match(/^ *end else begin$/gm).length, 1);
+    assert.equal(text.match(/^ *if \(\|\{/gm).length, 1023);
+    assert.equal(text.match(/^ *end else if \(/gm).length, N - 1 - 2 * 1023);
+    assert.equal(text.match(/^ *end else begin$/gm).length, 1 + 2 * 1023);
   });
 
   test(`#2577 ${lang}: a chain of ${N} branches translated, then simulated as the original`, () => {

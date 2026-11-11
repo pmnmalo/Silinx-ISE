@@ -6,6 +6,32 @@ import * as V from './values.js';
 import { bitpos, psliceLo } from './interp.js';
 import { lit, sameExpr } from './synth-verilog.js';
 
+// A chain of more than CHAIN_SPLIT branches (#3374: an if … else if, an elsif chain, a case of ranges): Yosys's front
+// end nests an else if per branch and overflowed its stack from 250 branches ("memory access out of bounds"), and its
+// passes on the chain of multiplexers it makes (muxcover) from 1000. It is written as an if of its halves, the first
+// taken when one of its conditions is true (a reduction | of their concatenation), each half the same way down to
+// chains of CHAIN_SPLIT branches: nested as deep as the log of its length, its multiplexers too. The same branch is
+// taken (the first one whose condition is true), the conditions are read before any branch as before. A half but the
+// last is taken when one of its conditions is true: its last branch is its else (Yosys would see a way through it
+// that assigns nothing: a latch of a combinational process).
+export const CHAIN_SPLIT = 32;
+
+// the chain's text: conds, the conditions' texts; bodies, a branch's text at an indentation; el, the else's (or null)
+export function splitChain(conds, bodies, el, ind) {
+  const write = (lo, hi, last, ind) => {
+    if (hi - lo <= CHAIN_SPLIT) {
+      const end = last ? hi : hi - 1;   // (the branches with their conditions: a half has 16 or more)
+      let out = '';
+      for (let i = lo; i < end; i++) out += `${ind}${i > lo ? 'end else ' : ''}if (${conds[i]}) begin\n${bodies[i](`${ind}  `)}`;
+      const e = last ? (el ? el(`${ind}  `) : '') : bodies[end](`${ind}  `);
+      return `${out}${ind}end${e ? ` else begin\n${e}${ind}end` : ''}\n`;
+    }
+    const mid = (lo + hi) >> 1;
+    return `${ind}if (|{${conds.slice(lo, mid).map(c => `(${c})`).join(', ')}}) begin\n${write(lo, mid, false, `${ind}  `)}${ind}end else begin\n${write(mid, hi, last, `${ind}  `)}${ind}end\n`;
+  };
+  return write(0, conds.length, true, ind);
+}
+
 /** { stmt } of toVerilog. */
 export function mountStatements(ctx) {
   const {
@@ -103,6 +129,14 @@ export function mountStatements(ctx) {
         return `${ind}${L.x} ${s.nb && mode === 'proc' ? '<=' : '='} ${val};\n`;
       }
       case 'if': {   // (an elsif / else if chain written as one, in a loop: thousands of branches, #2577)
+        const chain = [];
+        for (let x = s; x?.k === 'if' && chain.length <= CHAIN_SPLIT; x = x.else) chain.push(x);
+        if (chain.length > CHAIN_SPLIT) {   // (a long one: halved, #3374)
+          const conds = [], bodies = [];
+          for (; s?.k === 'if'; s = s.else) { const x = s; conds.push(truth(x.c, ctx)); bodies.push(i => stmt(x.then, ctx, i, mode, loop)); }
+          const x = s;
+          return splitChain(conds, bodies, x ? i => stmt(x, ctx, i, mode, loop) : null, ind);
+        }
         let out = `${ind}if (${truth(s.c, ctx)}) begin\n${stmt(s.then, ctx, `${ind}  `, mode, loop)}`;
         for (s = s.else; s?.k === 'if'; s = s.else) out += `${ind}end else if (${truth(s.c, ctx)}) begin\n${stmt(s.then, ctx, `${ind}  `, mode, loop)}`;
         const el = s ? stmt(s, ctx, `${ind}  `, mode, loop) : '';
@@ -136,6 +170,7 @@ export function mountStatements(ctx) {
         // range choices: an if / else if chain (the first matching choice wins, as in the simulator)
         const sv = s.sel.t.s ? S(sel.x) : sel.x;
         let out = '', first = true;
+        const long = s.items.length > CHAIN_SPLIT ? { conds: [], bodies: [] } : null;   // (a long one: halved, #3374)
         for (const it of s.items) {
           const conds = it.choices.map(ch => {
             if (ch.range) {
@@ -146,10 +181,12 @@ export function mountStatements(ctx) {
             const v = e(ch, ctx); const w = Math.max(sel.w, v.w);
             return `(${fit(sel.x, sel.w, vl ? s.ss : sel.s, w, sel.s)} == ${fit(v.x, v.w, vl ? s.ss : v.s, w, v.s)})`;
           });
+          if (long) { long.conds.push(conds.join(' || ')); long.bodies.push(i => stmt(it.body, ctx, i, mode, loop)); continue; }
           out += `${ind}${first ? '' : 'else '}if (${conds.join(' || ')}) begin\n${stmt(it.body, ctx, `${ind}  `, mode, loop)}${ind}end\n`;
           first = false;
         }
-        if (s.def) out += `${ind}${first ? '' : 'else '}begin\n${stmt(s.def, ctx, `${ind}  `, mode, loop)}${ind}end\n`;
+        if (long) return splitChain(long.conds, long.bodies, s.def ? i => stmt(s.def, ctx, i, mode, loop) : null, ind);
+        if (s.def) out +=`${ind}${first ? '' : 'else '}begin\n${stmt(s.def, ctx, `${ind}  `, mode, loop)}${ind}end\n`;
         return out;
       }
       case 'forrange': {
