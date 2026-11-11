@@ -25,10 +25,10 @@ const FRONT_END = new Set([
   'synth-values.js', 'synth-verilog.js',
   'unisim-jtag.js', 'unisim-s6.js', 'unisim.js',
   'verilog/lexer.js', 'verilog/parser-defs.js', 'verilog/parser-exprs.js',
-  'verilog/parser-assert.js', 'verilog/parser-items.js', 'verilog/parser-stmts.js', 'verilog/parser.js',
+  'verilog/parser-assert.js', 'verilog/parser-items.js', 'verilog/parser-nesting.js', 'verilog/parser-stmts.js', 'verilog/parser.js',   // (parser-nesting.js: #3490)
   'vhdl/actual.js', 'vhdl/labels.js', 'vhdl/lexer.js', 'vhdl/math-real.js', 'vhdl/nodes.js',
   'vhdl/parse-concurrent.js', 'vhdl/parse-decls.js', 'vhdl/parse-defs.js', 'vhdl/parse-expr.js',
-  'vhdl/parse-helpers.js', 'vhdl/parse-seq.js', 'vhdl/parser.js', 'vhdl/purity.js',
+  'vhdl/parse-helpers.js', 'vhdl/parse-nesting.js', 'vhdl/parse-seq.js', 'vhdl/parser.js', 'vhdl/purity.js',   // (parse-nesting.js: #3490)
 ].map((f) => HDL + f));
 // the npm packages it imports (its dependencies once it is a package of its own): none
 const PACKAGES = new Set();
@@ -103,7 +103,7 @@ test('#1709 HDL boundary: how the imports across are found', () => {
 });
 
 test('#1709 HDL boundary: the front end\'s modules exist, and are what the entry points reach', () => {
-  assert.equal(FRONT_END.size, 43);
+  assert.equal(FRONT_END.size, 45);
   for (const f of FRONT_END) assert.ok(fs.existsSync(path.join(ROOT, f)), `${f}: gone, remove it from FRONT_END`);
   // the package's modules (#1710), each one's old path in core/ re-exporting it
   for (const f of FRONT_END) assert.equal(moved(`core/${f.slice(HDL.length)}`), f);

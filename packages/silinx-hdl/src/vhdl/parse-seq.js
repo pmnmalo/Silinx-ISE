@@ -11,7 +11,7 @@ export const sequentialMethods = {
     const out = [];
     while (!this.atEof() && !this.isKw('end') && !this.isKw('elsif') && !this.isKw('else') && !this.isKw('when')) {
       const before = this.i;
-      const s = this.guard(() => this.parseSeqStmt(), null);
+      const s = this.guard(() => this.deeperStmt(() => this.parseSeqStmt(), null), null);
       if (s) out.push(s);
       if (this.i === before) { this.diag(`unexpected ${this.describe(this.peek())} in sequential statement`); this.next(); }
     }

@@ -26,3 +26,8 @@ export const intOr = (v, d) => { const n = parseInt(v, 10); return Number.isFini
 // the synthesis input, the translations) recurse once per level. 256, the bracket depth of C compilers.
 export const MAX_NESTING = 256;
 export const NESTING_MESSAGE = `expression nested more than ${MAX_NESTING} levels deep (parentheses, calls, unary operators)`;
+// The deepest statements nest (#3490): blocks, if, case, loops, a statement's body, generates (in Verilog a generate
+// block, in VHDL any concurrent statement), one count from the outermost construct of the module or architecture to
+// its innermost statement. The parsers refuse a deeper one, as they do expressions: the passes after them recurse once
+// per level (the elaboration from about 600 levels).
+export const STMT_NESTING_MESSAGE = `statement nested more than ${MAX_NESTING} levels deep (blocks, if, case, loops, generates)`;

@@ -6,10 +6,10 @@ import { assertStmt } from './parser-assert.js';
 /** Parser's methods of this part, assigned to its prototype by parser.js. */
 export const stmtMethods = {
   // ---------------- statements ----------------
+  // (a statement in another one level deeper: at most MAX_NESTING, #3490)
   stmt() {
-    const t = this.tok;
     const loc = this.loc();
-    const s = this.stmtInner();
+    const s = this.deeperStmt(() => this.stmtInner(), { kind: 'null' });
     if (s && !s.loc) s.loc = loc;
     return s;
   },

@@ -18,7 +18,7 @@ export const concurrentMethods = {
     while (!this.atEof() && !this.isKw('end') && !this.isKw('elsif') && !this.isKw('else') && !this.isKw('when')) {
       const before = this.i;
       this.sawGuarded = false;
-      let res = this.guard(() => this.parseConcurrent(decls), null);
+      let res = this.guard(() => this.deeperStmt(() => this.parseConcurrent(decls), null), null);
       // `t <= guarded v` in a block with a guard expression: assigned only while GUARD is true
       if (res && this.sawGuarded && this.blockGuard) res = guardItems(res, this.blockGuard);
       if (res) items.push(...res);

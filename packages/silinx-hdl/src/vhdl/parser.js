@@ -45,6 +45,7 @@ import { declarationMethods } from './parse-decls.js';
 import { concurrentMethods } from './parse-concurrent.js';
 import { sequentialMethods } from './parse-seq.js';
 import { expressionMethods } from './parse-expr.js';
+import { nestingMethods } from './parse-nesting.js';
 import { mapBits } from './nodes.js';
 import { ParseError, STD_LIBS, block } from './parse-defs.js';
 import { dedupe, mergePackageDecls } from './parse-helpers.js';
@@ -89,6 +90,8 @@ class Parser {
     this.region = null;              // the declarative region being read: { names, labels } (#192)
     this.entities = new Map();       // the entities of this file
     this.nesting = 0;                // how deep the expression being read nests (#3395)
+    this.stmtNesting = 0;            // how deep the statement being read nests, and its error reported (#3490)
+    this.stmtTooDeep = false;
   }
 
   // --- token helpers ---------------------------------------------------------
@@ -516,4 +519,4 @@ class Parser {
 }
 // the declarations, the concurrent and sequential statements, the expressions (parse-decls.js, parse-concurrent.js,
 // parse-seq.js, parse-expr.js, #405)
-Object.assign(Parser.prototype, declarationMethods, concurrentMethods, sequentialMethods, expressionMethods);
+Object.assign(Parser.prototype, declarationMethods, concurrentMethods, sequentialMethods, expressionMethods, nestingMethods);
