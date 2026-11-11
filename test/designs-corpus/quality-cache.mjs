@@ -143,3 +143,15 @@ export function runSummary({ measured, cached, timedOut, missing }) {
   if (missing.length) L.push(`left for the next run: ${buildsText(missing)}`);
   return L;
 }
+
+// The projects of a comparison (run.mjs --sizes <dir> --resume, #3342): each design marked in <dir>/.done/<name> as soon as
+// it is processed (its project written, or none: a design Silinx cannot build), so that a run stopped part-way through the
+// projects leaves the ones it made, and the next run makes only the others.
+const doneDir = dir => path.join(dir, '.done');
+/** The designs already processed in a projects folder (not .all, the workflow's mark of the whole step). */
+export const doneDesigns = dir => new Set(fs.existsSync(doneDir(dir)) ? fs.readdirSync(doneDir(dir)).filter(n => !n.startsWith('.')) : []);
+/** Mark a design processed. */
+export function markDesignDone(dir, name) {
+  fs.mkdirSync(doneDir(dir), { recursive: true });
+  fs.writeFileSync(path.join(doneDir(dir), name), '');
+}

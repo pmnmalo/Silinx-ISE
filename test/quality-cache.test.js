@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hashTree, hashFiles, cacheKey, cacheGet, cachePut, cachePrune, cacheTouch, buildOrder, mayStart, markPending, buildsText, runSummary, runBuilds, CACHE_VERSION } from './designs-corpus/quality-cache.mjs';
+import { hashTree, hashFiles, cacheKey, cacheGet, cachePut, cachePrune, cacheTouch, buildOrder, mayStart, markPending, buildsText, runSummary, runBuilds, CACHE_VERSION, doneDesigns, markDesignDone } from './designs-corpus/quality-cache.mjs';
 import { newFailures, GOALS } from './designs-corpus/compare-lib.mjs';
 import { qualityPage } from './designs-corpus/quality-page.mjs';
 
@@ -189,4 +189,26 @@ test('Quality workflow: the builds kept on the runner, a deadline and a build\'s
   // the Silinx toolchain in a process of its own, killed at the time limit (WebAssembly: a job's cancel does not stop it)
   assert.match(src, /spawn\(process\.execPath, \[fileURLToPath\(import\.meta\.url\), '--build-one', projectDir, goal\]/);
   assert.match(src, /child\.kill\('SIGKILL'\)/);
+});
+
+test('#3342 the projects of a comparison: each design marked as it is processed, skipped by the next run (run.mjs --resume)', () => {
+  const d = tmp();
+  try {
+    assert.deepEqual([...doneDesigns(d)], [], 'none yet');
+    markDesignDone(d, 'itc99-b02'); markDesignDone(d, 'epfl-log2'); markDesignDone(d, 'epfl-log2');
+    fs.writeFileSync(path.join(d, '.done', '.all'), '');
+    assert.deepEqual([...doneDesigns(d)].sort(), ['epfl-log2', 'itc99-b02'], 'not .all, the whole step\'s mark');
+    // (not a project: compare-ise.mjs takes the folders with a silinx.json)
+    assert.equal(fs.existsSync(path.join(d, '.done', 'silinx.json')), false);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+  const run = fs.readFileSync(path.join(ROOT, 'test/designs-corpus/run.mjs'), 'utf8');
+  assert.match(run, /resume: args\.includes\('--resume'\)/);
+  assert.match(run, /const todo = manifest\.designs\.filter\(picked\)\.map\(d => d\.name\)\.filter\(n => !kept\.has\(n\)\);/);
+  // a design's result and a timeout marked; a harness error or a worker's exit not (made again)
+  assert.match(run, /record\(r\.name, r\);/);
+  assert.match(run, /record\(cur, timedOutResult\(/);
+  const wf = fs.readFileSync(path.join(ROOT, '.github/workflows/quality.yml'), 'utf8');
+  assert.match(wf, /run\.mjs --stages frontend,synth,flow --sizes "\$P" --sizes-only --resume --jobs 1/);
+  assert.doesNotMatch(wf, /rm -rf "\$P"/, 'a stopped step\'s projects kept');
+  assert.match(wf, /mkdir -p "\$P\/\.done" && touch "\$P\/\.done\/\.all"/);
 });

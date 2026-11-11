@@ -79,17 +79,18 @@ jobs:
           mkdir -p "$HOME/silinx-cache/designs-corpus" .cache
           ln -sfn "$HOME/silinx-cache/designs-corpus" .cache/designs-corpus
           npm run fetch:designs
-      # the projects of the commit compared, kept for a run that resumes it (they take hours: #3292)
+      # the projects of the commit compared, kept for a run that resumes it, design by design (they take hours: #3292, #3342)
       - name: A Silinx project per design
         run: |
           C="$HOME/silinx-cache/quality/projects" P="$HOME/silinx-cache/quality/projects/$(git rev-parse HEAD)"
           mkdir -p "$C"
           find "$C" -mindepth 1 -maxdepth 1 ! -path "$P" -exec rm -rf {} +
-          if [ -f "$P/.done" ]; then echo "the projects of an earlier run of this commit"; else
-            rm -rf "$P"
-            # (the nightly checks the corpus's expectations: here only the projects are needed)
-            node test/designs-corpus/run.mjs --stages frontend,synth,flow --sizes "$P" --sizes-only --jobs 1 || true
-            touch "$P/.done"
+          [ -f "$P/.done" ] && rm -f "$P/.done"   # (a whole step's mark before #3342)
+          if [ -f "$P/.done/.all" ]; then echo "the projects of an earlier run of this commit"; else
+            # (the nightly checks the corpus's expectations: here only the projects are needed; --resume: the designs an
+            # earlier run of this commit processed kept, each marked as it is done, #3342)
+            node test/designs-corpus/run.mjs --stages frontend,synth,flow --sizes "$P" --sizes-only --resume --jobs 1 || true
+            mkdir -p "$P/.done" && touch "$P/.done/.all"
           fi
           ls "$P" | wc -l
           echo "QUALITY_PROJECTS=$P" >> "$GITHUB_ENV"
