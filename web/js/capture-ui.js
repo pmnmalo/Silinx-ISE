@@ -49,8 +49,10 @@ export async function captureSettings() {
   const { planInsertion, captureCost } = await import('/core/ila-insert.js');
   const { resourcesOf } = await import('/packages/silinx-fpga/src/parts.js');
   const part = S.devices?.parts.find(p => p.part === pj.device?.part);
+  const { familyProfile } = await import('/core/family-profile.js');
   const family = part?.family || 'spartan3e';
-  const total = part ? (resourcesOf(part, pj.device.package).find(r => r.id === (family === 'spartan6' ? 'ramb8bwer' : 'ramb16'))?.count ?? null) : null;
+  const ram = familyProfile(family).blockRam;   // (the family's block RAM: RAMB16s, or the Spartan-6's halves, #2310)
+  const total = part ? (resourcesOf(part, pj.device.package).find(r => r.id === ram?.resource)?.count ?? null) : null;
   const old = pj.capture || {};
   const { probes, clocks } = signalsOf(design);
   const list = h('select', { class: 'capture-probes', multiple: true, size: 12 },
@@ -79,7 +81,7 @@ export async function captureSettings() {
     const c = ins.errors.length ? null : captureCost(ins.plan, total);
     const errs = [...ins.errors, ...(c?.errors || [])];
     problems.replaceChildren(...errs.map(e => h('div', {}, e)));
-    cost.textContent = errs.length ? '' : `${ins.plan.width} bits × ${s.depth} samples: ${c.blocks} block RAM(s)${total != null ? ` of the device's ${family === 'spartan6' ? total / 2 : total}` : ''}`;
+    cost.textContent = errs.length ? '' : `${ins.plan.width} bits × ${s.depth} samples: ${c.blocks} block RAM(s)${total != null ? ` of the device's ${ram?.halves ? total / 2 : total}` : ''}`;
     ok = !errs.length;
     if (save.el) save.el.disabled = !ok;
   }

@@ -62,6 +62,11 @@ test('the multiplier: MULT18X18SIO on the Spartan-3E, DSP48A1 on the Spartan-6',
   assert.equal(familyProfile('ice40').multiplier, undefined);
 });
 
+test('the Map\'s choice (#3138, #3447): the Spartan-6\'s alone, as the flow\'s spec.s6Map takes it', () => {
+  assert.deepEqual(Object.keys(FAMILY_PROFILES).filter(f => familyProfile(f).mapChoice), ['spartan6']);
+  for (const f of ['spartan3e', 'ice40', 'artix7', null]) assert.equal(familyProfile(f).mapChoice, undefined, String(f));
+});
+
 test('the open flow: the parts each family\'s Silinx toolchain takes, its bit database, the iCE40\'s own steps', () => {
   for (const key of Object.keys(BROWSER_DEVICES)) {
     const dev = key.split('/')[0];

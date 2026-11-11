@@ -1,5 +1,5 @@
 // The device families' profiles (#2310): what each family offers the interface, as data. The interface asks the
-// profile (its clock manager, its block RAMs, its multiplier, its open flow) instead of testing a family's name, so that
+// profile (its clock manager, its block RAMs, its multiplier, its open flow, its Map's choice) instead of testing a family's name, so that
 // a new family is an entry here (test/family-conditions.test.js keeps web/js free of family names in conditions).
 // The resources' counts stay in the device resources model (packages/silinx-fpga/src/resources.js, #790): a profile
 // names the resource, the part counts it.
@@ -23,6 +23,8 @@ export const FAMILY_PROFILES = {
     multiplier: 'dsp48a1',
     // the Nexys3's and Atlys's parts, the bit databases in bitdb/s6 (#2103), and nextpnr as its engine (nextpnr-himbaechel-spartan6, #2138, #2137)
     openFlow: { parts: /^xc6slx\d+$/, bitDb: 's6', nextpnr: true },
+    // its Map's choice in Process Properties (#3138): Silinx's, or nextpnr's packer on trial (impl.s6Map)
+    mapChoice: true,
   },
   ice40: {
     // its own tools (#2295): nextpnr-ice40 and icepack, their steps, no device description of the Silinx toolchain

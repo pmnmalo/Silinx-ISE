@@ -170,7 +170,8 @@ export const SETTINGS_TOOLS = [
     async run({ project: name, optimization, startup_clock: clock, s6_map: map }) {
       const pj = await readProject(name);
       if (!optimization && !clock && !map) throw toolError('give optimization, startup_clock or s6_map');
-      const s6 = (await parts()).deviceFamily(pj.device) === 'spartan6';
+      const { familyProfile } = await import('../core/family-profile.js');
+      const s6 = !!familyProfile((await parts()).deviceFamily(pj.device)).mapChoice;   // (a Spartan-6's Map, as Process Properties shows it)
       if (map && !S6_MAPS.includes(map)) throw toolError(`s6_map: one of ${S6_MAPS.join(', ')}`);
       if (map && !s6) throw toolError(`s6_map: the project's device (${deviceName(pj.device)}) is not a Spartan-6`);
       if (optimization && !OPTIMIZATIONS.includes(optimization)) throw toolError(`optimization: one of ${OPTIMIZATIONS.join(', ')}`);
