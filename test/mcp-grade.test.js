@@ -79,7 +79,7 @@ test('grade: a wrong submission\'s first difference; wrong arguments', { timeout
   await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, student_copy, new');
   await err({ project: 'w', exercise: 'x.json' }, 'grade: exercise: \'x.json\' is not a .exercise.json');
   await err({ project: 'w', action: 'student_copy' }, 'grade: file: the new file of the exchange folder for the student\'s copy');
-  await err({ project: 'w', submissions: ['../../etc'] }, `grade: submissions: '../../etc' is outside the exchange folder ${xchg} (SILINX_MCP_FOLDER sets another)`);
+  await err({ project: 'w', submissions: ['../../etc'] }, `grade: submissions: '../../etc' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
   await ok('write_file', { project: 'w', path: 'other.exercise.json', text: '{}' });
   await err({ project: 'w' }, 'grade: exercise: the project \'w\' has 2 exercises (counter4.exercise.json, other.exercise.json): give one');
   const bad = await ok('grade', { project: 'w', exercise: 'other.exercise.json', action: 'check' });

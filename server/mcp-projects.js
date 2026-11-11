@@ -7,7 +7,7 @@ import * as P from './projects.js';
 import { orderExamples } from '../core/examples.js';
 import { TEST_DESIGNS, orderTestDesigns } from '../core/test-designs.js';
 import { nameUnnamed } from '../core/schname.js';
-import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice } from './mcp-util.js';
+import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice, redactor } from './mcp-util.js';
 
 // a project the MCP server makes is untrusted (#2981): its tools' results say so
 const UNTRUSTED = ' It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
@@ -136,6 +136,8 @@ export const PROJECT_TOOLS = [
       const full = await projectPath(name, rel);
       let text;
       try { text = await fsp.readFile(full, 'utf8'); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
+      // (a report or a log of build/ redacted as get_report's: the ISE machine's address never in a result, #3418)
+      if (/^build\//i.test(P.relKey(P.projectDir(name), full))) text = (await redactor())(text);
       return { text: clip(text), data: { project: name, path: rel, length: text.length }, untrusted: `the file ${rel}` };
     },
   },

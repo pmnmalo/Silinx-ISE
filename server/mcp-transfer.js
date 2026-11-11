@@ -22,11 +22,13 @@ export const exchangeDir = () => path.resolve(process.env.SILINX_MCP_FOLDER || p
 // a path of the exchange folder (relative to it, or absolute inside it), also once its symbolic links are followed
 export async function exchangePath(p, what) {
   const dir = exchangeDir();
-  if (typeof p !== 'string' || !p) throw toolError(`${what}: a path in the exchange folder ${dir}`);
+  // (a path as the results name it, <exchange folder>/a.zip, #3418: the folder's own)
+  if (typeof p === 'string' && /^<exchange folder>(?:[\\/]|$)/.test(p)) p = p.replace(/^<exchange folder>[\\/]?/, '') || '.';
+  if (typeof p !== 'string' || !p) throw toolError(`${what}: a path in the exchange folder`);
   let root;
-  try { root = await fsp.realpath(dir); } catch { throw toolError(`no exchange folder ${dir} (SILINX_MCP_FOLDER sets another)`); }
+  try { root = await fsp.realpath(dir); } catch { throw toolError('no exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names)'); }
   const full = path.resolve(dir, p);
-  const outside = () => toolError(`${what}: '${p}' is outside the exchange folder ${dir} (SILINX_MCP_FOLDER sets another)`);
+  const outside = () => toolError(`${what}: '${p}' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
   const under = (f, d) => f === d || f.startsWith(d + path.sep);
   if (!under(full, dir) && !under(full, root)) throw outside();
   // (the deepest part of the path that exists, resolved)
@@ -85,7 +87,7 @@ export const TRANSFER_TOOLS = [
   },
   {
     name: 'import_project', title: 'Import a project',
-    description: 'Make a new project in the workspace from a project in the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names), as the File menu\'s Import does: a .zip (a Xilinx ISE project with its .xise, or a Silinx project exported with its silinx.json), an ISE project\'s .xise (its folder\'s files with it) or a project folder. Its sources, constraints and other files are copied (not ISE\'s own outputs, nor hidden files); returns the files the project lists but were not found, and the import\'s warnings.',
+    description: 'Make a new project in the workspace from a project in the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names), as the File menu\'s Import does: a .zip (a Xilinx ISE project with its .xise, or a Silinx project exported with its silinx.json), an ISE project\'s .xise (its folder\'s files with it: a folder of its own, not the exchange folder\'s root) or a project folder. Its sources, constraints and other files are copied (not ISE\'s own outputs, nor hidden files); returns the files the project lists but were not found, and the import\'s warnings.',
     inputSchema: { type: 'object', properties: {
       name: STR('The new project\'s name (letters, digits, - and _).'),
       from: STR('The .zip, the .xise or the project folder, in the exchange folder: its name, a path in it, or an absolute path inside it.'),
@@ -96,9 +98,16 @@ export const TRANSFER_TOOLS = [
       let st;
       try { st = await fsp.stat(src); } catch { throw toolError(`no file or folder '${src}'`); }
       if (fs.existsSync(P.projectDir(name))) throw toolError(`project '${name}' already exists (delete_project, or another name)`);
+      // (never the exchange folder as a whole, the user's Downloads: a .xise at its root would take every file there
+      // with it, #3412)
+      const xise = !st.isDirectory() && /\.xise$/i.test(src);
+      if ((st.isDirectory() || xise) && await fsp.realpath(st.isDirectory() ? src : path.dirname(src)) === await fsp.realpath(exchangeDir())) {
+        throw toolError(st.isDirectory() ? `from: '${from}' is the exchange folder itself: give a project's own folder in it`
+          : `from: '${from}' is at the exchange folder's root, with whatever else is there: put the ISE project in a folder of its own and import that folder's .xise`);
+      }
       let entries;
       if (st.isDirectory()) entries = await folderEntries(src);
-      else if (/\.xise$/i.test(src)) {
+      else if (xise) {
         // the .xise chosen first: the import takes the first of the shallowest
         const all = await folderEntries(path.dirname(src));
         const me = path.basename(src);
