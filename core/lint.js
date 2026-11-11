@@ -41,7 +41,16 @@ export function eachStmt(s, fn, conds = []) {
   if (Array.isArray(s)) { for (const x of s) eachStmt(x, fn, conds); return; }
   switch (s.k) {
     case 'blk': eachStmt(s.stmts, fn, conds); return;
-    case 'if': fn(s, conds); eachStmt(s.then, fn, [...conds, s.c]); eachStmt(s.else, fn, [...conds, s.c]); return;
+    case 'if': {   // (an elsif / else if chain followed in a loop, its conditions in one array: thousands of branches, #2577)
+      const cs = [...conds];
+      for (let n = s; ;) {
+        fn(n, cs);
+        cs.push(n.c);
+        eachStmt(n.then, fn, cs);
+        if (n.else?.k !== 'if') { eachStmt(n.else, fn, cs); return; }
+        n = n.else;
+      }
+    }
     case 'case': fn(s, conds); for (const it of s.items) eachStmt(it.body, fn, [...conds, s.sel]); eachStmt(s.def, fn, [...conds, s.sel]); return;
     case 'for': fn(s, conds); eachStmt(s.init, fn, conds); eachStmt(s.body, fn, [...conds, s.cond]); eachStmt(s.step, fn, conds); return;
     case 'forrange': case 'while': case 'repeat': case 'forever': fn(s, conds); eachStmt(s.body, fn, [...conds, s.cond || s.count].filter(Boolean)); return;
@@ -120,7 +129,7 @@ export function targetBits(L, out = []) {
   if (s) out.push({ sig: s, bits: null });
   return out;
 }
-const addBits = (m, sig, bits) => {
+export const addBits = (m, sig, bits) => {
   if (!m.has(sig)) { m.set(sig, bits ? new Set(bits) : null); return; }
   const cur = m.get(sig);
   if (cur === null) return;
@@ -464,13 +473,26 @@ export function designChecks(lib, design, { lint = true, rules = true } = {}) {
         for (const a of after) for (const x of a) if (!definite.has(x) && !done.has(x)) report(x, stmt);
         return definite;
       };
+      // (an elsif / else if chain in a loop, as branchFlow would nest it, the same reports in the same order:
+      // thousands of branches, #2577)
+      const ifFlow = (n, done) => {
+        const chain = [], thens = [];
+        for (; n?.k === 'if'; n = n.else) { chain.push(n); thens.push(flow(n.then, new Set(done))); }
+        let after = flow(n, new Set(done));
+        for (let i = chain.length - 1; i >= 0; i--) {
+          const branches = [thens[i], after], definite = inter(branches);
+          for (const a of branches) for (const x of a) if (!definite.has(x) && !done.has(x)) report(x, chain[i]);
+          after = definite;
+        }
+        return after;
+      };
       const flow = (n, done) => {
         if (!n || typeof n !== 'object') return done;
         if (Array.isArray(n)) { for (const x of n) done = flow(x, done); return done; }
         switch (n.k) {
           case 'blk': return flow(n.stmts, done);
           case 'asg': for (const { sig } of targetBits(n.target)) done.add(sig); return done;
-          case 'if': return branchFlow(n, [n.then, n.else], done);
+          case 'if': return ifFlow(n, done);
           case 'case': return branchFlow(n, [...n.items.map(it => it.body), ...(n.def ? [n.def] : caseComplete(n) ? [] : [null])], done);
           case 'for': case 'forrange': case 'while': case 'repeat': case 'forever': return flow(n.body, done);
           case 'event': case 'delay': return flow(n.stmt, done);
@@ -496,13 +518,17 @@ export function designChecks(lib, design, { lint = true, rules = true } = {}) {
     // VHDL: what is read outside the clock-edge branch must be in the list
     const firstRead = new Map();
     const walk = (s) => {
-      if (!s || typeof s !== 'object') return;
-      if (Array.isArray(s)) { s.forEach(walk); return; }
-      if (s.k === 'blk') { walk(s.stmts); return; }
-      if (s.k === 'if' && inf.clocked && hasEdgeOf(s.c)) { walk(s.else); return; }
-      if (STMT_KINDS.has(s.k)) for (const e of exprsOf(s)) for (const x of readsOf(e)) if (!firstRead.has(x)) firstRead.set(x, s.loc?.line);
-      for (const key of ['then', 'else', 'body', 'stmt', 'def', 'init', 'step']) if (s[key]) walk(s[key]);
-      if (s.k === 'case') s.items.forEach(it => walk(it.body));
+      for (;;) {   // (an elsif chain followed in a loop: thousands of branches, #2577)
+        if (!s || typeof s !== 'object') return;
+        if (Array.isArray(s)) { s.forEach(walk); return; }
+        if (s.k === 'blk') { walk(s.stmts); return; }
+        if (s.k === 'if' && inf.clocked && hasEdgeOf(s.c)) { s = s.else; continue; }
+        if (STMT_KINDS.has(s.k)) for (const e of exprsOf(s)) for (const x of readsOf(e)) if (!firstRead.has(x)) firstRead.set(x, s.loc?.line);
+        if (s.k === 'if') { walk(s.then); s = s.else; continue; }
+        for (const key of ['then', 'else', 'body', 'stmt', 'def', 'init', 'step']) if (s[key]) walk(s[key]);
+        if (s.k === 'case') s.items.forEach(it => walk(it.body));
+        return;
+      }
     };
     walk(p.body);
     for (const [sig, line] of firstRead) if (!listed.has(sig))

@@ -32,12 +32,16 @@ export function gateAssignments(design) {
   const GATE_OPS = new Set(['&', '|', '^', '~^', '^~', 'and', 'or', 'xor', 'nand', 'nor', 'xnor', '~', '!', 'not']);
   const gates = v => (!v || typeof v !== 'object' || (v.k !== 'bin' && v.k !== 'un') ? 0
     : (GATE_OPS.has(String(v.o).toLowerCase()) ? 1 : 0) + gates(v.a) + gates(v.b));
-  const walk = o => {
-    if (!o || typeof o !== 'object' || seen.has(o)) return;
-    seen.add(o);
-    if (Array.isArray(o)) { o.forEach(walk); return; }
-    if (o.k === 'asg' && (o.target?.t?.w === 1 || o.target?.sig?.t?.w === 1)) n += gates(o.value);
-    for (const [k, v] of Object.entries(o)) if (k !== 'sig' && k !== 't' && k !== 'val') walk(v);
+  const walk = root => {
+    const stack = [root];   // (a stack of its own: an elsif chain of thousands of branches nests as deep, #2577)
+    while (stack.length) {
+      const o = stack.pop();
+      if (!o || typeof o !== 'object' || seen.has(o)) continue;
+      seen.add(o);
+      if (Array.isArray(o)) { for (const x of o) stack.push(x); continue; }
+      if (o.k === 'asg' && (o.target?.t?.w === 1 || o.target?.sig?.t?.w === 1)) n += gates(o.value);
+      for (const [k, v] of Object.entries(o)) if (k !== 'sig' && k !== 't' && k !== 'val') stack.push(v);
+    }
   };
   for (const p of design.procs || []) walk(p.body);
   return n;

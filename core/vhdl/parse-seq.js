@@ -126,23 +126,27 @@ export const sequentialMethods = {
     this.fail('invalid procedure call', tok);
   },
 
-  /** if / elsif / else; elsif chains nest in `else`, only the outermost consumes `end if;`. */
-  parseIf(loc, nested = false) {
-    if (!this.acceptKw('if')) this.expectKw('elsif');
-    const cond = this.parseExpression();
-    this.expectKw('then');
-    const tloc = this.loc();
-    const then = block(this.parseSeqStmts(), tloc);
+  /** if / elsif / else; elsif chains nest in `else`, only the outermost consumes `end if;`. The branches are read
+   *  in a loop, not one call per elsif: a chain of thousands of them (#2577). */
+  parseIf(loc) {
+    this.expectKw('if');
+    const ifs = [];
     let els = null;
-    if (this.isKw('elsif')) els = this.parseIf(this.loc(), true);
-    else if (this.acceptKw('else')) { const eloc = this.loc(); els = block(this.parseSeqStmts(), eloc); }
-    if (!nested) {
-      this.expectKw('end');
-      this.expectKw('if');
-      if (this.isId()) this.next();
-      this.expectOp(';');
+    for (;;) {
+      const cond = this.parseExpression();
+      this.expectKw('then');
+      const tloc = this.loc();
+      ifs.push({ kind: 'if', cond, then: block(this.parseSeqStmts(), tloc), else: null, loc });
+      if (this.isKw('elsif')) { loc = this.loc(); this.next(); continue; }
+      if (this.acceptKw('else')) { const eloc = this.loc(); els = block(this.parseSeqStmts(), eloc); }
+      break;
     }
-    return { kind: 'if', cond, then, else: els, loc };
+    this.expectKw('end');
+    this.expectKw('if');
+    if (this.isId()) this.next();
+    this.expectOp(';');
+    for (let k = ifs.length - 1; k >= 0; k--) { ifs[k].else = els; els = ifs[k]; }
+    return els;
   },
 
   parseCase(loc) {

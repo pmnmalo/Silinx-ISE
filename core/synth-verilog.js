@@ -304,7 +304,12 @@ function markFirstWrites(s, done, firsts) {
       if (key !== ANY && !done.has(key) && !done.has(ANY)) firsts.add(s);
       return union([done, [key]]);
     }
-    case 'if': return union([markFirstWrites(s.then, new Set(done), firsts), markFirstWrites(s.else, new Set(done), firsts)]);
+    case 'if': {   // (an elsif / else if chain in a loop: thousands of branches, #2577)
+      const after = [];
+      for (; s?.k === 'if'; s = s.else) after.push(markFirstWrites(s.then, new Set(done), firsts));
+      after.push(markFirstWrites(s, new Set(done), firsts));
+      return union(after);
+    }
     case 'case': return union([...s.items.map(it => markFirstWrites(it.body, new Set(done), firsts)), markFirstWrites(s.def, new Set(done), firsts)]);
     case 'forrange': case 'for': return markFirstWrites(s.body, markFirstWrites(s.body, done, firsts), firsts);
     default: return NO_WRITE.has(s.k) ? done : union([done, [ANY]]);
@@ -343,17 +348,22 @@ export function findShiftMems(design) {
   const writes = new Map(), bad = new Set(), vecWrites = new Map(), vecBad = new Set();
   const SKIP = new Set(['sig', 't', 'varT', 'val', 'retT', 'fn', 'loc']);
   const seen = new Set();
-  const walk = o => {
-    if (!o || typeof o !== 'object' || seen.has(o)) return;
-    seen.add(o);
-    if (Array.isArray(o)) { o.forEach(walk); return; }
-    if (o.k === 'asg' && o.target) {
-      const T = o.target;
-      if (T.k === 'elem' && T.base?.k === 'sig') { if (!writes.has(T.base.sig)) writes.set(T.base.sig, []); writes.get(T.base.sig).push(o); }
-      else if (T.k === 'sig') { bad.add(T.sig); if (!vecWrites.has(T.sig)) vecWrites.set(T.sig, []); vecWrites.get(T.sig).push(o); }   // (an array: assigned whole)
-      else if (T.base?.k === 'sig') vecBad.add(T.base.sig);   // (a part of a vector written)
+  const walk = root => {
+    const stack = [root];   // (in order, with a stack of its own: an elsif chain of thousands of branches, #2577)
+    while (stack.length) {
+      const o = stack.pop();
+      if (!o || typeof o !== 'object' || seen.has(o)) continue;
+      seen.add(o);
+      if (Array.isArray(o)) { for (let i = o.length - 1; i >= 0; i--) stack.push(o[i]); continue; }
+      if (o.k === 'asg' && o.target) {
+        const T = o.target;
+        if (T.k === 'elem' && T.base?.k === 'sig') { if (!writes.has(T.base.sig)) writes.set(T.base.sig, []); writes.get(T.base.sig).push(o); }
+        else if (T.k === 'sig') { bad.add(T.sig); if (!vecWrites.has(T.sig)) vecWrites.set(T.sig, []); vecWrites.get(T.sig).push(o); }   // (an array: assigned whole)
+        else if (T.base?.k === 'sig') vecBad.add(T.base.sig);   // (a part of a vector written)
+      }
+      const kids = Object.entries(o).filter(([k]) => !SKIP.has(k));
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i][1]);
     }
-    for (const [k, v] of Object.entries(o)) if (!SKIP.has(k)) walk(v);
   };
   for (const p of design.procs) walk(p.body);
   // (the loop's variable: a local, or a module integer, for (i = 15; i > 0; i = i - 1))

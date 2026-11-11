@@ -18,11 +18,35 @@ function bindStmt(E, s, ploc) {
   try {
     return bindStmt0(E, s, loc);
   } catch (e) {
-    if (!(e instanceof ElabError) && !(e instanceof SimError)) throw e;
-    if (e.hier && E.deferred && !E.deferred.done && !E.inFunction) throw e;   // (the whole item is elaborated again later)
-    diag(E, e.message, e.loc || loc);
-    return { k: 'null', loc };
+    return stmtError(E, e, loc);
   }
+}
+
+// a statement that does not bind: its error reported, a null statement in its place
+function stmtError(E, e, loc) {
+  if (!(e instanceof ElabError) && !(e instanceof SimError)) throw e;
+  if (e.hier && E.deferred && !E.deferred.done && !E.inFunction) throw e;   // (the whole item is elaborated again later)
+  diag(E, e.message, e.loc || loc);
+  return { k: 'null', loc };
+}
+
+// if … elsif / else if …: the chain bound in a loop, not one call per branch (a chain of thousands of them, #2577);
+// each else if as bindStmt binds it, at its own location, an error making it a null statement
+function bindIf(E, s, loc) {
+  const head = { k: 'if', c: vsize(E, bindExpr(E, s.cond, null, loc)), then: bindStmt(E, s.then, loc), else: null, loc };
+  let b = head;
+  for (s = s.else; s; s = s.else) {
+    const ploc = loc;
+    loc = s.loc || ploc;
+    if (s.kind !== 'if') { b.else = bindStmt(E, s, ploc); break; }
+    try {
+      b = b.else = { k: 'if', c: vsize(E, bindExpr(E, s.cond, null, loc)), then: bindStmt(E, s.then, loc), else: null, loc };
+    } catch (e) {
+      b.else = stmtError(E, e, loc);
+      break;
+    }
+  }
+  return head;
 }
 
 function bindStmt0(E, s, loc) {
@@ -74,7 +98,7 @@ function bindStmt0(E, s, loc) {
       if (E.lang === 'verilog' && !asg.nb && asg.delay) asg.intra = true;
       return asg;
     }
-    case 'if': return { k: 'if', c: vsize(E, bindExpr(E, s.cond, null, loc)), then: bindStmt(E, s.then, loc), else: s.else ? bindStmt(E, s.else, loc) : null, loc };
+    case 'if': return bindIf(E, s, loc);
     case 'case': {
       const sel = bindExpr(E, s.expr, null, loc);
       const items = s.items.map(it => ({

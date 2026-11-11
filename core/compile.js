@@ -65,7 +65,11 @@ export { elaborate, implRoots, topCandidates };
 // Convenience: compile + elaborate + simulate (used by tests and the CLI).
 export function simulate(sources, top, { until = Infinity, files, maxDeltas } = {}) {
   const lib = compile(sources);
-  const design = elaborate(lib, top);
+  // (an elaboration that throws, a bug of Silinx's such as a stack overflow: the design's error, not thrown, #2577)
+  let design;
+  try { design = elaborate(lib, top); } catch (e) {
+    design = { top: null, signals: [], procs: [], diags: [{ file: sources[0]?.path ?? '', line: 1, col: 1, message: `internal error elaborating '${top}': ${e.message}`, severity: 'error' }] };
+  }
   const errors = [...lib.errors, ...design.diags].filter(d => d.severity === 'error');
   if (errors.length) return { lib, design, errors, sim: null };
   const fileMap = new Map(files || sources.map(s => [s.path, s.text]));

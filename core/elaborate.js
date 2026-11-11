@@ -8,6 +8,7 @@
 //   call(fn,args) sys(name,args) edge(sig,pos) event(sig) str(value) image(a) strcat(parts) arr(elems) now
 // Bound statements: blk asg if case for forrange while repeat forever exit next ret null delay event wait task sys report assert
 import * as V from './values.js';
+import { walk } from './bound-walk.js';
 import { evalE, runSync, exec, strToVal } from './interp.js';
 import { purityErrors } from './vhdl/purity.js';
 import { declaredNames, interfaceNames, labelErrors } from './vhdl/labels.js';
@@ -816,16 +817,7 @@ export function checkAssignable(E, target, value, loc) {
 }
 
 // ---------------------------------------------------------------- read/write analysis
-export function walk(n, f) {
-  if (!n || typeof n !== 'object') return;
-  if (Array.isArray(n)) { for (const x of n) walk(x, f); return; }
-  if (f(n) === false) return;
-  for (const key in n) {
-    if (key === 'sig' || key === 't' || key === 'fn' || key === 'val' || key === 'loc' || key === 'triggers') continue;
-    const v = n[key];
-    if (v && typeof v === 'object') walk(v, f);
-  }
-}
+export { walk };   // (core/bound-walk.js: with a stack of its own, #2577)
 
 export function readsOf(n) {
   const reads = new Set();
