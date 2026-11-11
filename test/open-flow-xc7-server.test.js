@@ -2,8 +2,10 @@
 // database, the Nexys A7's xc7a100t not yet), its steps, and every example (gates … micro80) on the Basys 3 from HDL to
 // its .bit (server/open-flow.js, its own process server/open-flow-run.js: Yosys's synth_xilinx, nextpnr-himbaechel-xc7,
 // the bitstream from nextpnr's FASM) with the XDC the board's pin assignment writes: no warning, every clock at the
-// board's 100 MHz by nextpnr's estimate, the .bit read back as the xc7a35t's; the build folder has no ISE file. A pin the
-// package does not have: Place & Route's failure, no bitstream.
+// board's 100 MHz by nextpnr's estimate, the .bit read back as the xc7a35t's; the build folder has no ISE file. The .bit
+// checked against nextpnr's FASM with no Vivado (#3145, readback.js and roundtrip.js, apart from the generator): its frames
+// the ones fasm2frames makes of the FASM, and read back into features no bit lost and none stray. A pin the package does
+// not have: Place & Route's failure, no bitstream.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,6 +15,10 @@ import { openStatus, openSteps, runOpenImplementation } from '../server/open-flo
 import { parseBitHeader } from '../server/programmer.js';
 import { loadBitDbXc7 } from '../packages/silinx-fpga/src/node.js';
 import { readBitXc7 } from '../packages/silinx-fpga/src/fpga/xc7/bitstream.js';
+import { bitIndexXc7, readBitFramesXc7 } from '../packages/silinx-fpga/src/fpga/xc7/readback.js';
+import { referenceFrames, roundTrip } from '../packages/silinx-fpga/src/fpga/xc7/roundtrip.js';
+import { XC7_DB_DIR } from '../packages/silinx-fpga/src/fpga/xc7/bitdb-node.js';
+import zlib from 'node:zlib';
 import { EXAMPLES, exampleProject } from './examples-lib.mjs';
 
 const BASYS3 = { family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' };
@@ -50,6 +56,7 @@ const warnings = lines => lines.join('\n').split('\n').filter(l => /WARNING|ERRO
 test('every example on the Basys 3 through the 7-series\' back end: no warning, its .bit, 100 MHz met by nextpnr\'s estimate', async t => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-xc7-'));
   const db = loadBitDbXc7('xc7a35tcpg236-1');
+  const index = bitIndexXc7(JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(XC7_DB_DIR, 'xc7a35tcpg236-1.json.gz'))).toString('utf8')));
   try {
     for (const name of EXAMPLES) {
       await t.test(name, async () => {
@@ -83,6 +90,18 @@ test('every example on the Basys 3 through the 7-series\' back end: no warning, 
         const h = parseBitHeader(bit);
         assert.deepEqual([h.designName, h.rawDesign, h.part], [project.top, `${project.top};Generator=silinx-fpga`, '7a35tcpg236']);
         assert.ok([...readBitXc7(new Uint8Array(bit), db).values()].filter(w => w.some(Boolean)).length > 0, name);
+        // checked against nextpnr's FASM (#3145): its frames fasm2frames' (the part's others zeros), the round trip by bits
+        // clean, nothing added (no STEPDOWN in a bank of LVCMOS33, no required feature, no PUDC_B pull-up asked)
+        const fasm = fs.readFileSync(path.join(dir, 'build/open/routed.fasm'), 'utf8');
+        const ref = referenceFrames(index, fasm), back = readBitFramesXc7(new Uint8Array(bit), index);
+        assert.equal(back.idcode, 0x362d093);
+        let differ = 0;
+        for (const [a, w] of back.frames) if (!(ref.get(a) ?? new Uint32Array(101)).every((x, i) => x === w[i])) differ++;
+        assert.deepEqual([differ, back.frames.size, ref.size], [0, 5408, 4974], `${name}: frames not fasm2frames'`);
+        const rt = roundTrip(index, fasm, back.frames);
+        assert.deepEqual([rt.lost, rt.stray, rt.unknown, rt.missing, rt.extra], [[], [], [], [], []], name);
+        assert.deepEqual([rt.counts.aliases, rt.counts.added], [0, { required: 0, pudc: 0, stepdown: 0 }], name);
+        assert.ok(rt.counts.pseudoPips > 0 && rt.counts.zeroEncodings > 0, `${name}: ${JSON.stringify(rt.counts)}`);
         // (no ISE file in the build folder, the XDC's name kept)
         const build = fs.readdirSync(path.join(dir, 'build'));
         assert.ok(build.includes(path.basename(project.constraints)), build.join(' '));
