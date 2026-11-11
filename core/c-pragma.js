@@ -17,10 +17,10 @@ import { checkOpPragma } from './c-op-pragmas.js';
 
 // what Silinx makes of the pragmas it knows
 // (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY', 'ARRAY_RESHAPE', 'STREAM', 'ARRAY_STENCIL', 'EXPRESSION_BALANCE']);
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY', 'ARRAY_RESHAPE', 'STREAM', 'ARRAY_STENCIL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE']);
 // Vitis HLS's others: accepted, ignored with a warning
 export const IGNORED = new Set(['DATAFLOW', 'RESOURCE',
-  'OCCURRENCE', 'PROTOCOL', 'FUNCTION_INSTANTIATE',
+  'OCCURRENCE', 'PROTOCOL',
   'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
 export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite', 'm_axi', 'ap_fifo', 'ap_hs']);

@@ -71,7 +71,9 @@ export function elements(xml) {
 }
 
 /** csynth.xml (the top's synthesis report): { latency: {min,max}, interval: {min,max}, loops: [{ name, line, trip,
- *  latency, ii, iterationLatency }], ports: [{ name, dir, w, protocol, object }] } (null: unknown). */
+ *  latency, ii, iterationLatency }], ports: [{ name, dir, w, protocol, object }], modules: [{ module, instance, of }] |
+ *  null } (null: unknown). modules: its RTL hierarchy's instances (RTLDesignHierarchy), each one's module and the module
+ *  it is in, the top's first (#2244: which functions Vitis HLS keeps as modules of their own). */
 export function parseCsynth(xml) {
   const overall = tag(xml, 'SummaryOfOverallLatency') || '';
   const lat = (a, b) => { const x = num(tag(overall, a)), y = num(tag(overall, b)); return x === null && y === null ? null : { min: x, max: y }; };
@@ -92,7 +94,25 @@ export function parseCsynth(xml) {
     const p = m[1];
     ports.push({ name: tag(p, 'name'), dir: tag(p, 'Dir'), w: num(tag(p, 'Bits')), protocol: tag(p, 'IOProtocol') || null, object: tag(p, 'Object') || null });
   }
-  return { latency: lat('Best-caseLatency', 'Worst-caseLatency'), interval: lat('Interval-min', 'Interval-max'), loops, ports };
+  return { latency: lat('Best-caseLatency', 'Worst-caseLatency'), interval: lat('Interval-min', 'Interval-max'), loops, ports, modules: modulesOf(xml) };
+}
+
+/** The instances of csynth.xml's RTL hierarchy: [{ module, instance, of }] in its order, or null when it has none. */
+export function modulesOf(xml) {
+  const h = tag(xml, 'RTLDesignHierarchy');
+  if (h === null) return null;
+  const out = [];
+  const child = (el, t) => el.children.find((x) => x.tag === t);
+  const visit = (el, of) => {
+    const list = child(el, 'InstancesList');
+    for (const inst of list ? list.children.filter((x) => x.tag === 'Instance') : []) {
+      const module = child(inst, 'ModuleName')?.text ?? null;
+      out.push({ module, instance: child(inst, 'InstName')?.text ?? null, of });
+      visit(inst, module);
+    }
+  };
+  for (const top of elements(h).children.filter((x) => x.tag === 'TopModule')) visit(top, child(top, 'ModuleName')?.text ?? null);
+  return out;
 }
 
 /** The co-simulation report (<top>_cosim.rpt): { status: 'pass' | 'fail' | null, latency: {min,avg,max} | null } of
@@ -154,6 +174,11 @@ export function vitisTable(manifest, results, { image = '', part = PART } = {}) 
   const all = Object.values(results);
   L.push('', `${all.length} designs: ${all.filter((r) => r.vitis.csim === 'pass').length} through Vitis's C simulation, ${all.filter((r) => r.ports?.same).length} with Silinx's ports the same as Vitis's.`);
   return L.join('\n');
+}
+
+/** Silinx's sub-modules (cToHdl's report.functions), as modulesOf gives Vitis's: [{ module, instance, of }]. */
+export function silinxModules(gen) {
+  return (gen.report?.functions || []).map((f) => ({ module: f.module, instance: f.instance, of: f.of ?? gen.top }));
 }
 
 /** A design's comparison record from Vitis's parsed results and Silinx's run (lib.mjs's runDesign, cToHdl). */
@@ -255,7 +280,7 @@ async function main() {
       const R = path.join(work, 'results', d.name);
       const read = (f) => (fs.existsSync(path.join(R, f)) ? fs.readFileSync(path.join(R, f), 'utf8') : '');
       const syn = parseCsynth(read('csynth.xml')), co = parseCosim(read('cosim.rpt'));
-      const vitis = { ...parseStatus(read('status.txt'), read('csim.log')), latency: syn.latency, interval: syn.interval, cosimLatency: co.latency, loops: syn.loops, ports: syn.ports };
+      const vitis = { ...parseStatus(read('status.txt'), read('csim.log')), latency: syn.latency, interval: syn.interval, cosimLatency: co.latency, loops: syn.loops, ports: syn.ports, modules: syn.modules };
       if (co.status === 'fail') vitis.cosim = 'fail';
       const texts = Object.fromEntries(filesOf(d).map((f) => [f, fs.readFileSync(path.join(sourceDir(manifest.sources[d.source]), f), 'utf8')]));
       let silinx;
@@ -263,7 +288,7 @@ async function main() {
         const r = runDesign(d, texts);
         const { unit, opts } = optionsOf(d, texts);   // (its RTL blackboxes too, #2855)
         const g = cToHdl(unit, { ...opts, lang: 'vhdl' });
-        silinx = { csim: r.csim, synth: r.synth, cosim: r.cosim, latency: r.latency && { min: r.latency.min, max: r.latency.max }, loops: g.ok ? (g.report.loops || []).map((l) => ({ name: l.name || null, line: l.line, ii: l.ii, cycles: l.cycles })) : [], ports: g.ok ? g.ports.map(({ name, dir, w }) => ({ name, dir, w })) : [] };
+        silinx = { csim: r.csim, synth: r.synth, cosim: r.cosim, latency: r.latency && { min: r.latency.min, max: r.latency.max }, loops: g.ok ? (g.report.loops || []).map((l) => ({ name: l.name || null, line: l.line, ii: l.ii, cycles: l.cycles })) : [], ports: g.ok ? g.ports.map(({ name, dir, w }) => ({ name, dir, w })) : [], modules: g.ok ? silinxModules(g) : [] };
       } catch (e) { silinx = { csim: 'fail', synth: 'fail', cosim: 'skip', latency: null, loops: [], ports: [], reason: `exception: ${e.message}` }; }
       results[d.name] = compareDesign(vitis, silinx);
       const p = results[d.name].ports;

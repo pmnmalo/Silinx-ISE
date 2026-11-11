@@ -344,8 +344,8 @@ const CORPUS_WARNINGS = {
   'modeling-fixed-point-sqrt': ['77 warning: assert is ignored by synthesis (the C simulation checks it)'],
   'modeling-using-arbitrary-precision-casting': [],
   'modeling-using-cpp-templates': [],
-  'pipelining-functions-function-instantiate': ["19 warning: #pragma HLS INLINE off: 'foo' and its caller are combinational (latency 0): its logic is in its caller's, no module of its own",
-    '20 warning: #pragma HLS FUNCTION_INSTANTIATE is accepted and ignored: Silinx does not make it'],
+  // (FUNCTION_INSTANTIATE made, #2244: foo in the top's logic, its constants folded at each call)
+  'pipelining-functions-function-instantiate': ["19 warning: #pragma HLS INLINE off: 'foo' and its caller are combinational (latency 0): its logic is in its caller's, no module of its own"],
 };
 
 test('#1900 #1902 #1668 the corpus designs themselves (AMD\'s sources, when fetched): the five with Vitis HLS\'s ports; those too slow for the clock sequential, the others with no clock, their reset unused (#1924); each one\'s warnings', { skip: fetched }, () => {

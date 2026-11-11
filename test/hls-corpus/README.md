@@ -111,8 +111,10 @@ AMD's Vitis HLS is the oracle (#1624): `scripts/hls-vitis.mjs` runs each design 
 the small 7-series parts; a fixed Artix-7, the Vivado flow's interfaces) and compares its C simulation, its RTL ports
 (by name, direction and width), its co-simulation and its latency with Silinx's. Vitis does not target the
 Spartan-3E: the ports and the behaviour at them must be the same; the latency and the loops' II are a quality
-reference (Silinx's schedule is its own). `--update` writes `vitis.json` (numbers and port names only, no Vitis file)
-and this table:
+reference (Silinx's schedule is its own). Each side's modules are recorded too (#2244: Vitis's from `csynth.xml`'s RTL
+hierarchy, Silinx's from its report's functions, `{ module, instance, of }`), the oracle of which functions Vitis HLS keeps
+as modules of their own. `--update` writes `vitis.json` (numbers and port and module names only, no Vitis file) and this
+table:
 
 <!-- vitis -->
 Vitis HLS (xilinx/vitis-hls:2025.2, xc7a35tcpg236-1) against Silinx HLS: the C simulation, the ports, the latency (cycles) and the loops' II (Vitis's pipelined loops).

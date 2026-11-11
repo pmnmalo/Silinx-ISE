@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { vitisConfig, elements, parseCsynth, parseCosim, parseStatus, comparePorts, compareDesign, vitisTable, selectDesigns, keepsRun, PART } from '../scripts/hls-vitis.mjs';
+import { vitisConfig, elements, parseCsynth, parseCosim, parseStatus, comparePorts, compareDesign, vitisTable, selectDesigns, keepsRun, modulesOf, silinxModules, PART } from '../scripts/hls-vitis.mjs';
 import { cToHdl } from '../core/c-hdl.js';
 
 test('#1624 the config: the part fixed, the Vivado flow, no packaging nor Vivado run; the rest kept', () => {
@@ -71,6 +71,24 @@ test('#1624 csynth.xml: the latency and interval, the loops (nested, a range, a 
   ]);
 });
 
+// (csynth.xml's RTL hierarchy, as Vitis HLS 2025.2 writes it: each instance's name and module, nested in its caller's)
+const HIER = `<profile><RTLDesignHierarchy><TopModule><ModuleName>top</ModuleName><InstancesList>
+<Instance><InstName>grp_big_fu_80</InstName><ModuleName>big</ModuleName><ID>1</ID><BindInstances>add_ln5_fu_30</BindInstances>
+<InstancesList><Instance><InstName>grp_leaf_fu_20</InstName><ModuleName>leaf</ModuleName><ID>2</ID></Instance></InstancesList></Instance>
+<Instance><InstName>grp_big_fu_90</InstName><ModuleName>big</ModuleName><ID>3</ID></Instance>
+</InstancesList></TopModule></RTLDesignHierarchy></profile>`;
+
+test('#2244 csynth.xml\'s RTL hierarchy: each instance, its module and the module it is in; none recorded: null', () => {
+  const want = [{ module: 'big', instance: 'grp_big_fu_80', of: 'top' }, { module: 'leaf', instance: 'grp_leaf_fu_20', of: 'big' }, { module: 'big', instance: 'grp_big_fu_90', of: 'top' }];
+  assert.deepEqual(modulesOf(HIER), want);
+  assert.deepEqual(parseCsynth(HIER).modules, want);
+  assert.deepEqual(modulesOf('<profile><RTLDesignHierarchy><TopModule><ModuleName>f</ModuleName></TopModule></RTLDesignHierarchy></profile>'), []);
+  assert.equal(parseCsynth(CSYNTH).modules, null);
+  // (Silinx's: its report's functions, the same shape)
+  const g = cToHdl('int leaf(int x) {\n#pragma HLS INLINE off\n  int s = 0;\n  for (int i = 0; i < x; i++) s += i;\n  return s;\n}\nint top(int a) { return leaf(a) + 1; }\n', { file: 't.c', top: 'top' });
+  assert.deepEqual(silinxModules(g), [{ module: 'leaf', instance: 'leaf_U0', of: 'top' }]);
+});
+
 test('#1624 the element tree: nested elements, empty ones, each one\'s inner text; two loops side by side', () => {
   const r = elements('<a><b>1</b><c/><d><e> x </e></d></a>');
   assert.deepEqual(r.children.map((x) => x.tag), ['a']);
@@ -82,8 +100,8 @@ test('#1624 the element tree: nested elements, empty ones, each one\'s inner tex
 
 test('#1624 csynth.xml: an undefined latency (a loop of unknown trip count), no loops, no ports; an empty report', () => {
   const r = parseCsynth('<profile><SummaryOfOverallLatency><Best-caseLatency>3</Best-caseLatency><Worst-caseLatency>undef</Worst-caseLatency><Interval-min>4</Interval-min><Interval-max>undef</Interval-max></SummaryOfOverallLatency></profile>');
-  assert.deepEqual(r, { latency: { min: 3, max: null }, interval: { min: 4, max: null }, loops: [], ports: [] });
-  assert.deepEqual(parseCsynth(''), { latency: null, interval: null, loops: [], ports: [] });
+  assert.deepEqual(r, { latency: { min: 3, max: null }, interval: { min: 4, max: null }, loops: [], ports: [], modules: null });
+  assert.deepEqual(parseCsynth(''), { latency: null, interval: null, loops: [], ports: [], modules: null });
 });
 
 const COSIM = `
