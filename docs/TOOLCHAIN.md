@@ -93,7 +93,7 @@ and their data. nextpnr's routed design is converted to XDL (`fpga/nextpnr-xdl.j
 Everything outside the flow comes through `io`, so the same flow runs in Node (files on disk) and in the browser (files
 in memory): the sources, the constraints, the device, the bit database, Yosys, nextpnr, the files written, the report.
 The list is at the top of `src/open-flow-core.js`. nextpnr is one hook by micro-architecture:
-`io.nextpnr.spartan3e`, `io.nextpnr.spartan6`, `io.nextpnr.ice40` (with icepack: `pack(asc)`).
+`io.nextpnr.spartan3e`, `io.nextpnr.spartan6`, `io.nextpnr.ice40` (with icepack: `pack(asc)`), `io.nextpnr.xc7` (the 7-series', #3146).
 
 ### The back ends
 
@@ -131,7 +131,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 | ECP5, MachXO2 | `synth_ecp5`, to be defined | nextpnr | `ecppack`, Project Trellis | LPF | Planned (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
-| Xilinx 7-series | to be defined | nextpnr in the fork | to be written in JavaScript | to be defined | A spike first (#2305) |
+| Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T in the local server, AMD Vivado the default; its timing nextpnr's estimate; the Nexys A7 and the browser to come (#3147) |
 
 Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. The
 constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the

@@ -676,6 +676,10 @@ Beyond Xilinx, it takes **the 1BitSquared iCEBreaker** (Lattice iCE40UP5K-SG48):
 nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programmed into its SPI flash from Silinx: over WebUSB in the browser, or with openFPGALoader locally, #2298).
 The examples run on it with their seven-segment display and switches on its Pmods 1A and 1B; vga on the
 **1BitSquared iCEBreaker + PmodVGA**, a Digilent PmodVGA in those Pmods.
+On the 7-series, an experimental family (#3146), it takes **the Digilent Basys 3** (XC7A35T-CPG236) in the local server, when
+Silinx is the project's synthesis tool (AMD Vivado is the default there): Yosys's `synth_xilinx`, nextpnr-himbaechel's xilinx
+micro-architecture, and the `.bit` written from nextpnr's FASM on Project X-Ray's database; its timing is nextpnr's estimate,
+optimistic against Vivado's. Not yet the Nexys A7 (XC7A100T: no bit database), nor the browser edition.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
 what is planned: the [issues](https://github.com/pmnmalo/Silinx/issues).
