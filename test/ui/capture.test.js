@@ -129,3 +129,37 @@ uiTest('#3340 a capture whose samples are all the same (a slow signal: blinky\'s
   // (the probe's row, its value the samples' all along)
   assert.deepEqual(await page.eval(() => window.Silinx.active.view.state.rows.map(r => [r.sig.path, r.sig.wave.t.length])), [['capture_replay.led', 1]]);
 }, { timeout: 120000, skip: !PY && 'no Python 3 here' });
+
+// #3481: a design with no clock (gates, combinational): the Clock list has the board's oscillator, its default; saved as
+// the capture's boardClock; Portuguese
+uiTest('#3481 the logic analyzer on a design with no clock: the board\'s clock in the Clock list, chosen by default, saved; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'IlaComb', template: 'gates', board: 'basys2' });
+  fs.writeFileSync(path.join(env.server.configDir, 'config.json'), JSON.stringify({ mode: 'silinx' }));
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await page.openProject('IlaComb');
+  await reloadToolchain(page);
+  const clockList = () => page.eval(d => { const c = document.querySelector(`${d} .capture-clock`); return { options: [...c.options].map(o => o.textContent), value: c.value }; }, D);
+  await page.treeRow('#procs', 'Logic Analyzer Settings', { dbl: true });
+  await page.waitFor(d => document.querySelector(d), [D], { what: 'the settings dialog' });
+  const list = await clockList();
+  assert.deepEqual([list.options[0], list.value], ['the board\'s clock mclk (B8, 20 ns)', '@board']);
+  await fill(page, { probes: ['sw', 'led'], depth: 16, pre: 0 });
+  assert.deepEqual(await state(page), ['6 bits × 16 samples: 1 block RAM(s) of the device\'s 12', '', true]);
+  await page.eval(d => document.querySelector(`${d} .dlg-buttons .btn.primary`).click(), D);
+  await page.waitFor(d => !document.querySelector(d), [D], { what: 'the dialog closed' });
+  await page.waitConsole(/Logic analyzer: sw, led; 16 samples on the board's clock mclk \(B8, 20 ns\)\. Implement the design and program the board to capture them\./);
+  const pj = JSON.parse(await readWs(env, 'IlaComb', 'silinx.json'));
+  assert.deepEqual(pj.capture, { probes: ['sw', 'led'], boardClock: { name: 'mclk', label: 'MCLK oscillator (25/50/100 MHz via JP4, default 50 MHz)', pin: 'B8', period: 20, iostandard: 'LVCMOS33', dedicated: false },
+    depth: 16, pre: 0, trigger: { combine: 'and', conditions: [] } });
+  // opened again: the board's clock kept; in Portuguese
+  await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
+  try {
+    await page.treeRow('#procs', 'Definições do Analisador Lógico', { dbl: true });
+    await page.waitFor(d => document.querySelector(d), [D], { what: 'the dialog in Portuguese' });
+    const c = await clockList();
+    assert.deepEqual([c.options[0], c.value], ['o relógio da placa mclk (B8, 20 ns)', '@board']);
+    await page.eval(d => [...document.querySelectorAll(`${d} .dlg-buttons .btn`)].pop().click(), D);
+  } finally {
+    await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+  }
+}, { timeout: 120000 });

@@ -28,7 +28,9 @@ export const CAPTURE_PT = {
     'A Implementação insere o núcleo de captura (a cadeia de ferramentas Silinx, o Spartan-3E); programe a placa e depois Analisar o Projeto com o Analisador Lógico.',
 };
 export const CAPTURE_PT_PATTERNS = [
-  [/^(\d+) bits × (\d+) samples on (\S+), (\d+) before the trigger$/, '$1 bits × $2 amostras em $3, $4 antes do disparo'],
+  // (the board's oscillator as the capture's clock, #3481)
+  [/^the board's clock (\S+) \(([^,]+), ([\d.]+) ns\)$/, 'o relógio da placa $1 ($2, $3 ns)'],
+  [/^(\d+) bits × (\d+) samples on (.+), (\d+) before the trigger$/, (m, w, d, c, n) => `${w} bits × ${d} amostras em ${c.replace(/^the board's clock (\S+) \(([^,]+), ([\d.]+) ns\)$/, 'o relógio da placa $1 ($2, $3 ns)')}, ${n} antes do disparo`],
   [/^(\d+) block RAM\(s\), in the utilization above$/, '$1 block RAM(s), na utilização acima'],
   [/^(\d+) bits × (\d+) samples: (\d+) block RAM\(s\)( of the device's (\d+))?$/, (m, w, d, b, of, n) => `${w} bits × ${d} amostras: ${b} block RAM(s)${of ? ` das ${n} do dispositivo` : ''}`],
   // (the window of a capture, its tab)

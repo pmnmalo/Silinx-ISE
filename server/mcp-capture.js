@@ -36,11 +36,23 @@ async function check(name, pj, settings) {
   const errors = [...ins.errors, ...(cost?.errors || [])];
   const path = n => ins.probes.find(p => p.name === n)?.path ?? n;
   const trigger = errors.length ? null : triggerText(ins.spec).replace(/\b(\w+)( rises| falls| changes| = | != )/g, (m, n, rest) => `${path(n)}${rest}`);
-  return { ins, cost, errors, family, trigger };
+  const { captureClockText } = await import('../core/ila-insert.js');
+  return { ins, cost, errors, family, trigger, clockText: captureClockText(settings) };
+}
+
+// the board's oscillator of the project's board (clock: 'board', #3481), or an error
+async function boardClock(name, pj) {
+  const { resolveBoard } = await import('./devices.js');
+  const { boardClockOf } = await import('../core/ila-insert.js');
+  const board = pj.board ? resolveBoard(pj.board, { variant: pj.boardVariant, part: pj.device?.part })?.board : null;
+  if (!board) throw toolError(`clock board: the project '${name}' has no board (set_design_properties board): the board's clock is its oscillator`);
+  const c = boardClockOf(board);
+  if (!c) throw toolError(`clock board: the board ${board.name} has no oscillator of a known period`);
+  return c;
 }
 
 const summary = (settings, r) => [
-  `Capture: ${r.ins.probes.map(p => `${p.path} (${p.width} bit${p.width > 1 ? 's' : ''})`).join(', ')}; ${r.ins.plan.width} bits x ${settings.depth} samples on ${settings.clock}, ${settings.pre ?? 0} before the trigger: ${r.trigger}.`,
+  `Capture: ${r.ins.probes.map(p => `${p.path} (${p.width} bit${p.width > 1 ? 's' : ''})`).join(', ')}; ${r.ins.plan.width} bits x ${settings.depth} samples on ${r.clockText}, ${settings.pre ?? 0} before the trigger: ${r.trigger}.`,
   `Block RAMs: ${r.cost.blocks} (${r.ins.plan.memory?.primName || 'inferred'})${r.cost.total != null ? ` of the device's ${r.family === 'spartan6' ? `${r.cost.total / 2} RAMB16BWER` : `${r.cost.total} RAMB16`}` : ''}.`,
 ];
 const dataOf = (name, settings, r) => ({ project: name, capture: settings, probes: r.ins.probes.map(({ path, width, kind }) => ({ path, width, kind })),
@@ -49,11 +61,11 @@ const dataOf = (name, settings, r) => ({ project: name, capture: settings, probe
 export const CAPTURE_TOOLS = [
   {
     name: 'capture_settings', title: 'Logic Analyzer Settings',
-    description: 'Show, change or clear a project\'s logic analyzer capture (as ChipScope / Vivado\'s ILA): the signals of the design to watch on the board (probes: each signal\'s path below the top, e.g. count, u_ctl.state, g[1].q; vectors, integers, states, bits), the clock it samples on, the depth (samples, a power of 2 from 16 to 16384), the samples kept before the trigger (pre), and the trigger (conditions on the probes: = / != a value, rise / fall of a bit, change; combined by and / or; none: the first sample). Implement adds the capture core to the design (its sources unchanged) with a BSCAN, through which the PC reads it over the JTAG cable. Checked on the design\'s top: each probe\'s width, the block RAMs it takes against the device\'s (one kept for the design). No settings given: the current ones; clear: none.',
+    description: 'Show, change or clear a project\'s logic analyzer capture (as ChipScope / Vivado\'s ILA): the signals of the design to watch on the board (probes: each signal\'s path below the top, e.g. count, u_ctl.state, g[1].q; vectors, integers, states, bits), the clock it samples on (a signal, or the board\'s oscillator for a design with no clock), the depth (samples, a power of 2 from 16 to 16384), the samples kept before the trigger (pre), and the trigger (conditions on the probes: = / != a value, rise / fall of a bit, change; combined by and / or; none: the first sample). Implement adds the capture core to the design (its sources unchanged) with a BSCAN, through which the PC reads it over the JTAG cable. Checked on the design\'s top: each probe\'s width, the block RAMs it takes against the device\'s (one kept for the design). No settings given: the current ones; clear: none.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       probes: { type: 'array', items: { type: 'string' }, description: 'The signals to watch, by their path below the top (count, u_ctl.state).' },
-      clock: { type: 'string', description: 'The clock the samples are taken on (a signal of one bit, e.g. clk).' },
+      clock: { type: 'string', description: 'The clock the samples are taken on: a signal of one bit (e.g. clk), or board: the board\'s own oscillator (e.g. the Basys2\'s MCLK, 50 MHz), for a design with no clock (a combinational one); Implement then puts the capture\'s clock port on its pin.' },
       depth: { type: 'integer', description: 'The samples of a capture: a power of 2 from 16 to 16384.' },
       pre: { type: 'integer', description: 'The samples kept before the trigger (0 to depth - 1; default 0).' },
       trigger: { type: 'object', properties: {
@@ -83,7 +95,11 @@ export const CAPTURE_TOOLS = [
         return { text: summary(old, r).join('\n'), data: dataOf(name, old, r) };
       }
       for (const c of trigger?.conditions || []) if (!OPS.includes(c.op)) throw toolError(`op: one of ${OPS.join(', ')}`);
-      const settings = { ...(old || {}), ...(probes !== undefined && { probes }), ...(clock !== undefined && { clock }), ...(depth !== undefined && { depth }), ...(pre !== undefined && { pre }),
+      // (the board's clock, or a signal: the one replaces the other)
+      const { clock: c0, boardClock: b0, ...kept } = old || {};
+      const which = clock === undefined ? (b0 ? { boardClock: b0 } : c0 !== undefined ? { clock: c0 } : {})
+        : String(clock).toLowerCase() === 'board' ? { boardClock: await boardClock(name, pj) } : { clock };
+      const settings = { ...kept, ...which, ...(probes !== undefined && { probes }), ...(depth !== undefined && { depth }), ...(pre !== undefined && { pre }),
         ...(trigger !== undefined && { trigger: { combine: trigger.combine || 'and', conditions: trigger.conditions || [] } }) };
       if (settings.pre === undefined) settings.pre = 0;
       if (!settings.trigger) settings.trigger = { combine: 'and', conditions: [] };
