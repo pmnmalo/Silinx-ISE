@@ -4,7 +4,7 @@
 // one; the equivalence's through `yosys`, Yosys's run, core/verify.js). A Compile Error or an Interface Error is every
 // test's. gradeTests runs in one place, synchronously but for the synthesis and the equivalence: server/grade-worker.js
 // runs it in a worker with its limits, the interface on the student's own design. Isomorphic.
-import { VERDICTS, parseVectors, valueBits, limitsOf, testsOf, pointsOf, localize } from './grade-format.js';
+import { VERDICTS, parseVectors, valueBits, limitsOf, testsOf, pointsOf, localize, GRADE_CHECKS, NOT_GRADED } from './grade-format.js';
 import { prepareDesign } from './grade-design.js';
 import { runVectors, runTestbench, randomRows, referenceRows } from './grade-sim.js';
 import { CHECKS } from './labs-check.js';
@@ -86,7 +86,10 @@ function submissionIo(project, files, design) {
 }
 
 // a check test: each of the guided labs' checks on the submission; its reasons, a Wrong Answer
+// (a check grading cannot run, in an exercise graded all the same: a Grading Error, its reason said, #3329)
 async function runChecks(test, io) {
+  const bad = test.checks.map((c, j) => !GRADE_CHECKS.includes(c?.check) && `check ${j + 1} (${c?.check}): ${Object.hasOwn(NOT_GRADED, c?.check) ? NOT_GRADED[c.check] : `"check": one of ${GRADE_CHECKS.join(', ')}`}`).filter(Boolean);
+  if (bad.length) return { verdict: 'GE', messages: bad };
   const reasons = [];
   for (const c of test.checks) reasons.push(...await CHECKS[c.check].run(c, io));
   return reasons.length ? { verdict: 'WA', messages: [...new Set(reasons)] } : { verdict: 'AC', messages: [] };
