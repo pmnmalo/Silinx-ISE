@@ -93,29 +93,30 @@ function masterModel(b, slots, P) {
     P.push({ name: M(n), v: M(n) });
   }
   const T = `${b.bundle}`;
-  out.push(`  reg [63:0] ra_${T}, wa_${T}; reg [8:0] rn_${T}; reg [2:0] rs_${T}; integer ri_${T}, wi_${T}, rc_${T}, wc_${T}; reg [${lg + 2}:0] rl_${T}, wl_${T}; reg [63:0] re_${T}, we_${T};`);
-  // (a beat's element, its client: from the address)
+  out.push(`  reg [63:0] ra_${T}, wa_${T}; reg [8:0] rn_${T}; reg [2:0] rs_${T}; integer ri_${T}, wi_${T}, rc_${T}, wc_${T}, rb_${T}, wb_${T}; reg [63:0] re_${T}, we_${T}; reg [${W1 - 1}:0] wd_${T}; reg [${BY - 1}:0] ws_${T};`);
+  // (a beat's elements, each its client's: from the address; a burst's beats a bus's width each, #2276)
   const slot = (a) => `${a}[39:36]`;
+  const within = (c, e) => (c.n ? ` && ${e} / ${c.stride} < ${c.n}` : '');
   const reads = b.clients.filter((c) => c.read).map((c) => {
-    const k = slots.get(c.key);
-    return `        if (rc_${T} == ${k} && re_${T} % ${c.stride} == ${c.off}) begin ${c.name}_address0 = re_${T} / ${c.stride}; ${c.name}_ce0 = 1; ${c.written ? `${c.name}_we0 = 0; ` : ''}@(posedge ap_clk); #2 ${c.name}_ce0 = 0; ${M('RDATA')} = ${W1}'d0 | ${c.name}_q0; ${M('RDATA')} = ${M('RDATA')} << rl_${T}; end`;
+    const k = slots.get(c.key), e = `(re_${T} + rb_${T})`;
+    return `        if (rc_${T} == ${k}) for (rb_${T} = 0; rb_${T} < ${BY}; rb_${T} = rb_${T} + ${c.bytes}) if (${e} % ${c.stride} == ${c.off}${within(c, e)}) begin ${c.name}_address0 = ${e} / ${c.stride}; ${c.name}_ce0 = 1; ${c.written ? `${c.name}_we0 = 0; ` : ''}@(posedge ap_clk); #2 ${c.name}_ce0 = 0; ${M('RDATA')} = ${M('RDATA')} | ((${W1}'d0 | ${c.name}_q0) << (rb_${T} * 8)); end`;
   });
   const writes = b.clients.filter((c) => c.written).map((c) => {
-    const k = slots.get(c.key);
-    return `        if (wc_${T} == ${k} && we_${T} % ${c.stride} == ${c.off}) begin if (${M('WSTRB')} !== (${BY}'d${(1n << BigInt(c.bytes)) - 1n} << (wa_${T}[${lg - 1}:0]))) $display("AXI fault: ${M('WSTRB')}"); ${c.name}_address0 = we_${T} / ${c.stride}; ${c.name}_d0 = ${M('WDATA')} >> wl_${T}; ${c.name}_ce0 = 1; ${c.name}_we0 = 1; @(posedge ap_clk); #2 ${c.name}_ce0 = 0; ${c.name}_we0 = 0; end`;
+    const k = slots.get(c.key), e = `(we_${T} + wb_${T})`, all = (1n << BigInt(c.bytes)) - 1n;
+    return `        if (wc_${T} == ${k}) for (wb_${T} = 0; wb_${T} < ${BY}; wb_${T} = wb_${T} + ${c.bytes}) if (${e} % ${c.stride} == ${c.off} && ((ws_${T} >> wb_${T}) & ${all}) != 0${within(c, e)}) begin if (((ws_${T} >> wb_${T}) & ${all}) != ${all}) $display("AXI fault: ${M('WSTRB')}"); ${c.name}_address0 = ${e} / ${c.stride}; ${c.name}_d0 = wd_${T} >> (wb_${T} * 8); ${c.name}_ce0 = 1; ${c.name}_we0 = 1; @(posedge ap_clk); #2 ${c.name}_ce0 = 0; ${c.name}_we0 = 0; end`;
   });
   out.push('  initial begin', '    forever begin',
     `      if (ap_lfsr[3]) begin @(posedge ap_clk); #2; end`, `      ${M('ARREADY')} = 1;`, `      @(negedge ap_clk); while (!${M('ARVALID')}) @(negedge ap_clk);`,
     `      ra_${T} = ${M('ARADDR')}; rn_${T} = ${M('ARLEN')}; rs_${T} = ${M('ARSIZE')}; rc_${T} = ${slot(`ra_${T}`)};`, `      if (${M('ARBURST')} !== 1) $display("AXI fault: ${M('ARBURST')}");`,
     `      @(posedge ap_clk); #2 ${M('ARREADY')} = 0;`,
-    `      for (ri_${T} = 0; ri_${T} <= rn_${T}; ri_${T} = ri_${T} + 1) begin`, `        re_${T} = ra_${T}[35:0] + (ri_${T} << rs_${T}); rl_${T} = (ra_${T}[${lg - 1}:0] + (ri_${T} << rs_${T})) % ${BY} * 8;`, ...reads,
+    `      for (ri_${T} = 0; ri_${T} <= rn_${T}; ri_${T} = ri_${T} + 1) begin`, `        re_${T} = ra_${T}[35:0] + (ri_${T} << rs_${T}); re_${T} = re_${T} - re_${T} % ${BY}; ${M('RDATA')} = 0;`, ...reads,
     `        if (ap_lfsr[4]) begin @(posedge ap_clk); #2; end`, `        ${M('RLAST')} = ri_${T} == rn_${T}; ${M('RVALID')} = 1;`, `        @(negedge ap_clk); while (!${M('RREADY')}) @(negedge ap_clk);`, `        @(posedge ap_clk); #2 ${M('RVALID')} = 0;`, '      end', '    end', '  end');
   out.push('  initial begin', '    forever begin',
     `      if (ap_lfsr[5]) begin @(posedge ap_clk); #2; end`, `      ${M('AWREADY')} = 1;`, `      @(negedge ap_clk); while (!${M('AWVALID')}) @(negedge ap_clk);`,
     `      wa_${T} = ${M('AWADDR')}; wc_${T} = ${slot(`wa_${T}`)}; rn_${T}w = ${M('AWLEN')}; rs_${T}w = ${M('AWSIZE')};`, `      if (${M('AWBURST')} !== 1) $display("AXI fault: ${M('AWBURST')}");`,
     `      @(posedge ap_clk); #2 ${M('AWREADY')} = 0;`,
     `      for (wi_${T} = 0; wi_${T} <= rn_${T}w; wi_${T} = wi_${T} + 1) begin`, `        if (ap_lfsr[6]) begin @(posedge ap_clk); #2; end`, `        ${M('WREADY')} = 1;`, `        @(negedge ap_clk); while (!${M('WVALID')}) @(negedge ap_clk);`,
-    `        if (${M('WLAST')} !== (wi_${T} == rn_${T}w)) $display("AXI fault: ${M('WLAST')}");`, `        we_${T} = wa_${T}[35:0] + (wi_${T} << rs_${T}w); wl_${T} = (wa_${T}[${lg - 1}:0] + (wi_${T} << rs_${T}w)) % ${BY} * 8;`, `        @(posedge ap_clk); #2 ${M('WREADY')} = 0;`, ...writes, '      end',
+    `        if (${M('WLAST')} !== (wi_${T} == rn_${T}w)) $display("AXI fault: ${M('WLAST')}");`, `        we_${T} = wa_${T}[35:0] + (wi_${T} << rs_${T}w); we_${T} = we_${T} - we_${T} % ${BY}; wd_${T} = ${M('WDATA')}; ws_${T} = ${M('WSTRB')};`, `        @(posedge ap_clk); #2 ${M('WREADY')} = 0;`, ...writes, '      end',
     `      if (ap_lfsr[7]) begin @(posedge ap_clk); #2; end`, `      ${M('BVALID')} = 1;`, `      @(negedge ap_clk); while (!${M('BREADY')}) @(negedge ap_clk);`, `      @(posedge ap_clk); #2 ${M('BVALID')} = 0;`, '    end', '  end');
   out.unshift(`  reg [8:0] rn_${T}w; reg [2:0] rs_${T}w;`);
   return out;

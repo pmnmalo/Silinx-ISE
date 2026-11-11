@@ -60,7 +60,7 @@ test('#1893 two masters on one bundle, a byte on its lane: read and written, the
 });
 
 test('#1893 a wrong byte lane is found through the bus', () => {
-  const r = cosimulate(TWO, { file: 'a.cpp', top: 'f', lang: 'verilog', alter: (h) => h.replace(/assign (m_axi_gmem_WSTRB) = (\w+);/, "assign $1 = 4'hf;") });
+  const r = cosimulate(TWO, { file: 'a.cpp', top: 'f', lang: 'verilog', alter: (h) => h.replace(/assign (m_axi_gmem_WSTRB) = (\w+);/, "assign $1 = 4'h1;") });
   assert.equal(r.pass, false);
   assert.ok(r.mismatches.some((m) => m.port === 'AXI'));
 });
