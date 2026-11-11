@@ -60,6 +60,7 @@ const ALLOW = [
   ['test/server-api.test.js', /^(fpga-lab\.local|box\.lan)$/, 'made-up computer names: the Host header test, the ssh settings'],
   ['test/collab-host.test.js', '192.168.1.20', "a made-up local network address in an SDP fixture, a documentation address since (in the history only, #3365)"],
   ['server/git.js', /^(token@github\.com|https:\/\/user:token@github\.com)$/, "a made-up login in a comment's example of a URL with credentials (in the history only, #3365)"],
+  ['test/build-settings.test.js', /^(\/home\/[uU]|build-box\.local)$/, "made-up remote folders and a made-up computer name of the build-settings checks (#3407)"],
   ['test/impl.test.js', /^(dev@)?10\.0\.0\.2$/, 'a made-up address of an example (in the history only)'],
   ['test/impl.test.js', '/Users/Me', "a made-up macOS home folder of the ssh settings script's test (#1244, #1336)"],
   ['test/report-failure.test.js', /^(dev|me)@(192\.0\.2|203\.0\.113)\.\d+$/, 'made-up logins on documentation addresses (RFC 5737): the cleaning of a log line is tested on them (#251)'],
