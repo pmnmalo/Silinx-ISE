@@ -30,8 +30,11 @@ const fdre = (d, q, { c = 2, ce = '1', r = '0' } = {}) => ['FDRE', { C: c, CE: c
 test('a LUT with the flip-flop it feeds: two to a slice of one control set; flip-flops of two control sets, two slices', () => {
   assert.equal(sliceEstimate(netlist([lut(10, 3), fdre(10, 11), lut(12, 4), fdre(12, 13)]), 't'), 1);
   assert.equal(sliceEstimate(netlist([lut(10, 3), fdre(10, 11), lut(12, 4), fdre(12, 13, { ce: 5 })]), 't'), 2);
-  // (a set and a reset on one net: two modes, two control sets)
-  assert.equal(sliceEstimate(netlist([fdre(3, 11, { r: 5 }), ['FDSE', { C: 2, CE: '1', S: 5, D: 4, Q: 12 }]]), 't'), 2);
+  // (a set and a reset on one net: one control set, whether it sets or resets each flip-flop's own; a synchronous and an
+  // asynchronous one, two: nextpnr 1.5.1, #3389)
+  assert.equal(sliceEstimate(netlist([fdre(3, 11, { r: 5 }), ['FDSE', { C: 2, CE: '1', S: 5, D: 4, Q: 12 }]]), 't'), 1);
+  assert.equal(sliceEstimate(netlist([['FDCE', { C: 2, CE: '1', CLR: 5, D: 3, Q: 11 }], ['FDPE', { C: 2, CE: '1', PRE: 5, D: 4, Q: 12 }]]), 't'), 1);
+  assert.equal(sliceEstimate(netlist([fdre(3, 11, { r: 5 }), ['FDCE', { C: 2, CE: '1', CLR: 5, D: 4, Q: 12 }]]), 't'), 2);
   // (an inverter on a set / reset or an enable: the slice's SRINV / CEINV, the flip-flops on its input, the inverter gone;
   // one that a LUT reads too stays, a LUT)
   const inv = (o, i) => ['INV', { I: i, O: o }];
@@ -64,7 +67,13 @@ test('a carry chain: two stages to a slice, its LUTs and its sums\' flip-flops w
   // five: three; the carry out read by an XORCY: a stage more at the end
   const five = [...stages, lut(24, 7), ['MUXCY', { CI: 33, DI: '0', S: 24, O: 34 }], ['XORCY', { CI: 33, LI: 24, O: 44 }]];
   assert.equal(sliceEstimate(netlist(five), 't'), 3);
-  assert.equal(sliceEstimate(netlist([...stages, ['XORCY', { CI: 33, LI: '0', O: 45 }]]), 't'), 3);
+  assert.equal(sliceEstimate(netlist([...stages, ['XORCY', { CI: 33, LI: '1', O: 45 }]]), 't'), 3);
+  // (a sum whose LI is 0 and a stage whose select is 0 pass their carry in, their DI: wires, left out, 1.5.1, #3389; a
+  // flip-flop on such a sum alone, into the chain's slice)
+  assert.equal(sliceEstimate(netlist([...sums.slice(0, 6), ['XORCY', { CI: 31, LI: '0', O: 45 }], fdre(45, 46)]), 't'), 1);
+  const wire = [...sums.slice(0, 6), ['MUXCY', { CI: 31, DI: 8, S: '0', O: 32 }],
+    lut(23, 9), ['MUXCY', { CI: 32, DI: '0', S: 23, O: 33 }], lut(24, 10), ['MUXCY', { CI: 33, DI: '0', S: 24, O: 34 }]];
+  assert.equal(sliceEstimate(netlist(wire), 't'), 2);
   // the first stage's DI a net its LUT (of four other inputs) does not read: a stage before it brings the carry in
   const di = [['LUT4', { I0: 3, I1: 4, I2: 5, I3: 6, O: 20 }], ['MUXCY', { CI: 9, DI: 8, S: 20, O: 30 }]];
   assert.equal(sliceEstimate(netlist(di), 't'), 1);
@@ -77,6 +86,15 @@ test('the wide multiplexers: a slice per MUXF5, a MUXF6 over two; the memories: 
   const f5 = (o, a, b, s) => [lut(a, 3), lut(b, 4), ['MUXF5', { I0: a, I1: b, S: s, O: o }]];
   assert.equal(sliceEstimate(netlist([...f5(20, 10, 11, 5), fdre(20, 21)]), 't'), 1);
   assert.equal(sliceEstimate(netlist([...f5(20, 10, 11, 5), ...f5(22, 12, 13, 5), ['MUXF6', { I0: 20, I1: 22, S: 6, O: 23 }]]), 't'), 2);
+  // flip-flops alone into the free sides of the multiplexers' slices (BX the MUXF5's select, BY the MUXF6's), of their
+  // control set (1.5.1, #3389)
+  assert.equal(sliceEstimate(netlist([...f5(20, 10, 11, 5), fdre(5, 30), fdre(6, 31)]), 't'), 1);
+  assert.equal(sliceEstimate(netlist([...f5(20, 10, 11, 5), fdre(5, 30), fdre(6, 31), fdre(7, 32)]), 't'), 2);
+  assert.equal(sliceEstimate(netlist([...f5(20, 10, 11, 5), fdre(20, 21), fdre(6, 31)]), 't'), 1);
+  assert.equal(sliceEstimate(netlist([...f5(20, 10, 11, 5), fdre(20, 21), fdre(6, 31, { ce: 9 })]), 't'), 2);
+  const f6 = [...f5(20, 10, 11, 5), ...f5(22, 12, 13, 7), ['MUXF6', { I0: 20, I1: 22, S: 6, O: 23 }], fdre(23, 24)];
+  assert.equal(sliceEstimate(netlist([...f6, fdre(7, 30), fdre(5, 31), fdre(8, 32)]), 't'), 2);
+  assert.equal(sliceEstimate(netlist([...f6, fdre(7, 30), fdre(8, 31), fdre(9, 32)]), 't'), 3);
   // a MUXF6 over anything but MUXF5s: a LUT
   assert.equal(sliceEstimate(netlist([lut(10, 3), lut(11, 4), ['MUXF6', { I0: 10, I1: 11, S: 6, O: 23 }]]), 't'), 2);
   const srl = (q, ce) => ['SRL16E', { CLK: 2, CE: ce, D: 3, A0: '1', A1: '1', A2: '1', A3: '0', Q: q }];
