@@ -30,12 +30,20 @@ function serverOf(server = DEFAULT_SERVER) {
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw toolError(`server: '${server}' is not an http(s) address`);
   return u.origin;
 }
-// the token of the Silinx server on this computer at that port (none: a server started without one, as the tests')
+// the token of the Silinx server on this computer at that port (none: a server started without one, as the tests'),
+// sent only to that server: a loopback address (127.0.0.1, [::1], localhost), and the server there proving that it holds
+// the token (server/open-code.js holdsToken, the token never sent for it); any other host: its relay's key (key)
+const LOOPBACK = new Set(['127.0.0.1', '[::1]', 'localhost']);
 async function tokenOf(origin) {
   const u = new URL(origin);
+  if (!LOOPBACK.has(u.hostname.toLowerCase())) throw toolError(`server: ${origin} is not a Silinx server on this computer: sharing through another computer's relay needs that relay's key (key); this computer's server token is sent only to its own server`);
   const { tokenFile } = await import('./server.js');
   const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80));
-  try { return fs.readFileSync(tokenFile(port), 'utf8').trim(); } catch { return null; }
+  let token;
+  try { token = fs.readFileSync(tokenFile(port), 'utf8').trim(); } catch { return null; }
+  const { holdsToken } = await import('./open-code.js');
+  if (!await holdsToken(origin, token)) throw toolError(`server: the server at ${origin} is not the Silinx server whose token this computer keeps for port ${port} (another program, or one started since): not shared; start Silinx again (silinx serve)`);
+  return token;
 }
 
 // the project from the disk: { project (silinx.json, as the API gives it), files: { path: text } }
@@ -110,9 +118,10 @@ export const COLLAB_TOOLS = [
       const owner = cleanName(who) || 'MCP agent';
       const doc = projectDoc();
       publishProject(doc, { ...await readAll(name), owner });
+      const token = key ? String(key) : await tokenOf(origin);
       let session;
       try {
-        session = await shareRoom({ url: relayUrl(origin, 'share'), token: key ? String(key) : await tokenOf(origin), doc, user: { name: owner }, editors: !!editors, WebSocket: await WebSocketImpl() });
+        session = await shareRoom({ url: relayUrl(origin, 'share'), token, doc, user: { name: owner }, editors: !!editors, WebSocket: await WebSocketImpl() });
       } catch (e) { throw toolError(`cannot share through ${origin}: ${e.message} (is Silinx running there? silinx serve)`); }
       // (what changes on disk, published again; the relay's end, the share's)
       const { createProjectWatcher } = await import('./project-watch.js');

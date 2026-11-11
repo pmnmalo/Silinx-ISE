@@ -182,3 +182,55 @@ test('#3227 through a relay on another computer: share_project with its key; fol
   // (a wrong key: refused, the relay's own message)
   await fails('share_project', { project: 'gatesRelay', server: base, key: 'not-the-key' }, `cannot share through ${base}: sharing a project needs this Silinx server's token (is Silinx running there? silinx serve)`);
 });
+
+test('the server\'s token goes only to its own server: another host (a key needed), a loopback port whose server does not hold it', async () => {
+  const http = await import('node:http');
+  const { tokenFile } = await import('../server/server.js');
+  const port = srv.address().port;
+  const another = at => `server: ${at} is not a Silinx server on this computer: sharing through another computer's relay needs that relay's key (key); this computer's server token is sent only to its own server`;
+  // a WebSocket that records where it would connect, and with what (the token rides in its subprotocols)
+  const seen = [];
+  const prev = globalThis.WebSocket;
+  globalThis.WebSocket = class {
+    constructor(url, protocols) { seen.push({ url, protocols }); this.readyState = 0; this.on = {}; setTimeout(() => { this.readyState = 3; for (const t of ['error', 'close']) for (const f of this.on[t] || []) f({ code: 1006, reason: '' }); }, 0); }
+    addEventListener(type, f) { (this.on[type] ||= []).push(f); }
+    removeEventListener() {}
+    send() {}
+    close() {}
+  };
+  try {
+    // another host, at the port of this computer's server: no token, a key needed
+    const evil = `http://relay.example:${port}`;
+    await fails('share_project', { project: 'traffic', server: evil }, another(evil));
+    await fails('share_project', { project: 'traffic', server: `http://[::2]:${port}` }, another(`http://[::2]:${port}`));
+    assert.deepEqual(seen, []);
+    // with the relay's key: that key, never the token
+    const r = await call('share_project', { project: 'traffic', server: evil, key: 'relay-key' });
+    assert.equal(r.isError, true);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].url, `ws://relay.example:${port}/api/collab/share`);
+    assert.ok(seen[0].protocols.includes('token.relay-key'), String(seen[0].protocols));
+    assert.ok(!seen[0].protocols.some(p => p.includes('tok-mcp')), String(seen[0].protocols));
+  } finally { globalThis.WebSocket = prev; }
+  // a loopback port whose server is another program (the token file left by a server that stopped): not sent
+  const upgrades = [];
+  const other = http.createServer((req, res) => { res.writeHead(404); res.end(); });
+  other.on('upgrade', (req, socket) => { upgrades.push(req.headers['sec-websocket-protocol'] || ''); socket.destroy(); });
+  await new Promise(r => other.listen(0, '127.0.0.1', r));
+  const otherPort = other.address().port;
+  fs.writeFileSync(tokenFile(otherPort), 'tok-stale');
+  try {
+    for (const host of ['127.0.0.1', 'localhost']) {
+      const at = `http://${host}:${otherPort}`;
+      await fails('share_project', { project: 'traffic', server: at }, `server: the server at ${at} is not the Silinx server whose token this computer keeps for port ${otherPort} (another program, or one started since): not shared; start Silinx again (silinx serve)`);
+    }
+    assert.deepEqual(upgrades, []);
+  } finally {
+    fs.rmSync(tokenFile(otherPort), { force: true });
+    other.closeAllConnections?.();
+    await new Promise(r => other.close(r));
+  }
+  // this computer's own server, by its loopback address: shared with its token
+  await ok('share_project', { project: 'traffic', server: base });
+  await ok('share_project', { project: 'traffic', action: 'stop' });
+});
