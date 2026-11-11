@@ -6,10 +6,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { synthGoal, synthEffort, GOAL_IMPL, FAST_SYNTH, synthesizeVerilog, synthesizeArea, synthesizeFast } from '../packages/silinx-fpga/src/index.js';
-import { DEEP_RULE, logicLevels } from '../packages/silinx-fpga/src/synth-open.js';
+import { DEEP_RULE, logicLevels, criticalDelay, pathEnds } from '../packages/silinx-fpga/src/synth-open.js';
+import { compile, elaborate } from '../core/compile.js';
+import { compareNetlist } from './diff-synth.js';
 import { yosysNode } from '../packages/silinx-fpga/src/node.js';
 import { emptyProjectJson } from '../web/js/project-store.js';
-import { flowFrontEnd } from '../core/synth-front.js';
+import { flowFrontEnd, synthesisInput } from '../core/synth-front.js';
 import { example, exampleProject, silinxFlow } from './examples-lib.mjs';
 
 test('synthGoal: Fast, Area, Speed of the two ISE properties; every project before them Fast; new projects Area', () => {
@@ -82,6 +84,67 @@ test('#3096 Fast\'s synthesis of a deep design: Speed\'s netlist too, kept when 
   const shallow = await synthesizeFast(prioInput(), { ...opts, deepRule: { ...DEEP_RULE, levels: 42 } });
   assert.equal(shallow.fast, undefined);
   assert.equal(shallow.files['prio.json'], usual.files['prio.json']);
+});
+
+// #652: spi-fpga-slave's shift register (test/lut-resynth.test.js): its enable `load | shift` 3 LUT levels in the usual mapping, as
+// written, where XST has 2; Fast's netlist has its critical LUTs made shallower too (synth-open-resynth.js, no mapping), as Speed's
+const SHIFT_VHDL = `library ieee; use ieee.std_logic_1164.all;
+entity shift is port (clk, cs, sclk, last, busy, vld, mosi : in std_logic; din : in std_logic_vector(7 downto 0); q : out std_logic_vector(7 downto 0)); end shift;
+architecture rtl of shift is
+  signal rcs, rsclk, rspi, rlast, rbusy, rvld, rmosi : std_logic := '0';
+  signal rdin, sh : std_logic_vector(7 downto 0) := (others => '0');
+  signal rx, load, en : std_logic;
+begin
+  rx <= rsclk and not rspi and rlast;
+  load <= rvld and ((rcs and not rbusy) or rx);
+  en <= load or (rspi and not rsclk and not rcs);
+  process (clk) begin
+    if rising_edge(clk) then
+      rcs <= cs; rsclk <= sclk; rspi <= rsclk; rlast <= last; rbusy <= busy; rvld <= vld; rmosi <= mosi; rdin <= din;
+      if en = '1' then
+        if load = '1' then sh <= rdin; else sh <= sh(6 downto 0) & rmosi; end if;
+      end if;
+    end if;
+  end process;
+  q <= sh;
+end rtl;
+`;
+const SHIFT_VERILOG = `module shift(input clk, cs, sclk, last, busy, vld, mosi, input [7:0] din, output [7:0] q);
+  reg rcs = 0, rsclk = 0, rspi = 0, rlast = 0, rbusy = 0, rvld = 0, rmosi = 0;
+  reg [7:0] rdin = 0, sh = 0;
+  wire rx = rsclk & ~rspi & rlast;
+  wire load = rvld & ((rcs & ~rbusy) | rx);
+  wire en = load | (rspi & ~rsclk & ~rcs);
+  always @(posedge clk) begin
+    rcs <= cs; rsclk <= sclk; rspi <= rsclk; rlast <= last; rbusy <= busy; rvld <= vld; rmosi <= mosi; rdin <= din;
+    if (en) sh <= load ? rdin : {sh[6:0], rmosi};
+  end
+  assign q = sh;
+endmodule
+`;
+
+test('#652 Fast\'s synthesis of a short control path (spi-fpga-slave\'s enable): its critical LUTs made shallower, 2 levels instead of 3, kept by DEPTH_RULE, in VHDL and in Verilog; the netlist simulates as the design, no warning', async () => {
+  const close = (a, b, what) => assert.ok(Math.abs(a - b) < 1e-9, `${what}: ${a} vs ${b}`);
+  const opts = { family: 'spartan3e', run: yosysNode, effort: 'normal' };
+  for (const [lang, text] of [['vhdl', SHIFT_VHDL], ['verilog', SHIFT_VERILOG]]) {
+    const des = elaborate(compile([{ path: lang === 'vhdl' ? 'd.vhd' : 'd.v', lang, text }]), 'shift');
+    const [usual, fast] = await Promise.all([synthesizeVerilog(synthesisInput(des), { ...opts, ...FAST_SYNTH }), synthesizeFast(synthesisInput(des), opts)]);
+    // the usual mapping (Area's): 0.59 + 3 LUTs and their connections + the CE's 0.55, 5.04 ns, 11 LUTs
+    close(criticalDelay(usual.files['shift.json'], 'shift'), 0.59 + 0.45 + 0.70 + 0.45 + 0.70 + 0.45 + 0.70 + 0.45 + 0.55, `${lang} usual`);
+    assert.deepEqual([usual.util.luts, usual.depth.resynth], [11, undefined], lang);
+    // Fast: the enable on 2 levels, the D logic's 3 levels into D the critical path, 4.17 ns
+    const json = fast.files['shift.json'];
+    close(criticalDelay(json, 'shift'), 0.59 + 0.45 + 0.70 + 0.45 + 0.70 + 0.45 + 0.70 + 0.13, `${lang} fast`);
+    assert.equal(pathEnds(json, 'shift').ends.filter(e => e.port === 'CE').every(e => e.ns < 4), true, `${lang}: the enable's paths 2 levels`);
+    assert.deepEqual({ ...fast.depth.resynth, ns: +fast.depth.resynth.ns.toFixed(2) }, { rounds: 1, changed: 1, ns: 4.17, luts: 12, slices: 12, kept: true }, lang);
+    assert.deepEqual([fast.util.luts, fast.util.flipFlops, fast.fast], [12, 23, undefined], lang);
+    // the Verilog netlist and the statistics are the new netlist's
+    assert.equal(fast.files['shift_yosys.v'].match(/^ {2}LUT[1-4] #/gm).length, 12, lang);
+    assert.deepEqual(['LUT2', 'LUT3', 'LUT4'].map(t => +(new RegExp(`(\\d+) +${t}\\b`).exec(fast.files['shift_stat.txt'])?.[1] ?? 0)), [0, 9, 3], lang);
+    assert.deepEqual(fast.warnings, [], lang);
+    const cmp = compareNetlist(des, fast, { name: `fast-resynth-${lang}`, seed: 'shift', sim: { cycles: 600 } });
+    assert.equal(cmp.status, 'pass', cmp.report || cmp.reason);
+  }
 });
 
 test('#3096 Fast\'s synthesis of a design not deep (traffic): the usual mapping alone, as FAST_SYNTH', async () => {
