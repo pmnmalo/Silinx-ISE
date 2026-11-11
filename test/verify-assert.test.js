@@ -201,3 +201,19 @@ test('the same verdicts as SymbiYosys\'s (abc bmc3, abc pdr), natively', { skip:
     else assert.deepEqual([r.status, s.bmc, s.steps], ['bounded', 'PASS', null], what);
   }
 });
+
+// an assert property with no clocking event (Yosys's tests/various/countbits.sv style): checked at all times
+test('a concurrent assertion with no clock: proved at all times; one that fails, at its clock cycle, replayed', async () => {
+  const ok = { path: 'src/oh.v', lang: 'verilog', text: `module oh (input [1:0] s, output [3:0] y);
+  assign y = 4'b1 << s;
+  assert property ($countones(y) == 1);
+  assert property (s == 2'd3 |-> y[3]);
+endmodule
+` };
+  const r = await check([ok], 'oh');
+  assert.deepEqual([r.status, r.asserts, r.warnings], ['proved', 2, []]);
+  const bad = { ...ok, path: 'src/oh2.v', text: ok.text.replace('module oh ', 'module oh2 ').replace('|-> y[3]', '|-> y[2]') };
+  const f = await check([bad], 'oh2');
+  assert.deepEqual([f.status, f.cycle, f.failure, f.cycles[0].in.s], ['failed', 1, { file: 'src/oh2.v', line: 4, text: 'Assertion violation.' }, '11']);
+  for (const lang of ['verilog', 'vhdl']) assert.deepEqual(replay(f, lang, [bad]), [[0, 4, 'Assertion violation.']], lang);
+});

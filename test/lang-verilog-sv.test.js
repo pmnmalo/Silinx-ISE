@@ -120,7 +120,7 @@ endmodule`);
   assert.deepEqual(r, ['FOO 1 1 0 yes']);
 });
 
-test('immediate assertions: assert (e), assert (e) else …, labels; a concurrent assertion with no clock is not checked (a warning)', () => {
+test('immediate assertions: assert (e), assert (e) else …, labels; a concurrent assertion with no clock, checked at all times (#3177)', () => {
   const r = sim(`
 module tb;
   reg [3:0] a = 4;
@@ -133,14 +133,33 @@ module tb;
     $finish;
   end
 endmodule`, 'tb', { allowErrors: true });
-  assert.deepEqual(warningsOf(r), ['4: assert property with no clocking event (@(posedge clk)): not checked by the simulation nor by Verify']);
+  assert.deepEqual(warningsOf(r), []);
   assert.deepEqual(r.out, ['a is not 5', 'Assertion violation.', 'pass']);
   assert.deepEqual(r.log.filter(l => l.kind === 'error').map(l => l.text), ['Assertion violation.']);
 });
 
+// The nightly corpus's various/countbits.sv (Yosys's own tests): assert property (e) with no clocking event, which Yosys's
+// read_verilog -formal checks at all times, is an always @* block's assertion, no warning (it was 40 warnings, "no clocking
+// event"): a false constant fails at time 0, one on a signal when it changes, a |-> in the same instant; |=> needs a clock
+test('concurrent assertions with no clock: checked at all times (constants at time 0, signals as they change); |=> a warning', () => {
+  const r = sim(`
+module tb;
+  reg [3:0] a = 4;
+  assert property (1 == 2);
+  assert property ($countones(8'ha5) == 4);
+  assert property (a != 5) else $display("a is 5 at %0t", $time);
+  assert property (a == 6 |-> a > 9);
+  assert property (a |=> a);
+  initial begin #10 a = 5; #10 a = 6; #10 $finish; end
+endmodule`, 'tb', { allowErrors: true });
+  assert.deepEqual(warningsOf(r), ['8: assert property with |=> and no clocking event (@(posedge clk)): not checked by the simulation nor by Verify']);
+  assert.deepEqual(r.out, ['Assertion violation.', 'a is 5 at 10', 'Assertion violation.']);
+  assert.deepEqual(r.log.filter(l => l.kind === 'error').map(l => [l.time / 1000, l.line]), [[0, 4], [20, 7]]);
+});
+
 // #3177: a concurrent assertion of one clock is a process on its edge (core/verilog/parser-assert.js), checked by the
 // simulation as by Verify: the values before the edge, |-> in the same cycle, |=> in the next, disable iff, the else
-// action instead of the default message; sequences, $past, cover and no clock are not checked, with a warning each
+// action instead of the default message; sequences, $past, cover and |=> with no clock are not checked, with a warning each
 test('concurrent assertions: assert property (@(posedge clk) [disable iff (r)] a |-> b, a |=> b, e), checked at each edge', () => {
   const r = sim(`
 module tb;
