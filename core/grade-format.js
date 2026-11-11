@@ -7,7 +7,7 @@
 //   synthesis   the open synthesis's requirements (synthesizable, no latches, LUTs, flip-flops, slices, warnings)
 //   equivalence the submission's top proved equivalent to the reference design by Verify Equivalence (core/verify.js,
 //               Yosys's SAT: every input sequence, up to `depth` clock cycles or by induction, #3217)
-//   check       the guided labs' step checks (core/labs-check.js CHECKS: project, file, module, syntax, simulate) on the
+//   check       the guided labs' step checks (core/labs-check.js CHECKS: project, file, module, syntax, simulate; not process) on the
 //               submission, a lab's step as a test (#3179: a lab is an exercise without the grade)
 // A file's text can be in the exercise ({ path, text }) or in a file beside it ({ path, file }: read relative to the
 // exercise's folder and kept inside it, server/grade.js). The verdicts are VERDICTS. Isomorphic.
@@ -34,6 +34,10 @@ export const VERDICTS = Object.freeze({
   GE: 'Grading Error',   // (the grader could not run the test: its setup's, not the submission's; the teacher's to fix)
 });
 export const TEST_KINDS = ['vectors', 'reference', 'testbench', 'synthesis', 'equivalence', 'check'];
+/** The guided labs' checks a check test can have: not `process` (it reads the last run's reports, which a submission's
+ *  grading does not run: its synthesis test does, #3329); NOT_GRADED, why a check is not one of them. */
+export const GRADE_CHECKS = Object.keys(CHECKS).filter(k => k !== 'process');
+export const NOT_GRADED = { process: 'a process check is a guided lab\'s: grading runs its own synthesis test ("kind": "synthesis")' };
 export const DRAWINGS = ['sch', 'asm', 'fsm', 'tt', 'pn'];
 export const LANGUAGES = ['vhdl', 'verilog'];
 /** The limits when the exercise does not give them: simulated time (ns, a test bench's), simulation steps, the
@@ -107,10 +111,11 @@ function testProblems(t, ex, at) {
     if (t.done !== undefined && (typeof t.done !== 'string' || !pattern(t.done))) bad('"done": a message the test bench prints at its end (a text, or "/regex/flags")');
   }
   if (t.kind === 'check') {
-    if (!Array.isArray(t.checks) || !t.checks.length) bad(`"checks": a list of the guided labs' checks (${Object.keys(CHECKS).join(', ')})`);
+    if (!Array.isArray(t.checks) || !t.checks.length) bad(`"checks": a list of the guided labs' checks (${GRADE_CHECKS.join(', ')})`);
     else t.checks.forEach((c, j) => {
-      const kind = CHECKS[c?.check];
-      if (!kind) bad(`check ${j + 1}: "check": one of ${Object.keys(CHECKS).join(', ')}`);
+      const kind = GRADE_CHECKS.includes(c?.check) && CHECKS[c.check];
+      if (Object.hasOwn(NOT_GRADED, c?.check)) bad(`check ${j + 1} (${c.check}): ${NOT_GRADED[c.check]}`);
+      else if (!kind) bad(`check ${j + 1}: "check": one of ${GRADE_CHECKS.join(', ')}`);
       else for (const m of kind.problems(c)) bad(`check ${j + 1} (${c.check}): ${m}`);
     });
   }

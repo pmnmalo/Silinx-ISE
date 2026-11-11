@@ -58,7 +58,7 @@ test('#3192 the exercise: a right one has no problem; each kind of wrong one say
     'e.exercise.json: test 5: "kind": one of vectors, reference, testbench, synthesis, equivalence, check',
   ]);
   // (the guided labs' check kinds, core/labs-check.js: whatever kinds it has, #3179)
-  const KINDS = Object.keys(CHECKS).join(', ');
+  const KINDS = Object.keys(CHECKS).filter(k => k !== 'process').join(', ');
   assert.ok(['project', 'file', 'module', 'syntax', 'simulate'].every(k => CHECKS[k]), KINDS);
   const checks = counterExercise();
   checks.tests = [{ id: 'c', kind: 'check' }, { id: 'd', kind: 'check', checks: [{ check: 'fly' }, { check: 'syntax', warnings: ['/[/'] }] }, { id: 't', kind: 'testbench', top: 'tb', files: [{ path: 'tb.v', text: '' }], done: '/(/' }];
@@ -288,6 +288,19 @@ test('#3192 a check test: the guided labs\' checks on the submission (#3179), it
   const fsm = trafficExercise();
   fsm.tests = [{ id: 'lab', points: 1, kind: 'check', checks: [{ check: 'syntax', top: 'traffic' }] }];
   assert.equal((await grade(fsm, drawing())).verdict, 'AC');
+});
+
+test('#3329 a process check in an exercise: refused with its reason, and a Grading Error saying it if graded all the same (not a TypeError)', async () => {
+  const ex = counterExercise();
+  ex.tests = [{ id: 'lab', points: 1, kind: 'check', checks: [{ check: 'syntax' }, { check: 'process', process: 'synthesize' }] }];
+  const why = 'check 2 (process): a process check is a guided lab\'s: grading runs its own synthesis test ("kind": "synthesis")';
+  assert.deepEqual(exerciseProblems(ex, 'e.exercise.json'), [`e.exercise.json: test 1: ${why}`]);
+  assert.ok(CHECKS.process, 'the guided labs still have it');
+  const r = await grade(ex, hdl(COUNTER_V));
+  assert.deepEqual([r.verdict, r.tests[0].verdict, r.tests[0].messages], ['GE', 'GE', [why]]);
+  // (a check of no kind, in an exercise graded all the same: said too)
+  ex.tests[0].checks = [{ check: 'toString' }];
+  assert.deepEqual((await grade(ex, hdl(COUNTER_V))).tests[0].messages, [`check 1 (toString): "check": one of ${Object.keys(CHECKS).filter(k => k !== 'process').join(', ')}`]);
 });
 
 test('#3192 Grading Error: a synthesis the grader cannot run (a read Node\'s permission model refuses: its path said), never no verdict', async () => {
