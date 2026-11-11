@@ -32,7 +32,7 @@ export const YOSYS_FAMILY = {
 };
 
 // families of 4-input LUTs (MUXF5 … MUXF8 combine them)
-const LUT4_FAMILIES = new Set(['xc3s', 'xc3se', 'xc3sa', 'xc3sda', 'xc4v']);
+export const LUT4_FAMILIES = new Set(['xc3s', 'xc3se', 'xc3sa', 'xc3sda', 'xc4v']);
 // ABC's cost of a LUT of 1 … 6 inputs on those families: a 5-input function is two LUT4s and a
 // MUXF5 (one slice), a 6-input one four LUT4s, two MUXF5 and a MUXF6. synth_xilinx's own LUT
 // mapping there (LUTs of up to 8 inputs, each split by lut_map.v into LUT4s and MUXF5 … MUXF8)
