@@ -15,6 +15,7 @@
 //   write instead (a try on a past run)
 import { fileURLToPath } from 'node:url';
 import { scanText } from './check-private-data.mjs';
+import { codeBlock, ownIssue } from './github-text.mjs';
 
 // the runner's own name and folders, from its environment (set on a self-hosted runner, and in Actions; the
 // GitHub-hosted ones' are harmless but no less replaced): each a literal, replaced by its placeholder
@@ -113,7 +114,8 @@ export function issueText({ workflow, job, runUrl, sha, lines, timedOut = null }
         : `The scheduled run ${runUrl} failed in the job **${job}**, on ${sha.slice(0, 7)}.`,
       '',
       lines.length ? 'What its log says:' : 'Its log says nothing more (see the run).',
-      ...(lines.length ? ['', '```', ...lines, '```'] : []),
+      // (in a code block that no fence of the log closes: its text inert, no markup, no @mention, #3417)
+      ...(lines.length ? ['', ...codeBlock(lines)] : []),
       '',
       '(Opened by the workflow, scripts/report-failure.mjs: a later failure of this job is added here while the issue is open.)',
     ].join('\n'),
@@ -143,7 +145,8 @@ async function main() {
     let lines = [];
     try { lines = failureLines(await (await api(`actions/jobs/${j.id}/logs`)).text()); } catch (e) { console.error(`the log of ${j.name}: ${e.message}`); }
     const { title, body } = issueText({ workflow, job: j.name, runUrl: `${server}/${repo}/actions/runs/${runId}`, sha, lines, timedOut });
-    const issue = open.find(i => i.title === title);
+    // (the bot's own issue only: one of the same title by anyone else is not taken, #3417)
+    const issue = ownIssue(open, title);
     if (process.env.REPORT_DRY_RUN) { console.log(`${issue ? `comment on #${issue.number}` : 'new issue'}: ${title}\n${body}\n`); continue; }
     if (issue) {
       await api(`issues/${issue.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) });

@@ -102,7 +102,7 @@ test('yosys update: the table of the differences', () => {
   // (#3030, as nextpnr-update.yml measures them)
   assert.doesNotMatch(md, /run time|seconds/i);
   assert.match(md, /- Yosys reading the source: pass 1, mismatch 0, unsupported 0, error 0\n- Silinx's open synthesis: pass 0, mismatch 1, unsupported 0, error 0\n- shard\(s\) 2: no result/);
-  assert.match(md, /\*\*Regressions\*\* \(1: expected to pass\):\n\n- `a\.v:a \(synth\)`: mismatch: x/);
+  assert.match(md, /\*\*Regressions\*\* \(1: expected to pass\):\n\n- `a\.v:a \(synth\)`: `mismatch: x`/);
   // the test designs pinned at the old Yosys: to update in the same pull request
   assert.match(md, /\*\*To do in this pull request\*\*: test\/corpus\/expected\.json \(and warnings\.json\) belong to the Yosys test designs pinned by `YOSYS_TESTS_PIN` \(scripts\/fetch-yosys-tests\.mjs, v0\.68\); the new Yosys is v0\.70\. Pin v0\.70 .*refs\/tags\/v0\.70`.*`npm run fetch:yosys-tests && npm run test:corpus -- --update`/);
   assert.match(md, /never merged on green alone \(CLAUDE\.md, Integration\).*test\/synth-quality\.test\.js \(the size budgets\) and test\/synth-diff\*\.test\.js.*Actions ▸ Quality ▸ Run workflow.*docs\/QUALITY\.md will move/);
