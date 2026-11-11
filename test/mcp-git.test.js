@@ -60,6 +60,19 @@ test('git_clone, git_status, git_commit, git_push, git_pull, git_log: a Classroo
   assert.deepEqual([was.text, was.data.path], ['module extra; endmodule\n', 'src/extra.v']);
   await fails('git_log', { project: 'lab1', commit: last.commit }, 'give both commit and path: a file as it was in a commit');
   await fails('git_log', { project: 'lab1', commit: first.commit, path: 'src/extra.v' }, `no file 'src/extra.v' in the commit ${first.commit.slice(0, 7)}`);
+  // a pull's files pass the import gate (#3359): a tool's output, another spelling of silinx.json out of the folder, a
+  // WARNING each; a hidden file, left out by the clone's sparse checkout, says nothing
+  const other = path.join(tmp, 'other');
+  sh(tmp, 'clone', '--quiet', bare, other);
+  for (const [f, t] of [['build/top.bit', 'bits'], ['src/SILINX.JSON', '{}\n'], ['src/more.v', 'module more; endmodule\n'], ['.envrc', 'export X=1\n']]) {
+    fs.mkdirSync(path.dirname(path.join(other, f)), { recursive: true });
+    fs.writeFileSync(path.join(other, f), t);
+  }
+  sh(other, 'add', '-A', '-f'); sh(other, 'commit', '--quiet', '-m', 'Theirs'); sh(other, 'push', '--quiet');
+  const p = await ok('git_pull', { project: 'lab1' });
+  assert.equal(p.text, 'Pulled into main: 1 file(s) changed.\n  src/more.v\nWARNING: build/top.bit: not pulled into the project: a tool\'s output, made again from the sources\nWARNING: src/SILINX.JSON: not pulled into the project: another spelling of silinx.json, the project\'s description (\'SILINX.JSON\')');
+  assert.deepEqual(['build', 'src/SILINX.JSON', '.envrc'].filter(f => fs.existsSync(path.join(ws, 'lab1', f))), []);
+  assert.equal((await ok('git_status', { project: 'lab1' })).text, 'lab1: main, 0 commit(s) ahead of and 0 behind origin/main; no change since the last commit.');
   // .git stays out of the file tools (#3035)
   await fails('read_file', { project: 'lab1', path: '.git/config' }, '\'.git/config\': a hidden file or folder cannot be read');
   await fails('write_file', { project: 'lab1', path: '.git/hooks/pre-commit', text: 'x' }, '\'.git/hooks/pre-commit\': a hidden file or folder cannot be written');

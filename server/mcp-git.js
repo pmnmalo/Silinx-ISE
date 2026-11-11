@@ -86,7 +86,7 @@ export const GIT_TOOLS = [
   },
   {
     name: 'git_pull', title: 'Pull a project from GitHub',
-    description: 'Pull the commits of the project\'s GitHub repository into it (a merge), as File ▸ Git ▸ Pull does. A drawing changed on both sides is merged by its objects (never as text), its HDL made again; an object both sides changed differently is a conflict, named with its id: Pull again with resolve, "mine" or "theirs" for each (the result checked as Check Drawing checks it). Any other conflict pulls nothing: the project\'s files stay as they were, and the files in conflict are named.',
+    description: 'Pull the commits of the project\'s GitHub repository into it (a merge), as File ▸ Git ▸ Pull does. A drawing changed on both sides is merged by its objects (never as text), its HDL made again; an object both sides changed differently is a conflict, named with its id: Pull again with resolve, "mine" or "theirs" for each (the result checked as Check Drawing checks it). Any other conflict pulls nothing: the project\'s files stay as they were, and the files in conflict are named. The pulled files pass the import gate: a hidden file, a tool\'s output or another spelling of silinx.json stays out of the project\'s folder (a WARNING each); another file it refuses pulls nothing.',
     inputSchema: { type: 'object', properties: { project: PROJECT, resolve: { type: 'object', description: 'The choices of a drawing\'s conflicts: { "src/ctl.fsm.json": { "transitions/t1": "theirs", "states/s2": "mine" } }.', additionalProperties: { type: 'object', additionalProperties: { type: 'string', enum: ['mine', 'theirs'] } } } }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     async run({ project, resolve }) {
@@ -94,7 +94,7 @@ export const GIT_TOOLS = [
       let choices;
       try { choices = checkChoices(resolve); } catch (e) { throw toolError(e.message); }
       const r = await run(() => B().gitPull(project, { resolve: choices }));
-      return { text: [pullText(r), ...(r.resolved || []).map(p => `${p}: merged by its objects, its HDL made again.`)].join('\n'), data: r };
+      return { text: [pullText(r), ...(r.resolved || []).map(p => `${p}: merged by its objects, its HDL made again.`), ...(r.warnings || []).map(w => `WARNING: ${w}`)].join('\n'), data: r };
     },
   },
   {
