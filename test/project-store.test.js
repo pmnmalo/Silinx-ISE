@@ -131,6 +131,11 @@ test('folder: the exact errors (as the browser storage\'s)', async () => {
       [() => ops.renameFile('Err', 'src/a.vhd', 'src/a.vhd.'), "'src/a.vhd.': not renamed: name ending with a space or a dot ('a.vhd.')"],
       [() => ops.renameFile('Err', 'src/a.vhd', 'src/a|b.vhd'), "'src/a|b.vhd': not renamed: character not allowed in a name (< > : \" | ? *): 'a|b.vhd'"],
       [() => ops.renameFile('Err', 'lib', 'build'), "'build': not renamed: the project's build folder (build/) is Silinx's own"],
+      // a file written: its name by the same rules, as the local server's PUT file (#3414)
+      [() => ops.writeFile('Err', 'src/a.vhd.', 'x'), "'src/a.vhd.': not written: name ending with a space or a dot ('a.vhd.')"],
+      [() => ops.writeFile('Err', 'src/a\u202eb.vhd', 'x'), "'src/a\u202eb.vhd': not written: control, invisible or direction character in the name (U+202E)"],
+      [() => ops.writeFile('Err', '__proto__', 'x'), "'__proto__': not written: reserved name ('__proto__')"],
+      [() => ops.writeFile('Err', 'build/a|b.json', 'x'), "'build/a|b.json': not written: character not allowed in a name (< > : \" | ? *): 'a|b.json'"],
       [() => ops.writeFile('Err', '../out.v', 'x'), 'invalid path'],
     ];
     for (const [fn, msg] of errs) await assert.rejects(fn, { message: msg });

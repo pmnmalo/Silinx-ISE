@@ -296,6 +296,13 @@ export async function createProject({ name, template = 'empty', device, board, f
 export async function boardConstraints(dir, pj) {
   const r = resolveBoard(pj.board, { part: pj.device?.part });
   if (!r || !pj.top) return;
+  // (a constraints path that names the project's description or a hidden file, from a hand-made silinx.json: not
+  // written, #3411)
+  if (pj.constraints) {
+    const n = normalizePath(pj.constraints);
+    const reason = n.reason || (isProjectFile(n.path) ? `${PROJECT_FILE}, the project's description` : null);
+    if (reason) throw new HttpError(400, `the constraints file '${pj.constraints}' is not written: ${reason}`);
+  }
   const sources = [];
   for (const f of pj.files || []) {
     if (f.role === 'sim' || !/^(vhdl|verilog)$/.test(f.lang)) continue;
@@ -390,6 +397,11 @@ export async function writeFile(name, rel0, text) {
   if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
   // no hidden file (refuseHidden); build/ is written here too (the browser's open synthesis saves its netlists in build/open/)
   refuseHidden(dir, rel0, full, 'written');
+  // a name by the import gate's rules (#3414: no backslash, stream, trailing dot or space, invisible character…), as
+  // Rename's; build/'s own files by the rest of their path
+  const inBuild = /^build\//.test(rel);
+  const gated = normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
+  if (gated.reason) throw new HttpError(400, `'${rel0}': not written: ${gated.reason}`);
   await fs.mkdir(path.dirname(full), { recursive: true });
   // atomic: a reader (or a crash) never sees a half-written / empty file
   const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed

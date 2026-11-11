@@ -159,12 +159,17 @@ board or a PROM) without the user's say.
      source's line (1 MB), the nesting of brackets, XML elements and JSON (256), an HDL file's `elsif` / `else if`
      branches (1000). A zip's sizes are checked before each entry is inflated, and inflating stops at the size the
      entry declares.
-   - Names: relative to the project, no `..`, absolute path, drive letter, backslash, control character, `< > : " | ?
-     *`, hidden file or folder, reserved name (`build/`, `CON`, `NUL`, …), symbolic link, a name that differs from
+   - Names: relative to the project, no `..`, absolute path, drive letter, backslash, control character, invisible
+     or direction character (zero-width, bidi override, #3414), `< > : " | ? *`, hidden file or folder, reserved name
+     (`build/`, `CON`, `NUL`, `COM¹`, `__proto__`, …), symbolic link, a name that differs from
      another only as a case-insensitive file system reads it (its case, `ſ`, its NFC / NFD form: the server's fold,
-     `core/fold-name.js`), or another spelling of `silinx.json` (#3034). A refused entry is never inflated.
-   - XML (`.xise`, `.sch`, `.sym`, PNML, `.wcfg`, `.svg`): no DTD and no entity declaration, so no external entity
-     and no entity expansion, whatever parser reads it next (Silinx's own XML readers expand none either).
+     `core/fold-name.js`), or another spelling of `silinx.json` (#3034). A refused entry is never inflated. The same
+     rules hold for a file the server writes (`PUT /projects/:p/file`, #3414) and for the paths an imported
+     `silinx.json` names (its files, its constraints: never `silinx.json` itself, which updating the constraints would
+     overwrite, #3411).
+   - XML (`.xise`, `.sch`, `.sym`, PNML, `.wcfg`, `.svg`): valid UTF-8, declared so or not at all (#3414), with no DTD
+     and no entity declaration, so no external entity and no entity expansion, whatever parser reads it next (Silinx's
+     own XML readers expand none either).
    - Types by extension and content: a text file (a source, a drawing, constraints, a memory's data) that holds a
      NUL byte or is an HTML page is refused; text is read as UTF-8, its invalid bytes replaced with a warning. Any
      other file (a document, an image, a page or a script under its own extension, `.html`, `.js`) is kept as it is,
