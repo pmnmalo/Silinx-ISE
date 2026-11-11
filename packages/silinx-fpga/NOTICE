@@ -14,6 +14,10 @@ and Eigen, MPL-2.0: source code at https://gitlab.com/libeigen/eigen); for the i
 and the IceStorm tools (YoWASP's @yowasp/nextpnr-ice40, ISC, an optional dependency). Their licence texts are in
 THIRD-PARTY-NOTICES.md.
 
+It includes work ported from Project X-Ray, whose licence texts are in THIRD-PARTY-NOTICES.md too: the 7-series'
+bitstream writer (src/fpga/xc7/) follows its fasm2frames and xc7frames2bit (ISC), and the 7-series' bit database
+(bitdb/xc7/) is a subset of its database, prjxray-db (CC0 1.0).
+
 Your designs, and the netlists and bitstreams silinx-fpga makes of them, are not covered by this licence.
 
 silinx-fpga is an independent project, not affiliated with or endorsed by AMD/Xilinx. Xilinx, ISE and

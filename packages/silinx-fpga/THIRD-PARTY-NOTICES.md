@@ -1018,6 +1018,8 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
+Not in silinx-<version>.zip: Silinx downloads it from npm's registry on its first use.
+
 ## @yowasp/yosys 0.70.1258 — ISC
 
 https://yowasp.org/
