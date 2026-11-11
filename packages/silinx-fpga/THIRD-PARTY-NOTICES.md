@@ -6,7 +6,7 @@ which npm installs with it, and includes the ported ones (their code or data in 
 
 | Component | Version | Licence | Project |
 |---|---|---|---|
-| @silinx/nextpnr-himbaechel-spartan3e | 1.5.0 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
+| @silinx/nextpnr-himbaechel-spartan3e | 1.5.2 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @silinx/nextpnr-himbaechel-spartan6 | 0.4.1 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @silinx/nextpnr-himbaechel-xc7 | 0.1.1 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @yowasp/nextpnr-ecp5 | 0.11.825 | ISC | https://yowasp.org/ |
@@ -17,7 +17,7 @@ which npm installs with it, and includes the ported ones (their code or data in 
 | prjxray | c9f02d8 | ISC | https://github.com/f4pga/prjxray |
 | prjxray-db | 0a0adde | CC0-1.0 | https://github.com/f4pga/prjxray-db |
 
-## @silinx/nextpnr-himbaechel-spartan3e 1.5.0 — ISC
+## @silinx/nextpnr-himbaechel-spartan3e 1.5.2 — ISC
 
 https://github.com/pmnmalo/nextpnr-spartan
 
