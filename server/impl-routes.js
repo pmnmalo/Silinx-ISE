@@ -14,12 +14,13 @@ import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice } from 
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
-import { within, realOf } from './paths.js';
+import { within, nativeRealOf } from './paths.js';
 import * as Projects from './projects.js';
 import { mountXiseRoutes } from './xise-routes.js';
 import { IDENT } from './ident.js';
 import { isTrusted, untrustedMessage } from '../core/trust.js';
 import { normalizePath } from '../core/import-gate.js';
+import { foldName } from '../core/fold-name.js';
 
 // files that only Silinx understands: not part of an exported Xilinx ISE project
 export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|bool|fsm)\.json)$/i;
@@ -35,11 +36,17 @@ function topOf(project) {
 
 // An absolute .bit of the workspace is programmed as its project's (#3039): the project it is in, by its name and once
 // its links are followed, must be trusted, as the project's own route asks (#2830); a file outside the workspace
-// (iMPACT's file box: a .bit from the disk) is not any project's
+// (iMPACT's file box: a .bit from the disk) is not any project's. A case-insensitive file system (macOS, Windows)
+// takes the workspace's name in any case (#3358): the paths are compared as the system names them (realpath's
+// native form keeps the disk's case, JS's the one it is given), and by name with their case folded there.
+const FOLDS = process.platform === 'darwin' || process.platform === 'win32';
 async function checkWorkspaceBit(full) {
   const P = Projects, ws = path.resolve(P.workspaceDir()), names = new Set();
-  for (const [dir, f] of [[ws, path.resolve(full)], [realOf(ws), realOf(path.resolve(full))]]) {
-    if (f.startsWith(dir + path.sep)) names.add(path.relative(dir, f).split(path.sep)[0]);
+  const fold = s => (FOLDS ? foldName(s) : s);
+  for (const [dir, f] of [[ws, path.resolve(full)], [nativeRealOf(ws), nativeRealOf(path.resolve(full))]]) {
+    if (!fold(f).startsWith(fold(dir + path.sep))) continue;
+    const first = f.split(path.sep)[dir.split(path.sep).length];   // the folder of the workspace it is in
+    names.add(path.basename(nativeRealOf(path.join(ws, first))));  // the project's name, in its folder's case
   }
   for (const name of names) {
     let project = null;

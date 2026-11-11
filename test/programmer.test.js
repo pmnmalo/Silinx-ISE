@@ -322,6 +322,31 @@ test('program: an absolute bitfile of the workspace is programmed only when its 
   }
 });
 
+// #3358: on a case-insensitive file system (macOS, Windows) the workspace and the project named in another case are
+// the same folder: the bitstream is still its project's, and an untrusted one's is refused
+test('program: a workspace bitfile named in another case is still its project\'s', { skip: POSIX_ONLY }, async () => {
+  const ws = P.workspaceDir(), other = path.join(path.dirname(ws), path.basename(ws).toUpperCase());
+  if (!await fs.access(other).then(() => true, () => false)) return;   // a case-sensitive file system: nothing to check
+  await P.createProject({ name: 'Cased', board: 'basys2', fromOutside: true });
+  await fs.mkdir(path.join(P.projectDir('Cased'), 'build'), { recursive: true });
+  await fs.writeFile(path.join(P.projectDir('Cased'), 'build', 'top.bit'), makeBit());
+  const refused = "project 'Cased' came from outside (imported): programming the board runs only once you trust it (Trust Project, in the console when the project opens)";
+  for (const bitfile of [path.join(other, 'CASED', 'build', 'top.bit'), path.join(other, 'cased', 'BUILD', 'TOP.BIT'),
+    path.join(ws, 'cASED', 'build', 'top.bit')]) {
+    const r = await app.call('POST', '/program', { bitfile });
+    assert.equal(r.status, 403, bitfile);
+    assert.deepEqual(r.body, { error: refused }, bitfile);
+  }
+  const loose = path.join(ws, 'loose-cased.bit'), named = path.join(other, 'LOOSE-CASED.BIT');
+  await fs.writeFile(loose, makeBit());
+  const r = await app.call('POST', '/program', { bitfile: named });
+  assert.deepEqual([r.status, r.body], [403, { error: `${named} is in the workspace but in no project: a workspace's bitstream is programmed from its project` }]);
+  await P.trustProject('Cased');
+  const j = await run('/program', { bitfile: path.join(other, 'CASED', 'build', 'top.bit'), tool: 'xc3sprog', cable: 'xpc' });
+  assert.equal(j.status, 'ok');
+  assert.deepEqual(j.result.warnings, []);
+});
+
 // ------------------------------------------------------------------------------------------------
 // Platform Flash PROM
 // ------------------------------------------------------------------------------------------------
