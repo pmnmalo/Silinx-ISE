@@ -1,11 +1,12 @@
 // A shared project's drawings edited live (#3183, phase 3 of #3180): each drawing as a Yjs structure of its own, in the
 // project's document (core/collab-doc.js), so that several participants edit one drawing at once and their changes merge
 // per object and per field (a Y.Text of its JSON would merge characters, and break it).
-//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm')
+//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm', 'tt')
 //                                    settings  Y.Map  key -> value: the drawing's own settings (its name, language,
 //                                                     generatedFile, encoding, inputs, outputs, initial state, …)
 //                                    <coll>    Y.Map  id -> Y.Map  field -> value, one per object of each of its
-//                                                     collections (the FSM: states, transitions); _o its place
+//                                                     collections (the FSM: states, transitions; the truth table: its
+//                                                     outputs, by name, a field per cell of its column); _o its place
 // A value is JSON (a field's whole value: last write wins, per field). An editor keeps its "model in, model out"
 // interface: putDrawing applies a new model as the smallest set of changes (a diff by ids against `base`, the model the
 // editor last had: what others changed since is kept), drawingModel reads it back (normalized, as the editor's).
@@ -19,14 +20,47 @@
 //   drawingPathsOf(tr)                                  the drawings a transaction changed
 import * as Y from 'yjs';
 import { normalizeFsm } from './fsm.js';
+import { normalizeTable } from './logic.js';
 import { drawingKind, liveDrawing } from './collab-kinds.js';
 export { drawingKind, liveDrawing };
 
+// the truth table's shape (#3183): its outputs a collection keyed by their names (two participants adding one output
+// add one), each with a field per cell of its column (c0, c1, …: two changing two cells of one column keep both), its
+// typed expression, its form and minimal solutions (core/logic-choice.js); the rest its settings (its inputs, whose
+// order makes the rows, a whole value)
+function ttShape(m) {
+  const { outputs, table, exprs = {}, forms = {}, solutions = {}, ...settings } = normalizeTable(m);
+  return {
+    ...settings,
+    outputs: outputs.map(o => ({
+      id: o, ...Object.fromEntries([...table[o]].map((c, r) => [`c${r}`, c])),
+      ...(exprs[o] ? { expr: exprs[o] } : {}), ...(forms[o] ? { form: forms[o] } : {}), ...(solutions[o] ? { solution: solutions[o] } : {}),
+    })),
+  };
+}
+function ttModel(sh) {
+  const { outputs = [], ...settings } = sh;
+  const rows = 1 << Math.min(arr(settings.inputs).length, 8);
+  const outs = outputs.map(o => ({ ...o, id: String(o.id) }));
+  const of = f => Object.fromEntries(outs.filter(o => o[f] != null).map(o => [o.id, o[f]]));
+  const doc = {
+    ...settings, outputs: outs.map(o => o.id),
+    table: Object.fromEntries(outs.map(o => [o.id, Array.from({ length: rows }, (_, r) => String(o[`c${r}`] ?? '0')).join('')])),
+    exprs: of('expr'), forms: of('form'), solutions: of('solution'),
+  };
+  // (its keys in one order on every side, whatever order the structure's settings arrived in: the same file everywhere)
+  const keys = [...TT_KEYS.filter(k => k in doc), ...Object.keys(doc).filter(k => !TT_KEYS.includes(k)).sort()];
+  return normalizeTable(Object.fromEntries(keys.map(k => [k, doc[k]])));
+}
+const TT_KEYS = ['version', 'name', 'inputs', 'outputs', 'table', 'exprs', 'notes', 'form', 'lang', 'kmapOrder', 'generatedFile', 'forms', 'solutions'];
+
 /** The structure of the drawings edited live (core/collab-kinds.js), by kind: their collections, the fields of an
  *  object that name another (refs: a connection goes with what it connects, #3183), the settings that do (setRefs),
- *  the editor's normalization. */
+ *  shape (a model as its settings and collections, normalized) and model (back, as its editor has it); ownIds: a
+ *  participant's new objects' ids made its own (ids that are names, a truth table's outputs, are not). */
 export const DRAWING_KINDS = Object.freeze({
-  fsm: { collections: ['states', 'transitions'], refs: { transitions: { from: 'states', to: 'states' } }, setRefs: { initial: 'states' }, normalize: normalizeFsm },
+  fsm: { collections: ['states', 'transitions'], refs: { transitions: { from: 'states', to: 'states' } }, setRefs: { initial: 'states' }, shape: normalizeFsm, model: normalizeFsm, ownIds: true },
+  tt: { collections: ['outputs'], refs: {}, setRefs: {}, shape: ttShape, model: ttModel, ownIds: false },
 });
 /** What a follower takes of a room's drawings (#3361: the owner may be hostile): their objects, all together. */
 export const DRAWING_OBJECTS_MAX = 100_000;
@@ -82,7 +116,7 @@ export function drawingModel(doc, path) {
   const raw = rawModel(ymap, K);
   const dropped = dangling(raw, K);
   for (const { coll, id } of dropped) raw[coll] = raw[coll].filter(o => String(o.id) !== id);
-  return { model: K.normalize(raw), dropped };
+  return { model: K.model(raw), dropped };
 }
 
 /** The connections whose ends are gone, deleted from the structure (a merge's, said by the caller: nothing is changed
@@ -112,7 +146,7 @@ export function putDrawing(doc, path, model, { base = null, client = null, origi
   const kind = drawingKind(path), K = DRAWING_KINDS[kind];
   if (!K) throw new Error(`${path}: not a drawing that is edited live`);
   const drawings = doc.getMap('drawings');
-  const next = K.normalize(model);
+  const next = K.shape(model);
   const renamed = new Map();
   doc.transact(() => {
     let ymap = drawingMap(doc, path);
@@ -124,9 +158,9 @@ export function putDrawing(doc, path, model, { base = null, client = null, origi
       drawings.set(path, ymap);
     }
     for (const c of ['settings', ...K.collections]) if (!(ymap.get(c) instanceof Y.Map)) ymap.set(c, new Y.Map());
-    const b = base ? K.normalize(base) : rawModel(ymap, K);
+    const b = base ? K.shape(base) : rawModel(ymap, K);
     // (the new objects' ids: a participant's own, unique in the structure)
-    if (client !== null) {
+    if (client !== null && K.ownIds) {
       const tag = Number(client).toString(36);
       for (const c of K.collections) {
         const had = new Set(arr(b[c]).map(o => String(o.id))), cm = collMap(ymap, c);

@@ -14,10 +14,11 @@ import * as Y from 'yjs';
 import { putDrawing, drawingModel, drawingMap, pruneDrawing } from '/core/collab-model.js';
 
 const RETRY_MS = 120, MERGE_MS = 1500;
-const editorOf = d => d?.fsmEditor || null;
+/** The editor of a drawing edited live (#3183: a state diagram's, a truth table's), null: none. */
+export const editorOf = d => d?.fsmEditor || d?.ttEditor || null;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-/** A drawing's editor (d: its document, its editor in d.fsmEditor) bound to its structure; first made the same, the
+/** A drawing's editor (d: its document, its editor editorOf(d)) bound to its structure; first made the same, the
  *  editor's into the structure (mine: the owner's, its unsaved changes kept) or the structure's into the editor. say(text):
  *  a line of the console (a connection removed with what it connected); accept(model): whether a merged model is shown
  *  (an editor's page: through the import gate). Returns unbind() (null: nothing to bind, no structure yet). */
