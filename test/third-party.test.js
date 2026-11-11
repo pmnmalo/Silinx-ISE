@@ -22,7 +22,7 @@ test('every component has a known licence and its full text; the editor\'s modul
   const md = fs.readFileSync(path.join(ROOT, 'THIRD-PARTY-NOTICES.md'), 'utf8');
   assert.ok(THIRD_PARTY.length > 10);
   for (const c of THIRD_PARTY) {
-    assert.match(c.license, /^(MIT|ISC|BSD-[23]-Clause|Apache-2\.0|EPL-2\.0 OR GPL-3\.0-or-later|LGPL-2\.1)$/, `${c.name}: licence ${c.license}`);
+    assert.match(c.license, /^(MIT|ISC|BSD-[23]-Clause|Apache-2\.0|EPL-2\.0 OR GPL-3\.0-or-later|LGPL-2\.1|CC0-1\.0)$/, `${c.name}: licence ${c.license}`);
     const sec = new RegExp(`## ${c.name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} ${c.version} — [^\\n]*\\n\\n[^\\n]*\\n\\n\`\`\`text\\n([\\s\\S]*?)\\n\`\`\``).exec(md);
     assert.ok(sec, `${c.name} has a section`);
     assert.ok(sec[1].length > 200 && !/no licence file/.test(sec[1]), `${c.name}: the licence text`);
@@ -84,7 +84,8 @@ test('silinx-fpga: Apache-2.0 (LICENSE, package.json), its NOTICE, its dependenc
   const md = fs.readFileSync(path.join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8');
   assert.match(md, /^# Third-party notices\n\nsilinx-fpga \(Copyright 2026 Pedro Maló, Apache-2\.0\)/);
   const listed = [...md.matchAll(/^## (\S+) (\S+) — (\S+)$/gm)].map(m => m[1]);
-  assert.deepEqual(listed, Object.keys({ ...json.dependencies, ...json.peerDependencies }).sort());   // (an optional peer's: the iCE40's, #2295)
+  // (an optional peer's: the iCE40's, #2295; and the components ported into it: Project X-Ray's, #3144)
+  assert.deepEqual(listed, [...Object.keys({ ...json.dependencies, ...json.peerDependencies }), 'prjxray', 'prjxray-db'].sort());
   for (const name of listed) {
     const sec = new RegExp(`## ${name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} [^\\n]*\\n\\n[^\\n]*\\n\\n\`\`\`text\\n([\\s\\S]*?)\\n\`\`\``).exec(md);
     assert.ok(sec && sec[1].length > 200 && !/no licence file/.test(sec[1]), `${name}: the licence text`);
