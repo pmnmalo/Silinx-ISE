@@ -110,3 +110,22 @@ uiTest('#3176 the logic analyzer: its settings (a problem beside the fields, the
   await page.waitFor(() => document.querySelector('#procs')?.textContent.includes('Configure Target Device'), [], { what: 'ISE\'s processes' });
   assert.equal(await page.eval(() => document.querySelector('#procs').textContent.includes('Logic Analyzer')), false);
 }, { timeout: 180000, skip: !PY && 'no Python 3 here' });
+
+uiTest('#3340 a capture whose samples are all the same (a slow signal: blinky\'s LEDs in 2048 samples, 41 us): its window shows the probe, a flat wave, no error', E, async (page) => {
+  await makeProject(env, { name: 'Flat', template: 'blinky', board: 'basys2' });
+  fs.writeFileSync(path.join(env.server.configDir, 'config.json'), JSON.stringify({ mode: 'silinx', paths: { adepttool: STUB, adepttoolPython: PY } }));
+  fs.writeFileSync(path.join(env.server.configDir, 'ila-stub.json'), JSON.stringify({ width: 8, depth: 2048, fill: 2, samples: Array(2048).fill('a5') }));
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  const file = path.join(env.server.workspace, 'Flat', 'silinx.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), capture: { probes: ['led'], clock: 'clk', depth: 2048, pre: 0, trigger: { combine: 'and', conditions: [] } } }));
+  await page.openProject('Flat');
+  await reloadToolchain(page);
+  const before = await page.eval(() => window.__console().length);
+  await page.treeRow('#procs', 'Analyze Design Using the Logic Analyzer', { dbl: true });
+  await page.waitFor(() => window.Silinx.active?.view?.getState().markers.length && !window.Silinx.active.view.state.running, [], { what: 'the capture\'s window', timeout: 60000 });
+  const lines = await page.eval(c => window.__console().slice(c), before);
+  assert.match(lines, /Logic analyzer: 2048 samples of led, the trigger at sample 0/);
+  assert.doesNotMatch(lines, /ERROR|WARNING/);
+  // (the probe's row, its value the samples' all along)
+  assert.deepEqual(await page.eval(() => window.Silinx.active.view.state.rows.map(r => [r.sig.path, r.sig.wave.t.length])), [['capture_replay.led', 1]]);
+}, { timeout: 120000, skip: !PY && 'no Python 3 here' });

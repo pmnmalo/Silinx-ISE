@@ -152,3 +152,22 @@ test('a capture replayed (VHDL, Verilog): its module\'s simulated waves are the 
   }
 });
 
+
+test('#3340 a capture replayed whose samples do not change (all of them, its last ones): it compiles in VHDL and Verilog, its waves the samples', () => {
+  const spec = capSpec({ depth: 16, pre: 0, probes: [{ name: 'led', width: 8 }] });
+  const flat = Array(16).fill(0xa5n), tail = Array.from({ length: 16 }, (_, k) => BigInt(Math.min(k, 9)));
+  for (const led of [flat, tail]) {
+    const cap = { samples: led, probes: { led }, trigger: 0 };
+    for (const lang of ['vhdl', 'verilog']) {
+      const what = `${lang}, ${led === flat ? 'all the same' : 'the last ones the same'}`;
+      const lib = compile([{ path: `sim/ila_replay.${lang === 'verilog' ? 'v' : 'vhd'}`, text: replayBench(spec, cap, { lang, period: 10000 }) }]);
+      assert.deepEqual(lib.errors.map(e => e.message), [], what);
+      const design = elaborate(lib, 'ila_replay');
+      assert.deepEqual(design.diags.map(d => d.message), [], `${what}: no warnings`);
+      const sim = new Simulator(design);
+      sim.run(16 * 10000 + 1);
+      const sig = design.signals.find(s => s.name === 'led');
+      assert.deepEqual(Array.from({ length: 16 }, (_, k) => BigInt(`0b${V.toBin(sim.valueAt(sig, k * 10000 + 5000))}`)), led, what);
+    }
+  }
+});

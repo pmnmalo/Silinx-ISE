@@ -134,8 +134,11 @@ export async function openCaptureView(capture = null) {
   const { replayBench } = await import('/core/ila-capture.js');
   const name = p => p.path.replace(/[.[\]]+/g, '_').replace(/_+$/, '');
   const spec = { name: 'capture', lang: 'verilog', depth: capture.depth, pre: capture.pre, probes: capture.probes.map(p => ({ name: name(p), width: p.width })) };
-  const cap = { samples: Array.from({ length: capture.depth }, () => 0n), probes: Object.fromEntries(capture.probes.map(p => [name(p), p.samples.map(v => BigInt(v))])) };
-  const design = elaborate(compile([{ path: 'build/capture_replay.v', lang: 'verilog', text: replayBench(spec, cap, { lang: 'verilog', period: PERIOD }) }]), 'capture_replay');
+  const cap = { samples: Array.from({ length: capture.depth }, () => 0n), trigger: capture.trigger, probes: Object.fromEntries(capture.probes.map(p => [name(p), p.samples.map(v => BigInt(v))])) };
+  const lib = compile([{ path: 'build/capture_replay.v', lang: 'verilog', text: replayBench(spec, cap, { lang: 'verilog', period: PERIOD }) }]);
+  // (a replay that does not compile: said, not an empty window, #3340)
+  if (lib.errors.length) { log(`ERROR: View the Last Capture: the capture's replay does not compile: ${lib.errors[0].message}`); return; }
+  const design = elaborate(lib, 'capture_replay');
   const sim = new Simulator(design);
   const id = 'capture';
   const prev = findDoc(id);
