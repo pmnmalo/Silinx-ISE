@@ -10,6 +10,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { s6Device, s6Phys, s6Verilog, NEXYS3_LD, NEXYS3_SW } from './s6-lib.mjs';
 import { loadBitDbS6 } from '../packages/silinx-fpga/src/fpga/s6/bitdb-node.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { s6Sites } from '../packages/silinx-fpga/src/fpga/s6/sites.js';
 import { padPathsS6, padFits } from '../packages/silinx-fpga/src/fpga/s6/pad-paths.js';
 import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
 import { checkPlacementS6 } from '../packages/silinx-fpga/src/fpga/s6/place-check.js';
@@ -35,6 +37,21 @@ describe('the Spartan-6 pads\' known I/O paths (#3152)', () => {
     assert.deepEqual(without(m, 'out'), ['A10', 'A11', 'A12', 'A13', 'A14', 'A15', 'A16', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8',
       'A9', 'C11', 'C14', 'C4', 'C6', 'C8', 'C9', 'E13', 'F9']);
     assert.deepEqual(without(m, 'in'), ['F9', 'G9', 'R7', 'T7']);
+  });
+
+  test('#3349: with the PIPs held out of Silinx\'s flow (s6-pips-held.json), as nextpnr\'s chip database has them, the TIOI_INNER slaves\' pads take an output', () => {
+    // (what is left: the TIOI_OUTER slave OLOGIC2's D1 -> OQ, not measured yet, #3350; the 4 inputs, #3169's half)
+    for (const [part, noOut, noIn] of [
+      ['xc6slx16csg324-3', ['A11', 'A12', 'A4', 'C11', 'C12', 'C14', 'C4', 'C6', 'C8', 'C9', 'E12', 'E13', 'E6', 'E8', 'F8', 'F9'], ['F9', 'G9', 'U11', 'V11']],
+      ['xc6slx45csg324-3', ['A11', 'A13', 'A4', 'A7', 'C11', 'C14', 'C4', 'C6', 'C8', 'C9', 'E13', 'F9'], ['F9', 'G9', 'R7', 'T7']]]) {
+      const device = loadDeviceCache(part), sites = s6Sites(device), m = padPathsS6(device, loadBitDbS6(part, { held: true }), sites);
+      assert.equal(m.size, sites.pads.size);
+      assert.deepEqual(without(m, 'out'), noOut, part);
+      assert.ok(noOut.every(p => { const t = sites.pads.get(p).tile; return device.tileNames.some(n => n === t.replace(/^TIOB(_SINGLE)?/, 'TIOI_OUTER')); }), part);
+      assert.deepEqual(without(m, 'in'), noIn, part);
+    }
+    // (Silinx's flow: as above, the 30 pads without)
+    assert.equal(without(paths('xc6slx16csg324-3').paths, 'out').length, 30);
   });
 
   test('padFits: an output needs the O path, an input the I path, a bidirectional port both; no paths: every pad', () => {
