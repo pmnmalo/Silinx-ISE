@@ -4,7 +4,7 @@
 // translation), the table's schematic (the table, its HDL), an ASM chart (its state diagram, HDL), a Petri net (its state
 // machine, HDL), a schematic (its HDL), an HDL source (its translation), a test bench (its translation, its unit under
 // test), a C source (its HDL, its synthesis report), the report (the C, the HDL), a waveform of a test bench (the bench, its
-// unit under test). Each entry opens the right view on the other side, the document kept in front; a view open already
+// unit under test); none for the Design Summary and the power report (#3310). Each entry opens the right view on the other side, the document kept in front; a view open already
 // is brought to the front there, not made again; a view that cannot be made (an ASM chart that is not a plain state
 // machine) says why in the console and leaves the split as it was. Portuguese; both interfaces. No warnings but that one.
 import { before, after } from 'node:test';
@@ -193,4 +193,54 @@ uiTest('#2834 a C source: its HDL and its synthesis report beside, the report\'s
   await page.closeMenus();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+}, { timeout: 120000 });
+
+// a tab's whole menu
+const menuOf = async (page, title) => {
+  await page.rightClick(await tab(page, title));
+  const m = await page.waitFor(() => { const l = [...document.querySelectorAll('body > .menu-popup .mi')].map((i) => i.textContent.trim()); return l.length ? l : null; }, [], { what: 'the tab menu' });
+  await page.closeMenus();
+  return m;
+};
+
+uiTest('#3310 the Design Summary and the power report: no Show … Beside in their tab\'s menu nor in View, split or not; the RTL schematic keeps its module\'s views; Portuguese; no warnings', E, async (page) => {
+  await makeProject(env, { name: 'RelatedSummary', template: 'traffic' });
+  await page.openProject('RelatedSummary');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'tb_traffic'), [], { what: 'the modules' });
+  const related = (ids) => page.eval(async (xs) => { const { relatedViews } = await import('/js/related-views.js'); return xs.map((id) => relatedViews({ id }).map((v) => v.label)); }, ids);
+  const CLOSE = ['Close', 'Close Others', 'Close All'];
+
+  // the summary, the report: Close, Close Others, Close All; nothing in View
+  await page.eval(async () => (await import('/js/app.js')).openSummary());
+  await page.waitFor(() => window.Silinx.active?.id === 'summary', [], { what: 'the Design Summary' });
+  assert.deepEqual(await menuOf(page, 'Design Summary'), CLOSE);
+  assert.deepEqual(await viewMenu(page), []);
+  await page.eval(async () => { const { showTextDoc } = await import('/js/implement.js'); await showTextDoc('top.pwr', 'Estimated power: 1 mW'); });
+  await page.waitFor(() => window.Silinx.active?.id === 'text:top.pwr', [], { what: 'the power report' });
+  assert.deepEqual(await menuOf(page, 'top.pwr'), CLOSE);
+  assert.deepEqual(await viewMenu(page), []);
+  // none for them; the RTL / technology schematic and the C model keep their module's
+  assert.deepEqual(await related(['summary', 'text:top.pwr', 'rtl:top', 'tech:top', 'cmodel:top']),
+    [[], [], ['Show VHDL Beside', 'Show Verilog Beside'], ['Show VHDL Beside', 'Show Verilog Beside'], ['Show VHDL Beside', 'Show Verilog Beside']]);
+
+  // split: Move to the Other Side and Close Split as well
+  await open(page, 'src/top.vhd', 'file:src/top.vhd');
+  await show(page, 'top.vhd', 'Show Verilog Beside', 'tr:src/top.vhd');
+  await page.eval(() => window.SilinxApp.activateDoc(window.SilinxApp.findDoc('summary')));
+  await page.waitFor(() => window.Silinx.active?.id === 'summary', [], { what: 'the Design Summary in front' });
+  const SPLIT = [...CLOSE, 'Move to the Other Side', 'Close Split'];
+  assert.deepEqual(await menuOf(page, 'Design Summary'), SPLIT);
+  assert.deepEqual(await viewMenu(page), []);
+  await page.eval(() => window.SilinxApp.activateDoc(window.SilinxApp.findDoc('text:top.pwr')));
+  await page.waitFor(() => window.Silinx.active?.id === 'text:top.pwr', [], { what: 'the power report in front' });
+  assert.deepEqual(await menuOf(page, 'top.pwr'), SPLIT);
+  assert.deepEqual(await viewMenu(page), []);
+
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  assert.deepEqual(await menuOf(page, 'top.pwr'), ['Fechar', 'Fechar Outros', 'Fechar Todos', 'Mover para o Outro Lado', 'Fechar a Divisão']);
+  await page.eval(() => window.SilinxApp.activateDoc(window.SilinxApp.findDoc('summary')));
+  assert.deepEqual(await menuOf(page, 'Resumo do Projeto'), ['Fechar', 'Fechar Outros', 'Fechar Todos', 'Mover para o Outro Lado', 'Fechar a Divisão']);
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await noWarnings(page);
 }, { timeout: 120000 });
