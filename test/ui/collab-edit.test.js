@@ -80,7 +80,7 @@ uiTest('#3182 an editor edits a text file live with the owner: the same text on 
     await page.key('Escape');
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
     // (#3355) the owner's project, trusted, untrusted by the editor's first change written: said once, with its button
-    const untrusted = 'WARNING: Project "Live" was changed by an editor of its shared link: it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.';
+    const untrusted = 'WARNING: Project "Live" was changed by an editor of its shared link: it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it. Trust Project';   // (its button's label, in the console's text)
     assert.deepEqual(await page.eval(() => [window.Silinx.project.trusted, window.Silinx.project.madeBy]), [false, 'editor']);
     assert.equal(JSON.parse(await readWs(env, 'Live', 'silinx.json')).trusted, false);
     // a change the import gate refuses (a NUL byte in a text file): not written, undone at both, said at the owner's
