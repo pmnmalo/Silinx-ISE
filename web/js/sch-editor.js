@@ -14,6 +14,7 @@
 //   device                     // the project's part (a record of S.devices.parts): its family's Device Primitives in the
 //                              // palette, their count in Symbol Info (#791); ed.setDevice(part) when it changes
 //   ed.getDoc(); ed.setDoc(doc); ed.setLink(file); ed.setModules(modules); ed.fit(); ed.destroy();
+//   edited live (#3183): ed.setShared(history | null); ed.applyModel(doc, { renamed, mine }); ed.busy() (sch-edits.js)
 //   ed.copy(); ed.cut(); ed.paste(); ed.deleteSelection(); ed.canCopy(); ed.canPaste();   // Edit menu (#677)
 //
 // Styles: web/css/sch-editor.css (scoped under .sch-editor, themed by the ISE variables of theme.css).
@@ -208,10 +209,10 @@ export function mountSchEditor(container, opts = {}) {
     infoTarget: (...a) => infoTarget(...a) });
 
   // ---------------- edits, undo, change notification (sch-edits.js)
-  const { changed, edit, nextId, nextInstName, pruneSel, pushUndo, redo, snapshot, undo } = mountSchEdits({
+  const { applyModel, busy, changed, edit, nextId, nextInstName, pruneSel, pushUndo, redo, setShared, shared, snapshot, undo } = mountSchEdits({
     opts, changeTimer: () => changeTimer, destroyed: () => destroyed, doc: () => doc, lastDiags: () => lastDiags,
     live: () => live, modules: () => modules, readOnly, redoStack, render, renderProps, sel: () => sel, undoStack, setDoc: (v) => { doc = v; },
-    setLastDiags: (v) => { lastDiags = v; }, setChangeTimer: (v) => { changeTimer = v; }
+    setLastDiags: (v) => { lastDiags = v; }, setChangeTimer: (v) => { changeTimer = v; }, busy: () => (!!drag && !['pan', 'band'].includes(drag.kind)) || !!wireDraw || propBody.contains(document.activeElement)
   });
 
   // ---------------- tools (sch-tools.js)
@@ -341,8 +342,8 @@ export function mountSchEditor(container, opts = {}) {
     getDoc: () => clone(normalizeDoc(doc)),
     /** A note at the end of the toolbar (a read-only view's "Read-only, generated from …", #1193), or none. */
     setBanner(node) { tb.querySelector('.se-banner')?.remove(); if (node) { node.classList.add('se-banner'); tb.append(node); } },
-    undo: () => undo(), redo: () => redo(),
-    canUndo: () => undoStack.length > 0 && !live, canRedo: () => redoStack.length > 0 && !live,
+    undo: () => undo(), redo: () => redo(), setShared, applyModel, busy,   // (edited live, #3183: sch-edits.js)
+    canUndo: () => !live && (shared() ? shared().canUndo() : undoStack.length > 0), canRedo: () => !live && (shared() ? shared().canRedo() : redoStack.length > 0),
     // Edit ▸ Cut / Copy / Paste / Delete (#677)
     copy: () => copySel(), cut: () => copySel(true), paste: (clip, offset) => paste(clip, offset), deleteSelection: () => { if (!live) deleteSel(); },
     canCopy: () => !readOnly && !live && sel.size > 0, canPaste: () => !readOnly && !live && hasClip('schematic'),

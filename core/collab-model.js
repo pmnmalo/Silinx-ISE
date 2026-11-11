@@ -1,14 +1,14 @@
 // A shared project's drawings edited live (#3183, phase 3 of #3180): each drawing as a Yjs structure of its own, in the
 // project's document (core/collab-doc.js), so that several participants edit one drawing at once and their changes merge
 // per object and per field (a Y.Text of its JSON would merge characters, and break it).
-//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm', 'tt', 'asm', 'pn')
+//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm', 'tt', 'asm', 'pn', 'sch')
 //                                    settings  Y.Map  key -> value: the drawing's own settings (its name, language,
 //                                                     generatedFile, encoding, inputs, outputs, initial state, …)
 //                                    <coll>    Y.Map  id -> Y.Map  field -> value, one per object of each of its
 //                                                     collections (the FSM: states, transitions; the truth table: its
 //                                                     outputs, by name, a field per cell of its column; the ASM chart:
-//                                                     boxes, links; the Petri net: places, transitions, arcs); _o its
-//                                                     place
+//                                                     boxes, links; the Petri net: places, transitions, arcs; the
+//                                                     schematic: symbols, wires, labels, ports, graphics); _o its place
 // A value is JSON (a field's whole value: last write wins, per field). An editor keeps its "model in, model out"
 // interface: putDrawing applies a new model as the smallest set of changes (a diff by ids against `base`, the model the
 // editor last had: what others changed since is kept), drawingModel reads it back (normalized, as the editor's).
@@ -25,6 +25,7 @@ import { normalizeFsm } from './fsm.js';
 import { normalizeTable } from './logic.js';
 import { normalizeModel as normalizeAsm } from './asm.js';
 import { normalizePetri } from './petri.js';
+import { normalizeDoc } from './schdoc.js';
 import { drawingKind, liveDrawing } from './collab-kinds.js';
 export { drawingKind, liveDrawing };
 
@@ -52,11 +53,20 @@ function ttModel(sh) {
     table: Object.fromEntries(outs.map(o => [o.id, Array.from({ length: rows }, (_, r) => String(o[`c${r}`] ?? '0')).join('')])),
     exprs: of('expr'), forms: of('form'), solutions: of('solution'),
   };
-  // (its keys in one order on every side, whatever order the structure's settings arrived in: the same file everywhere)
-  const keys = [...TT_KEYS.filter(k => k in doc), ...Object.keys(doc).filter(k => !TT_KEYS.includes(k)).sort()];
-  return normalizeTable(Object.fromEntries(keys.map(k => [k, doc[k]])));
+  return normalizeTable(ordered(doc, TT_KEYS));
 }
 const TT_KEYS = ['version', 'name', 'inputs', 'outputs', 'table', 'exprs', 'notes', 'form', 'lang', 'kmapOrder', 'generatedFile', 'forms', 'solutions'];
+// a model's keys in one order on every side (the known ones first, the others sorted), whatever order the structure's
+// settings arrived in: the same file everywhere
+const ordered = (doc, known) => Object.fromEntries([...known.filter(k => k in doc), ...Object.keys(doc).filter(k => !known.includes(k)).sort()].map(k => [k, doc[k]]));
+
+// the schematic's shape (#3183): its symbols, wires, net names (labels), I/O markers (ports) and drawings with no
+// function (graphics), keyed by their ids; its name, language, sheet and the rest its settings. Its connections are
+// where its wires end, not ids: a wire left at a pin another deleted is said by its check, as any problem
+const SCH_COLLS = ['symbols', 'wires', 'labels', 'ports', 'graphics'];
+const SCH_KEYS = ['version', 'name', 'lang', 'sheet', ...SCH_COLLS, 'description', 'generatedFile'];
+const schShape = m => { const d = normalizeDoc(m); return { ...d, graphics: arr(d.graphics) }; };
+const schModel = sh => normalizeDoc(ordered(sh, SCH_KEYS));
 
 /** The structure of the drawings edited live (core/collab-kinds.js), by kind: their collections, the fields of an
  *  object that name another (refs, in a collection or one of several: a connection goes with what it connects, #3183), the settings that do (setRefs),
@@ -67,6 +77,7 @@ export const DRAWING_KINDS = Object.freeze({
   tt: { collections: ['outputs'], refs: {}, setRefs: {}, shape: ttShape, model: ttModel, ownIds: false },
   asm: { collections: ['nodes', 'edges'], refs: { edges: { from: 'nodes', to: 'nodes' } }, setRefs: { initial: 'nodes' }, shape: normalizeAsm, model: normalizeAsm, ownIds: true },
   pn: { collections: ['places', 'transitions', 'arcs'], refs: { arcs: { from: ['places', 'transitions'], to: ['places', 'transitions'] } }, setRefs: {}, shape: normalizePetri, model: normalizePetri, ownIds: true },
+  sch: { collections: SCH_COLLS, refs: {}, setRefs: {}, shape: schShape, model: schModel, ownIds: true },
 });
 /** What a follower takes of a room's drawings (#3361: the owner may be hostile): their objects, all together. */
 export const DRAWING_OBJECTS_MAX = 100_000;
@@ -142,6 +153,15 @@ function setFields(om, base, next) {
     if (!(k in next) || next[k] === undefined) { if (base && k in base && om.has(k)) om.delete(k); continue; }
     if ((!base || !same(base[k], next[k])) && !(om.has(k) && same(json(om.get(k)), next[k]))) om.set(k, next[k]);
   }
+}
+
+/** A drawing's file text, as its editor saves it (a schematic indented by one space, the others by two). */
+export const drawingText = (path, model) => JSON.stringify(model, null, drawingKind(path) === 'sch' ? 1 : 2);
+/** Whether two models are the same, whatever their keys' order. */
+export const sameModel = (a, b) => canon(a) === canon(b);
+/** Whether two drawing texts hold the same drawing, whatever their keys' order and spacing (false: one is not JSON). */
+export function sameDrawing(a, b) {
+  try { return typeof a === 'string' && typeof b === 'string' && canon(JSON.parse(a)) === canon(JSON.parse(b)); } catch { return false; }
 }
 
 /** A new model of the drawing applied to its structure: what changed from `base` (the model this participant last had;

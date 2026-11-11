@@ -1,17 +1,19 @@
 // The schematic editor's edits (#405: out of mountSchEditor in sch-editor.js): an edit made (the drawing normalized,
 // an undo step when it changed, onChange told a moment later), Undo and Redo, the selection pruned after them, and new
-// ids and instance names.
+// ids and instance names. A schematic edited live (#3183, web/js/collab-drawing.js): each change pushed to the shared
+// history at once, Undo / Redo its (this participant's own changes), the merged document applied in place.
 import { normalizeDoc, netlist } from '/core/schdoc.js';
 import { markerDirections } from '/core/schdoc-markers.js';
 import { autoInstName } from '/core/schname.js';
 import { KEYS, clone } from './sch-editor.js';
 
-/** { changed, edit, nextId, nextInstName, pruneSel, pushUndo, redo, snapshot, undo } of mountSchEditor (changeTimer(), destroyed(), doc(), lastDiags(), live(), sel(): its current values). */
+/** { applyModel, busy, changed, edit, nextId, nextInstName, pruneSel, pushUndo, redo, setShared, shared, snapshot, undo } of mountSchEditor (changeTimer(), destroyed(), doc(), lastDiags(), live(), sel(): its current values). */
 export function mountSchEdits(ctx) {
   const {
     opts, changeTimer, destroyed, doc, lastDiags, live, modules, readOnly, redoStack, render, renderProps, sel, undoStack,
-    setDoc, setLastDiags, setChangeTimer
+    setDoc, setLastDiags, setChangeTimer, busy = () => false
   } = ctx;
+  let shared = null;
   // the netlist of a drawing, null when it cannot be made (the markers' directions then left as they are)
   const nlOf = d => { try { return netlist(d, { modules: modules() }); } catch { return null; } };
 
@@ -33,17 +35,20 @@ export function mountSchEdits(ctx) {
   }
   function pushUndo(before) { undoStack.push(before); if (undoStack.length > 300) undoStack.shift(); redoStack.length = 0; }
   function changed() {
+    shared?.push(normalizeDoc(doc()));   // (its merge may change the document)
     setLastDiags(null);
     clearTimeout(changeTimer());
     setChangeTimer(setTimeout(() => { if (!destroyed()) opts.onChange?.(clone(doc())); }, 300));
   }
   function undo() {
+    if (shared && !live()) { shared.undo(); return; }
     if (!undoStack.length || live()) return;
     redoStack.push(snapshot());
     setDoc(normalizeDoc(JSON.parse(undoStack.pop())));
     pruneSel(); changed(); render(); renderProps();
   }
   function redo() {
+    if (shared && !live()) { shared.redo(); return; }
     if (!redoStack.length || live()) return;
     undoStack.push(snapshot());
     setDoc(normalizeDoc(JSON.parse(redoStack.pop())));
@@ -53,5 +58,16 @@ export function mountSchEdits(ctx) {
   function nextId(prefix, arr) { let n = 0; for (const o of arr) { const m = new RegExp(`^${prefix}(\\d+)$`).exec(o.id); if (m) n = Math.max(n, +m[1]); } return `${prefix}${n + 1}`; }
   const nextInstName = () => autoInstName(doc());   // (inst_n, #311)
 
-  return { changed, edit, nextId, nextInstName, pruneSel, pushUndo, redo, snapshot, undo };
+  // edited live: the shared history (null: the editor's own again); the merged document in place (its view, tool and
+  // selection kept: an object's id renamed by the merge, `renamed`; not while it is simulated live, busy()); mine: this
+  // participant's own change (an undo)
+  function setShared(s) { shared = s; undoStack.length = 0; redoStack.length = 0; }
+  function applyModel(m, { renamed = null, mine = false } = {}) {
+    setDoc(normalizeDoc(m, { modules: modules() }));
+    for (const k of [...sel()]) { const [kind, id] = k.split(/:(.*)/s); if (renamed?.has(id)) { sel().delete(k); sel().add(`${kind}:${renamed.get(id)}`); } }
+    pruneSel(); setLastDiags(null); render(); renderProps();
+    if (mine) { clearTimeout(changeTimer()); setChangeTimer(setTimeout(() => { if (!destroyed()) opts.onChange?.(clone(doc())); }, 300)); }
+  }
+
+  return { applyModel, busy: () => !!live() || busy(), changed, edit, nextId, nextInstName, pruneSel, pushUndo, redo, setShared, shared: () => shared, snapshot, undo };
 }

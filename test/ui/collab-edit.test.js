@@ -36,7 +36,7 @@ uiTest('#3182 an editor edits a text file live with the owner: the same text on 
     await ep.fill('.dlg-overlay input[data-field=name]', 'Rui');
     await ep.dialogButton('Follow');
     await ep.waitFor(() => window.Silinx?.project?.name === 'Live' && window.Silinx.startupChecked, [], { what: 'the project open', timeout: 30000 });
-    await ep.waitConsole(/^Editing Ana's project "Live" with them: its text files, state diagrams, truth tables, ASM charts and Petri nets change as you all edit them, its other drawings stay theirs, read only \(Following Ana, in the toolbar\)\.$/m);
+    await ep.waitConsole(/^Editing Ana's project "Live" with them: its text files and drawings change as you all edit them \(Following Ana, in the toolbar\)\.$/m);
     await page.waitConsole(/^Rui edits your project "Live" with you\.$/m);
     // the owner's editor followed, editable here, no read-only notice
     await ep.waitFor(() => window.Silinx.active?.path === 'src/top.vhd', [], { what: 'the owner\'s editor followed' });

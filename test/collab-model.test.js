@@ -14,6 +14,8 @@ import { projectDoc, publishProject, docTooLarge, FOLLOW_LIMITS } from '../core/
 import { newFsm, normalizeFsm, generateFsm, validateFsm } from '../core/fsm.js';
 import { normalizeTable, reshapeTable, generateTableHdl, truthTableFromModule, validateTable } from '../core/logic.js';
 import { compile, elaborate } from '../core/compile.js';
+import fs from 'node:fs';
+import { normalizeDoc, generateHdl } from '../core/schdoc.js';
 import { newPetri, normalizePetri, generatePetri, validatePetri } from '../core/petri.js';
 import { newModel as newAsm, normalizeModel as normalizeAsm, generate as generateAsm, validate as validateAsm } from '../core/asm.js';
 import { randomVectors, runHdl, runModel } from './fsm-sim.js';
@@ -32,14 +34,15 @@ function pair() {
 const model = (doc) => drawingModel(doc, P).model;
 const mut = (doc, fn) => { const m = structuredClone(model(doc)); fn(m); return m; };
 
-test('drawingKind: the FSM\'s diagrams, the truth tables, the ASM charts, the Petri nets (others: not yet, #3183\'s order)', () => {
+test('drawingKind: the FSM\'s diagrams, the truth tables, the ASM charts, the Petri nets, the schematics: every drawing (#3183)', () => {
   assert.equal(drawingKind('src/a.fsm.json'), 'fsm');
   assert.equal(drawingKind('src/A.FSM.JSON'), 'fsm');
   assert.equal(drawingKind('src/a.bool.json'), 'tt');
   assert.equal(drawingKind('src/a.tt.json'), 'tt', 'a truth table saved before #2065');
   assert.equal(drawingKind('src/a.asm.json'), 'asm');
   assert.equal(drawingKind('src/a.pn.json'), 'pn');
-  for (const p of ['src/a.sch.json', 'src/a.vhd', 'src/fsm.json', 'src/bool.json']) assert.equal(drawingKind(p), null, p);
+  assert.equal(drawingKind('src/a.sch.json'), 'sch');
+  for (const p of ['src/a.vhd', 'src/fsm.json', 'src/bool.json']) assert.equal(drawingKind(p), null, p);
   assert.throws(() => putDrawing(new Y.Doc(), 'src/a.vhd', {}), /src\/a\.vhd: not a drawing that is edited live/);
 });
 
@@ -437,4 +440,68 @@ test('a Petri net\'s generated HDL: identical from both sides\' merged net, comp
   ub.undo();
   assert.equal(nmodel(a).lang, 'vhdl');
   assert.equal(nmodel(a).transitions[1].guard, '!go', 'A\'s change kept');
+});
+
+// ---- the schematic (#3183's last editor): its symbols, wires, net names, I/O markers and graphics
+const S = 'src/gates.sch.json';
+const gates = () => normalizeDoc(JSON.parse(fs.readFileSync(new URL('../examples/gates/src/gates.sch.json', import.meta.url), 'utf8')));
+const smodel = (doc) => drawingModel(doc, S).model;
+const smut = (doc, fn) => { const m = structuredClone(smodel(doc)); fn(m); return m; };
+const byId = (l, id) => l.find((x) => x.id === id);
+const canonical = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x));
+
+test('a schematic put and read back: the same document, normalized, its keys in one order; the corpus\'s schematics too', () => {
+  const doc = new Y.Doc();
+  putDrawing(doc, S, gates());
+  assert.equal(canonical(smodel(doc)), canonical(gates()));
+  assert.deepEqual(Object.keys(smodel(doc)).slice(0, 8), ['version', 'name', 'lang', 'sheet', 'symbols', 'wires', 'labels', 'ports']);
+  const dir = new URL('./schematic-corpus/hand/', import.meta.url);
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.sch.json'))) {
+    const m = normalizeDoc(JSON.parse(fs.readFileSync(new URL(f, dir), 'utf8')));
+    const d = new Y.Doc();
+    putDrawing(d, `src/${f}`, m);
+    assert.equal(canonical(drawingModel(d, `src/${f}`).model), canonical(m), f);
+  }
+});
+
+test('a schematic, two participants: a symbol moved by one and renamed by the other both kept; a wire and a symbol added at once both kept (their ids each one\'s own); a deleted symbol stays deleted', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, S, gates());
+  const base = smodel(a);
+  hold();
+  const ra = putDrawing(a, S, smut(a, (m) => { byId(m.symbols, 'S5').x += 40; m.wires.push({ id: 'W99', points: [{ x: 0, y: 0 }, { x: 40, y: 0 }] }); m.symbols = m.symbols.filter((x) => x.id !== 'S8'); }), { base, client: a.clientID });
+  const rb = putDrawing(b, S, smut(b, (m) => { byId(m.symbols, 'S5').name = 'inv_cc'; byId(m.symbols, 'S8').name = 'and_x'; m.symbols.push({ ...structuredClone(byId(m.symbols, 'S6')), id: 'S99', name: 'inv_new', y: 900 }); }), { base, client: b.clientID });
+  release();
+  const m = smodel(a);
+  assert.equal(canonical(smodel(b)), canonical(m));
+  assert.deepEqual([byId(m.symbols, 'S5').x, byId(m.symbols, 'S5').name], [byId(base.symbols, 'S5').x + 40, 'inv_cc']);
+  assert.ok(!byId(m.symbols, 'S8'), 'deleted by A, renamed by B: deleted');
+  assert.ok(byId(m.wires, ra.renamed.get('W99')) && byId(m.symbols, rb.renamed.get('S99')));
+});
+
+test('a schematic\'s generated HDL: identical from both sides\' merged schematic, compiled and elaborated in VHDL and in Verilog, the same logic in both; each one\'s undo', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, S, gates());
+  const ob = {};
+  const ub = new Y.UndoManager(b.getMap('drawings').get(S), { trackedOrigins: new Set([ob]), captureTimeout: 0 });
+  const base = smodel(a);
+  hold();
+  putDrawing(a, S, smut(a, (m) => { byId(m.symbols, 'S5').x += 20; m.description = 'by Ana'; }), { base, client: a.clientID });
+  putDrawing(b, S, smut(b, (m) => { byId(m.symbols, 'S7').name = 'inv_aa'; }), { base, client: b.clientID, origin: ob });
+  release();
+  const ma = smodel(a);
+  assert.equal(canonical(smodel(b)), canonical(ma));
+  const tables = ['vhdl', 'verilog'].map((lang) => {
+    const ga = generateHdl(ma, { lang }), gb = generateHdl(smodel(b), { lang });
+    assert.equal(ga.code, gb.code, lang);
+    assert.match(ga.code, lang === 'vhdl' ? /^-- by Ana$/m : /^\/\/ by Ana$/m, 'A\'s description in it');
+    const lib = compile([{ path: ga.filename, text: ga.code }]);
+    assert.deepEqual([...lib.errors, ...elaborate(lib, 'gates').diags.filter((x) => x.severity === 'error')].map((x) => x.message), [], lang);
+    const t = truthTableFromModule([{ path: ga.filename, text: ga.code }], 'gates');
+    return t.table;
+  });
+  assert.deepEqual(tables[0], tables[1]);
+  ub.undo();
+  assert.equal(byId(smodel(a).symbols, 'S7').name, 'inv_a');
+  assert.equal(smodel(a).description, 'by Ana');
 });
