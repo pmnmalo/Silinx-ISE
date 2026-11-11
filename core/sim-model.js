@@ -444,6 +444,30 @@ export function postMapModels(nl, packed, o = {}) {
 }
 
 /**
+ * The Post-Map Simulation Model of a design nextpnr implements (#2530): nextpnr packs at Place & Route, so its packing is
+ * read from its routed design (packages/silinx-fpga/src/xdl.js parseXdl of the routed XDL), the routing left out: the
+ * slices as the bitstream fills them, of SIMPRIM primitives with no LOC and no timing, as postMapModels writes a packed
+ * design. Returns { vhdl, verilog, instances, unknown }. o: { top, part, generics, testbench } (the header).
+ */
+export function postMapModelsOfRouted(nl, design, o = {}) {
+  const M = new Structure(nl, nl.name);
+  const unknown = packedModel(M, placedAsPacked(design));
+  const h = c => modelHead(c, 'Post-Map', 'the design nextpnr packed (its routed design, without the routing)', o);
+  return { vhdl: M.write('vhdl', h('--'), o.generics), verilog: M.write('verilog', h('//'), o.generics), instances: M.insts.length, unknown };
+}
+
+// the sites of a placed design (parseXdl's) as the packer's: their kind from their type (the VCC / GND sources: constant
+// nets), their LOC; { insts, nets, all } as packedModel reads them
+function placedAsPacked(design) {
+  const KIND = { SLICEL: 'slice', SLICEM: 'slice', IOB: 'iob', IBUF: 'iob', BUFGMUX: 'bufg', RAMB16: 'bram', MULT18X18SIO: 'mult', DCM: 'dcm' };
+  const idx = new Map(design.insts.map((x, k) => [x.name, k]));
+  const insts = design.insts.map(x => ({ ...x, kind: KIND[x.type] || 'other', dir: x.cfg.some(c => c.attr === 'OUTBUF' && c.name) ? 'out' : 'in', loc: x.site }));
+  const nets = design.nets.map(n => ({ name: n.name, type: /^(vcc|power)$/i.test(n.type) ? 'vcc' : /^(gnd|ground)$/i.test(n.type) ? 'gnd' : n.type,
+    outpins: n.outpins.map(p => ({ inst: idx.get(p.inst), pin: p.pin })), inpins: n.inpins.map(p => ({ inst: idx.get(p.inst), pin: p.pin })) }));
+  return { insts: insts.filter(x => x.kind !== 'other' || !/^(VCC|GND|TIEOFF)$/.test(x.type)), nets, all: insts };
+}
+
+/**
  * The Post-Place & Route Simulation Model (#122): the placed and routed design (packages/silinx-fpga/src/xdl.js parseXdl of the
  * routed XDL) as the post-map model, each primitive with the LOC of its site, and its timing as an SDF file
  * (core/sdf.js): every element's delays (the static timing's delay model, packages/silinx-fpga/src/fpga/timing.js, the delay of each
@@ -454,13 +478,8 @@ export function postMapModels(nl, packed, o = {}) {
 export function postParModels(nl, design, o = {}) {
   const M = new Structure(nl, nl.name);
   const model = o.model || SPEED_4;
-  // the design's sites as the packer's: their kind from their type (the VCC / GND sources: constant nets)
-  const KIND = { SLICEL: 'slice', SLICEM: 'slice', IOB: 'iob', IBUF: 'iob', BUFGMUX: 'bufg', RAMB16: 'bram', MULT18X18SIO: 'mult', DCM: 'dcm' };
-  const idx = new Map(design.insts.map((x, k) => [x.name, k]));
-  const insts = design.insts.map(x => ({ ...x, kind: KIND[x.type] || 'other', dir: x.cfg.some(c => c.attr === 'OUTBUF' && c.name) ? 'out' : 'in', loc: x.site }));
-  const nets = design.nets.map(n => ({ name: n.name, type: /^(vcc|power)$/i.test(n.type) ? 'vcc' : /^(gnd|ground)$/i.test(n.type) ? 'gnd' : n.type,
-    outpins: n.outpins.map(p => ({ inst: idx.get(p.inst), pin: p.pin })), inpins: n.inpins.map(p => ({ inst: idx.get(p.inst), pin: p.pin })) }));
-  const unknown = packedModel(M, { insts: insts.filter(x => x.kind !== 'other' || !/^(VCC|GND|TIEOFF)$/.test(x.type)), nets, all: insts }, model);
+  // (the design's sites as the packer's, each with the LOC of its site)
+  const unknown = packedModel(M, placedAsPacked(design), model);
   // the connections' delays: on the element inputs that read each site pin
   const wire = new Map();
   for (const c of o.conns || []) wire.set(c.to, c.delay);

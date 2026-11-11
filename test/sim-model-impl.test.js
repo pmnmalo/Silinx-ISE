@@ -121,7 +121,7 @@ for (const name of ['adder', 'bram_dp', 'bram_prim', 'bram_sp', 'dram', 'fsm', '
 
 test('the flow\'s posttrans and postmap steps: the models synthesized with the test bench\'s generics, and the board\'s of this run\'s netlist (#622), written, in the report, the exact log', { timeout: 300000 }, async () => {
   const written = {}, lines = [];
-  const r = await runOpenFlow({ top: 'cnt', part: 'xc3s250ecp132-4', family: 'spartan3e', steps: orderOpenSteps(['postmap', 'posttrans']), simTop: 'tb' },
+  const r = await runOpenFlow({ top: 'cnt', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps: orderOpenSteps(['postmap', 'posttrans']), simTop: 'tb' },
     { log: l => lines.push(l), sources: () => src, simSources: () => tb, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {}, device });
   assert.equal(r.ok, true, lines.join('\n'));
   assert.deepEqual(lines.filter(l => /^=== SILINX STEP/.test(l)), ['synth', 'translate', 'posttrans', 'map', 'postmap'].map(x => `=== SILINX STEP ${x} ===`));
@@ -133,12 +133,15 @@ test('the flow\'s posttrans and postmap steps: the models synthesized with the t
     postmap: { path: 'build/netgen/map/cnt_map.vhd', verilog: 'build/netgen/map/cnt_map.v', testbench: 'tb', generics: { n: 3 },
       board: { path: 'build/netgen/map/cnt_map_board.vhd', verilog: 'build/netgen/map/cnt_map_board.v' } },
   });
-  // (the model's design synthesized once for both models; the board's of this run's netlist and packed design)
+  // (the model's design synthesized once for both models; the board's of this run's netlist; the post-map models of
+  // nextpnr's packing, each design placed and routed for it, #2530)
   const count = re => re.exec(lines.join('\n'))[1];
-  assert.deepEqual(lines.filter(l => /^(WARNING|INFO|ERROR|Synthesizing|Post-)/.test(l)), [
+  assert.deepEqual(lines.filter(l => /^(WARNING|INFO|ERROR|Synthesizing|Placing|Post-)/.test(l)), [
     "Synthesizing 'cnt' with the generics the test bench 'tb' gives: n = 3",
     `Post-Translate Simulation Model: build/netgen/translate/cnt_translate.vhd (VHDL, SIMPRIM primitives) and build/netgen/translate/cnt_translate.v (Verilog), ${count(/translate\.v \(Verilog\), (\d+) primitives/)} primitives`,
     'Post-Translate model for the Board Emulator, with the design\'s own generics: build/netgen/translate/cnt_translate_board.vhd (VHDL) and build/netgen/translate/cnt_translate_board.v (Verilog)',
+    'Placing and routing the design synthesized with the test bench\'s generics (nextpnr packs at Place & Route), for its Post-Map model.',
+    'Placing and routing the design with its own generics (nextpnr packs at Place & Route), for its Post-Map model.',
     `Post-Map Simulation Model: build/netgen/map/cnt_map.vhd (VHDL, SIMPRIM primitives) and build/netgen/map/cnt_map.v (Verilog), ${count(/map\.v \(Verilog\), (\d+) primitives/)} primitives`,
     'Post-Map model for the Board Emulator, with the design\'s own generics: build/netgen/map/cnt_map_board.vhd (VHDL) and build/netgen/map/cnt_map_board.v (Verilog)',
   ]);
@@ -152,9 +155,34 @@ test('the flow\'s posttrans and postmap steps: the models synthesized with the t
   }
   // without a test bench: the design's own generics, from this run's netlist and packed design (no synthesis again)
   const lines3 = [];
-  const r3 = await runOpenFlow({ top: 'cnt', part: 'xc3s250ecp132-4', family: 'spartan3e', steps: orderOpenSteps(['postmap', 'posttrans']) },
+  const r3 = await runOpenFlow({ top: 'cnt', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps: orderOpenSteps(['postmap', 'posttrans']) },
     { log: l => lines3.push(l), sources: () => src, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: n => `build/${n}`, read: () => null, save: () => {}, device });
   assert.equal(r3.ok, true, lines3.join('\n'));
   assert.deepEqual(r3.report.simModels.postmap, { path: 'build/netgen/map/cnt_map.vhd', verilog: 'build/netgen/map/cnt_map.v' });
-  assert.deepEqual(lines3.filter(l => /^(WARNING|INFO|ERROR|Synthesizing)/.test(l)), []);
+  assert.deepEqual(lines3.filter(l => /^(WARNING|INFO|ERROR|Synthesizing|Placing)/.test(l)), ['Placing and routing the design (nextpnr packs at Place & Route), for its Post-Map model.']);
+});
+
+// #2530: the Post-Map model of a design nextpnr implements is its packing, the bitstream's: the slices of its routed design
+// (the Post-Place & Route model's, without the LOCs and the timing), not Silinx's packer's: the netlist placed and routed
+// as Place & Route does it, the same design; the model's test bench passing on it, VHDL and Verilog
+test('#2530 the Post-Map model is nextpnr\'s packing: the Post-Place & Route model\'s primitives without their LOCs and timing', { timeout: 300000 }, async () => {
+  const written = {}, lines = [];
+  const r = await runOpenFlow({ top: 'cnt', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps: orderOpenSteps(['postmap', 'postpar']), seed: 1 },
+    { log: l => lines.push(l), sources: () => src, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {}, device });
+  assert.equal(r.ok, true, lines.join('\n'));
+  assert.deepEqual(lines.filter(l => /^(WARNING|INFO|ERROR)/.test(l)), []);
+  const map = written['netgen/map/cnt_map.vhd'], par = written['netgen/par/cnt_timesim.vhd'];
+  assert.match(map, /^-- Post-Map Simulation Model of 'cnt' \(xc3s250ecp132-4\): the design nextpnr packed \(its routed design, without the routing\)/);
+  assert.doesNotMatch(map, /LOC/);
+  // its LUTs and flip-flops: the routed design's, one by one (Silinx's packer named and filled the slices otherwise; the
+  // Post-Place & Route model has copies of the carry's multiplexers besides, for their timing)
+  const insts = t => [...t.matchAll(/^ {2}(\S+) : (X_(?:LUT4|FF|SFF))$/gm)].map(m => `${m[1]} ${m[2]}`).sort();
+  assert.ok(insts(map).length > 10);
+  assert.deepEqual(insts(map), insts(par));
+  // both languages: the counter's test bench on the model (q counts every 1000 clocks: 2 after 25 us)
+  for (const file of ['netgen/map/cnt_map.vhd', 'netgen/map/cnt_map.v']) {
+    const s = simulate(tbOwn, file, written[file], 'tb', 3e7, { stop: /^q = / });
+    assert.deepEqual(s.diags, [], file);
+    assert.deepEqual(s.log, ['q = 2'], file);
+  }
 });

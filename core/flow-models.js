@@ -5,7 +5,7 @@
 import { analyzeTiming, pack, readYosysJson, synthesizeVerilog, synthesizeArea, synthesizeFast, StepError } from '../packages/silinx-fpga/src/index.js';
 import { compile, elaborate } from './compile.js';
 import { flowFrontEnd } from './synth-front.js';
-import { dutGenerics, postMapModels, postParModels, postSynthesisModels, postTranslateModels, scalarVerilog } from './sim-model.js';
+import { dutGenerics, postMapModels, postMapModelsOfRouted, postParModels, postSynthesisModels, postTranslateModels, scalarVerilog } from './sim-model.js';
 import { parseXdl } from '../packages/silinx-fpga/src/parts.js';
 import { primitiveSources } from './unisim.js';
 
@@ -14,6 +14,7 @@ export function mountSimModels(ctx) {
   const {
     io, spec, log, netlist, packed, report, routedOrEarlier, routedText, step, synth, top, constraints, placeRouteNetlist
   } = ctx;
+  const packsAtPar = ctx.packsAtPar || (() => false);
 
   // The design the simulation models are made of (#120, #121): synthesized with the generics the test bench
   // (spec.simTop) gives its instance of the top; without any, this run's synthesis, or (netlistOk: the
@@ -116,7 +117,7 @@ export function mountSimModels(ctx) {
     writeModel('postsynth', 'synthesis', 'synthesis', 'Post-Synthesis', m, 'UNISIM', `${m.cells} cells`, board);
   }
   // Generate Post-Translate / Post-Map Simulation Model (#121): build/netgen/translate/<top>_translate.vhd,
-  // build/netgen/map/<top>_map.vhd (and .v): the netlist(), the packed() design, of SIMPRIM primitives
+  // build/netgen/map/<top>_map.vhd (and .v): the netlist(), the packed design (nextpnr's, #2530), of SIMPRIM primitives
   let modelNl = null, modelPacked = null;
   async function modelNetlist() {
     const d = await modelDesign(true);
@@ -130,17 +131,50 @@ export function mountSimModels(ctx) {
     const board = boardModel(d, 'post-translate', () => { const nl = ownNetlist(); return nl && postTranslateModels(nl, { top, part: spec.part }); });
     writeModel('posttrans', 'translate', 'translate', 'Post-Translate', m, 'SIMPRIM', `${m.instances} primitives`, board);
   }
+  // A netlist (its JSON text) placed and routed by the back end, as Place & Route does it (#2137: nextpnr), once per
+  // netlist: the post-map model's and the post-place & route model's (the design synthesized with the test bench's generics)
+  const placedOf = new Map();
+  function placeRoute(text, name, why) {
+    if (!placedOf.has(text)) {
+      log(why);
+      placedOf.set(text, placeRouteNetlist(text, name).catch(e => { placedOf.delete(text); throw e; }));
+    }
+    return placedOf.get(text);
+  }
+  // The routed design nextpnr packed a netlist into, for the Post-Map model (#2530: nextpnr packs at Place & Route, the
+  // model of its slices as the bitstream's): the netlist placed and routed as Place & Route does it (its seeds, so the
+  // design Place & Route makes of it)
+  async function nextpnrPacked(text, name, what) {
+    try { return parseXdl(await placeRoute(text, name, `Placing and routing ${what} (nextpnr packs at Place & Route), for its Post-Map model.`)); } catch (e) {
+      throw new StepError(`${what} could not be packed by nextpnr (it packs at Place & Route): ${e.message}`, e.list || [], e.hint);
+    }
+  }
   async function runPostMap() {
     const d = await modelNetlist();
-    let p = d.packed;
-    if (!p) {
-      try { p = modelPacked ||= pack(d.nl, { ucf: constraints(), part: spec.part }); } catch (e) { throw new StepError(`packing failed: ${e.message}`); }
+    const o = { top, part: spec.part, generics: d.generics, testbench: d.testbench };
+    let m, board;
+    if (!d.packed && packsAtPar()) {
+      // (nextpnr's packing, #2530: the model's design, and the board's, the implementation's netlist)
+      const text = d.own ? d.synth.files[`${d.synth.top}.json`] : ownText();
+      m = postMapModelsOfRouted(d.nl, await nextpnrPacked(text, d.own ? d.synth.top : top, d.own ? 'the design synthesized with the test bench\'s generics' : 'the design'), o);
+      let own = null, ownErr = null;
+      if (withTestbench(d)) {
+        const t = ownText();
+        if (t != null) try { own = postMapModelsOfRouted(ownNetlist(), await nextpnrPacked(t, top, 'the design with its own generics'), { top, part: spec.part }); } catch (e) { ownErr = e; }
+      }
+      board = boardModel(d, 'post-map', () => { if (ownErr) throw ownErr; return own; });
+    } else {
+      // (a back end that packs at Map: its packed design, or Silinx's packing of the netlist)
+      let p = d.packed;
+      if (!p) {
+        try { p = modelPacked ||= pack(d.nl, { ucf: constraints(), part: spec.part }); } catch (e) { throw new StepError(`packing failed: ${e.message}`); }
+      }
+      m = postMapModels(d.nl, p, o);
+      board = boardModel(d, 'post-map', () => {
+        const nl = ownNetlist();
+        return nl && postMapModels(nl, packed() || pack(nl, { ucf: constraints(), part: spec.part }), { top, part: spec.part });
+      });
     }
-    const m = postMapModels(d.nl, p, { top, part: spec.part, generics: d.generics, testbench: d.testbench });
-    const board = boardModel(d, 'post-map', () => {
-      const nl = ownNetlist();
-      return nl && postMapModels(nl, packed() || pack(nl, { ucf: constraints(), part: spec.part }), { top, part: spec.part });
-    });
     writeModel('postmap', 'map', 'map', 'Post-Map', m, 'SIMPRIM', `${m.instances} primitives`, board);
   }
   // Generate Post-Place & Route Simulation Model (#122): build/netgen/par/<top>_timesim.vhd (and .v), and its
@@ -152,8 +186,7 @@ export function mountSimModels(ctx) {
     if (!d.own) { routedOrEarlier(); text = routedText(); }
     else {
       // (its own Map and Place & Route: the back end's, nextpnr, #2137)
-      log('Placing and routing the design synthesized with the test bench\'s generics (nextpnr), for its model.');
-      try { text = await placeRouteNetlist(d.synth.files[`${d.synth.top}.json`], d.synth.top); } catch (e) {
+      try { text = await placeRoute(d.synth.files[`${d.synth.top}.json`], d.synth.top, 'Placing and routing the design synthesized with the test bench\'s generics (nextpnr), for its model.'); } catch (e) {
         throw new StepError(`the model's design (synthesized with the test bench's generics) could not be placed and routed: ${e.message}`, e.list || [], e.hint);
       }
     }

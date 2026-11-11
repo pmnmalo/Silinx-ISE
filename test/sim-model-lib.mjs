@@ -51,7 +51,7 @@ function exampleFlow(name) {
     const ex = example(name);
     const design = ex.design.map(f => ({ path: f.path, lang: f.lang, text: f.text })), sim = ex.sim.map(f => ({ path: f.path, lang: f.lang, text: f.text }));
     const written = {}, lines = [];
-    const r = await runOpenFlow({ top: ex.project.top, part: 'xc3s250ecp132-4', family: 'spartan3e', steps: orderOpenSteps(['posttrans', 'postmap']), simTop: ex.project.simTop },
+    const r = await runOpenFlow({ top: ex.project.top, part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps: orderOpenSteps(['posttrans', 'postmap']), simTop: ex.project.simTop },
       { log: l => lines.push(l), sources: () => design, simSources: () => sim, yosys: yosysNode, nextpnr: { spartan3e: nextpnrNode() }, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {}, device });
     return { ex, design, sim, r, lines, written };
   })());
