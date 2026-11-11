@@ -11,5 +11,4 @@ In detail:
     are the outputs of the 30 top-bank pads of the XC6SLX16 and the 23 of the XC6SLX45;
   - #3169's four pad wire -> IBUF PIPs of the TIOB_SINGLE and BIOB_SINGLE tiles, with no bits: the inputs of G9, F9,
     U11, V11 (XC6SLX16) and G9, F9, R7, T7 (XC6SLX45).
-
-  With them, every pad of both parts takes an input and an output.
+  - With them, every pad of both parts takes an input and an output.
