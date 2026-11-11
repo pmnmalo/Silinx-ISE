@@ -146,7 +146,7 @@ const PT = {
   'Select the device and design flow for the project.': 'Selecione o dispositivo e o fluxo de projeto.',
   'Evaluation Development Board:': 'Placa de Desenvolvimento:', 'Product Category:': 'Categoria de Produto:', 'Family:': 'Família:',
   'Device:': 'Dispositivo:', 'Package:': 'Encapsulamento:', 'Speed:': 'Velocidade:', 'Top-Level Source Type:': 'Tipo de Fonte de Topo:',
-  'Synthesis Tool:': 'Ferramenta de Síntese:', 'Silinx (VHDL/Verilog; no ISE needed)': 'Silinx (VHDL/Verilog; sem o ISE)', 'XST (VHDL/Verilog; Xilinx ISE)': 'XST (VHDL/Verilog; Xilinx ISE)', 'SSim (VHDL/Verilog; Silinx Simulator)': 'SSim (VHDL/Verilog; Simulador Silinx)', 'Simulator:': 'Simulador:', 'Preferred Language:': 'Linguagem Preferida:',
+  'Synthesis Tool:': 'Ferramenta de Síntese:', 'Silinx (VHDL/Verilog; no ISE needed)': 'Silinx (VHDL/Verilog; sem o ISE)', 'XST (VHDL/Verilog; Xilinx ISE)': 'XST (VHDL/Verilog; Xilinx ISE)', 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)': 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)', 'Silinx (VHDL/Verilog; no Vivado needed; on trial)': 'Silinx (VHDL/Verilog; sem o Vivado; em ensaio)', 'SSim (VHDL/Verilog; Silinx Simulator)': 'SSim (VHDL/Verilog; Simulador Silinx)', 'Simulator:': 'Simulador:', 'Preferred Language:': 'Linguagem Preferida:',
   'VHDL Source Analysis Standard:': 'Norma de Análise VHDL:', 'None Specified': 'Nenhuma', 'All': 'Todas',
   'Project name must start with a letter and contain only letters, digits and _.': 'O nome do projeto deve começar por uma letra e conter apenas letras, dígitos e _.',
   'No projects found in the workspace.': 'Não foram encontrados projetos na pasta de trabalho.',
@@ -542,7 +542,8 @@ Object.assign(PT, {
   'Device Utilization Summary (Silinx toolchain)': 'Resumo da Utilização do Dispositivo (toolchain Silinx)',
   'Device Utilization Summary (after synthesis)': 'Resumo da Utilização do Dispositivo (após a síntese)',
   'Timing (post Place & Route, Silinx toolchain estimate)': 'Temporização (após Posicionar e Encaminhar, estimativa da toolchain Silinx)',
-  'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)',
+  'Timing (post Place & Route, nextpnr\'s estimate: optimistic against Vivado)': 'Temporização (após Posicionar e Encaminhar, estimativa do nextpnr: otimista face ao Vivado)',
+  'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)', 'Routed Design (FASM)': 'Projeto Encaminhado (FASM)',
   'Static Timing Report': 'Relatório de Temporização Estática',
   // AMD Vivado's reports (the 7-series, #1649)
   'Synthesize - Vivado': 'Sintetizar - Vivado',

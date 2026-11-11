@@ -14,7 +14,7 @@ import { toolError, readProject, viewSourcesOf, STR, PROJECT, deviceName } from 
 const devices = () => import('./devices.js');
 const parts = () => import('../packages/silinx-fpga/src/parts.js');
 
-const SYNTH_TOOLS = ['silinx', 'xst'];
+const SYNTH_TOOLS = ['silinx', 'xst', 'vivado'];   // (vivado: the Artix-7's, #3146)
 const OPTIMIZATIONS = ['fast', 'area', 'speed'];
 const STARTUP_CLOCKS = { jtag: 'JtagClk', cclk: 'CCLK', user: 'UserClk' };
 // the Spartan-6's Map (#3138): Silinx's, or nextpnr's packer (on trial until its parity, #3139)
@@ -71,7 +71,7 @@ export const SETTINGS_TOOLS = [
   },
   {
     name: 'set_design_properties', title: 'Design Properties',
-    description: 'Change a project\'s target as Design Properties does: its board (its device then the board\'s; none: no board) or its device (part, package, speed), its synthesis tool (silinx: the Silinx toolchain; xst: Xilinx ISE) and its Preferred Language (the drawings\' HDL made again in it). A new device is checked against the design first (the primitives its family lacks, the resources it has too few of: warnings). With update_constraints, a new board\'s pins are written into the constraints file for the top\'s ports, as Update Constraints does: its pin locations are replaced.',
+    description: 'Change a project\'s target as Design Properties does: its board (its device then the board\'s; none: no board) or its device (part, package, speed), its synthesis tool (silinx: the Silinx toolchain; xst: Xilinx ISE; vivado: AMD Vivado, the Artix-7\'s default, its Silinx toolchain on trial) and its Preferred Language (the drawings\' HDL made again in it). A new device is checked against the design first (the primitives its family lacks, the resources it has too few of: warnings). With update_constraints, a new board\'s pins are written into the constraints file for the top\'s ports, as Update Constraints does: its pin locations are replaced.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, board: STR('The board (list_devices), or none for no board.'), variant: STR('The board\'s variant (list_devices; default: the board\'s default).'),
       part: STR('The device (list_devices), e.g. xc3s500e; with no board.'), package: STR('The device\'s package, e.g. fg320.'), speed: STR('The speed grade, e.g. -4.'),
@@ -122,6 +122,11 @@ export const SETTINGS_TOOLS = [
       // (the Artix-7: AMD Vivado's on this server, #1649)
       const vivado = R.vivadoDevice(next);
       if (experimental && synthTool === 'xst') throw toolError(vivado ? `the ${next.part.toUpperCase()} is implemented by AMD Vivado: no XST` : `${R.noFlowMessage(next)}: no XST`);
+      if (synthTool === 'vivado' && !vivado) throw toolError(`AMD Vivado implements the Artix-7 devices, not the ${next.part.toUpperCase()}`);
+      // (#3146) the Artix-7's synthesis tool: the one given, else the project's when it was one of the Artix-7's, else AMD Vivado;
+      // another family's never Vivado (the project's, from an Artix-7: Silinx)
+      const synthOf = () => (vivado ? { synthTool: synthTool || (R.vivadoDevice(pj.device) && ['vivado', 'silinx'].includes(pj.synthTool) ? pj.synthTool : 'vivado') }
+        : R.openOnlyDevice(next) || experimental ? { synthTool: 'silinx' } : synthTool ? { synthTool } : pj.synthTool === 'vivado' ? { synthTool: 'silinx' } : {});
       const warnings = [];
       const deviceChanged = next.part !== pj.device?.part || next.package !== pj.device?.package;
       if (deviceChanged) for (const m of await deviceChangeMessages(name, pj, next)) warnings.push(`WARNING: ${next.part.toUpperCase()}: ${m}`);
@@ -136,7 +141,7 @@ export const SETTINGS_TOOLS = [
         if (fs.existsSync(path.join(P.projectDir(name), old))) warnings.push(`WARNING: this device's constraints are ${ext.slice(1).toUpperCase()}: ${constraintsFile} is the project's now, ${old} was not converted.`);
       }
       const oldLang = pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl';
-      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...(R.openOnlyDevice(next) || experimental ? { synthTool: 'silinx' } : synthTool ? { synthTool } : {}), ...(language ? { preferredLanguage: language } : {}) }));
+      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...synthOf(), ...(language ? { preferredLanguage: language } : {}) }));
       // every drawing in the new language, its HDL file made again in it (#1477)
       const languageLines = [];
       if (language && language !== oldLang) {

@@ -74,7 +74,7 @@ export function mountSummary(el) {
     // timing
     const tm = rep?.timing;
     if (tm) {
-      page.append(h('table', { class: 'summary-table' }, h('caption', {}, open ? 'Timing (post Place & Route, Silinx toolchain estimate)' : 'Timing (post Place & Route)'),
+      page.append(h('table', { class: 'summary-table' }, h('caption', {}, open ? (tm.model ? 'Timing (post Place & Route, nextpnr\'s estimate: optimistic against Vivado)' : 'Timing (post Place & Route, Silinx toolchain estimate)') : 'Timing (post Place & Route)'),
         h('tr', {}, h('th', {}, 'Timing Constraints'), h('td', { class: tm.met === false ? 'status-bad' : 'status-good' }, tm.met === false ? (open ? `Not met (${tm.timingErrors} constraints)` : vivado ? `Not met (${tm.timingErrors} failing endpoints)` : `Not met (${tm.timingErrors} errors, score ${tm.score})`) : 'All constraints met')),
         tm.minPeriodNs ? h('tr', {}, h('th', {}, 'Minimum period'), h('td', {}, `${tm.minPeriodNs} ns (maximum frequency ${tm.maxFreqMHz} MHz)`)) : null,
         ...(tm.constraints || []).map(c => h('tr', {}, h('th', {}, c.name), h('td', {}, `${c.constraint} — ${c.timingErrors ? `${c.timingErrors} errors` : 'met'}, ${c.minPeriodNs == null ? 'no path between flip-flops to time' : `${c.minPeriodNs} ns`}`)))));
@@ -100,13 +100,15 @@ export function mountSummary(el) {
       h('tr', {}, h('th', {}, 'Report Name'), h('th', {}, 'Status')),
       ...(vivado ? [['Synthesis Utilization Report', `${pj.top}_synth_util.rpt`, rep?.synthesis], ['Utilization Report', `${pj.top}_util.rpt`, rep?.map], ['Route Status Report', `${pj.top}_route.rpt`, rep?.par],
         ['Timing Summary Report', `${pj.top}_timing.rpt`, rep?.timing], ['DRC Report', `${pj.top}_drc.rpt`, rep?.drc], ['Vivado Log', 'vivado.log', rep?.synthesis]]
+        // (the 7-series' routed design is nextpnr's FASM, #3146)
+        : open && /\.fasm$/.test(rep?.files?.routed || '') ? [['Synthesis Report (Yosys)', `open/${pj.top}_stat.txt`, rep?.synthesis], ['Routed Design (FASM)', 'open/routed.fasm', rep?.files?.routed], ['Static Timing Report', 'open/timing.txt', rep?.timing]]
         : open ? [['Synthesis Report (Yosys)', `open/${pj.top}_stat.txt`, rep?.synthesis], ['Placed Design (XDL)', 'open/placed.xdl', rep?.files?.placed], ['Routed Design (XDL)', 'open/routed.xdl', rep?.files?.routed], ['Static Timing Report', 'open/timing.txt', rep?.timing]]
         : [['Synthesis Report', `${pj.top}.syr`, rep?.synthesis], ['Map Report', `${pj.top}_map.mrp`, rep?.map], ['Place and Route Report', `${pj.top}.par`, rep?.par], ['Post-PAR Static Timing Report', `${pj.top}.twr`, rep?.timing], ['Bitgen Report', `${pj.top}.bgn`, rep?.bit]])
         .map(([n, f, r]) => h('tr', {}, h('td', {}, n), h('td', {}, r ? h('a', { onclick: () => app.openFile(`build/${f}`) }, 'Current') : '')))));
     // quick links (ISE sidebar style)
     page.append(h('div', { style: { color: 'var(--grey-3)', marginTop: '8px' } },
       // (a 7-series device: AMD Vivado's, #1649)
-      vivado || /^xc7/i.test(pj.device?.part || '') ? 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation of the 7-series use AMD Vivado 2025.2 (Toolchain Settings (the gear in the toolbar)).'
+      vivado || (/^xc7/i.test(pj.device?.part || '') && !open && !app.openMode?.()) ? 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation of the 7-series use AMD Vivado 2025.2 (Toolchain Settings (the gear in the toolbar)).'
       : app.openMode?.() ? 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation use the Silinx toolchain (no ISE): Toolchain Settings (the gear in the toolbar).'
         : 'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis/implementation require Xilinx ISE 14.7 (Toolchain Settings (the gear in the toolbar)).'));
   };

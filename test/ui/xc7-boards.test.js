@@ -1,5 +1,5 @@
 // UI: the 7-series' boards (#3142): the Basys 3 and the Nexys A7 in Design Properties, marked experimental, their family
-// too; choosing one locks the synthesis tool and writes the board's pins as constraints/top.xdc; the process tree and the
+// too; choosing one offers AMD Vivado as its synthesis tool (or the Silinx toolchain, #3146) and writes the board's pins as constraints/top.xdc; the process tree and the
 // toolbar are AMD Vivado's (#1649: its synthesis, implementation and programming, no Emulate), a run without Vivado
 // configured says so; Check Constraints reads XDC, its warnings exact; in Portuguese. Both interfaces.
 import { before, after } from 'node:test';
@@ -36,7 +36,7 @@ uiTest('#3142 #1649 Design Properties: the Basys 3, experimental; the pins as an
     const b = sel('Evaluation Development Board:'); b.value = 'basys3'; b.dispatchEvent(new Event('change'));
     return { part: sel('Device:').value, pkg: sel('Package:').value, speed: sel('Speed:').value, synth: sel('Synthesis Tool:').value, synthOff: sel('Synthesis Tool:').disabled };
   });
-  assert.deepEqual(chosen, { part: 'xc7a35t', pkg: 'cpg236', speed: '-1', synth: 'silinx', synthOff: true });
+  assert.deepEqual(chosen, { part: 'xc7a35t', pkg: 'cpg236', speed: '-1', synth: 'vivado', synthOff: false });   // (AMD Vivado, or the Silinx toolchain's experimental back end, #3146)
   await page.dialogButton('OK');
   await page.waitDialog('Update Constraints');
   await page.dialogButton('Yes');
@@ -109,7 +109,7 @@ uiTest('#3142 #1649 in Portuguese: the boards and the family marked experimental
       return { labels, board: sel('Placa de Desenvolvimento:')?.selectedOptions[0]?.textContent, family: sel('Família:')?.selectedOptions[0]?.textContent, synthOff: sel('Ferramenta de Síntese:')?.disabled };
     });
     assert.ok(r.labels.includes('Placa de Desenvolvimento:') && r.labels.includes('Família:'), String(r.labels));
-    assert.deepEqual([r.board, r.family, r.synthOff], ['Digilent Basys 3 (experimental)', 'Artix-7 (experimental)', true]);
+    assert.deepEqual([r.board, r.family, r.synthOff], ['Digilent Basys 3 (experimental)', 'Artix-7 (experimental)', false]);
     await page.dialogButton('Cancelar');
     // AMD Vivado's processes in Portuguese (#1649)
     await page.setView('impl');

@@ -38,9 +38,9 @@ test('set_design_properties: the Basys 3, its pins written as an XDC, the exampl
   const r = await ok('set_design_properties', { project: 'b1', board: 'basys3', update_constraints: true });
   // (no "no flow" warning: the Artix-7 is AMD Vivado's, #1649)
   const warnings = ['WARNING: this device\'s constraints are XDC: constraints/top.xdc is the project\'s now, constraints/top.ucf was not converted.'];
-  assert.equal(r.text, `${warnings[0]}\nDevice set to xc7a35t-1-cpg236 (board basys3); synthesis tool silinx; constraints/top.xdc written from the basys3's pins.`);
+  assert.equal(r.text, `${warnings[0]}\nDevice set to xc7a35t-1-cpg236 (board basys3); synthesis tool vivado; constraints/top.xdc written from the basys3's pins.`);   // (AMD Vivado the Artix-7's default, #3146)
   assert.deepEqual(r.data.warnings, warnings);
-  assert.deepEqual([r.data.constraints, r.data.synthTool], ['constraints/top.xdc', 'silinx']);
+  assert.deepEqual([r.data.constraints, r.data.synthTool], ['constraints/top.xdc', 'vivado']);
   const pj = await P.readProject('b1');
   assert.deepEqual(pj.device, { family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' });
   const xdc = fs.readFileSync(path.join(P.projectDir('b1'), 'constraints/top.xdc'), 'utf8');
@@ -60,7 +60,7 @@ test('set_design_properties: the Basys 3, its pins written as an XDC, the exampl
 test('set_design_properties: the XC7A100T with no board, its constraints an XDC', async () => {
   await ok('new_project', { name: 'n1' });
   const r = await ok('set_design_properties', { project: 'n1', part: 'xc7a100t', package: 'csg324', speed: '-1' });
-  assert.equal(r.text, 'Device set to xc7a100t-1-csg324; synthesis tool silinx.');   // (AMD Vivado's, #1649: no "no flow" warning)
+  assert.equal(r.text, 'Device set to xc7a100t-1-csg324; synthesis tool vivado.');   // (AMD Vivado's, #1649: no "no flow" warning)
   assert.equal((await P.readProject('n1')).constraints, 'constraints/top.xdc');
 });
 
@@ -100,4 +100,21 @@ test('run_process with the Silinx toolchain on the Basys 3: synth_xilinx, nextpn
   // (AMD Vivado stays the project's own when no toolchain is asked: the project made through the MCP server, not trusted)
   const untrusted = 'project \'o3\' was made through the MCP server (by an assistant): AMD Vivado runs only once you trust it (Trust Project, in the console when the project opens)';
   await fails('run_process', { project: 'o3', process: 'synthesize' }, untrusted);
+});
+
+// (#3146, #2674: what Design Properties offers) the Artix-7's synthesis tool: AMD Vivado, its default, or the Silinx toolchain,
+// whose 7-series back end its processes then run, as the interface's; Vivado not for another family
+test('set_design_properties: the Artix-7\'s synthesis tool, vivado or silinx; run_process then runs the project\'s', async () => {
+  await ok('new_project_from_example', { name: 'c3', example: 'gates', board: 'basys3' });
+  const s = await ok('set_design_properties', { project: 'c3', synth_tool: 'silinx' });
+  assert.equal(s.text, 'Device set to xc7a35t-1-cpg236 (board basys3); synthesis tool silinx.');
+  const r = await ok('run_process', { project: 'c3', process: 'implement' });
+  assert.deepEqual([r.data.toolchain, r.data.ok, r.data.warnings], ['silinx', true, []]);
+  assert.match(r.text, /\nProcess "implement" of <gates> completed successfully \(Silinx toolchain\)\.$/);
+  // (the choice kept when the board changes within the family; Vivado's again when asked)
+  assert.equal((await ok('set_design_properties', { project: 'c3', board: 'nexys-a7' })).data.synthTool, 'silinx');
+  assert.equal((await ok('set_design_properties', { project: 'c3', synth_tool: 'vivado' })).data.synthTool, 'vivado');
+  // (another family: no Vivado; from the Artix-7's Vivado, the Silinx toolchain)
+  await fails('set_design_properties', { project: 'c3', board: 'basys2', synth_tool: 'vivado' }, 'AMD Vivado implements the Artix-7 devices, not the XC3S250E');
+  assert.equal((await ok('set_design_properties', { project: 'c3', board: 'basys2' })).data.synthTool, 'silinx');
 });

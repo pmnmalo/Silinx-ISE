@@ -3,9 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ISE, NO_FLOW, SILINX, SILINX_ICE40, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
+import { ISE, NO_FLOW, SILINX, SILINX_ICE40, SILINX_XC7, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
 import { XILINX_STEPS, orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { ICE40_STEPS } from '../packages/silinx-fpga/src/open-flow-ice40.js';
+import { XC7_STEPS } from '../packages/silinx-fpga/src/open-flow-xc7.js';
 
 const read = f => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const ids = t => t.flatMap(n => [n.id, ...ids(n.children || [])]);
@@ -99,6 +100,7 @@ test('#2311 the tool of a project: ISE unless the Silinx toolchain, its back end
 test('#2311 each descriptor\'s steps: its back end\'s list, in its order, each with what it produces', () => {
   assert.deepEqual(SILINX.steps.map(({ produces, ...s }) => s), XILINX_STEPS);
   assert.deepEqual(SILINX_ICE40.steps.map(({ produces, ...s }) => s), ICE40_STEPS);
+  assert.deepEqual(SILINX_XC7.steps.map(({ produces, ...s }) => s), XC7_STEPS);
   assert.deepEqual(ISE.steps.map(s => s.id), XILINX_STEPS.map(s => s.id));
   assert.equal(ISE.steps[0].label, 'Synthesize - XST');
   for (const tool of TOOLS) {
@@ -219,7 +221,7 @@ test('#2311 the mechanism of the disabled process is gone: absent, not disabled'
 });
 
 test('#1649 AMD Vivado on the Artix-7 (the local server): ISE\'s step names, Vivado\'s products and reports, no simulation model, no Emulate; the other families as before', () => {
-  for (const part of ['xc7a35t', 'xc7a100t']) for (const open of [false, true]) assert.equal(toolOf({ part }, open), VIVADO, part);
+  for (const part of ['xc7a35t', 'xc7a100t']) assert.equal(toolOf({ part }, false), VIVADO, part);   // (open: the Silinx toolchain's, #3146)
   for (const part of ['xc7k70t', 'xc7z020']) assert.equal(toolOf({ part }, false), ISE, part);
   assert.equal(toolOf({ part: 'xc3s250e' }, true, { standalone: false }), SILINX);
   const t = built(VIVADO);
@@ -241,4 +243,27 @@ test('#1649 AMD Vivado on the Artix-7 (the local server): ISE\'s step names, Viv
   assert.equal(VIVADO.messages.line, MESSAGE_LINE);
   // the run of each node: the chain up to its step
   assert.deepEqual(find(t, 'bitgen').run(), ['synth', 'translate', 'map', 'par', 'bitgen']);
+});
+
+test('#3146 the Silinx toolchain on the Artix-7 (the project\'s synthesis tool Silinx, the local server): its steps, its reports, the timing nextpnr\'s; no simulation model, no view, no Emulate', () => {
+  for (const part of ['xc7a35t', 'xc7a100t']) {
+    assert.equal(toolOf({ part }, true), SILINX_XC7, part);
+    assert.equal(toolOf({ part }, true, { standalone: true }), NO_FLOW, `${part}: not in the browser edition yet`);
+  }
+  for (const part of ['xc7k70t', 'xc7z020']) assert.equal(toolOf({ part }, true), SILINX, `${part}: not the 7-series back end's`);
+  const t = built(SILINX_XC7);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] },
+    { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', { config: ['impact'] }]);
+  assert.equal(find(t, 'synth').label, 'Synthesize - Yosys');
+  assert.deepEqual(find(t, 'bitgen').run(), ['synth', 'translate', 'map', 'par', 'bitgen']);   // (the server's list maps in Place & Route)
+  assert.deepEqual(orderSteps(XC7_STEPS, ['synth', 'translate', 'map', 'par', 'bitgen']), ['synth', 'translate', 'par', 'bitgen']);
+  // what each step produces: the back end's files (open-flow-xc7.js)
+  const src = read('packages/silinx-fpga/src/open-flow-xc7.js');
+  for (const f of ['open/routed.fasm', 'open/nextpnr-report.json', 'open/timing.txt', '`${top}.bit`']) assert.ok(src.includes(f), f);
+  for (const r of SILINX_XC7.reports) assert.ok(SILINX_XC7.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
+  assert.ok(SILINX_XC7.tasks.every(x => allTasks().includes(x)), 'its tasks the others\'');
+  assert.deepEqual(SILINX_XC7.reports.map(r => r.label), ['Synthesis Report (Yosys)', 'Routed Design (FASM)', 'Static Timing Report']);
+  assert.deepEqual([SILINX_XC7.constraints.format, SILINX_XC7.program.file, SILINX_XC7.program.page, SILINX_XC7.open], ['xdc', '{top}.bit', 'impact', true]);
+  assert.deepEqual(SILINX_XC7.tasks.map(x => x.id), ['edit', 'sim', 'impl']);
+  assert.equal(SILINX_XC7.messages.line, MESSAGE_LINE);
 });

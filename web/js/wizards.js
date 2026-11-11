@@ -190,7 +190,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
   });
   // the synthesis tool: Silinx (its own flow, no ISE) or XST (Xilinx ISE, as set in Toolchain Settings)
   const synthSel = select(SYNTH_TOOLS, 'silinx');
-  dp.lockSynth(synthSel);
+  dp.lockSynth(synthSel, null);   // (the device's first: Silinx, or on the Artix-7 AMD Vivado, #3146)
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], 'vhdl');
   // the type of the top-level source: HDL, or a diagram / table whose HDL module is kept in sync
   const topType = select(TOP_TYPES.map(t => [t.id, t.label]), 'hdl');
@@ -235,7 +235,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
         `Project Navigator will create a new project with the following specifications.\n\n` +
         `Project:\n  Project Name: ${name.value.trim()}\n  Template:     ${tplSel.value}\n\n` +
         `Device:\n  Board:        ${b ? b.name : 'None Specified'}\n  Family:       ${dp.familyName()}\n  Device:       ${dp.value().part.toUpperCase()}\n  Package:      ${dp.value().package.toUpperCase()}\n  Speed:        ${dp.value().speed}\n\n` +
-        `Flow:\n  Top-Level Source Type: ${TOP_TYPES.find(t => t.id === topType.value).label}\n  Synthesis Tool:     ${SYNTH_TOOLS.find(t => t[0] === synthSel.value)[1]}\n  Simulator:          SSim (Silinx behavioural simulator)\n  Preferred Language: ${langSel.value.toUpperCase()}`));
+        `Flow:\n  Top-Level Source Type: ${TOP_TYPES.find(t => t.id === topType.value).label}\n  Synthesis Tool:     ${synthSel.selectedOptions[0]?.textContent || synthSel.value}\n  Simulator:          SSim (Silinx behavioural simulator)\n  Preferred Language: ${langSel.value.toUpperCase()}`));
     },
   };
   const ok = await wizard('New Project Wizard', [p1, p2, p3]);
@@ -568,7 +568,7 @@ export async function projectProperties() {
   const lang = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], pj.preferredLanguage || 'vhdl');
   // a project from before the setting follows Toolchain Settings
   const synth = select(SYNTH_TOOLS, pj.synthTool || (S.toolchain?.config?.mode === 'silinx' ? 'silinx' : 'xst'));
-  dp.lockSynth(synth);
+  dp.lockSynth(synth, pj.synthTool);
   const r = await dialog({
     title: 'Design Properties', width: 520,
     body: h('div', { class: 'form-grid' },
