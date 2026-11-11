@@ -128,6 +128,14 @@ export const THIRD_PARTY = [
     "standalone": true
   },
   {
+    "name": "@yowasp/nextpnr-ecp5",
+    "version": "0.11.825",
+    "license": "ISC",
+    "url": "https://yowasp.org/",
+    "standalone": false,
+    "downloaded": true
+  },
+  {
     "name": "@yowasp/nextpnr-ice40",
     "version": "0.11.825",
     "license": "ISC",

@@ -297,10 +297,12 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Devices**: every FPGA family ISE 14.7 WebPACK implements — Spartan-3, Spartan-3E,
   Spartan-3A/3AN, Spartan-3A DSP, Spartan-6, Virtex-4/5/6, Artix-7, Kintex-7 and Zynq-7000
   (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6. Beyond ISE, the
-  Lattice iCE40 (LP, HX, Ultra, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack.
+  Lattice iCE40 (LP, HX, Ultra, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack, and the Lattice
+  ECP5 (LFE5U, LFE5UM, LFE5UM5G) with nextpnr-ecp5 and ecppack (Project Trellis).
 - **Boards and I/O Pin Planning**: Digilent Basys2, Nexys2, Nexys3, Atlys, Cmod S6; Xilinx
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One;
-  1BitSquared iCEBreaker (iCE40, its pins written as a PCF; a 1BitSquared iCEBreaker + PmodVGA for VGA).
+  1BitSquared iCEBreaker (iCE40, its pins written as a PCF; a 1BitSquared iCEBreaker + PmodVGA for VGA); Radiona ULX3S
+  (ECP5, its pins written as an LPF; a Radiona ULX3S + VGA for VGA).
   Ports are mapped to board resources by name, the UCF is generated, and pins are checked against
   the board before ISE runs.
 - **View Implemented Design (FPGA)**: the placed and routed design inside the chip (from the Silinx
@@ -680,6 +682,10 @@ On the 7-series, an experimental family (#3146), it takes **the Digilent Basys 3
 Silinx is the project's synthesis tool (AMD Vivado is the default there): Yosys's `synth_xilinx`, nextpnr-himbaechel's xilinx
 micro-architecture, and the `.bit` written from nextpnr's FASM on Project X-Ray's database; its timing is nextpnr's estimate,
 optimistic against Vivado's. Not yet the Nexys A7 (XC7A100T: no bit database), nor the browser edition.
+It takes **the Radiona ULX3S-12f / 25f / 45f / 85f** too (Lattice ECP5, LFE5U in CABGA381): Yosys's `synth_ecp5`, nextpnr-ecp5
+and ecppack (Project Trellis), to `build/<top>.bit`, its pins written as an LPF (not programmed from Silinx yet: openFPGALoader
+-b ulx3s, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the
+**ULX3S + VGA-12f / 25f / 45f / 85f** (the Radiona ULX3S + VGA), a VGA connector on that header.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
 what is planned: the [issues](https://github.com/pmnmalo/Silinx/issues).

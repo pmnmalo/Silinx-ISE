@@ -1,5 +1,5 @@
-// Xilinx device families known to ISE 14.7, and the open toolchains' others (the iCE40, #2295) (isomorphic: used by the
-// server and the browser).
+// Xilinx device families known to ISE 14.7, and the open toolchains' others (the iCE40, #2295; the ECP5, #2302) (isomorphic:
+// used by the server and the browser). An open family's constraints format (constraints) and its bitstream's extension (bitstream).
 // Detection works from the part name alone, so it also covers parts missing from the device DB.
 
 export const FAMILY_INFO = {
@@ -16,7 +16,9 @@ export const FAMILY_INFO = {
   kintex7:      { name: 'Kintex-7',           xise: 'Kintex7',                  pm: 'kintex7' },
   virtex7:      { name: 'Virtex-7',           xise: 'Virtex7',                  pm: 'virtex7' },
   zynq:         { name: 'Zynq-7000',          xise: 'Zynq',                     pm: 'zynq' },
-  ice40:        { name: 'iCE40' },
+  ice40:        { name: 'iCE40', constraints: 'pcf', bitstream: '.bin' },
+  // (#2302: Project Trellis's, nextpnr-ecp5 and ecppack; its constraints LPF, its bitstream ecppack's .bit, no Xilinx header)
+  ecp5:         { name: 'ECP5', constraints: 'lpf', bitstream: '.bit' },
 };
 
 /** Family id of a part name such as xc3s250e, xc6slx9, xc3s700an, xc7a100t, ice40up5k. */
@@ -35,6 +37,7 @@ export function familyOfPart(part) {
   if (/^xc7v/.test(p)) return 'virtex7';
   if (/^xc7z/.test(p)) return 'zynq';
   if (/^ice40/.test(p)) return 'ice40';
+  if (/^lfe5u/.test(p)) return 'ecp5';   // (LFE5U, LFE5UM, LFE5UM5G)
   return null;
 }
 
@@ -54,10 +57,12 @@ export const experimentalDevice = device => !!FAMILY_INFO[deviceFamily(device)]?
 export const vivadoDevice = device => FAMILY_INFO[deviceFamily(device)]?.backEnd === 'vivado';
 /** Why an experimental family's device has no implementation (the interface offers none; a request gets this error). */
 export const noFlowMessage = device => `the ${String(device?.part || '').toUpperCase()} (${familyName(deviceFamily(device))}, an experimental family) has no implementation flow yet: its boards and its XDC constraints only`;
-/** The format of a project device's constraints: 'pcf' (the iCE40's), 'xdc' (the 7-series', #3142) or 'ucf'. */
-export const constraintsFormatOf = device => (openOnlyDevice(device) ? 'pcf' : FAMILY_INFO[deviceFamily(device)]?.constraints || 'ucf');
-/** The extension of a project device's constraints file: '.ucf', '.pcf' or '.xdc'. */
+/** The format of a project device's constraints: 'pcf' (the iCE40's), 'lpf' (the ECP5's, #2302), 'xdc' (the 7-series', #3142) or 'ucf'. */
+export const constraintsFormatOf = device => FAMILY_INFO[deviceFamily(device)]?.constraints || 'ucf';
+/** The extension of a project device's constraints file: '.ucf', '.pcf', '.lpf' or '.xdc'. */
 export const constraintsExtOf = device => `.${constraintsFormatOf(device)}`;
+/** The extension of a project device's bitstream (build/<top><ext>): '.bit' (Xilinx's, ecppack's), '.bin' (icepack's). */
+export const bitstreamExtOf = device => FAMILY_INFO[deviceFamily(device)]?.bitstream || '.bit';
 export const familyName = f => FAMILY_INFO[f]?.name || f || 'unknown family';
 export const isSpartan3Like = f => /^spartan3/.test(f || '');
 export const familyFromXise = text => {

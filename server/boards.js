@@ -1,6 +1,7 @@
 // Silinx - the boards (#405: out of server/devices.js): each board's FPGA, package and speed, its programming
 // interfaces, clocks, switches, buttons, LEDs, displays and connectors, their pins and the UCF they come from.
 import { FAMILY } from './family.js';
+import { ULX3S_BOARDS } from './boards-ulx3s.js';
 
 // ---------------------------------------------------------------------------------------------
 // Boards
@@ -673,6 +674,8 @@ export const BOARDS = [
       { name: 'vga_vsync', label: 'VGA VSYNC on the PmodVGA (Pmod 1B P1B8)', pins: ['36'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'VGA', verified: false },
     ],
   },
+  // (#2302) the ECP5's board: the ULX3S (boards-ulx3s.js)
+  ...ULX3S_BOARDS,
 ];
 
 // Every resource above was transcribed from the source UCF named on its board; mark them.

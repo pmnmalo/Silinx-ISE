@@ -10,7 +10,6 @@ import { compile } from '/core/compile.js';
 import { synthEffort, synthGoal, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { OPEN_STEPS, engineOf, s6MapOf, orderOpenSteps, orderSteps, deviceFamily, isIseFamily } from '/packages/silinx-fpga/src/parts.js';
-import { ICE40_PARTS } from '/packages/silinx-fpga/src/index.js';
 import { familyProfile } from '/core/family-profile.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
@@ -30,7 +29,7 @@ export const BROWSER_DEVICES = {
 // versions with the same Yosys: ../vendor/yowasp-yosys/<its version>/gen/bundle.js), and the site the
 // page opened from a file fetches them from (the site keeps the older releases' folders, so that a
 // downloaded Silinx.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
-const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
+const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', nextpnrEcp5: 'vendor/nextpnr-ecp5/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
 // (and each asset's SHA-256, checked by the cache, web/js/asset-cache.js #1237: here, in the flow worker's messages
 // and in the Yosys workers' code)
 if (LAYOUT.integrity) globalThis.SILINX_ASSET_INTEGRITY ||= LAYOUT.integrity;
@@ -51,6 +50,17 @@ export const yosysBundleUrl = (base = assetsBase()) => new URL(LAYOUT.yosys, bas
 export const nextpnrBundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnr || 'vendor/nextpnr-spartan/gen/bundle.js', base).href;
 /** The URL of the Spartan-6's nextpnr bundle (nextpnr-himbaechel-spartan6, its chip databases in ../chipdb, #2288). */
 export const nextpnrS6BundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnrS6 || 'vendor/nextpnr-spartan6/gen/bundle.js', base).href;
+/** Where a family's YoWASP tools are (its profile's openFlow): the URL of their bundle (the local server's), or their
+ *  package's { url, integrity } on npm's registry (the published editions', #2444); null when this edition has neither. */
+export function ownBundle(flow, base = assetsBase()) {
+  if (LAYOUT[`${flow.layout}Package`]) return LAYOUT[`${flow.layout}Package`];
+  return LAYOUT[flow.layout] ? new URL(LAYOUT[flow.layout], base).href : null;
+}
+// what the worker loads of a family's YoWASP tools: { family, where, tools, mb } (null: a family with none)
+function ownTools(family) {
+  const f = familyProfile(family).openFlow;
+  return f?.package ? { family, where: ownBundle(f), tools: `${f.tools} and ${f.packer}`, mb: f.mb } : null;
+}
 // does Implement of a family run nextpnr? The Spartan-3E's and the Spartan-6's (#2136, #2288, #2137: nextpnr, the one engine)
 const usesNextpnr = family => !!familyProfile(family).openFlow?.nextpnr;
 
@@ -63,12 +73,13 @@ export function browserOpenStatus(device = {}) {
   const family = deviceFamily(device) || 'spartan3e';
   const list = Object.keys(BROWSER_DEVICES).map(k => k.replace('/', ' ')).join(', ');
   const flow = familyProfile(family).openFlow;   // (the family's open flow, #2310)
-  // (the iCE40, #2295: nextpnr-ice40 served by the local server, or the published editions' download from npm's registry, #2444)
-  if (flow?.tools === 'nextpnr-ice40') {
-    const name = `${dev}${pkg}`;
-    if (!ICE40_PARTS.includes(dev.replace(/^ice40/, ''))) return { available: false, part: name, reason: `${dev}: not an iCE40 part of nextpnr-ice40` };
-    return LAYOUT.nextpnrIce40 || LAYOUT.nextpnrIce40Package ? { available: true, part: name, family, reason: `${name}: nextpnr-ice40 and icepack (in the browser)` }
-      : { available: false, part: name, reason: 'nextpnr-ice40 is not in this edition: use the local server' };
+  // (a family of YoWASP's tools, the iCE40's #2295, the ECP5's #2302: its nextpnr served by the local server, or the published
+  // editions' download from npm's registry, #2444)
+  if (flow?.package) {
+    const name = `${dev}${String(device.speed || '').replace(/^(?=\d)/, '-')}${pkg}`;
+    if (!flow.parts.test(dev)) return { available: false, part: name, reason: `${dev}: not ${flow.partOf} of ${flow.tools}` };
+    return ownBundle(flow) ? { available: true, part: name, family, reason: `${name}: ${flow.tools} and ${flow.packer} (in the browser)` }
+      : { available: false, part: name, reason: `${flow.tools} is not in this edition: use the local server` };
   }
   // (the Spartan-6, #2103: the parts of the Nexys3 and the Atlys)
   if (flow?.bitDb === 's6' && flow.parts.test(dev)) {
@@ -86,7 +97,7 @@ export function browserOpenStatus(device = {}) {
 const ALIASES = { implement: 'par', impl: 'par', synthesize: 'synth', xst: 'synth', ngdbuild: 'translate', place: 'par', route: 'par', timing: 'trce', bit: 'bitgen' };
 /** The steps of a run: the chain from synthesis to the last step asked for (packages/silinx-fpga/src/open-steps.js, as the server's openSteps). */
 export function browserSteps(steps, { synthUpToDate = false, family = null } = {}) {
-  const own = familyProfile(family).openFlow?.steps;   // (a family with its own tools' steps: the iCE40's)
+  const own = familyProfile(family).openFlow?.steps;   // (a family with its own tools' steps: the iCE40's, the ECP5's)
   if (own) {
     const asked = (Array.isArray(steps) ? steps : [steps]).filter(Boolean).map(s => ALIASES[String(s).toLowerCase()] || String(s).toLowerCase());
     const list = orderSteps(own, asked);
@@ -168,7 +179,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   // (a device with some of the steps only, as the server refuses the others: the Spartan-6's, #722)
   const missing = st.steps ? runSteps.filter(s => !st.steps.includes(s)) : [];
   if (missing.length) throw new Error(`the Silinx toolchain has no ${missing.join(', ')} for ${st.part} yet (only ${st.steps.join(', ')})`);
-  const spec = { top, part: st.part, device: dev, pkg, family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), s6Map: s6MapOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), ...(resources && { resources }) };
+  const spec = { top, part: st.part, device: dev, pkg, speed: String(project.device.speed || ''), family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), s6Map: s6MapOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), ...(resources && { resources }) };
   if (synthUpToDate && !spec.steps.includes('synth')) spec.synthUpToDate = synthUpToDate;
   // (the logic analyzer's capture, inserted by the front end: core/flow-ide.js, #3176)
   if (project.capture) spec.capture = project.capture;
@@ -179,7 +190,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   const earlier = {};
   for (const [k, v] of Object.entries(files)) if (k.startsWith('build/') && typeof v === 'string') earlier[k.slice(6)] = v;
   if (signal?.aborted) throw cancelled();
-  return workerRun({ spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null }, { onLine, onWrite, onReport, signal });
+  return workerRun({ spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrOwn: ownTools(st.family), integrity: LAYOUT.integrity || null }, { onLine, onWrite, onReport, signal });
 }
 
 // one run in the worker: its lines, files and report to the handlers; resolves its done ({ ok, report, error, view })
@@ -209,7 +220,7 @@ function workerRun(message, { onLine, onWrite = () => {}, onReport = () => {}, s
  */
 export function runBrowserSpec({ spec, sources, onLine, signal = null }) {
   if (signal?.aborted) return Promise.reject(cancelled());
-  return workerRun({ spec, sources, simSources: [], ucf: null, ucfName: null, files: {}, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrIce40: null, integrity: LAYOUT.integrity || null }, { onLine, signal });
+  return workerRun({ spec, sources, simSources: [], ucf: null, ucfName: null, files: {}, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrOwn: null, integrity: LAYOUT.integrity || null }, { onLine, signal });
 }
 
 /**

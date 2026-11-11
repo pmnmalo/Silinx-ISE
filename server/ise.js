@@ -14,7 +14,7 @@
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
-import { FAMILY_INFO, deviceFamily, isIseFamily, constraintsFormatOf, parseUcf, bitName, resourceCount } from '../packages/silinx-fpga/src/parts.js';
+import { FAMILY_INFO, deviceFamily, isIseFamily, constraintsFormatOf, openOnlyDevice, parseUcf, bitName, resourceCount } from '../packages/silinx-fpga/src/parts.js';
 import { compile, elaborate } from '../core/compile.js';
 import { clocksOf, latchGates } from '../core/schematic.js';
 import { primitiveSources } from '../core/unisim.js';
@@ -846,7 +846,8 @@ export async function collectReports(buildDir, top, device) {
   if (fss.existsSync(bitPath)) {
     const st = await fs.stat(bitPath);
     let header = null;
-    try { header = parseBitHeader(await fs.readFile(bitPath)); } catch (e) { header = { error: e.message }; }
+    // (an open family's .bit, the ECP5's: Lattice's, no Xilinx header to read, #2302)
+    if (!openOnlyDevice(device)) try { header = parseBitHeader(await fs.readFile(bitPath)); } catch (e) { header = { error: e.message }; }
     out.bit = { path: bitPath, size: st.size, mtime: st.mtime.toISOString(), header };
   }
   const pwr = await readIf(path.join(buildDir, `${top}.pwr`));

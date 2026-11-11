@@ -33,10 +33,14 @@ export const targetsOf = name => (S6_EXAMPLES.includes(name) ? TARGETS : S3E_TAR
 // the iCE40's board (#2517): the examples on the iCEBreaker, the display and the switches on its Pmods; vga on its
 // PmodVGA, a board of its own (icebreaker-vga). Its ports with no pin on the board, warned (btn<3>, led<5..7>…)
 export const ICE40_TARGETS = [{ board: 'icebreaker' }];
+// the ECP5's board (#2302): the examples on the ULX3S (its 85F), the display on its GPIO header; vga on its header too, a
+// board of its own (ulx3s-vga). Its ports with no pin on the board, warned (sw<4..7>)
+export const ECP5_TARGETS = [{ board: 'ulx3s' }];
 // the 7-series' boards (#3142): an experimental family, its constraints XDC; built by Vivado (#1649), not in TARGETS
 export const XC7_TARGETS = [{ board: 'basys3' }, { board: 'nexys-a7' }];
-/** The board an example runs on for a target: vga on the iCEBreaker with its PmodVGA. */
-export const exampleBoard = (name, t) => (name === 'vga' && t.board === 'icebreaker' ? { ...t, board: 'icebreaker-vga' } : t);
+/** The board an example runs on for a target: vga on the iCEBreaker with its PmodVGA, on the ULX3S with its VGA. */
+const VGA_BOARDS = { icebreaker: 'icebreaker-vga', ulx3s: 'ulx3s-vga' };
+export const exampleBoard = (name, t) => (name === 'vga' && VGA_BOARDS[t.board] ? { ...t, board: VGA_BOARDS[t.board] } : t);
 /** A target's name: 'basys2-250', 'nexys3'. */
 export const targetName = t => t.variant ? `${t.board}-${t.variant}` : t.board;
 
@@ -59,7 +63,7 @@ const ucfPort = p => {
   return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null };
 };
 
-/** The constraints of an example's top on a board (a UCF, or a PCF on the iCE40): { text, board: resolved, unmatched }. */
+/** The constraints of an example's top on a board (a UCF, a PCF on the iCE40, an LPF on the ECP5): { text, board: resolved, unmatched }. */
 export function exampleUcf(name, { board, variant }) {
   const ex = example(name);
   const r = resolveBoard(board, { variant });
@@ -107,7 +111,7 @@ export function exampleProject(name, target, into) {
   fs.cpSync(ex.dir, dir, { recursive: true, filter: f => !/[\\/]build$/.test(f) });
   const { text, device } = exampleUcf(name, target);
   const project = { ...ex.project, device, board: target.board, boardVariant: target.variant };
-  // (the iCE40's constraints are a PCF, #2517; the 7-series' an XDC, #3142: the example's UCF not kept)
+  // (the iCE40's constraints are a PCF, #2517; the ECP5's an LPF, #2302; the 7-series' an XDC, #3142: the example's UCF not kept)
   const ext = constraintsExtOf(device);
   if (!project.constraints.endsWith(ext)) {
     fs.rmSync(path.join(dir, project.constraints), { force: true });

@@ -10,7 +10,7 @@
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
 import { familyProfile } from '/core/family-profile.js';
-import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, ice40Io, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
+import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, ice40Io, ecp5Io, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
@@ -80,17 +80,22 @@ function nextpnrBrowser(url, post, runner, mb = 7) {
   };
 }
 
-// the iCE40's nextpnr and icepack (#2295): YoWASP's bundle served by the local server (its URL), or its package from npm's
-// registry, kept by this browser (the published editions: its { url, integrity }, #2444)
-const ice40s = new Map();
-function ice40Browser(where, post) {
-  const key = where.url || where;
-  if (!ice40s.has(key)) ice40s.set(key, ice40Io(() => (where.url ? ice40FromTarball(where, { log: line => post({ line }) }) : import(where))));
-  return ice40s.get(key);
+// a family's nextpnr and packer of YoWASP's (the iCE40's icepack #2295, the ECP5's ecppack #2302): their bundle served by the
+// local server (its URL), or their package from npm's registry, kept by this browser (the published editions: its { url,
+// integrity }, #2444); own: { family, where, tools, mb }
+const OWN_IO = { ice40: ice40Io, ecp5: ecp5Io };
+const owns = new Map();
+function ownBrowser({ family, where, tools, mb }, post) {
+  const key = `${family} ${where.url || where}`;
+  const cache = tools ? { tools, mb, cache: `silinx-${tools.split(' ')[0]}` } : {};
+  if (!owns.has(key)) owns.set(key, OWN_IO[family](() => (where.url ? ice40FromTarball(where, { log: line => post({ line }), ...cache }) : import(where))));
+  return owns.get(key);
 }
 
 self.onmessage = async ({ data }) => {
-  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl, nextpnrS6: nextpnrS6Url, nextpnrIce40: ice40Url } = data;
+  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl, nextpnrS6: nextpnrS6Url, nextpnrIce40: ice40Url, nextpnrOwn } = data;
+  // (the iCE40's bundle by its own key, as before #2302)
+  const own = nextpnrOwn || (ice40Url && { family: 'ice40', where: ice40Url });
   // every message carries the run's id (web/js/open-flow-browser.js: each run hears only its own)
   const post = m => self.postMessage({ ...m, id: data.id });
   if (data.integrity) self.SILINX_ASSET_INTEGRITY = data.integrity;   // (the assets' SHA-256, #1237: this worker's fetches and its Yosys workers')
@@ -161,7 +166,7 @@ self.onmessage = async ({ data }) => {
     const { io, store } = workerIo({ post, sources, simSources, ucf, ucfName, files, device: () => device, bitDb: () => db, yosys,
       // (the nextpnr engine's, #2136: its bundle and the device's chip database fetched on its first use, then kept by the
       // cache; the Spartan-6's, #2288)
-      nextpnr: ice40Url ? { ice40: ice40Browser(ice40Url, post) }
+      nextpnr: own ? { [own.family]: ownBrowser(own, post) }
         : spec.engine && spec.engine !== 'silinx' ? {
           spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post),
           spartan6: nextpnrBrowser(nextpnrS6Url || new URL('vendor/nextpnr-spartan6/gen/bundle.js', base).href, post, 'runNextpnrHimbaechelSpartan6', 5),
