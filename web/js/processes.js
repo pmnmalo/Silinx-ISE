@@ -378,7 +378,7 @@ function sourcesFingerprint() {
 // Translate while they are the same
 export function synthFingerprint(sources) {
   const ucf = S.project.constraints;
-  const parts = sources.filter(f => f.role !== 'sim' && f.path !== ucf && !/\.(ucf|pcf|xdc)$/i.test(f.path)).map(f => `${f.path}\n${f.text}`).sort();
+  const parts = sources.filter(f => f.role !== 'sim' && f.path !== ucf && !/\.(ucf|pcf|lpf|xdc)$/i.test(f.path)).map(f => `${f.path}\n${f.text}`).sort();
   parts.push(`top\n${S.project.top}`, `dev\n${JSON.stringify(S.project.device)}`, `tool\n${S.project.synthTool || ''}\n${openMode()}`, `effort\n${S.project.impl?.optLevel ?? ''}\n${S.project.impl?.optMode ?? ''}`);
   let h = 2166136261;
   for (const c of parts.join('\0')) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }

@@ -1,7 +1,7 @@
 // The implementation processes (#405: out of app.js): ISE's flow run step by step with its live status
 // (synthesis to bitstream), Check Constraints and the UCF made from the board, the open synthesis (Yosys in
 // the browser), the optional processes (simulation models, timing, power, pin back-annotation) and Stop.
-import { constraintsExt, pcfDiagnostics, xdcDiagnostics } from './constraints-format.js';
+import { constraintsExt, pcfDiagnostics, lpfDiagnostics, xdcDiagnostics } from './constraints-format.js';
 import { noFlowWarning } from './device-picker.js';
 import { api, followJob } from './api.js';
 import { h, alertDlg, confirmDlg, toast } from './ui.js';
@@ -104,6 +104,7 @@ export async function ucfDiagnostics(text, file) {
     } catch { /* no port data */ }
   }
   if (/\.pcf$/i.test(file)) return pcfDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
+  if (/\.lpf$/i.test(file)) return lpfDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
   if (/\.xdc$/i.test(file)) return xdcDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
   const db = S.devices;
   const famId = db?.parts?.find(x => x.part === pj.device?.part)?.family || pj.device?.family;

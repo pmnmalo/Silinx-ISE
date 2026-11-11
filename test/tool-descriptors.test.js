@@ -3,9 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ISE, NO_FLOW, SILINX, SILINX_ICE40, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
+import { ISE, NO_FLOW, SILINX, SILINX_ICE40, SILINX_ECP5, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
 import { XILINX_STEPS, orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { ICE40_STEPS } from '../packages/silinx-fpga/src/open-flow-ice40.js';
+import { ECP5_STEPS } from '../packages/silinx-fpga/src/open-flow-ecp5.js';
 
 const read = f => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const ids = t => t.flatMap(n => [n.id, ...ids(n.children || [])]);
@@ -41,6 +42,23 @@ test('#2311 the Silinx toolchain: ISE\'s tree without the open synthesis, Synthe
   assert.equal(find(t, 'synth').label, 'Synthesize - Yosys');
   for (const id of ['synth', 'impl', 'bitgen']) assert.equal(find(t, id).title, 'Silinx toolchain (no ISE)', id);
   assert.equal(find(t, 'translate').title, undefined);
+});
+
+test('#2302 the ECP5: the iCE40\'s tree without Emulate and Configure Target Device; its steps, reports, LPF, nothing to program', () => {
+  const t = built(SILINX_ECP5);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: [] }] }, 'bitgen']);
+  assert.equal(toolOf({ part: 'lfe5u-85f' }, true), SILINX_ECP5);
+  assert.equal(toolOf({ part: 'lfe5um5g-45f' }, false), ISE, 'a choice of the interface: the device makes the open mode (processes.js openMode)');
+  assert.deepEqual(SILINX_ECP5.steps.map(({ produces, ...s }) => s), ECP5_STEPS);
+  assert.deepEqual(SILINX_ECP5.steps.find(s => s.id === 'bitgen').produces, ['{top}.bit']);
+  assert.deepEqual(SILINX_ECP5.steps.find(s => s.id === 'par').produces, ['open/routed.config']);
+  assert.ok(read('packages/silinx-fpga/src/open-flow-ecp5.js').includes("io.write('open/routed.config'"));
+  for (const r of SILINX_ECP5.reports) assert.ok(SILINX_ECP5.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
+  assert.deepEqual(SILINX_ECP5.constraints, { format: 'lpf', ext: '.lpf', label: 'LPF' });
+  assert.equal(SILINX_ECP5.program, null);
+  assert.deepEqual(SILINX_ECP5.tasks.map(t => t.id), ['edit', 'sim', 'impl']);
+  assert.ok(!TOOLS.includes(SILINX_ECP5) && SILINX_ECP5.tasks.every(t => allTasks().includes(t)), 'its tasks the others\'');
+  assert.equal(SILINX_ECP5.messages.line, MESSAGE_LINE);
 });
 
 test('#2311 the iCE40: what it does not have is absent, not disabled', () => {

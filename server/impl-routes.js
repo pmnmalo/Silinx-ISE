@@ -10,7 +10,8 @@ import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
 import { runVivado, isVivadoDevice, vivadoSteps, collectVivadoReports } from './vivado.js';
-import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
+import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice, bitstreamExtOf, familyName } from '../packages/silinx-fpga/src/parts.js';
+import { familyProfile } from '../core/family-profile.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
@@ -213,11 +214,11 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
   api.get('/projects/:p/bitinfo', wrap(async req => {
     const project = await P.readProject(req.params.p);
     if (!topOf(project)) return { available: false, reason: 'no top module' };
-    // (the iCE40's .bin: no header, its size, #2298)
+    // (an open family's bitstream, the iCE40's .bin, the ECP5's .bit: no Xilinx header, its size, #2298, #2302; its family's flag)
     if (openOnlyDevice(project.device)) {
-      const bin = path.join(P.projectDir(req.params.p), 'build', `${project.top}.bin`);
+      const bin = path.join(P.projectDir(req.params.p), 'build', `${project.top}${bitstreamExtOf(project.device)}`), own = { [deviceFamily(project.device)]: true };
       const st = await fs.stat(bin).catch(() => null);
-      return st ? { available: true, path: bin, size: st.size, ice40: true } : { available: false, path: bin, ice40: true };
+      return st ? { available: true, path: bin, size: st.size, ...own } : { available: false, path: bin, ...own };
     }
     const bit = path.join(P.projectDir(req.params.p), 'build', `${project.top}.bit`);
     if (!fss.existsSync(bit)) return { available: false, path: bit };
@@ -234,11 +235,15 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     if (b.project) {
       project = await P.readProject(b.project);
       if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board', project), 403);   // (#2830)
+      // (an open family whose boards Silinx does not program yet: the ECP5's, #2302)
+      if (openOnlyDevice(project.device) && !familyProfile(deviceFamily(project.device)).program) {
+        throw bad(`Silinx does not program ${familyName(deviceFamily(project.device))} boards yet: build/${project.top || '<top>'}${bitstreamExtOf(project.device)} is the bitstream, for the board's own tools (openFPGALoader)`);
+      }
       const dir = P.projectDir(b.project);
       if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
       else {
         if (!topOf(project)) throw bad('project has no top module; cannot locate build/<top>.bit');
-        bitfile = path.join(dir, 'build', `${project.top}${openOnlyDevice(project.device) ? '.bin' : '.bit'}`);   // (the iCE40's, #2298)
+        bitfile = path.join(dir, 'build', `${project.top}${bitstreamExtOf(project.device)}`);   // (the iCE40's .bin, #2298)
       }
     } else if (b.bitfile) {
       if (!path.isAbsolute(b.bitfile)) throw bad('bitfile must be an absolute path when no project is given');

@@ -11,8 +11,9 @@ Source code: https://github.com/pmnmalo/Silinx (packages/silinx-fpga)
 It depends on open-source components from other projects, each under its own licence, which npm installs
 with it: Yosys (YoWASP, ISC) and nextpnr with the Spartan-3E and the Spartan-6 (nextpnr-spartan, ISC; with Boost, BSL-1.0,
 and Eigen, MPL-2.0: source code at https://gitlab.com/libeigen/eigen); for the iCE40, if installed, nextpnr-ice40
-and the IceStorm tools (YoWASP's @yowasp/nextpnr-ice40, ISC, an optional dependency). Their licence texts are in
-THIRD-PARTY-NOTICES.md.
+and the IceStorm tools (YoWASP's @yowasp/nextpnr-ice40, ISC, an optional dependency); for the ECP5, if installed,
+nextpnr-ecp5 and the Project Trellis tools (YoWASP's @yowasp/nextpnr-ecp5, ISC, an optional dependency). Their licence
+texts are in THIRD-PARTY-NOTICES.md.
 
 It includes work ported from Project X-Ray, whose licence texts are in THIRD-PARTY-NOTICES.md too: the 7-series'
 bitstream writer (src/fpga/xc7/) follows its fasm2frames and xc7frames2bit (ISC), and the 7-series' bit database

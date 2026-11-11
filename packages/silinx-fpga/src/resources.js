@@ -96,6 +96,11 @@ const FAMILY_RESOURCES = {
   ice40: [...LUT4_COMMON, globalBuffers(8, 'Number of SB_GBs', ['SB_GB']),
     { id: 'ebr', label: label('Block RAMs (4 Kbit)', 'RAMs de bloco (4 Kbit)'), report: null, count: p => p.brams, primitives: ['SB_RAM40_4K'] },
     { id: 'mac', label: label('DSP blocks', 'Blocos DSP'), report: null, count: p => p.dsp, primitives: ['SB_MAC16'] }],
+  // (the ECP5's data sheet, FPGA-DS-02012 Table 1.1, #2302: its 18 Kbit sysMEM blocks, its 18x18 multipliers, its PLLs)
+  ecp5: [...LUT4_COMMON,
+    { id: 'ebr', label: label('Block RAMs (18 Kbit)', 'RAMs de bloco (18 Kbit)'), report: 'Number of DP16KDs', count: p => p.brams, primitives: ['DP16KD', 'PDPW16KD'] },
+    { id: 'mult', label: label('Multipliers (18x18)', 'Multiplicadores (18x18)'), report: 'Number of MULT18X18Ds', count: p => p.multipliers, primitives: ['MULT18X18D'] },
+    { id: 'pll', label: label('PLLs', 'PLLs'), report: 'Number of EHXPLLLs', count: p => p.plls, primitives: ['EHXPLLL'] }],
 };
 
 /** The families whose own resources are all described (the Spartan-3, 3A, 3A DSP and Virtex-4 have their

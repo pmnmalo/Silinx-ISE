@@ -172,7 +172,7 @@ export const WIZARD_TOOLS = [
       const pj = await readProject(name);
       const { constraintsFormatOf, generateUcf, bitName, boardAutoAssign } = await import('../packages/silinx-fpga/src/parts.js');
       const format = constraintsFormatOf(pj.device);
-      if (format !== 'ucf') throw toolError(`the ${String(pj.device.part).toUpperCase()}'s constraints are a${format === 'xdc' ? 'n' : ''} ${format.toUpperCase()}: new_source constraints writes one`);
+      if (format !== 'ucf') throw toolError(`the ${String(pj.device.part).toUpperCase()}'s constraints are a${['xdc', 'lpf'].includes(format) ? 'n' : ''} ${format.toUpperCase()}: new_source constraints writes one`);
       const { compile, elaborate } = await import('../core/compile.js');
       const { primitiveSources } = await import('../core/unisim.js');
       const { viewSourcesOf } = await import('./mcp-util.js');

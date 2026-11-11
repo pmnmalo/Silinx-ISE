@@ -28,6 +28,7 @@ const SOURCE_TYPES = [
   { id: 'tb', label: 'Test Bench', ico: 'vhdl', ext: null, dir: 'sim', wiz: 'testbench' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints', wiz: 'ucf' },
   { id: 'pcf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.pcf', dir: 'constraints', hidden: true },   // (the iCE40's: its device shows it for UCF's, #2296)
+  { id: 'lpf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.lpf', dir: 'constraints', hidden: true },   // (the ECP5's, #2302)
   { id: 'xdc', label: 'Implementation Constraints File', ico: 'ucf', ext: '.xdc', dir: 'constraints', hidden: true },   // (the 7-series', #3142)
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
   { id: 'lab', label: 'Guided Lab', ico: 'help', ext: '.lab.json', dir: 'labs' },   // (a teacher's, its steps checked: #3179)
@@ -37,7 +38,7 @@ const SOURCE_TYPES = [
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src', hidden: true },
 ];
 // the constraints files' types: one shown, the device's format's
-const CONSTRAINTS = ['ucf', 'pcf', 'xdc'];
+const CONSTRAINTS = ['ucf', 'pcf', 'lpf', 'xdc'];
 
 // name, location, lang, atFile: a wizard's < Back (#2082): New Source again at the File Name and Location page, as left
 export async function newSourceWizard({ type, name = '', location = null, lang = null, atFile = false } = {}) {
@@ -46,7 +47,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   // (modwiz, schwiz, pnwiz, tbwiz) select the type whose Wizard button opens that wizard (#958)
   const LEGACY = { vhdl: ['hdl', 'vhdl'], verilog: ['hdl', 'verilog'], 'vhdl-tb': ['tb', 'vhdl'], 'verilog-tb': ['tb', 'verilog'],
     modwiz: ['hdl'], schwiz: ['sch'], pnwiz: ['petri'], tbwiz: ['tb'] };
-  const cons = constraintsFormatOf(S.project.device), consType = id => (id === 'ucf' ? cons : id);   // (the device's format: UCF, PCF or XDC)
+  const cons = constraintsFormatOf(S.project.device), consType = id => (id === 'ucf' ? cons : id);   // (the device's format: UCF, PCF, LPF or XDC)
   let st = SOURCE_TYPES.find(t => t.id === consType(LEGACY[type]?.[0] || type)) || SOURCE_TYPES.find(t => t.id === 'hdl');   // default: Module (HDL)
   const shown = () => SOURCE_TYPES.filter(t => (CONSTRAINTS.includes(t.id) ? t.id === cons : !t.hidden || t === st));
   // language of HDL modules and test benches (Define Module / Associate Source pages)
@@ -74,7 +75,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     validate: () => null,
   };
   // the file name and the location; Wizard (#958) opens the type's wizard with them (it asks the rest on its pages)
-  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json|lab\.json)$/i, '');
+  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|lpf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json|lab\.json)$/i, '');
   const fileError = () => {
     if (!FILE_RE.test(nameOf())) return 'Enter a valid file name (letters, digits, _ and -).';
     if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
@@ -203,7 +204,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     title: 'Summary',
     render: () => summary,
     onShow: () => {
-      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json)$/i, '');
+      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|pcf|lpf|xdc|mem|asm\.json|tt\.json|bool\.json|sch\.json)$/i, '');
       const lg = langSel.value === 'verilog' ? 'Verilog' : 'VHDL';
       summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}${st.ext ? '' : ` (${lg})`}\nSource Name: ${n}${extOf(st)}\n` +
         (st.id === 'hdl' ? `\nEntity name: ${entName.value}\n${langSel.value === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +
@@ -241,6 +242,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     }
     case 'ucf': text = T.ucfTemplate(pj); break;
     case 'pcf': text = T.pcfTemplate(pj); break;
+    case 'lpf': text = T.lpfTemplate(pj); break;
     case 'xdc': text = T.xdcTemplate(pj); break;
     case 'mem': text = '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n'; break;
     case 'lab': { const { newLab } = await import('/core/labs.js'); text = `${JSON.stringify(newLab(n, { top: pj.top, simTop: pj.simTop }), null, 2)}\n`; break; }

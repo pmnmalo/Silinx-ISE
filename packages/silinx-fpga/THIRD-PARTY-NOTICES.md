@@ -8,6 +8,7 @@ which npm installs with it, and includes the ported ones (their code or data in 
 |---|---|---|---|
 | @silinx/nextpnr-himbaechel-spartan3e | 1.5.0 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @silinx/nextpnr-himbaechel-spartan6 | 0.3.0 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
+| @yowasp/nextpnr-ecp5 | 0.11.825 | ISC | https://yowasp.org/ |
 | @yowasp/nextpnr-ice40 | 0.11.825 | ISC | https://yowasp.org/ |
 | @yowasp/yosys | 0.70.1258 | ISC | https://yowasp.org/ |
 | prjxray | c9f02d8 | ISC | https://github.com/f4pga/prjxray |
@@ -952,6 +953,73 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 The WASI SDK 34's runtime libraries (wasi-libc, libc++, libc++abi, libunwind; linked into the package): https://github.com/WebAssembly/wasi-sdk
 Licensed under the Apache License v2.0 with LLVM Exceptions (wasi-libc also MIT and CC0 parts): https://github.com/WebAssembly/wasi-libc/blob/main/LICENSE and https://llvm.org/LICENSE.txt
 ```
+
+## @yowasp/nextpnr-ecp5 0.11.825 — ISC
+
+https://yowasp.org/
+
+```text
+YoWASP nextpnr-ecp5 (the package: nextpnr-ecp5 and the Project Trellis tools, in WebAssembly): https://github.com/YoWASP/nextpnr
+
+ISC License
+
+Copyright (C) Catherine <whitequark@whitequark.org>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+nextpnr (compiled to WebAssembly in the package): https://github.com/YosysHQ/nextpnr
+
+ISC License
+
+Copyright (C) 2018-2020 Claire Xenia Wolf <claire@yosyshq.com>
+Copyright (C) 2018-2020 gatecat <gatecat@ds0.me>
+Copyright (C) 2018-2020 Dan Gisselquist <dan@symbioticeda.com>
+Copyright (C) 2018-2020 Serge Bazanski <q3k@q3k.org>
+Copyright (C) 2018-2020 Miodrag Milanovic <micko@yosyshq.com>
+Copyright (C) 2018-2020 Eddie Hung <eddieh@ece.ubc.ca>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+Project Trellis (ecppack, ecpunpack and the ECP5 databases, compiled into the package): https://github.com/YosysHQ/prjtrellis
+
+ISC License
+
+Copyright (C) 2018  The Project Trellis Authors. All rights reserved.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+Not in silinx-<version>.zip: Silinx downloads it from npm's registry on its first use.
 
 ## @yowasp/nextpnr-ice40 0.11.825 — ISC
 

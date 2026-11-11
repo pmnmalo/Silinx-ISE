@@ -205,6 +205,20 @@ test('program: an iCE40 project\'s .bin into the iCEBreaker\'s flash with openFP
   assert.equal(r.status, 400);
 });
 
+// #2302: an ECP5 project: its .bit (ecppack's, no Xilinx header) by its size in bitinfo; not programmed from Silinx yet
+test('program: an ECP5 project\'s .bit: its size; programming refused, the board\'s own tool named', async () => {
+  await P.createProject({ name: 'Ecp', board: 'ulx3s', device: { family: 'ecp5', part: 'lfe5u-85f', package: 'cabga381', speed: '-6' } });
+  await P.updateProject('Ecp', pj => { pj.top = 'top'; });
+  const bit = path.join(P.projectDir('Ecp'), 'build', 'top.bit');
+  await fs.mkdir(path.dirname(bit), { recursive: true });
+  assert.deepEqual((await app.call('GET', '/projects/Ecp/bitinfo')).body, { available: false, path: bit, ecp5: true });
+  await fs.writeFile(bit, Buffer.alloc(1927725, 0xff));
+  assert.deepEqual((await app.call('GET', '/projects/Ecp/bitinfo')).body, { available: true, path: bit, size: 1927725, ecp5: true });
+  const r = await app.call('POST', '/program', { project: 'Ecp' });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error, 'Silinx does not program ECP5 boards yet: build/top.bit is the bitstream, for the board\'s own tools (openFPGALoader)');
+});
+
 test('program: iMPACT success / silent failure / error message; adepttool DONE check; tool exit code', { skip: POSIX_ONLY }, async () => {
   let j = await run('/program', { project: 'Prog', tool: 'impact' });
   assert.equal(j.status, 'ok', j.lines.join('\n'));

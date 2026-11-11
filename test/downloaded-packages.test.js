@@ -1,5 +1,5 @@
 // The npm packages downloaded on their first use, left out of the release zip (#2444, #2570, scripts/downloaded-packages.mjs):
-// npm ci --omit=dev installs the iCE40's nextpnr all the same (an optional peer of the workspace silinx-fpga, devOptional in
+// npm ci --omit=dev installs the iCE40's and the ECP5's nextpnr (#2302) all the same (an optional peer of the workspace silinx-fpga, devOptional in
 // package-lock.json), so the packaging removes it after the install, and the notices mark it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,7 +30,7 @@ test('#2570 leaveOutDownloaded: the downloaded packages removed from node_module
 });
 
 test('#2570 the release zip removes them after npm ci, before zipping', () => {
-  assert.deepEqual(DOWNLOADED_PACKAGES, ['@yowasp/nextpnr-ice40']);
+  assert.deepEqual(DOWNLOADED_PACKAGES, ['@yowasp/nextpnr-ice40', '@yowasp/nextpnr-ecp5']);
   const src = read('scripts/package-release.mjs');
   const at = (re) => { const m = re.exec(src); assert.ok(m, String(re)); return m.index; };
   const install = at(/run\('npm', \['ci', '--omit=dev'/), leave = at(/\n {4}leaveOutDownloaded\(app\);\n/), zip = at(/run\('zip', \['-qr'/);
@@ -48,11 +48,13 @@ test('#2570 why: npm ci --omit=dev keeps them (devOptional), the fetch has their
     assert.match(e.resolved, /^https:\/\/registry\.npmjs\.org\//);
     assert.match(e.integrity, /^sha512-/);
   }
-  assert.match(read('server/nextpnr-ice40-fetch.js'), /\nconst NAME = '@yowasp\/nextpnr-ice40';\n/);
+  // (the server's fetch knows each, by the same name, #2302)
+  const fetchSrc = read('server/nextpnr-ice40-fetch.js');
+  for (const name of DOWNLOADED_PACKAGES) assert.ok(fetchSrc.includes(`  '${name}': { tools: `), name);
 });
 
 test('#2570 the notices: the downloaded packages listed and marked, with a note', () => {
-  assert.deepEqual(THIRD_PARTY.filter(c => c.downloaded).map(c => c.name), DOWNLOADED_PACKAGES);
+  assert.deepEqual(THIRD_PARTY.filter(c => c.downloaded).map(c => c.name).sort(), [...DOWNLOADED_PACKAGES].sort());
   const md = read('THIRD-PARTY-NOTICES.md');
   assert.match(md, /ships all of them but the ones it downloads on their first use;/);
   for (const c of THIRD_PARTY.filter(c => c.downloaded)) {

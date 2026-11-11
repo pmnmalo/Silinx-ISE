@@ -1437,13 +1437,14 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
     assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES, origin]);
     // the iCE40's nextpnr from npm's registry at package-lock.json's SHA-512 (#2444)
     const ice40 = JSON.parse(await fs.readFile(path.join(ROOT, 'package-lock.json'), 'utf8')).packages['node_modules/@yowasp/nextpnr-ice40'];
+    const ecp5 = JSON.parse(await fs.readFile(path.join(ROOT, 'package-lock.json'), 'utf8')).packages['node_modules/@yowasp/nextpnr-ecp5'];
     assert.ok(text.includes(JSON.stringify({ url: ice40.resolved, integrity: ice40.integrity })), 'the page has the package\'s URL and SHA-512');
     assert.deepEqual(d['worker-src'], ["'self'", 'blob:']);
     assert.deepEqual(d['object-src'], ["'none'"]);
     assert.deepEqual(d['base-uri'], ["'none'"]);
     assert.equal(d['frame-ancestors'], undefined, 'not in a <meta> (the browser reports it as an error)');
     layout = JSON.parse(text.match(/window\.SILINX_ASSET_LAYOUT = (\{.*?\});\n/)[1]);
-    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, nextpnr: `../vendor/nextpnr-spartan/${nextpnrVersion}/gen/bundle.js`, nextpnrS6: `../vendor/nextpnr-spartan6/${nextpnrS6Version}/gen/bundle.js`, nextpnrIce40Package: { url: ice40.resolved, integrity: ice40.integrity }, site: siteUrl, integrity: undefined });
+    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, nextpnr: `../vendor/nextpnr-spartan/${nextpnrVersion}/gen/bundle.js`, nextpnrS6: `../vendor/nextpnr-spartan6/${nextpnrS6Version}/gen/bundle.js`, nextpnrIce40Package: { url: ice40.resolved, integrity: ice40.integrity }, nextpnrEcp5Package: { url: ecp5.resolved, integrity: ecp5.integrity }, site: siteUrl, integrity: undefined });
   }
   // the site's assets, versioned; none at the unversioned paths of before
   const ls = async (p) => (await fs.readdir(path.join(site, p))).sort();

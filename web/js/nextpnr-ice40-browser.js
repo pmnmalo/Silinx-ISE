@@ -1,5 +1,6 @@
 // The iCE40's nextpnr and icepack in the browser's editions (#2444): the package @yowasp/nextpnr-ice40's tarball (78 MB, every
-// iCE40's chip database: too much for the site to keep per version), at the version and the SHA-512 of package-lock.json,
+// iCE40's chip database: too much for the site to keep per version; the ECP5's, @yowasp/nextpnr-ecp5, the same way, #2302),
+// at the version and the SHA-512 of package-lock.json,
 // downloaded by the first run from npm's registry and kept in Cache Storage. Its bundle runs from its files in memory: a function
 // of its text (the Content-Security-Policy allows eval, not Blob scripts), its import.meta.url and its fetch of its own files
 // given to it, so that it needs no URL of its own.
@@ -28,11 +29,12 @@ export async function ice40FromFiles(files) {
   return new AsyncFunction('fetch', source)(ownFetch);
 }
 
-const openCache = async () => { try { return globalThis.caches ? await caches.open(ICE40_CACHE) : null; } catch { return null; } };   // (an opaque origin throws)
+const openCache = async name => { try { return globalThis.caches ? await caches.open(name) : null; } catch { return null; } };   // (an opaque origin throws)
 
-/** The package's module from its { url, integrity }: kept, or downloaded (log says so) and kept. */
-export async function ice40FromTarball({ url, integrity }, { log = () => {}, fetchFn = fetch } = {}) {
-  const cache = await openCache();
+/** The package's module from its { url, integrity }: kept, or downloaded (log says so) and kept. tools, mb: what it holds,
+ *  its size (the log's); cache: its Cache Storage's name (the iCE40's when not given). */
+export async function ice40FromTarball({ url, integrity }, { log = () => {}, fetchFn = fetch, tools = 'nextpnr-ice40 and icepack', mb = 80, cache: cacheName = ICE40_CACHE } = {}) {
+  const cache = await openCache(cacheName), tool = tools.split(' ')[0];
   let bytes = null;
   const kept = await cache?.match(url).catch(() => null);
   if (kept) {
@@ -40,16 +42,16 @@ export async function ice40FromTarball({ url, integrity }, { log = () => {}, fet
     try { await checkIntegrity(bytes, integrity); } catch { bytes = null; }
   }
   if (!bytes) {
-    log(`Downloading nextpnr-ice40 and icepack (about 80 MB, from ${new URL(url).host}: once, then kept by this browser)…`);
+    log(`Downloading ${tools} (about ${mb} MB, from ${new URL(url).host}: once, then kept by this browser)…`);
     let response;
     try {
       response = await fetchFn(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       bytes = new Uint8Array(await response.arrayBuffer());
     } catch (e) {
-      throw new Error(`nextpnr-ice40 could not be downloaded from ${url} (${e.message})`);
+      throw new Error(`${tool} could not be downloaded from ${url} (${e.message})`);
     }
-    await checkIntegrity(bytes, integrity).catch(e => { throw new Error(`nextpnr-ice40 downloaded from ${url}: ${e.message}: not used`); });
+    await checkIntegrity(bytes, integrity).catch(e => { throw new Error(`${tool} downloaded from ${url}: ${e.message}: not used`); });
     if (cache) {
       // (this version's alone)
       for (const k of await cache.keys().catch(() => [])) if (k.url !== url) await cache.delete(k).catch(() => {});

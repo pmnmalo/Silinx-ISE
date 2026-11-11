@@ -377,8 +377,8 @@ uiTest('About shows the version and the GitHub link', E, async (page) => {
   // copyright, licence and the open-source components (collapsed, then opened)
   assert.match(info.text, /Digital design platform for Xilinx FPGAs[\s\S]*made for teaching[\s\S]*FSM and ASM state machine editors[\s\S]*Boolean algebra: truth tables, expressions and Karnaugh maps[\s\S]*board emulator/);
   // what synthesizes and programs (#299): the Silinx toolchain, or ISE; programming from the browser too
-  assert.ok(info.text.includes('a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'), info.text);
-  assert.ok(info.text.includes('Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, nextpnr, and the bitstream writer of Silinx or icepack for the iCE40) for the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards, or the Xilinx ISE 14.7 command-line tools.'), info.text);
+  assert.ok(info.text.includes('a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2, Nexys2, Nexys3, Atlys, iCEBreaker and ULX3S boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'), info.text);
+  assert.ok(info.text.includes('Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, nextpnr, and the bitstream writer of Silinx, icepack for the iCE40 or ecppack for the ECP5) for the Basys2, Nexys2, Nexys3, Atlys, iCEBreaker and ULX3S boards, or the Xilinx ISE 14.7 command-line tools.'), info.text);
   assert.doesNotMatch(info.text, /device programming with ISE|use the Xilinx ISE 14\.7 command-line tools\./);
   assert.match(info.text, /Copyright 2026 Pedro Maló\. Free software under the GNU Affero General Public License v3\.0/);
   assert.match(info.text, /ABSOLUTELY NO WARRANTY\. Source code: github\.com\//);
@@ -403,8 +403,8 @@ uiTest('About shows the version and the GitHub link', E, async (page) => {
     await page.menu('Ajuda', 'Acerca do Silinx');
     await page.waitDialog('Acerca');
     const pt = await page.eval(() => document.querySelector('.dlg-overlay').innerText);
-    assert.ok(pt.includes('um emulador da placa; síntese, place & route e bitstreams com a toolchain Silinx (as placas Basys2, Nexys2, Nexys3, Atlys e iCEBreaker) ou com o ISE 14.7; programação da FPGA e da sua Platform Flash, também a partir do browser por USB.'), pt);
-    assert.ok(pt.includes('A síntese, o place & route e a geração do bitstream usam a toolchain Silinx (o Yosys, o nextpnr, e o gerador de bitstreams do próprio Silinx ou o icepack para a iCE40) para as placas Basys2, Nexys2, Nexys3, Atlys e iCEBreaker, ou as ferramentas de linha de comandos do Xilinx ISE 14.7.'), pt);
+    assert.ok(pt.includes('um emulador da placa; síntese, place & route e bitstreams com a toolchain Silinx (as placas Basys2, Nexys2, Nexys3, Atlys, iCEBreaker e ULX3S) ou com o ISE 14.7; programação da FPGA e da sua Platform Flash, também a partir do browser por USB.'), pt);
+    assert.ok(pt.includes('A síntese, o place & route e a geração do bitstream usam a toolchain Silinx (o Yosys, o nextpnr, e o gerador de bitstreams do próprio Silinx, o icepack para a iCE40 ou o ecppack para a ECP5) para as placas Basys2, Nexys2, Nexys3, Atlys, iCEBreaker e ULX3S, ou as ferramentas de linha de comandos do Xilinx ISE 14.7.'), pt);
     await page.key('Enter');
     await page.waitNoDialog();
   } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }

@@ -8,9 +8,9 @@ import { nextpnrIce40Node } from '../packages/silinx-fpga/src/node.js';
 
 const ice40 = partsOfFamily('ice40');
 
-test('the iCE40: every part of nextpnr-ice40, last among the families, offered by the device database', () => {
+test('the iCE40: every part of nextpnr-ice40, after ISE\'s families (the ECP5 after it, #2302), offered by the device database', () => {
   assert.deepEqual(ice40.map(p => p.part.replace(/^ice40/, '')).sort(), [...ICE40_PARTS].sort());
-  assert.equal(FAMILIES.at(-1).id, 'ice40');
+  assert.deepEqual(FAMILIES.slice(-2).map(f => f.id), ['ice40', 'ecp5']);
   assert.equal(PARTS.filter(p => p.family === 'ice40').length, 12);
   assert.ok(getDeviceDb().families.find(f => f.id === 'ice40').parts.includes('ice40up5k'));
 });

@@ -24,9 +24,9 @@ import fss from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, synthGoal, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
+import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, ECP5_PARTS, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, synthGoal, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
 import { findPart } from './devices.js';
-import { ice40Package, ice40Present } from './nextpnr-ice40-fetch.js';
+import { ownPackage, ownPresent } from './nextpnr-ice40-fetch.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
 import { engineOf, s6MapOf } from '../packages/silinx-fpga/src/parts.js';
@@ -83,7 +83,7 @@ export function flowHeapMb(totalBytes = os.totalmem(), nodeOptions = process.env
  */
 export function openStatus(device, { dbDir = BIT_DB_DIR } = {}) {
   const out = { available: false, reason: '', part: null, device: null, graph: null, shipped: false, bitDb: false, canBuild: false };
-  if (deviceFamily(device) === 'ice40') return { ...out, ...ice40Status(device) };
+  if (OWN[deviceFamily(device)]) return { ...out, ...ownStatus(device) };
   let part;
   try { part = reportPart(device || {}); } catch (e) { out.reason = e.message; return out; }
   const dev = String(device.part).toLowerCase();
@@ -120,12 +120,22 @@ export function openStatus(device, { dbDir = BIT_DB_DIR } = {}) {
   return out;
 }
 
-// the iCE40 (#2295): nextpnr-ice40's part, and YoWASP's package installed or to download (the release zip leaves it out, #2444)
-function ice40Status(device) {
-  const dev = String(device.part).toLowerCase(), pkg = String(device.package || '').toLowerCase(), part = `${dev}${pkg}`;
-  if (!ICE40_PARTS.includes(dev.replace(/^ice40/, ''))) return { part, device: dev, reason: `${dev}: not an iCE40 part of nextpnr-ice40 (ice40${ICE40_PARTS.join(', ice40')})` };
-  if (!ice40Present() && !ice40Package()) return { part, device: dev, reason: 'nextpnr-ice40 is not in this installation: npm install @yowasp/nextpnr-ice40' };
-  return { part, device: dev, available: true, reason: `${part}: nextpnr-ice40 and icepack${ice40Present() ? '' : ' (downloaded by the first run, #2444)'}`, steps: backendOf('ice40').steps.map(s => s.id) };
+// the families of YoWASP's tools (the iCE40, #2295; the ECP5, #2302): nextpnr's part, and the package installed or to
+// download (the release zip leaves it out, #2444)
+const OWN = {
+  ice40: { pkg: '@yowasp/nextpnr-ice40', tools: 'nextpnr-ice40 and icepack', has: dev => ICE40_PARTS.includes(dev.replace(/^ice40/, '')),
+    not: dev => `${dev}: not an iCE40 part of nextpnr-ice40 (ice40${ICE40_PARTS.join(', ice40')})`, part: (dev, pkg) => `${dev}${pkg}` },
+  ecp5: { pkg: '@yowasp/nextpnr-ecp5', tools: 'nextpnr-ecp5 and ecppack', has: dev => !!ECP5_PARTS[dev],
+    not: dev => `${dev}: not an ECP5 part of nextpnr-ecp5 (${Object.keys(ECP5_PARTS).join(', ')})`, part: (dev, pkg, speed) => `${dev}${speed}${pkg}` },
+};
+function ownStatus(device) {
+  const own = OWN[deviceFamily(device)];
+  const dev = String(device.part).toLowerCase(), pkg = String(device.package || '').toLowerCase();
+  const part = own.part(dev, pkg, String(device.speed || '').replace(/^(?=\d)/, '-'));
+  if (!own.has(dev)) return { part, device: dev, reason: own.not(dev) };
+  const tool = own.tools.split(' ')[0];
+  if (!ownPresent(own.pkg) && !ownPackage(own.pkg)) return { part, device: dev, reason: `${tool} is not in this installation: npm install ${own.pkg}` };
+  return { part, device: dev, available: true, reason: `${part}: ${own.tools}${ownPresent(own.pkg) ? '' : ' (downloaded by the first run, #2444)'}`, steps: backendOf(deviceFamily(device)).steps.map(s => s.id) };
 }
 
 /** Normalise the steps of an open run: the chain from synthesis to the last requested step; a family ISE does not
@@ -178,10 +188,10 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
   if (!st.includes('synth')) {
     try { const r = JSON.parse(await fs.readFile(path.join(outDir, 'report.json'), 'utf8')); earlier = { synthesis: r.synthesis || null, files: { netlist: r.files?.netlist, synthesis: r.files?.synthesis } }; } catch { /* none */ }
   }
-  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'timing.txt', 'paths.json', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
+  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'routed.config', 'timing.txt', 'paths.json', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
   const spec = {
     top: gen.top, part: status.part, device: status.device, family: deviceFamily(project.device) || 'spartan3e',
-    pkg: String(project.device.package).toLowerCase(), graph: status.graph, bitDbDir: BIT_DB_DIR,
+    pkg: String(project.device.package).toLowerCase(), speed: String(project.device.speed || ''), graph: status.graph, bitDbDir: BIT_DB_DIR,
     sources: gen.sources.map(s => ({ path: s.path, lang: s.lang, file: path.join(gen.buildDir, s.buildPath) })),
     ucf: gen.hasUcf ? path.join(gen.buildDir, gen.constraintsFile || `${gen.top}.ucf`) : null,
     buildDir: gen.buildDir, outDir, steps: st, seed, effort, startupClk: project.impl?.startupClk || 'JtagClk', synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), engine: engineOf(project.impl), s6Map: s6MapOf(project.impl),

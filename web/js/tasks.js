@@ -83,7 +83,7 @@ export function taskOfDoc(id) {
   // logic analyzer's capture, Configure Target Device's, #3327)
   if (/^(summary|pins|fpgaview|impact|capture)$/.test(s) || /^(text|tech|rtl):/.test(s) || s.startsWith('file:build/')) return 'impl';
   // (the constraints file: Edit Constraints (Text), as I/O Pin Planning, #1265)
-  if (/^file:.+\.(ucf|pcf|xdc)$/i.test(s)) return 'impl';
+  if (/^file:.+\.(ucf|pcf|lpf|xdc)$/i.test(s)) return 'impl';
   return 'edit';
 }
 

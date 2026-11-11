@@ -1,7 +1,9 @@
 // Design Summary page (ISE "Design Summary/Reports").
 import { api } from './api.js';
 import { PRODUCT, VERSION_LABEL } from '/core/version.js';
-import { resourcesOf } from '/packages/silinx-fpga/src/parts.js';
+import { resourcesOf, bitstreamExtOf, deviceFamily } from '/packages/silinx-fpga/src/parts.js';
+import { familyProfile } from '/core/family-profile.js';
+import { toolOf } from './tool-descriptors.js';
 import { h } from './ui.js';
 import { S, app } from './app.js';
 
@@ -87,6 +89,12 @@ export function mountSummary(el) {
           : [h('tr', {}, h('th', {}, 'DRC'), h('td', { class: 'status-good' }, 'No violations'))])));
     }
     const bh = rep?.bit?.header;
+    // (a family of YoWASP's tools, the iCE40's and the ECP5's, #2302: their own reports, a bitstream with no Xilinx header)
+    const own = familyProfile(deviceFamily(pj.device)).openFlow?.package ? toolOf(pj.device, true) : null;
+    if (own && rep?.bit) {
+      page.append(h('table', { class: 'summary-table' }, h('caption', {}, 'Programming File'),
+        h('tr', {}, h('th', {}, 'Bitstream'), h('td', {}, `build/${pj.top}${bitstreamExtOf(pj.device)} (${Math.round(rep.bit.size / 1024)} KB)`))));
+    }
     if (bh) {
       page.append(h('table', { class: 'summary-table' }, h('caption', {}, 'Programming File'),
         h('tr', {}, h('th', {}, 'Bitstream'), h('td', {}, `build/${pj.top}.bit (${Math.round(rep.bit.size / 1024)} KB)`)),
@@ -100,6 +108,7 @@ export function mountSummary(el) {
       h('tr', {}, h('th', {}, 'Report Name'), h('th', {}, 'Status')),
       ...(vivado ? [['Synthesis Utilization Report', `${pj.top}_synth_util.rpt`, rep?.synthesis], ['Utilization Report', `${pj.top}_util.rpt`, rep?.map], ['Route Status Report', `${pj.top}_route.rpt`, rep?.par],
         ['Timing Summary Report', `${pj.top}_timing.rpt`, rep?.timing], ['DRC Report', `${pj.top}_drc.rpt`, rep?.drc], ['Vivado Log', 'vivado.log', rep?.synthesis]]
+        : own ? own.reports.map(r => [r.label, r.file.replace('{top}', pj.top), r.step === 'synth' ? rep?.synthesis : rep?.files?.[r.id]])
         : open ? [['Synthesis Report (Yosys)', `open/${pj.top}_stat.txt`, rep?.synthesis], ['Placed Design (XDL)', 'open/placed.xdl', rep?.files?.placed], ['Routed Design (XDL)', 'open/routed.xdl', rep?.files?.routed], ['Static Timing Report', 'open/timing.txt', rep?.timing]]
         : [['Synthesis Report', `${pj.top}.syr`, rep?.synthesis], ['Map Report', `${pj.top}_map.mrp`, rep?.map], ['Place and Route Report', `${pj.top}.par`, rep?.par], ['Post-PAR Static Timing Report', `${pj.top}.twr`, rep?.timing], ['Bitgen Report', `${pj.top}.bgn`, rep?.bit]])
         .map(([n, f, r]) => h('tr', {}, h('td', {}, n), h('td', {}, r ? h('a', { onclick: () => app.openFile(`build/${f}`) }, 'Current') : '')))));
