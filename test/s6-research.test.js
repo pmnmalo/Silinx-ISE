@@ -157,3 +157,21 @@ test('ise-s6.sh and night1-remote.sh: their syntax, the usage, the host asked fo
     assert.doesNotMatch(fs.readFileSync(path.join(S6, f), 'utf8'), /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\.local\b|\/Users\/|\/home\//, f);
   }
 });
+
+test('measure-3169-s6.sh, run-3169-s6.mjs, check-held6.mjs (#3169, #3350): the syntax, the host asked for, the usage, a design\'s verdict', async () => {
+  assert.equal(spawnSync('bash', ['-n', path.join(S6, 'measure-3169-s6.sh')]).status, 0);
+  const env = { ...process.env };
+  delete env.SILINX_ISE_HOST;
+  const r = spawnSync('bash', [path.join(S6, 'measure-3169-s6.sh'), os.tmpdir()], { encoding: 'utf8', env });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /SILINX_ISE_HOST: set SILINX_ISE_HOST=user@host/);
+  // (the runner: its usage before any setting is read)
+  const u = spawnSync(process.execPath, [path.join(S6, 'run-3169-s6.mjs'), 'both', os.tmpdir()], { encoding: 'utf8' });
+  assert.equal(u.status, 2);
+  assert.equal(u.stderr.trim(), 'usage: node research/s6/run-3169-s6.mjs in|out <W> [--any-time]');
+  const { verdict } = await import('../packages/silinx-fpga/research/s6/check-held6.mjs');
+  assert.equal(verdict({ same: true, diff: 0, unknown: new Map() }), 'byte-identical');
+  assert.equal(verdict({ same: false, diff: 3, unknown: new Map([['TIOI_OUTER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S', 1]]) }),
+    '3 bytes differ; not in the databases: TIOI_OUTER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S');
+  assert.equal(verdict({ same: false, diff: 1, unknown: new Map() }), '1 bytes differ');
+});
