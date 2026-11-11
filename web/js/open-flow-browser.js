@@ -29,7 +29,7 @@ export const BROWSER_DEVICES = {
 // versions with the same Yosys: ../vendor/yowasp-yosys/<its version>/gen/bundle.js), and the site the
 // page opened from a file fetches them from (the site keeps the older releases' folders, so that a
 // downloaded Silinx.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
-const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', nextpnrEcp5: 'vendor/nextpnr-ecp5/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
+const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', nextpnrEcp5: 'vendor/nextpnr-ecp5/gen/bundle.js', nextpnrGowin: 'vendor/nextpnr-himbaechel-gowin/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
 // (and each asset's SHA-256, checked by the cache, web/js/asset-cache.js #1237: here, in the flow worker's messages
 // and in the Yosys workers' code)
 if (LAYOUT.integrity) globalThis.SILINX_ASSET_INTEGRITY ||= LAYOUT.integrity;
@@ -59,8 +59,10 @@ export function ownBundle(flow, base = assetsBase()) {
 // what the worker loads of a family's YoWASP tools: { family, where, tools, mb } (null: a family with none)
 function ownTools(family) {
   const f = familyProfile(family).openFlow;
-  return f?.package ? { family, where: ownBundle(f), tools: `${f.tools} and ${f.packer}`, mb: f.mb } : null;
+  return f?.package ? { family, where: ownBundle(f), tools: toolsOf(f), mb: f.mb } : null;
 }
+// a family's YoWASP tools by name: its nextpnr and its packer (the Gowin's none yet, #2303)
+const toolsOf = f => (f.packer ? `${f.tools} and ${f.packer}` : f.tools);
 // does Implement of a family run nextpnr? The Spartan-3E's and the Spartan-6's (#2136, #2288, #2137: nextpnr, the one engine)
 const usesNextpnr = family => !!familyProfile(family).openFlow?.nextpnr;
 
@@ -78,7 +80,7 @@ export function browserOpenStatus(device = {}) {
   if (flow?.package) {
     const name = `${dev}${String(device.speed || '').replace(/^(?=\d)/, '-')}${pkg}`;
     if (!flow.parts.test(dev)) return { available: false, part: name, reason: `${dev}: not ${flow.partOf} of ${flow.tools}` };
-    return ownBundle(flow) ? { available: true, part: name, family, reason: `${name}: ${flow.tools} and ${flow.packer} (in the browser)` }
+    return ownBundle(flow) ? { available: true, part: name, family, reason: `${name}: ${toolsOf(flow)} (in the browser)${flow.bitstream === false ? '; no bitstream yet (#2303)' : ''}` }
       : { available: false, part: name, reason: `${flow.tools} is not in this edition: use the local server` };
   }
   // (the Spartan-6, #2103: the parts of the Nexys3 and the Atlys)

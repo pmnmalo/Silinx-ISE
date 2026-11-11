@@ -24,7 +24,7 @@ import fss from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, ECP5_PARTS, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, synthGoal, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
+import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, ECP5_PARTS, GOWIN_DEVICES, GOWIN_NO_BITSTREAM, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, synthGoal, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
 import { findPart } from './devices.js';
 import { ownPackage, ownPresent } from './nextpnr-ice40-fetch.js';
 import { runCommand } from './jobs.js';
@@ -127,15 +127,20 @@ const OWN = {
     not: dev => `${dev}: not an iCE40 part of nextpnr-ice40 (ice40${ICE40_PARTS.join(', ice40')})`, part: (dev, pkg) => `${dev}${pkg}` },
   ecp5: { pkg: '@yowasp/nextpnr-ecp5', tools: 'nextpnr-ecp5 and ecppack', has: dev => !!ECP5_PARTS[dev],
     not: dev => `${dev}: not an ECP5 part of nextpnr-ecp5 (${Object.keys(ECP5_PARTS).join(', ')})`, part: (dev, pkg, speed) => `${dev}${speed}${pkg}` },
+  // (#2303: its place and route only, no bitstream: said with its reason)
+  gowin: { pkg: '@yowasp/nextpnr-himbaechel-gowin', tools: 'nextpnr-himbaechel-gowin', has: (dev, pkg, speed) => !!GOWIN_DEVICES[`${dev}/${pkg}${speed}`],
+    not: (dev, pkg, speed) => `${dev}-${pkg}${speed}: not a Gowin device of nextpnr-himbaechel-gowin here (${Object.keys(GOWIN_DEVICES).join(', ')})`, part: (dev, pkg, speed) => `${dev}${speed}${pkg}`,
+    more: `; ${GOWIN_NO_BITSTREAM}` },
 };
 function ownStatus(device) {
   const own = OWN[deviceFamily(device)];
   const dev = String(device.part).toLowerCase(), pkg = String(device.package || '').toLowerCase();
   const part = own.part(dev, pkg, String(device.speed || '').replace(/^(?=\d)/, '-'));
-  if (!own.has(dev)) return { part, device: dev, reason: own.not(dev) };
+  const speed = String(device.speed || '').replace(/^(?=\d)/, '-');
+  if (!own.has(dev, pkg, speed)) return { part, device: dev, reason: own.not(dev, pkg, speed) };
   const tool = own.tools.split(' ')[0];
   if (!ownPresent(own.pkg) && !ownPackage(own.pkg)) return { part, device: dev, reason: `${tool} is not in this installation: npm install ${own.pkg}` };
-  return { part, device: dev, available: true, reason: `${part}: ${own.tools}${ownPresent(own.pkg) ? '' : ' (downloaded by the first run, #2444)'}`, steps: backendOf(deviceFamily(device)).steps.map(s => s.id) };
+  return { part, device: dev, available: true, reason: `${part}: ${own.tools}${ownPresent(own.pkg) ? '' : ' (downloaded by the first run, #2444)'}${own.more || ''}`, steps: backendOf(deviceFamily(device)).steps.map(s => s.id) };
 }
 
 /** Normalise the steps of an open run: the chain from synthesis to the last requested step; a family ISE does not

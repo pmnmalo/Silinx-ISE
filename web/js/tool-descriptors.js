@@ -1,5 +1,5 @@
 // The tool descriptors (#2311, the plan #2315): what each back end does, as data. One per back end: ISE, the Silinx
-// toolchain on the Xilinx families, the Silinx toolchain on the iCE40 and the ECP5 (nextpnr); and an experimental family's, none yet
+// toolchain on the Xilinx families, the Silinx toolchain on the iCE40, the ECP5 and the Gowin (nextpnr); and an experimental family's, none yet
 // (#3142: the 7-series, its flows to come, Vivado #1649 and the Silinx toolchain #3146). Each says
 // - steps: its steps (id, label, needs: the back end's own list) and what each produces, `{top}` the top module;
 // - reports: the reports of the Design Summary, each of a step;
@@ -94,7 +94,7 @@ const LAB_TASKS = [
 export const MESSAGE_LINE = /^\s*(ERROR|WARNING|FATAL|CRITICAL WARNING)\s*:\s*(?:([A-Za-z][\w-]*(?::\d+)?)\s+-\s+)?(.*)$/i;
 const LOG_MESSAGES = { line: MESSAGE_LINE, stepStart: '=== SILINX STEP', stepFailed: '=== SILINX FAILED', done: '=== SILINX DONE ===' };
 
-// the back ends' lists of steps (the toolchain's open-steps.js XILINX_STEPS, open-flow-ice40.js ICE40_STEPS, open-flow-ecp5.js ECP5_STEPS: the same,
+// the back ends' lists of steps (the toolchain's open-steps.js XILINX_STEPS, open-flow-ice40.js ICE40_STEPS, open-flow-ecp5.js ECP5_STEPS, open-flow-gowin.js GOWIN_STEPS: the same,
 // test/tool-descriptors.test.js; the interface loads none of the toolchain behind them, #1678)
 const step = (id, label, needs = []) => ({ id, label, needs });
 const XILINX_STEPS = [
@@ -125,11 +125,17 @@ const ECP5_STEPS = [
   step('par', 'Place & Route - nextpnr', ['translate']),
   step('bitgen', 'Generate Programming File - ecppack', ['par']),
 ];
+const GOWIN_STEPS = [
+  step('synth', 'Synthesize - Yosys'),
+  step('translate', 'Translate', ['synth']),
+  step('par', 'Place & Route - nextpnr', ['translate']),
+];
 const withProducts = (steps, products) => steps.map(s => ({ ...s, produces: products[s.id] || [] }));
 
 const UCF = { format: 'ucf', ext: '.ucf', label: 'UCF' };
 const PCF = { format: 'pcf', ext: '.pcf', label: 'PCF' };
 const LPF = { format: 'lpf', ext: '.lpf', label: 'LPF' };
+const CST = { format: 'cst', ext: '.cst', label: 'CST' };
 const XDC = { format: 'xdc', ext: '.xdc', label: 'XDC' };
 
 /** Xilinx ISE 14.7. */
@@ -217,6 +223,24 @@ export const SILINX_ECP5 = {
   tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
 };
 
+/** The Silinx toolchain on the Gowin (#2303), with nextpnr-himbaechel-gowin (Project Apicula): to its routed design, no bitstream
+ *  yet (Apicula's gowin_pack is Python), so no Generate Programming File, nothing to program, and no Emulate (its board has no
+ *  emulator yet). */
+export const SILINX_GOWIN = {
+  id: 'silinx-gowin', name: 'Silinx toolchain (Gowin)', open: true,
+  steps: withProducts(GOWIN_STEPS, { synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.json'] }),
+  reports: [
+    { id: 'synthesis', label: 'Synthesis Report (Yosys)', step: 'synth', file: 'open/{top}_stat.txt' },
+    { id: 'routed', label: 'Routed Design (nextpnr JSON)', step: 'par', file: 'open/routed.json' },
+  ],
+  constraints: CST,
+  messages: LOG_MESSAGES,
+  program: null,
+  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config', 'bitgen'], SILINX_CHANGE)
+    .filter(n => n.part !== 'emulate'),
+  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+};
+
 /** An experimental family's (#3142): its constraints (XDC) and the design's checks, no implementation, no programming yet:
  *  no step, no report, and the tasks without Implement (nor Emulate: its boards have no emulator yet). */
 export const NO_FLOW = {
@@ -257,7 +281,7 @@ export const VIVADO = {
 
 // (the tools that implement: NO_FLOW's tasks are some of theirs)
 export const TOOLS = [ISE, SILINX, SILINX_ICE40];
-const OPEN_BY_FAMILY = { ice40: SILINX_ICE40, ecp5: SILINX_ECP5 };
+const OPEN_BY_FAMILY = { ice40: SILINX_ICE40, ecp5: SILINX_ECP5, gowin: SILINX_GOWIN };
 /** The tool of a project device: a 7-series one's AMD Vivado on the local server (#1649; `standalone`, the browser edition:
  *  none); another experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE. */
 export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) && !standalone ? VIVADO

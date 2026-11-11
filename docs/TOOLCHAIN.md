@@ -130,7 +130,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 | iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works: local server and browser, nextpnr-ice40 downloaded on first use (#2444); its 12 parts in the interface (#2463), the iCEBreaker board (#2517), other boards #2297 |
 | ECP5 | `synth_ecp5` | nextpnr-ecp5 | `ecppack`, Project Trellis | LPF | Works: local server and browser, nextpnr-ecp5 downloaded on first use (30 MB); its 10 parts, the ULX3S board and the examples on it (#2302); its boards not programmed from Silinx yet (#2298) |
 | MachXO2 | to be defined | nextpnr-machxo2, not yet stable | `ecppack`, Project Trellis | LPF | To be measured (#2302) |
-| Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |
+| Gowin | `synth_gowin` | nextpnr-himbaechel-gowin | none yet: `gowin_pack` is Python (YoWASP runs it through Pyodide, with Python wheels from its CDN) | CST | Place and route: local server and browser, downloaded on first use (32 MB); the GW1NR-9C, the Tang Nano 9K and the examples on it (#2303); no bitstream |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
 | Xilinx 7-series | to be defined | nextpnr in the fork | to be written in JavaScript | to be defined | A spike first (#2305) |
 
@@ -146,6 +146,9 @@ one of the IDE: the release zip and the published site download it from npm's re
 The ECP5 is the second (#2302, `src/open-flow-ecp5.js`, `src/lpf.js`): YoWASP's `@yowasp/nextpnr-ecp5` the same way,
 `io.nextpnr.ecp5` with ecppack (`pack(config)`); the families of YoWASP's tools are data in their profiles
 (`core/family-profile.js` openFlow: the package, its packer, the browser edition's key) and in the server's `OWN` and `OWN_TOOLS`.
+The Gowin is the third (#2303, `src/open-flow-gowin.js`, `src/cst.js`): `@yowasp/nextpnr-himbaechel-gowin`, `io.nextpnr.gowin` with
+nextpnr alone, its steps ending at Place & Route; a port with no pin is an error (nextpnr-himbaechel-gowin places none), a
+clock's period a comment of the CST given to nextpnr as `--freq`.
 
 And around the flow, one issue each: the boards and examples (#2297), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).

@@ -542,7 +542,7 @@ Object.assign(PT, {
   'Device Utilization Summary (Silinx toolchain)': 'Resumo da Utilização do Dispositivo (toolchain Silinx)',
   'Device Utilization Summary (after synthesis)': 'Resumo da Utilização do Dispositivo (após a síntese)',
   'Timing (post Place & Route, Silinx toolchain estimate)': 'Temporização (após Posicionar e Encaminhar, estimativa da toolchain Silinx)',
-  'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)', 'Routed Design (Trellis configuration)': 'Projeto Encaminhado (configuração Trellis)',
+  'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)', 'Routed Design (Trellis configuration)': 'Projeto Encaminhado (configuração Trellis)', 'Routed Design (nextpnr JSON)': 'Projeto Encaminhado (JSON do nextpnr)',
   'Static Timing Report': 'Relatório de Temporização Estática',
   // AMD Vivado's reports (the 7-series, #1649)
   'Synthesize - Vivado': 'Sintetizar - Vivado',

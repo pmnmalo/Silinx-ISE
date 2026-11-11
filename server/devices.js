@@ -22,6 +22,7 @@ import { FAMILY } from './family.js';
 import { BOARDS } from './boards.js';
 import { ICE40_FAMILY, ICE40_DEVICES, ICE40_PACKAGES } from './devices-ice40.js';
 import { ECP5_FAMILY, ECP5_DEVICES, ECP5_PACKAGES } from './devices-ecp5.js';
+import { GOWIN_FAMILY, GOWIN_DEVICES_DB, GOWIN_PACKAGES } from './devices-gowin.js';
 export { FAMILY } from './family.js';
 export { BOARDS } from './boards.js';
 
@@ -250,7 +251,7 @@ export const FAMILIES = [
   },
 ];
 
-FAMILIES.push(ICE40_FAMILY, ECP5_FAMILY);   // (last: the ISE families first in the pickers)
+FAMILIES.push(ICE40_FAMILY, ECP5_FAMILY, GOWIN_FAMILY);   // (last: the ISE families first in the pickers)
 const famById = Object.fromEntries(FAMILIES.map(f => [f.id, f]));
 famById.spartan3adsp.ioStandards = famById.spartan3a.ioStandards;
 famById.zynq.ioStandards = [...new Set([...famById.artix7.ioStandards, ...famById.kintex7.ioStandards, 'I2C', 'SDIO'])];
@@ -408,7 +409,7 @@ const NEW_PARTS = [
 ];
 
 /** Every part of every WebPACK family (Spartan-3E entries are the same objects as DEVICES.parts). */
-export const PARTS = [...DEVICES.parts, ...NEW_PARTS, ...ICE40_DEVICES, ...ECP5_DEVICES];
+export const PARTS = [...DEVICES.parts, ...NEW_PARTS, ...ICE40_DEVICES, ...ECP5_DEVICES, ...GOWIN_DEVICES_DB];
 for (const p of PARTS) {
   for (const k of Object.keys(p)) if (p[k] === undefined) delete p[k];
   if (p.verified === undefined) p.verified = true;
@@ -418,6 +419,7 @@ for (const p of PARTS) {
 export const PACKAGES = {
   ...ICE40_PACKAGES,
   ...ECP5_PACKAGES,
+  ...GOWIN_PACKAGES,
   ...DEVICES.packages,
   cp132: '132-ball Chip-Scale Package (CSP)', fg456: '456-ball Fine-Pitch BGA (FBGA)', fg676: '676-ball Fine-Pitch BGA (FBGA)',
   tqg144: '144-pin Thin Quad Flat Pack, Pb-free (TQFP)', ftg256: '256-ball Fine-Pitch Thin BGA, Pb-free',

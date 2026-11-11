@@ -3,10 +3,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ISE, NO_FLOW, SILINX, SILINX_ICE40, SILINX_ECP5, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
+import { ISE, NO_FLOW, SILINX, SILINX_ICE40, SILINX_ECP5, SILINX_GOWIN, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
 import { XILINX_STEPS, orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { ICE40_STEPS } from '../packages/silinx-fpga/src/open-flow-ice40.js';
 import { ECP5_STEPS } from '../packages/silinx-fpga/src/open-flow-ecp5.js';
+import { GOWIN_STEPS } from '../packages/silinx-fpga/src/open-flow-gowin.js';
 
 const read = f => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const ids = t => t.flatMap(n => [n.id, ...ids(n.children || [])]);
@@ -59,6 +60,19 @@ test('#2302 the ECP5: the iCE40\'s tree without Emulate and Configure Target Dev
   assert.deepEqual(SILINX_ECP5.tasks.map(t => t.id), ['edit', 'sim', 'impl']);
   assert.ok(!TOOLS.includes(SILINX_ECP5) && SILINX_ECP5.tasks.every(t => allTasks().includes(t)), 'its tasks the others\'');
   assert.equal(SILINX_ECP5.messages.line, MESSAGE_LINE);
+});
+
+test('#2303 the Gowin: the ECP5\'s tree without Generate Programming File (no bitstream yet); its steps, reports, CST', () => {
+  const t = built(SILINX_GOWIN);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: [] }] }]);
+  assert.equal(toolOf({ part: 'gw1nr-9c' }, true), SILINX_GOWIN);
+  assert.deepEqual(SILINX_GOWIN.steps.map(({ produces, ...s }) => s), GOWIN_STEPS);
+  assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'par').produces, ['open/routed.json']);
+  assert.ok(read('packages/silinx-fpga/src/open-flow-gowin.js').includes("io.write('open/routed.json'"));
+  for (const r of SILINX_GOWIN.reports) assert.ok(SILINX_GOWIN.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
+  assert.deepEqual(SILINX_GOWIN.constraints, { format: 'cst', ext: '.cst', label: 'CST' });
+  assert.equal(SILINX_GOWIN.program, null);
+  assert.deepEqual(SILINX_GOWIN.tasks.map(t => t.id), ['edit', 'sim', 'impl']);
 });
 
 test('#2311 the iCE40: what it does not have is absent, not disabled', () => {

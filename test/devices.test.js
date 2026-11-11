@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 
 const dev = await import('../server/devices.js');
 
-const FAMILY_IDS = ['spartan3', 'spartan3e', 'spartan3a', 'spartan3adsp', 'spartan6', 'virtex4', 'virtex5', 'virtex6', 'artix7', 'kintex7', 'zynq', 'ice40', 'ecp5'];
-// the open toolchain's own families (#2295, #2302): not ISE's
-const OPEN_ONLY = ['ice40', 'ecp5'];
+const FAMILY_IDS = ['spartan3', 'spartan3e', 'spartan3a', 'spartan3adsp', 'spartan6', 'virtex4', 'virtex5', 'virtex6', 'artix7', 'kintex7', 'zynq', 'ice40', 'ecp5', 'gowin'];
+// the open toolchain's own families (#2295, #2302, #2303): not ISE's
+const OPEN_ONLY = ['ice40', 'ecp5', 'gowin'];
 
 test('families: the ISE 14.7 WebPACK families, with ISE names and I/O standards', () => {
   assert.deepEqual(dev.FAMILIES.map(f => f.id).sort(), [...FAMILY_IDS].sort());

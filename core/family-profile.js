@@ -3,7 +3,7 @@
 // a new family is an entry here (test/family-conditions.test.js keeps web/js free of family names in conditions).
 // The resources' counts stay in the device resources model (packages/silinx-fpga/src/resources.js, #790): a profile
 // names the resource, the part counts it.
-import { ICE40_STEPS, ICE40_PARTS, ECP5_STEPS, ECP5_PARTS } from '../packages/silinx-fpga/src/index.js';
+import { ICE40_STEPS, ICE40_PARTS, ECP5_STEPS, ECP5_PARTS, GOWIN_STEPS, GOWIN_PARTS } from '../packages/silinx-fpga/src/index.js';
 
 export const FAMILY_PROFILES = {
   spartan3e: {
@@ -38,6 +38,12 @@ export const FAMILY_PROFILES = {
     // its own tools (#2302): nextpnr-ecp5 and ecppack (Project Trellis), as the iCE40's; no programming of its boards yet
     // (#2298), no clock manager, block RAM or multiplier wizard (their primitives the Xilinx families')
     openFlow: { tools: 'nextpnr-ecp5', packer: 'ecppack', package: '@yowasp/nextpnr-ecp5', mb: 30, layout: 'nextpnrEcp5', parts: new RegExp(`^(${Object.keys(ECP5_PARTS).join('|')})$`), partOf: 'an ECP5 part', steps: ECP5_STEPS },
+  },
+  gowin: {
+    // its own tools (#2303): nextpnr-himbaechel-gowin (Project Apicula), to its routed design; no bitstream yet (bitstream:
+    // false: gowin_pack is Python), so no programming
+    openFlow: { tools: 'nextpnr-himbaechel-gowin', packer: null, bitstream: false, package: '@yowasp/nextpnr-himbaechel-gowin', mb: 32, layout: 'nextpnrGowin',
+      parts: new RegExp(`^(${GOWIN_PARTS.join('|')})$`), partOf: 'a Gowin part', steps: GOWIN_STEPS },
   },
 };
 

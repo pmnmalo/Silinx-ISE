@@ -40,10 +40,14 @@
   },
   "peerDependencies": {
     "@yowasp/nextpnr-ecp5": "0.11.825",
+    "@yowasp/nextpnr-himbaechel-gowin": "0.11.825",
     "@yowasp/nextpnr-ice40": "0.11.825"
   },
   "peerDependenciesMeta": {
     "@yowasp/nextpnr-ecp5": {
+      "optional": true
+    },
+    "@yowasp/nextpnr-himbaechel-gowin": {
       "optional": true
     },
     "@yowasp/nextpnr-ice40": {

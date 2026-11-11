@@ -129,6 +129,14 @@ export const THIRD_PARTY = [
     "downloaded": true
   },
   {
+    "name": "@yowasp/nextpnr-himbaechel-gowin",
+    "version": "0.11.825",
+    "license": "ISC",
+    "url": "https://yowasp.org/",
+    "standalone": false,
+    "downloaded": true
+  },
+  {
     "name": "@yowasp/nextpnr-ice40",
     "version": "0.11.825",
     "license": "ISC",

@@ -15,5 +15,6 @@ export { nextpnrNode } from './nextpnr-node.js';
 export { nextpnrS6Node } from './nextpnr-s6-node.js';
 export { nextpnrIce40Node } from './nextpnr-ice40-node.js';
 export { nextpnrEcp5Node } from './nextpnr-ecp5-node.js';
+export { nextpnrGowinNode } from './nextpnr-gowin-node.js';
 // a nextpnr package without its chip databases, fetched on first use (Silinx's release zip, #2329)
 export { leaveOutChipdbs, chipdbCacheDir } from './nextpnr-chipdb-node.js';

@@ -53,7 +53,7 @@ export class GateError extends Error {
 const KINDS = [
   ['hdl', /\.(v|vh|vhd|vhdl|sv|svh)$/i],
   ['c', /\.(c|h|cc|cpp|cxx|hpp|hh)$/i],
-  ['constraints', /\.(ucf|pcf|lpf|xdc|sdc)$/i],
+  ['constraints', /\.(ucf|pcf|lpf|cst|xdc|sdc)$/i],
   ['xml', /\.(xise|sch|sym|pnml|wcfg|xml|svg)$/i],
   ['json', /\.json$/i],
   ['data', /\.(mem|hex|coe|txt|dat|csv|md|vcd|do|tcl|ini|log)$/i],

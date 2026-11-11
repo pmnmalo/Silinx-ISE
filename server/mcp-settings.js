@@ -127,7 +127,7 @@ export const SETTINGS_TOOLS = [
       if (deviceChanged) for (const m of await deviceChangeMessages(name, pj, next)) warnings.push(`WARNING: ${next.part.toUpperCase()}: ${m}`);
       const changed = nextBoard !== (pj.board || null) || deviceChanged;
       if (constraints && !(changed && nextBoard && pj.top)) throw toolError(nextBoard ? (pj.top ? 'update_constraints: the board did not change' : `the project '${name}' has no top module: its constraints cannot come from a board's pins`) : 'update_constraints: the project has no board');
-      // the constraints of the new device's format (UCF, the iCE40's PCF, the ECP5's LPF, the 7-series' XDC)
+      // the constraints of the new device's format (UCF, the iCE40's PCF, the ECP5's LPF, the Gowin's CST, the 7-series' XDC)
       const ext = R.constraintsExtOf(next);
       let constraintsFile = pj.constraints;
       if (constraintsFile && !constraintsFile.toLowerCase().endsWith(ext)) {
