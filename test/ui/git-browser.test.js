@@ -4,8 +4,9 @@
 // private one refused, its hint the sign-in); Sign in with GitHub… (the device flow: the code shown, authorized on
 // "GitHub"); the Design pane's marks; Commit and Push… (several files in one commit, pushed at once: no Push in the menu);
 // Pull from GitHub (an open document read again); a rejected commit and a conflict as ERROR lines with their hint;
-// History… and a file as it was; Sign out of GitHub; the token never in a URL nor in the console, kept in this tab's
-// storage only, or in the browser's when remembered (#3356; the device flow's scope: the private repositories when asked). In Portuguese; with no relay nor OAuth App set up, the sign-in with a pasted token (its steps, a refusal). Both interfaces; no warnings.
+// History… and a file as it was; Sign out of GitHub; the token never in a URL nor in the console, kept in the browser's
+// storage (Remember me, the default), or in this tab's when unticked (#3356; the device flow's scope: the private
+// repositories when asked). In Portuguese; with no relay nor OAuth App set up, the sign-in with a pasted token (its steps, a refusal). Both interfaces; no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -81,9 +82,10 @@ uiTest('#3196 the browser edition: Open from Repository…, Sign in with GitHub�
   // Sign in with GitHub…: the code shown, authorized on GitHub, the dialog closed
   await page.menu('File', 'Sign in with GitHub…');
   await page.waitDialog('Sign in with GitHub');
-  // (#3356: first what it asks for: the private repositories ticked, not remembered)
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay input[type=checkbox]')].map((c) => [c.className, c.checked])), [['git-private', false], ['git-remember', false]]);
+  // (#3356: first what it asks for: the private repositories ticked, Remember me (ticked by default) unticked)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay input[type=checkbox]')].map((c) => [c.className, c.checked])), [['git-private', false], ['git-remember', true]]);
   await page.click('.dlg-overlay .git-private');
+  await page.click('.dlg-overlay .git-remember');
   await page.dialogButton('Get a Code');
   await page.waitFor(() => /^WDJB-\d{4}$/.test(document.querySelector('.dlg-overlay .git-user-code')?.textContent || ''), [], { what: 'the code' });
   const code = await page.eval(() => document.querySelector('.dlg-overlay .git-user-code').textContent);
@@ -213,9 +215,9 @@ uiTest('#3196 the browser edition in Portuguese: the Git commands; Initialize Re
   await page.dialogButton('Iniciar Sessão');
   await page.waitFor(() => /^GitHub refused the sign-in \(Bad credentials\): GitHub refused this token/.test(document.querySelector('.dlg-overlay .git-token-error').textContent), [], { what: 'the refusal' });
   assert.deepEqual(await page.eval(() => [sessionStorage.getItem('silinx.github-token'), localStorage.getItem('silinx.github-token')]), [null, null]);
-  // (#3356: Remember me, in Portuguese, ticked: kept in this browser)
+  // (#3356: Remember me, in Portuguese, ticked by default: kept in this browser)
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .git-remember').parentElement.textContent.trim()), 'Lembrar-me neste navegador (guardada depois de fechar este separador, onde todas as páginas do endereço deste sítio a podem ler)');
-  await page.click('.dlg-overlay .git-remember');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .git-remember').checked), true);
   await page.fill('.dlg-overlay .git-token', gh.token);
   await page.dialogButton('Iniciar Sessão');
   await page.waitNoDialog();

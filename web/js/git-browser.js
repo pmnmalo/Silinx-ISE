@@ -2,8 +2,8 @@
 // GitHub's REST API (core/git-rest.js), on the projects of the storage in use (web/js/project-store.js: the browser's,
 // or a folder on the disk); the GitHub sign-in (OAuth's device flow through web/js/github-app.js's relay, else a pasted
 // fine-grained personal access token, checked with GitHub's API before it is kept). The token is kept
-// in this tab only (sessionStorage: forgotten when it closes), or in this browser (localStorage) when the user chooses to
-// be remembered (#3356: every page of the site's origin, another GitHub Pages site of its account too, reads its
+// in this browser (localStorage: Remember me, the default), or in this tab only (sessionStorage: forgotten when it closes)
+// when the user unticks it (#3356: every page of the site's origin, another GitHub Pages site of its account too, reads its
 // localStorage), under the edition's own key (the development site's: silinx.dev.); sent only to GitHub's API in a
 // header; never in a URL, never in a message; Sign out forgets it. The device flow asks for the public repositories and
 // the gists only, the private ones when the user asks (core/github-api.js SCOPE, PRIVATE_SCOPE). What a project was at
@@ -92,9 +92,9 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
     githubSignedIn: () => !!token(),
     /** How this edition signs in: 'device' (the device flow, through the relay) or 'token' (a pasted token). */
     githubSignInWay: () => githubSettings().signIn,
-    /** A pasted fine-grained personal access token: checked with GitHub (its user), then kept (in this tab; remember: in
-     *  this browser) -> { signedIn, remembered, login }. */
-    githubSetToken: async (pasted, { remember = false } = {}) => {
+    /** A pasted fine-grained personal access token: checked with GitHub (its user), then kept (in this browser; remember
+     *  false: in this tab) -> { signedIn, remembered, login }. */
+    githubSetToken: async (pasted, { remember = true } = {}) => {
       const t = String(pasted ?? '').trim();
       if (!/^[A-Za-z0-9_]{20,255}$/.test(t)) throw new GitHubError('that is not a GitHub token', 'Paste the token GitHub showed when it was generated (github_pat_…).', 400);
       const me = await githubClient({ fetch: (...a) => globalThis.fetch(...a), token: () => t, api: githubSettings().api, hints: { again: 'GitHub refused this token: check it was copied whole, and that it has not expired.' } }).request('GET', '/user');
@@ -102,8 +102,8 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
     },
     /** Sign in with GitHub (the device flow): onCode({ userCode, verificationUri }) shows the code; signal: Cancel;
      *  privateRepos: the private repositories too (else the public ones and the gists); remember: kept in this browser
-     *  (else in this tab) -> { signedIn, remembered }. */
-    githubSignIn: async ({ onCode, signal, privateRepos = false, remember = false } = {}) => {
+     *  (the default; false: in this tab) -> { signedIn, remembered }. */
+    githubSignIn: async ({ onCode, signal, privateRepos = false, remember = true } = {}) => {
       const s = githubSettings();
       const d = await startDeviceFlow({ clientId: s.clientId, login: s.login, scope: privateRepos ? PRIVATE_SCOPE : SCOPE, fetch: (...a) => globalThis.fetch(...a) });
       onCode?.({ userCode: d.userCode, verificationUri: d.verificationUri, expiresIn: d.expiresIn });
