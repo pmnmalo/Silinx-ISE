@@ -53,5 +53,43 @@
       "fs": "ea97eb7aea7689f90ba59809a7b5d196cf0eea9d357dc70d73967f224bde52e6",
       "fsBytes": 3556680
     }
+  },
+  "designs": {
+    "note": "the rPLL and oscillator designs of test/gowin-pll-osc.test.js on the Tang Nano 9K: the same, their routed designs and Apicula 0.32's .fs",
+    "pll": {
+      "routed": "150bd211398550ddce9a9ff95d9eb36c642191654d58a00a0f3b8bbf444baba8",
+      "fs": "f6450a65cdbe5285896128c78ab0ed42ed146c29b2368841920d92b7662dc558",
+      "fsBytes": 2069320
+    },
+    "pll2": {
+      "routed": "bcf18a5a2b42cdb0ae9d7b4a19f02f5ffafd0350149e0ec8d7c1aa22f7821a64",
+      "fs": "ee813c95eb0b420f129a03f9a0f1fb42a8ebba0e7e9365837f70af53a03504b7",
+      "fsBytes": 2069320
+    },
+    "pll3": {
+      "routed": "77ad111ed8a01af3c2583cc2406c5f5e8d2a902ba41b91530a3c794690c1171e",
+      "fs": "4884758ef5313741a27beb3dae9e001170d452ba990f42ef0c70d1bb43466a85",
+      "fsBytes": 2069320
+    },
+    "pll4": {
+      "routed": "9b8cdc41302cef115b998026f6994fb0a0f41edbbe2ffbf9a800b3ef4dc3e22b",
+      "fs": "265ef13e4a3d63e282ccbca380d372ba62812b1a0ea56ef6d1a979604d13db79",
+      "fsBytes": 2069320
+    },
+    "pll5": {
+      "routed": "a89875c8a958592f5921d3a11c88de5c5d9c322c7316cfc0c87b289756882274",
+      "fs": "99b799a6e8c9e6077fc284855cf78007376077ec5d75cf222fa46b72bd1c5477",
+      "fsBytes": 2069320
+    },
+    "osc": {
+      "routed": "6fce9029a9bbfe07c29fb355855987d5cb9e53b40c98004da69fd3bd5f48d534",
+      "fs": "b42a49b46ab506d8be8b60f0ba9b1165e66126702172e7bced0b5370daba1c4a",
+      "fsBytes": 2069320
+    },
+    "osc2": {
+      "routed": "9b78714c9d6ad250fe19d4ad5fc70aad94c5c3c7ed048b6581f690a40a482088",
+      "fs": "9cf774bec98df782b32e401cc8c540a0e4bb98192d1f6050b7daa7f19774b732",
+      "fsBytes": 2069320
+    }
   }
 }

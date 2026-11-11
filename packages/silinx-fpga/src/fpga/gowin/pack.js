@@ -1,20 +1,21 @@
 // Silinx toolchain - the Gowin's bitstream writer (#2303): Apicula's gowin_pack (YosysHQ/apicula, MIT, Copyright (c) 2019
-// Pepijn de Vos) ported to JavaScript for the GW1N, byte for byte (test/gowin-pack.test.js: its .fs on the examples). From
-// nextpnr-himbaechel-gowin's routed netlist and the device's chip database (chipdb.js): the routing's fuses, the
-// isolated segments, the GSR and configuration, each bel's (place.js), the dual-mode pins', the constant ones, then the
-// fuses' bitmap with its checksum, and the .fs text: header, the rows with their CRC, the block SRAMs' initial values,
-// footer. Isomorphic: gowinPack(netlist, db) -> the .fs text.
+// Pepijn de Vos) ported to JavaScript for the GW1N, byte for byte (test/gowin-pack.test.js: its .fs on the examples;
+// test/gowin-pll-osc.test.js: the rPLL and the oscillator). From nextpnr-himbaechel-gowin's routed netlist and the device's
+// chip database (chipdb.js): the routing's fuses, the isolated segments, the GSR and configuration, each bel's (place.js), the
+// dual-mode pins', the constant ones, then the fuses' bitmap with its checksum, and the .fs text: header, the rows with their
+// CRC, the block SRAMs' initial values, footer. Isomorphic: gowinPack(netlist, db, device) -> the .fs text.
 import { ATTRIDS } from './attrids.js';
 import { addAttrVal, setBits, shortvalFuses, tileMap, fuseBitmap } from './chipdb.js';
 import { place, sliceFuses } from './place.js';
+import { pllAuxCols } from './pll-osc.js';
 
 const BEL = /^X(\d+)Y(\d+)\/(?:GSR|LUT|DFF|IOB|MUX|ALU|ODDR|OSC[ZFHWOA]?|BUF[GS]|RAM16SDP4|RAM16SDP2|RAM16SDP1|PLL|IOLOGIC|CLKDIV2|CLKDIV|BSRAM|ALU|MULTALU18X18|MULTALU27X18|MULTALU36X18|MULTADDALU18X18|MULTADDALU12X12|MULT36X36|MULT18X18|MULT12X12|MULT9X9|PADD18|PADD9|BANDGAP|DQCE|DCS|USERFLASH|EMCU|DHCEN|MIPI_OBUF|MIPI_IBUF|DLLDLY|PINCFG|PLLA|ADC)(\w*)/;
 const BSRAM_TYPES = new Set(['DP', 'SDP', 'SP', 'ROM']);
 const DSP_TYPES = new Set(['ALU54D', 'MULT36X36', 'MULTALU36X18', 'MULTADDALU18X18', 'MULTALU18X18', 'MULT18X18', 'MULT9X9', 'PADD18', 'PADD9', 'MULT12X12', 'MULTALU27X18', 'MULTADDALU12X12']);
 
 /** get_bels: the cells placed on bels, as { typ, row, col, num, parms, attrs, name, cell } (row, col from 1), with the aux bels
- *  of the block SRAMs and DSPs. */
-function* bels(top) {
+ *  of the rPLLs, block SRAMs and DSPs. */
+function* bels(top, device) {
   for (const [name, cell] of Object.entries(top.cells)) {
     if (cell.type.startsWith('DUMMY_') || cell.type === 'OSER16' || cell.type === 'IDES16' || !('NEXTPNR_BEL' in cell.attributes)) continue;
     const bel = cell.attributes.NEXTPNR_BEL;
@@ -24,7 +25,11 @@ function* bels(top) {
     const col = Number(m[1]) + 1, row = Number(m[2]) + 1, num = m[3];
     if ('DIFF' in cell.attributes) throw new Error(`gowin_pack: ${name}: differential I/O is not supported yet`);
     const one = (typ, c, n = num) => ({ typ, row, col: c, num: n, parms: cell.parameters, attrs: cell.attributes, name, cell });
-    if (cell.type === 'rPLL') throw new Error(`gowin_pack: ${name}: the rPLL is not supported yet`);
+    if (cell.type === 'rPLL') {
+      for (const c of pllAuxCols(device, col)) yield one('RPLLB', c);
+      yield one('RPLLA', col);
+      continue;
+    }
     if (BSRAM_TYPES.has(cell.type)) for (const off of [1, 2]) yield one('BSRAM_AUX', col + off);
     if (DSP_TYPES.has(cell.type)) for (let off = 1; off < 9; off++) yield one('DSP_AUX', col + off);
     yield one(cell.type, col);
@@ -194,19 +199,20 @@ function fsText(rows, hdr, ftr) {
   return out.join('');
 }
 
-/** gowin_pack: the .fs text of a routed netlist (nextpnr-himbaechel-gowin's JSON, parsed) on a device's database (chipdb.js). */
-export function gowinPack(netlist, db) {
+/** gowin_pack: the .fs text of a routed netlist (nextpnr-himbaechel-gowin's JSON, parsed) on a device's database (chipdb.js);
+ *  device: its name in Apicula ('GW1N-9C'), which an rPLL's limits and cells depend on. */
+export function gowinPack(netlist, db, device = 'GW1N-9C') {
   const top = netlist.modules?.top;
   if (top?.settings?.['packer.arch'] !== 'himbaechel/gowin') throw new Error('gowin_pack: only netlists made by nextpnr-himbaechel-gowin are supported');
   const nets = name => new Set(top.netnames[name]?.bits || []);
   const gnd = nets('$PACKER_GND'), vcc = nets('$PACKER_VCC');
-  const ctx = { db, tilemap: tileMap(db), slices: new Map(), banks: new Map(), ioBels: new Map(), bsramInit: null, lastMode: '',
+  const ctx = { db, device, tilemap: tileMap(db), slices: new Map(), banks: new Map(), ioBels: new Map(), bsramInit: null, lastMode: '',
     isConst: w => gnd.has(w) || vcc.has(w) };
   const passLuts = [];
   route(ctx, pipsOf(top, passLuts));
   isolateSegments(ctx, top);
   const dualmode = configFuses(ctx);
-  place(ctx, [...bels(top), ...passLuts]);
+  place(ctx, [...bels(top, device), ...passLuts]);
   sliceFuses(ctx);
   dualmode();
   for (let r = 0; r < db.rows; r++) for (let c = 0; c < db.cols; c++) {

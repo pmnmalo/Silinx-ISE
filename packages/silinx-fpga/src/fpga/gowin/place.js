@@ -1,10 +1,11 @@
 // Silinx toolchain - gowin_pack's place (#2303), ported from Apicula's gowin_pack.py (YosysHQ/apicula, MIT) for the GW1N: each
 // bel's fuses (LUTs, ALUs, flip-flops, the slices' shared attributes, distributed RAM, I/O buffers and their banks, block SRAMs,
-// the MULT9X9 / MULT18X18 DSPs), then the banks' I/O standards, then the configuration pins' defaults (db.io_cfg). The
-// primitives Silinx's flow does not make yet (PLLs, oscillators, IOLOGIC, LVDS, MIPI…) are refused by name.
+// the MULT9X9 / MULT18X18 DSPs, the rPLLs and oscillators: pll-osc.js), then the banks' I/O standards, then the configuration pins'
+// defaults (db.io_cfg). The primitives Silinx's flow does not make yet (other PLLs, IOLOGIC, LVDS, MIPI…) are refused by name.
 import { ATTRIDS } from './attrids.js';
 import { addAttrVal, setBits, shortvalFuses, longvalFuses, bankFuses, bankIoFuses, locBank } from './chipdb.js';
 import { bsramAttrs, storeBsramInit, dspAttrs } from './bsram-dsp.js';
+import { pllAttrs, oscAttrs, oscPowerSave } from './pll-osc.js';
 
 const DEFAULT_IOSTD = { IBUF: 'LVCMOS18', OBUF: 'LVCMOS18', TBUF: 'LVCMOS18', IOBUF: 'LVCMOS18' };
 const VCC_IOS = { LVCMOS10: '1.0', LVCMOS12: '1.2', LVCMOS15: '1.5', LVCMOS18: '1.8', LVCMOS25: '2.5', LVCMOS33: '3.3', LVDS25: '2.5', LVCMOS33D: '3.3',
@@ -27,7 +28,8 @@ const iostdAlias = s => IOSTD_ALIAS.find(([k]) => k.includes(s))?.[1] ?? s;
 const REFINE = { SLEW_RATE: 'SLEWRATE', PULL_MODE: 'PULLMODE', OPEN_DRAIN: 'OPENDRAIN' };
 const BSRAM_TYPES = new Set(['DP', 'SDP', 'SP', 'ROM']);
 const DSP_TYPES = new Set(['MULTADDALU18X18', 'MULTALU36X18', 'MULTALU18X18', 'MULT36X36', 'MULT18X18', 'MULT9X9', 'PADD18', 'PADD9', 'ALU54D', 'MULT12X12', 'MULTALU27X18', 'MULTADDALU12X12']);
-const UNSUPPORTED = /^(IOLOGIC|ODDR|OSER|OVIDEO|IDDR|IDES|IVIDEO|BANDGAP|PINCFG|FLASH|EMCU|MIPI|BUFS|BUFG|OSC|ADC|RPLL|PLL|CLKDIV|DCS|DQCE|DHCEN|DLLDLY|USERFLASH)/;
+const UNSUPPORTED = /^(IOLOGIC|ODDR|OSER|OVIDEO|IDDR|IDES|IVIDEO|BANDGAP|PINCFG|FLASH|EMCU|MIPI|BUFS|BUFG|OSC|ADC|PLL|CLKDIV|DCS|DQCE|DHCEN|DLLDLY|USERFLASH)/;
+const OSC_TYPES = new Set(['OSC', 'OSCZ', 'OSCF', 'OSCH', 'OSCW', 'OSCO']);
 const bin = v => parseInt(v, 2);
 
 function placeLut(ctx, t, tile, parms, num, row, col) {
@@ -232,6 +234,17 @@ export function place(ctx, bels) {
       typ = 'IOB';
     }
     if (typ === 'GSR' || typ.startsWith('MUX2_')) continue;
+    if (typ.startsWith('RPLL')) {
+      // (an rPLL's own cell and its RPLLB's: the PLL table of those that have one)
+      if (db.shortval.get(t.get('ttyp'))?.has('PLL')) setBits(tile, shortvalFuses(db, t.get('ttyp'), pllAttrs(db, ctx.device, parms), 'PLL'));
+      continue;
+    }
+    if (OSC_TYPES.has(typ)) {
+      if (ctx.device === 'GW1NZ-1') throw new Error(`gowin_pack: the oscillator of the GW1NZ-1 is not supported yet (${b.name})`);
+      setBits(tile, shortvalFuses(db, t.get('ttyp'), oscPowerSave(db), 'OSC'), 0);   // (its power save's fuses cleared)
+      setBits(tile, shortvalFuses(db, t.get('ttyp'), oscAttrs(db, typ, parms), 'OSC'));
+      continue;
+    }
     if (UNSUPPORTED.test(typ)) throw new Error(`gowin_pack: the primitive ${typ} (${b.name}) is not supported yet`);
     if (typ.startsWith('DFF')) {
       ctx.lastMode = typ.replace(/^E+|E+$/g, '');   // (place's `mode`, which the banks' loop reads after, #2303)
