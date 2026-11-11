@@ -390,3 +390,39 @@ uiTest('#3179 a teacher\'s lab: New Source ▸ Guided Lab (its template, in labs
     await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
   }
 }, { timeout: 180000 });
+
+uiTest('#3330 an open Lab document reads its lab file again when it is saved: the new text and check, the steps done kept; a file with problems leaves it as it was', E, async (page) => {
+  const step2 = (text, contains) => ({ id: 'look', title: { en: 'Look', pt: 'Olhar' }, text: { en: text, pt: text }, checks: [{ check: 'file', path: 'src/gates.vhd', contains: [contains] }] });
+  const lab = { silinxLab: 1, id: 'relab', title: { en: 'Relab', pt: 'Relab' }, steps: [{ id: 'read', title: { en: 'Read', pt: 'Ler' }, text: { en: 'Read it.', pt: 'Leia.' } }, step2('Find the old thing.', '/no such text here/')] };
+  await makeProject(env, { name: 'relab', template: 'gates', files: { 'labs/relab.lab.json': JSON.stringify(lab, null, 2) } });
+  await page.openProject('relab');
+  await openLab(page, 'relab');
+  assert.match(await checkStepOf(page, 1, 2), /Step done\./);
+  assert.match(await checkStepOf(page, 2, 2), /Not done yet/);
+  const shown = () => page.eval((d) => [document.querySelector(`${d} .lab-text`).textContent, [...document.querySelectorAll(`${d} .lab-step`)].map((s) => (s.classList.contains('done') ? '✓' : '·') + (s.classList.contains('current') ? '<' : '')).join(' ')], D);
+  assert.deepEqual(await shown(), ['Find the old thing.', '✓ ·<']);
+  // the file edited and saved: the document reads it again (said in the console)
+  const save = async (text) => {
+    await page.eval(() => window.SilinxApp.openFile('labs/relab.lab.json'));
+    await page.waitFor(() => window.Silinx.active?.id === 'file:labs/relab.lab.json' && window.Silinx.active.editor, [], { what: 'the lab file opened' });
+    const before = await page.eval(() => window.__console().length);
+    await page.eval((t) => window.Silinx.active.editor.setValue(t), text);
+    await page.eval(() => window.SilinxApp.saveAll());
+    return before;
+  };
+  let n = await save(JSON.stringify({ ...lab, steps: [lab.steps[0], step2('Find the entity.', '/entity gates/')] }, null, 2));
+  await page.waitConsole(/Lab "Relab" read again from labs\/relab\.lab\.json: its steps as saved, the steps done kept\./);
+  assert.equal(await page.eval((c) => window.__console().slice(c).trim(), n), 'Lab "Relab" read again from labs/relab.lab.json: its steps as saved, the steps done kept.');
+  await openLab(page, 'relab');
+  assert.deepEqual(await shown(), ['Find the entity.', '✓ ·<']);
+  assert.match(await checkStepOf(page, 2, 2), /Step done\./);
+  assert.deepEqual((await shown())[1], '✓ ✓<');
+  // a file with problems: said, the document as it was
+  n = await save(JSON.stringify({ ...lab, steps: [lab.steps[0], { ...step2('Broken.', '/x/'), checks: [{ check: 'pins' }] }] }, null, 2));
+  await page.waitFor((c) => /has 1 problem\(s\)/.test(window.__console().slice(c)), [n], { what: 'the problem said' });
+  assert.doesNotMatch(await page.eval((c) => window.__console().slice(c), n), /read again/);
+  // (Guided Labs leaves it out now: its tab)
+  await page.eval(() => window.Silinx.docs.find((d) => d.id === 'lab:relab').tab.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true })));
+  await page.waitFor(() => window.Silinx.active?.id === 'lab:relab', [], { what: 'the lab document' });
+  assert.deepEqual(await shown(), ['Find the entity.', '✓ ✓<']);
+}, { timeout: 120000 });
