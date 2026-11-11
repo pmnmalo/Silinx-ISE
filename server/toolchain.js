@@ -39,6 +39,21 @@ export function configDir() {
 }
 export const configPath = () => path.join(configDir(), 'config.json');
 
+/** A test run (node --test, or a *.test.js file run alone) never writes the user's own configuration (#3420): a test
+ *  that saves settings without its own SILINX_CONFIG_DIR (or HOME) wrote its placeholder ssh host, user, port and
+ *  settings script into the developer's ~/.silinx/config.json. The user's own: their account's home's .silinx (not
+ *  HOME's, which a test may point elsewhere); SILINX_TEST_REAL_CONFIG=1 allows it. */
+export function refuseUserConfigInTests({ env = process.env, execArgv = process.execArgv, script = process.argv[1] || '', dir = configDir() } = {}) {
+  const testing = env.NODE_TEST_CONTEXT || execArgv.includes('--test') || /\.test\.[cm]?js$/.test(script);
+  if (!testing || env.SILINX_TEST_REAL_CONFIG === '1') return;
+  let home;
+  try { home = os.userInfo().homedir; } catch { return; }   // (no account's home: none to protect)
+  const canon = p => { try { return fss.realpathSync.native(p); } catch { return path.resolve(p); } };
+  const own = canon(path.join(home, '.silinx')), at = canon(dir);
+  if (at === own || (process.platform !== 'linux' && at.toLowerCase() === own.toLowerCase()))
+    throw new Error(`a test run does not write the user's own configuration (${path.join(dir, 'config.json')}): set SILINX_CONFIG_DIR to a temporary folder`);
+}
+
 /** The folder on the ssh host for ISE work outside a project (scripts/check-open-flow.mjs, #482): SILINX_ISE_REMOTE_DIR,
  *  else config.json's ssh.remoteDir (Docker Desktop on the host may share only some folders: /Users/Shared/silinx-ise/build),
  *  else `fallback` in the remote home; without a leading '~/' or a trailing '/'. */
@@ -201,6 +216,7 @@ export function checkApiRemoteDir(dir) {
  *  through the HTTP API (the FILE_ONLY settings may only be sent unchanged). */
 export async function saveConfig(partial, { fromApi = false } = {}) {
   if (!partial || typeof partial !== 'object') throw Object.assign(new Error('config must be an object'), { status: 400 });
+  refuseUserConfigInTests();
   const current = await loadConfig();
   if (fromApi) {
     for (const key of FILE_ONLY) {
