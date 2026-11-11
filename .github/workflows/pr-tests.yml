@@ -2,8 +2,9 @@ name: PR tests
 # The test files of the modules a pull request changes, before the merge (#637): CI runs at a release only
 # (#607), so each pull request runs here, on GitHub's runners, the whole test file of every module it touches
 # (scripts/related-tests.mjs: the unit test files that import a changed file, directly or through a test
-# helper; a changed test file; the UI test of a changed page script), in three parts of about the same time.
-# main requires related-tests, green when every part passed (or had nothing to run).
+# helper; a changed test file; the UI test of a changed page script), in parts of about the same time: as many
+# as their measured time needs (test/timings.json, about 20 minutes each, #1982), one for a small change, none
+# when no test is related. main requires related-tests, green when every part passed (or there was none).
 on:
   pull_request:
 permissions:
@@ -13,15 +14,37 @@ concurrency:
   group: pr-tests-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # how many parts (#1982): a change of most of the repository ran 35 minutes and more in each of three parts
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      parts: ${{ steps.plan.outputs.parts }}
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - id: plan
+        run: node scripts/related-tests.mjs "origin/$BASE" HEAD --plan >> "$GITHUB_OUTPUT"
+        env:
+          BASE: ${{ github.base_ref }}
+
   tests:
+    needs: [plan]
+    if: needs.plan.outputs.parts != '0'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     runs-on: ubuntu-latest
-    # a change of the open toolchain runs "the examples on every board", 41 minutes alone (#1982)
-    timeout-minutes: 90
-    name: tests (${{ matrix.shard }}/3)
+    # the parts are planned at about 20 minutes; a part with "the examples on every board" alone takes 30 (#1982)
+    timeout-minutes: 60
+    name: tests (${{ matrix.shard }}/${{ needs.plan.outputs.parts }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,17 +52,18 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - run: >-
-          node scripts/related-tests.mjs "origin/$BASE" HEAD --shard "$SHARD/3"
+          node scripts/related-tests.mjs "origin/$BASE" HEAD --shard "$SHARD/$PARTS"
           --test-reporter=tap --test-reporter-destination=stdout
         env:
           BASE: ${{ github.base_ref }}
           SHARD: ${{ matrix.shard }}
+          PARTS: ${{ needs.plan.outputs.parts }}
           CHROME_PATH: /usr/bin/google-chrome
 
-  # the one check main requires (#637): green when every part passed
+  # the one check main requires (#637): green when the plan and every part passed (no part: no test related)
   related-tests:
     if: always()
-    needs: [tests]
+    needs: [plan, tests]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { imports, dataPaths, relatedTests, reexportsOnly, reexported, pageImports, shardOf, sources } from '../scripts/related-tests.mjs';
+import { imports, dataPaths, relatedTests, reexportsOnly, reexported, pageImports, shardOf, planShards, PART_MINUTES, MAX_PARTS, sources } from '../scripts/related-tests.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -181,6 +181,41 @@ test('related tests: in parts of about the same time, the UI tests balanced too,
   assert.ok(parts.every((p) => p.ui.length >= 7), parts.map((p) => p.ui.length).join(' '));
 });
 
+test('#1982 related tests: the parts planned by the tests\' measured time — one for a few, none for none, more for many, at most MAX_PARTS', () => {
+  const unit = (k, n) => Array.from({ length: n }, (_, j) => `test/${k}${String(j).padStart(3, '0')}.test.js`);
+  // none: no part (the PR tests run no job but the verdict)
+  assert.deepEqual(planShards({ unit: [], ui: [] }, { 'test/a.test.js': 600 }), { n: 0, minutes: 0 });
+  // a few: one part (as before #1982), the unit tests' time halved (two at once in effect), the UI tests' whole
+  const t = { 'test/a.test.js': 600, 'test/b.test.js': 300, 'test/ui/x.test.js': 120 };
+  assert.deepEqual(planShards({ unit: ['test/a.test.js', 'test/b.test.js'], ui: ['test/ui/x.test.js'] }, t), { n: 1, minutes: 9.5 });
+  // an unmeasured file (a new test) weighs the median of the measured ones of its kind (the lower of two): 300, the UI's 120; (1200 / 2 + 240) / 60
+  assert.deepEqual(planShards({ unit: ['test/a.test.js', 'test/b.test.js', 'test/new.test.js'], ui: ['test/ui/x.test.js', 'test/ui/new.test.js'] }, t), { n: 1, minutes: 14 });
+  // nothing measured: a second each
+  assert.deepEqual(planShards({ unit: unit('u', 4), ui: [] }), { n: 1, minutes: 2 / 60 });
+  // past a part's minutes: one more part for every PART_MINUTES of estimate
+  assert.equal(PART_MINUTES, 20);
+  const big = Object.fromEntries(unit('u', 30).map((f) => [f, 120]));   // 60 min measured, 30 estimated
+  assert.deepEqual(planShards({ unit: unit('u', 30), ui: [] }, big), { n: 2, minutes: 30 });
+  assert.equal(planShards({ unit: unit('u', 30), ui: [] }, big, { minutes: 10 }).n, 3);
+  assert.equal(planShards({ unit: unit('u', 30), ui: [] }, big, { minutes: 10, concurrency: 1 }).n, 6);
+  // never more parts than files: two files of an hour each
+  assert.equal(planShards({ unit: ['test/a.test.js', 'test/b.test.js'], ui: [] }, { 'test/a.test.js': 7200, 'test/b.test.js': 7200 }).n, 2);
+  // a huge selection: at most MAX_PARTS
+  assert.equal(MAX_PARTS, 16);
+  const huge = Object.fromEntries(unit('u', 500).map((f) => [f, 600]));
+  assert.equal(planShards({ unit: unit('u', 500), ui: [] }, huge).n, MAX_PARTS);
+  // the repository's whole suite by its timings: every part under 45 minutes estimated, a part of #3311's 161 files more than one
+  const timings = JSON.parse(fs.readFileSync(path.join(ROOT, 'test/timings.json'), 'utf8'));
+  const all = { unit: Object.keys(timings).filter((f) => !f.startsWith('test/ui/')), ui: Object.keys(timings).filter((f) => f.startsWith('test/ui/')) };
+  const plan = planShards(all, timings);
+  assert.ok(plan.n > 3 && plan.n <= MAX_PARTS, `${plan.n}`);
+  assert.ok(plan.minutes / plan.n < 25, `${plan.minutes} / ${plan.n}`);
+  // each part's files, balanced: every file once
+  const parts = Array.from({ length: plan.n }, (_, k) => shardOf(all, { i: k + 1, n: plan.n }, timings));
+  assert.deepEqual(parts.flatMap((p) => p.unit).sort(), [...all.unit].sort());
+  assert.deepEqual(parts.flatMap((p) => p.ui).sort(), [...all.ui].sort());
+});
+
 test('related tests: the repository — the synthesis\'s tests for a change of the package\'s synth-open.js (#635\'s), its helpers read', () => {
   const files = sources();
   assert.ok(Object.keys(files).some(f => f === 'test/examples-lib.mjs'), 'the helpers');
@@ -250,11 +285,19 @@ test('related tests: the command line, in a repository of its own — the list, 
   let r = run(base, 'HEAD');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, '1 file(s) changed; the tests of their modules: 0 unit, 0 UI\n');
+  // its plan (#1982): no part
+  r = run(base, 'HEAD', '--plan');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'parts=0\nshards=[]\n');
+  assert.equal(r.stderr, '1 file(s) changed; the tests of their modules: 0 unit, 0 UI, ~0 min: 0 part(s)\n');
   // the module changed, wrongly: its test listed, then failing
   fs.writeFileSync(path.join(dir, 'core', 'a.js'), 'export const a = 2;\n'); git('commit', '-qam', '3');
   r = run(base, 'HEAD', '--list');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, '2 file(s) changed; the tests of their modules: 1 unit, 0 UI\n  test/a.test.js\n');
+  r = run(base, 'HEAD', '--plan');
+  assert.equal(r.stdout, 'parts=1\nshards=[1]\n');
+  assert.equal(r.stderr, '2 file(s) changed; the tests of their modules: 1 unit, 0 UI, ~0 min: 1 part(s)\n');
   assert.equal(run(base, 'HEAD', '--shard', '2/2', '--list').stdout, '2 file(s) changed; the tests of their modules: 1 unit, 0 UI; part 2/2: 0 unit, 0 UI\n');
   r = run(base, 'HEAD', '--test-reporter=tap');
   assert.equal(r.status, 1, r.stdout);
@@ -262,22 +305,26 @@ test('related tests: the command line, in a repository of its own — the list, 
   // errors: no arguments; a base that is not there; a bad part
   r = run();
   assert.equal(r.status, 2);
-  assert.equal(r.stderr, 'usage: node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list] [node --test options …]\n');
+  assert.equal(r.stderr, 'usage: node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list | --plan] [node --test options …]\n');
   r = run('f'.repeat(40), 'HEAD');
   assert.equal(r.status, 2);
   assert.equal(r.stderr, `the files changed from ${'f'.repeat(40)} to HEAD are not known (is ${'f'.repeat(40)} fetched?)\n`);
   assert.equal(run(base, 'HEAD', '--shard', '4/3').status, 2);
 });
 
-test('PR tests: every pull request, three parts, the related-tests verdict main requires', () => {
+test('PR tests: every pull request, its parts planned (#1982), the related-tests verdict main requires', () => {
   const yml = fs.readFileSync(path.join(ROOT, '.github/workflows/pr-tests.yml'), 'utf8');
   assert.match(yml, /^on:\n {2}pull_request:\npermissions:\n {2}contents: read\n/m);
   assert.match(yml, /^concurrency:\n {2}group: pr-tests-\$\{\{ github\.ref \}\}\n {2}cancel-in-progress: true\n/m);
-  assert.match(yml, /\n {8}shard: \[1, 2, 3\]\n {4}runs-on: ubuntu-latest\n/, "GitHub's runner, never the self-hosted one");
-  // #1982: a part with "the examples on every board" (41 minutes) and its UI tests passed 45 minutes
-  assert.match(yml, /\n {4}runs-on: ubuntu-latest\n {4}# [^\n]*#1982\)\n {4}timeout-minutes: 90\n {4}name: tests/);
-  assert.match(yml, /fetch-depth: 0\n\s+- uses: \.\/\.github\/actions\/setup\n\s+- run: >-\n\s+node scripts\/related-tests\.mjs "origin\/\$BASE" HEAD --shard "\$SHARD\/3"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+env:\n\s+BASE: \$\{\{ github\.base_ref \}\}/);
-  assert.match(yml, /\n {2}related-tests:\n {4}if: always\(\)\n {4}needs: \[tests\]\n[\s\S]*- if: contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\n\s+run: exit 1\n/);
+  assert.equal(yml.match(/^ {4}runs-on: .*$/gm).join('\n'), Array(3).fill('    runs-on: ubuntu-latest').join('\n'), "GitHub's runner, never the self-hosted one");
+  // the plan: the parts the related tests need, as the job's outputs
+  assert.match(yml, /\n {2}plan:\n {4}runs-on: ubuntu-latest\n {4}timeout-minutes: 10\n {4}outputs:\n {6}parts: \$\{\{ steps\.plan\.outputs\.parts \}\}\n {6}shards: \$\{\{ steps\.plan\.outputs\.shards \}\}\n/);
+  assert.match(yml, /- id: plan\n\s+run: node scripts\/related-tests\.mjs "origin\/\$BASE" HEAD --plan >> "\$GITHUB_OUTPUT"\n\s+env:\n\s+BASE: \$\{\{ github\.base_ref \}\}\n/);
+  // the parts: one job each, none when no test is related; a part's limit well past its planned 20 minutes
+  assert.match(yml, /\n {2}tests:\n {4}needs: \[plan\]\n {4}if: needs\.plan\.outputs\.parts != '0'\n {4}strategy:\n {6}fail-fast: false\n {6}matrix:\n {8}shard: \$\{\{ fromJSON\(needs\.plan\.outputs\.shards\) \}\}\n {4}runs-on: ubuntu-latest\n {4}# [^\n]*#1982\)\n {4}timeout-minutes: 60\n {4}name: tests \(\$\{\{ matrix\.shard \}\}\/\$\{\{ needs\.plan\.outputs\.parts \}\}\)\n/);
+  assert.match(yml, /fetch-depth: 0\n\s+- uses: \.\/\.github\/actions\/setup\n\s+- run: >-\n\s+node scripts\/related-tests\.mjs "origin\/\$BASE" HEAD --shard "\$SHARD\/\$PARTS"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+env:\n\s+BASE: \$\{\{ github\.base_ref \}\}\n\s+SHARD: \$\{\{ matrix\.shard \}\}\n\s+PARTS: \$\{\{ needs\.plan\.outputs\.parts \}\}\n/);
+  // the verdict: a failed plan or part fails it, no part passes it
+  assert.match(yml, /\n {2}related-tests:\n {4}if: always\(\)\n {4}needs: \[plan, tests\]\n[\s\S]*- if: contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\n\s+run: exit 1\n/);
   for (const f of ['CLAUDE.md', 'ONBOARDING.md']) assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /related-tests/, f);
 });
 
