@@ -23,8 +23,8 @@ import { renderPresence, setPresenceCommands } from './collab-presence.js';
 import { projectDoc, publishProject, putFile, putProject, sharedPath, watchDoc, docFile, editablePath, gateEdit } from '/core/collab-doc.js';
 import { isTrusted, markEditedByEditor, untrustedNotice } from '/core/trust.js';
 import { keepBound, unbindAll } from './collab-bind.js';
-import { keepDrawingsBound, unbindDrawings, editorOf } from './collab-drawing.js';
-import { liveDrawing, drawingKind, drawingModel, drawingPathsOf, pruneDrawing, syncDrawing, revertDrawing } from '/core/collab-model.js';
+import { keepDrawingsBound, unbindDrawings, editorOf, modelOf } from './collab-drawing.js';
+import { liveDrawing, drawingKind, drawingText, sameDrawing, drawingModel, drawingPathsOf, pruneDrawing, syncDrawing, revertDrawing } from '/core/collab-model.js';
 import { shareRoom, colorOf } from '/core/collab-client.js';
 import { followLink, relayUrl, relayAddress } from '/core/collab-link.js';
 import { newHostKey } from '/core/collab-meet.js';
@@ -157,7 +157,7 @@ function linkDialog() {
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, `Anyone with this link follows "${share.project}" live, read only, as long as you share it.`),
       field,
-      h('p', {}, 'Anyone with the editors\' link edits its text files, state diagrams, truth tables, ASM charts and Petri nets with you, live; its other drawings stay yours.'),
+      h('p', {}, 'Anyone with the editors\' link edits its text files and drawings with you, live.'),
       editField,
       share.hosted ? h('p', {}, 'This page hosts it: its followers find it when they open the link, or send you a code, which Add a Follower… takes.') : null),
     buttons: [
@@ -171,7 +171,7 @@ function linkDialog() {
   });
 }
 
-const copyEditorLink = () => { writeClip('text', share.editLink); app.log('Shared project\'s editors\' link copied: whoever opens it edits its text files, state diagrams, truth tables, ASM charts and Petri nets with you.', 'ok'); };
+const copyEditorLink = () => { writeClip('text', share.editLink); app.log('Shared project\'s editors\' link copied: whoever opens it edits its text files and drawings with you.', 'ok'); };
 const addFollower = () => { const s = share; if (s?.hosted) import('./collab-host.js').then(m => m.addFollowerDialog(s)); };
 const commands = () => [
   { label: 'Copy Link', action: () => { writeClip('text', share.link); app.log('Shared project\'s link copied.', 'ok'); } },
@@ -310,7 +310,7 @@ async function onDrawingEdits(s, paths) {
     if (!await writeMerged(s, path, { edited: true })) revertDrawing(s.doc, path, s.bases);
   }
   if (undo) {
-    app.log(`WARNING: An editor's change undone (an editor changes the project's text files, state diagrams, truth tables, ASM charts and Petri nets only): ${paths.filter(p => !drawingHere(p)).join(', ') || paths.join(', ')}.`, 'warn');
+    app.log(`WARNING: An editor's change undone (an editor changes the project's text files and drawings only): ${paths.filter(p => !drawingHere(p)).join(', ') || paths.join(', ')}.`, 'warn');
     await resync();
   }
 }
@@ -321,8 +321,8 @@ async function writeMerged(s, path, { edited = false } = {}) {
   const r = drawingModel(s.doc, path);
   if (!r || share !== s) return true;
   if (r.dropped.length) pruneDrawing(s.doc, path);
-  const text = JSON.stringify(r.model, null, 2);
-  if (text === s.bases.get(path)) return true;
+  const text = drawingText(path, r.model);
+  if (sameDrawing(text, s.bases.get(path))) return true;
   let gated;
   try { gated = gateEdit(path, text); } catch (e) { app.log(`WARNING: ${path}: an editor's change not written: ${e.reason || e.message}.`, 'warn'); return false; }
   if (edited) await untrustEdited(s);
@@ -330,10 +330,10 @@ async function writeMerged(s, path, { edited = false } = {}) {
   s.bases.set(path, gated);
   putFile(s.doc, path, gated);
   const d = S.docs.find(x => x.path === path && editorOf(x));
-  if (d && JSON.stringify(editorOf(d).getModel(), null, 2) === gated) app.setDirty(d, false);
+  if (d && sameDrawing(drawingText(path, modelOf(editorOf(d))), gated)) app.setDirty(d, false);
   const m = await import('./drawings.js');
   const petri = async (p, x) => { if (x.generatedFile && S.fileTree.includes(x.generatedFile)) await m.syncHdlFromPetri(p, x); };   // (as its save does)
-  const sync = { fsm: m.syncHdlFromFsm, tt: m.syncHdlFromTt, asm: m.syncHdlFromAsm, pn: petri }[drawingKind(path)];
+  const sync = { fsm: m.syncHdlFromFsm, tt: m.syncHdlFromTt, asm: m.syncHdlFromAsm, pn: petri, sch: m.syncHdlFromSchematic }[drawingKind(path)];
   await sync(path, r.model).catch(e => app.log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
   return true;
 }

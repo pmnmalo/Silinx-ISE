@@ -415,14 +415,14 @@ export async function openSch(path) {
       el.append(host);
       const save = async m => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 1)); setDirty(d, false); };
       const ed = mountSchEditor(host, {
-        doc, modules, device: projectPart(), ...followOnly(),
+        doc, modules, device: projectPart(), ...followOnly(path),
         simSources: () => S.sources,   // live simulation: bodies of the module symbols
         onChange: () => setDirty(d, true),
         // (its drawing when it has one, as its Design row's double-click, else its HDL, #2046)
         onOpenModule: name => openModuleSource(name),
       });
       d.schEditor = ed;
-      if (following()) ed.setBanner(followNotice());
+      if (following()) ed.setBanner(followNotice(path));
       return {
         save: async () => {
           const m = ed.getDoc();

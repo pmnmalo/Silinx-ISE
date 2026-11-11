@@ -11,13 +11,14 @@
 //   out of the structure and said in the console (nothing is changed silently); the editor's check runs on the merge.
 //   bindDrawing(d, doc, path, { mine, say }) -> unbind()      keepDrawingsBound(bound, docs, doc, editable, opts)
 import * as Y from 'yjs';
-import { putDrawing, drawingModel, drawingMap, pruneDrawing } from '/core/collab-model.js';
+import { putDrawing, drawingModel, drawingMap, pruneDrawing, sameModel } from '/core/collab-model.js';
 
 const RETRY_MS = 120, MERGE_MS = 1500;
-/** The editor of a drawing edited live (#3183: a state diagram's, a truth table's, an ASM chart's, a Petri net's), null:
- *  none. */
-export const editorOf = d => d?.fsmEditor || d?.ttEditor || d?.asmEditor || d?.petriEditor || null;
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/** The editor of a drawing edited live (#3183: a state diagram's, a truth table's, an ASM chart's, a Petri net's, a
+ *  schematic's), null: none; modelOf(editor): its model (a schematic's, its document). */
+export const editorOf = d => d?.fsmEditor || d?.ttEditor || d?.asmEditor || d?.petriEditor || d?.schEditor || null;
+export const modelOf = ed => (ed.getModel ? ed.getModel() : ed.getDoc());
+const same = sameModel;
 
 /** A drawing's editor (d: its document, its editor editorOf(d)) bound to its structure; first made the same, the
  *  editor's into the structure (mine: the owner's, its unsaved changes kept) or the structure's into the editor. say(text):
@@ -26,7 +27,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function bindDrawing(d, doc, path, { mine = false, say = () => {}, accept = () => true } = {}) {
   const ed = editorOf(d);
   if (!ed) return null;
-  if (mine && (d.dirty || !drawingMap(doc, path))) putDrawing(doc, path, ed.getModel());   // (the disk's is the structure's)
+  if (mine && (d.dirty || !drawingMap(doc, path))) putDrawing(doc, path, modelOf(ed));   // (the disk's is the structure's)
   const ymap = drawingMap(doc, path);
   if (!ymap) return null;
   const origin = { path }, prune = { prune: path };
@@ -48,7 +49,7 @@ export function bindDrawing(d, doc, path, { mine = false, say = () => {}, accept
     if (r.dropped.length) pruneDrawing(doc, path, prune);
     if (!accept(r.model, path)) return;
     last = r.model;
-    if (!same(r.model, ed.getModel())) ed.applyModel(r.model, { renamed, mine: own });
+    if (!same(r.model, modelOf(ed))) ed.applyModel(r.model, { renamed, mine: own });
   };
   const observer = (_events, tr) => { if (tr.origin !== origin && tr.origin !== prune) apply({ own: tr.origin === um }); };
   ymap.observeDeep(observer);
@@ -59,7 +60,7 @@ export function bindDrawing(d, doc, path, { mine = false, say = () => {}, accept
       lastKey = key ?? null;
       const { renamed } = putDrawing(doc, path, model, { base: last, client: doc.clientID, origin });
       last = drawingModel(doc, path)?.model ?? last;
-      if (renamed.size || !same(last, ed.getModel())) apply({ renamed });
+      if (renamed.size || !same(last, modelOf(ed))) apply({ renamed });
     },
     undo: () => { um.undo(); },
     redo: () => { um.redo(); },

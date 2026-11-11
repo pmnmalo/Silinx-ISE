@@ -40,7 +40,7 @@ uiTest('#3183 a Petri net edited live by the owner and an editor: a place moved 
     await ep.fill('.dlg-overlay input[data-field=name]', 'Rui');
     await ep.dialogButton('Follow');
     await ep.waitFor(() => window.Silinx?.project?.name === 'LivePn' && window.Silinx.startupChecked, [], { what: 'the project open', timeout: 30000 });
-    await ep.waitConsole(/^Editing Ana's project "LivePn" with them: its text files, state diagrams, truth tables, ASM charts and Petri nets change as you all edit them, its other drawings stay theirs, read only \(Following Ana, in the toolbar\)\.$/m);
+    await ep.waitConsole(/^Editing Ana's project "LivePn" with them: its text files and drawings change as you all edit them \(Following Ana, in the toolbar\)\.$/m);
     await page.waitConsole(/^Rui edits your project "LivePn" with you\.$/m);
     await ep.waitFor((p) => window.Silinx.active?.path === p && !!window.Silinx.active.petriEditor, [F], { what: 'the owner\'s net followed' });
     assert.deepEqual(await ep.eval((ed) => [!!document.querySelector(`${ed} [data-follow-notice]`), !!document.querySelector(`${ed}.asm-readonly`)], ED), [false, false]);
@@ -72,7 +72,7 @@ uiTest('#3183 a Petri net edited live by the owner and an editor: a place moved 
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
     const dlg = page.eval(async () => { await (await import('/js/collab-share.js')).shareProjectDialog(); }).catch(() => {});
     await page.waitDialog('Partilhar Projeto');
-    assert.ok((await page.eval(() => document.querySelector('.dlg-overlay').textContent)).includes('Quem tiver a ligação de editores edita os ficheiros de texto, os diagramas de estados, as tabelas de verdade, os fluxogramas ASM e as redes de Petri consigo, em direto; os outros desenhos continuam seus.'));
+    assert.ok((await page.eval(() => document.querySelector('.dlg-overlay').textContent)).includes('Quem tiver a ligação de editores edita os ficheiros de texto e os desenhos consigo, em direto.'));
     await page.dialogButton('Fechar');
     await dlg;
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));

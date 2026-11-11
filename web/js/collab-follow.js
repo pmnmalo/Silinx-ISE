@@ -7,7 +7,7 @@
 // follows the owner again or stops following. Every message in the console. A room the owner's page hosts (#3227, a
 // link …/#follow=<room>.<key>.host) is reached over WebRTC, with codes exchanged by hand (collab-host.js). An editor's
 // link (#3182, …#edit=…) also edits the project's text files: their editors bound live (collab-bind.js); and its
-// drawings edited live (#3183, the state diagrams, truth tables, ASM charts and Petri nets): their editors bound to the drawings' structures (collab-drawing.js).
+// drawings edited live (#3183, every drawing: state diagrams, truth tables, ASM charts, Petri nets, schematics): their editors bound to the drawings' structures (collab-drawing.js).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app, activateDoc } from './app.js';
@@ -19,6 +19,7 @@ import { docProject } from '/core/collab-doc.js';
 import { keepBound } from './collab-bind.js';
 import { keepDrawingsBound } from './collab-drawing.js';
 import { gateEdit } from '/core/collab-doc.js';
+import { drawingText } from '/core/collab-model.js';
 import { followRoom, colorOf } from '/core/collab-client.js';
 import { parseFollowLink, relayUrl } from '/core/collab-link.js';
 
@@ -68,7 +69,7 @@ export async function startFollowing(hash = location.hash) {
   setPresenceCommands(commands);
   setInterval(track, TRACK_MS);
   draw();
-  if (session.editor) app.log(`Editing ${collab.owner}'s project "${project.name}" with them: its text files, state diagrams, truth tables, ASM charts and Petri nets change as you all edit them, its other drawings stay theirs, read only (Following ${collab.owner}, in the toolbar).`, 'ok');
+  if (session.editor) app.log(`Editing ${collab.owner}'s project "${project.name}" with them: its text files and drawings change as you all edit them (Following ${collab.owner}, in the toolbar).`, 'ok');
   else app.log(`Following ${collab.owner}'s project "${project.name}", read only: their changes appear as they make them, and their open editor while you follow them (Following ${collab.owner}, in the toolbar).`, 'ok');
   return project.name;
 }
@@ -119,7 +120,7 @@ function onEvent(ev) {
 // a drawing's merged model through the import gate (#3361): refused, not shown, said once
 const refusedDrawings = new Set();
 function shownDrawing(path, model) {
-  try { gateEdit(path, JSON.stringify(model, null, 2)); return true; } catch (e) {
+  try { gateEdit(path, drawingText(path, model)); return true; } catch (e) {
     const why = `${path}: ${e.reason || e.message}`;
     if (!refusedDrawings.has(why)) { refusedDrawings.add(why); app.log(`WARNING: Follow a shared project: ${path}: not shown: ${e.reason || e.message}.`, 'warn'); }
     return false;
