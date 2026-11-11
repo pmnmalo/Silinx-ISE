@@ -9,8 +9,8 @@
 //   - the Model Checking Contest's models of the diagram corpus (test/diagram-corpus/mcc.json: a year's
 //     archives), against the latest year of the contest
 //   - the packages pinned by a GitHub release's tarball (package.json, packages/silinx-fpga/package.json: the
-//     Spartan-6 nextpnr's, https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-vX.Y.Z/…, #2934),
-//     against the repository's latest tag of the same prefix (spartan6-v*)
+//     Spartan-6 nextpnr's was, https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-vX.Y.Z/…, #2934;
+//     none since it is on npm, #3357), against the repository's latest tag of the same prefix (spartan6-v*)
 // What is behind becomes one issue, "Pinned sources: newer versions available" (labels enhancement and
 // tests & CI), opened or updated (its text replaced); none when all are current, and the issue is closed
 // when they become so. As scripts/report-failure.mjs (#251), the issue is written by the workflow.
