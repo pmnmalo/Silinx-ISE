@@ -135,10 +135,11 @@ export function mergeFragments(body, files) {
 }
 
 // ---- a development build's changes (its Development menu): the fragments, each change typed by its issue's label
-/** A change's title: its first item's bold label ("**Title (#N):**"), without the issue numbers and the colon. */
+/** A change's title: its first item's bold label ("**Title (#N):**", its lines joined when it is wrapped), without
+ *  the issue numbers and the colon; an item with no bold label, its first line without the bold's **. */
 export function changeTitle(item) {
-  const m = /^- \*\*(.+?)\*\*/.exec(String(item));
-  const t = m ? m[1] : String(item).replace(/^- /, '').split('\n')[0];
+  const m = /^- \*\*([\s\S]+?)\*\*/.exec(String(item));
+  const t = m ? m[1].replace(/\s*\n\s*/g, ' ') : String(item).replace(/^- /, '').split('\n')[0].replace(/\*\*/g, '');
   return t.replace(/:$/, '').replace(/\s*\(#\d+(?:,\s*#\d+)*(?:,[^)]*)?\)$/, '').replace(/:$/, '').trim();
 }
 const itemText = item => String(item).replace(/^- /, '').replace(/\n\s+/g, ' ');
