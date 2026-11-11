@@ -566,7 +566,7 @@ test('logic depth: the mapping balanced once more is kept when better than the d
   assert.ok(!keepSecond([20, 10, 10.5], [100, 110, 100]), 'slower than the first');
 });
 
-// #377: the slices too, when known (sliceCount: packages/silinx-fpga/src/fpga/pack.js's count): a netlist with 5 % fewer slices is
+// #377: the slices too, when known (sliceCount: nextpnr's packing estimated, slice-estimate.js, #2529): a netlist with 5 % fewer slices is
 // smaller even with more LUTs; fewer LUTs, more slices is not; a faster one is not larger in slices either
 // Regression (#742): the netlist with the carry chains against the one without them, both ways. The EPFL adder in the
 // corpus's I/O wrapper: its chains' netlist 17.81 ns estimated, 171 LUTs, 194 slices; without them the SOP-balanced
@@ -609,7 +609,7 @@ test('#746 the netlist without the chains kept when larger by no more times than
   assert.equal(keepChains({ ns: 9.92, luts: 675, slices: 338 }, { ns: 17.81, luts: 171, slices: 194 }), true);
 });
 
-test('#377 logic depth: the rule weighs the slices too, when known; sliceCount packs a netlist as the open flow', () => {
+test('#377 logic depth: the rule weighs the slices too, when known; sliceCount counts them as nextpnr packs them (#2529)', () => {
   assert.ok(keepDepth([10, 10.05], [100, 104], DEPTH_RULE, [80, 76]), '5 % fewer slices, more LUTs, as fast: smaller');
   assert.ok(!keepDepth([10, 10.05], [100, 104], DEPTH_RULE, [80, 77]), 'not 5 % fewer slices');
   assert.ok(!keepDepth([3.78, 3.78], [64, 81], DEPTH_RULE, [57, 52]), 'the adder fixture\'s ABC9 netlist: 9 % fewer slices, 27 % more LUTs');
@@ -635,7 +635,7 @@ test('#377 logic depth: the rule weighs the slices too, when known; sliceCount p
   assert.ok(keepDepth([10, 10.1], [100, 95], DEPTH_RULE, [null, 99]));
   assert.ok(keepSecond([20, 10, 9.9], [100, 110, 112], DEPTH_RULE, [80, 90, 85]), 'not 3 % faster than the first, but 5 % fewer slices');
   assert.ok(!keepSecond([20, 10, 9], [100, 110, 108], DEPTH_RULE, [80, 88, 130]), 'faster than the first, but 62 % more slices than the usual one for 55 % of speed');
-  // sliceCount: two LUT4s into flip-flops of the same clock, in one slice; a netlist that does not pack: null
+  // sliceCount: two LUT4s into flip-flops of the same clock, in one slice; a netlist that cannot be read: null
   const ff = (d, q) => cell('FDRE', { C: 2, D: d, CE: '1', R: '0' }, { Q: q });
   const lut = (o, init) => ({ ...cell('LUT4', { I0: 3, I1: 4, I2: 5, I3: 6 }, { O: o }), parameters: { INIT: init } });
   const two = { a: lut(10, '1000000000000000'), b: lut(11, '0111111111111110'), f: ff(10, 12), g: ff(11, 13) };
@@ -729,8 +729,9 @@ endmodule
 test('#54 a barrel rotator written as gates: its 4:1 multiplexers two LUT4s and a MUXF5 each, the wider mapping kept at High (faster, as large), equal to the RTL; at Normal too', { timeout: 300000 }, async () => {
   const rot = elaborate(compile([{ path: 'rotg.v', lang: 'verilog', text: ROT_GATES }]), 'rotg');
   const r = await synthesizeOpen(rot, { family: 'spartan3e', run: yosysNode });
-  // (two levels of 32 4:1 multiplexers: 128 LUTs and 64 MUXF5, 64 slices; before LUT6_MAP the wider mapping was 256 LUTs)
-  assert.deepEqual([r.util.luts, r.util.muxes, r.cells.MUXF6 || 0, r.depth.wide.kept, r.depth.wide.slices], [128, 64, 0, true, 64], JSON.stringify(r.depth));
+  // (two levels of 32 4:1 multiplexers: 128 LUTs and 64 MUXF5, 64 slices, and 18 of the 36 input registers, which nextpnr does not put in
+  // the multiplexers' slices: 82, as nextpnr packs it, #2529; before LUT6_MAP the wider mapping was 256 LUTs)
+  assert.deepEqual([r.util.luts, r.util.muxes, r.cells.MUXF6 || 0, r.depth.wide.kept, r.depth.wide.slices], [128, 64, 0, true, 82], JSON.stringify(r.depth));
   assert.deepEqual(r.warnings, []);
   const c = compareNetlist(rot, r, { name: 'lut6-rotg', seed: 'rotg', sim: { cycles: 400 } });
   assert.equal(c.status, 'pass', c.report || JSON.stringify(c));
