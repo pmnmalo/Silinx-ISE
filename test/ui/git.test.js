@@ -105,6 +105,14 @@ uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a re
   await page.menu('File', 'Pull from GitHub');
   await page.waitConsole(/Pulled into main: 1 file\(s\) changed\.\n {2}src\/sevenseg\.v/);
   assert.equal(await readWs(env, 'lab1', 'src/sevenseg.v'), '// theirs\n');
+  // a tool's output pulled (#3359): left out of the project's folder, a WARNING in the console
+  const them = path.join(tmp, 'theirs', 'lab1');
+  fs.mkdirSync(path.join(them, 'build'), { recursive: true });
+  fs.writeFileSync(path.join(them, 'build', 'top.bit'), 'bits');
+  sh(them, 'add', '-f', 'build/top.bit'); sh(them, 'commit', '--quiet', '-m', 'Theirs: build'); sh(them, 'push', '--quiet');
+  await page.menu('File', 'Pull from GitHub');
+  await page.waitConsole(/Pulled into main: 0 file\(s\) changed\.\nWARNING: build\/top\.bit: not pulled into the project: a tool's output, made again from the sources/);
+  assert.equal(fs.existsSync(path.join(env.server.workspace, 'lab1', 'build', 'top.bit')), false);
   // a rejected push, then a conflict: their ERROR lines and hints; the file as it was
   theirs('lab1', 'src/sevenseg.v', '// theirs again\n');
   await writeFile(page, 'src/sevenseg.v', '// mine\n');
@@ -123,7 +131,7 @@ uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a re
   // of its toolbar
   await page.menu('File', 'History…');
   await page.waitDialog('History');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .git-commit .git-subject')].map((e) => e.textContent)), ['Mine', 'Theirs: src/sevenseg.v', 'Counter changed', 'Starter']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .git-commit .git-subject')].map((e) => e.textContent)), ['Mine', 'Theirs: build', 'Theirs: src/sevenseg.v', 'Counter changed', 'Starter']);
   const first = await page.eval(() => document.querySelector('.dlg-overlay .git-commit:last-child').dataset.commit);
   await page.click('.dlg-overlay .git-commit:last-child a[data-path="src/counter.v"]');
   await page.waitNoDialog();

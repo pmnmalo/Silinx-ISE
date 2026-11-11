@@ -298,6 +298,7 @@ export async function gitPull(name, { resolve = null } = {}) {
 // (the pull itself, the trust kept around it)
 async function pull(name, repo, branch, upstream, resolve) {
   const before = await headOf(repo.dir);
+  const kept = await keptOut(repo);
   const M = await import('./git-merge.js');
   await M.ensureDrawingAttributes((await ok('rev-parse', ['rev-parse', '--absolute-git-dir'], { cwd: repo.dir })).trim());
   const r = await git(['pull', '--no-rebase', '--ff', '--no-edit', ...(upstream ? [] : ['origin', branch])], { cwd: repo.dir, timeout: 180_000 });
@@ -322,9 +323,88 @@ async function pull(name, repo, branch, upstream, resolve) {
     resolved = m.resolved;
   }
   const after = await headOf(repo.dir);
+  const gated = before === after ? { out: [], warnings: [] } : await gatePulled(repo, before, after, kept);
   if (!upstream) await git(['branch', `--set-upstream-to=origin/${branch}`], { cwd: repo.dir });
-  const files = before === after ? [] : (await ok('diff', before ? ['diff', '--name-only', '--relative', before, after, '--', '.'] : ['ls-files', '--', '.'], { cwd: repo.dir })).split('\n').filter(Boolean);
-  return { project: name, branch, upToDate: before === after, files, ...(resolved.length ? { resolved } : {}) };
+  const files = before === after ? [] : (await ok('diff', before ? ['diff', '--name-only', '--relative', before, after, '--', '.'] : ['ls-files', '--', '.'], { cwd: repo.dir })).split('\n').filter(f => f && !gated.out.includes(f));
+  return { project: name, branch, upToDate: before === after, files, ...(resolved.length ? { resolved } : {}), ...(gated.warnings.length ? { warnings: gated.warnings } : {}) };
+}
+
+// what a pull brought passes the import gate (#3359), as a clone's files do (the workspace's repository: every
+// project's, each on its own): a hidden file (a project's .gitignore apart), a tool's output or another spelling of
+// silinx.json is taken out of the folder and left in the repository (skip-worktree: a commit neither deletes nor
+// changes it), each with its message; a file the gate refuses otherwise (a name, a NUL byte, a DTD, a size) undoes the
+// pull. -> { out: the project's paths not in its folder (taken out, or left out by a sparse checkout), warnings }
+async function gatePulled(repo, before, after, kept) {
+  const { gateEntries, gateMessages, normalizePath, GateError } = await import('../core/import-gate.js');
+  const listed = await ok('diff', before ? ['diff', '-z', '--name-only', '--diff-filter=d', before, after] : ['ls-files', '-z'], { cwd: repo.top });
+  const left = [], absent = [], warnings = [], groups = new Map();
+  for (const file of listed.split('\0').filter(Boolean)) {
+    const full = path.join(repo.top, ...file.split('/'));
+    let st = null;
+    try { st = await fsp.lstat(full); } catch { absent.push(file); continue; }   // (not in the folder: a sparse checkout's)
+    // (its project, and its path in it: the workspace's repository holds the projects' folders)
+    const cut = repo.root === 'workspace' ? file.indexOf('/') : -1;
+    const [group, rel] = cut > 0 ? [file.slice(0, cut), file.slice(cut + 1)] : ['', file];
+    if (rel === '.gitignore') continue;   // (git's own, as Silinx writes it)
+    const out = outOfProject(rel, normalizePath);
+    if (out) { left.push(file); warnings.push(`${file}: not pulled into the project: ${out}`); continue; }
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push({ path: rel, data: st.isFile() ? await fsp.readFile(full) : new Uint8Array(), symlink: st.isSymbolicLink() });
+  }
+  await takeOut(repo, left);
+  const errors = [];
+  for (const [group, entries] of groups) {
+    const at = m => (group ? `${group}/${m}` : m);
+    try {
+      const gated = gateEntries(entries);
+      errors.push(...gateMessages({ refusals: gated.refusals, warnings: [] }).map(at));
+      warnings.push(...gated.warnings.map(at));
+    } catch (e) { if (!(e instanceof GateError)) throw e; errors.push(group ? `${group}: ${e.message}` : e.message); }
+  }
+  if (errors.length) {
+    await undoPull(repo, before, [...groups].flatMap(([g, es]) => es.map(e => (g ? `${g}/${e.path}` : e.path))), kept);
+    throw new GitError(`git pull: ${errors.join('; ')}: nothing was pulled, the project's files are as they were`, null, 422);
+  }
+  const mine = p => (repo.prefix && p.startsWith(repo.prefix) ? p.slice(repo.prefix.length) : p);
+  return { out: [...left, ...absent].map(mine), warnings };
+}
+// why a pulled file stays out of the project's folder, or null: a hidden one, a tool's output, another spelling of
+// silinx.json (the import gate's reasons)
+function outOfProject(rel, normalizePath) {
+  if (isOutput(rel)) return 'a tool\'s output, made again from the sources';
+  const { reason } = normalizePath(rel);
+  return reason && (/^hidden |^a short \(8\.3\) name|build folder|^another spelling of /.test(reason)) ? reason : null;
+}
+// the folders a file taken out leaves empty, up to the project's
+async function pruneEmpty(top, dir) {
+  for (let d = dir; d.startsWith(top + path.sep); d = path.dirname(d)) {
+    try { await fsp.rmdir(d); } catch { return; }
+  }
+}
+// the files of the repository a pull left out of the folder (skip-worktree), before the next pull
+async function keptOut(repo) {
+  const r = await git(['ls-files', '-v', '-z'], { cwd: repo.top });
+  return r.code ? [] : r.stdout.split('\0').filter(l => l.startsWith('S ')).map(l => l.slice(2));
+}
+// files of the repository out of the folder, and out of the commits (skip-worktree), the folders they leave empty too
+async function takeOut(repo, files) {
+  if (!files.length) return;
+  for (const f of files) await fsp.rm(path.join(repo.top, ...f.split('/')), { force: true });
+  await ok('update-index', ['update-index', '--skip-worktree', '--', ...files], { cwd: repo.top });
+  for (const f of files) await pruneEmpty(repo.top, path.dirname(path.join(repo.top, ...f.split('/'))));
+}
+// a pull the gate refused: the branch back where it was (the changes not committed kept: reset --keep), the files a
+// pull had left out still out; a first pull (no commit before it): its files out of the index and the folder
+async function undoPull(repo, before, files, kept) {
+  if (before) {
+    await ok('reset', ['reset', '--quiet', '--keep', before], { cwd: repo.top });
+    const tracked = new Set((await ok('ls-files', ['ls-files', '-z'], { cwd: repo.top })).split('\0'));
+    await takeOut(repo, kept.filter(f => tracked.has(f)));
+    return;
+  }
+  await git(['update-ref', '-d', 'HEAD'], { cwd: repo.top });
+  await git(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '--', '.'], { cwd: repo.top });
+  for (const f of files) await fsp.rm(path.join(repo.top, ...f.split('/')), { force: true });
 }
 
 /** The project's commits, the newest first: [{ commit, author, date, message, files: [{ path, state }] }]. */
@@ -364,6 +444,19 @@ async function cloneEntries(dir, base = '') {
   return out;
 }
 
+// a clone's files checked out but its hidden ones (#3359): a hidden file is no part of a project (.vscode's tasks,
+// .envrc, a .gitattributes naming filters: other tools act on them), so git's sparse checkout leaves them in the
+// repository, out of the folder, for its pulls too (but the .gitignore, which Silinx writes itself); a commit leaves
+// them as they are
+const SPARSE = '/*\n!.*\n/.gitignore\n';
+async function checkoutSparse(dir) {
+  await ok('config', ['config', 'core.sparseCheckout', 'true'], { cwd: dir });
+  await ok('config', ['config', 'core.sparseCheckoutCone', 'false'], { cwd: dir });
+  await fsp.mkdir(path.join(dir, '.git', 'info'), { recursive: true });
+  await fsp.writeFile(path.join(dir, '.git', 'info', 'sparse-checkout'), SPARSE);
+  if (await headOf(dir)) await ok('checkout', ['read-tree', '-mu', 'HEAD'], { cwd: dir });
+}
+
 /** Open from Repository: clone a GitHub repository into the workspace as a project, untrusted (#2830: the trust mark in
  *  .git, so its silinx.json stays the repository's): { project, url, warnings }. madeBy 'mcp': the MCP's. */
 export async function gitClone({ url, name = null, madeBy = null }) {
@@ -375,8 +468,9 @@ export async function gitClone({ url, name = null, madeBy = null }) {
   await fsp.mkdir(ws, { recursive: true });
   const tmp = path.join(ws, `.silinx-clone-${crypto.randomBytes(6).toString('hex')}`);
   try {
-    const r = await git(['clone', '--quiet', '--no-recurse-submodules', '--', GIT_TESTING.remoteOf?.(remote) || remote.url, tmp], { cwd: ws, timeout: 300_000 });
+    const r = await git(['clone', '--quiet', '--no-checkout', '--no-recurse-submodules', '--', GIT_TESTING.remoteOf?.(remote) || remote.url, tmp], { cwd: ws, timeout: 300_000 });
     if (r.code) throw explain('clone', r);
+    await checkoutSparse(tmp);
     if (!fs.existsSync(path.join(tmp, P.PROJECT_FILE))) {
       const inside = (await fsp.readdir(tmp, { withFileTypes: true })).filter(d => d.isDirectory() && !d.name.startsWith('.') && fs.existsSync(path.join(tmp, d.name, P.PROJECT_FILE))).map(d => d.name).sort();
       throw inside.length

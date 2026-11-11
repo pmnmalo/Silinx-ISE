@@ -434,7 +434,8 @@ On your computer or a Silinx server, a project can live in a GitHub repository, 
   GitHub Classroom assignment's too.
 - **Commit…, Push to GitHub and Pull from GitHub** (the project's right-click menu in the Design pane, under Git; the
   File menu) send it back and bring the others' changes in. A pull that conflicts pulls nothing and leaves the files as
-  they were.
+  they were. The repository's hidden files (`.vscode`, `.github`) and the tools' outputs stay in the repository, out of
+  the project's folder, and a pull's files pass the import gate, as an imported project's.
 - **The Design pane** marks what changed (M) or is new (N) since the last commit.
 - **History…** lists the commits, and opens a file as it was in one, read only.
 - **Compare** (in History… and Commit…) shows a drawing's two versions side by side, what was added, removed, moved

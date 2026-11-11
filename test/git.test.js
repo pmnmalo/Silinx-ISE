@@ -249,6 +249,86 @@ test('clone: refused into an existing project, for a repository of several proje
   assert.deepEqual(fs.readdirSync(ws).filter(n => n.startsWith('.silinx-clone') || ['several', 'none', 'nul', 'json', 'missing'].includes(n)), []);
 });
 
+// #3359: a hidden file is no part of a project: a clone leaves the repository's out of the folder (git's sparse
+// checkout), in the repository, untouched by a commit; what a pull brings passes the import gate: a hidden file, a
+// tool's output, another spelling of silinx.json taken out of the folder with its message, another refusal undoes it
+const HIDDEN = { '.vscode/tasks.json': '{"tasks":[]}\n', '.envrc': 'export X=1\n', '.gitattributes': '*.vhd filter=x\n', '.github/workflows/ci.yml': 'on: push\n', 'src/.idea/x.xml': '<x/>\n' };
+const onDisk = dir => fs.readdirSync(dir, { recursive: true }).map(f => f.split(path.sep).join('/')).filter(f => !f.startsWith('.git/') && f !== '.git' && fs.statSync(path.join(dir, f)).isFile()).sort();
+
+test('clone: the repository\'s hidden files stay out of the project\'s folder, in the repository; a commit leaves them', async () => {
+  const bare = bareWith('dotted', d => { gates(d); write(path.join(d, '.gitignore'), 'build/\n'); for (const [f, t] of Object.entries(HIDDEN)) write(path.join(d, f), t); });
+  const r = await G.gitClone({ url: bare, name: 'dotted' });
+  assert.deepEqual(r.warnings, []);
+  const dir = path.join(ws, 'dotted');
+  for (const f of Object.keys(HIDDEN)) assert.equal(fs.existsSync(path.join(dir, f)), false, f);
+  assert.deepEqual(['.vscode', '.github', 'src/.idea'].filter(d => fs.existsSync(path.join(dir, d))), []);
+  assert.equal(read(path.join(dir, '.gitignore')), 'build/\n');
+  assert.deepEqual(onDisk(dir).filter(f => f.split('/').some(s => s.startsWith('.'))), ['.gitignore']);
+  assert.deepEqual((await G.gitStatus('dotted')).files, []);
+  write(path.join(dir, 'src', 'extra.v'), 'module extra; endmodule\n');
+  assert.deepEqual((await G.gitCommit('dotted', 'Extra')).files, [{ path: 'src/extra.v', state: 'new' }]);
+  await G.gitPush('dotted');
+  for (const [f, t] of Object.entries(HIDDEN)) assert.equal(sh(bare, 'show', `main:${f}`), t, f);
+  // a pull that changes them: still out of the folder
+  const theirs = other(bare, 'dotted');
+  write(path.join(theirs, '.vscode', 'tasks.json'), '{"tasks":[1]}\n');
+  write(path.join(theirs, '.vscode', 'launch.json'), '{}\n');
+  write(path.join(theirs, 'src', 'theirs.v'), 'module theirs; endmodule\n');
+  sh(theirs, 'add', '-A'); sh(theirs, 'commit', '--quiet', '-m', 'Theirs'); sh(theirs, 'push', '--quiet');
+  assert.deepEqual(await G.gitPull('dotted'), { project: 'dotted', branch: 'main', upToDate: false, files: ['src/theirs.v'] });
+  assert.equal(fs.existsSync(path.join(dir, '.vscode')), false);
+  assert.deepEqual((await G.gitStatus('dotted')).files, []);
+});
+
+test('pull: its files pass the import gate; a hidden file, a tool\'s output, another spelling of silinx.json taken out, with their messages; another refusal pulls nothing', async () => {
+  const bare = bareWith('pulled', gates);
+  // a project cloned by hand into the workspace (no sparse checkout): what a pull brings is gated all the same
+  sh(ws, 'clone', '--quiet', bare, 'pulled');
+  const dir = path.join(ws, 'pulled');
+  const theirs = other(bare, 'pulled');
+  for (const [f, t] of Object.entries(HIDDEN)) write(path.join(theirs, f), t);
+  write(path.join(theirs, 'build', 'top.bit'), 'bits');
+  write(path.join(theirs, 'src', 'SILINX.JSON'), '{"trusted":true}\n');
+  write(path.join(theirs, 'src', 'theirs.v'), 'module theirs; endmodule\n');
+  write(path.join(theirs, '.gitignore'), 'xst/\n');
+  sh(theirs, 'add', '-A'); sh(theirs, 'commit', '--quiet', '-m', 'Theirs'); sh(theirs, 'push', '--quiet');
+  const p = await G.gitPull('pulled');
+  assert.deepEqual(p, { project: 'pulled', branch: 'main', upToDate: false, files: ['.gitignore', 'src/theirs.v'], warnings: [
+    '.envrc: not pulled into the project: hidden file or folder (\'.envrc\')',
+    '.gitattributes: not pulled into the project: hidden file or folder (\'.gitattributes\')',
+    '.github/workflows/ci.yml: not pulled into the project: hidden file or folder (\'.github\')',
+    '.vscode/tasks.json: not pulled into the project: hidden file or folder (\'.vscode\')',
+    'build/top.bit: not pulled into the project: a tool\'s output, made again from the sources',
+    'src/.idea/x.xml: not pulled into the project: hidden file or folder (\'.idea\')',
+    'src/SILINX.JSON: not pulled into the project: another spelling of silinx.json, the project\'s description (\'SILINX.JSON\')',
+  ] });
+  assert.deepEqual(onDisk(dir).filter(f => !fs.existsSync(path.join(ROOT, 'examples', 'gates', f))), ['.gitignore', 'src/theirs.v']);
+  assert.deepEqual(['.vscode', '.github', 'build', 'src/.idea'].filter(d => fs.existsSync(path.join(dir, d))), []);
+  // in the repository still: no commit deletes them
+  assert.deepEqual((await G.gitStatus('pulled')).files, []);
+  write(path.join(dir, 'src', 'mine.v'), 'module mine; endmodule\n');
+  assert.deepEqual((await G.gitCommit('pulled', 'Mine')).files, [{ path: 'src/mine.v', state: 'new' }]);
+  assert.equal(sh(dir, 'show', 'HEAD:.envrc'), HIDDEN['.envrc']);
+  await G.gitPush('pulled');
+  // another refusal (a NUL byte in a source): nothing pulled, the branch where it was
+  sh(theirs, 'pull', '--quiet', '--no-rebase');
+  write(path.join(theirs, 'src', 'bad.vhd'), 'entity\0x');
+  write(path.join(theirs, 'src', 'good.v'), 'module good; endmodule\n');
+  write(path.join(theirs, '.vscode', 'tasks.json'), '{"tasks":[2]}\n');
+  sh(theirs, 'add', '-A'); sh(theirs, 'commit', '--quiet', '-m', 'Bad'); sh(theirs, 'push', '--quiet');
+  write(path.join(dir, 'src', 'notes.txt'), 'not committed\n');
+  const head = sh(dir, 'rev-parse', 'HEAD');
+  await assert.rejects(G.gitPull('pulled'), e => {
+    assert.equal(e.message, 'git pull: src/bad.vhd: not imported: binary content (a NUL byte) in a text file: nothing was pulled, the project\'s files are as they were');
+    assert.deepEqual([e.hint, e.status], [null, 422]);
+    return true;
+  });
+  assert.equal(sh(dir, 'rev-parse', 'HEAD'), head);
+  assert.deepEqual(['src/bad.vhd', 'src/good.v', '.vscode'].filter(f => fs.existsSync(path.join(dir, f))), []);
+  assert.equal(read(path.join(dir, 'src', 'notes.txt')), 'not committed\n');
+  assert.deepEqual((await G.gitStatus('pulled')).files, [{ path: 'src/notes.txt', state: 'new' }]);
+});
+
 test('the repository: never one above the workspace; the workspace as the repository of several projects, each commit its project\'s', async () => {
   const outer = path.join(tmp, 'outer');
   const prev = process.env.SILINX_WORKSPACE;

@@ -180,6 +180,7 @@ export async function gitPull({ resolve = null } = {}) {
     const p = await api.gitPull(name, resolve ? { resolve } : {});
     log(pullText(p), 'ok');
     for (const f of p.resolved || []) log(`${f}: merged by its objects, its HDL made again.`, 'info');
+    for (const w of p.warnings || []) log(`WARNING: ${w}`, 'warn');
     // (the server's watcher tells the page what changed; the browser edition has none: its open documents told here)
     if (!p.upToDate && S.project?.name === name) {
       if (api.standalone) await applyChanges({ project: name, changes: p.files.map(f => ({ path: f, kind: S.diskTree?.includes(f) ? 'changed' : 'added' })) });
