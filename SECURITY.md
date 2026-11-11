@@ -227,7 +227,10 @@ What it cannot do:
   there) and 400 files; a zip at an address is read to at most 16 MB, then through the gate.
 - **Reach this computer or a local network, or send anything:** `open=` takes an `https:` address only, with no user
   name or password, never `localhost`, a loopback, private, link-local or carrier-grade address, an IPv6 local one or
-  a `.local` / `.lan` / `.internal` name (also a decimal or hexadecimal address, read as the browser reads it). The
+  one that carries an IPv4 address (Teredo, 6to4, NAT64), a `.local` / `.lan` / `.internal` / `.corp` / `.svc` name or
+  one that never resolves (`.test`, `.invalid`, `.example`), a single label, or a name with an empty label (also a
+  decimal or hexadecimal address, read as the browser reads it, and a name with its trailing dots, #3415). Another
+  internal name, under a suffix not listed here, is not recognised as one: the dialog names the address for the user to judge. The
   check reads the host's name, not its DNS: a public name that resolves to a private address passes, but being
   `https:` it cannot reach the local server, which serves plain `http:`. The
   zip is fetched by the browser, never by the local server, only after the user agrees in a dialog that names its

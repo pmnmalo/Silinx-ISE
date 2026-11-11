@@ -201,6 +201,18 @@ test('privateHost: the IPv6 forms that carry an IPv4 address, the reserved IPv6 
   }
 });
 
+test('#3415 privateHost: every trailing dot taken off, an empty label, Teredo and a private network\'s names refused', () => {
+  for (const h of ['localhost.', 'localhost..', 'localhost...', '192.168.1.1..', '10.0.0.1...', 'router..', 'a..example.org', '.example.org',
+    '[2001:0:4136:e378:8000:63bf:3fff:fdd2]', '[2001::1]', '[2001:0:0:0:0:0:a00:1]',
+    'foo.corp', 'kubernetes.default.svc', 'wiki.intranet', 'nas.private', 'host.localdomain', 'site.test', 'x.invalid', 'www.example']) assert.equal(privateHost(h), true, h);
+  for (const h of ['example.org.', 'example.org..', '[2001:4860::8888]', '[2001:1::1]', 'corp.example.org', 'svc.github.io', 'test.org']) assert.equal(privateHost(h), false, h);
+  for (const [u, host] of [['https://localhost../a.zip', 'localhost..'], ['https://192.168.1.1../a.zip', '192.168.1.1..'],
+    ['https://[2001:0:4136:e378:8000:63bf:3fff:fdd2]/a.zip', '[2001:0:4136:e378:8000:63bf:3fff:fdd2]'], ['https://foo.corp/a.zip', 'foo.corp'],
+    ['https://kubernetes.default.svc/a.zip', 'kubernetes.default.svc']]) {
+    assert.throws(() => parseLink(`#open=${u}`), { message: `the link's open= is an address of this computer or of a local network ('${host}')` }, u);
+  }
+});
+
 test('makeLink: the link of a design, an example, a zip; parseLink reads it back', async () => {
   const base = 'https://pmnmalo.github.io/Silinx/#token=x';
   assert.equal(makeLink(base, { example: 'traffic', view: 'try' }), 'https://pmnmalo.github.io/Silinx/#open=example:traffic&view=try');
