@@ -91,7 +91,7 @@ test('run_process with the Silinx toolchain on the Basys 3: synth_xilinx, nextpn
   const par = await ok('get_report', { project: 'o3', report: 'par' });
   assert.match(par.text, /^Place and route \(Silinx toolchain\) of top: all signals are completely routed\.\nTiming constraints: all met; minimum period [\d.]+ ns \([\d.]+ MHz\), nextpnr's estimate \(optimistic against Vivado, #3146\)\.$/);
   const map = await ok('get_report', { project: 'o3', report: 'map' });
-  assert.match(map.text, /\n {2}Bonded IOB: 27 out of 106 25%\n/);
+  assert.match(map.text, /\n {2}Number of bonded IOBs: 27 out of 106 25%\n/);
   const timing = await ok('get_report', { project: 'o3', report: 'timing' });
   assert.equal(timing.data.path, 'build/open/timing.txt');
   assert.match(timing.text, /^Timing of xc7a35tcpg236-1 after Place & Route: nextpnr's estimate .*\n.*\n\nClock clk: [\d.]+ MHz \([\d.]+ ns\), constraint 100 MHz: met\n/);
