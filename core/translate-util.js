@@ -47,12 +47,18 @@ export function intRangeBits(range) {
 export const reservedInVerilog = name => VERILOG_WORDS.has(name) || SV_WORDS.has(name);
 export const reservedInVhdl = name => VHDL93_WORDS.has(String(name).toLowerCase());
 
-/** Every node of an IR tree (statements and expressions), depth first. */
+/** Every node of an IR tree (statements and expressions), depth first (with a stack of its own: an elsif chain of
+ *  thousands of branches nests as deep, #2577). */
 export function walk(node, f) {
-  if (Array.isArray(node)) { for (const n of node) walk(n, f); return; }
-  if (!node || typeof node !== 'object') return;
-  f(node);
-  for (const [k, v] of Object.entries(node)) if (k !== 'loc' && v && typeof v === 'object') walk(v, f);
+  const stack = [node];
+  while (stack.length) {
+    const n = stack.pop();
+    if (Array.isArray(n)) { for (let i = n.length - 1; i >= 0; i--) stack.push(n[i]); continue; }
+    if (!n || typeof n !== 'object') continue;
+    f(n);
+    const kids = Object.entries(n).filter(([k, v]) => k !== 'loc' && v && typeof v === 'object');
+    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i][1]);
+  }
 }
 
 /** The name an assignment's target is of (through its indices and slices), or null. */

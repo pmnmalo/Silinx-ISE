@@ -646,12 +646,13 @@ export function* exec(s, ctx) {
       if (s.intra) { yield* doAssignIntra(s, ctx); return; }
       doAssign(s, ctx);
       return;
-    case 'if': {
-      const c = V.truth(evalE(s.c, ctx));
-      if (c === 1) return yield* exec(s.then, ctx);
-      if (s.else) return yield* exec(s.else, ctx);
-      return;
-    }
+    case 'if':   // (an elsif / else if chain followed in a loop: thousands of branches, #2577)
+      for (let n = s; ;) {
+        if (V.truth(evalE(n.c, ctx)) === 1) return yield* exec(n.then, ctx);
+        n = n.else;
+        if (!n) return;
+        if (n.k !== 'if') return yield* exec(n, ctx);
+      }
     case 'case': {
       const sel = evalE(s.sel, ctx);
       for (const it of s.items) {

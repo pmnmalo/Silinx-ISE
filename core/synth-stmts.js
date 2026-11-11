@@ -102,11 +102,11 @@ export function mountStatements(ctx) {
         const val = s.target.k === 'cat' ? fit(v.x, v.w, v.s, L.w) : fitTarget(v, s.target, L.w);
         return `${ind}${L.x} ${s.nb && mode === 'proc' ? '<=' : '='} ${val};\n`;
       }
-      case 'if': {
-        const c = truth(s.c, ctx);
-        const th = stmt(s.then, ctx, `${ind}  `, mode, loop);
-        const el = s.else ? stmt(s.else, ctx, `${ind}  `, mode, loop) : '';
-        return `${ind}if (${c}) begin\n${th}${ind}end${el ? ` else begin\n${el}${ind}end` : ''}\n`;
+      case 'if': {   // (an elsif / else if chain written as one, in a loop: thousands of branches, #2577)
+        let out = `${ind}if (${truth(s.c, ctx)}) begin\n${stmt(s.then, ctx, `${ind}  `, mode, loop)}`;
+        for (s = s.else; s?.k === 'if'; s = s.else) out += `${ind}end else if (${truth(s.c, ctx)}) begin\n${stmt(s.then, ctx, `${ind}  `, mode, loop)}`;
+        const el = s ? stmt(s, ctx, `${ind}  `, mode, loop) : '';
+        return `${out}${ind}end${el ? ` else begin\n${el}${ind}end` : ''}\n`;
       }
       case 'case': {
         let sel = e(s.sel, ctx);
@@ -236,7 +236,7 @@ export function mountStatements(ctx) {
     switch (s.k) {
       case 'ret': case 'exit': case 'next': return true;
       case 'blk': return s.stmts.some(mayLeave);
-      case 'if': return mayLeave(s.then) || mayLeave(s.else);
+      case 'if': for (; s?.k === 'if'; s = s.else) if (mayLeave(s.then)) return true; return mayLeave(s);   // (#2577)
       case 'case': return s.items.some(it => mayLeave(it.body)) || mayLeave(s.def);
       default: return false;
     }

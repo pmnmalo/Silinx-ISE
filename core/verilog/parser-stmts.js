@@ -81,13 +81,7 @@ export const stmtMethods = {
         if (this.accept(':')) this.ident();
         return { kind: 'fork', label, decls, stmts, join };
       }
-      if (this.is('if')) {
-        this.next(); this.expect('(');
-        const cond = this.expr(); this.expect(')');
-        const then = this.stmt();
-        const els = this.accept('else') ? this.stmt() : null;
-        return { kind: 'if', cond, then, else: els };
-      }
+      if (this.is('if')) return this.ifChain();
       if (this.isAny('case', 'casez', 'casex')) {
         const variant = this.next().v;
         this.expect('(');
@@ -192,6 +186,35 @@ export const stmtMethods = {
       this.sync(['end', 'endcase', 'endmodule', 'endfunction', 'endtask', 'join']);
       return { kind: 'null' };
     }
+  },
+
+  // if … else if … else: the chain read in a loop, not one call per else if (a chain of thousands of them, #2577);
+  // it nests in else as before, each else if at its own location, and an error in an else if's condition makes
+  // that else a null statement, as a statement of its own would
+  ifChain() {
+    const ifs = [];
+    let els = null, loc = null;
+    for (;;) {
+      let cond;
+      try {
+        this.next(); this.expect('(');
+        cond = this.expr(); this.expect(')');
+      } catch (e) {
+        if (!(e instanceof Sync) || !ifs.length) throw e;
+        this.sync(['end', 'endcase', 'endmodule', 'endfunction', 'endtask', 'join']);
+        els = { kind: 'null', loc };
+        break;
+      }
+      const s = { kind: 'if', cond, then: this.stmt(), else: null };
+      if (loc) s.loc = loc;
+      ifs.push(s);
+      if (!this.accept('else')) break;
+      if (this.is('if')) { loc = this.loc(); continue; }
+      els = this.stmt();
+      break;
+    }
+    for (let k = ifs.length - 1; k >= 0; k--) { ifs[k].else = els; els = ifs[k]; }
+    return els;
   },
 
   // id '(' ... ')' ';' at statement level is a task call (not an assignment target)

@@ -47,7 +47,17 @@ export function writeModule(ctx) {
     }
     return null;
   }
-  const hasEdge = n => n && typeof n === 'object' && (n.k === 'edge' || n.k === 'event' || Object.entries(n).some(([k, v]) => k !== 't' && k !== 'sig' && k !== 'fn' && v && typeof v === 'object' && (Array.isArray(v) ? v.some(hasEdge) : hasEdge(v))));
+  // (in the same order as a recursive walk, with a stack of its own: an elsif chain of thousands of branches, #2577)
+  const hasEdge = n => {
+    for (const stack = [n]; stack.length;) {
+      const x = stack.pop();
+      if (!x || typeof x !== 'object') continue;
+      if (x.k === 'edge' || x.k === 'event') return true;
+      const kids = Object.entries(x).filter(([k, v]) => k !== 't' && k !== 'sig' && k !== 'fn' && v && typeof v === 'object');
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i][1]);
+    }
+    return false;
+  };
 
   // a concurrent assignment whose value is a condition chain with a clock edge
   // (q <= d when rising_edge(clk); q <= '0' when rst = '1' else d when rising_edge(clk)): the

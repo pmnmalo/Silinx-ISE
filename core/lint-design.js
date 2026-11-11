@@ -2,7 +2,7 @@
 // unused or never assigned (inputs bit by bit), names that differ only in case, clocks, Verilog's = and <= in
 // clocked and combinational blocks, integers without a range.
 import { readsOf } from './elaborate.js';
-import { eachStmt, exprsOf, hasEdgeOf, readBits, sameBits, short, targetBits, targetIndexExprs, unusedRanges } from './lint.js';
+import { addBits, eachStmt, exprsOf, hasEdgeOf, readBits, sameBits, short, targetBits, targetIndexExprs, unusedRanges } from './lint.js';
 
 /** designChecks' later rules, their findings added (nothing returned). */
 export function mountDesignRules(ctx) {
@@ -16,6 +16,15 @@ export function mountDesignRules(ctx) {
     const key = (sig, b) => `${sig.id}:${b}`;
     const bitsList = (sig, bits) => (bits ? [...bits] : sig.t?.kind === 'array' ? ['*'] : Array.from({ length: Math.min(sig.t?.w || 1, 256) }, (_, k) => k));
     const names = new Map();
+    // the bits the enclosing conditions read, kept for each array of them as it grows: an elsif chain's grows by one
+    // condition a branch (eachStmt), each read once, not again at every branch of thousands (#2577)
+    const condReads = new WeakMap();
+    const condBits = conds => {
+      let c = condReads.get(conds);
+      if (!c) condReads.set(conds, c = { n: 0, bits: new Map() });
+      for (; c.n < conds.length; c.n++) readBits(conds[c.n], c.bits);
+      return c.bits;
+    };
     for (const p of procs) {
       const inf = pinfo.get(p);
       if (inf.sim || inf.clocked || p.kind === 'native') continue;
@@ -24,7 +33,9 @@ export function mountDesignRules(ctx) {
       eachStmt(p.body, (s, conds) => {
         if (s.k !== 'asg') return;
         const src = new Map();
-        readBits([s.value, ...conds, ...targetIndexExprs(s.target)], src);
+        readBits(s.value, src);
+        for (const [sig, bits] of condBits(conds)) addBits(src, sig, bits);
+        readBits(targetIndexExprs(s.target), src);
         for (const tb of targetBits(s.target)) {
           const hold = s.value?.k === 'cond' && [s.value.a, s.value.b].some(x => x?.k === 'sig' && x.sig === tb.sig);
           for (const [rs, rb] of src) {
@@ -36,7 +47,7 @@ export function mountDesignRules(ctx) {
             for (const [a, b] of pairs) {
               const from = key(rs, a), to = key(tb.sig, b);
               names.set(from, rs); names.set(to, tb.sig);
-              push(edges, from, { to, file: fileOf(p), line: s.loc?.line ?? p.loc?.line, module: p.inst.module });
+              (edges.get(from) ?? edges.set(from, []).get(from)).push({ to, file: fileOf(p), line: s.loc?.line ?? p.loc?.line, module: p.inst.module });   // (a new edge each)
             }
           }
         }

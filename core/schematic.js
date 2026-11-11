@@ -8,6 +8,7 @@
 // node kinds: in, out, inout (top-level ports), inst (child instance), gate (operator from an
 // expression), reg (clocked process), comb (combinational process/always), const, blackbox
 import * as V from './values.js';
+import { walk } from './bound-walk.js';
 
 const GATE_OF = {
   '&': 'and', '|': 'or', '^': 'xor', '~^': 'xnor', nand: 'nand', nor: 'nor',
@@ -91,8 +92,8 @@ export function latchGates(design) {
   // flow through a combinational body: `done` = targets definitely assigned so far; a target
   // assigned on some paths of an if / case but not all (and not before it) is a latch
   const inter = (sets) => new Set([...sets[0]].filter(x => sets.every(st => st.has(x))));
-  const latchIf = (cond, branches, done) => {
-    const after = branches.map(b => flow(b, new Set(done)));
+  const latchIf = (cond, branches, done) => latchOf(cond, branches.map(b => flow(b, new Set(done))), done);
+  const latchOf = (cond, after, done) => {
     const all = new Set(after.flatMap(a => [...a]));
     const definite = inter(after);
     if ([...all].some(x => !definite.has(x) && !done.has(x))) for (const sg of sigsIn(cond)) gates.add(sg);
@@ -112,7 +113,13 @@ export function latchGates(design) {
         if (t) done.add(t);
         return done;
       }
-      case 'if': return latchIf(n.c, [n.then, n.else], done);
+      case 'if': {   // (an elsif / else if chain in a loop, as latchIf would nest it: thousands of branches, #2577)
+        const chain = [], thens = [];
+        for (; n?.k === 'if'; n = n.else) { chain.push(n); thens.push(flow(n.then, new Set(done))); }
+        let after = flow(n, new Set(done));
+        for (let i = chain.length - 1; i >= 0; i--) after = latchOf(chain[i].c, [thens[i], after], done);
+        return after;
+      }
       case 'case': return n.def ? latchIf(n.sel, [...n.items.map(it => it.body), n.def], done) : done;   // without others: coverage unknown, not flagged
       default: return done;
     }
@@ -130,13 +137,7 @@ export function latchGates(design) {
 export function clocksOf(p) {
   const clocks = new Set();
   for (const t of p.triggers || []) if (t.edge !== 'any') clocks.add(t.sig);
-  const visit = n => {
-    if (!n || typeof n !== 'object') return;
-    if (Array.isArray(n)) { n.forEach(visit); return; }
-    if ((n.k === 'edge' || n.k === 'event') && n.sig) clocks.add(n.sig);
-    for (const key in n) if (!['sig', 't', 'fn', 'val', 'loc', 'triggers'].includes(key)) { const v = n[key]; if (v && typeof v === 'object') visit(v); }
-  };
-  if (!clocks.size || p.lang === 'vhdl') visit(p.body);
+  if (!clocks.size || p.lang === 'vhdl') walk(p.body, n => { if ((n.k === 'edge' || n.k === 'event') && n.sig) clocks.add(n.sig); });
   // async resets in Verilog sensitivity lists are edge-triggered too: the clock is the edge
   // signal that is not tested as a plain condition at the top of the body.
   if (p.lang === 'verilog' && clocks.size > 1) {
