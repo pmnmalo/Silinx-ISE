@@ -26,6 +26,7 @@ import { mountFlowReports } from './open-flow-reports.js';
 import { mountS6Steps } from './open-flow-s6.js';
 import { mountNextpnrSteps } from './open-flow-nextpnr.js';
 import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
+import { sortedNetlistText } from './fpga/s6/nextpnr-pack.js';
 import { synthesizeVerilog } from './synth-open.js';
 import { synthesizeArea } from './synth-area.js';
 import { synthesizeFast } from './synth-fast.js';
@@ -114,15 +115,26 @@ function mountS3e(base) {
   };
 }
 
+// the netlist's cells by name when nextpnr packs it (spec.s6Map 'nextpnr', #3138: fpga/s6/nextpnr-pack.js), so that
+// Silinx's Map, whose sites nextpnr's placement is read back by, names them as nextpnr's packer does
+function sortedForNextpnr(base) {
+  if (base.spec.s6Map !== 'nextpnr') return base;
+  let of = null, text = null, nl = null;
+  const sorted = () => { const t = base.netlistText(); if (t !== of) { of = t; text = t == null ? t : sortedNetlistText(t); nl = t == null ? base.netlist() : readYosysJson(text); } };
+  return { ...base, netlist: () => { sorted(); return nl; }, netlistText: () => { sorted(); return text; } };
+}
+
 // the Spartan-6's Map (#732: open-flow-s6.js) and nextpnr's Place & Route (#2138: open-flow-nextpnr-s6.js), the one
-// engine (#2824: Silinx's own router removed); Place & Route alone packs first, as Map would
-function mountS6(base) {
+// engine (#2824: Silinx's own router removed); Place & Route alone packs first, as Map would. With spec.s6Map 'nextpnr'
+// (#3138), nextpnr packs Yosys's netlist too, into the sites of Silinx's Map
+function mountS6(b) {
+  const base = sortedForNextpnr(b);
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
   const own = mountS6Steps(ctx), np = mountNextpnrS6({ ...ctx, state: own.state });
   const runPar = () => { if (!own.state().phys) own.runMap(); return np.runPar(); };
   return { steps: xilinxSteps(ctx, own.runMap, runPar, mountFlowReports({ ...ctx, reports: S6_REPORTS })),
     routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
-    placeRouteNetlist: placeRouteNetlist(base, c => { const o = mountS6Steps(c); return { runMap: o.runMap, runPar: mountNextpnrS6({ ...c, state: o.state }).runPar }; }) };
+    placeRouteNetlist: placeRouteNetlist(base, c0 => { const c = sortedForNextpnr(c0), o = mountS6Steps(c); return { runMap: o.runMap, runPar: mountNextpnrS6({ ...c, state: o.state }).runPar }; }) };
 }
 
 // the synthesis's report: its lines as XST names them (the Spartan-3E's), else as the MAP report does (the part's resources)

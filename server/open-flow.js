@@ -29,7 +29,7 @@ import { findPart } from './devices.js';
 import { ice40Package, ice40Present } from './nextpnr-ice40-fetch.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
-import { engineOf } from '../packages/silinx-fpga/src/parts.js';
+import { engineOf, s6MapOf } from '../packages/silinx-fpga/src/parts.js';
 import { loadConfig, detectIse, iseStatus, iseModeOf, which } from './toolchain.js';
 import { generateBuild, partStrings, collectReports, runLocal, runDocker, runSsh, normalizeSteps, STEPS, SIM_MODELS } from './ise.js';
 
@@ -184,7 +184,7 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
     pkg: String(project.device.package).toLowerCase(), graph: status.graph, bitDbDir: BIT_DB_DIR,
     sources: gen.sources.map(s => ({ path: s.path, lang: s.lang, file: path.join(gen.buildDir, s.buildPath) })),
     ucf: gen.hasUcf ? path.join(gen.buildDir, gen.constraintsFile || `${gen.top}.ucf`) : null,
-    buildDir: gen.buildDir, outDir, steps: st, seed, effort, startupClk: project.impl?.startupClk || 'JtagClk', synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), engine: engineOf(project.impl),
+    buildDir: gen.buildDir, outDir, steps: st, seed, effort, startupClk: project.impl?.startupClk || 'JtagClk', synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), engine: engineOf(project.impl), s6Map: s6MapOf(project.impl),
     ...(!st.includes('synth') && { synthUpToDate: { report: earlier } }),
     // the part's resources: the synthesis's used of available and its check (#795)
     ...(findPart(project.device.part) && { resources: resourcesOf(findPart(project.device.part), project.device.package) }),

@@ -60,6 +60,11 @@ Map and Place & Route have one engine in the application, nextpnr (#2137); a pro
 | Spartan-3E | nextpnr packs the design at Place & Route | nextpnr |
 | Spartan-6 | Silinx's packer (`fpga/s6/`) | nextpnr; the pads, global buffers, block RAMs and DSPs placed by Silinx's rules first |
 
+On a Spartan-6, Process Properties' Map (Spartan-6) can be nextpnr (on trial until its parity, #3138, #3139;
+`impl.s6Map` `nextpnr`, the MCP tool `set_process_properties`'s `s6_map`): nextpnr packs Yosys's netlist into the sites of
+Silinx's packer and places them, its pads and clocks by its own rules (`fpga/s6/nextpnr-pack.js`); Silinx checks the sites
+are the same, then routes as with its own Map.
+
 There is no fallback: where nextpnr cannot start (its chip database not downloaded yet, offline) Place & Route fails,
 saying so. **nextpnr replaced Silinx's placer and router** (decided in #2131; parity in #2135, #2797; removed in #2137, the
 Spartan-3E's placer and router, and #2824, the Spartan-6's router, its placer kept for the sites nextpnr is given fixed:

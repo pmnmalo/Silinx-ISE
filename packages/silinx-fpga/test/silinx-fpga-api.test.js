@@ -27,7 +27,7 @@ const API = ['FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'ICE40_PARTS', 'ICE40_STE
   'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
   'nextpnrIo', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'pathHighlight', 'pathsText', 'periodNs', 'powerReport',
   'primitiveInstances', 'readBit', 'readXdc', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
-  'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea', 'synthesizeFast',
+  'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6MapOf', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea', 'synthesizeFast',
   'synthesizeVerilog', 'timingPaths', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeBit', 'writeXdc', 'writeXdl', 'yosysWorkerSource'];
 const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'chipdbCacheDir', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'leaveOutChipdbs', 'loadBitDbS6', 'loadDb',
   'loadDeviceCache', 'nextpnrIce40Node', 'nextpnrNode', 'nextpnrS6Node', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];   // (nextpnrNode: the nextpnr engine's io.nextpnr, #2136; nextpnrS6Node: its io.nextpnrS6, #2138; leaveOutChipdbs: the release zip's, #2356; chipdbCacheDir: its downloads' folder, #3215)
@@ -35,7 +35,7 @@ const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 
 const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PCF', 'XDC', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'boardConstraintsText', 'checkUcf',
   'constraintsExtOf', 'constraintsFormatOf', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'experimentalDevice', 'familyFromXise', 'familyName', 'familyOfPart', 'fpgaModel', 'generateUcf',
   'isIseFamily', 'locsNotOnBoard', 'lutTable', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'primitiveInstances',
-  'readXdc', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf', 'splitBitPart', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeXdc', 'writeXdl'];
+  'readXdc', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf', 's6MapOf', 'splitBitPart', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeXdc', 'writeXdl'];
 
 test('#1678 the API\'s names, each defined; ./parts: some of them; ./node: all and the loaders', () => {
   assert.deepEqual(Object.keys(parts).sort(), [...PARTS].sort());
