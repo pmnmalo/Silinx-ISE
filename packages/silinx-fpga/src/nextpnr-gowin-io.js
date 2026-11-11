@@ -24,7 +24,7 @@ export function gowinIo(load, readFile) {
       await mod();   // (the package there first: downloaded on its first use)
       if (!databases.has(family)) databases.set(family, apyculaDatabase(i => readFile(gowinResourcePart(i)), family).catch(e => { databases.delete(family); throw e; }));
       const xz = await databases.get(family);
-      return gowinPack(typeof routed === 'string' ? JSON.parse(routed) : routed, loadChipdb(xz));
+      return gowinPack(typeof routed === 'string' ? JSON.parse(routed) : routed, loadChipdb(xz), family);
     },
   };
 }

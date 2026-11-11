@@ -130,7 +130,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 | iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works: local server and browser, nextpnr-ice40 downloaded on first use (#2444); its 12 parts in the interface (#2463), the iCEBreaker board (#2517), other boards #2297 |
 | ECP5 | `synth_ecp5` | nextpnr-ecp5 | `ecppack`, Project Trellis | LPF | Works: local server and browser, nextpnr-ecp5 downloaded on first use (30 MB); its 10 parts, the ULX3S board and the examples on it (#2302); its boards not programmed from Silinx yet (#2298) |
 | MachXO2 | to be defined | nextpnr-machxo2, not yet stable | `ecppack`, Project Trellis | LPF | To be measured (#2302) |
-| Gowin | `synth_gowin` | nextpnr-himbaechel-gowin | `gowin_pack`, Silinx's JavaScript port of Apicula's (`src/fpga/gowin/`) | CST | Works: local server and browser, downloaded on first use (32 MB); the GW1NR-9C, the Tang Nano 9K and the examples on it, their `.fs` Apicula's byte for byte (#2303) |
+| Gowin | `synth_gowin` | nextpnr-himbaechel-gowin | `gowin_pack`, Silinx's JavaScript port of Apicula's (`src/fpga/gowin/`) | CST | Works: local server and browser, downloaded on first use (32 MB); the GW1NR-9C, the Tang Nano 9K and the examples on it, their `.fs` Apicula's byte for byte, the rPLL and the oscillator too (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
 | Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T in the local server, AMD Vivado the default; its timing nextpnr's estimate; the Nexys A7 and the browser to come (#3147) |
 
@@ -148,7 +148,8 @@ The ECP5 is the second (#2302, `src/open-flow-ecp5.js`, `src/lpf.js`): YoWASP's 
 (`core/family-profile.js` openFlow: the package, its packer, the browser edition's key) and in the server's `OWN` and `OWN_TOOLS`.
 The Gowin is the third (#2303, `src/open-flow-gowin.js`, `src/cst.js`): `@yowasp/nextpnr-himbaechel-gowin`, `io.nextpnr.gowin` with
 nextpnr and gowin_pack (`pack(routedJson, family)`: Silinx's port, `src/fpga/gowin/`, on Apicula's database read from the package's
-resources: Silinx ships none of Apicula's data); a port with no pin is an error (nextpnr-himbaechel-gowin places none), a
+resources: Silinx ships none of Apicula's data; the rPLL and the oscillator ported, `src/fpga/gowin/pll-osc.js`, the other PLLs, IOLOGIC
+and LVDS refused by name); a port with no pin is an error (nextpnr-himbaechel-gowin places none), a
 clock's period a comment of the CST given to nextpnr as `--freq`.
 
 And around the flow, one issue each: the boards and examples (#2297), the primitives' simulation models
