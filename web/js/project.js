@@ -235,7 +235,7 @@ export async function renderStartPage() {
   // (the page is the same whether a project is open or not, so that a late drawing keeps it, #494, #1222: an export
   // disabled with none by the host's data-project, web/css/app.css)
   const exportZip = kind => () => S.project && import('./menus.js').then(m => m.exportProjectZip(kind));
-  const command = ([l, ic, f, exp]) => h('div', { class: `entry${exp ? ' start-export' : ''}` }, icon(ic), h('a', { onclick: f }, l));
+  const command = ([l, ic, f, exp, cls]) => h('div', { class: `entry${exp ? ' start-export' : ''}${cls ? ` ${cls}` : ''}` }, icon(ic), h('a', { onclick: f }, l));
   const page = h('div', { class: 'page' },
     // New Project and Open Project: buttons at the top (#1216)
     h('div', { class: 'start-btns' },
@@ -247,8 +247,9 @@ export async function renderStartPage() {
         ['Copy Link to Project…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]].map(command),   // (#2826)
       // (a GitHub repository, a Classroom assignment's: the server editions, #3195; after Copy Link, #3323)
       ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
-      // (Share Project…, as the File menu's: the editions that share, not while following another's, #3315)
-      ...((api.collab || api.standalone) && !api.following ? [command(['Share Project…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true])] : []),
+      // (Share Project…, as the File menu's: the editions that share, not while following another's, #3315; the ISE
+      // style's only, the Silinx interface's in the Design tree's project and device menus, #3479: web/css/app.css)
+      ...((api.collab || api.standalone) && !api.following ? [command(['Share Project…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true, 'start-share'])] : []),
       h('hr', { class: 'start-sep' }),
       ...[['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command)),
     // teaching (#3333): the guided labs (#3179) and the exercises (#3192), as the Project menu has them; a project's, so

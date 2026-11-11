@@ -420,6 +420,8 @@ function projectContextMenu(e) {
     '-',
     { label: 'Design Properties…', action: () => wiz.projectProperties() },
     { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()) },   // (#2826)
+    // (Share Project…, as the File menu's: the editions that share, disabled while following another's, #3479)
+    api.collab || api.standalone ? { label: 'Share Project…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => !!api.following } : null,
     // (git, the server editions: here in both interfaces, the Silinx one having no File menu, #3195)
     hasGit() ? { label: 'Git', submenu: gitMenuItems() } : null,
     '-',
