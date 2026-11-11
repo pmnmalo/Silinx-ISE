@@ -41,3 +41,25 @@ test('#405 symbol library: an I/O marker\'s box holds its connection point', () 
     }
   }
 });
+
+test('#3419 a module\'s ports, an HDL block\'s inputs and outputs that are not a list of pins: read as none', () => {
+  const modules = { m: { name: 'm', ports: [{ name: 'a', dir: 'in', width: 1 }, { name: 'y', dir: 'out', width: 4 }] } };
+  const doc = schdoc.normalizeDoc({ symbols: [
+    { id: 'S1', type: 'module', x: 0, y: 0, params: { module: 'm', ports: 'a,y' } },
+    { id: 'S2', type: 'module', x: 200, y: 0, params: { module: 'm', ports: [null, 'a', [1], { name: 'b', dir: 'out', width: 2 }] } },
+    { id: 'S3', type: 'hdlblock', x: 0, y: 200, params: { title: 'h', inputs: 'a', outputs: { y: 1 } } },
+    { id: 'S4', type: 'hdlblock', x: 200, y: 200, params: { title: 'h', inputs: [null, 3, { name: 'c', width: 2 }], outputs: 5 } }
+  ] }, { modules });
+  const [s1, s2, s3, s4] = doc.symbols;
+  // (a module's ports not a list: its module's, as an instance saved without them)
+  assert.deepEqual(s1.params.ports, [{ name: 'a', dir: 'in', width: 1 }, { name: 'y', dir: 'out', width: 4 }]);
+  assert.deepEqual(s2.params.ports, [{ name: 'b', dir: 'out', width: 2 }]);
+  assert.deepEqual([s3.params.inputs, s3.params.outputs], [[], []]);
+  assert.deepEqual([s4.params.inputs, s4.params.outputs], [[{ name: 'c', width: 2 }], []]);
+  assert.deepEqual(symbols.symbolPins(s1, modules).map(p => p.name), ['a', 'y']);
+  assert.deepEqual(symbols.symbolPins(s4, modules).map(p => [p.name, p.width]), [['c', 2]]);
+  // (a symbol not normalized, as an editor holds it: drawn with no pin from the bad field)
+  assert.deepEqual(symbols.symbolPins({ type: 'hdlblock', x: 0, y: 0, params: { inputs: 'a', outputs: 'y' } }).length, 0);
+  assert.equal(symbols.symbolDef({ type: 'module', x: 0, y: 0, params: { module: 'z', ports: 'a' } }).missing, true);
+  assert.equal(schdoc.netlist(doc, { modules }).nets.length > 0, true);
+});
