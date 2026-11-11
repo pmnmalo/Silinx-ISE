@@ -40,6 +40,8 @@ const ALLOW = [
     /^(::[0-9a-f:.]*|64:ff9[ab]:[0-9a-f:]*|2002:[0-9a-f:]+|f[b-f][0-9a-f]{2}:[0-9a-f:]*|100::1?|10\.0\.0\.1|198\.(1[89]|20)\.\d+\.\d+|192\.0\.[03]\.\d+|203\.0\.114\.1)$/,
     'the special-purpose ranges a link\'s zip address is checked against, and addresses at their edges (#2962): IPv4-compatible, mapped, NAT64, 6to4, unique and link-local, multicast, discard, benchmarking; also named in the message of #3123\'s commit (#3129)'],
   ['test/server-api.test.js', /^(fpga-lab\.local|box\.lan)$/, 'made-up computer names: the Host header test, the ssh settings'],
+  ['test/collab-host.test.js', '192.168.1.20', "a made-up local network address in an SDP fixture, a documentation address since (in the history only, #3365)"],
+  ['server/git.js', /^(token@github\.com|https:\/\/user:token@github\.com)$/, "a made-up login in a comment's example of a URL with credentials (in the history only, #3365)"],
   ['test/impl.test.js', /^(dev@)?10\.0\.0\.2$/, 'a made-up address of an example (in the history only)'],
   ['test/impl.test.js', '/Users/Me', "a made-up macOS home folder of the ssh settings script's test (#1244, #1336)"],
   ['test/report-failure.test.js', /^(dev|me)@(192\.0\.2|203\.0\.113)\.\d+$/, 'made-up logins on documentation addresses (RFC 5737): the cleaning of a log line is tested on them (#251)'],

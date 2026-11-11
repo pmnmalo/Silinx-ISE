@@ -154,6 +154,14 @@ test('the allow-list (#3345): the made-up local address of a refused link in lin
   assert.deepEqual(kinds('test/ui/other.test.js', line), [`IP address: ${dot(192, 168, 1, 1)}`]);
 });
 
+test('the allow-list (#3365): two made-up values in the history, in their files only', () => {
+  assert.deepEqual(kinds('test/collab-host.test.js', `candidate ${dot(192, 168, 1, 20)} 54321`), []);
+  assert.deepEqual(kinds('test/other.test.js', `candidate ${dot(192, 168, 1, 20)} 54321`), [`IP address: ${dot(192, 168, 1, 20)}`]);
+  const url = `// e.g. https://user:token${at}${dot('github', 'com')}`;
+  assert.deepEqual(kinds('server/git.js', url), []);
+  assert.equal(kinds('server/other.js', url).length, 2);
+});
+
 test('the allow-list (#498): XPower\'s section numbers in the history, read as addresses, and nowhere else', () => {
   const sections = `sections ${dot(3, 3, 1, 1)} and ${dot(3, 3, 1, 2)} of the report`;
   assert.deepEqual(kinds('scripts/measure-power.mjs', sections), []);
