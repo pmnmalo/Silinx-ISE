@@ -96,7 +96,7 @@ function ownerWrites(name, doc, owner, warn, bases) {
       try { gated = gateEdit(c.path, text); } catch (e) { warn(`${c.path}: an editor's change not written: ${e.reason || e.message}`); refused = true; continue; }
       try {
         if (isTrusted(await P.readProject(name))) await P.updateProject(name, markEditedByEditor);
-        await fsp.writeFile(file, gated);
+        await P.writeAtomic(file, gated);   // (#3183: a reader never sees it half-written)
       } catch { refused = true; /* the next change */ }
     }
     if (project || refused || changes.length > write.length) { try { publishProject(doc, { ...await readAll(name), owner, bases }); } catch { /* the next change */ } }
@@ -120,7 +120,7 @@ function drawingWrites(name, doc, owner, warn, bases) {
       let gated;
       try { gated = gateEdit(path, text); } catch (e) { warn(`${path}: an editor's change not written: ${e.reason || e.message}`); revertDrawing(doc, path, bases); continue; }
       if (isTrusted(await P.readProject(name))) await P.updateProject(name, markEditedByEditor);
-      await fsp.writeFile(file, gated);
+      await P.writeAtomic(file, gated);
       bases.set(path, gated);
       const { syncDrawing } = await import('./drawing-sync.js');
       const s = await syncDrawing(P, name, path).catch(e => ({ messages: [`WARNING: HDL not synchronized: ${e.message}`] }));

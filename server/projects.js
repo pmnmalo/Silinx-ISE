@@ -171,6 +171,16 @@ export async function renameOver(from, to, { tries = 10, wait = 15 } = {}) {
   }
 }
 
+/** A file written atomically (a hidden temp file beside it, then renamed over it): a concurrent reader (a watcher,
+ *  another process, a shared project's followers, #3183) or a crash never sees it half-written or empty. */
+export async function writeAtomic(full, text) {
+  const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed
+  try {
+    await fs.writeFile(tmp, text);
+    await renameOver(tmp, full);
+  } catch (e) { await fs.rm(tmp, { force: true }).catch(() => {}); throw e; }
+}
+
 // Atomic write (temp file + rename): a concurrent reader never sees a half-written silinx.json.
 // The top and simulation top must be identifiers (#1431): build/<top>.bit and the like are paths of the project.
 async function writeProjectUnlocked(name, pj) {
@@ -406,12 +416,7 @@ export async function writeFile(name, rel0, text) {
   const gated = normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
   if (gated.reason) throw new HttpError(400, `'${rel0}': not written: ${gated.reason}`);
   await fs.mkdir(path.dirname(full), { recursive: true });
-  // atomic: a reader (or a crash) never sees a half-written / empty file
-  const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed
-  try {
-    await fs.writeFile(tmp, text);
-    await renameOver(tmp, full);
-  } catch (e) { await fs.rm(tmp, { force: true }).catch(() => {}); throw e; }
+  await writeAtomic(full, text);   // (a reader, or a crash, never sees a half-written / empty file)
   // Register HDL files automatically (not the generated ones in build/, e.g. the netlists of the open
   // synthesis); a file written again is back in the project (not excluded).
   const lang = langOf(rel);
