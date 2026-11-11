@@ -7,6 +7,7 @@
 // changed by its common prefix and suffix kept, so an update carries the edit only (and phase 2's editors, bound to
 // the same Y.Text, need no other layout).
 import * as Y from 'yjs';
+import { gateFile, GateError } from './import-gate.js';
 
 export const LAYOUT_VERSION = 1;
 export const FILE_MAX = 1 << 20;
@@ -45,6 +46,15 @@ const shareable = (path, text) => sharedPath(path) && typeof text === 'string' &
  *  drawing (phase 3, #3183) nor the project's settings. */
 export const EDITABLE_RE = /\.(vhd|vhdl|v|vh|sv|ucf|xdc|c|cc|cpp|h|hpp|txt|md)$/i;
 export const editablePath = p => sharedPath(p) && EDITABLE_RE.test(String(p));
+
+/** An editor's text of a file, at the owner's, before it is written (#3355): through the import gate, as any file from
+ *  outside (core/import-gate.js gateFile: its sizes, its content), the text to write; or a GateError, its `reason` the
+ *  console's. */
+export function gateEdit(path, text) {
+  const f = gateFile(path, text);
+  if (f.path !== path) throw new GateError(`${path}: not a file of the project`, { path, reason: 'not a file of the project' });
+  return f.text;
+}
 
 /** An editor's change of an existing file's text (an error for a file an editor may not change, or too large): what
  *  is deleted in one update, what is inserted in parts of `part` characters at most, each an update of its own, so

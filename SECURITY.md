@@ -176,6 +176,19 @@ board or a PROM) without the user's say.
    example): it holds what an assistant writes, so it is untrusted too, its console line and refusals saying it was made
    through the MCP server (#2981).
 
+### A project shared live (#3181, #3182, #3355)
+
+Share Project… (and the MCP's `share_project`) shares a project through a relay or the owner's page (#3227), end-to-end encrypted with a key in the
+link's fragment: the relay sees no file. A follower's link reads only. An editor's link writes too: its holder changes
+the text of the project's text files (HDL, constraints, C / C++, notes), signed with the link's key; anything else an
+editor changes (a drawing, the project's settings, a new file) is undone from the owner's disk. An editor's link is a
+bearer capability that can be forwarded, so what it writes is a file from outside: at the owner's, each change passes
+the import gate (`core/collab-doc.js` `gateEdit`) before it is written, what the gate refuses is not written (a warning
+says why), and the project is marked untrusted before the first change is written (`madeBy: "editor"`): Xilinx ISE and
+programming a board or a PROM are refused for it, its messages saying an editor changed it, until the user trusts it
+again with Trust Project; a later change untrusts it again. A project followed is not copied into the follower's
+workspace.
+
 ### A design opened from a link (#2826, #2829)
 
 A link (`…/#design=…`, `#open=example:<name>`, `#open=<zip address>`, with `view=`, `top=`, `board=`) can come from a

@@ -8,7 +8,8 @@
 // each follower finds it at the public meeting point (collab-meet.js: the link carries the owner's key), or connects
 // with codes exchanged by hand (Add a Follower…). Editors (#3182, phase 2): its editors' link (Copy Editor Link) signs
 // their changes; the page's open text editors are bound live to the document (collab-bind.js), and what an editor
-// changes in a text file is written to the disk, anything else undone from it (the disk is the owner's).
+// changes in a text file is written to the disk, anything else undone from it (the disk is the owner's); through the
+// import gate, the project untrusted from an editor's first change (#3355).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app } from './app.js';
@@ -16,7 +17,8 @@ import { writeClip } from './clipboard.js';
 import { prefKey } from './prefs.js';
 import { collab } from './collab-state.js';
 import { renderPresence, setPresenceCommands } from './collab-presence.js';
-import { projectDoc, publishProject, putFile, putProject, sharedPath, watchDoc, docFile, editablePath } from '/core/collab-doc.js';
+import { projectDoc, publishProject, putFile, putProject, sharedPath, watchDoc, docFile, editablePath, gateEdit } from '/core/collab-doc.js';
+import { isTrusted, markEditedByEditor, untrustedNotice } from '/core/trust.js';
 import { keepBound, unbindAll } from './collab-bind.js';
 import { shareRoom, colorOf } from '/core/collab-client.js';
 import { followLink, relayUrl, relayAddress } from '/core/collab-link.js';
@@ -230,20 +232,37 @@ const editableHere = p => editablePath(p) && !S.hdlToSch?.[p] && S.fileTree?.inc
 
 // what the editors change (the document's remote transactions): a text file's, written to the disk (its open editor, bound,
 // shows it already); anything else, undone (the project published again from the disk), said in the console
+// (#3355: the text through the import gate first, as any file from outside, what it refuses not written but undone; the
+// project untrusted before the first change is written: an editor's link reaches no ISE nor board until the user trusts
+// it again)
 async function onEdits(s, { changes, project }) {
   if (share !== s) return;
   const write = changes.filter(c => c.kind === 'changed' && editableHere(c.path));
+  let refused = false;
   for (const c of write) {
     const text = docFile(s.doc, c.path);
     if (typeof text !== 'string') continue;
+    let gated;
+    try { gated = gateEdit(c.path, text); } catch (e) { app.log(`WARNING: ${c.path}: an editor's change not written: ${e.reason || e.message}.`, 'warn'); refused = true; continue; }
     try {
-      await s.orig.writeFile(s.project, c.path, text);
-      for (const d of S.docs) if (d.path === c.path && d.editor?.getValue() === text) { d.editor.markClean?.(); app.setDirty(d, false); }
-    } catch (e) { app.log(`WARNING: ${c.path}: an editor's change not written: ${e.message}.`, 'warn'); }
+      await untrustEdited(s);
+      await s.orig.writeFile(s.project, c.path, gated);
+      for (const d of S.docs) if (d.path === c.path && d.editor?.getValue() === gated) { d.editor.markClean?.(); app.setDirty(d, false); }
+    } catch (e) { app.log(`WARNING: ${c.path}: an editor's change not written: ${e.message}.`, 'warn'); refused = true; }
   }
   const undone = changes.filter(c => !write.includes(c)).map(c => c.path);
-  if (project || undone.length) {
-    app.log(`WARNING: An editor's change undone (an editor changes the text of the project's text files only): ${[...(project ? ['silinx.json'] : []), ...undone].join(', ')}.`, 'warn');
-    await resync();
-  }
+  if (project || undone.length) app.log(`WARNING: An editor's change undone (an editor changes the text of the project's text files only): ${[...(project ? ['silinx.json'] : []), ...undone].join(', ')}.`, 'warn');
+  if (project || undone.length || refused) await resync();
+}
+
+// the shared project, untrusted by an editor's change (#3355): its description saved so (madeBy 'editor'), said in the
+// console with the Trust Project button, as an imported project's when it opens
+async function untrustEdited(s) {
+  if (S.project?.name === s.project && !isTrusted(S.project)) return;
+  const { fileTree, ...pj } = await api.project(s.project);   // eslint-disable-line no-unused-vars
+  if (!isTrusted(pj)) return;
+  const next = markEditedByEditor(pj);
+  await s.orig.saveProject(s.project, next);
+  if (S.project?.name === s.project) Object.assign(S.project, { trusted: false, madeBy: next.madeBy });
+  app.log(`WARNING: ${untrustedNotice(s.project, next)}`, 'warn', { action: { label: 'Trust Project', run: () => import('./project.js').then(m => m.trustProject(s.project)) } });
 }

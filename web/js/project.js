@@ -90,10 +90,11 @@ async function openProjectNow(name, { startup = false } = {}) {
   if (S.project?.name === name) dispatchEvent(new CustomEvent('silinx:project-opened', { detail: name }));
 }
 
-// The user trusts the project from outside (#2830): Xilinx ISE and programming may run for it from now on
-async function trustProject(name) {
+// The user trusts the project from outside (#2830): Xilinx ISE and programming may run for it from now on (also the
+// button of a shared project an editor changed, web/js/collab-share.js, #3355)
+export async function trustProject(name) {
   await api.trustProject(name);
-  if (S.project?.name === name) delete S.project.trusted;
+  if (S.project?.name === name) { delete S.project.trusted; delete S.project.madeBy; }
   log(`Project "${name}" trusted: Xilinx ISE and programming a board or a PROM may run for it.`, 'ok');
 }
 

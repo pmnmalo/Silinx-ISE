@@ -10,7 +10,8 @@ import { scratchEnv } from './server-helpers.js';
 import { newSigner, signerOf, verifierOf, signFrame, verifyFrame, pubOf, SIGN_RE, PUB_RE } from '../core/collab-sign.js';
 import { newKey, seal } from '../core/collab-crypto.js';
 import { shareRoom, followRoom, KIND } from '../core/collab-client.js';
-import { projectDoc, publishProject, editFile, editablePath, docFile, FILE_MAX } from '../core/collab-doc.js';
+import { projectDoc, publishProject, editFile, editablePath, docFile, FILE_MAX, gateEdit } from '../core/collab-doc.js';
+import { isTrusted, markEditedByEditor, untrustedMessage, untrustedNotice } from '../core/trust.js';
 import { relayUrl, followLink, parseFollowLink } from '../core/collab-link.js';
 import { hostedRooms, socketPair } from '../core/collab-loop.js';
 
@@ -69,6 +70,25 @@ test('an editor\'s link: the signing key after the room\'s key, through a relay 
   }
   for (const bad of [`#edit=${room}.${key}`, `#edit=${room}.${key}.host`, `#follow=${room}.${key}.${s.text}`, `#edit=${room}.${key}.${s.text.slice(1)}`]) assert.throws(() => parseFollowLink(bad), /the link to follow is broken/, bad);
   assert.throws(() => followLink('http://x/', room, key, 'relay', 'short'), /not an editor's key/);
+});
+
+test('#3355 gateEdit: an editor\'s text through the import gate (its text, or the gate\'s reason); markEditedByEditor: untrusted, changed by an editor, its messages; one untrusted already kept', () => {
+  assert.equal(gateEdit('src/top.vhd', FILES['src/top.vhd']), FILES['src/top.vhd']);
+  assert.equal(gateEdit('notes.md', '﻿notes\n'), 'notes\n', 'the byte order mark left out, as an import does');
+  const reason = (p, t) => { try { gateEdit(p, t); } catch (e) { assert.equal(e.gate, true); return e.reason; } return null; };
+  assert.equal(reason('src/top.vhd', 'entity\0top'), 'binary content (a NUL byte) in a text file');
+  assert.equal(reason('src/top.vhd', '<html><script>x</script></html>'), 'a web page (HTML), not the file its name says');
+  assert.equal(reason('src/top.vhd', `-- ${'x'.repeat(1 << 20)}\n`), 'line longer than 1 MB');
+  assert.equal(reason('src/top.vhd', `${'('.repeat(300)}${')'.repeat(300)}\n`), 'nesting deeper than 256 brackets');
+  assert.equal(reason('src/../top.vhd', 'x'), "path leaves the project ('..')");
+  assert.equal(reason('src//top.vhd', 'x'), 'not a file of the project');
+  const pj = { name: 'p', top: 'top' };
+  assert.deepEqual(markEditedByEditor(pj), { name: 'p', top: 'top', trusted: false, madeBy: 'editor' });
+  assert.deepEqual(pj, { name: 'p', top: 'top' }, 'the description given unchanged');
+  for (const u of [{ trusted: false }, { trusted: false, madeBy: 'mcp' }]) assert.equal(markEditedByEditor(u), u);
+  assert.equal(isTrusted(markEditedByEditor(pj)), false);
+  assert.equal(untrustedMessage('p', 'Xilinx ISE', { madeBy: 'editor' }), "project 'p' was changed by an editor of its shared link: Xilinx ISE runs only once you trust it (Trust Project, in the console when the project opens)");
+  assert.equal(untrustedNotice('p', { madeBy: 'editor' }), 'Project "p" was changed by an editor of its shared link: it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.');
 });
 
 test('editFile: an editable file\'s text, in parts (no pair of surrogates split); a drawing, a new file, too large: refused', () => {

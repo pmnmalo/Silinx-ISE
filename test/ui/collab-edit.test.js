@@ -3,7 +3,8 @@
 // with the owner at once (their text editors bound to the shared text: the same text on both sides, each one's change
 // in it); each one's Undo undoes their own change only; the owner's page writes the merged text to the disk; a large
 // paste reaches the owner in pieces (no connection lost); the owner renames a file the editor has open; the owner's
-// presence in Portuguese. The exact console lines; no warnings but those asserted.
+// presence in Portuguese; the project untrusted by the editor's first change, and a change the import gate refuses not
+// written (#3355). The exact console lines; no warnings but those asserted.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
@@ -78,9 +79,23 @@ uiTest('#3182 an editor edits a text file live with the owner: the same text on 
       [['Ana', 'você'], ['Rui', 'editor'], ['Copiar Ligação', ''], ['Copiar Ligação de Editor', ''], ['Parar de Partilhar', '']]);
     await page.key('Escape');
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-    // no warnings, on either side
+    // (#3355) the owner's project, trusted, untrusted by the editor's first change written: said once, with its button
+    const untrusted = 'WARNING: Project "Live" was changed by an editor of its shared link: it is edited, checked, simulated and implemented with the Silinx toolchain; Xilinx ISE and programming a board or a PROM run only once you trust it.';
+    assert.deepEqual(await page.eval(() => [window.Silinx.project.trusted, window.Silinx.project.madeBy]), [false, 'editor']);
+    assert.equal(JSON.parse(await readWs(env, 'Live', 'silinx.json')).trusted, false);
+    // a change the import gate refuses (a NUL byte in a text file): not written, undone at both, said at the owner's
+    const before = await readWs(env, 'Live', 'src/top.vhd');
+    await ep.eval(() => window.SilinxApp.openFile('src/top.vhd'));
+    await ep.waitFor(() => window.Silinx.active?.path === 'src/top.vhd', [], { what: 'top open at the editor\'s' });
+    await new Promise((r) => setTimeout(r, 700));
+    await ep.eval((t) => window.Silinx.active.editor.setValue(t), 'entity\0top is end;\n');
+    await page.waitConsole(/^WARNING: src\/top\.vhd: an editor's change not written: binary content \(a NUL byte\) in a text file\.$/m, { timeout: 15000 });
+    await ep.waitFor((t) => window.Silinx.active.editor.getValue() === t, [before], { what: 'the refused change undone at the editor\'s', timeout: 15000 });
+    assert.equal(await readWs(env, 'Live', 'src/top.vhd'), before);
+    // no warnings but those, on either side
     assert.deepEqual(await warnings(ep), []);
-    assert.deepEqual(await warnings(page), []);
+    assert.deepEqual(await warnings(page), [untrusted, 'WARNING: src/top.vhd: an editor\'s change not written: binary content (a NUL byte) in a text file.']);
+    assert.equal(await page.eval(() => [...document.querySelectorAll('#console-log button')].filter((b) => b.textContent === 'Trust Project').length), 1);
     assert.deepEqual(ep.errors, []);
   } finally { await ep.close(); await page.eval(async () => (await import('/js/collab-share.js')).stopSharing()); }
 });
