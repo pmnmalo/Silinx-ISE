@@ -5,10 +5,11 @@ In detail:
   a pad a path that nextpnr cannot route (#3152). Silinx's flow does not read the file: `bitDbS6` and `loadBitDbS6` read
   it only with `held: true`, and the browser never fetches it. The chip database's export
   (`research/nextpnr-s6/export-unknown-pips.mjs`) does read it, so the fork's generator puts those PIPs in its next
-  Spartan-6 chip database. Once that release is pinned, the PIPs move to the files the flow reads. The file starts with
-  #3269's `TIOI_INNER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S`, which `s6-pips-bscan.json`'s note had kept aside. That PIP
-  gives outputs to 14 of the 30 top-bank pads on the XC6SLX16 and 11 of 23 on the XC6SLX45. The other pads need the
-  TIOI_OUTER slave's PIP, still unmeasured (#3350).
-  It also has three of #3169's pad wire -> IBUF PIPs (`TIOB_SINGLE TIOB_IBUF1_PINW -> TIOB_IBUF1`, `BIOB_SINGLE
-  BIOB_IBUF{0,1}_PINW -> BIOB_IBUF{0,1}`), which ISE measured with no bits on both parts. With them, every *IOB_SINGLE pad
-  but G9 takes an input. G9's `TIOB_SINGLE TIOB_IBUF0_PINW -> TIOB_IBUF0` was not resolved by the measurement.
+  Spartan-6 chip database. Once that release is pinned, the PIPs move to the files the flow reads. The file has:
+  - the slave OLOGIC2's `D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S` of the TIOI_INNER tiles (#3269, which `s6-pips-bscan.json`'s
+    note had kept aside) and of the TIOI_OUTER tiles (#3350, measured with ISE: `26,35 27,48 28,14`, the same bits). These
+    are the outputs of the 30 top-bank pads of the XC6SLX16 and the 23 of the XC6SLX45;
+  - #3169's four pad wire -> IBUF PIPs of the TIOB_SINGLE and BIOB_SINGLE tiles, with no bits: the inputs of G9, F9,
+    U11, V11 (XC6SLX16) and G9, F9, R7, T7 (XC6SLX45).
+
+  With them, every pad of both parts takes an input and an output.
