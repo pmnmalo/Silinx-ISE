@@ -80,6 +80,9 @@ const PORTED = [
     note: 'packages/silinx-fpga/src/fpga/xc7/ (the 7-series\' frames and .bit of nextpnr\'s FASM) is a JavaScript port of its fasm2frames and xc7frames2bit.' },
   { name: 'prjxray-db', version: '0a0adde', ported: true, license: 'CC0-1.0', url: 'https://github.com/f4pga/prjxray-db', fpga: true,
     note: 'packages/silinx-fpga/bitdb/xc7/ is the subset of its database (artix7) the xc7a35t\'s bitstream needs.' },
+  // the Gowin's bitstream (#2303), in silinx-fpga too; its chip databases are read from YoWASP's package, not shipped
+  { name: 'apicula', version: '0.32', ported: true, license: 'MIT', url: 'https://github.com/YosysHQ/apicula', fpga: true,
+    note: 'packages/silinx-fpga/src/fpga/gowin/ (the Gowin\'s .fs of nextpnr-himbaechel-gowin\'s routed netlist) is a JavaScript port of its gowin_pack and of the parts of its chipdb, bslib and attrids that gowin_pack uses; the chip databases it reads are Apicula\'s, in @yowasp/nextpnr-himbaechel-gowin, not shipped by Silinx.' },
 ];
 const portedText = c => ({ ...c, source: null, text: fs.readFileSync(path.join(root, 'scripts', 'licences', `${c.name}.txt`), 'utf8').replace(/\r\n/g, '\n').trim() });
 

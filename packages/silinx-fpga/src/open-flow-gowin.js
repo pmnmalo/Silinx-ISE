@@ -1,8 +1,8 @@
 // Silinx toolchain - the Gowin's back end (#2303), a family of open-flow-backends.js's: Yosys's synth_gowin, then
-// nextpnr-himbaechel-gowin's place and route (Apicula's chip databases) into its routed netlist (open/routed.json); the
-// constraints are CST (cst.js). No bitstream yet: Apicula's gowin_pack is Python, which YoWASP's package runs in Pyodide, a
-// package of its own with Python's wheels from its CDN (#2303), so the steps end at Place & Route. nextpnr comes through
-// io.nextpnr.gowin { run(args, files, onLine) -> files } (nextpnr-gowin-io.js: YoWASP's @yowasp/nextpnr-himbaechel-gowin).
+// nextpnr-himbaechel-gowin's place and route (Apicula's chip databases) into its routed netlist (open/routed.json), then
+// gowin_pack's bitstream (<top>.fs): Silinx's JavaScript port of Apicula's (fpga/gowin/pack.js; the package's own is Python, which
+// runs in a browser only through Pyodide); the constraints are CST (cst.js). Both come through io.nextpnr.gowin { run(args,
+// files, onLine) -> files, pack(routedJson, family) -> .fs text } (nextpnr-gowin-io.js: YoWASP's @yowasp/nextpnr-himbaechel-gowin).
 // nextpnr-himbaechel-gowin places no port without a pin: such a port is an error here, named, before nextpnr runs.
 import { scriptSynthesis } from './synth-script.js';
 import { CST } from './cst.js';
@@ -15,14 +15,13 @@ export const GOWIN_DEVICES = {
 /** The Gowin's parts of nextpnr's chip databases here. */
 export const GOWIN_PARTS = [...new Set(Object.keys(GOWIN_DEVICES).map(k => k.split('/')[0]))];
 
-/** The Gowin's steps, as runFlow runs them: no bitstream (#2303). */
+/** The Gowin's steps, as runFlow runs them. */
 export const GOWIN_STEPS = [
   { id: 'synth', label: 'Synthesize - Yosys', needs: [] },
   { id: 'translate', label: 'Translate', needs: ['synth'] },
   { id: 'par', label: 'Place & Route - nextpnr', needs: ['translate'] },
+  { id: 'bitgen', label: 'Generate Programming File - gowin_pack', needs: ['par'] },
 ];
-/** Why the Gowin has no bitstream: the interface's and the issue's words. */
-export const GOWIN_NO_BITSTREAM = 'no bitstream for the Gowin yet: Apicula\'s gowin_pack is Python, which runs in a browser only through Pyodide and Python packages downloaded from its CDN (#2303)';
 
 // the synthesis's resources, from synth_gowin's cells
 const sum = (counts, re) => Object.entries(counts).reduce((n, [t, k]) => n + (re.test(t) ? k : 0), 0);
@@ -81,11 +80,26 @@ function mountGowin(ctx) {
     const fmax = Object.entries(r.fmax || {}).map(([clock, f]) => ({ clock: clockName(clock), achieved: +f.achieved.toFixed(2), constraint: +f.constraint.toFixed(2) }));
     for (const f of fmax) log(`Clock ${f.clock}: ${f.achieved} MHz (${f.achieved >= f.constraint ? 'met' : 'NOT met'}, ${f.constraint} MHz asked)`);
     report.par = { routed: true, unroutedSignals: 0, done: true, engine: 'nextpnr', fmax, constraintsMet: fmax.every(f => f.achieved >= f.constraint) };
+    routed = text(out['routed.json']);
     log(`Placed and routed by nextpnr-himbaechel-gowin in ${ms(t)}: ${report.files.routed}`);
-    log(`NOTE: ${GOWIN_NO_BITSTREAM}.`);
   }
 
-  return { steps: { translate: ctx.readNetlist, par: runPar } };
+  // gowin_pack (Silinx's port) on the routed design, this run's or an earlier one's
+  async function runBitgen() {
+    const dev = gowinDevice(spec);
+    if (!dev) throw new StepError(`${spec.device}-${spec.pkg}${spec.speed || ''}: not a Gowin device of nextpnr-himbaechel-gowin here (${Object.keys(GOWIN_DEVICES).join(', ')})`, [], '');
+    if (routed == null) routed = io.read('open/routed.json');
+    if (routed == null) throw new StepError('no routed design: run Place & Route first', [], '');
+    const t = now();
+    let fs;
+    try { fs = await tool().pack(routed, dev.family); } catch (e) { throw new StepError(`gowin_pack failed: ${e.message}`, [], ''); }
+    const bytes = new TextEncoder().encode(fs);
+    report.bit = { path: io.write(`${top}.fs`, bytes), size: bytes.length };
+    log(`Bitstream: build/${top}.fs (${bytes.length} bytes, gowin_pack in ${ms(t)})`);
+  }
+
+  let routed = null;
+  return { steps: { translate: ctx.readNetlist, par: runPar, bitgen: runBitgen } };
 }
 
 export const GOWIN = {

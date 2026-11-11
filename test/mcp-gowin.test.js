@@ -1,7 +1,7 @@
 // The MCP server on the Gowin (#2303, #2674: what the interface does): list_devices lists the family and the Tang Nano 9K,
 // set_design_properties makes the constraints a CST from the board's pins, new_source writes the CST template, the wizards
-// that make Xilinx primitives refuse it, run_process places and routes it (a bitstream refused: none yet) and get_report gives
-// its reports; every result's text.
+// that make Xilinx primitives refuse it, run_process builds its .fs (gowin_pack, Silinx's port) and get_report gives its reports;
+// every result's text.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -44,15 +44,17 @@ test('set_design_properties: the Tang Nano 9K, its pins written as a CST with th
   await fails('clock_manager', { project: 'b1' }, 'The Clocking Wizard makes a DCM for the Spartan-3E and a PLL for the Spartan-6: choose one of them as the target device (set_design_properties).');
 });
 
-test('run_process: blinky on the Tang Nano 9K placed and routed, nextpnr\'s warnings; a bitstream refused; get_report its reports', { timeout: 600000 }, async () => {
+test('run_process: blinky on the Tang Nano 9K to its .fs, nextpnr\'s warnings; get_report its reports', { timeout: 600000 }, async () => {
   await ok('new_project_from_example', { name: 'bi', example: 'blinky' });
   await ok('set_design_properties', { project: 'bi', board: 'tangnano9k', update_constraints: true });
-  const run = await ok('run_process', { project: 'bi', process: 'implement' });
+  const run = await ok('run_process', { project: 'bi', process: 'bitstream' });
   assert.equal(run.data.warnings.length, 8);
   for (const w of run.data.warnings) assert.match(w, /^WARNING:Place - Failed to route net '[^']+' from \S+ to \S+ using dedicated routing\.$/);
   assert.ok(fs.existsSync(path.join(P.projectDir('bi'), 'build', 'open', 'routed.json')));
   const summary = (await ok('get_report', { project: 'bi' })).data.summary;
   assert.deepEqual(summary.par.fmax.map(f => [f.clock, f.constraint]), [['clk', 27]]);
   assert.ok(summary.map.utilization.some(u => u.name === 'LUT4'));
-  await fails('run_process', { project: 'bi', process: 'bitstream' }, 'no step bitgen (the steps: synth, translate, par)');
+  assert.equal(summary.bit.size, 2069320);
+  assert.ok(fs.existsSync(path.join(P.projectDir('bi'), 'build', 'top.fs')));
+  await fails('run_process', { project: 'bi', process: 'timing' }, 'no step trce (the steps: synth, translate, par, bitgen)');
 });

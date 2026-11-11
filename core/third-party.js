@@ -167,6 +167,13 @@ export const THIRD_PARTY = [
     "ported": true
   },
   {
+    "name": "apicula",
+    "version": "0.32",
+    "license": "MIT",
+    "url": "https://github.com/YosysHQ/apicula",
+    "ported": true
+  },
+  {
     "name": "body-parser",
     "version": "2.4.0",
     "license": "MIT",

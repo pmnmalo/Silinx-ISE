@@ -1,7 +1,7 @@
 // UI: a Gowin device in the interface (#2303): the picker with its speed grade and the synthesis locked, the processes of its
-// toolchain only (no Generate Programming File: no bitstream yet, said in the console; no Emulate, no Configure Target Device),
-// its constraints CST (read, written, checked), Implement Design to its routed design in the server's real flow and the
-// Design Summary's reports, in English and Portuguese; the Tang Nano 9K's pins written as a CST by Update Constraints.
+// toolchain only (no Emulate, no Configure Target Device), its constraints CST (read, written, checked), Generate Programming File
+// to its .fs (gowin_pack, Silinx's port) in the server's real flow and the Design Summary's programming file and reports, in
+// English and Portuguese; the Tang Nano 9K's pins written as a CST by Update Constraints.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -30,7 +30,7 @@ uiTest('#2303 Design Properties: the Gowin GW1N, its part and speed grade, its s
   await page.dialogButton('Cancel');
 });
 
-uiTest('#2303 a Gowin project: its processes (no bitstream), its constraints CST, Implement Design to its routed design, the Design Summary; Portuguese', E, async (page) => {
+uiTest('#2303 a Gowin project: its processes, its constraints CST, Generate Programming File to its .fs, the Design Summary; Portuguese', E, async (page) => {
   await makeProject(env, { name: 'GowinRun', board: 'tangnano9k', device: DEVICE, files: { 'src/blinky.v': BLINKY, 'constraints/top.cst': PINS }, top: 'blinky', constraints: 'constraints/top.cst', synthTool: 'silinx' });
   await page.openProject('GowinRun');
   const r = await page.eval(async () => {
@@ -57,14 +57,14 @@ uiTest('#2303 a Gowin project: its processes (no bitstream), its constraints CST
   await page.setView('impl');
   await page.treeRow('#hier', 'blinky');
   const labels = await page.eval(() => [...document.querySelectorAll('#procs .row')].map((x) => x.textContent.trim().replace(/^▾/, '')));
-  assert.ok(labels.includes('Implement Design'), String(labels));
-  for (const absent of ['Generate Programming File', 'Map', 'Configure Target Device', 'Emulate on Board']) assert.ok(!labels.includes(absent), `${absent}: ${labels}`);
+  assert.ok(labels.includes('Implement Design') && labels.includes('Generate Programming File'), String(labels));
+  for (const absent of ['Map', 'Configure Target Device', 'Emulate on Board']) assert.ok(!labels.includes(absent), `${absent}: ${labels}`);
 
-  await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });
-  await page.waitConsole(/Process "Implement Design" (completed successfully|failed)/, { timeout: 120000 }).catch(async (e) => { throw new Error(`${e.message}\n${(await page.consoleText()).slice(-2500)}`); });
+  await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
+  await page.waitConsole(/Process "Generate Programming File" (completed successfully|failed)/, { timeout: 120000 }).catch(async (e) => { throw new Error(`${e.message}\n${(await page.consoleText()).slice(-2500)}`); });
   const text = await page.consoleText();
   assert.deepEqual(text.split('\n').filter((l) => /WARNING|ERROR/.test(l)), []);
-  assert.match(text, /NOTE: no bitstream for the Gowin yet: Apicula's gowin_pack is Python/);
+  assert.match(text, /Bitstream: build\/blinky\.fs \(2069320 bytes, gowin_pack in /);
 
   await page.eval(() => window.SilinxApp.openSummary());
   const summary = (caption) => page.waitFor((c) => {
@@ -72,7 +72,7 @@ uiTest('#2303 a Gowin project: its processes (no bitstream), its constraints CST
     return t ? [...t.querySelectorAll('tr')].map((tr) => [...tr.children].map((x) => x.textContent)) : null;
   }, [caption], { what: caption });
   assert.deepEqual(await summary('Detailed Reports'), [['Report Name', 'Status'], ['Synthesis Report (Yosys)', 'Current'], ['Routed Design (nextpnr JSON)', 'Current']]);
-  assert.equal(await page.eval(() => [...document.querySelectorAll('.summary-table caption')].some((c) => c.textContent === 'Programming File')), false);
+  assert.deepEqual(await summary('Programming File'), [['Bitstream', 'build/blinky.fs (2021 KB)']]);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
     assert.deepEqual((await summary('Relatórios Detalhados')).slice(1).map((x) => x[0]), ['Relatório de Síntese (Yosys)', 'Projeto Encaminhado (JSON do nextpnr)']);

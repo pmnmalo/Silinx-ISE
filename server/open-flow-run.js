@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { yosysWorkers, nextpnrNode, nextpnrS6Node, ice40Io, ecp5Io, gowinIo, loadDeviceCache, loadDb, loadBitDbS6 } from '../packages/silinx-fpga/src/node.js';
 import { runOpenFlow } from '../core/flow-ide.js';
-import { loadIce40, loadOwn } from './nextpnr-ice40-fetch.js';
+import { loadIce40, loadOwn, ownPackageFile } from './nextpnr-ice40-fetch.js';
 
 const spec = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const { outDir, buildDir } = spec;
@@ -33,7 +33,7 @@ const io = {
   yosys: yosysWorkers(),   // (the synthesis's mappings from the same netlist in parallel, #86)
   nextpnr: { spartan3e: nextpnrNode(), spartan6: nextpnrS6Node(), ice40: ice40Io(() => loadIce40({ log: line => console.log(line) })),
     ecp5: ecp5Io(() => loadOwn('@yowasp/nextpnr-ecp5', { log: line => console.log(line) })),
-    gowin: gowinIo(() => loadOwn('@yowasp/nextpnr-himbaechel-gowin', { log: line => console.log(line) })) },   // (the nextpnr engine's, spec.engine 'nextpnr', #2136, #2138; the iCE40's, #2295; the ECP5's, #2302; the Gowin's, #2303)
+    gowin: gowinIo(() => loadOwn('@yowasp/nextpnr-himbaechel-gowin', { log: line => console.log(line) }), file => ownPackageFile('@yowasp/nextpnr-himbaechel-gowin', file)) },   // (the nextpnr engine's, spec.engine 'nextpnr', #2136, #2138; the iCE40's, #2295; the ECP5's, #2302; the Gowin's, #2303)
   write: (name, data) => {
     const f = fileOf(name);
     fs.mkdirSync(path.dirname(f), { recursive: true });   // (netgen/synthesis/…)

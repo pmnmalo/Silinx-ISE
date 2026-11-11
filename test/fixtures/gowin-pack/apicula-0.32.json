@@ -1,0 +1,57 @@
+{
+  "apicula": "0.32",
+  "device": "GW1N-9C",
+  "note": "SHA-256 of each example's routed design (nextpnr-himbaechel-gowin 0.11.825, seed 1, on the Tang Nano 9K) and of the .fs Apicula's gowin_pack 0.32 writes for it (-d GW1N-9C)",
+  "examples": {
+    "gates": {
+      "routed": "e83ec97d237e21bfc058789eaaa8f5986c89064bcc101a27a70774ff1155eb77",
+      "fs": "291527a564519458aeabe9fee8c052115e71f27f1b16222e9fbea50d42f37f94",
+      "fsBytes": 2069320
+    },
+    "traffic": {
+      "routed": "dea3fe1f8ce3b013c27861b8b00790f6045f05e52ea879c4d537fc4550e1ab89",
+      "fs": "f32f5b6d9bbf77e2435bcbd7e422041ecaa2921e8a20ebc5fa5088acf5782470",
+      "fsBytes": 2069320
+    },
+    "blinky": {
+      "routed": "66b8c9540c1c9b2f36c55936ae024507a6c6bdd243ede8a5c715f7a2139cd7aa",
+      "fs": "9b3b6065bf17b222cc8c8c002e99f7b68b84230f1ea1075d83aa538d3acc3ad0",
+      "fsBytes": 2069320
+    },
+    "pong": {
+      "routed": "25220118e9b38af8cb645e5858664fed1333c1a1ce53b3f3e3652df2282b1cf5",
+      "fs": "3ff836b4961b6a1bddc7a56e75b5f66c4779a8e2eca7072c07970ce2bb676e78",
+      "fsBytes": 2069320
+    },
+    "stopwatch": {
+      "routed": "d6990edc607666da70c31c5133f00da8a687f1e8de903dce597f85e2bc1a4228",
+      "fs": "7843aee9e001e353ac076bb420689849de78c20efbff703a8cd21aaece33f722",
+      "fsBytes": 3556680
+    },
+    "clock": {
+      "routed": "a2f94095deb56f5221b6ef32f922a402566207ad8a33582ad99ee34b08d54a82",
+      "fs": "da738efb6eee8f718474c4760b14e99d0b5b1a38097aaf641d006065077a9b02",
+      "fsBytes": 2069320
+    },
+    "vga": {
+      "routed": "95eb8097e2b26159d5a76e8df18e1aa39e8e91dfa3c5ac1cd266f64d08392158",
+      "fs": "77e36bd1aa624285eb396c89ccc008e24e4477530dacc41d6ec70dd4412fc5d4",
+      "fsBytes": 2069320
+    },
+    "isqrt": {
+      "routed": "221b69d544a59ef12a775467e9a2970836ad5606591e25412574a6d744ccc204",
+      "fs": "97b24e1649650ae94c0bfa68d5dee0f3193cc813823b3785cc3594cfa9b80849",
+      "fsBytes": 2069320
+    },
+    "uart": {
+      "routed": "e0156711442b5c9721c82fd79fae37c3e81c6d8a3a19c9e6f6bbee0841ba9d40",
+      "fs": "4035a52818fd3dde927875a19d9da078a5f04c2f4e798a7bc27fc6f6b4c86a1b",
+      "fsBytes": 2069320
+    },
+    "micro80": {
+      "routed": "ca53d708eee4589869df71a2f39bd812133361024ce1a0a5eaeabde10d4c82c8",
+      "fs": "ea97eb7aea7689f90ba59809a7b5d196cf0eea9d357dc70d73967f224bde52e6",
+      "fsBytes": 3556680
+    }
+  }
+}

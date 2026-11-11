@@ -12,6 +12,7 @@ which npm installs with it, and includes the ported ones (their code or data in 
 | @yowasp/nextpnr-himbaechel-gowin | 0.11.825 | ISC | https://yowasp.org/ |
 | @yowasp/nextpnr-ice40 | 0.11.825 | ISC | https://yowasp.org/ |
 | @yowasp/yosys | 0.70.1258 | ISC | https://yowasp.org/ |
+| apicula | 0.32 | MIT | https://github.com/YosysHQ/apicula |
 | prjxray | c9f02d8 | ISC | https://github.com/f4pga/prjxray |
 | prjxray-db | 0a0adde | CC0-1.0 | https://github.com/f4pga/prjxray-db |
 
@@ -1228,6 +1229,36 @@ A PARTICULAR PURPOSE. THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS,
 AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO PROVIDE MAINTENANCE,
 SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 ```
+
+## apicula 0.32 — MIT
+
+https://github.com/YosysHQ/apicula
+
+```text
+MIT License
+
+Copyright (c) 2019 Pepijn de Vos
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+packages/silinx-fpga/src/fpga/gowin/ (the Gowin's .fs of nextpnr-himbaechel-gowin's routed netlist) is a JavaScript port of its gowin_pack and of the parts of its chipdb, bslib and attrids that gowin_pack uses; the chip databases it reads are Apicula's, in @yowasp/nextpnr-himbaechel-gowin, not shipped by Silinx.
 
 ## prjxray c9f02d8 — ISC
 

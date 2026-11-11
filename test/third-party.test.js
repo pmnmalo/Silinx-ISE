@@ -84,8 +84,8 @@ test('silinx-fpga: Apache-2.0 (LICENSE, package.json), its NOTICE, its dependenc
   const md = fs.readFileSync(path.join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8');
   assert.match(md, /^# Third-party notices\n\nsilinx-fpga \(Copyright 2026 Pedro Maló, Apache-2\.0\)/);
   const listed = [...md.matchAll(/^## (\S+) (\S+) — (\S+)$/gm)].map(m => m[1]);
-  // (an optional peer's: the iCE40's, #2295; and the components ported into it: Project X-Ray's, #3144)
-  assert.deepEqual(listed, [...Object.keys({ ...json.dependencies, ...json.peerDependencies }), 'prjxray', 'prjxray-db'].sort());
+  // (an optional peer's: the iCE40's, #2295; and the components ported into it: Project X-Ray's, #3144; Apicula's, #2303)
+  assert.deepEqual(listed, [...Object.keys({ ...json.dependencies, ...json.peerDependencies }), 'apicula', 'prjxray', 'prjxray-db'].sort());
   for (const name of listed) {
     const sec = new RegExp(`## ${name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} [^\\n]*\\n\\n[^\\n]*\\n\\n\`\`\`text\\n([\\s\\S]*?)\\n\`\`\``).exec(md);
     assert.ok(sec && sec[1].length > 200 && !/no licence file/.test(sec[1]), `${name}: the licence text`);

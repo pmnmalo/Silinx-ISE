@@ -37,7 +37,7 @@ export const ICE40_TARGETS = [{ board: 'icebreaker' }];
 // board of its own (ulx3s-vga). Its ports with no pin on the board, warned (sw<4..7>)
 export const ECP5_TARGETS = [{ board: 'ulx3s' }];
 // the Gowin's board (#2303): the examples on the Tang Nano 9K, every port on a pin of its headers (nextpnr-himbaechel-gowin places
-// none without one); vga on the tangnano9k-vga; placed and routed, no bitstream yet
+// none without one); vga on the tangnano9k-vga; to its .fs through gowin_pack (Silinx's port)
 export const GOWIN_TARGETS = [{ board: 'tangnano9k' }];
 // the 7-series' boards (#3142): an experimental family, its constraints XDC; built by Vivado (#1649), not in TARGETS
 export const XC7_TARGETS = [{ board: 'basys3' }, { board: 'nexys-a7' }];

@@ -62,10 +62,11 @@ test('#2302 the ECP5: the iCE40\'s tree without Emulate and Configure Target Dev
   assert.equal(SILINX_ECP5.messages.line, MESSAGE_LINE);
 });
 
-test('#2303 the Gowin: the ECP5\'s tree without Generate Programming File (no bitstream yet); its steps, reports, CST', () => {
+test('#2303 the Gowin: the ECP5\'s tree; its steps (gowin_pack\'s .fs), reports, CST', () => {
   const t = built(SILINX_GOWIN);
-  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: [] }] }]);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: [] }] }, 'bitgen']);
   assert.equal(toolOf({ part: 'gw1nr-9c' }, true), SILINX_GOWIN);
+  assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'bitgen').produces, ['{top}.fs']);
   assert.deepEqual(SILINX_GOWIN.steps.map(({ produces, ...s }) => s), GOWIN_STEPS);
   assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'par').produces, ['open/routed.json']);
   assert.ok(read('packages/silinx-fpga/src/open-flow-gowin.js').includes("io.write('open/routed.json'"));

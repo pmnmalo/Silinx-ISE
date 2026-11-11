@@ -21,10 +21,10 @@ test('#1678 silinx-fpga: its entries, the API, its light part and the API in Nod
 });
 
 // the API's names: a change to them is a change of the API (its version, #1681), made on purpose
-const API = ['CST', 'ECP5_PARTS', 'ECP5_STEPS', 'FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'GOWIN_DEVICES', 'GOWIN_NO_BITSTREAM', 'GOWIN_PARTS', 'GOWIN_STEPS', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'LPF', 'PCF', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError', 'XDC',
+const API = ['CST', 'ECP5_PARTS', 'ECP5_STEPS', 'FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'GOWIN_DEVICES', 'GOWIN_PARTS', 'GOWIN_STEPS', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'LPF', 'PCF', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError', 'XDC',
   'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'betweenPaths', 'bitDbS6', 'bitName', 'bitgen', 'bitstreamExtOf', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsExtOf', 'constraintsFormatOf',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'ecp5Io', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'experimentalDevice', 'familyFromXise', 'familyName',
-  'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'gowinIo', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
+  'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'gowinIo', 'gowinPack', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'loadGowinChipdb', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
   'nextpnrIo', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'pathHighlight', 'pathsText', 'periodNs', 'powerReport',
   'primitiveInstances', 'readBit', 'readXdc', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
   'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6MapOf', 's6OpenStatus', 'scriptTopError', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea', 'synthesizeFast',

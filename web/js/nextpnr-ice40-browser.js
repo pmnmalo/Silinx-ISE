@@ -26,7 +26,8 @@ export async function ice40FromFiles(files) {
     if (!data) return new Response(null, { status: 404 });
     return new Response(data, { headers: { 'Content-Type': String(url).endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream' } });
   };
-  return new AsyncFunction('fetch', source)(ownFetch);
+  // (and its files, by their path in the package: the Gowin's resources, which Silinx's gowin_pack reads, #2303)
+  return Object.assign(await new AsyncFunction('fetch', source)(ownFetch), { packageFile: name => files[name] ?? null });
 }
 
 const openCache = async name => { try { return globalThis.caches ? await caches.open(name) : null; } catch { return null; } };   // (an opaque origin throws)
