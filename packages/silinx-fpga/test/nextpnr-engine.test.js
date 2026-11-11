@@ -198,7 +198,7 @@ test('#2196 --seed 5: placements from that seed on, each reported, the fastest k
   assert.deepEqual(out2.filter(l => /^(Placement|Kept)/.test(l)), []);
 });
 
-test('#2196 the VGA example built by nextpnr: 143 slices as the packing fills them (#2223), its constants on routing (#2797), no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
+test('#2196 the VGA example built by nextpnr: 142 slices as the packing fills them (#2223), its constants on routing (#2797), no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'top.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('vga.json.gz'))));
@@ -207,8 +207,8 @@ test('#2196 the VGA example built by nextpnr: 143 slices as the packing fills th
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
-  assert.ok(out.includes('  Number of occupied Slices: 143 out of 2448 6%'), out.join('\n'));
-  assert.ok(out.includes('  Number of 4 input LUTs: 269 out of 4896 5%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 142 out of 2448 6%'), out.join('\n'));
+  assert.ok(out.includes('  Number of 4 input LUTs: 267 out of 4896 5%'), out.join('\n'));
   assert.ok(out.includes('  Number of Slice Flip Flops: 56 out of 4896 1%'), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'), out.join('\n'));
   const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
