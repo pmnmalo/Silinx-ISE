@@ -298,8 +298,8 @@ for Xilinx FPGAs supported by ISE 14.7.
   Spartan-3A/3AN, Spartan-3A DSP, Spartan-6, Virtex-4/5/6, Artix-7, Kintex-7 and Zynq-7000
   (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6. Beyond ISE, the
   Lattice iCE40 (LP, HX, Ultra, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack, and the Lattice
-  ECP5 (LFE5U, LFE5UM, LFE5UM5G) with nextpnr-ecp5 and ecppack (Project Trellis); the Gowin GW1NR-9C is placed and routed
-  by nextpnr-himbaechel-gowin (Project Apicula), with no bitstream yet (#2303).
+  ECP5 (LFE5U, LFE5UM, LFE5UM5G) with nextpnr-ecp5 and ecppack (Project Trellis); the Gowin GW1NR-9C with
+  nextpnr-himbaechel-gowin (Project Apicula) and gowin_pack, Silinx's JavaScript port of Apicula's (#2303).
 - **Boards and I/O Pin Planning**: Digilent Basys2, Nexys2, Nexys3, Atlys, Cmod S6; Xilinx
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One;
   1BitSquared iCEBreaker (iCE40, its pins written as a PCF; a 1BitSquared iCEBreaker + PmodVGA for VGA); Radiona ULX3S
@@ -688,10 +688,10 @@ It takes **the Radiona ULX3S-12f / 25f / 45f / 85f** too (Lattice ECP5, LFE5U in
 and ecppack (Project Trellis), to `build/<top>.bit`, its pins written as an LPF (not programmed from Silinx yet: openFPGALoader
 -b ulx3s, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the
 **ULX3S + VGA-12f / 25f / 45f / 85f** (the Radiona ULX3S + VGA), a VGA connector on that header.
-The **Sipeed Tang Nano 9K** (Gowin GW1NR-9C) goes as far as its place and route: Yosys's `synth_gowin` and
-nextpnr-himbaechel-gowin (Project Apicula), its pins written as a CST; no bitstream yet, Apicula's `gowin_pack` being Python
-(#2303). The examples place and route on it with their LEDs, switches, buttons and display on its headers (every port needs a
-pin there); vga on the **Sipeed Tang Nano 9K + VGA**.
+It takes **the Sipeed Tang Nano 9K** too (Gowin GW1NR-9C): Yosys's `synth_gowin`, nextpnr-himbaechel-gowin (Project Apicula)
+and gowin_pack, Silinx's JavaScript port of Apicula's (its `.fs` byte for byte Apicula's on the examples), to `build/<top>.fs`,
+its pins written as a CST (not programmed from Silinx yet: openFPGALoader -b tangnano9k, #2298). The examples run on it with
+their LEDs, switches, buttons and display on its headers (every port needs a pin there); vga on the **Sipeed Tang Nano 9K + VGA**.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
 what is planned: the [issues](https://github.com/pmnmalo/Silinx/issues).

@@ -137,6 +137,7 @@ const GOWIN_STEPS = [
   step('synth', 'Synthesize - Yosys'),
   step('translate', 'Translate', ['synth']),
   step('par', 'Place & Route - nextpnr', ['translate']),
+  step('bitgen', 'Generate Programming File - gowin_pack', ['par']),
 ];
 const withProducts = (steps, products) => steps.map(s => ({ ...s, produces: products[s.id] || [] }));
 
@@ -253,12 +254,12 @@ export const SILINX_ECP5 = {
   tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
 };
 
-/** The Silinx toolchain on the Gowin (#2303), with nextpnr-himbaechel-gowin (Project Apicula): to its routed design, no bitstream
- *  yet (Apicula's gowin_pack is Python), so no Generate Programming File, nothing to program, and no Emulate (its board has no
- *  emulator yet). */
+/** The Silinx toolchain on the Gowin (#2303), with nextpnr-himbaechel-gowin (Project Apicula) and gowin_pack (Silinx's port of
+ *  Apicula's): its bitstream the .fs; no programming of its boards yet (#2298: no Configure Target Device), nor Emulate (its board
+ *  has no emulator yet). */
 export const SILINX_GOWIN = {
   id: 'silinx-gowin', name: 'Silinx toolchain (Gowin)', open: true,
-  steps: withProducts(GOWIN_STEPS, { synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.json'] }),
+  steps: withProducts(GOWIN_STEPS, { synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.json'], bitgen: ['{top}.fs'] }),
   reports: [
     { id: 'synthesis', label: 'Synthesis Report (Yosys)', step: 'synth', file: 'open/{top}_stat.txt' },
     { id: 'routed', label: 'Routed Design (nextpnr JSON)', step: 'par', file: 'open/routed.json' },
@@ -266,7 +267,7 @@ export const SILINX_GOWIN = {
   constraints: CST,
   messages: LOG_MESSAGES,
   program: null,
-  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config', 'bitgen'], SILINX_CHANGE)
+  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE)
     .filter(n => n.part !== 'emulate'),
   tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
 };

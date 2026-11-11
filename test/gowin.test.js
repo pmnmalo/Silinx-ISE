@@ -1,8 +1,9 @@
 // The Gowin's back end (#2303): its constraints (CST), its synthesis's resources, and a design from HDL to its routed design
-// through runFlow with YoWASP's nextpnr-himbaechel-gowin; no bitstream yet (gowin_pack is Python), every port on a pin
+// through runFlow with YoWASP's nextpnr-himbaechel-gowin and Silinx's gowin_pack (test/gowin-pack.test.js: Apicula's .fs), every port
+// on a pin
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runFlow, backendOf, familyOfPart, familyName, deviceFamily, constraintsFormatOf, constraintsExtOf, bitstreamExtOf, openOnlyDevice, CST, GOWIN_DEVICES, GOWIN_NO_BITSTREAM, nextpnrGowinNode, yosysNode } from '../packages/silinx-fpga/src/node.js';
+import { runFlow, backendOf, familyOfPart, familyName, deviceFamily, constraintsFormatOf, constraintsExtOf, bitstreamExtOf, openOnlyDevice, CST, GOWIN_DEVICES, nextpnrGowinNode, yosysNode } from '../packages/silinx-fpga/src/node.js';
 import { readConstraints } from '../packages/silinx-fpga/src/constraints.js';
 import { gowinUtilization, gowinDevice } from '../packages/silinx-fpga/src/open-flow-gowin.js';
 import { orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
@@ -35,7 +36,7 @@ test('CST: what nextpnr-himbaechel-gowin would not apply throws, naming its line
   assert.throws(() => CST.read('IO_PORT "a" DRIVE;'), /IO_PORT a: DRIVE is not KEY=VALUE/);
 });
 
-test('the Gowin family: its part, its formats, its back end\'s steps (no bitstream) and constraints, its synthesis\'s resources', () => {
+test('the Gowin family: its part, its formats, its back end\'s steps and constraints, its synthesis\'s resources', () => {
   for (const p of ['gw1nr-9c', 'GW1NR-9C', 'gw1n-1']) assert.equal(familyOfPart(p), 'gowin', p);
   const d = { part: 'gw1nr-9c' };
   assert.equal(deviceFamily(d), 'gowin');
@@ -47,12 +48,11 @@ test('the Gowin family: its part, its formats, its back end\'s steps (no bitstre
   const b = backendOf('gowin');
   assert.equal(b.id, 'gowin');
   assert.equal(b.constraints, CST);
-  assert.deepEqual(b.steps.map(s => s.id), ['synth', 'translate', 'par']);
-  assert.throws(() => orderSteps(b.steps, ['bitgen']), /no step bitgen/);
+  assert.deepEqual(b.steps.map(s => [s.id, s.label]), [['synth', 'Synthesize - Yosys'], ['translate', 'Translate'], ['par', 'Place & Route - nextpnr'], ['bitgen', 'Generate Programming File - gowin_pack']]);
+  assert.throws(() => orderSteps(b.steps, ['trce']), /no step trce/);
   assert.deepEqual(gowinUtilization({ LUT1: 1, LUT2: 2, LUT4: 3, DFF: 4, DFFE: 1, ALU: 9, MUX2_LUT5: 2, RAM16SDP4: 1, SDPB: 1, pROM: 1, MULT18X18: 1, IBUF: 2, OBUF: 3, rPLL: 1, GND: 1, VCC: 1 }),
     { luts: 6, flipFlops: 5, latches: 0, ios: 5, carry: 9, muxes: 2, distributedRam: 1, blockRam: 2, multipliers: 1, clockBuffers: 0, dcms: 1, cells: 34 });
   assert.equal(b.synthName('luts'), 'Number of LUT4s');
-  assert.match(GOWIN_NO_BITSTREAM, /gowin_pack is Python/);
 });
 
 const gowin = nextpnrGowinNode();
@@ -61,15 +61,15 @@ function memoryIo(cst, extra = {}) {
   return { log, files, io: { log: l => log.push(l), sources: () => [{ path: 'blinky.v', lang: 'verilog', text: BLINKY }], ucf: cst, ucfName: cst ? 'blinky.cst' : null,
     yosys: yosysNode, nextpnr: { gowin }, write: (n, d) => { files[n] = d; return `build/${n}`; }, read: n => files[n] ?? null, save: () => {}, ...extra } };
 }
-const SPEC = { top: 'blinky', family: 'gowin', device: 'gw1nr-9c', pkg: 'qn88', speed: '-6', steps: ['synth', 'translate', 'par'] };
+const SPEC = { top: 'blinky', family: 'gowin', device: 'gw1nr-9c', pkg: 'qn88', speed: '-6', steps: ['synth', 'translate', 'par', 'bitgen'] };
 const warnings = log => log.filter(l => /^WARNING/.test(l));
 
-test('a design from HDL to its routed design: synth_gowin, nextpnr-himbaechel-gowin at the CST\'s pins and its clock; no bitstream, said', async () => {
+test('a design from HDL to its routed design: synth_gowin, nextpnr-himbaechel-gowin at the CST\'s pins and its clock; gowin_pack\'s .fs', async () => {
   const { log, files, io } = memoryIo(PINS);
   const r = await runFlow(SPEC, io);
   assert.ok(r.ok, r.error);
   assert.deepEqual(warnings(log), []);
-  assert.deepEqual(log.filter(l => /^=== SILINX STEP/.test(l)), ['synth', 'translate', 'par'].map(s => `=== SILINX STEP ${s} ===`));
+  assert.deepEqual(log.filter(l => /^=== SILINX STEP/.test(l)), ['synth', 'translate', 'par', 'bitgen'].map(s => `=== SILINX STEP ${s} ===`));
   assert.ok(log.includes('Netlist of <blinky> read; constraints: blinky.cst, 3 pin location(s), 1 PERIOD constraint(s).'));
   assert.deepEqual(r.report.synthesis.utilization.map(u => u.name), ['Number of LUT4s', 'Number of flip-flops', 'Number of carry cells', 'Number of IOBs']);
   const map = Object.fromEntries(r.report.map.utilization.map(u => [u.name, [u.used, u.total]]));
@@ -79,8 +79,18 @@ test('a design from HDL to its routed design: synth_gowin, nextpnr-himbaechel-go
   assert.ok(r.report.par.constraintsMet);
   const routed = JSON.parse(files['open/routed.json']);
   assert.ok(Object.values(routed.modules).some(m => Object.keys(m.cells || {}).length > 20), 'nextpnr\'s routed netlist');
-  assert.equal(r.report.bit, undefined);
-  assert.ok(log.includes(`NOTE: ${GOWIN_NO_BITSTREAM}.`));
+  // the .fs: Gowin's text bitstream, the GW1N-9C's size
+  const fsText = new TextDecoder().decode(files['blinky.fs']);
+  assert.deepEqual([r.report.bit.size, fsText.length], [2069320, 2069320]);
+  assert.ok(fsText.split('\n').slice(0, -1).every(l => /^[01]+$/.test(l)));
+  assert.ok(log.some(l => /^Bitstream: build\/blinky\.fs \(2069320 bytes, gowin_pack in [\d.]+ m?s\)$/.test(l)), log.join('\n'));
+  // (the next run: the bitstream alone, of the routed design written by this one: the same)
+  const next = memoryIo(PINS);
+  Object.assign(next.files, { 'open/routed.json': files['open/routed.json'] });
+  assert.ok((await runFlow({ ...SPEC, steps: ['bitgen'] }, next.io)).ok);
+  assert.deepEqual(next.files['blinky.fs'], files['blinky.fs']);
+  const none = memoryIo(PINS);
+  assert.match((await runFlow({ ...SPEC, steps: ['bitgen'] }, none.io)).error, /^no routed design: run Place & Route first/);
 });
 
 test('the Gowin without pins: refused before nextpnr, the ports named (nextpnr-himbaechel-gowin places none)', async () => {

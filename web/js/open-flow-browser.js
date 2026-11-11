@@ -61,8 +61,8 @@ function ownTools(family) {
   const f = familyProfile(family).openFlow;
   return f?.package ? { family, where: ownBundle(f), tools: toolsOf(f), mb: f.mb } : null;
 }
-// a family's YoWASP tools by name: its nextpnr and its packer (the Gowin's none yet, #2303)
-const toolsOf = f => (f.packer ? `${f.tools} and ${f.packer}` : f.tools);
+// a family's YoWASP tools by name: its nextpnr and its packer (the Gowin's Silinx's port of gowin_pack, #2303)
+const toolsOf = f => `${f.tools} and ${f.packer}`;
 // does Implement of a family run nextpnr? The Spartan-3E's and the Spartan-6's (#2136, #2288, #2137: nextpnr, the one engine)
 const usesNextpnr = family => !!familyProfile(family).openFlow?.nextpnr;
 
@@ -80,7 +80,7 @@ export function browserOpenStatus(device = {}) {
   if (flow?.package) {
     const name = `${dev}${String(device.speed || '').replace(/^(?=\d)/, '-')}${pkg}`;
     if (!flow.parts.test(dev)) return { available: false, part: name, reason: `${dev}: not ${flow.partOf} of ${flow.tools}` };
-    return ownBundle(flow) ? { available: true, part: name, family, reason: `${name}: ${toolsOf(flow)} (in the browser)${flow.bitstream === false ? '; no bitstream yet (#2303)' : ''}` }
+    return ownBundle(flow) ? { available: true, part: name, family, reason: `${name}: ${toolsOf(flow)} (in the browser)` }
       : { available: false, part: name, reason: `${flow.tools} is not in this edition: use the local server` };
   }
   // (the Spartan-6, #2103: the parts of the Nexys3 and the Atlys)

@@ -72,7 +72,8 @@ test('a project on the Tang Nano 9K: its constraints/top.cst from the board, pla
     const log = [], files = {};
     const io = { log: l => log.push(l), sources: () => [{ path: 'top.v', lang: 'verilog', text: TOP }], ucf: cst, ucfName: 'top.cst',
       yosys: yosysNode, nextpnr: { gowin: nextpnrGowinNode() }, write: (n, d) => { files[n] = d; return `build/${n}`; }, read: n => files[n] ?? null, save: () => {} };
-    const r = await runFlow({ top: 'top', family: 'gowin', device: 'gw1nr-9c', pkg: 'qn88', speed: '-6', steps: ['synth', 'translate', 'par'] }, io);
+    const r = await runFlow({ top: 'top', family: 'gowin', device: 'gw1nr-9c', pkg: 'qn88', speed: '-6', steps: ['synth', 'translate', 'par', 'bitgen'] }, io);
+    assert.equal(files['top.fs'].length, 2069320);
     assert.ok(r.ok, r.error);
     // (nextpnr-himbaechel-gowin routes a net through the general routing where its dedicated routing (a global's) did not reach)
     assert.deepEqual(log.filter(l => /^WARNING/.test(l)), ["WARNING:Place - Failed to route net 'led_n_OBUF_O_4_I_LUT2_F_I1[1]' from X28Y28/F6 to X1Y20/B0 using dedicated routing."]);

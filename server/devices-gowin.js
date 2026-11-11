@@ -8,7 +8,7 @@
 export const GOWIN_FAMILY = {
   id: 'gowin', name: 'Gowin GW1N', displayName: 'Gowin GW1N', datasheet: 'DS117', webpack: false,
   speeds: { '-6': 'C6/I5' }, ioStandards: ['LVCMOS33', 'LVCMOS25', 'LVCMOS18', 'LVCMOS15', 'LVCMOS12', 'LVDS25', 'SSTL15', 'SSTL18_I'],
-  note: 'Implemented by the open toolchain only (Yosys, nextpnr-himbaechel-gowin: Project Apicula), to its routed design: no bitstream yet (gowin_pack is Python, #2303); its constraints are CST.',
+  note: 'Implemented by the open toolchain only (Yosys, nextpnr-himbaechel-gowin: Project Apicula, and gowin_pack, Silinx\'s port of Apicula\'s); its constraints are CST.',
 };
 
 export const GOWIN_PACKAGES = { qn88: '88-pad QFN (QN88P)' };
