@@ -399,7 +399,9 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   // the Start page: no recent projects; opening one lists it again, and its Clear link empties the list
   await page.menu('File', 'Close Project');
   await page.waitFor(() => !document.querySelector('[data-page=start]').hidden && document.querySelector('#start-page .start-box'));
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#start-page .start-box')][1].querySelectorAll('a').length), 0);
+  // (the Recent Projects box, by its heading: the Silinx interface's Teaching box comes before it, #3333; drawn again
+  // once the project is closed)
+  await page.waitFor(() => [...document.querySelectorAll('#start-page .start-box')].find((b) => b.querySelector('h3')?.textContent === 'Recent Projects')?.querySelectorAll('a').length === 0, [], { what: 'no recent projects' });
   await page.openProject('Alpha');
   await page.menu('File', 'Close Project');
   await page.waitFor(() => [...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Alpha'));
