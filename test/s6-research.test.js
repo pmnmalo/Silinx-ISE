@@ -174,4 +174,11 @@ test('measure-3169-s6.sh, run-3169-s6.mjs, check-held6.mjs (#3169, #3350): the s
   assert.equal(verdict({ same: false, diff: 3, unknown: new Map([['TIOI_OUTER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S', 1]]) }),
     '3 bytes differ; not in the databases: TIOI_OUTER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S');
   assert.equal(verdict({ same: false, diff: 1, unknown: new Map() }), '1 bytes differ');
+  // (a resolved PIP against the databases' bits: the same, other bits, not in them; [x, y] pairs or 'x,y' strings)
+  const { pipCheck } = await import('../packages/silinx-fpga/research/s6/check-held6.mjs');
+  const pips = { 'TIOI_OUTER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S': ['26,35', '27,48', '28,14'], 'BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0': [] };
+  assert.equal(pipCheck('TIOI_OUTER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S', [[26, 35], [27, 48], [28, 14]], pips), null);
+  assert.equal(pipCheck('BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0', [], pips), null);
+  assert.equal(pipCheck('BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0', ['1,2'], pips), 'BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0 [1,2] (the databases: [])');
+  assert.equal(pipCheck('RIOI A -> B', [[22, 11]], pips), 'RIOI A -> B [22,11] (not in the databases)');
 });

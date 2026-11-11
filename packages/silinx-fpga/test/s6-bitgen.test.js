@@ -236,14 +236,14 @@ test('bitgen: a BSCAN_SPARTAN6\'s JTAG chain, one bit per chain in the corner\'s
   }
 });
 
-// #3169 / #3350: the designs that measured the pads' PIPs held out until nextpnr's chip database has them
+// #3169 / #3350: the designs that measured the pads' PIPs held out until nextpnr's chip database had them
 // (research/s6/gen-padsingle6.mjs, gen-padout6.mjs, measure-3169-s6.sh; the PIPs and their bits in
-// bitdb/s6/s6-pips-held.json, nextpnr-s6.test.js): each design's pad is one whose path takes such a PIP, unknown to
-// the flow and known with the held file (held: true).
-test('gen-padsingle6.mjs: one design per pad of the *IOB_SINGLE tiles, each pad\'s I pin a held pad wire -> IBUF PIP, all four taken, on both parts (#3169)', async () => {
+// bitdb/s6/s6-pips-io.json since #3349, nextpnr-s6.test.js): each design's pad is one whose path takes such a PIP,
+// known to the flow.
+test('gen-padsingle6.mjs: one design per pad of the *IOB_SINGLE tiles, each pad\'s I pin a pad wire -> IBUF PIP the flow knows, all four taken, on both parts (#3169)', async () => {
   const { SINGLE_PADS, padSingleDesigns } = await import('../research/s6/gen-padsingle6.mjs');
   for (const part of [PART, 'xc6slx45csg324-3']) {
-    const d = loadDeviceCache(part), sites = s6Sites(d), known = knownPipS6(d, loadBitDbS6(part)), withHeld = knownPipS6(d, loadBitDbS6(part, { held: true }));
+    const d = loadDeviceCache(part), sites = s6Sites(d), known = knownPipS6(d, loadBitDbS6(part));
     const pads = SINGLE_PADS[part.slice(0, 8)];
     assert.deepEqual([...sites.pads.values()].filter(p => /^[TB]IOB_SINGLE_/.test(p.tile)).map(p => p.name).sort(), [...pads].sort(), part);
     assert.deepEqual(Object.values(padSingleDesigns(part)).map(x => x.ucf.match(/NET "d" LOC = "(\w+)"/)[1]), pads);
@@ -253,7 +253,7 @@ test('gen-padsingle6.mjs: one design per pad of the *IOB_SINGLE tiles, each pad\
       d.forEachPip(d.sitePinNode(pad, 'I'), (t, k, i) => pips.push([k, i]));
       assert.equal(pips.length, 1, `${part} ${pad}`);
       const [k, i] = pips[0], q = d.pip(k, i);
-      assert.ok(!known(k, i) && withHeld(k, i), `${part} ${pad}`);
+      assert.ok(known(k, i), `${part} ${pad}`);
       return `${d.tileNames[k].replace(/_X\d+Y\d+$/, '')} ${q.from} ${q.dir} ${q.to}`;
     });
     assert.deepEqual(keys.sort(), ['BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0', 'BIOB_SINGLE BIOB_IBUF1_PINW -> BIOB_IBUF1',
@@ -261,12 +261,12 @@ test('gen-padsingle6.mjs: one design per pad of the *IOB_SINGLE tiles, each pad\
   }
 });
 
-test('gen-padout6.mjs: its designs\' outputs on pads a TIOI_OUTER slave OLOGIC2\'s held D1 -> OQ drives, on both parts (#3350)', async () => {
+test('gen-padout6.mjs: its designs\' outputs on pads a TIOI_OUTER slave OLOGIC2\'s D1 -> OQ drives, known to the flow, on both parts (#3350)', async () => {
   const { OUTER_SLAVE_PADS, padOutDesigns } = await import('../research/s6/gen-padout6.mjs');
   for (const part of [PART, 'xc6slx45csg324-3']) {
-    const d = loadDeviceCache(part), sites = s6Sites(d), known = knownPipS6(d, loadBitDbS6(part)), withHeld = knownPipS6(d, loadBitDbS6(part, { held: true }));
+    const d = loadDeviceCache(part), sites = s6Sites(d), known = knownPipS6(d, loadBitDbS6(part));
     const oNode = new Map([...sites.pads.values()].map(p => [d.sitePinNode(p.name, 'O'), p.name]));
-    // each TIOI_OUTER tile's slave D1 -> OQ, followed to the pad's O pin it drives: [known, known with the held PIPs]
+    // each TIOI_OUTER tile's slave D1 -> OQ, followed to the pad's O pin it drives: known
     const driven = new Map();
     d.tileNames.forEach((name, k) => {
       if (!/^TIOI_OUTER_X/.test(name)) return;
@@ -277,13 +277,13 @@ test('gen-padout6.mjs: its designs\' outputs on pads a TIOI_OUTER slave OLOGIC2\
         let front = [d.pipNodes(k, i)[1]];
         for (let n = 0; n < 4 && front.length; n++) {
           const next = [];
-          for (const x of front) { if (oNode.has(x)) driven.set(oNode.get(x), [known(k, i), withHeld(k, i)]); d.forEachPip(x, t => next.push(t)); }
+          for (const x of front) { if (oNode.has(x)) driven.set(oNode.get(x), known(k, i)); d.forEachPip(x, t => next.push(t)); }
           front = next;
         }
       }
     });
     const pads = OUTER_SLAVE_PADS[part.slice(0, 8)];
-    assert.deepEqual(pads.map(p => driven.get(p)), pads.map(() => [false, true]), part);
+    assert.deepEqual(pads.map(p => driven.get(p)), pads.map(() => true), part);
     assert.deepEqual(Object.values(padOutDesigns(part)).map(x => x.ucf.match(/NET "q" LOC = "(\w+)"/)[1]), pads);
   }
 });

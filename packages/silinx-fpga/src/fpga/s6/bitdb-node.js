@@ -11,8 +11,6 @@
 //   <device>-hard.json, s6-hard-base.json     the block RAMs' and DSP48A1s' settings and contents
 //   <device>-cmt-{settings,input}.json   the DCMs' and PLLs'
 //   s6-ologic.json                   an OLOGIC2's output flip-flop (#2025)
-//   s6-pips-held.json                PIPs measured but held out until nextpnr's chip database has them (#3349):
-//                                    read only with held: true (research/nextpnr-s6/export-unknown-pips.mjs)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,9 +22,9 @@ export const S6_DB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)),
 /**
  * A part's databases ('xc6slx16csg324-3'): { part, slices: { lut, rounds, sliceX }, int, other: { pips }, iob,
  * clocks, hard, hardBase, cmtSettings, cmtInput, ologic } (null for a file the part has not); cmtInput: false leaves the
- * CMTs' input bits out (research/s6/ana-cmtinput6.mjs measures them); held: true adds s6-pips-held.json's PIPs (#3349). The browser's: bitdb.js fetchBitDbS6.
+ * CMTs' input bits out (research/s6/ana-cmtinput6.mjs measures them). The browser's: bitdb.js fetchBitDbS6.
  */
-export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtInput = true, held = false } = {}) {
+export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtInput = true } = {}) {
   const read = n => { const f = path.join(dir, `${n}.json`); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; };
-  return bitDbS6(read, part, { cmtInput, held });
+  return bitDbS6(read, part, { cmtInput });
 }
