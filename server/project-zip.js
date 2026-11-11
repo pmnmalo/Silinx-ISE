@@ -9,7 +9,7 @@ import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
 import { createZip } from '../core/zip.js';
-import { gateMessages, requireGated } from '../core/import-gate.js';
+import { gateMessages, normalizePath, requireGated } from '../core/import-gate.js';
 import { markUntrusted } from '../core/trust.js';
 import { hiddenName } from './paths.js';
 import { exportCSources, exportIseSchematics, exportXise } from './xise.js';
@@ -95,7 +95,11 @@ export async function importProjectEntries(P, name, gated, bad) {
   for (const e of entries) {
     const r = rel(e.path);
     if (r === null || written.has(r) || /\.xise$/i.test(r) || P.isProjectFile(r) || (xiseEntry && ISE_OUTPUT.test(r))) continue;
-    const norm = path.posix.normalize(r);
+    // the path in the project, once the root folder is taken off, by the import gate's rules again (#3405): the gate
+    // checked the zip's path, p/build/top.bit, where build/ (Silinx's own: the bitstream, the reports) is not first
+    const gatedRel = normalizePath(r);
+    if (gatedRel.reason) { result.warnings.push(`${e.path}: not imported: ${gatedRel.reason}`); continue; }
+    const norm = gatedRel.path;
     // (no hidden file or folder: an export has none, and a .git/ or an editor's settings would run commands)
     if (norm.startsWith('..') || path.posix.isAbsolute(norm) || norm.split('/').some(hiddenName)) continue;
     const to = P.safeJoin(P.projectDir(name), norm);
