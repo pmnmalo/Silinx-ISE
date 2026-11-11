@@ -24,10 +24,10 @@ uiTest('#2302 Design Properties: an ECP5 part has its speed grades, its synthesi
     const sel = (l) => [...document.querySelectorAll('.dlg-overlay label')].find((x) => x.textContent === l).nextElementSibling;
     const fam = sel('Family:'); fam.value = f; fam.dispatchEvent(new Event('change'));
     return { part: sel('Device:').value, speeds: [...sel('Speed:').options].map((o) => o.value), synth: sel('Synthesis Tool:').value, synthOff: sel('Synthesis Tool:').disabled,
-      families: [...fam.options].map((o) => o.textContent).slice(-2) };
+      ecp5: [...fam.options].some((o) => o.value === 'ecp5' && o.textContent === 'ECP5') };
   }, family);
   const ecp5 = await state('ecp5');
-  assert.deepEqual(ecp5, { part: 'lfe5u-12f', speeds: ['-6', '-7', '-8'], synth: 'silinx', synthOff: true, families: ['iCE40', 'ECP5'] });
+  assert.deepEqual(ecp5, { part: 'lfe5u-12f', speeds: ['-6', '-7', '-8'], synth: 'silinx', synthOff: true, ecp5: true });
   const back = await state('spartan3e');
   assert.equal(back.synthOff, false);
   await page.dialogButton('Cancel');
@@ -65,7 +65,7 @@ uiTest('#2302 an ECP5 project: its processes, its constraints LPF, Implement giv
   // the processes: none of what the family's flow does not have
   await page.setView('impl');
   await page.treeRow('#hier', 'blinky');
-  const labels = await page.eval(() => [...document.querySelectorAll('#procs .row')].map((x) => x.textContent.trim()));
+  const labels = await page.eval(() => [...document.querySelectorAll('#procs .row')].map((x) => x.textContent.trim().replace(/^▾/, '')));
   assert.ok(labels.includes('Generate Programming File'), String(labels));
   for (const absent of ['Map', 'Generate Text Power Report', 'Back-annotate Pin Locations', 'Configure Target Device', 'Emulate on Board']) assert.ok(!labels.includes(absent), `${absent}: ${labels}`);
 
