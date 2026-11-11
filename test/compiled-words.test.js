@@ -228,11 +228,12 @@ test('#670 speed: pong\'s Post-Synthesis Simulation Model, at least 1.4 times as
 });
 test('#650 #659 blinky\'s post-translate, post-map and post-place & route models at word level, with tables (SIMPRIM; the router\'s LUT pins in any order)', { timeout: 600000 }, async () => {
   const m = await models('blinky', ['synth', 'translate', 'posttrans', 'map', 'postmap', 'par', 'trce', 'postpar']);
-  // (postpar: the design nextpnr routed, #2137: one cell fewer than the packed design's, a constant on routing)
-  const want = { posttrans: [543, 326], postmap: [632, 367], postpar: [631, 366] };
+  // (postpar: the design nextpnr routed, #2137: a constant on routing; postmap since #2530: that design without its
+  // routing, so the same cells)
+  const want = { posttrans: [543, 326], postmap: [631, 366], postpar: [631, 366] };
   const wantTables = {
     posttrans: [3, { tables: 19, inputs: 12, words: 7304, outputs: 127, cells: [326, 183] }, 6],
-    postmap: [3, { tables: 22, inputs: 12, words: 7392, outputs: 147, cells: [367, 207] }, 5],
+    postmap: [3, { tables: 22, inputs: 12, words: 7392, outputs: 146, cells: [366, 207] }, 5],
     postpar: [3, { tables: 21, inputs: 12, words: 7328, outputs: 137, cells: [366, 215] }, 5],
   };
   for (const [step, design] of Object.entries(m)) {
