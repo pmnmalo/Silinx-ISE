@@ -8,10 +8,11 @@ import { runYosysOnce } from './synth-open.js';
 /**
  * run() for Node: Yosys from @yowasp/yosys in this process. With a signal (its fifth argument, { signal }), in a worker
  * thread of its own instead, terminated when the signal aborts (Yosys's -timeout does nothing in WebAssembly: the
- * formal checks' time limit, #3261): the run rejected (aborted: true).
+ * formal checks' time limit, #3261): the run rejected (aborted: true). (In a process that may not start threads, Node's
+ * permission model without --allow-worker, such as the grading's: in the process, as without one.)
  */
 export async function yosysNode(args, files, onLine = () => {}, _onProgress, { signal } = {}) {
-  if (signal) return yosysStoppable(args, files, onLine, signal);
+  if (signal && process.permission?.has('worker') !== false) return yosysStoppable(args, files, onLine, signal);
   const { runYosys } = await import('@yowasp/yosys');
   return runYosysOnce(runYosys, args, files, onLine, { fetchProgress: () => {} });
 }
