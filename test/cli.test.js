@@ -34,9 +34,9 @@ before(async () => {
 after(async () => { await fs.rm(tmp, { recursive: true, force: true }); });
 
 /** Run the CLI to completion: { code, out, err }. */
-function cli(args, { extraEnv = {}, cwd = tmp, nodeArgs = [], bin = CLI } = {}) {
+function cli(args, { extraEnv = {}, cwd = tmp, nodeArgs = [] } = {}) {
   return new Promise((resolve, reject) => {
-    const p = spawn(process.execPath, [...nodeArgs, bin, ...args], { cwd, env: { ...env, ...extraEnv } });
+    const p = spawn(process.execPath, [...nodeArgs, CLI, ...args], { cwd, env: { ...env, ...extraEnv } });
     let out = '', err = '';
     p.stdout.on('data', d => { out += d; });
     p.stderr.on('data', d => { err += d; });
@@ -108,18 +108,14 @@ test('help: `help`, --help, -h and `<command> --help` print the usage and run no
   assert.ok(!fss.existsSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json')), 'toolchain --help changed nothing');
 });
 
-// #2624: the command's old name runs the same command, after a warning on stderr (stdout and the exit code as bin/silinx.js's)
-test('#2624 bin/silinx-ise.js: bin/silinx.js under its old name, with a warning on stderr', async () => {
-  const OLD = path.join(ROOT, 'bin', 'silinx-ise.js');
-  const WARN = 'silinx-ise is now called silinx: run node bin/silinx.js (bin/silinx-ise.js will be removed in a later release)\n';
-  const [now, old] = await Promise.all([cli(['help']), cli(['help'], { bin: OLD })]);
-  assert.deepEqual(old, { ...now, err: WARN });
-  assert.equal(now.err, '');
-  const bad = await cli(['frobnicate'], { bin: OLD });
-  assert.equal(bad.code, 1);
-  assert.equal(bad.out, '');
-  assert.match(bad.err, new RegExp(`^${WARN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}silinx: unknown command 'frobnicate'\nusage:`));
-  assert.equal((fss.statSync(OLD).mode & 0o111) !== 0 || process.platform === 'win32', true, 'executable');
+// #3133: the command's old name (#2624) is gone after its two releases: no file, no bin entry (the name built from
+// two parts, as test/old-name.test.js counts it)
+test('#3133 the old command is gone: package.json names bin/silinx.js only', () => {
+  assert.ok(!fss.existsSync(path.join(ROOT, 'bin', ['silinx', 'ise'].join('-') + '.js')));
+  for (const f of ['package.json', 'package-lock.json']) {
+    const pkg = JSON.parse(fss.readFileSync(path.join(ROOT, f), 'utf8'));
+    assert.deepEqual((f === 'package.json' ? pkg : pkg.packages['']).bin, { silinx: 'bin/silinx.js' }, f);
+  }
 });
 
 test('unknown command: error message + usage on stderr, exit code 1', async () => {

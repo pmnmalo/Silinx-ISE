@@ -4,8 +4,7 @@
   "description": "Silinx: HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, synthesis, place & route and bitstreams (its own toolchain for the Basys2 / Nexys2, or Xilinx ISE 14.7) and board programming from the browser",
   "type": "module",
   "bin": {
-    "silinx": "bin/silinx.js",
-    "silinx-ise": "bin/silinx-ise.js"
+    "silinx": "bin/silinx.js"
   },
   "scripts": {
     "start": "node bin/silinx.js serve",
