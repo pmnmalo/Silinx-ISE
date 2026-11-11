@@ -118,7 +118,7 @@ test('#2624 bin/silinx-ise.js: bin/silinx.js under its old name, with a warning 
   const bad = await cli(['frobnicate'], { bin: OLD });
   assert.equal(bad.code, 1);
   assert.equal(bad.out, '');
-  assert.match(bad.err, new RegExp(`^${WARN.replace(/[.()]/g, '\\$&')}silinx: unknown command 'frobnicate'\nusage:`));
+  assert.match(bad.err, new RegExp(`^${WARN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}silinx: unknown command 'frobnicate'\nusage:`));
   assert.equal((fss.statSync(OLD).mode & 0o111) !== 0 || process.platform === 'win32', true, 'executable');
 });
 

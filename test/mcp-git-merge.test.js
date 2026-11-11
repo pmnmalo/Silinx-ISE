@@ -83,7 +83,7 @@ test('git_pull: a drawing\'s conflict named with each object\'s id; resolved wit
   const bad = await call('git_pull', { project: 'traffic', resolve: { [FSM]: { 'transitions/t1': 'both' } } });
   assert.equal(bad.isError, true);
   const p = await ok('git_pull', { project: 'traffic', resolve: { [FSM]: { 'transitions/t1': 'theirs' } } });
-  assert.match(p.text, new RegExp(`\\n${FSM.replace(/\./g, '\\.')}: merged by its objects, its HDL made again\\.$`));
+  assert.match(p.text, new RegExp(`\\n${FSM.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: merged by its objects, its HDL made again\\.$`));
   assert.equal(t1(JSON.parse(fs.readFileSync(path.join(dir, FSM), 'utf8'))).cond, 'night or req');
   assert.equal((await ok('git_status', { project: 'traffic' })).text, 'traffic: main, 2 commit(s) ahead of and 0 behind origin/main; no change since the last commit.');
 });
