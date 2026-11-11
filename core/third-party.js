@@ -501,6 +501,20 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
+    "name": "prjxray",
+    "version": "c9f02d8",
+    "license": "ISC",
+    "url": "https://github.com/f4pga/prjxray",
+    "ported": true
+  },
+  {
+    "name": "prjxray-db",
+    "version": "0a0adde",
+    "license": "CC0-1.0",
+    "url": "https://github.com/f4pga/prjxray-db",
+    "ported": true
+  },
+  {
     "name": "proxy-addr",
     "version": "2.0.8",
     "license": "MIT",
