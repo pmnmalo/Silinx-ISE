@@ -14,12 +14,14 @@
 // database's JSON, a device description, an example, a fixture, #772) counts as a change of every source that
 // reads it, found from the code (a file or folder named from the source's own place: path.join(path.dirname(
 // fileURLToPath(import.meta.url)), '..', 'db'), a constant holding one, new URL('../db/', import.meta.url)), and
-// of the modules that import one of those, at any depth.
+// of the modules that import one of those, at any depth. And always the repository's checks (REPO_WIDE, #3461): the
+// tests that scan the whole repository, which a pull request can break with a file none of them imports.
 //
 //   node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list | --plan] [node --test options …]
 //   → runs node --test with those options on the unit tests, then (one at a time) on the UI tests; --list
 //     prints them instead. --shard i/n: part i of n of them, of about the same time (scripts/test-shard.mjs,
-//     the UI tests balanced too, #1032). No test related to the change: nothing runs, the exit is 0.
+//     the UI tests balanced too, #1032). No test related to the change (nor a
+//     repository-wide one, as in a repository without them): nothing runs, the exit is 0.
 //     --plan: how many parts the tests need (planShards, #1982), as the PR tests' outputs (parts=n, shards=[1, …, n],
 //     for $GITHUB_OUTPUT; the estimate on stderr), and nothing runs.
 import fs from 'node:fs';
@@ -158,6 +160,31 @@ export function relatedTests(files, changed) {
   return { unit: [...unit].sort(), ui: [...ui].sort() };
 }
 
+/** The repository's checks (#3461): the unit test files that scan the whole repository (its tracked files, a folder of
+ *  it) rather than test a module, run on every pull request: a file none of them imports can break one (a new file
+ *  holding the old name, a fragment, an address), and the break showed in the next pull request (#3365, #3434,
+ *  #3447, #3457, #3454's). Each runs in seconds (measured with an empty HOME, 2026-11-11). Left out:
+ *  test/hdl-boundary.test.js, which reads only the front end's modules, each named in it (a change of one selects it).
+ *  The time of each, then what it scans: */
+export const REPO_WIDE = [
+  'test/changelog-fragments.test.js',   // 1.3 s: changes/, the fragments' format
+  'test/changelog.test.js',             // 1.1 s: CHANGELOG.md and the tags; the fragments of changes/ as a build's changes
+  'test/code-size.test.js',             // 0.3 s: the size of every source (#405)
+  'test/docs.test.js',                  // 1.2 s: every Markdown file's links, paths and menus
+  'test/family-conditions.test.js',     // 0.2 s: web/js's conditions on a family's name
+  'test/layering.test.js',              // 0.7 s: every source's imports (the research)
+  'test/old-name.test.js',              // 0.5 s: the tracked files, the old name (#2624)
+  'test/private-data.test.js',          // 17 s: the tracked files, no private data, secrets or Xilinx files
+  'test/safe-output.test.js',           // 0.4 s: web/js, the pages, core/ and server/: markup from a value
+  'test/toolchain-boundary.test.js',    // 0.3 s: every source's imports (the package's API, #1678)
+  'test/web-i18n.test.js',              // 1.3 s: web/js's labels translated
+];
+
+/** The tests of a change and the repository's checks (REPO_WIDE, those of the repository's files). */
+export function withRepoWide({ unit, ui }, files) {
+  return { unit: [...new Set([...unit, ...REPO_WIDE.filter(f => files[f] != null)])].sort(), ui };
+}
+
 /** The repository's JavaScript the tests and their modules are made of: { path: text }. */
 export function sources(root = ROOT) {
   const out = {};
@@ -211,15 +238,16 @@ function main() {
   if (!base || !head) { console.error('usage: node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list | --plan] [node --test options …]'); process.exit(2); }
   const changed = changedFiles(base, head);
   if (changed == null) { console.error(`the files changed from ${base} to ${head} are not known (is ${base} fetched?)`); process.exit(2); }
-  const all = relatedTests(sources(), changed);
+  const files = sources();
+  const all = withRepoWide(relatedTests(files, changed), files);
   if (rest.includes('--plan')) {
     const { n, minutes } = planShards(all, readTimings());
-    console.error(`${changed.length} file(s) changed; the tests of their modules: ${all.unit.length} unit, ${all.ui.length} UI, ~${Math.round(minutes)} min: ${n} part(s)`);
+    console.error(`${changed.length} file(s) changed; the tests of their modules and the repository-wide tests: ${all.unit.length} unit, ${all.ui.length} UI, ~${Math.round(minutes)} min: ${n} part(s)`);
     console.log(`parts=${n}\nshards=${JSON.stringify(Array.from({ length: n }, (_, k) => k + 1))}`);
     return;
   }
   const { unit, ui } = shard ? shardOf(all, shard, readTimings()) : all;
-  console.log(`${changed.length} file(s) changed; the tests of their modules: ${all.unit.length} unit, ${all.ui.length} UI${shard ? `; part ${shard.i}/${shard.n}: ${unit.length} unit, ${ui.length} UI` : ''}`);
+  console.log(`${changed.length} file(s) changed; the tests of their modules and the repository-wide tests: ${all.unit.length} unit, ${all.ui.length} UI${shard ? `; part ${shard.i}/${shard.n}: ${unit.length} unit, ${ui.length} UI` : ''}`);
   for (const f of [...unit, ...ui]) console.log(`  ${f}`);
   if (rest.includes('--list')) return;
   const unitArgs = rest.filter(a => a !== '--list');

@@ -2,7 +2,7 @@ name: PR tests
 # The test files of the modules a pull request changes, before the merge (#637): CI runs at a release only
 # (#607), so each pull request runs here, on GitHub's runners, the whole test file of every module it touches
 # (scripts/related-tests.mjs: the unit test files that import a changed file, directly or through a test
-# helper; a changed test file; the UI test of a changed page script), in parts of about the same time: as many
+# helper; a changed test file; the UI test of a changed page script; and the repository-wide tests, REPO_WIDE, #3461), in parts of about the same time: as many
 # as their measured time needs (test/timings.json, about 20 minutes each, #1982), one for a small change, none
 # when no test is related. main requires related-tests, green when every part passed (or there was none).
 on:

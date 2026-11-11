@@ -90,7 +90,7 @@ the code and the lessons learnt.
   file of every module it changes (`.github/workflows/pr-tests.yml`, `scripts/related-tests.mjs`, #637: the
   unit test files that import a changed file, directly or through a test helper; a changed test; the UI test
   of a changed page script; for a data file (the bit database, a device description, an example), the tests of
-  the modules that read it and of their importers, #772); `main` requires its check, `related-tests`. Before pushing, run the same files
+  the modules that read it and of their importers, #772; and always the repository-wide tests, `REPO_WIDE`, #3461); `main` requires its check, `related-tests`. Before pushing, run the same files
   locally: `node scripts/related-tests.mjs origin/main HEAD`.
 - **Merging is the maintainer's** (#1872): the maintainer, or a session the maintainer runs, merges a pull request
   when `related-tests` is green, into `main` (rebased, fast-forward, no merge commit; rebase the branch first if
