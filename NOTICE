@@ -20,6 +20,9 @@ of the covered work.
 Its toolchain, silinx-fpga (packages/silinx-fpga: synthesis, pack, place, route, timing, bitstream and the
 device data), is Copyright 2026 Pedro Maló too, under the Apache License 2.0 (its LICENSE and NOTICE).
 
+Its HDL front end, silinx-hdl (packages/silinx-hdl: the VHDL and Verilog parsers, the elaboration, the simulator and
+the flat Verilog for synthesis), is Copyright 2026 Pedro Maló too, under the Apache License 2.0 (its LICENSE).
+
 It includes open-source components from other projects, each under its own licence:
 CodeMirror (MIT), Express and its dependencies (MIT, ISC, BSD-3-Clause), Yjs, y-protocols, y-codemirror.next, lib0, ws and Trystero (MIT: shared
 projects), Yosys (YoWASP, ISC),

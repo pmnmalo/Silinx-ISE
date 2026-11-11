@@ -4,12 +4,13 @@
 // module's other tests (#635). For each file the change touches, every unit test file (test/*.test.js, and the
 // toolchain package's, packages/silinx-fpga/test/*.test.js, #1680) that imports it, directly or through one of the
 // tests' helper modules (the .js and .mjs of those folders, at any depth but test/ui/, that are not tests), and through a module that only
-// re-exports it (the toolchain package's entries, #1677, #1678); a changed test file itself; <name>.test.js of
+// re-exports it (the toolchain package's entries, #1677, #1678; core/'s old paths of the HDL front end's package,
+// packages/silinx-hdl, #1710); a changed test file itself; <name>.test.js of
 // those folders for a changed <name>.js; a test that names a changed
 // file in quotes, by its path or its name (one that reads it: docs.test.js CLAUDE.md, ci-workflow.test.js the
-// workflows); test/code-size.test.js for a changed source of core/, web/js/, server/ or scripts/ (it measures them
-// all, #405); test/toolchain-boundary.test.js and test/layering.test.js for a changed source of the IDE or the
-// package (they read every source's imports, #2356). The UI tests (test/ui/) run when they changed, or when the page script of their name did
+// workflows); test/code-size.test.js for a changed source of core/, web/js/, server/, scripts/ or the packages' src/
+// (it measures them all, #405); test/toolchain-boundary.test.js, test/hdl-boundary.test.js and test/layering.test.js
+// for a changed source of the IDE or the packages (they read every source's imports, #2356, #1710). The UI tests (test/ui/) run when they changed, or when the page script of their name did
 // (web/js/<name>.js), or when they name a changed file. A changed data file (any file not JavaScript: the bit
 // database's JSON, a device description, an example, a fixture, #772) counts as a change of every source that
 // reads it, found from the code (a file or folder named from the source's own place: path.join(path.dirname(
@@ -140,10 +141,10 @@ export function relatedTests(files, changed) {
       if ((isUnit(t) || isUi(t)) && t !== f && names.some(r => r.test(text))) (isUnit(t) ? unit : ui).add(t);
   }
   // the size of every source (#405): a source changed may have grown past the limit
-  if (files['test/code-size.test.js'] != null && changed.some(f => /^(core|packages\/silinx-fpga\/src|web\/js|server|scripts)\/.+\.m?js$/.test(f))) unit.add('test/code-size.test.js');
+  if (files['test/code-size.test.js'] != null && changed.some(f => /^(core|packages\/silinx-(?:fpga|hdl)\/src|web\/js|server|scripts)\/.+\.m?js$/.test(f))) unit.add('test/code-size.test.js');
   // the imports of every source (#1678, #407): a source changed may import across the package's API or the research
-  if (changed.some(f => /^(core|server|web|scripts|bin|packages\/silinx-fpga\/src)\/.+\.m?js$/.test(f)))
-    for (const t of ['test/toolchain-boundary.test.js', 'test/layering.test.js']) if (files[t] != null) unit.add(t);
+  if (changed.some(f => /^(core|server|web|scripts|bin|packages\/silinx-(?:fpga|hdl)\/src)\/.+\.m?js$/.test(f)))
+    for (const t of ['test/toolchain-boundary.test.js', 'test/hdl-boundary.test.js', 'test/layering.test.js']) if (files[t] != null) unit.add(t);
   for (const f of ch) {
     if (!/\.m?js$/.test(f) || inTests(f)) continue;
     const name = path.posix.basename(f).replace(/\.m?js$/, '');

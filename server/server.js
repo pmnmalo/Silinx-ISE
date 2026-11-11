@@ -140,6 +140,8 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   app.use('/core', express.static(path.join(ROOT, 'core')));
   // the toolchain's package (silinx-fpga, #1677): its code, which core/'s re-exports import
   app.use('/packages/silinx-fpga/src', express.static(path.join(ROOT, 'packages/silinx-fpga/src')));
+  // the HDL front end's package (silinx-hdl, #1710): its code, which core/'s re-exports import
+  app.use('/packages/silinx-hdl/src', express.static(path.join(ROOT, 'packages/silinx-hdl/src')));
   app.use('/vendor/elk', express.static(path.join(ROOT, 'node_modules/elkjs/lib')));
   // the editor's ES modules (CodeMirror 6): the packages the import map of web/index.html names, only
   for (const pkg of importMapPackages()) {

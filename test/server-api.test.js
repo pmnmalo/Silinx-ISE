@@ -640,6 +640,15 @@ test('static files: the web UI and the shared core modules are served', async ()
   r = await fetch(app.origin + '/core/zip.js');
   assert.equal(r.status, 200);
   assert.match(await r.text(), /export async function createZip/);
+  // the HDL front end's package (silinx-hdl, #1710): core/'s old path re-exports it, the browser fetches both
+  r = await fetch(app.origin + '/core/vhdl/parser.js');
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /^export \* from '\.\.\/\.\.\/packages\/silinx-hdl\/src\/vhdl\/parser\.js';$/m);
+  r = await fetch(app.origin + '/packages/silinx-hdl/src/vhdl/parser.js');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type'), /javascript/);
+  assert.match(await r.text(), /export function parse\(/);
+  assert.equal((await fetch(app.origin + '/packages/silinx-hdl/package.json')).status, 404);
   assert.equal((await fetch(app.origin + '/api/no-such-route')).status, 404);
 });
 

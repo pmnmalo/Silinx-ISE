@@ -267,6 +267,14 @@ test('related tests: a module of the toolchain\'s package, through core/\'s old 
   for (const f of ['packages/silinx-fpga/test/fpga-pack.test.js', 'test/iob-pack.test.js']) assert.ok(sim.includes(f), f);
 });
 
+test('related tests: a module of the HDL front end\'s package, through core/\'s old path that re-exports it (#1710)', () => {
+  const { unit } = relatedTests(sources(), ['packages/silinx-hdl/src/vhdl/parser.js']);
+  // the tests of core/vhdl/parser.js (its old path) and of its importers, the size and the boundaries
+  for (const f of ['test/vhdl-parser.test.js', 'test/vhdl-parser-parts.test.js', 'test/code-size.test.js', 'test/hdl-boundary.test.js',
+    'test/toolchain-boundary.test.js', 'test/layering.test.js']) assert.ok(unit.includes(f), f);
+  assert.ok(relatedTests(sources(), ['packages/silinx-hdl/src/unisim.js']).unit.includes('test/blockram.test.js'));
+});
+
 test('related tests: the command line, in a repository of its own — the list, a part, a failing test, no test', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-related-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));

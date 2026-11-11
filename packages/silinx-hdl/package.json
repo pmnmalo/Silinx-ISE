@@ -1,0 +1,9 @@
+{
+  "name": "silinx-hdl",
+  "version": "0.1.0",
+  "description": "The Silinx HDL front end: VHDL and Verilog parsers, elaboration, an event-driven simulator with the UNISIM primitives' models, and the elaborated design as one flat Verilog module for synthesis",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "author": "Pedro Maló"
+}

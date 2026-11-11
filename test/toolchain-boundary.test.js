@@ -131,7 +131,7 @@ test('#1678 the IDE imports the toolchain through its API only, each import its 
   }
   assert.deepEqual(heavier, []);
   // no old path left: core/ re-exports none of the package's modules
-  assert.deepEqual(sources('core').filter((f) => /^export \* from '(\.\.\/)+packages\//m.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))), []);
+  assert.deepEqual(sources('core').filter((f) => /^export \* from '(\.\.\/)+packages\/silinx-fpga\//m.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))), []);
 });
 
 // #1680: the package's own tests (packages/silinx-fpga/test, their helper and fixtures) import nothing of the IDE either,
