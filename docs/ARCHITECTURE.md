@@ -26,9 +26,10 @@ WebAssembly tools into the single file; `scripts/pwa.mjs` adds the site's servic
  The hosts        server/   projects on disk, jobs, ISE's flow, the Silinx flow in a process, programmers, MCP
                   browser   projects in its storage, Web Workers (Yosys, the flow, the emulator)
                      │
- The core         core/     isomorphic (no DOM, no Node APIs): the HDL front end, the simulator, the drawings, Silinx
-                            HLS, the emulator's engines, the simulation models, programming over WebUSB
+ The core         core/     isomorphic (no DOM, no Node APIs): the drawings, Silinx HLS, the emulator's engines, the
+                            simulation models, programming over WebUSB
                      │
+ The front end    packages/silinx-hdl    VHDL and Verilog: parsers, elaboration, simulator, flat Verilog
  The toolchain    packages/silinx-fpga   synthesis to bitstream (TOOLCHAIN.md)
                      │
  Outside tools    Yosys and nextpnr (WebAssembly, npm) │ Xilinx ISE 14.7 (the user's) │ programmers (openFPGALoader…)
@@ -63,7 +64,9 @@ them, and `web/js/drawings.js` keeps a drawing and its HDL module in step.
 
 ### The HDL front end
 
-VHDL and Verilog are parsed into one intermediate representation (`core/vhdl/parser.js`, `core/verilog/parser.js`,
+The front end is a package of this repository, `packages/silinx-hdl` (#1710): its modules are in its `src/`, and
+core/'s old paths, named below, re-export them. VHDL and Verilog are parsed into one intermediate representation
+(`core/vhdl/parser.js`, `core/verilog/parser.js`,
 [IR.md](IR.md)), compiled into a library and elaborated into an instance hierarchy with bound, executable expressions
 (`core/compile.js`, `core/elaborate.js`). On it: Check Syntax and the lint (`core/lint.js`, `core/lint-design.js`), quick
 fixes and renames (`core/quickfix.js`, `core/rename.js`), the editor (`web/js/editor.js`, CodeMirror). For the synthesis,

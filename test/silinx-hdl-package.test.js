@@ -57,7 +57,7 @@ const sources = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: t
 const moved = sources('packages/silinx-hdl/src').sort();
 
 test('#1710 the front end\'s modules are in the package, core/\'s old paths re-export them', async () => {
-  assert.equal(shims.length, 24);
+  assert.equal(shims.length, 43);
   assert.deepEqual(shims.map(([, m]) => m).sort(), moved, 'every module of the package has its old path');
   for (const [old, mod] of shims) {
     assert.equal(mod, `packages/silinx-hdl/src/${old.slice('core/'.length)}`, old);
@@ -72,7 +72,9 @@ test('#1710 the front end\'s modules are in the package, core/\'s old paths re-e
 test('#1710 the package\'s modules import one another only, each relative import a module of the package', () => {
   const missing = [];
   for (const f of moved) {
-    for (const [, spec] of read(path.join(ROOT, f)).matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)['"]([^'"]+)['"]/g)) {
+    // (an import or export statement at the start of a line, or a dynamic import: not a message's "from '…'")
+    for (const [, a, b] of read(path.join(ROOT, f)).matchAll(/^\s*(?:import|export)\s[^'"`;]*?from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]/gm)) {
+      const spec = a || b;
       const target = path.posix.normalize(path.posix.join(path.posix.dirname(f), spec));
       if (!spec.startsWith('./') && !spec.startsWith('../')) missing.push(`${f}: ${spec}`);
       else if (!target.startsWith('packages/silinx-hdl/src/') || !fs.existsSync(path.join(ROOT, target))) missing.push(`${f}: ${spec}`);
@@ -97,4 +99,22 @@ test('#1710 the moved front end reads VHDL and Verilog through core/\'s old path
   // the UNISIM models: a primitive's VHDL source, given to a design that uses the library
   const { primitiveSources, UNISIM_SOURCE } = await import('../core/unisim.js');
   assert.deepEqual(primitiveSources([{ path: 't.vhd', text: 'library unisim;\nuse unisim.vcomponents.all;\n' }]).map((s) => s.path), [UNISIM_SOURCE.path]);
+});
+
+test('#1710 the moved front end compiles, elaborates, simulates and writes the flat Verilog, through core/\'s old paths and the package alike', async () => {
+  const old = await import('../core/compile.js'), pkgCompile = await import('../packages/silinx-hdl/src/compile.js');
+  const { toVerilog } = await import('../packages/silinx-hdl/src/synth-verilog.js');
+  assert.equal(old.compile, pkgCompile.compile);
+  assert.equal((await import('../core/synth-verilog.js')).toVerilog, toVerilog);
+  const src = [{ path: 'c.v', text: 'module c(input clk, output reg [1:0] q = 0);\n  always @(posedge clk) q <= q + 1;\nendmodule\n' },
+    { path: 'tb.v', text: 'module tb;\n  reg clk = 0; wire [1:0] q;\n  c u(.clk(clk), .q(q));\n  always #5 clk = ~clk;\n  initial begin #42 $display("q=%0d", q); $finish; end\nendmodule\n' }];
+  const lib = pkgCompile.compile(src);
+  assert.deepEqual(lib.errors, []);
+  assert.deepEqual(pkgCompile.topCandidates(lib), ['tb']);
+  const design = pkgCompile.elaborate(lib, 'c');
+  assert.deepEqual(design.diags, []);
+  assert.match(toVerilog(design, { name: 'c' }).text, /^module c\b/m);
+  const { sim, errors } = old.simulate(src, 'tb');
+  assert.deepEqual(errors, []);
+  assert.deepEqual(sim.log.filter((l) => l.kind === 'print').map((l) => [l.time, l.text]), [[42000, 'q=0']]);   // (in ps: four rising edges, 4 mod 4)
 });

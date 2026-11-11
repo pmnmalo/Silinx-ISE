@@ -1,8 +1,8 @@
 // The HDL front end's boundary (#1709, step 1 of silinx-hdl, docs/TOOLCHAIN-SEPARATION.md section 5): the front
-// end (what core/compile.js, core/synth-verilog.js and core/unisim.js reach: the VHDL and Verilog parsers, the
-// elaborator, the interpreter and simulator, the flat Verilog's synth-*.js) imports nothing of the IDE but its own
-// modules, listed below (moving into its package, packages/silinx-hdl/src, #1710). A new module reached by the front end is added to the list on purpose; an import of the
-// rest of the IDE fails (as the toolchain's, test/toolchain-boundary.test.js).
+// end (what compile.js, synth-verilog.js and unisim.js reach: the VHDL and Verilog parsers, the elaborator, the
+// interpreter and simulator, the flat Verilog's synth-*.js), in its package (packages/silinx-hdl/src, #1710), imports
+// nothing of the IDE but its own modules, listed below. A new module reached by the front end is added to the list on
+// purpose; an import of the rest of the IDE fails (as the toolchain's, test/toolchain-boundary.test.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,26 +11,25 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// the front end's package (#1710): its modules move there from core/, whose old paths re-export them
+// the front end's package (#1710): its modules moved there from core/, whose old paths re-export them
 const HDL = 'packages/silinx-hdl/src/';
 // the front end's entry points
-const ENTRIES = ['core/compile.js', 'core/synth-verilog.js', `${HDL}unisim.js`];
+const ENTRIES = ['compile.js', 'synth-verilog.js', 'unisim.js'].map((f) => HDL + f);
 // the front end's modules on 2026-10-27: what the entry points reach; a new one is added on purpose
 const FRONT_END = new Set([
-  'core/bound-walk.js', 'core/compile.js',   // (bound-walk.js: #2577)
-  'core/elab-call.js', 'core/elab-expr.js', 'core/elab-instance.js', 'core/elab-stmt.js', 'core/elaborate.js',
-  'core/interp-format.js', 'core/interp-textio.js', 'core/interp.js', 'core/simulator.js',
-  'core/native.js', 'core/values.js',
-  'core/synth-module.js', 'core/synth-operators.js', 'core/synth-stmts.js', 'core/synth-tables.js',
-  'core/synth-values.js', 'core/synth-verilog.js',
-  // in the package (#1710)
-  ...['util.js', 'unisim-jtag.js', 'unisim-s6.js', 'unisim.js',
-    'verilog/lexer.js', 'verilog/parser-defs.js', 'verilog/parser-exprs.js',
-    'verilog/parser-assert.js', 'verilog/parser-items.js', 'verilog/parser-stmts.js', 'verilog/parser.js',
-    'vhdl/actual.js', 'vhdl/labels.js', 'vhdl/lexer.js', 'vhdl/math-real.js', 'vhdl/nodes.js',
-    'vhdl/parse-concurrent.js', 'vhdl/parse-decls.js', 'vhdl/parse-defs.js', 'vhdl/parse-expr.js',
-    'vhdl/parse-helpers.js', 'vhdl/parse-seq.js', 'vhdl/parser.js', 'vhdl/purity.js'].map((f) => HDL + f),
-]);
+  'bound-walk.js', 'compile.js',   // (bound-walk.js: #2577)
+  'elab-call.js', 'elab-expr.js', 'elab-instance.js', 'elab-stmt.js', 'elaborate.js',
+  'interp-format.js', 'interp-textio.js', 'interp.js', 'simulator.js',
+  'native.js', 'util.js', 'values.js',
+  'synth-module.js', 'synth-operators.js', 'synth-stmts.js', 'synth-tables.js',
+  'synth-values.js', 'synth-verilog.js',
+  'unisim-jtag.js', 'unisim-s6.js', 'unisim.js',
+  'verilog/lexer.js', 'verilog/parser-defs.js', 'verilog/parser-exprs.js',
+  'verilog/parser-assert.js', 'verilog/parser-items.js', 'verilog/parser-stmts.js', 'verilog/parser.js',
+  'vhdl/actual.js', 'vhdl/labels.js', 'vhdl/lexer.js', 'vhdl/math-real.js', 'vhdl/nodes.js',
+  'vhdl/parse-concurrent.js', 'vhdl/parse-decls.js', 'vhdl/parse-defs.js', 'vhdl/parse-expr.js',
+  'vhdl/parse-helpers.js', 'vhdl/parse-seq.js', 'vhdl/parser.js', 'vhdl/purity.js',
+].map((f) => HDL + f));
 // the npm packages it imports (its dependencies once it is a package of its own): none
 const PACKAGES = new Set();
 
@@ -78,6 +77,7 @@ test('#1709 HDL boundary: how the imports across are found', () => {
   const text = [
     "import { a } from './lexer.js';", // within
     "import { u } from '../util.js';", // within, relative
+    "import { v } from '../values.js';",
     "import { p } from '/core/vhdl/parser.js';", // within: the browser's URL of an old path, which re-exports it (#1710)
     "import * as c from '../../../../core/schdoc.js';", // across, relative
     "export { s } from '../../../../core/sim-model.js';", // a re-export
@@ -97,6 +97,7 @@ test('#1709 HDL boundary: how the imports across are found', () => {
   assert.deepEqual(crossings('core/compile.js', "import { x } from './vhdl/parser.js';\nimport { u } from './util.js';"), []);
   assert.equal(moved('core/vhdl/parser.js'), `${HDL}vhdl/parser.js`);
   assert.equal(moved('core/unisim.js'), `${HDL}unisim.js`);
+  assert.equal(moved('core/compile.js'), `${HDL}compile.js`);
   assert.equal(moved('core/lint.js'), 'core/lint.js');
   assert.equal(moved('core/no-such.js'), 'core/no-such.js');
 });
@@ -105,9 +106,7 @@ test('#1709 HDL boundary: the front end\'s modules exist, and are what the entry
   assert.equal(FRONT_END.size, 43);
   for (const f of FRONT_END) assert.ok(fs.existsSync(path.join(ROOT, f)), `${f}: gone, remove it from FRONT_END`);
   // the package's modules (#1710), each one's old path in core/ re-exporting it
-  const inPackage = [...FRONT_END].filter((f) => f.startsWith(HDL));
-  assert.equal(inPackage.length, 24);
-  for (const f of inPackage) assert.equal(moved(`core/${f.slice(HDL.length)}`), f);
+  for (const f of FRONT_END) assert.equal(moved(`core/${f.slice(HDL.length)}`), f);
   for (const f of ENTRIES) assert.ok(FRONT_END.has(f), f);
   // not the front end: the toolchain's synth-*.js, the drawings, the IDE's simulation model
   for (const f of ['packages/silinx-fpga/src/synth-open.js', 'packages/silinx-fpga/src/synth-fsm.js', 'core/synth-front.js', 'core/schdoc.js', 'core/sim-model.js']) {
