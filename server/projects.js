@@ -241,10 +241,10 @@ export async function fileTree(name) {
 
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
 
-async function copyDir(src, dst) {
+async function copyDir(src, dst, { skipRoot = null } = {}) {
   await fs.mkdir(dst, { recursive: true });
   for (const ent of await fs.readdir(src, { withFileTypes: true })) {
-    if (ent.name.startsWith('.')) continue;   // hidden files (a Mac's .DS_Store): not part of a project
+    if (ent.name.startsWith('.') || ent.name === skipRoot) continue;   // hidden files (a Mac's .DS_Store): not part of a project
     const s = path.join(src, ent.name), d = path.join(dst, ent.name);
     if (ent.isDirectory()) await copyDir(s, d); else await fs.copyFile(s, d);
   }
@@ -261,8 +261,11 @@ export async function createProject({ name, template = 'empty', device, board, f
     const ok = /^[a-z0-9_-]+$/i.test(template);
     const src = [EXAMPLES_DIR, TEST_DESIGNS_DIR].map(d => path.join(d, template)).find(d => ok && fsSync.existsSync(path.join(d, PROJECT_FILE)));
     if (!src) throw new HttpError(400, `unknown template '${template}'`);
-    await copyDir(src, dir);
-    const pj = await readProject(name);
+    // (its files without its silinx.json, written once below, already marked when the project is untrusted: never on
+    // disk as a trusted project's in between, #3413)
+    const pj = { ...JSON.parse(await fs.readFile(path.join(src, PROJECT_FILE), 'utf8')), name };
+    pj.files ||= [];
+    await copyDir(src, dir, { skipRoot: PROJECT_FILE });
     const was = `${pj.board}|${pj.device?.part}|${pj.device?.package}`;
     if (device) pj.device = device;
     if (board !== undefined) pj.board = board;
