@@ -10,7 +10,7 @@ import { VERIFY_DEPTH, MAX_DEPTH } from '/core/verify.js';
 import { log } from './console.js';
 import { saveAll } from './processes.js';
 import { runSimulation } from './viewers.js';
-import { writeBench, verifySources } from './verify.js';
+import { writeBench, verifySources, timeLimitField } from './verify.js';
 
 const last = {};
 const KINDS = [['never', 'Never reaches a state'], ['reach', 'Reaches a state'], ['exclusive', 'Outputs never 1 together']];
@@ -21,7 +21,7 @@ function namesOf(m) {
   return { states, bits: (m.outputs || []).filter(o => (o.width ?? 1) === 1).map(o => o.name) };
 }
 
-/** The property and the depth asked: { property, depth }, or null (cancelled). */
+/** The property, the depth and the time limit asked: { property, depth, timeLimit }, or null (cancelled). */
 async function askProperty(m) {
   const { states, bits } = namesOf(m);
   const prev = last[m.name] || {};
@@ -35,38 +35,39 @@ async function askProperty(m) {
   const show = () => { stateRow.hidden = kind.value === 'exclusive'; outsRow.hidden = kind.value !== 'exclusive'; };
   kind.addEventListener('change', show);
   show();
+  const limit = timeLimitField();
   const property = () => (kind.value === 'exclusive' ? { kind: 'exclusive', outputs: boxes.filter(b => b.checked).map(b => b.value) } : { kind: kind.value, state: state.value });
   const r = await dialog({
     title: PROPERTY_PROCESS, width: 460,
     body: h('div', { class: 'verify-dlg' },
       h('p', {}, 'Proves a property of the state machine for every input sequence, or shows the first clock cycle where it fails.'),
       h('label', {}, 'Property:'), kind, stateRow, outsRow,
-      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth),
+      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth, limit.row),
     buttons: [{ label: 'Verify', primary: true, value: true, validate: () => {
       const n = +depth.value;
       if (!(Number.isInteger(n) && n >= 1 && n <= MAX_DEPTH)) { toast(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`, 'err'); return false; }
       const why = propertyError(m, property());
       if (why) { toast(why, 'err'); return false; }
-      return true;
+      return limit.ok();
     } }, { label: 'Cancel', value: null }],
   });
   if (!r) return null;
   last[m.name] = property();
   last.depth = +depth.value;
-  return { property: property(), depth: +depth.value };
+  return { property: property(), depth: +depth.value, timeLimit: +limit.input.value };
 }
 
 /** Verify Property of a drawing (its model m, of file `path`): the property asked, proved, a counterexample simulated. */
-export async function propertyProcess(m, { property, depth } = {}) {
+export async function propertyProcess(m, { property, depth, timeLimit } = {}) {
   if (!property) {
     const a = await askProperty(m);
     if (!a) return null;
-    ({ property, depth } = a);
+    ({ property, depth, timeLimit } = a);
   }
   try {
     await saveAll();
     const run = await (await import('./emulator.js')).emulatorYosys(api.standalone);
-    const r = await verifyProperty(verifySources(), { drawing: m, property, depth: depth ?? VERIFY_DEPTH, run });
+    const r = await verifyProperty(verifySources(), { drawing: m, property, depth: depth ?? VERIFY_DEPTH, timeLimit, run });
     const b = r.status === 'failed' ? propertyBench(r) : null;
     const bench = b ? await writeBench(b.name, b.path, () => b.text) : null;
     for (const x of propertyMessages(r, { bench })) log(x.text, x.kind === 'info' ? undefined : x.kind);

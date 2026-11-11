@@ -3,6 +3,7 @@
 // together); proved by induction, bounded, or the counterexample, in a drawing of each language; its test bench (the
 // drawing's HDL with the property's assertion, then the bench) simulated: the property's message at the clock cycle the
 // proof gives; the examples' drawings (traffic's state diagram, blinky's ASM chart); the refusals; the copy's HDL.
+// The time limit (#3261): a check stopped in the real Yosys.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -111,4 +112,19 @@ test('the refusals; the copy: the module renamed, the assertion before its end, 
   assert.match(g.text, /\nmodule xy_props/);
   assert.match(g.text, /    always @\* verify_property: assert \(!\(\(x && y\)\)\) else \$error\("xy has two of x, y 1 together"\);\n\nendmodule\n$/);
   assert.doesNotMatch(hdlOf(m).text, /verify_property|xy_props/);
+});
+
+test('#3261 the time limit: blinky\'s ASM chart, reaching WAIT_RELEASE within 200 cycles, stopped after 3 s (Yosys\'s worker thread terminated): the cycles checked by then', async () => {
+  const read = f => fs.readFileSync(new URL(`../examples/blinky/src/${f}`, import.meta.url), 'utf8');
+  const asm = JSON.parse(read('speed_ctrl.asm.json'));
+  const t0 = Date.now();
+  const r = await verifyProperty([{ path: 'src/speed_ctrl.vhd', lang: 'vhdl', text: read('speed_ctrl.vhd') }], { drawing: asm, property: { kind: 'reach', state: 'WAIT_RELEASE' }, depth: 200, timeLimit: 3, run: yosysNode });
+  assert.ok(Date.now() - t0 < 6000, 'stopped at its limit');
+  assert.deepEqual([r.status, r.holds, r.timeLimit, r.errors, r.warnings], ['timeout', false, 3, [], []]);
+  assert.ok(r.checked >= 1 && r.checked < 200, String(r.checked));
+  assert.deepEqual(msgs(r).slice(1), [
+    ['info', 'Proving that \'speed_ctrl\' reaches state WAIT_RELEASE: Yosys\'s SAT solver, at most 200 clock cycle(s), then a proof by induction.'],
+    ['warn', `WARNING:Verify - the check did not finish in 3 s (its time limit): 'speed_ctrl' does not reach state WAIT_RELEASE in the first ${r.checked} clock cycle(s), not checked beyond them: a larger time limit, or a smaller depth.`],
+    ['ok', 'Process "Verify Property" completed successfully with 1 warning(s)'],
+  ]);
 });

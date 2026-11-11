@@ -8,7 +8,7 @@
 // A counterexample's test bench holds the copy and the bench (sim/verify_<module>): the simulation reports the
 // property's assertion at the clock cycle the proof found.
 //
-//   const r = await verifyProperty(sources, { drawing, property: { kind, state | outputs }, depth, run })
+//   const r = await verifyProperty(sources, { drawing, property: { kind, state | outputs }, depth, timeLimit, run })
 //   r: verifyAssertions' result, and module, property, holds (the property holds: never and exclusive proved, reach
 //      failed, i.e. reached), copy ({ path, text, name, lang })
 import { generateFsm } from './fsm-hdl.js';
@@ -16,7 +16,7 @@ import { normalizeFsm } from './fsm.js';
 import { generate as generateAsm } from './asm-gen.js';
 import { normalizeModel as normalizeAsm } from './asm.js';
 import { verifyAssertions } from './verify-assert.js';
-import { VERIFY_DEPTH } from './verify.js';
+import { VERIFY_DEPTH, timeoutEnd } from './verify.js';
 import { counterexampleBench, benchName } from './verify-bench.js';
 
 export const PROPERTY_PROCESS = 'Verify Property';
@@ -80,14 +80,14 @@ export function propertyCopy(drawing, p, lang, { withCheck = true } = {}) {
  * Prove property p of the drawing (its model: a state diagram's or an ASM chart's) on the sources (the project's: the
  * drawing's HDL among them, any module it instantiates), at most `depth` clock cycles. run: Yosys's.
  */
-export async function verifyProperty(sources, { drawing, property: p, depth = VERIFY_DEPTH, lang, run, onLine } = {}) {
+export async function verifyProperty(sources, { drawing, property: p, depth = VERIFY_DEPTH, timeLimit, lang, run, onLine } = {}) {
   const error = (...errors) => ({ status: 'error', errors, warnings: [], depth, property: p });
   if (!drawing) return error('no state diagram or ASM chart to verify');
   const why = propertyError(drawing, p);
   if (why) return error(why);
   let copy;
   try { copy = propertyCopy(drawing, p, lang); } catch (e) { return error(`the drawing's HDL cannot be generated: ${e.message.split('\n')[0]}`); }
-  const r = await verifyAssertions([...sources.filter(s => s.path !== copy.path), { ...copy, role: 'simulation' }], { top: copy.name, depth, run, onLine });
+  const r = await verifyAssertions([...sources.filter(s => s.path !== copy.path), { ...copy, role: 'simulation' }], { top: copy.name, depth, timeLimit, run, onLine });
   const module = drawingOf(drawing).m.name;
   const holds = p.kind === 'reach' ? r.status === 'failed' : r.status === 'proved';
   return { ...r, module, property: p, holds, copy, drawing };
@@ -127,6 +127,11 @@ export function propertyMessages(r, { bench = null } = {}) {
   M.push({ text: `Proving that '${r.module}' ${what}: Yosys's SAT solver, at most ${r.depth} clock cycle(s), then a proof by induction.`, kind: 'info' });
   const warns = r.warnings.map(w => ({ text: `WARNING:Verify - ${w}`, kind: 'warn' }));
   M.push(...warns);
+  if (r.status === 'timeout') {
+    // (#3261: what the cycles checked show)
+    timeoutEnd(M, r, p.kind === 'reach' ? `'${r.module}' does not reach state ${p.state}` : `'${r.module}' ${what}`, end, warns.length);
+    return M;
+  }
   if (p.kind === 'reach') {
     if (r.status === 'failed') {
       M.push({ text: `'${r.module}' reaches state ${p.state} at clock cycle ${r.cycle}.`, kind: 'ok' });

@@ -2,7 +2,8 @@
 // workers, a third queued until one ends, the workers kept for the next runs; one worker on a device with
 // few cores or little memory; after a crash one Yosys at a time. The flow worker's pool (#279): its
 // workers' code (packages/silinx-fpga/src/synth-open.js yosysWorkerSource) run against a stand-in for Yosys; a worker that
-// cannot start says so (the flow worker then runs Yosys in its own thread).
+// cannot start says so (the flow worker then runs Yosys in its own thread). A run stopped by its signal (#3261): its
+// worker terminated.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -135,6 +136,32 @@ test('#400 a worker that fails at run time (after answering): terminated, its ru
   await assert.rejects(q, e => e.message === 'the Yosys worker failed: and again' && !e.workerFailed);
   assert.equal(last.w.terminated, true);
   assert.equal(last2.w.terminated, true);
+});
+
+test('#3261 a run stopped (its signal aborted): its worker terminated, the run rejected (aborted), the next one in a new worker; a queued one left out', async () => {
+  const { yosysPool } = await load({ hardwareConcurrency: 8, deviceMemory: 8 });
+  const made = [], posted = [];
+  const run = yosysPool({ spawn: () => { const w = { postMessage(m) { posted.push({ w, ...m }); }, terminate() { this.terminated = true; } }; made.push(w); return w; }, workers: 1 });
+  const a = new AbortController(), b = new AbortController();
+  const p = run(['a'], {}, () => {}, undefined, { signal: a.signal });
+  const q = run(['b'], {}, () => {}, undefined, { signal: b.signal });
+  assert.deepEqual(posted.map(x => x.args[0]), ['a'], 'b queued');
+  // b stopped while queued: it never runs
+  b.abort();
+  await assert.rejects(q, e => e.aborted === true && e.message === 'Yosys was stopped');
+  // a stopped while running: its worker terminated
+  a.abort();
+  await assert.rejects(p, e => e.aborted === true);
+  assert.equal(made[0].terminated, true);
+  // the next run: in a new worker, the pool kept (one at a time, as before)
+  const r = run(['c'], {});
+  assert.deepEqual([made.length, posted.map(x => x.args[0]), run.parallel], [2, ['a', 'c'], 1]);
+  made[1].onmessage({ data: { id: posted[1].id, files: { out: 'c' } } });
+  assert.deepEqual(await r, { out: 'c' });
+  // a late answer of the terminated worker: ignored; a signal already aborted: rejected at once
+  made[0].onmessage({ data: { id: posted[0].id, files: { out: 'a' } } });
+  await assert.rejects(run(['d'], {}, () => {}, undefined, { signal: AbortSignal.abort() }), e => e.aborted === true);
+  assert.equal(posted.length, 2);
 });
 
 // a stand-in for YoWASP's bundle, and the checks of a worker's code against it

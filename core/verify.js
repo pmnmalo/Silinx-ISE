@@ -7,11 +7,12 @@
 // and both modules' outputs, which core/verify-bench.js makes a test bench of (the simulator replays it, the waveform
 // viewer shows it).
 //
-//   const r = await verifyEquivalence(sources, { top, reference, depth, run, onLine })
-//   r: { status: 'proved' | 'bounded' | 'failed' | 'error', errors, warnings, depth, induction (the proof's length),
+//   const r = await verifyEquivalence(sources, { top, reference, depth, timeLimit, run, onLine })
+//   r: { status: 'proved' | 'bounded' | 'failed' | 'timeout' | 'error', errors, warnings, depth, induction (the proof's length),
 //        cycles: [{ in: { port: bits }, uut: { port: bits }, ref: { port: bits } }] (the counterexample), cycle (its
 //        difference's, from 1), differs: [port], ports: [{ name, dir, width, uut, ref }] (core/testbench.js tbPorts'),
-//        clocks: [port], log }
+//        clocks: [port], log }; timeout (core/verify-limit.js, #3261): Yosys stopped after timeLimit seconds, checked (the
+//        clock cycles it had checked with no difference by then)
 //
 // The model: every register takes its next value once per clock cycle (one clock: the designs of a course; their
 // asynchronous resets as Yosys's async2sync makes them, the reset's value seen at once); a register with no initial
@@ -21,9 +22,11 @@ import { primitiveSources } from './unisim.js';
 import { toVerilog, signedInt } from './synth-verilog.js';
 import { tbPorts } from './testbench.js';
 import { clocksOf } from './schematic.js';
+import { VERIFY_TIME_LIMIT, timeLimitError, runLimited, cyclesChecked, timeoutText } from './verify-limit.js';
 
 export const VERIFY_DEPTH = 20;
 export const MAX_DEPTH = 1000;
+export { VERIFY_TIME_LIMIT, MAX_TIME_LIMIT } from './verify-limit.js';
 // the modules' names in Yosys (the miter's gold, the reference, and gate, the module verified)
 const REF = 'silinx_ref', UUT = 'silinx_uut', MITER = 'silinx_miter';
 
@@ -135,11 +138,12 @@ export function readVerifyLog(lines, outputs = [], { inputs = null } = {}) {
  * synth-open-node.js yosysNode, web/js/yosys-client.js yosysBrowser). referenceSources: the reference's own sources,
  * compiled apart (an exercise's reference design, whose modules have the submission's names: automatic grading, #3217).
  */
-export async function verifyEquivalence(sources, { top, reference, referenceSources = null, depth = VERIFY_DEPTH, run, onLine = () => {} } = {}) {
+export async function verifyEquivalence(sources, { top, reference, referenceSources = null, depth = VERIFY_DEPTH, timeLimit = VERIFY_TIME_LIMIT, run, onLine = () => {} } = {}) {
   const error = (...errors) => ({ status: 'error', errors, warnings: [], depth });
   if (!top) return error('no module to verify');
   if (!reference) return error(`no reference module for '${top}'`);
   if (!(Number.isInteger(depth) && depth >= 1 && depth <= MAX_DEPTH)) return error(`the depth must be a number of clock cycles from 1 to ${MAX_DEPTH}`);
+  if (timeLimitError(timeLimit)) return error(timeLimitError(timeLimit));
   const lib = compile([...primitiveSources(sources), ...sources]);
   const libErrs = lib.errors.filter(e => e.severity === 'error');
   if (libErrs.length) return error(...libErrs.slice(0, 5).map(e => `${e.file}:${e.line} ${e.message}`));
@@ -165,12 +169,13 @@ export async function verifyEquivalence(sources, { top, reference, referenceSour
     } catch (e) { return error(`'${m.unit.name}' cannot be verified: ${e.message}`); }
   }
   const lines = [];
-  try { await run(['-p', verifyScript(depth)], files, l => { lines.push(l); onLine(l); }); }
+  let t;
+  try { t = await runLimited(run, ['-p', verifyScript(depth)], files, l => { lines.push(l); onLine(l); }, timeLimit); }
   catch (e) { return { ...error(e.message), log: lines }; }
   const refBy = new Map(ref.ports.map(p => [p.name, p]));
   const ports = uut.ports.map(p => ({ name: p.name, dir: p.dir, width: p.width, uut: p, ref: refBy.get(p.name) }));
   const outputs = ports.filter(p => p.dir === 'out').map(p => p.name);
-  const r = readVerifyLog(lines, outputs);
+  const r = t ? { status: 'timeout', timeLimit, checked: cyclesChecked(lines), warnings: [] } : readVerifyLog(lines, outputs);
   if (r.status === 'error') return { ...error('Yosys gave no result (its log has neither a proof nor a counterexample)'), log: lines };
   const clocks = [...new Set([...uut.clocks, ...ref.clocks])];
   return { ...r, errors: [], warnings: [...warnings, ...r.warnings], depth, top: uut.unit.name, reference: ref.unit.name,
@@ -202,6 +207,8 @@ export function verifyMessages(r, { top = r.top, reference = r.reference, bench 
   } else if (r.status === 'bounded') {
     M.push({ text: `WARNING:Verify - no difference in the first ${r.depth} clock cycle(s), but not proved beyond them (the induction did not succeed): a larger depth checks more cycles.`, kind: 'warn' });
     end(true, warns.length + 1);
+  } else if (r.status === 'timeout') {
+    timeoutEnd(M, r, 'no difference', end, warns.length);
   } else {
     const last = r.cycles[r.cycle - 1];
     const what = r.differs.map(n => `${n} = ${last.uut[n]}, the reference's ${n} = ${last.ref[n]}`).join('; ');
@@ -210,6 +217,13 @@ export function verifyMessages(r, { top = r.top, reference = r.reference, bench 
     end(false);
   }
   return M;
+}
+
+/** A timed-out check's messages (#3261): a warning when some clock cycles were checked, an error when none was. */
+export function timeoutEnd(M, r, what, end, warns) {
+  const ok = r.checked > 0;
+  M.push({ text: `${ok ? 'WARNING' : 'ERROR'}:Verify - ${timeoutText(r, what)}`, kind: ok ? 'warn' : 'err' });
+  end(ok, warns + 1);
 }
 
 /** Whether a file's text is a counterexample's test bench of Verify (written again by the next check). */

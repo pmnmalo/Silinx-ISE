@@ -13,6 +13,7 @@ export const VERIFY_PT = {
     'Provar uma propriedade da máquina de estados do fluxograma: um estado nunca alcançado, um estado alcançado, saídas nunca a 1 em simultâneo',
   'Proves a property of the state machine for every input sequence, or shows the first clock cycle where it fails.':
     'Prova uma propriedade da máquina de estados para qualquer sequência de entradas, ou mostra o primeiro ciclo de relógio em que falha.',
+  'Time limit (s):': 'Tempo limite (s):',
   'Property:': 'Propriedade:', 'State:': 'Estado:', 'Outputs (1 bit):': 'Saídas (1 bit):',
   'Never reaches a state': 'Nunca alcança um estado', 'Reaches a state': 'Alcança um estado', 'Outputs never 1 together': 'Saídas nunca a 1 em simultâneo',
   'Proves that the module\'s assertions hold for every input sequence, or shows the first clock cycle where one fails.':
@@ -21,4 +22,5 @@ export const VERIFY_PT = {
 
 export const VERIFY_PT_PATTERNS = [
   [/^The depth is a number of clock cycles from 1 to (\d+)$/, 'A profundidade é um número de ciclos de relógio de 1 a $1'],
+  [/^The time limit is a number of seconds from 1 to (\d+)$/, 'O tempo limite é um número de segundos de 1 a $1'],
 ];

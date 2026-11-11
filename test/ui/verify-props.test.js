@@ -3,9 +3,12 @@
 // the depth; Yosys's SAT solver in the page's worker; its messages in the console; a counterexample: its test bench
 // (sim/verify_<module>.vhd: the drawing's HDL with the property, then the bench) written and simulated, SSim reporting
 // the property; a property that holds: proved; a wrong one refused in the dialog; an ASM chart's ⋮ menu has it too;
-// Portuguese. Both interfaces. No warnings.
+// Portuguese. The time limit (#3261): a check that takes longer stopped (the page's Yosys worker terminated), its
+// verdict a warning with the cycles checked; the next check in a new worker; a limit out of range refused. Both
+// interfaces. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
 
 let env;
@@ -59,12 +62,12 @@ uiTest('#3177 Verify Property: a state diagram\'s outputs both 1 found and repla
   await page.eval(() => window.SilinxApp.openFsm('src/xy.fsm.json'));
   await page.waitFor((ed) => window.Silinx.active?.id === 'fsm:src/xy.fsm.json' && document.querySelector(ed), [ED], { what: 'state diagram editor' });
   const dlg = await openDialog(page);
-  assert.deepEqual(dlg, { title: 'Verify Property', labels: ['Proves a property of the state machine for every input sequence, or shows the first clock cycle where it fails.', 'Property:', 'State:', 'Depth (clock cycles):'],
+  assert.deepEqual(dlg, { title: 'Verify Property', labels: ['Proves a property of the state machine for every input sequence, or shows the first clock cycle where it fails.', 'Property:', 'State:', 'Depth (clock cycles):', 'Time limit (s):'],
     kinds: ['Never reaches a state', 'Reaches a state', 'Outputs never 1 together'], states: ['A', 'B', 'C', 'D'], buttons: ['Verify', 'Cancel'] });
   // (one output only: refused, the dialog stays)
   await setDialog(page, 'exclusive', { outputs: ['x'] });
   assert.deepEqual(await page.eval(() => [...[...document.querySelectorAll('.dlg-overlay')].pop().querySelectorAll('.dlg-body label')].filter((l) => !l.closest('[hidden]')).map((l) => l.textContent.trim())),
-    ['Property:', 'Outputs (1 bit):', 'x', 'y', 'Depth (clock cycles):']);
+    ['Property:', 'Outputs (1 bit):', 'x', 'y', 'Depth (clock cycles):', 'Time limit (s):']);
   await page.click('.dlg-buttons .btn.primary');
   await page.waitFor(() => /the property 'exclusive' needs two 1-bit outputs or more/.test(document.body.textContent), [], { what: 'the refusal' });
   await setDialog(page, 'exclusive', { outputs: ['x', 'y'] });
@@ -95,8 +98,61 @@ uiTest('#3177 Verify Property: a state diagram\'s outputs both 1 found and repla
   // Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   const pt = await openDialog(page, '.doc:not([hidden]) .asm-editor', 'Verificar Propriedade…');
-  assert.deepEqual([pt.title, pt.labels, pt.kinds, pt.buttons], ['Verificar Propriedade', ['Prova uma propriedade da máquina de estados para qualquer sequência de entradas, ou mostra o primeiro ciclo de relógio em que falha.', 'Propriedade:', 'Estado:', 'Profundidade (ciclos de relógio):'],
+  assert.deepEqual([pt.title, pt.labels, pt.kinds, pt.buttons], ['Verificar Propriedade', ['Prova uma propriedade da máquina de estados para qualquer sequência de entradas, ou mostra o primeiro ciclo de relógio em que falha.', 'Propriedade:', 'Estado:', 'Profundidade (ciclos de relógio):', 'Tempo limite (s):'],
     ['Nunca alcança um estado', 'Alcança um estado', 'Saídas nunca a 1 em simultâneo'], ['Verificar', 'Cancelar']]);
+  await page.click('.dlg-buttons .btn', { text: 'Cancelar' });
+  await page.waitNoDialog();
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  noWarnings(page);
+}, { timeout: 180000 });
+
+uiTest('#3261 Verify Property\'s time limit: blinky\'s ASM chart stopped after 3 s, the cycles checked; the next check in a new worker; a limit of 0 refused', E, async (page) => {
+  const asm = fs.readFileSync(new URL('../../examples/blinky/src/speed_ctrl.asm.json', import.meta.url), 'utf8');
+  await makeProject(env, { name: 'PropLimit', top: 'speed_ctrl', files: { 'src/speed_ctrl.asm.json': asm } });
+  await page.openProject('PropLimit');
+  await page.eval(() => window.SilinxApp.openAsm('src/speed_ctrl.asm.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'asm:src/speed_ctrl.asm.json' && document.querySelector('.doc:not([hidden]) [data-node]'), [], { what: 'ASM chart editor' });
+  const AE = '.doc:not([hidden]) .asm-editor';
+  // the dialog's depth and time limit
+  const set = (depth, limit) => page.eval((dp, lt) => {
+    const [de, li] = [...document.querySelectorAll('.dlg-overlay')].pop().querySelectorAll('input[type=number]');
+    de.value = dp; li.value = lt;
+  }, depth, limit);
+  const limitShown = () => page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelectorAll('input[type=number]')[1].value);
+  const dlg = await openDialog(page, AE);
+  assert.deepEqual(dlg.labels.slice(-2), ['Depth (clock cycles):', 'Time limit (s):']);
+  assert.equal(await limitShown(), '60');
+  await setDialog(page, 'reach', { state: 'WAIT_RELEASE' });
+  // (0 s: refused, the dialog stays)
+  await set(200, 0);
+  await page.click('.dlg-buttons .btn.primary');
+  await page.waitFor(() => /The time limit is a number of seconds from 1 to 3600/.test(document.body.textContent), [], { what: 'the refusal' });
+  await set(200, 3);
+  const t0 = Date.now();
+  await page.click('.dlg-buttons .btn.primary');
+  await page.waitConsole(/Process "Verify Property" completed successfully with 1 warning\(s\)/, { timeout: 30000 });
+  assert.ok(Date.now() - t0 < 15000, 'stopped at its limit');
+  const out = (await lines(page, 'Started : "Verify Property".')).slice(0, 7);
+  const k = /in the first (\d+) clock cycle/.exec(out[3])?.[1];
+  assert.ok(+k >= 1 && +k < 200, out[3]);
+  assert.deepEqual(out, ['Started : "Verify Property".', '',
+    'Proving that \'speed_ctrl\' reaches state WAIT_RELEASE: Yosys\'s SAT solver, at most 200 clock cycle(s), then a proof by induction.',
+    `WARNING:Verify - the check did not finish in 3 s (its time limit): 'speed_ctrl' does not reach state WAIT_RELEASE in the first ${k} clock cycle(s), not checked beyond them: a larger time limit, or a smaller depth.`, '',
+    'Process "Verify Property" completed successfully with 1 warning(s)']);
+  // the next check: in a new worker, 2 cycles (bounded); the limit kept
+  await openDialog(page, AE);
+  await setDialog(page, 'reach', { state: 'WAIT_RELEASE' });
+  assert.equal(await limitShown(), '3', 'the limit kept');
+  await set(2, 60);
+  await page.click('.dlg-buttons .btn.primary');
+  await page.waitConsole(/'speed_ctrl' does not reach state WAIT_RELEASE in the first 2 clock cycle\(s\): a larger depth checks more cycles\./, { timeout: 60000 });
+  // Portuguese: the label and the refusal
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  const pt = await openDialog(page, AE, 'Verificar Propriedade…');
+  assert.deepEqual(pt.labels.slice(-2), ['Profundidade (ciclos de relógio):', 'Tempo limite (s):']);
+  await set(2, 0);
+  await page.click('.dlg-buttons .btn.primary');
+  await page.waitFor(() => /O tempo limite é um número de segundos de 1 a 3600/.test(document.body.textContent), [], { what: 'the refusal in Portuguese' });
   await page.click('.dlg-buttons .btn', { text: 'Cancelar' });
   await page.waitNoDialog();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));

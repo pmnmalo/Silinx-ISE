@@ -14,6 +14,7 @@ export const VERIFY_TOOLS = [
     inputSchema: { type: 'object', properties: {
       project: PROJECT, module: STR('The module to verify (default: the project\'s top).'), reference: STR('The reference module: the outputs it must give (none: the module\'s own assertions are proved).'),
       depth: { type: 'integer', description: 'How many clock cycles the check covers at most (default 20, at most 1000).' },
+      time_limit: { type: 'number', description: 'How many seconds the check may take at most (default 60, at most 3600), as the dialogs\' Time limit: Yosys is stopped when it passes, and the result is timeout, with the clock cycles checked by then with no failure (checked).' },
       language: { type: 'string', enum: ['vhdl', 'verilog'], description: 'The counterexample\'s test bench\'s language (default: the module\'s).' },
       test_bench: { type: 'boolean', description: 'Write the counterexample\'s test bench and replay it (default true).' },
       property: { type: 'string', enum: ['never', 'reach', 'exclusive'], description: 'A property of the module\'s state diagram or ASM chart to prove instead, as Verify Property… does: never (the machine never reaches state), reach (it reaches state: the way there is the counterexample), exclusive (the 1-bit outputs are never 1 together).' },
@@ -31,15 +32,17 @@ export const VERIFY_TOOLS = [
       const top = a.module ?? pj.top;
       if (!top) throw toolError('module: the project has no top module: name the module to verify');
       const depth = a.depth ?? V.VERIFY_DEPTH;
+      // (#3261: Yosys stopped after it, a worker thread of its own terminated)
+      const timeLimit = a.time_limit ?? V.VERIFY_TIME_LIMIT;
       // the simulation view's sources: the design's, the drawings' HDL and the simulation-only files (a reference), but
       // an earlier counterexample's test bench (of ports that may have changed since)
       const srcs = (await viewSourcesOf(name, pj, true)).filter(s => !V.isVerifyBench(s.text));
       if (a.property && a.reference) throw toolError('give a reference or a property, not both');
       const Pr = await import('../core/verify-props.js');
       const drawing = a.property ? await drawingOf(name, top) : null;
-      const r = a.property ? await Pr.verifyProperty(srcs, { drawing, property: a.property === 'exclusive' ? { kind: 'exclusive', outputs: a.outputs || [] } : { kind: a.property, state: a.state }, depth, run: yosysNode })
-        : a.reference ? await V.verifyEquivalence(srcs, { top, reference: a.reference, depth, run: yosysNode })
-          : await A.verifyAssertions(srcs, { top, depth, run: yosysNode });
+      const r = a.property ? await Pr.verifyProperty(srcs, { drawing, property: a.property === 'exclusive' ? { kind: 'exclusive', outputs: a.outputs || [] } : { kind: a.property, state: a.state }, depth, timeLimit, run: yosysNode })
+        : a.reference ? await V.verifyEquivalence(srcs, { top, reference: a.reference, depth, timeLimit, run: yosysNode })
+          : await A.verifyAssertions(srcs, { top, depth, timeLimit, run: yosysNode });
       let bench = null, replay = [];
       const pb = a.property && r.status === 'failed' ? Pr.propertyBench(r) : null;
       if (r.status === 'failed' && a.test_bench !== false) {
@@ -72,6 +75,7 @@ export const VERIFY_TOOLS = [
       if (a.property) {
         const data = { project: name, module: r.module ?? top, property: r.property, status: r.status, holds: !!r.holds, depth,
           ...(r.status === 'proved' ? { induction: r.induction } : {}),
+          ...(r.status === 'timeout' ? { timeLimit, checked: r.checked } : {}),
           ...(r.status === 'failed' ? { cycle: r.cycle, counterexample: r.cycles, testBench: bench, replay } : {}),
           errors: r.errors, warnings: r.warnings };
         return { text: lines.join('\n'), data, isError: r.status === 'error' };
@@ -79,6 +83,7 @@ export const VERIFY_TOOLS = [
       const data = { project: name, module: r.top ?? top, reference: r.reference ?? a.reference ?? null, status: r.status, depth,
         ...(a.reference ? {} : { asserts: r.asserts, assumes: r.assumes }),
         ...(r.status === 'proved' ? { induction: r.induction } : {}),
+        ...(r.status === 'timeout' ? { timeLimit, checked: r.checked } : {}),
         ...(r.status === 'failed' ? { cycle: r.cycle, ...(a.reference ? { differs: r.differs } : { failure: r.failure ?? null }), counterexample: r.cycles, testBench: bench, replay } : {}),
         errors: r.errors, warnings: r.warnings };
       return { text: lines.join('\n'), data, isError: r.status === 'error' };
