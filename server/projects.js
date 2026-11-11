@@ -345,8 +345,37 @@ export async function isProjectFileAt(dir, full) {
   } catch { return false; }
 }
 
+// A hidden file or folder (.git/hooks, .vscode, .env) is no part of a project (#3036): no file route reads, writes, renames
+// or deletes one (#3354), by its name or once its symbolic links are followed; a short (8.3) name, or a path the system
+// names a hidden one, too (paths.js hiddenName, nativeRealOf). verb: what the route does ('read', 'written'…)
+function refuseHidden(dir, rel0, full, verb) {
+  const hidden = [relKey(dir, full), relKey(realOf(dir), realOf(full)), relKey(nativeRealOf(dir), nativeRealOf(full))].flatMap(k => k.split('/')).find(hiddenName);
+  if (hidden) throw new HttpError(400, `'${rel0}': not ${verb}: hidden file or folder ('${hidden}')`);
+}
+
+// a folder that holds a hidden file or folder (a clone's .git, with its trust mark, #2830) is neither renamed nor deleted
+// with it: the first one found, its path in the project; its symbolic links not followed (a rename or a delete moves or
+// removes a link, not what it names); a Mac's .DS_Store (Finder's settings of the folder) apart
+async function refuseHiddenInside(dir, rel0, full, verb) {
+  const find = async d => {
+    let ents;
+    try { ents = await fs.readdir(d, { withFileTypes: true }); } catch { return null; }
+    for (const e of ents) {
+      if (e.name === '.DS_Store' && !e.isDirectory()) continue;
+      if (hiddenName(e.name)) return path.join(d, e.name);
+      const f = e.isDirectory() && await find(path.join(d, e.name));
+      if (f) return f;
+    }
+    return null;
+  };
+  const found = await find(full);
+  if (found) throw new HttpError(400, `'${rel0}': not ${verb}: the folder holds a hidden file or folder ('${relKey(dir, found)}')`);
+}
+
 export async function readFile(name, rel) {
-  const full = safeJoin(projectDir(name), rel);
+  const dir = projectDir(name);
+  const full = safeJoin(dir, rel);
+  refuseHidden(dir, rel, full, 'read');
   try { return await fs.readFile(full, 'utf8'); }
   catch { throw new HttpError(404, `file '${rel}' not found`); }
 }
@@ -359,11 +388,8 @@ export async function writeFile(name, rel0, text) {
   const rel = relKey(dir, full);
   if (!rel) throw new HttpError(400, 'missing path');
   if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
-  // a hidden file or folder (.git/hooks, .vscode) is no part of a project (#3036), by its name or once its symbolic
-  // links are followed; build/ is written here too (the browser's open synthesis saves its netlists in build/open/); a
-  // short (8.3) name, or a path the system names a hidden one, too (paths.js hiddenName, nativeRealOf)
-  const hidden = [rel, relKey(realOf(dir), realOf(full)), relKey(nativeRealOf(dir), nativeRealOf(full))].flatMap(k => k.split('/')).find(hiddenName);
-  if (hidden) throw new HttpError(400, `'${rel0}': not written: hidden file or folder ('${hidden}')`);
+  // no hidden file (refuseHidden); build/ is written here too (the browser's open synthesis saves its netlists in build/open/)
+  refuseHidden(dir, rel0, full, 'written');
   await fs.mkdir(path.dirname(full), { recursive: true });
   // atomic: a reader (or a crash) never sees a half-written / empty file
   const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed
@@ -400,12 +426,15 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
   if (src === dir || dst === dir) throw new HttpError(400, 'cannot rename the project folder itself');
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
   if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
+  refuseHidden(dir, from, src, 'renamed');
   const gated = checkName ? normalizePath(toKey) : {};
   if (gated.reason) throw new HttpError(400, `'${to}': not renamed: ${gated.reason}`);
+  refuseHidden(dir, to, dst, 'renamed');   // (through a symbolic link too)
   return withProjectLock(name, async () => {
     let st;
     try { st = await fs.stat(src); } catch { throw new HttpError(404, `file '${from}' not found`); }
     const isDir = st.isDirectory();
+    if (isDir) await refuseHiddenInside(dir, from, src, 'renamed');
     if (isDir && src !== dst && (dst + path.sep).startsWith(src + path.sep)) throw new HttpError(400, `cannot move '${from}' into itself`);
     if (src !== dst && await exists(dst) && src.toLowerCase() !== dst.toLowerCase()) throw new HttpError(409, `'${to}' already exists`);
     await fs.mkdir(path.dirname(dst), { recursive: true });
@@ -438,7 +467,9 @@ export async function deleteFile(name, rel) {
   if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
   const key = relKey(dir, full);
   if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
+  refuseHidden(dir, rel, full, 'deleted');
   await withProjectLock(name, async () => {
+    await refuseHiddenInside(dir, rel, full, 'deleted');
     await fs.rm(full, { recursive: true, force: true });
     const pj = await readProject(name);
     const gone = p => p === key || p.startsWith(key + '/');
