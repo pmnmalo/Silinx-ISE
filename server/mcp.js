@@ -108,7 +108,10 @@ export function serveMcp({ input = process.stdin, output = process.stdout } = {}
     // (one at a time, in order: a process and a read of its report do not overlap)
     pending = pending.then(async () => {
       const batch = Array.isArray(msg) ? msg : [msg];
-      const out = (await Promise.all(batch.map(m => handle(m, state)))).filter(Boolean);
+      // (a batch's requests in order too, each seeing the one before it done: a project's creation and a process on it
+      // never overlap, #3413)
+      const out = [];
+      for (const m of batch) { const r = await handle(m, state); if (r) out.push(r); }
       if (out.length) send(Array.isArray(msg) ? out : out[0]);
     }).catch(e => process.stderr.write(`silinx mcp: ${e?.stack || e}\n`));
   });
