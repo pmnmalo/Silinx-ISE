@@ -101,9 +101,11 @@ test('the chip database\'s exports: the unknown PIPs are real PIPs of their tile
 
 test('#3349: the PIPs held out of Silinx\'s flow (s6-pips-held.json) are known to the chip database\'s export only', () => {
   const held = JSON.parse(fs.readFileSync(path.join(S6_DB_DIR, 's6-pips-held.json'), 'utf8')).pips;
-  // #3269's, and #3169's three pad wire -> IBUF PIPs (no bits), as measured
-  assert.deepEqual(held, { 'TIOI_INNER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S': ['26,35', '27,48', '28,14'],
-    'TIOB_SINGLE TIOB_IBUF1_PINW -> TIOB_IBUF1': [], 'BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0': [], 'BIOB_SINGLE BIOB_IBUF1_PINW -> BIOB_IBUF1': [] });
+  // #3269's and #3350's slave OLOGIC2 D1 -> OQ, #3169's four pad wire -> IBUF PIPs (no bits), as measured
+  const SLAVE = ['26,35', '27,48', '28,14'];
+  assert.deepEqual(held, { 'TIOI_INNER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S': SLAVE, 'TIOI_OUTER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S': SLAVE,
+    'TIOB_SINGLE TIOB_IBUF0_PINW -> TIOB_IBUF0': [], 'TIOB_SINGLE TIOB_IBUF1_PINW -> TIOB_IBUF1': [],
+    'BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0': [], 'BIOB_SINGLE BIOB_IBUF1_PINW -> BIOB_IBUF1': [] });
   // none of them in the files Silinx's flow reads, nor fetched by the browser
   assert.ok(!s6DbNames(PART).includes('s6-pips-held'));
   const flowDb = loadBitDbS6(PART), exportDb = loadBitDbS6(PART, { held: true });
@@ -111,8 +113,8 @@ test('#3349: the PIPs held out of Silinx\'s flow (s6-pips-held.json) are known t
     assert.equal(flowDb.other.pips[k], undefined, k);
     assert.deepEqual(exportDb.other.pips[k], bits, k);
   }
-  // the export leaves out exactly those PIPs fewer: each in every tile of its type (16 TIOI_INNER tiles, a TIOB_SINGLE,
-  // a BIOB_SINGLE)
+  // the export leaves out exactly those PIPs fewer: each in every tile of its type (the 33 TIOI_INNER / TIOI_OUTER tiles,
+  // a TIOB_SINGLE, a BIOB_SINGLE)
   const a = unknownPipsS6(device, flowDb), b = unknownPipsS6(device, exportDb);
   const want = tile => Object.keys(held).filter(k => k.startsWith(`${tile.replace(/_X\d+Y\d+$/, '')} `)).map(k => k.replace(/^\S+ /, '')).sort();
   let gone = 0;
@@ -122,7 +124,7 @@ test('#3349: the PIPs held out of Silinx\'s flow (s6-pips-held.json) are known t
     gone += g.length;
   }
   assert.equal(a.unknown - b.unknown, gone);
-  assert.equal(gone, 16 + 1 + 2);
+  assert.equal(gone, 33 + 2 + 2);
   // (the export script itself reads them)
   const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-s6-held-')), 'unknown.json');
   execFileSync(process.execPath, [fileURLToPath(new URL('../research/nextpnr-s6/export-unknown-pips.mjs', import.meta.url)), PART, out]);

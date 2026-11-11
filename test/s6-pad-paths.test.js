@@ -39,20 +39,17 @@ describe('the Spartan-6 pads\' known I/O paths (#3152)', () => {
     assert.deepEqual(without(m, 'in'), ['F9', 'G9', 'R7', 'T7']);
   });
 
-  test('#3349: with the PIPs held out of Silinx\'s flow (s6-pips-held.json), as nextpnr\'s chip database has them, the TIOI_INNER slaves\' pads take an output, the *IOB_SINGLE pads but G9 an input', () => {
-    // (what is left: the TIOI_OUTER slave OLOGIC2's D1 -> OQ, not measured yet, #3350; G9's input, its TIOB_SINGLE
-    // TIOB_IBUF0_PINW -> TIOB_IBUF0 unresolved by #3169's measurement)
-    for (const [part, noOut, noIn] of [
-      ['xc6slx16csg324-3', ['A11', 'A12', 'A4', 'C11', 'C12', 'C14', 'C4', 'C6', 'C8', 'C9', 'E12', 'E13', 'E6', 'E8', 'F8', 'F9'], ['G9']],
-      ['xc6slx45csg324-3', ['A11', 'A13', 'A4', 'A7', 'C11', 'C14', 'C4', 'C6', 'C8', 'C9', 'E13', 'F9'], ['G9']]]) {
+  test('#3349: with the PIPs held out of Silinx\'s flow (s6-pips-held.json), as nextpnr\'s chip database has them, every pad takes an input and an output', () => {
+    for (const part of ['xc6slx16csg324-3', 'xc6slx45csg324-3']) {
       const device = loadDeviceCache(part), sites = s6Sites(device), m = padPathsS6(device, loadBitDbS6(part, { held: true }), sites);
       assert.equal(m.size, sites.pads.size);
-      assert.deepEqual(without(m, 'out'), noOut, part);
-      assert.ok(noOut.every(p => { const t = sites.pads.get(p).tile; return device.tileNames.some(n => n === t.replace(/^TIOB(_SINGLE)?/, 'TIOI_OUTER')); }), part);
-      assert.deepEqual(without(m, 'in'), noIn, part);
+      assert.deepEqual(without(m, 'out'), [], part);
+      assert.deepEqual(without(m, 'in'), [], part);
     }
-    // (Silinx's flow: as above, the 30 pads without)
-    assert.equal(without(paths('xc6slx16csg324-3').paths, 'out').length, 30);
+    // (Silinx's flow: as above, the 30 pads without an output, the 4 without an input)
+    const { paths: m } = paths('xc6slx16csg324-3');
+    assert.equal(without(m, 'out').length, 30);
+    assert.equal(without(m, 'in').length, 4);
   });
 
   test('padFits: an output needs the O path, an input the I path, a bidirectional port both; no paths: every pad', () => {
