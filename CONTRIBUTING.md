@@ -19,7 +19,8 @@ Contributions are welcome: bug reports, ideas and pull requests.
   the same for everyone, people and AI agents alike.
 - **Before opening a pull request:**
   - run the test files of the modules your change touches (`node scripts/related-tests.mjs origin/main HEAD`);
-    the pull request runs the same on GitHub, and the full suites run at a release;
+    the pull request runs the same on GitHub, in as many parts at once as their measured time needs (one for a
+    small change, #1982), and the full suites run at a release;
   - add a changelog fragment, a new file `changes/<issue>-<slug>.md` (not an edit of CHANGELOG.md), as
     [changes/README.md](changes/README.md) says;
   - reference the issue (`Fixes #N`).

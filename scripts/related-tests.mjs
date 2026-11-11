@@ -16,10 +16,12 @@
 // fileURLToPath(import.meta.url)), '..', 'db'), a constant holding one, new URL('../db/', import.meta.url)), and
 // of the modules that import one of those, at any depth.
 //
-//   node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list] [node --test options …]
+//   node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list | --plan] [node --test options …]
 //   → runs node --test with those options on the unit tests, then (one at a time) on the UI tests; --list
 //     prints them instead. --shard i/n: part i of n of them, of about the same time (scripts/test-shard.mjs,
 //     the UI tests balanced too, #1032). No test related to the change: nothing runs, the exit is 0.
+//     --plan: how many parts the tests need (planShards, #1982), as the PR tests' outputs (parts=n, shards=[1, …, n],
+//     for $GITHUB_OUTPUT; the estimate on stderr), and nothing runs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -185,16 +187,37 @@ export function shardOf({ unit, ui }, { i, n }, timings = {}) {
   return { unit: parts[i - 1].files, ui: uiParts[byUnit.indexOf(i - 1)].files };
 }
 
+/** A part's planned time (#1982): the PR tests' job stops at 60 minutes, and a part of the whole suite took 35 minutes
+ *  for its unit tests at three parts (#1979's). The unit tests run at once on GitHub's runner (node --test's three, two
+ *  in effect: #3311's parts of 80 minutes measured took 40 and 46), the UI tests one at a time. */
+export const PART_MINUTES = 20, PART_CONCURRENCY = 2, MAX_PARTS = 16;
+
+/** The parts the tests need: their estimated minutes (each file's measured time, test/timings.json, an unmeasured
+ *  one the median of the others: weights()), in parts of about `minutes` each, from 1 (a small change: one part)
+ *  to `max` and no more than the files; 0 when there is no test. */
+export function planShards({ unit, ui }, timings = {}, { minutes = PART_MINUTES, concurrency = PART_CONCURRENCY, max = MAX_PARTS } = {}) {
+  const sum = (files) => Object.values(weights(files, timings)).reduce((a, b) => a + b, 0);
+  const estimate = (sum(unit) / concurrency + sum(ui)) / 60;
+  const files = unit.length + ui.length;
+  return { n: files ? Math.min(max, files, Math.max(1, Math.ceil(estimate / minutes))) : 0, minutes: estimate };
+}
+
 function main() {
   const [base, head, ...args] = process.argv.slice(2);
   const at = args.indexOf('--shard');
   let shard = null;
   if (at >= 0) { try { shard = parseShard(args[at + 1]); } catch (e) { console.error(e.message); process.exit(2); } args.splice(at, 2); }
   const rest = args;
-  if (!base || !head) { console.error('usage: node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list] [node --test options …]'); process.exit(2); }
+  if (!base || !head) { console.error('usage: node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list | --plan] [node --test options …]'); process.exit(2); }
   const changed = changedFiles(base, head);
   if (changed == null) { console.error(`the files changed from ${base} to ${head} are not known (is ${base} fetched?)`); process.exit(2); }
   const all = relatedTests(sources(), changed);
+  if (rest.includes('--plan')) {
+    const { n, minutes } = planShards(all, readTimings());
+    console.error(`${changed.length} file(s) changed; the tests of their modules: ${all.unit.length} unit, ${all.ui.length} UI, ~${Math.round(minutes)} min: ${n} part(s)`);
+    console.log(`parts=${n}\nshards=${JSON.stringify(Array.from({ length: n }, (_, k) => k + 1))}`);
+    return;
+  }
   const { unit, ui } = shard ? shardOf(all, shard, readTimings()) : all;
   console.log(`${changed.length} file(s) changed; the tests of their modules: ${all.unit.length} unit, ${all.ui.length} UI${shard ? `; part ${shard.i}/${shard.n}: ${unit.length} unit, ${ui.length} UI` : ''}`);
   for (const f of [...unit, ...ui]) console.log(`  ${f}`);
