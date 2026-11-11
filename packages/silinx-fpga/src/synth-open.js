@@ -13,6 +13,7 @@ import { rewriteCarryChains, GATE_MIN, ADDER_MIN } from './carry-chain.js';
 import { sliceEstimate } from './slice-estimate.js';
 import { fsmProbeCommands, fsmChosen, fsmExtracted, fsmExtractCommands, fsmForceCommands, fsmInits, fsmRestCommands, markWires, setInits, oldStateInits, refusedForUsers, quietForced, FSM_PRE_FILE, FSM_MARKED_FILE, FSM_POST_FILE, FSM_ENC_FILE, FSM_DETECT_FILE, FSM_FORCED_FILE } from './synth-fsm.js';
 import { asText } from './synth-open-yosys.js';
+import { scriptTopError } from './top-name.js';
 import {
   DEEP_RULE, criticalDelay, deepDesign, domainDelays, logicLevels, pathEnds
 } from './synth-open-path.js';
@@ -715,6 +716,8 @@ export const FAST_SYNTH = { effort: 'normal', depth: false, speed: false, abc9: 
  * luts, slices, kept } (csel: false leaves it out).
  */
 export async function synthesizeVerilog(input, options = {}) {
+  // (a top that Yosys's script cannot name: refused before any script, #3416)
+  if (scriptTopError(input.top)) throw new Error(scriptTopError(input.top));
   // the comparisons with a constant to map as logic (#3097, synth-cmp.js): found once; the design synthesized with them so
   // and as before, side by side, the one cmpChoice keeps (cmp: false, none; a list, those, no choice)
   if (options.cmp !== undefined) return withCarrySelect(input, { ...options, cmp: options.cmp || null });

@@ -4,6 +4,7 @@
 // families) is given one: scriptSynthesis({ script }) is synthesizeVerilog's signature and result, without its mappings.
 import { cellCounts, outputs } from './synth-open.js';
 import { asText } from './synth-open-yosys.js';
+import { scriptTopError } from './top-name.js';
 
 /** Yosys's generic cells counted as the Design Summary's resources: its LUTs ($lut), flip-flops, latches and the rest. */
 export function genericUtilization(counts) {
@@ -21,6 +22,7 @@ export function scriptSynthesis({ script, files = {}, utilization = genericUtili
   if (typeof script !== 'function') throw new Error('a synthesis script needs script(top)');
   return async (input, { run, onLine = () => {} } = {}) => {
     const { text, top, warnings = [] } = input;
+    if (scriptTopError(top)) throw new Error(scriptTopError(top));   // (#3416)
     const log = [];
     const out = await run(['-q', '-p', `read_verilog -sv ${top}_syn.v; ${script(top)}; ${outputs(top)}`], { ...files, [`${top}_syn.v`]: text },
       l => { if (!quiet.some(re => re.test(l))) { log.push(l); onLine(l); } });

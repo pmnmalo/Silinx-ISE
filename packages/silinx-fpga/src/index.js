@@ -17,6 +17,7 @@ export { backendOf, registerBackend } from './open-flow-backends.js';
 
 // synthesis: Verilog in (synthesisInput's { text, top }), a Yosys JSON netlist out
 export { synthesizeVerilog, synthEffort, synthGoal, GOAL_IMPL, FAST_SYNTH, cellCounts } from './synth-open.js';
+export { scriptTopError } from './top-name.js';
 export { synthesizeArea } from './synth-area.js';
 export { synthesizeFast } from './synth-fast.js';
 export { runYosysOnce, yosysWorkerSource, readableBlobs, asText } from './synth-open-yosys.js';
