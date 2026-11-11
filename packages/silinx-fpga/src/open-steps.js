@@ -79,3 +79,7 @@ export function orderOpenSteps(steps, { synthUpToDate = false } = {}) {
 /** A project's place and route engine: nextpnr, the one engine (#2137). A project saved with another (its impl.engine
  *  'silinx' or 'auto', Process Properties' choice of #2136) moves to it. */
 export const engineOf = () => 'nextpnr';
+
+/** A project's Map of the Spartan-6 (#3138): 'silinx' (Silinx's own, fpga/s6/pack.js, the default until nextpnr's packer
+ *  reaches parity, #3139) or 'nextpnr' (the fork's packer, which packs and places Yosys's netlist: impl.s6Map). */
+export const s6MapOf = impl => (impl?.s6Map === 'nextpnr' ? 'nextpnr' : 'silinx');

@@ -16,7 +16,7 @@ export { PCF } from './pcf.js';
 export { XDC, readXdc, writeXdc } from './xdc.js';
 
 // the flow's steps
-export { OPEN_STEPS, OPEN_CHAIN, orderOpenSteps, orderSteps, engineOf } from './open-steps.js';
+export { OPEN_STEPS, OPEN_CHAIN, orderOpenSteps, orderSteps, engineOf, s6MapOf } from './open-steps.js';
 
 // the placed and routed design (XDL), and a device's report (XDLRC)
 export { parseXdl, parseXdlrc, writeXdl, lutTable, fpgaModel, deviceGrid, MODEL_VERSION } from './xdl.js';
