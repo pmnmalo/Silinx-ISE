@@ -623,7 +623,8 @@ export async function implProperties() {
   const clk = select([['JtagClk', 'JTAG Clock'], ['CCLK', 'CCLK'], ['UserClk', 'User Clock']], pj.impl.startupClk || 'JtagClk');
   // a Spartan-6's Map (#3138): Silinx's, or nextpnr's packer, on trial until its parity (#3139)
   const { deviceFamily, s6MapOf } = await import('/packages/silinx-fpga/src/parts.js');
-  const map = deviceFamily(pj.device) === 'spartan6' ? select([['silinx', 'Silinx'], ['nextpnr', 'nextpnr (on trial)']], s6MapOf(pj.impl)) : null;
+  const { familyProfile } = await import('/core/family-profile.js');
+  const map = familyProfile(deviceFamily(pj.device)).mapChoice ? select([['silinx', 'Silinx'], ['nextpnr', 'nextpnr (on trial)']], s6MapOf(pj.impl)) : null;
   const r = await dialog({
     title: 'Process Properties - Synthesis / Implementation / Bitstream', width: 520,
     body: h('div', { class: 'form-grid' },
