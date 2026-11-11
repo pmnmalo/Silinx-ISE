@@ -90,7 +90,7 @@ can read that user's files has the server too.
   anyone with the link opens the project, as with the full link.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
   paths, keys and tokens, Xilinx files, a bitstream under any name) the tracked files, text, compressed
-  and binary, and every line ever added to `main`; CodeQL analyses
+  and binary, and every line, binary file and commit message, author and committer ever added to `main` (#3366); CodeQL analyses
   the JavaScript nightly and at every release; Dependabot's alerts report a dependency with a known
   vulnerability, and Dependabot updates the dependencies weekly and opens security updates at once.
   Before every push, `node scripts/check-private-data.mjs` checks the tracked files.

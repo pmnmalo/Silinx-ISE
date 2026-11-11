@@ -8,8 +8,11 @@
 //
 //   node scripts/check-private-data.mjs              the tracked files
 //   node scripts/check-private-data.mjs --history    also every line added in the history of HEAD
-//                                                    (main, in CI) and every commit message; other
-//                                                    branches are checked by their own pull requests
+//                                                    (main, in CI), every binary file added or changed
+//                                                    there, and every commit's message, author and
+//                                                    committer (#3366); other branches are checked by
+//                                                    their own pull requests
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -18,7 +21,16 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Known, harmless matches: [file (or a RegExp of files), the matched text (or a RegExp), why]
+// The maintainer's public commit addresses (#3366), by the SHA-256 of the address in lower case, so that this file
+// does not spell them out
+const PUBLIC_ADDRESSES = new Set([
+  'c6bfb5fcc22e157d3a22267f7a82ab149800fd43e7ccc5a25a89ebe21bb998b6',
+  'd48e9c9ebc87c8080a06452cbcafa230ec40c16b1ad77bb2763a3b4bc7c3429e',
+  'ac9c234512663d023e0caadb823ea29c7eaae5543be3a8ec7418e833efeb3c03',
+]);
+export const publicAddress = (text) => PUBLIC_ADDRESSES.has(crypto.createHash('sha256').update(text.toLowerCase()).digest('hex'));
+
+// Known, harmless matches: [file (or a RegExp of files), the matched text (or a RegExp, or a function of it), why]
 const ALLOW = [
   [/^((packages\/silinx-fpga\/)?THIRD-PARTY-NOTICES\.md|scripts\/licences\/[^/]+\.txt)$/, /@/, 'the licence texts of the third-party packages name their authors'],
   [/./, /^(127\.\d+\.\d+\.\d+|0\.0\.0\.0|255\.255\.255\.255)$/, 'loopback / any address / broadcast'],
@@ -27,6 +39,10 @@ const ALLOW = [
   [/./, /^(00[:-]00[:-]00[:-]00[:-]00[:-]00|[fF]{2}([:-][fF]{2}){5})$/, 'the MAC address of no card, the broadcast address'],
   [/./, /@(example\.(com|org|net)|[\w.-]+\.(example|test|invalid))$/, 'example domains (RFC 2606)'],
   [/./, /^(noreply@anthropic\.com|[\w.+-]+@users\.noreply\.github\.com)$/, 'no-reply addresses (the Co-Authored-By line of commits)'],
+  [/./, 'noreply@github.com', 'GitHub\'s own address: the committer of a commit made on github.com'],
+  [/^\((author|committer) of [0-9a-f]+\)$/, publicAddress, 'the maintainer\'s public commit addresses (#3366)'],
+  [/^\(committer of (4525058|7e935ac)\)$/, /./, 'two commits of the quality comparison made on the self-hosted runner before '
+    + '#486, whose committer was named after the machine\'s local user and name: the history cannot be rewritten (#3366)'],
   [/./, 'git@github.com', 'GitHub\'s ssh login, in a repository\'s ssh address (#3195): no one\'s address'],
   [/^packages\/silinx-fpga\/test\/fixtures\/xc7\/[\w-]+\.bitstream(\.gz)?$/, 'Xilinx bitstream',
     'bitstreams Project X-Ray\'s xc7frames2bit made (ISC), no Xilinx tool\'s: the 7-series writer\'s references (#3144)'],
@@ -62,7 +78,7 @@ const ALLOW = [
 export const SELF = ['scripts/check-private-data.mjs', 'test/private-data.test.js'];
 
 const allowed = (file, text) => ALLOW.some(([f, t]) =>
-  (typeof f === 'string' ? f === file : f.test(file)) && (typeof t === 'string' ? t === text : t.test(text)));
+  (typeof f === 'string' ? f === file : f.test(file)) && (typeof t === 'string' ? t === text : typeof t === 'function' ? t(text) : t.test(text)));
 
 // placeholders that may follow /Users/, /home/ or C:\Users\ in documentation
 const PLACEHOLDER_USERS = /^(<[^>]+>|\$\w+|\$\{\w+\}|%\w+%|you|me|user|username|name|runner|USER|USERNAME|\.\.\.|…)$/;
@@ -201,22 +217,44 @@ export function scanRepo(root = ROOT) {
   return out;
 }
 
-/** Every line added in the history of `rev` and every commit message: that branch's history only, not
- *  every branch (#555), so that an open pull request's branch cannot fail main's scan. */
+/** Every line added in the history of `rev`, every binary file added or changed there (#3366: `git log -p` shows
+ *  none of their content), and every commit's message, author and committer (#3366): that branch's history only,
+ *  not every branch (#555), so that an open pull request's branch cannot fail main's scan. */
 export function scanHistory(root = ROOT, rev = 'HEAD') {
   const out = [];
-  const log = execFileSync('git', ['log', rev, '-p', '--no-color', '--no-ext-diff', '--format=@@COMMIT %H%n%B@@END', '--'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 });
-  let commit = '', file = '', msg = null;
+  const log = execFileSync('git', ['-c', 'core.quotePath=false', 'log', rev, '-p', '--raw', '--no-abbrev', '--no-renames', '--no-color', '--no-ext-diff',
+    '--format=@@COMMIT %H%n@@ID %an <%ae>%x00%cn <%ce>%n%B@@END', '--'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 });
+  let commit = '', file = '', msg = null, blobs = new Map();
+  const binaries = new Map();   // blob -> { file, commit }, each blob once
+  const tagged = (x) => ({ ...x, commit });
   for (const line of log.split('\n')) {
-    if (line.startsWith('@@COMMIT ')) { commit = line.slice(9, 16); msg = []; continue; }
+    if (line.startsWith('@@COMMIT ')) { commit = line.slice(9, 16); msg = []; blobs = new Map(); continue; }
+    if (msg && !msg.length && line.startsWith('@@ID ')) {
+      const [author, committer] = line.slice(5).split('\0');
+      out.push(...scanText(`(author of ${commit})`, author).map(tagged), ...scanText(`(committer of ${commit})`, committer).map(tagged));
+      continue;
+    }
+    // the raw list (before the diff): each file's new blob, for a binary one
+    const raw = !msg && /^:\d+ \d+ [0-9a-f]+ ([0-9a-f]+) [AMT]\t(.*)$/.exec(line);
+    if (raw) { blobs.set(raw[2], raw[1]); continue; }
+    const binary = !msg && /^Binary files .* and b\/(.*) differ$/.exec(line);
+    if (binary) {
+      const sha = blobs.get(binary[1]);
+      if (sha && !binaries.has(sha) && !SELF.includes(binary[1])) binaries.set(sha, { file: binary[1], commit });
+      continue;
+    }
     if (msg) { if (line === '@@END') { out.push(...scanText(`(message of ${commit})`, msg.join('\n')).map((x) => ({ ...x, commit }))); msg = null; } else msg.push(line); continue; }
     if (line.startsWith('+++ b/')) { file = SELF.includes(line.slice(6)) ? null : line.slice(6); if (!file) continue; out.push(...scanText(file, '', { whole: false }).filter((x) => x.line === 0).map((x) => ({ ...x, commit }))); continue; }
     if (file && line.startsWith('+') && !line.startsWith('+++')) out.push(...scanText(file, line.slice(1), { whole: false }).filter((x) => x.line).map((x) => ({ ...x, commit })));
   }
+  for (const [sha, b] of binaries) out.push(...scanBuffer(b.file, readBlob(root, sha)).map((x) => ({ ...x, commit: b.commit })));
   // one report per finding
   const seen = new Set();
   return out.filter((x) => { const k = `${x.file}|${x.kind}|${x.text}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }
+
+/** A blob's bytes. */
+const readBlob = (root, sha) => execFileSync('git', ['cat-file', 'blob', sha], { cwd: root, maxBuffer: 1 << 30 });
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const found = [...scanRepo(), ...(process.argv.includes('--history') ? scanHistory() : [])];

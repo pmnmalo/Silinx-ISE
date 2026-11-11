@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import zlib from 'node:zlib';
-import { scanRepo, scanHistory, scanText, scanBuffer, isXilinxBitstream, SELF } from '../scripts/check-private-data.mjs';
+import { scanRepo, scanHistory, scanText, scanBuffer, isXilinxBitstream, publicAddress, SELF } from '../scripts/check-private-data.mjs';
 
 const kinds = (file, text) => scanText(file, text).map((x) => `${x.kind}: ${x.text}`);
 const at = '@', dot = (...p) => p.join('.');
@@ -175,6 +175,57 @@ test('the allow-list (#498): XPower\'s section numbers in the history, read as a
   assert.deepEqual(kinds('test/static-editions.test.js', home('x')), []);
   assert.deepEqual(kinds('test/static-editions.test.js', home('alice')), ['home folder with a user name: /Users/alice']);
   assert.deepEqual(kinds('test/other.test.js', home('x')), ['home folder with a user name: /Users/x']);
+});
+
+test('the history scan (#3366): the commits\' authors and committers, the binary files added or changed', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-private-'));
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
+  const git = (who, ...args) => execFileSync('git', ['-c', `user.name=${who[0]}`, '-c', `user.email=${who[1]}`, '-c', 'commit.gpgsign=false', ...args], { cwd: dir, encoding: 'utf8', env });
+  const t = ['T', `t${at}${dot('example', 'com')}`];
+  const commit = (who, file, data, msg) => { fs.writeFileSync(path.join(dir, file), data); git(who, 'add', file); git(who, 'commit', '-q', '-m', msg); return git(who, 'rev-parse', 'HEAD').trim().slice(0, 7); };
+  const report = () => scanHistory(dir).map((x) => `${x.commit} ${x.file}${x.line ? `:${x.line}` : ''}: ${x.kind}: ${x.text}`);
+  try {
+    git(t, 'init', '-q', '-b', 'main');
+    commit(t, 'a.md', 'nothing private\n', 'first');
+    // the bots' and GitHub's addresses are no one's
+    commit(['dependabot[bot]', `49699333+dependabot[bot]${at}${dot('users', 'noreply', 'github', 'com')}`], 'b.md', 'b\n', 'bump');
+    commit(['GitHub', `noreply${at}${dot('github', 'com')}`], 'c.md', 'c\n', 'web');
+    commit(['Claude', `noreply${at}${dot('anthropic', 'com')}`], 'd.md', 'd\n', 'co');
+    assert.deepEqual(report(), []);   // no warnings
+    // a person's address, in the author and the committer fields; a computer's name in a committer's
+    const ana = commit(['Ana', `ana${at}${dot('mail', 'pt')}`], 'e.md', 'e\n', 'by Ana');
+    const host = ['', 'Mac-mini-de-Ana', 'local'].join('.').slice(1);
+    const runner = commit(['runner', `ana${at}${host}`], 'f.md', 'f\n', 'on a runner');
+    // a binary file (a NUL byte) and a compressed one hold what a text would show; deleted since, they are in the history only
+    const bin = commit(t, 'g.bin', Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(`file://${['', 'Users', 'carol', 'x.v'].join('/')}\0`)]), 'a binary file');
+    const gz = commit(t, 'h.json.gz', zlib.gzipSync(`{"by": "bob${at}${dot('mail', 'pt')}"}`), 'a compressed file');
+    git(t, 'rm', '-q', 'g.bin', 'h.json.gz'); git(t, 'commit', '-q', '-m', 'gone');
+    assert.deepEqual(report(), [
+      `${runner} (author of ${runner}):1: e-mail address: ana${at}${host}`,
+      `${runner} (author of ${runner}):1: computer name: ${host}`,
+      `${runner} (committer of ${runner}):1: e-mail address: ana${at}${host}`,
+      `${runner} (committer of ${runner}):1: computer name: ${host}`,
+      `${ana} (author of ${ana}):1: e-mail address: ana${at}mail.pt`,
+      `${ana} (committer of ${ana}):1: e-mail address: ana${at}mail.pt`,
+      `${gz} h.json.gz:1: e-mail address: bob${at}mail.pt`,
+      `${bin} g.bin:1: home folder with a user name: /Users/carol`,
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the allow-list (#3366): the maintainer\'s public addresses by their hash, the two runner commits, GitHub\'s address', () => {
+  const someone = `Ana <ana${at}${dot('mail', 'pt')}>`;
+  assert.deepEqual(kinds('(author of 0000000)', someone), [`e-mail address: ana${at}mail.pt`]);
+  assert.deepEqual(kinds('(committer of 0000000)', `GitHub <noreply${at}${dot('github', 'com')}>`), []);
+  // the runner's two commits, by their committer only
+  const runner = `u <u${at}${['', 'Mac-mini-de-U', 'local'].join('.').slice(1)}>`;
+  assert.deepEqual(kinds('(committer of 4525058)', runner), []);
+  assert.deepEqual(kinds('(committer of 7e935ac)', runner), []);
+  assert.equal(kinds('(author of 4525058)', runner).length, 2);
+  assert.equal(kinds('(committer of 0000000)', runner).length, 2);
+  assert.equal(publicAddress(`ana${at}${dot('mail', 'pt')}`), false);
 });
 
 test('the history scan (#555): the history of HEAD (main), not the other branches', () => {
