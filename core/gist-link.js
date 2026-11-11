@@ -16,6 +16,9 @@ const DESCRIPTION = 'A Silinx project link (encrypted: only its link opens it)';
 const ID_RE = /^[0-9a-f]{20,40}$/;
 // the most a gist's content may be (the encrypted design: its base64 of LINK_LIMITS.maxEncoded and the AES tag)
 export const GIST_MAX = Math.ceil((LINK_LIMITS.maxEncoded + 16) * 4 / 3) + 256;
+// the most GitHub's answer for a link's gist may be (bytes): its file, escaped in JSON, and the gist's description, owner
+// and history (#3362: read with a running total, before it is parsed)
+export const GIST_ANSWER_MAX = 2 * GIST_MAX + (64 << 10);
 
 const fail = (msg, status = 400) => Object.assign(new Error(msg), { linkError: true, status });
 const b64u = bytes => {
@@ -61,6 +64,26 @@ export async function saveGist(client, design) {
   return { id: g.id, key, url: g.html_url || null };
 }
 
+// a response's text, read with a running total: no more than `max` bytes, whatever the site says it sends (a gist of
+// many large files refused before it is parsed, #3362)
+async function readCapped(r, max) {
+  const big = () => fail('the link\'s gist is too large for a Silinx link', 413);
+  if (Number(r.headers?.get?.('content-length')) > max) { r.body?.cancel?.().catch(() => {}); throw big(); }
+  if (!r.body?.getReader) { const t = await r.text(); if (t.length > max) throw big(); return t; }
+  const reader = r.body.getReader(), parts = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if ((n += value.length) > max) { reader.cancel().catch(() => {}); throw big(); }
+    parts.push(value);
+  }
+  const bytes = new Uint8Array(n);
+  let at = 0;
+  for (const p of parts) { bytes.set(p, at); at += p.length; }
+  return new TextDecoder().decode(bytes);
+}
+
 /** The design of a short link's gist, read through GitHub's API with no sign-in (fetch: the page's, credentials omitted). */
 export async function loadGist({ id, key }, { fetch: f = globalThis.fetch, api = 'https://api.github.com' } = {}) {
   let r;
@@ -69,7 +92,7 @@ export async function loadGist({ id, key }, { fetch: f = globalThis.fetch, api =
   if (r.status === 404) throw fail('the link\'s gist is not on GitHub (deleted, or the link is cut)', 404);
   if (!r.ok) throw fail(`GitHub refused the link's gist (${r.status})`, 502);
   let g;
-  try { g = await r.json(); } catch { throw fail('the link\'s gist is not a Silinx link', 422); }
+  try { g = JSON.parse(await readCapped(r, GIST_ANSWER_MAX)); } catch (e) { throw e.linkError ? e : fail('the link\'s gist is not a Silinx link', 422); }
   const file = g?.files?.[GIST_FILE];
   if (!file || typeof file.content !== 'string') throw fail('the link\'s gist is not a Silinx link', 422);
   if (file.truncated) throw fail('the link\'s gist is too large for a Silinx link', 413);

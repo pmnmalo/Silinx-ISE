@@ -92,8 +92,10 @@ async function designOf(source) {
   return { name, project: null, files: null, make: (as = name) => api.importZip(as, new Blob([z.bytes], { type: 'application/zip' })) };
 }
 
-/** Open the link's design (linkOptions) and its view; errors in the console, the workspace left as it was. */
-export async function openFromLink(opts) {
+/** Open the link's design (linkOptions) and its view; errors in the console, the workspace left as it was. prepare(d):
+ *  once the link is read (a zip's fetched, the user agreeing), before anything is compared or replaced (link-hash.js:
+ *  the open documents saved, #3362): true goes on, 'cancelled' or false stops. */
+export async function openFromLink(opts, { prepare = null } = {}) {
   const { source, view, top, board } = opts;
   try {
     const d = await designOf(source);
@@ -101,8 +103,11 @@ export async function openFromLink(opts) {
     if (d.project) {   // (a zip's: its view checked once it is open)
       const problem = viewProblem(d.project, d.files || {}, { view, top });
       if (problem) throw fail(problem);
-      if (board && board !== d.project.board) app.log(`WARNING: Open from a link: the link's board ${board} is not the design's (${d.project.board || 'none'}): the design's is kept.`, 'warn');
     }
+    const go = prepare ? await prepare(d) : true;
+    if (go === 'cancelled') { app.log('Open from a link: cancelled.', 'info'); return false; }
+    if (go !== true) return false;
+    if (d.project && board && board !== d.project.board) app.log(`WARNING: Open from a link: the link's board ${board} is not the design's (${d.project.board || 'none'}): the design's is kept.`, 'warn');
     const names = (await api.projects()).map(p => p.name);
     let exists = names.includes(d.name), kept = null;
     if (exists && !(d.files && sameFiles(texts((await gateZip(new Uint8Array(await (await api.exportZip(d.name, 'silinx')).blob.arrayBuffer()), browserCodec())).files), d.files))) {
