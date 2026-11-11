@@ -1,11 +1,13 @@
 // Silinx - the Verilog parser's assertions (#3177): immediate assertions (assert / assume (e) [pass] [else fail]) and
 // SystemVerilog's concurrent ones, written as what the simulator and the formal verification (core/verify.js) both run.
+// A concurrent assertion with no clocking event, assert property (e) or (a |-> b), is checked at all times, as an
+// always @* block's immediate assertion (as Yosys's read_verilog -formal reads it, #3177).
 // A concurrent assertion of one clock,
 //   [label:] assert | assume property (@(posedge | negedge clk) [disable iff (r)] p) [pass] [else fail];
 //   p:  e  |  a |-> b  (b in the same clock cycle as a)  |  a |=> b  (b in the next one)
 // becomes a process on that edge with an immediate assertion in it (a |=> b: a register holding a, its initial value 0,
 // as the FPGA's); the values seen are those before the edge, as SystemVerilog samples them. Sequences (##, [*…]),
-// $past and the like, cover and restrict, and a property with no clocking event are not checked: a warning says so.
+// $past and the like, cover and restrict, and |=> with no clocking event are not checked: a warning says so.
 import { ASSERTIONS } from './parser-defs.js';
 
 const not = a => ({ op: 'unary', o: '!', a });
@@ -40,14 +42,16 @@ export const assertMethods = {
     if (!this.isWord('property') || !this.is('(', this.peek())) return skip(`a concurrent ${form} that is not '${form} property (…)'`);
     const loc = this.loc(start);
     this.next(); this.next();
-    if (!this.is('@')) { this.i -= 2; return skip(`${form} property with no clocking event (@(posedge clk))`); }
-    this.next();
-    const at = this.i;
-    const ev = this.eventList();
-    if (ev === 'all' || ev.length !== 1 || ev[0].edge === 'any') { this.i = at - 3; return skip(`${form} property clocked by something other than one clock edge`); }
+    const back = this.i - 2;   // ('property': where a property not checked is skipped from)
+    // (no clocking event: checked at all times, combinationally, as Yosys's read_verilog -formal reads it)
+    let ev = 'all';
+    if (this.accept('@')) {
+      ev = this.eventList();
+      if (ev === 'all' || ev.length !== 1 || ev[0].edge === 'any') { this.i = back; return skip(`${form} property clocked by something other than one clock edge`); }
+    }
     let disable = null;
     if (this.accept('disable')) {
-      if (!this.isWord('iff')) { this.i = at - 3; return skip(`${form} property with 'disable' not followed by 'iff'`); }
+      if (!this.isWord('iff')) { this.i = back; return skip(`${form} property with 'disable' not followed by 'iff'`); }
       this.next(); this.expect('('); disable = this.expr(); this.expect(')');
     }
     // the implication: '|' '->' (|->) or '|=' '>' (|=>) at the property's own level, its antecedent read up to it
@@ -58,8 +62,9 @@ export const assertMethods = {
       else if (this.is(')', t) || this.is(']', t) || this.is('}', t)) { if (depth-- === 0) break; }
       else if (depth === 0 && this.is('|', t) && this.is('->', this.toks[j + 1])) { imp = 'same'; break; }
       else if (depth === 0 && this.is('|=', t) && this.is('>', this.toks[j + 1])) { imp = 'next'; break; }
-      else if (depth === 0 && (this.is('#', t) || (t.t === 'sys' && /^(\$past|\$rose|\$fell|\$stable|\$changed)$/.test(t.v)))) { this.i = at - 3; return skip(`${form} property with a sequence or a sampled-value function`); }
+      else if (depth === 0 && (this.is('#', t) || (t.t === 'sys' && /^(\$past|\$rose|\$fell|\$stable|\$changed)$/.test(t.v)))) { this.i = back; return skip(`${form} property with a sequence or a sampled-value function`); }
     }
+    if (imp === 'next' && ev === 'all') { this.i = back; return skip(`${form} property with |=> and no clocking event (@(posedge clk))`); }
     let ante = null, cons;
     if (imp) {
       const saved = this.toks[j];
