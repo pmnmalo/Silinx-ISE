@@ -121,6 +121,36 @@ export function publishProject(doc, { project, files, owner = '' }) {
   });
 }
 
+/** What a follower takes of a room (#3361: the owner may be hostile): its files, their total size (characters). */
+export const FOLLOW_LIMITS = Object.freeze({ files: 5000, total: 64 << 20 });
+
+const size = n => (n >= 1 << 20 ? `${Math.ceil(n / (1 << 20))} MB` : `${Math.ceil(n / 1024)} KB`);
+
+/** Why a followed document is past what a follower takes (null: it is not). */
+export function docTooLarge(doc, limits = FOLLOW_LIMITS) {
+  const files = doc.getMap('files');
+  if (files.size > limits.files) return `the shared project has more files than a follower takes (${files.size}, at most ${limits.files})`;
+  let total = 0;
+  for (const yt of files.values()) total += yt instanceof Y.Text ? yt.length : 0;
+  if (total > limits.total) return `the shared project is larger than a follower takes (${size(total)}, at most ${size(limits.total)})`;
+  return null;
+}
+
+/** A followed file's text through the import gate (#3361), as any file from outside: { text } (null: not in the
+ *  project), or { reason } it is not shown (its size, a NUL byte, an HTML page, an XML DTD, ...). */
+export function gatedDocFile(doc, path) {
+  const text = docFile(doc, path);
+  if (text === null) return { text: null };
+  if (text.length > FILE_MAX) return { reason: `file larger than ${FILE_MAX >> 20} MB` };
+  try {
+    const f = gateFile(path, text);
+    return f.path === path ? { text: f.text } : { reason: 'not a file of the project' };
+  } catch (e) {
+    if (e instanceof GateError) return { reason: e.reason || e.message };
+    throw e;
+  }
+}
+
 /** A file's text (null: not in the project). */
 export function docFile(doc, path) {
   if (!sharedPath(path)) return null;

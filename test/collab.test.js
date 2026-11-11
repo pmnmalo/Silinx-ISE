@@ -13,7 +13,7 @@ import * as encoding from 'lib0/encoding';
 import { scratchEnv } from './server-helpers.js';
 import { newKey, keyOf, seal, unseal, KEY_RE } from '../core/collab-crypto.js';
 import { followLink, parseFollowLink, relayUrl, ROOM_RE } from '../core/collab-link.js';
-import { projectDoc, publishProject, putFile, putProject, moveFile, dropFile, docFile, docProject, setText, sharedPath, watchDoc, FILE_MAX } from '../core/collab-doc.js';
+import { projectDoc, publishProject, putFile, putProject, moveFile, dropFile, docFile, docProject, setText, sharedPath, watchDoc, FILE_MAX, gatedDocFile, FOLLOW_LIMITS } from '../core/collab-doc.js';
 import { shareRoom, followRoom, KIND, PROTOCOL, SUBPROTOCOL, colorOf, COLORS } from '../core/collab-client.js';
 import { attachRelay, RELAY_LIMITS } from '../server/collab-relay.js';
 
@@ -232,6 +232,61 @@ test('a follower\'s awareness speaks for that follower only (#3360): the owner\'
   raw.send(JSON.stringify({ type: 'join', v: PROTOCOL, room: owner.room, client: doc.clientID }));
   await until(() => texts.length, 'the refusal');
   assert.deepEqual(texts, [{ type: 'error', message: 'another participant of this shared project has this client id' }]);
+  await owner.close();
+});
+
+// a hostile owner's file: written into the document directly (an honest owner's putFile refuses a large one)
+const plant = (doc, path, text) => { const yt = new Y.Text(); yt.insert(0, text); doc.getMap('files').set(path, yt); };
+
+test('#3361 a followed room\'s files through the import gate: a web page, a NUL byte, an XML DTD, a file too large not shown, their reason said', async () => {
+  const doc = owned();
+  plant(doc, 'src/page.vhd', '<!doctype html><script>alert(1)</script>');
+  plant(doc, 'src/zero.vhd', 'entity a is\0 end;');
+  plant(doc, 'src/nul.vhd', 'entity a is end;');
+  plant(doc, 'src/a.sch', '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><x>&e;</x>');
+  plant(doc, 'src/big.vhd', `-- ${'x'.repeat(FILE_MAX)}\n`);
+  const owner = await shareRoom({ url: url(), token: 'the-token', doc, user: { name: 'Ana' } });
+  const fol = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Rui' } });
+  await fol.ready;
+  const g = p => gatedDocFile(fol.doc, p);
+  assert.deepEqual(g('src/top.vhd'), { text: FILES['src/top.vhd'] });
+  assert.deepEqual(g('src/page.vhd'), { reason: 'a web page (HTML), not the file its name says' });
+  assert.deepEqual(g('src/zero.vhd'), { reason: 'binary content (a NUL byte) in a text file' });
+  assert.deepEqual(g('src/nul.vhd'), { reason: 'reserved name (\'nul.vhd\')' });
+  assert.deepEqual(g('src/a.sch'), { reason: 'XML with a DTD (<!DOCTYPE>): external entities and entity expansion are not accepted' });
+  assert.deepEqual(g('src/big.vhd'), { reason: 'file larger than 1 MB' });
+  assert.deepEqual(g('src/none.vhd'), { text: null });
+  assert.deepEqual(g('build/top.bit'), { text: null });
+  await owner.close();
+});
+
+test('#3361 a followed room past its caps (files, total size): left at once, said; ready rejected before it arrives', async () => {
+  const limits = { files: 3, total: 4096 };
+  // (too many files in the first update: never ready)
+  const doc = owned();
+  plant(doc, 'src/b.vhd', 'b'); plant(doc, 'src/c.vhd', 'c');
+  const owner = await shareRoom({ url: url(), token: 'the-token', doc, user: { name: 'Ana' } });
+  const evs = [];
+  const fol = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Rui' }, limits, onEvent: e => evs.push(e) });
+  await assert.rejects(fol.ready, { message: 'the shared project has more files than a follower takes (4, at most 3)' });
+  await until(() => fol.closed(), 'left');
+  // (said once; before it arrived, the page's console says it from ready's rejection)
+  assert.deepEqual(evs.filter(e => e.type === 'error'), [{ type: 'error', message: 'the shared project has more files than a follower takes (4, at most 3)', fatal: true }]);
+  // (the total past its cap after it arrived: left, nothing more applied)
+  const fol2 = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Eva' }, limits: { files: 10, total: 4096 }, onEvent: e => evs.push(e) });
+  await fol2.ready;
+  evs.length = 0;
+  putFile(doc, 'src/top.vhd', 'x'.repeat(5000));
+  await until(() => fol2.closed(), 'Eva left');
+  assert.deepEqual(evs.filter(e => e.type !== 'peers'), [
+    { type: 'error', message: 'the shared project is larger than a follower takes (5 KB, at most 4 KB)', fatal: true },
+    { type: 'closed', reason: 'the shared project is larger than a follower takes (5 KB, at most 4 KB)' },
+  ]);
+  putFile(doc, 'src/top.vhd', 'y');
+  await sleep(100);
+  assert.equal(docFile(fol2.doc, 'src/top.vhd').length, 5000);
+  // (the default caps: the gate's file count, 64 MB)
+  assert.deepEqual(FOLLOW_LIMITS, { files: 5000, total: 64 << 20 });
   await owner.close();
 });
 
