@@ -3,10 +3,15 @@
 // netlist kept when DEEP_RULE.gain (10 %) faster by the estimate. The usual mapping alone left such designs 3 times as deep as
 // XST's at its default (2026-11-08, #3070: epfl-max 57 levels against XST's 17, 68.2 against 25.7 ns; epfl-priority 45 against 18,
 // 43.1 against 20.8 ns), the old Normal's rule (#468) left out of Fast.
-// The usual mapping's netlist then has its critical LUTs made one level shallower, their fan-out kept (#652, synth-open-resynth.js:
-// no mapping, the netlist's LUTs rebuilt from their cones), kept by DEPTH_RULE as at Speed: the usual mapping follows a short control
-// path as it is written, a LUT level more than XST's (spi-fpga-slave's enable, 3 levels against 2).
-import { synthesizeVerilog, FAST_SYNTH, criticalDelay, deepDesign, logicLevels, sliceCount, utilization, DEEP_RULE, LUT4_FAMILIES, YOSYS_FAMILY } from './synth-open.js';
+// First, in the usual run, a design deeper than SOPB_RULE.levels but too large for DEEP_RULE gets its netlist balanced as sums of
+// products too (DEPTH_SOPB, one remap of seconds, the old Normal's for such a design: #370), kept when DEEP_RULE.gain faster: the
+// EPFL arbiter's 128 ring-shaped priority chains, 4033 LUTs and 30 levels in the usual mapping, 2727 and 6 so (34.9 -> 7.35 ns).
+// Then the netlist that run keeps, balanced or not, has its critical LUTs made one level shallower, their fan-out kept (#652,
+// synth-open-resynth.js: no mapping, the netlist's LUTs rebuilt from their cones), kept by DEPTH_RULE as at Speed: the usual mapping
+// follows a short control path as it is written, a LUT level more than XST's (spi-fpga-slave's enable, 3 levels against 2). In this
+// order, the resynthesis works on the shallower netlist when the balancing is kept (and leaves a design above SPEED_RULE.maxLuts, as
+// the balanced arbiter, as it is).
+import { synthesizeVerilog, FAST_SYNTH, criticalDelay, deepDesign, logicLevels, sliceCount, utilization, DEEP_RULE, DEPTH_RULE, LUT4_FAMILIES, YOSYS_FAMILY } from './synth-open.js';
 import { resynthStage } from './synth-open-resynth.js';
 
 // the usual mapping's result with its critical LUTs made shallower when DEPTH_RULE keeps it (r.depth.resynth, r.depth.domains), on
@@ -26,11 +31,11 @@ async function shallower(r, { run, family = 'spartan3e', onLine = () => {} }) {
 /** synthesizeVerilog at Optimization Fast: the usual mapping's netlist, or Speed's for a deep design when DEEP_RULE.gain faster
  *  (deepRule: DEEP_RULE, for tests); its messages said; r.fast { levels, usual: { ns, luts }, speed: { ns, luts }, kept: 'usual' |
  *  'speed' } for a deep design (none for the others); the usual mapping's netlist with its critical LUTs made shallower when DEPTH_RULE
- *  keeps it (r.depth.resynth, #652). */
+ *  keeps it (r.depth.resynth, #652), after the balancing of a deep design too large for DEEP_RULE (r.depth.sopb, #370). */
 export async function synthesizeFast(input, options = {}) {
   const { onLine = () => {}, deepRule = DEEP_RULE } = options;
   const lines = [];
-  const usual = await synthesizeVerilog(input, { ...options, ...FAST_SYNTH, onLine: l => lines.push(l) });
+  const usual = await synthesizeVerilog(input, { ...options, ...FAST_SYNTH, sopb: Math.min(deepRule.maxLuts ?? Infinity, DEPTH_RULE.maxLuts), onLine: l => lines.push(l) });
   const top = usual.top, json = usual.files?.[`${top}.json`];
   if (!json || !deepDesign(json, top, deepRule)) {
     for (const l of lines) onLine(l);
