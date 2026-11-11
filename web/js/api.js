@@ -80,7 +80,8 @@ export const api = {
   readFile: (name, path) => req('GET', `/api/projects/${enc(name)}/file?path=${enc(path)}`, undefined, { text: true }),
   writeFile: (name, path, text) => req('PUT', `/api/projects/${enc(name)}/file?path=${enc(path)}`, text),
   renameFile: (name, from, to) => req('POST', `/api/projects/${enc(name)}/rename`, { from, to }),
-  deleteFile: (name, path) => req('DELETE', `/api/projects/${enc(name)}/file?path=${enc(path)}`),
+  // (trash: the user's Delete File / Delete Folder, into the workspace's .trash -> { trashed }, #3364)
+  deleteFile: (name, path, { trash = false } = {}) => req('DELETE', `/api/projects/${enc(name)}/file?path=${enc(path)}${trash ? '&trash=1' : ''}`),
   sources: name => req('GET', `/api/projects/${enc(name)}/sources`),
   // a synthesis test of the project's exercise, graded on the server (#3216, server/grade-routes.js): { result }
   gradeSynthesis: (name, exercise, test) => req('POST', `/api/projects/${enc(name)}/grade/synthesis`, { exercise, test }),

@@ -460,17 +460,21 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
   });
 }
 
-/** Delete a project file or folder (recursively) and unregister the files it contained. */
-export async function deleteFile(name, rel) {
+/** Delete a project file or folder (recursively) and unregister the files it contained. trash (the user's Delete File /
+ *  Delete Folder, the MCP's delete_file, #3364): moved to the workspace's .trash folder, .trash/<project>-<time>/<path>,
+ *  as a deleted project is, from where it can be moved back -> { trashed: its path in the workspace, else null }. */
+export async function deleteFile(name, rel, { trash = false } = {}) {
   const dir = projectDir(name);
   const full = safeJoin(dir, rel);
   if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
   const key = relKey(dir, full);
   if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
   refuseHidden(dir, rel, full, 'deleted');
+  let trashed = null;
   await withProjectLock(name, async () => {
     await refuseHiddenInside(dir, rel, full, 'deleted');
-    await fs.rm(full, { recursive: true, force: true });
+    if (trash && await exists(full)) trashed = await toTrash(name, full, key);
+    else await fs.rm(full, { recursive: true, force: true });
     const pj = await readProject(name);
     const gone = p => p === key || p.startsWith(key + '/');
     const before = JSON.stringify(pj);
@@ -480,6 +484,18 @@ export async function deleteFile(name, rel) {
     if (pj.excluded) pj.excluded = pj.excluded.filter(p => !gone(p));
     if (JSON.stringify(pj) !== before) await writeProjectUnlocked(name, pj);
   });
+  return { trashed };
+}
+// a project's file or folder into the workspace's .trash, at .trash/<project>-<time>/<its path> -> that path (the
+// workspace's, with '/')
+async function toTrash(name, full, key) {
+  const trash = path.join(workspaceDir(), '.trash'), stamp = `${name}-${Date.now()}`;
+  let base = path.join(trash, stamp);
+  for (let i = 2; await exists(base); i++) base = path.join(trash, `${stamp}-${i}`);
+  const at = path.join(base, ...key.split('/'));
+  await fs.mkdir(path.dirname(at), { recursive: true });
+  await fs.rename(full, at);
+  return relKey(workspaceDir(), at);
 }
 
 export async function readSources(name) {

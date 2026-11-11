@@ -165,7 +165,7 @@ export const SOURCE_TOOLS = [
   },
   {
     name: 'delete_file', title: 'Delete a file or a folder',
-    description: 'Delete a file or a folder (with everything in it) of a project from the disk, as Delete File / Delete Folder does: it cannot be undone (remove_from_project keeps the file in the project folder). A top module the project then no longer has becomes the one root of its view, else none.',
+    description: 'Delete a file or a folder (with everything in it) of a project, as Delete File / Delete Folder does: it is moved to the workspace\'s .trash folder (.trash/<project>-<time>/<its path>, named in the result), from where it can be moved back by hand, as delete_project does (remove_from_project keeps the file in the project folder). A top module the project then no longer has becomes the one root of its view, else none.',
     inputSchema: { type: 'object', properties: { project: PROJECT, path: STR('The file\'s or folder\'s path in the project.') }, required: ['project', 'path'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true },
     async run({ project: name, path: rel }) {
@@ -175,9 +175,10 @@ export const SOURCE_TOOLS = [
       const folder = !tree.includes(file);
       if (folder && !tree.some(f => f.startsWith(`${file}/`))) throw toolError(`no file or folder '${file}' in the project '${name}'`);
       const count = folder ? tree.filter(f => f.startsWith(`${file}/`)).length : 1;
-      try { await P.deleteFile(name, file); } catch (e) { throw toolError(e.message); }
+      let r;
+      try { r = await P.deleteFile(name, file, { trash: true }); } catch (e) { throw toolError(e.message); }
       const lines = await fixMissingTops(name);
-      return { text: [...lines, `${file} deleted${folder ? ` (a folder: ${count} file(s))` : ''}.`].join('\n'), data: { project: name, deleted: file, folder, files: count, ...await tops(name), messages: lines } };
+      return { text: [...lines, `${file} deleted (${folder ? `a folder: ${count} file(s); ` : ''}moved to the workspace's .trash folder: ${r.trashed}).`].join('\n'), data: { project: name, deleted: file, folder, files: count, trashed: r.trashed, ...await tops(name), messages: lines } };
     },
   },
   {

@@ -307,7 +307,7 @@ export const api = {
     }
   },
   writeFile: (name, path, text) => ops.writeFile(name, path, text),
-  deleteFile: (name, path) => ops.deleteFile(name, path),
+  deleteFile: (name, path, opts) => ops.deleteFile(name, path, opts),
   sources: name => ops.sources(name),
   devices: async () => getDeviceDb(),
   toolchain: async () => ({

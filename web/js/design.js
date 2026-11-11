@@ -371,10 +371,13 @@ export function fileContextMenu(e, file) {
     { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) && S.viewTexts?.[file] === undefined },
   ].filter(Boolean), e.clientX, e.clientY);
 }
-// Delete File…: out of the project if it was in it, and deleted from the disk, which no Undo brings back (#1215;
-// Remove from Project keeps the file in the project folder)
+// Delete File…: out of the project if it was in it, and off the project folder (#1215; Remove from Project keeps the
+// file in the project folder): into the workspace's .trash, from where it can be moved back (#3364), or, in a browser's
+// storage, which has no .trash, deleted for good
 async function deleteFile(file) {
-  if (!await confirmDlg('Delete File', `Delete '${file}' from the disk?\n(It cannot be undone: Remove from Project keeps the file in the project folder.)`)) return;
+  const trash = !api.standalone || api.keepsTrash;
+  if (!await confirmDlg('Delete File', trash ? `Delete '${file}'?\n(It is moved to the workspace's .trash folder, from where you can move it back. Remove from Project keeps the file in the project folder.)`
+    : `Delete '${file}' from the disk?\n(It cannot be undone: Remove from Project keeps the file in the project folder.)`)) return;
   await saveAll();
   for (const d of [...S.docs]) if (d.path === file || String(d.id || '').endsWith(`:${file}`)) { d.dirty = false; clearTimeout(d._autosave); await closeDoc(d); }
   return serialOp(async () => {
@@ -384,8 +387,8 @@ async function deleteFile(file) {
     pj.excluded = (pj.excluded || []).filter(f => f !== file);
     await saveProjectJson();
     try {
-      await api.deleteFile(pj.name, file);
-      log(`${file} deleted.`, 'ok');
+      const r = await api.deleteFile(pj.name, file, { trash });
+      log(r?.trashed ? `${file} deleted (moved to the workspace's .trash folder: ${r.trashed}).` : `${file} deleted.`, 'ok');
     } catch (e) { log(`ERROR: cannot delete ${file}: ${e.message}`, 'err'); }
     await reloadProject();
     await fixMissingTops();

@@ -159,6 +159,20 @@ test('folder: listing (no hidden folders, no folders without silinx.json), readi
   assert.equal(tree[`${trashed}src/top.vhd`], '-- changed outside\n');
   assert.ok(tree[`${trashed}silinx.json`].includes('"name": "Aaa"'));
   await assert.rejects(() => ops.project('Aaa'), { message: "project 'Aaa' not found" });
+  // a file and a folder deleted by the user (#3364): into .trash/<name>-<time>/<path>, as the server does
+  await ops.create({ name: 'Ddd', template: 'blinky' });
+  const text = await ops.readFile('Ddd', 'src/top.vhd');
+  const f = await ops.deleteFile('Ddd', 'src/top.vhd', { trash: true });
+  assert.match(f.trashed, /^\.trash\/Ddd-\d+\/src\/top\.vhd$/);
+  const d = await ops.deleteFile('Ddd', 'src', { trash: true });
+  assert.match(d.trashed, /^\.trash\/Ddd-\d+(-\d+)?\/src$/);
+  const after = await dump(root);
+  assert.equal(after[f.trashed], text);
+  assert.ok(Object.keys(after).some((k) => k.startsWith(`${d.trashed}/`) && k.endsWith('.v')), Object.keys(after).join(' '));
+  assert.equal(Object.keys(after).some((k) => k.startsWith('Ddd/src/')), false);
+  // Silinx's own deletion (no trash): deleted
+  assert.deepEqual(await ops.deleteFile('Ddd', 'constraints'), { ok: true });
+  assert.equal(Object.keys(await dump(root)).filter((k) => k.startsWith('.trash/')).length, Object.keys(after).filter((k) => k.startsWith('.trash/')).length);
 });
 
 test('browser storage: the same operations, kept in localStorage under silinx.standalone.fs (the format of earlier versions)', async () => {

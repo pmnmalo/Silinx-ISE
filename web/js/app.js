@@ -786,11 +786,12 @@ async function renameFolder(dir) {
 async function deleteFolder(dir) {
   if (!S.project) return;
   const files = filesUnder(dir);
-  if (!await confirmDlg('Delete Folder', `Delete the folder '${dir}' and the ${files.length} file(s) in it from the project?\n\n${files.slice(0, 12).join('\n')}${files.length > 12 ? '\n…' : ''}`)) return;
+  const trash = !api.standalone || api.keepsTrash;   // (into the workspace's .trash, #3364; a browser's storage has none)
+  if (!await confirmDlg('Delete Folder', `Delete the folder '${dir}' and the ${files.length} file(s) in it from the project?${trash ? '\n(They are moved to the workspace\'s .trash folder, from where you can move them back.)' : ''}\n\n${files.slice(0, 12).join('\n')}${files.length > 12 ? '\n…' : ''}`)) return;
   for (const d of [...S.docs]) if (d.path && d.path.startsWith(`${dir}/`)) { d.dirty = false; clearTimeout(d._autosave); await closeDoc(d); }
   try {
-    await api.deleteFile(S.project.name, dir);
-    log(`Folder ${dir} deleted (${files.length} file(s)).`, 'ok');
+    const r = await api.deleteFile(S.project.name, dir, { trash });
+    log(`Folder ${dir} deleted (${files.length} file(s)${r?.trashed ? `; moved to the workspace's .trash folder: ${r.trashed}` : ''}).`, 'ok');
   } catch (e) { log(`ERROR: cannot delete folder ${dir}: ${e.message}`, 'err'); }
   await reloadProject();
 }
