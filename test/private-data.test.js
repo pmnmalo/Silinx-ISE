@@ -162,6 +162,12 @@ test('the allow-list (#3365): two made-up values in the history, in their files 
   assert.equal(kinds('server/other.js', url).length, 2);
 });
 
+test('the allow-list (#3407): build-settings\' made-up remote folder and computer name, in that file only', () => {
+  const line = `remoteDir: '${['', 'home', 'u', 'build'].join('/')}', host: '${dot('build-box', 'local')}'`;
+  assert.deepEqual(kinds('test/build-settings.test.js', line), []);
+  assert.equal(kinds('test/other.test.js', line).length, 2);
+});
+
 test('the allow-list (#498): XPower\'s section numbers in the history, read as addresses, and nowhere else', () => {
   const sections = `sections ${dot(3, 3, 1, 1)} and ${dot(3, 3, 1, 2)} of the report`;
   assert.deepEqual(kinds('scripts/measure-power.mjs', sections), []);
