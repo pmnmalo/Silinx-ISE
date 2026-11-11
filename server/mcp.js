@@ -54,8 +54,9 @@ const INSTRUCTIONS = 'Silinx: FPGA design for teaching (Spartan-3E; Basys2, Nexy
 export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS];
 
 // ------------------------------------------------------------------ the protocol
-/** One request (or notification) of a client: its answer, or null for a notification. */
-export async function handle(msg, state = {}) {
+/** One request (or notification) of a client: its answer, or null for a notification. signal: aborted when the client
+ *  cancels the request (notifications/cancelled), for the tools that run long (simulate, run_process, #3408). */
+export async function handle(msg, state = {}, { signal } = {}) {
   const reply = result => ({ jsonrpc: '2.0', id: msg.id, result });
   const fail = (code, message) => ({ jsonrpc: '2.0', id: msg.id ?? null, error: { code, message } });
   if (!msg || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return fail(-32600, 'invalid request');
@@ -80,7 +81,7 @@ export async function handle(msg, state = {}) {
       // (the workspace and the exchange folder named as such, never their absolute paths, #3418)
       const name = await pathNamer();
       try {
-        const r = await tool.run(args);
+        const r = await tool.run(args, { signal });
         r.text = name(r.text);
         r.data = name(r.data);
         // (text from outside, #3363: labelled, in the text and in the structured content)
@@ -105,19 +106,25 @@ export function serveMcp({ input = process.stdin, output = process.stdout } = {}
   const send = m => output.write(`${JSON.stringify(m)}\n`);
   const rl = readline.createInterface({ input, crlfDelay: Infinity });
   let pending = Promise.resolve();
+  // the requests waiting or running, by id: a cancellation aborts its request at once, which is then not answered (#3408)
+  const running = new Map();
   rl.on('line', line => {
     if (!line.trim()) return;
     let msg;
     try { msg = JSON.parse(line); } catch { send({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); return; }
+    if (msg?.method === 'notifications/cancelled' && msg.id === undefined) { running.get(msg.params?.requestId)?.abort(); return; }
+    const one = !Array.isArray(msg) && msg?.id !== undefined && msg.id !== null ? new AbortController() : null;
+    if (one) running.set(msg.id, one);
     // (one at a time, in order: a process and a read of its report do not overlap)
     pending = pending.then(async () => {
+      if (one?.signal.aborted) return;
       const batch = Array.isArray(msg) ? msg : [msg];
       // (a batch's requests in order too, each seeing the one before it done: a project's creation and a process on it
       // never overlap, #3413)
       const out = [];
-      for (const m of batch) { const r = await handle(m, state); if (r) out.push(r); }
-      if (out.length) send(Array.isArray(msg) ? out : out[0]);
-    }).catch(e => process.stderr.write(`silinx mcp: ${e?.stack || e}\n`));
+      for (const m of batch) { const r = await handle(m, state, { signal: one?.signal }); if (r) out.push(r); }
+      if (out.length && !one?.signal.aborted) send(Array.isArray(msg) ? out : out[0]);
+    }).catch(e => process.stderr.write(`silinx mcp: ${e?.stack || e}\n`)).finally(() => { if (one && running.get(msg.id) === one) running.delete(msg.id); });
   });
   // (its shared projects end with it, #3181)
   return new Promise(resolve => rl.on('close', () => pending.then(endCollab).then(resolve)));

@@ -98,6 +98,31 @@ function applyForces(sim, design, list) {
   return out;
 }
 
+// simulate's bounds (#3408): the run stops at a wall-clock limit (timeout_s) and at a number of time steps (as the C
+// simulation's, server/mcp-hls.js), a cancelled request stops it too; the waves recorded and the delta cycles are the
+// interface's (core/simulator.js: maxWaveEvents, maxDeltas); the changes returned are bounded
+export const SIM_LIMITS = Object.freeze({ timeoutS: 60, maxTimeoutS: 600, steps: 20_000_000, maxChanges: 1000, changes: 100_000 });
+const SIM_CHUNK = 20_000;   // time steps between two looks at the clock and at a cancellation
+const nth = n => n.toLocaleString('en-US');
+
+/** The simulation run to `until` (ps) in chunks: its status, and the limit that stopped it (null: none; steps: the
+ *  time steps' limit, SIM_LIMITS.steps). */
+export async function runBounded(sim, until, { timeoutS, signal, steps: maxSteps = SIM_LIMITS.steps }) {
+  const deadline = Date.now() + timeoutS * 1000;
+  let steps = 0, lastYield = Date.now(), st;
+  for (;;) {
+    const n = Math.min(SIM_CHUNK, maxSteps - steps);
+    st = sim.run(until, { maxSteps: n });
+    if (st.finished || st.now >= until) return { st, limit: null };
+    steps += n;
+    if (steps >= maxSteps) return { st, limit: 'steps' };
+    if (Date.now() >= deadline) return { st, limit: 'time' };
+    // (the server reads a cancellation between two chunks)
+    if (Date.now() - lastYield > 50) { await new Promise(r => setImmediate(r)); lastYield = Date.now(); }
+    if (signal?.aborted) throw toolError('cancelled');
+  }
+}
+
 export const HDL_TOOLS = [
   {
     name: 'check_syntax', title: 'Check Syntax',
@@ -121,7 +146,8 @@ export const HDL_TOOLS = [
       project: PROJECT, top: STR('The simulation top (default: the project\'s test bench).'),
       time_ns: { type: 'number', description: 'How long to simulate, in ns (default 1000; at most 1e9).' },
       signals: { type: 'array', items: { type: 'string' }, description: 'The signals to return (names of the top, or paths through instances: uut/count).' },
-      max_changes: { type: 'integer', description: 'The changes of each signal returned at most (default 20, the last ones).' },
+      max_changes: { type: 'integer', description: `The changes of each signal returned at most (default 20, the last ones; from 1 to ${SIM_LIMITS.maxChanges}, and ${nth(SIM_LIMITS.changes)} in all).` },
+      timeout_s: { type: 'integer', description: `The simulation's time limit, in seconds of the clock on the wall (default ${SIM_LIMITS.timeoutS}; at most ${SIM_LIMITS.maxTimeoutS}). It also stops after ${nth(SIM_LIMITS.steps)} time steps.` },
       model: { type: 'string', enum: ['behavioral', ...Object.keys(SIM_MODELS)], description: 'What the test bench runs against: behavioral (the sources, default), or a simulation model of the flow of the project\'s top: postsynth, posttrans, postmap, postpar (with its timing).' },
       generate: { type: 'boolean', description: 'A model not made yet: make it first (its run_process), as "Generate and Simulate" does.' },
       vcd: STR('Write the waves as a VCD file into the exchange folder (its name, e.g. tb.vcd; a new file).'),
@@ -134,8 +160,10 @@ export const HDL_TOOLS = [
       }, required: ['signal'] }, description: 'Forces, as SSim\'s Force Constant and Force Clock (ssim force add): over what drives the signal, from start until cancel. A later force of a signal cuts its earlier one.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
-    async run({ project: name, top, time_ns: timeNs = 1000, signals, max_changes: maxChanges = 20, model = 'behavioral', generate = false, vcd, forces }) {
+    async run({ project: name, top, time_ns: timeNs = 1000, signals, max_changes: maxChanges = 20, timeout_s: timeoutS = SIM_LIMITS.timeoutS, model = 'behavioral', generate = false, vcd, forces }, { signal } = {}) {
       if (!(timeNs > 0) || timeNs > 1e9) throw toolError('time_ns: from 0 to 1e9 ns');
+      if (!Number.isInteger(maxChanges) || maxChanges < 1 || maxChanges > SIM_LIMITS.maxChanges) throw toolError(`max_changes: from 1 to ${SIM_LIMITS.maxChanges}`);
+      if (!Number.isInteger(timeoutS) || timeoutS < 1 || timeoutS > SIM_LIMITS.maxTimeoutS) throw toolError(`timeout_s: from 1 to ${SIM_LIMITS.maxTimeoutS} s`);
       if (model !== 'behavioral' && !SIM_MODELS[model]) throw toolError(`model: behavioral or one of ${Object.keys(SIM_MODELS).join(', ')}`);
       // the behavioural Check Syntax first, as the interface's simulation does
       const view = await elaborateView(name, { top, sim: true });
@@ -175,8 +203,10 @@ export const HDL_TOOLS = [
       const wanted = signals?.length ? signals : [...byPath.keys()].filter(k => !k.includes('/'));
       const unknown = wanted.filter(n => !byPath.has(n) && !byPath.has(String(n).toLowerCase()));
       if (unknown.length) throw toolError(`no signal ${unknown.map(n => `'${n}'`).join(', ')} in <${mod}> (names of the top, or paths as uut/count)`);
+      if (wanted.length * maxChanges > SIM_LIMITS.changes)
+        throw toolError(`signals × max_changes: at most ${nth(SIM_LIMITS.changes)} changes returned (${wanted.length} signals × ${maxChanges}): fewer signals, or a smaller max_changes`);
       if (forces) for (const line of applyForces(sim, design, forces)) head.push(line);
-      const st = sim.run(timeNs * 1000);
+      const { st, limit } = await runBounded(sim, timeNs * 1000, { timeoutS, signal });
       const fmt = (s, v) => (s.t?.w === 1 ? V.toBin(v) : `${V.toBin(v).length <= 16 ? `"${V.toBin(v)}"` : `x"${V.format(v, 'hex')}"`}`);
       const sigs = {};
       for (const n of wanted) {
@@ -187,6 +217,8 @@ export const HDL_TOOLS = [
       }
       const failed = st.finished === 'error' || log.some(l => l.kind === 'error' || l.kind === 'failure');
       const stopped = `Simulation of <${mod}> stopped at ${st.now / 1000} ns${st.finished ? ` (${st.finished})` : ''}.`;
+      const limitLine = limit === 'time' ? `WARNING: the simulation stopped at its time limit (${timeoutS} s), before ${timeNs} ns: a shorter time_ns, or a longer timeout_s (at most ${SIM_LIMITS.maxTimeoutS}).`
+        : limit === 'steps' ? `WARNING: the simulation stopped at its limit of ${nth(SIM_LIMITS.steps)} time steps, before ${timeNs} ns: a shorter time_ns.` : null;
       // its waves as a VCD file, into the exchange folder (Export VCD: the user picks the file)
       let vcdPath = null;
       if (vcd) {
@@ -196,9 +228,9 @@ export const HDL_TOOLS = [
         if (!fs.existsSync(path.dirname(vcdPath))) throw toolError(`no folder '${path.dirname(vcdPath)}'`);
         try { fs.writeFileSync(vcdPath, toVCD(design, sim), { flag: 'wx' }); } catch (e) { throw toolError(e.code === 'EEXIST' ? `'${vcdPath}' exists: a VCD does not replace a file (give another name)` : e.message); }
       }
-      const text = [...head, ...diags.filter(d => d.severity !== 'error').map(diagLine), ...log.map(l => `[${l.timeNs.toFixed(3)} ns] ${l.kind === 'print' ? '' : `${l.kind.toUpperCase()}: `}${l.text}`), stopped,
+      const text = [...head, ...diags.filter(d => d.severity !== 'error').map(diagLine), ...log.map(l => `[${l.timeNs.toFixed(3)} ns] ${l.kind === 'print' ? '' : `${l.kind.toUpperCase()}: `}${l.text}`), stopped, ...(limitLine ? [limitLine] : []),
         ...Object.entries(sigs).map(([n, s]) => `${n} = ${s.final ?? '(no value)'}${s.totalChanges > 1 ? ` (${s.totalChanges} changes)` : ''}`), ...(vcdPath ? [`Waves written: ${vcdPath}.`] : [])].join('\n');
-      return { text: clip(text), data: { project: name, top: mod, model, started: true, stoppedAtNs: st.now / 1000, finished: st.finished || null, failed, log, signals: sigs, warnings: diags.filter(d => d.severity !== 'error').map(diagJson), notes: head, ...(vcdPath ? { vcd: vcdPath } : {}) }, isError: false };
+      return { text: clip(text), data: { project: name, top: mod, model, started: true, stoppedAtNs: st.now / 1000, finished: st.finished || null, limit: limit ? { kind: limit, ...(limit === 'time' ? { seconds: timeoutS } : { steps: SIM_LIMITS.steps }) } : null, failed, log, signals: sigs, warnings: diags.filter(d => d.severity !== 'error').map(diagJson), notes: head, ...(vcdPath ? { vcd: vcdPath } : {}) }, isError: false };
     },
   },
 ];
