@@ -174,29 +174,39 @@ const flashField = StateField.define({
   provide: f => EditorView.decorations.from(f),
 });
 
-// the lines a timing path goes through (#3178, Show Path): marked until another path or none
+// the lines a timing path goes through (#3178, Show Path): marked until another path or none; faint once the file is
+// edited (the analysis was of the design before the edit), the marks following the text
 const pathLines = StateEffect.define();
+const pathMark = (stale) => Decoration.line(stale ? { class: 'xl-path-line xl-path-stale', attributes: { title: t('From the timing analysis before this edit') } } : { class: 'xl-path-line' });
 const pathField = StateField.define({
-  create: () => Decoration.none,
-  update(deco, tr) {
+  create: () => ({ deco: Decoration.none, stale: false }),
+  update(v, tr) {
+    let { deco, stale } = v;
     deco = deco.map(tr.changes);
-    for (const e of tr.effects) if (e.is(pathLines)) deco = Decoration.set(e.value.map(at => Decoration.line({ class: 'xl-path-line' }).range(at)));
-    return deco;
+    if (tr.docChanged && !stale && deco.size) {
+      const at = [];
+      deco.between(0, tr.state.doc.length, from => { at.push(from); });
+      deco = Decoration.set(at.map(a => pathMark(true).range(a)));
+      stale = true;
+    }
+    for (const e of tr.effects) if (e.is(pathLines)) { deco = Decoration.set(e.value.map(at => pathMark(false).range(at))); stale = false; }
+    return deco === v.deco && stale === v.stale ? v : { deco, stale };
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: f => EditorView.decorations.from(f, v => v.deco),
 });
 
 /** Mark these lines of an editor (createEditor's; 1-based; none: unmarked), the first one scrolled into view (a timing
- *  path's, #3178); markedLines: the lines marked. */
+ *  path's, #3178); markedLines: the lines marked; marksStale: whether the file was edited since. */
 export function markLines({ view }, lines = []) {
   const doc = view.state.doc, at = [...new Set(lines)].filter(l => l >= 1 && l <= doc.lines).sort((x, y) => x - y).map(l => doc.line(l).from);
   view.dispatch({ effects: [pathLines.of(at), ...(at.length ? [EditorView.scrollIntoView(at[0], { y: 'center' })] : [])] });
 }
 export function markedLines({ view }) {
   const out = [];
-  view.state.field(pathField).between(0, view.state.doc.length, from => { out.push(view.state.doc.lineAt(from).number); });
+  view.state.field(pathField).deco.between(0, view.state.doc.length, from => { out.push(view.state.doc.lineAt(from).number); });
   return out;
 }
+export const marksStale = ({ view }) => view.state.field(pathField).stale;
 
 // the texts of the editor's own panels (search, go to line, folding), in the interface's language
 const phrases = () => (getLanguage() === 'pt' ? EDITOR_PHRASES_PT : {});
