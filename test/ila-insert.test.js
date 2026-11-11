@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { simulate, compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { planInsertion, captureSources, captureCost, captureFrontEnd, CAPTURE_TOP } from '../core/ila-insert.js';
+import { planInsertion, captureSources, captureCost, captureFrontEnd, boardClockOf, boardClockUcf, captureClockText, CAPTURE_TOP } from '../core/ila-insert.js';
 import { CAPTURE_CMD, readCapture, readoutCommands } from '../core/ila-capture.js';
 import { flowFrontEnd, synthesizeOpen } from '../core/synth-front.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
@@ -76,7 +76,7 @@ architecture rtl of top is type mem_t is array (0 to 3) of std_logic_vector(7 do
   assert.deepEqual(planInsertion(mem, settings({ probes: ['m'], trigger: {} })).errors, ["The probe 'm' is an array (a memory): a probe is a vector, an integer, a state or a bit."]);
   assert.deepEqual(errs({ probes: ['u.c', 'top.u.c'] }), ["The probe 'top.u.c' is given twice."]);
   assert.deepEqual(errs({ probes: [] }), ['A capture watches one signal or more (probes).']);
-  assert.deepEqual(errs({ clock: undefined }), ['A capture needs the clock it samples on (clock).']);
+  assert.deepEqual(errs({ clock: undefined }), ['A capture needs the clock it samples on (clock), or the board\'s clock.']);
   assert.deepEqual(errs({ clock: 'clock' }), ["The clock 'clock' is not a signal of the design."]);
   assert.deepEqual(errs({ clock: 'u.c' }), ["The clock 'u.c' is not a signal of one bit."]);
   assert.deepEqual(errs({ trigger: { conditions: [{ probe: 'u.s', op: '=', value: 1 }] } }), ["The trigger's signal 'u.s' is not one of the capture's probes."]);
@@ -189,4 +189,87 @@ test('the open flow\'s front end with the capture: the wrapper as the synthesis\
   // (a design with errors: the front end's own errors, no capture)
   const broken = captureFrontEnd(flowFrontEnd, settings())([{ ...VHDL[0], text: VHDL[0].text.replace('c <= c + 1;', 'c <= c + ;') }, VHDL[1]], 'top');
   assert.ok(broken.errors.length && !broken.capture);
+});
+
+// ------------------------------------------------------------------ the board's clock (#3481)
+// a design with no clock (combinational): the capture on the board's oscillator, a port of the wrapper's own
+const COMB = [{ path: 'src/top.v', lang: 'verilog', text: `module top (input [1:0] sw, output y);
+  assign y = sw[0] & sw[1];
+endmodule
+` }];
+const MCLK = { name: 'mclk', label: 'MCLK', pin: 'B8', period: 20, iostandard: 'LVCMOS33', dedicated: false };
+
+test('#3481 the board\'s clock: the oscillator found on a board, its constraints added to the design\'s, a pin taken refused', async () => {
+  const { BOARDS } = await import('../server/boards.js');
+  const { captureUcf } = await import('../core/flow-ide.js');
+  const basys2 = BOARDS.find(b => b.id === 'basys2');
+  assert.deepEqual(boardClockOf(basys2), { name: 'mclk', label: 'MCLK oscillator (25/50/100 MHz via JP4, default 50 MHz)', pin: 'B8', period: 20, iostandard: 'LVCMOS33', dedicated: false });
+  assert.deepEqual(boardClockOf(BOARDS.find(b => b.id === 'nexys3')), { name: 'clk', label: '100 MHz oscillator (GCLK)', pin: 'V10', period: 10, iostandard: 'LVCMOS33', dedicated: true });
+  assert.equal(boardClockOf({ resources: [{ name: 'led', group: 'LEDs', pins: ['M5'], dir: 'out' }] }), null);
+  assert.equal(boardClockOf(null), null);
+  assert.equal(captureClockText({ boardClock: MCLK }), 'the board\'s clock mclk (B8, 20 ns)');
+  assert.equal(captureClockText({ clock: 'clk' }), 'clk');
+  const lines = ['# the logic analyzer\'s clock: the board\'s clock mclk (B8, 20 ns) (#3481)', 'NET "silinx_board_clk" LOC = "B8" ;', 'NET "silinx_board_clk" CLOCK_DEDICATED_ROUTE = FALSE ;',
+    'NET "silinx_board_clk" TNM_NET = "silinx_board_clk" ;', 'TIMESPEC "TS_silinx_board_clk" = PERIOD "silinx_board_clk" 20 ns HIGH 50% ;'];
+  assert.equal(boardClockUcf(MCLK), lines.join('\n'));
+  // (the design's constraints and the clock's after them; its I/O standard only when the design names theirs)
+  const ucf = 'NET "sw<0>" LOC = "P11" ;\n';
+  assert.deepEqual(captureUcf({ boardClock: MCLK }, ucf), { ucf: `NET "sw<0>" LOC = "P11" ;\n\n${lines.join('\n')}\n`, error: null });
+  assert.match(captureUcf({ boardClock: MCLK }, 'NET "sw<0>" LOC = "P11" | IOSTANDARD = LVCMOS33 ;').ucf, /NET "silinx_board_clk" LOC = "B8" \| IOSTANDARD = LVCMOS33 ;/);
+  assert.deepEqual(captureUcf({ boardClock: MCLK }, null), { ucf: `${lines.join('\n')}\n`, error: null });
+  assert.deepEqual(captureUcf({ boardClock: MCLK }, 'NET "clk" LOC = "B8" ;\n'), { ucf: 'NET "clk" LOC = "B8" ;\n',
+    error: 'capture: the board\'s clock mclk (B8, 20 ns) is the design\'s port clk already: choose clk as the capture\'s clock (Logic Analyzer Settings, capture_settings)' });
+  assert.deepEqual(captureUcf({ clock: 'clk' }, ucf), { ucf, error: null });
+});
+
+test('#3481 a combinational design\'s capture on the board\'s clock: the wrapper\'s own clock port, simulated (sw\'s changes, y\'s rise the trigger)', () => {
+  const s = { boardClock: MCLK, depth: 16, pre: 2, probes: ['sw', 'y'], trigger: { combine: 'and', conditions: [{ probe: 'y', op: 'rise' }] } };
+  const ins = planInsertion(designOf(COMB), s);
+  assert.deepEqual([ins.errors, ins.clock, ins.boardClock], [[], null, MCLK]);
+  const c = captureSources(designOf(COMB), s, { lang: 'verilog', link: 'ports' });
+  const wrapper = c.sources[1].text;
+  assert.match(wrapper, /\n  input wire silinx_board_clk,\n  input wire tck,/);
+  assert.match(wrapper, /silinx_capture silinx_ila \(\.clk\(silinx_board_clk\), /);
+  // (no clock given, no board's clock: the error says both)
+  assert.deepEqual(planInsertion(designOf(COMB), { ...s, boardClock: undefined }).errors, ['A capture needs the clock it samples on (clock), or the board\'s clock.']);
+  assert.deepEqual(planInsertion(designOf(COMB), { ...s, boardClock: { name: 'mclk' } }).errors, ['The board\'s clock needs its name, its pin and its period.']);
+  // the bench: the oscillator 10 ns; sw counts from the third scan on, y rising when sw is 3
+  const cmds = SCANS(c.spec), R = c.plan.regBits;
+  const tb = `\`timescale 1ns / 1ps
+module tb;
+  reg silinx_board_clk = 0, tck = 0, sel = 0, capture = 0, shift = 0, tdi = 0;
+  reg [1:0] sw = 0;
+  wire tdo, y;
+  reg [1:0] cmds [0:${cmds.length - 1}];
+  reg [${R - 1}:0] got;
+  integer k, i;
+  always #5 silinx_board_clk = ~silinx_board_clk;
+  ${CAPTURE_TOP} uut (.sw(sw), .y(y), .silinx_board_clk(silinx_board_clk), .tck(tck), .sel(sel), .capture(capture), .shift(shift), .tdi(tdi), .tdo(tdo));
+  initial begin
+${cmds.map((x, k) => `    cmds[${k}] = 2'd${x};`).join('\n')}
+    #100;
+    for (k = 0; k < ${cmds.length}; k = k + 1) begin
+      if (k == 2) begin #400 repeat (6) #30 sw = sw + 1; #1000; end
+      sel = 1; capture = 1; #20 tck = 1; #20 tck = 0; capture = 0; shift = 1;
+      for (i = 0; i < ${R}; i = i + 1) begin
+        tdi = i < 2 ? cmds[k][i] : 1'b0;
+        #20 got[i] = tdo;
+        tck = 1; #20 tck = 0;
+      end
+      shift = 0; sel = 0;
+      #20 tck = 1; #20 tck = 0; #20 tck = 1; #20 tck = 0;
+      $display("S %b", got);
+    end
+    $finish;
+  end
+endmodule`;
+  const r = simulate([...COMB, ...c.sources, { path: 'sim/tb.v', lang: 'verilog', text: tb }], 'tb', { until: 1e9 });
+  assert.deepEqual(r.errors.map(e => `${e.file}:${e.line}: ${e.message}`), []);
+  assert.deepEqual([...(r.lib?.errors || []), ...(r.design?.diags || [])].map(d => `${d.file}:${d.line}: ${d.message}`), [], 'no warnings');
+  const words = r.sim.log.filter(l => /^S [01]+$/.test(l.text)).map(l => BigInt(`0b${l.text.slice(2)}`));
+  const cap = readCapture(c.spec, words.slice(3));
+  assert.deepEqual(cap.errors, []);
+  assert.equal(cap.trigger, 2);
+  // (sw 2 before the trigger, 3 at it: y rises; sw's later values as the bench gave them, each held 30 ns = 3 samples)
+  assert.deepEqual([cap.probes.sw[1], cap.probes.sw[2], cap.probes.y[1], cap.probes.y[2]], [2n, 3n, 0n, 1n]);
 });

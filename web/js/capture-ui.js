@@ -13,10 +13,12 @@ import { api, followJob } from './api.js';
 import { h, dialog } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
 import { Simulator } from '/core/simulator.js';
-import { S, closeDoc, findDoc, openDoc, withPrimitives } from './app.js';
+import { S, closeDoc, findDoc, openDoc, projectBoard, withPrimitives } from './app.js';
 import { log } from './console.js';
 import { inView, saveProjectJson } from './design.js';
 import { field, select } from './wizards.js';
+import { boardClockOf, boardClockText, captureClockText } from '/core/ila-insert.js';
+import { clocksOf } from '/core/schematic.js';
 
 export const DEPTHS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
 const OPS = [['=', '='], ['!=', '≠'], ['rise', 'rises'], ['fall', 'falls'], ['change', 'changes']];
@@ -41,6 +43,13 @@ function signalsOf(design) {
   return { probes: all, clocks: all.filter(s => s.bit).map(s => s.path) };
 }
 
+// the design's clocks: the signals its processes are clocked on, by their path below the top
+function clockPaths(design) {
+  const top = design.top.path, out = new Set();
+  for (const p of design.procs || []) { try { for (const sg of clocksOf(p).clocks) if (sg.path?.startsWith(`${top}.`)) out.add(sg.path.slice(top.length + 1)); } catch { /* not clocked */ } }
+  return out;
+}
+
 /** Logic Analyzer Settings: the capture's dialog; saves silinx.json's capture (or clears it). */
 export async function captureSettings() {
   const pj = S.project;
@@ -57,7 +66,13 @@ export async function captureSettings() {
   const { probes, clocks } = signalsOf(design);
   const list = h('select', { class: 'capture-probes', multiple: true, size: 12 },
     ...probes.map(p => h('option', { value: p.path, selected: (old.probes || []).includes(p.path) }, `${p.path}${p.width > 1 ? ` [${p.width}]` : ''}`)));
-  const clock = select(clocks.map(c => [c, c]), old.clock || clocks.find(c => /clk/i.test(c)) || clocks[0]);
+  // (the board's oscillator too, #3481: a design with no clock, a combinational one, samples on it; its default then)
+  const bc = boardClockOf(projectBoard(pj));
+  const BOARD = '@board';
+  const edges = clockPaths(design);
+  const clocked = clocks.filter(c => edges.has(c) || /clk|clock/i.test(c));
+  const clock = select([...(bc ? [[BOARD, boardClockText(bc)]] : []), ...clocks.map(c => [c, c])],
+    old.boardClock && bc ? BOARD : old.clock || clocked[0] || (bc ? BOARD : clocks[0]));
   const depth = select(DEPTHS.map(d => [String(d), String(d)]), String(old.depth || 1024));
   clock.classList.add('capture-clock'); depth.classList.add('capture-depth');
   const pre = h('input', { type: 'number', min: 0, value: String(old.pre ?? 0), class: 'capture-pre' });
@@ -72,7 +87,7 @@ export async function captureSettings() {
   };
   (old.trigger?.conditions || []).forEach(addRow);
   const problems = h('div', { class: 'capture-problems status-bad' }), cost = h('div', { class: 'capture-cost' });
-  const settings = () => ({ probes: chosen(), clock: clock.value, depth: +depth.value, pre: +pre.value || 0,
+  const settings = () => ({ probes: chosen(), ...(clock.value === BOARD ? { boardClock: bc } : { clock: clock.value }), depth: +depth.value, pre: +pre.value || 0,
     trigger: { combine: combine.value, conditions: [...rows.children].map(r => { const [p, o, v] = r.querySelectorAll('select, input'); return { probe: p.value, op: o.value, ...(['=', '!='].includes(o.value) ? { value: v.value.trim() } : {}) }; }) } });
   let ok = false;
   function check() {
@@ -101,7 +116,7 @@ export async function captureSettings() {
   if (r !== 'save' || !ok) return;
   pj.capture = settings();
   await saveProjectJson();
-  log(`Logic analyzer: ${pj.capture.probes.join(', ')}; ${pj.capture.depth} samples on ${pj.capture.clock}. Implement the design and program the board to capture them.`);
+  log(`Logic analyzer: ${pj.capture.probes.join(', ')}; ${pj.capture.depth} samples on ${captureClockText(pj.capture)}. Implement the design and program the board to capture them.`);
 }
 
 /** Analyze Design Using the Logic Analyzer: the capture on the board, then its window. */
@@ -118,7 +133,7 @@ export async function runCaptureOnBoard({ arm = true, timeoutS = 10 } = {}) {
   if (ins.errors.length) { log(`ERROR: Analyze Design Using the Logic Analyzer: the capture no longer fits the design: ${ins.errors.join(' ')}`); return null; }
   log('Logic analyzer: arming the capture on the board…');
   try {
-    const { job } = await api.capture(pj.name, { arm, timeoutS, spec: ins.spec, probes: ins.probes.map(({ path, name, width }) => ({ path, name, width })), top: pj.top, clock: pj.capture.clock });
+    const { job } = await api.capture(pj.name, { arm, timeoutS, spec: ins.spec, probes: ins.probes.map(({ path, name, width }) => ({ path, name, width })), top: pj.top, clock: captureClockText(pj.capture) });
     // (the job's lines in the console, its error among them)
     const j = await followJob(job, line => log(line));
     if (j.status !== 'ok' || !j.result?.capture) return null;

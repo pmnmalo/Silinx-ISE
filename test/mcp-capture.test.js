@@ -93,3 +93,32 @@ test('#3176 the capture in an ISE or Vivado run: said, the design implemented wi
   const { CAPTURE_LEFT_OUT } = await import('../server/impl-routes.js');
   assert.equal(CAPTURE_LEFT_OUT('Xilinx ISE'), 'WARNING:Silinx - the logic analyzer\'s capture is inserted by the Silinx toolchain only: Xilinx ISE implements the design without it.');
 });
+
+// #3481: a design with no clock (gates, combinational) captured on the board's own oscillator (Basys2's MCLK, B8)
+test('#3481 capture_settings clock board: gates (no clock) on the Basys2\'s MCLK, implemented (the port on B8, its period); blinky\'s clk on B8 refused', { timeout: 600000 }, async () => {
+  await ok('new_project_from_example', { name: 'g', example: 'gates' });
+  const s = await ok('capture_settings', { project: 'g', probes: ['sw', 'led'], clock: 'board', depth: 16, trigger: { combine: 'and', conditions: [{ probe: 'sw', op: 'change' }] } });
+  assert.deepEqual(s.data.capture.boardClock, { name: 'mclk', label: 'MCLK oscillator (25/50/100 MHz via JP4, default 50 MHz)', pin: 'B8', period: 20, iostandard: 'LVCMOS33', dedicated: false });
+  assert.equal(s.data.capture.clock, undefined);
+  assert.match(s.text, /^Capture: sw \(4 bits\), led \(2 bits\); 6 bits x 16 samples on the board's clock mclk \(B8, 20 ns\), 0 before the trigger: sw changes\.$/m);
+  const run = await ok('run_process', { project: 'g', process: 'bitstream', toolchain: 'silinx' });
+  assert.deepEqual(run.data.warnings, []);
+  assert.match(run.text, /^Logic analyzer: sw\[4\], led\[2\]; 6 bits x 16 samples on the board's clock mclk \(B8, 20 ns\), 0 before the trigger \(sw changes\); 1 block RAM\(s\), read over JTAG USER1 \(BSCAN_SPARTAN3\)\.$/m);
+  const routed = fs.readFileSync(path.join(P.projectDir('g'), 'build', 'open', 'routed.xdl'), 'utf8');
+  // (the clock port's input buffer on B8; the design's own pins at their places)
+  assert.ok(/^inst "silinx_board_clk" "IBUF",placed \S+ B8 /m.test(routed), (/^inst "silinx_board_clk".*$/m.exec(routed) || ['no silinx_board_clk'])[0]);
+  assert.ok(/^inst "sw<3>" "IBUF",placed \S+ B4 /m.test(routed));
+  assert.ok(fs.existsSync(path.join(P.projectDir('g'), 'build', 'gates.bit')));
+  assert.equal((await ok('get_report', { project: 'g' })).data.summary.capture.clock, 'the board\'s clock mclk (B8, 20 ns)');
+  // a signal again: the board's clock replaced
+  await ok('new_project_from_example', { name: 'bk', example: 'blinky' });
+  await ok('capture_settings', { project: 'bk', probes: ['u_knight.dir'], clock: 'board', depth: 16 });
+  const r = await call('run_process', { project: 'bk', process: 'synthesize', toolchain: 'silinx' });
+  assert.match(r.text, /capture: the board's clock mclk \(B8, 20 ns\) is the design's port clk already: choose clk as the capture's clock \(Logic Analyzer Settings, capture_settings\)/);
+  const c = await ok('capture_settings', { project: 'bk', clock: 'clk' });
+  assert.deepEqual([c.data.capture.clock, c.data.capture.boardClock], ['clk', undefined]);
+  // no board: no oscillator
+  await ok('new_project', { name: 'nb' });
+  const nb = await call('capture_settings', { project: 'nb', clock: 'board' });
+  assert.equal(nb.text, 'capture_settings: clock board: the project \'nb\' has no board (set_design_properties board): the board\'s clock is its oscillator');
+});

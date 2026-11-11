@@ -7,7 +7,11 @@
 // BSCAN primitive (BSCAN_SPARTAN3's USER1, BSCAN_SPARTAN6's and BSCANE2's JTAG_CHAIN 1). The wrapper is Verilog
 // whatever the design's language (a hierarchical name is Verilog's), which reads a VHDL design's signals as well.
 //
-// settings: { clock, depth, pre, probes: ['count', 'u_ctl.state', …], trigger: { combine: 'and' | 'or',
+// The clock may be the board's own oscillator instead of a signal of the design (boardClock, #3481: a design with no
+// clock, a combinational one): the wrapper then has a port of its own for it, BOARD_CLOCK_PORT, which Implement puts on
+// the oscillator's pin with its period (boardClockUcf).
+//
+// settings: { clock | boardClock: { name, pin, period (ns), iostandard, dedicated }, depth, pre, probes: ['count', 'u_ctl.state', …], trigger: { combine: 'and' | 'or',
 //   conditions: [{ probe, op, value }] } }: a condition's probe is one of `probes`, its value a number (a string:
 //   decimal, 0x…, 0b…; a negative number for a signed integer; an enumeration's literal for a state)
 //
@@ -25,6 +29,29 @@ import { compile, elaborate } from './compile.js';
 import { primitiveSources } from './unisim.js';
 
 export const CAPTURE_TOP = 'silinx_capture_top';
+export const BOARD_CLOCK_PORT = 'silinx_board_clk';
+
+/** The board's oscillator a capture can sample on (its first clock resource with a period): { name, label, pin, period
+ *  (ns), iostandard, dedicated }, or null. board: a board's description (server/boards.js BOARDS). */
+export function boardClockOf(board) {
+  const r = (board?.resources || []).find(x => x.group === 'Clock' && x.dir === 'in' && x.pins?.length === 1 && parseFloat(x.extra?.period) > 0);
+  return r ? { name: r.name, label: r.label || r.name, pin: String(r.pins[0]), period: parseFloat(r.extra.period), iostandard: r.iostandard || null, dedicated: r.clockDedicatedRoute !== false } : null;
+}
+
+/** The board clock's words, as the messages say them: "the board's clock mclk (B8, 20 ns)". */
+export const boardClockText = c => `the board's clock ${c.name} (${c.pin}, ${c.period} ns)`;
+/** The clock a capture samples on, as the messages say it: the signal's path, or the board's clock. */
+export const captureClockText = s => (s?.boardClock ? boardClockText(s.boardClock) : s?.clock ?? '');
+
+/** The constraints of the board's clock port (UCF lines): its pin, its period, and its I/O standard with iostandard
+ *  (when the design's constraints give theirs: else the bank's default, as the design's own pins). */
+export function boardClockUcf(c, { iostandard = false } = {}) {
+  const n = BOARD_CLOCK_PORT;
+  return [`# the logic analyzer's clock: ${boardClockText(c)} (#3481)`,
+    `NET "${n}" LOC = "${c.pin}"${iostandard && c.iostandard ? ` | IOSTANDARD = ${c.iostandard}` : ''} ;`,
+    ...(c.dedicated ? [] : [`NET "${n}" CLOCK_DEDICATED_ROUTE = FALSE ;`]),
+    `NET "${n}" TNM_NET = "${n}" ;`, `TIMESPEC "TS_${n}" = PERIOD "${n}" ${c.period} ns HIGH 50% ;`].join('\n');
+}
 export const CAPTURE_CORE = 'silinx_capture';
 // the BSCAN of each family: its cell, its parameters, its pins for tck, sel, capture, shift, tdi, tdo
 const BSCAN = {
@@ -91,8 +118,10 @@ export function planInsertion(design, settings, { family = 'spartan3e', lang = '
     probes.push({ path: rel, name, width, kind: KIND[sig.t.kind], signed: sig.t.kind === 'int' && sig.t.rlo < 0, ...(sig.t.kind === 'enum' && { names: sig.t.names }) });
   }
   if (!(Array.isArray(s.probes) && s.probes.length)) errors.push('A capture watches one signal or more (probes).');
-  const clk = s.clock ? findSignal(design, s.clock) : null;
-  if (!s.clock) errors.push('A capture needs the clock it samples on (clock).');
+  const bc = s.boardClock || null;
+  const clk = s.clock && !bc ? findSignal(design, s.clock) : null;
+  if (bc) { if (!(bc.pin && bc.name && bc.period > 0)) errors.push('The board\'s clock needs its name, its pin and its period.'); }
+  else if (!s.clock) errors.push('A capture needs the clock it samples on (clock), or the board\'s clock.');
   else if (!clk) errors.push(`The clock '${s.clock}' is not a signal of the design.`);
   else if (probeWidth(clk.t) !== 1 || clk.t.kind === 'int') errors.push(`The clock '${s.clock}' is not a signal of one bit.`);
   const byPath = new Map(probes.map(p => [p.path.toLowerCase(), p]));
@@ -110,7 +139,7 @@ export function planInsertion(design, settings, { family = 'spartan3e', lang = '
   const plan = planCapture(spec);
   const byName = n => probes.find(p => p.name === n)?.path ?? n;
   if (probes.length) errors.push(...plan.errors.filter(e => !/^(Probe |A capture watches)/.test(e)).map(e => e.replace(/'(\w+)'/g, (m, n) => `'${byName(n)}'`)));
-  return { probes, clock: clk ? clk.path.slice(design.top.path.length + 1) : null, spec, plan, errors };
+  return { probes, clock: clk ? clk.path.slice(design.top.path.length + 1) : null, ...(bc && { boardClock: bc }), spec, plan, errors };
 }
 
 // a Verilog name: escaped when it is not a plain identifier or is a keyword
@@ -122,7 +151,8 @@ const range = t => (t.scalar || t.w === 1 && t.left === t.right && !t.mark ? '' 
 function wrapperOf(design, ins, family, link) {
   const top = design.top, b = BSCAN[family];
   const ports = top.ports.map(p => `  ${p.dir === 'in' ? 'input' : p.dir === 'out' ? 'output' : 'inout'} wire ${range(p.sig.t)}${vname(p.sig.name)}`);
-  const own = link === 'ports' ? ['  input wire tck', '  input wire sel', '  input wire capture', '  input wire shift', '  input wire tdi', '  output wire tdo'] : [];
+  if (ins.boardClock && top.ports.some(p => p.sig.name.toLowerCase() === BOARD_CLOCK_PORT)) throw new Error(`the top has a port named ${BOARD_CLOCK_PORT}`);
+  const own = [...(ins.boardClock ? [`  input wire ${BOARD_CLOCK_PORT}`] : []), ...(link === 'ports' ? ['  input wire tck', '  input wire sel', '  input wire capture', '  input wire shift', '  input wire tdi', '  output wire tdo'] : [])];
   const W = ins.plan.width;
   const lines = [
     `// Silinx - the logic analyzer's capture (#3176) around the top '${top.module}': its ports, the top as dut, the`,
@@ -140,7 +170,7 @@ function wrapperOf(design, ins, family, link) {
     const pins = b.pins.map((pin, i) => `.${pin}(${LINK[i]})`);
     lines.push(`  ${b.cell}${b.params} silinx_bscan (${[...pins, ...b.tie.map(t => `.${t}(1'b0)`)].join(', ')});`);
   }
-  lines.push(`  ${CAPTURE_CORE} silinx_ila (.clk(dut.${vpath(ins.clock)}), .probe(silinx_probe), .tck(tck), .sel(sel), .capture(capture), .shift(shift), .tdi(tdi), .tdo(tdo));`);
+  lines.push(`  ${CAPTURE_CORE} silinx_ila (.clk(${ins.boardClock ? BOARD_CLOCK_PORT : `dut.${vpath(ins.clock)}`}), .probe(silinx_probe), .tck(tck), .sel(sel), .capture(capture), .shift(shift), .tdi(tdi), .tdo(tdo));`);
   lines.push('endmodule', '');
   return lines.join('\n');
 }

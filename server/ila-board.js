@@ -76,13 +76,14 @@ export async function captureSpecOf(name, pj) {
  */
 export async function captureProject(name, { arm = true, timeoutMs = 10000, device = 0, log = () => {}, link = null } = {}) {
   const { runCapture, captureRecord } = await import('../core/ila-link.js');
+  const { captureClockText } = await import('../core/ila-insert.js');
   const pj = await P.readProject(name);
   const { spec, probes } = await captureSpecOf(name, pj);
   const own = !link;
   link ||= await boardLink(spec, { device });
   let cap;
   try { cap = await runCapture(link, spec, { arm, timeoutMs, log }); } finally { if (own) await link.close(); }
-  const capture = captureRecord({ top: pj.top, clock: pj.capture.clock, spec, probes, cap });
+  const capture = captureRecord({ top: pj.top, clock: captureClockText(pj.capture), spec, probes, cap });
   const file = path.join(P.projectDir(name), CAPTURE_FILE);
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, `${JSON.stringify(capture, null, 1)}\n`);
