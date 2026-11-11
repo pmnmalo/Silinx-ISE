@@ -680,10 +680,11 @@ Beyond Xilinx, it takes **the 1BitSquared iCEBreaker** (Lattice iCE40UP5K-SG48):
 nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programmed into its SPI flash from Silinx: over WebUSB in the browser, or with openFPGALoader locally, #2298).
 The examples run on it with their seven-segment display and switches on its Pmods 1A and 1B; vga on the
 **1BitSquared iCEBreaker + PmodVGA**, a Digilent PmodVGA in those Pmods.
-On the 7-series, an experimental family (#3146), it takes **the Digilent Basys 3** (XC7A35T-CPG236) in the local server, when
+On the 7-series, an experimental family (#3146), it takes **the Digilent Basys 3** (XC7A35T-CPG236) and **the Digilent
+Nexys A7** (XC7A100T-CSG324, #3145) in the local server, when
 Silinx is the project's synthesis tool (AMD Vivado is the default there): Yosys's `synth_xilinx`, nextpnr-himbaechel's xilinx
 micro-architecture, and the `.bit` written from nextpnr's FASM on Project X-Ray's database; its timing is nextpnr's estimate,
-optimistic against Vivado's. Not yet the Nexys A7 (XC7A100T: no bit database), nor the browser edition.
+optimistic against Vivado's. Not yet the browser edition.
 It takes **the Radiona ULX3S-12f / 25f / 45f / 85f** too (Lattice ECP5, LFE5U in CABGA381): Yosys's `synth_ecp5`, nextpnr-ecp5
 and ecppack (Project Trellis), to `build/<top>.bit`, its pins written as an LPF (not programmed from Silinx yet: openFPGALoader
 -b ulx3s, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the

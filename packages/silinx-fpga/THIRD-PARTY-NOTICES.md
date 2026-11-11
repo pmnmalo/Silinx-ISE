@@ -1885,4 +1885,4 @@ express Statement of Purpose.
     this CC0 or use of the Work.
 ```
 
-packages/silinx-fpga/bitdb/xc7/ is the subset of its database (artix7) the xc7a35t's bitstream needs.
+packages/silinx-fpga/bitdb/xc7/ is the subset of its database (artix7) the xc7a35t's and the xc7a100t's bitstreams need.

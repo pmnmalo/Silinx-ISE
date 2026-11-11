@@ -5,6 +5,7 @@
 // it there: Silinx's frames and .bit byte-identical. The FASM's syntax, the bit database's lookups (an alias, a
 // pseudo-PIP, a block RAM's run of addresses) and the errors (a feature the database does not have, a bit set and
 // cleared, a line that is not FASM), a bank's STEPDOWN, PUDC_B's pull-up, the frames' ECC and the part's frame order.
+// The xc7a100t's database (the Nexys A7's, #3145): its frames and its .bit's length UG470's.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -76,6 +77,40 @@ test('xc7 bitstream: the header\'s defaults (silinx-fpga, the date and time in U
   assert.deepEqual(readBitXc7(bit, db).size, n);
   assert.throws(() => readBitXc7(bit.subarray(0, 200), db), /no frame data|not the/);
   assert.throws(() => readBitXc7(new Uint8Array(8), db), /no sync word/);
+});
+
+// the length field of a .bit's configuration data (its key 'e')
+function bitDataLength(bytes) {
+  let k = 13;
+  while (bytes[k] !== 0x65) k += 3 + ((bytes[k + 1] << 8) | bytes[k + 2]);
+  return ((bytes[k + 1] << 24) | (bytes[k + 2] << 16) | (bytes[k + 3] << 8) | bytes[k + 4]) >>> 0;
+}
+
+test('xc7 bitstream: the xc7a100t\'s (the Nexys A7\'s) database and an empty design\'s .bit, its length UG470\'s', () => {
+  assert.deepEqual(xc7Parts(), ['xc7a100tcsg324-1', PART]);
+  const a7 = loadBitDbXc7('xc7a100tcsg324-1');
+  const raw7 = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(XC7_DB_DIR, 'xc7a100tcsg324-1.json.gz'))).toString('utf8'));
+  // the same prjxray-db as the xc7a35t's; the xc7a100t's own fabric (the xc7a35t's is the xc7a50t's)
+  assert.deepEqual([raw7.prjxrayDb, rawDb().prjxrayDb], Array(2).fill('0a0addedd73e7e4139d52a6d8db4258763e0f1f3'));
+  assert.deepEqual([a7.part, a7.device, a7.fabric, a7.idcode], ['xc7a100tcsg324-1', 'xc7a100t', 'xc7a100t', 0x3631093]);
+  assert.deepEqual([a7.requiredFeatures, a7.pudcB, Object.keys(a7.banks).sort()], [[], ['LIOB33_X0Y93', 'IOB_Y0'], ['0', '14', '15', '16', '34', '35']]);
+  assert.equal(a7.tile('CLBLL_L_X2Y137').type, 'CLBLL_L');
+  // an empty design: the part's 9448 frames in 8 rows (rows 0 and 1 of each half, CLB_IO_CLK and BLOCK_RAM), 9012 the tiles'
+  const { frames } = fasmToFrames(a7, '');
+  const part = partFrames(a7.regions);
+  let n = 0, rows = 0;
+  for (let a = 0; a !== null; a = part.next(a)) {
+    n++;
+    const nx = part.next(a);
+    if (nx === null || ['block', 'bottom', 'row'].some(k => farFields(nx)[k] !== farFields(a)[k])) rows++;
+  }
+  assert.deepEqual([n, rows, frames.size], [9448, 8, 9012]);
+  const bit = bitstreamXc7(frames, a7);
+  assert.equal(bitHeader(bit).b, 'xc7a100tcsg324-1');
+  assert.equal(readBitXc7(bit, a7).size, 9448);
+  // the configuration data's length, UG470's (7 Series FPGAs Configuration, table 1-1): 30,606,304 bits for the
+  // XC7A100T, 17,536,096 for the XC7A35T
+  assert.deepEqual([bitDataLength(bit) * 8, bitDataLength(bitstreamXc7(fasmToFrames(db, '').frames, db)) * 8], [30606304, 17536096]);
 });
 
 test('xc7 bitstream: the part\'s frame order (block type, half, row, column, minor) and its ends', () => {
@@ -163,7 +198,6 @@ test('xc7 fasm: a line that is not FASM, a value too wide, an address backwards:
 });
 
 test('xc7 bitdb: a tile\'s feature\'s bits (a LUT, a switch box, a block RAM\'s contents), an alias, a pseudo-PIP', () => {
-  assert.deepEqual(xc7Parts(), [PART]);
   assert.deepEqual([db.part, db.device, db.fabric], [PART, 'xc7a35t', 'xc7a50t']);
   const clb = db.tile('CLBLL_L_X2Y37');
   assert.deepEqual([clb.type, clb.blocks.get(0).base, clb.blocks.get(0).offset, clb.blocks.get(0).words], ['CLBLL_L', 0x00400100, 75, 2]);

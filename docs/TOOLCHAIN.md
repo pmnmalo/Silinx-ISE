@@ -132,7 +132,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 | MachXO2 | to be defined | nextpnr-machxo2, not yet stable | `ecppack`, Project Trellis | LPF | To be measured (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel-gowin | `gowin_pack`, Silinx's JavaScript port of Apicula's (`src/fpga/gowin/`) | CST | Works: local server and browser, downloaded on first use (32 MB); the GW1NR-9C, the Tang Nano 9K and the examples on it, their `.fs` Apicula's byte for byte, the rPLL and the oscillator too (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
-| Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T in the local server, AMD Vivado the default; its timing nextpnr's estimate; the Nexys A7 and the browser to come (#3147) |
+| Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T and the Nexys A7's XC7A100T (#3145) in the local server, AMD Vivado the default; its timing nextpnr's estimate; the browser edition, and the quality against Vivado (#3147), to come |
 
 Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. The
 constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the
