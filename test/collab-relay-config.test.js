@@ -93,7 +93,7 @@ test('the relays a server\'s pages may use: config.json\'s relay.relays, in thei
   const path = await import('node:path');
   const { pageCsp } = await import('../server/server.js');
   const { configPath } = await import('../server/toolchain.js');
-  const page = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'web', 'index.html');
+  const page = path.join(path.dirname((await import('node:url')).fileURLToPath(import.meta.url)), '..', 'web', 'index.html');
   const connect = () => /connect-src ([^;]*)/.exec(pageCsp(page))[1].split(' ');
   const { TRACKER_SOURCES } = await import('../server/csp.js');
   const BASE = ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', ...TRACKER_SOURCES];
