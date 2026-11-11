@@ -214,6 +214,8 @@ const MARKUP = {
   'core/petri.js': 4,                 // a PNML file (not the page): positions and counts, numbers; names through xesc
   'core/asm-gen.js': 1,               // an HDL comment naming <input>_meta, not markup
   'server/csp.js': 1,                 // the Content Security Policy's <meta>, its content escaped (& and ")
+  'server/open-page.js': 2,           // the launcher's redirect page (#3409): the URL escaped as an attribute (& " <) and as
+                                      // a script string (JSON.stringify, < escaped); the URL is the server's own, with its code
 };
 const MARKUP_TAG = /<\/?(?:svg|g|text|tspan|path|rect|line|circle|polyline|polygon|ellipse|div|span|b|i|a|p|br|li|ul|ol|table|tr|td|th|button|img|style|script|meta|iframe|pre|code|em|strong|sub|sup|label|input|select|option|small|h[1-6]|foreignObject|use|defs|title)[\s>/]/;
 const ESCAPED = /^\s*(?:esc|xesc|escXml|escAttr|svgText|highlightHdl)\(/;
