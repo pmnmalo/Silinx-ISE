@@ -73,9 +73,11 @@ export async function checkLabFile(path) {
   return !problems.length;
 }
 
-/** A lab file saved (app.js flushDoc): its problems said when they changed since they were last. */
+/** A lab file saved (app.js flushDoc): its problems said when they changed since they were last; with none, an open Lab
+ *  document of it reads it again (#3330: its steps, texts and checks; its progress kept). */
 export async function labFileSaved(path) {
-  const { problems } = parseLab(await api.readFile(S.project.name, path), path);
+  const { lab, problems } = parseLab(await api.readFile(S.project.name, path), path);
+  if (lab) for (const d of S.docs.filter(d => d.labSource === path && d.reload)) d.reload(lab, path);
   const key = problems.join('\n');
   if (saidProblems.get(path) === key || (!saidProblems.has(path) && !problems.length)) { saidProblems.set(path, key); return; }
   saidProblems.set(path, key);
@@ -109,7 +111,8 @@ export async function openLab(entry) {
   const id = `lab:${entry.id}`;
   const d = findDoc(id);
   if (d) { openDoc({ id }); return d; }
-  return openDoc({ id, title: labTitle(entry.lab), icon: 'help', create: (el, doc) => mountLab(el, doc, entry.lab) });
+  // (a project's own lab: its file, which labFileSaved reads again into the document when it is saved)
+  return openDoc({ id, title: labTitle(entry.lab), icon: 'help', create: (el, doc) => ({ labSource: entry.source, ...mountLab(el, doc, entry.lab) }) });
 }
 const labTitle = lab => `Lab: ${localize(lab.title, lang())}`;
 
@@ -198,8 +201,20 @@ export function mountLab(el, doc, lab) {
     log(`Lab "${localize(lab.title, lang())}" restarted: no step done.`, '', { diag: false });
     render();
   }
+  // the lab's file saved again (labFileSaved): its new steps, texts and checks, the steps done kept by their ids and the
+  // step shown when it is still there
+  function reload(next, path) {
+    const shown = lab.steps[p.step - 1]?.id;
+    lab = next;
+    p = labProgress(all, lab);
+    const k = lab.steps.findIndex(s => s.id === shown);
+    if (k >= 0) p.step = k + 1;
+    doc.lab = lab;
+    log(`Lab "${localize(lab.title, lang())}" read again from ${path}: its steps as saved, the steps done kept.`, '', { diag: false });
+    render();
+  }
   const off = onLanguageChange(render);
   render();
   (async () => { all = await readProgress(name); p = labProgress(all, lab); render(); root.dataset.ready = '1'; })();
-  return { lab, destroy: () => off(), checkStep: check };
+  return { lab, destroy: () => off(), checkStep: check, reload };
 }
