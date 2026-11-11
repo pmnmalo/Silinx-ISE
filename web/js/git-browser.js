@@ -2,24 +2,33 @@
 // GitHub's REST API (core/git-rest.js), on the projects of the storage in use (web/js/project-store.js: the browser's,
 // or a folder on the disk); the GitHub sign-in (OAuth's device flow through web/js/github-app.js's relay, else a pasted
 // fine-grained personal access token, checked with GitHub's API before it is kept). The token is kept
-// in this browser only (localStorage), sent only to GitHub's API in a header; never in a URL, never in a message; Sign
-// out forgets it. What a project was at its last commit or pull is kept beside the storage (localStorage, one key per
-// project of each storage).
-import { githubClient, startDeviceFlow, pollDeviceFlow, GitHubError } from '../../core/github-api.js';
+// in this tab only (sessionStorage: forgotten when it closes), or in this browser (localStorage) when the user chooses to
+// be remembered (#3356: every page of the site's origin, another GitHub Pages site of its account too, reads its
+// localStorage), under the edition's own key (the development site's: silinx.dev.); sent only to GitHub's API in a
+// header; never in a URL, never in a message; Sign out forgets it. The device flow asks for the public repositories and
+// the gists only, the private ones when the user asks (core/github-api.js SCOPE, PRIVATE_SCOPE). What a project was at
+// its last commit or pull is kept beside the storage (localStorage, one key per project of each storage).
+import { githubClient, startDeviceFlow, pollDeviceFlow, GitHubError, SCOPE, PRIVATE_SCOPE } from '../../core/github-api.js';
 import { restGit } from '../../core/git-rest.js';
 import { markUntrusted } from '../../core/trust.js';
 import { githubSettings } from './github-app.js';
 import { projectJsonText, normalizeProjectJson } from './project-store.js';
 
-const ls = () => { try { return globalThis.localStorage; } catch { return null; } };
-const get = k => { try { return ls()?.getItem(k) ?? null; } catch { return null; } };
-const put = (k, v) => { try { if (v === null) ls()?.removeItem(k); else ls()?.setItem(k, v); } catch { /* not kept */ } };
+const area = kind => { try { return globalThis[kind] ?? null; } catch { return null; } };
+const get = (k, kind = 'localStorage') => { try { return area(kind)?.getItem(k) ?? null; } catch { return null; } };
+const put = (k, v, kind = 'localStorage') => { try { if (v === null) area(kind)?.removeItem(k); else area(kind)?.setItem(k, v); } catch { /* not kept */ } };
 
 /** The api's git functions: store() the storage in use, ops its projectOps, prefix its keys' (the development site's own). */
 export function browserGit({ store, ops, prefix = 'silinx.' }) {
   const TOKEN = `${prefix}github-token`;
   const metaKey = name => `${prefix}git:${store().kind}:${store().label || ''}:${name}`;
-  const token = () => get(TOKEN);
+  const token = () => get(TOKEN, 'sessionStorage') ?? get(TOKEN);
+  // the token kept: in this tab, or remembered in this browser (the other place cleared)
+  const keep = (t, remember) => {
+    put(TOKEN, null, remember ? 'sessionStorage' : 'localStorage');
+    put(TOKEN, t, remember ? 'localStorage' : 'sessionStorage');
+    return { signedIn: true, remembered: !!remember };
+  };
 
   // the project's files as the repository holds them: silinx.json as committed (without the trust mark, which is this
   // browser's: #2830), the others as they are
@@ -83,24 +92,25 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
     githubSignedIn: () => !!token(),
     /** How this edition signs in: 'device' (the device flow, through the relay) or 'token' (a pasted token). */
     githubSignInWay: () => githubSettings().signIn,
-    /** A pasted fine-grained personal access token: checked with GitHub (its user), then kept -> { login }. */
-    githubSetToken: async (pasted) => {
+    /** A pasted fine-grained personal access token: checked with GitHub (its user), then kept (in this tab; remember: in
+     *  this browser) -> { signedIn, remembered, login }. */
+    githubSetToken: async (pasted, { remember = false } = {}) => {
       const t = String(pasted ?? '').trim();
       if (!/^[A-Za-z0-9_]{20,255}$/.test(t)) throw new GitHubError('that is not a GitHub token', 'Paste the token GitHub showed when it was generated (github_pat_…).', 400);
       const me = await githubClient({ fetch: (...a) => globalThis.fetch(...a), token: () => t, api: githubSettings().api, hints: { again: 'GitHub refused this token: check it was copied whole, and that it has not expired.' } }).request('GET', '/user');
-      put(TOKEN, t);
-      return { signedIn: true, login: String(me?.login || '') };
+      return { ...keep(t, remember), login: String(me?.login || '') };
     },
-    /** Sign in with GitHub (the device flow): onCode({ userCode, verificationUri }) shows the code; signal: Cancel. */
-    githubSignIn: async ({ onCode, signal } = {}) => {
+    /** Sign in with GitHub (the device flow): onCode({ userCode, verificationUri }) shows the code; signal: Cancel;
+     *  privateRepos: the private repositories too (else the public ones and the gists); remember: kept in this browser
+     *  (else in this tab) -> { signedIn, remembered }. */
+    githubSignIn: async ({ onCode, signal, privateRepos = false, remember = false } = {}) => {
       const s = githubSettings();
-      const d = await startDeviceFlow({ clientId: s.clientId, login: s.login, fetch: (...a) => globalThis.fetch(...a) });
+      const d = await startDeviceFlow({ clientId: s.clientId, login: s.login, scope: privateRepos ? PRIVATE_SCOPE : SCOPE, fetch: (...a) => globalThis.fetch(...a) });
       onCode?.({ userCode: d.userCode, verificationUri: d.verificationUri, expiresIn: d.expiresIn });
       const t = await pollDeviceFlow({ clientId: s.clientId, ...d }, { login: s.login, signal, fetch: (...a) => globalThis.fetch(...a) });
-      put(TOKEN, t);
-      return { signedIn: true };
+      return keep(t, remember);
     },
-    githubSignOut: async () => { put(TOKEN, null); return { signedIn: false }; },
+    githubSignOut: async () => { put(TOKEN, null, 'sessionStorage'); put(TOKEN, null); return { signedIn: false }; },
     // ---- a short link's gist (#3223): a secret gist of the signed-in user
     gistAvailable: async () => !!token(),
     gistSave: async design => {

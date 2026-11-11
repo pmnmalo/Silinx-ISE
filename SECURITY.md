@@ -74,9 +74,19 @@ can read that user's files has the server too.
   client ID of Silinx's GitHub OAuth App and no secret, through Silinx's relay (`relay/github-device-flow`, a Cloudflare
   Worker: only the device flow's two POSTs, with only their own fields, only Silinx's origins, nothing kept nor
   logged; the page's policy allows its origin), or, with no relay, a fine-grained personal access token the user pastes
-  (checked with GitHub's API before it is kept, never shown again). Its token is kept in the user's browser only (localStorage),
-  sent only to GitHub's API in the `Authorization` header, never in a URL nor in a message; Sign out of GitHub forgets
-  it. A repository's address is checked as the server's (github.com's only), the sign-in page linked is github.com's
+  (checked with GitHub's API before it is kept, never shown again). The device flow asks for the narrowest scope that
+  works, `public_repo gist` (the public repositories, the gists of Copy Link's short links); the user's private
+  repositories (a Classroom assignment's) only when they tick them at the sign-in, which asks for `repo gist`: an OAuth
+  App has no scope for a single private repository, which only a fine-grained token (the pasted way) limits to the
+  repositories chosen (#3356). Its token is kept in the user's browser only, sent only to GitHub's API in the
+  `Authorization` header, never in a URL nor in a message; Sign out of GitHub forgets it. Where it is kept is the
+  trade-off (#3356): the site is served from `pmnmalo.github.io`, an origin that every GitHub Pages site of the account
+  shares (the development build's `dev/` too), and a page of that origin reads its storage. So the token is kept in the
+  tab's `sessionStorage` (forgotten when the tab closes, read only by a page of the origin loaded in that same tab), and
+  in `localStorage` (kept across sessions, readable by any page of the origin) only when the user ticks **Remember me**,
+  which says so; each edition has its own key (`silinx.github-token`, the development site's `silinx.dev.github-token`).
+  A key is no boundary between pages of one origin, so the remaining exposure is the account's other Pages sites,
+  which are the maintainer's; an origin of its own (a custom domain) would remove it. A repository's address is checked as the server's (github.com's only), the sign-in page linked is github.com's
   only, and an opened or pulled file passes the import gate; the repository's hidden and binary files stay on GitHub,
   never run nor deleted. A cloned project is untrusted (#2830). A commit moves its branch only forward (never forced).
   On a server, `SILINX_GIT=github` (`server/git-github.js`) uses the same back end with the environment's token
