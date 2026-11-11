@@ -86,7 +86,8 @@ test('#2273 a sub-module given a double and a float (INLINE off): its arguments 
 double f(double x, float y) { double p = g(x, y); return p + g(p, y); }
 int main() { double r = 0; for (int i = 0; i < 4; i++) r += f(i * 0.5 + 1, 2.25f - i); return r != 0 ? 0 : 1; }
 `;
-  assert.deepEqual(run(src, 'f'), { units: [['g', 2]], cycles: 39, blocks: 0, messages: [] });
+  // (an instance a call, #2244: was one with two calls)
+  assert.deepEqual(run(src, 'f'), { units: [['g', 1], ['g', 1]], cycles: 39, blocks: 0, messages: [] });
 });
 
 test('#2273 ALLOCATION of a floating-point operation: what is not made, its warning', () => {

@@ -64,10 +64,11 @@ test('#1961 ALLOCATION: what is not made, its warning', () => {
   const m = (p) => msgs(`int f(int a) {\n#pragma HLS ALLOCATION ${p}\n  return g(a) + h(a);\n}`.replace(/^/, 'int g(int v) {\n#pragma HLS INLINE\n  return v + 1;\n}\nint h(int v) {\n#pragma HLS INLINE off\n  return v + 2;\n}\n')).filter((x) => /ALLOCATION/.test(x));   // (h's own: combinational, its logic in its caller's)
   assert.deepEqual(m('instances=add limit=1 operation'), ['10 warning: #pragma HLS ALLOCATION of add: only multiplications and the floating-point operations (fadd, fsub, fmul, fdiv, fsqrt, dadd, dsub, dmul, ddiv, dsqrt) are shared: ignored']);
   assert.deepEqual(m('instances=mul'), ['10 warning: #pragma HLS ALLOCATION needs instances=<what> limit=N, a whole number, 1 or more: ignored']);
-  assert.deepEqual(m('instances=g limit=1 function'), ["10 warning: #pragma HLS ALLOCATION of the function 'g': it is inlined, no instance to limit (INLINE off makes it a sub-module, one instance): ignored"]);
+  assert.deepEqual(m('instances=g limit=1 function'), ["10 warning: #pragma HLS ALLOCATION of the function 'g': it is inlined, no instance to limit (INLINE off makes it a sub-module, an instance a call): ignored"]);
   assert.deepEqual(m('instances=q limit=1 function'), ["10 warning: #pragma HLS ALLOCATION of the function 'q': no such function: ignored"]);
   assert.deepEqual(m('instances=h limit=1 function'), []);
-  assert.deepEqual(m('instances=h limit=2 function'), ["10 warning: #pragma HLS ALLOCATION limit=2 of 'h': one instance made, its calls sharing it"]);
+  // (limit=2: two instances at most, #2244: was one, said)
+  assert.deepEqual(m('instances=h limit=2 function'), []);
 });
 
 test('#1961 LATENCY min=: a combinational top sequential, its wait states; max=: said when a path takes more', () => {

@@ -59,6 +59,8 @@ export function cToHdl(source, opts = {}) {
     units = shareUnits(checked);
   }
   for (const w of units.warnings) checked.diagnostics.push({ file, line: w.loc.line, col: w.loc.col, message: w.message, severity: 'warning' });
+  // (consts: FUNCTION_INSTANTIATE's arguments of this sub-module, constants of its own, #2244)
+  if (opts.consts) constArgs(checked.funcs.get(checked.top), opts.consts);
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
   const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
   // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js;
@@ -76,7 +78,7 @@ export function cToHdl(source, opts = {}) {
   return gen.ok ? axisTop(gen, names, lang, side()) : gen;
 }
 
-function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null, taken = null, host = null } = {}) {
+function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null, taken = null, host = null, large = false } = {}) {
   const diagnostics = [...checked.diagnostics];
   // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903; those this source declares,
   // #3022)
@@ -130,7 +132,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const fn = checked.funcs.get(checked.top);
   const lat = latencyPragma(fn);
   // (the functions not inlined, sub-modules, #1960)
-  const { subs, sub, kept } = subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes, mults, stall, modules });
+  const { subs, sub, kept } = subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes, mults, stall, modules, large });
   // (a region a sub-module of its own: made, #1706)
   if ([...checked.funcs.values()].some((f) => f.body && f !== fn && sub(f) && hasDataflow(f))) diagnostics.splice(0, diagnostics.length, ...diagnostics.filter((d) => !/^#pragma HLS DATAFLOW is accepted and ignored/.test(d.message)));
   const pragmaOf = (f) => f.body.items.find((s) => s.kind === 'pragma' && s.pragma.name === 'INLINE').loc;
@@ -240,12 +242,23 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, ...(df.freeRun ? { freeRun: true } : {}), states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };
 }
 
+/** A function's arguments made constants of its body ({ name: BigInt }): its ports no more (FUNCTION_INSTANTIATE, #2244). */
+function constArgs(fn, consts) {
+  const vars = fn.params.filter((p) => Object.hasOwn(consts, p.name)).map((p) => {
+    const k = BigInt(consts[p.name]), lit = { kind: 'num', value: k < 0n ? -k : k, text: `${k < 0n ? -k : k}`, loc: p.loc };
+    return { kind: 'var', name: p.name, type: p.type, init: k < 0n ? { kind: 'unary', op: '-', e: lit, loc: p.loc } : lit, static: false, const: true, loc: p.loc };
+  });
+  fn.params = fn.params.filter((p) => !Object.hasOwn(consts, p.name));
+  fn.body.items.unshift({ kind: 'decl', vars, loc: fn.loc });
+}
+
 /** The sub-modules of a top (core/c-submodule.js, #1960): the registry and what is a sub-module; the functions off kept inlined. */
-export function subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes = null, mults = null, stall = false, modules = null }) {
+// (large: a function with no pragma and a loop of its own a sub-module, as Vitis HLS keeps a large one, #2244; off by default)
+export function subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes = null, mults = null, stall = false, modules = null, large = false }) {
   const fn = checked.funcs.get(checked.top);
   const globals = new Map(checked.ast.items.filter((it) => it.kind === 'var').map((it) => [it.name, it]));
-  const { sub, kept } = hierarchy(fn, checked.funcs, globals, checked.ast.structArgs, stall ? 'its caller waits for an AXI master (ap_ce), it would not (not yet)' : null);
-  const subs = modules || moduleRegistry({ make: (callee, depths, module) => cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, clock, family, blackboxes, mults, modules: subs }) });
+  const { sub, kept } = hierarchy(fn, checked.funcs, globals, checked.ast.structArgs, stall ? 'its caller waits for an AXI master (ap_ce), it would not (not yet)' : null, { large });
+  const subs = modules || moduleRegistry({ make: (callee, depths, module, consts) => cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, clock, family, blackboxes, mults, modules: subs, consts, large }) });
   return { subs, sub, kept };
 }
 

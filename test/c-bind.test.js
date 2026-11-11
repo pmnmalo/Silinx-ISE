@@ -136,7 +136,8 @@ test('#2125 a multiplication in a sub-module\'s argument: on the unit, the limit
   const r = cToHdl(src, { ...opts, lang: 'verilog' });
   assert.ok(r.ok, JSON.stringify(r.diagnostics));
   assert.deepEqual(r.diagnostics, []);
-  assert.equal(r.report.functions.length, 1);
+  // (an instance a call, #2244: two of f's module, its multiplier block its own)
+  assert.deepEqual(r.report.functions.map((f) => [f.module, f.instance]), [['f', 'f_U0'], ['f', 'f_U1']]);
   assert.equal(r.report.blocks, 1);
   const top = r.hdl.slice(r.hdl.lastIndexOf('module top'));
   assert.equal((top.match(/ \* /g) || []).length, 1);

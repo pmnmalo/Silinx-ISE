@@ -9,7 +9,7 @@
 // Isomorphic ES module: no DOM and no Node APIs.
 //
 //   inlineMode(f) -> 'off' | 'recursive' | 'on' | null
-//   hierarchy(fn, funcs, globals, structArgs, all) -> { sub(f, recursive) -> whether a call of f is a sub-module's, kept: [{ f, why }: the
+//   hierarchy(fn, funcs, globals, structArgs, all, { large }) -> { sub(f, recursive) -> whether a call of f is a sub-module's, kept: [{ f, why }: the
 //     functions off that must be inlined] }
 //   moduleRegistry({ make }) -> { of(callee, depths) -> { callee, module, gen }, modules(): callees first }
 //   latencyOf(machine, callLatency) -> { min, max, loops }
@@ -28,6 +28,26 @@ const walk = (x, f) => {
 };
 const U = (w) => ({ w, s: false });
 const CTRL = new Set(['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready']);
+
+/** The arguments a function's FUNCTION_INSTANTIATE names (variable=a, b), each call's constant one made its own module's
+ *  constant (#2244). */
+export function instantiated(f) {
+  return (f.body?.items || []).filter((s) => s.kind === 'pragma' && s.pragma.name === 'FUNCTION_INSTANTIATE')
+    .flatMap((s) => String(s.pragma.args.variable ?? '').split(',').map((x) => x.trim()).filter(Boolean));
+}
+
+/** ALLOCATION instances=f limit=N function, in any function's body: f's instances at most N (the least said), #2244. */
+export function allocationLimits(funcs) {
+  const out = new Map();
+  for (const f of funcs.values()) {
+    for (const s of f.body?.items || []) {
+      const a = s.kind === 'pragma' && s.pragma.name === 'ALLOCATION' ? s.pragma.args : null;
+      if (!a || !(a.function !== undefined || String(a.type ?? '').toLowerCase() === 'function') || !/^\d+$/.test(String(a.limit)) || Number(a.limit) < 1) continue;
+      out.set(String(a.instances), Math.min(out.get(String(a.instances)) ?? Infinity, Number(a.limit)));
+    }
+  }
+  return out;
+}
 
 export function inlineMode(f) {
   const p = (f.body?.items || []).find((s) => s.kind === 'pragma' && s.pragma.name === 'INLINE');
@@ -48,7 +68,7 @@ const globalsOf = (fs, globals) => {
   return used;
 };
 
-export function hierarchy(fn, funcs, globals, structArgs = null, all = null) {
+export function hierarchy(fn, funcs, globals, structArgs = null, all = null, { large = false } = {}) {
   const kept = [];
   // (a variable kept between calls that the callee shares with its caller: a sub-module would have its own copy)
   const written = new Set([...globals.values()].filter((g) => !g.const).map((g) => g.name));
@@ -71,21 +91,50 @@ export function hierarchy(fn, funcs, globals, structArgs = null, all = null) {
   // (a DATAFLOW region of streams the top calls among other statements: a module of its own, called each time, #1706)
   const region = (f) => f.body && hasDataflow(f) && hasStreams(f) && !all;
   for (const f of tree(fn, funcs)) if (f !== fn && inlineMode(f) === 'off' && !able(f)) kept.push({ f, why: memo.get(f.name) });
-  // (off wins over a caller's recursive, as Vitis HLS's)
-  return { kept, sub: (f) => f !== fn && ((inlineMode(f) === 'off' && able(f)) || region(f)) };
+  // (large: a function with no INLINE pragma that holds a loop of its own, called outside any loop, a module of its own, as
+  // Vitis HLS keeps a large function, #2244; where it cannot be, or a loop or a pipelined function calls it, inlined, said
+  // nowhere. Not by default until Vitis HLS's modules of the corpus are recorded, scripts/hls-vitis.mjs)
+  const looped = new Set();
+  for (const g of tree(fn, funcs)) {
+    const piped = (g.body?.items || []).some((s) => s.kind === 'pragma' && s.pragma.name === 'PIPELINE' && !s.pragma.args.off);
+    const mark = (x) => walk(x, (c) => { if (c.kind === 'call' && c.callee?.kind === 'id') looped.add(c.callee.name); });
+    if (piped) mark(g.body);
+    else walk(g.body, (n) => { if (isLoop(n)) mark(n.body); });
+  }
+  // (what a function called in a loop calls: in that loop too, once it is inlined)
+  for (let more = true; more;) {
+    more = false;
+    for (const g of tree(fn, funcs)) if (looped.has(g.name)) walk(g.body, (c) => { if (c.kind === 'call' && c.callee?.kind === 'id' && !looped.has(c.callee.name)) { looped.add(c.callee.name); more = true; } });
+  }
+  const big = (f) => large && !!f.body && !f.library && !f.blackbox && inlineMode(f) === null && !/^ap_unit_/.test(f.name) && ownLoop(f.body) && !looped.has(f.name) && able(f);
+  // (off wins over a caller's recursive, as Vitis HLS's; recursive inlines one kept by default)
+  return { kept, sub: (f, recursive = false) => f !== fn && ((inlineMode(f) === 'off' && able(f)) || region(f) || (!recursive && big(f))) };
+}
+
+const isLoop = (n) => n.kind === 'for' || n.kind === 'while' || n.kind === 'do';
+/** A loop in a body that is not unrolled whole (#pragma HLS UNROLL with no factor in it). */
+function ownLoop(body) {
+  let hit = false;
+  walk(body, (n) => {
+    if (hit || !isLoop(n)) return;
+    const items = n.body?.kind === 'block' ? n.body.items : [];
+    if (!items.some((s) => s.kind === 'pragma' && s.pragma.name === 'UNROLL' && s.pragma.args.factor === undefined)) hit = true;
+  });
+  return hit;
 }
 
 /** The modules of a design: one per function and sizes of its arrays. make(callee, depths, module) -> cToHdl's result. */
 export function moduleRegistry({ make }) {
   const mods = new Map(), made = [];
   return {
-    of(callee, depths = {}) {
-      const key = `${callee} ${JSON.stringify(depths)}`;
+    // (binds: FUNCTION_INSTANTIATE's arguments a constant at the call, { name: BigInt }, a module of their own, #2244)
+    of(callee, depths = {}, binds = null) {
+      const key = `${callee} ${JSON.stringify(depths)}${binds ? ` ${JSON.stringify(Object.entries(binds).map(([k, v]) => [k, `${v}`]))}` : ''}`;
       if (!mods.has(key)) {
         const same = [...mods.values()].filter((m) => m.callee === callee).length;
-        const m = { callee, depths, module: `${portOf(hdlName(callee))}${same ? `_${same}` : ''}`, gen: null };
+        const m = { callee, depths, binds, module: `${portOf(hdlName(callee))}${same ? `_${same}` : ''}`, gen: null };
         mods.set(key, m);
-        m.gen = make(callee, depths, m.module);
+        m.gen = make(callee, depths, m.module, binds);
         if (m.gen?.module) m.module = m.gen.module;   // (a module of its own name: an RTL blackbox's process, #2340)
         made.push(m);
       }
@@ -154,11 +203,18 @@ export const subMethods = {
     const slotOf = (a) => { const x = named(a); return x.kind === 'id' ? this.slots.get(x.name) : null; };
     const depths = {};
     f.params.forEach((pa, i) => { const sl = slotOf(s.args[i]); if (sl?.kind === 'mem') depths[pa.name] = sl.n; });
-    const m = this.subs.of(s.callee, depths);
+    // (FUNCTION_INSTANTIATE: an argument it names, a constant at this call, a constant of a module of its own, #2244)
+    const binds = {};
+    for (const v of instantiated(f)) {
+      const i = f.params.findIndex((pa) => pa.name === v), a = s.args[i];
+      if (i < 0 || !a || ['ptr', 'array', 'stream', 'struct'].includes(f.params[i].type.kind) || this.hasMem(a) || this.hasSide(a)) continue;
+      const k = this.expr(a, this.T);
+      if (this.g.isConst(k.id)) binds[v] = this.g.k(k.id);
+    }
+    const m = this.subs.of(s.callee, depths, Object.keys(binds).length ? binds : null);
     if (!m.gen.ok) this.error(s.loc, `'${s.callee}' could not be made a module of its own (#pragma HLS INLINE off)`);
     if (!m.gen.ports.some((p) => p.name === 'ap_done')) this.error(s.loc, `'${s.callee}' has no block protocol: it cannot be called as a sub-module`);
-    if (!this.insts.has(m.module)) this.insts.set(m.module, { name: `${m.module}_U0`, m, calls: 0 });
-    const inst = this.insts.get(m.module);
+    const inst = this.instanceOf(m, s);
     inst.calls++;
     const I = (p, t) => this.g.add('in', [], t, { port: { key: `inst:${inst.name}_${p}`, name: `${inst.name}_${p}` } });
     const drive = new Map([['ap_start', g]]);
@@ -213,6 +269,20 @@ export const subMethods = {
     for (const [sl, acc] of fifos) this.fifoAcc.set(sl.name, acc);
     this.stall = this.or(this.stall, this.and(g, this.not(done)));
     this.callNow = { inst, drive };
+  },
+  /** A call's instance: one a call, as Vitis HLS makes them (#2244); ALLOCATION limit=N of the function N, the calls on
+   *  them in turn; a floating-point operation's unit (ap_unit_*, #2273), or a function with a static variable, one. */
+  instanceOf(m, s) {
+    this.limits ??= allocationLimits(this.c.funcs);
+    this.sites ??= new Map();
+    if (!this.sites.has(s)) this.sites.set(s, { m, k: [...this.sites.values()].filter((x) => x.m === m).length });
+    // (a static variable in it, or in what it calls, is one variable for all the calls: one instance, as the C's)
+    const f = this.c.funcs.get(m.callee);
+    const kept = f && [...tree(f, this.c.funcs)].some((x) => { let st = false; walk(x.body, (n) => { if (n.kind === 'decl' && n.vars.some((v) => v.static)) st = true; }); return st; });
+    const lim = /^ap_unit_/.test(m.callee) || kept ? 1 : this.limits.get(m.callee) ?? Infinity;
+    const k = this.sites.get(s).k % lim, key = `${m.module}#${k}`;
+    if (!this.insts.has(key)) this.insts.set(key, { name: `${m.module}_U${k}`, m, calls: 0 });
+    return this.insts.get(key);
   },
   /** The instances' inputs, driven by the states that call them. */
   instPorts(states) {

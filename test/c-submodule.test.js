@@ -1,5 +1,5 @@
-// Silinx HLS (#1960): a called function that is not inlined, a sub-module with its own block protocol, shared by its calls
-// (core/c-submodule.js): #pragma HLS INLINE, INLINE off and INLINE recursive as Vitis HLS takes them, each design
+// Silinx HLS (#1960): a called function that is not inlined, a sub-module with its own block protocol, an instance a call
+// (#2244; one shared by its calls when it holds a static) (core/c-submodule.js): #pragma HLS INLINE, INLINE off and INLINE recursive as Vitis HLS takes them, each design
 // co-simulated in VHDL and in Verilog, its warnings asserted, the report's latency and resources per function.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -116,7 +116,8 @@ int main() { int o = 9; int e = 0; if (top(1, &o) != 5 || o != 3) e = 1; o = 9; 
 `;
   const { g } = both(src);
   assert.deepEqual(ents(g), ['maybe', 'bump', 'top']);
-  assert.equal(inst(g, 'maybe'), 1);
+  // (an instance a call, as Vitis HLS makes them, #2244: was one shared)
+  assert.equal(inst(g, 'maybe'), 2);
 });
 
 test('#1960 arrays: the top\'s ap_memory and a local array (a memory, whatever its size) the callee\'s during the call; streams too', () => {
@@ -153,7 +154,8 @@ void top(hls::stream<int> &i, hls::stream<int> &o) {
 int main() { hls::stream<int> a, b; for (int i = 0; i < 3; i++) a.write(i); top(a, b); int s = 0; for (int i = 0; i < 3; i++) s += b.read(); return s == 6 ? 0 : 1; }
 `;
   const r = both(st, ['4 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)']);
-  assert.equal(r.g.report.functions[0].calls, 2);
+  // (an instance a call, #2244: was one with two calls)
+  assert.deepEqual(r.g.report.functions.map((f) => [f.instance, f.calls]), [['pass_U0', 1], ['pass_U1', 1]]);
   assert.equal(r.g.report.latency.max, null);
 });
 
