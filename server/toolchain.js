@@ -232,8 +232,10 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
   if (cfg.ssh.host && !/^[A-Za-z0-9._@:\-[\]]+$/.test(cfg.ssh.host)) throw Object.assign(new Error('ssh.host contains invalid characters'), { status: 400 });
   if (cfg.ssh.image && !IMAGE.test(cfg.ssh.image)) throw Object.assign(new Error('ssh.image contains invalid characters'), { status: 400 });
   if (cfg.ssh.user && !/^[A-Za-z0-9._-]+$/.test(cfg.ssh.user)) throw Object.assign(new Error('ssh.user contains invalid characters'), { status: 400 });
-  // only the user may read it (the ssh host and user, the identity file's path)
+  // only the user may read it (the ssh host and user, the identity file's path): the folder too, one that exists (#3410)
   await fs.mkdir(configDir(), { recursive: true, mode: 0o700 });
+  const { tightenConfigFolder } = await import('./config-folder.js');
+  tightenConfigFolder();
   await fs.writeFile(configPath(), JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
   await fs.chmod(configPath(), 0o600).catch(() => {});   // a file written before with another mode
   return cfg;

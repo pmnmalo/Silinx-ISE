@@ -283,10 +283,15 @@ test('serve: starts on the given port with the scratch workspace and opens the b
     assert.equal(r.status, 200);
     assert.ok(Array.isArray(await r.json()));
     for (let i = 0; i < 300 && !fss.existsSync(env.FAKE_OPEN_LOG); i++) await sleep(10);
-    // the browser opened with a one-time code, never the token on the opener's command line (#2955)
+    // the browser opened with a one-time code, never the token on the opener's command line (#2955); nor the code: the
+    // opener is given a page of the configuration folder, its owner's only, that leads to the address with it (#3409)
     const opened = await fs.readFile(env.FAKE_OPEN_LOG, 'utf8');
-    assert.match(opened, new RegExp(`(open|xdg-open) http://127.0.0.1:${port}/#code=[\\w-]{24}$`, 'm'));
-    assert.ok(!opened.includes(token));
+    const pageOf = log => new RegExp(`^(?:open|xdg-open) (${process.env.SILINX_CONFIG_DIR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/open-[\\w-]+\\.html)$`, 'm').exec(log)?.[1];
+    const first = pageOf(opened);
+    assert.ok(first, opened);
+    assert.ok(!opened.includes('code=') && !opened.includes(token));
+    assert.equal(fss.statSync(first).mode & 0o777, 0o600);
+    assert.match(fss.readFileSync(first, 'utf8'), new RegExp(`location\\.replace\\("http://127\\.0\\.0\\.1:${port}/#code=[\\w-]{24}"\\)`));
     // a second launch (the launcher double-clicked twice): "already running" (the server proved it holds the token of
     // its file), and opens it with a code of its own
     await fs.rm(env.FAKE_OPEN_LOG, { force: true });
@@ -294,7 +299,8 @@ test('serve: starts on the given port with the scratch workspace and opens the b
     assert.equal(again.code, 0, again.err);
     assert.match(again.out, new RegExp(`^Silinx is already running at http://127.0.0.1:${port}$`, 'm'));
     for (let i = 0; i < 300 && !fss.existsSync(env.FAKE_OPEN_LOG); i++) await sleep(10);
-    const code = /#code=([\w-]+)/.exec(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'))?.[1];
+    const second = pageOf(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'));
+    const code = /#code=([\w-]+)/.exec(fss.readFileSync(second, 'utf8'))?.[1];
     assert.ok(code);
     const page = { method: 'POST', headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json' }, body: JSON.stringify({ code }) };
     assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/api/token`, page)).json(), { token });
