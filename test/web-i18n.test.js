@@ -330,7 +330,7 @@ test('#1024 Program FPGA with no programming file, or one older than the sources
 // interface no longer has fails here (it is removed with its label)
 test('#1405 every Portuguese translation is of a text the sources still have', () => {
   const ROOT = path.join(WEB, '..', '..');
-  const tracked = execSync('git ls-files web core server packages/silinx-fpga/src', { cwd: ROOT, encoding: 'utf8' }).split('\n');
+  const tracked = execSync('git ls-files web core server packages/silinx-fpga/src packages/silinx-hdl/src', { cwd: ROOT, encoding: 'utf8' }).split('\n');
   const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
   const texts = new Set(), made = [];
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
