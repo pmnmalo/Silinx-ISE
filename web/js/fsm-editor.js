@@ -5,6 +5,7 @@
 //                                          onOpenFile(path), onTruthTables(), onToAsm(), onVerify(model), onMessage(text), onProblems(diags), onCheck(diags),
 //                                          readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.focus(d); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
+//   ed.setShared({ push(model, key), undo(), redo(), canUndo(), canRedo() } | null); ed.applyModel(m, { renamed, mine }); ed.busy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
 // curved arrows labelled "condition / outputs" (Mealy outputs) — Moore outputs are written inside
@@ -79,6 +80,7 @@ export function mountFsmEditor(container, opts = {}) {
   let drag = null;
   let destroyed = false;
   let panel = null;                    // 'tables' | 'sim' | null
+  let shared = null;                   // the shared history of a diagram edited live (#3183, collab-drawing.js)
   let sim = null;                      // { state, inputs: {}, trace: [], timer }
   const timers = {};
 
@@ -232,13 +234,14 @@ export function mountFsmEditor(container, opts = {}) {
   }
 
   // ---------------------------------------------------------------------------- history (fsm-history.js)
-  const { commit, redo, undo, updateToolbar } = mountFsmHistory({
+  const { applyModel, commit, redo, setShared, undo, updateToolbar } = mountFsmHistory({
     opts, M: () => M, delBtn, destroyed: () => destroyed, encSel, hi: () => hi, hist: () => hist,
     lastKey: () => lastKey, lastT: () => lastT, panel: () => panel, render: (...a) => render(...a),
     renderPanel: (...a) => renderPanel(...a), renderSide: (...a) => renderSide(...a), sel: () => sel, stateById,
     status, styleSel, tabBtns, timers, transById, validateSoon: (...a) => validateSoon(...a),
     setM: (v) => { M = v; }, setHist: (v) => { hist = v; }, setHi: (v) => { hi = v; },
-    setLastKey: (v) => { lastKey = v; }, setLastT: (v) => { lastT = v; }, setSel: (v) => { sel = v; }
+    setLastKey: (v) => { lastKey = v; }, setLastT: (v) => { lastT = v; }, setSel: (v) => { sel = v; },
+    shared: () => shared, setSharedRef: (v) => { shared = v; }, simGone: () => { if (sim && !stateById(sim.state)) resetSim(); }
   });
 
   // (a text typed in place that is not valid: to the console, by the document, #2729, as every message, #2718)
@@ -320,7 +323,7 @@ export function mountFsmEditor(container, opts = {}) {
   return {
     getModel: () => clone(M),
     undo: () => undo(), redo: () => redo(),
-    canUndo: () => hi > 0, canRedo: () => hi < hist.length - 1,
+    canUndo: () => (shared ? shared.canUndo() : hi > 0), canRedo: () => (shared ? shared.canRedo() : hi < hist.length - 1),
     // Edit ▸ Cut / Copy / Paste / Delete (#677): a state (a transition: Delete only)
     copy: () => copySel(), cut: () => copySel(true), paste: () => paste(), deleteSelection: () => deleteSelection(),
     canCopy: () => sel?.type === 'state', canDelete: () => !readOnly && !!sel, canPaste: () => !readOnly && hasClip('fsm'),
@@ -332,6 +335,9 @@ export function mountFsmEditor(container, opts = {}) {
       if (sim && !stateById(sim.state)) resetSim();
       render(); renderSide(); runValidate(); refreshLink(); if (panel) renderPanel();
     },
+    setShared, applyModel,   // (edited live, #3183: fsm-history.js)
+    // (a change under way the merge must wait for: a state or an arrow dragged, a field of the side panel being typed)
+    busy: () => (!!drag && drag.kind !== 'pan') || side.contains(document.activeElement),
     // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
     setLink(file) { linkModel(M, file); hist = hist.map((s) => linkSnapshot(s, file, normalizeFsm)); refreshLink(); },
     refreshLink,

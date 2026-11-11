@@ -11,6 +11,8 @@ import * as Y from 'yjs';
 import { followRoom } from '../core/collab-client.js';
 import { docFile, docProject } from '../core/collab-doc.js';
 import { parseFollowLink, relayUrl, followLink } from '../core/collab-link.js';
+import { drawingModel, putDrawing } from '../core/collab-model.js';
+import { normalizeFsm, generateFsm } from '../core/fsm.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, what, ms = 5000) => { const t0 = Date.now(); for (;;) { const v = await fn(); if (v) return v; if (Date.now() - t0 > ms) throw new Error(`timed out: ${what}`); await sleep(25); } };
@@ -136,21 +138,21 @@ test('#3182 editors: share_project gives an editor\'s link; follow_project write
   const r = await ok('share_project', { project: 'trafficEd', name: 'Ana', server: base, editors: true });
   const { link, editLink } = r.data;
   assert.match(editLink, new RegExp(`^${base}/#edit=${parseFollowLink(link).room}\\.[A-Za-z0-9_-]{43}\\.[A-Za-z0-9_-]{129}$`));
-  assert.equal(r.text, `Sharing 'trafficEd' live, read only, as Ana. Anyone with this link follows it (until share_project stop):\n${link}\nAnyone with this one edits its text files too:\n${editLink}`);
+  assert.equal(r.text, `Sharing 'trafficEd' live, read only, as Ana. Anyone with this link follows it (until share_project stop):\n${link}\nAnyone with this one edits its text files and state diagrams too:\n${editLink}`);
   const l = parseFollowLink(link);
   const page = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Eva' } });
   await page.ready;
   // the MCP client as an editor: a text file written, merged, on the disk, at the follower's
   const f = await ok('follow_project', { link: editLink, name: 'Bot' });
   assert.equal(f.data.editor, true);
-  assert.ok(f.text.startsWith('Following Ana\'s project \'trafficEd\' (an editor: its text files).'), f.text);
+  assert.ok(f.text.startsWith('Following Ana\'s project \'trafficEd\' (an editor: its text files and state diagrams).'), f.text);
   const timer = await P.readFile('trafficEd', 'src/timer.vhd');
   const w = await ok('follow_project', { link: editLink, write: { path: 'src/timer.vhd', text: `-- by Bot\n${timer}` } });
   assert.ok(w.text.includes('Wrote src/timer.vhd (merged as this participant\'s edit).'), w.text);
   await until(async () => (await P.readFile('trafficEd', 'src/timer.vhd')) === `-- by Bot\n${timer}`, 'the edit on the disk', 8000);
   await until(() => docFile(page.doc, 'src/timer.vhd') === `-- by Bot\n${timer}`, 'the edit at the follower\'s');
-  // refused: a drawing, a new file, a follower's link
-  await fails('follow_project', { link: editLink, write: { path: 'src/traffic.fsm.json', text: '{}' } }, 'write: src/traffic.fsm.json: not a text file of the project that an editor can change');
+  // refused: a drawing not edited live (#3183: the state diagrams are), a new file, a follower's link
+  await fails('follow_project', { link: editLink, write: { path: 'src/lamps.bool.json', text: '{}' } }, 'write: src/lamps.bool.json: not a text file of the project that an editor can change');
   await fails('follow_project', { link: editLink, write: { path: 'src/new.vhd', text: 'x' } }, 'write: src/new.vhd: not a text file of the project that an editor can change');
   await fails('follow_project', { link, write: { path: 'src/timer.vhd', text: 'x' } }, 'write: this link follows only (an editor\'s link, …#edit=…, writes)');
   // undone by the owner, from the disk: the HDL a drawing generates (the drawing's), a file an editor's page made
@@ -201,6 +203,59 @@ test('#3355 an editor\'s change of a trusted project: through the import gate, t
   await page.close();
   await ok('follow_project', { link: editLink, stop: true });
   await ok('share_project', { project: 'trustedEd', action: 'stop' });
+});
+
+test('#3183 a state diagram edited live: an editor\'s page and the MCP client change it at once, merged per state and field; the owner writes it and its HDL; follow_project reads it merged with its Check; a structure an editor may not change undone', async () => {
+  await ok('new_project_from_example', { name: 'trafficFsm', example: 'traffic' });
+  const FSM = 'src/traffic.fsm.json';
+  const { data: { link, editLink } } = await ok('share_project', { project: 'trafficFsm', name: 'Ana', server: base, editors: true });
+  const l = parseFollowLink(editLink);
+  const ed = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, sign: l.sign, user: { name: 'Rui' } });
+  await ed.ready;
+  const disk0 = JSON.parse(await P.readFile('trafficFsm', FSM));
+  assert.deepEqual(drawingModel(ed.doc, FSM).model, normalizeFsm(disk0));
+  // the MCP client reads it as merged, with its Check
+  const r0 = await ok('follow_project', { link: editLink, name: 'Bot', path: FSM });
+  assert.equal(r0.data.text, JSON.stringify(normalizeFsm(disk0), null, 2));
+  assert.ok(r0.text.endsWith('\nProcess "Check State Diagram" of traffic.fsm.json completed successfully.'), r0.text);
+  assert.deepEqual(r0.data.check, { errors: [], warnings: [] });
+  // at once: Rui (a page) renames CARS and moves it; the MCP client moves ALL_RED and adds a state with a transition
+  const base0 = drawingModel(ed.doc, FSM).model;
+  const mine = structuredClone(base0);
+  Object.assign(mine.states[0], { name: 'GO', x: 40 });
+  putDrawing(ed.doc, FSM, mine, { base: base0, client: ed.doc.clientID });
+  const bots = structuredClone(normalizeFsm(disk0));
+  bots.states[2].y = 999;
+  bots.states.push({ id: 's8', name: 'EXTRA', x: 10, y: 10, outputs: { phase: '00' } });
+  bots.transitions.push({ id: 't9', from: 's7', to: 's8', cond: 'req' });
+  const w = await ok('follow_project', { link: editLink, write: { path: FSM, text: JSON.stringify(bots) } });
+  assert.ok(w.text.includes(`Wrote ${FSM} (merged as this participant's edit).`), w.text);
+  // merged on both sides; the owner's disk, its HDL made again from it (the new state's name in it)
+  const want = (m) => m && m.states[0].name === 'GO' && m.states[0].x === 40 && m.states[2].y === 999 && m.states.some((s) => s.name === 'EXTRA');
+  await until(() => want(drawingModel(ed.doc, FSM)?.model), 'merged at the page');
+  await until(async () => want(JSON.parse(await P.readFile('trafficFsm', FSM))), 'the merge on the disk', 8000);
+  const disk = JSON.parse(await P.readFile('trafficFsm', FSM));
+  assert.deepEqual(disk, drawingModel(ed.doc, FSM).model);
+  await until(async () => /S_GO\b/.test(await P.readFile('trafficFsm', 'src/traffic.vhd')) && /S_EXTRA\b/.test(await P.readFile('trafficFsm', 'src/traffic.vhd')), 'the HDL made again', 8000);
+  assert.equal(await P.readFile('trafficFsm', 'src/traffic.vhd'), generateFsm(normalizeFsm(disk), 'vhdl', { source: 'traffic.fsm.json' }).code);
+  const pj = await P.readProject('trafficFsm');
+  assert.equal(pj.trusted, false);
+  // the MCP client reads the merge: its Check (EXTRA is never left: a warning of the diagram's own, not of the merge)
+  const r1 = await ok('follow_project', { link: editLink, path: FSM });
+  assert.deepEqual(JSON.parse(r1.data.text), disk);
+  // a drawing an editor may not edit live (an ASM chart's structure made up): undone from the disk, nothing written
+  ed.doc.transact(() => ed.doc.getMap('drawings').set('src/x.asm.json', new Y.Map()));
+  await until(() => !ed.doc.getMap('drawings').has('src/x.asm.json'), 'the made-up structure undone', 8000);
+  assert.equal(fs.existsSync(path.join(P.projectDir('trafficFsm'), 'src/x.asm.json')), false);
+  // a write that is not a state diagram's JSON: refused
+  await fails('follow_project', { link: editLink, write: { path: FSM, text: 'not json' } }, `write: ${FSM}: not a state diagram's JSON`);
+  await fails('follow_project', { link: editLink, write: { path: 'src/none.fsm.json', text: '{}' } }, 'write: src/none.fsm.json: not a drawing of the project that an editor can change');
+  // a follower (no editor) cannot write it
+  await fails('follow_project', { link, write: { path: FSM, text: '{}' } }, 'write: this link follows only (an editor\'s link, …#edit=…, writes)');
+  assert.deepEqual((await ok('share_project', { project: 'trafficFsm', action: 'status' })).data.warnings, []);
+  await ed.close();
+  await ok('follow_project', { link: editLink, stop: true });
+  await ok('share_project', { project: 'trafficFsm', action: 'stop' });
 });
 
 test('#3227 through a relay on another computer: share_project with its key; follow_project of a site\'s link that names the relay', async () => {

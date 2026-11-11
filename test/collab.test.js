@@ -285,8 +285,8 @@ test('#3361 a followed room past its caps (files, total size): left at once, sai
   putFile(doc, 'src/top.vhd', 'y');
   await sleep(100);
   assert.equal(docFile(fol2.doc, 'src/top.vhd').length, 5000);
-  // (the default caps: the gate's file count, 64 MB)
-  assert.deepEqual(FOLLOW_LIMITS, { files: 5000, total: 64 << 20 });
+  // (the default caps: the gate's file count, 64 MB, the drawings' objects, #3183)
+  assert.deepEqual(FOLLOW_LIMITS, { files: 5000, total: 64 << 20, objects: 100_000 });
   await owner.close();
 });
 

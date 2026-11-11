@@ -6,16 +6,19 @@
 // cursor, or browses alone (opening another document); the toolbar shows who is in (collab-presence.js), its menu
 // follows the owner again or stops following. Every message in the console. A room the owner's page hosts (#3227, a
 // link …/#follow=<room>.<key>.host) is reached over WebRTC, with codes exchanged by hand (collab-host.js). An editor's
-// link (#3182, …#edit=…) also edits the project's text files: their editors bound live (collab-bind.js).
+// link (#3182, …#edit=…) also edits the project's text files: their editors bound live (collab-bind.js); and its
+// drawings edited live (#3183, the state diagrams): their editors bound to the drawings' structures (collab-drawing.js).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app, activateDoc } from './app.js';
-import { collab } from './collab-state.js';
+import { collab, editsDrawingHere } from './collab-state.js';
 import { renderPresence, setPresenceCommands } from './collab-presence.js';
 import { followApi } from './collab-follow-api.js';
 import { NAME_KEY, cleanName, relaysHere, notHere } from './collab-share.js';
 import { docProject } from '/core/collab-doc.js';
 import { keepBound } from './collab-bind.js';
+import { keepDrawingsBound } from './collab-drawing.js';
+import { gateEdit } from '/core/collab-doc.js';
 import { followRoom, colorOf } from '/core/collab-client.js';
 import { parseFollowLink, relayUrl } from '/core/collab-link.js';
 
@@ -59,13 +62,13 @@ export async function startFollowing(hash = location.hash) {
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);
-  fol = { name, session, following: true, driven: null, mine: null, bound: new Map() };
+  fol = { name, session, following: true, driven: null, mine: null, bound: new Map(), drawn: new Map() };
   Object.assign(collab, { role: 'follower', owner: owner || session.owner()?.name || '?', project: project.name, session, editor: session.editor });
   Object.assign(api, followApi(api, session.doc, { warn: text => app.log(`WARNING: Follow a shared project: ${text}.`, 'warn') }));
   setPresenceCommands(commands);
   setInterval(track, TRACK_MS);
   draw();
-  if (session.editor) app.log(`Editing ${collab.owner}'s project "${project.name}" with them: its text files change as you all type them, its drawings stay theirs, read only (Following ${collab.owner}, in the toolbar).`, 'ok');
+  if (session.editor) app.log(`Editing ${collab.owner}'s project "${project.name}" with them: its text files and state diagrams change as you all edit them, its other drawings stay theirs, read only (Following ${collab.owner}, in the toolbar).`, 'ok');
   else app.log(`Following ${collab.owner}'s project "${project.name}", read only: their changes appear as they make them, and their open editor while you follow them (Following ${collab.owner}, in the toolbar).`, 'ok');
   return project.name;
 }
@@ -113,6 +116,16 @@ function onEvent(ev) {
   else if (ev.type === 'error') app.log(`${ev.fatal ? 'ERROR' : 'WARNING'}: Follow a shared project: ${ev.message}.`, ev.fatal ? 'err' : 'warn');
 }
 
+// a drawing's merged model through the import gate (#3361): refused, not shown, said once
+const refusedDrawings = new Set();
+function shownDrawing(path, model) {
+  try { gateEdit(path, JSON.stringify(model, null, 2)); return true; } catch (e) {
+    const why = `${path}: ${e.reason || e.message}`;
+    if (!refusedDrawings.has(why)) { refusedDrawings.add(why); app.log(`WARNING: Follow a shared project: ${path}: not shown: ${e.reason || e.message}.`, 'warn'); }
+    return false;
+  }
+}
+
 // the owner's view followed; the follower's own, told; the others' cursors in the open text editors
 let busy = false;
 async function track() {
@@ -138,6 +151,8 @@ async function track() {
     fol.mine = docPath(S.active);
     // (the open text editors, live, #3182: an editor's own files to edit, the others read only)
     keepBound(fol.bound, S.docs, fol.session.doc.getMap('files'), p => !!d0(p) && api.shown(p));
+    // (an editor's drawings edited live, #3183: a merged model shown once it passes the import gate, as any file, #3361)
+    keepDrawingsBound(fol.drawn, S.docs, fol.session.doc, editsDrawingHere, { say: text => app.log(text, 'warn'), accept: (m, path) => shownDrawing(path, m) });
     fol.session.setView(fol.mine ? { path: fol.mine, line: S.active?.editor?.getCursor?.().line ?? null, ch: S.active?.editor?.getCursor?.().ch ?? null } : null);
     const peers = fol.session.peers();
     for (const d of S.docs) {
