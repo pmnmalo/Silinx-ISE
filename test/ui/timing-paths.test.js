@@ -309,3 +309,47 @@ uiTest('#3178 the Paths panel beside Vivado\'s timing summary: its paths, Show P
   await page.waitFor((f) => window.Silinx.docs.some((d) => d.path === f), [Object.keys(want)[0]], { what: 'the path\'s files open' });
   for (const [f, l] of Object.entries(want)) assert.deepEqual(await marked(page, f), l.sort((a, b) => a - b), f);
 });
+
+// #3337: a marked file edited: its marks faint (a dashed bar, the tooltip), following the text, in Portuguese too;
+// Show Path again marks them plainly; the report opened again on the same analysis keeps them, on a new run's takes
+// them off
+uiTest('#3337 Show Path\'s marks after an edit: faint, following the text; a new analysis takes them off', E, async (page) => {
+  await timedProject('PathsEdit');
+  await page.setViewport(1600, 800);
+  await page.openProject('PathsEdit');
+  await openReport(page);
+  await page.click(`${R} .tp-row`, { text: '2' });
+  await page.click(`${R} .tp-actions .btn`, { text: 'Show Path' });
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/sub.vhd', [], { what: 'sub.vhd in front' });
+  const state = () => page.eval(async () => {
+    const d = window.SilinxApp.findDoc('file:src/sub.vhd'), m = await import('/js/editor.js');
+    const line = d.el.querySelector('.xl-path-line');
+    return { lines: m.markedLines(d.editor), stale: m.marksStale(d.editor), faint: line?.classList.contains('xl-path-stale') ?? null, title: line?.title ?? null };
+  });
+  assert.deepEqual(await state(), { lines: [6], stale: false, faint: false, title: '' });
+  const edit = () => page.eval(() => { const v = window.SilinxApp.findDoc('file:src/sub.vhd').editor.view; v.dispatch({ changes: { from: 0, insert: '-- edited\n' } }); });
+  await edit();
+  assert.deepEqual(await state(), { lines: [7], stale: true, faint: true, title: 'From the timing analysis before this edit' });
+  await edit();
+  assert.deepEqual((await state()).lines, [8], 'they follow the text');
+  // Show Path again: plain marks, at the analysis's lines; in Portuguese, the tooltip of an edit after it
+  await page.eval(() => window.SilinxApp.openFile('build/open/timing.txt'));
+  await page.click(`${R} .tp-actions .btn`, { text: 'Show Path' });
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/sub.vhd', [], { what: 'sub.vhd in front' });
+  assert.deepEqual(await state(), { lines: [6], stale: false, faint: false, title: '' });
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
+  await edit();
+  assert.equal((await state()).title, 'Da análise temporal anterior a esta edição');
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
+  // the report opened again on the same analysis: the marks kept
+  const reopen = () => page.eval(async () => { await window.SilinxApp.closeDoc(window.SilinxApp.findDoc('file:build/open/timing.txt')); await window.SilinxApp.openFile('build/open/timing.txt'); });
+  await reopen();
+  await page.waitFor((r) => document.querySelector(`${r} .tp-row`), [R], { what: 'the Paths panel' });
+  assert.deepEqual((await state()).lines, [7]);
+  // a new run's paths: taken off when its report opens
+  const build = path.join(env.server.workspace, 'PathsEdit', 'build', 'open');
+  await fs.writeFile(path.join(build, 'paths.json'), JSON.stringify({ ...PATHS, paths: PATHS.paths.slice(1) }));
+  await reopen();
+  await page.waitFor((r) => document.querySelector(`${r} .tp-row`), [R], { what: 'the new Paths panel' });
+  assert.deepEqual(await state(), { lines: [], stale: false, faint: null, title: null });
+});

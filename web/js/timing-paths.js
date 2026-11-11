@@ -14,7 +14,7 @@ import { log } from './console.js';
 import { markLines } from './editor.js';
 import { S, findDoc, openFile, openFpgaView } from './app.js';
 import { betweenPaths, pathHighlight } from '/packages/silinx-fpga/src/index.js';
-import { showInDrawings } from './drawing-path.js';
+import { clearDrawings, showInDrawings } from './drawing-path.js';
 import { iseTimingPaths } from '/core/twr-paths.js';
 import { vivadoTimingPaths } from '/core/vivado-paths.js';
 
@@ -24,15 +24,28 @@ const KIND = { 'clock-to-out': 'clock-to-out', net: 'net', logic: 'logic', setup
 const ns = x => `${x.toFixed(3)} ns`;
 const end = s => `${s.inst}.${s.pin}`;
 
-// the editors whose lines a path marked (unmarked by the next Show Path)
-let marked = [];
+// the editors whose lines a path marked (unmarked by the next Show Path), and the analysis the path came from (its
+// report and its text's hash: a new run's clears the marks when its report opens)
+let marked = [], markedFrom = null;
+const hash = (text) => { let x = 2166136261; for (let i = 0; i < text.length; i++) x = Math.imul(x ^ text.charCodeAt(i), 16777619); return (x >>> 0).toString(36); };
+
+/** The marks of the last Show Path taken off: the editors' lines, the drawings' elements, the FPGA view's path. */
+export function clearPathMarks() {
+  for (const d of marked) if (d.editor) markLines(d.editor, []);
+  marked = [];
+  markedFrom = null;
+  clearDrawings();
+  findDoc('fpgaview')?.view?.showPath?.(null);
+}
 
 /** Show Path: the path's source lines marked in their editors (the first file in front), the elements of the drawings
- *  they are generated from in theirs, its sites and nets in the FPGA view when it is open (fpga: open it on the path). */
-export async function showPath(p, { fpga = false } = {}) {
+ *  they are generated from in theirs, its sites and nets in the FPGA view when it is open (fpga: open it on the path;
+ *  from: the analysis it comes from, the panel's). */
+export async function showPath(p, { fpga = false, from = null } = {}) {
   const hl = pathHighlight(p);
   for (const d of marked) if (d.editor) markLines(d.editor, []);
   marked = [];
+  markedFrom = from;
   const files = Object.keys(hl.files);
   if (!files.length) log(`The logic of the path to ${end(p.stages.at(-1))} could not be traced back to its source lines.`);
   for (const f of [...files].reverse()) {
@@ -50,18 +63,21 @@ export async function showPath(p, { fpga = false } = {}) {
 // back to the project's HDL by their netlists' names: core/twr-paths.js, core/vivado-paths.js)
 async function pathsOf(pj, file) {
   const sources = () => S.sources.filter(s => !s.view && s.role !== 'sim');
-  if (file.endsWith('.twr')) return iseTimingPaths(await api.readFile(pj, file), sources(), S.project.top);
-  if (file.endsWith('_timing.rpt')) return vivadoTimingPaths(await api.readFile(pj, file), sources(), S.project.top);
-  return JSON.parse(await api.readFile(pj, PATHS_FILE));
+  const text = await api.readFile(pj, file.endsWith('.twr') || file.endsWith('_timing.rpt') ? file : PATHS_FILE);
+  const r = file.endsWith('.twr') ? iseTimingPaths(text, sources(), S.project.top)
+    : file.endsWith('_timing.rpt') ? vivadoTimingPaths(text, sources(), S.project.top) : JSON.parse(text);
+  return { r, origin: `${file}\n${hash(text)}` };
 }
 
 /** The Paths panel beside a timing report's editor (the Silinx toolchain's, ISE's .twr, Vivado's _timing.rpt; none when
  *  the analysis wrote no paths: an older run). */
 export async function mountTimingPaths(d, el, host) {
   const pj = S.project?.name;
-  let r;
-  try { r = await pathsOf(pj, d.path || TIMING_REPORT); } catch { return null; }
+  let r, origin;
+  try { ({ r, origin } = await pathsOf(pj, d.path || TIMING_REPORT)); } catch { return null; }
   if (!r?.paths || S.project?.name !== pj) return null;
+  // (the marks of this report's earlier analysis: a new run's paths, they are taken off)
+  if (markedFrom && markedFrom.split('\n')[0] === origin.split('\n')[0] && markedFrom !== origin) clearPathMarks();
   const root = h('div', { class: 'tp' });
   const side = h('aside', { class: 'tp-side' }, h('div', { class: 'asm-cap' }, 'Paths'));
   host.replaceWith(root);
@@ -113,11 +129,11 @@ export async function mountTimingPaths(d, el, host) {
           s.kind === 'net' ? (s.net || end(s)) : end(s),
           ...s.sources.map(x => h('a', { href: '#', class: 'tp-src', onclick: e => { e.preventDefault(); openFile(x.file, x.line); } }, ` ${x.file.split('/').pop()}:${x.line}`)))))),
       h('div', { class: 'tp-actions' },
-        h('button', { class: 'btn', title: 'Mark the source lines of the path\'s logic, and the path in the FPGA view when it is open', onclick: () => showPath(p) }, 'Show Path'),
+        h('button', { class: 'btn', title: 'Mark the source lines of the path\'s logic, and the path in the FPGA view when it is open', onclick: () => showPath(p, { from: origin }) }, 'Show Path'),
         // (Vivado's sites: a 7-series device's, not the FPGA view's)
-        r.toolchain === 'vivado' ? null : h('button', { class: 'btn', title: 'Open the FPGA view on the path: its sites and its nets', onclick: () => showPath(p, { fpga: true }) }, 'Show in FPGA View'))].filter(Boolean));
+        r.toolchain === 'vivado' ? null : h('button', { class: 'btn', title: 'Open the FPGA view on the path: its sites and its nets', onclick: () => showPath(p, { fpga: true, from: origin }) }, 'Show in FPGA View'))].filter(Boolean));
   }
   renderList(); renderDetail();
   return { paths: r.paths, between: (a = '', b = '') => { from.value = a; to.value = b; choose(); return shown; },
-    select: i => { sel = i; renderList(); renderDetail(); }, show: (i, o) => showPath(shown[i], o) };
+    select: i => { sel = i; renderList(); renderDetail(); }, show: (i, o) => showPath(shown[i], { from: origin, ...o }) };
 }
