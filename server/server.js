@@ -13,6 +13,8 @@ import { configDir, relayConfig } from './toolchain.js';
 import { createProjectWatcher } from './project-watch.js';
 import { listJobs } from './jobs.js';
 import { createOpenCodes, tokenProof } from './open-code.js';
+import { launchTarget } from './open-page.js';
+import { tightenConfigFolder, tightenedMessage } from './config-folder.js';
 import { attachRelay } from './collab-relay.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -252,6 +254,9 @@ export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
       if (err) return reject(err);
       const real = srv.address().port;
       const file = tokenFile(real);
+      // (the configuration folder its owner's only, one made before #2564 too, #3410)
+      const tightened = tightenedMessage(tightenConfigFolder());
+      if (tightened) console.log(tightened);
       try {
         fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
         fs.rmSync(file, { force: true });   // written anew, so the mode below holds
@@ -275,13 +280,20 @@ export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
   });
 }
 
+/** The opener's command for `url`: [cmd, args]; an address with its one-time code (or a token) as the path of a page
+ *  of the configuration folder that leads to it, readable by its owner only, never on the command line (#3409). */
+export function openerCommand(url, { platform = process.platform, target = launchTarget } = {}) {
+  let to = url;
+  try { to = target(url); } catch { /* no configuration folder: the address as it is */ }
+  return platform === 'win32' ? ['cmd', ['/c', 'start', '""', to]] : platform === 'darwin' ? ['open', [to]] : ['xdg-open', [to]];
+}
+
 /** Open a URL in the default browser (best effort). */
 export async function openBrowser(url) {
   // SILINX_NO_BROWSER=1: only print the URL (tests run the launchers this way; also for a server)
   if (process.env.SILINX_NO_BROWSER) return;
   const { spawn } = await import('node:child_process');
-  const [cmd, args] = process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', url]]
-    : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
+  const [cmd, args] = openerCommand(url);
   try {
     // no opener installed (headless Linux without xdg-open): spawn reports ENOENT as an 'error' event,
     // which would crash the process without a listener

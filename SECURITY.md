@@ -26,8 +26,9 @@ Out of scope: Xilinx ISE itself and its Docker image (the project only drives th
 problems to their vendors); the user's operating system and browser; a server the user exposed to
 other computers with `serve --host 0.0.0.0` (or another address), which the printed token protects:
 whoever has the address with its token has the server, as the warning says at start. On this computer, the
-token is in the configuration folder (`~/.silinx`) while the server runs, readable by its owner only: whoever
-can read that user's files has the server too.
+token is in the configuration folder (`~/.silinx`) while the server runs, readable by its owner only (the folder
+0700 and `config.json` 0600, a folder made before or by hand tightened when the server starts, #3410): whoever can
+read that user's files has the server too.
 
 ## What the project does
 
@@ -35,7 +36,9 @@ can read that user's files has the server too.
   start is the only way in, on loopback too (another user of the same computer has none, #2564); it
   refuses an API request another site's page made (`Sec-Fetch-Site`), one that changes something from another Origin,
   and, bound to loopback, one whose Host is not local. The browser a launcher opens is given a one-time code
-  (single use, for a minute), which the page exchanges for the token, so that the token is on no command line; a
+  (single use, for a minute), which the page exchanges for the token, so that the token is on no command line; nor is
+  the code: the opener (`open`, `xdg-open`, `start`) is given a page of the configuration folder, readable by its owner
+  only and deleted after the code's minute, that leads the browser to the address with its code (#3409); a
   second launch opens a server already on its port only when that server proves it holds the token of its file
   (#2955). The token travels in a request's `X-Silinx-Token` header only, never in a request's address (the printed `#token=` stays in the
   browser, #3045). The MCP server's `share_project` sends it only to the server it belongs to: a loopback address whose
