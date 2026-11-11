@@ -144,8 +144,8 @@ function ownStatus(device) {
   return { part, device: dev, available: true, reason: `${part}: ${own.tools}${ownPresent(own.pkg) ? '' : ' (downloaded by the first run, #2444)'}`, steps: backendOf(deviceFamily(device)).steps.map(s => s.id) };
 }
 
-// the 7-series (#3146): nextpnr's chip database (the package's) and Project X-Ray's bit database of the part (the xc7a35t's
-// so far: the Basys 3's)
+// the 7-series (#3146): nextpnr's chip database (the package's) and Project X-Ray's bit database of the part (the xc7a35t's,
+// the Basys 3's, and the xc7a100t's, the Nexys A7's: #3145)
 function xc7Status(device) {
   const dev = String(device.part).toLowerCase(), part = reportPart(device), parts = xc7Parts();
   if (!parts.includes(part)) return { part, device: dev, reason: `no 7-series bit database for the ${part} yet (only ${parts.join(', ') || 'none'}): use AMD Vivado for this device` };
