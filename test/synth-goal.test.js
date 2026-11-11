@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { synthGoal, synthEffort, GOAL_IMPL, FAST_SYNTH, synthesizeVerilog, synthesizeArea, synthesizeFast } from '../packages/silinx-fpga/src/index.js';
-import { DEEP_RULE, logicLevels, criticalDelay, pathEnds } from '../packages/silinx-fpga/src/synth-open.js';
+import { DEEP_RULE, logicLevels, criticalDelay, pathEnds, sliceCount } from '../packages/silinx-fpga/src/synth-open.js';
 import { compile, elaborate } from '../core/compile.js';
 import { compareNetlist } from './diff-synth.js';
 import { yosysNode } from '../packages/silinx-fpga/src/node.js';
@@ -145,6 +145,38 @@ test('#652 Fast\'s synthesis of a short control path (spi-fpga-slave\'s enable):
     const cmp = compareNetlist(des, fast, { name: `fast-resynth-${lang}`, seed: 'shift', sim: { cycles: 600 } });
     assert.equal(cmp.status, 'pass', cmp.report || cmp.reason);
   }
+});
+
+// #370: a deep design too large for DEEP_RULE (the EPFL arbiter: 4033 LUTs, 30 levels, 34.9 ns in the usual mapping) gets the usual
+// mapping balanced as sums of products (DEPTH_SOPB), the old Normal's, kept when DEEP_RULE.gain faster. The priority encoder with
+// DEEP_RULE.maxLuts below its 182 LUTs stands for it: 42 levels and 49.0 ns before, 6 levels and 7.70 ns so, then 7.62 with
+// its critical LUTs made shallower (#652; Speed's: 7.62)
+test('#370 Fast\'s synthesis of a deep design too large for DEEP_RULE: the usual mapping balanced as sums of products, kept when DEEP_RULE.gain faster; the netlist simulates as the design', async () => {
+  const opts = { family: 'spartan3e', run: yosysNode, effort: 'normal' };
+  const large = { ...DEEP_RULE, maxLuts: 100 };
+  const lines = [];
+  const fast = await synthesizeFast(prioInput(), { ...opts, deepRule: large, onLine: l => lines.push(l) });
+  const json = fast.files['prio.json'];
+  assert.equal(fast.fast, undefined, 'not deep by the rule: Speed\'s not made');
+  assert.deepEqual(fast.depth.sopb, { ns: fast.depth.sopb.ns, luts: 217, slices: 109, kept: true });
+  assert.ok(Math.abs(fast.depth.sopb.ns - 7.70) < 1e-9, String(fast.depth.sopb.ns));
+  // then the balanced netlist's critical LUTs made shallower (#652): 7.62 ns, Speed's
+  assert.deepEqual({ ...fast.depth.resynth, ns: +fast.depth.resynth.ns.toFixed(2) }, { rounds: 2, changed: 2, ns: 7.62, luts: 217, slices: 109, kept: true });
+  assert.ok(Math.abs(criticalDelay(json, 'prio') - 7.62) < 1e-9, String(criticalDelay(json, 'prio')));
+  assert.deepEqual([fast.util.luts, logicLevels(json, 'prio'), sliceCount(json, 'prio')], [217, 6, 109]);
+  assert.deepEqual(fast.warnings, []);   // no warnings
+  assert.deepEqual(lines.filter(l => /^Warning/.test(l)), []);
+  // the usual mapping alone (FAST_SYNTH: Area's), as Fast was: 42 levels
+  const usual = await synthesizeVerilog(prioInput(), { ...opts, ...FAST_SYNTH });
+  assert.equal(usual.depth.sopb, undefined);
+  assert.deepEqual([usual.util.luts, logicLevels(usual.files['prio.json'], 'prio')], [182, 42]);
+  // not that much faster: the usual mapping kept, its netlist (its resynthesis not kept either)
+  const slow = await synthesizeFast(prioInput(), { ...opts, deepRule: { ...large, gain: 0.99 } });
+  assert.deepEqual([slow.depth.sopb.kept, slow.depth.resynth.kept], [false, false]);
+  assert.equal(slow.files['prio.json'], usual.files['prio.json']);
+  const des = elaborate(compile([{ path: 'prio.v', lang: 'verilog', text: PRIO }]), 'prio');
+  const cmp = compareNetlist(des, fast, { name: 'fast-sopb-prio', seed: 'prio', sim: { cycles: 400 } });
+  assert.equal(cmp.status, 'pass', cmp.report || cmp.reason);
 });
 
 test('#3096 Fast\'s synthesis of a design not deep (traffic): the usual mapping alone, as FAST_SYNTH', async () => {

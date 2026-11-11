@@ -15,7 +15,7 @@ import {
 /** { withDepth } of synthesizeOpen (tryDepth(): its current values). */
 export function mountDepth(ctx) {
   const {
-    deepRule, depth, family, run, wide, withAbc9, withResynth, log, normal, quiet, speed, top, tryDepth
+    deepRule, depth, family, run, wide, withAbc9, withResynth, withSopb, log, normal, quiet, speed, top, tryDepth
   } = ctx;
 
   // a mapping (its run's output) and, from the design as it was before its LUT mapping, the depth-oriented
@@ -74,9 +74,10 @@ export function mountDepth(ctx) {
     const wideN = wide && normal && !tryDepth() && depth && !info.muxf?.kept && !info.muxf?.failed && out[PREMAP_FILE] && utilization(cells).luts <= DEPTH_RULE.maxLuts ? remap(null, linesW) : null;
     wideN?.catch(() => {});
     // the GIA's SOP balancing (#654): a deep design's candidate (SOPB_RULE), at both efforts and above DEPTH_RULE.maxLuts
-    // too, started at once beside the other mappings
+    // too, started at once beside the other mappings; with depth false, that one alone for a design of more than withSopb LUTs
+    // (Optimization Fast, #370: those DEEP_RULE leaves out)
     const linesS = [];
-    const sopb = depth && out[PREMAP_FILE] && utilization(cells).luts <= SOPB_RULE.maxLuts && logicLevels(json, top) > SOPB_RULE.levels
+    const sopb = (depth || (withSopb !== false && utilization(cells).luts > withSopb)) && out[PREMAP_FILE] && utilization(cells).luts <= SOPB_RULE.maxLuts && logicLevels(json, top) > SOPB_RULE.levels
       ? remap(DEPTH_SOPB, linesS) : null;
     sopb?.catch(() => {});
     if (tryDepth() && out[PREMAP_FILE] && utilization(cells).luts <= DEPTH_RULE.maxLuts) {

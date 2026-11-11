@@ -350,7 +350,7 @@ export function longestCarryChain(json, top) {
   for (const c of byOut.values()) m = Math.max(m, len(c));
   return m;
 }
-export function synthCommands(top, family, { srl = true, premap = null, lutram = false, csel = null, cmp = null } = {}) {
+export function synthCommands(top, family, { srl = true, premap = null, muxCount = true, lutram = false, csel = null, cmp = null } = {}) {
   const fam = YOSYS_FAMILY[family];
   if (!fam) throw new Error(`open synthesis: no Yosys mapping for the device family '${family}'`);
   const synth = `synth_xilinx -family ${fam} -ise -flatten -top ${top}`;
@@ -361,7 +361,7 @@ export function synthCommands(top, family, { srl = true, premap = null, lutram =
   // xilinx_srl and the map to SRL16E (before map_cells, whose own map writes SRLC32E), then the step;
   // fine's own opt -full run first made t80 7 % larger)
   const shreg = srl ? `${memorySteps(synth, memoryOpts(fam, { premap, lutram, cmp }))}; memory_map; xilinx_srl -variable -minlen 3; techmap -map ${SRL_MAP_FILE}; ${cselStep(csel)}${synth} -run fine:map_ffs; xilinx_srl -fixed -minlen 3; techmap -map ${SRL_MAP_FILE}; ${synth} -run map_ffs:map_luts` : cmpStep(`${synth} -run :map_luts`, cmp);
-  return `${shreg}; opt_expr -mux_undef -noclkinv; ${premap ? `write_rtlil ${premap}; ${MUX_COUNT}; ` : ''}abc -luts ${LUT4_ONLY}; ${lutsToCells(synth)}`;
+  return `${shreg}; opt_expr -mux_undef -noclkinv; ${premap ? `write_rtlil ${premap}; ${muxCount ? `${MUX_COUNT}; ` : ''}` : ''}abc -luts ${LUT4_ONLY}; ${lutsToCells(synth)}`;
 }
 // The clock enables on the critical path (#653): Yosys gives a flip-flop whose next state is held under a
 // condition that condition as its clock enable (FDRE's CE), its logic apart from the D logic's; a critical path
@@ -681,7 +681,8 @@ export const FAST_SYNTH = { effort: 'normal', depth: false, speed: false, abc9: 
  * abc9: false leaves it out); each with its slices too, when it packs (sliceCount); muxf: { trees, ns, luts, slices,
  * kept } of the mapping with the wide multiplexers onto MUXF5 … MUXF7, when the usual run found some (#511), and sopb: { ns,
  * luts, slices, kept } of the mapping balanced as sums of products (DEPTH_SOPB, #654), made for a design deeper than
- * SOPB_RULE.levels at both efforts (at Normal kept by DEEP_RULE's gain too when the design gets none of High's mappings) }.
+ * SOPB_RULE.levels at both efforts (at Normal kept by DEEP_RULE's gain too when the design gets none of High's mappings; sopb: n, with
+ * depth false: that candidate alone for a design of more than n LUTs, Optimization Fast's, #370) }.
  * speed: { ns, luts, slices, kept } of the speedup's mapping (SPEED_ABC, #652), fold: { flipFlops, ns, luts, slices, kept } of
  * the mapping with the clock enables that end the critical path folded into D (#653), both from the netlist before the
  * LUT mapping, measured against the netlist chosen of the others, on both efforts (speed: false leaves them out); resynth:
@@ -750,14 +751,14 @@ async function withCarrySelect(input, options) {
 }
 
 // synthesizeVerilog's synthesis but the carry-select candidate (carrySelect: CSEL_RULE when making it)
-async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () => {}, depth = true, effort = 'high', abc9: withAbc9 = true, deepRule = DEEP_RULE, smallRule = SMALL_RULE, fsm: withFsm = true, speed: withSpeed = true, wide = true, resynth: withResynth = true, bdd: withBdd = true, lutram: withLutram = true, carrySelect = null, cmp = null } = {}) {
+async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () => {}, depth = true, effort = 'high', abc9: withAbc9 = true, deepRule = DEEP_RULE, smallRule = SMALL_RULE, fsm: withFsm = true, speed: withSpeed = true, wide = true, resynth: withResynth = true, bdd: withBdd = true, lutram: withLutram = true, sopb: withSopb = false, carrySelect = null, cmp = null } = {}) {
   const { text, top, warnings = [], shiftArrays = [], gates: gateCount = 0 } = input;
   const lut4 = LUT4_FAMILIES.has(YOSYS_FAMILY[family]);
   const normal = effort === 'normal';
   const speed = withSpeed && depth && lut4;
   let tryDepth = !normal && depth && lut4;
   // (Normal: the design as it is before the LUT mapping written too, for High's mappings if it is deep)
-  const opts = { ...((tryDepth || (normal && depth && lut4)) && { premap: PREMAP_FILE }), ...(carrySelect && { csel: carrySelect }), ...(cmp?.length && { cmp }) };
+  const opts = { ...((tryDepth || (normal && depth && lut4) || (withSopb !== false && lut4)) && { premap: PREMAP_FILE, ...(!depth && { muxCount: false }) }), ...(carrySelect && { csel: carrySelect }), ...(cmp?.length && { cmp }) };
   const log = [];
   const quiet = l => QUIET.some(re => re.test(l));
   const line = l => { if (!quiet(l)) { log.push(l); onLine(l); } };
@@ -835,7 +836,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
   const highMappings = !normal || !!deep?.deep;
   // a mapping (its run's output) and the depth-oriented ones, the faster kept (synth-open-depth.js)
   const { withDepth } = mountDepth({
-    deepRule, depth, family, run, wide, withAbc9, withResynth, log, normal, quiet, speed, top, tryDepth: () => tryDepth
+    deepRule, depth, family, run, wide, withAbc9, withResynth, withSopb, log, normal, quiet, speed, top, tryDepth: () => tryDepth
   });
 
   // a design with logic written as gates: its carry chains (adders, comparators: carry-chain.js, #77)
