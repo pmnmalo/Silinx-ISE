@@ -69,7 +69,7 @@ export function processText({ errors, warnings, lines, head, logLines = 40 }) {
 
 /** A process of the project's top run to its end (or stopped after timeoutS): its log redacted, its errors and
  *  warnings, whether it ended well, its toolchain. Errors: tool errors. */
-export async function runProcess(name, proc, { toolchain, timeoutS = 1800 } = {}) {
+export async function runProcess(name, proc, { toolchain, timeoutS = 1800, signal } = {}) {
   const pj = await readProject(name);
   const steps = PROCESSES[proc];
   if (!steps) throw toolError(`process: one of ${Object.keys(PROCESSES).join(', ')}`);
@@ -78,11 +78,11 @@ export async function runProcess(name, proc, { toolchain, timeoutS = 1800 } = {}
   let job;
   try { job = await startImplementation(name, { steps, ...(toolchain ? { toolchain } : {}) }); } catch (e) { throw toolError(e.message); }
   const end = Date.now() + timeoutS * 1000;
-  while (job.status === 'running' && Date.now() < end) await new Promise(r => setTimeout(r, 250));
+  while (job.status === 'running' && Date.now() < end && !signal?.aborted) await new Promise(r => setTimeout(r, 250));
   if (job.status === 'running') {
     const { cancelJob } = await import('./jobs.js');
     cancelJob(job.id);
-    throw toolError(`the process ${proc} did not end in ${timeoutS} s: stopped`);
+    throw toolError(signal?.aborted ? `the process ${proc} was cancelled: stopped` : `the process ${proc} did not end in ${timeoutS} s: stopped`);
   }
   const redact = await redactor();
   const lines = job.lines.map(redact);
@@ -92,6 +92,9 @@ export async function runProcess(name, proc, { toolchain, timeoutS = 1800 } = {}
   return { top: pj.top, lines, errors, warnings, ok: job.status === 'ok', silinx: tc === 'silinx', toolchain: tc };
 }
 
+// run_process's bounds (#3408): how long it waits (then the process is stopped), the lines of the log returned
+export const PROCESS_LIMITS = Object.freeze({ timeoutS: 7200, logLines: 1000 });
+
 export const PROCESS_TOOLS = [
   {
     name: 'run_process', title: 'Run a process',
@@ -99,12 +102,14 @@ export const PROCESS_TOOLS = [
     inputSchema: { type: 'object', properties: {
       project: PROJECT, process: { type: 'string', enum: Object.keys(PROCESSES), description: 'The process.' },
       toolchain: { type: 'string', enum: ['silinx', 'ise', 'vivado'], description: 'The toolchain (default: the project\'s synthesis tool, else Toolchain Settings).' },
-      log_lines: { type: 'integer', description: 'The lines of the end of the log returned (default 40).' },
-      timeout_s: { type: 'integer', description: 'How long to wait, in seconds (default 1800).' },
+      log_lines: { type: 'integer', description: `The lines of the end of the log returned (default 40; from 1 to ${PROCESS_LIMITS.logLines}).` },
+      timeout_s: { type: 'integer', description: `How long to wait, in seconds (default 1800; from 1 to ${PROCESS_LIMITS.timeoutS}): then the process is stopped.` },
     }, required: ['project', 'process'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    async run({ project: name, process: proc, toolchain, log_lines: logLines = 40, timeout_s: timeoutS = 1800 }) {
-      const { top, lines, errors, warnings, ok, toolchain: tc } = await runProcess(name, proc, { toolchain, timeoutS });
+    async run({ project: name, process: proc, toolchain, log_lines: logLines = 40, timeout_s: timeoutS = 1800 }, { signal } = {}) {
+      if (!Number.isInteger(logLines) || logLines < 1 || logLines > PROCESS_LIMITS.logLines) throw toolError(`log_lines: from 1 to ${PROCESS_LIMITS.logLines}`);
+      if (!Number.isInteger(timeoutS) || timeoutS < 1 || timeoutS > PROCESS_LIMITS.timeoutS) throw toolError(`timeout_s: from 1 to ${PROCESS_LIMITS.timeoutS} s`);
+      const { top, lines, errors, warnings, ok, toolchain: tc } = await runProcess(name, proc, { toolchain, timeoutS, signal });
       const pj = { top };
       const head = `Process "${proc}" of <${pj.top}> ${ok ? `completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}` : `failed (${errors.length} error(s), ${warnings.length} warning(s))`} (${TOOLCHAIN_NAMES[tc]}).`;
       return { text: processText({ errors, warnings, lines, head, logLines }),
