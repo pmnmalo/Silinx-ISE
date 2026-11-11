@@ -3,7 +3,14 @@
 // Yosys to the bitstream: its routing checked, its .bit that of the routed XDL, no warning.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { runFlow, loadDeviceCache, loadBitDbS6, yosysNode, nextpnrS6Node } from '../src/node.js';
+import { S6_DB_DIR } from '../src/fpga/s6/bitdb-node.js';
+import { s6DbNames } from '../src/fpga/s6/bitdb.js';
 import { parseXdl } from '../src/xdl.js';
 import { checkRoutingS6 } from '../src/fpga/s6/route-check.js';
 import { placementOf, siteBel, siteNetlist, timingParam } from '../src/fpga/s6/nextpnr.js';
@@ -90,6 +97,32 @@ test('the chip database\'s exports: the unknown PIPs are real PIPs of their tile
   device.templates.forEach((tp, i) => { if (t.tileWire[i]) assert.equal(t.tileWire[i].length, tp.wires.length); });
   assert.ok([...t.node, ...Object.values(t.tileWire).flat()].every(c => Number.isInteger(t.nodeClass[c])));
   assert.ok(t.nodeClass.every(ps => Number.isInteger(ps) && ps >= 0 && ps < 1000));
+});
+
+test('#3349: the PIPs held out of Silinx\'s flow (s6-pips-held.json) are known to the chip database\'s export only', () => {
+  const held = JSON.parse(fs.readFileSync(path.join(S6_DB_DIR, 's6-pips-held.json'), 'utf8')).pips;
+  // #3269's, as measured
+  assert.deepEqual(held, { 'TIOI_INNER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S': ['26,35', '27,48', '28,14'] });
+  // none of them in the files Silinx's flow reads, nor fetched by the browser
+  assert.ok(!s6DbNames(PART).includes('s6-pips-held'));
+  const flowDb = loadBitDbS6(PART), exportDb = loadBitDbS6(PART, { held: true });
+  for (const [k, bits] of Object.entries(held)) {
+    assert.equal(flowDb.other.pips[k], undefined, k);
+    assert.deepEqual(exportDb.other.pips[k], bits, k);
+  }
+  // the export leaves out exactly those PIPs fewer: one in each TIOI_INNER tile
+  const a = unknownPipsS6(device, flowDb), b = unknownPipsS6(device, exportDb);
+  const tiles = Array.from({ length: device.tileCount }, (_, k) => device.tileNames[k]).filter(n => /^TIOI_INNER_X\d+Y\d+$/.test(n));
+  assert.ok(tiles.length > 0);
+  assert.equal(a.unknown - b.unknown, tiles.length);
+  for (const [tile, list] of Object.entries(a.pips)) {
+    const gone = list.filter(i => !(b.pips[tile] ?? []).includes(i)).map(i => { const p = device.pip(device.tile(tile), i); return `${p.from} ${p.dir} ${p.to}`; });
+    assert.deepEqual(gone, tiles.includes(tile) ? ['D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S'] : [], tile);
+  }
+  // (the export script itself reads them)
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-s6-held-')), 'unknown.json');
+  execFileSync(process.execPath, [fileURLToPath(new URL('../research/nextpnr-s6/export-unknown-pips.mjs', import.meta.url)), PART, out]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(out, 'utf8')), b.pips);
 });
 
 /** A node's delay in the chip database (ps): its class's (timingExportS6). */

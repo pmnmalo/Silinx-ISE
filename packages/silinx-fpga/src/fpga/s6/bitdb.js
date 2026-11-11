@@ -19,10 +19,11 @@ export function s6DbNames(part) {
 
 /**
  * A part's databases ('xc6slx16csg324-3') from read(name): a file's object, or null for a file the part has not;
- * cmtInput: false leaves the CMTs' input bits out. { part, slices: { lut, rounds, sliceX }, int, other: { pips }, iob,
+ * cmtInput: false leaves the CMTs' input bits out; held: true adds the PIPs measured but held out of Silinx's flow until
+ * nextpnr's chip database has them (s6-pips-held.json, #3349: only the chip database's export reads them). { part, slices: { lut, rounds, sliceX }, int, other: { pips }, iob,
  * clocks, hard, hardBase, cmtSettings, cmtInput, ologic, bscan }.
  */
-export function bitDbS6(read, part, { cmtInput = true } = {}) {
+export function bitDbS6(read, part, { cmtInput = true, held = false } = {}) {
   const dev = n => read(`${deviceOf(part)}-${n}`);
   const pips = n => read(n)?.pips ?? {};
   return {
@@ -35,7 +36,8 @@ export function bitDbS6(read, part, { cmtInput = true } = {}) {
     int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
     // the other tiles' PIPs (the PIP drop), the I/O path's, the clocks', the probed ones, the CMT paths', the BSCANs'
     // (#3176) and the open flow's (#732) one at a time
-    other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...(dev('pips-cmt')?.pips ?? {}), ...pips('s6-pips-bscan'), ...pips('s6-pips-flow') } },
+    other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...(dev('pips-cmt')?.pips ?? {}), ...pips('s6-pips-bscan'), ...pips('s6-pips-flow'),
+      ...(held ? pips('s6-pips-held') : {}) } },
     iob: dev('iob'), clocks: read('s6-clocks'), hard: dev('hard'), hardBase: read('s6-hard-base'),
     cmtSettings: dev('cmt-settings'), cmtInput: cmtInput ? dev('cmt-input') : null, ologic: read('s6-ologic'),
     bscan: read('s6-bscan'),

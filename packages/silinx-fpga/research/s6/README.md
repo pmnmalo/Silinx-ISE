@@ -861,7 +861,8 @@ traffic, blinky and pong on the Atlys):
   tile's LOGICOUT wires), 35 of them known already with the same bits. 85 of the 86 new ones are in `db/s6-pips-bscan.json`; the slave OLOGIC2's
   `D1 -> OQ` of a top inner I/O tile (TIOI_INNER, three bits), which c3's and c4's output took, is left out while
   nextpnr's released chip database has not got it: Silinx would give the 30 (23) top-bank pads of #3152 outputs that
-  nextpnr cannot route. It comes with the fork's next Spartan-6 chip database.
+  nextpnr cannot route. It waits in `db/s6-pips-held.json` (#3349), which the chip database's export
+  (`research/nextpnr-s6/export-unknown-pips.mjs`) reads and the flow does not, for the fork's next Spartan-6 chip database.
   With them every design is one bit from ISE's bitgen: the instance's JTAG_CHAIN, one bit per chain in UR_UPPER's
   region (frame 22, bits 31 … 28 for chains 1 … 4) whichever site holds it. That is `db/s6-bscan.json`, which
   `bitgen.js` reads. The five designs are then byte-identical with ISE's bitgen but for c3's and c4's output path, and on the XC6SLX45 too (c1, c3: its
