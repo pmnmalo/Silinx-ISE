@@ -111,3 +111,26 @@ test('#2917 projectDir: a project name that is not a string is refused as invali
   assert.equal(P.projectDir('demo'), path.join(ws, 'demo'));
   assert.throws(() => P.projectDir('../demo'), e => e.status === 400);
 });
+
+test('#3275 a project\'s descriptor, its clone mark and a template\'s constraints: in the project only (CodeQL js/path-injection)', async () => {
+  // a name that is not one (a separator, a dot, too long) is refused before any path is made of it, by every operation
+  const before = fs.readdirSync(tmp).sort();
+  const ops = { read: n => P.readProject(n), write: n => P.writeProject(n, { files: [] }), update: n => P.updateProject(n, pj => pj),
+    trust: n => P.trustProject(n), create: n => P.createProject({ name: n }), example: n => P.createProject({ name: n, template: 'blinky' }) };
+  for (const name of ['..', '../Esc', 'a/b', 'a\\b', '/abs', 'C:\\x', '.git', 'A/../../Esc', `A${'b'.repeat(64)}`, 'A.b', '', ' A'])
+    for (const [op, f] of Object.entries(ops))
+      await assert.rejects(async () => f(name), e => e.status === 400 && /^invalid project name/.test(e.message), `${op} ${JSON.stringify(name)}`);
+  assert.deepEqual(fs.readdirSync(tmp).sort(), before, 'nothing made outside the workspace');
+  // a valid name: the descriptor (its temporary file too) and the clone's mark written and removed in its folder
+  await P.createProject({ name: 'Inside' });
+  const dir = path.join(ws, 'Inside');
+  fs.mkdirSync(path.join(dir, '.git'));
+  fs.writeFileSync(path.join(dir, P.CLONE_TRUST), '{}');
+  assert.equal((await P.readProject('Inside')).trusted, false);
+  await P.trustProject('Inside');
+  assert.equal(fs.existsSync(path.join(dir, P.CLONE_TRUST)), false);
+  assert.deepEqual(fs.readdirSync(dir).filter(f => f.endsWith('.tmp')), []);
+  // a template's constraints (createProject's safeJoin): a path out of the project refused
+  for (const rel of ['../x.ucf', '/x.ucf', 'src/../../x.ucf', path.join(tmp, 'x.ucf')])
+    assert.throws(() => P.safeJoin(dir, rel), e => e.status === 400 && e.message === 'path escapes project', rel);
+});

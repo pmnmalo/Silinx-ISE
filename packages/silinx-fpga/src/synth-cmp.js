@@ -144,9 +144,25 @@ export const cmpSet = (top, names) => names.map(n => `${top}/${n}\n`).join('');
 /** The commands with the comparisons listed in CMP_SET_FILE mapped as logic just before synth_xilinx's coarse step (`cmp`:
  *  some listed; none, the commands as they are): each `synth_xilinx … -run <from>:<to>` that runs it (from before it, to
  *  after it) as `… -run <from>:coarse; <the map>; … -run coarse:<to>`. */
-export const cmpStep = (cmds, cmp) => (!cmp?.length ? cmds : cmds.replace(/(synth_xilinx [^;]*?) -run (\w*):(\w*)/g, (m, synth, from, to) => {
+export const cmpStep = (cmds, cmp) => (!cmp?.length ? cmds : synthRuns(cmds, (m, synth, from, to) => {
   const f = from ? LABELS.indexOf(from) : 0, t = to ? LABELS.indexOf(to) : LABELS.length;
   return f < COARSE && t > COARSE
     ? `${synth} -run ${from}:coarse; select -set silinx_cmp -read ${CMP_SET_FILE}; techmap -map ${CMP_FILE} @silinx_cmp; select -clear; ${synth} -run coarse:${to}`
     : m;
 }));
+// each `synth_xilinx … -run <from>:<to>` of the commands (up to the first ` -run x:y` in its command) replaced by
+// `fn(match, synth, from, to)`, as /(synth_xilinx [^;]*?) -run (\w*):(\w*)/g would, in linear time (that RegExp tried
+// from every synth_xilinx to the command's end: quadratic, CodeQL js/polynomial-redos, #3171)
+function synthRuns(cmds, fn) {
+  const SYNTH = 'synth_xilinx ';
+  let out = '', at = 0;
+  for (let i; (i = cmds.indexOf(SYNTH, at)) >= 0;) {
+    const semi = cmds.indexOf(';', i), end = semi < 0 ? cmds.length : semi;
+    const m = / -run (\w*):(\w*)/.exec(cmds.slice(i + SYNTH.length, end));   // (its command only)
+    if (!m) { out += cmds.slice(at, end); at = end; continue; }
+    const run = i + SYNTH.length + m.index, stop = run + m[0].length;
+    out += cmds.slice(at, i) + fn(cmds.slice(i, stop), cmds.slice(i, run), m[1], m[2]);
+    at = stop;
+  }
+  return out + cmds.slice(at);
+}

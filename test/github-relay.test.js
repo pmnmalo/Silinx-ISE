@@ -83,7 +83,7 @@ test('nothing logged, nothing kept: no console in its code, no storage; nothing 
 test('the browser edition\'s sign-in through the relay: the code, then the token', async () => {
   const { gh, run } = github();
   // (the page's fetch: the relay's URL answered by the worker, as Cloudflare would)
-  const page = async (url, o) => { assert.ok(url.startsWith(RELAY), url); const r = await run(new Request(url, { ...o, headers: { ...o.headers, Origin: SITE } })); return r; };
+  const page = async (url, o) => { assert.equal(new URL(url).origin, RELAY, url); const r = await run(new Request(url, { ...o, headers: { ...o.headers, Origin: SITE } })); return r; };
   const d = await startDeviceFlow({ clientId: gh.clientId, login: RELAY, fetch: page });
   gh.authorize(d.userCode);
   assert.equal(await pollDeviceFlow({ clientId: gh.clientId, ...d }, { login: RELAY, fetch: page, sleep: async () => {} }), gh.token);

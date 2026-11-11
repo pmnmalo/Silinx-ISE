@@ -35,8 +35,9 @@ export function synBlocks(synText) {
     if (/^endmodule\b/.test(l) && cur) { cur.to = i; cur = null; return; }
     if (!cur) return;
     for (const c of l.matchAll(/\b(\w+)\s*\(/g)) cur.calls.add(c[1]);
-    // (an assignment's target: `\display.count  <= …`, `x[3] = …`, `assign y = …`)
-    const a = /^\s*(?:assign\s+)?(\\\S+|[A-Za-z_][\w$]*)\s*(?:\[[^\]]*\]\s*)*<?=(?!=)/.exec(l);
+    // (an assignment's target: `\display.count  <= …`, `x[3] = …`, `assign y = …`; an escaped name ends at a space, as
+    // Verilog's: in linear time, CodeQL js/polynomial-redos, #3271)
+    const a = /^\s*(?:assign\s+)?(\\\S+(?=\s)|[A-Za-z_][\w$]*)\s*(?:\[[^\]]*\]\s*)*<?=(?!=)/.exec(l);
     if (a) cur.writes.add(a[1].replace(/^\\/, ''));
   });
   return Object.assign(out, { funcs });
@@ -66,7 +67,7 @@ export function cellSources(netlist, synText, top) {
     if (name.startsWith('$') || n.hide_name) continue;
     for (const b of n.bits || []) if (typeof b === 'number') { if (!byBit.has(b)) byBit.set(b, []); byBit.get(b).push(name); }
   }
-  const synFile = new RegExp(`^${`${top}_syn.v`.replace(/[.$]/g, '\\$&')}:(\\d+)\\.\\d+-(\\d+)\\.\\d+$`);
+  const synFile = new RegExp(`^${`${top}_syn.v`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:(\\d+)\\.\\d+-(\\d+)\\.\\d+$`);   // (#3278)
   // the blocks that call a function, directly or through other functions
   const callers = (name, seen = new Set()) => {
     if (seen.has(name)) return [];

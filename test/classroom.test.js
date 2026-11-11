@@ -52,7 +52,7 @@ test('#3193 the template: the starter project, the student\'s copy and the files
 test('#3193 the workflow: silinx grade --visible on each push, a release checked against its SHA256SUMS, the summary, no secret, read only', () => {
   const y = workflowYaml('counter4.exercise.json');
   assert.match(y, /^on:\n {2}push:\n {2}workflow_dispatch:\npermissions:\n {2}contents: read\n/m);
-  assert.match(y, new RegExp(`SILINX_VERSION: ${VERSION.replace(/\./g, '\\.')}\n`));
+  assert.match(y, new RegExp(`SILINX_VERSION: ${VERSION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\n`));
   assert.ok(y.includes(`uses: ${CHECKOUT}\n        with:\n          persist-credentials: false`));
   assert.ok(y.includes(`uses: ${SETUP_NODE}`));
   assert.match(y, /curl -fsSL -o "silinx-\$SILINX_VERSION\.zip" "https:\/\/github\.com\/pmnmalo\/Silinx\/releases\/download\/v\$SILINX_VERSION\/silinx-\$SILINX_VERSION\.zip"\n/);

@@ -70,8 +70,9 @@ export function configProperties(board = {}) {
   return props;
 }
 
-// the properties an XDC sets on the design itself: left to it
-const xdcSets = (xdc, prop) => new RegExp(`set_property\\s+(?:-dict\\s*\\{[^}]*\\b${prop.replace(/\./g, '\\.')}\\b|${prop.replace(/\./g, '\\.')}\\s)[^\\n]*current_design`, 'i').test(xdc || '');
+// the properties an XDC sets on the design itself: left to it (the property's name escaped in full, #3280)
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const xdcSets = (xdc, prop) => new RegExp(`set_property\\s+(?:-dict\\s*\\{[^}]*\\b${reEsc(prop)}\\b|${reEsc(prop)}\\s)[^\\n]*current_design`, 'i').test(xdc || '');
 
 /** A path in braces in Tcl: none of the characters that would end it (ise.js's scriptSafe already refuses "{} and controls). */
 const tclPath = p => { if (/[{}\\\r\n]/.test(p)) throw Object.assign(new Error(`file path not allowed in Vivado's script: ${JSON.stringify(p)}`), { status: 400 }); return `{${p}}`; };

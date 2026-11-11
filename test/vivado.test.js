@@ -100,6 +100,13 @@ test('run.tcl: the sources, the XDC, synth_design to write_bitstream with their 
   const own = V.vivadoTcl({ top: 'top', part: 'xc7a35tcpg236-1', sources, xdc: 'top.xdc', xdcText: XDC });
   assert.doesNotMatch(own, /set_property (CFGBVS|CONFIG_VOLTAGE)/);
   assert.match(V.vivadoTcl({ top: 'top', part: 'p', sources, xdcText: 'set_property -dict { CFGBVS VCCO CONFIG_VOLTAGE 3.3 } [current_design]' }), /^(?![\s\S]*set_property (CFGBVS|CONFIG_VOLTAGE) )/);
+  // #3280 the flash's properties with dots: the XDC's own left to it, by its exact name (a dot is not any character)
+  const board = { config: { spiBuswidth: 4, configRate: 33 } };
+  const tclOf = xdcText => V.vivadoTcl({ top: 'top', part: 'p', sources, xdcText, board });
+  assert.doesNotMatch(tclOf('set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]'), /set_property BITSTREAM\.CONFIG\.SPI_BUSWIDTH/);
+  assert.match(tclOf('set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]'), /set_property BITSTREAM\.CONFIG\.CONFIGRATE 33 \[current_design\]/);
+  assert.match(tclOf('set_property BITSTREAMxCONFIGxSPI_BUSWIDTH 4 [current_design]'), /set_property BITSTREAM\.CONFIG\.SPI_BUSWIDTH 4 \[current_design\]/);
+  assert.doesNotMatch(tclOf('set_property -dict { BITSTREAM.CONFIG.CONFIGRATE 33 } [current_design]'), /set_property BITSTREAM\.CONFIG\.CONFIGRATE/);
   // no XDC: no read_xdc; no include folder: no -include_dirs; the goals
   const bare = V.vivadoTcl({ top: 'top', part: 'p', sources: [sources[0]], goal: 'fast' });
   assert.doesNotMatch(bare, /read_xdc|-include_dirs/);

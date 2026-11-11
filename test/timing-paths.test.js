@@ -40,6 +40,29 @@ test('synBlocks: each block from its `// name (file:line)` line, what it assigns
   assert.deepEqual([...synBlocks('')], []);
 });
 
+test('#3271 synBlocks: an assignment\'s target found as before, and in linear time on a long line (CodeQL js/polynomial-redos)', () => {
+  const OLD = /^\s*(?:assign\s+)?(\\\S+|[A-Za-z_][\w$]*)\s*(?:\[[^\]]*\]\s*)*<?=(?!=)/;
+  const lines = ['    q <= 1;', '    \\u.y  = 1;', '    \\u.y [3] <= 1;', '    x[3][1:0] = 2;', '    assign y = 0;', '    \\a.b  [0]  <= 1;', '    q == 1;',
+    '    \\a$b = 1;', '    if (x) q <= 1;', '    \\p[1] = 2;', '    \\x[3]<= 1;', '    r<=1;', '    \\'];
+  const writes = l => [...synBlocks(['  // b (f.v:1)', l, 'endmodule'].join('\n'))[0].writes];
+  // the old RegExp's target, but for an escaped name with no space after it (not Verilog: Yosys ends it with one)
+  for (const l of lines) assert.deepEqual(writes(l), l === '    \\x[3]<= 1;' ? [] : [OLD.exec(l)?.[1].replace(/^\\/, '')].filter(Boolean), l);
+  for (const l of [`\\A[${'!['.repeat(50000)}`, `\\x${'[]'.repeat(50000)}`, `A[]${'[[]'.repeat(50000)}`]) {
+    const t0 = performance.now();
+    assert.deepEqual(writes(l), []);
+    assert.ok(performance.now() - t0 < 500, `${l.slice(0, 10)}…: ${performance.now() - t0} ms`);
+  }
+});
+
+test('#3278 cellSources: a top whose name has a RegExp\'s characters, its synthesis file\'s lines matched as they are', () => {
+  const syn = SYN.replace('module t ', 'module \\t+ ');
+  const netlist = { modules: { 't+': { cells: { r: { attributes: { src: 't+_syn.v:10.3-12.6' }, connections: {}, port_directions: {} },
+    s: { attributes: { src: 'tt_syn.v:10.3-12.6' }, connections: {}, port_directions: {} } }, netnames: {} } } };
+  const of = cellSources(netlist, syn, 't+');
+  assert.deepEqual(of('r').map(x => `${x.file}:${x.line} ${x.block}`), ['src/t.vhd:12 process_12']);
+  assert.deepEqual(of('s'), [], 'another file');
+});
+
 test('cellSources: a cell\'s own src (in a function: its callers), the named signals on its outputs, the cells it feeds; none', () => {
   const cell = (src, conns, dirs) => ({ attributes: src ? { src } : {}, connections: conns, port_directions: dirs });
   const netlist = { modules: { t: {

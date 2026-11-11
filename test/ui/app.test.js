@@ -768,9 +768,9 @@ uiTest("update dialog: What's new from the release's notes, of a release with th
     await page.eval((text) => {
       window.__origFetch ??= window.fetch;
       window.fetch = (u, o) => {
-        const s = String(u);
-        if (s.includes('api.github.com')) return Promise.resolve(new Response(JSON.stringify({ tag_name: 'v99.1.0', name: 'v99.1.0', html_url: 'https://github.com/x/y/releases/tag/v99.1.0', assets: [], body: text }), { status: 200 }));
-        if (s.includes('raw.githubusercontent.com')) return Promise.resolve(new Response('', { status: 404 }));
+        const host = new URL(String(u), location.href).host;
+        if (host === 'api.github.com') return Promise.resolve(new Response(JSON.stringify({ tag_name: 'v99.1.0', name: 'v99.1.0', html_url: 'https://github.com/x/y/releases/tag/v99.1.0', assets: [], body: text }), { status: 200 }));
+        if (host === 'raw.githubusercontent.com') return Promise.resolve(new Response('', { status: 404 }));
         return window.__origFetch(u, o);
       };
     }, body);

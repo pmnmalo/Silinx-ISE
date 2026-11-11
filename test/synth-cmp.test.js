@@ -75,6 +75,23 @@ test('cmpStep: the comparisons listed mapped just before synth_xilinx\'s coarse 
   assert.equal(cmpSet('t', ['$gt$a', '$lt$b']), 't/$gt$a\nt/$lt$b\n');
 });
 
+test('#3171 cmpStep: the runs found as the RegExp it replaced found them, and in linear time (CodeQL js/polynomial-redos)', () => {
+  const cmp = ['$gt$t_syn.v:3$1'];
+  // the old match, each of its runs mapped alone: the same commands
+  const old = c => c.replace(/(synth_xilinx [^;]*?) -run (\w*):(\w*)/g, m => cmpStep(m, cmp));
+  const s = 'synth_xilinx -top t';
+  for (const c of [`${s} -run :fine`, `${s} -run :fine; ${s} -run :fine`, `${s} -run :fine ${s} -run map_dsp:`, `x; ${s}; ${s} -run :`,
+    `${s} -run x -run :fine`, `${s} -run:fine; ${s}  -run :fine`, `synth_xilinx -run :fine`, `synth_xilinx  -run :`, `${s} -run :fine -run :fine`,
+    `a${s} -run ::fine`, `${s} -run :prepare; opt; synth_xilinx synth_xilinx -run map_dsp:fine; ${s}`, '', ';;', 'synth_xilinx '])
+    assert.equal(cmpStep(c, cmp), old(c), c);
+  // many synth_xilinx with no run, in one command and in many: at once (the RegExp's 40 000: seconds)
+  for (const c of ['synth_xilinx '.repeat(40000), 'synth_xilinx ;'.repeat(40000), `${s} -run`.repeat(40000), `${s} -run a`.repeat(40000)]) {
+    const t0 = performance.now();
+    assert.equal(cmpStep(c, cmp), c);
+    assert.ok(performance.now() - t0 < 500, `${c.slice(0, 20)}…: ${performance.now() - t0} ms`);
+  }
+});
+
 test('synthCommands and yosysFiles: the comparisons of opts.cmp mapped before the coarse step on every script; without it, as before', async () => {
   const { synthCommands, yosysFiles, memorySteps } = await import('../packages/silinx-fpga/src/synth-open.js');
   const synth = 'synth_xilinx -family xc3se -ise -flatten -top t';
