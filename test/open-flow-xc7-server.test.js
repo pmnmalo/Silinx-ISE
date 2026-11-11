@@ -64,7 +64,8 @@ test('every example on the Basys 3 through the 7-series\' back end: no warning, 
         assert.equal(r.par.router, 'router2');
         // the resources: the synthesis's, then nextpnr's held to the xc7a35t's (its slices' 41,600 registers, its 106 pins)
         assert.ok(r.synthesis.utilization.find(u => u.name === 'Number of Slice LUTs').used > 0, name);
-        const regs = r.map.utilization.find(u => u.name === 'Slice Registers'), iob = r.map.utilization.find(u => u.name === 'Bonded IOB');
+        const row = n => r.map.utilization.find(u => u.name === n), regs = row('Number of Slice Registers'), iob = row('Number of bonded IOBs');
+        if (name !== 'gates') assert.ok(row('Number of Slice LUTs').used > 0 && row('Number of occupied Slices').total === 5200, name);
         assert.equal(iob.total, 106);
         if (name !== 'gates') assert.equal(regs.total, 41600);
         // the timing: nextpnr's estimate; gates has no clock

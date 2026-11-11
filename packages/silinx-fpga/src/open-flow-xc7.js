@@ -35,15 +35,36 @@ export const xc7Utilization = counts => ({
 });
 // (the lines of the synthesis's report: Vivado's names for those the part's resources do not name)
 const NAMES = { luts: 'Slice LUTs', ffs: 'Slice Registers', ramb16: 'Block RAM Tiles', mult18x18: 'DSPs', bufgmux: 'BUFGCTRL', dcm: 'MMCME2_ADV / PLLE2_ADV', iob: 'Bonded IOB' };
-// nextpnr's bels (its --report's utilization), as Vivado's utilization report names the resources, and how many the part
-// has of each from its resources (resources.js: slices, luts, ffs, iob): the chip database of the xc7a35t is the xc7a50t's
-// (#3143), whose counts nextpnr gives; a resource the part's do not count (block RAM, DSP), nextpnr's. Its others
-// (PSEUDO_GND, the pads' buffers…) left out
+// nextpnr's bels (its --report's utilization), named as the part's resources name them (resources.js: their `report`, the
+// Design Summary's rows) or as Vivado's utilization report does, and how many the part has of each (counts: its resources'
+// slices, luts, ffs, iob): the chip database of the xc7a35t is the xc7a50t's (#3143), whose counts nextpnr gives; a resource
+// the part's do not count (block RAM, DSP), nextpnr's. Its others (PSEUDO_GND, the pads' buffers…) left out; the LUTs and
+// the slices are the FASM's (xc7FasmUtilization), not its LUT bels (a LUT6 and a LUT5 of a site are two).
 const BELS = [
-  [/^SLICE_LUTX$/, 'LUT bels (6-input and 5-input)', r => 2 * r.luts], [/^SLICE_FFX$/, 'Slice Registers', r => r.ffs], [/^CARRY4$/, 'CARRY4', r => r.slices],
-  [/^F7MUX$/, 'F7 Muxes', r => 2 * r.slices], [/^F8MUX$/, 'F8 Muxes', r => r.slices], [/^RAMB18E1(_RAMB18E1)?$/, 'RAMB18'], [/^RAMB36E1(_RAMB36E1)?$/, 'RAMB36'], [/^DSP48E1(_DSP48E1)?$/, 'DSPs'],
-  [/^BUFGCTRL$/, 'BUFGCTRL'], [/^(MMCME2_ADV|PLLE2_ADV)$/, 'MMCME2_ADV / PLLE2_ADV'], [/^PAD$/, 'Bonded IOB', r => r.iob],
+  [/^SLICE_FFX$/, { id: 'ffs', name: 'Slice Registers' }, r => r.ffs], [/^CARRY4$/, { name: 'CARRY4' }, r => r.slices],
+  [/^F7MUX$/, { name: 'F7 Muxes' }, r => 2 * r.slices], [/^F8MUX$/, { name: 'F8 Muxes' }, r => r.slices], [/^RAMB18E1(_RAMB18E1)?$/, { name: 'RAMB18' }],
+  [/^RAMB36E1(_RAMB36E1)?$/, { name: 'RAMB36' }], [/^DSP48E1(_DSP48E1)?$/, { name: 'DSPs' }], [/^BUFGCTRL$/, { name: 'BUFGCTRL' }],
+  [/^(MMCME2_ADV|PLLE2_ADV)$/, { name: 'MMCME2_ADV / PLLE2_ADV' }], [/^PAD$/, { id: 'iob', name: 'Bonded IOB' }, r => r.iob],
 ];
+
+// a LUT's INIT that passes one input through (bit i is input k's value in i): nextpnr's feed-through LUTs, around the carry
+// chains (#3160), or a buffer synthesis left
+const passThrough = bits => {
+  for (let k = 0; 1 << k < bits.length; k++) if ([...bits].every((b, j) => +b === (((bits.length - 1 - j) >> k) & 1))) return true;
+  return false;
+};
+
+/** The LUT sites a FASM uses (each a LUT6, or a LUT6 and a LUT5, with an INIT): those with logic and those nextpnr made
+ *  feed-throughs (one input passed through), and its slices: { luts, feedThroughs, slices }. */
+export function xc7FasmUtilization(fasm) {
+  const luts = new Map(), slices = new Set();
+  for (const m of String(fasm).matchAll(/^([A-Z0-9_]+_X\d+Y\d+\.SLICE[LM]?_X[01])\.(?:([A-D])LUT\.INIT\[(\d+):0\]\s*=\s*\d+'b([01]+))?/gm)) {
+    slices.add(m[1]);
+    if (m[2]) luts.set(`${m[1]}.${m[2]}`, passThrough(m[4].padStart(+m[3] + 1, '0')));
+  }
+  const feedThroughs = [...luts.values()].filter(Boolean).length;
+  return { luts: luts.size - feedThroughs, feedThroughs, slices: slices.size };
+}
 
 const text = v => (typeof v === 'string' ? v : new TextDecoder().decode(v));
 // the model's bits are x<1> (UCF's), nextpnr's x[1]
@@ -69,16 +90,24 @@ export function nextpnrXdc(model, bits) {
     clocks: clocks.map(c => ({ net: c.net, mhz: 1000 / c.period })) };
 }
 
-/** The resources nextpnr used (its --report's utilization) as rows { name, used, total, percent } (util: runFlow's), each
- *  total the part's own (resources: resources.js resourcesOf's) where the chip database is a larger part's. */
-export function xc7PlacedUtilization(report, resources = [], util) {
+/** The resources nextpnr used (its --report's utilization; fasm: its FASM, for the LUTs and the slices) as rows { name, used,
+ *  total, percent } (util: runFlow's), each total the part's own (resources: resources.js resourcesOf's) where the chip
+ *  database is a larger part's. */
+export function xc7PlacedUtilization(report, resources = [], util, fasm = null) {
   const counts = Object.fromEntries(resources.filter(x => x.count).map(x => [x.id, x.count]));
+  const nameOf = (id, name) => resources.find(x => x.id === id)?.report || name;
   const rows = new Map();
+  if (fasm != null) {
+    const f = xc7FasmUtilization(fasm);
+    if (f.luts) rows.set(nameOf('luts', 'Slice LUTs'), { used: f.luts, available: counts.luts });
+    if (f.feedThroughs) rows.set('LUTs as feed-throughs (nextpnr)', { used: f.feedThroughs, available: counts.luts });
+    if (f.slices) rows.set(nameOf('slices', 'Slices'), { used: f.slices, available: counts.slices });
+  }
   for (const [bel, u] of Object.entries(report.utilization || {})) {
     const row = BELS.find(([re]) => re.test(bel));
     if (!row || !u.used) continue;
-    const [, name, own] = row, r = rows.get(name) || { used: 0, available: 0, own };
-    rows.set(name, { ...r, used: r.used + u.used, available: r.available + u.available });
+    const [, { id, name }, own] = row, key = nameOf(id, name), r = rows.get(key) || { used: 0, available: 0, own };
+    rows.set(key, { ...r, used: r.used + u.used, available: r.available + u.available });
   }
   return [...rows].map(([name, u]) => util(name, u.used, (u.own && u.own(counts)) || u.available));
 }
@@ -162,7 +191,7 @@ function mountXc7(ctx) {
     fasm = text(out['routed.fasm']);
     report.files.routed = io.write('open/routed.fasm', fasm);
     io.write('open/nextpnr-report.json', JSON.stringify(nreport, null, 2) + '\n');
-    const items = xc7PlacedUtilization(nreport, spec.resources, ctx.util);
+    const items = xc7PlacedUtilization(nreport, spec.resources, ctx.util, fasm);
     // (the xc7a35t's chip database is the xc7a50t's, #3143: nextpnr does not hold it to the part's own resources)
     const over = items.filter(i => i.total && i.used > i.total);
     report.map = { utilization: items, warnings: warnings.length, errors: over.length };

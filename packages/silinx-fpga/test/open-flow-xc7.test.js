@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { XC7, XC7_STEPS, XC7_TIMING_MODEL, nextpnrXdc, xc7PlacedUtilization, xc7Timing, xc7TimingText, xc7Utilization } from '../src/open-flow-xc7.js';
+import { XC7, XC7_STEPS, XC7_TIMING_MODEL, nextpnrXdc, xc7FasmUtilization, xc7PlacedUtilization, xc7Timing, xc7TimingText, xc7Utilization } from '../src/open-flow-xc7.js';
 import { backendOf } from '../src/open-flow-backends.js';
 import { XDC } from '../src/xdc.js';
 import { readConstraints } from '../src/constraints.js';
@@ -23,7 +23,8 @@ const gz = f => zlib.gunzipSync(fs.readFileSync(path.join(FIX, f)));
 const PART = 'xc7a35tcpg236-1';
 const util = (name, used, total) => ({ name, used, total, percent: total ? Math.round((100 * used) / total) : 0 });
 // the xc7a35t's resources (resources.js resourcesOf of server/devices.js's record, CPG236)
-const RESOURCES = [{ id: 'ffs', count: 41600 }, { id: 'luts', count: 20800 }, { id: 'slices', count: 5200 }, { id: 'distRam', count: 409600 }, { id: 'iob', count: 106 }];
+const RESOURCES = [{ id: 'ffs', report: 'Number of Slice Registers', count: 41600 }, { id: 'luts', report: 'Number of Slice LUTs', count: 20800 },
+  { id: 'slices', report: 'Number of occupied Slices', count: 5200 }, { id: 'distRam', report: null, count: 409600 }, { id: 'iob', report: 'Number of bonded IOBs', count: 106 }];
 
 const XDC_TEXT = `set_property -dict { PACKAGE_PIN W5 IOSTANDARD LVCMOS33 } [get_ports {clk}]
 set_property -dict { PACKAGE_PIN U18 IOSTANDARD LVCMOS33 } [get_ports {btn[0]}]
@@ -59,12 +60,18 @@ test('xc7: the resources nextpnr used, each total the xc7a35t\'s (its chip datab
     IOB33_OUTBUF: { available: 250, used: 20 }, PAD: { available: 512, used: 26 }, PSEUDO_GND: { available: 1, used: 1 }, RAMB18E1_RAMB18E1: { available: 150, used: 1 },
     SLICE_FFX: { available: 65200, used: 201 }, SLICE_LUTX: { available: 65200, used: 336 }, F7MUX: { available: 16300, used: 0 },
   } };
-  assert.deepEqual(xc7PlacedUtilization(report, RESOURCES, util), [
-    util('BUFGCTRL', 1, 32), util('CARRY4', 49, 5200), util('DSPs', 3, 120), util('Bonded IOB', 26, 106), util('RAMB18', 1, 150),
-    util('Slice Registers', 201, 41600), util('LUT bels (6-input and 5-input)', 336, 41600),
+  // (the LUTs and the slices the FASM's: a LUT of logic, a feed-through of input 3, a slice of two LUTs and one of none)
+  const fasm = ['CLBLL_L_X2Y37.SLICEL_X0.ALUT.INIT[63:0] = 64\'b0110', `CLBLL_L_X2Y37.SLICEL_X0.BLUT.INIT[63:0] = 64'b${'11110000'.repeat(8)}`,
+    'CLBLM_R_X3Y1.SLICEM_X0.CARRY4.ACY0', 'INT_L_X2Y37.LOGIC_OUTS_L4.IMUX_L1', ''].join('\n');
+  assert.deepEqual(xc7PlacedUtilization(report, RESOURCES, util, fasm), [
+    util('Number of Slice LUTs', 1, 20800), util('LUTs as feed-throughs (nextpnr)', 1, 20800), util('Number of occupied Slices', 2, 5200),
+    util('BUFGCTRL', 1, 32), util('CARRY4', 49, 5200), util('DSPs', 3, 120), util('Number of bonded IOBs', 26, 106), util('RAMB18', 1, 150),
+    util('Number of Slice Registers', 201, 41600),
   ]);
+  // the reference FASM of blinky (the fork's CI): its LUTs of logic near Vivado's 94 on the same netlist, nextpnr's feed-throughs
+  assert.deepEqual(xc7FasmUtilization(gz('blinky.fasm.gz').toString('utf8')), { luts: 104, feedThroughs: 108, slices: 93 });
   // (without the part's resources: nextpnr's counts)
-  assert.deepEqual(xc7PlacedUtilization({ utilization: { CARRY4: { available: 8150, used: 2 } } }, [], util), [util('CARRY4', 2, 8150)]);
+  assert.deepEqual(xc7PlacedUtilization({ utilization: { CARRY4: { available: 8150, used: 2 }, SLICE_FFX: { available: 65200, used: 3 } } }, [], util), [util('CARRY4', 2, 8150), util('Slice Registers', 3, 65200)]);
 });
 
 test('xc7: nextpnr\'s timing, its estimate, a clock net named as synthesis left it given its port\'s name', () => {
