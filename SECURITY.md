@@ -38,7 +38,8 @@ can read that user's files has the server too.
   (single use, for a minute), which the page exchanges for the token, so that the token is on no command line; a
   second launch opens a server already on its port only when that server proves it holds the token of its file
   (#2955). The token travels in a request's `X-Silinx-Token` header only, never in a request's address (the printed `#token=` stays in the
-  browser, #3045).
+  browser, #3045). The MCP server's `share_project` sends it only to the server it belongs to: a loopback address whose
+  server proves it holds it, as a second launch asks; a relay on another computer takes its own key (#3181).
 - The pages carry a Content Security Policy with the hashes of their scripts and styles.
 - Every path a request names is confined to the project it belongs to; a project's zip is limited in
   size when it is unpacked. A hidden file or folder (`.git`, `.env`, an editor's settings) is no part of a project:
