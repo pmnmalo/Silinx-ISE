@@ -5,6 +5,8 @@
 //     onProblems(diags), onCheck(diags), onMessage(text, isError), readOnly, banner });
 //   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.print();
 //   ed.select({ kind, id }); ed.destroy();
+//   edited live (#3183, web/js/collab-drawing.js): ed.setShared({ push(model), undo(), redo(), canUndo(), canRedo() } | null)
+//   (each change pushed, Undo / Redo the shared history's), ed.applyModel(m, { renamed, mine }) (in place), ed.busy()
 //
 // Places are circles holding their tokens (dots, or a number), transitions bars; an arc goes from a
 // place to a transition (it takes tokens: its weight) or from a transition to a place (it puts them);
@@ -52,7 +54,7 @@ export function mountPetriEditor(container, opts = {}) {
   let panel = null;                     // 'sim' | 'analysis' | null
   let sim = null;                       // { marking, fired: [], inputs: {}, log: [], timer }
   const hist = [JSON.stringify(M)];
-  let hi = 0;
+  let hi = 0, shared = null;
 
   container.innerHTML = '';
   const root = h('div', { class: 'asm-editor petri-editor', tabindex: '0' });
@@ -98,13 +100,14 @@ export function mountPetriEditor(container, opts = {}) {
     if (readOnly) { M = normalizePetri(JSON.parse(hist[hi])); render(); return; }   // (read only: nothing changes)
     M = normalizePetri(M);
     const s = JSON.stringify(M);
-    if (s !== hist[hi]) { hist.length = hi + 1; hist.push(s); if (hist.length > 200) hist.shift(); hi = hist.length - 1; opts.onChange?.(clone(M)); }
+    if (s !== hist[hi] && shared) { hist.length = 0; hist.push(s); hi = 0; opts.onChange?.(clone(M)); shared.push(clone(M)); }   // (its merge may change M)
+    else if (s !== hist[hi]) { hist.length = hi + 1; hist.push(s); if (hist.length > 200) hist.shift(); hi = hist.length - 1; opts.onChange?.(clone(M)); }
     if (sim) resetSim(false);
     render();
   }
   const restore = i => { hi = i; M = normalizePetri(JSON.parse(hist[hi])); if (sel && !nodeOf(sel.id) && !M.arcs.some(a => a.id === sel.id)) sel = null; opts.onChange?.(clone(M)); if (sim) resetSim(false); render(); };
-  const undo = () => { if (hi > 0) restore(hi - 1); };
-  const redo = () => { if (hi < hist.length - 1) restore(hi + 1); };
+  const undo = () => { if (shared) shared.undo(); else if (hi > 0) restore(hi - 1); };
+  const redo = () => { if (shared) shared.redo(); else if (hi < hist.length - 1) restore(hi + 1); };
 
   function setTool(t) { tool = t; arcFrom = null; for (const [k, b] of Object.entries(tools)) b.classList.toggle('active', k === t); svg.classList.toggle('pn-adding', t !== 'select'); render(); }
   function addNode(kind, at) {
@@ -293,7 +296,19 @@ export function mountPetriEditor(container, opts = {}) {
   return {
     getModel: () => clone(M),
     setModel(m) { M = normalizePetri(m); hist.length = 0; hist.push(JSON.stringify(M)); hi = 0; sel = null; if (sim) resetSim(false); render(); },
-    undo, redo, canUndo: () => hi > 0, canRedo: () => hi < hist.length - 1,
+    undo, redo, canUndo: () => (shared ? shared.canUndo() : hi > 0), canRedo: () => (shared ? shared.canRedo() : hi < hist.length - 1),
+    setShared(s) { shared = s; hist.length = 0; hist.push(JSON.stringify(M)); hi = 0; },
+    // the merged net in place: the view, the tool and the selection kept (its object's id renamed by the merge)
+    applyModel(m, { renamed = null, mine = false } = {}) {
+      M = normalizePetri(m); hist.length = 0; hist.push(JSON.stringify(M)); hi = 0;
+      if (sel && renamed?.has(sel.id)) sel = { ...sel, id: renamed.get(sel.id) };
+      if (sel && !nodeOf(sel.id) && !M.arcs.some(a => a.id === sel.id)) sel = null;
+      if (arcFrom && !nodeOf(arcFrom)) { arcFrom = null; drag = null; }
+      if (sim) resetSim(false);
+      render(); if (mine) opts.onChange?.(clone(M));
+    },
+    // (a change under way the merge must wait for: a place or a transition moved, a field of the side panel being typed)
+    busy: () => drag?.kind === 'move' || side.contains(document.activeElement),
     // Edit ▸ Cut / Copy / Paste / Delete (#677): a place or a transition (an arc: Delete only)
     copy: () => copySel(), cut: () => copySel(true), paste: () => paste(), deleteSelection: () => deleteSelection(),
     canCopy: () => !!sel && sel.kind !== 'arc', canDelete: () => !readOnly && !!sel, canPaste: () => !readOnly && hasClip('petri'),

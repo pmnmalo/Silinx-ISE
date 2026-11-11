@@ -15,6 +15,7 @@ import { drawingModel, putDrawing } from '../core/collab-model.js';
 import { normalizeFsm, generateFsm } from '../core/fsm.js';
 import { normalizeTable, generateTableHdl } from '../core/logic.js';
 import { normalizeModel as normalizeAsm, generate as generateAsm } from '../core/asm.js';
+import { normalizePetri, generatePetri } from '../core/petri.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, what, ms = 5000) => { const t0 = Date.now(); for (;;) { const v = await fn(); if (v) return v; if (Date.now() - t0 > ms) throw new Error(`timed out: ${what}`); await sleep(25); } };
@@ -140,21 +141,21 @@ test('#3182 editors: share_project gives an editor\'s link; follow_project write
   const r = await ok('share_project', { project: 'trafficEd', name: 'Ana', server: base, editors: true });
   const { link, editLink } = r.data;
   assert.match(editLink, new RegExp(`^${base}/#edit=${parseFollowLink(link).room}\\.[A-Za-z0-9_-]{43}\\.[A-Za-z0-9_-]{129}$`));
-  assert.equal(r.text, `Sharing 'trafficEd' live, read only, as Ana. Anyone with this link follows it (until share_project stop):\n${link}\nAnyone with this one edits its text files, state diagrams, truth tables and ASM charts too:\n${editLink}`);
+  assert.equal(r.text, `Sharing 'trafficEd' live, read only, as Ana. Anyone with this link follows it (until share_project stop):\n${link}\nAnyone with this one edits its text files, state diagrams, truth tables, ASM charts and Petri nets too:\n${editLink}`);
   const l = parseFollowLink(link);
   const page = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Eva' } });
   await page.ready;
   // the MCP client as an editor: a text file written, merged, on the disk, at the follower's
   const f = await ok('follow_project', { link: editLink, name: 'Bot' });
   assert.equal(f.data.editor, true);
-  assert.ok(f.text.startsWith('Following Ana\'s project \'trafficEd\' (an editor: its text files, state diagrams, truth tables and ASM charts).'), f.text);
+  assert.ok(f.text.startsWith('Following Ana\'s project \'trafficEd\' (an editor: its text files, state diagrams, truth tables, ASM charts and Petri nets).'), f.text);
   const timer = await P.readFile('trafficEd', 'src/timer.vhd');
   const w = await ok('follow_project', { link: editLink, write: { path: 'src/timer.vhd', text: `-- by Bot\n${timer}` } });
   assert.ok(w.text.includes('Wrote src/timer.vhd (merged as this participant\'s edit).'), w.text);
   await until(async () => (await P.readFile('trafficEd', 'src/timer.vhd')) === `-- by Bot\n${timer}`, 'the edit on the disk', 8000);
   await until(() => docFile(page.doc, 'src/timer.vhd') === `-- by Bot\n${timer}`, 'the edit at the follower\'s');
-  // refused: a drawing not edited live (#3183: the state diagrams, truth tables and ASM charts are), a new file, a follower's link
-  await fails('follow_project', { link: editLink, write: { path: 'src/ctl.pn.json', text: '{}' } }, 'write: src/ctl.pn.json: not a text file of the project that an editor can change');
+  // refused: a file not of text (#3183: the drawings but the schematics are edited live), a new file, a follower's link
+  await fails('follow_project', { link: editLink, write: { path: 'doc/notes.pdf', text: '{}' } }, 'write: doc/notes.pdf: not a text file of the project that an editor can change');
   await fails('follow_project', { link: editLink, write: { path: 'src/new.vhd', text: 'x' } }, 'write: src/new.vhd: not a text file of the project that an editor can change');
   await fails('follow_project', { link, write: { path: 'src/timer.vhd', text: 'x' } }, 'write: this link follows only (an editor\'s link, …#edit=…, writes)');
   // undone by the owner, from the disk: the HDL a drawing generates (the drawing's), a file an editor's page made
@@ -347,6 +348,35 @@ test('#3183 an ASM chart edited live: a page renames a state while the MCP clien
   await ed.close();
   await ok('follow_project', { link: editLink, stop: true });
   await ok('share_project', { project: 'blinkyAsm', action: 'stop' });
+});
+
+test('#3183 a Petri net edited live: a page adds a place while the MCP client adds a transition, both kept; the owner writes it and its HDL; follow_project reads it merged with its Check', async () => {
+  await ok('new_project_from_example', { name: 'netPn', example: 'traffic' });
+  await ok('new_source', { project: 'netPn', type: 'petri', name: 'ctl', language: 'vhdl' });
+  const F = 'src/ctl.pn.json';
+  const { data: { editLink } } = await ok('share_project', { project: 'netPn', name: 'Ana', server: base, editors: true });
+  const l = parseFollowLink(editLink);
+  const ed = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, sign: l.sign, user: { name: 'Rui' } });
+  await ed.ready;
+  const disk0 = normalizePetri(JSON.parse(await P.readFile('netPn', F)));
+  assert.deepEqual(drawingModel(ed.doc, F).model, disk0);
+  assert.ok((await ok('follow_project', { link: editLink, name: 'Bot', path: F })).text.includes('\nProcess "Check Petri Net" of ctl.pn.json '));
+  // at once: Rui adds a place, the MCP client a transition
+  const mine = structuredClone(disk0); mine.places.push({ id: 'p9', name: 'spare', x: 600, y: 140, tokens: 0, capacity: 1, outputs: {} });
+  putDrawing(ed.doc, F, mine, { base: disk0, client: ed.doc.clientID });
+  const bots = structuredClone(disk0); bots.transitions.push({ id: 't9', name: 'fire', x: 300, y: 300, guard: '', outputs: {} });
+  await ok('follow_project', { link: editLink, write: { path: F, text: JSON.stringify(bots) } });
+  const want = (m) => m && m.places.some((p) => p.name === 'spare') && m.transitions.some((t) => t.name === 'fire');
+  await until(() => want(drawingModel(ed.doc, F)?.model), 'merged at the page');
+  await until(async () => want(JSON.parse(await P.readFile('netPn', F))), 'the merge on the disk', 8000);
+  const disk = JSON.parse(await P.readFile('netPn', F));
+  assert.deepEqual(disk, drawingModel(ed.doc, F).model);
+  await until(async () => (await P.readFile('netPn', 'src/ctl.vhd')) === generatePetri(disk, 'vhdl', { source: 'ctl.pn.json' }).code, 'the HDL made again', 8000);
+  assert.match(await P.readFile('netPn', 'src/ctl.vhd'), /spare/);
+  assert.deepEqual((await ok('share_project', { project: 'netPn', action: 'status' })).data.warnings, []);
+  await ed.close();
+  await ok('follow_project', { link: editLink, stop: true });
+  await ok('share_project', { project: 'netPn', action: 'stop' });
 });
 
 test('#3227 through a relay on another computer: share_project with its key; follow_project of a site\'s link that names the relay', async () => {

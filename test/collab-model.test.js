@@ -14,6 +14,7 @@ import { projectDoc, publishProject, docTooLarge, FOLLOW_LIMITS } from '../core/
 import { newFsm, normalizeFsm, generateFsm, validateFsm } from '../core/fsm.js';
 import { normalizeTable, reshapeTable, generateTableHdl, truthTableFromModule, validateTable } from '../core/logic.js';
 import { compile, elaborate } from '../core/compile.js';
+import { newPetri, normalizePetri, generatePetri, validatePetri } from '../core/petri.js';
 import { newModel as newAsm, normalizeModel as normalizeAsm, generate as generateAsm, validate as validateAsm } from '../core/asm.js';
 import { randomVectors, runHdl, runModel } from './fsm-sim.js';
 
@@ -31,13 +32,14 @@ function pair() {
 const model = (doc) => drawingModel(doc, P).model;
 const mut = (doc, fn) => { const m = structuredClone(model(doc)); fn(m); return m; };
 
-test('drawingKind: the FSM\'s diagrams, the truth tables, the ASM charts (others: not yet, #3183\'s order)', () => {
+test('drawingKind: the FSM\'s diagrams, the truth tables, the ASM charts, the Petri nets (others: not yet, #3183\'s order)', () => {
   assert.equal(drawingKind('src/a.fsm.json'), 'fsm');
   assert.equal(drawingKind('src/A.FSM.JSON'), 'fsm');
   assert.equal(drawingKind('src/a.bool.json'), 'tt');
   assert.equal(drawingKind('src/a.tt.json'), 'tt', 'a truth table saved before #2065');
   assert.equal(drawingKind('src/a.asm.json'), 'asm');
-  for (const p of ['src/a.sch.json', 'src/a.pn.json', 'src/a.vhd', 'src/fsm.json', 'src/bool.json']) assert.equal(drawingKind(p), null, p);
+  assert.equal(drawingKind('src/a.pn.json'), 'pn');
+  for (const p of ['src/a.sch.json', 'src/a.vhd', 'src/fsm.json', 'src/bool.json']) assert.equal(drawingKind(p), null, p);
   assert.throws(() => putDrawing(new Y.Doc(), 'src/a.vhd', {}), /src\/a\.vhd: not a drawing that is edited live/);
 });
 
@@ -377,4 +379,62 @@ test('an ASM chart\'s generated HDL: identical from both sides\' merged chart, c
   assert.equal(runs[0].length, 80);
   ua.undo();
   assert.deepEqual([node(amodel(b), 'd2').cond, amodel(b).encoding, node(amodel(b), 's3').actions], ['done', 'binary', ['ready = 1']]);
+});
+
+// ---- the Petri net (#3183's fourth editor): its places, transitions and arcs; an arc names a place or a transition
+const N = 'src/ctl.pn.json';
+const nmodel = (doc) => drawingModel(doc, N).model;
+const nmut = (doc, fn) => { const m = structuredClone(nmodel(doc)); fn(m); return m; };
+
+test('a Petri net, two participants: a place\'s tokens and a transition\'s guard changed at once both kept; an arc to a transition deleted meanwhile goes with it, to a place kept; two places added at once both kept', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, N, newPetri('ctl'));
+  assert.deepEqual(nmodel(b), normalizePetri(newPetri('ctl')));
+  const base = nmodel(a);
+  hold();
+  const ra = putDrawing(a, N, nmut(a, (m) => {
+    m.places[0].tokens = 2; m.places[0].capacity = 2;
+    m.transitions = m.transitions.filter((t) => t.id !== 't2'); m.arcs = m.arcs.filter((x) => x.from !== 't2' && x.to !== 't2');
+    m.places.push({ id: 'p3', name: 'spare', x: 500, y: 140 });
+  }), { base, client: a.clientID });
+  const rb = putDrawing(b, N, nmut(b, (m) => {
+    m.transitions[0].guard = 'go && !busy';
+    m.places.push({ id: 'p3', name: 'other', x: 500, y: 260 });
+    m.arcs.push({ id: 'a5', from: 'p3', to: 't2' }, { id: 'a6', from: 't1', to: 'p3' });
+  }), { base, client: b.clientID });
+  release();
+  const r1 = drawingModel(a, N), r2 = drawingModel(b, N);
+  assert.deepEqual(r1, r2);
+  const m = r1.model;
+  assert.deepEqual([m.places[0].tokens, m.transitions[0].guard, m.transitions.map((t) => t.id)], [2, 'go && !busy', ['t1']]);
+  assert.deepEqual(m.places.map((p) => p.name).sort(), ['idle', 'other', 'spare', 'work']);
+  assert.deepEqual(r1.dropped, [{ coll: 'arcs', id: rb.renamed.get('a5') }], 'the arc to the deleted transition');
+  assert.ok(m.arcs.some((x) => x.id === rb.renamed.get('a6') && x.to === rb.renamed.get('p3')), 'the arc between the kept ones');
+  assert.notEqual(ra.renamed.get('p3'), rb.renamed.get('p3'));
+});
+
+test('a Petri net\'s generated HDL: identical from both sides\' merged net, compiled and simulated in VHDL and in Verilog the same; each one\'s undo', () => {
+  const { a, b, hold, release } = pair();
+  putDrawing(a, N, newPetri('ctl'));
+  const oa = {}, ob = {};
+  const ub = new Y.UndoManager(b.getMap('drawings').get(N), { trackedOrigins: new Set([ob]), captureTimeout: 0 });
+  const base = nmodel(a);
+  hold();
+  putDrawing(a, N, nmut(a, (m) => { m.transitions[1].guard = '!go'; m.places[1].outputs = { busy: '1' }; }), { base, client: a.clientID, origin: oa });
+  putDrawing(b, N, nmut(b, (m) => { m.arcs.find((x) => x.id === 'a2').weight = 1; m.places[0].tokens = 1; m.lang = 'verilog'; }), { base, client: b.clientID, origin: ob });
+  release();
+  const ma = nmodel(a);
+  assert.deepEqual(nmodel(b), ma);
+  assert.deepEqual(validatePetri(ma).filter((d) => d.severity === 'error'), []);
+  const vectors = randomVectors(ma, 60, 9);
+  const runs = ['vhdl', 'verilog'].map((lang) => {
+    const ga = generatePetri(ma, lang, { source: 'ctl.pn.json' }), gb = generatePetri(nmodel(b), lang, { source: 'ctl.pn.json' });
+    assert.equal(ga.code, gb.code, lang);
+    return runHdl(ga.code, lang, ma, vectors);
+  });
+  assert.deepEqual(runs[0], runs[1]);
+  assert.equal(runs[0].length, 60);
+  ub.undo();
+  assert.equal(nmodel(a).lang, 'vhdl');
+  assert.equal(nmodel(a).transitions[1].guard, '!go', 'A\'s change kept');
 });

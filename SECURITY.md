@@ -221,7 +221,7 @@ board or a PROM) without the user's say.
 
 Share Project… (and the MCP's `share_project`) shares a project through a relay or the owner's page (#3227), end-to-end encrypted with a key in the
 link's fragment: the relay sees no file. A follower's link reads only. An editor's link writes too: its holder changes
-the text of the project's text files (HDL, constraints, C / C++, notes) and its state diagrams, truth tables and ASM charts (#3183: their states and
+the text of the project's text files (HDL, constraints, C / C++, notes) and its state diagrams, truth tables, ASM charts and Petri nets (#3183: their states and
 transitions, a table's outputs and cells, merged per field into the drawing's structure, `core/collab-model.js`), signed with the link's key; anything
 else an editor changes (another drawing, the project's settings, a new file) is undone from the owner's disk. An editor's link is a
 bearer capability that can be forwarded, so what it writes is a file from outside: at the owner's, each change passes
@@ -304,6 +304,6 @@ Share Project… (and the MCP's `share_project`) shares the open project live; a
   its reason; the MCP's `follow_project` refuses it the same way. A room whose document passes 5000 files or 64 MB
   or 100,000 drawing objects (`FOLLOW_LIMITS`) is left at once, with an error in the console. Nothing a follower receives is written to the
   disk.
-- **An editor** (an editor's link, `#edit=…`) changes the project's text files, state diagrams, truth tables and ASM charts. At the owner's, each change passes the
+- **An editor** (an editor's link, `#edit=…`) changes the project's text files, state diagrams, truth tables, ASM charts and Petri nets. At the owner's, each change passes the
   import gate before it is written. The first one makes a trusted project untrusted (#3355): Xilinx ISE and the board
   wait for the user's Trust Project.
