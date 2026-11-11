@@ -15,7 +15,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ENTRIES = ['core/compile.js', 'core/synth-verilog.js', 'core/unisim.js'];
 // the front end's modules on 2026-10-27: what the entry points reach; a new one is added on purpose
 const FRONT_END = new Set([
-  'core/compile.js',
+  'core/bound-walk.js', 'core/compile.js',   // (bound-walk.js: #2577)
   'core/elab-call.js', 'core/elab-expr.js', 'core/elab-instance.js', 'core/elab-stmt.js', 'core/elaborate.js',
   'core/interp-format.js', 'core/interp-textio.js', 'core/interp.js', 'core/simulator.js',
   'core/native.js', 'core/util.js', 'core/values.js',
@@ -87,7 +87,7 @@ test('#1709 HDL boundary: how the imports across are found', () => {
 });
 
 test('#1709 HDL boundary: the front end\'s modules exist, and are what the entry points reach', () => {
-  assert.equal(FRONT_END.size, 42);
+  assert.equal(FRONT_END.size, 43);
   for (const f of FRONT_END) assert.ok(fs.existsSync(path.join(ROOT, f)), `${f}: gone, remove it from FRONT_END`);
   for (const f of ENTRIES) assert.ok(FRONT_END.has(f), f);
   // not the front end: the toolchain's synth-*.js, the drawings, the IDE's simulation model
