@@ -3,14 +3,26 @@
 // It reaches nothing of the server: a follower has no token, and needs none. Every change (a file written, renamed,
 // deleted, a process run) is refused, read only; the processes run in the owner's Silinx. An editor (#3182) writes a
 // text file's text: merged into the shared document as its edit (core/collab-doc.js editFile), which the owner writes.
-import { docFile, docProject, watchDoc, editFile } from '/core/collab-doc.js';
+// Every file the room shows passes the import gate first (#3361: core/collab-doc.js gatedDocFile), as any file from
+// outside: one it refuses is not shown, and `warn` says so once.
+import { docProject, watchDoc, editFile, gatedDocFile } from '/core/collab-doc.js';
 import { collab, readOnlyError, editsHere } from './collab-state.js';
 
 const notFound = what => Object.assign(new Error(what), { status: 404 });
 
-/** The backend of a followed room's document (`api`: the one it stands for; its other functions refuse). */
-export function followApi(api, doc) {
+/** The backend of a followed room's document (`api`: the one it stands for; its other functions refuse). warn(text):
+ *  a file the gate refuses, once for each reason. */
+export function followApi(api, doc, { warn = () => {} } = {}) {
   const out = {};
+  const said = new Set();
+  let version = 0;
+  const verdicts = new Map();   // path -> { version, shown } (#3361: a bound editor's file checked at each change only)
+  doc.on('update', () => { version++; });
+  const gated = path => {
+    const g = gatedDocFile(doc, path);
+    if (g.reason && !said.has(`${path}\0${g.reason}`)) { said.add(`${path}\0${g.reason}`); warn(`${path}: not shown: ${g.reason}`); }
+    return g;
+  };
   const storage = api.storage?.bind(api);   // (the one it stands for: Object.assign replaces api's own, collab-follow.js)
   for (const [k, v] of Object.entries(api)) if (typeof v === 'function') out[k] = async () => { throw readOnlyError(); };
   const current = () => {
@@ -25,6 +37,16 @@ export function followApi(api, doc) {
   };
   return Object.assign(out, {
     following: true,
+    /** Whether a file's text passes the gate now (its live editor stays bound only while it does; said by the reads,
+     *  not here). A file this participant edits stays bound: its own typing is checked by the owner's gate (#3355). */
+    shown: path => {
+      if (editsHere(path)) return true;
+      const v = verdicts.get(path);
+      if (v?.version === version) return v.shown;
+      const shown = typeof gatedDocFile(doc, path).text === 'string';
+      verdicts.set(path, { version, shown });
+      return shown;
+    },
     projects: async () => {
       const { project } = current();
       return [{ name: project.name, device: project.device, top: project.top, board: project.board, modified: null }];
@@ -39,15 +61,16 @@ export function followApi(api, doc) {
     project: async name => { const { project, fileTree } = check(name); return { ...structuredClone(project), fileTree }; },
     readFile: async (name, path) => {
       check(name);
-      const t = docFile(doc, path);
-      if (t === null) throw notFound(`file '${path}' not found`);
-      return t;
+      const g = gated(path);
+      if (g.reason) throw notFound(`file '${path}' not shown: ${g.reason}`);
+      if (g.text === null) throw notFound(`file '${path}' not found`);
+      return g.text;
     },
     sources: async name => {
       const { project } = check(name);
       return (project.files || []).map(f => {
-        const t = docFile(doc, f.path);
-        return t === null ? { ...f, text: '', missing: true } : { ...f, text: t };
+        const g = gated(f.path);
+        return g.text == null ? { ...f, text: '', missing: true } : { ...f, text: g.text };
       });
     },
     reports: async () => ({ available: false }),

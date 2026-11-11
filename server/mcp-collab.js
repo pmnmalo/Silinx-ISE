@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
-import { projectDoc, publishProject, sharedPath, docProject, docFile, watchDoc, editFile, editablePath, gateEdit } from '../core/collab-doc.js';
+import { projectDoc, publishProject, sharedPath, docProject, docFile, gatedDocFile, watchDoc, editFile, editablePath, gateEdit } from '../core/collab-doc.js';
 import { isTrusted, markEditedByEditor } from '../core/trust.js';
 import { relayConfig } from './toolchain.js';
 import { shareRoom, followRoom } from '../core/collab-client.js';
@@ -203,7 +203,10 @@ export const COLLAB_TOOLS = [
       const view = cur.session.owner()?.view || null;
       let text = null;
       if (path !== undefined) {
-        text = docFile(cur.session.doc, String(path));
+        // (through the import gate, as the interface's follower reads it, #3361)
+        const g = gatedDocFile(cur.session.doc, String(path));
+        if (g.reason) throw toolError(`${path}: not shown: ${g.reason}`);
+        text = g.text;
         if (text === null) throw toolError(`'${path}' is not a file of the shared project (${fileTree.join(', ')})`);
       }
       const lines = [

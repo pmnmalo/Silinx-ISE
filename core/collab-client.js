@@ -23,6 +23,7 @@ import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { newKey, keyOf, seal, unseal } from './collab-crypto.js';
 import { newSigner, signerOf, verifierOf, signFrame, verifyFrame } from './collab-sign.js';
+import { docTooLarge, FOLLOW_LIMITS } from './collab-doc.js';
 
 export const PROTOCOL = 3;   // (2: an editor's signed edits, #3182; 3: a follower's awareness marked with its sender, #3360)
 export const SUBPROTOCOL = 'silinx-collab';   // (the WebSockets', server/collab-relay.js's)
@@ -198,8 +199,9 @@ export async function shareRoom({ url, token = null, doc, user, editors = false,
 /** A follower joins a room with its link's key: { doc (the project, as it arrives), ready (resolves once it has
  *  arrived), peers(), owner(), setView(), close() }. Read only: nothing it does reaches the owner but its view. With
  *  `sign` (an editor link's key, #3182), an editor: what changes in its document (core/collab-doc.js editFile) is
- *  sent, signed, to everyone. */
-export async function followRoom({ url, room, key: keyText, sign = null, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {} }) {
+ *  sent, signed, to everyone. A room whose document passes `limits` (its files, their total size: core/collab-doc.js
+ *  FOLLOW_LIMITS, #3361) is left at once: an error event ({ fatal: true }), `ready` rejected, nothing more applied. */
+export async function followRoom({ url, room, key: keyText, sign = null, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {}, limits = FOLLOW_LIMITS }) {
   const key = await keyOf(keyText);
   const signer = sign ? await signerOf(sign) : null;
   const doc = new Y.Doc();
@@ -215,14 +217,26 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
   let synced, failed = null;
   const ready = new Promise((resolve, reject) => { synced = resolve; failed = reject; });
   ready.catch(() => {});
-  let warned = false;
+  let warned = false, left = false;
+  // (the document past what a follower takes: left, said once)
+  const capped = () => {
+    const why = docTooLarge(doc, limits);
+    if (!why) return false;
+    left = true;
+    onEvent({ type: 'error', message: why, fatal: true });
+    failed(new Error(why));
+    c.closedReason = why;
+    c.ws.close();
+    return true;
+  };
   const c = connection(url, WS, [SUBPROTOCOL], msg => {
     if (c.first?.(msg)) { c.first = null; return; }
     if (msg.type === 'leave') removeAwarenessStates(awareness, [Number(msg.client)], 'relay');
     else if (msg.type === 'closed') c.closedReason = msg.reason;
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
   }, async frame => {
-    if (frame[0] === KIND.edit) { await applyEdit(doc, key, room, verifierOfDoc, frame).catch(() => false); return; }
+    if (left) return;
+    if (frame[0] === KIND.edit) { if (await applyEdit(doc, key, room, verifierOfDoc, frame).catch(() => false)) capped(); return; }
     // (another follower's awareness, marked by the room with who sent it, #3360; anything else is the owner's)
     const from = senderOf(frame);
     let m;
@@ -231,7 +245,7 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
       return;
     }
     if (from) { if (m.kind === KIND.awareness) applyAwarenessFrom(awareness, m.bytes, from.client); return; }
-    if (m.kind === KIND.update) { Y.applyUpdate(doc, m.bytes, 'remote'); synced(); }
+    if (m.kind === KIND.update) { Y.applyUpdate(doc, m.bytes, 'remote'); if (!capped()) synced(); }
     else if (m.kind === KIND.awareness) applyAwarenessFrom(awareness, m.bytes);   // (the owner's: who is in)
   });
   try { await c.opened; } catch (e) { awareness.destroy(); throw e; }

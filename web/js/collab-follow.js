@@ -38,11 +38,14 @@ export async function startFollowing(hash = location.hash) {
   let saved = '';
   try { saved = localStorage.getItem(NAME_KEY) || ''; } catch { /* none */ }
   const input = h('input', { type: 'text', value: saved, 'data-field': 'name', maxlength: 40, style: { width: '100%' } });
+  // (a room the owner's page hosts: the public servers its follower reaches, named first, #3361)
+  const servers = link.via === 'host' ? (await import('./collab-meet.js')).publicServers(link) : null;
   const name = await dialog({
     title: 'Follow a Shared Project',
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, 'This link follows a project someone shares: you see its files and drawings as they change, read only, and where its owner is.'),
       link.relay ? h('p', {}, `Through the relay at ${new URL(link.relay).host}.`) : null,
+      servers ? h('p', { class: 'collab-servers' }, servers) : null,
       h('label', {}, 'Your name, as they see it:'), input),
     buttons: [{ label: 'Follow', primary: true, value: () => cleanName(input.value) || 'Guest' }, { label: 'Cancel', value: null }],
   });
@@ -58,7 +61,7 @@ export async function startFollowing(hash = location.hash) {
   const { project, owner } = docProject(session.doc);
   fol = { name, session, following: true, driven: null, mine: null, bound: new Map() };
   Object.assign(collab, { role: 'follower', owner: owner || session.owner()?.name || '?', project: project.name, session, editor: session.editor });
-  Object.assign(api, followApi(api, session.doc));
+  Object.assign(api, followApi(api, session.doc, { warn: text => app.log(`WARNING: Follow a shared project: ${text}.`, 'warn') }));
   setPresenceCommands(commands);
   setInterval(track, TRACK_MS);
   draw();
@@ -107,7 +110,7 @@ function onEvent(ev) {
   if (!fol) return;
   if (ev.type === 'peers') { draw(); track(); }
   else if (ev.type === 'closed') { app.log(`WARNING: ${collab.owner}'s project "${collab.project}" is no longer followed (${ev.reason}): what you see is as it was then.`, 'warn'); draw(); for (const d of S.docs) d.editor?.setPeers?.([]); }
-  else if (ev.type === 'error') app.log(`WARNING: Follow a shared project: ${ev.message}.`, 'warn');
+  else if (ev.type === 'error') app.log(`${ev.fatal ? 'ERROR' : 'WARNING'}: Follow a shared project: ${ev.message}.`, ev.fatal ? 'err' : 'warn');
 }
 
 // the owner's view followed; the follower's own, told; the others' cursors in the open text editors
@@ -134,7 +137,7 @@ async function track() {
     }
     fol.mine = docPath(S.active);
     // (the open text editors, live, #3182: an editor's own files to edit, the others read only)
-    keepBound(fol.bound, S.docs, fol.session.doc.getMap('files'), p => !!d0(p));
+    keepBound(fol.bound, S.docs, fol.session.doc.getMap('files'), p => !!d0(p) && api.shown(p));
     fol.session.setView(fol.mine ? { path: fol.mine, line: S.active?.editor?.getCursor?.().line ?? null, ch: S.active?.editor?.getCursor?.().ch ?? null } : null);
     const peers = fol.session.peers();
     for (const d of S.docs) {

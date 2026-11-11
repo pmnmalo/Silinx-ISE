@@ -259,3 +259,30 @@ What it cannot do:
 Privacy: a `#design=` link holds the whole project, its comments too (a student's name in a header): Copy Link…
 says so. A broken link, a design that does not decode, a zip that cannot be fetched, or a view the design does not
 have is an error in the console, the workspace as it was.
+
+### Live sharing (#3181, #3182, #3227, #3361)
+
+Share Project… (and the MCP's `share_project`) shares the open project live; anyone with its link follows it.
+
+- **The relay** (`server/collab-relay.js`, `core/collab-room.js`): the Silinx server that serves the page, or another
+  Silinx's relay named in the link. It reads nothing of the project: every message is sealed with a key that is only in
+  the link's fragment (AES-GCM, `core/collab-crypto.js`), which a browser never sends. Opening a room takes the server's
+  token (or a relay's key); joining one, its id. It forwards only the owner's updates (a follower's are refused) and,
+  when the owner lets editors in, an editor's edits signed with the room's key (`core/collab-sign.js`). A follower's presence (who they are, what they look at) goes through marked with the client id it joined with, so it
+  speaks for that follower only, never for the owner nor another (#3360). Its limits: a
+  follower's message 64 KB, the owner's 16 MB, followers per room, rooms per server.
+- **A room the owner's page hosts** (the browser edition, `#follow=….host`): the followers reach it over WebRTC. With
+  the owner's key in the link, the follower's page looks for the owner at a public meeting point: Trystero's WebTorrent
+  trackers (`core/collab-meet.js` `TRACKERS`), and the owner proves itself with a signature only it can make. Without
+  it, the codes are exchanged by hand. Either way a STUN server (`stun.l.google.com`, or this browser's own list)
+  finds the connection's addresses. Those servers see the follower's IP address, so the follow dialog names them
+  before anything is sent.
+- **A follower** receives the project read only, and nothing it does changes the owner's. The owner may be anyone who
+  sent the link, so everything the room shows passes the import gate first (`core/collab-doc.js` `gatedDocFile`):
+  each file's size (1 MB), NUL bytes, an HTML page, an XML DTD. A file refused is not shown, and the console gives
+  its reason; the MCP's `follow_project` refuses it the same way. A room whose document passes 5000 files or 64 MB
+  (`FOLLOW_LIMITS`) is left at once, with an error in the console. Nothing a follower receives is written to the
+  disk.
+- **An editor** (an editor's link, `#edit=…`) changes the project's text files. At the owner's, each change passes the
+  import gate before it is written. The first one makes a trusted project untrusted (#3355): Xilinx ISE and the board
+  wait for the user's Trust Project.

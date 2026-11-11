@@ -7,11 +7,12 @@
 // the follower's after MEET_MS with no owner, or at their choice (Exchange Codes Instead). Every message in the console.
 //   meetFollowers(share, hostKey): the owner's page at the meeting point (its followers attached to its room)
 //   findOwner(link) -> a WebSocket class for followRoom, 'codes' (the codes instead) or null (cancelled)
+//   publicServers(link) -> the follow dialog's line naming the public servers a hosted room's follower reaches (#3361)
 import { h, dialog } from './ui.js';
 import { app } from './app.js';
 import { prefKey } from './prefs.js';
 import { iceServers } from './collab-rtc.js';
-import { meetAsHost, meetOwner, channelMeeting, trysteroMeeting, MEET_MS } from '/core/collab-meet.js';
+import { meetAsHost, meetOwner, channelMeeting, trysteroMeeting, MEET_MS, TRACKERS } from '/core/collab-meet.js';
 import { FOLLOWER_JOIN } from '/core/collab-loop.js';
 
 /** This browser's meeting point: '' (the public one, Trystero's) or 'local' (between this browser's pages). */
@@ -25,6 +26,18 @@ export async function meetingPoint() {
   if (which === 'local') return channelMeeting();
   const { joinRoom, selfId } = await import('@trystero-p2p/torrent');
   return trysteroMeeting({ joinRoom, selfId, rtcConfig: { iceServers: iceServers() } });
+}
+
+/** The public servers a follower's page reaches for a room its owner's page hosts (#3361), named before it joins, since
+ *  they see its IP address: the meeting point's trackers (a link with the owner's key, the public meeting point) and the
+ *  STUN servers; null: none (this browser's settings name none). */
+export function publicServers(link) {
+  let local = false;
+  try { local = localStorage.getItem(MEETING_KEY) === 'local'; } catch { /* the public one */ }
+  const trackers = link.host && !local ? TRACKERS.map(t => new URL(t).host) : [];
+  const stun = iceServers().flatMap(s => s.urls).map(u => String(u).replace(/^stuns?:/i, ''));
+  const parts = [trackers.length ? `the WebTorrent trackers ${trackers.join(', ')} (to find its owner)` : null, stun.length ? `the STUN server${stun.length > 1 ? 's' : ''} ${stun.join(', ')}` : null].filter(Boolean);
+  return parts.length ? `This page connects to public servers, which see your IP address: ${parts.join(' and ')}.` : null;
 }
 
 /** The owner's page at the meeting point: each follower that finds it there gets its proof, then joins its room. */

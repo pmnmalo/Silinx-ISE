@@ -38,6 +38,10 @@ export const COLLAB_PT_PATTERNS = [
   [/^Read-only, following (.+)'s project$/, 'Só de leitura, a seguir o projeto de $1'],
   [/^Sharing \((\d+)\)$/, 'A partilhar ($1)'],
   [/^Through the relay at (.+)\.$/, 'Através do retransmissor em $1.'],
+  // (the public servers a hosted room's follower reaches, #3361: web/js/collab-meet.js publicServers)
+  [/^This page connects to public servers, which see your IP address: (?:the WebTorrent trackers (.+) \(to find its owner\)(?: and )?)?(?:the STUN servers? (.+))?\.$/,
+    (_, t, s) => `Esta página liga-se a servidores públicos, que veem o seu endereço IP: ${[t ? `os rastreadores WebTorrent ${t} (para encontrar o dono)` : null,
+      s ? (s.includes(',') ? `os servidores STUN ${s}` : `o servidor STUN ${s}`) : null].filter(Boolean).join(' e ')}.`],
   [/^Anyone with this link follows "(.+)" live, read only, as long as you share it\.$/, 'Quem tiver esta ligação segue "$1" em direto, só de leitura, enquanto o partilhar.'],
   // (the presence's button: the owner's name)
   [/^Following ([^."():]+)$/, 'A seguir $1'],

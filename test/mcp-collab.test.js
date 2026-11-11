@@ -290,3 +290,26 @@ test('#3363 share_project and follow_project reach this computer\'s server or a 
     assert.deepEqual(seen, []);
   } finally { globalThis.WebSocket = prev; }
 });
+
+test('#3361 follow_project: a file the import gate refuses is not given, its reason said; a room past a follower\'s caps is left', async () => {
+  const { shareRoom } = await import('../core/collab-client.js');
+  const { projectDoc, publishProject } = await import('../core/collab-doc.js');
+  const plant = (doc, p, text) => { const yt = new Y.Text(); yt.insert(0, text); doc.getMap('files').set(p, yt); };
+  // a hostile owner: a web page under a source's name, a NUL byte
+  const doc = projectDoc();
+  publishProject(doc, { project: { name: 'h', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl' }], fileTree: ['src/top.vhd'] }, files: { 'src/top.vhd': 'entity top is end;\n' }, owner: 'Eve' });
+  plant(doc, 'src/page.vhd', '<html><body>x</body></html>');
+  plant(doc, 'src/zero.vhd', 'a\0b');
+  const owner = await shareRoom({ url: relayUrl(base, 'share'), token: 'tok-mcp', doc, user: { name: 'Eve' } });
+  const link = followLink(`${base}/`, owner.room, owner.key);
+  const f = await ok('follow_project', { link, name: 'Bot' });
+  assert.deepEqual(f.data.files, ['src/page.vhd', 'src/top.vhd', 'src/zero.vhd']);
+  assert.equal((await ok('follow_project', { link, path: 'src/top.vhd' })).data.text, 'entity top is end;\n');
+  await fails('follow_project', { link, path: 'src/page.vhd' }, 'src/page.vhd: not shown: a web page (HTML), not the file its name says');
+  await fails('follow_project', { link, path: 'src/zero.vhd' }, 'src/zero.vhd: not shown: binary content (a NUL byte) in a text file');
+  await ok('follow_project', { link, stop: true });
+  // past the files a follower takes: refused
+  doc.transact(() => { for (let i = 0; i < 5000; i++) plant(doc, `src/f${i}.v`, ''); });
+  await fails('follow_project', { link }, 'cannot follow: the shared project has more files than a follower takes (5003, at most 5000)');
+  await owner.close();
+});
