@@ -147,6 +147,13 @@ test('files that must not be in the repository: Xilinx outputs and licences, key
   assert.deepEqual(kinds('test/fixtures/fpga/d.xdlrc', `# XDL REPORT MODE\n# (a small hand-made device in the format of xdl -report)\n`), []);
 });
 
+test('the allow-list (#3345): the made-up local address of a refused link in link-hash\'s UI test, as design-link\'s, not elsewhere', () => {
+  const line = `['open=https://${dot(192, 168, 1, 1)}/a.zip', 'refused']`;
+  assert.deepEqual(kinds('test/ui/link-hash.test.js', line), []);
+  assert.deepEqual(kinds('test/ui/design-link.test.js', line), []);
+  assert.deepEqual(kinds('test/ui/other.test.js', line), [`IP address: ${dot(192, 168, 1, 1)}`]);
+});
+
 test('the allow-list (#498): XPower\'s section numbers in the history, read as addresses, and nowhere else', () => {
   const sections = `sections ${dot(3, 3, 1, 1)} and ${dot(3, 3, 1, 2)} of the report`;
   assert.deepEqual(kinds('scripts/measure-power.mjs', sections), []);
