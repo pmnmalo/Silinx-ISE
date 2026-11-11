@@ -101,8 +101,9 @@ test('the chip database\'s exports: the unknown PIPs are real PIPs of their tile
 
 test('#3349: the PIPs held out of Silinx\'s flow (s6-pips-held.json) are known to the chip database\'s export only', () => {
   const held = JSON.parse(fs.readFileSync(path.join(S6_DB_DIR, 's6-pips-held.json'), 'utf8')).pips;
-  // #3269's, as measured
-  assert.deepEqual(held, { 'TIOI_INNER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S': ['26,35', '27,48', '28,14'] });
+  // #3269's, and #3169's three pad wire -> IBUF PIPs (no bits), as measured
+  assert.deepEqual(held, { 'TIOI_INNER D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S': ['26,35', '27,48', '28,14'],
+    'TIOB_SINGLE TIOB_IBUF1_PINW -> TIOB_IBUF1': [], 'BIOB_SINGLE BIOB_IBUF0_PINW -> BIOB_IBUF0': [], 'BIOB_SINGLE BIOB_IBUF1_PINW -> BIOB_IBUF1': [] });
   // none of them in the files Silinx's flow reads, nor fetched by the browser
   assert.ok(!s6DbNames(PART).includes('s6-pips-held'));
   const flowDb = loadBitDbS6(PART), exportDb = loadBitDbS6(PART, { held: true });
@@ -110,15 +111,18 @@ test('#3349: the PIPs held out of Silinx\'s flow (s6-pips-held.json) are known t
     assert.equal(flowDb.other.pips[k], undefined, k);
     assert.deepEqual(exportDb.other.pips[k], bits, k);
   }
-  // the export leaves out exactly those PIPs fewer: one in each TIOI_INNER tile
+  // the export leaves out exactly those PIPs fewer: each in every tile of its type (16 TIOI_INNER tiles, a TIOB_SINGLE,
+  // a BIOB_SINGLE)
   const a = unknownPipsS6(device, flowDb), b = unknownPipsS6(device, exportDb);
-  const tiles = Array.from({ length: device.tileCount }, (_, k) => device.tileNames[k]).filter(n => /^TIOI_INNER_X\d+Y\d+$/.test(n));
-  assert.ok(tiles.length > 0);
-  assert.equal(a.unknown - b.unknown, tiles.length);
+  const want = tile => Object.keys(held).filter(k => k.startsWith(`${tile.replace(/_X\d+Y\d+$/, '')} `)).map(k => k.replace(/^\S+ /, '')).sort();
+  let gone = 0;
   for (const [tile, list] of Object.entries(a.pips)) {
-    const gone = list.filter(i => !(b.pips[tile] ?? []).includes(i)).map(i => { const p = device.pip(device.tile(tile), i); return `${p.from} ${p.dir} ${p.to}`; });
-    assert.deepEqual(gone, tiles.includes(tile) ? ['D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S'] : [], tile);
+    const g = list.filter(i => !(b.pips[tile] ?? []).includes(i)).map(i => { const p = device.pip(device.tile(tile), i); return `${p.from} ${p.dir} ${p.to}`; }).sort();
+    assert.deepEqual(g, want(tile), tile);
+    gone += g.length;
   }
+  assert.equal(a.unknown - b.unknown, gone);
+  assert.equal(gone, 16 + 1 + 2);
   // (the export script itself reads them)
   const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-s6-held-')), 'unknown.json');
   execFileSync(process.execPath, [fileURLToPath(new URL('../research/nextpnr-s6/export-unknown-pips.mjs', import.meta.url)), PART, out]);
