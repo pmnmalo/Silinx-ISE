@@ -25,6 +25,7 @@ import { validateDevice, findPart } from './devices.js';
 import { parseBitHeader } from './programmer.js';
 import { within } from './paths.js';
 import { IDENT } from './ident.js';
+import { sourceSettingsSh } from './settings-guard.js';
 
 // the default flow (an empty request runs these)
 export const STEPS = ['synth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit'];
@@ -232,36 +233,7 @@ export function generateRunSh({ top, device, hasUcf, defaultSteps = STEPS, impl 
 cd "$(dirname "$0")" || exit 1
 STEPS="\${*:-${defaultSteps.join(' ')}}"
 
-if ! command -v xst >/dev/null 2>&1; then
-  ISE_SETTINGS="\${ISE_SETTINGS:-${DEFAULT_SETTINGS_SH}}"
-  if [ -f "$ISE_SETTINGS" ]; then
-    # never a file of the build folder (its files come from the project, #3032): its real path,
-    # every link followed, outside this folder's real path
-    real_path() {
-      f="$1"; n=0
-      while :; do
-        d="$(cd -P "$(dirname "$f")" 2>/dev/null && pwd -P)" || return 1
-        f="$d/$(basename "$f")"
-        [ -L "$f" ] || break
-        l="$(readlink "$f")" || return 1
-        case "$l" in /*) f="$l" ;; *) f="$d/$l" ;; esac
-        n=$((n + 1)); [ "$n" -lt 40 ] || return 1
-      done
-      printf '%s\\n' "$f"
-    }
-    here="$(pwd -P)"
-    real="$(real_path "$ISE_SETTINGS")" || real=""
-    case "$real" in
-      ""|"$here"/*)
-        echo "ERROR: ISE_SETTINGS ($ISE_SETTINGS) is a file of the build folder: not sourced." >&2
-        exit 126 ;;
-    esac
-    # settings64.sh takes $1 as the install dir: source it with no positional arguments.
-    set --
-    # shellcheck disable=SC1090
-    . "$ISE_SETTINGS" >/dev/null 2>&1
-  fi
-fi
+${sourceSettingsSh('xst', DEFAULT_SETTINGS_SH)}
 if ! command -v xst >/dev/null 2>&1; then
   echo "ERROR: Xilinx ISE tools (xst) not found. Put ISE 14.7 on PATH or set ISE_SETTINGS to settings64.sh." >&2
   exit 127
@@ -443,7 +415,7 @@ export async function generateBuild(project, projectDir, { steps, sourcesOnly = 
   // Copy sources, preserving their relative layout under build/src/ (paths stay unique).
   const sources = [];
   for (const f of design) {
-    const from = inside(scriptSafe(f.path));
+    const from = inside(scriptSafe(noSettingsScript(f.path)));
     if (!fss.existsSync(from)) { warnings.push(`missing source file ${f.path} (skipped)`); continue; }
     // (its path inside the project, as resolved: a '..' of silinx.json's never reaches past build/src/, #2956)
     const rel = path.relative(projectDir, from).split(path.sep).join('/');
@@ -475,7 +447,7 @@ export async function generateBuild(project, projectDir, { steps, sourcesOnly = 
   for (const s of sources) if (s.lang === 'verilog') includeDirs.add(path.posix.dirname(s.buildPath));
 
   if (!ise) {
-    const name = !sourcesOnly && project.constraints && fss.existsSync(inside(project.constraints)) ? path.basename(project.constraints) : null;
+    const name = !sourcesOnly && project.constraints && fss.existsSync(inside(project.constraints)) ? path.basename(noSettingsScript(project.constraints)) : null;
     if (name) await fs.copyFile(inside(project.constraints), path.join(buildDir, name));
     return { buildDir, top, device, files: name ? [name] : [], sources, hasUcf: !!name, constraintsFile: name, warnings, steps: [] };
   }
@@ -516,6 +488,14 @@ export async function generateBuild(project, projectDir, { steps, sourcesOnly = 
   await fs.chmod(path.join(buildDir, 'run.sh'), 0o755);
   await fs.mkdir(path.join(buildDir, 'xst', 'projnav.tmp'), { recursive: true });
   return { buildDir, top, device, files: Object.keys(files).concat(hasUcf ? [`${top}.ucf`] : []), sources, hasUcf, warnings, steps: defaultSteps };
+}
+
+// A file copied into the build folder is never named as a settings script (settings64.sh, settings32.sh, any case): the
+// build folder stays on the ssh host after a run, and a settings script found there would be sourced (#3407)
+const SETTINGS_NAME = /(^|[\\/])settings(32|64)\.sh$/i;
+function noSettingsScript(rel) {
+  if (SETTINGS_NAME.test(String(rel))) throw Object.assign(new Error(`${rel}: a file named ${path.basename(String(rel))} is not copied into the build folder (the name of ISE's settings script)`), { status: 400 });
+  return rel;
 }
 
 // A path as XST's script and project file quote it: nothing that would end its quotes or its option

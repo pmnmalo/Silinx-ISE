@@ -29,6 +29,7 @@ import { findPart } from './devices.js';
 import { ice40Package, ice40Present } from './nextpnr-ice40-fetch.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
+import { sourceSettingsSh } from './settings-guard.js';
 import { engineOf, s6MapOf } from '../packages/silinx-fpga/src/parts.js';
 import { loadConfig, detectIse, iseStatus, iseModeOf, which } from './toolchain.js';
 import { generateBuild, partStrings, collectReports, runLocal, runDocker, runSsh, normalizeSteps, STEPS, SIM_MODELS } from './ise.js';
@@ -283,10 +284,7 @@ export function deviceReportScript() {
 # toolchain's description of the device. Usage: ./run.sh <part>   (e.g. xc3s500efg320-4)
 cd "$(dirname "$0")" || exit 1
 PART="$1"
-if ! command -v xdl >/dev/null 2>&1; then
-  ISE_SETTINGS="\${ISE_SETTINGS:-/opt/Xilinx/14.7/ISE_DS/settings64.sh}"
-  if [ -f "$ISE_SETTINGS" ]; then set --; . "$ISE_SETTINGS" >/dev/null 2>&1; fi
-fi
+${sourceSettingsSh('xdl', '/opt/Xilinx/14.7/ISE_DS/settings64.sh')}
 if ! command -v xdl >/dev/null 2>&1; then
   echo "ERROR: Xilinx ISE tools (xdl) not found. Put ISE 14.7 on PATH or set ISE_SETTINGS to settings64.sh." >&2
   exit 127

@@ -52,7 +52,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   mode: 'silinx',                               // the Silinx toolchain: no ISE to install for the supported boards (#27)
   local: { settings: '' },                      // '' = auto-detect
   docker: { command: 'docker', image: '', platform: 'linux/amd64', settings: DEFAULT_SETTINGS, extraArgs: [], memory: '' },   // memory: docker run --memory (8g; '' = no limit, #1435)
-  ssh: { host: '', user: '', port: 22, identity: '', remoteDir: 'silinx-build', settings: DEFAULT_SETTINGS, image: '', sshArgs: [] },   // image: docker image on the host ('' = ISE installed there)
+  ssh: { host: '', user: '', port: 22, identity: '', remoteDir: 'silinx-build', settings: DEFAULT_SETTINGS, image: '', sshArgs: [], earlierDirs: [] },   // image: docker image on the host ('' = ISE installed there); earlierDirs: remoteDir's earlier values (#3407)
   open: { iseMode: 'docker' },                  // Silinx toolchain mode: the ISE that builds device descriptions (developers) (local|docker|ssh)
   vivado: { mode: 'docker', image: '', settings: '' },   // AMD Vivado (7-series): its mode (local|docker|ssh), image, settings64.sh ('' = found)
   programmer: { tool: '', cable: '' },          // global defaults (board defaults take precedence when empty)
@@ -97,7 +97,9 @@ export async function loadConfig() {
 
 /** The settings that name a program to run or its arguments: set in config.json (or with the
  *  command line) only, never through the API (Toolchain Settings does not show them). */
-export const FILE_ONLY = ['docker.command', 'docker.extraArgs', 'ssh.sshArgs', 'ssh.identity', 'paths', 'relay', 'mcp'];
+export const FILE_ONLY = ['docker.command', 'docker.extraArgs', 'ssh.sshArgs', 'ssh.identity', 'ssh.earlierDirs', 'paths', 'relay', 'mcp'];
+// the earlier build folders on the ssh host remembered (their files came from projects and stay there, #3407)
+const EARLIER_DIRS = 100;
 
 /** The GitHub repositories the MCP server may make a project's remote (#3363; config.json only): ["owner/repo",
  *  "owner/*"], in lower case. */
@@ -156,11 +158,22 @@ function checkRemoteSettings(cfg) {
   const d = cfg.docker.settings ? path.posix.normalize(String(cfg.docker.settings)) : '';
   if (d && (!d.startsWith('/') || d === '/work' || d.startsWith('/work/'))) throw bad('docker.settings must be an absolute path outside /work (the build folder)');
   const s = cfg.ssh.settings ? path.posix.normalize(String(cfg.ssh.settings)).toLowerCase() : '';
-  const base = path.posix.normalize(String(cfg.ssh.remoteDir || 'silinx-build').replace(/^~\/?/, '') || 'silinx-build').replace(/\/$/, '').toLowerCase();
+  const base = buildBase(cfg.ssh.remoteDir);
   if (base === '.' || base === '/') throw bad('ssh.remoteDir must name a folder of its own for the builds');
-  if (s && (!s.startsWith('/') || (base.startsWith('/') ? s.startsWith(base + '/') : s.includes(`/${base}/`))))
+  if (s && (!s.startsWith('/') || inBuildBase(s, base)))
     throw bad('ssh.settings must be an absolute path outside ssh.remoteDir (the build folder)');
+  // nor in a build folder used before: the files a run uploaded stay there when ssh.remoteDir changes (#3407)
+  const earlier = s && earlierDirs(cfg).find(d => inBuildBase(s, buildBase(d)));
+  if (earlier) throw bad(`ssh.settings must be a path outside the earlier build folder ${earlier} (its files came from projects)`);
 }
+
+/** A build folder on the ssh host as the checks compare it: normalized, no '~/', lower case. */
+const buildBase = dir => path.posix.normalize(String(dir || 'silinx-build').replace(/^~\/?/, '') || 'silinx-build').replace(/\/$/, '').toLowerCase();
+/** A normalized, lower-case absolute path inside a build folder (an absolute one; a relative one: in the remote home). */
+const inBuildBase = (p, base) => (base.startsWith('/') ? p.startsWith(base + '/') : p.includes(`/${base}/`));
+/** The build folders used before on the ssh host: ssh.earlierDirs, and the default one. */
+const earlierDirs = cfg => [...new Set([...(Array.isArray(cfg.ssh.earlierDirs) ? cfg.ssh.earlierDirs : []), 'silinx-build'].map(String))]
+  .filter(d => buildBase(d) !== buildBase(cfg.ssh.remoteDir) && !['.', '/'].includes(buildBase(d)));
 
 /** Vivado's settings in its image or on the ssh host: an absolute plain path, outside the build folder (/work, ssh.remoteDir). */
 function checkVivadoRemoteSettings(cfg) {
@@ -168,8 +181,9 @@ function checkVivadoRemoteSettings(cfg) {
   if (v.split('/').some(p => p === '.' || p === '..') || /^\/+(proc|dev|sys)(\/|$)/i.test(v)) throw bad('vivado.settings must be a plain path: no . or .. in it, not under /proc, /dev or /sys');
   const n = path.posix.normalize(v);
   if (!n.startsWith('/') || n === '/work' || n.startsWith('/work/')) throw bad('vivado.settings must be an absolute path outside /work (the build folder)');
-  const base = path.posix.normalize(String(cfg.ssh.remoteDir || 'silinx-build').replace(/^~\/?/, '') || 'silinx-build').replace(/\/$/, '').toLowerCase();
-  if (base.startsWith('/') ? n.toLowerCase().startsWith(base + '/') : n.toLowerCase().includes(`/${base}/`)) throw bad('vivado.settings must be a path outside ssh.remoteDir (the build folder)');
+  if (inBuildBase(n.toLowerCase(), buildBase(cfg.ssh.remoteDir))) throw bad('vivado.settings must be a path outside ssh.remoteDir (the build folder)');
+  const earlier = earlierDirs(cfg).find(d => inBuildBase(n.toLowerCase(), buildBase(d)));
+  if (earlier) throw bad(`vivado.settings must be a path outside the earlier build folder ${earlier} (its files came from projects)`);
 }
 
 /** ssh.remoteDir set through the API: a folder inside the remote home (every run removes and remakes
@@ -202,6 +216,12 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
     if (vs && !/(^|\/)settings64\.sh$/.test(String(vs))) throw bad("vivado.settings must be Vivado's settings64.sh");
   }
   const cfg = modeAlias(merge(current, partial));
+  // a build folder left: remembered, its files are no settings script's (#3407); the API forgets none of them
+  if (buildBase(cfg.ssh.remoteDir) !== buildBase(current.ssh.remoteDir)) {
+    const dirs = [...new Set([...(Array.isArray(current.ssh.earlierDirs) ? current.ssh.earlierDirs : []), String(current.ssh.remoteDir || 'silinx-build')])];
+    if (fromApi && dirs.length > EARLIER_DIRS) throw Object.assign(new Error(`ssh.remoteDir: ${EARLIER_DIRS} build folders used already; another can only be set in ${configPath()}`), { status: 403 });
+    cfg.ssh.earlierDirs = dirs.slice(-EARLIER_DIRS);
+  }
   // the settings scripts run as the user who started the server: through the API (any process of
   // this computer may call it) only one that the project's files cannot be; a changed value only
   if (fromApi) {
@@ -230,6 +250,10 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
   for (const k of ['extraArgs']) if (!Array.isArray(cfg.docker[k])) throw Object.assign(new Error(`docker.${k} must be an array of strings`), { status: 400 });
   if (!Array.isArray(cfg.ssh.sshArgs)) throw Object.assign(new Error('ssh.sshArgs must be an array of strings'), { status: 400 });
   if (cfg.ssh.host && !/^[A-Za-z0-9._@:\-[\]]+$/.test(cfg.ssh.host)) throw Object.assign(new Error('ssh.host contains invalid characters'), { status: 400 });
+  if (cfg.ssh.host && String(cfg.ssh.host).startsWith('-')) throw bad('ssh.host cannot start with - (an option of ssh)');
+  if (!/^\d{1,5}$/.test(String(cfg.ssh.port)) || !(+cfg.ssh.port >= 1 && +cfg.ssh.port <= 65535)) throw bad('ssh.port must be a whole number from 1 to 65535');
+  cfg.ssh.port = +cfg.ssh.port;
+  if (!Array.isArray(cfg.ssh.earlierDirs)) throw bad('ssh.earlierDirs must be an array of strings');
   if (cfg.ssh.image && !IMAGE.test(cfg.ssh.image)) throw Object.assign(new Error('ssh.image contains invalid characters'), { status: 400 });
   if (cfg.ssh.user && !/^[A-Za-z0-9._-]+$/.test(cfg.ssh.user)) throw Object.assign(new Error('ssh.user contains invalid characters'), { status: 400 });
   // only the user may read it (the ssh host and user, the identity file's path): the folder too, one that exists (#3410)

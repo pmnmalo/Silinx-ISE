@@ -58,7 +58,10 @@ read that user's files has the server too.
   device, a board, a position, the bitstream: `server/programmer-values.js`, no value that starts with `-`); so whoever
   holds the token can send a project's build to an ssh machine of its choosing, the token being the server (Scope).
   An ISE settings script and a Docker image the page chooses are checked: the script is a file outside the projects
-  and the build folders, writable only by its owner (root or the user), and Docker never pulls an image Silinx runs. The ISE
+  and the build folders (on the ssh machine, every build folder used before too: `ssh.earlierDirs`, which the page cannot
+  change; no file named as a settings script is ever copied into a build folder, #3407), writable only by its owner
+  (root or the user), and Docker never pulls an image Silinx runs. The ssh port is a port number and the host no option of
+  ssh. The ISE
   container runs with no network, no capability, no way to gain privileges and a bound on its processes
   (`--network none --cap-drop ALL --security-opt no-new-privileges --pids-limit`), and a memory limit
   when the configuration sets one (`docker.memory`).
