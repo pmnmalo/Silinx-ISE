@@ -65,7 +65,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
   # the open synthesis with each Yosys: the examples through the open flow (packages/silinx-fpga/research/s3e-route/open-flow.mjs
   # --quality), the subset of the design corpus through test/designs-corpus/run.mjs (frontend, synth, flow;
-  # its comparison with expected.json is not this job's verdict: the report compares the two sides)
+  # its comparison with expected.json is not this job's verdict: the report compares the two sides). A side per job: what it
+  # compares (the size, the critical path by Silinx's STA) is the same on any runner; a run time would not be (#3030: both
+  # sides in one job, alternated and repeated, as nextpnr-update.yml measures them)
   measure:
     needs: check
     if: needs.check.outputs.changed == 'true'

@@ -5,7 +5,9 @@ name: nextpnr update
 # through the application's flow (nextpnr packs, places and routes) on the Basys2-250, the Nexys3 and the Atlys (slices,
 # LUTs, flip-flops, the minimum period by Silinx's STA, the run time) with the pull request's packages and with the base
 # branch's (the same code, this pull request's: only the nextpnr packages differ, the base's installed over them): one
-# table of the differences (scripts/nextpnr-update-report.mjs).
+# table of the differences (scripts/nextpnr-update-report.mjs). Both sides of a board are measured in one job, on one
+# runner, alternated and repeated (#3030: a side per job, the runners alone moved the run times by 20-39 %); a board whose
+# package does not change is not measured.
 #
 # The table goes to the job summary and to the artifact nextpnr-update-report always, and to a comment on the pull request
 # (one, updated by later runs) when the token may comment (a Dependabot pull request's can be read-only; no
@@ -35,6 +37,7 @@ jobs:
       changed: ${{ steps.v.outputs.changed }}
       base: ${{ steps.v.outputs.base }}
       summary: ${{ steps.v.outputs.summary }}
+      boards: ${{ steps.v.outputs.boards }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,16 +61,19 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-  # the examples with each side's packages, a job per board (scripts/nextpnr-update-report.mjs BOARDS)
+  # the examples with both sides' packages, a job per board whose package changes and per shard of its examples
+  # (scripts/nextpnr-update-report.mjs BOARDS, SHARDS): both sides on the same runner (#3030), the pull request's checkout
+  # (its packages) and a copy of it with the base's packages installed over them, measured alternately (base, head, head,
+  # base, base, head): three runs of each side, or the pairs that fit the job's time
   measure:
     needs: check
     if: needs.check.outputs.changed == 'true'
-    name: measure (${{ matrix.side }}, ${{ matrix.board }})
+    name: measure (${{ matrix.board }}, ${{ matrix.shard }}/2)
     strategy:
       fail-fast: false
       matrix:
-        side: [base, head]
-        board: [basys2-250, nexys3, atlys]
+        board: ${{ fromJSON(needs.check.outputs.boards || '["basys2-250", "nexys3", "atlys"]') }}
+        shard: [1, 2]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -78,34 +84,48 @@ jobs:
       # a package and a version, or a release of the fork, and nothing else, before it reaches npm install: the check
       # job's output, this file's own check (#1440)
       - name: The base's packages checked
-        if: matrix.side == 'base'
         env:
           BASE_INSTALL: ${{ needs.check.outputs.base }}
         run: |
           for s in $BASE_INSTALL; do
             [[ "$s" =~ ^@silinx/nextpnr-himbaechel-spartan(3e|6)@([0-9]+\.[0-9]+\.[0-9]+|https://github\.com/pmnmalo/nextpnr-spartan/releases/download/[a-z0-9]+-v[0-9]+\.[0-9]+\.[0-9]+/[A-Za-z0-9._-]+\.tgz)$ ]] || { echo "::error::not a nextpnr package's version: $s"; exit 1; }
           done
+      # the base's side: the same checkout and dependencies, copied
+      - name: The base's side
+        run: cp -a . "$RUNNER_TEMP/base"
       # into the toolchain's workspace and the root both (#3156): installed at the root only, npm kept the pull request's
       # package nested in packages/silinx-fpga/node_modules, which the toolchain resolves first
       - name: The base's nextpnr
-        if: matrix.side == 'base'
+        working-directory: ${{ runner.temp }}/base
         env:
           BASE_INSTALL: ${{ needs.check.outputs.base }}
         run: |
           [ -z "$BASE_INSTALL" ] || npm install --no-save --ignore-scripts --workspace silinx-fpga --include-workspace-root $BASE_INSTALL
-      # the versions the toolchain loads (from packages/silinx-fpga and from the root), the side's or the job fails
+      # the versions the toolchain loads (from packages/silinx-fpga and from the root), each side's or the job fails
       - name: The nextpnr packages resolved
         env:
-          BASE_INSTALL: ${{ matrix.side == 'base' && needs.check.outputs.base || '' }}
-        run: node scripts/resolved-package.mjs packages/silinx-fpga @silinx/nextpnr-himbaechel-spartan3e @silinx/nextpnr-himbaechel-spartan6 $BASE_INSTALL
-      - name: The examples
+          BASE_INSTALL: ${{ needs.check.outputs.base }}
+        run: |
+          node scripts/resolved-package.mjs packages/silinx-fpga @silinx/nextpnr-himbaechel-spartan3e @silinx/nextpnr-himbaechel-spartan6
+          cd "$RUNNER_TEMP/base" && node scripts/resolved-package.mjs packages/silinx-fpga @silinx/nextpnr-himbaechel-spartan3e @silinx/nextpnr-himbaechel-spartan6 $BASE_INSTALL
+      # out/<side>/r<run>/<board>/<example>.json; a pair of runs started within the job's first 35 minutes only
+      - name: The examples, both sides alternately
         env:
           BOARD: ${{ matrix.board }}
-        run: node scripts/nextpnr-update-report.mjs measure "$BOARD" out
+          SHARD: ${{ matrix.shard }}
+        run: |
+          for run in 1 2 3; do
+            if (( run > 1 && SECONDS > 2100 )); then echo "::notice::$BOARD $SHARD/2: $((run - 1)) run(s) of each side (the job's time)"; break; fi
+            if (( run % 2 )); then order="base head"; else order="head base"; fi
+            for side in $order; do
+              dir="$GITHUB_WORKSPACE"; [ "$side" = base ] && dir="$RUNNER_TEMP/base"
+              (cd "$dir" && node scripts/nextpnr-update-report.mjs measure "$BOARD" "$GITHUB_WORKSPACE/out/$side/r$run" --shard "$SHARD/2")
+            done
+          done
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nextpnr-${{ matrix.side }}-${{ matrix.board }}
+          name: nextpnr-measure-${{ matrix.board }}-${{ matrix.shard }}
           path: out
   report:
     needs: [check, measure]
@@ -131,10 +151,11 @@ jobs:
       - name: The table of the differences
         env:
           SUMMARY: ${{ needs.check.outputs.summary }}
+          BOARDS: ${{ needs.check.outputs.boards }}
         run: |
           mkdir -p results/base results/head
-          for d in results/nextpnr-base-*/ results/nextpnr-head-*/; do [ -d "$d" ] || continue; side=$(basename "$d" | cut -d- -f2); cp -r "$d"* "results/$side/"; done
-          node base/scripts/nextpnr-update-report.mjs report --base results/base --head results/head --summary "$SUMMARY" --out nextpnr-update.md
+          for d in results/nextpnr-measure-*/; do for side in base head; do [ ! -d "$d$side" ] || cp -r "$d$side/." "results/$side/"; done; done
+          node base/scripts/nextpnr-update-report.mjs report --base results/base --head results/head --summary "$SUMMARY" --boards "$BOARDS" --out nextpnr-update.md
           cat nextpnr-update.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
