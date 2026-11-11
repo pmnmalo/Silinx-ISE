@@ -36,14 +36,14 @@ import {
 } from './schdoc-from-hdl.js';
 import {
   FF_INPUTS, MUX_INPUTS, PORT_SIDES, ROT_OK, SIDE_V, SYMBOLS, SYMBOL_CATEGORIES, arithIo, attrParam, defaultParams,
-  ffVariant, findMod, freePortName, gateVariant, int, normModules, oppositeSide, portBox, portSide, rotSize, symbolBox,
+  ffVariant, findMod, freePortName, gateVariant, int, normModules, oppositeSide, pinList, portBox, portSide, rotSize, symbolBox,
   symbolDef, symbolParams, symbolPins, symbolTypeName, turnSide, xform, xformSide
 } from './schdoc-symbols.js';
 import { clone, lineStarts } from './util.js';
 export { lineStarts };   // (core/util.js's)
 export {
   FF_INPUTS, MUX_INPUTS, PORT_SIDES, SIDE_V, SYMBOLS, SYMBOL_CATEGORIES, arithIo, attrParam, defaultParams, ffVariant,
-  findMod, freePortName, gateVariant, int, normModules, oppositeSide, portBox, portSide, rotSize, symbolBox, symbolDef,
+  findMod, freePortName, gateVariant, int, normModules, oppositeSide, pinList, portBox, portSide, rotSize, symbolBox, symbolDef,
   symbolParams, symbolPins, symbolTypeName, turnSide, xform, xformSide
 };
 export { BUF_OLD_W, COMPARE_OPS, COMPARE_SYM, compareOps, comparePin, constWidth, JOIN_BAR, JOIN_OLD_W, JOIN_W, MUX_BODY_W, MUX_OLD_BODY_W, MUX_SEL_X } from './schdoc-symbols.js';
@@ -82,6 +82,7 @@ export function newDoc(name = 'schematic', lang = 'vhdl') {
 
 // (modules: the project's modules, the pins of its module symbols, to convert a document of version 2;
 // without them, a document with module symbols stays at version 2, converted when they are known)
+const PIN_LISTS = { module: ['ports'], hdlblock: ['inputs', 'outputs'] };
 export function normalizeDoc(d, { modules } = {}) {
   const doc = d && typeof d === 'object' ? clone(d) : newDoc();
   const before301 = !(+doc.version >= 2);
@@ -108,6 +109,13 @@ export function normalizeDoc(d, { modules } = {}) {
     if ((o.type === 'vcc' || o.type === 'gnd') && !('width' in (s.params || {}))) delete o.params.width;
     // an ENCODER saved without its Type, from before priority was the default (#1553): one-hot, as it was
     if (o.type === 'encoder' && !('mode' in (s.params || {}))) o.params.mode = 'one-hot';
+    // (a module's ports, an HDL block's inputs and outputs not a list of pins: none, #3419; a module then takes its
+    // module's, below)
+    for (const k of PIN_LISTS[o.type] || []) {
+      if (!(k in o.params)) continue;
+      const l = pinList(o.params[k]);
+      if (l) o.params[k] = l; else if (o.type === 'module') delete o.params[k]; else o.params[k] = [];
+    }
     if (s.hdl != null) o.hdl = String(s.hdl);
     uid(o, 'S'); return o;
   });

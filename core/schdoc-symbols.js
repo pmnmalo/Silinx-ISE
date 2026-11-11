@@ -252,6 +252,10 @@ export function symbolParams(sym) {
 
 export const SYMBOL_CATEGORIES = ['Logic', 'Buffers', 'Arithmetic', 'Flip-Flops', 'Mux', 'Decoders/Encoders', 'Bus', 'General', 'Device Primitives', 'Project modules'];
 
+// a module's ports, an HDL block's inputs and outputs: a list of pins, each an object; anything else (a string, an
+// object, null in the list) is read as no pin, so a hand-made schematic opens (#3419)
+export const pinList = v => (Array.isArray(v) ? v.filter(q => q && typeof q === 'object' && !Array.isArray(q)) : null);
+
 export function defaultParams(type) {
   const s = SYMBOLS[type];
   const p = {};
@@ -503,8 +507,9 @@ export function symbolDef(sym, modules = {}) {
     const m = findMod(modules, p.module);
     // (its pins the ports it was placed with, not its module's as they are now: a change of the module moves no pin
     // under its wires, #1183, core/schdoc-modsym.js; their widths the module's, unless its generics are overridden)
-    let ports = Array.isArray(p.ports) ? p.ports : m ? m.ports : [];
-    const snapW = new Map((p.ports || []).map(q => [String(q.name).toLowerCase(), q.width]));
+    const own = pinList(p.ports);
+    let ports = own || (m ? m.ports : []);
+    const snapW = new Map((own || []).map(q => [String(q.name).toLowerCase(), q.width]));
     const theirs = new Map((m?.ports || []).map(q => [String(q.name).toLowerCase(), q]));
     const overridden = p.generics && Object.keys(p.generics).length > 0;
     ports = ports.map(q => {
@@ -512,7 +517,7 @@ export function symbolDef(sym, modules = {}) {
       return { name: q.name, dir: q.dir || 'in', width: (overridden && snapW.has(k)) ? snapW.get(k) : ((t ? t.width : q.width) ?? 1), type: t ? t.type : q.type };
     });
     const d = boxDef(ports.filter(q => q.dir !== 'out'), ports.filter(q => q.dir === 'out'), p.module, 80);
-    return { ...d, shape: 'module', title: p.module || '?', missing: !m && !p.ports };
+    return { ...d, shape: 'module', title: p.module || '?', missing: !m && !own };
   }
   if (S?.prim) {
     // (a box: the inputs on the left, the outputs on the right, in the order of UNISIM's ports; the name of the
@@ -523,8 +528,8 @@ export function symbolDef(sym, modules = {}) {
     return { ...d, shape: 'lib', title: r.name, prim: r.name };
   }
   if (t === 'hdlblock') {
-    const ins = (p.inputs || []).map(q => ({ name: q.name, dir: q.dir === 'inout' ? 'inout' : 'in', width: Math.max(1, int(q.width, 1)), clock: !!q.clock }));
-    const outs = (p.outputs || []).map(q => ({ name: q.name, dir: 'out', width: Math.max(1, int(q.width, 1)), reg: !!q.reg }));
+    const ins = (pinList(p.inputs) || []).map(q => ({ name: q.name, dir: q.dir === 'inout' ? 'inout' : 'in', width: Math.max(1, int(q.width, 1)), clock: !!q.clock }));
+    const outs = (pinList(p.outputs) || []).map(q => ({ name: q.name, dir: 'out', width: Math.max(1, int(q.width, 1)), reg: !!q.reg }));
     const d = boxDef(ins, outs, p.title, 100);
     return { ...d, shape: 'hdl', title: p.title || 'HDL' };
   }
