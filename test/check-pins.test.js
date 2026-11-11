@@ -34,14 +34,15 @@ test('check-pins: every pin of the repository (Yosys\'s test designs, each corpu
   const mcc = pins.find(p => p.kind === 'mcc');
   assert.equal(mcc.year, 2026);
   assert.ok(mcc.models.length >= 2);
-  // the Spartan-6 nextpnr, pinned by its release's URL in both package.json files (#2934)
+  // no package pinned by a release's URL: the Spartan-6 nextpnr's was (#2934), on npm since #3357 by its exact version
+  // in both package.json files, as the Spartan-3E's (Dependabot's)
   const releases = pins.filter(p => p.kind === 'release');
-  const s6 = releases.find(p => p.name === '@silinx/nextpnr-himbaechel-spartan6');
-  assert.deepEqual([s6.repo, s6.prefix, s6.files], ['pmnmalo/nextpnr-spartan', 'spartan6-v', ['package.json', 'packages/silinx-fpga/package.json']]);
-  assert.equal(s6.tag, `spartan6-v${s6.version}`);
-  assert.ok(pkg.dependencies['@silinx/nextpnr-himbaechel-spartan6'].includes(`/${s6.tag}/`));
-  // (the Spartan-3E's is on npm: Dependabot's)
-  assert.ok(!releases.some(p => p.name === '@silinx/nextpnr-himbaechel-spartan3e'));
+  assert.deepEqual(releases, []);
+  const fpga = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/silinx-fpga/package.json'), 'utf8'));
+  for (const d of [pkg.dependencies, fpga.dependencies]) {
+    for (const n of ['@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6']) assert.match(d[n], /^\d+\.\d+\.\d+$/, n);
+  }
+  assert.equal(pkg.dependencies['@silinx/nextpnr-himbaechel-spartan6'], fpga.dependencies['@silinx/nextpnr-himbaechel-spartan6']);
   assert.equal(pins.length, 2 + commits.length + releases.length);
 });
 

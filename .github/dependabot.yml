@@ -8,11 +8,10 @@
 #   - Docker: the Vitis HLS image's base (scripts/vitis-hls-image/Dockerfile), pinned by its digest (#2645), which
 #     Dependabot updates with the digest within Ubuntu 22.04 (the release Vivado supports); the ISE image's
 #     Ubuntu 14.04 (docker/ise/) has no new digest to come (end of life), and is left out
-# @silinx/nextpnr-himbaechel-spartan3e (nextpnr, #2136) is pinned by its version on npm (#2307), which Dependabot updates,
-# never grouped: a pull request of its own, which .github/workflows/nextpnr-update.yml labels "nextpnr update" and
-# measures (the examples with the new nextpnr against the base's), never merged on green alone (#2935); -spartan6 (#2138)
-# is still pinned by its release's URL (pmnmalo/nextpnr-spartan), which Dependabot does not update: the monthly Pins
-# check lists a newer release (#2934), pinned by hand in a pull request the same workflow measures.
+# @silinx/nextpnr-himbaechel-spartan3e (nextpnr, #2136) and -spartan6 (#2138) are pinned by their version on npm (#2307;
+# the Spartan-6's since #3357, before by its release's URL), which Dependabot updates, never grouped: a pull request of
+# its own, which .github/workflows/nextpnr-update.yml labels "nextpnr update" and measures (the examples with the new
+# nextpnr against the base's), never merged on green alone (#2935).
 # Sources pinned outside npm (Yosys's test designs, the design corpus, the MCC models): the monthly
 # .github/workflows/pins.yml (scripts/check-pins.mjs).
 # elkjs is no longer ignored (0.9 to 0.12 in #351): a 0.x minor update may change the schematic layout;
