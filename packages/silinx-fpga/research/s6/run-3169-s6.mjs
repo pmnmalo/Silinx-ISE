@@ -23,7 +23,7 @@ const sshArgs = [];
 if (s.identity) sshArgs.push('-i', s.identity.replace(/^~/, os.homedir()));
 if (s.port) sshArgs.push('-p', String(s.port));
 const [gen, out] = KINDS[kind];
-const env = { ...process.env, SILINX_ISE_HOST: s.user ? `${s.user}@${s.host}` : s.host, SILINX_ISE_SSH_ARGS: sshArgs.join(' '),
+const env = { ...process.env, SILINX_ISE_HOST: s.user ? `${s.user}@${s.host}` : s.host, ISE_SSH_ARGS: sshArgs.join(' '),
   IMAGE: s.image || 'xilinx/ise:14.7', GEN: gen, OUT: out };
 const late = () => { const h = new Date().getHours(); return !anyTime && h >= 7 && h < 20; };
 

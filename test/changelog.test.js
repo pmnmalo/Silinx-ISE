@@ -89,6 +89,9 @@ test('buildChanges: the fragments as changes, newest issue first, typed by label
   assert.equal(buildChanges(files.slice(0, 1), { 12: ['enhancement', 'bug'] })[0].type, 'bugfix');
   assert.equal(changeTitle('- plain text, no bold\n  more'), 'plain text, no bold');
   assert.equal(changeTitle('- **Title (#5, #6, Refs #7):** x'), 'Title');
+  // the issue named with a word, as some fragments do: "(Fixes #N)", "(part of #N)", "(Refs #N)" (#3462)
+  for (const ref of ['Fixes #3358', 'part of #3181', 'Part of #2830, #2831', 'Refs #7']) assert.equal(changeTitle(`- **A title (${ref}):** x`), 'A title', ref);
+  assert.equal(changeTitle('- **A title (the old one, #12):** x'), 'A title (the old one, #12)', 'text before the number: kept');
   // #3090 a bold title wrapped onto the next line: one title, its lines joined, no ** left
   assert.equal(changeTitle('- **A long title wrapped onto\n  a second line (#3090):** the text\n  more'), 'A long title wrapped onto a second line');
   assert.equal(changeTitle('- An item with **bold** words, no label\n  more'), 'An item with bold words, no label');
