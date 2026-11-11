@@ -38,7 +38,7 @@ uiTest('#3183 a truth table edited live by the owner and an editor: two cells of
     await ep.fill('.dlg-overlay input[data-field=name]', 'Rui');
     await ep.dialogButton('Follow');
     await ep.waitFor(() => window.Silinx?.project?.name === 'LiveTt' && window.Silinx.startupChecked, [], { what: 'the project open', timeout: 30000 });
-    await ep.waitConsole(/^Editing Ana's project "LiveTt" with them: its text files, state diagrams, truth tables and ASM charts change as you all edit them, its other drawings stay theirs, read only \(Following Ana, in the toolbar\)\.$/m);
+    await ep.waitConsole(/^Editing Ana's project "LiveTt" with them: its text files, state diagrams, truth tables, ASM charts and Petri nets change as you all edit them, its other drawings stay theirs, read only \(Following Ana, in the toolbar\)\.$/m);
     await page.waitConsole(/^Rui edits your project "LiveTt" with you\.$/m);
     // the owner's table followed, editable here: no read-only notice
     await ep.waitFor((p) => window.Silinx.active?.path === p && !!window.Silinx.active.ttEditor, [TT], { what: 'the owner\'s table followed' });
@@ -72,7 +72,7 @@ uiTest('#3183 a truth table edited live by the owner and an editor: two cells of
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
     const dlg = page.eval(async () => { await (await import('/js/collab-share.js')).shareProjectDialog(); }).catch(() => {});
     await page.waitDialog('Partilhar Projeto');
-    assert.ok((await page.eval(() => document.querySelector('.dlg-overlay').textContent)).includes('Quem tiver a ligação de editores edita os ficheiros de texto, os diagramas de estados, as tabelas de verdade e os fluxogramas ASM consigo, em direto; os outros desenhos continuam seus.'));
+    assert.ok((await page.eval(() => document.querySelector('.dlg-overlay').textContent)).includes('Quem tiver a ligação de editores edita os ficheiros de texto, os diagramas de estados, as tabelas de verdade, os fluxogramas ASM e as redes de Petri consigo, em direto; os outros desenhos continuam seus.'));
     await page.dialogButton('Fechar');
     await dlg;
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
