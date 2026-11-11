@@ -88,6 +88,7 @@ class Parser {
     this.strMode = 0;                // >0 while parsing report/assert messages
     this.region = null;              // the declarative region being read: { names, labels } (#192)
     this.entities = new Map();       // the entities of this file
+    this.nesting = 0;                // how deep the expression being read nests (#3395)
   }
 
   // --- token helpers ---------------------------------------------------------

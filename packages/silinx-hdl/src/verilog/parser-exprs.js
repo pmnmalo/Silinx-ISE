@@ -2,21 +2,32 @@
 // unary ones, primaries (literals, names, concatenations, calls, the conditional operator) and their postfixes.
 import { BIN_PREC, SYS_NOARG, Sync, UNARY } from './parser-defs.js';
 import { basedToBits } from './lexer.js';
+import { MAX_NESTING, NESTING_MESSAGE } from '../util.js';
 
 /** Parser's methods of this part, assigned to its prototype by parser.js. */
 export const exprMethods = {
   // ---------------- expressions ----------------
-  // (a chain c0 ? a0 : c1 ? a1 : …, nesting in its else as deep as it is long: read in a loop, #3375)
+  // (a chain c0 ? a0 : c1 ? a1 : …, nesting in its else as deep as it is long: read in a loop, #3375; an expression
+  // in another, in parentheses, a call, an index or a then branch, one level deeper: at most MAX_NESTING, #3395)
   expr() {
-    const conds = [];
-    let e = this.binary(0);
-    while (this.accept('?')) {
-      const a = this.expr(); this.expect(':');
-      conds.push([e, a]);
-      e = this.binary(0);
-    }
-    for (let i = conds.length - 1; i >= 0; i--) e = { op: 'cond', cond: conds[i][0], then: conds[i][1], else: e };
-    return e;
+    try {
+      this.deeper(1);
+      const conds = [];
+      let e = this.binary(0);
+      while (this.accept('?')) {
+        const a = this.expr(); this.expect(':');
+        conds.push([e, a]);
+        e = this.binary(0);
+      }
+      for (let i = conds.length - 1; i >= 0; i--) e = { op: 'cond', cond: conds[i][0], then: conds[i][1], else: e };
+      return e;
+    } finally { this.nesting--; }
+  },
+
+  // n levels deeper (its caller leaves them): an error past MAX_NESTING (#3395)
+  deeper(n) {
+    this.nesting += n;
+    if (this.nesting > MAX_NESTING) { this.error(NESTING_MESSAGE); throw new Sync(); }
   },
 
   binary(level) {
@@ -25,21 +36,30 @@ export const exprMethods = {
     const ops = BIN_PREC[level];
     while (this.tok.t === 'op' && ops.includes(this.tok.v)) {
       const o = this.next().v;
-      const right = o === '**' ? this.binary(level) : this.binary(level + 1);
+      let right;
+      if (o === '**') try { this.deeper(1); right = this.binary(level); } finally { this.nesting--; }
+      else right = this.binary(level + 1);
       left = { op: 'binary', o, a: left, b: right };
     }
     return left;
   },
 
+  // (a run of unary operators read in a loop, each one a level deeper, #3395)
   unary() {
-    if (this.tok.t === 'op' && UNARY.has(this.tok.v)) {
-      const o = this.next().v;
-      const a = this.unary();
-      if (o === '+') return a;
-      if (o === '-' && (a.op === 'int')) return { op: 'int', value: a.value.startsWith('-') ? a.value.slice(1) : '-' + a.value };
-      return { op: 'unary', o, a };
-    }
-    return this.primary();
+    const ops = [];
+    while (this.tok.t === 'op' && UNARY.has(this.tok.v)) ops.push(this.next().v);
+    if (!ops.length) return this.primary();
+    try {
+      this.deeper(ops.length);
+      let a = this.primary();
+      for (let i = ops.length - 1; i >= 0; i--) {
+        const o = ops[i];
+        if (o === '+') continue;
+        if (o === '-' && (a.op === 'int')) a = { op: 'int', value: a.value.startsWith('-') ? a.value.slice(1) : '-' + a.value };
+        else a = { op: 'unary', o, a };
+      }
+      return a;
+    } finally { this.nesting -= ops.length; }
   },
 
   primary() {

@@ -25,6 +25,7 @@ class Parser {
     this.genScopes = [];          // generate scopes: the count of their generate constructs
     this.blockDepth = 0;          // inside generate blocks (their declarations are their own)
     this.portNames = new Map();
+    this.nesting = 0;             // how deep the expression being read nests (#3395)
   }
   isWord(v, t = this.tok) { return t.t === 'id' && t.v === v; }
   // does a declaration start here with a data type (not an instance of a module: `bit u1 (…)`)

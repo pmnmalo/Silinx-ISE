@@ -159,12 +159,12 @@ function replH(cx, e) {
 function unaryH(cx, e) {
   const a = exprH(cx, e.a);
   switch (e.o) {
-    case '!': return { c: `not ${wrap(toBool(a), P.misc)}`, p: P.misc, t: 'bool' };
+    case '!': return { c: `not ${wrap(toBool(a), P.misc + 1)}`, p: P.misc, t: 'bool' };
     case '~':
-      if (a.t === 'bool') return { c: `not ${wrap(a, P.misc)}`, p: P.misc, t: 'bool' };
+      if (a.t === 'bool') return { c: `not ${wrap(a, P.misc + 1)}`, p: P.misc, t: 'bool' };
       if (a.t === 'lit') return atom(bitString(a.bits.replace(/[01]/g, b => (b === '1' ? '0' : '1'))), 'lit', { bits: a.bits.replace(/[01]/g, b => (b === '1' ? '0' : '1')), w: a.w });
       if (a.t === 'int') return cannot('~ of an integer', e);
-      return { c: `not ${wrap(a, P.misc)}`, p: P.misc, t: a.t, w: a.w };
+      return { c: `not ${wrap(a, P.misc + 1)}`, p: P.misc, t: a.t, w: a.w };
     case '-': { const n = toNum(a); return n.t === 'int' ? { c: `-${wrap(n, P.sign + 1)}`, p: P.sign, t: 'int', v: n.v != null ? -n.v : undefined } : { c: `0 - ${wrap(n, P.add + 1)}`, p: P.add, t: n.t, w: n.w }; }
     case '+': return a;
     case '|': case '~|': { const n = toNum(a); return { c: `${wrap(n, P.rel + 1)} ${e.o === '|' ? '/=' : '='} 0`, p: P.rel, t: 'bool' }; }

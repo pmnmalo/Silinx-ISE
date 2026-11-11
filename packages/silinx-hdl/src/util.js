@@ -20,3 +20,9 @@ export function tokenText(toks, tok) {
 }
 /** v as a decimal integer, else d (a symbol's parameter). */
 export const intOr = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
+
+// The deepest an expression nests (#3395): parentheses, calls, indexes, concatenations, unary operators, a ?: in a
+// then branch. The parsers refuse a deeper one: the passes after them (the binder, the simulator, the design checks,
+// the synthesis input, the translations) recurse once per level. 256, the bracket depth of C compilers.
+export const MAX_NESTING = 256;
+export const NESTING_MESSAGE = `expression nested more than ${MAX_NESTING} levels deep (parentheses, calls, unary operators)`;
