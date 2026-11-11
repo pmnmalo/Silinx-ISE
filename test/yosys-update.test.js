@@ -98,6 +98,9 @@ test('yosys update: the table of the differences', () => {
   assert.match(md, /\*\*Summary\*\*: 1 worse \(blinky\); 1 better \(serv\); Yosys's test designs: 1 regression\(s\), 0 newly passing, 0 new warning\(s\), shard\(s\) 2 without a result\./);
   assert.match(md, /### Examples \(Basys2-250\)\n\n\| design \| slices \| LUTs \| FFs \| critical path \(ns\) \| \|\n\|---\|---\|---\|---\|---\|---\|\n\| blinky \| 86 → 95 \(\+10\.5%\) \*\*worse\*\* \| 172 → 190 \(\+10\.5%\) \*\*worse\*\* \| 86 → 95 \(\+10\.5%\) \*\*worse\*\* \| 7\.300 \|  \|\n\| gates \| 1 \| 2 \| 1 \| - \|  \|/);
   assert.match(md, /\| serv \| 191 → 180 \(-5\.8%\) \*\*better\*\* \|/);
+  // the size and the critical path only, the same on any runner: no run time, which would need both sides in one job
+  // (#3030, as nextpnr-update.yml measures them)
+  assert.doesNotMatch(md, /run time|seconds/i);
   assert.match(md, /- Yosys reading the source: pass 1, mismatch 0, unsupported 0, error 0\n- Silinx's open synthesis: pass 0, mismatch 1, unsupported 0, error 0\n- shard\(s\) 2: no result/);
   assert.match(md, /\*\*Regressions\*\* \(1: expected to pass\):\n\n- `a\.v:a \(synth\)`: mismatch: x/);
   // the test designs pinned at the old Yosys: to update in the same pull request
