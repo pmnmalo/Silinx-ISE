@@ -12,16 +12,57 @@
 //                                    follower's), KIND.awareness (y-protocols' awareness: who is in, their view),
 //                                    KIND.edit (an editor's Yjs update, signed with the editor link's key:
 //                                    core/collab-sign.js; forwarded and applied only when its signature is the room's,
-//                                    #3182; the room's public key in the owner's open, and in the document's meta)
+//                                    #3182; the room's public key in the owner's open, and in the document's meta),
+//                                    KIND.from (#3360: a follower's awareness as the room forwards it, [KIND.from][its
+//                                    client id, 4 bytes][the sealed frame]: the room's word for who sent it, so that a
+//                                    follower's awareness speaks for that follower only)
 // The relay never reads them: a hosted one, for the browser edition, can be the same.
 import * as Y from 'yjs';
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
+import * as encoding from 'lib0/encoding';
+import * as decoding from 'lib0/decoding';
 import { newKey, keyOf, seal, unseal } from './collab-crypto.js';
 import { newSigner, signerOf, verifierOf, signFrame, verifyFrame } from './collab-sign.js';
 
-export const PROTOCOL = 2;   // (2: an editor's signed edits, #3182)
+export const PROTOCOL = 3;   // (2: an editor's signed edits, #3182; 3: a follower's awareness marked with its sender, #3360)
 export const SUBPROTOCOL = 'silinx-collab';   // (the WebSockets', server/collab-relay.js's)
-export const KIND = Object.freeze({ update: 1, awareness: 2, edit: 3 });
+export const KIND = Object.freeze({ update: 1, awareness: 2, edit: 3, from: 4 });
+
+/** A follower's frame as the room forwards it (#3360): marked with the client id it joined with. */
+export function fromFrame(client, frame) {
+  const out = new Uint8Array(frame.length + 5);
+  out[0] = KIND.from;
+  new DataView(out.buffer).setUint32(1, client);
+  out.set(frame, 5);
+  return out;
+}
+
+/** A frame the room marked: { client, frame } (null: not one). */
+export function senderOf(frame) {
+  if (frame[0] !== KIND.from || frame.length < 6) return null;
+  return { client: new DataView(frame.buffer, frame.byteOffset).getUint32(1), frame: frame.subarray(5) };
+}
+
+/** An awareness update applied with only the states its sender may speak for (#3360): a follower's own (`only`, the
+ *  client id the room says sent it), or any but this participant's own (the owner's, the room's authority: who is in
+ *  for a newcomer); never this participant's own state. Returns the client ids applied. */
+export function applyAwarenessFrom(awareness, update, only = null) {
+  const d = decoding.createDecoder(update);
+  const e = encoding.createEncoder();
+  const kept = [];
+  const entries = [];
+  for (let n = decoding.readVarUint(d); n > 0; n--) {
+    const client = decoding.readVarUint(d), clock = decoding.readVarUint(d), state = decoding.readVarString(d);
+    if (client === awareness.clientID || (only !== null && client !== only)) continue;
+    entries.push([client, clock, state]);
+    kept.push(client);
+  }
+  if (!entries.length) return kept;
+  encoding.writeVarUint(e, entries.length);
+  for (const [client, clock, state] of entries) { encoding.writeVarUint(e, client); encoding.writeVarUint(e, clock); encoding.writeVarString(e, state); }
+  applyAwarenessUpdate(awareness, encoding.toUint8Array(e), 'remote');
+  return kept;
+}
 /** The colours of the participants, by their client id. */
 export const COLORS = ['#d9480f', '#1971c2', '#2f9e44', '#9c36b5', '#e8590c', '#0c8599', '#c2255c', '#5c940d'];
 export const colorOf = client => COLORS[Math.abs(Number(client) || 0) % COLORS.length];
@@ -131,8 +172,12 @@ export async function shareRoom({ url, token = null, doc, user, editors = false,
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
   }, async frame => {
     if (frame[0] === KIND.edit) { await applyEdit(doc, key, p.room, () => verifier, frame).catch(() => false); return; }
-    const { kind, bytes } = await unseal(key, p.room, frame);
-    if (kind === KIND.awareness) applyAwarenessUpdate(awareness, bytes, 'remote');   // (a follower's update: never applied)
+    // (a follower's awareness, marked by the room with who sent it: that follower's own state only, #3360; a follower's
+    // update: never applied)
+    const from = senderOf(frame);
+    if (!from) return;
+    const { kind, bytes } = await unseal(key, p.room, from.frame);
+    if (kind === KIND.awareness) applyAwarenessFrom(awareness, bytes, from.client);
   });
   try { await c.opened; } catch (e) { awareness.destroy(); throw e; }
   const answer = firstAnswer(c, 'opened');
@@ -178,13 +223,16 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
   }, async frame => {
     if (frame[0] === KIND.edit) { await applyEdit(doc, key, room, verifierOfDoc, frame).catch(() => false); return; }
+    // (another follower's awareness, marked by the room with who sent it, #3360; anything else is the owner's)
+    const from = senderOf(frame);
     let m;
-    try { m = await unseal(key, room, frame); } catch (e) {
+    try { m = await unseal(key, room, from ? from.frame : frame); } catch (e) {
       if (!warned) { warned = true; onEvent({ type: 'error', message: e.message }); failed(e); }
       return;
     }
+    if (from) { if (m.kind === KIND.awareness) applyAwarenessFrom(awareness, m.bytes, from.client); return; }
     if (m.kind === KIND.update) { Y.applyUpdate(doc, m.bytes, 'remote'); synced(); }
-    else if (m.kind === KIND.awareness) applyAwarenessUpdate(awareness, m.bytes, 'remote');
+    else if (m.kind === KIND.awareness) applyAwarenessFrom(awareness, m.bytes);   // (the owner's: who is in)
   });
   try { await c.opened; } catch (e) { awareness.destroy(); throw e; }
   const answer = firstAnswer(c, 'joined');

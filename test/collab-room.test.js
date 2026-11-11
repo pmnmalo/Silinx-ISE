@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { collabRooms, ROOM_LIMITS } from '../core/collab-room.js';
-import { KIND, PROTOCOL } from '../core/collab-client.js';
+import { KIND, PROTOCOL, fromFrame } from '../core/collab-client.js';
 import { ROOM_RE } from '../core/collab-link.js';
 
 // a participant: what it was sent (text as JSON, binary as bytes), how it was closed
@@ -46,7 +46,9 @@ test('what passes: the owner\'s frames to every follower; a follower\'s awarenes
   o.message(frame(KIND.update, 9, 9), true);
   assert.deepEqual([a.got, b.got], [[[KIND.update, 9, 9]], [[KIND.update, 9, 9]]]);
   pa.message(frame(KIND.awareness, 5), true);
-  assert.deepEqual([owner.got, a.got.length, b.got.at(-1)], [[[KIND.awareness, 5]], 1, [KIND.awareness, 5]]);
+  // (marked with the client id the follower joined with, #3360)
+  assert.deepEqual([owner.got, a.got.length, b.got.at(-1)], [[[KIND.from, 0, 0, 0, 7, KIND.awareness, 5]], 1, [KIND.from, 0, 0, 0, 7, KIND.awareness, 5]]);
+  assert.deepEqual([...fromFrame(7, frame(KIND.awareness, 5))], [KIND.from, 0, 0, 0, 7, KIND.awareness, 5]);
   pa.message(frame(KIND.update, 6), true);
   assert.deepEqual(a.got.at(-1), { type: 'error', message: 'read only: a follower cannot change the shared project' });
   assert.equal(owner.got.length, 1);
@@ -85,6 +87,7 @@ test('the first message: the role\'s, this version, a client id; the time to it'
   assert.deepEqual(refused('owner', text({ type: 'join', room: 'x', client: 1 })), NOT);
   assert.deepEqual(refused('owner', JSON.stringify({ type: 'open', v: 0, client: 1 })), NOT);
   assert.deepEqual(refused('owner', text({ type: 'open', client: -1 })), NOT);
+  assert.deepEqual(refused('owner', text({ type: 'open', client: 2 ** 32 })), NOT);   // (Yjs's client ids: 32 bits)
   assert.deepEqual(refused('owner', 'not json'), NOT);
   assert.deepEqual(refused('owner', Uint8Array.from([1, 2]), true), NOT);
   assert.deepEqual(refused('follower', text({ type: 'join', room: 'Z'.repeat(22), client: 1 })),
@@ -95,6 +98,15 @@ test('the first message: the role\'s, this version, a client id; the time to it'
   slow.welcome(s, 'follower');
   await new Promise(r => setTimeout(r, 60));
   assert.deepEqual([s.got, s.closed], [[{ type: 'error', message: 'no open nor join' }], [1008, 'refused']]);
+});
+
+test('a follower cannot join with the owner\'s client id nor another follower\'s (#3360)', () => {
+  const { host, owner, id, join } = room();
+  join(7);
+  const TAKEN = [[{ type: 'error', message: 'another participant of this shared project has this client id' }], [1008, 'refused']];
+  for (const client of [1, 7]) { const [s] = join(client); assert.deepEqual([s.got, s.closed], TAKEN); }
+  assert.deepEqual([...host.rooms.get(id).followers.values()], [7]);
+  assert.deepEqual(owner.got.slice(1), [{ type: 'join', client: 7 }]);
 });
 
 test('the limits: rooms per host, followers per room', () => {

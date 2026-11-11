@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { WebSocket } from 'ws';
 import * as Y from 'yjs';
+import * as encoding from 'lib0/encoding';
 import { scratchEnv } from './server-helpers.js';
 import { newKey, keyOf, seal, unseal, KEY_RE } from '../core/collab-crypto.js';
 import { followLink, parseFollowLink, relayUrl, ROOM_RE } from '../core/collab-link.js';
@@ -191,6 +192,46 @@ test('read only: a follower\'s edit is refused by the relay and never reaches th
   fol.awareness.setLocalStateField('role', 'owner');
   await sleep(100);
   assert.deepEqual(owner.peers().map(p => p.role), ['follower']);
+  await owner.close();
+});
+
+// an awareness update as y-protocols encodes it: [[client, clock, state], …]
+const awarenessUpdate = entries => {
+  const e = encoding.createEncoder();
+  encoding.writeVarUint(e, entries.length);
+  for (const [client, clock, state] of entries) { encoding.writeVarUint(e, client); encoding.writeVarUint(e, clock); encoding.writeVarString(e, JSON.stringify(state)); }
+  return encoding.toUint8Array(e);
+};
+
+test('a follower\'s awareness speaks for that follower only (#3360): the owner\'s state, another\'s, ghosts dropped everywhere', async () => {
+  const doc = owned();
+  const owner = await shareRoom({ url: url(), token: 'the-token', doc, user: { name: 'Ana' } });
+  owner.setView({ path: 'src/top.vhd', line: 3, ch: 0 });
+  const fol = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Rui' } });
+  const eva = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Eva' } });
+  await Promise.all([fol.ready, eva.ready]);
+  await until(() => eva.peers().length === 2 && owner.peers().length === 2 && eva.owner()?.view, 'everyone in');
+  // Rui, with the room's key, seals an update that names the owner, Eva and a ghost, and his own state
+  const forged = { user: { name: 'Mallory' }, role: 'owner', view: { path: 'src/top.ucf', line: 9, ch: 0 } };
+  fol.send(KIND.awareness, awarenessUpdate([
+    [doc.clientID, 1000, forged], [eva.doc.clientID, 1000, forged], [4242, 1, forged], [fol.doc.clientID, 1000, { user: { name: 'Rui 2' }, role: 'follower', view: null }],
+  ]));
+  await until(() => eva.peers().some(p => p.name === 'Rui 2') && owner.peers().some(p => p.name === 'Rui 2'), 'Rui\'s own state');
+  await sleep(100);
+  // the owner is still Ana, where she is; no ghost; Eva's own state and the owner's in her page unchanged
+  assert.deepEqual(eva.owner(), { client: doc.clientID, name: 'Ana', color: colorOf(doc.clientID), role: 'owner', view: { path: 'src/top.vhd', line: 3, ch: 0 } });
+  assert.deepEqual(eva.peers().map(p => [p.name, p.role]), [['Ana', 'owner'], ['Rui 2', 'follower']]);
+  assert.deepEqual(eva.awareness.getLocalState().user, { name: 'Eva' });
+  assert.deepEqual(owner.peers().map(p => [p.name, p.role]).sort(), [['Eva', 'follower'], ['Rui 2', 'follower']]);
+  assert.deepEqual(owner.awareness.getLocalState(), { user: { name: 'Ana' }, role: 'owner', view: { path: 'src/top.vhd', line: 3, ch: 0 } });
+  // (a raw follower joining with the owner's client id: refused)
+  const raw = new WebSocket(furl(), [SUBPROTOCOL]);
+  const texts = [];
+  raw.on('message', (d, bin) => { if (!bin) texts.push(JSON.parse(String(d))); });
+  await new Promise(r => raw.on('open', r));
+  raw.send(JSON.stringify({ type: 'join', v: PROTOCOL, room: owner.room, client: doc.clientID }));
+  await until(() => texts.length, 'the refusal');
+  assert.deepEqual(texts, [{ type: 'error', message: 'another participant of this shared project has this client id' }]);
   await owner.close();
 });
 
