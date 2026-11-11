@@ -2,7 +2,7 @@
 // own gowin_pack, run offline on the designs below routed by the flow on the Tang Nano 9K (test/fixtures/gowin-pack/apicula-0.32.json,
 // designs: the SHA-256 of their routed designs and of Apicula's .fs): the rPLL on each side of the GW1N-9C (its three RPLLB cells),
 // its outputs CLKOUT, CLKOUTP, CLKOUTD and CLKOUTD3, its phase and duty fixed or dynamic, its bypasses, its dividers static or
-// dynamic, another input frequency; the oscillator with two dividers. Their limits refused as Apicula refuses them; the charge
+// dynamic, another input frequency; the oscillator with two dividers; each clock checked at its own frequency (#3488). Their limits refused as Apicula refuses them; the charge
 // pump against Apicula's calc_pll_pump's values.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,24 +26,24 @@ const CLK = 'IO_LOC "clk" 52;\n';
 const counter = (clk, bits, out) => `  reg [${bits - 1}:0] c_${clk} = 0;\n  always @(posedge ${clk}) begin c_${clk} <= c_${clk} + 1; ${out}; end\n`;
 const DESIGNS = {
   // 27 MHz to 54 MHz (VCO 432 MHz), placed on the right side
-  pll: { cst: `${CLK}${LEDS(2)}// create_clock -name clk -period 37.037 [get_ports {clk}]\n`, clocks: ['fast'],
+  pll: { cst: `${CLK}${LEDS(2)}// create_clock -name clk -period 37.037 [get_ports {clk}]\n`, clocks: ['fast'], asked: [54],
     text: `module pll(input clk, output reg [1:0] led);\n  wire fast, lock;\n  rPLL #(.FCLKIN("27"), .IDIV_SEL(0), .FBDIV_SEL(1), .ODIV_SEL(8), .DEVICE("GW1NR-9C")) u (.CLKIN(clk), .CLKOUT(fast), .LOCK(lock), ${PORTS});\n${counter('fast', 25, 'led <= {lock, c_fast[24]}')}endmodule\n` },
   // 90 MHz, CLKOUTP's phase and duty, CLKOUTD by 6: on the left side
-  pll2: { cst: `${CLK}${LEDS(3)}// create_clock -name clk -period 37.037 [get_ports {clk}]\n`, clocks: ['d', 'o', 'p'],
+  pll2: { cst: `${CLK}${LEDS(3)}// create_clock -name clk -period 37.037 [get_ports {clk}]\n`, clocks: ['d', 'o', 'p'], asked: [15, 90, 90],
     text: `module pll2(input clk, output reg [2:0] led);\n  wire o, p, d, lock;\n  rPLL #(.FCLKIN("27"), .IDIV_SEL(2), .FBDIV_SEL(9), .ODIV_SEL(8), .PSDA_SEL("0100"), .DUTYDA_SEL("1000"), .CLKOUTD_SRC("CLKOUT"), .DYN_SDIV_SEL(6), .DEVICE("GW1NR-9C"))\n    u (.CLKIN(clk), .CLKOUT(o), .CLKOUTP(p), .CLKOUTD(d), .LOCK(lock), ${PORTS});\n${counter('o', 25, 'led[0] <= c_o[24]')}${counter('p', 25, 'led[1] <= c_p[24] & lock')}${counter('d', 23, 'led[2] <= c_d[22]')}endmodule\n` },
   // the phase and duty dynamic (the outputs' delays), CLKOUTD and CLKOUTD3 from CLKOUTP, CLKOUTP bypassed
-  pll3: { cst: `${CLK}${LEDS(3)}`, clocks: ['d', 'd3', 'o'],
+  pll3: { cst: `${CLK}${LEDS(3)}`, clocks: ['d', 'd3', 'o'], asked: [6.75, 9, 108],
     text: `module pll3(input clk, output reg [2:0] led);\n  wire o, p, d, d3, lock;\n  rPLL #(.FCLKIN("27"), .IDIV_SEL(0), .FBDIV_SEL(3), .ODIV_SEL(4), .DYN_DA_EN("true"), .CLKOUT_DLY_STEP(2), .CLKOUTP_DLY_STEP(1), .CLKOUTD_SRC("CLKOUTP"), .CLKOUTD3_SRC("CLKOUTP"), .CLKOUTP_BYPASS("true"), .DYN_SDIV_SEL(4), .DEVICE("GW1NR-9C"))\n    u (.CLKIN(clk), .CLKOUT(o), .CLKOUTP(p), .CLKOUTD(d), .CLKOUTD3(d3), .LOCK(lock), ${PORTS});\n${counter('o', 25, 'led[0] <= c_o[24]')}${counter('d', 25, 'led[1] <= c_d[24] & lock')}${counter('d3', 23, 'led[2] <= c_d3[22]')}endmodule\n` },
   // a 100 MHz input (another range of the charge pump: VCO 600 MHz), CLKOUT and CLKOUTD bypassed
-  pll4: { cst: `${CLK}${LEDS(2)}`, clocks: ['o'],
+  pll4: { cst: `${CLK}${LEDS(2)}`, clocks: ['o'], asked: [100],
     text: `module pll4(input clk, output reg [1:0] led);\n  wire o, lock;\n  rPLL #(.FCLKIN("100"), .IDIV_SEL(3), .FBDIV_SEL(11), .ODIV_SEL(2), .CLKOUT_BYPASS("true"), .CLKOUTD_BYPASS("true"), .DEVICE("GW1NR-9C"))\n    u (.CLKIN(clk), .CLKOUT(o), .LOCK(lock), ${PORTS});\n${counter('o', 25, 'led <= {lock, c_o[24]}')}endmodule\n` },
   // the dividers dynamic (their ports), so not checked by gowin_pack
-  pll5: { cst: `${CLK}${LEDS(2)}`, clocks: ['o'],
+  pll5: { cst: `${CLK}${LEDS(2)}`, clocks: ['o'], asked: [null],
     text: `module pll5(input clk, output reg [1:0] led);\n  wire o, lock;\n  rPLL #(.FCLKIN("27"), .DYN_IDIV_SEL("true"), .DYN_FBDIV_SEL("true"), .DYN_ODIV_SEL("true"), .DEVICE("GW1NR-9C"))\n    u (.CLKIN(clk), .CLKOUT(o), .LOCK(lock), .RESET(1'b0), .RESET_P(1'b0), .CLKFB(1'b0), .FBDSEL(6'b111110), .IDSEL(6'b111111), .ODSEL(6'b111000), .PSDA(4'b0), .DUTYDA(4'b0), .FDLY(4'b0));\n${counter('o', 25, 'led <= {lock, c_o[24]}')}endmodule\n` },
   // the oscillator by 10 and by 128
-  osc: { cst: LEDS(2), clocks: ['clk'], fallback: 26,
+  osc: { cst: LEDS(2), clocks: ['clk'], asked: [25], fallback: 26,
     text: `module osc(output reg [1:0] led);\n  wire clk;\n  OSC #(.FREQ_DIV(10), .DEVICE("GW1NR-9C")) u (.OSCOUT(clk));\n${counter('clk', 24, 'led <= c_clk[23:22]')}endmodule\n` },
-  osc2: { cst: LEDS(2), clocks: ['clk'], fallback: 22,
+  osc2: { cst: LEDS(2), clocks: ['clk'], asked: [1.95], fallback: 22,
     text: `module osc2(output reg [1:0] led);\n  wire clk;\n  OSC #(.FREQ_DIV(128), .DEVICE("GW1NR-9C")) u (.OSCOUT(clk));\n${counter('clk', 20, 'led <= c_clk[19:18]')}endmodule\n` },
 };
 // nextpnr's warnings: the oscillator's clock routed through the general routing where its dedicated routing did not reach
@@ -67,6 +67,10 @@ describe('the rPLL and the oscillator from HDL to the .fs: Apicula\'s byte for b
       const map = Object.fromEntries(r.report.map.utilization.map(u => [u.name, [u.used, u.total]]));
       assert.deepEqual(map[prim[0]], [1, prim[1]], JSON.stringify(map));
       assert.deepEqual(r.report.par.fmax.map(f => f.clock), DESIGNS[name].clocks);
+      // each clock checked at its own frequency (#3488: the PLL's outputs were at the CST's 27 MHz, the oscillator's at nextpnr's 12 MHz)
+      assert.deepEqual(r.report.par.fmax.map(f => f.constraint), DESIGNS[name].asked);
+      assert.deepEqual(log.filter(l => /^Clock /.test(l)).map(l => l.replace(/: [\d.]+ MHz/, ': N MHz')),
+        DESIGNS[name].clocks.map((c, i) => `Clock ${c}: N MHz (${DESIGNS[name].asked[i] == null ? 'no constraint' : `met, ${DESIGNS[name].asked[i]} MHz asked`})`));
       assert.equal(sha(files['open/routed.json']), REF[name].routed, `${name}: the routed design is not the reference's`);
       const fsText = files[`${name}.fs`];
       assert.equal(fsText.length, REF[name].fsBytes);

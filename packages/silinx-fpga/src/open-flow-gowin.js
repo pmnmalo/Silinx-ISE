@@ -7,6 +7,7 @@
 import { scriptSynthesis } from './synth-script.js';
 import { CST } from './cst.js';
 import { portBits, nextpnrNames } from './nextpnr-ports.js';
+import { gowinClocks } from './gowin-clocks.js';
 
 /** The Gowin's parts, packages and speeds nextpnr-himbaechel-gowin takes: `${part}/${package}${speed}` -> its --device and family. */
 export const GOWIN_DEVICES = {
@@ -37,6 +38,17 @@ const text = v => (typeof v === 'string' ? v : new TextDecoder().decode(v));
 // a clock as the report names its net: clk_IBUF_I_O (the input buffer's output) -> clk
 const clockName = n => n.replace(/_IBUF_I_O$/, '');
 
+/** nextpnr's clocks (its report's fmax; lines: its log) with their constraints: a clock's own when nextpnr says it constrains its
+ *  net ("constraining clock net 'fast' to 54.00 MHz", "Derived frequency constraint of 27.0 MHz for net x"), else null (no
+ *  constraint of its own: not nextpnr's --freq or 12 MHz, #3488). */
+export function gowinFmax(r, lines) {
+  const named = new Set(lines.map(l => (/constraining clock net '(.*)' to/.exec(l) || /Derived frequency constraint of .* for net (\S+)/.exec(l))?.[1]).filter(Boolean));
+  return Object.entries(r.fmax || {}).map(([net, f]) => {
+    const constrained = named.has(net) || named.has(clockName(net));
+    return { clock: clockName(net), achieved: +f.achieved.toFixed(2), constraint: constrained ? +f.constraint.toFixed(2) : null };
+  });
+}
+
 /** The device of a spec: its --device and family, or null. */
 export const gowinDevice = spec => GOWIN_DEVICES[`${String(spec.device || '').toLowerCase()}/${String(spec.pkg || '').toLowerCase()}${spec.speed || '-6'}`] || null;
 
@@ -59,14 +71,17 @@ function mountGowin(ctx) {
       throw new StepError(`${free.length} port(s) with no pin (IO_LOC in the CST): ${free.slice(0, 12).join(', ')}${free.length > 12 ? ', …' : ''}: nextpnr-himbaechel-gowin places no port without one`, [],
         'Assign them in I/O Pin Planning.');
     }
-    // (a CST has no clock: nextpnr's --freq, the fastest of the constraints' clocks)
+    // the clocks at their own frequencies (#3488): the CST's, the rPLLs' and the oscillators' (an SDC); a clock the SDC does not name,
+    // nextpnr's --freq (the fastest of the CST's clocks, as before: the routed designs unchanged) or its 12 MHz, reported with no constraint
+    const sdc = gowinClocks(netlistText(), top, dev.family, cst?.clocks || []);
     const mhz = Math.max(0, ...(cst?.clocks || []).map(c => 1000 / c.period));
     const args = ['--device', dev.device, '--vopt', `family=${dev.family}`, '--vopt', 'cst=design.cst', '--json', 'netlist.json', '--write', 'routed.json',
-      '--report', 'report.json', '--seed', String(spec.seed || 1), ...(mhz ? ['--freq', String(+mhz.toFixed(6))] : [])];
+      '--report', 'report.json', '--seed', String(spec.seed || 1), ...(mhz ? ['--freq', String(+mhz.toFixed(6))] : []),
+      ...(sdc.sdc ? ['--sdc', 'design.sdc'] : [])];
     const nextpnr = tool(), lines = [];
     let out;
     try {
-      out = await nextpnr.run(args, { 'netlist.json': netlistText(), 'design.cst': CST.write(cst) }, l => lines.push(l));
+      out = await nextpnr.run(args, { 'netlist.json': netlistText(), 'design.cst': CST.write(cst), ...(sdc.sdc && { 'design.sdc': sdc.sdc }) }, l => lines.push(l));
     } catch (e) {
       throw new StepError(`nextpnr-himbaechel-gowin failed: ${e.message}`, lines.filter(l => /^ERROR:/.test(l)), '');
     }
@@ -77,9 +92,9 @@ function mountGowin(ctx) {
     report.map = { utilization: items, warnings: 0, errors: 0 };
     log('Device utilization (nextpnr-himbaechel-gowin):');
     for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
-    const fmax = Object.entries(r.fmax || {}).map(([clock, f]) => ({ clock: clockName(clock), achieved: +f.achieved.toFixed(2), constraint: +f.constraint.toFixed(2) }));
-    for (const f of fmax) log(`Clock ${f.clock}: ${f.achieved} MHz (${f.achieved >= f.constraint ? 'met' : 'NOT met'}, ${f.constraint} MHz asked)`);
-    report.par = { routed: true, unroutedSignals: 0, done: true, engine: 'nextpnr', fmax, constraintsMet: fmax.every(f => f.achieved >= f.constraint) };
+    const fmax = gowinFmax(r, lines);
+    for (const f of fmax) log(`Clock ${f.clock}: ${f.achieved} MHz (${f.constraint == null ? 'no constraint' : `${f.achieved >= f.constraint ? 'met' : 'NOT met'}, ${f.constraint} MHz asked`})`);
+    report.par = { routed: true, unroutedSignals: 0, done: true, engine: 'nextpnr', fmax, constraintsMet: fmax.every(f => f.constraint == null || f.achieved >= f.constraint) };
     routed = text(out['routed.json']);
     log(`Placed and routed by nextpnr-himbaechel-gowin in ${ms(t)}: ${report.files.routed}`);
   }
