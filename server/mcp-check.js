@@ -12,6 +12,21 @@ const KINDS = [
 // the item a message is about (the editor selects it when the message is clicked)
 const itemOf = d => d.ref?.id ?? d.nodeId ?? d.state ?? d.transition ?? null;
 
+/** A drawing's Check (its model, `file` its path): { lines: the console's, errors, warnings: { message, item } } (null: not
+ *  a drawing checked here). Also a shared drawing's after a merge (#3183, follow_project). */
+export async function checkDrawing(file, m) {
+  const kind = KINDS.find(k => k.re.test(file));
+  if (!kind) return null;
+  const diags = (await kind.check(m)).filter(d => d.severity === 'error' || d.severity === 'warning');
+  const errors = diags.filter(d => d.severity === 'error'), warnings = diags.filter(d => d.severity === 'warning');
+  const base = file.split('/').pop();
+  const lines = [...diags.map(d => `${d.severity === 'error' ? 'ERROR' : 'WARNING'}: ${d.message}`),
+    errors.length ? `Process "${kind.what}" of ${base} failed (${errors.length} error(s), ${warnings.length} warning(s)).`
+      : `Process "${kind.what}" of ${base} completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}.`];
+  const json = d => ({ message: d.message, item: itemOf(d) });
+  return { lines, errors: errors.map(json), warnings: warnings.map(json) };
+}
+
 export const CHECK_TOOLS = [
   {
     name: 'check_drawing', title: 'Check a drawing',
@@ -24,14 +39,8 @@ export const CHECK_TOOLS = [
       let m;
       const text = await projectText(name, file, `no drawing '${file}' in the project '${name}'`);
       try { m = JSON.parse(text); } catch { throw toolError(`no drawing '${file}' in the project '${name}'`); }
-      const diags = (await kind.check(m)).filter(d => d.severity === 'error' || d.severity === 'warning');
-      const errors = diags.filter(d => d.severity === 'error'), warnings = diags.filter(d => d.severity === 'warning');
-      const base = file.split('/').pop();
-      const lines = [...diags.map(d => `${d.severity === 'error' ? 'ERROR' : 'WARNING'}: ${d.message}`),
-        errors.length ? `Process "${kind.what}" of ${base} failed (${errors.length} error(s), ${warnings.length} warning(s)).`
-          : `Process "${kind.what}" of ${base} completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}.`];
-      const json = d => ({ message: d.message, item: itemOf(d) });
-      return { text: lines.join('\n'), data: { project: name, file, ok: !errors.length, errors: errors.map(json), warnings: warnings.map(json) }, isError: false };
+      const { lines, errors, warnings } = await checkDrawing(file, m);
+      return { text: lines.join('\n'), data: { project: name, file, ok: !errors.length, errors, warnings }, isError: false };
     },
   },
 ];

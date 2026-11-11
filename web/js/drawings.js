@@ -22,10 +22,11 @@ export {
   openTt, openTtSchematic, syncHdlFromTt, ttContextMenu
 };
 import { openPetriFsm } from './petri-fsm-doc.js';
-import { following, followNotice } from './collab-state.js';
+import { following, followNotice, editsDrawingHere } from './collab-state.js';
 export { openPetriFsm };
-// a project followed (#3181): its drawings read only, the follower's notice at the end of their toolbar
-const followOnly = () => (following() ? { readOnly: true, banner: followNotice() } : {});
+// a project followed (#3181): its drawings read only, the follower's notice at the end of their toolbar; but those an
+// editor's link edits live (#3183, `path`: collab-drawing.js binds them)
+const followOnly = (path = null) => (following() && !(path && editsDrawingHere(path)) ? { readOnly: true, banner: followNotice() } : {});
 
 // ---- ASM
 export async function openAsm(path) {
@@ -157,7 +158,7 @@ export async function openFsm(path) {
       const setProblems = (diags) => { last = diags; problems.set(inLanguage(diags)); };
       const offLang = onLanguageChange(() => setProblems(last));
       const ed = mountFsmEditor(host, {
-        model, ...followOnly(),
+        model, ...followOnly(path),
         onChange: () => setDirty(d, true),
         linkInfo: () => { const f = S.schOwners?.[path]; return f ? { file: f, why: S.outOfSync?.[f] } : null; },
         onOpenFile: f => openFile(f),

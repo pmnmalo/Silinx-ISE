@@ -9,7 +9,10 @@
 // with codes exchanged by hand (Add a Follower…). Editors (#3182, phase 2): its editors' link (Copy Editor Link) signs
 // their changes; the page's open text editors are bound live to the document (collab-bind.js), and what an editor
 // changes in a text file is written to the disk, anything else undone from it (the disk is the owner's); through the
-// import gate, the project untrusted from an editor's first change (#3355).
+// import gate, the project untrusted from an editor's first change (#3355). Its drawings edited live (#3183): each one a
+// structure of its own in the document (core/collab-model.js), its open editor bound to it (collab-drawing.js); what an
+// editor changes in one is written to the disk (through the gate too) and its HDL generated again, as the page's own
+// changes are.
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app } from './app.js';
@@ -20,6 +23,8 @@ import { renderPresence, setPresenceCommands } from './collab-presence.js';
 import { projectDoc, publishProject, putFile, putProject, sharedPath, watchDoc, docFile, editablePath, gateEdit } from '/core/collab-doc.js';
 import { isTrusted, markEditedByEditor, untrustedNotice } from '/core/trust.js';
 import { keepBound, unbindAll } from './collab-bind.js';
+import { keepDrawingsBound, unbindDrawings } from './collab-drawing.js';
+import { liveDrawing, drawingModel, drawingPathsOf, pruneDrawing, syncDrawing, revertDrawing } from '/core/collab-model.js';
 import { shareRoom, colorOf } from '/core/collab-client.js';
 import { followLink, relayUrl, relayAddress } from '/core/collab-link.js';
 import { newHostKey } from '/core/collab-meet.js';
@@ -41,7 +46,8 @@ const keepRelay = r => { try { localStorage.setItem(RELAY_KEY, JSON.stringify(r)
 /** The name of a participant, as the others see it (trimmed, at most 40 characters). */
 export const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim().slice(0, 40);
 
-let share = null;   // { name, session, doc, link, editLink, restore, orig, timer, known: Map<client, name>, view, hosted (a room of the page's), bound, unwatch }
+let share = null;   // { name, session, doc, link, editLink, restore, orig, timer, known: Map<client, name>, view, hosted (a room of the page's), bound, unwatch,
+                    //   bases (a drawing's text last put into its structure, #3183), drawn (its drawings bound), drawing (their writes, one after the other) }
 
 /** Share Project…: shares the open project (asks the name first), or shows the link of the one shared. */
 export async function shareProjectDialog() {
@@ -93,18 +99,19 @@ export async function startSharing(name, { via = api.collab ? 'relay' : 'host', 
   if (other && !(await relaysHere()).includes(other)) throw new Error(notHere(other));
   if (via === 'relay' && !other && !api.collab) throw new Error('the browser edition shares through a relay of its settings, or its own page');
   const project = S.project.name;
-  const doc = projectDoc();
-  publishProject(doc, { ...await readAll(project), owner: name });
+  const doc = projectDoc(), bases = new Map();
+  publishProject(doc, { ...await readAll(project), owner: name, bases });
   const host = via === 'host' ? (await import('./collab-host.js')).hostRoom() : null;
   const hostKey = host ? await newHostKey() : null;
   const session = host
     ? await shareRoom({ url: 'silinx-host:', WebSocket: host.WebSocket, doc, user: { name }, editors: true, onEvent: ev => onEvent(ev) })
     : await shareRoom({ url: relayUrl(other || location.href, 'share'), token: other ? relay.key || null : await api.collabToken(), doc, user: { name }, editors: true, onEvent: ev => onEvent(ev) });
   const base = location.origin + location.pathname, pub = hostKey?.pub ?? null;
-  share = { name, project, session, doc, link: followLink(base, session.room, session.key, via, null, other, pub), editLink: followLink(base, session.room, session.key, via, session.editKey, other, pub), known: new Map(), view: null, hosted: host?.hosted || null, bound: new Map() };
+  share = { name, project, session, doc, link: followLink(base, session.room, session.key, via, null, other, pub), editLink: followLink(base, session.room, session.key, via, session.editKey, other, pub), known: new Map(), view: null, hosted: host?.hosted || null, bound: new Map(), bases, drawn: new Map(), drawing: Promise.resolve() };
   Object.assign(collab, { role: 'owner', owner: name, project, session });
-  ({ restore: share.restore, orig: share.orig } = hookApi(project, doc));
-  share.unwatch = watchDoc(doc, ev => onEdits(share, ev));
+  ({ restore: share.restore, orig: share.orig } = hookApi(project, doc, share));
+  const s0 = share, offFiles = watchDoc(doc, ev => onEdits(s0, ev)), offDrawings = watchDrawings(s0);
+  share.unwatch = () => { offFiles(); offDrawings(); };
   share.timer = setInterval(track, TRACK_MS);
   addEventListener('silinx:disk-changes', onDisk);
   setPresenceCommands(commands);
@@ -129,6 +136,7 @@ export async function stopSharing(why = null) {
   removeEventListener('silinx:disk-changes', onDisk);
   s.unwatch();
   unbindAll(s.bound);
+  unbindDrawings(s.drawn);
   s.restore();
   for (const o of S.docs) o.editor?.setPeers?.([]);
   Object.assign(collab, { role: null, owner: '', project: null, session: null });
@@ -149,7 +157,7 @@ function linkDialog() {
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, `Anyone with this link follows "${share.project}" live, read only, as long as you share it.`),
       field,
-      h('p', {}, 'Anyone with the editors\' link changes its text files with you, live; its drawings stay yours.'),
+      h('p', {}, 'Anyone with the editors\' link edits its text files and state diagrams with you, live; its other drawings stay yours.'),
       editField,
       share.hosted ? h('p', {}, 'This page hosts it: its followers find it when they open the link, or send you a code, which Add a Follower… takes.') : null),
     buttons: [
@@ -163,7 +171,7 @@ function linkDialog() {
   });
 }
 
-const copyEditorLink = () => { writeClip('text', share.editLink); app.log('Shared project\'s editors\' link copied: whoever opens it changes its text files with you.', 'ok'); };
+const copyEditorLink = () => { writeClip('text', share.editLink); app.log('Shared project\'s editors\' link copied: whoever opens it edits its text files and state diagrams with you.', 'ok'); };
 const addFollower = () => { const s = share; if (s?.hosted) import('./collab-host.js').then(m => m.addFollowerDialog(s)); };
 const commands = () => [
   { label: 'Copy Link', action: () => { writeClip('text', share.link); app.log('Shared project\'s link copied.', 'ok'); } },
@@ -196,6 +204,7 @@ function track() {
   if (!share) return;
   if (S.project?.name !== share.project) { stopSharing(`Stopped sharing "${share.project}": another project was opened.`); return; }
   keepBound(share.bound, S.docs, share.doc.getMap('files'), editableHere, { mine: true });   // (its text editors, live, #3182)
+  keepDrawingsBound(share.drawn, S.docs, share.doc, drawingHere, { mine: true, say: sayLine });   // (its drawings, #3183)
   const d = S.active, path = d?.path || (/^(sch|asm|tt|fsm|pn):/.test(String(d?.id || '')) ? String(d.id).replace(/^[a-z]+:/, '') : null);
   const c = path && d.editor?.getCursor ? d.editor.getCursor() : null;
   share.session.setView(path ? { path, line: c?.line ?? null, ch: c?.ch ?? null } : null);
@@ -212,23 +221,38 @@ async function onDisk(ev) {
 async function resync() {
   const s = share;
   if (!s) return;
-  try { const all = await readAll(s.project); if (share === s) publishProject(s.doc, { ...all, owner: s.name }); } catch { /* the next change reads it */ }
+  try { const all = await readAll(s.project); if (share === s) publishProject(s.doc, { ...all, owner: s.name, bases: s.bases }); } catch { /* the next change reads it */ }
 }
 
 // the page's own changes of the project, into the document as they are made (the functions of api.js wrapped while
 // the project is shared; restored after)
-function hookApi(project, doc) {
+// (a drawing edited live, #3183: what the page changed in it since its last text put into its structure, what a bound
+// one's editor pushed already left as it is)
+function hookApi(project, doc, s) {
   const orig = { writeFile: api.writeFile, renameFile: api.renameFile, deleteFile: api.deleteFile, saveProject: api.saveProject };
   const mine = name => name === project;
-  api.writeFile = async (name, path, text) => { const r = await orig.writeFile(name, path, text); if (mine(name)) { putFile(doc, path, text); if (!doc.getMap('files').has(path)) resync(); } return r; };
+  const drawn = path => [...s.drawn.keys()].some(d => d.path === path);
+  api.writeFile = async (name, path, text) => {
+    const r = await orig.writeFile(name, path, text);
+    if (mine(name)) {
+      putFile(doc, path, text);
+      // (a bound drawing's save may have been made before the others' last change: the merge written after it)
+      if (liveDrawing(path)) syncDrawing(doc, path, text, s.bases);
+      if (liveDrawing(path) && drawn(path)) s.drawing = s.drawing.then(() => writeMerged(s, path)).catch(() => {});
+      if (!doc.getMap('files').has(path)) resync();
+    }
+    return r;
+  };
   api.saveProject = async (name, pj) => { const r = await orig.saveProject(name, pj); if (mine(name)) { putProject(doc, pj); resync(); } return r; };
   api.renameFile = async (name, from, to) => { const r = await orig.renameFile(name, from, to); if (mine(name)) resync(); return r; };
   api.deleteFile = async (name, path, opts) => { const r = await orig.deleteFile(name, path, opts); if (mine(name)) resync(); return r; };
   return { restore: () => Object.assign(api, orig), orig };
 }
 
-// the files an editor may change here: a text file of the project's that no drawing generates
+// the files an editor may change here: a text file of the project's that no drawing generates; a drawing edited live
 const editableHere = p => editablePath(p) && !S.hdlToSch?.[p] && S.fileTree?.includes(p);
+const drawingHere = p => liveDrawing(p) && !!S.fileTree?.includes(p);
+const sayLine = text => app.log(text, /^WARNING/.test(text) ? 'warn' : 'info');
 
 // what the editors change (the document's remote transactions): a text file's, written to the disk (its open editor, bound,
 // shows it already); anything else, undone (the project published again from the disk), said in the console
@@ -265,4 +289,49 @@ async function untrustEdited(s) {
   await s.orig.saveProject(s.project, next);
   if (S.project?.name === s.project) Object.assign(S.project, { trusted: false, madeBy: next.madeBy });
   app.log(`WARNING: ${untrustedNotice(s.project, next)}`, 'warn', { action: { label: 'Trust Project', run: () => import('./project.js').then(m => m.trustProject(s.project)) } });
+}
+
+// what the editors change in the drawings (#3183): the document's remote transactions, each drawing's merged model
+// written to the disk, one write after the other (the newest model each time), its HDL generated again from it
+function watchDrawings(s) {
+  const fn = tr => {
+    if (tr.local || share !== s) return;
+    const paths = drawingPathsOf(tr);
+    if (paths.length) s.drawing = s.drawing.then(() => onDrawingEdits(s, paths)).catch(e => app.log(`WARNING: an editor's change of a drawing not written: ${e.message}.`, 'warn'));
+  };
+  s.doc.on('afterTransaction', fn);
+  return () => s.doc.off('afterTransaction', fn);
+}
+async function onDrawingEdits(s, paths) {
+  let undo = false;
+  for (const path of paths) {
+    if (share !== s) return;
+    if (!drawingHere(path) || !drawingModel(s.doc, path)) { undo = true; continue; }
+    if (!await writeMerged(s, path, { edited: true })) revertDrawing(s.doc, path, s.bases);
+  }
+  if (undo) {
+    app.log(`WARNING: An editor's change undone (an editor changes the project's text files and state diagrams only): ${paths.filter(p => !drawingHere(p)).join(', ') || paths.join(', ')}.`, 'warn');
+    await resync();
+  }
+}
+// a drawing's merged model written to the disk when it is not what the disk has (its last text put, bases), through
+// the import gate (an editor's change: the project untrusted first), its open editor clean, its HDL generated again;
+// false: the gate refused it (said)
+async function writeMerged(s, path, { edited = false } = {}) {
+  const r = drawingModel(s.doc, path);
+  if (!r || share !== s) return true;
+  if (r.dropped.length) pruneDrawing(s.doc, path);
+  const text = JSON.stringify(r.model, null, 2);
+  if (text === s.bases.get(path)) return true;
+  let gated;
+  try { gated = gateEdit(path, text); } catch (e) { app.log(`WARNING: ${path}: an editor's change not written: ${e.reason || e.message}.`, 'warn'); return false; }
+  if (edited) await untrustEdited(s);
+  await s.orig.writeFile(s.project, path, gated);
+  s.bases.set(path, gated);
+  putFile(s.doc, path, gated);
+  const d = S.docs.find(x => x.path === path && x.fsmEditor);
+  if (d && JSON.stringify(d.fsmEditor.getModel(), null, 2) === gated) app.setDirty(d, false);
+  const { syncHdlFromFsm } = await import('./drawings.js');
+  await syncHdlFromFsm(path, r.model).catch(e => app.log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
+  return true;
 }

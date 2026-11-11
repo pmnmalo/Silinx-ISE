@@ -9,6 +9,7 @@ import { log } from './console.js';
 import { S, activateDoc, closeDoc, openFile, refreshSummary, setDirty, flushDoc } from './app.js';
 import { reloadProject } from './project.js';
 import { restoreImplStatus, saveImplStatus } from './processes.js';
+import { editsDrawingHere } from './collab-state.js';
 
 const REPORTS = 'build/reports.json', STATUS = 'build/silinx-status.json';
 // (a drawing's document: its path in its id, as app.js's docPath)
@@ -63,8 +64,10 @@ export async function applyChanges({ project, changes = [], by = null }) {
   if (run) refreshSummary();
 }
 
-// whether an open text editor of `path` shows its file's text already
+// whether an open text editor of `path` shows its file's text already (a drawing an editor's link edits: bound live to
+// its structure, #3183)
 async function shownLive(path) {
+  if (editsDrawingHere(path) && S.docs.some(o => docPath(o) === path && o.fsmEditor)) return true;
   const d = S.docs.find(o => docPath(o) === path && o.editor);
   if (!d) return false;
   try { return d.editor.getValue() === await api.readFile(S.project.name, path); } catch { return false; }

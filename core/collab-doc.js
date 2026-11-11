@@ -3,11 +3,14 @@
 //   project  Y.Map   json: silinx.json as the API gives it (its fileTree left out)
 //   files    Y.Map   path -> Y.Text: every file of the project's tree, text only (the HDL, the constraints, the test
 //                    benches, the C, the drawings' JSON), FILE_MAX at most each; build/ and hidden files never
+//   drawings Y.Map   path -> Y.Map: the drawings edited live, each as a structure of its own (#3183,
+//                    core/collab-model.js); their files' texts the owner's, written from it
 // The owner's Silinx writes it (publishProject, putFile, ...), a follower's reads it (docProject, docFile). A text is
 // changed by its common prefix and suffix kept, so an update carries the edit only (and phase 2's editors, bound to
 // the same Y.Text, need no other layout).
 import * as Y from 'yjs';
 import { gateFile, GateError } from './import-gate.js';
+import { syncDrawings, drawingObjects, DRAWING_OBJECTS_MAX } from './collab-model.js';
 
 export const LAYOUT_VERSION = 1;
 export const FILE_MAX = 1 << 20;
@@ -109,8 +112,10 @@ export function putProject(doc, json) {
   if (m.get('json') !== s) m.set('json', s);
 }
 
-/** The whole project into the document: { project, files: { path: text } }; the files no longer in it removed. */
-export function publishProject(doc, { project, files, owner = '' }) {
+/** The whole project into the document: { project, files: { path: text } }; the files no longer in it removed; the
+ *  drawings edited live (#3183) from their files, each one's change since `bases` (path -> text, kept up to date: the
+ *  owner's, core/collab-model.js syncDrawings). */
+export function publishProject(doc, { project, files, owner = '', bases = new Map() }) {
   doc.transact(() => {
     const meta = doc.getMap('meta');
     if (meta.get('version') !== LAYOUT_VERSION) meta.set('version', LAYOUT_VERSION);
@@ -118,11 +123,12 @@ export function publishProject(doc, { project, files, owner = '' }) {
     putProject(doc, project);
     for (const [p, t] of Object.entries(files)) putFile(doc, p, t);
     for (const p of [...doc.getMap('files').keys()]) if (!Object.hasOwn(files, p) || !shareable(p, files[p])) dropFile(doc, p);
+    syncDrawings(doc, Object.fromEntries(Object.entries(files).filter(([p, t]) => shareable(p, t))), bases);
   });
 }
 
 /** What a follower takes of a room (#3361: the owner may be hostile): its files, their total size (characters). */
-export const FOLLOW_LIMITS = Object.freeze({ files: 5000, total: 64 << 20 });
+export const FOLLOW_LIMITS = Object.freeze({ files: 5000, total: 64 << 20, objects: DRAWING_OBJECTS_MAX });
 
 const size = n => (n >= 1 << 20 ? `${Math.ceil(n / (1 << 20))} MB` : `${Math.ceil(n / 1024)} KB`);
 
@@ -133,6 +139,8 @@ export function docTooLarge(doc, limits = FOLLOW_LIMITS) {
   let total = 0;
   for (const yt of files.values()) total += yt instanceof Y.Text ? yt.length : 0;
   if (total > limits.total) return `the shared project is larger than a follower takes (${size(total)}, at most ${size(limits.total)})`;
+  const objects = drawingObjects(doc);
+  if (objects > (limits.objects ?? DRAWING_OBJECTS_MAX)) return `the shared project's drawings hold more objects than a follower takes (${objects}, at most ${limits.objects ?? DRAWING_OBJECTS_MAX})`;
   return null;
 }
 
