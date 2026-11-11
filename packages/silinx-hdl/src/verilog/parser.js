@@ -6,6 +6,7 @@ import { itemMethods } from './parser-items.js';
 import { stmtMethods } from './parser-stmts.js';
 import { exprMethods } from './parser-exprs.js';
 import { assertMethods } from './parser-assert.js';
+import { nestingMethods } from './parser-nesting.js';
 
 // opts.include(name): the text of a project file for `include (null when there is none)
 export function parse(source, file = 'input', opts = {}) {
@@ -26,6 +27,8 @@ class Parser {
     this.blockDepth = 0;          // inside generate blocks (their declarations are their own)
     this.portNames = new Map();
     this.nesting = 0;             // how deep the expression being read nests (#3395)
+    this.stmtNesting = 0;         // how deep the statement being read nests, and its error reported (#3490)
+    this.stmtTooDeep = false;
   }
   isWord(v, t = this.tok) { return t.t === 'id' && t.v === v; }
   // does a declaration start here with a data type (not an instance of a module: `bit u1 (…)`)
@@ -552,18 +555,18 @@ class Parser {
         this.expect('endgenerate');
         return;
       }
-      // generate constructs: numbered in their scope (the names of their unnamed blocks)
-      if (this.isAny('for', 'if', 'case')) {
+      // generate constructs: numbered in their scope (the names of their unnamed blocks); one in another one level
+      // deeper, as statements: at most MAX_NESTING (#3490)
+      if (this.isAny('for', 'if', 'case')) return this.deeperStmt(() => {
         const n = this.genScopes.length ? ++this.genScopes[this.genScopes.length - 1].n : 0;
         if (this.is('for')) return items.push(this.genFor(n));
         if (this.is('if')) return items.push(this.genIf(n));
         return items.push(this.genCase(n));
-      }
-      if (this.is('begin')) { // bare generate block
+      });
+      if (this.is('begin')) return this.deeperStmt(() => { // bare generate block
         const blk = this.genBlock();
         items.push({ kind: 'generate_if', label: blk.label, cond: { op: 'int', value: '1' }, then: blk.items, else: [], decls: blk.decls, loc: this.loc(t) });
-        return;
-      }
+      });
       if (this.is('function') || this.is('task')) return decls.push(this.funcDecl());
       if (this.is('defparam')) {   // defparam u1.P = v, u1.u2.Q = w;
         this.next();
@@ -770,4 +773,4 @@ class Parser {
   }
 }
 // (its generate blocks, functions and instances, statements and expressions: parser-items.js, parser-stmts.js, parser-exprs.js)
-Object.assign(Parser.prototype, itemMethods, stmtMethods, exprMethods, assertMethods);
+Object.assign(Parser.prototype, itemMethods, stmtMethods, exprMethods, assertMethods, nestingMethods);
