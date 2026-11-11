@@ -108,9 +108,32 @@ export async function listProjects() {
 }
 
 // a project cloned from a repository (#3195, server/git.js): untrusted until the user trusts it (#2830), its mark kept in
-// .git, not in silinx.json, which stays the repository's (a clone shows no change)
+// .git, not in silinx.json, which stays the repository's (a clone shows no change). An untrusted project put in a
+// repository keeps its mark there too (keepTrustInRepo), so that what git checks out (a pull, a merge) never trusts
+// it: the project's own repository's .git/silinx-trust.json, or the workspace's .git/silinx-trust/<project>.json (a
+// repository of several projects). A mark that cannot be read is an untrusted one.
 export const CLONE_TRUST = path.join('.git', 'silinx-trust.json');
-const cloneTrust = dir => { try { return JSON.parse(fsSync.readFileSync(path.join(dir, CLONE_TRUST), 'utf8')); } catch { return null; } };
+const trustMarks = dir => [path.join(dir, CLONE_TRUST), path.join(path.dirname(dir), '.git', 'silinx-trust', `${path.basename(dir)}.json`)];
+const cloneTrust = dir => {
+  for (const f of trustMarks(dir)) {
+    let text;
+    try { text = fsSync.readFileSync(f, 'utf8'); } catch { continue; }
+    try { const m = JSON.parse(text); return m && typeof m === 'object' ? m : { trusted: false }; } catch { return { trusted: false }; }
+  }
+  return null;
+};
+
+/** An untrusted project in a repository (root: 'project', its own, or 'workspace', server/git.js repoOf): its mark kept
+ *  in the repository's .git, never in what git tracks. A trusted project: nothing (false); fromOutside: one that a pull
+ *  brought, untrusted whatever its silinx.json says. */
+export async function keepTrustInRepo(name, root, { fromOutside = false } = {}) {
+  const pj = await readProject(name);
+  if (pj.trusted !== false && !fromOutside) return false;
+  const f = trustMarks(projectDir(name))[root === 'workspace' ? 1 : 0];
+  await fs.mkdir(path.dirname(f), { recursive: true });
+  await fs.writeFile(f, JSON.stringify({ trusted: false, ...(pj.madeBy === 'mcp' ? { madeBy: 'mcp' } : {}) }) + '\n');
+  return true;
+}
 
 export async function readProject(name) {
   const dir = projectDir(name);
@@ -185,7 +208,7 @@ export function writeProject(name, pj) {
 /** The user trusts a project from outside (#2830): Xilinx ISE and programming may run for it. */
 export async function trustProject(name) {
   const out = await updateProject(name, pj => { const { trusted, madeBy, ...rest } = pj; return rest; });   // eslint-disable-line no-unused-vars
-  await fs.rm(path.join(projectDir(name), CLONE_TRUST), { force: true });
+  for (const f of trustMarks(projectDir(name))) await fs.rm(f, { force: true });
   return out;
 }
 
@@ -304,6 +327,7 @@ export async function deleteProject(name) {
   const trash = path.join(workspaceDir(), '.trash');
   await fs.mkdir(trash, { recursive: true });
   await fs.rename(dir, path.join(trash, `${name}-${Date.now()}`));
+  await fs.rm(trustMarks(dir)[1], { force: true });   // (the workspace repository's mark, #2830)
 }
 
 // project-relative path normalised to forward slashes, without './' or a trailing '/'
