@@ -861,8 +861,9 @@ traffic, blinky and pong on the Atlys):
   tile's LOGICOUT wires), 35 of them known already with the same bits. 85 of the 86 new ones are in `db/s6-pips-bscan.json`; the slave OLOGIC2's
   `D1 -> OQ` of a top inner I/O tile (TIOI_INNER, three bits), which c3's and c4's output took, is left out while
   nextpnr's released chip database has not got it: Silinx would give the 30 (23) top-bank pads of #3152 outputs that
-  nextpnr cannot route. It waits in `db/s6-pips-held.json` (#3349), which the chip database's export
-  (`research/nextpnr-s6/export-unknown-pips.mjs`) reads and the flow does not, for the fork's next Spartan-6 chip database.
+  nextpnr cannot route. It waited in `db/s6-pips-held.json` (#3349), which the chip database's export
+  (`research/nextpnr-s6/export-unknown-pips.mjs`) read and the flow did not, for the fork's next Spartan-6 chip database;
+  since spartan6 0.4.1 is pinned it is in `db/s6-pips-bscan.json`, and the held file is gone.
   The TIOI_OUTER tiles' slave `D1 -> OQ` (#3350, the same bits) and the *IOB_SINGLE tiles' pad wire -> IBUF PIPs (#3169,
   no bits) joined it, measured with `measure-3169-s6.sh`.
   With them every design is one bit from ISE's bitgen: the instance's JTAG_CHAIN, one bit per chain in UR_UPPER's
@@ -883,8 +884,8 @@ traffic, blinky and pong on the Atlys):
   D_ILOGIC_IDATAIN_IODELAY_S`, and the bits that changes are exactly that PIP's (`23,20 23,21`, `db/s6-pips-flow.json`),
   the same on both parts. Silinx's writer gives ISE's bitgen the same bytes on the eight designs with or without the
   four PIPs (one OLOGIC2 bit on the LED's output flip-flop apart, and on the XC6SLX45 two clock PIPs the databases
-  have not). They wait in `db/s6-pips-held.json` until nextpnr's chip database has them (#3349), so those pads still
-  take no input.
+  have not). They waited in `db/s6-pips-held.json` until nextpnr's chip database had them; since #3349 (spartan6
+  0.4.1 pinned) they are in `db/s6-pips-io.json`, and those pads take an input.
 
 - **The TIOI_OUTER tiles' slave outputs** (#3350). The output half of #3169: 16 of the XC6SLX16's top-bank pads (12 of
   the XC6SLX45's) are driven by TIOI_OUTER's slave OLOGIC2, whose route-through `D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S`
@@ -894,12 +895,13 @@ traffic, blinky and pong on the Atlys):
   slave's: `ana-pipdrop6.mjs` leaves it unresolved, as the drop always takes it with the pad tile's `TIOB TIOB_O1 ->
   TIOB_O1_PINW` (no bits, `db/s6-pips-flow.json`), and the bits that change are exactly those three on the four designs.
   With it Silinx's writer is byte-identical with ISE's bitgen on three of them (the fourth: three clock PIPs of its
-  CMT_PLL_TOP / REG_V_HCLK route the databases have not). It waits in `db/s6-pips-held.json` too.
+  CMT_PLL_TOP / REG_V_HCLK route the databases have not). It waited in `db/s6-pips-held.json` too; since #3349 it is in
+  `db/s6-pips-io.json`, and every pad of both parts takes an input and an output.
 
   To measure again: `node research/s6/run-3169-s6.mjs in|out <W>` runs `measure-3169-s6.sh` on both parts with the ISE
   machine's settings read from `~/.silinx/config.json` (masked in its output; one ISE container at a time, none started
   after 07:00), then `node research/s6/check-held6.mjs <W>` compares Silinx's writer with ISE's bitgen on the designs,
-  with and without the held PIPs, and the resolved PIPs with the held file's bits.
+  with the databases the flow reads, and lists the resolved PIPs those have not, or with other bits.
 
 ## Trying the parts that exist
 
@@ -945,9 +947,9 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `gen-pipdrop6.mjs` | The examples routed by ISE without the other tiles' PIPs (`--split`: a quarter at a time) (#726) |
 | `ana-pipdrop6.mjs` | Their bits by tile and PIP: `db/s6-pips-other.json` (#726) |
 | `gen-bscan6.mjs`, `measure-3176-s6.sh` | #3176: BSCAN_SPARTAN6 on each JTAG chain, implemented by ISE from HDL, its corner tiles' PIPs dropped: `db/s6-pips-bscan.json`, the chain's bit `db/s6-bscan.json` |
-| `gen-padsingle6.mjs`, `measure-3169-s6.sh` | #3169: an input on each pad of the TIOB_SINGLE / BIOB_SINGLE tiles, implemented by ISE from HDL, its PIPs dropped (no bits): `db/s6-pips-held.json` |
-| `gen-padout6.mjs` | #3350: an output on TIOI_OUTER slave pads, for `measure-3169-s6.sh` (`GEN=gen-padout6.mjs`): `db/s6-pips-held.json` |
-| `run-3169-s6.mjs`, `check-held6.mjs` | #3169, #3350: both measurements on both parts with the ISE machine's settings; Silinx's writer on their designs with the held PIPs |
+| `gen-padsingle6.mjs`, `measure-3169-s6.sh` | #3169: an input on each pad of the TIOB_SINGLE / BIOB_SINGLE tiles, implemented by ISE from HDL, its PIPs dropped (no bits): `db/s6-pips-io.json` |
+| `gen-padout6.mjs` | #3350: an output on TIOI_OUTER slave pads, for `measure-3169-s6.sh` (`GEN=gen-padout6.mjs`): `db/s6-pips-io.json` |
+| `run-3169-s6.mjs`, `check-held6.mjs` | #3169, #3350: both measurements on both parts with the ISE machine's settings; Silinx's writer on their designs, against ISE's bitgen |
 | `residual6.mjs` | Every bit of ISE's implemented examples predicted from the databases; what is left, by tile type (#725, #726) |
 | `gen-iob6.mjs` | The pads' designs: every bonded pad an IOB of one setting, the id designs (#727) |
 | `gen-clock6.mjs` | The clock path's designs (ISE implements them): one or more clocks to fixed flip-flops, k16 (#727) |

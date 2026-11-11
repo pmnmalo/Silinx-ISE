@@ -43,9 +43,9 @@ for (const part of ['xc6slx16csg324-3', 'xc6slx45csg324-3']) {
   });
 }
 
-// (xc6slx16-cmt.json: the DCMs' and PLLs' measured variants, which the clock tests read, not the flow; s6-pips-held.json:
-// the PIPs held out of the flow until nextpnr's chip database has them, which only its export reads, #3349)
-const NOT_THE_FLOWS = ['xc6slx16-cmt', 's6-pips-held'];
+// (xc6slx16-cmt.json: the DCMs' and PLLs' measured variants, which the clock tests read, not the flow; s6-pips-held.json,
+// the PIPs held out of the flow until nextpnr's chip database had them, is gone since #3349)
+const NOT_THE_FLOWS = ['xc6slx16-cmt'];
 test('#2103 every file of bitdb/s6 is one a part reads: the browser fetches them all', () => {
   const files = fs.readdirSync(S6_DB_DIR).filter(f => f.endsWith('.json') && !/ \d+\.json$/.test(f)).map(f => f.slice(0, -5)).filter(f => !NOT_THE_FLOWS.includes(f)).sort();
   const read = [...new Set(['xc6slx16csg324-3', 'xc6slx45csg324-3'].flatMap(s6DbNames))].sort();
