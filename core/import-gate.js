@@ -83,6 +83,8 @@ export function normalizePath(p, { limits = GATE_LIMITS } = {}) {
     if (s === '..') return { reason: "path leaves the project ('..')" };
     if (/[<>:"|?*]/.test(s)) return { reason: `character not allowed in a name (< > : " | ? *): '${s}'` };
     if (s.startsWith('.')) return { reason: `hidden file or folder ('${s}')` };
+    // (a '~' and digits in the base name: what Windows may take for a hidden one's short name, GIT~1 for .git)
+    if (/^[^.]*~\d/.test(s)) return { reason: `a short (8.3) name, which may be a hidden file's or folder's ('${s}')` };
     if (/[ .]$/.test(s)) return { reason: `name ending with a space or a dot ('${s}')` };
     if (WINDOWS_DEVICE.test(s)) return { reason: `reserved name ('${s}')` };
     if (s.length > limits.maxSegment) return { reason: `name longer than ${limits.maxSegment} characters` };

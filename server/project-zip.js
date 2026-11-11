@@ -11,6 +11,7 @@ import path from 'node:path';
 import { createZip } from '../core/zip.js';
 import { gateMessages, requireGated } from '../core/import-gate.js';
 import { markUntrusted } from '../core/trust.js';
+import { hiddenName } from './paths.js';
 import { exportCSources, exportIseSchematics, exportXise } from './xise.js';
 import { isCSource } from '../core/view-hdl.js';
 import { ISE_OUTPUT, NODE_CODEC, SILINX_ONLY, importXiseProject } from './impl-routes.js';
@@ -96,7 +97,7 @@ export async function importProjectEntries(P, name, gated, bad) {
     if (r === null || written.has(r) || /\.xise$/i.test(r) || P.isProjectFile(r) || (xiseEntry && ISE_OUTPUT.test(r))) continue;
     const norm = path.posix.normalize(r);
     // (no hidden file or folder: an export has none, and a .git/ or an editor's settings would run commands)
-    if (norm.startsWith('..') || path.posix.isAbsolute(norm) || norm.split('/').some(s => s.startsWith('.'))) continue;
+    if (norm.startsWith('..') || path.posix.isAbsolute(norm) || norm.split('/').some(hiddenName)) continue;
     const to = P.safeJoin(P.projectDir(name), norm);
     if (await P.isProjectFileAt(P.projectDir(name), to)) continue;   // (silinx.json by another spelling: ſilinx.json, #2956)
     await fs.mkdir(path.dirname(to), { recursive: true });

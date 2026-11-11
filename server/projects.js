@@ -8,7 +8,7 @@ import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { boardAutoAssign, boardConstraintsText, constraintsExtOf } from '../packages/silinx-fpga/src/parts.js';
 import { resolveBoard } from './devices.js';
-import { realOf, within } from './paths.js';
+import { realOf, nativeRealOf, hiddenName, within } from './paths.js';
 import { topNameError } from './ident.js';
 import { normalizePath } from '../core/import-gate.js';
 import { foldName } from '../core/fold-name.js';
@@ -360,8 +360,9 @@ export async function writeFile(name, rel0, text) {
   if (!rel) throw new HttpError(400, 'missing path');
   if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
   // a hidden file or folder (.git/hooks, .vscode) is no part of a project (#3036), by its name or once its symbolic
-  // links are followed; build/ is written here too (the browser's open synthesis saves its netlists in build/open/)
-  const hidden = [rel, relKey(realOf(dir), realOf(full))].flatMap(k => k.split('/')).find(s => s.startsWith('.'));
+  // links are followed; build/ is written here too (the browser's open synthesis saves its netlists in build/open/); a
+  // short (8.3) name, or a path the system names a hidden one, too (paths.js hiddenName, nativeRealOf)
+  const hidden = [rel, relKey(realOf(dir), realOf(full)), relKey(nativeRealOf(dir), nativeRealOf(full))].flatMap(k => k.split('/')).find(hiddenName);
   if (hidden) throw new HttpError(400, `'${rel0}': not written: hidden file or folder ('${hidden}')`);
   await fs.mkdir(path.dirname(full), { recursive: true });
   // atomic: a reader (or a crash) never sees a half-written / empty file
