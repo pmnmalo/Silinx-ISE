@@ -1,5 +1,5 @@
-// CI at a release only (#607): .github/workflows/ci.yml on a version tag and by hand, never on a pull
-// request or a push to main; everything it runs, and ci-ok, the verdict the Release workflow waits for.
+// CI at a release (#607): .github/workflows/ci.yml on a version tag, nightly on main when it changed (#3423) and by
+// hand, never on a pull request or a push to main; everything it runs, and ci-ok, the verdict the Release workflow waits for.
 // The development build and the site's dev/ on every push to main; CodeQL nightly and at a release.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,21 +24,21 @@ function jobs(yml) {
 }
 const on = yml => yml.slice(yml.indexOf('\non:\n') + 1, yml.search(/\n(?:permissions|concurrency|jobs):\n/) + 1);
 
-test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v*, #1681) and by hand; every job, none gated; ci-ok needs them all', () => {
+test('CI: at a release (a tag v*, or the toolchain package\'s silinx-fpga-v*, #1681), nightly (#3423) and by hand; every job, gated only by the nightly\'s change check; ci-ok needs them all', () => {
   const ci = read('.github/workflows/ci.yml');
-  assert.equal(on(ci).replace(/^#.*\n/gm, ''), "on:\n  push:\n    tags: ['v*', 'silinx-fpga-v*']\n  workflow_dispatch:\n");
+  assert.equal(on(ci).replace(/^#.*\n/gm, '').replace(/ +#.*$/gm, ''), "on:\n  push:\n    tags: ['v*', 'silinx-fpga-v*']\n  schedule:\n    - cron: '17 23 * * *'\n  workflow_dispatch:\n");
   assert.doesNotMatch(ci, /pull_request|branches:|paths(-ignore)?:/, 'not on pull requests nor on pushes to main');
   assert.ok(!fs.existsSync(path.join(ROOT, 'scripts/ci-changes.mjs')), 'no change detection: everything runs');
   // the tags' runs one at a time (#3124: two tags' runs together queued their jobs up to 50 minutes); a run by hand on its ref
   // (a third tag cancels the waiting run: the comment says so, and what to do)
   assert.match(ci, /a third tag pushed while one runs and one waits cancels the waiting one[\s\S]*?Re-run all jobs/);
-  assert.match(ci, /^concurrency:\n  group: \$\{\{ github\.event_name == 'push' && 'ci-tags' \|\| format\('ci-\{0\}-\{1\}', github\.ref, github\.sha\) \}\}\n  cancel-in-progress: false\n/m);
+  assert.match(ci, /^concurrency:\n  group: \$\{\{ github\.event_name == 'push' && 'ci-tags' \|\| github\.event_name == 'schedule' && 'ci-schedule' \|\| format\('ci-\{0\}-\{1\}', github\.ref, github\.sha\) \}\}\n  cancel-in-progress: false\n/m);
   const j = jobs(ci);
-  assert.deepEqual(Object.keys(j), ['unit', 'ui', 'webkit-standalone', 'release-zip', 'browsers', 'os', 'private-data-history', 'ci-ok']);
-  for (const [name, lines] of Object.entries(j)) {
-    if (name === 'ci-ok') continue;
-    assert.ok(!lines.some(l => /^    (needs|if):/.test(l)), `${name}: not gated`);
-  }
+  assert.deepEqual(Object.keys(j), ['changes', 'unit', 'ui', 'webkit-standalone', 'release-zip', 'browsers', 'os', 'private-data-history', 'ci-ok', 'report']);
+  const TESTS = Object.keys(j).filter(n => !['changes', 'ci-ok', 'report'].includes(n));
+  // gated only by the change check (#3423), which never skips a tag's run or one by hand (scripts/changed-since-last-run.mjs)
+  for (const name of TESTS)
+    assert.deepEqual(j[name].filter(l => /^    (needs|if):/.test(l)), ['    needs: changes', "    if: needs.changes.outputs.run == 'true'"], `${name}: gated by the change check only`);
   // the unit tests on every system in parts of about the same time (#573), each Linux part's file times uploaded: on
   // Linux all of them in five parts, on macOS and Windows in three but the toolchain's heaviest (--light, #3124)
   const unit = j.unit.join('\n');
@@ -74,12 +74,53 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
   assert.match(hist, /fetch-depth: 0[\s\S]*node scripts\/check-private-data\.mjs --history/);
   assert.doesNotMatch(hist, /npm ci/, 'only node built-ins');
   // ci-ok: every other job, run always, red only on a failure or a cancellation
+  // (and the change check: a failed one never lets a tag's run through with its tests skipped, #3423)
   const ok = j['ci-ok'].join('\n');
-  assert.match(ok, /^    if: always\(\)$/m);
-  assert.equal(ok.match(/^    needs: \[(.*)\]$/m)[1], Object.keys(j).filter(n => n !== 'ci-ok').join(', '));
-  assert.match(ok, /- if: contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\n\s+run: exit 1/);
+  assert.match(ok, /^    if: always\(\) && github\.event_name != 'schedule'$/m);
+  assert.equal(ok.match(/^    needs: \[(.*)\]$/m)[1], ['changes', ...TESTS].join(', '));
+  assert.match(ok, /- if: contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\) \|\| contains\(needs\.\*\.result, 'skipped'\)\n\s+run: exit 1/);
   // the rules say so: no CI before the merge, the related tests locally (CLAUDE.md, ONBOARDING.md)
-  for (const f of ['CLAUDE.md', 'ONBOARDING.md']) assert.match(read(f), /CI runs at a release only/, f);
+  for (const f of ['CLAUDE.md', 'ONBOARDING.md']) {
+    assert.match(read(f), /CI runs at a release, and nightly on `?main`? when it changed\*\* \(#607, #3423\)/, f);
+    assert.doesNotMatch(read(f), /CI runs at a release only/, f);
+  }
+});
+
+test('CI nightly on main (#3423): after the Nightly, only when main changed, in a group of its own, its failures issues, nothing published', () => {
+  const ci = read('.github/workflows/ci.yml');
+  const j = jobs(ci);
+  // at night, after the Nightly's 21:17 UTC
+  const [, min, hour] = on(ci).match(/^    - cron: '(\d+) (\d+) \* \* \*'/m).map(Number);
+  const [, nMin, nHour] = read('.github/workflows/nightly.yml').match(/^    - cron: '(\d+) (\d+) \* \* \*'/m).map(Number);
+  assert.ok(hour * 60 + min > nHour * 60 + nMin, 'after the Nightly');
+  // the change check of the other scheduled workflows, given this one's file
+  assert.deepEqual(j.changes, ['    uses: ./.github/workflows/scheduled-changes.yml', '    permissions:', '      actions: read', '      contents: read', '    with:', '      workflow: ci.yml']);
+  // its own concurrency group, neither the tags' nor a run by hand's (the group of each event, the expression's branches)
+  const group = ci.match(/^concurrency:\n  group: \$\{\{ (.*) \}\}$/m)[1];
+  const groupOf = event => [...group.matchAll(/github\.event_name == '(\w+)' && '([\w-]+)'/g)].find(m => m[1] === event)?.[2] ?? 'by hand';
+  assert.equal(groupOf('push'), 'ci-tags');
+  assert.equal(groupOf('schedule'), 'ci-schedule');
+  assert.equal(groupOf('workflow_dispatch'), 'by hand');
+  assert.match(ci, /^  cancel-in-progress: false$/m, 'a tag\'s run never cancelled');
+  // a failed job an issue, as the Nightly's (#251): failure-report.yml, after every test job, on a schedule only;
+  // ci-ok not run then (its failure would be one more issue)
+  const report = j.report.join('\n');
+  const tests = Object.keys(j).filter(n => !['ci-ok', 'report'].includes(n));
+  assert.equal(report.match(/^    needs: \[(.*)\]$/m)[1], tests.join(', '));
+  assert.match(report, /^    if: always\(\) && github\.event_name == 'schedule' && \(contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\)$/m);
+  assert.match(report, /^    uses: \.\/\.github\/workflows\/failure-report\.yml$/m);
+  assert.ok(j['ci-ok'].includes("    if: always() && github.event_name != 'schedule'"));
+  // nothing published: a read-only token but the report's issues, no release, package, push or page
+  assert.match(ci, /\npermissions:\n  contents: read\n(?! )/);
+  for (const [name, lines] of Object.entries(j)) {
+    const writes = lines.filter(l => /^ {6}[\w-]+: write$/.test(l)).map(l => l.trim());
+    assert.deepEqual(writes, name === 'report' ? ['issues: write'] : [], name);
+  }
+  assert.doesNotMatch(ci.replace(/^\s*#.*$/gm, ''), /\bnpm publish\b|\bgh release\b|\bgit push\b|deploy-pages|upload-pages-artifact|GH_TOKEN|NODE_AUTH_TOKEN/);
+  // and no workflow follows CI's runs: the Release and the toolchain's npm publishing wait for a tag's or a run by hand's
+  // (scripts/wait-for-ci.mjs, test/wait-for-ci.test.js), never started by a run of CI
+  for (const f of fs.readdirSync(path.join(ROOT, '.github/workflows')).filter(f => /\.ya?ml$/.test(f)))
+    assert.doesNotMatch(read(`.github/workflows/${f}`), /workflow_run:\n\s+workflows: \[[^\]]*\bCI\b/, f);
 });
 
 test('CI at a release only: the development build and the site\'s dev/ after every push to main, not after CI (#607)', () => {

@@ -39,6 +39,15 @@ test('wait for CI: the verdict from the runs of the commit', () => {
   assert.equal(verdict([run(19, 'completed', 'success', 'push', 'other-v1.0.0')]).state, 'none');
 });
 
+test('wait for CI: a scheduled run of main is not a release\'s (#3423)', () => {
+  // the nightly run of the whole CI (ci.yml's schedule) passed or failed on the commit: the tag's run is still waited for
+  const nightly = (id, status, conclusion) => run(id, status, conclusion, 'schedule', 'main');
+  assert.equal(verdict([nightly(1, 'completed', 'success')]).state, 'none');
+  assert.equal(verdict([nightly(1, 'completed', 'failure'), run(2, 'in_progress')]).state, 'pending');
+  assert.equal(verdict([nightly(1, 'completed', 'failure'), run(2, 'completed', 'success')]).state, 'success');
+  assert.equal(verdict([nightly(1, 'completed', 'success'), run(2, 'completed', 'failure')]).state, 'failure');
+});
+
 test('wait for CI: the command line without its arguments', () => {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/wait-for-ci.mjs')], { encoding: 'utf8', env: { ...process.env, GITHUB_REPOSITORY: '' } });
   assert.equal(r.status, 2);
@@ -56,7 +65,7 @@ test('release: CI on the tagged commit instead of npm test, the commit on main; 
   assert.match(yml, /uses: actions\/checkout@.+\n\s+with:\n\s+fetch-depth: 0\n/);
   assert.match(yml, /- name: The commit is on main\n\s+run: git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main\n/);
   // CI starts on the tag, with the release (ci.yml)
-  assert.match(fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8'), /^on:\n {2}push:\n {4}tags: \['v\*', 'silinx-fpga-v\*'\]\n {2}workflow_dispatch:\n/m);
+  assert.match(fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8'), /^on:\n {2}push:\n {4}tags: \['v\*', 'silinx-fpga-v\*'\]\n {2}schedule:\n {4}- cron: .*\n {2}workflow_dispatch:\n/m);
   // the job's limit above the wait's, with time to package and check
   const wait = +/--timeout (\d+)/.exec(yml)[1], job = +/\n {4}timeout-minutes: (\d+)\n/.exec(yml)[1];
   assert.ok(job >= wait + 15, `${job} >= ${wait} + 15`);

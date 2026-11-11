@@ -84,7 +84,8 @@ the code and the lessons learnt.
 - **Tests while working, locally**: only the tests related to the change (the files it touches and
   their neighbours), a few at a time; no full suites and no parallel stress runs on the developer's
   machine. To check a fix against load, use `SILINX_UI_THROTTLE` on one or two processes.
-- **CI runs at a release only** (#607): not on pull requests nor on pushes to `main`. Push the branch and
+- **CI runs at a release, and nightly on `main` when it changed** (#607, #3423): not on pull requests nor on pushes
+  to `main`; a failed job of the nightly run is an issue, fixed in the next change. Push the branch and
   open a pull request (`gh pr create`, its description saying `Fixes #N`). A pull request runs the whole test
   file of every module it changes (`.github/workflows/pr-tests.yml`, `scripts/related-tests.mjs`, #637: the
   unit test files that import a changed file, directly or through a test helper; a changed test; the UI test
@@ -118,7 +119,8 @@ the code and the lessons learnt.
   creates, moves or deletes a `v*` tag (a tag ruleset: a workflow's token cannot make a release). The weekly quality
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
-- **CI** (`.github/workflows/ci.yml`) runs everything when a version tag `v*` is pushed, and by hand
+- **CI** (`.github/workflows/ci.yml`) runs everything when a version tag `v*` is pushed, every night on `main` when
+  `main` changed since its last run (after the Nightly, #3423; it publishes nothing), and by hand
   (Actions ▸ CI ▸ Run workflow): the unit tests on Linux, macOS and Windows (the toolchain's heaviest, `HEAVY` in
   `scripts/test-shard.mjs`, on Linux only, #3124), the UI tests in both
   interfaces, Firefox / WebKit, the operating systems' smoke tests, WebKit memory, the standalone build,

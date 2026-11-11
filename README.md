@@ -492,8 +492,8 @@ inside the remote home, #2958).
 
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
 publishes a release with the files above (`.github/workflows/release.yml`), once CI, which the tag
-starts, has passed on the tagged commit (`scripts/wait-for-ci.mjs`). CI runs at a release only, not on
-pushes to main (#607); a pull request runs the test files of the modules it changes (`.github/workflows/pr-tests.yml`, #637).
+starts, has passed on the tagged commit (`scripts/wait-for-ci.mjs`). CI runs at a release, and nightly on main
+when it changed (#3423), not on pushes to main (#607); a pull request runs the test files of the modules it changes (`.github/workflows/pr-tests.yml`, #637).
 The tests against ISE (`test/ise/`) run nightly, and on demand (Actions ▸ ISE ▸ Run workflow), on
 a self-hosted runner with the ISE Docker image (label `ise`, `.github/workflows/ise.yml`); only code
 already on main runs there, never a pull request's: the runner refuses every other job before its

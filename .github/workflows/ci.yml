@@ -1,13 +1,19 @@
 name: CI
-# The tests, all of them, at a release only (#607): when a version tag v* is pushed (the Release workflow
+# The tests, all of them, at a release (#607): when a version tag v* is pushed (the Release workflow
 # waits for this run of the tagged commit, scripts/wait-for-ci.mjs), or the toolchain package's silinx-fpga-v*
 # (its npm publishing waits for it the same way, silinx-fpga-release.yml, #1681), and by hand (Actions ▸ CI ▸ Run
-# workflow, on main or a branch). Not on pull requests nor on pushes to main: a change is merged after
-# the tests related to it, run locally (CLAUDE.md); the scheduled workflows (nightly, ISE, Quality) keep
-# watching between releases.
+# workflow, on main or a branch). And every night on main, after the Nightly, when main changed since this
+# workflow's last successful run on main (#3423, scheduled-changes.yml): the breaks a pull request's related tests
+# miss (a UI test that depends on a change indirectly, two pull requests that break together, a test that fails on
+# macOS or Windows only) found the next morning, not at the release; a failed job is an issue, as the Nightly's
+# (failure-report.yml). A scheduled run publishes nothing, and the Release does not take it for a tag's
+# (wait-for-ci.mjs: a push's or a run by hand only). Not on pull requests nor on pushes to main: a change is merged
+# after the tests related to it (CLAUDE.md); the other scheduled workflows (nightly, ISE, Quality) keep watching too.
 on:
   push:
     tags: ['v*', 'silinx-fpga-v*']
+  schedule:
+    - cron: '17 23 * * *'     # 23:17 UTC, two hours after the Nightly (21:17), when main changed (#3423)
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,15 +23,26 @@ permissions:
 # GitHub keeps one run waiting per group: a third tag pushed while one runs and one waits cancels the waiting one. Its
 # release then fails, unless another tag's run of the same commit passed ("CI did not pass (cancelled)"): run CI on that
 # tag again (Actions ▸ CI ▸ the cancelled run ▸ Re-run all jobs) and then its release. Push the tags of a release two at a
-# time at most. A run by hand, on its ref and commit.
+# time at most. The scheduled run in a group of its own (#3423): it neither waits for a tag's run nor makes one wait
+# (nor cancels it), though both share the jobs GitHub runs at once. A run by hand, on its ref and commit.
 concurrency:
-  group: ${{ github.event_name == 'push' && 'ci-tags' || format('ci-{0}-{1}', github.ref, github.sha) }}
+  group: ${{ github.event_name == 'push' && 'ci-tags' || github.event_name == 'schedule' && 'ci-schedule' || format('ci-{0}-{1}', github.ref, github.sha) }}
   cancel-in-progress: false
 # Everything runs: the unit tests on Linux (the toolchain's heaviest on Linux only, #3124), macOS and Windows, the UI
 # tests in both interfaces, Firefox /
 # WebKit, the operating systems' smoke tests, WebKit memory and the standalone build, the release zip, the
 # history's private-data scan. ci-ok is green when every job passed.
 jobs:
+  # whether main changed since this workflow's last successful run on main (#3423: a scheduled run with nothing new
+  # to test is skipped; a tag's run and one by hand always run): .github/workflows/scheduled-changes.yml
+  changes:
+    uses: ./.github/workflows/scheduled-changes.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      workflow: ci.yml
+
   # the unit tests, in parts at once of about the same time (scripts/test-shard.mjs, by each file's time in
   # test/timings.json, #573): on Linux all of them in five parts; on macOS and Windows in three, but the toolchain's
   # heaviest tests (HEAVY in scripts/test-shard.mjs, --light: the whole open flow on every feature, device and example,
@@ -36,6 +53,8 @@ jobs:
   # node scripts/update-test-timings.mjs <run id>. The end of the output lists each file's time, and a file
   # over 15 minutes is a warning (scripts/test-file-times.mjs, #566)
   unit:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -80,6 +99,8 @@ jobs:
   # about 70 in November 2026, a part up to 25 on a slow runner (#2462).
   # Each part uploads its files' times, merged by node scripts/update-test-timings.mjs <run id>
   ui:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -114,6 +135,8 @@ jobs:
 
   # the memory test in WebKit (Safari's engine), and the single-file edition builds
   webkit-standalone:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -162,6 +185,8 @@ jobs:
   # the release zip as users get it: packaged as the Release workflow does, unzipped, started with its
   # launcher, and the open synthesis run in Chrome from it without the Internet
   release-zip:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -176,6 +201,8 @@ jobs:
 
   # the main UI flows in Firefox and in WebKit (Safari's engine)
   browsers:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     # (Firefox, then WebKit, one file at a time: about 25 minutes, #1126; the steps' own limits first, #2939)
     timeout-minutes: 70
@@ -223,6 +250,8 @@ jobs:
   # macOS and Windows: a small UI smoke test in the installed Chrome (and on macOS the release zip,
   # with its .command launcher); their unit tests are in the unit job
   os:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -252,6 +281,8 @@ jobs:
   # up to it; an open branch never fails a release.
   # Only node's built-ins: no npm ci.
   private-data-history:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -265,15 +296,28 @@ jobs:
       - run: node scripts/check-private-data.mjs --history
 
   # the verdict of the run (#409), which the Release workflow waits for: green when every job above passed,
-  # red when one failed or was cancelled
+  # red when one failed, was cancelled or was skipped (a tag's run and one by hand skip nothing: a failed change check
+  # never lets a release through untested, #3423); not in a scheduled run, whose failed jobs are reported one by one
+  # (its own failure would be one more issue)
   ci-ok:
-    if: always()
-    needs: [unit, ui, webkit-standalone, release-zip, browsers, os, private-data-history]
+    if: always() && github.event_name != 'schedule'
+    needs: [changes, unit, ui, webkit-standalone, release-zip, browsers, os, private-data-history]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - run: echo "$RESULTS"
         env:
           RESULTS: ${{ toJSON(needs) }}
-      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
         run: exit 1
+
+  # a failed job of a scheduled run is an issue, as the Nightly's (#251, #3423): .github/workflows/failure-report.yml
+  report:
+    needs: [changes, unit, ui, webkit-standalone, release-zip, browsers, os, private-data-history]
+    if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    uses: ./.github/workflows/failure-report.yml
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: write

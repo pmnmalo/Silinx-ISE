@@ -33,7 +33,8 @@ npm start          # prints the address to open: http://127.0.0.1:8642/#token=â€
 1. **An issue for everything**, even a bug fixed at once. Commits and PRs say `Fixes #N`. Issues are
    public: no personal data, no hosts, no course code.
 2. **A branch and a pull request for every change.** `main` is protected: no force push, a linear
-   history. **CI runs at a release only** (#607), not on pull requests nor on pushes to main. A pull
+   history. **CI runs at a release, and nightly on main when it changed** (#607, #3423), not on pull requests nor
+   on pushes to main. A pull
    request runs the whole test file of every module it changes (`pr-tests.yml`, #637; in parts of about 20
    minutes, as many as the tests' measured time needs, #1982); Pedro (or a
    session of Pedro's) merges when its check `related-tests` is green (`gh pr checks <N> --required`), with
