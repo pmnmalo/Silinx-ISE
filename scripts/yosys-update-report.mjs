@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { QUALITY_TOLERANCE } from '../test/designs-corpus/lib.mjs';
 import { EXAMPLE_ORDER } from '../core/examples.js';
 import { YOSYS_TESTS_PIN } from './fetch-yosys-tests.mjs';
+import { code, ownComment } from './github-text.mjs';
 
 export const PACKAGE = '@yowasp/yosys';
 // the comment's mark: a later run updates the same comment
@@ -140,7 +141,7 @@ export function reportMarkdown({ baseVersion, headVersion, examples, designs, co
   };
   table('Examples (Basys2-250)', examples);
   table('Design corpus (a representative subset)', designs);
-  L.push(`### Yosys's test designs (test/corpus, ${corpus?.tag || testsPin.tag}) against test/corpus/expected.json`, '');
+  L.push(`### Yosys's test designs (test/corpus, ${corpus?.tag ? code(corpus.tag) : testsPin.tag}) against test/corpus/expected.json`, '');
   if (!corpus || !corpus.shards.length) L.push('No result (see the run).', '');
   else {
     const kind = v => String(v).split(':')[0];
@@ -149,10 +150,11 @@ export function reportMarkdown({ baseVersion, headVersion, examples, designs, co
     L.push(`- Yosys reading the source: ${tally(keys.filter(k => !k.endsWith(' (synth)')))}`, `- Silinx's open synthesis: ${tally(keys.filter(k => k.endsWith(' (synth)')))}`);
     if (corpus.missing.length) L.push(`- shard(s) ${corpus.missing.join(', ')}: no result (the job failed or was cancelled: see the run)`);
     L.push('');
-    if (corpus.regress.length) L.push(`**Regressions** (${corpus.regress.length}: expected to pass):`, '', ...cap(corpus.regress, 30, k => `- \`${k}\`: ${corpus.results[k] ?? 'no result'}`), '');
-    if (corpus.timedOut.length) L.push(`**Timed out** (${corpus.timedOut.length}): ${corpus.timedOut.map(f => `\`${f}\``).join(', ')}`, '');
-    if (corpus.fixed.length) L.push(`Newly passing (${corpus.fixed.length}):`, '', ...cap(corpus.fixed, 30, k => `- \`${k}\` (was: ${corpus.expected[k] ?? '?'})`), '');
-    if (corpus.newWarnings.length) L.push(`**New warnings** (${corpus.newWarnings.length}):`, '', ...cap(corpus.newWarnings, 20, w => `- ${w}`), '');
+    // (the artifact's text, which the pull request's Yosys wrote, in code spans: inert, #3417)
+    if (corpus.regress.length) L.push(`**Regressions** (${corpus.regress.length}: expected to pass):`, '', ...cap(corpus.regress, 30, k => `- ${code(k)}: ${corpus.results[k] != null ? code(corpus.results[k]) : 'no result'}`), '');
+    if (corpus.timedOut.length) L.push(`**Timed out** (${corpus.timedOut.length}): ${corpus.timedOut.map(code).join(', ')}`, '');
+    if (corpus.fixed.length) L.push(`Newly passing (${corpus.fixed.length}):`, '', ...cap(corpus.fixed, 30, k => `- ${code(k)} (was: ${corpus.expected[k] != null ? code(corpus.expected[k]) : '?'})`), '');
+    if (corpus.newWarnings.length) L.push(`**New warnings** (${corpus.newWarnings.length}):`, '', ...cap(corpus.newWarnings, 20, w => `- ${code(w)}`), '');
     if (corpus.goneWarnings.length) L.push(`Warnings no longer given: ${corpus.goneWarnings.length}`, '');
     if (corpus.fresh.length) L.push(`Not in expected.json: ${corpus.fresh.length}`, '');
     if (!corpus.regress.length && !corpus.fixed.length && !corpus.newWarnings.length && !corpus.timedOut.length) L.push('No change against the expectations.', '');
@@ -190,7 +192,8 @@ export async function postComment(file, { mark = MARK, artifact = 'yosys-update-
   const body = fs.readFileSync(file, 'utf8');
   const api = (p, opts = {}) => fetch(`https://api.github.com/repos/${repo}/${p}`, { ...opts, headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', ...(opts.body && { 'Content-Type': 'application/json' }) } });
   const list = await api(`issues/${pr}/comments?per_page=100`);
-  const mine = list.ok ? (await list.json()).find(c => String(c.body || '').startsWith(mark)) : null;
+  // (the bot's own comment only: one that starts the same way by anyone else, which its author could edit, is not taken, #3417)
+  const mine = list.ok ? ownComment(await list.json(), mark) : null;
   const r = mine ? await api(`issues/comments/${mine.id}`, { method: 'PATCH', body: JSON.stringify({ body }) })
     : await api(`issues/${pr}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
   if (r.ok) { console.log(mine ? `updated the comment ${mine.id}` : `commented on #${pr}`); return; }

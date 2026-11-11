@@ -27,6 +27,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { YOSYS_TESTS_PIN } from './fetch-yosys-tests.mjs';
+import { ownIssue } from './github-text.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const TITLE = 'Pinned sources: newer versions available';
@@ -243,7 +244,8 @@ async function main() {
     open.push(...batch.filter(i => !i.pull_request));
     if (batch.length < 100) break;
   }
-  const issue = open.find(i => i.title === TITLE) || null;
+  // (the bot's own issue only: one of the same title by anyone else is not taken, #3417)
+  const issue = ownIssue(open, TITLE);
   const action = issueAction(issue, behind.length);
   if (action === 'open') console.log(`opened #${(await gh(`repos/${repo}/issues`, { method: 'POST', body: JSON.stringify({ title: TITLE, body, labels: LABELS }) })).number}`);
   else if (action === 'update') { await gh(`repos/${repo}/issues/${issue.number}`, { method: 'PATCH', body: JSON.stringify({ body }) }); console.log(`updated #${issue.number}`); }
