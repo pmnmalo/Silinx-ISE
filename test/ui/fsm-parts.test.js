@@ -1,12 +1,13 @@
 // UI: the parts of the state diagram editor (#405: out of mountFsmEditor in web/js/fsm-editor.js), on a Mealy machine
 // opened in the editor: the view (fsm-view.js: Fit, the zooms, Arrange), the history (fsm-history.js: a change undone
 // and redone, the toolbar's buttons following), the inline editing (fsm-inline.js: a state renamed in place, Escape
-// cancelling), the pointer and keys (fsm-pointer.js: a state selected, moved, Escape, Delete) and the bottom panel
+// cancelling, a condition edited, opened by the pointer's double click, #3459), the pointer and keys (fsm-pointer.js: a state selected, moved, Escape, Delete) and the bottom panel
 // (fsm-bottom.js: the tables, the HDL, the simulation's clock edge). The editor's whole use: test/ui/fsm.test.js.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { normalizeFsm } from '../../core/fsm.js';
+import { generateFsm } from '../../core/fsm-hdl.js';
 
 const ACT = { Fit: 'fit', '+': 'zin', '−': 'zout' };
 let env;
@@ -65,22 +66,38 @@ uiTest('#405 FSM editor parts: the view, the history, the inline editing, the po
   assert.ok(b1.x > 300 && b1.y > 100, `${b1.x},${b1.y}`);
   await page.key('Escape');
   await page.waitFor((ed) => !document.querySelector(`${ed} [data-state="b"]`).classList.contains('sel'), [ED], { what: 'B no longer selected' });
-  // ---- the inline editing: a double click on C, renamed; a double click on A, Escape: unchanged
-  // (the double click as its event on the state: the pointer's two clicks in a row miss it in the test's browser, on main too)
-  const dbl = (id) => page.eval((ed, sid) => { const c = document.querySelector(`${ed} [data-state="${sid}"] .fsm-circle`); const b = c.getBoundingClientRect();
-    c.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: b.left + b.width / 2, clientY: b.top + b.height / 2 })); }, ED, id);
+  // ---- the inline editing: a double click on C, renamed (in its HDL too); a double click on A, Escape: unchanged; a
+  // double click on a transition's label, its condition edited (#3459: the pointer's two presses, as a mouse does them:
+  // the first one drew the state again and the browser's dblclick missed it, nothing opened)
+  const dbl = async (id) => page.dblclick(await statePos(id));
+  const inline = () => page.eval((ed) => document.querySelector(`${ed} .fsm-inline`)?.value ?? null, ED);
   await dbl('c');
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the inline editor' });
+  assert.equal(await inline(), 'C');
   await page.eval((ed) => { const i = document.querySelector(`${ed} .fsm-inline`); i.value = 'C2'; }, ED);
   await page.key('Enter');
   await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'applied' });
-  assert.equal((await model()).states.find((s) => s.id === 'c').name, 'C2');
+  assert.deepEqual((await model()).states.map((s) => s.name), ['A', 'B', 'C2']);   // (no state added by the double click)
+  assert.match(await page.eval((ed) => document.querySelector(`${ed} [data-state="c"] .fsm-name`).textContent, ED), /^C2$/);
+  assert.match(generateFsm(await model(), 'vhdl').code, /\bC2\b/);
+  assert.match(generateFsm(await model(), 'verilog').code, /\bC2\b/);
   await dbl('a');
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the inline editor on A' });
   await page.eval((ed) => { document.querySelector(`${ed} .fsm-inline`).value = 'NOPE'; }, ED);
   await page.key('Escape');
   await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'cancelled' });
   assert.equal((await model()).states.find((s) => s.id === 'a').name, 'A');
+  const label = (id) => page.eval((ed, tid) => { const b = document.querySelector(`${ed} [data-trans="${tid}"] .fsm-label`).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, ED, id);
+  await page.dblclick(await label('t4'));
+  await page.waitFor((ed) => document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the inline editor on t4' });
+  assert.equal(await inline(), ' / z=1');
+  await page.eval((ed) => { document.querySelector(`${ed} .fsm-inline`).value = 'y / z=1'; }, ED);
+  await page.key('Enter');
+  await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-inline`), [ED], { what: 'the condition applied' });
+  assert.equal((await model()).transitions.find((t) => t.id === 't4').cond, 'y');
+  await tool('↶');
+  assert.equal((await model()).transitions.find((t) => t.id === 't4').cond, '');
+  assert.deepEqual(page.console.filter((c) => /^(warn|warning|error)$/.test(c.type)).map((c) => c.text), []);
   // ---- the keys: B selected, Delete: B and its transitions gone; undone
   await page.click(await statePos('b'));
   await page.key('Delete');

@@ -25,6 +25,17 @@ export function mountFsmPointer(ctx) {
     return null;
   };
   const capture = (ev) => { try { svg.setPointerCapture(ev.pointerId); } catch { /* not an active pointer */ } };
+  // a double click on a state or a transition, seen at its second press and opened when it is released unmoved (#3459):
+  // the first press draws the item again (render) and captures the pointer, so the browser's dblclick never reaches it
+  let press = null, editedAt = -Infinity;
+  const secondPress = (key, ev) => {
+    const p = press;
+    press = { key, t: ev.timeStamp, x: ev.clientX, y: ev.clientY };
+    if (!p || p.key !== key || ev.timeStamp - p.t > 500 || Math.hypot(ev.clientX - p.x, ev.clientY - p.y) > 6) return false;
+    press = null;
+    return true;
+  };
+  const editAt = (ev, edit) => { editedAt = ev.timeStamp; edit(); };
   function onPointerDown(ev) {
     setFitted(true);
     const sel0 = sel();
@@ -48,7 +59,7 @@ export function mountFsmPointer(ctx) {
       const t = transById(tEl.dataset.trans);
       setSel({ type: 'trans', id: t.id }); render(); renderSide();
       if (readOnly) return;   // (read-only, #2696: selected, not bent)
-      setDrag({ kind: 'bend', sel0, t, start: w, moved: false, bend: t.bend, angle: t.angle });
+      setDrag({ kind: 'bend', sel0, t, start: w, moved: false, bend: t.bend, angle: t.angle, dbl: secondPress(`t:${t.id}`, ev) });
       capture(ev);
       return;
     }
@@ -60,10 +71,11 @@ export function mountFsmPointer(ctx) {
       setSel({ type: 'state', id: s.id }); render(); renderSide();
       if (readOnly) return;
       // (a pen's or a finger's rim is wider: a stroke started on its edge, #3286)
+      const dbl = secondPress(`s:${s.id}`, ev);
       if (d > r - (ev.pointerType === 'mouse' ? 7 : 12)) {
-        setDrag({ kind: 'connect', sel0, from: s, start: w, pts: [w] });
+        setDrag({ kind: 'connect', sel0, from: s, start: w, pts: [w], dbl, x: ev.clientX, y: ev.clientY });
         svg.classList.add('connecting');
-      } else setDrag({ kind: 'move', sel0, s, x: s.x, y: s.y, dx: w.x - s.x, dy: w.y - s.y, moved: false });
+      } else setDrag({ kind: 'move', sel0, s, x: s.x, y: s.y, dx: w.x - s.x, dy: w.y - s.y, moved: false, dbl });
       capture(ev);
     }
   }
@@ -120,7 +132,12 @@ export function mountFsmPointer(ctx) {
     if (!d) return;
     if (d.kind === 'move' && d.moved) commit('move');
     else if (d.kind === 'bend' && d.moved) commit('bend');
-    else if (d.kind === 'connect') {
+    else if (d.dbl && d.kind === 'move') editAt(ev, () => editState(d.s));
+    else if (d.dbl && d.kind === 'bend') editAt(ev, () => editLabel(d.t));
+    else if (d.dbl && d.kind === 'connect' && Math.hypot(ev.clientX - d.x, ev.clientY - d.y) < 4) {
+      for (const el of gStates.querySelectorAll('.fsm-state.drop')) el.classList.remove('drop');
+      editAt(ev, () => editState(d.from));
+    } else if (d.kind === 'connect') {
       for (const el of gStates.querySelectorAll('.fsm-state.drop')) el.classList.remove('drop');
       // the arc in the stroke's shape; a self-loop once the stroke left the state, whatever its size (#3286)
       if (d.target && d.end) {
@@ -144,7 +161,7 @@ export function mountFsmPointer(ctx) {
     render(); renderSide();
   }
   function onDblClick(ev) {
-    if (readOnly) return;
+    if (readOnly || ev.timeStamp - editedAt < 1000) return;   // (opened by the second press, #3459)
     const tEl = ev.target.closest('[data-trans]');
     if (tEl) { editLabel(transById(tEl.dataset.trans)); return; }
     const sEl = ev.target.closest('[data-state]');
