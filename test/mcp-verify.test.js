@@ -4,6 +4,7 @@
 // too), written again by the next check; the refusals (a file of the user's in its place, wrong ports, no reference).
 // With no reference: the module's own assertions proved (core/verify-assert.js), a failure's test bench (the module
 // alone) replayed, the assertion's message in its simulation.
+// The time limit (#3261, time_limit): a check stopped, its cycles checked.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -139,4 +140,19 @@ test('verify with a property: a state diagram\'s state never reached (failed, re
   assert.equal((await call('verify', { project: 'tp', module: 'traffic', property: 'never', state: 'X', reference: 'top' })).text, 'verify: give a reference or a property, not both');
   const x = await call('verify', { project: 'tp', module: 'traffic', property: 'exclusive', outputs: ['phase', 'q'] });
   assert.deepEqual([x.isError, x.data.errors], [true, ['\'phase\' is not a 1-bit output of \'traffic\' (its 1-bit outputs: none)']]);
+});
+
+test('#3261 verify\'s time_limit: blinky\'s ASM chart stopped after 3 s (timeout, the cycles checked, a warning); a limit out of range refused', async () => {
+  await ok('new_project_from_example', { example: 'blinky', name: 'bt' });
+  const t0 = Date.now();
+  const r = await ok('verify', { project: 'bt', module: 'speed_ctrl', property: 'reach', state: 'WAIT_RELEASE', depth: 200, time_limit: 3 });
+  assert.ok(Date.now() - t0 < 8000, 'stopped at its limit');
+  const k = r.data.checked;
+  assert.ok(k >= 1 && k < 200, String(k));
+  assert.deepEqual([r.data.status, r.data.holds, r.data.timeLimit, r.data.testBench, r.data.errors, r.data.warnings], ['timeout', false, 3, undefined, [], []]);
+  assert.equal(r.text, ['Started : "Verify Property".', 'Proving that \'speed_ctrl\' reaches state WAIT_RELEASE: Yosys\'s SAT solver, at most 200 clock cycle(s), then a proof by induction.',
+    `WARNING:Verify - the check did not finish in 3 s (its time limit): 'speed_ctrl' does not reach state WAIT_RELEASE in the first ${k} clock cycle(s), not checked beyond them: a larger time limit, or a smaller depth.`,
+    'Process "Verify Property" completed successfully with 1 warning(s)'].join('\n'));
+  const bad = await call('verify', { project: 'v', reference: 'cnt_ref', time_limit: 0 });
+  assert.deepEqual([bad.isError, bad.data.errors], [true, ['the time limit must be a number of seconds, more than 0 and at most 3600']]);
 });

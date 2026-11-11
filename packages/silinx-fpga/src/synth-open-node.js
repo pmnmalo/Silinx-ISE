@@ -5,10 +5,34 @@ import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import { runYosysOnce } from './synth-open.js';
 
-/** run() for Node: Yosys from @yowasp/yosys in this process. */
-export async function yosysNode(args, files, onLine = () => {}) {
+/**
+ * run() for Node: Yosys from @yowasp/yosys in this process. With a signal (its fifth argument, { signal }), in a worker
+ * thread of its own instead, terminated when the signal aborts (Yosys's -timeout does nothing in WebAssembly: the
+ * formal checks' time limit, #3261): the run rejected (aborted: true).
+ */
+export async function yosysNode(args, files, onLine = () => {}, _onProgress, { signal } = {}) {
+  if (signal) return yosysStoppable(args, files, onLine, signal);
   const { runYosys } = await import('@yowasp/yosys');
   return runYosysOnce(runYosys, args, files, onLine, { fetchProgress: () => {} });
+}
+
+// one run in a worker thread of its own, terminated when the signal aborts
+function yosysStoppable(args, files, onLine, signal) {
+  const stopped = () => Object.assign(new Error('Yosys was stopped'), { aborted: true });
+  if (signal.aborted) return Promise.reject(stopped());
+  return new Promise((resolve, reject) => {
+    const w = new Worker(new URL('./synth-open-node-worker.js', import.meta.url));
+    const end = (f, x) => { signal.removeEventListener('abort', abort); w.terminate(); f(x); };
+    const abort = () => end(reject, stopped());
+    signal.addEventListener('abort', abort, { once: true });
+    w.on('message', m => {
+      if (m.line !== undefined) onLine(m.line);
+      else if (m.error) end(reject, Object.assign(new Error(m.error), { code: m.code, crash: m.crash }));
+      else end(resolve, m.files);
+    });
+    w.on('error', e => end(reject, new Error(`Yosys failed: ${e.message}`)));
+    w.postMessage({ id: 1, args, files });
+  });
 }
 
 /**

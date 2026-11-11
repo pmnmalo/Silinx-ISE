@@ -13,8 +13,10 @@ const nav = globalThis.navigator || {};
 export const WORKERS = (nav.hardwareConcurrency || 1) >= 4 && (nav.deviceMemory === undefined || nav.deviceMemory >= 8) ? 2 : 1;
 
 /**
- * A pool of Yosys workers: run(args, files, onLine, onProgress) -> the output files; run.parallel, how many
- * at a time. spawn() starts a worker that answers as web/js/yosys-worker.js does.
+ * A pool of Yosys workers: run(args, files, onLine, onProgress, { signal }) -> the output files; run.parallel, how many
+ * at a time. spawn() starts a worker that answers as web/js/yosys-worker.js does. An aborted signal stops the run: a
+ * queued one left out, a running one's worker terminated (Yosys's -timeout does nothing in WebAssembly: Verify's time
+ * limit, #3261); the run rejected (aborted: true), the next runs on a new worker.
  */
 export function yosysPool({ spawn = () => new Worker('/js/yosys-worker.js', { type: 'module' }), workers = WORKERS } = {}) {
   let max = workers, seq = 0;
@@ -59,7 +61,7 @@ export function yosysPool({ spawn = () => new Worker('/js/yosys-worker.js', { ty
     max = 1;
     busy.delete(w);
     w.terminate();
-    queue.unshift({ ...p, retried: true });
+    queue.unshift({ ...p, retried: true });   // (p.of: the run's own job, for its signal)
     next();
   }
 
@@ -70,14 +72,33 @@ export function yosysPool({ spawn = () => new Worker('/js/yosys-worker.js', { ty
       const w = idle.pop() || (busy.size < max ? startWorker() : null);
       if (!w) return;
       const p = queue.shift();
-      w.job = { ...p, id: ++seq };
+      w.job = { ...p, id: ++seq, of: p.of || p };
       busy.add(w);
       w.postMessage({ id: w.job.id, args: p.args, files: p.files });
     }
   }
 
-  const run = (args, files, onLine = () => {}, onProgress) =>
-    new Promise((resolve, reject) => { queue.push({ resolve, reject, onLine, onProgress, args, files }); next(); });
+  // the run of job p stopped (its signal aborted): out of the queue, or its worker terminated
+  function stop(p) {
+    const err = Object.assign(new Error('Yosys was stopped'), { aborted: true });
+    const q = queue.findIndex(x => x === p || x.of === p);
+    if (q >= 0) { queue.splice(q, 1); p.reject(err); return; }
+    const w = [...busy].find(x => x.job?.of === p);
+    if (!w) return;
+    w.job = null;
+    busy.delete(w);
+    w.terminate();
+    p.reject(err);
+    next();
+  }
+
+  const run = (args, files, onLine = () => {}, onProgress, { signal } = {}) => new Promise((resolve, reject) => {
+    const p = { resolve, reject, onLine, onProgress, args, files };
+    if (signal?.aborted) { reject(Object.assign(new Error('Yosys was stopped'), { aborted: true })); return; }
+    signal?.addEventListener('abort', () => stop(p), { once: true });
+    queue.push(p);
+    next();
+  });
   // (how many at a time, for packages/silinx-fpga/src/synth-open.js)
   Object.defineProperty(run, 'parallel', { get: () => max });
   return run;
@@ -85,7 +106,7 @@ export function yosysPool({ spawn = () => new Worker('/js/yosys-worker.js', { ty
 
 const page = yosysPool();
 /** run() for packages/silinx-fpga/src/synth-open.js. onProgress(0…1) while the WebAssembly module is being fetched. */
-export function yosysBrowser(args, files, onLine = () => {}, onProgress) {
-  return page(args, files, onLine, onProgress);
+export function yosysBrowser(args, files, onLine = () => {}, onProgress, opts) {
+  return page(args, files, onLine, onProgress, opts);
 }
 Object.defineProperty(yosysBrowser, 'parallel', { get: () => page.parallel });

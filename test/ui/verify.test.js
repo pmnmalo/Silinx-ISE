@@ -65,7 +65,7 @@ uiTest('#3177 Verify Equivalence: the reference asked, a counterexample simulate
   }
   const dlg = await openVerify(page);
   assert.deepEqual(dlg, { title: 'Verify Equivalence', labels: ['Proves that the module gives the outputs of the reference module for every input sequence, or shows the first clock cycle where they differ.',
-    'Reference module:', 'Depth (clock cycles):'], options: ['cnt_ref', 'hex'], reference: 'cnt_ref', depth: '20', buttons: ['Verify', 'Cancel'] });
+    'Reference module:', 'Depth (clock cycles):', 'Time limit (s):'], options: ['cnt_ref', 'hex'], reference: 'cnt_ref', depth: '20', buttons: ['Verify', 'Cancel'] });
   await page.click('.dlg-buttons .btn.primary');
   await page.waitConsole(/Process "Verify Equivalence" failed/, { timeout: 60000 });
   assert.deepEqual((await lines(page, 'Started : "Verify Equivalence".')).slice(0, 7), ['Started : "Verify Equivalence".', '',
@@ -88,7 +88,7 @@ uiTest('#3177 Verify Equivalence: the reference asked, a counterexample simulate
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   const pt = await openVerify(page, 'Verificar Equivalência…');
   assert.deepEqual([pt.title, pt.labels, pt.buttons], ['Verificar Equivalência', ['Prova que o módulo dá as saídas do módulo de referência para qualquer sequência de entradas, ou mostra o primeiro ciclo de relógio em que diferem.',
-    'Módulo de referência:', 'Profundidade (ciclos de relógio):'], ['Verificar', 'Cancelar']]);
+    'Módulo de referência:', 'Profundidade (ciclos de relógio):', 'Tempo limite (s):'], ['Verificar', 'Cancelar']]);
   await page.click('.dlg-buttons .btn', { text: 'Cancelar' });
   await page.waitNoDialog();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
@@ -113,7 +113,7 @@ uiTest('#3177 Verify Assertions: the depth asked, an assertion that fails replay
   }
   const dlg = await openVerify(page, 'Verify Assertions…');
   assert.deepEqual(dlg, { title: 'Verify Assertions', labels: ['Proves that the module\'s assertions hold for every input sequence, or shows the first clock cycle where one fails.',
-    'Depth (clock cycles):'], options: [], depth: '20', buttons: ['Verify', 'Cancel'] });
+    'Depth (clock cycles):', 'Time limit (s):'], options: [], depth: '20', buttons: ['Verify', 'Cancel'] });
   await page.click('.dlg-buttons .btn.primary');
   await page.waitConsole(/Process "Verify Assertions" failed/, { timeout: 60000 });
   assert.deepEqual((await lines(page, 'Started : "Verify Assertions".')).slice(0, 7), ['Started : "Verify Assertions".', '',
@@ -131,7 +131,7 @@ uiTest('#3177 Verify Assertions: the depth asked, an assertion that fails replay
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   const pt = await openVerify(page, 'Verificar Asserções…');
   assert.deepEqual([pt.title, pt.labels, pt.buttons], ['Verificar Asserções', ['Prova que as asserções do módulo se verificam para qualquer sequência de entradas, ou mostra o primeiro ciclo de relógio em que uma falha.',
-    'Profundidade (ciclos de relógio):'], ['Verificar', 'Cancelar']]);
+    'Profundidade (ciclos de relógio):', 'Tempo limite (s):'], ['Verificar', 'Cancelar']]);
   await page.click('.dlg-buttons .btn', { text: 'Cancelar' });
   await page.waitNoDialog();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));

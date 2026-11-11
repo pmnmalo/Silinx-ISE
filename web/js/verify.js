@@ -6,7 +6,7 @@
 // way (the module alone, its failing assertion reported by the simulation).
 import { api } from './api.js';
 import { h, dialog, toast } from './ui.js';
-import { verifyEquivalence, verifyMessages, isVerifyBench, VERIFY_DEPTH, MAX_DEPTH, VERIFY_PROCESS } from '/core/verify.js';
+import { verifyEquivalence, verifyMessages, isVerifyBench, VERIFY_DEPTH, MAX_DEPTH, VERIFY_PROCESS, VERIFY_TIME_LIMIT, MAX_TIME_LIMIT } from '/core/verify.js';
 import { counterexampleBench, benchName } from '/core/verify-bench.js';
 import { verifyAssertions, assertMessages, ASSERT_PROCESS } from '/core/verify-assert.js';
 import { S, app } from './app.js';
@@ -19,7 +19,24 @@ import { runSimulation } from './viewers.js';
 const REF_NAMES = m => [`${m}_ref`, `ref_${m}`, `${m}_reference`, `${m}_golden`].map(n => n.toLowerCase());
 const last = {};
 
-/** The reference module and the depth, asked: { reference, depth }, or null (cancelled). */
+/**
+ * The time limit's field of a check's dialog (#3261: Yosys stopped when it passes), its label and input: { row, input,
+ * ok() (valid, or a toast and false) }; the value kept for the next dialogs.
+ */
+export function timeLimitField() {
+  const input = h('input', { type: 'number', min: 1, max: MAX_TIME_LIMIT, value: limits.timeLimit || VERIFY_TIME_LIMIT, style: { width: '6em' } });
+  const row = h('div', {}, h('label', { style: { display: 'block', marginTop: '8px' } }, 'Time limit (s):'), input);
+  const ok = () => {
+    const n = +input.value;
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_TIME_LIMIT) { limits.timeLimit = n; return true; }
+    toast(`The time limit is a number of seconds from 1 to ${MAX_TIME_LIMIT}`, 'err');
+    return false;
+  };
+  return { row, input, ok };
+}
+const limits = {};
+
+/** The reference module, the depth and the time limit, asked: { reference, depth, timeLimit }, or null (cancelled). */
 async function askReference(mod) {
   const names = [...new Set(S.modules.filter(m => m.kind !== 'package' && m.name.toLowerCase() !== mod.toLowerCase() && !isVerifyBench(S.sources.find(s => s.path === m.file)?.text)).map(m => m.name))]
     .sort((a, b) => a.localeCompare(b));
@@ -27,67 +44,77 @@ async function askReference(mod) {
   const proposed = names.find(n => REF_NAMES(mod).includes(n.toLowerCase())) || (names.includes(last[mod]) ? last[mod] : names[0]);
   const sel = h('select', { style: { width: '100%' } }, ...names.map(n => h('option', { value: n, 'data-no-i18n': true, selected: n === proposed }, n)));
   const depth = h('input', { type: 'number', min: 1, max: MAX_DEPTH, value: last.depth || VERIFY_DEPTH, style: { width: '6em' } });
+  const limit = timeLimitField();
   const r = await dialog({
     title: VERIFY_PROCESS, width: 460,
     body: h('div', { class: 'verify-dlg' },
       h('p', {}, 'Proves that the module gives the outputs of the reference module for every input sequence, or shows the first clock cycle where they differ.'),
       h('label', {}, 'Reference module:'), sel,
-      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth),
-    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => { const n = +depth.value; if (Number.isInteger(n) && n >= 1 && n <= MAX_DEPTH) return true; toast(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`, 'err'); return false; } },
+      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth, limit.row),
+    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => depthOk(depth) && limit.ok() },
       { label: 'Cancel', value: null }],
   });
   if (!r) return null;
   last[mod] = sel.value;
   last.depth = +depth.value;
-  return { reference: sel.value, depth: +depth.value };
+  return { reference: sel.value, depth: +depth.value, timeLimit: +limit.input.value };
 }
 
-// the depth asked (Verify Assertions): a number, or null (cancelled)
+// the depth's field valid, or a toast and false
+const depthOk = depth => {
+  const n = +depth.value;
+  if (Number.isInteger(n) && n >= 1 && n <= MAX_DEPTH) return true;
+  toast(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`, 'err');
+  return false;
+};
+
+// the depth and the time limit asked (Verify Assertions): { depth, timeLimit }, or null (cancelled)
 async function askDepth() {
   const depth = h('input', { type: 'number', min: 1, max: MAX_DEPTH, value: last.depth || VERIFY_DEPTH, style: { width: '6em' } });
+  const limit = timeLimitField();
   const r = await dialog({
     title: ASSERT_PROCESS, width: 460,
     body: h('div', { class: 'verify-dlg' },
       h('p', {}, 'Proves that the module\'s assertions hold for every input sequence, or shows the first clock cycle where one fails.'),
-      h('label', {}, 'Depth (clock cycles):'), depth),
-    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => { const n = +depth.value; if (Number.isInteger(n) && n >= 1 && n <= MAX_DEPTH) return true; toast(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`, 'err'); return false; } },
+      h('label', {}, 'Depth (clock cycles):'), depth, limit.row),
+    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => depthOk(depth) && limit.ok() },
       { label: 'Cancel', value: null }],
   });
   if (!r) return null;
   last.depth = +depth.value;
-  return +depth.value;
+  return { depth: +depth.value, timeLimit: +limit.input.value };
 }
 
 /** Verify Equivalence of module `mod`: the reference asked, the check run, a counterexample simulated. */
-export async function verifyProcess(mod, { reference, depth } = {}) {
+export async function verifyProcess(mod, { reference, depth, timeLimit } = {}) {
   if (!reference) {
     const a = await askReference(mod);
     if (!a) return null;
-    ({ reference, depth } = a);
+    ({ reference, depth, timeLimit } = a);
   }
-  try { return await verifyInner(mod, { reference, depth: depth ?? VERIFY_DEPTH }); }
+  try { return await verifyInner(mod, { reference, depth: depth ?? VERIFY_DEPTH, timeLimit }); }
   catch (e) { setStatus('verify', 'err'); log(`ERROR:Verify - ${e.message}`, 'err'); return null; }
 }
 
 /** Verify Assertions of module `mod`: the depth asked, its assertions proved, a counterexample simulated. */
-export async function assertProcess(mod, { depth } = {}) {
-  if (depth == null) { depth = await askDepth(); if (depth == null) return null; }
-  try { return await verifyInner(mod, { depth }); }
+export async function assertProcess(mod, { depth, timeLimit } = {}) {
+  if (depth == null) { const a = await askDepth(); if (!a) return null; ({ depth, timeLimit } = a); }
+  try { return await verifyInner(mod, { depth, timeLimit }); }
   catch (e) { setStatus('verify-assert', 'err'); log(`ERROR:Verify - ${e.message}`, 'err'); return null; }
 }
 
-async function verifyInner(mod, { reference = null, depth }) {
+async function verifyInner(mod, { reference = null, depth, timeLimit }) {
   const id = reference ? 'verify' : 'verify-assert';
   await saveAll();
   setStatus(id, 'running');
   const srcs = verifySources();
   // (Yosys: the page's workers, or the browser edition's own, as the emulator's compiled engine runs it)
   const run = await (await import('./emulator.js')).emulatorYosys(api.standalone);
-  const r = reference ? await verifyEquivalence(srcs, { top: mod, reference, depth, run }) : await verifyAssertions(srcs, { top: mod, depth, run });
+  const r = reference ? await verifyEquivalence(srcs, { top: mod, reference, depth, timeLimit, run }) : await verifyAssertions(srcs, { top: mod, depth, timeLimit, run });
   const tb = benchName(r.top);
   const bench = r.status === 'failed' ? await writeBench(tb, `sim/${tb}.${r.lang === 'vhdl' ? 'vhd' : 'v'}`, () => counterexampleBench(r, { name: tb })) : null;
   for (const m of (reference ? verifyMessages : assertMessages)(r, { bench })) log(m.text, m.kind === 'info' ? undefined : m.kind);
-  setStatus(id, r.status === 'proved' && !r.warnings.length ? 'ok' : r.status === 'proved' || r.status === 'bounded' ? 'warn' : 'err');
+  setStatus(id, r.status === 'proved' && !r.warnings.length ? 'ok' : r.status === 'proved' || r.status === 'bounded' || (r.status === 'timeout' && r.checked) ? 'warn' : 'err');
   // the counterexample replayed: the waveform viewer shows it, the console the same difference
   if (bench) await runSimulation(tb);
   return r;

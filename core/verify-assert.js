@@ -8,15 +8,17 @@
 // module alone); the simulator replays it at once, and its first failing assertion is the one reported, at its clock
 // cycle, with its own message.
 //
-//   const r = await verifyAssertions(sources, { top, depth, run, onLine })
-//   r: { status: 'proved' | 'bounded' | 'failed' | 'error', errors, warnings, depth, induction, cycles (the
+//   const r = await verifyAssertions(sources, { top, depth, timeLimit, run, onLine })
+//   r: { status: 'proved' | 'bounded' | 'failed' | 'timeout' | 'error', errors, warnings, depth, induction, cycles (the
 //        counterexample: [{ in, uut }]), cycle, steps (Yosys's length of it), failure: { file, line, text } (the assertion that fails, as the
-//        simulator reports it), asserts, assumes (their numbers), ports, clocks, top, lang, log }
+//        simulator reports it), asserts, assumes (their numbers), ports, clocks, top, lang, log }; timeout (#3261):
+//        Yosys stopped after timeLimit seconds, checked (the clock cycles it had checked with no failure by then)
 import { compile, simulate } from './compile.js';
 import { primitiveSources } from './unisim.js';
 import { toVerilog } from './synth-verilog.js';
 import { clocksOf } from './schematic.js';
-import { VERIFY_DEPTH, MAX_DEPTH, assertScript, readVerifyLog, moduleOf } from './verify.js';
+import { VERIFY_DEPTH, MAX_DEPTH, assertScript, readVerifyLog, moduleOf, timeoutEnd } from './verify.js';
+import { VERIFY_TIME_LIMIT, timeLimitError, runLimited, cyclesChecked } from './verify-limit.js';
 import { counterexampleBench, benchName, PERIOD } from './verify-bench.js';
 
 export const ASSERT_PROCESS = 'Verify Assertions';
@@ -41,10 +43,11 @@ export function countAssertions(design) {
  * Prove the assertions of module `top` of the sources ([{ path, text, lang }]): proved (by induction), bounded (none
  * fails in the first `depth` clock cycles) or failed (the counterexample, replayed). run(args, files, onLine): Yosys's.
  */
-export async function verifyAssertions(sources, { top, depth = VERIFY_DEPTH, run, onLine = () => {} } = {}) {
+export async function verifyAssertions(sources, { top, depth = VERIFY_DEPTH, timeLimit = VERIFY_TIME_LIMIT, run, onLine = () => {} } = {}) {
   const error = (...errors) => ({ status: 'error', errors, warnings: [], depth });
   if (!top) return error('no module to verify');
   if (!(Number.isInteger(depth) && depth >= 1 && depth <= MAX_DEPTH)) return error(`the depth must be a number of clock cycles from 1 to ${MAX_DEPTH}`);
+  if (timeLimitError(timeLimit)) return error(timeLimitError(timeLimit));
   const lib = compile([...primitiveSources(sources), ...sources]);
   const libErrs = lib.errors.filter(e => e.severity === 'error');
   if (libErrs.length) return error(...libErrs.slice(0, 5).map(e => `${e.file}:${e.line} ${e.message}`));
@@ -62,11 +65,12 @@ export async function verifyAssertions(sources, { top, depth = VERIFY_DEPTH, run
     warnings.push(...v.warnings.map(w => `${uut.unit.name}: ${w.message ?? w}`));
   } catch (e) { return error(`'${uut.unit.name}' cannot be verified: ${e.message}`); }
   const lines = [];
-  try { await run(['-p', assertScript(depth)], { [`${UUT}.sv`]: text }, l => { lines.push(l); onLine(l); }); }
+  let t;
+  try { t = await runLimited(run, ['-p', assertScript(depth)], { [`${UUT}.sv`]: text }, l => { lines.push(l); onLine(l); }, timeLimit); }
   catch (e) { return { ...error(e.message), log: lines }; }
   const ports = uut.ports.map(p => ({ name: p.name, dir: p.dir, width: p.width, uut: p }));
   const inputs = ports.filter(p => p.dir === 'in').map(p => p.name);
-  const r = readVerifyLog(lines, [], { inputs });
+  const r = t ? { status: 'timeout', timeLimit, checked: cyclesChecked(lines), warnings: [] } : readVerifyLog(lines, [], { inputs });
   if (r.status === 'error') return { ...error('Yosys gave no result (its log has neither a proof nor a counterexample)'), log: lines };
   // (steps: the counterexample's length as Yosys gives it)
   const out = { ...r, steps: r.cycle, errors: [], warnings: [...warnings, ...r.warnings], depth, top: uut.unit.name, reference: null,
@@ -124,6 +128,8 @@ export function assertMessages(r, { top = r.top, bench = null } = {}) {
   } else if (r.status === 'bounded') {
     M.push({ text: `WARNING:Verify - no assertion fails in the first ${r.depth} clock cycle(s), but they are not proved beyond them (the induction did not succeed): a larger depth checks more cycles.`, kind: 'warn' });
     end(true, warns.length + 1);
+  } else if (r.status === 'timeout') {
+    timeoutEnd(M, r, 'no assertion fails', end, warns.length);
   } else {
     const f = r.failure;
     M.push({ text: `ERROR:Verify - an assertion of '${top}' fails at clock cycle ${r.cycle}${f ? `: ${f.file}:${f.line}: ${f.text.replace(/\.$/, '')}` : ''}.`, kind: 'err' });
