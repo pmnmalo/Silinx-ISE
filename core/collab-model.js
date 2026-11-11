@@ -1,12 +1,13 @@
 // A shared project's drawings edited live (#3183, phase 3 of #3180): each drawing as a Yjs structure of its own, in the
 // project's document (core/collab-doc.js), so that several participants edit one drawing at once and their changes merge
 // per object and per field (a Y.Text of its JSON would merge characters, and break it).
-//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm', 'tt')
+//   drawings  Y.Map  path -> Y.Map   kind      the drawing's kind ('fsm', 'tt', 'asm')
 //                                    settings  Y.Map  key -> value: the drawing's own settings (its name, language,
 //                                                     generatedFile, encoding, inputs, outputs, initial state, …)
 //                                    <coll>    Y.Map  id -> Y.Map  field -> value, one per object of each of its
 //                                                     collections (the FSM: states, transitions; the truth table: its
-//                                                     outputs, by name, a field per cell of its column); _o its place
+//                                                     outputs, by name, a field per cell of its column; the ASM chart:
+//                                                     boxes, links); _o its place
 // A value is JSON (a field's whole value: last write wins, per field). An editor keeps its "model in, model out"
 // interface: putDrawing applies a new model as the smallest set of changes (a diff by ids against `base`, the model the
 // editor last had: what others changed since is kept), drawingModel reads it back (normalized, as the editor's).
@@ -21,6 +22,7 @@
 import * as Y from 'yjs';
 import { normalizeFsm } from './fsm.js';
 import { normalizeTable } from './logic.js';
+import { normalizeModel as normalizeAsm } from './asm.js';
 import { drawingKind, liveDrawing } from './collab-kinds.js';
 export { drawingKind, liveDrawing };
 
@@ -55,12 +57,13 @@ function ttModel(sh) {
 const TT_KEYS = ['version', 'name', 'inputs', 'outputs', 'table', 'exprs', 'notes', 'form', 'lang', 'kmapOrder', 'generatedFile', 'forms', 'solutions'];
 
 /** The structure of the drawings edited live (core/collab-kinds.js), by kind: their collections, the fields of an
- *  object that name another (refs: a connection goes with what it connects, #3183), the settings that do (setRefs),
+ *  object that name another (refs, in a collection or one of several: a connection goes with what it connects, #3183), the settings that do (setRefs),
  *  shape (a model as its settings and collections, normalized) and model (back, as its editor has it); ownIds: a
  *  participant's new objects' ids made its own (ids that are names, a truth table's outputs, are not). */
 export const DRAWING_KINDS = Object.freeze({
   fsm: { collections: ['states', 'transitions'], refs: { transitions: { from: 'states', to: 'states' } }, setRefs: { initial: 'states' }, shape: normalizeFsm, model: normalizeFsm, ownIds: true },
   tt: { collections: ['outputs'], refs: {}, setRefs: {}, shape: ttShape, model: ttModel, ownIds: false },
+  asm: { collections: ['nodes', 'edges'], refs: { edges: { from: 'nodes', to: 'nodes' } }, setRefs: { initial: 'nodes' }, shape: normalizeAsm, model: normalizeAsm, ownIds: true },
 });
 /** What a follower takes of a room's drawings (#3361: the owner may be hostile): their objects, all together. */
 export const DRAWING_OBJECTS_MAX = 100_000;
@@ -103,7 +106,7 @@ function dangling(model, K) {
   const ids = Object.fromEntries(K.collections.map(c => [c, new Set(arr(model[c]).map(o => String(o.id)))]));
   const out = [];
   for (const [c, refs] of Object.entries(K.refs)) {
-    for (const o of arr(model[c])) if (Object.entries(refs).some(([f, to]) => !ids[to].has(String(o[f])))) out.push({ coll: c, id: String(o.id) });
+    for (const o of arr(model[c])) if (Object.entries(refs).some(([f, to]) => ![to].flat().some(t => ids[t].has(String(o[f]))))) out.push({ coll: c, id: String(o.id) });
   }
   return out;
 }

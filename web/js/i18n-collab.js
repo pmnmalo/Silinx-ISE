@@ -15,9 +15,9 @@ export const COLLAB_PT = {
     'Esta ligação segue um projeto que alguém partilha: vê os ficheiros e os desenhos à medida que mudam, só de leitura, e onde está o seu dono.',
   // (editors, #3182: web/js/collab-share.js)
   'Copy Editor Link': 'Copiar Ligação de Editor', 'editor': 'editor',
-  // (and the state diagrams and truth tables, #3183)
-  'Anyone with the editors\' link edits its text files, state diagrams and truth tables with you, live; its other drawings stay yours.':
-    'Quem tiver a ligação de editores edita os ficheiros de texto, os diagramas de estados e as tabelas de verdade consigo, em direto; os outros desenhos continuam seus.',
+  // (and the state diagrams, truth tables and ASM charts, #3183)
+  'Anyone with the editors\' link edits its text files, state diagrams, truth tables and ASM charts with you, live; its other drawings stay yours.':
+    'Quem tiver a ligação de editores edita os ficheiros de texto, os diagramas de estados, as tabelas de verdade e os fluxogramas ASM consigo, em direto; os outros desenhos continuam seus.',
   // (a room the owner's page hosts, #3227: web/js/collab-host.js)
   'Through a relay (a Silinx server that lets this site in); else this page hosts it': 'Através de um retransmissor (um servidor Silinx que deixa entrar este sítio); senão, esta página aloja-o',
   'The relay\'s address:': 'O endereço do retransmissor:', 'Its key (from its administrator):': 'A sua chave (do seu administrador):',
