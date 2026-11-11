@@ -40,9 +40,13 @@
     "@yowasp/yosys": "0.70.1258"
   },
   "peerDependencies": {
+    "@yowasp/nextpnr-ecp5": "0.11.825",
     "@yowasp/nextpnr-ice40": "0.11.825"
   },
   "peerDependenciesMeta": {
+    "@yowasp/nextpnr-ecp5": {
+      "optional": true
+    },
     "@yowasp/nextpnr-ice40": {
       "optional": true
     }

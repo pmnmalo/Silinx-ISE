@@ -22,7 +22,7 @@ const ALLOWED = new Set([
 // (@silinx/nextpnr-himbaechel-spartan3e: nextpnr in WebAssembly, the flow's nextpnr engine, #2136; -spartan6: its
 // Spartan-6, #2138; -xc7: the 7-series', #3146)
 const PACKAGES = new Set(['@yowasp/yosys', '@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6', '@silinx/nextpnr-himbaechel-xc7',
-  '@yowasp/nextpnr-ice40']);   // (an optional peer dependency: the iCE40's, #2295)
+  '@yowasp/nextpnr-ice40', '@yowasp/nextpnr-ecp5']);   // (optional peer dependencies: the iCE40's, #2295; the ECP5's, #2302)
 
 function sources(dir) {
   return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {

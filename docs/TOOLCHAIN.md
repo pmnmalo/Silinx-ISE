@@ -93,7 +93,7 @@ and their data. nextpnr's routed design is converted to XDL (`fpga/nextpnr-xdl.j
 Everything outside the flow comes through `io`, so the same flow runs in Node (files on disk) and in the browser (files
 in memory): the sources, the constraints, the device, the bit database, Yosys, nextpnr, the files written, the report.
 The list is at the top of `src/open-flow-core.js`. nextpnr is one hook by micro-architecture:
-`io.nextpnr.spartan3e`, `io.nextpnr.spartan6`, `io.nextpnr.ice40` (with icepack: `pack(asc)`), `io.nextpnr.xc7` (the 7-series', #3146).
+`io.nextpnr.spartan3e`, `io.nextpnr.spartan6`, `io.nextpnr.ice40` (with icepack: `pack(asc)`), `io.nextpnr.xc7` (the 7-series', #3146), `io.nextpnr.ecp5` (with ecppack: `pack(config)`).
 
 ### The back ends
 
@@ -128,7 +128,8 @@ The plan is in #1953 and #2315. For the open toolchains:
 | Spartan-3E | `synth_xilinx` | nextpnr | Silinx | UCF | Works, browser and local |
 | Spartan-6 | `synth_xilinx` | nextpnr | Silinx | UCF | Works, browser (#2103, #2288) and local |
 | iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works: local server and browser, nextpnr-ice40 downloaded on first use (#2444); its 12 parts in the interface (#2463), the iCEBreaker board (#2517), other boards #2297 |
-| ECP5, MachXO2 | `synth_ecp5`, to be defined | nextpnr | `ecppack`, Project Trellis | LPF | Planned (#2302) |
+| ECP5 | `synth_ecp5` | nextpnr-ecp5 | `ecppack`, Project Trellis | LPF | Works: local server and browser, nextpnr-ecp5 downloaded on first use (30 MB); its 10 parts, the ULX3S board and the examples on it (#2302); its boards not programmed from Silinx yet (#2298) |
+| MachXO2 | to be defined | nextpnr-machxo2 (experimental) | `ecppack`, Project Trellis | LPF | To be measured (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
 | Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T in the local server, AMD Vivado the default; its timing nextpnr's estimate; the Nexys A7 and the browser to come (#3147) |
@@ -142,6 +143,9 @@ needs (`orderSteps`), ISE's names for the Xilinx families. A fake family runs in
 `@yowasp/nextpnr-ice40` (about 80 MB, every iCE40's chip database) is an optional peer dependency of the package and a development
 one of the IDE: the release zip and the published site download it from npm's registry on the first iCE40 run, at
 `package-lock.json`'s version and SHA-512, and keep it (`server/nextpnr-ice40-fetch.js`, `web/js/nextpnr-ice40-browser.js`, #2444).
+The ECP5 is the second (#2302, `src/open-flow-ecp5.js`, `src/lpf.js`): YoWASP's `@yowasp/nextpnr-ecp5` the same way,
+`io.nextpnr.ecp5` with ecppack (`pack(config)`); the families of YoWASP's tools are data in their profiles
+(`core/family-profile.js` openFlow: the package, its packer, the browser edition's key) and in the server's `OWN` and `OWN_TOOLS`.
 
 And around the flow, one issue each: the boards and examples (#2297), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).

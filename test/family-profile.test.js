@@ -8,7 +8,7 @@ import { FAMILY_PROFILES, familyProfile } from '../core/family-profile.js';
 import { planClock } from '../core/clocking.js';
 import { MEMORY_FAMILIES, planMemory } from '../core/blockram.js';
 import { resourceCount, resourceOfPrimitive } from '../packages/silinx-fpga/src/resources.js';
-import { FAMILY_INFO, ICE40_STEPS } from '../packages/silinx-fpga/src/index.js';
+import { FAMILY_INFO, ICE40_STEPS, ECP5_STEPS, ECP5_PARTS } from '../packages/silinx-fpga/src/index.js';
 import { findPart } from '../server/devices.js';
 
 globalThis.SILINX_ASSETS = 'https://example.test/assets/';
@@ -16,13 +16,16 @@ const { browserOpenStatus, browserSteps, BROWSER_DEVICES } = await import('../we
 
 test('every profile is of a known family; a family with none gets an empty, frozen profile', () => {
   for (const f of Object.keys(FAMILY_PROFILES)) assert.ok(FAMILY_INFO[f], f);
-  assert.deepEqual(Object.keys(FAMILY_PROFILES).sort(), ['ice40', 'spartan3e', 'spartan6']);
+  assert.deepEqual(Object.keys(FAMILY_PROFILES).sort(), ['ecp5', 'ice40', 'spartan3e', 'spartan6']);
   for (const f of ['spartan3a', 'artix7', 'nonsense', null, undefined]) {
     assert.deepEqual(familyProfile(f), {});
     assert.ok(Object.isFrozen(familyProfile(f)));
   }
   assert.equal(familyProfile('ice40').clock, undefined);
   assert.equal(familyProfile('ice40').blockRam, undefined);
+  // (#2302: the ECP5 offers none of the Xilinx families' wizards, and no programming yet; the iCE40 programs its flash)
+  for (const k of ['clock', 'blockRam', 'multiplier', 'mapChoice', 'program']) assert.equal(familyProfile('ecp5')[k], undefined, k);
+  assert.equal(familyProfile('ice40').program, 'spi-flash');
 });
 
 test('the clock manager: the primitive core/clocking.js plans for the family, its resource the resources model\'s', () => {
@@ -82,6 +85,13 @@ test('the open flow: the parts each family\'s Silinx toolchain takes, its bit da
   }
   assert.equal(familyProfile('ice40').openFlow.tools, 'nextpnr-ice40');
   assert.equal(familyProfile('ice40').openFlow.steps, ICE40_STEPS);
+  // (#2302) the families of YoWASP's tools: their package, its packer, the browser's key, their parts
+  assert.deepEqual(Object.keys(FAMILY_PROFILES).filter(f => familyProfile(f).openFlow?.package), ['ice40', 'ecp5']);
+  const ecp5 = familyProfile('ecp5').openFlow;
+  assert.deepEqual([ecp5.tools, ecp5.packer, ecp5.package, ecp5.layout, ecp5.steps], ['nextpnr-ecp5', 'ecppack', '@yowasp/nextpnr-ecp5', 'nextpnrEcp5', ECP5_STEPS]);
+  for (const p of Object.keys(ECP5_PARTS)) assert.ok(ecp5.parts.test(p), p);
+  for (const p of ['lfe5u-85', 'lfe5u-85f-6', 'ice40up5k', 'xc3s250e']) assert.ok(!ecp5.parts.test(p), p);
+  assert.ok(familyProfile('ice40').openFlow.parts.test('ice40up5k') && !familyProfile('ice40').openFlow.parts.test('ice40zz9k'));
 });
 
 test('the browser\'s open flow asks the profile: the same answers per family as before', () => {
@@ -92,6 +102,11 @@ test('the browser\'s open flow asks the profile: the same answers per family as 
   const ice = browserOpenStatus({ family: 'ice40', part: 'ice40hx1k', package: 'tq144', speed: '' });
   assert.deepEqual([ice.available, ice.family, ice.part], [true, 'ice40', 'ice40hx1ktq144']);
   assert.match(browserOpenStatus({ family: 'ice40', part: 'ice40zz9k', package: 'tq144' }).reason, /not an iCE40 part of nextpnr-ice40/);
+  // (#2302) the ECP5: its part with its speed, its tools served by the local server (the unbuilt layout's)
+  const ecp5 = browserOpenStatus({ family: 'ecp5', part: 'lfe5u-85f', package: 'cabga381', speed: '-6' });
+  assert.deepEqual([ecp5.available, ecp5.family, ecp5.part, ecp5.reason], [true, 'ecp5', 'lfe5u-85f-6cabga381', 'lfe5u-85f-6cabga381: nextpnr-ecp5 and ecppack (in the browser)']);
+  assert.equal(browserOpenStatus({ family: 'ecp5', part: 'lfe5u-99f', package: 'cabga381', speed: '-6' }).reason, 'lfe5u-99f: not an ECP5 part of nextpnr-ecp5');
+  assert.deepEqual(browserSteps(['bitgen'], { family: 'ecp5' }), ECP5_STEPS.map(s => s.id));
   // a family with no open flow, and a Spartan-6 part outside the Nexys3's and Atlys's kind: not the Silinx toolchain's
   for (const device of [{ family: 'spartan3a', part: 'xc3s200a', package: 'vq100', speed: '-4' }, { family: 'spartan6', part: 'xc6slx45t', package: 'fgg484', speed: '-3' }]) {
     const st = browserOpenStatus(device);

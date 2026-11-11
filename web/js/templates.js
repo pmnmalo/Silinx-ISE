@@ -215,6 +215,18 @@ export function pcfTemplate(project) {
 `;
 }
 
+export function lpfTemplate(project) {
+  return `# Logical preference file for ${project.name}
+# Target: ${project.device.part}${project.device.speed || ''}-${project.device.package}
+#
+# Example:
+# LOCATE COMP "clk" SITE "G2";
+# IOBUF PORT "clk" IO_TYPE=LVCMOS33;
+# LOCATE COMP "led[0]" SITE "B2";
+# FREQUENCY PORT "clk" 25 MHZ;
+`;
+}
+
 export function xdcTemplate(project) {
   return `# Xilinx Design Constraints for ${project.name}
 # Target: ${project.device.part}${project.device.speed}-${project.device.package}

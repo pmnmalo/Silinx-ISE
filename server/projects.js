@@ -74,7 +74,7 @@ export function langOf(p) {
   const ext = path.extname(p).toLowerCase();
   if (ext === '.v' || ext === '.vh' || ext === '.sv') return 'verilog';
   if (ext === '.vhd' || ext === '.vhdl') return 'vhdl';
-  if (ext === '.ucf' || ext === '.pcf' || ext === '.xdc') return 'ucf';
+  if (ext === '.ucf' || ext === '.pcf' || ext === '.lpf' || ext === '.xdc') return 'ucf';
   return 'text';
 }
 

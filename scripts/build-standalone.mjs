@@ -45,6 +45,8 @@ const LAYOUT = {
   nextpnrS6: `../vendor/nextpnr-spartan6/${NEXTPNR_S6_VERSION}/gen/bundle.js`,
   // (the iCE40's: not published, from npm's registry on its first run, at package-lock.json's version and SHA-512, #2444)
   nextpnrIce40Package: (({ resolved: url, integrity }) => ({ url, integrity }))(JSON.parse(rd('package-lock.json')).packages['node_modules/@yowasp/nextpnr-ice40']),
+  // (the ECP5's the same way, #2302)
+  nextpnrEcp5Package: (({ resolved: url, integrity }) => ({ url, integrity }))(JSON.parse(rd('package-lock.json')).packages['node_modules/@yowasp/nextpnr-ecp5']),
   site: new URL(arg('--assets-url') || (BUILD ? `${PUBLISHED}dev/` : PUBLISHED)).href,
 };
 // the assets this version publishes (writeAssets): their folder under assets/, where they come from, which files

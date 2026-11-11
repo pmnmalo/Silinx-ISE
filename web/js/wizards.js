@@ -348,7 +348,7 @@ export async function zipFolderSelection(fileList) { // exported for tests
 }
 
 export async function importXiseDialog() {
-  const fileInp = h('input', { type: 'file', multiple: true, accept: '.zip,.xise,.v,.vhd,.vhdl,.ucf,.pcf' });
+  const fileInp = h('input', { type: 'file', multiple: true, accept: '.zip,.xise,.v,.vhd,.vhdl,.ucf,.pcf,.lpf' });
   const dirInp = h('input', { type: 'file', webkitdirectory: true, multiple: true });
   const name = h('input', { type: 'text', placeholder: 'new project name' });
   const info = h('div', { class: 'hint', style: { minHeight: '16px' } });
@@ -485,7 +485,7 @@ export { newSourceWizard } from './new-source.js';
 export const addSourceTitle = () => (document.documentElement.dataset.layout === 'tasks' ? 'Import Source' : 'Add Copy of Source');
 /** Add Copy of Source… (`role`: the association first chosen; `title`: Import Test Bench, Simulation only, #1385, #1501). */
 export async function addSourceDialog({ role: first = 'design', title = addSourceTitle() } = {}) {
-  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.pcf,.mem,.hex,.asm.json,.json' });
+  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.pcf,.lpf,.mem,.hex,.asm.json,.json' });
   const role = select([['design', 'All (Implementation + Simulation)'], ['impl', 'Implementation only'], ['sim', 'Simulation only']], typeof first === 'string' ? first : 'design');
   // (the Silinx interface asks no association: Import Source's All, Import Test Bench's Simulation only, #1501)
   const ask = document.documentElement.dataset.layout !== 'tasks';
@@ -498,7 +498,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
   const written = [];
   for (const f of inp.files) {
     const ext = f.name.split('.').pop().toLowerCase();
-    const dir = ['ucf', 'pcf', 'xdc'].includes(ext) ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
+    const dir = ['ucf', 'pcf', 'lpf', 'xdc'].includes(ext) ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
     // through the import gate (#2830): a file it refuses is not added, said in the console
     let text;
@@ -521,7 +521,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg(title, `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, text);
     written.push(path);
-    if (['ucf', 'pcf', 'xdc'].includes(ext) && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
+    if (['ucf', 'pcf', 'lpf', 'xdc'].includes(ext) && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
   }
   if (!written.length) return;
   // the association (role) of exactly the files written
@@ -753,7 +753,7 @@ export function aboutDialog() {
     body: h('div', { style: { display: 'flex', gap: '16px' } },
       h('div', { style: { width: '64px', height: '64px', background: '#c4161c', color: '#fff', font: 'bold 40px Arial', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' } }, 'S'),
       h('div', {}, h('div', { style: { fontSize: '16px', fontWeight: 'bold' } }, PRODUCT_FULL), h('div', {}, `Version ${VERSION}`),
-        h('p', {}, 'Digital design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7) and the Lattice iCE40, made for teaching: mixed VHDL/Verilog projects; schematics with live simulation; FSM and ASM state machine editors; Boolean algebra: truth tables, expressions and Karnaugh maps; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'),
+        h('p', {}, 'Digital design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7) and the Lattice iCE40 and ECP5, made for teaching: mixed VHDL/Verilog projects; schematics with live simulation; FSM and ASM state machine editors; Boolean algebra: truth tables, expressions and Karnaugh maps; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2, Nexys2, Nexys3, Atlys, iCEBreaker and ULX3S boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'),
         h('p', { style: { fontStyle: 'italic' } }, 'Silinx was developed for educational purposes, specifically to support the teaching of Digital Systems, because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.'),
         h('table', { class: 'about-info', style: { borderSpacing: '0 3px', margin: '6px 0 10px' } },
           h('tr', {}, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Project:'),
@@ -775,7 +775,7 @@ export function aboutDialog() {
         h('p', { class: 'hint' }, 'This program comes with ABSOLUTELY NO WARRANTY. Source code: ', link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`), '.'),
         h('p', { class: 'hint' }, 'Using Silinx in a course? ', link(WHO_URL, 'Tell us who you are'), '.'),
         componentsNode(),
-        h('p', { style: { color: 'var(--grey-4)' } }, 'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, nextpnr, and the bitstream writer of Silinx or icepack for the iCE40) for the Basys2, Nexys2, Nexys3, Atlys and iCEBreaker boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
+        h('p', { style: { color: 'var(--grey-4)' } }, 'Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, nextpnr, and the bitstream writer of Silinx, icepack for the iCE40 or ecppack for the ECP5) for the Basys2, Nexys2, Nexys3, Atlys, iCEBreaker and ULX3S boards, or the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
 }

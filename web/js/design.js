@@ -365,7 +365,7 @@ export function fileContextMenu(e, file) {
     { label: 'Open', action: () => openFile(file) },
     { label: 'Rename…', action: () => renameDialog(file) },
     /\.(vhdl?|v|sv|c)$/i.test(file) ? { label: 'Check Syntax', action: () => checkFileSyntax(file) } : null,   // (.c: Silinx HLS, #1524)
-    /\.(ucf|pcf|xdc)$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
+    /\.(ucf|pcf|lpf|xdc)$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
     { label: 'Remove from Project', action: () => removeFile(file) },
     { label: 'Delete File…', action: () => deleteFile(file) },
     { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) && S.viewTexts?.[file] === undefined },

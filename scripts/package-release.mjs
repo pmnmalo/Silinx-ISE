@@ -78,7 +78,7 @@ function packageApp() {
     copyTracked(app);
     run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], app);
     unlinkWorkspaces(app);
-    // the iCE40's nextpnr: downloaded on its first use (#2444), but installed by npm ci (#2570)
+    // the iCE40's and the ECP5's nextpnr: downloaded on their first use (#2444, #2302), but installed by npm ci (#2570)
     leaveOutDownloaded(app);
     // nextpnr's chip databases: downloaded on their first use (#2329)
     for (const pkg of NEXTPNR_PACKAGES) leaveOutChipdbs(path.join(app, 'node_modules', pkg));

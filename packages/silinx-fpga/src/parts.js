@@ -4,7 +4,7 @@
 // ./index.js gives all of it too.
 
 // the parts: their families and resources
-export { FAMILY_INFO, familyOfPart, deviceFamily, isIseFamily, openOnlyDevice, experimentalDevice, vivadoDevice, noFlowMessage, constraintsFormatOf, constraintsExtOf, familyName, familyFromXise, splitBitPart } from './family.js';
+export { FAMILY_INFO, familyOfPart, deviceFamily, isIseFamily, openOnlyDevice, experimentalDevice, vivadoDevice, noFlowMessage, constraintsFormatOf, constraintsExtOf, bitstreamExtOf, familyName, familyFromXise, splitBitPart } from './family.js';
 export { resourcesOf, resourceCount, resourceOfPrimitive } from './resources.js';
 export { usedOfReport, primitiveInstances, deviceChangeIssues } from './resource-check.js';
 
@@ -13,6 +13,7 @@ export { boardConstraintsText } from './board-constraints.js';
 export { parseUcf, generateUcf, checkUcf, bitName, boardAutoAssign, periodNs, ucfPlacesPins, backAnnotateUcf, locsNotOnBoard } from './ucf.js';
 
 export { PCF } from './pcf.js';
+export { LPF } from './lpf.js';
 export { XDC, readXdc, writeXdc } from './xdc.js';
 
 // the flow's steps

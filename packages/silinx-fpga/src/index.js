@@ -28,7 +28,11 @@ export { ice40Io } from './nextpnr-ice40-io.js';
 export { ICE40_PARTS, ICE40_STEPS } from './open-flow-ice40.js';
 // the 7-series' back end (#3146): its steps and its timing's model (nextpnr's estimate); in Node: node.js nextpnrXc7Node, loadBitDbXc7
 export { XC7_STEPS, XC7_TIMING_MODEL } from './open-flow-xc7.js';
+// the ECP5's nextpnr and ecppack, YoWASP's package as io.nextpnr.ecp5 (#2302; in Node: node.js nextpnrEcp5Node)
+export { ecp5Io } from './nextpnr-ecp5-io.js';
+export { ECP5_PARTS, ECP5_STEPS } from './open-flow-ecp5.js';
 export { PCF } from './pcf.js';
+export { LPF } from './lpf.js';
 export { XDC, readXdc, writeXdc } from './xdc.js';
 export { gateAssignments, rewriteCarryChains } from './carry-chain.js';
 

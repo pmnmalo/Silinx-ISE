@@ -3,7 +3,7 @@
 // a new family is an entry here (test/family-conditions.test.js keeps web/js free of family names in conditions).
 // The resources' counts stay in the device resources model (packages/silinx-fpga/src/resources.js, #790): a profile
 // names the resource, the part counts it.
-import { ICE40_STEPS } from '../packages/silinx-fpga/src/index.js';
+import { ICE40_STEPS, ICE40_PARTS, ECP5_STEPS, ECP5_PARTS } from '../packages/silinx-fpga/src/index.js';
 
 export const FAMILY_PROFILES = {
   spartan3e: {
@@ -27,8 +27,17 @@ export const FAMILY_PROFILES = {
     mapChoice: true,
   },
   ice40: {
-    // its own tools (#2295): nextpnr-ice40 and icepack, their steps, no device description of the Silinx toolchain
-    openFlow: { tools: 'nextpnr-ice40', steps: ICE40_STEPS },
+    // its own tools (#2295): nextpnr-ice40 and icepack, their steps, no device description of the Silinx toolchain;
+    // YoWASP's package, downloaded on first use (#2444)
+    // (its parts, nextpnr-ice40's; layout: the browser edition's key of its bundle, #2444)
+    openFlow: { tools: 'nextpnr-ice40', packer: 'icepack', package: '@yowasp/nextpnr-ice40', mb: 80, layout: 'nextpnrIce40', parts: new RegExp(`^ice40(${ICE40_PARTS.join('|')})$`), partOf: 'an iCE40 part', steps: ICE40_STEPS },
+    // its board programmed: the .bin into its SPI flash (#2298)
+    program: 'spi-flash',
+  },
+  ecp5: {
+    // its own tools (#2302): nextpnr-ecp5 and ecppack (Project Trellis), as the iCE40's; no programming of its boards yet
+    // (#2298), no clock manager, block RAM or multiplier wizard (their primitives the Xilinx families')
+    openFlow: { tools: 'nextpnr-ecp5', packer: 'ecppack', package: '@yowasp/nextpnr-ecp5', mb: 30, layout: 'nextpnrEcp5', parts: new RegExp(`^(${Object.keys(ECP5_PARTS).join('|')})$`), partOf: 'an ECP5 part', steps: ECP5_STEPS },
   },
 };
 

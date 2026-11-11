@@ -141,12 +141,12 @@ test('docs: the menu paths they give (File ▸ …, Tools ▸ …) are the inter
 // ---- the Silinx toolchain
 const MODE_LABEL = /\['silinx', '(Silinx toolchain[^']+)'\]/.exec(read('web/js/wizards.js'))[1];
 const boardsOf = pred => BOARDS.flatMap(b => (b.variants || [null]).map(v => {
-  const short = b.name.replace(/^(Digilent|Xilinx|Numato) /, '').replace(/ \(.*\)$/, '');
+  const short = b.name.replace(/^(Digilent|Xilinx|Numato|Radiona) /, '').replace(/ \(.*\)$/, '');
   return { board: b.id, name: v ? `${short}-${v.id}` : short, device: v?.device || b.device };
 })).filter(x => pred(openStatus(x.device).available));
 const SUPPORTED = boardsOf(a => a);
-// 'Basys2-100 / 250 and Nexys2-500 / 1200' → Basys2-100, Basys2-250, Nexys2-500, Nexys2-1200
-const named = text => [...text.matchAll(/\b(Basys2|Nexys2|Nexys3|Atlys)-(\w+)((?: \/ \w+)*)/g)]
+// 'Basys2-100 / 250 and Nexys2-500 / 1200' → Basys2-100, Basys2-250, Nexys2-500, Nexys2-1200 (the ULX3S's sizes too, #2302)
+const named = text => [...text.matchAll(/\b(Basys2|Nexys2|Nexys3|Atlys|ULX3S(?: \+ VGA)?)-(\w+)((?: \/ \w+)*)/g)]
   .flatMap(([, b, v, more]) => [v, ...more.split(' / ').slice(1)].map(x => `${b}-${x}`));
 
 test('docs: the Silinx toolchain\'s name and default mode are the code\'s', () => {
