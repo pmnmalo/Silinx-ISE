@@ -78,3 +78,26 @@ test('new_project, new_project_from_example and new_source on the 7-series: XDC 
   assert.match(fs.readFileSync(path.join(dir, 'constraints/extra.xdc'), 'utf8'), /^# Xilinx Design Constraints for v3\n# Target: xc7a35t-1-cpg236\n/);
   await fails('constraints_wizard', { project: 'v3', module: 'top', name: 'c2' }, 'the XC7A35T\'s constraints are an XDC: new_source constraints writes one');
 });
+
+// (#3146) the Silinx toolchain's 7-series back end, asked for (toolchain silinx): from HDL to the .bit as the interface runs
+// it, its reports the Design Summary's; no trust needed (it runs in Silinx's own process, as the other open flows)
+test('run_process with the Silinx toolchain on the Basys 3: synth_xilinx, nextpnr, the .bit from its FASM; the reports, the timing nextpnr\'s estimate', async () => {
+  await ok('new_project_from_example', { name: 'o3', example: 'blinky', board: 'basys3' });
+  const r = await ok('run_process', { project: 'o3', process: 'bitstream', toolchain: 'silinx' });
+  assert.deepEqual([r.data.toolchain, r.data.ok, r.data.errors, r.data.warnings], ['silinx', true, [], []]);
+  assert.match(r.text, /\nProcess "bitstream" of <top> completed successfully \(Silinx toolchain\)\.$/);
+  assert.ok(r.data.log.some(l => /^Bitstream: build\/top\.bit \(\d+ bytes, from nextpnr's FASM on Project X-Ray's database\)$/.test(l)), r.data.log.join('\n'));
+  assert.ok(fs.existsSync(path.join(P.projectDir('o3'), 'build/top.bit')));
+  const par = await ok('get_report', { project: 'o3', report: 'par' });
+  assert.match(par.text, /^Place and route \(Silinx toolchain\) of top: all signals are completely routed\.\nTiming constraints: all met; minimum period [\d.]+ ns \([\d.]+ MHz\), nextpnr's estimate \(optimistic against Vivado, #3146\)\.$/);
+  const map = await ok('get_report', { project: 'o3', report: 'map' });
+  assert.match(map.text, /\n {2}Bonded IOB: 27 out of 106 25%\n/);
+  const timing = await ok('get_report', { project: 'o3', report: 'timing' });
+  assert.equal(timing.data.path, 'build/open/timing.txt');
+  assert.match(timing.text, /^Timing of xc7a35tcpg236-1 after Place & Route: nextpnr's estimate .*\n.*\n\nClock clk: [\d.]+ MHz \([\d.]+ ns\), constraint 100 MHz: met\n/);
+  // (a step the back end does not have: refused with its list)
+  await fails('run_process', { project: 'o3', process: 'post_par_model', toolchain: 'silinx' }, 'no step postpar (the steps: synth, translate, par, trce, bitgen)');
+  // (AMD Vivado stays the project's own when no toolchain is asked: the project made through the MCP server, not trusted)
+  const untrusted = 'project \'o3\' was made through the MCP server (by an assistant): AMD Vivado runs only once you trust it (Trust Project, in the console when the project opens)';
+  await fails('run_process', { project: 'o3', process: 'synthesize' }, untrusted);
+});

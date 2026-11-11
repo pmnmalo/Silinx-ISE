@@ -13,9 +13,9 @@ import zlib from 'node:zlib';
 export const CHIPDB_MANIFEST = 'fetch.json';
 
 /** The GitHub release of a nextpnr package's version: v<version> for the Spartan-3E's, spartan6-v<version> for the
- *  Spartan-6's (the fork's tags). */
+ *  Spartan-6's, xc7-v<version> for the 7-series' (#3146) (the fork's tags). */
 export function chipdbReleaseUrl(name, version) {
-  const family = /-(spartan\w+)$/.exec(name)?.[1];
+  const family = /-(spartan\w+|xc7)$/.exec(name)?.[1];
   if (!family) throw new Error(`${name}: not a nextpnr package of nextpnr-spartan`);
   return `https://github.com/pmnmalo/nextpnr-spartan/releases/download/${family === 'spartan3e' ? '' : `${family}-`}v${version}/`;
 }

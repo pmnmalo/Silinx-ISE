@@ -98,7 +98,7 @@ const { ok, report } = await runFlow({ top: 'blinky', part, device: 'xc3s250e', 
 ```
 
 The sources are flat Verilog; VHDL needs an HDL front end (`io.frontEnd`, Silinx's). The place and route is
-nextpnr's, `io.nextpnr.spartan3e`, `.spartan6` and `.ice40` (in Node `nextpnrNode()`, `nextpnrS6Node()` and `nextpnrIce40Node()` of
+nextpnr's, `io.nextpnr.spartan3e`, `.spartan6`, `.ice40` and `.xc7` (the 7-series', #3146; in Node `nextpnrNode()`, `nextpnrS6Node()`, `nextpnrIce40Node()` and `nextpnrXc7Node()` of
 `silinx-fpga/node`).
 
 Licence: Apache-2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)), its code and its data; its dependencies' licences are in

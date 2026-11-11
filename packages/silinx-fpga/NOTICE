@@ -9,7 +9,8 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 Source code: https://github.com/pmnmalo/Silinx (packages/silinx-fpga)
 
 It depends on open-source components from other projects, each under its own licence, which npm installs
-with it: Yosys (YoWASP, ISC) and nextpnr with the Spartan-3E and the Spartan-6 (nextpnr-spartan, ISC; with Boost, BSL-1.0,
+with it: Yosys (YoWASP, ISC) and nextpnr with the Spartan-3E, the Spartan-6 and the 7-series (nextpnr-spartan, ISC, its 7-series chip
+databases from Project X-Ray's, CC0; with Boost, BSL-1.0,
 and Eigen, MPL-2.0: source code at https://gitlab.com/libeigen/eigen); for the iCE40, if installed, nextpnr-ice40
 and the IceStorm tools (YoWASP's @yowasp/nextpnr-ice40, ISC, an optional dependency). Their licence texts are in
 THIRD-PARTY-NOTICES.md.
