@@ -88,7 +88,16 @@ const owns = new Map();
 function ownBrowser({ family, where, tools, mb }, post) {
   const key = `${family} ${where.url || where}`;
   const cache = tools ? { tools, mb, cache: `silinx-${tools.split(' ')[0]}` } : {};
-  if (!owns.has(key)) owns.set(key, OWN_IO[family](() => (where.url ? ice40FromTarball(where, { log: line => post({ line }), ...cache }) : import(where))));
+  let mod = null;
+  const load = () => (mod ||= where.url ? ice40FromTarball(where, { log: line => post({ line }), ...cache }) : import(where));
+  // (a file of the package: kept with its download, or beside the bundle the local server serves; the Gowin's, #2303)
+  const file = async name => {
+    const m = await load();
+    if (m.packageFile) return m.packageFile(name);
+    const r = await fetch(new URL(`../${name}`, where));
+    return r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
+  };
+  if (!owns.has(key)) owns.set(key, OWN_IO[family](load, file));
   return owns.get(key);
 }
 

@@ -3,7 +3,8 @@
 // and J7). The board's own resources: the 27 MHz clock, 6 LEDs and 2 buttons (active low, its bank 3 at 1.8 V), the BL702's
 // UART. nextpnr-himbaechel-gowin places no port without a pin, so every port of the examples has one: their LEDs,
 // switches, buttons and seven-segment display on its headers (a breadboard, as the iCEBreaker's Pmods, #2517), vga's VGA
-// on the same pins (tangnano9k-vga); none verified on a board. No bitstream from Silinx yet (#2303), so no programming.
+// on the same pins (tangnano9k-vga); none verified on a board. Its .fs from gowin_pack (Silinx's port, #2303); not programmed from
+// Silinx yet (#2298).
 
 const CST_SOURCE = 'Apicula\'s tangnano9k.cst (YosysHQ/apicula) and the headers J6 / J7 of LiteX\'s sipeed_tang_nano_9k.py';
 const CST_URL = 'https://github.com/YosysHQ/apicula/blob/master/examples/tangnano9k.cst';
@@ -25,11 +26,11 @@ const BREADBOARD = [
 ];
 const BOARD = {
   vendor: 'Sipeed', device,
-  flash: { type: 'spi', part: 'P25Q32U', sizeMbit: 32, xcf: false, verified: false, note: 'Not written from Silinx: no Gowin bitstream yet (#2303).' },
+  flash: { type: 'spi', part: 'P25Q32U', sizeMbit: 32, xcf: false, verified: false, note: 'Not written from Silinx yet: openFPGALoader -b tangnano9k -f <top>.fs writes the .fs into it.' },
   jtagChain: [{ name: 'gw1nr-9c', role: 'fpga' }],
   programmer: {
     preferred: 'openFPGALoader',
-    tools: { openFPGALoader: { board: 'tangnano9k', onboard: true, verified: false, note: 'The on-board BL702 (JTAG): not from Silinx, which makes no Gowin bitstream yet (#2303).' } },
+    tools: { openFPGALoader: { board: 'tangnano9k', onboard: true, verified: false, note: 'The on-board BL702 (JTAG): not from Silinx yet (#2298), openFPGALoader -b tangnano9k <top>.fs by hand.' } },
   },
   source: CST_SOURCE, sourceUrl: CST_URL,
 };

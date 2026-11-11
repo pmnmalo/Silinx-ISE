@@ -239,8 +239,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       // (an open family whose boards Silinx does not program yet: the ECP5's, #2302)
       if (openOnlyDevice(project.device) && !familyProfile(deviceFamily(project.device)).program) {
         const fam = deviceFamily(project.device);
-        throw bad(familyProfile(fam).openFlow?.bitstream === false ? `Silinx does not program ${familyName(fam)} boards: it makes no bitstream for them yet`
-          : `Silinx does not program ${familyName(fam)} boards yet: build/${project.top || '<top>'}${bitstreamExtOf(project.device)} is the bitstream, for the board's own tools (openFPGALoader)`);
+        throw bad(`Silinx does not program ${familyName(fam)} boards yet: build/${project.top || '<top>'}${bitstreamExtOf(project.device)} is the bitstream, for the board's own tools (openFPGALoader)`);
       }
       const dir = P.projectDir(b.project);
       if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);

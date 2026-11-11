@@ -1,0 +1,384 @@
+{
+  "creator": "Next Generation Place and Route (Version nextpnr-0.11.1)",
+  "modules": {
+    "top": {
+      "settings": {
+        "route": "00000000000000000000000000000001",
+        "router/tmg_ripup": "0 ",
+        "router1/useEstimate": "1 ",
+        "router1/fullCleanupReroute": "1 ",
+        "router1/cleanupReroute": "1 ",
+        "router1/maxIterCnt": "200",
+        "place": "00000000000000000000000000000001",
+        "placer1/startTemp": "1.000000",
+        "placer1/minBelsForGridPick": "64",
+        "placer1/netShareWeight": "0.000000",
+        "placer1/constraintWeight": "10.000000",
+        "placerHeap/cellPlacementTimeout": "8",
+        "placerHeap/noCtrlSet": "0 ",
+        "placerHeap/netShareWeight": "0.000000",
+        "placerHeap/parallelRefine": "0 ",
+        "pack": "00000000000000000000000000000001",
+        "synth": "00000000000000000000000000000001",
+        "placerHeap/timingWeight": "10 ",
+        "placerHeap/criticalityExponent": "2",
+        "placerHeap/beta": "0.900000",
+        "placerHeap/alpha": "0.100000",
+        "seed": "0000100000011111110100000010000100001110101100100101111000000000",
+        "arch.type": " ",
+        "arch.name": "himbaechel",
+        "router": "default",
+        "placer": "heap",
+        "auto_freq": "00000000000000000000000000000000",
+        "timing_driven": "00000000000000000000000000000001",
+        "target_freq": "12000000.000000",
+        "cst.filename": "design.cst",
+        "packer.partno": "GW1NR-LV9QN88PC6/I5",
+        "packer.chipdb": "GW1N-9C",
+        "packer.arch": "himbaechel/gowin"
+      },
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "gates_syn.v:2.1-110.10"
+      },
+      "ports": {
+        "sw": {
+          "direction": "input",
+          "bits": [ 7701, 7699, 7697, 7687 ]
+        },
+        "led": {
+          "direction": "output",
+          "bits": [ 7705, 7703 ]
+        }
+      },
+      "cells": {
+        "GSR": {
+          "hide_name": 0,
+          "type": "GSR",
+          "parameters": {
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000010",
+            "NEXTPNR_BEL": "X0Y0/GSR"
+          },
+          "port_directions": {
+            "GSRI": "input"
+          },
+          "connections": {
+            "GSRI": [ 7716 ]
+          }
+        },
+        "$PACKER_GND_DRV": {
+          "hide_name": 1,
+          "type": "GOWIN_GND",
+          "parameters": {
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000010",
+            "NEXTPNR_BEL": "X0Y0/GND"
+          },
+          "port_directions": {
+            "G": "output"
+          },
+          "connections": {
+            "G": [ 7717 ]
+          }
+        },
+        "$PACKER_VCC_DRV": {
+          "hide_name": 1,
+          "type": "GOWIN_VCC",
+          "parameters": {
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000010",
+            "NEXTPNR_BEL": "X0Y0/VCC"
+          },
+          "port_directions": {
+            "V": "output"
+          },
+          "connections": {
+            "V": [ 7716 ]
+          }
+        },
+        "led_OBUF_O_1": {
+          "hide_name": 0,
+          "type": "OBUF",
+          "parameters": {
+            "NET_I": "NET",
+            "NET_O": "NET",
+            "NET_BOTTOM_IO_PORT_A": "GND",
+            "NET_BOTTOM_IO_PORT_B": "GND"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000101",
+            "NEXTPNR_BEL": "X7Y28/IOBA",
+            "src": "gates_syn.v:4.22-4.25",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001",
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "BOTTOM_IO_PORT_B": "input",
+            "BOTTOM_IO_PORT_A": "input",
+            "O": "output",
+            "I": "input"
+          },
+          "connections": {
+            "BOTTOM_IO_PORT_B": [ 7717 ],
+            "BOTTOM_IO_PORT_A": [ 7717 ],
+            "O": [ 7705 ],
+            "I": [ 7691 ]
+          }
+        },
+        "led_OBUF_O": {
+          "hide_name": 0,
+          "type": "OBUF",
+          "parameters": {
+            "NET_I": "NET",
+            "NET_O": "NET"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000101",
+            "NEXTPNR_BEL": "X7Y28/IOBB",
+            "src": "gates_syn.v:4.22-4.25",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001",
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "I": "input"
+          },
+          "connections": {
+            "O": [ 7703 ],
+            "I": [ 7691 ]
+          }
+        },
+        "d_IBUF_O": {
+          "hide_name": 0,
+          "type": "IBUF",
+          "parameters": {
+            "NET_I": "NET",
+            "NET_O": "NET"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000101",
+            "NEXTPNR_BEL": "X32Y28/IOBB",
+            "src": "gates_syn.v:3.20-3.22",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001",
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "I": "input"
+          },
+          "connections": {
+            "O": [ 7692 ],
+            "I": [ 7701 ]
+          }
+        },
+        "c_IBUF_O": {
+          "hide_name": 0,
+          "type": "IBUF",
+          "parameters": {
+            "NET_I": "NET",
+            "NET_O": "NET"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000101",
+            "NEXTPNR_BEL": "X28Y28/IOBA",
+            "src": "gates_syn.v:3.20-3.22",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001",
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "I": "input"
+          },
+          "connections": {
+            "O": [ 7693 ],
+            "I": [ 7699 ]
+          }
+        },
+        "b_IBUF_O": {
+          "hide_name": 0,
+          "type": "IBUF",
+          "parameters": {
+            "NET_I": "NET",
+            "NET_O": "NET"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000101",
+            "NEXTPNR_BEL": "X40Y28/IOBA",
+            "src": "gates_syn.v:3.20-3.22",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001",
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "I": "input"
+          },
+          "connections": {
+            "O": [ 7694 ],
+            "I": [ 7697 ]
+          }
+        },
+        "a_LUT4_I3": {
+          "hide_name": 0,
+          "type": "LUT4",
+          "parameters": {
+            "INIT": "0010100010101100"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000001",
+            "NEXTPNR_BEL": "X32Y26/LUT1",
+            "src": "/share/gowin/cells_map.v:147.23-148.48",
+            "module_not_derived": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I3": "input",
+            "I2": "input",
+            "I1": "input",
+            "I0": "input",
+            "F": "output"
+          },
+          "connections": {
+            "I3": [ 7688 ],
+            "I2": [ 7694 ],
+            "I1": [ 7693 ],
+            "I0": [ 7692 ],
+            "F": [ 7691 ]
+          }
+        },
+        "a_IBUF_O": {
+          "hide_name": 0,
+          "type": "IBUF",
+          "parameters": {
+            "NET_I": "NET",
+            "NET_O": "NET"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000101",
+            "NEXTPNR_BEL": "X40Y28/IOBB",
+            "src": "gates_syn.v:3.20-3.22",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001",
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "I": "input"
+          },
+          "connections": {
+            "O": [ 7688 ],
+            "I": [ 7687 ]
+          }
+        }
+      },
+      "netnames": {
+        "$PACKER_GND": {
+          "hide_name": 1,
+          "bits": [ 7717 ] ,
+          "attributes": {
+            "ROUTING": "X7Y28/D6;X7Y28/D6/W260;1;X7Y28/W260;X7Y28/W260/VSS;1;X7Y28/VSS;;1;X7Y28/C6;X7Y28/C6/W261;1;X8Y28/W260;X8Y28/W260/VSS;1;X8Y28/VSS;;1"
+          }
+        },
+        "$PACKER_VCC": {
+          "hide_name": 1,
+          "bits": [ 7716 ] ,
+          "attributes": {
+            "ROUTING": "X0Y0/C4;X0Y0/C4/W262;1;X2Y0/W260;X2Y0/W260/VCC;1;X2Y0/VCC;;1"
+          }
+        },
+        "led[0]": {
+          "hide_name": 0,
+          "bits": [ 7705 ] ,
+          "attributes": {
+            "ROUTING": " ",
+            "src": "gates_syn.v:4.22-4.25"
+          }
+        },
+        "led[1]": {
+          "hide_name": 0,
+          "bits": [ 7703 ] ,
+          "attributes": {
+            "ROUTING": " ",
+            "src": "gates_syn.v:4.22-4.25"
+          }
+        },
+        "sw[0]": {
+          "hide_name": 0,
+          "bits": [ 7701 ] ,
+          "attributes": {
+            "ROUTING": " ",
+            "src": "gates_syn.v:3.20-3.22"
+          }
+        },
+        "sw[1]": {
+          "hide_name": 0,
+          "bits": [ 7699 ] ,
+          "attributes": {
+            "ROUTING": " ",
+            "src": "gates_syn.v:3.20-3.22"
+          }
+        },
+        "sw[2]": {
+          "hide_name": 0,
+          "bits": [ 7697 ] ,
+          "attributes": {
+            "ROUTING": " ",
+            "src": "gates_syn.v:3.20-3.22"
+          }
+        },
+        "b": {
+          "hide_name": 0,
+          "bits": [ 7694 ] ,
+          "attributes": {
+            "ROUTING": "X40Y28/F6;;1;X40Y28/N130;X40Y28/N130/F6;1;X40Y27/W830;X40Y27/W830/N131;1;X32Y27/N260;X32Y27/N260/W838;1;X32Y26/C1;X32Y26/C1/N261;1",
+            "src": "gates_syn.v:8.15-8.16",
+            "single_bit_vector": "00000000000000000000000000000001"
+          }
+        },
+        "c": {
+          "hide_name": 0,
+          "bits": [ 7693 ] ,
+          "attributes": {
+            "ROUTING": "X28Y28/F6;;1;X28Y28/N260;X28Y28/N260/F6;1;X28Y26/E260;X28Y26/E260/N262;1;X30Y26/E270;X30Y26/E270/E262;1;X32Y26/X04;X32Y26/X04/E272;1;X32Y26/B1;X32Y26/B1/X04;1",
+            "src": "gates_syn.v:7.15-7.16",
+            "single_bit_vector": "00000000000000000000000000000001"
+          }
+        },
+        "d": {
+          "hide_name": 0,
+          "bits": [ 7692 ] ,
+          "attributes": {
+            "ROUTING": "X32Y28/Q6;;1;X32Y28/N260;X32Y28/N260/Q6;1;X32Y26/X01;X32Y26/X01/N262;1;X32Y26/A1;X32Y26/A1/X01;1",
+            "src": "gates_syn.v:6.15-6.16",
+            "single_bit_vector": "00000000000000000000000000000001"
+          }
+        },
+        "a_LUT4_I3_F": {
+          "hide_name": 0,
+          "bits": [ 7691 ] ,
+          "attributes": {
+            "ROUTING": "X7Y28/X08;X7Y28/X08/W271;1;X7Y28/D1;X7Y28/D1/X08;1;X32Y26/F1;;1;X32Y26/W810;X32Y26/W810/F1;1;X24Y26/W820;X24Y26/W820/W818;1;X16Y26/W820;X16Y26/W820/W828;1;X8Y26/S270;X8Y26/S270/W828;1;X8Y28/W270;X8Y28/W270/S272;1;X7Y28/A0;X7Y28/A0/W271;1"
+          }
+        },
+        "a": {
+          "hide_name": 0,
+          "bits": [ 7688 ] ,
+          "attributes": {
+            "ROUTING": "X40Y28/Q6;;1;X40Y28/W830;X40Y28/W830/Q6;1;X32Y28/N250;X32Y28/N250/W838;1;X32Y26/X08;X32Y26/X08/N252;1;X32Y26/D1;X32Y26/D1/X08;1",
+            "src": "gates_syn.v:9.15-9.16",
+            "single_bit_vector": "00000000000000000000000000000001"
+          }
+        },
+        "sw[3]": {
+          "hide_name": 0,
+          "bits": [ 7687 ] ,
+          "attributes": {
+            "ROUTING": " ",
+            "src": "gates_syn.v:3.20-3.22"
+          }
+        }
+      }
+    }
+  }
+}

@@ -19,7 +19,9 @@ an optional dependency). Their licence texts are in THIRD-PARTY-NOTICES.md.
 
 It includes work ported from Project X-Ray, whose licence texts are in THIRD-PARTY-NOTICES.md too: the 7-series'
 bitstream writer (src/fpga/xc7/) follows its fasm2frames and xc7frames2bit (ISC), and the 7-series' bit database
-(bitdb/xc7/) is a subset of its database, prjxray-db (CC0 1.0).
+(bitdb/xc7/) is a subset of its database, prjxray-db (CC0 1.0). It includes work ported from Project Apicula (MIT): the
+Gowin's bitstream writer (src/fpga/gowin/) is a port of its gowin_pack; the Gowin chip databases it reads are Apicula's, from
+@yowasp/nextpnr-himbaechel-gowin, and are not part of silinx-fpga.
 
 Your designs, and the netlists and bitstreams silinx-fpga makes of them, are not covered by this licence.
 

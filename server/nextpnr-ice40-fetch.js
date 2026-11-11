@@ -16,7 +16,7 @@ const MODULE = 'gen/bundle.js';
 export const OWN_TOOLS = {
   '@yowasp/nextpnr-ice40': { tools: 'nextpnr-ice40 and icepack', mb: 80, dir: 'nextpnr-ice40' },
   '@yowasp/nextpnr-ecp5': { tools: 'nextpnr-ecp5 and ecppack', mb: 30, dir: 'nextpnr-ecp5' },
-  '@yowasp/nextpnr-himbaechel-gowin': { tools: 'nextpnr-himbaechel-gowin', mb: 32, dir: 'nextpnr-himbaechel-gowin' },
+  '@yowasp/nextpnr-himbaechel-gowin': { tools: 'nextpnr-himbaechel-gowin and gowin_pack', mb: 32, dir: 'nextpnr-himbaechel-gowin' },
 };
 const ICE40 = '@yowasp/nextpnr-ice40';
 const toolOf = name => OWN_TOOLS[name] || { tools: name, mb: '?', dir: name.split('/').pop() };
@@ -76,6 +76,19 @@ export async function loadOwn(name, { log = () => {}, fetchFn = fetch, pkg = own
     fs.renameSync(tmp, dir);
   }
   return import(pathToFileURL(mod).href);
+}
+
+/** A file of a package (its path from the package's folder): the installed package's, else the one kept; null when neither has
+ *  it (the Gowin's resources, read by Silinx's gowin_pack, #2303). */
+export function ownPackageFile(name, file, pkg = ownPackage(name)) {
+  const dirs = [];
+  try { dirs.push(path.dirname(path.dirname(fileURLToPath(import.meta.resolve(name))))); } catch { /* not installed */ }
+  if (pkg) dirs.push(ownCacheDir(name, pkg.version));
+  for (const d of dirs) {
+    const f = path.join(d, file);
+    if (fs.existsSync(f)) return new Uint8Array(fs.readFileSync(f));
+  }
+  return null;
 }
 
 // the iCE40's (#2444), as they were

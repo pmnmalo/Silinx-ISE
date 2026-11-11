@@ -40,9 +40,9 @@ export const FAMILY_PROFILES = {
     openFlow: { tools: 'nextpnr-ecp5', packer: 'ecppack', package: '@yowasp/nextpnr-ecp5', mb: 30, layout: 'nextpnrEcp5', parts: new RegExp(`^(${Object.keys(ECP5_PARTS).join('|')})$`), partOf: 'an ECP5 part', steps: ECP5_STEPS },
   },
   gowin: {
-    // its own tools (#2303): nextpnr-himbaechel-gowin (Project Apicula), to its routed design; no bitstream yet (bitstream:
-    // false: gowin_pack is Python), so no programming
-    openFlow: { tools: 'nextpnr-himbaechel-gowin', packer: null, bitstream: false, package: '@yowasp/nextpnr-himbaechel-gowin', mb: 32, layout: 'nextpnrGowin',
+    // its own tools (#2303): nextpnr-himbaechel-gowin (Project Apicula) and gowin_pack, Silinx's port of Apicula's (the
+    // package's is Python); no programming of its boards yet (#2298)
+    openFlow: { tools: 'nextpnr-himbaechel-gowin', packer: 'gowin_pack', package: '@yowasp/nextpnr-himbaechel-gowin', mb: 32, layout: 'nextpnrGowin',
       parts: new RegExp(`^(${GOWIN_PARTS.join('|')})$`), partOf: 'a Gowin part', steps: GOWIN_STEPS },
   },
 };
