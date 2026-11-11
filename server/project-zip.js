@@ -11,6 +11,7 @@ import path from 'node:path';
 import { createZip } from '../core/zip.js';
 import { gateMessages, normalizePath, requireGated } from '../core/import-gate.js';
 import { markUntrusted } from '../core/trust.js';
+import { PROJECT_FILE } from '../core/fold-name.js';
 import { hiddenName } from './paths.js';
 import { exportCSources, exportIseSchematics, exportXise } from './xise.js';
 import { isCSource } from '../core/view-hdl.js';
@@ -114,10 +115,18 @@ export async function importProjectEntries(P, name, gated, bad) {
     let saved = null;
     try { saved = JSON.parse(text(pjEntry)); } catch { /* ignore a broken silinx.json */ }
     if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
-      // its file paths stay inside the project (a path that leaves it is dropped, with a warning)
+      // its file paths stay inside the project (a path that leaves it is dropped, with a warning), and are names the
+      // import gate takes: no hidden file, no silinx.json (a write target once the constraints are updated, #3411)
       const safe = p => { try { P.safeJoin(P.projectDir(name), p); return true; } catch { return false; } };
-      if (Array.isArray(saved.files)) saved.files = saved.files.filter(f => { const ok = typeof f?.path === 'string' && safe(f.path); if (!ok) result.warnings.push(`silinx.json: file path outside the project dropped (${f?.path})`); return ok; });
-      if (typeof saved.constraints === 'string' && saved.constraints && !safe(saved.constraints)) { result.warnings.push(`silinx.json: constraints path outside the project dropped (${saved.constraints})`); delete saved.constraints; }
+      const why = p => { const n = normalizePath(p); return n.reason || (P.isProjectFile(n.path) ? `${PROJECT_FILE}, the project's description` : null); };
+      const keep = (p, what) => {
+        if (typeof p !== 'string' || !safe(p)) { result.warnings.push(`silinx.json: ${what} path outside the project dropped (${p})`); return false; }
+        const reason = why(p);
+        if (reason) { result.warnings.push(`silinx.json: ${what} path '${p}' dropped: ${reason}`); return false; }
+        return true;
+      };
+      if (Array.isArray(saved.files)) saved.files = saved.files.filter(f => keep(f?.path, 'file'));
+      if (typeof saved.constraints === 'string' && saved.constraints && !keep(saved.constraints, 'constraints')) delete saved.constraints;
       const exists = p => { try { return fss.existsSync(P.safeJoin(P.projectDir(name), p)); } catch { return false; } };
       project = await P.updateProject(name, cur => ({ ...cur, ...(xiseEntry ? { board: saved.board ?? cur.board, stimuli: saved.stimuli || {}, preferredLanguage: saved.preferredLanguage, impl: { ...cur.impl, ...saved.impl } } : { ...saved, name, trusted: false }) }));
       if (!xiseEntry) {

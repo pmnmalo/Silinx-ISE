@@ -452,6 +452,9 @@ export function projectOps(getStore, examples = {}) {
       let json = null;
       // written again: back in the project
       path = notDescriptor(cleanPath(path));
+      // (a name by the import gate's rules, as the local server's, #3414; build/'s files by the rest of their path)
+      const gated = normalizePath(/^build\//.test(path) ? `b${path.slice(5)}` : path);   // (build/x as b/x)
+      if (gated.reason) fail(`'${path}': not written: ${gated.reason}`);
       if ((p.json.excluded || []).includes(path)) { json = clone(p.json); json.excluded = json.excluded.filter(f => f !== path); }
       await S().writeFile(name, path, text);
       const lang = langOf(path);

@@ -17,13 +17,14 @@
 // The rules:
 // - sizes: the archive, the decompressed total, the file count, each file, a text's line length and its nesting
 //   depth (brackets, XML elements, JSON; an HDL's if … elsif chain, #2577);
-// - names: relative to the project, no '..', absolute path, drive letter, backslash, control character, character
-//   Windows refuses (< > : " | ? *), hidden file or folder (.git, .silinx), reserved name (build/, CON, NUL, …),
+// - names: relative to the project, no '..', absolute path, drive letter, backslash, control, invisible or direction
+//   character (#3414), character Windows refuses (< > : " | ? *), hidden file or folder (.git, .silinx), reserved name
+//   (build/, CON, NUL, COM¹, __proto__, …),
 //   symbolic link, a name that differs from another only by its case or its Unicode form (the full case fold and
 //   NFKC: core/fold-name.js), or one a case-insensitive file system takes for silinx.json but silinx.json itself
 //   (SILINX.JSON, ſilinx.json, #3034);
-// - XML (.xise, .sch, .sym, PNML, .wcfg, .svg): no DTD (<!DOCTYPE>, <!ENTITY>), so no external entity and no entity
-//   expansion (XXE, billion laughs), whatever the parser that reads it next;
+// - XML (.xise, .sch, .sym, PNML, .wcfg, .svg): valid UTF-8, declared so or not at all (#3414), and no DTD (<!DOCTYPE>,
+//   <!ENTITY>), so no external entity and no entity expansion (XXE, billion laughs), whatever the parser that reads it next;
 // - types: by the extension and the content: a text file (an HDL source, a drawing, constraints…) that holds a NUL
 //   byte or is a web page is refused; text is decoded as UTF-8 (invalid sequences replaced, with a warning); any other
 //   file (a document, an image, a script) is kept as it is, opaque: Silinx never renders it as a page nor runs it.
@@ -66,7 +67,8 @@ export function kindOf(path) {
   return 'opaque';
 }
 
-const WINDOWS_DEVICE = /^(con|prn|aux|nul|com[0-9]|lpt[0-9]|conin\$|conout\$)(\..*)?$/i;
+// (COM¹ … LPT³ too: Windows reserves the superscript digits' names as well, #3414)
+const WINDOWS_DEVICE = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³]|conin\$|conout\$)(\..*)?$/i;
 
 /** A path of a project's file made canonical ('./a//b' -> 'a/b'): { path }, or { reason } it is refused. */
 export function normalizePath(p, { limits = GATE_LIMITS } = {}) {
@@ -74,6 +76,10 @@ export function normalizePath(p, { limits = GATE_LIMITS } = {}) {
   if (p.length > limits.maxPath) return { reason: `path longer than ${limits.maxPath} characters` };
   // eslint-disable-next-line no-control-regex
   if (/[\0-\x1f\x7f]/.test(p)) return { reason: 'control character in the name' };
+  // (the C1 controls, and the invisible and direction characters: a name that reads as another, a.vhd<U+202E>, or a
+  // silinx.json followed by a zero-width space, #3414)
+  const hid = /[\p{Cc}\p{Cf}\u2028\u2029]/u.exec(p);
+  if (hid) return { reason: `control, invisible or direction character in the name (U+${hid[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})` };
   if (/^[A-Za-z]:/.test(p)) return { reason: 'absolute path (a drive letter)' };
   if (p.includes('\\')) return { reason: 'backslash in the name' };
   if (p.startsWith('/')) return { reason: 'absolute path' };
@@ -87,6 +93,8 @@ export function normalizePath(p, { limits = GATE_LIMITS } = {}) {
     if (/^[^.]*~\d/.test(s)) return { reason: `a short (8.3) name, which may be a hidden file's or folder's ('${s}')` };
     if (/[ .]$/.test(s)) return { reason: `name ending with a space or a dot ('${s}')` };
     if (WINDOWS_DEVICE.test(s)) return { reason: `reserved name ('${s}')` };
+    // (a key of the stores' plain objects that sets their prototype: the file would be lost with no word, #3414)
+    if (s === '__proto__') return { reason: `reserved name ('${s}')` };
     if (s.length > limits.maxSegment) return { reason: `name longer than ${limits.maxSegment} characters` };
   }
   // (by its full case fold: what a case-insensitive file system may take for build, #2956)
@@ -172,6 +180,9 @@ function textReason(kind, text, limits) {
   }
   if (kind === 'json' && bracketDepth(text, true) > limits.maxDepth) return `JSON nested deeper than ${limits.maxDepth} levels`;
   if (kind === 'xml') {
+    // (another encoding, UTF-7's or EBCDIC's, would hide a DTD from this check from a parser that follows it, #3414)
+    const enc = /^\s*<\?xml\s[^>]*?\bencoding\s*=\s*["']([^"']*)["']/.exec(text)?.[1];
+    if (enc != null && !/^(utf-?8|us-ascii|ascii)$/i.test(enc)) return `XML declared in another encoding than UTF-8 ('${enc.slice(0, 32)}'): not accepted`;
     if (/<!DOCTYPE/i.test(text)) return 'XML with a DTD (<!DOCTYPE>): external entities and entity expansion are not accepted';
     if (/<!ENTITY/i.test(text)) return 'XML with an entity declaration (<!ENTITY>): not accepted';
     if (xmlDepth(text) > limits.maxDepth) return `XML nested deeper than ${limits.maxDepth} elements`;
@@ -187,6 +198,8 @@ function screen(path, data, limits) {
   if (!TEXT_KINDS.has(kind)) return { file: { path, data: bytes, kind } };
   let text, warning = null;
   try { text = strict.decode(bytes); } catch { text = loose.decode(bytes); warning = `${path}: not valid UTF-8 (the invalid bytes replaced)`; }
+  // (an XML's DTD check reads UTF-8: one in another encoding is refused, not read with its bytes replaced, #3414)
+  if (warning && kind === 'xml') return { reason: 'XML that is not valid UTF-8: not accepted' };
   text = text.replace(/^﻿/, '');
   const reason = textReason(kind, text, limits);
   return reason ? { reason } : { file: { path, data: bytes, kind, text }, warning };

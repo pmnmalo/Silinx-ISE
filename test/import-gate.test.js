@@ -262,3 +262,48 @@ test('the repository\'s designs pass the gate with no refusal and no warning', a
   assert.deepEqual(gateMessages(z), []);
   assert.deepEqual(z.files.map(f => f.path), all.map(f => f.path));
 });
+
+test('#3414 names: control, invisible and direction characters, COM\u00b9 … LPT\u00b3 and __proto__ refused with their reasons', () => {
+  const cases = {
+    'src/a\x7f.vhd': 'control character in the name',
+    'src/a\u0085.vhd': 'control, invisible or direction character in the name (U+0085)',
+    'src/a\u2028.vhd': 'control, invisible or direction character in the name (U+2028)',
+    'src/a\u202eb.vhd': 'control, invisible or direction character in the name (U+202E)',
+    'src/a\u200bb.vhd': 'control, invisible or direction character in the name (U+200B)',
+    'silinx.json\u200b': 'control, invisible or direction character in the name (U+200B)',
+    'src/\ufeffa.vhd': 'control, invisible or direction character in the name (U+FEFF)',
+    'src/COM\u00b9.v': "reserved name ('COM\u00b9.v')",
+    'LPT\u00b2.txt': "reserved name ('LPT\u00b2.txt')",
+    'com\u00b3': "reserved name ('com\u00b3')",
+    '__proto__': "reserved name ('__proto__')",
+    'src/__proto__/a.v': "reserved name ('__proto__')",
+  };
+  for (const [p, reason] of Object.entries(cases)) assert.deepEqual(normalizePath(p), { reason }, JSON.stringify(p));
+  // (letters of every script, an accent, a space inside, COM10, constructor: names as before)
+  for (const p of ['src/café.vhd', 'src/計数器.v', 'src/my top.vhd', 'src/COM10.v', 'constructor', 'src/__proto__x.v']) assert.deepEqual(normalizePath(p), { path: p }, p);
+  const r = gateEntries([{ path: '__proto__', data: 'x' }, { path: 'src/a.vhd', data: 'entity a is end;' }]);
+  assert.deepEqual(gateMessages(r), ["__proto__: not imported: reserved name ('__proto__')"]);
+});
+
+test('#3414 XML: one that is not valid UTF-8, or declares another encoding, refused', () => {
+  const sch = '<drawing version="7"/>';
+  const bytes = s => new TextEncoder().encode(s);
+  const r = gateEntries([
+    { path: 'a.sch', data: `<?xml version="1.0" encoding="UTF-7"?>+ADw-!DOCTYPE r+AD4-${sch}` },
+    { path: 'b.sch', data: `<?xml version='1.0' encoding='ISO-8859-1'?>${sch}` },
+    { path: 'c.sch', data: new Uint8Array([0x4c, 0x6f, 0xa7, 0x94, 0x93]) },                  // '<?xml' in EBCDIC
+    { path: 'd.wcfg', data: new Uint8Array([...bytes('<?xml version="1.0"?><w>'), 0xe9, ...bytes('</w>')]) },
+    { path: 'e.sch', data: `<?xml version="1.0" encoding="UTF-8"?>${sch}` },
+    { path: 'f.sch', data: `<?xml version="1.0" encoding="utf8" standalone="no"?>${sch}` },
+    { path: 'g.sch', data: `<?xml version="1.0" encoding="US-ASCII"?>${sch}` },
+    { path: 'h.sch', data: `<?xml version="1.0"?>${sch}` },
+    { path: 'i.sch', data: sch },
+  ]);
+  assert.deepEqual(gateMessages(r), [
+    "a.sch: not imported: XML declared in another encoding than UTF-8 ('UTF-7'): not accepted",
+    "b.sch: not imported: XML declared in another encoding than UTF-8 ('ISO-8859-1'): not accepted",
+    'c.sch: not imported: XML that is not valid UTF-8: not accepted',
+    'd.wcfg: not imported: XML that is not valid UTF-8: not accepted',
+  ]);
+  assert.deepEqual(r.files.map(f => f.path), ['e.sch', 'f.sch', 'g.sch', 'h.sch', 'i.sch']);
+});

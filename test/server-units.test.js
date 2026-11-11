@@ -327,7 +327,7 @@ test('projects: boardConstraints reads and writes inside the project only (a fil
   await fs.rm(outside, { force: true });
   const pj = { top: 'top', board: 'basys2', device: { part: 'xc3s250e' }, files: [{ path: 'src/top.v', lang: 'verilog', role: 'design' }] };
   // the constraints file outside the project: refused, nothing written there
-  await assert.rejects(P.boardConstraints(dir, { ...pj, constraints: '../escape.ucf' }), /path escapes project/);
+  await assert.rejects(P.boardConstraints(dir, { ...pj, constraints: '../escape.ucf' }), { message: "the constraints file '../escape.ucf' is not written: path leaves the project ('..')" });   // (by the import gate's rules, #3411)
   await assert.rejects(fs.access(outside));
   // a source outside the project: skipped (not read), the UCF written inside
   await P.boardConstraints(dir, { ...pj, files: [{ path: '../../outside.v', lang: 'verilog', role: 'design' }, ...pj.files], constraints: 'constraints/top.ucf' });
