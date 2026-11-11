@@ -69,7 +69,7 @@ There is no fallback: where nextpnr cannot start (its chip database not download
 saying so. **nextpnr replaced Silinx's placer and router** (decided in #2131; parity in #2135, #2797; removed in #2137, the
 Spartan-3E's placer and router, and #2824, the Spartan-6's router, its placer kept for the sites nextpnr is given fixed:
 pads, global buffers, block RAMs, DSPs; their parts other modules use are in `fpga/device-sites.js`, `fpga/place-common.js`,
-`fpga/route-check.js`, `fpga/clock-reach.js`). Silinx's packer stays: the open synthesis counts the slices with it (#2529). The Post-Map model is written
+`fpga/route-check.js`, `fpga/clock-reach.js`). The open synthesis counts the slices as nextpnr packs them (`slice-estimate.js`, #2529). The Post-Map model is written
 from nextpnr's packing: its routed design without the routing (#2530).
 The micro-architectures live in the fork `pmnmalo/nextpnr-spartan`. What stays Silinx's in any case: the timing, the bitstream
 and their data. nextpnr's routed design is converted to XDL (`fpga/nextpnr-xdl.js`), which those steps read.

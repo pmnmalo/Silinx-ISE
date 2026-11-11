@@ -10,8 +10,7 @@
 //   r: { top, files: { '<top>_syn.v', '<top>.json', '<top>_yosys.v', '<top>_stat.txt' }, cells, util,
 //        warnings, log }
 import { rewriteCarryChains, GATE_MIN, ADDER_MIN } from './carry-chain.js';
-import { readYosysJson } from './fpga/netlist.js';
-import { pack } from './fpga/pack.js';
+import { sliceEstimate } from './slice-estimate.js';
 import { fsmProbeCommands, fsmChosen, fsmExtracted, fsmExtractCommands, fsmForceCommands, fsmInits, fsmRestCommands, markWires, setInits, oldStateInits, refusedForUsers, quietForced, FSM_PRE_FILE, FSM_MARKED_FILE, FSM_POST_FILE, FSM_ENC_FILE, FSM_DETECT_FILE, FSM_FORCED_FILE } from './synth-fsm.js';
 import { asText } from './synth-open-yosys.js';
 import {
@@ -535,10 +534,10 @@ export function keepChains(n, c, { linesN = [], linesC = [] } = {}, rule = DEPTH
   return !times && !keepDepth([c.ns, n.ns], [c.luts, n.luts], rule, [c.slices, n.slices]);
 }
 
-/** The slices of a mapped netlist of a 4-input-LUT family (Yosys's JSON), as fpga/pack.js packs them for
- *  the open flow; null when it does not pack (a cell it does not support yet). */
+/** The slices of a mapped netlist of a 4-input-LUT family (Yosys's JSON) as nextpnr packs them for the open flow,
+ *  estimated (slice-estimate.js, #2529: no longer Silinx's packer); null when it cannot be read or has other cells. */
 export function sliceCount(json, top) {
-  try { return pack(readYosysJson(asText(json) || json, { top })).stats.slices; } catch { return null; }
+  return sliceEstimate(asText(json) || json, top);
 }
 
 /** The commands that map the design written by synthCommands(…, { premap: PREMAP_FILE }) again,
