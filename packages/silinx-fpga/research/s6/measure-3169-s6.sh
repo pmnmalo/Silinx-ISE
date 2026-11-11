@@ -6,7 +6,7 @@
 # (the bits by tile and PIP: $W/single-pips.json). GEN=gen-padout6.mjs OUT=outer-pips.json: the TIOI_OUTER slave
 # outputs (#3350) the same way. As measure-3176-s6.sh, but one ISE container at a time, each started
 # when the machine runs at most one other (docker ps). ISE's outputs stay in W, out of the repository.
-#   SILINX_ISE_HOST=user@host [SILINX_ISE_SSH_ARGS="-i key -p port"] [RW=<folder>] [PART=xc6slx16-csg324-3]
+#   SILINX_ISE_HOST=user@host [ISE_SSH_ARGS="-i key -p port"] [RW=<folder>] [PART=xc6slx16-csg324-3]
 #     [IMAGE=xilinx/ise:14.7] [GEN=gen-padsingle6.mjs] [OUT=single-pips.json] bash research/s6/measure-3169-s6.sh W
 # (RW: the folder on the ISE machine, absolute (one Docker Desktop shares, #482) or in its home, default silinx-3169-s6;
 # the host on the command line only)
@@ -17,7 +17,7 @@ W=${1:?W}; W=${W%/}; mkdir -p "$W"
 RW=${RW:-silinx-3169-s6}; PART=${PART:-xc6slx16-csg324-3}; IMAGE=${IMAGE:-xilinx/ise:14.7}
 GEN=${GEN:-gen-padsingle6.mjs}; OUT=${OUT:-single-pips.json}
 case "$RW" in /*) MNT=$RW ;; *) MNT='$HOME/'$RW ;; esac
-SSHO="ssh $SILINX_ISE_SSH_ARGS -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30"
+SSHO="ssh $ISE_SSH_ARGS -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30"
 SSH=($SSHO "$SILINX_ISE_HOST")
 PATHX='export PATH="$PATH:/usr/local/bin";'
 DOCKER="$PATHX docker run --rm --network none -v \"$MNT\":/w $IMAGE bash"
