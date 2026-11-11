@@ -46,7 +46,7 @@ export async function openAsm(path) {
       // (its problems in the console's Errors and Warnings, a click selecting the box, #2730)
       const problems = editorProblems({ file: path, tool: 'ASM', goto: (x) => { activateDoc(d); if (x.nodeId) ed.focusNode(x.nodeId); } });
       const ed = mountAsmEditor(host, {
-        model, ...followOnly(),
+        model, ...followOnly(path),
         onChange: () => setDirty(d, true),
         onProblems: (diags) => problems.set(diags),
         onValidate: (diags) => problems.log(diags),
