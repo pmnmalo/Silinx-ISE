@@ -1,6 +1,6 @@
 // The MCP server's tools of a C or C++ source (#2674, server/mcp-hls.js), as the C module's processes: C Simulation and
 // C/RTL Co-simulation of the test designs (fir, gcd, sort, popcount; stream_sum in C++), the co-simulation in VHDL and
-// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox; #3022: a C source that does not declare a blackbox's function, made; a description no C source declares, a warning of check_syntax.
+// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit; #2182: a pipelined loop's iteration over several cycles); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox; #3022: a C source that does not declare a blackbox's function, made; a description no C source declares, a warning of check_syntax.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -86,6 +86,21 @@ test('#2273 c_synthesis_report and c_cosimulation: ALLOCATION of fmul, one unit 
     assert.deepEqual([c.data.pass, c.data.mismatches, c.data.latency.max], [true, [], 61], language);
   }
   await ok('delete_file', { project: 'gcd', path: 'src/fm.c' });
+});
+
+// #2182: a pipelined loop too slow for the board's clock, its iteration over two cycles at II=1: said in the loops, no warning
+test('#2182 c_synthesis_report and c_cosimulation: a pipelined loop\'s iteration over two cycles at the board\'s clock, PASS in VHDL and in Verilog', async () => {
+  const slow = 'int slow(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n#pragma HLS PIPELINE II=1\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n';
+  await ok('write_file', { project: 'gcd', path: 'src/slow.c', text: `${slow}int main() {\n  return slow(3) == slow(3) ? 0 : 1;\n}\n` });
+  await ok('set_design_properties', { project: 'gcd', board: 'basys2', variant: '250' });
+  const r = await ok('c_synthesis_report', { project: 'gcd', path: 'src/slow.c' });
+  assert.ok(r.text.includes('\nLoops:\n  line 3    100 iterations; II=1 (an iteration over 2 cycles), 101 cycles; pipelined, II=1 asked\n'), r.text);
+  assert.deepEqual(r.data.warnings, []);
+  for (const language of ['vhdl', 'verilog']) {
+    const c = await ok('c_cosimulation', { project: 'gcd', path: 'src/slow.c', language });
+    assert.deepEqual([c.data.pass, c.data.mismatches], [true, []], language);
+  }
+  await ok('delete_file', { project: 'gcd', path: 'src/slow.c' });
 });
 
 test('c_generated: the HDL and the ASM chart made from fir.c', async () => {

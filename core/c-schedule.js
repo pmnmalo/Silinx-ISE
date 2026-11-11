@@ -27,8 +27,12 @@ export function scheduled(checked, opts = {}, { clock = DEFAULT_CLOCK, family = 
   const split = (ctx) => schedule(ctx, budget, family, mults);
   const timing = { budget, family };
   let m = fsmd(checked, { ...opts, split, timing });
+  // (a pipelined loop of one state an iteration whose path does not fit the clock: made again as a pipeline of stages,
+  // its iteration over several cycles at its II, as Vitis HLS makes it, #2182)
+  const deep = m.deepen ? new Set(m.deepen) : null;
+  if (deep) m = fsmd(checked, { ...opts, split, timing, deep });
   // (the state's register wide enough for the states added: the machine made again with room for them)
-  if (m.overflow) m = fsmd(checked, { ...opts, split, timing, spare: m.overflow });
+  if (m.overflow) m = fsmd(checked, { ...opts, split, timing, spare: m.overflow, deep });
   if (m.diagnostics.some((d) => d.severity === 'error')) return m;
   const subStates = m.subStates || new Map();
   // (a loop's states an iteration: its states' chains in them)

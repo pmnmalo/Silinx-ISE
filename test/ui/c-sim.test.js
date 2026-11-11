@@ -93,7 +93,7 @@ uiTest('#1531 a C module\'s processes (C Synthesis (HLS)): View C Synthesis Repo
   assert.match(log, /Ports:\n {2}ap_clk {11}in {4}1 bit\n[\s\S]* {2}a_address0 {7}out {3}3 bits\n {2}a_ce0 {12}out {3}1 bit\n {2}a_q0 {13}in {3}32 bits\n/);
   assert.match(log, /Memories:\n {2}a {16}8 x 32 bits, ap_memory \(outside the module\)\n/);
   // (the second loop pipelined automatically, as Vitis HLS does, #1919)
-  assert.match(log, /Loops:\n {2}line 4 {4}8 iterations; II=2, 18 cycles; pipelined, II=1 asked\n {2}line 8 {4}4 iterations; II=1, 5 cycles; pipelined automatically, as Vitis HLS does\n/);
+  assert.match(log, /Loops:\n {2}line 4 {4}8 iterations; II=2 \(an iteration over 4 cycles\), 18 cycles; pipelined, II=1 asked\n {2}line 8 {4}4 iterations; II=1, 5 cycles; pipelined automatically, as Vitis HLS does\n/);
   // (its multiplication a unit, #2125: its widths, its blocks, its uses)
   assert.match(log, /\nMultipliers: 1 unit, \d+ multiplier blocks?\n {2}mul_0 {11}\d+ x \d+ bits, \d+ blocks?; 1 use, 1 input multiplexed\n/);
   assert.match(log, /WARNING:SilinxC - "src\/sum\.c" line 4: #pragma HLS PIPELINE II=1: II=2 made \(the memory 'a' has one port, accessed 2 times an iteration\)/);
@@ -344,8 +344,9 @@ uiTest('#2783 View C Synthesis Report: the multiplications within the device\'s 
   }
 });
 
-// #2080: a pipelined loop that does not fit the board's clock: its II kept, said in the report, not in a compilation's messages
-uiTest('#2080 View C Synthesis Report: a pipelined loop too slow for the board\'s clock said, with its path; one that fits, not', E, async (page) => {
+// #2080, #2182: a pipelined loop that does not fit the board's clock: its iteration over several cycles at its II, said in
+// the report's loops, no warning (was its II kept and its path over the clock, a warning of the report)
+uiTest('#2080 #2182 View C Synthesis Report: a pipelined loop too slow for the board\'s clock made in stages, its iteration\'s cycles said; no warning', E, async (page) => {
   const loop = (name, prag) => `int ${name}(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n#pragma HLS PIPELINE ${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n`;
   await makeProject(env, { name: 'CSlow', top: 'slow', files: { 'src/slow.c': loop('slow', 'II=1'), 'src/calm.c': loop('calm', 'off') } });
   await page.openProject('CSlow');
@@ -358,9 +359,8 @@ uiTest('#2080 View C Synthesis Report: a pipelined loop too slow for the board\'
   await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
   await page.waitConsole(/C Synthesis Report of 'slow'[\s\S]*Process "View C Synthesis Report" completed successfully/);
   const log = await page.consoleText();
-  assert.match(log, /line 3 +100 iterations; II=1, 101 cycles; pipelined, II=1 asked/);
-  assert.match(log, /WARNING:SilinxC - "src\/slow\.c" line 3: this pipelined loop's iteration does not fit the 20 ns clock: a path of about \d+\.\d ns in one cycle \(Silinx adds no pipeline stages\); a slower clock, or #pragma HLS PIPELINE off, makes it fit/);
-  assert.doesNotMatch(log, /ERROR/);
+  assert.match(log, /line 3 +100 iterations; II=1 \(an iteration over 2 cycles\), 101 cycles; pipelined, II=1 asked/);
+  assert.doesNotMatch(log, /WARNING|ERROR/);
 });
 
 // The lines a viewer sees, not those hidden by the Console's filter: the test designs of each language.

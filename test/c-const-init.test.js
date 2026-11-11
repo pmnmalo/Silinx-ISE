@@ -135,7 +135,9 @@ test('#2151 read through a pointer (the checker resolves it to the array): still
 
 const COUNT = 'the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)';
 const PIPED = "this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 't' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off";
-const WARN = { 'its count from an input': [COUNT], 'the array read by it': [PIPED], 'an element added to': [PIPED] };
+// (its bound k % 100 longer than the clock, the exit known late: the II raised for it, #2182)
+const LATE = 'this loop is pipelined automatically, as Vitis HLS does (II=1): II=4 made (a dependence at this clock: the next iteration must wait for this one to say the loop goes on); #pragma HLS PIPELINE off in it turns that off';
+const WARN = { 'its count from an input': [COUNT, LATE], 'the array read by it': [PIPED], 'an element added to': [PIPED] };
 test('#2151 a loop that depends on anything else is not folded: it stays hardware, as the C says, co-simulated', () => {
   const NOT = {
     'its value from an input': TABLE('short t[100];', 'for (int i = 0; i < 100; i++) t[i] = i + x;', 'return t[k % 100];'),

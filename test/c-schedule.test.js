@@ -230,14 +230,25 @@ test('#2967 a stream\'s read in the state of what computes with its value; split
   assert.ok(chain.slice(0, -1).every((st) => !st.fifo.size));
 });
 
-test('#2080 a pipelined loop that does not fit the clock: its II kept, its path in the report, no warning; one that fits, none', () => {
-  const src = (prag) => `int f(int x) {\n#pragma HLS EXPRESSION_BALANCE off\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n`;
-  const slow = cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 10 });
+test('#2080 #2182 a pipelined loop that does not fit the clock: its iteration in stages, its II kept; one Silinx cannot make so (a stream polled), its path in the report', () => {
+  const src = (prag) => `int f(int x) {\n#pragma HLS EXPRESSION_BALANCE off\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\nint main() { return f(7) == f(7) ? 0 : 1; }\n`;
+  // (was its II kept and a path of 15.6 ns in one cycle, said in the report, #2080: now an iteration over 3 cycles)
+  const slow = cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 10, top: 'f' });
   assert.deepEqual(slow.diagnostics, []);
-  assert.deepEqual(slow.report.loops.map((l) => [l.pipeline, l.ii]), [[1, 1]]);
-  assert.deepEqual(slow.report.slowLoops.map((l) => [l.line, Math.round(l.ns * 10) / 10]), [[4, 15.6]]);
-  assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 40 }).report.slowLoops, []);
-  assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE off'), { file: 't.c', clock: 10 }).report.slowLoops, []);
+  assert.deepEqual(slow.report.loops.map((l) => [l.pipeline, l.ii, l.depth, l.cycles]), [[1, 1, 3, 102]]);
+  assert.deepEqual(slow.report.slowLoops, []);
+  for (const lang of ['vhdl', 'verilog']) {
+    const c = cosimulate(src('#pragma HLS PIPELINE II=1'), { file: 't.c', top: 'f', lang, clock: 10 });
+    assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, 104, []], lang);
+  }
+  // (a clock it fits in: one state an iteration, as before)
+  const calm = cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 40, top: 'f' });
+  assert.deepEqual([calm.report.loops.map((l) => [l.ii, l.depth, l.cycles]), calm.report.slowLoops], [[[1, undefined, 101]], []]);
+  assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE off'), { file: 't.c', clock: 10, top: 'f' }).report.slowLoops, []);
+  // (a stream polled in its condition: its accesses a state each, no stages; its path said)
+  const polled = `#include "hls_stream.h"\nvoid f(hls::stream<int> &xs, hls::stream<int> &ys, int x) {\n#pragma HLS EXPRESSION_BALANCE off\n  int i = 0;\n  while (!xs.empty()) {\n#pragma HLS PIPELINE II=1\n    int v = xs.read();\n    ys.write(v * x * i + x + i + 1);\n    i++;\n  }\n}\n`;
+  const p = cToHdl(polled, { file: 't.cpp', clock: 10, top: 'f' });
+  assert.deepEqual(p.report.slowLoops.map((l) => [l.line, Math.round(l.ns * 10) / 10]), [[5, 19.8]]);
 });
 
 test('#2183 the state register as wide as the states need: the machine\'s overflow only the states the clock\'s split adds (not the method of that name)', () => {
