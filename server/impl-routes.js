@@ -78,9 +78,10 @@ export async function startImplementation(name, body = {}) {
   // the Silinx toolchain (mode 'silinx'): no ISE, Silinx's own flow (server/open-flow.js). The
   // request's toolchain, else the project's synthesis tool (synthTool: 'silinx' | 'xst'), else the
   // execution mode of Toolchain Settings
-  const choice = body.toolchain || ({ silinx: 'silinx', xst: 'ise' })[project.synthTool];
-  // (a 7-series device: Vivado's, the only toolchain that implements it yet, #1649; a toolchain asked for Vivado: its)
-  const vivado = body.toolchain === 'vivado' || (isVivadoDevice(project.device) && !['silinx', 'open', 'ise'].includes(body.toolchain));
+  const choice = body.toolchain || ({ silinx: 'silinx', xst: 'ise', vivado: 'vivado' })[project.synthTool];
+  // (a 7-series device: Vivado's, #1649, unless the Silinx toolchain is asked for or is the project's synthesis tool: its
+  // 7-series back end, on trial, #3146; a toolchain asked for Vivado: its)
+  const vivado = body.toolchain === 'vivado' || (isVivadoDevice(project.device) && !['silinx', 'open', 'ise'].includes(choice));
   if (body.toolchain === 'vivado' && !isVivadoDevice(project.device)) throw bad(`AMD Vivado implements the Artix-7 devices, not the ${String(project.device?.part || '').toUpperCase()}`);
   if (vivado) {
     try { steps = vivadoSteps(steps); } catch (e) { throw bad(e.message); }

@@ -119,6 +119,14 @@ const ICE40_STEPS = [
   step('par', 'Place & Route - nextpnr', ['translate']),
   step('bitgen', 'Generate Programming File - icepack', ['par']),
 ];
+// (the 7-series', open-flow-xc7.js XC7_STEPS, #3146)
+const XC7_STEPS = [
+  step('synth', 'Synthesize - Yosys'),
+  step('translate', 'Translate', ['synth']),
+  step('par', 'Place & Route - nextpnr', ['translate']),
+  step('trce', 'Generate Post-Place & Route Static Timing', ['par']),
+  step('bitgen', 'Generate Programming File', ['par']),
+];
 const withProducts = (steps, products) => steps.map(s => ({ ...s, produces: products[s.id] || [] }));
 
 const UCF = { format: 'ucf', ext: '.ucf', label: 'UCF' };
@@ -190,6 +198,28 @@ export const SILINX_ICE40 = {
   tasks: LAB_TASKS,
 };
 
+/** The Silinx toolchain on the 7-series (#3146, an experimental family: the Artix-7 of the Basys 3), with nextpnr and the bitstream
+ *  from its FASM: nextpnr maps in its Place & Route, its timing is nextpnr's estimate; no simulation models, no views of the
+ *  routed design, no Emulate (the 7-series' boards have none yet); the board programmed as Vivado's .bit is (iMPACT's page).
+ *  The local server's only: the browser edition has NO_FLOW. */
+export const SILINX_XC7 = {
+  id: 'silinx-xc7', name: 'Silinx toolchain (7-series, on trial)', open: true,
+  steps: withProducts(XC7_STEPS, {
+    synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.fasm', 'open/nextpnr-report.json'], trce: ['open/timing.txt'], bitgen: ['{top}.bit'],
+  }),
+  reports: [
+    { id: 'synthesis', label: 'Synthesis Report (Yosys)', step: 'synth', file: 'open/{top}_stat.txt' },
+    { id: 'routed', label: 'Routed Design (FASM)', step: 'par', file: 'open/routed.fasm' },
+    { id: 'timing', label: 'Static Timing Report', step: 'trce', file: 'open/timing.txt' },
+  ],
+  constraints: XDC,
+  messages: LOG_MESSAGES,
+  program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit' },
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE)
+    .filter(n => n.part !== 'emulate'),
+  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+};
+
 /** An experimental family's (#3142): its constraints (XDC) and the design's checks, no implementation, no programming yet:
  *  no step, no report, and the tasks without Implement (nor Emulate: its boards have no emulator yet). */
 export const NO_FLOW = {
@@ -228,12 +258,13 @@ export const VIVADO = {
   tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
 };
 
-// (the tools that implement: NO_FLOW's tasks are some of theirs)
+// (the tools that implement with every task of a lab session: NO_FLOW's, VIVADO's and SILINX_XC7's are some of theirs)
 export const TOOLS = [ISE, SILINX, SILINX_ICE40];
-const OPEN_BY_FAMILY = { ice40: SILINX_ICE40 };
-/** The tool of a project device: a 7-series one's AMD Vivado on the local server (#1649; `standalone`, the browser edition:
- *  none); another experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE. */
-export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) && !standalone ? VIVADO
+const OPEN_BY_FAMILY = { ice40: SILINX_ICE40, artix7: SILINX_XC7 };
+/** The tool of a project device: a 7-series one's AMD Vivado on the local server (#1649), or the Silinx toolchain there when
+ *  `open` (the project's synthesis tool Silinx, #3146; `standalone`, the browser edition: none); another
+ *  experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE. */
+export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) && !standalone ? (open ? SILINX_XC7 : VIVADO)
   : experimentalDevice(device) ? NO_FLOW : open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
 
 /** Every tool's tasks, in their order: the kept state's and the switchers'. */

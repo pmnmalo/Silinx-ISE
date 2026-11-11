@@ -36,8 +36,9 @@ const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'sum
 // the project's synthesis tool (Design Properties: Silinx or XST), else Toolchain Settings' mode; never
 // in the single-file edition (no server: the Silinx toolchain runs on it)
 // (the browser edition: the Silinx toolchain, unless the project chose XST)
-// (a device of Vivado's, on the local server: not the Silinx toolchain's, whatever the synthesis tool says, #1649)
-export const vivadoMode = () => !api.standalone && vivadoDevice(S.project?.device);
+// (a device of Vivado's, on the local server: AMD Vivado's, #1649, unless the project's synthesis tool is Silinx: the Silinx
+// toolchain's 7-series back end, on trial: the 7-series an experimental family, #3146)
+export const vivadoMode = () => !api.standalone && vivadoDevice(S.project?.device) && S.project?.synthTool !== 'silinx';
 export const openMode = () => !vivadoMode() && (openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx'));
 /** The project's tool (its descriptor, web/js/tool-descriptors.js): what the process tree and the tasks are built from. */
 export const projectTool = () => toolOf(S.project?.device, openMode(), { standalone: api.standalone });

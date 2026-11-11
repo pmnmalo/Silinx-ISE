@@ -12,6 +12,9 @@ export const boardOptions = db => [['', 'None Specified'], ...db.boards.map(b =>
  *  else null: the Artix-7's is AMD Vivado's on the local server (#1649), none in the browser edition. */
 export const noFlowWarning = device => (experimentalDevice(device) && !(vivadoDevice(device) && !api.standalone) ? `WARNING: ${noFlowMessage(device)}.` : null);
 
+/** The synthesis tools of an Artix-7 project on the local server (#3146): AMD Vivado's flow, or the Silinx toolchain's. */
+export const VIVADO_TOOLS = [['vivado', 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)'], ['silinx', 'Silinx (VHDL/Verilog; no Vivado needed; on trial)']];
+
 // Cascading Family -> Device -> Package -> Speed selectors over the device database.
 export function devicePicker(db, device) {
   const families = (db.families || []).filter(f => (f.parts || []).length);
@@ -50,8 +53,26 @@ export function devicePicker(db, device) {
   set(device);
   return {
     famSel, partSel, pkgSel, spdSel, set,
-    // (no ISE for the family; an experimental one: no tool runs it yet, the choice kept 'silinx' and locked, #3142)
-    lockSynth(sel) { (fitSynth = () => { const d = { part: partSel.value }, o = openOnlyDevice(d) || experimentalDevice(d); if (o) sel.value = 'silinx'; sel.disabled = o; })(); },
+    // (no ISE for the family; an experimental one: no tool runs it yet, the choice kept 'silinx' and locked, #3142; the
+    // Artix-7 on the local server: AMD Vivado, the default, or the Silinx toolchain, on trial, #3146: the list's
+    // choices those two; want: the project's choice, else the list's first, the one selected for the other families)
+    lockSynth(sel, want = null) {
+      const own = [...sel.options].map(o => [o.value, o.textContent]), first = sel.value;
+      const fill = list => {
+        if ([...sel.options].map(o => o.value).join() === list.map(o => o[0]).join()) return;
+        sel.replaceChildren(...list.map(([v, t]) => h('option', { value: v }, t)));
+        const has = v => list.some(o => o[0] === v);
+        sel.value = has(want) ? want : list === own && has(first) ? first : list[0][0];
+      };
+      (fitSynth = () => {
+        const d = { part: partSel.value };
+        if (vivadoDevice(d) && !api.standalone) { fill(VIVADO_TOOLS); sel.disabled = false; return; }
+        fill(own);
+        const o = openOnlyDevice(d) || experimentalDevice(d);
+        if (o) sel.value = 'silinx';
+        sel.disabled = o;
+      })();
+    },
     disable(on) { [famSel, partSel, pkgSel].forEach(e => { e.disabled = on; }); spdSel.disabled = on || !spdSel.options.length; },
     value: () => ({ family: famSel.value, part: partSel.value, package: pkgSel.value, speed: spdSel.value }),
     familyName: () => famSel.selectedOptions[0]?.textContent || famSel.value,   // (with its experimental mark)
