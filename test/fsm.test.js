@@ -110,6 +110,33 @@ test('labels: "condition / outputs", output lists', () => {
   assert.equal(formatOutputs({ z: '1', w: "2'b10" }), "z=1, w=2'b10");
 });
 
+test('#3288 output assignments checked against the machine\'s outputs: a constant value, a declared output; Check says the same', () => {
+  const outs = [{ name: 'z0', width: 1 }, { name: 'z', width: 1 }, { name: 'w', width: 2 }];
+  const constant = (v, o) => `the value '${v}' of ${o} must be a constant (e.g. 0, 1, 4'b1010, 5)`;
+  // a comma missing: z0's value is '1z=1', not a constant (without the outputs, as before: taken as it is)
+  assert.deepEqual(parseOutputs('z0=1z=1'), { outputs: { z0: '1z=1' } });
+  assert.deepEqual(parseOutputs('z0=1z=1', outs), { error: constant('1z=1', 'z0') });
+  assert.deepEqual(parseOutputs('z0=1, q=1', outs), { error: "'q' is not an output" });
+  assert.deepEqual(parseOutputs('z=x', outs), { error: constant('x', 'z') });
+  assert.deepEqual(parseOutputs('z0=1, z, w=2\'b10; w := 3', outs), { outputs: { z0: '1', z: '1', w: '3' } });
+  assert.deepEqual(parseOutputs('', outs), { outputs: {} });
+  assert.deepEqual(parseOutputs('q', []), { error: "'q' is not an output" });
+  assert.deepEqual(parseOutputs('3 = z', outs).error, "'3 = z' is not an output assignment (write output=value, e.g. z=1)");
+  // (a value that does not fit is Check's warning, not the field's error)
+  assert.deepEqual(parseOutputs('z=2', outs), { outputs: { z: '2' } });
+  // a transition's label: its outputs checked the same way
+  assert.deepEqual(parseLabel('x / z0=1z=1', outs), { cond: 'x', outputs: {}, error: constant('1z=1', 'z0') });
+  assert.deepEqual(parseLabel('x / q', outs).error, "'q' is not an output");
+  assert.deepEqual(parseLabel('x / z', outs), { cond: 'x', outputs: { z: '1' }, error: undefined });
+  // Check (validateFsm, also the MCP's check_drawing and write_file's): the same messages, the state's or transition's name before them
+  const m = normalizeFsm({ name: 'f', inputs: [{ name: 'x', width: 1 }], outputs: outs.map((o) => ({ ...o, default: '0' })), initial: 'a',
+    states: [{ id: 'a', name: 'A', outputs: { z0: '1z=1', q: '1' } }, { id: 'b', name: 'B' }],
+    transitions: [{ id: 't', from: 'a', to: 'b', cond: 'x', outputs: { q: '0' } }, { id: 'u', from: 'b', to: 'a', outputs: { z: '2' } }] });
+  const msgs = validateFsm(m).filter((d) => /output|value/.test(d.message) && !/never set/.test(d.message)).map((d) => `${d.severity}: ${d.message}`);
+  assert.deepEqual(msgs, [`error: State A: ${constant('1z=1', 'z0')}`, "error: State A: 'q' is not an output", "error: Transition A → B: 'q' is not an output",
+    'warning: Transition B → A: the value 2 of z does not fit in 1 bit(s)']);
+});
+
 test('conditions: Verilog width rules, bit selections, words and VHDL operators', () => {
   const W = (n) => ({ x: 1, y: 2, n: 3 }[n] ?? 1);
   const ev = (t, env) => evalCond(parseCond(t).ast, Object.fromEntries(Object.entries(env).map(([k, v]) => [k, BigInt(v)])), W);

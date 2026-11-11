@@ -50,6 +50,24 @@ test('check_drawing: the examples\' charts clean; a Petri net with an error, one
   assert.deepEqual(w.data, { project: 't', file: 'src/ctl.pn.json', ok: true, errors: [], warnings: [{ message: 'the net can reach a deadlock, no transition able to fire: after start, done', item: null }] });
 });
 
+test('#3288 a state diagram\'s output assignments (write_file, check_drawing): the editor\'s fields\' errors, the state\'s name before them', async () => {
+  await ok('new_project_from_example', { name: 'o', example: 'traffic' });
+  const { parseOutputs } = await import('../core/fsm.js');
+  const fsm = JSON.parse((await ok('read_file', { project: 'o', path: 'src/traffic.fsm.json' })).text);
+  const [s] = fsm.states, z = fsm.outputs[0].name;
+  // (a comma missing, as the field reads it, and an output the machine does not have)
+  s.outputs = { ...s.outputs, ...parseOutputs(`${z}=1z=1, q=1`).outputs };
+  const w = await ok('write_file', { project: 'o', path: 'src/traffic.fsm.json', text: JSON.stringify(fsm) });
+  const field = [parseOutputs(`${z}=1z=1`, fsm.outputs).error, parseOutputs('q=1', fsm.outputs).error];
+  assert.deepEqual(field, [`the value '1z=1' of ${z} must be a constant (e.g. 0, 1, 4'b1010, 5)`, "'q' is not an output"]);
+  const want = field.map(m => `State ${s.name}: ${m}`);
+  assert.equal(w.text, `Wrote src/traffic.fsm.json (${JSON.stringify(fsm).length} characters).\nWARNING: src/traffic.vhd not updated: src/traffic.fsm.json has errors: ${want.join('; ')}`);
+  const f = await ok('check_drawing', { project: 'o', file: 'src/traffic.fsm.json' });
+  assert.deepEqual(f.data.errors, want.map(message => ({ message, item: s.id })));
+  assert.deepEqual(f.data.warnings, []);
+  assert.equal(f.text, `${want.map(m => `ERROR: ${m}`).join('\n')}\nProcess "Check State Diagram" of traffic.fsm.json failed (2 error(s), 0 warning(s)).`);
+});
+
 test('check_drawing: an ASM chart (the blinky example\'s, clean), a file that is no such drawing or is not there', async () => {
   await ok('new_project_from_example', { name: 'b', example: 'blinky' });
   assert.equal((await ok('check_drawing', { project: 'b', file: 'src/speed_ctrl.asm.json' })).text, 'Process "Validate" of speed_ctrl.asm.json completed successfully.');

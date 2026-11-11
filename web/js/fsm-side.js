@@ -33,7 +33,7 @@ export function mountSide(ctx) {
       const e = encOf().get(s.id);
       const name = input(s.name, (v, done) => { s.name = v.trim(); commit('sname'); if (done) renderMachine(); }, { cls: 'mono fsm-sname', key: 'sname' });
       const outs = input(formatOutputs(s.outputs), (v) => {
-        const r = parseOutputs(v);
+        const r = parseOutputs(v, M().outputs);
         outErr.textContent = r.error || '';
         if (!r.error) { s.outputs = r.outputs; commit('souts'); }
       }, { cls: 'mono fsm-souts', ph: 'e.g. z=1, y=2\'b10', key: 'souts' });
@@ -64,7 +64,7 @@ export function mountSide(ctx) {
     const cond = input(t.cond, (v) => { t.cond = v.trim(); commit('cond'); }, { cls: 'mono fsm-cond', ph: 'e.g. x && !y   (empty = always)', key: 'cond' });
     const outErr = h('span', { class: 'asm-fhint c-err' });
     const outs = input(formatOutputs(t.outputs), (v) => {
-      const r = parseOutputs(v);
+      const r = parseOutputs(v, M().outputs);
       outErr.textContent = r.error || '';
       if (!r.error) { t.outputs = r.outputs; commit('touts'); }
     }, { cls: 'mono fsm-touts', ph: 'e.g. z=1', key: 'touts' });

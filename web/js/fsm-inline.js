@@ -44,7 +44,7 @@ export function mountFsmInline(ctx) {
     inlineAt({ x: s.x, y: s.y }, outs ? `${s.name} / ${outs}` : s.name, (v) => {
       const k = v.indexOf('/');
       const name = (k < 0 ? v : v.slice(0, k)).trim();
-      const r = k < 0 ? { outputs: s.outputs } : parseOutputs(v.slice(k + 1));
+      const r = k < 0 ? { outputs: s.outputs } : parseOutputs(v.slice(k + 1), M().outputs);
       if (r.error) { flash(r.error, 'err'); return; }
       const cur = stateById(s.id);
       if (!cur) return;
@@ -60,7 +60,7 @@ export function mountFsmInline(ctx) {
     inlineAt(g.lab, M().type === 'mealy' || o ? `${t.cond}${o ? ` / ${o}` : (M().type === 'mealy' ? ' / ' : '')}` : t.cond, (v) => {
       const cur = transById(t.id);
       if (!cur) return;
-      const p = parseLabel(v);
+      const p = parseLabel(v, M().outputs);
       if (p.error) { flash(p.error, 'err'); return; }
       cur.cond = p.cond;
       cur.outputs = p.outputs;

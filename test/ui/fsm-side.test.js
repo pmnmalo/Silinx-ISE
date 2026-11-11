@@ -82,6 +82,39 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
   assert.deepEqual(out.commits, ['sname', 'souts', '', 'cond', '', '', 'touts']);
 });
 
+uiTest('#3288 FSM side panel: an output assignment checked (a comma missing, an output not declared), under its field, in English and Portuguese', E, async (page) => {
+  await page.eval(MOUNT);
+  const run = () => page.eval(async () => {
+    const { side, M, commits, selSection: S, set, select } = window.__s;
+    const tick = () => new Promise((ok) => setTimeout(ok, 0));   // (the translation's observer)
+    const r = {};
+    select({ type: 'state', id: 's2' }); side.renderSide();
+    const err = () => S.querySelector('.c-err').textContent;
+    for (const v of ['z=1z=1', 'q=1', 'z=1', 'z']) { set(S.querySelector('.fsm-souts'), v); await tick(); r[`s:${v}`] = [err(), { ...M.states[1].outputs }]; }
+    select({ type: 'trans', id: 't3' }); side.renderSide();
+    for (const v of ['q=0', 'z=x']) { set(S.querySelector('.fsm-touts'), v); await tick(); r[`t:${v}`] = [err(), { ...M.transitions.find((t) => t.id === 't3').outputs }]; }
+    M.states[1].outputs = {}; M.transitions.find((t) => t.id === 't3').outputs = {};
+    r.commits = commits.splice(0);
+    return r;
+  });
+  const out = await run();
+  assert.deepEqual(out, {
+    's:z=1z=1': ["the value '1z=1' of z must be a constant (e.g. 0, 1, 4'b1010, 5)", {}],
+    's:q=1': ["'q' is not an output", {}],
+    's:z=1': ['', { z: '1' }],
+    's:z': ['', { z: '1' }],
+    't:q=0': ["'q' is not an output", {}],
+    't:z=x': ["the value 'x' of z must be a constant (e.g. 0, 1, 4'b1010, 5)", {}],
+    commits: ['souts', 'souts'],
+  });
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  try {
+    const pt = await run();
+    assert.deepEqual([pt['s:z=1z=1'][0], pt['s:q=1'][0], pt['t:z=x'][0]], ["o valor '1z=1' de z tem de ser uma constante (p.ex. 0, 1, 4'b1010, 5)", "'q' não é uma saída", "o valor 'x' de z tem de ser uma constante (p.ex. 0, 1, 4'b1010, 5)"]);
+  } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
+});
+
 uiTest('#405 FSM side panel: the machine (its name, a port added and removed, the reset, the description)', E, async (page) => {
   await page.eval(MOUNT);
   const out = await page.eval(() => {
