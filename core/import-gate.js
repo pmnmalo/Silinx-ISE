@@ -129,14 +129,25 @@ function bracketDepth(text, json) {
   return max;
 }
 
-// the deepest nesting of an XML's elements (comments, CDATA, processing instructions and self-closing tags left out)
+// the deepest nesting of an XML's elements (comments, CDATA, processing instructions and self-closing tags left out);
+// a linear scan (a regular expression took quadratic time on an unclosed construct, #3406): a terminator once not
+// found is not searched again, and an unclosed construct is skipped as the regular expression skipped it
+const XML_OPEN = [['<!--', '-->'], ['<![CDATA[', ']]>'], ['<?', '?>']];
+const NAME_START = /[A-Za-z_]/;
 function xmlDepth(text) {
   let d = 0, max = 0;
-  const re = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<(\/?)[A-Za-z_][^>]*?(\/?)>/g;
-  for (let m; (m = re.exec(text));) {
-    if (m[1] === undefined) continue;
-    if (m[1]) d = Math.max(0, d - 1);
-    else if (!m[2] && ++d > max) max = d;
+  const missing = new Set();
+  const find = (s, from) => { if (missing.has(s)) return -1; const e = text.indexOf(s, from); if (e < 0) missing.add(s); return e; };
+  for (let i = text.indexOf('<'); i >= 0; i = text.indexOf('<', i)) {
+    const open = XML_OPEN.find(([o]) => text.startsWith(o, i));
+    const e = open && find(open[1], i + open[0].length);
+    if (e >= 0) { i = e + open[1].length; continue; }
+    const start = i + (text[i + 1] === '/' ? 2 : 1);
+    const gt = NAME_START.test(text[start] || '') ? find('>', start) : -1;
+    if (gt < 0) { i++; continue; }
+    if (start === i + 2) d = Math.max(0, d - 1);
+    else if (text[gt - 1] !== '/' && ++d > max) max = d;
+    i = gt + 1;
   }
   return max;
 }
