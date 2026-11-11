@@ -93,9 +93,11 @@ test('follow_project: an MCP client follows the MCP\'s share (two participants),
   assert.equal(f.data.project, 'blinky');
   assert.deepEqual(f.data.participants.map(p => [p.name, p.role]), [['Ana', 'owner']]);
   assert.equal(f.data.ownerView, null);
+  assert.equal(f.data.untrusted.content, 'the shared project\'s files and names');   // (#3363: the names its participants chose)
   assert.equal(f.text, `Following Ana's project 'blinky' (read only).\nFiles: ${files.join(', ')}\nIn it:\nAna (owner)`);
   const path0 = files.find(x => x.endsWith('.ucf'));
   const t = await ok('follow_project', { link, path: path0 });
+  assert.equal(t.data.untrusted.content, `the shared project's files, names and the file ${path0}`);
   assert.equal(t.data.text, await P.readFile('blinky', path0));
   assert.ok(t.text.endsWith(`${path0}:\n${t.data.text}`));
   await fails('follow_project', { link, path: 'build/top.bit' }, `'build/top.bit' is not a file of the shared project (${files.join(', ')})`);
@@ -232,6 +234,9 @@ test('the server\'s token goes only to its own server: another host (a key neede
     send() {}
     close() {}
   };
+  // (another computer's relays, named in the user's settings: #3363 refuses any other)
+  const cfgFile = path.join(process.env.SILINX_CONFIG_DIR, 'config.json');
+  fs.writeFileSync(cfgFile, JSON.stringify({ relay: { relays: [`http://relay.example:${port}`, `http://[::2]:${port}`] } }));
   try {
     // another host, at the port of this computer's server: no token, a key needed
     const evil = `http://relay.example:${port}`;
@@ -245,7 +250,7 @@ test('the server\'s token goes only to its own server: another host (a key neede
     assert.equal(seen[0].url, `ws://relay.example:${port}/api/collab/share`);
     assert.ok(seen[0].protocols.includes('token.relay-key'), String(seen[0].protocols));
     assert.ok(!seen[0].protocols.some(p => p.includes('tok-mcp')), String(seen[0].protocols));
-  } finally { globalThis.WebSocket = prev; }
+  } finally { globalThis.WebSocket = prev; fs.rmSync(cfgFile, { force: true }); }
   // a loopback port whose server is another program (the token file left by a server that stopped): not sent
   const upgrades = [];
   const other = http.createServer((req, res) => { res.writeHead(404); res.end(); });
@@ -267,4 +272,21 @@ test('the server\'s token goes only to its own server: another host (a key neede
   // this computer's own server, by its loopback address: shared with its token
   await ok('share_project', { project: 'traffic', server: base });
   await ok('share_project', { project: 'traffic', action: 'stop' });
+});
+
+test('#3363 share_project and follow_project reach this computer\'s server or a relay the user\'s settings name, nothing else', async () => {
+  const NOT = (what, at) => `${what}: ${at} is neither a Silinx server on this computer nor a relay the user's settings name (relay.relays in config.json): the MCP server shares and follows through those only`;
+  // (a WebSocket that records where it would connect: none for a refused host)
+  const seen = [];
+  const prev = globalThis.WebSocket;
+  globalThis.WebSocket = class { constructor(url) { seen.push(url); throw new Error('not here'); } };
+  try {
+    for (const at of ['https://relay.example', 'http://192.0.2.7:8642', 'http://[2001:db8::7]']) {
+      await fails('share_project', { project: 'traffic', server: at, key: 'a-relay-key-of-someone-0123456789' }, NOT('server', at));
+      // a link to follow: the relay it names, or the site it is on
+      await fails('follow_project', { link: followLink(`${at}/`, 'R'.repeat(22), 'K'.repeat(43)) }, NOT('link', at));
+      await fails('follow_project', { link: followLink(`${base}/`, 'R'.repeat(22), 'K'.repeat(43), 'relay', null, at) }, NOT('link', at));
+    }
+    assert.deepEqual(seen, []);
+  } finally { globalThis.WebSocket = prev; }
 });

@@ -136,7 +136,7 @@ export const PROJECT_TOOLS = [
       const full = await projectPath(name, rel);
       let text;
       try { text = await fsp.readFile(full, 'utf8'); } catch { throw toolError(`no file '${rel}' in the project '${name}'`); }
-      return { text: clip(text), data: { project: name, path: rel, length: text.length } };
+      return { text: clip(text), data: { project: name, path: rel, length: text.length }, untrusted: `the file ${rel}` };
     },
   },
   {

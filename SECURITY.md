@@ -97,6 +97,15 @@ can read that user's files has the server too.
   On a server, `SILINX_GIT=github` (`server/git-github.js`) uses the same back end with the environment's token
   (`GH_TOKEN`), never stored nor logged; what a project was at its last commit is kept in Silinx's configuration
   folder, out of the workspace, so that the MCP's file tools cannot point its commits at another repository.
+- The MCP server's outbound channels (#3363): an assistant led astray by what it read must not send a project where it
+  chooses. `git_init` sets a project's remote only to a GitHub repository the user's configuration file names
+  (`mcp.remotes`: `owner/repo` or `owner/*`), so `git_push` reaches only a remote the user set, one a clone came from,
+  or one of that list. `share_project` and `follow_project` connect only to the Silinx server of this computer
+  (loopback) or to a relay the configuration file names (`relay.relays`), never to another host, a private or local
+  address included. Both lists are `FILE_ONLY` settings: the page cannot change them. A tool's result that holds a
+  project's or a remote's text (`read_file`, `git_log`, `git_diff`, `get_report`, the import's and a clone's
+  warnings, `follow_project`'s files and names, `share_project`'s followers) is labelled "Untrusted content" after its
+  text, and `untrusted` in its structured content: data, never instructions.
 - A short link (#3223, `core/gist-link.js`): the project is encrypted where the link is made (AES-GCM, a random
   256-bit key and 96-bit IV each time) and saved as a secret gist of the user's account; the key is only in the link's
   fragment, which a browser never sends, so GitHub keeps only the ciphertext. Opening it reads the gist through GitHub's

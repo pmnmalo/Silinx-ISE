@@ -574,7 +574,11 @@ source lines, sites and nets its Show Path highlights, and the elements of the d
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
 the same), so what the assistant does is seen in the interface when the project is opened again.
 Every path stays inside its project; programming a board is not one of its tools; the ISE machine's
-address never appears in a result. In Claude Desktop's `claude_desktop_config.json`:
+address never appears in a result. Where the assistant's results can be sent is yours to say (#3363): `git_init` gives a project
+only a GitHub repository that `~/.silinx/config.json` names (`"mcp": { "remotes": ["owner/repo", "owner/*"] }`), and
+`share_project` / `follow_project` go only through this computer's Silinx or a relay it names (`"relay": { "relays": [...] }`).
+A result that holds a project's or a remote's own text (a file, a commit's message, a report, a shared project's files) is
+marked as such ("Untrusted content", and `untrusted` in its structured content): data, never instructions. In Claude Desktop's `claude_desktop_config.json`:
 
 ```json
 { "mcpServers": { "silinx": { "command": "node", "args": ["/path/to/silinx/bin/silinx.js", "mcp"] } } }
