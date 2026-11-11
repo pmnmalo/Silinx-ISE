@@ -187,7 +187,8 @@ uiTest('#3315 Share Project… in the Start page\'s Project Commands; who is in,
   const commands = () => page.eval(() => [...document.querySelectorAll('#start-page .entry a')].map((a) => a.textContent));
   await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project') && [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Share Project…'), [], { what: 'the Start page\'s Share Project…' });
   const cmds = await commands();
-  assert.equal(cmds[cmds.indexOf('Copy Link to Project…') + 1], 'Share Project…');
+  // (as the File menu: Copy Link to Project…, Open from Repository… where there is git (#3323), Share Project…)
+  assert.deepEqual(cmds.slice(cmds.indexOf('Copy Link to Project…'), cmds.indexOf('Share Project…') + 1).filter((c) => c !== 'Open from Repository…'), ['Copy Link to Project…', 'Share Project…']);
   await page.click('#start-page .entry a', { text: 'Share Project…' });
   await page.waitDialog('Share Project');
   await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
@@ -213,7 +214,7 @@ uiTest('#3315 Share Project… in the Start page\'s Project Commands; who is in,
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Partilhar Projeto…'), [], { what: 'Partilhar Projeto…' });
   const pt = await commands();
-  assert.equal(pt[pt.indexOf('Copiar Ligação para o Projeto…') + 1], 'Partilhar Projeto…');
+  assert.deepEqual(pt.slice(pt.indexOf('Copiar Ligação para o Projeto…'), pt.indexOf('Partilhar Projeto…') + 1).filter((c) => c !== 'Abrir do Repositório…'), ['Copiar Ligação para o Projeto…', 'Partilhar Projeto…']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());
   await page.waitConsole(/^Stopped sharing "StartShared": its followers no longer see it\.$/m);
