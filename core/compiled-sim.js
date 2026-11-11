@@ -32,6 +32,7 @@
 //
 // Isomorphic ES module (browser + Node), no DOM.
 import { toVerilog } from './synth-verilog.js';
+import { scriptTopError } from '../packages/silinx-fpga/src/index.js';
 import { PRIMITIVE_MODELS, bramInit, simprimCell } from './compiled-prims.js';
 import { gateModel } from './compiled-tables.js';
 import { CompileError, CHUNK, CUT_GAIN, FF, GUARD, HELPERS, PIECE, PMAX, PROFILE, SPLIT, WORTH } from './compiled-helpers.js';
@@ -65,6 +66,8 @@ export async function netlistOf(design, { run, words = true }) {
   let v;
   // (the SIMPRIM primitives of a post-translate / map / place & route model as their cells, #627)
   try { v = toVerilog(design, { simprim: simprimCell }); } catch (e) { throw new CompileError(e.message); }
+  // (its name in the Yosys script below: one Yosys reads as more words refused, #3416)
+  if (scriptTopError(v.top)) throw new CompileError(scriptTopError(v.top));
   const missing = v.primitives.filter(p => !PRIMITIVE_MODELS[p]);
   if (missing.length) throw new CompileError(`the compiled simulator has no model of ${missing.join(', ')}`);
   // (the primitives' models: core/compiled-prims.js)
