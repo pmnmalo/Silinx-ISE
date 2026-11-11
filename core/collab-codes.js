@@ -37,6 +37,12 @@ export async function sealCode(key, room, kind, sdp) {
   return PREFIX + b64url(await seal(key, room, CODE_KINDS[kind], packed));
 }
 
+/** A code that this sharing's key does not open: what to do, on each side (#3351). */
+export const NOT_THIS = Object.freeze({
+  offer: 'a follower\'s code is not of this sharing (or not whole): its link may be of an earlier one (each sharing has a new link); give them this sharing\'s link again (Copy Link) and paste the code their page then shows, whole',
+  answer: 'the owner\'s code is not of this sharing (or not whole): the owner may have shared again (each sharing has a new link); open their new link, or paste their code again, whole',
+});
+
 /** A code opened: its session description. Errors: not a code, too long, not this kind, not this shared project's. */
 export async function openCode(key, room, kind, code) {
   const what = kind === 'offer' ? 'a follower\'s code' : 'the owner\'s code';
@@ -46,7 +52,8 @@ export async function openCode(key, room, kind, code) {
   let frame;
   try { frame = unb64url(text.slice(PREFIX.length)); } catch { throw new Error(`not ${what} (copy it again, whole)`); }
   let opened;
-  try { opened = await unseal(key, room, frame); } catch { throw new Error(`${what} is not of this shared project (or not whole)`); }
+  // (not this sharing's key: a link of an earlier sharing, the code cut short; each sharing has a new link, #3351)
+  try { opened = await unseal(key, room, frame); } catch { throw new Error(kind === 'offer' ? NOT_THIS.offer : NOT_THIS.answer); }
   if (opened.kind !== CODE_KINDS[kind]) throw new Error(`not ${what}: ${opened.kind === CODE_KINDS.offer ? 'a follower\'s' : 'the owner\'s'} instead`);
   try { return new TextDecoder('utf-8', { fatal: true }).decode(await through(new DecompressionStream('deflate-raw'), opened.bytes, SDP_MAX)); } catch { throw new Error(`${what} is broken`); }
 }

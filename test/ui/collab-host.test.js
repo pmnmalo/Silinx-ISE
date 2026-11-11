@@ -60,7 +60,7 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     await page.waitDialog('Add a Follower');
     await page.fill('.dlg-overlay textarea[data-field=code]', 'S1.not-a-code');
     await page.dialogButton('Connect');
-    await page.waitConsole(/^ERROR: Add a Follower: a follower's code is not of this shared project \(or not whole\)\.$/m);
+    await page.waitConsole(/^ERROR: Add a Follower: a follower's code is not of this sharing \(or not whole\): its link may be of an earlier one \(each sharing has a new link\); give them this sharing's link again \(Copy Link\) and paste the code their page then shows, whole\.$/m);
     // the follower's code, at the owner's: the answer's code
     await page.click('.collab-presence .collab-btn');
     await page.waitForSelector('body > .menu-popup');
@@ -93,7 +93,7 @@ uiTest('#3227 the owner\'s page hosts the shared project: the codes exchanged, t
     await fp.waitConsole(/^WARNING: Ana's project "Hosted" is no longer followed \(the owner stopped sharing\): what you see is as it was then\.$/m);
     // the warnings and errors: the follower's end of sharing; the owner's refused code
     assert.deepEqual(await warnings(fp), ['WARNING: Ana\'s project "Hosted" is no longer followed (the owner stopped sharing): what you see is as it was then.']);
-    assert.deepEqual(await warnings(page), ['ERROR: Add a Follower: a follower\'s code is not of this shared project (or not whole).']);
+    assert.deepEqual(await warnings(page), [`ERROR: Add a Follower: ${"a follower's code is not of this sharing (or not whole): its link may be of an earlier one (each sharing has a new link); give them this sharing's link again (Copy Link) and paste the code their page then shows, whole"}.`]);
     assert.deepEqual(fp.errors, []);
   } finally { await fp.close(); }
 });

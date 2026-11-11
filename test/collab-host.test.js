@@ -8,7 +8,7 @@ import { test, after } from 'node:test';
 import * as Y from 'yjs';
 import assert from 'node:assert/strict';
 import { socketPair, hostedRooms, HOST_LIMITS, FOLLOWER_JOIN } from '../core/collab-loop.js';
-import { sealCode, openCode, CODE_KINDS, CODE_MAX, SDP_MAX } from '../core/collab-codes.js';
+import { sealCode, openCode, CODE_KINDS, CODE_MAX, SDP_MAX, NOT_THIS } from '../core/collab-codes.js';
 import { shareRoom, followRoom, KIND } from '../core/collab-client.js';
 import { newKey, keyOf, seal, b64url } from '../core/collab-crypto.js';
 import { projectDoc, publishProject, putFile, docFile, docProject } from '../core/collab-doc.js';
@@ -119,9 +119,11 @@ test('the codes exchanged by hand: sealed, opened by their project\'s key and ki
   await assert.rejects(openCode(key, room, 'answer', offer), /^Error: not the owner's code: a follower's instead$/);
   const answer = await sealCode(key, room, 'answer', 'v=0\r\n');
   await assert.rejects(openCode(key, room, 'offer', answer), /^Error: not a follower's code: the owner's instead$/);
-  await assert.rejects(openCode((await newKey()).key, room, 'offer', offer), /^Error: a follower's code is not of this shared project \(or not whole\)$/);
-  await assert.rejects(openCode(key, 'S'.repeat(22), 'offer', offer), /not of this shared project/);
-  await assert.rejects(openCode(key, room, 'offer', offer.slice(0, -4)), /not of this shared project \(or not whole\)/);
+  await assert.rejects(openCode((await newKey()).key, room, 'offer', offer), new RegExp(`^Error: ${NOT_THIS.offer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+  // (the owner's code at a follower's page of another sharing: what to do too, #3351)
+  await assert.rejects(openCode((await newKey()).key, room, 'answer', await sealCode(key, room, 'answer', 'v=0')), (e) => e.message === NOT_THIS.answer);
+  await assert.rejects(openCode(key, 'S'.repeat(22), 'offer', offer), /not of this sharing/);
+  await assert.rejects(openCode(key, room, 'offer', offer.slice(0, -4)), /not of this sharing \(or not whole\)/);
   for (const bad of ['', 'hello', 'S1.', 'S1.abc+/=', null]) await assert.rejects(openCode(key, room, 'offer', bad), /^Error: not a follower's code \(copy it again, whole\)$/);
   await assert.rejects(openCode(key, room, 'offer', `S1.${'A'.repeat(CODE_MAX)}`), /^Error: a follower's code too long$/);
   await assert.rejects(sealCode(key, room, 'frame', sdp), /an offer or an answer/);
