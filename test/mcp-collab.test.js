@@ -288,6 +288,37 @@ test('#3183 a truth table edited live: a page and the MCP client change two cell
   await ok('share_project', { project: 'trafficTt', action: 'stop' });
 });
 
+test('#3183 the owner writes an editor\'s change atomically (a temp file renamed over it): a reader never sees a text file or a drawing half-written; no temp file left', async () => {
+  await ok('new_project_from_example', { name: 'atomicEd', example: 'traffic' });
+  const dir = P.projectDir('atomicEd');
+  const { data: { editLink } } = await ok('share_project', { project: 'atomicEd', name: 'Ana', server: base, editors: true });
+  const ino = (rel) => fs.statSync(path.join(dir, rel)).ino;
+  const timer = await P.readFile('atomicEd', 'src/timer.vhd');
+  const fsm = JSON.parse(await P.readFile('atomicEd', 'src/traffic.fsm.json'));
+  const before = { timer: ino('src/timer.vhd'), fsm: ino('src/traffic.fsm.json') };
+  // a reader polling both files the whole time: every text it reads is whole (the old one or the new one)
+  let reading = true;
+  const seen = [];
+  const reader = (async () => { while (reading) { for (const rel of ['src/timer.vhd', 'src/traffic.fsm.json']) seen.push([rel, fs.readFileSync(path.join(dir, rel), 'utf8')]); await new Promise((r) => setImmediate(r)); } })();
+  await ok('follow_project', { link: editLink, name: 'Bot', write: { path: 'src/timer.vhd', text: `-- atomic\n${timer}` } });
+  fsm.states[0].x += 20;
+  await ok('follow_project', { link: editLink, write: { path: 'src/traffic.fsm.json', text: JSON.stringify(fsm) } });
+  await until(async () => (await P.readFile('atomicEd', 'src/timer.vhd')).startsWith('-- atomic\n'), 'the text file written', 8000);
+  await until(async () => JSON.parse(await P.readFile('atomicEd', 'src/traffic.fsm.json')).states[0].x === fsm.states[0].x, 'the drawing written', 8000);
+  reading = false;
+  await reader;
+  // (renamed over: another file; written in place, as before, the same one)
+  assert.notEqual(ino('src/timer.vhd'), before.timer);
+  assert.notEqual(ino('src/traffic.fsm.json'), before.fsm);
+  for (const [rel, t] of seen) {
+    if (rel === 'src/timer.vhd') assert.ok(t === timer || t === `-- atomic\n${timer}`, `a half-written ${rel}: ${t.length} characters`);
+    else assert.doesNotThrow(() => JSON.parse(t), `a half-written ${rel}: ${t.length} characters`);
+  }
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'src')).filter((f) => f.endsWith('.tmp')), []);
+  await ok('follow_project', { link: editLink, stop: true });
+  await ok('share_project', { project: 'atomicEd', action: 'stop' });
+});
+
 test('#3227 through a relay on another computer: share_project with its key; follow_project of a site\'s link that names the relay', async () => {
   await ok('new_project_from_example', { name: 'gatesRelay', example: 'gates' });
   // (the key given, not the token file of this computer: here this server's token, as a relay's key opens a room the same way)
