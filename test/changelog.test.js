@@ -89,6 +89,10 @@ test('buildChanges: the fragments as changes, newest issue first, typed by label
   assert.equal(buildChanges(files.slice(0, 1), { 12: ['enhancement', 'bug'] })[0].type, 'bugfix');
   assert.equal(changeTitle('- plain text, no bold\n  more'), 'plain text, no bold');
   assert.equal(changeTitle('- **Title (#5, #6, Refs #7):** x'), 'Title');
+  // #3090 a bold title wrapped onto the next line: one title, its lines joined, no ** left
+  assert.equal(changeTitle('- **A long title wrapped onto\n  a second line (#3090):** the text\n  more'), 'A long title wrapped onto a second line');
+  assert.equal(changeTitle('- An item with **bold** words, no label\n  more'), 'An item with bold words, no label');
+  assert.equal(buildChanges([{ name: '3090-wrapped.md', text: 'In detail:\n\n- **The reader, a title\n  wrapped (#3090):** text\n' }])[0].title, 'The reader, a title wrapped');
   // the repository's own fragments: every one a change with a title
   const repo = buildChanges(fs.readdirSync('changes').filter(f => /^\d+-.*\.md$/.test(f)).map(name => ({ name, text: fs.readFileSync(path.join('changes', name), 'utf8') })));
   assert.ok(repo.every(x => x.issue > 0 && x.title && !/\*\*|#\d+\)$/.test(x.title)), JSON.stringify(repo.filter(x => !x.title)));
