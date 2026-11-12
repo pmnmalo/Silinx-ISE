@@ -1,6 +1,6 @@
 // Silinx ASM charts - the chart's graph checked (#405: out of analyze in core/asm.js): its states and initial
 // state, the edges' ends, the every-cycle blocks, each node's exits, the blocks' trees, the states reachable.
-import { blockTrees, buildIndex, describe, flatten, normPort, treeNodes, walkAlways } from './asm.js';
+import { blockTrees, buildIndex, describe, normPort, treeNodes, treeParts, walkAlways } from './asm.js';
 
 /** { alwaysNodes, alwaysTrees, idx, trees } of analyze. */
 export function mountGraphChecks(ctx) {
@@ -53,7 +53,7 @@ export function mountGraphChecks(ctx) {
     alwaysTrees.set(a.id, tree);
     for (const id of treeNodes(tree)) { if (!alwaysOf.has(id)) alwaysOf.set(id, []); alwaysOf.get(id).push(a.id); }
     const reported = new Set();
-    (function check(t) {
+    for (const t of treeParts(tree)) {   // (each shared subtree once: its leaves' errors are the same, #3554)
       const key = `${t.k}:${t.id}`;
       if (t.k === 'state' && !reported.has(key)) {
         reported.add(key);
@@ -61,9 +61,7 @@ export function mountGraphChecks(ctx) {
       }
       if (t.k === 'loop' && !reported.has(key)) { reported.add(key); err(`${describe(a)}: loop through decision/output boxes (an every-cycle block must not loop)`, t.id); }
       if (t.k === 'badcase' && !reported.has(key)) { reported.add(key); err(`${describe(a)}: case boxes are not supported in every-cycle blocks (use decision boxes)`, t.id); }
-      if (t.k === 'if') { check(t.t); check(t.f); }
-      if (t.k === 'act') check(t.next);
-    })(tree);
+    }
   }
   for (const e of m.edges) {
     if (idx.nodes.get(e.to)?.type === 'always' && idx.nodes.has(e.from)) {
@@ -94,12 +92,9 @@ export function mountGraphChecks(ctx) {
   for (const [sid, tree] of trees) {
     for (const id of treeNodes(tree)) { if (!inBlock.has(id)) inBlock.set(id, []); inBlock.get(id).push(sid); }
     const loops = new Set();
-    (function findLoops(t) {
+    for (const t of treeParts(tree)) {
       if (t.k === 'loop' && !loops.has(t.id)) { loops.add(t.id); err(`Loop through decision/output boxes without a state (in the block of state '${idx.nodes.get(sid).name}')`, t.id); }
-      if (t.k === 'if') { findLoops(t.t); findLoops(t.f); }
-      if (t.k === 'case') for (const b of t.branches) findLoops(b.sub);
-      if (t.k === 'act') findLoops(t.next);
-    })(tree);
+    }
   }
   for (const n of m.nodes) {
     if (n.type === 'state' || n.type === 'always') continue;
@@ -121,7 +116,7 @@ export function mountGraphChecks(ctx) {
     const q = [m.initial];
     while (q.length) {
       const s = q.shift();
-      for (const t of flatten(trees.get(s))) if (t.next && !seen.has(t.next)) { seen.add(t.next); q.push(t.next); }
+      for (const t of treeParts(trees.get(s))) if (t.k === 'goto' && !seen.has(t.id)) { seen.add(t.id); q.push(t.id); }
     }
     for (const s of states) if (!seen.has(s.id)) warn(`State '${s.name}' is unreachable from the initial state`, s.id);
   }

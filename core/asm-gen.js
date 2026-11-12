@@ -2,7 +2,7 @@
 // and its encoding, the next-state and output logic, registered outputs and registers, every-cycle blocks), with the
 // header that lets core/asm-from-hdl.js recover the chart's spelling. Isomorphic ES module: no DOM and no Node APIs.
 // asm.js re-exports these functions.
-import { analyze, bits, buildIndex, flatten, joinPoints, normalizeModel, pad, stateEncoding, stripParens, validate, vhAssign, vhBool, vhExpr, vhLitW, vhNot, vhTruth, vlAssign, vlExpr, vlLitW, vlNot, walkAlways } from './asm.js';
+import { MAX_PATHS, analyze, bits, buildIndex, flatten, joinPoints, normalizeModel, pad, pathCount, treeSize, stateEncoding, stripParens, validate, vhAssign, vhBool, vhExpr, vhLitW, vhNot, vhTruth, vlAssign, vlExpr, vlLitW, vlNot, walkAlways } from './asm.js';
 
 // ---------------------------------------------------------------------------------------
 // Generators
@@ -48,6 +48,47 @@ function outStmts(tree, B) {
     case 'case': return B.caseStmt(tree.node.id, tree.branches.map((b) => outStmts(b.sub, B)), false);
   }
   return [];
+}
+
+// A state's statements (next: the next-state logic's, else the output logic's): its tree's, each decision's branches
+// written in full to the state they reach, when the tree is small; past GEN_LIMIT boxes of it (a chain of decisions
+// whose branches meet again: they double at each), the branches stop where they meet again and the boxes after are
+// written once, after them (#3554), GEN_MAX statements at most.
+const GEN_LIMIT = 1024, GEN_MAX = 200000;
+// the header lists the paths of a block of HEADER_PATHS at most
+const HEADER_PATHS = 256;
+function stateStmts(a, s, B, next) {
+  const tree = a.trees.get(s.id);
+  if (treeSize(tree) <= GEN_LIMIT) return next ? nextStmts(tree, B) : outStmts(tree, B);
+  const idx = a.idx, join = (a.join ??= joinPoints(idx));
+  let budget = GEN_MAX;
+  const emit = (out, ...st) => {
+    if ((budget -= st.length) < 0) throw new Error(`State '${s.name}': its logic takes more than ${GEN_MAX} statements, too many to generate`);
+    out.push(...st);
+  };
+  const seq = (id, stop) => {
+    const out = [];
+    while (id != null && id !== stop) {
+      const n = idx.nodes.get(id), ex = idx.exits.get(id) || {};
+      if (n.type === 'state') { if (next) emit(out, { s: 'raw', text: B.setState(`S_${n.name}`) }); break; }
+      if (n.type === 'decision') {
+        const j = join(id), t = seq(ex.true.to, j), f = seq(ex.false.to, j);
+        if (JSON.stringify(t) === JSON.stringify(f)) emit(out, ...t);
+        else if (!next && !t.length) emit(out, { s: 'if', cond: B.not(B.cond(id)), then: f, else: [] });
+        else emit(out, { s: 'if', cond: B.cond(id), then: t, else: f });
+        id = j;
+      } else if (n.type === 'case') {
+        const j = join(id);
+        emit(out, ...B.caseStmt(id, (idx.cases.get(id) || []).map((e) => seq(e.to, j)), next));
+        id = j;
+      } else {
+        if (!next) emit(out, ...B.actions(id));
+        id = ex.next?.to ?? null;
+      }
+    }
+    return out;
+  };
+  return seq(idx.exits.get(s.id)?.next?.to ?? null, null);
 }
 
 function printStmts(stmts, ind, lang, out) {
@@ -104,15 +145,21 @@ function printStmts(stmts, ind, lang, out) {
   return out;
 }
 
-/** Paths of an every-cycle block: [{ conditions: [{ nodeId, cond, value }], actions: [{ nodeId, action }] }]. */
-function flattenAlways(tree, conds = [], acts = [], out = []) {
+/** Paths of an every-cycle block: [{ conditions: [{ nodeId, cond, value }], actions: [{ nodeId, action }] }]. Throws past
+ *  MAX_PATHS of them. */
+function flattenAlways(tree) {
+  const n = pathCount(tree);
+  if (n > MAX_PATHS) throw new Error(`${n} paths through the decisions, more than ${MAX_PATHS} to list`);
+  return flattenAlwaysInto(tree);
+}
+function flattenAlwaysInto(tree, conds = [], acts = [], out = []) {
   switch (tree.k) {
     case 'if':
-      flattenAlways(tree.t, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: true }], acts, out);
-      flattenAlways(tree.f, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: false }], acts, out);
+      flattenAlwaysInto(tree.t, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: true }], acts, out);
+      flattenAlwaysInto(tree.f, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: false }], acts, out);
       break;
     case 'act':
-      flattenAlways(tree.next, conds, [...acts, ...tree.node.actions.map((a) => ({ nodeId: tree.node.id, action: a }))], out);
+      flattenAlwaysInto(tree.next, conds, [...acts, ...tree.node.actions.map((a) => ({ nodeId: tree.node.id, action: a }))], out);
       break;
     case 'end':
       out.push({ conditions: conds, actions: acts });
@@ -126,9 +173,10 @@ function flattenAlways(tree, conds = [], acts = [], out = []) {
 export function extractAlwaysBlocks(model) {
   const m = normalizeModel(model);
   const idx = buildIndex(m);
-  return m.nodes.filter((n) => n.type === 'always').map((n) => ({
-    id: n.id, name: n.name, actions: [...n.actions], paths: flattenAlways(walkAlways(idx, n)),
-  }));
+  const paths = (n) => {
+    try { return flattenAlways(walkAlways(idx, n)); } catch (e) { throw new Error(`Every-cycle block '${n.name}': ${e.message}`); }
+  };
+  return m.nodes.filter((n) => n.type === 'always').map((n) => ({ id: n.id, name: n.name, actions: [...n.actions], paths: paths(n) }));
 }
 
 /** Join point (where both branches meet again) of each decision of the every-cycle blocks: (id) => id | null. */
@@ -197,7 +245,11 @@ function headerLines(a, lang) {
   }
   L.push(c);
   L.push(`${c} Transitions (condition -> next state [Mealy outputs]):`);
+  // (a block of more paths than HEADER_PATHS has its number of paths, #3554)
+  const tooMany = (what, n) => L.push(`${c}   (${what}: ${n} paths through its decisions, too many to list)`);
   for (const s of enc) {
+    const paths = pathCount(a.trees.get(s.id));
+    if (paths > HEADER_PATHS) { tooMany(`state ${s.name}`, paths); continue; }
     const ts = flatten(a.trees.get(s.id));
     for (const t of ts) {
       const mealy = t.mealyActions.length ? `  [${t.mealyActions.map((x) => x.action).join(', ')}]` : '';
@@ -209,6 +261,8 @@ function headerLines(a, lang) {
     L.push(`${c} Every cycle (in parallel with the states; the state's assignments take priority):`);
     for (const n of a.alwaysNodes) {
       if (n.actions.length) L.push(`${c}   ${pad(n.name, nw)}  Actions: ${n.actions.join(', ')}`);
+      const paths = pathCount(a.alwaysTrees.get(n.id));
+      if (paths > HEADER_PATHS) { tooMany(`every cycle ${n.name}`, paths); continue; }
       for (const p of flattenAlways(a.alwaysTrees.get(n.id))) {
         if (!p.conditions.length && !p.actions.length) continue;
         L.push(`${c}   ${pad(n.name, nw)} : ${condText(p.conditions)}${p.actions.length ? `  [${p.actions.map((x) => x.action).join(', ')}]` : ''}`);
@@ -322,7 +376,7 @@ function outputBody(a, B, lang) {
   }
   const items = [];
   for (const s of a.enc) {
-    const st = [...B.actions(s.id), ...outStmts(a.trees.get(s.id), B)];
+    const st = [...B.actions(s.id), ...stateStmts(a, s, B, false)];
     if (st.length) items.push([s, st]);
   }
   return { pre, items };
@@ -419,7 +473,7 @@ export function generateVerilog(model) {
   L.push('        state_next = state_reg;');
   L.push('        case (state_reg)');
   for (const s of enc) {
-    const st = nextStmts(a.trees.get(s.id), B);
+    const st = stateStmts(a, s, B, true);
     if (st.length === 1 && st[0].s === 'raw') { L.push(`            ${s.constName}: ${st[0].text}`); continue; }
     L.push(`            ${s.constName}: begin`);
     printStmts(st, 4, 'verilog', L);
@@ -559,7 +613,7 @@ export function generateVhdl(model) {
   const body = [];
   for (const s of enc) {
     body.push(`            when ${s.constName} =>`);
-    printStmts(nextStmts(a.trees.get(s.id), Bn), 4, 'vhdl', body);
+    printStmts(stateStmts(a, s, Bn, true), 4, 'vhdl', body);
   }
   body.push('            when others =>');
   body.push(`                state_next <= ${enc[0].constName};`);

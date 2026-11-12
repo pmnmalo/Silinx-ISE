@@ -312,25 +312,75 @@ export function buildIndex(m) {
   return { nodes, exits, cases, dupExits, badEdges };
 }
 
-/** Walk one ASM block. Returns a tree of { k:'goto'|'if'|'act'|'missing'|'loop' }. */
-function walkBlock(idx, startId, fromNode, port) {
-  const visit = (id, path, from, fport) => {
-    const n = id == null ? null : idx.nodes.get(id);
-    if (!n) return { k: 'missing', from, port: fport };
-    if (n.type === 'state') return { k: 'goto', id: n.id, name: n.name };
-    if (n.type === 'always') return { k: 'missing', from, port: fport, enter: n.id };
-    if (path.includes(n.id)) return { k: 'loop', id: n.id, path };
-    const p2 = [...path, n.id];
-    const ex = idx.exits.get(n.id) || {};
-    if (n.type === 'decision') {
-      return { k: 'if', node: n, t: visit(ex.true?.to, p2, n, 'true'), f: visit(ex.false?.to, p2, n, 'false') };
-    }
-    if (n.type === 'case') {
-      return { k: 'case', node: n, branches: (idx.cases.get(n.id) || []).map((e) => ({ label: e.port, sub: visit(e.to, p2, n, e.port) })) };
-    }
-    return { k: 'act', node: n, next: visit(ex.next?.to, p2, n, 'next') };
+// A box's subtree is the same whatever the path that reaches it, unless it loops back onto that path: it is walked
+// once and shared (the tree is a graph), so that a chain of decisions whose branches meet again is walked in linear
+// time, not once per path (#3554). A subtree with a loop is walked again on each path, as its loop may not be on
+// another, for WALK_LIMIT boxes of a block: past them (only a chart that loops gets there, and its loop is an error) it
+// is shared too, its loops where the first path found them. The walk keeps its own stack, not the language's: a chain
+// of a thousand decisions is as deep.
+//   leaf(id, from, port): the leaf an exit leads to (no box, a state…), or null for a box;
+//   exits(n): the box's exits in order, [{ to, port }]; build(n, subs): its tree node of its exits' subtrees.
+const WALK_LIMIT = 20000;
+function sharedWalk(idx, { leaf, exits, build }, startId, fromNode, port) {
+  const memo = new Map(), loopy = new WeakSet(), path = [], onPath = new Set();
+  let budget = WALK_LIMIT;
+  const loop = (id) => { const t = { k: 'loop', id, path: [...path] }; loopy.add(t); return t; };
+  // the subtree at an exit, or null when its box is to be walked
+  const at = (id, from, p) => {
+    const l = leaf(id, from, p);
+    if (l) return l;
+    if (onPath.has(id)) return loop(id);
+    if (memo.has(id)) return memo.get(id);
+    return null;
   };
-  return visit(startId, [], fromNode, port);
+  const first = at(startId, fromNode, port);
+  if (first) return first;
+  const open = (n) => { budget--; path.push(n.id); onPath.add(n.id); return { n, ex: exits(n), subs: [] }; };
+  const stack = [open(idx.nodes.get(startId))];
+  for (;;) {
+    const top = stack[stack.length - 1];
+    if (top.subs.length < top.ex.length) {
+      const e = top.ex[top.subs.length];
+      const t = at(e.to, top.n, e.port);
+      if (t) top.subs.push(t); else stack.push(open(idx.nodes.get(e.to)));
+      continue;
+    }
+    stack.pop();
+    onPath.delete(path.pop());
+    const t = build(top.n, top.subs);
+    if (budget > 0 && top.subs.some((x) => loopy.has(x))) loopy.add(t);
+    else memo.set(top.n.id, t);
+    if (!stack.length) return t;
+    stack[stack.length - 1].subs.push(t);
+  }
+}
+/** The subtrees of a tree's node. */
+export function treeSubs(t) {
+  return t.k === 'if' ? [t.t, t.f] : t.k === 'case' ? t.branches.map((b) => b.sub) : t.k === 'act' ? [t.next] : [];
+}
+
+/** Walk one ASM block. Returns a tree of { k:'goto'|'if'|'act'|'missing'|'loop' }, its subtrees shared (sharedWalk). */
+function walkBlock(idx, startId, fromNode, port) {
+  return sharedWalk(idx, {
+    leaf(id, from, p) {
+      const n = id == null ? null : idx.nodes.get(id);
+      if (!n) return { k: 'missing', from, port: p };
+      if (n.type === 'state') return { k: 'goto', id: n.id, name: n.name };
+      if (n.type === 'always') return { k: 'missing', from, port: p, enter: n.id };
+      return null;
+    },
+    exits(n) {
+      const ex = idx.exits.get(n.id) || {};
+      if (n.type === 'decision') return [{ to: ex.true?.to, port: 'true' }, { to: ex.false?.to, port: 'false' }];
+      if (n.type === 'case') return (idx.cases.get(n.id) || []).map((e) => ({ to: e.to, port: e.port }));
+      return [{ to: ex.next?.to, port: 'next' }];
+    },
+    build(n, subs) {
+      if (n.type === 'decision') return { k: 'if', node: n, t: subs[0], f: subs[1] };
+      if (n.type === 'case') return { k: 'case', node: n, branches: (idx.cases.get(n.id) || []).map((e, i) => ({ label: e.port, sub: subs[i] })) };
+      return { k: 'act', node: n, next: subs[0] };
+    },
+  }, startId, fromNode, port);
 }
 
 export function blockTrees(m, idx) {
@@ -348,28 +398,34 @@ export function blockTrees(m, idx) {
  * { k: 'state' } (error: reaches a state), { k: 'enter' } (error: enters a header), { k: 'loop' }.
  */
 export function walkAlways(idx, header) {
-  const visit = (id, path, from, fport) => {
-    const n = id == null ? null : idx.nodes.get(id);
-    if (!n) return { k: 'end' };
-    if (n.type === 'state') return { k: 'state', id: n.id, name: n.name, from: from.id };
-    if (n.type === 'always') return { k: 'enter', id: n.id, from: from.id };
-    if (path.includes(n.id)) return { k: 'loop', id: n.id, path };
-    const p2 = [...path, n.id];
-    const ex = idx.exits.get(n.id) || {};
-    if (n.type === 'decision') {
-      return { k: 'if', node: n, t: visit(ex.true?.to, p2, n, 'true'), f: visit(ex.false?.to, p2, n, 'false') };
-    }
-    if (n.type === 'case') return { k: 'badcase', id: n.id };
-    return { k: 'act', node: n, next: visit(ex.next?.to, p2, n, 'next') };
-  };
   const ex = idx.exits.get(header.id) || {};
-  return visit(ex.next?.to, [], header, 'next');
+  return sharedWalk(idx, {
+    leaf(id, from) {
+      const n = id == null ? null : idx.nodes.get(id);
+      if (!n) return { k: 'end' };
+      if (n.type === 'state') return { k: 'state', id: n.id, name: n.name, from: from.id };
+      if (n.type === 'always') return { k: 'enter', id: n.id, from: from.id };
+      return null;
+    },
+    exits(n) {
+      const x = idx.exits.get(n.id) || {};
+      if (n.type === 'decision') return [{ to: x.true?.to }, { to: x.false?.to }];
+      return n.type === 'case' ? [] : [{ to: x.next?.to }];
+    },
+    build(n, subs) {
+      if (n.type === 'decision') return { k: 'if', node: n, t: subs[0], f: subs[1] };
+      if (n.type === 'case') return { k: 'badcase', id: n.id };
+      return { k: 'act', node: n, next: subs[0] };
+    },
+  }, ex.next?.to, header, 'next');
 }
 
 /**
  * Join points of the every-cycle blocks: for each decision, the box where its two branches
  * meet again (immediate post-dominator), or null when they only meet at the end of the block.
- * The blocks must be loop-free (validated).
+ * The blocks must be loop-free (validated). The immediate post-dominators are found by intersecting the exits' (the
+ * walk keeps its own stack: a chain of a thousand decisions is as deep, #3554); a chart that loops (an error) has them
+ * from the sets of post-dominators, as before.
  */
 export function joinPoints(idx) {
   const succ = (id) => {
@@ -379,17 +435,68 @@ export function joinPoints(idx) {
     if (n.type === 'case') return (idx.cases.get(id) || []).map(ok);
     return n.type === 'decision' ? [ok(ex.true), ok(ex.false)] : [ok(ex.next)];
   };
+  const END = '#end', ip = new Map(), depth = new Map([[END, 0]]);
+  let loops = false;
+  const meet = (a, b) => {
+    while (a !== b) {
+      while (depth.get(a) > depth.get(b)) a = ip.get(a);
+      while (depth.get(b) > depth.get(a)) b = ip.get(b);
+      if (a !== b) { a = ip.get(a); b = ip.get(b); }
+    }
+    return a;
+  };
+  const solve = (start) => {   // the ip of start and of the boxes after it; false when they loop
+    if (ip.has(start)) return true;
+    const onPath = new Set([start]), stack = [{ id: start, next: succ(start), i: 0 }];
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      if (top.i < top.next.length) {
+        const x = top.next[top.i++];
+        if (x == null || ip.has(x)) continue;
+        if (onPath.has(x)) return false;
+        onPath.add(x);
+        stack.push({ id: x, next: succ(x), i: 0 });
+        continue;
+      }
+      stack.pop();
+      onPath.delete(top.id);
+      const d = top.next.length ? top.next.map((x) => x ?? END).reduce(meet) : END;
+      ip.set(top.id, d);
+      depth.set(top.id, depth.get(d) + 1);
+    }
+    return true;
+  };
+  const sets = setJoinPoints(succ);
+  return (id) => {
+    if (!loops && !(loops = !solve(id))) { const d = ip.get(id); return d === END ? null : d; }
+    return sets(id);
+  };
+}
+// joinPoints of a chart that loops: from the sets of post-dominators of each box
+function setJoinPoints(succ) {
   const memo = new Map();
-  const pdom = (id, guard = 0) => { // post-dominators of id (including itself and '#end')
-    if (id == null) return new Set(['#end']);
-    if (memo.has(id)) return memo.get(id);
-    if (guard > 10000) return new Set(['#end']);
-    memo.set(id, new Set(['#end'])); // provisional (cycles are validation errors)
-    const sets = succ(id).map((x) => pdom(x, guard + 1));
-    const out = new Set([...sets[0]].filter((x) => sets.every((S) => S.has(x))));
-    out.add(id);
-    memo.set(id, out);
-    return out;
+  const END = new Set(['#end']);
+  const pdom = (start) => { // post-dominators of id (including itself and '#end')
+    if (start == null) return END;
+    if (memo.has(start)) return memo.get(start);
+    const open = (id) => { memo.set(id, END); return { id, next: succ(id), sets: [] }; }; // provisional (cycles are validation errors)
+    const stack = [open(start)];
+    for (;;) {
+      const top = stack[stack.length - 1];
+      if (top.sets.length < top.next.length) {
+        const x = top.next[top.sets.length];
+        if (x == null) top.sets.push(END);
+        else if (memo.has(x)) top.sets.push(memo.get(x));
+        else stack.push(open(x));
+        continue;
+      }
+      stack.pop();
+      const out = new Set([...top.sets[0]].filter((x) => top.sets.every((S) => S.has(x))));
+      out.add(top.id);
+      memo.set(top.id, out);
+      if (!stack.length) return out;
+      stack[stack.length - 1].sets.push(out);
+    }
   };
   return (id) => {
     let best = null, size = -1;
@@ -402,25 +509,65 @@ export function joinPoints(idx) {
   };
 }
 
+/** Every distinct subtree of a tree, once each (its leaves too), in the order of a walk: the boxes' time, not the paths'. */
+export function treeParts(tree) {
+  const out = [], seen = new WeakSet(), stack = [tree];
+  while (stack.length) {
+    const t = stack.pop();
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+    stack.push(...treeSubs(t).reverse());
+  }
+  return out;
+}
+
+/** The boxes of a tree, in the order of a walk (a shared subtree walked once). */
 export function treeNodes(tree, acc = new Set()) {
-  if (tree.k === 'if') { acc.add(tree.node.id); treeNodes(tree.t, acc); treeNodes(tree.f, acc); }
-  else if (tree.k === 'case') { acc.add(tree.node.id); for (const b of tree.branches) treeNodes(b.sub, acc); }
-  else if (tree.k === 'act') { acc.add(tree.node.id); treeNodes(tree.next, acc); }
+  for (const t of treeParts(tree)) if (t.k === 'if' || t.k === 'case' || t.k === 'act') acc.add(t.node.id);
   return acc;
 }
 
-export function flatten(tree, conds = [], acts = [], out = []) {
+/** A sum over a tree's paths, counted in the boxes' time: leaf(t) a leaf's, box(t) what a box adds to its subtrees'. */
+function treeSum(tree, leaf, box) {
+  const memo = new Map(), stack = [{ t: tree, subs: treeSubs(tree), i: 0 }];
+  while (stack.length) {
+    const top = stack[stack.length - 1];
+    if (top.i < top.subs.length) {
+      const x = top.subs[top.i++];
+      if (!memo.has(x)) stack.push({ t: x, subs: treeSubs(x), i: 0 });
+      continue;
+    }
+    stack.pop();
+    memo.set(top.t, top.subs.length ? top.subs.reduce((n, x) => n + memo.get(x), box(top.t)) : leaf(top.t));
+  }
+  return memo.get(tree);
+}
+/** The number of paths of a tree (a BigInt: a chain of n decisions has 2^n). */
+export const pathCount = (tree) => treeSum(tree, () => 1n, () => 0n);
+/** The number of boxes and leaves of a tree written out in full, every path's apart (a Number). */
+export const treeSize = (tree) => treeSum(tree, () => 1, () => 1);
+/** The paths listed one by one (flatten, the generated header's list of transitions) at most. */
+export const MAX_PATHS = 4096;
+
+/** The paths of a block: [{ conditions, mealyActions, next, nextName, error? }]. Throws past MAX_PATHS of them. */
+export function flatten(tree) {
+  const n = pathCount(tree);
+  if (n > MAX_PATHS) throw new Error(`${n} paths through the decisions, more than ${MAX_PATHS} to list`);
+  return flattenInto(tree);
+}
+function flattenInto(tree, conds = [], acts = [], out = []) {
   switch (tree.k) {
     case 'goto': out.push({ conditions: conds, mealyActions: acts, next: tree.id, nextName: tree.name }); break;
     case 'if':
-      flatten(tree.t, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: true }], acts, out);
-      flatten(tree.f, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: false }], acts, out);
+      flattenInto(tree.t, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: true }], acts, out);
+      flattenInto(tree.f, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: false }], acts, out);
       break;
     case 'case':
-      for (const b of tree.branches) flatten(b.sub, [...conds, { nodeId: tree.node.id, cond: caseCondText(tree.node.expr, b.label), value: true }], acts, out);
+      for (const b of tree.branches) flattenInto(b.sub, [...conds, { nodeId: tree.node.id, cond: caseCondText(tree.node.expr, b.label), value: true }], acts, out);
       break;
     case 'act':
-      flatten(tree.next, conds, [...acts, ...tree.node.actions.map((a) => ({ nodeId: tree.node.id, action: a }))], out);
+      flattenInto(tree.next, conds, [...acts, ...tree.node.actions.map((a) => ({ nodeId: tree.node.id, action: a }))], out);
       break;
     default:
       out.push({ conditions: conds, mealyActions: acts, next: null, nextName: null,
@@ -478,8 +625,11 @@ export function extractTransitions(model) {
   const m = normalizeModel(model);
   const idx = buildIndex(m);
   const trees = blockTrees(m, idx);
+  const paths = (s) => {
+    try { return flatten(trees.get(s.id)); } catch (e) { throw new Error(`State '${s.name}': ${e.message}`); }
+  };
   return m.nodes.filter((n) => n.type === 'state').map((s) => ({
-    state: s.id, name: s.name, mooreActions: [...s.actions], transitions: flatten(trees.get(s.id)),
+    state: s.id, name: s.name, mooreActions: [...s.actions], transitions: paths(s),
   }));
 }
 
