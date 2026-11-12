@@ -133,9 +133,14 @@ test('a short link\'s gist (#3223) in the browser edition: with the sign-in only
   await git.githubSetToken(gh.token);
   assert.equal(await git.gistAvailable(), true);
   const g = await git.gistSave('the design');
-  assert.deepEqual(Object.keys(g).sort(), ['id', 'key']);
+  assert.deepEqual(Object.keys(g).sort(), ['deleted', 'expires', 'id', 'key']);
+  assert.deepEqual([g.expires, g.deleted], [null, 0]);
   assert.equal(gh.gists.get(g.id).public, false);
   const { loadGist } = await import('../core/gist-link.js');
   assert.equal(await loadGist(g, { fetch: gh.fetch }), 'the design');
+  // (an expiry, #3629: in a week)
+  const w = await git.gistSave('the design', 7);
+  assert.ok(Math.abs(Date.parse(w.expires) - Date.now() - 7 * 86400000) < 60000, w.expires);
+  assert.equal(await loadGist(w, { fetch: gh.fetch }), 'the design');
   await git.githubSignOut();
 });

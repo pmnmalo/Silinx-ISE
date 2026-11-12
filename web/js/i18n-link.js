@@ -15,6 +15,8 @@ export const LINK_PT = {
   'Keep Mine': 'Manter o Meu', 'Open': 'Abrir', 'Save and Open': 'Guardar e Abrir',
   'Include the current view: the open tabs, the split, the panels': 'Incluir a vista atual: os separadores abertos, a divisão, os painéis',
   'Lab:': 'Laboratório:', 'No lab': 'Nenhum laboratório',
+  // a short link's expiry (#3629)
+  'Expires:': 'Expira:', 'Never': 'Nunca', 'In a week': 'Daqui a uma semana', 'In a month': 'Daqui a um mês', 'In six months': 'Daqui a seis meses', 'In a year': 'Daqui a um ano',
 };
 
 export const LINK_PT_PATTERNS = [

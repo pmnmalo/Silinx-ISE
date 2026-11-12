@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { encryptDesign, decryptDesign, saveGist, loadGist, parseGistRef, GIST_FILE, GIST_FORMAT, GIST_MAX, GIST_ANSWER_MAX } from '../core/gist-link.js';
+import { encryptDesign, decryptDesign, saveGist, loadGist, parseGistRef, expiryDate, deleteExpiredGists, EXPIRY_DAYS, GIST_FILE, GIST_FORMAT, GIST_MAX, GIST_ANSWER_MAX } from '../core/gist-link.js';
 import { LINK_LIMITS, encodeDesign, decodeDesign, makeLink, parseLink } from '../core/design-link.js';
 import { githubClient } from '../core/github-api.js';
 import { fakeGitHub } from './fake-github.mjs';
@@ -48,7 +48,7 @@ test('a wrong or cut key, a tampered gist, a gist that is not Silinx\'s or too l
   const j = JSON.parse(content);
   const flip = j.data[5] === 'A' ? 'B' : 'A';
   await rejects(decryptDesign(JSON.stringify({ ...j, data: j.data.slice(0, 5) + flip + j.data.slice(6) }), key), 'the link\'s key does not open its gist (a wrong or cut link)');
-  for (const c of ['not json', JSON.stringify({ format: 'other', version: 1, iv: j.iv, data: j.data }), JSON.stringify({ ...j, version: 2 }), '[]'])
+  for (const c of ['not json', JSON.stringify({ format: 'other', version: 1, iv: j.iv, data: j.data }), JSON.stringify({ ...j, version: 3 }), JSON.stringify({ ...j, expires: 'soon' }), '[]'])
     await rejects(decryptDesign(c, key), 'the link\'s gist is not a Silinx link', 422);
   await rejects(decryptDesign('x'.repeat(GIST_MAX + 1), key), 'the link\'s gist is too large for a Silinx link');
 });
@@ -143,4 +143,87 @@ test('#3362 a gist larger than a link\'s is refused before its JSON is parsed, i
   // within the cap: read and opened as before
   const small = Buffer.from(JSON.stringify({ id, files: { [GIST_FILE]: { filename: GIST_FILE, content, truncated: false } } }));
   assert.equal(await loadGist({ id, key }, { fetch: async () => new Response(small, { status: 200 }) }), 'design');
+});
+
+// #3629: a short link's expiry, kept beside the encrypted design and authenticated with it (AES-GCM's additional data),
+// and in the gist's description; an expired link refused; #3223's links (version 1, no expiry) opened as before; making
+// a short link deletes the user's expired Silinx gists, and no other
+const DAY = 86400000, NOW = Date.parse('2026-11-12T10:00:00.000Z');
+test('#3629 expiryDate: never, or so many days from now; a bad number refused', () => {
+  assert.deepEqual(EXPIRY_DAYS, [0, 7, 30, 182, 365]);
+  for (const d of [0, null, undefined]) assert.equal(expiryDate(d, NOW), null);
+  assert.equal(expiryDate(7, NOW), '2026-11-19T10:00:00.000Z');
+  assert.equal(expiryDate(3650, NOW), new Date(NOW + 3650 * DAY).toISOString());
+  for (const d of [-1, 1.5, 3651, '7', NaN]) assert.throws(() => expiryDate(d, NOW), { message: 'expires_days: a whole number of days, 1 to 3650 (or 0: never)' }, String(d));
+});
+
+test('#3629 an expiring link: opened until its date, refused after it; its date tampered with, its key no longer opens it; #3223\'s links as before', async () => {
+  const expires = expiryDate(7, NOW);
+  const { content, key } = await encryptDesign('design', { expires });
+  assert.equal(JSON.parse(content).version, 2);
+  assert.equal(JSON.parse(content).expires, expires);
+  assert.equal(await decryptDesign(content, key, { now: NOW }), 'design');
+  assert.equal(await decryptDesign(content, key, { now: Date.parse(expires) - 1 }), 'design');
+  await rejects(decryptDesign(content, key, { now: Date.parse(expires) }), 'the link expired on 2026-11-19 (its gist kept until its owner deletes it)', 410);
+  // (its date moved on, or taken out: the key does not open it)
+  const j = JSON.parse(content);
+  for (const e of [expiryDate(365, NOW), null]) await rejects(decryptDesign(JSON.stringify({ ...j, expires: e }), key, { now: NOW }), 'the link\'s key does not open its gist (a wrong or cut link)', 422);
+  // never: version 2, no date, opened any time
+  const n = await encryptDesign('design');
+  assert.equal(JSON.parse(n.content).expires, null);
+  assert.equal(await decryptDesign(n.content, n.key, { now: NOW + 100 * 365 * DAY }), 'design');
+  await rejects(encryptDesign('design', { expires: 'tomorrow' }), 'expires: a date');
+  // #3223's version 1 (no additional data), made as it was then: opened
+  const raw = crypto.getRandomValues(new Uint8Array(32)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt']);
+  const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode('old design')));
+  const b64u = (b) => Buffer.from(b).toString('base64url');
+  assert.equal(await decryptDesign(JSON.stringify({ format: GIST_FORMAT, version: 1, iv: b64u(iv), data: b64u(data) }), b64u(raw), { now: NOW }), 'old design');
+});
+
+test('#3629 saveGist with an expiry: its description says it; opened then refused; the user\'s expired Silinx gists deleted, no other', async () => {
+  const gh = fakeGitHub();
+  const client = githubClient({ fetch: gh.fetch, token: () => gh.token });
+  const old = await saveGist(client, 'old', { days: 7, now: NOW - 30 * DAY });
+  assert.equal(old.expires, '2026-10-20T10:00:00.000Z');
+  assert.deepEqual(old.deleted, []);
+  assert.equal(gh.gists.get(old.id).description, 'A Silinx project link (encrypted: only its link opens it; expires 2026-10-20T10:00:00.000Z)');
+  await rejects(loadGist(old, { fetch: gh.fetch, now: NOW }), 'the link expired on 2026-10-20 (its gist kept until its owner deletes it)', 410);
+  // (made before the first one expired: nothing deleted)
+  const live = await saveGist(client, 'live', { days: 60, now: NOW - 30 * DAY });
+  const never = await saveGist(client, 'never', { now: NOW - 30 * DAY });
+  assert.deepEqual([live.deleted, never.deleted], [[], []]);
+  assert.equal(gh.gists.get(never.id).description, 'A Silinx project link (encrypted: only its link opens it)');
+  assert.equal(await loadGist(live, { fetch: gh.fetch, now: NOW }), 'live');
+  // gists that are not Silinx's, or not only its file, or another's: kept, whatever their description says
+  const desc = gh.gists.get(old.id).description, file = gh.gists.get(old.id).files[GIST_FILE];
+  const put = (id, g) => gh.gists.set(id, { public: false, owner: 'student', description: desc, files: { [GIST_FILE]: file }, ...g });
+  put('d'.repeat(32), { files: { [GIST_FILE]: file, 'notes.md': { filename: 'notes.md', content: 'mine' } } });
+  put('e'.repeat(32), { files: { 'notes.md': { filename: 'notes.md', content: 'mine' } } });
+  put('f'.repeat(32), { description: 'My notes; expires 2026-10-20T10:00:00.000Z)' });
+  put('a'.repeat(32), { owner: 'someone' });
+  put('c'.repeat(32), { public: true });
+  const before = new Set(gh.gists.keys());
+  const made = await saveGist(client, 'new', { days: 7, now: NOW });
+  assert.deepEqual(made.deleted, [old.id]);
+  assert.deepEqual([...before].filter((id) => !gh.gists.has(id)), [old.id]);
+  assert.ok(gh.gists.has(made.id) && gh.gists.has(live.id) && gh.gists.has(never.id));
+  // the cleaning failing (GitHub refusing the list): the new link made all the same
+  const refusing = githubClient({ fetch: async (u, o) => (o.method === 'GET' && /\/gists\?/.test(u) ? new Response('{"message":"nope"}', { status: 500 }) : gh.fetch(u, o)), token: () => gh.token });
+  const g2 = await saveGist(refusing, 'still', { days: 7, now: NOW });
+  assert.deepEqual(g2.deleted, []);
+  assert.equal(await loadGist(g2, { fetch: gh.fetch, now: NOW }), 'still');
+  await rejects(saveGist(client, 'x', { days: 4000, now: NOW }), 'expires_days: a whole number of days, 1 to 3650 (or 0: never)');
+});
+
+test('#3629 deleteExpiredGists: every page read before any deletion (250 expired gists, all deleted), the newest kept', async () => {
+  const gh = fakeGitHub();
+  const client = githubClient({ fetch: gh.fetch, token: () => gh.token });
+  const first = await saveGist(client, 'x', { days: 1, now: NOW - 10 * DAY });
+  const g = gh.gists.get(first.id);
+  for (let i = 0; i < 249; i++) gh.gists.set(i.toString(16).padStart(32, '0'), { ...g });
+  const kept = await saveGist(client, 'y', { days: 1, now: NOW - 10 * DAY });
+  assert.equal(gh.gists.size, 251);
+  assert.equal((await deleteExpiredGists(client, { now: NOW, keep: kept.id })).length, 250);
+  assert.deepEqual([...gh.gists.keys()], [kept.id]);
 });

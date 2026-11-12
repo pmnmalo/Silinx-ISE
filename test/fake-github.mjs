@@ -68,7 +68,14 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
     if (auth && !valid.has(auth[1])) return json(401, { message: 'Bad credentials' });
     const signed = !!auth;
     if (url.pathname === '/user' && method === 'GET') return signed ? json(200, { login: user }) : json(401, { message: 'Requires authentication' });
-    // gists (#3223): a secret one made by the signed-in user, read by anyone with its id
+    // gists (#3223): a secret one made by the signed-in user, read by anyone with its id; the user's own listed (100 a
+    // page, their contents left out, as GitHub's) and deleted by them only (#3629)
+    if (url.pathname === '/gists' && method === 'GET') {
+      if (!signed) return json(401, { message: 'Requires authentication' });
+      const per = Number(url.searchParams.get('per_page') || 30), page = Number(url.searchParams.get('page') || 1);
+      const mine = [...gists].filter(([, g]) => g.owner === user).reverse().slice((page - 1) * per, page * per);
+      return json(200, mine.map(([id, g]) => ({ id, public: g.public, description: g.description, files: Object.fromEntries(Object.keys(g.files).map((n) => [n, { filename: n }])) })));
+    }
     if (url.pathname === '/gists' && method === 'POST') {
       if (!signed) return json(401, { message: 'Requires authentication' });
       const id = crypto.randomBytes(16).toString('hex');
@@ -77,7 +84,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
     }
     const gm = /^\/gists\/([0-9a-f]+)$/.exec(url.pathname);
     if (gm && method === 'GET') { const g = gists.get(gm[1]); return g ? json(200, { id: gm[1], ...g }) : nope(); }
-    if (gm && method === 'DELETE') { if (!signed) return json(401, { message: 'Requires authentication' }); return gists.delete(gm[1]) ? json(204, null) : nope(); }
+    if (gm && method === 'DELETE') { if (!signed) return json(401, { message: 'Requires authentication' }); return gists.get(gm[1])?.owner === user && gists.delete(gm[1]) ? json(204, null) : nope(); }
     const m = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(url.pathname);
     if (!m) return nope();
     const full = `${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}`, rest = m[3] || '';

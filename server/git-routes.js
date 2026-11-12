@@ -19,10 +19,10 @@ export function registerGitRoutes(api) {
   // a short link's gist (#3223): made with the server's GitHub token (GH_TOKEN), never the page's
   api.get('/gist', (req, res) => res.json({ available: GH.gistAvailable() }));
   api.post('/gist', (req, res) => Promise.resolve().then(() => {
-    const d = body(req).design;
+    const { design: d, expires_days: days = 0 } = body(req);
     if (typeof d !== 'string' || !d) throw Object.assign(new Error('design: the encoded design (Copy Link\'s)'), { status: 400 });
-    return GH.makeGist(d);
-  }).then(({ id, key }) => res.json({ id, key }), err => res.status(err.status || 500).json({ error: err.status ? err.message : 'internal server error', ...(err.hint ? { hint: err.hint } : {}) })));
+    return GH.makeGist(d, { days });   // (an expiry, #3629: checked by core/gist-link.js expiryDate)
+  }).then(({ id, key, expires, deleted }) => res.json({ id, key, expires, deleted: deleted.length }), err => res.status(err.status || 500).json({ error: err.status ? err.message : 'internal server error', ...(err.hint ? { hint: err.hint } : {}) })));
   // (whether git is there: the interface shows its menu)
   api.get('/git', (req, res) => res.json({ enabled: Git.gitEnabled() }));
   api.post('/git/clone', route(req => B().gitClone({ url: body(req).url, name: body(req).name || null })));

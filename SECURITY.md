@@ -131,7 +131,11 @@ read that user's files has the server too.
   fragment, which a browser never sends, so GitHub keeps only the ciphertext. Opening it reads the gist through GitHub's
   API with no credentials (GitHub's answer read to a cap before it is parsed, #3362), checks it is a Silinx link's, decrypts it (a wrong key or a changed gist refused by AES-GCM's
   tag) and imports it as a design link: the same import gate and limits. A secret gist is unlisted, not private:
-  anyone with the link opens the project, as with the full link.
+  anyone with the link opens the project, as with the full link. Its expiry (#3629) is kept beside the ciphertext and
+  authenticated with it (AES-GCM's additional data: a date changed, the key no longer opens it), and in the gist's
+  description, so that making a short link deletes the user's expired Silinx gists without their keys (only gists
+  whose description and single file are Silinx's). An expired link is refused by Silinx, but its gist stays on GitHub
+  until it is deleted: anyone who kept the link and the gist could still decrypt it by hand.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
   paths, keys and tokens, Xilinx files, a bitstream under any name) the tracked files, text, compressed
   and binary, and every line, binary file and commit message, author and committer ever added to `main` (#3366); CodeQL analyses

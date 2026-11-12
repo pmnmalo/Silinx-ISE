@@ -48,3 +48,28 @@ test('project_link short: a secret gist, the link #gist=…; open_link opens it 
   assert.equal(gone.text, 'open_link: the link\'s gist is not on GitHub (deleted, or the link is cut)');
   process.env.GH_TOKEN = gh.token;
 });
+
+// #3629: project_link short's expires_days; open_link of an expired link refused, in core/gist-link.js's words; making
+// a short link deletes the account's expired Silinx gists
+test('#3629 project_link short expires_days: its date said; an expired link refused by open_link; the expired gists deleted', async () => {
+  const { saveGist } = await import('../core/gist-link.js');
+  const { githubClient } = await import('../core/github-api.js');
+  const { encodeDesign, makeLink } = await import('../core/design-link.js');
+  await ok('new_project_from_example', { name: 'clock1', example: 'blinky' });
+  // a link that expired yesterday, made ten days ago
+  const client = githubClient({ fetch: gh.fetch, token: () => gh.token });
+  const old = await saveGist(client, (await encodeDesign([{ path: 'silinx.json', data: new TextEncoder().encode('{}') }])).design, { days: 9, now: Date.now() - 10 * 86400000 });
+  const expired = await call('open_link', { link: makeLink('https://pmnmalo.github.io/Silinx/', { gist: `${old.id}.${old.key}` }), name: 'clock2' });
+  assert.equal(expired.isError, true);
+  assert.equal(expired.text, `open_link: the link expired on ${old.expires.slice(0, 10)} (its gist kept until its owner deletes it)`);
+  const r = await ok('project_link', { project: 'clock1', short: true, expires_days: 7 });
+  const date = new Date(Date.parse(r.data.expires)).toISOString().slice(0, 10);
+  assert.ok(Math.abs(Date.parse(r.data.expires) - (Date.now() + 7 * 86400000)) < 60000, r.data.expires);
+  assert.deepEqual(r.data.deleted, [old.id]);
+  assert.ok(!gh.gists.has(old.id));
+  assert.ok(r.text.startsWith(`The short link of 'clock1' (${r.data.length} characters; the project encrypted in a secret gist, https://gist.github.com/student/${r.data.gist}; it expires on ${date}):\n${r.data.link}\n1 expired short link deleted from the account's gists.`), r.text);
+  assert.equal((await ok('open_link', { link: r.data.link, name: 'clock3' })).data.project, 'clock3');
+  // refused: an expiry without short; days out of range
+  assert.equal((await call('project_link', { project: 'clock1', expires_days: 7 })).text, 'project_link: expires_days: only a short link expires (give short: true)');
+  assert.equal((await call('project_link', { project: 'clock1', short: true, expires_days: 4000 })).text, 'project_link: expires_days: a whole number of days, 1 to 3650 (or 0: never)');
+});

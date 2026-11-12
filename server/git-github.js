@@ -107,11 +107,11 @@ export const gitClone = ({ url, name = null, madeBy = null }) => backend({ madeB
 /** Whether this server can make a short link: a GitHub token in its environment (GH_TOKEN, GITHUB_TOKEN). */
 export const gistAvailable = () => !!token();
 /** A short link's secret gist, made with the environment's token -> { id, key, url }. */
-export async function makeGist(design) {
+export async function makeGist(design, { days = 0 } = {}) {
   if (!token()) throw new GitHubError('a short link needs a GitHub token on this server', `Set GH_TOKEN before starting Silinx (with GitHub's command line: GH_TOKEN=$(gh auth token)), or copy the full link; Silinx never stores it.`, 409);
   const { saveGist } = await import('../core/gist-link.js');
   const f = GITHUB_TESTING.fetch || globalThis.fetch;
-  return saveGist(githubClient({ fetch: (...a) => f(...a), token, hints: HINTS }), design);
+  return saveGist(githubClient({ fetch: (...a) => f(...a), token, hints: HINTS }), design, { days });
 }
 /** A short link's design, read from its gist (no token needed). */
 export async function readGist(ref) {

@@ -87,7 +87,7 @@ export const api = {
   gradeSynthesis: (name, exercise, test) => req('POST', `/api/projects/${enc(name)}/grade/synthesis`, { exercise, test }),
   // a short link's gist (#3223): made by the server with its GitHub token
   gistAvailable: () => req('GET', '/api/gist').then(r => !!r.available, () => false),
-  gistSave: design => req('POST', '/api/gist', { design }),
+  gistSave: (design, days = 0) => req('POST', '/api/gist', { design, ...(days ? { expires_days: days } : {}) }),
   // git (#3195, the server editions: server/git-routes.js)
   gitEnabled: () => req('GET', '/api/git'),
   gitClone: (url, name = null) => req('POST', '/api/git/clone', { url, ...(name ? { name } : {}) }),
