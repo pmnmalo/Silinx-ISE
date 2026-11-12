@@ -14,12 +14,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { EXAMPLES, targetName, exampleProject } from './examples-lib.mjs';
 
-// the bar of #3139 (the Spartan-3E's, #2797): about 4 % on average, here 5 % (measured on 2026-11-12: 1.7 % on the
-// Nexys3, 4.1 % on the Atlys, the best of 3 seeds; over 9 seeds the two Maps' mean periods within 3 % on every example,
-// nextpnr's 0.4 % shorter on average: the two Maps hand nextpnr the same sites and timing arcs, the seeds differ); and one
-// example's own, its seeds' spread (micro80 on the Nexys3 13 %)
+// the bar of #3139: 5 % on average (the maintainer's, 2026-11-12; the Spartan-3E's about 4 %, #2797. Measured on
+// 2026-11-12: 1.7 % on the Nexys3, 4.1 % on the Atlys, the best of 3 seeds; over 9 seeds the two Maps' mean periods within
+// 3 % on every example, nextpnr's 0.4 % shorter on average: the two Maps hand nextpnr the same sites and timing arcs, the
+// seeds differ); and one example's own, its seeds' spread (micro80 on the Nexys3 13 %)
 export const PARITY = 1.05;
 export const PERIOD_NOISE = 1.15;
+
+/** The board's average of nextpnr's Map's periods over Silinx's Map's: the geometric mean of the examples' ratios. */
+export const meanRatio = ratios => Math.exp(ratios.reduce((s, r) => s + Math.log(r), 0) / ratios.length);
 
 // the application's open flow on a project folder (its synthesis kept with synthUpToDate: the second Map reads the first's netlist)
 async function flow(dir, project, steps, synthUpToDate = false) {
@@ -87,7 +90,7 @@ export function packTests(t) {
     const clocked = EXAMPLES.filter(e => e !== 'gates');
     // (every example measured: one test failed, or left out by a name pattern, leaves no average)
     if (ratios.size < clocked.length) return ctx.skip(`${clocked.length - ratios.size} example(s) not measured`);
-    const mean = Math.exp([...ratios.values()].reduce((s, r) => s + Math.log(r), 0) / ratios.size);
+    const mean = meanRatio([...ratios.values()]);
     ctx.diagnostic(`${targetName(t)}: nextpnr's Map ${((mean - 1) * 100).toFixed(1)} % on average (${[...ratios].map(([e, r]) => `${e} ${((r - 1) * 100).toFixed(1)} %`).join(', ')})`);
     assert.ok(mean <= PARITY, `${((mean - 1) * 100).toFixed(1)} % on average`);
   });
