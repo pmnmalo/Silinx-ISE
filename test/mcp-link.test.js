@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { scratchEnv } from './server-helpers.js';
+import { decodeSvg } from './qr-helpers.js';
+import { QR_MAX_BYTES } from '../core/qr.js';
 
 let tmp;
 before(async () => { tmp = fs.realpathSync(await scratchEnv('silinx-mcp-link-')); });
@@ -149,4 +151,29 @@ test('#2894 project_link / open_link of every example with constraints: the same
   const bit = await ok('run_process', { project: 'pong_2894l', process: 'bitstream' });
   assert.deepEqual(bit.data.warnings, []);
   assert.ok(fs.existsSync(path.join(P.projectDir('pong_2894l'), 'build', 'pong.bit')) || /bit/i.test(bit.text));
+});
+
+// #3637: project_link qr, the link's QR code as an SVG (decoded back); a link longer than a QR code holds has none, a
+// warning saying so
+test('#3637 project_link qr: the link\'s QR code; a link too long for one, the warning', async () => {
+  // (an example's full link is longer: gates' about 5000 characters)
+  await ok('new_project', { name: 'qr1' });
+  const r = await ok('project_link', { project: 'qr1', qr: true });
+  assert.ok(r.data.link.length <= QR_MAX_BYTES, `${r.data.link.length}`);
+  assert.equal(decodeSvg(r.data.qr), r.data.link);
+  assert.deepEqual(r.data.warnings, []);
+  assert.equal(r.text, `The link of 'qr1' (${r.data.link.length} characters; its QR code: qr, an SVG):\n${r.data.link}`);
+  // (no qr asked: none)
+  assert.equal((await ok('project_link', { project: 'qr1' })).data.qr, undefined);
+  // too long
+  await ok('new_project_from_example', { name: 'qr2', example: 'gates' });
+  const t = await ok('project_link', { project: 'qr2', qr: true });
+  const n = t.data.link.length;
+  assert.ok(n > QR_MAX_BYTES && n < 64000, `${n}`);
+  assert.equal(t.data.qr, undefined);
+  assert.deepEqual(t.data.warnings, [
+    `WARNING: the link is ${n} characters long: some slide tools cut a link longer than 2000 (a zip hosted elsewhere makes a short one)`,
+    `WARNING: the link is ${n} characters, too long for a QR code (at most ${QR_MAX_BYTES}): a short link (short: true) has one`,
+  ]);
+  assert.ok(t.text.startsWith(`${t.data.warnings.join('\n')}\nThe link of 'qr2' (${n} characters`) && !t.text.includes('QR code: qr'), t.text);
 });

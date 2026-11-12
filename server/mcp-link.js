@@ -12,6 +12,7 @@ import path from 'node:path';
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
 import { projectNameError } from '../core/project-name.js';
+import { QR_MAX_BYTES, qrSvg } from '../core/qr.js';
 import { BOARD_RE, MODULE_RE, LINK_LIMITS, LINK_VIEWS, SITE_URL, decodeDesign, encodeDesign, makeLink, parseLink, sameFiles, viewProblem } from '../core/design-link.js';
 
 const VIEW_NAMES = { try: 'Try it', simulate: 'the simulation', emulate: 'the board emulator' };
@@ -41,10 +42,11 @@ export const LINK_TOOLS = [
       base: STR(`The address of Silinx the link opens (default ${SITE_URL}, the site's latest release; e.g. a local server's http://localhost:3000/).`),
       lab: STR('A guided lab of the project to open beside it (its id: lab action list).'),
       short: { type: 'boolean', description: 'A short link (#gist=…, about 140 characters): the project encrypted and saved as a secret gist of the GitHub account of the server\'s token (GH_TOKEN); only the link opens it.' },
+      qr: { type: 'boolean', description: `The link's QR code too, as the interface shows it (#3637): qr, an SVG (black on white). A link longer than a QR code holds (${QR_MAX_BYTES} bytes) has none, a warning saying so (a short link has one).` },
       expires_days: { type: 'integer', minimum: 0, maximum: 3650, description: 'With short: the link expires after this many days, opening it then refused (0 or none: never; Share Project Copy… offers 7, 30, 182, 365). Making a short link deletes the account\'s expired Silinx gists.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    async run({ project: name, view, top, base = SITE_URL, lab, short = false, expires_days: days = 0 }) {
+    async run({ project: name, view, top, base = SITE_URL, lab, short = false, expires_days: days = 0, qr = false }) {
       const pj = await readProject(name);
       if (view !== undefined && !LINK_VIEWS.includes(view)) throw toolError(`view: one of ${LINK_VIEWS.join(', ')}`);
       let url;
@@ -69,11 +71,14 @@ export const LINK_TOOLS = [
         let g;
         try { g = await GH.makeGist(e.design, { days }); } catch (err) { throw toolError([err.message, ...(err.hint ? [`Hint: ${err.hint}`] : [])].join('\n')); }
         link = makeLink(url.href, { gist: `${g.id}.${g.key}`, view, top, lab });
-        return { text: `The short link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters; the project encrypted in a secret gist${g.url ? `, ${g.url}` : ''}${g.expires ? `; it expires on ${g.expires.slice(0, 10)}` : ''}):\n${link}${g.deleted.length ? `\n${g.deleted.length} expired short link${g.deleted.length > 1 ? 's' : ''} deleted from the account's gists.` : ''}`, data: { project: name, link, length: link.length, view: view || null, top: top || null, ...(lab ? { lab } : {}), left: e.left, warnings: [], gist: g.id, expires: g.expires, deleted: g.deleted } };
+        const svg = qr ? qrSvg(link) : null;
+        return { text: `${svg ? 'With its QR code (qr, an SVG). ' : ''}The short link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters; the project encrypted in a secret gist${g.url ? `, ${g.url}` : ''}${g.expires ? `; it expires on ${g.expires.slice(0, 10)}` : ''}):\n${link}${g.deleted.length ? `\n${g.deleted.length} expired short link${g.deleted.length > 1 ? 's' : ''} deleted from the account's gists.` : ''}`, data: { project: name, link, length: link.length, view: view || null, top: top || null, ...(lab ? { lab } : {}), left: e.left, warnings: [], gist: g.id, expires: g.expires, deleted: g.deleted, ...(svg ? { qr: svg } : {}) } };
       }
       const warnings = link.length > LINK_LIMITS.slides ? [`WARNING: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides} (a zip hosted elsewhere makes a short one)`] : [];
-      const lines = [...warnings, `The link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters${e.left.length ? `; ${e.left.join(', ')} made again from ${e.left.length > 1 ? 'their drawings' : 'its drawing'}` : ''}):`, link];
-      return { text: lines.join('\n'), data: { project: name, link, length: link.length, view: view || null, top: top || null, ...(lab ? { lab } : {}), left: e.left, warnings } };
+      const svg = qr ? qrSvg(link) : null;
+      if (qr && !svg) warnings.push(`WARNING: the link is ${link.length} characters, too long for a QR code (at most ${QR_MAX_BYTES}): a short link (short: true) has one`);
+      const lines = [...warnings, `The link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters${e.left.length ? `; ${e.left.join(', ')} made again from ${e.left.length > 1 ? 'their drawings' : 'its drawing'}` : ''}${svg ? '; its QR code: qr, an SVG' : ''}):`, link];
+      return { text: lines.join('\n'), data: { project: name, link, length: link.length, view: view || null, top: top || null, ...(lab ? { lab } : {}), left: e.left, warnings, ...(svg ? { qr: svg } : {}) } };
     },
   },
   {
