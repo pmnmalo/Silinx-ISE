@@ -905,8 +905,9 @@ traffic, blinky and pong on the Atlys):
 
 ### nextpnr's Map against Silinx's Map (#3139, 2026-11-12)
 
-The bar of #3139 (the Spartan-3E's): every example on both parts through nextpnr's packer (`impl.s6Map` `nextpnr`,
-`fpga/s6/nextpnr-pack.js`, #3138) with no more slices than Silinx's Map, a period within about 4 % of it, and ISE's
+The bar of #3139: every example on both parts through nextpnr's packer (`impl.s6Map` `nextpnr`,
+`fpga/s6/nextpnr-pack.js`, #3138) with no more slices than Silinx's Map, the periods within 5 % of its on average on
+each board (the maintainer's bar, 2026-11-12; the Spartan-3E's was about 4 %, #2797), and ISE's
 verdict (DRC clean, the `.bit` byte-identical to ISE's bitgen). Measured on main 931dee85 with
 `@silinx/nextpnr-himbaechel-spartan6` 0.4.1, the application's flow (`server/open-flow.js`, Optimization Speed), one
 run at a time on an Apple-silicon Mac. S: Silinx's Map, N: nextpnr's. The period is Silinx's timing model's, the best of
