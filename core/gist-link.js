@@ -18,7 +18,7 @@ const DESCRIPTION = 'A Silinx project link (encrypted: only its link opens it)';
 const EXPIRES_RE = /; expires (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z)\)$/;
 // the expiries Copy Link offers (days; 0: never) and the most a link may last
 export const EXPIRY_DAYS = [0, 7, 30, 182, 365];
-export const EXPIRY_MAX_DAYS = 3650;
+const EXPIRY_MAX_DAYS = 3650;
 const ID_RE = /^[0-9a-f]{20,40}$/;
 // the most a gist's content may be (the encrypted design: its base64 of LINK_LIMITS.maxEncoded and the AES tag)
 export const GIST_MAX = Math.ceil((LINK_LIMITS.maxEncoded + 16) * 4 / 3) + 256;

@@ -59,8 +59,8 @@ export function findInDrawing(json, re, { max = 1000 } = {}) {
 
 // ------------------------------------------------------------------ Find in Project (#3546: the page's and the MCP's)
 /** The text sources Find in Project searches (their lines) and its drawings (their texts). */
-export const FIND_TEXT_FILE = /\.(vhdl?|v|sv|ucf|mem|hex|coe|txt)$/i;
-export const FIND_DRAWING = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
+const FIND_TEXT_FILE = /\.(vhdl?|v|sv|ucf|mem|hex|coe|txt)$/i;
+const FIND_DRAWING = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
 /** The results of one file at most. */
 export const FIND_MAX = 2000;
 

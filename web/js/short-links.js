@@ -16,7 +16,7 @@ const area = () => { try { return globalThis.location?.protocol === 'file:' ? gl
 const day = iso => String(iso || '').slice(0, 10);
 
 /** The links this browser made, newest first: [{ id, link, project, expires, made }]. */
-export function rememberedLinks() {
+function rememberedLinks() {
   try { const v = JSON.parse(area()?.getItem(KEY) || '[]'); return Array.isArray(v) ? v.filter(r => r && typeof r.id === 'string' && typeof r.link === 'string') : []; } catch { return []; }
 }
 const keep = list => { try { area()?.setItem(KEY, JSON.stringify(list.slice(0, MAX))); } catch { /* not kept */ } };
@@ -25,7 +25,7 @@ export function rememberLink({ id, link, project, expires = null }) {
   keep([{ id, link, project, expires, made: new Date().toISOString() }, ...rememberedLinks().filter(r => r.id !== id)]);
 }
 /** Forget the links whose gists are gone: given the ids deleted, or the ids that are still there (`still`). */
-export function forgetLinks({ ids = null, still = null }) {
+function forgetLinks({ ids = null, still = null }) {
   keep(rememberedLinks().filter(r => (ids ? !ids.includes(r.id) : still.includes(r.id))));
 }
 
