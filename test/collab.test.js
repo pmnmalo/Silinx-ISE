@@ -376,6 +376,40 @@ test('the server: opening a room needs its token, at the upgrade; the host, the 
   assert.equal(await upgrade('/api/projects'), 404);
 });
 
+test('#3529 a follower\'s join: the whole document to that follower only; one already in gets nothing of it while others join and leave', async () => {
+  const doc = owned();
+  const owner = await shareRoom({ url: url(), token: 'the-token', doc, user: { name: 'Ana' } });
+  const fol = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Eva' } });
+  await fol.ready;
+  // (a raw follower already in: what reaches it counted, by kind)
+  const raw = new WebSocket(furl(), [SUBPROTOCOL]);
+  const frames = [];
+  raw.on('message', (d, bin) => { if (bin) frames.push(Buffer.from(d)); });
+  await new Promise(r => raw.on('open', r));
+  raw.send(JSON.stringify({ type: 'join', v: PROTOCOL, room: owner.room, client: 7 }));
+  await until(() => frames.length >= 2, 'its own snapshot and the awareness');
+  await sleep(100);
+  assert.deepEqual(frames.map(f => f[0]), [KIND.update, KIND.awareness]);
+  frames.length = 0;
+  // (five joins and leaves: each joiner has the project; the one in gets their awareness only, never a snapshot)
+  for (let k = 0; k < 5; k++) {
+    const other = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: `Rui ${k}` } });
+    await other.ready;
+    assert.equal(docFile(other.doc, 'src/top.vhd'), FILES['src/top.vhd']);
+    await other.close();
+  }
+  await sleep(150);
+  assert.equal(frames.filter(f => f[0] === KIND.update).length, 0);
+  assert.ok(frames.every(f => f[0] === KIND.from), frames.map(f => f[0]).join());
+  // (an owner's change still reaches every follower)
+  putFile(doc, 'src/top.vhd', 'entity top is end; -- 2\n');
+  await until(() => docFile(fol.doc, 'src/top.vhd') === 'entity top is end; -- 2\n', 'the change');
+  await until(() => frames.some(f => f[0] === KIND.update), 'the change, to the raw follower too');
+  raw.close();
+  await fol.close();
+  await owner.close();
+});
+
 test('the relay reads nothing: a participant without the key gets only sealed frames, never a file\'s text; a stranger\'s first message refused', async () => {
   const owner = await shareRoom({ url: url(), token: 'the-token', doc: owned(), user: { name: 'Ana' } });
   const raw = new WebSocket(furl(), [SUBPROTOCOL]);
