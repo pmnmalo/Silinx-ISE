@@ -117,8 +117,10 @@ read that user's files has the server too.
   (loopback) or to a relay the configuration file names (`relay.relays`), never to another host, a private or local
   address included. Both lists are `FILE_ONLY` settings: the page cannot change them. A tool's result that holds a
   project's or a remote's text (`read_file`, `git_log`, `git_diff`, `get_report`, the import's and a clone's
-  warnings, `follow_project`'s files and names, `share_project`'s followers) is labelled "Untrusted content" after its
-  text, and `untrusted` in its structured content: data, never instructions.
+  warnings, `follow_project`'s files and names, `share_project`'s followers and warnings, `open_link`'s design,
+  `project_info`, a project's own lab in `lab`, the lines a design prints in `simulate`, and every tool's error, #3528)
+  is labelled "Untrusted content" after its text, and `untrusted` in its structured content: data, never instructions.
+  `open_link` takes a design's own board and top only as names, as the link's `board=` and `top=` are.
 - What the MCP server tells an assistant of the user's folders (#3412, #3418): its results and errors name the
   workspace and the exchange folder `<workspace>` and `<exchange folder>`, never their absolute paths (the user's name,
   their folders); a file of `build/` it reads is redacted as a report is (the ISE machine's address); and its

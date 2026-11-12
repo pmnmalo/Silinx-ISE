@@ -123,7 +123,9 @@ export const PROJECT_TOOLS = [
       const all = (await P.fileTree(name)).filter(f => !/^build\//.test(f));
       const data = { project: name, top: pj.top || null, simTop: pj.simTop || null, device: pj.device || null, board: pj.board || null, constraints: pj.constraints || null, synthTool: pj.synthTool || null, files, otherFiles: all.filter(f => !files.some(x => x.path === f) && f !== 'silinx.json') };
       return { text: [`${name}: top ${data.top || '(none)'}, test bench ${data.simTop || '(none)'}, ${data.board || 'no board'} (${data.device ? `${data.device.part}${data.device.package}${data.device.speed}` : 'no device'}), constraints ${data.constraints || '(none)'}`,
-        ...files.map(f => `  ${f.path} (${f.lang}, ${f.role})`), ...(data.otherFiles.length ? [`  other files: ${data.otherFiles.join(', ')}`] : [])].join('\n'), data };
+        ...files.map(f => `  ${f.path} (${f.lang}, ${f.role})`), ...(data.otherFiles.length ? [`  other files: ${data.otherFiles.join(', ')}`] : [])].join('\n'), data,
+      // (its silinx.json's fields and its files' names: the project's own text, #3528)
+      untrusted: 'the project\'s settings and files\' names' };
     },
   },
   {
