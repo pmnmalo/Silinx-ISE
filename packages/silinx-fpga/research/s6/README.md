@@ -903,6 +903,73 @@ traffic, blinky and pong on the Atlys):
   after 07:00), then `node research/s6/check-held6.mjs <W>` compares Silinx's writer with ISE's bitgen on the designs,
   with the databases the flow reads, and lists the resolved PIPs those have not, or with other bits.
 
+### nextpnr's Map against Silinx's Map (#3139, 2026-11-12)
+
+The bar of #3139 (the Spartan-3E's): every example on both parts through nextpnr's packer (`impl.s6Map` `nextpnr`,
+`fpga/s6/nextpnr-pack.js`, #3138) with no more slices than Silinx's Map, a period within about 4 % of it, and ISE's
+verdict (DRC clean, the `.bit` byte-identical to ISE's bitgen). Measured on main 931dee85 with
+`@silinx/nextpnr-himbaechel-spartan6` 0.4.1, the application's flow (`server/open-flow.js`, Optimization Speed), one
+run at a time on an Apple-silicon Mac. S: Silinx's Map, N: nextpnr's. The period is Silinx's timing model's, the best of
+the flow's 3 seeds; the 9-seed means are of seeds 1 to 9 (three runs from seeds 1, 4 and 7), on the examples whose best
+differed by more than 4 %. The run time is the whole flow's, synthesis to bitstream. The LUTs and flip-flops are Map's
+report's. No warning on any run, every PERIOD met.
+
+| example | part | slices S / N | LUTs | FFs | period S / N (ns) | Δ | 9-seed mean S / N (ns) | run time S / N (s) | warnings S / N |
+|---|---|---|---|---|---|---|---|---|---|
+| gates | Nexys3 | 1 / 1 | 1 | 0 | no clocked paths | | | 13 / 10 | 0 / 0 |
+| gates | Atlys | 1 / 1 | 1 | 0 | no clocked paths | | | 23 / 18 | 0 / 0 |
+| traffic | Nexys3 | 34 / 34 | 96 | 58 | 5.739 / 6.082 | +6.0 % | 6.45 / 6.43 | 9 / 9 | 0 / 0 |
+| traffic | Atlys | 34 / 34 | 96 | 58 | 5.775 / 6.241 | +8.1 % | 6.34 / 6.29 | 19 / 22 | 0 / 0 |
+| blinky | Nexys3 | 53 / 53 | 102 | 130 | 4.646 / 4.726 | +1.7 % | | 13 / 12 | 0 / 0 |
+| blinky | Atlys | 53 / 53 | 102 | 130 | 4.653 / 4.744 | +2.0 % | | 25 / 23 | 0 / 0 |
+| pong | Nexys3 | 111 / 111 | 270 | 207 | 8.171 / 8.216 | +0.6 % | | 22 / 19 | 0 / 0 |
+| pong | Atlys | 111 / 111 | 270 | 207 | 8.203 / 8.160 | −0.5 % | | 34 / 37 | 0 / 0 |
+| stopwatch | Nexys3 | 85 / 85 | 181 | 201 | 8.941 / 9.067 | +1.4 % | | 24 / 23 | 0 / 0 |
+| stopwatch | Atlys | 85 / 85 | 181 | 201 | 9.354 / 9.489 | +1.4 % | | 29 / 33 | 0 / 0 |
+| clock | Nexys3 | 81 / 81 | 152 | 158 | 6.577 / 5.782 | −12.1 % | 6.34 / 6.23 | 18 / 21 | 0 / 0 |
+| clock | Atlys | 81 / 81 | 152 | 158 | 5.567 / 5.902 | +6.0 % | 6.02 / 5.91 | 38 / 41 | 0 / 0 |
+| vga | Nexys3 | 52 / 52 | 129 | 56 | 6.501 / 6.824 | +5.0 % | 6.74 / 6.94 | 15 / 18 | 0 / 0 |
+| vga | Atlys | 52 / 52 | 129 | 56 | 6.384 / 6.869 | +7.6 % | 6.96 / 6.92 | 40 / 41 | 0 / 0 |
+| isqrt | Nexys3 | 30 / 30 | 74 | 86 | 4.435 / 4.392 | −1.0 % | | 13 / 14 | 0 / 0 |
+| isqrt | Atlys | 30 / 30 | 74 | 86 | 4.610 / 4.759 | +3.2 % | | 28 / 21 | 0 / 0 |
+| uart | Nexys3 | 52 / 52 | 140 | 138 | 5.845 / 6.015 | +2.9 % | | 15 / 65 | 0 / 0 |
+| uart | Atlys | 52 / 52 | 140 | 138 | 5.689 / 5.788 | +1.7 % | | 143 / 95 | 0 / 0 |
+| micro80 | Nexys3 | 63 / 63 | 172 | 185 | 8.640 / 9.759 | +13.0 % | 9.28 / 9.41 | 87 / 72 | 0 / 0 |
+| micro80 | Atlys | 63 / 63 | 172 | 185 | 8.434 / 9.065 | +7.5 % | 9.02 / 8.82 | 89 / 63 | 0 / 0 |
+
+On average (the geometric mean of the ratios, the nine clocked examples) nextpnr's Map is 1.7 % slower on the Nexys3
+and 4.1 % on the Atlys, 2.9 % on both. Most of that is the seeds' spread, not the packer:
+- **The size is the same by construction.** The fork packs the sites of Silinx's Map (Place & Route checks them site by
+  site, `samePacking`), so the slices, LUTs and flip-flops are the same.
+- **nextpnr gets the same problem from both Maps.** On traffic and micro80 (the Nexys3), the placement run's input of
+  Silinx's Map (`siteNetlist`) and the fork's packed design have the same cells, the same timing arcs (each cell's
+  `TMG`: equal on all 59 and 95 cells), the same carry chains (`CHAIN_NEXT`), the pads and global buffers on the same
+  sites (Silinx's Map gives them fixed, the fork places them by its rules, #3136: the same ones), and the same number of
+  movable cells for nextpnr's analytic placer. The fork's design also has two constant nets (`$s6_gnd`, `$s6_vcc`, the
+  LUTs' unused inputs), with no driver, which the placer ignores; `GENERAL_OK` is Silinx's in both routing runs. Only
+  the cells' and nets' names (Yosys's against Silinx's) and their order differ, which is a different draw of the
+  placer's random choices.
+- **One example's period moves by up to 20 % between seeds**, both Maps alike (micro80 on the Nexys3: Silinx's Map's
+  nine seeds 8.07 to 10.74 ns), so the best of three differs by as much from one Map to the other. Over nine seeds the
+  two Maps' mean periods are within 3 % on every example tried, nextpnr's 0.4 % shorter on average (vga on the Nexys3
+  +3.0 %, micro80 on the Nexys3 +1.4 %, the five others shorter by nextpnr's Map).
+
+There was nothing to fix on Silinx's side, or in the fork, for the size or the speed. `test/examples-nextpnr-s6-pack.test.js`
+(the Nexys3) and `test/examples-nextpnr-s6-pack-atlys.test.js` (the Atlys) build every example with both Maps, on one
+synthesis, and check nextpnr's against Silinx's: no warning, the same slices, LUTs and flip-flops, each example's period
+within 15 % and the board's within 5 % on average (the best of 3 seeds: 4.1 % on the Atlys today).
+
+ISE's verdict is checked on the ISE machine with the ISE tests (`test/ise/examples.test.js`) and
+`SILINX_S6_MAP=nextpnr`, which gives the Spartan-6's open-flow checks nextpnr's Map, one design and one ISE
+container at a time:
+
+```sh
+SILINX_ISE_TESTS=1 SILINX_S6_MAP=nextpnr \
+SILINX_ISE_HOST="$(node -p "const s = require(os.homedir() + '/.silinx/config.json').ssh; s.user + '@' + s.host")" \
+SILINX_ISE_REMOTE_DIR="$(node -p "require(os.homedir() + '/.silinx/config.json').ssh.remoteDir")" \
+node --test --test-name-pattern="for the (nexys3|atlys) with nextpnr's Map" test/ise/examples.test.js
+```
+
 ## Trying the parts that exist
 
 The Spartan-6 parts of the flow are behind a developer flag (#722): with `SILINX_SPARTAN6_OPEN=1` in the server's
