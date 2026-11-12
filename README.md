@@ -420,7 +420,9 @@ link has every file, its comments too), so nothing has to be hosted. Copy Link c
 saved as a secret gist of your GitHub account (the browser edition's Sign in with GitHub…; a server's `GH_TOKEN`), and
 the key is in the link, so GitHub keeps only what it cannot read; opening it needs no sign-in, and your links are your
 gists, which you list and delete on GitHub. A short link may expire (*Expires:* a week, a month, six months or a
-year; never by default): opened after its date it is refused, and making a short link deletes your expired ones. Some slide tools cut a link longer than about 2
+year; never by default): opened after its date it is refused, and making a short link deletes your expired ones. *File ▸ Short Links…* lists
+your short links (when each was made, when it expires), copies again those this browser made, and deletes the ones you
+choose, or the expired ones. Some slide tools cut a link longer than about 2
 000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
 `…/Silinx/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
 (`…/Silinx/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`

@@ -71,6 +71,7 @@ export function setupMenus() {
       hasGit() ? { label: 'Open from Repository…', action: () => openFromRepositoryDialog() } : null,   // (a GitHub repository, a Classroom assignment's: #3195; after Copy Link, #3323)
       // (live, read only, through the server's relay, #3181; the browser edition has none yet)
       api.collab || api.standalone ? { label: 'Share Project…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => hasPj() || !!api.following } : null,
+      { label: 'Short Links…', action: () => import('./short-links.js').then(m => m.shortLinksDialog()) },   // (the short links' gists, #3635)
       '-',
       { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
       { label: 'Export Xilinx ISE Project (.zip)…', action: () => exportProjectZip('xilinx'), disabled: hasPj },

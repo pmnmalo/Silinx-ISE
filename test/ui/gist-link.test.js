@@ -71,8 +71,16 @@ uiTest('#3223 Copy Link\'s short link in Portuguese', E, async (page) => {
   // (its expiry, #3629)
   assert.deepEqual(await page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field="expires"]'); return [s.previousElementSibling.textContent, ...[...s.options].map((o) => o.textContent)]; }),
     ['Expira:', 'Nunca', 'Daqui a uma semana', 'Daqui a um mês', 'Daqui a seis meses', 'Daqui a um ano']);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .link-manage a').textContent), 'Gerir as ligações curtas…');
   await page.dialogButton('Cancelar');
   assert.equal(await copied(page), null);
+  // Short Links… (#3635): its title, its columns, its buttons
+  await page.eval(() => { window.__links = import('/js/short-links.js').then((m) => m.shortLinksDialog()); });
+  await page.waitDialog('Ligações Curtas');
+  assert.deepEqual(await page.eval(() => [[...document.querySelectorAll('.dlg-overlay table.short-links thead th')].map((t) => t.textContent), [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)]),
+    [['', 'Projeto', 'Feita', 'Expira', ''], ['Apagar as Selecionadas', 'Apagar as Expiradas', 'Fechar']]);
+  await page.dialogButton('Fechar');
+  await page.waitNoDialog();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(warnings(page), []);
 });
@@ -110,5 +118,67 @@ uiTest('#3629 Copy Link: a short link that expires; an expired one refused; the 
   await page.eval(async () => { const { api } = await import('/js/api.js'); await api.deleteProject('dial'); });
   await open(page, link.slice(link.indexOf('#')));
   await page.waitFor(() => window.Silinx.project?.name === 'dial' && document.querySelector('#hier .row'), [], { what: 'dial opened from the short link' });
+  assert.deepEqual(warnings(page), []);
+}, { timeout: 120000 });
+
+// #3635: File ▸ Short Links…: the account's short links, the newest first; those this browser made with their project,
+// copied again; one made elsewhere said to be; Delete Expired and Delete Selected, each said in the console; opened from
+// Copy Link's Manage short links… too
+uiTest('#3635 Short Links…: listed, the one made here copied again, the expired and a selected one deleted', E, async (page) => {
+  await fakeApi(page);
+  const rows = () => page.eval(() => [...document.querySelectorAll('.dlg-overlay table.short-links tbody tr')].map((r) => [r.querySelector('.short-project').textContent, r.querySelector('.short-expires').textContent, !!r.querySelector('.short-copy')]));
+  // (the account's gists and this browser's links of the tests before cleared)
+  await page.eval(async () => {
+    const { api } = await import('/js/api.js');
+    const ids = (await api.gistList()).map((g) => g.id);
+    if (ids.length) await api.gistDelete({ ids });
+    localStorage.removeItem('silinx.short-links');
+    await api.createProject({ name: 'beam', template: 'blinky' });
+  });
+  await page.openProject('beam');
+  await startCopy(page);
+  await page.waitDialog('Copy Link');
+  await page.click('.dlg-overlay input[data-field="short"]');
+  await page.dialogButton('Copy Link');
+  await page.waitNoDialog();
+  const link = await copied(page);
+  // two made elsewhere: one that never expires, one expired three days ago
+  const made = await page.eval(async (t) => {
+    const { saveGist } = await import('/core/gist-link.js');
+    const { githubClient } = await import('/core/github-api.js');
+    const client = githubClient({ fetch: (...a) => fetch(...a), token: () => t, api: `${location.origin}/fake-github` });
+    const never = await saveGist(client, 'elsewhere');
+    const old = await saveGist(client, 'old', { days: 7, now: Date.now() - 10 * 86400000 });
+    return { never: never.id, old: old.id, expired: old.expires.slice(0, 10) };
+  }, TOKEN);
+  await page.menu('File', 'Short Links…');
+  await page.waitDialog('Short Links');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .short-links-count').textContent), '3 short links of your GitHub account, the newest first; 1 expired.');
+  assert.deepEqual(await rows(page), [['Made in another browser', `Expired ${made.expired}`, false], ['Made in another browser', 'Never', false], ['beam', 'Never', true]]);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay table.short-links thead th')].map((t) => t.textContent)), ['', 'Project', 'Made', 'Expires', '']);
+  // copied again
+  await page.click('.dlg-overlay tr:last-child .short-copy');
+  await page.waitConsole(new RegExp(`Short Links: the short link of 'beam' copied, ${link.length} characters\\.`));
+  // the expired one, then the selected one
+  await page.dialogButton('Delete Expired');
+  await page.waitConsole(/Short Links: 1 short link deleted from your gists \(the expired ones\)\./);
+  await page.waitFor(() => document.querySelectorAll('.dlg-overlay table.short-links tbody tr').length === 2, [], { what: 'the expired one gone' });
+  await page.click(`.dlg-overlay tr[data-gist="${made.never}"] input[type=checkbox]`);
+  await page.dialogButton('Delete Selected');
+  await page.waitConsole(/Short Links: 1 short link deleted from your gists\./);
+  await page.waitFor(() => document.querySelectorAll('.dlg-overlay table.short-links tbody tr').length === 1, [], { what: 'the selected one gone' });
+  assert.deepEqual(await rows(page), [['beam', 'Never', true]]);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .short-links-count').textContent), '1 short link of your GitHub account, the newest first; 0 expired.');
+  await page.dialogButton('Close');
+  await page.waitNoDialog();
+  assert.deepEqual(await page.eval(async (a, b) => [(await fetch(`/fake-github/gists/${a}`)).status, (await fetch(`/fake-github/gists/${b}`)).status], made.never, made.old), [404, 404]);
+  // from Copy Link's Manage short links…
+  await startCopy(page);
+  await page.waitDialog('Copy Link');
+  await page.click('.dlg-overlay .link-manage a');
+  await page.waitDialog('Short Links');
+  assert.equal(await copied(page), null);
+  await page.dialogButton('Close');
+  await page.waitNoDialog();
   assert.deepEqual(warnings(page), []);
 }, { timeout: 120000 });

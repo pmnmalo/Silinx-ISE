@@ -74,12 +74,12 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
       if (!signed) return json(401, { message: 'Requires authentication' });
       const per = Number(url.searchParams.get('per_page') || 30), page = Number(url.searchParams.get('page') || 1);
       const mine = [...gists].filter(([, g]) => g.owner === user).reverse().slice((page - 1) * per, page * per);
-      return json(200, mine.map(([id, g]) => ({ id, public: g.public, description: g.description, files: Object.fromEntries(Object.keys(g.files).map((n) => [n, { filename: n }])) })));
+      return json(200, mine.map(([id, g]) => ({ id, html_url: `https://gist.github.com/${g.owner}/${id}`, created_at: g.created_at || null, public: g.public, description: g.description, files: Object.fromEntries(Object.keys(g.files).map((n) => [n, { filename: n }])) })));
     }
     if (url.pathname === '/gists' && method === 'POST') {
       if (!signed) return json(401, { message: 'Requires authentication' });
       const id = crypto.randomBytes(16).toString('hex');
-      gists.set(id, { public: !!body.public, description: body.description, owner: user, files: Object.fromEntries(Object.entries(body.files || {}).map(([n, f]) => [n, { filename: n, content: f.content, truncated: false }])) });
+      gists.set(id, { public: !!body.public, description: body.description, owner: user, created_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'), files: Object.fromEntries(Object.entries(body.files || {}).map(([n, f]) => [n, { filename: n, content: f.content, truncated: false }])) });
       return json(201, { id, html_url: `https://gist.github.com/${user}/${id}`, public: !!body.public });
     }
     const gm = /^\/gists\/([0-9a-f]+)$/.exec(url.pathname);

@@ -89,23 +89,49 @@ export async function saveGist(client, design, { days = 0, now = Date.now() } = 
   return { id: g.id, key, url: g.html_url || null, expires, deleted };
 }
 
-/** The signed-in user's Silinx gists that have expired, deleted (their description says it, their one file is
- *  GIST_FILE: no other gist is touched; at most `pages` pages of 100 gists looked at) -> the ids deleted. */
-export async function deleteExpiredGists(client, { now = Date.now(), keep = null, pages = 10 } = {}) {
-  // (every page read before any deletion: a deletion moves the later gists to earlier pages)
-  const expired = [];
+// a gist of the list (GitHub's GET /gists) that is a Silinx short link's: its description Silinx's (with its expiry,
+// or none), its one file GIST_FILE, secret -> its expiry ('' none), or null
+function silinxExpiry(g) {
+  const d = String(g?.description || ''), files = Object.keys(g?.files || {});
+  if (g?.public || !ID_RE.test(String(g?.id || '')) || files.length !== 1 || files[0] !== GIST_FILE) return null;
+  if (d === DESCRIPTION) return '';
+  const m = EXPIRES_RE.exec(d);
+  return m && d === `${DESCRIPTION.slice(0, -1)}; expires ${m[1]})` ? m[1] : null;
+}
+
+/** The signed-in user's short links (#3635): their Silinx gists, newest first (every page read, at most `pages` of 100)
+ *  -> [{ id, url, created, expires (ISO, or null: never), expired }]. No other gist is listed. */
+export async function listGists(client, { now = Date.now(), pages = 10 } = {}) {
+  const out = [];
   for (let page = 1; page <= pages; page++) {
     const list = await client.request('GET', `/gists?per_page=100&page=${page}`);
     if (!Array.isArray(list) || !list.length) break;
     for (const g of list) {
-      const m = EXPIRES_RE.exec(String(g?.description || ''));
-      const files = Object.keys(g?.files || {});
-      if (!m || !String(g.description).startsWith(DESCRIPTION.slice(0, -1)) || files.length !== 1 || files[0] !== GIST_FILE) continue;
-      if (g.public || g.id === keep || !ID_RE.test(String(g.id)) || Date.parse(m[1]) > now) continue;
-      expired.push(g.id);
+      const e = silinxExpiry(g);
+      if (e === null) continue;
+      out.push({ id: g.id, url: g.html_url || `https://gist.github.com/${g.id}`, created: g.created_at || null, expires: e || null, expired: !!e && Date.parse(e) <= now });
     }
     if (list.length < 100) break;
   }
+  return out;
+}
+
+/** Short links deleted (#3635): each of `ids` one of the user's Silinx gists (listGists), or refused before any is
+ *  deleted -> the ids deleted. */
+export async function deleteGists(client, ids, { now = Date.now() } = {}) {
+  const want = [...new Set(ids || [])];
+  if (!want.length) throw fail('no short link to delete');
+  const mine = new Set((await listGists(client, { now })).map(g => g.id));
+  const other = want.find(id => !mine.has(id));
+  if (other !== undefined) throw fail(`'${String(other).slice(0, 40)}' is not a short link of your GitHub account`, 404);
+  for (const id of want) await client.request('DELETE', `/gists/${id}`);
+  return want;
+}
+
+/** The signed-in user's Silinx gists that have expired, deleted (listGists: every page read before any deletion, which
+ *  moves the later gists to earlier pages; no other gist touched) -> the ids deleted. */
+export async function deleteExpiredGists(client, { now = Date.now(), keep = null, pages = 10 } = {}) {
+  const expired = (await listGists(client, { now, pages })).filter(g => g.expired && g.id !== keep).map(g => g.id);
   for (const id of expired) await client.request('DELETE', `/gists/${id}`);
   return expired;
 }

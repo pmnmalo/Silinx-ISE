@@ -142,5 +142,10 @@ test('a short link\'s gist (#3223) in the browser edition: with the sign-in only
   const w = await git.gistSave('the design', 7);
   assert.ok(Math.abs(Date.parse(w.expires) - Date.now() - 7 * 86400000) < 60000, w.expires);
   assert.equal(await loadGist(w, { fetch: gh.fetch }), 'the design');
+  // (Short Links…, #3635: the signed-in user's listed, then deleted)
+  assert.deepEqual((await git.gistList()).map((x) => x.id), [w.id, g.id]);
+  assert.deepEqual(await git.gistDelete({ ids: [g.id] }), [g.id]);
+  assert.deepEqual(await git.gistDelete({ expired: true }), []);
+  assert.deepEqual((await git.gistList()).map((x) => x.id), [w.id]);
   await git.githubSignOut();
 });

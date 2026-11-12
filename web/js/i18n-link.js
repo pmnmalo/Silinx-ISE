@@ -16,10 +16,18 @@ export const LINK_PT = {
   'Include the current view: the open tabs, the split, the panels': 'Incluir a vista atual: os separadores abertos, a divisão, os painéis',
   'Lab:': 'Laboratório:', 'No lab': 'Nenhum laboratório',
   // a short link's expiry (#3629)
+  // Short Links… (#3635)
+  'Short Links…': 'Ligações Curtas…', 'Short Links': 'Ligações Curtas', 'Manage short links…': 'Gerir as ligações curtas…',
+  'Made in another browser': 'Feita noutro navegador', 'Made': 'Feita', 'Expires': 'Expira', 'Gist': 'Gist',
+  'Delete Selected': 'Apagar as Selecionadas', 'Delete Expired': 'Apagar as Expiradas', 'No short link in your GitHub account.': 'Nenhuma ligação curta na sua conta do GitHub.',
+  'Your short links: secret gists of your GitHub account, each the project encrypted. A link this browser made can be copied again; deleting one deletes its gist, and the link no longer opens.':
+    'As suas ligações curtas: gists secretos da sua conta do GitHub, cada um com o projeto cifrado. Uma ligação feita neste navegador pode ser copiada de novo; apagar uma apaga o seu gist, e a ligação deixa de abrir.',
   'Expires:': 'Expira:', 'Never': 'Nunca', 'In a week': 'Daqui a uma semana', 'In a month': 'Daqui a um mês', 'In six months': 'Daqui a seis meses', 'In a year': 'Daqui a um ano',
 };
 
 export const LINK_PT_PATTERNS = [
+  [/^Expired (\d{4}-\d\d-\d\d)$/, 'Expirou a $1'], [/^Until (\d{4}-\d\d-\d\d)$/, 'Até $1'],   // (Short Links…, #3635)
+  [/^(\d+) short links? of your GitHub account, the newest first; (\d+) expired\.$/, '$1 ligação(ões) curta(s) da sua conta do GitHub, a mais recente primeiro; $2 expirada(s).'],
   [/^A link that opens '(.+)' in Silinx, for slides or a message: the whole project is inside the link \(no file to host\)\. Anyone with the link has every file of the project, its comments too\.$/,
     'Uma ligação que abre \'$1\' no Silinx, para diapositivos ou uma mensagem: o projeto inteiro vai dentro da ligação (sem ficheiro para alojar). Quem tiver a ligação tem todos os ficheiros do projeto, também os comentários.'],
   [/^(\d+) characters\.$/, '$1 caracteres.'],
