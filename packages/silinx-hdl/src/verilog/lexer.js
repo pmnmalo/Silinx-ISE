@@ -13,8 +13,14 @@ posedge negedge or and not generate endgenerate function endfunction task endtas
 supply0 supply1 tri wait disable fork join automatic real realtime time defparam
 nand nor xor xnor buf bufif0 bufif1 notif0 notif1 event wand wor triand trior tri0 tri1 specify endspecify`.split(/\s+/));
 
+const KW_MAX = Math.max(...[...KEYWORDS].map(k => k.length));
+
 const OPS = ['<<<=', '>>>=', '<<=', '>>=', '*=', '/=', '%=', '++', '--', '+=', '-=', '|=', '&=', '^=', '===', '!==', '<<<', '>>>', '~&', '~|', '~^', '^~', '==', '!=', '<=', '>=', '&&', '||', '<<', '>>', '**', '+:', '-:', '->', '::',
   '+', '-', '*', '/', '%', '<', '>', '!', '~', '&', '|', '^', '?', ':', ';', ',', '.', '(', ')', '[', ']', '{', '}', '=', '#', '@'];
+
+// the limits of the macros' expansions (#3556): nested expansions (a macro used in its own body), and
+// the text the macros add, over a file and the files it includes
+const MAX_DEPTH = 1000, MAX_TEXT = 1 << 23;
 
 const UNIT = { s: 1e12, ms: 1e9, us: 1e6, ns: 1e3, ps: 1, fs: 1e-3 };
 
@@ -26,22 +32,46 @@ export function tokenize(src, file, errors, opts = {}) {
   const cond = []; // stack of { active, taken }
   let timescale = opts.timescale;
   const active = () => cond.every(c => c.active);
-  let i = 0, line = 1, col = 1, expansions = 0, lastId = null;
+  let i = 0, line = 1, col = 1, lastId = null, joinId = null;
   const err = (msg, l = line, c = col, sev = 'error') => errors.push({ file, line: l, col: c, message: msg, severity: sev });
+
+  // The text is read through a window, src (#3556): a macro's use makes its body the window, the text
+  // before the use goes to `done` and the text after it is set aside (`pending`, the innermost last),
+  // brought back into the window as the reading needs it, so each character is copied a bounded number
+  // of times (rebuilding the whole text at each use was quadratic). `base`: the window's offset in the
+  // expanded text (the tokens' `at`).
+  const done = [], pending = [];
+  let base = 0;
+  function more(k) {
+    while (k >= src.length && pending.length) {
+      const top = pending[pending.length - 1], n = Math.max(64, src.length, k + 1 - src.length);
+      src += top.s.slice(top.p, top.p + n);
+      top.p += n;
+      if (top.p >= top.s.length) pending.pop();
+    }
+    return src[k];
+  }
+  const ch = k => (k < src.length ? src[k] : more(k));
+  const has = k => ch(k) !== undefined;
+  const SW = o => (ch(i + o.length - 1), src.startsWith(o, i));
+  // the expansions under way: where each body ends in the expanded text (less `shift`, the length
+  // the later expansions added before it), the innermost last; the macros' text, over all the files (halt: a limit reached)
+  const open = [], budget = opts.budget || { text: 0, halt: false };
+  let shift = 0;
 
   function adv(n = 1) {
     for (let k = 0; k < n; k++) {
-      if (src[i] === '\n') { line++; col = 1; } else col++;
+      if (ch(i) === '\n') { line++; col = 1; } else col++;
       i++;
     }
   }
 
   function restOfLine() {
     let s = '';
-    while (i < src.length && src[i] !== '\n') {
-      if (src[i] === '\\' && src[i + 1] === '\n') { adv(2); s += ' '; continue; }
-      if (src[i] === '/' && src[i + 1] === '/') { while (i < src.length && src[i] !== '\n') adv(); break; }
-      s += src[i]; adv();
+    while (has(i) && ch(i) !== '\n') {
+      if (ch(i) === '\\' && ch(i + 1) === '\n') { adv(2); s += ' '; continue; }
+      if (ch(i) === '/' && ch(i + 1) === '/') { while (has(i) && ch(i) !== '\n') adv(); break; }
+      s += ch(i); adv();
     }
     return s;
   }
@@ -53,28 +83,28 @@ export function tokenize(src, file, errors, opts = {}) {
     seen = toks.length;
   };
 
-  while (i < src.length) {
+  while (has(i)) {
     mark();
-    const c = src[i];
+    const c = ch(i);
     if (c === '\n' || c === ' ' || c === '\t' || c === '\r' || c === '\f') { adv(); continue; }
-    if (c === '/' && src[i + 1] === '/') { while (i < src.length && src[i] !== '\n') adv(); continue; }
-    if (c === '/' && src[i + 1] === '*') {
+    if (c === '/' && ch(i + 1) === '/') { while (has(i) && ch(i) !== '\n') adv(); continue; }
+    if (c === '/' && ch(i + 1) === '*') {
       adv(2);
-      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) adv();
+      while (has(i) && !(ch(i) === '*' && ch(i + 1) === '/')) adv();
       adv(2); continue;
     }
     const l0 = line, c0 = col, b0 = i;
-    start = i;
+    start = base + i;
     // Verilog-2001 attribute instances (* ... *) are ignored (but not @(*)).
-    if (c === '(' && src[i + 1] === '*' && src[i + 2] !== ')' && !(toks.length && toks[toks.length - 1].v === '@')) {
+    if (c === '(' && ch(i + 1) === '*' && ch(i + 2) !== ')' && !(toks.length && toks[toks.length - 1].v === '@')) {
       adv(2);
-      while (i < src.length && !(src[i] === '*' && src[i + 1] === ')')) adv();
+      while (has(i) && !(ch(i) === '*' && ch(i + 1) === ')')) adv();
       adv(2); continue;
     }
     if (c === '`') {
       adv();
       let name = '';
-      while (i < src.length && /[A-Za-z0-9_]/.test(src[i])) { name += src[i]; adv(); }
+      while (has(i) && /[A-Za-z0-9_]/.test(ch(i))) { name += ch(i); adv(); }
       if (name === 'ifdef' || name === 'ifndef') {
         const m = restOfLine().trim().split(/\s+/)[0];
         const d = defines.has(m);
@@ -115,9 +145,10 @@ export function tokenize(src, file, errors, opts = {}) {
         else if (text == null) err(`\`include file '${m[1]}' not found in the project`, l0, c0);
         else if ((opts.depth || 0) > 16) err('`include nested too deeply', l0, c0);
         else {
-          const sub = tokenize(text, file, errors, { ...opts, defines, timescale, depth: (opts.depth || 0) + 1 });
+          const sub = tokenize(text, file, errors, { ...opts, defines, timescale, budget, depth: (opts.depth || 0) + 1 });
           if (sub.timescale) timescale = sub.timescale;
           for (const t of sub.tokens) if (t.t !== 'eof') toks.push(t);
+          if (budget.halt) break;   // (a limit of the expansions: its one error)
         }
       } else if (['default_nettype', 'resetall', 'celldefine', 'endcelldefine', 'unconnected_drive', 'nounconnected_drive'].includes(name)) {
         restOfLine();
@@ -131,17 +162,17 @@ export function tokenize(src, file, errors, opts = {}) {
         if (mac.params) {
           // actual arguments: comma-separated at parenthesis depth 0; each replaces its parameter
           // (an empty one: the parameter's default value, SystemVerilog `define F(a = text))
-          while (src[j] === ' ' || src[j] === '\t') j++;
+          while (ch(j) === ' ' || ch(j) === '\t') j++;
           const args = [];
-          if (src[j] === '(') {
+          if (ch(j) === '(') {
             j++;
             let depth = 0, cur = '';
-            while (j < src.length && !(depth === 0 && src[j] === ')')) {
-              const ch = src[j];
-              if (ch === '(' || ch === '[' || ch === '{') depth++;
-              if (ch === ')' || ch === ']' || ch === '}') depth--;
-              if (ch === '\n') nl += '\n';
-              if (ch === ',' && depth === 0) { args.push(cur.trim()); cur = ''; } else cur += ch;
+            while (has(j) && !(depth === 0 && ch(j) === ')')) {
+              const c = ch(j);
+              if (c === '(' || c === '[' || c === '{') depth++;
+              if (c === ')' || c === ']' || c === '}') depth--;
+              if (c === '\n') nl += '\n';
+              if (c === ',' && depth === 0) { args.push(cur.trim()); cur = ''; } else cur += c;
               j++;
             }
             j++;
@@ -155,15 +186,21 @@ export function tokenize(src, file, errors, opts = {}) {
           body = body.replace(/`"/g, '\u0001').replace(/"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z0-9_$]*/g, w => (P.has(w) ? P.get(w) : w)).replace(/\u0001/g, '"');
         }
         body = body.replace(/``/g, '');   // `` joins the text on its two sides
-        if (++expansions > 100000) { err(`macro \`${name} expands too deeply`, l0, c0); i = j; continue; }
-        src = src.slice(0, b0) + body + nl + src.slice(j);
-        i = b0; line = l0; col = c0;
-        // an identifier just before the use joins the body's first word (f4_`name)
+        // the bodies this use ends in or goes past are read; the others hold it
+        j = Math.min(j, src.length);
+        const g = base + b0, gj = base + j;
+        while (open.length && open[open.length - 1] + shift < gj) open.pop();
+        if (open.length >= MAX_DEPTH) { err(`macro \`${name} expands too deeply (more than ${MAX_DEPTH} nested expansions)`, l0, c0); budget.halt = true; break; }
+        if ((budget.text += body.length) > MAX_TEXT) { err(`macro \`${name}: the macros' expansions exceed ${MAX_TEXT} characters`, l0, c0); budget.halt = true; break; }
+        shift += body.length + nl.length - (gj - g);
+        open.push(g + body.length - shift);
+        done.push(src.slice(0, b0));
+        if (j < src.length) pending.push({ s: src, p: j });
+        base = g; src = body + nl; i = 0; line = l0; col = c0;
+        // an identifier just before the use joins the body's first word (f4_`name): its token is
+        // read on with the body
         const last = toks[toks.length - 1];
-        if (lastId && lastId.tok === last && lastId.end === b0 && /^[A-Za-z0-9_$]/.test(body)) {
-          toks.pop();
-          i = b0 - last.v.length; line = last.line; col = last.col;
-        }
+        if (lastId && lastId.tok === last && lastId.end === g && /^[A-Za-z0-9_$]/.test(body)) joinId = toks.pop();
       } else {
         err(`undefined macro \`${name}`, l0, c0);
       }
@@ -172,19 +209,23 @@ export function tokenize(src, file, errors, opts = {}) {
     if (!active()) { adv(); continue; }
 
     // identifiers / keywords / system names
-    if (/[A-Za-z_$]/.test(c)) {
-      let s = '';
-      while (i < src.length && /[A-Za-z0-9_$]/.test(src[i])) { s += src[i]; adv(); }
-      if (s[0] === '$') toks.push({ t: 'sys', v: s, line: l0, col: c0 });
-      else toks.push({ t: KEYWORDS.has(s) ? 'kw' : 'id', v: s, line: l0, col: c0 });
-      lastId = { tok: toks[toks.length - 1], end: i };
+    // (an identifier a macro's body joins: read on from its start, f4_`name)
+    if (joinId || /[A-Za-z_$]/.test(c)) {
+      // (its first character and its length, not the name itself: a long name joined to many times
+      // would be read whole at each)
+      let s = '', s0 = c, l1 = l0, c1 = c0;
+      if (joinId) ({ v: s, line: l1, col: c1, at: start } = joinId), s0 = joinId.t === 'sys' ? '$' : 'a', joinId = null;
+      while (has(i) && /[A-Za-z0-9_$]/.test(ch(i))) { s += ch(i); adv(); }
+      if (s0 === '$') toks.push({ t: 'sys', v: s, line: l1, col: c1 });
+      else toks.push({ t: s.length <= KW_MAX && KEYWORDS.has(s) ? 'kw' : 'id', v: s, line: l1, col: c1 });
+      lastId = { tok: toks[toks.length - 1], end: base + i };
       // SystemVerilog cast to a type: my_t'(expr), signed'(expr) -> the name and a cast mark
-      if (src[i] === "'" && src[i + 1] === '(' && s[0] !== '$') { adv(); toks.push({ t: 'cast', v: "'", line, col }); }
+      if (ch(i) === "'" && ch(i + 1) === '(' && s0 !== '$') { adv(); toks.push({ t: 'cast', v: "'", line, col }); }
       continue;
     }
     if (c === '\\') { // escaped identifier
       adv(); let s = '';
-      while (i < src.length && !/\s/.test(src[i])) { s += src[i]; adv(); }
+      while (has(i) && !/\s/.test(ch(i))) { s += ch(i); adv(); }
       toks.push({ t: 'id', v: s, line: l0, col: c0 });
       continue;
     }
@@ -192,25 +233,25 @@ export function tokenize(src, file, errors, opts = {}) {
     if (/[0-9']/.test(c)) {
       let size = '';
       if (c !== "'") {
-        while (i < src.length && /[0-9_]/.test(src[i])) { size += src[i]; adv(); }
+        while (has(i) && /[0-9_]/.test(ch(i))) { size += ch(i); adv(); }
         // real?
-        if (src[i] === '.' && /[0-9]/.test(src[i + 1] || '')) {
+        if (ch(i) === '.' && /[0-9]/.test(ch(i + 1) || '')) {
           let s = size + '.'; adv();
-          while (/[0-9_]/.test(src[i] || '')) { s += src[i]; adv(); }
-          if (/[eE]/.test(src[i] || '')) { s += 'e'; adv(); if (/[+-]/.test(src[i])) { s += src[i]; adv(); } while (/[0-9]/.test(src[i] || '')) { s += src[i]; adv(); } }
+          while (/[0-9_]/.test(ch(i) || '')) { s += ch(i); adv(); }
+          if (/[eE]/.test(ch(i) || '')) { s += 'e'; adv(); if (/[+-]/.test(ch(i))) { s += ch(i); adv(); } while (/[0-9]/.test(ch(i) || '')) { s += ch(i); adv(); } }
           toks.push({ t: 'real', v: parseFloat(s.replace(/_/g, '')), line: l0, col: c0 });
           continue;
         }
         // SystemVerilog size cast: 8'(expr) -> the width and a cast mark
-        if (src[i] === "'" && src[i + 1] === '(') {
+        if (ch(i) === "'" && ch(i + 1) === '(') {
           toks.push({ t: 'int', v: size.replace(/_/g, ''), line: l0, col: c0 });
           adv();
           toks.push({ t: 'cast', v: "'", line, col });
           continue;
         }
         // allow whitespace between size and '
-        let j = i; while (src[j] === ' ' || src[j] === '\t') j++;
-        if (src[j] !== "'" || !/[sSbBoOdDhH]/.test(src[j + 1] || '')) {
+        let j = i; while (ch(j) === ' ' || ch(j) === '\t') j++;
+        if (ch(j) !== "'" || !/[sSbBoOdDhH]/.test(ch(j + 1) || '')) {
           toks.push({ t: 'int', v: size.replace(/_/g, ''), line: l0, col: c0 });
           continue;
         }
@@ -219,17 +260,17 @@ export function tokenize(src, file, errors, opts = {}) {
       // at '
       adv();
       let signed = false;
-      if (src[i] === 's' || src[i] === 'S') { signed = true; adv(); }
-      const baseChar = src[i] || '', base = baseChar.toLowerCase();
+      if (ch(i) === 's' || ch(i) === 'S') { signed = true; adv(); }
+      const baseChar = ch(i) || '', base = baseChar.toLowerCase();
       if (!'bodh'.includes(base) || !base) {
         // unbased unsized '0 '1 'x 'z (SystemVerilog)
-        if (/[01xzXZ]/.test(src[i] || '')) { const d = src[i].toLowerCase(); adv(); toks.push({ t: 'fill', v: d, line: l0, col: c0 }); continue; }
+        if (/[01xzXZ]/.test(ch(i) || '')) { const d = ch(i).toLowerCase(); adv(); toks.push({ t: 'fill', v: d, line: l0, col: c0 }); continue; }
         err('bad number literal', l0, c0); continue;
       }
       adv();
-      while (src[i] === ' ' || src[i] === '\t') adv();
+      while (ch(i) === ' ' || ch(i) === '\t') adv();
       let digits = '';
-      while (i < src.length && /[0-9a-fA-FxXzZ?_]/.test(src[i])) { digits += src[i]; adv(); }
+      while (has(i) && /[0-9a-fA-FxXzZ?_]/.test(ch(i))) { digits += ch(i); adv(); }
       const written = digits;
       digits = digits.replace(/_/g, '').toLowerCase();
       // the digits of the base only (XST rejects the others); a decimal x / z / ? stands alone
@@ -247,26 +288,26 @@ export function tokenize(src, file, errors, opts = {}) {
     }
     if (c === '"') {
       adv(); let s = '';
-      while (i < src.length && src[i] !== '"') {
-        if (src[i] === '\\') {
-          adv(); const e = src[i];
+      while (has(i) && ch(i) !== '"') {
+        if (ch(i) === '\\') {
+          adv(); const e = ch(i);
           s += e === 'n' ? '\n' : e === 't' ? '\t' : e; adv(); continue;
         }
-        if (src[i] === '\n') { err('unterminated string', l0, c0); break; }
-        s += src[i]; adv();
+        if (ch(i) === '\n') { err('unterminated string', l0, c0); break; }
+        s += ch(i); adv();
       }
       adv();
       toks.push({ t: 'str', v: s, line: l0, col: c0 });
       continue;
     }
-    const op = OPS.find(o => src.startsWith(o, i));
+    const op = OPS.find(o => SW(o));
     if (op) { adv(op.length); toks.push({ t: 'op', v: op === '^~' ? '~^' : op, line: l0, col: c0 }); continue; }
     err(`unexpected character '${c}'`); adv();
   }
   mark();
-  if (cond.length) err('missing `endif');
+  if (cond.length && !budget.halt) err('missing `endif');
   toks.push({ t: 'eof', v: '', line, col });
-  Object.defineProperty(toks, 'src', { value: src });   // (tokenText)
+  Object.defineProperty(toks, 'src', { value: done.join('') + src });   // (tokenText)
   return { tokens: toks, timescale, defines };
 }
 
