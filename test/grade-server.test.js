@@ -139,8 +139,9 @@ test('#3192 gradeAll over a folder: Accepted, Wrong Answer, Compile Error, a sub
 
 test('#3192 Memory Limit Exceeded: a design past the heap of its process (every test\'s)', { timeout: 120000 }, async () => {
   const ex = exercise(path.join(tmp, 'ex3'), { limits: { memoryMb: 64, seconds: 20 } });
+  // (4M elements of 4 bits: within an object's limits, #3555, its values past 64 MB)
   const hog = project(path.join(tmp, 'subs3/hog'), `module counter4(input clk, input rst, input en, output reg [3:0] q);
-  reg [31:0] mem [0:4000000];
+  reg [3:0] mem [0:4000000];
   always @(posedge clk) if (rst) q <= 4'd0; else if (en) q <= q + mem[q];
 endmodule
 `);
