@@ -34,13 +34,15 @@ test('#3412 import_project: a .xise at the exchange folder\'s root, or the folde
   fs.writeFileSync(path.join(xchg, 'notes.txt'), 'private notes');
   fs.mkdirSync(path.join(xchg, 'other'));
   fs.writeFileSync(path.join(xchg, 'other', 'thesis.vhd'), '-- a thesis');
+  // (the path as the results name it: '/' after the folder's name, Windows's too, #3611)
+  const named = from => from.replace(xchg, '<exchange folder>').replace(/\\/g, '/');
   for (const from of ['a.xise', path.join(xchg, 'a.xise'), '<exchange folder>/a.xise']) {
     const r = await call('import_project', { name: 'x', from });
-    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${from.replace(xchg, '<exchange folder>')}' is at the exchange folder's root, with whatever else is there: put the ISE project in a folder of its own and import that folder's .xise`], from);
+    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${named(from)}' is at the exchange folder's root, with whatever else is there: put the ISE project in a folder of its own and import that folder's .xise`], from);
   }
   for (const from of ['.', xchg, '<exchange folder>', 'other/..']) {
     const r = await call('import_project', { name: 'x', from });
-    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${from.replace(xchg, '<exchange folder>')}' is the exchange folder itself: give a project's own folder in it`], from);
+    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${named(from)}' is the exchange folder itself: give a project's own folder in it`], from);
   }
   assert.equal(fs.existsSync(P.projectDir('x')), false);
   // (in a folder of its own: its files only)

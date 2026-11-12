@@ -56,7 +56,8 @@ test('#3420 saveConfig with ssh settings under a test run: refused, the account\
     try { await tc.saveConfig({ mode: 'ssh', ssh: { host: 'buildbox', user: 'u', port: 22, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }); console.log('saved'); }
     catch (e) { console.log(e.message); }`;
   const run = extra => spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, '--input-type=module', '-e', script],
-    { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, NODE_TEST_CONTEXT: 'child-v8', ...extra } });
+    // (the account's home as os.homedir reads it: HOME, and on Windows USERPROFILE, #3611)
+    { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home, NODE_TEST_CONTEXT: 'child-v8', ...extra } });
   // HOME is the account's home, no SILINX_CONFIG_DIR: refused
   let r = run({});
   assert.match(r.stdout.trim(), MESSAGE, r.stderr);

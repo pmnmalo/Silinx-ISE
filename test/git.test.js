@@ -217,7 +217,9 @@ test('no hook of a repository runs: its .git/hooks, a core.hooksPath of its own;
   write(lfs, `#!/bin/sh\necho ran > '${flag}'\ncat\n`); fs.chmodSync(lfs, 0o755);
   const withLfs = bareWith('lfs', d => { gates(d); write(path.join(d, '.gitattributes'), '*.vhd filter=lfs\n'); write(path.join(d, '.gitmodules'), `[submodule "x"]\n\tpath = x\n\turl = ${remote}\n`); });
   const global = fs.readFileSync(process.env.GIT_CONFIG_GLOBAL, 'utf8');
-  fs.appendFileSync(process.env.GIT_CONFIG_GLOBAL, `[filter "lfs"]\n\tsmudge = ${lfs}\n\tclean = ${lfs}\n\trequired = true\n`);
+  // (the path with '/': in git's configuration a backslash is an escape, Windows's C:\Users… a bad line, #3613)
+  const lfsPath = lfs.split(path.sep).join('/');
+  fs.appendFileSync(process.env.GIT_CONFIG_GLOBAL, `[filter "lfs"]\n\tsmudge = ${lfsPath}\n\tclean = ${lfsPath}\n\trequired = true\n`);
   try {
     await G.gitClone({ url: withLfs, name: 'lfs' });
     write(path.join(ws, 'lfs', 'src', 'gates.vhd'), '-- changed\n');
