@@ -14,12 +14,14 @@ const CLOCK = /^\/\/\s*create_clock\s+(?:-name\s+\S+\s+)?-period\s+([\d.]+)\s+\[
 
 function readCst(text) {
   const assignments = {}, netStatements = [], clocks = [];
+  let line = 0;
   const set = (net, attrs) => {
-    netStatements.push({ net, attrs: { ...attrs } });
+    netStatements.push({ net, attrs: { ...attrs }, line });
     assignments[net] = { ...assignments[net], ...attrs };
   };
   String(text).split(/\r?\n/).forEach((raw, i) => {
     const fail = msg => { throw new Error(`line ${i + 1}: ${msg}`); };
+    line = i + 1;
     const clock = CLOCK.exec(raw.trim());
     if (clock) {
       if (!(+clock[1] > 0)) fail('create_clock needs a period in ns');

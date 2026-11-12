@@ -4,6 +4,7 @@
 // Two views (#2694): the table, and the board as the Board Emulator draws it (pinplanner-board.js), the ports dragged
 // from the Ports panel on its left (pinplanner-ports.js, #2715) onto its parts or onto the rows of Board Resources.
 import { constraintsExt, readPins, writePins } from './constraints-format.js';
+import { pinAttrsOf } from '/core/constraints-check.js';
 import { toolWide } from './editor-icons.js';
 import { mountSideFold } from './side-fold.js';
 import { mountPinBoard } from './pinplanner-board.js';
@@ -55,7 +56,9 @@ export function mountPinPlanner(el, doc, top) {
   const resPins = [];
   for (const r of board?.resources || []) r.pins.forEach((pin, i) => resPins.push({ res: r, pin, label: r.pins.length > 1 ? `${r.name}<${i}>` : r.name, idx: i }));
   const famId = db?.parts?.find(p => p.part === pj.device.part)?.family || pj.device.family;
-  const iostds = db?.families?.find(f => f.id === famId)?.ioStandards || db?.iostandards || ['LVCMOS33', 'LVCMOS25', 'LVTTL'];
+  // (the attributes the device's format writes, #2296: a PCF's pull-up only; an LPF's and a CST's own I/O standards, drives…)
+  const can = pinAttrsOf(pj.device);
+  const iostds = Array.isArray(can.iostandard) ? can.iostandard : can.iostandard ? db?.families?.find(f => f.id === famId)?.ioStandards || db?.iostandards || ['LVCMOS33', 'LVCMOS25', 'LVTTL'] : [];
 
   let asg = {}, clocks = [], other = [];
   // Undo / Redo of the assignments (Edit menu, Ctrl+Z / Ctrl+Y on the page)
@@ -178,13 +181,14 @@ export function mountPinPlanner(el, doc, top) {
         if (r?.res.pull) asg[n.net].pull = r.res.pull;
         render();
       });
-      const std = h('select', {}, h('option', { value: '' }, 'default'), ...iostds.map(s => h('option', { value: s, selected: a.iostandard === s }, s)));
+      // (an attribute the format has not: its select disabled)
+      const std = h('select', { disabled: !can.iostandard }, h('option', { value: '' }, 'default'), ...iostds.map(s => h('option', { value: s, selected: a.iostandard === s }, s)));
       std.addEventListener('change', () => set('iostandard', std.value));
-      const drive = h('select', {}, ...['', '2', '4', '6', '8', '12', '16', '24'].map(v => h('option', { value: v, selected: String(a.drive || '') === v }, v || '—')));
+      const drive = h('select', { disabled: !can.drive }, ...['', ...(can.drive || [])].map(v => h('option', { value: v, selected: String(a.drive || '') === v }, v || '—')));
       drive.addEventListener('change', () => set('drive', drive.value ? +drive.value : undefined));
-      const slew = h('select', {}, ...['', 'slow', 'fast', 'quietio'].map(v => h('option', { value: v, selected: (a.slew || '') === v }, v || '—')));
+      const slew = h('select', { disabled: !can.slew }, ...['', ...(can.slew || [])].map(v => h('option', { value: v, selected: String(a.slew || '').toLowerCase() === v }, v || '—')));
       slew.addEventListener('change', () => set('slew', slew.value));
-      const pull = h('select', {}, ...['', 'up', 'down', 'keeper'].map(v => h('option', { value: v, selected: (a.pull || '') === v }, v || '—')));
+      const pull = h('select', {}, ...['', ...can.pull].map(v => h('option', { value: v, selected: (a.pull || '') === v }, v || '—')));
       pull.addEventListener('change', () => set('pull', pull.value));
       const clk = clocks.find(c => c.net === n.net);
       const per = h('input', { type: 'text', value: clk ? clk.period : '', style: { width: '70px' }, disabled: n.port.dir !== 'in' || n.port.bus });

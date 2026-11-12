@@ -1,6 +1,6 @@
 // Silinx toolchain - the constraints' model (#2385), the same whatever the format they are written in:
 //   assignments    the pins: { name: { loc, iostandard, pull, drive, slew, clockDedicatedRoute } }
-//   netStatements  the same in the order written, [{ net, attrs }] (ucf.js portAssignments: wildcards, the last one wins)
+//   netStatements  the same in the order written, [{ net, attrs, line? }] (ucf.js portAssignments: wildcards, the last one wins; line: PCF's, LPF's, CST's, #2296)
 //   clocks         [{ net, period (ns), duty, name?, tnm? }]
 //   other          what is not portable: the format's own statements, as text, for the back ends that know the format
 //   format, name   the format's id, the file's name (for the log)

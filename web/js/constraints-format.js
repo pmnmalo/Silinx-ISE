@@ -2,6 +2,7 @@
 // (#2303) or the 7-series' XDC (#3142). The interface's model is parseUcf's: a bus's bit written x<1>, as PCF, LPF and XDC write x[1]; PCF's and LPF's
 // own text stays nextpnr's.
 import { PCF, LPF, CST, XDC, constraintsExtOf, constraintsFormatOf, generateUcf, parseUcf } from '/packages/silinx-fpga/src/parts.js';
+import { constraintsDiagnostics } from '/core/constraints-check.js';
 
 export const constraintsExt = device => constraintsExtOf(device);
 
@@ -29,33 +30,15 @@ export function writePins(device, { assignments = {}, clocks = [], header, ...re
   return `${header ? `${NEXTPNR[format].comment || '#'} ${header}\n` : ''}${body}`;
 }
 
-/** A PCF's errors (the line nextpnr would stop at) and its nets that are no port of the top. */
-export const pcfDiagnostics = (text, ports = []) => diagnostics(PCF, 'set_io', text, ports);
-/** An LPF's errors (the statement nextpnr-ecp5 would not apply) and its ports that are no port of the top (#2302). */
-export const lpfDiagnostics = (text, ports = []) => diagnostics(LPF, 'LOCATE COMP', text, ports);
-/** A CST's errors (the statement nextpnr-himbaechel-gowin would not apply) and its ports that are no port of the top (#2303). */
-export const cstDiagnostics = (text, ports = []) => diagnostics(CST, 'IO_LOC', text, ports);
+// (the checks: core/constraints-check.js, the MCP server's too; opts: { top, device, board }, #2296)
+/** A PCF's errors (the line nextpnr would stop at, its pins: of the package, once each), its nets that are no port of the top, its pins on no resource of the board. */
+export const pcfDiagnostics = (text, ports = [], opts) => constraintsDiagnostics('pcf', text, { ports, ...opts });
+/** An LPF's errors (the statement nextpnr-ecp5 would not apply, a pin's, an I/O standard at another voltage than its bank's on the board) and warnings (#2302). */
+export const lpfDiagnostics = (text, ports = [], opts) => constraintsDiagnostics('lpf', text, { ports, ...opts });
+/** A CST's errors (the statement nextpnr-himbaechel-gowin would not apply, a pin's, an I/O standard at another voltage than its bank's) and warnings (#2303). */
+export const cstDiagnostics = (text, ports = [], opts) => constraintsDiagnostics('cst', text, { ports, ...opts });
 /** An XDC's errors (the line Vivado would stop at) and its ports that are no port of the top (#3142: Vivado's [Common 17-55]). */
-export const xdcDiagnostics = (text, ports = []) => diagnostics(XDC, 'get_ports', text, ports);
-
-// a line's words, an XDC's get_ports objects among them: {led[0]}, { SW[0] }, clk]
-const namesIn = line => [...line.split(/\s+/), ...[...line.matchAll(/"([^"]*)"/g)].map(m => m[1]), ...line.split(/[\s;]+/).map(w => w.replace(/\]$/, '')),
-  ...[...line.matchAll(/\{([^{}]*)\}/g)].flatMap(m => m[1].trim().split(/\s+/))];
-
-function diagnostics(format, command, text, ports) {
-  let model;
-  try { model = format.read(text); } catch (e) {
-    return [{ severity: 'error', line: +(/^line (\d+)/.exec(e.message)?.[1] || 1), message: e.message.replace(/^line \d+: /, '') }];
-  }
-  if (!ports.length) return [];
-  const known = new Set(ports.flatMap(p => (p.width > 1 ? Array.from({ length: p.width }, (_, i) => `${p.name}<${Math.min(p.msb, p.lsb) + i}>`) : [p.name])));
-  const lines = String(text).split(/\r?\n/);
-  const nets = format === XDC ? [...model.netStatements.map(n => n.net), ...model.clocks.map(c => c.net)] : Object.keys(model.assignments);
-  return [...new Set(nets)].filter(n => !known.has(toModel(n))).map(n => ({
-    severity: 'warning', message: `${command} ${toPcf(n)}: the top has no such port`,
-    line: lines.findIndex(l => namesIn(l).includes(toPcf(n))) + 1,
-  }));
-}
+export const xdcDiagnostics = (text, ports = [], opts) => constraintsDiagnostics('xdc', text, { ports, ...opts });
 
 /** A device's change of format: the project's constraints another file, nothing converted, the user told. */
 export function constraintsForDevice(pj, fileTree, log) {

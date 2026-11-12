@@ -33,12 +33,14 @@ function statements(text) {
 
 function readLpf(text) {
   const assignments = {}, netStatements = [], clocks = [], other = [];
+  let line = 0;
   const set = (net, attrs) => {
-    netStatements.push({ net, attrs: { ...attrs } });
+    netStatements.push({ net, attrs: { ...attrs }, line });
     assignments[net] = { ...assignments[net], ...attrs };
   };
   for (const st of statements(text)) {
     const fail = msg => { throw new Error(`line ${st.line}: ${msg}`); };
+    line = st.line;
     if (st.open) fail(`${st.text.split(/\s+/)[0]}: no ';' at its end`);
     const m = /^(\w+)\s*(.*)$/s.exec(st.text), verb = m[1].toUpperCase(), rest = m[2];
     if (verb === 'LOCATE') {
@@ -79,7 +81,7 @@ function writeLpf({ assignments = {}, clocks = [], other = [] }) {
   for (const [net, a] of Object.entries(assignments)) {
     if (a?.loc) lines.push(`LOCATE COMP ${q(net)} SITE ${q(a.loc)};`);
     const attrs = [a?.iostandard && `IO_TYPE=${a.iostandard}`, a?.pull !== undefined && `PULLMODE=${PULL_MODE[a.pull] || 'NONE'}`, a?.drive && `DRIVE=${a.drive}`,
-      a?.slew && `SLEWRATE=${a.slew}`, ...Object.entries(a?.lpf || {}).map(([k, v]) => `${k}=${v}`)].filter(Boolean);
+      a?.slew && `SLEWRATE=${String(a.slew).toUpperCase()}`, ...Object.entries(a?.lpf || {}).map(([k, v]) => `${k}=${v}`)].filter(Boolean);
     if (attrs.length) lines.push(`IOBUF PORT ${q(net)} ${attrs.join(' ')};`);
   }
   for (const c of clocks) lines.push(`FREQUENCY PORT ${q(c.net)} ${+(1000 / periodNs(c.period)).toFixed(6)} MHZ;`);

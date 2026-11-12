@@ -29,7 +29,7 @@ test('list_devices: the Gowin GW1N and its GW1NR-9C, the Tang Nano 9K and its VG
   assert.equal(gowin.text, 'Devices:\n  Gowin GW1N (gowin):\n    gw1nr-9c: qn88 -6');
 });
 
-test('set_design_properties: the Tang Nano 9K, its pins written as a CST with their I/O standards; new_source the CST template; the wizards refuse it', async () => {
+test('set_design_properties: the Tang Nano 9K, its pins written as a CST with their I/O standards; new_source the CST template; the Xilinx primitives\' wizards refuse it', async () => {
   await ok('new_project_from_example', { name: 'b1', example: 'blinky' });
   const r = await ok('set_design_properties', { project: 'b1', board: 'tangnano9k', update_constraints: true });
   assert.equal(r.text, 'WARNING: this device\'s constraints are CST: constraints/top.cst is the project\'s now, constraints/top.ucf was not converted.\n'
@@ -40,7 +40,8 @@ test('set_design_properties: the Tang Nano 9K, its pins written as a CST with th
   await fails('set_design_properties', { project: 'b1', synth_tool: 'xst' }, 'the GW1NR-9C is the Silinx toolchain\'s only: no XST');
   assert.equal((await ok('new_source', { project: 'b1', type: 'constraints', name: 'pins' })).text, 'Created Implementation Constraints File \'constraints/pins.cst\'.');
   assert.match(fs.readFileSync(path.join(P.projectDir('b1'), 'constraints/pins.cst'), 'utf8'), /^\/\/ Physical constraints for b1\n\/\/ Target: gw1nr-9c-6-qn88\n/);
-  await fails('constraints_wizard', { project: 'b1' }, 'the GW1NR-9C\'s constraints are a CST: new_source constraints writes one');
+  // (the CST Wizard, #2296: test/mcp-constraints.test.js)
+  await fails('constraints_wizard', { project: 'b1' }, 'constraints/top.cst already exists: choose another name.');
   await fails('clock_manager', { project: 'b1' }, 'The Clocking Wizard makes a DCM for the Spartan-3E and a PLL for the Spartan-6: choose one of them as the target device (set_design_properties).');
 });
 
