@@ -16,6 +16,7 @@ import { slicesChipdb, GRADE_DEVICE } from '../server/grade-synth.js';
 import { gradeCommand } from '../server/grade-cli.js';
 import { createZip } from '../core/zip.js';
 import { COUNTER_V, COUNTER_VHD, counterExercise } from './grade-fixtures.mjs';
+import { MAX_ITERATIONS } from '../packages/silinx-hdl/src/util.js';
 
 let tmp;
 before(() => { tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-grade-'))); });
@@ -38,11 +39,14 @@ function exercise(dir, extra = {}) {
 }
 const verdicts = r => Object.fromEntries(r.tests.map(t => [t.id, t.verdict]));
 // (no loop past the interpreter's iteration limit, which is a Time Limit Exceeded of its own: its time only)
+// a hang at the first clock edge: past the loop budget of one process run (#3630: Time Limit Exceeded, the budget's
+// reason, at once); SLOW: each edge within the budget (about 4M iterations, a second or more), the test's time limit
 const HANG = `module counter4(input clk, input rst, input en, output reg [3:0] q);
   integer i, j;
   always @(posedge clk) for (i = 0; i < 100000; i = i + 1) for (j = 0; j < 100000; j = j + 1) q = q + 4'd1;
 endmodule
 `;
+const SLOW = HANG.replace(/100000/g, '2000');
 
 test('#3192 loadExercise: the files beside it read; one outside its folder, or missing, refused', () => {
   const dir = path.join(tmp, 'ex1');
@@ -117,19 +121,24 @@ test('#3192 gradeAll over a folder: Accepted, Wrong Answer, Compile Error, a sub
   project(path.join(subs, 'c-wrong'), COUNTER_V.replace("q + 4'd1", "q + 4'd2"));
   project(path.join(subs, 'd-syntax'), COUNTER_V.replace("q + 4'd1", 'q +'));
   project(path.join(subs, 'e-hang'), HANG);
+  project(path.join(subs, 'e-slow'), SLOW);
   write(path.join(subs, 'f-empty/readme.txt'), 'nothing');
   const seen = [];
   const t0 = Date.now();
   const { results, problems } = await gradeAll(ex, [subs], { onResult: r => seen.push(r.submission) });
   assert.deepEqual(problems, []);
-  assert.deepEqual(seen, ['a-verilog', 'b-vhdl', 'c-wrong', 'd-syntax', 'e-hang', 'f-empty']);
-  assert.deepEqual(results.map(r => [r.submission, r.verdict, r.points]), [['a-verilog', 'AC', 100], ['b-vhdl', 'AC', 100], ['c-wrong', 'WA', 0], ['d-syntax', 'CE', 0], ['e-hang', 'TLE', 0], ['f-empty', 'CE', 0]]);
-  assert.deepEqual(verdicts(results[4]), { count: 'TLE', random: 'TLE', bench: 'TLE' });
-  assert.deepEqual(results[4].tests.map(t => t.messages), [['the test took more than 3 s'], ['the test took more than 3 s'], ['the test took more than 3 s']]);
-  assert.deepEqual(results[4].design.warnings, ['"src/counter4.v" Line 1: Input <rst> is never used.', '"src/counter4.v" Line 1: Input <en> is never used.',
+  assert.deepEqual(seen, ['a-verilog', 'b-vhdl', 'c-wrong', 'd-syntax', 'e-hang', 'e-slow', 'f-empty']);
+  assert.deepEqual(results.map(r => [r.submission, r.verdict, r.points]), [['a-verilog', 'AC', 100], ['b-vhdl', 'AC', 100], ['c-wrong', 'WA', 0], ['d-syntax', 'CE', 0], ['e-hang', 'TLE', 0], ['e-slow', 'TLE', 0], ['f-empty', 'CE', 0]]);
+  for (const k of [4, 5]) assert.deepEqual(verdicts(results[k]), { count: 'TLE', random: 'TLE', bench: 'TLE' });
+  const budget = inst => `loop iteration limit exceeded: more than ${MAX_ITERATIONS} iterations and calls in one evaluation (a constant, or a process until it waits) (in ${inst}/always_3)`;
+  assert.deepEqual(results[4].tests.map(t => t.messages.map(m => m.replace(/ at \d+ ns \(src\/counter4\.v line 3\)$/, ''))),
+    [[budget('counter4')], [budget('counter4')], [budget('tb_counter4.uut')]]);
+  for (const t of results[4].tests) assert.match(t.messages[0], / at \d+ ns \(src\/counter4\.v line 3\)$/);
+  assert.deepEqual(results[5].tests.map(t => t.messages), [['the test took more than 3 s'], ['the test took more than 3 s'], ['the test took more than 3 s']]);
+  for (const k of [4, 5]) assert.deepEqual(results[k].design.warnings, ['"src/counter4.v" Line 1: Input <rst> is never used.', '"src/counter4.v" Line 1: Input <en> is never used.',
     '"src/counter4.v" Line 3: Blocking assignment (=) to <q> in a clocked always block; use a non-blocking assignment (<=).']);
   assert.ok(Date.now() - t0 < 60000, `${Date.now() - t0} ms`);
-  assert.deepEqual(results[5].design, { verdict: 'CE', messages: ['no Silinx project (silinx.json not found)'], warnings: [] });
+  assert.deepEqual(results[6].design, { verdict: 'CE', messages: ['no Silinx project (silinx.json not found)'], warnings: [] });
   for (const r of results.slice(0, 2)) assert.deepEqual(r.design, { verdict: null, messages: [], warnings: [] });
   // --visible: the visible test alone
   const vis = await gradeAll(ex, [path.join(subs, 'c-wrong')], { visible: true });
