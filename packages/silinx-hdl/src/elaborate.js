@@ -9,6 +9,7 @@
 // Bound statements: blk asg if case for forrange while repeat forever exit next ret null delay event wait task sys report assert
 import * as V from './values.js';
 import { walk } from './bound-walk.js';
+import { walkItems } from './util.js';
 import { evalE, runSync, exec, strToVal } from './interp.js';
 import { purityErrors } from './vhdl/purity.js';
 import { declaredNames, interfaceNames, labelErrors } from './vhdl/labels.js';
@@ -168,14 +169,7 @@ export function findModule(lib, name) {
 // Modules that are never instantiated by another module (top-level candidates).
 export function topCandidates(lib) {
   const used = new Set();
-  const visit = items => {
-    for (const it of items || []) {
-      if (it.kind === 'instance') used.add(it.module.toLowerCase());
-      if (it.items) visit(it.items);
-      if (it.then) visit(it.then);
-      if (it.else) visit(it.else);
-    }
-  };
+  const visit = items => walkItems(items, it => { if (it.kind === 'instance') used.add(it.module.toLowerCase()); });
   for (const m of lib.modules.values()) visit(m.items);
   return [...lib.modules.values()].filter(m => !used.has(m.name.toLowerCase())).map(m => m.name);
 }
@@ -185,14 +179,7 @@ export function topCandidates(lib) {
 // instantiates (a module instantiated only from a test bench is a root too; the top's former parent one of them).
 export function implRoots(lib, { top = '', visible = () => true } = {}) {
   const used = new Set();
-  const visit = items => {
-    for (const it of items || []) {
-      if (it.kind === 'instance') used.add(it.module.toLowerCase());
-      if (it.items) visit(it.items);
-      if (it.then) visit(it.then);
-      if (it.else) visit(it.else);
-    }
-  };
+  const visit = items => walkItems(items, it => { if (it.kind === 'instance') used.add(it.module.toLowerCase()); });
   for (const m of lib.modules.values()) if (visible(m.name)) visit(m.items);
   const topMod = top ? findModule(lib, top) : null;
   const first = topMod && visible(topMod.name) ? [topMod.name] : [];

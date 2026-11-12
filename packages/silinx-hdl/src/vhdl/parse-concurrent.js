@@ -183,33 +183,37 @@ export const concurrentMethods = {
   },
 
   /**
-   * if-generate with VHDL-2008 elsif/else alternatives. `elsif` chains become a nested
-   * generate_if in `else`; only the outermost call consumes `end generate [label];`.
+   * if-generate with VHDL-2008 elsif/else alternatives. Each `elsif` is a generate_if in the `else` of the one before
+   * (elseChain: the same construct, its label, its scope), the chain read in a loop (#3500); `end generate [label];`
+   * once, after the last alternative.
    */
-  parseIfGenerate(label, loc, nested = false) {
-    if (!this.acceptKw('if')) this.expectKw('elsif');
-    if (this.isId() && this.isOp(':', 1)) { this.next(); this.next(); } // alternative label
-    const cond = this.parseExpression();
-    this.expectKw('generate');
-    const body = this.parseGenerateBody();
-    this.acceptAltEnd();
-    const g = { kind: 'generate_if', label, cond, then: body.items, else: [], decls: body.decls, loc };
-    if (this.isKw('elsif')) {
-      g.else = [this.parseIfGenerate(label, this.loc(), true)];
-    } else if (this.acceptKw('else')) {
-      if (this.isId() && this.isOp(':', 1)) { this.next(); this.next(); }
+  parseIfGenerate(label, loc) {
+    let first = null, prev = null;
+    for (;;) {
+      if (!this.acceptKw('if')) this.expectKw('elsif');
+      if (this.isId() && this.isOp(':', 1)) { this.next(); this.next(); } // alternative label
+      const cond = this.parseExpression();
       this.expectKw('generate');
-      const eb = this.parseGenerateBody();
+      const body = this.parseGenerateBody();
       this.acceptAltEnd();
-      g.else = [...eb.decls.map((d) => ({ kind: 'decl', decl: d })), ...eb.items];
+      const g = { kind: 'generate_if', label, cond, then: body.items, else: [], decls: body.decls, loc };
+      if (prev) { prev.else = [g]; prev.elseChain = true; } else first = g;
+      prev = g;
+      if (this.isKw('elsif')) { loc = this.loc(); continue; }
+      if (this.acceptKw('else')) {
+        if (this.isId() && this.isOp(':', 1)) { this.next(); this.next(); }
+        this.expectKw('generate');
+        const eb = this.parseGenerateBody();
+        this.acceptAltEnd();
+        g.else = [...eb.decls.map((d) => ({ kind: 'decl', decl: d })), ...eb.items];
+      }
+      break;
     }
-    if (!nested) {
-      this.expectKw('end');
-      this.expectKw('generate');
-      if (this.isId()) this.next();
-      this.expectOp(';');
-    }
-    return g;
+    this.expectKw('end');
+    this.expectKw('generate');
+    if (this.isId()) this.next();
+    this.expectOp(';');
+    return first;
   },
 
   /**
@@ -240,12 +244,14 @@ export const concurrentMethods = {
       const [lo, hi] = c.range.dir === 'downto' ? [c.range.right, c.range.left] : [c.range.left, c.range.right];
       return bin('&', bin('>=', sel, lo), bin('<=', sel, hi));
     };
-    let rest = [];
+    // (each alternative the else of the one before, elseChain: the same construct, #3500)
+    let rest = [], chain = false;
     for (let k = alts.length - 1; k >= 0; k--) {
       const { choices, body } = alts[k];
-      if (choices.includes('others')) { rest = [...body.decls.map((d) => ({ kind: 'decl', decl: d })), ...body.items]; continue; }
+      if (choices.includes('others')) { rest = [...body.decls.map((d) => ({ kind: 'decl', decl: d })), ...body.items]; chain = false; continue; }
       const cond = choices.map(test).reduce((x, y) => bin('|', x, y));
-      rest = [{ kind: 'generate_if', label, cond, then: body.items, else: rest, decls: body.decls, loc }];
+      rest = [{ kind: 'generate_if', label, cond, then: body.items, else: rest, decls: body.decls, loc, ...(chain ? { elseChain: true } : {}) }];
+      chain = true;
     }
     return rest.length === 1 && rest[0].kind === 'generate_if' ? rest[0] : { kind: 'generate_if', label, cond: { op: 'ref', name: 'true' }, then: rest, else: [], decls: [], loc };
   },

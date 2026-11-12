@@ -5,6 +5,7 @@ import { h, dialog, alertDlg, confirmDlg, promptDlg, popupMenu, splitter, toast 
 import { createEditor, instTemplate, snippetsFor, typeText } from './editor.js';
 import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC, noteFailedC } from './c-source.js';
 import { compile, implRoots, topCandidates } from '/core/compile.js';
+import { genChain } from '/core/util.js';
 import { primitiveSources } from '/core/unisim.js';
 import * as wiz from './wizards.js';
 import { PRODUCT, VERSION_LABEL } from '/core/version.js';
@@ -187,7 +188,13 @@ export function instancesOf(mod) {
     for (const it of items || []) {
       if (it.kind === 'instance') out.push({ name: prefix + it.name, module: it.module, loc: it.loc });
       if (it.kind === 'generate_for') visit(it.items, `${prefix}${it.label}.`);
-      if (it.kind === 'generate_if') { visit(it.then, prefix + (it.label ? it.label + '.' : '')); visit(it.else, prefix); }
+      if (it.kind === 'generate_if') {
+        // (an else if chain in a loop, #3500)
+        for (const g of genChain(it)) {
+          visit(g.then, prefix + (g.label ? g.label + '.' : ''));
+          if (!g.elseChain) visit(g.else, prefix);
+        }
+      }
     }
   };
   visit(mod.items, '');

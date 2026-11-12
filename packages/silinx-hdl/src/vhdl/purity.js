@@ -21,6 +21,8 @@
 //
 // Isomorphic module (browser + Node).
 
+import { genChain } from '../util.js';
+
 export const PURE_CHECK = 'pure-function';
 
 // (XST reports any use of these, also s'length, and a file: writeline(f, l))
@@ -229,14 +231,18 @@ export function purityErrors(units, { file = null, text = null, packages = () =>
         declare(s, it.decls, { inProcess: true });
         region(it.decls, s);
       } else if (it.kind === 'generate_for' || it.kind === 'generate_if') {
-        const s = new Scope(scope, scope.file);
-        if (it.var) s.add(it.var, { cls: 'constant', decl: it });
-        const decls = [...(it.decls || []), ...[...(it.then || []), ...(it.else || [])].filter(x => x?.kind === 'decl').map(x => x.decl)];
-        declare(s, decls);
-        region(decls, s);
-        items(it.items, s);
-        items(it.then, s);
-        items(it.else, s);
+        // (an elsif chain, a case generate: each alternative in a scope of its own, in a loop, #3500)
+        for (const g of genChain(it)) {
+          const s = new Scope(scope, scope.file);
+          if (g.var) s.add(g.var, { cls: 'constant', decl: g });
+          const rest = g.elseChain ? [] : g.else || [];
+          const decls = [...(g.decls || []), ...[...(g.then || []), ...rest].filter(x => x?.kind === 'decl').map(x => x.decl)];
+          declare(s, decls);
+          region(decls, s);
+          items(g.items, s);
+          items(g.then, s);
+          items(rest, s);
+        }
       }
     }
   };

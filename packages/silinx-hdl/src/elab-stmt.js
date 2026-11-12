@@ -3,6 +3,7 @@
 import { SimError, bitpos } from './interp.js';
 import { TEXTIO_PROCS, bindExpr, bindTextio, boundFunction, hierResolve, notDeclared, pickOverload } from './elab-expr.js';
 import * as V from './values.js';
+import { walkItems } from './util.js';
 import {
   ElabError, INT, STR, Scope, bindDecl, bindLvalue, checkAssignable, containsKind, ctxSize, diag, evalRange, fitVal,
   lroot, packageScope, rangeCheck, readsOf, triggersOfReads, walk
@@ -205,8 +206,7 @@ function isScopeName(E, name) {
   for (let i = E.inst; i; i = i.parent) if (i.module === first || i.name === first) return true;
   if (E.sc.lookup(first)?.kind === 'gen' || E.sc.lookup(first)?.kind === 'genarr') return true;
   const insts = new Set();
-  const visit = items => { for (const it of items || []) { if (it.kind === 'instance') insts.add(it.name); visit(it.items); visit(it.then); visit(it.else); } };
-  visit(E.inst?.mod?.items);
+  walkItems(E.inst?.mod?.items, it => { if (it.kind === 'instance') insts.add(it.name); });
   return insts.has(first);
 }
 
