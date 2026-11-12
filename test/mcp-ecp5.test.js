@@ -74,6 +74,6 @@ test('run_process: blinky on the ULX3S to its .bit through nextpnr-ecp5 and ecpp
   assert.equal(summary.bit.size, 1927725);
   assert.deepEqual(summary.par.fmax.map(f => [f.clock, f.constraint]), [['clk', 25]]);
   assert.ok(summary.map.utilization.some(u => u.name === 'TRELLIS_COMB'));
-  // (no Map, timing report or simulation model of its own: the processes the interface does not offer for it)
-  await fails('run_process', { project: 'bi', process: 'timing' }, 'no step trce (the steps: synth, translate, par, bitgen)');
+  // (its timing nextpnr's, #2300: test/mcp-nextpnr-reports.test.js; no power estimate)
+  await fails('run_process', { project: 'bi', process: 'power' }, 'no step xpwr (the steps: synth, translate, par, trce, bitgen)');
 });

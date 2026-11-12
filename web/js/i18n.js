@@ -504,6 +504,8 @@ const PT_PATTERNS = [
   [/^the Silinx toolchain does not support the (\S+) family yet \(only the Spartan-3E (.+)\): use an ISE mode$/, 'a toolchain Silinx ainda não suporta a família $1 (só o Spartan-3E $2): use um modo ISE'],
   [/^Not met \((\d+) constraints\)$/, 'Não cumpridas ($1 restrições)'],
   [/^Not met \((\d+) failing endpoints\)$/, 'Não cumpridas ($1 terminais em falha)'],
+  // (a clock no constraint asks for, nextpnr's timing: #2300)
+  [/^([\d.]+) MHz \(([\d.]+) ns\) — no constraint$/, '$1 MHz ($2 ns) — sem restrição'],
   [/^Version (\d[\w.-]*)$/, 'Versão $1'],
   // schematic palette: "<SYMBOL>: <description>"
   [/^([A-Z][A-Z0-9_]*(?: [A-Z]+)?): (.+)$/, (m, a, b) => `${a}: ${t(b)}`],
@@ -543,6 +545,7 @@ Object.assign(PT, {
   'Device Utilization Summary (after synthesis)': 'Resumo da Utilização do Dispositivo (após a síntese)',
   'Timing (post Place & Route, Silinx toolchain estimate)': 'Temporização (após Posicionar e Encaminhar, estimativa da toolchain Silinx)',
   'Timing (post Place & Route, nextpnr\'s estimate: optimistic against Vivado)': 'Temporização (após Posicionar e Encaminhar, estimativa do nextpnr: otimista face ao Vivado)',
+  'Timing (post Place & Route, nextpnr\'s analysis)': 'Temporização (após Posicionar e Encaminhar, análise do nextpnr)',
   'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)', 'Routed Design (Trellis configuration)': 'Projeto Encaminhado (configuração Trellis)', 'Routed Design (nextpnr JSON)': 'Projeto Encaminhado (JSON do nextpnr)', 'Routed Design (FASM)': 'Projeto Encaminhado (FASM)',
   'Static Timing Report': 'Relatório de Temporização Estática',
   // AMD Vivado's reports (the 7-series, #1649)

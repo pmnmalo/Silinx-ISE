@@ -84,11 +84,11 @@ uiTest('#2302 an ECP5 project: its processes, its constraints LPF, Implement giv
   }, [prog, reports], { what: 'the Design Summary' });
   const en = await summary('Programming File', 'Detailed Reports');
   assert.deepEqual(en.prog, [['Bitstream', 'build/blinky.bit (1883 KB)']]);
-  assert.deepEqual(en.reports, [['Report Name', 'Status'], ['Synthesis Report (Yosys)', 'Current'], ['Routed Design (Trellis configuration)', 'Current']]);
+  assert.deepEqual(en.reports, [['Report Name', 'Status'], ['Synthesis Report (Yosys)', 'Current'], ['Routed Design (Trellis configuration)', 'Current'], ['Static Timing Report', 'Current']]);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
     const pt = await summary('Ficheiro de Programação', 'Relatórios Detalhados');
-    assert.deepEqual(pt.reports.slice(1).map((x) => x[0]), ['Relatório de Síntese (Yosys)', 'Projeto Encaminhado (configuração Trellis)']);
+    assert.deepEqual(pt.reports.slice(1).map((x) => x[0]), ['Relatório de Síntese (Yosys)', 'Projeto Encaminhado (configuração Trellis)', 'Relatório de Temporização Estática']);
   } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
 });
 

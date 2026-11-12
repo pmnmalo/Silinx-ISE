@@ -72,16 +72,16 @@ const PORTS = '.RESET(1\'b0), .RESET_P(1\'b0), .CLKFB(1\'b0), .FBDSEL(6\'b0), .I
 const PINS = 'IO_LOC "clk" 52;\nIO_LOC "led[0]" 10;\nIO_LOC "led[1]" 11;\n';
 const warnings = log => log.filter(l => /warning/i.test(l));
 
-test('a PLL clock faster than the design runs: Place & Route fails at its own frequency (378 MHz), not the input\'s 27 MHz', { timeout: 300000 }, async () => {
+test('a PLL clock faster than the design runs: checked at its own frequency (378 MHz), not the input\'s 27 MHz; not met, warned (#2300: no failure)', { timeout: 300000 }, async () => {
   const text = `module fastpll(input clk, output reg [1:0] led);\n  wire fast, lock;\n  rPLL #(.FCLKIN("27"), .IDIV_SEL(0), .FBDIV_SEL(13), .ODIV_SEL(2), .DEVICE("GW1NR-9C")) u (.CLKIN(clk), .CLKOUT(fast), .LOCK(lock), ${PORTS});\n`
     + '  reg [31:0] c = 0;\n  always @(posedge fast) begin c <= c + 1; led <= {lock, c[31]}; end\nendmodule\n';
   const { r, log } = await build('fastpll', text, `${PINS}// create_clock -name clk -period 37.037 [get_ports {clk}]\n`);
-  assert.equal(r.ok, false);
-  assert.equal(r.error, 'nextpnr-himbaechel-gowin failed: nextpnr exited with code 1');
-  // (nextpnr's own error, its period in picoseconds: 378.07 MHz)
-  assert.deepEqual(log.filter(l => /ERROR/.test(l)).map(l => l.replace(/[\d.]+ MHz \(/, 'N MHz (')),
-    ['ERROR:Silinx - nextpnr-himbaechel-gowin failed: nextpnr exited with code 1', '  ERROR: Max frequency for clock \'fast\': N MHz (FAIL at 378.07 MHz)']);
-  assert.deepEqual(warnings(log), []);
+  // (placed and routed again, allowed to fail: nextpnr's own warning, its period in picoseconds: 378.07 MHz; the Design Summary's
+  // timing not met)
+  assert.ok(r.ok, r.error);
+  assert.deepEqual(log.filter(l => /ERROR/.test(l)), []);
+  assert.deepEqual(warnings(log).map(l => l.replace(/[\d.]+ MHz \(/, 'N MHz (')), ['WARNING:Place - Max frequency for clock \'fast\': N MHz (FAIL at 378.07 MHz)']);
+  assert.deepEqual([r.report.timing.met, r.report.timing.constraints.map(c => [c.name, c.timingErrors])], [false, [['clock fast', 1]]]);
 });
 
 test('no clock in the CST: the design\'s clock reported with no constraint (not nextpnr\'s 12 MHz); no warnings', { timeout: 300000 }, async () => {

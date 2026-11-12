@@ -76,10 +76,15 @@ export function mountSummary(el) {
     // timing
     const tm = rep?.timing;
     if (tm) {
-      page.append(h('table', { class: 'summary-table' }, h('caption', {}, open ? (tm.model ? 'Timing (post Place & Route, nextpnr\'s estimate: optimistic against Vivado)' : 'Timing (post Place & Route, Silinx toolchain estimate)') : 'Timing (post Place & Route)'),
+      // (#2300: the iCE40's, the ECP5's and the Gowin's timing nextpnr's own analysis)
+      const timingCaption = !open ? 'Timing (post Place & Route)' : tm.model ? 'Timing (post Place & Route, nextpnr\'s estimate: optimistic against Vivado)'
+        : tm.engine === 'nextpnr' ? 'Timing (post Place & Route, nextpnr\'s analysis)' : 'Timing (post Place & Route, Silinx toolchain estimate)';
+      page.append(h('table', { class: 'summary-table' }, h('caption', {}, timingCaption),
         h('tr', {}, h('th', {}, 'Timing Constraints'), h('td', { class: tm.met === false ? 'status-bad' : 'status-good' }, tm.met === false ? (open ? `Not met (${tm.timingErrors} constraints)` : vivado ? `Not met (${tm.timingErrors} failing endpoints)` : `Not met (${tm.timingErrors} errors, score ${tm.score})`) : 'All constraints met')),
         tm.minPeriodNs ? h('tr', {}, h('th', {}, 'Minimum period'), h('td', {}, `${tm.minPeriodNs} ns (maximum frequency ${tm.maxFreqMHz} MHz)`)) : null,
-        ...(tm.constraints || []).map(c => h('tr', {}, h('th', {}, c.name), h('td', {}, `${c.constraint} — ${c.timingErrors ? `${c.timingErrors} errors` : 'met'}, ${c.minPeriodNs == null ? 'no path between flip-flops to time' : `${c.minPeriodNs} ns`}`)))));
+        ...(tm.constraints || []).map(c => h('tr', {}, h('th', {}, c.name), h('td', {}, `${c.constraint} — ${c.timingErrors ? `${c.timingErrors} errors` : 'met'}, ${c.minPeriodNs == null ? 'no path between flip-flops to time' : `${c.minPeriodNs} ns`}`))),
+        // (a clock no constraint asks for: nextpnr's, its frequency alone)
+        ...(tm.engine === 'nextpnr' ? tm.clocks || [] : []).filter(c => c.constraintMHz == null).map(c => h('tr', {}, h('th', {}, `clock ${c.clock}`), h('td', {}, `${c.maxFreqMHz} MHz (${c.minPeriodNs} ns) — no constraint`)))));
     }
     // Vivado's design rule check (report_drc): its rules found, or none
     const drc = vivado && rep?.drc;

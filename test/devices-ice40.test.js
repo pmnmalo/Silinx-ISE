@@ -41,7 +41,7 @@ test('the iCE40: a device valid with no speed grade, a package it does not have 
 
 test('the iCE40: Implement\'s chain, which asks for Map, is nextpnr\'s Place & Route', () => {
   assert.deepEqual(orderSteps(ICE40_STEPS, ['synth', 'translate', 'map']), ['synth', 'translate', 'par']);
-  assert.throws(() => orderSteps(ICE40_STEPS, ['trce']), /no step trce/);
+  assert.throws(() => orderSteps(ICE40_STEPS, ['xpwr']), /no step xpwr/);
 });
 
 // a netlist with no cells: what is checked is that nextpnr knows the part and its package

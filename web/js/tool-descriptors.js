@@ -117,6 +117,7 @@ const ICE40_STEPS = [
   step('synth', 'Synthesize - Yosys'),
   step('translate', 'Translate', ['synth']),
   step('par', 'Place & Route - nextpnr', ['translate']),
+  step('trce', 'Generate Post-Place & Route Static Timing', ['par']),
   step('bitgen', 'Generate Programming File - icepack', ['par']),
 ];
 // (the 7-series', open-flow-xc7.js XC7_STEPS, #3146)
@@ -131,12 +132,14 @@ const ECP5_STEPS = [
   step('synth', 'Synthesize - Yosys'),
   step('translate', 'Translate', ['synth']),
   step('par', 'Place & Route - nextpnr', ['translate']),
+  step('trce', 'Generate Post-Place & Route Static Timing', ['par']),
   step('bitgen', 'Generate Programming File - ecppack', ['par']),
 ];
 const GOWIN_STEPS = [
   step('synth', 'Synthesize - Yosys'),
   step('translate', 'Translate', ['synth']),
   step('par', 'Place & Route - nextpnr', ['translate']),
+  step('trce', 'Generate Post-Place & Route Static Timing', ['par']),
   step('bitgen', 'Generate Programming File - gowin_pack', ['par']),
 ];
 const withProducts = (steps, products) => steps.map(s => ({ ...s, produces: products[s.id] || [] }));
@@ -197,18 +200,19 @@ export const SILINX = {
 export const SILINX_ICE40 = {
   id: 'silinx-ice40', name: 'Silinx toolchain (iCE40)', open: true,
   steps: withProducts(ICE40_STEPS, {
-    synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.asc'], bitgen: ['{top}.bin'],
+    synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.asc', 'open/nextpnr-report.json'], trce: ['open/timing.txt', 'open/paths.json'], bitgen: ['{top}.bin'],
   }),
   reports: [
     { id: 'synthesis', label: 'Synthesis Report (Yosys)', step: 'synth', file: 'open/{top}_stat.txt' },
     { id: 'routed', label: 'Routed Design (ASC)', step: 'par', file: 'open/routed.asc' },
+    { id: 'timing', label: 'Static Timing Report', step: 'trce', file: 'open/timing.txt' },
   ],
   constraints: PCF,
   messages: LOG_MESSAGES,
   // (#2298: no JTAG chain and no PROM; the .bin written into the board's SPI flash: openFPGALoader in the local server, WebUSB
   // in the browser edition)
   program: { process: 'config', page: 'program-ice40', title: 'Program Flash', target: 'spi-flash', file: '{top}.bin' },
-  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
   tasks: LAB_TASKS,
 };
 
@@ -240,16 +244,17 @@ export const SILINX_XC7 = {
 export const SILINX_ECP5 = {
   id: 'silinx-ecp5', name: 'Silinx toolchain (ECP5)', open: true,
   steps: withProducts(ECP5_STEPS, {
-    synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.config'], bitgen: ['{top}.bit'],
+    synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.config', 'open/nextpnr-report.json'], trce: ['open/timing.txt', 'open/paths.json'], bitgen: ['{top}.bit'],
   }),
   reports: [
     { id: 'synthesis', label: 'Synthesis Report (Yosys)', step: 'synth', file: 'open/{top}_stat.txt' },
     { id: 'routed', label: 'Routed Design (Trellis configuration)', step: 'par', file: 'open/routed.config' },
+    { id: 'timing', label: 'Static Timing Report', step: 'trce', file: 'open/timing.txt' },
   ],
   constraints: LPF,
   messages: LOG_MESSAGES,
   program: null,
-  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE)
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE)
     .filter(n => n.part !== 'emulate'),
   tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
 };
@@ -259,15 +264,16 @@ export const SILINX_ECP5 = {
  *  has no emulator yet). */
 export const SILINX_GOWIN = {
   id: 'silinx-gowin', name: 'Silinx toolchain (Gowin)', open: true,
-  steps: withProducts(GOWIN_STEPS, { synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.json'], bitgen: ['{top}.fs'] }),
+  steps: withProducts(GOWIN_STEPS, { synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.json', 'open/nextpnr-report.json'], trce: ['open/timing.txt', 'open/paths.json'], bitgen: ['{top}.fs'] }),
   reports: [
     { id: 'synthesis', label: 'Synthesis Report (Yosys)', step: 'synth', file: 'open/{top}_stat.txt' },
     { id: 'routed', label: 'Routed Design (nextpnr JSON)', step: 'par', file: 'open/routed.json' },
+    { id: 'timing', label: 'Static Timing Report', step: 'trce', file: 'open/timing.txt' },
   ],
   constraints: CST,
   messages: LOG_MESSAGES,
   program: null,
-  tree: treeOf(['synth-open', 'map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE)
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE)
     .filter(n => n.part !== 'emulate'),
   tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
 };

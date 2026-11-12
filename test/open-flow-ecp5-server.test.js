@@ -19,7 +19,7 @@ test.after(() => fs.rmSync(config, { recursive: true, force: true }));
 test('openStatus: an ECP5 part is available, its speed in its name, with its steps; a part nextpnr-ecp5 does not have is not', () => {
   const st = openStatus(DEVICE);
   assert.deepEqual([st.available, st.part, st.device, st.graph, st.reason], [true, 'lfe5u-85f-6cabga381', 'lfe5u-85f', null, 'lfe5u-85f-6cabga381: nextpnr-ecp5 and ecppack']);
-  assert.deepEqual(st.steps, ['synth', 'translate', 'par', 'bitgen']);
+  assert.deepEqual(st.steps, ['synth', 'translate', 'par', 'trce', 'bitgen']);
   const bad = openStatus({ ...DEVICE, part: 'lfe5u-99f' });
   assert.equal(bad.available, false);
   assert.match(bad.reason, /^lfe5u-99f: not an ECP5 part of nextpnr-ecp5 \(lfe5u-12f, /);
@@ -29,10 +29,11 @@ test('openStatus: an ECP5 part is available, its speed in its name, with its ste
 
 test('openSteps: the ECP5\'s list, as the iCE40\'s', () => {
   const family = 'ecp5';
-  assert.deepEqual(openSteps(undefined, { family }), ['synth', 'translate', 'par', 'bitgen']);
+  assert.deepEqual(openSteps(undefined, { family }), ['synth', 'translate', 'par', 'trce', 'bitgen']);
   assert.deepEqual(openSteps(['map'], { family }), ['synth', 'translate', 'par']);
   assert.deepEqual(openSteps(['bitgen'], { family, synthUpToDate: true }), ['translate', 'par', 'bitgen']);
-  assert.throws(() => openSteps(['trce'], { family }), /no step trce/);
+  assert.deepEqual(openSteps(['trce'], { family }), ['synth', 'translate', 'par', 'trce']);   // (#2300: nextpnr's timing)
+  assert.throws(() => openSteps(['xpwr'], { family }), /no step xpwr/);
 });
 
 test('nextpnr-ecp5 downloaded on first use: its version and SHA-512 of package-lock.json, kept in its own folder', async () => {

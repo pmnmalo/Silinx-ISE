@@ -182,3 +182,37 @@ uiTest('#3176 Design Summary: the logic analyzer inserted at Implement, its prob
   await page.waitFor(() => window.SilinxApp.findDoc('summary') && /Silinx toolchain\)/.test(document.querySelector('.doc:not([hidden])')?.innerText || ''), [], { what: 'the summary' });
   assert.equal(await page.eval(() => document.querySelector('.summary-capture')), null);
 });
+
+// an iCE40 run's reports (#2300: nextpnr's own, open-flow-ice40.js, nextpnr-timing.js): nextpnr's resources, its timing (a clock
+// its PCF constrains, another no constraint asks for), its Static Timing Report among the reports
+const ICE40_REPORTS = JSON.stringify({ source: 'open', top: 'blinky', synthesis: { tool: 'Yosys', cells: 70, warnings: 0, errors: 0, utilization: [] },
+  map: { utilization: [['ICESTORM_LC', 29, 5280], ['SB_GB', 2, 8], ['SB_IO', 4, 39]].map(([name, used, total]) => ({ name, used, total, percent: Math.round((100 * used) / total) })), warnings: 0, errors: 0 },
+  par: { routed: true, unroutedSignals: 0, done: true, engine: 'nextpnr', fmax: [{ clock: 'clk', achieved: 79.74, constraint: 12 }, { clock: 'slow', achieved: 120.5, constraint: 12 }], constraintsMet: true },
+  timing: { met: true, timingErrors: 0, score: null, minPeriodNs: 12.541, maxFreqMHz: 79.74, engine: 'nextpnr',
+    clocks: [{ clock: 'clk', minPeriodNs: 12.541, maxFreqMHz: 79.74, constraintMHz: 12 }, { clock: 'slow', minPeriodNs: 8.299, maxFreqMHz: 120.5, constraintMHz: null }],
+    constraints: [{ name: 'clock clk', constraint: 'clk at 12 MHz (83.333 ns)', required: 83.333, constraintMHz: 12, minPeriodNs: 12.541, maxFreqMHz: 79.74, timingErrors: 0, slackNs: 70.792 }] },
+  bit: { path: 'build/blinky.bin', size: 104090 }, simModels: {}, files: { routed: 'build/open/routed.asc', timing: 'build/open/timing.txt', paths: 'build/open/paths.json' },
+  summary: { synthesized: true, mapped: true, routed: true, bitstream: true } });
+
+uiTest('#2300 Design Summary of an iCE40 run: nextpnr\'s resources, its timing (a clock constrained, one with none), its Static Timing Report; in Portuguese too', E, async (page) => {
+  await makeProject(env, { name: 'Ice40Sum', template: 'blinky', device: { family: 'ice40', part: 'ice40up5k', package: 'sg48', speed: '' }, synthTool: 'silinx' });
+  await writeWs(env, 'Ice40Sum', 'build/reports.json', ICE40_REPORTS);
+  await page.openProject('Ice40Sum');
+  const title = 'Timing (post Place & Route, nextpnr\'s analysis)';
+  await page.waitFor((x) => window.SilinxApp.findDoc('summary') && (document.querySelector('.doc:not([hidden])')?.innerText || '').includes(x), [title], { what: 'the summary\'s timing' });
+  assert.equal(await page.eval(CAPTION), 'Device Utilization Summary (Silinx toolchain)');
+  assert.deepEqual((await page.eval(ROWS)).slice(0, 3), [['ICESTORM_LC', '29', '5280', '1%', false], ['SB_GB', '2', '8', '25%', false], ['SB_IO', '4', '39', '10%', false]]);
+  assert.deepEqual(await page.eval(TABLE, title), [['Timing Constraints', 'All constraints met'], ['Minimum period', '12.541 ns (maximum frequency 79.74 MHz)'],
+    ['clock clk', 'clk at 12 MHz (83.333 ns) — met, 12.541 ns'], ['clock slow', '120.5 MHz (8.299 ns) — no constraint']]);
+  assert.deepEqual(await page.eval(TABLE, 'Detailed Reports'), [['Report Name', 'Status'], ['Synthesis Report (Yosys)', 'Current'], ['Routed Design (ASC)', 'Current'], ['Static Timing Report', 'Current']]);
+  await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
+  try {
+    const pt = 'Temporização (após Posicionar e Encaminhar, análise do nextpnr)';
+    await page.waitFor((x) => (document.querySelector('.doc:not([hidden])')?.innerText || '').includes(x), [pt], { what: 'the summary in Portuguese' });
+    const rows = await page.eval(TABLE, pt);
+    assert.deepEqual([rows[0], rows.at(-1)], [['Restrições de Temporização', 'Todas as restrições cumpridas'], ['clock slow', '120.5 MHz (8.299 ns) — sem restrição']]);
+    assert.ok((await page.eval(TABLE, 'Relatórios Detalhados')).some((r) => r[0] === 'Relatório de Temporização Estática'));
+  } finally {
+    await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+  }
+});

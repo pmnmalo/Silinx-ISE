@@ -5,6 +5,8 @@
 import { scriptSynthesis } from './synth-script.js';
 import { LPF } from './lpf.js';
 import { portBits, nextpnrNames } from './nextpnr-ports.js';
+import { mountNextpnrTiming } from './nextpnr-timing.js';
+import { askedClocks } from './open-flow-ice40.js';
 
 /** The ECP5's parts as nextpnr-ecp5 names them (its --<part> option), by Lattice's names: lfe5u-85f -> 85k, lfe5um5g-45f -> um5g-45k. */
 export const ECP5_PARTS = { 'lfe5u-12f': '12k', 'lfe5u-25f': '25k', 'lfe5u-45f': '45k', 'lfe5u-85f': '85k',
@@ -15,6 +17,7 @@ export const ECP5_STEPS = [
   { id: 'synth', label: 'Synthesize - Yosys', needs: [] },
   { id: 'translate', label: 'Translate', needs: ['synth'] },
   { id: 'par', label: 'Place & Route - nextpnr', needs: ['translate'] },
+  { id: 'trce', label: 'Generate Post-Place & Route Static Timing', needs: ['par'] },
   { id: 'bitgen', label: 'Generate Programming File - ecppack', needs: ['par'] },
 ];
 
@@ -38,6 +41,7 @@ const speedOf = spec => String(spec.speed || '').replace(/^-/, '') || '6';
 function mountEcp5(ctx) {
   const { io, spec, log, report, top, ms, now, constraints, netlistText, StepError } = ctx;
   const device = String(spec.device || '').toLowerCase();
+  const timing = mountNextpnrTiming(ctx, { tool: 'nextpnr-ecp5', clockName });
   let config = null;
   const configOrEarlier = () => {
     if (config == null) config = io.read('open/routed.config');
@@ -58,7 +62,7 @@ function mountEcp5(ctx) {
     const free = bits.map(b => b.name).filter(p => !pins[p]?.loc);
     for (const p of free) log(`WARNING:Place - the port ${p} has no pin (LOCATE in the LPF): nextpnr places it anywhere.`);
     const args = [`--${ECP5_PARTS[device]}`, ...(spec.pkg ? ['--package', String(spec.pkg).toUpperCase()] : []), '--speed', speedOf(spec),
-      '--json', 'netlist.json', '--textcfg', 'routed.config', '--report', 'report.json', '--seed', String(spec.seed || 1),
+      '--json', 'netlist.json', '--textcfg', 'routed.config', '--report', 'report.json', '--seed', String(spec.seed || 1), '--timing-allow-fail',
       ...(lpf ? ['--lpf', 'design.lpf'] : []), ...(free.length ? ['--lpf-allow-unconstrained'] : [])];
     const nextpnr = tool(), lines = [];
     let out;
@@ -78,6 +82,7 @@ function mountEcp5(ctx) {
     const fmax = Object.entries(r.fmax || {}).map(([clock, f]) => ({ clock: clockName(clock), achieved: +f.achieved.toFixed(2), constraint: +f.constraint.toFixed(2) }));
     for (const f of fmax) log(`Clock ${f.clock}: ${f.achieved} MHz (${f.achieved >= f.constraint ? 'met' : 'NOT met'}, ${f.constraint} MHz asked)`);
     report.par = { routed: true, unroutedSignals: 0, done: true, engine: 'nextpnr', fmax, constraintsMet: fmax.every(f => f.achieved >= f.constraint) };
+    timing.record(r, askedClocks(fmax, (read?.clocks || []).map(c => c.net)));
     log(`Placed and routed by nextpnr-ecp5 in ${ms(t)}: ${report.files.routed}`);
   }
 
@@ -87,7 +92,7 @@ function mountEcp5(ctx) {
     log(`Bitstream: build/${top}.bit (${bytes.length} bytes, ecppack)`);
   }
 
-  return { steps: { translate: ctx.readNetlist, par: runPar, bitgen: runBitgen } };
+  return { steps: { translate: ctx.readNetlist, par: runPar, trce: timing.runTiming, bitgen: runBitgen } };
 }
 
 export const ECP5 = {

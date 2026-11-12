@@ -48,12 +48,14 @@ test('#2311 the Silinx toolchain: ISE\'s tree without the open synthesis, Synthe
 
 test('#2302 the ECP5: the iCE40\'s tree without Emulate and Configure Target Device; its steps, reports, LPF, nothing to program', () => {
   const t = built(SILINX_ECP5);
-  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: [] }] }, 'bitgen']);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen']);
   assert.equal(toolOf({ part: 'lfe5u-85f' }, true), SILINX_ECP5);
   assert.equal(toolOf({ part: 'lfe5um5g-45f' }, false), ISE, 'a choice of the interface: the device makes the open mode (processes.js openMode)');
   assert.deepEqual(SILINX_ECP5.steps.map(({ produces, ...s }) => s), ECP5_STEPS);
   assert.deepEqual(SILINX_ECP5.steps.find(s => s.id === 'bitgen').produces, ['{top}.bit']);
-  assert.deepEqual(SILINX_ECP5.steps.find(s => s.id === 'par').produces, ['open/routed.config']);
+  assert.deepEqual(SILINX_ECP5.steps.find(s => s.id === 'par').produces, ['open/routed.config', 'open/nextpnr-report.json']);
+  assert.deepEqual(SILINX_ECP5.steps.find(s => s.id === 'trce').produces, ['open/timing.txt', 'open/paths.json']);   // (#2300: nextpnr's timing)
+  assert.deepEqual(SILINX_ECP5.reports.map(r => r.id), ['synthesis', 'routed', 'timing']);
   assert.ok(read('packages/silinx-fpga/src/open-flow-ecp5.js').includes("io.write('open/routed.config'"));
   for (const r of SILINX_ECP5.reports) assert.ok(SILINX_ECP5.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
   assert.deepEqual(SILINX_ECP5.constraints, { format: 'lpf', ext: '.lpf', label: 'LPF' });
@@ -65,11 +67,13 @@ test('#2302 the ECP5: the iCE40\'s tree without Emulate and Configure Target Dev
 
 test('#2303 the Gowin: the ECP5\'s tree; its steps (gowin_pack\'s .fs), reports, CST', () => {
   const t = built(SILINX_GOWIN);
-  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: [] }] }, 'bitgen']);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen']);
   assert.equal(toolOf({ part: 'gw1nr-9c' }, true), SILINX_GOWIN);
   assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'bitgen').produces, ['{top}.fs']);
   assert.deepEqual(SILINX_GOWIN.steps.map(({ produces, ...s }) => s), GOWIN_STEPS);
-  assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'par').produces, ['open/routed.json']);
+  assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'par').produces, ['open/routed.json', 'open/nextpnr-report.json']);
+  assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'trce').produces, ['open/timing.txt', 'open/paths.json']);
+  assert.deepEqual(SILINX_GOWIN.reports.map(r => r.id), ['synthesis', 'routed', 'timing']);
   assert.ok(read('packages/silinx-fpga/src/open-flow-gowin.js').includes("io.write('open/routed.json'"));
   for (const r of SILINX_GOWIN.reports) assert.ok(SILINX_GOWIN.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
   assert.deepEqual(SILINX_GOWIN.constraints, { format: 'cst', ext: '.cst', label: 'CST' });
@@ -80,7 +84,7 @@ test('#2303 the Gowin: the ECP5\'s tree; its steps (gowin_pack\'s .fs), reports,
 test('#2311 the iCE40: what it does not have is absent, not disabled', () => {
   const t = built(SILINX_ICE40);
   assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] },
-    { impl: [{ translate: [] }, { par: [] }] }, 'bitgen', 'emulate', { config: ['impact'] }]);
+    { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', 'emulate', { config: ['impact'] }]);
   for (const id of ids(t)) assert.equal(find(t, id).disabled, undefined, id);
   assert.equal(find(t, 'synth').label, 'Synthesize - Yosys');
   assert.equal(find(t, 'par').label, 'Place & Route');
@@ -161,7 +165,8 @@ test('#2311 each descriptor\'s reports: of a step it has, a file that step produ
     }
   }
   assert.deepEqual(ISE.reports.map(r => r.file), ['{top}.syr', '{top}_map.mrp', '{top}.par', '{top}.twr']);
-  assert.ok(!SILINX_ICE40.reports.some(r => r.id === 'timing'));   // (nextpnr's report gives the timing)
+  // (#2300: nextpnr's timing, its report's clocks and critical paths, as the Static Timing Report)
+  assert.deepEqual(SILINX_ICE40.reports.find(r => r.id === 'timing'), { id: 'timing', label: 'Static Timing Report', step: 'trce', file: 'open/timing.txt' });
 });
 
 test('#2311 each descriptor\'s constraints: UCF, or PCF on the iCE40, as a new project of its device', async () => {
