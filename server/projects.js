@@ -62,17 +62,22 @@ export class HttpError extends Error {
 // other error as it is
 const fsHttpError = async (e, dir, full) => { const f = await fsFailure(e, dir, full); return f ? new HttpError(f.status, f.message) : e; };
 
+// (the name's rule keeps the folder in the workspace; the check after it says so where CodeQL's js/path-injection sees
+// it, as safeJoin's: a resolved path that starts with its root's, #3648)
 export function projectDir(name) {
   const bad = projectNameError(name);
   if (bad) throw new HttpError(400, bad);
-  return path.join(workspaceDir(), name);
+  const ws = path.resolve(workspaceDir()), dir = path.resolve(ws, name);
+  if (!dir.startsWith(ws + path.sep)) throw new HttpError(400, `invalid project name '${name}'`);
+  return dir;
 }
 
 // Resolve a project-relative path, refusing anything that escapes the project folder (by a symbolic link too, #1234).
 export function safeJoin(dir, rel) {
   if (!rel || typeof rel !== 'string') throw new HttpError(400, 'missing path');
-  const full = path.resolve(dir, rel);
-  if (!within(dir, full)) throw new HttpError(400, 'path escapes project');
+  const root = path.resolve(dir), full = path.resolve(root, rel);
+  if (full === root) return root;
+  if (!full.startsWith(root + path.sep) || !within(dir, full)) throw new HttpError(400, 'path escapes project');
   return full;
 }
 
@@ -355,7 +360,7 @@ export async function deleteProject(name) {
   if (!await exists(dir)) throw new HttpError(404, 'not found');
   const trash = path.join(workspaceDir(), '.trash');
   await fs.mkdir(trash, { recursive: true });
-  await fs.rename(dir, path.join(trash, `${name}-${Date.now()}`));
+  await fs.rename(dir, path.join(trash, `${path.basename(dir)}-${Date.now()}`));
   await fs.rm(trustMarks(dir)[1], { force: true });   // (the workspace repository's mark, #2830)
 }
 
@@ -524,7 +529,7 @@ export async function deleteFile(name, rel, { trash = false, mustExist = false }
     const there = await fs.lstat(full).then(() => true, () => false);
     if (mustExist && !there) throw new HttpError(404, `no file or folder '${key}' in the project '${name}'`);
     try {
-      if (trash && there) trashed = await toTrash(name, full, key);
+      if (trash && there) trashed = await toTrash(dir, full, key);
       else await fs.rm(full, { recursive: true, force: true });
     } catch (e) { throw await fsHttpError(e, dir, full); }
     const pj = await readProject(name);
@@ -539,9 +544,9 @@ export async function deleteFile(name, rel, { trash = false, mustExist = false }
   return { trashed };
 }
 // a project's file or folder into the workspace's .trash, at .trash/<project>-<time>/<its path> -> that path (the
-// workspace's, with '/')
-async function toTrash(name, full, key) {
-  const trash = path.join(workspaceDir(), '.trash'), stamp = `${name}-${Date.now()}`;
+// workspace's, with '/'); dir: the project's folder (projectDir's)
+async function toTrash(dir, full, key) {
+  const trash = path.join(workspaceDir(), '.trash'), stamp = `${path.basename(dir)}-${Date.now()}`;
   let base = path.join(trash, stamp);
   for (let i = 2; await exists(base); i++) base = path.join(trash, `${stamp}-${i}`);
   const at = path.join(base, ...key.split('/'));
