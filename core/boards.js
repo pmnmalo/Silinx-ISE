@@ -318,10 +318,14 @@ export const BOARDS = [
     resources: [
       { name: 'clk', label: '100 MHz oscillator', pins: ['V10'], dir: 'in', iostandard: 'LVCMOS33', group: 'Clock', extra: { period: '10 ns' } },
       { name: 'led', label: 'LEDs LED0..LED7', pins: ['P15', 'P16', 'N15', 'N16', 'U17', 'U18', 'T17', 'T18'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: 'LEDs', extra: { activeHigh: true } },
-      { name: 'dip', label: 'DIP switches DPSwitch0..7', pins: ['C17', 'C18', 'D17', 'D18', 'E18', 'E16', 'F18', 'F17'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Switches' },
-      { name: 'btn', label: 'Push buttons Switch0..5', pins: ['M18', 'L18', 'M16', 'L17', 'K17', 'K18'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Buttons' },
-      { name: 'seg', label: '7-segment segments SevenSegment[0..7] (Numato UCF order)', pins: ['A5', 'C6', 'D6', 'C5', 'C4', 'A4', 'B4', 'A3'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: '7-segment' },
-      { name: 'seg_en', label: '7-segment digit enables SevenSegmentEnable[0..2]', pins: ['B2', 'A2', 'B3'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: '7-segment' },
+      // (the DIP switches and the buttons pull up: ON / pressed reads 0, Numato's demo; #3709)
+      { name: 'sw', label: 'DIP switches DPSwitch0..7 (active low: ON reads 0)', pins: ['C17', 'C18', 'D17', 'D18', 'E18', 'E16', 'F18', 'F17'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Switches', extra: { activeLow: true } },
+      { name: 'btn', label: 'Push buttons Switch0..5 (active low)', pins: ['M18', 'L18', 'M16', 'L17', 'K17', 'K18'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Buttons', extra: { activeLow: true } },
+      // the display (3 digits, common anode, all active low): Numato's SevenSegment[7..1] are a..g, [0] the decimal point
+      // (its demo's "abcdefgh"), SevenSegmentEnable[0..2] the digits; as the other boards' seg (CA..CG), dp and an (#3709)
+      { name: 'seg', label: '7-segment segments a..g SevenSegment[7..1] (active low)', pins: ['A3', 'B4', 'A4', 'C4', 'C5', 'D6', 'C6'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: '7-segment', extra: { activeLow: true } },
+      { name: 'dp', label: '7-segment decimal point SevenSegment[0] (active low)', pins: ['A5'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: '7-segment', extra: { activeLow: true } },
+      { name: 'an', label: '7-segment digit enables SevenSegmentEnable[0..2] (active low)', pins: ['B2', 'A2', 'B3'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: '7-segment', extra: { activeLow: true } },
       { name: 'audio', label: 'Audio out Audio1, Audio2', pins: ['B16', 'A16'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: 'Audio' },
       { name: 'vga_red', label: 'VGA red Red[0..2]', pins: ['A9', 'B9', 'C9'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: 'VGA' },
       { name: 'vga_green', label: 'VGA green Green[0..2]', pins: ['C10', 'A10', 'C11'], dir: 'out', iostandard: 'LVCMOS33', drive: 8, slew: 'fast', group: 'VGA' },
