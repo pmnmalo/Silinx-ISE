@@ -12,7 +12,7 @@ import {
   enumChar, evalRange, fold, locNode, newSignal, packageScope, probeCtx, scalarBounds, stdTypeName, strVec, vecT,
 } from './elaborate.js';
 import { bindBuiltin, bindCall, bindVlogCall, positional } from './elab-call.js';
-export { BUILTIN_SUBPROGRAMS, TEXTIO_PROCS, bindTextio, boundFunction, pickOverload, positional } from './elab-call.js';
+export { BUILTIN_SUBPROGRAMS, TEXTIO_PROCS, bindTextio, boundFunction, checkCallNesting, pickOverload, positional } from './elab-call.js';
 
 const ARITH = new Set(['+', '-', '*', '/', '%', 'mod', 'rem', '**']);
 const BITWISE = new Set(['&', '|', '^', '~^', 'nand', 'nor']);

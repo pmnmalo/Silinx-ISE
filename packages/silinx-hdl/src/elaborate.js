@@ -210,9 +210,11 @@ export function elaborate(lib, topName, opts = {}) {
 }
 
 export function diag(E, msg, loc, sev = 'error', tool) {
+  // (a location of another file: a call nested too deep in a function of a package, #3508)
+  const file = loc?.file || E.file;
   // (an expression without a location, as a call in a declaration's range: the declaration's, #16)
   if (!loc?.line) loc = E.at || loc;
-  E.ctx.design.diags.push({ file: E.file, line: loc?.line || 1, col: loc?.col || 1, severity: sev, message: msg, ...(tool ? { tool } : {}) });
+  E.ctx.design.diags.push({ file, line: loc?.line || 1, col: loc?.col || 1, severity: sev, message: msg, ...(tool ? { tool } : {}) });
 }
 
 // ---------------------------------------------------------------- scopes for packages

@@ -1,7 +1,7 @@
 // Silinx elaboration - statements (#405: out of core/elaborate.js): sequential statements bound (assignments, if,
 // case, loops, waits, calls of procedures and tasks, their triggers), VHDL's delay mechanisms and dynamic ranges.
 import { SimError, bitpos } from './interp.js';
-import { TEXTIO_PROCS, bindExpr, bindTextio, boundFunction, hierResolve, notDeclared, pickOverload } from './elab-expr.js';
+import { TEXTIO_PROCS, bindExpr, bindTextio, boundFunction, checkCallNesting, hierResolve, notDeclared, pickOverload } from './elab-expr.js';
 import * as V from './values.js';
 import { walkItems } from './util.js';
 import {
@@ -26,6 +26,7 @@ function bindStmt(E, s, ploc) {
 // a statement that does not bind: its error reported, a null statement in its place
 function stmtError(E, e, loc) {
   if (!(e instanceof ElabError) && !(e instanceof SimError)) throw e;
+  if (e.callNesting && E.inFunction) throw e;   // (reported once, by the outermost call's statement, #3508)
   if (e.hier && E.deferred && !E.deferred.done && !E.inFunction) throw e;   // (the whole item is elaborated again later)
   diag(E, e.message, e.loc || loc);
   return { k: 'null', loc };
@@ -293,6 +294,7 @@ function bindCallStmt(E, s, loc) {
       (sigActuals ||= [])[k] = { rv, lv };
     });
   }
+  checkCallNesting(E, loc);
   const fn = boundFunction(entry, s.args.map((a, k) => args[k] || bindLvalue(E, a, loc)), loc, sigActuals);
   const outTargets = s.args.map((a, k) => (decl.params[k] && decl.params[k].dir !== 'in' && !sigActuals?.[k] ? bindLvalue(E, a, loc) : null));
   if (sigActuals) args.forEach((_, k) => { if (sigActuals[k]) args[k] = null; });

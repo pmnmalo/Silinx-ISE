@@ -2,8 +2,8 @@
 // parsers, the binder, the simulator, the design checks, the synthesis input, the translation: each recursed once per
 // branch, the chain nesting in else). Check Syntax (the design checks too) with no warnings; the simulation the same
 // as a short equivalent design's, from its first branches and across its last ones into else; the synthesis input
-// (an else if chain, as one); the translation, simulated again; an elaboration that throws a design error, not
-// thrown out of simulate.
+// (an else if chain, as one); the translation, simulated again; a constant of thousands of chained functions a design
+// error of simulate (#3508), not thrown.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate, simulate } from '../core/compile.js';
@@ -12,6 +12,7 @@ import { parse as parseVhdl } from '../core/vhdl/parser.js';
 import { parse as parseVerilog } from '../core/verilog/parser.js';
 import { synthesisInput } from '../core/synth-front.js';
 import { translateSource } from '../core/translate.js';
+import { CALL_NESTING_MESSAGE, MAX_CALL_NESTING } from '../packages/silinx-hdl/src/util.js';
 
 const N = 20000;
 const val = i => (i * 3) % 1000;   // (the value of branch i)
@@ -204,13 +205,15 @@ test('#2577 Verilog: an error in an else if\'s condition makes that else if a nu
   assert.deepEqual([s.kind, s.else.kind], ['if', 'null']);
 });
 
-// (an expression of 20 000 terms no longer throws, #3375, nor one nested 4000 levels deep, the parser's error, #3395: a
-// constant of 20 000 functions, each calling the next, does)
-test('#2577 an elaboration that throws (a constant of 20 000 functions, each calling the next) is a design error of simulate, not thrown', () => {
+// (an expression of 20 000 terms no longer throws, #3375, nor one nested 4000 levels deep, the parser's error, #3395, nor a
+// constant of 20 000 functions, each calling the next: calls nested past MAX_CALL_NESTING are an error at the call past
+// the limit, #3508)
+test('#2577 #3508 a constant of 20 000 functions, each calling the next: simulate\'s design error at the call past the limit, not thrown', () => {
   const n = 20000;
   const fns = Array.from({ length: n }, (_, i) => `function integer f${i}(input integer x); f${i} = ${i < n - 1 ? `f${i + 1}(x) + 1` : 'x'}; endfunction`);
   const text = `module t;\n${fns.join('\n')}\nlocalparam P = f0(1);\ninitial $display("%0d", P);\nendmodule\n`;
   const r = simulate([{ path: 't.v', text }], 't');
   assert.equal(r.sim, null);
-  assert.deepEqual(r.errors.map(e => `${e.file}:${e.line} ${e.severity}: ${e.message}`), ["t.v:1 error: internal error elaborating 't': Maximum call stack size exceeded"]);
+  // (f63's call of f64, on line 65; the constant then not declared where it is written)
+  assert.deepEqual(r.errors.map(e => `${e.file}:${e.line} ${e.severity}: ${e.message}`), [`t.v:${MAX_CALL_NESTING + 1} error: ${CALL_NESTING_MESSAGE}`, `t.v:${n + 3} error: 'P' is not declared`]);
 });
