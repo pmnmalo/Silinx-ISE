@@ -34,7 +34,8 @@ export const UNIT_TESTS = /^(?:test|packages\/silinx-fpga\/test)\/[^/]+\.test\.j
 export const HEAVY = [
   'packages/silinx-fpga/test/nextpnr-engine.test.js', 'packages/silinx-fpga/test/nextpnr-hard.test.js',
   'test/blockram-flow.test.js', 'test/carry-chain.test.js', 'test/carry-select.test.js', 'test/clocking-flow.test.js',
-  'test/examples-nextpnr-s3e.test.js', 'test/examples-nextpnr-s6.test.js', 'test/examples.test.js', 'test/lut-resynth.test.js',
+  'test/examples-nextpnr-s3e.test.js', 'test/examples-nextpnr-s6-pack-atlys.test.js', 'test/examples-nextpnr-s6-pack.test.js',
+  'test/examples-nextpnr-s6.test.js', 'test/examples.test.js', 'test/lut-resynth.test.js',
   'test/nextpnr-size.test.js', 'test/open-flow-clocks.test.js', 'test/open-flow-core.test.js', 'test/open-flow-features.test.js',
   'test/open-flow-io.test.js', 'test/s6-place.test.js', 'test/sim-model-examples.test.js', 'test/sim-model-impl.test.js',
   'test/sim-model-par-examples.test.js', 'test/sim-model-par-micro80.test.js', 'test/sim-model-par-vga-verilog.test.js',
