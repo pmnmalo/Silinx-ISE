@@ -1,6 +1,6 @@
 // UI: the Board Emulator on the 7-series' boards (#3704): a Basys 3 project has Emulate on Board in its processes (its RTL
 // model only: the flow makes no simulation model), the Silinx toolbar's Emulate and the Tasks interface's Emulate task; the
-// emulator opens on the board's generic rows of parts (no drawing of the Basys 3 yet), its pins the XDC's, and reacts: the
+// emulator opens on the board drawn as the real one (#3706), its pins the XDC's, and reacts: the
 // switches and the centre button drive the LEDs, SW0 the digit. In Portuguese; both interfaces and the Tasks interface. Its warnings Check Syntax's only.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -52,25 +52,22 @@ async function basys3(page, name) {
 /** The emulator running, and reacting: SW0 and SW2 on, BTNC held; then all released. */
 async function reacts(page) {
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'emulator running' });
-  // the generic rows of parts: the board's name, 4 digits, 16 LEDs, 16 switches, 5 buttons; its clock the XDC's
+  // the Basys 3 drawn as the real board (#3706): its name, 4 digits, 16 LEDs, 16 switches, 5 buttons; its clock the XDC's
   assert.deepEqual(await page.eval(() => {
-    const b = document.querySelector('.doc:not([hidden]) .emu-board');
-    return [b?.querySelector('h3').textContent, !!document.querySelector('.doc:not([hidden]) .emu-pcb'), ...['svg[viewBox="0 0 44 64"]', '.emu-led', '.emu-sw', '.emu-btn'].map((s) => b.querySelectorAll(s).length)];
-  }), ['Digilent Basys 3 — emu7', false, 4, 16, 16, 5]);
-  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-board').textContent), /Clock clk: 100 MHz on the board/);
+    const b = document.querySelector('.doc:not([hidden]) .emu-board-wrap');
+    return [b?.querySelector('.emu-board-note [data-no-i18n]').textContent, !!b.querySelector('.emu-pcb'), ...['svg[viewBox="0 0 44 64"]', '.emu-led', '.emu-sw', '.emu-btn'].map((s) => b.querySelectorAll(s).length)];
+  }), ['Digilent Basys 3 — emu7', true, 4, 16, 16, 5]);
+  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-board-note').textContent), /Clock clk: 100 MHz on the board/);
   await settled(page, { leds: LEDS(), digit: ZERO }, 'at rest');
-  // (the rows from the left: SW15..SW0, BTN4..BTN0: each marked for the pointer, its k-th from the left)
-  const click = async (k, part, opts) => {
-    await page.eval((kk, p) => document.querySelectorAll(`.doc:not([hidden]) .emu-board .${p}`)[kk].setAttribute('data-t', `${p}-${kk}`), k, part);
-    await page.click(`[data-t="${part}-${k}"]`, opts?.shift ? { modifiers: 8 } : {});
-  };
-  await click(15, 'emu-sw');
+  // (the parts by their names on the board: sw0, btn0 = BTNC)
+  const click = (part, opts) => page.click(`.doc:not([hidden]) [data-part="${part}"] > *`, opts?.shift ? { modifiers: 8 } : {});
+  await click('sw0');
   await settled(page, { leds: LEDS(0), digit: ONE }, 'SW0 on: LD0, the digit 1');
-  await click(13, 'emu-sw');
+  await click('sw2');
   await settled(page, { leds: LEDS(0, 2), digit: ONE }, 'SW2 on: LD2');
-  await click(4, 'emu-btn', { shift: true });
+  await click('btn0', { shift: true });
   await settled(page, { leds: LEDS(0, 2, 4), digit: ONE }, 'BTNC held: LD4');
-  await click(15, 'emu-sw');
+  await click('sw0');
   await settled(page, { leds: LEDS(2, 4), digit: ZERO }, 'SW0 off: the digit 0');
 }
 
