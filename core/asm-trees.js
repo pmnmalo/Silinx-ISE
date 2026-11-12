@@ -3,6 +3,7 @@
 // resolved, their case labels, the last assignment on each path.
 import { atLine, fail, lit, stmtList } from './asm-hdl-util.js';
 import { exprToString, parseCaseChoices } from './asm.js';
+import { MAX_NESTING } from './util.js';
 import {
   asmIsBool, condKey, condNegKey, conv, simpLogical
 } from './asm-from-hdl.js';
@@ -12,6 +13,20 @@ import {
 // ---------------------------------------------------------------------------------------
 // Tree: { k: 'act', acts, next } | { k: 'if', cond, t, f } | { k: 'leaf' }
 // act item: { goto: stateKey | '@self' } or { target, ast, prefix? }
+// The trees are graphs (#3582): the statements after an `if` or a `case` are one subtree, shared by its branches, so n
+// sequential ifs make n decisions, not 2^n; every walk below takes a shared subtree once (memo by node), and keeps the
+// nodes it does not change, so that what is shared stays shared.
+
+// A branch built before the subtree of the statements after it (the first branch: the errors come in the statements'
+// order) ends at a hole, filled with that subtree once it is built. place(obj, key, node): obj[key] = node, the hole's
+// places noted.
+const hole = () => ({ k: 'hole', sites: [] });
+function place(obj, key, node) {
+  obj[key] = node;
+  if (node.k === 'hole') node.sites.push([obj, key]);
+  return obj;
+}
+const fill = (h, node) => { for (const [obj, key] of h.sites) place(obj, key, node); };
 
 // VHDL evaluates `unsigned + natural`, shifts and `not` at the width of their vector operands,
 // while the chart (like Verilog) evaluates them at the width of their context, and unsized
@@ -178,18 +193,25 @@ export function makeTreeBuilder(A) {
     if (A.lang === 'vhdl' && r.ast.w != null && r.ast.w !== w) return null;
     return r.ast.v;
   };
-  // items: [{ values: [BigInt], body: [stmt] }]; others: [stmt] | null
-  const caseItems = (subj, items, others, rest, ctx) => {
+  // items: [{ values: [BigInt], body: [stmt] }]; others: [stmt] | null; each branch then rest (one subtree), then tail
+  const caseItems = (subj, items, others, rest, ctx, tail) => {
     const seen = new Set();
     for (const it of items) for (const v of it.values) { if (seen.has(v)) return null; seen.add(v); }
     const full = subj.w <= 16 && seen.size === 2 ** subj.w;
-    const branches = items.map((it) => ({ values: it.values, sub: toTree([...it.body, ...rest], ctx) }));
+    const arms = items.map((it) => ({ values: it.values, body: it.body }));
     // (an others arm with statements is kept even when the values are all listed)
-    if (!full || (others && others.length)) branches.push({ values: null, sub: toTree([...(others || []), ...rest], ctx) });
+    if (!full || (others && others.length)) arms.push({ values: null, body: others || [] });
+    const h = hole();
+    let after = h;
+    const branches = arms.map((arm, i) => {
+      const br = place({ values: arm.values, sub: null }, 'sub', toTree(arm.body, ctx, after));
+      if (i === 0) { after = toTree(rest, ctx, tail); fill(h, after); }
+      return br;
+    });
     return { k: 'case', expr: subj.ast, w: subj.w, branches };
   };
   // HDL `case` on an input/register (or a selection of one) with constant choices -> case box
-  const caseStmtTree = (st, rest, ctx) => {
+  const caseStmtTree = (st, rest, ctx, tail) => {
     const subj = caseSubject(st.expr, st.loc);
     if (!subj) return null;
     const items = [];
@@ -198,7 +220,7 @@ export function makeTreeBuilder(A) {
       if (!values.length || values.some((v) => v == null)) return null;
       items.push({ values, body: stmtList(it.body) });
     }
-    return caseItems(subj, items, st.default ? stmtList(st.default) : null, rest, ctx);
+    return caseItems(subj, items, st.default ? stmtList(st.default) : null, rest, ctx, tail);
   };
   // `x = v1 or x = v2 ...` on the same multi-bit selection (VHDL case boxes on a slice are
   // generated as if/elsif chains): { subj, values } or null
@@ -220,7 +242,7 @@ export function makeTreeBuilder(A) {
     if (values.some((v) => v >= 1n << BigInt(w)) || !A.caseExprs?.has(exprToString(subj))) return null;
     return { subj: { ast: subj, w }, values };
   };
-  const sliceChainTree = (st, rest, ctx) => {
+  const sliceChainTree = (st, rest, ctx, tail) => {
     if (A.lang !== 'vhdl') return null;
     const first = sliceTest(st.cond, st.loc);
     if (!first) return null;
@@ -233,33 +255,48 @@ export function makeTreeBuilder(A) {
       items.push({ values: t.values, body: stmtList(others[0].then) });
       others = stmtList(others[0].else);
     }
-    return caseItems(first.subj, items, others, rest, ctx);
+    return caseItems(first.subj, items, others, rest, ctx, tail);
   };
-  const toTree = (list, ctx) => {
+  // The decisions (if, case) on a path of a state's statements, one after the other or nested: at most MAX_NESTING (the
+  // walks of the tree recurse along a path)
+  let decisions = 0;
+  const decision = (st, f) => {
+    if (++decisions > MAX_NESTING) {
+      fail(`${st.kind} statement${atLine(st.loc)}: more than ${MAX_NESTING} decisions on a path of a state (if and case statements one after the other or nested), too many for a chart`);
+    }
+    try { return f(); } finally { decisions--; }
+  };
+  // the tree of a list of statements, then tail (where the list ends: what follows it)
+  const toTree = (list, ctx, tail = { k: 'leaf' }) => {
     list = stmtList(list);
     const acts = [];
-    const withActs = (node) => (acts.length ? { k: 'act', acts, next: node } : node);
+    const withActs = (node) => (acts.length ? place({ k: 'act', acts, next: null }, 'next', node) : node);
     for (let i = 0; i < list.length; i++) {
       const st = list[i];
       if (st.kind === 'assign') { acts.push(action(st, ctx)); continue; }
       if (st.kind === 'case') {
-        const node = caseStmtTree(st, list.slice(i + 1), ctx);
+        const node = decision(st, () => caseStmtTree(st, list.slice(i + 1), ctx, tail));
         if (node) return withActs(node);
         list = [...list.slice(0, i), ...caseChain(st), ...list.slice(i + 1)]; i--; continue;
       }
       if (st.kind === 'if') {
         const ba = boolAssign(st, ctx);
         if (ba) { acts.push(ba); continue; }
-        const sc = sliceChainTree(st, list.slice(i + 1), ctx);
+        const sc = decision(st, () => sliceChainTree(st, list.slice(i + 1), ctx, tail));
         if (sc) return withActs(sc);
-        const rest = list.slice(i + 1);
-        const node = { k: 'if', cond: condOf(st.cond, st.loc),
-          t: toTree([...stmtList(st.then), ...rest], ctx), f: toTree([...stmtList(st.else), ...rest], ctx) };
-        return acts.length ? { k: 'act', acts, next: node } : node;
+        // the then branch, the statements after the if, the else branch: the two branches end at that subtree
+        return withActs(decision(st, () => {
+          const node = { k: 'if', cond: condOf(st.cond, st.loc), t: null, f: null };
+          const h = hole();
+          place(node, 't', toTree(st.then, ctx, h));
+          const after = toTree(list.slice(i + 1), ctx, tail);
+          fill(h, after);
+          return place(node, 'f', toTree(st.else, ctx, after));
+        }));
       }
       fail(`${st.kind} statement${atLine(st.loc)} is not supported in a state machine chart`);
     }
-    return acts.length ? { k: 'act', acts, next: { k: 'leaf' } } : { k: 'leaf' };
+    return withActs(tail);
   };
   // Every-cycle blocks: sequential items { k: 'acts', acts } | { k: 'if', cond, t, f }; the
   // statement after an `if` is where both branches join again.
@@ -298,16 +335,36 @@ export function makeTreeBuilder(A) {
   return { toTree, toSeq };
 }
 
-function restrict(t, key, neg, value, W) {
-  if (t.k === 'act') return { ...t, next: restrict(t.next, key, neg, value, W) };
-  if (t.k === 'case') return { ...t, branches: t.branches.map((br) => ({ ...br, sub: restrict(br.sub, key, neg, value, W) })) };
-  if (t.k === 'if') {
-    const k = condKey(t.cond, W);
-    if (k === key) return restrict(value ? t.t : t.f, key, neg, value, W);
-    if (k === neg) return restrict(value ? t.f : t.t, key, neg, value, W);
-    return { ...t, t: restrict(t.t, key, neg, value, W), f: restrict(t.f, key, neg, value, W) };
+// memo: the value of a walk at a node, for a key (a Map per node; a walk's memo lasts one call of mergeTrees,
+// resolveTree…)
+function memoAt(memo, t, k, f) {
+  let m = memo.get(t);
+  if (!m) memo.set(t, (m = new Map()));
+  if (!m.has(k)) m.set(k, f());
+  return m.get(k);
+}
+// a node with its subtrees mapped by f: the node itself when none changed
+function mapSubs(t, f) {
+  if (t.k === 'act') { const next = f(t.next); return next === t.next ? t : { ...t, next }; }
+  if (t.k === 'if') { const T = f(t.t), F = f(t.f); return T === t.t && F === t.f ? t : { ...t, t: T, f: F }; }
+  if (t.k === 'case') {
+    const branches = t.branches.map((br) => { const sub = f(br.sub); return sub === br.sub ? br : { ...br, sub }; });
+    return branches.every((br, i) => br === t.branches[i]) ? t : { ...t, branches };
   }
   return t;
+}
+
+/** Tree `t` where the condition of key `key` (negation `neg`) is known to be `value`. */
+function restrict(t, key, neg, value, W, M) {
+  return memoAt(M.restricted, t, `${value}\0${key}\0${neg}`, () => {
+    const r = (x) => restrict(x, key, neg, value, W, M);
+    if (t.k === 'if') {
+      const k = condKey(t.cond, W);
+      if (k === key) return r(value ? t.t : t.f);
+      if (k === neg) return r(value ? t.f : t.t);
+    }
+    return mapSubs(t, r);
+  });
 }
 
 /**
@@ -316,28 +373,34 @@ function restrict(t, key, neg, value, W) {
  * goes on top; by default the first process (usually the next-state logic) wins.
  */
 export function mergeTrees(a, b, W, rank = () => Infinity) {
-  if (a.k === 'act') return { k: 'act', acts: a.acts, next: mergeTrees(a.next, b, W, rank) };
-  if (b.k === 'act') return { k: 'act', acts: b.acts, next: mergeTrees(a, b.next, W, rank) };
-  if (a.k === 'leaf') return b;
-  if (b.k === 'leaf') return a;
-  if (a.k === 'case' && b.k === 'case' && caseKey(a) === caseKey(b)) return mergeCases(a, b, W, rank);
-  if (a.k === 'case') {
-    return { ...a, branches: a.branches.map((br) => ({ ...br, sub: mergeTrees(br.sub, restrictCase(b, a, br.values), W, rank) })) };
-  }
-  if (b.k === 'case') {
-    const key = condKey(a.cond, W), neg = condNegKey(a.cond, W);
-    return { k: 'if', cond: a.cond, t: mergeTrees(a.t, restrict(b, key, neg, true, W), W, rank), f: mergeTrees(a.f, restrict(b, key, neg, false, W), W, rank) };
-  }
-  if (rank(b.cond) < rank(a.cond)) {
-    const key = condKey(b.cond, W), neg = condNegKey(b.cond, W);
-    if (condKey(a.cond, W) !== key && condKey(a.cond, W) !== neg) {
-      return { k: 'if', cond: b.cond, t: mergeTrees(restrict(a, key, neg, true, W), b.t, W, rank),
-        f: mergeTrees(restrict(a, key, neg, false, W), b.f, W, rank) };
+  return mergeIn(a, b, W, rank, { merged: new Map(), restricted: new Map(), cased: new Map() });
+}
+function mergeIn(a, b, W, rank, M) {
+  return memoAt(M.merged, a, b, () => {
+    const merge = (x, y) => mergeIn(x, y, W, rank, M);
+    if (a.k === 'act') return { k: 'act', acts: a.acts, next: merge(a.next, b) };
+    if (b.k === 'act') return { k: 'act', acts: b.acts, next: merge(a, b.next) };
+    if (a.k === 'leaf') return b;
+    if (b.k === 'leaf') return a;
+    if (a.k === 'case' && b.k === 'case' && caseKey(a) === caseKey(b)) return mergeCases(a, b, merge);
+    if (a.k === 'case') {
+      return { ...a, branches: a.branches.map((br) => ({ ...br, sub: merge(br.sub, restrictCase(b, a, br.values, M)) })) };
     }
-  }
-  const key = condKey(a.cond, W), neg = condNegKey(a.cond, W);
-  const bt = restrict(b, key, neg, true, W), bf = restrict(b, key, neg, false, W);
-  return { k: 'if', cond: a.cond, t: mergeTrees(a.t, bt, W, rank), f: mergeTrees(a.f, bf, W, rank) };
+    if (b.k === 'case') {
+      const key = condKey(a.cond, W), neg = condNegKey(a.cond, W);
+      return { k: 'if', cond: a.cond, t: merge(a.t, restrict(b, key, neg, true, W, M)), f: merge(a.f, restrict(b, key, neg, false, W, M)) };
+    }
+    if (rank(b.cond) < rank(a.cond)) {
+      const key = condKey(b.cond, W), neg = condNegKey(b.cond, W);
+      if (condKey(a.cond, W) !== key && condKey(a.cond, W) !== neg) {
+        return { k: 'if', cond: b.cond, t: merge(restrict(a, key, neg, true, W, M), b.t),
+          f: merge(restrict(a, key, neg, false, W, M), b.f) };
+      }
+    }
+    const key = condKey(a.cond, W), neg = condNegKey(a.cond, W);
+    const bt = restrict(b, key, neg, true, W, M), bf = restrict(b, key, neg, false, W, M);
+    return { k: 'if', cond: a.cond, t: merge(a.t, bt), f: merge(a.f, bf) };
+  });
 }
 
 const caseKey = (t) => exprToString(t.expr);
@@ -358,22 +421,22 @@ function othersValues(c) {
 }
 
 /** Tree `t` where the subject of case tree `c` is known to be one of `values` (null: others of c). */
-function restrictCase(t, c, values) {
-  if (t.k === 'act') return { ...t, next: restrictCase(t.next, c, values) };
-  if (t.k === 'if') return { ...t, t: restrictCase(t.t, c, values), f: restrictCase(t.f, c, values) };
-  if (t.k !== 'case') return t;
-  if (caseKey(t) === caseKey(c)) {
-    const vals = values || othersValues(c);
-    if (vals && vals.length) {
-      const idx = new Set(vals.map((v) => caseBranch(t, v)));
-      if (idx.size === 1) return restrictCase(caseSub(t, [...idx][0]), c, values);
+function restrictCase(t, c, values, M) {
+  return memoAt(memoAt(M.cased, c, values, () => new Map()), t, null, () => {
+    const r = (x) => restrictCase(x, c, values, M);
+    if (t.k === 'case' && caseKey(t) === caseKey(c)) {
+      const vals = values || othersValues(c);
+      if (vals && vals.length) {
+        const idx = new Set(vals.map((v) => caseBranch(t, v)));
+        if (idx.size === 1) return r(caseSub(t, [...idx][0]));
+      }
     }
-  }
-  return { ...t, branches: t.branches.map((br) => ({ ...br, sub: restrictCase(br.sub, c, values) })) };
+    return mapSubs(t, r);
+  });
 }
 
-/** Merge two case trees on the same value: one branch per distinct pair of branches taken. */
-function mergeCases(a, b, W, rank) {
+/** Merge two case trees on the same value: one branch per distinct pair of branches taken (merge: of two subtrees). */
+function mergeCases(a, b, merge) {
   const groups = new Map();
   const seen = new Set();
   for (const t of [a, b]) {
@@ -388,10 +451,10 @@ function mergeCases(a, b, W, rank) {
       }
     }
   }
-  const branches = [...groups.values()].map((g) => ({ values: g.values, sub: mergeTrees(caseSub(a, g.ia), caseSub(b, g.ib), W, rank) }));
+  const branches = [...groups.values()].map((g) => ({ values: g.values, sub: merge(caseSub(a, g.ia), caseSub(b, g.ib)) }));
   const oa = a.branches.findIndex((br) => !br.values), ob = b.branches.findIndex((br) => !br.values);
   if (!(a.w <= 16 && seen.size === 2 ** a.w) || oa >= 0 || ob >= 0) {
-    branches.push({ values: null, sub: mergeTrees(caseSub(a, oa), caseSub(b, ob), W, rank) });
+    branches.push({ values: null, sub: merge(caseSub(a, oa), caseSub(b, ob)) });
   }
   return { ...a, branches };
 }
@@ -441,27 +504,30 @@ export function caseLabels(t, conds, lang) {
 }
 
 /** Resolve next-state assignments: leaves become { k: 'goto', state }. */
-export function resolveTree(t, cur, self) {
-  if (t.k === 'act') {
-    let c = cur;
-    const acts = [];
-    for (const x of t.acts) { if (x.goto) c = x.goto === '@self' ? self : x.goto; else acts.push(x); }
-    const next = resolveTree(t.next, c, self);
-    if (!acts.length) return next;
-    if (next.k === 'act') return { k: 'act', acts: lastWins([...acts, ...next.acts]), next: next.next };
-    return { k: 'act', acts: lastWins(acts), next };
-  }
-  if (t.k === 'if') {
-    const T = resolveTree(t.t, cur, self), F = resolveTree(t.f, cur, self);
-    if (treeSig(T) === treeSig(F)) return T;
-    return { k: 'if', cond: t.cond, t: T, f: F };
-  }
-  if (t.k === 'case') {
-    const branches = t.branches.map((br) => ({ ...br, sub: resolveTree(br.sub, cur, self) }));
-    if (branches.every((br) => treeSig(br.sub) === treeSig(branches[0].sub))) return branches[0].sub;
-    return { ...t, branches };
-  }
-  return { k: 'goto', state: cur || self };
+export function resolveTree(t, cur, self, M = { resolved: new Map(), sig: treeSigs() }) {
+  return memoAt(M.resolved, t, cur, () => {
+    const resolve = (x, c) => resolveTree(x, c, self, M);
+    if (t.k === 'act') {
+      let c = cur;
+      const acts = [];
+      for (const x of t.acts) { if (x.goto) c = x.goto === '@self' ? self : x.goto; else acts.push(x); }
+      const next = resolve(t.next, c);
+      if (!acts.length) return next;
+      if (next.k === 'act') return { k: 'act', acts: lastWins([...acts, ...next.acts]), next: next.next };
+      return { k: 'act', acts: lastWins(acts), next };
+    }
+    if (t.k === 'if') {
+      const T = resolve(t.t, cur), F = resolve(t.f, cur);
+      if (M.sig(T) === M.sig(F)) return T;
+      return { k: 'if', cond: t.cond, t: T, f: F };
+    }
+    if (t.k === 'case') {
+      const branches = t.branches.map((br) => ({ ...br, sub: resolve(br.sub, cur) }));
+      if (branches.every((br) => M.sig(br.sub) === M.sig(branches[0].sub))) return branches[0].sub;
+      return { ...t, branches };
+    }
+    return { k: 'goto', state: cur || self };
+  });
 }
 
 /** Drop assignments overridden later in the same box (e.g. a default before the case). */
@@ -469,11 +535,30 @@ function lastWins(acts) {
   return acts.filter((a, i) => !acts.slice(i + 1).some((b) => b.target === a.target));
 }
 
-const treeSig = (t) => JSON.stringify(t, (k, v) => (typeof v === 'bigint' ? `${v}n` : k === 'loc' ? undefined : v));
+// A tree's signature: equal for two trees whose text (JSON, without the source lines) is equal. Each node's own text,
+// its subtrees' numbers in their places, is numbered once (a shared subtree is not written out again).
+const TREE_KINDS = new Set(['act', 'if', 'case', 'leaf', 'goto']);
+const SUB_KEYS = new Set(['next', 't', 'f', 'sub']);
+function treeSigs() {
+  const nums = new Map(), sigs = new Map();
+  const sig = (t) => {
+    if (!sigs.has(t)) {
+      const text = JSON.stringify(t, (k, v) => (typeof v === 'bigint' ? `${v}n` : k === 'loc' ? undefined
+        : v !== t && SUB_KEYS.has(k) && TREE_KINDS.has(v?.k) ? `#${sig(v)}` : v));
+      if (!nums.has(text)) nums.set(text, nums.size);
+      sigs.set(t, nums.get(text));
+    }
+    return sigs.get(t);
+  };
+  return sig;
+}
 
-export function assignsOnEveryPath(t, target) {
-  if (t.k === 'act') return t.acts.some((x) => x.target === target) || assignsOnEveryPath(t.next, target);
-  if (t.k === 'if') return assignsOnEveryPath(t.t, target) && assignsOnEveryPath(t.f, target);
-  if (t.k === 'case') return t.branches.every((br) => assignsOnEveryPath(br.sub, target));
-  return false;
+export function assignsOnEveryPath(t, target, memo = new Map()) {
+  return memoAt(memo, t, target, () => {
+    const every = (x) => assignsOnEveryPath(x, target, memo);
+    if (t.k === 'act') return t.acts.some((x) => x.target === target) || every(t.next);
+    if (t.k === 'if') return every(t.t) && every(t.f);
+    if (t.k === 'case') return t.branches.every((br) => every(br.sub));
+    return false;
+  });
 }
