@@ -21,10 +21,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 520,
+   "slices": 471,
    "luts": 941,
    "ffs": 264,
-   "period": 9.295
+   "period": 9.356
   }
  },
  "epfl-cavlc": {
@@ -171,10 +171,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 39,
+   "slices": 34,
    "luts": 62,
    "ffs": 64,
-   "period": 6.913
+   "period": 7.274
   }
  },
  "epfl-sin": {
@@ -351,10 +351,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 62,
-   "luts": 117,
+   "slices": 53,
+   "luts": 103,
    "ffs": 43,
-   "period": 6.142
+   "period": 6.191
   }
  },
  "itc99-b08": {
@@ -365,10 +365,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 19,
+   "slices": 18,
    "luts": 34,
    "ffs": 21,
-   "period": 6.671
+   "period": 5.792
   }
  },
  "itc99-b09": {
@@ -407,10 +407,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 89,
-   "luts": 173,
-   "ffs": 31,
-   "period": 8.138
+   "slices": 81,
+   "luts": 157,
+   "ffs": 36,
+   "period": 7.751
   }
  },
  "itc99-b12": {
@@ -477,18 +477,15 @@
     "WARNING:Silinx:646 (unused-signal) - b15.vhd:51: Signal <nonaligned> is assigned but never used. This unconnected signal will be trimmed during the optimization process."
    ],
    "synth": [
-    "Warning: Replacing memory \\p1_v0 with list of registers. See b15_syn.v:739, b15_syn.v:641"
-   ],
-   "flow": [
-    "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
+    "Warning: Replacing memory \\p1_v0 with list of registers. See b15_syn.v:715, b15_syn.v:617"
    ]
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1233,
-   "luts": 2457,
+   "slices": 1336,
+   "luts": 2661,
    "ffs": 546,
-   "period": 20.024
+   "period": 19.768
   }
  },
  "itc99-b17": {
@@ -503,9 +500,9 @@
     "WARNING:Silinx:646 (unused-signal) - b17.vhd:51: Signal <nonaligned> is assigned but never used. This unconnected signal will be trimmed during the optimization process."
    ],
    "synth": [
-    "Warning: Replacing memory \\p10_v0 with list of registers. See b17_syn.v:1529, b17_syn.v:1431",
-    "Warning: Replacing memory \\p13_v0 with list of registers. See b17_syn.v:2173, b17_syn.v:2075",
-    "Warning: Replacing memory \\p7_v0 with list of registers. See b17_syn.v:885, b17_syn.v:787"
+    "Warning: Replacing memory \\p10_v0 with list of registers. See b17_syn.v:1477, b17_syn.v:1379",
+    "Warning: Replacing memory \\p13_v0 with list of registers. See b17_syn.v:2097, b17_syn.v:1999",
+    "Warning: Replacing memory \\p7_v0 with list of registers. See b17_syn.v:857, b17_syn.v:759"
    ],
    "flow": [
     "WARNING:Silinx (timing) - PERIOD 20 ns on clock not met"
@@ -513,10 +510,10 @@
   },
   "quality": {
    "part": "xc3s500efg320-4",
-   "slices": 3801,
-   "luts": 7575,
+   "slices": 3742,
+   "luts": 7451,
    "ffs": 1380,
-   "period": 21.997
+   "period": 22.378
   }
  },
  "itc99-b20": {
@@ -608,10 +605,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 52,
+   "slices": 49,
    "luts": 95,
    "ffs": 54,
-   "period": 4.81
+   "period": 4.814
   }
  },
  "iwls05-simple-spi": {
@@ -686,10 +683,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 67,
-   "luts": 115,
+   "slices": 63,
+   "luts": 112,
    "ffs": 96,
-   "period": 5.015
+   "period": 5.408
   }
  },
  "light8080": {
@@ -827,35 +824,35 @@
     "Warning: Latch inferred for signal `p424_v0 [31:6]' from process `\\neorv32_test_setup_approm.$proc': $auto",
     "Warning: Latch inferred for signal `p424_v0 [4:0]' from process `\\neorv32_test_setup_approm.$proc': $auto",
     "Warning: Latch inferred for signal `p424_v0 [5]' from process `\\neorv32_test_setup_approm.$proc': $auto",
-    "Warning: Replacing memory \\neorv32_top_inst.bus_gateway_inst.port_req with list of registers. See neorv32_test_setup_approm_syn.v:5175",
-    "Warning: Replacing memory \\neorv32_top_inst.bus_gateway_inst.port_rsp with list of registers. See neorv32_test_setup_approm_syn.v:5135",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.cnt_we with list of registers. See neorv32_test_setup_approm_syn.v:3214",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.hpmcnt_rd with list of registers. See neorv32_test_setup_approm_syn.v:4182",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.hpmevent with list of registers. See neorv32_test_setup_approm_syn.v:4214",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.hpmevent_rd with list of registers. See neorv32_test_setup_approm_syn.v:4246",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_alu_inst.cp_result with list of registers. See neorv32_test_setup_approm_syn.v:4489, neorv32_test_setup_approm_syn.v:4419",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_alu_inst.cpu_alu_shifter_inst.lvl with list of registers. See neorv32_test_setup_approm_syn.v:4476",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_frontend_inst.ipb_rdata with list of registers. See neorv32_test_setup_approm_syn.v:1595, neorv32_test_setup_approm_syn.v:1506",
-    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_frontend_inst.ipb_wdata with list of registers. See neorv32_test_setup_approm_syn.v:1474",
+    "Warning: Replacing memory \\neorv32_top_inst.bus_gateway_inst.port_req with list of registers. See neorv32_test_setup_approm_syn.v:5117",
+    "Warning: Replacing memory \\neorv32_top_inst.bus_gateway_inst.port_rsp with list of registers. See neorv32_test_setup_approm_syn.v:5077",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.cnt_we with list of registers. See neorv32_test_setup_approm_syn.v:3174",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.hpmcnt_rd with list of registers. See neorv32_test_setup_approm_syn.v:4140",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.hpmevent with list of registers. See neorv32_test_setup_approm_syn.v:4172",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cnts_enabled.cpu_counters_inst.hpmevent_rd with list of registers. See neorv32_test_setup_approm_syn.v:4204",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_alu_inst.cp_result with list of registers. See neorv32_test_setup_approm_syn.v:4443, neorv32_test_setup_approm_syn.v:4377",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_alu_inst.cpu_alu_shifter_inst.lvl with list of registers. See neorv32_test_setup_approm_syn.v:4430",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_frontend_inst.ipb_rdata with list of registers. See neorv32_test_setup_approm_syn.v:1593, neorv32_test_setup_approm_syn.v:1504",
+    "Warning: Replacing memory \\neorv32_top_inst.core_complex_gen[0].core_complex_inst.cpu_inst.cpu_frontend_inst.ipb_wdata with list of registers. See neorv32_test_setup_approm_syn.v:1472",
     "Warning: Replacing memory \\neorv32_top_inst.core_req with list of registers. See neorv32_test_setup_approm_syn.v:1374",
-    "Warning: Replacing memory \\neorv32_top_inst.core_rsp with list of registers. See neorv32_test_setup_approm_syn.v:5067",
+    "Warning: Replacing memory \\neorv32_top_inst.core_rsp with list of registers. See neorv32_test_setup_approm_syn.v:5009",
     "Warning: Replacing memory \\neorv32_top_inst.cpu_trace with list of registers. See neorv32_test_setup_approm_syn.v:1358",
-    "Warning: Replacing memory \\neorv32_top_inst.firq with list of registers. See neorv32_test_setup_approm_syn.v:6279, neorv32_test_setup_approm_syn.v:5083",
-    "Warning: Replacing memory \\neorv32_top_inst.io_system.bus_io_switch_inst.dev_req with list of registers. See neorv32_test_setup_approm_syn.v:6084",
-    "Warning: Replacing memory \\neorv32_top_inst.io_system.bus_io_switch_inst.dev_rsp with list of registers. See neorv32_test_setup_approm_syn.v:5832",
-    "Warning: Replacing memory \\neorv32_top_inst.io_system.clint_enabled.clint_inst.mswi_rd with list of registers. See neorv32_test_setup_approm_syn.v:6747",
-    "Warning: Replacing memory \\neorv32_top_inst.io_system.clint_enabled.clint_inst.mtimecmp_rd with list of registers. See neorv32_test_setup_approm_syn.v:6667",
-    "Warning: Replacing memory \\neorv32_top_inst.io_system.sysinfo_inst.sysinfo with list of registers. See neorv32_test_setup_approm_syn.v:6966",
-    "Warning: Replacing memory \\neorv32_top_inst.iodev_req with list of registers. See neorv32_test_setup_approm_syn.v:5800, neorv32_test_setup_approm_syn.v:5792, neorv32_test_setup_approm_syn.v:5784, neorv32_test_setup_approm_syn.v:5776, neorv32_test_setup_approm_syn.v:5768, neorv32_test_setup_approm_sy",
-    "Warning: Replacing memory \\neorv32_top_inst.iodev_rsp with list of registers. See neorv32_test_setup_approm_syn.v:6961, neorv32_test_setup_approm_syn.v:6578, neorv32_test_setup_approm_syn.v:6275, neorv32_test_setup_approm_syn.v:5071"
+    "Warning: Replacing memory \\neorv32_top_inst.firq with list of registers. See neorv32_test_setup_approm_syn.v:6217, neorv32_test_setup_approm_syn.v:5025",
+    "Warning: Replacing memory \\neorv32_top_inst.io_system.bus_io_switch_inst.dev_req with list of registers. See neorv32_test_setup_approm_syn.v:6022",
+    "Warning: Replacing memory \\neorv32_top_inst.io_system.bus_io_switch_inst.dev_rsp with list of registers. See neorv32_test_setup_approm_syn.v:5770",
+    "Warning: Replacing memory \\neorv32_top_inst.io_system.clint_enabled.clint_inst.mswi_rd with list of registers. See neorv32_test_setup_approm_syn.v:6685",
+    "Warning: Replacing memory \\neorv32_top_inst.io_system.clint_enabled.clint_inst.mtimecmp_rd with list of registers. See neorv32_test_setup_approm_syn.v:6605",
+    "Warning: Replacing memory \\neorv32_top_inst.io_system.sysinfo_inst.sysinfo with list of registers. See neorv32_test_setup_approm_syn.v:6904",
+    "Warning: Replacing memory \\neorv32_top_inst.iodev_req with list of registers. See neorv32_test_setup_approm_syn.v:5738, neorv32_test_setup_approm_syn.v:5730, neorv32_test_setup_approm_syn.v:5722, neorv32_test_setup_approm_syn.v:5714, neorv32_test_setup_approm_syn.v:5706, neorv32_test_setup_approm_sy",
+    "Warning: Replacing memory \\neorv32_top_inst.iodev_rsp with list of registers. See neorv32_test_setup_approm_syn.v:6899, neorv32_test_setup_approm_syn.v:6516, neorv32_test_setup_approm_syn.v:6213, neorv32_test_setup_approm_syn.v:5013"
    ]
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 1663,
-   "luts": 3312,
+   "slices": 1662,
+   "luts": 3313,
    "ffs": 1319,
-   "period": 16.212
+   "period": 16.497
   }
  },
  "picorv32": {
@@ -919,9 +916,9 @@
   "flow": "complete: on the XC3S500E",
   "warnings": {
    "synth": [
-    "Warning: Replacing memory \\dec_block.inv_sbox_inst.inv_sbox with list of registers. See aes_core_syn.v:1629, aes_core_syn.v:1625, aes_core_syn.v:1621, aes_core_syn.v:1617, aes_core_syn.v:1613, aes_core_syn.v:1609, aes_core_syn.v:1605, aes_core_syn.v:1601, aes_core_syn.v:1597, aes_core_syn.v:1593, ae",
-    "Warning: Replacing memory \\keymem.key_mem with list of registers. See aes_core_syn.v:1855",
-    "Warning: Replacing memory \\sbox_inst.sbox with list of registers. See aes_core_syn.v:3106, aes_core_syn.v:3102, aes_core_syn.v:3098, aes_core_syn.v:3094, aes_core_syn.v:3090, aes_core_syn.v:3086, aes_core_syn.v:3082, aes_core_syn.v:3078, aes_core_syn.v:3074, aes_core_syn.v:3070, aes_core_syn.v:3066,"
+    "Warning: Replacing memory \\dec_block.inv_sbox_inst.inv_sbox with list of registers. See aes_core_syn.v:1625, aes_core_syn.v:1621, aes_core_syn.v:1617, aes_core_syn.v:1613, aes_core_syn.v:1609, aes_core_syn.v:1605, aes_core_syn.v:1601, aes_core_syn.v:1597, aes_core_syn.v:1593, aes_core_syn.v:1589, ae",
+    "Warning: Replacing memory \\keymem.key_mem with list of registers. See aes_core_syn.v:1847",
+    "Warning: Replacing memory \\sbox_inst.sbox with list of registers. See aes_core_syn.v:3094, aes_core_syn.v:3090, aes_core_syn.v:3086, aes_core_syn.v:3082, aes_core_syn.v:3078, aes_core_syn.v:3074, aes_core_syn.v:3070, aes_core_syn.v:3066, aes_core_syn.v:3062, aes_core_syn.v:3058, aes_core_syn.v:3054,"
    ],
    "flow": [
     "WARNING:Silinx (timing) - PERIOD 20 ns on clk not met"
@@ -932,7 +929,7 @@
    "slices": 3613,
    "luts": 7225,
    "ffs": 2989,
-   "period": 30.875
+   "period": 27.099
   }
  },
  "secworks-sha1": {
@@ -1127,15 +1124,15 @@
     "WARNING:Silinx:647 (unused-input) - axis_fifo.v:124: Input <pause_req> is never used."
    ],
    "synth": [
-    "Warning: Replacing memory \\m_axis_pipe_reg with list of registers. See axis_fifo_syn.v:242"
+    "Warning: Replacing memory \\m_axis_pipe_reg with list of registers. See axis_fifo_syn.v:236"
    ]
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 20,
+   "slices": 19,
    "luts": 33,
    "ffs": 32,
-   "period": 5.406
+   "period": 5.705
   }
  },
  "verilog-i2c-master": {
@@ -1245,7 +1242,7 @@
    "slices": 266,
    "luts": 166,
    "ffs": 509,
-   "period": 6.165
+   "period": 6.582
   }
  },
  "vtr-diffeq1": {
