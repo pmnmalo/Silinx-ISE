@@ -285,6 +285,7 @@
   "test/logic-sch.test.js": 0.3,
   "test/logic.test.js": 12.4,
   "test/lut-resynth.test.js": 296,
+  "test/mcp-args.test.js": 0.8,
   "test/mcp-check.test.js": 0.7,
   "test/mcp-convert.test.js": 25.3,
   "test/mcp-drawings.test.js": 3.9,
