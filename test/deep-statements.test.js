@@ -21,8 +21,7 @@ const pad = '    ';
 
 // Each kind: the lines before its constructs (head), the level of the first one (k0), the construct of level k
 // opened (open) and closed (close), the innermost statement (inner, a level of its own unless innerFree), the lines
-// after them (tail), and the value of y at a (the reference); untranslated: an if generate's translation loses its
-// body or is refused (#3501); unsynthesized: the synthesis input of nested loops takes time exponential in their depth
+// after them (tail), and the value of y at a (the reference); unsynthesized: the synthesis input of nested loops takes time exponential in their depth
 // (#3504). Each construct on a line of its own: the statement of level k (k0 <= k) on line head.length + k - k0 + 1,
 // at column 5.
 const VERILOG_ALWAYS = ['module nest(input [7:0] a, output reg [7:0] y);', '  always @* begin', '    y = 0;'];
@@ -35,13 +34,13 @@ const KINDS = {
     if: { head: VERILOG_ALWAYS, k0: 2, open: k => `if (a > ${k % 128})`, close: () => '', inner: 'y = a + 1;', tail: ['  end', 'endmodule'], ref: a => (a >= 128 ? (a + 1) % 256 : 0) },
     ifelse: { head: VERILOG_ALWAYS, k0: 2, open: k => `if (a > ${k % 128})`, close: k => `else y = ${k};`, inner: 'y = a + 1;', tail: ['  end', 'endmodule'], ref: a => (a >= 128 ? (a + 1) % 256 : a < 2 ? 2 : a) },
     case: { head: VERILOG_ALWAYS, k0: 2, open: () => 'case (a[0]) 1\'b1:', close: () => 'default: y = 7; endcase', inner: 'y = a + 1;', tail: ['  end', 'endmodule'], ref: a => (a % 2 ? (a + 1) % 256 : 7) },
-    generate: { head: ['module nest(input [7:0] a, output [7:0] y);'], k0: 1, open: () => 'if (1) begin', close: () => 'end', inner: 'assign y = a + 1;', innerFree: true, tail: ['endmodule'], ref: a => (a + 1) % 256, untranslated: true }
+    generate: { head: ['module nest(input [7:0] a, output [7:0] y);'], k0: 1, open: () => 'if (1) begin', close: () => 'end', inner: 'assign y = a + 1;', innerFree: true, tail: ['endmodule'], ref: a => (a + 1) % 256 }
   },
   vhdl: {
     if: { head: VHDL_PROCESS, k0: 2, open: k => `if a > ${k % 128} then`, close: k => `else y <= to_unsigned(${k}, 8); end if;`, inner: 'y <= a + 1;', tail: ['  end process;', 'end rtl;'], ref: a => (a >= 128 ? (a + 1) % 256 : a < 2 ? 2 : a) },
     loop: { head: VHDL_PROCESS, k0: 2, open: k => `for i${k} in 0 to 0 loop`, close: () => 'end loop;', inner: 'y <= a + 1;', tail: ['  end process;', 'end rtl;'], ref: a => (a + 1) % 256, unsynthesized: true },
     case: { head: VHDL_PROCESS, k0: 2, open: () => 'case a(0) is when \'1\' =>', close: () => 'when others => y <= to_unsigned(7, 8); end case;', inner: 'y <= a + 1;', tail: ['  end process;', 'end rtl;'], ref: a => (a % 2 ? (a + 1) % 256 : 7) },
-    generate: { head: VHDL_HEAD, k0: 1, open: k => `g${k}: if true generate`, close: () => 'end generate;', inner: 'y <= a + 1;', tail: ['end rtl;'], ref: a => (a + 1) % 256, untranslated: true },
+    generate: { head: VHDL_HEAD, k0: 1, open: k => `g${k}: if true generate`, close: () => 'end generate;', inner: 'y <= a + 1;', tail: ['end rtl;'], ref: a => (a + 1) % 256 },
     block: { head: VHDL_HEAD, k0: 1, open: k => `b${k}: block begin`, close: () => 'end block;', inner: 'y <= a + 1;', tail: ['end rtl;'], ref: a => (a + 1) % 256 }
   }
 };
@@ -116,7 +115,7 @@ for (const lang of ['vhdl', 'verilog']) {
       assert.match(v, /^module nest \(/m);
     });
 
-    if (!kind.untranslated) test(`#3490 ${lang} ${name}: statements nested ${MAX_NESTING / 2} levels deep translated, checked, then simulated as the original`, () => {
+    test(`#3490 ${lang} ${name}: statements nested ${MAX_NESTING / 2} levels deep translated, checked, then simulated as the original`, () => {
       const to = lang === 'vhdl' ? 'verilog' : 'vhdl';
       // (half the limit: a translation nests more, each branch of an if in a begin … end in Verilog)
       const text = design(kind, MAX_NESTING / 2);

@@ -70,6 +70,26 @@ export function walk(node, f) {
   }
 }
 
+/** An if generate's branches, as both parsers write it (#3501): [{ cond, label, decls, items, loc }], the last one's cond
+ *  null for an else. Its items are `then`, its else `else` ([] when there is none). An else if (Verilog: `elseChain`)
+ *  and an elsif (VHDL: an else of one if generate of the same label), a case generate's next alternative too, are the
+ *  next branch, read in a loop (a chain of thousands); a VHDL else's declarations are among its items
+ *  ({ kind: 'decl' }), a Verilog else's in `elseDecls`, its label in `elseLabel`. */
+export function ifGenerateBranches(g) {
+  const out = [];
+  for (let cur = g; ;) {
+    out.push({ cond: cur.cond, label: cur.label ?? null, decls: cur.decls || [], items: cur.then || [], loc: cur.loc });
+    const els = cur.else || [];
+    const chained = cur.elseChain || (cur.elseLabel === undefined && cur.elseDecls === undefined && els[0]?.label === cur.label);
+    if (els.length === 1 && els[0].kind === 'generate_if' && chained) { cur = els[0]; continue; }
+    if (els.length || cur.elseDecls?.length) {
+      out.push({ cond: null, label: cur.elseLabel ?? null, loc: cur.loc, items: els.filter(i => i.kind !== 'decl'),
+        decls: [...(cur.elseDecls || []), ...els.filter(i => i.kind === 'decl').map(i => i.decl)] });
+    }
+    return out;
+  }
+}
+
 /** The name an assignment's target is of (through its indices and slices), or null. */
 export function targetName(t) {
   while (t && (t.op === 'index' || t.op === 'slice' || t.op === 'pslice' || (t.op === 'apply' && t.args?.length === 1))) {
