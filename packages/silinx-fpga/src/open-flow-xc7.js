@@ -55,11 +55,13 @@ const passThrough = bits => {
 };
 
 /** The LUT sites a FASM uses (each a LUT6, or a LUT6 and a LUT5, with an INIT): those with logic and those nextpnr made
- *  feed-throughs (one input passed through), and its slices: { luts, feedThroughs, slices }. */
+ *  feed-throughs (one input passed through), and its slices: { luts, feedThroughs, slices }. A slice counts with a feature
+ *  other than NOCLKINV: nextpnr writes both halves of every logic tile it uses (fasm.cc, write_logic), and an empty half
+ *  gets only the FF block's default, NOCLKINV (#3683). */
 export function xc7FasmUtilization(fasm) {
   const luts = new Map(), slices = new Set();
-  for (const m of String(fasm).matchAll(/^([A-Z0-9_]+_X\d+Y\d+\.SLICE[LM]?_X[01])\.(?:([A-D])LUT\.INIT\[(\d+):0\]\s*=\s*\d+'b([01]+))?/gm)) {
-    slices.add(m[1]);
+  for (const m of String(fasm).matchAll(/^([A-Z0-9_]+_X\d+Y\d+\.SLICE[LM]?_X[01])\.(?:([A-D])LUT\.INIT\[(\d+):0\]\s*=\s*\d+'b([01]+)|(NOCLKINV)\s*$)?/gm)) {
+    if (!m[5]) slices.add(m[1]);
     if (m[2]) luts.set(`${m[1]}.${m[2]}`, passThrough(m[4].padStart(+m[3] + 1, '0')));
   }
   const feedThroughs = [...luts.values()].filter(Boolean).length;
