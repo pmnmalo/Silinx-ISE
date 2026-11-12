@@ -6,7 +6,7 @@ import { STD_LIBS } from './parse-defs.js';
 import { MAX_NESTING, NESTING_MESSAGE } from '../util.js';
 
 const LOGIC_CHARS = /^[01uxzwlhUXZWLH-]*$/;
-const TIME_UNITS = { fs: ['fs', 1], ps: ['ps', 1], ns: ['ns', 1], us: ['us', 1], ms: ['ms', 1], sec: ['sec', 1], min: ['sec', 60], hr: ['sec', 3600] };
+const TIME_UNITS = { __proto__: null, fs: ['fs', 1], ps: ['ps', 1], ns: ['ns', 1], us: ['us', 1], ms: ['ms', 1], sec: ['sec', 1], min: ['sec', 60], hr: ['sec', 3600] };
 const LOGICAL = { and: '&', or: '|', xor: '^', xnor: '~^', nand: 'nand', nor: 'nor' };
 const UNARY_REDUCE = { and: '&', or: '|', xor: '^', nand: '~&', nor: '~|', xnor: '~^' };
 const RELATIONAL = { '=': '==', '/=': '!=', '<': '<', '<=': '<=', '>': '>', '>=': '>=',

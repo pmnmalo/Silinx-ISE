@@ -5,12 +5,12 @@
 //
 //   cppTokens(tokens, report) -> tokens
 
-export const CPP_HEADERS = { cstdint: 'stdint.h', cstdio: 'stdio.h', cstdlib: 'stdlib.h', cstring: 'string.h', cmath: 'math.h',
+export const CPP_HEADERS = { __proto__: null, cstdint: 'stdint.h', cstdio: 'stdio.h', cstdlib: 'stdlib.h', cstring: 'string.h', cmath: 'math.h',
   climits: 'limits.h', cstddef: 'stddef.h', iostream: 'stdio.h', ostream: 'stdio.h', fstream: 'stdio.h', iomanip: 'stdio.h', sstream: 'stdio.h', string: 'string.h', 'assert.h': 'assert.h', cassert: 'assert.h' };
 export const isCpp = (file) => /\.(cpp|cc|cxx|hpp|hh)$/i.test(String(file || ''));
 
 const FUNC_CASTS = new Set(['char', 'short', 'int', 'long', 'unsigned', 'signed', 'bool', 'float', 'double']);
-const STREAM_TYPES = { ofstream: 'w', ifstream: 'r', fstream: 'r' };
+const STREAM_TYPES = { __proto__: null, ofstream: 'w', ifstream: 'r', fstream: 'r' };
 
 export function cppTokens(toks, report, streams = new Map()) {
   const out = [];

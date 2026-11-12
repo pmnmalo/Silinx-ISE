@@ -14,7 +14,7 @@ const walkExpr = (x, f) => {
 };
 
 // (the manipulators of a stream: endl a new line, the others its format from here on; '' those that change nothing)
-const MANIP = { endl: '\n', left: 'left', right: 'right', hex: 'hex', oct: 'oct', dec: 'dec', fixed: 'fixed', scientific: 'scientific', defaultfloat: 'defaultfloat',
+const MANIP = { __proto__: null, endl: '\n', left: 'left', right: 'right', hex: 'hex', oct: 'oct', dec: 'dec', fixed: 'fixed', scientific: 'scientific', defaultfloat: 'defaultfloat',
   showpoint: '', noshowpoint: '', flush: '' };
 
 export function cppTree(ast, report, streams = new Map()) {

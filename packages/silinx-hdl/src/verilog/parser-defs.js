@@ -4,8 +4,10 @@
 
 
 export const GATES = new Set(['and', 'or', 'nand', 'nor', 'xor', 'xnor', 'not', 'buf', 'bufif0', 'bufif1', 'notif0', 'notif1']);
+// (the tables a design's names are looked up in have no prototype, #3560: a signal named toString or constructor is
+// no built-in)
 // net types with their own resolution (wired and / or, pull-down / pull-up when undriven)
-export const WIRED = { wand: 'and', triand: 'and', wor: 'or', trior: 'or', tri0: 'tri0', tri1: 'tri1' };
+export const WIRED = { __proto__: null, wand: 'and', triand: 'and', wor: 'or', trior: 'or', tri0: 'tri0', tri1: 'tri1' };
 export const BIN_PREC = [
   ['||'], ['&&'], ['|'], ['^', '~^'], ['&'], ['==', '!=', '===', '!=='],
   ['<', '<=', '>', '>='], ['<<', '>>', '<<<', '>>>'], ['+', '-'], ['*', '/', '%'], ['**'],
@@ -13,7 +15,7 @@ export const BIN_PREC = [
 export const UNARY = new Set(['!', '~', '-', '+', '&', '|', '^', '~&', '~|', '~^']);
 // SystemVerilog data types that are not Verilog-2001 keywords: identifiers everywhere else (a
 // Verilog-2001 design may name a signal `bit`); int / shortint / longint / byte are signed
-export const ATOMS = { int: 32, shortint: 16, longint: 64, byte: 8 };
+export const ATOMS = { __proto__: null, int: 32, shortint: 16, longint: 64, byte: 8 };
 export const TYPEWORDS = new Set(['bit', ...Object.keys(ATOMS)]);
 // nets of a port declaration (input wor x): the wired ones resolve their drivers (WIRED)
 export const PORT_NETS = ['wire', 'reg', 'logic', 'tri', 'var', 'supply0', 'supply1', ...Object.keys(WIRED)];

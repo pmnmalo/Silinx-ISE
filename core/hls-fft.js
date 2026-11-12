@@ -36,15 +36,17 @@
 import { CPP_OWN_HEADERS } from './cpp-headers.js';
 
 // hls::ip_fft's constants and the structs' fields and defaults, read from Silinx's hls_fft.h (core/cpp-headers.js)
+// (tables with no prototype, #3560: a C++ name such as toString is none of their names)
+const nullProto = (entries) => Object.assign(Object.create(null), Object.fromEntries(entries));
 const HEADER = CPP_OWN_HEADERS['hls_fft.h'];
-export const FFT_CONSTANTS = Object.fromEntries([...HEADER.matchAll(/enum \w+ \{([^}]*)\}/g)].flatMap((m) => [...m[1].matchAll(/(\w+) = (\d+)/g)].map((x) => [x[1], Number(x[2])])));
-const fieldsOf = (body) => Object.fromEntries([...body.matchAll(/static const (unsigned|bool) (\w+) = (\w+);/g)]
+export const FFT_CONSTANTS = nullProto([...HEADER.matchAll(/enum \w+ \{([^}]*)\}/g)].flatMap((m) => [...m[1].matchAll(/(\w+) = (\d+)/g)].map((x) => [x[1], Number(x[2])])));
+const fieldsOf = (body) => nullProto([...body.matchAll(/static const (unsigned|bool) (\w+) = (\w+);/g)]
   .map(([, , name, v]) => [name, v === 'false' ? 0n : v === 'true' ? 1n : /^\d+$/.test(v) ? BigInt(v) : BigInt(FFT_CONSTANTS[v])]));
 const structBody = (name) => new RegExp(`struct ${name}[^{]*\\{([^}]*)\\}`).exec(HEADER)[1];
 export const FFT_DEFAULTS = fieldsOf(structBody('params_t'));
-export const FFT_SSR_DEFAULTS = { ...FFT_DEFAULTS, ...fieldsOf(structBody('ssr_params_t')) };
+export const FFT_SSR_DEFAULTS = { __proto__: null, ...FFT_DEFAULTS, ...fieldsOf(structBody('ssr_params_t')) };
 // UG1399's names of the fields (AMD's examples' header names them as Silinx's does)
-export const FFT_ALIASES = { log2_transform_length: 'max_nfft', run_time_configurable_transform_length: 'has_nfft', implementation_options: 'arch_opt',
+export const FFT_ALIASES = { __proto__: null, log2_transform_length: 'max_nfft', run_time_configurable_transform_length: 'has_nfft', implementation_options: 'arch_opt',
   scaling_options: 'scaling_opt', rounding_modes: 'rounding_opt', super_sample_rates: 'super_sample_rate', ordering_opt: 'output_ordering' };
 const C = FFT_CONSTANTS;
 const nameOf = (field, v) => {

@@ -18,6 +18,7 @@
 // and defaults, config_t and status_t, hls::fft<CONFIG_T>. Its constants and defaults are read from it (core/hls-fft.js);
 // a source's transforms made by core/cpp-fft.js, which takes its tokens out.
 export const CPP_OWN_HEADERS = {
+  __proto__: null,
   'hls_vector.h': `#pragma once
 #include <stdint.h>
 #include <assert.h>

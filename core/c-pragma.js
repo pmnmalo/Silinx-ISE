@@ -25,7 +25,7 @@ export const IGNORED = new Set(['DATAFLOW', 'RESOURCE',
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
 export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite', 'm_axi', 'ap_fifo', 'ap_hs']);
 // (a memory's type, its ports: ram_2p reads on port 0 and writes on port 1, ram_t2p reads and writes on both; #1901)
-const STORAGE = { ram_1p: '1p', rom_1p: '1p', ram_2p: '2p', ram_s2p: '2p', ram_t2p: 't2p', rom_2p: 't2p' };
+const STORAGE = { __proto__: null, ram_1p: '1p', rom_1p: '1p', ram_2p: '2p', ram_s2p: '2p', ram_t2p: 't2p', rom_2p: 't2p' };
 export function storageOf({ name, args }) {
   const type = String((name === 'BIND_STORAGE' ? args.type : args.storage_type) ?? '').toLowerCase();
   return STORAGE[type] ?? null;
@@ -85,7 +85,7 @@ export function addDirectives(fn, directives) {
 }
 
 // (BIND_STORAGE impl=: what the Spartan-3E has, #1961)
-const IMPL_STYLE = { bram: 'block', lutram: 'distributed' };
+const IMPL_STYLE = { __proto__: null, bram: 'block', lutram: 'distributed' };
 /** How a BIND_STORAGE's memory is made: 'block' | 'distributed' (the tools' ram_style), 'register' (no memory), or null. */
 export function implOf({ args }) {
   const impl = String(args.impl ?? '').toLowerCase();

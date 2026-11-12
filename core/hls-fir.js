@@ -23,9 +23,11 @@ import { CPP_OWN_HEADERS } from './cpp-headers.js';
 
 // hls::ip_fir's constants and params_t's defaults, read from Silinx's hls_fir.h (core/cpp-headers.js): an integer field's
 // default a BigInt, a double's a number; coeff_vec has none, total_num_coeff is num_coeffs * coeff_sets
+// (tables with no prototype, #3560: a C++ name such as toString is none of their names)
+const nullProto = (entries) => Object.assign(Object.create(null), Object.fromEntries(entries));
 const HEADER = CPP_OWN_HEADERS['hls_fir.h'];
-export const FIR_CONSTANTS = Object.fromEntries([...HEADER.matchAll(/(\w+) = (\d+)[,\s}]/g)].filter((m) => !/static/.test(HEADER.slice(HEADER.lastIndexOf('\n', m.index), m.index))).map((m) => [m[1], Number(m[2])]));
-export const FIR_DEFAULTS = Object.fromEntries([...HEADER.matchAll(/static (?:const|constexpr) (unsigned|bool|double) (\w+) = ([\w.]+);/g)].filter((m) => m[2] !== 'total_num_coeff')
+export const FIR_CONSTANTS = nullProto([...HEADER.matchAll(/(\w+) = (\d+)[,\s}]/g)].filter((m) => !/static/.test(HEADER.slice(HEADER.lastIndexOf('\n', m.index), m.index))).map((m) => [m[1], Number(m[2])]));
+export const FIR_DEFAULTS = nullProto([...HEADER.matchAll(/static (?:const|constexpr) (unsigned|bool|double) (\w+) = ([\w.]+);/g)].filter((m) => m[2] !== 'total_num_coeff')
   .map(([, ty, name, v]) => [name, ty === 'double' ? Number(v) : v === 'false' ? 0n : v === 'true' ? 1n : /^\d+$/.test(v) ? BigInt(v) : BigInt(FIR_CONSTANTS[v])]));
 const C = FIR_CONSTANTS;
 const nameOf = (field, v) => {
