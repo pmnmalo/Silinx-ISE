@@ -9,6 +9,7 @@
 
 import { UNISIM_S6_VHDL } from './unisim-s6.js';
 import { UNISIM_JTAG_VHDL } from './unisim-jtag.js';
+import { GOWIN_SOURCE, GOWIN_CELLS, usesGowin } from './gowin-prims.js';
 import { hex2 } from './util.js';
 
 /** True if a VHDL source uses the UNISIM library (e.g. a netgen netlist). */
@@ -844,10 +845,29 @@ export function vlogUsesUnisim(text, defined = new Set(), prims = primNames()) {
   return false;
 }
 
+// The Gowin primitives a Verilog source instantiates (#2299): one that is not UNISIM's (DFFE, ALU, MUX2_LUT5, rPLL…; their
+// names as Gowin writes them, rPLL and pROM in lower case), or one whose name is UNISIM's too with a pin of Gowin's (a LUT's
+// output F, VCC's V, MULT18X18's DOUT, IOBUF's OEN)
+let GOWIN_ONLY = null;
+const gowinOnly = () => (GOWIN_ONLY ??= new Set([...GOWIN_CELLS].filter((n) => !primNames().has(n.toUpperCase()))));
+const GOWIN_PINS = /(?:^|[;\s)])(LUT[1-4]|VCC|MULT18X18|IOBUF)\s*(?:#\s*\([^;]*?\)\s*)?(?:[A-Za-z_][\w$]*|\\\S+)\s*(?:\[[^\]]*\]\s*)?\([^;]*?\.(?:F|V|DOUT|OEN)\s*\(/g;
+
+/** True if a Verilog source instantiates a Gowin primitive (`DFFE r (…);`, `LUT4 #(.INIT(16'h8000)) l (.F(y), …);`) not one of `defined`. */
+export function vlogUsesGowin(text, defined = new Set()) {
+  const t = stripVlogComments(text), only = gowinOnly();
+  // (an instance's name may be escaped, as Yosys writes it: \dec.q2_DFF_Q)
+  const re = /(?:^|[;\s)])([A-Za-z][A-Za-z0-9_]*)(?![\w$])\s*(?:#\s*\(|(?:[A-Za-z_][\w$]*|\\\S+)\s*(?:\[[^\]]*\]\s*)?\()/g;
+  for (const m of t.matchAll(re)) if (only.has(m[1]) && !defined.has(m[1].toUpperCase())) return true;
+  for (const m of t.matchAll(GOWIN_PINS)) if (!defined.has(m[1])) return true;
+  return false;
+}
+
 /**
  * Library sources to compile with `sources`: Silinx's UNISIM models for netlists written by
  * netgen and designs that instantiate primitives (VHDL `library UNISIM`, or a Verilog instance of
- * one), and SIMPRIM's for netgen's post-implementation netlists. Libraries already among
+ * one), and SIMPRIM's for netgen's post-implementation netlists; the Gowin primitives' (#2299) for a
+ * design that instantiates them (VHDL `library gw1n`, or a Verilog instance of one: Yosys's synth_gowin
+ * netlist), in place of UNISIM's (some of their names are the same). Libraries already among
  * `sources` are not repeated.
  */
 export function primitiveSources(sources) {
@@ -855,16 +875,18 @@ export function primitiveSources(sources) {
   const texts = list.map((s) => s.text);
   let sim = texts.some(usesSimprim);
   let uni = sim || texts.some(usesUnisim);
+  let gw = !uni && texts.some(usesGowin);
   if ((!uni || !sim) && list.some(isVerilog)) {
     const defined = new Set();
     for (const s of list) {
       const t = isVerilog(s) ? stripVlogComments(s.text) : String(s.text || '');
       for (const m of t.matchAll(isVerilog(s) ? /\b(?:module|macromodule|primitive)\s+([A-Za-z_]\w*)/g : /\bentity\s+([A-Za-z_]\w*)\s+is\b/gi)) defined.add(m[1].toUpperCase());
     }
+    gw ||= !uni && list.some((s) => isVerilog(s) && vlogUsesGowin(s.text, defined));
     // (a Verilog netlist of SIMPRIM primitives: the Silinx toolchain's post-translate / post-map models, #121)
     sim ||= list.some((s) => isVerilog(s) && vlogUsesUnisim(s.text, defined, simprimNames()));
-    uni ||= sim || list.some((s) => isVerilog(s) && vlogUsesUnisim(s.text, defined));
+    uni ||= sim || (!gw && list.some((s) => isVerilog(s) && vlogUsesUnisim(s.text, defined)));
   }
   const have = new Set(list.map((s) => s.path));
-  return [...(uni ? [UNISIM_SOURCE] : []), ...(sim ? [SIMPRIM_SOURCE] : [])].filter((s) => !have.has(s.path));
+  return [...(uni ? [UNISIM_SOURCE] : []), ...(sim ? [SIMPRIM_SOURCE] : []), ...(gw && !uni ? [GOWIN_SOURCE] : [])].filter((s) => !have.has(s.path));
 }

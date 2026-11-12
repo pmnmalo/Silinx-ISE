@@ -5,6 +5,7 @@
 // with the same behaviour (VHDL signal semantics: outputs are updated one delta later).
 // Primitives not listed here (latches, block RAMs, multipliers, DCMs) keep their VHDL models.
 import * as V from './values.js';
+import { gowinPrimitive } from './native-gowin.js';
 
 const VAL = [V.ZERO, V.ONE, V.X1];
 // bit 0 of a value: 0, 1 or 2 (unknown). (Compared, not masked, when it is a single bit: a BigInt & allocates,
@@ -30,17 +31,18 @@ const FF = /^(FD(C|P|R|S|E|CE|PE|RE|SE|RS|RSE|CP|CPE)?)(_1)?$/;
 
 /**
  * Native process for primitive `name` with elaborated `params` ({ name, value }) and `ports`
- * ({ name, dir, sig }); null if the primitive has no native implementation. reset(): its state as at
+ * ({ name, dir, sig }); null if the primitive has no native implementation. gowin: one of the Gowin
+ * primitives (gowin-prims.js, #2299), whose names may be UNISIM's (LUT4, its output F). reset(): its state as at
  * the start (a simulator that starts again: the board emulator's power cycle, #698).
  * @returns {{ fn(sim), inputs: object[], outputs: object[], init: Array<[sig, value]>, reset() } | null}
  */
-export function nativePrimitive(name, params, ports) {
+export function nativePrimitive(name, params, ports, { gowin = false } = {}) {
   const proj = new Map();   // output -> [stamp, scheduled bit] (below)
-  const r = primitive(name, params, ports, proj);
+  const r = primitive(name, params, ports, proj, gowin);
   if (r) { const own = r.reset; r.reset = () => { proj.clear(); own?.(); }; }
   return r;
 }
-function primitive(name, params, ports, proj) {
+function primitive(name, params, ports, proj, gowin) {
   const N = String(name).toUpperCase();
   const P = new Map(ports.map((p) => [p.name.toUpperCase(), p.sig]));
   const param = (k) => params.find((p) => p.name.toUpperCase() === k)?.value;
@@ -63,6 +65,7 @@ function primitive(name, params, ports, proj) {
   // as the VHDL models in core/unisim.js)
   const mux = (a, c, s) => comb(ins(a, c, s), outs('O', 'LO'), () => { const x = b(s); if (x === 1) return b(c); if (x === 0) return b(a); const u = b(a); return u !== 2 && u === b(c) ? u : 2; });
 
+  if (gowin) return gowinPrimitive(N, { P, param, ins, outs, set, comb, b, mux, bit, rising, falling, VAL });
   let m;
   if ((m = LUT.exec(N))) {
     const n = Number(m[2]);

@@ -77,7 +77,7 @@ export function elabInstance(ctx, mod, name, path, paramOverrides, portConns, pa
   for (const p of mod.ports) safe(E, p.loc, () => elabPort(E, p, portConns.get(p.name)));
   // Silinx's own netlist primitives (core/unisim.js) run as native processes (core/native.js)
   if (String(mod.file || '').startsWith('<silinx>/')) {
-    const nat = nativePrimitive(mod.name, inst.params, inst.ports);
+    const nat = nativePrimitive(mod.name, inst.params, inst.ports, { gowin: mod.file === '<silinx>/gowin.vhd' });
     if (nat) {
       // (an output connected to a whole Verilog net is that net: it starts at the primitive's
       // INIT, not at the x of a driven net)
