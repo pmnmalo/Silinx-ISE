@@ -1,7 +1,7 @@
 // Calls nested in calls (#3508): a constant computed by a function that calls the next one, thousands deep, overflowed
 // the elaboration's stack (each call's subprogram bound inside its caller's binding: past about 230 functions of one
 // statement, past about 100 whose call sits in an if, a for and a case), thrown out of elaborate. The elaboration
-// binds calls nested MAX_CALL_NESTING (64) levels deep; a call past it is one error of its file at that call, never a
+// binds calls nested MAX_CALL_NESTING (32, #3612) levels deep; a call past it is one error of its file at that call, never a
 // throw. A chain of functions MAX_CALL_NESTING long, each call in an if, a loop and a case and in parentheses, in VHDL
 // and Verilog: a constant and a value of the simulation computed through it (Check Syntax with no warnings, simulated,
 // the synthesis input with no warnings), its outermost call MAX_NESTING - 6 blocks deep; one function more, and

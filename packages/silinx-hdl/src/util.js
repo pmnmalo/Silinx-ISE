@@ -34,10 +34,12 @@ export const STMT_NESTING_MESSAGE = `statement nested more than ${MAX_NESTING} l
 // The deepest calls nest while a design is elaborated (#3508): a function calling another, that calls another…, each
 // call's subprogram bound (and a constant one evaluated) inside its caller's binding. The JavaScript stack ran out
 // (Node 24's default stack) past about 230 functions of one statement each, past about 100 whose call sits in an if, a
-// for, a case and parentheses; 64, with a margin over both: 64 of those still bind with their outermost call 250 blocks
-// deep (statements nest at most MAX_NESTING levels) and 30 parentheses around each call. A call past it is an error of
-// the file at the call.
-export const MAX_CALL_NESTING = 64;
+// for, a case and parentheses. Each level of those takes about 35 frames, 10 KB of the stack (more while the code is not
+// yet optimized): 64 of them, with their outermost call 250 blocks deep (statements nest at most MAX_NESTING levels)
+// and 30 parentheses around each call, took 600 to 700 KB of Node's 984 KB and overflowed it on CI's macOS runner, Node
+// 22, in every run (#3612). 32: there they bind and simulate in every run, still with 800 KB. A call past it is an
+// error of the file at the call.
+export const MAX_CALL_NESTING = 32;
 export const CALL_NESTING_MESSAGE = `calls nested more than ${MAX_CALL_NESTING} levels deep (a function calling another, that calls another…)`;
 // The largest object (#3555): a vector's width, an array's elements times their width (an array of arrays: every
 // level's), a record's fields, a string's characters (8 bits each), an expression's result (a concatenation, a
