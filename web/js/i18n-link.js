@@ -1,8 +1,16 @@
-// Portuguese strings of a design's link (#2826): Copy Link… (web/js/link-copy.js) and the opening of a link
+// Portuguese strings of a design's link (#2826): Share Project…'s copy (web/js/link-copy.js), its Share: row
+// (web/js/share-how.js, #3698) and the opening of a link
 // (web/js/link-open.js); merged into the dictionary of i18n.js.
 export const LINK_PT = {
-  'Share Project Copy…': 'Partilhar Cópia do Projeto…', 'Share Module Copy…': 'Partilhar Cópia do Módulo…',
-  'Share Project Copy': 'Partilhar Cópia do Projeto', 'Share Module Copy': 'Partilhar Cópia do Módulo',   // (its dialog's titles, #3628)
+  // (one action, a copy or live chosen in its window, #3698)
+  'Share Project…': 'Partilhar Projeto…', 'Share Module…': 'Partilhar Módulo…', 'Share Project': 'Partilhar Projeto', 'Share Module': 'Partilhar Módulo',
+  'Share:': 'Partilhar:', 'A copy: a link with the project in it': 'Uma cópia: uma ligação com o projeto lá dentro',
+  'Live: others follow it as you work': 'Em direto: os outros seguem-no enquanto trabalha',
+  'This edition of Silinx does not share a project live.': 'Esta edição do Silinx não partilha um projeto em direto.',
+  'A Silinx opened from a file has no address that others can open: open Silinx from its site to share a project live.':
+    'Um Silinx aberto a partir de um ficheiro não tem um endereço que os outros possam abrir: abra o Silinx a partir do seu sítio para partilhar um projeto em direto.',
+  'You are following another\'s project: stop following it to share one live.': 'Está a seguir o projeto de outra pessoa: deixe de o seguir para partilhar um em direto.',
+  'A test bench is shared as a copy only.': 'Um test bench só se partilha como cópia.',
   'Copy Link': 'Copiar Ligação', 'Open from a Link': 'Abrir a partir de uma Ligação',
   // Copy Link's short link (#3223)
   'Link:': 'Ligação:',

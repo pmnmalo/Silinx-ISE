@@ -342,9 +342,8 @@ function moduleContextMenu(e, mod, file) {
     ]),
     isSimView ? { label: 'Simulate Behavioral Model', action: () => runSimulation(mod) } : null,
     // (a schematic's, a state diagram's, a Petri net's or an ASM chart's module: its Try it or simulation, #2826, #2869, #2881)
-    { label: 'Share Module Copy…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog({ module: mod, view: /\.(sch|fsm|pn|asm)\.json$/i.test(S.hdlToSch?.[file] || file) ? 'try' : null })) },
-    // (the project shared live, opening on this module: the editions that share, not while following another's, #3631)
-    api.collab || api.standalone ? { label: 'Share Module Live…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog({ module: mod })), disabled: () => !!api.following } : null,
+    // (a copy, or live opening on this module, #3631: chosen in its window, #3698)
+    { label: 'Share Module…', action: () => import('./share-how.js').then(m => m.shareDialog({ module: mod, view: /\.(sch|fsm|pn|asm)\.json$/i.test(S.hdlToSch?.[file] || file) ? 'try' : null })) },
     '-',
     { label: 'New Source…', action: () => wiz.newSourceWizard() },
     { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog() },
@@ -421,9 +420,7 @@ function projectContextMenu(e) {
     { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog() },
     '-',
     { label: 'Design Properties…', action: () => wiz.projectProperties() },
-    { label: 'Share Project Copy…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()) },   // (#2826)
-    // (Share Project Live…, as the File menu's: the editions that share, disabled while following another's, #3479)
-    api.collab || api.standalone ? { label: 'Share Project Live…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => !!api.following } : null,
+    { label: 'Share Project…', action: () => import('./share-how.js').then(m => m.shareDialog()) },   // (a copy, #2826, or live, #3479: chosen in its window, #3698)
     // (Initialize Repository…, Sign in with GitHub…: where they apply, before the Git submenu that has them too, #3534)
     ...gitStartItems().map(({ label, action }) => ({ label, action })),
     // (git, the server editions: here in both interfaces, the Silinx one having no File menu, #3195)

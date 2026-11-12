@@ -1,4 +1,4 @@
-// The MCP server's tools of a design's link (#2826, server/mcp.js, #2674), as the interface's Share Project Copy… and the
+// The MCP server's tools of a design's link (#2826, server/mcp.js, #2674), as the interface's Share Project… and the
 // opening of a link: project_link makes a project's link (the project inside it, core/design-link.js; the view, the
 // module, a guided lab opened beside it), open_link makes a project of a link (the design inside it, or an example),
 // as the interface does when it is opened at that address: a project of the workspace that differs is never replaced
@@ -34,8 +34,8 @@ async function labIds(name) {
 
 export const LINK_TOOLS = [
   {
-    name: 'project_link', title: 'Share Project Copy (a project\'s link)',
-    description: `The link that opens a project in Silinx, as Share Project Copy… (Share Module Copy… with top) does (for lecture slides): the whole project inside the link (compressed; the HDL its drawings make again left out), and what it opens in: view try (Try it: a schematic's live simulation, a state diagram's, a Petri net's or an ASM chart's simulation), simulate (its test bench's simulation) or emulate (the board emulator); top: the module (default the project's top). A link longer than ${LINK_LIMITS.slides} characters works in a browser but some slide tools cut it; one above ${LINK_LIMITS.maxEncoded} cannot be made (export_project kind silinx, a zip hosted elsewhere, and its link #open=<its https address>). Anyone with the link has the whole project, its comments included.`,
+    name: 'project_link', title: 'A project\'s link (Share Project…, a copy)',
+    description: `The link that opens a project in Silinx, as Share Project… does with A copy chosen (Share Module… with top) (for lecture slides): the whole project inside the link (compressed; the HDL its drawings make again left out), and what it opens in: view try (Try it: a schematic's live simulation, a state diagram's, a Petri net's or an ASM chart's simulation), simulate (its test bench's simulation) or emulate (the board emulator); top: the module (default the project's top). A link longer than ${LINK_LIMITS.slides} characters works in a browser but some slide tools cut it; one above ${LINK_LIMITS.maxEncoded} cannot be made (export_project kind silinx, a zip hosted elsewhere, and its link #open=<its https address>). Anyone with the link has the whole project, its comments included.`,
     inputSchema: { type: 'object', properties: {
       project: PROJECT, view: { type: 'string', enum: LINK_VIEWS, description: 'What the link opens: try, simulate or emulate (default: the project only).' },
       top: STR('The module to open (default: the project\'s top); with view simulate, the test bench to simulate (default: the project\'s); a test bench only with simulate.'),
@@ -43,7 +43,7 @@ export const LINK_TOOLS = [
       lab: STR('A guided lab of the project to open beside it (its id: lab action list).'),
       short: { type: 'boolean', description: 'A short link (#gist=…, about 140 characters): the project encrypted and saved as a secret gist of the GitHub account of the server\'s token (GH_TOKEN); only the link opens it.' },
       qr: { type: 'boolean', description: `The link's QR code too, as the interface shows it (#3637): qr, an SVG (black on white). A link longer than a QR code holds (${QR_MAX_BYTES} bytes) has none, a warning saying so (a short link has one).` },
-      expires_days: { type: 'integer', minimum: 0, maximum: 3650, description: 'With short: the link expires after this many days, opening it then refused (0 or none: never; Share Project Copy… offers 7, 30, 182, 365). Making a short link deletes the account\'s expired Silinx gists.' },
+      expires_days: { type: 'integer', minimum: 0, maximum: 3650, description: 'With short: the link expires after this many days, opening it then refused (0 or none: never; Share Project… offers 7, 30, 182, 365). Making a short link deletes the account\'s expired Silinx gists.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     async run({ project: name, view, top, base = SITE_URL, lab, short = false, expires_days: days = 0, qr = false }) {

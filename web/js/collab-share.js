@@ -1,5 +1,5 @@
-// Share Project Live… (#3181): the owner shares the open project live, read only, through the relay of Silinx's server
-// (server/collab-relay.js). Its files go into a Yjs document (core/collab-doc.js), kept as the project changes: what
+// Share Project…'s live sharing (#3181; a copy or live: web/js/share-how.js, #3698): the owner shares the open project
+// live, read only, through the relay of Silinx's server (server/collab-relay.js). Its files go into a Yjs document (core/collab-doc.js), kept as the project changes: what
 // the page saves, renames, deletes, the project's settings, and what another process changes on disk (#2843); the
 // editor in front and its cursor go into the owner's awareness. The link (core/collab-link.js) carries the room and
 // its key, so the relay sees nothing of the project. The followers are shown in the toolbar (collab-presence.js),
@@ -29,6 +29,7 @@ import { shareRoom, colorOf } from '/core/collab-client.js';
 import { followLink, relayUrl, relayAddress, withTop } from '/core/collab-link.js';
 import { newHostKey } from '/core/collab-meet.js';
 import { qrBox } from './link-qr.js';
+import { howRow, shareTitle } from './share-how.js';
 
 export const NAME_KEY = prefKey('silinx.collab.name');
 const TRACK_MS = 300;
@@ -50,13 +51,13 @@ export const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim().slice(
 let share = null;   // { name, session, doc, link, editLink, restore, orig, timer, known: Map<client, name>, view, hosted (a room of the page's), bound, unwatch,
                     //   bases (a drawing's text last put into its structure, #3183), drawn (its drawings bound), drawing (their writes, one after the other) }
 
-/** Share Project Live…: shares the open project (asks the name first), or shows the link of the one shared; Share
- *  Module Live… (`module`, #3631): the same, that module's source opened (the followers follow it), the links opening
- *  on it. */
-export async function shareProjectDialog({ module = null } = {}) {
+/** Share Project…'s window, live: shares the open project (asks the name first), or shows the link of the one shared;
+ *  Share Module… (`module`, #3631): the same, that module's source opened (the followers follow it), the links opening
+ *  on it (`view`: its copy's, the way switched, #3698). */
+export async function shareProjectDialog({ module = null, view = null } = {}) {
   if (!S.project) return null;
-  const action = module ? 'Share Module Live' : 'Share Project Live';
-  if (share) return showShared(module);
+  const action = shareTitle(module);
+  if (share) return showShared(module, view);
   // (a page opened from a file has no address the followers could open: the site's has, #3227)
   if (location.protocol === 'file:') { app.log(`ERROR: ${action}: a Silinx opened from a file has no address that others can open; open Silinx from its site to share a project.`, 'err'); return null; }
   const input = h('input', { type: 'text', value: savedName(), 'data-field': 'name', maxlength: 40, style: { width: '100%' } });
@@ -68,25 +69,33 @@ export async function shareProjectDialog({ module = null } = {}) {
   const relayPart = !relays.length ? null : h('div', { class: 'collab-relay' },
     h('label', { class: 'collab-check' }, viaRelay, ' Through a relay (a Silinx server that lets this site in); else this page hosts it'),
     h('label', {}, 'The relay\'s address:'), address, h('label', {}, 'Its key (from its administrator):'), key);
+  // (a copy, or live: the window's first row, #3698)
+  let closeIt = null;
+  const way = howRow('live', { module, view, close: () => closeIt?.() });
   const ok = await dialog({
     title: action,
-    body: h('div', { class: 'collab-dlg' },
+    onOpen: ({ close }) => { closeIt = () => close(null); },
+    body: h('div', { class: 'collab-dlg' }, way.el,
       h('p', {}, 'Others follow this project live with its link, read only: its files and drawings as they change, the editor you have open and your cursor. Its builds are not shared.'),
       h('label', {}, 'Your name, as they see it:'), input, relayPart),
     buttons: [{ label: 'Share', primary: true, value: () => ({ name: cleanName(input.value), relay: { on: viaRelay.checked, address: address.value.trim(), key: key.value } }) }, { label: 'Cancel', value: null }],
   });
+  if (way.wanted) return way.switched();
   if (!ok?.name) return null;
   keepName(ok.name);
   if (!api.collab) keepRelay(ok.relay);
   const how = !api.collab && ok.relay.on ? { via: 'relay', relay: ok.relay } : {};
   try { await startSharing(ok.name, how); } catch (e) { app.log(`ERROR: ${action}: ${e.message}.`, 'err'); return null; }
-  return showShared(module);
+  return showShared(module, view);
 }
 
 // the dialog of the links, a module's (its source opened first, as a link's top= opens it: link-open.js) or the project's
-async function showShared(module) {
+async function showShared(module, view) {
   if (module) await (await import('./link-open.js')).showModule(module, true);
-  return linkDialog(module);
+  let closeIt = null;
+  const way = howRow('live', { module, view, close: () => closeIt?.() });
+  const r = await linkDialog(module, way.el, close => { closeIt = close; });
+  return way.wanted ? way.switched() : r;
 }
 
 // the project as the API gives it, and its files' texts: { project, files }
@@ -126,7 +135,7 @@ export async function startSharing(name, { via = api.collab ? 'relay' : 'host', 
   addEventListener('silinx:disk-changes', onDisk);
   setPresenceCommands(commands);
   draw();
-  app.log(`Sharing project "${project}": anyone with its link follows it live, read only (Share Project Live… shows the link; Stop Sharing ends it).`, 'ok');
+  app.log(`Sharing project "${project}": anyone with its link follows it live, read only (Share Project… shows the link; Stop Sharing ends it).`, 'ok');
   if (other) app.log(`Shared through the relay at ${new URL(other).host}: it sees no file, only who is in.`, 'info');
   if (host) {
     app.log('This page hosts the shared project: its followers find it at the meeting point when they open the link, or send you a code (Add a Follower…, in the toolbar, takes it); it lasts while this page is open.', 'info');
@@ -158,17 +167,17 @@ export async function stopSharing(why = null) {
 export const sharedLink = () => share?.link || null;
 export const editorsLink = () => share?.editLink || null;
 
-function linkDialog(module = null) {
+function linkDialog(module, howEl, onClose) {
   // (a module's: the links that open on it, #3631)
   const link = module ? withTop(share.link, module) : share.link, editLink = module ? withTop(share.editLink, module) : share.editLink;
   const field = h('input', { type: 'text', value: link, readonly: '', 'data-field': 'link', 'data-no-i18n': '', style: { width: '100%' } });
   // (the follow link's QR code, #3637: for a phone or another computer, enlarged for a projector)
   const qr = qrBox();
-  if (!qr.show(link)) app.log(`WARNING: ${module ? 'Share Module Live' : 'Share Project Live'}: the link is ${link.length} characters, too long for a QR code.`, 'warn');
+  if (!qr.show(link)) app.log(`WARNING: ${shareTitle(module)}: the link is ${link.length} characters, too long for a QR code.`, 'warn');
   const editField = h('input', { type: 'text', value: editLink, readonly: '', 'data-field': 'edit-link', 'data-no-i18n': '', style: { width: '100%' } });
   return dialog({
-    title: module ? 'Share Module Live' : 'Share Project Live',
-    body: h('div', { class: 'collab-dlg' },
+    title: shareTitle(module),
+    body: h('div', { class: 'collab-dlg' }, howEl,
       h('p', {}, module ? `Anyone with this link follows "${share.project}" live, read only, opening it on ${module}, as long as you share it.` : `Anyone with this link follows "${share.project}" live, read only, as long as you share it.`),
       h('div', { class: 'collab-link-row' }, h('div', {}, field), qr.el),
       h('p', {}, 'Anyone with the editors\' link edits its text files and drawings with you, live.'),
@@ -181,7 +190,7 @@ function linkDialog(module = null) {
       { label: 'Stop Sharing', value: () => { stopSharing(); return null; } },
       { label: 'Close', value: link },
     ],
-    onOpen: () => setTimeout(() => field.select(), 0),
+    onOpen: ({ close }) => { onClose(() => close(null)); setTimeout(() => field.select(), 0); },
   });
 }
 
@@ -210,7 +219,7 @@ function onEvent(ev) {
     share.known = now;
     draw();
   } else if (ev.type === 'closed') stopSharing(`Sharing "${share.project}" ended: ${ev.reason}.`);
-  else if (ev.type === 'error') app.log(`WARNING: Share Project Live: ${ev.message}.`, 'warn');
+  else if (ev.type === 'error') app.log(`WARNING: Share Project: ${ev.message}.`, 'warn');
 }
 
 // the editor in front and its cursor, for the followers; another project opened: sharing stops

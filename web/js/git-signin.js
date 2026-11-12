@@ -52,7 +52,7 @@ async function tokenDialog() {
         h('li', {}, 'Open GitHub\'s page for a new token:', ' ', h('a', { class: 'git-new-token', href: NEW_TOKEN, target: '_blank', rel: 'noopener noreferrer', 'data-no-i18n': '' }, NEW_TOKEN)),
         h('li', {}, 'Repository access: Only select repositories (the ones to open in Silinx).'),
         h('li', {}, 'Repository permissions: Contents, Read and write (Metadata, Read-only, comes with it).'),
-        h('li', {}, 'Account permissions: Gists, Read and write (for Share Project Copy\'s short links).'),
+        h('li', {}, 'Account permissions: Gists, Read and write (for Share Project\'s short links).'),
         h('li', {}, 'Generate the token, copy it and paste it here.')),
       field, err, checkLine(remember, REMEMBER),
       keptHint()),

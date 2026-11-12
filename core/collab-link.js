@@ -8,7 +8,7 @@
 //   <Silinx's address>/#follow=<room>.<key>&relay=<the relay's address, its origin, http(s)>
 // A hosted room found at the public meeting point (core/collab-meet.js) carries the owner's public key after `.host`,
 // which tells the owner from the other pages that have the link: …#follow=<room>.<key>.host.<owner's key>.
-// A module's link (#3631, Share Module Live…) names the module its follower opens on, last: …#follow=…&top=<module>.
+// A module's link (#3631, Share Module…) names the module its follower opens on, last: …#follow=…&top=<module>.
 import { KEY_RE } from './collab-crypto.js';
 import { SIGN_RE, PUB_RE } from './collab-sign.js';
 import { MODULE_RE } from './design-link.js';
@@ -53,7 +53,7 @@ export function followLink(base, room, key, via = 'relay', sign = null, relay = 
   return u.href;
 }
 
-/** A link to follow that opens on a module (Share Module Live…, #3631): the link with `&top=<module>` (one only). */
+/** A link to follow that opens on a module (Share Module…, #3631): the link with `&top=<module>` (one only). */
 export function withTop(link, top) {
   if (!MODULE_RE.test(String(top ?? ''))) throw new Error(`'${String(top ?? '').slice(0, 64)}' is not a module name`);
   const l = parseFollowLink(link);
@@ -75,7 +75,7 @@ export function parseFollowLink(text) {
   const sign = m?.[1] === 'edit' ? m[4] : null;
   let relay = null;
   if (m?.[7] !== undefined) { try { relay = relayAddress(decodeURIComponent(m[7])); } catch { relay = null; } }
-  if (!m || !ROOM_RE.test(m[2]) || !KEY_RE.test(m[3]) || (m[1] === 'edit' ? !SIGN_RE.test(sign || '') : m[4] !== undefined) || (m[6] !== undefined && !PUB_RE.test(m[6])) || (m[7] !== undefined && (!relay || m[5])) || (m[8] !== undefined && !MODULE_RE.test(m[8]))) throw new Error('the link to follow is broken (copy it again from the owner\'s Share Project Live)');
+  if (!m || !ROOM_RE.test(m[2]) || !KEY_RE.test(m[3]) || (m[1] === 'edit' ? !SIGN_RE.test(sign || '') : m[4] !== undefined) || (m[6] !== undefined && !PUB_RE.test(m[6])) || (m[7] !== undefined && (!relay || m[5])) || (m[8] !== undefined && !MODULE_RE.test(m[8]))) throw new Error('the link to follow is broken (copy it again from the owner\'s Share Project)');
   return { base: at > 0 ? s.slice(0, at) : null, room: m[2], key: m[3], via: m[5] ? 'host' : 'relay', sign, ...(relay ? { relay } : {}), ...(m[6] ? { host: m[6] } : {}), ...(m[8] ? { top: m[8] } : {}) };
 }
 

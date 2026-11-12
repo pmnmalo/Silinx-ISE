@@ -109,8 +109,9 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   assert.ok(file.includes('Import Silinx Project (.zip)…') && file.includes('Export Silinx Project (.zip)…'), file.join(' | '));
   assert.deepEqual(file.filter((l) => /bundle/i.test(l)), []);
   await page.closeMenus();
-  // Share Project Live… (#3227): here, from a file, refused with its reason (the site's hosts the room in the page)
-  assert.ok(file.includes('Share Project Live…'), file.join(' | '));
+  // Share Project… (#3227, #3698): here, from a file, its copy only, Live disabled with its reason (the site's hosts the
+  // room in the page)
+  assert.ok(file.includes('Share Project…'), file.join(' | '));
   // New Project wizard from the embedded blinky example
   // (what Implement needs would be fetched as soon as the project opens: not from a file, #1450)
   await page.eval(() => { window.SILINX_PREPARE_DELAY = 0; });
@@ -131,8 +132,12 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   await page.waitFor(() => window.Silinx.project?.name === 'Solo' && [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'u_knight - knight'));
   // the project lives in localStorage
   assert.ok(await page.eval(() => Object.keys(localStorage).some((k) => (localStorage.getItem(k) || '').includes('"Solo"'))));
-  await page.menu('File', 'Share Project Live…');
-  await page.waitConsole(/^ERROR: Share Project Live: a Silinx opened from a file has no address that others can open; open Silinx from its site to share a project\.$/m);
+  await page.menu('File', 'Share Project…');
+  await page.waitDialog('Share Project');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .share-how input')].map((r) => [r.value, r.checked, r.disabled, r.closest('label').title])),
+    [['copy', true, false, ''], ['live', false, true, 'A Silinx opened from a file has no address that others can open: open Silinx from its site to share a project live.']]);
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
   // nothing of what Implement needs downloaded in the background from a page opened from a file (#1450): WebKit and
   // Firefox give it a Cache Storage, and the download, cancelled by the reload below, was a console error in WebKit
   const fetched = () => served.filter((p) => /^assets\//.test(p));
@@ -595,7 +600,7 @@ uiTest('standalone edition (file://) in a user\'s browser (Chrome without --allo
 }, { url: () => 'about:blank', timeout: 300000 });
 
 // #418: the Board Emulator in the browser edition compiles the design with the site's Yosys (its assets)
-uiTest('#3227 browser edition: Share Project Live… hosts the room in the page (its link …#follow=<room>.<key>.host.<owner\'s key>), Add a Follower… among its commands', E, async (page) => {
+uiTest('#3227 browser edition: Share Project… hosts the room in the page (its link …#follow=<room>.<key>.host.<owner\'s key>), Add a Follower… among its commands', E, async (page) => {
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
   await page.menu('File', 'New Project…');
@@ -610,8 +615,11 @@ uiTest('#3227 browser edition: Share Project Live… hosts the room in the page 
   await page.waitFor(() => window.Silinx.project?.name === 'WebShare');
   // (the meeting point between this browser's pages: the tests never reach the public trackers)
   await page.eval(() => { localStorage.setItem('silinx.collab.meeting', 'local'); localStorage.setItem('silinx.dev.collab.meeting', 'local'); });
-  await page.menu('File', 'Share Project Live…');
-  await page.waitDialog('Share Project Live');
+  await page.menu('File', 'Share Project…');
+  await page.waitDialog('Share Project');
+  // (Live chosen in its window: the copy its default, #3698)
+  await page.click('.dlg-overlay input[data-field=how-live]');
+  await page.waitFor(() => !!document.querySelector('.dlg-overlay input[data-field=name]'), [], { what: 'the live window' });
   // (a relay of the site's, #3227: none in a build without SILINX_SITE_RELAYS, so no such choice; this page hosts it)
   assert.equal(await page.eval(() => !!document.querySelector('.dlg-overlay .collab-relay')), false);
   await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
@@ -1464,9 +1472,9 @@ uiTest('#2826 browser edition (the Pages site): a design\'s link and an example\
   await boot();
   await page.waitConsole(/Opened 'gates' from a link\./);
   assert.equal(await page.dialogCount(), 0);
-  // the project's own link (Share Project Copy…'s), opened: the same project
-  await page.menu('File', 'Share Project Copy…');
-  await page.waitDialog('Share Project Copy');
+  // the project's own link (Share Project…'s), opened: the same project
+  await page.menu('File', 'Share Project…');
+  await page.waitDialog('Share Project');
   await page.eval(() => { const v = document.querySelector('.dlg-overlay select[data-field=view]'); v.value = 'simulate'; v.dispatchEvent(new Event('change')); });
   const link = await page.waitFor(() => /^https?:.*#design=[\w-]+&view=simulate(&ui=[\w-]+)?$/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
   await page.dialogButton('Cancel');
@@ -1483,15 +1491,15 @@ uiTest('#2894 regression, browser edition (the Pages site): a link opened in a n
   const pj = JSON.parse(await fs.readFile(path.join(ROOT, 'examples/pong/silinx.json'), 'utf8'));
   await page.goto(`${siteUrl}?l=1#open=example:pong`);
   await boot();
-  // Share Project Copy… and Share Module Copy…'s links: the project only, the module debounce's, the board emulator
+  // Share Project… and Share Module…'s links: the project only, the module debounce's, the board emulator
   const copy = async (view, module) => {
     if (module) {
       const row = await page.waitFor((m) => { const i = [...document.querySelectorAll('#hier .row')].findIndex((r) => r.dataset.module === m); return i >= 0 ? i : null; }, [module], { what: `${module}'s row` });
       await page.rightClick('#hier .row .lbl', { index: row });
       await page.waitForSelector('body > .menu-popup');
-      await page.click('body > .menu-popup .mi', { text: 'Share Module Copy…' });
-    } else await page.menu('File', 'Share Project Copy…');
-    await page.waitDialog(module ? 'Share Module Copy' : 'Share Project Copy');
+      await page.click('body > .menu-popup .mi', { text: 'Share Module…' });
+    } else await page.menu('File', 'Share Project…');
+    await page.waitDialog(module ? 'Share Module' : 'Share Project');
     await page.eval((v) => { const s = document.querySelector('.dlg-overlay select[data-field=view]'); s.value = v; s.dispatchEvent(new Event('change')); }, view);
     const link = await page.waitFor(() => /#design=[\w-]+/.test(document.querySelector('.dlg-overlay .link-out').value) && document.querySelector('.dlg-overlay .link-out').value, [], { what: 'the link' });
     await page.dialogButton('Cancel');

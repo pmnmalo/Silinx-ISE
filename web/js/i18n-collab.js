@@ -1,10 +1,9 @@
-// Portuguese strings of a shared project (#3181): Share Project Live… (web/js/collab-share.js), following one
+// Portuguese strings of a shared project (#3181): Share Project…'s live sharing (web/js/collab-share.js), following one
 // (web/js/collab-follow.js), who is in it (web/js/collab-presence.js), the follower's notice (web/js/collab-state.js),
 // a room the owner's page hosts (web/js/collab-host.js) and its meeting point (web/js/collab-meet.js);
 // merged into the dictionary of i18n.js. (The console's lines are not translated, as every tool's output.)
 export const COLLAB_PT = {
-  'Share Project Live…': 'Partilhar Projeto em Direto…', 'Share Project Live': 'Partilhar Projeto em Direto',
-  'Share Module Live…': 'Partilhar Módulo em Direto…', 'Share Module Live': 'Partilhar Módulo em Direto', 'Share': 'Partilhar',   // (Share Module Live…: #3631)
+  'Share': 'Partilhar',
   'Follow a Shared Project': 'Seguir um Projeto Partilhado', 'Follow': 'Seguir',
   // (a shared project's link given to a running Silinx with changes not saved yet, web/js/link-hash.js, #3531)
   'This link follows a project someone shares. Your open documents have changes not saved yet: save them, then follow it?':

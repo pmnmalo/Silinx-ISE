@@ -27,7 +27,7 @@ uiTest('#3223 Copy Link: the full link or a short one (a secret gist); the short
   await page.eval(async () => { const { api } = await import('/js/api.js'); await api.createProject({ name: 'lamp', template: 'blinky' }); });
   await page.openProject('lamp');
   await startCopy(page);
-  await page.waitDialog('Share Project Copy');
+  await page.waitDialog('Share Project');
   // the full link, as before; then the short one: made when it is copied
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+/);
   await page.click('.dlg-overlay input[data-field="short"]');
@@ -37,7 +37,7 @@ uiTest('#3223 Copy Link: the full link or a short one (a secret gist); the short
   await page.waitNoDialog();
   const link = await copied(page);
   assert.match(link, /#gist=[0-9a-f]{32}\.[A-Za-z0-9_-]{43}(&ui=[A-Za-z0-9_-]+)?$/);
-  await page.waitConsole(/Share Project Copy: the short link of 'lamp' copied, \d+ characters \(the project in a secret gist of your GitHub account\)\./);
+  await page.waitConsole(/Share Project: the short link of 'lamp' copied, \d+ characters \(the project in a secret gist of your GitHub account\)\./);
   const [id, key] = /#gist=([0-9a-f]+)\.([A-Za-z0-9_-]+)/.exec(link).slice(1);
   const gist = await page.eval(async (i) => (await fetch(`/fake-github/gists/${i}`)).json(), id);
   assert.equal(gist.public, false);
@@ -63,7 +63,7 @@ uiTest('#3223 Copy Link\'s short link in Portuguese', E, async (page) => {
   await page.openProject('luz');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await startCopy(page);
-  await page.waitDialog('Partilhar Cópia do Projeto');
+  await page.waitDialog('Partilhar Projeto');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .link-forms label')].map((l) => l.textContent)),
     ['A ligação completa: o projeto dentro dela (não precisa de nada, mas é longa)', 'Uma ligação curta: o projeto cifrado num gist secreto da sua conta do GitHub']);
   await page.click('.dlg-overlay input[data-field="short"]');
@@ -101,7 +101,7 @@ uiTest('#3629 Copy Link: a short link that expires; an expired one refused; the 
   await open(page, `#gist=${old.id}.${old.key}`);
   await page.waitConsole(new RegExp(`ERROR: Open from a link: the link expired on ${old.expires.slice(0, 10)} \\(its gist kept until its owner deletes it\\)\\.`));
   await startCopy(page);
-  await page.waitDialog('Share Project Copy');
+  await page.waitDialog('Share Project');
   const expires = () => page.eval(() => { const s = document.querySelector('.dlg-overlay select[data-field="expires"]'); return [s.disabled, s.value, [...s.options].map((o) => o.textContent)]; });
   assert.deepEqual(await expires(), [true, '0', ['Never', 'In a week', 'In a month', 'In six months', 'In a year']]);
   await page.click('.dlg-overlay input[data-field="short"]');
@@ -111,8 +111,8 @@ uiTest('#3629 Copy Link: a short link that expires; an expired one refused; the 
   await page.waitNoDialog();
   const link = await copied(page);
   const date = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-  await page.waitConsole(new RegExp(`Share Project Copy: the short link of 'dial' copied, ${link.length} characters \\(the project in a secret gist of your GitHub account, until ${date}\\)\\.`));
-  await page.waitConsole(/Share Project Copy: 1 expired short link deleted from your gists\./);
+  await page.waitConsole(new RegExp(`Share Project: the short link of 'dial' copied, ${link.length} characters \\(the project in a secret gist of your GitHub account, until ${date}\\)\\.`));
+  await page.waitConsole(/Share Project: 1 expired short link deleted from your gists\./);
   assert.equal((await page.eval(async (i) => (await fetch(`/fake-github/gists/${i}`)).status, old.id)), 404);
   // the new one opens
   await page.eval(async () => { const { api } = await import('/js/api.js'); await api.deleteProject('dial'); });
@@ -137,7 +137,7 @@ uiTest('#3635 Short Links…: listed, the one made here copied again, the expire
   });
   await page.openProject('beam');
   await startCopy(page);
-  await page.waitDialog('Share Project Copy');
+  await page.waitDialog('Share Project');
   await page.click('.dlg-overlay input[data-field="short"]');
   await page.dialogButton('Copy Link');
   await page.waitNoDialog();
@@ -174,7 +174,7 @@ uiTest('#3635 Short Links…: listed, the one made here copied again, the expire
   assert.deepEqual(await page.eval(async (a, b) => [(await fetch(`/fake-github/gists/${a}`)).status, (await fetch(`/fake-github/gists/${b}`)).status], made.never, made.old), [404, 404]);
   // from Copy Link's Manage short links…
   await startCopy(page);
-  await page.waitDialog('Share Project Copy');
+  await page.waitDialog('Share Project');
   await page.click('.dlg-overlay .link-manage a');
   await page.waitDialog('Short Links');
   assert.equal(await copied(page), null);

@@ -45,7 +45,7 @@ export async function meetFollowers(share, hostKey) {
   try {
     return await meetAsHost({ meeting: await meetingPoint(), room: share.session.room, key: share.session.key, hostKey, maxReceive: FOLLOWER_JOIN, attach: end => share.hosted?.follower(end) });
   } catch (e) {
-    app.log(`WARNING: Share Project Live: the meeting point is out of reach (${e.message}): each follower connects with a code instead (Add a Follower…).`, 'warn');
+    app.log(`WARNING: Share Project: the meeting point is out of reach (${e.message}): each follower connects with a code instead (Add a Follower…).`, 'warn');
     return null;
   }
 }

@@ -1,4 +1,4 @@
-// A QR code of a link (#3637): Share Project Copy…'s and Share Project Live…'s, for a phone or another computer to
+// A QR code of a link (#3637): Share Project…'s (a copy's, or the live sharing's), for a phone or another computer to
 // scan off the teacher's screen. A small encoder of ISO/IEC 18004's (model 2), made here, with no network: the text's
 // UTF-8 bytes in byte mode, the smallest version (1 to 40) that holds them at the lowest error correction (L), then the
 // highest correction that still fits that version (M, Q, H: a projector's glare forgives more), the mask of the least
