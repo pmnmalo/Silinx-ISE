@@ -4,6 +4,7 @@
 // Bound expression nodes (produced by elaborate.js) all carry `t` (ElType) and optionally `ew`
 // (evaluation width from Verilog context sizing). See elaborate.js for the node catalogue.
 import * as V from './values.js';
+import { MAX_ELEMENTS } from './util.js';
 import { mathReal, textFile, textio } from './interp-textio.js';
 import { formatDisplay, imageOf, strToVal, toStr } from './interp-format.js';
 export { formatDisplay, formatTime, imageOf, strToVal, toStr } from './interp-format.js';
@@ -18,6 +19,8 @@ function dasliceRange(n, ctx) {
   if (l.x || r.x) return null;
   const a = V.toNum(l), b = V.toNum(r);
   if (n.dir && nullSlice(n.dir, a, b)) return { off: 0, len: 0 };
+  // (its elements, each a value or a write of its own, within MAX_ELEMENTS: #3555)
+  if (Math.abs(a - b) >= MAX_ELEMENTS) throw new SimError(`array too large (${Math.abs(a - b) + 1} elements)`);
   return { off: Math.min(a, b) - (n.base.t.lo ?? 0), len: Math.abs(a - b) + 1 };
 }
 

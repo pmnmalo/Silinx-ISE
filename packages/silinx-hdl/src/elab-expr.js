@@ -7,6 +7,7 @@
 import * as V from './values.js';
 import { evalE, strToVal, bitpos } from './interp.js';
 import { mapBits } from './vhdl/parser.js';
+import { MAX_BITS, MAX_ELEMENTS, widthMessage } from './util.js';
 import {
   BIT, BOOL, CHAR, ElabError, INT, PHYS, REAL, STR, TIME, charConst, constOf, defaultValue, diag, elabType,
   enumChar, evalRange, fold, locNode, newSignal, packageScope, probeCtx, scalarBounds, stdTypeName, strVec, vecT,
@@ -400,6 +401,7 @@ function arraySliceNode(E, base, left, right, loc, dir) {
   const l = V.toNum(left.val), r = V.toNum(right.val);
   const isNull = E.lang === 'vhdl' && (desc ? l < r : l > r);
   const lo = Math.min(l, r), len = isNull ? 0 : Math.abs(l - r) + 1, off = lo - t.lo;
+  if (len > MAX_ELEMENTS) throw new ElabError(`array too large (${len} elements)`, loc);   // (#3555)
   if (len && (off < 0 || off + len > t.len)) diag(E, `slice out of range for '${base.name || 'expression'}'`, loc, 'warning');
   return { k: 'aslice', base, off, t: { kind: 'array', left: l, right: r, desc, lo, len, elem: t.elem, w: t.elem.w }, loc };
 }
@@ -556,12 +558,15 @@ function unconstrainedAggregate(E, e, expect, loc) {
       if (ch === 'others') throw new ElabError('aggregate with others needs a constrained target', loc);
       if (ch.range) {
         const r = evalRange(E, ch.range);
+        if (!r.isNull && Math.abs(r.left - r.right) >= MAX_ELEMENTS) throw new ElabError(`array too large (${Math.abs(r.left - r.right) + 1} elements)`, loc);
         if (!r.isNull) for (let i = Math.min(r.left, r.right); i <= Math.max(r.left, r.right); i++) at.set(i, val);
       } else at.set(V.toNum(constOf(E, bindExpr(E, ch, null, loc), loc)), val);
     }
   }
   if (!at.size) return mk(expect.ileft ?? 0, 0, []);
   const lo = Math.min(...at.keys()), len = Math.max(...at.keys()) - lo + 1;
+  // (its elements within MAX_ELEMENTS, #3555)
+  if (len > MAX_ELEMENTS) throw new ElabError(`array too large (${len} elements)`, loc);
   const elems = Array.from({ length: len }, (_, k) => at.get(lo + k));
   const gap = elems.findIndex(x => !x);
   if (gap >= 0) throw new ElabError(`aggregate has no element for index ${lo + gap}`, loc);
@@ -675,7 +680,15 @@ function bindAggregate(E, e, expect, loc) {
       if (!it.choices) { chars[pos++] = ch(it); continue; }
       for (const c of it.choices) {
         if (c === 'others') { other = ch(it); continue; }
-        if (c.range) { const r = evalRange(E, c.range); if (!r.isNull) for (let i = Math.min(r.left, r.right); i <= Math.max(r.left, r.right); i++) chars[i - 1] = ch(it); continue; }
+        if (c.range) {
+          const r = evalRange(E, c.range), hi = Math.max(r.left, r.right);
+          if (r.isNull) continue;
+          // (a string past MAX_BITS, 8 bits a character: #3555)
+          if (8 * hi > MAX_BITS) throw new ElabError(widthMessage('the expression', 8 * hi), loc);
+          const x = ch(it);
+          for (let i = Math.min(r.left, r.right); i <= hi; i++) chars[i - 1] = x;
+          continue;
+        }
         chars[V.toNum(constOf(E, bindExpr(E, c, null, loc), loc)) - 1] = ch(it);
       }
     }
@@ -719,8 +732,13 @@ function bindAggregate(E, e, expect, loc) {
         if (ch === 'others') { for (let k = 0; k < slots.length; k++) if (!slots[k]) slots[k] = val; }
         else if (ch.range) {
           const r = evalRange(E, ch.range);
-          if (!r.isNull) for (let i = Math.min(r.left, r.right); i <= Math.max(r.left, r.right); i++) slots[i - expect.lo] = val;
-        } else slots[V.toNum(constOf(E, bindExpr(E, ch, null, loc), loc)) - expect.lo] = val;
+          // (the array's elements only, #3555: a range past them is not walked)
+          const hi = Math.min(Math.max(r.left, r.right), expect.lo + expect.len - 1);
+          if (!r.isNull) for (let i = Math.max(Math.min(r.left, r.right), expect.lo); i <= hi; i++) slots[i - expect.lo] = val;
+        } else {
+          const k = V.toNum(constOf(E, bindExpr(E, ch, null, loc), loc)) - expect.lo;
+          if (k >= 0 && k < expect.len) slots[k] = val;
+        }
       }
     }
     const def = { k: 'c', val: defaultValue(expect.elem, E.lang), t: expect.elem };
@@ -736,31 +754,57 @@ function bindAggregate(E, e, expect, loc) {
     throw new ElabError('aggregate with others needs a constrained target', loc);
   }
   const w = t.w;
-  const bits = new Array(w).fill(null); // indexed by bit position
-  let pos = 0;
+  // the bits each element gives, by bit position, [lo, hi, value] (a range of them one entry: #3555, no list of the
+  // vector's bits), and the first others' value (the bits no element gives)
+  const given = [];
+  let others = null, pos = 0;
   for (const it of e.items) {
     const val = bindExpr(E, it.value, BIT, loc);
     if (!it.choices) {
-      const idx = t.desc ? t.left - pos : t.left + pos;
+      const p = bitpos(t, t.desc ? t.left - pos : t.left + pos);
       pos++;
-      bits[bitpos(t, idx)] = val;
+      given.push([p, p, val]);
       continue;
     }
     for (const ch of it.choices) {
-      if (ch === 'others') { for (let k = 0; k < w; k++) if (!bits[k]) bits[k] = val; }
+      if (ch === 'others') others ??= val;
       else if (ch.range) {
         const r = evalRange(E, ch.range);
-        if (!r.isNull) for (let i = Math.min(r.left, r.right); i <= Math.max(r.left, r.right); i++) bits[bitpos(t, i)] = val;
-      } else bits[bitpos(t, V.toNum(constOf(E, bindExpr(E, ch, null, loc), loc)))] = val;
+        if (!r.isNull) { const a = bitpos(t, r.left), b = bitpos(t, r.right); given.push([Math.min(a, b), Math.max(a, b), val]); }
+      } else { const p = bitpos(t, V.toNum(constOf(E, bindExpr(E, ch, null, loc), loc))); given.push([p, p, val]); }
     }
   }
   // (a null array: no element; its choices are still bound, for their diagnostics)
   if (w === 0) return { k: 'c', val: V.mk(0, 0n, 0n, !!t.s), t: vecT(0, t.s) };
-  const zero = { k: 'c', val: V.ZERO, t: BIT };
-  const parts = [];
-  for (let p = w - 1; p >= 0; p--) parts.push(bits[p] || zero);
-  if (parts.every(p => p === parts[0])) return fold({ k: 'repl', count: { k: 'c', val: V.fromInt(w), t: INT }, a: parts[0], t: vecT(w, t.s) });
+  const runs = bitRuns(given, w, others || { k: 'c', val: V.ZERO, t: BIT });
+  if (runs.length === 1) return fold({ k: 'repl', count: { k: 'c', val: V.fromInt(w), t: INT }, a: runs[0][1], t: vecT(w, t.s) });
+  // (a run of up to 64 bits: its bits one by one, as they were; a longer one replicated)
+  const parts = runs.flatMap(([n, a]) => (n <= 64 ? new Array(n).fill(a) : [fold({ k: 'repl', count: { k: 'c', val: V.fromInt(n), t: INT }, a, t: vecT(n) })]));
   return fold({ k: 'cat', parts, t: { ...vecT(w, t.s) } });
+}
+
+// The bits of a vector aggregate, from its most significant: [n, value] for each run of n bits of one value. given:
+// [lo, hi, value] by bit position (a later one over an earlier one; one outside the vector ignored), the other bits
+// fill's. In the time of the elements, not the bits (#3555): the positions where a value starts or ends cut the
+// vector into segments, each given the value of the last element over it (from the last, each segment once).
+function bitRuns(given, w, fill) {
+  const cuts = [...new Set([0, w, ...given.flatMap(([lo, hi]) => [Math.max(0, lo), Math.min(w, hi + 1)])])].filter(c => c >= 0 && c <= w).sort((a, b) => a - b);
+  const seg = new Map(cuts.map((c, k) => [c, k]));
+  const val = new Array(cuts.length - 1).fill(null);
+  const next = cuts.map((_, k) => k);   // (the first segment from k not yet given a value: path-halving)
+  const free = k => { while (next[k] !== k) { next[k] = next[next[k]]; k = next[k]; } return k; };
+  for (let g = given.length - 1; g >= 0; g--) {
+    const [lo, hi, v] = given[g];
+    if (hi < 0 || lo >= w) continue;
+    const end = seg.get(Math.min(w, hi + 1));
+    for (let k = free(seg.get(Math.max(0, lo))); k < end; k = free(k)) { val[k] = v; next[k] = k + 1; }
+  }
+  const runs = [];
+  for (let k = val.length - 1; k >= 0; k--) {
+    const v = val[k] || fill, n = cuts[k + 1] - cuts[k];
+    if (runs.length && runs[runs.length - 1][1] === v) runs[runs.length - 1][0] += n; else runs.push([n, v]);
+  }
+  return runs;
 }
 
 // VHDL name(args): index, call, or conversion

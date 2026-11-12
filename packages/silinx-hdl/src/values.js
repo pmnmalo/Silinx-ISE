@@ -24,6 +24,21 @@ export function fromBool(b) { return b ? ONE : ZERO; }
 // bits: string MSB first of 0 1 x z (case-insensitive)
 export function fromBits(bits, s = false) {
   let v = 0n, x = 0n;
+  if (bits.length > 64) {
+    // (a long one: each plane written as a binary numeral and read at once, #3555: a bit at a time took a time of the
+    // square of the width)
+    const vb = new Uint8Array(bits.length), xb = new Uint8Array(bits.length);
+    let n = 0;
+    for (let i = 0; i < bits.length; i++) {
+      const c = bits.charCodeAt(i);
+      // (a character, not a UTF-16 unit, one bit: the second unit of a pair skipped)
+      if (c >= 0xDC00 && c <= 0xDFFF && i && (bits.charCodeAt(i - 1) & 0xFC00) === 0xD800) continue;
+      const z = c === 122 || c === 90 || c === 63;   // z Z ?
+      vb[n] = c === 49 || z ? 49 : 48; xb[n] = c === 120 || c === 88 || z ? 49 : 48; n++;
+    }
+    const read = b => BigInt('0b' + new TextDecoder('latin1').decode(b.subarray(0, n)));
+    return mk(bits.length, read(vb), read(xb), s);
+  }
   for (const c of bits) {
     v <<= 1n; x <<= 1n;
     if (c === '1') v |= 1n;
@@ -213,10 +228,15 @@ export function concat(parts) {
   return mk(w, v, x, false);
 }
 
+// (by doubling, #3555: the copies joined one at a time took a time of the square of the width)
 export function repl(n, a) {
-  const parts = [];
-  for (let i = 0; i < n; i++) parts.push(a);
-  return n > 0 ? concat(parts) : mk(0);
+  let w = 0, v = 0n, x = 0n, pw = a.w, pv = a.v, px = a.x;
+  for (let k = n; k > 0; k >>= 1) {
+    const s = BigInt(pw);
+    if (k & 1) { v = (v << s) | pv; x = (x << s) | px; w += pw; }
+    if (k > 1) { pv = (pv << s) | pv; px = (px << s) | px; pw *= 2; }
+  }
+  return mk(w, v, x, false);
 }
 
 // Extract w bits starting at bit position lo (lo may be out of range -> X).

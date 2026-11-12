@@ -39,6 +39,17 @@ export const STMT_NESTING_MESSAGE = `statement nested more than ${MAX_NESTING} l
 // the file at the call.
 export const MAX_CALL_NESTING = 64;
 export const CALL_NESTING_MESSAGE = `calls nested more than ${MAX_CALL_NESTING} levels deep (a function calling another, that calls another…)`;
+// The largest object (#3555): a vector's width, an array's elements times their width (an array of arrays: every
+// level's), a record's fields, a string's characters (8 bits each), an expression's result (a concatenation, a
+// replication). The repository's widest is 40 960 bits (a memory of 4096 elements of 10 bits); the largest block RAM
+// of the supported devices 4.9 Mbits. 16 Mbits (2**24), with a margin over both: a vector that wide is a number of
+// 2 MB, an array that size at most MAX_ELEMENTS elements. Past it the elaboration ran for minutes and out of memory
+// (an aggregate's others built bit by bit, a replication's bits joined one at a time), or threw (a number too large).
+export const MAX_BITS = 2 ** 24;
+// An array's elements, those of every level of an array of arrays (each a value of its own: 4M of them 2 s and
+// 600 MB): the limit an array had alone, now of the whole (#3555: 22 levels of two elements, 8M in all, 1.6 GB).
+export const MAX_ELEMENTS = 2 ** 22;
+export const widthMessage = (what, n) => `${what} is ${n} bits wide, more than the limit of ${MAX_BITS} bits`;
 // The branches of a generate if … else if chain, of a case generate (#3500): the node, then each else if / elsif / next
 // alternative, the same construct in the same scope (elseChain: its else is that one generate_if), listed in a loop:
 // a chain is not nesting, thousands of branches are read, elaborated and translated without recursing per branch.

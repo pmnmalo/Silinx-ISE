@@ -9,7 +9,7 @@
 // Bound statements: blk asg if case for forrange while repeat forever exit next ret null delay event wait task sys report assert
 import * as V from './values.js';
 import { walk } from './bound-walk.js';
-import { walkItems } from './util.js';
+import { MAX_BITS, MAX_ELEMENTS, walkItems, widthMessage } from './util.js';
 import { evalE, runSync, exec, strToVal } from './interp.js';
 import { purityErrors } from './vhdl/purity.js';
 import { declaredNames, interfaceNames, labelErrors } from './vhdl/labels.js';
@@ -37,7 +37,11 @@ export function enumChar(t, ch) {
   const i = t.names.indexOf(`'${ch}'`);
   return i < 0 ? null : { k: 'c', val: V.fromInt(i, t.w, false), t };
 }
-export const vecT = (w, s = false) => ({ kind: 'logic', w, s, left: w - 1, right: 0, desc: true });
+// (an expression's result past MAX_BITS, a concatenation's, a replication's: an error of the file, #3555)
+export const vecT = (w, s = false) => {
+  if (w > MAX_BITS) throw new ElabError(widthMessage('the expression', w));
+  return { kind: 'logic', w, s, left: w - 1, right: 0, desc: true };
+};
 
 export const PHYS = { __proto__: null, fs: 0.001, ps: 1, ns: 1e3, us: 1e6, ms: 1e9, sec: 1e12, s: 1e12 };
 
@@ -375,7 +379,21 @@ function packedOf(E, range, elem, signed = false) {
   return { kind: 'logic', w, s: !!signed, left: w - 1, right: 0, desc: true, packed: { left, right, desc, n, elem } };
 }
 
+// The bits of a value of type t, and its elements (an array of arrays': those of each level, #3555; a record's fields)
+const bitsOf = t => (t.fields ? t.fields.reduce((a, f) => a + bitsOf(f.t), 0) : t.kind === 'array' ? (t.len || 0) * bitsOf(t.elem)
+  : t.kind === 'str' ? 8 * (t.slen || 0) : t.w || 0);
+const elementsOf = t => (t.kind !== 'array' ? 0 : t.fields ? t.fields.reduce((a, f) => a + 1 + elementsOf(f.t), 0) : (t.len || 0) * (1 + elementsOf(t.elem)));
+
+/** The type that ts describes; a type larger than MAX_BITS or MAX_ELEMENTS is an error, before any value of it is made. */
 export function elabType(E, ts, allowUnconstrained = false) {
+  const t = typeOf(E, ts, allowUnconstrained);
+  if (t.kind === 'array') { const n = elementsOf(t); if (n > MAX_ELEMENTS) throw new ElabError(`array too large (${n} elements)`); }
+  const w = bitsOf(t);
+  if (w > MAX_BITS) throw new ElabError(widthMessage('the type', w));
+  return t;
+}
+
+function typeOf(E, ts, allowUnconstrained) {
   // SystemVerilog packed dimensions after the first one (logic [0:3][7:0]): the outer dimensions
   // are arrays of the inner ones
   if (ts.kind === 'logic' && ts.inner?.length) {
@@ -458,7 +476,6 @@ export function elabType(E, ts, allowUnconstrained = false) {
       if (!ts.range) return { kind: 'array', unconstrained: true, elem, w: 0, ...indexStart(E, ts.index) };
       const r = evalRange(E, ts.range), { left, right, desc } = r;
       const lo = Math.min(left, right), len = rangeLen(r);
-      if (len > 1 << 22) throw new ElabError(`array too large (${len} elements)`);
       return { kind: 'array', left, right, desc, lo, len, elem, w: elem.w };
     }
     case 'named': {
