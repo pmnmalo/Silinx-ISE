@@ -78,15 +78,19 @@ test('#3408 simulate: stopped at its number of time steps', async () => {
 });
 
 test('#3408 simulate: max_changes, timeout_s and the changes returned in all are bounded', async () => {
-  for (const max_changes of [0, -1, 1001, 1e9, 2.5]) await fails('simulate', { project: 'd', max_changes }, 'max_changes: from 1 to 1000');
-  for (const timeout_s of [0, -1, 601, 1.5]) await fails('simulate', { project: 'd', timeout_s }, 'timeout_s: from 1 to 600 s');
+  for (const max_changes of [0, -1, 1001, 1e9]) await fails('simulate', { project: 'd', max_changes }, 'max_changes: from 1 to 1000');
+  for (const timeout_s of [0, -1, 601]) await fails('simulate', { project: 'd', timeout_s }, 'timeout_s: from 1 to 600 s');
+  // (not an integer: refused by the schema's check, #3535)
+  await fails('simulate', { project: 'd', max_changes: 2.5 }, 'max_changes: an integer');
+  await fails('simulate', { project: 'd', timeout_s: 1.5 }, 'timeout_s: an integer');
   await fails('simulate', { project: 'd', signals: Array(101).fill('n'), max_changes: 1000 }, 'signals × max_changes: at most 100,000 changes returned (101 signals × 1000): fewer signals, or a smaller max_changes');
   const r = await ok('simulate', { project: 'd', time_ns: 0.05, signals: ['n'], max_changes: 1000 });
   assert.equal(r.data.signals.n.changes.length, 26);
 });
 
 test('#3408 run_process: timeout_s and log_lines are bounded', async () => {
-  for (const timeout_s of [-1, 0, 7201, 0.5]) await fails('run_process', { project: 'g', process: 'synthesize', timeout_s }, 'timeout_s: from 1 to 7200 s');
+  for (const timeout_s of [-1, 0, 7201]) await fails('run_process', { project: 'g', process: 'synthesize', timeout_s }, 'timeout_s: from 1 to 7200 s');
+  await fails('run_process', { project: 'g', process: 'synthesize', timeout_s: 0.5 }, 'timeout_s: an integer');
   for (const log_lines of [0, -5, 1001]) await fails('run_process', { project: 'g', process: 'synthesize', log_lines }, 'log_lines: from 1 to 1000');
 });
 

@@ -58,5 +58,5 @@ test('forces: the errors', async () => {
   await fails({ forces: [{ signal: 'sw', clock: true, duty: 100 }] }, 'forces[0]: duty cycle must be between 0 and 100');
   await fails({ forces: [{ signal: 'sw', clock: true, period: '1 ps' }] }, 'forces[0]: period must be at least 2 ps');
   await fails({ forces: [{ signal: 'sw', value: '1', start: 'soon' }] }, 'forces[0]: invalid time \'soon\'');
-  await fails({ forces: 'sw=1' }, 'forces: a list of { signal, value } or { signal, clock, period… }');
+  await fails({ forces: 'sw=1' }, 'forces: an array');
 });

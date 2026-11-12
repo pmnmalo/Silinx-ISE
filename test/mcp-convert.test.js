@@ -143,7 +143,7 @@ test('the converters\' refusals', async () => {
   await fails('convert_module', { project: 's', module: 'debounce', to: 'fsm' }, '\'debounce\' cannot be shown as a state diagram: clocked process at line 22 has no reset: the state register must be reset to the initial state');
   await fails('convert_module', { project: 'b', module: 'knight', to: 'fsm' }, '\'knight\' cannot be shown as a state diagram: expression at line 34 uses concatenation, which a chart cannot express');
   await fails('convert_module', { project: 'b', module: 'nosuch', to: 'fsm' }, 'no module \'nosuch\' in the project\'s HDL files');
-  await fails('convert_module', { project: 'b', module: 'knight', to: 'petri' }, 'to: schematic, asm or fsm');
+  await fails('convert_module', { project: 'b', module: 'knight', to: 'petri' }, 'to: one of schematic, asm, fsm');
   await fails('convert_drawing', { project: 'd', path: 'src/traffic.fsm.json', to: 'fsm' }, 'src/traffic.fsm.json: an ASM chart (.asm.json) becomes a state diagram');
   await fails('convert_drawing', { project: 'd', path: 'src/traffic_asm.asm.json', to: 'boolean' }, 'src/traffic_asm.asm.json: a state diagram (.fsm.json) becomes an ASM chart or Boolean algebra');
   await fails('convert_drawing', { project: 'd', path: 'src/none.fsm.json', to: 'asm' }, 'no drawing \'src/none.fsm.json\' in the project \'d\'');
