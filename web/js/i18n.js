@@ -916,7 +916,7 @@ function translateAttrs(el) {
   }
 }
 
-export function translateTree(root) {
+function translateTree(root) {
   if (!root) return;
   if (root.nodeType === 3) { translateText(root); return; }
   if (root.nodeType !== 1 && root.nodeType !== 9 && root.nodeType !== 11) return;

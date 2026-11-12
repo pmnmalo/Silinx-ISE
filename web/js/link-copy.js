@@ -18,7 +18,7 @@ import { gateZip } from '/core/import-gate.js';
 
 const VIEWS = [['', 'Open the project only'], ['try', 'Try it (a drawing\'s simulation)'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
 /** The address of this app, the base of its links (its hash, a token or a link, left out). */
-export const linkBase = () => location.origin + location.pathname;
+const linkBase = () => location.origin + location.pathname;
 
 /** The Copy Link… dialog of the open project: module and view chosen first (a module's context menu). Resolves to
  *  the link copied, or null. */

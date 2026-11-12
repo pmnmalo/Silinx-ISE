@@ -15,7 +15,7 @@ import { CHECKS, pattern } from './labs-check.js';
 import { MAX_DEPTH } from './verify.js';
 import { NAME_RE } from './ident.js';
 
-export const EXERCISE_VERSION = 1;
+const EXERCISE_VERSION = 1;
 export const isExerciseFile = p => /\.exercise\.json$/i.test(String(p || ''));
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
@@ -44,7 +44,7 @@ export const LANGUAGES = ['vhdl', 'verilog'];
  *  wall-clock seconds of a test, the heap of a submission's worker (MB). */
 export const DEFAULT_LIMITS = Object.freeze({ simNs: 1e6, steps: 5e6, seconds: 10, memoryMb: 256 });
 const MAX_LIMITS = Object.freeze({ simNs: 1e9, steps: 1e9, seconds: 600, memoryMb: 4096 });
-export const MAX_ROWS = 100000;   // (a vectors test's rows, a reference test's cycles)
+const MAX_ROWS = 100000;   // (a vectors test's rows, a reference test's cycles)
 
 /** A text of the exercise in the language `lang` (else English, else the first one given). */
 export function localize(text, lang = 'en') {

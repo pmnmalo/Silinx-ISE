@@ -29,7 +29,7 @@ export const isIo = t => /^(IOB|IBUF|DIFF[MS]I?|IOBM|IOBS)$/.test(t);
 const siteXY = name => { const m = /_X(\d+)Y(\d+)$/.exec(name); return m ? [+m[1], +m[2]] : null; };
 
 /** Geometry of every site of the device: { name -> { x, y, w, h, type, bonded, tile } }. */
-export function layoutSites(device) {
+function layoutSites(device) {
   const out = new Map();
   for (const [r, c, tname, ttype, sites] of device.tiles) {
     const x0 = c * TW, y0 = r * TH;

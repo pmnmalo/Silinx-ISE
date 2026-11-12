@@ -95,7 +95,7 @@ const jobs = new Map();
 let jobSeq = 0;
 /** The jobs kept: the running ones and the last finished ones (a finished job's download, a blob
  *  URL, is released with it). */
-export const KEEP_JOBS = 20;
+const KEEP_JOBS = 20;
 function addJob(job) {
   jobs.set(job.id, job);
   const done = [...jobs.values()].filter(j => j.status !== 'running');

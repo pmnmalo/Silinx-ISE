@@ -32,7 +32,7 @@ const at = e => `at ${e.time / 1000} ns${e.file ? ` (${e.file}${e.line ? ` line 
 
 /** Each output's value per row of the vectors ({ inputs, outputs, rows }) on a design: { obtained: [[bits]], sim, st,
  *  stopped } (stopped: the time a $finish or an error of the design stopped it before the last row). */
-export function simulateRows(design, vec, { clock = null, periodNs = 20, files = new Map(), limits }) {
+function simulateRows(design, vec, { clock = null, periodNs = 20, files = new Map(), limits }) {
   const T = Math.round(periodNs * 1000);
   const sim = new Simulator(design, { files, maxWaveEvents: 0 });
   const ins = vec.inputs.map(p => portOf(design, p.name)?.sig), outs = vec.outputs.map(p => portOf(design, p.name)?.sig);

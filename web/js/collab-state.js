@@ -13,7 +13,6 @@ export const collab = {
   editor: false,   // (a follower whose link edits the project's text files, #3182)
 };
 export const following = () => collab.role === 'follower';
-export const sharing = () => collab.role === 'owner';
 /** Whether this page edits a file of the project it follows (an editor's link, a text file: its editor bound live). */
 export const editsHere = path => following() && collab.editor && editablePath(path);
 /** Whether this page edits a drawing of the project it follows (an editor's link, a drawing edited live, #3183: its

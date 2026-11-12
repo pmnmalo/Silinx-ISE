@@ -131,7 +131,7 @@ const emulateProcs = (top, onTop) => ({ id: 'emulate', label: 'Emulate on Board'
   ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `emulate-${step}`, label: `Emulate ${name} Model`, ico: 'board', onTop, run: () => openEmulator(top, { model: step }) })),
 ] });
 /** The processes of the Tasks interface's Emulate (#1204): the top module's User Constraints and Emulate on Board. */
-export function emulateProcesses() {
+function emulateProcesses() {
   const top = S.project?.top;
   return top ? [constraintsProcs(top), emulateProcs(top)] : [];
 }
@@ -156,7 +156,7 @@ function noTopNote() {
     h('button', { class: 'btn', type: 'button', onclick: () => chooseTop() }, 'Set Top Module…'));
 }
 /** Set Top Module…: the top chosen among the design's modules, the hierarchy's roots first (#1224). */
-export async function chooseTop() {
+async function chooseTop() {
   const byName = (a, b) => a.localeCompare(b);
   const roots = viewRoots(false).sort(byName);   // (in their names' order, not the files')
   const names = [...new Set([...roots, ...S.modules.filter(m => m.kind !== 'package' && m.role !== 'sim').map(m => m.name).sort(byName)])];
@@ -174,7 +174,7 @@ export async function chooseTop() {
 }
 
 /** The tree of the processes `defs` drawn in `host`: each with its state, run by a double-click, its menu. */
-export function renderProcessTree(host, defs) {
+function renderProcessTree(host, defs) {
   host.innerHTML = '';
   const tree = h('ul', { class: 'tree' });
   const add = (ul, p) => {

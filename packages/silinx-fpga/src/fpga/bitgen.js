@@ -295,7 +295,7 @@ export function designFeatures(design, db) {
  *  - a tristate path: 'TMUX:<v>' and its inverters ('T1INV:T1'…).
  *  (The database has only the input delay ISE's map chooses by itself, IFD:DLY2 / DLY3: a pad's other
  *  delays interact with its neighbours', so they are refused.) */
-export function iobPadRegFeatures(cfg) {
+function iobPadRegFeatures(cfg) {
   const val = a => { const c = cfg.find(x => x.attr === a); return c && c.value !== '#OFF' ? (c.name && !c.value ? '' : c.value) : null; };
   const feats = [], attrs = new Set();
   const take = (...as) => as.forEach(a => attrs.add(a));
@@ -330,7 +330,7 @@ export function iobPadRegFeatures(cfg) {
 /** The settings of the I/O registers (and the input delays, the registered output and tristate
  *  paths), and of the plain paths (IOB_PLAIN: no bits of their own, the pad's standard has them). */
 export const IOB_REG_ATTRS = /^(IFF[12]|OFF[12]|TFF[12])(_INIT_ATTR|_SR_ATTR)?$|^(IFF|OFF|TFF)ATTRBOX$|^(ICLK[12]|OTCLK[12]|ICE|OCE|TCE|SR|REV|O1|O2|T1|T2)INV$|^(I|O|T)(SR|REV)_USED$|^(IFFDMUX|IFFDELMUX|IDDRIN_MUX|PRE_DELAY_MUX|IFD_DELAY_VALUE|IBUF_DELAY_VALUE|IFD_DELAY|IBUF_DELAY|PRE_DELAY|IDELMUX|IMUX|OMUX|TMUX|TSMUX|T_USED|O1_DDRMUX|O2_DDRMUX|ODDROUT[12]_MUX|OFFDDRBLACKBOX|IFFDDRBLACKBOX|PCICE_MUX|PCIRDY_MUX)$/;
-export const IOB_PLAIN = /^(IMUX|IDELMUX|O1INV|OMUX)$/;
+const IOB_PLAIN = /^(IMUX|IDELMUX|O1INV|OMUX)$/;
 
 /** The pad features of an I/O site's registers (#44, research/s3e-bitstream stage G): the delay and
  *  path features (iobPadRegFeatures), 'R:<setting>:<value>' for every other register setting, and
@@ -350,12 +350,12 @@ export function iobRegFeatures(cfg) {
 /** The settings of an I/O site's register groups left out while the group is used (#44): 'IFF2:#OFF'
  *  for an input register without its DDR partner, 'ICEINV:#OFF' for one without a clock enable…
  *  (as a slice's flip-flops without a clock enable): a register's unused parts set bits of their own. */
-export const IOB_REG_GROUPS = {
+const IOB_REG_GROUPS = {
   I: ['IFF1', 'IFF2', 'IFF1_INIT_ATTR', 'IFF2_INIT_ATTR', 'IFF1_SR_ATTR', 'IFF2_SR_ATTR', 'IFFATTRBOX', 'ICLK1INV', 'ICLK2INV', 'ICEINV', 'ISR_USED', 'IREV_USED', 'IDDRIN_MUX'],
   O: ['OFF1', 'OFF2', 'OFF1_INIT_ATTR', 'OFF2_INIT_ATTR', 'OFF1_SR_ATTR', 'OFF2_SR_ATTR', 'OFFATTRBOX', 'OTCLK1INV', 'OTCLK2INV', 'OCEINV', 'OSR_USED', 'OREV_USED'],
   T: ['TFF1', 'TFF2', 'TFF1_INIT_ATTR', 'TFF2_INIT_ATTR', 'TFF1_SR_ATTR', 'TFF2_SR_ATTR', 'TFFATTRBOX', 'OTCLK1INV', 'OTCLK2INV', 'TCEINV', 'TSR_USED', 'TREV_USED'],
 };
-export function iobRegPseudo(cfg) {
+function iobRegPseudo(cfg) {
   const on = a => cfg.some(c => c.attr === a && c.value !== '#OFF');
   const used = g => on(`${g}FF1`) || on(`${g}FF2`);
   const out = new Set();

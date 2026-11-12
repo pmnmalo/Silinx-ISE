@@ -83,7 +83,7 @@ export function topOf(sources) {
  * The Verilog's errors as Yosys reads it, each file by its name (the flow synthesizes them as one text, its lines not the
  * files'): its syntax, then the hierarchy under the top (a module missing). [] when none; each 'ERROR: <file>:<line>: …'.
  */
-export async function verilogErrors(sources, top, run = yosysNode) {
+async function verilogErrors(sources, top, run = yosysNode) {
   const lines = [];
   try {
     await run(['-q', '-p', `${sources.map(s => `read_verilog -sv ${s.path}`).join('; ')}; hierarchy -check -top ${top}`],

@@ -111,7 +111,7 @@ async function tbFiles(src) {
 }
 
 /** C Simulation: the C source's main() run (core/c-interp.js), its output in the Console. */
-export async function runCSimulation(path) {
+async function runCSimulation(path) {
   const { simulateC } = await import('/core/c-interp.js');
   log(`\nStarted : "C Simulation" of ${path}.\n`, 'hdr');
   showConsolePage('console');
@@ -134,7 +134,7 @@ export async function runCSimulation(path) {
 }
 
 /** C/RTL Co-simulation: the test bench's calls of the top function replayed on its HDL (core/c-cosim.js), compared. */
-export async function runCosimulation(path) {
+async function runCosimulation(path) {
   const { cosimulate } = await import('/core/c-cosim.js');
   const lang = hdlLang();
   log(`\nStarted : "C/RTL Co-simulation" of ${path} (${lang === 'vhdl' ? 'VHDL' : 'Verilog'}).\n`, 'hdr');
@@ -174,7 +174,7 @@ export function hlsMults() {
 
 /** View C Synthesis Report (#1531): what the C was made into (core/c-hdl.js's report): the module, its ports, its
  *  states and registers, its memories, each loop's pragmas, II and cycles. */
-export async function runCReport(path) {
+async function runCReport(path) {
   const { cToHdl } = await import('/core/c-hdl.js');
   const lang = hdlLang();
   log(`\nStarted : "View C Synthesis Report" of ${path}.\n`, 'hdr');

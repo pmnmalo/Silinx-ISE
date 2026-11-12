@@ -52,7 +52,6 @@ export function tableFuses(attrs, table) {
 }
 export const shortvalFuses = (db, ttyp, attrs, name) => tableFuses(attrs, need(db.shortval.get(ttyp), name, ttyp));
 export const longvalFuses = (db, ttyp, attrs, name) => tableFuses(attrs, need(db.longval.get(ttyp), name, ttyp));
-export const longFuses = (db, ttyp, attrs, name) => tableFuses(attrs, need(db.longfuses.get(ttyp), name, ttyp));
 /** get_bank_fuses: the bank's table, its keys' first number the bank. */
 export function bankFuses(db, ttyp, attrs, name, bank) {
   const own = new Map();

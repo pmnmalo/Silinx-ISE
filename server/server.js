@@ -42,7 +42,7 @@ export function pageCsp(file) {
 }
 
 /** A loopback address (the server only reachable from this machine). */
-export const isLoopback = host => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(String(host).toLowerCase()) || /^127\./.test(String(host)) || /^::ffff:127\./.test(String(host));
+const isLoopback = host => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(String(host).toLowerCase()) || /^127\./.test(String(host)) || /^::ffff:127\./.test(String(host));
 
 export async function createApp({ host = '127.0.0.1', token = null, codes = createOpenCodes(), relay = relayConfig() } = {}) {
   const app = express();

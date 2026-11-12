@@ -26,7 +26,7 @@ export const REG6 = ['CRC', 'FAR_MAJ', 'FAR_MIN', 'FDRI', 'FDRO', 'CMD', 'CTL', 
   'MFWR', 'CCLK_FREQ', 'SEU_OPT', 'EXP_SIGN', 'RDBK_SIGN', 'BOOTSTS', 'EYE_MASK', 'CBC_REG'];
 const R = Object.fromEntries(REG6.map((n, i) => [n, i]).filter(([n]) => n));
 /** Commands written to CMD. */
-export const CMD6 = { NULL: 0, WCFG: 1, MFW: 2, LFRM: 3, RCFG: 4, START: 5, RCRC: 7, AGHIGH: 8, GRESTORE: 10, SHUTDOWN: 11, DESYNC: 13, IPROG: 14 };
+const CMD6 = { NULL: 0, WCFG: 1, MFW: 2, LFRM: 3, RCFG: 4, START: 5, RCRC: 7, AGHIGH: 8, GRESTORE: 10, SHUTDOWN: 11, DESYNC: 13, IPROG: 14 };
 
 /** The frame length in words, for every part. */
 export const FRAME_WORDS = 65;

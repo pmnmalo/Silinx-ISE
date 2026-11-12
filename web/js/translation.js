@@ -18,13 +18,6 @@ export function translationBadge(file, context) {
   return lang ? { text: label(lang), base: false, title: `Translated to ${label(lang)} (read-only)`, open: () => openTranslation(file), context } : null;
 }
 
-/** The language a project source is translated to ('VHDL' / 'Verilog': in the other language than the preferred one),
- *  or null. */
-export function translationOf(path) {
-  const lang = S.sources.some(s => s.path === path && !s.view) && translationLang(path, preferred());
-  return lang ? label(lang) : null;
-}
-
 // the source's text: its open editor's (saved or not), else the project's
 async function sourceText(path) {
   const d = findDoc(`file:${path}`);

@@ -61,7 +61,7 @@ export const LUT4_ONLY = '1,1,1,1';
 // of 886). (4:1 trees too, -mux4: serv 29 % slower by the estimate, none faster.) Full trees only (-nopartial,
 // #554): muxcover's partial trees (some leaves missing) made a wrong netlist of secworks-sha256's core with -mux16,
 // with these F-multiplexers or 2:1 multiplexers in their place alike; -mux8 alone, or -nopartial, kept it right.
-export const MUXCOVER = 'muxcover -mux8 -mux16 -nodecode -nopartial';
+const MUXCOVER = 'muxcover -mux8 -mux16 -nodecode -nopartial';
 export const MUXF_MAP_FILE = 'silinx_muxf_map.v';
 export const MUXF_MAP = `// Silinx: muxcover's trees of 2:1 multiplexers onto MUXF5 / MUXF6 / MUXF7 (#511)
 module \\$_MUX4_ (input A, B, C, D, S, T, output Y);
@@ -213,7 +213,7 @@ module SRL16E_1 (output Q, input A0, input A1, input A2, input A3, input CE, (* 
   parameter [15:0] INIT = 16'h0000;
 endmodule
 `;
-export const SRL_MAP = `// Silinx: $__XILINX_SHREG_ (xilinx_srl) as SRL16E for the 4-input-LUT families
+const SRL_MAP = `// Silinx: $__XILINX_SHREG_ (xilinx_srl) as SRL16E for the 4-input-LUT families
 module \\$__XILINX_SHREG_ (input C, input D, input [31:0] L, input E, output Q, output SO);
   parameter DEPTH = 0;
   parameter [DEPTH-1:0] INIT = 0;
@@ -567,8 +567,8 @@ export function abc9RemapCommands(top, family) {
 // marked keep before the mapping, which makes clean keep their names, and unmarked after it (no attribute in
 // the netlist). (keep also lists the net among the AIG's outputs: ABC9 maps the same logic, the LUTs of a
 // design may differ by a few.)
-export const ABC9_KEEP_CLOCKS = 'select -set silinx_clocks t:* %ci1:+[C]:+[CLK]:+[CLKA]:+[CLKB]:+[WCLK]:+[CLKIN] w:* %i; setattr -set keep 1 @silinx_clocks';
-export const ABC9_UNKEEP_CLOCKS = 'setattr -unset keep @silinx_clocks';
+const ABC9_KEEP_CLOCKS = 'select -set silinx_clocks t:* %ci1:+[C]:+[CLK]:+[CLKA]:+[CLKB]:+[WCLK]:+[CLKIN] w:* %i; setattr -set keep 1 @silinx_clocks';
+const ABC9_UNKEEP_CLOCKS = 'setattr -unset keep @silinx_clocks';
 
 // $scopeinfo cells (kept hierarchy names) are not cells of the device: deleted before writing. The JSON has the
 // top module alone (#86): synth_xilinx reads Yosys's whole Xilinx cell library as black boxes (430 modules of every
@@ -583,7 +583,7 @@ export const TOP_ONLY = 'setattr -mod -unset blackbox =A:top; select =A:top';
 export const outputs = top => `delete t:$scopeinfo; ${TOP_ONLY}; write_json -selected ${top}.json; select -clear; write_verilog -noattr ${top}_yosys.v; tee -q -o ${top}_stat.txt stat`;
 
 // the netlist between the two runs of a design with carry chains written as gates (#77)
-export const CHAIN_FILE = 'silinx_chains.json';
+const CHAIN_FILE = 'silinx_chains.json';
 // the mapped netlist with its critical LUTs made shallower (#652, lut-resynth.js), read by Yosys to write the
 // outputs (the Verilog netlist, the statistics) as of every other netlist; the cells' library for their ports
 export const RESYNTH_FILE = 'silinx_resynth.json';

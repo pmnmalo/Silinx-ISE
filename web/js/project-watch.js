@@ -107,7 +107,7 @@ async function reloadDoc(d, { path, kind }, by = null) {
 }
 
 /** Changed in the editor and on disk (deleted there): true, keep the editor's (closed: kept too, the user's work). */
-export async function askKeep(path, gone) {
+async function askKeep(path, gone) {
   const v = await dialog({
     title: 'File Changed on Disk',
     className: 'disk-change-dlg',

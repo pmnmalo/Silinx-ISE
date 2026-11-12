@@ -12,7 +12,7 @@ import { WebSocketServer } from 'ws';
 import { SUBPROTOCOL } from '../core/collab-client.js';
 import { collabRooms, fail, ROOM_LIMITS } from '../core/collab-room.js';
 
-export const RELAY_PATH = '/api/collab';
+const RELAY_PATH = '/api/collab';
 export { SUBPROTOCOL };
 export const RELAY_LIMITS = Object.freeze({ ownerFrame: 16 << 20, followerFrame: 64 << 10, ...ROOM_LIMITS, ping: 30_000 });
 // the token an owner's upgrade carries in its subprotocols (`token.<token>`), or null

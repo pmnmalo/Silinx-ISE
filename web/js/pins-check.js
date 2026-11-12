@@ -6,7 +6,7 @@ import { dialog, h } from './ui.js';
 import { readPins } from './constraints-format.js';
 
 /** Whether the constraints text places any pin: a UCF, or the iCE40's PCF (`device`'s format, #2511). */
-export function placesPins(text, device) {
+function placesPins(text, device) {
   if (!text) return false;
   try { return Object.values(readPins(device, text).assignments).some((a) => a.loc); } catch { return false; }   // (a PCF with an error places none)
 }

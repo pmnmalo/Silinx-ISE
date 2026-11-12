@@ -20,7 +20,7 @@ import { VERIFY_DEPTH, timeoutEnd } from './verify.js';
 import { counterexampleBench, benchName } from './verify-bench.js';
 
 export const PROPERTY_PROCESS = 'Verify Property';
-export const PROPERTY_KINDS = ['never', 'reach', 'exclusive'];
+const PROPERTY_KINDS = ['never', 'reach', 'exclusive'];
 
 // the drawing normalized, its states' and 1-bit outputs' names
 function drawingOf(drawing) {
@@ -31,7 +31,7 @@ function drawingOf(drawing) {
 }
 
 /** A property's words, as the console says them: "never reaches state S", "reaches state S", "never has a and b both 1". */
-export function propertyText(p) {
+function propertyText(p) {
   if (p.kind === 'never') return `never reaches state ${p.state}`;
   if (p.kind === 'reach') return `reaches state ${p.state}`;
   return `never has ${p.outputs.slice(0, -1).join(', ')} and ${p.outputs[p.outputs.length - 1]} both 1`;

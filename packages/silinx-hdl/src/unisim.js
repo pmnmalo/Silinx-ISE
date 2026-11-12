@@ -853,7 +853,7 @@ const gowinOnly = () => (GOWIN_ONLY ??= new Set([...GOWIN_CELLS].filter((n) => !
 const GOWIN_PINS = /(?:^|[;\s)])(LUT[1-4]|VCC|MULT18X18|IOBUF)\s*(?:#\s*\([^;]*?\)\s*)?(?:[A-Za-z_][\w$]*|\\\S+)\s*(?:\[[^\]]*\]\s*)?\([^;]*?\.(?:F|V|DOUT|OEN)\s*\(/g;
 
 /** True if a Verilog source instantiates a Gowin primitive (`DFFE r (…);`, `LUT4 #(.INIT(16'h8000)) l (.F(y), …);`) not one of `defined`. */
-export function vlogUsesGowin(text, defined = new Set()) {
+function vlogUsesGowin(text, defined = new Set()) {
   const t = stripVlogComments(text), only = gowinOnly();
   // (an instance's name may be escaped, as Yosys writes it: \dec.q2_DFF_Q)
   const re = /(?:^|[;\s)])([A-Za-z][A-Za-z0-9_]*)(?![\w$])\s*(?:#\s*\(|(?:[A-Za-z_][\w$]*|\\\S+)\s*(?:\[[^\]]*\]\s*)?\()/g;

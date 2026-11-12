@@ -21,8 +21,8 @@ import { within } from './paths.js';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 export const MAX_FILE = 2 << 20;
-export const MAX_TOTAL = 20 << 20;
-export const MAX_FILES = 2000;
+const MAX_TOTAL = 20 << 20;
+const MAX_FILES = 2000;
 const CODEC = { inflate: (d, limit) => zlib.inflateRawSync(d, { maxOutputLength: Math.max(1, limit) }) };
 const isText = p => !/\.(bit|bin|ncd|ngc|ngd|zip|png|jpe?g|gif|pdf|o|exe|dll)$/i.test(p);
 

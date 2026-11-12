@@ -10,7 +10,7 @@ const wrap = (r, p) => (r.p < p ? `(${r.c})` : r.c);
 const atom = (c, t, more = {}) => ({ c, p: P.atom, t, ...more });
 
 /** A bit string as a VHDL literal: "0101", x"A5" for whole hex digits of 8 bits or more. */
-export function bitString(bits) {
+function bitString(bits) {
   const b = bits.toUpperCase();
   if (/^[01]+$/.test(b) && b.length >= 8 && b.length % 4 === 0) return `x"${BigInt(`0b${b}`).toString(16).toUpperCase().padStart(b.length / 4, '0')}"`;
   return `"${b}"`;
@@ -20,7 +20,7 @@ const litVal = r => (r.t === 'lit' && /^[01]+$/.test(r.bits) && r.bits.length <=
 
 // ------------------------------------------------------------------ conversions
 /** To a numeric operand: unsigned (signed), or an integer (a literal's value). */
-export function toNum(r) {
+function toNum(r) {
   switch (r.t) {
     case 'uns': case 'sgn': case 'int': return r;
     case 'slv': return atom(`${r.concat ? "unsigned'" : 'unsigned'}(${r.c})`, 'uns', { w: r.w });
@@ -30,7 +30,7 @@ export function toNum(r) {
   return cannot('a condition used as a number');
 }
 /** To a std_logic_vector of n bits (n: a number, or null when not known: the value's own width). */
-export function toSlv(r, n, wc) {
+function toSlv(r, n, wc) {
   switch (r.t) {
     case 'slv':
       if (n == null || r.w == null || r.w === n) return r;

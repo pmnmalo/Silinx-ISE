@@ -21,7 +21,7 @@ import { checkUrl, nameFromRepo } from '/core/github-url.js';
 // ------------------------------------------------------------------ git on this server
 let enabled = null;
 /** Whether this edition has git: the browser edition (GitHub's API), a server whose git is not turned off (SILINX_GIT=off). */
-export async function gitAvailable() {
+async function gitAvailable() {
   if (enabled === null) enabled = await api.gitEnabled().then(r => !!r.enabled, () => false);
   return enabled;
 }
@@ -37,14 +37,14 @@ export function logGitError(e) {
 // ------------------------------------------------------------------ the status and the Design pane's marks
 let timer = null, seq = 0, newest = null;
 /** The project's status read again soon (several writes in a row: once). */
-export function scheduleGitStatus(ms = 400) {
+function scheduleGitStatus(ms = 400) {
   if (enabled === false || !S.project) return;
   clearTimeout(timer);
   timer = setTimeout(() => refreshGitStatus(), ms);
 }
 /** The project's status read again: S.git ({ files, byPath, branch… } or null), the Design pane's marks drawn again. A
  *  read that a later one overtakes gives the later one's answer (Commit… asks while a save's read is in flight). */
-export function refreshGitStatus() {
+function refreshGitStatus() {
   const n = ++seq;
   const run = readStatus(n).then(r => (n === seq ? r : newest));
   newest = run;
@@ -131,7 +131,7 @@ export async function openFromRepositoryDialog() {
 }
 
 /** File ▸ Git ▸ Commit…: the project's changes with a message. */
-export async function commitDialog() {
+async function commitDialog() {
   if (!S.project) return null;
   await saveAll();
   const s = await refreshGitStatus();
@@ -166,7 +166,7 @@ export async function commitDialog() {
 }
 
 /** File ▸ Git ▸ Push. */
-export async function gitPush() {
+async function gitPush() {
   if (!S.project) return null;
   try { const p = await api.gitPush(S.project.name); log(pushText(p), 'ok'); return p; } catch (e) { logGitError(e); return null; } finally { await refreshGitStatus(); }
 }
@@ -174,7 +174,7 @@ export async function gitPush() {
 /** File ▸ Git ▸ Pull: GitHub's commits merged in; the project read again (its open documents, by the watcher). A
  *  drawing's objects changed on both sides (#3197): Mine or Theirs asked for each (web/js/git-resolve-dialog.js), then
  *  pulled again with the choices. */
-export async function gitPull({ resolve = null } = {}) {
+async function gitPull({ resolve = null } = {}) {
   if (!S.project) return null;
   await saveAll();
   const name = S.project.name;
@@ -201,7 +201,7 @@ export async function gitPull({ resolve = null } = {}) {
 }
 
 /** File ▸ Git ▸ Initialize Repository…: git init, Silinx's .gitignore, optionally the GitHub repository (origin). */
-export async function initDialog() {
+async function initDialog() {
   if (!S.project) return null;
   const url = h('input', { type: 'text', class: 'git-url', placeholder: 'https://github.com/owner/repository', style: { width: '100%' } });
   const err = fieldError('git-url-error');

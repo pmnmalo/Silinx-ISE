@@ -26,18 +26,18 @@ import { capture, runCommand } from './jobs.js';
 import { IDENT } from './ident.js';
 import { parseUtilization, utilizationSummary, summaryRows, parseRouteStatus, parseTimingSummary, parseDrc, parsePower, logMessages, logCommands } from './vivado-reports.js';
 
-export const VIVADO_VERSION = '2025.2';
+const VIVADO_VERSION = '2025.2';
 /** Is a device's family one Vivado implements (the Artix-7: its back end in FAMILY_INFO, packages/silinx-fpga/src/family.js)? ISE's flow is
  *  not used for them. */
 export const isVivadoDevice = vivadoDevice;
 
 // the steps Vivado runs (ISE's names), in order; the default flow (an empty request) and the ones it does not have
-export const VIVADO_STEPS = ['synth', 'translate', 'map', 'par', 'trce', 'pin2ucf', 'xpwr', 'bitgen', 'prombit'];
+const VIVADO_STEPS = ['synth', 'translate', 'map', 'par', 'trce', 'pin2ucf', 'xpwr', 'bitgen', 'prombit'];
 const DEFAULT_STEPS = ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'];
 const NOT_IN_VIVADO = { postsynth: 'post-synthesis simulation model', posttrans: 'post-translate simulation model', postmap: 'post-map simulation model', postpar: 'post-place & route simulation model', fpgaview: 'FPGA view' };
 
 /** The settings scripts Vivado's run.sh looks for when VIVADO_SETTINGS is not set and vivado is not on PATH. */
-export const SETTINGS_GLOBS = ['/tools/Xilinx/*/Vivado/settings64.sh', '/tools/Xilinx/Vivado/*/settings64.sh', '/opt/Xilinx/*/Vivado/settings64.sh', '/opt/Xilinx/Vivado/*/settings64.sh'];
+const SETTINGS_GLOBS = ['/tools/Xilinx/*/Vivado/settings64.sh', '/tools/Xilinx/Vivado/*/settings64.sh', '/opt/Xilinx/*/Vivado/settings64.sh', '/opt/Xilinx/Vivado/*/settings64.sh'];
 /** What Vivado needs in a container besides ISE's isolation (#2305): sysfs's buses, classes and devices hidden, or its
  *  licence manager crashes in libudev after routing under x86 emulation ("realloc(): invalid pointer"). */
 export const VIVADO_DOCKER_ARGS = Object.freeze(['--tmpfs', '/sys/bus', '--tmpfs', '/sys/class', '--tmpfs', '/sys/devices']);
@@ -220,7 +220,7 @@ export function vivadoRunConfig(cfg) {
 export const vivadoSshOptions = cfg => ({ dockerArgs: [...VIVADO_DOCKER_ARGS], env: cfg.vivado?.settings ? { VIVADO_SETTINGS: cfg.vivado.settings } : {} });
 
 /** A local Vivado: on PATH, or its settings64.sh (vivado.settings, else one of SETTINGS_GLOBS'). */
-export function detectVivado(cfg) {
+function detectVivado(cfg) {
   const bin = which('vivado');
   if (bin) return { found: true, path: bin, settings: null };
   const cands = cfg?.vivado?.settings ? [cfg.vivado.settings] : [];

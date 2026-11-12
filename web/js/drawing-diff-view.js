@@ -5,7 +5,7 @@
 // from History… (a file of a commit against the commit before) and from Commit… (a changed file against the last
 // commit).
 import { h } from './ui.js';
-import { S, findDoc, activateDoc, openDoc } from './app.js';
+import { findDoc, activateDoc, openDoc } from './app.js';
 import { diffDrawings, drawingKind } from '/core/drawing-merge.js';
 import { sideBySide } from '/core/text-diff.js';
 
@@ -19,7 +19,7 @@ const css = s => String(s).replace(/["\\]/g, '\\$&');
 
 /** The marks of a drawing's diff, as a style sheet for the two panes (scoped by their classes): it holds through the
  *  editors' redrawing. */
-export function diffStyle(kind, d) {
+function diffStyle(kind, d) {
   const attr = VIEWS[kind]?.attr;
   if (!attr) return '';
   const sel = (side, list) => list.map(x => `.diff-${side} [${attr(x.coll)}="${css(x.key)}"]`).join(',\n');
@@ -84,6 +84,3 @@ function textPanes(el, d, path, before, after) {
   d.textDiff = { changed };
   return {};
 }
-
-// (the project's: a compare of another project's is closed with it)
-export const compareDocs = () => S.docs.filter(x => x.compare);

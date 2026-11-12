@@ -20,7 +20,7 @@ const OUT_BYTES = 0x11, INOUT_BYTES = 0x31;   // (MSB first, written on the fall
 const CS = 0x10, CDONE = 0x40, CRESET = 0x80, DIRECTION = 0x93;   // (SCK, MOSI, CS and CRESET_B driven)
 // the flash's commands (Winbond W25Q and the like)
 const POWER_UP = 0xab, POWER_DOWN = 0xb9, JEDEC_ID = 0x9f, WRITE_ENABLE = 0x06, READ_STATUS = 0x05, BLOCK_ERASE_64K = 0xd8, PAGE_PROGRAM = 0x02, READ = 0x03;
-export const BLOCK = 0x10000, PAGE = 256;
+const BLOCK = 0x10000, PAGE = 256;
 const CHUNK = 4096;   // the bytes a read asks at a time
 
 const fail = msg => { throw new Error(`FTDI USB: ${msg}`); };
@@ -29,7 +29,7 @@ const addr24 = a => [(a >> 16) & 0xff, (a >> 8) & 0xff, a & 0xff];
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 /** The FT2232H's channel A in MPSSE mode, and the SPI flash behind it. */
-export class FtdiSpi {
+class FtdiSpi {
   constructor(usb, { sleep = wait } = {}) { this.usb = usb; this.sleep = sleep; this.rx = []; }
 
   async open() {

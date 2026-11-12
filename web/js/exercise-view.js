@@ -31,7 +31,7 @@ const lang = () => (getLanguage() === 'pt' ? 'pt' : 'en');
 const TEXT = p => !/\.(bit|bin|ncd|ngc|ngd|zip|png|jpe?g|gif|pdf)$/i.test(p) && !/^build\//.test(p) && !isExerciseFile(p);
 
 /** The project `name` as a submission (core/grade-design.js): its silinx.json and its files' texts, as they are saved. */
-export async function projectSubmission(name) {
+async function projectSubmission(name) {
   const pj = await api.project(name);
   const files = new Map();
   for (const p of (pj.fileTree || []).filter(TEXT)) { try { files.set(p, await api.readFile(name, p)); } catch { /* not readable */ } }
@@ -39,7 +39,7 @@ export async function projectSubmission(name) {
 }
 
 /** The project's top and its ports, as an exercise states them ({ top, ports }), or the reason it has none. */
-export async function topPorts(name) {
+async function topPorts(name) {
   const sub = await projectSubmission(name);
   const top = sub.project.top;
   if (!top) return { error: 'the project has no top module' };
@@ -89,7 +89,7 @@ export async function openExercise(path) {
 const num = n => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, ''));
 
 /** The exercise document in `el`: its toolbar, its page, its Properties panel, its status line. */
-export function mountExercise(el, doc, path, ex) {
+function mountExercise(el, doc, path, ex) {
   const name = S.project.name;
   let sel = 0, results = null, busy = false;
   const root = h('div', { class: 'ex' });

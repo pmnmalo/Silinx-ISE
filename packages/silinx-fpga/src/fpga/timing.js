@@ -794,7 +794,7 @@ const GENERAL = new Set([WIRE.OMUX, WIRE.DOUBLE, WIRE.HEX, WIRE.LONG]);
  * clock arrives there, ISE's delay of that connection less a global line's (model.clock.detour, fitted to trce's clock
  * paths).
  */
-export function clockDetour(path, tree, device, model = SPEED_4) {
+function clockDetour(path, tree, device, model = SPEED_4) {
   const cls = nodeClasses(device);
   const k = path.findIndex(n => GENERAL.has(cls[n]));
   if (k < 0) return null;

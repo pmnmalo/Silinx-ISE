@@ -22,12 +22,12 @@ import os from 'node:os';
 import { capture } from './jobs.js';
 import { TOOLS as PROGRAMMER_TOOLS, VALUE as PROGRAMMER_VALUE } from './programmer-values.js';
 
-export const ISE_TOOLS = ['xst', 'ngdbuild', 'map', 'par', 'trce', 'bitgen'];
-export const PROGRAMMERS = ['openFPGALoader', 'xc3sprog', 'djtgcfg', 'impact'];
+const ISE_TOOLS = ['xst', 'ngdbuild', 'map', 'par', 'trce', 'bitgen'];
+const PROGRAMMERS = ['openFPGALoader', 'xc3sprog', 'djtgcfg', 'impact'];
 export const DEFAULT_SETTINGS = '/opt/Xilinx/14.7/ISE_DS/settings64.sh';
 // the ways of running ISE, and the Silinx toolchain (no ISE)
-export const ISE_MODES = ['local', 'docker', 'ssh'];
-export const MODES = [...ISE_MODES, 'silinx'];
+const ISE_MODES = ['local', 'docker', 'ssh'];
+const MODES = [...ISE_MODES, 'silinx'];
 /** A saved configuration from before #28 says 'open' for the Silinx toolchain. */
 const modeAlias = cfg => (cfg.mode === 'open' ? { ...cfg, mode: 'silinx' } : cfg);
 

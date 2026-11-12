@@ -13,10 +13,10 @@
 import { FRAME_WORDS } from './frames.js';
 
 /** The configuration registers' addresses (UG470). */
-export const REG7 = { CRC: 0x00, FAR: 0x01, FDRI: 0x02, FDRO: 0x03, CMD: 0x04, CTL0: 0x05, MASK: 0x06, STAT: 0x07, LOUT: 0x08, COR0: 0x09,
+const REG7 = { CRC: 0x00, FAR: 0x01, FDRI: 0x02, FDRO: 0x03, CMD: 0x04, CTL0: 0x05, MASK: 0x06, STAT: 0x07, LOUT: 0x08, COR0: 0x09,
   MFWR: 0x0a, CBC: 0x0b, IDCODE: 0x0c, AXSS: 0x0d, COR1: 0x0e, WBSTAR: 0x10, TIMER: 0x11, UNKNOWN: 0x13, BOOTSTS: 0x16, CTL1: 0x18, BSPI: 0x1f };
 /** Commands written to CMD. */
-export const CMD7 = { NULL: 0, WCFG: 1, MFW: 2, LFRM: 3, RCFG: 4, START: 5, RCAP: 6, RCRC: 7, AGHIGH: 8, SWITCH: 9, GRESTORE: 10, SHUTDOWN: 11,
+const CMD7 = { NULL: 0, WCFG: 1, MFW: 2, LFRM: 3, RCFG: 4, START: 5, RCAP: 6, RCRC: 7, AGHIGH: 8, SWITCH: 9, GRESTORE: 10, SHUTDOWN: 11,
   GCAPTURE: 12, DESYNC: 13, IPROG: 15 };
 const BLOCKS = ['CLB_IO_CLK', 'BLOCK_RAM', 'CFG_CLB'];
 
@@ -88,7 +88,7 @@ const nops = n => Array(n).fill(NOP);
  * next frame is of another block type, half or row) and at the end (Configuration::createType2ConfigurationPacketData).
  * A frame of the fabric's tiles the part does not have (the xc7a35t's tiles are the xc7a50t's) is written all the same.
  */
-export function fdriLayout(addresses, part) {
+function fdriLayout(addresses, part) {
   const all = new Set(addresses);
   for (let a = 0; a !== null; a = part.next(a)) all.add(a);
   const at = new Map();

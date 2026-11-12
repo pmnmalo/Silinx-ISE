@@ -14,7 +14,7 @@ import { browserCodec, textOf } from '/core/zip.js';
 import { gateMessages, gateZip } from '/core/import-gate.js';
 
 /** The most a zip at an address may be (bytes). */
-export const LINK_ZIP_MAX = 16 << 20;
+const LINK_ZIP_MAX = 16 << 20;
 const VIEWS = { try: 'Try it', simulate: 'the simulation', emulate: 'the board emulator' };
 const fail = msg => Object.assign(new Error(msg), { linkError: true });
 const texts = entries => Object.fromEntries(entries.map(e => [e.path, typeof e.data === 'string' ? e.data : textOf(e)]));

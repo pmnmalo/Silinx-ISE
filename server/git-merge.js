@@ -12,7 +12,7 @@ import { drawingConflicts, resolveConflict } from '../core/git-resolve.js';
 import { syncDrawing } from './drawing-sync.js';
 
 const MARK = '# Silinx (#3197): the drawings are merged by their objects, never as text';
-export const DRAWING_ATTRIBUTES = `${MARK}\n${['sch', 'asm', 'fsm', 'tt', 'bool', 'pn'].map(k => `*.${k}.json merge=binary`).join('\n')}\n`;
+const DRAWING_ATTRIBUTES = `${MARK}\n${['sch', 'asm', 'fsm', 'tt', 'bool', 'pn'].map(k => `*.${k}.json merge=binary`).join('\n')}\n`;
 
 /** The repository's info/attributes with Silinx's lines (once; what else it holds kept). */
 export async function ensureDrawingAttributes(gitDir) {
