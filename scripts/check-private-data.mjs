@@ -2,9 +2,10 @@
 // addresses, home folders with a user name, logins such as user@host), computer names and IP, IPv6
 // and MAC addresses of a network, network paths, passwords, keys (private, SSH public) and access
 // tokens, and Xilinx files (ISE's binary outputs, licences, device reports). Run by
-// test/private-data.test.js on every tracked file: the text ones line by line (a long line in chunks),
-// the compressed ones (.gz) inflated, the other binary ones by their readable strings and, for a Xilinx
-// bitstream, by its header (#1441).
+// test/private-data.test.js on every tracked file: the text ones line by line (a long line in chunks), UTF-16
+// ones decoded (#3520), the compressed ones (.gz) inflated, the archives' (.zip, .tar, .tgz) files each, another
+// archive refused unless allowed, the other binary ones by their readable strings and, for a Xilinx bitstream, by
+// its header (#1441). The scanner and its test are scanned too (#3520): their own examples are allowed below.
 //
 //   node scripts/check-private-data.mjs              the tracked files
 //   node scripts/check-private-data.mjs --history    also every line added in the history of HEAD
@@ -73,9 +74,23 @@ const ALLOW = [
   // ISE's text reports and simulation models of our own test designs (no personal data in them):
   // the fixtures of the report parsers and of the netgen simulation
   [/^test\/fixtures\/(ise|netgen)\//, 'Xilinx file', 'ISE reports / netgen models of test designs, kept as parser fixtures'],
+  ['test/git-core.test.js', 'u@h', 'a made-up ssh login in a URL whose credentials redact takes off (#3195, #3520)'],
+  ['test/ise-flow.test.js', 'me@build-box', 'the made-up login and computer of the remote build\'s ssh command test (#3520)'],
+  // the scanner and its test (#3520: scanned too): this list names each value it allows (a text, or ^…$ texts) with its
+  // reason, and the rules' comments their examples; the test's examples are built at run time, and its expected results
+  // name made-up people's folders and made-up secrets
+  ['scripts/check-private-data.mjs', (t) => namedHere(t) || /^(Janes-MacBook-Pro\.local|\/Users\/,|-----BEGIN OPENSSH PRIVATE KEY-----|130\.0\.0\.0)$/.test(t),
+    'the allow-list\'s own values, each with its reason above, the rules\' examples in their comments, and a Chrome version it allowed '
+    + 'in a User-Agent string before #1080 (in the history only) (#3520)'],
+  ['test/private-data.test.js', /^(\/(Users|home)\/(alice|bob|carol|x)|Janes-MacBook-Pro\.local|password = \x22hunter2x\x22|api_key\x22: \x22k3yValue9\x22|secret = \x22\\\$\{SECRET\}\x22|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTIt…)$/,
+    'the rules\' tests: made-up people\'s home folders, a made-up computer name and made-up secrets in their expected results (#3520)'],
 ];
+// a text an entry of the allow-list names as such (a text, or an anchored pattern): the list's own values
+function namedHere(t) {
+  return ALLOW.some(([, a]) => (typeof a === 'string' ? a === t : a instanceof RegExp && a.source.startsWith('^') && a.source.endsWith('$') && a.test(t)));
+}
 
-// the rules themselves and their tests hold examples of what they look for
+// the rules themselves and their tests hold examples of what they look for (scanned all the same, their own ALLOW entries)
 export const SELF = ['scripts/check-private-data.mjs', 'test/private-data.test.js'];
 
 const allowed = (file, text) => ALLOW.some(([f, t]) =>
@@ -95,6 +110,10 @@ const RULES = [
   // slash, as in a User-Agent string: Chrome/1.2.3.4, #1080)
   { kind: 'IP address', re: /(?<![\w.]|[A-Za-z]\/)(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\w.]*\d)/g },
   { kind: 'login (user@address)', needs: '@', re: /\b[A-Za-z0-9._-]+@(?:\d{1,3}\.){3}\d{1,3}\b/g },
+  // a login on a computer named with no domain (user@name, #3520): after ssh / scp / sftp / rsync / mosh, after ://,
+  // or as a YAML value (a package's version, pkg@latest, an action's, x/y@v4, a test's name, tb@synth, are none)
+  { kind: 'login (user@name)', needs: '@', re: /(?:(?<=\b(?:ssh|scp|sftp|rsync|mosh)\s(?:[^\s|;&]+\s+)*)|(?<=:\/\/)|(?<=^\s*[\w.-]+:\s+["']?))[A-Za-z0-9._-]+@[A-Za-z][A-Za-z0-9-]*(?![\w.@\\-])/gm,
+    check: (m) => (/^(user|you|me|name|login|username)@(host|server|machine|name|computer|hostname|address|example)$/i.test(m[0]) ? null : m[0]) },
   // an IPv6 address (#1441): eight groups of hex digits, or a shortened one (::) with two groups at least, a digit
   // and a group of two digits or more (a time, 08:13:55, has no ::; a scope, std::string or A::B, no digit); ::1,
   // :: and the documentation prefix are allowed below, as 127.0.0.1 is
@@ -104,9 +123,13 @@ const RULES = [
   { kind: 'MAC address', re: /(?<![\w:-])(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}(?![\w:])|(?<![\w:-])(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}(?![\w-])/g },
   // a computer's name: under .local with a hyphen (Janes-MacBook-Pro.local); any name under .local / .lan /
   // .internal / .home.arpa after @ or ://; on its own (#1441), a name under .lan / .home.arpa, or one with a hyphen
-  // or a digit under .local / .internal (p.local, this.internal are code's properties)
+  // or a digit under .local / .internal (p.local, this.internal are code's properties); any one under .local /
+  // .internal in quotes, right after = or a colon, or as a YAML value (#3520)
   { kind: 'computer name', re: /(?:\b[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+\.local\b|(?:@|:\/\/)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:local|lan|internal|home\.arpa)\b|(?<=^|[\s"'`(<=[,])(?:[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*\.(?:lan|home\.arpa)|(?=[A-Za-z0-9.-]*[\d-])[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*\.(?:local|internal))(?=$|[\s"'`)>\]:,;/]))/gm,
     check: (m) => m[0].replace(/^(@|:\/\/)/, '') },
+  { kind: 'computer name', re: /(?:(?<=["'`=:])|(?<=^\s*[\w.-]+:\s+))[A-Za-z]+(?:\.[A-Za-z]+)*\.(?:local|internal)(?=$|["'`\s)>\]:,;/])/gm },
+  // a tailnet's name (Tailscale's MagicDNS, #3520): <computer>.<tailnet>.ts.net
+  { kind: 'computer name', needs: '.ts.net', re: /\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.ts\.net\b/g },
   // a network path, \\server\share (#1441), in text (in JavaScript, \\ is a string's one backslash: Verilog's
   // escaped identifiers, a regular expression)
   { kind: 'network path', re: /(?<![\\\w])\\\\(?![\\?.])([A-Za-z0-9][\w.-]*)\\[\w$][^\\\s"']*/g, not: /\.(m?js|cjs|ts|html?)$/i,
@@ -189,13 +212,80 @@ export function scanText(file, text, { whole = true } = {}) {
 
 const isBinary = (buf) => buf.subarray(0, 8000).includes(0);
 
-/** The problems of one file read as bytes (#1441): a text file by its lines; a compressed one (.gz) by what it
- *  holds, under its name without .gz; a binary one by its header (a Xilinx bitstream under any name) and by its
- *  readable strings (eight characters or more), on which the rules run as on lines. */
+// UTF-16 text (#3520): its byte order mark, or one byte of two zero in a text of ASCII characters -> 'utf16le' /
+// 'utf16be', or null
+function utf16(buf) {
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) return 'utf16le';
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) return 'utf16be';
+  const n = Math.min(buf.length, 8000) & ~1;
+  if (n < 8) return null;
+  let even = 0, odd = 0;
+  for (let k = 0; k < n; k += 2) { if (buf[k] === 0) even++; if (buf[k + 1] === 0) odd++; }
+  return odd > n * 0.45 && !even ? 'utf16le' : even > n * 0.45 && !odd ? 'utf16be' : null;
+}
+const fromUtf16 = (buf, enc) => {
+  const b = enc === 'utf16be' ? Buffer.from(buf.subarray(0, buf.length & ~1)).swap16() : buf;
+  return b.toString('utf16le').replace(/^﻿/, '');
+};
+
+// an archive's files (#3520): a zip's (stored or deflated), a tar's -> [{ name, data }], or null if it cannot be read
+function zipFiles(buf) {
+  const end = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (end < 0 || end + 22 > buf.length) return null;
+  const out = [];
+  let at = buf.readUInt32LE(end + 16);
+  for (let k = buf.readUInt16LE(end + 10); k > 0; k--) {
+    if (at + 46 > buf.length || buf.readUInt32LE(at) !== 0x02014b50) return null;
+    const method = buf.readUInt16LE(at + 10), size = buf.readUInt32LE(at + 20), nl = buf.readUInt16LE(at + 28);
+    const name = buf.toString('utf8', at + 46, at + 46 + nl), local = buf.readUInt32LE(at + 42);
+    at += 46 + nl + buf.readUInt16LE(at + 30) + buf.readUInt16LE(at + 32);
+    if (local + 30 > buf.length || buf.readUInt32LE(local) !== 0x04034b50) return null;
+    const from = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28), raw = buf.subarray(from, from + size);
+    if (name.endsWith('/')) continue;
+    if (method === 0) out.push({ name, data: raw });
+    else if (method === 8) { try { out.push({ name, data: zlib.inflateRawSync(raw) }); } catch { return null; } }
+    else return null;
+  }
+  return out;
+}
+function tarFiles(buf) {
+  const out = [];
+  for (let at = 0; at + 512 <= buf.length;) {
+    const head = buf.subarray(at, at + 512);
+    if (head.every((b) => b === 0)) break;
+    const str = (a, n) => head.toString('utf8', a, a + n).replace(/\0.*$/s, '');
+    const size = parseInt(str(124, 12).trim() || '0', 8);
+    if (!Number.isFinite(size) || head.toString('latin1', 257, 262) !== 'ustar' && !/^[0-7 \0]+$/.test(head.toString('latin1', 124, 136))) return null;
+    const name = [str(345, 155), str(0, 100)].filter(Boolean).join('/');
+    if ('0\0'.includes(String.fromCharCode(head[156])) || 'xgL'.includes(String.fromCharCode(head[156]))) out.push({ name, data: buf.subarray(at + 512, at + 512 + size) });
+    at += 512 + Math.ceil(size / 512) * 512;
+  }
+  return out;
+}
+// archives no rule reads: refused unless allowed (#3520)
+const OTHER_ARCHIVE = /\.(7z|rar|xz|txz|bz2|tbz2?|zst|lz|lzma|z|cab|iso|dmg|apk|deb|rpm)$/i;
+
+/** The problems of one file read as bytes (#1441): a text file by its lines (UTF-16 decoded, #3520); a compressed
+ *  one (.gz) by what it holds, under its name without .gz; an archive (.zip and the formats built on it, .tar, .tgz)
+ *  by its files, each under archive:name (#3520), another kind of archive, or one that cannot be read, refused unless
+ *  allowed ('archive not read'); a binary one by its header (a Xilinx bitstream under any name) and by its readable
+ *  strings (eight characters or more), on which the rules run as on lines. */
 export function scanBuffer(file, buf) {
   if (/\.gz$/i.test(file)) {
-    try { return scanBuffer(file.replace(/\.gz$/i, ''), zlib.gunzipSync(buf)).map((x) => ({ ...x, file })); } catch { /* not gzip: as bytes */ }
+    const inner = file.replace(/\.gz$/i, '');   // (an archive's file keeps its name after the archive's)
+    try { return scanBuffer(inner, zlib.gunzipSync(buf)).map((x) => ({ ...x, file: file + x.file.slice(inner.length) })); } catch { /* not gzip: as bytes */ }
   }
+  if (/\.tgz$/i.test(file)) {
+    const inner = file.replace(/\.tgz$/i, '.tar');
+    try { return scanBuffer(inner, zlib.gunzipSync(buf)).map((x) => ({ ...x, file: file + x.file.slice(inner.length) })); } catch { /* not gzip */ }
+  }
+  const members = /\.(zip|jar|docx|xlsx|pptx|odt|ods|odp|epub|whl)$/i.test(file) ? zipFiles(buf) : /\.tar$/i.test(file) ? tarFiles(buf) : undefined;
+  if (members !== undefined || OTHER_ARCHIVE.test(file)) {
+    if (members) return members.flatMap((m) => scanBuffer(`${file}:${m.name}`, m.data));
+    return allowed(file, 'archive not read') ? [] : [{ file, line: 0, kind: 'archive not read', text: path.basename(file) }];
+  }
+  const wide = isBinary(buf) && utf16(buf);
+  if (wide) return scanText(file, fromUtf16(buf, wide));
   if (!isBinary(buf)) return scanText(file, buf.toString('utf8'));
   const out = [];
   if (isXilinxBitstream(buf) && !allowed(file, 'Xilinx bitstream')) out.push({ file, line: 0, kind: 'Xilinx bitstream (by its header)', text: path.basename(file) });
@@ -210,7 +300,6 @@ export function scanRepo(root = ROOT) {
   const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 }).split('\0').filter(Boolean);
   const out = [];
   for (const f of files) {
-    if (SELF.includes(f)) continue;
     const p = path.join(root, f);
     if (!fs.existsSync(p) || fs.statSync(p).isDirectory()) continue;
     out.push(...scanBuffer(f, fs.readFileSync(p)));
@@ -237,21 +326,43 @@ export function scanHistory(root = ROOT, rev = 'HEAD') {
     }
     // the raw list (before the diff): each file's new blob, for a binary one
     const raw = !msg && /^:\d+ \d+ [0-9a-f]+ ([0-9a-f]+) [AMT]\t(.*)$/.exec(line);
-    if (raw) { blobs.set(raw[2], raw[1]); continue; }
-    const binary = !msg && /^Binary files .* and b\/(.*) differ$/.exec(line);
+    if (raw) { blobs.set(unquote(raw[2]), raw[1]); continue; }
+    const binary = !msg && /^Binary files .* and ("?)b\/(.*)\1 differ$/.exec(line);
     if (binary) {
+      binary[1] = unquote(binary[1] ? `"${binary[2]}"` : binary[2]);
       const sha = blobs.get(binary[1]);
-      if (sha && !binaries.has(sha) && !SELF.includes(binary[1])) binaries.set(sha, { file: binary[1], commit });
+      if (sha && !binaries.has(sha)) binaries.set(sha, { file: binary[1], commit });
       continue;
     }
     if (msg) { if (line === '@@END') { out.push(...scanText(`(message of ${commit})`, msg.join('\n')).map((x) => ({ ...x, commit }))); msg = null; } else msg.push(line); continue; }
-    if (line.startsWith('+++ b/')) { file = SELF.includes(line.slice(6)) ? null : line.slice(6); if (!file) continue; out.push(...scanText(file, '', { whole: false }).filter((x) => x.line === 0).map((x) => ({ ...x, commit }))); continue; }
+    // a file's header: its path as git writes it, quoted when it holds a quote, a backslash or a control character
+    // (#3520: such a file's lines were filed under the file before it); a file deleted has no line added
+    if (line.startsWith('+++ ')) {
+      const name = line === '+++ /dev/null' ? null : unquote(line.slice(4));
+      file = name && name.startsWith('b/') ? name.slice(2) : name;
+      if (file) out.push(...scanText(file, '', { whole: false }).filter((x) => x.line === 0).map((x) => ({ ...x, commit })));
+      continue;
+    }
+    if (line.startsWith('diff --git ')) { file = null; continue; }
     if (file && line.startsWith('+') && !line.startsWith('+++')) out.push(...scanText(file, line.slice(1), { whole: false }).filter((x) => x.line).map((x) => ({ ...x, commit })));
   }
   for (const [sha, b] of binaries) out.push(...scanBuffer(b.file, readBlob(root, sha)).map((x) => ({ ...x, commit: b.commit })));
   // one report per finding
   const seen = new Set();
   return out.filter((x) => { const k = `${x.file}|${x.kind}|${x.text}`; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+/** A path as git writes it: as it is, or in quotes with C's escapes (\", \\, \t, \n, \ooo for a byte). */
+export function unquote(p) {
+  if (!p.startsWith('"') || !p.endsWith('"') || p.length < 2) return p;
+  const body = Buffer.from(p.slice(1, -1), 'utf8'), bytes = [];
+  const esc = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 };
+  for (let k = 0; k < body.length; k++) {
+    if (body[k] !== 0x5c) { bytes.push(body[k]); continue; }
+    const o = /^[0-7]{3}/.exec(body.toString('latin1', k + 1, k + 4));
+    if (o) { bytes.push(parseInt(o[0], 8)); k += 3; } else { k++; const c = String.fromCharCode(body[k]); bytes.push(esc[c] ?? body[k]); }
+  }
+  return Buffer.from(bytes).toString('utf8');
 }
 
 /** A blob's bytes. */

@@ -31,8 +31,9 @@ export function runnerLiterals(env = process.env) {
   });
 }
 
-// a computer's name: a name under .local / .lan / .home / .internal / .home.arpa (mDNS, a home router's domain)
-const HOST_NAME = /\b[\w-]+(?:\.[\w-]+)*\.(?:local|lan|home|internal|home\.arpa)\b/gi;
+// a computer's name: a name under .local / .lan / .home / .internal / .home.arpa (mDNS, a home router's domain), or a
+// tailnet's (Tailscale's MagicDNS, .ts.net, #3520)
+const HOST_NAME = /\b[\w-]+(?:\.[\w-]+)*\.(?:local|lan|home|internal|home\.arpa|ts\.net)\b/gi;
 // an IPv6 address: eight groups, or a compressed one (::) with a group at least (a time, 08:13:55, has no ::),
 // with its zone (%en0) if any
 const IPV6 = /(?<![\w:.])(?:(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}|(?:[0-9a-f]{1,4}:){1,7}:(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})?|::(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})(?:%\w+)?(?![\w:.])/gi;

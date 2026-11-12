@@ -15,7 +15,7 @@ const at = '@', dot = (...p) => p.join('.');
 
 test('the tracked files hold no private data, secrets or Xilinx files', () => {
   const found = scanRepo();
-  // (the scanner and this file are left out: they hold examples of what is looked for)
+  // (the scanner and this file are scanned too, #3520: their examples of what is looked for allowed by their own entries)
   assert.deepEqual(SELF, ['scripts/check-private-data.mjs', 'test/private-data.test.js']);   // and nothing else
   assert.deepEqual(found.map((x) => `${x.file}${x.line ? `:${x.line}` : ''}: ${x.kind}: ${x.text}`), [],
     'remove these (or, for a harmless match, add it with its reason to ALLOW in scripts/check-private-data.mjs)');
@@ -270,4 +270,91 @@ test('the allow-list (#3494): #3415\'s commit message names a made-up local addr
   const msg = `so localhost.. and ${dot(192, 168, 1, 1)}.. passed`;
   assert.deepEqual(kinds('(message of 9973e11)', msg), []);
   assert.deepEqual(kinds('(message of 0000000)', msg), [`IP address: ${dot(192, 168, 1, 1)}`]);
+});
+
+// #3520: what the checks missed, each on made-up values
+test('names and logins (#3520): a tailnet\'s name, a bare .local name in quotes or as a value, a login on a computer with no domain', () => {
+  const ts = dot('mini', 'tail0000', 'ts', 'net');
+  assert.deepEqual(kinds('a.md', `ssh to ${ts} (MagicDNS)`), [`computer name: ${ts}`]);
+  const box = dot('labbox', 'local');
+  for (const line of [`host: "${box}"`, `const h = '${box}';`, `HOST=${box}`, `{"host":"${box}"}`, `  host: ${box}`])
+    assert.deepEqual(kinds('a.yml', line), [`computer name: ${box}`], line);
+  assert.deepEqual(kinds('a.js', 'const local = p.local; x.local = 1; if (a.internal) f(this.local);'), []);   // code, as before
+  const login = ['ana', 'labbox'].join(at);
+  for (const line of [`ssh ${login}`, `scp -P 22 f ${login}:x`, `rsync -a d/ ${login}:d/`, `ssh://${login}/x`, `  host: ${login}`])
+    assert.deepEqual(kinds('a.sh', line), [`login (user${at}name): ${login}`], line);
+  // a package's or an action's version, a test's name, an e-mail field of a test, git's own address: not logins
+  for (const line of [`npm i playwright${at}latest`, `uses: actions/checkout${at}v4`, `tb${at}synth`, `user.email=t${at}t`, `ssh ${['user', 'host'].join(at)}`, `ssh://git${at}github\\.com`])
+    assert.deepEqual(kinds('a.sh', line), [], line);
+});
+
+test('contents (#3520): UTF-16 text decoded; a zip\'s, a tar\'s and a tgz\'s files scanned; another archive refused unless allowed', () => {
+  const secret = `write to jane${at}${dot('mail', 'pt')}`;
+  const found = [`e-mail address: jane${at}mail.pt`];
+  const k = (file, buf) => scanBuffer(file, buf).map((x) => `${x.file} ${x.kind}: ${x.text}`);
+  // UTF-16, with and without its byte order mark, both byte orders
+  const le = Buffer.from(secret, 'utf16le');
+  for (const [name, buf] of [['bom-le.txt', Buffer.concat([Buffer.from([0xff, 0xfe]), le])], ['le.txt', le], ['be.txt', Buffer.from(le).swap16()],
+    ['bom-be.txt', Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(le).swap16()])]])
+    assert.deepEqual(k(name, buf), [`${name} ${found[0]}`], name);
+  // a zip (stored and deflated), a tar, a tgz: each file under archive:name
+  const zip = (entries) => {
+    const parts = [], dir = [];
+    let at = 0;
+    for (const [name, data, deflate] of entries) {
+      const body = deflate ? zlib.deflateRawSync(data) : data, n = Buffer.from(name);
+      const local = Buffer.alloc(30); local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(deflate ? 8 : 0, 8); local.writeUInt32LE(body.length, 18); local.writeUInt32LE(data.length, 22); local.writeUInt16LE(n.length, 26);
+      const cen = Buffer.alloc(46); cen.writeUInt32LE(0x02014b50, 0); cen.writeUInt16LE(deflate ? 8 : 0, 10); cen.writeUInt32LE(body.length, 20); cen.writeUInt32LE(data.length, 24); cen.writeUInt16LE(n.length, 28); cen.writeUInt32LE(at, 42);
+      parts.push(local, n, body); dir.push(cen, n); at += 30 + n.length + body.length;
+    }
+    const cd = Buffer.concat(dir), end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10); end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(at, 16);
+    return Buffer.concat([...parts, cd, end]);
+  };
+  const z = zip([['a/clean.txt', Buffer.from('nothing\n'), false], ['a/notes.md', Buffer.from(secret), true], ['b.txt', Buffer.from(secret), false]]);
+  assert.deepEqual(k('x.zip', z), [`x.zip:a/notes.md ${found[0]}`, `x.zip:b.txt ${found[0]}`]);
+  assert.deepEqual(k('x.docx', z).length, 2);
+  const tar = (entries) => Buffer.concat([...entries.flatMap(([name, data]) => {
+    const h = Buffer.alloc(512); h.write(name, 0); h.write(data.length.toString(8).padStart(11, '0'), 124); h.write('0', 156); h.write('ustar', 257);
+    return [h, data, Buffer.alloc((512 - (data.length % 512)) % 512)];
+  }), Buffer.alloc(1024)]);
+  const t = tar([['clean.txt', Buffer.from('nothing\n')], ['src/notes.md', Buffer.from(secret)]]);
+  assert.deepEqual(k('x.tar', t), [`x.tar:src/notes.md ${found[0]}`]);
+  assert.deepEqual(k('x.tgz', zlib.gzipSync(t)), [`x.tgz:src/notes.md ${found[0]}`]);
+  assert.deepEqual(k('x.tar.gz', zlib.gzipSync(t)), [`x.tar.gz:src/notes.md ${found[0]}`]);
+  assert.deepEqual(k('clean.zip', zip([['a.txt', Buffer.from('nothing\n'), true]])), []);   // no warnings
+  // another kind of archive, or one that cannot be read: refused
+  assert.deepEqual(k('x.7z', Buffer.from('7z\xbc\xaf\x27\x1c', 'latin1')), ['x.7z archive not read: x.7z']);
+  assert.deepEqual(k('bad.zip', Buffer.from('PK not a zip')), ['bad.zip archive not read: bad.zip']);
+});
+
+test('the scanner and its test are scanned too (#3520): their own examples allowed, nothing else', () => {
+  assert.deepEqual(SELF, ['scripts/check-private-data.mjs', 'test/private-data.test.js']);
+  const mail = `write to jane${at}${dot('mail', 'pt')}`;
+  for (const f of SELF) {
+    assert.deepEqual(kinds(f, mail), [`e-mail address: jane${at}mail.pt`], f);
+    assert.deepEqual(scanText(f, fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8')), [], f);
+  }
+});
+
+test('the history scan (#3520): a file whose path git quotes is read under its own name', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-private-'));
+  const git = (...args) => execFileSync('git', ['-c', 'user.name=T', `-c`, `user.email=t${at}${dot('example', 'com')}`, '-c', 'commit.gpgsign=false', ...args], { cwd: dir, encoding: 'utf8' });
+  const report = () => scanHistory(dir).map((x) => `${x.file}${x.line ? `:${x.line}` : ''}: ${x.kind}: ${x.text}`);
+  try {
+    git('init', '-q', '-b', 'main');
+    // the file before it in the commit is one the allow-list allows: its lines were filed under it, and allowed
+    const allowedFile = 'test/server-api.test.js', quoted = 'docs/a"b\\c.md';
+    fs.mkdirSync(path.join(dir, 'test')); fs.mkdirSync(path.join(dir, 'docs'));
+    fs.writeFileSync(path.join(dir, allowedFile), 'x\n');
+    fs.writeFileSync(path.join(dir, ...quoted.split('/')), `ssh to ${dot('fpga-lab', 'local')}\n`);
+    fs.writeFileSync(path.join(dir, 'docs', 'bin"x.dat'), Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(` mail jane${at}${dot('mail', 'pt')} `)]));
+    git('add', '.'); git('commit', '-q', '-m', 'files');
+    assert.deepEqual(report(), [
+      `${quoted}:1: computer name: ${dot('fpga-lab', 'local')}`,
+      `docs/bin"x.dat:1: e-mail address: jane${at}mail.pt`,
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
