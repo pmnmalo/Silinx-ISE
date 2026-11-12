@@ -62,7 +62,6 @@ export const FIND_TOOLS = [
       lines.push(count ? `${count} result(s) in ${found.length} file(s)` : 'No results');
       const data = { project: name, text, count, files };
       if (replace === undefined) return { text: clip(lines.join('\n')), data, untrusted: count ? 'the lines of the project\'s files' : undefined };
-      if (typeof replace !== 'string') throw toolError('replace: the replacement text');
       // Replace All (web/js/find-project.js replace): the text sources not generated from a drawing
       const { GateError, gateFile } = await import('../core/import-gate.js');
       const replaced = [];

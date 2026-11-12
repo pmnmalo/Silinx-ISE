@@ -175,7 +175,7 @@ test('check_syntax: the design as the application checks it, then an error and a
   const noLint = await srv.call('check_syntax', { project: 'Blinky', top: 'inv', lint: false });
   assert.deepEqual(noLint.structuredContent.warnings, []);
   assert.equal(noLint.content[0].text, 'Process "Check Syntax" of <inv> completed successfully (3 signals, 2 processes).');
-  assert.equal((await srv.call('check_syntax', { project: 'Blinky', top: 'inv', lint: 'no' })).content[0].text, 'check_syntax: lint: true or false');
+  assert.equal((await srv.call('check_syntax', { project: 'Blinky', top: 'inv', lint: 'no' })).content[0].text, 'check_syntax: lint: true or false');   // (the arguments' central check, #3535)
   assert.equal((await srv.call('check_syntax', { project: 'Blinky', top: 'nothere' })).structuredContent.ok, false);
 });
 

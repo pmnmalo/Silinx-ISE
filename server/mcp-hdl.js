@@ -134,7 +134,6 @@ export const HDL_TOOLS = [
       lint: { type: 'boolean', description: 'The design checks\' lint warnings, as Edit ▸ Design Checks (Lint Warnings) (default true, the interface\'s default).' } }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
     async run({ project: name, top, simulation = false, lint = true }) {
-      if (typeof lint !== 'boolean') throw toolError('lint: true or false');
       const { design, top: mod, diags } = await elaborateView(name, { top, sim: simulation, lint });
       const errors = diags.filter(d => d.severity === 'error'), warnings = diags.filter(d => d.severity !== 'error');
       const ok = !errors.length && !!design?.top;
