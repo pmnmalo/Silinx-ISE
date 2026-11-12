@@ -10,9 +10,9 @@
 // view's model: read back from there after a reload) and the bitstream is downloaded. Configure
 // Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
-import { getDeviceDb, findPart } from '../../server/devices.js';
+import { getDeviceDb, findPart } from '../../core/devices.js';
 import { resourcesOf, openOnlyDevice, experimentalDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
-import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
+import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../core/xise.js';
 import EXAMPLES from 'silinx-examples';
 import { isCSource } from '../../core/view-hdl.js';
 import { orderExamples } from '../../core/examples.js';
