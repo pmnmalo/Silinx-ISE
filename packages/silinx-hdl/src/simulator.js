@@ -5,7 +5,7 @@
 // step runs), and follow the driver rules: a new assignment deletes the driver's later
 // transactions, and inertial delay also rejects pulses shorter than the reject limit.
 import * as V from './values.js';
-import { exec, evalE, applyWrite, applyElem, formatDisplay, SimError, formatTime, sameDeep, locFrame } from './interp.js';
+import { exec, evalE, applyWrite, applyElem, formatDisplay, SimError, formatTime, sameDeep, locFrame, newBudget } from './interp.js';
 
 class Heap {
   constructor() { this.a = []; this.seq = 0; }
@@ -358,7 +358,7 @@ export class Simulator {
 
   makeGen(rt) {
     const p = rt.p;
-    const ctx = { frame: p.frameInit ? p.frameInit() : [], sim: this, depth: 0, timeUnit: p.timeUnit, scopeName: p.inst.path };
+    const ctx = { frame: p.frameInit ? p.frameInit() : [], sim: this, depth: 0, timeUnit: p.timeUnit, scopeName: p.inst.path, budget: newBudget() };
     rt.ctx = ctx;
     const body = p.body, triggers = p.triggers;
     const sim = this;
@@ -399,7 +399,7 @@ export class Simulator {
   processError(rt, e) {
     rt.done = true;
     const msg = e instanceof SimError ? e.message : `internal error: ${e.message}`;
-    this.emit({ kind: 'error', text: `${msg} (in ${rt.p.inst.path}/${rt.p.name})`, file: rt.p.file, line: e.loc?.line || rt.ctx?.loc?.line || rt.p.loc?.line });
+    this.emit({ kind: 'error', text: `${msg} (in ${rt.p.inst.path}/${rt.p.name})`, file: e.loc?.file || rt.p.file, line: e.loc?.line || rt.ctx?.loc?.line || rt.p.loc?.line });
     if (!(e instanceof SimError)) console.error(e);
     this.finish('error');
   }
@@ -414,6 +414,7 @@ export class Simulator {
       else rt.done = true;   // (no input: it waits forever)
       return;
     }
+    if (rt.ctx?.budget) rt.ctx.budget.n = 0;   // (a run's budget of iterations, #3525)
     for (;;) {
       let r;
       try {

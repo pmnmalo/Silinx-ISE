@@ -50,6 +50,16 @@ export const MAX_BITS = 2 ** 24;
 // 600 MB): the limit an array had alone, now of the whole (#3555: 22 levels of two elements, 8M in all, 1.6 GB).
 export const MAX_ELEMENTS = 2 ** 22;
 export const widthMessage = (what, n) => `${what} is ${n} bits wide, more than the limit of ${MAX_BITS} bits`;
+// The loop iterations and calls of one evaluation (#3525): a constant's (a function run while the design is
+// elaborated), a process's run until it waits (the simulation's limits, of time steps and of the clock, are looked at
+// between two runs). Every iteration of a for, a while, a VHDL loop, a repeat, a forever that does not wait, and every
+// call of a function, a procedure or a task counts, nested loops and recursion together (what one iteration runs
+// besides is bounded by the source). Past it, one error at the loop or the call. The repository's largest evaluation
+// is 1536 (a test bench's memory filled in a loop); the interpreter runs about 3 million a second: 2**22 (4M), with a
+// margin of thousands over it, about 1.5 s. (Each while or loop stopped at 10 million on its own before, about half a
+// minute; a for and a repeat never, and nested loops multiplied it.)
+export const MAX_ITERATIONS = 2 ** 22;
+export const ITERATIONS_MESSAGE = `loop iteration limit exceeded: more than ${MAX_ITERATIONS} iterations and calls in one evaluation (a constant, or a process until it waits)`;
 // The branches of a generate if … else if chain, of a case generate (#3500): the node, then each else if / elsif / next
 // alternative, the same construct in the same scope (elseChain: its else is that one generate_if), listed in a loop:
 // a chain is not nesting, thousands of branches are read, elaborated and translated without recursing per branch.

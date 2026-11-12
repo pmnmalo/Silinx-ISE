@@ -129,7 +129,7 @@ function bindStmt0(E, s, loc) {
     }
     case 'for': return {
       k: 'for', init: bindStmt(E, s.init, loc), cond: vsize(E, bindExpr(E, s.cond, null, loc)), step: bindStmt(E, s.step, loc),
-      body: bindStmt(E, s.body, loc), loc,
+      body: bindStmt(E, s.body, loc), loc, file: E.file,
     };
     case 'forrange': {
       const r = evalRangeDyn(E, s.range, loc);
@@ -139,14 +139,15 @@ function bindStmt0(E, s, loc) {
       const i = E.fb.alloc(INT, init);
       sc.def(s.var, { kind: 'loc', i, t: INT, lvl: E.fb.level });
       const LE = { ...E, sc };
-      return { k: 'forrange', var: i, varT: INT, from: r.from, to: r.to, down: r.down, body: bindStmt(LE, s.body, loc), loc, label: s.label };
+      return { k: 'forrange', var: i, varT: INT, from: r.from, to: r.to, down: r.down, body: bindStmt(LE, s.body, loc), loc, file: E.file, label: s.label };
     }
-    case 'while': return { k: 'while', cond: vsize(E, bindExpr(E, s.cond, null, loc)), body: bindStmt(E, s.body, loc), loc, label: s.label };
-    case 'repeat': return { k: 'repeat', count: vsize(E, bindExpr(E, s.count, null, loc)), body: bindStmt(E, s.body, loc), loc };
+    // (file: a loop's own, a package's, for the error past the budget of iterations, #3525)
+    case 'while': return { k: 'while', cond: vsize(E, bindExpr(E, s.cond, null, loc)), body: bindStmt(E, s.body, loc), loc, file: E.file, label: s.label };
+    case 'repeat': return { k: 'repeat', count: vsize(E, bindExpr(E, s.count, null, loc)), body: bindStmt(E, s.body, loc), loc, file: E.file };
     case 'forever': {
       const body = bindStmt(E, s.body, loc);
       // (a VHDL `loop` may iterate without waiting: it ends with exit; only the iteration count is limited)
-      return { k: 'forever', body, hasWait: E.lang === 'vhdl' || containsKind(body, ['delay', 'event', 'wait', 'task', 'fork', 'waitfork']), loc, label: s.label };
+      return { k: 'forever', body, hasWait: E.lang === 'vhdl' || containsKind(body, ['delay', 'event', 'wait', 'task', 'fork', 'waitfork']), loc, file: E.file, label: s.label };
     }
     case 'exit': case 'next': return { k: s.kind, c: s.cond ? bindExpr(E, s.cond, null, loc) : null, loc, label: s.label };
     // the return type is the expected type of aggregates and of character / enumeration literals
@@ -298,7 +299,7 @@ function bindCallStmt(E, s, loc) {
   const fn = boundFunction(entry, s.args.map((a, k) => args[k] || bindLvalue(E, a, loc)), loc, sigActuals);
   const outTargets = s.args.map((a, k) => (decl.params[k] && decl.params[k].dir !== 'in' && !sigActuals?.[k] ? bindLvalue(E, a, loc) : null));
   if (sigActuals) args.forEach((_, k) => { if (sigActuals[k]) args[k] = null; });
-  const node = { k: 'task', fn, args, outTargets, loc };
+  const node = { k: 'task', fn, args, outTargets, loc, file: E.file };
   // signals passed to `signal` parameters of mode in / inout are read by the call
   if (sigActuals) node.sigReads = sigActuals.flatMap((a, k) => (a && decl.params[k].dir !== 'out' ? [a.rv] : []));
   return node;
