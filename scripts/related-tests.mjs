@@ -15,7 +15,9 @@
 // database's JSON, a device description, an example, a fixture, #772) counts as a change of every source that
 // reads it, found from the code (a file or folder named from the source's own place: path.join(path.dirname(
 // fileURLToPath(import.meta.url)), '..', 'db'), a constant holding one, new URL('../db/', import.meta.url)), and
-// of the modules that import one of those, at any depth. And always the repository's checks (REPO_WIDE, #3461): the
+// of the modules that import one of those, at any depth. A changed module no test imports (#3544: about 60, the
+// translators', the HLS's, the simulator's parts) counts through its importers, up to the modules a test imports
+// (untestedReach). And always the repository's checks (REPO_WIDE, #3461): the
 // tests that scan the whole repository, which a pull request can break with a file none of them imports.
 //
 //   node scripts/related-tests.mjs <base> <head> [--shard i/n] [--list | --plan] [node --test options …]
@@ -95,6 +97,38 @@ export function reexported(text) {
   return [...String(text).matchAll(/^\s*export\s+(?:\*(?:\s+as\s+\w+)?|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]);
 }
 
+/** How many importers up a changed module no test imports is followed (#3544): the deepest today is 3
+ *  (packages/silinx-hdl/src/native-gowin.js, 2026-11-12). */
+export const UNTESTED_DEPTH = 4;
+
+/** The modules a test imports that stand for the changed modules no test imports (#3544), the IDE's and the packages'
+ *  sources outside web/ (whose page scripts have their UI tests): each one's importers, then theirs, up to a module a
+ *  test (or a helper of the tests) imports, at most UNTESTED_DEPTH levels; the web/ pages and the tests are not
+ *  followed. deps: each file's imports resolved; ch: the changed modules. */
+export function untestedReach(files, deps, ch, isTest, inTests, reexports = () => false) {
+  const tested = new Set(Object.keys(files).filter(isTest).flatMap(f => deps[f]));
+  const source = f => /\.m?js$/.test(f) && !inTests(f) && !f.startsWith('web/');
+  const importers = {};
+  for (const f of Object.keys(files)) if (source(f)) for (const d of deps[f]) (importers[d] ||= []).push(f);
+  const out = new Set();
+  for (const f of ch) {
+    // (imported by the tests through a module that re-exports it, core/'s old path of a package's module: tested)
+    if (!source(f) || tested.has(f) || (importers[f] || []).some(g => tested.has(g) && reexports(g, f))) continue;
+    const seen = new Set([f]);
+    let level = [f];
+    for (let k = 0; k < UNTESTED_DEPTH && level.length; k++) {
+      const next = [];
+      for (const g of level) for (const i of importers[g] || []) {
+        if (seen.has(i)) continue;
+        seen.add(i);
+        if (tested.has(i)) out.add(i); else next.push(i);
+      }
+      level = next;
+    }
+  }
+  return [...out];
+}
+
 export function relatedTests(files, changed) {
   // (a page script's absolute import, as the server serves it: /core/… the repository's core/, /js/… web/js/, #2093)
   const resolve = (from, spec) => (spec.startsWith('/') ? (spec.startsWith('/js/') ? `web${spec}` : spec.slice(1))
@@ -124,9 +158,13 @@ export function relatedTests(files, changed) {
     grew = false;
     for (const f of Object.keys(files)) if (!ch.has(f) && ((reexportsOnly(files[f]) && deps[f].some(d => ch.has(d))) || again[f].some(d => ch.has(d)))) { ch.add(f); grew = true; }
   }
+  // a changed module no test imports (#3544: core/translate-to-verilog.js, imported by core/translate.js only): its
+  // importers count as changed for their tests, followed up to the modules the tests import
+  const reexports = (g, f) => again[g].includes(f) || (reexportsOnly(files[g]) && deps[g].includes(f));
+  const touched = new Set([...ch, ...untestedReach(files, deps, ch, f => isUnit(f) || isHelper(f), inTests, reexports)]);
   // a helper of the tests that imports a changed file (or changed itself) counts as changed for its tests
-  const touched = new Set(ch);
-  for (const f of Object.keys(files)) if (isHelper(f) && deps[f].some(d => ch.has(d))) touched.add(f);
+  const base = new Set(touched);
+  for (const f of Object.keys(files)) if (isHelper(f) && deps[f].some(d => base.has(d))) touched.add(f);
   const unit = new Set(), ui = new Set();
   for (const f of Object.keys(files)) {
     if (isUnit(f) && (ch.has(f) || deps[f].some(d => touched.has(d)))) unit.add(f);

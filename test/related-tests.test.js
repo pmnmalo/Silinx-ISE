@@ -8,7 +8,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readTimings } from '../scripts/test-shard.mjs';
-import { imports, dataPaths, relatedTests, reexportsOnly, reexported, pageImports, shardOf, planShards, PART_MINUTES, MAX_PARTS, sources, REPO_WIDE, withRepoWide } from '../scripts/related-tests.mjs';
+import { imports, dataPaths, relatedTests, reexportsOnly, reexported, pageImports, shardOf, planShards, PART_MINUTES, MAX_PARTS, sources, REPO_WIDE, withRepoWide, UNTESTED_DEPTH } from '../scripts/related-tests.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -391,4 +391,47 @@ test('#2093 related tests: through a module re-exporting names of a changed one;
   const real = relatedTests(sources(), ['core/schdoc-symbols.js']);
   for (const t of ['test/schmulti.test.js', 'test/schsymbols.test.js', 'test/symdocs.test.js', 'test/inv-bits.test.js']) assert.ok(real.unit.includes(t), t);
   for (const t of ['test/ui/sch-props.test.js', 'test/ui/sch-inv-bits.test.js']) assert.ok(real.ui.includes(t), t);
+});
+
+test('#3544 related tests: a changed module no test imports, through its importers up to the modules the tests import (at most UNTESTED_DEPTH levels)', () => {
+  const files = {
+    'core/translate.js': "import { toV } from './translate-to-verilog.js';\nimport { toVhdl } from './translate-to-vhdl.js';",
+    'core/translate-to-verilog.js': "import { expr } from './translate-expr.js';",
+    'core/translate-to-vhdl.js': "import { expr } from './translate-expr.js';",
+    'core/translate-expr.js': '',
+    'core/views.js': "import { translate } from './translate.js';",
+    'core/tested-too.js': "import { expr } from './translate-expr.js';",
+    'core/lone.js': '',
+    'core/d1.js': "import './d2.js';", 'core/d2.js': "import './d3.js';", 'core/d3.js': "import './d4.js';", 'core/d4.js': "import './d5.js';", 'core/d5.js': '',
+    'web/js/page.js': "import { expr } from '/core/translate-expr.js';",
+    'server/srv.js': "import { expr } from '../core/translate-expr.js';",
+    'test/translate.test.js': "import { translate } from '../core/translate.js';",
+    'test/views.test.js': "import { views } from '../core/views.js';",
+    'test/lib.mjs': "export * from '../core/tested-too.js';",
+    'test/via-helper.test.js': "import './lib.mjs';",
+    'test/page.test.js': "import '../web/js/page.js';",
+    'test/d1.test.js': "import '../core/d1.js';",
+  };
+  // core/translate-to-verilog.js: no test imports it; core/translate.js does: its tests, not those of core/views.js beyond it
+  assert.deepEqual(relatedTests(files, ['core/translate-to-verilog.js']), { unit: ['test/translate.test.js'], ui: [] });
+  // two levels up, both ways: core/translate.js (through either translator) and core/tested-too.js, through a helper;
+  // the page script (web/) and the server's module (no test imports it, and nothing imports it) not followed
+  assert.deepEqual(relatedTests(files, ['core/translate-expr.js']), { unit: ['test/translate.test.js', 'test/via-helper.test.js'], ui: [] });
+  // a module a test imports: its own tests only, as before; a module nothing imports: none
+  assert.deepEqual(relatedTests(files, ['core/translate.js']), { unit: ['test/translate.test.js'], ui: [] });
+  assert.deepEqual(relatedTests(files, ['core/lone.js']), { unit: [], ui: [] });
+  // bounded: core/d1.js is 4 levels above core/d5.js, 3 above core/d4.js, 5 above core/d6.js
+  assert.equal(UNTESTED_DEPTH, 4);
+  assert.deepEqual(relatedTests(files, ['core/d4.js']), { unit: ['test/d1.test.js'], ui: [] });
+  assert.deepEqual(relatedTests(files, ['core/d5.js']), { unit: ['test/d1.test.js'], ui: [] });
+  assert.deepEqual(relatedTests({ ...files, 'core/d5.js': "import './d6.js';", 'core/d6.js': '' }, ['core/d6.js']), { unit: [], ui: [] });
+  // the repository: the audit's modules (#3544) now run their importers' tests, besides the repository's checks
+  const repo = sources();
+  const of = (f) => relatedTests(repo, [f]).unit;
+  for (const [f, t] of [['core/translate-to-verilog.js', 'test/translate.test.js'], ['core/translate-to-vhdl.js', 'test/translate.test.js'],
+    ['core/translate-vhdl-expr.js', 'test/translate.test.js'], ['core/cpp-tb-parse.js', 'test/cpp.test.js'], ['core/c-fsmd.js', 'test/c-schedule.test.js'],
+    ['packages/silinx-hdl/src/vhdl/purity.js', 'test/elab-call.test.js'], ['core/cpp-tb-run.js', 'test/c-tb-files.test.js']])
+    assert.ok(of(f).includes(t), `${f}: ${t}`);
+  // and a change of one stays far from the whole suite
+  for (const f of ['core/translate-to-verilog.js', 'core/c-fsmd.js', 'core/cpp-tb-run.js']) assert.ok(of(f).length < 30, `${f}: ${of(f).length}`);
 });
