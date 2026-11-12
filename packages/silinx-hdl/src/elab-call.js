@@ -9,6 +9,19 @@ import {
 import { SimError } from './interp.js';
 import * as V from './values.js';
 import { bindExpr, edgeOperand, hierResolve, slvNum, strAsLogic } from './elab-expr.js';
+import { CALL_NESTING_MESSAGE, MAX_CALL_NESTING } from './util.js';
+
+// Calls nested in calls (#3508): the subprograms being bound, one inside another's body. A call past MAX_CALL_NESTING is
+// an error at that call, in its file (callNesting: passed up through the functions being bound, to the statement or
+// declaration of the design that makes the outermost call, which reports it once, rather than each body's statement
+// reporting it and binding on).
+let callDepth = 0;
+export function checkCallNesting(E, loc) {
+  if (callDepth < MAX_CALL_NESTING) return;
+  const e = new ElabError(CALL_NESTING_MESSAGE, { ...loc, file: E.file });
+  e.callNesting = true;
+  throw e;
+}
 
 export function positional(args) { return args.map(a => (a && a.named !== undefined ? a.value : a)); }
 
@@ -239,7 +252,7 @@ export function pickOverload(E, entry, rawArgs, loc) {
   try {
     acts = rawArgs.map(a => (a == null ? null : { named: a.named, n: bindExpr(E, a.named !== undefined ? a.value : a, null, loc) }));
   } catch (e) {
-    if (e instanceof ElabError || e instanceof SimError) return entry;
+    if ((e instanceof ElabError || e instanceof SimError) && !e.callNesting) return entry;
     throw e;
   }
   const fitsType = (n, pt, strict) => {
@@ -301,6 +314,7 @@ export function bindCall(E, entry, rawArgs, name, loc) {
     if (E.lang === 'vhdl' && n.k === 'str' && pt && (pt.kind === 'logic' || (pt.kind === 'named' && stdTypeName(pt.name)?.kind === 'logic'))) return strAsLogic(n, { t: { kind: 'logic' } });
     return n;
   });
+  checkCallNesting(E, loc);
   const fn = boundFunction(entry, args, loc);
   if (decl.kind === 'task' || !fn.retT) throw new ElabError(`'${name}' is a procedure/task, not a function`, loc);
   args.forEach((a, k) => { if (E.lang === 'verilog') ctxSize(a, fn.params[k].t.w); });
@@ -338,7 +352,7 @@ export function boundFunction(entry, args, loc, sigActuals = null) {
     // try the generic binding; on errors, fall back to the per-constant one
     const diags = entry.E.ctx.design.diags, n0 = diags.length;
     let fn = null;
-    try { fn = bindSubprogram(entry, args, key, sigActuals, null); } catch (e) { if (!(e instanceof ElabError) && !(e instanceof SimError)) throw e; }
+    try { fn = bindSubprogram(entry, args, key, sigActuals, null); } catch (e) { if ((!(e instanceof ElabError) && !(e instanceof SimError)) || e.callNesting) throw e; }
     if (fn && !diags.slice(n0).some(d => d.severity === 'error')) return fn;
     diags.length = n0;
     if (!sigActuals) entry.cache.set(key, { needsConsts: true });
@@ -363,6 +377,7 @@ function bindSubprogram(entry, args, key, sigActuals, consts) {
   // them from one call to the next; one set per declaration, so per instance of its module)
   if (DE.lang === 'verilog' && !decl.automatic) fn.static = entry.static ??= Symbol(decl.name);
   if (!sigActuals) entry.cache.set(key, fn);
+  callDepth++;
   try {
     decl.params.forEach((p, k) => {
       if (sigActuals?.[k]) {
@@ -409,6 +424,8 @@ function bindSubprogram(entry, args, key, sigActuals, consts) {
   } catch (e) {
     if (!sigActuals && entry.cache.get(key) === fn) entry.cache.delete(key);
     throw e;
+  } finally {
+    callDepth--;
   }
   fn.frameInit = fb.makeInit();
   const rw = collectRW(fn.body);

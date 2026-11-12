@@ -31,6 +31,14 @@ export const NESTING_MESSAGE = `expression nested more than ${MAX_NESTING} level
 // its innermost statement. The parsers refuse a deeper one, as they do expressions: the passes after them recurse once
 // per level (the elaboration from about 600 levels).
 export const STMT_NESTING_MESSAGE = `statement nested more than ${MAX_NESTING} levels deep (blocks, if, case, loops, generates)`;
+// The deepest calls nest while a design is elaborated (#3508): a function calling another, that calls another…, each
+// call's subprogram bound (and a constant one evaluated) inside its caller's binding. The JavaScript stack ran out
+// (Node 24's default stack) past about 230 functions of one statement each, past about 100 whose call sits in an if, a
+// for, a case and parentheses; 64, with a margin over both: 64 of those still bind with their outermost call 250 blocks
+// deep (statements nest at most MAX_NESTING levels) and 30 parentheses around each call. A call past it is an error of
+// the file at the call.
+export const MAX_CALL_NESTING = 64;
+export const CALL_NESTING_MESSAGE = `calls nested more than ${MAX_CALL_NESTING} levels deep (a function calling another, that calls another…)`;
 // The branches of a generate if … else if chain, of a case generate (#3500): the node, then each else if / elsif / next
 // alternative, the same construct in the same scope (elseChain: its else is that one generate_if), listed in a loop:
 // a chain is not nesting, thousands of branches are read, elaborated and translated without recursing per branch.
