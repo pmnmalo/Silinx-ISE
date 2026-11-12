@@ -5,7 +5,7 @@
 //   BLOCK RESETPATHS;  SYSCONFIG CONFIG_IOVOLTAGE=3.3 …;                 the board's, kept as they are (the model's `other`)
 // '#' and '//' start a comment, ';' ends a statement. The names are nextpnr's (led[0]), as PCF's. Another statement throws,
 // naming its line: nextpnr-ecp5 would not apply it.
-import { periodNs } from './ucf.js';
+import { byName, periodNs, setByName } from './ucf.js';
 
 const PULLS = { UP: 'up', DOWN: 'down', NONE: null, KEEPER: 'keeper', BUSHOLD: 'keeper' };
 const PULL_MODE = { up: 'UP', down: 'DOWN', keeper: 'KEEPER' };
@@ -35,7 +35,7 @@ function readLpf(text) {
   const assignments = {}, netStatements = [], clocks = [], other = [];
   const set = (net, attrs) => {
     netStatements.push({ net, attrs: { ...attrs } });
-    assignments[net] = { ...assignments[net], ...attrs };
+    setByName(assignments, net, { ...byName(assignments, net), ...attrs });
   };
   for (const st of statements(text)) {
     const fail = msg => { throw new Error(`line ${st.line}: ${msg}`); };

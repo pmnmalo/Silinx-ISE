@@ -2,7 +2,7 @@
 //   set_io [-nowarn] [-pullup yes|no] [-pullup_resistor 3P3K|6P8K|10K|100K] <port> <pin>   a port's pin
 //   set_frequency <net> <MHz>                                                              a clock's frequency
 // '#' starts a comment. Another command throws, naming its line: nextpnr would stop at it.
-import { periodNs } from './ucf.js';
+import { byName, periodNs, setByName } from './ucf.js';
 
 const RESISTORS = ['3P3K', '6P8K', '10K', '100K'];
 
@@ -33,7 +33,7 @@ function readPcf(text) {
       const [net, loc] = rest;
       attrs.loc = loc;
       netStatements.push({ net, attrs: { ...attrs } });
-      assignments[net] = { ...assignments[net], ...attrs };
+      setByName(assignments, net, { ...byName(assignments, net), ...attrs });
     } else if (cmd === 'set_frequency') {
       const mhz = Number(args[1]);
       if (args.length !== 2 || !(mhz > 0)) fail('set_frequency needs a net and its frequency in MHz');

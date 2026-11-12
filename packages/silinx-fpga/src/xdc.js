@@ -7,7 +7,7 @@
 // kept as it is (the model's `other`, for Vivado): XDC is Tcl, and only these are portable.
 // A line for a port the design does not have makes Vivado warn ("[Common 17-55] 'set_property' expects at least one
 // object"): writeXdc leaves out the nets of the ports synthesis removed, given the ports it kept.
-import { periodNs } from './ucf.js';
+import { byName, periodNs, setByName } from './ucf.js';
 
 const PULLS = { PULLUP: 'up', PULLDOWN: 'down', KEEPER: 'keeper' };
 const PULL_TYPE = { up: 'PULLUP', down: 'PULLDOWN', keeper: 'KEEPER' };
@@ -94,7 +94,7 @@ function command(m, ws, fail) {
     }
     if (args.length !== 3) fail('set_property needs a property, its value and its objects');
     if (args[2].kind === '[' && words(args[2].text)[0]?.text === 'current_design') {
-      m.config[args[0].text.toUpperCase()] = args[1].text;
+      setByName(m.config, args[0].text.toUpperCase(), args[1].text);
       return true;
     }
     if (!objects) return false;
@@ -129,7 +129,7 @@ function command(m, ws, fail) {
 function setPort(m, net, attrs) {
   const n = toModel(net);
   m.netStatements.push({ net: n, attrs: { ...attrs } });
-  m.assignments[n] = { ...m.assignments[n], ...attrs };
+  setByName(m.assignments, n, { ...byName(m.assignments, n), ...attrs });
 }
 
 /** The model of an XDC text: { assignments, netStatements, clocks, config, other }. Throws 'line N: …' where Vivado would stop. */
