@@ -68,8 +68,11 @@ read that user's files has the server too.
 - Git (#3195, `server/git.js`): the system's git is spawned with an argument array, never through a shell, with a
   timeout and no prompt (`GIT_TERMINAL_PROMPT=0`, ssh in batch mode). No hook of a repository runs (`core.hooksPath`
   is an empty folder of Silinx's), nor a repository's fsmonitor; no symbolic link is checked out; only https and ssh
-  are allowed (`protocol.allow`), and a remote is github.com's (checked before a clone, a push and a pull: the fetch
-  and the push URLs). The repository is the project's folder or the workspace, never one above it
+  are allowed (`protocol.allow`), and a remote is github.com's (checked before a clone, a push and a pull: every fetch
+  and push URL). A repository's own configuration (a folder that came with its `.git`) holds only the settings a clone,
+  Silinx and the usual tools write: one that names a program git would run (a filter, a merge or diff driver, a signing
+  program, a credential helper, a remote's helper), a file to include or an address rewritten stops every git command
+  in it, the error naming the setting (#3523, `server/git-repo-config.js`). The repository is the project's folder or the workspace, never one above it
   (`GIT_CEILING_DIRECTORIES`), and every command is limited to the project's folder. The credentials are the system's
   credential helper's: Silinx never asks for, stores or logs one (an error's URLs lose their `user:password@`). A
   cloned project passes the import gate and is untrusted (#2830); its hidden files (`.vscode`, `.envrc`, `.gitattributes`,
