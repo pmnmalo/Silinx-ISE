@@ -24,7 +24,7 @@ const P = await import('../server/projects.js');
 let id = 0;
 async function call(name, args = {}) {
   const r = (await handle({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: args } })).result;
-  return { text: r.content.map(c => c.text).join('\n'), data: r.structuredContent, isError: r.isError };
+  return { text: r.content.map(c => c.text).filter(t => !t.startsWith('[Untrusted content')).join('\n'), data: r.structuredContent, isError: r.isError };
 }
 const XISE = '<?xml version="1.0" encoding="UTF-8"?>\n<project xmlns="http://www.xilinx.com/XMLSchema"><files><file xil_pn:name="top.vhd" xil_pn:type="FILE_VHDL"/></files></project>\n';
 

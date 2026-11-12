@@ -230,7 +230,8 @@ export const HDL_TOOLS = [
       }
       const text = [...head, ...diags.filter(d => d.severity !== 'error').map(diagLine), ...log.map(l => `[${l.timeNs.toFixed(3)} ns] ${l.kind === 'print' ? '' : `${l.kind.toUpperCase()}: `}${l.text}`), stopped, ...(limitLine ? [limitLine] : []),
         ...Object.entries(sigs).map(([n, s]) => `${n} = ${s.final ?? '(no value)'}${s.totalChanges > 1 ? ` (${s.totalChanges} changes)` : ''}`), ...(vcdPath ? [`Waves written: ${vcdPath}.`] : [])].join('\n');
-      return { text: clip(text), data: { project: name, top: mod, model, started: true, stoppedAtNs: st.now / 1000, finished: st.finished || null, limit: limit ? { kind: limit, ...(limit === 'time' ? { seconds: timeoutS } : { steps: SIM_LIMITS.steps }) } : null, failed, log, signals: sigs, warnings: diags.filter(d => d.severity !== 'error').map(diagJson), notes: head, ...(vcdPath ? { vcd: vcdPath } : {}) }, isError: false };
+      // (the lines the design prints, report / $display: the project's own text, #3528)
+      return { untrusted: log.length ? 'the design\'s messages (report, $display, assertions)' : undefined, text: clip(text), data: { project: name, top: mod, model, started: true, stoppedAtNs: st.now / 1000, finished: st.finished || null, limit: limit ? { kind: limit, ...(limit === 'time' ? { seconds: timeoutS } : { steps: SIM_LIMITS.steps }) } : null, failed, log, signals: sigs, warnings: diags.filter(d => d.severity !== 'error').map(diagJson), notes: head, ...(vcdPath ? { vcd: vcdPath } : {}) }, isError: false };
     },
   },
 ];
