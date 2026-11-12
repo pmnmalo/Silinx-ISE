@@ -1,4 +1,5 @@
-// Copy Link… (#2826): the link that opens the project in Silinx (for lecture slides), the whole project inside it
+// Share Project Copy… and Share Module Copy… (#2826, #3628): the link that opens the project in Silinx (for lecture
+// slides), the whole project inside it
 // (core/design-link.js encodeDesign), and what it opens: the project only, Try it (a schematic's), the simulation (the
 // test bench), the board emulator; the module; a guided lab opened beside it (#3179). The link is shown as it is made, its length with it; one too large
 // for a link (a zip hosted elsewhere then) or a view the design does not have is said in the dialog, and the copy in
@@ -20,13 +21,14 @@ const VIEWS = [['', 'Open the project only'], ['try', 'Try it (a drawing\'s simu
 /** The address of this app, the base of its links (its hash, a token or a link, left out). */
 export const linkBase = () => location.origin + location.pathname;
 
-/** The Copy Link… dialog of the open project: module and view chosen first (a module's context menu). Resolves to
- *  the link copied, or null. */
+/** The Share Project Copy… dialog of the open project (Share Module Copy…: module and view chosen first, a module's
+ *  context menu). Resolves to the link copied, or null. */
 export async function copyLinkDialog({ module = null, view = null } = {}) {
   if (!S.project) return null;
   const name = S.project.name;
+  const action = module ? 'Share Module Copy' : 'Share Project Copy';   // (the dialog's title, its messages' name, #3628)
   let entries;
-  try { entries = (await gateZip(new Uint8Array(await (await api.exportZip(name, 'silinx')).blob.arrayBuffer()), browserCodec())).files; } catch (e) { app.log(`ERROR: Copy Link: ${e.message}`, 'err'); return null; }
+  try { entries = (await gateZip(new Uint8Array(await (await api.exportZip(name, 'silinx')).blob.arrayBuffer()), browserCodec())).files; } catch (e) { app.log(`ERROR: ${action}: ${e.message}`, 'err'); return null; }
   const files = Object.fromEntries(entries.filter(e => e.path !== 'silinx.json').map(e => [e.path, textOf(e)]));
   let design = null, encodeError = null;
   try { design = (await encodeDesign(entries)).design; } catch (e) { encodeError = e.message; }
@@ -64,7 +66,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   const front = /^lab:(.+)$/.exec(S.active?.id || '')?.[1];
   const labSel = h('select', { 'data-field': 'lab' }, h('option', { value: '' }, 'No lab'),
     ...labs.map(l => h('option', { value: l.id, selected: l.id === front, 'data-no-i18n': '' }, localize(l.lab.title, getLanguage() === 'pt' ? 'pt' : 'en'))));
-  // the link's form: full, or short (a gist, made on Copy Link)
+  // the link's form: full, or short (a gist, made on the Copy Link button)
   const short = h('input', { type: 'radio', name: 'link-form', value: 'short', 'data-field': 'short' });
   const full = h('input', { type: 'radio', name: 'link-form', value: 'full', checked: true, 'data-field': 'full' });
   const signIn = h('a', { href: '#', class: 'link-signin', style: { display: 'none' }, onclick: async e => { e.preventDefault(); if (await (await import('./git-signin.js')).signInDialog()) update(); } }, 'Sign in with GitHub…');
@@ -73,10 +75,10 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     link = null;
     out.value = ''; info.textContent = ''; err.textContent = '';
     if (encodeError) { err.textContent = encodeError; return; }
-    // (the module: in the link when it is not the project's top, or when the link is a module's: Copy Link to This
-    // Module…, the project then opened on it, #2871; a test bench when it is not the project's, #2878)
-    // (Open the project only, from the project's Copy Link…: no module, the project opened with no source in front,
-    // #3230; a module's Copy Link to This Module… keeps its module, #2871)
+    // (the module: in the link when it is not the project's top, or when the link is a module's: Share Module
+    // Copy…, the project then opened on it, #2871; a test bench when it is not the project's, #2878)
+    // (Open the project only, from the project's Share Project Copy…: no module, the project opened with no source in
+    // front, #3230; a module's Share Module Copy… keeps its module, #2871)
     const top = !modSel.value || isEmu() || (!viewSel.value && !module) ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
@@ -101,7 +103,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   modSel.addEventListener('change', () => { if (!isEmu()) chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
   update();
   const r = await dialog({
-    title: 'Copy Link', width: 560,
+    title: action, width: 560,
     body: h('div', {},
       h('div', { class: 'hint' }, `A link that opens '${name}' in Silinx, for slides or a message: the whole project is inside the link (no file to host). Anyone with the link has every file of the project, its comments too.`),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
@@ -133,8 +135,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   });
   if (!r || !link) return null;
   writeClip('text', link);
-  if (short.checked) { app.log(`Copy Link: the short link of '${name}'${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters (the project in a secret gist of your GitHub account).`, 'ok'); return link; }
-  app.log(`Copy Link: the link of '${name}'${viewSel.value ? ` (${VIEWS.find(([v]) => v === viewSel.value)[1]}, ${modSel.value})` : ''}${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters.`, 'ok');
-  if (link.length > LINK_LIMITS.slides) app.log(`WARNING: Copy Link: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides}.`, 'warn');
+  if (short.checked) { app.log(`${action}: the short link of '${name}'${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters (the project in a secret gist of your GitHub account).`, 'ok'); return link; }
+  app.log(`${action}: the link of '${name}'${viewSel.value ? ` (${VIEWS.find(([v]) => v === viewSel.value)[1]}, ${modSel.value})` : ''}${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters.`, 'ok');
+  if (link.length > LINK_LIMITS.slides) app.log(`WARNING: ${action}: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides}.`, 'warn');
   return link;
 }

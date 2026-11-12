@@ -20,7 +20,7 @@ export function registerGitRoutes(api) {
   api.get('/gist', (req, res) => res.json({ available: GH.gistAvailable() }));
   api.post('/gist', (req, res) => Promise.resolve().then(() => {
     const d = body(req).design;
-    if (typeof d !== 'string' || !d) throw Object.assign(new Error('design: the encoded design (Copy Link\'s)'), { status: 400 });
+    if (typeof d !== 'string' || !d) throw Object.assign(new Error('design: the encoded design (Share Project Copy\'s)'), { status: 400 });
     return GH.makeGist(d);
   }).then(({ id, key }) => res.json({ id, key }), err => res.status(err.status || 500).json({ error: err.status ? err.message : 'internal server error', ...(err.hint ? { hint: err.hint } : {}) })));
   // (whether git is there: the interface shows its menu)

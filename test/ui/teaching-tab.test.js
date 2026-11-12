@@ -1,6 +1,6 @@
 // UI: the Teaching tab of the Design pane's row (#3533, web/js/teaching-page.js), in both interfaces
 // (SILINX_UI_INTERFACE): its page's two boxes, Labs and Exercises (Guided Labs…, Exercise…) and Links and Sharing (Copy
-// Link to Project…, Open from Repository… where there is git, Share Project… in the editions that share); a project's
+// Link to Project…, Open from Repository… where there is git, Share Project Live… in the editions that share); a project's
 // commands disabled with none, each opening its dialog with one; the Start page's Teaching box gone (#3333); the tab on
 // a narrow screen (the drawer's); in Portuguese; no warnings.
 import { before, after } from 'node:test';
@@ -22,9 +22,9 @@ const teach = (page) => page.eval(() => {
   return { shown: host.getClientRects().length > 0, headings: [...host.querySelectorAll('.start-box h3')].map((e) => e.textContent),
     commands: [...host.querySelectorAll('.entry a')].map((a) => `${a.textContent}${getComputedStyle(a).pointerEvents === 'none' ? ' (disabled)' : ''}`) };
 });
-// what this edition offers: git (Open from Repository…), the live sharing (Share Project…)
+// what this edition offers: git (Open from Repository…), the live sharing (Share Project Live…)
 const edition = (page) => page.eval(async () => ({ git: (await import('/js/git.js')).hasGit(), share: (({ api }) => !!(api.collab || api.standalone) && !api.following)(await import('/js/api.js')) }));
-const commands = ({ git, share }, off) => ['Guided Labs…', 'Exercise…', 'Copy Link to Project…', ...(git ? ['Open from Repository…'] : []), ...(share ? ['Share Project…'] : [])]
+const commands = ({ git, share }, off) => ['Guided Labs…', 'Exercise…', 'Share Project Copy…', ...(git ? ['Open from Repository…'] : []), ...(share ? ['Share Project Live…'] : [])]
   .map((c) => (off && c !== 'Open from Repository…' ? `${c} (disabled)` : c));
 
 uiTest('#3533 the Teaching tab: the labs, the exercises, the link and the sharing, disabled with no project, each opening its dialog; Portuguese', E, async (page) => {
@@ -59,8 +59,8 @@ uiTest('#3533 the Teaching tab: the labs, the exercises, the link and the sharin
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent.trim())), ['New Exercise', 'Cancel']);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
-  await page.click('#teach-page .entry a', { text: 'Copy Link to Project…' });
-  await page.waitDialog('Copy Link');
+  await page.click('#teach-page .entry a', { text: 'Share Project Copy…' });
+  await page.waitDialog('Share Project Copy');
   await page.key('Escape');
   await page.waitNoDialog();
   if (ed.git) {
@@ -79,8 +79,8 @@ uiTest('#3533 the Teaching tab: the labs, the exercises, the link and the sharin
   try {
     await page.waitFor(() => document.querySelector('#teach-page .start-box h3')?.textContent === 'Laboratórios e Exercícios', [], { what: 'Portuguese' });
     assert.deepEqual(await teach(page), { shown: true, headings: ['Laboratórios e Exercícios', 'Ligações e Partilha'],
-      commands: commands(ed, true).map((c) => c.replace('Guided Labs…', 'Laboratórios Guiados…').replace('Exercise…', 'Exercício…').replace('Copy Link to Project…', 'Copiar Ligação para o Projeto…')
-        .replace('Open from Repository…', 'Abrir do Repositório…').replace('Share Project…', 'Partilhar Projeto…')) });
+      commands: commands(ed, true).map((c) => c.replace('Guided Labs…', 'Laboratórios Guiados…').replace('Exercise…', 'Exercício…').replace('Share Project Copy…', 'Partilhar Cópia do Projeto…')
+        .replace('Open from Repository…', 'Abrir do Repositório…').replace('Share Project Live…', 'Partilhar Projeto em Direto…')) });
     assert.equal(await page.eval(() => document.querySelector('#left-tabs .tab[data-page=teaching] .tab-lbl').textContent), 'Ensino');
   } finally {
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));

@@ -1,5 +1,5 @@
 // UI: a shared project, phase 1 (#3181), two participants in one test, in both interfaces: the owner shares the open
-// project (File ▸ Share Project…, their name, the link), the follower opens the link (their name) and sees the project,
+// project (File ▸ Share Project Live…, their name, the link), the follower opens the link (their name) and sees the project,
 // the owner's open editor and cursor, read only (the notice at the right end of the toolbar, an edit refused: the
 // text unchanged, nothing saved); an edit of the owner arrives (live, #3182); the follower browses alone and follows
 // again; the presence in both toolbars, the follower's arrival in the owner's console; Stop Sharing from the presence's
@@ -21,8 +21,8 @@ const active = (page) => page.eval(() => window.Silinx.active?.path || window.Si
 
 // the owner shares the open project from the File menu: the link (the dialog closed)
 async function share(page, name, { pt = false } = {}) {
-  await page.menu(pt ? 'Ficheiro' : 'File', pt ? 'Partilhar Projeto…' : 'Share Project…');
-  await page.waitDialog(pt ? 'Partilhar Projeto' : 'Share Project');
+  await page.menu(pt ? 'Ficheiro' : 'File', pt ? 'Partilhar Projeto em Direto…' : 'Share Project Live…');
+  await page.waitDialog(pt ? 'Partilhar Projeto em Direto' : 'Share Project Live');
   await page.fill('.dlg-overlay input[data-field=name]', name);
   await page.dialogButton(pt ? 'Partilhar' : 'Share');
   const link = await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });
@@ -170,7 +170,7 @@ uiTest('#3318 a follow link pasted into an open tab is followed; in the page tha
   assert.deepEqual(await consoleWarnings(page), ['WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window.']);
 });
 
-// (#3315) Share Project… in the Start page's Project Commands, below Copy Link to Project…, the ISE style's only: the
+// (#3315) Share Project Live… in the Start page's Project Commands, below Share Project Copy…, the ISE style's only: the
 // Silinx interface's in the Design tree's project and device menus (#3479); who is in, at the Silinx interface's top bar
 // before Search commands and files, at the ISE style toolbar's right end, which has no Split button any more (View ▸
 // Split Editor); moved when the interface changes; in Portuguese
@@ -191,26 +191,26 @@ async function treeMenu(page, row, item) {
   return items;
 }
 const startShown = (page, label) => page.eval((l) => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === l && a.getClientRects().length > 0), label);
-uiTest('#3315 Share Project… in the Start page\'s Project Commands (the ISE style), the Design tree\'s menu (Silinx); who is in, at the top bar\'s right end (Silinx) or the toolbar\'s (ISE style, no Split button)', E, async (page) => {
+uiTest('#3315 Share Project Live… in the Start page\'s Project Commands (the ISE style), the Design tree\'s menu (Silinx); who is in, at the top bar\'s right end (Silinx) or the toolbar\'s (ISE style, no Split button)', E, async (page) => {
   await makeProject(env, { name: 'StartShared', top: 'top', files: { 'src/top.vhd': TOP } });
   await page.openProject('StartShared');
   await page.leftTab('start');
   const ise = await page.eval(() => document.documentElement.dataset.ui) === 'ise';
   const commands = () => page.eval(() => [...document.querySelectorAll('#start-page .entry a')].filter((a) => a.getClientRects().length).map((a) => a.textContent));
-  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project') && [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Copy Link to Project…'), [], { what: 'the Start page with the project' });
+  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project') && [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Share Project Copy…'), [], { what: 'the Start page with the project' });
   const cmds = await commands();
   if (ise) {
-    // (as the File menu: Copy Link to Project…, Open from Repository… and Initialize Repository… where there is git
-    // (#3323, #3534), Share Project…)
-    assert.deepEqual(cmds.slice(cmds.indexOf('Copy Link to Project…'), cmds.indexOf('Share Project…') + 1).filter((c) => !['Open from Repository…', 'Initialize Repository…'].includes(c)), ['Copy Link to Project…', 'Share Project…']);
-    await page.click('#start-page .entry a', { text: 'Share Project…' });
+    // (as the File menu: Share Project Copy…, Open from Repository… and Initialize Repository… where there is git
+    // (#3323, #3534), Share Project Live…)
+    assert.deepEqual(cmds.slice(cmds.indexOf('Share Project Copy…'), cmds.indexOf('Share Project Live…') + 1).filter((c) => !['Open from Repository…', 'Initialize Repository…'].includes(c)), ['Share Project Copy…', 'Share Project Live…']);
+    await page.click('#start-page .entry a', { text: 'Share Project Live…' });
   } else {
     // (the Silinx interface: none on the Start page, #3479; the project's menu in the Design tree)
-    assert.ok(!cmds.includes('Share Project…'), cmds.join(' | '));
+    assert.ok(!cmds.includes('Share Project Live…'), cmds.join(' | '));
     await page.leftTab('design');
-    await treeMenu(page, 0, 'Share Project…');
+    await treeMenu(page, 0, 'Share Project Live…');
   }
-  await page.waitDialog('Share Project');
+  await page.waitDialog('Share Project Live');
   await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
   await page.dialogButton('Share');
   await page.waitFor(() => document.querySelector('.dlg-overlay input[data-field=link]')?.value || null, [], { what: 'the link' });
@@ -233,45 +233,45 @@ uiTest('#3315 Share Project… in the Start page\'s Project Commands (the ISE st
   // in Portuguese: the Start page's command (the ISE style), none in the Silinx interface
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.leftTab('start');
-  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Partilhar Projeto…'), [], { what: 'Partilhar Projeto…' });
+  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Partilhar Projeto em Direto…'), [], { what: 'Partilhar Projeto em Direto…' });
   const pt = await commands();
-  if (ise) assert.deepEqual(pt.slice(pt.indexOf('Copiar Ligação para o Projeto…'), pt.indexOf('Partilhar Projeto…') + 1).filter((c) => !['Abrir do Repositório…', 'Inicializar Repositório…'].includes(c)), ['Copiar Ligação para o Projeto…', 'Partilhar Projeto…']);
-  else assert.equal(await startShown(page, 'Partilhar Projeto…'), false, pt.join(' | '));
+  if (ise) assert.deepEqual(pt.slice(pt.indexOf('Partilhar Cópia do Projeto…'), pt.indexOf('Partilhar Projeto em Direto…') + 1).filter((c) => !['Abrir do Repositório…', 'Inicializar Repositório…'].includes(c)), ['Partilhar Cópia do Projeto…', 'Partilhar Projeto em Direto…']);
+  else assert.equal(await startShown(page, 'Partilhar Projeto em Direto…'), false, pt.join(' | '));
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());
   await page.waitConsole(/^Stopped sharing "StartShared": its followers no longer see it\.$/m);
   assert.deepEqual(await consoleWarnings(page), []);
 });
 
-// (#3479) Share Project… in the Design tree's project and device menus, after Copy Link to Project… (the File menu's
+// (#3479) Share Project Live… in the Design tree's project and device menus, after Share Project Copy… (the File menu's
 // order), in both interfaces; none in a module's; disabled while following another's project; it opens the File menu's
 // dialog; in Portuguese. No warnings.
-uiTest('#3479 Share Project… in the Design tree\'s project and device menus, after Copy Link; none in a module\'s; disabled while following; Portuguese', E, async (page) => {
+uiTest('#3479 Share Project Live… in the Design tree\'s project and device menus, after Copy Link; none in a module\'s; disabled while following; Portuguese', E, async (page) => {
   await makeProject(env, { name: 'TreeShared', top: 'top', files: { 'src/top.vhd': TOP } });
   await page.openProject('TreeShared');
   await page.leftTab('design');
   await page.waitFor(() => document.querySelectorAll('#hier .row .lbl').length >= 3, [], { what: 'the Design tree' });
   for (const row of [0, 1]) {
     const items = await treeMenu(page, row);
-    assert.deepEqual(items.slice(items.indexOf('Copy Link to Project…'), items.indexOf('Copy Link to Project…') + 2), ['Copy Link to Project…', 'Share Project…'], `row ${row}: ${items.join(' | ')}`);
+    assert.deepEqual(items.slice(items.indexOf('Share Project Copy…'), items.indexOf('Share Project Copy…') + 2), ['Share Project Copy…', 'Share Project Live…'], `row ${row}: ${items.join(' | ')}`);
   }
   // a module's row (the top's): none
   const mod = await treeMenu(page, 2);
-  assert.ok(mod.length && !mod.some((i) => i.startsWith('Share Project…')), mod.join(' | '));
+  assert.ok(mod.length && !mod.some((i) => i.startsWith('Share Project Live…')), mod.join(' | '));
   // following another's project: disabled, as the File menu's
   await page.eval(async () => { (await import('/js/api.js')).api.following = true; });
-  assert.ok((await treeMenu(page, 1)).includes('Share Project… (disabled)'));
+  assert.ok((await treeMenu(page, 1)).includes('Share Project Live… (disabled)'));
   await page.eval(async () => { delete (await import('/js/api.js')).api.following; });
   // from the device's row: the File menu's dialog
-  await treeMenu(page, 1, 'Share Project…');
-  await page.waitDialog('Share Project');
+  await treeMenu(page, 1, 'Share Project Live…');
+  await page.waitDialog('Share Project Live');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  for (const row of [0, 1]) assert.ok((await treeMenu(page, row)).includes('Partilhar Projeto…'), `row ${row}`);
-  await treeMenu(page, 0, 'Partilhar Projeto…');
-  await page.waitDialog('Partilhar Projeto');
+  for (const row of [0, 1]) assert.ok((await treeMenu(page, row)).includes('Partilhar Projeto em Direto…'), `row ${row}`);
+  await treeMenu(page, 0, 'Partilhar Projeto em Direto…');
+  await page.waitDialog('Partilhar Projeto em Direto');
   await page.dialogButton('Cancelar');
   await page.waitNoDialog();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));

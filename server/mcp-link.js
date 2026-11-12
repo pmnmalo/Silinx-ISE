@@ -1,4 +1,4 @@
-// The MCP server's tools of a design's link (#2826, server/mcp.js, #2674), as the interface's Copy Link… and the
+// The MCP server's tools of a design's link (#2826, server/mcp.js, #2674), as the interface's Share Project Copy… and the
 // opening of a link: project_link makes a project's link (the project inside it, core/design-link.js; the view, the
 // module, a guided lab opened beside it), open_link makes a project of a link (the design inside it, or an example),
 // as the interface does when it is opened at that address: a project of the workspace that differs is never replaced
@@ -32,8 +32,8 @@ async function labIds(name) {
 
 export const LINK_TOOLS = [
   {
-    name: 'project_link', title: 'Copy Link (a project\'s link)',
-    description: `The link that opens a project in Silinx, as Copy Link… does (for lecture slides): the whole project inside the link (compressed; the HDL its drawings make again left out), and what it opens in: view try (Try it: a schematic's live simulation, a state diagram's, a Petri net's or an ASM chart's simulation), simulate (its test bench's simulation) or emulate (the board emulator); top: the module (default the project's top). A link longer than ${LINK_LIMITS.slides} characters works in a browser but some slide tools cut it; one above ${LINK_LIMITS.maxEncoded} cannot be made (export_project kind silinx, a zip hosted elsewhere, and its link #open=<its https address>). Anyone with the link has the whole project, its comments included.`,
+    name: 'project_link', title: 'Share Project Copy (a project\'s link)',
+    description: `The link that opens a project in Silinx, as Share Project Copy… (Share Module Copy… with top) does (for lecture slides): the whole project inside the link (compressed; the HDL its drawings make again left out), and what it opens in: view try (Try it: a schematic's live simulation, a state diagram's, a Petri net's or an ASM chart's simulation), simulate (its test bench's simulation) or emulate (the board emulator); top: the module (default the project's top). A link longer than ${LINK_LIMITS.slides} characters works in a browser but some slide tools cut it; one above ${LINK_LIMITS.maxEncoded} cannot be made (export_project kind silinx, a zip hosted elsewhere, and its link #open=<its https address>). Anyone with the link has the whole project, its comments included.`,
     inputSchema: { type: 'object', properties: {
       project: PROJECT, view: { type: 'string', enum: LINK_VIEWS, description: 'What the link opens: try, simulate or emulate (default: the project only).' },
       top: STR('The module to open (default: the project\'s top); with view simulate, the test bench to simulate (default: the project\'s); a test bench only with simulate.'),

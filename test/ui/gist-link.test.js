@@ -27,7 +27,7 @@ uiTest('#3223 Copy Link: the full link or a short one (a secret gist); the short
   await page.eval(async () => { const { api } = await import('/js/api.js'); await api.createProject({ name: 'lamp', template: 'blinky' }); });
   await page.openProject('lamp');
   await startCopy(page);
-  await page.waitDialog('Copy Link');
+  await page.waitDialog('Share Project Copy');
   // the full link, as before; then the short one: made when it is copied
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .link-out').value), /#design=[A-Za-z0-9_-]+/);
   await page.click('.dlg-overlay input[data-field="short"]');
@@ -37,7 +37,7 @@ uiTest('#3223 Copy Link: the full link or a short one (a secret gist); the short
   await page.waitNoDialog();
   const link = await copied(page);
   assert.match(link, /#gist=[0-9a-f]{32}\.[A-Za-z0-9_-]{43}(&ui=[A-Za-z0-9_-]+)?$/);
-  await page.waitConsole(/Copy Link: the short link of 'lamp' copied, \d+ characters \(the project in a secret gist of your GitHub account\)\./);
+  await page.waitConsole(/Share Project Copy: the short link of 'lamp' copied, \d+ characters \(the project in a secret gist of your GitHub account\)\./);
   const [id, key] = /#gist=([0-9a-f]+)\.([A-Za-z0-9_-]+)/.exec(link).slice(1);
   const gist = await page.eval(async (i) => (await fetch(`/fake-github/gists/${i}`)).json(), id);
   assert.equal(gist.public, false);
@@ -63,7 +63,7 @@ uiTest('#3223 Copy Link\'s short link in Portuguese', E, async (page) => {
   await page.openProject('luz');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await startCopy(page);
-  await page.waitDialog('Copiar Ligação');
+  await page.waitDialog('Partilhar Cópia do Projeto');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .link-forms label')].map((l) => l.textContent)),
     ['A ligação completa: o projeto dentro dela (não precisa de nada, mas é longa)', 'Uma ligação curta: o projeto cifrado num gist secreto da sua conta do GitHub']);
   await page.click('.dlg-overlay input[data-field="short"]');

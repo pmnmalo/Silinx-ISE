@@ -1,7 +1,8 @@
 // Portuguese strings of a design's link (#2826): Copy Link… (web/js/link-copy.js) and the opening of a link
 // (web/js/link-open.js); merged into the dictionary of i18n.js.
 export const LINK_PT = {
-  'Copy Link to Project…': 'Copiar Ligação para o Projeto…', 'Copy Link to This Module…': 'Copiar Ligação para Este Módulo…',
+  'Share Project Copy…': 'Partilhar Cópia do Projeto…', 'Share Module Copy…': 'Partilhar Cópia do Módulo…',
+  'Share Project Copy': 'Partilhar Cópia do Projeto', 'Share Module Copy': 'Partilhar Cópia do Módulo',   // (its dialog's titles, #3628)
   'Copy Link': 'Copiar Ligação', 'Open from a Link': 'Abrir a partir de uma Ligação',
   // Copy Link's short link (#3223)
   'Link:': 'Ligação:',

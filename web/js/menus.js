@@ -67,10 +67,10 @@ export function setupMenus() {
       '-',
       { label: 'Import Silinx Project (.zip)…', action: () => wiz.importSilinxDialog() },
       { label: 'Export Silinx Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
-      { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()), disabled: hasPj },   // (#2826)
+      { label: 'Share Project Copy…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()), disabled: hasPj },   // (#2826)
       hasGit() ? { label: 'Open from Repository…', action: () => openFromRepositoryDialog() } : null,   // (a GitHub repository, a Classroom assignment's: #3195; after Copy Link, #3323)
       // (live, read only, through the server's relay, #3181; the browser edition has none yet)
-      api.collab || api.standalone ? { label: 'Share Project…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => hasPj() || !!api.following } : null,
+      api.collab || api.standalone ? { label: 'Share Project Live…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => hasPj() || !!api.following } : null,
       '-',
       { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
       { label: 'Export Xilinx ISE Project (.zip)…', action: () => exportProjectZip('xilinx'), disabled: hasPj },
