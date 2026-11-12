@@ -351,3 +351,18 @@ test('#3179 a new lab (New Source ▸ Guided Lab): valid, its id the file\'s nam
   assert.deepEqual(labFileLines('labs/a.lab.json', problems), ['ERROR: labs/a.lab.json: step 1, check 1 (pins): "pins": a list of { "port", "loc" }',
     'The lab labs/a.lab.json has 1 problem(s): Project ▸ Guided Labs… leaves it out until they are fixed.']);
 });
+
+// #3526: the check's simulation is bounded: at_ns within time_ns's limit, and a number of time steps
+test('check simulate: at_ns past the limit is the lab\'s problem; a test bench that never gets there stops at the steps\' limit', async () => {
+  const lab = checks => ({ silinxLab: LAB_VERSION, id: 'a', title: 'A', steps: [{ id: 's', title: 'S', text: 'T', checks }] });
+  assert.deepEqual(labProblems(lab([{ check: 'simulate', values: [{ signal: 'led', at_ns: 1e12, value: '0' }] }])),
+    ['the lab: step 1, check 1 (simulate): "values": "at_ns" from 0 to 1000000 ns']);
+  assert.deepEqual(labProblems(lab([{ check: 'simulate', values: [{ signal: 'led', at_ns: 1e6, value: '0' }] }])), []);
+  // a clock of 2 ps beside the test bench's stimulus: 1 ms would take 10^9 time steps
+  const fast = exampleIo('gates', { 'sim/tb_gates.vhd': v => v.replace("\nBEGIN\n", "\n   signal tick : std_logic := '0';\nBEGIN\n   tick <= not tick after 1 ps;\n") });
+  const t0 = Date.now();
+  assert.deepEqual(await run({ check: 'simulate', time_ns: 1e6, errors: true }, fast), ['the simulation of tb_gates did not reach 1000000 ns in 2000000 time steps (it stopped at 2000 ns)']);
+  assert.ok(Date.now() - t0 < 60_000);
+  // (a run within the limit: as before)
+  assert.deepEqual(await run({ check: 'simulate', time_ns: 1, errors: true }, fast), []);
+});

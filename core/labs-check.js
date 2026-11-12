@@ -16,6 +16,7 @@ import { toBin } from './values.js';
 import { parseUcf } from '../packages/silinx-fpga/src/parts.js';
 
 const MAX_NS = 1e6;   // (a lab's simulation: at most 1 ms of simulated time)
+const MAX_STEPS = 2_000_000;   // (and at most this many time steps, #3526: a clock of a few ps never ends otherwise)
 const str = v => typeof v === 'string' && v.length > 0;
 const list = v => v === undefined || (Array.isArray(v) && v.every(str));
 
@@ -168,6 +169,7 @@ export const CHECKS = {
     problems: c => [
       ...(c.time_ns === undefined || (c.time_ns > 0 && c.time_ns <= MAX_NS) ? [] : [`"time_ns": from 0 to ${MAX_NS} ns`]),
       ...(c.values === undefined || (Array.isArray(c.values) && c.values.every(x => str(x?.signal) && x.at_ns >= 0 && x.value !== undefined)) ? [] : ['"values": a list of { "signal", "at_ns", "value" }']),
+      ...(Array.isArray(c.values) && c.values.some(x => x?.at_ns > MAX_NS) ? [`"values": "at_ns" from 0 to ${MAX_NS} ns`] : []),
       ...patternProblems('messages', c.messages),
     ],
     async run(c, io) {
@@ -179,7 +181,8 @@ export const CHECKS = {
       const files = new Map(v.srcs.map(s => [s.path, s.text]));
       const sim = new Simulator(v.design, { files, onLog: e => { if (log.length < 500) log.push(e); } });
       const timeNs = c.time_ns ?? Math.max(1000, ...(c.values || []).map(x => x.at_ns + 1));
-      sim.run(timeNs * 1000);
+      const st = sim.run(timeNs * 1000, { maxSteps: MAX_STEPS });
+      if (!st.finished && st.now < timeNs * 1000) return [`the simulation of ${v.top} did not reach ${timeNs} ns in ${MAX_STEPS} time steps (it stopped at ${st.now / 1000} ns)`];
       const sig = signalsByPath(v.design), out = [];
       for (const x of c.values || []) {
         const s = sig(x.signal);
