@@ -16,7 +16,7 @@ function statements(text) {
   const out = [];
   let cur = '', start = 0;
   String(text).split(/\r?\n/).forEach((raw, i) => {
-    let rest = raw.replace(/(#|\/\/).*$/, '');
+    let rest = raw.replace(/(#|\/\/).*$/s, '');   // (the s flag: linear on a long line, CodeQL's js/polynomial-redos, #3663)
     for (;;) {
       const k = rest.indexOf(';');
       if (k < 0) break;
@@ -31,6 +31,8 @@ function statements(text) {
   return out;
 }
 
+const notLpf = verb => `${verb}: not an LPF statement nextpnr-ecp5 applies (LOCATE, IOBUF, FREQUENCY, BLOCK, SYSCONFIG)`;
+
 function readLpf(text) {
   const assignments = {}, netStatements = [], clocks = [], other = [];
   let line = 0;
@@ -42,7 +44,9 @@ function readLpf(text) {
     const fail = msg => { throw new Error(`line ${st.line}: ${msg}`); };
     line = st.line;
     if (st.open) fail(`${st.text.split(/\s+/)[0]}: no ';' at its end`);
-    const m = /^(\w+)\s*(.*)$/s.exec(st.text), verb = m[1].toUpperCase(), rest = m[2];
+    const m = /^(\w+)\s*(.*)$/s.exec(st.text);
+    if (!m) fail(notLpf(st.text.split(/\s+/)[0]));   // (a statement with no keyword, #3670)
+    const verb = m[1].toUpperCase(), rest = m[2];
     if (verb === 'LOCATE') {
       const l = /^COMP\s+"([^"]+)"\s+SITE\s+"([^"]+)"$/i.exec(rest);
       if (!l) fail('LOCATE needs COMP "<port>" SITE "<pin>"');
@@ -70,7 +74,7 @@ function readLpf(text) {
       const mhz = +l[2] * { MHZ: 1, KHZ: 1e-3, HZ: 1e-6 }[l[3].toUpperCase()];
       clocks.push({ net: l[1], period: +periodNs(`${mhz} MHz`).toFixed(6) });
     } else if (KEPT.includes(verb)) other.push(`${st.text};`);
-    else fail(`${m[1]}: not an LPF statement nextpnr-ecp5 applies (LOCATE, IOBUF, FREQUENCY, BLOCK, SYSCONFIG)`);
+    else fail(notLpf(m[1]));
   }
   return { assignments, netStatements, clocks, other };
 }

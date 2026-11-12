@@ -10,7 +10,9 @@ import { byName, periodNs, setByName } from './ucf.js';
 
 const PULLS = { UP: 'up', DOWN: 'down', NONE: null, KEEPER: 'keeper' };
 const PULL_MODE = { up: 'UP', down: 'DOWN', keeper: 'KEEPER' };
-const CLOCK = /^\/\/\s*create_clock\s+(?:-name\s+\S+\s+)?-period\s+([\d.]+)\s+\[get_ports\s+\{?([^\s}\]]+)\}?\]\s*;?\s*$/;
+const CLOCK = /^\/\/\s*create_clock\s+(?:-name\s+\S+\s+)?-period\s+([\d.]+)\s+\[get_ports\s+\{?([^\s}\]]+)\}?\]\s*(?:;\s*)?$/;
+
+const notCst = verb => `${verb}: not a CST statement nextpnr-himbaechel-gowin applies (IO_LOC, IO_PORT)`;
 
 function readCst(text) {
   const assignments = {}, netStatements = [], clocks = [];
@@ -28,14 +30,18 @@ function readCst(text) {
       clocks.push({ net: clock[2], period: +clock[1] });
       return;
     }
-    for (const part of raw.replace(/\/\/.*$/, '').split(';').map(s => s.trim()).filter(Boolean)) {
-      const m = /^(\w+)\s*(.*)$/.exec(part), verb = m[1].toUpperCase();
+    // (the regular expressions' '.' with the s flag, and no two \s* in a row: linear on a long line, CodeQL's
+    // js/polynomial-redos, #3663-#3667)
+    for (const part of raw.replace(/\/\/.*$/s, '').split(';').map(s => s.trim()).filter(Boolean)) {
+      const m = /^(\w+)\s*(.*)$/s.exec(part);
+      if (!m) fail(notCst(part.split(/\s+/)[0]));   // (a statement with no keyword, #3670)
+      const verb = m[1].toUpperCase();
       if (verb === 'IO_LOC') {
         const l = /^"([^"]+)"\s+([^\s,]+)(?:\s*,\s*\S+)?$/.exec(m[2]);
         if (!l) fail('IO_LOC needs "<port>" and its pin');
         set(l[1], { loc: l[2] });
       } else if (verb === 'IO_PORT') {
-        const l = /^"([^"]+)"\s*(.*)$/.exec(m[2]);
+        const l = /^"([^"]+)"\s*(.*)$/s.exec(m[2]);
         if (!l) fail('IO_PORT needs "<port>" and its attributes');
         const attrs = {};
         for (const kv of l[2].split(/\s+/).filter(Boolean)) {
@@ -50,7 +56,7 @@ function readCst(text) {
           else attrs.cst = { ...attrs.cst, [key]: v };
         }
         set(l[1], attrs);
-      } else fail(`${m[1]}: not a CST statement nextpnr-himbaechel-gowin applies (IO_LOC, IO_PORT)`);
+      } else fail(notCst(m[1]));
     }
   });
   return { assignments, netStatements, clocks, other: [] };

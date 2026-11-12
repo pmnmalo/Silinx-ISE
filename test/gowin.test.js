@@ -34,6 +34,30 @@ test('CST: what nextpnr-himbaechel-gowin would not apply throws, naming its line
   assert.throws(() => CST.read('IO_LOC a 1;'), /line 1: IO_LOC needs "<port>" and its pin/);
   assert.throws(() => CST.read('IO_PORT "a" PULL_MODE=SIDEWAYS;'), /PULL_MODE=SIDEWAYS: UP, DOWN, NONE or KEEPER/);
   assert.throws(() => CST.read('IO_PORT "a" DRIVE;'), /IO_PORT a: DRIVE is not KEY=VALUE/);
+  // a statement with no keyword: its line named, not a TypeError (#3670)
+  assert.throws(() => CST.read('IO_LOC "a" 1;\n"a" 1;'), /^Error: line 2: "a": not a CST statement nextpnr-himbaechel-gowin applies/);
+});
+
+test('#3663 CST: the same model as before, and in linear time on a long line (CodeQL js/polynomial-redos)', () => {
+  // the model of PINS and of the other statements as the readers' regular expressions read it before
+  const m = CST.read(PINS);
+  assert.deepEqual(m.clocks, [{ net: 'clk', period: 37.037 }]);
+  assert.deepEqual(CST.read('//create_clock -period 10 [get_ports clk] ;  \nIO_LOC "a" 3;// x\nIO_PORT "a"   PULL_MODE=UP;').assignments, { a: { loc: '3', pull: 'up' } });
+  assert.deepEqual(CST.read('//create_clock -period 10 [get_ports clk];').clocks, [{ net: 'clk', period: 10 }]);
+  // (a lone carriage return in a comment: the rest of the line is the comment's)
+  assert.deepEqual(CST.read('IO_LOC "a" 1; // x\rIO_LOC "b" 2;').assignments, { a: { loc: '1' } });
+  const n = 100000, slow = [];
+  for (const [text, expect] of [
+    [`//create_clock -period 1 [get_ports a]${' '.repeat(n)}x`, null],
+    [`${'//'.repeat(n)} `, null],
+    [`IO_LOC${' '.repeat(n)}x y;`, /IO_LOC needs "<port>" and its pin/],
+    [`IO_PORT "a"${' '.repeat(n)}x y;`, /IO_PORT a: x is not KEY=VALUE/],
+  ]) {
+    const t0 = performance.now();
+    if (expect) assert.throws(() => CST.read(text), expect); else assert.deepEqual(CST.read(text).assignments, {});
+    if (performance.now() - t0 > 500) slow.push(`${JSON.stringify(text.slice(0, 12))}…: ${Math.round(performance.now() - t0)} ms`);
+  }
+  assert.deepEqual(slow, []);
 });
 
 test('the Gowin family: its part, its formats, its back end\'s steps and constraints, its synthesis\'s resources', () => {
