@@ -208,7 +208,7 @@ export const exprMethods = {
     if (l.kind === 'id') {
       const slot = this.lookup(l.name, l.loc);
       if (slot.kind === 'var') {
-        if (this.globals.has(l.name) && !this.scopes.some((s) => s.has(l.name))) this.error(l.loc, `'${l.name}' is a constant`);
+        if (this.globals.has(l.name) && !this.scopes.some((s) => s.has(l.name)) && !this.ownGlobal(l.name)) this.error(l.loc, `'${l.name}' is a constant`);
         const nv = this.conv(val, slot.t);
         slot.val = this.mux(g, nv.id, slot.val, slot.t);
         return nv;

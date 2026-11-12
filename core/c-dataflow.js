@@ -133,6 +133,9 @@ export class Flow {
   }
   lookup(name, loc) {
     for (let k = this.scopes.length - 1; k >= 0; k--) if (this.scopes[k].has(name)) return this.scopes[k].get(name);
+    // (a global of a sequential module, in a function inlined: the top's register, its current value, #3511)
+    const own = this.ownGlobal(name);
+    if (own) return own;
     const gv = this.globals.get(name);
     if (gv) {
       const slot = this.declareGlobal(gv);
@@ -140,6 +143,8 @@ export class Flow {
     }
     this.error(loc, `'${name}' is not declared`);
   }
+  /** A global's slot of the module's own (a sequential module's register or memory, core/c-fsmd.js), or null. */
+  ownGlobal() { return null; }
   declareGlobal(gv) {
     if (!this.globalSlots) this.globalSlots = new Map();
     if (this.globalSlots.has(gv.name)) return this.globalSlots.get(gv.name);
