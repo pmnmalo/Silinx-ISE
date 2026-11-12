@@ -169,8 +169,7 @@ export function toVerilog(design, { name, tables = true, simprim = null, formal 
   for (const p of design.procs) if (!skipProc.has(p)) findLoops(p.body);
   // the nonblocking assignments that no other assignment to their signal can precede in their process
   // (x[i] <= c ? v : x[i] there written if (c) x[i] <= v: readBack)
-  const firstWrites = new WeakSet();
-  for (const p of design.procs) if (!skipProc.has(p)) markFirstWrites(p.body, new Set(), firstWrites);
+  const firstWrites = firstWritesOf(design.procs.filter(p => !skipProc.has(p)));
   for (const s of design.signals) {
     if (sigName.has(s) || skipSig.has(s)) continue;
     const path = s.path.startsWith(prefix) ? s.path.slice(prefix.length) : s.path;
@@ -287,36 +286,143 @@ export function toVerilog(design, { name, tables = true, simprim = null, formal 
   });
 }
 
-// The assignments of a statement that no assignment to the same signal or variable can precede (in
-// `firsts`), given the ones already assigned before it (`done`: their signals and variables, ANY for
-// any); returns the ones assigned after it. A loop's body is walked once: a second walk, from the writes of the
-// first (those of its next turn), marks none the first did not (`done` only grows, and with it fewer assignments are
-// first; one first in its first turn only stays marked, #3512) and returns the same writes, and nested loops walked
-// twice each took time exponential in their depth (#3504).
+// The nonblocking assignments of processes that no earlier write of their run can have written a bit of
+// (x <= c ? v : x written if (c) x <= v there, readBack). What is written before a statement (`done`): a
+// signal's or variable's key (all of it, or bits not known; ANY: anything), or a part's token: constant bits
+// (words of a memory), or in a loop the element its earlier turns wrote at its variable, which a turn does
+// not write again (x[i] in a loop over i). A loop's body is walked once, after all that its earlier turns
+// write (#3512: the writes of its first turn alone, x <= c ? v : x after an earlier turn's x <= 1); each statement's
+// writes found once (nested loops walked twice each took time exponential in their depth, #3504).
 const ANY = Symbol('any');
 const NO_WRITE = new Set(['exit', 'next', 'ret', 'null', 'report', 'assert', 'textio', 'sys']);
-function markFirstWrites(s, done, firsts) {
-  if (!s || typeof s !== 'object') return done;
-  const union = sets => new Set(sets.flatMap(x => [...x]));
-  switch (s.k) {
-    case 'blk': for (const x of s.stmts) done = markFirstWrites(x, done, firsts); return done;
-    case 'asg': {
-      let T = s.target;
-      while (['bit', 'slice', 'dslice', 'pslice', 'elem'].includes(T?.k)) T = T.base;
-      const key = T?.k === 'sig' ? T.sig : T?.k === 'loc' && T.up == null ? `loc${T.i}` : ANY;
-      if (key !== ANY && !done.has(key) && !done.has(ANY)) firsts.add(s);
-      return union([done, [key]]);
-    }
-    case 'if': {   // (an elsif / else if chain in a loop: thousands of branches, #2577)
-      const after = [];
-      for (; s?.k === 'if'; s = s.else) after.push(markFirstWrites(s.then, new Set(done), firsts));
-      after.push(markFirstWrites(s, new Set(done), firsts));
-      return union(after);
-    }
-    case 'case': return union([...s.items.map(it => markFirstWrites(it.body, new Set(done), firsts)), markFirstWrites(s.def, new Set(done), firsts)]);
-    case 'forrange': case 'for': return markFirstWrites(s.body, done, firsts);
-    default: return NO_WRITE.has(s.k) ? done : union([done, [ANY]]);
+const PARTS = ['bit', 'slice', 'dslice', 'pslice', 'elem'];
+const isVar = x => x?.k === 'sig' || x?.k === 'loc';
+const keyOf = T => T?.k === 'sig' ? T.sig : T?.k === 'loc' && T.up == null ? `loc${T.i}` : ANY;
+const num = x => x?.k === 'c' ? V.toNum(x.val) : null;
+
+// The part of its signal or variable an assignment's target is: { key } all of it (or not known), { key, lo, hi,
+// word } constant bits (or words), { key, at, word } the bit (or word) at a variable (its key)
+function written(T) {
+  if (!PARTS.includes(T?.k) || !isVar(T.base)) {
+    while (PARTS.includes(T?.k)) T = T.base;
+    return { key: keyOf(T) };
   }
+  const key = keyOf(T.base), t = T.base.t;
+  if (key === ANY) return { key };
+  switch (T.k) {
+    case 'slice': return { key, lo: T.lo, hi: T.lo + T.t.w - 1 };
+    case 'dslice': {
+      const l = num(T.left), r = num(T.right);
+      if (l == null || r == null) return { key };
+      const a = bitpos(t, l), b = bitpos(t, r);
+      return { key, lo: Math.min(a, b), hi: Math.max(a, b) };
+    }
+    case 'pslice': {
+      const st = num(T.start);
+      if (st == null) return { key };
+      const lo = psliceLo(t, st, T.t.w, T.dir);
+      return { key, lo, hi: lo + T.t.w - 1 };
+    }
+    default: {   // (bit, elem)
+      const word = T.k === 'elem', n = num(T.index);
+      if (n != null) { const p = word ? n : bitpos(t, n); return { key, lo: p, hi: p, word }; }
+      const at = isVar(T.index) ? keyOf(T.index) : ANY;
+      return at === ANY ? { key } : { key, at, word };
+    }
+  }
+}
+
+function firstWritesOf(procs) {
+  const firsts = new WeakSet(), memo = new WeakMap(), tokens = new Map();
+  // a part's token: one object for each part (a Set holds it once); '': the key has some
+  const token = (key, tag, x) => {
+    let m = tokens.get(key);
+    if (!m) tokens.set(key, m = new Map([['', {}]]));
+    if (!m.has(tag)) m.set(tag, x);
+    return m.get(tag);
+  };
+  // what a write adds to `done` (in the loop over `turn`: for its next turns)
+  const add = (done, w, turn) => {
+    if (w.lo != null) done.add(token(w.key, `${w.word ? 'w' : 'b'}${w.lo}:${w.hi}`, w));
+    else if (w.at != null && w.at === turn) done.add(token(w.key, w.at, w));
+    else { done.add(w.key); return; }
+    done.add(token(w.key, ''));
+  };
+  // can an earlier write have written a bit of w
+  const clash = (done, w) => {
+    if (done.has(ANY) || done.has(w.key)) return true;
+    if (!done.has(token(w.key, ''))) return false;
+    for (const [tag, t] of tokens.get(w.key)) {
+      if (tag === '' || !done.has(t)) continue;
+      if (!!t.word !== !!w.word) return true;
+      if (t.lo != null ? w.lo == null || (w.lo <= t.hi && t.lo <= w.hi) : t.at !== w.at) return true;
+    }
+    return false;
+  };
+  // the parts a statement can write
+  const writes = s => {
+    if (!s || typeof s !== 'object') return [];
+    if (memo.has(s)) return memo.get(s);
+    let w;
+    switch (s.k) {
+      case 'blk': w = s.stmts.flatMap(writes); break;
+      case 'asg': w = [written(s.target)]; break;
+      case 'if': {
+        w = [];
+        let x = s;
+        for (; x?.k === 'if'; x = x.else) w.push(...writes(x.then));
+        w.push(...writes(x));
+        break;
+      }
+      case 'case': w = [...s.items.flatMap(it => writes(it.body)), ...writes(s.def)]; break;
+      case 'forrange': case 'for': w = writes(s.body); break;
+      default: w = NO_WRITE.has(s.k) ? [] : [{ key: ANY }];
+    }
+    memo.set(s, w);
+    return w;
+  };
+  // the variable whose value is each turn of a loop's own: a VHDL loop's; a Verilog for's, stepped by a
+  // constant, tested on itself and constants alone, and not written by the body
+  const turnVar = s => {
+    if (s.k === 'forrange') return `loc${s.var}`;
+    const v = s.init?.k === 'asg' ? s.init.target : null, key = keyOf(v), x = s.step?.value;
+    if (!isVar(v) || key === ANY || s.step?.k !== 'asg' || !isVar(s.step.target) || keyOf(s.step.target) !== key) return null;
+    const by = x?.k !== 'bin' ? null : (x.o === '+' || x.o === '-') && isVar(x.a) && keyOf(x.a) === key ? num(x.b)
+      : x.o === '+' && isVar(x.b) && keyOf(x.b) === key ? num(x.a) : null;
+    const alone = e => !e || (isVar(e) ? keyOf(e) === key : e.k === 'c' || (['un', 'bin', 'conv', 'cond'].includes(e.k) && alone(e.a) && alone(e.b) && alone(e.c)));
+    if (!by || !alone(s.cond) || writes(s.body).some(w => w.key === key || w.key === ANY)) return null;
+    return key;
+  };
+  const union = sets => new Set(sets.flatMap(x => [...x]));
+  const mark = (s, done) => {
+    if (!s || typeof s !== 'object') return done;
+    switch (s.k) {
+      case 'blk': for (const x of s.stmts) done = mark(x, done); return done;
+      case 'asg': {
+        const w = written(s.target);
+        if (w.key !== ANY && !clash(done, w)) firsts.add(s);
+        done = new Set(done);
+        add(done, w);
+        return done;
+      }
+      case 'if': {   // (an elsif / else if chain in a loop: thousands of branches, #2577)
+        const after = [];
+        for (; s?.k === 'if'; s = s.else) after.push(mark(s.then, new Set(done)));
+        after.push(mark(s, new Set(done)));
+        return union(after);
+      }
+      case 'case': return union([...s.items.map(it => mark(it.body, new Set(done))), mark(s.def, new Set(done))]);
+      case 'forrange': case 'for': {
+        const turn = turnVar(s), before = new Set(done), after = new Set(done);
+        for (const w of writes(s.body)) { add(before, w, turn); add(after, w); }
+        mark(s.body, before);
+        return after;
+      }
+      default: return NO_WRITE.has(s.k) ? done : union([done, [ANY]]);
+    }
+  };
+  for (const p of procs) mark(p.body, new Set());
+  return firsts;
 }
 
 // Two expressions that are the same and read the same bits: the same signals and variables, operators
