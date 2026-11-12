@@ -30,8 +30,9 @@ https://pmnmalo.github.io/Silinx/dev/, com os projetos à parte) e passe ao pass
   (**Ctrl+K**: escreva o nome do comando).
 
 - Os projetos ficam guardados **dentro deste browser**, neste computador. Para guardar uma cópia
-  ou passar para outro computador use **File ▸ Download Project Bundle** (e **File ▸ Open Project
-  Bundle** para o voltar a abrir). Apagar os dados do browser apaga os projetos.
+  ou passar para outro computador use **File ▸ Export Silinx Project (.zip)…** (e **File ▸ Import
+  Silinx Project (.zip)…** para o voltar a abrir; também abre um pacote de projeto `.silinx.json` de uma
+  versão anterior). Apagar os dados do browser apaga os projetos.
 - **Ou guarde-os numa pasta do seu disco** (Chrome ou Edge): **File ▸ Open Workspace Folder…**
   (também na página inicial) e escolha uma pasta, por exemplo uma nova pasta `Silinx-projects` nos
   Documentos. Cada projeto passa a ser uma pasta normal lá dentro (`silinx.json`, `src/`, `sim/`,

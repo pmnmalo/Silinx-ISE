@@ -2,7 +2,7 @@
 // palette, printing the document in front, and exporting or importing a project as a zip file.
 import { api } from './api.js';
 import { icons, icon } from './icons.js';
-import { h, alertDlg, menuBar, toast, downloadText, runAction } from './ui.js';
+import { h, alertDlg, menuBar, toast, runAction } from './ui.js';
 import * as wiz from './wizards.js';
 import { setLanguage, getLanguage, LOCALES } from './i18n.js';
 import { lintEnabled, setLintEnabled } from './diaghelp.js';
@@ -11,7 +11,7 @@ import { openPalette } from './palette.js';
 import { openFindInProject } from './find-project.js';
 import { developmentMenu } from './devmenu.js';
 import { S, activateDoc, app, canCopyAny, canDeleteAny, canPasteAny, closeDoc, copyAny, cutAny, deleteAny, docEditor, history, openFile,
-  openFpgaView, openImpact, openPinPlanner, openSummary, pasteAny, projectRedo, projectUndo, redoAny, redoesProject, setView, showLeftPage,
+  openFpgaView, openImpact, openPinPlanner, openSummary, pasteAny, projectRedo, projectUndo, redoAny, redoesProject, setView,
   undoAny, undoesProject } from './app.js';
 import { log } from './console.js';
 import { openProject, closeProject, recent, clearRecent, storageMenuItems } from './project.js';
@@ -75,9 +75,6 @@ export function setupMenus() {
       { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
       { label: 'Export Xilinx ISE Project (.zip)…', action: () => exportProjectZip('xilinx'), disabled: hasPj },
       '-',
-      api.standalone ? { label: 'Download Project Bundle…', action: async () => downloadText(`${S.project.name}.silinx.json`, await api.exportBundle(S.project.name), 'application/json'), disabled: hasPj } : null,
-      api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,
-      api.standalone ? '-' : null,
       ...(api.standalone ? storageMenuItems() : []),
       // git (#3195): the project's commit, push, pull; a repository made
       ...(hasGit() ? [...gitMenuItems().map(it => (it === '-' ? it : { ...it, disabled: hasPj() || it.disabled })), '-'] : []),
@@ -275,18 +272,4 @@ export async function exportProjectZip(kind = 'xilinx') {
       : `Exported ${filename}: Xilinx ISE project ${S.project.name}.xise + its sources (${Math.round(blob.size / 1024)} KB).`, 'ok');
     for (const w of warnings) log(`WARNING: ${w}`, 'warn');
   } catch (e) { alertDlg(title, e.message, 'error'); }
-}
-
-function openBundle() {
-  const inp = h('input', { type: 'file', accept: '.json' });
-  inp.addEventListener('change', async () => {
-    const f = inp.files[0];
-    if (!f) return;
-    try {
-      const name = await api.importBundle(await f.text()); await openProject(name); showLeftPage('design');
-      for (const w of api.lastImportWarnings || []) log(`WARNING: ${w}`, 'warn');
-    }
-    catch (e) { alertDlg('Open Project Bundle', e.message, 'error'); }
-  });
-  inp.click();
 }

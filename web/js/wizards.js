@@ -102,18 +102,15 @@ async function askReplaceProject(pname) {
     `A project named '${pname}' already exists.\n\nReplace it? ${deletesProjects() ? 'The existing project will be deleted from this browser.' : 'The existing project is moved to the workspace .trash folder.'}`);
 }
 // Replace an existing project by running `fn` (an import): the old project is removed first; if
-// the import then fails, it comes back from a snapshot taken before (standalone: a bundle; server:
-// a Silinx zip of the whole project) and is opened again if it was open. Should the restore fail
+// the import then fails, it comes back from a snapshot taken before (a Silinx zip of the whole project)
+// and is opened again if it was open. Should the restore fail
 // too, the server still has the old project in the workspace .trash folder.
 export async function replaceProjectWith(pname, fn) {
   const exists = (await api.projects()).some(p => p.name === pname);
   const wasOpen = S.project?.name === pname;
   let backup = null;
   if (exists) {
-    try {
-      if (api.standalone && api.exportBundle) backup = { bundle: await api.exportBundle(pname) };
-      else backup = { zip: (await api.exportZip(pname, 'silinx')).blob };
-    } catch { /* no snapshot: the server keeps the old project in .trash */ }
+    try { backup = { zip: (await api.exportZip(pname, 'silinx')).blob }; } catch { /* no snapshot: the server keeps the old project in .trash */ }
   }
   await removeExistingProject(pname);
   try { return await fn(); }
@@ -121,8 +118,7 @@ export async function replaceProjectWith(pname, fn) {
     try { await api.deleteProject(pname); } catch { /* nothing was created */ }
     let restored = false;
     try {
-      if (backup?.bundle) { await api.importBundle(backup.bundle); restored = true; }
-      else if (backup?.zip) { await api.importZip(pname, backup.zip); restored = true; }
+      if (backup?.zip) { await api.importZip(pname, backup.zip); restored = true; }
     } catch { /* keep the import error */ }
     if (restored) {
       app.log(`The previous project '${pname}' was restored.`, 'info');
@@ -408,18 +404,21 @@ export async function importXiseDialog() {
 }
 
 // ------------------------------------------------------------------ Import Silinx Project
-// A .zip made with File ▸ Export Silinx Project (silinx.json + every project file).
+// A .zip made with File ▸ Export Silinx Project (silinx.json + every project file); in the browser edition also
+// a project bundle (.silinx.json) of its File ▸ Download Project Bundle before #3548, read as such a zip.
+const projectNameOf = f => f.name.replace(/\.zip$|\.silinx\.json$|\.json$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
 export async function importSilinxDialog() {
-  const fileInp = h('input', { type: 'file', accept: '.zip' });
+  const fileInp = h('input', { type: 'file', accept: api.standalone ? '.zip,.json' : '.zip' });
   const name = h('input', { type: 'text', placeholder: 'project name' });
   fileInp.addEventListener('change', () => {
     const f = fileInp.files[0];
-    if (f && !name.value) name.value = f.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
+    if (f && !name.value) name.value = projectNameOf(f);
   });
   const r = await dialog({
     title: 'Import Silinx Project', width: 520,
     body: h('div', {},
       h('div', { class: 'hint' }, 'Import a whole Silinx project from a .zip made with File ▸ Export Silinx Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).'),
+      api.standalone ? h('div', { class: 'hint' }, 'It also opens a project bundle (.silinx.json) made with an earlier version.') : null,
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         ...field('.zip file:', fileInp),
         ...field('Project name:', name))),
@@ -428,7 +427,7 @@ export async function importSilinxDialog() {
   if (!r) return;
   const zf = fileInp.files[0];
   if (!zf) return alertDlg('Import Silinx Project', 'Select the .zip of the Silinx project.', 'error');
-  const pname = name.value.trim() || zf.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
+  const pname = name.value.trim() || projectNameOf(zf);
   if (!await askReplaceProject(pname)) return;
   try {
     const res = await replaceProjectWith(pname, () => api.importZip(pname, zf));

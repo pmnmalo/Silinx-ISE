@@ -28,7 +28,7 @@ import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ic
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
 import { browserGit } from './git-browser.js';
-import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, normalizeProjectJson, projectFromZip, safePath, NAME_RE, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
+import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, projectFromZip, bundleEntries, safePath, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
 
 const fail = msg => { throw new Error(msg); };
 
@@ -110,7 +110,7 @@ function fakeJob(kind, lines, status = 'error', error) {
   addJob({ id, kind, status, lines, next: lines.length, error });
   return { job: id };
 }
-const FULL_APP = 'the full Silinx application (run `npm start` in the Silinx folder and open http://127.0.0.1:8642; File > Download Project Bundle moves a project there)';
+const FULL_APP = 'the full Silinx application (run `npm start` in the Silinx folder and open http://127.0.0.1:8642; File > Export Silinx Project (.zip)… moves a project there)';
 // the board's Digilent USB, or an iCE40 board's FTDI (#2298): the user chooses it once; the browser remembers the permission
 async function adeptDevice(vendor = ADEPT_VENDOR, filters = ADEPT_FILTERS) {
   const usb = globalThis.navigator?.usb;
@@ -486,38 +486,16 @@ export const api = {
   // the zip's entries as a project (project-store.js projectFromZip: every path inside the project,
   // silinx.json normalised, what was dropped in the warnings), then stored
   // (through the import gate, #2830: its caps checked while the zip is read, each entry's name and content)
+  // an old project bundle (.silinx.json, #3548) is read as such a zip: its silinx.json and its files
   importZip: async (name, file) => {
     if (file.size > GATE_LIMITS.maxArchive) fail(`the zip is larger than ${GATE_LIMITS.maxArchive >> 20} MB, the most an import takes`);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bundle = bytes[0] === 0x50 ? null : bundleEntries(new TextDecoder().decode(bytes));   // (a zip starts with 'PK')
     let gated;
-    try { gated = await gateZip(new Uint8Array(await file.arrayBuffer()), browserCodec()); } catch (e) { fail(e.message); }
+    try { gated = bundle ? gateEntries(bundle) : await gateZip(bytes, browserCodec()); } catch (e) { fail(e.message); }
     const p = projectFromZip(name, gated, { xiseProject, textOf });
     if (await store.exists(name)) fail(`project '${name}' already exists`);
     return { project: await ops.put(name, p.json, p.files), missing: p.missing, warnings: p.warnings };
-  },
-
-  // standalone-only: project bundles (one JSON file with every project file)
-  exportBundle: async name => {
-    const p = await store.load(name);
-    return JSON.stringify({ format: 'silinx-bundle', version: 1, project: p.json, files: p.files }, null, 1);
-  },
-  // the bundle's project description normalised and its files' paths checked as a zip's (#483);
-  // the name of the project made, and the warnings in api.lastImportWarnings
-  importBundle: async text => {
-    const b = JSON.parse(text);
-    if (!b || b.format !== 'silinx-bundle') fail('not a Silinx project bundle');
-    const base = String(b.project?.name ?? '');
-    if (!NAME_RE.test(base)) fail(`invalid project name '${base}'`);
-    let name = base;
-    while (await store.exists(name)) name = `${base}_${Math.floor(Math.random() * 1000)}`;
-    const n = normalizeProjectJson(b.project, name);
-    // its files through the import gate (#2830)
-    const g = gateEntries(Object.entries(b.files && typeof b.files === 'object' ? b.files : {}).filter(([, v]) => typeof v === 'string').map(([path, data]) => ({ path, data })));
-    const files = Object.fromEntries(g.files.map(f => [f.path, f.text ?? textOf(f)]));
-    n.warnings.unshift(...gateMessages(g));
-    n.json = markUntrusted(n.json);   // (a project from outside, #2830)
-    await ops.put(name, n.json, files);
-    api.lastImportWarnings = n.warnings;
-    return name;
   },
 };
 

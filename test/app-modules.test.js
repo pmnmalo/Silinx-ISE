@@ -49,7 +49,7 @@ const PARTS = {
   'design.js': ['renderHierarchy', 'clashBadge', 'viewOfModule', 'treeItem', 'selectRow', 'markSelRow', 'treeKeys',
     'select', 'testBench', 'inView', 'moduleContextMenu', 'fileContextMenu', 'projectContextMenu', 'setTop',
     'projectSaves', 'saveProjectJson', 'serialOp', 'removeFile', 'removeModule', 'removeNow'],
-  'menus.js': ['setupMenus', 'setupToolbar', 'refreshSteps', 'showPalette', 'printActive', 'downloadUrl', 'exportProjectZip', 'openBundle'],
+  'menus.js': ['setupMenus', 'setupToolbar', 'refreshSteps', 'showPalette', 'printActive', 'downloadUrl', 'exportProjectZip'],
   'viewers.js': ['netlistSources', 'SIM_MODEL_THEN', 'offerSimModel', 'isPrimitive', 'openTechSchematic',
     'openSilinxTechSchematic', 'openSchematic', 'readDataFiles', 'runSimulation', 'runSimulationInner',
     'saveStimTestbench', 'confirmElabErrors', 'openEmulator'],
@@ -176,7 +176,7 @@ test('#405 design.js: the Design pane, its context menus, Set as Top Module and 
 
 test('#405 menus.js: the menu bar, the toolbar, the command palette, printing and the project zip left app.js', () => {
   const code = read('menus.js');
-  for (const s of ["menuBar($('menubar')", 'function exportProjectZip(', 'function openBundle(']) assert.ok(code.includes(s) && !app.includes(s), s);
+  for (const s of ["menuBar($('menubar')", 'function exportProjectZip(']) assert.ok(code.includes(s) && !app.includes(s), s);
   // app.js's boot still sets them up
   for (const name of ['setupMenus', 'setupToolbar']) assert.match(app, new RegExp(`\\b${name}\\(\\)`), name);
 });

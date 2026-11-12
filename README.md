@@ -609,7 +609,7 @@ npm run build:standalone    # writes dist/Silinx.html (~5 MB)
 
 One file, no server: open it in a browser or share it. It includes the editor, schematics, ASM
 editor, simulation/SSim, pin planner and ISE project import/export; the examples (*gates*, *traffic*,
-*blinky*, *pong*, *stopwatch*, *clock*, *vga*, *isqrt*, *uart*, *micro80*) are embedded. Projects are stored in the browser (*File ▸ Download / Open Project Bundle* to move
+*blinky*, *pong*, *stopwatch*, *clock*, *vga*, *isqrt*, *uart*, *micro80*) are embedded. Projects are stored in the browser (*File ▸ Export / Import Silinx Project (.zip)…* to move
 them), or, in Chrome / Edge, in a folder on the disk (*File ▸ Open Workspace Folder…*: the File
 System Access API; each project a folder as the full application writes it, so the same folder opens
 there; web/js/project-store.js). `--site <dir>` also writes the GitHub Pages site: the page and its `assets/` (the device

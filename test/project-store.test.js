@@ -198,7 +198,7 @@ test('browser storage: the same operations, kept in localStorage under silinx.st
   // a full localStorage: why, and what to do
   const full = browserStore({ getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } });
   await assert.rejects(() => projectOps(() => full).create({ name: 'Big' }),
-    { message: 'browser storage is full or unavailable (QuotaExceededError); download your project bundle to keep it' });
+    { message: 'browser storage is full or unavailable (QuotaExceededError); export your project (File > Export Silinx Project (.zip)…) to keep it' });
 });
 
 test('copying the browser\'s projects into the folder: the same projects; one of the same name already there is not copied', async () => {
@@ -320,7 +320,7 @@ test('browser storage: a build\'s results are not kept (this session only), noth
 });
 
 // ---- #483: every path inside the project, the imported silinx.json normalised
-import { safePath, cleanPath, normalizeProjectJson, projectFromZip, emptyProjectJson } from '../web/js/project-store.js';
+import { safePath, cleanPath, normalizeProjectJson, projectFromZip, emptyProjectJson, bundleEntries } from '../web/js/project-store.js';
 import { gateEntries } from '../core/import-gate.js';
 import { textOf } from '../core/zip.js';
 
@@ -580,4 +580,48 @@ test('#2894 a link round trip of every example with constraints in the browser\'
     assert.deepEqual(Object.keys(got.files).sort(), Object.keys(src.files).sort(), ex);
     for (const [p, t] of Object.entries(src.files)) assert.equal(got.files[p], t, `${ex}: ${p}`);
   }
+});
+
+// #3548: an old project bundle (.silinx.json, the browser edition's File ▸ Download Project Bundle before) read as a
+// Silinx zip's entries, through the import gate and projectFromZip, by Import Silinx Project (api-local.js importZip)
+const oldBundle = (p) => JSON.stringify({ format: 'silinx-bundle', version: 1, project: p.json, files: p.files }, null, 1);   // (as exportBundle wrote it)
+test('#3548 an old bundle of every example: the same project as its own (description, every file), no warnings', async () => {
+  const store = browserStore(memStorage()), ops = projectOps(() => store, EXAMPLES);
+  for (const ex of Object.keys(EXAMPLES)) {
+    await ops.create({ name: ex, template: ex });
+    const src = await store.load(ex);
+    const g = gateEntries(bundleEntries(oldBundle(src)));
+    const r = projectFromZip(`${ex}_old`, g, { textOf });
+    assert.deepEqual([r.warnings, r.missing], [[], []], ex);
+    assert.deepEqual(r.files, src.files, ex);
+    for (const k of ['board', 'device', 'top', 'simTop', 'files', 'constraints', 'impl', 'stimuli']) assert.deepEqual(r.json[k], src.json[k], `${ex}: ${k}`);
+    assert.equal(r.json.name, `${ex}_old`, 'the name the import\'s, not the bundle\'s');
+    assert.equal(r.json.trusted, false, 'a project from outside (#2830)');
+  }
+});
+
+test('#3548 an old bundle\'s hostile paths and fields: refused by the gate, dropped from silinx.json, said in the warnings', () => {
+  const text = JSON.stringify({ format: 'silinx-bundle', version: 1,
+    project: { name: 'X', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: '../up.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }] },
+    files: { 'src/top.vhd': 'entity top is end;\n', '../escape.txt': 'x', '/abs.txt': 'x', 'build/top.bit': 'b', 'silinx.json': '{"name":"twin"}', 'src/n.bin': 7, 'sub\\win.v': 'module m; endmodule\n' } });
+  const e = bundleEntries(text);
+  assert.deepEqual(e.map((x) => x.path), ['silinx.json', 'src/top.vhd', '../escape.txt', '/abs.txt', 'build/top.bit', 'sub\\win.v'], 'its own silinx.json and the non-text files left out');
+  const r = projectFromZip('Y', gateEntries(e), { textOf });
+  assert.deepEqual(r.warnings, [
+    "../escape.txt: not imported: path leaves the project ('..')",
+    '/abs.txt: not imported: absolute path',
+    "build/top.bit: not imported: the project's build folder (build/) is Silinx's own",
+    'sub\\win.v: not imported: backslash in the name',
+    'silinx.json: file path outside the project dropped (../up.vhd)',
+  ]);
+  assert.deepEqual(r.missing, ['src/gone.vhd']);
+  assert.deepEqual(Object.keys(r.files), ['src/top.vhd']);
+});
+
+test('#3548 bundleEntries: a text that is not a bundle is none (the import reads it as a zip, and says so)', () => {
+  for (const t of ['', 'PK\u0003\u0004', '{', 'null', '[]', '"silinx-bundle"', '{"format":"other","project":{},"files":{}}', '{"project":{},"files":{}}']) assert.equal(bundleEntries(t), null, t);
+  // a bundle without its project or files: an empty project, said
+  const r = projectFromZip('E', gateEntries(bundleEntries('{"format":"silinx-bundle"}')), { textOf });
+  assert.deepEqual(r.warnings, ['silinx.json is not a project description: an empty project']);
+  assert.deepEqual(r.files, {});
 });
