@@ -241,10 +241,13 @@ export async function renderStartPage() {
     h('div', { class: 'start-btns' },
       h('button', { class: 'btn', type: 'button', onclick: () => wiz.newProjectWizard() }, 'New Project…'),
       h('button', { class: 'btn', type: 'button', onclick: () => wiz.openProjectDialog() }, 'Open Project…')),   // (Close Project: under the Design tree, #1309)
-    // the Silinx and the Xilinx imports and exports, as the File menu has them, a line between (#1216)
+    // the Silinx and the Xilinx imports and exports, as the File menu has them (#1216); a line, then the sharing and the
+    // git entries in one group (#3699)
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
       ...[['Import Silinx Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx Project (.zip)…', 'save', exportZip('silinx'), true],
-        ['Share Project Copy…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]].map(command),   // (#2826)
+        ['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command),
+      h('hr', { class: 'start-sep' }),
+      command(['Share Project Copy…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]),   // (#2826)
       // (a GitHub repository, a Classroom assignment's: the server editions, #3195; after Copy Link, #3323)
       ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
       // (Initialize Repository…, the open project's, disabled with none as the exports; Sign in with GitHub…, the
@@ -252,9 +255,7 @@ export async function renderStartPage() {
       ...gitStartItems().map(it => command([it.label, it.project ? 'save' : 'project', () => (S.project || !it.project) && it.action(), it.project])),
       // (Share Project Live…, as the File menu's: the editions that share, not while following another's, #3315; the ISE
       // style's only, the Silinx interface's in the Design tree's project and device menus, #3479: web/css/app.css)
-      ...((api.collab || api.standalone) && !api.following ? [command(['Share Project Live…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true, 'start-share'])] : []),
-      h('hr', { class: 'start-sep' }),
-      ...[['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command)),
+      ...((api.collab || api.standalone) && !api.following ? [command(['Share Project Live…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true, 'start-share'])] : [])),
     // (where the projects are kept above the recent ones, #2029)
     api.standalone ? await storageBox() : await workspaceBox(),
     h('div', { class: 'start-box' }, h('h3', {}, 'Recent Projects'),

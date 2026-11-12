@@ -659,8 +659,8 @@ uiTest('Files view: rename a folder (its files and subfolders follow, still regi
 
 // #1216: the Start page: New Project… and Open Project… buttons at the top, half of the page each (Close Project: under the
 // Design tree, #1309); Project Commands
-// the Silinx and the Xilinx imports and exports, a line between (the exports disabled with no project; with one,
-// they download its zips); in Portuguese
+// the Silinx and the Xilinx imports and exports, then a line and the sharing and git entries in one group (#3699; the
+// exports disabled with no project; with one, they download its zips); in Portuguese
 const startPage = (page) => page.eval(() => {
   const p = document.getElementById('start-page');
   const btns = [...p.querySelectorAll('.start-btns .btn')], w = btns.map((b) => b.getBoundingClientRect().width);
@@ -672,7 +672,7 @@ const startPage = (page) => page.eval(() => {
     commands: [...box.children].slice(1).filter((e) => e.getClientRects().length).map((e) => (e.tagName === 'HR' ? '—' : `${e.textContent}${getComputedStyle(e.querySelector('a')).pointerEvents === 'none' ? ' (disabled)' : ''}`)),
   };
 });
-uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silinx and Xilinx imports and exports in Project Commands', E, async (page) => {
+uiTest('#1216 #3699 Start page: New Project and Open Project buttons on top; the Silinx and Xilinx imports and exports in Project Commands, then the sharing and git group', E, async (page) => {
   await page.eval(() => window.SilinxApp.closeProject?.());
   await page.leftTab('start');
   await page.waitFor(() => document.querySelectorAll('#start-page .start-btns .btn').length === 2, [], { what: 'the Start page' });
@@ -682,7 +682,8 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   assert.deepEqual(await startPage(page), { buttons: ['New Project…', 'Open Project…'], top: true, halves: true, commands: [
     // (Open from Repository…: the server editions' git, #3195, after Copy Link, #3323; Initialize Repository…, the open
     // project's, #3534; Share Project Live…, the editions that share, #3315)
-    'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)… (disabled)', 'Share Project Copy… (disabled)', 'Open from Repository…', 'Initialize Repository… (disabled)', ...share(' (disabled)'), '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)'] });
+    'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)… (disabled)', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)… (disabled)', '—',
+    'Share Project Copy… (disabled)', 'Open from Repository…', 'Initialize Repository… (disabled)', ...share(' (disabled)')] });
   // drawn again with a project open (a late drawing while one opens): the same page kept, only its host's attribute
   // changes, so that a click pressed before is not lost (#494, #1222)
   assert.deepEqual(await page.eval(async () => {
@@ -708,7 +709,8 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.openProject('StartZip');
   await page.leftTab('start');
   await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the exports enabled' });
-  assert.deepEqual((await startPage(page)).commands, ['Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Share Project Copy…', 'Open from Repository…', 'Initialize Repository…', ...share(''), '—', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…']);
+  assert.deepEqual((await startPage(page)).commands, ['Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Import Xilinx ISE Project (.zip)…', 'Export Xilinx ISE Project (.zip)…', '—',
+    'Share Project Copy…', 'Open from Repository…', 'Initialize Repository…', ...share('')]);
   await page.click('#start-page .entry a', { text: 'Export Silinx Project (.zip)…' });
   await waitDownload(page, 'StartZip-silinx.zip');
   await page.click('#start-page .entry a', { text: 'Export Xilinx ISE Project (.zip)…' });
@@ -717,6 +719,9 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor(() => document.querySelector('#start-page .start-btns .btn')?.textContent !== 'New Project…', [], { what: 'Portuguese' });
   assert.deepEqual((await startPage(page)).buttons, ['Novo Projeto…', 'Abrir Projeto…']);
+  await page.waitFor(() => document.querySelector('#start-page .start-box .entry a')?.textContent === 'Importar Projeto Silinx (.zip)…', [], { what: 'the commands in Portuguese' });
+  assert.deepEqual((await startPage(page)).commands, ['Importar Projeto Silinx (.zip)…', 'Exportar Projeto Silinx (.zip)…', 'Importar Projeto Xilinx ISE (.zip)…', 'Exportar Projeto Xilinx ISE (.zip)…', '—',
+    'Partilhar Cópia do Projeto…', 'Abrir do Repositório…', 'Inicializar Repositório…', ...(ise ? ['Partilhar Projeto em Direto…'] : [])]);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
