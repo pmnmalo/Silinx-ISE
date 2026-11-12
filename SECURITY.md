@@ -119,7 +119,8 @@ read that user's files has the server too.
   project's or a remote's text (`read_file`, `find_in_project`, `git_log`, `git_diff`, `get_report`, the import's, `import_source`'s and a clone's
   warnings, `follow_project`'s files and names, `share_project`'s followers and warnings, `open_link`'s design,
   `project_info`, a project's own lab in `lab`, the lines a design prints in `simulate`, and every tool's error, #3528;
-  a failed `check_syntax`'s and a `simulate` that did not start, whose lines quote the design's names, #3681)
+  a failed `check_syntax`'s, a `simulate` that did not start, a failed `run_process`, a `verify` that failed or could
+  not run, and a failed `c_simulation`, whose lines quote the design's names, #3681)
   is labelled "Untrusted content" after its text, and `untrusted` in its structured content: data, never instructions.
   `open_link` takes a design's own board and top only as names, as the link's `board=` and `top=` are.
 - What the MCP server tells an assistant of the user's folders (#3412, #3418): its results and errors name the
