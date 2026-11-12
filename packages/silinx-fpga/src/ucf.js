@@ -149,7 +149,7 @@ export function generateUcf({ ports, assignments = {}, clocks = [], header, othe
       continue;
     }
     const attrs = attrList(a);
-    const suffix = typeof n === 'string' ? '' : '  # not a port of the top module';
+    const suffix = typeof n === 'string' ? (a.comment ? `  # ${a.comment}` : '') : '  # not a port of the top module';
     lines.push(`NET ${q(name).padEnd(w)} ${attrs.join(' | ')} ;${suffix}`);
     if (a.clockDedicatedRoute === false || a.clockDedicatedRoute === 'FALSE')
       lines.push(`NET ${q(name).padEnd(w)} CLOCK_DEDICATED_ROUTE = FALSE ;`);
@@ -443,7 +443,7 @@ export function boardAutoAssign(ports, board, { byDirection = false } = {}) {
     }
     matched.push(p.name);
   }
-  if (!byDirection) return { assignments, clocks, matched, unmatched, byDirection: directed };
+  if (!byDirection) return onHeaders({ assignments, clocks, matched, unmatched, byDirection: directed }, ports, res);
   // the ports left: by direction, on the pins no port took by name
   const used = new Set(Object.values(assignments).map(a => String(a.loc).toUpperCase()));
   const free = groups => res.filter(r => groups.includes(r.group)).sort((x, y) => groups.indexOf(x.group) - groups.indexOf(y.group))
@@ -475,7 +475,48 @@ export function boardAutoAssign(ports, board, { byDirection = false } = {}) {
     directed.push({ port: p.name, nets });
     matched.push(p.name);
   }
-  return { assignments, clocks, matched, unmatched: left, byDirection: directed };
+  return onHeaders({ assignments, clocks, matched, unmatched: left, byDirection: directed }, ports, res);
+}
+
+// The port bits a board has no resource for, on the free pins of its headers (group 'Headers': user I/O that nothing on
+// the board drives, the Mimas V2's P6..P9, #3709), in the order of the ports, an input with a pull-down: ISE builds no
+// board project with a port bit with no pin (server/ise.js), and an example's an<3> on a board with 3 digits has none;
+// a serial rx with a pull-up (it idles high).
+// Each such bit's assignment has a comment (the UCF's), the bits in r.onHeaders: [{ port, nets: [[net, header label]] }];
+// what no header pin is left for stays in unmatched.
+function onHeaders(r, ports, res) {
+  const pool = res.filter(x => x.group === 'Headers').flatMap(x => x.pins.map((pin, i) => ({ r: x, pin, label: x.pins.length > 1 ? `${x.name}<${i}>` : x.name })));
+  r.onHeaders = [];
+  if (!pool.length || !r.unmatched.length) return r;
+  const used = new Set(Object.values(r.assignments).map(a => String(a.loc).toUpperCase()));
+  const left = [];
+  for (const entry of r.unmatched) {
+    const name = entry.replace(/\[\d+\.\.\]$/, ''), p = ports.find(q => q.name === name);
+    if (!p || (p.dir !== 'in' && p.dir !== 'out')) { left.push(entry); continue; }
+    const width = p.width || 1, bus = !(width === 1 && (p.msb === null || p.msb === undefined));
+    const lo = bus ? Math.min(p.msb, p.lsb) : 0;
+    // (a serial port's rx idles high: a pull-up, no start bit)
+    const key = p.name.toLowerCase(), idlesHigh = ((Object.hasOwn(ALIASES, key) && ALIASES[key]) || key) === 'rx';
+    const nets = [];
+    for (let i = 0; i < width; i++) {
+      const net = bus ? bitName(p.name, lo + i) : bitName(p.name);
+      if (byName(r.assignments, net)?.loc) continue;
+      let s;
+      while ((s = pool.shift()) && used.has(String(s.pin).toUpperCase()));
+      if (!s) break;
+      used.add(String(s.pin).toUpperCase());
+      setByName(r.assignments, net, { loc: s.pin, ...(p.dir === 'in' ? { pull: idlesHigh ? 'up' : 'down' } : {}), comment: `no pin on the board: on the header pin ${s.label}` });
+      nets.push([net, s.label]);
+    }
+    const done = Array.from({ length: width }, (_, i) => (bus ? bitName(p.name, lo + i) : bitName(p.name))).filter(n => byName(r.assignments, n)?.loc).length;
+    if (nets.length) {
+      r.onHeaders.push({ port: p.name, nets });
+      if (!r.matched.includes(p.name)) r.matched.push(p.name);
+    }
+    if (done < width) left.push(bus && done ? `${p.name}[${lo + done}..]` : entry);
+  }
+  r.unmatched = left;
+  return r;
 }
 
 // LOCs of a parsed UCF that are not pins of the given board (or of any of its resources).

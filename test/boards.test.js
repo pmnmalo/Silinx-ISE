@@ -46,7 +46,7 @@ test('#732 the Atlys: the seven-segment display and VGA on its VHDCI connector, 
 
 // (#3709) the Mimas V2's display as the other boards': Numato's SevenSegment[7..1] are a..g and [0] the decimal point
 // (its demo's "abcdefgh"), its 3 digit enables an, all active low, as its buttons and DIP switches (pull-ups); the
-// examples' seg, dp and an then on its pins, an<3> with none (3 digits), and the clock's UCF on them
+// examples' seg, dp and an then on its pins, an<3> on a header pin (3 digits), and the clock's UCF on them
 test('#3709 the Mimas V2: seg a..g, dp and an (3 digits) on Numato\'s pins, active low, the examples\' display on them', async () => {
   const mimas = BOARDS.find(b => b.id === 'mimas-v2'), r = Object.fromEntries(mimas.resources.map(x => [x.name, x]));
   assert.deepEqual(r.seg.pins, ['A3', 'B4', 'A4', 'C4', 'C5', 'D6', 'C6']);
@@ -57,13 +57,13 @@ test('#3709 the Mimas V2: seg a..g, dp and an (3 digits) on Numato\'s pins, acti
   for (const n of ['sw', 'btn']) assert.equal(r[n].pull, 'up', n);
   assert.equal(r.led.extra?.activeHigh, true);
   const { EXAMPLES, exampleUcf } = await import('./examples-lib.mjs');
-  const noPin = { gates: [], vga: [], uart: ['rx', 'an[3..]'] };
-  for (const name of EXAMPLES) assert.deepEqual(exampleUcf(name, { board: 'mimas-v2' }).unmatched, noPin[name] || ['an[3..]'], name);
+  // (what the board has no pin for, an<3> and uart's rx: on its headers' free pins, board-headers.test.js)
+  for (const name of EXAMPLES) assert.deepEqual(exampleUcf(name, { board: 'mimas-v2' }).unmatched, [], name);
   const { text } = exampleUcf('clock', { board: 'mimas-v2' });
   const locs = Object.fromEntries([...text.matchAll(/^NET "([^"]+)"\s+LOC = "([^"]+)"/gm)].map(m => [m[1], m[2]]));
   assert.deepEqual(['seg<0>', 'seg<1>', 'seg<2>', 'seg<3>', 'seg<4>', 'seg<5>', 'seg<6>', 'dp', 'an<0>', 'an<1>', 'an<2>'].map(n => locs[n]),
     ['A3', 'B4', 'A4', 'C4', 'C5', 'D6', 'C6', 'A5', 'B2', 'A2', 'B3']);
-  assert.match(text, /^# NET "an<3>"\s+LOC = "" ;\s+# unassigned$/m);
+  assert.match(text, /^NET "an<3>"\s+LOC = "U7" ;  # no pin on the board: on the header pin io_p6<0>$/m);
   assert.deepEqual(['clk', 'sw<0>', 'sw<1>', 'btn<0>', 'btn<3>'].map(n => locs[n]), ['V10', 'C17', 'C18', 'M18', 'L17']);
   assert.match(text, /TIMESPEC "TS_clk" = PERIOD "clk" 10 ns HIGH 50% ;/);
 });

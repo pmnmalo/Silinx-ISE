@@ -460,6 +460,9 @@ export async function generateBuild(project, projectDir, { steps, sourcesOnly = 
     ucfText = await fs.readFile(inside(project.constraints), 'utf8');
     hasUcf = true;
   }
+  // the port bits Silinx's board assignment put on a header pin, the board having no pin for them (#3709): warned
+  for (const m of ucfText.matchAll(/^NET\s+"([^"]+)"[^#\n]*#\s*no pin on the board: on the header pin (\S+)[ \t]*$/gm))
+    warnings.push(`${m[1]}: the ${project.board || 'board'} has no pin for it; it is on the header pin ${m[2]} (the board's constraints)`);
   // Top-level port bits without a LOC. ISE's placer crashes (segfault in "Design Feasibility Check")
   // when it has to choose I/O sites itself under x86 emulation (Apple Silicon), so Silinx chooses
   // them: run.sh assigns free general-purpose pins from partgen's package file. With a board this
