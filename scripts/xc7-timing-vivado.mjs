@@ -181,7 +181,7 @@ async function openFlow(d, into, steps) {
 
 /** What Vivado reads of a design ({ board, name }), written in folder D: its netlist (the open flow's synthesis, the
  *  projects made in into) as netlist.edf, its constraints as netlist.xdc. -> { top, netlist: the JSON's hash }. */
-export async function prepareDesign(d, into, D) {
+async function prepareDesign(d, into, D) {
   const { yosysNode } = await import('../packages/silinx-fpga/src/node.js');
   const f = await openFlow(d, into, ['synth', 'translate']);
   const out = await yosysNode(['-q', '-p', edifScript(f.top)], { 'netlist.json': f.netlist });
@@ -194,7 +194,7 @@ export async function prepareDesign(d, into, D) {
 
 /** nextpnr's numbers of a design (the whole open flow, as the application runs it): { netlist: its netlist's hash (the
  *  one Vivado had?), fmaxMHz, logicNs, routeNs (its critical path's) }. */
-export async function nextpnrNumbers(d, into) {
+async function nextpnrNumbers(d, into) {
   const f = await openFlow(d, into, ['synth', 'translate', 'par', 'trce']);
   const report = JSON.parse(fs.readFileSync(path.join(f.dir, 'build', 'open', 'nextpnr-report.json'), 'utf8'));
   const split = Object.values(nextpnrPathSplit(report)).sort((a, b) => b.totalNs - a.totalNs)[0] || {};
