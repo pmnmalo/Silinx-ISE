@@ -33,6 +33,7 @@ import { assembleIseImport } from './isesch-assemble.js';
 import { ISE_GRAPHIC_TAGS, graphicsFromIse, iseGraphic } from './isesch-graphics.js';
 import { libTemplate } from './isesch-hdl.js';
 import { primFromIse, primLibPins } from './isesch-prims.js';
+import { attrPairs } from './xml-attrs.js';
 export { exportIseSch, decodeXlSymbol, iseTimestamp };
 
 export function parseXml(text) {
@@ -69,10 +70,7 @@ export function parseXml(text) {
     const m = /^\s*([^\s/>]+)/.exec(body);
     if (!m) continue;
     const el = { tag: m[1].toLowerCase(), attrs: {}, children: [], text: '' };
-    const re = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
-    let a;
-    const rest = body.slice(m[0].length);
-    while ((a = re.exec(rest))) el.attrs[a[1]] = decodeEnt(a[2] ?? a[3] ?? a[4] ?? '');
+    for (const [k, v] of attrPairs(body.slice(m[0].length))) el.attrs[k] = decodeEnt(v);   // (in one pass, #3557)
     top().children.push(el);
     if (!selfClose) stack.push(el);
   }
@@ -82,7 +80,8 @@ function decodeEnt(s) {
   return s.replace(/&(#x[0-9a-f]+|#\d+|lt|gt|amp|quot|apos);/gi, (_, e) => {
     const l = e.toLowerCase();
     if (l === 'lt') return '<'; if (l === 'gt') return '>'; if (l === 'amp') return '&'; if (l === 'quot') return '"'; if (l === 'apos') return "'";
-    return String.fromCodePoint(l[1] === 'x' ? parseInt(l.slice(2), 16) : parseInt(l.slice(1), 10));
+    const cp = l[1] === 'x' ? parseInt(l.slice(2), 16) : parseInt(l.slice(1), 10);
+    return cp <= 0x10ffff ? String.fromCodePoint(cp) : '\uFFFD';   // (past Unicode, &#x110000; on: U+FFFD, #3557)
   });
 }
 
@@ -141,7 +140,8 @@ export function parseIseSym(text) {
   const dirOf = p => (/^out/i.test(p) ? 'out' : /^bi|inout/i.test(p) ? 'inout' : 'in');
   if (/^\s*VERSION\s+\d/i.test(src) || /^\s*BEGIN\s+SYMBOL/im.test(src.slice(0, 200))) {
     const out = { name: (/BEGIN\s+SYMBOL\s+(\S+)/.exec(src) || [])[1] || '', pins: [] };
-    for (const m of src.matchAll(/^\s*SYMPIN\s+(-?\d+)\s+(-?\d+)\s+(\w+)\s+(\S+)/gm)) out.pins.push({ name: m[4], dir: dirOf(m[3]), x: +m[1], y: +m[2] });
+    // (no line end before SYMPIN: \s* went over the blank lines after each line's start, #3557)
+    for (const m of src.matchAll(/^[^\S\n\r\u2028\u2029]*SYMPIN\s+(-?\d+)\s+(-?\d+)\s+(\w+)\s+(\S+)/gm)) out.pins.push({ name: m[4], dir: dirOf(m[3]), x: +m[1], y: +m[2] });
     return out;
   }
   const root = parseXml(src);

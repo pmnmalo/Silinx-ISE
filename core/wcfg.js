@@ -17,8 +17,13 @@ const RADIX_OF = Object.fromEntries(Object.entries(RADIX).map(([k, v]) => [v, k]
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-const unesc = s => String(s).replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi, (m, e) =>
-  e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : ENT[e.toLowerCase()]);
+// (a character reference past Unicode, &#x110000; on: the file's error, #3557)
+const unesc = s => String(s).replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi, (m, e) => {
+  if (e[0] !== '#') return ENT[e.toLowerCase()];
+  const cp = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+  if (cp > 0x10ffff) throw new Error(`malformed XML: invalid character reference '${m.length > 20 ? `${m.slice(0, 17)}...` : m}'`);
+  return String.fromCodePoint(cp);
+});
 
 /** The text of a .wcfg file of the configuration. */
 export function writeWcfg({ tops = [], rows = [], markers = [] } = {}) {
@@ -55,29 +60,79 @@ export function writeWcfg({ tops = [], rows = [], markers = [] } = {}) {
   return out.join('\n');
 }
 
-// the XML as a tree of { name, attrs, children, text } (the subset a .wcfg uses: elements, attributes, text)
+// the XML as a tree of { name, attrs, children, text } (the subset a .wcfg uses: elements, attributes, text), read in
+// one pass (#3557: the regular expressions that took out the comments, the instructions and the CDATA went to the end
+// of the text from each unclosed one); the text between two tags is unescaped whole (its CDATA escaped first)
 function parseXml(text) {
+  const src = String(text), n = src.length;
   const root = { name: '', attrs: {}, children: [], text: '' };
   const stack = [root];
-  const src = String(text).replace(/<!--[\s\S]*?-->/g, '').replace(/<\?[\s\S]*?\?>/g, '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (m, c) => esc(c));
-  const re = /<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[\w:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)|(<)/g;
-  for (let m; (m = re.exec(src));) {
-    const top = stack[stack.length - 1];
-    if (m[6]) throw new Error(`malformed XML near '${src.slice(m.index, m.index + 20)}'`);
-    if (m[5] != null) { top.text += unesc(m[5]); continue; }
-    if (m[1]) {
-      if (top.name !== m[2]) throw new Error(`malformed XML: </${m[2]}> closes <${top.name || 'nothing'}>`);
-      stack.pop();
+  const near = k => new Error(`malformed XML near '${src.slice(k, k + 20)}'`);
+  let raw = '';
+  const flush = () => { if (raw) stack[stack.length - 1].text += unesc(raw); raw = ''; };
+  for (let i = 0; i < n;) {
+    const lt = src.indexOf('<', i);
+    if (lt < 0) { raw += src.slice(i); break; }
+    raw += src.slice(i, lt);
+    i = lt;
+    const skip = [['<!--', '-->'], ['<?', '?>'], ['<![CDATA[', ']]>']].find(([o]) => src.startsWith(o, i));
+    if (skip) {
+      const e = src.indexOf(skip[1], i + skip[0].length);
+      if (e < 0) throw near(i);
+      if (skip[0] === '<![CDATA[') raw += esc(src.slice(i + 9, e));
+      i = e + skip[1].length;
       continue;
     }
-    const attrs = {};
-    for (const a of m[3].matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) attrs[a[1]] = unesc(a[2] ?? a[3]);
-    const el = { name: m[2], attrs, children: [], text: '' };
-    top.children.push(el);
-    if (!m[4]) stack.push(el);
+    const t = tagAt(src, i);
+    if (!t) throw near(i);
+    flush();
+    const top = stack[stack.length - 1];
+    if (t.close) {
+      if (top.name !== t.name) throw new Error(`malformed XML: </${t.name}> closes <${top.name || 'nothing'}>`);
+      stack.pop();
+    } else {
+      const el = { name: t.name, attrs: t.attrs, children: [], text: '' };
+      top.children.push(el);
+      if (!t.self) stack.push(el);
+    }
+    i = t.end;
   }
+  flush();
   if (stack.length > 1) throw new Error(`malformed XML: <${stack[stack.length - 1].name}> not closed`);
   return root;
+}
+
+// the tag at s[i] ('<'): { close, name, attrs, self, end } (end: just after its '>'), null if it is none: as
+// /<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[\w:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>/ read it
+function tagAt(s, i) {
+  const sp = k => /\s/.test(s[k] ?? ''), nm = k => /[\w:.-]/.test(s[k] ?? '');
+  let j = i + 1;
+  const close = s[j] === '/';
+  if (close) j++;
+  if (!/[A-Za-z_]/.test(s[j] ?? '')) return null;
+  const n0 = j;
+  while (nm(j)) j++;
+  const name = s.slice(n0, j), attrs = {};
+  for (;;) {   // an attribute: \s+ name \s* = \s* "value" | 'value'
+    let k = j;
+    while (sp(k)) k++;
+    const a0 = k;
+    if (k === j || !nm(k)) break;
+    while (nm(k)) k++;
+    const a = s.slice(a0, k);
+    while (sp(k)) k++;
+    if (s[k] !== '=') break;
+    k++;
+    while (sp(k)) k++;
+    const q = s[k], e = q === '"' || q === "'" ? s.indexOf(q, k + 1) : -1;
+    if (e < 0) break;
+    attrs[a] = unesc(s.slice(k + 1, e));
+    j = e + 1;
+  }
+  while (sp(j)) j++;
+  const self = s[j] === '/';
+  if (self) j++;
+  return s[j] === '>' ? { close, name, attrs, self, end: j + 1 } : null;
 }
 
 /** The configuration of a .wcfg file's text: { tops, rows, markers }. */
