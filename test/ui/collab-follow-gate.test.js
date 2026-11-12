@@ -39,13 +39,16 @@ uiTest('#3361 a hostile owner\'s room: a file the import gate refuses not shown,
     const opened = await page.eval(async () => { try { await window.SilinxApp.openFile('src/page.vhd'); } catch { /* refused */ } return window.Silinx.docs.some((d) => d.path === 'src/page.vhd' && d.editor?.getValue?.().includes('<script>')); });
     assert.equal(opened, false);
     assert.equal(await page.eval(async () => { await window.SilinxApp.openFile('src/top.vhd'); return window.Silinx.active?.editor?.getValue(); }), TOP);
-    assert.deepEqual(await notes(page), [refused]);
+    // (opening it: refused, the error in the console, #3540)
+    const cannot = 'ERROR: cannot open src/page.vhd: file \'src/page.vhd\' not shown: a web page (HTML), not the file its name says';
+    assert.deepEqual(await notes(page), [refused, cannot]);
     // past the files a follower takes: left, with an error
     doc.transact(() => { for (let i = 0; i < 5000; i++) plant(doc, `src/f${i}.v`, ''); });
     const why = 'the shared project has more files than a follower takes (5002, at most 5000)';
     await page.waitConsole(/no longer followed/);
     assert.deepEqual(await notes(page), [
       refused,
+      cannot,
       `ERROR: Follow a shared project: ${why}.`,
       `WARNING: Eve's project "Hostile" is no longer followed (${why}): what you see is as it was then.`,
     ]);
