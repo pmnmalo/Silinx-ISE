@@ -557,8 +557,17 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
       stateNode.actions = t.acts.slice(0, k).map((a) => TX.actionText(a, lists[0] || []));
       t = k < t.acts.length ? { ...t, acts: t.acts.slice(k) } : t.next;
     }
+    // (a state's tree written out as it was read while it has SHARE_LIMIT boxes at most; past that, a subtree reached
+    // again, the statements after an if, is one box reached from both branches, #3582)
+    const built = boxesOf(t) > SHARE_LIMIT ? new Map() : null;
     const build = (tr) => {
       if (tr.k === 'goto') return stateId.get(tr.state);
+      if (built?.has(tr)) return built.get(tr);
+      const id = buildBox(tr);
+      built?.set(tr, id);
+      return id;
+    };
+    const buildBox = (tr) => {
       if (tr.k === 'case') {
         const id = `c${++nC}`;
         nodes.push({ id, type: 'case', x: 0, y: 0, expr: exprToString(tr.expr) });
@@ -710,18 +719,37 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
   return { model, warnings };
 }
 
-function renameTargets(t, f) {
-  if (t.k === 'act') return { ...t, acts: t.acts.map((a) => (a.target ? { ...a, target: f(a.target) } : a)), next: renameTargets(t.next, f) };
-  if (t.k === 'if') return { ...t, t: renameTargets(t.t, f), f: renameTargets(t.f, f) };
-  if (t.k === 'case') return { ...t, branches: t.branches.map((br) => ({ ...br, sub: renameTargets(br.sub, f) })) };
-  return t;
+// (the trees are graphs, their subtrees shared: each walk takes a subtree once, #3582)
+function renameTargets(t, f, memo = new Map()) {
+  if (!memo.has(t)) {
+    const r = (x) => renameTargets(x, f, memo);
+    if (t.k === 'act') memo.set(t, { ...t, acts: t.acts.map((a) => (a.target ? { ...a, target: f(a.target) } : a)), next: r(t.next) });
+    else if (t.k === 'if') memo.set(t, { ...t, t: r(t.t), f: r(t.f) });
+    else if (t.k === 'case') memo.set(t, { ...t, branches: t.branches.map((br) => ({ ...br, sub: r(br.sub) })) });
+    else memo.set(t, t);
+  }
+  return memo.get(t);
 }
 
-function assignsDeeper(t, target) {
-  if (t.k === 'act') return t.acts.some((x) => x.target === target) || assignsDeeper(t.next, target);
-  if (t.k === 'if') return assignsDeeper(t.t, target) || assignsDeeper(t.f, target);
-  if (t.k === 'case') return t.branches.some((br) => assignsDeeper(br.sub, target));
-  return false;
+function assignsDeeper(t, target, memo = new Map()) {
+  if (!memo.has(t)) {
+    const r = (x) => assignsDeeper(x, target, memo);
+    memo.set(t, t.k === 'act' ? t.acts.some((x) => x.target === target) || r(t.next)
+      : t.k === 'if' ? r(t.t) || r(t.f) : t.k === 'case' ? t.branches.some((br) => r(br.sub)) : false);
+  }
+  return memo.get(t);
+}
+
+// A state's tree is written out in full up to this many boxes (as the generator writes a state, GEN_LIMIT in asm-gen.js)
+const SHARE_LIMIT = 1024;
+// The boxes of a state's tree written out, every path apart (a Number; leaves none).
+function boxesOf(t, memo = new Map()) {
+  if (!memo.has(t)) {
+    const r = (x) => boxesOf(x, memo);
+    memo.set(t, t.k === 'act' ? 1 + r(t.next) : t.k === 'if' ? 1 + r(t.t) + r(t.f)
+      : t.k === 'case' ? t.branches.reduce((n, br) => n + r(br.sub), 1) : 0);
+  }
+  return memo.get(t);
 }
 
 export default asmFromHdl;

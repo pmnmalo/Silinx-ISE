@@ -69,16 +69,17 @@ function stateOrder(m, byId, ex) {
   while (q.length) {
     const s = q.shift();
     order.push(s);
-    const visit = (id, path) => {
+    // (each box of the block once: a box reached again, where branches meet, adds no state that its first visit did not,
+    // #3582)
+    const visit = (id, seenBox) => {
       const n = byId.get(id);
-      if (!n || path.has(id)) return;
+      if (!n || seenBox.has(id)) return;
       if (n.type === 'state') { push(id); return; }
-      path.add(id);
+      seenBox.add(id);
       const e = ex.get(id) || {};
-      if (n.type === 'decision') { visit(e.true, path); visit(e.false, path); }
-      else if (n.type === 'case') for (const t of caseTargets(m, id)) visit(t, path);
-      else visit(e.next, path);
-      path.delete(id);
+      if (n.type === 'decision') { visit(e.true, seenBox); visit(e.false, seenBox); }
+      else if (n.type === 'case') for (const t of caseTargets(m, id)) visit(t, seenBox);
+      else visit(e.next, seenBox);
     };
     visit((ex.get(s) || {}).next, new Set());
   }
