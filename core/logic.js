@@ -18,6 +18,7 @@
 
 import { VHDL93_WORDS, VERILOG_WORDS } from './reserved.js';
 import { reservedWarning } from './asm.js';
+import { DRAWING_NESTING, DRAWING_NESTING_MESSAGE, deeperThanLimit } from './asm-expr.js';
 import { compile, elaborate, simulate } from './compile.js';
 import { clocksOf, latchGates } from './schematic.js';
 import { tbPorts, generateTestbench, expectedFromTrace } from './testbench.js';
@@ -45,19 +46,19 @@ const KW = { not: 'not', and: 'and', or: 'or', xor: 'xor', nand: 'nand', nor: 'n
 function tokenize(src) {
   const toks = [];
   let i = 0;
-  const s = String(src ?? '');
+  const s = String(src ?? ''), at = re => { re.lastIndex = i; return re.exec(s); };   // (sticky: linear, #3559)
   while (i < s.length) {
     const c = s[i];
     if (/\s/.test(c)) { i++; continue; }
     const pos = i + 1;
     let m;
-    if ((m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(s.slice(i)))) {
+    if ((m = at(/[A-Za-z_][A-Za-z0-9_]*/y))) {
       const w = m[0];
       const kw = KW[w.toLowerCase()];
       toks.push(kw ? { k: kw, pos, text: w } : { k: 'id', v: w, pos, text: w });
       i += w.length; continue;
     }
-    if ((m = /^(?:1'b[01]|'[01]'|[01])(?![0-9])/.exec(s.slice(i)))) {
+    if ((m = at(/(?:1'b[01]|'[01]'|[01])(?![0-9])/y))) {
       toks.push({ k: 'const', v: +m[0].replace(/\D*1'b|'/g, '').slice(-1), pos, text: m[0] });
       i += m[0].length; continue;
     }
@@ -93,7 +94,7 @@ export function parseExpr(src, opts = {}) {
   const single = vars && vars.length > 0 && vars.every(v => v.length === 1);
   const toks = tokenize(src);
   if (toks.length === 1) throw new LogicError('the expression is empty');
-  let k = 0;
+  let k = 0, nest = 0;
   const peek = () => toks[k];
   const next = () => toks[k++];
   const startsPrimary = t => t.k === 'id' || t.k === 'const' || t.k === '(' || t.k === 'not';
@@ -114,7 +115,12 @@ export function parseExpr(src, opts = {}) {
     return out.length === 1 ? out[0] : { t: op, args: out };
   };
   const runs = new WeakSet();   // products read from a run of letters (ab'c)
-  function primary() {
+  function primary() {   // (parentheses and NOTs nested at most DRAWING_NESTING levels deep, #3559)
+    const t = peek(), deep = t.k === '(' || t.k === 'not';
+    if (deep && ++nest > DRAWING_NESTING) throw new LogicError(DRAWING_NESTING_MESSAGE, t.pos);
+    try { return primary1(); } finally { if (deep) nest--; }
+  }
+  function primary1() {
     const t = next();
     let e;
     if (t.k === 'id') {
@@ -175,6 +181,7 @@ export function parseExpr(src, opts = {}) {
   const e = orExpr();
   const t = peek();
   if (t.k !== 'eof') throw new LogicError(t.k === ')' ? "unexpected ')' (no matching '(')" : `unexpected '${t.text}'`, t.pos);
+  if (deeperThanLimit(e, x => (x.a ? [x.a] : x.args || []))) throw new LogicError(DRAWING_NESTING_MESSAGE);   // (a ' chain, NANDs)
   return e;
 }
 

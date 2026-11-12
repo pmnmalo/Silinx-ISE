@@ -61,10 +61,14 @@ export function mountGateConversion(ctx) {
     let inverted = false;
     if (e.op === 'unary' && e.o === '~' && e.a.op === 'binary' && ['&', '|', '^'].includes(e.a.o)) { inverted = true; e = e.a; }
     if (e.op === 'binary' && ['&', '|', '^', '~^', 'nand', 'nor'].includes(e.o)) {
-      // flatten associative chains
+      // flatten associative chains (left to right, without recursing: a chain of thousands, #3559)
       const flat = [];
-      const f = x => { if (x.op === 'binary' && x.o === e.o && ['&', '|', '^'].includes(e.o) && flat.length < 16) { f(x.a); f(x.b); } else flat.push(x); };
-      if (['&', '|', '^'].includes(e.o)) f(e); else flat.push(e.a, e.b);
+      if (['&', '|', '^'].includes(e.o)) {
+        for (const todo = [e]; todo.length;) {
+          const x = todo.pop();
+          if (x.op === 'binary' && x.o === e.o && flat.length < 16) todo.push(x.b, x.a); else flat.push(x);
+        }
+      } else flat.push(e.a, e.b);
       // (a NAND / NOR / XNOR: one gate, at most 4 / 2 inputs; an AND / OR / XOR of more: a tree of gates, #171)
       const maxN = inverted ? ({ '&': 4, '|': 4, '^': 2 }[e.o]) : ({ '&': 16, '|': 16, '^': 16 }[e.o] || 2);
       if (flat.length > maxN) return null;
