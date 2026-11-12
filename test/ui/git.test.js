@@ -184,3 +184,68 @@ uiTest('#3195 the Design pane\'s project menu: the Git commands (the Silinx inte
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(warnings(page), []);
 });
+
+// (#3534) Initialize Repository… on the Start page (after Open from Repository…) and in the Design tree's project and
+// device menus (after Share Project…, before the Git submenu): shown for a project with no repository, the Start
+// page's disabled with no project open, the File menu's dialog run from either; gone from both once the project is a
+// repository; never Sign in with GitHub… (the browser edition's); in Portuguese. Both interfaces; no warnings.
+const treeItems = async (page, row, item) => {
+  await page.rightClick('#hier .row .lbl', { index: row });
+  await page.waitForSelector('body > .menu-popup');
+  const items = await page.eval(() => [...document.querySelectorAll('body > .menu-popup > .mi')].map((m) => `${m.querySelector('.lbl')?.textContent.trim() ?? m.textContent.trim()}${m.classList.contains('disabled') ? ' (disabled)' : ''}`));
+  if (item) await page.click('body > .menu-popup > .mi', { text: item }); else await page.closeMenus();
+  return items;
+};
+const startCommands = (page) => page.eval(() => [...document.querySelector('#start-page .start-box').querySelectorAll('.entry')]
+  .filter((e) => e.getClientRects().length).map((e) => `${e.textContent}${getComputedStyle(e.querySelector('a')).pointerEvents === 'none' ? ' (disabled)' : ''}`));
+uiTest('#3534 Initialize Repository… on the Start page and in the Design tree\'s project and device menus, for a project with no repository; Portuguese', E, async (page) => {
+  await page.eval(() => window.SilinxApp.closeProject?.());
+  await page.leftTab('start');
+  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Open from Repository…'), [], { what: 'the Start page' });
+  // no project open: disabled, as the exports
+  let cmds = await startCommands(page);
+  assert.deepEqual(cmds.slice(cmds.indexOf('Open from Repository…'), cmds.indexOf('Open from Repository…') + 2), ['Open from Repository…', 'Initialize Repository… (disabled)'], cmds.join(' | '));
+  assert.ok(!cmds.some((c) => c.startsWith('Sign in with GitHub')), cmds.join(' | '));
+  await page.eval(async () => { const { api } = await import('/js/api.js'); await api.createProject({ name: 'startgit', template: 'gates' }); });
+  await page.openProject('startgit');
+  await page.leftTab('start');
+  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the commands enabled' });
+  cmds = await startCommands(page);
+  assert.ok(cmds.includes('Initialize Repository…'), cmds.join(' | '));
+  // the Start page's: the File menu's dialog
+  await page.click('#start-page .entry a', { text: 'Initialize Repository…' });
+  await page.waitDialog('Initialize Repository');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  // the project's and the device's rows: after Share Project… (Copy Link to Project… where none), before Git
+  await page.leftTab('design');
+  await page.waitFor(() => document.querySelectorAll('#hier .row .lbl').length >= 2, [], { what: 'the Design tree' });
+  for (const row of [0, 1]) {
+    const items = await treeItems(page, row);
+    const at = items.indexOf('Initialize Repository…');
+    assert.ok(at > 0 && /^(Share Project…|Copy Link to Project…)/.test(items[at - 1]) && items[at + 1] === 'Git', `row ${row}: ${items.join(' | ')}`);
+    assert.ok(!items.some((c) => c.startsWith('Sign in with GitHub')), items.join(' | '));
+  }
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  for (const row of [0, 1]) assert.ok((await treeItems(page, row)).includes('Inicializar Repositório…'), `row ${row}`);
+  await page.leftTab('start');
+  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Inicializar Repositório…'), [], { what: 'the Start page in Portuguese' });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  // from the device's row: initialized; gone from the menus and the Start page
+  await page.leftTab('design');
+  await treeItems(page, 1, 'Initialize Repository…');
+  await page.waitDialog('Initialize Repository');
+  await page.dialogButton('Initialize');
+  await page.waitNoDialog();
+  await page.waitConsole(/Repository made for 'startgit'; \.gitignore written\./);
+  await page.waitFor(() => !!window.SilinxApp.S.git, [], { what: 'the repository' });
+  for (const row of [0, 1]) {
+    const items = await treeItems(page, row);
+    assert.ok(!items.includes('Initialize Repository…') && items.includes('Git'), `row ${row}: ${items.join(' | ')}`);
+  }
+  await page.leftTab('start');
+  await page.waitFor(() => ![...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Initialize Repository…'), [], { what: 'the Start page\'s entry gone' });
+  assert.ok((await startCommands(page)).includes('Open from Repository…'));
+  assert.deepEqual(warnings(page), []);
+});

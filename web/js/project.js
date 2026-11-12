@@ -14,7 +14,7 @@ import { renderProcesses, restoreImplStatus, reservedNameDiags } from './process
 import { projectSaved, renderHierarchy } from './design.js';
 import { prefKey } from './prefs.js';
 import { watchProject, stopWatching } from './project-watch.js';
-import { hasGit, openFromRepositoryDialog } from './git.js';
+import { gitStartItems, hasGit, openFromRepositoryDialog } from './git.js';
 
 const $ = id => document.getElementById(id);
 // how long after a project opens the browser edition fetches what Implement needs (#967): after the opening's own work
@@ -247,6 +247,9 @@ export async function renderStartPage() {
         ['Copy Link to Project…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]].map(command),   // (#2826)
       // (a GitHub repository, a Classroom assignment's: the server editions, #3195; after Copy Link, #3323)
       ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
+      // (Initialize Repository…, the open project's, disabled with none as the exports; Sign in with GitHub…, the
+      // browser edition's: where they apply, in both interfaces, #3534)
+      ...gitStartItems().map(it => command([it.label, it.project ? 'save' : 'project', () => (S.project || !it.project) && it.action(), it.project])),
       // (Share Project…, as the File menu's: the editions that share, not while following another's, #3315; the ISE
       // style's only, the Silinx interface's in the Design tree's project and device menus, #3479: web/css/app.css)
       ...((api.collab || api.standalone) && !api.following ? [command(['Share Project…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true, 'start-share'])] : []),

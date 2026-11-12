@@ -200,8 +200,9 @@ uiTest('#3315 Share Project… in the Start page\'s Project Commands (the ISE st
   await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project') && [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Copy Link to Project…'), [], { what: 'the Start page with the project' });
   const cmds = await commands();
   if (ise) {
-    // (as the File menu: Copy Link to Project…, Open from Repository… where there is git (#3323), Share Project…)
-    assert.deepEqual(cmds.slice(cmds.indexOf('Copy Link to Project…'), cmds.indexOf('Share Project…') + 1).filter((c) => c !== 'Open from Repository…'), ['Copy Link to Project…', 'Share Project…']);
+    // (as the File menu: Copy Link to Project…, Open from Repository… and Initialize Repository… where there is git
+    // (#3323, #3534), Share Project…)
+    assert.deepEqual(cmds.slice(cmds.indexOf('Copy Link to Project…'), cmds.indexOf('Share Project…') + 1).filter((c) => !['Open from Repository…', 'Initialize Repository…'].includes(c)), ['Copy Link to Project…', 'Share Project…']);
     await page.click('#start-page .entry a', { text: 'Share Project…' });
   } else {
     // (the Silinx interface: none on the Start page, #3479; the project's menu in the Design tree)
@@ -234,7 +235,7 @@ uiTest('#3315 Share Project… in the Start page\'s Project Commands (the ISE st
   await page.leftTab('start');
   await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Partilhar Projeto…'), [], { what: 'Partilhar Projeto…' });
   const pt = await commands();
-  if (ise) assert.deepEqual(pt.slice(pt.indexOf('Copiar Ligação para o Projeto…'), pt.indexOf('Partilhar Projeto…') + 1).filter((c) => c !== 'Abrir do Repositório…'), ['Copiar Ligação para o Projeto…', 'Partilhar Projeto…']);
+  if (ise) assert.deepEqual(pt.slice(pt.indexOf('Copiar Ligação para o Projeto…'), pt.indexOf('Partilhar Projeto…') + 1).filter((c) => !['Abrir do Repositório…', 'Inicializar Repositório…'].includes(c)), ['Copiar Ligação para o Projeto…', 'Partilhar Projeto…']);
   else assert.equal(await startShown(page, 'Partilhar Projeto…'), false, pt.join(' | '));
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());

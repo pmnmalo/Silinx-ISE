@@ -55,9 +55,10 @@ async function readStatus(n) {
   let s;
   try { s = await api.gitStatus(name); } catch { s = null; }
   if (n !== seq || S.project?.name !== name) return null;   // (a later read, or another project: not this answer)
-  const before = JSON.stringify(S.git?.files || []);
+  const before = JSON.stringify(S.git?.files || []), had = !!S.git;
   S.git = s?.repository ? { ...s, byPath: new Map(s.files.map(f => [f.path, f.state])) } : null;
   if (JSON.stringify(S.git?.files || []) !== before) renderHierarchy();
+  if (!!S.git !== had) renderStartPage();   // (its Initialize Repository…, a project with no repository's, #3534)
   return S.git;
 }
 
@@ -228,5 +229,16 @@ export const gitMenuItems = () => [
   { label: 'Initialize Repository…', action: () => initDialog() },
   ...(api.standalone ? ['-', api.githubSignedIn()
     ? { label: 'Sign out of GitHub', action: () => import('./git-signin.js').then(m => m.signOut()) }
-    : { label: 'Sign in with GitHub…', action: () => import('./git-signin.js').then(m => m.signInDialog()) }] : []),
+    : { label: 'Sign in with GitHub…', action: () => signIn() }] : []),
 ];
+// Sign in with GitHub…, the Start page drawn again after it (its entry gone once signed in, #3534)
+const signIn = () => import('./git-signin.js').then(m => m.signInDialog()).then(ok => { if (ok) renderStartPage(); return ok; });
+
+/** The git commands that start one (the Start page, the Design pane's project and device menus, #3534), where they
+ *  apply: Initialize Repository… when the project has no repository (the open one's: on the Start page, disabled with
+ *  none), Sign in with GitHub… in the browser edition when not signed in (Sign out of GitHub: the Git submenu's). The
+ *  same functions as the Git submenu's; `project`: the command needs an open project. */
+export const gitStartItems = () => (!hasGit() ? [] : [
+  !S.git ? { label: 'Initialize Repository…', action: () => initDialog(), project: true } : null,
+  api.standalone && !api.githubSignedIn() ? { label: 'Sign in with GitHub…', action: () => signIn() } : null,
+].filter(Boolean));
