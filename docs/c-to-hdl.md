@@ -287,11 +287,14 @@ the C's). Each call is a state of the caller's machine holding `ap_start` at 1 a
 loop calling it is not pipelined (said, if asked). Its value and a pointer's are taken when they come (`ap_return` at
 `ap_done`, a pointer's at its `_ap_vld`, so one it does not write keeps the caller's); an array or a stream argument's
 port is the callee's during the call (the array a memory, whatever its size); its `static` variables are the module's.
+A global variable it shares with its caller is a port of it, as Vitis HLS makes it (#2244): an integer one a pointer's
+(`g_i`, `g_o`, `g_o_ap_vld`; `g` alone when it only reads it), an array a memory's, the caller's variable passed at each
+call.
 The report lists each function's calls, latency (from `ap_start` to `ap_done`; at most, when its branches differ) and
 resources (states, register bits, memories), a sub-module's own below it. The same modules serve DATAFLOW's processes.
 Five cases stay inlined, with a warning: a function of latency 0 called by a top of latency 0 (no clock to start it
-with: its ports are Vitis HLS's), one sharing a global variable with its caller (Vitis HLS makes it a port of the
-sub-module), one with a struct argument, an `hls::vector` too (not yet), one with `ap_ctrl_chain`, and one called by a module that waits for an AXI master (`ap_ce`) (not yet). A function is one module per size of its
+with: its ports are Vitis HLS's), one sharing a global variable with its caller that a function it calls uses too, or
+that is not an integer nor an array of them (not yet), one with a struct argument, an `hls::vector` too (not yet), one with `ap_ctrl_chain`, and one called by a module that waits for an AXI master (`ap_ce`) (not yet). A function is one module per size of its
 arrays; `FUNCTION_INSTANTIATE variable=v` (#2244) makes one per constant `v` its calls give, `v` a constant inside it
 (its port gone), a call whose `v` is not a constant the module with the port; `ALLOCATION instances=f limit=N function`
 (below) gives its calls N instances at most, in turn. With no pragma a function is inlined, where Vitis HLS keeps a
