@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, waitDownload } from './harness.js';
+import { FILE, exportZip, openImport } from './zip-helpers.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -63,27 +64,25 @@ uiTest('#3538 New Project wizard: the server\'s name rule and message, in Portug
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });
 
-uiTest('#3538 Import Silinx Project / Import Xilinx ISE Project: the name suggested from 2026-lab.zip is p_2026-lab, and the project is made', E, async (page) => {
+uiTest('#3538 Import Project (.zip)…, Silinx and Xilinx ISE: the name suggested from 2026-lab.zip is p_2026-lab, and the project is made', E, async (page) => {
   await makeProject(env, { name: 'NameSrc', template: 'blinky', board: 'basys2' });
   await page.openProject('NameSrc');
-  await page.menu('File', 'Export Silinx Project (.zip)…');
+  await exportZip(page, 'silinx');
   const zip = path.join(env.tmp, '2026-lab.zip');
   await fs.copyFile(await waitDownload(page, 'NameSrc-silinx.zip'), zip);
-  await page.menu('File', 'Import Silinx Project (.zip)…');
-  await page.waitDialog('Import Silinx Project');
-  await page.setFiles('.dlg-overlay input[type=file]', [zip]);
+  await openImport(page, 'silinx');
+  await page.setFiles(FILE, [zip]);
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=text]').value), 'p_2026-lab');
   await page.dialogButton('Import');
   await page.waitFor(() => window.Silinx.project?.name === 'p_2026-lab', [], { what: 'the project imported' });
   await page.waitConsole(/Imported Silinx project 'p_2026-lab'/);
   // the ISE import suggests the same name, and refuses one past the rule with its message
-  await page.menu('File', 'Export Xilinx ISE Project (.zip)…');
+  await exportZip(page, 'xilinx');
   const ise = path.join(env.tmp, 'ise', '2026-lab.zip');
   await fs.mkdir(path.dirname(ise), { recursive: true });
   await fs.copyFile(await waitDownload(page, 'p_2026-lab.zip'), ise);
-  await page.menu('File', 'Import Xilinx ISE Project (.zip)…');
-  await page.waitDialog('Import Xilinx ISE Project');
-  await page.setFiles('.dlg-overlay input[type=file]', [ise], { index: 1 });
+  await openImport(page, 'xilinx');
+  await page.setFiles(FILE, [ise]);
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=text]').value), 'p_2026-lab');
   await page.fill('.dlg-overlay input[type=text]', 'lab.1');
   await page.dialogButton('Import');

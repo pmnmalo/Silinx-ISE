@@ -30,8 +30,8 @@ https://pmnmalo.github.io/Silinx/dev/, com os projetos à parte) e passe ao pass
   (**Ctrl+K**: escreva o nome do comando).
 
 - Os projetos ficam guardados **dentro deste browser**, neste computador. Para guardar uma cópia
-  ou passar para outro computador use **File ▸ Export Silinx Project (.zip)…** (e **File ▸ Import
-  Silinx Project (.zip)…** para o voltar a abrir; também abre um pacote de projeto `.silinx.json` de uma
+  ou passar para outro computador use **File ▸ Export Project (.zip)…** (e **File ▸ Import
+  Project (.zip)…** para o voltar a abrir; também abre um pacote de projeto `.silinx.json` de uma
   versão anterior). Apagar os dados do browser apaga os projetos.
 - **Ou guarde-os numa pasta do seu disco** (Chrome ou Edge): **File ▸ Open Workspace Folder…**
   (também na página inicial) e escolha uma pasta, por exemplo uma nova pasta `Silinx-projects` nos
@@ -59,7 +59,7 @@ https://pmnmalo.github.io/Silinx/dev/, com os projetos à parte) e passe ao pass
   **Generate Programming File** funcionam. **O Chrome num tablet Android também programa a placa**,
   como num computador (verificado num tablet Samsung; a placa na porta USB do tablet); o Safari num iPad não acede a dispositivos USB
   (programe o `.bit` descarregado a partir de um computador ou de um tablet Android). Os projetos ficam no browser, que o iPadOS pode apagar ao fim de algumas
-  semanas sem uso: guarde uma cópia com **File ▸ Export Silinx Project (.zip)…**. Um tablet tem
+  semanas sem uso: guarde uma cópia com **File ▸ Export Project (.zip)…**. Um tablet tem
   menos memória, por isso um desenho grande pode falhar na síntese. Os menus do botão direito abrem
   com um **toque longo** (o dedo parado meio segundo); dois dedos movem um desenho e o gesto de pinça faz zoom. Na vertical o painel lateral (Projeto) mostra-se ou esconde-se com o
   botão do painel lateral no cabeçalho (na interface Estilo ISE é uma gaveta, o botão à esquerda do cabeçalho) e as propriedades dos editores abrem por cima do desenho (**Propriedades**).
@@ -147,7 +147,7 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 - Os projetos ficam em pastas normais em **`Silinx-projects`**, na sua pasta de utilizador
   (Windows: `C:\Users\<você>\Silinx-projects`, macOS: `/Users/<você>/Silinx-projects`).
   Pode copiá-los, fazer cópias de segurança, ou comprimi-los para entregar.
-- **File ▸ Export Xilinx ISE Project (.zip)** cria um zip que abre no Xilinx ISE 14.7; **File ▸ Export Silinx Project (.zip)** guarda o projeto Silinx completo (com os diagramas ASM e esquemáticos), que se reabre com **Import Silinx Project**. Um projeto importado veio de fora: só corre o Xilinx ISE e só programa uma placa depois de carregar em **Confiar no Projeto** (Trust Project) na consola, que o diz quando o projeto abre.
+- **File ▸ Export Project (.zip)…** começa pelo software de destino: **Xilinx ISE** cria um zip que abre no Xilinx ISE 14.7; **Silinx** guarda o projeto Silinx completo (com os diagramas ASM e esquemáticos), que se reabre com **File ▸ Import Project (.zip)…** (que reconhece o software do zip). AMD Vivado e Intel Quartus aparecem desativados: o Silinx ainda não lê nem escreve os seus projetos. Um projeto importado veio de fora: só corre o Xilinx ISE e só programa uma placa depois de carregar em **Confiar no Projeto** (Trust Project) na consola, que o diz quando o projeto abre.
 - A interface abre em português quando o browser está em português; muda-se em **Definições (⚙) ▸ Idioma** (na interface
   Estilo ISE, **View ▸ Language**).
 

@@ -187,7 +187,7 @@ export function browserStore(storage = () => globalThis.localStorage) {
   };
   const persist = () => {
     try { ls().setItem(BROWSER_KEY, JSON.stringify(mem)); }
-    catch (e) { throw new Error(`browser storage is full or unavailable (${e.message}); export your project (File > Export Silinx Project (.zip)…) to keep it`); }
+    catch (e) { throw new Error(`browser storage is full or unavailable (${e.message}); export your project (File > Export Project (.zip)…) to keep it`); }
   };
   const get = name => all()[name] || fail(`project '${name}' not found`);
   return {

@@ -104,7 +104,7 @@ export async function encodeDesign(entries, { codec = browserCodec() } = {}) {
   for (const p of Object.keys(gen)) delete files[p];
   const payload = { v: FORMAT, project, files, ...(Object.keys(bin).length ? { bin } : {}), ...(Object.keys(gen).length ? { made: Object.keys(gen) } : {}) };
   const design = toB64url(new Uint8Array(await codec.deflate(enc.encode(JSON.stringify(payload)))));
-  if (design.length > LINK_LIMITS.maxEncoded) throw linkError(`the design is too large for a link (${design.length} characters, at most ${LINK_LIMITS.maxEncoded}): export it as a .zip (Export Silinx Project) and link to that`);
+  if (design.length > LINK_LIMITS.maxEncoded) throw linkError(`the design is too large for a link (${design.length} characters, at most ${LINK_LIMITS.maxEncoded}): export it as a .zip (Export Project (.zip)…, Silinx) and link to that`);
   return { design, length: design.length, name: project.name, left: Object.keys(gen) };
 }
 

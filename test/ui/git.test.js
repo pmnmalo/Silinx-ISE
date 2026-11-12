@@ -63,7 +63,7 @@ uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a re
   // (the File menu: Open from Repository… after Share Project…, #3323; from the menus' definitions, the Silinx
   // interface showing no File menu)
   const file = await page.eval(() => window.SilinxApp.S.menus.find((m) => m.label === 'File').items().filter(Boolean).map((x) => (x === '-' ? '—' : x.label)));
-  assert.deepEqual(file.slice(0, file.indexOf('Import Xilinx ISE Project (.zip)…')), ['New Project…', 'Open Project…', '—', 'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Share Project…', 'Open from Repository…', 'Short Links…', '—']);
+  assert.deepEqual(file.slice(0, file.indexOf('Short Links…') + 2), ['New Project…', 'Open Project…', '—', 'Import Project (.zip)…', 'Export Project (.zip)…', 'Share Project…', 'Open from Repository…', 'Short Links…', '—']);
   await page.menu('File', 'Open from Repository…');
   await page.waitDialog('Open from Repository');
   // a URL that is not GitHub's: said beside the field, the dialog open

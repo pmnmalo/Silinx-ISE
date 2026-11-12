@@ -64,6 +64,6 @@ export const LINK_PT_PATTERNS = [
   [/^The design has no board to emulate it on\.$/, 'O circuito não tem placa onde o emular.'],
   [/^The design has no top module to emulate\.$/, 'O circuito não tem módulo de topo para emular.'],
   [/^The board emulator emulates the top module, '(.+)', not '(.+)'\.$/, 'O emulador da placa emula o módulo de topo, \'$1\', não \'$2\'.'],
-  [/^the design is too large for a link \((\d+) characters, at most (\d+)\): export it as a \.zip \(Export Silinx Project\) and link to that$/,
-    'o circuito é grande demais para uma ligação ($1 caracteres, no máximo $2): exporte-o como .zip (Exportar Projeto Silinx) e ligue para esse'],
+  [/^the design is too large for a link \((\d+) characters, at most (\d+)\): export it as a \.zip \(Export Project \(\.zip\)…, Silinx\) and link to that$/,
+    'o circuito é grande demais para uma ligação ($1 caracteres, no máximo $2): exporte-o como .zip (Exportar Projeto (.zip)…, Silinx) e ligue para esse'],
 ];

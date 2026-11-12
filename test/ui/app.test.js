@@ -2,7 +2,8 @@
 // one only), About, Check for Updates, language switch, keyboard shortcuts.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject, chromeOnly, BROWSER, PageGoneError, toggleSplitEditor } from './harness.js';
+import { setupUi, uiTest, makeProject, chromeOnly, BROWSER, PageGoneError, toggleSplitEditor, waitDownload } from './harness.js';
+import { exportZip } from './zip-helpers.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
@@ -195,8 +196,8 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
   // (the Silinx interface: they open from the processes and the toolbar, not from a menu, #1217)
   // (no Window menu in the Silinx interface: its documents in their tabs, #1253)
   for (const w of silinx ? [] : ['SSim (', 'Board Emulator (top)', 'I/O Pin Planning', 'iMPACT', 'Design Summary']) assert.ok(windows.some((x) => x === w || (w.endsWith('(') && x.startsWith(w))), `Window menu lists ${w}: ${windows}`);
-  for (const must of ['File ▸ New Project…', 'File ▸ Open Project…', 'File ▸ Import Silinx Project (.zip)…', 'File ▸ Export Silinx Project (.zip)…',
-    'File ▸ Import Xilinx ISE Project (.zip)…', 'File ▸ Export Xilinx ISE Project (.zip)…', 'File ▸ Recent Projects', 'Edit ▸ Undo', 'Edit ▸ Redo', 'Edit ▸ Find…',
+  for (const must of ['File ▸ New Project…', 'File ▸ Open Project…', 'File ▸ Import Project (.zip)…', 'File ▸ Export Project (.zip)…',
+    'File ▸ Recent Projects', 'Edit ▸ Undo', 'Edit ▸ Redo', 'Edit ▸ Find…',
     'Edit ▸ Replace…', 'Edit ▸ Go to Line…', 'View ▸ Implementation', 'View ▸ Simulation', 'View ▸ Design Summary', 'View ▸ Language',
     'Project ▸ New Source…', `Project ▸ ${IMPORT}…`, 'Project ▸ Design Properties…',
     'Process ▸ Implement Top Module', 'Process ▸ Check Syntax', 'Process ▸ Simulate Behavioral Model',
@@ -204,12 +205,11 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
     'Tools ▸ Toolchain Settings (ISE / Programmers)…', 'Help ▸ About Silinx', 'Help ▸ Keyboard Shortcuts', 'Help ▸ Check for Updates…', 'Window ▸ Close All Documents'].filter((m) => !silinx || !GONE.some((g) => m.startsWith(`${g} ▸`)))) {
     assert.ok(acted.some((a) => a.startsWith(must)), `${must} acted (acted: ${acted.join(', ')}; disabled: ${disabled.join(', ')})`);
   }
-  // no Project ▸ Sync with .xise (#1248): it only wrote the .xise, File ▸ Export Xilinx ISE Project gives ISE the project
+  // no Project ▸ Sync with .xise (#1248): it only wrote the .xise, File ▸ Export Project (.zip)… to Xilinx ISE gives ISE the project
   assert.ok(![...acted, ...disabled, ...idle].some((a) => a.includes('.xise')), `a .xise entry: ${[...acted, ...disabled].join(', ')}`);
-  // both exports were downloaded (the ISE style interface's File menu; the Silinx one's are the Start page's, #1307)
-  const fs = await import('node:fs/promises');
-  const files = await fs.readdir(page.downloadDir);
-  if (!silinx) assert.ok(files.includes('MenuPj-silinx.zip') && files.includes('MenuPj.zip'), `downloads: ${files.join(', ')}`);
+  // both exports were downloaded (the ISE style interface's File menu; the Silinx one's are the Start page's, #1307),
+  // the software chosen in Export Project (.zip)…'s window (#3703)
+  if (!silinx) for (const [id, zip] of [['silinx', 'MenuPj-silinx.zip'], ['xilinx', 'MenuPj.zip']]) { await exportZip(page, id); await waitDownload(page, zip); }
 });
 
 uiTest('dialogs close with Escape and only the topmost dialog handles Enter / Escape', E, async (page) => {
@@ -472,7 +472,7 @@ uiTest('Portuguese: View ▸ Language switches the UI; menus, dialogs and the ma
     await compare(`menu ${m}`, () => page.eval(() => window.__uiTexts(document.querySelector('body > .menu-popup'))));
     await page.closeMenus();
   }
-  const dialogs = [['File', 'New Project…', 3, 'Zz9'], ['File', 'Open Project…'], ['File', 'Import Silinx Project (.zip)…'], ['File', 'Import Xilinx ISE Project (.zip)…'],
+  const dialogs = [['File', 'New Project…', 3, 'Zz9'], ['File', 'Open Project…'], ['File', 'Import Project (.zip)…'],
     ['Project', 'New Source…', 3, 'zz9'], ['Project', `${IMPORT}…`], ['Project', 'Design Properties…'], ['Tools', 'Toolchain Settings (ISE / Programmers)…'],
     ['Help', 'About Silinx'], ['Help', 'Keyboard Shortcuts']];
   for (const [m, it, pages = 1, name] of dialogs) {
