@@ -13,8 +13,8 @@ import { tbPorts, guessClockReset, makeVectors, showValue, generateTestbench, ge
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
 import { mountVectorsPage } from './tbwizard-vectors.js';
+import { NAME_RE } from '/core/ident.js';
 
-const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 export const designSources = () => S.sources.filter(s => s.role === 'design' && (s.lang === 'vhdl' || s.lang === 'verilog'));
 

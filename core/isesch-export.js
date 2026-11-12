@@ -11,16 +11,18 @@ import { graphicsToIse } from './isesch-graphics.js';
 import { graphicBox } from './schgraphics.js';
 import { primIseSymbol, primTimestamp } from './isesch-prims.js';
 import { pickOrigin, placeBlock, routeStubs, sheetRouter } from './isesch-route.js';
+import { escXml } from './escape.js';
+import { isIdent } from './ident.js';
 
 const S_OUT = 16 / 5;                     // Silinx px -> ISE units (grid 10 -> 32, pin pitch 20 -> 64)
 const SHEET_SIZES = [[1760, 1360], [2720, 1760], [3520, 2720], [5440, 3520], [7040, 5440]];
-const xesc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const xesc = s => escXml(s ?? '');
 const hexOf = bits => (bits ? BigInt('0b' + bits.replace(/[^01]/g, '0')).toString(16) : '0');
 // a name as ISE holds it (#1763): an identifier, which an escaped name (\opcode[0]) cannot be; its other characters
 // become '_', none first nor last (a VHDL identifier too, as the import reads it back): opcode_0
 export function iseIdent(s) {
   const t = String(s ?? '');
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(t)) return t;
+  if (isIdent(t)) return t;
   const u = t.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   return !u ? 'n' : /^\d/.test(u) ? `n${u}` : u;
 }

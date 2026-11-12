@@ -17,6 +17,7 @@ import { gateTemplates } from './gates.js';
 import { builtinTemplates } from './templates.js';
 import { recognizeWords } from './expression.js';
 import { findFlipFlops, ffSymbol } from './flipflops.js';
+import { isName } from '../ident.js';
 
 const median = a => [...a].sort((x, y) => x - y)[a.length >> 1];
 // the farthest a gate's template may be (held-out gates: 0.84 at most; letters: 1.5 and more, an o 0.9)
@@ -131,7 +132,7 @@ export function circuitErrors(circuit) {
   const errors = [...circuit.errors], seen = new Set();
   for (const n of circuit.nets) {
     if (!n.name) continue;
-    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(n.name)) errors.push(`'${n.name}' is not a name: correct it.`);
+    if (!isName(n.name)) errors.push(`'${n.name}' is not a name: correct it.`);
     else if (seen.has(n.name.toLowerCase())) errors.push(`The name ${n.name} is on two nets.`);
     seen.add(n.name.toLowerCase());
   }

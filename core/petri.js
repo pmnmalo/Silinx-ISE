@@ -18,6 +18,7 @@ import { portExprCoder, isIdentifier, reservedIn, reservedWarning } from './asm.
 import { parseCond, evalCond, parseOutputs, constValue } from './fsm.js';
 import { clone } from './util.js';
 import { pnmlTag, pnmlStartTag, pnmlAttr, pnmlElements, pnmlPosition } from './pnml-scan.js';
+import { escXml } from './escape.js';
 
 export const PETRI_VERSION = 1;
 export const PLACE_R = 22;          // radius of a place (drawing units)
@@ -339,7 +340,7 @@ export function generatePetri(model, lang, { source } = {}) {
 }
 
 // ------------------------------------------------------------------ PNML
-const xesc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const xesc = escXml;
 /** The net as PNML (place / transition net), with the Silinx parts (guards, outputs, capacities) as tool-specific data. */
 export function toPnml(model) {
   const m = normalizePetri(model);
