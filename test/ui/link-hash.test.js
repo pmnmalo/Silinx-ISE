@@ -3,8 +3,9 @@
 // Try it, as a fresh load of the same link; a zip at another site asked first (Cancel: nothing fetched); a refused
 // address said in the console, nothing made; an open document's changes saved before the link opens, once the user
 // agrees (#3362), and one that cannot be saved keeps the link from opening (the work kept); a hash that is no link, or a
-// link not agreed to, saves nothing (#3362); a shared project's link handled by a load of the page (its start-up
-// messages); an address's token left alone. The console's messages asserted, no warnings.
+// link not agreed to, saves nothing (#3362); a shared project's link read first (#3531): a broken one said, nothing
+// saved, the page not loaded again; a good one asked as a design's, nothing saved in the page that shares, then the
+// page loaded again, which follows it; an address's token left alone. The console's messages asserted, no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -144,11 +145,16 @@ uiTest('#3362 a hash that is no link, or a link the user does not agree to, save
   };
   // not a link, a broken link, a refused address: said (or nothing to say), nothing saved
   for (const [hash, line] of [['nothing=1', null], ['design=%%%', 'ERROR: Open from a link: the link\'s design is not well encoded.'],
-    ['open=https://192.168.1.1/a.zip', 'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').']]) {
+    ['open=https://192.168.1.1/a.zip', 'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').'],
+    // (a shared project's broken link, #3531: said, the hash cleared, the page not loaded again)
+    ['follow=x', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).'], ['edit=x', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).']]) {
+    const said = () => page.eval((m) => window.__console().split('\n').filter((l) => l.trim() === m).length, line);
+    const before = line ? await said() : 0;
     await setHash(page, hash);
-    if (line) await page.waitFor((m) => window.__console().includes(m), [line], { what: line, timeout: 30000 });
+    if (line) await page.waitFor((m, n) => window.__console().split('\n').filter((l) => l.trim() === m).length > n, [line, before], { what: line, timeout: 30000 });
     else await new Promise((r) => setTimeout(r, 300));
     await untouched();
+    if (/^(follow|edit)=/.test(hash)) assert.deepEqual(await page.eval(() => [location.hash, window.__loaded]), ['', true]);
   }
   // a link not agreed to: cancelled, nothing saved, the project as it was (the dialog in Portuguese too)
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
@@ -168,19 +174,73 @@ uiTest('#3362 a hash that is no link, or a link the user does not agree to, save
   await untouched();
   assert.equal(await page.eval(() => window.Silinx.project.name), 'stopwatch');
   assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), ['ERROR: Open from a link: the link\'s design is not well encoded.',
-    'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').']);
+    'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).']);
   assert.deepEqual(warnings(page), []);
 });
 
-uiTest('#3316 a shared project\'s link given to the running app: the page loaded again, the link handled at its start-up (a broken one said); an address\'s token left alone', E, async (page) => {
+// a shared project's link that is well formed (#3531): asked as a design's when a document has changes not saved yet
+// (Cancel: nothing saved, the hash cleared); in the page that shares a project, the console's warning, nothing asked
+// nor saved; agreed to, the work saved, then the page loaded again, which asks the follower's name
+uiTest('#3531 a shared project\'s link: asked before the work is saved, nothing saved in the page that shares; agreed, saved, then the page loaded again', E, async (page) => {
+  await boot(page, 'open=example:stopwatch');
+  await linkOpened(page);
+  await page.eval(() => window.SilinxApp.openFile('src/debounce.vhd'));
+  await page.waitFor(() => window.Silinx.active?.path === 'src/debounce.vhd' && window.Silinx.active.editor, [], { what: 'the VHDL open' });
+  const disk = await readWs(env, 'stopwatch', 'src/debounce.vhd');
+  await page.eval(() => {
+    const d = window.Silinx.active, save = d.save.bind(d);
+    window.__saves = 0;
+    d.save = async (...a) => { window.__saves++; return save(...a); };
+    d.editor.setValue(`-- to follow\n${d.editor.getValue()}`);
+    clearTimeout(d._autosave);
+  });
+  const untouched = async () => {
+    assert.equal(await page.eval(() => window.__saves), 0);
+    assert.equal(await page.eval(() => window.Silinx.active.dirty), true);
+    assert.equal(await readWs(env, 'stopwatch', 'src/debounce.vhd'), disk);
+  };
+  const link = `follow=${'r'.repeat(22)}.${'k'.repeat(43)}`;
+  // (asked, in Portuguese too; Cancel: nothing saved, the hash cleared, the same page)
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await setHash(page, link);
+  await page.waitDialog('Seguir um Projeto Partilhado');
+  assert.deepEqual(await page.eval(() => [document.querySelector('.dlg-overlay .msg-text').textContent, [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent.trim())]),
+    ['Esta ligação segue um projeto que alguém partilha. Os seus documentos abertos têm alterações ainda não guardadas: guardá-las e depois segui-lo?', ['Guardar e Seguir', 'Cancelar']]);
+  await page.dialogButton('Cancelar');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await page.waitConsole(/Follow a shared project: cancelled\./);
+  await untouched();
+  assert.deepEqual(await page.eval(() => [location.hash, window.__loaded]), ['', true]);
+  // (the page that shares a project: the warning, nothing asked nor saved)
+  await page.eval(async () => { (await import('/js/collab-state.js')).collab.role = 'owner'; });
+  await setHash(page, link);
+  await page.waitConsole(/WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window\./);
+  assert.equal(await page.dialogCount(), 0);
+  await untouched();
+  assert.deepEqual(await page.eval(() => [location.hash, window.__loaded]), ['', true]);
+  assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), ['WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window.']);
+  await page.eval(async () => { (await import('/js/collab-state.js')).collab.role = null; });
+  // (agreed: saved, then the page loaded again, which asks the follower's name)
+  await setHash(page, link);
+  await page.waitDialog('Follow a Shared Project');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent), 'This link follows a project someone shares. Your open documents have changes not saved yet: save them, then follow it?');
+  await page.dialogButton('Save and Follow');
+  // (the page loaded again asks the follower's name, its start-up waiting for the answer)
+  await page.waitFor(() => !window.__loaded && document.querySelector('.dlg-overlay input[data-field="name"]'), [], { what: 'the page loaded again', timeout: 30000 });
+  assert.match(await readWs(env, 'stopwatch', 'src/debounce.vhd'), /^-- to follow\n/);
+  await page.dialogButton('Cancel');
+  await page.waitFor(() => window.Silinx?.startupChecked, [], { what: 'the start-up', timeout: 30000 });
+  assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), []);
+});
+
+uiTest('#3316 a shared project\'s link given to the running app: a broken one said, the page not loaded again (#3531); an address\'s token left alone', E, async (page) => {
   await boot(page);
   await page.eval(() => { location.hash = 'token=evilEvil1'; });
   await new Promise((r) => setTimeout(r, 300));
   assert.equal(await page.eval(() => localStorage.getItem('silinx-token')), null);
   assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), []);
   await page.eval(() => { window.__loaded = true; location.hash = 'follow=broken'; });
-  await page.waitFor(() => !window.__loaded && window.Silinx?.startupChecked, [], { what: 'the page loaded again', timeout: 30000 });
   await page.waitConsole(/ERROR: Follow a shared project: the link to follow is broken \(copy it again from the owner's Share Project\)\./);
-  assert.equal(await page.eval(() => location.hash), '');
+  assert.deepEqual(await page.eval(() => [location.hash, window.__loaded]), ['', true]);
   assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), ['ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).']);
 });
