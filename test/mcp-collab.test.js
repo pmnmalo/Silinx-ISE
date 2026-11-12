@@ -128,7 +128,7 @@ test('the errors: a project not shared, a bad action, no project, a bad server, 
   const d = await call('share_project', { project: 'traffic', server: dead });
   assert.equal(d.isError, true);
   assert.match(d.text, /^share_project: cannot share through http:\/\/127\.0\.0\.1:1: cannot reach the relay at ws:\/\/127\.0\.0\.1:1\/api\/collab\/share \(is Silinx running there\? silinx serve\)$/);
-  await fails('follow_project', { link: 'http://x/#follow=abc' }, 'the link to follow is broken (copy it again from the owner\'s Share Project)');
+  await fails('follow_project', { link: 'http://x/#follow=abc' }, 'the link to follow is broken (copy it again from the owner\'s Share Project Live)');
   // (a project its owner's page hosts, #3227: a browser's, over WebRTC)
   await fails('follow_project', { link: `http://x/#follow=${'R'.repeat(22)}.${'K'.repeat(43)}.host` }, 'link: a project its owner\'s page hosts (…#follow=….host) is followed in a browser, over WebRTC: open the link in Silinx');
   // (and with its owner's key, the meeting point's: a browser's too)

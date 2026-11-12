@@ -64,7 +64,7 @@ export function parseFollowLink(text) {
   const sign = m?.[1] === 'edit' ? m[4] : null;
   let relay = null;
   if (m?.[7] !== undefined) { try { relay = relayAddress(decodeURIComponent(m[7])); } catch { relay = null; } }
-  if (!m || !ROOM_RE.test(m[2]) || !KEY_RE.test(m[3]) || (m[1] === 'edit' ? !SIGN_RE.test(sign || '') : m[4] !== undefined) || (m[6] !== undefined && !PUB_RE.test(m[6])) || (m[7] !== undefined && (!relay || m[5]))) throw new Error('the link to follow is broken (copy it again from the owner\'s Share Project)');
+  if (!m || !ROOM_RE.test(m[2]) || !KEY_RE.test(m[3]) || (m[1] === 'edit' ? !SIGN_RE.test(sign || '') : m[4] !== undefined) || (m[6] !== undefined && !PUB_RE.test(m[6])) || (m[7] !== undefined && (!relay || m[5]))) throw new Error('the link to follow is broken (copy it again from the owner\'s Share Project Live)');
   return { base: at > 0 ? s.slice(0, at) : null, room: m[2], key: m[3], via: m[5] ? 'host' : 'relay', sign, ...(relay ? { relay } : {}), ...(m[6] ? { host: m[6] } : {}) };
 }
 
