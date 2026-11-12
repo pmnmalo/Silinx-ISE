@@ -375,11 +375,14 @@ class SeqFlow extends Flow {
     // (ARRAY_RESHAPE of a memory: one of wide words, core/c-reshape.js, #2424)
     const isMem = (v) => this.arrayLength(v) > MEM_MIN || !!this.storage?.has(v.orig ?? v.name);
     for (const v of decls) this.slots.set(v.name, (v.type.kind === 'array' && this.reshapeSlot(v, isMem(v))) || (v.type.kind === 'array' && this.partOf(v) ? this.bankSlot(v, this.partOf(v), { used }) : this.regSlot(v)));
+    // (each one's slot also the functions' it inlines, as the top's: the same register, #3511)
+    this.globalOwn = new Map();
     for (const [name, gv] of this.globals) {
       const plan = gv.type.kind === 'array' ? this.partOf(gv) : null;
-      if (plan) this.slots.set(name, this.bankSlot({ ...gv, static: !gv.const }, plan, { used }));
-      else if (!gv.const) this.slots.set(name, this.regSlot({ ...gv, static: true }));
-      else if (gv.type.kind === 'array' && (this.arrayLength(gv) > MEM_MIN || this.memArgs?.has(name)) && !this.partWhole(gv)) this.slots.set(name, this.memSlot(gv));   // (a ROM)
+      if (plan) this.globalOwn.set(name, this.bankSlot({ ...gv, static: !gv.const }, plan, { used }));
+      else if (!gv.const) this.globalOwn.set(name, this.regSlot({ ...gv, static: true }));
+      else if (gv.type.kind === 'array' && (this.arrayLength(gv) > MEM_MIN || this.memArgs?.has(name)) && !this.partWhole(gv)) this.globalOwn.set(name, this.memSlot(gv));   // (a ROM)
+      if (this.globalOwn.has(name)) this.slots.set(name, this.globalOwn.get(name));
     }
     // the statics of the functions the top calls (#1618): a register each, all the calls of a function sharing it
     this.calleeStatics = new Map();
@@ -403,6 +406,7 @@ class SeqFlow extends Flow {
     }
     if (this.retType) this.retReg = this.reg('ap_return_reg', this.retType);
   }
+  ownGlobal(name) { return this.globalOwn?.get(name) ?? null; }
   /** The functions fn calls, directly or through others. */
   called(fn) {
     const out = new Set();
