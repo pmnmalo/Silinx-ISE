@@ -8,13 +8,13 @@ import { S } from './app.js';
 import { prefKey } from './prefs.js';
 
 const HOW_KEY = prefKey('silinx.share-how');
-export const HOWS = Object.freeze(['copy', 'live']);
+const HOWS = Object.freeze(['copy', 'live']);
 
 /** The window's title, and its console messages' name: Share Project, or Share Module (a module's). */
 export const shareTitle = module => (module ? 'Share Module' : 'Share Project');
 
 /** Why the project (`module`: one of its modules) cannot be shared live here, or null. */
-export function liveProblem(module = null) {
+function liveProblem(module = null) {
   if (!api.collab && !api.standalone) return 'This edition of Silinx does not share a project live.';
   if (location.protocol === 'file:') return 'A Silinx opened from a file has no address that others can open: open Silinx from its site to share a project live.';
   if (api.following) return 'You are following another\'s project: stop following it to share one live.';
