@@ -86,7 +86,7 @@ test('wcfg: a signal the design has not: said, left out (as the wave window)', a
 test('wcfg: the errors', async () => {
   await fails('save_wave_config', { project: 'b', file: '../x' }, '\'../x\' is not a valid file name (letters, digits, _ . - and folders; .wcfg).');
   await fails('save_wave_config', { project: 'b', file: 'n.wcfg', rows: ['nosuch'] }, 'rows[0]: signal \'nosuch\' not found');
-  await fails('save_wave_config', { project: 'b', file: 'n.wcfg', rows: [{ signal: 'clk', radix: 'c1dec' }] }, 'rows[0]: radix one of default, bin, hex, oct, udec, sdec, ascii');
+  await fails('save_wave_config', { project: 'b', file: 'n.wcfg', rows: [{ signal: 'clk', radix: 'c1dec' }] }, 'rows[0].radix: one of default, bin, hex, oct, udec, sdec, ascii');
   await fails('save_wave_config', { project: 'b', file: 'n.wcfg', rows: [{ group: 'a', rows: [{ group: 'b' }] }] }, 'rows[0].rows[0]: a group in a group (the wave window has one level)');
   await fails('save_wave_config', { project: 'b', file: 'n.wcfg', markers_ns: [-1] }, 'markers_ns: times in ns, from 0');
   await fails('load_wave_config', { project: 'b', file: 'nosuch' }, 'no wave configuration \'nosuch\' in the project (sim/tb_top.wcfg, sim/other.wcfg, src/prescaler.wcfg, waves/pre.wcfg)');
