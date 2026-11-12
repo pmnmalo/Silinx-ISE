@@ -88,7 +88,7 @@ the code and the lessons learnt.
   to `main`; a failed job of the nightly run is an issue, fixed in the next change. Push the branch and
   open a pull request (`gh pr create`, its description saying `Fixes #N`). A pull request runs the whole test
   file of every module it changes (`.github/workflows/pr-tests.yml`, `scripts/related-tests.mjs`, #637: the
-  unit test files that import a changed file, directly or through a test helper; a changed test; the UI test
+  unit test files that import a changed file, directly or through a test helper; for a module no test imports, those of its importers, up to the modules tests import, #3544; a changed test; the UI test
   of a changed page script; for a data file (the bit database, a device description, an example), the tests of
   the modules that read it and of their importers, #772; and always the repository-wide tests, `REPO_WIDE`, #3461); `main` requires its check, `related-tests`. Before pushing, run the same files
   locally: `node scripts/related-tests.mjs origin/main HEAD`.
