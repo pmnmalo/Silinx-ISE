@@ -12,11 +12,12 @@
 import { DEV_SITE } from './prefs.js';
 import { constraintsExtOf } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
+import { PROJECT_NAME_RE, projectNameError, sameProject } from '../../core/project-name.js';
 import { gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
 import { markUntrusted } from '../../core/trust.js';
 import { foldsToProjectFile, PROJECT_FILE } from '../../core/fold-name.js';
 
-export const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+export const NAME_RE = PROJECT_NAME_RE;   // (core/project-name.js, #3538)
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
 // the site's development edition (https://pmnmalo.github.io/Silinx/dev/, built from main): its
 // own browser storage, so that a development build never touches the stable edition's projects
@@ -272,7 +273,7 @@ export function folderStore(root) {
     return run;
   };
   const projectDir = async (name, create = false) => {
-    if (!NAME_RE.test(name || '')) fail(`invalid project name '${name}'`);
+    if (projectNameError(name)) fail(projectNameError(name));
     try { return await root.getDirectoryHandle(name, { create }); } catch (e) { if (notFound(e)) fail(`project '${name}' not found`); throw e; }
   };
   const readJson = async dir => JSON.parse(await (await (await dir.getFileHandle(PROJECT_FILE)).getFile()).text());
@@ -418,8 +419,10 @@ export function projectOps(getStore, examples = {}) {
     list: async () => (await S().list()).map(j => ({ name: j.name, device: j.device, top: j.top, board: j.board, modified: j.modified || 0 })),
     load: name => S().load(name),
     create: async ({ name, template = 'empty', device, board }) => {
-      if (!NAME_RE.test(name || '')) fail(`invalid project name '${name}'`);
-      if (await S().exists(name)) fail(`project '${name}' already exists`);
+      if (projectNameError(name)) fail(projectNameError(name));
+      // (one in another case too: the same folder on a case-insensitive file system, #3538)
+      const other = sameProject(await S().list(), name)?.name;
+      if (other || await S().exists(name)) fail(`project '${other ?? name}' already exists`);
       if (template && template !== 'empty') {
         const ex = examples[template] || fail(`unknown template '${template}'`);
         const json = { ...clone(ex.json), name };
@@ -443,7 +446,7 @@ export function projectOps(getStore, examples = {}) {
     /** A whole project at once (imports, bundles, copies): its description normalised (what it drops
      *  is for the caller to say: normalizeProjectJson), every file's path inside the project. */
     put: async (name, json, files = {}) => {
-      if (!NAME_RE.test(name || '')) fail(`invalid project name '${name}'`);
+      if (projectNameError(name)) fail(projectNameError(name));
       const clean = normalizeProjectJson(json, name).json;
       const out = {};
       for (const [k, v] of Object.entries(files)) { const p = cleanPath(k); if (!isDescriptor(p)) out[p] = v; }

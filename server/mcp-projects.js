@@ -60,7 +60,7 @@ export const PROJECT_TOOLS = [
   {
     name: 'new_project_from_example', title: 'New project from an example',
     description: 'Make a new project in the workspace from an example or a test design (list_examples), optionally for another board (basys2, nexys2): its pins are then the board\'s.',
-    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name (letters, digits, - and _).'), example: STR('The example, or test design (list_examples).'), board: STR('The board: basys2 or nexys2 (default: the example\'s).'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.') }, required: ['name', 'example'], additionalProperties: false },
+    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name: a letter, then up to 63 letters, digits, - and _.'), example: STR('The example, or test design (list_examples).'), board: STR('The board: basys2 or nexys2 (default: the example\'s).'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.') }, required: ['name', 'example'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ name, example, board, variant }) {
       // (an example, or a test design: #1746)
@@ -79,7 +79,7 @@ export const PROJECT_TOOLS = [
   {
     name: 'new_project', title: 'New empty project',
     description: 'Make a new empty project in the workspace for a board (basys2, nexys2; default: the Basys2-250\'s device, no board). Then write its sources with write_file (a test bench in sim/) and choose its top module and test bench with set_top.',
-    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name (letters, digits, - and _).'), board: STR('The board: basys2 or nexys2.'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.') }, required: ['name'], additionalProperties: false },
+    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name: a letter, then up to 63 letters, digits, - and _.'), board: STR('The board: basys2 or nexys2.'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.') }, required: ['name'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ name, board, variant }) {
       let device;

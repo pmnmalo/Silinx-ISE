@@ -13,6 +13,7 @@ import { topNameError } from './ident.js';
 import { normalizePath } from '../core/import-gate.js';
 import { foldName } from '../core/fold-name.js';
 import { fsFailure } from './fs-error.js';
+import { PROJECT_NAME_RE, projectNameError, sameProject } from '../core/project-name.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
@@ -52,7 +53,7 @@ export function workspaceDir() {
 
 const projectFile = async dir => path.join(dir, PROJECT_FILE);
 
-const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const NAME_RE = PROJECT_NAME_RE;   // (core/project-name.js: the page's, the stores', the MCP's, #3538)
 
 export class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -62,7 +63,8 @@ export class HttpError extends Error {
 const fsHttpError = async (e, dir, full) => { const f = await fsFailure(e, dir, full); return f ? new HttpError(f.status, f.message) : e; };
 
 export function projectDir(name) {
-  if (typeof name !== 'string' || !NAME_RE.test(name)) throw new HttpError(400, `invalid project name '${name}'`);
+  const bad = projectNameError(name);
+  if (bad) throw new HttpError(400, bad);
   return path.join(workspaceDir(), name);
 }
 
@@ -270,7 +272,9 @@ async function copyDir(src, dst, { skipRoot = null } = {}) {
 // madeBy 'mcp': a project the MCP server makes, untrusted too, its messages saying so (#2981)
 export async function createProject({ name, template = 'empty', device, board, fromOutside = false, madeBy = null }) {
   const dir = projectDir(name);
-  if (await exists(dir)) throw new HttpError(409, `project '${name}' already exists`);
+  // (one in another case too: the same folder on a case-insensitive file system, #3538)
+  const other = sameProject(await fs.readdir(workspaceDir()).catch(() => []), name);
+  if (other || await exists(dir)) throw new HttpError(409, `project '${other ?? name}' already exists`);
   if (template && template !== 'empty') {
     // an example, else a test design (#1746)
     const ok = /^[a-z0-9_-]+$/i.test(template);

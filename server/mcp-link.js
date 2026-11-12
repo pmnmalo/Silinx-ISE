@@ -11,6 +11,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
+import { projectNameError } from '../core/project-name.js';
 import { BOARD_RE, MODULE_RE, LINK_LIMITS, LINK_VIEWS, SITE_URL, decodeDesign, encodeDesign, makeLink, parseLink, sameFiles, viewProblem } from '../core/design-link.js';
 
 const VIEW_NAMES = { try: 'Try it', simulate: 'the simulation', emulate: 'the board emulator' };
@@ -93,7 +94,7 @@ export const LINK_TOOLS = [
         try { opts.source = { kind: 'design', design: await (await import('./git-github.js')).readGist(source) }; } catch (e) { throw linkFail(e); }
         return LINK_TOOLS[1].run({ link: makeLink(SITE_URL, { design: opts.source.design, view: view || null, top: top || null, board: board || null, lab }), name });
       }
-      if (name !== undefined && !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(String(name))) throw toolError(`name: '${name}' is not a project name (a letter, then letters, digits, - and _)`);
+      if (name !== undefined && projectNameError(String(name))) throw toolError(projectNameError(String(name)));
       const warnings = [];
       let pjName, files, project, make;
       if (source.kind === 'design') {
