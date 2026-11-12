@@ -71,7 +71,7 @@ test('#3629 project_link short expires_days: its date said; an expired link refu
   assert.equal((await ok('open_link', { link: r.data.link, name: 'clock3' })).data.project, 'clock3');
   // refused: an expiry without short; days out of range
   assert.equal((await call('project_link', { project: 'clock1', expires_days: 7 })).text, 'project_link: expires_days: only a short link expires (give short: true)');
-  assert.equal((await call('project_link', { project: 'clock1', short: true, expires_days: 4000 })).text, 'project_link: expires_days: a whole number of days, 1 to 3650 (or 0: never)');
+  assert.equal((await call('project_link', { project: 'clock1', short: true, expires_days: 4000 })).text, 'project_link: expires_days: at most 3650');   // (the schema's maximum, #3641)
 });
 
 // #3635: short_links lists the account's short links, delete_short_link deletes some or the expired ones; another gist

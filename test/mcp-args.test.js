@@ -1,5 +1,5 @@
 // A tool call's arguments checked against the tool's inputSchema (server/mcp-args.js, #3535) before the tool runs: each
-// kind of wrong value (a type, an enum, an integer, a minimum, an array's items and size, an object's properties,
+// kind of wrong value (a type, an enum, an integer, a minimum and a maximum (#3641), an array's items and size, an object's properties,
 // anyOf) said in one message naming the argument, and nothing written; every tool's schema of the kinds checked.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,7 +24,7 @@ const refused = async (name, args, text) => { const r = await call(name, args); 
 test('schemaErrors: each keyword the tools use, the place of the wrong value named', () => {
   const S = {
     type: 'object', properties: {
-      s: { type: 'string' }, n: { type: 'number' }, i: { type: 'integer', minimum: 0 }, b: { type: 'boolean' },
+      s: { type: 'string' }, n: { type: 'number' }, i: { type: 'integer', minimum: 0, maximum: 10 }, b: { type: 'boolean' },
       e: { type: 'string', enum: ['vhdl', 'verilog'] }, si: { type: ['string', 'integer'] },
       list: { type: 'array', maxItems: 2, items: { type: 'object', properties: { name: { type: 'string' }, dir: { type: 'string', enum: ['in', 'out'] } }, required: ['name'] } },
       map: { type: 'object', additionalProperties: { type: 'string' } },
@@ -44,6 +44,7 @@ test('schemaErrors: each keyword the tools use, the place of the wrong value nam
     [{ s: 'x', n: Infinity }, ['n: a number']],
     [{ s: 'x', i: 1.5 }, ['i: an integer']],
     [{ s: 'x', i: -1 }, ['i: at least 0']],
+    [{ s: 'x', i: 11 }, ['i: at most 10']],
     [{ s: 'x', b: 'true' }, ['b: true or false']],
     [{ s: 'x', e: 'c' }, ['e: one of vhdl, verilog']],
     [{ s: 'x', si: true }, ['si: a string or an integer']],
@@ -62,7 +63,7 @@ test('schemaErrors: each keyword the tools use, the place of the wrong value nam
 });
 
 test('every tool\'s schema is of the kinds checked (an object, its keywords known), its required arguments among its properties', () => {
-  const KNOWN = new Set(['type', 'properties', 'required', 'additionalProperties', 'items', 'enum', 'minimum', 'maxItems', 'anyOf', 'description']);
+  const KNOWN = new Set(['type', 'properties', 'required', 'additionalProperties', 'items', 'enum', 'minimum', 'maximum', 'maxItems', 'anyOf', 'description']);
   const walk = (s, where) => {
     for (const k of Object.keys(s)) assert.ok(KNOWN.has(k), `${where}: ${k}`);
     for (const [k, v] of Object.entries(s.properties || {})) walk(v, `${where}.${k}`);
@@ -98,6 +99,8 @@ test('#3535 a wrong value refused before the tool runs, nothing written: an enum
   await refused('simulate', { project: 'g', signals: ['led', 2] }, 'simulate: signals[1]: a string');
   await refused('lab', { project: 'g', action: 'show', step: 1.5 }, 'lab: step: a string or an integer');
   await refused('write_file', { project: 'g', path: 'src/x.vhd', text: { a: 1 } }, 'write_file: text: a string');
+  // (a maximum, #3641: a short link's expiry)
+  await refused('project_link', { project: 'g', short: true, expires_days: 4000 }, 'project_link: expires_days: at most 3650');
   // (several wrong values: all said)
   await refused('new_source', { project: 7, type: 'module', name: 'm1', language: 'c' }, 'new_source: project: a string; language: one of vhdl, verilog');
   // (the arguments not an object)
