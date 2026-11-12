@@ -250,9 +250,10 @@ function zipFiles(buf) {
 }
 function tarFiles(buf) {
   const out = [];
-  for (let at = 0; at + 512 <= buf.length;) {
+  let headers = 0;
+  for (let at = 0; at + 512 <= buf.length; headers++) {
     const head = buf.subarray(at, at + 512);
-    if (head.every((b) => b === 0)) break;
+    if (head.every((b) => b === 0)) { headers++; break; }
     const str = (a, n) => head.toString('utf8', a, a + n).replace(/\0.*$/s, '');
     const size = parseInt(str(124, 12).trim() || '0', 8);
     if (!Number.isFinite(size) || head.toString('latin1', 257, 262) !== 'ustar' && !/^[0-7 \0]+$/.test(head.toString('latin1', 124, 136))) return null;
@@ -260,14 +261,14 @@ function tarFiles(buf) {
     if ('0\0'.includes(String.fromCharCode(head[156])) || 'xgL'.includes(String.fromCharCode(head[156]))) out.push({ name, data: buf.subarray(at + 512, at + 512 + size) });
     at += 512 + Math.ceil(size / 512) * 512;
   }
-  return out;
+  return headers ? out : null;   // (no header, not even the end's: no tar, #3682)
 }
 // archives no rule reads: refused unless allowed (#3520)
 const OTHER_ARCHIVE = /\.(7z|rar|xz|txz|bz2|tbz2?|zst|lz|lzma|z|cab|iso|dmg|apk|deb|rpm)$/i;
 
 /** The problems of one file read as bytes (#1441): a text file by its lines (UTF-16 decoded, #3520); a compressed
- *  one (.gz) by what it holds, under its name without .gz; an archive (.zip and the formats built on it, .tar, .tgz)
- *  by its files, each under archive:name (#3520), another kind of archive, or one that cannot be read, refused unless
+ *  one (.gz, a .tgz with no tar inside: #3682) by what it holds, under its name without .gz; an archive (.zip and
+ *  the formats built on it, .tar, .tgz) by its files, each under archive:name (#3520), another kind of archive, or one that cannot be read, refused unless
  *  allowed ('archive not read'); a binary one by its header (a Xilinx bitstream under any name) and by its readable
  *  strings (eight characters or more), on which the rules run as on lines. */
 export function scanBuffer(file, buf) {
@@ -276,8 +277,13 @@ export function scanBuffer(file, buf) {
     try { return scanBuffer(inner, zlib.gunzipSync(buf)).map((x) => ({ ...x, file: file + x.file.slice(inner.length) })); } catch { /* not gzip: as bytes */ }
   }
   if (/\.tgz$/i.test(file)) {
-    const inner = file.replace(/\.tgz$/i, '.tar');
-    try { return scanBuffer(inner, zlib.gunzipSync(buf)).map((x) => ({ ...x, file: file + x.file.slice(inner.length) })); } catch { /* not gzip */ }
+    // (a gzip with no tar inside scanned as what it holds, as a .gz's is, #3682)
+    let data = null;
+    try { data = zlib.gunzipSync(buf); } catch { /* not gzip */ }
+    if (data) {
+      const inner = tarFiles(data) ? file.replace(/\.tgz$/i, '.tar') : file.replace(/\.tgz$/i, '');
+      return scanBuffer(inner, data).map((x) => ({ ...x, file: file + x.file.slice(inner.length) }));
+    }
   }
   const members = /\.(zip|jar|docx|xlsx|pptx|odt|ods|odp|epub|whl)$/i.test(file) ? zipFiles(buf) : /\.tar$/i.test(file) ? tarFiles(buf) : undefined;
   if (members !== undefined || OTHER_ARCHIVE.test(file)) {

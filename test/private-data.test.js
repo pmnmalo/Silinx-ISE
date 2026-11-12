@@ -328,6 +328,27 @@ test('contents (#3520): UTF-16 text decoded; a zip\'s, a tar\'s and a tgz\'s fil
   assert.deepEqual(k('bad.zip', Buffer.from('PK not a zip')), ['bad.zip archive not read: bad.zip']);
 });
 
+test('contents (#3682): a .tgz with no tar inside scanned as its gzip\'s content; a .tar with no header refused; a real tarball as before', () => {
+  const secret = `write to jane${at}${dot('mail', 'pt')}`;
+  const found = `e-mail address: jane${at}mail.pt`;
+  const k = (file, buf) => scanBuffer(file, buf).map((x) => `${x.file} ${x.kind}: ${x.text}`);
+  // a plain gzip named .tgz: found, as the same bytes named .gz are
+  assert.deepEqual(k('b.gz', zlib.gzipSync(secret)), [`b.gz ${found}`]);
+  assert.deepEqual(k('b.tgz', zlib.gzipSync(secret)), [`b.tgz ${found}`]);
+  assert.deepEqual(k('b.tgz', zlib.gzipSync(secret + '\n'.repeat(600))), [`b.tgz ${found}`]);   // (longer than a tar's block)
+  assert.deepEqual(k('clean.tgz', zlib.gzipSync('nothing\n')), []);   // no warnings
+  // a .tgz that is no gzip: its bytes
+  assert.deepEqual(k('raw.tgz', Buffer.from(secret)), [`raw.tgz ${found}`]);
+  // a .tar that is none: refused, not passed as empty
+  assert.deepEqual(k('x.tar', Buffer.from(secret)), ['x.tar archive not read: x.tar']);
+  // a real tarball, and an empty one (its end's blocks only)
+  const h = Buffer.alloc(512); h.write('src/notes.md', 0); h.write(Buffer.byteLength(secret).toString(8).padStart(11, '0'), 124); h.write('0', 156); h.write('ustar', 257);
+  const t = Buffer.concat([h, Buffer.from(secret), Buffer.alloc(512 - Buffer.byteLength(secret)), Buffer.alloc(1024)]);
+  assert.deepEqual(k('x.tgz', zlib.gzipSync(t)), [`x.tgz:src/notes.md ${found}`]);
+  assert.deepEqual(k('empty.tgz', zlib.gzipSync(Buffer.alloc(1024))), []);
+  assert.deepEqual(k('empty.tar', Buffer.alloc(1024)), []);
+});
+
 test('the scanner and its test are scanned too (#3520): their own examples allowed, nothing else', () => {
   assert.deepEqual(SELF, ['scripts/check-private-data.mjs', 'test/private-data.test.js']);
   const mail = `write to jane${at}${dot('mail', 'pt')}`;
