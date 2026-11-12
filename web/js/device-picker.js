@@ -9,8 +9,8 @@ const FAMILY_MARK = ' (experimental)';
 export const boardOptions = db => [['', 'None Specified'], ...db.boards.map(b => [b.id, `${b.name}${experimentalDevice(b.device) ? FAMILY_MARK : ''}`])];
 
 /** The console's warning for a device of an experimental family with no back end here (set_design_properties says the same),
- *  else null: the Artix-7's is AMD Vivado's on the local server (#1649), none in the browser edition. */
-export const noFlowWarning = device => (experimentalDevice(device) && !(vivadoDevice(device) && !api.standalone) ? `WARNING: ${noFlowMessage(device)}.` : null);
+ *  else null: the Artix-7's is AMD Vivado's on the local server (#1649), the Silinx toolchain's in the browser edition (#3143). */
+export const noFlowWarning = device => (experimentalDevice(device) && !vivadoDevice(device) ? `WARNING: ${noFlowMessage(device)}.` : null);
 
 /** The synthesis tools of an Artix-7 project on the local server (#3146): AMD Vivado's flow, or the Silinx toolchain's. */
 const VIVADO_TOOLS = [['vivado', 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)'], ['silinx', 'Silinx (VHDL/Verilog; no Vivado needed; on trial)']];

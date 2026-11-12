@@ -2,19 +2,22 @@
 // WebAssembly, pack, place and route, timing, bitstream) in the browser edition, off the page's thread.
 // The device description, the bit database and Yosys are fetched from `assets` (the site's
 // assets/ folder; web/js/open-flow-browser.js chooses it).
-//   in:  { spec, sources: [{ path, lang, text }], simSources (the test benches), ucf, ucfName, files: { name: text }, assets, yosys (its bundle's URL) }
+//   in:  { spec, sources: [{ path, lang, text }], simSources (the test benches), ucf, ucfName, files: { name: text }, assets, yosys (its bundle's URL),
+//          nextpnr, nextpnrS6, nextpnrXc7 (Silinx's nextpnr bundles: the Spartan-3E's, the Spartan-6's, the 7-series'), nextpnrOwn }
 //   out: { line } … { write: name, data } … { report } … then { done: { ok, report, error, view } }
 //   in:  { prepare: { graph, part, family, device, pkg, nextpnr }, assets, yosys, nextpnr, root }: what a run of that device fetches
-//        (nextpnr and the device's chip database too when prepare.nextpnr: the project's engine is not Silinx's, #2136),
+//        (nextpnr and the device's chip database too when prepare.nextpnr: the project's engine is not Silinx's, #2136; the
+//        7-series': no device description, its bit database bitdb/xc7/<part>.json.gz and nextpnr-himbaechel-xc7, #3143),
 //        fetched into Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
 import { familyProfile } from '/core/family-profile.js';
-import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, ice40Io, ecp5Io, gowinIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
+import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, bitDbXc7, nextpnrIo, ice40Io, ecp5Io, gowinIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
 import { ice40FromTarball } from './nextpnr-ice40-browser.js';
+import { routerFallback } from './nextpnr-router-fallback.js';
 import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES, nextpnrFiles, nextpnrChipdb } from './asset-cache.js';
 
 // (Yosys in this worker's own thread, where it cannot start workers of its own: its Blobs readable, #556)
@@ -42,18 +45,27 @@ const loaded = new Set();   // (the URLs of Yosys a run of this worker has loade
 const yosysSource = bundle => assetFetchSource() + yosysWorkerSource(bundle);
 
 /** What a run of the device fetches, fetched into the cache: { fetched, bytes, pruned }. */
-async function prepare({ prepare: d, assets, yosys, nextpnr, root }) {
+async function prepare({ prepare: d, assets, yosys, nextpnr, keep, root }) {
   const base = new URL(assets);
-  // (this version's nextpnr kept, its gen/ and chipdb/, whatever this project's engine; nextpnr: the family's, #2288)
-  const pruned = await pruneAssetCache(root, [base.href, new URL('.', yosys).href, ...(nextpnr ? [new URL('..', nextpnr).href] : [])]);
-  const urls = [new URL(`devices/${d.graph}`, base), ...dbUrls(d, base),
+  // (this version's nextpnr kept, its gen/ and chipdb/, whatever this project's engine; nextpnr: the family's, #2288; keep: this
+  // version's every nextpnr bundle, the other families' too, #3143)
+  const pruned = await pruneAssetCache(root, [base.href, new URL('.', yosys).href, ...(keep || (nextpnr ? [nextpnr] : [])).map(u => new URL('..', u).href)]);
+  const urls = [...(d.graph ? [new URL(`devices/${d.graph}`, base)] : []), ...dbUrls(d, base),
     ...YOSYS_FILES.map(f => new URL(f, yosys)),
-    ...(nextpnr && d.nextpnr ? [...nextpnrFiles(familyProfile(d.family).openFlow?.bitDb === 's6' ? 'spartan6' : 'spartan3e'), nextpnrChipdb(d.device)].map(f => new URL(f, nextpnr)) : [])];
+    ...(nextpnr && d.nextpnr ? [...nextpnrFiles(uarchOf(d.family)).map(f => new URL(f, nextpnr)), await chipdbUrl(d, nextpnr)] : [])];
   return { ...await prefetchAssets(urls, { fetchFn: netFetch }), pruned };
 }
+// a family's nextpnr micro-architecture (the name of its WebAssembly files): its profile's, else the Spartan-3E's or -6's
+const uarchOf = family => { const f = familyProfile(family).openFlow; return f?.uarch || (f?.bitDb === 's6' ? 'spartan6' : 'spartan3e'); };
+// the URL of a device's chip database: beside the bundle, by the device's name; the package's own (its chipdbUrl) where a
+// part takes another device's (the 7-series': the xc7a35t the xc7a50t's, #3143)
+const chipdbUrl = async (d, nextpnr) => (familyProfile(d.family).openFlow?.uarch ? (await import(nextpnr)).chipdbUrl(d.part) : new URL(nextpnrChipdb(d.device), nextpnr));
 // a device's bit database files: the Spartan-3E's in bitdb/, the Spartan-6's in bitdb/s6 (#2103)
+// (the 7-series': one gzipped file per part in bitdb/xc7, #3143)
 const dbUrls = (d, base) => (familyProfile(d.family).openFlow?.bitDb === 's6' ? s6DbNames(d.part).map(n => new URL(`bitdb/s6/${n}.json`, base))
+  : familyProfile(d.family).openFlow?.bitDb === 'xc7' ? [xc7DbUrl(d.part, base)]
   : Object.values(dbFileNames(d.device, d.pkg)).map(f => new URL(`bitdb/${f}`, base)));
+const xc7DbUrl = (part, base) => new URL(`bitdb/xc7/${part}.json.gz`, base);
 // the Spartan-6's bit databases (fpga/s6/bitdb.js fetchBitDbS6: the same object as the server's loadBitDbS6)
 const fetchS6Db = (part, base) => fetchBitDbS6(part, async f => {
   const r = await fetch(new URL(`bitdb/s6/${f}`, base));
@@ -65,6 +77,7 @@ let lastDevice = null;   // { key, device, db }
 
 // nextpnr in this worker's thread (#2136), from its bundle; the log says what the wait is the first time
 const nextpnrs = new Map();
+const xc7 = familyProfile('artix7').openFlow;
 function nextpnrBrowser(url, post, runner, mb = 7) {
   if (!nextpnrs.has(url)) nextpnrs.set(url, nextpnrIo(() => import(url), runner));
   const io = nextpnrs.get(url);
@@ -102,7 +115,7 @@ function ownBrowser({ family, where, tools, mb }, post) {
 }
 
 self.onmessage = async ({ data }) => {
-  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl, nextpnrS6: nextpnrS6Url, nextpnrIce40: ice40Url, nextpnrOwn } = data;
+  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl, nextpnrS6: nextpnrS6Url, nextpnrXc7: nextpnrXc7Url, nextpnrIce40: ice40Url, nextpnrOwn } = data;
   // (the iCE40's bundle by its own key, as before #2302)
   const own = nextpnrOwn || (ice40Url && { family: 'ice40', where: ice40Url });
   // every message carries the run's id (web/js/open-flow-browser.js: each run hears only its own)
@@ -133,6 +146,14 @@ self.onmessage = async ({ data }) => {
         if (!json.layout || !json.tiles) throw new Error(`no bit database for ${spec.device} on the site`);
         lastDevice = { key, device: dev, db: makeBitDb(dbFilesFrom(json, spec.pkg), dev, spec.part) };
       }
+    } else if (familyProfile(spec.family).openFlow?.bitDb === 'xc7' && lastDevice?.key !== key) {
+      // (the 7-series': no device description, Project X-Ray's bit database of the part, #3143)
+      lastDevice = null;
+      post({ line: `Loading the bit database of ${spec.part}…` });
+      const r = await fetch(xc7DbUrl(spec.part, base));
+      if (r.status === 404) throw new Error(`no 7-series bit database for the ${spec.part} on the site`);
+      if (!r.ok) throw new Error(`the bit database could not be loaded (${xc7DbUrl(spec.part, base)}: HTTP ${r.status})`);
+      lastDevice = { key, device: null, db: bitDbXc7(await gunzipJson(r)) };
     }
     const { device, db } = lastDevice || {};
     // Yosys, compiled to WebAssembly (YoWASP): fetched once, then kept in Cache Storage (#967); in workers of
@@ -179,6 +200,8 @@ self.onmessage = async ({ data }) => {
         : spec.engine && spec.engine !== 'silinx' ? {
           spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post),
           spartan6: nextpnrBrowser(nextpnrS6Url || new URL('vendor/nextpnr-spartan6/gen/bundle.js', base).href, post, 'runNextpnrHimbaechelSpartan6', 5),
+          // (the 7-series', #3143: router2 as the local server's, router1 where it runs out of this browser's memory)
+          xc7: routerFallback(nextpnrBrowser(nextpnrXc7Url || new URL('vendor/nextpnr-xc7/gen/bundle.js', base).href, post, xc7.runner, xc7.mb), post),
         } : null });
     const res = await runOpenFlow(spec, io);
     // the FPGA view's model, from the routed design

@@ -155,6 +155,7 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   app.use('/vendor/nextpnr-spartan', express.static(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e')));
   // (the Spartan-6's, #2288)
   app.use('/vendor/nextpnr-spartan6', express.static(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan6')));
+  app.use('/vendor/nextpnr-xc7', express.static(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-xc7')));   // (the 7-series', #3143)
   // (the iCE40's nextpnr and icepack, when installed: not in the release zip, #2295)
   app.use('/vendor/nextpnr-ice40', express.static(path.join(ROOT, 'node_modules/@yowasp/nextpnr-ice40')));
   app.use('/vendor/nextpnr-ecp5', express.static(path.join(ROOT, 'node_modules/@yowasp/nextpnr-ecp5')));   // (the ECP5's, #2302)
