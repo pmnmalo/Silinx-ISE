@@ -79,7 +79,8 @@ read that user's files has the server too.
   `.github`; not `.git` nor the `.gitignore`) stay in the repository, out of the project's folder (git's sparse checkout),
   and a commit leaves them as they are (#3359). A pull's files go through the import gate too: a hidden file, a tool's
   output or another spelling of `silinx.json` stays out of the folder (in the repository, untouched by a commit), with a
-  warning each, and another file the gate refuses pulls nothing. An untrusted project in a repository keeps its mark in
+  warning each, and another file the gate refuses pulls nothing, as does a name another tracked file has but for its case
+  (one file on a case-insensitive file system, #3524). An untrusted project in a repository keeps its mark in
   the repository's `.git`, never in what git tracks, so that no pull or merge trusts it whatever the pulled `silinx.json`
   says; a project a pull brings into the workspace's repository is untrusted. On a hosted server git uses the server
   account's credentials: `SILINX_GIT=off` turns git off.
