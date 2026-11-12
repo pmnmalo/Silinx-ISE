@@ -42,6 +42,18 @@ test('LPF: what nextpnr-ecp5 would not apply throws, naming its line', () => {
   assert.throws(() => LPF.read('IOBUF PORT "a" DRIVE;'), /line 1: IOBUF a: DRIVE is not KEY=VALUE/);
   assert.throws(() => LPF.read('IOBUF "a" DRIVE=4;'), /IOBUF needs PORT "<port>" and its attributes/);
   assert.throws(() => LPF.read('FREQUENCY PORT "clk" fast;'), /line 1: FREQUENCY needs PORT "<port>" \(or NET\) and its frequency: 25 MHZ/);
+  // a statement with no keyword: its line named, not a TypeError (#3670)
+  assert.throws(() => LPF.read('BLOCK RESETPATHS;\n"a";'), /^Error: line 2: "a": not an LPF statement nextpnr-ecp5 applies/);
+});
+
+test('#3663 LPF: the same model as before, and in linear time on a long line (CodeQL js/polynomial-redos)', () => {
+  assert.deepEqual(LPF.read('LOCATE COMP "a" SITE "A1"; # x ; y\nIOBUF PORT "a" PULLMODE=UP; // z;').assignments, { a: { loc: 'A1', pull: 'up' } });
+  const n = 100000;
+  for (const text of [`${'#'.repeat(n)} `, `${'//'.repeat(n)}\r`]) {
+    const t0 = performance.now();
+    assert.deepEqual(LPF.read(text).assignments, {});
+    assert.ok(performance.now() - t0 < 500, `${JSON.stringify(text.slice(0, 4))}…: ${Math.round(performance.now() - t0)} ms`);
+  }
 });
 
 test('the ECP5 family: its parts, its formats, its back end\'s steps and constraints, its synthesis\'s resources', () => {
