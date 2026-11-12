@@ -6,6 +6,7 @@
 import { blockMarkOf, schName } from './schdoc-hdl.js';
 import { clocksOf } from './schematic.js';
 import { elaborate } from './elaborate.js';
+import { walkItems } from './util.js';
 import { placeAndRoute } from './schdoc-place.js';
 import {
   defaultParams, findMod, lineStarts, newDoc, normModules, offsetOf, prVhdl, prVlog,
@@ -106,8 +107,7 @@ function vhdlInterface(text, mod, toks = tokenize(text, 'vhdl')) {
 // collect items (and their loc objects) nested under each top-level item
 function nestedOf(item) {
   const set = new Set([item, item.loc]);
-  const walk = arr => { for (const x of arr || []) { set.add(x); if (x.loc) set.add(x.loc); walk(x.items); walk(x.then); walk(x.else); } };
-  walk(item.items); walk(item.then); walk(item.else);
+  walkItems([item], x => { set.add(x); if (x.loc) set.add(x.loc); });
   return set;
 }
 

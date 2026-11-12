@@ -84,23 +84,27 @@ export const itemMethods = {
     return next;
   },
 
+  // if … else if …: the chain's branches read in a loop (#3500), each else if the next branch of the same construct
+  // (same number, same scope), its node the else of the one before
   genIf(n = 0) {
-    const loc = this.loc();
-    this.expect('if'); this.expect('(');
-    const cond = this.expr(); this.expect(')');
-    const thenB = this.genBlock();
-    const node = { kind: 'generate_if', label: thenB.label, cond, then: thenB.items, else: [], decls: thenB.decls, loc };
-    if (!thenB.label) this.autoLabel(node, 'label', n);
-    if (this.accept('else')) {
-      // else if: the next branch of the same construct (same number, same scope)
-      if (this.is('if')) { node.else = [this.genIf(n)]; node.elseChain = true; }
-      else {
-        const b = this.genBlock();
-        node.else = b.items; node.elseDecls = b.decls; node.elseLabel = b.label;
-        if (!b.label) this.autoLabel(node, 'elseLabel', n);
-      }
+    let first = null, prev = null;
+    for (;;) {
+      const loc = this.loc();
+      this.expect('if'); this.expect('(');
+      const cond = this.expr(); this.expect(')');
+      const thenB = this.genBlock();
+      const node = { kind: 'generate_if', label: thenB.label, cond, then: thenB.items, else: [], decls: thenB.decls, loc };
+      if (!thenB.label) this.autoLabel(node, 'label', n);
+      if (prev) { prev.else = [node]; prev.elseChain = true; } else first = node;
+      prev = node;
+      if (!this.accept('else')) break;
+      if (this.is('if')) continue;
+      const b = this.genBlock();
+      node.else = b.items; node.elseDecls = b.decls; node.elseLabel = b.label;
+      if (!b.label) this.autoLabel(node, 'elseLabel', n);
+      break;
     }
-    return node;
+    return first;
   },
 
   // automatic / static before a declaration of a block or a subprogram (SystemVerilog)

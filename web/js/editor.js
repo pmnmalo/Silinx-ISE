@@ -26,6 +26,7 @@ import { esc } from './dom.js';
 import { mountCompletion } from './editor-complete.js';
 import { cSnippets } from './c-templates.js';
 import { exprShort, typeText } from '/core/type-text.js';
+import { genChain } from '/core/util.js';
 import { statusLine } from './status-line.js';
 import { peersField, peerSetter } from './editor-peers.js';
 
@@ -86,7 +87,7 @@ function symbolsOf(parsed, lang) {
       if (it.kind === 'instance') add(it.name, 'instance', `instance of ${it.module}`, it.loc);
       if (it.kind === 'process' && it.label) add(it.label, 'process', 'process', it.loc);
       if (it.kind === 'generate_for') { add(it.var, 'genvar', 'generate variable', it.loc); visitDecls(it.decls); visitItems(it.items); }
-      if (it.kind === 'generate_if') { visitDecls(it.decls); visitItems(it.then); visitItems(it.else); }
+      if (it.kind === 'generate_if') for (const g of genChain(it)) { visitDecls(g.decls); visitItems(g.then); if (!g.elseChain) visitItems(g.else); }
       if (it.kind === 'process') visitDecls(it.decls);
     }
   };

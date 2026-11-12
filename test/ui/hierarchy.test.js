@@ -12,7 +12,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { setupUi, uiTest, makeProject, readWs } from './harness.js';
+import { setupUi, uiTest, makeProject, readWs, tick } from './harness.js';
 import { newDoc, normalizeDoc, symbolPins } from '../../core/schdoc.js';
 import { viewHdl } from '../../core/view-hdl.js';
 import { newModel } from '../../core/asm.js';
@@ -640,3 +640,31 @@ uiTest('#2877 Set as Top Module on an instantiated module: it is the first root,
   assert.equal((await env.server.api('GET', '/api/projects/H_nested_top')).top, 'a');
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
+
+// #3500: a generate chain of 20 000 branches (Verilog's if … else if, VHDL's if … elsif), an instance in its last branch
+// and in its else: the Design pane shows both under the module (its hierarchy read in a loop, as the editor's symbols),
+// Check Syntax completes, the source opens in the editor. Both interfaces; no warnings.
+uiTest('#3500 a generate chain of 20 000 branches: its instances in the Design pane, Check Syntax, its source in the editor', E, async (page) => {
+  const N = 20000;
+  const V = `module chain #(parameter P = ${N - 1}) (input x, output y);\nif (P == 0) begin : b0 assign y = x; end\n${Array.from({ length: N - 2 }, (_, k) => `else if (P == ${k + 1}) begin : b${k + 1} assign y = x; end`).join('\n')}\nelse if (P == ${N - 1}) begin : last leaf u_leaf(.x(x), .y(y)); end\nelse begin : other leaf u_other(.x(x), .y(y)); end\nendmodule\n`;
+  const H = `library ieee; use ieee.std_logic_1164.all;\nentity vchain is generic (P : integer := ${N - 1}); port (x : in std_logic; y : out std_logic); end vchain;\narchitecture r of vchain is\nbegin\ng: if P = 0 generate y <= x;\n${Array.from({ length: N - 2 }, (_, k) => `elsif P = ${k + 1} generate y <= x;`).join('\n')}\nelsif P = ${N - 1} generate u_leaf : entity work.leaf port map (x => x, y => y);\nelse generate u_other : entity work.leaf port map (x => x, y => y);\nend generate;\nend r;\n`;
+  const LEAF = 'module leaf(input x, output y); assign y = ~x; endmodule\n';
+  const TOP = 'module top(input x, output y, output z); chain u_c(.x(x), .y(y)); vchain u_v(.x(x), .y(z)); endmodule\n';
+  await makeProject(env, { name: 'H_gen_chain', top: 'top', files: { 'src/top.v': TOP, 'src/chain.v': V, 'src/vchain.vhd': H, 'src/leaf.v': LEAF } });
+  await page.openProject('H_gen_chain');
+  await page.leftTab('design');
+  const want = ['project H_gen_chain', '  chip xc3s250e-4-cp132', '    moduleTop top [Verilog*] [VHDL] (top.v)',
+    '      verilog u_c - chain [Verilog*] [VHDL] (chain.v)', '        verilog last.u_leaf - leaf [Verilog*] [VHDL] (leaf.v)', '        verilog u_other - leaf [Verilog*] [VHDL] (leaf.v)',
+    '      vhdl u_v - vchain [VHDL*] (vchain.vhd)', '        verilog g.u_leaf - leaf [Verilog*] [VHDL] (leaf.v)', '        verilog u_other - leaf [Verilog*] [VHDL] (leaf.v)'];
+  await page.waitFor((n) => document.querySelectorAll('#hier .row').length === n, [want.length], { what: 'the hierarchy', timeout: 30000 });
+  assert.deepEqual(await rows(page), want);
+  await page.treeRow('#hier', 'top', { exact: true });
+  await page.treeRow('#procs', 'Check Syntax', { dbl: true, exact: true });
+  await page.waitConsole(/Process "Check Syntax" completed successfully/, { timeout: 60000 });
+  for (const f of ['src/chain.v', 'src/vchain.vhd']) {
+    await page.eval((x) => window.SilinxApp.openFile(x), f);
+    await page.waitFor((x) => window.Silinx.active?.id === `file:${x}`, [f], { what: f });
+  }
+  await tick(1500);   // (the editor's symbols, made after a pause)
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+}, { timeout: 180000 });

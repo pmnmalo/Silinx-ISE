@@ -6,6 +6,7 @@
 // functions with a result, the numeric_std conversions. What has no translation throws Untranslatable (records,
 // packages' names, procedures, a wait in a process with a sensitivity list…). Isomorphic ES module.
 import { at, atLine, cannot, intOf, intRangeBits, reservedInVerilog, walk, targetName, indent, ifGenerateBranches } from './translate-util.js';
+import { walkItems } from './util.js';
 
 // Verilog's operators: their precedence (higher binds tighter)
 const PREC = { '**': 11, '*': 10, '/': 10, '%': 10, '+': 9, '-': 9, '<<': 8, '>>': 8, '<<<': 8, '>>>': 8, '<': 7, '<=': 7, '>': 7, '>=': 7,
@@ -115,14 +116,11 @@ function widthOf(cx, R) {
 // the signals (and variables) a process assigns: Verilog's regs
 function assignedInProcesses(mod) {
   const regs = new Set();
-  const visit = items => {
-    for (const it of items || []) {
-      if (it.kind === 'assign' && it.delay) regs.add(targetName(it.target));
-      if (it.kind === 'process') walk(it.body, n => { if (n.kind === 'assign') { const t = targetName(n.target); if (t) regs.add(t); } });
-      if (it.kind === 'generate_for' || it.kind === 'generate_if') { visit(it.items || it.then); visit(it.else); }
-    }
-  };
-  visit(mod.items);
+  // (the generates' items too, walked in a loop: an elsif chain thousands long, #3500)
+  walkItems(mod.items, it => {
+    if (it.kind === 'assign' && it.delay) regs.add(targetName(it.target));
+    if (it.kind === 'process') walk(it.body, n => { if (n.kind === 'assign') { const t = targetName(n.target); if (t) regs.add(t); } });
+  });
   return regs;
 }
 

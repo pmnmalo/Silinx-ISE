@@ -7,6 +7,7 @@ import { stmtMethods } from './parser-stmts.js';
 import { exprMethods } from './parser-exprs.js';
 import { assertMethods } from './parser-assert.js';
 import { nestingMethods } from './parser-nesting.js';
+import { genChain } from '../util.js';
 
 // opts.include(name): the text of a project file for `include (null when there is none)
 export function parse(source, file = 'input', opts = {}) {
@@ -197,9 +198,10 @@ class Parser {
       for (const it of its) {
         if (it.kind === 'instance') names.add(it.name.replace(/\[.*$/, ''));
         if (it.kind === 'generate_if' || it.kind === 'generate_for') {
-          if (it.label && !it.autoLabel) names.add(it.label);
-          if (it.elseLabel && !it.autoElse) names.add(it.elseLabel);
-          if (it.elseChain) visit(it.else);
+          for (const g of genChain(it)) {
+            if (g.label && !g.autoLabel) names.add(g.label);
+            if (g.elseLabel && !g.autoElse) names.add(g.elseLabel);
+          }
         }
       }
     };

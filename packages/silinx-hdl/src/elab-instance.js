@@ -525,9 +525,13 @@ function elabGenFor(E, it) {
 }
 
 function elabGenIf(E, it) {
-  const c = V.isTrue(constOf(E, bindExpr(E, it.cond), it.loc));
-  // else if / the next case alternative: the same construct, in the same scope
-  if (!c && it.elseChain) { elabItems(E, it.else); return; }
+  // else if / the next case alternative: the same construct, in the same scope; the chain walked in a loop (#3500)
+  let c;
+  for (;;) {
+    c = V.isTrue(constOf(E, bindExpr(E, it.cond), it.loc));
+    if (c || !it.elseChain) break;
+    it = it.else[0];
+  }
   if (!c && !it.else?.length && !it.elseDecls?.length) return;
   const label = c ? it.label : it.elseLabel ?? it.label;
   const sc = new Scope(E.sc);

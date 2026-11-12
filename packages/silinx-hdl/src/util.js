@@ -31,3 +31,24 @@ export const NESTING_MESSAGE = `expression nested more than ${MAX_NESTING} level
 // its innermost statement. The parsers refuse a deeper one, as they do expressions: the passes after them recurse once
 // per level (the elaboration from about 600 levels).
 export const STMT_NESTING_MESSAGE = `statement nested more than ${MAX_NESTING} levels deep (blocks, if, case, loops, generates)`;
+// The branches of a generate if … else if chain, of a case generate (#3500): the node, then each else if / elsif / next
+// alternative, the same construct in the same scope (elseChain: its else is that one generate_if), listed in a loop:
+// a chain is not nesting, thousands of branches are read, elaborated and translated without recursing per branch.
+export function genChain(it) {
+  const out = [];
+  for (let g = it; g; g = g.elseChain ? g.else[0] : null) out.push(g);
+  return out;
+}
+/** f(x) for each module item of items and of the generate blocks in them (items, then, else), in source order, with a
+ * stack of its own rather than recursing (#3500: an else if chain thousands of branches long). */
+export function walkItems(items, f) {
+  const stack = [[items || [], 0]];
+  while (stack.length) {
+    const top = stack[stack.length - 1];
+    if (top[1] >= top[0].length) { stack.pop(); continue; }
+    const x = top[0][top[1]++];
+    if (!x || typeof x !== 'object') continue;
+    f(x);
+    for (const k of ['else', 'then', 'items']) if (Array.isArray(x[k]) && x[k].length) stack.push([x[k], 0]);
+  }
+}
