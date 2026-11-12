@@ -39,7 +39,7 @@ export function enumChar(t, ch) {
 }
 export const vecT = (w, s = false) => ({ kind: 'logic', w, s, left: w - 1, right: 0, desc: true });
 
-export const PHYS = { fs: 0.001, ps: 1, ns: 1e3, us: 1e6, ms: 1e9, sec: 1e12, s: 1e12 };
+export const PHYS = { __proto__: null, fs: 0.001, ps: 1, ns: 1e3, us: 1e6, ms: 1e9, sec: 1e12, s: 1e12 };
 
 export class ElabError extends Error {
   constructor(msg, loc) { super(msg); this.loc = loc; }

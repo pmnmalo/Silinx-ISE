@@ -302,8 +302,8 @@ function pow(o, x, y) {
     o.sel(o.and(o.eq(ax, one), o.isinf(y)), one, o.sel(zx, zres, general)))));
 }
 
-const ALGOS = { exp, log, sin, cos, tan, log2, log10, exp2, atan, asin, acos, sinh, cosh, tanh, cbrt };
-const ALGOS2 = { hypot, fmod, atan2 };
+const ALGOS = { __proto__: null, exp, log, sin, cos, tan, log2, log10, exp2, atan, asin, acos, sinh, cosh, tanh, cbrt };
+const ALGOS2 = { __proto__: null, hypot, fmod, atan2 };
 
 // ---- the C simulation's ops: numbers (a float's rounded with Math.fround after each operation)
 function jsOps(p) {
@@ -400,6 +400,7 @@ export const MATHLIB = [
 const J32 = jsOps('f32'), J64 = jsOps('f64');
 /** The C simulation's functions: the algorithms on numbers, a float's rounded at each step. */
 export const JS_MATH = {
+  __proto__: null,
   ...Object.fromEntries(Object.entries(ALGOS).flatMap(([n, f]) => [[n, (x) => f(J64, x)], [`${n}f`, (x) => f(J32, Math.fround(x))]])),
   ...Object.fromEntries(Object.entries(ALGOS2).flatMap(([n, f]) => [[n, (x, y) => f(J64, x, y)], [`${n}f`, (x, y) => f(J32, Math.fround(x), Math.fround(y))]])),
   pow: (x, y) => pow(J64, x, y), powf: (x, y) => Math.fround(pow(J64, Math.fround(x), Math.fround(y))),

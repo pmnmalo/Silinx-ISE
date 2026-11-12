@@ -4,7 +4,7 @@
 //   structBytes(S) -> { size, align }, or null when a member's size is not known here (S as core/c-struct.js has it)
 import { constTokens } from './cpp-template.js';
 
-const BYTES = { char: 1, bool: 1, short: 2, int: 4, long: 8, float: 4, double: 8, int8_t: 1, uint8_t: 1, int16_t: 2, uint16_t: 2, int32_t: 4, uint32_t: 4, int64_t: 8, uint64_t: 8, size_t: 8 };
+const BYTES = { __proto__: null, char: 1, bool: 1, short: 2, int: 4, long: 8, float: 4, double: 8, int8_t: 1, uint8_t: 1, int16_t: 2, uint16_t: 2, int32_t: 4, uint32_t: 4, int64_t: 8, uint64_t: 8, size_t: 8 };
 const IGNORED = new Set(['const', 'volatile', 'static', 'signed', 'unsigned']);
 
 function scalarBytes(type) {

@@ -18,7 +18,7 @@ const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
 const L = (t, v, tt = 'op') => ({ ...t, t: tt, v });
 const STMT_START = (t) => !t || op(t, ';') || op(t, '{') || op(t, '}') || t.t === 'pragma';
 const QUALS = new Set(['const', 'static', 'volatile', 'register', 'extern', 'inline', 'constexpr']);
-const STDINT = { int8_t: [8, true], int16_t: [16, true], int32_t: [32, true], int64_t: [64, true], uint8_t: [8, false], uint16_t: [16, false],
+const STDINT = { __proto__: null, int8_t: [8, true], int16_t: [16, true], int32_t: [32, true], int64_t: [64, true], uint8_t: [8, false], uint16_t: [16, false],
   uint32_t: [32, false], uint64_t: [64, false], size_t: [64, false] };
 const WORD = { 8: ['unsigned', 'char'], 16: ['unsigned', 'short'], 32: ['unsigned', 'int'], 64: ['unsigned', 'long', 'long'] };
 const ASSIGN_OPS = new Set(['+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<=', '>>=']);

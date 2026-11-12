@@ -13,7 +13,7 @@ import { JS_MATH } from './c-mathlib.js';
 export const F64 = { fl: 64, w: 64, s: true };
 export const F32 = { fl: 32, w: 32, s: true };
 export const floatType = (t) => ((t.base ?? t.name) === 'float' ? F32 : F64);   // (a typedef's: its base, #3009)
-export const BITCASTS = { ap_float_bits: { fl: 32, bits: true }, ap_double_bits: { fl: 64, bits: true }, ap_bits_float: { fl: 32 }, ap_bits_double: { fl: 64 } };
+export const BITCASTS = { __proto__: null, ap_float_bits: { fl: 32, bits: true }, ap_double_bits: { fl: 64, bits: true }, ap_bits_float: { fl: 32 }, ap_bits_double: { fl: 64 } };
 
 /** x = m * 2^e exactly (m a BigInt, x finite and positive). */
 function parts(x) {
@@ -89,6 +89,7 @@ const CSIGN = (a, b) => (b < 0 || Object.is(b, -0) ? -Math.abs(a) : Math.abs(a))
 const MATH_ONE = ['exp', 'log', 'sin', 'cos', 'tan', 'log2', 'log10', 'exp2', 'atan', 'asin', 'acos', 'sinh', 'cosh', 'tanh', 'cbrt'];
 const MATH_TWO = ['hypot', 'fmod', 'atan2'];
 export const MATH = {
+  __proto__: null,
   sqrt: R(Math.sqrt), sqrtf: R(Math.sqrt), fabs: R(Math.abs), fabsf: R(Math.abs), floor: R(Math.floor), ceil: R(Math.ceil),
   trunc: R(Math.trunc),
   ...Object.fromEntries(MATH_ONE.flatMap((n) => [[n, R(JS_MATH[n])], [`${n}f`, R(JS_MATH[`${n}f`])]])),

@@ -16,7 +16,7 @@ const op = (t, v) => t && t.t === 'op' && t.v === v;
 const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
 const L = (t, v, tt = 'op') => ({ ...t, t: tt, v });
 const BUILTIN = new Set(['char', 'short', 'int', 'long', 'float', 'double', 'bool', 'unsigned', 'signed']);
-const SIZES = { char: 1, short: 2, int: 4, long: 8, float: 4, double: 8, bool: 1, int8_t: 1, uint8_t: 1, int16_t: 2, uint16_t: 2, int32_t: 4, uint32_t: 4, int64_t: 8, uint64_t: 8 };
+const SIZES = { __proto__: null, char: 1, short: 2, int: 4, long: 8, float: 4, double: 8, bool: 1, int8_t: 1, uint8_t: 1, int16_t: 2, uint16_t: 2, int32_t: 4, uint32_t: 4, int64_t: 8, uint64_t: 8 };
 
 /** The bytes of a type's tokens (a builtin, ap_int, ap_uint, complex of one), or null. */
 function bytesOf(ty) {

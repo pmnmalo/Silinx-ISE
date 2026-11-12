@@ -35,7 +35,7 @@ to_string to_bstring to_hstring minimum maximum now std_match finish stop`.split
 // the simulator's console (OUTPUT, and files: their lines are shown with the file's name) and
 // reading lines of the project's data files
 export const TEXTIO_PROCS = new Set(['write', 'writeline', 'read', 'readline', 'deallocate', 'flush', 'hwrite', 'owrite', 'bwrite', 'hread', 'oread', 'bread']);
-const TIME_UNITS = { fs: 0.001, ps: 1, ns: 1e3, us: 1e6, ms: 1e9, sec: 1e12, min: 6e13, hr: 3.6e15 };
+const TIME_UNITS = { __proto__: null, fs: 0.001, ps: 1, ns: 1e3, us: 1e6, ms: 1e9, sec: 1e12, min: 6e13, hr: 3.6e15 };
 function textioFile(E, a, loc) {
   if (a && a.op === 'ref' && /^(output|input)$/i.test(a.name) && !E.sc.lookup(a.name)) return { k: 'c', val: { str: a.name.toLowerCase(), std: true }, t: STR };
   return bindExpr(E, a, null, loc);

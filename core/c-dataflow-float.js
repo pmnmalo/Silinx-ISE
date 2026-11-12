@@ -52,7 +52,7 @@ export function f64Bits(x) { if (Number.isNaN(x)) return 0x7ff8000000000000n; f6
 const TYPE = { 32: F32, 64: F64 };
 // (math.h's made in hardware of any value, #1783: its precision and the library's operation)
 // (floor, ceil, trunc, round, fmin, fmax, copysign too, #1843)
-const HW_MATH = { sqrt: [64, 'sqrt'], sqrtf: [32, 'sqrt'], fabs: [64, 'abs'], fabsf: [32, 'abs'] };
+const HW_MATH = { __proto__: null, sqrt: [64, 'sqrt'], sqrtf: [32, 'sqrt'], fabs: [64, 'abs'], fabsf: [32, 'abs'] };
 for (const op of ['floor', 'ceil', 'trunc', 'round', 'fmin', 'fmax', 'copysign']) { HW_MATH[op] = [64, op]; HW_MATH[`${op}f`] = [32, op]; }
 // (exp, log, sin, cos, pow, tan, …: Silinx's own library, core/c-mathlib.js, #1761, #2119)
 for (const op of ['exp', 'log', 'sin', 'cos', 'pow', 'tan', 'log2', 'log10', 'exp2', 'hypot', 'fmod', 'atan', 'asin', 'acos', 'atan2', 'sinh', 'cosh', 'tanh', 'cbrt']) { HW_MATH[op] = [64, op]; HW_MATH[`${op}f`] = [32, op]; }

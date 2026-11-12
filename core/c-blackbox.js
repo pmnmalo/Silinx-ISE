@@ -21,10 +21,10 @@ import { parse as parseVhdl } from './vhdl/parser.js';
 const KEYS = new Set(['c_function_name', 'rtl_top_module_name', 'c_files', 'rtl_files', 'c_parameters', 'c_return', 'rtl_common_signal', 'rtl_performance', 'rtl_resource_usage']);
 const SCALAR = new Set(['data_read_in', 'data_write_out', 'data_write_valid']);
 // (Vitis HLS's keys: a memory's, RAM_1P; a stream's, its flags 1 when it is not empty, not full, #2339)
-const RAM = { RAM_address: 'addr', RAM_clock_enable: 'ce', RAM_write_enable: 'we', RAM_data_write_out: 'd', RAM_data_read_in: 'q' };
-const FIFO = { FIFO_empty_flag: 'empty_n', FIFO_read_enable: 'read', FIFO_data_read_in: 'dout', FIFO_full_flag: 'full_n', FIFO_write_enable: 'write', FIFO_data_write_out: 'din' };
+const RAM = { __proto__: null, RAM_address: 'addr', RAM_clock_enable: 'ce', RAM_write_enable: 'we', RAM_data_write_out: 'd', RAM_data_read_in: 'q' };
+const FIFO = { __proto__: null, FIFO_empty_flag: 'empty_n', FIFO_read_enable: 'read', FIFO_data_read_in: 'dout', FIFO_full_flag: 'full_n', FIFO_write_enable: 'write', FIFO_data_write_out: 'din' };
 const FIFO_IN = ['FIFO_empty_flag', 'FIFO_read_enable', 'FIFO_data_read_in'], FIFO_OUT = ['FIFO_full_flag', 'FIFO_write_enable', 'FIFO_data_write_out'];
-const COMMON = { module_clock: 'clock', module_reset: 'reset', module_clock_enable: 'ce', ap_ctrl_chain_protocol_idle: 'idle', ap_ctrl_chain_protocol_start: 'start', ap_ctrl_chain_protocol_ready: 'ready', ap_ctrl_chain_protocol_done: 'done', ap_ctrl_chain_protocol_continue: 'cont' };
+const COMMON = { __proto__: null, module_clock: 'clock', module_reset: 'reset', module_clock_enable: 'ce', ap_ctrl_chain_protocol_idle: 'idle', ap_ctrl_chain_protocol_start: 'start', ap_ctrl_chain_protocol_ready: 'ready', ap_ctrl_chain_protocol_done: 'done', ap_ctrl_chain_protocol_continue: 'cont' };
 const IDENT = /^[A-Za-z_][A-Za-z0-9_$]*$/;
 const dirOf = (p) => (p.includes('/') ? p.replace(/[^/]*$/, '') : '');
 const isObject = (x) => x && typeof x === 'object' && !Array.isArray(x);

@@ -13,7 +13,7 @@ const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
 const INTS = new Set(['int', 'unsigned', 'signed', 'short', 'long', 'char', 'bool', 'size_t', 'static', 'const', 'constexpr',
   'auto', 'int8_t', 'int16_t', 'int32_t', 'int64_t', 'uint8_t', 'uint16_t', 'uint32_t', 'uint64_t']);
 
-const SIZES = { char: 1, bool: 1, short: 2, 'short int': 2, int: 4, long: 8, 'long int': 8, 'long long': 8, 'long long int': 8, float: 4, double: 8,
+const SIZES = { __proto__: null, char: 1, bool: 1, short: 2, 'short int': 2, int: 4, long: 8, 'long int': 8, 'long long': 8, 'long long int': 8, float: 4, double: 8,
   int8_t: 1, uint8_t: 1, int16_t: 2, uint16_t: 2, int32_t: 4, uint32_t: 4, int64_t: 8, uint64_t: 8, size_t: 8 };
 
 export function constants() {

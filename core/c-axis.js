@@ -11,7 +11,7 @@
 import { structPragmas } from './c-aggregate.js';
 import { fifoSuffix } from './c-fifo.js';
 
-const SIDE = { data: 'TDATA', keep: 'TKEEP', strb: 'TSTRB', user: 'TUSER', last: 'TLAST', id: 'TID', dest: 'TDEST' };
+const SIDE = { __proto__: null, data: 'TDATA', keep: 'TKEEP', strb: 'TSTRB', user: 'TUSER', last: 'TLAST', id: 'TID', dest: 'TDEST' };
 const modeOf = (a) => String(a.mode || Object.keys(a).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();
 const isAxis = (st) => st.kind === 'pragma' && st.pragma.name === 'INTERFACE' && st.pragma.args.port && modeOf(st.pragma.args) === 'axis';
 

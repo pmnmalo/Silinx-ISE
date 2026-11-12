@@ -10,7 +10,7 @@
 import { BOOL, typeOf } from './c-types.js';
 import { exprMethods } from './c-dataflow-expr.js';
 
-const HS = { dout: '', empty_n: '_ap_vld', read: '_ap_ack', din: '', full_n: '_ap_ack', write: '_ap_vld' };
+const HS = { __proto__: null, dout: '', empty_n: '_ap_vld', read: '_ap_ack', din: '', full_n: '_ap_ack', write: '_ap_vld' };
 /** A port's suffix: ap_fifo's, or ap_hs's. */
 export const fifoSuffix = (f, port) => (f.hs ? HS[port] : `_${port}`);
 // (a statement that only computes: no access of a memory, a stream, a sub-module or a blackbox)
