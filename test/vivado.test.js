@@ -299,7 +299,7 @@ test('reports.json of a Vivado build (GET reports, get_report): the summary, eac
   // an ISE or a Silinx toolchain run has no DRC report of its own
   fs.cpSync(path.join(ROOT, 'examples', 'gates'), path.join(process.env.SILINX_WORKSPACE, 'GatesD'), { recursive: true });
   assert.equal((await call('get_report', { project: 'GatesD', report: 'drc' })).text, 'No drc report for \'GatesD\': no process has run yet (run_process implement).');
-  assert.equal((await call('get_report', { project: 'GatesD', report: 'netlist' })).text, 'get_report: report: summary or one of power, timing, synthesis, map, par, pins, drc');
+  assert.equal((await call('get_report', { project: 'GatesD', report: 'netlist' })).text, 'get_report: report: one of summary, power, timing, synthesis, map, par, pins, drc');
 });
 
 test('#3158 the MCP tools\' schemas: get_report\'s reports (not the toolchains), drc among them; run_process\'s toolchains with vivado', async () => {
