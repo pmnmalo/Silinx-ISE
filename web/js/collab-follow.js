@@ -75,7 +75,7 @@ export async function startFollowing(hash = location.hash) {
   return project.name;
 }
 
-/** A module's link (Share Module Live…, #3631), once the project followed is open: that module opened (its drawing,
+/** A module's link (Share Module…, #3631), once the project followed is open: that module opened (its drawing,
  *  else its HDL), its follower browsing alone on it (Follow <owner>, in the toolbar, follows the owner's editor). */
 export async function openFollowedTop() {
   if (!fol?.top) return;

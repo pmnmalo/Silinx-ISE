@@ -20,7 +20,7 @@ function rememberedLinks() {
   try { const v = JSON.parse(area()?.getItem(KEY) || '[]'); return Array.isArray(v) ? v.filter(r => r && typeof r.id === 'string' && typeof r.link === 'string') : []; } catch { return []; }
 }
 const keep = list => { try { area()?.setItem(KEY, JSON.stringify(list.slice(0, MAX))); } catch { /* not kept */ } };
-/** A short link made here, remembered (Share Project Copy…'s, web/js/link-copy.js). */
+/** A short link made here, remembered (Share Project…'s, web/js/link-copy.js). */
 export function rememberLink({ id, link, project, expires = null }) {
   keep([{ id, link, project, expires, made: new Date().toISOString() }, ...rememberedLinks().filter(r => r.id !== id)]);
 }

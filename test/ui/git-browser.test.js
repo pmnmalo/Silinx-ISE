@@ -204,7 +204,7 @@ uiTest('#3196 the browser edition in Portuguese: the Git commands; Initialize Re
     'Abra a página do GitHub para um novo token: https://github.com/settings/personal-access-tokens/new',
     'Acesso aos repositórios: Only select repositories (os que vai abrir no Silinx).',
     'Permissões dos repositórios: Contents, Read and write (Metadata, Read-only, vem com ela).',
-    'Permissões da conta: Gists, Read and write (para as ligações curtas de Partilhar Cópia do Projeto).',
+    'Permissões da conta: Gists, Read and write (para as ligações curtas de Partilhar Projeto).',
     'Gere o token, copie-o e cole-o aqui.']);
   assert.deepEqual(await page.eval(() => { const a = document.querySelector('.dlg-overlay .git-new-token'); return [a.target, a.rel, document.querySelector('.dlg-overlay .git-token').type]; }), ['_blank', 'noopener noreferrer', 'password']);
   // (not a token; one GitHub refuses: said beside the field, nothing kept)

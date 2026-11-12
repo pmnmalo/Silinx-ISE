@@ -91,7 +91,7 @@ uiTest('#3183 a state diagram edited live by the owner and an editor: both chang
     // the owner's dialog, in Portuguese
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
     const dlg = page.eval(async () => { await (await import('/js/collab-share.js')).shareProjectDialog(); }).catch(() => {});
-    await page.waitDialog('Partilhar Projeto em Direto');
+    await page.waitDialog('Partilhar Projeto');
     assert.ok((await page.eval(() => document.querySelector('.dlg-overlay').textContent)).includes('Quem tiver a ligação de editores edita os ficheiros de texto e os desenhos consigo, em direto.'));
     await page.dialogButton('Fechar');
     await dlg;

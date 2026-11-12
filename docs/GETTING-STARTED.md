@@ -61,7 +61,7 @@ That's all. Things to know:
   memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
   (hold a finger still for half a second); two fingers move a drawing and a pinch zooms it. In portrait the side panel (Design) is shown or hidden
   with the header's side panel button (in the ISE style interface it is a drawer, the button at the left of the header), and the editors' properties open over the drawing (**Properties**).
-- **A link for your slides**: right-click the project in the Design pane, **Share Project Copy…**: the link opens
+- **A link for your slides**: right-click the project in the Design pane, **Share Project…** (a copy): the link opens
   Silinx on the design, in Try it, the simulation or the board emulator, the whole project inside it (see the README,
   *A design in a link*).
 

@@ -83,7 +83,7 @@ test('link: made and parsed; another hash is not one; a broken one is said', () 
   assert.throws(() => relayUrl('http://127.0.0.1:8642/'), /a role, share or follow/);
   assert.match('x'.repeat(22), ROOM_RE);
 });
-test('#3631 a module\'s link (Share Module Live…): &top=<module> last, of every form; parsed; one only; a bad name refused', () => {
+test('#3631 a module\'s link (Share Module…): &top=<module> last, of every form; parsed; one only; a bad name refused', () => {
   const room = 'A'.repeat(22), key = 'b'.repeat(43), sign = 'c'.repeat(129);
   const l = followLink('http://localhost:8642/', room, key);
   assert.equal(withTop(l, 'speed_ctrl'), `${l}&top=speed_ctrl`);

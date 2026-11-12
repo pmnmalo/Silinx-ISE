@@ -60,10 +60,10 @@ const errorText = (page, cls) => page.eval((c) => document.querySelector(`.dlg-o
 
 uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a rejected push and a conflict in the console', E, async (page) => {
   const remote = bare('lab1');
-  // (the File menu: Open from Repository… after Share Project Copy…, #3323; from the menus' definitions, the Silinx
+  // (the File menu: Open from Repository… after Share Project…, #3323; from the menus' definitions, the Silinx
   // interface showing no File menu)
   const file = await page.eval(() => window.SilinxApp.S.menus.find((m) => m.label === 'File').items().filter(Boolean).map((x) => (x === '-' ? '—' : x.label)));
-  assert.deepEqual(file.slice(0, file.indexOf('Import Xilinx ISE Project (.zip)…')), ['New Project…', 'Open Project…', '—', 'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Share Project Copy…', 'Open from Repository…', 'Share Project Live…', 'Short Links…', '—']);
+  assert.deepEqual(file.slice(0, file.indexOf('Import Xilinx ISE Project (.zip)…')), ['New Project…', 'Open Project…', '—', 'Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…', 'Share Project…', 'Open from Repository…', 'Short Links…', '—']);
   await page.menu('File', 'Open from Repository…');
   await page.waitDialog('Open from Repository');
   // a URL that is not GitHub's: said beside the field, the dialog open
@@ -186,7 +186,7 @@ uiTest('#3195 the Design pane\'s project menu: the Git commands (the Silinx inte
 });
 
 // (#3534) Initialize Repository… on the Start page (after Open from Repository…) and in the Design tree's project and
-// device menus (after Share Project Live…, before the Git submenu): shown for a project with no repository, the Start
+// device menus (after Share Project…, before the Git submenu): shown for a project with no repository, the Start
 // page's disabled with no project open, the File menu's dialog run from either; gone from both once the project is a
 // repository; never Sign in with GitHub… (the browser edition's); in Portuguese. Both interfaces; no warnings.
 const treeItems = async (page, row, item) => {
@@ -217,13 +217,13 @@ uiTest('#3534 Initialize Repository… on the Start page and in the Design tree\
   await page.waitDialog('Initialize Repository');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
-  // the project's and the device's rows: after Share Project Live… (Share Project Copy… where none), before Git
+  // the project's and the device's rows: after Share Project… (Share Project… where none), before Git
   await page.leftTab('design');
   await page.waitFor(() => document.querySelectorAll('#hier .row .lbl').length >= 2, [], { what: 'the Design tree' });
   for (const row of [0, 1]) {
     const items = await treeItems(page, row);
     const at = items.indexOf('Initialize Repository…');
-    assert.ok(at > 0 && /^(Share Project Live…|Share Project Copy…)/.test(items[at - 1]) && items[at + 1] === 'Git', `row ${row}: ${items.join(' | ')}`);
+    assert.ok(at > 0 && /^(Share Project…|Share Project…)/.test(items[at - 1]) && items[at + 1] === 'Git', `row ${row}: ${items.join(' | ')}`);
     assert.ok(!items.some((c) => c.startsWith('Sign in with GitHub')), items.join(' | '));
   }
   // in Portuguese

@@ -147,7 +147,7 @@ uiTest('#3362 a hash that is no link, or a link the user does not agree to, save
   for (const [hash, line] of [['nothing=1', null], ['design=%%%', 'ERROR: Open from a link: the link\'s design is not well encoded.'],
     ['open=https://192.168.1.1/a.zip', 'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').'],
     // (a shared project's broken link, #3531: said, the hash cleared, the page not loaded again)
-    ['follow=x', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project Live).'], ['edit=x', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project Live).']]) {
+    ['follow=x', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).'], ['edit=x', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).']]) {
     const said = () => page.eval((m) => window.__console().split('\n').filter((l) => l.trim() === m).length, line);
     const before = line ? await said() : 0;
     await setHash(page, hash);
@@ -174,7 +174,7 @@ uiTest('#3362 a hash that is no link, or a link the user does not agree to, save
   await untouched();
   assert.equal(await page.eval(() => window.Silinx.project.name), 'stopwatch');
   assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), ['ERROR: Open from a link: the link\'s design is not well encoded.',
-    'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project Live).', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project Live).']);
+    'ERROR: Open from a link: the link\'s open= is an address of this computer or of a local network (\'192.168.1.1\').', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).', 'ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).']);
   assert.deepEqual(warnings(page), []);
 });
 
@@ -240,7 +240,7 @@ uiTest('#3316 a shared project\'s link given to the running app: a broken one sa
   assert.equal(await page.eval(() => localStorage.getItem('silinx-token')), null);
   assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), []);
   await page.eval(() => { window.__loaded = true; location.hash = 'follow=broken'; });
-  await page.waitConsole(/ERROR: Follow a shared project: the link to follow is broken \(copy it again from the owner's Share Project Live\)\./);
+  await page.waitConsole(/ERROR: Follow a shared project: the link to follow is broken \(copy it again from the owner's Share Project\)\./);
   assert.deepEqual(await page.eval(() => [location.hash, window.__loaded]), ['', true]);
-  assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), ['ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project Live).']);
+  assert.deepEqual(await consoleLines(page, /^(WARNING|ERROR)/), ['ERROR: Follow a shared project: the link to follow is broken (copy it again from the owner\'s Share Project).']);
 });

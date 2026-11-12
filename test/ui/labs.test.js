@@ -279,8 +279,8 @@ uiTest('#3179 the stopwatch lab: the emulator (a step to try), the test bench, t
   assert.equal(await ticks(page), '✓ ✓ ✓ ✓ ✓<');
 
   // Copy Link…: the lab in front chosen; none, or another
-  await page.menu('File', 'Share Project Copy…');
-  await page.waitDialog('Share Project Copy');
+  await page.menu('File', 'Share Project…');
+  await page.waitDialog('Share Project');
   const linkOut = () => page.waitFor(() => document.querySelector('.dlg-overlay .link-out')?.value || null, [], { what: 'the link' });
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay select[data-field=lab] option')].map((o) => `${o.value}:${o.textContent}${o.selected ? ' <' : ''}`)),
     [':No lab', 'stopwatch-emulator:The emulator <', 'gates-first-steps:First steps', 'traffic-state-machine:A state machine', 'blinky-clock-board:The clock and the board']);
@@ -298,7 +298,7 @@ uiTest('#3179 the stopwatch lab: the emulator (a step to try), the test bench, t
   await page.waitFor(() => document.documentElement.lang === 'en');
   await page.dialogButton('Copy Link');
   await page.waitNoDialog();
-  await page.waitConsole(/Share Project Copy: the link of 'stopwatch', opening the lab 'stopwatch-emulator' copied, \d+ characters\./);
+  await page.waitConsole(/Share Project: the link of 'stopwatch', opening the lab 'stopwatch-emulator' copied, \d+ characters\./);
 
   // a link that opens the example with its lab (the student's project kept: the link's in a project of its own), the lab at its first step
   await page.goto(`${env.server.url}/?l=lab#open=example:stopwatch&lab=stopwatch-emulator`);

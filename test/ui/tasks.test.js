@@ -1820,7 +1820,7 @@ for (const theme of ['light', 'dark']) uiTest(`#1409 Tasks (${theme}): the side 
   const start = await page.eval(() => {
     const r = (s) => document.querySelector(s).getBoundingClientRect(), b = document.querySelector('#start-page .start-btns .btn');
     return { bar: Math.round(r('#start-page .start-btns').height), button: `${Math.round(b.getBoundingClientRect().height)} ${getComputedStyle(b).fontSize}`,
-      // (the entries shown: Share Project Live… is the ISE style's, hidden here, #3479)
+      // (the entries shown: Share Project… is the ISE style's, hidden here, #3479)
       icons: [...new Set([...document.querySelectorAll('#start-page .entry .ico')].filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().width)))] };
   });
   assert.deepEqual(start, { bar: edit.bar, button: edit.button, icons: [16] });

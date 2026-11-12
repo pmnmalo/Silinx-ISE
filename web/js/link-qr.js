@@ -1,5 +1,5 @@
-// The QR code of a sharing dialog's link (#3637): Share Project Copy…'s (the full link, or the short one once made) and
-// Share Project Live…'s (the follow link), for a phone or another computer to scan off the teacher's screen. Made here
+// The QR code of a sharing dialog's link (#3637): Share Project…'s copy (the full link, or the short one once made) and
+// its live sharing (the follow link), for a phone or another computer to scan off the teacher's screen. Made here
 // (core/qr.js, no network), an image of its SVG (the CSP's img-src data:); a click on it, or Enlarge, shows it as large as
 // the window allows, for a projector. A link longer than a QR code holds gets none: its dialog says so in the console.
 import { h, dialog } from './ui.js';

@@ -48,7 +48,7 @@ export const GIT_PT = {
   'Repository access: Only select repositories (the ones to open in Silinx).': 'Acesso aos repositórios: Only select repositories (os que vai abrir no Silinx).',
   'Repository permissions: Contents, Read and write (Metadata, Read-only, comes with it).': 'Permissões dos repositórios: Contents, Read and write (Metadata, Read-only, vem com ela).',
   'Generate the token, copy it and paste it here.': 'Gere o token, copie-o e cole-o aqui.',
-  'Account permissions: Gists, Read and write (for Share Project Copy\'s short links).': 'Permissões da conta: Gists, Read and write (para as ligações curtas de Partilhar Cópia do Projeto).',
+  'Account permissions: Gists, Read and write (for Share Project\'s short links).': 'Permissões da conta: Gists, Read and write (para as ligações curtas de Partilhar Projeto).',
   'Sign In': 'Iniciar Sessão',
 };
 

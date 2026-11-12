@@ -19,7 +19,7 @@ export function benchItems(app, name) {
     { label: 'Rename…', action: () => import('./rename.js').then(r => r.renameDialog(file(), name)) },
     { label: 'Check Syntax', action: () => check(name) },
     // (its link, the simulation of this test bench, #2883)
-    { label: 'Share Module Copy…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog({ module: name })) },
+    { label: 'Share Module…', action: () => import('./share-how.js').then(m => m.shareDialog({ module: name })) },   // (a copy: a test bench's, #3698)
     '-',
     { label: 'New Test Bench…', action: () => newBench(app) },
     { label: 'Import Test Bench…', action: addCopy },

@@ -1,5 +1,5 @@
-// Share Project Copy… and Share Module Copy… (#2826, #3628): the link that opens the project in Silinx (for lecture
-// slides), the whole project inside it
+// Share Project… and Share Module…'s copy (#2826, #3628, #3698: web/js/share-how.js): the link that opens the project
+// in Silinx (for lecture slides), the whole project inside it
 // (core/design-link.js encodeDesign), and what it opens: the project only, Try it (a schematic's), the simulation (the
 // test bench), the board emulator; the module; a guided lab opened beside it (#3179). The link is shown as it is made, its length with it; one too large
 // for a link (a zip hosted elsewhere then) or a view the design does not have is said in the dialog, and the copy in
@@ -20,17 +20,18 @@ import { EXPIRY_DAYS } from '/core/gist-link.js';
 import { rememberLink, shortLinksDialog } from './short-links.js';
 import { qrBox } from './link-qr.js';
 import { QR_MAX_BYTES } from '/core/qr.js';
+import { howRow, shareTitle } from './share-how.js';
 
 const VIEWS = [['', 'Open the project only'], ['try', 'Try it (a drawing\'s simulation)'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
 /** The address of this app, the base of its links (its hash, a token or a link, left out). */
 const linkBase = () => location.origin + location.pathname;
 
-/** The Share Project Copy… dialog of the open project (Share Module Copy…: module and view chosen first, a module's
- *  context menu). Resolves to the link copied, or null. */
+/** Share Project…'s window, a copy of the open project (Share Module…: module and view chosen first, a module's
+ *  context menu). Resolves to the link copied, or null (or the live window's, the way switched). */
 export async function copyLinkDialog({ module = null, view = null } = {}) {
   if (!S.project) return null;
   const name = S.project.name;
-  const action = module ? 'Share Module Copy' : 'Share Project Copy';   // (the dialog's title, its messages' name, #3628)
+  const action = shareTitle(module);   // (the window's title, its messages' name, #3698)
   let entries;
   try { entries = (await gateZip(new Uint8Array(await (await api.exportZip(name, 'silinx')).blob.arrayBuffer()), browserCodec())).files; } catch (e) { app.log(`ERROR: ${action}: ${e.message}`, 'err'); return null; }
   const files = Object.fromEntries(entries.filter(e => e.path !== 'silinx.json').map(e => [e.path, textOf(e)]));
@@ -104,8 +105,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
     if (encodeError) { err.textContent = encodeError; return; }
     // (the module: in the link when it is not the project's top, or when the link is a module's: Share Module
     // Copy…, the project then opened on it, #2871; a test bench when it is not the project's, #2878)
-    // (Open the project only, from the project's Share Project Copy…: no module, the project opened with no source in
-    // front, #3230; a module's Share Module Copy… keeps its module, #2871)
+    // (Open the project only, from the project's Share Project…: no module, the project opened with no source in
+    // front, #3230; a module's Share Module… keeps its module, #2871)
     const top = !modSel.value || isEmu() || (!viewSel.value && !module) ? null : isSim() ? (givenBench || modSel.value !== pj.simTop ? modSel.value : null) : ((module && !givenBench) || modSel.value !== pj.top ? modSel.value : null);
     const problem = viewProblem(S.project, files, { view: viewSel.value || null, top });
     if (problem) { err.textContent = `${problem[0].toUpperCase()}${problem.slice(1)}.`; return; }
@@ -135,10 +136,12 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   labSel.addEventListener('change', update);
   modSel.addEventListener('change', () => { if (!isEmu()) chosen = { ...chosen, [isSim() ? 'bench' : 'design']: modSel.value }; update(); });
   update();
+  // (a copy, or live: the window's first row, #3698)
+  const how = howRow('copy', { module, view, close: () => closeIt?.() });
   const r = await dialog({
     title: action, width: 560,
     onOpen: ({ close }) => { closeIt = () => close(null); },
-    body: h('div', {},
+    body: h('div', {}, how.el,
       h('div', { class: 'hint' }, `A link that opens '${name}' in Silinx, for slides or a message: the whole project is inside the link (no file to host). Anyone with the link has every file of the project, its comments too.`),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         h('label', {}, 'Open in:'), viewSel,
@@ -161,6 +164,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
       return true;
     } }, { label: 'Cancel', value: null }],
   });
+  if (how.wanted) return how.switched();
   if (manage) { shortLinksDialog(); return null; }
   if (!r || !link) return null;
   writeClip('text', link);

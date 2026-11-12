@@ -238,7 +238,6 @@ table.grid tr.sel td { background: #dbe8fb; }
 #start-page:not([data-project]) .start-export, #teach-page:not([data-project]) .start-export { color: #888; }
 :is(#start-page, #teach-page):not([data-project]) .start-export a { color: inherit; cursor: default; pointer-events: none; text-decoration: none; }
 #teach-page .start-box:first-child h3 { margin-top: 0; }   /* (the Teaching page's, as the Start page's, #3533) */
-html[data-ui="silinx"] #start-page .start-share { display: none; }   /* (Share Project Live…: the ISE style's Start page, the Silinx interface's in the Design tree's menus, #3479) */
 .summary-table { border-collapse: collapse; margin-bottom: 16px; min-width: 640px; }
 .summary-table caption.summary-status { display: none; }   /* (the Tasks interface's only: web/css/tasks.css) */
 .summary-table caption { text-align: left; font-weight: bold; background: linear-gradient(#e9eff8, #c9d7ed); color: #15428b; padding: 3px 8px; border: 1px solid #99bbe8; border-bottom: none; }

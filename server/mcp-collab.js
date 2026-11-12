@@ -1,4 +1,4 @@
-// The MCP server's tools of a shared project (#3181, server/mcp.js, #2674), as the interface's Share Project Live… and the
+// The MCP server's tools of a shared project (#3181, server/mcp.js, #2674), as the interface's Share Project… and the
 // opening of a link to follow: share_project shares a project of the workspace live, read only, through the relay of
 // a running Silinx server (server/collab-relay.js; its token read as a second launch reads it, server/server.js
 // tokenFile), its files published from the disk and kept as they change (the project watcher, #2843);
@@ -143,8 +143,8 @@ const peerLines = peers => (peers.length ? peers.map(p => `${p.name} (${p.role})
 
 export const COLLAB_TOOLS = [
   {
-    name: 'share_project', title: 'Share Project Live (read only)',
-    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project Live… does (Share Module Live… with top): action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
+    name: 'share_project', title: 'Share a project live (read only)',
+    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project… does with Live chosen (Share Module… with top): action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       action: { type: 'string', enum: ['start', 'status', 'stop'], description: 'start (default), status or stop.' },
@@ -153,7 +153,7 @@ export const COLLAB_TOOLS = [
       editors: { type: 'boolean', description: 'start: editors may change its text files and drawings too (the result: an editor\'s link besides the follower\'s; what they change written to the disk, a drawing\'s HDL made again from it, through the import gate, the project untrusted from their first change: Xilinx ISE waits until the user trusts it in the interface).' },
       qr: { type: 'boolean', description: 'start, status: the follow link\'s QR code too, as the interface shows it (#3637): qr, an SVG (black on white).' },
       key: STR('start: the key of a relay on another computer (its config.json\'s relay.key, #3227), instead of the token of a Silinx server on this one.'),
-      top: STR('start: a module of the project the links open on, as Share Module Live… does (#3631): …#follow=…&top=<module>; the project shared as it is.'),
+      top: STR('start: a module of the project the links open on, as Share Module… does, live (#3631): …#follow=…&top=<module>; the project shared as it is.'),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     async run({ project: name, action = 'start', name: who, server, editors = false, key, top, qr = false }) {
@@ -177,7 +177,7 @@ export const COLLAB_TOOLS = [
         return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, ...withQr(cur.link), followers: peers, warnings: [...cur.warnings] }, untrusted: peers.length || cur.warnings.length ? [...(peers.length ? ['the followers\' names and views'] : []), ...(cur.warnings.length ? ['the warnings, which name the shared project\'s files'] : [])].join(', ') : undefined };
       }
       await readProject(name);
-      // (a module's links, Share Module Live…: one of the design's modules, #3631)
+      // (a module's links, Share Module…: one of the design's modules, #3631)
       const all = await readAll(name);
       const problem = top === undefined ? null : viewProblem(all.project, all.files, { top });
       if (problem) throw toolError(`top: ${problem}`);
@@ -213,7 +213,7 @@ export const COLLAB_TOOLS = [
   },
   {
     name: 'follow_project', title: 'Follow a shared project (read only)',
-    description: 'Follow a project someone shares (a link …/#follow=… of Share Project Live… or share_project), read only (an editor\'s link, …/#edit=…: write changes its text files and drawings), as the interface does when opened at that link: gives the project\'s files, who is in it, the file the owner has open and their cursor; path: that file\'s text as it is now (call again to see it change; a drawing as its participants have merged it, with its Check (but a truth table and a schematic)). stop: leave. The project is not copied into the workspace (import nothing; read it here).',
+    description: 'Follow a project someone shares (a link …/#follow=… of Share Project… or share_project), read only (an editor\'s link, …/#edit=…: write changes its text files and drawings), as the interface does when opened at that link: gives the project\'s files, who is in it, the file the owner has open and their cursor; path: that file\'s text as it is now (call again to see it change; a drawing as its participants have merged it, with its Check (but a truth table and a schematic)). stop: leave. The project is not copied into the workspace (import nothing; read it here).',
     inputSchema: { type: 'object', properties: {
       link: STR('The link to follow (the whole address).'),
       path: STR('A file of the project: its text as it is now.'),

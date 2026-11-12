@@ -129,7 +129,7 @@ test('#2894 project_link / open_link of every example with constraints: the same
     const o = `${ex}_2894`, l = `${ex}_2894l`;
     await ok('new_project_from_example', { name: o, example: ex });
     const src = await P.readProject(o);
-    // the project only, and a module's link (the top's first other module; Share Module Copy…)
+    // the project only, and a module's link (the top's first other module; Share Module…)
     const mod = (await Promise.all(src.files.filter(f => f.role !== 'sim').map(f => P.readFile(o, f.path)))).join('\n')
       .match(/^\s*(?:entity|module)\s+(\w+)/gim).map(m => m.trim().split(/\s+/)[1]).find(m => m.toLowerCase() !== src.top.toLowerCase());
     for (const [args, as] of [[{}, l], [{ top: mod }, `${l}m`], [{ view: 'emulate' }, `${l}e`]]) {
