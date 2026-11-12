@@ -105,7 +105,7 @@ export const UNTESTED_DEPTH = 4;
  *  sources outside web/ (whose page scripts have their UI tests): each one's importers, then theirs, up to a module a
  *  test (or a helper of the tests) imports, at most UNTESTED_DEPTH levels; the web/ pages and the tests are not
  *  followed. deps: each file's imports resolved; ch: the changed modules. */
-export function untestedReach(files, deps, ch, isTest, inTests, reexports = () => false) {
+function untestedReach(files, deps, ch, isTest, inTests, reexports = () => false) {
   const tested = new Set(Object.keys(files).filter(isTest).flatMap(f => deps[f]));
   const source = f => /\.m?js$/.test(f) && !inTests(f) && !f.startsWith('web/');
   const importers = {};
