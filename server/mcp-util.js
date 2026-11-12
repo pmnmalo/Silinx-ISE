@@ -144,8 +144,10 @@ export const deviceName = d => (d ? `${d.part}${d.package}${d.speed}` : 'no devi
 // a board (basys2, nexys2) and its variant: { board, device } for a new project
 export async function boardDevice(board, variant) {
   const { resolveBoard } = await import('./devices.js');
+  // (a variant needs a board, as set_design_properties says it; the boards are list_devices', #3535)
+  if (!board) throw toolError('variant: the project has no board (give board)');
   const r = resolveBoard(board, { variant });
-  if (!r) throw toolError(`unknown board '${board}' (basys2, nexys2)`);
+  if (!r) throw toolError(`unknown board '${board}' (list_devices)`);
   if (variant && r.variant?.id !== variant) throw toolError(`the ${r.board.name} has no variant '${variant}'`);
   return { board: r.board.id, device: { family: r.device.family || 'spartan3e', part: r.device.part, package: r.device.package, speed: r.device.speed } };
 }

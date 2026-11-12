@@ -118,7 +118,7 @@ test('follow_project: an MCP client follows the MCP\'s share (two participants),
 
 test('the errors: a project not shared, a bad action, no project, a bad server, no server there, a broken link, a link of a page\'s host', async () => {
   await fails('share_project', { project: 'traffic', action: 'stop' }, '\'traffic\' is not shared');
-  await fails('share_project', { project: 'traffic', action: 'pause' }, 'action: start, status or stop');
+  await fails('share_project', { project: 'traffic', action: 'pause' }, 'action: one of start, status, stop');
   const r = await call('share_project', { project: 'nope', server: base });
   assert.equal(r.isError, true);
   assert.match(r.text, /^share_project: no project 'nope'/);

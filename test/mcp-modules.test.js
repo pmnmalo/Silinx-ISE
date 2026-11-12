@@ -99,7 +99,7 @@ test('the helpers: a tool\'s error, the clipped text, the boards, the diagnostic
   assert.equal(U.deviceName({ part: 'xc3s250e', package: 'cp132', speed: '-4' }), 'xc3s250ecp132-4');
   assert.equal(U.deviceName(null), 'no device');
   assert.deepEqual(await U.boardDevice('basys2', '100'), { board: 'basys2', device: { family: 'spartan3e', part: 'xc3s100e', package: 'cp132', speed: '-4' } });
-  await assert.rejects(U.boardDevice('nosuch'), { toolError: true, message: "unknown board 'nosuch' (basys2, nexys2)" });
+  await assert.rejects(U.boardDevice('nosuch'), { toolError: true, message: "unknown board 'nosuch' (list_devices)" });
   await assert.rejects(U.readProject(''), { toolError: true, message: 'project: the name of a project of the workspace (list_projects)' });
   const d = { severity: 'warning', file: 'src/a.vhd', line: 3, message: 'unused signal' };
   assert.equal(U.diagLine(d), 'WARNING:HDLCompiler - "src/a.vhd" Line 3: unused signal');
