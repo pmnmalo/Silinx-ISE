@@ -517,6 +517,9 @@ test('#3361 follow_project: a file the import gate refuses is not given, its rea
   await ok('follow_project', { link, stop: true });
   // past the files a follower takes: refused
   doc.transact(() => { for (let i = 0; i < 5000; i++) plant(doc, `src/f${i}.v`, ''); });
+  // (the change on its way first: a follower joining while it is sealed would get it before the whole project, its
+  // 5000 files alone within the caps)
+  await owner.flush();
   await fails('follow_project', { link }, 'cannot follow: the shared project has more files than a follower takes (5003, at most 5000)');
   await owner.close();
 });
