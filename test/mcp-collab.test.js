@@ -520,3 +520,31 @@ test('#3361 follow_project: a file the import gate refuses is not given, its rea
   await fails('follow_project', { link }, 'cannot follow: the shared project has more files than a follower takes (5003, at most 5000)');
   await owner.close();
 });
+
+test('#3527 regression: follow_project leaves a room whose owner sends a part of no shared project; share_project refuses an editor\'s change of another part than the files and the drawings, said in its status', async () => {
+  const { shareRoom } = await import('../core/collab-client.js');
+  const { projectDoc, publishProject } = await import('../core/collab-doc.js');
+  // a hostile owner: a root of its own
+  const doc = projectDoc();
+  publishProject(doc, { project: { name: 'h', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl' }], fileTree: ['src/top.vhd'] }, files: { 'src/top.vhd': 'entity top is end;\n' }, owner: 'Eve' });
+  doc.getMap('evil').set('k', 'x'.repeat(1000));
+  const owner = await shareRoom({ url: relayUrl(base, 'share'), token: 'tok-mcp', doc, user: { name: 'Eve' } });
+  await fails('follow_project', { link: followLink(`${base}/`, owner.room, owner.key) }, 'cannot follow: the shared project holds a part that no shared project has ("evil")');
+  await owner.close();
+  // an editor's change of the project's settings: refused by the MCP's share, said in its status, applied nowhere
+  await P.createProject({ name: 'rootsEd', template: 'traffic' });
+  const { data: { link, editLink } } = await ok('share_project', { project: 'rootsEd', name: 'Ana', server: base, editors: true });
+  const l = parseFollowLink(editLink);
+  const ed = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, sign: l.sign, user: { name: 'Rui' } });
+  await ed.ready;
+  ed.doc.getMap('project').set('json', '{"name":"hacked"}');
+  await until(async () => (await ok('share_project', { project: 'rootsEd', action: 'status' })).data.warnings.length, 'the refusal said');
+  const st = await ok('share_project', { project: 'rootsEd', action: 'status' });
+  assert.deepEqual(st.data.warnings, ['an editor\'s change was refused: it changes a part of the document that an editor does not ("project")']);
+  assert.ok(st.text.endsWith('\nWARNING: an editor\'s change was refused: it changes a part of the document that an editor does not ("project")'), st.text);
+  const f = await ok('follow_project', { link, name: 'Bot' });
+  assert.equal(f.data.project, 'rootsEd');
+  await ed.close();
+  await ok('follow_project', { link, stop: true });
+  await ok('share_project', { project: 'rootsEd', action: 'stop' });
+});

@@ -290,6 +290,45 @@ test('#3361 a followed room past its caps (files, total size): left at once, sai
   await owner.close();
 });
 
+test('#3527 regression: a followed room\'s whole document bounded: a root of no shared project\'s, values that are no text, left at once, said', async () => {
+  const limits = { files: 10, total: 4096 };
+  const evs = [];
+  const errs = () => evs.filter(e => e.type === 'error');
+  // (another root in the document: never ready)
+  const doc = owned();
+  doc.getMap('evil').set('k', 'v');
+  const owner = await shareRoom({ url: url(), token: 'the-token', doc, user: { name: 'Ana' } });
+  const fol = await followRoom({ url: furl(), room: owner.room, key: owner.key, user: { name: 'Rui' }, limits, onEvent: e => evs.push(e) });
+  // (bounded: the old code's follower stayed, its ready never settled)
+  await assert.rejects(Promise.race([fol.ready.then(() => { throw new Error('followed'); }), sleep(5000).then(() => { throw new Error('not left'); })]), { message: 'the shared project holds a part that no shared project has ("evil")' });
+  await until(() => fol.closed(), 'left');
+  assert.deepEqual(errs(), [{ type: 'error', message: 'the shared project holds a part that no shared project has ("evil")', fatal: true }]);
+  await owner.close();
+  // (values that are no text, in the parts a shared project has: their bytes counted, past the total left; nothing more applied)
+  const doc2 = owned();
+  const owner2 = await shareRoom({ url: url(), token: 'the-token', doc: doc2, user: { name: 'Ana' } });
+  for (const put of [d => d.getMap('meta').set('junk', 'x'.repeat(5000)), d => d.getMap('files').set('src/a.vhd', 'x'.repeat(5000)), d => d.getMap('project').set('more', new Y.Map([['k', 'x'.repeat(5000)]]))]) {
+    evs.length = 0;
+    const f2 = await followRoom({ url: furl(), room: owner2.room, key: owner2.key, user: { name: 'Eva' }, limits, onEvent: e => evs.push(e) });
+    await f2.ready;
+    put(doc2);
+    await until(() => f2.closed(), 'Eva left');
+    const why = `the shared project is larger than a follower takes (${Math.ceil(Y.encodeStateAsUpdate(f2.doc).length / 1024)} KB, at most 4 KB)`;
+    assert.ok(Y.encodeStateAsUpdate(f2.doc).length > 4096);
+    assert.deepEqual(evs.filter(e => e.type !== 'peers'), [{ type: 'error', message: why, fatal: true }, { type: 'closed', reason: why }]);
+    doc2.transact(() => { for (const n of ['meta', 'files', 'project']) for (const k of [...doc2.getMap(n).keys()]) if (['junk', 'src/a.vhd', 'more'].includes(k)) doc2.getMap(n).delete(k); });
+  }
+  // (under the total: followed, no error)
+  evs.length = 0;
+  const f3 = await followRoom({ url: furl(), room: owner2.room, key: owner2.key, user: { name: 'Bo' }, limits, onEvent: e => evs.push(e) });
+  await f3.ready;
+  doc2.getMap('meta').set('junk', 'x'.repeat(1000));
+  await until(() => f3.doc.getMap('meta').get('junk'), 'the value arrived');
+  assert.deepEqual(errs(), []);
+  assert.equal(f3.closed(), false);
+  await owner2.close();
+});
+
 test('a wrong key, an unknown room, a room no longer shared: refused, said', async () => {
   const owner = await shareRoom({ url: url(), token: 'the-token', doc: owned(), user: { name: 'Ana' } });
   const errors = [];

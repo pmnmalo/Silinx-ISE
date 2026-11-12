@@ -23,7 +23,7 @@ import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { newKey, keyOf, seal, unseal } from './collab-crypto.js';
 import { newSigner, signerOf, verifierOf, signFrame, verifyFrame } from './collab-sign.js';
-import { docTooLarge, FOLLOW_LIMITS } from './collab-doc.js';
+import { docTooLarge, docMeter, editOutside, updateOutside, FOLLOW_LIMITS } from './collab-doc.js';
 
 export const PROTOCOL = 3;   // (2: an editor's signed edits, #3182; 3: a follower's awareness marked with its sender, #3360)
 export const SUBPROTOCOL = 'silinx-collab';   // (the WebSockets', server/collab-relay.js's)
@@ -141,25 +141,37 @@ function participant({ c, room, key, doc, awareness, owner, onEvent }) {
   };
 }
 
-// an editor's edit, at its arrival: applied when its signature is the room's (the key: `verifier()`)
-async function applyEdit(doc, key, room, verifier, frame) {
+// an editor's edit, at its arrival: applied when its signature is the room's (the key: `verifier()`) and `admit(bytes)`
+// (#3527: what it changes, its size)
+async function applyEdit(doc, key, room, verifier, frame, admit = () => true) {
   const v = await verifier();
   const f = v && await verifyFrame(v, room, frame);
   if (!f) return false;
   const { bytes } = await unseal(key, room, f);
+  if (!admit(bytes)) return false;
   Y.applyUpdate(doc, bytes, 'remote');
   return true;
 }
 
 /** The owner shares `doc`: the room opened on the relay at `url` (its share endpoint, with the server's token).
  *  Returns { room, key (the link's), editKey (an editor link's, with `editors`), peers(), setView(), close(), ... }.
- *  onEvent({ type: 'peers' | 'closed' | 'error', ... }). editors: editors may change it (their link signs, #3182). */
-export async function shareRoom({ url, token = null, doc, user, editors = false, WebSocket: WS = globalThis.WebSocket, onEvent = () => {} }) {
+ *  onEvent({ type: 'peers' | 'closed' | 'error', ... }). editors: editors may change it (their link signs, #3182); an
+ *  editor's change refused (an error event) past `limits.total` or outside the files and the drawings (#3527). */
+export async function shareRoom({ url, token = null, doc, user, editors = false, WebSocket: WS = globalThis.WebSocket, onEvent = () => {}, limits = FOLLOW_LIMITS }) {
   const { key, text } = await newKey();
   const signer = editors ? await newSigner() : null;
   // (the room's public key, for every participant: in the document)
   if (signer) doc.getMap('meta').set('editors', signer.pub); else doc.getMap('meta').delete('editors');
   const verifier = signer ? await verifierOf(signer.pub) : null;
+  // (#3527: an editor's edit refused, said, when it changes another part than the files and the drawings, or would take
+  // the document past what a follower takes)
+  const meter = docMeter(doc);
+  const admit = bytes => {
+    const why = editOutside(doc, bytes) || meter.over(limits.total, bytes.length);
+    if (why) { onEvent({ type: 'error', message: `an editor's change was refused: ${why}` }); return false; }
+    meter.add(bytes.length);
+    return true;
+  };
   const awareness = new Awareness(doc);
   awareness.setLocalState({ user, role: 'owner', view: null });
   let p = null;
@@ -172,7 +184,7 @@ export async function shareRoom({ url, token = null, doc, user, editors = false,
     else if (msg.type === 'closed') c.closedReason = msg.reason;
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
   }, async frame => {
-    if (frame[0] === KIND.edit) { await applyEdit(doc, key, p.room, () => verifier, frame).catch(() => false); return; }
+    if (frame[0] === KIND.edit) { await applyEdit(doc, key, p.room, () => verifier, frame, admit).catch(() => false); return; }
     // (a follower's awareness, marked by the room with who sent it: that follower's own state only, #3360; a follower's
     // update: never applied)
     const from = senderOf(frame);
@@ -188,7 +200,7 @@ export async function shareRoom({ url, token = null, doc, user, editors = false,
   p = participant({ c, room, key, doc, awareness, owner: doc.clientID, onEvent });
   const onUpdate = (u, origin) => { if (origin !== 'remote') p.send(KIND.update, u); };
   doc.on('update', onUpdate);
-  c.ws.addEventListener('close', () => doc.off('update', onUpdate), { once: true });
+  c.ws.addEventListener('close', () => { doc.off('update', onUpdate); meter.stop(); }, { once: true });
   return {
     ...p, key: text, editKey: signer?.text || null,
     /** Stops sharing: the room closed for everyone. */
@@ -200,7 +212,7 @@ export async function shareRoom({ url, token = null, doc, user, editors = false,
  *  arrived), peers(), owner(), setView(), close() }. Read only: nothing it does reaches the owner but its view. With
  *  `sign` (an editor link's key, #3182), an editor: what changes in its document (core/collab-doc.js editFile) is
  *  sent, signed, to everyone. A room whose document passes `limits` (its files, their total size: core/collab-doc.js
- *  FOLLOW_LIMITS, #3361) is left at once: an error event ({ fatal: true }), `ready` rejected, nothing more applied. */
+ *  FOLLOW_LIMITS, #3361; its bytes, a root of no shared project's, #3527) is left at once: an error event ({ fatal: true }), `ready` rejected, nothing more applied. */
 export async function followRoom({ url, room, key: keyText, sign = null, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {}, limits = FOLLOW_LIMITS }) {
   const key = await keyOf(keyText);
   const signer = sign ? await signerOf(sign) : null;
@@ -218,9 +230,12 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
   const ready = new Promise((resolve, reject) => { synced = resolve; failed = reject; });
   ready.catch(() => {});
   let warned = false, left = false;
-  // (the document past what a follower takes: left, said once)
-  const capped = () => {
-    const why = docTooLarge(doc, limits);
+  // (the document past what a follower takes: left, said once; #3527: its bytes, whatever they hold, the updates and
+  // the edits received counted; an editor's edit the owner refuses, refused here too, not applied)
+  const meter = docMeter(doc);
+  const capped = (n = 0, why = null) => {
+    meter.add(n);
+    why ||= docTooLarge(doc, limits) || meter.over(limits.total);
     if (!why) return false;
     left = true;
     onEvent({ type: 'error', message: why, fatal: true });
@@ -236,7 +251,7 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
   }, async frame => {
     if (left) return;
-    if (frame[0] === KIND.edit) { if (await applyEdit(doc, key, room, verifierOfDoc, frame).catch(() => false)) capped(); return; }
+    if (frame[0] === KIND.edit) { let n = 0; if (await applyEdit(doc, key, room, verifierOfDoc, frame, b => { n = b.length; return !editOutside(doc, b) && !meter.over(limits.total, n); }).catch(() => false)) capped(n); return; }
     // (another follower's awareness, marked by the room with who sent it, #3360; anything else is the owner's)
     const from = senderOf(frame);
     let m;
@@ -245,7 +260,12 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
       return;
     }
     if (from) { if (m.kind === KIND.awareness) applyAwarenessFrom(awareness, m.bytes, from.client); return; }
-    if (m.kind === KIND.update) { Y.applyUpdate(doc, m.bytes, 'remote'); if (!capped()) synced(); }
+    if (m.kind === KIND.update) {
+      // (#3527: an update that changes a root of no shared project's: left, not applied)
+      const outside = updateOutside(doc, m.bytes);
+      if (!outside) Y.applyUpdate(doc, m.bytes, 'remote');
+      if (!capped(m.bytes.length, outside)) synced();
+    }
     else if (m.kind === KIND.awareness) applyAwarenessFrom(awareness, m.bytes);   // (the owner's: who is in)
   });
   try { await c.opened; } catch (e) { awareness.destroy(); throw e; }

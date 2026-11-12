@@ -308,8 +308,14 @@ Share Project… (and the MCP's `share_project`) shares the open project live; a
   sent the link, so everything the room shows passes the import gate first (`core/collab-doc.js` `gatedDocFile`):
   each file's size (1 MB), NUL bytes, an HTML page, an XML DTD. A file refused is not shown, and the console gives
   its reason; the MCP's `follow_project` refuses it the same way. A room whose document passes 5000 files or 64 MB
-  or 100,000 drawing objects (`FOLLOW_LIMITS`) is left at once, with an error in the console. Nothing a follower receives is written to the
+  or 100,000 drawing objects (`FOLLOW_LIMITS`) is left at once, with an error in the console. The 64 MB holds for the
+  whole document (#3527): its encoded size, whatever it holds (values that are no text, updates waiting for others),
+  counted as the updates arrive; an update that adds a part no shared project has (a root other than `meta`,
+  `project`, `files`, `drawings`: `core/collab-roots.js`) is not applied, and the room is left. Nothing a follower receives is written to the
   disk.
-- **An editor** (an editor's link, `#edit=…`) changes the project's text files and drawings. At the owner's, each change passes the
+- **An editor** (an editor's link, `#edit=…`) changes the project's text files and drawings. At the owner's, an edit
+  that changes another part of the document (the project's settings, its meta, a root of its own), builds on changes
+  the owner does not have, or would take the document past 64 MB is refused before it is applied, said as a warning
+  (#3527); each change passes the
   import gate before it is written. The first one makes a trusted project untrusted (#3355): Xilinx ISE and the board
   wait for the user's Trust Project.

@@ -182,3 +182,55 @@ test('an editor in a room the owner\'s page hosts: the same', async () => {
     o => followRoom({ url: 'silinx-host:', WebSocket: function S() { const { client, room } = socketPair(); h.follower(room); return client; }, ...o }));
   await edits(t);
 });
+
+test('#3527 regression: an editor\'s change of another part than the files and the drawings, or past the total a follower takes: refused at the owner\'s, said, applied nowhere', async () => {
+  const doc = owned();
+  const errors = [];
+  const owner = keep(await shareRoom({ url: relayUrl(base, 'share'), token: 'the-token', doc, user: { name: 'Ana' }, editors: true, limits: { total: 8192 }, onEvent: e => { if (e.type === 'error') errors.push(e.message); } }));
+  const editor = async () => { const e = keep(await followRoom({ url: relayUrl(base, 'follow'), room: owner.room, key: owner.key, sign: owner.editKey, user: { name: 'Rui' } })); await e.ready; return e; };
+  // (a follower whose limit is the owner's: what the owner refuses, it refuses too)
+  const fol = keep(await followRoom({ url: relayUrl(base, 'follow'), room: owner.room, key: owner.key, user: { name: 'Eva' }, limits: { files: 5000, total: 8192 } }));
+  await fol.ready;
+  const REFUSED = 'an editor\'s change was refused: ';
+  // (a root of its own, the project's settings, the meta: refused; what the editor inserts after it, built on a refused
+  // change, refused too; after a deletion refused, which takes no place of its own, applied)
+  const steps = [
+    [d => d.getMap('evil').set('k', 'x'.repeat(100)), 'it changes a part of the document that an editor does not ("evil")'],
+    [d => d.getMap('project').set('json', '{"name":"hacked"}'), 'it changes a part of the document that an editor does not ("project")'],
+    [d => d.getMap('meta').set('owner', 'Eve'), 'it changes a part of the document that an editor does not ("meta")'],
+    [d => d.getMap('meta').delete('version'), 'it changes a part of the document that an editor does not ("meta")', false],
+  ];
+  for (const [change, why, after = true] of steps) {
+    const ed = await editor();
+    errors.length = 0;
+    change(ed.doc);
+    editFile(ed.doc, 'src/top.ucf', '-- after it\n');
+    if (after) await until(() => errors.length === 2, why);
+    else await until(() => docFile(fol.doc, 'src/top.ucf') === '-- after it\n', 'the change after it');
+    assert.deepEqual(errors, [REFUSED + why, ...(after ? [`${REFUSED}it builds on changes the owner does not have`] : [])]);
+    await ed.close();
+  }
+  // (a text past the total: its insertion refused; one within it applied)
+  errors.length = 0;
+  const ed = await editor();
+  editFile(ed.doc, 'src/top.vhd', `-- ${'x'.repeat(9000)}\n`);
+  // (in two parts of 8192 characters at most: the first past the total, the second built on it)
+  await until(() => errors.length === 2, 'the large one refused');
+  assert.match(errors[0], /^an editor's change was refused: the shared project is larger than a follower takes \(\d+ KB, at most 8 KB\)$/);
+  assert.equal(errors[1], `${REFUSED}it builds on changes the owner does not have`);
+  await ed.close();
+  errors.length = 0;
+  const ed2 = await editor();
+  editFile(ed2.doc, 'src/top.ucf', 'NET "clk" LOC = "C8";\n');
+  await until(() => docFile(fol.doc, 'src/top.ucf') === 'NET "clk" LOC = "C8";\n' && docFile(doc, 'src/top.ucf') === 'NET "clk" LOC = "C8";\n', 'the small edit at the owner\'s and the follower\'s');
+  assert.deepEqual(errors, []);
+  // (applied nowhere: the owner's and the follower's documents as they were)
+  for (const d of [doc, fol.doc]) {
+    assert.deepEqual([...d.share.keys()].sort(), ['drawings', 'files', 'meta', 'project']);
+    assert.deepEqual([d.getMap('meta').get('owner'), d.getMap('meta').get('version'), JSON.parse(d.getMap('project').get('json')).name], ['Ana', 1, 'traffic']);
+    // (the large change's deletion, an update of its own, applied; its insertion not)
+    assert.equal(docFile(d, 'src/top.vhd'), '\n');
+  }
+  assert.equal(fol.closed(), false);
+  await owner.close();
+});
