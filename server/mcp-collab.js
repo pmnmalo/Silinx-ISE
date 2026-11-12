@@ -1,4 +1,4 @@
-// The MCP server's tools of a shared project (#3181, server/mcp.js, #2674), as the interface's Share Project… and the
+// The MCP server's tools of a shared project (#3181, server/mcp.js, #2674), as the interface's Share Project Live… and the
 // opening of a link to follow: share_project shares a project of the workspace live, read only, through the relay of
 // a running Silinx server (server/collab-relay.js; its token read as a second launch reads it, server/server.js
 // tokenFile), its files published from the disk and kept as they change (the project watcher, #2843);
@@ -141,8 +141,8 @@ const peerLines = peers => (peers.length ? peers.map(p => `${p.name} (${p.role})
 
 export const COLLAB_TOOLS = [
   {
-    name: 'share_project', title: 'Share Project (live, read only)',
-    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project… does: action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
+    name: 'share_project', title: 'Share Project Live (read only)',
+    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project Live… does: action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       action: { type: 'string', enum: ['start', 'status', 'stop'], description: 'start (default), status or stop.' },
@@ -199,7 +199,7 @@ export const COLLAB_TOOLS = [
   },
   {
     name: 'follow_project', title: 'Follow a shared project (read only)',
-    description: 'Follow a project someone shares (a link …/#follow=… of Share Project… or share_project), read only (an editor\'s link, …/#edit=…: write changes its text files and drawings), as the interface does when opened at that link: gives the project\'s files, who is in it, the file the owner has open and their cursor; path: that file\'s text as it is now (call again to see it change; a drawing as its participants have merged it, with its Check (but a truth table and a schematic)). stop: leave. The project is not copied into the workspace (import nothing; read it here).',
+    description: 'Follow a project someone shares (a link …/#follow=… of Share Project Live… or share_project), read only (an editor\'s link, …/#edit=…: write changes its text files and drawings), as the interface does when opened at that link: gives the project\'s files, who is in it, the file the owner has open and their cursor; path: that file\'s text as it is now (call again to see it change; a drawing as its participants have merged it, with its Check (but a truth table and a schematic)). stop: leave. The project is not copied into the workspace (import nothing; read it here).',
     inputSchema: { type: 'object', properties: {
       link: STR('The link to follow (the whole address).'),
       path: STR('A file of the project: its text as it is now.'),

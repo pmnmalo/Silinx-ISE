@@ -405,17 +405,17 @@ they are), ticking it in the Steps panel, or giving its hint and the reasons in 
 on the gates example, "A state machine" on traffic, "The clock and the board" on blinky and "The emulator" on stopwatch
 (in English and Portuguese); a teacher writes a lab as a `labs/<name>.lab.json` file of a project (*New Source ▸
 Guided Lab* starts one from a template; its format: `core/labs.js`), checked as it is edited (each save, and its Check
-Syntax, say its problems), and shares it with the project. A link opens a lab beside the project (`lab=<its id>`: *Copy Link*'s
+Syntax, say its problems), and shares it with the project. A link opens a lab beside the project (`lab=<its id>`: *Share Project Copy*'s
 Lab, e.g. `…/Silinx/#open=example:stopwatch&lab=stopwatch-emulator`). The progress is the project's
 (`labs/progress.json`): a lab resumes where it was left.
 
 ### A design in a link (for lecture slides)
 
 A link opens Silinx on a design, straight in Try it, the simulation or the board emulator, with no project to create
-or import: **Copy Link to Project…** (the project's right-click menu in the Design pane, the Start page, the ISE
-style's File menu) or **Copy Link to This Module…** (a module's right-click menu) makes it, the view and the module
+or import: **Share Project Copy…** (the project's right-click menu in the Design pane, the Start page, the ISE
+style's File menu) or **Share Module Copy…** (a module's right-click menu) makes it, the view and the module
 chosen. The whole project goes inside the link (`#design=…`, compressed: 5 to 25 KB for the examples; anyone with the
-link has every file, its comments too), so nothing has to be hosted. Copy Link can make a **short link** instead
+link has every file, its comments too), so nothing has to be hosted. Share Project Copy can make a **short link** instead
 (`#gist=…`, about 140 characters, for a chat that refuses a long message): the project is encrypted in your browser and
 saved as a secret gist of your GitHub account (the browser edition's Sign in with GitHub…; a server's `GH_TOKEN`), and
 the key is in the link, so GitHub keeps only what it cannot read; opening it needs no sign-in, and your links are your
@@ -433,7 +433,7 @@ only when they say so. A zip from another site is fetched only once you agree (i
 https address that is not of this computer or a local network, the zip's own (a redirection is not followed); a
 broken link is said in the console, the workspace as it was.
 
-Copy Link… includes Silinx as it is when the link is copied (**Include the current view**): the open tabs, the one in
+Share Project Copy… includes Silinx as it is when the link is copied (**Include the current view**): the open tabs, the one in
 front, the split and, in the Silinx interface, the task, the side panel, the messages and a maximized document; the
 link opens it so, for that page only (the viewer's own layout is not changed).
 

@@ -20,10 +20,10 @@ export function renderTeachingPage() {
       ...[['Guided Labs…', 'help', () => S.project && import('./lab-view.js').then(m => m.guidedLabsDialog()), true],
         ['Exercise…', 'run', () => S.project && import('./exercise-view.js').then(m => m.exerciseDialog()), true]].map(command)),
     h('div', { class: 'start-box teach-share' }, h('h3', {}, 'Links and Sharing'),
-      command(['Copy Link to Project…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]),
+      command(['Share Project Copy…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]),
       // (the server editions, #3195; the editions that share, not while following another's, #3315)
       ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
-      ...((api.collab || api.standalone) && !api.following ? [command(['Share Project…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true])] : [])));
+      ...((api.collab || api.standalone) && !api.following ? [command(['Share Project Live…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true])] : [])));
   if (S.project) host.dataset.project = ''; else delete host.dataset.project;
   // kept when it is the same (a click between a press and its release, as the Start page's, #494)
   if (host.firstElementChild?.outerHTML === page.outerHTML) return;
