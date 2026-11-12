@@ -65,7 +65,7 @@ test('simulate model: a model older than the sources is said; the VCD of the wav
   await fails('simulate', { project: 'g', time_ns: 100, vcd: 'gates.vcd' }, `'<exchange folder>/gates.vcd' exists: a VCD does not replace a file (give another name)`);
   await fails('simulate', { project: 'g', time_ns: 100, vcd: 'gates.txt' }, 'vcd: \'gates.txt\' is not a .vcd');
   await fails('simulate', { project: 'g', time_ns: 100, vcd: '../out.vcd' }, `vcd: '../out.vcd' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
-  await fails('simulate', { project: 'g', model: 'netlist', time_ns: 100 }, 'model: behavioral or one of postsynth, posttrans, postmap, postpar');
+  await fails('simulate', { project: 'g', model: 'netlist', time_ns: 100 }, 'model: one of behavioral, postsynth, posttrans, postmap, postpar');
 });
 
 test('simulate model: a Verilog test bench (the clock example) against the post-synthesis model', async () => {

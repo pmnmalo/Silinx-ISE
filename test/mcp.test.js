@@ -247,7 +247,7 @@ test('new_project and set_top: an empty project for a board, its source written,
   assert.equal(made.content[0].text, 'Empty project \'Counter4\' made: basys2 (xc3s100ecp132-4). Write its sources with write_file, then set_top. It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');
   assert.deepEqual(made.structuredContent.device, { family: 'spartan3e', part: 'xc3s100e', package: 'cp132', speed: '-4' });
   assert.equal((await srv.call('new_project', { name: 'Counter4' })).content[0].text, 'new_project: project \'Counter4\' already exists');
-  assert.equal((await srv.call('new_project', { name: 'X', board: 'zedboard' })).content[0].text, 'new_project: unknown board \'zedboard\' (basys2, nexys2)');
+  assert.equal((await srv.call('new_project', { name: 'X', board: 'zedboard' })).content[0].text, 'new_project: unknown board \'zedboard\' (list_devices)');
   assert.equal((await srv.call('new_project', { name: 'X', board: 'nexys2', variant: '250' })).content[0].text, 'new_project: the Digilent Nexys2 has no variant \'250\'');
   const bare = await srv.call('new_project', { name: 'Bare' });
   assert.equal(bare.content[0].text, 'Empty project \'Bare\' made: no board (xc3s250ecp132-4). Write its sources with write_file, then set_top. It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.');

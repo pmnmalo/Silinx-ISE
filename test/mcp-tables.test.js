@@ -74,7 +74,7 @@ test('set_output_logic refuses: not a table, nothing to set, an output, a form o
   await fails({ project: 'b', path: 'src/top.vhd', output: 'f', form: 'sop' }, 'src/top.vhd: a truth table (.bool.json, .tt.json) has outputs');
   await fails({ project: 'b', path: 'src/lamps.bool.json', output: 'car_r' }, 'form or solution: what to set');
   await fails({ project: 'b', path: 'src/lamps.bool.json', output: 'f', form: 'sop' }, "src/lamps.bool.json: no output 'f' (outputs: car_r, car_y, car_g, walk_r, walk_g)");
-  await fails({ project: 'b', path: 'src/lamps.bool.json', output: 'car_r', form: 'esop' }, 'src/lamps.bool.json: form: sop, pos, xor, nand, nor, gates, delay, csop, cpos');
+  await fails({ project: 'b', path: 'src/lamps.bool.json', output: 'car_r', form: 'esop' }, 'form: one of sop, pos, xor, nand, nor, gates, delay, csop, cpos');
   await fails({ project: 'b', path: 'src/lamps.bool.json', output: 'car_r', solution: { sop: 3 } }, 'src/lamps.bool.json: solution sop: one minimal solution (0)');
   await fails({ project: 'b', path: 'src/none.bool.json', output: 'f', form: 'sop' }, "no file 'src/none.bool.json' in the project 'b'");
   assert.equal(read('b', 'src/lamps.bool.json'), before, 'nothing written');

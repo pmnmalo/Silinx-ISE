@@ -13,6 +13,7 @@
 import readline from 'node:readline';
 import { VERSION } from '../core/version.js';
 import { pathNamer, redactor, untrustedNote } from './mcp-util.js';
+import { checkArgs } from './mcp-args.js';
 import { PROJECT_TOOLS } from './mcp-projects.js';
 import { HDL_TOOLS } from './mcp-hdl.js';
 import { WCFG_TOOLS } from './mcp-wcfg.js';
@@ -75,10 +76,9 @@ export async function handle(msg, state = {}, { signal } = {}) {
       const tool = TOOLS.find(t => t.name === msg.params?.name);
       if (!tool) return fail(-32602, `unknown tool '${msg.params?.name}'`);
       const args = msg.params?.arguments || {};
-      const known = Object.keys(tool.inputSchema.properties);
-      const extra = Object.keys(args).filter(k => !known.includes(k));
-      const missing = (tool.inputSchema.required || []).filter(k => args[k] === undefined);
-      if (extra.length || missing.length) return reply({ content: [{ type: 'text', text: `${tool.name}: ${[missing.length ? `missing ${missing.join(', ')}` : '', extra.length ? `unknown ${extra.join(', ')}` : ''].filter(Boolean).join('; ')}` }], isError: true });
+      // (every argument checked against the tool's schema first, #3535: no tool runs on a wrong value)
+      const wrong = checkArgs(tool, args);
+      if (wrong) return reply({ content: [{ type: 'text', text: wrong }], isError: true });
       // (the workspace and the exchange folder named as such, never their absolute paths, #3418)
       const name = await pathNamer();
       try {
