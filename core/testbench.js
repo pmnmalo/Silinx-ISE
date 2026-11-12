@@ -11,6 +11,7 @@
 // RELEASES it ('Z') so that the design can drive it; the value on the bus is then checked like
 // an output (its expected value, '-' = not checked).
 // The generated VHDL is VHDL-93 (it also runs in Xilinx ISim); the Verilog is Verilog-2001.
+import { isName } from './ident.js';
 
 export const MAX_VECTORS = 4096;
 
@@ -176,7 +177,7 @@ function makeInVectors(inputs, { mode = 'exhaustive', count = 16, seed = 1 } = {
 }
 
 // ------------------------------------------------------------------ generation
-const ident = (s) => /^[A-Za-z][A-Za-z0-9_]*$/.test(s);
+const ident = isName;
 
 // the test bench's own names (its constants, signals, variables, labels): each one as it is, or with tb_ before it
 // while a port of the module has that name (#2740: a port named done, the bench's done flag, two signals of one name);

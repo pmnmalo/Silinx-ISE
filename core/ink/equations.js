@@ -12,6 +12,7 @@ import { boxOf } from './segment.js';
 import { recognizeExpression, splitEquation, expressionInputs } from './expression.js';
 import { builtinTemplates } from './templates.js';
 import { parseExpr, exprColumn, LogicError, MAX_EDIT_INPUTS } from '../logic.js';
+import { isName } from '../ident.js';
 
 export function inkLines(strokes) {
   const boxes = strokes.map(s => boxOf([s]));
@@ -51,7 +52,7 @@ export function tableFromEquations(text, { name = 'F', maxInputs = MAX_EDIT_INPU
   if (eqs.length === 1 && !eqs[0].name) eqs[0].name = name;
   const outputs = [];
   for (const e of eqs) {
-    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(e.name)) throw new LogicError(`'${e.name}' is not a name: a letter, then letters, digits or _.`);
+    if (!isName(e.name)) throw new LogicError(`'${e.name}' is not a name: a letter, then letters, digits or _.`);
     if (outputs.some(o => o.toLowerCase() === e.name.toLowerCase())) throw new LogicError(`The output ${e.name} has two expressions.`);
     if (!e.expr) throw new LogicError(`${e.name} has no expression.`);
     outputs.push(e.name);

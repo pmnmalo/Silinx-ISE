@@ -4,7 +4,8 @@
 import { api } from './api.js';
 import { h, toast } from './ui.js';
 import { reservedError } from '/core/reserved.js';
-import { wizard, field, replaceGuard, closeBeforeReplace, NAME_RE } from './wizards.js';
+import { wizard, field, replaceGuard, closeBeforeReplace } from './wizards.js';
+import { NAME_RE } from '/core/ident.js';
 import { S, app } from './app.js';
 
 // a truth table from "name = expression" (#1056): its inputs (the expression's, 1 to 6), its output (the name, else f)

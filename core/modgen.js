@@ -13,6 +13,7 @@
 // Isomorphic (no DOM).
 import { newDoc, normalizeDoc, portBox, GRID } from './schdoc.js';
 import { reservedError } from './reserved.js';
+import { isName } from './ident.js';
 
 // ===================================================================== identifiers
 export const MAX_WIDTH = 256;
@@ -23,7 +24,7 @@ export function identError(name, lang) {
   const n = String(name ?? '');
   if (!n) return 'the name is empty';
   if (!/^[A-Za-z]/.test(n)) return `'${n}' must start with a letter`;
-  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(n)) return `'${n}' may only contain letters, digits and _`;
+  if (!isName(n)) return `'${n}' may only contain letters, digits and _`;
   if (/__/.test(n) || /_$/.test(n)) return `'${n}': no double __ and no _ at the end`;
   // a reserved word of either language, in any letter case: the HDL is generated in both (#679)
   const r = reservedError(n);

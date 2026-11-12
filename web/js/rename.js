@@ -9,6 +9,7 @@ import { reloadProject } from './project.js';
 import { isFsm, isTt, syncHdlFromAsm, syncHdlFromFsm, syncHdlFromSchematic, syncHdlFromTt } from './drawings.js';
 import { markStale, saveAll } from './processes.js';
 import { reservedError } from '/core/reserved.js';
+import { isName } from '/core/ident.js';
 
 // ---- Rename Symbol (F2) in an HDL editor: the name under the cursor, everywhere it means the same
 // object in the file; a port / generic also in the instances of its module in the other files
@@ -67,7 +68,7 @@ export async function renameDialog(file, mod = null) {
       if (!to || to.startsWith('/') || to.split('/').includes('..')) return 'Enter a file path inside the project.';
       if (to !== file && S.fileTree.some(f => f.toLowerCase() === to.toLowerCase()) && to.toLowerCase() !== file.toLowerCase()) return `${to} already exists.`;
       if (mIn) {
-        if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(nm)) return 'The module name must start with a letter and contain only letters, digits and _.';
+        if (!isName(nm)) return 'The module name must start with a letter and contain only letters, digits and _.';
         // not a reserved word of VHDL or Verilog, in any letter case (#679)
         const r = nm.toLowerCase() !== modName.toLowerCase() && reservedError(nm);
         if (r) return `${r}: choose another name.`;

@@ -17,11 +17,10 @@ import { byLastUsed } from './project-store.js';
 import { currentProject, opened } from './project.js';
 import { prefKey } from './prefs.js';
 import { safeReleaseUrl } from './release-url.js';
+import { NAME_RE } from '/core/ident.js';
 
-export const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 // Device used when no evaluation board is selected.
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
-export const FILE_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
 
 export function field(label, input) { return [h('label', {}, label), input]; }
 export function select(options, value) {

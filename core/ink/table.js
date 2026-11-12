@@ -12,10 +12,10 @@ import { segment, boxOf, InkError } from './segment.js';
 import { classify } from './pdollar.js';
 import { builtinTemplates } from './templates.js';
 import { recognizeWords } from './expression.js';
+import { NAME_RE } from '../ident.js';
 
 // the cells' symbols, and what is written alike
 const CELL = { 0: '0', O: '0', o: '0', 1: '1', l: '1', '|': '1', I: '1', X: 'X', x: 'X', '*': 'X' };
-const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 const median = a => [...a].sort((x, y) => x - y)[a.length >> 1];
 
 function strokeInfo(s) {

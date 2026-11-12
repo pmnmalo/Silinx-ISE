@@ -13,11 +13,11 @@
 // exercise's folder and kept inside it, server/grade.js). The verdicts are VERDICTS. Isomorphic.
 import { CHECKS, pattern } from './labs-check.js';
 import { MAX_DEPTH } from './verify.js';
+import { NAME_RE } from './ident.js';
 
 export const EXERCISE_VERSION = 1;
 export const isExerciseFile = p => /\.exercise\.json$/i.test(String(p || ''));
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
-const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 /** The verdicts, each with its short code (the CSV's, the text report's) and its name. */
 export const VERDICTS = Object.freeze({

@@ -5,6 +5,7 @@
 // An ISE arc goes from (sx, sy) to (ex, ey) around (cx, cy), its angle decreasing (the y axis pointing down): the
 // AND gate's right side, from its bottom (144,-48) through (192,-96) to its top (144,-144) around (144,-96).
 import { arcCircle, normalizeGraphic, textBox } from './schgraphics.js';
+import { escXmlText } from './escape.js';
 
 export const ISE_GRAPHIC_TAGS = new Set(['text', 'line', 'rect', 'circle', 'arc']);
 const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
@@ -52,11 +53,10 @@ export function graphicsFromIse(model, MX, MY, s) {
  *  (Silinx px -> ISE units). A text of several lines is a text per line. */
 export function graphicsToIse(graphics, X, ind = '        ') {
   const L = [];
-  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   for (const g of graphics || []) {
     if (g.kind === 'text') {
       const b = textBox(g);
-      b.lines.forEach((l, i) => { if (l.trim()) L.push(`${ind}<text style="fontsize:${X(b.size)};fontname:Arial" x="${X(g.x)}" y="${X(g.y + i * b.lh)}">${esc(l)}</text>`); });
+      b.lines.forEach((l, i) => { if (l.trim()) L.push(`${ind}<text style="fontsize:${X(b.size)};fontname:Arial" x="${X(g.x)}" y="${X(g.y + i * b.lh)}">${escXmlText(l)}</text>`); });
     } else if (g.kind === 'line') L.push(`${ind}<line x2="${X(g.x2)}" y1="${X(g.y1)}" y2="${X(g.y2)}" x1="${X(g.x1)}" />`);
     else if (g.kind === 'rect') L.push(`${ind}<rect width="${X(g.w)}" x="${X(g.x)}" y="${X(g.y)}" height="${X(g.h)}" />`);
     else if (g.kind === 'circle') L.push(`${ind}<circle r="${X(g.r)}" cx="${X(g.cx)}" cy="${X(g.cy)}" />`);

@@ -22,6 +22,7 @@ import { inView, moduleBadges, openModuleSource, saveProjectJson } from './desig
 import { wcfgFiles } from './sim-wcfg.js';
 import { prefKey } from './prefs.js';
 import { pinsReady } from './pins-check.js';
+import { isName } from '/core/ident.js';
 
 // ---- schematic
 // Netlist written by netgen for `step` (postsynth / posttrans / postmap / postpar) with the
@@ -318,7 +319,7 @@ async function saveStimTestbench(mod, inst, m) {
   for (let k = 2; moduleInfo(dft); k++) dft = `tb_${mod}_${k}`;
   const name = String(await promptDlg(title, 'Test bench name:', dft) ?? '').trim();
   if (!name) return;
-  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) return alertDlg(title, `'${name}' is not a valid name (a letter, then letters, digits or _).`, 'error');
+  if (!isName(name)) return alertDlg(title, `'${name}' is not a valid name (a letter, then letters, digits or _).`, 'error');
   const lang = (S.project.preferredLanguage || info?.lang) === 'verilog' ? 'verilog' : 'vhdl';
   const dir = String(info?.file || 'src/x').replace(/\/[^/]*$/, '');
   const path = `${dir}/${name}.${lang === 'verilog' ? 'v' : 'vhd'}`;
