@@ -11,11 +11,12 @@
 // wcfgPath and wcfgList: the configurations' files in a project (web/js/sim-wcfg.js). wcfgSignal and placeWcfg: a
 // configuration's rows from and onto an elaborated design's signals, the wave window's (web/js/isim-wcfg.js) and the
 // MCP's (server/mcp-wcfg.js, #2839).
+import { escXmlApos } from './escape.js';
 
 const RADIX = { bin: 'BINARYRADIX', hex: 'HEXRADIX', oct: 'OCTALRADIX', udec: 'UNSIGNEDDECRADIX', sdec: 'SIGNEDDECRADIX', ascii: 'ASCIIRADIX' };
 const RADIX_OF = Object.fromEntries(Object.entries(RADIX).map(([k, v]) => [v, k]));
 
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+const esc = escXmlApos;
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 // (a character reference past Unicode, &#x110000; on: the file's error, #3557)
 const unesc = s => String(s).replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi, (m, e) => {

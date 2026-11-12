@@ -10,6 +10,7 @@
 //                         //   lines: [] }] }, the slowest first
 import { compile } from './compile.js';
 import { signalDrivers } from './hdl-drivers.js';
+import { isIdent } from './ident.js';
 
 const NUM = '(-?\\d+(?:\\.\\d+)?)';
 // trce's delay types: the clock-to-out ones (Tcko, Tcko of a block RAM or multiplier: Trcko_DOA, Tmult…cko), the setup
@@ -27,7 +28,7 @@ export function xstBase(n) {
   const b = last.replace(/^M(?:add|sub|addsub|compar|count|mux|xor|mult|sh|shift)_/i, '')
     .replace(/_(?:cmp_[a-z]+|or|and|not|mux|addsub|add|sub|xor|share|eq|ne|lt|gt|le|ge|inv)\d{4}.*$/i, '')
     .replace(/_FSM_FFd\d+.*$/, '').replace(/_SW\d+$/, '').replace(/_INV_\d+$/, '');
-  return b && b !== last && /^[A-Za-z_]\w*$/.test(b) ? head + b : null;
+  return b && b !== last && isIdent(b) ? head + b : null;
 }
 
 // one stage line: "SLICE_X29Y34.YQ      Tcko                  0.587   u_pre/cnt<0>"

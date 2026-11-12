@@ -11,6 +11,7 @@
 //   pathNames(path, file)                      // the names of the path in the module generated into `file`
 //   drawingPath(kind, model, names, { modules })  // [{ type: state | trans | node | edge | sym | wire, id, label }]
 import { netlist } from './schdoc.js';
+import { isIdent } from './ident.js';
 
 const IDENT = /[A-Za-z_][A-Za-z0-9_]*/g;
 // (the generators' names of a signal's parts: a register's present and next value, an input's synchronisers)
@@ -19,7 +20,7 @@ const base = n => n.replace(/_(reg|next|sync|meta)$/, '');
 export const signalOf = n => {
   if (!n || n.startsWith('$')) return null;
   const last = n.split('.').pop().replace(/\[\d+\]$/, '');
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(last) ? last : null;
+  return isIdent(last) ? last : null;
 };
 
 /** The signal names of a path in the module generated into `file` (lower case: VHDL's are): the named nets next to a

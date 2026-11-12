@@ -10,7 +10,8 @@ import { uutInfo } from '/core/uut-info.js';
 import { S, app } from './app.js';
 import { isView } from '/core/view-hdl.js';
 import { reservedError } from '/core/reserved.js';
-import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere, drawnHdlTaken, NAME_RE, FILE_RE } from './wizards.js';
+import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere, drawnHdlTaken } from './wizards.js';
+import { NAME_RE, FILE_RE } from '/core/ident.js';
 import { cTemplate, cppTemplate } from './c-templates.js';
 export { cTemplate, cppTemplate } from './c-templates.js';
 

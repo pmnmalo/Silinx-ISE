@@ -7,6 +7,7 @@ import { compile } from '../core/compile.js';
 import { renameModuleInSource, renameModuleInSchematic } from '../core/rename.js';
 import { reservedError } from '../core/reserved.js';
 import { syncDrawing } from './drawing-sync.js';
+import { isName } from '../core/ident.js';
 
 const VIEW = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
 const extOf = p => (VIEW.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
@@ -39,7 +40,7 @@ export async function renameModule(P, name, oldName, newName, { to = null } = {}
   const from = mod.file;
   const tree = await P.fileTree(name);
   // the dialog's checks
-  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(newName)) throw fail('The module name must start with a letter and contain only letters, digits and _.');
+  if (!isName(newName)) throw fail('The module name must start with a letter and contain only letters, digits and _.');
   if (!eq(newName, oldName)) {
     const r = reservedError(newName);
     if (r) throw fail(`${r}: choose another name.`);

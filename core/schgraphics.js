@@ -7,6 +7,7 @@
 //                  { id, kind: 'circle', cx, cy, r }
 //                  { id, kind: 'arc', x1, y1, x2, y2, x3, y3 }]  // from (x1, y1) through (x2, y2) to (x3, y3)
 import { clone } from './util.js';
+import { escXml } from './escape.js';
 
 export const GRAPHIC_KINDS = ['text', 'line', 'rect', 'circle', 'arc'];
 export const TEXT_SIZE = 14;
@@ -14,7 +15,7 @@ export const TEXT_SIZES = [8, 72];
 const COORDS = { text: ['x', 'y'], line: ['x1', 'y1', 'x2', 'y2'], rect: ['x', 'y', 'w', 'h'], circle: ['cx', 'cy', 'r'], arc: ['x1', 'y1', 'x2', 'y2', 'x3', 'y3'] };
 const XS = new Set(['x', 'x1', 'x2', 'x3', 'cx']), YS = new Set(['y', 'y1', 'y2', 'y3', 'cy']);
 const num = v => (Number.isFinite(+v) ? Math.round(+v) : 0);
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = escXml;
 
 /** A graphic as a document keeps it, or null when it is none (an unknown kind, an empty text, a shape of no size). */
 export function normalizeGraphic(g) {

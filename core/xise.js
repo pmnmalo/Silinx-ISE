@@ -11,10 +11,11 @@ import { convertIseSchematics, exportIseSch, iseTimestamp } from './isesch.js';
 import { compile, langOfPath } from './compile.js';
 import { modulesFromLibrary } from './schdoc.js';
 import { isCSource, viewHdl } from './view-hdl.js';
+import { escXml } from './escape.js';
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
 
-const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = s => escXml(s ?? '');
 const unesc = s => String(s ?? '').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&amp;/g, '&');
 
 const STARTUP = { JtagClk: 'JTAG Clock', Cclk: 'CCLK', CCLK: 'CCLK', UserClk: 'User Clock' };
