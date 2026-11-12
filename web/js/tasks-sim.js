@@ -11,13 +11,14 @@
 // simTarget and simChoices have no DOM and are unit tested (test/tasks.test.js).
 
 import { h } from './ui.js';
+import { simModelsOf } from './tool-descriptors.js';
 
 /** SSim's toolbar in its wave window's line, where its name ("Default.wcfg") and the cursor's text were (`tasks`: the
  *  Tasks interface, #1026; web/css/tasks.css hides them), its stimuli bar under it (#1270), else both back under its title
- *  bar, as SSim made them. */
-export function placeSimToolbar(tasks, S = null) {
+ *  bar, as SSim made them; its model's choices the project's tool's (`tool`, #3707). */
+export function placeSimToolbar(tasks, S = null, tool = null) {
   if (!tasks) for (const f of document.querySelectorAll('#workspace .isim-toolbar .isim-model-field')) f.remove();   // (the Tasks interface's only)
-  else if (S) for (const d of S.docs) if (/^isim:/.test(d.id)) placeModel(d, tasks);
+  else if (S) for (const d of S.docs) if (/^isim:/.test(d.id)) placeModel(d, tasks, tool);
   for (const root of document.querySelectorAll('#workspace .isim')) {
     watchSide(root.querySelector('.isim-left'));
     const tb = root.querySelector('.isim-toolbar'), cap = root.querySelector('.isim-wavewin > .caption');
@@ -33,15 +34,14 @@ export function placeSimToolbar(tasks, S = null) {
 
 /** The simulation's model in its toolbar's right end, after Edit Stimuli (the Tasks interface, #1353): another one chosen
  *  simulates the same module with it (a netlist not generated yet offered to be generated first, #490). */
-function placeModel(d, tasks) {
+function placeModel(d, tasks, tool) {
   const tb = d.el.querySelector('.isim-toolbar');
   let sel = tb?.querySelector('.isim-model');
   if (!tb || !tasks) { sel?.closest('.isim-model-field')?.remove(); return; }
-  if (sel) return;
   const [mod, model = ''] = d.id.slice('isim:'.length).split('@');
-  sel = h('select', { class: 'isim-model', title: 'The model to simulate', 'aria-label': 'The model to simulate' },
-    ...SIM_MODELS.map(([v, label]) => h('option', { value: v }, label)));
-  sel.value = model;
+  if (sel) { modelOptions(sel, tool, model); return; }
+  sel = h('select', { class: 'isim-model', title: 'The model to simulate', 'aria-label': 'The model to simulate' });
+  modelOptions(sel, tool, model);
   sel.addEventListener('change', async () => {
     const v = sel.value;
     sel.value = model;   // (this simulation's; the other one in its own tab)
@@ -87,6 +87,18 @@ function watchSide(el) {
 }
 
 export const SIM_MODELS = [['', 'Behavioral'], ['postsynth', 'Post-Synthesis'], ['posttrans', 'Post-Translate'], ['postmap', 'Post-Map'], ['postpar', 'Post-Place & Route']];
+/** The models a project's tool simulates (#3707): Behavioral, and the netlists its flow generates (none but in the Spartan
+ *  flows); every one with no tool. */
+export const modelChoices = tool => SIM_MODELS.filter(([v]) => !v || !tool || simModelsOf(tool).includes(v));
+// a model select's options, the tool's (`head`: its prompt's), made again when they changed; its value kept
+function modelOptions(sel, tool, value, head = []) {
+  const list = modelChoices(tool), key = list.map(([v]) => v).join();
+  if (sel.dataset.key === key) return;
+  sel.dataset.key = key;
+  sel.replaceChildren(...head, ...list.map(([v, label]) => h('option', { value: v }, label)));
+  sel.value = list.some(([v]) => v === value) ? value : head.length ? '?' : '';
+}
+const modelPrompt = () => h('option', { value: '?', disabled: true }, 'Select simulation model...');
 
 /** The module Simulate runs: the project's simulation top, else its first test bench, else its top (null: none). */
 export function simTarget(project, modules = []) {
@@ -100,9 +112,8 @@ export function simTarget(project, modules = []) {
 /** The task's bar's choice of the model to simulate (shown in Simulate only): a choice simulates it at once (#1018;
  *  a netlist not generated yet offered to be generated first, #490). */
 export function modelSelect(app) {
-  const sel = h('select', { id: 'task-model', title: 'The model to simulate', 'aria-label': 'The model to simulate' },
-    h('option', { value: '?', disabled: true }, 'Select simulation model...'), ...SIM_MODELS.map(([v, label]) => h('option', { value: v }, label)));
-  sel.value = '?';
+  const sel = h('select', { id: 'task-model', title: 'The model to simulate', 'aria-label': 'The model to simulate' });
+  modelOptions(sel, app?.projectTool?.(), '?', [modelPrompt()]);
   sel.addEventListener('change', () => { if (ready()) simulate(app); });
   return sel;
 }
@@ -167,6 +178,9 @@ export function refreshBench(app) {
     for (const o of sel.options) if (o.value && !o.disabled) o.dataset.noI18n = '';   // (the modules' names, not the prompt)
   }
   sel.value = prompt.on && !prompt.module ? '' : simTarget(app.S.project, app.S.modules) || '';
+  // (the models the project's tool has, #3707)
+  const m = document.getElementById('task-model');
+  if (m) modelOptions(m, app.projectTool?.(), m.value, [modelPrompt()]);
 }
 /** The Test Bench Wizard for the top module; the test bench it makes becomes the one Simulate runs. */
 export async function newBench(app) {

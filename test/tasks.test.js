@@ -132,6 +132,14 @@ test('#800 simTarget: Simulate runs the simulation top, else the first test benc
   assert.deepEqual(SIM.SIM_MODELS.map(([v]) => v), ['', 'postsynth', 'posttrans', 'postmap', 'postpar']);
 });
 
+test('#3707 modelChoices: the models of the project\'s tool, Behavioral only where its flow makes none; every one with no tool', async () => {
+  const T = await import('../web/js/tool-descriptors.js');
+  const all = ['', 'postsynth', 'posttrans', 'postmap', 'postpar'];
+  for (const [tool, want] of [[T.ISE, all], [T.SILINX, all], [T.SILINX_ICE40, ['']], [T.SILINX_ECP5, ['']], [T.SILINX_GOWIN, ['']], [T.SILINX_XC7, ['']], [T.VIVADO, ['']], [T.NO_FLOW, ['']], [null, all]]) {
+    assert.deepEqual(SIM.modelChoices(tool).map(([v]) => v), want, tool?.id);
+  }
+});
+
 test('#917 simChoices: the test benches, then the design\'s modules with the top first', () => {
   const mods = [{ name: 'top', role: 'design' }, { name: 'knight', role: 'design' }, { name: 'tb_top', role: 'sim' }, { name: 'counter', role: 'design' }, { name: 'tb_a', role: 'sim' }];
   assert.deepEqual(SIM.simChoices({ top: 'top' }, mods), { benches: ['tb_a', 'tb_top'], design: ['top', 'counter', 'knight'] });

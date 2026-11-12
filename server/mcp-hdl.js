@@ -8,10 +8,15 @@ import * as P from './projects.js';
 import { toolError, clip, elaborateView, diagLine, diagJson, STR, PROJECT } from './mcp-util.js';
 import { parseTime, parseValue } from '../core/ssim-values.js';
 import { findSignalIn, injectForceIn } from '../core/ssim-forces.js';
+import { deviceFamily, experimentalDevice, familyName, openOnlyDevice, vivadoDevice } from '../packages/silinx-fpga/src/parts.js';
 
 export const SIM_MODELS = { postsynth: 'Post-Synthesis', posttrans: 'Post-Translate', postmap: 'Post-Map', postpar: 'Post-Place & Route' };
 // the process that makes each model (run_process), and the stage it comes after
 export const MODEL_PROCESS = { postsynth: 'post_synthesis_model', posttrans: 'post_translate_model', postmap: 'post_map_model', postpar: 'post_par_model' };
+// the flows that make the models (#3707): the Spartan ones, ISE's and the Silinx toolchain's; none on the iCE40, ECP5,
+// Gowin, the 7-series nor an experimental family, as the interface's tools (web/js/tool-descriptors.js simModelsOf, toolOf)
+export const hasSimModels = device => !vivadoDevice(device) && !experimentalDevice(device) && !openOnlyDevice(device);
+export const noSimModelMessage = (device, model) => `the ${familyName(deviceFamily(device))} flow makes no ${SIM_MODELS[model].toLowerCase()} simulation model (only the Spartan flows make them): simulate the behavioral model`;
 const STAGE = { postsynth: 'synth', posttrans: 'translate', postmap: 'map', postpar: 'par' };
 
 // the project's data files ($readmemh, textio: viewers.js readDataFiles), with the sources' texts
@@ -185,6 +190,7 @@ export const HDL_TOOLS = [
       if (model !== 'behavioral') {
         const pj = await P.readProject(name);
         if (!pj.top) throw toolError(`the project '${name}' has no top module: its models are of the top`);
+        if (!hasSimModels(pj.device)) throw toolError(noSimModelMessage(pj.device, model));
         const net = await modelSources(name, pj, model, generate);
         head.push(...net.notes, ...net.warnings);
         const { compile, elaborate } = await import('../core/compile.js');
