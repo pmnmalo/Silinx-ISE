@@ -48,8 +48,8 @@ test('the Gowin family: its part, its formats, its back end\'s steps and constra
   const b = backendOf('gowin');
   assert.equal(b.id, 'gowin');
   assert.equal(b.constraints, CST);
-  assert.deepEqual(b.steps.map(s => [s.id, s.label]), [['synth', 'Synthesize - Yosys'], ['translate', 'Translate'], ['par', 'Place & Route - nextpnr'], ['bitgen', 'Generate Programming File - gowin_pack']]);
-  assert.throws(() => orderSteps(b.steps, ['trce']), /no step trce/);
+  assert.deepEqual(b.steps.map(s => [s.id, s.label]), [['synth', 'Synthesize - Yosys'], ['translate', 'Translate'], ['par', 'Place & Route - nextpnr'], ['trce', 'Generate Post-Place & Route Static Timing'], ['bitgen', 'Generate Programming File - gowin_pack']]);
+  assert.throws(() => orderSteps(b.steps, ['xpwr']), /no step xpwr/);
   assert.deepEqual(gowinUtilization({ LUT1: 1, LUT2: 2, LUT4: 3, DFF: 4, DFFE: 1, ALU: 9, MUX2_LUT5: 2, RAM16SDP4: 1, SDPB: 1, pROM: 1, MULT18X18: 1, IBUF: 2, OBUF: 3, rPLL: 1, GND: 1, VCC: 1 }),
     { luts: 6, flipFlops: 5, latches: 0, ios: 5, carry: 9, muxes: 2, distributedRam: 1, blockRam: 2, multipliers: 1, clockBuffers: 0, dcms: 1, cells: 34 });
   assert.equal(b.synthName('luts'), 'Number of LUT4s');

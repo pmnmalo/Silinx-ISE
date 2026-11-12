@@ -57,7 +57,8 @@ test('run_process: blinky on the Tang Nano 9K to its .fs, nextpnr\'s warnings; g
   assert.ok(summary.map.utilization.some(u => u.name === 'LUT4'));
   assert.equal(summary.bit.size, 2069320);
   assert.ok(fs.existsSync(path.join(P.projectDir('bi'), 'build', 'top.fs')));
-  await fails('run_process', { project: 'bi', process: 'timing' }, 'no step trce (the steps: synth, translate, par, bitgen)');
+  // (its timing nextpnr's, #2300: test/mcp-nextpnr-reports.test.js; no power estimate)
+  await fails('run_process', { project: 'bi', process: 'power' }, 'no step xpwr (the steps: synth, translate, par, trce, bitgen)');
 });
 
 test('run_process and get_report: a CST with no clock, the clock reported with no constraint, not nextpnr\'s 12 MHz (#3488)', { timeout: 600000 }, async () => {

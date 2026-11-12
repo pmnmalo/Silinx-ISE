@@ -5,6 +5,7 @@
 import { scriptSynthesis } from './synth-script.js';
 import { PCF } from './pcf.js';
 import { portBits, nextpnrNames } from './nextpnr-ports.js';
+import { mountNextpnrTiming } from './nextpnr-timing.js';
 
 /** The iCE40's parts, as nextpnr-ice40 names them (its --<part> option): ice40up5k, ice40hx8k… */
 export const ICE40_PARTS = ['lp384', 'lp1k', 'lp4k', 'lp8k', 'hx1k', 'hx4k', 'hx8k', 'up3k', 'up5k', 'u1k', 'u2k', 'u4k'];
@@ -14,6 +15,7 @@ export const ICE40_STEPS = [
   { id: 'synth', label: 'Synthesize - Yosys', needs: [] },
   { id: 'translate', label: 'Translate', needs: ['synth'] },
   { id: 'par', label: 'Place & Route - nextpnr', needs: ['translate'] },
+  { id: 'trce', label: 'Generate Post-Place & Route Static Timing', needs: ['par'] },
   { id: 'bitgen', label: 'Generate Programming File - icepack', needs: ['par'] },
 ];
 
@@ -27,10 +29,15 @@ export const ice40Utilization = counts => ({
 const NAMES = { luts: 'Number of LUT4s', ffs: 'Number of flip-flops', ramb16: 'Number of RAM4Ks', mult18x18: 'Number of DSPs', bufgmux: 'Number of global buffers', dcm: 'Number of PLLs', iob: 'Number of IOs' };
 
 const text = v => (typeof v === 'string' ? v : new TextDecoder().decode(v));
+// a clock as the report names its net: clk$SB_IO_IN_$glb_clk (an input's, on a global buffer) -> clk
+const clockName = n => n.replace(/(\$SB_IO_IN)?(_\$glb_clk|\$glb_clk)?$/, '');
+/** A clock's constraint when the constraints ask for it (asked: their clocks' nets), else null (nextpnr's default, 12 MHz). */
+export const askedClocks = (fmax, asked) => fmax.map(f => ({ ...f, constraint: asked.includes(f.clock) ? f.constraint : null }));
 
 function mountIce40(ctx) {
   const { io, spec, log, report, top, ms, now, constraints, netlistText, StepError } = ctx;
   const part = String(spec.device || '').toLowerCase().replace(/^ice40/, '');
+  const timing = mountNextpnrTiming(ctx, { tool: 'nextpnr-ice40', clockName });
   let asc = null;
   const ascOrEarlier = () => {
     if (asc == null) asc = io.read('open/routed.asc');
@@ -51,7 +58,7 @@ function mountIce40(ctx) {
     const free = bits.map(b => b.name).filter(p => !pins[p]?.loc);
     for (const p of free) log(`WARNING:Place - the port ${p} has no pin (set_io in the PCF): nextpnr places it anywhere.`);
     const args = [`--${part}`, ...(spec.pkg ? ['--package', spec.pkg] : []), '--json', 'netlist.json', '--asc', 'routed.asc', '--report', 'report.json',
-      '--seed', String(spec.seed || 1), ...(pcf ? ['--pcf', 'design.pcf'] : []), ...(free.length ? ['--pcf-allow-unconstrained'] : [])];
+      '--seed', String(spec.seed || 1), '--timing-allow-fail', ...(pcf ? ['--pcf', 'design.pcf'] : []), ...(free.length ? ['--pcf-allow-unconstrained'] : [])];
     const nextpnr = tool(), lines = [];
     let out;
     try {
@@ -67,9 +74,10 @@ function mountIce40(ctx) {
     report.map = { utilization: items, warnings: 0, errors: 0 };
     log('Device utilization (nextpnr-ice40):');
     for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
-    const fmax = Object.entries(r.fmax || {}).map(([clock, f]) => ({ clock, achieved: +f.achieved.toFixed(2), constraint: +f.constraint.toFixed(2) }));
+    const fmax = Object.entries(r.fmax || {}).map(([clock, f]) => ({ clock: clockName(clock), achieved: +f.achieved.toFixed(2), constraint: +f.constraint.toFixed(2) }));
     for (const f of fmax) log(`Clock ${f.clock}: ${f.achieved} MHz (${f.achieved >= f.constraint ? 'met' : 'NOT met'}, ${f.constraint} MHz asked)`);
     report.par = { routed: true, unroutedSignals: 0, done: true, engine: 'nextpnr', fmax, constraintsMet: fmax.every(f => f.achieved >= f.constraint) };
+    timing.record(r, askedClocks(fmax, (read?.clocks || []).map(c => c.net)));
     log(`Placed and routed by nextpnr-ice40 in ${ms(t)}: ${report.files.routed}`);
   }
 
@@ -79,7 +87,7 @@ function mountIce40(ctx) {
     log(`Bitstream: build/${top}.bin (${bytes.length} bytes, icepack)`);
   }
 
-  return { steps: { translate: ctx.readNetlist, par: runPar, bitgen: runBitgen } };
+  return { steps: { translate: ctx.readNetlist, par: runPar, trce: timing.runTiming, bitgen: runBitgen } };
 }
 
 export const ICE40 = {

@@ -15,7 +15,7 @@ test('openStatus: an iCE40 part is available, with its steps; a part nextpnr-ice
   assert.equal(st.available, true);
   assert.equal(st.part, 'ice40up5ksg48');
   assert.equal(st.graph, null);
-  assert.deepEqual(st.steps, ['synth', 'translate', 'par', 'bitgen']);
+  assert.deepEqual(st.steps, ['synth', 'translate', 'par', 'trce', 'bitgen']);
   const bad = openStatus({ ...DEVICE, part: 'ice40xx9k' });
   assert.equal(bad.available, false);
   assert.match(bad.reason, /^ice40xx9k: not an iCE40 part of nextpnr-ice40/);
@@ -23,11 +23,12 @@ test('openStatus: an iCE40 part is available, with its steps; a part nextpnr-ice
 
 test('openSteps: the iCE40\'s list; a Xilinx family\'s chain as it was', () => {
   const family = 'ice40';
-  assert.deepEqual(openSteps(undefined, { family }), ['synth', 'translate', 'par', 'bitgen']);
+  assert.deepEqual(openSteps(undefined, { family }), ['synth', 'translate', 'par', 'trce', 'bitgen']);
   assert.deepEqual(openSteps(['par'], { family }), ['synth', 'translate', 'par']);
   assert.deepEqual(openSteps(['bitgen'], { family, synthUpToDate: true }), ['translate', 'par', 'bitgen']);
   assert.deepEqual(openSteps(['map'], { family }), ['synth', 'translate', 'par']);   // (Implement's chain: nextpnr maps in its Place & Route, #2463)
-  assert.throws(() => openSteps(['trce'], { family }), /no step trce/);
+  assert.deepEqual(openSteps(['trce'], { family }), ['synth', 'translate', 'par', 'trce']);   // (#2300: nextpnr's timing)
+  assert.throws(() => openSteps(['xpwr'], { family }), /no step xpwr/);
   assert.deepEqual(openSteps(['par'], { family: 'spartan3e' }), openSteps(['par']));
   assert.ok(openSteps(['par']).includes('map'));
 });

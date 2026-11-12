@@ -71,11 +71,11 @@ uiTest('#2303 a Gowin project: its processes, its constraints CST, Generate Prog
     const t = [...document.querySelectorAll('.summary-table')].find((x) => x.querySelector('caption')?.textContent === c);
     return t ? [...t.querySelectorAll('tr')].map((tr) => [...tr.children].map((x) => x.textContent)) : null;
   }, [caption], { what: caption });
-  assert.deepEqual(await summary('Detailed Reports'), [['Report Name', 'Status'], ['Synthesis Report (Yosys)', 'Current'], ['Routed Design (nextpnr JSON)', 'Current']]);
+  assert.deepEqual(await summary('Detailed Reports'), [['Report Name', 'Status'], ['Synthesis Report (Yosys)', 'Current'], ['Routed Design (nextpnr JSON)', 'Current'], ['Static Timing Report', 'Current']]);
   assert.deepEqual(await summary('Programming File'), [['Bitstream', 'build/blinky.fs (2021 KB)']]);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
-    assert.deepEqual((await summary('Relatórios Detalhados')).slice(1).map((x) => x[0]), ['Relatório de Síntese (Yosys)', 'Projeto Encaminhado (JSON do nextpnr)']);
+    assert.deepEqual((await summary('Relatórios Detalhados')).slice(1).map((x) => x[0]), ['Relatório de Síntese (Yosys)', 'Projeto Encaminhado (JSON do nextpnr)', 'Relatório de Temporização Estática']);
   } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
 });
 

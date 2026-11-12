@@ -7,6 +7,7 @@
 import { scriptSynthesis } from './synth-script.js';
 import { CST } from './cst.js';
 import { portBits, nextpnrNames } from './nextpnr-ports.js';
+import { mountNextpnrTiming } from './nextpnr-timing.js';
 import { gowinClocks } from './gowin-clocks.js';
 
 /** The Gowin's parts, packages and speeds nextpnr-himbaechel-gowin takes: `${part}/${package}${speed}` -> its --device and family. */
@@ -21,6 +22,7 @@ export const GOWIN_STEPS = [
   { id: 'synth', label: 'Synthesize - Yosys', needs: [] },
   { id: 'translate', label: 'Translate', needs: ['synth'] },
   { id: 'par', label: 'Place & Route - nextpnr', needs: ['translate'] },
+  { id: 'trce', label: 'Generate Post-Place & Route Static Timing', needs: ['par'] },
   { id: 'bitgen', label: 'Generate Programming File - gowin_pack', needs: ['par'] },
 ];
 
@@ -49,11 +51,18 @@ export function gowinFmax(r, lines) {
   });
 }
 
+// nextpnr's bels that are no resource of the device (#2300): its constants (GND, VCC), the global set / reset every design has
+// (GSR), its placeholders (DUMMY_CELL, of none available)
+const NOT_RESOURCES = /^(GND|VCC|GSR|DUMMY_CELL)$/;
+/** The resources a design takes, of nextpnr's report's utilization: [[bel, { used, available }]], those it uses of the device's. */
+export const gowinPlaced = r => Object.entries(r.utilization || {}).filter(([name, u]) => u.used && u.available && !NOT_RESOURCES.test(name));
+
 /** The device of a spec: its --device and family, or null. */
 export const gowinDevice = spec => GOWIN_DEVICES[`${String(spec.device || '').toLowerCase()}/${String(spec.pkg || '').toLowerCase()}${spec.speed || '-6'}`] || null;
 
 function mountGowin(ctx) {
   const { io, spec, log, report, top, ms, now, constraints, netlistText, StepError } = ctx;
+  const timing = mountNextpnrTiming(ctx, { tool: 'nextpnr-himbaechel-gowin', clockName });
   const tool = () => {
     if (!io.nextpnr?.gowin) throw new StepError('nextpnr-himbaechel-gowin is not in this installation (io.nextpnr.gowin)', [], 'Install it: npm install @yowasp/nextpnr-himbaechel-gowin');
     return io.nextpnr.gowin;
@@ -78,23 +87,33 @@ function mountGowin(ctx) {
     const args = ['--device', dev.device, '--vopt', `family=${dev.family}`, '--vopt', 'cst=design.cst', '--json', 'netlist.json', '--write', 'routed.json',
       '--report', 'report.json', '--seed', String(spec.seed || 1), ...(mhz ? ['--freq', String(+mhz.toFixed(6))] : []),
       ...(sdc.sdc ? ['--sdc', 'design.sdc'] : [])];
-    const nextpnr = tool(), lines = [];
-    let out;
+    const nextpnr = tool(), files = { 'netlist.json': netlistText(), 'design.cst': CST.write(cst), ...(sdc.sdc && { 'design.sdc': sdc.sdc }) };
+    let out, lines = [];
     try {
-      out = await nextpnr.run(args, { 'netlist.json': netlistText(), 'design.cst': CST.write(cst), ...(sdc.sdc && { 'design.sdc': sdc.sdc }) }, l => lines.push(l));
+      out = await nextpnr.run(args, files, l => lines.push(l));
     } catch (e) {
-      throw new StepError(`nextpnr-himbaechel-gowin failed: ${e.message}`, lines.filter(l => /^ERROR:/.test(l)), '');
+      // (a clock slower than its constraint, #2300: placed and routed again, allowed to fail, its timing reported; not at once, which
+      // would change every routed design, the examples' references, by its setting)
+      const slow = lines.some(l => /^ERROR: Max frequency for clock .* \(FAIL at /.test(l));
+      if (!slow) throw new StepError(`nextpnr-himbaechel-gowin failed: ${e.message}`, lines.filter(l => /^ERROR:/.test(l)), '');
+      lines = [];
+      try {
+        out = await nextpnr.run([...args, '--timing-allow-fail'], files, l => lines.push(l));
+      } catch (e2) {
+        throw new StepError(`nextpnr-himbaechel-gowin failed: ${e2.message}`, lines.filter(l => /^ERROR:/.test(l)), '');
+      }
     }
     for (const l of lines.filter(l => /^Warning:/.test(l))) log(`WARNING:Place - ${l.replace(/^Warning:\s*/, '')}`);
     const r = JSON.parse(text(out['report.json']));
     report.files.routed = io.write('open/routed.json', text(out['routed.json']));
-    const items = Object.entries(r.utilization || {}).filter(([, u]) => u.used).map(([name, u]) => ctx.util(name, u.used, u.available));
+    const items = gowinPlaced(r).map(([name, u]) => ctx.util(name, u.used, u.available));
     report.map = { utilization: items, warnings: 0, errors: 0 };
     log('Device utilization (nextpnr-himbaechel-gowin):');
     for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
     const fmax = gowinFmax(r, lines);
     for (const f of fmax) log(`Clock ${f.clock}: ${f.achieved} MHz (${f.constraint == null ? 'no constraint' : `${f.achieved >= f.constraint ? 'met' : 'NOT met'}, ${f.constraint} MHz asked`})`);
     report.par = { routed: true, unroutedSignals: 0, done: true, engine: 'nextpnr', fmax, constraintsMet: fmax.every(f => f.constraint == null || f.achieved >= f.constraint) };
+    timing.record(r, fmax);
     routed = text(out['routed.json']);
     log(`Placed and routed by nextpnr-himbaechel-gowin in ${ms(t)}: ${report.files.routed}`);
   }
@@ -114,7 +133,7 @@ function mountGowin(ctx) {
   }
 
   let routed = null;
-  return { steps: { translate: ctx.readNetlist, par: runPar, bitgen: runBitgen } };
+  return { steps: { translate: ctx.readNetlist, par: runPar, trce: timing.runTiming, bitgen: runBitgen } };
 }
 
 export const GOWIN = {

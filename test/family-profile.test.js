@@ -110,7 +110,7 @@ test('the browser\'s open flow asks the profile: the same answers per family as 
   const ecp5 = browserOpenStatus({ family: 'ecp5', part: 'lfe5u-85f', package: 'cabga381', speed: '-6' });
   assert.deepEqual([ecp5.available, ecp5.family, ecp5.part, ecp5.reason], [true, 'ecp5', 'lfe5u-85f-6cabga381', 'lfe5u-85f-6cabga381: nextpnr-ecp5 and ecppack (in the browser)']);
   assert.equal(browserOpenStatus({ family: 'ecp5', part: 'lfe5u-99f', package: 'cabga381', speed: '-6' }).reason, 'lfe5u-99f: not an ECP5 part of nextpnr-ecp5');
-  assert.deepEqual(browserSteps(['bitgen'], { family: 'ecp5' }), ECP5_STEPS.map(s => s.id));
+  assert.deepEqual(browserSteps(['bitgen'], { family: 'ecp5' }), ECP5_STEPS.map(s => s.id).filter(s => s !== 'trce'));
   // (#2303) the Gowin: its place and route and gowin_pack in the browser
   const gw = browserOpenStatus({ family: 'gowin', part: 'gw1nr-9c', package: 'qn88', speed: '-6' });
   assert.deepEqual([gw.available, gw.part, gw.reason], [true, 'gw1nr-9c-6qn88', 'gw1nr-9c-6qn88: nextpnr-himbaechel-gowin and gowin_pack (in the browser)']);
@@ -123,7 +123,8 @@ test('the browser\'s open flow asks the profile: the same answers per family as 
     assert.match(st.reason, /the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 only/);
   }
   // the iCE40's steps (its own tools'), the others the Silinx toolchain's
-  assert.deepEqual(browserSteps(['bitgen'], { family: 'ice40' }), ICE40_STEPS.map(s => s.id));
+  assert.deepEqual(browserSteps(['bitgen'], { family: 'ice40' }), ICE40_STEPS.map(s => s.id).filter(s => s !== 'trce'));
+  assert.deepEqual(browserSteps(['trce'], { family: 'ice40' }), ['synth', 'translate', 'par', 'trce']);   // (#2300: nextpnr's timing)
   assert.deepEqual(browserSteps(['par'], { family: 'ice40' }), ['synth', 'translate', 'par']);
   assert.deepEqual(browserSteps(['bitgen'], { family: 'ice40', synthUpToDate: true }), browserSteps(['bitgen'], { family: 'ice40' }).filter(s => s !== 'synth'));
   assert.throws(() => browserSteps(['impact'], { family: 'spartan3e' }), /not available in the Silinx toolchain/);
