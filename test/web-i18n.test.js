@@ -88,24 +88,53 @@ test('t(): exact strings, patterns, surrounding whitespace, unknown text unchang
   assert.equal(t(null), null);
 });
 
-// UI labels written as literals in the sources: label: '…', title: '…', field('…', …), headings…
+// UI labels written as literals in the sources: label: '…', title: '…', field('…', …), headings…; and (#3539) the
+// texts of toasts, dialogs' titles and messages, plain elements (but those marked data-no-i18n), textContent and the
+// errors a dialog's check returns (a sentence)
+const LABEL_FORMS = [/\blabel: '([^'$`]+)'/g, /\btitle: '([^'$`]+)'/g, /\bfield\('([^'$`]+)'/g, /\bplaceholder: '([^'$`]+)'/g,
+  /\bh\('(?:h2|h3|h4|th|label|button|summary|caption)', \{[^{}]*\}, '([^'$`]+)'\)/g,
+  /\btoast\(\s*'([^'$`]+)'/g, /\b(?:alertDlg|confirmDlg|promptDlg)\(\s*'([^'$`]+)'/g,
+  /\b(?:alertDlg|confirmDlg|promptDlg)\(\s*(?:'[^'$`]*'|[\w.]+),\s*'([^'$`]+)'/g,
+  /\bh\('(?:div|p|span|option|b|small|em|strong|li|legend|td)', \{(?![^{}]*no-i18n)[^{}]*\}, '([^'$`]+)'\)/g,
+  /\btextContent = '([^'$`]+)'/g, /\breturn '([A-Z][^'$`]* [^'$`]*[.!?…])';/g];
+function labelsOf(src, add) {
+  for (const re of LABEL_FORMS) for (const m of src.matchAll(re)) add(m[1]);
+}
 function sourceLabels() {
   const out = new Map();
   for (const f of fs.readdirSync(WEB).filter((x) => x.endsWith('.js') && !/^(i18n|schematic-demo-data|icons)\.js$/.test(x))) {
     const src = fs.readFileSync(path.join(WEB, f), 'utf8');
-    const add = (s) => { if (/[A-Za-z]{2}/.test(s) && !s.includes('\\')) out.set(s, f); };
-    for (const re of [/\blabel: '([^'$`]+)'/g, /\btitle: '([^'$`]+)'/g, /\bfield\('([^'$`]+)'/g, /\bplaceholder: '([^'$`]+)'/g,
-      /\bh\('(?:h2|h3|h4|th|label|button|summary|caption)', \{[^{}]*\}, '([^'$`]+)'\)/g]) {
-      for (const m of src.matchAll(re)) add(m[1]);
-    }
+    labelsOf(src, (s) => { if (/[A-Za-z]{2}/.test(s) && !s.includes('\\')) out.set(s, f); });
   }
   return out;
 }
 
+test('#3539 the label scan reaches toasts, dialogs, plain elements, textContent and a dialog\'s returned error', () => {
+  const src = `toast('Use Ctrl+V to paste', 'info'); alertDlg('Rename Folder', 'A folder cannot be moved into itself.');
+    confirmDlg('Replace Project',
+      'x'); alertDlg(title, 'Select a top-level module first.', 'warn'); h('option', { value: '' }, '(no board / generic JTAG)');
+    h('td', { 'data-no-i18n': '' }, 'integer'); busy.textContent = 'Simulating the current design…';
+    if (!to) return 'Enter a file path inside the project.'; return 'sim';`;
+  const found = [];
+  labelsOf(src, (s) => found.push(s));
+  assert.deepEqual(found.sort(), ['(no board / generic JTAG)', 'A folder cannot be moved into itself.', 'Enter a file path inside the project.', 'Rename Folder',
+    'Replace Project', 'Select a top-level module first.', 'Simulating the current design…', 'Use Ctrl+V to paste', 'x'].sort());
+  // the texts the audit found untranslated (#3539)
+  const T = {
+    'Select the top module first': 'Selecione primeiro o módulo de topo', 'Simulating the current design…': 'A simular o projeto atual…',
+    'Replace Project': 'Substituir Projeto', '(no board / generic JTAG)': '(sem placa / JTAG genérico)', 'Open Project Bundle': 'Abrir Pacote do Projeto',
+    'Enter a file path inside the project.': 'Escreva um caminho de ficheiro dentro do projeto.',
+    'The module name must start with a letter and contain only letters, digits and _.': 'O nome do módulo tem de começar por uma letra e ter só letras, algarismos e _.',
+    'Use Ctrl+V to paste': 'Use Ctrl+V para colar', 'No messages.': 'Sem mensagens.',
+  };
+  for (const [en, pt] of Object.entries(T)) assert.equal(t(en), pt, en);
+});
+
 test('every UI label in the web/js sources has a Portuguese translation', () => {
   // the same in both languages: names, codes, abbreviations
   const SAME = new Set(['work', 'iMPACT', 'OK', 'MSB', 'LSB', 'Bitstream', 'labels', 'Slew', 'Pull', 'Case', 'Flip-Flops', 'VHDL', 'Verilog', 'ISim', 'Bidir',
-    'schematic' /* default architecture name */, 'iMPACT — Boundary Scan', 'Interface' /* the same word in Portuguese */, 'Silinx' /* the Silinx interface: a proper name, #2451 */, 'AMD Vivado' /* a product's name, #1649 */]);
+    'schematic' /* default architecture name */, 'iMPACT — Boundary Scan', 'Interface' /* the same word in Portuguese */, 'Silinx' /* the Silinx interface: a proper name, #2451 */, 'AMD Vivado' /* a product's name, #1649 */,
+    'bypass' /* iMPACT's device in bypass, as ISE writes it */]);
   const labels = sourceLabels();
   assert.ok(labels.size > 200, `${labels.size} labels found`);
   const missing = [...labels].filter(([s]) => !SAME.has(s) && !/^[^a-z]*$/.test(s) && t(s) === s).map(([s, f]) => `${f}: ${s}`);
