@@ -53,12 +53,18 @@ test('related_view: traffic\'s translation, ASM chart and table\'s schematic, as
   assert.deepEqual(files('t'), before);
 });
 
-test('related_view: a Verilog source in VHDL; a Petri net\'s state machine', async () => {
+test('related_view: a Verilog source in VHDL (an if generate\'s branches, #3501); a Petri net\'s state machine', async () => {
   await call('new_project_from_example', { name: 'p', example: 'pong' });
   const tr = await ok({ project: 'p', path: 'src/sevenseg.v', view: 'translation' });
   assert.equal(tr.data.lang, 'vhdl');
   assert.equal(tr.data.name, 'sevenseg.vhd');
   assert.match(tr.text, /^entity sevenseg is/m);
+  // (an if generate's branches, its body kept, #3501)
+  const gen = 'module gen #(parameter N = 0) (input [7:0] a, output [7:0] y);\n  if (N == 0) begin : zero\n    assign y = a;\n  end else if (N == 1) begin : one\n    assign y = a + 1;\n  end else begin : more\n    assign y = 0;\n  end\nendmodule\n';
+  await call('write_file', { project: 'p', path: 'src/gen.v', text: gen });
+  const g = await ok({ project: 'p', path: 'src/gen.v', view: 'translation' });
+  assert.equal(g.text, translateSource(gen, { path: 'src/gen.v', to: 'vhdl' }).text);
+  assert.match(g.text, /^ {4}one: if not \(N = 0\) and \(N = 1\) generate\n {8}y <= std_logic_vector\(unsigned\(a\) \+ 1\);$/m);
   const net = newPetri('ctl', 'vhdl');
   await call('write_file', { project: 'p', path: 'src/ctl.pn.json', text: JSON.stringify(net, null, 2) });
   const fsm = await ok({ project: 'p', path: 'src/ctl.pn.json', view: 'fsm' });

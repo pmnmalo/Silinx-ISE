@@ -5,7 +5,7 @@
 // out port). Always blocks: clocked (one edge), with an asynchronous reset, combinational (their sensitivity list the
 // signals they read), a test bench's (delays, events). What has no translation throws Untranslatable (tasks, casez,
 // fork, a blocking assignment read again in a clocked block, an expression in a port map…). Isomorphic ES module.
-import { at, atLine, cannot, intOf, reservedInVhdl, walk, targetName, indent } from './translate-util.js';
+import { at, atLine, cannot, intOf, reservedInVhdl, walk, targetName, indent, ifGenerateBranches } from './translate-util.js';
 import { bitLike, exprH, toBool, toInt, toSl, toType, PREC } from './translate-vhdl-expr.js';
 
 const stmtsOf = x => (!x ? [] : x.kind === 'block' ? x.stmts : [x]);
@@ -355,12 +355,24 @@ function generateForH(cx, g, vars) {
   const items = (g.items || []).flatMap(i => itemH(cx, i, vars));
   return [`${cx.vname(g.label || `gen_${g.var}`)}: for ${cx.name(g.var)} in ${r} generate`, ...(decls.length ? [...indent(decls), 'begin'] : []), ...indent(items), 'end generate;'];
 }
+// an if generate, else if branches and else included (#3501): VHDL-93 has neither elsif nor else generates (XST
+// takes VHDL-93), so each branch is an if generate of its own, on its condition and the earlier ones' negated; its
+// label the branch's own (Verilog's), else the first one's numbered, `_else` for the else
 function generateIfH(cx, g, vars) {
-  const c = toBool(exprH(cx, g.cond)).c;
-  const label = cx.vname(g.label || 'gen_if');
-  const els = g.else?.items || g.elseItems;
-  return [`${label}: if ${c} generate`, ...indent((g.items || []).flatMap(i => itemH(cx, i, vars))), 'end generate;',
-    ...(els ? [`${label}_else: if not (${c}) generate`, ...indent(els.flatMap(i => itemH(cx, i, vars))), 'end generate;'] : [])];
+  const base = cx.vname(g.label || 'gen_if'), used = new Set([base.toLowerCase()]), earlier = [];
+  return ifGenerateBranches(g).flatMap((b, k) => {
+    atLine(b);
+    const c = b.cond ? toBool(exprH(cx, b.cond)).c : null;
+    const terms = [...earlier.map(e => `not (${e})`), ...(c ? [earlier.length ? `(${c})` : c] : [])];
+    if (c) earlier.push(c);
+    let label = k && b.label ? cx.vname(b.label) : null;
+    if (!k) label = base;
+    else if (!label || used.has(label.toLowerCase())) label = c ? `${base}_${k + 1}` : `${base}_else`;
+    used.add(label.toLowerCase());
+    const decls = b.decls.map(d => { declare(cx, d.name, 'signal', typeOf(cx, d.type)); return signalDecl(cx, d.name, d.init); });
+    const items = b.items.flatMap(i => itemH(cx, i, vars));
+    return [`${label}: if ${terms.length ? terms.join(' and ') : 'true'} generate`, ...(decls.length ? [...indent(decls), 'begin'] : []), ...indent(items), 'end generate;'];
+  });
 }
 
 // an always block: clocked (one edge), with an asynchronous reset (two), combinational, or a test bench's

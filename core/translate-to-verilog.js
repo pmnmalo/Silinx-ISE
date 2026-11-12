@@ -5,7 +5,7 @@
 // combinational, a test bench's with waits), if / case / for / while, concurrent assignments, instances, generates,
 // functions with a result, the numeric_std conversions. What has no translation throws Untranslatable (records,
 // packages' names, procedures, a wait in a process with a sensitivity list…). Isomorphic ES module.
-import { at, atLine, cannot, intOf, intRangeBits, reservedInVerilog, walk, targetName, indent } from './translate-util.js';
+import { at, atLine, cannot, intOf, intRangeBits, reservedInVerilog, walk, targetName, indent, ifGenerateBranches } from './translate-util.js';
 
 // Verilog's operators: their precedence (higher binds tighter)
 const PREC = { '**': 11, '*': 10, '/': 10, '%': 10, '+': 9, '-': 9, '<<': 8, '>>': 8, '<<<': 8, '>>>': 8, '<': 7, '<=': 7, '>': 7, '>=': 7,
@@ -119,7 +119,7 @@ function assignedInProcesses(mod) {
     for (const it of items || []) {
       if (it.kind === 'assign' && it.delay) regs.add(targetName(it.target));
       if (it.kind === 'process') walk(it.body, n => { if (n.kind === 'assign') { const t = targetName(n.target); if (t) regs.add(t); } });
-      if (it.kind === 'generate_for' || it.kind === 'generate_if') { visit(it.items); visit(it.else?.items || it.elseItems); }
+      if (it.kind === 'generate_for' || it.kind === 'generate_if') { visit(it.items || it.then); visit(it.else); }
     }
   };
   visit(mod.items);
@@ -309,17 +309,31 @@ function generateForV(cx, g, regs) {
   declare(cx, g.var, 'loop', { k: 'int', bits: null });
   const up = g.cond?.o === '<=';
   const end = exprV(cx, g.cond.b).c;
-  const inner = [...(g.decls || []).flatMap(d => declV(cx, d, regs)), ...(g.items || []).flatMap(i => itemV(cx, i, regs))];
+  const inner = generateRegion(cx, () => [...(g.decls || []).flatMap(d => declV(cx, d, regs)), ...(g.items || []).flatMap(i => itemV(cx, i, regs))]);
   cx.names.delete(g.var);
-  return [`genvar ${v};`, `generate for (${v} = ${exprV(cx, g.init).c}; ${v} ${up ? '<=' : '>='} ${end}; ${v} = ${v} ${up ? '+' : '-'} 1) begin : ${outName(cx, g.label || `gen_${g.var}`)}`,
-    ...indent(inner), 'end endgenerate'];
+  return [`genvar ${v};`, ...region(cx, [`for (${v} = ${exprV(cx, g.init).c}; ${v} ${up ? '<=' : '>='} ${end}; ${v} = ${v} ${up ? '+' : '-'} 1) begin : ${outName(cx, g.label || `gen_${g.var}`)}`,
+    ...indent(inner), 'end'])];
 }
+// a generate construct's contents, made inside a generate region; the region's keywords around the outermost construct
+// only (generate regions do not nest, #3501)
+function generateRegion(cx, f) {
+  const saved = cx.inGenerate;
+  cx.inGenerate = true;
+  try { return f(); } finally { cx.inGenerate = saved; }
+}
+const region = (cx, lines) => (cx.inGenerate ? lines : [`generate ${lines[0]}`, ...lines.slice(1, -1), `${lines.at(-1)} endgenerate`]);
+// an if generate, elsif and else branches included (#3501; a case generate is one too): an else if chain, each branch
+// a named block (Verilog-2001 declares nothing in an unnamed one), the first one's label numbered for the others, as
+// VHDL's alternatives share it
 function generateIfV(cx, g, regs) {
-  const inner = [...(g.decls || []).flatMap(d => declV(cx, d, regs)), ...(g.items || []).flatMap(i => itemV(cx, i, regs))];
-  const els = g.else?.items || g.elseItems;
-  if (g.else && !els) cannot('an if generate with elsif branches', g);
-  return [`generate if (${exprV(cx, g.cond).c}) begin : ${outName(cx, g.label || 'gen_if')}`, ...indent(inner),
-    ...(els ? ['end else begin', ...indent(els.flatMap(i => itemV(cx, i, regs)))] : []), 'end endgenerate'];
+  const base = g.label || 'gen_if';
+  const out = ifGenerateBranches(g).flatMap((b, k) => {
+    atLine(b);
+    const label = outName(cx, !k ? base : b.cond ? `${base}_${k + 1}` : `${base}_else`);
+    const head = `${k ? 'end else ' : ''}${b.cond ? `if (${exprV(cx, b.cond).c}) ` : ''}begin : ${label}`;
+    return [head, ...indent(generateRegion(cx, () => [...b.decls.flatMap(d => declV(cx, d, regs)), ...b.items.flatMap(i => itemV(cx, i, regs))]))];
+  });
+  return region(cx, [...out, 'end']);
 }
 
 // a process: clocked (one clock edge), with an asynchronous reset, combinational, or a test bench's (with waits)
