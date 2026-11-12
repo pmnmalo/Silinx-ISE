@@ -24,8 +24,10 @@ const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf
 // needed; the zip 30.4 MB. zipMB 32 → 40 by the Spartan-6 device descriptions (#723, #884: 4.2 MB zipped);
 // the zip 36.6 MB. The measured XC3S250E description in research/ is not packaged (#1541, #1573): the zip 38.0 MB,
 // unzipped 128.0 MB. The shared projects' packages took it to 40.4 MB (#3214); their tests and demos, every package's maps
-// and types, and the legacy modes the editor does not load left out (#3232, scripts/zip-trim.mjs): 38.8 MB, unzipped 129.8 MB
-const BUDGET = { zipMB: 40, appMB: 140 };
+// and types, and the legacy modes the editor does not load left out (#3232, scripts/zip-trim.mjs): 38.8 MB, unzipped 129.8 MB.
+// zipMB 40 → 42 by the 7-series' back end (#3146: nextpnr-himbaechel-xc7 0.7 MB zipped, its bit database 0.5 MB) and
+// the HDL front end's package (#1710, 0.2 MB): the zip 40.6 MB, unzipped 134.6 MB (#3615)
+const BUDGET = { zipMB: 42, appMB: 140 };
 
 const has = (cmd) => { try { execFileSync(cmd, ['-v'], { stdio: 'ignore' }); return true; } catch { return false; } };
 const SKIP = process.platform === 'win32' ? 'the release is packaged on Linux (zip): not on Windows'
@@ -88,11 +90,12 @@ test('release zip: the app with its production dependencies only, Yosys\'s WebAs
   assert.ok(!fs.existsSync(path.join(APP, 'node_modules/silinx-hdl')), 'no link to packages/silinx-hdl in node_modules');
   const { THIRD_PARTY } = await import(pathToFileURL(path.join(APP, 'core/third-party.js')).href);
   // (code ported into Silinx, e.g. adepttool, is listed but is not a package)
-  // (and a package downloaded on its first use, the iCE40's nextpnr, is not in it: #2444, #2570)
+  // (and a package downloaded on its first use, the iCE40's, the ECP5's and the Gowin's nextpnr, is not in it: #2444,
+  // #2570, #2302, #2303)
   const listed = THIRD_PARTY.filter((c) => !c.ported && !c.downloaded).map((c) => `${c.name}@${c.version}`).sort();
   assert.deepEqual(packages(path.join(APP, 'node_modules')), listed, 'node_modules of the zip = THIRD-PARTY-NOTICES.md (node scripts/third-party.mjs)');
   const downloaded = THIRD_PARTY.filter((c) => c.downloaded).map((c) => c.name);
-  assert.deepEqual(downloaded, ['@yowasp/nextpnr-ice40']);
+  assert.deepEqual(downloaded, ['@yowasp/nextpnr-ecp5', '@yowasp/nextpnr-himbaechel-gowin', '@yowasp/nextpnr-ice40']);
   for (const name of downloaded) assert.ok(!fs.existsSync(path.join(APP, 'node_modules', name)), `${name} left out of the zip`);
   const notices = fs.readFileSync(path.join(APP, 'THIRD-PARTY-NOTICES.md'), 'utf8');
   for (const c of listed) assert.ok(notices.includes(`## ${c.replace(/@(?=[^@]+$)/, ' ')} `), `${c} in THIRD-PARTY-NOTICES.md`);
