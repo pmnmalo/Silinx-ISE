@@ -412,6 +412,7 @@
   "test/open-flow.test.js": 163,
   "test/open-steps.test.js": 0.9,
   "test/open-toolchain.test.js": 185.1,
+  "test/path-case.test.js": 2,
   "test/path-drawing.test.js": 129.8,
   "test/petri-analysis.test.js": 0,
   "test/petri-fsm.test.js": 0.5,
