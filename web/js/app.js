@@ -938,7 +938,7 @@ async function boot() {
   const asked = projectRequested();
   const link = location.hash.length > 1 && (await import('./link-open.js')).linkOptions();   // a design's link: its project, not the last (#2826)
   // (a workspace folder waiting for its permission: its last project is not the browser's one of that name)
-  if (followed) await openProject(followed);
+  if (followed) { await openProject(followed); await (await import('./collab-follow.js')).openFollowedTop(); }   // (a module's link: on it, #3631)
   else if (!asked && !link && last && projects.some(p => p.name === last) && !(api.standalone && api.storage().needsPermission)) {
     try {
       await openProject(last, { startup: true });   // (where the user was: its tasks too, #1191)

@@ -3,7 +3,8 @@
 // a room the owner's page hosts (web/js/collab-host.js) and its meeting point (web/js/collab-meet.js);
 // merged into the dictionary of i18n.js. (The console's lines are not translated, as every tool's output.)
 export const COLLAB_PT = {
-  'Share Project Live…': 'Partilhar Projeto em Direto…', 'Share Project Live': 'Partilhar Projeto em Direto', 'Share': 'Partilhar',
+  'Share Project Live…': 'Partilhar Projeto em Direto…', 'Share Project Live': 'Partilhar Projeto em Direto',
+  'Share Module Live…': 'Partilhar Módulo em Direto…', 'Share Module Live': 'Partilhar Módulo em Direto', 'Share': 'Partilhar',   // (Share Module Live…: #3631)
   'Follow a Shared Project': 'Seguir um Projeto Partilhado', 'Follow': 'Seguir',
   // (a shared project's link given to a running Silinx with changes not saved yet, web/js/link-hash.js, #3531)
   'This link follows a project someone shares. Your open documents have changes not saved yet: save them, then follow it?':
@@ -48,6 +49,7 @@ export const COLLAB_PT_PATTERNS = [
     (_, t, s) => `Esta página liga-se a servidores públicos, que veem o seu endereço IP: ${[t ? `os rastreadores WebTorrent ${t} (para encontrar o dono)` : null,
       s ? (s.includes(',') ? `os servidores STUN ${s}` : `o servidor STUN ${s}`) : null].filter(Boolean).join(' e ')}.`],
   [/^Anyone with this link follows "(.+)" live, read only, as long as you share it\.$/, 'Quem tiver esta ligação segue "$1" em direto, só de leitura, enquanto o partilhar.'],
+  [/^Anyone with this link follows "(.+)" live, read only, opening it on (\S+), as long as you share it\.$/, 'Quem tiver esta ligação segue "$1" em direto, só de leitura, aberto em $2, enquanto o partilhar.'],   // (#3631)
   // (the presence's button: the owner's name)
   [/^Following ([^."():]+)$/, 'A seguir $1'],
   [/^Follow ([^."():]+)$/, 'Seguir $1'],

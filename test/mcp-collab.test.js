@@ -116,6 +116,31 @@ test('follow_project: an MCP client follows the MCP\'s share (two participants),
   await fails('follow_project', { link }, 'cannot follow: this shared project is no longer shared (its owner stopped sharing it)');
 });
 
+test('#3631 share_project top (Share Module Live…): the links open on the module; follow_project says it; a module the design has not, a test bench, a bad name, top with status', async () => {
+  await ok('new_project_from_example', { name: 'blinkyMod', example: 'blinky' });
+  const r = await ok('share_project', { project: 'blinkyMod', name: 'Ana', server: base, top: 'speed_ctrl', editors: true });
+  const { link, editLink } = r.data;
+  assert.match(link, /#follow=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}&top=speed_ctrl$/);
+  assert.match(editLink, /#edit=[^&]+&top=speed_ctrl$/);
+  assert.equal(r.data.top, 'speed_ctrl');
+  assert.equal(r.text, `Sharing 'blinkyMod' live, read only, as Ana, opening on speed_ctrl. Anyone with this link follows it (until share_project stop):\n${link}\nAnyone with this one edits its text files and drawings too:\n${editLink}`);
+  assert.deepEqual(parseFollowLink(link), { ...parseFollowLink(link.replace(/&top=.*$/, '')), top: 'speed_ctrl' });
+  // (shared already: that module's links, another module's too)
+  const again = await ok('share_project', { project: 'blinkyMod', server: base, top: 'knight' });
+  assert.equal(again.text, `'blinkyMod' is shared already, opening on knight: ${link.replace(/speed_ctrl$/, 'knight')}`);
+  assert.equal(again.data.editLink, editLink.replace(/speed_ctrl$/, 'knight'));
+  assert.equal((await ok('share_project', { project: 'blinkyMod', action: 'status' })).data.link, link.replace(/&top=speed_ctrl$/, ''));
+  const f = await ok('follow_project', { link, name: 'Bot' });
+  assert.equal(f.data.top, 'speed_ctrl');
+  assert.ok(f.text.startsWith('Following Ana\'s project \'blinkyMod\' (read only), its link opening on speed_ctrl.\n'), f.text);
+  await ok('follow_project', { link, stop: true });
+  await fails('share_project', { project: 'blinkyMod', server: base, top: 'nope' }, 'top: the design has no module \'nope\'');
+  await fails('share_project', { project: 'blinkyMod', server: base, top: 'tb_top' }, 'top: \'tb_top\' is a test bench: a link opens it in the simulation');
+  await fails('share_project', { project: 'blinkyMod', server: base, top: 'a b' }, 'top: \'a b\' is not a module name');
+  await fails('share_project', { project: 'blinkyMod', action: 'status', top: 'knight' }, 'top: with action start only');
+  await ok('share_project', { project: 'blinkyMod', action: 'stop' });
+});
+
 test('the errors: a project not shared, a bad action, no project, a bad server, no server there, a broken link, a link of a page\'s host', async () => {
   await fails('share_project', { project: 'traffic', action: 'stop' }, '\'traffic\' is not shared');
   await fails('share_project', { project: 'traffic', action: 'pause' }, 'action: one of start, status, stop');

@@ -21,7 +21,8 @@ import { relayConfig } from './toolchain.js';
 import { liveDrawing, drawingText, sameDrawing, drawingModel, drawingPathsOf, putDrawing, pruneDrawing, revertDrawing } from '../core/collab-model.js';
 import { checkDrawing } from './mcp-check.js';
 import { shareRoom, followRoom } from '../core/collab-client.js';
-import { followLink, parseFollowLink, relayUrl } from '../core/collab-link.js';
+import { followLink, parseFollowLink, relayUrl, withTop } from '../core/collab-link.js';
+import { MODULE_RE, viewProblem } from '../core/design-link.js';
 
 export const DEFAULT_SERVER = 'http://127.0.0.1:8642';
 const ARRIVE_MS = 15_000;
@@ -142,7 +143,7 @@ const peerLines = peers => (peers.length ? peers.map(p => `${p.name} (${p.role})
 export const COLLAB_TOOLS = [
   {
     name: 'share_project', title: 'Share Project Live (read only)',
-    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project Live… does: action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
+    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project Live… does (Share Module Live… with top): action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       action: { type: 'string', enum: ['start', 'status', 'stop'], description: 'start (default), status or stop.' },
@@ -150,10 +151,13 @@ export const COLLAB_TOOLS = [
       server: STR(`The address of the Silinx server whose relay shares it (default ${DEFAULT_SERVER}).`),
       editors: { type: 'boolean', description: 'start: editors may change its text files and drawings too (the result: an editor\'s link besides the follower\'s; what they change written to the disk, a drawing\'s HDL made again from it, through the import gate, the project untrusted from their first change: Xilinx ISE waits until the user trusts it in the interface).' },
       key: STR('start: the key of a relay on another computer (its config.json\'s relay.key, #3227), instead of the token of a Silinx server on this one.'),
+      top: STR('start: a module of the project the links open on, as Share Module Live… does (#3631): …#follow=…&top=<module>; the project shared as it is.'),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    async run({ project: name, action = 'start', name: who, server, editors = false, key }) {
+    async run({ project: name, action = 'start', name: who, server, editors = false, key, top }) {
       if (!['start', 'status', 'stop'].includes(action)) throw toolError('action: start, status or stop');
+      if (top !== undefined && action !== 'start') throw toolError('top: with action start only');
+      if (top !== undefined && !MODULE_RE.test(top)) throw toolError(`top: '${String(top).slice(0, 64)}' is not a module name`);
       const cur = shares.get(name);
       if (action === 'stop') {
         if (!cur) throw toolError(`'${name}' is not shared`);
@@ -169,11 +173,17 @@ export const COLLAB_TOOLS = [
         return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, followers: peers, warnings: [...cur.warnings] }, untrusted: peers.length || cur.warnings.length ? [...(peers.length ? ['the followers\' names and views'] : []), ...(cur.warnings.length ? ['the warnings, which name the shared project\'s files'] : [])].join(', ') : undefined };
       }
       await readProject(name);
-      if (cur && !cur.session.closed()) return { text: `'${name}' is shared already: ${cur.link}`, data: { project: name, shared: true, link: cur.link, followers: cur.session.peers() } };
+      // (a module's links, Share Module Live…: one of the design's modules, #3631)
+      const all = await readAll(name);
+      const problem = top === undefined ? null : viewProblem(all.project, all.files, { top });
+      if (problem) throw toolError(`top: ${problem}`);
+      const on = l => (l && top !== undefined ? withTop(l, top) : l);
+      const at = top !== undefined ? `, opening on ${top}` : '';
+      if (cur && !cur.session.closed()) return { text: `'${name}' is shared already${at}: ${on(cur.link)}`, data: { project: name, shared: true, link: on(cur.link), ...(cur.editLink ? { editLink: on(cur.editLink) } : {}), ...(top !== undefined ? { top } : {}), followers: cur.session.peers() } };
       const origin = serverOf(server);
       const owner = cleanName(who) || 'MCP agent';
       const doc = projectDoc(), bases = new Map();
-      publishProject(doc, { ...await readAll(name), owner, bases });
+      publishProject(doc, { ...all, owner, bases });
       const token = key ? String(key) : await tokenOf(origin);
       let session;
       // (an editor's change the owner refused among them too, #3527)
@@ -192,8 +202,8 @@ export const COLLAB_TOOLS = [
       const editLink = session.editKey ? followLink(`${origin}/`, session.room, session.key, 'relay', session.editKey) : null;
       shares.set(name, { session, link, editLink, server: origin, off, warnings });
       return {
-        text: `Sharing '${name}' live, read only, as ${owner}. Anyone with this link follows it (until share_project stop):\n${link}${editLink ? `\nAnyone with this one edits its text files and drawings too:\n${editLink}` : ''}`,
-        data: { project: name, shared: true, link, ...(editLink ? { editLink } : {}), followers: [] },
+        text: `Sharing '${name}' live, read only, as ${owner}${at}. Anyone with this link follows it (until share_project stop):\n${on(link)}${editLink ? `\nAnyone with this one edits its text files and drawings too:\n${on(editLink)}` : ''}`,
+        data: { project: name, shared: true, link: on(link), ...(editLink ? { editLink: on(editLink) } : {}), ...(top !== undefined ? { top } : {}), followers: [] },
       };
     },
   },
@@ -254,14 +264,14 @@ export const COLLAB_TOOLS = [
         if (live) check = await checkDrawing(String(path), live.model);
       }
       const lines = [
-        `Following ${owner}'s project '${project?.name}' (${cur.session.editor ? 'an editor: its text files and drawings' : 'read only'}).`,
+        `Following ${owner}'s project '${project?.name}' (${cur.session.editor ? 'an editor: its text files and drawings' : 'read only'})${l.top ? `, its link opening on ${l.top}` : ''}.`,
         `Files: ${fileTree.join(', ')}`,
         `In it:\n${peerLines(peers)}`,
         ...(write !== undefined ? [`Wrote ${write.path} (merged as this participant's edit).`] : []),
         ...(text !== null ? [`${path}:`, text] : []),
         ...(check ? check.lines : []),
       ];
-      return { text: lines.join('\n'), data: { following: true, editor: cur.session.editor, owner, project: project?.name ?? null, files: fileTree, participants: peers, ownerView: view, ...(text !== null ? { path, text } : {}), ...(check ? { check: { errors: check.errors, warnings: check.warnings } } : {}) }, untrusted: text !== null ? `the shared project's files, names and the file ${path}` : 'the shared project\'s files and names' };
+      return { text: lines.join('\n'), data: { following: true, editor: cur.session.editor, owner, project: project?.name ?? null, files: fileTree, participants: peers, ownerView: view, ...(l.top ? { top: l.top } : {}), ...(text !== null ? { path, text } : {}), ...(check ? { check: { errors: check.errors, warnings: check.warnings } } : {}) }, untrusted: text !== null ? `the shared project's files, names and the file ${path}` : 'the shared project\'s files and names' };
     },
   },
 ];
