@@ -276,10 +276,11 @@ export function normModules(modules) {
   return out;
 }
 export function findMod(modules, name) {
-  if (!name) return null;
-  if (modules[name]) return modules[name];
+  // (a name that is not text: none; a name of Object.prototype's, as toString, no module unless the project has it, #3532)
+  if (!name || typeof name !== 'string') return null;
+  if (Object.hasOwn(modules, name)) return modules[name];
   const ln = name.toLowerCase();
-  for (const k in modules) if (k.toLowerCase() === ln) return modules[k];
+  for (const k of Object.keys(modules)) if (k.toLowerCase() === ln) return modules[k];
   return null;
 }
 
