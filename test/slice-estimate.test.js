@@ -16,7 +16,7 @@ import { orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { nextpnrNode } from '../packages/silinx-fpga/src/nextpnr-node.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { device } from './timesim-lib.mjs';
-import { example } from './examples-lib.mjs';
+import { example, EXAMPLES } from './examples-lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUTS = new Set(['O', 'Q', 'Q15', 'SPO', 'DPO', 'LO']);
@@ -36,10 +36,15 @@ test('a LUT with the flip-flop it feeds: two to a slice of one control set; flip
   assert.equal(sliceEstimate(netlist([['FDCE', { C: 2, CE: '1', CLR: 5, D: 3, Q: 11 }], ['FDPE', { C: 2, CE: '1', PRE: 5, D: 4, Q: 12 }]]), 't'), 1);
   assert.equal(sliceEstimate(netlist([fdre(3, 11, { r: 5 }), ['FDCE', { C: 2, CE: '1', CLR: 5, D: 4, Q: 12 }]]), 't'), 2);
   // (an inverter on a set / reset or an enable: the slice's SRINV / CEINV, the flip-flops on its input, the inverter gone;
-  // one that a LUT reads too stays, a LUT)
+  // one that a LUT reads too stays, a LUT; a flip-flop on the net and one on its inverse, two slices: one CEINV, SRINV,
+  // CLKINV a slice, same_mode, #3389)
   const inv = (o, i) => ['INV', { I: i, O: o }];
   assert.equal(sliceEstimate(netlist([inv(20, 5), inv(21, 5), fdre(3, 11, { r: 20 }), fdre(4, 12, { r: 21 })]), 't'), 1);
-  assert.equal(sliceEstimate(netlist([inv(20, 5), fdre(3, 11, { ce: 20 }), fdre(4, 12, { ce: 5 })]), 't'), 1);
+  assert.equal(sliceEstimate(netlist([inv(20, 5), fdre(3, 11, { ce: 20 }), fdre(4, 12, { ce: 5 })]), 't'), 2);
+  assert.equal(sliceEstimate(netlist([inv(20, 5), fdre(3, 11, { r: 20 }), fdre(4, 12, { r: 5 })]), 't'), 2);
+  assert.equal(sliceEstimate(netlist([inv(20, 2), fdre(3, 11, { c: 20 }), fdre(4, 12)]), 't'), 2);
+  assert.equal(sliceEstimate(netlist([fdre(3, 11, { ce: 5 }), ['FDRE', { C: 2, CE: 5, R: '0', D: 4, Q: 12 }, { IS_CE_INVERTED: '1' }]]), 't'), 2);
+  assert.equal(sliceEstimate(netlist([fdre(3, 11), ['FDRE_1', { C: 2, CE: '1', R: '0', D: 4, Q: 12 }]]), 't'), 2);
   assert.equal(sliceEstimate(netlist([inv(20, 5), fdre(3, 11, { r: 20 }), lut(30, 20), lut(31, 6), lut(32, 7)]), 't'), 2);
   // three LUTs alone: two slices; as text, and as bytes
   const three = netlist([lut(10, 3), lut(11, 4), lut(12, 5)]);
@@ -78,6 +83,12 @@ test('a carry chain: two stages to a slice, its LUTs and its sums\' flip-flops w
   const di = [['LUT4', { I0: 3, I1: 4, I2: 5, I3: 6, O: 20 }], ['MUXCY', { CI: 9, DI: 8, S: 20, O: 30 }]];
   assert.equal(sliceEstimate(netlist(di), 't'), 1);
   assert.equal(sliceEstimate(netlist([...di, lut(21, 7), ['MUXCY', { CI: 30, DI: '0', S: 21, O: 31 }]]), 't'), 2);
+  // a LUT on the selects of two chains' stages whose sums are used: one stage takes a copy of it, no longer reading it,
+  // and the other the LUT itself (stage_lut; before #3389 both copies, the LUT a slice of its own)
+  const shared = [lut(20, 3, 4), ['MUXCY', { CI: 9, DI: '0', S: 20, O: 30 }], ['XORCY', { CI: 9, LI: 20, O: 40 }], fdre(40, 60),
+    ['MUXCY', { CI: 10, DI: '0', S: 20, O: 31 }], ['XORCY', { CI: 10, LI: 20, O: 41 }], fdre(41, 61)];
+  assert.equal(sliceEstimate(netlist(shared), 't'), 2);
+  assert.equal(sliceEstimate(netlist([...shared, lut(70, 20)]), 't'), 3);
   // a stage whose select is 1 and whose carry in no sum reads: left out
   assert.equal(sliceEstimate(netlist([['MUXCY', { CI: 9, DI: '0', S: '1', O: 30 }], lut(21, 7), ['MUXCY', { CI: 30, DI: '0', S: 21, O: 31 }]]), 't'), 1);
 });
@@ -114,9 +125,10 @@ test('a netlist that cannot be read, or of another family (a Spartan-6\'s LUT6, 
 // nextpnr's packing of a design's netlist: the slices of its routed design (Translate, Map, Place & Route on the XC3S250E)
 async function nextpnrSlices(json, top) {
   const lines = [];
-  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, steps: orderOpenSteps(['par'], { synthUpToDate: true }) },
+  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, placements: 1, steps: orderOpenSteps(['par'], { synthUpToDate: true }) },
     { log: l => lines.push(l), sources: () => [], read: n => (n === `open/${top}.json` ? json : null), write: n => `build/${n}`, save: () => {}, device, nextpnr: { spartan3e: nextpnrNode() } });
   assert.equal(r.ok, true, lines.join('\n'));
+  assert.deepEqual(lines.filter(l => /warning/i.test(l)), [], 'the flow\'s warnings: none');
   return r.report.map.summary.slices.used;
 }
 const within = (est, real) => Math.abs(est - real) <= Math.max(1, Math.ceil(0.02 * real));
@@ -131,15 +143,23 @@ test('against nextpnr: the packer\'s fixtures (wide multiplexers, flip-flops of 
   }
 });
 
-test('against nextpnr: the examples traffic (wide multiplexers), isqrt and uart (carry chains, shift registers)', { timeout: 900000 }, async () => {
-  const { synthesizeOpen } = await import('../core/synth-front.js');
-  const { compile, elaborate } = await import('../core/compile.js');
-  const { primitiveSources } = await import('../core/unisim.js');
-  for (const name of ['traffic', 'isqrt', 'uart']) {
-    const ex = example(name);
-    const r = await synthesizeOpen(elaborate(compile([...primitiveSources(ex.design), ...ex.design]), ex.project.top), { family: 'spartan3e', run: yosysNode });
-    const text = r.files[`${r.top}.json`];
-    const real = await nextpnrSlices(text, r.top), est = sliceEstimate(text, r.top);
-    assert.ok(within(est, real), `${name}: estimated ${est}, nextpnr ${real}`);
-  }
-});
+// the ten examples, each as the open synthesis maps it for the Spartan-3E: the estimate is nextpnr 1.5.2's count, exactly
+// (#3389; before it, pong, stopwatch, clock and vga one slice more: a LUT on two chains' selects, copied for one stage,
+// taken by the other). The packing is the device's family's, before placement: one device stands for the Spartan-3E's
+// four (the Spartan-6's netlists, of LUT6s, have no estimate)
+const EXAMPLE_SLICES = { gates: 1, traffic: 66, blinky: 116, pong: 224, stopwatch: 192, clock: 195, vga: 121, isqrt: 63, uart: 112, micro80: 148 };
+for (const names of [EXAMPLES.slice(0, 5), EXAMPLES.slice(5)]) {
+  test(`against nextpnr: the examples ${names.join(', ')}`, { timeout: 900000 }, async () => {
+    const { synthesizeOpen } = await import('../core/synth-front.js');
+    const { compile, elaborate } = await import('../core/compile.js');
+    const { primitiveSources } = await import('../core/unisim.js');
+    for (const name of names) {
+      const ex = example(name);
+      const r = await synthesizeOpen(elaborate(compile([...primitiveSources(ex.design), ...ex.design]), ex.project.top), { family: 'spartan3e', run: yosysNode });
+      assert.deepEqual(r.warnings, [], `${name}: the synthesis's warnings`);
+      const text = r.files[`${r.top}.json`];
+      const real = await nextpnrSlices(text, r.top), est = sliceEstimate(text, r.top);
+      assert.deepEqual([name, est, real], [name, EXAMPLE_SLICES[name], EXAMPLE_SLICES[name]]);
+    }
+  });
+}
