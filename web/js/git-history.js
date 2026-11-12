@@ -14,7 +14,7 @@ const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.vhdl?$/i.test(p) ?
 const day = iso => String(iso || '').slice(0, 10);
 
 /** A file of the project as it was in a commit: read only, in a document of its own (one per commit and file). */
-export async function openFileAt(commit, path, date = '') {
+async function openFileAt(commit, path, date = '') {
   const id = `git:${commit}:${path}`;
   const old = findDoc(id);
   if (old) { activateDoc(old); return old; }
@@ -69,7 +69,7 @@ export async function historyDialog() {
 const textAt = (commit, path) => (commit ? api.gitShow(S.project.name, commit, path).then(r => r.text, e => { if (e.status === 404) return null; throw e; }) : Promise.resolve(null));
 
 /** Compare a file of a commit with the commit before (none: the file is new). */
-export async function compareAt({ commit, parent, path }) {
+async function compareAt({ commit, parent, path }) {
   let a, b;
   try { [a, b] = await Promise.all([textAt(parent, path), textAt(commit, path)]); } catch (e) { logGitError(e); return null; }
   const { openCompare } = await import('./drawing-diff-view.js');

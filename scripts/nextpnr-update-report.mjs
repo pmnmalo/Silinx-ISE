@@ -42,7 +42,7 @@ export const BOARDS = { 'basys2-250': { board: 'basys2', variant: '250', pkg: PA
   atlys: { board: 'atlys', pkg: PACKAGES[1] } };
 // the jobs of a board (--shard k/SHARDS: its examples alternately), each measuring both sides within its time limit
 export const SHARDS = 2;
-export const METRICS = [['slices', 'slices'], ['luts', 'LUTs'], ['ffs', 'FFs'], ['period', 'min. period (ns)'], ['seconds', 'run time (s)']];
+const METRICS = [['slices', 'slices'], ['luts', 'LUTs'], ['ffs', 'FFs'], ['period', 'min. period (ns)'], ['seconds', 'run time (s)']];
 // the run time, both sides on the same runner (#3030): marked past 10 % and past its runs' own noise, when they agree
 export const TOLERANCE = { ...QUALITY_TOLERANCE, seconds: 0.1 };
 

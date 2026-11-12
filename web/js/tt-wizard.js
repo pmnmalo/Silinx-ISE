@@ -10,7 +10,7 @@ import { S, app } from './app.js';
 
 // a truth table from "name = expression" (#1056): its inputs (the expression's, 1 to 6), its output (the name, else f)
 // and the output's column; or the error to show
-export async function ttFromExpression(text) {
+async function ttFromExpression(text) {
   const { splitEquation, expressionInputs } = await import('/core/ink/expression.js');
   const { parseExpr, exprColumn, MAX_EDIT_INPUTS } = await import('/core/logic.js');
   const { name, expr } = splitEquation(text);

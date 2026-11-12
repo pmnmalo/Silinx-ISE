@@ -15,7 +15,7 @@ const LATCH_RE = /^"[^"]*" Line \d+: Found \d+-bit latch for signal/;
 
 /** The vectors a test compares: a vectors test's own (`text`: its file's when it has one), a reference test's from the
  *  reference design (`expected`, computed apart: the reference never runs with a submission). */
-export function testVectors(ex, test, { text = null, expected = null } = {}) {
+function testVectors(ex, test, { text = null, expected = null } = {}) {
   if (test.kind === 'vectors') return parseVectors(text ?? test.vectors, ex.ports, { clock: test.clock });
   if (test.kind === 'reference') return expected ? { ...expected, problems: [] } : { problems: ['the reference\'s outputs are not computed'] };
   return null;
@@ -97,7 +97,7 @@ async function runChecks(test, io) {
 
 /** One test of a prepared design (prepareDesign): its { verdict, messages, detail? }. `project`: the submission's
  *  silinx.json (the check tests'). */
-export async function runTest(ex, test, design, { files = new Map(), vectors = null, synthesize = null, yosys = null, project = {} } = {}) {
+async function runTest(ex, test, design, { files = new Map(), vectors = null, synthesize = null, yosys = null, project = {} } = {}) {
   const limits = limitsOf(ex, test);
   if (test.kind === 'testbench') return runTestbench(design.sources, test, { files, limits });
   if (test.kind === 'check') return runChecks(test, submissionIo(project, files, design));

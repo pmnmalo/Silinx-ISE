@@ -34,7 +34,7 @@ import { wizardLine } from './clocking.js';
 import { planMemory, bramShapes } from './blockram.js';
 import { identError } from './modgen.js';
 
-export const CAPTURE_OPS = ['=', '!=', 'rise', 'fall', 'change'];
+const CAPTURE_OPS = ['=', '!=', 'rise', 'fall', 'change'];
 export const STATUS_BITS = 18;
 const MIN_DEPTH = 16, MAX_DEPTH = 16384, MAX_WIDTH = 256;
 const PORTS = ['clk', 'probe', 'tck', 'sel', 'capture', 'shift', 'tdi', 'tdo'];

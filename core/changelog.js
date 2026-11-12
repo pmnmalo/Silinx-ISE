@@ -65,7 +65,7 @@ function shortenNotes(notes, s, head, limit) {
 // as in a section of CHANGELOG.md (changes/README.md).
 
 /** A fragment's file name: <issue>-<slug>.md, the slug in lower-case words joined by hyphens. */
-export const FRAGMENT_NAME = /^(\d+)-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+const FRAGMENT_NAME = /^(\d+)-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 /** A fragment's lists: { short: [item], detail: [item] }, each item a "- " bullet with its continuation
  *  lines (indented); throws an Error saying what is wrong with a malformed one. */

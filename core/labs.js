@@ -9,7 +9,6 @@ import { CHECKS } from './labs-check.js';
 import { LABS } from './labs-shipped.js';
 
 export const LAB_VERSION = 1;
-export const LAB_DIR = 'labs';
 export const PROGRESS_FILE = 'labs/progress.json';
 export const isLabFile = p => /^labs\/[^/]+\.lab\.json$/i.test(String(p || ''));
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;

@@ -102,7 +102,7 @@ const firstLine = text => {
 };
 
 /** A failed command's GitError: git's line and the hint of the known cases. */
-export function explain(op, r) {
+function explain(op, r) {
   const t = `${r.stderr}\n${r.stdout}`;
   const line = firstLine(r.stderr || r.stdout);
   const hint =
@@ -135,7 +135,7 @@ const same = (a, b) => (process.platform === 'win32' || process.platform === 'da
 
 /** The repository holding a project: { dir, top, prefix, root: 'project' | 'workspace' }, or null (none, or one above
  *  the workspace). */
-export async function repoOf(name) {
+async function repoOf(name) {
   await P.readProject(name);
   const dir = P.projectDir(name);
   const r = await git(['rev-parse', '--show-toplevel', '--show-prefix'], { cwd: dir });

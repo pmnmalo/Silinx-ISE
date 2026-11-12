@@ -45,7 +45,7 @@ const TASK_DEFS = allTasks();
 const taskField = f => Object.fromEntries(TASK_DEFS.map(t => [t.id, t[f]]));
 export const TASKS = TASK_DEFS.map(t => t.id);
 export const TASK_LABEL = taskField('label');
-export const TASKS_KEY = prefKey('silinx.tasks');
+const TASKS_KEY = prefKey('silinx.tasks');
 const STEP = taskField('step');
 const ACTION = taskField('action');
 const NO_BENCH = 'The project has no test bench yet: create one with the wizard, or choose a module to simulate with stimuli drawn in SSim.';
@@ -184,7 +184,7 @@ function arrange(patch) {
 function toggle(patch) { arrange(patch); layoutToggled(); }
 
 /** The task in front (`t`), its arrangement and its document; `fromDoc`: its document is already in front. */
-export function setTask(t, { fromDoc = false } = {}) {
+function setTask(t, { fromDoc = false } = {}) {
   if (!TASKS.includes(t) || (t !== 'edit' && app && !app.S.project)) return;   // (no project: Design only, #1260)
   if (app && !hasTask(app.projectTool(), t)) return;   // (a task the tool does not have, #2311)
   state.task = t;
@@ -457,7 +457,7 @@ function build() {
 // The header's room (#839): every label of the switcher if they fit, else the current task's only, else none,
 // else a shorter project name too (#topbar data-fit; the window's width, the language and a development
 // build's Development menu decide it, not a fixed width).
-export const FIT_STEPS = ['', 'current', 'icons', 'tight'];
+const FIT_STEPS = ['', 'current', 'icons', 'tight'];
 function fitHeader() {
   const sw = document.getElementById('task-switch'), top = document.getElementById('topbar');
   if (!sw || !on()) return;

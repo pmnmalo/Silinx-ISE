@@ -20,13 +20,13 @@ const FILE = path.join(ROOT, 'test', 'hls-corpus', 'vitis-names.json');
 const words = (s) => s.trim().split(/\s+/);
 
 /** C's own words: they cannot name an argument, so they are no candidates. */
-export const C_WORDS = new Set(words(`auto break case char const continue default do double else enum extern float for goto
+const C_WORDS = new Set(words(`auto break case char const continue default do double else enum extern float for goto
   if inline int long register restrict return short signed sizeof static struct switch typedef union unsigned void volatile
   while asm typeof`));
 
 /** The candidates, by group: the names not reserved by any language's list are the point of #1926, the reserved words
  *  are checked too (each one is renamed today, on the word of the lists in core/reserved.js alone). */
-export const CANDIDATES = {
+const CANDIDATES = {
   plain: words('x size index position p value data result clk_en my_pos negate'),
   case: words('POS Pos NEG Neg IN In ENTITY Entity NEW New CLASS Class'),
   systemc: words(`pos neg sensitive sensitive_pos sensitive_neg sc_module SC_MODULE sc_in sc_out sc_inout sc_signal sc_clock

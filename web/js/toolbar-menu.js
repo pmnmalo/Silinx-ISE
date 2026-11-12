@@ -55,7 +55,7 @@ const checkItem = (role, label, { checked, disabled = false, title = null, oncli
 }, h('span', { class: 'tb-menu-tick', 'aria-hidden': 'true' }, checked ? '✓' : ''), h('span', {}, label));
 
 /** An item's ✓ put or taken away. */
-export function setChecked(item, on) {
+function setChecked(item, on) {
   item.classList.toggle('checked', on);
   item.setAttribute('aria-checked', String(on));
   item.firstChild.textContent = on ? '✓' : '';

@@ -12,7 +12,7 @@ import { setSide, splitState, tabParent } from './split-view.js';
 
 const SLOP = 8;   // (px: a press that moves less is a click)
 /** A tab's tooltip: its document's, and how to move it. */
-export const TAB_HINT = 'Drag to move it, or Alt+Shift+← / →';
+const TAB_HINT = 'Drag to move it, or Alt+Shift+← / →';
 export const tabTip = doc => `${doc.tooltip || doc.title}\n${TAB_HINT}`;
 
 const shown = d => d.tab.getClientRects().length > 0;
@@ -52,7 +52,7 @@ export function moveTab(doc, side, ref = null) {
 }
 
 /** A tab one place left (-1) or right (+1) in its row; false at the row's end. */
-export function nudgeTab(doc, dir) {
+function nudgeTab(doc, dir) {
   const on = splitState().on;
   const row = S.docs.filter(d => (d === doc || shown(d)) && (!on || sideOf(d) === sideOf(doc)));
   const j = row.indexOf(doc) + dir;

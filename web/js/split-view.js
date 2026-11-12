@@ -78,7 +78,7 @@ export function toggleSplit() {
 }
 
 /** Close Split: every document on one side again, the one in front kept. */
-export function closeSplit() {
+function closeSplit() {
   if (!on) return;
   end();
   saveViewState();
@@ -108,7 +108,7 @@ export const tabParent = d => (on && groups ? groups[sideOf(d)] : $('doc-tabs'))
 /** Show … Beside (#2834): a view related to `doc` (web/js/related-views.js: { find, open }) on the other side (split),
  *  `doc` kept in front: made or opened there; open already, brought to the front there (made again where it is, a view
  *  that can be, as a translation). Not made (its errors in the console): as it was. */
-export async function showBeside(doc, view) {
+async function showBeside(doc, view) {
   const s = other(sideOf(doc)), was = on;
   let g = view.find();
   on = true;

@@ -17,7 +17,7 @@ const PERSPECTIVE = 1100;
 /** A cell's value as the map shows it: SOP groups the 1s, its 0s left blank; POS the 0s, its 1s blank (X always, #1494). */
 export const cellText = (v, groups) => (v === (groups === 'pos' ? '1' : '0') ? '' : v);
 /** The 3D box of the K-map's options: `d3` the editor's ({ on }, #3074: each table its own), `changed` the map drawn again. */
-export function k3dBox(d3, changed) {
+function k3dBox(d3, changed) {
   const c = h('input', { type: 'checkbox', class: 'tt-k3d-on', checked: d3.on, onchange: () => { d3.on = c.checked; changed(); } });
   return h('label', { class: 'tt-check', title: 'The maps stacked in depth: a group across maps seen as one box' }, c, ' 3D');
 }
@@ -26,7 +26,7 @@ export function k3dBox(d3, changed) {
  * The 3D map in `host`: { layout, col (the output's column), terms (the groups), groups ('sop' | 'pos'), colors, names
  * (the inputs), onCell(mt), title(code) (a layer's label) }.
  */
-export function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCell, title, d3 }) {
+function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCell, title, d3 }) {
   let view = d3.stack || { rx: -28, ry: 32 };   // (this table's, kept between its redraws as the viewer left it, #3074)
   const rows = L.rowCodes.length, cols = L.colCodes.length, W = cols * C, H = rows * C, depth = (L.maps.length - 1) * GAP;
   const stack = h('div', { class: 'tt-k3d-stack', style: { width: `${W}px`, height: `${H}px` } });

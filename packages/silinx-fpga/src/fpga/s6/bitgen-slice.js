@@ -3,7 +3,7 @@
 // Browser + Node.
 import { evalLut } from '../../xdl.js';
 
-export const LUTS = ['A', 'B', 'C', 'D'];
+const LUTS = ['A', 'B', 'C', 'D'];
 const EQN = '(A1*A2)';
 const key = ([f, b]) => `${f},${b}`;
 const ROUNDS = ['full', 'nets', 'slice'];

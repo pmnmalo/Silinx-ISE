@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-export const CHIPDB_MANIFEST = 'fetch.json';
+const CHIPDB_MANIFEST = 'fetch.json';
 
 /** The GitHub release of a nextpnr package's version: v<version> for the Spartan-3E's, spartan6-v<version> for the
  *  Spartan-6's, xc7-v<version> for the 7-series' (#3146) (the fork's tags). */

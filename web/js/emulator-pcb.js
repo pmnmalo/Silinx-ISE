@@ -18,7 +18,7 @@ export function scopeIds(body, n) {
 }
 let drawn = 0;
 
-export function svgEl(w, hgt, body) {
+function svgEl(w, hgt, body) {
   const s = SVG('svg', { width: w, height: hgt, viewBox: `0 0 ${w} ${hgt}`, class: 'emu-pcb-art' });
   s.innerHTML = scopeIds(body, `b${++drawn}`);
   return s;
@@ -27,7 +27,7 @@ export function svgEl(w, hgt, body) {
 export const holes4 = (W, H) => [[22, 22], [W - 22, 22], [22, H - 22], [W - 22, H - 22]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="#d8c67e"/><circle cx="${x}" cy="${y}" r="5" fill="#1b1b1b"/>`).join('');
 
 // "<board> — <design> · <clock note>": the names are data (not translated), the note is UI text
-export const boardNote = (h, board, title, clockNote) => h('div', { class: 'emu-board-note' },
+const boardNote = (h, board, title, clockNote) => h('div', { class: 'emu-board-note' },
   h('span', { 'data-no-i18n': true }, `${board.name}${title ? ` — ${title}` : ''}`), ' · ', h('span', {}, clockNote));
 
 export function boardFrame({ h, W, H, art, board, title, clockNote }) {

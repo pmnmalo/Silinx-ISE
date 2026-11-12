@@ -18,8 +18,8 @@ import { clearDrawings, showInDrawings } from './drawing-path.js';
 import { iseTimingPaths } from '/core/twr-paths.js';
 import { vivadoTimingPaths } from '/core/vivado-paths.js';
 
-export const TIMING_REPORT = 'build/open/timing.txt';
-export const PATHS_FILE = 'build/open/paths.json';
+const TIMING_REPORT = 'build/open/timing.txt';
+const PATHS_FILE = 'build/open/paths.json';
 const KIND = { 'clock-to-out': 'clock-to-out', net: 'net', logic: 'logic', setup: 'setup' };
 const ns = x => `${x.toFixed(3)} ns`;
 const end = s => `${s.inst}.${s.pin}`;
@@ -30,7 +30,7 @@ let marked = [], markedFrom = null;
 const hash = (text) => { let x = 2166136261; for (let i = 0; i < text.length; i++) x = Math.imul(x ^ text.charCodeAt(i), 16777619); return (x >>> 0).toString(36); };
 
 /** The marks of the last Show Path taken off: the editors' lines, the drawings' elements, the FPGA view's path. */
-export function clearPathMarks() {
+function clearPathMarks() {
   for (const d of marked) if (d.editor) markLines(d.editor, []);
   marked = [];
   markedFrom = null;
@@ -41,7 +41,7 @@ export function clearPathMarks() {
 /** Show Path: the path's source lines marked in their editors (the first file in front), the elements of the drawings
  *  they are generated from in theirs, its sites and nets in the FPGA view when it is open (fpga: open it on the path;
  *  from: the analysis it comes from, the panel's). */
-export async function showPath(p, { fpga = false, from = null } = {}) {
+async function showPath(p, { fpga = false, from = null } = {}) {
   const hl = pathHighlight(p);
   for (const d of marked) if (d.editor) markLines(d.editor, []);
   marked = [];

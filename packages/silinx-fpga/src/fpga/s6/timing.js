@@ -97,7 +97,7 @@ const placedPin = (device, inst, pin) => (inst?.placed !== false && inst?.site ?
  * Each connection's delay (timingGraph's conns, ns): the wire model on its routed path; a connection not routed (or
  * not found) by the placer's estimate (fpga/s6/place-timing.js: base + per tile of Manhattan distance).
  */
-export function connDelaysS6(design, device, tg, model = S6_SPEED_3) {
+function connDelaysS6(design, device, tg, model = S6_SPEED_3) {
   const inst = new Map(design.insts.map(i => [i.name, i])), nets = new Map(design.nets.map(n => [n.name, n])), trees = new Map();
   let siteTile = null;
   const tileXY = s => { siteTile ??= new Map(device.sites().map(x => [x.name, device.tile(x.tileName)])); const k = siteTile.get(s); return k === undefined ? null : [device.tileCol[k], device.tileRow[k]]; };

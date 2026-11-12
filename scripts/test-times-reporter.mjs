@@ -8,7 +8,7 @@
 import path from 'node:path';
 
 /** The file's path relative to the working directory, with '/' (the same on Windows). */
-export const relative = file => path.relative(process.cwd(), file).split(path.sep).join('/');
+const relative = file => path.relative(process.cwd(), file).split(path.sep).join('/');
 
 /** Adds a reporter event to { file: seconds }: a file's summary (the run's own, with no file, is not one). */
 export function addFileTime(times, { type, data }) {

@@ -253,7 +253,7 @@ export function showPalette() {
   return openPalette({ commands: menuCommands(S.menus), files });
 }
 
-export function downloadUrl(url, filename) {
+function downloadUrl(url, filename) {
   const a = h('a', { href: url, download: filename });
   document.body.append(a); a.click(); a.remove();
 }

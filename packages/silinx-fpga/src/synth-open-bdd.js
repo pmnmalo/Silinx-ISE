@@ -156,8 +156,8 @@ function orders(n, count) {
 }
 
 /** The commands that map the trees of bddFile (modules bdd_<k>_<o>) onto LUT4s, each alone, into out. */
-export const bddMapCommands = (bddFile, out) => `read_verilog ${bddFile}; proc; opt; techmap; opt; abc -lut 4 -script ${abcPlain(DEPTH_ABC2)}; opt_clean; write_json ${out}`;
-export const BDD_FILE = 'silinx_bdd.v';
+const bddMapCommands = (bddFile, out) => `read_verilog ${bddFile}; proc; opt; techmap; opt; abc -lut 4 -script ${abcPlain(DEPTH_ABC2)}; opt_clean; write_json ${out}`;
+const BDD_FILE = 'silinx_bdd.v';
 const BDD_OUT = 'silinx_bdd.json';
 
 // a mapped tree's LUTs and its depth (from Yosys's $lut cells)

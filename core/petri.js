@@ -20,7 +20,7 @@ import { clone } from './util.js';
 import { pnmlTag, pnmlStartTag, pnmlAttr, pnmlElements, pnmlPosition } from './pnml-scan.js';
 import { escXml } from './escape.js';
 
-export const PETRI_VERSION = 1;
+const PETRI_VERSION = 1;
 export const PLACE_R = 22;          // radius of a place (drawing units)
 export const TRANS_W = 10, TRANS_H = 40;
 const MAX_CAP = 255;

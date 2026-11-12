@@ -17,12 +17,12 @@
 import * as V from './values.js';
 
 export const MAX_CYCLES = 1024;
-export const STIM_BITS = ['0', '1', 'Z', 'X'];
+const STIM_BITS = ['0', '1', 'Z', 'X'];
 
 const clampInt = (v, lo, hi, dft) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dft; };
 
 /** The ports a stimulus model has: the 'in' ones are driven, the 'out' ones checked (inout ones are neither). */
-export const stimPorts = ports => ({ ins: ports.filter(p => p.dir === 'in'), outs: ports.filter(p => p.dir === 'out') });
+const stimPorts = ports => ({ ins: ports.filter(p => p.dir === 'in'), outs: ports.filter(p => p.dir === 'out') });
 
 /** A new model for the module of `ports` ([{ name, dir, width }]): every input 0, nothing expected. */
 export function newStimuli(ports, { clock = null, periodNs = 20, stepNs = 10, cycles = 16 } = {}) {

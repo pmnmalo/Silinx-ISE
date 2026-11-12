@@ -5,7 +5,7 @@
 // Isomorphic ES module (browser + Node), no DOM.
 
 /** Index of bit `i` of a port (as written in the UCF, e.g. opcode<3>) inside its value (bit 0 = LSB). */
-export function bitPos(t, i) {
+function bitPos(t, i) {
   if (!t || t.left === undefined) return 0;
   return t.desc ? i - t.right : t.right - i;
 }
@@ -100,7 +100,7 @@ export function manualClocks(wiring) {
 // ---------------------------------------------------------------------------------------------
 
 /** 0/1/null (unknown) of bit `pos` of a simulator value. */
-export function bitValue(v, pos) {
+function bitValue(v, pos) {
   if (v == null || Array.isArray(v)) return null;
   const P = BigInt(pos);
   if (v.x && ((v.x >> P) & 1n)) return null;
@@ -108,7 +108,7 @@ export function bitValue(v, pos) {
 }
 
 /** Changes of one bit in [t0, t1]: [[t, 0|1|null], ...], first entry at t0. */
-export function bitTrack(sig, pos, t0, t1) {
+function bitTrack(sig, pos, t0, t1) {
   const w = sig.wave;
   if (!w || !w.t.length) return [[t0, bitValue(sig.val, pos)]];
   let i = 0;
@@ -122,7 +122,7 @@ export function bitTrack(sig, pos, t0, t1) {
 }
 
 /** Time in [t0, t1] during which pred(values of the tracks) holds. */
-export function timeWhere(tracks, t0, t1, pred) {
+function timeWhere(tracks, t0, t1, pred) {
   const idx = tracks.map(() => 0);
   const cur = tracks.map((tr) => tr[0][1]);
   let t = t0, total = 0;

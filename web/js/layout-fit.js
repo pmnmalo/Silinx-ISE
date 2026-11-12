@@ -6,7 +6,7 @@
 // The room settles after the toggle (the layout, a transition): the drawing fits at once, again on every size
 // change in the next half second, and at its end.
 
-export const LAYOUT_TOGGLED = 'silinx:layout-toggled';
+const LAYOUT_TOGGLED = 'silinx:layout-toggled';
 const SETTLE = 500;
 
 /** Says that the user changed the documents' room. */

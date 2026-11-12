@@ -22,7 +22,7 @@ export const INTERFACE_NAMES = Object.freeze({
 // the interfaces' ids before #2451, and theirs now: a preference saved with one is migrated once, on load
 // (migrateInterface; web/index.html's early script does the same before the first paint)
 export const LEGACY_INTERFACES = Object.freeze({ modern: 'silinx', classic: 'ise' });
-export const THEMES = ['system', 'light', 'dark'];
+const THEMES = ['system', 'light', 'dark'];
 
 const store = () => { try { return globalThis.localStorage || null; } catch { return null; } };
 /** A stored preference, or `def` when it is missing or not one of `allowed`. */

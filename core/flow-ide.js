@@ -13,10 +13,10 @@ import { captureFrontEnd, captureClockText, boardClockUcf, boardClockText } from
 import { triggerText } from './ila.js';
 
 // the families whose open flow places and routes the BSCAN (nextpnr 1.5.0's Spartan-3E)
-export const CAPTURE_OPEN_FAMILIES = ['spartan3e'];
+const CAPTURE_OPEN_FAMILIES = ['spartan3e'];
 
 /** A capture inserted (captureSources's result) as the report has it: the probes, the shape, the trigger, the blocks. */
-export function captureReport(c) {
+function captureReport(c) {
   const path = n => c.probes.find(p => p.name === n)?.path ?? n;
   return {
     probes: c.probes.map(({ path: p, width }) => ({ path: p, width })), clock: c.clock ?? captureClockText(c), width: c.plan.width, depth: +c.spec.depth, pre: +c.spec.pre,

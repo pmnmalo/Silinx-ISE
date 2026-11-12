@@ -131,7 +131,7 @@ function printWhenLoaded(win, ready) {
 }
 
 /** Raster image (PNG blob) of a snapshot at `k` pixels per drawing unit, within browser canvas limits. */
-export async function snapshotPng(snapshot, k = 2) {
+async function snapshotPng(snapshot, k = 2) {
   const { w, h: hh } = snapshot.bounds;
   k = Math.max(0.1, Math.min(k, 16000 / w, 16000 / hh, Math.sqrt(120e6 / (w * hh))));
   const url = URL.createObjectURL(new Blob([snapshot.svg], { type: 'image/svg+xml' }));

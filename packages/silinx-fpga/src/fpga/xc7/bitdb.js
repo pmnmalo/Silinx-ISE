@@ -8,7 +8,7 @@
 // takes another type's bits (its sites renamed, its offset moved back by the alias's start). A pseudo-PIP (ppips_*.db)
 // has no bits: setting it sets nothing. A feature the database does not have is an error.
 
-export const BLOCK_TYPES = ['CLB_IO_CLK', 'BLOCK_RAM', 'CFG_CLB'];
+const BLOCK_TYPES = ['CLB_IO_CLK', 'BLOCK_RAM', 'CFG_CLB'];
 
 /** A feature the database has no bits for (Project X-Ray's FasmLookupError). */
 export class FeatureLookupError extends Error {
