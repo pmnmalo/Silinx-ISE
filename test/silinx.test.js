@@ -225,8 +225,8 @@ test('index.html: one page for both interfaces (header, activity bar icons, empt
   assert.match(head, /prefers-color-scheme: dark/);
   // (the theme in both interfaces, the ISE style one dark too: #2676)
   assert.match(head, /d\.setAttribute\('data-theme', dark \? 'dark' : 'light'\);/);
-  for (const page of ['start', 'design', 'files', 'libraries']) assert.match(html, new RegExp(`data-page="${page}" role="tab"`), page);
-  assert.equal((html.match(/class="ico-inline tab-ico" data-icon="m\w+"/g) || []).length, 4);
+  for (const page of ['start', 'design', 'files', 'libraries', 'teaching']) assert.match(html, new RegExp(`data-page="${page}" role="tab"`), page);   // (Teaching, #3533)
+  assert.equal((html.match(/class="ico-inline tab-ico" data-icon="m\w+"/g) || []).length, 5);
 });
 
 test('silinx.css: the Silinx look applies only under data-ui="silinx"; the ISE style look hides its parts', () => {
