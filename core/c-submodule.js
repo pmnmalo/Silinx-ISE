@@ -10,7 +10,8 @@
 //
 //   inlineMode(f) -> 'off' | 'recursive' | 'on' | null
 //   hierarchy(fn, funcs, globals, structArgs, all, { large }) -> { sub(f, recursive) -> whether a call of f is a sub-module's, kept: [{ f, why }: the
-//     functions off that must be inlined] }
+//     functions off that must be inlined], shared: Map(a sub-module's name -> the globals it shares with its caller) }
+//   sharedGlobals(f, names, globals, funcs) -> those globals f's arguments, its calls passing them
 //   moduleRegistry({ make }) -> { of(callee, depths) -> { callee, module, gen }, modules(): callees first }
 //   latencyOf(machine, callLatency) -> { min, max, loops }
 //   subMethods: SeqFlow's subStmt, instPorts, subArrays
@@ -69,7 +70,7 @@ const globalsOf = (fs, globals) => {
 };
 
 export function hierarchy(fn, funcs, globals, structArgs = null, all = null, { large = false } = {}) {
-  const kept = [];
+  const kept = [], shared = new Map();
   // (a variable kept between calls that the callee shares with its caller: a sub-module would have its own copy)
   const written = new Set([...globals.values()].filter((g) => !g.const).map((g) => g.name));
   const why = (f) => {
@@ -83,8 +84,15 @@ export function hierarchy(fn, funcs, globals, structArgs = null, all = null, { l
     const mine = tree(f, funcs);
     const others = new Set([...tree(fn, funcs)].filter((g) => !mine.has(g)));
     const own = globalsOf(mine, written), theirs = globalsOf(others, written);
-    const both = [...own].find((n) => theirs.has(n));
-    return both ? `the global variable '${both}' is used by its caller too` : null;
+    const both = [...own].filter((n) => theirs.has(n));
+    // (a global it shares with its caller: an argument of its own, a port of the sub-module as Vitis HLS makes it, the
+    // caller's variable passed at each call, #2244; but where a function it calls uses it too, or it is not an integer or
+    // an array of integers of a known size)
+    const inner = globalsOf([...mine].filter((g) => g !== f), written);
+    const bad = both.find((n) => inner.has(n) || !portable(globals.get(n).type) || shadowed(n, tree(fn, funcs)));
+    if (bad) return `the global variable '${bad}' is used by its caller too${inner.has(bad) ? ' and by a function it calls' : ''}`;
+    if (both.length) shared.set(f.name, both);
+    return null;
   };
   const memo = new Map();
   const able = (f) => { if (!memo.has(f.name)) memo.set(f.name, why(f)); return memo.get(f.name) === null; };
@@ -108,7 +116,44 @@ export function hierarchy(fn, funcs, globals, structArgs = null, all = null, { l
   }
   const big = (f) => large && !!f.body && !f.library && !f.blackbox && inlineMode(f) === null && !/^ap_unit_/.test(f.name) && ownLoop(f.body) && !looped.has(f.name) && able(f);
   // (off wins over a caller's recursive, as Vitis HLS's; recursive inlines one kept by default)
-  return { kept, sub: (f, recursive = false) => f !== fn && ((inlineMode(f) === 'off' && able(f)) || region(f) || (!recursive && big(f))) };
+  const sub = (f, recursive = false) => f !== fn && ((inlineMode(f) === 'off' && able(f)) || region(f) || (!recursive && big(f)));
+  // (shared: the globals each sub-module shares with its caller, its arguments, sharedGlobals)
+  return { kept, sub, shared: new Map([...shared].filter(([n]) => sub(funcs.get(n)) && !region(funcs.get(n)))) };
+}
+
+// (a global a sub-module's port can be: an integer, or an array of them of a known size; a name no function of the top's
+// declares again, its caller's id at the call the global)
+const portable = (t) => (t.kind === 'array' ? !!(t.size || t.length) && t.of.kind !== 'array' && !!typeOf(t.of) : !!typeOf(t));
+function shadowed(name, fs) {
+  let hit = false;
+  for (const f of fs) {
+    if (f.params.some((pa) => pa.name === name)) hit = true;
+    walk(f.body, (n) => { if ((n.kind === 'decl' && n.vars.some((v) => v.name === name)) || (n.kind === 'var' && n.name === name)) hit = true; });
+  }
+  return hit;
+}
+
+/** A sub-module's globals shared with its caller made its arguments (#2244): f's parameters (a scalar a pointer, *g its
+ *  uses, as a C++ reference is made, core/cpp-tree.js; an array as it is: its ports a pointer's, g_i, g_o and g_o_ap_vld,
+ *  and a memory's), each call of f in funcs given the global (&g, g). As the caller's (funcs: its functions) and as the
+ *  sub-module's own (its top f, the globals then none of its). */
+export function sharedGlobals(f, names, globals, funcs = null) {
+  const scalars = new Set();
+  for (const n of names) {
+    const v = globals.get(n), arr = v.type.kind === 'array';
+    if (!arr) scalars.add(n);
+    f.params.push({ name: n, type: arr ? v.type : { kind: 'ptr', to: v.type }, loc: v.loc });
+  }
+  const deref = (x) => {
+    if (!x || typeof x !== 'object') return x;
+    if (Array.isArray(x)) { x.forEach((y, k) => { x[k] = deref(y); }); return x; }
+    if (x.kind === 'id' && scalars.has(x.name)) return { kind: 'unary', op: '*', e: { ...x }, loc: x.loc };
+    for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type' && v && typeof v === 'object') x[k] = deref(v);
+    return x;
+  };
+  deref(f.body);
+  const arg = (n, loc) => (scalars.has(n) ? { kind: 'unary', op: '&', e: { kind: 'id', name: n, loc }, loc } : { kind: 'id', name: n, loc });
+  if (funcs) for (const g of funcs.values()) walk(g.body, (c) => { if (c.kind === 'call' && c.callee?.kind === 'id' && c.callee.name === f.name) c.args.push(...names.map((n) => arg(n, c.loc))); });
 }
 
 const isLoop = (n) => n.kind === 'for' || n.kind === 'while' || n.kind === 'do';

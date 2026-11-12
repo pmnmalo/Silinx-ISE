@@ -29,7 +29,7 @@ import { loadBlackboxes, applyBlackboxes, blackboxHdl, declaredBlackboxes } from
 import { latencyPragma, markFabric, mulLimit } from './c-op-pragmas.js';
 import { isUnit, shareUnits, unitSource } from './c-float-units.js';
 import { bindable } from './c-bind.js';
-import { hierarchy, inlineMode, latencyOf, moduleRegistry } from './c-submodule.js';
+import { hierarchy, inlineMode, latencyOf, moduleRegistry, sharedGlobals } from './c-submodule.js';
 import { fftTop } from './hls-fft-hdl.js';
 
 export const bits = (k, w) => {
@@ -61,6 +61,11 @@ export function cToHdl(source, opts = {}) {
   for (const w of units.warnings) checked.diagnostics.push({ file, line: w.loc.line, col: w.loc.col, message: w.message, severity: 'warning' });
   // (consts: FUNCTION_INSTANTIATE's arguments of this sub-module, constants of its own, #2244)
   if (opts.consts) constArgs(checked.funcs.get(checked.top), opts.consts);
+  // (globals: those this sub-module shares with its caller, its arguments, #2244)
+  if (opts.globals) {
+    sharedGlobals(checked.funcs.get(checked.top), opts.globals, new Map(checked.ast.items.filter((it) => it.kind === 'var').map((it) => [it.name, it])));
+    checked.ast.items = checked.ast.items.filter((it) => it.kind !== 'var' || !opts.globals.includes(it.name));
+  }
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
   const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
   // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js;
@@ -257,8 +262,10 @@ function constArgs(fn, consts) {
 export function subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes = null, mults = null, stall = false, modules = null, large = false }) {
   const fn = checked.funcs.get(checked.top);
   const globals = new Map(checked.ast.items.filter((it) => it.kind === 'var').map((it) => [it.name, it]));
-  const { sub, kept } = hierarchy(fn, checked.funcs, globals, checked.ast.structArgs, stall ? 'its caller waits for an AXI master (ap_ce), it would not (not yet)' : null, { large });
-  const subs = modules || moduleRegistry({ make: (callee, depths, module, consts) => cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, clock, family, blackboxes, mults, modules: subs, consts, large }) });
+  const { sub, kept, shared } = hierarchy(fn, checked.funcs, globals, checked.ast.structArgs, stall ? 'its caller waits for an AXI master (ap_ce), it would not (not yet)' : null, { large });
+  // (a global a sub-module shares with its caller: its argument, the caller's variable passed at each call, #2244)
+  for (const [f, names] of shared) sharedGlobals(checked.funcs.get(f), names, globals, checked.funcs);
+  const subs = modules || moduleRegistry({ make: (callee, depths, module, consts) => cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, clock, family, blackboxes, mults, modules: subs, consts, large, globals: shared.get(callee) }) });
   return { subs, sub, kept };
 }
 

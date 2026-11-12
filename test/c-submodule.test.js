@@ -193,7 +193,7 @@ test('#1960 INLINE off of a combinational function: in a sequential caller an in
   assert.deepEqual(ents(r.g), ['top']);
 });
 
-test('#1960 what cannot be one is said: a global its caller uses too (inlined), a bad option; a call of an array element\'s address refused', () => {
+test('#1960 what cannot be one is said: a bad option; a global its caller uses too a port of it (#2244, test/c-global-ports.test.js)', () => {
   const src = `int g;
 void inc(int d) {
 #pragma HLS INLINE off
@@ -202,8 +202,8 @@ void inc(int d) {
 int top(int d) { inc(d); return g; }
 int main() { return top(1) == 2 ? 0 : 1; }
 `;
-  const r = both(src, ["3 warning: #pragma HLS INLINE off: 'inc' is inlined: the global variable 'g' is used by its caller too"]);
-  assert.deepEqual(ents(r.g), ['top']);
+  const r = both(src);
+  assert.deepEqual(ents(r.g), ['inc', 'top']);
   // (a global only it uses: its own)
   const mine = `int g;\nint inc(int d) {\n#pragma HLS INLINE off\n  for (int i = 0; i < 2; i++) g += d;\n  return g;\n}\nint top(int d) { return inc(d); }\nint main() { return top(1) == 2 ? 0 : 1; }\n`;
   assert.deepEqual(ents(both(mine).g), ['inc', 'top']);

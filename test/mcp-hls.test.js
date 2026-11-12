@@ -1,6 +1,6 @@
 // The MCP server's tools of a C or C++ source (#2674, server/mcp-hls.js), as the C module's processes: C Simulation and
 // C/RTL Co-simulation of the test designs (fir, gcd, sort, popcount; stream_sum in C++), the co-simulation in VHDL and
-// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit; #2182: a pipelined loop's iteration over several cycles); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox; #3022: a C source that does not declare a blackbox's function, made; a description no C source declares, a warning of check_syntax.
+// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit; #2182: a pipelined loop's iteration over several cycles; #2244: a global shared with a sub-module its port); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox; #3022: a C source that does not declare a blackbox's function, made; a description no C source declares, a warning of check_syntax.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -101,6 +101,22 @@ test('#2182 c_synthesis_report and c_cosimulation: a pipelined loop\'s iteration
     assert.deepEqual([c.data.pass, c.data.mismatches], [true, []], language);
   }
   await ok('delete_file', { project: 'gcd', path: 'src/slow.c' });
+});
+
+// #2244: a global a sub-module shares with its caller, a port of it: its function listed, its ports in the HDL, no warning
+test('#2244 c_synthesis_report, c_generated and c_cosimulation: a global shared with a sub-module its port, PASS in VHDL and in Verilog', async () => {
+  const inc = 'int g;\nvoid inc(int d) {\n#pragma HLS INLINE off\n  for (int i = 0; i < 2; i++) g += d;\n}\nint top(int d) {\n  inc(d);\n  return g;\n}\n';
+  await ok('write_file', { project: 'gcd', path: 'src/inc.c', text: `${inc}int main() {\n  int a = top(1);\n  return a == 2 && top(2) == 6 ? 0 : 1;\n}\n` });
+  const r = await ok('c_synthesis_report', { project: 'gcd', path: 'src/inc.c' });
+  assert.ok(/\nFunctions \(the module's latency: \d+ cycles\):\n  inc_U0 +inc: 1 call;/.test(r.text), r.text);
+  assert.deepEqual(r.data.warnings, []);
+  const h = await ok('c_generated', { project: 'gcd', path: 'src/inc.c' });
+  assert.match(h.text, /\nentity inc is\n[^)]*\n {4}d : in std_logic_vector\(31 downto 0\);\n {4}g_i : in std_logic_vector\(31 downto 0\);\n {4}g_o : out std_logic_vector\(31 downto 0\);\n {4}g_o_ap_vld : out std_logic\n {2}\);/);
+  for (const language of ['vhdl', 'verilog']) {
+    const c = await ok('c_cosimulation', { project: 'gcd', path: 'src/inc.c', language });
+    assert.deepEqual([c.data.pass, c.data.mismatches], [true, []], language);
+  }
+  await ok('delete_file', { project: 'gcd', path: 'src/inc.c' });
 });
 
 test('c_generated: the HDL and the ASM chart made from fir.c', async () => {
