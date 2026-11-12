@@ -29,6 +29,9 @@ async function tbFiles(name, text, tree) {
   return Object.fromEntries(await Promise.all(testBenchFiles(text, tree).map(async p => [p, await P.readFile(name, p)])));
 }
 
+// a failed C/RTL co-simulation's or C synthesis report's messages (#3681): they quote the source's names
+const QUOTES = 'the C compiler\'s messages, which quote the source\'s names';
+
 const PATH = STR('The C or C++ source (e.g. src/fir.c).');
 
 export const HLS_TOOLS = [
@@ -66,14 +69,14 @@ export const HLS_TOOLS = [
       const { cosimulate } = await import('../core/c-cosim.js');
       const r = cosimulate(c.text, { file: rel, lang, files: await tbFiles(name, c.text, c.tree), clock: c.clock, family: c.family, mults: c.mults, ...c.hls });
       const lines = r.errors.map(e => `ERROR:SilinxC - "${rel}" ${e}`);
-      if (!r.ok || r.errors.length) return { text: [...lines, 'Process "C/RTL Co-simulation" failed'].join('\n'), data: { project: name, path: rel, language: lang, ok: false, pass: false, errors: r.errors }, isError: true };
+      if (!r.ok || r.errors.length) return { text: [...lines, 'Process "C/RTL Co-simulation" failed'].join('\n'), data: { project: name, path: rel, language: lang, ok: false, pass: false, errors: r.errors }, isError: true, untrusted: QUOTES };
       lines.push(`C simulation: ${r.calls} call(s) of '${r.gen.top}' replayed on its ${L}.`);
       if (r.latency) lines.push(`Latency: ${r.latency.min} to ${r.latency.max} cycles (average ${r.latency.avg.toFixed(1)}).`);
       for (const m of r.mismatches.slice(0, 20)) lines.push(`ERROR:SilinxC - call ${m.call ?? '-'}, ${m.port}: the C gives ${m.expected}, the HDL ${m.got ?? 'X'}`);
       if (r.mismatches.length > 20) lines.push(`… ${r.mismatches.length - 20} more mismatch(es)`);
       lines.push(...(r.pass ? [`C/RTL co-simulation PASS: ${r.calls} call(s), the same results`, 'Process "C/RTL Co-simulation" completed successfully']
         : [`C/RTL co-simulation FAIL: ${r.mismatches.length} mismatch(es)`, 'Process "C/RTL Co-simulation" failed']));
-      return { text: lines.join('\n'), data: { project: name, path: rel, language: lang, ok: true, pass: r.pass, calls: r.calls, latency: r.latency || null, mismatches: r.mismatches.slice(0, 20) }, isError: !r.pass };
+      return { text: lines.join('\n'), data: { project: name, path: rel, language: lang, ok: true, pass: r.pass, calls: r.calls, latency: r.latency || null, mismatches: r.mismatches.slice(0, 20) }, isError: !r.pass, untrusted: r.pass ? undefined : QUOTES };
     },
   },
   {
@@ -87,7 +90,7 @@ export const HLS_TOOLS = [
       const { cReportLines } = await import('../core/c-report.js');
       const r = cToHdl(c.text, { file: rel, lang: c.lang, clock: c.clock, family: c.family, mults: c.mults, ...c.hls });
       const diags = r.diagnostics.map(d => `${d.severity === 'error' ? 'ERROR' : 'WARNING'}:SilinxC - "${rel}" line ${d.line}: ${d.message}`);
-      if (!r.ok) return { text: [...diags, 'Process "View C Synthesis Report" failed'].join('\n'), data: { project: name, path: rel, ok: false, diagnostics: r.diagnostics }, isError: true };
+      if (!r.ok) return { text: [...diags, 'Process "View C Synthesis Report" failed'].join('\n'), data: { project: name, path: rel, ok: false, diagnostics: r.diagnostics }, isError: true, untrusted: QUOTES };
       const { lines, warnings } = cReportLines(r, { path: rel, lang: c.lang, clock: c.clock });
       return { text: [...diags, ...lines, ...warnings, 'Process "View C Synthesis Report" completed successfully'].join('\n'),
         data: { project: name, path: rel, ok: true, top: r.top, ports: r.ports, report: r.report, warnings: [...diags.filter(d => /^WARNING/.test(d)), ...warnings] } };
