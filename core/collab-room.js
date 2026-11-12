@@ -3,6 +3,8 @@
 // It reads no message (they are sealed with the link's key, which it never sees). What it checks:
 // - a participant's first message: an owner's `open` (a new room), a follower's `join` (a room's id), of this version,
 //   with a client id of its own (#3360: not the owner's nor another follower's);
+// - the owner's frames go to every follower, but one it addresses to a follower (#3529: the whole document a join asks
+//   for), which goes to that follower only;
 // - only the owner's updates are forwarded: a follower's are dropped and answered with an error (read only), only
 //   their awareness (who they are, what they look at) goes through, marked with the client id they joined with (#3360:
 //   a follower's awareness speaks for that follower only, never for the owner nor another); and, when the owner lets editors in (its open
@@ -12,7 +14,7 @@
 // - a room ends with its owner (stopping sharing, or the connection lost): its followers are told and closed.
 // A participant is a socket: send(data, { binary }), close(code, reason), readyState (1: open), as a WebSocket of
 // `ws`; its transport gives each message to `message(data, binary)` and its end to `close()`.
-import { KIND, PROTOCOL, fromFrame } from './collab-client.js';
+import { KIND, PROTOCOL, fromFrame, senderOf } from './collab-client.js';
 import { b64url } from './collab-crypto.js';
 import { verifierOf, verifyFrame, PUB_RE } from './collab-sign.js';
 
@@ -74,6 +76,13 @@ export function collabRooms({ limits = ROOM_LIMITS } = {}) {
       if (!r) return;
       if (me.role === 'owner') {
         if (!binary) { let msg = null; try { msg = JSON.parse(String(data)); } catch { /* ignored */ } if (msg?.type === 'close') closeRoom(me.room, 'the owner stopped sharing'); return; }
+        // (a frame for one follower: to it only, its mark taken off; to no one when it has left, #3529)
+        if (data[0] === KIND.to) {
+          const to = senderOf(new Uint8Array(data), KIND.to);
+          const f = to && [...r.followers].find(([, c]) => c === to.client)?.[0];
+          if (f?.readyState === 1) f.send(to.frame, { binary: true });
+          return;
+        }
         for (const f of r.followers.keys()) if (f.readyState === 1) f.send(data, { binary: true });
         return;
       }

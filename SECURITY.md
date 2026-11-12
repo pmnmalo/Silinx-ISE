@@ -297,7 +297,9 @@ Share Project… (and the MCP's `share_project`) shares the open project live; a
   the link's fragment (AES-GCM, `core/collab-crypto.js`), which a browser never sends. Opening a room takes the server's
   token (or a relay's key); joining one, its id. It forwards only the owner's updates (a follower's are refused) and,
   when the owner lets editors in, an editor's edits signed with the room's key (`core/collab-sign.js`). A follower's presence (who they are, what they look at) goes through marked with the client id it joined with, so it
-  speaks for that follower only, never for the owner nor another (#3360). Its limits: a
+  speaks for that follower only, never for the owner nor another (#3360). What a join asks for (the whole document,
+  who is in) goes to the follower that joined only (#3529): joining and leaving again multiplies nobody else's
+  download. Its limits: a
   follower's message 64 KB, the owner's 16 MB, followers per room, rooms per server.
 - **A room the owner's page hosts** (the browser edition, `#follow=….host`): the followers reach it over WebRTC. With
   the owner's key in the link, the follower's page looks for the owner at a public meeting point: Trystero's WebTorrent

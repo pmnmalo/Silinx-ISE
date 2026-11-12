@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { collabRooms, ROOM_LIMITS } from '../core/collab-room.js';
-import { KIND, PROTOCOL, fromFrame } from '../core/collab-client.js';
+import { KIND, PROTOCOL, fromFrame, toFrame, senderOf } from '../core/collab-client.js';
 import { ROOM_RE } from '../core/collab-link.js';
 
 // a participant: what it was sent (text as JSON, binary as bytes), how it was closed
@@ -58,6 +58,24 @@ test('what passes: the owner\'s frames to every follower; a follower\'s awarenes
   b.readyState = 3;
   o.message(frame(KIND.update, 1), true);
   assert.deepEqual([a.got.at(-1), b.got.length], [[KIND.update, 1], 2]);
+});
+
+test('#3529 the owner\'s frame for one follower: to that follower only, its mark taken off; to a follower gone, to nobody', () => {
+  const { owner, o, join } = room();
+  const [a] = join(7), [b, pb] = join(8);
+  for (const s of [owner, a, b]) s.got.length = 0;
+  const f = toFrame(8, frame(KIND.update, 9, 9));
+  assert.deepEqual([...f], [KIND.to, 0, 0, 0, 8, KIND.update, 9, 9]);
+  assert.deepEqual(senderOf(f, KIND.to), { client: 8, frame: frame(KIND.update, 9, 9) });
+  assert.equal(senderOf(f), null);
+  o.message(f, true);
+  assert.deepEqual([a.got, b.got, owner.got], [[], [[KIND.update, 9, 9]], []]);
+  // (a client not in the room, a follower that left, a mark cut short: nobody)
+  o.message(toFrame(9, frame(KIND.update, 1)), true);
+  pb.close();
+  o.message(toFrame(8, frame(KIND.update, 2)), true);
+  o.message(Uint8Array.from([KIND.to, 0, 0]), true);
+  assert.deepEqual([a.got.filter(m => Array.isArray(m)), b.got.length], [[], 1]);
 });
 
 test('who leaves: the others told; the room ends with its owner, by Stop Sharing or the connection lost', () => {
