@@ -8,6 +8,7 @@ import { decodeSvg } from './qr-helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
+import { closable } from './server-close.js';
 import * as Y from 'yjs';
 import { followRoom } from '../core/collab-client.js';
 import { docFile, docProject } from '../core/collab-doc.js';
@@ -22,12 +23,13 @@ import { normalizeDoc, generateHdl } from '../core/schdoc.js';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, what, ms = 5000) => { const t0 = Date.now(); for (;;) { const v = await fn(); if (v) return v; if (Date.now() - t0 > ms) throw new Error(`timed out: ${what}`); await sleep(25); } };
 
-let tmp, srv, base;
+let tmp, srv, base, closeSrv;
 before(async () => {
   tmp = fs.realpathSync(await scratchEnv('silinx-mcp-collab-'));
   const { createApp, tokenFile } = await import('../server/server.js');
   const app = await createApp({ host: '127.0.0.1', token: 'tok-mcp' });
   srv = app.listen(0, '127.0.0.1');
+  closeSrv = closable(srv);
   await new Promise(r => srv.once('listening', r));
   base = `http://127.0.0.1:${srv.address().port}`;
   // (as startServer writes it: the MCP server finds the token of the server on this computer)
@@ -36,8 +38,7 @@ before(async () => {
 });
 after(async () => {
   await (await import('../server/mcp-collab.js')).endCollab();
-  srv?.closeAllConnections?.();
-  await new Promise(r => srv.close(r));
+  await closeSrv();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
