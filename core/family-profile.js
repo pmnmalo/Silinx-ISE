@@ -3,7 +3,7 @@
 // a new family is an entry here (test/family-conditions.test.js keeps web/js free of family names in conditions).
 // The resources' counts stay in the device resources model (packages/silinx-fpga/src/resources.js, #790): a profile
 // names the resource, the part counts it.
-import { ICE40_STEPS, ICE40_PARTS, ECP5_STEPS, ECP5_PARTS, GOWIN_STEPS, GOWIN_PARTS } from '../packages/silinx-fpga/src/index.js';
+import { ICE40_STEPS, ICE40_PARTS, ECP5_STEPS, ECP5_PARTS, GOWIN_STEPS, GOWIN_PARTS, XC7_STEPS } from '../packages/silinx-fpga/src/index.js';
 
 export const FAMILY_PROFILES = {
   spartan3e: {
@@ -25,6 +25,13 @@ export const FAMILY_PROFILES = {
     openFlow: { parts: /^xc6slx\d+$/, bitDb: 's6', nextpnr: true },
     // its Map's choice in Process Properties (#3138): Silinx's, or nextpnr's packer on trial (impl.s6Map)
     mapChoice: true,
+  },
+  artix7: {
+    // the Silinx toolchain's 7-series back end (#3146), in the browser edition too (#3143): nextpnr-himbaechel-xc7 (its
+    // micro-architecture uarch, its function runner; layout: the browser edition's key of its bundle, its chip databases in
+    // ../chipdb beside it; mb: its WebAssembly and a chip database, the log's), Project X-Ray's bit databases in bitdb/xc7
+    // (one per part: <part>.json.gz), its steps (nextpnr packs in its Place & Route)
+    openFlow: { parts: /^xc7a\d+t$/, bitDb: 'xc7', nextpnr: true, uarch: 'xilinx', runner: 'runNextpnrHimbaechelXilinx', layout: 'nextpnrXc7', mb: 6, steps: XC7_STEPS },
   },
   ice40: {
     // its own tools (#2295): nextpnr-ice40 and icepack, their steps, no device description of the Silinx toolchain;

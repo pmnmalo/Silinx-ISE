@@ -1,7 +1,7 @@
 // The browser edition's versioned assets kept in Cache Storage (#967): Yosys in WebAssembly
 // (assets/vendor/yowasp-yosys/<its version>/gen/*, 16.7 MB gzipped), nextpnr in WebAssembly and its chip databases
-// (assets/vendor/nextpnr-spartan/<its version>/gen|chipdb/*, #2136; the Spartan-6's in vendor/nextpnr-spartan6, #2288) and the device descriptions and the
-// bit databases (assets/<version>/devices|bitdb|bitdb/s6/*). Their URLs name their version, so that what one holds
+// (assets/vendor/nextpnr-spartan/<its version>/gen|chipdb/*, #2136; the Spartan-6's in vendor/nextpnr-spartan6, #2288; the 7-series' in
+// vendor/nextpnr-xc7, #3143) and the device descriptions and the bit databases (assets/<version>/devices|bitdb|bitdb/s6|bitdb/xc7/*). Their URLs name their version, so that what one holds
 // never changes: they are read from the cache with no request at all. The browser's HTTP cache kept them
 // 10 minutes only (GitHub Pages' max-age=600), and its revalidation downloaded Yosys again whenever the
 // site had been deployed since (its ETags are the files' times of deployment: every push to main).
@@ -19,7 +19,7 @@
 export const ASSET_CACHE = 'silinx-assets';
 /** Is url one of the versioned assets (its content never changes)? */
 /** The versioned assets' URLs: one pattern for isVersionedAsset and assetFetch (#2792: assetFetch had its own, without nextpnr's). */
-export const VERSIONED_ASSET = /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/vendor\/nextpnr-spartan6?\/\d[^/]*\/(gen|chipdb)\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb(\/s6)?)\/[^/?#]+$/;
+export const VERSIONED_ASSET = /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/vendor\/nextpnr-(spartan6?|xc7)\/\d[^/]*\/(gen|chipdb)\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb(\/(s6|xc7))?)\/[^/?#]+$/;
 export const isVersionedAsset = url => VERSIONED_ASSET.test(String(url));
 
 /** The scope's fetch reads the versioned assets from Cache Storage, and puts there those it fetches. Returns
@@ -97,7 +97,7 @@ export async function assetCached(url, scope = globalThis) {
 /** The files of Yosys's bundle (YoWASP's gen/): what its first run fetches. */
 export const YOSYS_FILES = ['bundle.js', 'yosys.core.wasm', 'yosys.core2.wasm', 'yosys.core3.wasm', 'yosys.core4.wasm', 'yosys-resources.0.tar'];
 
-/** The files of nextpnr's bundle of a micro-architecture (its gen/, #2136; 'spartan6', #2288) and a device's chip database
+/** The files of nextpnr's bundle of a micro-architecture (its gen/, #2136; 'spartan6', #2288; 'xilinx', the 7-series', #3143) and a device's chip database
  *  beside it: what its first run fetches. */
 export const nextpnrFiles = (uarch = 'spartan3e') => ['bundle.js', ...['', '2', '3', '4'].map(n => `nextpnr-himbaechel-${uarch}.core${n}.wasm`),
   `nextpnr-himbaechel-${uarch}-resources.0.tar`];

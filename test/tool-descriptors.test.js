@@ -174,8 +174,9 @@ test('#2311 each descriptor\'s constraints: UCF, or PCF on the iCE40, as a new p
 });
 
 test('#3142 an experimental family\'s tool: no step, no report, nothing to program; its tree the constraints and the checks', () => {
-  // (the Artix-7's in the browser edition: no back end there; on the local server it is Vivado's, #1649)
-  for (const part of ['xc7a35t', 'xc7a100t']) for (const open of [false, true]) assert.equal(toolOf({ part }, open, { standalone: true }), NO_FLOW, part);
+  // (the Artix-7's in the browser edition: the Silinx toolchain's since #3143, whatever the project's synthesis tool; on the local
+  // server it is Vivado's, #1649: no family is left with NO_FLOW, kept for the next experimental one)
+  for (const part of ['xc7a35t', 'xc7a100t']) for (const open of [false, true]) assert.equal(toolOf({ part }, open, { standalone: true }), SILINX_XC7, part);
   assert.equal(toolOf({ part: 'xc7k70t' }, false), ISE, 'another 7-series family: ISE\'s as before');
   assert.deepEqual([NO_FLOW.steps, NO_FLOW.reports, NO_FLOW.program, NO_FLOW.open], [[], [], null, false]);
   assert.deepEqual(built(NO_FLOW).map(shape), ['summary', 'constraints', 'rtl', 'check']);
@@ -281,7 +282,8 @@ test('#1649 AMD Vivado on the Artix-7 (the local server): ISE\'s step names, Viv
 test('#3146 the Silinx toolchain on the Artix-7 (the project\'s synthesis tool Silinx, the local server): its steps, its reports, the timing nextpnr\'s; no simulation model, no view, no Emulate', () => {
   for (const part of ['xc7a35t', 'xc7a100t']) {
     assert.equal(toolOf({ part }, true), SILINX_XC7, part);
-    assert.equal(toolOf({ part }, true, { standalone: true }), NO_FLOW, `${part}: not in the browser edition yet`);
+    assert.equal(toolOf({ part }, true, { standalone: true }), SILINX_XC7, `${part}: in the browser edition too (#3143)`);
+    assert.equal(toolOf({ part }, false), VIVADO, `${part}: Vivado's on the local server, the project's synthesis tool not Silinx`);
   }
   for (const part of ['xc7k70t', 'xc7z020']) assert.equal(toolOf({ part }, true), SILINX, `${part}: not the 7-series back end's`);
   const t = built(SILINX_XC7);

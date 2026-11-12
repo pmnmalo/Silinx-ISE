@@ -1420,6 +1420,8 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
   const yosysVersion = JSON.parse(await fs.readFile(path.join(ROOT, 'node_modules/@yowasp/yosys/package.json'), 'utf8')).version;
   const nextpnrVersion = JSON.parse(await fs.readFile(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json'), 'utf8')).version;
   const nextpnrS6Version = JSON.parse(await fs.readFile(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan6/package.json'), 'utf8')).version;
+  const nextpnrXc7Version = JSON.parse(await fs.readFile(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-xc7/package.json'), 'utf8')).version;
+  const xc7Parts = (await fs.readdir(path.join(ROOT, 'packages/silinx-fpga/bitdb/xc7'))).filter((f) => f.endsWith('.json.gz')).map((f) => f.slice(0, -8)).sort();
   const dir = `dev-${build.commit}/`;
   const origin = new URL(siteUrl).origin;
   let layout;
@@ -1445,7 +1447,7 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
     assert.deepEqual(d['base-uri'], ["'none'"]);
     assert.equal(d['frame-ancestors'], undefined, 'not in a <meta> (the browser reports it as an error)');
     layout = JSON.parse(text.match(/window\.SILINX_ASSET_LAYOUT = (\{.*?\});\n/)[1]);
-    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, nextpnr: `../vendor/nextpnr-spartan/${nextpnrVersion}/gen/bundle.js`, nextpnrS6: `../vendor/nextpnr-spartan6/${nextpnrS6Version}/gen/bundle.js`, nextpnrIce40Package: { url: ice40.resolved, integrity: ice40.integrity }, nextpnrEcp5Package: { url: ecp5.resolved, integrity: ecp5.integrity }, nextpnrGowinPackage: { url: gowin.resolved, integrity: gowin.integrity }, site: siteUrl, integrity: undefined });
+    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, nextpnr: `../vendor/nextpnr-spartan/${nextpnrVersion}/gen/bundle.js`, nextpnrS6: `../vendor/nextpnr-spartan6/${nextpnrS6Version}/gen/bundle.js`, nextpnrXc7: `../vendor/nextpnr-xc7/${nextpnrXc7Version}/gen/bundle.js`, xc7Parts, nextpnrIce40Package: { url: ice40.resolved, integrity: ice40.integrity }, nextpnrEcp5Package: { url: ecp5.resolved, integrity: ecp5.integrity }, nextpnrGowinPackage: { url: gowin.resolved, integrity: gowin.integrity }, site: siteUrl, integrity: undefined });
   }
   // the site's assets, versioned; none at the unversioned paths of before
   const ls = async (p) => (await fs.readdir(path.join(site, p))).sort();
@@ -1463,14 +1465,22 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
   // (the Spartan-6's, nextpnr-himbaechel-spartan6, in a folder of its own: #2288)
   assert.deepEqual(await ls(`assets/vendor/nextpnr-spartan6/${nextpnrS6Version}`), ['chipdb', 'gen', 'package.json']);
   assert.deepEqual(await ls(`assets/vendor/nextpnr-spartan6/${nextpnrS6Version}/chipdb`), ['chipdb-xc6slx16.bin.gz', 'chipdb-xc6slx45.bin.gz']);
+  // (the 7-series', nextpnr-himbaechel-xc7, and its bit databases, gzipped, in bitdb/xc7: #3143)
+  assert.deepEqual(await ls(`assets/vendor/nextpnr-xc7/${nextpnrXc7Version}`), ['chipdb', 'gen', 'package.json']);
+  assert.deepEqual(await ls(`assets/vendor/nextpnr-xc7/${nextpnrXc7Version}/chipdb`), ['chipdb-xc7a100t.bin.gz', 'chipdb-xc7a50t.bin.gz']);
+  assert.ok(xc7Parts.includes('xc7a35tcpg236-1'), xc7Parts.join());
+  assert.deepEqual(await ls(`assets/${dir}bitdb/xc7`), xc7Parts.map((p) => `${p}.json.gz`));
   // #1237: each published asset's SHA-256 in the page (the cache checks it), and no other
   const { createHash } = await import('node:crypto');
-  const published = [...(await ls(`assets/${dir}devices`)).map((f) => `${dir}devices/${f}`), ...(await ls(`assets/${dir}bitdb`)).filter((f) => f !== 's6').map((f) => `${dir}bitdb/${f}`), ...(await ls(`assets/${dir}bitdb/s6`)).map((f) => `${dir}bitdb/s6/${f}`),   // (the Spartan-6's folder, #2103)
+  const published = [...(await ls(`assets/${dir}devices`)).map((f) => `${dir}devices/${f}`), ...(await ls(`assets/${dir}bitdb`)).filter((f) => f !== 's6' && f !== 'xc7').map((f) => `${dir}bitdb/${f}`), ...(await ls(`assets/${dir}bitdb/s6`)).map((f) => `${dir}bitdb/s6/${f}`),   // (the Spartan-6's folder, #2103)
+    ...(await ls(`assets/${dir}bitdb/xc7`)).map((f) => `${dir}bitdb/xc7/${f}`),   // (the 7-series', #3143)
     ...(await ls(`assets/vendor/yowasp-yosys/${yosysVersion}/gen`)).map((f) => `vendor/yowasp-yosys/${yosysVersion}/gen/${f}`),
     ...(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/gen`)).map((f) => `vendor/nextpnr-spartan/${nextpnrVersion}/gen/${f}`),
     ...(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/chipdb`)).map((f) => `vendor/nextpnr-spartan/${nextpnrVersion}/chipdb/${f}`),
     ...(await ls(`assets/vendor/nextpnr-spartan6/${nextpnrS6Version}/gen`)).map((f) => `vendor/nextpnr-spartan6/${nextpnrS6Version}/gen/${f}`),
-    ...(await ls(`assets/vendor/nextpnr-spartan6/${nextpnrS6Version}/chipdb`)).map((f) => `vendor/nextpnr-spartan6/${nextpnrS6Version}/chipdb/${f}`)];
+    ...(await ls(`assets/vendor/nextpnr-spartan6/${nextpnrS6Version}/chipdb`)).map((f) => `vendor/nextpnr-spartan6/${nextpnrS6Version}/chipdb/${f}`),
+    ...(await ls(`assets/vendor/nextpnr-xc7/${nextpnrXc7Version}/gen`)).map((f) => `vendor/nextpnr-xc7/${nextpnrXc7Version}/gen/${f}`),
+    ...(await ls(`assets/vendor/nextpnr-xc7/${nextpnrXc7Version}/chipdb`)).map((f) => `vendor/nextpnr-xc7/${nextpnrXc7Version}/chipdb/${f}`)];
   assert.deepEqual(Object.keys(layout.integrity).sort(), published.sort());
   for (const f of published) assert.equal(layout.integrity[f], `sha256-${createHash('sha256').update(await fs.readFile(path.join(site, 'assets', f))).digest('base64')}`, f);
   // #1445: Yosys's bundle.js, the one script the page imports from the site, is among them (the Yosys workers check it

@@ -314,9 +314,9 @@ export const VIVADO = {
 export const TOOLS = [ISE, SILINX, SILINX_ICE40];
 const OPEN_BY_FAMILY = { ice40: SILINX_ICE40, artix7: SILINX_XC7, ecp5: SILINX_ECP5, gowin: SILINX_GOWIN };
 /** The tool of a project device: a 7-series one's AMD Vivado on the local server (#1649), or the Silinx toolchain there when
- *  `open` (the project's synthesis tool Silinx, #3146; `standalone`, the browser edition: none); another
+ *  `open` (the project's synthesis tool Silinx, #3146), and always in the browser edition (`standalone`, #3143); another
  *  experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE. */
-export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) && !standalone ? (open ? SILINX_XC7 : VIVADO)
+export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) ? (open || standalone ? SILINX_XC7 : VIVADO)
   : experimentalDevice(device) ? NO_FLOW : open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
 
 /** Every tool's tasks, in their order: the kept state's and the switchers'. */

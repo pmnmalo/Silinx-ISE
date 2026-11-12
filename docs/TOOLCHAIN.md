@@ -132,7 +132,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 | MachXO2 | to be defined | nextpnr-machxo2, not yet stable | `ecppack`, Project Trellis | LPF | To be measured (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel-gowin | `gowin_pack`, Silinx's JavaScript port of Apicula's (`src/fpga/gowin/`) | CST | Works: local server and browser, downloaded on first use (32 MB); the GW1NR-9C, the Tang Nano 9K and the examples on it, their `.fs` Apicula's byte for byte, the rPLL and the oscillator too (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
-| Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T and the Nexys A7's XC7A100T (#3145) in the local server, AMD Vivado the default; its timing nextpnr's estimate; the browser edition, and the quality against Vivado (#3147), to come |
+| Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T and the Nexys A7's XC7A100T (#3145) in the local server (AMD Vivado the default there) and in the browser (#3143: the Basys 3's `.bit` the local server's byte for byte); its timing nextpnr's estimate; the quality against Vivado (#3147) to come |
 
 Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. The
 constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the
@@ -151,6 +151,14 @@ nextpnr and gowin_pack (`pack(routedJson, family)`: Silinx's port, `src/fpga/gow
 resources: Silinx ships none of Apicula's data; the rPLL and the oscillator ported, `src/fpga/gowin/pll-osc.js`, the other PLLs, IOLOGIC
 and LVDS refused by name); a port with no pin is an error (nextpnr-himbaechel-gowin places none), a
 clock's period a comment of the CST given to nextpnr as `--freq`.
+The 7-series (#3146, `src/open-flow-xc7.js`) is the first of Silinx's own nextpnr packages on them: `@silinx/nextpnr-himbaechel-xc7` (nextpnr's
+xilinx micro-architecture, about 2.8 MB, and a chip database per device beside it, 3.3 MB the xc7a50t's that the xc7a35t takes),
+`io.nextpnr.xc7`, and the bitstream from its FASM on Project X-Ray's bit database (`bitdb/xc7/<part>.json.gz`, 0.3 MB the
+xc7a35t's). The browser edition publishes them as the Spartan-3E's and the Spartan-6's (#3143): `assets/vendor/nextpnr-xc7/<its
+version>/gen|chipdb/` and `assets/<version>/bitdb/xc7/`, a part available where the build found its bit database (the page's
+layout `xc7Parts`), fetched into Cache Storage when a project opens; nextpnr routes with router2 as the local server does (about
+1.3 GB of the browser's memory for the xc7a35t, its `.bit` the server's), router1 again where router2 stops without an error of
+its own, out of memory (`web/js/nextpnr-router-fallback.js`, a warning says so).
 
 And around the flow, one issue each: the boards and examples (#2297), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).

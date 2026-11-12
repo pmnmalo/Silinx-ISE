@@ -50,11 +50,16 @@ test('#967 the versioned assets: Yosys and nextpnr (#2136) of a version, a versi
     // the Spartan-6's, a folder of their own (#2288)
     `${SITE}assets/vendor/nextpnr-spartan6/0.1.1/gen/nextpnr-himbaechel-spartan6.core.wasm`, `${SITE}dev/assets/vendor/nextpnr-spartan6/0.1.1/chipdb/chipdb-xc6slx45.bin.gz`,
     // the Spartan-6's bit databases, a folder of their own (#2103)
-    `${SITE}assets/15.12.0/bitdb/s6/xc6slx16-lut.json`, `${SITE}dev/assets/dev-770bf18/bitdb/s6/s6-pips-flow.json`])
+    `${SITE}assets/15.12.0/bitdb/s6/xc6slx16-lut.json`, `${SITE}dev/assets/dev-770bf18/bitdb/s6/s6-pips-flow.json`,
+    // the 7-series' nextpnr, its chip databases and its bit databases, folders of their own (#3143)
+    `${SITE}assets/vendor/nextpnr-xc7/0.1.1/gen/nextpnr-himbaechel-xilinx.core.wasm`, `${SITE}dev/assets/vendor/nextpnr-xc7/0.1.1/chipdb/chipdb-xc7a50t.bin.gz`,
+    `${SITE}assets/15.12.0/bitdb/xc7/xc7a35tcpg236-1.json.gz`, `${SITE}dev/assets/dev-770bf18/bitdb/xc7/xc7a100tcsg324-1.json.gz`])
     assert.equal(isVersionedAsset(u), true, u);
   // unversioned: the local server's Yosys and the tests' assets, the page, version.json; a folder; a query
   for (const u of ['http://127.0.0.1:8/vendor/yowasp-yosys/gen/yosys.core.wasm', 'http://127.0.0.1:8/vendor/nextpnr-spartan/gen/bundle.js', `${SITE}assets/vendor/nextpnr-spartan/0.11.2/package.json`, `${SITE}assets/vendor/nextpnr-spartan6/0.1.1/package.json`, `${SITE}assets/vendor/nextpnr-spartan7/0.1.1/gen/bundle.js`, 'http://127.0.0.1:8/vendor/nextpnr-spartan6/gen/bundle.js', 'http://127.0.0.1:8/assets/devices/xc3s250ecp132-4.json.gz', SITE, `${SITE}version.json`,
-    `${SITE}assets/15.12.0/devices/`, `${SITE}assets/15.12.0/bitdb/s6/`, `${SITE}assets/15.12.0/bitdb/x6/a.json`, `${GRAPH}?x=1`, `${SITE}assets/latest/devices/a.json.gz`])
+    `${SITE}assets/15.12.0/devices/`, `${SITE}assets/15.12.0/bitdb/s6/`, `${SITE}assets/15.12.0/bitdb/x6/a.json`, `${GRAPH}?x=1`, `${SITE}assets/latest/devices/a.json.gz`,
+    // (#3143: the 7-series' unversioned, its package.json, a folder)
+    'http://127.0.0.1:8/vendor/nextpnr-xc7/gen/bundle.js', `${SITE}assets/vendor/nextpnr-xc7/0.1.1/package.json`, `${SITE}assets/15.12.0/bitdb/xc7/`, `${SITE}assets/vendor/nextpnr-xc8/0.1.1/gen/bundle.js`])
     assert.equal(isVersionedAsset(u), false, u);
 });
 
@@ -251,7 +256,7 @@ test('#1237 assetFetchSource: the Yosys worker\'s code carries the SHA-256 and c
 });
 
 test('#2288 nextpnrFiles: a micro-architecture\'s bundle, as its package ships it (the Spartan-3E\'s by default, NEXTPNR_FILES)', () => {
-  for (const [uarch, dir] of [['spartan3e', 'nextpnr-himbaechel-spartan3e'], ['spartan6', 'nextpnr-himbaechel-spartan6']]) {
+  for (const [uarch, dir] of [['spartan3e', 'nextpnr-himbaechel-spartan3e'], ['spartan6', 'nextpnr-himbaechel-spartan6'], ['xilinx', 'nextpnr-himbaechel-xc7']]) {
     const gen = fs.readdirSync(path.join(ROOT, 'node_modules/@silinx', dir, 'gen')).sort();
     assert.deepEqual([...nextpnrFiles(uarch)].sort(), gen, uarch);
   }

@@ -8,7 +8,7 @@ import { FAMILY_PROFILES, familyProfile } from '../core/family-profile.js';
 import { planClock } from '../core/clocking.js';
 import { MEMORY_FAMILIES, planMemory } from '../core/blockram.js';
 import { resourceCount, resourceOfPrimitive } from '../packages/silinx-fpga/src/resources.js';
-import { FAMILY_INFO, ICE40_STEPS, ECP5_STEPS, ECP5_PARTS, GOWIN_STEPS } from '../packages/silinx-fpga/src/index.js';
+import { FAMILY_INFO, ICE40_STEPS, ECP5_STEPS, ECP5_PARTS, GOWIN_STEPS, XC7_STEPS } from '../packages/silinx-fpga/src/index.js';
 import { findPart } from '../server/devices.js';
 
 globalThis.SILINX_ASSETS = 'https://example.test/assets/';
@@ -16,8 +16,8 @@ const { browserOpenStatus, browserSteps, BROWSER_DEVICES } = await import('../we
 
 test('every profile is of a known family; a family with none gets an empty, frozen profile', () => {
   for (const f of Object.keys(FAMILY_PROFILES)) assert.ok(FAMILY_INFO[f], f);
-  assert.deepEqual(Object.keys(FAMILY_PROFILES).sort(), ['ecp5', 'gowin', 'ice40', 'spartan3e', 'spartan6']);
-  for (const f of ['spartan3a', 'artix7', 'nonsense', null, undefined]) {
+  assert.deepEqual(Object.keys(FAMILY_PROFILES).sort(), ['artix7', 'ecp5', 'gowin', 'ice40', 'spartan3e', 'spartan6']);
+  for (const f of ['spartan3a', 'kintex7', 'nonsense', null, undefined]) {
     assert.deepEqual(familyProfile(f), {});
     assert.ok(Object.isFrozen(familyProfile(f)));
   }
@@ -70,7 +70,7 @@ test('the Map\'s choice (#3138, #3447): the Spartan-6\'s alone, as the flow\'s s
   for (const f of ['spartan3e', 'ice40', 'artix7', null]) assert.equal(familyProfile(f).mapChoice, undefined, String(f));
 });
 
-test('the open flow: the parts each family\'s Silinx toolchain takes, its bit database, the iCE40\'s own steps', () => {
+test('the open flow: the parts each family\'s Silinx toolchain takes, its bit database, the iCE40\'s own steps', async () => {
   for (const key of Object.keys(BROWSER_DEVICES)) {
     const dev = key.split('/')[0];
     const f = dev.startsWith('xc6') ? 'spartan6' : 'spartan3e';
@@ -78,8 +78,16 @@ test('the open flow: the parts each family\'s Silinx toolchain takes, its bit da
   }
   assert.equal(familyProfile('spartan3e').openFlow.bitDb, 'bitdb');
   assert.equal(familyProfile('spartan6').openFlow.bitDb, 's6');
-  // nextpnr: the Spartan-3E's and the Spartan-6's engine (#2136, #2288, #2137)
-  assert.deepEqual(Object.keys(FAMILY_PROFILES).filter(f => familyProfile(f).openFlow?.nextpnr), ['spartan3e', 'spartan6']);
+  // nextpnr: the Spartan-3E's and the Spartan-6's engine (#2136, #2288, #2137), the 7-series' (#3146, in the browser #3143)
+  assert.deepEqual(Object.keys(FAMILY_PROFILES).filter(f => familyProfile(f).openFlow?.nextpnr), ['spartan3e', 'spartan6', 'artix7']);
+  const xc7 = familyProfile('artix7').openFlow;
+  assert.deepEqual([xc7.bitDb, xc7.uarch, xc7.runner, xc7.layout, xc7.steps, xc7.package], ['xc7', 'xilinx', 'runNextpnrHimbaechelXilinx', 'nextpnrXc7', XC7_STEPS, undefined]);
+  for (const p of ['xc7a35t', 'xc7a50t', 'xc7a100t']) assert.ok(xc7.parts.test(p), p);
+  for (const p of ['xc7k70t', 'xc7z020', 'xc7a35', 'xc6slx16']) assert.ok(!xc7.parts.test(p), p);
+  // (its runner is the package's, its WebAssembly files the micro-architecture's)
+  const xc7Package = await import('@silinx/nextpnr-himbaechel-xc7');
+  assert.equal(typeof xc7Package[xc7.runner], 'function');
+  assert.equal(xc7Package.deviceOf('xc7a35tcpg236-1'), 'xc7a50t');
   for (const dev of ['xc3s200a', 'xc3s400', 'xc6slx45t', 'xc7a35t']) {
     assert.ok(!familyProfile('spartan3e').openFlow.parts.test(dev) && !familyProfile('spartan6').openFlow.parts.test(dev), dev);
   }
@@ -115,12 +123,19 @@ test('the browser\'s open flow asks the profile: the same answers per family as 
   const gw = browserOpenStatus({ family: 'gowin', part: 'gw1nr-9c', package: 'qn88', speed: '-6' });
   assert.deepEqual([gw.available, gw.part, gw.reason], [true, 'gw1nr-9c-6qn88', 'gw1nr-9c-6qn88: nextpnr-himbaechel-gowin and gowin_pack (in the browser)']);
   assert.deepEqual(browserSteps(['par'], { family: 'gowin' }), ['synth', 'translate', 'par']);
+  // (#3143) the 7-series: its bit database, nextpnr's chip database; its back end's steps (nextpnr maps in its Place & Route)
+  const xc7 = browserOpenStatus({ family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' });
+  assert.deepEqual([xc7.available, xc7.family, xc7.part, xc7.graph, xc7.bitDb], [true, 'artix7', 'xc7a35tcpg236-1', null, 'xc7/xc7a35tcpg236-1.json.gz']);
+  assert.deepEqual(browserSteps(['bitgen'], { family: 'artix7' }), ['synth', 'translate', 'par', 'bitgen']);
+  assert.deepEqual(browserSteps(['synth', 'translate', 'map', 'par'], { family: 'artix7' }), ['synth', 'translate', 'par']);
+  assert.deepEqual(browserSteps(['trce'], { family: 'artix7', synthUpToDate: true }), ['translate', 'par', 'trce']);
+  assert.throws(() => browserSteps(['prombit'], { family: 'artix7' }), /no step prombit/);
   assert.deepEqual(browserSteps(['bitgen'], { family: 'gowin' }), ['synth', 'translate', 'par', 'bitgen']);
   // a family with no open flow, and a Spartan-6 part outside the Nexys3's and Atlys's kind: not the Silinx toolchain's
   for (const device of [{ family: 'spartan3a', part: 'xc3s200a', package: 'vq100', speed: '-4' }, { family: 'spartan6', part: 'xc6slx45t', package: 'fgg484', speed: '-3' }]) {
     const st = browserOpenStatus(device);
     assert.equal(st.available, false, device.part);
-    assert.match(st.reason, /the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 only/);
+    assert.match(st.reason, /the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 \(.*\), and the Artix-7, only/);
   }
   // the iCE40's steps (its own tools'), the others the Silinx toolchain's
   assert.deepEqual(browserSteps(['bitgen'], { family: 'ice40' }), ICE40_STEPS.map(s => s.id));
