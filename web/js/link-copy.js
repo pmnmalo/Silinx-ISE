@@ -15,6 +15,7 @@ import { currentViewState } from './view-state.js';
 import { layoutNow } from './tasks.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateZip } from '/core/import-gate.js';
+import { EXPIRY_DAYS } from '/core/gist-link.js';
 
 const VIEWS = [['', 'Open the project only'], ['try', 'Try it (a drawing\'s simulation)'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
 /** The address of this app, the base of its links (its hash, a token or a link, left out). */
@@ -68,8 +69,12 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   const short = h('input', { type: 'radio', name: 'link-form', value: 'short', 'data-field': 'short' });
   const full = h('input', { type: 'radio', name: 'link-form', value: 'full', checked: true, 'data-field': 'full' });
   const signIn = h('a', { href: '#', class: 'link-signin', style: { display: 'none' }, onclick: async e => { e.preventDefault(); if (await (await import('./git-signin.js')).signInDialog()) update(); } }, 'Sign in with GitHub…');
-  let link = null, opts = null;
+  // (a short link's expiry, #3629: core/gist-link.js EXPIRY_DAYS; the full link's never)
+  const EXPIRY = { 0: 'Never', 7: 'In a week', 30: 'In a month', 182: 'In six months', 365: 'In a year' };
+  const expiry = h('select', { 'data-field': 'expires', disabled: true }, ...EXPIRY_DAYS.map(d => h('option', { value: String(d) }, EXPIRY[d])));
+  let link = null, opts = null, made = null;
   const update = () => {
+    expiry.disabled = !short.checked;
     link = null;
     out.value = ''; info.textContent = ''; err.textContent = '';
     if (encodeError) { err.textContent = encodeError; return; }
@@ -112,7 +117,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
         h('span'), h('label', { class: 'link-ui' }, withView, h('span', {}, 'Include the current view: the open tabs, the split, the panels')),
         h('label', {}, 'Link:'), h('div', { class: 'link-forms' },
           h('label', { class: 'link-full' }, full, h('span', {}, 'The full link: the project inside it (needs nothing, but long)')), h('br'),
-          h('label', { class: 'link-short' }, short, h('span', {}, 'A short link: the project encrypted in a secret gist of your GitHub account')))),
+          h('label', { class: 'link-short' }, short, h('span', {}, 'A short link: the project encrypted in a secret gist of your GitHub account'))),
+        h('label', {}, 'Expires:'), expiry),
       out, info, err, signIn),
     buttons: [{ label: 'Copy Link', primary: true, value: true, validate: async () => {
       if (!link) return false;
@@ -124,7 +130,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
         return false;
       }
       try {
-        const g = await api.gistSave(design);
+        const g = await api.gistSave(design, Number(expiry.value));
+        made = g;
         link = makeLink(linkBase(), { gist: `${g.id}.${g.key}`, ...opts });
         out.value = link;
         return true;
@@ -133,7 +140,11 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   });
   if (!r || !link) return null;
   writeClip('text', link);
-  if (short.checked) { app.log(`Copy Link: the short link of '${name}'${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters (the project in a secret gist of your GitHub account).`, 'ok'); return link; }
+  if (short.checked) {
+    app.log(`Copy Link: the short link of '${name}'${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters (the project in a secret gist of your GitHub account${made?.expires ? `, until ${made.expires.slice(0, 10)}` : ''}).`, 'ok');
+    if (made?.deleted) app.log(`Copy Link: ${made.deleted} expired short link${made.deleted > 1 ? 's' : ''} deleted from your gists.`, 'info');
+    return link;
+  }
   app.log(`Copy Link: the link of '${name}'${viewSel.value ? ` (${VIEWS.find(([v]) => v === viewSel.value)[1]}, ${modSel.value})` : ''}${labSel.value ? `, opening the lab '${labSel.value}'` : ''} copied, ${link.length} characters.`, 'ok');
   if (link.length > LINK_LIMITS.slides) app.log(`WARNING: Copy Link: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides}.`, 'warn');
   return link;

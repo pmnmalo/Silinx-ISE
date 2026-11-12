@@ -118,10 +118,10 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
     githubSignOut: async () => { put(TOKEN, null, 'sessionStorage'); put(TOKEN, null); return { signedIn: false }; },
     // ---- a short link's gist (#3223): a secret gist of the signed-in user
     gistAvailable: async () => !!token(),
-    gistSave: async design => {
+    gistSave: async (design, days = 0) => {
       const { saveGist } = await import('../../core/gist-link.js');
-      const { id, key } = await saveGist(githubClient({ fetch: (...a) => globalThis.fetch(...a), token, api: githubSettings().api }), design);
-      return { id, key };
+      const { id, key, expires, deleted } = await saveGist(githubClient({ fetch: (...a) => globalThis.fetch(...a), token, api: githubSettings().api }), design, { days });
+      return { id, key, expires, deleted: deleted.length };
     },
   };
 }

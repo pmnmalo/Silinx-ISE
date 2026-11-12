@@ -40,9 +40,10 @@ export const LINK_TOOLS = [
       base: STR(`The address of Silinx the link opens (default ${SITE_URL}, the site's latest release; e.g. a local server's http://localhost:3000/).`),
       lab: STR('A guided lab of the project to open beside it (its id: lab action list).'),
       short: { type: 'boolean', description: 'A short link (#gist=…, about 140 characters): the project encrypted and saved as a secret gist of the GitHub account of the server\'s token (GH_TOKEN); only the link opens it.' },
+      expires_days: { type: 'integer', minimum: 0, maximum: 3650, description: 'With short: the link expires after this many days, opening it then refused (0 or none: never; Copy Link offers 7, 30, 182, 365). Making a short link deletes the account\'s expired Silinx gists.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    async run({ project: name, view, top, base = SITE_URL, lab, short = false }) {
+    async run({ project: name, view, top, base = SITE_URL, lab, short = false, expires_days: days = 0 }) {
       const pj = await readProject(name);
       if (view !== undefined && !LINK_VIEWS.includes(view)) throw toolError(`view: one of ${LINK_VIEWS.join(', ')}`);
       let url;
@@ -61,12 +62,13 @@ export const LINK_TOOLS = [
         e = await encodeDesign(entries);
         link = makeLink(url.href, { design: e.design, view, top, lab });
       } catch (err) { throw linkFail(err); }
+      if (days && !short) throw toolError('expires_days: only a short link expires (give short: true)');
       if (short) {
         const GH = await import('./git-github.js');
         let g;
-        try { g = await GH.makeGist(e.design); } catch (err) { throw toolError([err.message, ...(err.hint ? [`Hint: ${err.hint}`] : [])].join('\n')); }
+        try { g = await GH.makeGist(e.design, { days }); } catch (err) { throw toolError([err.message, ...(err.hint ? [`Hint: ${err.hint}`] : [])].join('\n')); }
         link = makeLink(url.href, { gist: `${g.id}.${g.key}`, view, top, lab });
-        return { text: `The short link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters; the project encrypted in a secret gist${g.url ? `, ${g.url}` : ''}):\n${link}`, data: { project: name, link, length: link.length, view: view || null, top: top || null, ...(lab ? { lab } : {}), left: e.left, warnings: [], gist: g.id } };
+        return { text: `The short link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters; the project encrypted in a secret gist${g.url ? `, ${g.url}` : ''}${g.expires ? `; it expires on ${g.expires.slice(0, 10)}` : ''}):\n${link}${g.deleted.length ? `\n${g.deleted.length} expired short link${g.deleted.length > 1 ? 's' : ''} deleted from the account's gists.` : ''}`, data: { project: name, link, length: link.length, view: view || null, top: top || null, ...(lab ? { lab } : {}), left: e.left, warnings: [], gist: g.id, expires: g.expires, deleted: g.deleted } };
       }
       const warnings = link.length > LINK_LIMITS.slides ? [`WARNING: the link is ${link.length} characters long: some slide tools cut a link longer than ${LINK_LIMITS.slides} (a zip hosted elsewhere makes a short one)`] : [];
       const lines = [...warnings, `The link of '${name}'${view ? `, opening ${VIEW_NAMES[view]}` : ''}${top ? ` of ${top}` : ''}${lab ? `, with the lab '${lab}'` : ''} (${link.length} characters${e.left.length ? `; ${e.left.join(', ')} made again from ${e.left.length > 1 ? 'their drawings' : 'its drawing'}` : ''}):`, link];

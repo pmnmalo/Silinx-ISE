@@ -5,7 +5,9 @@
 // which a browser never sends, so GitHub keeps only what it cannot read. Opening the link needs no sign-in: the gist is
 // read through GitHub's API (api.github.com, CORS-enabled), checked to be Silinx's, decrypted, and the design opened as
 // a design link's (decodeDesign: the same import gate and limits). The user's links are their gists, which they list
-// and delete on GitHub. Isomorphic (Web Crypto).
+// and delete on GitHub. A link may expire (#3629): its date kept beside the encrypted design, authenticated with it
+// (AES-GCM's additional data), and in the gist's description in the clear, so that making a short link deletes the
+// user's expired ones without their keys. Isomorphic (Web Crypto).
 import { LINK_LIMITS, parseGistRef } from './design-link.js';
 
 export { parseGistRef };
@@ -13,6 +15,10 @@ export { parseGistRef };
 export const GIST_FILE = 'silinx-link.json';
 export const GIST_FORMAT = 'silinx-link';
 const DESCRIPTION = 'A Silinx project link (encrypted: only its link opens it)';
+const EXPIRES_RE = /; expires (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z)\)$/;
+// the expiries Copy Link offers (days; 0: never) and the most a link may last
+export const EXPIRY_DAYS = [0, 7, 30, 182, 365];
+export const EXPIRY_MAX_DAYS = 3650;
 const ID_RE = /^[0-9a-f]{20,40}$/;
 // the most a gist's content may be (the encrypted design: its base64 of LINK_LIMITS.maxEncoded and the AES tag)
 export const GIST_MAX = Math.ceil((LINK_LIMITS.maxEncoded + 16) * 4 / 3) + 256;
@@ -30,38 +36,78 @@ const unb64u = s => { const t = atob(String(s).replace(/-/g, '+').replace(/_/g, 
 const subtle = () => globalThis.crypto.subtle;
 const aesKey = (raw, use) => subtle().importKey('raw', raw, { name: 'AES-GCM' }, false, [use]);
 
-/** A design encrypted: { content (the gist's file: JSON), key (base64url, 32 bytes) }. */
-export async function encryptDesign(design) {
+/** When a link made now expires, `days` from now (0, null or undefined: never) -> its ISO instant, or null. */
+export function expiryDate(days, now = Date.now()) {
+  if (days === undefined || days === null || days === 0) return null;
+  if (!Number.isInteger(days) || days < 1 || days > EXPIRY_MAX_DAYS) throw fail(`expires_days: a whole number of days, 1 to ${EXPIRY_MAX_DAYS} (or 0: never)`);
+  return new Date(now + days * 86400000).toISOString();
+}
+const aad = expires => new TextEncoder().encode(`${GIST_FORMAT}/2 expires ${expires || 'never'}`);
+
+/** A design encrypted: { content (the gist's file: JSON), key (base64url, 32 bytes) }; expires: an ISO instant, or null. */
+export async function encryptDesign(design, { expires = null } = {}) {
   const text = String(design ?? '');
   if (!text) throw fail('nothing to put in the link');
   if (text.length > LINK_LIMITS.maxEncoded) throw fail(`the project is too large for a link (${text.length} characters, at most ${LINK_LIMITS.maxEncoded})`);
+  if (expires !== null && Number.isNaN(Date.parse(expires))) throw fail('expires: a date');
   const raw = globalThis.crypto.getRandomValues(new Uint8Array(32)), iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
-  const data = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv }, await aesKey(raw, 'encrypt'), new TextEncoder().encode(text)));
-  return { content: `${JSON.stringify({ format: GIST_FORMAT, version: 1, iv: b64u(iv), data: b64u(data) })}\n`, key: b64u(raw) };
+  const data = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: aad(expires) }, await aesKey(raw, 'encrypt'), new TextEncoder().encode(text)));
+  return { content: `${JSON.stringify({ format: GIST_FORMAT, version: 2, iv: b64u(iv), data: b64u(data), expires })}\n`, key: b64u(raw) };
 }
 
-/** A gist's content decrypted with the link's key -> the design (encodeDesign's text); or an Error saying why. */
-export async function decryptDesign(content, key) {
+/** A gist's content decrypted with the link's key -> the design (encodeDesign's text); or an Error saying why (an
+ *  expired link's too: version 2's expires, authenticated with the design; version 1, #3223's, has none). */
+export async function decryptDesign(content, key, { now = Date.now() } = {}) {
   if (typeof content !== 'string' || content.length > GIST_MAX) throw fail('the link\'s gist is too large for a Silinx link');
   let j;
   try { j = JSON.parse(content); } catch { j = null; }
-  if (!j || j.format !== GIST_FORMAT || j.version !== 1 || typeof j.iv !== 'string' || typeof j.data !== 'string') throw fail('the link\'s gist is not a Silinx link', 422);
+  if (!j || j.format !== GIST_FORMAT || (j.version !== 1 && j.version !== 2) || typeof j.iv !== 'string' || typeof j.data !== 'string'
+    || (j.version === 2 && j.expires !== null && (typeof j.expires !== 'string' || Number.isNaN(Date.parse(j.expires))))) throw fail('the link\'s gist is not a Silinx link', 422);
+  const expires = j.version === 2 ? j.expires : null;
   let text;
   try {
     const iv = unb64u(j.iv), raw = unb64u(key);
     if (iv.length !== 12 || raw.length !== 32) throw new Error('size');
-    text = new TextDecoder('utf-8', { fatal: true }).decode(await subtle().decrypt({ name: 'AES-GCM', iv }, await aesKey(raw, 'decrypt'), unb64u(j.data)));
+    const p = { name: 'AES-GCM', iv, ...(j.version === 2 ? { additionalData: aad(expires) } : {}) };
+    text = new TextDecoder('utf-8', { fatal: true }).decode(await subtle().decrypt(p, await aesKey(raw, 'decrypt'), unb64u(j.data)));
   } catch { throw fail('the link\'s key does not open its gist (a wrong or cut link)', 422); }
   if (text.length > LINK_LIMITS.maxEncoded) throw fail('the link\'s design is too large', 413);
+  if (expires && Date.parse(expires) <= now) throw fail(`the link expired on ${expires.slice(0, 10)} (its gist kept until its owner deletes it)`, 410);
   return text;
 }
 
-/** The design saved as a secret gist of the signed-in user (client: core/github-api.js githubClient) -> { id, key, url }. */
-export async function saveGist(client, design) {
-  const { content, key } = await encryptDesign(design);
-  const g = await client.request('POST', '/gists', { description: DESCRIPTION, public: false, files: { [GIST_FILE]: { content } } });
+/** The design saved as a secret gist of the signed-in user (client: core/github-api.js githubClient), expiring in
+ *  `days` (0 or none: never); then the user's expired Silinx gists deleted (deleteExpiredGists) -> { id, key, url,
+ *  expires, deleted }. */
+export async function saveGist(client, design, { days = 0, now = Date.now() } = {}) {
+  const expires = expiryDate(days, now);
+  const { content, key } = await encryptDesign(design, { expires });
+  const g = await client.request('POST', '/gists', { description: expires ? `${DESCRIPTION.slice(0, -1)}; expires ${expires})` : DESCRIPTION, public: false, files: { [GIST_FILE]: { content } } });
   if (!ID_RE.test(String(g?.id || ''))) throw fail('GitHub did not make the gist', 502);
-  return { id: g.id, key, url: g.html_url || null };
+  // (the cleaning a courtesy: a failure of it never fails the new link)
+  const deleted = await deleteExpiredGists(client, { now, keep: g.id }).catch(() => []);
+  return { id: g.id, key, url: g.html_url || null, expires, deleted };
+}
+
+/** The signed-in user's Silinx gists that have expired, deleted (their description says it, their one file is
+ *  GIST_FILE: no other gist is touched; at most `pages` pages of 100 gists looked at) -> the ids deleted. */
+export async function deleteExpiredGists(client, { now = Date.now(), keep = null, pages = 10 } = {}) {
+  // (every page read before any deletion: a deletion moves the later gists to earlier pages)
+  const expired = [];
+  for (let page = 1; page <= pages; page++) {
+    const list = await client.request('GET', `/gists?per_page=100&page=${page}`);
+    if (!Array.isArray(list) || !list.length) break;
+    for (const g of list) {
+      const m = EXPIRES_RE.exec(String(g?.description || ''));
+      const files = Object.keys(g?.files || {});
+      if (!m || !String(g.description).startsWith(DESCRIPTION.slice(0, -1)) || files.length !== 1 || files[0] !== GIST_FILE) continue;
+      if (g.public || g.id === keep || !ID_RE.test(String(g.id)) || Date.parse(m[1]) > now) continue;
+      expired.push(g.id);
+    }
+    if (list.length < 100) break;
+  }
+  for (const id of expired) await client.request('DELETE', `/gists/${id}`);
+  return expired;
 }
 
 // a response's text, read with a running total: no more than `max` bytes, whatever the site says it sends (a gist of
@@ -85,7 +131,7 @@ async function readCapped(r, max) {
 }
 
 /** The design of a short link's gist, read through GitHub's API with no sign-in (fetch: the page's, credentials omitted). */
-export async function loadGist({ id, key }, { fetch: f = globalThis.fetch, api = 'https://api.github.com' } = {}) {
+export async function loadGist({ id, key }, { fetch: f = globalThis.fetch, api = 'https://api.github.com', now = Date.now() } = {}) {
   let r;
   try { r = await f(`${api}/gists/${id}`, { headers: { Accept: 'application/vnd.github+json' }, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' }); }
   catch { throw fail('GitHub could not be reached to open the link\'s gist', 503); }
@@ -96,5 +142,5 @@ export async function loadGist({ id, key }, { fetch: f = globalThis.fetch, api =
   const file = g?.files?.[GIST_FILE];
   if (!file || typeof file.content !== 'string') throw fail('the link\'s gist is not a Silinx link', 422);
   if (file.truncated) throw fail('the link\'s gist is too large for a Silinx link', 413);
-  return decryptDesign(file.content, key);
+  return decryptDesign(file.content, key, { now });
 }
