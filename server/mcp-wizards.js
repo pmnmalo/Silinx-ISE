@@ -206,7 +206,9 @@ export const WIZARD_TOOLS = [
       for (const [net, pin] of Object.entries(pins)) {
         if (!nets.includes(net)) throw toolError(`pins: '${net}' is not a net of ${top} (${nets.slice(0, 12).join(', ')}${nets.length > 12 ? '…' : ''})`);
         const loc = String(pin).trim().toUpperCase();
-        if (pin) asg[net] = { ...(asg[net] || {}), loc, ...(format === 'cst' && standardOf(loc) ? { iostandard: standardOf(loc) } : {}) }; else delete asg[net];
+        // (an own property: a port named __proto__ is a net as any other, #3553)
+        const value = { ...(Object.hasOwn(asg, net) ? asg[net] : {}), loc, ...(format === 'cst' && standardOf(loc) ? { iostandard: standardOf(loc) } : {}) };
+        if (pin) Object.defineProperty(asg, net, { value, enumerable: true, writable: true, configurable: true }); else delete asg[net];
       }
       try { applyAttributes(pj.device, asg, attributes); } catch (e) { throw toolError(e.message); }
       const loc = String(location ?? 'constraints').trim().replace(/\/+$/, '');

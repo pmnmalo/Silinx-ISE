@@ -110,3 +110,13 @@ test('a UCF: check_constraints is checkUcf\'s; the refusals', async () => {
   await fails('check_constraints', { project: 's3e', file: 'constraints/none.ucf' }, 'constraints/none.ucf cannot be read.');
   await fails('constraints_wizard', { project: 's3e', module: 'gates', name: 'w2', attributes: { 'led<0>': { drive: '8' } } }, 'attributes: a UCF\'s are I/O Pin Planning\'s (write_file), not the wizard\'s');
 });
+
+test('constraints_wizard: attributes for a net named __proto__ or constructor refused as any net with no pin, nothing inherited changed (#3553)', async () => {
+  for (const n of ['__proto__', 'constructor', 'toString']) {
+    await fails('constraints_wizard', { project: 'ice', module: 'gates', name: 'w3', attributes: JSON.parse(`{"${n}": { "pull": "up" }}`) }, `attributes: ${n} has no pin`);
+  }
+  assert.equal({}.pull, undefined);
+  assert.equal(Object.pull, undefined);
+  assert.equal(Object.prototype.toString.pull, undefined);
+  assert.ok(!fs.existsSync(`${P.projectDir('ice')}/constraints/w3.pcf`));
+});

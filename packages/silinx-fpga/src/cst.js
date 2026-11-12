@@ -6,7 +6,7 @@
 //                                                               Gowin's tools read it from an SDC), given to nextpnr in an SDC (gowin-clocks.js)
 // '//' starts a comment, ';' ends a statement. The names are nextpnr's (led[0]). Another statement throws, naming its line:
 // nextpnr would not apply it.
-import { periodNs } from './ucf.js';
+import { byName, periodNs, setByName } from './ucf.js';
 
 const PULLS = { UP: 'up', DOWN: 'down', NONE: null, KEEPER: 'keeper' };
 const PULL_MODE = { up: 'UP', down: 'DOWN', keeper: 'KEEPER' };
@@ -17,7 +17,7 @@ function readCst(text) {
   let line = 0;
   const set = (net, attrs) => {
     netStatements.push({ net, attrs: { ...attrs }, line });
-    assignments[net] = { ...assignments[net], ...attrs };
+    setByName(assignments, net, { ...byName(assignments, net), ...attrs });
   };
   String(text).split(/\r?\n/).forEach((raw, i) => {
     const fail = msg => { throw new Error(`line ${i + 1}: ${msg}`); };
