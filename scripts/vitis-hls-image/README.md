@@ -52,3 +52,22 @@ in a file; `local` for the image on this machine); `SILINX_VITIS_IMAGE` (default
 flow's interfaces (`flow_target=vivado`: ap_ctrl_hs, ap_vld, ap_memory, as Silinx makes them) and no IP packaging
 (`hls-vitis-run.sh`, in the image, with no network). `--update` writes the numbers and port names
 (`test/hls-corpus/vitis.json`) and the README's table.
+
+## Measuring the 7-series' timing (#3516)
+
+The same image has Vivado: `scripts/xc7-timing-vivado.mjs` measures the examples' timing with it, to calibrate nextpnr's
+7-series delays (its Fmax 1.2–1.5 times Vivado's on the same netlist). Each example's netlist as Silinx's open flow
+makes it (Yosys's `synth_xilinx`, written as an EDIF by the same Yosys) is linked, placed and routed by Vivado (no
+`opt_design`: the same netlist), which writes its SDF, its worst paths with each element, its timing summary and its
+routes' nodes; nextpnr's Fmax on the same netlist is measured here.
+
+    node scripts/xc7-timing-vivado.mjs --detach [--boards basys3,nexys-a7] [--filter '^(blinky|pong)$']
+    node scripts/xc7-timing-vivado.mjs --collect silinx-xc7t-… --update
+
+Vivado runs alone on the machine (the script refuses to start while another container runs), one design after
+another. `--update` writes only numbers: `packages/silinx-fpga/research/xc7/vivado-timing.json` (per board and
+example: Vivado's and nextpnr's Fmax, the cells' delays, the routes' delays grouped by their wire classes) and the fit,
+`packages/silinx-fpga/research/xc7/timing-fit.json` (`scripts/xc7-timing-fit.mjs`: the slice's LUT and flip-flop delays
+that replace the stubs of the fork's `gen/xilinx_gen.py`, CARRY4's and the F7/F8 multiplexers' arcs, a delay per wire
+class, and the logic and routing scales of the critical paths). Vivado's files are deleted with the run's folder.
+`SILINX_VIVADO_IMAGE` (default `xilinx/vitis-hls:2025.2`), `SILINX_VIVADO_TIMEOUT` (a design's, s; default 3600).
