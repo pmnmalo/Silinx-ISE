@@ -47,7 +47,9 @@ export async function pathNamer() {
   // (the longest first: a folder inside the other; a folder's name only where it ends, not Downloads2's start)
   const res = pairs.sort((a, b) => b[0].length - a[0].length)
     .map(([d, label]) => [new RegExp(`${d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\\\/]|$|[^\\w.-])`, 'g'), label]);
-  const name = v => (typeof v === 'string' ? res.reduce((t, [re, label]) => t.replace(re, label), v)
+  // (the path after a folder's name with '/', as on every system: <exchange folder>/a.zip, never Windows's backslashes, #3611)
+  const slashes = t => t.replace(/(<workspace>|<exchange folder>)((?:\\[^\s\\'"`<>|*?]+)+\\?)/g, (m, label, rest) => label + rest.replace(/\\/g, '/'));
+  const name = v => (typeof v === 'string' ? slashes(res.reduce((t, [re, label]) => t.replace(re, label), v))
     : Array.isArray(v) ? v.map(name) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, name(x)])) : v);
   return name;
 }
