@@ -1,5 +1,5 @@
 // UI: a Gowin device in the interface (#2303): the picker with its speed grade and the synthesis locked, the processes of its
-// toolchain only (no Emulate, no Configure Target Device), its constraints CST (read, written, checked), Generate Programming File
+// toolchain only (no Configure Target Device; Emulate on Board, #3704), its constraints CST (read, written, checked), Generate Programming File
 // to its .fs (gowin_pack, Silinx's port) in the server's real flow and the Design Summary's programming file and reports, in
 // English and Portuguese; the Tang Nano 9K's pins written as a CST by Update Constraints.
 import { before, after } from 'node:test';
@@ -58,7 +58,10 @@ uiTest('#2303 a Gowin project: its processes, its constraints CST, Generate Prog
   await page.treeRow('#hier', 'blinky');
   const labels = await page.eval(() => [...document.querySelectorAll('#procs .row')].map((x) => x.textContent.trim().replace(/^▾/, '')));
   assert.ok(labels.includes('Implement Design') && labels.includes('Generate Programming File'), String(labels));
-  for (const absent of ['Map', 'Configure Target Device', 'Emulate on Board']) assert.ok(!labels.includes(absent), `${absent}: ${labels}`);
+  for (const absent of ['Map', 'Configure Target Device']) assert.ok(!labels.includes(absent), `${absent}: ${labels}`);
+  // Emulate on Board (#3704): the HDL on the board's pins; its RTL model only (the flow makes no simulation model)
+  for (const present of ['Emulate on Board', 'Emulate Behavioral Model (RTL)']) assert.ok(labels.includes(present), `${present}: ${labels}`);
+  assert.ok(!labels.some((l) => /^Emulate Post-/.test(l)), String(labels));
 
   await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
   await page.waitConsole(/Process "Generate Programming File" (completed successfully|failed)/, { timeout: 120000 }).catch(async (e) => { throw new Error(`${e.message}\n${(await page.consoleText()).slice(-2500)}`); });

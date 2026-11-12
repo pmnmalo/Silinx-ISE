@@ -8,70 +8,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EXAMPLES, example, exampleUcf } from './examples-lib.mjs';
 import { designOf, rng } from './compiled-diff.js';
-import { Simulator } from '../core/simulator.js';
+import { engines, boardOf, lcdLines, shown } from './emulate-lib.js';
 import * as V from '../core/values.js';
 import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
-import { resolveBoard } from '../server/devices.js';
-import { boardWiring, boardOutputs, emulatorClocks, lcdState, lcdFeed, lcdText, timingGenerics, autoTimeScale, scaledGenerics } from '../core/emulate.js';
-import { netlistOf } from '../core/compiled-sim.js';
-import { CompiledBoard } from '../core/emulate-compiled.js';
-import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { lcdState, timingGenerics, autoTimeScale, scaledGenerics } from '../core/emulate.js';
 
-const boardOf = (id) => { const r = resolveBoard(id); return { name: r.board.name, device: r.device, resources: r.resources }; };
-const ucfPort = (p) => { const t = p.sig.t, bus = t.w > 1 || (t.kind === 'logic' && !t.scalar); return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null }; };
-const allX = (v) => v && !Array.isArray(v) && v.w > 0 && v.x === (1n << BigInt(v.w)) - 1n;
-function powerUpZero(design) {
-  for (const s of design.signals) {
-    if (Array.isArray(s.val)) { if (s.val.some(allX)) s.val = s.val.map((e) => (allX(e) ? V.fromInt(0, e.w, false) : e)); } else if (allX(s.val)) s.val = V.fromInt(0, s.val.w, false);
-  }
-}
-
-// the two engines side by side, driven as web/js/emulator.js drives its engine
-async function boards({ sources, top, generics, ucf, board }) {
-  const design = designOf(sources, top, { generics });
-  const assignments = parseUcf(ucf, { ports: design.top.ports.map(ucfPort) }).assignments;
-  const wiring = boardWiring({ ports: design.top.ports, assignments, board });
-  wiring.clocks = emulatorClocks(wiring, design.top.ports);
-  const period = wiring.clocks[0]?.period || 20000;
-  // the event-driven simulator, as the emulator runs it
-  const ev = new Simulator(design, { maxWaveEvents: 1e9 });
-  powerUpZero(design);
-  for (const s of design.signals) s.wave = null;
-  for (const c of wiring.clocks) ev.addClock(c.sig, { period: c.period });
-  ev.run(0);
-  // the compiled one
-  const cdesign = designOf(sources, top, { generics });
-  const { json, top: ntop } = await netlistOf(cdesign, { run: yosysNode });
-  const cw = boardWiring({ ports: cdesign.top.ports, assignments, board });
-  cw.clocks = emulatorClocks(cw, cdesign.top.ports);
-  const cb = new CompiledBoard({ json, top: ntop, design: cdesign, wiring: cw, clock: cw.clocks[0]?.port || null, period });
-  const outs = new Set(wiring.bits.filter((b) => b.dir !== 'in').map((b) => b.sig));
-  const state = { ev: { prev: null, lcd: lcdState() }, cb: { prev: null, lcd: lcdState() } };
-  return {
-    design, cdesign, wiring, cw, period, ev, cb,
-    force(name, value) {
-      const p = design.top.ports.find((x) => x.name === name), q = cdesign.top.ports.find((x) => x.name === name);
-      ev.force(p.sig, V.fromInt(value, p.sig.t.w, false));
-      cb.force(q.sig, V.fromInt(value, q.sig.t.w, false));
-    },
-    window(n) {
-      const t0 = ev.now;
-      for (const s of outs) s.wave = { t: [ev.now], v: [s.val] };
-      ev.run(ev.now + n * period);
-      state.ev.prev = boardOutputs(wiring, t0, Math.max(ev.now, t0 + 1), state.ev.prev);
-      lcdFeed(state.ev.lcd, wiring, t0, ev.now);
-      const c0 = cb.now;
-      cb.run(cb.now + n * period);
-      state.cb.prev = cb.outputs(c0, Math.max(cb.now, c0 + 1), state.cb.prev);
-      cb.lcd(state.cb.lcd);
-      return state;
-    },
-  };
-}
-// the LCD's two lines (lcdText gives their character codes)
-const lcdLines = (st) => (lcdText(st) || []).map((row) => String.fromCharCode(...row).trimEnd());
-const round = (o) => JSON.parse(JSON.stringify(o, (k, v) => (typeof v === 'number' ? Math.round(v * 1e9) / 1e9 : v)));
-const shown = (st) => round({ leds: st.prev.leds, digits: st.prev.digits, lcd: lcdLines(st.lcd) });
+// (as web/js/emulator.js runs them: test/emulate-lib.js)
+const boards = ({ ucf, ...o }) => engines({ ...o, assignments: (ports) => parseUcf(ucf, { ports }).assignments });
 
 for (const name of EXAMPLES) {
   test(`example ${name} on the Basys2: the compiled engine shows what the event-driven one shows, window by window`, async () => {

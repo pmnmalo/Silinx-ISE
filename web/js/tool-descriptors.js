@@ -218,7 +218,7 @@ export const SILINX_ICE40 = {
 
 /** The Silinx toolchain on the 7-series (#3146, an experimental family: the Artix-7 of the Basys 3), with nextpnr and the bitstream
  *  from its FASM: nextpnr maps in its Place & Route, its timing is nextpnr's estimate; no simulation models, no views of the
- *  routed design, no Emulate (the 7-series' boards have none yet); the board programmed as Vivado's .bit is (iMPACT's page).
+ *  routed design; Emulate, the board's emulator on the HDL and the XDC's pins (#3704); the board programmed as Vivado's .bit is (iMPACT's page).
  *  The local server's only: the browser edition has NO_FLOW. */
 export const SILINX_XC7 = {
   id: 'silinx-xc7', name: 'Silinx toolchain (7-series, on trial)', open: true,
@@ -233,14 +233,12 @@ export const SILINX_XC7 = {
   constraints: XDC,
   messages: LOG_MESSAGES,
   program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit' },
-  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE)
-    .filter(n => n.part !== 'emulate'),
-  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
+  tasks: LAB_TASKS,
 };
 
 /** The Silinx toolchain on the ECP5 (#2302), with nextpnr-ecp5 and ecppack (Project Trellis): as the iCE40's, its bitstream
- *  ecppack's .bit; no programming of its boards yet (#2298: no Configure Target Device), nor Emulate (its board has no
- *  emulator yet). */
+ *  ecppack's .bit; no programming of its boards yet (#2298: no Configure Target Device); Emulate on the LPF's pins (#3704). */
 export const SILINX_ECP5 = {
   id: 'silinx-ecp5', name: 'Silinx toolchain (ECP5)', open: true,
   steps: withProducts(ECP5_STEPS, {
@@ -254,14 +252,13 @@ export const SILINX_ECP5 = {
   constraints: LPF,
   messages: LOG_MESSAGES,
   program: null,
-  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE)
-    .filter(n => n.part !== 'emulate'),
-  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE),
+  tasks: LAB_TASKS,
 };
 
 /** The Silinx toolchain on the Gowin (#2303), with nextpnr-himbaechel-gowin (Project Apicula) and gowin_pack (Silinx's port of
- *  Apicula's): its bitstream the .fs; no programming of its boards yet (#2298: no Configure Target Device), nor Emulate (its board
- *  has no emulator yet). */
+ *  Apicula's): its bitstream the .fs; no programming of its boards yet (#2298: no Configure Target Device); Emulate on the CST's pins
+ *  (#3704). */
 export const SILINX_GOWIN = {
   id: 'silinx-gowin', name: 'Silinx toolchain (Gowin)', open: true,
   steps: withProducts(GOWIN_STEPS, { synth: ['open/{top}.json', 'open/{top}_stat.txt'], par: ['open/routed.json', 'open/nextpnr-report.json'], trce: ['open/timing.txt', 'open/paths.json'], bitgen: ['{top}.fs'] }),
@@ -273,27 +270,26 @@ export const SILINX_GOWIN = {
   constraints: CST,
   messages: LOG_MESSAGES,
   program: null,
-  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE)
-    .filter(n => n.part !== 'emulate'),
-  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE),
+  tasks: LAB_TASKS,
 };
 
 /** An experimental family's (#3142): its constraints (XDC) and the design's checks, no implementation, no programming yet:
- *  no step, no report, and the tasks without Implement (nor Emulate: its boards have no emulator yet). */
+ *  no step, no report, and the tasks without Implement; Emulate, which needs no flow (the HDL on the board's pins, #3704). */
 export const NO_FLOW = {
   id: 'no-flow', name: 'No implementation flow yet (experimental family)', open: false,
   steps: [], reports: [],
   constraints: XDC,
   messages: LOG_MESSAGES,
   program: null,
-  tree: [{ part: 'summary' }, { part: 'constraints' }, proc('rtl', 'View RTL Schematic', { ico: 'schematic' }), proc('check', 'Check Syntax')],
-  tasks: LAB_TASKS.filter(t => t.id === 'edit' || t.id === 'sim'),
+  tree: [{ part: 'summary' }, { part: 'constraints' }, proc('rtl', 'View RTL Schematic', { ico: 'schematic' }), proc('check', 'Check Syntax'), { part: 'emulate' }],
+  tasks: LAB_TASKS.filter(t => t.id !== 'impl'),
 };
 
 /** AMD Vivado on the 7-series (#1649, server/vivado.js): ISE's step names, each a Vivado command (synth_design, opt_design as
  *  Map, place_design and route_design, report_timing_summary, report_io, report_power, write_bitstream), no simulation models,
  *  no technology schematic, no FPGA view; its reports Vivado's; the board programmed with openFPGALoader (iMPACT's page);
- *  no Emulate (the 7-series' boards have no emulator yet). The local server's only: the browser edition has NO_FLOW. */
+ *  Emulate, the board's emulator on the HDL and the XDC's pins (#3704). The local server's only: the browser edition has NO_FLOW. */
 export const VIVADO = {
   id: 'vivado', name: 'AMD Vivado', open: false,
   steps: withProducts([step('synth', 'Synthesize - Vivado'), step('translate', 'Translate', ['synth']), step('map', 'Map', ['translate']), step('par', 'Place & Route', ['map']),
@@ -311,9 +307,8 @@ export const VIVADO = {
   constraints: XDC,
   messages: LOG_MESSAGES,
   program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit' },
-  tree: treeOf(['synth-open', 'tech', 'postsynth', 'posttrans', 'postmap', 'postpar', 'fpgaview', 'capture'], { synth: { label: 'Synthesize - Vivado', title: 'AMD Vivado' }, impl: { title: 'AMD Vivado' }, bitgen: { title: 'AMD Vivado' } })
-    .filter(n => n.part !== 'emulate'),
-  tasks: LAB_TASKS.filter(t => t.id !== 'emu'),
+  tree: treeOf(['synth-open', 'tech', 'postsynth', 'posttrans', 'postmap', 'postpar', 'fpgaview', 'capture'], { synth: { label: 'Synthesize - Vivado', title: 'AMD Vivado' }, impl: { title: 'AMD Vivado' }, bitgen: { title: 'AMD Vivado' } }),
+  tasks: LAB_TASKS,
 };
 
 // (the tools that implement with every task of a lab session: NO_FLOW's, VIVADO's and SILINX_XC7's are some of theirs)
@@ -328,6 +323,13 @@ export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevi
 /** Every tool's tasks, in their order: the kept state's and the switchers'. */
 export const allTasks = (tools = TOOLS) => [...new Map(tools.flatMap(t => t.tasks).map(t => [t.id, t])).values()];
 export const hasTask = (tool, id) => tool.tasks.some(t => t.id === id);
+/** The simulation models a tool generates, its tree's (#3704: the emulator's models, none in the flows with no netgen):
+ *  ['postsynth', 'posttrans', 'postmap', 'postpar'] or some of them. */
+export const simModelsOf = (tool) => {
+  const ids = new Set(), walk = ns => ns.forEach(n => { if (n.id) ids.add(n.id); if (n.children) walk(n.children); });
+  walk(tool.tree);
+  return ['postsynth', 'posttrans', 'postmap', 'postpar'].filter(id => ids.has(id));
+};
 
 /**
  * The process tree of a tool: its descriptor's nodes with what they run.

@@ -1,5 +1,5 @@
 // UI: an ECP5 device in the interface (#2302): the picker with its speed grades and the synthesis locked, the processes of its
-// toolchain only (no Map, no Emulate, no Configure Target Device: Silinx does not program its boards yet), its constraints LPF
+// toolchain only (no Map, no Configure Target Device: Silinx does not program its boards yet; Emulate on Board, #3704), its constraints LPF
 // (read, written, checked), Implement to its .bit with no warnings in the server's real flow and the Design Summary's
 // reports, in English and Portuguese; the ULX3S's pins written as an LPF by Update Constraints.
 import { before, after } from 'node:test';
@@ -67,7 +67,10 @@ uiTest('#2302 an ECP5 project: its processes, its constraints LPF, Implement giv
   await page.treeRow('#hier', 'blinky');
   const labels = await page.eval(() => [...document.querySelectorAll('#procs .row')].map((x) => x.textContent.trim().replace(/^▾/, '')));
   assert.ok(labels.includes('Generate Programming File'), String(labels));
-  for (const absent of ['Map', 'Generate Text Power Report', 'Back-annotate Pin Locations', 'Configure Target Device', 'Emulate on Board']) assert.ok(!labels.includes(absent), `${absent}: ${labels}`);
+  for (const absent of ['Map', 'Generate Text Power Report', 'Back-annotate Pin Locations', 'Configure Target Device']) assert.ok(!labels.includes(absent), `${absent}: ${labels}`);
+  // Emulate on Board (#3704): the HDL on the board's pins; its RTL model only (the flow makes no simulation model)
+  for (const present of ['Emulate on Board', 'Emulate Behavioral Model (RTL)']) assert.ok(labels.includes(present), `${present}: ${labels}`);
+  assert.ok(!labels.some((l) => /^Emulate Post-/.test(l)), String(labels));
 
   await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
   await page.waitConsole(/Process "Generate Programming File" (completed successfully|failed)/, { timeout: 120000 }).catch(async (e) => { throw new Error(`${e.message}\n${(await page.consoleText()).slice(-2500)}`); });
