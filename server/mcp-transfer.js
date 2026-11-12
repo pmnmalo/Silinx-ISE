@@ -144,15 +144,14 @@ export const TRANSFER_TOOLS = [
     description: 'Copy files of the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names) into a project, as Import Source / Add Copy of Source does (Import Test Bench: association sim): a VHDL or Verilog file to src/ (sim/ with association sim), a constraints file (.ucf, .pcf, .lpf, .cst) to constraints/ (the project\'s constraints when its own is not in it), a memory file (.mem, .hex) or a drawing (.json, its HDL made) to src/ (sim/). Each file through the import gate (a file it refuses is not copied: a warning); a drawing named with a reserved word of VHDL or Verilog is refused; a file the project has already is replaced only with replace.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
-      files: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'The files to copy, in the exchange folder: each its name, a path in it, or an absolute path inside it.' },
+      files: { type: 'array', items: { type: 'string' }, description: 'The files to copy (one or more), in the exchange folder: each its name, a path in it, or an absolute path inside it.' },
       association: { type: 'string', enum: ['design', 'impl', 'sim'], description: 'design (All: Implementation + Simulation, default), impl (Implementation only) or sim (Simulation only: Import Test Bench).' },
       replace: { type: 'boolean', description: 'Replace a file the project has already (default: it is left as it is, a warning).' },
     }, required: ['project', 'files'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true },
     async run({ project: name, files, association: role = 'design', replace = false }) {
       await readProject(name);
-      if (!Array.isArray(files) || !files.length || files.some(f => typeof f !== 'string')) throw toolError('files: the files to copy, in the exchange folder');
-      if (!['design', 'impl', 'sim'].includes(role)) throw toolError('association: design, impl or sim');
+      if (!files.length) throw toolError('files: the files to copy, in the exchange folder');
       const { importSourceTakes, importSourceFile, assignImported, IMPORT_SOURCE_ACCEPT } = await import('../core/import-source.js');
       // the files first, all of them: one that is not there, or not a source, copies none
       const srcs = [];

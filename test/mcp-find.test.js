@@ -77,7 +77,7 @@ test('find_in_project with replace: Replace All in the text sources, not in the 
 test('find_in_project: its errors', async () => {
   await fails('find_in_project', { project: 'gates', text: '(', regex: true }, 'Invalid regular expression: Invalid regular expression: /(/gi: Unterminated group');
   await fails('find_in_project', { project: 'gates', text: '' }, 'text: the text to find');
-  await fails('find_in_project', { project: 'gates', text: 'a', replace: 3 }, 'replace: the replacement text');
+  await fails('find_in_project', { project: 'gates', text: 'a', replace: 3 }, 'replace: a string');   // (the arguments' central check, #3535)
   await fails('find_in_project', { project: 'nothere', text: 'a' }, 'no project \'nothere\' in the workspace');
   await fails('find_in_project', { project: 'gates' }, 'missing text');
   assert.ok(fs.existsSync(path.join(process.env.SILINX_WORKSPACE, 'gates')));
