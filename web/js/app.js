@@ -22,6 +22,7 @@ import { deviceFamily, openOnlyDevice } from '/packages/silinx-fpga/src/parts.js
 import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
+import { renderTeachingPage } from './teaching-page.js';
 import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus, refreshBlackboxes } from './project.js';
 import { FLOW_UP_TO, boardUcf, checkUcfFile, regenerateUcf, runImpl, stepTracker, ucfDiagnostics } from './implement.js';
 import { adoptDrawnHdl, drawnHdlClashes, freshHdl, openAsm, openFsm, openPetri, openSch,
@@ -710,6 +711,7 @@ export function showLeftPage(page) {
   document.querySelectorAll('#left-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.page === page));
   document.querySelectorAll('.left-page').forEach(p => { p.hidden = p.dataset.page !== page; });
   if (page === 'start') renderStartPage();
+  if (page === 'teaching') renderTeachingPage();
 }
 
 export function renderFilesPage() {
@@ -854,6 +856,8 @@ async function boot() {
   splitter($('h-split'), $('console-wrap'), { dir: 'v', min: 60, max: 700, invert: true, storageKey: 'xl.consoleH' });
   initDrawer();
   document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('click', () => { leftTabClicked(t.dataset.page, document.querySelector('#left-tabs .tab.active')?.dataset.page); showLeftPage(t.dataset.page); }));
+  // (the Teaching page's commands of a project enabled or disabled with it, #3533)
+  for (const ev of ['silinx:project-opened', 'silinx:project-closed']) addEventListener(ev, () => renderTeachingPage());
   document.querySelectorAll('#console-tabs .tab').forEach(t => t.addEventListener('click', () => showConsolePage(t.dataset.page)));
   document.querySelectorAll('input[name=view]').forEach(r => r.addEventListener('change', () => setView(r.value)));
   // Clear: the console and the Warnings and Errors tabs, their counts too (#302; the editors' marks stay,

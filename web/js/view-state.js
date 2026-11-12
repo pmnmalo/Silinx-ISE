@@ -68,7 +68,7 @@ export async function applyViewState(v) {
   keepView = true;
   try {
     if (v.view === 'sim' || v.view === 'impl') { if (v.view !== S.view) setView(v.view); }
-    if (['design', 'files', 'libs'].includes(v.page)) showLeftPage(v.page);
+    if (['design', 'files', 'libs', 'teaching'].includes(v.page)) showLeftPage(v.page);
     for (const id of v.open) {
       const [re, open] = REOPEN.find(([r]) => r.test(id)) || [];
       if (!re) continue;

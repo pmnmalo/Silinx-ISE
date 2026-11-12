@@ -10,6 +10,7 @@ import { h, dialog, toast } from './ui.js';
 import { log } from './console.js';
 import { S } from './app.js';
 import { openProject, reloadProject, renderStartPage } from './project.js';
+import { renderTeachingPage } from './teaching-page.js';
 import { saveAll } from './processes.js';
 import { renderHierarchy } from './design.js';
 import { field } from './wizards.js';
@@ -86,9 +87,9 @@ export function hookGitStatus() {
   }
   addEventListener('silinx:project-opened', () => refreshGitStatus());
   addEventListener('silinx:project-closed', () => { S.git = null; });
-  // (git's presence asked once: the Start page then has Open from Repository…; a project reopened at start-up, which
+  // (git's presence asked once: the Start page and the Teaching page then have Open from Repository…; a project reopened at start-up, which
   // says no project-opened, gets its status)
-  gitAvailable().then(on => { if (!on) return; renderStartPage(); if (S.project) refreshGitStatus(); });
+  gitAvailable().then(on => { if (!on) return; renderStartPage(); renderTeachingPage(); if (S.project) refreshGitStatus(); });
 }
 
 // ------------------------------------------------------------------ the commands

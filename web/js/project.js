@@ -252,12 +252,6 @@ export async function renderStartPage() {
       ...((api.collab || api.standalone) && !api.following ? [command(['Share Project…', 'save', () => S.project && import('./collab-share.js').then(m => m.shareProjectDialog()), true, 'start-share'])] : []),
       h('hr', { class: 'start-sep' }),
       ...[['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command)),
-    // teaching (#3333): the guided labs (#3179) and the exercises (#3192), as the Project menu has them; a project's, so
-    // disabled with none as the exports (start-export); the Silinx interface's (the ISE style's Start page is ISE's, its
-    // menus have both: web/css/app.css)
-    h('div', { class: 'start-box start-teach' }, h('h3', {}, 'Teaching'),
-      ...[['Guided Labs…', 'help', () => S.project && import('./lab-view.js').then(m => m.guidedLabsDialog()), true],
-        ['Exercise…', 'run', () => S.project && import('./exercise-view.js').then(m => m.exerciseDialog()), true]].map(command)),
     // (where the projects are kept above the recent ones, #2029)
     api.standalone ? await storageBox() : await workspaceBox(),
     h('div', { class: 'start-box' }, h('h3', {}, 'Recent Projects'),

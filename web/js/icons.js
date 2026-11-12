@@ -66,6 +66,7 @@ export const icons = {
   mDesign: L('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h4a2.5 2.5 0 012.5 2.5v5"/>'),
   mFiles: L('<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
   mLibrary: L('<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16.5 4.5l3.8 1 -3.9 14.6-3.8-1z"/>'),
+  mTeach: L('<path d="M2.5 9L12 4.5 21.5 9 12 13.5z"/><path d="M6.5 11v5c0 1.6 2.5 3 5.5 3s5.5-1.4 5.5-3v-5M21.5 9v5.5"/>'),   // (the Teaching tab, #3533)
   mSearch: L('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'),
   mSettings: L('<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),   // (the header's Settings, #1314)
   mSun: L('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>'),

@@ -399,8 +399,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   // the Start page: no recent projects; opening one lists it again, and its Clear link empties the list
   await page.menu('File', 'Close Project');
   await page.waitFor(() => !document.querySelector('[data-page=start]').hidden && document.querySelector('#start-page .start-box'));
-  // (the Recent Projects box, by its heading: the Silinx interface's Teaching box comes before it, #3333; drawn again
-  // once the project is closed)
+  // (the Recent Projects box, by its heading; drawn again once the project is closed)
   await page.waitFor(() => [...document.querySelectorAll('#start-page .start-box')].find((b) => b.querySelector('h3')?.textContent === 'Recent Projects')?.querySelectorAll('a').length === 0, [], { what: 'no recent projects' });
   await page.openProject('Alpha');
   await page.menu('File', 'Close Project');
@@ -719,49 +718,6 @@ uiTest('#1216 Start page: New Project and Open Project buttons on top; the Silin
   assert.deepEqual((await startPage(page)).buttons, ['Novo Projeto…', 'Abrir Projeto…']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
-});
-
-// #3333: the Start page's Teaching box, the Silinx interface's: Guided Labs… and Exercise…, disabled with no project, each
-// opening its dialog with one; in Portuguese; none in the ISE style (its Start page is ISE's, its menus have both)
-uiTest('#3333 Start page: Guided Labs and Exercise in a Teaching box (the Silinx interface), disabled with no project; Portuguese', E, async (page) => {
-  await page.eval(() => window.SilinxApp.closeProject?.());
-  await page.leftTab('start');
-  await page.waitFor(() => document.querySelectorAll('#start-page .start-btns .btn').length === 2, [], { what: 'the Start page' });
-  const teach = () => page.eval(() => {
-    const box = document.querySelector('#start-page .start-teach');
-    return box && { shown: box.getClientRects().length > 0, title: box.querySelector('h3').textContent,
-      commands: [...box.querySelectorAll('.entry')].map((e) => `${e.querySelector('a').textContent}${getComputedStyle(e.querySelector('a')).pointerEvents === 'none' ? ' (disabled)' : ''}`) };
-  });
-  if (await page.eval(() => document.documentElement.dataset.ui) === 'ise') {
-    assert.equal((await teach()).shown, false, 'the ISE style\'s Start page: no Teaching box');
-    return;
-  }
-  assert.deepEqual(await teach(), { shown: true, title: 'Teaching', commands: ['Guided Labs… (disabled)', 'Exercise… (disabled)'] });
-  // (after Project Commands)
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#start-page .start-box h3')].slice(0, 2).map((e) => e.textContent)), ['Project Commands', 'Teaching']);
-  await makeProject(env, { name: 'StartTeach', template: 'gates' });
-  await page.openProject('StartTeach');
-  await page.leftTab('start');
-  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the commands enabled' });
-  assert.deepEqual((await teach()).commands, ['Guided Labs…', 'Exercise…']);
-  await page.click('#start-page .start-teach .entry a', { text: 'Guided Labs…' });
-  await page.waitDialog('Guided Labs');
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .lab-pick')?.dataset.lab), 'gates-first-steps');
-  await page.dialogButton('Cancel');
-  await page.waitNoDialog();
-  await page.click('#start-page .start-teach .entry a', { text: 'Exercise…' });
-  await page.waitDialog('Exercise');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent.trim())), ['New Exercise', 'Cancel']);
-  await page.dialogButton('Cancel');
-  await page.waitNoDialog();
-  // in Portuguese
-  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  try {
-    await page.waitFor(() => document.querySelector('#start-page .start-teach h3')?.textContent === 'Ensino', [], { what: 'Portuguese' });
-    assert.deepEqual((await teach()).commands, ['Laboratórios Guiados…', 'Exercício…']);
-  } finally {
-    await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  }
 });
 
 // #1300: Close Project in the right-click menu of the project's row (and the device's) in the Design tree
