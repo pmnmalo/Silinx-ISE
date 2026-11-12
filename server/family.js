@@ -1,4 +1,3 @@
-// Silinx - the device family of the boards and parts of server/devices.js (#405: out of it, shared with
-// server/boards.js).
-
-export const FAMILY = 'spartan3e';
+// Moved to core/boards-family.js (#3541: the browser's page imports it too, and web/js imports nothing of server/); the
+// server's modules import it from here as before.
+export * from '../core/boards-family.js';

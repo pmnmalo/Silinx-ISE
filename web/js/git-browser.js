@@ -58,9 +58,9 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
       return store().saveJson(name, json);
     },
     remove: (name, path) => (path === 'silinx.json' ? null : store().removePath(name, path)),
-    // a merged drawing's HDL file made from it again (#3197), as the server's (server/drawing-sync.js) on this storage
+    // a merged drawing's HDL file made from it again (#3197), as the server's (core/drawing-sync.js) on this storage
     regenerate: async (name, path) => {
-      const { syncDrawing } = await import('../../server/drawing-sync.js');
+      const { syncDrawing } = await import('../../core/drawing-sync.js');
       const P = {
         readProject: n => ops.project(n), fileTree: async n => (await ops.project(n)).fileTree,
         readFile: ops.readFile, writeFile: ops.writeFile, deleteFile: ops.deleteFile, readSources: ops.sources,

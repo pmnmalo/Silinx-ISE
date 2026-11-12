@@ -2,7 +2,7 @@
 // (web/js/new-source.js): a module (its ports), a VHDL package, a test bench of a module, a constraints file, a .mem
 // file, a C or C++ function (Silinx HLS), an empty schematic, state diagram, ASM chart, Petri net or truth table, a
 // guided lab (#3179: core/labs.js newLab); from
-// the wizard's own templates (web/js/templates.js, c-templates.js: they import nothing) and the drawings' models, with
+// the wizard's own templates (core/templates.js, c-templates.js: they import nothing) and the drawings' models, with
 // its checks: a file name, a name that is not a reserved word, a module or a drawing's HDL file that is not taken. A
 // file that exists is not replaced.
 import fs from 'node:fs';
@@ -32,7 +32,7 @@ const DRAWN = ['schematic', 'fsm', 'asm', 'petri', 'boolean'];
 
 // the source's text, as the wizard's Finish writes it
 async function sourceText(type, { file, lang, pj, entity, arch, ports, uut }) {
-  const T = await import('../web/js/templates.js');
+  const T = await import('../core/templates.js');
   const n = ident(file);
   switch (type) {
     case 'module': return lang === 'vhdl' ? T.vhdlModule(entity, arch, ports, pj) : T.vlogModule(entity, ports, pj);
@@ -41,8 +41,8 @@ async function sourceText(type, { file, lang, pj, entity, arch, ports, uut }) {
     // (the device's format, as New Source's: UCF, the iCE40's PCF, the ECP5's LPF, the Gowin's CST, the 7-series' XDC)
     case 'constraints': return ({ pcf: T.pcfTemplate, lpf: T.lpfTemplate, cst: T.cstTemplate, xdc: T.xdcTemplate }[(await import('../packages/silinx-fpga/src/parts.js')).constraintsFormatOf(pj.device)] || T.ucfTemplate)(pj);
     case 'mem': return '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n';
-    case 'c': return (await import('../web/js/c-templates.js')).cTemplate(n);
-    case 'cpp': return (await import('../web/js/c-templates.js')).cppTemplate(n);
+    case 'c': return (await import('../core/c-templates.js')).cTemplate(n);
+    case 'cpp': return (await import('../core/c-templates.js')).cppTemplate(n);
     case 'schematic': return JSON.stringify((await import('../core/schdoc.js')).newDoc(n, lang), null, 1);
     case 'asm': return JSON.stringify((await import('../core/asm.js')).normalizeModel({ name: n, lang }), null, 2);
     case 'fsm': return JSON.stringify((await import('../core/fsm.js')).normalizeFsm({ name: n, lang }), null, 2);
