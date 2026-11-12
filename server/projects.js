@@ -432,7 +432,7 @@ export async function writeFile(name, rel0, text) {
   // a name by the import gate's rules (#3414: no backslash, stream, trailing dot or space, invisible character…), as
   // Rename's; build/'s own files by the rest of their path
   const inBuild = /^build\//.test(rel);
-  const gated = normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
+  const gated = rawName(rel0) ?? normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
   if (gated.reason) throw new HttpError(400, `'${rel0}': not written: ${gated.reason}`);
   // (onto a folder, or through a file: the project's path in the message, #3537)
   if ((await fs.stat(full).catch(() => null))?.isDirectory()) throw new HttpError(400, `'${rel}' is a folder, not a file`);
@@ -460,6 +460,10 @@ export async function writeFile(name, rel0, text) {
 }
 
 
+// the name as it was given, before the system's path reads it: on Windows a backslash is a folder's separator, so
+// src/a\b.vhd joined is src/a/b.vhd, which the gate takes (#3611); the gate's reason for it, or null
+const rawName = rel => (String(rel).includes('\\') ? normalizePath(String(rel)) : null);
+
 /** Move/rename a project file (or folder), keeping the project's file list and constraints path. */
 // checkName: the new name by the import gate's rules for a name (the interface's Rename and MCP rename_file alike,
 // #2973); false only to put a file back at the name it had (a rename undone)
@@ -470,7 +474,7 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
   if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
   refuseHidden(dir, from, src, 'renamed');
-  const gated = checkName ? normalizePath(toKey) : {};
+  const gated = checkName ? rawName(to) ?? normalizePath(toKey) : {};
   if (gated.reason) throw new HttpError(400, `'${to}': not renamed: ${gated.reason}`);
   refuseHidden(dir, to, dst, 'renamed');   // (through a symbolic link too)
   return withProjectLock(name, async () => {

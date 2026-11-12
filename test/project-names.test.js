@@ -75,4 +75,7 @@ test('#3414 PUT file: a name the import gate refuses is not written, with its re
     const r = await app.call('PUT', `/projects/PutNames/file?path=${encodeURIComponent(p)}`, 'x\n');
     assert.deepEqual([r.status, r.body?.error], [400, `'${p}': not written: ${why}`], p);
   }
+  // (a rename the same, the name as it was given: on Windows a backslash would be a folder's separator, #3611)
+  await assert.rejects(P.renameFile('PutNames', 'src/ok.vhd', 'src/x\\y.vhd'), { status: 400, message: "'src/x\\y.vhd': not renamed: backslash in the name" });
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'src')), ['ok.vhd']);
 });
