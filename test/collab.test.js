@@ -21,15 +21,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, what, ms = 3000) => { const t0 = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t0 > ms) throw new Error(`timed out: ${what}`); await sleep(10); } };
 
 let tmp, srv, base;
+// (every connection, the relay's WebSockets too: a test that fails leaves its own open, and the server's close
+// waited for it with no end, the CI's part timed out, #3614)
+const sockets = new Set();
 before(async () => {
   tmp = await scratchEnv('silinx-collab-');
   const { createApp } = await import('../server/server.js');
   const app = await createApp({ host: '127.0.0.1', token: 'the-token' });
   srv = app.listen(0, '127.0.0.1');
+  srv.on('connection', s => { sockets.add(s); s.once('close', () => sockets.delete(s)); });
   await new Promise(r => srv.once('listening', r));
   base = `http://127.0.0.1:${srv.address().port}/`;
 });
-after(async () => { srv?.closeAllConnections?.(); await new Promise(r => srv.close(r)); const fs = await import('node:fs'); fs.rmSync(tmp, { recursive: true, force: true }); });
+after(async () => { srv?.closeAllConnections?.(); for (const s of sockets) s.destroy(); await new Promise(r => srv.close(r)); const fs = await import('node:fs'); fs.rmSync(tmp, { recursive: true, force: true }); });
 
 const PROJECT = { name: 'traffic', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl' }], device: { part: 'xc3s250e' } };
 const FILES = { 'src/top.vhd': 'entity top is end;\n', 'src/top.ucf': 'NET "clk" LOC = "B8";\n' };
@@ -298,7 +302,8 @@ test('#3361 a followed room past its caps (files, total size): left at once, sai
   await fol2.ready;
   evs.length = 0;
   putFile(doc, 'src/top.vhd', 'x'.repeat(5000));
-  await until(() => fol2.closed(), 'Eva left');
+  // (the event of its end, which comes once the connection has closed: closed() is true from its closing, #3614)
+  await until(() => evs.some(e => e.type === 'closed'), 'Eva left');
   assert.deepEqual(evs.filter(e => e.type !== 'peers'), [
     { type: 'error', message: 'the shared project is larger than a follower takes (5 KB, at most 4 KB)', fatal: true },
     { type: 'closed', reason: 'the shared project is larger than a follower takes (5 KB, at most 4 KB)' },
@@ -333,7 +338,7 @@ test('#3527 regression: a followed room\'s whole document bounded: a root of no 
     const f2 = await followRoom({ url: furl(), room: owner2.room, key: owner2.key, user: { name: 'Eva' }, limits, onEvent: e => evs.push(e) });
     await f2.ready;
     put(doc2);
-    await until(() => f2.closed(), 'Eva left');
+    await until(() => evs.some(e => e.type === 'closed'), 'Eva left');   // (its end's event, #3614)
     const why = `the shared project is larger than a follower takes (${Math.ceil(Y.encodeStateAsUpdate(f2.doc).length / 1024)} KB, at most 4 KB)`;
     assert.ok(Y.encodeStateAsUpdate(f2.doc).length > 4096);
     assert.deepEqual(evs.filter(e => e.type !== 'peers'), [{ type: 'error', message: why, fatal: true }, { type: 'closed', reason: why }]);
