@@ -20,9 +20,10 @@
 // - the other LUTs and flip-flops (pack_slices): a LUT with the first flip-flop it feeds (the LUTs in the netlist's
 //   order, 1.5.1), a LUT alone, a flip-flop alone (first into a free side of a chain's or a wide multiplexer's slice of
 //   its control set, whose BX / BY brings nothing else: ffs_into_chains), two LUTs and two flip-flops of one control set
-//   (clock, enable, set / reset, synchronous or not: 1.5.1, whether it sets or resets each flip-flop's own) a slice: as many
-//   slices as the LUTs need or as each control set's flip-flops need, the larger (nextpnr fills them greedily, by the
-//   nets they share, or the critical connections' first when that costs at most 2 % more slices).
+//   (clock, enable, set / reset, each inverted or not, synchronous or not: 1.5.1, whether it sets or resets each
+//   flip-flop's own) a slice: as many slices as the LUTs need or as each control set's flip-flops need, the larger
+//   (nextpnr fills them greedily, by the nets they share, or the critical connections' first when that costs at most 2 %
+//   more slices; its greedy fill reaches that bound on the examples).
 // Measured against nextpnr's slices on the examples and the open synthesis's choices on the corpus (#2529).
 import { readYosysJson } from './fpga/netlist.js';
 
@@ -58,11 +59,15 @@ export function sliceEstimate(json, top) {
   });
   const pinNet = k => invOf.get(k) ?? k;
   // a flip-flop's control set (pack_luts_ffs: an enable at 1, a set / reset at 0, none; same_mode: the set / reset
-  // synchronous or not, whether it sets or resets the flip-flop's own)
+  // synchronous or not, whether it sets or resets the flip-flop's own; the slice's CLKINV, CEINV, SRINV: a pin inverted by
+  // its parameter, the cell's _1 or an inverter, #3389)
   const ctrl = i => {
-    const c = cells[i], p = c.pins, sr = p.R ?? p.S ?? p.CLR ?? p.PRE ?? 0;
-    const mode = sr === 0 ? '' : p.R !== undefined || p.S !== undefined ? 'S' : 'A';
-    return `${c.type[0]}:${pinNet(p.C ?? p.G)}:${(p.CE ?? p.GE ?? 1) === 1 ? '' : pinNet(p.CE ?? p.GE)}:${mode && pinNet(sr)}:${mode}`;
+    const c = cells[i], p = c.pins, srPin = ['R', 'S', 'CLR', 'PRE'].find(x => p[x] !== undefined), sr = srPin ? p[srPin] : 0;
+    const mode = sr === 0 ? '' : srPin === 'R' || srPin === 'S' ? 'S' : 'A';
+    const inv = (pin, k) => (Number(c.params[`IS_${pin}_INVERTED`]) & 1) ^ (invOf.has(k) ? 1 : 0) ? '~' : '';
+    const [cp, ep] = c.type[0] === 'L' ? ['G', 'GE'] : ['C', 'CE'], ce = p[ep] ?? 1;
+    const clk = `${pinNet(p[cp])}${inv(cp, p[cp]) === '~' !== c.type.endsWith('_1') ? '~' : ''}`;
+    return `${c.type[0]}:${clk}:${ce === 1 ? '' : pinNet(ce) + inv(ep, ce)}:${mode && pinNet(sr) + inv(srPin, sr)}:${mode}`;
   };
   // the flip-flop a net feeds on its D, not in a cluster yet (the first)
   const ffOn = k => { for (const l of loads(k)) if (kind[l.cell] === 'ff' && l.pin === 'D' && !taken.has(l.cell)) return l.cell; return -1; };
@@ -222,12 +227,14 @@ export function sliceEstimate(json, top) {
       if (cin) return;
       // (the chain's carry in on BX: a net, or a constant from the VCC / GND source)
       if (k === 0 && mx >= 0) sl.b[0] = isConst(carryIn(mx)) ? -1 : carryIn(mx);
-      // its LUT: the select's driver when it feeds only this stage, or the sum is not used
+      // its LUT: the select's driver when it feeds only this stage, or the sum is not used; else a copy of it or a LUT
+      // passing it through, the stage no longer a load of the select (stage_lut): a later stage may take the driver (#3389)
       const s = mx >= 0 ? cells[mx].pins.S : cells[xr].pins.LI, d = driverOf(s);
       const others = loads(s).some(l => l.cell !== mx && l.cell !== xr);
       const sumFree = xr < 0 || loads(cells[xr].pins.O).length === 0;
       const lutd = d >= 0 && kind[d] === 'lut';
       if (lutd && !taken.has(d) && (!others || sumFree)) taken.add(d);
+      else if (s > 1) nets[s].loads = nets[s].loads.filter(l => l.cell !== mx && l.cell !== xr);
       // (its DI on BX / BY: a net its LUT, of four other inputs, does not read)
       const di = mx >= 0 ? cells[mx].pins.DI : undefined;
       const ins = lutd ? ['I0', 'I1', 'I2', 'I3', 'I'].map(p => cells[d].pins[p]).filter(n => n !== undefined && !isConst(n)) : [s];
