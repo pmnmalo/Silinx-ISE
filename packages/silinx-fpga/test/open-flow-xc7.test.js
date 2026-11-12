@@ -69,9 +69,27 @@ test('xc7: the resources nextpnr used, each total the xc7a35t\'s (its chip datab
     util('Number of Slice Registers', 201, 41600),
   ]);
   // the reference FASM of blinky (the fork's CI): its LUTs of logic near Vivado's 94 on the same netlist, nextpnr's feed-throughs
-  assert.deepEqual(xc7FasmUtilization(gz('blinky.fasm.gz').toString('utf8')), { luts: 104, feedThroughs: 108, slices: 93 });
+  // (its 93 slices with a feature, 16 of them empty halves of a tile with NOCLKINV alone, #3683)
+  assert.deepEqual(xc7FasmUtilization(gz('blinky.fasm.gz').toString('utf8')), { luts: 104, feedThroughs: 108, slices: 77 });
   // (without the part's resources: nextpnr's counts)
   assert.deepEqual(xc7PlacedUtilization({ utilization: { CARRY4: { available: 8150, used: 2 }, SLICE_FFX: { available: 65200, used: 3 } } }, [], util), [util('CARRY4', 2, 8150), util('Slice Registers', 3, 65200)]);
+});
+
+test('xc7: the occupied slices, an empty half of a tile nextpnr wrote (NOCLKINV alone) not counted (#3683)', () => {
+  // (as nextpnr's write_logic writes a tile: both halves, the empty one with the FF block's default bit only)
+  const tile = ['CLBLL_L_X2Y37.SLICEL_X0.ALUT.INIT[63:0] = 64\'b0110', 'CLBLL_L_X2Y37.SLICEL_X0.AFF.ZINI', 'CLBLL_L_X2Y37.SLICEL_X0.AFF.ZRST',
+    'CLBLL_L_X2Y37.SLICEL_X0.FFSYNC', 'CLBLL_L_X2Y37.SLICEL_X0.NOCLKINV', 'CLBLL_L_X2Y37.SLICEL_X1.NOCLKINV', ''];
+  // (the regression: two slices were counted, the tile's both halves)
+  assert.deepEqual(xc7FasmUtilization(tile.join('\n')), { luts: 1, feedThroughs: 0, slices: 1 });
+  // (a FASM with Windows' line ends the same)
+  assert.equal(xc7FasmUtilization(tile.join('\r\n')).slices, 1);
+  // a half with something but its LUTs: a flip-flop, a carry, an output mux, a feed-through LUT, an inverted clock
+  for (const f of ['AFF.ZINI', 'CARRY4.ACY0', 'PRECYINIT.CIN', 'DOUTMUX.O5', 'CLKINV', 'CEUSEDMUX', `BLUT.INIT[63:0] = 64'b${'11110000'.repeat(8)}`]) {
+    assert.equal(xc7FasmUtilization(`CLBLM_R_X3Y1.SLICEM_X0.${f}\nCLBLM_R_X3Y1.SLICEM_X0.NOCLKINV\nCLBLM_R_X3Y1.SLICEL_X1.NOCLKINV\n`).slices, 1, f);
+  }
+  // the clock-inversion bit alone in both halves, or a FASM with no slice: none; a routing pip of the tile's switch box is no slice
+  assert.equal(xc7FasmUtilization('CLBLM_R_X3Y1.SLICEM_X0.NOCLKINV\nCLBLM_R_X3Y1.SLICEL_X1.NOCLKINV\nINT_R_X3Y1.LOGIC_OUTS4.IMUX12\n').slices, 0);
+  assert.deepEqual(xc7FasmUtilization(''), { luts: 0, feedThroughs: 0, slices: 0 });
 });
 
 test('xc7: nextpnr\'s timing, its estimate, a clock net named as synthesis left it given its port\'s name', () => {
