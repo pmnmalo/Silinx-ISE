@@ -521,7 +521,10 @@ uiTest('#3530 regression, standalone edition (file://): Sign in with GitHub… k
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.project?.name === 'SoloGit', [], { what: 'SoloGit open' });
-  const before = await page.eval(() => Object.keys(localStorage).sort());
+  // (the keys but the tasks' arrangement, kept whenever a document comes to the front: the new project's open
+  // asynchronously, before or after this, web/js/tasks.js TASKS_KEY)
+  const keys = () => page.eval(() => Object.keys(localStorage).filter((k) => !/^silinx\.(dev\.)?tasks$/.test(k)).sort());
+  const before = await keys();
   await page.menu('File', 'Sign in with GitHub…');
   await page.waitDialog('Sign in with GitHub');
   assert.deepEqual(await page.eval(() => { const b = document.querySelector('.dlg-overlay .git-remember'); return [b.checked, b.disabled, b.title]; }),
@@ -533,7 +536,7 @@ uiTest('#3530 regression, standalone edition (file://): Sign in with GitHub… k
   await page.waitNoDialog();
   await page.waitConsole(/Signed in to GitHub as student: the sign-in is kept in this tab until it is closed \(Sign out of GitHub forgets it\)\./);
   // nothing written to localStorage; the token in this tab's storage only
-  assert.deepEqual(await page.eval(() => Object.keys(localStorage).sort()), before);
+  assert.deepEqual(await keys(), before);
   assert.ok(!(await page.eval(() => Object.values(localStorage).join('\n'))).includes(TOKEN));
   assert.equal(await page.eval(() => sessionStorage.getItem('silinx.github-token')), TOKEN);
   assert.ok(!(await page.eval(() => window.__console())).includes(TOKEN));
