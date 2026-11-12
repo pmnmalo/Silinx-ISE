@@ -25,8 +25,8 @@ export const LINK_LIMITS = Object.freeze({ maxEncoded: 64000, maxInflated: 4 << 
 export const LINK_VIEWS = Object.freeze(['try', 'simulate', 'emulate']);
 const FORMAT = 1;
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;   // (a project's: server/projects.js, web/js/project-store.js)
-const MODULE_RE = /^[A-Za-z_][\w$]{0,127}$/;
-const BOARD_RE = /^[a-z0-9_-]{1,32}$/i;
+export const MODULE_RE = /^[A-Za-z_][\w$]{0,127}$/;
+export const BOARD_RE = /^[a-z0-9_-]{1,32}$/i;
 const LAB_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;   // (a guided lab's id, core/labs.js)
 const EXAMPLE_RE = /^[a-z0-9_-]{1,64}$/i;
 
