@@ -157,7 +157,7 @@ export async function readProject(name) {
 // Per-project mutex: every read-modify-write of silinx.json runs under it, so concurrent requests
 // (API, CLI, several browser tabs) cannot lose each other's updates.
 const locks = new Map();
-export function withProjectLock(name, fn) {
+function withProjectLock(name, fn) {
   name = String(name).toLowerCase();   // case-insensitive file systems: Foo and foo are one folder
   const prev = locks.get(name) || Promise.resolve();
   const run = prev.then(() => fn());

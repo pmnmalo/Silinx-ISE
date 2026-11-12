@@ -20,7 +20,7 @@ import { field, select } from './wizards.js';
 import { boardClockOf, boardClockText, captureClockText } from '/core/ila-insert.js';
 import { clocksOf } from '/core/schematic.js';
 
-export const DEPTHS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
+const DEPTHS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
 const OPS = [['=', '='], ['!=', '≠'], ['rise', 'rises'], ['fall', 'falls'], ['change', 'changes']];
 const PERIOD = 20000;   // (ps: a sample a period in the capture's view)
 

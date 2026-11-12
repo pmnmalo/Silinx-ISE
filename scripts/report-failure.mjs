@@ -24,7 +24,7 @@ const RUNNER_ENV = [['RUNNER_NAME', '<runner>'], ['HOSTNAME', '<host>'], ['RUNNE
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** The runner's names and folders to replace: [RegExp, placeholder]; a value shorter than three characters or a
  *  plain number would hit everything, and is not. */
-export function runnerLiterals(env = process.env) {
+function runnerLiterals(env = process.env) {
   return RUNNER_ENV.flatMap(([name, to]) => {
     const v = (env[name] || '').trim().replace(/[\\/]+$/, '');
     return v.length >= 3 && !/^\d+$/.test(v) ? [[new RegExp(escapeRe(v), 'gi'), to]] : [];
@@ -60,7 +60,7 @@ export function clean(line, env = process.env) {
 
 /** Whether a cleaned line still holds what the private-data rules (scripts/check-private-data.mjs) look for:
  *  such a line is withheld rather than published (#1437). */
-export const holdsPrivateData = (line) => scanText("(a job's log)", line, { whole: false }).some((x) => x.line > 0);
+const holdsPrivateData = (line) => scanText("(a job's log)", line, { whole: false }).some((x) => x.line > 0);
 
 // the lines that say what failed: a test's 'not ok' and its error, a corpus design's failure, an error
 const FAILURE = /\bnot ok \d+\b|^\s*✖|\bfail(?![-\w])|\bmismatch\b|\bfailed\b|\bERROR\b|\berror\b:|^\s*(Error|AssertionError|TypeError|RangeError)\b|timed out|^(LARGER OR SLOWER|NEW WARNINGS|VANISHED WARNINGS)\b|##\[error\]/;

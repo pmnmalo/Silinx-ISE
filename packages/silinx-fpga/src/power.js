@@ -16,7 +16,7 @@ import { evalLut } from './xdl.js';
 import { clockPort } from './fpga/timing.js';
 
 /** XPower's default activity rates, which the estimate uses too. */
-export const DEFAULT_RATES = { ffToggle: 0.125, ioToggle: 0.125, outputLoadPf: 5, ffPasses: 3 };
+const DEFAULT_RATES = { ffToggle: 0.125, ioToggle: 0.125, outputLoadPf: 5, ffPasses: 3 };
 /** The estimate against XPower on the examples (scripts/measure-power.mjs --compare, test/power.test.js):
  *  its total within ESTIMATE_ERROR_PERCENT %, its dynamic part within DYNAMIC_RANGE times XPower's. */
 export const ESTIMATE_ERROR_PERCENT = 10;

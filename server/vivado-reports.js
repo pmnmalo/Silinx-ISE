@@ -52,7 +52,7 @@ export function parseUtilization(text) {
 const pick = (items, re) => { const it = items.find(i => re.test(i.name)); return it ? { used: it.used, total: it.total, percent: it.percent } : null; };
 
 // the rows the Design Summary always shows (the others when used): the 7-series' logic, memory, I/O and clocks
-export const MAIN_ROWS = ['Slice LUTs', 'Slice Registers', 'Slice', 'F7 Muxes', 'Block RAM Tile', 'DSPs', 'Bonded IOB', 'BUFGCTRL', 'MMCME2_ADV', 'PLLE2_ADV'];
+const MAIN_ROWS = ['Slice LUTs', 'Slice Registers', 'Slice', 'F7 Muxes', 'Block RAM Tile', 'DSPs', 'Bonded IOB', 'BUFGCTRL', 'MMCME2_ADV', 'PLLE2_ADV'];
 /** The top-level rows of report_utilization the Design Summary shows: the main ones, and every other one used. */
 export const summaryRows = items => items.filter(u => !u.level && (MAIN_ROWS.includes(u.name) || u.used > 0));
 

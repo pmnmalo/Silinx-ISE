@@ -20,7 +20,7 @@ import { visibleCopy, localize } from '../core/grade-format.js';
 import { textReport, csvReport } from '../core/grade-report.js';
 import { VERSION } from '../core/version.js';
 
-export const RELEASES = 'https://github.com/pmnmalo/Silinx/releases/download';
+const RELEASES = 'https://github.com/pmnmalo/Silinx/releases/download';
 // (the actions the workflow uses, pinned by their commits as the repository's own workflows pin them)
 export const CHECKOUT = 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1';
 export const SETUP_NODE = 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0';
@@ -74,7 +74,7 @@ jobs:
 }
 
 /** The students' README of the template (English and Portuguese): the statement, what runs on each push. */
-export function readmeText(ex, exerciseFile) {
+function readmeText(ex, exerciseFile) {
   const ports = ex.ports.map(p => `\`${p.name}\``).join(', ');
   const part = lang => [
     `## ${localize(ex.title, lang)}`, '', localize(ex.statement, lang), '',
@@ -129,7 +129,7 @@ export function makeTemplate(exerciseFile, starterDir, outDir, { version = VERSI
 // ---------------------------------------------------------------- the teacher's run
 const exec = promisify(execFile);
 /** The commands' runner (the GitHub CLI and git): { stdout }; a test gives its own. */
-export const RUNNER = (cmd, args, opts = {}) => exec(cmd, args, { maxBuffer: 64 << 20, ...opts });
+const RUNNER = (cmd, args, opts = {}) => exec(cmd, args, { maxBuffer: 64 << 20, ...opts });
 
 /** The repositories of an assignment: the organization's whose name is <assignment>-<student>, not archived, by name. */
 export async function assignmentRepos(org, assignment, { runner = RUNNER } = {}) {

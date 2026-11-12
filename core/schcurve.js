@@ -197,7 +197,7 @@ export function simplify(pts, tol) {
 
 // ------------------------------------------------------------------ hop-overs on curves (#1163)
 /** The radius of a hop (sheet px), as the technical drawing's (#692). */
-export const HOP_R = 5;
+const HOP_R = 5;
 // a curve as a polyline and its cumulative lengths, its bounding box
 function track(w, n) {
   const S = sampleCurve(w, n), L = lengths(S);

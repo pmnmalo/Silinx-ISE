@@ -9,9 +9,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** Of every package. */
-export const UNUSED = /\.(map|d\.ts|d\.mts|d\.cts)$/;
+const UNUSED = /\.(map|d\.ts|d\.mts|d\.cts)$/;
 /** Of some packages, their paths inside them (yjs's tests/ apart: its exports name tests/testHelper.js). */
-export const UNUSED_IN = Object.freeze({
+const UNUSED_IN = Object.freeze({
   lib0: [/^coverage\//, /\.test\.(js|cjs|mjs)$/, /^dist\/test\.(cjs|js|mjs)$/],
   'y-protocols': [/\.test\.(js|cjs|mjs)$/, /^dist\/test\.(cjs|js|mjs)$/],
   'y-codemirror.next': [/^dist\/(demo|test)\.(cjs|js|mjs)$/],

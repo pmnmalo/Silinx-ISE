@@ -81,23 +81,3 @@ export function netEndpointsS6(design, device, res = routingResources(device)) {
   }
   return { nets, errors, used };
 }
-
-/** The TIEOFF sources a power sink may be routed from: those of the tiles nearest its node (ISE: its switch box's). */
-export function powerSources(device, res, node, power, near = 2) {
-  const r = (device.nodeR0[node] + device.nodeR1[node]) >> 1, c = (device.nodeC0[node] + device.nodeC1[node]) >> 1;
-  const out = [];
-  for (let dr = -near; dr <= near; dr++) {
-    for (let dc = -near; dc <= near; dc++) {
-      const k = device.tileIndex.get(tileAt(device, r + dr, c + dc));
-      const t = k === undefined ? null : res.tieoffs.get(k);
-      if (t) out.push({ ...t, node: power === 'vcc' ? t.hard1 : t.hard0, d: Math.abs(dr) + Math.abs(dc) });
-    }
-  }
-  return out.sort((a, b) => a.d - b.d);
-}
-const grids = new WeakMap();
-function tileAt(device, r, c) {
-  let g = grids.get(device);
-  if (!g) { g = new Map(); for (let k = 0; k < device.tileCount; k++) g.set(device.tileRow[k] * 4096 + device.tileCol[k], device.tileNames[k]); grids.set(device, g); }
-  return g.get(r * 4096 + c);
-}

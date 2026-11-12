@@ -24,7 +24,7 @@ export function watchLinks(target = window) {
 }
 
 /** The address's hash now handled as a link (false: none, or not opened). Exported for tests. */
-export async function linkChanged(hash = location.hash) {
+async function linkChanged(hash = location.hash) {
   if (hash.length <= 1 || TOKEN.test(hash)) return false;
   const what = FOLLOW.test(hash) ? 'Follow a shared project' : 'Open from a link';
   if (S.busy || S.currentJob) { app.log(`ERROR: ${what}: an implementation is running: stop it (or wait for it to finish), then open the link again.`, 'err'); return false; }

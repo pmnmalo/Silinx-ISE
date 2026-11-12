@@ -288,7 +288,7 @@ const focusedField = () => {
   const el = document.activeElement;
   return el && !el.closest('.cm-editor, .dlg-overlay') && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|url|)$/i.test(el.getAttribute('type') || ''))) ? el : null;
 };
-export const clipEditor = d => {
+const clipEditor = d => {
   const f = focusedField();
   if (f) return fieldClip(f);
   if (!d) return null;

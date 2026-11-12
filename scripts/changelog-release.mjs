@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { assembleRelease, changesOf, checkFragments } from '../core/changelog.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const FRAGMENTS_DIR = path.join(ROOT, 'changes');
+const FRAGMENTS_DIR = path.join(ROOT, 'changes');
 
 /** Where a changelog is: the IDE's, or a workspace's (packages/<name>, #1681); paths relative to the repository. */
 export function changelogOf(pkg) {

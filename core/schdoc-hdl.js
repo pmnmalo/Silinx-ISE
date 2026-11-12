@@ -24,7 +24,7 @@ export function vhdlClass(type) {
 // An escaped identifier (#1697): a name written with a backslash first (\opcode[0]), as the schematic of a module whose
 // ports are Verilog escaped identifiers keeps them; in the HDL \opcode[0]  in Verilog (the space ends it), the extended
 // identifier \opcode[0]\ in VHDL. Other names as they are.
-export const escapedName = n => /^\\[!-~]+$/.test(String(n ?? ''));
+const escapedName = n => /^\\[!-~]+$/.test(String(n ?? ''));
 export const hdlName = (n, lang) => (!escapedName(n) ? n : lang === 'vhdl' ? `\\${n.slice(1).replace(/\\/g, '\\\\')}\\` : `${n} `);
 // a name declared in HDL as the schematic names it: an escaped one with its backslash (a VHDL extended identifier,
 // \t[0]\, without its closing one, #1809)

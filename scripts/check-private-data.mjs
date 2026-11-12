@@ -353,7 +353,7 @@ export function scanHistory(root = ROOT, rev = 'HEAD') {
 }
 
 /** A path as git writes it: as it is, or in quotes with C's escapes (\", \\, \t, \n, \ooo for a byte). */
-export function unquote(p) {
+function unquote(p) {
   if (!p.startsWith('"') || !p.endsWith('"') || p.length < 2) return p;
   const body = Buffer.from(p.slice(1, -1), 'utf8'), bytes = [];
   const esc = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 };

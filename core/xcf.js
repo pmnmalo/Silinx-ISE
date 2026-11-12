@@ -30,13 +30,13 @@ export const PROGRAM_S = 0.02;
 // polled after ISC_PROGRAM: 0.19 ms on a Basys2's XCF02S), at least PROGRAM_MIN_S, at most PROGRAM_S;
 // measured on the first MEASURE_FIRST blocks, every MEASURE_EVERY and the last, and whenever a status
 // check finds the PROM still busy
-export const PROGRAM_MIN_S = 0.002, WAIT_FACTOR = 5;
-export const MEASURE_FIRST = 2, MEASURE_EVERY = 64;
+const PROGRAM_MIN_S = 0.002, WAIT_FACTOR = 5;
+const MEASURE_FIRST = 2, MEASURE_EVERY = 64;
 const POLL_FIRST_S = 0.001;   // the first span of the polls (16 of them)
 const POLL_S = 0.05;   // the longest a program is polled (xcf_prog.py's)
 // every block confirmed (#294): CONFIRM_POLLS status reads in its own stream, CONFIRM_GAP clocks in
 // Run-Test/Idle before each; then, while busy, more, the gap doubling up to CONFIRM_GAP_S
-export const CONFIRM_POLLS = 4, CONFIRM_GAP = 128, CONFIRM_GAP_S = 0.002;   // the gap at most 2 ms
+const CONFIRM_POLLS = 4, CONFIRM_GAP = 128, CONFIRM_GAP_S = 0.002;   // the gap at most 2 ms
 // the XCF0xS by IDCODE bits 19..12: [size in bits, bits per block]
 const SIZES = { 0x44: [1 << 20, 2048], 0x45: [2 << 20, 4096], 0x46: [4 << 20, 4096] };
 const ST_DONE = 0x20;   // the Spartan-3E's DONE in its captured IR
@@ -45,7 +45,7 @@ export const NOT_DONE = 'the FPGA did not load from the PROM (mode jumper on ROM
 export const ERASED = 'the PROM is erased: nothing to load (Program PROM first)';
 // the FPGA polled for DONE after CONFIG every 0.2 s: CONFIG_POLLS of them (the Basys2 takes ~1.2 s),
 // then, the FPGA reset by JPROGRAM instead (#521), DONE_POLLS more
-export const CONFIG_POLLS = 12, DONE_POLLS = 25;
+const CONFIG_POLLS = 12, DONE_POLLS = 25;
 
 const fail = msg => { throw new Error(`Adept USB: ${msg}`); };
 const hex8 = n => n.toString(16).padStart(8, '0');

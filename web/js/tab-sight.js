@@ -13,7 +13,7 @@ let mounted = false, pending = false;
 const rowOf = tab => (tab.parentElement?.classList.contains('tab-group') && getComputedStyle(tab.parentElement).display !== 'contents' ? tab.parentElement : $('doc-tabs'));
 
 /** Scrolls `tab` (a shown one) into its row's visible part, the least needed. */
-export function scrollTabIntoRow(tab) {
+function scrollTabIntoRow(tab) {
   if (!tab?.isConnected) return;
   const row = rowOf(tab), r = tab.getBoundingClientRect();
   if (!row || !r.width) return;   // (not shown: another view's)

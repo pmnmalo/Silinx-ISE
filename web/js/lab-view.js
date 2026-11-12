@@ -25,7 +25,7 @@ const lang = () => (getLanguage() === 'pt' ? 'pt' : 'en');
 
 /** The project `name` as a lab's checks read it (core/labs-check.js `io`): as it is saved, its HDL as Check Syntax takes
  *  it (the HDL files of the view, and the views' HDL made in the browser, S.viewSources). */
-export function projectIo(name) {
+function projectIo(name) {
   const pj = () => api.project(name);
   return {
     project: pj,
@@ -129,7 +129,7 @@ function richText(text) {
 }
 
 /** The lab document in `el`: its toolbar, its step, its Steps panel, its status line. */
-export function mountLab(el, doc, lab) {
+function mountLab(el, doc, lab) {
   const name = S.project.name;
   const io = projectIo(name);
   let all = {}, p = labProgress(all, lab), busy = false;

@@ -7,7 +7,7 @@ import { addAttrVal, setBits } from './chipdb.js';
 const BIT_WIDTHS = { 1: '1', 2: '2', 4: '4', 8: '9', 9: '9', 16: '16', 18: '16', 32: 'X36', 36: 'X36' };
 const bin = v => parseInt(v, 2);
 /** attrs_upper: a cell's string values upper case, in place. */
-export const attrsUpper = o => { for (const [k, v] of Object.entries(o)) if (typeof v === 'string') o[k] = v.toUpperCase(); };
+const attrsUpper = o => { for (const [k, v] of Object.entries(o)) if (typeof v === 'string') o[k] = v.toUpperCase(); };
 
 function byteEnables(ctx, typ, cell, a, ports, both) {
   const allConst = ports.every(p => ctx.isConst(cell.connections[p][0]));

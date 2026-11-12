@@ -22,10 +22,10 @@ import { SYMBOLS } from '/core/ink/font.js';
 import { LogicError } from '/core/logic.js';
 import { prefKey } from './prefs.js';
 
-export const SAMPLES_KEY = prefKey('silinx.ink.samples');
+const SAMPLES_KEY = prefKey('silinx.ink.samples');
 const MAX_SAMPLES = 400;
 
-export function loadSamples() {
+function loadSamples() {
   try { return validSamples(JSON.parse(localStorage.getItem(SAMPLES_KEY) || '[]')); } catch { return []; }
 }
 function saveSamples(list) {
@@ -44,7 +44,7 @@ export function keepSamples(list, what) {
 }
 
 /** The error of a text of equations, one a line (null: they make a table, and check finds nothing wrong with it). */
-export function expressionError(text, { name = 'F', check = () => null } = {}) {
+function expressionError(text, { name = 'F', check = () => null } = {}) {
   try { return check(tableFromEquations(text, { name })); } catch (e) { if (e instanceof LogicError) return e.message; throw e; }
 }
 

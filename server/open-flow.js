@@ -253,7 +253,7 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
  * open-flow-run.js) in the shape of collectReports(), with source 'open'. Reports of an earlier ISE
  * run left in build/ are not mixed in.
  */
-export async function openReports(buildDir, top, device) {
+async function openReports(buildDir, top, device) {
   const base = await collectReports(buildDir, top, device);   // the .bit and its header
   let r = {};
   try { r = JSON.parse(await fs.readFile(path.join(buildDir, 'open', 'report.json'), 'utf8')); } catch { /* the flow wrote nothing */ }

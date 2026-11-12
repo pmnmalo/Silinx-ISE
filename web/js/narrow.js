@@ -28,7 +28,7 @@ function readOpen(key, def) {
 function writeOpen(key, open) { try { localStorage.setItem(key, open ? 'open' : 'closed'); } catch { /* storage unavailable */ } }
 
 // ------------------------------------------------------------------ the drawer (the left side)
-export const drawerOpen = () => document.documentElement.dataset.drawer === 'open';
+const drawerOpen = () => document.documentElement.dataset.drawer === 'open';
 /** Shows or hides the drawer (<html data-drawer="open|closed">), remembered unless `remember` is false. */
 export function setDrawer(open, { remember = true } = {}) {
   document.documentElement.dataset.drawer = open ? 'open' : 'closed';

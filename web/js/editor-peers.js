@@ -5,7 +5,7 @@ import { StateEffect, StateField } from '@codemirror/state';
 import { EditorView, Decoration, WidgetType } from '@codemirror/view';
 
 /** The participants' carets: [{ name, color, pos (an offset) }]. */
-export const setPeersEffect = StateEffect.define();
+const setPeersEffect = StateEffect.define();
 
 class Caret extends WidgetType {
   constructor(name, color) { super(); this.name = name; this.color = color; }

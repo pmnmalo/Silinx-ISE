@@ -15,7 +15,7 @@ const SELECTOR = { state: id => `[data-state="${CSS.escape(id)}"]`, trans: id =>
 const KINDS = new Set(['fsm', 'asm', 'sch']);
 
 /** The drawing (a project's state diagram, ASM chart or schematic) whose HDL file is `file`, or null. */
-export function drawingOf(file) {
+function drawingOf(file) {
   const p = S.hdlToSch?.[file];
   return p && KINDS.has(drawingKind(p)) ? p : null;
 }

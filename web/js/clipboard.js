@@ -67,7 +67,7 @@ async function systemReadable() {
 systemReadable();
 
 /** The same, from a paste event (Ctrl+V: the browser gives the page the clipboard with no permission asked). */
-export const clipFromEvent = (e, kind) => fromText(e.clipboardData?.getData('text/plain') ?? null, kind);
+const clipFromEvent = (e, kind) => fromText(e.clipboardData?.getData('text/plain') ?? null, kind);
 
 /** Ctrl+V in a drawing editor (its keydown, not prevented): the browser's paste event that follows reads the system
  *  clipboard with no permission asked; when the browser sends none (a page that is not editable), the clipboard

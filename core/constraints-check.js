@@ -11,7 +11,7 @@ import { PCF, LPF, CST, XDC, constraintsFormatOf } from '../packages/silinx-fpga
 
 const FORMATS = { pcf: PCF, lpf: LPF, cst: CST, xdc: XDC };
 // a format's command that places a port: the messages'
-export const PIN_COMMAND = { pcf: 'set_io', lpf: 'LOCATE COMP', cst: 'IO_LOC', xdc: 'get_ports' };
+const PIN_COMMAND = { pcf: 'set_io', lpf: 'LOCATE COMP', cst: 'IO_LOC', xdc: 'get_ports' };
 // the keyword of an I/O standard, a drive and a slew in the messages
 const KEYS = { lpf: { iostandard: 'IO_TYPE', drive: 'DRIVE', slew: 'SLEWRATE' }, cst: { iostandard: 'IO_TYPE', drive: 'DRIVE' } };
 

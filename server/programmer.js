@@ -94,7 +94,7 @@ export function checkBitPart(header, device) {
 
 // a bitstream for another device than the project's (or the board's) is refused, as the browser's programming
 // refuses it (core/adept.js programAdept); the request's force: true programs it anyway, warned (#3040)
-export const mismatchRefusal = mismatch => `${mismatch}: not programmed`;
+const mismatchRefusal = mismatch => `${mismatch}: not programmed`;
 
 export async function readBitInfo(file) {
   const fd = await fs.open(file, 'r');
@@ -207,7 +207,7 @@ export function resolveOptions(req, cfg, boardId) {
 // ---------------------------------------------------------------------------------------------
 
 const XCF_PROG = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'xcf_prog.py');
-export const PROM_OPS = ['program', 'verify', 'erase', 'read', 'reconfigure'];
+const PROM_OPS = ['program', 'verify', 'erase', 'read', 'reconfigure'];
 
 /**
  * Platform Flash (XCF0xS) operations through the board's Adept USB (adepttool + scripts/xcf_prog.py).

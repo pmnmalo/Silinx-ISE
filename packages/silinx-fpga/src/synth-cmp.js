@@ -74,14 +74,14 @@ module _silinx_cmp_const (A, B, Y);
 endmodule
 `;
 export const CMP_SET_FILE = 'silinx_cmp.txt';
-export const CMP_PROBE_FILE = 'silinx_cmp.json';
+const CMP_PROBE_FILE = 'silinx_cmp.json';
 // synth_xilinx's steps, in order
 const LABELS = ['begin', 'prepare', 'map_dsp', 'coarse', 'map_memory', 'map_ffram', 'fine', 'map_cells', 'map_ffs', 'map_luts', 'finalize', 'check', 'edif', 'blif', 'json'];
 const COARSE = LABELS.indexOf('coarse');
 const CMP_TYPES = ['$lt', '$le', '$gt', '$ge'];
 /** The commands of the run that finds the comparisons (`read`: the reads of the usual script, `synth`: synth_xilinx's
  *  command): up to the coarse step, the comparison cells written (CMP_PROBE_FILE, Yosys's JSON). */
-export const cmpProbeCommands = (read, synth) => `${read}${synth} -run :coarse; select ${CMP_TYPES.map(t => `t:${t}`).join(' ')}; write_json -selected ${CMP_PROBE_FILE}; select -clear`;
+const cmpProbeCommands = (read, synth) => `${read}${synth} -run :coarse; select ${CMP_TYPES.map(t => `t:${t}`).join(' ')}; write_json -selected ${CMP_PROBE_FILE}; select -clear`;
 // an unsigned comparison that is the OR of the signal's bits from k up (or its negation): X > 2^k - 1, X >= 2^k, X < 2^k,
 // X <= 2^k - 1 (X > 0: any bit set), the constant C's bits (Yosys's JSON: the lowest first) and the operator as X op C
 const powerOfTwo = n => n > 0n && (n & (n - 1n)) === 0n;

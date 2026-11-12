@@ -10,7 +10,7 @@ export class GitHubError extends Error {
 }
 
 export const API = 'https://api.github.com';
-export const LOGIN = 'https://github.com';
+const LOGIN = 'https://github.com';
 // the OAuth App's scope (#3356): the user's public repositories and their gists (a short link's, #3223), the narrowest
 // that works; the private ones too (a Classroom assignment's is private) only when the user asks for them at the sign-in
 // (PRIVATE_SCOPE: an OAuth App has no scope narrower than all the user's repositories for a private one)

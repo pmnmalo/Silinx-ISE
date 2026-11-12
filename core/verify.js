@@ -77,7 +77,7 @@ export function moduleOf(lib, name, what) {
 }
 
 /** The differences between the ports of the module verified and of its reference (messages), [] when they match. */
-export function portDifferences(uut, ref) {
+function portDifferences(uut, ref) {
   const out = [];
   const byName = new Map(ref.ports.map(p => [p.name.toLowerCase(), p]));
   for (const p of uut.ports) {

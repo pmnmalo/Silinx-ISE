@@ -12,14 +12,14 @@ import { TEXT_CSS, domSnapshot, metaLine, openPrintView, printOptions, printPage
 const CHROME = ['.doc-toolbar', '.doc-status', '.editor-bar', '.tb-btn', 'button', '.fv-tip', '.fv-search', '.ctx-menu', '.print-frame'];
 
 /** The project and file of document `d` (its header's line). */
-export const docMeta = (d) => metaLine({ project: d.project || S.project?.name || '', file: d.path || '' });
+const docMeta = (d) => metaLine({ project: d.project || S.project?.name || '', file: d.path || '' });
 
 const langOf = (p) => (/\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(v|vh|sv)$/i.test(p) ? 'verilog' : null);
 
 // The print view of a document that is not a diagram: `{ title, meta, html, fit }`, the page printed; null for a
 // diagram (it prints from its own window). d.printView() (or its view's, its editor's), when it has one, gives `{ title, body, css, app, fit }`
 // (app: the copy of its elements needs the application's style sheets).
-export function printView(d) {
+function printView(d) {
   if (!d || diagramPrint(d)) return null;
   const meta = docMeta(d);
   // (its own: the document's, or its component's: SSim's and the Board Emulator's view, the truth table's editor)

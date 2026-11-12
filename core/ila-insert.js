@@ -29,7 +29,7 @@ import { compile, elaborate } from './compile.js';
 import { primitiveSources } from './unisim.js';
 
 export const CAPTURE_TOP = 'silinx_capture_top';
-export const BOARD_CLOCK_PORT = 'silinx_board_clk';
+const BOARD_CLOCK_PORT = 'silinx_board_clk';
 
 /** The board's oscillator a capture can sample on (its first clock resource with a period): { name, label, pin, period
  *  (ns), iostandard, dedicated }, or null. board: a board's description (server/boards.js BOARDS). */
@@ -52,7 +52,7 @@ export function boardClockUcf(c, { iostandard = false } = {}) {
     ...(c.dedicated ? [] : [`NET "${n}" CLOCK_DEDICATED_ROUTE = FALSE ;`]),
     `NET "${n}" TNM_NET = "${n}" ;`, `TIMESPEC "TS_${n}" = PERIOD "${n}" ${c.period} ns HIGH 50% ;`].join('\n');
 }
-export const CAPTURE_CORE = 'silinx_capture';
+const CAPTURE_CORE = 'silinx_capture';
 // the BSCAN of each family: its cell, its parameters, its pins for tck, sel, capture, shift, tdi, tdo
 const BSCAN = {
   spartan3e: { cell: 'BSCAN_SPARTAN3', params: '', pins: ['DRCK1', 'SEL1', 'CAPTURE', 'SHIFT', 'TDI', 'TDO1'], tie: ['TDO2'] },
@@ -60,7 +60,6 @@ const BSCAN = {
   artix7: { cell: 'BSCANE2', params: ' #(.JTAG_CHAIN(1))', pins: ['DRCK', 'SEL', 'CAPTURE', 'SHIFT', 'TDI', 'TDO'], tie: [] },
 };
 const LINK = ['tck', 'sel', 'capture', 'shift', 'tdi', 'tdo'];
-export const CAPTURE_FAMILIES = Object.keys(BSCAN);
 
 const bitsOf = n => { let k = 1; while ((1n << BigInt(k)) <= n) k++; return k; };
 // a signal's bits as a probe (an integer: its range's; an enumeration: its encoding's), or null (an array, a real…)

@@ -15,8 +15,8 @@ import * as P from './projects.js';
 import { loadConfig } from './toolchain.js';
 import { adepttoolPaths } from './programmer.js';
 
-export const ILA_SCAN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'ila-scan.py');
-export const CAPTURE_FILE = 'build/capture.json';
+const ILA_SCAN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'ila-scan.py');
+const CAPTURE_FILE = 'build/capture.json';
 
 /** The link through adepttool (its Python and modules: cfg's paths, as the programmer's). */
 export async function boardLink(spec, { cfg = null, device = 0 } = {}) {
@@ -53,7 +53,7 @@ export async function boardLink(spec, { cfg = null, device = 0 } = {}) {
 }
 
 /** The capture core's spec of a project: its capture settings on its design, as Implement inserts it. */
-export async function captureSpecOf(name, pj) {
+async function captureSpecOf(name, pj) {
   const { viewSourcesOf } = await import('./mcp-util.js');
   const { compile, elaborate } = await import('../core/compile.js');
   const { primitiveSources } = await import('../core/unisim.js');

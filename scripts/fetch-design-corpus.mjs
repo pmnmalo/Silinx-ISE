@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const MANIFEST = path.join(ROOT, 'test', 'designs-corpus', 'manifest.json');
+const MANIFEST = path.join(ROOT, 'test', 'designs-corpus', 'manifest.json');
 
 /**
  * The main checkout of the checkout at `root`: root itself, or, for a linked git worktree (its .git

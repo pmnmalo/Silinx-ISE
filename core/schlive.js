@@ -173,7 +173,7 @@ export function buildLiveSim(docIn, { modules = {}, sources = [], lang, generics
   return out;
 }
 
-export class LiveSim {
+class LiveSim {
   constructor(doc, modules, design, lang) {
     this.doc = doc;
     this.modules = modules;
