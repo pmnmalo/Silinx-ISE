@@ -4,6 +4,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import * as P from './projects.js';
 import { toolError, clip, redactor, projectPath, readProject, PROJECT } from './mcp-util.js';
+import { MODEL_PROCESS, hasSimModels, noSimModelMessage } from './mcp-hdl.js';
 
 export const PROCESSES = {
   synthesize: ['synth'],
@@ -76,6 +77,9 @@ export async function runProcess(name, proc, { toolchain, timeoutS = 1800, signa
   const steps = PROCESSES[proc];
   if (!steps) throw toolError(`process: one of ${Object.keys(PROCESSES).join(', ')}`);
   if (!pj.top) throw toolError(`the project '${name}' has no top module`);
+  // (a model the flow does not make: refused, as simulate refuses it, #3707)
+  const model = Object.keys(MODEL_PROCESS).find(m => MODEL_PROCESS[m] === proc);
+  if (model && !hasSimModels(pj.device)) throw toolError(noSimModelMessage(pj.device, model));
   const { startImplementation } = await import('./impl-routes.js');
   let job;
   try { job = await startImplementation(name, { steps, ...(toolchain ? { toolchain } : {}) }); } catch (e) { throw toolError(e.message); }

@@ -61,7 +61,7 @@ const LEFT = {
   'core/logic.js': 'TT_VERSION MAX_INPUTS evalExpr normColumn',
   'server/mcp-collab.js': 'DEFAULT_SERVER',
   'server/mcp-grade.js': 'topPorts',
-  'server/mcp-hdl.js': 'SIM_MODELS MODEL_PROCESS',
+  'server/mcp-hdl.js': 'SIM_MODELS',
   'server/mcp-labs.js': 'projectIo lastRun',
   'server/mcp-processes.js': 'PROCESS_LIMITS',
   'server/mcp-timing.js': 'PATHS_FILE',

@@ -83,3 +83,37 @@ test('simulate: the project\'s data files given to the simulation ($readmemh of 
   const s = await ok('simulate', { project: 'm', top: 'tb_rom', time_ns: 10, signals: [] });
   assert.deepEqual(s.data.log.map(l => l.text), ['mem[2] = 0c']);
 });
+
+test('#3707 simulate model and run_process …_model: refused on a flow that makes no models (iCE40, Basys 3), as the interface lists none; a Basys2 project makes them', async () => {
+  for (const [project, board, family] of [['ice', 'icebreaker', 'iCE40'], ['b3', 'basys3', 'Artix-7']]) {
+    await ok('new_project_from_example', { name: project, example: 'gates' });
+    await ok('set_design_properties', { project, board });
+    for (const [model, proc, name] of [['postsynth', 'post_synthesis_model', 'post-synthesis'], ['posttrans', 'post_translate_model', 'post-translate'], ['postmap', 'post_map_model', 'post-map'], ['postpar', 'post_par_model', 'post-place & route']]) {
+      const message = `the ${family} flow makes no ${name} simulation model (only the Spartan flows make them): simulate the behavioral model`;
+      await fails('simulate', { project, model, time_ns: 100 }, message);
+      await fails('simulate', { project, model, generate: true, time_ns: 100 }, message);
+      await fails('run_process', { project, process: proc }, message);
+    }
+    // (its behavioural simulation as before)
+    assert.deepEqual((await ok('simulate', { project, time_ns: 1000, signals: [] })).data.log.map(l => l.text), ['Simulation finished OK']);
+  }
+  // (the Basys2's gates makes them, as above)
+  assert.deepEqual((await ok('simulate', { project: 'g', model: 'postsynth', generate: true, time_ns: 1000, signals: [] })).data.failed, false);
+});
+
+test('#3707 hasSimModels: the flows the interface\'s tools list models for, on every board and with no device', async () => {
+  const { hasSimModels } = await import('../server/mcp-hdl.js');
+  const { simModelsOf, toolOf } = await import('../web/js/tool-descriptors.js');
+  const { BOARDS } = await import('../core/boards.js');
+  const { openOnlyDevice } = await import('../packages/silinx-fpga/src/parts.js');
+  const ALL = ['postsynth', 'posttrans', 'postmap', 'postpar'];
+  for (const device of [undefined, ...BOARDS.map(b => b.device)]) {
+    for (const open of [true, false]) {
+      // (ISE on an open-only family, which the interface never offers: toolOf's fallback, not a flow)
+      if (!open && openOnlyDevice(device)) continue;
+      const tool = toolOf(device, open);
+      assert.deepEqual(simModelsOf(tool), hasSimModels(device) ? ALL : [], `${device?.part} ${tool.id}`);
+    }
+  }
+  assert.deepEqual([hasSimModels({ part: 'xc3s100e' }), hasSimModels({ part: 'xc6slx16' }), hasSimModels({ part: 'ice40up5k' }), hasSimModels({ part: 'xc7a35t' })], [true, true, false, false]);
+});

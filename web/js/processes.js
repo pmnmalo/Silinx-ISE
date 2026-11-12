@@ -76,7 +76,8 @@ function selectionProcesses(sel, view) {
     { id: 'isim', label: 'SSim Simulator', ico: 'sim', children: [
       { id: 'sim-check', label: 'Behavioral Check Syntax', ico: 'process', run: () => checkSyntax(mod, true) },
       { id: 'sim-run', label: 'Simulate Behavioral Model', ico: 'wave', run: () => runSimulation(mod) },
-      ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `sim-${step}`, label: `Simulate ${name} Model`, ico: 'wave', run: () => runSimulation(mod, step) })),
+      // (the models the project's tool generates: none in the flows with no netgen, #3707)
+      ...Object.entries(SIM_MODEL_NAMES).filter(([step]) => simModelsOf(projectTool()).includes(step)).map(([step, name]) => ({ id: `sim-${step}`, label: `Simulate ${name} Model`, ico: 'wave', run: () => runSimulation(mod, step) })),
     ] },
     { id: 'verify', label: 'Verify Equivalence…', ico: 'process', run: async () => (await import('./verify.js')).verifyProcess(mod) },   // (#3177)
     { id: 'verify-assert', label: 'Verify Assertions…', ico: 'process', run: async () => (await import('./verify.js')).assertProcess(mod) },
