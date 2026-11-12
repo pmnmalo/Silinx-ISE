@@ -160,7 +160,7 @@ test('a hidden file or folder of a project (.git, .env, .vscode) refused by ever
   await fails('rename_module', { project: 'h', module: 'timer', to: 'tick', file: '.git/tick.vhd' }, '\'.git/tick.vhd\': a hidden file or folder cannot be renamed');
   // the tools that read a drawing or a source a path names
   await fails('check_drawing', { project: 'h', file: '.vscode/x.fsm.json' }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
-  await fails('simulate_drawing', { project: 'h', file: '.vscode/x.fsm.json', cycles: 2 }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
+  await fails('simulate_drawing', { project: 'h', file: '.vscode/x.fsm.json', cycles: [{}] }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
   await fails('related_view', { project: 'h', path: '.vscode/x.fsm.json', view: 'translation' }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
   await fails('convert_drawing', { project: 'h', path: '.vscode/x.fsm.json', to: 'asm' }, '\'.vscode/x.fsm.json\': a hidden file or folder cannot be read');
   await fails('c_simulation', { project: 'h', path: '.git/x.c' }, '\'.git/x.c\': a hidden file or folder cannot be read');
