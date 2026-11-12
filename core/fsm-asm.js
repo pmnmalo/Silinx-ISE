@@ -2,7 +2,7 @@
 // condition, in priority order) and an ASM chart as a diagram (its paths from each state, their conditions and
 // outputs), as the ASM editor and the diagram's conversions use them.
 import { asmLayout } from './asm-from-hdl.js';
-import { exprToString, normalizeModel as normalizeAsm, parseAction, parseCaseChoices } from './asm.js';
+import { MAX_PATHS, exprToString, normalizeModel as normalizeAsm, parseAction, parseCaseChoices } from './asm.js';
 import {
   clone, condNames, constValue, evalCond, fsmKind, inputCombos, normalizeFsm, parseCond, placeNew, stateById,
   transitionsFrom
@@ -59,19 +59,38 @@ function asmPaths(asm, stateId) {
   const exits = new Map();
   for (const e of asm.edges) { if (!exits.has(e.from)) exits.set(e.from, []); exits.get(e.from).push(e); }
   const widthOf = (name) => asm.inputs.find((i) => i.name === name)?.width ?? 1;
+  // the paths counted first, each box's once: a chain of decisions whose branches meet again has as many as 2^n, more
+  // than MAX_PATHS transitions a diagram is not drawn with (#3554); a box met again on its own path is a loop
+  const count = new Map(), onPath = new Set(), walking = new Set();
+  let loops = false;
+  const paths = (id) => {
+    const n = nodes.get(id);
+    if (!n || n.type === 'state') return 1;
+    if (onPath.has(id)) { loops = true; return 1; }
+    if (!count.has(id)) {
+      onPath.add(id);
+      count.set(id, Math.max(1, (exits.get(id) || []).reduce((k, e) => k + paths(e.to), 0)));
+      onPath.delete(id);
+    }
+    return count.get(id);
+  };
   const out = [];
-  const walk = (id, conds, acts, depth) => {
-    if (depth > 200) throw new Error('the chart has a loop without a state');
+  const walk = (id, conds, acts) => {
     const n = nodes.get(id);
     if (!n) throw new Error('the chart has an exit that leads nowhere');
     if (n.type === 'state') { out.push({ conds, acts, to: n.id }); return; }
+    if (walking.has(id)) throw new Error('the chart has a loop without a state');
+    walking.add(id);
+    try { box(n, id, conds, acts); } finally { walking.delete(id); }
+  };
+  const box = (n, id, conds, acts) => {
     const ex = exits.get(id) || [];
     if (n.type === 'decision') {
       const p = parseCond(n.cond);
       if (p.error) throw new Error(`the condition '${n.cond}' is not valid (${p.error})`);
       for (const e of ex) {
         const neg = e.port === 'false';
-        walk(e.to, [...conds, { ast: p.ast, text: n.cond, neg }], acts, depth + 1);
+        walk(e.to, [...conds, { ast: p.ast, text: n.cond, neg }], acts);
       }
       return;
     }
@@ -88,21 +107,24 @@ function asmPaths(asm, stateId) {
           const vals = all.filter((x) => x.values).flatMap((x) => x.values);
           ast = vals.length ? vals.map((v) => ({ k: 'bin', op: '!=', a: p.ast, b: lit(v) })).reduce((a, b) => ({ k: 'bin', op: '&&', a, b })) : null;
         } else ast = ch.values.map((v) => ({ k: 'bin', op: '==', a: p.ast, b: lit(v) })).reduce((a, b) => ({ k: 'bin', op: '||', a, b }));
-        walk(ex[i].to, ast ? [...conds, { ast, text: exprToString(ast), neg: false }] : conds, acts, depth + 1);
+        walk(ex[i].to, ast ? [...conds, { ast, text: exprToString(ast), neg: false }] : conds, acts);
       }
       return;
     }
     if (n.type === 'output') {
       const nx = ex.find((e) => e.port === 'next');
       if (!nx) throw new Error('a conditional output box has no exit');
-      walk(nx.to, conds, [...acts, ...n.actions], depth + 1);
+      walk(nx.to, conds, [...acts, ...n.actions]);
       return;
     }
     throw new Error(`a ${n.type} box cannot be part of a state diagram`);
   };
   const first = (exits.get(stateId) || []).find((e) => e.port === 'next');
   if (!first) return [];       // no exit: stays
-  walk(first.to, [], [], 0);
+  const k = paths(first.to);
+  if (k > MAX_PATHS && loops) throw new Error('the chart has a loop without a state');
+  if (k > MAX_PATHS) throw new Error(`the state ${nodes.get(stateId).name} has ${k} paths through its decisions, more than ${MAX_PATHS} transitions for a state diagram`);
+  walk(first.to, [], []);
   return out;
 }
 
