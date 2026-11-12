@@ -28,6 +28,11 @@ export const GIT_PT = {
     'A sessão é enviada só ao GitHub, e fica guardada neste navegador a menos que desmarque Lembrar-me (então neste separador até ser fechado).',
   'Remember me in this browser (kept after this tab closes, where every page of this site\'s address can read it)':
     'Lembrar-me neste navegador (guardada depois de fechar este separador, onde todas as páginas do endereço deste sítio a podem ler)',
+  // (#3530: the single file opened from the disk keeps the sign-in in its tab only)
+  'The sign-in is sent only to GitHub, and kept in this tab until it is closed (a Silinx opened from a file does not remember it).':
+    'A sessão é enviada só ao GitHub, e fica guardada neste separador até ser fechado (um Silinx aberto de um ficheiro não a lembra).',
+  'A Silinx opened from a file keeps the sign-in in this tab only: every page opened from the disk can read what this browser keeps for files.':
+    'Um Silinx aberto de um ficheiro guarda a sessão só neste separador: todas as páginas abertas do disco podem ler o que este navegador guarda para ficheiros.',
   'Silinx asks GitHub for your public repositories and your gists.': 'O Silinx pede ao GitHub os seus repositórios públicos e os seus gists.',
   'Include my private repositories (a Classroom assignment\'s): GitHub then gives Silinx all of them':
     'Incluir os meus repositórios privados (o de um trabalho do Classroom): o GitHub dá então ao Silinx todos eles',

@@ -496,6 +496,66 @@ uiTest('standalone edition (file://): the Board Emulator runs blinky on the comp
 // #556: in Firefox and WebKit too; WebKit's workers of such a page read no Blob (Yosys could not start:
 // Generate Programming File failed, the emulator fell back to the event-driven engine), and its workers
 // start none of their own (the flow worker runs Yosys in its own thread)
+uiTest('#3530 regression, standalone edition (file://): Sign in with GitHub… keeps the token in this tab only, Remember me unticked and disabled, its reason its tip; nothing written to localStorage; in Portuguese', E, async (page) => {
+  // (GitHub a stand-in inside the page: the made-up token's user)
+  const TOKEN = 'github_pat_11FAKEFAKE0_madeupmadeupmadeup';
+  const boot = async () => {
+    await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'standalone boot' });
+    await page.eval((t) => {
+      window.SILINX_GITHUB = { api: 'https://fake.github.test' };
+      const real = window.fetch;
+      window.fetch = (url, opts = {}) => (String(url).startsWith('https://fake.github.test/')
+        ? Promise.resolve(new Response(JSON.stringify(opts.headers?.Authorization === `Bearer ${t}` || opts.headers?.authorization === `Bearer ${t}` ? { login: 'student' } : { message: 'Bad credentials' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+        : real(url, opts));
+    }, TOKEN);
+  };
+  await page.goto(pathToFileURL(html).href);
+  await boot();
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'SoloGit');
+  await page.fill('.dlg-overlay .wiz-main select', 'gates', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.dialogButton('Next >');
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.project?.name === 'SoloGit', [], { what: 'SoloGit open' });
+  const before = await page.eval(() => Object.keys(localStorage).sort());
+  await page.menu('File', 'Sign in with GitHub…');
+  await page.waitDialog('Sign in with GitHub');
+  assert.deepEqual(await page.eval(() => { const b = document.querySelector('.dlg-overlay .git-remember'); return [b.checked, b.disabled, b.title]; }),
+    [false, true, 'A Silinx opened from a file keeps the sign-in in this tab only: every page opened from the disk can read what this browser keeps for files.']);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .git-remember').parentElement.nextElementSibling.textContent),
+    'The sign-in is sent only to GitHub, and kept in this tab until it is closed (a Silinx opened from a file does not remember it).');
+  await page.fill('.dlg-overlay .git-token', TOKEN);
+  await page.dialogButton('Sign In');
+  await page.waitNoDialog();
+  await page.waitConsole(/Signed in to GitHub as student: the sign-in is kept in this tab until it is closed \(Sign out of GitHub forgets it\)\./);
+  // nothing written to localStorage; the token in this tab's storage only
+  assert.deepEqual(await page.eval(() => Object.keys(localStorage).sort()), before);
+  assert.ok(!(await page.eval(() => Object.values(localStorage).join('\n'))).includes(TOKEN));
+  assert.equal(await page.eval(() => sessionStorage.getItem('silinx.github-token')), TOKEN);
+  assert.ok(!(await page.eval(() => window.__console())).includes(TOKEN));
+  await page.menu('File', 'Sign out of GitHub');
+  await page.waitConsole(/Signed out of GitHub: this browser no longer keeps the sign-in\./);
+  assert.equal(await page.eval(() => sessionStorage.getItem('silinx.github-token')), null);
+  // in Portuguese: the tip and the hint translated
+  await page.eval(() => localStorage.setItem('silinx.lang', 'pt'));
+  await page.goto(pathToFileURL(html).href);
+  await boot();
+  await page.waitFor(() => document.documentElement.lang === 'pt' && window.Silinx.project?.name === 'SoloGit', [], { what: 'Portuguese, SoloGit' });
+  // (by its label where the menu is shown, the ISE style interface; by its English one where the harness runs it from the menus' definitions)
+  await page.menu('Ficheiro', 'Iniciar sessão no GitHub…').catch((e) => { if (/^no item/.test(e.message)) return page.menu('Ficheiro', 'Sign in with GitHub…'); throw e; });
+  await page.waitDialog('Iniciar sessão no GitHub');
+  assert.deepEqual(await page.eval(() => { const b = document.querySelector('.dlg-overlay .git-remember'); return [b.checked, b.disabled, b.title, b.parentElement.nextElementSibling.textContent]; }),
+    [false, true, 'Um Silinx aberto de um ficheiro guarda a sessão só neste separador: todas as páginas abertas do disco podem ler o que este navegador guarda para ficheiros.',
+      'A sessão é enviada só ao GitHub, e fica guardada neste separador até ser fechado (um Silinx aberto de um ficheiro não a lembra).']);
+  await page.dialogButton('Cancelar').catch(() => page.dialogButton('Cancel'));
+  await page.waitNoDialog();
+  await page.eval(() => localStorage.removeItem('silinx.lang'));
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+}, { url: () => 'about:blank', timeout: 240000 });
+
 uiTest('standalone edition (file://) in a user\'s browser (Chrome without --allow-file-access-from-files, Firefox, WebKit): Generate Programming File and the Board Emulator run in their workers (#512, #556)', PLAIN, async (page) => {
   await page.goto(pathToFileURL(html).href);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'standalone boot' });

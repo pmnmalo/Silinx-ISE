@@ -81,6 +81,35 @@ test('#3356 where the token is kept: this browser (remembered, the default), or 
   await git.githubSignOut();
 });
 
+test('#3530 regression: at file: (the single file opened from the disk) the token is kept in this tab only, Remember me or not; one left in localStorage neither read nor kept', async () => {
+  globalThis.SILINX_GITHUB = { api: 'https://api.github.com' };
+  const { canRemember } = await import('../web/js/git-browser.js');
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { protocol: 'file:' }, configurable: true });
+  try {
+    assert.equal(canRemember(), false);
+    // (a token an older Silinx remembered: not read at file:)
+    store.set('silinx.github-token', gh.token);
+    assert.equal(git.githubSignedIn(), false);
+    assert.deepEqual(await git.githubSetToken(gh.token), { signedIn: true, remembered: false, login: 'student' });
+    assert.deepEqual([session.get('silinx.github-token'), store.has('silinx.github-token')], [gh.token, false]);
+    assert.equal(git.githubSignedIn(), true);
+    // (the device flow too)
+    const g2 = fakeGitHub({ interval: 0.01 });
+    globalThis.fetch = g2.fetch;
+    try {
+      globalThis.SILINX_GITHUB = { relay: 'https://silinx-github-relay.example.workers.dev', clientId: g2.clientId };
+      assert.deepEqual(await git.githubSignIn({ onCode: ({ userCode }) => g2.authorize(userCode), remember: true }), { signedIn: true, remembered: false });
+      assert.deepEqual([session.get('silinx.github-token'), store.has('silinx.github-token')], [g2.token, false]);
+    } finally { globalThis.fetch = gh.fetch; }
+  } finally {
+    await git.githubSignOut();
+    if (had) Object.defineProperty(globalThis, 'location', had); else delete globalThis.location;
+  }
+  assert.equal(session.has('silinx.github-token') || store.has('silinx.github-token'), false);
+  assert.equal(canRemember(), true);
+});
+
 test('#3356 the device flow asks for the public repositories and the gists, the private ones only when asked; the token kept as chosen', async () => {
   const g2 = fakeGitHub({ interval: 0.01 });
   globalThis.fetch = g2.fetch;

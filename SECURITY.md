@@ -96,6 +96,9 @@ read that user's files has the server too.
   ticked by default (the maintainer's choice: a student signs in once), keeps the token in `localStorage` (kept across
   sessions, readable by any page of the origin, as its label says); unticked, the token is kept in the tab's
   `sessionStorage` only (forgotten when the tab closes, read only by a page of the origin loaded in that same tab); each edition has its own key (`silinx.github-token`, the development site's `silinx.dev.github-token`).
+  The single file opened from the disk (`Silinx.html` at a `file:` address) never remembers it (#3530): in Chrome every
+  page opened from the disk shares that one origin and its `localStorage`, so there Remember me is unticked and disabled
+  (its tip says why), the token is kept in the tab's `sessionStorage` only, and a token left in `localStorage` is not read.
   A key is no boundary between pages of one origin, so the remaining exposure is the account's other Pages sites,
   which are the maintainer's; an origin of its own (a custom domain) would remove it. A repository's address is checked as the server's (github.com's only), the sign-in page linked is github.com's
   only, and an opened or pulled file passes the import gate; the repository's hidden and binary files stay on GitHub,
