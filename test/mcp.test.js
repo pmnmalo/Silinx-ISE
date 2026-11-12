@@ -64,10 +64,10 @@ test('the handshake: the protocol version, the server, its tools with their sche
   srv.p.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n');   // (a notification: no answer)
   const { tools } = (await srv.send('tools/list')).result;
   assert.deepEqual(tools.map(t => t.name), ['list_examples', 'list_projects', 'new_project_from_example', 'new_project', 'set_top', 'project_info', 'read_file', 'write_file',
-    'list_devices', 'set_design_properties', 'set_process_properties', 'set_source_properties', 'new_source', 'clock_manager', 'block_memory', 'constraints_wizard', 'check_constraints', 'test_bench_wizard', 'convert_module', 'convert_drawing', 'related_view', 'set_output_logic', 'check_drawing', 'rearrange_wires', 'rearrange_schematic', 'simulate_drawing', 'unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project',
-    'export_project', 'import_project', 'project_link', 'open_link', 'git_clone', 'git_init', 'git_status', 'git_commit', 'git_push', 'git_pull', 'git_log', 'git_diff', 'share_project', 'follow_project', 'check_syntax', 'simulate', 'verify', 'save_wave_config', 'load_wave_config', 'c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated', 'run_process', 'get_report', 'capture_settings', 'capture', 'timing_paths', 'lab', 'grade']);
+    'list_devices', 'set_design_properties', 'set_process_properties', 'set_source_properties', 'new_source', 'clock_manager', 'block_memory', 'constraints_wizard', 'check_constraints', 'test_bench_wizard', 'convert_module', 'convert_drawing', 'related_view', 'set_output_logic', 'check_drawing', 'rearrange_wires', 'rearrange_schematic', 'simulate_drawing', 'unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project', 'find_in_project',
+    'export_project', 'import_project', 'import_source', 'project_link', 'open_link', 'git_clone', 'git_init', 'git_status', 'git_commit', 'git_push', 'git_pull', 'git_log', 'git_diff', 'share_project', 'follow_project', 'check_syntax', 'simulate', 'verify', 'save_wave_config', 'load_wave_config', 'c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated', 'run_process', 'get_report', 'capture_settings', 'capture', 'timing_paths', 'lab', 'grade']);
   // (a tool that deletes or replaces what is in the workspace says so: the client asks before it runs)
-  assert.deepEqual(tools.filter(t => t.annotations.destructiveHint).map(t => t.name), ['set_top', 'write_file', 'set_design_properties', 'set_source_properties', 'clock_manager', 'block_memory', 'convert_module', 'delete_file', 'delete_project', 'git_pull', 'grade']);
+  assert.deepEqual(tools.filter(t => t.annotations.destructiveHint).map(t => t.name), ['set_top', 'write_file', 'set_design_properties', 'set_source_properties', 'clock_manager', 'block_memory', 'convert_module', 'delete_file', 'delete_project', 'find_in_project', 'import_source', 'git_pull', 'grade']);
   for (const t of tools) {
     assert.equal(t.inputSchema.type, 'object', t.name);
     assert.ok(t.description.length > 40 && t.title, t.name);
@@ -171,6 +171,11 @@ test('check_syntax: the design as the application checks it, then an error and a
   assert.deepEqual(warn.structuredContent.warnings.map(w => [w.file, w.line, w.check]), [['src/inv.vhd', 7, 'latch'], ['src/inv.vhd', 4, 'unused-signal']]);
   assert.match(warn.structuredContent.warnings[0].message, /^Found 1-bit latch for signal <spare>\./);
   assert.match(warn.content[0].text, /completed successfully with 2 warning\(s\)/);
+  // Edit ▸ Design Checks (Lint Warnings) off (#3546): lint false
+  const noLint = await srv.call('check_syntax', { project: 'Blinky', top: 'inv', lint: false });
+  assert.deepEqual(noLint.structuredContent.warnings, []);
+  assert.equal(noLint.content[0].text, 'Process "Check Syntax" of <inv> completed successfully (3 signals, 2 processes).');
+  assert.equal((await srv.call('check_syntax', { project: 'Blinky', top: 'inv', lint: 'no' })).content[0].text, 'check_syntax: lint: true or false');
   assert.equal((await srv.call('check_syntax', { project: 'Blinky', top: 'nothere' })).structuredContent.ok, false);
 });
 

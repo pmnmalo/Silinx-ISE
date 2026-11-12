@@ -562,9 +562,12 @@ instances, drawings and top with it), `delete_file` and `delete_project` (into t
 can be moved back),
 `git_clone`, `git_init`, `git_status`, `git_commit`, `git_push`, `git_pull` and `git_log` (a project in a GitHub repository, as the interface's git: its history, a file as it was in a commit),
 `export_project` and `import_project` (a Xilinx ISE or a Silinx project, as a .zip; a .xise or a project folder too;
-only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `project_link` and `open_link` (a project's
+only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `import_source` (files of the exchange
+folder copied into a project, as *Import Source* / *Add Copy of Source* / *Import Test Bench*), `find_in_project` (*Find in
+Project*: every source's lines and every drawing's texts; its Replace All), `project_link` and `open_link` (a project's
 link, the project inside it, opening Try it, the simulation or the board emulator, for slides; a project made from such a link
-or from an example's, one that differs never replaced), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included),
+or from an example's, one that differs never replaced), `check_syntax` (the errors and warnings of *Check Syntax*, the design checks included; their lint warnings left out as with
+*Edit ▸ Design Checks* off),
 `simulate` (the test bench: its messages and its signals' changes; against the post-synthesis, post-translate, post-map or
 post-place & route model too, with its timing; signals forced, a value or a clock, as SSim's Force; its waves as a VCD file), `c_simulation`, `c_cosimulation`,
 `c_synthesis_report` and `c_generated` (a C / C++ source of Silinx HLS: its main() run, its C/RTL co-simulation, its report, the HDL

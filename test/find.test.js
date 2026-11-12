@@ -2,7 +2,7 @@
 // with String methods.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findPattern, findInText, replaceInText, findInDrawing } from '../core/find.js';
+import { findPattern, findInText, replaceInText, findInDrawing, findPaths, findInProject, FIND_MAX } from '../core/find.js';
 
 const TEXT = 'entity Counter is\n  port (clk : in std_logic;\n        count : out unsigned(3 downto 0));\nend counter;\n-- counter of clk\n';
 
@@ -46,4 +46,29 @@ test('findInDrawing: the string values of a drawing\'s document, where each is; 
   const m = findInDrawing(JSON.stringify(doc), findPattern({ text: 'red' }).re);
   assert.deepEqual(m.map(x => [x.where, x.col]), [['states[0].name', 1], ['notes', 1]]);
   assert.deepEqual(findInDrawing('not json', findPattern({ text: 'a' }).re), []);
+});
+
+test('findPaths: the project\'s files, its sources and its constraints once each, sorted; its text sources and drawings only (#3546)', () => {
+  const tree = ['src/top.vhd', 'src/ctl.fsm.json', 'src/ctl.vhd', 'build/x.bit', 'notes.pdf', 'src/rom.mem', 'src/c.c'];
+  const files = [{ path: 'src/top.vhd' }, { path: 'sim/tb.v' }];
+  assert.deepEqual(findPaths(tree, files, 'constraints/top.ucf'), [
+    { path: 'constraints/top.ucf', drawing: false }, { path: 'sim/tb.v', drawing: false }, { path: 'src/ctl.fsm.json', drawing: true },
+    { path: 'src/ctl.vhd', drawing: false }, { path: 'src/rom.mem', drawing: false }, { path: 'src/top.vhd', drawing: false }]);
+  assert.deepEqual(findPaths(), []);
+  assert.deepEqual(findPaths(['a.sch.json'], [], null), [{ path: 'a.sch.json', drawing: true }]);
+});
+
+test('findInProject: each text\'s matches (its lines, or its drawing\'s texts), the texts with none left out; at most FIND_MAX a file (#3546)', () => {
+  const re = findPattern({ text: 'counter' }).re;
+  const r = findInProject([
+    { path: 'a.vhd', text: TEXT, drawing: false, generated: true },
+    { path: 'b.v', text: 'module x; endmodule\n', drawing: false },
+    { path: 'c.fsm.json', text: JSON.stringify({ name: 'counter', states: [{ label: 'Counter' }] }), drawing: true },
+  ], re);
+  assert.deepEqual(r.map(f => [f.path, f.generated, f.hits.length]), [['a.vhd', true, 3], ['c.fsm.json', undefined, 2]]);
+  assert.deepEqual(r[0].hits, findInText(TEXT, re), 'findInText\'s');
+  assert.deepEqual(r[1].hits.map(m => m.where), ['name', 'states[0].label']);
+  assert.equal(FIND_MAX, 2000);
+  assert.equal(findInProject([{ path: 'x.txt', text: 'a'.repeat(3000), drawing: false }], findPattern({ text: 'a' }).re)[0].hits.length, FIND_MAX);
+  assert.equal(findInProject([{ path: 'x.txt', text: 'aaa', drawing: false }], findPattern({ text: 'a' }).re, { max: 2 })[0].hits.length, 2);
 });

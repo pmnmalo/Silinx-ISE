@@ -7,21 +7,15 @@
 import { h, toast } from './ui.js';
 import { api } from './api.js';
 import { S, app, findDoc, openDoc, openFile, setDirty } from './app.js';
-import { findPattern, findInText, findInDrawing, replaceInText } from '/core/find.js';
-
-const TEXT_FILE = /\.(vhdl?|v|sv|ucf|mem|hex|coe|txt)$/i;
-const DRAWING = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
-const MAX = 2000;   // (results at most)
+import { findPattern, findPaths, findInProject, replaceInText } from '/core/find.js';
 
 /** The project's texts to search: [{ path, text, drawing, generated }], the open editors' as they are. */
 async function projectTexts() {
   const pj = S.project;
   // (the project's files: its sources, its drawings (not in its files' list), its constraints)
-  const paths = [...new Set([...(S.fileTree || []), ...(pj.files || []).map(f => f.path), pj.constraints].filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const out = [];
-  for (const path of paths) {
-    if (DRAWING.test(path)) { const t = S.viewTexts?.[path]; if (t != null) out.push({ path, text: t, drawing: true }); continue; }
-    if (!TEXT_FILE.test(path)) continue;
+  for (const { path, drawing } of findPaths(S.fileTree || [], pj.files || [], pj.constraints)) {
+    if (drawing) { const t = S.viewTexts?.[path]; if (t != null) out.push({ path, text: t, drawing: true }); continue; }
     const ed = findDoc(`file:${path}`)?.editor;
     let text = ed ? ed.getValue() : S.sources.find(s => s.path === path)?.text;
     if (text == null) { try { text = await api.readFile(pj.name, path); } catch { continue; } }
@@ -64,7 +58,7 @@ function mountFind(el) {
     if (error) { status.textContent = `Invalid regular expression: ${error}`; return; }
     if (!re) { status.textContent = ''; return; }
     await app.saveAll?.();
-    last = (await projectTexts()).map(f => ({ ...f, hits: f.drawing ? findInDrawing(f.text, re, { max: MAX }) : findInText(f.text, re, { max: MAX }) })).filter(f => f.hits.length);
+    last = findInProject(await projectTexts(), re);
     const n = last.reduce((s, f) => s + f.hits.length, 0);
     status.textContent = n ? `${n} result(s) in ${last.length} file(s)` : 'No results';
     for (const f of last) results.append(fileResults(f));

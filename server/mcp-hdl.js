@@ -129,11 +129,13 @@ export async function runBounded(sim, until, { timeoutS, signal, steps: maxSteps
 export const HDL_TOOLS = [
   {
     name: 'check_syntax', title: 'Check Syntax',
-    description: 'Parse and elaborate the design (or, with simulation, the test bench) as the application\'s Check Syntax does: the errors and warnings with their file and line, the design checks (latches, sensitivity lists, unused signals…) included.',
-    inputSchema: { type: 'object', properties: { project: PROJECT, top: STR('The module to elaborate (default: the project\'s top, or its test bench with simulation).'), simulation: { type: 'boolean', description: 'Check the simulation view (the test bench and the design).' } }, required: ['project'], additionalProperties: false },
+    description: 'Parse and elaborate the design (or, with simulation, the test bench) as the application\'s Check Syntax does: the errors and warnings with their file and line, the design checks (latches, sensitivity lists, unused signals…) included; with lint false, as with Edit ▸ Design Checks (Lint Warnings) off, their lint warnings left out (their errors kept).',
+    inputSchema: { type: 'object', properties: { project: PROJECT, top: STR('The module to elaborate (default: the project\'s top, or its test bench with simulation).'), simulation: { type: 'boolean', description: 'Check the simulation view (the test bench and the design).' },
+      lint: { type: 'boolean', description: 'The design checks\' lint warnings, as Edit ▸ Design Checks (Lint Warnings) (default true, the interface\'s default).' } }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
-    async run({ project: name, top, simulation = false }) {
-      const { design, top: mod, diags } = await elaborateView(name, { top, sim: simulation });
+    async run({ project: name, top, simulation = false, lint = true }) {
+      if (typeof lint !== 'boolean') throw toolError('lint: true or false');
+      const { design, top: mod, diags } = await elaborateView(name, { top, sim: simulation, lint });
       const errors = diags.filter(d => d.severity === 'error'), warnings = diags.filter(d => d.severity !== 'error');
       const ok = !errors.length && !!design?.top;
       const lines = [...diags.map(diagLine),

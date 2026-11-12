@@ -56,3 +56,23 @@ export function findInDrawing(json, re, { max = 1000 } = {}) {
   walk(doc, '');
   return out;
 }
+
+// ------------------------------------------------------------------ Find in Project (#3546: the page's and the MCP's)
+/** The text sources Find in Project searches (their lines) and its drawings (their texts). */
+export const FIND_TEXT_FILE = /\.(vhdl?|v|sv|ucf|mem|hex|coe|txt)$/i;
+export const FIND_DRAWING = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
+/** The results of one file at most. */
+export const FIND_MAX = 2000;
+
+/** The paths Find in Project searches: the project's files (`tree`), its sources (`files`, the project's list) and its
+ *  constraints, once each, sorted; its text sources and its drawings only: [{ path, drawing }]. */
+export function findPaths(tree = [], files = [], constraints = null) {
+  const paths = [...new Set([...tree, ...files.map(f => f.path), constraints].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  return paths.filter(p => FIND_DRAWING.test(p) || FIND_TEXT_FILE.test(p)).map(path => ({ path, drawing: FIND_DRAWING.test(path) }));
+}
+
+/** Find in Project's results: the texts ([{ path, text, drawing, generated }]) with their matches (`hits`: findInText's
+ *  or findInDrawing's), those with none left out. */
+export function findInProject(texts, re, { max = FIND_MAX } = {}) {
+  return texts.map(f => ({ ...f, hits: f.drawing ? findInDrawing(f.text, re, { max }) : findInText(f.text, re, { max }) })).filter(f => f.hits.length);
+}
