@@ -5,7 +5,8 @@ export const LABS_PT = {
   'Guided Labs…': 'Laboratórios Guiados…',
   'Guided Labs': 'Laboratórios Guiados',
   'Guided Lab': 'Laboratório Guiado',   // (New Source's type)
-  'Teaching': 'Ensino',   // (the Start page's box of the labs and exercises, #3333)
+  'Teaching': 'Ensino',   // (the Design pane's Teaching tab, #3533)
+  'Labs and Exercises': 'Laboratórios e Exercícios', 'Links and Sharing': 'Ligações e Partilha',
   'A guided lab is in the labs folder: Location labs.': 'Um laboratório guiado fica na pasta labs: Localização labs.',
   'This project has no lab.': 'Este projeto não tem laboratórios.',
   'Check Step': 'Verificar Passo',

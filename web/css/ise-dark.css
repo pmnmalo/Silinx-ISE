@@ -119,7 +119,7 @@ html[data-ui="ise"][data-theme="dark"] .page h2, html[data-ui="ise"][data-theme=
 html[data-ui="ise"][data-theme="dark"] .page a { color: var(--ise-link); }
 html[data-ui="ise"][data-theme="dark"] .start-box h3 { border-bottom-color: #34425a; }
 html[data-ui="ise"][data-theme="dark"] .start-box .start-sep { border-top-color: #34425a; }
-html[data-ui="ise"][data-theme="dark"] :is(.start-box .entry .disabled, .start-box .entry.hint, #start-page:not([data-project]) .start-export) { color: var(--muted); }
+html[data-ui="ise"][data-theme="dark"] :is(.start-box .entry .disabled, .start-box .entry.hint, :is(#start-page, #teach-page):not([data-project]) .start-export) { color: var(--muted); }
 html[data-ui="ise"][data-theme="dark"] .summary-table caption { background: var(--title-grad); color: var(--title-fg); border-color: var(--ise-caption-line); }
 html[data-ui="ise"][data-theme="dark"] .summary-table th, html[data-ui="ise"][data-theme="dark"] .summary-table td { border-color: #333a46; }
 html[data-ui="ise"][data-theme="dark"] .summary-table th { background: var(--m-surface-2); color: #c8cdd4; }

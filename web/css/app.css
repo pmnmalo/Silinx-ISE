@@ -235,9 +235,9 @@ table.grid tr.sel td { background: #dbe8fb; }
 .start-btns .btn { flex: 1 1 0; min-width: 0; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .start-box .start-sep { border: none; border-top: 1px solid #c9d7ed; margin: 4px 0; }
 /* an export with no project open: disabled (#1222: by the page's host, the page itself the same either way) */
-#start-page:not([data-project]) .start-export { color: #888; }
-#start-page:not([data-project]) .start-export a { color: inherit; cursor: default; pointer-events: none; text-decoration: none; }
-html[data-ui="ise"] #start-page .start-teach { display: none; }   /* (the labs and exercises: the Silinx interface's Start page, #3333) */
+#start-page:not([data-project]) .start-export, #teach-page:not([data-project]) .start-export { color: #888; }
+:is(#start-page, #teach-page):not([data-project]) .start-export a { color: inherit; cursor: default; pointer-events: none; text-decoration: none; }
+#teach-page .start-box:first-child h3 { margin-top: 0; }   /* (the Teaching page's, as the Start page's, #3533) */
 html[data-ui="silinx"] #start-page .start-share { display: none; }   /* (Share Project…: the ISE style's Start page, the Silinx interface's in the Design tree's menus, #3479) */
 .summary-table { border-collapse: collapse; margin-bottom: 16px; min-width: 640px; }
 .summary-table caption.summary-status { display: none; }   /* (the Tasks interface's only: web/css/tasks.css) */

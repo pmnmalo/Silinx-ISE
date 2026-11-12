@@ -377,7 +377,7 @@ function taskButton(t) {
 // the task switchers, the task's bar and the page of a task with no document: there in the Tasks interface
 // only (the other interfaces' pages, their tests and their translations do not have them)
 const PARTS = ['task-switch', 'task-tabs', 'task-bar', 'task-empty', 'task-sim-panel', 'task-impl-bar', 'task-procs-tab', 'task-emu-tab', 'task-emu-panel', 'task-view', 'task-src-bar', 'task-files-bar', 'task-close-bar'];   // (their ids)
-const PAGE_NAME = { start: 'Start', design: 'Design', test: 'Test', files: 'Files', libraries: 'Libraries', procs: 'Implementation', emu: 'Emulate' };
+const PAGE_NAME = { start: 'Start', design: 'Design', test: 'Test', files: 'Files', libraries: 'Libraries', teaching: 'Teaching', procs: 'Implementation', emu: 'Emulate' };
 function build() {
   const $ = id => document.getElementById(id);
   if ($('task-bar')) return;
