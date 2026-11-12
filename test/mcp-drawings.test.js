@@ -111,7 +111,7 @@ test('set_source_properties: a drawing in Verilog (its HDL file with it), back t
   for (const [args, message] of [
     [{ path: 'src/top.vhd', language: 'verilog' }, '\'src/top.vhd\' has no language to choose: HDL written by hand, or a drawing made from its HDL'],
     [{ path: 'src/none.fsm.json', language: 'verilog' }, 'no file \'src/none.fsm.json\' in the project \'s\''],
-    [{ path: 'src/traffic.fsm.json', language: 'c' }, 'language: vhdl, verilog or project']]) {
+    [{ path: 'src/traffic.fsm.json', language: 'c' }, 'language: one of vhdl, verilog, project']]) {
     const r = await call('set_source_properties', { project: 's', ...args });
     assert.equal(r.isError, true);
     assert.equal(r.text, `set_source_properties: ${message}`);
@@ -133,5 +133,5 @@ test('set_design_properties preferred_language: the drawings\' HDL in Verilog, t
     await passes(name, messages);
   }
   const r = await call('set_design_properties', { project: 'l_gates', preferred_language: 'c' });
-  assert.equal(r.text, 'set_design_properties: preferred_language: vhdl or verilog');
+  assert.equal(r.text, 'set_design_properties: preferred_language: one of vhdl, verilog');
 });

@@ -141,7 +141,7 @@ test('the C tools: a C with an error, the errors', async () => {
   for (const [name, args, message] of [
     ['c_simulation', { path: 'src/fir.vhd' }, 'path: a C or C++ source of the project (.c, .cpp), not \'src/fir.vhd\''],
     ['c_cosimulation', { path: 'src/none.c' }, 'no file \'src/none.c\' in the project \'fir\''],
-    ['c_generated', { path: 'src/fir.c', what: 'netlist' }, 'what: hdl or asm'],
+    ['c_generated', { path: 'src/fir.c', what: 'netlist' }, 'what: one of hdl, asm'],
   ]) {
     const e = await call(name, { project: 'fir', ...args });
     assert.equal(e.isError, true);

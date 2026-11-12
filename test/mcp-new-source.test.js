@@ -129,7 +129,7 @@ test('new_source: the wizard\'s refusals; an existing file not replaced', async 
   await fails({ type: 'module', name: 'm1', module: 'signal' }, '\'signal\' is a reserved word of VHDL: choose another name.');
   await fails({ type: 'module', name: 'm1', ports: [{ name: 'a' }, { name: 'A' }] }, 'Duplicate port names.');
   await fails({ type: 'module', name: 'm1', ports: [{ name: 'a b' }] }, 'Invalid port name \'a b\'.');
-  await fails({ type: 'module', name: 'm1', ports: [{ name: 'a', dir: 'up' }] }, 'port \'a\': dir in, out or inout');
+  await fails({ type: 'module', name: 'm1', ports: [{ name: 'a', dir: 'up' }] }, 'ports[0].dir: one of in, out, inout');
   await fails({ type: 'fsm', name: 'reg' }, '\'reg\' is a reserved word of Verilog: choose another name.');
   await fails({ type: 'fsm', name: 'cnt_v' }, 'A module named \'cnt_v\' already exists.');
   await fails({ type: 'fsm', name: 'other', ports: [] }, 'ports and architecture: a module\'s');
