@@ -11,7 +11,7 @@ import { resolveBoard } from './devices.js';
 import { realOf, nativeRealOf, hiddenName, within } from './paths.js';
 import { topNameError } from './ident.js';
 import { normalizePath } from '../core/import-gate.js';
-import { foldName } from '../core/fold-name.js';
+import { foldName, sameNameIn, spelledAs } from '../core/fold-name.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
@@ -393,9 +393,18 @@ async function refuseHiddenInside(dir, rel0, full, verb) {
   if (found) throw new HttpError(400, `'${rel0}': not ${verb}: the folder holds a hidden file or folder ('${relKey(dir, found)}')`);
 }
 
+// A path of the project with its folders and its file spelled as on disk (#3536: SRC/a.vhd is src/a.vhd when the
+// project has src, on every system, as a case-insensitive file system reads it) -> its full path. last: false, the
+// last name kept as asked (a rename's new name).
+const namesIn = dir => async folder => { try { return await fs.readdir(path.join(dir, ...folder.split('/'))); } catch { return []; } };
+export async function spelledJoin(dir, rel, { last = true } = {}) {
+  const key = relKey(dir, safeJoin(dir, rel));
+  return key ? safeJoin(dir, await spelledAs(key, namesIn(dir), { last })) : dir;
+}
+
 export async function readFile(name, rel) {
   const dir = projectDir(name);
-  const full = safeJoin(dir, rel);
+  const full = await spelledJoin(dir, rel);
   refuseHidden(dir, rel, full, 'read');
   try { return await fs.readFile(full, 'utf8'); }
   catch { throw new HttpError(404, `file '${rel}' not found`); }
@@ -403,7 +412,7 @@ export async function readFile(name, rel) {
 
 export async function writeFile(name, rel0, text) {
   const dir = projectDir(name);
-  const full = safeJoin(dir, rel0);
+  const full = await spelledJoin(dir, rel0);
   // the path as the project lists it (./src/a.vhd and src//a.vhd are src/a.vhd, #1229); silinx.json is the
   // project's description, written by the project's own routes (as the browser store refuses it)
   const rel = relKey(dir, full);
@@ -443,7 +452,7 @@ export async function writeFile(name, rel0, text) {
 // #2973); false only to put a file back at the name it had (a rename undone)
 export async function renameFile(name, from, to, { checkName = true } = {}) {
   const dir = projectDir(name);
-  const src = safeJoin(dir, from), dst = safeJoin(dir, to);
+  const src = await spelledJoin(dir, from), dst = await spelledJoin(dir, to, { last: false });
   if (src === dir || dst === dir) throw new HttpError(400, 'cannot rename the project folder itself');
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
   if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
@@ -457,7 +466,9 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
     const isDir = st.isDirectory();
     if (isDir) await refuseHiddenInside(dir, from, src, 'renamed');
     if (isDir && src !== dst && (dst + path.sep).startsWith(src + path.sep)) throw new HttpError(400, `cannot move '${from}' into itself`);
-    if (src !== dst && await exists(dst) && src.toLowerCase() !== dst.toLowerCase()) throw new HttpError(409, `'${to}' already exists`);
+    // (a name the folder has in another case is taken too, but the file's own: a rename of its case, #3536)
+    const taken = sameNameIn(path.basename(dst), await namesIn(dir)(relKey(dir, path.dirname(dst))));
+    if (taken && path.join(path.dirname(dst), taken) !== src) throw new HttpError(409, `'${to}' already exists`);
     await fs.mkdir(path.dirname(dst), { recursive: true });
     await fs.rename(src, dst);
     const pj = await readProject(name);
@@ -486,7 +497,7 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
  *  as a deleted project is, from where it can be moved back -> { trashed: its path in the workspace, else null }. */
 export async function deleteFile(name, rel, { trash = false } = {}) {
   const dir = projectDir(name);
-  const full = safeJoin(dir, rel);
+  const full = await spelledJoin(dir, rel);
   if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
   const key = relKey(dir, full);
   if (await isProjectFileAt(dir, full)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);

@@ -36,9 +36,9 @@ async function fixMissingTops(name) {
 
 // a path of the project as the project lists it, inside it, not hidden; not silinx.json nor build/ (verb: what the
 // tool does with it)
-async function sourcePath(name, rel, verb) {
+async function sourcePath(name, rel, verb, opts) {
   if (typeof rel !== 'string' || !rel) throw toolError('path: a file\'s path in the project (project_info)');
-  const full = await projectPath(name, rel, verb);
+  const full = await projectPath(name, rel, verb, opts);
   const key = P.relKey(P.projectDir(name), full);
   if (!key) throw toolError('path: a file\'s path in the project, not the project\'s folder');
   if (await P.isProjectFileAt(P.projectDir(name), full)) throw toolError(`${P.PROJECT_FILE} is the project's description`);
@@ -123,7 +123,7 @@ export const SOURCE_TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ project: name, from, to }) {
       await readProject(name);
-      const a = await sourcePath(name, from, 'renamed'), b = await sourcePath(name, to, null);
+      const a = await sourcePath(name, from, 'renamed'), b = await sourcePath(name, to, null, { last: false });
       if (/^build(\/|$)/i.test(a) || /^build(\/|$)/i.test(b)) throw toolError('build/ is written by Silinx itself');
       // (the new name by the import gate's rules: P.renameFile, as the interface's Rename, #2973)
       if (a === b) return { text: `${a}: the same path, nothing renamed.`, data: { project: name, from: a, to: b, links: [] } };

@@ -14,7 +14,7 @@ import { constraintsExtOf } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
 import { gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
 import { markUntrusted } from '../../core/trust.js';
-import { foldsToProjectFile, PROJECT_FILE } from '../../core/fold-name.js';
+import { foldName, foldsToProjectFile, PROJECT_FILE, sameNameIn, spelledAs } from '../../core/fold-name.js';
 
 export const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
@@ -57,6 +57,11 @@ export const emptyProjectJson = (name, { device, board } = {}) => ({
   constraints: `constraints/top${constraintsExtOf(device)}`, stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
 });
 const under = (k, dir) => k === dir || k.startsWith(`${dir}/`);
+// the names in a project's folder ('' its root), from its files' paths: the paths spelled as the project spells its
+// folders and files (core/fold-name.js spelledAs, as the local server does, #3536)
+const namesOf = files => folder => [...new Set(Object.keys(files).filter(k => !folder || k.startsWith(`${folder}/`))
+  .map(k => k.slice(folder ? folder.length + 1 : 0).split('/')[0]))];
+const spelled = (p, path, opts) => spelledAs(path, namesOf(p.files), opts);
 const plain = o => !!o && typeof o === 'object' && !Array.isArray(o);
 const str = (v, dflt = '') => (typeof v === 'string' ? v : dflt);
 
@@ -457,7 +462,8 @@ export function projectOps(getStore, examples = {}) {
       return clone({ ...json, name });
     },
     readFile: async (name, path) => {
-      const t = (await S().load(name)).files[cleanPath(path)];
+      const p = await S().load(name);
+      const t = p.files[await spelled(p, cleanPath(path))];
       if (t === undefined) fail(`file '${path}' not found`);
       return t;
     },
@@ -465,7 +471,7 @@ export function projectOps(getStore, examples = {}) {
       const p = await S().load(name);
       let json = null;
       // written again: back in the project
-      path = notDescriptor(cleanPath(path));
+      path = notDescriptor(await spelled(p, cleanPath(path)));
       // (a name by the import gate's rules, as the local server's, #3414; build/'s files by the rest of their path)
       const gated = normalizePath(/^build\//.test(path) ? `b${path.slice(5)}` : path);   // (build/x as b/x)
       if (gated.reason) fail(`'${path}': not written: ${gated.reason}`);
@@ -481,19 +487,32 @@ export function projectOps(getStore, examples = {}) {
       return { ok: true };
     },
     renameFile: async (name, from, to) => {
-      from = notDescriptor(cleanPath(from)); to = notDescriptor(cleanPath(to));
+      const p = await S().load(name);
+      from = notDescriptor(await spelled(p, cleanPath(from))); to = notDescriptor(await spelled(p, cleanPath(to), { last: false }));
       // the new name by the import gate's rules for a name, as the local server's Rename (#2973)
       const gated = normalizePath(to);
       if (gated.reason) fail(`'${to}': not renamed: ${gated.reason}`);
-      const p = await S().load(name);
       const json = clone(p.json);
-      const inside = Object.keys(p.files).filter(k => k.startsWith(`${from}/`));
-      if (p.files[from] === undefined && inside.length) {
+      // (a rename of its case through another name: a case-insensitive file system has the old name and the new one
+      // as the same file, which a copy then a removal of the old would lose)
+      const move = async () => {
+        if (from === to) return;
+        if (foldName(from) !== foldName(to)) return S().renamePath(name, from, to);
+        const tmp = `${to}.renaming-${Date.now()}`;
+        await S().renamePath(name, from, tmp);
+        await S().renamePath(name, tmp, to);
+      };
+      const isDir = p.files[from] === undefined && Object.keys(p.files).some(k => k.startsWith(`${from}/`));
+      if (p.files[from] === undefined && !isDir) fail(`file '${from}' not found`);
+      if (isDir && to.startsWith(`${from}/`)) fail(`cannot move '${from}' into itself`);
+      // a name the folder has in another case is taken too, but the file's own (a rename of its case, #3536)
+      const { parts, last } = split(to), folder = parts.join('/');
+      const taken = sameNameIn(last, namesOf(p.files)(folder));
+      if (taken && (folder ? `${folder}/${taken}` : taken) !== from) fail(`'${to}' already exists`);
+      if (isDir) {
         // a folder: every file under it moves, registrations and the constraints path follow
-        if (to.startsWith(`${from}/`)) fail(`cannot move '${from}' into itself`);
-        if (Object.keys(p.files).some(k => under(k, to))) fail(`'${to}' already exists`);
         const remap = k => (k.startsWith(`${from}/`) ? to + k.slice(from.length) : k);
-        await S().renamePath(name, from, to);
+        await move();
         json.files = json.files.map(f => ({ ...f, path: remap(f.path) }));
         if (json.constraints) json.constraints = remap(json.constraints);
         // the files removed from the project stay removed at their new paths (#1228)
@@ -502,9 +521,7 @@ export function projectOps(getStore, examples = {}) {
         await S().saveJson(name, json);
         return clone(json);
       }
-      if (p.files[from] === undefined) fail(`file '${from}' not found`);
-      if (from !== to && p.files[to] !== undefined) fail(`'${to}' already exists`);
-      if (from !== to) await S().renamePath(name, from, to);
+      await move();
       const lang = /\.vhdl?$/i.test(to) ? 'vhdl' : /\.(v|sv)$/i.test(to) ? 'verilog' : null;
       json.files = json.files.map(f => (f.path === from ? { ...f, path: to, lang: lang || f.lang } : f));
       if (json.constraints === from) json.constraints = to;
@@ -515,8 +532,8 @@ export function projectOps(getStore, examples = {}) {
     },
     // (trash: into the folder's .trash, where the store keeps one, the folder's: keepsTrash, #3364)
     deleteFile: async (name, path, { trash = false } = {}) => {
-      path = notDescriptor(cleanPath(path));
       const p = await S().load(name);
+      path = notDescriptor(await spelled(p, cleanPath(path)));
       const trashed = (await S().removePath(name, path, { trash })) || null;
       const json = clone(p.json);
       json.files = json.files.filter(f => !under(f.path, path));

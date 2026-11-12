@@ -215,3 +215,17 @@ test('set_top on an instantiated module (#2877): project_info, Check Syntax and 
     assert.deepEqual(synth.data.warnings, [PINS]);
   }
 });
+
+test('#3536 write_file / rename_file: a path by another case is the project\'s own spelling (on every system)', async () => {
+  await ok('new_project_from_example', { name: 'cs', example: 'traffic' });
+  const t = 'entity extra is end;\narchitecture r of extra is begin end;\n';
+  assert.equal((await ok('write_file', { project: 'cs', path: 'SRC/extra.vhd', text: t })).text, `Created src/extra.vhd (${t.length} characters), added to the project.`);
+  assert.equal((await ok('read_file', { project: 'cs', path: 'Src/Extra.VHD' })).text, t);
+  assert.equal((await ok('rename_file', { project: 'cs', from: 'SRC/extra.vhd', to: 'SIM/Extra.vhd' })).text, 'Rename: src/extra.vhd → sim/Extra.vhd.');
+  await fails('rename_file', { project: 'cs', from: 'sim/Extra.vhd', to: 'SRC/TOP.vhd' }, '\'src/TOP.vhd\' already exists');
+  assert.equal((await ok('rename_file', { project: 'cs', from: 'SRC/LAMPS.VHD', to: 'src/Lamps.vhd' })).text, 'Rename: src/lamps.vhd → src/Lamps.vhd (the link of src/lamps.bool.json updated).');
+  assert.equal(drawingLink('cs', 'src/lamps.bool.json'), 'src/Lamps.vhd');
+  assert.ok((await files('cs')).includes('sim/Extra.vhd') && (await files('cs')).includes('src/Lamps.vhd'));
+  assert.deepEqual((await P.fileTree('cs')).filter(f => /extra|lamps\.vhd/i.test(f)), ['sim/Extra.vhd', 'src/Lamps.vhd']);
+  assert.equal((await ok('check_syntax', { project: 'cs' })).text, 'Process "Check Syntax" of <top> completed successfully (41 signals, 30 processes).');
+});
