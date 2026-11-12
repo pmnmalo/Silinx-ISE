@@ -139,6 +139,15 @@ export function designNumbers(read, parseSummary) {
   };
 }
 
+/** The jobs among the host's containers (docker ps --format '{{.Image}}\t{{.Names}}', a line each): those of a Xilinx
+ *  image (xilinx/ise, xilinx/vitis-hls, or image) or named silinx-* (the detached runs'); the host's own services (its
+ *  proxy, tailscale) are not jobs. -> their names. */
+export function jobContainers(text, image = '') {
+  return String(text).split(/\r?\n/).map((l) => l.trim().split('\t')).filter(([img]) => img)
+    .filter(([img, name = '']) => /^(docker\.io\/)?xilinx\/(ise|vitis-hls)(:|$)/.test(img) || (image && img === image) || /^silinx-/.test(name))
+    .map(([img, name]) => name || img);
+}
+
 /** Whether --collect keeps a run's folder on the host: until --update has saved its results. */
 export const keepsRun = (args) => !args.includes('--update');
 
@@ -235,7 +244,8 @@ async function main() {
     } else {
       designs = selectDesigns(EXAMPLES, (opt('--boards') || 'basys3').split(','), opt('--filter'));
       if (!designs.length) { console.error('no design selected (--boards, --filter)'); process.exit(2); }
-      if (!local && ssh('docker ps -q | wc -l').trim() !== '0') { console.error('another job is running on the host (docker ps): Vivado runs alone there, wait for it'); process.exit(4); }
+      const busy = local ? [] : jobContainers(ssh("docker ps --format '{{.Image}}\t{{.Names}}'"), IMAGE);
+      if (busy.length) { console.error(`another job is running on the host (${busy.join(', ')}): Vivado runs alone there, wait for it`); process.exit(4); }
       // each design's netlist (the open flow's synthesis) as an EDIF, its constraints, in the work folder
       const list = [];
       for (const d of designs) {

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sexpr, timescalePs, parseSdf, parseTimingPaths, parseRoutes, connections, wireClass, lutBelPin, nextpnrPathSplit } from '../scripts/xc7-timing-parse.mjs';
 import { cellSamples, cellStats, wireSamples, groupWires, mergeCellStats, mergeGroups, nnls, fitWires, chipdbTable, compareFmax, fitMeasurement, CLASSES } from '../scripts/xc7-timing-fit.mjs';
-import { edifScript, measureTcl, runSh, selectDesigns, designNumbers, mergeMeasurement, keepsRun, BOARDS, OUTPUTS } from '../scripts/xc7-timing-vivado.mjs';
+import { edifScript, measureTcl, runSh, selectDesigns, designNumbers, mergeMeasurement, keepsRun, jobContainers, BOARDS, OUTPUTS } from '../scripts/xc7-timing-vivado.mjs';
 import { parseTimingSummary } from '../server/vivado-reports.js';
 
 const SDF = `(DELAYFILE
@@ -354,4 +354,16 @@ test('#3516 nextpnr\'s critical paths split into logic and routing', () => {
   const report = { critical_paths: [{ from: 'posedge clk', path: [{ type: 'clk-to-q', delay: 0.35 }, { type: 'routing', delay: 0.632 }, { type: 'logic', delay: 0.125 }, { type: 'routing', delay: 0 }, { type: 'setup', delay: 0.1 }] }] };
   assert.deepEqual(nextpnrPathSplit(report), { 'posedge clk': { logicNs: 0.575, routeNs: 0.632, totalNs: 1.207 } });
   assert.deepEqual(nextpnrPathSplit({}), {});
+});
+
+test('#3516 the host\'s jobs: a Xilinx image\'s container or a silinx-* run is one; the host\'s services (its proxy, tailscale) are not', () => {
+  const ps = ['alpine/socat:latest\tsocat-proxy', 'tailscale/tailscale:stable\ttailscale', ''].join('\n');
+  assert.deepEqual(jobContainers(ps), []);
+  assert.deepEqual(jobContainers(''), []);
+  assert.deepEqual(jobContainers(`${ps}\nxilinx/ise:14.7\tadmiring_turing`), ['admiring_turing']);
+  assert.deepEqual(jobContainers(`${ps}\nxilinx/vitis-hls:2025.2\tsilinx-vitis-abc123`), ['silinx-vitis-abc123']);
+  assert.deepEqual(jobContainers('ubuntu:22.04\tsilinx-xc7t-x1y2'), ['silinx-xc7t-x1y2']);
+  assert.deepEqual(jobContainers('my/vivado:2025.2\tjob', 'my/vivado:2025.2'), ['job']);
+  assert.deepEqual(jobContainers('my/vivado:2025.2\tjob'), []);
+  assert.deepEqual(jobContainers('notxilinx/ise:1\tx'), []);
 });
