@@ -64,7 +64,7 @@ uiTest('#2103 browser edition: Generate Programming File of blinky on the Nexys3
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
   await newProject(page, 'Web6', 'blinky', 'nexys3');
   assert.deepEqual(await page.eval(() => window.Silinx.project.device), { family: 'spartan6', part: 'xc6slx16', package: 'csg324', speed: '-3' });
-  assert.match(await page.consoleText(), /Browser edition: projects are stored in this browser .*run the Silinx toolchain here \(the Spartan-3E, and the Spartan-6 of the Nexys3 and the Atlys\)/);
+  assert.match(await page.consoleText(), /Browser edition: projects are stored in this browser .*run the Silinx toolchain here \(the Spartan-3E, the Spartan-6 of the Nexys3 and the Atlys, and the Artix-7 of the Basys 3 and the Nexys A7\)/);
   // the example's UCF (the Basys2's pins) made again for the Nexys3 when the project is made, as the server does (#2430)
   await page.waitConsole(/^constraints\/top\.ucf regenerated for Digilent Nexys3: /m);
   const ucf = await ucfText(page);

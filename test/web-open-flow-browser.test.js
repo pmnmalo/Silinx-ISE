@@ -157,7 +157,7 @@ test('#2103 the Spartan-6 in the browser: the Nexys3\'s and the Atlys\'s parts, 
   assert.deepEqual(browserOpenStatus({ family: 'spartan6', part: 'xc6slx9', package: 'csg324', speed: '-2' }), { available: false, part: 'xc6slx9csg324-2', family: 'spartan6',
     reason: 'the Silinx toolchain for the Spartan-6 is for the XC6SLX16 (CSG324, Nexys3), XC6SLX45 (CSG324, Atlys) only: use an ISE mode for the xc6slx9' });
   assert.equal(browserOpenStatus({ ...nexys3, package: 'ftg256' }).available, false);
-  assert.match(browserOpenStatus({ family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' }).reason, /^the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 only \(xc3s100e cp132, .*xc6slx16 csg324, xc6slx45 csg324\)/);
+  assert.match(browserOpenStatus({ family: 'kintex7', part: 'xc7k70t', package: 'fbg484', speed: '-1' }).reason, /^the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 \(xc3s100e cp132, .*xc6slx16 csg324, xc6slx45 csg324\), and the Artix-7, only; other devices need Xilinx ISE/);
   const s6 = { ...project, device: nexys3 };
   const before = live()?.posted.length || 0;
   const r = runBrowserFlow({ project: s6, files, steps: ['bitgen'], onLine: () => {} });
@@ -193,4 +193,46 @@ test('#2103 the Spartan-6 in the browser: the Nexys3\'s and the Atlys\'s parts, 
     qw.send({ id: qm.id, done: { fetched: 8, bytes: 5e6, pruned: 0 } });
     assert.deepEqual(await q, { fetched: 8, bytes: 5e6, pruned: 0 });
   } finally { delete globalThis.caches; delete globalThis.isSecureContext; }
+});
+
+test('#3143 the 7-series in the browser: the Basys 3\'s part, its bit database and steps; a run sends the 7-series\' nextpnr bundle; prepare asks for its bit database and keeps every nextpnr', async () => {
+  const basys3 = { family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' };
+  assert.deepEqual(browserOpenStatus(basys3), { available: true, part: 'xc7a35tcpg236-1', family: 'artix7', graph: null, bitDb: 'xc7/xc7a35tcpg236-1.json.gz',
+    reason: 'xc7a35tcpg236-1: nextpnr-himbaechel (xilinx) and Project X-Ray\'s bit database (in the browser; the 7-series, an experimental family)' });
+  // (the Nexys A7's, unbuilt: the worker's fetch of its bit database says whether the site has it)
+  assert.equal(browserOpenStatus({ family: 'artix7', part: 'xc7a100t', package: 'csg324', speed: '-1' }).bitDb, 'xc7/xc7a100tcsg324-1.json.gz');
+  // a run: its spec, the XDC given as the constraints, no check of UCF pins (the back end warns of a port with no pin)
+  const xc7 = { ...project, device: basys3, board: 'basys3', constraints: 'top.xdc' };
+  const before = live()?.posted.length || 0;
+  const r = runBrowserFlow({ project: xc7, files: { ...files, 'top.xdc': 'set_property -dict { PACKAGE_PIN W5 IOSTANDARD LVCMOS33 } [get_ports {a}]\n' }, steps: ['bitgen'], onLine: () => {} });
+  const w = await posts(before + 1), m = w.posted.at(-1);
+  assert.deepEqual([m.spec.family, m.spec.part, m.spec.graph, m.spec.steps, m.ucfName], ['artix7', 'xc7a35tcpg236-1', null, ['synth', 'translate', 'par', 'bitgen'], 'top.xdc']);
+  assert.equal(m.nextpnrXc7, 'https://example.test/assets/vendor/nextpnr-xc7/gen/bundle.js');
+  w.send({ id: m.id, done: { ok: true } });
+  assert.deepEqual(await r, { ok: true });
+  await assert.rejects(runBrowserFlow({ project: xc7, files, steps: ['prombit'], onLine: () => {} }), /no step prombit/);
+  globalThis.caches = {};
+  globalThis.isSecureContext = true;
+  globalThis.location = new URL('https://example.test/');
+  try {
+    const p = prepareBrowserFlow(basys3);
+    const pw = live(), pm = pw.posted.at(-1);
+    assert.deepEqual(pm.prepare, { graph: null, part: 'xc7a35tcpg236-1', family: 'artix7', device: 'xc7a35t', pkg: 'cpg236', nextpnr: true });
+    assert.equal(pm.nextpnr, 'https://example.test/assets/vendor/nextpnr-xc7/gen/bundle.js');
+    assert.deepEqual(pm.keep, ['nextpnr-spartan', 'nextpnr-spartan6', 'nextpnr-xc7'].map(d => `https://example.test/assets/vendor/${d}/gen/bundle.js`));
+    pw.send({ id: pm.id, done: { fetched: 9, bytes: 6.5e6, pruned: 0 } });
+    assert.deepEqual(await p, { fetched: 9, bytes: 6.5e6, pruned: 0 });
+    assert.equal(await prepareBrowserFlow(basys3), null, 'prepared already');
+  } finally { delete globalThis.caches; delete globalThis.isSecureContext; delete globalThis.location; }
+});
+
+test('#3143 the built page: the 7-series\' parts with a bit database, the build\'s list (LAYOUT.xc7Parts); another part refused before the run', async () => {
+  globalThis.SILINX_ASSET_LAYOUT = { dir: 'dev-abc/', yosys: '../vendor/yowasp-yosys/1/gen/bundle.js', nextpnrXc7: '../vendor/nextpnr-xc7/0.1.1/gen/bundle.js', xc7Parts: ['xc7a35tcpg236-1'], site: 'https://example.test/' };
+  try {
+    const built = await import('../web/js/open-flow-browser.js?built');
+    assert.equal(built.browserOpenStatus({ family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' }).available, true);
+    assert.deepEqual(built.browserOpenStatus({ family: 'artix7', part: 'xc7a100t', package: 'csg324', speed: '-1' }), { available: false, part: 'xc7a100tcsg324-1', family: 'artix7',
+      reason: 'no 7-series bit database for the xc7a100tcsg324-1 yet (only xc7a35tcpg236-1): use AMD Vivado, in the full application' });
+    assert.equal(built.nextpnrXc7BundleUrl('https://example.test/assets/dev-abc/'), 'https://example.test/assets/vendor/nextpnr-xc7/0.1.1/gen/bundle.js');
+  } finally { delete globalThis.SILINX_ASSET_LAYOUT; }
 });

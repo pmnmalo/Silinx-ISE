@@ -9,7 +9,7 @@ import { blackboxesIn, blackboxModels } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
 import { synthEffort, synthGoal, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
-import { OPEN_STEPS, engineOf, s6MapOf, orderOpenSteps, orderSteps, deviceFamily, isIseFamily } from '/packages/silinx-fpga/src/parts.js';
+import { OPEN_STEPS, engineOf, s6MapOf, orderOpenSteps, orderSteps, deviceFamily, constraintsFormatOf } from '/packages/silinx-fpga/src/parts.js';
 import { familyProfile } from '/core/family-profile.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
@@ -29,7 +29,7 @@ export const BROWSER_DEVICES = {
 // versions with the same Yosys: ../vendor/yowasp-yosys/<its version>/gen/bundle.js), and the site the
 // page opened from a file fetches them from (the site keeps the older releases' folders, so that a
 // downloaded Silinx.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
-const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', nextpnrEcp5: 'vendor/nextpnr-ecp5/gen/bundle.js', nextpnrGowin: 'vendor/nextpnr-himbaechel-gowin/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
+const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrS6: 'vendor/nextpnr-spartan6/gen/bundle.js', nextpnrXc7: 'vendor/nextpnr-xc7/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', nextpnrEcp5: 'vendor/nextpnr-ecp5/gen/bundle.js', nextpnrGowin: 'vendor/nextpnr-himbaechel-gowin/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx/' };
 // (and each asset's SHA-256, checked by the cache, web/js/asset-cache.js #1237: here, in the flow worker's messages
 // and in the Yosys workers' code)
 if (LAYOUT.integrity) globalThis.SILINX_ASSET_INTEGRITY ||= LAYOUT.integrity;
@@ -50,6 +50,10 @@ export const yosysBundleUrl = (base = assetsBase()) => new URL(LAYOUT.yosys, bas
 export const nextpnrBundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnr || 'vendor/nextpnr-spartan/gen/bundle.js', base).href;
 /** The URL of the Spartan-6's nextpnr bundle (nextpnr-himbaechel-spartan6, its chip databases in ../chipdb, #2288). */
 export const nextpnrS6BundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnrS6 || 'vendor/nextpnr-spartan6/gen/bundle.js', base).href;
+/** The URL of the 7-series' nextpnr bundle (nextpnr-himbaechel-xc7, its chip databases in ../chipdb, #3143). */
+export const nextpnrXc7BundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnrXc7 || 'vendor/nextpnr-xc7/gen/bundle.js', base).href;
+// the nextpnr bundle of a family of Silinx's nextpnr packages (its profile's layout: the 7-series'; the Spartan-6's, the Spartan-3E's)
+const nextpnrOf = family => { const f = familyProfile(family).openFlow; return f?.layout === 'nextpnrXc7' ? nextpnrXc7BundleUrl() : f?.bitDb === 's6' ? nextpnrS6BundleUrl() : nextpnrBundleUrl(); };
 /** Where a family's YoWASP tools are (its profile's openFlow): the URL of their bundle (the local server's), or their
  *  package's { url, integrity } on npm's registry (the published editions', #2444); null when this edition has neither. */
 export function ownBundle(flow, base = assetsBase()) {
@@ -89,8 +93,15 @@ export function browserOpenStatus(device = {}) {
     if (!s6.available || !BROWSER_DEVICES[`${dev}/${pkg}`]) return { available: false, part, family, reason: s6.reason };
     return { available: true, part, family, graph: BROWSER_DEVICES[`${dev}/${pkg}`], steps: s6.steps, reason: `${s6.reason} (in the browser)` };
   }
+  // (the 7-series, #3143: Project X-Ray's bit database of the part in bitdb/xc7, the parts the build found there, LAYOUT.xc7Parts;
+  // unbuilt, the worker's fetch says whether the site has it)
+  if (flow?.bitDb === 'xc7' && flow.parts.test(dev)) {
+    const parts = LAYOUT.xc7Parts;
+    if (parts && !parts.includes(part)) return { available: false, part, family, reason: `no 7-series bit database for the ${part} yet (only ${parts.join(', ') || 'none'}): use AMD Vivado, in the full application` };
+    return { available: true, part, family, graph: null, bitDb: `xc7/${part}.json.gz`, reason: `${part}: nextpnr-himbaechel (xilinx) and Project X-Ray's bit database (in the browser; the 7-series, an experimental family)` };
+  }
   if (!flow?.parts?.test(dev)) {
-    return { available: false, part, family, reason: `the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 only (${list}); other devices need Xilinx ISE, in the full application` };
+    return { available: false, part, family, reason: `the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 (${list}), and the Artix-7, only; other devices need Xilinx ISE, in the full application` };
   }
   if (!BROWSER_DEVICES[`${dev}/${pkg}`]) return { available: false, part, family, reason: `no device description of the ${dev} in the ${pkg} package yet (only ${list})` };
   return { available: true, part, family, graph: BROWSER_DEVICES[`${dev}/${pkg}`], reason: `${part}: device description and bit database (in the browser)` };
@@ -173,7 +184,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   const ucf = project.constraints && typeof files[project.constraints] === 'string' ? files[project.constraints] : null;
   // the port bits without a pin: on a board they would go to arbitrary pins (refused, as the server does)
   // (the iCE40's constraints are PCF: its back end says the ports without a pin, #2295)
-  const unplaced = isIseFamily(st.family) ? await unconstrainedPorts(sources, top, ucf || '') : [];   // (a UCF's: the iCE40 warns in its own flow)
+  const unplaced = constraintsFormatOf(project.device) === 'ucf' ? await unconstrainedPorts(sources, top, ucf || '') : [];   // (a UCF's: the iCE40, the 7-series warn in their own flows)
   if (unplaced.length && project.board) throw new Error(`${unplaced.length} top-level port bit(s) have no pin location (LOC) for the ${project.board} board: ${unplaced.slice(0, 12).map(u => u.net).join(', ')}${unplaced.length > 12 ? ', …' : ''}. Assign them in I/O Pin Planning (or remove the board in Design Properties).`);
   if (unplaced.length) onLine(`WARNING:Silinx - ${unplaced.length} port bit(s) have no LOC constraint (${unplaced.slice(0, 8).map(u => u.net).join(', ')}${unplaced.length > 8 ? ', …' : ''}): the Silinx toolchain chooses their pins - do NOT program real hardware with this bitstream`);
   const dev = String(project.device.part).toLowerCase(), pkg = String(project.device.package).toLowerCase();
@@ -192,7 +203,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   const earlier = {};
   for (const [k, v] of Object.entries(files)) if (k.startsWith('build/') && typeof v === 'string') earlier[k.slice(6)] = v;
   if (signal?.aborted) throw cancelled();
-  return workerRun({ spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrOwn: ownTools(st.family), integrity: LAYOUT.integrity || null }, { onLine, onWrite, onReport, signal });
+  return workerRun({ spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrXc7: nextpnrXc7BundleUrl(), nextpnrOwn: ownTools(st.family), integrity: LAYOUT.integrity || null }, { onLine, onWrite, onReport, signal });
 }
 
 // one run in the worker: its lines, files and report to the handlers; resolves its done ({ ok, report, error, view })
@@ -222,7 +233,7 @@ function workerRun(message, { onLine, onWrite = () => {}, onReport = () => {}, s
  */
 export function runBrowserSpec({ spec, sources, onLine, signal = null }) {
   if (signal?.aborted) return Promise.reject(cancelled());
-  return workerRun({ spec, sources, simSources: [], ucf: null, ucfName: null, files: {}, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrOwn: null, integrity: LAYOUT.integrity || null }, { onLine, signal });
+  return workerRun({ spec, sources, simSources: [], ucf: null, ucfName: null, files: {}, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrS6: nextpnrS6BundleUrl(), nextpnrXc7: nextpnrXc7BundleUrl(), nextpnrOwn: null, integrity: LAYOUT.integrity || null }, { onLine, signal });
 }
 
 /**
@@ -237,12 +248,13 @@ export function runBrowserSpec({ spec, sources, onLine, signal = null }) {
 const prepared = new Set();
 export function prepareBrowserFlow(device = {}) {
   const st = browserOpenStatus(device);
-  if (!st.available || !st.graph || prepared.has(st.graph) || globalThis.location?.protocol === 'file:' || !globalThis.isSecureContext || !globalThis.caches) return Promise.resolve(null);
-  prepared.add(st.graph);
+  const key = st.graph || st.bitDb;   // (the 7-series' has no device description: its bit database, #3143)
+  if (!st.available || !key || prepared.has(key) || globalThis.location?.protocol === 'file:' || !globalThis.isSecureContext || !globalThis.caches) return Promise.resolve(null);
+  prepared.add(key);
   const w = getWorker(), id = ++runSeq;
   return new Promise(resolve => {
-    runs.set(id, { onData: data => { if (data.done) { runs.delete(id); resolve(data.done); } }, fail: () => { runs.delete(id); prepared.delete(st.graph); resolve(null); } });
-    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: usesNextpnr(st.family) }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: familyProfile(st.family).openFlow?.bitDb === 's6' ? nextpnrS6BundleUrl() : nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
+    runs.set(id, { onData: data => { if (data.done) { runs.delete(id); resolve(data.done); } }, fail: () => { runs.delete(id); prepared.delete(key); resolve(null); } });
+    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: usesNextpnr(st.family) }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrOf(st.family), keep: [nextpnrBundleUrl(), nextpnrS6BundleUrl(), nextpnrXc7BundleUrl()], root: assetsRoot(), integrity: LAYOUT.integrity || null });
   });
 }
 
