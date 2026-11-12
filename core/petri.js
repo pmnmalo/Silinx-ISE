@@ -17,6 +17,7 @@
 import { portExprCoder, isIdentifier, reservedIn, reservedWarning } from './asm.js';
 import { parseCond, evalCond, parseOutputs, constValue } from './fsm.js';
 import { clone } from './util.js';
+import { pnmlTag, pnmlStartTag, pnmlAttr, pnmlElements, pnmlPosition } from './pnml-scan.js';
 
 export const PETRI_VERSION = 1;
 export const PLACE_R = 22;          // radius of a place (drawing units)
@@ -367,33 +368,30 @@ export function toPnml(model) {
 export function fromPnml(xml, { name = null } = {}) {
   const text = String(xml || '');
   const un = s => s.replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-  const tag = (s, t) => { const r = new RegExp(`<${t}\\b[^>]*>([\\s\\S]*?)</${t}>`).exec(s); return r ? r[1] : null; };
+  const tag = pnmlTag;   // (core/pnml-scan.js: the searches in linear time, #3557)
   const txt = (s, t) => { const x = tag(s, t); return x == null ? null : un((tag(x, 'text') ?? tag(x, 'value') ?? x).trim()); };   // (PIPE writes <value>)
-  const attr = (s, a) => { const r = new RegExp(`\\b${a}="([^"]*)"`).exec(s); return r ? un(r[1]) : null; };
-  const pos = s => { const g = tag(s, 'graphics') || ''; const r = /<position\b[^>]*x="([-\d.]+)"[^>]*y="([-\d.]+)"/.exec(g); return r ? { x: Math.round(+r[1]), y: Math.round(+r[2]) } : null; };
+  const attr = (s, a) => { const v = pnmlAttr(s, a); return v == null ? null : un(v); };
+  const pos = s => { const r = pnmlPosition(tag(s, 'graphics') || ''); return r ? { x: Math.round(+r[0]), y: Math.round(+r[1]) } : null; };
   const json = (s, d) => { try { return JSON.parse(un(s)); } catch { return d; } };
   const safe = (s, i, pre) => { const n = String(s || '').replace(/[^A-Za-z0-9_]/g, '_').replace(/^([^A-Za-z])/, `${pre}$1`).replace(/_+/g, '_'); return n || `${pre}${i}`; };
   const netT = tag(text, 'net') ?? text;
-  const netId = attr((/<net\b[^>]*>/.exec(text) || [''])[0], 'id');
+  const netId = attr(pnmlStartTag(text, 'net'), 'id');
   const head = netT.split(/<(?:place|transition|page)\b/)[0];   // (the net's own name, not a place's)
   const io = json(tag(tag(netT, 'toolspecific') || '', 'io') || '{}', {});
   const m = { name: name || safe(txt(head, 'name') || netId || 'petri_net', 0, 'n'), lang: io.lang, inputs: io.inputs, outputs: io.outputs, clock: io.clock, reset: io.reset, description: io.description, places: [], transitions: [], arcs: [] };
   let i = 0;
-  for (const r of netT.matchAll(/<place\b([^>]*)>([\s\S]*?)<\/place>|<place\b([^>]*)\/>/g)) {
-    const head = r[1] || r[3], body = r[2] || '';
+  for (const [head, body = ''] of pnmlElements(netT, 'place')) {
     const ts = tag(body, 'toolspecific') || '';
     const p = pos(body) || { x: 100 + 120 * (i % 6), y: 100 + 120 * Math.floor(i / 6) };
     m.places.push({ id: attr(head, 'id'), name: safe(txt(body, 'name'), ++i, 'p'), ...p, tokens: int(txt(body, 'initialMarking'), 0), capacity: int(tag(ts, 'capacity'), 1) || Math.max(1, int(txt(body, 'initialMarking'), 0)), outputs: json(tag(ts, 'outputs') || '{}', {}) });
   }
   let j = 0;
-  for (const r of netT.matchAll(/<transition\b([^>]*)>([\s\S]*?)<\/transition>|<transition\b([^>]*)\/>/g)) {
-    const head = r[1] || r[3], body = r[2] || '';
+  for (const [head, body = ''] of pnmlElements(netT, 'transition')) {
     const ts = tag(body, 'toolspecific') || '';
     const p = pos(body) || { x: 160 + 120 * (j % 6), y: 100 + 120 * Math.floor(j / 6) };
     m.transitions.push({ id: attr(head, 'id'), name: safe(txt(body, 'name'), ++j, 't'), ...p, guard: un(tag(ts, 'guard') || ''), outputs: json(tag(ts, 'outputs') || '{}', {}) });
   }
-  for (const r of netT.matchAll(/<arc\b([^>]*?)(?:\/>|>([\s\S]*?)<\/arc>)/g)) {
-    const head = r[1], body = r[2] || '';
+  for (const [head, body = ''] of pnmlElements(netT, 'arc', true)) {
     m.arcs.push({ id: attr(head, 'id') || `a${m.arcs.length + 1}`, from: attr(head, 'source'), to: attr(head, 'target'), weight: int(txt(body, 'inscription'), 1) || 1, inhibitor: /inhibitor/i.test(body) });
   }
   // a place given more tokens than its capacity (another tool's net): the capacity follows
