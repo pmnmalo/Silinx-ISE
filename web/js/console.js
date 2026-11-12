@@ -89,7 +89,7 @@ export function renderDiagnostics() {
   const errs = diags.filter(d => d.severity === 'error'), warns = diags.filter(d => d.severity !== 'error');
   const fill = (el, list, ico) => {
     el.innerHTML = '';
-    if (!list.length) { el.append(h('div', { class: 'ln info' }, 'No messages.')); return; }
+    if (!list.length) { el.append(h('div', { class: 'ln info' }, t('No messages.'))); return; }
     for (const d of list) {
       const hint = hintRow(d);   // plain-language explanation + fix, expandable under the message
       const row = h('div', { class: 'diag' }, icon(ico),

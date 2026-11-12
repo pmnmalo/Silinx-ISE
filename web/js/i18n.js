@@ -31,6 +31,7 @@ import { PINS_PT, PINS_PT_PATTERNS } from './i18n-pins.js';
 import { LABS_PT, LABS_PT_PATTERNS } from './i18n-labs.js';
 import { GRADE_PT, GRADE_PT_PATTERNS } from './i18n-grade.js';
 import { CAPTURE_PT, CAPTURE_PT_PATTERNS } from './i18n-capture.js';
+import { MESSAGES_PT } from './i18n-messages.js';
 import { prefKey } from './prefs.js';
 
 const PT = {
@@ -848,6 +849,7 @@ for (const [k, v] of Object.entries(GRADE_PT)) if (!(k in PT)) PT[k] = v;   // t
 PT_PATTERNS.unshift(...GRADE_PT_PATTERNS);
 for (const [k, v] of Object.entries(CAPTURE_PT)) if (!(k in PT)) PT[k] = v;   // the logic analyzer (#3176)
 PT_PATTERNS.unshift(...CAPTURE_PT_PATTERNS);
+for (const [k, v] of Object.entries(MESSAGES_PT)) if (!(k in PT)) PT[k] = v;   // toasts, dialogs, plain elements' texts (#3539)
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },
