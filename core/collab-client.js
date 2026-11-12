@@ -15,7 +15,10 @@
 //                                    #3182; the room's public key in the owner's open, and in the document's meta),
 //                                    KIND.from (#3360: a follower's awareness as the room forwards it, [KIND.from][its
 //                                    client id, 4 bytes][the sealed frame]: the room's word for who sent it, so that a
-//                                    follower's awareness speaks for that follower only)
+//                                    follower's awareness speaks for that follower only), KIND.to (#3529: the owner's
+//                                    frame for one follower, [KIND.to][its client id, 4 bytes][the sealed frame]: the
+//                                    room gives the sealed frame to that follower only; the whole document a join asks
+//                                    for, which the others have already)
 // The relay never reads them: a hosted one, for the browser edition, can be the same.
 import * as Y from 'yjs';
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
@@ -25,9 +28,9 @@ import { newKey, keyOf, seal, unseal } from './collab-crypto.js';
 import { newSigner, signerOf, verifierOf, signFrame, verifyFrame } from './collab-sign.js';
 import { docTooLarge, docMeter, editOutside, updateOutside, FOLLOW_LIMITS } from './collab-doc.js';
 
-export const PROTOCOL = 3;   // (2: an editor's signed edits, #3182; 3: a follower's awareness marked with its sender, #3360)
+export const PROTOCOL = 4;   // (2: an editor's signed edits, #3182; 3: a follower's awareness marked with its sender, #3360; 4: the owner's frame for one follower, #3529)
 export const SUBPROTOCOL = 'silinx-collab';   // (the WebSockets', server/collab-relay.js's)
-export const KIND = Object.freeze({ update: 1, awareness: 2, edit: 3, from: 4 });
+export const KIND = Object.freeze({ update: 1, awareness: 2, edit: 3, from: 4, to: 5 });
 
 /** A follower's frame as the room forwards it (#3360): marked with the client id it joined with. */
 export function fromFrame(client, frame) {
@@ -38,9 +41,16 @@ export function fromFrame(client, frame) {
   return out;
 }
 
-/** A frame the room marked: { client, frame } (null: not one). */
-export function senderOf(frame) {
-  if (frame[0] !== KIND.from || frame.length < 6) return null;
+/** The owner's frame for one follower (#3529): the room gives `frame` to the follower of that client id only. */
+export function toFrame(client, frame) {
+  const out = fromFrame(client, frame);
+  out[0] = KIND.to;
+  return out;
+}
+
+/** A frame the room marked: { client, frame } (null: not one); kind KIND.to: the owner's frame for one follower. */
+export function senderOf(frame, kind = KIND.from) {
+  if (frame[0] !== kind || frame.length < 6) return null;
   return { client: new DataView(frame.buffer, frame.byteOffset).getUint32(1), frame: frame.subarray(5) };
 }
 
@@ -128,6 +138,8 @@ function participant({ c, room, key, doc, awareness, owner, onEvent }) {
   return {
     room, doc, awareness,
     send,
+    /** A frame for one follower only (#3529: the room gives it to that client). */
+    sendTo: (client, kind, bytes) => c.frame(async () => toFrame(client, await seal(key, room, kind, bytes))),
     /** The participants but this one: [{ client, name, color, role, view: { path, line, ch } | null }]. */
     peers: () => peersOf(awareness, owner),
     /** What this participant looks at (null: nothing open). */
@@ -177,9 +189,11 @@ export async function shareRoom({ url, token = null, doc, user, editors = false,
   let p = null;
   const c = connection(url, WS, [SUBPROTOCOL, ...(token ? [`token.${token}`] : [])], async msg => {
     if (c.first?.(msg)) { c.first = null; return; }
-    if (msg.type === 'join') {   // (someone joined: the whole document and who is in, for them)
-      await p.send(KIND.update, Y.encodeStateAsUpdate(doc));
-      await p.send(KIND.awareness, encodeAwarenessUpdate(awareness, [...awareness.getStates().keys()]));
+    if (msg.type === 'join') {   // (someone joined: the whole document and who is in, for them only, #3529)
+      const client = Number(msg.client);
+      if (!Number.isSafeInteger(client) || client < 0 || client > 0xFFFFFFFF) return;
+      await p.sendTo(client, KIND.update, Y.encodeStateAsUpdate(doc));
+      await p.sendTo(client, KIND.awareness, encodeAwarenessUpdate(awareness, [...awareness.getStates().keys()]));
     } else if (msg.type === 'leave') removeAwarenessStates(awareness, [Number(msg.client)], 'relay');
     else if (msg.type === 'closed') c.closedReason = msg.reason;
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
