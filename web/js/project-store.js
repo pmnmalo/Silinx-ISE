@@ -155,6 +155,20 @@ export function projectFromZip(name, gated, { xiseProject, textOf }) {
   return { json: markUntrusted(p.json), files: p.files, warnings, missing };
 }
 
+/**
+ * An old project bundle (a .silinx.json file: { format: 'silinx-bundle', project, files }, which the browser edition's
+ * File ▸ Download Project Bundle made before #3548) as a Silinx zip's entries: its silinx.json and its text files, each
+ * with its path, for the import gate and projectFromZip; null for a text that is not one.
+ */
+export function bundleEntries(text) {
+  let b;
+  try { b = JSON.parse(text); } catch { return null; }
+  if (!plain(b) || b.format !== 'silinx-bundle') return null;
+  const files = plain(b.files) ? Object.entries(b.files).filter(([path, data]) => typeof data === 'string' && !isDescriptor(path)) : [];
+  // (none: false, not a project description, which projectFromZip says)
+  return [{ path: PROJECT_FILE, data: JSON.stringify(b.project ?? false) }, ...files.map(([path, data]) => ({ path, data }))];
+}
+
 // ------------------------------------------------------------------ the browser's storage
 /** Projects in localStorage (`storage`): { [name]: { json, files: { path: text } } }. */
 export function browserStore(storage = () => globalThis.localStorage) {
@@ -167,7 +181,7 @@ export function browserStore(storage = () => globalThis.localStorage) {
   };
   const persist = () => {
     try { ls().setItem(BROWSER_KEY, JSON.stringify(mem)); }
-    catch (e) { throw new Error(`browser storage is full or unavailable (${e.message}); download your project bundle to keep it`); }
+    catch (e) { throw new Error(`browser storage is full or unavailable (${e.message}); export your project (File > Export Silinx Project (.zip)…) to keep it`); }
   };
   const get = name => all()[name] || fail(`project '${name}' not found`);
   return {

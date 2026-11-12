@@ -29,7 +29,6 @@ const ALLOW = {
   'core/import-gate.js': { why: 'the gate itself' },
   'core/zip.js': { why: 'the zip reader the gate calls (gateZip), with its caps and its check of each entry' },
   'core/collab-codes.js': { why: 'a WebRTC session description a follower or the owner pastes (#3227): sealed with the link\'s key, its size capped inflated; never a project\'s file' },
-  'web/js/menus.js': { why: 'Open Project Bundle hands the file\'s text to api.importBundle', via: 'web/js/api-local.js' },
   'web/js/api.js': { why: 'the local server\'s client: it sends the zip or the .xise to the server, which gates them', via: 'server/xise-routes.js' },
   'web/js/impact.js': { why: 'a bitstream programmed into a board, never kept in a project' },
   'server/mcp-hdl.js': { why: 'simulate writes a VCD into the exchange folder: an output, nothing read' },

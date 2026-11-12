@@ -30,8 +30,8 @@ That's all. Things to know:
   (**Ctrl+K**: type the command's name).
 
 - Your projects are saved **inside this browser** on this computer. To keep a copy or move it to
-  another computer use **File ▸ Download Project Bundle** (and **File ▸ Open Project Bundle** to
-  load it back). Clearing the browser's data deletes them.
+  another computer use **File ▸ Export Silinx Project (.zip)…** (and **File ▸ Import Silinx Project
+  (.zip)…** to load it back; it also opens a `.silinx.json` project bundle of an earlier version). Clearing the browser's data deletes them.
 - **Or keep them in a folder on your disk** (Chrome or Edge): **File ▸ Open Workspace Folder…**
   (also on the Start page) and choose a folder, for instance a new `Silinx-projects` folder in your
   Documents. Each project is then an ordinary folder in it (`silinx.json`, `src/`, `sim/`,

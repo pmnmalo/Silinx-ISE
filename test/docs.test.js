@@ -127,7 +127,7 @@ test('docs: the menu paths they give (File ▸ …, Tools ▸ …) are the inter
     for (const [path_] of read(f).matchAll(new RegExp(`\\b(?:${MENUS.join('|')}) ▸ [^*.,;:)\\n]+`, 'g'))) {
       n++;
       for (const seg of path_.split(' ▸ ').map(s => s.replace(/[…(]+$/, '').trim())) {
-        // 'Download / Open Project Bundle': two items
+        // 'Export / Import Silinx Project': two items
         const alts = /^(\w+) \/ (\w+) (.+)$/.exec(seg);
         const items = alts ? [`${alts[1]} ${alts[3]}`, `${alts[2]} ${alts[3]}`] : [seg];
         for (const it of items) if (!MENUS.includes(it) && !UI.some(s => s.startsWith(it))) bad.push(`${f}: "${it}" in ${path_}`);

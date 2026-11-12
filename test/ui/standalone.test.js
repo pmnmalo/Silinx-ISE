@@ -104,9 +104,10 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   assert.equal(await page.eval(() => document.title), `Silinx ${versionLabel(build)}`);
   assert.equal(await page.eval(() => document.querySelector('#titlebar .app-logo').title), `Silinx ${versionLabel(build)}`);   // (not in the header, #987)
   await page.waitConsole(/Browser edition: projects are stored in this browser/);
-  // File menu: the bundle commands of the standalone edition
+  // File menu: a project moved with the Silinx zip, no project bundle (#3548)
   const file = (await page.openMenu('File')).map((i) => i.label);
-  assert.ok(file.includes('Open Project Bundle…') && file.includes('Download Project Bundle…'), file.join(' | '));
+  assert.ok(file.includes('Import Silinx Project (.zip)…') && file.includes('Export Silinx Project (.zip)…'), file.join(' | '));
+  assert.deepEqual(file.filter((l) => /bundle/i.test(l)), []);
   await page.closeMenus();
   // Share Project… (#3227): here, from a file, refused with its reason (the site's hosts the room in the page)
   assert.ok(file.includes('Share Project…'), file.join(' | '));
@@ -803,7 +804,7 @@ uiTest('browser edition: File ▸ Open Workspace Folder… keeps the projects in
   };
   const files = () => page.eval(async (url) => (await import(url)).dump(window.__fakeRoot), fakeUrl);
   await boot();
-  await page.waitConsole(/Browser edition: projects are stored in this browser \(File > Download Project Bundle to keep a copy; File > Open Workspace Folder… keeps them in a folder on the disk\)\. Implement Design/);
+  await page.waitConsole(/Browser edition: projects are stored in this browser \(File > Export Silinx Project \(\.zip\)… to keep a copy; File > Open Workspace Folder… keeps them in a folder on the disk\)\. Implement Design/);
   assert.equal(await statusStorage(page), 'Storage: this browser');
   assert.deepEqual(await fileMenu(page), [{ label: 'Open Workspace Folder…', disabled: false, title: '' }]);
   assert.deepEqual(await startEntries(page), [
@@ -985,7 +986,7 @@ uiTest('browser edition without the File System Access API (Firefox, Safari): Op
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: NO_FOLDER_API });
   await page.goto(siteUrl);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && document.querySelector('#start-page .start-storage'), [], { what: 'site boot' });
-  await page.waitConsole(/Browser edition: projects are stored in this browser \(File > Download Project Bundle to keep a copy\)\. Implement Design/);
+  await page.waitConsole(/Browser edition: projects are stored in this browser \(File > Export Silinx Project \(\.zip\)… to keep a copy\)\. Implement Design/);
   assert.equal(await statusStorage(page), 'Storage: this browser');
   assert.deepEqual(await fileMenu(page), [{ label: 'Open Workspace Folder…', disabled: true, title: UNSUPPORTED }]);
   assert.deepEqual(await startEntries(page), [
@@ -1315,6 +1316,78 @@ uiTest('#483 browser edition: a hostile zip (paths leaving the project, a broken
   });
   assert.equal(await page.eval(() => [...document.querySelectorAll('#hier .lbl')].some((e) => /^top\b/.test(e.textContent))), true, 'the top module in the hierarchy');
   assert.equal(await page.eval(() => document.getElementById('err-count').textContent), '', 'no error');
+}, { url: () => 'about:blank' });
+
+// #3548: one way to move a project, the Silinx zip: the File menu has no project bundle, in English and in Portuguese;
+// an old bundle (a .silinx.json of File ▸ Download Project Bundle, before) opens through Import Silinx Project, as a zip's
+// silinx.json and files: its name from the file's, through the import gate (#2830), with the zip import's warnings
+uiTest('#3548 browser edition: no project bundle in the File menu (English, Portuguese); an old .silinx.json opens through Import Silinx Project, with its warnings', E, async (page) => {
+  const top = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity top is port (a : in std_logic; y : out std_logic); end;\narchitecture rtl of top is begin y <= a; end;\n';
+  const bundle = { format: 'silinx-bundle', version: 1,
+    project: { name: 'Elsewhere', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }] },
+    files: { 'src/top.vhd': top, 'notes.txt': 'notes\n', '../escape.txt': 'x', 'build/top.bit': 'bits', 'src/odd.bin': 5 } };
+  const file = path.join(env.tmp, 'OldLab.silinx.json');
+  await fs.writeFile(file, JSON.stringify(bundle, null, 1));
+  const boot = () => page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
+  // (by its name: the Silinx interface shows no menu bar, #1321; 'Ficheiro' in Portuguese)
+  const fileMenu = async (m = 'File') => { const l = (await page.openMenu(m)).map((i) => i.label); await page.closeMenus(); return l; };
+  await page.goto(siteUrl);
+  await boot();
+  const en = await fileMenu();
+  assert.ok(en.includes('Import Silinx Project (.zip)…') && en.includes('Export Silinx Project (.zip)…'), en.join(' | '));
+  assert.deepEqual(en.filter((l) => /bundle/i.test(l)), []);
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=file]').accept), '.zip,.json');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .hint')].map((e) => e.textContent)).then((h) => h.slice(1)), ['It also opens a project bundle (.silinx.json) made with an earlier version.']);
+  await page.setFiles('.dlg-overlay input[type=file]', [file]);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=text]').value), 'OldLab', 'the name the file\'s, as a zip\'s');
+  await page.dialogButton('Import');
+  await page.waitFor(() => window.Silinx.project?.name === 'OldLab' && document.querySelector('#hier .row'), [], { what: 'the imported project open' });
+  await page.waitConsole(/Imported Silinx project 'OldLab' \(2 source file\(s\)\)\./);
+  assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /^(WARNING|ERROR)/.test(l)), [
+    'WARNING: files listed in silinx.json but not in the zip: src/gone.vhd',
+    // (the import gate's refusals, #2830)
+    "WARNING: ../escape.txt: not imported: path leaves the project ('..')",
+    "WARNING: build/top.bit: not imported: the project's build folder (build/) is Silinx's own",
+  ]);
+  // a project from outside (#2830): untrusted until the user says so
+  assert.equal(await page.eval(() => window.Silinx.project.trusted), false);
+  assert.deepEqual(await page.eval(() => ({ tree: window.Silinx.diskTree, top: window.Silinx.project.top })), { tree: ['notes.txt', 'src/top.vhd'], top: 'top' });
+  assert.equal(await page.eval(() => document.getElementById('err-count').textContent), '', 'no error');
+  // replaced by a .json that is no bundle: the zip's error, and the project before it back from its snapshot, a Silinx
+  // zip (api.exportZip, the bundle's before)
+  const bad = path.join(env.tmp, 'OldLab.json');
+  await fs.writeFile(bad, '{"format":"other"}');
+  await page.menu('File', 'Import Silinx Project (.zip)…');
+  await page.waitDialog('Import Silinx Project');
+  await page.setFiles('.dlg-overlay input[type=file]', [bad]);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=text]').value), 'OldLab');
+  await page.dialogButton('Import');
+  await page.waitDialog('Replace Project');
+  await page.dialogButton('Yes');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .msg-error'), [], { what: 'the import\'s error' });
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay').innerText), /cannot read zip/);
+  await page.dialogButton('OK');
+  await page.waitNoDialog();
+  await page.waitConsole(/The previous project 'OldLab' was restored\./);
+  await page.waitFor(() => window.Silinx.project?.name === 'OldLab' && document.querySelector('#hier .row'), [], { what: 'the project open again' });
+  assert.deepEqual(await page.eval(() => window.Silinx.diskTree), ['notes.txt', 'src/top.vhd']);
+  // in Portuguese: the same File menu, translated, and the dialog's hint
+  await page.eval(() => localStorage.setItem('silinx.lang', 'pt'));
+  await page.goto(siteUrl);
+  await boot();
+  const pt = await fileMenu('Ficheiro');
+  // (translated where the menu bar is shown, the ISE style interface's: the Silinx one's items are its definition's)
+  const shown = await page.eval(() => !!document.querySelector('#menubar .item')?.getClientRects().length);
+  const [imp, exp] = shown ? ['Importar Projeto Silinx (.zip)…', 'Exportar Projeto Silinx (.zip)…'] : ['Import Silinx Project (.zip)…', 'Export Silinx Project (.zip)…'];
+  assert.ok(pt.includes(imp) && pt.includes(exp), pt.join(' | '));
+  assert.deepEqual(pt.filter((l) => /bundle|pacote/i.test(l)), []);
+  assert.equal(pt.length, en.length);
+  await page.menu('Ficheiro', imp);
+  await page.waitDialog('Importar Projeto Silinx');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .hint')].map((e) => e.textContent)).then((h) => h.slice(1)), ['Também abre um pacote de projeto (.silinx.json) feito com uma versão anterior.']);
+  await page.dialogButton('Cancelar');
 }, { url: () => 'about:blank' });
 
 uiTest('#2826 browser edition (the Pages site): a design\'s link and an example\'s, opened again unchanged with no question', E, async (page) => {

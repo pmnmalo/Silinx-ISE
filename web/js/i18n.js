@@ -51,7 +51,6 @@ const PT = {
   'New Project…': 'Novo Projeto…', 'Open Project…': 'Abrir Projeto…', 'Close Project': 'Fechar Projeto', 'Trust Project': 'Confiar no Projeto', 'Check Design': 'Verificar Projeto', 'Show the waveform': 'Mostrar a forma de onda', 'Open the HDL here, in Simulation': 'Abrir o HDL aqui, na Simulação',
   'Import Xilinx ISE Project (.zip)…': 'Importar Projeto Xilinx ISE (.zip)…', 'Export Xilinx ISE Project (.zip)…': 'Exportar Projeto Xilinx ISE (.zip)…',
   'Import Silinx Project (.zip)…': 'Importar Projeto Silinx (.zip)…', 'Export Silinx Project (.zip)…': 'Exportar Projeto Silinx (.zip)…',
-  'Download Project Bundle…': 'Descarregar Pacote do Projeto…', 'Open Project Bundle…': 'Abrir Pacote do Projeto…',
   // the browser edition: where the projects are kept (in the browser storage, or in a folder on the disk)
   'Open Workspace Folder…': 'Abrir Pasta de Trabalho…', 'Open Workspace Folder': 'Abrir Pasta de Trabalho',
   'Copy Browser Projects to the Folder': 'Copiar os Projetos do Navegador para a Pasta', 'Use Browser Storage': 'Usar o Armazenamento do Navegador',
@@ -526,6 +525,7 @@ Object.assign(PT, {
   'Device': 'Dispositivo', 'Top': 'Topo', 'Board': 'Placa', 'Last Used': 'Último uso', '.zip file:': 'Ficheiro .zip:',
   'Import a whole Silinx project from a .zip made with File ▸ Export Silinx Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).':
     'Importe um projeto Silinx completo a partir de um .zip feito com Ficheiro ▸ Exportar Projeto Silinx (silinx.json e todos os ficheiros do projeto: fontes, diagramas ASM, esquemáticos, restrições, ficheiros de simulação).',
+  'It also opens a project bundle (.silinx.json) made with an earlier version.': 'Também abre um pacote de projeto (.silinx.json) feito com uma versão anterior.',
   'Easiest setup on any OS:': 'Configuração mais simples em qualquer sistema operativo:',
   'build the private Docker image with the Silinx kit (docker/ise/README.md):': 'construa a imagem Docker privada com o kit do Silinx (docker/ise/README.md):',
   '(Windows: build-ise-image.ps1). It configures Silinx automatically.': '(Windows: build-ise-image.ps1). Configura o Silinx automaticamente.',
