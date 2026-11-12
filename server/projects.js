@@ -12,6 +12,7 @@ import { realOf, nativeRealOf, hiddenName, within } from './paths.js';
 import { topNameError } from './ident.js';
 import { normalizePath } from '../core/import-gate.js';
 import { foldName } from '../core/fold-name.js';
+import { fsFailure } from './fs-error.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
@@ -56,6 +57,9 @@ const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 export class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
+// a file system error on `full` (in the project's folder `dir`) as an HttpError with the project's path (#3537), any
+// other error as it is
+const fsHttpError = async (e, dir, full) => { const f = await fsFailure(e, dir, full); return f ? new HttpError(f.status, f.message) : e; };
 
 export function projectDir(name) {
   if (typeof name !== 'string' || !NAME_RE.test(name)) throw new HttpError(400, `invalid project name '${name}'`);
@@ -404,6 +408,7 @@ export async function readFile(name, rel) {
 export async function writeFile(name, rel0, text) {
   const dir = projectDir(name);
   const full = safeJoin(dir, rel0);
+  if (typeof text !== 'string') throw new HttpError(400, 'text: the whole text of the file');
   // the path as the project lists it (./src/a.vhd and src//a.vhd are src/a.vhd, #1229); silinx.json is the
   // project's description, written by the project's own routes (as the browser store refuses it)
   const rel = relKey(dir, full);
@@ -416,8 +421,12 @@ export async function writeFile(name, rel0, text) {
   const inBuild = /^build\//.test(rel);
   const gated = normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
   if (gated.reason) throw new HttpError(400, `'${rel0}': not written: ${gated.reason}`);
-  await fs.mkdir(path.dirname(full), { recursive: true });
-  await writeAtomic(full, text);   // (a reader, or a crash, never sees a half-written / empty file)
+  // (onto a folder, or through a file: the project's path in the message, #3537)
+  if ((await fs.stat(full).catch(() => null))?.isDirectory()) throw new HttpError(400, `'${rel}' is a folder, not a file`);
+  try {
+    await fs.mkdir(path.dirname(full), { recursive: true });
+    await writeAtomic(full, text);   // (a reader, or a crash, never sees a half-written / empty file)
+  } catch (e) { throw await fsHttpError(e, dir, full); }
   // Register HDL files automatically (not the generated ones in build/, e.g. the netlists of the open
   // synthesis); a file written again is back in the project (not excluded).
   const lang = langOf(rel);
@@ -458,8 +467,10 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
     if (isDir) await refuseHiddenInside(dir, from, src, 'renamed');
     if (isDir && src !== dst && (dst + path.sep).startsWith(src + path.sep)) throw new HttpError(400, `cannot move '${from}' into itself`);
     if (src !== dst && await exists(dst) && src.toLowerCase() !== dst.toLowerCase()) throw new HttpError(409, `'${to}' already exists`);
-    await fs.mkdir(path.dirname(dst), { recursive: true });
-    await fs.rename(src, dst);
+    try {
+      await fs.mkdir(path.dirname(dst), { recursive: true });
+      await fs.rename(src, dst);
+    } catch (e) { throw await fsHttpError(e, dir, dst); }
     const pj = await readProject(name);
     // a file maps exactly; a folder maps every path below it
     const remap = p => {
@@ -483,8 +494,9 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
 
 /** Delete a project file or folder (recursively) and unregister the files it contained. trash (the user's Delete File /
  *  Delete Folder, the MCP's delete_file, #3364): moved to the workspace's .trash folder, .trash/<project>-<time>/<path>,
- *  as a deleted project is, from where it can be moved back -> { trashed: its path in the workspace, else null }. */
-export async function deleteFile(name, rel, { trash = false } = {}) {
+ *  as a deleted project is, from where it can be moved back -> { trashed: its path in the workspace, else null }.
+ *  mustExist (the route's, the MCP's, #3537): nothing at that path is a 404, else nothing to do. */
+export async function deleteFile(name, rel, { trash = false, mustExist = false } = {}) {
   const dir = projectDir(name);
   const full = safeJoin(dir, rel);
   if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
@@ -494,8 +506,12 @@ export async function deleteFile(name, rel, { trash = false } = {}) {
   let trashed = null;
   await withProjectLock(name, async () => {
     await refuseHiddenInside(dir, rel, full, 'deleted');
-    if (trash && await exists(full)) trashed = await toTrash(name, full, key);
-    else await fs.rm(full, { recursive: true, force: true });
+    const there = await fs.lstat(full).then(() => true, () => false);
+    if (mustExist && !there) throw new HttpError(404, `no file or folder '${key}' in the project '${name}'`);
+    try {
+      if (trash && there) trashed = await toTrash(name, full, key);
+      else await fs.rm(full, { recursive: true, force: true });
+    } catch (e) { throw await fsHttpError(e, dir, full); }
     const pj = await readProject(name);
     const gone = p => p === key || p.startsWith(key + '/');
     const before = JSON.stringify(pj);

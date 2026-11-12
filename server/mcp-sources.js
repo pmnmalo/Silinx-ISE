@@ -176,7 +176,7 @@ export const SOURCE_TOOLS = [
       if (folder && !tree.some(f => f.startsWith(`${file}/`))) throw toolError(`no file or folder '${file}' in the project '${name}'`);
       const count = folder ? tree.filter(f => f.startsWith(`${file}/`)).length : 1;
       let r;
-      try { r = await P.deleteFile(name, file, { trash: true }); } catch (e) { throw toolError(e.message); }
+      try { r = await P.deleteFile(name, file, { trash: true, mustExist: true }); } catch (e) { throw toolError(e.message); }
       const lines = await fixMissingTops(name);
       return { text: [...lines, `${file} deleted (${folder ? `a folder: ${count} file(s); ` : ''}moved to the workspace's .trash folder: ${r.trashed}).`].join('\n'), data: { project: name, deleted: file, folder, files: count, trashed: r.trashed, ...await tops(name), messages: lines } };
     },

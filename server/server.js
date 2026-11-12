@@ -19,9 +19,11 @@ import { attachRelay } from './collab-relay.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// (an error with no status that is the system's or Node's own, whose message names the server's paths: "internal server
+// error", as the final handler answers, #3537)
 const wrap = fn => (req, res) => Promise.resolve().then(() => fn(req, res)).then(
   out => { if (out !== undefined && !res.headersSent) res.json(out); },
-  err => res.status(err.status || 500).json({ error: err.message }),
+  err => res.status(err.status || 500).json({ error: !err.status && (err.syscall || /^ERR_/.test(err.code || '')) ? 'internal server error' : err.message }),
 );
 
 const cspCache = new Map();
@@ -203,7 +205,7 @@ export async function createApp({ host = '127.0.0.1', token = null, codes = crea
   }));
   // (trash=1: the user's Delete File / Delete Folder, into the workspace's .trash, #3364)
   api.delete('/projects/:p/file', wrap(async req => {
-    const { trashed } = await P.deleteFile(req.params.p, req.query.path, { trash: req.query.trash === '1' });
+    const { trashed } = await P.deleteFile(req.params.p, req.query.path, { trash: req.query.trash === '1', mustExist: true });
     return { ok: true, ...(trashed ? { trashed } : {}) };
   }));
   // what changes in the project's folder made by another process (#2843): server-sent events, one { project,

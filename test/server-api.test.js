@@ -204,7 +204,7 @@ test('files: a hidden file or folder is not written through the file route (#303
   assert.equal((await call('GET', '/projects/Hid/file?path=build/open/top.json')).body, '{}\n');
 });
 
-test('files: missing / traversing / absolute paths are refused, missing files are 404, I/O errors are 500', async () => {
+test('files: missing / traversing / absolute paths are refused, missing files are 404, file system errors by the project\'s path (#3537)', async () => {
   await call('POST', '/projects', { name: 'Trav' });
   const bad = ['../Files/src/top.v', '../../etc/passwd', '/etc/passwd', 'src/../../x', '..'];
   for (const p of bad) {
@@ -227,12 +227,32 @@ test('files: missing / traversing / absolute paths are refused, missing files ar
   assert.equal(r.status, 404);
   assert.match(r.body.error, /file 'src\/none.v' not found/);
   assert.equal((await call('GET', '/projects/Trav/file?path=src')).status, 404);   // a folder is not a file
-  // writing over a folder is an internal error (500), reported as JSON
-  r = await call('PUT', '/projects/Trav/file?path=src', 'x');
-  assert.equal(r.status, 500);
-  assert.match(r.body.error, /EISDIR|EPERM|illegal operation/i);
-  // deleting a file that is not there is fine (idempotent)
-  assert.equal((await call('DELETE', '/projects/Trav/file?path=nothing.txt')).status, 200);
+  // #3537: a file system error answered with the project's path and a plain message, never Node's own with the
+  // server's absolute path: onto a folder, through a file, a text that is no string; deleting nothing is a 404
+  const plain = async (m, p, body, status, error) => {
+    const r = await call(m, `/projects/Trav/file?path=${encodeURIComponent(p)}`, body);
+    assert.deepEqual([r.status, r.body], [status, { error }], `${m} ${p}`);
+  };
+  assert.equal((await call('PUT', '/projects/Trav/file?path=src/a.v', 'module a; endmodule\n')).status, 200);
+  await plain('PUT', 'src', 'x', 400, "'src' is a folder, not a file");
+  await plain('PUT', 'src/a.v/b.v', 'x', 400, "'src/a.v' is a file, not a folder");
+  await plain('PUT', 'src/a.v/c/d.v', 'x', 400, "'src/a.v' is a file, not a folder");
+  await plain('PUT', 'src/b.v', { text: 12 }, 400, 'text: the whole text of the file');
+  await plain('DELETE', 'nothing.txt', undefined, 404, "no file or folder 'nothing.txt' in the project 'Trav'");
+  await plain('DELETE', 'src/a.v/x', undefined, 404, "no file or folder 'src/a.v/x' in the project 'Trav'");
+  r = await call('POST', '/projects/Trav/rename', { from: 'src/a.v', to: 'src/a.v/b.v' });
+  assert.deepEqual([r.status, r.body], [400, { error: "'src/a.v' is a file, not a folder" }]);
+  assert.equal(fss.readFileSync(path.join(P.workspaceDir(), 'Trav', 'src', 'a.v'), 'utf8'), 'module a; endmodule\n');
+  assert.equal(fss.existsSync(path.join(P.workspaceDir(), 'Trav', 'src', 'b.v')), false);
+  // any other error of the system with no status: "internal server error", as the final handler says (no path)
+  if (process.platform !== 'win32' && process.getuid?.() !== 0) {
+    const locked = path.join(P.workspaceDir(), 'Trav', 'locked');
+    fss.mkdirSync(locked); fss.chmodSync(locked, 0);
+    try {
+      r = await call('GET', '/projects/Trav');
+      assert.deepEqual([r.status, r.body], [500, { error: 'internal server error' }]);
+    } finally { fss.chmodSync(locked, 0o755); fss.rmdirSync(locked); }
+  }
   // nothing escaped the project
   assert.ok(!fss.existsSync(path.join(P.workspaceDir(), 'x')));
 });
