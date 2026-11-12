@@ -135,7 +135,9 @@ read that user's files has the server too.
   authenticated with it (AES-GCM's additional data: a date changed, the key no longer opens it), and in the gist's
   description, so that making a short link deletes the user's expired Silinx gists without their keys (only gists
   whose description and single file are Silinx's). An expired link is refused by Silinx, but its gist stays on GitHub
-  until it is deleted: anyone who kept the link and the gist could still decrypt it by hand.
+  until it is deleted: anyone who kept the link and the gist could still decrypt it by hand. Short Links… (#3635) lists
+  and deletes only those gists of the account; the links this browser made (with their keys) are kept where its
+  sign-in is (localStorage; at `file:`, the tab only), never sent anywhere.
 - At every release, CI scans for private data (e-mail addresses, computer names, network addresses and
   paths, keys and tokens, Xilinx files, a bitstream under any name) the tracked files, text, compressed
   and binary, and every line, binary file and commit message, author and committer ever added to `main` (#3366); CodeQL analyses

@@ -146,4 +146,36 @@ export const LINK_TOOLS = [
         untrusted: source.kind === 'design' ? 'the link\'s design: its names, and the warnings, which name its files' : warnings.length ? 'the warnings' : undefined };
     },
   },
+  // File ▸ Short Links… (#3635, web/js/short-links.js): the short links of the account of the server's GH_TOKEN
+  {
+    name: 'short_links', title: 'Short Links (list)',
+    description: 'The short links (#gist=…) of the GitHub account of the server\'s token (GH_TOKEN), as File ▸ Short Links… lists them: its Silinx gists, the newest first, each with when it was made, when it expires (or never) and whether it has expired. The link itself is not on GitHub (its key is only in the link): project_link short\'s answer is the only copy.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    async run() {
+      const GH = await import('./git-github.js');
+      let list;
+      try { list = await GH.listShortLinks(); } catch (err) { throw toolError([err.message, ...(err.hint ? [`Hint: ${err.hint}`] : [])].join('\n')); }
+      const day = iso => String(iso || '').slice(0, 10);
+      const lines = list.length ? [`${list.length} short link${list.length > 1 ? 's' : ''}, the newest first:`, ...list.map(g => `${g.id}: made ${day(g.created) || '?'}, ${g.expires ? `${g.expired ? 'expired' : 'expires'} ${day(g.expires)}` : 'never expires'} (${g.url})`)] : ['No short link in the account.'];
+      return { text: lines.join('\n'), data: { links: list } };
+    },
+  },
+  {
+    name: 'delete_short_link', title: 'Short Links (delete)',
+    description: 'Delete short links of the account of the server\'s token (GH_TOKEN), as Short Links…\'s Delete Selected and Delete Expired do: gists (their ids, from short_links), or the expired ones (expired: true); only Silinx\'s gists of the account, any other id refused before anything is deleted. A deleted link no longer opens.',
+    inputSchema: { type: 'object', properties: {
+      gists: { type: 'array', items: { type: 'string' }, description: 'The gists\' ids (short_links).' },
+      expired: { type: 'boolean', description: 'Delete every expired short link instead.' },
+    }, additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    async run({ gists = [], expired = false }) {
+      if (!expired && !gists.length) throw toolError('give gists (their ids: short_links) or expired: true');
+      if (expired && gists.length) throw toolError('give gists or expired: true, not both');
+      const GH = await import('./git-github.js');
+      let deleted;
+      try { deleted = await GH.deleteShortLinks({ ids: gists, expired }); } catch (err) { throw toolError([err.message, ...(err.hint ? [`Hint: ${err.hint}`] : [])].join('\n')); }
+      return { text: `${deleted.length} short link${deleted.length === 1 ? '' : 's'} deleted${expired ? ' (the expired ones)' : ''}${deleted.length ? `: ${deleted.join(', ')}` : ''}.`, data: { deleted } };
+    },
+  },
 ];

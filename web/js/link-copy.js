@@ -16,6 +16,7 @@ import { layoutNow } from './tasks.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateZip } from '/core/import-gate.js';
 import { EXPIRY_DAYS } from '/core/gist-link.js';
+import { rememberLink, shortLinksDialog } from './short-links.js';
 
 const VIEWS = [['', 'Open the project only'], ['try', 'Try it (a drawing\'s simulation)'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
 /** The address of this app, the base of its links (its hash, a token or a link, left out). */
@@ -72,7 +73,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   // (a short link's expiry, #3629: core/gist-link.js EXPIRY_DAYS; the full link's never)
   const EXPIRY = { 0: 'Never', 7: 'In a week', 30: 'In a month', 182: 'In six months', 365: 'In a year' };
   const expiry = h('select', { 'data-field': 'expires', disabled: true }, ...EXPIRY_DAYS.map(d => h('option', { value: String(d) }, EXPIRY[d])));
-  let link = null, opts = null, made = null;
+  let link = null, opts = null, made = null, manage = false, closeIt = null;
   const update = () => {
     expiry.disabled = !short.checked;
     link = null;
@@ -107,6 +108,7 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   update();
   const r = await dialog({
     title: 'Copy Link', width: 560,
+    onOpen: ({ close }) => { closeIt = () => close(null); },
     body: h('div', {},
       h('div', { class: 'hint' }, `A link that opens '${name}' in Silinx, for slides or a message: the whole project is inside the link (no file to host). Anyone with the link has every file of the project, its comments too.`),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
@@ -119,7 +121,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
           h('label', { class: 'link-full' }, full, h('span', {}, 'The full link: the project inside it (needs nothing, but long)')), h('br'),
           h('label', { class: 'link-short' }, short, h('span', {}, 'A short link: the project encrypted in a secret gist of your GitHub account'))),
         h('label', {}, 'Expires:'), expiry),
-      out, info, err, signIn),
+      out, info, err, signIn,
+      h('div', { class: 'link-manage' }, h('a', { href: '#', onclick: e => { e.preventDefault(); manage = true; closeIt?.(); } }, 'Manage short links…'))),
     buttons: [{ label: 'Copy Link', primary: true, value: true, validate: async () => {
       if (!link) return false;
       if (!short.checked) return true;
@@ -133,11 +136,13 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
         const g = await api.gistSave(design, Number(expiry.value));
         made = g;
         link = makeLink(linkBase(), { gist: `${g.id}.${g.key}`, ...opts });
+        rememberLink({ id: g.id, link, project: name, expires: g.expires || null });   // (Short Links…, #3635)
         out.value = link;
         return true;
       } catch (e) { err.textContent = e.hint ? `${e.message}: ${e.hint}` : e.message; return false; }
     } }, { label: 'Cancel', value: null }],
   });
+  if (manage) { shortLinksDialog(); return null; }
   if (!r || !link) return null;
   writeClip('text', link);
   if (short.checked) {

@@ -73,3 +73,36 @@ test('#3629 project_link short expires_days: its date said; an expired link refu
   assert.equal((await call('project_link', { project: 'clock1', expires_days: 7 })).text, 'project_link: expires_days: only a short link expires (give short: true)');
   assert.equal((await call('project_link', { project: 'clock1', short: true, expires_days: 4000 })).text, 'project_link: expires_days: a whole number of days, 1 to 3650 (or 0: never)');
 });
+
+// #3635: short_links lists the account's short links, delete_short_link deletes some or the expired ones; another gist
+// refused, nothing deleted; the arguments checked
+test('#3635 short_links and delete_short_link: the account\'s short links listed, deleted; another gist refused', async () => {
+  const { saveGist } = await import('../core/gist-link.js');
+  const { githubClient } = await import('../core/github-api.js');
+  for (const id of [...gh.gists.keys()]) gh.gists.delete(id);
+  assert.equal((await ok('short_links')).text, 'No short link in the account.');
+  const client = githubClient({ fetch: gh.fetch, token: () => gh.token });
+  // (the live one first: making a short link deletes the expired ones)
+  const live = await saveGist(client, 'live', { days: 30 });
+  const old = await saveGist(client, 'old', { days: 1, now: Date.now() - 10 * 86400000 });
+  gh.gists.set('e'.repeat(32), { public: false, owner: 'student', description: 'notes', files: { 'n.md': { filename: 'n.md', content: 'x' } } });
+  const r = await ok('short_links');
+  const day = (iso) => iso.slice(0, 10), today = new Date().toISOString().slice(0, 10);
+  assert.equal(r.text, ['2 short links, the newest first:',
+    `${old.id}: made ${today}, expired ${day(old.expires)} (https://gist.github.com/student/${old.id})`,
+    `${live.id}: made ${today}, expires ${day(live.expires)} (https://gist.github.com/student/${live.id})`].join('\n'));
+  assert.deepEqual(r.data.links.map((g) => [g.id, g.expired]), [[old.id, true], [live.id, false]]);
+  // refused: nothing given, both given, another gist (nothing deleted)
+  assert.equal((await call('delete_short_link', {})).text, 'delete_short_link: give gists (their ids: short_links) or expired: true');
+  assert.equal((await call('delete_short_link', { gists: [live.id], expired: true })).text, 'delete_short_link: give gists or expired: true, not both');
+  assert.equal((await call('delete_short_link', { gists: [live.id, 'e'.repeat(32)] })).text, `delete_short_link: '${'e'.repeat(32)}' is not a short link of your GitHub account`);
+  assert.ok(gh.gists.has(live.id));
+  assert.equal((await ok('delete_short_link', { expired: true })).text, `1 short link deleted (the expired ones): ${old.id}.`);
+  assert.deepEqual((await ok('delete_short_link', { gists: [live.id] })).data.deleted, [live.id]);
+  assert.deepEqual([...gh.gists.keys()], ['e'.repeat(32)]);
+  // no token: said with its hint
+  delete process.env.GH_TOKEN;
+  try {
+    assert.equal((await call('short_links')).text, 'short_links: the short links need a GitHub token on this server\nHint: Set GH_TOKEN before starting Silinx (with GitHub\'s command line: GH_TOKEN=$(gh auth token)); Silinx never stores it.');
+  } finally { process.env.GH_TOKEN = gh.token; }
+});

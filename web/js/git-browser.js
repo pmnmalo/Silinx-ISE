@@ -123,5 +123,15 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
       const { id, key, expires, deleted } = await saveGist(githubClient({ fetch: (...a) => globalThis.fetch(...a), token, api: githubSettings().api }), design, { days });
       return { id, key, expires, deleted: deleted.length };
     },
+    // (#3635: the short links of the signed-in user, listed and deleted)
+    gistList: async () => {
+      const { listGists } = await import('../../core/gist-link.js');
+      return listGists(githubClient({ fetch: (...a) => globalThis.fetch(...a), token, api: githubSettings().api }));
+    },
+    gistDelete: async ({ ids = [], expired = false } = {}) => {
+      const { deleteGists, deleteExpiredGists } = await import('../../core/gist-link.js');
+      const client = githubClient({ fetch: (...a) => globalThis.fetch(...a), token, api: githubSettings().api });
+      return expired ? deleteExpiredGists(client) : deleteGists(client, ids);
+    },
   };
 }

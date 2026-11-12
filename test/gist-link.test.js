@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { encryptDesign, decryptDesign, saveGist, loadGist, parseGistRef, expiryDate, deleteExpiredGists, EXPIRY_DAYS, GIST_FILE, GIST_FORMAT, GIST_MAX, GIST_ANSWER_MAX } from '../core/gist-link.js';
+import { encryptDesign, decryptDesign, saveGist, loadGist, parseGistRef, expiryDate, deleteExpiredGists, listGists, deleteGists, EXPIRY_DAYS, GIST_FILE, GIST_FORMAT, GIST_MAX, GIST_ANSWER_MAX } from '../core/gist-link.js';
 import { LINK_LIMITS, encodeDesign, decodeDesign, makeLink, parseLink } from '../core/design-link.js';
 import { githubClient } from '../core/github-api.js';
 import { fakeGitHub } from './fake-github.mjs';
@@ -226,4 +226,33 @@ test('#3629 deleteExpiredGists: every page read before any deletion (250 expired
   assert.equal(gh.gists.size, 251);
   assert.equal((await deleteExpiredGists(client, { now: NOW, keep: kept.id })).length, 250);
   assert.deepEqual([...gh.gists.keys()], [kept.id]);
+});
+
+// #3635: Short Links…'s list and deletions: only the user's Silinx gists, newest first, with their dates; a deletion of
+// any other gist refused before anything is deleted
+test('#3635 listGists: the user\'s Silinx gists only, the newest first, made, expires, expired; deleteGists: theirs only', async () => {
+  const gh = fakeGitHub();
+  const client = githubClient({ fetch: gh.fetch, token: () => gh.token });
+  assert.deepEqual(await listGists(client), []);
+  const a = await saveGist(client, 'a', { days: 1, now: NOW - 10 * DAY });
+  const b = await saveGist(client, 'b', { days: 30, now: NOW - 10 * DAY });
+  const c = await saveGist(client, 'c', { now: NOW - 10 * DAY });
+  const file = gh.gists.get(a.id).files[GIST_FILE];
+  gh.gists.set('e'.repeat(32), { public: false, owner: 'student', description: 'notes', files: { 'n.md': { filename: 'n.md', content: 'x' } } });
+  gh.gists.set('f'.repeat(32), { public: true, owner: 'student', description: gh.gists.get(c.id).description, files: { [GIST_FILE]: file } });
+  gh.gists.set('d'.repeat(32), { public: false, owner: 'student', description: `${gh.gists.get(c.id).description} (mine)`, files: { [GIST_FILE]: file } });
+  const list = await listGists(client, { now: NOW });
+  assert.deepEqual(list.map((g) => [g.id, g.expires, g.expired]), [[c.id, null, false], [b.id, b.expires, false], [a.id, a.expires, true]]);
+  assert.ok(list.every((g) => g.url === `https://gist.github.com/student/${g.id}` && /^\d{4}-\d\d-\d\dT/.test(g.created)), JSON.stringify(list));
+  // deleted: theirs; another gist among them refused, nothing deleted; none given
+  await rejects(deleteGists(client, [b.id, 'e'.repeat(32)], { now: NOW }), `'${'e'.repeat(32)}' is not a short link of your GitHub account`, 404);
+  await rejects(deleteGists(client, [b.id, 'f'.repeat(32)], { now: NOW }), `'${'f'.repeat(32)}' is not a short link of your GitHub account`, 404);
+  assert.ok(gh.gists.has(b.id));
+  await rejects(deleteGists(client, []), 'no short link to delete');
+  assert.deepEqual(await deleteGists(client, [b.id, b.id], { now: NOW }), [b.id]);
+  assert.deepEqual((await listGists(client, { now: NOW })).map((g) => g.id), [c.id, a.id]);
+  assert.deepEqual(await deleteExpiredGists(client, { now: NOW }), [a.id]);
+  assert.deepEqual([...gh.gists.keys()].sort(), [c.id, 'd'.repeat(32), 'e'.repeat(32), 'f'.repeat(32)].sort());
+  // signed out: GitHub's refusal
+  await assert.rejects(listGists(githubClient({ fetch: gh.fetch, token: () => null })), { message: 'GitHub refused the sign-in (Requires authentication)' });
 });

@@ -113,6 +113,21 @@ export async function makeGist(design, { days = 0 } = {}) {
   const f = GITHUB_TESTING.fetch || globalThis.fetch;
   return saveGist(githubClient({ fetch: (...a) => f(...a), token, hints: HINTS }), design, { days });
 }
+/** The short links of the token's account (#3635, core/gist-link.js listGists). */
+export async function listShortLinks() {
+  if (!token()) throw new GitHubError('the short links need a GitHub token on this server', 'Set GH_TOKEN before starting Silinx (with GitHub\'s command line: GH_TOKEN=$(gh auth token)); Silinx never stores it.', 409);
+  const { listGists } = await import('../core/gist-link.js');
+  const f = GITHUB_TESTING.fetch || globalThis.fetch;
+  return listGists(githubClient({ fetch: (...a) => f(...a), token, hints: HINTS }));
+}
+/** Short links of the token's account deleted: `ids`, or the expired ones (expired: true) -> the ids deleted. */
+export async function deleteShortLinks({ ids = [], expired = false } = {}) {
+  if (!token()) throw new GitHubError('the short links need a GitHub token on this server', 'Set GH_TOKEN before starting Silinx (with GitHub\'s command line: GH_TOKEN=$(gh auth token)); Silinx never stores it.', 409);
+  const { deleteGists, deleteExpiredGists } = await import('../core/gist-link.js');
+  const f = GITHUB_TESTING.fetch || globalThis.fetch;
+  const client = githubClient({ fetch: (...a) => f(...a), token, hints: HINTS });
+  return expired ? deleteExpiredGists(client) : deleteGists(client, ids);
+}
 /** A short link's design, read from its gist (no token needed). */
 export async function readGist(ref) {
   const { loadGist } = await import('../core/gist-link.js');
