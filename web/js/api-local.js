@@ -110,7 +110,7 @@ function fakeJob(kind, lines, status = 'error', error) {
   addJob({ id, kind, status, lines, next: lines.length, error });
   return { job: id };
 }
-const FULL_APP = 'the full Silinx application (run `npm start` in the Silinx folder and open http://127.0.0.1:8642; File > Export Silinx Project (.zip)… moves a project there)';
+const FULL_APP = 'the full Silinx application (run `npm start` in the Silinx folder and open http://127.0.0.1:8642; File > Export Project (.zip)… moves a project there)';
 // the board's Digilent USB, or an iCE40 board's FTDI (#2298): the user chooses it once; the browser remembers the permission
 async function adeptDevice(vendor = ADEPT_VENDOR, filters = ADEPT_FILTERS) {
   const usb = globalThis.navigator?.usb;
@@ -461,7 +461,7 @@ export const api = {
     const r = xiseProject(name, x.text, Object.fromEntries(g.files.filter(f => f !== x && f.text != null).map(f => [f.path, f.text])));
     return { project: await ops.put(name, markUntrusted(r.json), r.files), warnings: [...gateMessages(g), ...r.warnings] };
   },
-  syncXise: async () => fail('not available in the standalone edition (use File > Export Xilinx ISE Project)'),
+  syncXise: async () => fail('not available in the standalone edition (use File > Export Project (.zip)…, Xilinx ISE)'),
   exportZip: async (name, kind = 'xilinx') => {
     const p = await store.load(name);
     if (kind === 'silinx') {   // the whole Silinx project as it is

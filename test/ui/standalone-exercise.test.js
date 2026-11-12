@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { setupUi, uiTest, ROOT } from './harness.js';
+import { FILE, openImport } from './zip-helpers.js';
 import { buildSite } from './site-lib.js';
 import { createZip } from '../../core/zip.js';
 import { gradeSubmission, readSubmission, loadExercise, referenceVectorsOf } from '../../server/grade.js';
@@ -49,9 +50,8 @@ uiTest('#3216 browser edition: the synthesis tests run in the page (the flow\'s 
 
   await page.goto(site.url);
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
-  await page.menu('File', 'Import Silinx Project (.zip)…');
-  await page.waitDialog('Import Silinx Project');
-  await page.setFiles('.dlg-overlay input[type=file]', [zipFile]);
+  await openImport(page, 'silinx');
+  await page.setFiles(FILE, [zipFile]);
   await page.fill('.dlg-overlay input[type=text]', 'Cnt');
   await page.dialogButton('Import');
   await page.waitFor(() => window.Silinx.project?.name === 'Cnt' && document.querySelector('#hier .row'), [], { what: 'the imported project open' });

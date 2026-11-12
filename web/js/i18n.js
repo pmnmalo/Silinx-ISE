@@ -50,8 +50,7 @@ const PT = {
   'File': 'Ficheiro', 'Edit': 'Editar', 'View': 'Ver', 'Project': 'Projeto', 'Process': 'Processo', 'Tools': 'Ferramentas',
   'Window': 'Janela', 'Help': 'Ajuda', 'Language': 'Idioma',
   'New Project…': 'Novo Projeto…', 'Open Project…': 'Abrir Projeto…', 'Close Project': 'Fechar Projeto', 'Trust Project': 'Confiar no Projeto', 'Check Design': 'Verificar Projeto', 'Show the waveform': 'Mostrar a forma de onda', 'Open the HDL here, in Simulation': 'Abrir o HDL aqui, na Simulação',
-  'Import Xilinx ISE Project (.zip)…': 'Importar Projeto Xilinx ISE (.zip)…', 'Export Xilinx ISE Project (.zip)…': 'Exportar Projeto Xilinx ISE (.zip)…',
-  'Import Silinx Project (.zip)…': 'Importar Projeto Silinx (.zip)…', 'Export Silinx Project (.zip)…': 'Exportar Projeto Silinx (.zip)…',
+  'Import Project (.zip)…': 'Importar Projeto (.zip)…', 'Export Project (.zip)…': 'Exportar Projeto (.zip)…',
   // the browser edition: where the projects are kept (in the browser storage, or in a folder on the disk)
   'Open Workspace Folder…': 'Abrir Pasta de Trabalho…', 'Open Workspace Folder': 'Abrir Pasta de Trabalho',
   'Copy Browser Projects to the Folder': 'Copiar os Projetos do Navegador para a Pasta', 'Use Browser Storage': 'Usar o Armazenamento do Navegador',
@@ -138,7 +137,7 @@ const PT = {
   'SSim Simulator': 'Simulador SSim', 'Behavioral Check Syntax': 'Verificar Sintaxe (Comportamental)',
   'View/Edit State Diagram (ASM)': 'Ver/Editar Diagrama de Estados (ASM)', 'No processes for the selected item': 'Sem processos para o item selecionado',
   // dialogs & wizards
-  'Cancel': 'Cancelar', 'Yes': 'Sim', 'No': 'Não', 'Replace': 'Substituir', 'Next >': 'Seguinte >', '< Back': '< Anterior', 'Finish': 'Concluir', 'Import': 'Importar',
+  'Cancel': 'Cancelar', 'Yes': 'Sim', 'No': 'Não', 'Replace': 'Substituir', 'Next >': 'Seguinte >', '< Back': '< Anterior', 'Finish': 'Concluir', 'Import': 'Importar', 'Export': 'Exportar',
   'New Project Wizard': 'Assistente de Novo Projeto', 'Create New Project': 'Criar Novo Projeto', 'Project Settings': 'Definições do Projeto',
   'Project Summary': 'Resumo do Projeto', 'Enter a name and location for the project.': 'Indique um nome e uma localização para o projeto.',
   'Name:': 'Nome:', 'Location:': 'Localização:', 'Start from:': 'Começar a partir de:',
@@ -149,12 +148,20 @@ const PT = {
   'Synthesis Tool:': 'Ferramenta de Síntese:', 'Silinx (VHDL/Verilog; no ISE needed)': 'Silinx (VHDL/Verilog; sem o ISE)', 'XST (VHDL/Verilog; Xilinx ISE)': 'XST (VHDL/Verilog; Xilinx ISE)', 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)': 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)', 'Silinx (VHDL/Verilog; no Vivado needed; on trial)': 'Silinx (VHDL/Verilog; sem o Vivado; em ensaio)', 'SSim (VHDL/Verilog; Silinx Simulator)': 'SSim (VHDL/Verilog; Simulador Silinx)', 'Simulator:': 'Simulador:', 'Preferred Language:': 'Linguagem Preferida:',
   'VHDL Source Analysis Standard:': 'Norma de Análise VHDL:', 'None Specified': 'Nenhuma', 'All': 'Todas',
   'No projects found in the workspace.': 'Não foram encontrados projetos na pasta de trabalho.',
-  'Import Xilinx ISE Project': 'Importar Projeto Xilinx ISE', 'Export Xilinx ISE Project': 'Exportar Projeto Xilinx ISE',
-  'Import Silinx Project': 'Importar Projeto Silinx', 'Export Silinx Project': 'Exportar Projeto Silinx', 'Project name:': 'Nome do projeto:',
+  // Import Project (.zip)… and Export Project (.zip)…: the software chosen in the window (#3703)
+  'Import Project': 'Importar Projeto', 'Export Project': 'Exportar Projeto', 'Project name:': 'Nome do projeto:',
+  'Software:': 'Programa:', 'AMD Vivado (not yet)': 'AMD Vivado (ainda não)', 'Intel Quartus (not yet)': 'Intel Quartus (ainda não)',
+  'Silinx does not read or write an AMD Vivado project (.xpr) yet.': 'O Silinx ainda não lê nem escreve um projeto AMD Vivado (.xpr).',
+  'Silinx does not read or write an Intel Quartus project (.qpf, .qsf) yet.': 'O Silinx ainda não lê nem escreve um projeto Intel Quartus (.qpf, .qsf).',
+  'The zip holds no silinx.json nor .xise: it is not a project Silinx reads.': 'O zip não tem silinx.json nem .xise: não é um projeto que o Silinx leia.',
+  'The whole Silinx project: silinx.json and every project file (sources, ASM charts, schematics, constraints, simulation files). It opens in Silinx with File ▸ Import Project (.zip)….':
+    'O projeto Silinx completo: o silinx.json e todos os ficheiros do projeto (fontes, diagramas ASM, esquemáticos, restrições, ficheiros de simulação). Abre no Silinx com Ficheiro ▸ Importar Projeto (.zip)….',
+  'A Xilinx ISE 14.7 project: its .xise and its sources, the schematics as ISE schematics, the other drawings and the C sources as their HDL. It opens in Xilinx ISE.':
+    'Um projeto Xilinx ISE 14.7: o seu .xise e as suas fontes, os esquemáticos como esquemáticos do ISE, os outros diagramas e as fontes C como o seu HDL. Abre no Xilinx ISE.',
   'Project folder:': 'Pasta do projeto:', 'or .zip / .xise file(s):': 'ou ficheiro(s) .zip / .xise:',
   'Select the project folder, a .zip, or a .xise with its sources.': 'Selecione a pasta do projeto, um .zip, ou um .xise com as suas fontes.',
   'ISE output files in the folder (xst, _ngo, netlists, bitstreams, logs) are not imported.': 'Os ficheiros gerados pelo ISE na pasta (xst, _ngo, netlists, bitstreams, logs) não são importados.',
-  'Import an ISE project from its folder (the folder with the .xise file), or from a .zip of that folder (e.g. one exported with File ▸ Export Xilinx ISE Project).': 'Importe um projeto ISE a partir da sua pasta (a pasta com o ficheiro .xise), ou de um .zip dessa pasta (p. ex. um exportado com Ficheiro ▸ Exportar Projeto Xilinx ISE).',
+  'Import an ISE project from its folder (the folder with the .xise file), or from a .zip of that folder (e.g. one exported with File ▸ Export Project (.zip)…).': 'Importe um projeto ISE a partir da sua pasta (a pasta com o ficheiro .xise), ou de um .zip dessa pasta (p. ex. um exportado com Ficheiro ▸ Exportar Projeto (.zip)…).',
   'New Source': 'Nova Fonte', 'Select Source Type': 'Selecionar Tipo de Fonte', 'File Name and Location': 'Nome do Ficheiro e Localização', 'Source type:': 'Tipo de fonte:', 'Select the type of the new source; its name and location come next.': 'Selecione o tipo da nova fonte; o nome e a localização vêm a seguir.', 'File name:': 'Nome do ficheiro:',
   'Add to project': 'Adicionar ao projeto', 'Define Module': 'Definir Módulo', 'Entity / Module name:': 'Nome da entidade / módulo:',
   'Architecture name:': 'Nome da arquitetura:', 'Port Name': 'Nome do Porto', 'Direction': 'Direção', 'Associate Source': 'Associar Fonte',
@@ -525,8 +532,8 @@ Object.assign(PT, {
     'Dica: faça duplo clique num processo no painel Processos para o executar. A simulação corre inteiramente no Silinx; a síntese/implementação requer o Xilinx ISE 14.7 (Definições da Toolchain (a roda dentada da barra de ferramentas)).',
   'Print…': 'Imprimir…', 'Print': 'Imprimir', 'Source': 'Fonte', 'Source (read-only)': 'Fonte (só de leitura)', 'Marker': 'Marcador', 'Time shown': 'Tempo mostrado', 'Simulation time': 'Tempo de simulação', 'project name': 'nome do projeto', 'new project name': 'nome do novo projeto', 'file name': 'nome do ficheiro',
   'Device': 'Dispositivo', 'Top': 'Topo', 'Board': 'Placa', 'Last Used': 'Último uso', '.zip file:': 'Ficheiro .zip:',
-  'Import a whole Silinx project from a .zip made with File ▸ Export Silinx Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).':
-    'Importe um projeto Silinx completo a partir de um .zip feito com Ficheiro ▸ Exportar Projeto Silinx (silinx.json e todos os ficheiros do projeto: fontes, diagramas ASM, esquemáticos, restrições, ficheiros de simulação).',
+  'Import a whole Silinx project from a .zip made with File ▸ Export Project (.zip)… (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).':
+    'Importe um projeto Silinx completo a partir de um .zip feito com Ficheiro ▸ Exportar Projeto (.zip)… (silinx.json e todos os ficheiros do projeto: fontes, diagramas ASM, esquemáticos, restrições, ficheiros de simulação).',
   'It also opens a project bundle (.silinx.json) made with an earlier version.': 'Também abre um pacote de projeto (.silinx.json) feito com uma versão anterior.',
   'Easiest setup on any OS:': 'Configuração mais simples em qualquer sistema operativo:',
   'build the private Docker image with the Silinx kit (docker/ise/README.md):': 'construa a imagem Docker privada com o kit do Silinx (docker/ise/README.md):',

@@ -231,21 +231,20 @@ export async function renderStartPage() {
   const n = ++startRenders;
   const projects = await api.projects().catch(() => []);
   const recentHere = recent().filter(r => projects.some(p => p.name === r));
-  // (an export: the open project's, disabled with none; menus.js loaded when used)
+  // (an export: the open project's, disabled with none; project-zip-dialogs.js loaded when used)
   // (the page is the same whether a project is open or not, so that a late drawing keeps it, #494, #1222: an export
   // disabled with none by the host's data-project, web/css/app.css)
-  const exportZip = kind => () => S.project && import('./menus.js').then(m => m.exportProjectZip(kind));
+  const zipDialog = f => () => import('./project-zip-dialogs.js').then(m => m[f]());   // (the software chosen in the window, #3703)
   const command = ([l, ic, f, exp, cls]) => h('div', { class: `entry${exp ? ' start-export' : ''}${cls ? ` ${cls}` : ''}` }, icon(ic), h('a', { onclick: f }, l));
   const page = h('div', { class: 'page' },
     // New Project and Open Project: buttons at the top (#1216)
     h('div', { class: 'start-btns' },
       h('button', { class: 'btn', type: 'button', onclick: () => wiz.newProjectWizard() }, 'New Project…'),
       h('button', { class: 'btn', type: 'button', onclick: () => wiz.openProjectDialog() }, 'Open Project…')),   // (Close Project: under the Design tree, #1309)
-    // the Silinx and the Xilinx imports and exports, as the File menu has them (#1216); a line, then the sharing and the
-    // git entries in one group (#3699)
+    // the import and the export, as the File menu has them (#1216; the software chosen in their window, #3703); a line,
+    // then the sharing and the git entries in one group (#3699)
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
-      ...[['Import Silinx Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Export Silinx Project (.zip)…', 'save', exportZip('silinx'), true],
-        ['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Export Xilinx ISE Project (.zip)…', 'save', exportZip('xilinx'), true]].map(command),
+      ...[['Import Project (.zip)…', 'open', zipDialog('importProjectDialog')], ['Export Project (.zip)…', 'save', () => S.project && zipDialog('exportProjectDialog')(), true]].map(command),
       h('hr', { class: 'start-sep' }),
       command(['Share Project Copy…', 'save', () => S.project && import('./link-copy.js').then(m => m.copyLinkDialog()), true]),   // (#2826)
       // (a GitHub repository, a Classroom assignment's: the server editions, #3195; after Copy Link, #3323)

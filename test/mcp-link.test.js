@@ -86,7 +86,7 @@ test('project_link: a project too large for a link', async () => {
   await P.writeFile('big', 'src/noise.txt', noise);
   const r = await call('project_link', { project: 'big' });
   assert.equal(r.isError, true);
-  assert.match(r.text, /^project_link: the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Silinx Project\) and link to that$/);
+  assert.match(r.text, /^project_link: the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Project \(\.zip\)…, Silinx\) and link to that$/);
 });
 
 test('open_link: an example, on its board and on another (its pins the board\'s), in the emulator', async () => {

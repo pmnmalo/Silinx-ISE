@@ -65,16 +65,14 @@ export function setupMenus() {
       { label: 'New Project…', icon: icon('newProject'), action: () => wiz.newProjectWizard() },
       { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
       '-',
-      { label: 'Import Silinx Project (.zip)…', action: () => wiz.importSilinxDialog() },
-      { label: 'Export Silinx Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
+      // (the software, Silinx or Xilinx ISE, chosen in the window, #3703)
+      { label: 'Import Project (.zip)…', action: () => import('./project-zip-dialogs.js').then(m => m.importProjectDialog()) },
+      { label: 'Export Project (.zip)…', action: () => import('./project-zip-dialogs.js').then(m => m.exportProjectDialog()), disabled: hasPj },
       { label: 'Share Project Copy…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()), disabled: hasPj },   // (#2826)
       hasGit() ? { label: 'Open from Repository…', action: () => openFromRepositoryDialog() } : null,   // (a GitHub repository, a Classroom assignment's: #3195; after Copy Link, #3323)
       // (live, read only, through the server's relay, #3181; the browser edition has none yet)
       api.collab || api.standalone ? { label: 'Share Project Live…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => hasPj() || !!api.following } : null,
       { label: 'Short Links…', action: () => import('./short-links.js').then(m => m.shortLinksDialog()) },   // (the short links' gists, #3635)
-      '-',
-      { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
-      { label: 'Export Xilinx ISE Project (.zip)…', action: () => exportProjectZip('xilinx'), disabled: hasPj },
       '-',
       ...(api.standalone ? storageMenuItems() : []),
       // git (#3195): the project's commit, push, pull; a repository made
@@ -260,9 +258,10 @@ function downloadUrl(url, filename) {
 
 // kind 'xilinx': a Xilinx ISE 14.7 project (.xise + sources, opens in ISE);
 // kind 'silinx': the whole Silinx project (silinx.json + every file, ASM charts and schematics included)
+// (Export Project (.zip)…'s, the kind chosen in its window: project-zip-dialogs.js, #3703)
 export async function exportProjectZip(kind = 'xilinx') {
   await saveAll();
-  const title = kind === 'silinx' ? 'Export Silinx Project' : 'Export Xilinx ISE Project';
+  const title = 'Export Project';
   try {
     const { blob, filename, warnings = [] } = await api.exportZip(S.project.name, kind);
     const url = URL.createObjectURL(blob);

@@ -30,7 +30,7 @@ That's all. Things to know:
   (**Ctrl+K**: type the command's name).
 
 - Your projects are saved **inside this browser** on this computer. To keep a copy or move it to
-  another computer use **File ▸ Export Silinx Project (.zip)…** (and **File ▸ Import Silinx Project
+  another computer use **File ▸ Export Project (.zip)…** (and **File ▸ Import Project
   (.zip)…** to load it back; it also opens a `.silinx.json` project bundle of an earlier version). Clearing the browser's data deletes them.
 - **Or keep them in a folder on your disk** (Chrome or Edge): **File ▸ Open Workspace Folder…**
   (also on the Start page) and choose a folder, for instance a new `Silinx-projects` folder in your
@@ -57,7 +57,7 @@ That's all. Things to know:
   **Generate Programming File** work. **Chrome on an Android tablet also programs the board**, as
   on a computer (checked on a Samsung tablet; the board on the tablet's USB port); Safari on an iPad cannot reach USB devices (program
   the downloaded `.bit` from a computer or an Android tablet). The projects stay in the browser, which iPadOS may clear after some weeks
-  without use: keep a copy with **File ▸ Export Silinx Project (.zip)…**. A tablet has less
+  without use: keep a copy with **File ▸ Export Project (.zip)…**. A tablet has less
   memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
   (hold a finger still for half a second); two fingers move a drawing and a pinch zooms it. In portrait the side panel (Design) is shown or hidden
   with the header's side panel button (in the ISE style interface it is a drawer, the button at the left of the header), and the editors' properties open over the drawing (**Properties**).
@@ -141,7 +141,7 @@ A black window (the Silinx server) opens and then your browser shows Silinx at
 - Your projects are saved as normal folders in **`Silinx-projects`** in your user folder
   (Windows: `C:\Users\<you>\Silinx-projects`, macOS: `/Users/<you>/Silinx-projects`).
   You can copy them, back them up, or zip them to hand in.
-- **File ▸ Export Xilinx ISE Project (.zip)** produces a zip that opens in Xilinx ISE 14.7; **File ▸ Export Silinx Project (.zip)** saves the whole Silinx project (ASM charts and schematics included), reopened with **Import Silinx Project**. An imported project came from outside: it runs Xilinx ISE and programs a board only once you press **Trust Project** in the console, where it says so when the project opens.
+- **File ▸ Export Project (.zip)…** starts with the software it goes to: **Xilinx ISE** produces a zip that opens in Xilinx ISE 14.7; **Silinx** saves the whole Silinx project (ASM charts and schematics included), reopened with **File ▸ Import Project (.zip)…** (which recognises the zip's software). AMD Vivado and Intel Quartus are shown disabled: Silinx does not read or write their projects yet. An imported project came from outside: it runs Xilinx ISE and programs a board only once you press **Trust Project** in the console, where it says so when the project opens.
 
 ### Updating Silinx
 
