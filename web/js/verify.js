@@ -19,18 +19,24 @@ import { runSimulation } from './viewers.js';
 const REF_NAMES = m => [`${m}_ref`, `ref_${m}`, `${m}_reference`, `${m}_golden`].map(n => n.toLowerCase());
 const last = {};
 
+/** The line of a check's dialog that says what is wrong with its fields, beside them (#3540: not a toast): { el,
+ *  say(message) (shown, and false) }. */
+export function fieldError() {
+  const el = h('div', { class: 'hint verify-error', style: { color: 'var(--error-fg)', minHeight: '16px', marginTop: '8px' } });
+  return { el, say: (m) => { el.textContent = m; return false; } };
+}
+
 /**
  * The time limit's field of a check's dialog (#3261: Yosys stopped when it passes), its label and input: { row, input,
- * ok() (valid, or a toast and false) }; the value kept for the next dialogs.
+ * ok() (valid, or its error said on the dialog's line err, and false) }; the value kept for the next dialogs.
  */
-export function timeLimitField() {
+export function timeLimitField(err) {
   const input = h('input', { type: 'number', min: 1, max: MAX_TIME_LIMIT, value: limits.timeLimit || VERIFY_TIME_LIMIT, style: { width: '6em' } });
   const row = h('div', {}, h('label', { style: { display: 'block', marginTop: '8px' } }, 'Time limit (s):'), input);
   const ok = () => {
     const n = +input.value;
     if (Number.isInteger(n) && n >= 1 && n <= MAX_TIME_LIMIT) { limits.timeLimit = n; return true; }
-    toast(`The time limit is a number of seconds from 1 to ${MAX_TIME_LIMIT}`, 'err');
-    return false;
+    return err.say(`The time limit is a number of seconds from 1 to ${MAX_TIME_LIMIT}`);
   };
   return { row, input, ok };
 }
@@ -44,14 +50,14 @@ async function askReference(mod) {
   const proposed = names.find(n => REF_NAMES(mod).includes(n.toLowerCase())) || (names.includes(last[mod]) ? last[mod] : names[0]);
   const sel = h('select', { style: { width: '100%' } }, ...names.map(n => h('option', { value: n, 'data-no-i18n': true, selected: n === proposed }, n)));
   const depth = h('input', { type: 'number', min: 1, max: MAX_DEPTH, value: last.depth || VERIFY_DEPTH, style: { width: '6em' } });
-  const limit = timeLimitField();
+  const err = fieldError(), limit = timeLimitField(err);
   const r = await dialog({
     title: VERIFY_PROCESS, width: 460,
     body: h('div', { class: 'verify-dlg' },
       h('p', {}, 'Proves that the module gives the outputs of the reference module for every input sequence, or shows the first clock cycle where they differ.'),
       h('label', {}, 'Reference module:'), sel,
-      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth, limit.row),
-    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => depthOk(depth) && limit.ok() },
+      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth, limit.row, err.el),
+    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => depthOk(depth, err) && limit.ok() },
       { label: 'Cancel', value: null }],
   });
   if (!r) return null;
@@ -60,24 +66,23 @@ async function askReference(mod) {
   return { reference: sel.value, depth: +depth.value, timeLimit: +limit.input.value };
 }
 
-// the depth's field valid, or a toast and false
-const depthOk = depth => {
+// the depth's field valid, or its error said on the dialog's line err and false
+export const depthOk = (depth, err) => {
   const n = +depth.value;
   if (Number.isInteger(n) && n >= 1 && n <= MAX_DEPTH) return true;
-  toast(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`, 'err');
-  return false;
+  return err.say(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`);
 };
 
 // the depth and the time limit asked (Verify Assertions): { depth, timeLimit }, or null (cancelled)
 async function askDepth() {
   const depth = h('input', { type: 'number', min: 1, max: MAX_DEPTH, value: last.depth || VERIFY_DEPTH, style: { width: '6em' } });
-  const limit = timeLimitField();
+  const err = fieldError(), limit = timeLimitField(err);
   const r = await dialog({
     title: ASSERT_PROCESS, width: 460,
     body: h('div', { class: 'verify-dlg' },
       h('p', {}, 'Proves that the module\'s assertions hold for every input sequence, or shows the first clock cycle where one fails.'),
-      h('label', {}, 'Depth (clock cycles):'), depth, limit.row),
-    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => depthOk(depth) && limit.ok() },
+      h('label', {}, 'Depth (clock cycles):'), depth, limit.row, err.el),
+    buttons: [{ label: 'Verify', primary: true, value: true, validate: () => depthOk(depth, err) && limit.ok() },
       { label: 'Cancel', value: null }],
   });
   if (!r) return null;

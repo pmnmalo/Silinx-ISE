@@ -66,6 +66,12 @@ export function logLine(line, opts) {
   else if (/=== SILINX (STEP|DONE)/.test(line) || /completed successfully/i.test(line)) cls = 'ok';
   log(line, cls, opts);
 }
+/** An error of the app's own (#3540: a file it cannot read): an ERROR line of the console, its Errors tab
+ *  in front, never a toast. */
+export function logError(text) {
+  log(`ERROR: ${text}`, 'err');
+  bringForward('errors');
+}
 export function showConsolePage(page) {
   // (a tab of the console only: the keyboard's focus stays where it is, an editor's typing goes on)
   broughtForward = null;

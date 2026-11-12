@@ -21,7 +21,7 @@ import { isLabFile } from '/core/labs.js';
 import { primitiveTemplates } from '/core/prim-templates.js';
 import { deviceFamily, openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
 import { setActionRunner, longPressMenu } from './ui.js';
-import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
+import { log, logError, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
 import { renderTeachingPage } from './teaching-page.js';
 import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus, refreshBlackboxes } from './project.js';
@@ -464,7 +464,7 @@ export async function openFile(path, line, col, { task } = {}) {
     const pj = S.project.name;
     let text;
     try { text = await api.readFile(pj, path); }
-    catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+    catch (e) { logError(`cannot open ${path}: ${e.message}`); return; }
     if (S.project?.name !== pj) return;   // another project opened during the read: not its file (#1231)
     const lang = /\.(vhd|vhdl)$/i.test(path) ? 'vhdl' : /\.(v|vh|sv)$/i.test(path) ? 'verilog' : /\.ucf$/i.test(path) ? 'ucf' : isC(path) ? 'c' : 'text';   // (c: Silinx HLS, #1524; C++ too, #1590)
     doc = openDoc({

@@ -2,9 +2,9 @@
 // module (the table its base, #1176), the module a table is read back from, a table loaded from a module, and the table's schematic
 // view (#694).
 import { S, activateDoc, compileProject, findDoc, flushDoc, openDoc, openFile, setDirty, status } from './app.js';
-import { alertDlg, confirmDlg, dialog, h, popupMenu, toast } from './ui.js';
+import { alertDlg, confirmDlg, dialog, h, popupMenu } from './ui.js';
 import { api } from './api.js';
-import { log } from './console.js';
+import { log, logError } from './console.js';
 import { markStale, saveAll } from './processes.js';
 import { removeModule, renderHierarchy, topMenuItem } from './design.js';
 import { renameDialog } from './rename.js';
@@ -24,7 +24,7 @@ export async function openTt(path) {
   let model;
   const pj = S.project.name;
   try { model = JSON.parse(await api.readFile(pj, path)); }
-  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  catch (e) { logError(`cannot open ${path}: ${e.message}`); return; }
   const { mountTtEditor } = await import('./truthtable.js');
   if (S.project?.name !== pj) return;   // another project opened meanwhile: not its drawing (#1231)
   openDoc({
@@ -146,7 +146,7 @@ export async function openTtSchematic(ttPath) {
   const id = `ttsch:${ttPath}`;
   if (findDoc(id)) return activateDoc(findDoc(id));
   let model;
-  try { model = await ttModel(ttPath); } catch (e) { toast(`Cannot open ${ttPath}: ${e.message}`, 'error'); return; }
+  try { model = await ttModel(ttPath); } catch (e) { logError(`cannot open ${ttPath}: ${e.message}`); return; }
   const { mountSchEditor } = await import('./sch-editor.js');
   const first = await ttSchematicDoc(model);
   openDoc({
