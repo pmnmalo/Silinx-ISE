@@ -134,3 +134,34 @@ test('#3275 a project\'s descriptor, its clone mark and a template\'s constraint
   for (const rel of ['../x.ucf', '/x.ucf', 'src/../../x.ucf', path.join(tmp, 'x.ucf')])
     assert.throws(() => P.safeJoin(dir, rel), e => e.status === 400 && e.message === 'path escapes project', rel);
 });
+
+test('#3648 the file routes (read, write, rename, delete, its trash): a path out of the project refused, by any spelling, nothing outside touched (CodeQL js/path-injection)', async () => {
+  await P.createProject({ name: 'Routes' });
+  const dir = path.join(ws, 'Routes');
+  fs.writeFileSync(path.join(tmp, 'outside.vhd'), 'KEEP');
+  fs.mkdirSync(path.join(ws, 'Other', 'src'), { recursive: true });
+  fs.writeFileSync(path.join(ws, 'Other', 'src', 'b.vhd'), 'OTHER');
+  await P.writeFile('Routes', 'src/a.vhd', 'A');
+  const before = [fs.readdirSync(tmp).sort(), fs.readdirSync(ws).sort()];
+  const escapes = ['../outside.vhd', '../../outside.vhd', 'src/../../Other/src/b.vhd', 'SRC/../../../outside.vhd', '/outside.vhd', path.join(tmp, 'outside.vhd'), '..', '../Other'];
+  const ops = { read: r => P.readFile('Routes', r), write: r => P.writeFile('Routes', r, 'x'), renameFrom: r => P.renameFile('Routes', r, 'src/c.vhd'),
+    renameTo: r => P.renameFile('Routes', 'src/a.vhd', r), delete: r => P.deleteFile('Routes', r), trash: r => P.deleteFile('Routes', r, { trash: true, mustExist: true }) };
+  for (const rel of escapes)
+    for (const [op, f] of Object.entries(ops))
+      await assert.rejects(async () => f(rel), e => e.status === 400 && e.message === 'path escapes project', `${op} ${rel}`);
+  assert.deepEqual([fs.readdirSync(tmp).sort(), fs.readdirSync(ws).sort()], before, 'nothing made or moved outside the project');
+  assert.equal(fs.readFileSync(path.join(tmp, 'outside.vhd'), 'utf8'), 'KEEP');
+  assert.equal(fs.readFileSync(path.join(ws, 'Other', 'src', 'b.vhd'), 'utf8'), 'OTHER');
+  // the project's own paths as before: '.' its folder, a file in another case its own (#3536), its trash named after it
+  assert.equal(P.safeJoin(dir, '.'), dir);
+  assert.equal(await P.readFile('Routes', 'SRC/a.vhd'), 'A');
+  const { trashed } = await P.deleteFile('Routes', 'src/a.vhd', { trash: true });
+  assert.match(trashed, /^\.trash\/Routes-\d+\/src\/a\.vhd$/);
+  assert.equal(fs.readFileSync(path.join(ws, ...trashed.split('/')), 'utf8'), 'A');
+  // projectDir: the project's folder in the workspace, whatever the workspace's spelling
+  const was = process.env.SILINX_WORKSPACE;
+  try {
+    process.env.SILINX_WORKSPACE = `${ws}${path.sep}.${path.sep}`;
+    assert.equal(P.projectDir('Routes'), dir);
+  } finally { process.env.SILINX_WORKSPACE = was; }
+});
