@@ -188,7 +188,14 @@ async function keepTrust(name, repo) {
 // a project that a pull into the workspace's repository brought: from outside, untrusted
 async function broughtUntrusted(repo, had) {
   if (repo.root !== 'workspace') return;
-  for (const p of await P.listProjects()) if (!had.has(p.name.toLowerCase())) await P.keepTrustInRepo(p.name, 'workspace', { fromOutside: true });
+  // each on its own (#3522): one that cannot be marked never leaves the ones after it trusted
+  const failed = [];
+  for (const p of await P.listProjects()) {
+    if (had.has(p.name.toLowerCase())) continue;
+    try { await P.keepTrustInRepo(p.name, 'workspace', { fromOutside: true }); }
+    catch (e) { failed.push(`'${p.name}' (${e.code || e.message})`); }
+  }
+  if (failed.length) throw new GitError(`the pull brought ${failed.join(', ')}, which could not be marked untrusted in the repository's .git`, 'Do not run Xilinx ISE nor program a board from it: move its folder out of the workspace.', 500);
 }
 
 // ------------------------------------------------------------------ the commands

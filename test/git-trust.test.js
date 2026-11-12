@@ -141,3 +141,34 @@ test('the workspace\'s repository: its untrusted project stays so, and a project
     assert.deepEqual(fs.readdirSync(path.join(wsDir, '.git', 'silinx-trust')), ['b.json']);
   } finally { process.env.SILINX_WORKSPACE = prev; }
 });
+
+// #3522: a folder whose name is no project's, brought by a pull, stopped the marks: the projects after it stayed trusted
+test('the workspace\'s repository: a pull that brings a folder with an invalid project name still marks the projects after it', async () => {
+  const bare = bareRepo('workspace3');
+  const seed = path.join(tmp, 'seed-ws3');
+  fs.cpSync(path.join(ROOT, 'examples', 'gates'), path.join(seed, 'mine'), { recursive: true });
+  sh(seed, 'init', '--quiet'); sh(seed, 'symbolic-ref', 'HEAD', 'refs/heads/main');
+  sh(seed, 'add', '-A'); sh(seed, 'commit', '--quiet', '-m', 'Mine'); sh(seed, 'push', '--quiet', bare, 'main');
+  const prev = process.env.SILINX_WORKSPACE;
+  const wsDir = path.join(tmp, 'ws3');
+  sh(tmp, 'clone', '--quiet', bare, wsDir);
+  process.env.SILINX_WORKSPACE = wsDir;
+  try {
+    // another author: '0bad' (no project's name, listed before the others) and the project 'zz'
+    const theirs = path.join(tmp, 'theirs-ws3');
+    sh(tmp, 'clone', '--quiet', bare, theirs);
+    for (const n of ['0bad', 'zz']) fs.cpSync(path.join(ROOT, 'examples', 'gates'), path.join(theirs, n), { recursive: true });
+    sh(theirs, 'add', '-A'); sh(theirs, 'commit', '--quiet', '-m', 'Theirs'); sh(theirs, 'push', '--quiet');
+    const r = await G.gitPull('mine');
+    assert.deepEqual([r.upToDate, r.files], [false, []]);
+    assert.deepEqual(['0bad', 'zz'].map(n => fs.existsSync(path.join(wsDir, n, 'silinx.json'))), [true, true]);
+    // the folder is no project, and the project after it is untrusted: Xilinx ISE refused
+    assert.deepEqual((await P.listProjects()).map(p => p.name), ['mine', 'zz']);
+    assert.equal((await P.readProject('mine')).trusted, undefined);
+    assert.equal((await P.readProject('zz')).trusted, false);
+    assert.deepEqual(fs.readdirSync(path.join(wsDir, '.git', 'silinx-trust')), ['zz.json']);
+    const { startImplementation } = await import('../server/impl-routes.js');
+    await assert.rejects(startImplementation('zz', { toolchain: 'ise' }), { message: ISE_OUTSIDE('zz'), status: 403 });
+    await assert.rejects(P.readProject('0bad'), { message: "invalid project name '0bad'", status: 400 });
+  } finally { process.env.SILINX_WORKSPACE = prev; }
+});
