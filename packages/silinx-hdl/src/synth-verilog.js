@@ -289,7 +289,10 @@ export function toVerilog(design, { name, tables = true, simprim = null, formal 
 
 // The assignments of a statement that no assignment to the same signal or variable can precede (in
 // `firsts`), given the ones already assigned before it (`done`: their signals and variables, ANY for
-// any); returns the ones assigned after it. A loop's body is walked twice (its writes precede its next turn).
+// any); returns the ones assigned after it. A loop's body is walked once: a second walk, from the writes of the
+// first (those of its next turn), marks none the first did not (`done` only grows, and with it fewer assignments are
+// first; one first in its first turn only stays marked, #3512) and returns the same writes, and nested loops walked
+// twice each took time exponential in their depth (#3504).
 const ANY = Symbol('any');
 const NO_WRITE = new Set(['exit', 'next', 'ret', 'null', 'report', 'assert', 'textio', 'sys']);
 function markFirstWrites(s, done, firsts) {
@@ -311,7 +314,7 @@ function markFirstWrites(s, done, firsts) {
       return union(after);
     }
     case 'case': return union([...s.items.map(it => markFirstWrites(it.body, new Set(done), firsts)), markFirstWrites(s.def, new Set(done), firsts)]);
-    case 'forrange': case 'for': return markFirstWrites(s.body, markFirstWrites(s.body, done, firsts), firsts);
+    case 'forrange': case 'for': return markFirstWrites(s.body, done, firsts);
     default: return NO_WRITE.has(s.k) ? done : union([done, [ANY]]);
   }
 }
