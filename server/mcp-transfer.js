@@ -5,13 +5,14 @@
 // replaces a file; an import makes a new project. Where the interface has the user choose the file, the client
 // names it: both tools take only the paths of one exchange folder (the user's Downloads, where the interface's
 // exports land, or SILINX_MCP_FOLDER), symbolic links that leave it included, so that an assistant led astray by
-// what it read reaches nothing else of the disk.
+// what it read reaches nothing else of the disk. Import Source / Add Copy of Source / Import Test Bench (#3546) copies
+// files of the same folder into a project (core/import-source.js, as the interface's dialog).
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import * as P from './projects.js';
-import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
+import { toolError, readProject, diagLine, STR, PROJECT } from './mcp-util.js';
 
 const KINDS = { xilinx: 'a Xilinx ISE project', silinx: 'a Silinx project' };
 const MAX_FILES = 5000;
@@ -136,6 +137,69 @@ export const TRANSFER_TOOLS = [
       const lines = [...r.warnings.map(w => `WARNING: ${w}`), ...r.missing.map(m => `WARNING: ${m}: listed by the project, not found`),
         `Imported the ${kind} project as '${name}': top ${pj.top || '(none)'}, test bench ${pj.simTop || '(none)'}, ${pj.board || 'no board'} (${pj.device ? `${pj.device.part}${pj.device.package}${pj.device.speed}` : 'no device'}), ${(pj.files || []).length} source(s)${r.extra.length ? `, ${r.extra.length} other file(s)` : ''}.`];
       return { text: lines.join('\n'), data: { project: name, kind: kind === 'Xilinx ISE' ? 'xilinx' : 'silinx', top: pj.top || null, simTop: pj.simTop || null, board: pj.board || null, device: pj.device || null, files: (pj.files || []).map(f => f.path), extra: r.extra, missing: r.missing, warnings: r.warnings }, untrusted: r.warnings.length ? 'the import\'s warnings, which name its files' : undefined };
+    },
+  },
+  {
+    name: 'import_source', title: 'Import Source (Add Copy of Source)',
+    description: 'Copy files of the exchange folder (the user\'s Downloads, or the folder SILINX_MCP_FOLDER names) into a project, as Import Source / Add Copy of Source does (Import Test Bench: association sim): a VHDL or Verilog file to src/ (sim/ with association sim), a constraints file (.ucf, .pcf, .lpf, .cst) to constraints/ (the project\'s constraints when its own is not in it), a memory file (.mem, .hex) or a drawing (.json, its HDL made) to src/ (sim/). Each file through the import gate (a file it refuses is not copied: a warning); a drawing named with a reserved word of VHDL or Verilog is refused; a file the project has already is replaced only with replace.',
+    inputSchema: { type: 'object', properties: {
+      project: PROJECT,
+      files: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'The files to copy, in the exchange folder: each its name, a path in it, or an absolute path inside it.' },
+      association: { type: 'string', enum: ['design', 'impl', 'sim'], description: 'design (All: Implementation + Simulation, default), impl (Implementation only) or sim (Simulation only: Import Test Bench).' },
+      replace: { type: 'boolean', description: 'Replace a file the project has already (default: it is left as it is, a warning).' },
+    }, required: ['project', 'files'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    async run({ project: name, files, association: role = 'design', replace = false }) {
+      await readProject(name);
+      if (!Array.isArray(files) || !files.length || files.some(f => typeof f !== 'string')) throw toolError('files: the files to copy, in the exchange folder');
+      if (!['design', 'impl', 'sim'].includes(role)) throw toolError('association: design, impl or sim');
+      const { importSourceTakes, importSourceFile, assignImported, IMPORT_SOURCE_ACCEPT } = await import('../core/import-source.js');
+      // the files first, all of them: one that is not there, or not a source, copies none
+      const srcs = [];
+      for (const f of files) {
+        const full = await exchangePath(f, 'files');
+        if (!(await fsp.stat(full).catch(() => null))?.isFile()) throw toolError(`files: no file '${full}'`);
+        if (!importSourceTakes(path.basename(full))) throw toolError(`files: '${full}' is not a file Import Source takes (${IMPORT_SOURCE_ACCEPT.split(',').join(', ')})`);
+        srcs.push(full);
+      }
+      const tree = await P.fileTree(name);
+      const lines = [], written = [], refused = [];
+      for (const full of srcs) {
+        const base = path.basename(full);
+        // (through the import gate, #2830; a drawing named with a reserved word refused, #679: core/import-source.js)
+        const c = importSourceFile(base, new Uint8Array(await fsp.readFile(full)), role);
+        if (c.refused) { lines.push(`${c.refused === 'gate' ? 'WARNING' : 'ERROR'}: ${c.message}`); refused.push({ path: c.path, message: c.message }); continue; }
+        if (c.warning) lines.push(`WARNING: ${c.warning}`);
+        if (tree.includes(c.path) && !replace) {
+          const message = `${c.path} already exists in the project: not replaced with the copy of ${base} (replace: true replaces it).`;
+          lines.push(`WARNING: ${message}`);
+          refused.push({ path: c.path, message });
+          continue;
+        }
+        try { await P.writeFile(name, c.path, c.text); } catch (e) { throw toolError(e.message); }
+        if (!written.includes(c.path)) written.push(c.path);
+      }
+      if (!written.length) return { text: [...lines, 'No source file added.'].join('\n'), data: { project: name, added: [], refused, constraints: null }, isError: true, untrusted: 'the names of the files copied' };
+      // the association (role) of exactly the files written, and the constraints file
+      await P.updateProject(name, pj => assignImported(pj, written, role, tree));
+      // a drawing: its HDL file made (#3184), as the interface does when it reads the project again
+      const { adoptDrawing, syncDrawing } = await import('./drawing-sync.js');
+      for (const f of written.filter(f => /\.(sch|asm|tt|bool|fsm|pn)\.json$/i.test(f))) {
+        const sync = await syncDrawing(P, name, f) || await adoptDrawing(P, name, f);
+        lines.push(...(sync?.messages || []));
+      }
+      lines.push(`Added ${written.length} source file(s).`);
+      // an HDL file's module named with a reserved word (#679): a warning, as the interface's
+      const { compile } = await import('../core/compile.js');
+      const { reservedModuleDiags } = await import('../core/reserved.js');
+      const pj = await P.readProject(name);
+      const hdl = await Promise.all(pj.files.filter(f => written.includes(f.path) && (f.lang === 'vhdl' || f.lang === 'verilog'))
+        .map(async f => ({ path: f.path, lang: f.lang, text: await P.readFile(name, f.path) })));
+      let units = [];
+      try { units = compile(hdl).parsed.flatMap(p => (p.units || []).filter(u => u.kind === 'module').map(u => ({ name: u.name, file: p.file, line: u.loc?.line }))); } catch { /* none */ }
+      lines.push(...reservedModuleDiags(units).map(diagLine));
+      const added = written.map(p => ({ path: p, role: pj.files.find(f => f.path === p)?.role || null }));
+      return { text: lines.join('\n'), data: { project: name, added, refused, constraints: pj.constraints || null }, untrusted: 'the names of the files copied' };
     },
   },
 ];

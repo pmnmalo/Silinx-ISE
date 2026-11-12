@@ -31,6 +31,7 @@ const ALLOW = {
   'core/collab-codes.js': { why: 'a WebRTC session description a follower or the owner pastes (#3227): sealed with the link\'s key, its size capped inflated; never a project\'s file' },
   'web/js/menus.js': { why: 'Open Project Bundle hands the file\'s text to api.importBundle', via: 'web/js/api-local.js' },
   'web/js/api.js': { why: 'the local server\'s client: it sends the zip or the .xise to the server, which gates them', via: 'server/xise-routes.js' },
+  'web/js/wizards.js': { why: 'Import Source\'s files go through core/import-source.js importSourceFile, which gates each one (gateFile, #3546)' },
   'web/js/impact.js': { why: 'a bitstream programmed into a board, never kept in a project' },
   'server/mcp-hdl.js': { why: 'simulate writes a VCD into the exchange folder: an output, nothing read' },
   'server/mcp-grade.js': { why: 'grade\'s submissions of the exchange folder are read by server/grade.js, through the gate; its CSV and student\'s copy are outputs', via: 'server/grade.js' },
@@ -78,4 +79,12 @@ test('the project importers take only a gate\'s result; the MCP\'s write_file ga
   const mcp = fs.readFileSync(path.join(ROOT, 'server/mcp-projects.js'), 'utf8');
   const write = mcp.slice(mcp.indexOf("name: 'write_file'"));
   assert.ok(write.indexOf('gateFile(') > 0 && write.indexOf('gateFile(') < write.indexOf('P.writeFile('), 'write_file: gateFile before the file is written');
+  // Import Source (#3546): the dialog and the MCP's import_source copy through importSourceFile, which gates the file
+  const copy = fs.readFileSync(path.join(ROOT, 'core/import-source.js'), 'utf8');
+  assert.match(copy, /export function importSourceFile\([^)]*\) \{\n {2}const path = [^\n]*\n {2}let text[^\n]*\n {2}try \{\n {4}const g = gateFile\(path, data\);/, 'importSourceFile gates first');
+  for (const [f, from, write] of [['web/js/wizards.js', 'export async function addSourceDialog', 'api.writeFile('], ['server/mcp-transfer.js', "name: 'import_source'", 'P.writeFile(']]) {
+    const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    const body = src.slice(src.indexOf(from));
+    assert.ok(body.indexOf('importSourceFile(') > 0 && body.indexOf('importSourceFile(') < body.indexOf(write), `${f}: importSourceFile before the file is written`);
+  }
 });

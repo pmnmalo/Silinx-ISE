@@ -100,8 +100,9 @@ export async function viewSourcesOf(name, project, sim, failed = null) {
 export const diagLine = d => `${d.severity === 'error' ? 'ERROR' : d.severity === 'info' ? 'INFO' : 'WARNING'}:${d.tool || 'HDLCompiler'} - "${d.file}" Line ${d.line}: ${d.message}`;
 export const diagJson = d => ({ severity: d.severity, file: d.file, line: d.line, col: d.col ?? null, tool: d.tool || 'HDLCompiler', message: d.message, ...(d.check ? { check: d.check } : {}) });
 
-// compile and elaborate a view of a project: { lib, design, top, diags } (the design checks included)
-export async function elaborateView(name, { top, sim = false } = {}) {
+// compile and elaborate a view of a project: { lib, design, top, diags } (the design checks included; lint: their lint
+// warnings too, as Edit ▸ Design Checks on, #3546)
+export async function elaborateView(name, { top, sim = false, lint = true } = {}) {
   const project = await readProject(name);
   const mod = top || (sim ? project.simTop : project.top);
   if (!mod) throw toolError(sim ? `the project '${name}' has no simulation top (a test bench): give top` : `the project '${name}' has no top module: give top`);
@@ -124,7 +125,7 @@ export async function elaborateView(name, { top, sim = false } = {}) {
   const bbWarn = undeclaredBlackboxes(hls, cTexts).map(d => ({ ...d, tool: 'SilinxC' }));
   let design = null, extra = [];
   if (!cTop) { try { design = elaborate(lib, mod); } catch (e) { extra = [{ severity: 'error', file: srcs[0]?.path || '', line: 1, col: 1, message: e.message }]; } }
-  if (design) { try { extra = designChecks(lib, design, { lint: true }); } catch { /* no checks */ } }
+  if (design) { try { extra = designChecks(lib, design, { lint }); } catch { /* no checks */ } }
   // (an HDL file its drawing cannot make again, #303: an error of the file, the drawing's errors in it, as Check Syntax's)
   const { staleDrawings } = await import('./drawing-sync.js');
   const inView = new Set(srcs.map(s => s.path));

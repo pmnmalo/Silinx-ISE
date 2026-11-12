@@ -8,8 +8,7 @@ import { h, dialog, alertDlg, confirmDlg, toast } from './ui.js';
 import { S, app } from './app.js';
 import { THIRD_PARTY } from '/core/third-party.js';
 import { drawnHdlPath, isView } from '/core/view-hdl.js';
-import { reservedError } from '/core/reserved.js';
-import { GateError, gateFile } from '/core/import-gate.js';
+import { IMPORT_SOURCE_ACCEPT, IMPORT_SOURCE_ROLES, assignImported, importSourceFile } from '/core/import-source.js';
 import { reservedNameDiags } from './processes.js';
 import { countEvent, siteCounts } from './analytics.js';
 import { confirmDeviceChange } from './device-change.js';
@@ -485,8 +484,8 @@ export { newSourceWizard } from './new-source.js';
 export const addSourceTitle = () => (document.documentElement.dataset.layout === 'tasks' ? 'Import Source' : 'Add Copy of Source');
 /** Add Copy of Source… (`role`: the association first chosen; `title`: Import Test Bench, Simulation only, #1385, #1501). */
 export async function addSourceDialog({ role: first = 'design', title = addSourceTitle() } = {}) {
-  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.pcf,.lpf,.cst,.mem,.hex,.asm.json,.json' });
-  const role = select([['design', 'All (Implementation + Simulation)'], ['impl', 'Implementation only'], ['sim', 'Simulation only']], typeof first === 'string' ? first : 'design');
+  const inp = h('input', { type: 'file', multiple: true, accept: IMPORT_SOURCE_ACCEPT });
+  const role = select(IMPORT_SOURCE_ROLES, typeof first === 'string' ? first : 'design');
   // (the Silinx interface asks no association: Import Source's All, Import Test Bench's Simulation only, #1501)
   const ask = document.documentElement.dataset.layout !== 'tasks';
   const r = await dialog({
@@ -496,40 +495,21 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
   });
   if (!r) return;
   const written = [];
+  const tree = [...S.fileTree];
   for (const f of inp.files) {
-    const ext = f.name.split('.').pop().toLowerCase();
-    const dir = ['ucf', 'pcf', 'lpf', 'cst', 'xdc'].includes(ext) ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
-    const path = `${dir}/${f.name}`;
-    // through the import gate (#2830): a file it refuses is not added, said in the console
-    let text;
-    try {
-      const g = gateFile(path, new Uint8Array(await f.arrayBuffer()));
-      if (g.warning) app.log(`WARNING: ${g.warning}`, 'warn');
-      text = g.text ?? new TextDecoder().decode(g.data);
-    } catch (e) {
-      if (!(e instanceof GateError)) throw e;
-      app.log(`WARNING: ${e.path}: not imported: ${e.reason}`, 'warn');
-      continue;
-    }
-    // a drawing named with a reserved word of VHDL or Verilog (its HDL is generated): refused (#679); an
-    // HDL file's module, written in its own language, is said when the project is reloaded
-    if (/\.json$/i.test(f.name)) {
-      let bad = null;
-      try { bad = reservedError(JSON.parse(text)?.name); } catch { /* not a drawing */ }
-      if (bad) { await alertDlg(title, `${f.name}: ${bad}: rename the module in the file first.`, 'error'); continue; }
-    }
-    if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg(title, `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
-    await api.writeFile(S.project.name, path, text);
-    written.push(path);
-    if (['ucf', 'pcf', 'lpf', 'cst', 'xdc'].includes(ext) && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
+    // through the import gate (#2830): a file it refuses is not added, said in the console; a drawing named with a
+    // reserved word refused (#679) (core/import-source.js)
+    const c = importSourceFile(f.name, new Uint8Array(await f.arrayBuffer()), role.value);
+    if (c.refused === 'gate') { app.log(`WARNING: ${c.message}`, 'warn'); continue; }
+    if (c.refused) { await alertDlg(title, c.message, 'error'); continue; }
+    if (c.warning) app.log(`WARNING: ${c.warning}`, 'warn');
+    if ((S.diskTree || S.fileTree).includes(c.path) && !await confirmDlg(title, `${c.path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
+    await api.writeFile(S.project.name, c.path, c.text);
+    written.push(c.path);
   }
   if (!written.length) return;
-  // the association (role) of exactly the files written
-  const pj = await api.project(S.project.name);
-  for (const path of written) {
-    const e = pj.files.find(x => x.path === path);
-    if (e) e.role = role.value;
-  }
+  // the association (role) of exactly the files written, and the constraints file
+  const pj = assignImported(await api.project(S.project.name), written, role.value, tree);
   delete pj.fileTree;
   await api.saveProject(pj.name, pj);
   await app.reloadProject();
