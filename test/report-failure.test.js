@@ -54,6 +54,11 @@ test('report-failure: clean takes off computer names, volumes, the runner\'s fol
   assert.equal(clean('plain line', {}), 'plain line');
   // IPv6 (but ::1), with its zone; a time or a C++ scope is not an address
   assert.equal(clean(`${j(':', '2001', 'db8', '', '7')} ${j(':', 'fe80', '', '1')}%en0 [${j(':', '2001', '0db8', '0000', '0000', '0000', 'ff00', '0042', '8329')}]:80 ::1 at 08:13:55 std::string`), '<address> <address> [<address>]:80 ::1 at 08:13:55 std::string');
+  // a tailnet's name (MagicDNS), a bare .local name and a login on a computer with no domain (#3520): ssh's message
+  const host = j('.', 'mini', 'tail0000', 'ts', 'net');
+  assert.equal(clean(`ssh: connect to host ${host} port 22: Operation timed out`), 'ssh: connect to host <host> port 22: Operation timed out');
+  assert.equal(clean(`ssh ${j('@', 'ana', 'labbox')} and ${j('.', 'labbox', 'local')}: refused`), 'ssh <user>@<host> and <host>: refused');
+  assert.deepEqual(failureLines(`2026-01-01T00:00:00Z ##[error]ssh: connect to host ${host} port 22: failed`), ['##[error]ssh: connect to host <host> port 22: failed']);
   // MAC addresses, container ids (12 or 64 hex digits with a letter and a digit); a short hash and a number stay
   assert.equal(clean(`${j(':', 'a4', '83', 'e7', '01', '23', '45')} ${j('-', '00', '1a', '2b', '3c', '4d', '5e')} 3f9c2a1b7d0e ${'a'.repeat(63)}1 359c48a 123456789012 deadbeefcafe deadbeefcaf3`), '<mac> <mac> <id> <id> 359c48a 123456789012 deadbeefcafe <id>');
 });
