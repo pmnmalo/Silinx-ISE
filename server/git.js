@@ -142,7 +142,17 @@ export async function repoOf(name) {
   const [top, prefix = ''] = r.stdout.split(/\r?\n/);
   const t = real(top), d = real(dir), ws = real(P.workspaceDir());
   const root = same(t, d) ? 'project' : same(t, ws) ? 'workspace' : null;
-  return root ? { dir, top: t, prefix: prefix.trim(), root } : null;
+  if (!root) return null;
+  await checkRepoConfig(dir);
+  return { dir, top: t, prefix: prefix.trim(), root };
+}
+
+// the repository's own configuration holds nothing that makes git run a program or read another file (#3523,
+// git-repo-config.js): checked before any other command runs in it
+async function checkRepoConfig(cwd) {
+  const list = async scope => { const c = await git(['config', `--${scope}`, '--no-includes', '--list', '-z'], { cwd }); return c.code ? '' : c.stdout; };
+  const setting = await repoConfigProblem(list);
+  if (setting) throw new GitError(`the repository's own configuration sets '${setting}': Silinx runs no git command in it`, `A repository made or cloned by Silinx has no such setting: remove it if you trust it (git config --local --unset-all ${setting}), or open the repository again with Open from Repository….`, 409);
 }
 
 async function needRepo(name) {
@@ -153,6 +163,7 @@ async function needRepo(name) {
 
 // the tools' outputs and Silinx's .gitignore (core/git-ignore.js, the browser's back end's too)
 import { GLOBS, EXCLUDE, isOutput, GITIGNORE } from '../core/git-ignore.js';
+import { repoConfigProblem } from './git-repo-config.js';
 export { GITIGNORE };
 
 async function ensureGitignore(dir) {
@@ -169,8 +180,9 @@ const headOf = async cwd => { const r = await git(['rev-parse', '--verify', '--q
 async function origin(cwd) {
   const r = await git(['remote', 'get-url', 'origin'], { cwd });
   if (r.code) throw new GitError('the repository has no remote (origin)', 'Initialize Repository… with the GitHub repository\'s address sets it.', 409);
-  const push = (await git(['remote', 'get-url', '--push', 'origin'], { cwd })).stdout.trim();
-  checkUrl(push || r.stdout.trim());
+  // (every URL of the remote, #3523: git fetches from the first, and pushes to each push URL)
+  const all = async flags => (await git(['remote', 'get-url', ...flags, '--all', 'origin'], { cwd })).stdout.split(/\r?\n/).map(u => u.trim()).filter(Boolean);
+  for (const u of [...await all([]), ...await all(['--push'])]) checkUrl(u);
   return checkUrl(r.stdout.trim());
 }
 

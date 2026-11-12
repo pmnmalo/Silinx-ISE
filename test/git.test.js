@@ -394,3 +394,50 @@ test('the routes: status, commit, push, log, show; a failure\'s message and hint
     } finally { delete process.env.SILINX_GIT; }
   } finally { await app.close(); }
 });
+
+// #3523: a repository's own configuration can name programs git runs (a filter, a driver, a helper), files to include
+// and addresses rewritten: git runs in no such repository; every URL of the remote is checked
+test('a repository whose own configuration names a program, an included file or a rewritten address: no git command runs in it; every push URL checked', async () => {
+  await P.createProject({ name: 'own-config', template: 'gates' });
+  const dir = path.join(ws, 'own-config');
+  sh(dir, 'init', '--quiet'); sh(dir, 'add', '-A'); sh(dir, 'commit', '--quiet', '-m', 'First');
+  const flag = path.join(tmp, 'config-ran');
+  const run = `sh -c "echo ran >> '${flag}'; cat"`;
+  const refused = key => ({ message: `the repository's own configuration sets '${key}': Silinx runs no git command in it`, status: 409,
+    hint: `A repository made or cloned by Silinx has no such setting: remove it if you trust it (git config --local --unset-all ${key}), or open the repository again with Open from Repository….` });
+  // a filter, named by the repository's own attributes file: nothing runs, by a status, a commit or the log
+  write(path.join(dir, '.git', 'info', 'attributes'), '* filter=x\n');
+  for (const [key, value] of [['filter.x.clean', run], ['filter.x.smudge', run], ['filter.x.process', run], ['merge.x.driver', run], ['diff.x.textconv', run],
+    ['diff.x.command', run], ['gpg.program', run], ['gpg.ssh.program', run], ['credential.helper', `!${run}`], ['core.sshCommand', run], ['core.pager', run], ['core.editor', run],
+    ['core.gitProxy', run], ['core.askPass', run], ['core.attributesFile', flag], ['core.worktree', tmp], ['include.path', flag], ['includeIf.gitdir:/.path', flag],
+    ['url.https://example.com/.insteadOf', 'https://github.com/'], ['remote.origin.vcs', 'x'], ['remote.origin.uploadpack', run], ['remote.origin.receivepack', run],
+    ['remote.origin.proxy', 'http://example.com'], ['uploadpack.packObjectsHook', run], ['sequence.editor', run], ['alias.status', `!${run}`]]) {
+    sh(dir, 'config', key, value);
+    const listed = key.replace(/^[^.]+/, s => s.toLowerCase()).replace(/[^.]+$/, s => s.toLowerCase());
+    if (key === 'core.worktree') { assert.deepEqual(await G.gitStatus('own-config'), { project: 'own-config', repository: false, files: [] }); }   // (no repository of the project's: nothing runs)
+    else {
+      await assert.rejects(G.gitStatus('own-config'), refused(listed), key);
+      await assert.rejects(G.gitCommit('own-config', 'x'), refused(listed), key);
+      await assert.rejects(G.gitLog('own-config'), refused(listed), key);
+    }
+    sh(dir, 'config', '--unset-all', key);
+  }
+  assert.equal(fs.existsSync(flag), false);
+  // the attributes file alone names a filter no configuration defines: git runs, and nothing else does
+  assert.deepEqual((await G.gitStatus('own-config')).files, []);
+  // the settings a clone, Silinx and the usual tools write: accepted
+  for (const [key, value] of [['user.name', 'Ana'], ['branch.main.description', 'x'], ['branch.main.vscode-merge-base', 'origin/main'], ['remote.origin.gh-resolved', 'base'], ['pull.rebase', 'false'], ['core.autocrlf', 'input'], ['commit.gpgsign', 'false']]) sh(dir, 'config', key, value);
+  assert.equal((await G.gitStatus('own-config')).repository, true);
+  assert.equal(fs.existsSync(flag), false);
+  // a second push URL that is not GitHub's: the push refused before git pushes to any
+  G.GIT_TESTING.localRemotes = false;
+  try {
+    sh(dir, 'config', 'remote.origin.url', 'https://github.com/a/b');
+    sh(dir, 'remote', 'set-url', '--push', 'origin', 'https://github.com/a/b');
+    sh(dir, 'remote', 'set-url', '--add', '--push', 'origin', 'https://elsewhere.example/a/b');
+    await assert.rejects(G.gitPush('own-config'), { message: 'not a GitHub repository\'s address: https://elsewhere.example/a/b' });
+    sh(dir, 'remote', 'set-url', '--add', 'origin', 'https://elsewhere.example/c/d');
+    sh(dir, 'config', '--unset-all', 'remote.origin.pushurl');
+    await assert.rejects(G.gitPull('own-config'), { message: 'not a GitHub repository\'s address: https://elsewhere.example/c/d' });
+  } finally { G.GIT_TESTING.localRemotes = true; }
+});
