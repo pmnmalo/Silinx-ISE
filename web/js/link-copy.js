@@ -18,7 +18,8 @@ import { browserCodec, textOf } from '/core/zip.js';
 import { gateZip } from '/core/import-gate.js';
 import { EXPIRY_DAYS } from '/core/gist-link.js';
 import { rememberLink, shortLinksDialog } from './short-links.js';
-import { QR_MAX_BYTES, qrBox } from './link-qr.js';
+import { qrBox } from './link-qr.js';
+import { QR_MAX_BYTES } from '/core/qr.js';
 
 const VIEWS = [['', 'Open the project only'], ['try', 'Try it (a drawing\'s simulation)'], ['simulate', 'Simulation'], ['emulate', 'Board Emulator']];
 /** The address of this app, the base of its links (its hash, a token or a link, left out). */

@@ -3,13 +3,12 @@
 // (core/qr.js, no network), an image of its SVG (the CSP's img-src data:); a click on it, or Enlarge, shows it as large as
 // the window allows, for a projector. A link longer than a QR code holds gets none: its dialog says so in the console.
 import { h, dialog } from './ui.js';
-import { QR_MAX_BYTES, qrBytes, qrSvg } from '/core/qr.js';
+import { qrSvg } from '/core/qr.js';
 
-export { QR_MAX_BYTES, qrBytes };
 const image = (svg, cls) => h('img', { class: cls, alt: 'QR code of the link', 'aria-label': 'QR code of the link', src: `data:image/svg+xml,${encodeURIComponent(svg)}` });
 
 /** The enlarged QR code of `link`, in a dialog of its own (over the one that shows it). */
-export function enlargeQr(link, title = 'QR Code') {
+function enlargeQr(link, title = 'QR Code') {
   const svg = qrSvg(link);
   if (!svg) return null;
   return dialog({
