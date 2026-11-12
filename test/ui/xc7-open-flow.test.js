@@ -1,6 +1,6 @@
 // UI: the Silinx toolchain on the Artix-7 (#3146, experimental): Design Properties offers AMD Vivado (the default) or
 // Silinx as the Basys 3's synthesis tool; Silinx chosen, the process tree is the toolchain's 7-series back end (Yosys,
-// nextpnr's Place & Route, the static timing, the programming file; no simulation model, no view, no Emulate), Generate
+// nextpnr's Place & Route, the static timing, the programming file, Emulate on Board (#3704); no simulation model, no view), Generate
 // Programming File runs it from HDL to build/top.bit with no warning, and the Design Summary says the timing is nextpnr's
 // estimate and lists the routed design's FASM; in Portuguese, the choices translated. Both interfaces.
 import { before, after } from 'node:test';
@@ -46,8 +46,11 @@ uiTest('#3146 Design Properties: the Basys 3\'s synthesis tool, Vivado or Silinx
   const labels = await procLabels(page);
   for (const present of ['User Constraints', 'Synthesize - Yosys', 'View RTL Schematic', 'Check Syntax', 'Implement Design', 'Translate', 'Place & Route', 'Generate Post-Place & Route Static Timing', 'Generate Programming File', 'Configure Target Device'])
     assert.ok(labels.includes(present), `${present}: ${labels}`);
-  for (const absent of ['Synthesize - Vivado', 'Synthesize - XST', 'Map', 'Emulate on Board', 'View Technology Schematic', 'Generate Post-Synthesis Simulation Model', 'Generate Text Power Report', 'View Implemented Design (FPGA)'])
+  for (const absent of ['Synthesize - Vivado', 'Synthesize - XST', 'Map', 'View Technology Schematic', 'Generate Post-Synthesis Simulation Model', 'Generate Text Power Report', 'View Implemented Design (FPGA)'])
     assert.ok(!labels.some(l => l.startsWith(absent)), `${absent}: ${labels}`);
+  // Emulate on Board (#3704): the HDL on the board's pins; its RTL model only (the flow makes no simulation model)
+  for (const present of ['Emulate on Board', 'Emulate Behavioral Model (RTL)']) assert.ok(labels.includes(present), `${present}: ${labels}`);
+  assert.ok(!labels.some(l => /^Emulate Post-/.test(l)), String(labels));
 
   // Generate Programming File: Yosys, nextpnr, the .bit from its FASM; no warning
   await page.eval(async () => (await import('/js/implement.js')).runImpl('top', ['synth', 'translate', 'map', 'par', 'bitgen']));

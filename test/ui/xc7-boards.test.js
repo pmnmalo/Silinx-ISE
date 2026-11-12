@@ -1,6 +1,6 @@
 // UI: the 7-series' boards (#3142): the Basys 3 and the Nexys A7 in Design Properties, marked experimental, their family
 // too; choosing one offers AMD Vivado as its synthesis tool (or the Silinx toolchain, #3146) and writes the board's pins as constraints/top.xdc; the process tree and the
-// toolbar are AMD Vivado's (#1649: its synthesis, implementation and programming, no Emulate), a run without Vivado
+// toolbar are AMD Vivado's (#1649: its synthesis, implementation and programming; the Board Emulator's Emulate, #3704), a run without Vivado
 // configured says so; Check Constraints reads XDC, its warnings exact; in Portuguese. Both interfaces.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -52,16 +52,19 @@ uiTest('#3142 #1649 Design Properties: the Basys 3, experimental; the pins as an
   assert.match(xdc, /\[get_ports \{led\[7\]\}\]\n\n# Timing constraints\ncreate_clock -add -name clk -period 10\.000 -waveform \{0\.000 5\.000\} \[get_ports \{clk\}\]\n/);
 
   // the processes: AMD Vivado's (#1649): its synthesis, the implementation, the programming file and the board; no
-  // simulation model, no technology view, no FPGA view, no Emulate
+  // simulation model, no technology view, no FPGA view; Emulate on Board (#3704)
   await page.setView('impl');
   await page.treeRow('#hier', 'top');
   const labels = await page.eval(() => [...document.querySelectorAll('#procs .row')].map(x => x.textContent.trim().replace(/^▾/, '')));
-  for (const absent of ['Synthesize - Yosys', 'Synthesize - XST', 'Emulate on Board', 'View Technology Schematic', 'Generate Post-Synthesis Simulation Model', 'View Implemented Design (FPGA)']) assert.ok(!labels.some(l => l.startsWith(absent)), `${absent}: ${labels}`);
+  for (const absent of ['Synthesize - Yosys', 'Synthesize - XST', 'View Technology Schematic', 'Generate Post-Synthesis Simulation Model', 'View Implemented Design (FPGA)']) assert.ok(!labels.some(l => l.startsWith(absent)), `${absent}: ${labels}`);
   for (const present of ['User Constraints', 'Synthesize - Vivado', 'View RTL Schematic', 'Check Syntax', 'Implement Design', 'Map', 'Place & Route', 'Generate Post-Place & Route Static Timing', 'Generate Programming File', 'Configure Target Device'])
     assert.ok(labels.includes(present), `${present}: ${labels}`);
-  // the Silinx toolbar's steps (the Silinx interface's): Emulate disabled (no emulator for the board yet), the others not
+  // Emulate on Board (#3704): the HDL on the board's pins; its RTL model only (the flow makes no simulation model)
+  for (const present of ['Emulate on Board', 'Emulate Behavioral Model (RTL)']) assert.ok(labels.includes(present), `${present}: ${labels}`);
+  assert.ok(!labels.some(l => /^Emulate Post-/.test(l)), String(labels));
+  // the Silinx toolbar's steps (the Silinx interface's): every one on, Emulate too (#3704)
   const steps = await page.eval(() => { window.SilinxApp.select?.(window.Silinx.sel); return Object.fromEntries([...document.querySelectorAll('#toolbar .m-step')].map(b => [b.dataset.step, b.disabled])); });
-  assert.deepEqual(steps, { check: false, simulate: false, implement: false, emulate: true, program: false });
+  assert.deepEqual(steps, { check: false, simulate: false, implement: false, emulate: false, program: false });
   // Synthesize with no Vivado configured: said so, the scripts generated all the same (run.tcl and run.sh in build/)
   await page.eval(async () => (await import('/js/implement.js')).runImpl('top', ['synth']));
   await page.waitConsole(/AMD Vivado not available \(docker mode\): no Vivado docker image configured \(vivado\.image\)/);

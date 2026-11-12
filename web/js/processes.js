@@ -21,7 +21,7 @@ import { openWizardModule, wizardProcessOf } from './wizard-modules.js';
 import { openEmulator, openSchematic, openTechSchematic, runSimulation } from './viewers.js';
 import { cProcesses, failedCDiags, isC } from './c-source.js';
 import { openCModel } from './c-model.js';
-import { EXTRA_STEPS, FLOW_PROCS, IMPL_IDS, buildProcesses, toolOf } from './tool-descriptors.js';
+import { EXTRA_STEPS, FLOW_PROCS, IMPL_IDS, buildProcesses, simModelsOf, toolOf } from './tool-descriptors.js';
 
 export { EXTRA_STEPS, IMPL_IDS } from './tool-descriptors.js';
 
@@ -125,10 +125,10 @@ const constraintsProcs = mod => ({ id: 'constraints', label: 'User Constraints',
   { id: 'ucf-check', label: 'Check Constraints', ico: 'process', run: () => checkUcfFile() },
 ] });
 // Emulate on Board and its models, of the top module `top` (onTop: what it does to the top, said when another
-// module is selected; none in Emulate's own list, which is the top's)
+// module is selected; none in Emulate's own list, which is the top's); the models the project's tool generates (#3704)
 const emulateProcs = (top, onTop) => ({ id: 'emulate', label: 'Emulate on Board', ico: 'board', onTop, run: () => openEmulator(top), children: [
   { id: 'emulate-rtl', label: 'Emulate Behavioral Model (RTL)', ico: 'board', onTop, run: () => openEmulator(top) },
-  ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `emulate-${step}`, label: `Emulate ${name} Model`, ico: 'board', onTop, run: () => openEmulator(top, { model: step }) })),
+  ...Object.entries(SIM_MODEL_NAMES).filter(([step]) => simModelsOf(projectTool()).includes(step)).map(([step, name]) => ({ id: `emulate-${step}`, label: `Emulate ${name} Model`, ico: 'board', onTop, run: () => openEmulator(top, { model: step }) })),
 ] });
 /** The processes of the Tasks interface's Emulate (#1204): the top module's User Constraints and Emulate on Board. */
 function emulateProcesses() {
