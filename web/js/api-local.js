@@ -29,6 +29,7 @@ import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
 import { browserGit } from './git-browser.js';
 import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, normalizeProjectJson, projectFromZip, safePath, NAME_RE, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
+import { projectNameError } from '../../core/project-name.js';
 
 const fail = msg => { throw new Error(msg); };
 
@@ -506,7 +507,7 @@ export const api = {
     const b = JSON.parse(text);
     if (!b || b.format !== 'silinx-bundle') fail('not a Silinx project bundle');
     const base = String(b.project?.name ?? '');
-    if (!NAME_RE.test(base)) fail(`invalid project name '${base}'`);
+    if (projectNameError(base)) fail(projectNameError(base));
     let name = base;
     while (await store.exists(name)) name = `${base}_${Math.floor(Math.random() * 1000)}`;
     const n = normalizeProjectJson(b.project, name);

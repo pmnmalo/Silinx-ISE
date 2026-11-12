@@ -118,7 +118,7 @@ test('folder: the exact errors (as the browser storage\'s)', async () => {
     await ops.writeFile('Err', 'lib/x.v', 'x');
     const errs = [
       [() => ops.create({ name: 'Err' }), "project 'Err' already exists"],
-      [() => ops.create({ name: '1bad' }), "invalid project name '1bad'"],
+      [() => ops.create({ name: '1bad' }), "invalid project name '1bad': a letter, then up to 63 letters, digits, - and _"],
       [() => ops.create({ name: 'T', template: 'nope' }), "unknown template 'nope'"],
       [() => ops.project('Nope'), "project 'Nope' not found"],
       [() => ops.readFile('Err', 'src/zz.vhd'), "file 'src/zz.vhd' not found"],

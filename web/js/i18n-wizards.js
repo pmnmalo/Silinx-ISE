@@ -1,8 +1,9 @@
 // Portuguese strings of the FSM, ASM, Petri net, UCF and Boolean Algebra wizards of New Source (#2082, #2140, #2149:
 // web/js/chart-wizards.js, template-page.js, ucf-wizard.js, tt-wizard.js, core/chart-templates.js; merged into the
-// dictionary of i18n.js).
+// dictionary of i18n.js); a project's name and Replace Project (New Project's, the imports', #3538).
 export const WIZARDS_PT = {
   'Wizard >': 'Assistente >',   // New Source's button (#958, #2082)
+  'Replace Project': 'Substituir Projeto',   // (New Project's and the imports', #3538)
   // the FSM and ASM wizards
   'FSM Wizard': 'Assistente de FSM', 'ASM Wizard': 'Assistente de ASM',
   'State machine (module) name:': 'Nome da máquina de estados (módulo):', 'ASM chart (module) name:': 'Nome do diagrama ASM (módulo):',
@@ -87,6 +88,11 @@ export const WIZARDS_PT = {
 const label = what => (WIZARDS_PT[`${what}:`] || `${what}:`).replace(/:$/, '');
 
 export const WIZARDS_PT_PATTERNS = [
+  // a project's name (core/project-name.js: the New Project wizard's, the imports', the server's, #3538)
+  [/^invalid project name '(.*)': a letter, then up to 63 letters, digits, - and _$/, "nome de projeto inválido '$1': uma letra, depois até 63 letras, dígitos, - e _"],
+  [/^A project named '(.*)' already exists: choose another name\.$/, "Já existe um projeto chamado '$1': escolha outro nome."],
+  [/^A project named '(.*)' already exists\.\n\nReplace it\? The existing project will be deleted from this browser\.$/, "Já existe um projeto chamado '$1'.\n\nSubstituí-lo? O projeto existente será apagado deste browser."],
+  [/^A project named '(.*)' already exists\.\n\nReplace it\? The existing project is moved to the workspace \.trash folder\.$/, "Já existe um projeto chamado '$1'.\n\nSubstituí-lo? O projeto existente é movido para a pasta .trash da pasta de trabalho."],
   [/^The template's port '(.*)' was removed: put it back, or choose another template or parameters on the Template page\.$/, "O porto '$1' do modelo foi removido: reponha-o, ou escolha outro modelo ou outros parâmetros na página Modelo."],
   [/^The port '(.*)' is wired by the template, with its direction and width: change them on the Template page, or in the schematic editor after creating it\.$/, "O porto '$1' é ligado pelo modelo, com a sua direção e largura: altere-as na página Modelo, ou no editor de esquemáticos depois de o criar."],
   [/^(.*): a whole number from (-?\d+) to (-?\d+)\.$/, (m, what, lo, hi) => `${label(what)}: um número inteiro de ${lo} a ${hi}.`],
