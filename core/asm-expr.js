@@ -3,6 +3,7 @@
 import {
   bits
 } from './asm.js';
+import { MAX_NESTING } from './util.js';
 
 // ---------------------------------------------------------------------------------------
 // Expression language: tokenizer + parser
@@ -12,6 +13,26 @@ const OPS = ['&&', '||', '==', '!=', '/=', '<<', '>>', '<=', '>=', ':=', '<', '>
 const WORD_OPS = { and: '&&', or: '||', not: '!', xor: '^' };
 
 class ExprError extends Error {}
+
+// The deepest a drawing's expression nests (#3559: an ASM chart's, a state diagram's, a Petri net's condition or action,
+// a truth table's expression): parentheses, unary operators, and the operators of a chain (a & b & c: each one a level).
+// The parser and every pass after it (the checks, the generators, the simulation) recurse once per level. Half the HDL
+// front end's MAX_NESTING (#3395): the HDL generated from it nests up to twice as deep (a Verilog NOT and its
+// parentheses), and compiles. A deeper one is the box's (the cell's) error.
+export const DRAWING_NESTING = MAX_NESTING / 2;
+export const DRAWING_NESTING_MESSAGE = `expression nested more than ${DRAWING_NESTING} levels deep (parentheses, operators)`;
+// whether an expression's tree (kids(node): its operands) is more than DRAWING_NESTING levels deep, without recursing
+// (the truth tables' expressions too, core/logic.js)
+export function deeperThanLimit(ast, kids) {
+  const stack = [[ast, 0]];   // (the levels of operators above an operand)
+  while (stack.length) {
+    const [e, d] = stack.pop();
+    if (d > DRAWING_NESTING) return true;
+    for (const x of kids(e)) stack.push([x, d + 1]);
+  }
+  return false;
+}
+const operands = (e) => (e.k === 'un' ? [e.a] : e.k === 'bin' ? [e.a, e.b] : []);
 
 function parseBased(widthStr, base, digits, src) {
   const clean = digits.replace(/_/g, '');
@@ -27,37 +48,47 @@ function parseBased(widthStr, base, digits, src) {
   return { k: 'lit', v, w, base: b };
 }
 
+// the tokens' patterns, sticky: each one read at the current position (#3559: in a time linear in the text's length)
+const T_BIT = /'([01])'/y;
+const T_BASED = /(\d+)?\s*'[sS]?([bBoOdDhH])\s*([0-9a-fA-F_xXzZ?]+)/y;
+const T_HEX = /0[xX]([0-9a-fA-F_]+)/y;
+const T_BIN = /0[bB]([01_]+)/y;
+const T_DEC = /\d[\d_]*/y;
+const T_BITS = /"([01_]*)"/y;
+const T_BADBITS = /"[^"]*"?/y;
+const T_ID = /[A-Za-z_][A-Za-z0-9_]*/y;
+
 function tokenize(src) {
   const toks = [];
   let i = 0;
+  const at = (re) => { re.lastIndex = i; return re.exec(src); };
   while (i < src.length) {
     const c = src[i];
     if (/\s/.test(c)) { i++; continue; }
-    const rest = src.slice(i);
     let m;
-    if ((m = /^'([01])'/.exec(rest))) {
+    if ((m = at(T_BIT))) {
       toks.push({ t: 'lit', v: { k: 'lit', v: BigInt(m[1]), w: 1, base: 'b' }, pos: i });
-    } else if ((m = /^(\d+)?\s*'[sS]?([bBoOdDhH])\s*([0-9a-fA-F_xXzZ?]+)/.exec(rest))) {
+    } else if ((m = at(T_BASED))) {
       toks.push({ t: 'lit', v: parseBased(m[1], m[2], m[3], m[0]), pos: i });
-    } else if ((m = /^0[xX]([0-9a-fA-F_]+)/.exec(rest))) {
+    } else if ((m = at(T_HEX))) {
       toks.push({ t: 'lit', v: parseBased(null, 'h', m[1], m[0]), pos: i });
-    } else if ((m = /^0[bB]([01_]+)/.exec(rest))) {
+    } else if ((m = at(T_BIN))) {
       toks.push({ t: 'lit', v: parseBased(null, 'b', m[1], m[0]), pos: i });
-    } else if ((m = /^\d[\d_]*/.exec(rest))) {
+    } else if ((m = at(T_DEC))) {
       toks.push({ t: 'lit', v: { k: 'lit', v: BigInt(m[0].replace(/_/g, '')), w: null, base: 'd' }, pos: i });
-    } else if ((m = /^"([01_]*)"/.exec(rest))) {
+    } else if ((m = at(T_BITS))) {
       const bits = m[1].replace(/_/g, '');
       if (!bits) throw new ExprError('empty bit-string literal ""');
       toks.push({ t: 'lit', v: { k: 'lit', v: BigInt('0b' + bits), w: bits.length, base: 'b' }, pos: i });
-    } else if ((m = /^"[^"]*"?/.exec(rest))) {
+    } else if ((m = at(T_BADBITS))) {
       throw new ExprError(`bit-string literal ${m[0]} may only contain 0, 1 and _`);
-    } else if ((m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(rest))) {
+    } else if ((m = at(T_ID))) {
       const low = m[0].toLowerCase();
       if (WORD_OPS[low]) toks.push({ t: 'op', v: WORD_OPS[low], pos: i });
       else if (low === 'true' || low === 'false') toks.push({ t: 'lit', v: { k: 'lit', v: low === 'true' ? 1n : 0n, w: 1, base: 'b' }, pos: i });
       else toks.push({ t: 'id', v: m[0], pos: i });
     } else {
-      const op = OPS.find((o) => rest.startsWith(o));
+      const op = OPS.find((o) => src.startsWith(o, i));
       if (!op) throw new ExprError(`unexpected character '${c}'`);
       toks.push({ t: 'op', v: op, pos: i });
       m = [op];
@@ -71,7 +102,7 @@ function tokenize(src) {
 const BIN_LEVELS = [['||'], ['&&'], ['|'], ['^'], ['&'], ['==', '!='], ['<', '>', '<=', '>='], ['<<', '>>'], ['+', '-']];
 
 function makeParser(toks, condMode) {
-  let p = 0;
+  let p = 0, nest = 0;
   const peek = () => toks[p];
   const opv = (tk) => {
     if (tk.t !== 'op') return null;
@@ -109,8 +140,9 @@ function makeParser(toks, condMode) {
       return { k: 'sel', name: tk.v, hi, lo };
     }
     const o = opv(tk);
-    if (o === '(') { p++; const e = binary(0); expect(')'); return e; }
-    if (o === '!' || o === '~' || o === '-') { p++; return { k: 'un', op: o, a: primary() }; }
+    if ((o === '(' || o === '!' || o === '~' || o === '-') && ++nest > DRAWING_NESTING) throw new ExprError(DRAWING_NESTING_MESSAGE);
+    if (o === '(') { p++; const e = binary(0); expect(')'); nest--; return e; }
+    if (o === '!' || o === '~' || o === '-') { p++; const e = { k: 'un', op: o, a: primary() }; nest--; return e; }
     if (tk.t === 'eof') throw new ExprError('unexpected end of expression');
     throw new ExprError(`unexpected '${tk.v}'`);
   }
@@ -125,7 +157,12 @@ function makeParser(toks, condMode) {
     }
   }
   return {
-    expr() { const e = binary(0); if (peek().t !== 'eof') throw new ExprError(`unexpected '${peek().v}'`); return e; },
+    expr() {
+      const e = binary(0);
+      if (peek().t !== 'eof') throw new ExprError(`unexpected '${peek().v}'`);
+      if (deeperThanLimit(e, operands)) throw new ExprError(DRAWING_NESTING_MESSAGE);
+      return e;
+    },
     toks, get pos() { return p; }, set pos(v) { p = v; },
   };
 }

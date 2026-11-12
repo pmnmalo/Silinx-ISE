@@ -254,6 +254,7 @@ function verifyImport(doc, conns, modules, nk) {
   return bad;
 }
 
+const CELL = 100;   // (stubNets' cells, in drawing units)
 // replace the wires of the given nets by short stubs with net-name labels
 function stubNets(doc, conns, which, modules) {
   const cache = new Map();
@@ -266,22 +267,34 @@ function stubNets(doc, conns, which, modules) {
     doc.labels = doc.labels.filter(l => !badNetObjs.has(nl.labelNet.get(l.id)));
   }
   // occupancy: pins, marker points and existing wire geometry
+  // (the segments and the points by cells of the sheet: a stub is checked against those near it, #3559)
+  const segCells = new Map(), ptCells = new Map();
+  const cellsOf = (a, b, f) => {
+    for (let cx = Math.floor(Math.min(a.x, b.x) / CELL); cx <= Math.floor(Math.max(a.x, b.x) / CELL); cx++) {
+      for (let cy = Math.floor(Math.min(a.y, b.y) / CELL); cy <= Math.floor(Math.max(a.y, b.y) / CELL); cy++) f(`${cx},${cy}`);
+    }
+  };
+  const into = (cells, c, v) => { if (!cells.has(c)) cells.set(c, []); cells.get(c).push(v); };
+  const addSeg = (p, q) => cellsOf(p, q, c => into(segCells, c, [p, q]));
+  const addPt = (set, x, y) => { const k = key(x, y); if (!set.has(k)) { set.add(k); cellsOf({ x, y }, { x, y }, c => into(ptCells, c, k)); } };
   const pinPts = new Set();
-  for (const s of doc.symbols) for (const p of symbolPins(s, modules)) pinPts.add(key(p.x, p.y));
-  for (const p of doc.ports) pinPts.add(key(p.x, p.y));
-  const segs = [];
+  for (const s of doc.symbols) for (const p of symbolPins(s, modules)) addPt(pinPts, p.x, p.y);
+  for (const p of doc.ports) addPt(pinPts, p.x, p.y);
   const endPts = new Set();
-  for (const w of doc.wires) { for (let i = 0; i + 1 < w.points.length; i++) segs.push([w.points[i], w.points[i + 1]]); for (const p of w.points) endPts.add(key(p.x, p.y)); }
+  for (const w of doc.wires) { for (let i = 0; i + 1 < w.points.length; i++) addSeg(w.points[i], w.points[i + 1]); for (const p of w.points) addPt(endPts, p.x, p.y); }
   const free = (a, b) => {
     if (pinPts.has(key(b.x, b.y)) || endPts.has(key(b.x, b.y))) return false;
-    for (const [p, q] of segs) if (onSeg(b, p, q) || onSeg(a, p, q) && !(a.x === p.x && a.y === p.y) && !(a.x === q.x && a.y === q.y)) return false;
-    // nothing else may touch the stub
-    for (const k of [...pinPts, ...endPts]) {
-      if (k === key(a.x, a.y)) continue;
-      const [x, y] = k.split(',').map(Number);
-      if (onSeg({ x, y }, a, b)) return false;
-    }
-    return true;
+    let ok = true;
+    cellsOf(a, b, c => {
+      for (const [p, q] of segCells.get(c) || []) if (onSeg(b, p, q) || onSeg(a, p, q) && !(a.x === p.x && a.y === p.y) && !(a.x === q.x && a.y === q.y)) ok = false;
+      // nothing else may touch the stub
+      for (const k of ptCells.get(c) || []) {
+        if (k === key(a.x, a.y)) continue;
+        const [x, y] = k.split(',').map(Number);
+        if (onSeg({ x, y }, a, b)) ok = false;
+      }
+    });
+    return ok;
   };
   let wk = doc.wires.reduce((m, w) => Math.max(m, +String(w.id).replace(/\D/g, '') || 0), 0);
   let lk = doc.labels.reduce((m, l) => Math.max(m, +String(l.id).replace(/\D/g, '') || 0), 0);
@@ -299,7 +312,7 @@ function stubNets(doc, conns, which, modules) {
       }
       if (!q) q = { x: p.x + dx * 30, y: p.y + dy * 30 };
       doc.wires.push({ id: `W${++wk}`, points: [{ x: p.x, y: p.y }, q], ...(n.width > 1 ? { bus: true } : {}) });
-      segs.push([{ x: p.x, y: p.y }, q]); endPts.add(key(q.x, q.y)); endPts.add(key(p.x, p.y));
+      addSeg({ x: p.x, y: p.y }, q); addPt(endPts, q.x, q.y); addPt(endPts, p.x, p.y);
       if (!e.port || nk2(doc, e.port) !== n.name) doc.labels.push({ id: `L${++lk}`, x: q.x, y: q.y, net: n.name });
     }
   }
