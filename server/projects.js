@@ -361,6 +361,8 @@ export async function deleteProject(name) {
 
 // project-relative path normalised to forward slashes, without './' or a trailing '/'
 export const relKey = (dir, full) => path.relative(dir, full).split(path.sep).join('/');
+// a name given with a backslash, as given (the import gate refuses it), or null: on Windows relKey reads it as a separator
+const givenBackslash = rel => (String(rel).includes('\\') ? String(rel) : null);
 // a name as a case-insensitive file system may read it (core/fold-name.js, shared with the browser, #3034)
 export { foldName };
 // (whatever its case: on a case-insensitive file system SILINX.JSON is the same file)
@@ -432,7 +434,8 @@ export async function writeFile(name, rel0, text) {
   // a name by the import gate's rules (#3414: no backslash, stream, trailing dot or space, invisible character…), as
   // Rename's; build/'s own files by the rest of their path
   const inBuild = /^build\//.test(rel);
-  const gated = normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
+  // (the name as given when it has a backslash: Windows' path functions read it as a folder's separator, #3611)
+  const gated = normalizePath(givenBackslash(rel0) ?? (inBuild ? `b${rel.slice(5)}` : rel));   // (build/x as b/x: its own name checked)
   if (gated.reason) throw new HttpError(400, `'${rel0}': not written: ${gated.reason}`);
   // (onto a folder, or through a file: the project's path in the message, #3537)
   if ((await fs.stat(full).catch(() => null))?.isDirectory()) throw new HttpError(400, `'${rel}' is a folder, not a file`);
@@ -470,7 +473,7 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
   if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
   refuseHidden(dir, from, src, 'renamed');
-  const gated = checkName ? normalizePath(toKey) : {};
+  const gated = checkName ? normalizePath(givenBackslash(to) ?? toKey) : {};
   if (gated.reason) throw new HttpError(400, `'${to}': not renamed: ${gated.reason}`);
   refuseHidden(dir, to, dst, 'renamed');   // (through a symbolic link too)
   return withProjectLock(name, async () => {

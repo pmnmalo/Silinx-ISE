@@ -36,11 +36,11 @@ test('#3412 import_project: a .xise at the exchange folder\'s root, or the folde
   fs.writeFileSync(path.join(xchg, 'other', 'thesis.vhd'), '-- a thesis');
   for (const from of ['a.xise', path.join(xchg, 'a.xise'), '<exchange folder>/a.xise']) {
     const r = await call('import_project', { name: 'x', from });
-    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${from.replace(xchg, '<exchange folder>')}' is at the exchange folder's root, with whatever else is there: put the ISE project in a folder of its own and import that folder's .xise`], from);
+    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${from.replace(xchg, '<exchange folder>').replaceAll('\\', '/')}' is at the exchange folder's root, with whatever else is there: put the ISE project in a folder of its own and import that folder's .xise`], from);
   }
   for (const from of ['.', xchg, '<exchange folder>', 'other/..']) {
     const r = await call('import_project', { name: 'x', from });
-    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${from.replace(xchg, '<exchange folder>')}' is the exchange folder itself: give a project's own folder in it`], from);
+    assert.deepEqual([r.isError, r.text], [true, `import_project: from: '${from.replace(xchg, '<exchange folder>').replaceAll('\\', '/')}' is the exchange folder itself: give a project's own folder in it`], from);
   }
   assert.equal(fs.existsSync(P.projectDir('x')), false);
   // (in a folder of its own: its files only)
@@ -80,4 +80,13 @@ test('#3418 the workspace and the exchange folder named as such in results and e
   fs.mkdirSync(`${xchg}2`);
   const o = await call('export_project', { project: 'rep', path: path.join(`${xchg}2`, 'r.zip') });
   assert.equal(o.text, `export_project: path: '${path.join(`${xchg}2`, 'r.zip')}' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
+});
+
+test('#3611 a path in a folder named as such, with / on every system: Windows\' <exchange folder>\\a\\r.zip is <exchange folder>/a/r.zip', async () => {
+  const { pathNamer } = await import('../server/mcp-util.js');
+  const name = await pathNamer();
+  assert.equal(name(`exported: ${xchg}\\a\\r.zip (12 bytes)`), 'exported: <exchange folder>/a/r.zip (12 bytes)');
+  assert.equal(name(`'${xchg}/a/r.zip' exists; run ${process.env.SILINX_WORKSPACE}\\p\\build\\run.sh on a machine with C:\\Xilinx`),
+    '\'<exchange folder>/a/r.zip\' exists; run <workspace>/p/build/run.sh on a machine with C:\\Xilinx');
+  assert.deepEqual(name({ files: [`${xchg}\\x.vcd`, `${xchg}2\\y.vcd`] }), { files: ['<exchange folder>/x.vcd', `${xchg}2\\y.vcd`] });
 });

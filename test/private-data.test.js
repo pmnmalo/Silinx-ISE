@@ -344,12 +344,17 @@ test('the history scan (#3520): a file whose path git quotes is read under its o
   try {
     git('init', '-q', '-b', 'main');
     // the file before it in the commit is one the allow-list allows: its lines were filed under it, and allowed
-    const allowedFile = 'test/server-api.test.js', quoted = 'docs/a"b\\c.md';
-    fs.mkdirSync(path.join(dir, 'test')); fs.mkdirSync(path.join(dir, 'docs'));
-    fs.writeFileSync(path.join(dir, allowedFile), 'x\n');
-    fs.writeFileSync(path.join(dir, ...quoted.split('/')), `ssh to ${dot('fpga-lab', 'local')}\n`);
-    fs.writeFileSync(path.join(dir, 'docs', 'bin"x.dat'), Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(` mail jane${at}${dot('mail', 'pt')} `)]));
-    git('add', '.'); git('commit', '-q', '-m', 'files');
+    // (Windows has no file named with " or \, and git there no path with \, #3616: the files go into the commit
+    // through git's index, never the folder)
+    const allowedFile = 'test/server-api.test.js', quoted = process.platform === 'win32' ? 'docs/a"b.md' : 'docs/a"b\\c.md';
+    const add = (file, content) => {
+      const sha = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: dir, input: content, encoding: 'utf8' }).trim();
+      git('update-index', '--add', '--cacheinfo', `100644,${sha},${file}`);
+    };
+    add(allowedFile, 'x\n');
+    add(quoted, `ssh to ${dot('fpga-lab', 'local')}\n`);
+    add('docs/bin"x.dat', Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(` mail jane${at}${dot('mail', 'pt')} `)]));
+    git('commit', '-q', '-m', 'files');
     assert.deepEqual(report(), [
       `${quoted}:1: computer name: ${dot('fpga-lab', 'local')}`,
       `docs/bin"x.dat:1: e-mail address: jane${at}mail.pt`,

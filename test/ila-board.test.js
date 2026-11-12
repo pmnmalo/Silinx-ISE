@@ -14,7 +14,8 @@ import { scratchEnv } from './server-helpers.js';
 import { capSpec, SAMPLES } from './ila-lib.mjs';
 
 const STUB = fileURLToPath(new URL('./fixtures/adepttool-stub', import.meta.url));
-const PY = spawnSync('sh', ['-c', 'command -v python3'], { encoding: 'utf8' }).stdout.trim();
+// (Python's own path, as the system names it: on Windows sh's command -v gives Git Bash's /c/…, no file to Node, #3613)
+const PY = spawnSync('python3', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).stdout?.trim() ?? '';
 const skip = !PY && 'no Python 3 here';
 const cfg = { paths: { adepttool: STUB, adepttoolPython: PY } };
 const hex = v => v.toString(16);

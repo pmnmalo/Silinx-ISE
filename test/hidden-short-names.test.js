@@ -49,7 +49,8 @@ test('the file writes (the server\'s and the MCP\'s): an alias segment refused, 
     await fails('read_file', { project: 'p', path: rel }, `'${rel}': a hidden file or folder cannot be read`);
   }
   assert.equal(fs.readFileSync(path.join(ws, 'p', '.git', 'config'), 'utf8'), '[core]\n');
-  assert.equal(fs.existsSync(path.join(ws, 'p', 'GIT~1')), false);
+  // (no folder of that name made: on Windows GIT~1 is .git's own short name, which existsSync finds, #3616)
+  assert.deepEqual(fs.readdirSync(path.join(ws, 'p')).filter(f => /~/.test(f)), []);
   // the interface's route: the same
   const app = await startApp();
   try {

@@ -242,11 +242,11 @@ test('clone: refused into an existing project, for a repository of several proje
     return true;
   });
   await rejects(G.gitClone({ url: bareWith('none', d => write(path.join(d, 'README.md'), 'x\n')) }), 'the repository is not a Silinx project: it has no silinx.json');
-  await rejects(G.gitClone({ url: bareWith('nul', d => { gates(d); write(path.join(d, 'src', 'bad.vhd'), 'entity\0x'); }) }), 'not opened: src/bad.vhd: not imported: binary content (a NUL byte) in a text file');
+  await rejects(G.gitClone({ url: bareWith('binary', d => { gates(d); write(path.join(d, 'src', 'bad.vhd'), 'entity\0x'); }) }), 'not opened: src/bad.vhd: not imported: binary content (a NUL byte) in a text file');
   await rejects(G.gitClone({ url: bareWith('json', d => { gates(d); write(path.join(d, 'silinx.json'), '{'); }) }), 'not opened: its silinx.json is not valid JSON');
   await assert.rejects(G.gitClone({ url: path.join(tmp, 'remotes', 'missing.git') }), e => { assert.match(e.message, /^git clone: /); assert.equal(e.hint, 'Check the repository\'s address, and that your GitHub account can see it.'); return true; });
   // nothing left behind
-  assert.deepEqual(fs.readdirSync(ws).filter(n => n.startsWith('.silinx-clone') || ['several', 'none', 'nul', 'json', 'missing'].includes(n)), []);
+  assert.deepEqual(fs.readdirSync(ws).filter(n => n.startsWith('.silinx-clone') || ['several', 'none', 'binary', 'json', 'missing'].includes(n)), []);
 });
 
 // #3359: a hidden file is no part of a project: a clone leaves the repository's out of the folder (git's sparse
@@ -487,4 +487,19 @@ test('a repository whose own configuration names a program, an included file or 
     sh(dir, 'config', '--unset-all', 'remote.origin.pushurl');
     await assert.rejects(G.gitPull('own-config'), { message: 'not a GitHub repository\'s address: https://elsewhere.example/c/d' });
   } finally { G.GIT_TESTING.localRemotes = true; }
+});
+
+// #3613: Windows' temporary folder can be a short (8.3) name (RUNNER~1 for runneradmin), which fs.realpathSync leaves
+// as it is while git names the repository by its long name: the project's folder in its native form, as git's.
+// Emulated: the workspace through a symbolic link, which git resolves and a realpath that resolves nothing leaves
+test('#3613 a workspace named by an alias the system resolves (Windows\' short names): its projects\' repositories found', async () => {
+  const alias = path.join(tmp, 'alias-ws');
+  fs.symlinkSync(ws, alias, 'junction');
+  const realpathSync = fs.realpathSync;
+  fs.realpathSync = Object.assign(p => path.resolve(String(p)), { native: realpathSync.native });
+  process.env.SILINX_WORKSPACE = alias;
+  try {
+    const s = await G.gitStatus('gates');
+    assert.deepEqual([s.repository, s.root, s.branch], [true, 'project', 'main']);
+  } finally { fs.realpathSync = realpathSync; process.env.SILINX_WORKSPACE = ws; fs.rmSync(alias); }
 });

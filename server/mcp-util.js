@@ -44,10 +44,12 @@ export async function pathNamer() {
       if (d && d.length > 1) pairs.push([d, label]);
     }
   }
-  // (the longest first: a folder inside the other; a folder's name only where it ends, not Downloads2's start)
+  // (the longest first: a folder inside the other; a folder's name only where it ends, not Downloads2's start; the path
+  // that follows, up to a space or a quote, with / on every system, as the tools take it: <exchange folder>/a.zip, not
+  // Windows' <exchange folder>\a.zip, #3611)
   const res = pairs.sort((a, b) => b[0].length - a[0].length)
-    .map(([d, label]) => [new RegExp(`${d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\\\/]|$|[^\\w.-])`, 'g'), label]);
-  const name = v => (typeof v === 'string' ? res.reduce((t, [re, label]) => t.replace(re, label), v)
+    .map(([d, label]) => [new RegExp(`${d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\\\/]|$|[^\\w.-])([^\\s'"\`]*)`, 'g'), label]);
+  const name = v => (typeof v === 'string' ? res.reduce((t, [re, label]) => t.replace(re, (m, rest) => label + rest.replaceAll('\\', '/')), v)
     : Array.isArray(v) ? v.map(name) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, name(x)])) : v);
   return name;
 }

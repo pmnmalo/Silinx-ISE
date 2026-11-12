@@ -32,7 +32,8 @@ test('#3193 the template: the starter project, the student\'s copy and the files
   const { files, exerciseFile } = makeTemplate(EXERCISE, path.join(EX, 'starter'), dir);
   assert.equal(exerciseFile, 'counter4.exercise.json');
   assert.deepEqual(Object.keys(files).sort(), ['.github/workflows/silinx-grade.yml', '.gitignore', 'README.md', 'counter4.exercise.json', 'silinx.json', 'src/counter4.vhd', 'tests/count.vec']);
-  const all = execFileSync('find', [dir, '-type', 'f'], { encoding: 'utf8' }).trim().split('\n').map(f => path.relative(dir, f)).sort();
+  // (every file written, by its path with / on every system, #3611)
+  const all = fs.readdirSync(dir, { recursive: true }).filter(f => fs.statSync(path.join(dir, f)).isFile()).map(f => f.split(path.sep).join('/')).sort();
   assert.deepEqual(all, Object.keys(files).sort());
   // (nothing of the hidden tests: no reference, no test bench, no random test's seed, not in any file)
   const text = Object.values(files).join('\n');

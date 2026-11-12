@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'packages', 'silinx-hdl');
@@ -62,7 +62,7 @@ test('#1710 the front end\'s modules are in the package, core/\'s old paths re-e
   for (const [old, mod] of shims) {
     assert.equal(mod, `packages/silinx-hdl/src/${old.slice('core/'.length)}`, old);
     assert.match(read(path.join(ROOT, old)), /^\/\/ Silinx - moved to packages\/silinx-hdl\/src\/[\w/-]+\.js \(#1710[^\n]*\n[^\n]+\n$/, `${old}: a comment and the re-export only`);
-    const a = await import(path.join(ROOT, old)), b = await import(path.join(ROOT, mod));
+    const a = await import(pathToFileURL(path.join(ROOT, old)).href), b = await import(pathToFileURL(path.join(ROOT, mod)).href);
     assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort(), old);
     assert.ok(Object.keys(b).length > 0, mod);
     for (const k of Object.keys(b)) assert.equal(a[k], b[k], `${old} ${k}`);
