@@ -5,6 +5,7 @@ import { Block } from './c-interp-task.js';
 import { INT, BOOL, typeOf, promote, binaryType, compareType, shiftType, unaryType, literalType, wrap } from './c-types.js';
 import { F64, F32, fmtFloat } from './c-float.js';
 import { fixedType, toFixed, fixedOp, fixedCompare, fixedToInt, fixedToDouble, fixedText } from './c-fixed.js';
+import { MAX_ARRAY_ELEMENTS, arrayMessage } from './c-limits.js';
 
 const CMP = { '==': (a, b) => a === b, '!=': (a, b) => a !== b, '<': (a, b) => a < b, '<=': (a, b) => a <= b, '>': (a, b) => a > b, '>=': (a, b) => a >= b };
 
@@ -101,7 +102,9 @@ export const exprMethods = {
   heapPtr(x, to, e) {
     const t = typeOf(to);
     if (!t) this.fail(e, 'malloc: its memory is given to a pointer to numbers');
-    const arr = Array.from({ length: Math.floor(x.heap / Math.ceil((t.w || 32) / 8)) }, () => ({ v: t.fl ? 0 : 0n }));
+    const n = Math.floor(x.heap / Math.ceil((t.w || 32) / 8));
+    if (n > MAX_ARRAY_ELEMENTS) this.fail(e, `malloc: ${arrayMessage(null, n)}`);   // (#3558)
+    const arr = Array.from({ length: n }, () => ({ v: t.fl ? 0 : 0n }));
     if (!arr.length) this.fail(e, `malloc: ${x.heap} bytes hold no element`);
     return { ptr: this.elemRef(arr, 0, t), t };
   },

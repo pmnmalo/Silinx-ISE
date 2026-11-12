@@ -25,6 +25,13 @@ Spartan-3E, so it is not Silinx's oracle: the C itself is (see *Checking it* bel
   that is not `main`. The other functions are inlined into it. `main()` is the test bench (C
   simulation, C/RTL co-simulation); it is never synthesized.
 - `#define` constants and function-like macros of one expression; `#if`/`#ifdef` on them.
+- **Limits** (#3558, `core/c-limits.js`), each one error where it is passed: an array of at most 2^22 elements (all its
+  dimensions; a test bench's array of a size known when it runs, and `malloc`'s, too); an array in the hardware (a
+  memory of the module, or the values of a combinational one) of at most 2^23 bits; parentheses, a call's arguments,
+  indexes, `?:` and assignments nested at most 256 deep, statements (blocks, `if` and `else if`, loops, `switch`) too;
+  an expression at most 1024 operators deep (a chain of 1024 `+` is that deep); a macro's expansion at most 65,536
+  tokens, macros nested at most 256 deep. A source deeper than the stack holds all the same (functions calling each
+  other at the far end of long expressions) is refused with one error.
 - `__SYNTHESIS__` is defined in synthesis, as Vitis HLS's (#1897): code under `#ifndef __SYNTHESIS__` runs only in the
   C simulation, even in the top function (a trace file of each call, as AMD's examples write), checked as the test
   bench's.

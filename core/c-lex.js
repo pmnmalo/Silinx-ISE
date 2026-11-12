@@ -16,6 +16,7 @@
 import { cppTokens, CPP_HEADERS, isCpp } from './cpp-lex.js';
 import { CPP_OWN_HEADERS } from './cpp-headers.js';
 import { readPragma } from './c-pragma.js';
+import { MAX_NESTING, MAX_MACRO_TOKENS, macroMessage, macroNestingMessage } from './c-limits.js';
 import { cppTemplates } from './cpp-template.js';
 import { cppStl } from './cpp-stl.js';
 import { cppTestBench } from './cpp-tb.js';
@@ -198,16 +199,29 @@ export function numText(v) {
 }
 
 // ---------------------------------------------------------------- macros
-/** The tokens with the macros expanded (object-like and function-like; no recursion into the same macro). */
-function expand(toks, macros, err, active = new Set()) {
+/** The tokens with the macros expanded (object-like and function-like; no recursion into the same macro). Each macro
+ *  the line names at most MAX_MACRO_TOKENS tokens, macros at most MAX_NESTING deep (#3558): past either, its error and
+ *  the macro 0 (budget: { left, said }, shared by one macro's levels, each token counted where it is made). */
+function expand(toks, macros, err, active = new Set(), budget = null, name = null) {
   const out = [];
-  for (let k = 0; k < toks.length; k++) {
+  const stop = (message) => { if (!budget.said) { budget.said = true; err(message); } };
+  const keep = (t) => { if (budget && --budget.left < 0) stop(macroMessage(name)); else out.push(t); };
+  // (a macro's tokens pushed one by one: out.push(...x) of a long x is a RangeError)
+  const deeper = (m, body, at) => {
+    const b = budget ?? { left: MAX_MACRO_TOKENS, said: false };
+    if (active.size >= MAX_NESTING) { if (!b.said) { b.said = true; err(macroNestingMessage(m)); } } else {
+      const list = expand(body, macros, err, new Set([...active, m]), b, name ?? m);
+      if (!b.said) { for (const x of list) out.push(at(x)); return; }
+    }
+    if (!budget) out.push(at({ t: 'num', v: '0' }));
+  };
+  for (let k = 0; k < toks.length && !budget?.said; k++) {
     const t = toks[k];
     const m = t.t === 'id' && !active.has(t.v) ? macros.get(t.v) : null;
-    if (!m) { out.push(t); continue; }
+    if (!m) { keep(t); continue; }
     const at = (x) => ({ ...x, line: t.line, col: t.col });
-    if (!m.params) { out.push(...expand(m.body, macros, err, new Set([...active, t.v])).map(at)); continue; }
-    if (toks[k + 1]?.v !== '(') { out.push(t); continue; }
+    if (!m.params) { deeper(t.v, m.body, at); continue; }
+    if (toks[k + 1]?.v !== '(') { keep(t); continue; }
     // the arguments: split at the commas outside parentheses
     const args = [[]];
     let depth = 0, j = k + 2;
@@ -224,9 +238,12 @@ function expand(toks, macros, err, active = new Set()) {
     const body = [];
     for (const b of m.body) {
       const i = b.t === 'id' ? m.params.indexOf(b.v) : -1;
-      body.push(...(i >= 0 ? [{ t: 'op', v: '(' }, ...(given[i] || []), { t: 'op', v: ')' }] : [b]));
+      if (i < 0) { body.push(b); continue; }
+      body.push({ t: 'op', v: '(' });
+      for (const x of given[i] || []) body.push(x);
+      body.push({ t: 'op', v: ')' });
     }
-    out.push(...expand(body, macros, err, new Set([...active, t.v])).map(at));
+    deeper(t.v, body, at);
     k = j;
   }
   return out;
@@ -373,7 +390,7 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     for (const t of scan(text, line, lineBad)) scanned.push(place(t));
     for (const b of lineBad) bad.push({ ...b, ...place({ col: b.col }) });
     const sim = !liveSyn();
-    tokens.push(...expand(scanned, macros, (m) => err(line, scanned[0]?.col || 1, m)).map((t) => (sim ? { ...own(t), sim } : own(t))));
+    for (const t of expand(scanned, macros, (m) => err(line, scanned[0]?.col || 1, m))) tokens.push(sim ? { ...own(t), sim } : own(t));
   }
   for (const c of cond) err(c.line, 1, '#if with no #endif');
   for (const b of bad) err(b.line, b.col, b.message);

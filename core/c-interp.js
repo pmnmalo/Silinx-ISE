@@ -16,6 +16,7 @@ import { typeOf } from './c-types.js';
 import { exprMethods, convert } from './c-interp-expr.js';
 import { libMethods, Exit } from './c-interp-lib.js';
 import { taskMethods } from './c-interp-task.js';
+import { DEEP_MESSAGE, isStackOverflow, MAX_ARRAY_ELEMENTS, arrayMessage } from './c-limits.js';
 
 export const MAX_STEPS = 20_000_000;
 
@@ -124,6 +125,8 @@ class Machine {
       let at = t;
       // (a size known when it runs: a test bench's, #1734)
       for (; at.kind === 'array'; at = at.of) dims.push(at.length ?? (at.size ? Number(this.intOf(this.eval(at.size), v)) : at === t && v.init?.kind === 'init' ? v.init.items.length : 0));
+      // (a size known when it runs: at most MAX_ARRAY_ELEMENTS too, #3558)
+      if (dims.reduce((a, b) => a * b, 1) > MAX_ARRAY_ELEMENTS) this.fail(v, arrayMessage(v.name, dims.reduce((a, b) => a * b, 1)));
       // (const char *: a test bench's texts, each cell a pointer, #2309)
       if (at.kind === 'ptr' && at.to.kind === 'int' && at.to.bits === 8) {
         const n = dims.reduce((a, b) => a * b, 1), et = { w: 64, s: false, ap: false, text: true };
@@ -180,6 +183,8 @@ class Machine {
       return { ok: true, output: this.out.join(''), exitCode: r ? Number(convert(r.v ?? 0n, { w: 32, s: true })) : 0, calls: this.calls, error: null, steps: this.steps };
     } catch (e) {
       if (e instanceof Exit) return { ok: true, output: this.out.join(''), exitCode: e.code, calls: this.calls, error: null, steps: this.steps };
+      // (the stack ran out: the calls too deep for it, at the function it ran in, #3558)
+      if (isStackOverflow(e)) { const at = e.fn?.loc; return { ok: false, output: this.out.join(''), exitCode: null, calls: this.calls, error: { line: at?.line || 1, col: at?.col || 1, message: DEEP_MESSAGE }, steps: this.steps }; }
       if (!(e instanceof Halt)) throw e;
       return { ok: false, output: this.out.join(''), exitCode: null, calls: this.calls, error: { line: e.loc?.line || 1, col: e.loc?.col || 1, message: e.message }, steps: this.steps };
     }
@@ -249,7 +254,7 @@ class Machine {
       const r = this.items(fn.body.items);
       if (r instanceof Return) return r.value && fn.ret.kind !== 'void' ? { v: this.as(r.value, typeOf(fn.ret), r.at), t: typeOf(fn.ret) } : null;
       return null;
-    } finally { this.frames.pop(); }
+    } catch (e) { if (isStackOverflow(e)) e.fn ??= fn; throw e; } finally { this.frames.pop(); }
   }
   /** A function's parameters in its scope. */
   bind(scope, fn, args, at) {
