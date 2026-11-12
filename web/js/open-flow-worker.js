@@ -96,7 +96,8 @@ function nextpnrBrowser(url, post, runner, mb = 7) {
 // a family's nextpnr and packer of YoWASP's (the iCE40's icepack #2295, the ECP5's ecppack #2302; the Gowin's nextpnr alone #2303): their bundle served by the
 // local server (its URL), or their package from npm's registry, kept by this browser (the published editions: its { url,
 // integrity }, #2444); own: { family, where, tools, mb }
-const OWN_IO = { ice40: ice40Io, ecp5: ecp5Io, gowin: gowinIo };
+// (a Map: the family the page names is looked up among these only, never a name of an object's own, #3662)
+const OWN_IO = new Map([['ice40', ice40Io], ['ecp5', ecp5Io], ['gowin', gowinIo]]);
 const owns = new Map();
 function ownBrowser({ family, where, tools, mb }, post) {
   const key = `${family} ${where.url || where}`;
@@ -110,7 +111,11 @@ function ownBrowser({ family, where, tools, mb }, post) {
     const r = await fetch(new URL(`../${name}`, where));
     return r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
   };
-  if (!owns.has(key)) owns.set(key, OWN_IO[family](load, file));
+  if (!owns.has(key)) {
+    const io = OWN_IO.get(family);
+    if (!io) throw new Error(`the family '${family}' has no tools of its own in the browser`);
+    owns.set(key, io(load, file));
+  }
   return owns.get(key);
 }
 

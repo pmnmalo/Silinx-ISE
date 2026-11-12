@@ -73,3 +73,27 @@ uiTest('#2388 a fake family\'s back end runs in the browser\'s worker: its steps
   assert.deepEqual(again.done.report.timing, { routed: '.asc 9' });
   assert.deepEqual(again.lines.filter((l) => /^(WARNING|ERROR)/.test(l)), []);
 }, { timeout: 60000 });
+
+uiTest('#3662 the flow worker: a family with no tools of its own in the browser is an error naming it, never a method of an object\'s (CodeQL js/unvalidated-dynamic-method-call)', E, async (page) => {
+  const r = await page.eval(async () => {
+    const root = new URL('/', location.href).href;
+    const out = [];
+    for (const family of ['constructor', 'toString', 'spartan3e']) {
+      const w = new Worker('/js/open-flow-worker.js', { type: 'module' });
+      const lines = [];
+      const done = await new Promise((resolve, reject) => {
+        w.onerror = e => reject(new Error(e.message || 'the worker failed'));
+        w.onmessage = ({ data }) => { if (data.line !== undefined) lines.push(data.line); if (data.done) resolve(data.done); };
+        w.postMessage({ id: 1, spec: { top: 'top', family: 'gowin', steps: ['synth'] }, sources: [], simSources: [], ucf: null, ucfName: null, files: {}, assets: root,
+          yosys: new URL('vendor/yowasp-yosys/gen/bundle.js', root).href, nextpnrOwn: { family, where: root } });
+      });
+      w.terminate();
+      out.push({ family, ok: done.ok, error: done.error, lines: lines.filter(l => /^(WARNING|ERROR|===)/.test(l)) });
+    }
+    return out;
+  });
+  assert.deepEqual(r, ['constructor', 'toString', 'spartan3e'].map(family => {
+    const error = `the family '${family}' has no tools of its own in the browser`;
+    return { family, ok: false, error, lines: [`ERROR:Silinx - ${error}`, '=== SILINX FAILED synth (exit 1) ==='] };
+  }));
+}, { timeout: 60000 });
