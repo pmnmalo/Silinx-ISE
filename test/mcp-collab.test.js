@@ -4,6 +4,7 @@
 // client.js) and the MCP's follow of it; a change on disk arriving; the status with its follower; stop; the errors.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { decodeSvg } from './qr-helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
@@ -70,6 +71,12 @@ test('share_project start: a page follows it (the project, its files, the owner\
   assert.deepEqual(r.data, { project: 'traffic', shared: true, link, followers: [] });
   // (again: the same link)
   assert.equal((await ok('share_project', { project: 'traffic', server: base })).text, `'traffic' is shared already: ${link}`);
+  // (its QR code, #3637: the follow link's, decoded back; the status's too)
+  const q = await ok('share_project', { project: 'traffic', server: base, qr: true });
+  assert.equal(q.text, `'traffic' is shared already: ${link}`);
+  assert.equal(decodeSvg(q.data.qr), link);
+  assert.equal(decodeSvg((await ok('share_project', { project: 'traffic', action: 'status', qr: true })).data.qr), link);
+  assert.equal((await ok('share_project', { project: 'traffic', action: 'status' })).data.qr, undefined);
   const l = parseFollowLink(link);
   const page = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Rui' } });
   await page.ready;
@@ -129,6 +136,8 @@ test('#3631 share_project top (Share Module Live…): the links open on the modu
   const again = await ok('share_project', { project: 'blinkyMod', server: base, top: 'knight' });
   assert.equal(again.text, `'blinkyMod' is shared already, opening on knight: ${link.replace(/speed_ctrl$/, 'knight')}`);
   assert.equal(again.data.editLink, editLink.replace(/speed_ctrl$/, 'knight'));
+  // (its QR code, #3637: the module's follow link's)
+  assert.equal(decodeSvg((await ok('share_project', { project: 'blinkyMod', server: base, top: 'knight', qr: true })).data.qr), link.replace(/speed_ctrl$/, 'knight'));
   assert.equal((await ok('share_project', { project: 'blinkyMod', action: 'status' })).data.link, link.replace(/&top=speed_ctrl$/, ''));
   const f = await ok('follow_project', { link, name: 'Bot' });
   assert.equal(f.data.top, 'speed_ctrl');

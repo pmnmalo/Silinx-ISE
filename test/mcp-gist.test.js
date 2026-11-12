@@ -3,6 +3,7 @@
 // with no token; a deleted gist and no token said with their messages.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { decodeSvg } from './qr-helpers.js';
 import { scratchEnv } from './server-helpers.js';
 import { fakeGitHub } from './fake-github.mjs';
 
@@ -32,6 +33,11 @@ test('project_link short: a secret gist, the link #gist=…; open_link opens it 
   assert.equal(r.data.length, link.length);
   assert.ok(r.text.startsWith('The short link of \'lamp\', opening the simulation ('), r.text);
   assert.equal(gh.gists.get(r.data.gist).public, false);
+  assert.equal(r.data.qr, undefined);
+  // (its QR code, #3637: the short link's, decoded back)
+  const q = await ok('project_link', { project: 'lamp', short: true, qr: true });
+  assert.equal(decodeSvg(q.data.qr), q.data.link);
+  assert.ok(q.text.startsWith('With its QR code (qr, an SVG). The short link of \'lamp\' ('), q.text);
   delete process.env.GH_TOKEN;
   const o = await ok('open_link', { link, name: 'lamp2' });
   assert.equal(o.data.project, 'lamp2');
