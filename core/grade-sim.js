@@ -14,7 +14,7 @@ import { pattern } from './labs-check.js';
 import { portProblems } from './grade-design.js';
 
 const DELTA_RE = /^delta cycle limit \(\d+\) exceeded/;
-const ITER_RE = /^loop iteration limit exceeded/;   // (a loop of 10 million iterations in one process run, core/interp.js)
+const ITER_RE = /^loop iteration limit exceeded/;   // (a process run of more than MAX_ITERATIONS loop iterations and calls, #3525)
 const FINISH_RE = /^simulation (finished|stopped) \(\$\w+\)/;
 const portOf = (design, name) => design.top.ports.find(p => p.name.toLowerCase() === name.toLowerCase());
 

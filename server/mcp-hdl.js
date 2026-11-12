@@ -109,10 +109,13 @@ const nth = n => n.toLocaleString('en-US');
  *  time steps' limit, SIM_LIMITS.steps). */
 export async function runBounded(sim, until, { timeoutS, signal, steps: maxSteps = SIM_LIMITS.steps }) {
   const deadline = Date.now() + timeoutS * 1000;
+  // (the clock looked at inside a process's run too, #3525: one that does not wait stops at the deadline)
+  sim.deadline = deadline;
   let steps = 0, lastYield = Date.now(), st;
   for (;;) {
     const n = Math.min(SIM_CHUNK, maxSteps - steps);
     st = sim.run(until, { maxSteps: n });
+    if (sim.timedOut) return { st, limit: 'time' };
     if (st.finished || st.now >= until) return { st, limit: null };
     steps += n;
     if (steps >= maxSteps) return { st, limit: 'steps' };

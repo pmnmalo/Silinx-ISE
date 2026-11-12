@@ -2,7 +2,7 @@
 // asynchronous resets, and combinational), the initial blocks, the primitives' instances, the declarations with the
 // signals' start values, and the text of the one flat module with what the synthesis needs to know of it. The values
 // and statements it writes come from toVerilog's translator. Isomorphic (no DOM, no Node APIs).
-import { SimError, applyWrite, bitpos, exec } from './interp.js';
+import { SimError, applyWrite, bitpos, exec, newBudget } from './interp.js';
 import * as V from './values.js';
 import { SynthError, esc, findShiftMems, lit, sgn, yosysCell } from './synth-verilog.js';
 import { GOWIN_CELLS } from './gowin-prims.js';
@@ -168,7 +168,7 @@ export function writeModule(ctx) {
         now: 0, stamp: 0, write, nba: (wr, v) => nba.push([wr, v]), preempt() {}, print() {}, strobe() {}, monitor() {}, report() {}, finish() {},
         after: no('a delayed assignment in an initial block'), readmem: no('$readmemh / $readmemb (the file is not read by synthesis)'), random: no('$random'),
       };
-      const ctx = { frame: p.frameInit ? p.frameInit() : [], sim, depth: 0, timeUnit: p.timeUnit, scopeName: p.inst?.path };
+      const ctx = { frame: p.frameInit ? p.frameInit() : [], sim, depth: 0, timeUnit: p.timeUnit, scopeName: p.inst?.path, budget: newBudget() };
       const r = exec(p.body, ctx).next();
       // it must end (or stop for good: VHDL wait; / $finish) without waiting for time or events;
       // a VHDL process that runs to its end without waiting would start again at once
