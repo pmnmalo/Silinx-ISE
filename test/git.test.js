@@ -329,6 +329,53 @@ test('pull: its files pass the import gate; a hidden file, a tool\'s output, ano
   assert.deepEqual((await G.gitStatus('pulled')).files, [{ path: 'src/notes.txt', state: 'new' }]);
 });
 
+// #3524: a pulled name that another tracked file has but for its case is one file on a case-insensitive file system
+// (macOS's, Windows'): a pulled SILINX.JSON wrote over the project's silinx.json, then the gate's taking it out (another
+// spelling of silinx.json) deleted it, and the project was gone. Such a pull is refused and undone on any file system
+// (as a clone's gate refuses the name); the other file as it was, its changes not committed too.
+test('pull: a name another tracked file has but for its case is refused and undone; silinx.json kept, the project opens (#3524)', async () => {
+  const bare = bareWith('clash', gates);
+  await G.gitClone({ url: bare, name: 'clash' });
+  const dir = path.join(ws, 'clash');
+  const pj = read(path.join(dir, 'silinx.json')), vhd = read(path.join(dir, 'src', 'gates.vhd'));
+  const head = sh(dir, 'rev-parse', 'HEAD');
+  // whether this file system is case-insensitive (the case the issue's loss happened on)
+  const folds = fs.existsSync(path.join(dir, 'SILINX.JSON'));
+  // another author's commit of names that differ from tracked ones only by their case (written into git's index, so
+  // that it is made on any file system)
+  const theirs = other(bare, 'clash');
+  sh(theirs, 'config', 'core.ignorecase', 'false');
+  const add = (f, t) => { write(path.join(tmp, 'blob'), t); sh(theirs, 'update-index', '--add', '--cacheinfo', `100644,${sh(theirs, 'hash-object', '-w', path.join(tmp, 'blob')).trim()},${f}`); };
+  add('SILINX.JSON', '{"name":"other","trusted":true}\n');
+  add('src/GATES.vhd', '-- theirs\n');
+  add('src/theirs.v', 'module theirs; endmodule\n');
+  sh(theirs, 'commit', '--quiet', '-m', 'Clash'); sh(theirs, 'push', '--quiet');
+  // a change of silinx.json not committed: kept as it is
+  const mine = pj.replace(/\n$/, '') + ' \n';
+  write(path.join(dir, 'silinx.json'), mine);
+  await rejects(G.gitPull('clash'), 'git pull: SILINX.JSON: not imported: same name as \'silinx.json\' but for its case; src/GATES.vhd: not imported: same name as \'src/gates.vhd\' but for its case: nothing was pulled, the project\'s files are as they were');
+  assert.equal(sh(dir, 'rev-parse', 'HEAD'), head);
+  assert.deepEqual(fs.readdirSync(dir).filter(f => /^silinx\.json$/i.test(f)), ['silinx.json'], `case-insensitive: ${folds}`);
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'src')).sort(), ['gates.sch.json', 'gates.vhd']);
+  assert.equal(read(path.join(dir, 'silinx.json')), mine);
+  assert.equal(read(path.join(dir, 'src', 'gates.vhd')), vhd);
+  assert.deepEqual((await G.gitStatus('clash')).files, [{ path: 'silinx.json', state: 'modified' }]);
+  assert.ok((await P.listProjects()).some(p => (p.name ?? p) === 'clash'));
+  assert.equal((await P.readProject('clash')).name, 'clash');
+  assert.equal((await P.readProject('clash')).trusted, false);
+  // the same pull again, with nothing changed here: refused the same way, the commit's silinx.json kept
+  write(path.join(dir, 'silinx.json'), pj);
+  await assert.rejects(G.gitPull('clash'), e => e instanceof G.GitError && e.status === 422 && /^git pull: SILINX\.JSON: not imported: same name as 'silinx\.json' but for its case; /.test(e.message));
+  assert.equal(read(path.join(dir, 'silinx.json')), pj);
+  assert.deepEqual((await G.gitStatus('clash')).files, []);
+  // once the other author takes the names back, the pull brings the rest
+  sh(theirs, 'rm', '--quiet', '--cached', 'SILINX.JSON', 'src/GATES.vhd');
+  sh(theirs, 'commit', '--quiet', '-m', 'Names back'); sh(theirs, 'push', '--quiet');
+  assert.deepEqual(await G.gitPull('clash'), { project: 'clash', branch: 'main', upToDate: false, files: ['src/theirs.v'] });
+  assert.equal(read(path.join(dir, 'silinx.json')), pj);
+  assert.equal(read(path.join(dir, 'src', 'gates.vhd')), vhd);
+});
+
 test('the repository: never one above the workspace; the workspace as the repository of several projects, each commit its project\'s', async () => {
   const outer = path.join(tmp, 'outer');
   const prev = process.env.SILINX_WORKSPACE;

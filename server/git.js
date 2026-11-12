@@ -17,6 +17,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import * as P from './projects.js';
 import { checkUrl as checkGithubUrl, redact, nameFromRepo } from '../core/github-url.js';
+import { foldName } from '../core/fold-name.js';
 
 /** A git command's failure: its message (git's own line), a hint for the user, the HTTP status; files: a conflict's. */
 export class GitError extends Error {
@@ -318,6 +319,7 @@ export async function gitPull(name, { resolve = null } = {}) {
 async function pull(name, repo, branch, upstream, resolve) {
   const before = await headOf(repo.dir);
   const kept = await keptOut(repo);
+  const changed = await changedFiles(repo);
   const M = await import('./git-merge.js');
   await M.ensureDrawingAttributes((await ok('rev-parse', ['rev-parse', '--absolute-git-dir'], { cwd: repo.dir })).trim());
   const r = await git(['pull', '--no-rebase', '--ff', '--no-edit', ...(upstream ? [] : ['origin', branch])], { cwd: repo.dir, timeout: 180_000 });
@@ -342,7 +344,7 @@ async function pull(name, repo, branch, upstream, resolve) {
     resolved = m.resolved;
   }
   const after = await headOf(repo.dir);
-  const gated = before === after ? { out: [], warnings: [] } : await gatePulled(repo, before, after, kept);
+  const gated = before === after ? { out: [], warnings: [] } : await gatePulled(repo, before, after, kept, changed);
   if (!upstream) await git(['branch', `--set-upstream-to=origin/${branch}`], { cwd: repo.dir });
   const files = before === after ? [] : (await ok('diff', before ? ['diff', '--name-only', '--relative', before, after, '--', '.'] : ['ls-files', '--', '.'], { cwd: repo.dir })).split('\n').filter(f => f && !gated.out.includes(f));
   return { project: name, branch, upToDate: before === after, files, ...(resolved.length ? { resolved } : {}), ...(gated.warnings.length ? { warnings: gated.warnings } : {}) };
@@ -353,9 +355,15 @@ async function pull(name, repo, branch, upstream, resolve) {
 // silinx.json is taken out of the folder and left in the repository (skip-worktree: a commit neither deletes nor
 // changes it), each with its message; a file the gate refuses otherwise (a name, a NUL byte, a DTD, a size) undoes the
 // pull. -> { out: the project's paths not in its folder (taken out, or left out by a sparse checkout), warnings }
-async function gatePulled(repo, before, after, kept) {
+async function gatePulled(repo, before, after, kept, changed) {
   const { gateEntries, gateMessages, normalizePath, GateError } = await import('../core/import-gate.js');
   const listed = await ok('diff', before ? ['diff', '-z', '--name-only', '--diff-filter=d', before, after] : ['ls-files', '-z'], { cwd: repo.top });
+  // (a pulled name another tracked file has but for its case: one file on a case-insensitive file system, #3524)
+  const clashes = caseClashes(listed.split('\0').filter(Boolean), await trackedPaths(repo));
+  if (clashes.length) {
+    await undoClashes(repo, before, clashes, kept, changed);
+    throw new GitError(`git pull: ${clashes.map(([p, q]) => `${p}: not imported: same name as '${q}' but for its case`).join('; ')}: nothing was pulled, the project's files are as they were`, null, 422);
+  }
   const left = [], absent = [], warnings = [], groups = new Map();
   for (const file of listed.split('\0').filter(Boolean)) {
     const full = path.join(repo.top, ...file.split('/'));
@@ -405,10 +413,45 @@ async function keptOut(repo) {
   const r = await git(['ls-files', '-v', '-z'], { cwd: repo.top });
   return r.code ? [] : r.stdout.split('\0').filter(l => l.startsWith('S ')).map(l => l.slice(2));
 }
-// files of the repository out of the folder, and out of the commits (skip-worktree), the folders they leave empty too
+// the repository's tracked paths (its index)
+async function trackedPaths(repo) {
+  return (await ok('ls-files', ['ls-files', '-z'], { cwd: repo.top })).split('\0').filter(Boolean);
+}
+// the pulled paths that differ from another tracked path only by their case (or form), as a case-insensitive file
+// system reads them: [[pulled, other]], each pulled path once
+function caseClashes(pulled, tracked) {
+  const byKey = new Map();
+  for (const t of tracked) { const k = foldName(t); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(t); }
+  return pulled.flatMap(p => { const q = (byKey.get(foldName(p)) || []).find(t => t !== p); return q ? [[p, q]] : []; });
+}
+// the tracked files changed and not committed, before a pull: { path: their bytes } (a name clash's pull writes over
+// them on a case-insensitive file system, #3524)
+async function changedFiles(repo) {
+  const r = await git(['diff', '-z', '--name-only', '--diff-filter=M'], { cwd: repo.top });
+  const out = {};
+  for (const f of r.code ? [] : r.stdout.split('\0').filter(Boolean)) {
+    try { out[f] = await fsp.readFile(path.join(repo.top, ...f.split('/'))); } catch { /* (gone meanwhile) */ }
+  }
+  return out;
+}
+// a pull that brought a name clash undone (#3524): the branch back where it was (reset --keep, as undoPull), then the
+// other paths' files as they were before the pull (on a case-insensitive file system the pull wrote over them, and
+// putting the branch back deleted the pulled spelling: their file): their changes not committed, else the commit's
+async function undoClashes(repo, before, clashes, kept, changed) {
+  if (!before) return undoPull(repo, before, [...new Set(clashes.map(([p]) => p))], kept);
+  await undoPull(repo, before, [], kept);
+  const was = new Set((await ok('ls-tree', ['ls-tree', '-r', '-z', '--name-only', before], { cwd: repo.top })).split('\0'));
+  const back = [...new Set(clashes.map(([, q]) => q))].filter(q => was.has(q));
+  if (back.length) await ok('checkout', ['checkout', before, '--', ...back], { cwd: repo.top });
+  for (const q of back) if (changed[q]) await fsp.writeFile(path.join(repo.top, ...q.split('/')), changed[q]);
+}
+// files of the repository out of the folder, and out of the commits (skip-worktree), the folders they leave empty too;
+// a file another tracked path names but for its case (the same file on a case-insensitive file system) left in the
+// folder (#3524)
 async function takeOut(repo, files) {
   if (!files.length) return;
-  for (const f of files) await fsp.rm(path.join(repo.top, ...f.split('/')), { force: true });
+  const out = new Set(files), keys = new Set((await trackedPaths(repo)).filter(t => !out.has(t)).map(foldName));
+  for (const f of files) if (!keys.has(foldName(f))) await fsp.rm(path.join(repo.top, ...f.split('/')), { force: true });
   await ok('update-index', ['update-index', '--skip-worktree', '--', ...files], { cwd: repo.top });
   for (const f of files) await pruneEmpty(repo.top, path.dirname(path.join(repo.top, ...f.split('/'))));
 }
