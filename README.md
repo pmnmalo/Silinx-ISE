@@ -93,8 +93,8 @@ for Xilinx FPGAs supported by ISE 14.7.
   output boxes evaluated on every clock cycle, in parallel with the states), e.g. the blinky
   example's `speed_ctrl.asm.json` (button synchronisers + debouncers + speed FSM + step divider).
 - **Board emulator** (*Emulate on Board ▸ Emulate Behavioral Model (RTL)*): the design runs on a drawing of the real kit
-  (Digilent Basys2, Nexys2, Nexys3 and Atlys, Spartan-3E Starter Kit, 1BitSquared iCEBreaker; a generic panel for the other boards:
-  the Basys 3, the Nexys A7, the ULX3S, the Tang Nano 9K…),
+  (Digilent Basys2, Nexys2, Nexys3, Atlys, Basys 3 and Nexys A7, Spartan-3E Starter Kit, 1BitSquared iCEBreaker; a generic panel
+  for the other boards: the ULX3S, the Tang Nano 9K…),
   wired by the constraints (UCF, XDC, PCF, LPF or CST): click the slide switches, press the buttons, watch the LEDs and the
   multiplexed 7-segment display (persistence of vision), at a chosen clock rate, with a watch list
   of internal signals. It works without ISE and in the standalone edition. Two engines: the design

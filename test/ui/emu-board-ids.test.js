@@ -35,7 +35,7 @@ end rtl;
 `;
 
 // each board's PCB: its gradient's top colour (the boards' own modules, web/js/emulator-<board>.js)
-const PCB = { basys2: '#2156b3', nexys2: '#26493a', 's3e-starter': '#2a5c3d', nexys3: '#2b4f3e', atlys: '#2a4d40', icebreaker: '#1d3a7a' };
+const PCB = { basys2: '#2156b3', nexys2: '#26493a', 's3e-starter': '#2a5c3d', nexys3: '#2b4f3e', atlys: '#2a4d40', icebreaker: '#1d3a7a', basys3: '#1f58ad', 'nexys-a7': '#1f5442' };
 const rgb = (hex) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 
 /** The boards drawn in the document, the visible first: for each, where its PCB's fill resolves ('own': its own
