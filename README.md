@@ -384,7 +384,7 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
   port (a USB-C to USB adapter if needed). Safari on an iPad has no WebUSB: generate the `.bit` there, then program the board from a
   computer or an Android tablet.
 - **No workspace folder on the disk**: the projects are kept in the browser's storage, which iPadOS
-  may clear after some weeks without use. Keep a copy with *File ▸ Export Silinx Project (.zip)…*.
+  may clear after some weeks without use. Keep a copy with *File ▸ Export Project (.zip)…*.
 - **Less memory per tab**: a large design may fail in synthesis or implementation.
 - **The right-click menus open with a long press** (a finger or a pen held still for half a second)
   on a Design-pane row or badge, a document tab, a Files view row, a symbol of the schematic
@@ -425,7 +425,7 @@ gists, which you list and delete on GitHub. A short link may expire (*Expires:* 
 year; never by default): opened after its date it is refused, and making a short link deletes your expired ones. *File ▸ Short Links…* lists
 your short links (when each was made, when it expires), copies again those this browser made, and deletes the ones you
 choose, or the expired ones. Some slide tools cut a link longer than about 2
-000 characters: a larger project goes as a zip hosted elsewhere (*Export Silinx Project*, then
+000 characters: a larger project goes as a zip hosted elsewhere (*Export Project (.zip)…* to Silinx, then
 `…/Silinx/#open=https://…/lecture3.zip&view=simulate`), and an example by its name
 (`…/Silinx/#open=example:gates&view=try`; `#open=example:traffic&top=traffic&view=try` its state diagram). `view=`
 is `try` (the Try it of a schematic, a state diagram, a Petri net or an ASM chart), `simulate` (the test bench) or
@@ -617,7 +617,7 @@ npm run build:standalone    # writes dist/Silinx.html (~5 MB)
 
 One file, no server: open it in a browser or share it. It includes the editor, schematics, ASM
 editor, simulation/SSim, pin planner and ISE project import/export; the examples (*gates*, *traffic*,
-*blinky*, *pong*, *stopwatch*, *clock*, *vga*, *isqrt*, *uart*, *micro80*) are embedded. Projects are stored in the browser (*File ▸ Export / Import Silinx Project (.zip)…* to move
+*blinky*, *pong*, *stopwatch*, *clock*, *vga*, *isqrt*, *uart*, *micro80*) are embedded. Projects are stored in the browser (*File ▸ Export / Import Project (.zip)…* to move
 them), or, in Chrome / Edge, in a folder on the disk (*File ▸ Open Workspace Folder…*: the File
 System Access API; each project a folder as the full application writes it, so the same folder opens
 there; web/js/project-store.js). `--site <dir>` also writes the GitHub Pages site: the page and its `assets/` (the device

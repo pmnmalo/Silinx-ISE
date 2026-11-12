@@ -95,7 +95,7 @@ export function wizard(title, pages, { width = 720, finishLabel = 'Finish', extr
 // unless the projects are kept in a workspace folder on the disk (it has a .trash folder too).
 const deletesProjects = () => api.standalone && !api.keepsTrash;
 // (a project of the name in another case too: the same folder on a case-insensitive file system, #3538)
-async function askReplaceProject(name) {
+export async function askReplaceProject(name) {
   const pname = sameProject(await api.projects(), name)?.name;
   if (!pname) return true;
   return confirmDlg('Replace Project',
@@ -342,104 +342,6 @@ export async function zipFolderSelection(fileList) { // exported for tests
   if (!entries.some(e => /\.xise$/i.test(e.path))) throw new Error(`no .xise project file in the folder '${rootName}'`);
   const zip = await createZip(entries, browserCodec());
   return { blob: new Blob([zip], { type: 'application/zip' }), rootName, count: entries.length, skipped };
-}
-
-export async function importXiseDialog() {
-  const fileInp = h('input', { type: 'file', multiple: true, accept: '.zip,.xise,.v,.vhd,.vhdl,.ucf,.pcf,.lpf,.cst' });
-  const dirInp = h('input', { type: 'file', webkitdirectory: true, multiple: true });
-  const name = h('input', { type: 'text', placeholder: 'new project name' });
-  const info = h('div', { class: 'hint', style: { minHeight: '16px' } });
-  const suggest = n => { if (!name.value && n) name.value = projectNameFrom(n); };
-  fileInp.addEventListener('change', () => {
-    dirInp.value = '';
-    const f = [...fileInp.files].find(x => /\.(zip|xise)$/i.test(x.name));
-    if (f) suggest(f.name);
-    info.textContent = fileInp.files.length ? `${fileInp.files.length} file(s) selected` : '';
-  });
-  dirInp.addEventListener('change', () => {
-    fileInp.value = '';
-    const files = [...dirInp.files];
-    const xise = files.find(x => /\.xise$/i.test(x.name));
-    suggest(xise ? xise.name : (files[0]?.webkitRelativePath || '').split('/')[0]);
-    info.textContent = files.length ? `Folder '${(files[0].webkitRelativePath || '').split('/')[0]}': ${files.length} file(s)${xise ? `, project ${xise.name}` : ' — no .xise found!'}` : '';
-  });
-  const r = await dialog({
-    title: 'Import Xilinx ISE Project', width: 600,
-    body: h('div', {},
-      h('div', { class: 'hint' }, 'Import an ISE project from its folder (the folder with the .xise file), or from a .zip of that folder (e.g. one exported with File ▸ Export Xilinx ISE Project). ',
-        'ISE output files in the folder (xst, _ngo, netlists, bitstreams, logs) are not imported.'),
-      h('div', { class: 'form-grid', style: { marginTop: '10px' } },
-        ...field('Project folder:', dirInp),
-        ...field('or .zip / .xise file(s):', fileInp),
-        ...field('Project name:', name)),
-      info),
-    buttons: [{ label: 'Import', primary: true, value: true }, { label: 'Cancel', value: null }],
-  });
-  if (!r) return;
-  const files = [...fileInp.files];
-  const zf = files.find(f => /\.zip$/i.test(f.name));
-  const xf = files.find(f => /\.xise$/i.test(f.name));
-  if (!dirInp.files.length && !zf && !xf) return alertDlg('Import Xilinx ISE Project', 'Select the project folder, a .zip, or a .xise with its sources.', 'error');
-  const folder = (dirInp.files[0]?.webkitRelativePath || '').split('/')[0];
-  const pname = name.value.trim() || projectNameFrom((zf || xf)?.name || folder) || 'imported';
-  if (projectNameError(pname)) return alertDlg('Import Xilinx ISE Project', projectNameError(pname), 'error');
-  if (!await askReplaceProject(pname)) return;
-  try {
-    const res = await replaceProjectWith(pname, async () => {
-      if (dirInp.files.length) {
-        const z = await zipFolderSelection(dirInp.files);
-        app.log(`Importing folder '${z.rootName}': ${z.count} file(s)${z.skipped ? `, ${z.skipped} ISE output/hidden file(s) skipped` : ''}.`, 'info');
-        return api.importZip(pname, z.blob);
-      }
-      if (zf) return api.importZip(pname, zf);
-      const others = {};
-      for (const f of files.filter(f => f !== xf)) others[f.name] = await f.text();
-      return api.importXise({ name: pname, xise: await xf.text(), files: others });
-    });
-    await app.openProject(pname);
-    app.showLeftPage('design');
-    const n = res?.project?.files?.length ?? 0;
-    app.log(`Imported Xilinx ISE project '${pname}' (${n} source file(s)${res?.extra?.length ? `, ${res.extra.length} other file(s)` : ''}).`, 'ok');
-    if (res?.missing?.length) app.log(`WARNING: files referenced by the .xise but not found: ${res.missing.join(', ')}`, 'warn');
-    for (const w of res?.warnings || []) app.log(`WARNING: ${w}`, 'warn');
-  } catch (e) { alertDlg('Import Xilinx ISE Project', e.message, 'error'); }
-}
-
-// ------------------------------------------------------------------ Import Silinx Project
-// A .zip made with File ▸ Export Silinx Project (silinx.json + every project file); in the browser edition also
-// a project bundle (.silinx.json) of its File ▸ Download Project Bundle before #3548, read as such a zip.
-export async function importSilinxDialog() {
-  const fileInp = h('input', { type: 'file', accept: api.standalone ? '.zip,.json' : '.zip' });
-  const name = h('input', { type: 'text', placeholder: 'project name' });
-  fileInp.addEventListener('change', () => {
-    const f = fileInp.files[0];
-    if (f && !name.value) name.value = projectNameFrom(f.name);
-  });
-  const r = await dialog({
-    title: 'Import Silinx Project', width: 520,
-    body: h('div', {},
-      h('div', { class: 'hint' }, 'Import a whole Silinx project from a .zip made with File ▸ Export Silinx Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).'),
-      api.standalone ? h('div', { class: 'hint' }, 'It also opens a project bundle (.silinx.json) made with an earlier version.') : null,
-      h('div', { class: 'form-grid', style: { marginTop: '10px' } },
-        ...field('.zip file:', fileInp),
-        ...field('Project name:', name))),
-    buttons: [{ label: 'Import', primary: true, value: true }, { label: 'Cancel', value: null }],
-  });
-  if (!r) return;
-  const zf = fileInp.files[0];
-  if (!zf) return alertDlg('Import Silinx Project', 'Select the .zip of the Silinx project.', 'error');
-  const pname = name.value.trim() || projectNameFrom(zf.name) || 'imported';
-  if (projectNameError(pname)) return alertDlg('Import Silinx Project', projectNameError(pname), 'error');
-  if (!await askReplaceProject(pname)) return;
-  try {
-    const res = await replaceProjectWith(pname, () => api.importZip(pname, zf));
-    await app.openProject(pname);
-    app.showLeftPage('design');
-    app.log(`Imported Silinx project '${pname}' (${res?.project?.files?.length ?? 0} source file(s)${res?.extra?.length ? `, ${res.extra.length} other file(s)` : ''}).`, 'ok');
-    if (res?.missing?.length) app.log(`WARNING: files listed in silinx.json but not in the zip: ${res.missing.join(', ')}`, 'warn');
-    // (what the import dropped: an entry that would leave the project, a broken silinx.json field, #483)
-    for (const w of res?.warnings || []) app.log(`WARNING: ${w}`, 'warn');
-  } catch (e) { alertDlg('Import Silinx Project', e.message, 'error'); }
 }
 
 // ------------------------------------------------------------------ replacing an existing file

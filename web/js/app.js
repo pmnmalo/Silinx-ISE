@@ -907,7 +907,7 @@ async function boot() {
   if (api.standalone) {
     const st = await api.initStorage().catch(() => api.storage());
     const where = st.kind === 'folder' ? `in the folder '${st.folder}' on the disk (File > Use Browser Storage to keep them in this browser)`
-      : `in this browser (File > Export Silinx Project (.zip)… to keep a copy${st.supported ? '; File > Open Workspace Folder… keeps them in a folder on the disk' : ''})`;
+      : `in this browser (File > Export Project (.zip)… to keep a copy${st.supported ? '; File > Open Workspace Folder… keeps them in a folder on the disk' : ''})`;
     log(`Browser edition: projects are stored ${where}. Implement Design and Generate Programming File run the Silinx toolchain here (the Spartan-3E, the Spartan-6 of the Nexys3 and the Atlys, and the Artix-7 of the Basys 3 and the Nexys A7); Configure Target Device programs the FPGA of the board and its Platform Flash over USB (Chrome / Edge).`, 'info');
     if (st.needsPermission) log(`The workspace folder '${st.remembered}' needs the browser's permission again: Start page > Reopen ${st.remembered}.`, 'warn');
     if (api.devSite) log(`Development edition (built from main, not a release): its projects are kept apart from the stable edition's, ${new URL('../', location).href} (a workspace folder on the disk can be opened by both).`, 'warn');

@@ -83,7 +83,7 @@ test('encodeDesign: a file that is not text goes as base64 and comes back; a dra
 test('encodeDesign: too large for a link, not a project', async () => {
   const big = [{ path: 'silinx.json', data: JSON.stringify({ name: 'big', files: [] }) },
     { path: 'src/noise.vhd', data: Array.from({ length: 60000 }, (_, i) => ((i * 2654435761) >>> 0).toString(36)).join(' ') }];
-  await assert.rejects(encodeDesign(big), e => e.linkError && /^the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Silinx Project\) and link to that$/.test(e.message));
+  await assert.rejects(encodeDesign(big), e => e.linkError && /^the design is too large for a link \(\d+ characters, at most 64000\): export it as a \.zip \(Export Project \(\.zip\)…, Silinx\) and link to that$/.test(e.message));
   await rejects(encodeDesign([{ path: 'src/a.vhd', data: 'x' }]), 'not a Silinx project: no silinx.json');
 });
 

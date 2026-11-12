@@ -21,7 +21,7 @@ const LEFT = {
   // kept for compatibility, as its comment says (the Spartan-3E-only view of the database)
   'core/devices.js': 'DEVICES',
   // what wizards.js exported before #405's split it exports still (test/new-source-module.test.js checks it)
-  'web/js/wizards.js': 'createTopSource zipFolderSelection GOATCOUNTER_URL WHO_URL',
+  'web/js/wizards.js': 'createTopSource GOATCOUNTER_URL WHO_URL',
   // declared with MIN_ZOOM (`export const MAX_ZOOM = …, MIN_ZOOM = …`), which test/tasks.test.js reads: the check
   // takes a declaration's first name only
   'web/js/tasks-emu.js': 'MAX_ZOOM',
