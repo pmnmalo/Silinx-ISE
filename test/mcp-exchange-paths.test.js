@@ -81,3 +81,17 @@ test('#3418 the workspace and the exchange folder named as such in results and e
   const o = await call('export_project', { project: 'rep', path: path.join(`${xchg}2`, 'r.zip') });
   assert.equal(o.text, `export_project: path: '${path.join(`${xchg}2`, 'r.zip')}' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
 });
+
+test('#3611 the path after a folder\'s name with \'/\' on every system, as Windows writes it with \\ too', async () => {
+  const { pathNamer } = await import('../server/mcp-util.js');
+  const name = await pathNamer();
+  const ws = P.workspaceDir();
+  // (Windows's separator: what path.join gives there)
+  assert.equal(name(`Exported 'traffic' as a Xilinx ISE project: ${xchg}\\traffic.zip (10485 bytes).`), "Exported 'traffic' as a Xilinx ISE project: <exchange folder>/traffic.zip (10485 bytes).");
+  assert.equal(name(`from: '${ws}\\vga' is outside the exchange folder`), "from: '<workspace>/vga' is outside the exchange folder");
+  assert.equal(name(`or run ${ws}\\Basys3Blinky\\build\\run.sh on a machine with Vivado`), 'or run <workspace>/Basys3Blinky/build/run.sh on a machine with Vivado');
+  assert.deepEqual(name({ path: `${xchg}\\sub\\gates.vcd`, folder: xchg, list: [`${xchg}\\a\\`] }), { path: '<exchange folder>/sub/gates.vcd', folder: '<exchange folder>', list: ['<exchange folder>/a/'] });
+  // (this system's own, and a text with no folder of the server's, as they were)
+  assert.equal(name(path.join(xchg, 'sub', 'a.zip')), '<exchange folder>/sub/a.zip');
+  assert.equal(name('a\\b.vhd: not written: backslash in the name'), 'a\\b.vhd: not written: backslash in the name');
+});
