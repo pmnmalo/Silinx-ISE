@@ -97,7 +97,8 @@ export async function listProjects() {
   await fs.mkdir(ws, { recursive: true });
   const out = [];
   for (const ent of await fs.readdir(ws, { withFileTypes: true })) {
-    if (!ent.isDirectory() || ent.name.startsWith('.')) continue;
+    // (a folder whose name is no project's is none, whatever it holds: no route opens it, #3522)
+    if (!ent.isDirectory() || ent.name.startsWith('.') || !NAME_RE.test(ent.name)) continue;
     try {
       const dir = path.join(ws, ent.name);
       const pj = JSON.parse(await fs.readFile(await projectFile(dir), 'utf8'));
