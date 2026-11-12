@@ -28,6 +28,7 @@ import { liveDrawing, drawingKind, drawingText, sameDrawing, drawingModel, drawi
 import { shareRoom, colorOf } from '/core/collab-client.js';
 import { followLink, relayUrl, relayAddress } from '/core/collab-link.js';
 import { newHostKey } from '/core/collab-meet.js';
+import { qrBox } from './link-qr.js';
 
 export const NAME_KEY = prefKey('silinx.collab.name');
 const TRACK_MS = 300;
@@ -151,12 +152,15 @@ export const editorsLink = () => share?.editLink || null;
 function linkDialog() {
   const link = share.link;
   const field = h('input', { type: 'text', value: link, readonly: '', 'data-field': 'link', 'data-no-i18n': '', style: { width: '100%' } });
+  // (the follow link's QR code, #3637: for a phone or another computer, enlarged for a projector)
+  const qr = qrBox();
+  if (!qr.show(link)) app.log(`WARNING: Share Project Live: the link is ${link.length} characters, too long for a QR code.`, 'warn');
   const editField = h('input', { type: 'text', value: share.editLink, readonly: '', 'data-field': 'edit-link', 'data-no-i18n': '', style: { width: '100%' } });
   return dialog({
     title: 'Share Project Live',
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, `Anyone with this link follows "${share.project}" live, read only, as long as you share it.`),
-      field,
+      h('div', { class: 'collab-link-row' }, h('div', {}, field), qr.el),
       h('p', {}, 'Anyone with the editors\' link edits its text files and drawings with you, live.'),
       editField,
       share.hosted ? h('p', {}, 'This page hosts it: its followers find it when they open the link, or send you a code, which Add a Follower… takes.') : null),

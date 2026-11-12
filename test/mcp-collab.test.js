@@ -4,6 +4,7 @@
 // client.js) and the MCP's follow of it; a change on disk arriving; the status with its follower; stop; the errors.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { decodeSvg } from './qr-helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
@@ -70,6 +71,12 @@ test('share_project start: a page follows it (the project, its files, the owner\
   assert.deepEqual(r.data, { project: 'traffic', shared: true, link, followers: [] });
   // (again: the same link)
   assert.equal((await ok('share_project', { project: 'traffic', server: base })).text, `'traffic' is shared already: ${link}`);
+  // (its QR code, #3637: the follow link's, decoded back; the status's too)
+  const q = await ok('share_project', { project: 'traffic', server: base, qr: true });
+  assert.equal(q.text, `'traffic' is shared already: ${link}`);
+  assert.equal(decodeSvg(q.data.qr), link);
+  assert.equal(decodeSvg((await ok('share_project', { project: 'traffic', action: 'status', qr: true })).data.qr), link);
+  assert.equal((await ok('share_project', { project: 'traffic', action: 'status' })).data.qr, undefined);
   const l = parseFollowLink(link);
   const page = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Rui' } });
   await page.ready;

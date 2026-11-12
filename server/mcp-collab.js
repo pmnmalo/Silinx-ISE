@@ -22,6 +22,7 @@ import { liveDrawing, drawingText, sameDrawing, drawingModel, drawingPathsOf, pu
 import { checkDrawing } from './mcp-check.js';
 import { shareRoom, followRoom } from '../core/collab-client.js';
 import { followLink, parseFollowLink, relayUrl } from '../core/collab-link.js';
+import { qrSvg } from '../core/qr.js';
 
 export const DEFAULT_SERVER = 'http://127.0.0.1:8642';
 const ARRIVE_MS = 15_000;
@@ -149,10 +150,13 @@ export const COLLAB_TOOLS = [
       name: STR('The name the followers see (default: "MCP agent").'),
       server: STR(`The address of the Silinx server whose relay shares it (default ${DEFAULT_SERVER}).`),
       editors: { type: 'boolean', description: 'start: editors may change its text files and drawings too (the result: an editor\'s link besides the follower\'s; what they change written to the disk, a drawing\'s HDL made again from it, through the import gate, the project untrusted from their first change: Xilinx ISE waits until the user trusts it in the interface).' },
+      qr: { type: 'boolean', description: 'start, status: the follow link\'s QR code too, as the interface shows it (#3637): qr, an SVG (black on white).' },
       key: STR('start: the key of a relay on another computer (its config.json\'s relay.key, #3227), instead of the token of a Silinx server on this one.'),
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    async run({ project: name, action = 'start', name: who, server, editors = false, key }) {
+    async run({ project: name, action = 'start', name: who, server, editors = false, key, qr = false }) {
+      // (the follow link's QR code, #3637)
+      const withQr = link => (qr ? { qr: qrSvg(link) } : {});
       if (!['start', 'status', 'stop'].includes(action)) throw toolError('action: start, status or stop');
       const cur = shares.get(name);
       if (action === 'stop') {
@@ -166,10 +170,10 @@ export const COLLAB_TOOLS = [
         if (!cur || cur.session.closed()) { if (cur) { shares.delete(name); cur.off(); } return { text: `'${name}' is not shared.`, data: { project: name, shared: false } }; }
         const peers = cur.session.peers();
         const warns = cur.warnings.map(w => `\nWARNING: ${w}`).join('');
-        return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, followers: peers, warnings: [...cur.warnings] }, untrusted: peers.length || cur.warnings.length ? [...(peers.length ? ['the followers\' names and views'] : []), ...(cur.warnings.length ? ['the warnings, which name the shared project\'s files'] : [])].join(', ') : undefined };
+        return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, ...withQr(cur.link), followers: peers, warnings: [...cur.warnings] }, untrusted: peers.length || cur.warnings.length ? [...(peers.length ? ['the followers\' names and views'] : []), ...(cur.warnings.length ? ['the warnings, which name the shared project\'s files'] : [])].join(', ') : undefined };
       }
       await readProject(name);
-      if (cur && !cur.session.closed()) return { text: `'${name}' is shared already: ${cur.link}`, data: { project: name, shared: true, link: cur.link, followers: cur.session.peers() } };
+      if (cur && !cur.session.closed()) return { text: `'${name}' is shared already: ${cur.link}`, data: { project: name, shared: true, link: cur.link, ...withQr(cur.link), followers: cur.session.peers() } };
       const origin = serverOf(server);
       const owner = cleanName(who) || 'MCP agent';
       const doc = projectDoc(), bases = new Map();
@@ -192,8 +196,8 @@ export const COLLAB_TOOLS = [
       const editLink = session.editKey ? followLink(`${origin}/`, session.room, session.key, 'relay', session.editKey) : null;
       shares.set(name, { session, link, editLink, server: origin, off, warnings });
       return {
-        text: `Sharing '${name}' live, read only, as ${owner}. Anyone with this link follows it (until share_project stop):\n${link}${editLink ? `\nAnyone with this one edits its text files and drawings too:\n${editLink}` : ''}`,
-        data: { project: name, shared: true, link, ...(editLink ? { editLink } : {}), followers: [] },
+        text: `Sharing '${name}' live, read only, as ${owner}. Anyone with this link follows it (until share_project stop)${qr ? '; its QR code: qr, an SVG' : ''}:\n${link}${editLink ? `\nAnyone with this one edits its text files and drawings too:\n${editLink}` : ''}`,
+        data: { project: name, shared: true, link, ...withQr(link), ...(editLink ? { editLink } : {}), followers: [] },
       };
     },
   },
