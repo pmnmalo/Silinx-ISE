@@ -130,10 +130,17 @@ test('#3192 gradeAll over a folder: Accepted, Wrong Answer, Compile Error, a sub
   assert.deepEqual(seen, ['a-verilog', 'b-vhdl', 'c-wrong', 'd-syntax', 'e-hang', 'e-slow', 'f-empty']);
   assert.deepEqual(results.map(r => [r.submission, r.verdict, r.points]), [['a-verilog', 'AC', 100], ['b-vhdl', 'AC', 100], ['c-wrong', 'WA', 0], ['d-syntax', 'CE', 0], ['e-hang', 'TLE', 0], ['e-slow', 'TLE', 0], ['f-empty', 'CE', 0]]);
   for (const k of [4, 5]) assert.deepEqual(verdicts(results[k]), { count: 'TLE', random: 'TLE', bench: 'TLE' });
+  // (the hang: the loop budget's reason or the test's time limit, whichever the machine reaches first: the budget's
+  // 4M iterations take less than 3 s on one machine, more on another)
   const budget = inst => `loop iteration limit exceeded: more than ${MAX_ITERATIONS} iterations and calls in one evaluation (a constant, or a process until it waits) (in ${inst}/always_3)`;
-  assert.deepEqual(results[4].tests.map(t => t.messages.map(m => m.replace(/ at \d+ ns \(src\/counter4\.v line 3\)$/, ''))),
-    [[budget('counter4')], [budget('counter4')], [budget('tb_counter4.uut')]]);
-  for (const t of results[4].tests) assert.match(t.messages[0], / at \d+ ns \(src\/counter4\.v line 3\)$/);
+  results[4].tests.forEach((t, k) => {
+    assert.equal(t.messages.length, 1, String(t.messages));
+    const m = t.messages[0];
+    if (m !== 'the test took more than 3 s') {
+      assert.match(m, / at \d+ ns \(src\/counter4\.v line 3\)$/);
+      assert.equal(m.replace(/ at \d+ ns \(src\/counter4\.v line 3\)$/, ''), budget(k === 2 ? 'tb_counter4.uut' : 'counter4'));
+    }
+  });
   assert.deepEqual(results[5].tests.map(t => t.messages), [['the test took more than 3 s'], ['the test took more than 3 s'], ['the test took more than 3 s']]);
   for (const k of [4, 5]) assert.deepEqual(results[k].design.warnings, ['"src/counter4.v" Line 1: Input <rst> is never used.', '"src/counter4.v" Line 1: Input <en> is never used.',
     '"src/counter4.v" Line 3: Blocking assignment (=) to <q> in a clocked always block; use a non-blocking assignment (<=).']);
