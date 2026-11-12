@@ -141,8 +141,8 @@ read that user's files has the server too.
 - The workflows install the dependencies without their install scripts, their checkouts keep no credentials,
   and a token that writes reaches only the job that publishes (a release, the npm package, the development
   build, the site), which runs no code of the repository's dependencies: a job that reads builds the files,
-  and the publishing job takes them from its artifact; Dependabot proposes an npm version a week after it is
-  published. The Docker images' bases are pinned by digest.
+  and the publishing job takes them from its artifact; Dependabot proposes an npm version, an action's release and a
+  Docker image's digest a week after it is published. The Docker images' bases are pinned by digest.
 - The self-hosted runner with Xilinx ISE (the maintainer's machine) runs only `ise.yml` and `quality.yml`,
   scheduled or started by hand, on `main`, with a read-only token and no credentials kept; never a pull
   request's code. Every workflow's jobs are checked for it in `test/workflows.test.js` and `test/ise-runner.test.js`; a pull request from

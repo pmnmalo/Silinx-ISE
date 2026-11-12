@@ -313,6 +313,13 @@ test('workflows: every action pinned by its commit, its version in a comment, al
   assert.match(fs.readFileSync(path.join(ROOT, '.github/dependabot.yml'), 'utf8'), /github-actions\n\s+directories: \[\/, \/\.github\/actions\/setup\]/);
 });
 
+test('dependabot: every ecosystem waits a week after a release before proposing it (cooldown, #1436, #3521)', () => {
+  const yml = fs.readFileSync(path.join(ROOT, '.github/dependabot.yml'), 'utf8');
+  const blocks = yml.split(/^  - package-ecosystem: /m).slice(1);
+  assert.deepEqual(blocks.map(b => b.split('\n')[0]), ['npm', 'github-actions', 'docker']);
+  for (const b of blocks) assert.match(b, /\n    cooldown:\n      default-days: 7\n/, b.split('\n')[0]);
+});
+
 test('workflows: a run: script that reads an env variable says shell: bash in a job that runs on Windows (#505)', () => {
   // (Windows runners' default shell is PowerShell: "$SHARD" is not expanded there, the unit tests got '/3')
   for (const f of FILES) {

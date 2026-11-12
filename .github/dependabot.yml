@@ -18,7 +18,8 @@
 # its pull request runs test/hdl-to-sch.test.js, which checks every example's Convert to Schematic.
 # A dependency update changes NOTICE / THIRD-PARTY-NOTICES when its licence or authors change (CLAUDE.md).
 # An npm version is proposed a week after it is published (cooldown, #1436): a compromised version is usually
-# found and pulled within days.
+# found and pulled within days. The same week for an action's release and a Docker image's digest (#3521): an
+# action's pull request runs the new action in pr-tests.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -43,6 +44,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies]
     groups:
@@ -53,6 +56,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 1
     labels: [dependencies]
     ignore:
