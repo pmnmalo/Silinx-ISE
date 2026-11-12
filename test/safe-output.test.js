@@ -212,6 +212,8 @@ const MARKUP = {
   'core/isesch-graphics.js': 5,       // an ISE .sch file's graphics (a file, not the page): coordinates, numbers
   'core/isesch-export.js': 4,         // the ISE .sch file's shapes (a file, not the page): coordinates, numbers
   'core/petri.js': 4,                 // a PNML file (not the page): positions and counts, numbers; names through xesc
+  'core/qr.js': 1,                   // qrSvg (#3637): the size and the modules' places, numbers it computes; the link's text
+                                      // never in it (its bits only)
   'core/asm-gen.js': 1,               // an HDL comment naming <input>_meta, not markup
   'server/csp.js': 1,                 // the Content Security Policy's <meta>, its content escaped (& and ")
   'server/open-page.js': 2,           // the launcher's redirect page (#3409): the URL escaped as an attribute (& " <) and as
