@@ -337,7 +337,8 @@ test('the scanner and its test are scanned too (#3520): their own examples allow
   }
 });
 
-test('the history scan (#3520): a file whose path git quotes is read under its own name', () => {
+// (" and a backslash are no characters of a Windows file's name: the case on the other systems, #3616)
+test('the history scan (#3520): a file whose path git quotes is read under its own name', { skip: process.platform === 'win32' && 'a name with " and \\ cannot be made on Windows' }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-private-'));
   const git = (...args) => execFileSync('git', ['-c', 'user.name=T', `-c`, `user.email=t${at}${dot('example', 'com')}`, '-c', 'commit.gpgsign=false', ...args], { cwd: dir, encoding: 'utf8' });
   const report = () => scanHistory(dir).map((x) => `${x.file}${x.line ? `:${x.line}` : ''}: ${x.kind}: ${x.text}`);

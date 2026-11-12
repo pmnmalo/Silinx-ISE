@@ -9,7 +9,7 @@ import fss from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { refuseUserConfigInTests } = await import('../server/toolchain.js');
@@ -51,10 +51,11 @@ test('#3420 saveConfig with ssh settings under a test run: refused, the account\
   const real = path.join(os.userInfo().homedir, '.silinx', 'config.json');
   const stamp = () => { try { const s = fss.statSync(real); return `${s.mtimeMs} ${s.size}`; } catch { return 'none'; } };
   const before = stamp();
-  const script = `const tc = await import(${JSON.stringify(path.join(ROOT, 'server', 'toolchain.js'))});
+  // (a module's file URL, never its path: on Windows C:\ reads as a URL's scheme, #3611)
+  const script = `const tc = await import(${JSON.stringify(pathToFileURL(path.join(ROOT, 'server', 'toolchain.js')).href)});
     try { await tc.saveConfig({ mode: 'ssh', ssh: { host: 'buildbox', user: 'u', port: 22, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }); console.log('saved'); }
     catch (e) { console.log(e.message); }`;
-  const run = extra => spawnSync(process.execPath, ['--import', stub, '--input-type=module', '-e', script],
+  const run = extra => spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, '--input-type=module', '-e', script],
     { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, NODE_TEST_CONTEXT: 'child-v8', ...extra } });
   // HOME is the account's home, no SILINX_CONFIG_DIR: refused
   let r = run({});
