@@ -301,6 +301,7 @@
   "test/mcp-tables.test.js": 0.2,
   "test/mcp-test-bench.test.js": 1.9,
   "test/mcp-transfer.test.js": 1.2,
+  "test/mcp-untrusted.test.js": 1.9,
   "test/mcp-views.test.js": 0.5,
   "test/mcp-wcfg.test.js": 1.1,
   "test/mcp-wizards.test.js": 3.4,
