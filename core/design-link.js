@@ -17,6 +17,7 @@ import { browserCodec, createZip } from './zip.js';
 import { VIEW_RE, isCSource, viewHdl } from './view-hdl.js';
 import { gateEntries, gateMessages } from './import-gate.js';
 import { foldsToProjectFile, PROJECT_FILE } from './fold-name.js';
+import { PROJECT_NAME_RE } from './project-name.js';
 
 /** The limits of a link: the design's encoded length (characters), its JSON inflated (bytes), its files; `slides`:
  *  the length above which some slide tools cut a link (it is still made, with a warning). */
@@ -24,7 +25,7 @@ export const LINK_LIMITS = Object.freeze({ maxEncoded: 64000, maxInflated: 4 << 
 /** The views a link opens. */
 export const LINK_VIEWS = Object.freeze(['try', 'simulate', 'emulate']);
 const FORMAT = 1;
-const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;   // (a project's: server/projects.js, web/js/project-store.js)
+const NAME_RE = PROJECT_NAME_RE;   // (a project's: core/project-name.js, #3538)
 export const MODULE_RE = /^[A-Za-z_][\w$]{0,127}$/;
 export const BOARD_RE = /^[a-z0-9_-]{1,32}$/i;
 const LAB_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;   // (a guided lab's id, core/labs.js)

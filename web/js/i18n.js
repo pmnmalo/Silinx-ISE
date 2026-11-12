@@ -148,7 +148,6 @@ const PT = {
   'Device:': 'Dispositivo:', 'Package:': 'Encapsulamento:', 'Speed:': 'Velocidade:', 'Top-Level Source Type:': 'Tipo de Fonte de Topo:',
   'Synthesis Tool:': 'Ferramenta de Síntese:', 'Silinx (VHDL/Verilog; no ISE needed)': 'Silinx (VHDL/Verilog; sem o ISE)', 'XST (VHDL/Verilog; Xilinx ISE)': 'XST (VHDL/Verilog; Xilinx ISE)', 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)': 'Vivado (VHDL/Verilog; AMD Vivado 2025.2)', 'Silinx (VHDL/Verilog; no Vivado needed; on trial)': 'Silinx (VHDL/Verilog; sem o Vivado; em ensaio)', 'SSim (VHDL/Verilog; Silinx Simulator)': 'SSim (VHDL/Verilog; Simulador Silinx)', 'Simulator:': 'Simulador:', 'Preferred Language:': 'Linguagem Preferida:',
   'VHDL Source Analysis Standard:': 'Norma de Análise VHDL:', 'None Specified': 'Nenhuma', 'All': 'Todas',
-  'Project name must start with a letter and contain only letters, digits and _.': 'O nome do projeto deve começar por uma letra e conter apenas letras, dígitos e _.',
   'No projects found in the workspace.': 'Não foram encontrados projetos na pasta de trabalho.',
   'Import Xilinx ISE Project': 'Importar Projeto Xilinx ISE', 'Export Xilinx ISE Project': 'Exportar Projeto Xilinx ISE',
   'Import Silinx Project': 'Importar Projeto Silinx', 'Export Silinx Project': 'Exportar Projeto Silinx', 'Project name:': 'Nome do projeto:',
