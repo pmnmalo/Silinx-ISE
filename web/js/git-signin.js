@@ -4,7 +4,8 @@
 // stopping it. Without it, a fine-grained personal access token of the user's, pasted: the steps to make one and the
 // permissions it needs said, the token checked with GitHub before it is kept (a refusal said beside the field). The
 // sign-in is kept in this browser (Remember me, ticked by default), or in this tab until it closes when the user unticks
-// it (#3356); the device
+// it (#3356); the single file opened from the disk (file:) keeps it in this tab only, Remember me unticked and disabled,
+// its reason its tip (#3530: every page opened from the disk reads that browser's storage); the device
 // flow asks for the public repositories only, the private ones when the user ticks them. Sign out of GitHub forgets the
 // sign-in. Every message goes to the console; the token is never in one.
 import { api } from './api.js';
@@ -17,8 +18,15 @@ const NEW_TOKEN = 'https://github.com/settings/personal-access-tokens/new';
 // (GitHub's page only: what the sign-in's answer names elsewhere is not linked)
 const pageOf = uri => (/^https:\/\/github\.com\/[\w/-]*$/.test(String(uri || '')) ? uri : DEVICE);
 const KEPT = 'The sign-in is sent only to GitHub, and kept in this browser unless you untick Remember me (then in this tab until it is closed).';
-// Remember me: the sign-in kept in this browser (#3356)
-const rememberBox = () => h('input', { type: 'checkbox', class: 'git-remember', checked: true });
+// (#3530: a Silinx opened from a file, whose storage every page opened from the disk reads)
+const fromFile = () => globalThis.location?.protocol === 'file:';
+const KEPT_FILE = 'The sign-in is sent only to GitHub, and kept in this tab until it is closed (a Silinx opened from a file does not remember it).';
+const NO_REMEMBER = 'A Silinx opened from a file keeps the sign-in in this tab only: every page opened from the disk can read what this browser keeps for files.';
+// Remember me: the sign-in kept in this browser (#3356); at file: unticked and disabled (#3530)
+const rememberBox = () => (fromFile()
+  ? h('input', { type: 'checkbox', class: 'git-remember', checked: false, disabled: true, title: NO_REMEMBER })
+  : h('input', { type: 'checkbox', class: 'git-remember', checked: true }));
+const keptHint = () => h('div', { class: 'hint', style: { marginTop: '10px' } }, fromFile() ? KEPT_FILE : KEPT);
 const checkLine = (box, label) => h('label', { style: { display: 'block', marginTop: '6px' } }, box, ' ', label);
 const REMEMBER = 'Remember me in this browser (kept after this tab closes, where every page of this site\'s address can read it)';
 // the console's line once signed in
@@ -47,7 +55,7 @@ async function tokenDialog() {
         h('li', {}, 'Account permissions: Gists, Read and write (for Copy Link\'s short links).'),
         h('li', {}, 'Generate the token, copy it and paste it here.')),
       field, err, checkLine(remember, REMEMBER),
-      h('div', { class: 'hint', style: { marginTop: '10px' } }, KEPT)),
+      keptHint()),
     buttons: [{ label: 'Sign In', primary: true, value: () => who, validate: async () => {
       try { who = await api.githubSetToken(field.value, { remember: remember.checked }); return true; } catch (e) { err.textContent = e.hint ? `${e.message}: ${e.hint}` : e.message; return false; }
     } }, { label: 'Cancel', value: null }],
@@ -67,7 +75,7 @@ async function deviceDialog() {
       h('div', {}, 'Silinx asks GitHub for your public repositories and your gists.'),
       checkLine(priv, 'Include my private repositories (a Classroom assignment\'s): GitHub then gives Silinx all of them'),
       checkLine(remember, REMEMBER),
-      h('div', { class: 'hint', style: { marginTop: '10px' } }, KEPT)),
+      keptHint()),
     buttons: [{ label: 'Get a Code', primary: true, value: () => ({ privateRepos: priv.checked, remember: remember.checked }) }, { label: 'Cancel', value: null }],
   });
   if (!opts) { log('The GitHub sign-in was cancelled.', 'info'); return false; }

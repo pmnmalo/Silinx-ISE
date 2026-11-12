@@ -7,7 +7,9 @@
 // localStorage), under the edition's own key (the development site's: silinx.dev.); sent only to GitHub's API in a
 // header; never in a URL, never in a message; Sign out forgets it. The device flow asks for the public repositories and
 // the gists only, the private ones when the user asks (core/github-api.js SCOPE, PRIVATE_SCOPE). What a project was at
-// its last commit or pull is kept beside the storage (localStorage, one key per project of each storage).
+// its last commit or pull is kept beside the storage (localStorage, one key per project of each storage). The single file
+// opened from the disk (file:, #3530) keeps the token in its tab only, never in localStorage: every page opened from the
+// disk shares that one origin's storage.
 import { githubClient, startDeviceFlow, pollDeviceFlow, GitHubError, SCOPE, PRIVATE_SCOPE } from '../../core/github-api.js';
 import { restGit } from '../../core/git-rest.js';
 import { markUntrusted } from '../../core/trust.js';
@@ -17,14 +19,17 @@ import { projectJsonText, normalizeProjectJson } from './project-store.js';
 const area = kind => { try { return globalThis[kind] ?? null; } catch { return null; } };
 const get = (k, kind = 'localStorage') => { try { return area(kind)?.getItem(k) ?? null; } catch { return null; } };
 const put = (k, v, kind = 'localStorage') => { try { if (v === null) area(kind)?.removeItem(k); else area(kind)?.setItem(k, v); } catch { /* not kept */ } };
+/** Whether the sign-in may be remembered in this browser: not at file: (#3530), whose storage every local page reads. */
+export const canRemember = () => { try { return globalThis.location?.protocol !== 'file:'; } catch { return true; } };
 
 /** The api's git functions: store() the storage in use, ops its projectOps, prefix its keys' (the development site's own). */
 export function browserGit({ store, ops, prefix = 'silinx.' }) {
   const TOKEN = `${prefix}github-token`;
   const metaKey = name => `${prefix}git:${store().kind}:${store().label || ''}:${name}`;
-  const token = () => get(TOKEN, 'sessionStorage') ?? get(TOKEN);
-  // the token kept: in this tab, or remembered in this browser (the other place cleared)
-  const keep = (t, remember) => {
+  const token = () => get(TOKEN, 'sessionStorage') ?? (canRemember() ? get(TOKEN) : null);
+  // the token kept: in this tab, or remembered in this browser (the other place cleared); at file: in this tab only
+  const keep = (t, wanted) => {
+    const remember = !!wanted && canRemember();
     put(TOKEN, null, remember ? 'sessionStorage' : 'localStorage');
     put(TOKEN, t, remember ? 'localStorage' : 'sessionStorage');
     return { signedIn: true, remembered: !!remember };
