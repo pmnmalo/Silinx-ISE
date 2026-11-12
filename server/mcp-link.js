@@ -11,7 +11,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT } from './mcp-util.js';
-import { LINK_LIMITS, LINK_VIEWS, SITE_URL, decodeDesign, encodeDesign, makeLink, parseLink, sameFiles, viewProblem } from '../core/design-link.js';
+import { BOARD_RE, MODULE_RE, LINK_LIMITS, LINK_VIEWS, SITE_URL, decodeDesign, encodeDesign, makeLink, parseLink, sameFiles, viewProblem } from '../core/design-link.js';
 
 const VIEW_NAMES = { try: 'Try it', simulate: 'the simulation', emulate: 'the board emulator' };
 const NEXT = { simulate: 'simulate runs its test bench', emulate: 'run_process bitstream builds it for the board', try: 'Try it is the interface\'s: a schematic\'s live simulation, a state diagram\'s, a Petri net\'s or an ASM chart\'s simulation' };
@@ -102,6 +102,9 @@ export const LINK_TOOLS = [
         warnings.push(...d.warnings.map(w => `WARNING: ${w}`));
         pjName = name || d.name;
         project = d.project;
+        // (the design's own board and modules checked as names, as the link's board= and top= are, #3528)
+        for (const k of ['top', 'simTop']) if (project[k] != null && project[k] !== '' && !(typeof project[k] === 'string' && MODULE_RE.test(project[k]))) throw toolError(`the link's design: its ${k} is not a module name`);
+        if (project.board != null && project.board !== '' && !(typeof project.board === 'string' && BOARD_RE.test(project.board))) throw toolError('the link\'s design: its board is not a board name');
         files = Object.fromEntries(d.entries.filter(x => x.path !== 'silinx.json').map(x => [x.path, text(x.data)]));
         if (board && board !== project.board) warnings.push(`WARNING: the link's board ${board} is not the design's (${project.board || 'none'}): the design's kept`);
         make = async () => {
@@ -136,7 +139,9 @@ export const LINK_TOOLS = [
       const pj = await P.readProject(pjName);
       if (lab && !(await labIds(pjName)).includes(lab)) warnings.push(`WARNING: the project has no lab '${lab}' (lab action list)`);
       const lines = [...warnings, `${created ? 'Opened the link as the new project' : 'The link\'s design is the project'} '${pjName}'${created ? '' : ' already (unchanged)'}: top ${pj.top || '(none)'}, ${pj.board || 'no board'}${view ? `; the link opens ${VIEW_NAMES[view]}${top ? ` of ${top}` : ''} (${NEXT[view]})` : ''}${lab ? `; the link opens the lab '${lab}' (lab action show)` : ''}.`];
-      return { text: lines.join('\n'), data: { project: pjName, created, view, top, board: pj.board || null, ...(lab ? { lab } : {}), warnings } };
+      // (a design's names and its warnings, which name its files: the link's own text, #3528)
+      return { text: lines.join('\n'), data: { project: pjName, created, view, top, board: pj.board || null, ...(lab ? { lab } : {}), warnings },
+        untrusted: source.kind === 'design' ? 'the link\'s design: its names, and the warnings, which name its files' : warnings.length ? 'the warnings' : undefined };
     },
   },
 ];

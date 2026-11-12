@@ -39,13 +39,16 @@ async function readProgress(name) {
   try { return parseProgress(await P.readFile(name, PROGRESS_FILE)); } catch { return {}; }
 }
 
-// a lab of the project by its id: its entry of listLabs
+// (a lab of the project's own, a teacher's file: its titles and texts the project's text, #3528)
+const OWN = 'the project\'s own lab: its titles and texts';
+
+// a lab of the project by its id: its entry of listLabs ({ id, source, example, lab })
 async function findLab(name, id) {
   const { labs } = await listLabs(await P.fileTree(name), rel => P.readFile(name, rel), { example: name });
   if (!id) throw toolError(`lab: the lab's id (${labs.map(l => l.id).join(', ') || 'none'}: action list)`);
   const l = labs.find(x => x.id === id);
   if (!l) throw toolError(`no lab '${id}' in the project '${name}' (${labs.map(x => x.id).join(', ') || 'none'})`);
-  return l.lab;
+  return l;
 }
 
 const stepJson = (lab, s, p, lang) => ({ number: lab.steps.indexOf(s) + 1, id: s.id, title: localize(s.title, lang), text: localize(s.text, lang),
@@ -71,20 +74,22 @@ export const LAB_TOOLS = [
         let text;
         try { text = await P.readFile(name, file); } catch { throw toolError(`no file ${file} in the project '${name}'`); }
         const { lab, problems } = parseLab(text, file);
-        return { text: labFileLines(file, problems).join('\n'), data: { project: name, file, ok: !problems.length, ...(lab && !problems.length ? { lab: lab.id } : {}), problems } };
+        return { text: labFileLines(file, problems).join('\n'), data: { project: name, file, ok: !problems.length, ...(lab && !problems.length ? { lab: lab.id } : {}), problems }, untrusted: 'the lab file\'s problems, which quote it' };
       }
       const all = await readProgress(name);
       if (action === 'list') {
         const { labs, problems } = await listLabs(await P.fileTree(name), rel => P.readFile(name, rel), { example: name });
         const rows = labs.map(l => { const p = labProgress(all, l.lab); return { id: l.id, title: localize(l.lab.title, lang), source: l.source, example: l.example, steps: l.lab.steps.length, done: l.lab.steps.filter(s => p.done[s.id]).length, step: p.step }; });
         const lines = [...rows.map(r => `${r.id}: "${r.title}" (${r.source === 'silinx' ? `Silinx's, for the ${r.example} example` : r.source}), ${r.done} of ${r.steps} step(s) done`), ...problems.map(m => `WARNING: ${m}`)];
-        return { text: lines.join('\n') || `The project '${name}' has no lab.`, data: { project: name, labs: rows, problems } };
+        const own = rows.some(r => r.source !== 'silinx') || problems.length;
+        return { text: lines.join('\n') || `The project '${name}' has no lab.`, data: { project: name, labs: rows, problems }, untrusted: own ? 'the project\'s own labs: their titles, and the problems of its lab files' : undefined };
       }
-      const lab = await findLab(name, id);
+      const found = await findLab(name, id), lab = found.lab;
+      const untrusted = found.source === 'silinx' ? undefined : OWN;
       if (action === 'restart') {
         delete all[lab.id];
         await P.writeFile(name, PROGRESS_FILE, progressText(all));
-        return { text: `Lab "${localize(lab.title, lang)}" restarted: no step done.`, data: { project: name, lab: lab.id, step: 1 } };
+        return { text: `Lab "${localize(lab.title, lang)}" restarted: no step done.`, data: { project: name, lab: lab.id, step: 1 }, untrusted };
       }
       const p = labProgress(all, lab);
       const step = which === undefined ? lab.steps[p.step - 1] : stepOf(lab, which);
@@ -93,7 +98,7 @@ export const LAB_TOOLS = [
       if (action === 'show') {
         await P.writeFile(name, PROGRESS_FILE, progressText(all));   // (the step shown, as the document's: resumed there)
         const s = stepJson(lab, step, p, lang);
-        return { text: [`Lab "${localize(lab.title, lang)}", step ${s.number} of ${lab.steps.length}: ${s.title}${s.done ? ' (done)' : ''}`, s.text].join('\n'), data: { project: name, lab: lab.id, step: s } };
+        return { text: [`Lab "${localize(lab.title, lang)}", step ${s.number} of ${lab.steps.length}: ${s.title}${s.done ? ' (done)' : ''}`, s.text].join('\n'), data: { project: name, lab: lab.id, step: s }, untrusted };
       }
       const result = await checkStep(step, projectIo(name));
       recordTry(all, lab, step, result.ok);
@@ -103,7 +108,7 @@ export const LAB_TOOLS = [
       const lines = checkLines(lab, step, result, lang);
       if (!result.ok && step.hint) lines.push(`Hint: ${localize(step.hint, lang)}`);
       if (result.ok) lines.push(next ? `Next: step ${next}, ${localize(lab.steps[next - 1].title, lang)}.` : 'Every step of the lab is done.');
-      return { text: lines.join('\n'), data: { project: name, lab: lab.id, step: stepJson(lab, step, p, lang), ok: result.ok, results: result.results, next: next || null, labDone: !nextOpen(lab, p) } };
+      return { text: lines.join('\n'), data: { project: name, lab: lab.id, step: stepJson(lab, step, p, lang), ok: result.ok, results: result.results, next: next || null, labDone: !nextOpen(lab, p) }, untrusted };
     },
   },
 ];

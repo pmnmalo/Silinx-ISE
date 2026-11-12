@@ -190,6 +190,8 @@ test('#3355 an editor\'s change of a trusted project: through the import gate, t
   const st = await ok('share_project', { project: 'trustedEd', action: 'status' });
   assert.deepEqual(st.data.warnings, ['src/timer.vhd: an editor\'s change not written: binary content (a NUL byte) in a text file']);
   assert.ok(st.text.endsWith('\nWARNING: src/timer.vhd: an editor\'s change not written: binary content (a NUL byte) in a text file'), st.text);
+  // (#3528: its warnings name the shared project's files: labelled, as its followers are)
+  assert.equal(st.data.untrusted.content, 'the followers\' names and views, the warnings, which name the shared project\'s files');
   assert.equal(await P.readFile('trustedEd', 'src/timer.vhd'), timer);
   assert.equal((await P.readProject('trustedEd')).trusted, undefined, 'nothing written: still trusted');
   // a change it lets through: written, the project untrusted, changed by an editor; Xilinx ISE refused

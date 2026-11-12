@@ -18,7 +18,9 @@ const P = await import('../server/projects.js');
 let id = 0;
 async function call(name, args = {}) {
   const r = (await handle({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: args } })).result;
-  return { text: r.content[0].text, data: r.structuredContent, isError: r.isError };
+  // (the label of a design's text, #3528: test/mcp-untrusted.test.js; the data here without it)
+  const { untrusted, ...data } = r.structuredContent || {};
+  return { text: r.content[0].text, data: r.structuredContent && data, untrusted: untrusted?.content, isError: r.isError };
 }
 const ok = async (name, args) => { const r = await call(name, args); assert.equal(r.isError, false, r.text); return r; };
 const fails = async (name, args, message) => { const r = await call(name, args); assert.equal(r.isError, true); assert.equal(r.text, `${name}: ${message}`); };
