@@ -11,6 +11,7 @@ import { WebSocket } from 'ws';
 import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
 import { scratchEnv } from './server-helpers.js';
+import { closable } from './server-close.js';
 import { newKey, keyOf, seal, unseal, KEY_RE } from '../core/collab-crypto.js';
 import { followLink, parseFollowLink, relayUrl, ROOM_RE, withTop } from '../core/collab-link.js';
 import { projectDoc, publishProject, putFile, putProject, moveFile, dropFile, docFile, docProject, setText, sharedPath, watchDoc, FILE_MAX, gatedDocFile, FOLLOW_LIMITS } from '../core/collab-doc.js';
@@ -20,20 +21,19 @@ import { attachRelay, RELAY_LIMITS } from '../server/collab-relay.js';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, what, ms = 3000) => { const t0 = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t0 > ms) throw new Error(`timed out: ${what}`); await sleep(10); } };
 
-let tmp, srv, base;
-// (every connection, the relay's WebSockets too: a test that fails leaves its own open, and the server's close
-// waited for it with no end, the CI's part timed out, #3614)
-const sockets = new Set();
+// (its close ends every connection, the relay's WebSockets too: a test that fails leaves its own open, and the
+// server's close waited for it with no end, the CI's part timed out, #3614; test/server-close.js)
+let tmp, srv, base, closeSrv;
 before(async () => {
   tmp = await scratchEnv('silinx-collab-');
   const { createApp } = await import('../server/server.js');
   const app = await createApp({ host: '127.0.0.1', token: 'the-token' });
   srv = app.listen(0, '127.0.0.1');
-  srv.on('connection', s => { sockets.add(s); s.once('close', () => sockets.delete(s)); });
+  closeSrv = closable(srv);
   await new Promise(r => srv.once('listening', r));
   base = `http://127.0.0.1:${srv.address().port}/`;
 });
-after(async () => { srv?.closeAllConnections?.(); for (const s of sockets) s.destroy(); await new Promise(r => srv.close(r)); const fs = await import('node:fs'); fs.rmSync(tmp, { recursive: true, force: true }); });
+after(async () => { await closeSrv(); const fs = await import('node:fs'); fs.rmSync(tmp, { recursive: true, force: true }); });
 
 const PROJECT = { name: 'traffic', top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl' }], device: { part: 'xc3s250e' } };
 const FILES = { 'src/top.vhd': 'entity top is end;\n', 'src/top.ucf': 'NET "clk" LOC = "B8";\n' };

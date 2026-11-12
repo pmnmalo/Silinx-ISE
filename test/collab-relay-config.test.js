@@ -6,22 +6,24 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
 import { scratchEnv } from './server-helpers.js';
+import { closable } from './server-close.js';
 import { shareRoom, followRoom, SUBPROTOCOL } from '../core/collab-client.js';
 import { projectDoc, publishProject, docFile } from '../core/collab-doc.js';
 import { followLink, parseFollowLink, relayUrl } from '../core/collab-link.js';
 
 const KEY = 'a-relay-key-of-the-university-0123456789';
 const SITE = 'https://site.example';
-let tmp, srv, base;
+let tmp, srv, base, closeSrv;
 before(async () => {
   tmp = await scratchEnv('silinx-relay-config-');
   const { createApp } = await import('../server/server.js');
   const app = await createApp({ host: '127.0.0.1', token: 'the-token', relay: { origins: [SITE], key: KEY } });
   srv = app.listen(0, '127.0.0.1');
+  closeSrv = closable(srv);
   await new Promise(r => srv.once('listening', r));
   base = `http://127.0.0.1:${srv.address().port}`;
 });
-after(async () => { srv?.closeAllConnections?.(); await new Promise(r => srv.close(r)); const fs = await import('node:fs'); fs.rmSync(tmp, { recursive: true, force: true }); });
+after(async () => { await closeSrv(); const fs = await import('node:fs'); fs.rmSync(tmp, { recursive: true, force: true }); });
 
 const until = async (fn, what, ms = 4000) => { const t0 = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t0 > ms) throw new Error(`timed out: ${what}`); await new Promise(r => setTimeout(r, 10)); } };
 const upgrade = (path, origin, protocols = [SUBPROTOCOL]) => new Promise(resolve => {

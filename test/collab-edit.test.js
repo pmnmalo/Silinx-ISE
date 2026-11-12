@@ -7,6 +7,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import * as Y from 'yjs';
 import { scratchEnv } from './server-helpers.js';
+import { closable } from './server-close.js';
 import { newSigner, signerOf, verifierOf, signFrame, verifyFrame, pubOf, SIGN_RE, PUB_RE } from '../core/collab-sign.js';
 import { newKey, seal } from '../core/collab-crypto.js';
 import { shareRoom, followRoom, KIND } from '../core/collab-client.js';
@@ -21,7 +22,7 @@ const PROJECT = { name: 'traffic', top: 'top', files: [{ path: 'src/top.vhd', la
 const FILES = { 'src/top.vhd': 'entity top is end;\n', 'src/top.ucf': 'NET "clk" LOC = "B8";\n', 'src/top.fsm.json': '{"states":[]}\n' };
 const owned = () => { const doc = projectDoc(); publishProject(doc, { project: { ...PROJECT, fileTree: Object.keys(FILES) }, files: FILES, owner: 'Ana' }); return doc; };
 
-let tmp, srv, base;
+let tmp, srv, base, closeSrv;
 const live = [];
 const keep = p => { live.push(p); return p; };
 before(async () => {
@@ -29,12 +30,13 @@ before(async () => {
   const { createApp } = await import('../server/server.js');
   const app = await createApp({ host: '127.0.0.1', token: 'the-token' });
   srv = app.listen(0, '127.0.0.1');
+  closeSrv = closable(srv);
   await new Promise(r => srv.once('listening', r));
   base = `http://127.0.0.1:${srv.address().port}/`;
 });
 after(async () => {
   for (const p of live) await p.close().catch(() => {});
-  srv?.closeAllConnections?.(); await new Promise(r => srv.close(r));
+  await closeSrv();
   const fs = await import('node:fs'); fs.rmSync(tmp, { recursive: true, force: true });
 });
 
