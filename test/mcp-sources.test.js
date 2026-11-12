@@ -99,6 +99,21 @@ test('rename_file: a file and a folder, the project\'s files, the drawings\' lin
   await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '.hidden/top.vhd' }, '\'.hidden/top.vhd\': not renamed: hidden file or folder (\'.hidden\')');   // (the import gate's message, as Rename's, #2973)
 });
 
+// #3537: a file system error as the HTTP API answers it: the project's path and a plain message, no absolute path
+test('write_file / rename_file / delete_file: a path onto a folder or through a file, by its path in the project (#3537)', async () => {
+  await ok('new_project_from_example', { name: 'fse', example: 'gates' });
+  await fails('write_file', { project: 'fse', path: 'src', text: 'x' }, '\'src\' is a folder, not a file');
+  await fails('write_file', { project: 'fse', path: 'src/gates.vhd/b.v', text: 'module b; endmodule\n' }, '\'src/gates.vhd\' is a file, not a folder');
+  await fails('rename_file', { project: 'fse', from: 'sim/tb_gates.vhd', to: 'src/gates.vhd/tb.vhd' }, '\'src/gates.vhd\' is a file, not a folder');
+  await fails('delete_file', { project: 'fse', path: 'src/none.vhd' }, 'no file or folder \'src/none.vhd\' in the project \'fse\'');
+  assert.deepEqual(await files('fse'), ['sim/tb_gates.vhd', 'src/gates.vhd']);
+  const tree = await P.fileTree('fse');
+  assert.ok(tree.includes('sim/tb_gates.vhd') && tree.includes('src/gates.vhd'));
+  // P.deleteFile itself: nothing at the path is nothing to do, unless it must exist (the route's, the MCP's)
+  assert.deepEqual(await P.deleteFile('fse', 'src/none.vhd'), { trashed: null });
+  await assert.rejects(P.deleteFile('fse', 'src/none.vhd', { mustExist: true }), { status: 404, message: 'no file or folder \'src/none.vhd\' in the project \'fse\'' });
+});
+
 test('delete_file: a drawing\'s HDL file (the drawing\'s HDL made from it then), a folder; delete_project', async () => {
   await ok('new_project_from_example', { name: 'd', example: 'gates' });
   const r = await ok('delete_file', { project: 'd', path: 'src/gates.vhd' });
