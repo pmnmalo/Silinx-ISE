@@ -24,6 +24,7 @@ const FRONT_END = new Set([
   'synth-module.js', 'synth-operators.js', 'synth-stmts.js', 'synth-tables.js',
   'synth-values.js', 'synth-verilog.js',
   'unisim-jtag.js', 'unisim-s6.js', 'unisim.js',
+  'gowin-bsram.js', 'gowin-dsp.js', 'gowin-prims.js', 'native-gowin.js',   // (the Gowin primitives' models: #2299)
   'verilog/lexer.js', 'verilog/parser-defs.js', 'verilog/parser-exprs.js',
   'verilog/parser-assert.js', 'verilog/parser-items.js', 'verilog/parser-nesting.js', 'verilog/parser-stmts.js', 'verilog/parser.js',   // (parser-nesting.js: #3490)
   'vhdl/actual.js', 'vhdl/labels.js', 'vhdl/lexer.js', 'vhdl/math-real.js', 'vhdl/nodes.js',
@@ -103,7 +104,7 @@ test('#1709 HDL boundary: how the imports across are found', () => {
 });
 
 test('#1709 HDL boundary: the front end\'s modules exist, and are what the entry points reach', () => {
-  assert.equal(FRONT_END.size, 45);
+  assert.equal(FRONT_END.size, 49);
   for (const f of FRONT_END) assert.ok(fs.existsSync(path.join(ROOT, f)), `${f}: gone, remove it from FRONT_END`);
   // the package's modules (#1710), each one's old path in core/ re-exporting it
   for (const f of FRONT_END) assert.equal(moved(`core/${f.slice(HDL.length)}`), f);

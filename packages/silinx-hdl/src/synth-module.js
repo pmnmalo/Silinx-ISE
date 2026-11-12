@@ -5,6 +5,9 @@
 import { SimError, applyWrite, bitpos, exec } from './interp.js';
 import * as V from './values.js';
 import { SynthError, esc, findShiftMems, lit, sgn, yosysCell } from './synth-verilog.js';
+import { GOWIN_CELLS } from './gowin-prims.js';
+
+const GOWIN_NAMES = new Map([...GOWIN_CELLS].map(n => [n.toUpperCase(), n]));
 
 /** The module's text and what the synthesis needs to know of it (toVerilog's result); setShiftMems: the shift-chain
  *  arrays found, for the translator's values. */
@@ -200,12 +203,14 @@ export function writeModule(ctx) {
   // (a SIMPRIM primitive: the cell it is compiled as, its pins renamed, the generics that place or time it left
   // out, #627; a primitive with no model keeps its name, for the compiled simulator's message)
   const simCell = inst => (simprim && inst.file === '<silinx>/simprim.vhd' ? simprim(inst.module.toUpperCase()) : null);
-  const cellOf = inst => simCell(inst) || yosysCell(inst.module.toUpperCase(), inst.ports.map(pt => pt.name.toUpperCase()));
+  // (a Gowin primitive: its name as Gowin writes it, rPLL, pROM; #3498)
+  const gowinCell = inst => (inst.file === '<silinx>/gowin.vhd' ? { name: GOWIN_NAMES.get(inst.module.toUpperCase()) || inst.module, tie: {} } : null);
+  const cellOf = inst => simCell(inst) || gowinCell(inst) || yosysCell(inst.module.toUpperCase(), inst.ports.map(pt => pt.name.toUpperCase()));
   function instance({ inst, driven }) {
     const sc = simCell(inst);
     const given = inst.params.filter(prm => prm.given && (!sc || sc.param(prm.name.toUpperCase()))).map(prm => [prm.name.toUpperCase(), paramLit(prm, inst)]);
     const params = given.map(([n, x]) => `    .${n}(${x})`);
-    const cell = sc ? { name: sc.name, tie: {} } : yosysCell(inst.module.toUpperCase(), inst.ports.map(pt => pt.name.toUpperCase()));
+    const cell = sc ? { name: sc.name, tie: {} } : cellOf(inst);
     const conns = Object.entries(cell.tie).map(([pin, v]) => `    .${pin}(${v})`);
     for (const pt of inst.ports) {
       let x = sigName.get(pt.sig);

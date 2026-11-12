@@ -72,3 +72,44 @@ test('run_process and get_report: a CST with no clock, the clock reported with n
   assert.deepEqual(summary.par.fmax.map(f => [f.clock, f.constraint]), [['clk', null]]);
   assert.equal(summary.par.constraintsMet, true);
 });
+
+// #3498: a design that instantiates the Gowin's rPLL and OSC elaborates (the Gowin primitives' models, #2299): set_top, Check
+// Syntax and the test bench's simulation (the PLL's lock, its clock's and the oscillator's edges counted), its synthesis
+const PLL_TOP = `module top(input clk, output lock, output reg [3:0] n = 0, output reg [3:0] m = 0);
+  wire fast, slow;
+  rPLL #(.FCLKIN("27"), .IDIV_SEL(0), .FBDIV_SEL(1), .ODIV_SEL(8), .DEVICE("GW1NR-9C")) u (.CLKIN(clk), .CLKOUT(fast), .LOCK(lock), .CLKFB(1'b0),
+    .RESET(1'b0), .RESET_P(1'b0), .FBDSEL(6'b0), .IDSEL(6'b0), .ODSEL(6'b0), .PSDA(4'b0), .DUTYDA(4'b0), .FDLY(4'b0));
+  OSC #(.FREQ_DIV(10), .DEVICE("GW1NR-9C")) o (.OSCOUT(slow));
+  always @(posedge fast) n <= n + 1;
+  always @(posedge slow) m <= m + 1;
+endmodule
+`;
+const PLL_TB = `\`timescale 1ns / 1ps
+module tb_top;
+  reg clk = 0;
+  wire lock;
+  wire [3:0] n, m;
+  top dut (.clk(clk), .lock(lock), .n(n), .m(m));
+  always #18.5 clk = ~clk;
+  initial begin #500; $display("lock %b n %0d m %0d", lock, n, m); end
+endmodule
+`;
+test('a project instantiating an rPLL and an OSC: set_top, check_syntax and simulate, its synthesis (#3498)', { timeout: 600000 }, async () => {
+  await ok('new_project', { name: 'pll' });
+  await ok('set_design_properties', { project: 'pll', board: 'tangnano9k' });
+  await ok('write_file', { project: 'pll', path: 'src/top.v', text: PLL_TOP });
+  await ok('write_file', { project: 'pll', path: 'sim/tb_top.v', text: PLL_TB });
+  await ok('set_top', { project: 'pll', top: 'top', sim_top: 'tb_top' });
+  assert.match((await ok('check_syntax', { project: 'pll' })).text, /^Process "Check Syntax" of <top> completed successfully \(\d+ signals, \d+ processes\)\.$/);
+  assert.match((await ok('check_syntax', { project: 'pll', simulation: true })).text, /^Process "Check Syntax" of <tb_top> completed successfully \(\d+ signals, \d+ processes\)\.$/);
+  const s = await ok('simulate', { project: 'pll', time_ns: 600, signals: [] });
+  // CLKIN rises at 18.5, 55.5 … ns: locked at the third (92.5 ns), CLKOUT (54 MHz) from the fourth (129.5 ns), a rising edge every
+  // 18.5 ns: 21 to 499.5 ns, n = 21 mod 16; OSCOUT (25 MHz) rises at 20, 60 … 460 ns: 12
+  assert.deepEqual([s.data.log.map(l => l.text), s.data.warnings, s.data.failed], [['lock 1 n 5 m 12'], [], false]);
+  const run = await ok('run_process', { project: 'pll', process: 'synthesize' });
+  assert.deepEqual(run.data.warnings, []);
+  // (the primitives kept as Gowin's cells, their names as Gowin writes them)
+  const net = fs.readFileSync(path.join(P.projectDir('pll'), 'build', 'open', 'top_yosys.v'), 'utf8');
+  assert.match(net, /^\s*rPLL #\(/m);
+  assert.match(net, /^\s*OSC #\(/m);
+});

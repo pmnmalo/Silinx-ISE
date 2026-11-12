@@ -130,7 +130,7 @@ export function toVerilog(design, { name, tables = true, simprim = null, formal 
 
   // ---------------- primitives instantiated by name
   // An instance of a module of Silinx's own UNISIM library (core/unisim.js, file <silinx>/…) is a
-  // Xilinx primitive: Yosys knows it as a cell, so it stays an instance, with the generics the
+  // Xilinx primitive (or a Gowin one, gowin-prims.js, #3498): Yosys knows it as a cell, so it stays an instance, with the generics the
   // design gave it. Its simulation model (signals, processes, sub-instances) is left out; only
   // its port signals remain, with the processes that drive its inputs from their actuals.
   const prims = [], skipSig = new Set(), skipProc = new Set();
@@ -138,7 +138,7 @@ export function toVerilog(design, { name, tables = true, simprim = null, formal 
   (function walk(inst) {
     for (const c of inst.children || []) {
       if (!String(c.file || '').startsWith('<silinx>/')) { walk(c); continue; }
-      if (c.file !== '<silinx>/unisim.vhd' && !(simprim && c.file === '<silinx>/simprim.vhd')) fail(`${c.module} (${c.path}): the primitives of a post-implementation netlist (${c.file}) cannot be synthesized`, c, c.file);
+      if (c.file !== '<silinx>/unisim.vhd' && c.file !== '<silinx>/gowin.vhd' && !(simprim && c.file === '<silinx>/simprim.vhd')) fail(`${c.module} (${c.path}): the primitives of a post-implementation netlist (${c.file}) cannot be synthesized`, c, c.file);
       const portSigs = new Set(c.ports.map(pt => pt.sig));
       const inside = [];
       (function all(i) { inside.push(i); (i.children || []).forEach(all); })(c);
