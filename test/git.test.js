@@ -242,11 +242,12 @@ test('clone: refused into an existing project, for a repository of several proje
     return true;
   });
   await rejects(G.gitClone({ url: bareWith('none', d => write(path.join(d, 'README.md'), 'x\n')) }), 'the repository is not a Silinx project: it has no silinx.json');
-  await rejects(G.gitClone({ url: bareWith('nul', d => { gates(d); write(path.join(d, 'src', 'bad.vhd'), 'entity\0x'); }) }), 'not opened: src/bad.vhd: not imported: binary content (a NUL byte) in a text file');
+  // (not 'nul', a reserved name on Windows, #3613)
+  await rejects(G.gitClone({ url: bareWith('nulbyte', d => { gates(d); write(path.join(d, 'src', 'bad.vhd'), 'entity\0x'); }) }), 'not opened: src/bad.vhd: not imported: binary content (a NUL byte) in a text file');
   await rejects(G.gitClone({ url: bareWith('json', d => { gates(d); write(path.join(d, 'silinx.json'), '{'); }) }), 'not opened: its silinx.json is not valid JSON');
   await assert.rejects(G.gitClone({ url: path.join(tmp, 'remotes', 'missing.git') }), e => { assert.match(e.message, /^git clone: /); assert.equal(e.hint, 'Check the repository\'s address, and that your GitHub account can see it.'); return true; });
   // nothing left behind
-  assert.deepEqual(fs.readdirSync(ws).filter(n => n.startsWith('.silinx-clone') || ['several', 'none', 'nul', 'json', 'missing'].includes(n)), []);
+  assert.deepEqual(fs.readdirSync(ws).filter(n => n.startsWith('.silinx-clone') || ['several', 'none', 'nulbyte', 'json', 'missing'].includes(n)), []);
 });
 
 // #3359: a hidden file is no part of a project: a clone leaves the repository's out of the folder (git's sparse

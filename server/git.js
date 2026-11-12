@@ -54,7 +54,7 @@ function gitEnv() {
   const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C', LANGUAGE: 'C' };
   for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_NAMESPACE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES']) delete env[k];
   let ws = P.workspaceDir();
-  try { ws = fs.realpathSync(ws); } catch { /* not made yet */ }
+  try { ws = fs.realpathSync.native(ws); } catch { /* not made yet */ }   // (a Windows short name expanded, as git does)
   env.GIT_CEILING_DIRECTORIES = path.dirname(ws);
   if (!env.GIT_SSH_COMMAND) env.GIT_SSH_COMMAND = 'ssh -o BatchMode=yes';
   return env;
@@ -130,7 +130,9 @@ const ok = async (op, args, opt) => {
 };
 
 // ------------------------------------------------------------------ a project's repository
-const real = p => { try { return path.resolve(fs.realpathSync(p)); } catch { return path.resolve(p); } };
+// (the system's resolution, as git's own: on Windows the temporary folder is often a short (8.3) name, RUNNER~1, that
+// git reports by its long one and fs.realpathSync keeps as it is, #3611)
+const real = p => { try { return path.resolve(fs.realpathSync.native(p)); } catch { return path.resolve(p); } };
 const same = (a, b) => (process.platform === 'win32' || process.platform === 'darwin' ? a.toLowerCase() === b.toLowerCase() : a === b);
 
 /** The repository holding a project: { dir, top, prefix, root: 'project' | 'workspace' }, or null (none, or one above
