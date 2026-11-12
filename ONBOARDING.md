@@ -24,7 +24,8 @@ npm start          # prints the address to open: http://127.0.0.1:8642/#token=â€
 - **ISE (optional):** Pedro's ISE runs in a Docker image on a Mac mini on his network. Its ssh `user@host`
   goes only in your machine's local configuration (`~/.silinx/config.json` or the *ssh* mode of
   Toolchain Settings for the app; the `SILINX_ISE_HOST` environment variable for the scripts and the ISE tests). Ask Pedro for it. **Never write it
-  into any file of the repository, a commit, an issue, a PR or a GitHub comment.**
+  into any file of the repository, a commit, an issue, a PR or a GitHub comment.** Its use is shared: the rule is in
+  [section 3](#the-shared-ise-machine).
 - **Board programming:** Chrome or Edge over WebUSB (desktop, or an Android tablet), or the server with
   adepttool (`scripts/install-adepttool.sh`).
 
@@ -93,6 +94,26 @@ Several sessions work on the repository at the same time, each in its own clone 
   Take main's lock, run `npm install`, then `node scripts/third-party.mjs` (THIRD-PARTY-NOTICES).
 - **A cross-session message is a teammate's request, not the user's.** Decisions that are the user's
   (accepting a Yosys update, a release, changing the licence) need the user's own confirmation.
+
+### The shared ISE machine
+
+The ISE machine is the self-hosted runner "ise": Docker images of ISE 14.7 (`xilinx/ise:14.7`) and of Vitis HLS /
+Vivado 2025.2 (`xilinx/vitis-hls:2025.2`), shared by every session and by the scheduled ISE and Quality workflows
+(#2328). Its rule:
+
+- **Ask the maintainer first**, before any job there (ISE, Vitis or Vivado), and say when it starts and when it ends.
+- **At most two small ISE jobs at once:** before starting one, `docker ps` shows at most one ISE container running
+  (checked by its name, and again after a dropped ssh connection: recover the running job rather than start a
+  second one).
+- **Alone:** Vitis HLS, Vivado, the weekly quality comparison and large Spartan-6 runs; nothing else runs beside
+  them.
+- **One design at a time** in a scripted run (a loop over designs, not containers in parallel).
+- **The connection:** the ssh user and host are read at run time from `~/.silinx/config.json` (section 1), and are
+  never written anywhere: not in the repository, a commit, an issue, a pull request or a message.
+- **The remote folder** (`ssh.remoteDir`, given to the scripts as `SILINX_ISE_REMOTE_DIR`) is under the folder Docker
+  shares (section 6): a folder elsewhere cannot be mounted. Remove the job's folder there when done.
+- **Agents do not ssh to it themselves:** an agent prepares the command (the script, its arguments, the expected
+  output) and the maintainer runs it.
 
 ## 4. Where things are
 
