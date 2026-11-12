@@ -214,6 +214,6 @@ test('#2577 #3508 a constant of 20 000 functions, each calling the next: simulat
   const text = `module t;\n${fns.join('\n')}\nlocalparam P = f0(1);\ninitial $display("%0d", P);\nendmodule\n`;
   const r = simulate([{ path: 't.v', text }], 't');
   assert.equal(r.sim, null);
-  // (f63's call of f64, on line 65; the constant then not declared where it is written)
+  // (the call past MAX_CALL_NESTING, f31's of f32 on line 33; the constant then not declared where it is written)
   assert.deepEqual(r.errors.map(e => `${e.file}:${e.line} ${e.severity}: ${e.message}`), [`t.v:${MAX_CALL_NESTING + 1} error: ${CALL_NESTING_MESSAGE}`, `t.v:${n + 3} error: 'P' is not declared`]);
 });
