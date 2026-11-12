@@ -169,6 +169,6 @@ test('the workspace\'s repository: a pull that brings a folder with an invalid p
     assert.deepEqual(fs.readdirSync(path.join(wsDir, '.git', 'silinx-trust')), ['zz.json']);
     const { startImplementation } = await import('../server/impl-routes.js');
     await assert.rejects(startImplementation('zz', { toolchain: 'ise' }), { message: ISE_OUTSIDE('zz'), status: 403 });
-    await assert.rejects(P.readProject('0bad'), { message: "invalid project name '0bad'", status: 400 });
+    await assert.rejects(P.readProject('0bad'), { message: "invalid project name '0bad': a letter, then up to 63 letters, digits, - and _", status: 400 });
   } finally { process.env.SILINX_WORKSPACE = prev; }
 });

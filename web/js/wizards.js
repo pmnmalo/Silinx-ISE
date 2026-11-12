@@ -17,6 +17,7 @@ import { currentProject, opened } from './project.js';
 import { prefKey } from './prefs.js';
 import { safeReleaseUrl } from './release-url.js';
 import { NAME_RE } from '/core/ident.js';
+import { projectNameError, projectNameFrom, sameProject } from '/core/project-name.js';
 
 // Device used when no evaluation board is selected.
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
@@ -93,9 +94,10 @@ export function wizard(title, pages, { width = 720, finishLabel = 'Finish', extr
 // project is moved to <workspace>/.trash (recoverable); in the standalone edition it is deleted,
 // unless the projects are kept in a workspace folder on the disk (it has a .trash folder too).
 const deletesProjects = () => api.standalone && !api.keepsTrash;
-async function askReplaceProject(pname) {
-  const list = await api.projects();
-  if (!list.some(p => p.name === pname)) return true;
+// (a project of the name in another case too: the same folder on a case-insensitive file system, #3538)
+async function askReplaceProject(name) {
+  const pname = sameProject(await api.projects(), name)?.name;
+  if (!pname) return true;
   return confirmDlg('Replace Project',
     `A project named '${pname}' already exists.\n\nReplace it? ${deletesProjects() ? 'The existing project will be deleted from this browser.' : 'The existing project is moved to the workspace .trash folder.'}`);
 }
@@ -104,11 +106,11 @@ async function askReplaceProject(pname) {
 // and is opened again if it was open. Should the restore fail
 // too, the server still has the old project in the workspace .trash folder.
 export async function replaceProjectWith(pname, fn) {
-  const exists = (await api.projects()).some(p => p.name === pname);
-  const wasOpen = S.project?.name === pname;
+  const old = sameProject(await api.projects(), pname)?.name, exists = !!old;
+  const wasOpen = !!old && S.project?.name === old;
   let backup = null;
   if (exists) {
-    try { backup = { zip: (await api.exportZip(pname, 'silinx')).blob }; } catch { /* no snapshot: the server keeps the old project in .trash */ }
+    try { backup = { zip: (await api.exportZip(old, 'silinx')).blob }; } catch { /* no snapshot: the server keeps the old project in .trash */ }
   }
   await removeExistingProject(pname);
   try { return await fn(); }
@@ -116,19 +118,19 @@ export async function replaceProjectWith(pname, fn) {
     try { await api.deleteProject(pname); } catch { /* nothing was created */ }
     let restored = false;
     try {
-      if (backup?.zip) { await api.importZip(pname, backup.zip); restored = true; }
+      if (backup?.zip) { await api.importZip(old, backup.zip); restored = true; }
     } catch { /* keep the import error */ }
     if (restored) {
-      app.log(`The previous project '${pname}' was restored.`, 'info');
-      if (wasOpen) { try { await app.openProject(pname); app.showLeftPage('design'); } catch { /* it is in the project list */ } }
-    } else if (exists && !deletesProjects()) app.log(`The previous project '${pname}' is in the workspace .trash folder.`, 'info');
+      app.log(`The previous project '${old}' was restored.`, 'info');
+      if (wasOpen) { try { await app.openProject(old); app.showLeftPage('design'); } catch { /* it is in the project list */ } }
+    } else if (exists && !deletesProjects()) app.log(`The previous project '${old}' is in the workspace .trash folder.`, 'info');
     throw e;
   }
 }
 
-async function removeExistingProject(pname) {
-  const list = await api.projects();
-  if (!list.some(p => p.name === pname)) return;
+async function removeExistingProject(name) {
+  const pname = sameProject(await api.projects(), name)?.name;
+  if (!pname) return;
   if (S.project?.name === pname) await app.closeProject();
   await api.deleteProject(pname);
   app.log(`Project '${pname}' replaced${deletesProjects() ? '' : ' (the old one is in the workspace .trash folder)'}.`, 'info');
@@ -164,11 +166,12 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
         ...field('Start from:', tplSel)),
       h('div', { class: 'hint', style: { marginTop: '14px' } }, where.hint)),
     validate: async () => {
-      if (!NAME_RE.test(name.value.trim())) return 'Project name must start with a letter and contain only letters, digits and _.';
+      const bad = projectNameError(name.value.trim());   // (the server's rule and message, core/project-name.js, #3538)
+      if (bad) return bad;
       st.replace = false;
-      const list = await api.projects();
-      if (list.some(p => p.name === name.value.trim())) {
-        if (!await askReplaceProject(name.value.trim())) return `A project named '${name.value.trim()}' already exists: choose another name.`;
+      const other = sameProject(await api.projects(), name.value.trim())?.name;
+      if (other) {
+        if (!await askReplaceProject(other)) return `A project named '${other}' already exists: choose another name.`;
         st.replace = true;
       }
       return null;
@@ -346,7 +349,7 @@ export async function importXiseDialog() {
   const dirInp = h('input', { type: 'file', webkitdirectory: true, multiple: true });
   const name = h('input', { type: 'text', placeholder: 'new project name' });
   const info = h('div', { class: 'hint', style: { minHeight: '16px' } });
-  const suggest = n => { if (!name.value && n) name.value = n.replace(/\.(zip|xise)$/i, '').replace(/[^A-Za-z0-9_]/g, '_').replace(/^[^A-Za-z]+/, 'p_'); };
+  const suggest = n => { if (!name.value && n) name.value = projectNameFrom(n); };
   fileInp.addEventListener('change', () => {
     dirInp.value = '';
     const f = [...fileInp.files].find(x => /\.(zip|xise)$/i.test(x.name));
@@ -378,7 +381,8 @@ export async function importXiseDialog() {
   const xf = files.find(f => /\.xise$/i.test(f.name));
   if (!dirInp.files.length && !zf && !xf) return alertDlg('Import Xilinx ISE Project', 'Select the project folder, a .zip, or a .xise with its sources.', 'error');
   const folder = (dirInp.files[0]?.webkitRelativePath || '').split('/')[0];
-  const pname = (name.value.trim() || (zf || xf)?.name.replace(/\.(zip|xise)$/i, '') || folder || 'imported').replace(/[^A-Za-z0-9_]/g, '_');
+  const pname = name.value.trim() || projectNameFrom((zf || xf)?.name || folder) || 'imported';
+  if (projectNameError(pname)) return alertDlg('Import Xilinx ISE Project', projectNameError(pname), 'error');
   if (!await askReplaceProject(pname)) return;
   try {
     const res = await replaceProjectWith(pname, async () => {
@@ -404,13 +408,12 @@ export async function importXiseDialog() {
 // ------------------------------------------------------------------ Import Silinx Project
 // A .zip made with File ▸ Export Silinx Project (silinx.json + every project file); in the browser edition also
 // a project bundle (.silinx.json) of its File ▸ Download Project Bundle before #3548, read as such a zip.
-const projectNameOf = f => f.name.replace(/\.zip$|\.silinx\.json$|\.json$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
 export async function importSilinxDialog() {
   const fileInp = h('input', { type: 'file', accept: api.standalone ? '.zip,.json' : '.zip' });
   const name = h('input', { type: 'text', placeholder: 'project name' });
   fileInp.addEventListener('change', () => {
     const f = fileInp.files[0];
-    if (f && !name.value) name.value = projectNameOf(f);
+    if (f && !name.value) name.value = projectNameFrom(f.name);
   });
   const r = await dialog({
     title: 'Import Silinx Project', width: 520,
@@ -425,7 +428,8 @@ export async function importSilinxDialog() {
   if (!r) return;
   const zf = fileInp.files[0];
   if (!zf) return alertDlg('Import Silinx Project', 'Select the .zip of the Silinx project.', 'error');
-  const pname = name.value.trim() || projectNameOf(zf);
+  const pname = name.value.trim() || projectNameFrom(zf.name) || 'imported';
+  if (projectNameError(pname)) return alertDlg('Import Silinx Project', projectNameError(pname), 'error');
   if (!await askReplaceProject(pname)) return;
   try {
     const res = await replaceProjectWith(pname, () => api.importZip(pname, zf));

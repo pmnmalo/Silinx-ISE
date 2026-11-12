@@ -117,7 +117,7 @@ test('open_link: a broken or hostile link is refused, nothing made (#2829)', asy
   await fails('open_link', { link: `#design=${hostile}` }, 'the link\'s design has a file outside the project (\'../../escape.vhd\')');
   const named = Buffer.from(zlib.deflateRawSync(JSON.stringify({ v: 1, project: { name: '<svg onload=alert(1)>' }, files: {} }))).toString('base64url');
   await fails('open_link', { link: `#design=${named}` }, 'the link\'s design has no valid project name (\'<svg onload=alert(1)>\')');
-  await fails('open_link', { link: '#open=example:gates', name: '../x' }, 'name: \'../x\' is not a project name (a letter, then letters, digits, - and _)');
+  await fails('open_link', { link: '#open=example:gates', name: '../x' }, 'invalid project name \'../x\': a letter, then up to 63 letters, digits, - and _');
   assert.equal((await P.listProjects()).length, before);
   assert.equal(fs.existsSync(path.join(tmp, 'escape.vhd')), false);
 });
