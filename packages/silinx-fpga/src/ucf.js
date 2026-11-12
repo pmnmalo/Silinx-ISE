@@ -143,7 +143,7 @@ export function generateUcf({ ports, assignments = {}, clocks = [], header, othe
   const w = Math.max(8, ...nets.map(n => (typeof n === 'string' ? n : n.extra).length + 2));
   for (const n of nets) {
     const name = typeof n === 'string' ? n : n.extra;
-    const a = assignments[name];
+    const a = byName(assignments, name);
     if (!a || !a.loc && !a.iostandard && !a.pull && !a.drive && !a.slew) {
       lines.push(`# NET ${q(name).padEnd(w)} LOC = "" ;  # unassigned`);
       continue;
@@ -239,6 +239,17 @@ function periodSpecOk(s) {
   return /^("[^"]*"|[A-Za-z_][\w$]*)\s*[/*]\s*\d+(?:\.\d*)?(?:\s+PHASE\s*[+-]?\s*\d+(?:\.\d*)?\s*(ps|ns|us|ms)?)?(?:\s+(HIGH|LOW)\s*\d+(?:\.\d*)?\s*%?)?$/i.test(t);
 }
 
+/** A design's name (a net's, a port's) as a key of a table of constraints, a plain object: read as its own property
+ *  only, and written as one, so that __proto__, constructor or toString are names as any other, which neither read
+ *  what every object inherits nor change it (#3553). */
+export function byName(table, name) {
+  return Object.hasOwn(table, name) ? table[name] : undefined;
+}
+export function setByName(table, name, value) {
+  Object.defineProperty(table, name, { value, writable: true, enumerable: true, configurable: true });
+  return value;
+}
+
 /**
  * Parse UCF text. Net names are kept as written, but for bus bits written a(0) or a[0], which
  * become a<0>: with `ports` (the top's, as normalizePort takes them), only the bits of its buses;
@@ -250,7 +261,7 @@ export function parseUcf(text, { ports } = {}) {
   const assignments = {};
   const clocks = [];
   const other = [];          // [{ i, text }] sorted by statement position at the end
-  const tnmToNet = {};
+  const tnmToNet = new Map();   // a timing name -> its net
   const tnmStmts = [];       // TNM_NET/TNM attributes: kept verbatim unless a parsed clock re-creates them
   const pendingTs = [];
   const netStatements = [];  // [{ net, attrs }]: the NET statements' attributes in order (portAssignments)
@@ -268,7 +279,7 @@ export function parseUcf(text, { ports } = {}) {
         if (p) clocks.push({ net, ...p }); else keep(st);
         return;
       }
-      const a = assignments[net] || {};
+      const a = byName(assignments, net) || {};
       const own = {};   // this statement's attributes (netStatements)
       let touched = false;
       for (const raw of rest.split('|')) {
@@ -290,11 +301,11 @@ export function parseUcf(text, { ports } = {}) {
           case 'DRIVE': if (Number.isNaN(parseInt(val, 10))) asIs(); else { own.drive = parseInt(val, 10); touched = true; } break;
           case 'SLEW': own.slew = val.toLowerCase(); touched = true; break;
           case 'CLOCK_DEDICATED_ROUTE': own.clockDedicatedRoute = !/^false$/i.test(val); touched = true; break;
-          case 'TNM_NET': case 'TNM': tnmToNet[val] ??= net; tnmStmts.push({ i, net, tnm: val, text: `NET "${net}" ${part}` }); break;
+          case 'TNM_NET': case 'TNM': if (!tnmToNet.has(val)) tnmToNet.set(val, net); tnmStmts.push({ i, net, tnm: val, text: `NET "${net}" ${part}` }); break;
           default: asIs();
         }
       }
-      if (touched) { assignments[net] = Object.assign(a, own); netStatements.push({ net, attrs: own }); }
+      if (touched) { setByName(assignments, net, Object.assign(a, own)); netStatements.push({ net, attrs: own }); }
       return;
     }
     const mTs = /^TIMESPEC\s+("[^"]*"|\S+)\s*=\s*PERIOD\s+("[^"]*"|\S+)\s+(.*)$/i.exec(st);
@@ -306,14 +317,14 @@ export function parseUcf(text, { ports } = {}) {
   for (const t of pendingTs) {
     const p = parsePeriodSpec(t.spec);
     // derived ('TS_clk / 2'), with jitter, or on a group no NET defines: keep the statement as written
-    if (!p || !(t.tnm in tnmToNet)) { other.push({ i: t.i, text: t.st }); continue; }
+    if (!p || !tnmToNet.has(t.tnm)) { other.push({ i: t.i, text: t.st }); continue; }
     usedTnm.add(t.tnm);
-    clocks.push({ net: tnmToNet[t.tnm], name: t.name, tnm: t.tnm, ...p });
+    clocks.push({ net: tnmToNet.get(t.tnm), name: t.name, tnm: t.tnm, ...p });
   }
   // a TNM_NET that no parsed clock re-creates (used by a derived TIMESPEC, OFFSET, TIMEGRP...) is kept
   const recreated = new Set();
   for (const t of tnmStmts) {
-    if (usedTnm.has(t.tnm) && t.net === tnmToNet[t.tnm] && !recreated.has(t.tnm)) { recreated.add(t.tnm); continue; }
+    if (usedTnm.has(t.tnm) && t.net === tnmToNet.get(t.tnm) && !recreated.has(t.tnm)) { recreated.add(t.tnm); continue; }
     other.push({ i: t.i, text: t.text });
   }
   other.sort((x, y) => x.i - y.i);
@@ -380,7 +391,7 @@ export function portAssignments(parsed, names, { oneBitBuses = [] } = {}) {
   for (const { net, attrs } of stmts) {
     const targets = hasWildcard(net) ? names.filter(n => ucfPattern(net, 'i').test(n)) : [exact(net)];
     if (!targets.length && !unmatched.includes(net)) unmatched.push(net);
-    for (const n of targets) assignments[n] = { ...assignments[n], ...attrs };
+    for (const n of targets) setByName(assignments, n, { ...byName(assignments, n), ...attrs });
   }
   return { assignments, unmatched };
 }
@@ -404,14 +415,14 @@ export function boardAutoAssign(ports, board, { byDirection = false } = {}) {
   const byName = new Map(res.map(r => [r.name.toLowerCase(), r]));
   for (const p of ports) {
     const key = p.name.toLowerCase();
-    const alias = ALIASES[key] || key;
+    const alias = (Object.hasOwn(ALIASES, key) && ALIASES[key]) || key;
     let r = byName.get(key) || byName.get(alias);
     // fall back to the board's resource group (e.g. Numato boards call their switches "dip")
     const GROUP = { clk: 'Clock', led: 'LEDs', sw: 'Switches', btn: 'Buttons' };
-    if (!r && GROUP[alias]) r = res.find(x => x.group === GROUP[alias] && x.pins.length >= Math.min(p.width || 1, 2)) || res.find(x => x.group === GROUP[alias]);
+    if (!r && Object.hasOwn(GROUP, alias)) r = res.find(x => x.group === GROUP[alias] && x.pins.length >= Math.min(p.width || 1, 2)) || res.find(x => x.group === GROUP[alias]);
     // rx / tx: the board's serial port, whatever it calls them (rs232_rx, uart_tx, rs232_dce_txd…: the first, #2537)
     const SERIAL = { rx: 'in', tx: 'out' };
-    if (!r && SERIAL[alias]) r = res.find(x => ['UART', 'RS-232', 'USB-UART'].includes(x.group) && x.dir === SERIAL[alias]);
+    if (!r && Object.hasOwn(SERIAL, alias)) r = res.find(x => ['UART', 'RS-232', 'USB-UART'].includes(x.group) && x.dir === SERIAL[alias]);
     if (!r) { unmatched.push(p.name); continue; }
     const attrs = pin => {
       const a = { loc: pin };   // I/O standard: the default (none written) unless the user picks one
@@ -423,12 +434,12 @@ export function boardAutoAssign(ports, board, { byDirection = false } = {}) {
     };
     const width = p.width || 1;
     if (width === 1 && (p.msb === null || p.msb === undefined)) {
-      assignments[bitName(p.name)] = attrs(r.pins[0]);
+      setByName(assignments, bitName(p.name), attrs(r.pins[0]));
       if (r.group === 'Clock') clocks.push({ net: bitName(p.name), period: periodNs(r.extra?.period || '20 ns'), duty: 50 });
     } else {
       const lo = Math.min(p.msb, p.lsb);
       if (width > r.pins.length) unmatched.push(`${p.name}[${lo + r.pins.length}..]`);
-      for (let i = 0; i < Math.min(width, r.pins.length); i++) assignments[bitName(p.name, lo + i)] = attrs(r.pins[i]);
+      for (let i = 0; i < Math.min(width, r.pins.length); i++) setByName(assignments, bitName(p.name, lo + i), attrs(r.pins[i]));
     }
     matched.push(p.name);
   }
@@ -456,7 +467,7 @@ export function boardAutoAssign(ports, board, { byDirection = false } = {}) {
       if (s.r.pull) a.pull = s.r.pull;
       if (s.r.drive) a.drive = s.r.drive;
       if (s.r.slew) a.slew = s.r.slew;
-      assignments[net] = a;
+      setByName(assignments, net, a);
       nets.push([net, s.label]);
     }
     if (!nets.length) { left.push(name); continue; }

@@ -38,7 +38,7 @@ export function wizardError({ device, board = null, assignments, text }) {
 export function applyAttributes(device, assignments, attributes = {}) {
   const format = constraintsFormatOf(device), F = format.toUpperCase(), can = PIN_ATTRS[format];
   for (const [net, attrs] of Object.entries(attributes)) {
-    const a = assignments[net];
+    const a = Object.hasOwn(assignments, net) ? assignments[net] : null;   // (a net's own: __proto__ is a name, #3553)
     if (!a) throw new Error(`attributes: ${net} has no pin`);
     for (const [k, v0] of Object.entries(attrs || {})) {
       if (!['iostandard', 'pull', 'drive', 'slew'].includes(k)) throw new Error(`attributes: ${k} is not an attribute (iostandard, pull, drive, slew)`);
