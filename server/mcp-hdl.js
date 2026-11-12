@@ -126,6 +126,9 @@ export async function runBounded(sim, until, { timeoutS, signal, steps: maxSteps
   }
 }
 
+// what a failed check_syntax or simulate holds (#3681): the compiler's lines, which quote the design's names and files
+const FAILED = 'the compiler\'s messages, which quote the design\'s names and files';
+
 export const HDL_TOOLS = [
   {
     name: 'check_syntax', title: 'Check Syntax',
@@ -140,7 +143,8 @@ export const HDL_TOOLS = [
       const lines = [...diags.map(diagLine),
         ok ? `Process "Check Syntax" of <${mod}> completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''} (${design.signals.length} signals, ${design.procs.length} processes).`
           : `Process "Check Syntax" of <${mod}> failed (${errors.length} error(s), ${warnings.length} warning(s)).`];
-      return { text: lines.join('\n'), data: { project: name, top: mod, ok, errors: errors.map(diagJson), warnings: warnings.map(diagJson) }, isError: false };
+      // (a failure's lines quote the design's names and files: the project's own text, #3681)
+      return { untrusted: ok ? undefined : FAILED, text: lines.join('\n'), data: { project: name, top: mod, ok, errors: errors.map(diagJson), warnings: warnings.map(diagJson) }, isError: false };
     },
   },
   {
@@ -174,7 +178,7 @@ export const HDL_TOOLS = [
       const { srcs, top: mod, diags } = view;
       let { design } = view;
       const errors = diags.filter(d => d.severity === 'error');
-      if (errors.length || !design?.top) return { text: [...errors.map(diagLine), `The simulation of <${mod}> did not start: ${errors.length} error(s) (check_syntax with simulation).`].join('\n'), data: { project: name, top: mod, started: false, errors: errors.map(diagJson) }, isError: true };
+      if (errors.length || !design?.top) return { untrusted: FAILED, text: [...errors.map(diagLine), `The simulation of <${mod}> did not start: ${errors.length} error(s) (check_syntax with simulation).`].join('\n'), data: { project: name, top: mod, started: false, errors: errors.map(diagJson) }, isError: true };
       // a model of the flow: the test bench against its netlist, compiled after the sources (its entity replaces the RTL one)
       const head = [];
       let simSrcs = srcs;
@@ -190,7 +194,7 @@ export const HDL_TOOLS = [
         lib.errors = lib.errors.filter(e => !/redefined/.test(e.message));
         design = elaborate(lib, mod);
         const errs = [...lib.errors, ...design.diags].filter(d => d.severity === 'error');
-        if (errs.length || !design.top) return { text: [...head, ...errs.map(diagLine), `The simulation of <${mod}> with the ${SIM_MODELS[model].toLowerCase()} model did not start: ${errs.length} error(s).`].join('\n'), data: { project: name, top: mod, model, started: false, errors: errs.map(diagJson) }, isError: true };
+        if (errs.length || !design.top) return { untrusted: FAILED, text: [...head, ...errs.map(diagLine), `The simulation of <${mod}> with the ${SIM_MODELS[model].toLowerCase()} model did not start: ${errs.length} error(s).`].join('\n'), data: { project: name, top: mod, model, started: false, errors: errs.map(diagJson) }, isError: true };
       }
       const { Simulator, toVCD } = await import('../core/simulator.js');
       const V = await import('../core/values.js');
