@@ -22,6 +22,7 @@
 import { lex, numText } from './c-lex.js';
 import { cppTree } from './cpp-tree.js';
 import { isCpp } from './cpp-lex.js';
+import { MAX_NESTING, NESTING_MESSAGE, STMT_NESTING_MESSAGE, cutDeep } from './c-limits.js';
 
 // the type names of C and of stdint.h, as Silinx HLS knows them (docs/c-to-hdl.md: widths, signedness)
 export const STDINT = {
@@ -41,7 +42,7 @@ const ASSIGN = new Set(['=', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<
 
 /** The token tools of the parser: the position (S.p), the token tests, the errors and the recovery. */
 function tokenTools(toks, file, errors) {
-  const S = { p: 0 };
+  const S = { p: 0, depth: 0, sdepth: 0 };
 
   const at = (v) => toks[S.p].v === v && (toks[S.p].t === 'op' || toks[S.p].t === 'id');
   // (sim: a statement only the C simulation compiles, #ifndef __SYNTHESIS__, core/c-lex.js, #1897)
@@ -65,7 +66,14 @@ function tokenTools(toks, file, errors) {
     }
   };
 
-  return { toks, S, at, loc, fail, expect, show, recover, Stop };
+  /** f() one level deeper in S[key] (the parser's nesting, #3558): past MAX_NESTING, the error `message` here. */
+  const nested = (key, message, f) => {
+    if (S[key] >= MAX_NESTING) { S.tooDeep = S.p; fail(message); }
+    S[key]++;
+    try { return f(); } finally { S[key]--; }
+  };
+
+  return { toks, S, at, loc, fail, expect, show, recover, Stop, nested };
 }
 /** The types, declarators and expressions of the parser. */
 function exprParser(T, typedefs, cpp = false) {
@@ -318,7 +326,9 @@ function exprParser(T, typedefs, cpp = false) {
     expect(':', "in a '? :' expression");
     return { kind: 'cond', c, a, b: ternary(noGt), loc: loc(t) };
   }
-  function assignment() {
+  // (each one a level of the parser's nesting: parentheses, arguments, indexes, ?:, assignments, #3558)
+  function assignment() { return T.nested('depth', NESTING_MESSAGE, assignment1); }
+  function assignment1() {
     const l = ternary();
     if (toks[S.p].t === 'op' && ASSIGN.has(toks[S.p].v)) {
       const t = toks[S.p++];
@@ -331,7 +341,8 @@ function exprParser(T, typedefs, cpp = false) {
     while (at(',')) { const t = toks[S.p++]; e = { kind: 'comma', l: e, r: assignment(), loc: loc(t) }; }
     return e;
   }
-  function initializer() {
+  function initializer() { return at('{') ? T.nested('depth', NESTING_MESSAGE, initializer1) : assignment(); }
+  function initializer1() {
     if (!at('{')) return assignment();
     const l = loc();
     S.p++;
@@ -396,7 +407,9 @@ function stmtParser(T, E, typedefs) {
     expect('}', 'to close the block');
     return { kind: 'block', items, loc: l };
   }
-  function statement() {
+  // (each one a level of the parser's nesting: a block, an if's or a loop's body, an else if, #3558)
+  function statement() { return T.nested('sdepth', STMT_NESTING_MESSAGE, statement1); }
+  function statement1() {
     const t = toks[S.p];
     const l = loc(t);
     if (t.t === 'pragma') { S.p++; return { kind: 'pragma', pragma: t.v, loc: l }; }
@@ -409,7 +422,15 @@ function stmtParser(T, E, typedefs) {
     if (t.t === 'id') switch (t.v) {
       case 'if': {
         S.p++; expect('(', "after 'if'"); const cond = expression(); expect(')');
-        const then = statement();
+        const from = S.p;
+        let then;
+        try { then = statement(); } catch (e) {
+          // (its statement past the nesting: the else if chain's rest skipped with it, one error, #3558)
+          if (!(e instanceof Stop) || S.tooDeep !== from) throw e;
+          recover();
+          while (at('else')) { S.p++; recover(); }
+          return { kind: 'empty', loc: l };
+        }
         let els = null;
         if (at('else')) { S.p++; els = statement(); }
         return { kind: 'if', cond, then, else: els, loc: l };
@@ -489,6 +510,8 @@ export function parse(source, file = 'input.c', opts = {}) {
       if (S.p === before) S.p++;
     }
   }
+  // (an expression too deep for the passes after the parser: cut, its error, #3558)
+  cutDeep(items, (n, message) => errors.push({ file, line: n.loc?.line || 1, col: n.loc?.col || 1, message, severity: 'error' }));
   const ast = { file, items, pragmas: filePragmas, includes: lx.includes, errors, structArgs: lx.structArgs || new Map(), resetCtors: lx.resetCtors || new Set(), firs: lx.firs || new Map(), ffts: lx.ffts || new Map(), apFloats: lx.apFloats || [], tbProgram: lx.tbProgram || null };
   if (cpp) cppTree(ast, (n, message) => errors.push({ file, line: n?.loc?.line || 1, col: n?.loc?.col || 1, message, severity: 'error' }), lx.streams);
   return ast;

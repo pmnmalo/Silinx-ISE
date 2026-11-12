@@ -14,6 +14,7 @@
 // Isomorphic ES module: no DOM and no Node APIs.
 import { BOOL, INT, typeOf } from './c-types.js';
 import { implOf, storageOf } from './c-pragma.js';
+import { MAX_MEMORY_BITS, memoryMessage } from './c-limits.js';
 
 export const MEM_MIN = 64;   // a local array of more elements than this is a memory (fewer: registers)
 
@@ -80,6 +81,7 @@ export const memMethods = {
     if (!et) this.error(v.loc, `'${v.name}': only arrays of integers are supported`);
     const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : null);
     if (!n) this.error(v.loc, ext ? `the array argument '${v.name}' needs its size (the memory's depth): ${v.name}[N]` : `'${v.name}': an array needs its size`);
+    if (!ext && Number(n) * et.w > MAX_MEMORY_BITS) this.error(v.loc, memoryMessage(v.name, Number(n), et.w));   // (#3558)
     let init = null;
     if (v.init) {
       if (v.init.kind !== 'init') this.error(v.loc, `'${v.name}': an array is initialized with { … }`);

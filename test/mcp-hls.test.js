@@ -1,6 +1,6 @@
 // The MCP server's tools of a C or C++ source (#2674, server/mcp-hls.js), as the C module's processes: C Simulation and
 // C/RTL Co-simulation of the test designs (fir, gcd, sort, popcount; stream_sum in C++), the co-simulation in VHDL and
-// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit; #2182: a pipelined loop's iteration over several cycles; #2244: a global shared with a sub-module its port); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox; #3022: a C source that does not declare a blackbox's function, made; a description no C source declares, a warning of check_syntax.
+// in Verilog; View C Synthesis Report (#2783: scheduled within the device's multiplier blocks; #2273: a floating-point operation's unit; #2182: a pipelined loop's iteration over several cycles; #2244: a global shared with a sub-module its port); the HDL and the ASM chart made from the C; a C with an error; the errors; #2995: check_syntax with a refused RTL blackbox; #3022: a C source that does not declare a blackbox's function, made; a description no C source declares, a warning of check_syntax; #3558: a source past the limits, its one error.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -226,4 +226,25 @@ test('#3022 a C source that calls no RTL blackbox: its module made, c_synthesis_
   const b = await ok('check_syntax', { project: 'bbother' });
   assert.deepEqual([b.data.ok, b.data.errors, b.data.warnings], [true, [], []]);
   assert.match((await ok('c_synthesis_report', { project: 'bbother', path: 'src/top.cpp' })).text, /^C Synthesis Report of 'top' \(src\/top.cpp, VHDL\)\n[\s\S]*completed successfully$/);
+});
+
+test('#3558 the C tools on a source past Silinx HLS\'s limits: its one error each, as the interface\'s, not an exception', async () => {
+  let macros = '#define M0 a\n';
+  for (let k = 1; k <= 16; k++) macros += `#define M${k} M${k - 1} + M${k - 1}\n`;
+  const cases = [
+    ['src/big.c', 'int g[100000000];\nint top(int i) { g[i] = i; return g[i]; }\nint main(void) { return top(3) == 3 ? 0 : 1; }\n', 1, "an array of 100000000 elements: at most 4194304 (Silinx HLS)"],
+    ['src/chain.c', `int top(int a) { return ${Array.from({ length: 10000 }, () => 'a').join(' + ')}; }\nint main(void) { return top(0); }\n`, 1, 'expression more than 1024 operators deep (a chain of 1024 operators, x + x + …, is that deep): split it into several statements'],
+    ['src/macro.c', `${macros}int top(int a) { return M16; }\nint main(void) { return top(0); }\n`, 18, "the expansion of the macro 'M16' is longer than 65536 tokens"],
+  ];
+  for (const [path, text, line, message] of cases) {
+    await ok('write_file', { project: 'fir', path, text });
+    for (const [tool, process, args] of [['c_simulation', 'C Simulation', {}], ['c_synthesis_report', 'View C Synthesis Report', {}], ['c_cosimulation', 'C/RTL Co-simulation', {}], ['c_generated', null, { what: 'hdl' }]]) {
+      const r = await call(tool, { project: 'fir', path, ...args });
+      assert.equal(r.isError, true, `${tool} ${path}`);
+      // (the co-simulation's: its C simulation cannot run, as for any error of the source; c_generated's: its own line)
+      const first = tool === 'c_cosimulation' ? `ERROR:SilinxC - "${path}" the C simulation cannot run: the source has errors`
+        : tool === 'c_generated' ? `c_generated: ${path}: line ${line}: ${message}` : `ERROR:SilinxC - "${path}" line ${line}: ${message}`;
+      assert.equal(r.text, process ? `${first}\nProcess "${process}" failed` : first, `${tool} ${path}`);
+    }
+  }
 });

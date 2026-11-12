@@ -28,7 +28,7 @@ const NUM = /^\d+$/;
 const walk = (x, f) => {
   if (!x || typeof x !== 'object') return;
   if (Array.isArray(x)) { x.forEach((y) => walk(y, f)); return; }
-  f(x);
+  if (f(x) === false) return;
   for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type' && k !== 'pragma') walk(v, f);
 };
 
@@ -46,7 +46,8 @@ export function asked(checked) {
           if (FLOAT_OPS.has(op) && a.function === undefined && lower(a.type) !== 'function' && NUM.test(String(a.limit)) && Number(a.limit) >= 1) out.push({ op, scope: block, fn: f, loc: s.loc });
         }
       }
-      walk(block.items, (n) => { if (n !== block && n.kind === 'block') scan(n); });
+      // (each block inside scanned once, by its own scan: not again from every block around it, 2^depth times, #3558)
+      walk(block.items, (n) => { if (n !== block && n.kind === 'block') { scan(n); return false; } return undefined; });
     };
     scan(f.body);
   }

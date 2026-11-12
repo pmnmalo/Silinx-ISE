@@ -31,6 +31,7 @@ import { isUnit, shareUnits, unitSource } from './c-float-units.js';
 import { bindable } from './c-bind.js';
 import { hierarchy, inlineMode, latencyOf, moduleRegistry, sharedGlobals } from './c-submodule.js';
 import { fftTop } from './hls-fft-hdl.js';
+import { DEEP_MESSAGE, isStackOverflow } from './c-limits.js';
 
 export const bits = (k, w) => {
   const m = (1n << BigInt(w)) - 1n;
@@ -44,6 +45,13 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // threshold of the loops pipelined automatically, 0 none, #1919; directives: a config's syn.directive.interface lines, #1901;
 // modules: the design's modules, when it is one of them, its hdl then only its own, core/c-submodule.js, #1960)
 export function cToHdl(source, opts = {}) {
+  try { return toHdl(source, opts); } catch (e) {
+    // (the stack ran out on a source too deep: its one error, #3558)
+    if (!isStackOverflow(e)) throw e;
+    return { ok: false, hdl: '', top: opts.top ?? null, ports: [], diagnostics: [{ file: opts.file ?? 'input.c', line: 1, col: 1, message: DEEP_MESSAGE, severity: 'error' }] };
+  }
+}
+function toHdl(source, opts) {
   const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true, directives = null, host = null } = opts;
   // (host: a loop of that top's DATAFLOW region made a process, core/c-dataflow-loops.js, #1706)
   const check = (src, t = host ?? top) => checkC(src, file, { headers, top: t, depths: host ? null : depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)

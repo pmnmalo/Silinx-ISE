@@ -16,6 +16,7 @@
 import { pointerArithmetic, pointerVariables } from './c-pointer.js';
 import { pointerToPointer, pointerArgsMoved } from './c-pointer-args.js';
 import { parse, parseExpression } from './c-parse.js';
+import { DEEP_MESSAGE, isStackOverflow, MAX_ARRAY_ELEMENTS, arrayMessage } from './c-limits.js';
 import { checkPragmas, tripcountArgs, addDirectives, constArgs } from './c-pragma.js';
 import { MATH, BITCASTS } from './c-float.js';
 import { Q_MODES, O_MODES } from './c-fixed.js';
@@ -79,6 +80,14 @@ function fftMade(ast, funcs) {
 }
 
 export function checkC(source, file = 'input.c', opts = {}) {
+  try { return checkSource(source, file, opts); } catch (e) {
+    // (the stack ran out on a source too deep: its one error, #3558)
+    if (!isStackOverflow(e)) throw e;
+    const diagnostics = [{ file, line: 1, col: 1, message: DEEP_MESSAGE, severity: 'error' }];
+    return { ast: parse('', file, opts), top: null, funcs: new Map(), loops: [], consts: new Map(), diagnostics, ok: false, dataflow: false };
+  }
+}
+function checkSource(source, file, opts) {
   const ast = parse(source, file, opts);
   const diags = [...ast.errors];
   const report = (loc, message, severity = 'error') => diags.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity });
@@ -128,7 +137,14 @@ export function checkC(source, file = 'input.c', opts = {}) {
         const n = constValue(t.size, consts);
         if (n === null) { if (!vla) report(loc, 'the size of an array must be a constant (Silinx HLS: fixed sizes)'); }
         else if (n < 1n) report(loc, 'the size of an array must be 1 or more');
-        else t.length = Number(n);
+        else {
+          // (its elements, all its dimensions: at most MAX_ARRAY_ELEMENTS, once for the outermost, #3558)
+          const inner = t.of.kind === 'array' ? t.of.elements ?? 1 : 1;
+          const all = n * BigInt(inner);
+          if (all > BigInt(MAX_ARRAY_ELEMENTS) && inner <= MAX_ARRAY_ELEMENTS) report(loc, arrayMessage(null, all));
+          t.length = Number(n);
+          t.elements = Number(all);
+        }
       }
     }
     if (t.kind === 'ptr') typeOk(t.to, loc);

@@ -14,6 +14,7 @@
 import { Graph } from './c-graph.js';
 import { BOOL, INT, typeOf, promote, binaryType, compareType, shiftType, unaryType, literalType, wrap } from './c-types.js';
 import { constValue } from './c-check.js';
+import { MAX_MEMORY_BITS, memoryMessage } from './c-limits.js';
 import { sizeofBytes } from './c-sizeof.js';
 
 const MAX_UNROLL = 65536;   // iterations unrolled in all, at most
@@ -159,6 +160,7 @@ export class Flow {
       if (!et) this.error(v.loc, `'${v.name}': only arrays of integers (one dimension) are supported yet`);
       const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : null);
       if (!n) this.error(v.loc, `'${v.name}': an array needs its size`);
+      if (n * et.w > MAX_MEMORY_BITS) this.error(v.loc, memoryMessage(v.name, n, et.w));   // (#3558)
       const zero = this.g.const(0, et);
       const elems = Array.from({ length: n }, () => zero);
       if (v.init?.kind === 'init') v.init.items.forEach((x, k) => { if (k < n) elems[k] = this.conv(this.expr(x, g), et).id; });
