@@ -2,13 +2,13 @@
 // and schematics opened in their editors, each kept in sync with the HDL module it is the base of; the views of an
 // HDL file (schematic, ASM chart), the conversions between them, and a drawing whose HDL file name is taken.
 import { api } from './api.js';
-import { h, alertDlg, confirmDlg, popupMenu, toast } from './ui.js';
+import { h, alertDlg, confirmDlg, popupMenu } from './ui.js';
 import { elaborate } from '/core/compile.js';
 import { viewHdl, drawnHdlPath, drawnHdlClash, drawingInLanguage } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { S, activateDoc, closeDocByPath, compileProject, findDoc, flushDoc, hdlInProject, moduleInfo, openDoc,
   openFile, setDirty, status } from './app.js';
-import { log } from './console.js';
+import { log, logError } from './console.js';
 import { editorProblems } from './editor-problems.js';
 import { t, onLanguageChange } from './i18n.js';
 import { reloadProject } from './project.js';
@@ -35,7 +35,7 @@ export async function openAsm(path) {
   let model;
   const pj = S.project.name;
   try { model = JSON.parse(await api.readFile(pj, path)); }
-  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  catch (e) { logError(`cannot open ${path}: ${e.message}`); return; }
   const { mountAsmEditor } = await import('./asm-editor.js');
   if (S.project?.name !== pj) return;   // another project opened meanwhile: not its drawing (#1231)
   openDoc({
@@ -142,7 +142,7 @@ export async function openFsm(path) {
   let model;
   const pj = S.project.name;
   try { model = JSON.parse(await api.readFile(pj, path)); }
-  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  catch (e) { logError(`cannot open ${path}: ${e.message}`); return; }
   const { mountFsmEditor } = await import('./fsm-editor.js');
   if (S.project?.name !== pj) return;   // another project opened meanwhile: not its drawing (#1231)
   openDoc({
@@ -276,7 +276,7 @@ async function fsmToAsmChart(fsmPath) {
 async function asmToFsmDiagram(asmPath) {
   const { asmToFsm } = await import('/core/fsm.js');
   let asm;
-  try { asm = JSON.parse(await api.readFile(S.project.name, asmPath)); } catch (e) { toast(e.message, 'error'); return; }
+  try { asm = JSON.parse(await api.readFile(S.project.name, asmPath)); } catch (e) { logError(`cannot open ${asmPath}: ${e.message}`); return; }
   let m;
   try { m = asmToFsm(asm); }
   catch (e) { alertDlg('Convert to State Diagram', `${asmPath.split('/').pop()} cannot be shown as a state diagram:\n\n${e.message}`, 'error'); return; }
@@ -318,7 +318,7 @@ export async function openPetri(path) {
   let model;
   const pj = S.project.name;
   try { model = JSON.parse(await api.readFile(pj, path)); }
-  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  catch (e) { logError(`cannot open ${path}: ${e.message}`); return; }
   const { mountPetriEditor } = await import('./petri-editor.js');
   if (S.project?.name !== pj) return;   // another project opened meanwhile: not its drawing (#1231)
   openDoc({
@@ -404,7 +404,7 @@ export async function openSch(path) {
   let doc;
   const pj = S.project.name;
   try { doc = JSON.parse(await api.readFile(pj, path)); }
-  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  catch (e) { logError(`cannot open ${path}: ${e.message}`); return; }
   const { mountSchEditor } = await import('./sch-editor.js');
   const modules = await schModules();
   if (S.project?.name !== pj) return;   // another project opened meanwhile: not its drawing (#1231)

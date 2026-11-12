@@ -126,7 +126,15 @@ uiTest('#3261 Verify Property\'s time limit: blinky\'s ASM chart stopped after 3
   // (0 s: refused, the dialog stays)
   await set(200, 0);
   await page.click('.dlg-buttons .btn.primary');
-  await page.waitFor(() => /The time limit is a number of seconds from 1 to 3600/.test(document.body.textContent), [], { what: 'the refusal' });
+  // (beside the fields, not a toast: #3540)
+  await page.waitFor(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.verify-error')?.textContent, [], { what: 'the refusal' });
+  assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.verify-error').textContent), 'The time limit is a number of seconds from 1 to 3600');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.toast')].map((t) => t.textContent)), []);
+  // and the depth's
+  await set(0, 3);
+  await page.click('.dlg-buttons .btn.primary');
+  await page.waitFor(() => /^The depth is/.test([...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.verify-error').textContent), [], { what: 'the depth\'s refusal' });
+  assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().querySelector('.verify-error').textContent), 'The depth is a number of clock cycles from 1 to 1000');
   await set(200, 3);
   const t0 = Date.now();
   await page.click('.dlg-buttons .btn.primary');

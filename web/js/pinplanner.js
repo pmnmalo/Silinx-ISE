@@ -18,6 +18,7 @@ import { elaborate } from '/core/compile.js';
 import { boardRemove } from '/core/pin-board.js';
 import { S, app, setDirty } from './app.js';
 import { statusLine } from './status-line.js';
+import { logError } from './console.js';
 
 export function mountPinPlanner(el, doc, top) {
   const pj = S.project;
@@ -83,7 +84,7 @@ export function mountPinPlanner(el, doc, top) {
         // the bits of the buses written x[1] or x(1) become x<1>; any other name stays as written (#63)
         const u = readPins(pj.device, await api.readFile(pj.name, pj.constraints), { ports });
         asg = u.assignments || {}; clocks = u.clocks || []; other = u.other || [];
-      } catch (e) { toast(`Cannot parse UCF: ${e.message}`, 'error'); }
+      } catch (e) { logError(`cannot parse ${pj.constraints}: ${e.message}`); }
     }
     snap();
     render();

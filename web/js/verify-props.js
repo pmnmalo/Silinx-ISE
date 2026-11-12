@@ -4,13 +4,13 @@
 // (or a reached state's way there): its test bench written into the project (the drawing's HDL with the property, and
 // the bench: sim/verify_<module>) and simulated, the property's assertion reported by the simulation.
 import { api } from './api.js';
-import { h, dialog, toast } from './ui.js';
+import { h, dialog } from './ui.js';
 import { verifyProperty, propertyMessages, propertyBench, propertyError, PROPERTY_PROCESS } from '/core/verify-props.js';
 import { VERIFY_DEPTH, MAX_DEPTH } from '/core/verify.js';
 import { log } from './console.js';
 import { saveAll } from './processes.js';
 import { runSimulation } from './viewers.js';
-import { writeBench, verifySources, timeLimitField } from './verify.js';
+import { writeBench, verifySources, timeLimitField, fieldError, depthOk } from './verify.js';
 
 const last = {};
 const KINDS = [['never', 'Never reaches a state'], ['reach', 'Reaches a state'], ['exclusive', 'Outputs never 1 together']];
@@ -35,19 +35,18 @@ async function askProperty(m) {
   const show = () => { stateRow.hidden = kind.value === 'exclusive'; outsRow.hidden = kind.value !== 'exclusive'; };
   kind.addEventListener('change', show);
   show();
-  const limit = timeLimitField();
+  const err = fieldError(), limit = timeLimitField(err);
   const property = () => (kind.value === 'exclusive' ? { kind: 'exclusive', outputs: boxes.filter(b => b.checked).map(b => b.value) } : { kind: kind.value, state: state.value });
   const r = await dialog({
     title: PROPERTY_PROCESS, width: 460,
     body: h('div', { class: 'verify-dlg' },
       h('p', {}, 'Proves a property of the state machine for every input sequence, or shows the first clock cycle where it fails.'),
       h('label', {}, 'Property:'), kind, stateRow, outsRow,
-      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth, limit.row),
+      h('label', { style: { display: 'block', marginTop: '8px' } }, 'Depth (clock cycles):'), depth, limit.row, err.el),
     buttons: [{ label: 'Verify', primary: true, value: true, validate: () => {
-      const n = +depth.value;
-      if (!(Number.isInteger(n) && n >= 1 && n <= MAX_DEPTH)) { toast(`The depth is a number of clock cycles from 1 to ${MAX_DEPTH}`, 'err'); return false; }
+      if (!depthOk(depth, err)) return false;
       const why = propertyError(m, property());
-      if (why) { toast(why, 'err'); return false; }
+      if (why) return err.say(why);
       return limit.ok();
     } }, { label: 'Cancel', value: null }],
   });
