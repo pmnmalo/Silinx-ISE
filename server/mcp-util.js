@@ -55,9 +55,9 @@ export async function pathNamer() {
 // a file of a project: inside its folder, also once its symbolic links are followed, and not hidden (.git, .env, an
 // editor's settings: no part of a project, #3035; a report of build/ is not hidden); verb: what the tool does with it
 // (null: a new name P.renameFile's import gate checks, its message the interface's Rename's)
-export async function projectPath(name, rel, verb = 'read') {
+export async function projectPath(name, rel, verb = 'read', { last = true } = {}) {
   const dir = P.projectDir(name);
-  const full = P.safeJoin(dir, rel);
+  const full = await P.spelledJoin(dir, rel, { last });   // (its folders as the project spells them, #3536)
   const root = await fsp.realpath(dir).catch(() => { throw toolError(`no project '${name}' in the workspace`); });
   // (the deepest part of the path that exists, resolved)
   let probe = full;
