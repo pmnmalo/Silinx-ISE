@@ -45,6 +45,8 @@ const ISE_WARNINGS = {
 };
 // on the Spartan-6, micro80's are fewer (XST's) and map's and par's on its register bank, as in ISE's project flow (#2679)
 const ISE_S6_WARNINGS = { micro80: MICRO80_S6_WARNINGS };
+// ISE's warnings on the clock on the Mimas V2 (#3709)
+const MIMAS_V2_CLOCK_WARNINGS = [];
 
 let tmp;
 before(() => {
@@ -76,23 +78,35 @@ const checkOpenFlow = (name, t) => {
   assert.match(r.stdout, /open flow ok; 0 warning\(s\)/);
 };
 
+// ISE's build of an example for a board: no error, a bitstream, ISE's warnings the expected ones
+const iseBuild = async (name, t, expected = null) => {
+  const { createJob } = await import('../../server/jobs.js');
+  const { runImplementation } = await import('../../server/ise.js');
+  const { dir, project } = exampleProject(name, t, path.join(tmp, 'ise'));
+  const job = createJob('example', j => runImplementation(j, { project, projectDir: dir, steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] }));
+  while (job.status === 'running') await new Promise(r => setTimeout(r, 1000));
+  assert.equal(job.status, 'ok', job.lines.filter(l => /ERROR/.test(l)).join('\n'));
+  assert.ok(fs.existsSync(path.join(dir, 'build', `${project.top}.bit`)));
+  assert.deepEqual(iseWarnings(job.lines), expected ?? (project.device.family === 'spartan6' ? ISE_S6_WARNINGS[name] ?? ISE_WARNINGS[name] : ISE_WARNINGS[name]));
+  return job;
+};
+
 for (const name of EXAMPLES) {
   for (const t of S6_EXAMPLES.includes(name) ? S6_TARGETS : []) {
     test(`example ${name} for the ${targetName(t)}${s6MapName}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000, todo: KNOWN[`${name}-${targetName(t)}`] }, () => checkOpenFlow(name, t));
   }
   for (const t of [...TARGETS, ...(S6_EXAMPLES.includes(name) ? S6_TARGETS : [])]) {
-    test(`ISE builds example ${name} for the ${targetName(t)}, with the expected warnings`, { skip, timeout: 30 * 60000 }, async () => {
-      const { createJob } = await import('../../server/jobs.js');
-      const { runImplementation } = await import('../../server/ise.js');
-      const { dir, project } = exampleProject(name, t, path.join(tmp, 'ise'));
-      const job = createJob('example', j => runImplementation(j, { project, projectDir: dir, steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] }));
-      while (job.status === 'running') await new Promise(r => setTimeout(r, 1000));
-      assert.equal(job.status, 'ok', job.lines.filter(l => /ERROR/.test(l)).join('\n'));
-      assert.ok(fs.existsSync(path.join(dir, 'build', `${project.top}.bit`)));
-      assert.deepEqual(iseWarnings(job.lines), project.device.family === 'spartan6' ? ISE_S6_WARNINGS[name] ?? ISE_WARNINGS[name] : ISE_WARNINGS[name]);
-    });
+    test(`ISE builds example ${name} for the ${targetName(t)}, with the expected warnings`, { skip, timeout: 30 * 60000 }, () => iseBuild(name, t));
   }
   for (const t of TARGETS) {
     test(`example ${name} for the ${t.board}-${t.variant}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000, todo: KNOWN[name] }, () => checkOpenFlow(name, t));
   }
 }
+
+// (#3709) the clock example on the Numato Mimas V2, an XC6SLX9 the Silinx toolchain has no device description for: ISE
+// builds it from the board's UCF (its display's seg a..g, dp and an on Numato's pins; an<3>, 3 digits, on a header pin)
+test('ISE builds example clock for the mimas-v2, with the expected warnings', { skip, timeout: 30 * 60000 }, async () => {
+  const job = await iseBuild('clock', { board: 'mimas-v2' }, MIMAS_V2_CLOCK_WARNINGS);
+  // (Silinx's own: an<3> on a header pin, the board having no 4th digit)
+  assert.deepEqual(job.lines.filter(l => /^WARNING: /.test(l)), ['WARNING: an<3>: the mimas-v2 has no pin for it; it is on the header pin io_p6<0> (the board\'s constraints)']);
+});

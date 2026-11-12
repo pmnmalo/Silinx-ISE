@@ -1,8 +1,8 @@
 In short:
 
-- **Numato Mimas V2: the examples' seven-segment display works.** A project for the Mimas V2 now gets its digit
-  enables and decimal point, and its segments a..g on the right pins. Before, the display stayed dark or showed wrong
-  segments.
+- **Numato Mimas V2: the examples build with ISE, their seven-segment display on the right pins.** A project for the
+  Mimas V2 now gets its digit enables and decimal point, and its segments a..g on the right pins. Before, ISE's build
+  was refused (no pin for the digit enables) and the display showed wrong segments.
 
 In detail:
 
@@ -12,3 +12,7 @@ In detail:
   (a..g), `dp` and `an` (the 3 digits; an example's `an<3>` has no pin). It also records the active levels: the
   display, the push buttons and the DIP switches are active low, and the DIP switches are named `sw`, as the Board
   Emulator's switches.
+- **A port the board has no pin for, on a free header pin (#3709).** Silinx refused ISE's build of a board project
+  with a port bit that has no pin. The clock example's `an<3>` on the Mimas V2 (3 digits) had none. The board's
+  constraints now put such a bit on a free pin of the board's headers (the Mimas V2's, the Elbert V2's, the Spartan-3A
+  Starter Kit's), with a comment in the UCF, and the build warns about it.
