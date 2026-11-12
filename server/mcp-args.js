@@ -1,6 +1,6 @@
 // A tool call's arguments checked against the tool's inputSchema (server/mcp.js, #3535), before the tool runs: the
-// missing and the unknown ones, then each value's type, enum, minimum, an array's items and size, an object's
-// properties (a JSON Schema's subset the tools use: type, enum, minimum, maxItems, items, properties, required,
+// missing and the unknown ones, then each value's type, enum, minimum and maximum, an array's items and size, an object's
+// properties (a JSON Schema's subset the tools use: type, enum, minimum, maximum, maxItems, items, properties, required,
 // additionalProperties, anyOf). One message for every tool: the argument named, with what it must be
 // ("language: one of vhdl, verilog", "rows[2].radix: a string").
 
@@ -28,6 +28,7 @@ export function schemaErrors(value, schema, where) {
   if (schema.type && ![].concat(schema.type).some(t => isType(value, t))) return [`${where}: ${typeWord(schema)}`];
   if (schema.enum && !schema.enum.includes(value)) return [`${where}: one of ${schema.enum.join(', ')}`];
   if (schema.minimum !== undefined && typeof value === 'number' && value < schema.minimum) return [`${where}: at least ${schema.minimum}`];
+  if (schema.maximum !== undefined && typeof value === 'number' && value > schema.maximum) return [`${where}: at most ${schema.maximum}`];
   if (Array.isArray(value)) {
     if (schema.maxItems !== undefined && value.length > schema.maxItems) return [`${where}: at most ${schema.maxItems} item(s)`];
     return schema.items ? value.flatMap((v, i) => schemaErrors(v, schema.items, `${where}[${i}]`)) : [];
