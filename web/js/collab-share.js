@@ -26,7 +26,7 @@ import { keepBound, unbindAll } from './collab-bind.js';
 import { keepDrawingsBound, unbindDrawings, editorOf, modelOf } from './collab-drawing.js';
 import { liveDrawing, drawingKind, drawingText, sameDrawing, drawingModel, drawingPathsOf, pruneDrawing, syncDrawing, revertDrawing } from '/core/collab-model.js';
 import { shareRoom, colorOf } from '/core/collab-client.js';
-import { followLink, relayUrl, relayAddress } from '/core/collab-link.js';
+import { followLink, relayUrl, relayAddress, withTop } from '/core/collab-link.js';
 import { newHostKey } from '/core/collab-meet.js';
 
 export const NAME_KEY = prefKey('silinx.collab.name');
@@ -49,12 +49,15 @@ export const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim().slice(
 let share = null;   // { name, session, doc, link, editLink, restore, orig, timer, known: Map<client, name>, view, hosted (a room of the page's), bound, unwatch,
                     //   bases (a drawing's text last put into its structure, #3183), drawn (its drawings bound), drawing (their writes, one after the other) }
 
-/** Share Project Live…: shares the open project (asks the name first), or shows the link of the one shared. */
-export async function shareProjectDialog() {
+/** Share Project Live…: shares the open project (asks the name first), or shows the link of the one shared; Share
+ *  Module Live… (`module`, #3631): the same, that module's source opened (the followers follow it), the links opening
+ *  on it. */
+export async function shareProjectDialog({ module = null } = {}) {
   if (!S.project) return null;
-  if (share) return linkDialog();
+  const action = module ? 'Share Module Live' : 'Share Project Live';
+  if (share) return showShared(module);
   // (a page opened from a file has no address the followers could open: the site's has, #3227)
-  if (location.protocol === 'file:') { app.log('ERROR: Share Project Live: a Silinx opened from a file has no address that others can open; open Silinx from its site to share a project.', 'err'); return null; }
+  if (location.protocol === 'file:') { app.log(`ERROR: ${action}: a Silinx opened from a file has no address that others can open; open Silinx from its site to share a project.`, 'err'); return null; }
   const input = h('input', { type: 'text', value: savedName(), 'data-field': 'name', maxlength: 40, style: { width: '100%' } });
   // (the browser edition: this page hosts the room, or a relay of the settings does, #3227)
   const r0 = savedRelay(), relays = api.collab ? [] : await relaysHere();
@@ -65,7 +68,7 @@ export async function shareProjectDialog() {
     h('label', { class: 'collab-check' }, viaRelay, ' Through a relay (a Silinx server that lets this site in); else this page hosts it'),
     h('label', {}, 'The relay\'s address:'), address, h('label', {}, 'Its key (from its administrator):'), key);
   const ok = await dialog({
-    title: 'Share Project Live',
+    title: action,
     body: h('div', { class: 'collab-dlg' },
       h('p', {}, 'Others follow this project live with its link, read only: its files and drawings as they change, the editor you have open and your cursor. Its builds are not shared.'),
       h('label', {}, 'Your name, as they see it:'), input, relayPart),
@@ -75,8 +78,14 @@ export async function shareProjectDialog() {
   keepName(ok.name);
   if (!api.collab) keepRelay(ok.relay);
   const how = !api.collab && ok.relay.on ? { via: 'relay', relay: ok.relay } : {};
-  try { await startSharing(ok.name, how); } catch (e) { app.log(`ERROR: Share Project Live: ${e.message}.`, 'err'); return null; }
-  return linkDialog();
+  try { await startSharing(ok.name, how); } catch (e) { app.log(`ERROR: ${action}: ${e.message}.`, 'err'); return null; }
+  return showShared(module);
+}
+
+// the dialog of the links, a module's (its source opened first, as a link's top= opens it: link-open.js) or the project's
+async function showShared(module) {
+  if (module) await (await import('./link-open.js')).showModule(module, true);
+  return linkDialog(module);
 }
 
 // the project as the API gives it, and its files' texts: { project, files }
@@ -148,21 +157,22 @@ export async function stopSharing(why = null) {
 export const sharedLink = () => share?.link || null;
 export const editorsLink = () => share?.editLink || null;
 
-function linkDialog() {
-  const link = share.link;
+function linkDialog(module = null) {
+  // (a module's: the links that open on it, #3631)
+  const link = module ? withTop(share.link, module) : share.link, editLink = module ? withTop(share.editLink, module) : share.editLink;
   const field = h('input', { type: 'text', value: link, readonly: '', 'data-field': 'link', 'data-no-i18n': '', style: { width: '100%' } });
-  const editField = h('input', { type: 'text', value: share.editLink, readonly: '', 'data-field': 'edit-link', 'data-no-i18n': '', style: { width: '100%' } });
+  const editField = h('input', { type: 'text', value: editLink, readonly: '', 'data-field': 'edit-link', 'data-no-i18n': '', style: { width: '100%' } });
   return dialog({
-    title: 'Share Project Live',
+    title: module ? 'Share Module Live' : 'Share Project Live',
     body: h('div', { class: 'collab-dlg' },
-      h('p', {}, `Anyone with this link follows "${share.project}" live, read only, as long as you share it.`),
+      h('p', {}, module ? `Anyone with this link follows "${share.project}" live, read only, opening it on ${module}, as long as you share it.` : `Anyone with this link follows "${share.project}" live, read only, as long as you share it.`),
       field,
       h('p', {}, 'Anyone with the editors\' link edits its text files and drawings with you, live.'),
       editField,
       share.hosted ? h('p', {}, 'This page hosts it: its followers find it when they open the link, or send you a code, which Add a Follower… takes.') : null),
     buttons: [
       { label: 'Copy Link', primary: true, value: () => { writeClip('text', link); app.log('Shared project\'s link copied.', 'ok'); return link; } },
-      { label: 'Copy Editor Link', value: () => { copyEditorLink(); return link; } },
+      { label: 'Copy Editor Link', value: () => { copyEditorLink(editLink); return link; } },
       ...(share.hosted ? [{ label: 'Add a Follower…', value: () => { addFollower(); return link; } }] : []),
       { label: 'Stop Sharing', value: () => { stopSharing(); return null; } },
       { label: 'Close', value: link },
@@ -171,7 +181,7 @@ function linkDialog() {
   });
 }
 
-const copyEditorLink = () => { writeClip('text', share.editLink); app.log('Shared project\'s editors\' link copied: whoever opens it edits its text files and drawings with you.', 'ok'); };
+const copyEditorLink = (editLink = share.editLink) => { writeClip('text', editLink); app.log('Shared project\'s editors\' link copied: whoever opens it edits its text files and drawings with you.', 'ok'); };
 const addFollower = () => { const s = share; if (s?.hosted) import('./collab-host.js').then(m => m.addFollowerDialog(s)); };
 const commands = () => [
   { label: 'Copy Link', action: () => { writeClip('text', share.link); app.log('Shared project\'s link copied.', 'ok'); } },

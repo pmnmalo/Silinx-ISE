@@ -343,6 +343,8 @@ function moduleContextMenu(e, mod, file) {
     isSimView ? { label: 'Simulate Behavioral Model', action: () => runSimulation(mod) } : null,
     // (a schematic's, a state diagram's, a Petri net's or an ASM chart's module: its Try it or simulation, #2826, #2869, #2881)
     { label: 'Share Module Copy…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog({ module: mod, view: /\.(sch|fsm|pn|asm)\.json$/i.test(S.hdlToSch?.[file] || file) ? 'try' : null })) },
+    // (the project shared live, opening on this module: the editions that share, not while following another's, #3631)
+    api.collab || api.standalone ? { label: 'Share Module Live…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog({ module: mod })), disabled: () => !!api.following } : null,
     '-',
     { label: 'New Source…', action: () => wiz.newSourceWizard() },
     { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog() },

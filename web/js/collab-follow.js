@@ -24,7 +24,8 @@ import { followRoom, colorOf } from '/core/collab-client.js';
 import { parseFollowLink, relayUrl } from '/core/collab-link.js';
 
 const TRACK_MS = 300, ARRIVE_MS = 20_000;
-let fol = null;   // { name, session, following, driven (the owner's view last followed), mine (the follower's) }
+let fol = null;   // { name, session, following, driven (the owner's view last followed), mine (the follower's), top (a module's link's
+                  //   module, opened once the project is, #3631) }
 
 const d0 = p => S.docs.find(x => x.path === p && x.editor?.view);
 const docPath = d => d?.path || (/^(sch|asm|tt|fsm|pn):/.test(String(d?.id || '')) ? String(d.id).replace(/^[a-z]+:/, '') : null);
@@ -63,7 +64,7 @@ export async function startFollowing(hash = location.hash) {
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);
-  fol = { name, session, following: true, driven: null, mine: null, bound: new Map(), drawn: new Map() };
+  fol = { name, session, following: true, driven: null, mine: null, bound: new Map(), drawn: new Map(), top: link.top || null };
   Object.assign(collab, { role: 'follower', owner: owner || session.owner()?.name || '?', project: project.name, session, editor: session.editor });
   Object.assign(api, followApi(api, session.doc, { warn: text => app.log(`WARNING: Follow a shared project: ${text}.`, 'warn') }));
   setPresenceCommands(commands);
@@ -72,6 +73,18 @@ export async function startFollowing(hash = location.hash) {
   if (session.editor) app.log(`Editing ${collab.owner}'s project "${project.name}" with them: its text files and drawings change as you all edit them (Following ${collab.owner}, in the toolbar).`, 'ok');
   else app.log(`Following ${collab.owner}'s project "${project.name}", read only: their changes appear as they make them, and their open editor while you follow them (Following ${collab.owner}, in the toolbar).`, 'ok');
   return project.name;
+}
+
+/** A module's link (Share Module Live…, #3631), once the project followed is open: that module opened (its drawing,
+ *  else its HDL), its follower browsing alone on it (Follow <owner>, in the toolbar, follows the owner's editor). */
+export async function openFollowedTop() {
+  if (!fol?.top) return;
+  const top = fol.top;
+  fol.top = null;
+  fol.following = false;   // (the owner's view not brought to the front meanwhile)
+  await (await import('./link-open.js')).showModule(top, true);
+  app.log(`Browsing alone on ${top}, the link's module (Follow ${collab.owner}, in the toolbar, follows ${collab.owner}'s editor).`, 'info');
+  draw();
 }
 
 /** A link to follow pasted into the address bar of this page, already open (#3318): only its fragment changed, so the
@@ -92,6 +105,7 @@ function setFollowing(on) {
   if (!fol) return;
   fol.following = on;
   fol.driven = null;
+  fol.drivenKey = null;   // (the owner's view brought to the front again, even unchanged since: #3631)
   app.log(on ? `Following ${collab.owner}'s editor.` : `Browsing alone: ${collab.owner}'s editor is no longer followed (Follow ${collab.owner}, in the toolbar, follows it again).`, 'info');
   draw();
   track();

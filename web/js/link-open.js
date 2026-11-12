@@ -165,7 +165,7 @@ async function openView(view, module, files) {
 
 // the link's module in the Design pane (#2871): its row selected, its parents expanded, scrolled to; opened as a
 // double-click does (its drawing, else its HDL) when `open`
-async function showModule(name, open) {
+export async function showModule(name, open) {
   await new Promise(r => setTimeout(r, 0));   // (the tree drawn for the project just opened)
   const row = [...document.querySelectorAll('#hier .row[data-module]')].find(r => r.dataset.module.toLowerCase() === String(name).toLowerCase());
   if (!row) return;

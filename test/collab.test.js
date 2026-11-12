@@ -12,7 +12,7 @@ import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
 import { scratchEnv } from './server-helpers.js';
 import { newKey, keyOf, seal, unseal, KEY_RE } from '../core/collab-crypto.js';
-import { followLink, parseFollowLink, relayUrl, ROOM_RE } from '../core/collab-link.js';
+import { followLink, parseFollowLink, relayUrl, ROOM_RE, withTop } from '../core/collab-link.js';
 import { projectDoc, publishProject, putFile, putProject, moveFile, dropFile, docFile, docProject, setText, sharedPath, watchDoc, FILE_MAX, gatedDocFile, FOLLOW_LIMITS } from '../core/collab-doc.js';
 import { shareRoom, followRoom, KIND, PROTOCOL, SUBPROTOCOL, colorOf, COLORS } from '../core/collab-client.js';
 import { attachRelay, RELAY_LIMITS } from '../server/collab-relay.js';
@@ -79,6 +79,27 @@ test('link: made and parsed; another hash is not one; a broken one is said', () 
   assert.throws(() => relayUrl('http://127.0.0.1:8642/'), /a role, share or follow/);
   assert.match('x'.repeat(22), ROOM_RE);
 });
+test('#3631 a module\'s link (Share Module Live…): &top=<module> last, of every form; parsed; one only; a bad name refused', () => {
+  const room = 'A'.repeat(22), key = 'b'.repeat(43), sign = 'c'.repeat(129);
+  const l = followLink('http://localhost:8642/', room, key);
+  assert.equal(withTop(l, 'speed_ctrl'), `${l}&top=speed_ctrl`);
+  assert.deepEqual(parseFollowLink(withTop(l, 'speed_ctrl')), { base: 'http://localhost:8642/', room, key, via: 'relay', sign: null, top: 'speed_ctrl' });
+  assert.equal(withTop(withTop(l, 'a'), 'b'), `${l}&top=b`, 'one module: the last given');
+  // (a hosted room's, a relay's, an editor's link: the module after the rest)
+  const hosted = followLink('https://s.example/', room, key, 'host');
+  assert.equal(parseFollowLink(withTop(hosted, 'top')).top, 'top');
+  assert.equal(parseFollowLink(withTop(hosted, 'top')).via, 'host');
+  const relayed = followLink('https://s.example/', room, key, 'relay', null, 'https://relay.example.org');
+  assert.deepEqual(parseFollowLink(withTop(relayed, 'm1')), { ...parseFollowLink(relayed), top: 'm1' });
+  assert.deepEqual(parseFollowLink(withTop(followLink('https://s.example/', room, key, 'relay', sign), 'm1')), { base: 'https://s.example/', room, key, via: 'relay', sign, top: 'm1' });
+  // (no module: none in the parsed link)
+  assert.equal('top' in parseFollowLink(l), false);
+  // refused: not a module name, not a link to follow; a broken top in a link
+  for (const bad of ['', 'a b', '1abc', 'x'.repeat(129), 'a&top=b', null]) assert.throws(() => withTop(l, bad), /is not a module name/, String(bad));
+  assert.throws(() => withTop('http://x/#design=abc', 'm1'), /not a link to follow/);
+  for (const bad of [`#follow=${room}.${key}&top=`, `#follow=${room}.${key}&top=a%20b`, `#follow=${room}.${key}&top=a&top=b`, `#follow=${room}.${key}&top=m1&relay=https%3A%2F%2Fr.example`]) assert.throws(() => parseFollowLink(bad), /broken/, bad);
+});
+
 
 test('doc: a project published, its files as texts, build/, hidden files, silinx.json and paths out of it never', () => {
   for (const p of ['src/a.vhd', 'a.ucf', 'sim/tb_a.vhd', 'src/x.sch.json']) assert.ok(sharedPath(p), p);
