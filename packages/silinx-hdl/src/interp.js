@@ -4,6 +4,7 @@
 // Bound expression nodes (produced by elaborate.js) all carry `t` (ElType) and optionally `ew`
 // (evaluation width from Verilog context sizing). See elaborate.js for the node catalogue.
 import * as V from './values.js';
+import { ITERATIONS_MESSAGE, MAX_ITERATIONS } from './util.js';
 import { mathReal, textFile, textio } from './interp-textio.js';
 import { formatDisplay, imageOf, strToVal, toStr } from './interp-format.js';
 export { formatDisplay, formatTime, imageOf, strToVal, toStr } from './interp-format.js';
@@ -23,6 +24,22 @@ function dasliceRange(n, ctx) {
 
 export class SimError extends Error {
   constructor(msg, loc) { super(msg); this.loc = loc; }
+}
+
+// One evaluation's count of loop iterations and calls (#3525): ctx.budget, shared by the contexts of the calls in it
+// (a fresh one for each constant evaluated, set to 0 at each run of a process). Past MAX_ITERATIONS, an error at the
+// loop or the call (budget: an elaboration reports it once, at the loop, rather than as a constant that is not one).
+// Every 2**16 the clock: a simulation's deadline (sim.deadline, the MCP's timeout_s) stops a run that does not wait.
+export const newBudget = () => ({ n: 0 });
+function tick(ctx, s) {
+  const b = ctx.budget;
+  if (!b) return;
+  const loc = () => (s.file && s.loc ? { ...s.loc, file: s.file } : s.loc);   // (the loop's file: a package's)
+  if (++b.n > MAX_ITERATIONS) { const e = new SimError(ITERATIONS_MESSAGE, loc()); e.budget = true; throw e; }
+  if ((b.n & 0xFFFF) === 0 && ctx.sim?.deadline && Date.now() > ctx.sim.deadline) {
+    ctx.sim.timedOut = true;
+    throw new SimError('the simulation\'s time limit was reached in a process that does not wait', loc());
+  }
 }
 
 // Bit position of logical index i within a vector type.
@@ -470,6 +487,7 @@ function callFunction(n, ctx) {
   });
   // (the depth counts in the callee's context too: it was copied before the increment, so a function
   // calling itself without end overflowed the JavaScript stack instead of this error)
+  tick(ctx, n);
   if (++ctx.depth > MAX_CALL_DEPTH) { ctx.depth--; throw new SimError(`recursion too deep in function ${f.name} (more than ${MAX_CALL_DEPTH} nested calls)`); }
   const sub = { ...calleeCtx(f, frame, ctx), inFn: true };
   try {
@@ -710,12 +728,11 @@ export function* exec(s, ctx) {
     }
     case 'for': {
       yield* exec(s.init, ctx);
-      let guard = 0;
       while (V.truth(evalE(s.cond, ctx)) === 1) {
         const r = yield* exec(s.body, ctx);
         if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
         yield* exec(s.step, ctx);
-        if (++guard > 10_000_000) throw new SimError('loop iteration limit exceeded', s.loc);
+        tick(ctx, s);
       }
       return;
     }
@@ -724,17 +741,17 @@ export function* exec(s, ctx) {
       const step = s.down ? -1 : 1;
       for (let i = a; s.down ? i >= b : i <= b; i += step) {
         ctx.frame[s.var] = V.fromInt(i, s.varT.w, s.varT.s);
+        tick(ctx, s);
         const r = yield* exec(s.body, ctx);
         if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
       }
       return;
     }
     case 'while': {
-      let guard = 0;
       while (V.truth(evalE(s.cond, ctx)) === 1) {
         const r = yield* exec(s.body, ctx);
         if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
-        if (++guard > 10_000_000) throw new SimError('loop iteration limit exceeded', s.loc);
+        tick(ctx, s);
       }
       return;
     }
@@ -742,21 +759,21 @@ export function* exec(s, ctx) {
       const n = evalE(s.count, ctx);
       const cnt = n.x ? 0 : V.toNum(n);
       for (let i = 0; i < cnt; i++) {
+        tick(ctx, s);
         const r = yield* exec(s.body, ctx);
         if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
       }
       return;
     }
     case 'forever': {
-      let guard = 0;
       for (;;) {
         const t0 = ctx.sim ? ctx.sim.now : 0, st0 = ctx.sim ? ctx.sim.stamp : 0;
         const r = yield* exec(s.body, ctx);
         if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
         if (!ctx.sim || (ctx.sim.now === t0 && ctx.sim.stamp === st0)) {   // an iteration without waiting
           if (ctx.sim && !s.hasWait) throw new SimError('infinite loop without wait/delay', s.loc);
-          if (++guard > 10_000_000) throw new SimError('loop iteration limit exceeded', s.loc);
-        } else guard = 0;
+          tick(ctx, s);
+        }
       }
       return;
     }
@@ -792,6 +809,7 @@ export function* exec(s, ctx) {
     }
     case 'task': {
       const f = s.fn;
+      tick(ctx, s);
       const { frame, done } = calleeFrame(f, ctx);
       try {
         s.args.forEach((a, k) => {

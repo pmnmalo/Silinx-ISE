@@ -4,7 +4,7 @@
 // functions as automatic SystemVerilog functions, or folded when they can be evaluated here. Isomorphic (no DOM, no
 // Node APIs).
 import * as V from './values.js';
-import { evalE } from './interp.js';
+import { evalE, newBudget } from './interp.js';
 import { TAB_BITS, esc, lit, sgn, signedInt } from './synth-verilog.js';
 
 const summaries = new WeakMap();   // (tabulate's: a context -> its nodes' summaries)
@@ -215,7 +215,7 @@ export function mountTables(ctx) {
     // warnings (#13)
     if (f && f.body && foldable(f) && f.retT && f.retT.kind !== 'array' && n.args.every(a => a.k === 'c' && !Array.isArray(a.val) && a.val.str === undefined && a.val.real === undefined)) {
       let v = null;
-      try { v = evalE(n, { frame: [], sim: null, depth: 0 }); } catch { v = null; }
+      try { v = evalE(n, { frame: [], sim: null, depth: 0, budget: newBudget() }); } catch { v = null; }
       if (v && !Array.isArray(v) && v.v !== undefined && v.str === undefined && v.real === undefined) {
         const w = f.retT.w || v.w;
         return { x: lit(V.resize(v, w), w), w, s: !!f.retT.s };

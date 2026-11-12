@@ -10,7 +10,7 @@
 import * as V from './values.js';
 import { walk } from './bound-walk.js';
 import { walkItems } from './util.js';
-import { evalE, runSync, exec, strToVal } from './interp.js';
+import { evalE, newBudget, runSync, exec, strToVal } from './interp.js';
 import { purityErrors } from './vhdl/purity.js';
 import { declaredNames, interfaceNames, labelErrors } from './vhdl/labels.js';
 import {
@@ -106,7 +106,7 @@ export class FrameBuilder {
 export function probeCtx(E) {
   const outer = [];
   for (let f = E.fb?.parent; f; f = f.parent) outer.unshift(f.probe());
-  return { frame: E.fb ? E.fb.probe() : [], outer, sim: null, depth: 0, probe: true };
+  return { frame: E.fb ? E.fb.probe() : [], outer, sim: null, depth: 0, probe: true, budget: newBudget() };
 }
 
 // A variable: a slot of its frame; one of an enclosing process or subprogram (a procedure declared
@@ -627,13 +627,20 @@ export function fitAny(v, t) {
 }
 
 // ---------------------------------------------------------------- constant evaluation
-function constCtx() { return { frame: [], sim: null, depth: 0 }; }
+function constCtx() { return { frame: [], sim: null, depth: 0, budget: newBudget() }; }
+// A constant's evaluation past its budget of iterations (#3525): the error at the loop, once (callNesting: passed up
+// through the functions being bound, as a call nested too deep, #3508), not the constant's evaluation tried again
+function budgetError(e, loc) {
+  const x = new ElabError(e.message, e.loc ?? loc);   // (at the loop; a call's: at the expression)
+  x.callNesting = true;
+  return x;
+}
 
 export function constOf(E, n, loc) {
   if (n.k === 'c') return n.val;
   if (!isConstNode(n)) throw new ElabError('expression is not constant', loc);
   try { return evalE(n, constCtx()); }
-  catch (e) { throw new ElabError(e.message, loc); }
+  catch (e) { throw e.budget ? budgetError(e, loc) : new ElabError(e.message, loc); }
 }
 
 // (a node's own answer: true or false, or the nodes it depends on)
@@ -678,7 +685,7 @@ export function fold(n) {
       const v = evalE(n, constCtx());
       // src: the expression, re-evaluated if Verilog context sizing widens it (ctxSize)
       return { k: 'c', val: v, t: n.t, src: n };
-    } catch { return n; }
+    } catch (e) { if (e.budget) throw budgetError(e); return n; }
   }
   return n;
 }
