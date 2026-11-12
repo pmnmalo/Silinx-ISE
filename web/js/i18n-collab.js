@@ -5,6 +5,10 @@
 export const COLLAB_PT = {
   'Share Project…': 'Partilhar Projeto…', 'Share Project': 'Partilhar Projeto', 'Share': 'Partilhar',
   'Follow a Shared Project': 'Seguir um Projeto Partilhado', 'Follow': 'Seguir',
+  // (a shared project's link given to a running Silinx with changes not saved yet, web/js/link-hash.js, #3531)
+  'This link follows a project someone shares. Your open documents have changes not saved yet: save them, then follow it?':
+    'Esta ligação segue um projeto que alguém partilha. Os seus documentos abertos têm alterações ainda não guardadas: guardá-las e depois segui-lo?',
+  'Save and Follow': 'Guardar e Seguir',
   'Stop Sharing': 'Parar de Partilhar', 'Stop Following': 'Deixar de Seguir', 'Sharing': 'A partilhar',
   'Not shared any more': 'Já não partilhado', 'Shared project': 'Projeto partilhado',
   'Shared project: who is in it, and its commands': 'Projeto partilhado: quem está nele, e os seus comandos',

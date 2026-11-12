@@ -6,12 +6,14 @@
 // (following replaces the workspace's api). The open documents are saved only once the link is read and agreed to
 // (#3362: another page holding this window can change its hash): a design's link once it decodes (a zip's once the
 // user agrees to fetch it), the user asked first when a document has changes not saved yet; a link that loads the page
-// again, before the load. One that cannot be saved keeps the link from opening (the work is kept); a hash that is no
+// again, once it is read (#3531: a shared project's link parsed, asked as a design's; nothing in the page that
+// shares), before the load. One that cannot be saved keeps the link from opening (the work is kept); a hash that is no
 // link saves nothing. An address's token (#token=, #code=) is api.js's, at start-up only. The hash the app clears
 // (history.replaceState) fires no hashchange: no loop.
 import { api } from './api.js';
 import { S, app } from './app.js';
 import { confirmDlg } from './ui.js';
+import { collab } from './collab-state.js';
 
 const TOKEN = /^#(?:token|code)=/, FOLLOW = /^#(?:follow|edit)=/;
 let queue = Promise.resolve();
@@ -27,10 +29,26 @@ export async function linkChanged(hash = location.hash) {
   const what = FOLLOW.test(hash) ? 'Follow a shared project' : 'Open from a link';
   if (S.busy || S.currentJob) { app.log(`ERROR: ${what}: an implementation is running: stop it (or wait for it to finish), then open the link again.`, 'err'); return false; }
   // (a shared project's link: collab-follow.js followPasted, which loads the page again, but not in the page that shares
-  // one, which the console warns about, #3318, #3331; the work saved before the load)
-  if (FOLLOW.test(hash) || api.following) {
-    if (!await saved(what)) return false;
-    if (FOLLOW.test(hash)) (await import('./collab-follow.js')).followPasted(); else location.reload();
+  // one, which the console warns about, #3318, #3331; read first, #3531: a broken one said, the hash cleared, and
+  // nothing saved, nor in the page that shares; the work saved before the load, the user asked first as for a design)
+  if (FOLLOW.test(hash)) {
+    const [{ parseFollowLink }, { followPasted }] = await Promise.all([import('/core/collab-link.js'), import('./collab-follow.js')]);
+    try { parseFollowLink(hash); } catch (e) { clearHash(); app.log(`ERROR: ${what}: ${e.message}.`, 'err'); return false; }
+    if (collab.role === 'owner') { followPasted(); return false; }
+    const go = await followAgreed(what);
+    if (go === 'cancelled') { clearHash(); app.log(`${what}: cancelled.`, 'info'); }
+    if (go !== true) return false;
+    followPasted();
+    return true;
+  }
+  // (any other link while a project is followed: the page loaded again, which opens it; a hash that is no link, or a
+  // broken one, said and nothing saved, #3531)
+  if (api.following) {
+    const { parseLink } = await import('/core/design-link.js');
+    let link;
+    try { link = parseLink(hash); } catch (e) { app.log(`ERROR: ${what}: ${e.message}.`, 'err'); return false; }
+    if (!link || !await saved(what)) return false;
+    location.reload();
     return true;
   }
   const { linkOptions, openFromLink } = await import('./link-open.js');
@@ -46,6 +64,16 @@ async function saved(what) {
   const unsaved = S.docs.filter(d => d.dirty);
   if (unsaved.length) { app.log(`ERROR: ${what}: ${unsaved.map(d => d.path || d.title).join(', ')} could not be saved: the link was not opened; your changes are kept.`, 'err'); return false; }
   return true;
+}
+const clearHash = () => history.replaceState(null, '', location.pathname + location.search);
+// a shared project's link read: the user asked before the documents with changes not saved yet are saved, then saved ->
+// true, false (not saved), or 'cancelled'
+async function followAgreed(what) {
+  if (S.docs.some(x => x.dirty)) {
+    const yes = await confirmDlg('Follow a Shared Project', 'This link follows a project someone shares. Your open documents have changes not saved yet: save them, then follow it?', { yes: 'Save and Follow', no: 'Cancel' });
+    if (!yes) return 'cancelled';
+  }
+  return saved(what);
 }
 // a design's link read (d: link-open.js designOf's): the user asked before the documents with changes not saved yet are
 // saved (a zip's link asked already, before its fetch), then saved -> true, false (not saved), or 'cancelled'
