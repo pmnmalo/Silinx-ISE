@@ -228,3 +228,76 @@ uiTest('#3196 the browser edition in Portuguese: the Git commands; Initialize Re
   await page.eval(() => localStorage.removeItem('silinx.lang'));
   assert.deepEqual(warnings(page), []);
 }, { url: () => 'about:blank', timeout: 180000 });
+
+// (#3534) Sign in with GitHub… on the Start page (no project needed) and in the Design tree's project and device menus,
+// with Initialize Repository… for a project with no repository: shown when not signed in, the File menu's dialog run
+// from either (a cancel keeps them); gone from both once signed in (Sign out of GitHub: the Git submenu's), back once
+// signed out; in Portuguese. Both interfaces; no warnings.
+const startLinks = (page) => page.eval(() => [...document.querySelectorAll('#start-page .entry a')].filter((a) => a.getClientRects().length).map((a) => a.textContent));
+const treeItems = async (page, row, item) => {
+  await page.rightClick('#hier .row .lbl', { index: row });
+  await page.waitForSelector('body > .menu-popup');
+  const items = await page.eval(() => [...document.querySelectorAll('body > .menu-popup > .mi')].map((m) => m.querySelector('.lbl')?.textContent.trim() ?? m.textContent.trim()));
+  if (item) await page.click('body > .menu-popup > .mi', { text: item }); else await page.closeMenus();
+  return items;
+};
+uiTest('#3534 the browser edition: Sign in with GitHub… on the Start page and in the Design tree\'s project and device menus, until signed in; Portuguese', E, async (page) => {
+  await boot(page, { clientId: 'REPLACE-ME-with-the-client-ID-of-Silinx-GitHub-OAuth-App' });
+  await page.eval(() => { localStorage.removeItem('silinx.github-token'); sessionStorage.removeItem('silinx.github-token'); });
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'SignTree');
+  await page.fill('.dlg-overlay .wiz-main select', 'gates', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.dialogButton('Next >');
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.project?.name === 'SignTree' && document.querySelectorAll('#hier .row .lbl').length >= 2, [], { what: 'SignTree open' });
+  // the Start page: after Open from Repository…, Initialize Repository… then Sign in with GitHub…
+  await page.leftTab('start');
+  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Sign in with GitHub…'), [], { what: 'the Start page\'s sign-in' });
+  let links = await startLinks(page);
+  assert.deepEqual(links.slice(links.indexOf('Open from Repository…'), links.indexOf('Open from Repository…') + 3), ['Open from Repository…', 'Initialize Repository…', 'Sign in with GitHub…'], links.join(' | '));
+  // its dialog, the File menu's; cancelled: still there
+  await page.click('#start-page .entry a', { text: 'Sign in with GitHub…' });
+  await page.waitDialog('Sign in with GitHub');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await page.waitConsole(/The GitHub sign-in was cancelled\./);
+  assert.ok((await startLinks(page)).includes('Sign in with GitHub…'));
+  // the project's and the device's rows: Initialize Repository…, Sign in with GitHub…, then Git
+  await page.leftTab('design');
+  for (const row of [0, 1]) {
+    const items = await treeItems(page, row);
+    const at = items.indexOf('Initialize Repository…');
+    assert.deepEqual(items.slice(at, at + 3), ['Initialize Repository…', 'Sign in with GitHub…', 'Git'], `row ${row}: ${items.join(' | ')}`);
+  }
+  // signed in from the device's row: gone from the menus and the Start page
+  await treeItems(page, 1, 'Sign in with GitHub…');
+  await page.waitDialog('Sign in with GitHub');
+  await page.fill('.dlg-overlay .git-token', gh.token);
+  await page.dialogButton('Sign In');
+  await page.waitNoDialog();
+  await page.waitConsole(/Signed in to GitHub as student: the sign-in is kept in this browser/);
+  for (const row of [0, 1]) {
+    const items = await treeItems(page, row);
+    assert.ok(!items.includes('Sign in with GitHub…') && items.includes('Initialize Repository…'), `row ${row}: ${items.join(' | ')}`);
+  }
+  await page.leftTab('start');
+  await page.waitFor(() => ![...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Sign in with GitHub…'), [], { what: 'the Start page\'s sign-in gone' });
+  assert.ok((await startLinks(page)).includes('Initialize Repository…'));
+  // signed out (the Git submenu's): back, in Portuguese (the page loaded again)
+  await page.menu('File', 'Sign out of GitHub');
+  await page.waitConsole(/Signed out of GitHub/);
+  await page.eval(() => localStorage.setItem('silinx.lang', 'pt'));
+  await boot(page, { clientId: 'REPLACE-ME-with-the-client-ID-of-Silinx-GitHub-OAuth-App' });
+  await page.waitFor(() => document.documentElement.lang === 'pt' && window.Silinx.project?.name === 'SignTree' && document.querySelectorAll('#hier .row .lbl').length >= 2, [], { what: 'Portuguese, SignTree' });
+  for (const row of [0, 1]) {
+    const items = await treeItems(page, row);
+    assert.ok(items.includes('Inicializar Repositório…') && items.includes('Iniciar sessão no GitHub…'), `row ${row}: ${items.join(' | ')}`);
+  }
+  await page.leftTab('start');
+  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Iniciar sessão no GitHub…'), [], { what: 'the Start page in Portuguese' });
+  await page.eval(() => localStorage.removeItem('silinx.lang'));
+  assert.deepEqual(warnings(page), []);
+}, { url: () => 'about:blank', timeout: 180000 });

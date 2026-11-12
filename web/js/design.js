@@ -20,7 +20,7 @@ import { renameDialog } from './rename.js';
 import { openWizardModule, wizardLabelOf } from './wizard-modules.js';
 import { cBadge, cBadges, cSequential, isC } from './c-source.js';
 import { translationBadge } from './translation.js';
-import { gitMark, gitMenuItems, hasGit } from './git.js';
+import { gitMark, gitMenuItems, gitStartItems, hasGit } from './git.js';
 
 const $ = id => document.getElementById(id);
 // the Tasks interface (#799): one tree, no views: the design (as the Implementation view shows it); the test
@@ -422,6 +422,8 @@ function projectContextMenu(e) {
     { label: 'Copy Link to Project…', action: () => import('./link-copy.js').then(m => m.copyLinkDialog()) },   // (#2826)
     // (Share Project…, as the File menu's: the editions that share, disabled while following another's, #3479)
     api.collab || api.standalone ? { label: 'Share Project…', action: () => import('./collab-share.js').then(m => m.shareProjectDialog()), disabled: () => !!api.following } : null,
+    // (Initialize Repository…, Sign in with GitHub…: where they apply, before the Git submenu that has them too, #3534)
+    ...gitStartItems().map(({ label, action }) => ({ label, action })),
     // (git, the server editions: here in both interfaces, the Silinx one having no File menu, #3195)
     hasGit() ? { label: 'Git', submenu: gitMenuItems() } : null,
     '-',
