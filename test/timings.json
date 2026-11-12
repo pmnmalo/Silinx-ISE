@@ -348,6 +348,7 @@
   "test/long-if-synth.test.js": 395.8,
   "test/loop-write-back-synth.test.js": 190,
   "test/lut-resynth.test.js": 257.7,
+  "test/mcp-args.test.js": 0.8,
   "test/mcp-capture.test.js": 67.8,
   "test/mcp-check.test.js": 0.6,
   "test/mcp-collab.test.js": 18.3,
