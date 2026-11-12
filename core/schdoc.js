@@ -83,6 +83,17 @@ export function newDoc(name = 'schematic', lang = 'vhdl') {
 // (modules: the project's modules, the pins of its module symbols, to convert a document of version 2;
 // without them, a document with module symbols stays at version 2, converted when they are known)
 const PIN_LISTS = { module: ['ports'], hdlblock: ['inputs', 'outputs'] };
+// (a symbol's parameters not an object: none; a parameter read as text (its default is) that is not text: a number or
+// a truth value as its text, a list of them joined by commas, anything else its default; a module's generics: those
+// whose value is text, a number or a truth value; so a hand-made schematic opens, #3532)
+const plainObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+const scalar = v => typeof v === 'number' || typeof v === 'boolean';
+const asText = (v, d) => (typeof v === 'string' ? v : scalar(v) ? String(v) : Array.isArray(v) && v.every(x => typeof x === 'string' || scalar(x)) ? v.join(',') : d);
+function textGenerics(g) {
+  const out = {};
+  if (plainObj(g)) for (const [k, v] of Object.entries(g)) if (typeof v === 'string' || scalar(v)) out[k] = String(v);
+  return out;
+}
 export function normalizeDoc(d, { modules } = {}) {
   const doc = d && typeof d === 'object' ? clone(d) : newDoc();
   const before301 = !(+doc.version >= 2);
@@ -102,13 +113,16 @@ export function normalizeDoc(d, { modules } = {}) {
     ids.add(id); o.id = id;
   };
   doc.symbols = (Array.isArray(doc.symbols) ? doc.symbols : []).filter(s => s && s.type).map(s => {
-    const o = { id: s.id, type: String(s.type), x: snap(+s.x || 0), y: snap(+s.y || 0), rot: ROT_OK.has(+s.rot) ? +s.rot : 0, mirror: !!s.mirror, name: String(s.name ?? ''), params: { ...defaultParams(s.type), ...(s.params || {}) } };
+    const sp = plainObj(s.params) ? s.params : {}, dp = defaultParams(s.type);
+    const o = { id: s.id, type: String(s.type), x: snap(+s.x || 0), y: snap(+s.y || 0), rot: ROT_OK.has(+s.rot) ? +s.rot : 0, mirror: !!s.mirror, name: String(s.name ?? ''), params: { ...dp, ...sp } };
+    for (const [k, d] of Object.entries(dp)) if (typeof d === 'string') o.params[k] = asText(o.params[k], d);
+    if (o.type === 'module') o.params.generics = textGenerics(o.params.generics);
     // a M4_1 / DEMUX saved before its select bits had pins of their own (#301): its bus pin S kept
-    if (before301 && (o.type === 'mux4' || o.type === 'demux') && !('selBus' in (s.params || {}))) o.params.selBus = true;
+    if (before301 && (o.type === 'mux4' || o.type === 'demux') && !('selBus' in sp)) o.params.selBus = true;
     // a VCC / GND saved before it had a Width (#953): none, it keeps taking the width of its net
-    if ((o.type === 'vcc' || o.type === 'gnd') && !('width' in (s.params || {}))) delete o.params.width;
+    if ((o.type === 'vcc' || o.type === 'gnd') && !('width' in sp)) delete o.params.width;
     // an ENCODER saved without its Type, from before priority was the default (#1553): one-hot, as it was
-    if (o.type === 'encoder' && !('mode' in (s.params || {}))) o.params.mode = 'one-hot';
+    if (o.type === 'encoder' && !('mode' in sp)) o.params.mode = 'one-hot';
     // (a module's ports, an HDL block's inputs and outputs not a list of pins: none, #3419; a module then takes its
     // module's, below)
     for (const k of PIN_LISTS[o.type] || []) {
@@ -121,7 +135,7 @@ export function normalizeDoc(d, { modules } = {}) {
   });
   doc.wires = (Array.isArray(doc.wires) ? doc.wires : []).filter(w => w && Array.isArray(w.points) && w.points.length >= 2).map(w => {
     const pts = [];
-    for (const p of w.points) { const q = { x: snap(+p.x || 0), y: snap(+p.y || 0) }; const l = pts[pts.length - 1]; if (!l || l.x !== q.x || l.y !== q.y) pts.push(q); }
+    for (const p of w.points) { if (!plainObj(p)) continue; const q = { x: snap(+p.x || 0), y: snap(+p.y || 0) }; const l = pts[pts.length - 1]; if (!l || l.x !== q.x || l.y !== q.y) pts.push(q); }
     const o = { id: w.id, points: pts };
     if (w.bus) o.bus = true;
     // (its own curve, #1144: drawn when the schematic is drawn with curves)
@@ -148,7 +162,18 @@ export function normalizeDoc(d, { modules } = {}) {
   const names = new Set(doc.symbols.map(s => s.name).filter(Boolean));
   let k = 0;
   for (const s of doc.symbols) if (!s.name) { do k++; while (names.has(`U${k}`)); s.name = `U${k}`; names.add(s.name); }
-  if (doc.hdl && typeof doc.hdl !== 'object') delete doc.hdl;
+  if (doc.hdl && !plainObj(doc.hdl)) delete doc.hdl;
+  // (the HDL kept from a module's source, #3532: its language one of the two, its texts text, its generics a list of
+  // named ones)
+  else if (doc.hdl) {
+    const hd = doc.hdl;
+    if (hd.lang != null && hd.lang !== 'vhdl' && hd.lang !== 'verilog') delete hd.lang;
+    for (const k of ['context', 'decls', 'arch']) if (hd[k] != null) hd[k] = asText(hd[k], '');
+    if (hd.generics != null) {
+      hd.generics = (Array.isArray(hd.generics) ? hd.generics : []).filter(g => plainObj(g) && (typeof g.name === 'string' || scalar(g.name)) && String(g.name))
+        .map(g => { const o = { ...g, name: String(g.name) }; for (const k of ['type', 'default']) if (o[k] != null) o[k] = asText(o[k], ''); return o; });
+    }
+  }
   // (drawn with curves, #1144; else the technical drawing)
   if (doc.wireStyle !== 'curved') delete doc.wireStyle;
   delete doc.importDiagnostics;
