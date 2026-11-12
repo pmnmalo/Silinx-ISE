@@ -177,3 +177,20 @@ test('#3179 a teacher\'s lab: new_source type lab writes its template, validate 
   assert.match((await call('new_source', { project: 'w', type: 'lab', name: 'x', location: 'src' })).text, /A guided lab is in the labs folder: Location labs\.$/);
   assert.match((await call('new_source', { project: 'w', type: 'lab', name: 'week1' })).text, /labs\/week1\.lab\.json already exists: choose another name\.$/);
 });
+
+// #3526: a project's lab whose simulate check cannot get there (a 2 ps clock in the test bench, 1 ms asked): the check
+// answers, stopped at the time steps' limit; a value past the limit is the lab's problem
+test('#3526 a lab\'s simulate check: bounded through the MCP\'s lab, at_ns past the limit refused', async () => {
+  await ok('new_project_from_example', { name: 'f', example: 'gates' });
+  const tb = `${tmp}/ws/f/sim/tb_gates.vhd`;
+  fs.writeFileSync(tb, fs.readFileSync(tb, 'utf8').replace('\nBEGIN\n', "\n   signal tick : std_logic := '0';\nBEGIN\n   tick <= not tick after 1 ps;\n"));
+  const write = checks => fs.writeFileSync(`${tmp}/ws/f/labs/fast.lab.json`, JSON.stringify({ silinxLab: 1, id: 'fast', title: 'Fast', steps: [{ id: 'sim', title: 'Sim', text: 'T', checks }] }));
+  fs.mkdirSync(`${tmp}/ws/f/labs`, { recursive: true });
+  write([{ check: 'simulate', time_ns: 1e6, errors: true }]);
+  const r = await ok('lab', { project: 'f', action: 'check', lab: 'fast' });
+  assert.deepEqual(r.data.results, [{ check: 'simulate', ok: false, reasons: ['the simulation of tb_gates did not reach 1000000 ns in 2000000 time steps (it stopped at 2000 ns)'] }]);
+  write([{ check: 'simulate', values: [{ signal: 'led', at_ns: 1e12, value: '0' }] }]);
+  const v = await ok('lab', { project: 'f', action: 'validate', file: 'labs/fast.lab.json' });
+  assert.equal(v.text, ['ERROR: labs/fast.lab.json: step 1, check 1 (simulate): "values": "at_ns" from 0 to 1000000 ns',
+    'The lab labs/fast.lab.json has 1 problem(s): Project ▸ Guided Labs… leaves it out until they are fixed.'].join('\n'));
+});

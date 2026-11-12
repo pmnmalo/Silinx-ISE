@@ -17,6 +17,20 @@ import { parseUcf } from '../packages/silinx-fpga/src/parts.js';
 
 const MAX_NS = 1e6;   // (a lab's simulation: at most 1 ms of simulated time)
 const MAX_STEPS = 2_000_000;   // (and at most this many time steps, #3526: a clock of a few ps never ends otherwise)
+const MAX_S = 60;   // (and at most this many seconds, #3526, as the MCP's simulate: a design slow at each step)
+const CHUNK = 20_000;   // (time steps between two looks at the clock; the page and the server answer in between)
+
+// the check's simulation run to `until` (ps), bounded (#3526): its status, and the limit that stopped it (null: none)
+async function runBounded(sim, until) {
+  const deadline = Date.now() + MAX_S * 1000;
+  for (let steps = 0; ;) {
+    const st = sim.run(until, { maxSteps: CHUNK });
+    if (st.finished || st.now >= until) return { st, limit: null };
+    if ((steps += CHUNK) >= MAX_STEPS) return { st, limit: `${MAX_STEPS} time steps` };
+    if (Date.now() >= deadline) return { st, limit: `${MAX_S} s` };
+    await new Promise(r => setTimeout(r, 0));
+  }
+}
 const str = v => typeof v === 'string' && v.length > 0;
 const list = v => v === undefined || (Array.isArray(v) && v.every(str));
 
@@ -181,8 +195,8 @@ export const CHECKS = {
       const files = new Map(v.srcs.map(s => [s.path, s.text]));
       const sim = new Simulator(v.design, { files, onLog: e => { if (log.length < 500) log.push(e); } });
       const timeNs = c.time_ns ?? Math.max(1000, ...(c.values || []).map(x => x.at_ns + 1));
-      const st = sim.run(timeNs * 1000, { maxSteps: MAX_STEPS });
-      if (!st.finished && st.now < timeNs * 1000) return [`the simulation of ${v.top} did not reach ${timeNs} ns in ${MAX_STEPS} time steps (it stopped at ${st.now / 1000} ns)`];
+      const { st, limit } = await runBounded(sim, timeNs * 1000);
+      if (limit) return [`the simulation of ${v.top} did not reach ${timeNs} ns in ${limit} (it stopped at ${st.now / 1000} ns)`];
       const sig = signalsByPath(v.design), out = [];
       for (const x of c.values || []) {
         const s = sig(x.signal);
