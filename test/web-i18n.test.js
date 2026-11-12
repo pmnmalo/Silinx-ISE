@@ -372,3 +372,14 @@ test('#2082 the FSM, ASM and UCF wizards\' messages in Portuguese', () => {
   // the old label of the button: gone with it
   assert.equal(PT.strings.Wizard, undefined);
 });
+
+test('#2296 the PCF, LPF and CST wizards\' names and refusals in Portuguese', () => {
+  const T = {
+    'PCF Wizard': 'Assistente de PCF', 'LPF Wizard': 'Assistente de LPF', 'CST Wizard': 'Assistente de CST', 'XDC Wizard': 'Assistente de XDC',
+    'set_io led[0]: 50 is not a pin of the sg48 package (1…48).': 'set_io led[0]: 50 não é um pino do encapsulamento sg48 (1…48).',
+    'LOCATE COMP led[0]: 12 is not a pin of the cabga381 package (its balls look like A1, B12, AA3).': 'LOCATE COMP led[0]: 12 não é um pino do encapsulamento cabga381 (as suas esferas são como A1, B12, AA3).',
+    'IO_TYPE=LVCMOS33 of led_n[0]: the pin 10 (led_n<0>) is in a bank at 1.8 V on the Sipeed Tang Nano 9K (LVCMOS18), not 3.3 V.':
+      'IO_TYPE=LVCMOS33 de led_n[0]: o pino 10 (led_n<0>) está num banco a 1.8 V na Sipeed Tang Nano 9K (LVCMOS18), não a 3.3 V.',
+  };
+  for (const [en, pt] of Object.entries(T)) assert.equal(t(en), pt, en);
+});

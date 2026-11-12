@@ -107,5 +107,8 @@ test('constraints_wizard: a module\'s ports on the board\'s pins; with no board,
   await fails('constraints_wizard', { project: 'n', module: 'a', name: 'b', pins: { 'sw<2>': 'P3' } }, 'pins: \'sw<2>\' is not a net of a (clk, sw<1>, sw<0>, led<1>, led<0>)');
   await fails('constraints_wizard', { project: 'n', module: 'nosuch' }, 'no design module \'nosuch\' in the project');
   await ok('set_design_properties', { project: 'n', board: 'none', part: 'ice40hx1k', package: 'vq100' });
-  await fails('constraints_wizard', { project: 'n', module: 'a', name: 'c' }, 'the ICE40HX1K\'s constraints are a PCF: new_source constraints writes one');
+  // (an iCE40: the PCF Wizard, its pins numbered, #2296: test/mcp-constraints.test.js)
+  const c = await ok('constraints_wizard', { project: 'n', module: 'a', name: 'c', pins: { clk: '21' } });
+  assert.equal(c.text, 'PCF Wizard: created constraints/c.pcf for a: 1 of 5 net(s) on a pin.\nWARNING: no pin for sw<1>, sw<0>, led<1>, led<0>.\nconstraints/c.pcf is the project\'s constraints file.');
+  await fails('constraints_wizard', { project: 'n', module: 'a', name: 'd', pins: { clk: 'P1' } }, 'set_io clk: P1 is not a pin of the vq100 package (1…100).');
 });

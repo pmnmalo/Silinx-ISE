@@ -1,7 +1,7 @@
 // The implementation processes (#405: out of app.js): ISE's flow run step by step with its live status
 // (synthesis to bitstream), Check Constraints and the UCF made from the board, the open synthesis (Yosys in
 // the browser), the optional processes (simulation models, timing, power, pin back-annotation) and Stop.
-import { constraintsExt, pcfDiagnostics, lpfDiagnostics, cstDiagnostics, xdcDiagnostics } from './constraints-format.js';
+import { constraintsExt, pcfDiagnostics, lpfDiagnostics, cstDiagnostics, xdcDiagnostics, readPins } from './constraints-format.js';
 import { noFlowWarning } from './device-picker.js';
 import { api, followJob } from './api.js';
 import { h, alertDlg, confirmDlg, toast } from './ui.js';
@@ -103,9 +103,11 @@ export async function ucfDiagnostics(text, file) {
       lang = moduleInfo(pj.top)?.lang || 'vhdl';
     } catch { /* no port data */ }
   }
-  if (/\.pcf$/i.test(file)) return pcfDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
-  if (/\.lpf$/i.test(file)) return lpfDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
-  if (/\.cst$/i.test(file)) return cstDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
+  // (the top, its package's pins, its board's pins and their banks, #2296)
+  const opts = { top: pj.top || null, device: pj.device, board: projectBoard(pj) };
+  if (/\.pcf$/i.test(file)) return pcfDiagnostics(text, ports, opts).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
+  if (/\.lpf$/i.test(file)) return lpfDiagnostics(text, ports, opts).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
+  if (/\.cst$/i.test(file)) return cstDiagnostics(text, ports, opts).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
   if (/\.xdc$/i.test(file)) return xdcDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
   const db = S.devices;
   const famId = db?.parts?.find(x => x.part === pj.device?.part)?.family || pj.device?.family;
@@ -157,9 +159,10 @@ async function checkConstraints(warnings = null) {
     return false;
   }
   if (!pj.constraints || !S.fileTree.includes(pj.constraints)) return true;
-  const { parseUcf, locsNotOnBoard } = await import('/packages/silinx-fpga/src/parts.js');
+  const { locsNotOnBoard } = await import('/packages/silinx-fpga/src/parts.js');
   let bad = [];
-  try { bad = locsNotOnBoard(parseUcf(await api.readFile(pj.name, pj.constraints), { ports: topUcfPorts() }).assignments, board); } catch { return true; }
+  // (in the device's format: a PCF's, an LPF's, a CST's pins too, #2296)
+  try { bad = locsNotOnBoard(readPins(pj.device, await api.readFile(pj.name, pj.constraints), { ports: topUcfPorts() }).assignments, board); } catch { return true; }
   if (!bad.length) return true;
   const list = bad.slice(0, 8).map(b => `${b.net}=${b.loc}`).join(', ') + (bad.length > 8 ? ', …' : '');
   log(`ERROR: ${pj.constraints} uses ${bad.length} pin(s) that are not on the ${board.name}: ${list}`, 'err');

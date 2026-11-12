@@ -105,4 +105,9 @@ export const WIZARDS_PT_PATTERNS = [
   [/^Not assigned: (.*)\.$/, 'Por atribuir: $1.'], [/^The pin (\S+) is given to (\S+) and (\S+)\.$/, 'O pino $1 está dado a $2 e a $3.'],
   [/^The wizard will create (\S+), the project's constraints file:$/, 'O assistente vai criar $1, o ficheiro de restrições do projeto:'],
   [/^The wizard will create (\S+):$/, 'O assistente vai criar $1:'],
+  // the other families' constraints wizards (#2296): their names, their refusals (core/constraints-wizard.js)
+  [/^(PCF|LPF|CST|XDC) Wizard$/, 'Assistente de $1'],
+  [/^(set_io|LOCATE COMP|IO_LOC) (\S+): (\S+) is not a pin of the (\S+) package \(1…(\d+)\)\.$/, '$1 $2: $3 não é um pino do encapsulamento $4 (1…$5).'],
+  [/^(set_io|LOCATE COMP|IO_LOC) (\S+): (\S+) is not a pin of the (\S+) package \(its balls look like A1, B12, AA3\)\.$/, '$1 $2: $3 não é um pino do encapsulamento $4 (as suas esferas são como A1, B12, AA3).'],
+  [/^IO_TYPE=(\S+) of (\S+): the pin (\S+) \((\S+)\) is in a bank at ([\d.]+) V on the (.+) \((\S+)\), not ([\d.]+) V\.$/, 'IO_TYPE=$1 de $2: o pino $3 ($4) está num banco a $5 V na $6 ($7), não a $8 V.'],
 ];

@@ -32,7 +32,7 @@ function readPcf(text) {
       if (rest.length !== 2) fail('set_io needs a port and a pin');
       const [net, loc] = rest;
       attrs.loc = loc;
-      netStatements.push({ net, attrs: { ...attrs } });
+      netStatements.push({ net, attrs: { ...attrs }, line: i + 1 });
       assignments[net] = { ...assignments[net], ...attrs };
     } else if (cmd === 'set_frequency') {
       const mhz = Number(args[1]);

@@ -171,7 +171,10 @@ for Xilinx FPGAs supported by ISE 14.7.
   top by default) on a pin of the project's board, assigned from the board as I/O Pin Planning's *Auto-assign*
   (by the names, then the inputs on the switches and the outputs on the LEDs) and changed in a list of the board's
   pins (with no board: the package pins typed); a pin given twice is refused; it writes the `.ucf`, the project's
-  constraints file when it has none.
+  constraints file when it has none. On the other families it is the device's format's: the **PCF Wizard** (iCE40, a
+  pull-up per pin), the **LPF Wizard** (ECP5) and the **CST Wizard** (Gowin, each pin's I/O standard its bank's), with
+  the I/O standard, pull and drive their format writes; a pin that is no pin of the package, or an I/O standard at
+  another voltage than its bank's on the board, is refused (Check Constraints says the same of a file edited by hand).
 - **Module Wizard** (*New Source ▸ Module (HDL) ▸ Wizard >*), for beginners: the name, the location and the
   language typed on New Source; the inputs, outputs and bidirectional ports
   in a friendly table (name, input/output/bidirectional, width — 1 is a single bit, N a bus N-1
@@ -552,7 +555,7 @@ Constraints*; `unset_top`, as *Unset as Top Module*), `list_projects`, `project_
 *Design Properties*), `set_source_properties` (a drawing's language), `new_source` (every type of *New Source*: a module with its ports, a test
 bench, a package, constraints, a .mem, a C / C++ function, an empty drawing), `clock_manager` and `block_memory` (the Clocking Wizard's DCM / PLL, the
 Block Memory wizard's RAM or ROM; a module of theirs made again with other settings), `test_bench_wizard` (a self-checking
-test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins), `convert_module` (an HDL module to a schematic, ASM chart or state
+test bench: its vectors, their expected outputs given or from the design) and `constraints_wizard` (a UCF on the board's pins; a PCF, LPF, CST or XDC on the other families' boards), `check_constraints` (*Check Constraints*, in the device's format), `convert_module` (an HDL module to a schematic, ASM chart or state
 diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM chart and back, or to its Boolean algebra), `related_view` (a read-only view shown beside a source, nothing written: an HDL source's translation, a state diagram's ASM chart, an ASM chart's or a Petri net's state diagram, a truth table's schematic, or its results: the canonical and minimal forms, each output's HDL logic), `set_output_logic` (a truth table output's HDL logic or the minimal solution it uses, its HDL made again), `check_drawing` (an ASM chart's, a state diagram's or a Petri net's Check), `rearrange_wires` and `rearrange_schematic` (a schematic's Rearrange Wires: few bends and crossings, the wires of a channel spread evenly; and Rearrange Schematic), `save_wave_config` and `load_wave_config` (a simulation's wave configuration saved as a .wcfg of the project, and loaded), `simulate_drawing` (an ASM chart or a state diagram stepped clock edge by clock edge, as its Simulate panel does), `verify` (a module's equivalence with a reference module, as *Verify Equivalence*, or with no reference its own assertions, as *Verify Assertions*, or with a property a state diagram's or an ASM chart's, as *Verify Property*: a state never reached, a state reached, outputs never 1 together; proved, or the first clock cycle where an output differs, an assertion fails or the property does, its counterexample written as a test bench and replayed), `set_process_properties` (the Optimization, the start-up clock),
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file` and `delete_project` (into the workspace's `.trash` folder, from where they

@@ -161,18 +161,22 @@ export const WIZARD_TOOLS = [
     },
   },
   {
-    name: 'constraints_wizard', title: 'UCF Wizard',
-    description: 'Write a constraints file (UCF) for a module\'s ports, as the UCF Wizard does: each bit of its ports on a pin of the project\'s board, assigned by their names (clk, led, sw, btn, seg, an…) and directions, the clock\'s period from the board; pins given override them (a net: x, or x<3> for a bit of a bus), and with no board they are all given. The project\'s constraints file when it has none. A file that exists is not replaced (set_top with update_constraints writes the project\'s again).',
+    name: 'constraints_wizard', title: 'Constraints Wizard (UCF, PCF, LPF, CST, XDC)',
+    description: 'Write a constraints file for a module\'s ports in the device\'s format, as the UCF Wizard does (the PCF Wizard on an iCE40, the LPF Wizard on an ECP5, the CST Wizard on a Gowin, the XDC Wizard on a 7-series): each bit of its ports on a pin of the project\'s board, assigned by their names (clk, led, sw, btn, seg, an…) and directions, the clock\'s period from the board; pins given override them (a net: x, or x<3> for a bit of a bus), and with no board they are all given. A PCF, an LPF or a CST takes the attributes its format writes (a PCF: pull up; an LPF: iostandard, pull, drive, slew; a CST: iostandard, pull, drive) and is refused with a pin that is no pin of the package or an I/O standard at another voltage than its bank\'s on the board. The project\'s constraints file when it has none. A file that exists is not replaced (set_top with update_constraints writes the project\'s again).',
     inputSchema: { type: 'object', properties: {
       project: PROJECT, module: STR('The module (default: the project\'s top).'), name: STR('The file\'s name (default: the module\'s).'), location: STR('Its folder (default constraints).'),
       pins: { type: 'object', additionalProperties: { type: 'string' }, description: 'Pins given: { net: pin }, e.g. { "led<0>": "M5", "clk": "B8" }.' },
+      attributes: { type: 'object', additionalProperties: { type: 'object', properties: { iostandard: STR('The I/O standard (LVCMOS33…).'), pull: STR('up, down, keeper or none.'), drive: STR('The drive, mA.'), slew: STR('slow or fast.') }, additionalProperties: false },
+        description: 'A PCF\'s, an LPF\'s or a CST\'s attributes of nets on a pin: { net: { iostandard, pull, drive, slew } }, e.g. { "led<0>": { "drive": "8" } }; "none" takes one off.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false },
-    async run({ project: name, module, name: file, location, pins = {} }) {
+    async run({ project: name, module, name: file, location, pins = {}, attributes }) {
       const pj = await readProject(name);
-      const { constraintsFormatOf, generateUcf, bitName, boardAutoAssign } = await import('../packages/silinx-fpga/src/parts.js');
-      const format = constraintsFormatOf(pj.device);
-      if (format !== 'ucf') throw toolError(`the ${String(pj.device.part).toUpperCase()}'s constraints are a${['xdc', 'lpf'].includes(format) ? 'n' : ''} ${format.toUpperCase()}: new_source constraints writes one`);
+      const { constraintsFormatOf, constraintsExtOf, bitName, boardAutoAssign } = await import('../packages/silinx-fpga/src/parts.js');
+      const { wizardTitle, wizardText, wizardError, applyAttributes, article } = await import('../core/constraints-wizard.js');
+      // (the device's format, #2296: the interface's wizard's title, text and checks)
+      const format = constraintsFormatOf(pj.device), ext = constraintsExtOf(pj.device), title = wizardTitle(pj.device);
+      if (attributes && ['ucf', 'xdc'].includes(format)) throw toolError(`attributes: ${article(format.toUpperCase())} ${format.toUpperCase()}'s are I/O Pin Planning's (write_file), not the wizard's`);
       const { compile, elaborate } = await import('../core/compile.js');
       const { primitiveSources } = await import('../core/unisim.js');
       const { viewSourcesOf } = await import('./mcp-util.js');
@@ -195,30 +199,31 @@ export const WIZARD_TOOLS = [
       const board = pj.board ? resolveBoard(pj.board, { part: pj.device.part }) : null;
       let asg = {}, clocks = [], unmatched = [];
       if (board) ({ assignments: asg, clocks, unmatched } = boardAutoAssign(ports, { ...board.board, device: board.device, resources: board.resources }, { byDirection: true }));
+      const brd = board ? { ...board.board, resources: board.resources } : null;
+      // (a CST's I/O standard: its pin's on the board, as the interface's wizard sets it)
+      const standardOf = pin => { const r = brd?.resources.find(x => x.pins.includes(pin)); return r ? r.pinIostandards?.[pin] || r.iostandard : null; };
+      if (format === 'cst') for (const a of Object.values(asg)) a.iostandard ||= standardOf(a.loc) || undefined;
       for (const [net, pin] of Object.entries(pins)) {
         if (!nets.includes(net)) throw toolError(`pins: '${net}' is not a net of ${top} (${nets.slice(0, 12).join(', ')}${nets.length > 12 ? '…' : ''})`);
-        if (pin) asg[net] = { ...(asg[net] || {}), loc: String(pin).trim().toUpperCase() }; else delete asg[net];
+        const loc = String(pin).trim().toUpperCase();
+        if (pin) asg[net] = { ...(asg[net] || {}), loc, ...(format === 'cst' && standardOf(loc) ? { iostandard: standardOf(loc) } : {}) }; else delete asg[net];
       }
-      const used = new Map();
-      for (const [net, x] of Object.entries(asg)) {
-        const k = String(x.loc).toUpperCase();
-        if (used.has(k)) throw toolError(`The pin ${x.loc} is given to ${used.get(k)} and ${net}.`);
-        used.set(k, net);
-      }
+      try { applyAttributes(pj.device, asg, attributes); } catch (e) { throw toolError(e.message); }
       const loc = String(location ?? 'constraints').trim().replace(/\/+$/, '');
-      const base = String(file ?? top).trim().replace(/\.ucf$/i, '');
+      const base = String(file ?? top).trim().replace(new RegExp(`\\${ext}$`, 'i'), '');
       if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(base)) throw toolError('Enter a valid file name (letters, digits, _ and -).');
       if (!/^[A-Za-z0-9_/-]+$/.test(loc) || loc.split('/').some(x => !x || x.startsWith('.')) || /^build(\/|$)/i.test(loc)) throw toolError('Invalid location.');
-      const path = `${loc}/${base}.ucf`;
+      const path = `${loc}/${base}${ext}`;
       const tree = await P.fileTree(name);
       if (tree.includes(path)) throw toolError(`${path} already exists: choose another name.`);
-      const text = generateUcf({ ports, assignments: asg, clocks,
-        header: `UCF generated by the Silinx UCF Wizard for '${top}' (${pj.device.part}${pj.device.speed}-${pj.device.package}${board ? `, ${board.board.name}` : ''})` });
+      const text = wizardText({ device: pj.device, board: brd, ports, assignments: asg, clocks, top });
+      const bad = wizardError({ device: pj.device, board: brd, assignments: asg, text });
+      if (bad) throw toolError(bad);
       const noConstraints = !pj.constraints || !tree.includes(pj.constraints);
       await P.writeFile(name, path, text);
       if (noConstraints) await P.updateProject(name, x => ({ ...x, constraints: path }));
       const free = nets.filter(n => !asg[n]);
-      return { text: [`UCF Wizard: created ${path} for ${top}: ${Object.keys(asg).length} of ${nets.length} net(s) on a pin${board ? ` of the ${board.board.name}` : ''}${clocks.length ? `, the period of ${clocks.map(c => c.net || c.port || c.name).join(', ')}` : ''}.`,
+      return { text: [`${title}: created ${path} for ${top}: ${Object.keys(asg).length} of ${nets.length} net(s) on a pin${board ? ` of the ${board.board.name}` : ''}${clocks.length ? `, the period of ${clocks.map(c => c.net || c.port || c.name).join(', ')}` : ''}.`,
         ...(free.length ? [`WARNING: no pin for ${free.join(', ')}${board && unmatched.length ? ' (not on the board by its name)' : ''}.`] : []), ...(noConstraints ? [`${path} is the project's constraints file.`] : [])].join('\n'),
       data: { project: name, path, module: top, assigned: Object.keys(asg).length, nets: nets.length, unassigned: free, constraints: (await P.readProject(name)).constraints } };
     },

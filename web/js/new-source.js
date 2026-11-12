@@ -27,10 +27,11 @@ const SOURCE_TYPES = [
   { id: 'bramwiz', label: 'Block Memory', ico: 'template', ext: null, dir: 'src', wiz: 'memory', only: true },
   { id: 'tb', label: 'Test Bench', ico: 'vhdl', ext: null, dir: 'sim', wiz: 'testbench' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints', wiz: 'ucf' },
-  { id: 'pcf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.pcf', dir: 'constraints', hidden: true },   // (the iCE40's: its device shows it for UCF's, #2296)
-  { id: 'lpf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.lpf', dir: 'constraints', hidden: true },   // (the ECP5's, #2302)
-  { id: 'cst', label: 'Implementation Constraints File', ico: 'ucf', ext: '.cst', dir: 'constraints', hidden: true },   // (the Gowin's, #2303)
-  { id: 'xdc', label: 'Implementation Constraints File', ico: 'ucf', ext: '.xdc', dir: 'constraints', hidden: true },   // (the 7-series', #3142)
+  // (the Constraints Wizard in the device's format, #2296: the PCF, LPF, CST and XDC Wizards)
+  { id: 'pcf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.pcf', dir: 'constraints', hidden: true, wiz: 'ucf' },   // (the iCE40's: its device shows it for UCF's, #2296)
+  { id: 'lpf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.lpf', dir: 'constraints', hidden: true, wiz: 'ucf' },   // (the ECP5's, #2302)
+  { id: 'cst', label: 'Implementation Constraints File', ico: 'ucf', ext: '.cst', dir: 'constraints', hidden: true, wiz: 'ucf' },   // (the Gowin's, #2303)
+  { id: 'xdc', label: 'Implementation Constraints File', ico: 'ucf', ext: '.xdc', dir: 'constraints', hidden: true, wiz: 'ucf' },   // (the 7-series', #3142)
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
   { id: 'lab', label: 'Guided Lab', ico: 'help', ext: '.lab.json', dir: 'labs' },   // (a teacher's, its steps checked: #3179)
   { id: 'c', label: 'C Function (HLS)', ico: 'file', ext: '.c', dir: 'src' },   // (Silinx HLS, compatible with Vitis HLS: #1531)
