@@ -176,14 +176,16 @@ export const COLLAB_TOOLS = [
       publishProject(doc, { ...await readAll(name), owner, bases });
       const token = key ? String(key) : await tokenOf(origin);
       let session;
+      // (an editor's change the owner refused among them too, #3527)
+      const warnings = [];
+      const onEvent = ev => { if (ev.type === 'error' && ev.message) warnings.push(ev.message); };
       try {
-        session = await shareRoom({ url: relayUrl(origin, 'share'), token, doc, user: { name: owner }, editors: !!editors, WebSocket: await WebSocketImpl() });
+        session = await shareRoom({ url: relayUrl(origin, 'share'), token, doc, user: { name: owner }, editors: !!editors, WebSocket: await WebSocketImpl(), onEvent });
       } catch (e) { throw toolError(`cannot share through ${origin}: ${e.message} (is Silinx running there? silinx serve)`); }
       // (what changes on disk, published again; the relay's end, the share's)
       const { createProjectWatcher } = await import('./project-watch.js');
       const watcher = createProjectWatcher({ dirOf: P.projectDir });
       const unsub = watcher.subscribe(name, async () => { try { publishProject(doc, { ...await readAll(name), owner, bases }); } catch { /* the next change */ } });
-      const warnings = [];
       const unwatch = session.editKey ? ownerWrites(name, doc, owner, w => warnings.push(w), bases) : () => {};
       const off = () => { unsub(); unwatch(); watcher.close?.(); };
       const link = followLink(`${origin}/`, session.room, session.key);

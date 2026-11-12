@@ -5,12 +5,14 @@
 //                    benches, the C, the drawings' JSON), FILE_MAX at most each; build/ and hidden files never
 //   drawings Y.Map   path -> Y.Map: the drawings edited live, each as a structure of its own (#3183,
 //                    core/collab-model.js); their files' texts the owner's, written from it
+// No other root (DOC_ROOTS, #3527): a follower leaves a room whose owner sends one, or whose bytes pass its limit.
 // The owner's Silinx writes it (publishProject, putFile, ...), a follower's reads it (docProject, docFile). A text is
 // changed by its common prefix and suffix kept, so an update carries the edit only (and phase 2's editors, bound to
 // the same Y.Text, need no other layout).
 import * as Y from 'yjs';
 import { gateFile, GateError } from './import-gate.js';
 import { syncDrawings, drawingObjects, DRAWING_OBJECTS_MAX } from './collab-model.js';
+import { updateRoots } from './collab-roots.js';
 
 export const LAYOUT_VERSION = 1;
 export const FILE_MAX = 1 << 20;
@@ -127,12 +129,13 @@ export function publishProject(doc, { project, files, owner = '', bases = new Ma
   });
 }
 
-/** What a follower takes of a room (#3361: the owner may be hostile): its files, their total size (characters). */
+/** What a follower takes of a room (#3361: the owner may be hostile): its files, their total size (characters; the
+ *  document's encoded size too, its bytes, #3527). */
 export const FOLLOW_LIMITS = Object.freeze({ files: 5000, total: 64 << 20, objects: DRAWING_OBJECTS_MAX });
 
 const size = n => (n >= 1 << 20 ? `${Math.ceil(n / (1 << 20))} MB` : `${Math.ceil(n / 1024)} KB`);
 
-/** Why a followed document is past what a follower takes (null: it is not). */
+/** Why a followed document is past what a follower takes (null: it is not); its bytes: docMeter. */
 export function docTooLarge(doc, limits = FOLLOW_LIMITS) {
   const files = doc.getMap('files');
   if (files.size > limits.files) return `the shared project has more files than a follower takes (${files.size}, at most ${limits.files})`;
@@ -142,6 +145,55 @@ export function docTooLarge(doc, limits = FOLLOW_LIMITS) {
   const objects = drawingObjects(doc);
   if (objects > (limits.objects ?? DRAWING_OBJECTS_MAX)) return `the shared project's drawings hold more objects than a follower takes (${objects}, at most ${limits.objects ?? DRAWING_OBJECTS_MAX})`;
   return null;
+}
+
+/** The parts of a shared project's document (#3527): a root of any other name is no part of one. An editor's edit
+ *  changes the files and the drawings only. */
+export const DOC_ROOTS = Object.freeze(['meta', 'project', 'files', 'drawings']);
+export const EDIT_ROOTS = Object.freeze(['files', 'drawings']);
+const rootName = n => JSON.stringify(String(n).slice(0, 64));
+
+/** The bytes a document holds (#3527), whatever they are (every root, values that are no text, the updates waiting for
+ *  others): its encoded size, measured again only when what came since (the updates received, counted with add(), and
+ *  its own changes) may take it past a maximum. */
+export function docMeter(doc) {
+  let measured = Y.encodeStateAsUpdate(doc).length, since = 0;
+  const own = (u, origin) => { if (origin !== 'remote') since += u.length; };
+  doc.on('update', own);
+  const measure = () => { measured = Y.encodeStateAsUpdate(doc).length; since = 0; return measured; };
+  return {
+    /** `n` bytes received (applied, or waiting for the updates they follow). */
+    add: n => { since += n; },
+    /** Why the document, with `n` bytes more, is past `max` (null: it is not). */
+    over: (max, n = 0) => (measured + since + n <= max || measure() + n <= max ? null
+      : `the shared project is larger than a follower takes (${size(measured + n)}, at most ${size(max)})`),
+    stop: () => doc.off('update', own),
+  };
+}
+
+// the first root outside `roots` that an update changes (undefined: none; null: it does not decode); `strict`: what it
+// refers to that the document does not have yet counted as outside
+function rootOutside(doc, bytes, roots, strict) {
+  const r = updateRoots(doc, bytes);
+  if (!r) return null;
+  const out = [...r.roots].find(n => !roots.includes(n));
+  return out ?? (strict && r.unknown ? '' : undefined);
+}
+
+/** Why an update the owner sent is past what a follower takes (#3527): it changes a root of no shared project's (null:
+ *  it does not). */
+export function updateOutside(doc, bytes) {
+  const r = rootOutside(doc, bytes, DOC_ROOTS, false);
+  return r === null ? 'an update of the shared project that does not decode' : r === undefined ? null : `the shared project holds a part that no shared project has (${rootName(r)})`;
+}
+
+/** Why an editor's edit (a Yjs update) is refused before it is applied (#3527): it changes a part of the document that
+ *  an editor does not, or builds on changes the owner does not have (null: it does not). */
+export function editOutside(doc, bytes) {
+  const r = rootOutside(doc, bytes, EDIT_ROOTS, true);
+  if (r === null) return 'it is not an update of the document';
+  if (r === '') return 'it builds on changes the owner does not have';
+  return r === undefined ? null : `it changes a part of the document that an editor does not (${rootName(r)})`;
 }
 
 /** A followed file's text through the import gate (#3361), as any file from outside: { text } (null: not in the
