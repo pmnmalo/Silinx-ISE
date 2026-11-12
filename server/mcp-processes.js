@@ -115,7 +115,9 @@ export const PROCESS_TOOLS = [
       const pj = { top };
       const head = `Process "${proc}" of <${pj.top}> ${ok ? `completed successfully${warnings.length ? ` with ${warnings.length} warning(s)` : ''}` : `failed (${errors.length} error(s), ${warnings.length} warning(s))`} (${TOOLCHAIN_NAMES[tc]}).`;
       return { text: processText({ errors, warnings, lines, head, logLines }),
-        data: { project: name, process: proc, toolchain: tc, ok, errors, warnings, log: lines.slice(-Math.max(1, logLines)) }, isError: !ok };
+        data: { project: name, process: proc, toolchain: tc, ok, errors, warnings, log: lines.slice(-Math.max(1, logLines)) }, isError: !ok,
+        // (a failure's errors and log quote the design's names and files: the project's own text, #3681)
+        untrusted: ok ? undefined : 'the process\'s messages, which quote the design\'s names and files' };
     },
   },
   {

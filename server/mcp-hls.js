@@ -46,7 +46,9 @@ export const HLS_TOOLS = [
       const lines = [...out, ...(wrote.length ? [`${wrote.length} file(s) written by the test bench, in memory (not saved to the project): ${wrote.slice(0, 5).join(', ')}${wrote.length > 5 ? ', …' : ''}`] : [])];
       if (!r.ok) {
         const why = r.error ? `line ${r.error.line}: ${r.error.message}` : r.diagnostics.filter(d => d.severity === 'error').map(d => `line ${d.line}: ${d.message}`).join('; ');
-        return { text: [...lines, `ERROR:SilinxC - "${rel}" ${why}`, 'Process "C Simulation" failed'].join('\n'), data: { project: name, path: rel, ok: false, output: out, error: why }, isError: true };
+        // (the error and the output quote the source's names and what it printed: the project's own text, #3681)
+        return { text: [...lines, `ERROR:SilinxC - "${rel}" ${why}`, 'Process "C Simulation" failed'].join('\n'), data: { project: name, path: rel, ok: false, output: out, error: why }, isError: true,
+          untrusted: 'the C compiler\'s messages and the test bench\'s output, which quote the source\'s names' };
       }
       lines.push(`main() returned ${r.exitCode}; ${r.calls.length} call(s) of '${r.top || '?'}'.`, 'Process "C Simulation" completed successfully');
       return { text: lines.join('\n'), data: { project: name, path: rel, ok: true, output: out, exitCode: r.exitCode, calls: r.calls.length, top: r.top || null, filesWritten: wrote } };

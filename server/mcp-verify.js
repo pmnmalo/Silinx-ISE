@@ -7,6 +7,10 @@
 import * as P from './projects.js';
 import { toolError, readProject, viewSourcesOf, STR, PROJECT } from './mcp-util.js';
 
+// a check that failed or could not run (#3681): its messages, and a counterexample's replay, quote the design's names
+// and files and what it prints: the project's own text
+const failed = r => (r.status === 'error' || r.status === 'failed' ? 'Verify\'s messages, which quote the design\'s names and files, and the replay\'s lines' : undefined);
+
 export const VERIFY_TOOLS = [
   {
     name: 'verify', title: 'Verify Equivalence',
@@ -78,7 +82,7 @@ export const VERIFY_TOOLS = [
           ...(r.status === 'timeout' ? { timeLimit, checked: r.checked } : {}),
           ...(r.status === 'failed' ? { cycle: r.cycle, counterexample: r.cycles, testBench: bench, replay } : {}),
           errors: r.errors, warnings: r.warnings };
-        return { text: lines.join('\n'), data, isError: r.status === 'error' };
+        return { text: lines.join('\n'), data, isError: r.status === 'error', untrusted: failed(r) };
       }
       const data = { project: name, module: r.top ?? top, reference: r.reference ?? a.reference ?? null, status: r.status, depth,
         ...(a.reference ? {} : { asserts: r.asserts, assumes: r.assumes }),
@@ -86,7 +90,7 @@ export const VERIFY_TOOLS = [
         ...(r.status === 'timeout' ? { timeLimit, checked: r.checked } : {}),
         ...(r.status === 'failed' ? { cycle: r.cycle, ...(a.reference ? { differs: r.differs } : { failure: r.failure ?? null }), counterexample: r.cycles, testBench: bench, replay } : {}),
         errors: r.errors, warnings: r.warnings };
-      return { text: lines.join('\n'), data, isError: r.status === 'error' };
+      return { text: lines.join('\n'), data, isError: r.status === 'error', untrusted: failed(r) };
     },
   },
 ];
