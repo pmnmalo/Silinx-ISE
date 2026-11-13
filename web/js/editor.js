@@ -21,7 +21,7 @@ import { quickFixes } from '/core/quickfix.js';
 import { hintTooltip } from './diaghelp.js';
 import { t, getLanguage, onLanguageChange } from './i18n.js';
 import { EDITOR_PHRASES_PT } from './i18n-editor.js';
-import { popupMenu, toast } from './ui.js';
+import { popupMenu, message } from './ui.js';
 import { esc } from './dom.js';
 import { mountCompletion } from './editor-complete.js';
 import { cSnippets } from './c-templates.js';
@@ -311,7 +311,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
   }
   function showFixMenu(line = getCursor().line, at = null) {
     const fixes = fixesOnLine(line);
-    if (!fixes.length) { toast('No quick fix here.', 'info'); return; }
+    if (!fixes.length) { message('No quick fix here.'); return; }
     const c = at || view.coordsAtPos(line === getCursor().line ? view.state.selection.main.head : offsetOf({ line, ch: 0 }));
     popupMenu(fixes.map(f => ({ label: `Fix: ${f.title}`, action: () => applyFix(f) })), c.left, c.bottom);
   }

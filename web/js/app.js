@@ -1,7 +1,7 @@
 // Silinx Project Navigator — main application shell (ISE-like).
 import { api, followJob } from './api.js';
 import { icons, icon } from './icons.js';
-import { h, dialog, alertDlg, confirmDlg, promptDlg, popupMenu, splitter, toast } from './ui.js';
+import { h, dialog, alertDlg, confirmDlg, promptDlg, popupMenu, splitter, setMessageSink } from './ui.js';
 import { createEditor, instTemplate, snippetsFor, typeText } from './editor.js';
 import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC, noteFailedC } from './c-source.js';
 import { compile, implRoots, topCandidates } from '/core/compile.js';
@@ -21,7 +21,7 @@ import { isLabFile } from '/core/labs.js';
 import { primitiveTemplates } from '/core/prim-templates.js';
 import { deviceFamily, openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
 import { setActionRunner, longPressMenu } from './ui.js';
-import { log, logError, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
+import { log, logError, logInfo, logLine, logWarning, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
 import { renderTeachingPage } from './teaching-page.js';
 import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus, refreshBlackboxes } from './project.js';
@@ -225,6 +225,8 @@ export const history = createHistory(api, {
     for (const p of reopen.reverse()) if ((S.diskTree || []).includes(p)) await openFile(p).catch(() => {});
   },
 });
+// the messages of ui.js's menus and of the editors (#3591): lines of the console
+setMessageSink((text, level) => (level === 'error' ? logError : level === 'warning' ? logWarning : logInfo)(text));
 // (the toolbar's buttons refreshed when a command ends: Undo / Redo follow the project's history at once, #1199)
 setActionRunner((label, fn) => {
   const r = NOT_RECORDED.test(String(label || '')) ? fn() : history.run(label, fn);
@@ -543,7 +545,7 @@ export async function openFile(path, line, col, { task } = {}) {
             sch ? null : '-',
             sch ? null : { label: 'Cut', action: () => { navigator.clipboard?.writeText(ed.getSelection()); ed.replaceSelection(''); }, disabled: !hasSel },
             { label: 'Copy', action: () => navigator.clipboard?.writeText(ed.getSelection()), disabled: !hasSel },
-            sch ? null : { label: 'Paste', action: async () => { try { ed.replaceSelection(await navigator.clipboard.readText()); ed.focus(); } catch { toast('Use Ctrl+V to paste', 'info'); } } },
+            sch ? null : { label: 'Paste', action: async () => { try { ed.replaceSelection(await navigator.clipboard.readText()); ed.focus(); } catch { logInfo('Use Ctrl+V to paste'); } } },
             { label: 'Select All', action: () => ed.exec('selectAll') },
             '-',
             edit ? { label: 'Toggle Comment', action: () => ed.exec('toggleComment') } : null,

@@ -222,7 +222,7 @@ const PT = {
   'Verify after programming': 'Verificar após programar', 'Reload the FPGA from the PROM afterwards (mode jumper on ROM)': 'Recarregar a FPGA a partir da PROM no fim (jumper de modo em ROM)',
   'Loads the FPGA directly (volatile: lost at power-off). Select the PROM in the chain to store the design in flash.': 'Carrega a FPGA diretamente (volátil: perde-se ao desligar). Selecione a PROM na cadeia para guardar o projeto na flash.',
   'Program': 'Programar', 'Erase PROM': 'Apagar PROM', 'No board selected: choose the programming tool and cable explicitly.': 'Nenhuma placa selecionada: escolha a ferramenta e o cabo de programação.',
-  'Another operation is running': 'Outra operação está em curso', 'Failed — see console': 'Falhou — ver consola', 'Scan finished.': 'Scan concluído.',
+  'Another operation is running': 'Outra operação está em curso', 'Scan finished.': 'Scan concluído.',
   // (the iCE40's Configure Target Device, #2298)
   'Program the iCE40 — SPI flash': 'Programar o iCE40 — flash SPI', 'Program Flash': 'Programar Flash', 'Configuration file (.bin):': 'Ficheiro de configuração (.bin):',
   '(no board)': '(sem placa)', '(no top module)': '(sem módulo de topo)', 'No top module: set one in the Design pane first.': 'Sem módulo de topo: defina-o primeiro no painel Design.',

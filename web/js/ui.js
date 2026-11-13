@@ -100,6 +100,11 @@ addEventListener('blur', closeMenus);
 let actionRunner = (label, fn) => fn();
 export function setActionRunner(f) { actionRunner = f; }
 export const runAction = (label, fn) => actionRunner(label, fn);
+// where a message goes (#3591: a menu action's error, an editor's "No quick fix here."): the app's console
+// (setMessageSink, app.js), a toast in a page without one (the demos); level: 'error', 'warning' or 'info'
+let messageSink = (text, level) => toast(text, level === 'info' ? 'info' : 'error');
+export function setMessageSink(f) { messageSink = f; }
+export const message = (text, level = 'info') => messageSink(text, level);
 
 export function popupMenu(items, x, y) {
   closeMenus();
@@ -154,7 +159,7 @@ function buildMenu(items) {
     }
     if (!disabled && it.action) row.addEventListener('click', e => {
       e.stopPropagation(); closeMenus();
-      Promise.resolve().then(() => runAction(it.label, it.action)).catch(err => { console.error(err); toast(`${it.label}: ${err.message || err}`, 'error'); });
+      Promise.resolve().then(() => runAction(it.label, it.action)).catch(err => { console.error(err); message(`${it.label}: ${err.message || err}`, 'error'); });
     });
     m.append(row);
   }
