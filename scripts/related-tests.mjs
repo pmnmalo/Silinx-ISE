@@ -216,7 +216,10 @@ export const REPO_WIDE = [
   'test/private-data.test.js',          // 17 s: the tracked files, no private data, secrets or Xilinx files
   'test/safe-output.test.js',           // 0.4 s: web/js, the pages, core/ and server/: markup from a value
   'test/toolchain-boundary.test.js',    // 0.3 s: every source's imports (the package's API, #1678)
+  'test/unused-exports.test.js',        // 0.6 s: every module's exports used elsewhere, a dynamic import's names (#3734)
+  'test/url-pathname.test.js',          // 0.3 s: the tests' and research's paths, no file URL's pathname (#3732)
   'test/web-i18n.test.js',              // 1.3 s: web/js's labels translated
+  'test/web-markup-interpolations.test.js', // 0.2 s: web/js's markup templates, each value escaped (#3728)
 ];
 
 /** The tests of a change and the repository's checks (REPO_WIDE, those of the repository's files). */
