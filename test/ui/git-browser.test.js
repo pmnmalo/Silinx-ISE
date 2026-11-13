@@ -253,11 +253,11 @@ uiTest('#3534 the browser edition: Sign in with GitHub… on the Start page and 
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.project?.name === 'SignTree' && document.querySelectorAll('#hier .row .lbl').length >= 2, [], { what: 'SignTree open' });
-  // the Start page: after Open from Repository…, Initialize Repository… then Sign in with GitHub…
+  // the Start page's git group: Sign in with GitHub… first, Initialize Repository…, Open from Repository… last (#3716)
   await page.leftTab('start');
   await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Sign in with GitHub…'), [], { what: 'the Start page\'s sign-in' });
   let links = await startLinks(page);
-  assert.deepEqual(links.slice(links.indexOf('Open from Repository…'), links.indexOf('Open from Repository…') + 3), ['Open from Repository…', 'Initialize Repository…', 'Sign in with GitHub…'], links.join(' | '));
+  assert.deepEqual(links.slice(links.indexOf('Sign in with GitHub…'), links.indexOf('Sign in with GitHub…') + 3), ['Sign in with GitHub…', 'Initialize Repository…', 'Open from Repository…'], links.join(' | '));
   // its dialog, the File menu's; cancelled: still there
   await page.click('#start-page .entry a', { text: 'Sign in with GitHub…' });
   await page.waitDialog('Sign in with GitHub');

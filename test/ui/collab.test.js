@@ -177,10 +177,10 @@ uiTest('#3318 a follow link pasted into an open tab is followed; in the page tha
   assert.deepEqual(await consoleWarnings(page), ['WARNING: Follow a shared project: this page shares a project, which loading the link here would stop: open the link in another tab or window.']);
 });
 
-// (#3315) Share Project… in the Start page's Project Commands, below Share Project…, the ISE style's only: the
-// Silinx interface's in the Design tree's project and device menus (#3479); who is in, at the Silinx interface's top bar
-// before Search commands and files, at the ISE style toolbar's right end, which has no Split button any more (View ▸
-// Split Editor); moved when the interface changes; in Portuguese
+// (#3315, #3716) Share Project in the main toolbar, before Close Project (none on the Start page), both interfaces:
+// disabled with no project, its window with one; who is in, at the Silinx interface's top bar before Search commands
+// and files, at the ISE style toolbar's right end, which has no Split button any more (View ▸ Split Editor); moved when
+// the interface changes; in Portuguese
 const presencePlace = (page) => page.eval(() => {
   const box = document.querySelector('.collab-presence');
   const ui = document.documentElement.dataset.ui;
@@ -197,15 +197,23 @@ async function treeMenu(page, row, item) {
   else await page.closeMenus();
   return items;
 }
-uiTest('#3315 Share Project… in the Start page\'s Project Commands, in both interfaces (#3698); who is in, at the top bar\'s right end (Silinx) or the toolbar\'s (ISE style, no Split button)', E, async (page) => {
+const toolbarShare = (page) => page.eval(() => {
+  const cmds = [...document.querySelectorAll('#toolbar .tb-btn')].map((b) => b.dataset.cmd), b = document.querySelector('#toolbar .tb-btn[data-cmd=share]');
+  return b && { around: cmds.slice(cmds.indexOf('share') - 1, cmds.indexOf('share') + 2), title: b.title, disabled: b.disabled, shown: b.getClientRects().length > 0 };
+});
+uiTest('#3716 Share Project in the main toolbar, before Close Project, none on the Start page; who is in, at the top bar\'s right end (Silinx) or the toolbar\'s (ISE style, no Split button)', E, async (page) => {
+  // no project: disabled
+  await page.eval(() => window.SilinxApp.closeProject?.());
+  await page.waitFor(() => !window.Silinx.project && document.querySelector('#toolbar .tb-btn[data-cmd=share]')?.disabled, [], { what: 'Share Project disabled' });
+  assert.deepEqual(await toolbarShare(page), { around: ['open', 'share', 'closeProject'], title: 'Share Project', disabled: true, shown: true });
   await makeProject(env, { name: 'StartShared', top: 'top', files: { 'src/top.vhd': TOP } });
   await page.openProject('StartShared');
+  await page.waitFor(() => !document.querySelector('#toolbar .tb-btn[data-cmd=share]').disabled, [], { what: 'Share Project enabled' });
+  // (the Start page: none, the toolbar's and the File menu's)
   await page.leftTab('start');
-  const commands = () => page.eval(() => [...document.querySelectorAll('#start-page .entry a')].filter((a) => a.getClientRects().length).map((a) => a.textContent));
-  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project') && [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Share Project…'), [], { what: 'the Start page with the project' });
-  // (one Share Project…, a copy or live, as the File menu's: before Open from Repository… where there is git, #3323)
-  assert.equal((await commands()).filter((c) => c === 'Share Project…').length, 1, (await commands()).join(' | '));
-  await page.click('#start-page .entry a', { text: 'Share Project…' });
+  await page.waitFor(() => document.getElementById('start-page').hasAttribute('data-project'), [], { what: 'the Start page with the project' });
+  assert.ok(!(await page.eval(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => /^Share /.test(a.textContent)))));
+  await page.click('#toolbar .tb-btn[data-cmd=share]');
   await page.waitDialog('Share Project');
   await chooseLive(page);
   await page.fill('.dlg-overlay input[data-field=name]', 'Ana');
@@ -227,10 +235,9 @@ uiTest('#3315 Share Project… in the Start page\'s Project Commands, in both in
     assert.ok((await page.openMenu('View')).some((i) => i.label === 'Split Editor'));
     await page.closeMenus();
   }
-  // in Portuguese: the Start page's command
+  // in Portuguese: the button's tip
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  await page.leftTab('start');
-  await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Partilhar Projeto…'), [], { what: 'Partilhar Projeto…' });
+  await page.waitFor(() => document.querySelector('#toolbar .tb-btn[data-cmd=share]')?.title === 'Partilhar Projeto', [], { what: 'Partilhar Projeto' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await page.eval(async () => (await import('/js/collab-share.js')).stopSharing());
   await page.waitConsole(/^Stopped sharing "StartShared": its followers no longer see it\.$/m);
