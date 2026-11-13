@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 
 let env;
-before(async () => { env = await setupUi(); });
+before(async () => { env = await setupUi({ webrtc: true }); });   // (the pages' own addresses, #3567)
 after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
