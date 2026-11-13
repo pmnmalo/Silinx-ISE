@@ -15,6 +15,7 @@ import readline from 'node:readline';
 import { VERSION } from '../core/version.js';
 import { pathNamer, redactor, untrustedNote } from './mcp-util.js';
 import { checkArgs } from './mcp-args.js';
+import { checkDesignOnly } from './mcp-design-only.js';
 import { PROJECT_TOOLS } from './mcp-projects.js';
 import { HDL_TOOLS } from './mcp-hdl.js';
 import { WCFG_TOOLS } from './mcp-wcfg.js';
@@ -89,6 +90,8 @@ export async function handle(msg, state = {}, { signal } = {}) {
       // (the workspace and the exchange folder named as such, never their absolute paths, #3418)
       const name = await pathNamer();
       try {
+        // (a design and simulation project, #3780: the flow's and the HDL's tools refused, as the interface hides them)
+        await checkDesignOnly(tool.name, args);
         const r = await tool.run(args, { signal });
         r.text = name(r.text);
         r.data = name(r.data);

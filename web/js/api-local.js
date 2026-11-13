@@ -11,6 +11,7 @@
 // Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
 import { getDeviceDb, findPart, findBoard } from '../../core/devices.js';
+import { DESIGN_ONLY_MESSAGES, isDesignOnly } from '../../core/project-kind.js';
 import { resourcesOf, openOnlyDevice, experimentalDevice, vivadoDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
 import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../core/xise.js';
 import EXAMPLES from 'silinx-examples';
@@ -322,6 +323,8 @@ export const api = {
   openStatus: async name => browserOpenStatus((await projectJson(name)).device || {}),
   implement: async (name, { steps, synthUpToDate = false } = {}) => {
     const p = await store.load(name);
+    // (a design and simulation project, #3780: no flow, the server's message)
+    if (isDesignOnly(p.json)) return fakeJob('implement', [`ERROR: ${DESIGN_ONLY_MESSAGES.flow(name)}`], 'error', DESIGN_ONLY_MESSAGES.flow(name));
     // (the Artix-7's: the Silinx toolchain's 7-series back end, #3143)
     if (experimentalDevice(p.json.device) && !vivadoDevice(p.json.device)) return fakeJob('implement', [`ERROR: ${noFlowMessage(p.json.device)}`], 'error', noFlowMessage(p.json.device));
     if (p.json.synthTool === 'xst' && !openOnlyDevice(p.json.device)) return fakeJob('implement', NEED_ISE, 'error', 'XST needs Xilinx ISE 14.7 (choose Silinx as the synthesis tool in Design Properties)');

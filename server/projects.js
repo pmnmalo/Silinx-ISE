@@ -15,6 +15,7 @@ import { filePath, normalizePath } from '../core/import-gate.js';
 import { foldName, sameNameIn, spelledAs } from '../core/fold-name.js';
 import { fsFailure } from './fs-error.js';
 import { PROJECT_NAME_RE, projectNameError, sameProject } from '../core/project-name.js';
+import { DESIGN_KIND, asDesignProject } from '../core/project-kind.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
@@ -276,7 +277,10 @@ async function copyDir(src, dst, { skipRoot = null } = {}) {
 // fromOutside: an import's project, trusted: false from its first write, so an import that fails halfway leaves no
 // trusted project (#2956, core/trust.js)
 // madeBy 'mcp': a project the MCP server makes, untrusted too, its messages saying so (#2981)
-export async function createProject({ name, template = 'empty', device, board, fromOutside = false, madeBy = null }) {
+// kind 'design': a design and simulation project (#3780, core/project-kind.js): an empty one, no board, no constraints
+export async function createProject({ name, template = 'empty', device, board, kind = null, fromOutside = false, madeBy = null }) {
+  if (kind != null && kind !== DESIGN_KIND) throw new HttpError(400, `unknown project kind '${kind}'`);
+  if (kind && template && template !== 'empty') throw new HttpError(400, 'a design and simulation project starts empty: no example');
   const dir = projectDir(name);
   // (one in another case too: the same folder on a case-insensitive file system, #3538)
   const other = sameProject(await fs.readdir(workspaceDir()).catch(() => []), name);
@@ -311,14 +315,15 @@ export async function createProject({ name, template = 'empty', device, board, f
   }
   await fs.mkdir(path.join(dir, 'src'), { recursive: true });
   await fs.mkdir(path.join(dir, 'sim'), { recursive: true });
-  await fs.mkdir(path.join(dir, 'constraints'), { recursive: true });
-  return writeProject(name, {
+  if (!kind) await fs.mkdir(path.join(dir, 'constraints'), { recursive: true });
+  const json = {
     name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null,
     top: '', simTop: '', files: [], constraints: `constraints/top${constraintsExtOf(device)}`,
     stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
     ...(fromOutside ? { trusted: false } : {}),
     ...(madeBy === 'mcp' ? { trusted: false, madeBy } : {}),
-  });
+  };
+  return writeProject(name, kind ? asDesignProject({ ...json, device: DEFAULT_DEVICE }) : json);
 }
 
 /** Writes the board's values (its clock, CLK_HZ; its buttons' and switches' levels, BTN_LOW, SW_LOW) as the defaults of
