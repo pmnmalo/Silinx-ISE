@@ -229,7 +229,7 @@ export function exprColumn(ast, inputs) {
  *   'ascii'    a*b' + c   'vhdl' (a and not b) or c   'verilog' (a & ~b) | c
  * XOR is ⊕ (ascii ^, vhdl xor, verilog ^); the XNOR of two operands is xnor / ~^ in VHDL / Verilog.
  * A NAND / NOR gate (#694) is a complemented product / sum, /(a·b), (a + b)'; in VHDL a nand b, and
- * not (a and b and c) for more inputs, in Verilog ~(a & b); an inverter (one input) a nand a, ~(a & a).
+ * not (a and b and c) for more inputs, in Verilog ~(a & b); an inverter (one input) a nand a, ~(a & a), /(a·a).
  * parseExpr reads the / notations back as the same expression (the editor's expressions: tested),
  * 'textbook', 'compact' and 'ascii' as the same function.
  */
@@ -256,8 +256,8 @@ export function formatExpr(e, notation = 'textbook') {
       case 'var': return x.name;
       case 'nand': case 'nor': {
         const base = x.t === 'nand' ? 'and' : 'or';
-        if (!hdl) return f({ t: 'not', a: x.args.length === 1 ? x.args[0] : { t: base, args: x.args } }, parentOp);
-        const args = x.args.length === 1 ? [x.args[0], x.args[0]] : x.args;
+        const args = x.args.length === 1 ? [x.args[0], x.args[0]] : x.args;   // (one input: tied, /(a·a), not /a, #3785)
+        if (!hdl) return f({ t: 'not', a: { t: base, args } }, parentOp);
         if (N === 'verilog') return `~(${args.map(a => f(a, base)).join(sym[base])})`;
         const s = args.length === 2 ? args.map(a => f(a, x.t)).join(` ${x.t} `) : `not (${args.map(a => f(a, base)).join(sym[base])})`;
         return parentOp ? `(${s})` : s;

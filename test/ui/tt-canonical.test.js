@@ -79,7 +79,7 @@ uiTest('#2927 #2952 Truth Table: the canonical SOP and POS in full, in the notat
     ...[...document.querySelectorAll(`${t} .tt-groups input[type=radio]`)].map((r) => r.closest('label').textContent.trim()),
     document.querySelector(`${t} .tt-res.tt-nand`).title, document.querySelector(`${t} .tt-res.tt-nor`).title,
   ], T), ['SdP mínima', 'PdS mínimo', 'Grupos SdP (1s)', 'Grupos PdS (0s)',
-    'A SdP mínima só com portas NAND (dupla negação); um inversor é uma NAND de uma entrada', 'O PdS mínimo só com portas NOR (dupla negação); um inversor é uma NOR de uma entrada']);
+    'A SdP mínima só com portas NAND (dupla negação); um inversor é uma NAND com as entradas ligadas, /(a·a)', 'O PdS mínimo só com portas NOR (dupla negação); um inversor é uma NOR com as entradas ligadas, /(a + a)']);
   assert.doesNotMatch(await page.eval((t) => document.querySelector(t).innerText, T), /\b(SOP|POS)\b/, 'no SOP nor POS left');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // 8 inputs: 255 minterms of 8 literals, one maxterm; the expressions wrap, the panel does not scroll sideways

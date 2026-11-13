@@ -82,6 +82,6 @@ export function renderTtResults(ctx) {
     form('Minimal POS', 'pos', 'tt-pos'),
     canonForms(A, out, M.inputs.length, notation, tick),
     ...(xorForm ? [xorForm] : []),
-    gateForm('NAND form', A.nand, 'tt-nand', 'The minimal SOP with NAND gates only (double negation); an inverter is a NAND of one input'),
-    gateForm('NOR form', A.nor, 'tt-nor', 'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input'));
+    gateForm('NAND form', A.nand, 'tt-nand', 'The minimal SOP with NAND gates only (double negation); an inverter is a NAND with its inputs tied, /(a·a)'),
+    gateForm('NOR form', A.nor, 'tt-nor', 'The minimal POS with NOR gates only (double negation); an inverter is a NOR with its inputs tied, /(a + a)'));
 }

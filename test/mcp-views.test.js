@@ -88,8 +88,8 @@ Canonical SOP: f = Σm(1, 3, 6) + d(2, 5)   (3 term(s), 9 literal(s))
 Canonical POS: f = ΠM(0, 4, 7) · D(2, 5)   (3 term(s), 9 literal(s))
   f = (a + b + c)·(a' + b + c)·(a' + b' + c')
 XOR form: f = c ⊕ a·b
-NAND form: f = ((a'·c)'·(b·c')')'
-NOR form: f = ((b + c)' + (a' + c')')'
+NAND form: f = (((a·a)'·c)'·(b·(c·c)')')'
+NOR form: f = ((b + c)' + ((a + a)' + (c + c)')')'
 HDL logic: Least number of gates: f = c ⊕ a·b   (least gates: XOR form, 3 literal(s), 2 gate(s), delay 2)
 
 Least number of gates: Minimal SOP: z = 0

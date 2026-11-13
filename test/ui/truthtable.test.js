@@ -308,7 +308,7 @@ uiTest("Truth Table expressions (#180): '/' NOT and '.' AND typed in the Express
   assert.equal(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-cell[data-out=f]`)].map((c) => c.textContent).join(''), T), '00111100');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-sop .tt-expr`).textContent, T), "f = /a.b + a./b");
   // its NAND and NOR forms (#694)
-  assert.deepEqual(await page.eval((t) => [`${t} .tt-nand`, `${t} .tt-nor`].map((q) => document.querySelector(`${q} .tt-expr`).textContent), T), ['f = /(/(/a.b)./(a./b))', 'f = /(/(a + b) + /(/a + /b))']);
+  assert.deepEqual(await page.eval((t) => [`${t} .tt-nand`, `${t} .tt-nor`].map((q) => document.querySelector(`${q} .tt-expr`).textContent), T), ['f = /(/(/(a.a).b)./(a./(b.b)))', 'f = /(/(a + b) + /(/(a + a) + /(b + b)))']);
   // an invalid expression: where it stops
   await page.fill(`${T} .tt-expr-in`, 'a..b');
   await page.click(`${T} .tt-btn`, { text: 'Fill Table' });

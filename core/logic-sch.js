@@ -71,18 +71,20 @@ export function gateForm(res, inputs, g = res.form === 'pos' ? 'nor' : 'nand') {
 }
 
 // gate tree of an expression (the schematic of outputForm): the tree of outputTree, a complemented
-// input (NOT, or a one-input NAND / NOR) a leaf `neg`; XNOR, NAND, NOR of two or more inputs their gates
-function astTree(e, index) {
+// input (NOT, or a one-input NAND / NOR) a leaf `neg`; XNOR, NAND, NOR of two or more inputs their gates. own: a
+// one-input NAND / NOR of an input is a gate of its own, not the inverted rail (an INV), #3785
+function astTree(e, index, own = false) {
   const leaf = x => (x.t === 'var' ? { leaf: index.get(x.name), neg: false } : null);
   if (e.t === 'var') return leaf(e);
+  if (own && (e.t === 'nand' || e.t === 'nor') && e.args.length === 1 && e.args[0].t === 'var') return { op: `${e.t}1`, kids: [leaf(e.args[0])] };
   if ((e.t === 'not' || ((e.t === 'nand' || e.t === 'nor') && e.args.length === 1)) && (e.a || e.args[0]).t === 'var') return { leaf: index.get((e.a || e.args[0]).name), neg: true };
   if (e.t === 'not') {
     const op = { xor: 'xnor', and: 'nand', or: 'nor' }[e.a.t];
     if (!op) throw new Error(`schematic of a table: NOT of ${e.a.t}`);
     return { op, kids: e.a.args.map(k => astTree(k, index)) };
   }
-  if (e.t === 'nand' || e.t === 'nor') return e.args.length === 1 ? { op: `${e.t}1`, kids: [astTree(e.args[0], index)] } : { op: e.t, kids: e.args.map(k => astTree(k, index)) };
-  if (e.args) return { op: e.t, kids: e.args.map(k => astTree(k, index)) };
+  if (e.t === 'nand' || e.t === 'nor') return e.args.length === 1 ? { op: `${e.t}1`, kids: [astTree(e.args[0], index, own)] } : { op: e.t, kids: e.args.map(k => astTree(k, index, own)) };
+  if (e.args) return { op: e.t, kids: e.args.map(k => astTree(k, index, own)) };
   throw new Error(`schematic of a table: ${e.t}`);
 }
 
@@ -90,7 +92,7 @@ function astTree(e, index) {
  * Gate schematic (core/schdoc.js document) of a table: input markers on the left, one vertical
  * rail per used input literal (inverters at the top), the circuit of each output's expression in the
  * form, the one of its HDL module (outputForm, #694: minimal SOP: AND gates then an OR gate; POS: OR
- * then AND; the XOR form with XOR / XNOR gates; NAND or NOR gates only, the inverters too) and the
+ * then AND; the XOR form with XOR / XNOR gates; NAND or NOR gates only, the inverters too, #3785) and the
  * output markers on the right. A gate has at most 5 inputs (AND, OR), 4 (NAND, NOR, XOR, XNOR).
  * opts: { form: one of FORMS for every output (default: each output's own, #2951), lang, name }.
  */
@@ -109,8 +111,10 @@ export function schematicFromTable(docIn, { form, lang, name } = {}) {
   const trees = tt.outputs.map((o, i) => {
     const { ast } = forms[i];
     if (ast.t === 'const') return { o, t: { const: ast.v } };
-    // (f = /a in NAND or NOR gates only: an inverter gate, not the inverted rail)
-    let t = only && ast.args?.length === 1 && ast.args[0].t === 'var' ? { op: `${only}1`, kids: [{ leaf: index.get(ast.args[0].name), neg: false }] } : astTree(ast, index);
+    // (f = /a in NAND or NOR gates only: an inverter gate, not the inverted rail; an output in the NAND or NOR form among
+    // others: its inverters NANDs or NORs of its own, the rails' INVs the other outputs', #3785)
+    const own = !only && (forms[i].form === 'nand' || forms[i].form === 'nor');
+    let t = only && ast.args?.length === 1 && ast.args[0].t === 'var' ? { op: `${only}1`, kids: [{ leaf: index.get(ast.args[0].name), neg: false }] } : astTree(ast, index, own);
     t = splitFanIn(t, fanIn);
     if (t.leaf != null) t = { op: 'buf', kids: [t] };
     return { o, t };
