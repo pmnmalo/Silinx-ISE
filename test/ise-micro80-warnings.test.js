@@ -14,7 +14,7 @@ test('the Spartan-3E list: 41 warnings of XST, sorted, the top\'s unconnected po
     assert.ok(list.every(l => l.startsWith('WARNING:Xst:')));
     const ports = list.filter(l => l.startsWith('WARNING:Xst:753 '));
     assert.deepEqual(ports.map(l => /port '(\w+)'/.exec(l)[1]), ['fetch', 'halt', 'inta', 'inte', 'rd', 'vma']);
-    assert.ok(ports.every(l => l.includes(`"${dir}/micro80_top.vhd" line 61:`)));
+    assert.ok(ports.every(l => l.includes(`"${dir}/micro80_top.vhd" line 74:`)));
   }
 });
 

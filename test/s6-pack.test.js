@@ -274,18 +274,20 @@ test('a cell the packer has no place for: a PackError naming it', () => {
 const EXAMPLE_PACK = {
   gates: { slices: 1, X: 1, L: 0, M: 0, luts: 1, ffs: 0, warnings: 0 },
   traffic: { slices: 34, X: 14, L: 20, M: 0, luts: 96, ffs: 58, warnings: 0 },
-  blinky: { slices: 53, X: 24, L: 29, M: 0, luts: 102, ffs: 130, warnings: 0 },
+  blinky: { slices: 55, X: 24, L: 31, M: 0, luts: 102, ffs: 132, warnings: 0 },   // (#3710: 53, 29, 130 with 20-bit debouncers)
   pong: { slices: 111, X: 58, L: 53, M: 0, luts: 270, ffs: 207, warnings: 0 },
   stopwatch: { slices: 85, X: 43, L: 42, M: 0, luts: 181, ffs: 201, warnings: 0 },
   clock: { slices: 81, X: 35, L: 46, M: 0, luts: 152, ffs: 158, warnings: 0 },
   vga: { slices: 52, X: 22, L: 30, M: 0, luts: 129, ffs: 56, warnings: 0 },
   isqrt: { slices: 30, X: 17, L: 13, M: 0, luts: 74, ffs: 86, warnings: 0 },
   uart: { slices: 52, X: 33, L: 19, M: 0, luts: 140, ffs: 138, warnings: 0 },
-  micro80: { slices: 63, X: 43, L: 18, M: 2, luts: 172, ffs: 185, warnings: 0 },
+  micro80: { slices: 65, X: 45, L: 18, M: 2, luts: 180, ffs: 185, warnings: 0 },   // (#3710: 63, 43, 172 before its CLK_HZ)
 };
 // with LUT combining (combine: 'area'): the slices, never more than without, and the same warnings (isqrt: 29 when
 // the combining came before the storage elements, which then filled the slices it emptied again, #2636)
-const EXAMPLE_AREA = { gates: 1, traffic: 31, blinky: 52, pong: 102, stopwatch: 80, clock: 76, vga: 49, isqrt: 28, uart: 49, micro80: 61 };
+const EXAMPLE_AREA = { gates: 1, traffic: 31, blinky: 54, pong: 102, stopwatch: 80, clock: 76, vga: 49, isqrt: 28, uart: 49, micro80: 63 };
+// the SLICELs of night 1's netlists where an example changed since (blinky's 21-bit debouncers, #3710: 31 now)
+const NIGHT1_L = { blinky: 29 };
 // map's packing of the same netlists on ISE (packages/silinx-fpga/research/s6/measured/night1.json, night 1): its SLICELs are the packer's
 // (the carry chains and the wide multiplexers); its SLICEX are a placement's, more (packages/silinx-fpga/research/s6/README.md)
 test('the packer\'s SLICELs are those of ISE\'s map on the same netlists, every example on the Nexys3 and the Atlys (night 1)', () => {
@@ -294,7 +296,7 @@ test('the packer\'s SLICELs are those of ISE\'s map on the same netlists, every 
     for (const name of ISE_RECORDED) {
       const open = night1.boards[board].examples[name].open;
       assert.equal(open.routed, true, `${board} ${name}`);
-      assert.equal(open.sites.SLICEL || 0, EXAMPLE_PACK[name].L, `${board} ${name}`);
+      assert.equal(open.sites.SLICEL || 0, NIGHT1_L[name] ?? EXAMPLE_PACK[name].L, `${board} ${name}`);
       assert.equal(open.sites.SLICEM || 0, EXAMPLE_PACK[name].M, `${board} ${name}`);
       assert.ok(open.sites.SLICEX >= EXAMPLE_PACK[name].X, `${board} ${name}: map's SLICEX ${open.sites.SLICEX}, the packer's ${EXAMPLE_PACK[name].X}`);
     }

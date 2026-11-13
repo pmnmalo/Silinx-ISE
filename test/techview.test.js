@@ -211,7 +211,7 @@ async function technologyExample(name, { inst: instName, groups, lowerTop }) {
 
 test('the example blinky, synthesized by Yosys: a technology netlist by instance that compiles and is drawn', { timeout: 300000 }, async () => {
   // (blinky's BCD counter u_count drives the top's signal digits, and u_speed its step: their cells in them, #1003)
-  await technologyExample('blinky', { inst: 'u_pre', lowerTop: true, groups: g => assert.deepEqual(g, { u_pre: 67, u_speed: 212, u_knight: 52, u_count: 84, u_display: 61 }) });
+  await technologyExample('blinky', { inst: 'u_pre', lowerTop: true, groups: g => assert.deepEqual(g, { u_pre: 67, u_speed: 218, u_knight: 52, u_count: 84, u_display: 61 }) });
 });
 
 test('the example pong, synthesized by Yosys: a technology netlist by instance that compiles and is drawn', { timeout: 300000 }, async () => {

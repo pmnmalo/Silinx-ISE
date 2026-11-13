@@ -170,10 +170,10 @@ const BLINKY_CLOCK_BOARD = {
       id: 'speed',
       title: { en: 'Twice as fast', pt: 'Duas vezes mais rápido' },
       text: {
-        en: 'In src/top.vhd, the generic `DIV` divides the clock: 625 000 cycles make the base tick, 80 a second. Make the light run twice as fast: `DIV` 312 500 (`312_500`), 160 ticks a second. Save, and Check Syntax: no warnings.',
-        pt: 'Em src/top.vhd, o genérico `DIV` divide o relógio: 625 000 ciclos fazem o tique de base, 80 por segundo. Ponha a luz a andar duas vezes mais depressa: `DIV` 312 500 (`312_500`), 160 tiques por segundo. Guarde, e verifique a sintaxe: sem avisos.',
+        en: 'In src/top.vhd, the generic `DIV` divides the clock: its default, 0, takes CLK_HZ / 80 cycles for the base tick, 625 000 at the Basys2\'s 50 MHz, 80 ticks a second. Make the light run twice as fast: `DIV` 312 500 (`312_500`), 160 ticks a second. Save, and Check Syntax: no warnings.',
+        pt: 'Em src/top.vhd, o genérico `DIV` divide o relógio: o seu valor por omissão, 0, toma CLK_HZ / 80 ciclos para o tique de base, 625 000 aos 50 MHz da Basys2, 80 tiques por segundo. Ponha a luz a andar duas vezes mais depressa: `DIV` 312 500 (`312_500`), 160 tiques por segundo. Guarde, e verifique a sintaxe: sem avisos.',
       },
-      hint: { en: 'Twice as fast is half the cycles per tick: 625 000 / 2 = 312 500, the default value of DIV in the entity top.', pt: 'Duas vezes mais rápido é metade dos ciclos por tique: 625 000 / 2 = 312 500, o valor por omissão de DIV na entidade top.' },
+      hint: { en: 'Twice as fast is half the cycles per tick: 625 000 / 2 = 312 500, the default value of DIV (0 now) in the entity top.', pt: 'Duas vezes mais rápido é metade dos ciclos por tique: 625 000 / 2 = 312 500, o valor por omissão de DIV (agora 0) na entidade top.' },
       checks: [{ check: 'file', path: 'src/top.vhd', contains: ['/\\bDIV\\s*:\\s*integer\\s*:=\\s*312_?500\\b/i'] }, { check: 'syntax', warnings: [] }],
     },
     {

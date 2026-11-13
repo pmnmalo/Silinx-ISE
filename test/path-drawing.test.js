@@ -107,7 +107,8 @@ test('the open flow: the ASM chart\'s paths in VHDL and in Verilog, each on its 
   for (const m of [v, w]) {
     assert.equal(m.length, 20);
     assert.ok(m.every(p => p.items.length), JSON.stringify(m.filter(p => !p.items.length).map(p => p.names)));
-    assert.ok(m.findIndex(p => p.names.join() === 'level,ticks') < 10, JSON.stringify(m.map(p => p.names)));
+    // (among the 12 slowest: the debouncers' counters of 21 bits, for 100 MHz boards, #3710, a little slower)
+    assert.ok(m.findIndex(p => p.names.join() === 'level,ticks') < 12, JSON.stringify(m.map(p => p.names)));
     assert.ok(cmp(m).items.some(x => x.label === 'ticks >= (1 << level) - 1'));
   }
   assert.deepEqual(cmp(v).items, cmp(w).items);
