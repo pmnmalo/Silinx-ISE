@@ -33,6 +33,7 @@ import { clone } from '/core/util.js';
 import { printDiagram, svgSnapshot } from './print.js';
 import { mountPetriToolbar } from './petri-toolbar.js';
 import { petriReadOnlyChrome, lockPetriSide } from './petri-readonly.js';
+import { mountDockPanel } from './dock-panel.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const GRID = 20;
@@ -80,6 +81,8 @@ export function mountPetriEditor(container, opts = {}) {
   const bottom = h('div', { class: 'asm-codepanel pn-panel', hidden: true },
     h('div', { class: 'asm-codebar' }, panelTitle, panelTools, h('div', { class: 'asm-spacer' }), btn('✕', 'Close the panel', () => togglePanel(null))), panelBody);
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap, bottom);
+  // (resized and moved, below or on the right: dock-panel.js, #3797)
+  const dock = mountDockPanel({ main: mainCol, panel: bottom, bar: bottom.querySelector('.asm-codebar'), btn, kind: 'petri', changed: () => { if (!destroyed) applyView(); } });
   const selSection = h('section', { class: 'asm-section pn-selection' });
   const netBody = h('div', { class: 'pn-net-body' });
   // (the net's fields: a section always open, as the selection's; the panel folds as a whole, #2735)
@@ -318,6 +321,6 @@ export function mountPetriEditor(container, opts = {}) {
     showPanel: (p) => { if (panel !== p) togglePanel(p); }, get panel() { return panel; },   // ('sim': a link's view=try, #2869)
     // (a problem's item, from the console)
     select(ref) { if (!nodeOf(ref.id) && !M.arcs.some(a => a.id === ref.id)) return; sel = { kind: ref.kind, id: ref.id }; render(); },
-    destroy() { destroyed = true; ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
+    destroy() { destroyed = true; dock.destroy(); ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
   };
 }

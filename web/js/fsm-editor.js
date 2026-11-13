@@ -40,6 +40,7 @@ import { mountFsmHistory } from './fsm-history.js';
 import { clone } from '/core/util.js';
 import { statusLine } from './status-line.js';
 import { designKind } from './project-kind-flag.js';
+import { mountDockPanel } from './dock-panel.js';
 export { clone };   // (core/util.js's)
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -158,6 +159,8 @@ export function mountFsmEditor(container, opts = {}) {
     h('div', { class: 'asm-codebar' }, panelTitle, panelTools, h('div', { class: 'asm-spacer' }), btn('✕', 'Close the panel', () => togglePanel(null))),
     panelBody);
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap, bottom);
+  // (resized and moved, below or on the right, the drawing fitted again: dock-panel.js, #3797)
+  const dock = mountDockPanel({ main: mainCol, panel: bottom, bar: bottom.querySelector('.asm-codebar'), btn, kind: 'fsm', size: 0.44, changed: () => { if (!destroyed && panel) fit(); } });
 
   // side panel
   const selSection = h('section', { class: 'asm-section fsm-selection' });
@@ -353,6 +356,7 @@ export function mountFsmEditor(container, opts = {}) {
     destroy() {
       destroyed = true;
       stopRun();
+      dock.destroy();
       Object.values(timers).forEach(clearTimeout);
       ro?.disconnect();
       root.remove();
