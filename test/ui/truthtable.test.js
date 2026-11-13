@@ -163,9 +163,9 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .se-banner').textContent), /^Read-only, generated from maj3\.bool\.json$/);   // (at the end of its toolbar, #1193)
   let sch = await ttSchematic(page, 'src/maj3.bool.json');
   assert.deepEqual(netlist(sch).diagnostics, []);
-  // (the table's, as core/logic.js draws it: AND, OR and NOT gates)
+  // (the table's, as core/logic.js draws it: AND and OR gates, /a.b./c + a./b./c's complements their inverted inputs, #3786)
   assert.deepEqual(sch.symbols.map((x) => x.type), schematicFromTable(await ttFile('TtPj', 'src/maj3.bool.json')).symbols.map((x) => x.type));
-  assert.ok(symTypes(sch).every((x) => /^(and\d|or\d|inv)$/.test(x)), symTypes(sch));
+  assert.deepEqual(sch.symbols.map((x) => x.type).sort(), ['and3b2', 'and3b2', 'or2']);
   const careSim = (st) => assert.ok([...'0X10100X'].every((c, i) => c === 'X' || c === st[i]), st);
   careSim(simTable(generateHdl(sch).code, 'maj3.vhd', 'maj3').f);
   assert.ok(!(await page.eval(() => window.Silinx.fileTree)).some((f) => /\.sch\.json$/.test(f)), 'no schematic file');

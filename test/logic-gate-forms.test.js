@@ -110,14 +110,14 @@ test('#3785 the schematic of the NAND and NOR forms: NAND (NOR) gates only, no I
 
 test('#3785 an output in the NAND (NOR) form among outputs in other forms: its inverters NANDs (NORs) of its own, the others\' INVs', () => {
   for (const lang of ['vhdl', 'verilog']) {
-    // f = /a + b in the NAND form, g = /a·/c in its minimal SOP (INVs on the rails of a and c), h = /b in the NOR form
+    // f = /a + b in the NAND form, g = /a·/c in its minimal SOP, h = /b in the NOR form
     const doc = { ...newTable(`mix_${lang}`, ['a', 'b', 'c'], ['f', 'g', 'h']), table: { f: '11110011', g: '10100000', h: '11001100' }, form: 'sop', forms: { f: 'nand', h: 'nor' } };
     const sch = schematicFromTable(doc, { lang });
     simulatesTo(sch, doc, lang, `mixed ${lang}`);
     // the gates driving f and h: NANDs and NORs only (their inverted inputs not taken from the INV rails)
     const types = sch.symbols.map(s => s.type).sort();
     assert.ok(types.includes('nand2') && types.includes('nor2'), types.join(' '));
-    // f: /(a./(b.b)), /b a NAND of its own: two NAND2 (one of them tied); h = /(b + b): one NOR2 tied; g's INVs only
-    assert.deepEqual(types.filter(t => /^n(and|or)|^inv/.test(t)), ['inv', 'inv', 'nand2', 'nand2', 'nor2']);
+    // f: /(a./(b.b)), /b a NAND of its own: two NAND2 (one of them tied); h = /(b + b): one NOR2 tied; g an AND2B2 (#3786)
+    assert.deepEqual(types, ['and2b2', 'nand2', 'nand2', 'nor2']);
   }
 });
