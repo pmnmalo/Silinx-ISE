@@ -525,8 +525,9 @@ export const BOARDS = [
     resources: [
       { name: 'clk', label: '12 MHz oscillator', pins: ['P129'], dir: 'in', iostandard: 'LVCMOS33', group: 'Clock', extra: { period: '83.333 ns' } },
       { name: 'led', label: 'LEDs LED0..LED7', pins: ['P46', 'P47', 'P48', 'P49', 'P50', 'P51', 'P54', 'P55'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: 'LEDs', extra: { activeHigh: true } },
-      { name: 'dip', label: 'DIP switches DPSwitch0..7', pins: ['P70', 'P69', 'P68', 'P64', 'P63', 'P60', 'P59', 'P58'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Switches' },
-      { name: 'btn', label: 'Push buttons Switch0..5', pins: ['P80', 'P79', 'P78', 'P77', 'P76', 'P75'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Buttons' },
+      // (pull-ups: ON / pressed reads 0, Numato's demo, "DPSwitch = x"FF"" all off; #3710)
+      { name: 'dip', label: 'DIP switches DPSwitch0..7 (active low: ON reads 0)', pins: ['P70', 'P69', 'P68', 'P64', 'P63', 'P60', 'P59', 'P58'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Switches', extra: { activeLow: true } },
+      { name: 'btn', label: 'Push buttons Switch0..5 (active low)', pins: ['P80', 'P79', 'P78', 'P77', 'P76', 'P75'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Buttons', extra: { activeLow: true } },
       { name: 'seg', label: '7-segment segments SevenSegment[0..7] (Numato UCF order)', pins: ['P114', 'P110', 'P111', 'P112', 'P113', 'P115', 'P116', 'P117'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: '7-segment' },
       { name: 'seg_en', label: '7-segment digit enables Enable[0..2]', pins: ['P120', 'P121', 'P124'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: '7-segment' },
       { name: 'vga_red', label: 'VGA red Red[0..2]', pins: ['P103', 'P104', 'P105'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: 'VGA' },

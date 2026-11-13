@@ -12,7 +12,10 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity vga is
-    Port ( clk       : in  STD_LOGIC;                      -- 50 MHz
+    Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
+              BTN_LOW : boolean := false;          -- true: the board's buttons read '0' when pressed
+              SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
+    Port ( clk       : in  STD_LOGIC;
            sw        : in  STD_LOGIC_VECTOR (0 downto 0);
            btn       : in  STD_LOGIC_VECTOR (3 downto 0);
            vga_red   : out STD_LOGIC_VECTOR (2 downto 0);
@@ -23,6 +26,11 @@ entity vga is
 end vga;
 
 architecture Behavioral of vga is
+    -- clock cycles per pixel, for 25 MHz: 2 at 50 MHz, 4 at 100 MHz (at least 1)
+    function pace_of (hz : integer) return integer is
+    begin
+        if hz < 37_500_000 then return 1; else return (hz + 12_500_000) / 25_000_000; end if;
+    end function;
     constant SIZE : integer := 32;
     signal pixel, active, frame, hsync, vsync : STD_LOGIC;
     signal x : integer range 0 to 799;
@@ -35,8 +43,15 @@ architecture Behavioral of vga is
     -- the colour of the pixel: red (3 bits), green (3), blue (2)
     signal rgb : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
     signal hs, vs : STD_LOGIC := '1';
+    -- the buttons and switches as '1' when pressed or on, whatever the board's level
+    signal btnOn : STD_LOGIC_VECTOR (3 downto 0);
+    signal swOn  : STD_LOGIC_VECTOR (0 downto 0);
 begin
+    btnOn <= not btn when BTN_LOW else btn;
+    swOn  <= not sw when SW_LOW else sw;
+
     timing: entity work.vga_sync
+        generic map (DIV => pace_of(CLK_HZ))
         port map (clk => clk, pixel => pixel, x => x, y => y, active => active, frame => frame, hsync => hsync, vsync => vsync);
 
     -- the square: moved once a frame, after the picture, while a button is held
@@ -44,9 +59,9 @@ begin
         variable step : integer range 1 to 4;
     begin
         if rising_edge(clk) then
-            sync1 <= btn;
+            sync1 <= btnOn;
             buttons <= sync1;
-            if sw(0) = '1' then step := 4; else step := 1; end if;
+            if swOn(0) = '1' then step := 4; else step := 1; end if;
             if pixel = '1' and frame = '1' then
                 if buttons(3) = '1' then
                     if sx >= step then sx <= sx - step; else sx <= 0; end if;

@@ -15,10 +15,13 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity stopwatch is
-    Generic ( CS      : integer := 500_000;      -- clock cycles per hundredth of a second
-              STABLE  : integer := 1_000_000;    -- button debounce (20 ms)
-              REFRESH : integer := 50_000 );     -- display: cycles per digit (1 ms)
-    Port ( clk : in  STD_LOGIC;                  -- 50 MHz
+    Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
+              CS      : integer := CLK_HZ / 100;   -- clock cycles per hundredth of a second
+              STABLE  : integer := CLK_HZ / 50;    -- button debounce (20 ms)
+              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              BTN_LOW : boolean := false;          -- true: the board's buttons read '0' when pressed
+              SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
+    Port ( clk : in  STD_LOGIC;                  -- the board's clock (CLK_HZ)
            sw  : in  STD_LOGIC_VECTOR (0 downto 0);
            btn : in  STD_LOGIC_VECTOR (3 downto 0);
            led : out STD_LOGIC_VECTOR (7 downto 0);
@@ -43,16 +46,22 @@ architecture Behavioral of stopwatch is
     signal shown     : UNSIGNED (13 downto 0);
     signal digits    : STD_LOGIC_VECTOR (15 downto 0);
     signal shownDigits : STD_LOGIC_VECTOR (15 downto 0);
+    -- the buttons and switches as '1' when pressed or on, whatever the board's level
+    signal btnOn : STD_LOGIC_VECTOR (3 downto 0);
+    signal swOn  : STD_LOGIC_VECTOR (0 downto 0);
 begin
-    db0: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btn(0), press => startStop);
-    db1: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btn(1), press => lap);
-    db2: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btn(2), press => clear);
-    db3: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btn(3), press => recall);
+    btnOn <= not btn when BTN_LOW else btn;
+    swOn  <= not sw when SW_LOW else sw;
+
+    db0: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(0), press => startStop);
+    db1: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(1), press => lap);
+    db2: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(2), press => clear);
+    db3: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(3), press => recall);
 
     process (clk)
     begin
         if rising_edge(clk) then
-            if sw(0) = '1' then
+            if swOn(0) = '1' then
                 running <= false; recalling <= false; tick <= 0; elapsed <= (others => '0'); laps <= (others => '0');
             else
                 -- the time
@@ -88,7 +97,7 @@ begin
     process (clk)
     begin
         if rising_edge(clk) then
-            if lap = '1' and running and laps < 1023 and sw(0) = '0' then
+            if lap = '1' and running and laps < 1023 and swOn(0) = '0' then
                 laps_ram(to_integer(laps)) <= elapsed;
             end if;
             lapTime <= laps_ram(to_integer(index));

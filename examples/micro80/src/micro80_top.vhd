@@ -17,9 +17,11 @@ use IEEE.NUMERIC_STD.ALL;
 use work.program_pkg.ALL;
 
 entity micro80_top is
-    Generic ( TICK    : integer := 6_250_000;     -- cycles per tick (1/8 s at 50 MHz)
-              REFRESH : integer := 50_000 );      -- display: cycles per digit (1 ms)
-    Port ( clk : in  STD_LOGIC;                   -- 50 MHz
+    Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
+              TICK    : integer := CLK_HZ / 8;     -- cycles per tick (1/8 s)
+              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
+    Port ( clk : in  STD_LOGIC;                   -- the board's clock (CLK_HZ)
            sw  : in  STD_LOGIC_VECTOR (7 downto 0);
            led : out STD_LOGIC_VECTOR (7 downto 0);
            seg : out STD_LOGIC_VECTOR (6 downto 0);
@@ -48,7 +50,11 @@ architecture Behavioral of micro80_top is
     signal leds     : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
     signal count    : integer range 0 to TICK - 1 := 0;
     signal flag     : STD_LOGIC := '0';
+    -- the switches as '1' when on, whatever the board's level
+    signal swOn  : STD_LOGIC_VECTOR (7 downto 0);
 begin
+    swOn  <= not sw when SW_LOW else sw;
+
     rst <= '1' when boot /= "1111" else '0';
 
     process (clk)
@@ -78,7 +84,7 @@ begin
     process (clk)
     begin
         if rising_edge(clk) then
-            sw_meta <= sw;                            -- the switches synchronised to the clock
+            sw_meta <= swOn;                            -- the switches synchronised to the clock
             sw_sync <= sw_meta;
             io_last <= io;
             if addr(0) = '0' then io_data <= sw_sync; else io_data <= "0000000" & flag; end if;

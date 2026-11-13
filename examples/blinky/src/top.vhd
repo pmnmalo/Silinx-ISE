@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------------
 -- Silinx example: blinky for the Digilent Basys2 (Spartan-3E XC3S250E-CP132).
 -- Mixed-language design: VHDL top, pattern generator and BCD counter + Verilog prescaler and display.
---   clk  : 50 MHz MCLK oscillator (B8, default JP4 setting)
+--   clk  : the board's oscillator (CLK_HZ: on the Basys2 its 50 MHz MCLK, B8, JP4's default setting)
 --   sw   : sw(0) = reset, sw(1) = mode (0 = knight rider, 1 = binary counter),
 --          sw(2) = pause, sw(3) = invert the LEDs
 --   btn  : btn(1) = faster, btn(0) = slower (8 speeds, from 80 to 0.6 steps per second;
@@ -16,9 +16,12 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity top is
-    Generic ( DIV      : integer := 625_000;     -- base tick: 80 per second at 50 MHz
-              DEBOUNCE : integer := 1_000_000;   -- button debounce: 20 ms at 50 MHz
-              REFRESH  : integer := 50_000 );    -- display: cycles per digit (1 ms at 50 MHz)
+    Generic ( CLK_HZ  : integer := 50_000_000;      -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
+              DIV      : integer := CLK_HZ / 80;    -- base tick: 80 per second
+              DEBOUNCE : integer := CLK_HZ / 50;    -- button debounce: 20 ms
+              REFRESH  : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              BTN_LOW : boolean := false;           -- true: the board's buttons read '0' when pressed
+              SW_LOW  : boolean := false );         -- true: the board's switches read '0' when on
     -- speed after reset: level 5 of speed_ctrl = 80 / 2**5 = 2.5 steps per second
     Port ( clk : in  STD_LOGIC;
            sw  : in  STD_LOGIC_VECTOR (3 downto 0);
@@ -42,26 +45,32 @@ architecture Structural of top is
     signal tick, speed_step, step : std_logic;
     signal leds       : std_logic_vector(7 downto 0);
     signal digits     : std_logic_vector(15 downto 0);
+    -- the buttons and switches as '1' when pressed or on, whatever the board's level
+    signal btnOn : STD_LOGIC_VECTOR (1 downto 0);
+    signal swOn  : STD_LOGIC_VECTOR (3 downto 0);
 begin
+    btnOn <= not btn when BTN_LOW else btn;
+    swOn  <= not sw when SW_LOW else sw;
+
     u_pre : prescaler
         generic map ( DIV => DIV )
-        port map ( clk => clk, rst => sw(0), tick => tick );
+        port map ( clk => clk, rst => swOn(0), tick => tick );
 
     u_speed : entity work.speed_ctrl
         generic map ( DEBOUNCE => DEBOUNCE )
-        port map ( clk => clk, rst => sw(0), faster => btn(1), slower => btn(0),
+        port map ( clk => clk, rst => swOn(0), faster => btnOn(1), slower => btnOn(0),
                    tick => tick, step => speed_step );
 
     u_knight : entity work.knight
-        port map ( clk => clk, rst => sw(0), step => step, mode => sw(1), leds => leds );
+        port map ( clk => clk, rst => swOn(0), step => step, mode => swOn(1), leds => leds );
 
     u_count : entity work.bcd_counter
-        port map ( clk => clk, rst => sw(0), inc => step, digits => digits );
+        port map ( clk => clk, rst => swOn(0), inc => step, digits => digits );
 
     u_display : sevenseg
         generic map ( REFRESH => REFRESH )
         port map ( clk => clk, digits => digits, points => "0000", seg => seg, dp => dp, an => an );
 
-    step <= speed_step and not sw(2);                -- sw(2): pause
-    led  <= leds xor (7 downto 0 => sw(3));          -- sw(3): invert
+    step <= speed_step and not swOn(2);                -- swOn(2): pause
+    led  <= leds xor (7 downto 0 => swOn(3));          -- swOn(3): invert
 end Structural;

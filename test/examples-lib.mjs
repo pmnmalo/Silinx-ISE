@@ -11,6 +11,7 @@ import { constraintsExtOf } from '../packages/silinx-fpga/src/family.js';
 import { resolveBoard } from '../server/devices.js';
 import { EXAMPLE_ORDER } from '../core/examples.js';
 import { isCSource, viewHdl } from '../core/view-hdl.js';
+import { topForBoard } from '../core/board-generics.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt, uart, micro80
@@ -115,6 +116,11 @@ export function exampleProject(name, target, into) {
   fs.cpSync(ex.dir, dir, { recursive: true, filter: f => !/[\\/]build$/.test(f) });
   const { text, device } = exampleUcf(name, target);
   const project = { ...ex.project, device, board: target.board, boardVariant: target.variant };
+  // (another board than the example's: its clock and its inputs' levels as the top's generics, as New Project does, #3710)
+  if (target.board !== ex.project.board) {
+    const top = topForBoard(ex.design, ex.project.top, resolveBoard(target.board, { variant: target.variant }));
+    if (top) fs.writeFileSync(path.join(dir, top.path), top.text);
+  }
   // (the iCE40's constraints are a PCF, #2517; the ECP5's an LPF, #2302; the 7-series' an XDC, #3142: the example's UCF not kept)
   const ext = constraintsExtOf(device);
   if (!project.constraints.endsWith(ext)) {

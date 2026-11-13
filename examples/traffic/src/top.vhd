@@ -3,7 +3,7 @@
 -- The cars have green until a pedestrian presses the button; then (after at least 5 s of green)
 -- yellow, all red, the pedestrians' green with the seconds left to cross on the display, their
 -- green blinking at the end, all red again, and the cars' green.
---   clk : 50 MHz oscillator
+--   clk : the board's oscillator (CLK_HZ: 50 MHz on the Basys2 / Nexys2)
 --   BTN0 (btn(0)) : "press to cross": remembered until the pedestrians get their green
 --   SW0  (sw(0))  : reset
 --   SW1  (sw(1))  : night mode: the cars' yellow flashes, the pedestrian lamps are off
@@ -25,8 +25,11 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity top is
-    Generic ( TICK    : integer := 50_000_000;      -- clock cycles per second
-              REFRESH : integer := 50_000 );        -- display: cycles per digit (1 ms)
+    Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
+              TICK    : integer := CLK_HZ;         -- clock cycles per second
+              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              BTN_LOW : boolean := false;          -- true: the board's buttons read '0' when pressed
+              SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
     Port ( clk : in  STD_LOGIC;
            sw  : in  STD_LOGIC_VECTOR (1 downto 0);
            btn : in  STD_LOGIC_VECTOR (0 downto 0);
@@ -56,14 +59,20 @@ architecture Structural of top is
     signal left                : STD_LOGIC_VECTOR (3 downto 0);
     signal digits              : STD_LOGIC_VECTOR (15 downto 0);
     signal car_r, car_y, car_g, walk_r, walk_g : STD_LOGIC;
+    -- the buttons and switches as '1' when pressed or on, whatever the board's level
+    signal btnOn : STD_LOGIC_VECTOR (0 downto 0);
+    signal swOn  : STD_LOGIC_VECTOR (1 downto 0);
 begin
-    rst <= sw(0);
+    btnOn <= not btn when BTN_LOW else btn;
+    swOn  <= not sw when SW_LOW else sw;
+
+    rst <= swOn(0);
 
     process (clk)
     begin
         if rising_edge(clk) then
-            btn_meta <= btn(0);  btn_sync <= btn_meta;
-            sw_meta  <= sw(1);   night    <= sw_meta;
+            btn_meta <= btnOn(0);  btn_sync <= btn_meta;
+            sw_meta  <= swOn(1);   night    <= sw_meta;
             -- the request: set by the button, kept until the pedestrians' green
             if rst = '1' or phase = WALK then
                 req <= '0';

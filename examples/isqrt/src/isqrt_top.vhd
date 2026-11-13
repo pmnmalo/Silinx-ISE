@@ -13,8 +13,10 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity isqrt_top is
-    Generic ( REFRESH : integer := 50_000 );      -- display: cycles per digit (1 ms)
-    Port ( clk : in  STD_LOGIC;                   -- 50 MHz
+    Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
+              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
+    Port ( clk : in  STD_LOGIC;                   -- the board's clock (CLK_HZ)
            sw  : in  STD_LOGIC_VECTOR (7 downto 0);
            led : out STD_LOGIC_VECTOR (1 downto 0);
            seg : out STD_LOGIC_VECTOR (6 downto 0);
@@ -47,12 +49,16 @@ architecture Behavioral of isqrt_top is
         else return "0000" & STD_LOGIC_VECTOR(resize(x, 4));
         end if;
     end function;
+    -- the switches as '1' when on, whatever the board's level
+    signal swOn  : STD_LOGIC_VECTOR (7 downto 0);
 begin
+    swOn  <= not sw when SW_LOW else sw;
+
     process (clk)
     begin
         if rising_edge(clk) then
             if boot /= "11" then boot <= boot + 1; end if;
-            sw_meta <= sw;                            -- the switches synchronised to the clock
+            sw_meta <= swOn;                            -- the switches synchronised to the clock
             n       <= sw_meta;
             if rem_vld = '1' then remainder <= unsigned(rem_now); end if;
             if done = '1' then root <= unsigned(root_now); end if;

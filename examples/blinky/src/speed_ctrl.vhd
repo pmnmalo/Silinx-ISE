@@ -39,9 +39,9 @@
 -- current state/path at the clock edge and hold it otherwise.
 --
 -- Registers (internal; load the value assigned in this cycle at the clock edge, hold otherwise):
---   cnt_f : 20 bits, reset 0
+--   cnt_f : 21 bits, reset 0
 --   deb_f : 1 bit, reset 0
---   cnt_s : 20 bits, reset 0
+--   cnt_s : 21 bits, reset 0
 --   deb_s : 1 bit, reset 0
 --   level : 3 bits, reset 5
 --   ticks : 7 bits, reset 0
@@ -82,9 +82,9 @@ architecture rtl of speed_ctrl is
     signal step_reg, step_next : std_logic := '0';
 
     -- internal registers
-    signal cnt_f, cnt_f_next : std_logic_vector(19 downto 0) := "00000000000000000000";
+    signal cnt_f, cnt_f_next : std_logic_vector(20 downto 0) := "000000000000000000000";
     signal deb_f, deb_f_next : std_logic := '0';
-    signal cnt_s, cnt_s_next : std_logic_vector(19 downto 0) := "00000000000000000000";
+    signal cnt_s, cnt_s_next : std_logic_vector(20 downto 0) := "000000000000000000000";
     signal deb_s, deb_s_next : std_logic := '0';
     signal level, level_next : std_logic_vector(2 downto 0) := "101";
     signal ticks, ticks_next : std_logic_vector(6 downto 0) := "0000000";
@@ -102,9 +102,9 @@ begin
             if rst = '1' then
                 state_reg <= S_IDLE;
                 step_reg <= '0';
-                cnt_f <= "00000000000000000000";
+                cnt_f <= "000000000000000000000";
                 deb_f <= '0';
-                cnt_s <= "00000000000000000000";
+                cnt_s <= "000000000000000000000";
                 deb_s <= '0';
                 level <= "101";
                 ticks <= "0000000";
@@ -167,24 +167,24 @@ begin
         -- every cycle: debounce_faster
         if faster_sync /= deb_f then
             if unsigned(cnt_f) = (DEBOUNCE - 1) then
-                cnt_f_next <= "00000000000000000000";
+                cnt_f_next <= "000000000000000000000";
                 deb_f_next <= faster_sync;
             else
                 cnt_f_next <= std_logic_vector(unsigned(cnt_f) + 1);
             end if;
         else
-            cnt_f_next <= "00000000000000000000";
+            cnt_f_next <= "000000000000000000000";
         end if;
         -- every cycle: debounce_slower
         if slower_sync /= deb_s then
             if unsigned(cnt_s) = (DEBOUNCE - 1) then
-                cnt_s_next <= "00000000000000000000";
+                cnt_s_next <= "000000000000000000000";
                 deb_s_next <= slower_sync;
             else
                 cnt_s_next <= std_logic_vector(unsigned(cnt_s) + 1);
             end if;
         else
-            cnt_s_next <= "00000000000000000000";
+            cnt_s_next <= "000000000000000000000";
         end if;
         -- every cycle: divider
         step_next <= '0';

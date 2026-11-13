@@ -11,6 +11,8 @@
 
 import { DEV_SITE } from './prefs.js';
 import { constraintsExtOf } from '../../packages/silinx-fpga/src/parts.js';
+import { topForBoard } from '../../core/board-generics.js';
+import { resolveBoard } from '../../core/devices.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
 import { PROJECT_NAME_RE, projectNameError, sameProject } from '../../core/project-name.js';
 import { filePath, gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
@@ -430,7 +432,7 @@ export function projectOps(getStore, examples = {}) {
       if (other || await S().exists(name)) fail(`project '${other ?? name}' already exists`);
       if (template && template !== 'empty') {
         const ex = examples[template] || fail(`unknown template '${template}'`);
-        const json = { ...clone(ex.json), name };
+        const json = { ...clone(ex.json), name }, fromBoard = json.board;
         if (device) json.device = device;
         if (board !== undefined) json.board = board;
         json.files ||= [];
@@ -440,6 +442,13 @@ export function projectOps(getStore, examples = {}) {
         if (json.constraints && !json.constraints.toLowerCase().endsWith(ext)) {
           delete files[json.constraints];
           json.constraints = json.constraints.replace(/\.[^./]*$/, '') + ext;
+        }
+        // another board than the example's: its clock and its buttons' and switches' levels as the top's generics,
+        // as the server does (core/board-generics.js, #3710)
+        if (json.board && json.board !== fromBoard) {
+          const design = json.files.filter(f => f.role !== 'sim' && /^(vhdl|verilog)$/.test(f.lang) && typeof files[f.path] === 'string');
+          const top = topForBoard(design.map(f => ({ path: f.path, lang: f.lang, text: files[f.path] })), json.top, resolveBoard(json.board, { part: json.device?.part }));
+          if (top) files[top.path] = top.text;
         }
         await S().create(name, json, files);
         return clone(json);

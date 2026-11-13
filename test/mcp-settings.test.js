@@ -127,3 +127,22 @@ test('set_process_properties: the Optimization, the start-up clock; no place and
   await fails('set_process_properties', { project: 'p1', startup_clock: 'JtagClk' }, 'startup_clock: one of jtag, cclk, user');
   await fails('set_process_properties', { project: 'p1', pr_engine: 'silinx' }, 'unknown pr_engine');
 });
+
+// (#3710) a board change: the top's generics CLK_HZ, BTN_LOW and SW_LOW the new board's (the clock example: on the
+// Mimas V2, 100 MHz and its active-low inputs), said in the text and in the data, as the dialog does; back to the
+// Basys2, its values again; a board with the same values (Nexys2: 50 MHz, active high), nothing written or said
+test('#3710 set_design_properties: another board, its clock and inputs\' levels as the top\'s generics', async () => {
+  await ok('new_project_from_example', { name: 'clk3710', example: 'clock' });
+  const file = () => fs.readFileSync(path.join(P.projectDir('clk3710'), 'src/digital_clock.v'), 'utf8');
+  const params = () => file().split('\n').filter(l => /parameter (CLK_HZ|BTN_LOW|SW_LOW) /.test(l)).map(l => l.trim().replace(/\s*\/\/.*$/, ''));
+  const r = await ok('set_design_properties', { project: 'clk3710', board: 'mimas-v2', update_constraints: true });
+  assert.ok(r.text.split('\n').includes('src/digital_clock.v: CLK_HZ = 100000000, BTN_LOW = 1, SW_LOW = 1, the Numato Mimas V2\'s clock and inputs (the defaults of its generics).'), r.text);
+  assert.deepEqual(r.data.generics, { file: 'src/digital_clock.v', CLK_HZ: 100_000_000, BTN_LOW: true, SW_LOW: true });
+  assert.deepEqual(params(), ['parameter CLK_HZ  = 100000000,', 'parameter BTN_LOW = 1,', 'parameter SW_LOW  = 1']);
+  const back = await ok('set_design_properties', { project: 'clk3710', board: 'basys2' });
+  assert.deepEqual(back.data.generics, { file: 'src/digital_clock.v', CLK_HZ: 50_000_000, BTN_LOW: false, SW_LOW: false });
+  assert.equal(file(), fs.readFileSync(path.join(P.EXAMPLES_DIR, 'clock', 'src/digital_clock.v'), 'utf8'));
+  const same = await ok('set_design_properties', { project: 'clk3710', board: 'nexys2' });
+  assert.equal(same.data.generics, null);
+  assert.ok(!/the defaults of its generics/.test(same.text), same.text);
+});
