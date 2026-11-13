@@ -99,10 +99,10 @@ test('stopwatch: its lap memory is a block RAM, its divisions by 10, 100 and 100
   assert.deepEqual([r.util.blockRam, r.util.multipliers, r.util.distributedRam], [1, 3, 0]);
 });
 
-test('blinky: (1 << level) - 1 of a 3-bit level is a table, not a 32-bit subtracter (the longest carry chain is a 20-bit counter)', { timeout: 120000 }, async () => {
+test('blinky: (1 << level) - 1 of a 3-bit level is a table, not a 32-bit subtracter (the longest carry chain is a 21-bit counter)', { timeout: 120000 }, async () => {
   const r = await synth(example('blinky'));
   assert.match(r.files['top_syn.v'], /function automatic \[31:0\] tab\d+\(input \[2:0\] i\)/);
-  assert.equal(longestChain(r.nl), 19);   // 20-bit counters: 19 MUXCY and their carry in
+  assert.equal(longestChain(r.nl), 20);   // 21-bit counters (the debouncers', for 100 MHz boards, #3710): 20 MUXCY and their carry in
 });
 
 test('shift registers: chains of 3 or more flip-flops without reset become SRL16E (falling edge: SRL16E_1), chains longer than 16 several', { timeout: 120000 }, async () => {

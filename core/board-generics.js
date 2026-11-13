@@ -6,7 +6,7 @@
 // Project (server/projects.js), the browser edition's (web/js/project-store.js) and the tests' example projects.
 //
 // Isomorphic ES module (browser + Node), no DOM.
-import { periodNs } from '../packages/silinx-fpga/src/ucf.js';
+import { periodNs } from '../packages/silinx-fpga/src/parts.js';
 
 // a board resource by its name, else the first of its group (as boardAutoAssign finds a port's: Numato's "dip")
 const resourceOf = (resources, name, group) => resources.find(r => r.name === name) || resources.find(r => r.group === group) || null;

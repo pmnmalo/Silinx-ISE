@@ -120,7 +120,8 @@ test('#650 a chain longer than a word: its pieces\' carries (a 40-bit counter pa
   }
 });
 
-// the examples' models, from the Silinx toolchain's flow on the Basys2-250
+// the examples' models, from the Silinx toolchain's flow on the Basys2-250, with the examples' own generics: their counters
+// whole (a test bench's make them a few bits since they are sized by their counts, #3710)
 async function models(name, steps) {
   const { runOpenFlow } = await import('../core/flow-ide.js');
   const ex = example(name), top = ex.project.top, written = {};
@@ -141,7 +142,7 @@ async function models(name, steps) {
     // (placed and routed by nextpnr, the application's engine, #2137)
     Object.assign(io, { ucf: exampleUcf(name, { board: 'basys2', variant: '250' }).text, device: () => device, bitDb: () => bitDb, nextpnr: { spartan3e: nextpnrNode() } });
   }
-  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps, seed: 1, effort: 1, simTop: ex.project.simTop, engine: 'nextpnr' }, io);
+  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', steps, seed: 1, effort: 1, engine: 'nextpnr' }, io);
   assert.equal(r.ok, true, r.error);
   const FILES = { postsynth: /^netgen\/synthesis\/[^/]*_synthesis\.v$/, posttrans: /^netgen\/translate\/[^/]*_translate\.v$/, postmap: /^netgen\/map\/[^/]*_map\.v$/, postpar: /^netgen\/par\/[^/]*_timesim\.v$/ };
   return Object.fromEntries(steps.filter(s => FILES[s]).map(s => {
@@ -172,34 +173,35 @@ async function same(design, label) {
 // (chains, registers made words, cells before and after)
 const EXPECTED = {
   gates: { chains: 0, registers: 0, cells: [1, 1] },
-  traffic: { chains: 1, registers: 1, cells: [194, 141] },
-  blinky: { chains: 4, registers: 4, cells: [543, 326] },
-  pong: { chains: 9, registers: 8, cells: [1115, 433] },
-  stopwatch: { chains: 3, registers: 3, cells: [406, 264] },   // (#3161: 403, 261 before #3097's comparisons as logic)
-  clock: { chains: 6, registers: 6, cells: [870, 448] },   // (#3161: [872, 450] before #3097)
-  vga: { chains: 2, registers: 2, cells: [454, 382] },   // (#3161: [498, 426] before #3097)
-  isqrt: { chains: 0, registers: 0, cells: [277, 277] },
-  uart: { chains: 1, registers: 1, cells: [360, 339] },
-  micro80: { chains: 1, registers: 1, cells: [657, 620] },
+  traffic: { chains: 2, registers: 2, cells: [312, 156] },
+  blinky: { chains: 5, registers: 5, cells: [635, 341] },
+  pong: { chains: 7, registers: 7, cells: [1106, 581] },
+  stopwatch: { chains: 9, registers: 9, cells: [916, 350] },
+  clock: { chains: 6, registers: 6, cells: [891, 469] },
+  vga: { chains: 2, registers: 2, cells: [457, 385] },
+  isqrt: { chains: 1, registers: 1, cells: [342, 289] },
+  uart: { chains: 3, registers: 3, cells: [588, 445] },
+  micro80: { chains: 2, registers: 2, cells: [762, 628] },
 };
 // (#659, #670: the equalities with a constant; the tables (their inputs at most, their words, their outputs), the
 // cells before and after; the registers wordLevel made again of the flip-flops the tables feed)
 const TABLES = {
   gates: [0, { tables: 0, inputs: 12, words: 0, outputs: 0, cells: [1, 1] }, 0],
-  traffic: [1, { tables: 8, inputs: 12, words: 7632, outputs: 42, cells: [137, 39] }, 4],
-  blinky: [3, { tables: 28, inputs: 12, words: 16272, outputs: 63, cells: [322, 138] }, 8],
-  pong: [9, { tables: 39, inputs: 12, words: 42212, outputs: 94, cells: [379, 202] }, 6],
-  stopwatch: [1, { tables: 34, inputs: 12, words: 9112, outputs: 64, cells: [260, 168] }, 9],   // (#3161: 33, 12440, 63, [257, 167] before #3097)
-  clock: [7, { tables: 31, inputs: 12, words: 15664, outputs: 83, cells: [419, 148] }, 4],   // (#3161: 9, 28, 15148, 75, [414, 153] before #3097)
-  vga: [2, { tables: 20, inputs: 12, words: 38368, outputs: 54, cells: [381, 107] }, 3],   // (#3161: 19, 48864, 55, [425, 110], 2 before #3097)
-  isqrt: [0, { tables: 34, inputs: 12, words: 22504, outputs: 78, cells: [277, 123] }, 6],
-  uart: [0, { tables: 33, inputs: 11, words: 25328, outputs: 77, cells: [339, 167] }, 7],
-  micro80: [0, { tables: 118, inputs: 10, words: 48224, outputs: 195, cells: [620, 441] }, 5],
+  traffic: [5, { tables: 13, inputs: 12, words: 14816, outputs: 43, cells: [144, 56] }, 5],
+  blinky: [6, { tables: 27, inputs: 12, words: 23928, outputs: 63, cells: [329, 144] }, 8],
+  pong: [10, { tables: 58, inputs: 10, words: 23984, outputs: 150, cells: [548, 286] }, 6],
+  stopwatch: [7, { tables: 41, inputs: 12, words: 9792, outputs: 69, cells: [312, 212] }, 4],
+  clock: [8, { tables: 28, inputs: 12, words: 28248, outputs: 81, cells: [439, 144] }, 4],
+  vga: [2, { tables: 20, inputs: 12, words: 38368, outputs: 54, cells: [383, 107] }, 3],
+  isqrt: [1, { tables: 35, inputs: 12, words: 22512, outputs: 78, cells: [285, 131] }, 6],
+  uart: [6, { tables: 50, inputs: 11, words: 23536, outputs: 96, cells: [433, 222] }, 6],
+  micro80: [2, { tables: 119, inputs: 10, words: 51752, outputs: 196, cells: [617, 439] }, 5],
 };
 // (#670: the part of its operations a step evaluates at most, as the profile estimates it: clock's and vga's models,
 // their display's and their pixel clock's logic changing at every other step, unguarded; blinky's display refresh
 // counter at every step, #983; isqrt's machine, called again and again, at every step; micro80's processor too)
-const WORK = { gates: 1, traffic: 0.6, blinky: 0.45, pong: 0.5, stopwatch: 0.2, clock: 1, vga: 1, isqrt: 1, uart: 1, micro80: 1 };
+// (traffic: its display's and its timer's counters, of its own generics, at every step, #3710)
+const WORK = { gates: 1, traffic: 1, blinky: 0.45, pong: 0.5, stopwatch: 0.2, clock: 1, vga: 1, isqrt: 1, uart: 1, micro80: 1 };
 test('#650 #659 every example\'s Post-Synthesis Simulation Model at word level, its irregular logic as tables: the same outputs as bit by bit', { timeout: 600000 }, async () => {
   for (const name of EXAMPLES) {
     const { postsynth } = await models(name, ['postsynth']);
@@ -230,15 +232,15 @@ test('#650 #659 blinky\'s post-translate, post-map and post-place & route models
   const m = await models('blinky', ['synth', 'translate', 'posttrans', 'map', 'postmap', 'par', 'trce', 'postpar']);
   // (postpar: the design nextpnr routed, #2137: a constant on routing; postmap since #2530: that design without its
   // routing, so the same cells)
-  const want = { posttrans: [543, 326], postmap: [631, 366], postpar: [631, 366] };
+  const want = { posttrans: [635, 341], postmap: [745, 385], postpar: [745, 385] };
   const wantTables = {
-    posttrans: [3, { tables: 19, inputs: 12, words: 7304, outputs: 127, cells: [326, 183] }, 6],
-    postmap: [3, { tables: 22, inputs: 12, words: 7392, outputs: 146, cells: [366, 207] }, 5],
-    postpar: [3, { tables: 21, inputs: 12, words: 7328, outputs: 137, cells: [366, 215] }, 5],
+    posttrans: [6, { tables: 21, inputs: 12, words: 19568, outputs: 137, cells: [341, 190] }, 6],
+    postmap: [6, { tables: 26, inputs: 12, words: 21704, outputs: 155, cells: [385, 221] }, 6],
+    postpar: [6, { tables: 25, inputs: 12, words: 21640, outputs: 146, cells: [385, 229] }, 6],
   };
   for (const [step, design] of Object.entries(m)) {
     const { stats, tables } = await same(design, step);
-    assert.deepEqual(stats, { chains: 4, registers: 4, cells: want[step] }, step);
+    assert.deepEqual(stats, { chains: 5, registers: 5, cells: want[step] }, step);
     assert.deepEqual([tables.equalities.equalities, tables.tables, tables.registers], wantTables[step], step);
   }
 });
