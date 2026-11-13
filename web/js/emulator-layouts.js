@@ -12,9 +12,11 @@ import { nexysA7Layout } from './emulator-nexys-a7.js';
 import { s3StarterLayout } from './emulator-s3-starter.js';
 import { s3aLayout } from './emulator-s3a.js';
 import { s3eLayout } from './emulator-s3e.js';
+import { tangnano9kLayout } from './emulator-tangnano9k.js';
 import { ulx3sLayout } from './emulator-ulx3s.js';
 
 export const BOARD_LAYOUTS = { basys2: basys2Layout, nexys2: nexys2Layout, 's3e-starter': s3eLayout, nexys3: nexys3Layout, atlys: atlysLayout, icebreaker: icebreakerLayout,
   basys3: basys3Layout, 'nexys-a7': nexysA7Layout, 's3a-starter': s3aLayout, 'mimas-v2': mimasV2Layout,
   's3-starter': s3StarterLayout, 'cmod-s6': cmodS6Layout,
-  'icebreaker-vga': icebreakerLayout, ulx3s: ulx3sLayout, 'ulx3s-vga': ulx3sLayout };
+  'icebreaker-vga': icebreakerLayout, ulx3s: ulx3sLayout, 'ulx3s-vga': ulx3sLayout,
+  tangnano9k: tangnano9kLayout, 'tangnano9k-vga': tangnano9kLayout };
