@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 // Yosys 0.70: the version YoWASP (@yowasp/yosys 0.70.x) runs
 export const YOSYS_TESTS_PIN = { tag: 'v0.70', commit: '28ba3cb926fe376fa05ebfc1b921747d011d4557' };
-const YOSYS_TEST_DIRS = ['tests/simple', 'tests/asicworld', 'tests/hana', 'tests/vloghtb', 'tests/various'];
+export const YOSYS_TEST_DIRS = ['tests/simple', 'tests/asicworld', 'tests/hana', 'tests/vloghtb', 'tests/various'];
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = path.join(ROOT, '.cache', 'yosys-tests');
 
@@ -43,7 +43,7 @@ export function untar(buf) {
 }
 
 /** Download and extract (once). Returns the directory holding tests/. */
-async function fetchYosysTests({ force = false, log = console.log } = {}) {
+export async function fetchYosysTests({ force = false, log = console.log } = {}) {
   const dest = path.join(CACHE, YOSYS_TESTS_PIN.commit);
   const stamp = path.join(dest, '.complete');
   if (fs.existsSync(stamp) && !force) return dest;
