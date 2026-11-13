@@ -7,6 +7,7 @@
 //   gateEntries([{ path, data }], { limits }) -> { files, refusals, warnings } entries already read (a folder, a link)
 //   gateFile(path, data, { limits }) -> { path, data, kind, text }             one file, or a GateError with the reason
 //   normalizePath(p) -> { path } | { reason }                                  a path of a project's file
+//   filePath(p) -> { path } | { reason, message }                              a path a file operation is given
 //
 // files: [{ path, data (Uint8Array), kind, text (a text kind's, decoded) }]; refusals: [{ path, reason }], the files
 // left out (the import goes on without them); warnings: what was accepted with a change (invalid UTF-8 replaced);
@@ -69,6 +70,27 @@ export function kindOf(path) {
 
 // (COM¹ … LPT³ too: Windows reserves the superscript digits' names as well, #3414)
 const WINDOWS_DEVICE = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³]|conin\$|conout\$)(\..*)?$/i;
+
+/**
+ * The path a file operation is given (read, write, rename, delete), by one rule in the browser's store and on the
+ * server (#3598): relative, '/' between its folders, no '..' (src/../x.v is refused, not read as x.v) and no backslash
+ * (src\y.v is refused, not read as src/y.v); './a//b' is 'a/b'. { path }, or { reason, message } it is refused: the
+ * import gate's reason, the message the operation throws. A name's other rules (hidden, reserved, build/) are the
+ * operation's own: normalizePath for a name written, the stores' checks for one read.
+ */
+export function filePath(p) {
+  const no = reason => ({ reason, message: reason === 'no name' ? 'missing path' : `'${p}': invalid path: ${reason}` });
+  if (typeof p !== 'string' || !p) return no('no name');
+  // eslint-disable-next-line no-control-regex
+  if (/[\0-\x1f\x7f]/.test(p)) return no('control character in the name');
+  if (/^[A-Za-z]:/.test(p)) return no('absolute path (a drive letter)');
+  if (p.includes('\\')) return no('backslash in the name');
+  if (p.startsWith('/')) return no('absolute path');
+  const parts = p.split('/').filter(s => s !== '' && s !== '.');
+  if (!parts.length) return no("the project's folder, not a file's path");
+  if (parts.includes('..')) return no("path leaves the project ('..')");
+  return { path: parts.join('/') };
+}
 
 /** A path of a project's file made canonical ('./a//b' -> 'a/b'): { path }, or { reason } it is refused. */
 export function normalizePath(p, { limits = GATE_LIMITS } = {}) {

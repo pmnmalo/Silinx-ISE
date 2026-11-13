@@ -94,7 +94,7 @@ test('rename_file: a file and a folder, the project\'s files, the drawings\' lin
   await fails('rename_file', { project: 'n', from: 'rtl/none.vhd', to: 'rtl/x.vhd' }, 'file \'rtl/none.vhd\' not found');
   await fails('rename_file', { project: 'n', from: 'rtl', to: 'rtl/inner' }, 'cannot move \'rtl\' into itself');
   await fails('rename_file', { project: 'n', from: 'silinx.json', to: 'x.json' }, 'silinx.json is the project\'s description');
-  await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '../top.vhd' }, 'path escapes project');
+  await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '../top.vhd' }, "'../top.vhd': invalid path: path leaves the project ('..')");
   await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: 'build/top.vhd' }, 'build/ is written by Silinx itself');
   await fails('rename_file', { project: 'n', from: 'rtl/top.vhd', to: '.hidden/top.vhd' }, '\'.hidden/top.vhd\': not renamed: hidden file or folder (\'.hidden\')');   // (the import gate's message, as Rename's, #2973)
 });
@@ -129,7 +129,7 @@ test('delete_file: a drawing\'s HDL file (the drawing\'s HDL made from it then),
   assert.equal(f.text, `INFO: The top-level module 'gates' is no longer in the project, nor any other module.\nsrc deleted (a folder: 1 file(s); moved to the workspace's .trash folder: ${f.data.trashed}).`);
   await fails('delete_file', { project: 'd', path: 'src' }, 'no file or folder \'src\' in the project \'d\'');
   await fails('delete_file', { project: 'd', path: 'silinx.json' }, 'silinx.json is the project\'s description');
-  await fails('delete_file', { project: 'd', path: '.' }, 'path: a file\'s path in the project, not the project\'s folder');
+  await fails('delete_file', { project: 'd', path: '.' }, "'.': invalid path: the project's folder, not a file's path");
   // the project: into the workspace's .trash
   assert.equal((await ok('delete_project', { project: 'd' })).text, 'Project \'d\' deleted (moved to the workspace\'s .trash folder).');
   assert.ok(!fs.existsSync(P.projectDir('d')));
@@ -147,7 +147,8 @@ test('a hidden file or folder of a project (.git, .env, .vscode) refused by ever
   fs.writeFileSync(path.join(dir, '.vscode/x.fsm.json'), fs.readFileSync(path.join(dir, 'src/traffic.fsm.json')));
   fs.writeFileSync(path.join(dir, '.git/x.c'), 'int f(int a) { return a; }\n');
   fs.symlinkSync('.git', path.join(dir, 'gitlink'), process.platform === 'win32' ? 'junction' : 'dir');   // (a link in the project to it)
-  for (const p of ['.git/config', './.git/config', 'src/../.git/config', '.env', 'gitlink/config'])
+  await fails('read_file', { project: 'h', path: 'src/../.git/config' }, "'src/../.git/config': invalid path: path leaves the project ('..')");   // (#3598)
+  for (const p of ['.git/config', './.git/config', '.env', 'gitlink/config'])
     await fails('read_file', { project: 'h', path: p }, `'${p}': a hidden file or folder cannot be read`);
   await fails('write_file', { project: 'h', path: '.git/hooks/pre-commit', text: 'x' }, '\'.git/hooks/pre-commit\': a hidden file or folder cannot be written');
   await fails('write_file', { project: 'h', path: 'gitlink/hooks/pre-commit', text: 'x' }, '\'gitlink/hooks/pre-commit\': a hidden file or folder cannot be written');
