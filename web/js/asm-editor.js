@@ -255,8 +255,8 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg);
 
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap, simApi.panel);
-  // (resized and moved, below or on the right: dock-panel.js, #3797)
-  const dock = mountDockPanel({ main: mainCol, panel: simApi.panel, bar: simApi.panel.querySelector('.asm-codebar'), btn, kind: 'asm', changed: () => { if (!destroyed) applyView(); } });
+  // (resized and moved, below or on the left, the chart zoomed to fit when it moves: dock-panel.js, #3797, #3802)
+  const dock = mountDockPanel({ main: mainCol, panel: simApi.panel, bar: simApi.panel.querySelector('.asm-codebar'), btn, kind: 'asm', changed: () => { if (!destroyed) applyView(); }, fit: () => { if (!destroyed) fit(); } });
 
   // side panel
   const selSection = h('section', { class: 'asm-section asm-selection' });

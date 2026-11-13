@@ -184,17 +184,18 @@
 /* code preview */
 .asm-editor .asm-codepanel { flex: 0 0 42%; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--asm-border); background: var(--asm-panel); }
 .asm-editor .asm-codepanel[hidden] { display: none; }
-/* the bottom panel resized by its edge and moved below or on the right of the drawing (#3797, web/js/dock-panel.js) */
+/* the bottom panel resized by its edge and moved below or on the left of the drawing (#3797, #3802, web/js/dock-panel.js) */
 .asm-editor .asm-main.has-dock { position: relative; }
 .asm-editor .asm-codepanel.dockable { position: relative; flex: 0 0 var(--dock-size, 42%); }
-.asm-editor .asm-main.dock-right { flex-direction: row; }
-.asm-editor .asm-main.dock-right > .asm-canvas-wrap { min-width: 120px; }
-.asm-editor .asm-main.dock-right > .asm-codepanel.dockable { border-top: 0; border-left: 1px solid var(--asm-border); min-width: 0; }
-/* (on the right, narrower: its title bar and its tools wrap, never past its edge) */
-.asm-editor .asm-main.dock-right > .dockable > .asm-codebar { flex-wrap: wrap; row-gap: 4px; }
-.asm-editor .asm-main.dock-right > .dockable > .asm-codebar :is(.fsm-panel-tools, .pn-panel-tools) { flex-wrap: wrap; row-gap: 4px; }
+.asm-editor .asm-main.dock-left { flex-direction: row; }
+.asm-editor .asm-main.dock-left > .asm-codepanel.dockable { order: -1; }
+.asm-editor .asm-main.dock-left > .asm-canvas-wrap { min-width: 120px; }
+.asm-editor .asm-main.dock-left > .asm-codepanel.dockable { border-top: 0; border-right: 1px solid var(--asm-border); min-width: 0; }
+/* (on the left, narrower: its title bar and its tools wrap, never past its edge) */
+.asm-editor .asm-main.dock-left > .dockable > .asm-codebar { flex-wrap: wrap; row-gap: 4px; }
+.asm-editor .asm-main.dock-left > .dockable > .asm-codebar :is(.fsm-panel-tools, .pn-panel-tools) { flex-wrap: wrap; row-gap: 4px; }
 .asm-editor .dock-grip { position: absolute; z-index: 3; left: 0; right: 0; top: -3px; height: 7px; cursor: ns-resize; touch-action: none; }
-.asm-editor .asm-main.dock-right > .dockable > .dock-grip { top: 0; bottom: 0; left: -3px; right: auto; width: 7px; height: auto; cursor: ew-resize; }
+.asm-editor .asm-main.dock-left > .dockable > .dock-grip { top: 0; bottom: 0; right: -3px; left: auto; width: 7px; height: auto; cursor: ew-resize; }
 .asm-editor .dock-grip:hover, .asm-editor .dock-grip:focus-visible, .asm-editor .dockable.dock-resizing > .dock-grip {
   outline: none; background: color-mix(in srgb, var(--asm-accent) 45%, transparent);
 }
@@ -204,14 +205,14 @@
 .asm-editor .dock-preview { position: absolute; z-index: 6; pointer-events: none; border: 2px dashed var(--asm-accent); background: color-mix(in srgb, var(--asm-accent) 16%, transparent); }
 .asm-editor .dock-preview[hidden] { display: none; }
 .asm-editor .dock-preview.to-bottom { left: 0; right: 0; bottom: 0; height: var(--dock-size, 42%); }
-.asm-editor .dock-preview.to-right { top: 0; bottom: 0; right: 0; width: var(--dock-size, 42%); }
+.asm-editor .dock-preview.to-left { top: 0; bottom: 0; left: 0; width: var(--dock-size, 42%); }
 .asm-editor .asm-codebar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--asm-border); }
 .asm-editor .asm-codebar .asm-btn { height: 24px; padding: 0 8px; }
 .asm-editor .asm-code-title { font-family: var(--asm-mono); font-size: 12px; color: var(--asm-muted); }
 /* the Try it panel green, as the schematic's Try it (#3798, sch-editor.css .se-simbar, .lv-badge) */
 .asm-editor .asm-codepanel.try-it > .asm-codebar { background: linear-gradient(#f2fbf2, #dcefdc); border-bottom-color: #8fbf8f; }
 .asm-editor .asm-codepanel.try-it { border-top-color: #8fbf8f; }
-.asm-editor .asm-main.dock-right > .asm-codepanel.try-it { border-left-color: #8fbf8f; }
+.asm-editor .asm-main.dock-left > .asm-codepanel.try-it { border-right-color: #8fbf8f; }
 .asm-editor .try-it .asm-code-title { position: relative; padding-left: 14px; font-family: inherit; font-weight: bold; color: #1b5e1b; }
 .asm-editor .try-it .asm-code-title::before {
   content: ''; position: absolute; left: 0; top: 50%; width: 9px; height: 9px; margin-top: -5px; border-radius: 50%; background: #20c020; box-shadow: 0 0 4px #20c020;

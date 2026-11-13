@@ -163,8 +163,8 @@ export function mountFsmEditor(container, opts = {}) {
     h('div', { class: 'asm-codebar' }, panelTitle, panelTools, h('div', { class: 'asm-spacer' }), btn('✕', 'Close the panel', () => togglePanel(null))),
     panelBody);
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap, bottom);
-  // (resized and moved, below or on the right, the drawing fitted again: dock-panel.js, #3797)
-  const dock = mountDockPanel({ main: mainCol, panel: bottom, bar: bottom.querySelector('.asm-codebar'), btn, kind: 'fsm', size: 0.44, changed: () => { if (!destroyed && panel) fit(); } });
+  // (resized and moved, below or on the left, the drawing fitted again: dock-panel.js, #3797, #3802)
+  const dock = mountDockPanel({ main: mainCol, panel: bottom, bar: bottom.querySelector('.asm-codebar'), btn, kind: 'fsm', size: 0.44, changed: () => { if (!destroyed && panel) fit(); }, fit: () => { if (!destroyed) fit(); } });
 
   // side panel
   const selSection = h('section', { class: 'asm-section fsm-selection' });

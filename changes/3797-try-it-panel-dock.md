@@ -1,8 +1,8 @@
 In short:
 
 - The Try it panel of the state diagram, ASM chart and Petri net editors can be resized by dragging its edge, and moved
-  below or to the right of the drawing by dragging its title bar (or its ⇆ button); its place and size are kept per
-  editor.
+  below or to the left of the drawing (#3802) by dragging its title bar (or its ⇆ button); its place and size are kept
+  per editor.
 
 In detail:
 

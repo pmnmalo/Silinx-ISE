@@ -19,11 +19,11 @@ export const FSM_PT = {
   'Make an ASM chart (.asm.json) of this state machine': 'Fazer um fluxograma ASM (.asm.json) desta máquina de estados',
   'Encoding:': 'Codificação:', 'Coding Style': 'Estilo de Código', 'Encoding': 'Codificação',
   'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas',
-  // the bottom panel resized and moved, the ASM chart's and the Petri net's too (dock-panel.js, #3797)
-  'Move the panel to the right of the drawing': 'Mover o painel para a direita do desenho', 'Move the panel below the drawing': 'Mover o painel para baixo do desenho',
+  // the bottom panel resized and moved, the ASM chart's and the Petri net's too (dock-panel.js, #3797, on the left #3802)
+  'Move the panel to the left of the drawing': 'Mover o painel para a esquerda do desenho', 'Move the panel below the drawing': 'Mover o painel para baixo do desenho',
   'Drag to resize the panel (↑ ↓ with the keyboard)': 'Arraste para redimensionar o painel (↑ ↓ com o teclado)',
   'Drag to resize the panel (← → with the keyboard)': 'Arraste para redimensionar o painel (← → com o teclado)',
-  'Drag the title bar to move the panel below or to the right of the drawing': 'Arraste a barra de título para mover o painel para baixo ou para a direita do desenho',
+  'Drag the title bar to move the panel below or to the left of the drawing': 'Arraste a barra de título para mover o painel para baixo ou para a esquerda do desenho',
   // selection
   'State (Moore outputs inside)': 'Estado (saídas de Moore lá dentro)', 'Initial (reset) state': 'Estado inicial (de reset)',
   'Name': 'Nome', 'Outputs (Moore)': 'Saídas (Moore)',
