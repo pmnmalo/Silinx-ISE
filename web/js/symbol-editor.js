@@ -87,11 +87,15 @@ export function mountSymbolEditor(container, opts = {}) {
     svg.setAttribute('viewBox', `${-M} ${-M} ${vw} ${vh}`);
     svg.setAttribute('width', String(Math.round(vw * zoom)));
     svg.setAttribute('height', String(Math.round(vh * zoom)));
-    let out = symbolSvg(s, def);
+    // (the symbol as the schematic draws it, its names through sch-svg.js's esc; the pins' handles, DOM nodes)
+    svg.innerHTML = symbolSvg(s, def);
     for (const p of symbolPins(s, s.modules, def)) {
-      out += `<circle class="sy-pin${p.name === sel ? ' sel' : ''}" data-pin="${p.name.replace(/"/g, '&quot;')}" cx="${p.x}" cy="${p.y}" r="5"><title>${p.name.replace(/</g, '&lt;')}</title></circle>`;
+      const c = document.createElementNS(SVGNS, 'circle'), t = document.createElementNS(SVGNS, 'title');
+      for (const [k, v] of Object.entries({ class: `sy-pin${p.name === sel ? ' sel' : ''}`, 'data-pin': p.name, cx: p.x, cy: p.y, r: 5 })) c.setAttribute(k, String(v));
+      t.textContent = p.name;
+      c.append(t);
+      svg.append(c);
     }
-    svg.innerHTML = out;
     zoomLbl.textContent = `${Math.round(zoom * 100)}%`;
     const has = !!sel && !readOnly;
     earlier.disabled = !has; later.disabled = !has;
