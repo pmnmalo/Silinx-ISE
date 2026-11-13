@@ -10,6 +10,7 @@ import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
 import { runVivado, isVivadoDevice, vivadoSteps, collectVivadoReports } from './vivado.js';
+import { DESIGN_ONLY_MESSAGES, isDesignOnly } from '../core/project-kind.js';
 import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice, bitstreamExtOf } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
@@ -107,6 +108,7 @@ export async function startImplementation(name, body = {}) {
   const projectDir = P.projectDir(name);
   let steps;
   try { steps = normalizeSteps(body.steps); } catch (e) { throw bad(e.message); }
+  if (isDesignOnly(project)) throw bad(DESIGN_ONLY_MESSAGES.flow(project.name));   // (a design and simulation project, #3780)
   if (!topOf(project)) throw bad('set the top module of the project before implementing');
   // (an experimental family with no back end: its flows to come; the 7-series' is Vivado's, #1649, the Silinx toolchain's #3146)
   if (experimentalDevice(project.device) && !isVivadoDevice(project.device)) throw bad(noFlowMessage(project.device));

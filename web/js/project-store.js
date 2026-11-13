@@ -17,6 +17,7 @@ import { clone } from '../../core/util.js';   // (a relative path: Node imports 
 import { PROJECT_NAME_RE, projectNameError, sameProject } from '../../core/project-name.js';
 import { filePath, gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
 import { markUntrusted } from '../../core/trust.js';
+import { DESIGN_KIND, asDesignProject, isDesignOnly } from '../../core/project-kind.js';
 import { foldName, foldsToProjectFile, PROJECT_FILE, sameNameIn, spelledAs } from '../../core/fold-name.js';
 
 export const NAME_RE = PROJECT_NAME_RE;   // (core/project-name.js, #3538)
@@ -107,6 +108,7 @@ export function normalizeProjectJson(saved, name) {
   if (saved.preferredLanguage === 'vhdl' || saved.preferredLanguage === 'verilog') json.preferredLanguage = saved.preferredLanguage;
   if (plain(saved.sourceLanguage)) json.sourceLanguage = saved.sourceLanguage;
   if (typeof saved.synthTool === 'string') json.synthTool = saved.synthTool;
+  if (isDesignOnly(saved)) Object.assign(json, { kind: DESIGN_KIND, board: null });   // (a design and simulation project, #3780)
   if (saved.trusted === false) json.trusted = false;   // (a project from outside, #2830: never made trusted by its description)
   return { json: clone(json), warnings };
 }
@@ -425,8 +427,11 @@ export function projectOps(getStore, examples = {}) {
   const ops = {
     list: async () => (await S().list()).map(j => ({ name: j.name, device: j.device, top: j.top, board: j.board, modified: j.modified || 0 })),
     load: name => S().load(name),
-    create: async ({ name, template = 'empty', device, board }) => {
+    create: async ({ name, template = 'empty', device, board, kind = null }) => {
       if (projectNameError(name)) fail(projectNameError(name));
+      // (a design and simulation project, #3780: empty, no board, no constraints; the server's rule and messages)
+      if (kind != null && kind !== DESIGN_KIND) fail(`unknown project kind '${kind}'`);
+      if (kind && template && template !== 'empty') fail('a design and simulation project starts empty: no example');
       // (one in another case too: the same folder on a case-insensitive file system, #3538)
       const other = sameProject(await S().list(), name)?.name;
       if (other || await S().exists(name)) fail(`project '${other ?? name}' already exists`);
@@ -453,8 +458,8 @@ export function projectOps(getStore, examples = {}) {
         await S().create(name, json, files);
         return clone(json);
       }
-      const json = emptyProjectJson(name, { device, board });
-      await S().create(name, json, {}, { dirs: ['src', 'sim', 'constraints'] });
+      const json = kind ? asDesignProject(emptyProjectJson(name)) : emptyProjectJson(name, { device, board });
+      await S().create(name, json, {}, { dirs: kind ? ['src', 'sim'] : ['src', 'sim', 'constraints'] });
       return clone(json);
     },
     /** A whole project at once (imports, bundles, copies): its description normalised (what it drops

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ISE, NO_FLOW, SILINX, SILINX_ICE40, SILINX_XC7, SILINX_ECP5, SILINX_GOWIN, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, simModelsOf, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
+import { ISE, NO_FLOW, DESIGN_ONLY, SILINX, SILINX_ICE40, SILINX_XC7, SILINX_ECP5, SILINX_GOWIN, VIVADO, TOOLS, allTasks, buildProcesses, hasTask, simModelsOf, toolOf, MESSAGE_LINE, EXTRA_STEPS, IMPL_IDS } from '../web/js/tool-descriptors.js';
 import { XILINX_STEPS, orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { ICE40_STEPS } from '../packages/silinx-fpga/src/open-flow-ice40.js';
 import { XC7_STEPS } from '../packages/silinx-fpga/src/open-flow-xc7.js';
@@ -190,6 +190,17 @@ test('#3142 an experimental family\'s tool: no step, no report, nothing to progr
   assert.ok(!TOOLS.includes(NO_FLOW) && NO_FLOW.tasks.every(t => allTasks().includes(t)), 'its tasks the others\'');
   assert.equal(hasTask(NO_FLOW, 'impl'), false);
   assert.equal(NO_FLOW.messages.line, MESSAGE_LINE);
+});
+
+test('#3780 a design and simulation project\'s tool: Check Design alone, the tasks Design and Simulate, whatever its device', () => {
+  for (const part of ['xc3s250e', 'xc7a35t', 'ice40up5k']) for (const open of [false, true]) assert.equal(toolOf({ part }, open, { designOnly: true }), DESIGN_ONLY, part);
+  assert.deepEqual([DESIGN_ONLY.steps, DESIGN_ONLY.reports, DESIGN_ONLY.program, DESIGN_ONLY.constraints, DESIGN_ONLY.open], [[], [], null, null, false]);
+  assert.deepEqual(built(DESIGN_ONLY).map(shape), ['check']);
+  assert.equal(DESIGN_ONLY.tree[0].label, 'Check Design');
+  assert.deepEqual(DESIGN_ONLY.tasks.map(t => t.id), ['edit', 'sim']);
+  assert.ok(!TOOLS.includes(DESIGN_ONLY) && DESIGN_ONLY.tasks.every(t => allTasks().includes(t)), 'its tasks the others\'');
+  assert.deepEqual(['emu', 'impl'].map(id => hasTask(DESIGN_ONLY, id)), [false, false]);
+  assert.equal(DESIGN_ONLY.messages.line, MESSAGE_LINE);
 });
 
 test('#2311 each descriptor\'s messages: the log\'s lines read, the markers the step tracker reads', () => {

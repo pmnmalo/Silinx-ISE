@@ -10,6 +10,11 @@ import path from 'node:path';
 import * as P from './projects.js';
 import { topForBoardText } from '../core/board-generics.js';
 import { toolError, readProject, viewSourcesOf, STR, PROJECT, deviceName } from './mcp-util.js';
+import { DESIGN_ONLY_MESSAGES, isDesignOnly } from '../core/project-kind.js';
+import { makeDesignProject } from './mcp-design-only.js';
+
+// the project's kind dropped when a design and simulation project is given a board or a device (#3780)
+const withoutKind = (pj, drop) => { if (drop) delete pj.kind; return pj; };
 
 // the device database (server/devices.js) and the toolchain package's checks, loaded on first use
 const devices = () => import('./devices.js');
@@ -79,10 +84,20 @@ export const SETTINGS_TOOLS = [
       synth_tool: { type: 'string', enum: SYNTH_TOOLS, description: 'The synthesis tool.' },
       preferred_language: { type: 'string', enum: ['vhdl', 'verilog'], description: 'The Preferred Language: the drawings\' HDL (the drawings with no language of their own) made again in it.' },
       update_constraints: { type: 'boolean', description: 'With a new board: write its pins into the constraints file (default false).' },
+      design_only: { type: 'boolean', description: 'true: make the project a design and simulation project (no board, no constraints, its HDL hidden), as Design Properties\' "Design and simulation only (no FPGA)"; refused when it has HDL or C sources of its own. A design and simulation project becomes an FPGA project with a board (or a device).' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-    async run({ project: name, board, variant, part, package: pkg, speed, synth_tool: synthTool, preferred_language: language, update_constraints: constraints = false }) {
-      const pj = await readProject(name);
+    async run(args) {
+      const { project: name, board, variant, part, package: pkg, speed, synth_tool: synthTool, preferred_language: language, update_constraints: constraints = false } = args;
+      let pj = await readProject(name);
+      // (a design and simulation project, #3780: made one; or one given a board or a device, an FPGA project then)
+      if (args.design_only === true) return makeDesignProject(name, pj, args);
+      const fromDesign = isDesignOnly(pj);
+      if (fromDesign) {
+        if (args.design_only === false && !(board && board !== 'none') && !part) throw toolError(`the project '${name}' is a design and simulation project: give a board (or a device) to make it an FPGA project`);
+        if (!(board && board !== 'none') && !part) throw toolError(DESIGN_ONLY_MESSAGES.flow(name));
+        pj = { ...pj, board: null, constraints: null };
+      }
       const D = await devices(), R = await parts();
       if (board === undefined && variant === undefined && part === undefined && pkg === undefined && speed === undefined && synthTool === undefined && language === undefined) throw toolError('give board, part, package, speed, synth_tool or preferred_language');
       if (language !== undefined && !['vhdl', 'verilog'].includes(language)) throw toolError('preferred_language: vhdl or verilog');
@@ -135,14 +150,14 @@ export const SETTINGS_TOOLS = [
       if (constraints && !(changed && nextBoard && pj.top)) throw toolError(nextBoard ? (pj.top ? 'update_constraints: the board did not change' : `the project '${name}' has no top module: its constraints cannot come from a board's pins`) : 'update_constraints: the project has no board');
       // the constraints of the new device's format (UCF, the iCE40's PCF, the ECP5's LPF, the Gowin's CST, the 7-series' XDC)
       const ext = R.constraintsExtOf(next);
-      let constraintsFile = pj.constraints;
+      let constraintsFile = fromDesign ? `constraints/top${ext}` : pj.constraints;
       if (constraintsFile && !constraintsFile.toLowerCase().endsWith(ext)) {
         const old = constraintsFile;
         constraintsFile = old.replace(/\.[^./]*$/, '') + ext;
         if (fs.existsSync(path.join(P.projectDir(name), old))) warnings.push(`WARNING: this device's constraints are ${ext.slice(1).toUpperCase()}: ${constraintsFile} is the project's now, ${old} was not converted.`);
       }
       const oldLang = pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl';
-      await P.updateProject(name, p => ({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...synthOf(), ...(language ? { preferredLanguage: language } : {}) }));
+      await P.updateProject(name, p => withoutKind({ ...p, board: nextBoard, device: next, constraints: constraintsFile, ...synthOf(), ...(language ? { preferredLanguage: language } : {}) }, fromDesign));
       // every drawing in the new language, its HDL file made again in it (#1477)
       const languageLines = [];
       if (language && language !== oldLang) {
@@ -162,7 +177,7 @@ export const SETTINGS_TOOLS = [
       // (after the device, as the dialog's console says it)
       const noFlow = experimental && !vivado ? [`WARNING: ${R.noFlowMessage(next)}.`] : [];
       warnings.push(...noFlow);
-      const text = [...warnings.filter(w => !pins.includes(w) && !languageLines.includes(w) && !noFlow.includes(w)), ...languageLines, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`, ...pins, ...noFlow];
+      const text = [...warnings.filter(w => !pins.includes(w) && !languageLines.includes(w) && !noFlow.includes(w)), ...languageLines, ...(fromDesign ? [`${name}: an FPGA project now: its HDL and its implementation shown.`] : []), `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`, ...pins, ...noFlow];
       return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, preferredLanguage: after.preferredLanguage || 'vhdl', constraints: after.constraints || null, constraintsUpdated: constraints, generics: generics ? { file: generics.path, ...generics.values } : null, warnings } };
     },
   },

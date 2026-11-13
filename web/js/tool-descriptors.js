@@ -287,6 +287,18 @@ export const NO_FLOW = {
   tasks: LAB_TASKS.filter(t => t.id !== 'impl'),
 };
 
+/** A design and simulation project's (#3780, core/project-kind.js: no FPGA): no flow, no constraints, no board, no programming;
+ *  its tree Check Design alone, its tasks Design and Simulate. */
+export const DESIGN_ONLY = {
+  id: 'design-only', name: 'Design and simulation only (no FPGA)', open: false,
+  steps: [], reports: [],
+  constraints: null,
+  messages: LOG_MESSAGES,
+  program: null,
+  tree: [proc('check', 'Check Design')],
+  tasks: LAB_TASKS.filter(t => t.id === 'edit' || t.id === 'sim'),
+};
+
 /** AMD Vivado on the 7-series (#1649, server/vivado.js): ISE's step names, each a Vivado command (synth_design, opt_design as
  *  Map, place_design and route_design, report_timing_summary, report_io, report_power, write_bitstream), no simulation models,
  *  no technology schematic, no FPGA view; its reports Vivado's; the board programmed with openFPGALoader (iMPACT's page);
@@ -317,8 +329,9 @@ export const TOOLS = [ISE, SILINX, SILINX_ICE40];
 const OPEN_BY_FAMILY = { ice40: SILINX_ICE40, artix7: SILINX_XC7, ecp5: SILINX_ECP5, gowin: SILINX_GOWIN };
 /** The tool of a project device: a 7-series one's AMD Vivado on the local server (#1649), or the Silinx toolchain there when
  *  `open` (the project's synthesis tool Silinx, #3146), and always in the browser edition (`standalone`, #3143); another
- *  experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE. */
-export const toolOf = (device, open, { standalone = false } = {}) => (vivadoDevice(device) ? (open || standalone ? SILINX_XC7 : VIVADO)
+ *  experimental family's none yet; `open`, the Silinx toolchain (its back end by the family), else ISE; a design and simulation
+ *  project's (`designOnly`, #3780) DESIGN_ONLY whatever its device. */
+export const toolOf = (device, open, { standalone = false, designOnly = false } = {}) => (designOnly ? DESIGN_ONLY : vivadoDevice(device) ? (open || standalone ? SILINX_XC7 : VIVADO)
   : experimentalDevice(device) ? NO_FLOW : open ? OPEN_BY_FAMILY[deviceFamily(device)] || SILINX : ISE);
 
 /** Every tool's tasks, in their order: the kept state's and the switchers'. */

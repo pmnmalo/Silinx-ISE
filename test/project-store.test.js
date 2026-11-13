@@ -46,6 +46,25 @@ const under = (tree, name) => sorted(Object.fromEntries(Object.entries(tree).fil
 const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m }; };
 const folder = () => { const root = fakeDirectory('Silinx-projects'); const store = folderStore(root); return { root, store, ops: projectOps(() => store, EXAMPLES) }; };
 
+test('#3780 a design and simulation project: the server\'s (silinx.json text, src/ sim/, no constraints/); its kind kept by an import', async () => {
+  const { root, ops } = folder();
+  const pj = await ops.create({ name: 'Drawn', kind: 'design' });
+  await P.createProject({ name: 'Drawn', kind: 'design' });
+  const server = diskTree(P.projectDir('Drawn'));
+  assert.deepEqual(under(await dump(root), 'Drawn'), sorted(server));
+  assert.deepEqual(Object.keys(server).sort(), ['silinx.json', 'sim/', 'src/']);
+  assert.equal(server['silinx.json'], projectJsonText('Drawn', pj));
+  assert.deepEqual([pj.kind, pj.board, pj.constraints], ['design', null, null]);
+  // (the same refusals, the same messages)
+  for (const [args, message] of [[{ name: 'D2', kind: 'fpga' }, 'unknown project kind \'fpga\''], [{ name: 'D3', kind: 'design', template: 'blinky' }, 'a design and simulation project starts empty: no example']]) {
+    await assert.rejects(ops.create(args), { message });
+    await assert.rejects(P.createProject(args), { message });
+  }
+  const { normalizeProjectJson } = await import('../web/js/project-store.js');
+  assert.deepEqual(['kind', 'board'].map(k => normalizeProjectJson({ ...pj, board: 'basys2' }, 'Drawn').json[k]), ['design', null]);
+  assert.equal(normalizeProjectJson({ ...pj, kind: 'other' }, 'Drawn').json.kind, undefined);
+});
+
 test('folder: a new empty project is the server\'s (silinx.json text, src/ sim/ constraints/)', async () => {
   const { root, ops } = folder();
   const pj = await ops.create({ name: 'Empty', board: 'basys2' });

@@ -7,6 +7,8 @@ import * as P from './projects.js';
 import { orderExamples } from '../core/examples.js';
 import { TEST_DESIGNS, orderTestDesigns } from '../core/test-designs.js';
 import { nameUnnamed } from '../core/schname.js';
+import { DESIGN_KIND, isDesignOnly } from '../core/project-kind.js';
+import { designProjectInfo } from './mcp-design-only.js';
 import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice, redactor } from './mcp-util.js';
 
 // a project the MCP server makes is untrusted (#2981): its tools' results say so
@@ -78,14 +80,16 @@ export const PROJECT_TOOLS = [
   },
   {
     name: 'new_project', title: 'New empty project',
-    description: 'Make a new empty project in the workspace for a board (basys2, nexys2; default: the Basys2-250\'s device, no board). Then write its sources with write_file (a test bench in sim/) and choose its top module and test bench with set_top.',
-    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name: a letter, then up to 63 letters, digits, - and _.'), board: STR('The board: basys2 or nexys2.'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.') }, required: ['name'], additionalProperties: false },
+    description: 'Make a new empty project in the workspace for a board (basys2, nexys2; default: the Basys2-250\'s device, no board). Then write its sources with write_file (a test bench in sim/) and choose its top module and test bench with set_top. With design_only, a design and simulation project, as New Project\'s "Design and simulation only (no FPGA)": no board, no device, no constraints; its sources are drawings (new_source), simulated with test_bench_wizard and simulate; no implementation, emulation or programming, and its HDL is not shown (set_design_properties with a board makes it an FPGA project).',
+    inputSchema: { type: 'object', properties: { name: STR('The new project\'s name: a letter, then up to 63 letters, digits, - and _.'), board: STR('The board: basys2 or nexys2.'), variant: STR('The board\'s variant: 100 or 250 for the Basys2, 500 or 1200 for the Nexys2.'), design_only: { type: 'boolean', description: 'A design and simulation project: drawings and simulation only, no board (default false).' } }, required: ['name'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false },
-    async run({ name, board, variant }) {
+    async run({ name, board, variant, design_only: designOnly = false }) {
+      if (designOnly && (board || variant)) throw toolError('a design and simulation project has no board: give design_only or a board, not both');
       let device;
       if (board || variant) ({ board, device } = await boardDevice(board, variant));
-      try { await P.createProject({ name, device, board, madeBy: 'mcp' }); } catch (e) { throw toolError(e.message); }
+      try { await P.createProject({ name, device, board, kind: designOnly ? DESIGN_KIND : null, madeBy: 'mcp' }); } catch (e) { throw toolError(e.message); }
       const pj = await P.readProject(name);
+      if (designOnly) return { text: `Empty design and simulation project '${name}' made (no FPGA). Add its drawings with new_source, then set_top.`, data: { project: name, kind: DESIGN_KIND, board: null, device: null, trusted: false } };
       return { text: `Empty project '${name}' made: ${pj.board || 'no board'} (${deviceName(pj.device)}). Write its sources with write_file, then set_top.${UNTRUSTED}`, data: { project: name, board: pj.board || null, device: pj.device, trusted: false } };
     },
   },
@@ -119,6 +123,8 @@ export const PROJECT_TOOLS = [
     annotations: { readOnlyHint: true },
     async run({ project: name }) {
       const pj = await readProject(name);
+      // (a design and simulation project, #3780: its HDL not shown, nor its internal device)
+      if (isDesignOnly(pj)) return designProjectInfo(name, pj, await P.fileTree(name));
       const files = (pj.files || []).map(f => ({ path: f.path, lang: f.lang, role: f.role || 'design' }));
       const all = (await P.fileTree(name)).filter(f => !/^build\//.test(f));
       const data = { project: name, top: pj.top || null, simTop: pj.simTop || null, device: pj.device || null, board: pj.board || null, constraints: pj.constraints || null, synthTool: pj.synthTool || null, files, otherFiles: all.filter(f => !files.some(x => x.path === f) && f !== 'silinx.json') };
