@@ -6,3 +6,8 @@
 .sym-editor .sy-pin:hover { fill: color-mix(in srgb, var(--se-highlight) 30%, transparent); stroke: var(--se-highlight); }
 .sym-editor .sy-pin.sel { fill: color-mix(in srgb, var(--se-select) 25%, transparent); stroke: var(--se-select); }
 .sym-editor .sy-port { margin: 2px 0 6px; }
+/* (a drag selects no text, #3789: the pin being dragged under the pointer, a bar where it will go) */
+.sym-editor .sy-canvas, .sym-editor .sy-canvas * { user-select: none; -webkit-user-select: none; }
+.sym-editor .sy-svg text { pointer-events: none; }
+.sym-editor .sy-ghost { fill: color-mix(in srgb, var(--se-select) 35%, transparent); stroke: var(--se-select); stroke-width: 1.5; pointer-events: none; }
+.sym-editor .sy-mark { stroke: var(--se-select); stroke-width: 2.5; stroke-dasharray: 4 2; pointer-events: none; }

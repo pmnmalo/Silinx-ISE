@@ -51,6 +51,9 @@ uiTest('#3755 Edit Symbol: the symbol made and opened; pins moved, by the Proper
   assert.deepEqual(await page.eval((s) => [...document.querySelectorAll(`${s} .sy-toolbar button`)].filter((x) => /^(Undo|Redo)$|Print/.test(x.title)).length, SY), 0);
   assert.deepEqual(await page.eval((s) => ['zin', 'zout', 'fit'].map((a) => !!document.querySelector(`${s} [data-act=${a}] svg`)), SY), [true, true, true]);
   assert.equal(await page.eval((s) => document.querySelector(`${s} .sy-earlier`).disabled, SY), true, 'no pin selected: Earlier disabled');
+  // (Reset to Default a button of the toolbar, no ⋮ menu, #3789)
+  assert.deepEqual(await page.eval((s) => [...document.querySelectorAll(`${s} .sy-toolbar > .asm-group:first-child button`)].map((b) => b.textContent), SY), ['◀ Earlier', 'Later ▶', 'Reset to Default']);
+  assert.equal(await page.eval((s) => document.querySelector(`${s} .sy-toolbar .tb-menu-btn, ${s} .sy-toolbar [aria-haspopup]`), SY), null, 'no ⋮ menu');
 
   // the clock c selected: its section; to the bottom by its Side
   await page.click(`${SY} .sy-pin[data-pin="c"]`);
@@ -58,11 +61,20 @@ uiTest('#3755 Edit Symbol: the symbol made and opened; pins moved, by the Proper
   assert.equal(await page.eval((s) => document.querySelector(`${s} .sy-port`).textContent, SY), 'Input, 1 bit');
   await page.fill(`${SY} .sy-side`, 'S');
   assert.deepEqual(await pins(page), ['d:W', 'ce:W', 'q:E', 'c:S']);
-  // q dragged to the left side, above d
-  await page.drag(`${SY} .sy-pin[data-pin="q"]`, await page.eval((s) => {
+  // q dragged to the left side, above d: on the way, its handle under the pointer and a bar where it will go, no text
+  // selected (#3789)
+  const from = await page.point(`${SY} .sy-pin[data-pin="q"]`), to = await page.eval((s) => {
     const r = document.querySelector(`${s} .sy-pin[data-pin="d"]`).getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top - 6 };
-  }, SY));
+  }, SY);
+  await page.mouse('mouseMoved', from.x, from.y);
+  await page.mouse('mousePressed', from.x, from.y);
+  for (let i = 1; i <= 8; i++) await page.mouse('mouseMoved', from.x + (to.x - from.x) * i / 8, from.y + (to.y - from.y) * i / 8, { buttons: 1, button: 'left' });
+  assert.deepEqual(await page.eval((s) => {
+    const g = document.querySelector(`${s} .sy-ghost`)?.getBoundingClientRect(), m = document.querySelector(`${s} .sy-mark`);
+    return { ghost: !!g, mark: !!m, across: m ? m.getAttribute('y1') === m.getAttribute('y2') : null, selected: String(getSelection()) };
+  }, SY), { ghost: true, mark: true, across: true, selected: '' });
+  await page.mouse('mouseReleased', to.x, to.y);
   await page.waitFor(() => window.Silinx.active.symEditor.getSymbol().pins[0].name === 'q', [], { what: 'q dragged' });
   assert.deepEqual(await pins(page), ['q:W', 'd:W', 'ce:W', 'c:S']);
   // q selected (dragged): Later ▶ moves it below d
@@ -71,17 +83,25 @@ uiTest('#3755 Edit Symbol: the symbol made and opened; pins moved, by the Proper
   // the spacing 40: the body taller
   await page.fill(`${SY} .sy-spacing`, '40');
   assert.deepEqual(await fields(), ['4 pin(s)', '80 × 160']);
+  assert.equal(await page.eval(() => String(getSelection())), '', 'no text selected (#3789)');
   // the main toolbar's Undo: one step back
   await page.menu('Edit', 'Undo');
   await page.waitFor(() => window.Silinx.active.symEditor.getSymbol().spacing === 20, [], { what: 'undone' });
   assert.deepEqual(await pins(page), ['d:W', 'q:W', 'ce:W', 'c:S']);
   await page.fill(`${SY} .sy-spacing`, '40');
+  // Reset to Default: the default symbol; undone, the one edited back
+  await page.click(`${SY} .sy-reset`);
+  assert.deepEqual(await pins(page), ['d:W', 'ce:W', 'c:W', 'q:E']);
+  await page.menu('Edit', 'Undo');
+  await page.waitFor(() => window.Silinx.active.symEditor.getSymbol().spacing === 40, [], { what: 'Reset undone' });
+  assert.deepEqual(await pins(page), ['d:W', 'q:W', 'ce:W', 'c:S']);
 
   // Portuguese
   await setLang(page, 'pt');
   assert.deepEqual(await page.eval((s) => [...document.querySelectorAll(`${s} .sy-later, ${s} .sy-earlier, ${s} .sy-symbol-props h3, ${s} .sy-symbol-props .asm-label, ${s} .sy-pin-props .asm-label, ${s} .asm-side .asm-cap`)].map((e) => e.firstChild.textContent.trim()), SY),
     ['◀ Antes', 'Depois ▶', 'Propriedades', 'Saída, 1 bit', 'Lado', 'Posição', 'Símbolo', 'Espaçamento dos pinos', 'Largura', 'Altura', 'Nome do módulo']);
   await page.waitFor((s) => document.querySelector(`${s} .doc-status .ds-f`).textContent === '4 pino(s)', [SY], { what: 'the status line in Portuguese' });
+  assert.equal(await page.eval((s) => document.querySelector(`${s} .sy-reset`).textContent, SY), 'Repor o Predefinido');
   assert.deepEqual(await page.eval((s) => [...document.querySelectorAll(`${s} .sy-side option`)].map((o) => o.textContent), SY), ['Esquerda', 'Direita', 'Topo', 'Base']);
   await setLang(page, 'en');
 
