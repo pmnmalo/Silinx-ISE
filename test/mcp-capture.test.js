@@ -66,7 +66,7 @@ test('capture_settings\'s refusals: a signal not in the design, the XC3S100E\'s 
   assert.equal((await P.readProject('b')).capture, undefined);
 });
 
-test('#3176 Implement inserts the capture (Silinx toolchain): blinky\'s bitstream with the core on BSCAN_SPARTAN3, no warning; the Design Summary\'s capture; the Spartan-6 refused', { timeout: 600000 }, async () => {
+test('#3176 Implement inserts the capture (Silinx toolchain): blinky\'s bitstream with the core on BSCAN_SPARTAN3, no warning; the Design Summary\'s capture', { timeout: 600000 }, async () => {
   await ok('new_project_from_example', { name: 'bi', example: 'blinky' });
   await ok('capture_settings', { project: 'bi', probes: ['u_knight.count', 'u_knight.dir'], clock: 'clk', depth: 1024, pre: 64,
     trigger: { combine: 'and', conditions: [{ probe: 'u_knight.dir', op: 'rise' }, { probe: 'u_knight.count', op: '=', value: 20 }] } });
@@ -82,11 +82,6 @@ test('#3176 Implement inserts the capture (Silinx toolchain): blinky\'s bitstrea
     blocks: 1, link: 'JTAG USER1 (BSCAN_SPARTAN3)' });
   // (the synthesis counted the core: its block RAM among the design's)
   assert.equal(summary.synthesis.utilization.find(u => u.id === 'ramb16').used, 1);
-  // the Spartan-6: the Silinx toolchain has no BSCAN there yet
-  await ok('set_design_properties', { project: 'bi', board: 'nexys3' });
-  await ok('capture_settings', { project: 'bi', probes: ['u_knight.count'], clock: 'clk', depth: 1024, trigger: {} });
-  const s6 = await call('run_process', { project: 'bi', process: 'synthesize', toolchain: 'silinx' });
-  assert.match(s6.text, /capture: the Silinx toolchain inserts the logic analyzer on the Spartan-3E only \(not yet the spartan6\); clear the capture \(capture_settings\) to implement the design/);
 });
 
 test('#3176 the capture in an ISE or Vivado run: said, the design implemented without it', async () => {

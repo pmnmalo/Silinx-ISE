@@ -24,8 +24,8 @@ export const CAPTURE_PT = {
   'Any (or)': 'Qualquer (ou)',
   'Add a condition': 'Acrescentar uma condição',
   'Remove the condition': 'Remover a condição',
-  'Implement inserts the capture core (the Silinx toolchain, the Spartan-3E); program the board, then Analyze Design Using the Logic Analyzer.':
-    'A Implementação insere o núcleo de captura (a cadeia de ferramentas Silinx, o Spartan-3E); programe a placa e depois Analisar o Projeto com o Analisador Lógico.',
+  'Implement inserts the capture core (the Silinx toolchain: the Spartan-3E, the Spartan-6); program the board, then Analyze Design Using the Logic Analyzer.':
+    'A Implementação insere o núcleo de captura (a cadeia de ferramentas Silinx: o Spartan-3E, o Spartan-6); programe a placa e depois Analisar o Projeto com o Analisador Lógico.',
 };
 export const CAPTURE_PT_PATTERNS = [
   // (the board's oscillator as the capture's clock, #3481)

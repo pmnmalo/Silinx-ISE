@@ -60,6 +60,8 @@ const BSCAN = {
   artix7: { cell: 'BSCANE2', params: ' #(.JTAG_CHAIN(1))', pins: ['DRCK', 'SEL', 'CAPTURE', 'SHIFT', 'TDI', 'TDO'], tie: [] },
 };
 const LINK = ['tck', 'sel', 'capture', 'shift', 'tdi', 'tdo'];
+/** The BSCAN primitive of a family (BSCAN_SPARTAN3, BSCAN_SPARTAN6, BSCANE2), or null. */
+export const bscanCell = family => BSCAN[family]?.cell ?? null;
 
 const bitsOf = n => { let k = 1; while ((1n << BigInt(k)) <= n) k++; return k; };
 // a signal's bits as a probe (an integer: its range's; an enumeration: its encoding's), or null (an array, a real…)

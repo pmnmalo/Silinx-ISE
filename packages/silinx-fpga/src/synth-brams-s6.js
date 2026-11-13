@@ -73,8 +73,13 @@ ram block $__XILINX_BLOCKRAM_TDP_ {
 }
 `;
 
+// the BSCAN's DRCK on the general routing (#3766): nextpnr's chip database has no switch from the fabric into a BUFGMUX
+// (none measured: ISE's designs of #3176 left DRCK off the global buffers)
+export const S6_CLOCK_DRIVERS = 'setattr -set clkbuf_driver 1 =BSCAN_SPARTAN6/w:DRCK';
+
 /** synth_xilinx -family xc6s (`synth`, its command) with its memory step on BRAMS_S6: the step's commands as
- *  synth_xilinx runs them for the family (Yosys 0.70: its LUT RAMs, its ROMs' logic cost), the rule file swapped. */
-export const s6SynthCommands = synth => `${synth} -run :map_memory; `
+ *  synth_xilinx runs them for the family (Yosys 0.70: its LUT RAMs, its ROMs' logic cost), the rule file swapped.
+ *  A BSCAN_SPARTAN6's DRCK a clock driver of its own (#3766): no BUFG on it (clkbufmap), as ISE routes it. */
+export const s6SynthCommands = synth => `${synth} -run :map_memory; ${S6_CLOCK_DRIVERS}; `
   + `memory_libmap -lib +/xilinx/lutrams_xc5v.txt -lib ${BRAMS_S6_FILE} -D IS_SPARTAN6 -logic-cost-rom 0.015625; `
   + `techmap -map +/xilinx/lutrams_xc5v_map.v; techmap -map +/xilinx/brams_xc3sda_map.v; ${synth} -run map_ffram:`;

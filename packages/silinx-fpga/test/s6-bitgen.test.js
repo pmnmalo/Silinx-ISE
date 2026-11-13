@@ -209,7 +209,7 @@ test('bitdb-node: the open flow\'s PIPs measured one at a time (#732: a right I/
   assert.ok(i < tp.from.length && allow(k, i));
 });
 
-test('bitgen: a BSCAN_SPARTAN6\'s JTAG chain, one bit per chain in the corner\'s region whatever its site; its pins\' switches into the fabric and TDO\'s from it known, on both parts (#3176)', () => {
+test('bitgen: a BSCAN_SPARTAN6, one bit per site in the corner\'s region (the site decides its JTAG chain, #3766); its pins\' switches into the fabric and TDO\'s from it known, on both parts (#3176)', () => {
   const sites = device.sites('BSCAN').sort((a, b) => a.name.localeCompare(b.name));
   assert.equal(sites.length, 4);
   const lone = (site, chain) => ({ insts: [{ name: 'b', type: 'BSCAN', site: site.name, tile: site.tileName, placed: true, cfg: cfg({ JTAG_CHAIN: String(chain), JTAG_TEST: '0' }) }], nets: [] });
@@ -218,7 +218,9 @@ test('bitgen: a BSCAN_SPARTAN6\'s JTAG chain, one bit per chain in the corner\'s
     const p = predictDesign(lone(site, k + 1), device, dev, db);
     assert.deepEqual([[...p.bits], [...p.unknown.keys()]], [[`2966,${31 - k}`], []], site.name);
   }
-  assert.deepEqual([...predictDesign(lone(sites[0], 5), device, dev, db).unknown.keys()], ['BSCAN JTAG_CHAIN=5']);
+  // #3766: the bit is the site's, whatever the JTAG_CHAIN (ISE's bitgen: the chain 1 on BSCAN_X0Y3 sets bit 28, the site's)
+  const p13 = predictDesign(lone(sites[3], 1), device, dev, db);
+  assert.deepEqual([[...p13.bits], [...p13.unknown.keys()]], [['2966,28'], []]);
   const OUTS = ['CAPTURE', 'DRCK', 'RESET', 'RUNTEST', 'SEL', 'SHIFT', 'TCK', 'TDI', 'TMS', 'UPDATE'];
   for (const part of [PART, 'xc6slx45csg324-3']) {
     const d = loadDeviceCache(part), known = knownPipS6(d, loadBitDbS6(part));

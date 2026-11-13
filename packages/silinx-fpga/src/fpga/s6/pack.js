@@ -66,7 +66,7 @@ const MEM = {
   SRL16E: { luts: 1, srl: true }, SRLC32E: { luts: 1, srl: true }, SRL16: { luts: 1, srl: true }, SRLC16E: { luts: 1, srl: true },
 };
 // the cells on sites of their own, counted
-const OWN_SITE = /^(IBUF|IBUFG|OBUF|OBUFT|IOBUF|BUFG|BUFGMUX|BUFGCE|BUFIO2|BUFH|RAMB8BWER|RAMB16BWER|DSP48A1|DCM_SP|PLL_BASE|PLL_ADV|GND|VCC|PULLUP|PULLDOWN)$/;
+const OWN_SITE = /^(IBUF|IBUFG|OBUF|OBUFT|IOBUF|BUFG|BUFGMUX|BUFGCE|BUFIO2|BUFH|RAMB8BWER|RAMB16BWER|DSP48A1|DCM_SP|PLL_BASE|PLL_ADV|BSCAN_SPARTAN6|GND|VCC|PULLUP|PULLDOWN)$/;
 
 /** The netlist's index: a net's driver and loads, a cell's input nets. */
 function indexOf(nl) {
