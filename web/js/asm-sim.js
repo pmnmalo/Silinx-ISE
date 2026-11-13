@@ -56,7 +56,7 @@ export function mountAsmSim({ M, btn, render, layout, destroyed, onErrors, simBt
     insRow,
     h('div', { class: 'fsm-sim-row' }, h('span', { class: 'asm-label' }, 'Outputs'), outs),
     regsRow, trace));
-  const panel = h('div', { class: 'asm-codepanel fsm-panel asm-simpanel', hidden: true },
+  const panel = h('div', { class: 'asm-codepanel fsm-panel asm-simpanel try-it', hidden: true },   // (green, as the schematic's Try it, #3798)
     h('div', { class: 'asm-codebar' }, title, tools, h('div', { class: 'asm-spacer' }), foldBtn, btn('✕', 'Close the panel', () => show(false))),
     body);
   function fold() {

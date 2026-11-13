@@ -22,6 +22,7 @@ export function mountPetriSim(ctx) {
   function togglePanel(which) {
     setPanel(panel() === which ? null : which);
     bottom.hidden = !panel();
+    bottom.classList.toggle('try-it', panel() === 'sim');   // (green, as the schematic's Try it, #3798)
     for (const [k, b] of Object.entries(tabBtns)) b.classList.toggle('active', k === panel());
     if (panel() === 'sim' && !sim()) resetSim(false);
     if (panel() !== 'sim' && sim()) { if (sim().timer) clearInterval(sim().timer); setSim(null); }

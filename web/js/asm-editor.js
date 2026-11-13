@@ -38,6 +38,7 @@ import { mountAsmOps } from './asm-ops.js';
 import { clone } from '/core/util.js';
 import { statusLine } from './status-line.js';
 import { mountAsmSim } from './asm-sim.js';
+import { mountDockPanel } from './dock-panel.js';
 
 export const GRID = 20;
 const CHW = 7.25;          // approx. width of a 12px monospace character
@@ -254,6 +255,8 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg);
 
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap, simApi.panel);
+  // (resized and moved, below or on the right: dock-panel.js, #3797)
+  const dock = mountDockPanel({ main: mainCol, panel: simApi.panel, bar: simApi.panel.querySelector('.asm-codebar'), btn, kind: 'asm', changed: () => { if (!destroyed) applyView(); } });
 
   // side panel
   const selSection = h('section', { class: 'asm-section asm-selection' });
@@ -411,6 +414,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
     destroy() {
       destroyed = true;
       simApi.stop();
+      dock.destroy();
       Object.values(timers).forEach(clearTimeout);
       ro?.disconnect();
       root.remove();
