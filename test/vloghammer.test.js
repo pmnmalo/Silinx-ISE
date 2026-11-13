@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generate, moduleText, reductions, moduleSize, exprText, exprSize, FAMILIES } from './corpus/vloghammer-gen.mjs';
-import { runBatch, reduce } from './corpus/vloghammer.mjs';
+import { runBatch, reduce, checkModule, yosysBatch } from './corpus/vloghammer.mjs';
 
 test('the generator: seeded like VlogHammer, reproducible, every family', () => {
   for (const f of FAMILIES) assert.equal(moduleText(generate(f, 3)), moduleText(generate(f, 3)), f);
@@ -53,4 +53,18 @@ test('a fixed batch: Silinx and Yosys agree on every module', { timeout: 300000 
   const bad = results.filter(r => r.status !== 'pass');
   assert.deepEqual(bad.map(r => `${r.name}: ${r.status}: ${r.reason}\n${r.report || ''}`), []);
   assert.equal(results.length, 48);
+});
+
+test('#3733 a difference Yosys\'s alumacc alone makes is Yosys\'s bug (YosysHQ/yosys#3278), not a mismatch; another stays one', { timeout: 300000 }, async () => {
+  // the Nightly's wideexpr_47035: y2 = 6'sb101111 - $signed(-((3'sb111) << s3)); for s3 = 2 the operand of $signed is
+  // self-determined, 3 bits: (111 << 2) = 100, -(100) = 100, -4; -17 - -4 = -13 = 0xfff3 (Silinx, and Yosys before
+  // alumacc); after alumacc Yosys's netlist gives 0xffeb, -17 - 4: the 3-bit wrap lost
+  const r = await checkModule(generate('wideexpr', 47035));
+  assert.equal(r.status, 'yosys-bug', r.reason);
+  assert.match(r.reason, /^Yosys's alumacc \(YosysHQ\/yosys#3278\): its netlist differs, the netlist without alumacc agrees \(cycle \d+: y\)$/);
+  // a netlist of another module (renamed): it differs, and Yosys's own, with alumacc or not, does not: a mismatch still
+  const m = generate('wideexpr', 0), other = generate('wideexpr', 1);
+  const wrong = (await yosysBatch([{ name: m.name, text: moduleText(other).replace(`module ${other.name}(`, `module ${m.name}(`) }]))[m.name];
+  const w = await checkModule(m, { yosys: wrong });
+  assert.equal(w.status, 'mismatch', w.reason);
 });

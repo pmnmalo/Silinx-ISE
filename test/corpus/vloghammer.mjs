@@ -27,11 +27,13 @@ import { yosysNode } from '../../packages/silinx-fpga/src/synth-open-node.js';
 
 const VECTORS = 64;
 
-/** Yosys on several modules in one run: { name: { json, verilog } | { error } }. */
+/** Yosys on several modules in one run: { name: { json, verilog } | { error } }. flow: generic, xilinx, or
+ *  generic-noalumacc (synth -noalumacc: the arithmetic kept as Yosys read it, see checkModule). */
 export async function yosysBatch(mods, flow = 'generic') {
   const one = m => {
     const f = `${m.name}.v`;
-    const map = flow === 'xilinx' ? `synth_xilinx -family xc3se -ise -flatten -top ${m.name}` : `synth -flatten -top ${m.name}`;
+    const map = flow === 'xilinx' ? `synth_xilinx -family xc3se -ise -flatten -top ${m.name}`
+      : `synth ${flow === 'generic-noalumacc' ? '-noalumacc ' : ''}-flatten -top ${m.name}`;
     return { file: f, cmd: `design -reset; read_verilog ${f}; ${map}; delete t:$scopeinfo; write_json ${m.name}.json; write_verilog -noattr ${m.name}_yosys.v` };
   };
   const res = {};
@@ -70,9 +72,21 @@ export async function checkModule(m, { flow = 'generic', vectors = VECTORS, yosy
   if (!fe.design) return { status: 'unsupported', reason: `Silinx: ${fe.stage}: ${fe.reason}` };
   const y = yosys || (await yosysBatch([{ name: m.name, text }], flow))[m.name];
   if (!y || y.error || !y.json) return { status: 'yosys-error', reason: y?.error || 'no netlist' };
-  const syn = { top: m.name, files: { [`${m.name}.json`]: y.json, [`${m.name}_yosys.v`]: y.verilog }, cells: cellCounts(y.json, m.name) };
-  const r = compareNetlist(fe.design, syn, { name: m.name, seed: m.name, sim: { cycles: vectors } });
-  return r.status === 'pass' ? { status: 'pass' } : { status: r.status, reason: r.reason, report: r.report };
+  const compare = y => compareNetlist(fe.design, { top: m.name, files: { [`${m.name}.json`]: y.json, [`${m.name}_yosys.v`]: y.verilog }, cells: cellCounts(y.json, m.name) },
+    { name: m.name, seed: m.name, sim: { cycles: vectors } });
+  const r = compare(y);
+  if (r.status === 'pass') return { status: 'pass' };
+  // Yosys's alumacc merges a negation that wraps at its own width into a wider sum (YosysHQ/yosys#3278, open; #3733):
+  // when Yosys's netlist differs, but agrees once alumacc is left out, Yosys's own synthesis changed the value Yosys
+  // read (Silinx's open synthesis writes -x as 0 - x against it, #743: test/synth-negation.test.js). Both netlists
+  // made again, so that the verdict is Yosys's on this text alone.
+  if (r.status === 'mismatch' && flow === 'generic') {
+    const [withA, without] = await Promise.all(['generic', 'generic-noalumacc'].map(async f => (await yosysBatch([{ name: m.name, text }], f))[m.name]));
+    if (withA?.json && without?.json && compare(withA).status === 'mismatch' && compare(without).status === 'pass') {
+      return { status: 'yosys-bug', reason: `Yosys's alumacc (YosysHQ/yosys#3278): its netlist differs, the netlist without alumacc agrees (${r.reason})` };
+    }
+  }
+  return { status: r.status, reason: r.reason, report: r.report };
 }
 
 /** Reduce a failing module while it keeps failing (opts.check(m, opts) -> { status }: checkModule by default). Returns { module, steps }. */

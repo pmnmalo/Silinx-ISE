@@ -119,6 +119,9 @@ xorshift32 sequence and seeds. `test/corpus/vloghammer.mjs` compares Silinx's si
 Yosys's netlist of the same text (`synth` to gates by default; `--flow xilinx` for synth_xilinx;
 `--synth` also checks Silinx's synthesis path) on random input vectors, and reduces a failing
 module (one output kept, expression nodes replaced by an operand or a constant) to a small text.
+A module whose Yosys netlist differs, but agrees once Yosys's `alumacc` is left out (`synth -noalumacc`), is
+`yosys-bug`, not a failure: alumacc merges a negation that wraps at its own width into a wider sum
+(YosysHQ/yosys#3278, open; the Nightly's `wideexpr_47035`, #3733), which Silinx's open synthesis avoids (#743).
 
     npm run test:vloghammer -- --seed 0 --count 1000 [--families expression,partsel] [--synth] [--out dir]
 
