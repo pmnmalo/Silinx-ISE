@@ -281,7 +281,7 @@ test('the traffic lab on its example: the diagram and its simulation as it is, t
 
 test('the blinky lab on its example: the board, the clock, the simulation as it is; the speed after its action, not a wrong one; implemented, its bitstream', async () => {
   const lab = LABS.find(l => l.id === 'blinky-clock-board');
-  const fast = (div = '312_500') => ({ 'src/top.vhd': v => v.replace('DIV      : integer := 625_000;', `DIV      : integer := ${div};`) });
+  const fast = (div = '312_500') => ({ 'src/top.vhd': v => v.replace('DIV      : integer := 0;', `DIV      : integer := ${div};`) });
   assert.deepEqual(await done(lab, exampleIo('blinky', {}, { reports: null })), [true, true, true, false, false, false]);
   assert.deepEqual(await done(lab, exampleIo('blinky', fast(), { reports: runReports('implement') })), [true, true, true, true, true, false]);
   assert.deepEqual(await done(lab, exampleIo('blinky', fast(), { reports: runReports('bitstream') })), [true, true, true, true, true, true]);

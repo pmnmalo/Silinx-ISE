@@ -375,7 +375,7 @@ uiTest('open mode: View Technology Schematic of blinky and pong without ISE: the
   await page.setView('impl');
   assert.deepEqual((await procLabels(page)).find((p) => p.label === 'View Technology Schematic'), { label: 'View Technology Schematic', disabled: false, title: '' });
   await checkTechSchematic(page, { top: 'top', blocks: ['u_pre', 'u_speed', 'u_knight', 'u_count', 'u_display'], inside: 'u_pre',
-    message: "Technology Schematic of 'top': the netlist of the Silinx toolchain's synthesis (build/open/top.json), 508 cells in 5 block(s): u_display (61), u_knight (52), u_speed (212), u_count (84), u_pre (68)." });
+    message: "Technology Schematic of 'top': the netlist of the Silinx toolchain's synthesis (build/open/top.json), 513 cells in 5 block(s): u_display (61), u_knight (52), u_count (84), u_speed (218), u_pre (67)." });
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
   // Portuguese: the view's bar, its tab and the LUT's function have no untranslated text (the netlist's names apart)
   await page.eval(TEXTS);
@@ -454,7 +454,8 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   await page.treeRow('#procs', 'View RTL Schematic', { dbl: true, exact: true });
   await page.waitFor(() => window.Silinx.active?.id === 'rtl:top' && document.querySelectorAll('.doc:not([hidden]) .se-svg [data-kind=sym]').length >= 5, [], { what: 'RTL schematic' });
   const rtl = await viewerTexts(page);
-  assert.deepEqual(rtl.kinds, ['wire', 'sym:module', 'sym:slice', 'sym:constant', 'sym:and2b1', 'sym:hdlblock', 'port', 'label']);   // (the constant: the display's decimal points, #983)
+  // (the constant: the display's decimal points, #983; the HDL block first: the inputs read through btnOn / swOn, #3710)
+  assert.deepEqual(rtl.kinds, ['wire', 'sym:hdlblock', 'sym:module', 'sym:slice', 'sym:constant', 'sym:and2b1', 'port', 'label']);
   assert.deepEqual(rtl.untranslated, []);
   for (const s of ['Propriedades', '<--Todos os Símbolos-->', '@Inversor', '@Porta AND de 2, 3 ou 4 entradas, as entradas e as entradas invertidas nas suas propriedades (bit a bit quando Largura > 1)', 'Fio · rede clk', "Rede 'clk', 1 bit",
     'Módulo prescaler', 'Parâmetros', 'vazio = valor por omissão do módulo', 'Pinos (3)', 'Índice do MSB', 'Marcador de E/S', 'Bidirecional', 'Nome de Rede',
@@ -469,7 +470,7 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   const tech = await viewerTexts(page);
   assert.deepEqual(tech.kinds, ['wire', 'sym:module', 'sym:constant', 'sym:slice', 'sym:busjoin', 'port', 'label']);
   assert.deepEqual(tech.untranslated, []);
-  for (const s of ['Propriedades', '⬆ Subir', 'Módulo LUT2', 'Pinos (3)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
+  for (const s of ['Propriedades', '⬆ Subir', 'Módulo LUT3', 'Pinos (4)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
     assert.ok(tech.pt.has(s), `${s}: ${[...tech.pt].join(' | ')}`);
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
@@ -822,8 +823,8 @@ uiTest('#695 #698 open mode: blinky\'s Post-Map Model on the event-driven engine
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'EventModel', template: 'blinky' });
   const top = await readWs(env, 'EventModel', 'src/top.vhd');
-  assert.match(top, /DIV {6}: integer := 625_000;/);
-  await writeWs(env, 'EventModel', 'src/top.vhd', top.replace(/DIV {6}: integer := 625_000;/, 'DIV      : integer := 625;    '));
+  assert.match(top, /DIV {6}: integer := 0;/);   // (0: CLK_HZ / 80, 625 000 at 50 MHz, #3710)
+  await writeWs(env, 'EventModel', 'src/top.vhd', top.replace(/DIV {6}: integer := 0;/, 'DIV      : integer := 625;'));
   await page.openProject('EventModel');
   await reloadToolchain(page);
   await page.treeRow('#procs', 'Emulate Post-Map Model', { dbl: true, exact: true });

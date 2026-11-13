@@ -30,7 +30,8 @@ const BOARDS = [
       ...[7, 6, 5].map(i => `WARNING:Place - IO 'led[${i}]' is unconstrained in PCF and will be automatically placed`)] },
   { board: 'ulx3s', tool: 'nextpnr-ecp5', part: 'lfe5u-85f-6cabga381', mhz: 25, util: ['DCCA', 'TRELLIS_COMB', 'TRELLIS_FF', 'TRELLIS_IO'], io: IO, warnings: [] },
   { board: 'tangnano9k', tool: 'nextpnr-himbaechel-gowin', part: 'gw1nr-9c-6qn88', mhz: 27, util: ['ALU', 'DFF', 'IOB', 'LUT4', 'MUX2_LUT5'], io: [],
-    warnings: ['C7', 'C6', '9Y26/C7', 'C5', '9Y26/C6', '8Y26/C5', '8Y26/C7', '11Y26/C5'].map(t => `WARNING:Place - Failed to route net 'sw_IBUF_I_O[2]' from X28Y28/F6 to X${/\//.test(t) ? t : `10Y26/${t}`} using dedicated routing.`) },
+    // (the switches read through swOn, #3710: before, sw_IBUF_I_O[2]'s)
+    warnings: ['X11Y26/C6', 'X11Y26/C2', 'X11Y26/C7', 'X9Y26/C6', 'X10Y26/C6', 'X8Y26/C6', 'X8Y26/C7', 'X11Y26/C5'].map(t => `WARNING:Place - Failed to route net 'swon[1]' from X28Y28/F6 to ${t} using dedicated routing.`) },
 ];
 
 for (const b of BOARDS) {

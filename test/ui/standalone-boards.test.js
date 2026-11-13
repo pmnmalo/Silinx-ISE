@@ -31,6 +31,10 @@ async function serverBit(ucf) {
   try {
     const project = JSON.parse(fs.readFileSync(path.join(ROOT, 'examples/blinky/silinx.json'), 'utf8'));
     for (const f of project.files) { fs.mkdirSync(path.join(dir, path.dirname(f.path)), { recursive: true }); fs.copyFileSync(path.join(ROOT, 'examples/blinky', f.path), path.join(dir, f.path)); }
+    // (the Nexys3's 100 MHz as the top's CLK_HZ, as New Project writes it for the board, #3710)
+    const { topForBoard } = await import('../../core/board-generics.js');
+    const top = topForBoard(project.files.filter((f) => f.role !== 'sim' && /^(vhdl|verilog)$/.test(f.lang)).map((f) => ({ ...f, text: fs.readFileSync(path.join(dir, f.path), 'utf8') })), project.top, resolveBoard('nexys3'));
+    if (top) fs.writeFileSync(path.join(dir, top.path), top.text);
     fs.mkdirSync(path.join(dir, path.dirname(project.constraints)), { recursive: true });
     fs.writeFileSync(path.join(dir, project.constraints), ucf);
     const lines = [];

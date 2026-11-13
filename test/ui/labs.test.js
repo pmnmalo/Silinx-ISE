@@ -243,9 +243,9 @@ uiTest('#3179 the blinky lab: the board, the clock, the simulation, the speed (a
   }
   // the speed: three times as fast (wrong), then twice
   const top = await readWs(env, 'blinky', 'src/top.vhd');
-  await writeWs(env, 'blinky', 'src/top.vhd', top.replace('DIV      : integer := 625_000;', 'DIV      : integer := 208_333;'));
+  await writeWs(env, 'blinky', 'src/top.vhd', top.replace('DIV      : integer := 0;', 'DIV      : integer := 208_333;'));
   assert.match(await checkStepOf(page, 4, 6), /WARNING: src\/top\.vhd has nothing like '[^']*312_\?500[^']*'\nHint: Twice as fast is half/);
-  await writeWs(env, 'blinky', 'src/top.vhd', top.replace('DIV      : integer := 625_000;', 'DIV      : integer := 312_500;'));
+  await writeWs(env, 'blinky', 'src/top.vhd', top.replace('DIV      : integer := 0;', 'DIV      : integer := 312_500;'));
   assert.match(await checkStepOf(page, 4, 6), /Step done\./);
   assert.equal(await ticks(page), '✓ ✓ ✓ ✓ ·< ·');
   // Implement Design: not run, then run: no warnings, its timing met; the bitstream after it
