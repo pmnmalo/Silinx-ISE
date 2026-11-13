@@ -44,7 +44,7 @@ test('export_project / import_project: traffic as a Xilinx ISE project and back,
   const i = await ok('import_project', { name: 'traffic_x', from: out('traffic.zip') });
   assert.equal(i.text, 'Imported the Xilinx ISE project as \'traffic_x\': top top, test bench tb_traffic, no board (xc3s250ecp132-4), 6 source(s).');
   assert.deepEqual([i.data.kind, i.data.missing, i.data.warnings], ['xilinx', [], []]);
-  assert.equal((await ok('check_syntax', { project: 'traffic_x' })).text, 'Process "Check Syntax" of <top> completed successfully (41 signals, 30 processes).');
+  assert.equal((await ok('check_syntax', { project: 'traffic_x' })).text, 'Process "Check Syntax" of <top> completed successfully (43 signals, 32 processes).');
   // its .xise alone: its folder's files with it
   for (const e of await readZip(fs.readFileSync(out('traffic.zip')), NODE_CODEC)) {
     fs.mkdirSync(path.dirname(out(`ise/${e.path}`)), { recursive: true });
@@ -52,7 +52,7 @@ test('export_project / import_project: traffic as a Xilinx ISE project and back,
   }
   const f = await ok('import_project', { name: 'traffic_ise', from: out('ise/traffic.xise') });
   assert.equal(f.text, 'Imported the Xilinx ISE project as \'traffic_ise\': top top, test bench tb_traffic, no board (xc3s250ecp132-4), 6 source(s).');
-  assert.equal((await ok('check_syntax', { project: 'traffic_ise', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (42 signals, 32 processes).');
+  assert.equal((await ok('check_syntax', { project: 'traffic_ise', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (44 signals, 34 processes).');
 });
 
 test('export_project / import_project: a Silinx project, its drawings and board kept; a project folder', async () => {

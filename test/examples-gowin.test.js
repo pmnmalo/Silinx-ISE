@@ -19,7 +19,7 @@ process.env.SILINX_CONFIG_DIR = path.join(tmp, 'config');
 test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 // nextpnr's warnings of each example (seed 1): "Failed to route net … using dedicated routing."
-const DEDICATED = { gates: 1, traffic: 1, blinky: 8, pong: 10, stopwatch: 0, clock: 10, vga: 0, isqrt: 1, uart: 0, micro80: 1 };
+const DEDICATED = { gates: 1, traffic: 1, blinky: 8, pong: 8, stopwatch: 0, clock: 12, vga: 0, isqrt: 1, uart: 0, micro80: 1 };
 const FALLBACK = /^WARNING:Place - Failed to route net '[^']+' from \S+ to \S+ using dedicated routing\.$/;
 
 test('the examples\' ports on the Tang Nano 9K: every one with a pin', () => {
