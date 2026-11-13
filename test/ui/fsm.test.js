@@ -277,7 +277,9 @@ uiTest('State diagram (FSM): step-by-step simulation, Mealy labels, module -> di
   await new Promise((r) => setTimeout(r, 1300));
   assert.equal(await cycles(), n1, 'no clock edge once stopped');
   await page.click(`${ED} .fsm-sim-reset`);
-  // ---- undo / redo of a deleted transition (Del key)
+  // ---- undo / redo of a deleted transition (Del key), Try it closed (the diagram locked while it is open, #3793)
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Try it' });
+  await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-sim`), [ED], { what: 'Try it closed' });
   await selectTrans(page, 't1');
   await page.eval((ed) => document.querySelector(ed).focus(), ED);
   await page.key('Delete');
