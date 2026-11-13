@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sexpr, timescalePs, parseSdf, parseTimingPaths, parseRoutes, connections, wireClass, lutBelPin, nextpnrPathSplit } from '../scripts/xc7-timing-parse.mjs';
 import { cellSamples, cellStats, wireSamples, groupWires, mergeCellStats, mergeGroups, nnls, fitWires, chipdbTable, compareFmax, fitMeasurement, CLASSES } from '../scripts/xc7-timing-fit.mjs';
-import { edifScript, measureTcl, runSh, selectDesigns, designNumbers, mergeMeasurement, keepsRun, jobContainers, BOARDS, OUTPUTS } from '../scripts/xc7-timing-vivado.mjs';
+import { edifScript, measureTcl, runSh, selectDesigns, nameFilter, designNumbers, mergeMeasurement, keepsRun, jobContainers, BOARDS, OUTPUTS } from '../scripts/xc7-timing-vivado.mjs';
 import { parseTimingSummary } from '../server/vivado-reports.js';
 
 const SDF = `(DELAYFILE
@@ -368,4 +368,21 @@ test('#3516 the host\'s jobs: a Xilinx image\'s container or a silinx-* run is o
   assert.deepEqual(jobContainers('my/vivado:2025.2\tjob', 'my/vivado:2025.2'), ['job']);
   assert.deepEqual(jobContainers('my/vivado:2025.2\tjob'), []);
   assert.deepEqual(jobContainers('notxilinx/ise:1\tx'), []);
+});
+
+test('#3752 --filter: examples\' names, matched as the same regular expression would, never a regular expression built from the command line', async () => {
+  const { EXAMPLES } = await import('./examples-lib.mjs');
+  const names = [...EXAMPLES, 'blinky2', 'myblinky'];
+  // (the reference: the pattern as a regular expression, as --filter was before; every form nameFilter takes)
+  const filters = ['^blinky$', '^(blinky|pong)$', '^(blinky)$', 'blinky|pong', '(blinky|pong)', '^b', '^(b|c)', 'k$', '(k|o)$', 'o', 'micro80', '^micro80$', '^(gates|traffic|blinky|pong|stopwatch|clock|vga|isqrt|uart|micro80)$', 'none'];
+  for (const f of filters) assert.deepEqual(names.filter(nameFilter(f)), names.filter((n) => new RegExp(f).test(n)), f);
+  // a comma as |
+  assert.deepEqual(names.filter(nameFilter('^(blinky,pong)$')), ['blinky', 'pong']);
+  assert.deepEqual(names.filter(nameFilter('blinky,pong')), names.filter((n) => /blinky|pong/.test(n)));
+  assert.deepEqual(selectDesigns(['gates', 'blinky', 'pong'], ['basys3'], '^blinky$').map((d) => d.id), ['basys3-blinky']);
+  assert.deepEqual(selectDesigns(['gates', 'blinky'], ['basys3'], 'x'), []);
+  // anything but names: an error naming the filter (the old code built a regular expression of any of these)
+  for (const f of ['(a+)+$', '.*', 'blink.', '^(blinky|pong$', '^blinky)$', 'blinky||pong', '|blinky', 'a b', '^$', '$^blinky', '[a-z]+', '\\w']) {
+    assert.throws(() => selectDesigns(['gates', 'blinky'], ['basys3'], f), (e) => e.message === `--filter: examples' names separated by | or , (as '^(blinky|pong)$'), not ${f}`, f);
+  }
 });
