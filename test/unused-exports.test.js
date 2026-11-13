@@ -20,8 +20,6 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LEFT = {
   // kept for compatibility, as its comment says (the Spartan-3E-only view of the database)
   'core/devices.js': 'DEVICES',
-  // what wizards.js exported before #405's split it exports still (test/new-source-module.test.js checks it)
-  'web/js/wizards.js': 'createTopSource GOATCOUNTER_URL WHO_URL',
   // declared with MIN_ZOOM (`export const MAX_ZOOM = …, MIN_ZOOM = …`), which test/tasks.test.js reads: the check
   // takes a declaration's first name only
   'web/js/tasks-emu.js': 'MAX_ZOOM',
@@ -142,15 +140,42 @@ function unusedExports(text) {
     for (const m of t.matchAll(/['"`]([^'"`\n$]+?\.m?js)(?=[?'"`])/g)) {
       const quoted = m[1].replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
       if (named.has(m[1]) && !new RegExp(`import\\s+\\*|import\\s*\\(\\s*['"\`]${quoted}`).test(t)) continue;
+      // (a bare name, a piece of a path.join: every module whose path ends so, #3734)
       const to = resolve(f, m[1]);
-      if (!to || to === f) continue;
+      const tos = to ? [to] : /^[\w.-]+(\/[\w.-]+)*$/.test(m[1]) ? [...text.keys()].filter(p => p.endsWith(`/${m[1]}`)) : [];
       words ??= new Set(t.match(/[A-Za-z_$][\w$]*/g));
-      for (const n of exported(to)) if (words.has(n)) mark(to, n);
+      for (const p of tos) if (p !== f) for (const n of exported(p)) if (words.has(n)) mark(p, n);
     }
   }
   for (const e of PUBLIC) if (text.has(e)) for (const n of exported(e)) mark(e, n);
   const out = [];
   for (const [f, d] of defs) if (CHECKED(f)) for (const n of d.keys()) if (!used.get(f).has(n)) out.push(`${f} ${n}`);
+  return out;
+}
+
+/** The names a file takes from a dynamic import (`const { a, b } = await import(…)`) that the module it names
+ *  (its last quoted .js / .mjs, a bare one by its path's ending) does not export: `file name (module)` each. */
+function missingDynamicImports(text) {
+  const out = [];
+  for (const [f, t] of text) {
+    for (const m of t.matchAll(/\bconst\s*\{([^}]*)\}\s*=\s*await\s+import\s*\(([^;\n]*)/g)) {
+      const spec = [...m[2].matchAll(/['"`]([\w./-]+\.m?js)['"`]/g)].pop()?.[1];
+      if (!spec) continue;
+      const mods = spec.startsWith('.') ? [path.posix.normalize(path.posix.join(path.posix.dirname(f), spec))].filter(p => text.has(p))
+        : [...text.keys()].filter(p => p.endsWith(`/${spec}`));
+      if (mods.length !== 1 || /\bexport\s*\*/.test(text.get(mods[0]))) continue;
+      const src = text.get(mods[0]);
+      // (its exports: a declaration's names, `export const A = 1, B = 2` too; an export list's, as they are named out)
+      const names = new Set();
+      for (const d of src.matchAll(/^export\s+(?:async\s+)?(?:function\s*\*?|class)\s+([\w$]+)/gm)) names.add(d[1]);
+      for (const d of src.matchAll(/^export\s+(?:const|let|var)\s+([^;]*)/gm)) for (const v of d[1].matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*=/g)) names.add(v[1]);
+      for (const d of src.matchAll(/^export\s*\{([^}]*)\}/gm)) for (const p of d[1].split(',').map(x => x.trim()).filter(Boolean)) names.add(p.split(/\s+as\s+/).pop().trim());
+      for (const part of m[1].split(',').map(x => x.trim()).filter(Boolean)) {
+        const n = part.split(/\s*[:=]\s*/)[0].trim();
+        if (!names.has(n)) out.push(`${f} ${n} (${mods[0]})`);
+      }
+    }
+  }
   return out;
 }
 
@@ -174,6 +199,16 @@ test('no module exports a name nothing else uses, but the reviewed exceptions (#
   assert.deepEqual(left.filter(x => !found.includes(x)), [], 'in LEFT, no longer an unused export');
 });
 
+test('every name taken from a dynamic import is one its module exports (#3734)', () => {
+  assert.deepEqual(missingDynamicImports(repository()), []);
+  const files = new Map(Object.entries({
+    'scripts/fetch.mjs': 'export async function fetchIt() {}\nexport const PIN = 1, DIRS = [];\nconst hidden = 2;\nexport { hidden as shown };',
+    'test/corpus/run.mjs': "const { fetchIt, DIRS, PIN, shown, hidden } = await import(pathToFileURL(path.join(HERE, '..', '..', 'scripts', 'fetch.mjs')).href);",
+    'core/c.js': "const { fetchIt: f, gone } = await import('../scripts/fetch.mjs');",
+  }));
+  assert.deepEqual(missingDynamicImports(files), ['test/corpus/run.mjs hidden (scripts/fetch.mjs)', 'core/c.js gone (scripts/fetch.mjs)']);
+});
+
 test('the check finds an export nothing uses, and sees each kind of use (#3543)', () => {
   const files = new Map(Object.entries({
     'core/a.js': 'export const A = 1;\nexport function unused() {}\nexport const viaNs = 2, viaDyn = 3;\nexport { A as B };\nexport const RE = 4;',
@@ -187,6 +222,9 @@ test('the check finds an export nothing uses, and sees each kind of use (#3543)'
     'packages/silinx-fpga/src/index.js': "export * from './deep.js';",
     'packages/silinx-fpga/src/deep.js': 'export const api = 1;',
     'test/t.test.js': "import { B } from '../core/a.js';",
+    // a module named by the pieces of its path (test/corpus/run-corpus.mjs's import of scripts/fetch-yosys-tests.mjs, #3734)
+    'scripts/fetch.mjs': 'export async function fetchIt() {}\nexport const DIRS = [];\nexport const unseen = 1;',
+    'test/corpus/run.mjs': "const { fetchIt, DIRS } = await import(pathToFileURL(path.join(HERE, '..', '..', 'scripts', 'fetch.mjs')).href);",
   }));
-  assert.deepEqual(unusedExports(files).sort(), ['core/a.js unused', 'core/c.js own', 'web/js/api-local.js extra']);
+  assert.deepEqual(unusedExports(files).sort(), ['core/a.js unused', 'core/c.js own', 'scripts/fetch.mjs unseen', 'web/js/api-local.js extra']);
 });
