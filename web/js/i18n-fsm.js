@@ -59,7 +59,7 @@ export const FSM_PT = {
   // the ASM chart's Simulate panel (#2880, asm-sim.js; its other labels the state diagram's)
   'Step through the chart: set the inputs, apply clock edges, see the state, the path taken and the outputs': 'Percorrer o fluxograma passo a passo: definir as entradas, aplicar flancos de relógio, ver o estado, o caminho seguido e as saídas',
   'Apply clock edges at the chosen rate': 'Aplicar flancos de relógio ao ritmo escolhido', 'Clock edges per second of Run': 'Flancos de relógio por segundo de Correr',
-  '↶ Back': '↶ Recuar', 'Undo the last clock edge': 'Desfazer o último flanco de relógio', 'Fold / unfold the panel': 'Recolher / expandir o painel',
+  '↶ Back': '↶ Recuar', 'Undo the last clock edge': 'Desfazer o último flanco de relógio',
   'Apply one rising clock edge: the machine follows the path shown in color': 'Aplicar um flanco ascendente de relógio: a máquina segue o caminho mostrado a cores',
   'Registered output: its present value': 'Saída registada: o seu valor presente', 'Its default value': 'O seu valor por omissão',
   'Assigned by an every-cycle block': 'Atribuída por um bloco de cada ciclo', 'Mealy output (a conditional output box)': 'Saída de Mealy (uma caixa de saída condicional)',

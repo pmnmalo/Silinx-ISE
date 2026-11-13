@@ -8,10 +8,7 @@ import { h } from './dom.js';
 import { asmResetActive, asmSimEval, asmSimReset, asmSimStep, prepareAsmSim } from '/core/asm-sim.js';
 import { simInputControls, simTraceTable } from './sim-panel.js';
 
-const FOLD_KEY = 'silinx.asm.sim.folded';
 const RATES = [1, 2, 5, 10];   // clock edges per second of Run
-const readFold = () => { try { return localStorage.getItem(FOLD_KEY) === '1'; } catch { return false; } };
-const writeFold = (v) => { try { localStorage.setItem(FOLD_KEY, v ? '1' : '0'); } catch { /* storage unavailable */ } };
 
 /** A value as the panel shows it: a bit 0 / 1, a vector in binary. */
 const text = (v, w) => (w === 1 ? String(v) : v.toString(2).padStart(w, '0'));
@@ -26,7 +23,6 @@ export function mountAsmSim({ M, btn, render, layout, destroyed, onErrors, simBt
   let prep = null;         // core/asm-sim.js prepareAsmSim's sim of the chart
   let sim = null;          // { st, inputs: {}, trace: [], past: [], cycle, timer, rate }
   let cur = null;          // asmSimEval of the present cycle
-  let folded = readFold();
 
   // ------------------------------------------------------------------------ the panel
   const title = h('span', { class: 'asm-code-title' }, 'Try it');
@@ -39,7 +35,6 @@ export function mountAsmSim({ M, btn, render, layout, destroyed, onErrors, simBt
     btn('⟲ Reset', 'Back to the initial state', () => { reset(); update(); }, 'asm-small asm-sim-reset'),
     btn('Clock ↑', 'Apply one rising clock edge: the machine follows the path shown in color', () => step(), 'asm-small asm-primary asm-sim-step'),
     runBtn, rateSel, backBtn);
-  const foldBtn = btn('▾', 'Fold / unfold the panel', () => { folded = !folded; writeFold(folded); fold(); }, 'asm-sim-fold');
   const state = h('b', { class: 'fsm-sim-state' });
   const next = h('span', { class: 'asm-muted asm-sim-next' });
   const outs = h('div', { class: 'fsm-sim-outputs' });
@@ -57,14 +52,9 @@ export function mountAsmSim({ M, btn, render, layout, destroyed, onErrors, simBt
     h('div', { class: 'fsm-sim-row' }, h('span', { class: 'asm-label' }, 'Outputs'), outs),
     regsRow, trace));
   const panel = h('div', { class: 'asm-codepanel fsm-panel asm-simpanel try-it', hidden: true },   // (green, as the schematic's Try it, #3798)
-    h('div', { class: 'asm-codebar' }, title, tools, h('div', { class: 'asm-spacer' }), foldBtn, btn('✕', 'Close the panel', () => show(false))),
+    h('div', { class: 'asm-codebar' }, title, tools, h('div', { class: 'asm-spacer' }), btn('✕', 'Close the panel', () => show(false))),
     body);
-  function fold() {
-    panel.classList.toggle('folded', folded);
-    foldBtn.textContent = folded ? '▴' : '▾';
-    requestAnimationFrame(() => { if (!destroyed()) layout(); });
-  }
-  fold();
+  // (no fold: the panel is resized by its edge, dock-panel.js, #3800)
 
   // ------------------------------------------------------------------------ the simulation
   const off = () => (M().reset.active === 'high' ? 0 : 1);

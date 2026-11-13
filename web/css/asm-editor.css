@@ -198,7 +198,6 @@
 .asm-editor .dock-grip:hover, .asm-editor .dock-grip:focus-visible, .asm-editor .dockable.dock-resizing > .dock-grip {
   outline: none; background: color-mix(in srgb, var(--asm-accent) 45%, transparent);
 }
-.asm-editor .dockable.folded > .dock-grip { display: none; }
 .asm-editor .dock-bar { cursor: move; touch-action: none; }
 .asm-editor .dock-bar :is(button, select, input, label) { cursor: default; }
 .asm-editor .dock-btn[hidden] { display: none; }
@@ -324,9 +323,6 @@ html[data-theme="dark"] .asm-editor .try-it .asm-code-title { color: var(--m-suc
 .asm-editor .asm-node.sim-next:not(.sim-cur) .asm-shape { stroke: var(--asm-sim-hot); stroke-width: 2.6; stroke-dasharray: 7 4; }
 .asm-editor .asm-edge.sim-path .asm-edge-line { stroke: var(--asm-sim-hot); stroke-width: 3; stroke-dasharray: 8 4; }
 .asm-editor .asm-arrowhead.hot { fill: var(--asm-sim-hot); }
-.asm-editor .asm-simpanel.folded { flex: 0 0 auto; }
-.asm-editor .asm-simpanel.folded > .fsm-panel-body { display: none; }
-.asm-editor .asm-sim-fold { width: 26px; padding: 0; }
 .asm-editor .asm-sim-rate { height: 24px; }
 .asm-editor .asm-sim-reg.changes { border-color: var(--asm-sim-hot); }
 .asm-editor .fsm-sim-row[hidden] { display: none; }
@@ -335,6 +331,6 @@ html[data-theme="dark"] .asm-editor .try-it .asm-code-title { color: var(--m-suc
   .asm-editor .asm-main { position: relative; }
   .asm-editor .asm-simpanel { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; max-height: 60%; box-shadow: 0 -6px 20px rgba(0, 0, 0, .22); }
   .asm-editor .asm-simpanel.dockable { position: absolute; }   /* (not the docked panel's relative) */
-  .asm-editor .asm-simpanel.dockable:not(.folded) { height: var(--dock-size, 42%); max-height: 85%; }
+  .asm-editor .asm-simpanel.dockable { height: var(--dock-size, 42%); max-height: 85%; }
   .asm-editor .asm-simpanel .fsm-panel-tools { flex-wrap: wrap; }
 }
