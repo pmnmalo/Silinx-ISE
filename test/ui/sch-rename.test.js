@@ -58,9 +58,9 @@ uiTest('#1546 schematic: Rename… in the right-click menu of a symbol, an I/O m
   const open = async (target, title, item = 'Rename…') => {
     await page.rightClick(target);
     await page.waitFor(() => document.querySelector('body > .menu-popup'), [], { what: 'the menu' });
-    // (a symbol's menu has Symbol Info… first, #2953)
+    // (a symbol's menu has Symbol Info… first, #2953; a module's instance's, Edit Symbol next, #3755)
     const idx = (await menuItems()).indexOf(item);
-    assert.ok(idx === 0 || (idx === 1 && target === SYM), `${item} in the menu: ${await menuItems()}`);
+    assert.ok(idx === 0 || (idx === 2 && target === SYM), `${item} in the menu: ${await menuItems()}`);
     await page.click('body > .menu-popup > .mi', { index: idx });
     await page.waitDialog(title);
   };
