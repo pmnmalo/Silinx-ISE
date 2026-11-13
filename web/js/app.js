@@ -241,7 +241,7 @@ function primTemplatesMenu(d, lang) {
   return { label: 'Device Primitives', disabled: !list.length, submenu: list.map(t => ({ label: t.name, action: () => d.editor.insertText(t.text) })) };
 }
 // (a read-only document, the HDL generated from a drawing (#1176): none, its Undo / Redo greyed out, #1192)
-export const docEditor = d => d && (d.editor ? (d.editor.readOnly?.() ? null : { undo: () => d.editor.exec('undo'), redo: () => d.editor.exec('redo') }) : d.schEditor || d.asmEditor || d.fsmEditor || d.ttEditor || d.petriEditor || d.pinPlanner || null);
+export const docEditor = d => d && (d.editor ? (d.editor.readOnly?.() ? null : { undo: () => d.editor.exec('undo'), redo: () => d.editor.exec('redo') }) : d.schEditor || d.asmEditor || d.fsmEditor || d.ttEditor || d.petriEditor || d.symEditor || d.pinPlanner || null);
 export const undoesProject = () => history.canUndo() && !(S.active?._editedAt > history.lastAt() && docEditor(S.active));
 export const redoesProject = () => history.canRedo() && !(S.active?._editedAt > history.redoAt() && docEditor(S.active));
 export async function projectUndo() {
@@ -456,6 +456,7 @@ export async function openFile(path, line, col, { task } = {}) {
   if (/\.(tt|bool)\.json$/.test(path)) return openTt(path);
   if (path.endsWith('.fsm.json')) return openFsm(path);
   if (path.endsWith('.pn.json')) return openPetri(path);
+  if (/\.sym\.json$/i.test(path)) return (await import('./symbol-doc.js')).openSymbol(path);   // (a module's symbol, #3755)
   if (path.endsWith('.exercise.json')) return (await import('./exercise-view.js')).openExercise(path);   // (#3192)
   const id = `file:${path}`;
   let doc = findDoc(id);

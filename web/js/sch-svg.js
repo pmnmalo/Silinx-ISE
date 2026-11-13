@@ -116,7 +116,9 @@ export function bodySvg(sym, def) {
       const b = def.body;
       s += `<rect class="gate" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/>`;
       for (const p of pins) {
-        s += p.side === 'W' ? lead(0, p.y, b.x, p.y, bus(p)) : lead(b.x + b.w, p.y, p.x, p.y, bus(p));
+        // (a module's symbol of its own may have pins on the top and the bottom too, #3755)
+        s += p.side === 'W' ? lead(0, p.y, b.x, p.y, bus(p)) : p.side === 'N' ? lead(p.x, p.y, p.x, b.y, bus(p))
+          : p.side === 'S' ? lead(p.x, b.y + b.h, p.x, p.y, bus(p)) : lead(b.x + b.w, p.y, p.x, p.y, bus(p));
         // (a device primitive's clock: its triangle, as the flip-flops' and the modules', #1135)
         if (p.clock) s += p.side === 'W' ? `<path class="clk" d="M${b.x},${p.y - 5} L${b.x + 8},${p.y} L${b.x},${p.y + 5}"/>`
           : `<path class="clk" d="M${b.x + b.w},${p.y - 5} L${b.x + b.w - 8},${p.y} L${b.x + b.w},${p.y + 5}"/>`;
@@ -162,7 +164,9 @@ export function bodySvg(sym, def) {
       const b = def.body;
       s += `<rect class="box${def.shape === 'hdl' ? ' hdl' : ''}${def.missing ? ' missing' : ''}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/>`;
       for (const p of pins) {
-        s += p.side === 'W' ? lead(0, p.y, b.x, p.y, bus(p)) : lead(b.x + b.w, p.y, p.x, p.y, bus(p));
+        // (a module's symbol of its own may have pins on the top and the bottom too, #3755)
+        s += p.side === 'W' ? lead(0, p.y, b.x, p.y, bus(p)) : p.side === 'N' ? lead(p.x, p.y, p.x, b.y, bus(p))
+          : p.side === 'S' ? lead(p.x, b.y + b.h, p.x, p.y, bus(p)) : lead(b.x + b.w, p.y, p.x, p.y, bus(p));
         if (p.clock) s += `<path class="clk" d="M${b.x},${p.y - 5} L${b.x + 8},${p.y} L${b.x},${p.y + 5}"/>`;
       }
     }
@@ -237,7 +241,7 @@ function textsSvg(sym, def, ctx = {}) {
   const muxAbove = muxType && !muxIn;
   if (showName) {
     // above the symbol; when pins stick out of the top (turned symbols), beside the top right corner instead
-    const topPins = (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'mux' || def.shape === 'ff') && symbolPins(sym, null, def).some(p => p.side === 'N');
+    const topPins = (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'mux' || def.shape === 'ff' || def.shape === 'module') && symbolPins(sym, null, def).some(p => p.side === 'N');
     s += topPins ? `<text class="iname" x="${box.x + box.w + 3}" y="${box.y - 2 - (muxAbove ? 11 : 0)}" text-anchor="start">${esc(sym.name)}</text>`
       : `<text class="iname" x="${box.x + box.w / 2}" y="${box.y - 4 - (muxAbove ? 11 : 0)}" text-anchor="middle">${esc(sym.name)}</text>`;
   }
@@ -249,7 +253,7 @@ function textsSvg(sym, def, ctx = {}) {
   }
   if (def.shape === 'module' || def.shape === 'hdl') {
     const tt = def.shape === 'hdl' ? (sym.params.title || 'HDL') : def.title;
-    const top = cx(def.body.x + def.body.w / 2, def.body.y + 11);
+    const top = cx(def.body.x + def.body.w / 2, def.titleY ?? def.body.y + 11);   // (its place of a symbol of its own, #3755)
     const rot = sym.rot === 90 || sym.rot === 270;
     s += `<text class="stitle${def.shape === 'hdl' ? ' hdl' : ''}" x="${rot ? center.x : top.x}" y="${rot ? center.y : top.y + 3}" text-anchor="middle">${esc(tt)}</text>`;
   } else if (def.shape === 'ff') {

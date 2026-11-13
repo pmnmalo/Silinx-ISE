@@ -143,9 +143,12 @@ async function reloadProjectNow(render = true, depth = 0) {
       if (d.generatedFile && S.fileTree.includes(d.generatedFile) && !hdlToSch[d.generatedFile]) { schOwners[f] = d.generatedFile; hdlToSch[d.generatedFile] = f; viewModule[f] = d.name; }
     } catch { /* unreadable */ }
   }
+  // (the modules' symbols of their own, <module>.sym.json, #3755: the schematics' module symbols drawn from them)
+  const symbolFiles = {};
+  for (const f of S.fileTree.filter(f => /\.sym\.json$/i.test(f))) { try { symbolFiles[f] = await api.readFile(pj.name, f); } catch { /* unreadable */ } }
   // (the RTL blackboxes of its C functions, as it opens, #1903)
   const hls = await readBlackboxes(pj.name);
-  Object.assign(S, { schOwners, hdlToSch, viewModule, viewTexts, hls });
+  Object.assign(S, { schOwners, hdlToSch, viewModule, viewTexts, symbolFiles, hls });
   compileProject();
   // a drawing whose base was its HDL (before #220) is made the base; a drawn source without its HDL
   // file gets it (#207): read the project again with them

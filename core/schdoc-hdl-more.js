@@ -203,7 +203,10 @@ export function mountSymbolCasesMore(ctx) {
         const mname = m?.name || p.module;
         if (!mname) { diags.push({ severity: 'error', message: `${s.name}: no module selected`, ref: { kind: 'symbol', id: s.id } }); return; }
         const gens = Object.entries(p.generics || {}).filter(([, v]) => String(v ?? '').trim() !== '');
-        const conns = def.pins.map(q => {
+        // (a symbol of its own, #3755: its connections in the module's order, whatever its drawing's)
+        const at = new Map((m?.ports || []).map((q, i) => [q.name.toLowerCase(), i]));
+        const pins = p.layout && m ? [...def.pins].sort((a, b) => (at.get(a.name.toLowerCase()) ?? 1e9) - (at.get(b.name.toLowerCase()) ?? 1e9)) : def.pins;
+        const conns = pins.map(q => {
           // (an output left unconnected: open, #2544)
           const pn = nl.pinNet.get(`${s.id}/${q.name}`), n = q.dir === 'out' && pn?.auto && isolated(pn) ? null : pn;
           let a = n ? (outRead.get(n) && q.dir !== 'out' ? outRead.get(n) : (q.dir === 'out' && outRead.get(n)) || netName(n)) : null;

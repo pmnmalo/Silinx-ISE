@@ -4,7 +4,7 @@
 // clicked, its rectilinear path routed between its ends), a net name attached to a wire, an I/O marker added (joining a
 // net of its name, #2170); the points a wire can connect to.
 // mountTools(ctx) is called by mountSchEditor where this code was.
-import { SYMBOLS, defaultParams, symbolDef, symbolPins, rotSize, freePortName, normalizeDoc, parseNetName, splitWiresAt, renameNet, netShort,
+import { SYMBOLS, defaultParams, instanceParams, symbolDef, symbolPins, rotSize, freePortName, normalizeDoc, parseNetName, splitWiresAt, renameNet, netShort,
 } from '/core/schdoc.js';
 import { h } from './dom.js';
 import { reservedError } from '/core/reserved.js';
@@ -41,7 +41,7 @@ export function mountTools(ctx) {
     set({ placing: { type: it.type, params: { ...defaultParams(it.type), ...clone(it.params || {}) }, rot: 0, mirror: false, preset: it.preset || null } });
     if (it.type === 'module') {
       const m = modules()[it.params.module];
-      if (m) placing().params.ports = m.ports.map(p => ({ name: p.name, dir: p.dir, width: p.width }));
+      if (m) Object.assign(placing().params, instanceParams(m));   // (its symbol's layout too, #3755)
     }
     set({ tool: 'place' });
     canvas.dataset.tool = 'place';

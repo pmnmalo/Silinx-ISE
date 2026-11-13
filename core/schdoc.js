@@ -31,6 +31,7 @@ import { normalizeCurve, splitCurve } from './schcurve.js';
 import { normalizeGraphic } from './schgraphics.js';
 import { moveTaps, widenBuffers, widenJoins, widenMuxes } from './schdoc-upgrade.js';
 import { symbolDiff } from './schdoc-modsym.js';
+import { instanceParams } from './symbol-layout.js';
 import {
   modulesFromLibrary, schematicFromHdl
 } from './schdoc-from-hdl.js';
@@ -49,6 +50,7 @@ export {
 export { BUF_OLD_W, COMPARE_OPS, COMPARE_SYM, compareOps, comparePin, constWidth, JOIN_BAR, JOIN_OLD_W, JOIN_W, MUX_BODY_W, MUX_OLD_BODY_W, MUX_SEL_X } from './schdoc-symbols.js';
 export { followPins, otherPins, repinSymbol } from './schdoc-repin.js';
 export { symbolDiff, updateModuleSymbols, updatedPorts } from './schdoc-modsym.js';
+export { attachSymbols, instanceParams, isSymbolFile, layoutDef, newSymbol, normalizeSymbol, readSymbol, reconcile, symbolFileOf, symbolText } from './symbol-layout.js';
 export {
   modulesFromLibrary, schematicFromHdl
 };
@@ -193,7 +195,7 @@ export function normalizeDoc(d, { modules } = {}) {
   for (const s of doc.symbols) {
     if (s.type !== 'module' || Array.isArray(s.params.ports)) continue;
     const m = findMod(mods, s.params.module);
-    if (m) s.params.ports = (m.ports || []).map(q => ({ name: q.name, dir: q.dir || 'in', width: q.width ?? 1 }));
+    if (m) Object.assign(s.params, instanceParams(m));   // (its symbol's layout, when it has one of its own, #3755)
   }
   return doc;
 }
@@ -574,7 +576,7 @@ export function netlist(docIn, { modules = {} } = {}) {
   for (const [s, od] of outOfDate) {
     const what = [od.added.length && `added ${od.added.join(', ')}`, od.removed.length && `removed ${od.removed.join(', ')}`,
       od.turned.length && `direction changed ${od.turned.join(', ')}`].filter(Boolean).join('; ');
-    diags.push({ severity: 'warning', message: `${s.name}: the symbol of module '${s.params.module}' is out of date (its ports: ${what}): Update Symbol`, ref: { kind: 'symbol', id: s.id }, x: s.x, y: s.y });
+    diags.push({ severity: 'warning', message: `${s.name}: the symbol of module '${s.params.module}' is out of date (${what ? `its ports: ${what}` : 'its symbol changed'}): Update Symbol`, ref: { kind: 'symbol', id: s.id }, x: s.x, y: s.y });
     for (const n of [...od.removed, ...od.turned]) {
       const net = pinNet.get(`${s.id}/${n}`);
       if (net && net.endpoints.length + net.wires.length + net.labels.length > 1) diags.push({ severity: 'error', message: `${s.name}: pin ${n} is connected, but module '${s.params.module}' ${od.removed.includes(n) ? 'no longer has that port' : 'has that port in the other direction now'}: Update Symbol, then connect it again`, ref: { kind: 'symbol', id: s.id, pin: n }, x: s.x, y: s.y });
