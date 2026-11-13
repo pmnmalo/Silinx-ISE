@@ -39,7 +39,8 @@ export const ECP5_TARGETS = [{ board: 'ulx3s' }];
 // the Gowin's board (#2303): the examples on the Tang Nano 9K, every port on a pin of its headers (nextpnr-himbaechel-gowin places
 // none without one); vga on the tangnano9k-vga; to its .fs through gowin_pack (Silinx's port)
 export const GOWIN_TARGETS = [{ board: 'tangnano9k' }];
-// the 7-series' boards (#3142): an experimental family, its constraints XDC; built by Vivado (#1649), not in TARGETS
+// the 7-series' boards (#3142): an experimental family, its constraints XDC; every example built by the Silinx toolchain
+// (test/open-flow-xc7-server.test.js, #3147) and by Vivado (#1649); not in TARGETS (ISE's)
 export const XC7_TARGETS = [{ board: 'basys3' }, { board: 'nexys-a7' }];
 /** The board an example runs on for a target: vga on the iCEBreaker with its PmodVGA, on the ULX3S with its VGA. */
 const VGA_BOARDS = { icebreaker: 'icebreaker-vga', ulx3s: 'ulx3s-vga', tangnano9k: 'tangnano9k-vga' };

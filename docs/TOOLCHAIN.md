@@ -132,7 +132,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 | MachXO2 | to be defined | nextpnr-machxo2, not yet stable | `ecppack`, Project Trellis | LPF | To be measured (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel-gowin | `gowin_pack`, Silinx's JavaScript port of Apicula's (`src/fpga/gowin/`) | CST | Works: local server and browser, downloaded on first use (32 MB); the GW1NR-9C, the Tang Nano 9K and the examples on it, their `.fs` Apicula's byte for byte, the rPLL and the oscillator too (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
-| Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T and the Nexys A7's XC7A100T (#3145) in the local server (AMD Vivado the default there) and in the browser (#3143: the Basys 3's `.bit` the local server's byte for byte); its timing nextpnr's estimate; the quality against Vivado (#3147) to come |
+| Xilinx 7-series (Artix-7) | `synth_xilinx` | nextpnr-himbaechel's xilinx, `@silinx/nextpnr-himbaechel-xc7` (#3143) | Silinx, from nextpnr's FASM on Project X-Ray's database (#3144) | XDC | An experimental family (#3146): the Basys 3's XC7A35T and the Nexys A7's XC7A100T (#3145) in the local server (AMD Vivado the default there) and in the browser (#3143: the Basys 3's `.bit` the local server's byte for byte); its timing nextpnr's estimate; every example on both boards, its size and speed below (#3147) |
 
 Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. The
 constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the
@@ -159,6 +159,25 @@ version>/gen|chipdb/` and `assets/<version>/bitdb/xc7/`, a part available where 
 layout `xc7Parts`), fetched into Cache Storage when a project opens; nextpnr routes with router2 as the local server does (about
 1.3 GB of the browser's memory for the xc7a35t, its `.bit` the server's), router1 again where router2 stops without an error of
 its own, out of memory (`web/js/nextpnr-router-fallback.js`, a warning says so).
+
+Every example builds on the Basys 3 and the Nexys A7 with no warning, each clock at the boards' 100 MHz by nextpnr's
+estimate (#3147, `test/open-flow-xc7-server.test.js`, which holds each build to these numbers: up to 15 % more LUTs, the
+registers within 10 %, the frequency up to 15 % lower). The LUTs are nextpnr's count (each 6LUT and 5LUT, its feed-throughs
+included): Vivado counts a LUT site once, about 4–13 % fewer on blinky, vga and micro80 (#3160); Vivado's numbers on
+every example are to join the weekly quality comparison (#3760).
+
+| Example | Basys 3: LUTs | registers | MHz | Nexys A7: LUTs | registers | MHz |
+|---|---|---|---|---|---|---|
+| gates | 1 | 0 | – | 1 | 0 | – |
+| traffic | 87 | 58 | 213.6 | 86 | 58 | 199.3 |
+| blinky | 101 | 130 | 241.6 | 98 | 130 | 276.4 |
+| pong | 252 | 207 | 159.0 | 244 | 207 | 155.9 |
+| stopwatch | 184 | 201 | 210.6 | 184 | 201 | 225.9 |
+| clock | 149 | 158 | 268.4 | 146 | 158 | 240.9 |
+| vga | 125 | 56 | 257.2 | 124 | 56 | 234.2 |
+| isqrt | 72 | 86 | 282.9 | 73 | 86 | 316.8 |
+| uart | 122 | 138 | 257.6 | 122 | 138 | 260.0 |
+| micro80 | 169 | 185 | 146.4 | 179 | 185 | 150.1 |
 
 And around the flow, one issue each: the boards and examples (#2297), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).

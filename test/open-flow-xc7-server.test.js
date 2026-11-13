@@ -2,8 +2,8 @@
 // have Project X-Ray's bit database, #3145; another part not), its steps, and every example (gates … micro80) on the
 // Basys 3 and on the Nexys A7 from HDL to its .bit (server/open-flow.js, its own process server/open-flow-run.js: Yosys's
 // synth_xilinx, nextpnr-himbaechel-xc7, the bitstream from nextpnr's FASM) with the XDC the board's pin assignment
-// writes: no warning, every clock at the board's 100 MHz by nextpnr's estimate, the .bit read back as its part's; the
-// build folder has no ISE file. The .bit
+// writes: no warning, every clock at the board's 100 MHz by nextpnr's estimate, its LUTs, registers and frequency
+// reported and held to a table (#3147), the .bit read back as its part's; the build folder has no ISE file. The .bit
 // checked against nextpnr's FASM with no Vivado (#3145, readback.js and roundtrip.js, apart from the generator): its frames
 // the ones fasm2frames makes of the FASM, and read back into features no bit lost and none stray. A pin the package does
 // not have: Place & Route's failure, no bitstream.
@@ -62,16 +62,28 @@ async function run(dir, project, steps = ['synth', 'translate', 'par', 'trce', '
     return { lines, result: await runOpenImplementation(job, { project, projectDir: dir, steps }) };
   } catch (e) { return { lines, error: e }; }
 }
+// each example's LUTs, registers and frequency (MHz, nextpnr's estimate, router2) on each board (#3147), measured with
+// @silinx/nextpnr-himbaechel-xc7 0.1.1: a build may have up to 15 % more LUTs, its registers 10 % apart (an example's
+// counters sized from its clock, #3710), its frequency 15 % lower. The LUTs nextpnr's (each 6LUT and 5LUT, the
+// feed-throughs included); Vivado's on the same netlists in #3160
+const QUALITY = {
+  basys3: { gates: [1, 0, null], traffic: [87, 58, 213.6], blinky: [101, 130, 241.6], pong: [252, 207, 159.0],
+    stopwatch: [184, 201, 210.6], clock: [149, 158, 268.4], vga: [125, 56, 257.2], isqrt: [72, 86, 282.9],
+    uart: [122, 138, 257.6], micro80: [169, 185, 146.4] },
+  'nexys-a7': { gates: [1, 0, null], traffic: [86, 58, 199.3], blinky: [98, 130, 276.4], pong: [244, 207, 155.9],
+    stopwatch: [184, 201, 225.9], clock: [146, 158, 240.9], vga: [124, 56, 234.2], isqrt: [73, 86, 316.8],
+    uart: [122, 138, 260.0], micro80: [179, 185, 150.1] },
+};
 const warnings = lines => lines.join('\n').split('\n').filter(l => /WARNING|ERROR/.test(l));
 
-for (const { board } of XC7_TARGETS) test(`every example on the ${board} through the 7-series' back end: no warning, its .bit, 100 MHz met by nextpnr's estimate`, async t => {
+for (const { board } of XC7_TARGETS) test(`every example on the ${board} through the 7-series' back end: no warning, its .bit, 100 MHz met by nextpnr's estimate, its LUTs, registers and frequency the table's`, async t => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-xc7-'));
   const P = PARTS[board];
   const db = loadBitDbXc7(P.part);
   const index = bitIndexXc7(JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(XC7_DB_DIR, `${P.part}.json.gz`))).toString('utf8')));
   try {
     for (const name of EXAMPLES) {
-      await t.test(name, async () => {
+      await t.test(name, async t => {
         const { dir, project } = exampleProject(name, { board }, tmp);
         const { lines, result, error } = await run(dir, project);
         assert.equal(error, undefined, error?.message);
@@ -96,6 +108,14 @@ for (const { board } of XC7_TARGETS) test(`every example on the ${board} through
           assert.deepEqual(r.timing.constraints.map(c => c.name), ['clk']);
           assert.ok(r.timing.maxFreqMHz >= 100, `${name}: ${r.timing.maxFreqMHz} MHz`);
         }
+        // the quality (#3147): the LUTs, the registers and the frequency reported, held to the table's (a regression of
+        // the packer's, #3160's feed-throughs, or of the router's fails)
+        const q = { luts: row('Number of Slice LUTs').used, regs: regs?.used ?? 0, mhz: r.timing.maxFreqMHz ?? null };
+        t.diagnostic(`${board} ${name}: ${q.luts} LUTs (${row('LUTs as feed-throughs (nextpnr)')?.used ?? 0} feed-throughs), ${q.regs} registers, ${row('Number of occupied Slices').used} slices${q.mhz ? `, ${q.mhz} MHz` : ''}`);
+        const [luts, nregs, mhz] = QUALITY[board][name];
+        assert.ok(q.luts <= Math.ceil(luts * 1.15), `${name}: ${q.luts} LUTs, the table's ${luts}`);
+        assert.ok(Math.abs(q.regs - nregs) <= Math.ceil(nregs * 0.1), `${name}: ${q.regs} registers, the table's ${nregs}`);
+        if (mhz) assert.ok(q.mhz >= mhz * 0.85, `${name}: ${q.mhz} MHz, the table's ${mhz}`);
         assert.ok(fs.readFileSync(path.join(dir, 'build/open/timing.txt'), 'utf8').startsWith(`Timing of ${P.part} after Place & Route: nextpnr's estimate`));
         // the .bit: the part's, its frames read back
         const bit = fs.readFileSync(path.join(dir, `build/${project.top}.bit`));
