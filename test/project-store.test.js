@@ -136,7 +136,7 @@ test('folder: the exact errors (as the browser storage\'s)', async () => {
       [() => ops.writeFile('Err', 'src/a\u202eb.vhd', 'x'), "'src/a\u202eb.vhd': not written: control, invisible or direction character in the name (U+202E)"],
       [() => ops.writeFile('Err', '__proto__', 'x'), "'__proto__': not written: reserved name ('__proto__')"],
       [() => ops.writeFile('Err', 'build/a|b.json', 'x'), "'build/a|b.json': not written: character not allowed in a name (< > : \" | ? *): 'a|b.json'"],
-      [() => ops.writeFile('Err', '../out.v', 'x'), 'invalid path'],
+      [() => ops.writeFile('Err', '../out.v', 'x'), "'../out.v': invalid path: path leaves the project ('..')"],
     ];
     for (const [fn, msg] of errs) await assert.rejects(fn, { message: msg });
   }
@@ -328,10 +328,12 @@ test('#483 safePath / cleanPath: hostile paths refused, odd but harmless ones no
   const bad = ['', '/etc/passwd', '//host/share/x', '\\\\host\\share\\x', 'C:\\Windows\\x.v', 'c:/x.v', '../out.v', 'src/../../out.v', 'src/..', '..', 'src/a\u0000.v', 'src/a\n.v', null, undefined, 42, ['src/a.v'], { path: 'src/a.v' }, '.', './', 'src/./..'];
   for (const p of bad) {
     assert.equal(safePath(p), null, `safePath(${JSON.stringify(p)})`);
-    assert.throws(() => cleanPath(p), { message: 'invalid path' }, `cleanPath(${JSON.stringify(p)})`);
+    assert.throws(() => cleanPath(p), { message: /^(missing path|'.*': invalid path: .+)$/s }, `cleanPath(${JSON.stringify(p)})`);
   }
-  const ok = { 'src/top.vhd': 'src/top.vhd', 'src\\sub\\x.v': 'src/sub/x.v', './src/a.v': 'src/a.v', 'src//a.v': 'src/a.v', 'src/./a.v': 'src/a.v', 'a/b/': 'a/b', 'src/..a.v': 'src/..a.v', 'src/a..v': 'src/a..v', 'C:x.v': 'C:x.v', 'é/ü.vhd': 'é/ü.vhd', 'build/top.bit': 'build/top.bit' };
+  const ok = { 'src/top.vhd': 'src/top.vhd', './src/a.v': 'src/a.v', 'src//a.v': 'src/a.v', 'src/./a.v': 'src/a.v', 'a/b/': 'a/b', 'src/..a.v': 'src/..a.v', 'src/a..v': 'src/a..v', 'é/ü.vhd': 'é/ü.vhd', 'build/top.bit': 'build/top.bit' };
   for (const [p, n] of Object.entries(ok)) { assert.equal(safePath(p), n); assert.equal(cleanPath(p), n); }
+  // (a backslash and a drive letter: folded by safePath, for a store's saved list; refused by an operation, #3598)
+  for (const [p, n] of Object.entries({ 'src\\sub\\x.v': 'src/sub/x.v', 'C:x.v': 'C:x.v' })) { assert.equal(safePath(p), n); assert.throws(() => cleanPath(p), /invalid path/); }
 });
 
 test('#483 normalizeProjectJson: the examples\' descriptions unchanged; a broken one in shape, what was dropped said', () => {
@@ -450,24 +452,26 @@ test('#483 the project operations refuse a path that leaves the project, in both
     const { ops } = make();
     await ops.create({ name: 'Trav', template: 'blinky' });
     const before = await ops.project('Trav');
-    for (const bad of ['../out.v', '/etc/passwd', 'C:\\x.v', 'src/../../x.v', '']) {
-      await assert.rejects(ops.readFile('Trav', bad), { message: 'invalid path' }, `readFile ${bad}`);
-      await assert.rejects(ops.writeFile('Trav', bad, 'x'), { message: 'invalid path' }, `writeFile ${bad}`);
-      await assert.rejects(ops.renameFile('Trav', 'src/top.vhd', bad), { message: 'invalid path' }, `renameFile to ${bad}`);
-      await assert.rejects(ops.renameFile('Trav', bad, 'src/x.vhd'), { message: 'invalid path' }, `renameFile from ${bad}`);
-      await assert.rejects(ops.deleteFile('Trav', bad), { message: 'invalid path' }, `deleteFile ${bad}`);
-      await assert.rejects(ops.put('Put', emptyProjectJson('Put'), { [bad]: 'x' }), { message: 'invalid path' }, `put ${bad}`);
+    for (const [bad, message] of [['../out.v', "'../out.v': invalid path: path leaves the project ('..')"], ['/etc/passwd', "'/etc/passwd': invalid path: absolute path"],
+      ['C:\\x.v', "'C:\\x.v': invalid path: absolute path (a drive letter)"], ['src/../../x.v', "'src/../../x.v': invalid path: path leaves the project ('..')"], ['', 'missing path']]) {
+      await assert.rejects(ops.readFile('Trav', bad), { message }, `readFile ${bad}`);
+      await assert.rejects(ops.writeFile('Trav', bad, 'x'), { message }, `writeFile ${bad}`);
+      await assert.rejects(ops.renameFile('Trav', 'src/top.vhd', bad), { message }, `renameFile to ${bad}`);
+      await assert.rejects(ops.renameFile('Trav', bad, 'src/x.vhd'), { message }, `renameFile from ${bad}`);
+      await assert.rejects(ops.deleteFile('Trav', bad), { message }, `deleteFile ${bad}`);
+      await assert.rejects(ops.put('Put', emptyProjectJson('Put'), { [bad]: 'x' }), { message }, `put ${bad}`);
     }
     for (const op of [() => ops.writeFile('Trav', 'silinx.json', '{}'), () => ops.renameFile('Trav', 'src/top.vhd', 'silinx.json'), () => ops.deleteFile('Trav', 'silinx.json')]) {
       await assert.rejects(op, { message: "silinx.json is the project's description" });
     }
-    // a backslash path is the same file with forward slashes
-    await ops.writeFile('Trav', 'src\\sub\\new.v', 'module n; endmodule');
+    // a backslash path is refused, as the server refuses it (#3598); './' and '//' are the same file
+    await assert.rejects(ops.writeFile('Trav', 'src\\sub\\new.v', 'x'), { message: "'src\\sub\\new.v': invalid path: backslash in the name" });
+    await ops.writeFile('Trav', 'src//sub/new.v', 'module n; endmodule');
     assert.equal(await ops.readFile('Trav', 'src/sub/new.v'), 'module n; endmodule');
     await ops.deleteFile('Trav', './src/sub/new.v');
     assert.deepEqual(await ops.project('Trav'), before, 'nothing else changed');
     // put: the description normalised, silinx.json among the files ignored
-    const put = await ops.put('Put', { ...emptyProjectJson('Put'), top: 'a', files: 'none', constraints: 7, extra: true }, { 'silinx.json': '{}', 'src\\a.v': 'module a; endmodule' });
+    const put = await ops.put('Put', { ...emptyProjectJson('Put'), top: 'a', files: 'none', constraints: 7, extra: true }, { 'silinx.json': '{}', 'src//a.v': 'module a; endmodule' });
     assert.deepEqual(put, { ...emptyProjectJson('Put'), top: 'a', constraints: null });
     assert.deepEqual((await ops.project('Put')).fileTree, ['src/a.v']);
   }

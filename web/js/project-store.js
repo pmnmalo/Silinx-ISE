@@ -13,7 +13,7 @@ import { DEV_SITE } from './prefs.js';
 import { constraintsExtOf } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
 import { PROJECT_NAME_RE, projectNameError, sameProject } from '../../core/project-name.js';
-import { gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
+import { filePath, gateMessages, normalizePath, requireGated } from '../../core/import-gate.js';
 import { markUntrusted } from '../../core/trust.js';
 import { foldName, foldsToProjectFile, PROJECT_FILE, sameNameIn, spelledAs } from '../../core/fold-name.js';
 
@@ -40,8 +40,8 @@ export function safePath(p) {
   const out = parts.filter(s => s !== '' && s !== '.');
   return out.length ? out.join('/') : null;
 }
-/** safePath, or the error 'invalid path'. */
-export function cleanPath(p) { return safePath(p) ?? fail('invalid path'); }
+/** The path a store's operation is given, by the server's rule (core/import-gate.js filePath, #3598), or its error. */
+export function cleanPath(p) { const r = filePath(p); return r.reason ? fail(r.message) : r.path; }
 // (silinx.json is the project's description, not one of its files: never written, renamed or deleted as one; by its
 // folded name, as a case-insensitive file system reads it: SILINX.JSON, ſilinx.json are the same file, #3034)
 const isDescriptor = foldsToProjectFile;

@@ -211,7 +211,7 @@ test('files: missing / traversing / absolute paths are refused, missing files ar
     for (const [m, body] of [['GET'], ['PUT', 'x'], ['DELETE']]) {
       const r = await call(m, `/projects/Trav/file?path=${encodeURIComponent(p)}`, body);
       assert.equal(r.status, 400, `${m} ${p}`);
-      assert.match(String(r.body.error), /path escapes project/, `${m} ${p} ${String(r.body)}`);
+      assert.match(String(r.body.error), /^'.*': invalid path: (path leaves the project \('\.\.'\)|absolute path)$/, `${m} ${p} ${String(r.body)}`);   // (#3598)
     }
     const r = await call('POST', '/projects/Trav/rename', { from: p, to: 'x.v' });
     assert.equal(r.status, 400, `rename from ${p}`);

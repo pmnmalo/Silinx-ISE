@@ -56,7 +56,7 @@ test('the interface\'s Delete: a file and a folder into the workspace\'s .trash,
     assert.deepEqual(tree(path.join(ws, '.trash')), trashed);
     // refused as before: silinx.json, the folder itself, a hidden file
     assert.deepEqual(await app.call('DELETE', '/projects/sw/file?path=silinx.json&trash=1').then(x => [x.status, x.body]), [400, { error: 'silinx.json cannot be deleted' }]);
-    assert.deepEqual(await app.call('DELETE', '/projects/sw/file?path=.&trash=1').then(x => [x.status, x.body]), [400, { error: 'cannot delete the project folder itself (delete the project instead)' }]);
+    assert.deepEqual(await app.call('DELETE', '/projects/sw/file?path=.&trash=1').then(x => [x.status, x.body]), [400, { error: "'.': invalid path: the project's folder, not a file's path" }]);
   } finally { await app.close(); }
 });
 

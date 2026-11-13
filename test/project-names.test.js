@@ -56,13 +56,15 @@ test('#3411 boardConstraints refuses a hand-made constraints path that names the
 test('#3414 PUT file: a name the import gate refuses is not written, with its reason', async () => {
   await P.createProject({ name: 'PutNames', device: DEVICE });
   const dir = P.projectDir('PutNames');
-  for (const [p, why] of [['src/a\\b.vhd', 'backslash in the name'], ['src/a.vhd::$DATA', "character not allowed in a name (< > : \" | ? *): 'a.vhd::$DATA'"],
+  for (const [p, why] of [['src/a.vhd::$DATA', "character not allowed in a name (< > : \" | ? *): 'a.vhd::$DATA'"],
     ['src/a.vhd.', "name ending with a space or a dot ('a.vhd.')"], ['src/a.vhd ', "name ending with a space or a dot ('a.vhd ')"],
     ['src/a\u200cb.vhd', 'control, invisible or direction character in the name (U+200C)'], ['src/a\u202eb.vhd', 'control, invisible or direction character in the name (U+202E)'],
     ['src/COM\u00b9.v', "reserved name ('COM\u00b9.v')"], ['__proto__', "reserved name ('__proto__')"]]) {
     const r = await app.call('PUT', `/projects/PutNames/file?path=${encodeURIComponent(p)}`, 'x\n');
     assert.deepEqual([r.status, r.body?.error], [400, `'${p}': not written: ${why}`], p);
   }
+  // (a backslash: refused as a path, by the browser store's rule, #3598)
+  assert.deepEqual(Object.values((await app.call('PUT', `/projects/PutNames/file?path=${encodeURIComponent('src/a\\b.vhd')}`, 'x\n')).body), ["'src/a\\b.vhd': invalid path: backslash in the name"]);
   assert.deepEqual(fs.readdirSync(dir).filter(f => f !== 'silinx.json').sort(), ['constraints', 'sim', 'src']);
   assert.deepEqual(fs.readdirSync(path.join(dir, 'src')), []);
   // (build/ is the browser's open synthesis's, written here: its files by the rest of their path)
@@ -76,6 +78,6 @@ test('#3414 PUT file: a name the import gate refuses is not written, with its re
     assert.deepEqual([r.status, r.body?.error], [400, `'${p}': not written: ${why}`], p);
   }
   // (a rename the same, the name as it was given: on Windows a backslash would be a folder's separator, #3611)
-  await assert.rejects(P.renameFile('PutNames', 'src/ok.vhd', 'src/x\\y.vhd'), { status: 400, message: "'src/x\\y.vhd': not renamed: backslash in the name" });
+  await assert.rejects(P.renameFile('PutNames', 'src/ok.vhd', 'src/x\\y.vhd'), { status: 400, message: "'src/x\\y.vhd': invalid path: backslash in the name" });
   assert.deepEqual(fs.readdirSync(path.join(dir, 'src')), ['ok.vhd']);
 });

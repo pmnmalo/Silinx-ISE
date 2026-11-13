@@ -10,7 +10,7 @@ import { boardAutoAssign, boardConstraintsText, constraintsExtOf } from '../pack
 import { resolveBoard } from './devices.js';
 import { realOf, nativeRealOf, hiddenName, within } from './paths.js';
 import { topNameError } from './ident.js';
-import { normalizePath } from '../core/import-gate.js';
+import { filePath, normalizePath } from '../core/import-gate.js';
 import { foldName, sameNameIn, spelledAs } from '../core/fold-name.js';
 import { fsFailure } from './fs-error.js';
 import { PROJECT_NAME_RE, projectNameError, sameProject } from '../core/project-name.js';
@@ -411,6 +411,9 @@ async function refuseHiddenInside(dir, rel0, full, verb) {
 // last name kept as asked (a rename's new name).
 const namesIn = dir => async folder => { try { return await fs.readdir(path.join(dir, ...folder.split('/'))); } catch { return []; } };
 export async function spelledJoin(dir, rel, { last = true } = {}) {
+  // (the path by the browser store's rule: src/../x.v and src\y.v refused, not resolved by the system, #3598)
+  const shape = filePath(rel);
+  if (shape.reason) throw new HttpError(400, shape.message);
   const key = relKey(dir, safeJoin(dir, rel));
   return key ? safeJoin(dir, await spelledAs(key, namesIn(dir), { last })) : dir;
 }
@@ -437,7 +440,7 @@ export async function writeFile(name, rel0, text) {
   // a name by the import gate's rules (#3414: no backslash, stream, trailing dot or space, invisible character…), as
   // Rename's; build/'s own files by the rest of their path
   const inBuild = /^build\//.test(rel);
-  const gated = rawName(rel0) ?? normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
+  const gated = normalizePath(inBuild ? `b${rel.slice(5)}` : rel);   // (build/x as b/x: its own name checked)
   if (gated.reason) throw new HttpError(400, `'${rel0}': not written: ${gated.reason}`);
   // (onto a folder, or through a file: the project's path in the message, #3537)
   if ((await fs.stat(full).catch(() => null))?.isDirectory()) throw new HttpError(400, `'${rel}' is a folder, not a file`);
@@ -465,9 +468,6 @@ export async function writeFile(name, rel0, text) {
 }
 
 
-// the name as it was given, before the system's path reads it: on Windows a backslash is a folder's separator, so
-// src/a\b.vhd joined is src/a/b.vhd, which the gate takes (#3611); the gate's reason for it, or null
-const rawName = rel => (String(rel).includes('\\') ? normalizePath(String(rel)) : null);
 
 /** Move/rename a project file (or folder), keeping the project's file list and constraints path. */
 // checkName: the new name by the import gate's rules for a name (the interface's Rename and MCP rename_file alike,
@@ -479,7 +479,7 @@ export async function renameFile(name, from, to, { checkName = true } = {}) {
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
   if (await isProjectFileAt(dir, src) || await isProjectFileAt(dir, dst)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
   refuseHidden(dir, from, src, 'renamed');
-  const gated = checkName ? rawName(to) ?? normalizePath(toKey) : {};
+  const gated = checkName ? normalizePath(toKey) : {};
   if (gated.reason) throw new HttpError(400, `'${to}': not renamed: ${gated.reason}`);
   refuseHidden(dir, to, dst, 'renamed');   // (through a symbolic link too)
   return withProjectLock(name, async () => {

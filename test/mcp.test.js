@@ -119,8 +119,11 @@ test('read_file / write_file: a source read and written, a new HDL file added to
   assert.equal((await srv.call('write_file', { project: 'Blinky', path: 'silinx.json', text: '{}' })).content[0].text, 'write_file: \'silinx.json\' is written by Silinx itself');
   assert.equal((await srv.call('write_file', { project: 'Blinky', path: 'build/top.bit', text: 'x' })).content[0].text, 'write_file: \'build/top.bit\' is written by Silinx itself');
   // #1233: the same files spelt otherwise; a source spelt otherwise is written and listed once, by its plain path
-  for (const p of ['./silinx.json', 'src/../silinx.json', 'src//../silinx.json', './build/top.bit', 'build', 'src/../build/x.v'])
+  for (const p of ['./silinx.json', './build/top.bit', 'build'])
     assert.equal((await srv.call('write_file', { project: 'Blinky', path: p, text: '{}' })).content[0].text, `write_file: '${p}' is written by Silinx itself`);
+  // (through a '..': refused as a path, as the browser's store refuses it, #3598)
+  for (const p of ['src/../silinx.json', 'src//../silinx.json', 'src/../build/x.v'])
+    assert.equal((await srv.call('write_file', { project: 'Blinky', path: p, text: '{}' })).content[0].text, `write_file: '${p}': invalid path: path leaves the project ('..')`);
   // what an assistant writes passes the import gate (#2830): an XXE schematic, a binary source, a script in a name, a
   // 2000-branch elsif chain (#2577) refused with their reasons, nothing written
   const gateCases = [
@@ -139,9 +142,10 @@ test('read_file / write_file: a source read and written, a new HDL file added to
   const listed = JSON.parse(fs.readFileSync(path.join(ws, 'Blinky', 'silinx.json'), 'utf8'));
   assert.deepEqual(listed.files.filter(f => f.path.includes('inv')).map(f => f.path), ['src/inv.vhd']);
   assert.equal(listed.name, 'Blinky');
-  for (const [tool, args] of [['read_file', { path: '../TrafficN/silinx.json' }], ['read_file', { path: '/etc/hosts' }], ['write_file', { path: '../../escape.vhd', text: 'x' }]]) {
+  for (const [tool, args, why] of [['read_file', { path: '../TrafficN/silinx.json' }, "path leaves the project ('..')"], ['read_file', { path: '/etc/hosts' }, 'absolute path'],
+    ['write_file', { path: '../../escape.vhd', text: 'x' }, "path leaves the project ('..')"]]) {
     const r = await srv.call(tool, { project: 'Blinky', ...args });
-    assert.deepEqual(r, toolFailure(`${tool}: path escapes project`), `${tool} ${args.path}`);
+    assert.deepEqual(r, toolFailure(`${tool}: '${args.path}': invalid path: ${why}`), `${tool} ${args.path}`);
   }
   // a symbolic link in the project to a folder outside it
   fs.mkdirSync(path.join(tmp, 'outside'));
