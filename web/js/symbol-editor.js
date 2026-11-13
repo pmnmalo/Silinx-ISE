@@ -1,0 +1,189 @@
+// The Symbol Editor (#3755): a module's symbol of its own (<module>.sym.json, core/symbol-layout.js), as ISE's
+// Symbol Editor edits a .sym: its pins' order and side (left, right, top, bottom: a pin dragged to its new place, or
+// its Side and Position in the Properties), the spacing between the pins, the body's width and height, where the
+// module's name is drawn. The symbol drawn as the schematic draws it (sch-svg.js). Its toolbar (the pin earlier /
+// later, the zoom, ☰ Properties, the ⋮ menu's Reset to Default), its foldable Properties panel and its status line
+// (the pins, the body's size) are the other editors' (docs/UI-GUIDELINES.md); its messages go to the console
+// (onMessage). Standalone: no app state.
+//
+//   const ed = mountSymbolEditor(container, { symbol, module, readOnly, banner, onChange(symbol), onMessage(text, warn) });
+//   ed.getSymbol(); ed.setModule(module); ed.select(pinName); ed.undo(); ed.redo(); ed.destroy();
+import { h } from './dom.js';
+import { toolbarMenu } from './toolbar-menu.js';
+import { toolIcon, zoomTools } from './editor-icons.js';
+import { panelToggle, PROPS_KEY } from './narrow.js';
+import { statusLine } from './status-line.js';
+import { mountSideFold } from './side-fold.js';
+import { symbolSvg, SVGNS } from './sch-svg.js';
+import { instanceParams, newSymbol, normalizeSymbol, reconcile, symbolDef, symbolPins } from '/core/schdoc.js';
+import { mountSymbolSide } from './symbol-side.js';
+
+const clone = o => JSON.parse(JSON.stringify(o));
+const M = 40;   // (the margin around the symbol: its pins' names)
+
+export function mountSymbolEditor(container, opts = {}) {
+  const readOnly = !!opts.readOnly;
+  let module = opts.module || null;
+  let S = normalizeSymbol(opts.symbol || newSymbol(module || { name: '?' })).symbol;
+  let sel = null, zoom = 2, dragging = null, destroyed = false;
+  const hist = [];
+  let hi = -1;
+
+  container.innerHTML = '';
+  const root = h('div', { class: 'asm-editor sym-editor', tabindex: '0' });
+  container.append(root);
+  const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `asm-btn ${cls}`, title, onclick }, label);
+  const sep = () => h('span', { class: 'asm-sep' });
+  const say = (text, warn = false) => opts.onMessage?.(text, warn);
+
+  // ---------------------------------------------------------------- toolbar
+  const earlier = btn('◀ Earlier', 'Move the selected pin one place earlier on its side (up, or left)', () => shift(-1), 'sy-earlier');
+  const later = btn('Later ▶', 'Move the selected pin one place later on its side (down, or right)', () => shift(1), 'sy-later');
+  const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '200%');
+  const more = toolbarMenu([
+    btn('Reset to Default', 'The symbol as Silinx draws it by default: the inputs on the left, the outputs on the right, in the module\'s order', () => reset(), 'sy-reset'),
+  ], { title: 'Symbol commands', btnClass: 'asm-btn' });
+  const editing = h('div', { class: 'asm-group' }, earlier, later);
+  const toolbar = h('div', { class: 'asm-toolbar sy-toolbar' },
+    readOnly ? null : editing, readOnly ? null : sep(),
+    h('div', { class: 'asm-group' }, ...zoomTools(f => setZoom(zoom * f), () => fit()), zoomLbl),
+    h('div', { class: 'asm-spacer' }),
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
+    opts.banner || null, readOnly ? null : more.el);
+
+  // ---------------------------------------------------------------- canvas, side panel, status line
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'se-svg sy-svg');
+  const canvasWrap = h('div', { class: 'asm-canvas-wrap sch-editor sy-canvas' }, svg);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'));
+  mountSideFold({ root, side, key: 'silinx.symbol.props.folded' });
+  const info = statusLine();
+  root.append(toolbar, h('div', { class: 'asm-body' }, h('div', { class: 'asm-main' }, canvasWrap), side), info.el);
+  const { renderSide } = mountSymbolSide({ side, readOnly, S: () => S, sel: () => sel, module: () => module, sideOf, movePin, commit });
+
+  // ---------------------------------------------------------------- the symbol: its ports, its drawing
+  const ports = () => (module?.ports?.length ? module.ports : S.pins.map(q => ({ name: q.name, dir: q.side === 'E' ? 'out' : 'in', width: 1 })));
+  function instance() {
+    const m = { name: S.module, ports: ports(), symbol: S };
+    return { id: 'SYM', type: 'module', name: '', x: 0, y: 0, rot: 0, mirror: false, params: { module: S.module, generics: {}, ...instanceParams(m) }, modules: { [S.module]: m } };
+  }
+  function sideOf(name) { return S.pins.find(q => q.name === name)?.side; }
+
+  // the module's ports and the symbol's pins in step: the new ports added, the ones gone dropped (in the console)
+  function inStep(say_ = true) {
+    if (!module) return false;
+    const r = reconcile(S, module.ports);
+    if (!r.added.length && !r.removed.length) return false;
+    S.pins = r.pins;
+    if (say_ && r.added.length) say(`${S.module}: pins added for the module's new ports: ${r.added.join(', ')}`, true);
+    if (say_ && r.removed.length) say(`${S.module}: pins removed, the module has no such ports any more: ${r.removed.join(', ')}`, true);
+    return true;
+  }
+
+  function render() {
+    if (destroyed) return;
+    const s = instance(), def = symbolDef(s, s.modules);
+    const vw = def.w + 2 * M, vh = def.h + 2 * M;
+    svg.setAttribute('viewBox', `${-M} ${-M} ${vw} ${vh}`);
+    svg.setAttribute('width', String(Math.round(vw * zoom)));
+    svg.setAttribute('height', String(Math.round(vh * zoom)));
+    let out = symbolSvg(s, def);
+    for (const p of symbolPins(s, s.modules, def)) {
+      out += `<circle class="sy-pin${p.name === sel ? ' sel' : ''}" data-pin="${p.name.replace(/"/g, '&quot;')}" cx="${p.x}" cy="${p.y}" r="5"><title>${p.name.replace(/</g, '&lt;')}</title></circle>`;
+    }
+    svg.innerHTML = out;
+    zoomLbl.textContent = `${Math.round(zoom * 100)}%`;
+    const has = !!sel && !readOnly;
+    earlier.disabled = !has; later.disabled = !has;
+    info.set([`${S.pins.length} pin(s)`, `${def.body.w} × ${def.body.h}`]);
+    renderSide();
+    return def;
+  }
+  const setZoom = z => { zoom = Math.max(0.5, Math.min(8, z)); render(); };
+  function fit() {
+    const s = instance(), def = symbolDef(s, s.modules);
+    const r = canvasWrap.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) zoom = Math.max(0.5, Math.min(4, Math.min((r.width - 20) / (def.w + 2 * M), (r.height - 20) / (def.h + 2 * M))));
+    render();
+  }
+
+  // ---------------------------------------------------------------- edits
+  function commit() {
+    if (readOnly) return;
+    const t = JSON.stringify(S);
+    if (t !== hist[hi]) { hist.length = hi + 1; hist.push(t); if (hist.length > 200) hist.shift(); hi = hist.length - 1; opts.onChange?.(clone(S)); }
+    render();
+  }
+  const restore = i => { hi = i; S = JSON.parse(hist[hi]); if (sel && !sideOf(sel)) sel = null; opts.onChange?.(clone(S)); render(); };
+  const undo = () => { if (hi > 0) restore(hi - 1); };
+  const redo = () => { if (hi < hist.length - 1) restore(hi + 1); };
+
+  /** The pin `name` to `side`, at `index` among that side's other pins (0: the first, top or left). */
+  function movePin(name, side, index) {
+    const at = S.pins.findIndex(q => q.name === name);
+    if (at < 0) return;
+    const [pin] = S.pins.splice(at, 1);
+    pin.side = side;
+    const same = S.pins.map((q, i) => [q, i]).filter(([q]) => q.side === side);
+    const k = Math.max(0, Math.min(index, same.length));
+    const pos = k < same.length ? same[k][1] : same.length ? same[same.length - 1][1] + 1 : S.pins.length;
+    S.pins.splice(pos, 0, pin);
+    commit();
+  }
+  function shift(by) {
+    if (!sel) return;
+    const sd = sideOf(sel), same = S.pins.filter(q => q.side === sd).map(q => q.name);
+    const i = same.indexOf(sel);
+    if (i + by < 0 || i + by >= same.length) return;
+    movePin(sel, sd, i + by);
+  }
+  function reset() {
+    S = { ...newSymbol({ name: S.module, ports: ports() }) };
+    commit();
+    say(`${S.module}: the symbol reset to the default one`);
+  }
+
+  // ---------------------------------------------------------------- the mouse: select a pin, drag it to its new place
+  const toLocal = e => { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const m = svg.getScreenCTM(); return m ? p.matrixTransform(m.inverse()) : { x: 0, y: 0 }; };
+  svg.addEventListener('pointerdown', e => {
+    const c = e.target.closest?.('.sy-pin');
+    sel = c ? c.dataset.pin : null;
+    if (c && !readOnly) { dragging = { name: sel, id: e.pointerId }; svg.setPointerCapture?.(e.pointerId); }
+    render();
+  });
+  svg.addEventListener('pointerup', e => {
+    if (!dragging) return;
+    const d = dragging; dragging = null;
+    const pt = toLocal(e), s = instance(), def = symbolDef(s, s.modules), b = def.body;
+    const pin = def.pins.find(q => q.name === d.name);
+    if (pin && Math.hypot(pt.x - pin.x, pt.y - pin.y) < 8) return;   // (a click: only selected)
+    drop(d.name, pt, def, b);
+  });
+  function drop(name, pt, def, b) {
+    // (the side the point is beyond, the further one at a corner; inside the body, its nearest edge)
+    const dx = pt.x < b.x ? b.x - pt.x : pt.x > b.x + b.w ? pt.x - b.x - b.w : 0, dy = pt.y < b.y ? b.y - pt.y : pt.y > b.y + b.h ? pt.y - b.y - b.h : 0;
+    const dist = { W: Math.abs(pt.x - b.x), E: Math.abs(pt.x - (b.x + b.w)), N: Math.abs(pt.y - b.y), S: Math.abs(pt.y - (b.y + b.h)) };
+    const sd = dx || dy ? (dx >= dy ? (pt.x < b.x ? 'W' : 'E') : (pt.y < b.y ? 'N' : 'S')) : Object.keys(dist).reduce((a, k) => (dist[k] < dist[a] ? k : a), 'W');
+    const along = q => (sd === 'W' || sd === 'E' ? q.y : q.x), at = sd === 'W' || sd === 'E' ? pt.y : pt.x;
+    const index = def.pins.filter(q => q.side === sd && q.name !== name && along(q) < at).length;
+    movePin(name, sd, index);
+  }
+  root.addEventListener('keydown', e => {
+    if (readOnly || !sel || e.target.closest('input, select, textarea')) return;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { shift(-1); e.preventDefault(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { shift(1); e.preventDefault(); }
+  });
+
+  if (inStep()) { hist.push(JSON.stringify(normalizeSymbol(opts.symbol || newSymbol(module)).symbol)); hi = 0; commit(); }
+  else { hist.push(JSON.stringify(S)); hi = 0; render(); }
+  requestAnimationFrame(() => { if (!destroyed && canvasWrap.isConnected) fit(); });
+
+  return {
+    root,
+    getSymbol: () => clone(S),
+    setModule(m) { module = m; if (inStep()) commit(); else render(); },
+    select(name) { sel = sideOf(name) ? name : null; render(); },
+    undo, redo, fit,
+    destroy() { destroyed = true; container.innerHTML = ''; },
+  };
+}

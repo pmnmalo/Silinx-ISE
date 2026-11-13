@@ -3,16 +3,20 @@
 // never moves its pins under the wires connected to them (connections are geometric). Such an instance is out of
 // date (symbolDiff: a warning in Check Schematic, an error when a port it connects is gone) until Update Symbol
 // (updateModuleSymbols): its ports the module's, the pins that stay in their order, the new ones at the end of their
-// side, and the wires following their pin by name. Isomorphic (no DOM).
+// side, and the wires following their pin by name. A module with a symbol of its own (<module>.sym.json, #3755,
+// core/symbol-layout.js): its instance out of date too when the symbol's layout changed (relaid), Update Symbol then
+// taking the symbol's pins' order and sides and its layout. Isomorphic (no DOM).
 import { SIDE_V, findMod, symbolDef, xform, xformSide } from './schdoc-symbols.js';
 import { followPins, otherPins } from './schdoc-repin.js';
+import { instanceParams, layoutChanged } from './symbol-layout.js';
 
 const lc = s => String(s).toLowerCase();
 const side = q => (q.dir === 'out' ? 'out' : 'in');
 const portCopy = q => ({ name: q.name, dir: q.dir || 'in', width: q.width ?? 1 });
 
 /** How an instance's ports differ from its module's: null when it has the same ones on the same sides (their order
- *  apart: its pins keep theirs, Update Symbol does not change it), else { added, removed, turned } (port names). */
+ *  apart: its pins keep theirs, Update Symbol does not change it), and the same layout as its module's symbol (#3755),
+ *  else { added, removed, turned, relaid? } (port names; relaid: true when the symbol's layout changed). */
 export function symbolDiff(sym, modules = {}) {
   if (sym.type !== 'module' || !Array.isArray(sym.params?.ports)) return null;
   const m = findMod(modules, sym.params.module);
@@ -23,7 +27,8 @@ export function symbolDiff(sym, modules = {}) {
   const added = theirs.filter(q => !have.has(lc(q.name))).map(q => q.name);
   const removed = mine.filter(q => !byName.has(lc(q.name))).map(q => q.name);
   const turned = mine.filter(q => byName.has(lc(q.name)) && side(byName.get(lc(q.name))) !== side(q)).map(q => q.name);
-  return added.length || removed.length || turned.length ? { added, removed, turned } : null;
+  const relaid = layoutChanged(sym.params, m);
+  return added.length || removed.length || turned.length || relaid ? { added, removed, turned, ...(relaid ? { relaid } : {}) } : null;
 }
 
 /** The ports an instance takes on Update Symbol: on each side the ones it has, in their order, then the module's new
@@ -54,7 +59,9 @@ export function updateModuleSymbols(doc, modules = {}, ids = null) {
     if (s.type !== 'module' || !m) continue;
     const diff = symbolDiff(s, modules) || { removed: [], turned: [] };
     const oldDef = symbolDef(s, modules), oldAt = new Map(oldDef.pins.map(p => [lc(p.name), xform(s, oldDef, p.x, p.y)]));
-    s.params.ports = updatedPorts(s.params.ports || m.ports, m.ports || []);
+    // (a symbol of its own: its order, sides and layout, #3755; else the pins in their order, the new ones after them)
+    if (m.symbol) Object.assign(s.params, instanceParams(m));
+    else { s.params.ports = updatedPorts(s.params.ports || m.ports, m.ports || []); delete s.params.layout; }
     const newDef = symbolDef(s, modules);
     const others = otherPins(doc, s, modules);
     // a removed or turned pin's wire left where it was, unconnected: pulled back from a pin that comes there (first:

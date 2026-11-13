@@ -386,9 +386,10 @@ export function fsmContextMenu(e, file) {
 
 // ---- schematic editor (.sch.json): schematic <-> HDL
 export async function schModules() {
-  const { modulesFromLibrary } = await import('/core/schdoc.js');
+  const { attachSymbols, modulesFromLibrary } = await import('/core/schdoc.js');
   const sources = Object.fromEntries(S.sources.map(s => [s.path, s.text]));
-  const mods = modulesFromLibrary(S.lib, { sources });
+  // (their symbols of their own, the Symbol Editor's, #3755)
+  const mods = attachSymbols(modulesFromLibrary(S.lib, { sources }), S.symbolFiles);
   // the test benches (Simulation-only sources, #332): not offered in the palette's Project modules
   const sim = new Set(S.sources.filter(s => s.role === 'sim').map(s => s.path));
   for (const m of Object.values(mods)) if (sim.has(m.file)) m.testbench = true;
@@ -420,6 +421,7 @@ export async function openSch(path) {
         onChange: () => setDirty(d, true),
         // (its drawing when it has one, as its Design row's double-click, else its HDL, #2046)
         onOpenModule: name => openModuleSource(name),
+        onEditSymbol: name => import('./symbol-doc.js').then(m => m.editSymbol(name)),   // (#3755)
       });
       d.schEditor = ed;
       if (following()) ed.setBanner(followNotice(path));

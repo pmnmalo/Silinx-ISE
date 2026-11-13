@@ -9,7 +9,7 @@ import { TITLES } from './sch-rename.js';
 export function mountSchContext(ctx) {
   const {
     readOnly, doc, live, segSel, sel, tool, setSel, render, renderProps, rename, duplicateSel, rotateSel, mirrorSel, deleteSel,
-    openInfo, symTarget
+    openInfo, symTarget, opts = {}
   } = ctx;
 
   function contextMenu(e, it) {
@@ -22,8 +22,11 @@ export function mountSchContext(ctx) {
     render(); renderProps();
     // (what applies to the selection: Duplicate, Rotate and Mirror to its symbols and I/O markers)
     const parts = [...sel()].some(k => k.startsWith('sym:') || k.startsWith('port:'));
+    // (a module's instance: its module's symbol in the Symbol Editor, #3755)
+    const s = it.kind === 'sym' && doc().symbols.find(o => o.id === it.id);
+    const symbol = s?.type === 'module' && s.params?.module && opts.onEditSymbol && { label: 'Edit Symbol', action: () => opts.onEditSymbol(s.params.module) };
     popupMenu([
-      info, info && '-',
+      info, symbol, (info || symbol) && '-',
       { label: 'Rename…', action: () => rename(it) },
       '-',
       parts && { label: 'Duplicate', action: duplicateSel },

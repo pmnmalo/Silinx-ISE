@@ -17,7 +17,9 @@ export function staleSection(s, { readOnly, doc, modules, edit, flash }) {
     flash(lost.length ? `Symbol updated; not connected any more: ${lost.join(', ')}` : `Symbol updated (${r.updated.join(', ')}), its connections kept`);
   };
   const others = stale().length - 1;
-  return [h('div', { class: 'se-note se-stale' }, h('span', { text: `The symbol is out of date: module '${s.params.module}' changed its ports (${what}).` })),
+  // (its symbol's layout changed, #3755: Symbol Editor)
+  const why = what ? `module '${s.params.module}' changed its ports (${what})` : `module '${s.params.module}' has a new symbol`;
+  return [h('div', { class: 'se-note se-stale' }, h('span', { text: `The symbol is out of date: ${why}.` })),
     h('div', { class: 'se-pbtns' }, h('button', { class: 'btn se-update', type: 'button', text: 'Update Symbol', onclick: () => update(false) }),
       others > 0 ? h('button', { class: 'btn se-update-all', type: 'button', text: `Update All (${others + 1})`, onclick: () => update(true) }) : null)];
 }

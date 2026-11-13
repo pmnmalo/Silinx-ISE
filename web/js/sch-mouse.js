@@ -3,7 +3,7 @@
 // moves (the hover, the drop target), the release (a move checked for clashes, rerouted, untangled), the wheel, the
 // double click, the context menu. Curved wires (#1144): a handle of the selected wire dragged (double-clicked: removed),
 // the wire grabbed on its curve.
-import { GRID, defaultParams, normalizeDoc, splitWiresAt, symbolPins } from '/core/schdoc.js';
+import { GRID, defaultParams, instanceParams, normalizeDoc, splitWiresAt, symbolPins } from '/core/schdoc.js';
 import { connectionsKept, connectivity, placementClashes, rerouteAfterMove } from '/core/schroute.js';
 import { closeMenus, twoFingerView } from './ui.js';
 import { untangleNew } from '/core/schpath.js';
@@ -230,7 +230,7 @@ export function mountSchMouse(ctx) {
     e.preventDefault();
     const it = JSON.parse(raw);
     const src = { type: it.type, params: { ...defaultParams(it.type), ...(it.params || {}) }, rot: 0, mirror: false };
-    if (it.type === 'module' && modules()[it.params.module]) src.params.ports = modules()[it.params.module].ports.map(p => ({ name: p.name, dir: p.dir, width: p.width }));
+    if (it.type === 'module' && modules()[it.params.module]) Object.assign(src.params, instanceParams(modules()[it.params.module]));   // (its symbol's layout too, #3755)
     // (a finger, #1179: the symbol dragged goes on being placed, by taps on the sheet, until Select or Esc; the mouse:
     // the symbol dropped selected)
     if (globalThis.matchMedia?.('(pointer: coarse)').matches) { startPlace(it); placeAt(toSheet(e.clientX, e.clientY)); return; }

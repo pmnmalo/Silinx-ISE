@@ -6,6 +6,7 @@
 //     modules,                   // { name: { name, ports: [{ name, dir, width, type? }], generics: [{ name, default }] } }
 //     onChange(doc) {},          // debounced, after every edit
 //     onOpenModule(moduleName) {},
+//     onEditSymbol(moduleName) {},   // a module instance's Edit Symbol (#3755)
 //   });
 //   readOnly: true             // view only: pan/zoom/select/inspect, no edits (RTL schematic viewer)
 //   simulate: true             // with readOnly: Simulate kept, the drawing not editable (a truth table's schematic, #946;
@@ -266,7 +267,7 @@ export function mountSchEditor(container, opts = {}) {
   // the right-click menu (sch-context.js): Rename… (sch-rename.js, #1546), the selection's commands (#1556)
   const { rename } = mountSchRename({ doc: () => doc, nl: () => nl, edit, joinByName, joinMarker, renameLabel });
   const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, segSel, sel: () => sel, tool: () => tool, render, renderProps,
-    rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; }, openInfo: (...a) => openInfo(...a), symTarget: (...a) => symTarget(...a) });
+    rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; }, openInfo: (...a) => openInfo(...a), symTarget: (...a) => symTarget(...a), opts });
   const { finishMove, onMove, onUp } = mountSchMouse({
     segSel, wholeBranch, container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor: () => cursor, destroyed: () => destroyed, doc: () => doc, drag: () => drag, finishSegMove, finishWire,

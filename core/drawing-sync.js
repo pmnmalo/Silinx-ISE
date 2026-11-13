@@ -7,17 +7,27 @@
 // drawing's own (Source Properties) put the drawings in it (drawings-lang.js, #1477, #2254). A drawing made from its
 // HDL (base 'hdl') is a view of it, not its base: none of this.
 import { compile } from './compile.js';
-import { modulesFromLibrary } from './schdoc.js';
+import { attachSymbols, isSymbolFile, modulesFromLibrary } from './schdoc.js';
 import { VIEW_RE, definesModule, drawingInLanguage, drawnHdlPath, modelLanguage, viewHdl } from './view-hdl.js';
 
 const kindOf = path => VIEW_RE.exec(path)?.[1].toLowerCase();
 const indent = path => (kindOf(path) === 'sch' ? 1 : 2);
 const isVerilog = file => /\.s?v$/i.test(file);
 
-/** The project's modules from its HDL sources (the schematics' module symbols), as the editors read them. */
+/** The project's modules from its HDL sources (the schematics' module symbols), as the editors read them, with their
+ *  symbols of their own (<module>.sym.json, #3755). */
 export async function projectModules(P, name) {
   const hdl = (await P.readSources(name)).filter(s => !s.missing && (s.lang === 'vhdl' || s.lang === 'verilog'));
-  try { return modulesFromLibrary(compile(hdl), { sources: Object.fromEntries(hdl.map(s => [s.path, s.text])) }); } catch { return {}; }
+  let mods;
+  try { mods = modulesFromLibrary(compile(hdl), { sources: Object.fromEntries(hdl.map(s => [s.path, s.text])) }); } catch { return {}; }
+  return attachSymbols(mods, await symbolFiles(P, name));
+}
+
+/** The project's symbol files: { path: text }. */
+export async function symbolFiles(P, name) {
+  const out = {};
+  for (const f of (await P.fileTree(name)).filter(isSymbolFile)) { try { out[f] = await P.readFile(name, f); } catch { /* unreadable */ } }
+  return out;
 }
 
 // the drawing's model and its HDL file in the project (null: none, or not the drawing's base)
