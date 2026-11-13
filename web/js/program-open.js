@@ -2,7 +2,7 @@
 // with the file its flow makes, by the target of its tool's descriptor (web/js/tool-descriptors.js program): an iCE40's .bin
 // written into the board's SPI flash, which the FPGA then loads (and at every power-up); an ECP5's .bit, a Gowin's .fs loaded
 // into the FPGA's SRAM (until the board is powered off). By openFPGALoader in the local server; through the board's USB
-// over WebUSB in the browser edition, where the board's tool says so (webusb: core/ftdi-ice40.js).
+// over WebUSB in the browser edition, where the board's tool says so (webusb: core/usb-program.js).
 import { api, followJob } from './api.js';
 import { h, toast, alertDlg, confirmDlg } from './ui.js';
 import { S, app } from './app.js';

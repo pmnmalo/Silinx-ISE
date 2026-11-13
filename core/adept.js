@@ -155,11 +155,16 @@ export class Djtg {
 const BYTEREV = Uint8Array.from({ length: 256 }, (_, x) => { let r = 0; for (let b = 0; b < 8; b++) if (x & (1 << b)) r |= 1 << (7 - b); return r; });
 export const byterev = data => { const out = new Uint8Array(data.length); for (let i = 0; i < data.length; i++) out[i] = BYTEREV[data[i]]; return out; };
 
-// the devices of the Digilent boards' chains: IDCODE (version bits masked), name, IR length, kind
+// the devices of the boards' chains: IDCODE (version bits masked), name, IR length, kind; the Digilent Adept boards', and
+// the FTDI boards' of core/ftdi-jtag.js (#2298: the Basys 3's and the Nexys A7's Artix-7, UG470; the Tang Nano 9K's GW1NR-9C,
+// whose IDCODE's top bits are not a version: kept)
 const JTAG_DEVICES = [
   [0x01c10093, 'xc3s100e', 6, 'fpga'], [0x01c1a093, 'xc3s250e', 6, 'fpga'], [0x01c22093, 'xc3s500e', 6, 'fpga'],
   [0x01c2e093, 'xc3s1200e', 6, 'fpga'], [0x01c3a093, 'xc3s1600e', 6, 'fpga'],
   [0x05044093, 'xcf01s', 8, 'prom'], [0x05045093, 'xcf02s', 8, 'prom'], [0x05046093, 'xcf04s', 8, 'prom'],
+  [0x0362e093, 'xc7a15t', 6, 'fpga'], [0x0362d093, 'xc7a35t', 6, 'fpga'], [0x0362c093, 'xc7a50t', 6, 'fpga'],
+  [0x03632093, 'xc7a75t', 6, 'fpga'], [0x03631093, 'xc7a100t', 6, 'fpga'], [0x03636093, 'xc7a200t', 6, 'fpga'],
+  [0x1100481b, 'gw1nr-9c', 8, 'fpga', 0xffffffff],
 ];
 const idMask = 0x0fffffff;
 const bigOf = b => { let n = 0n; for (let i = b.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(b[i]); return n; };
@@ -177,7 +182,7 @@ export class Chain {
     for (;;) {
       const id = rd32(await this.port.getTdoBits(false, false, 32));
       if (id === 0 || id === 0xffffffff) break;
-      const known = JTAG_DEVICES.find(([c]) => (id & idMask) === c);
+      const known = JTAG_DEVICES.find(([c, , , , mask = idMask]) => ((id & mask) >>> 0) === c);
       if (!known) fail(`unknown JTAG device (IDCODE ${id.toString(16).padStart(8, '0')})`);
       this.devices.push({ idcode: id, name: known[1], irLen: known[2], kind: known[3], cur: (1 << known[2]) - 1 });
       if (this.devices.length > 8) fail('JTAG chain too long (no device answers?)');
@@ -352,10 +357,10 @@ export class JtagSeq {
 const S3 = { CFG_IN: 0x05, JPROGRAM: 0x0b, JSTART: 0x0c };
 const ST_INIT = 0x10, ST_DONE = 0x20;
 
-/** The FPGA of the chain (or an error naming what was found). */
-function fpgaOf(chain) {
+/** The FPGA of the chain (or an error naming what was found; family: what was looked for). */
+function fpgaOf(chain, family = 'Spartan-3E') {
   const f = chain.devices.find(d => d.kind === 'fpga');
-  if (!f) fail(`no Spartan-3E FPGA on the JTAG chain (found ${chain.devices.map(d => d.name).join(', ')})`);
+  if (!f) fail(`no ${family} FPGA on the JTAG chain (found ${chain.devices.map(d => d.name).join(', ')})`);
   return f;
 }
 
@@ -418,47 +423,57 @@ export function usbLine(st) {
  * commands by kind, as the PROM's does.
  */
 export async function programAdept(usb, bit, { part = null, log = () => {}, maxPolls = 2000, now = () => performance.now() } = {}) {
-  part = bitHeader(bit)?.part || part;   // the file says what it was built for
-  const start = now();
   const a = await new Adept(usb).open();
   try {
     log(`Programmer: ${a.productName || 'Digilent Adept USB'}${a.serial ? ` (serial ${a.serial})` : ''}`);
     const chain = new Chain(new Djtg(a, 0));
-    await chain.init();
-    const fpga = fpgaOf(chain);
-    log(`JTAG chain: ${[...chain.devices].reverse().map(d => d.name.toUpperCase()).join(' → ')}`);
-    if (part && fpga.name !== String(part).toLowerCase()) fail(`the board's FPGA is a ${fpga.name.toUpperCase()}, the bitstream is for a ${String(part).toUpperCase()}`);
-    const stats = { now }, seq = () => new JtagSeq(chain, stats);
-    // the FPGA's status (its captured IR) after one more shift of its current instruction, 12
-    // clocks in Run-Test/Idle first when rti (the start-up after JSTART runs there)
-    const status = async (s, rti) => { if (rti) s.rti(12); const st = s.ir(fpga, fpga.cur, true); await s.run(); return st.num; };
-    log('JPROGRAM: clearing the configuration');
-    let s = seq();
-    s.ir(fpga, S3.JPROGRAM);
-    s.ir(fpga, S3.CFG_IN);
-    let initPolls = 0, polls = 0;
-    while (!((await status(s, false)) & ST_INIT)) {
-      if (++initPolls > maxPolls) fail('the FPGA does not get ready (INIT_B stays low)');
-      s = seq();
-    }
-    log(`CFG_IN: ${bit.length} bytes`);
-    const t = now();
-    s = seq();
-    s.dr(fpga, byterev(bit), bit.length * 8);
-    s.ir(fpga, S3.JSTART);
-    log('JSTART');
-    while (!((await status(s, true)) & ST_DONE)) {
-      if (++polls > maxPolls) fail('DONE did not go high: the bitstream was not accepted (wrong device or a corrupt file?)');
-      s = seq();
-    }
-    s = seq();
-    s.rti(12);
-    await s.run();
-    const d = stats.data, bits = bit.length * 8;
-    log(`  bitstream: ${bits} bits in ${secs(now() - t)}${d?.ms > 0 ? ` (${(bits / d.ms / 1000).toFixed(2)} MHz TCK over USB)` : ''}; INIT after ${initPolls} poll${initPolls === 1 ? '' : 's'}, DONE after ${polls}`);
-    log(usbLine(stats));
-    log(`DONE: the FPGA is configured in ${secs(now() - start)}`);
+    const r = await configureXilinx(chain, bit, { part, log, maxPolls, now });
     await chain.close();
-    return { fpga: fpga.name };
+    return r;
   } finally { await a.close(); }
+}
+
+/**
+ * A Xilinx FPGA of a chain configured (SRAM) with a .bit, behind any JTAG port (the Adept's Djtg, an FTDI's MPSSE: core/ftdi-jtag.js,
+ * #2298): the Spartan-3E's sequence of programAdept, which the 7-series' is too (UG470: JPROGRAM, INIT_COMPLETE and DONE the same
+ * bits of the captured IR). The chain initialised here; its port left enabled.
+ */
+export async function configureXilinx(chain, bit, { part = null, family = 'Spartan-3E', log = () => {}, maxPolls = 2000, now = () => performance.now() } = {}) {
+  part = bitHeader(bit)?.part || part;   // the file says what it was built for
+  const start = now();
+  await chain.init();
+  const fpga = fpgaOf(chain, family);
+  log(`JTAG chain: ${[...chain.devices].reverse().map(d => d.name.toUpperCase()).join(' → ')}`);
+  if (part && fpga.name !== String(part).toLowerCase()) fail(`the board's FPGA is a ${fpga.name.toUpperCase()}, the bitstream is for a ${String(part).toUpperCase()}`);
+  const stats = { now }, seq = () => new JtagSeq(chain, stats);
+  // the FPGA's status (its captured IR) after one more shift of its current instruction, 12
+  // clocks in Run-Test/Idle first when rti (the start-up after JSTART runs there)
+  const status = async (s, rti) => { if (rti) s.rti(12); const st = s.ir(fpga, fpga.cur, true); await s.run(); return st.num; };
+  log('JPROGRAM: clearing the configuration');
+  let s = seq();
+  s.ir(fpga, S3.JPROGRAM);
+  s.ir(fpga, S3.CFG_IN);
+  let initPolls = 0, polls = 0;
+  while (!((await status(s, false)) & ST_INIT)) {
+    if (++initPolls > maxPolls) fail('the FPGA does not get ready (INIT_B stays low)');
+    s = seq();
+  }
+  log(`CFG_IN: ${bit.length} bytes`);
+  const t = now();
+  s = seq();
+  s.dr(fpga, byterev(bit), bit.length * 8);
+  s.ir(fpga, S3.JSTART);
+  log('JSTART');
+  while (!((await status(s, true)) & ST_DONE)) {
+    if (++polls > maxPolls) fail('DONE did not go high: the bitstream was not accepted (wrong device or a corrupt file?)');
+    s = seq();
+  }
+  s = seq();
+  s.rti(12);
+  await s.run();
+  const d = stats.data, bits = bit.length * 8;
+  log(`  bitstream: ${bits} bits in ${secs(now() - t)}${d?.ms > 0 ? ` (${(bits / d.ms / 1000).toFixed(2)} MHz TCK over USB)` : ''}; INIT after ${initPolls} poll${initPolls === 1 ? '' : 's'}, DONE after ${polls}`);
+  log(usbLine(stats));
+  log(`DONE: the FPGA is configured in ${secs(now() - start)}`);
+  return { fpga: fpga.name };
 }

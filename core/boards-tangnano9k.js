@@ -30,7 +30,7 @@ const BOARD = {
   jtagChain: [{ name: 'gw1nr-9c', role: 'fpga' }],
   programmer: {
     preferred: 'openFPGALoader',
-    tools: { openFPGALoader: { board: 'tangnano9k', onboard: true, verified: false, usb: 'BL702', note: 'The on-board BL702 (JTAG): the .fs loaded into the FPGA\'s SRAM, until the board is powered off.' } },
+    tools: { openFPGALoader: { board: 'tangnano9k', onboard: true, verified: false, usb: 'BL702', webusb: 'ft2232', note: 'The on-board BL702 (JTAG): the .fs loaded into the FPGA\'s SRAM, until the board is powered off.' } },
   },
   source: CST_SOURCE, sourceUrl: CST_URL,
 };

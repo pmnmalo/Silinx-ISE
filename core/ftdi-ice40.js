@@ -28,8 +28,8 @@ const hex = (b, n = 2) => `0x${b.toString(16).padStart(n, '0')}`;
 const addr24 = a => [(a >> 16) & 0xff, (a >> 8) & 0xff, a & 0xff];
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-/** The FT2232H's channel A in MPSSE mode, and the SPI flash behind it. */
-class FtdiSpi {
+/** The FT2232H's channel A in MPSSE mode, and the SPI flash behind it (its MPSSE also core/ftdi-jtag.js's, #2298). */
+export class FtdiSpi {
   constructor(usb, { sleep = wait } = {}) { this.usb = usb; this.sleep = sleep; this.rx = []; }
 
   async open() {

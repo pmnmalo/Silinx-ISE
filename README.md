@@ -627,7 +627,8 @@ descriptions, the bit database and Yosys in WebAssembly, ~115 MB), with which th
 Silinx toolchain in the browser: *Implement Design* and *Generate Programming File* for the
 Spartan-3E and Spartan-6 boards and the iCE40 (the bitstream is downloaded), and *Configure Target Device* programs the FPGA of
 a Basys2 / Nexys2 over WebUSB (Chrome / Edge; core/adept.js, a port of adepttool's Adept USB
-protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`), and the iCEBreaker's SPI flash (core/ftdi-ice40.js). XST (Xilinx ISE)
+protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`), and the iCEBreaker's SPI flash (core/ftdi-ice40.js),
+and the FPGA of a Basys 3, a Nexys A7 or a Tang Nano 9K through its FT2232H's (or BL702's) JTAG (core/ftdi-jtag.js, #2298). XST (Xilinx ISE)
 needs the full application (`npm start`).
 
 ## Synthesis and bitstreams (Xilinx ISE 14.7)
@@ -705,7 +706,7 @@ local server's openFPGALoader -b ulx3s, #2298). The examples run on it with thei
 **ULX3S + VGA-12f / 25f / 45f / 85f** (the Radiona ULX3S + VGA), a VGA connector on that header.
 It takes **the Sipeed Tang Nano 9K** too (Gowin GW1NR-9C): Yosys's `synth_gowin`, nextpnr-himbaechel-gowin (Project Apicula)
 and gowin_pack, Silinx's JavaScript port of Apicula's (its `.fs` byte for byte Apicula's on the examples), to `build/<top>.fs`,
-its pins written as a CST, loaded into the FPGA by *Configure Target Device* (the local server's openFPGALoader -b tangnano9k, #2298). The examples run on it with
+its pins written as a CST, loaded into the FPGA by *Configure Target Device* (the local server's openFPGALoader -b tangnano9k, or the browser over WebUSB, #2298). The examples run on it with
 their LEDs, switches, buttons and display on its headers (every port needs a pin there); vga on the **Sipeed Tang Nano 9K + VGA**.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
@@ -787,7 +788,8 @@ the same over WebUSB (`core/xcf.js`, Chrome / Edge, Chrome on Android), its back
 
 ```
 core/       VHDL/Verilog parsers, elaborator, simulator, schematics, ASM, UCF, zip (browser + Node);
-            adept.js / xcf.js: the board and its Platform Flash programmed over WebUSB
+            adept.js / xcf.js: the board and its Platform Flash programmed over WebUSB; ftdi-ice40.js /
+            ftdi-jtag.js: the FTDI boards' (the iCEBreaker's flash, the 7-series' and the Gowin's JTAG)
 server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
 web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/silinx.css): editor, SSim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image

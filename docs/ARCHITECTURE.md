@@ -11,7 +11,7 @@ Silinx is one web application. The same pages and the same `core/` modules run i
 | Edition | Host | The projects | Runs ISE | Programs the board |
 |---|---|---|---|---|
 | **Local server** (`npm start`, `bin/silinx.js serve`) | Node: `server/server.js` serves the pages and a REST API | Folders on disk, `~/Silinx-projects` ([PROJECT.md](PROJECT.md)) | Yes (Docker, SSH or native: `server/toolchain.js`) | Through local tools (`server/programmer.js`) or WebUSB |
-| **Browser edition**: one file (`dist/Silinx.html`) and the site, installable as an app | The browser alone: no server | The browser's storage or a folder the user picks (`web/js/project-store.js`) | No | WebUSB (`core/adept.js`, `core/xcf.js`) |
+| **Browser edition**: one file (`dist/Silinx.html`) and the site, installable as an app | The browser alone: no server | The browser's storage or a folder the user picks (`web/js/project-store.js`) | No | WebUSB (`core/adept.js`, `core/xcf.js`, `core/ftdi-ice40.js`, `core/ftdi-jtag.js`: `core/usb-program.js`) |
 
 The interface does not know which host it has: it talks to `web/js/api.js` (the server's REST API) or `web/js/api-local.js`
 (the same interface, in the browser). `scripts/build-standalone.mjs` bundles the pages, `core/`, the examples and the

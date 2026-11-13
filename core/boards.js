@@ -557,7 +557,7 @@ export const BOARDS = [
     programmer: {
       preferred: 'openFPGALoader',
       tools: {
-        openFPGALoader: { board: 'basys3', onboard: true, verified: false, note: 'The on-board USB-JTAG (FTDI FT2232HQ).' },
+        openFPGALoader: { board: 'basys3', usb: 'FT2232H', webusb: 'digilent', onboard: true, verified: false, note: 'The on-board USB-JTAG (FTDI FT2232HQ).' },
       },
     },
     source: BASYS3_XDC,
@@ -597,7 +597,7 @@ export const BOARDS = [
     programmer: {
       preferred: 'openFPGALoader',
       tools: {
-        openFPGALoader: { board: 'nexys_a7_100', onboard: true, verified: false, note: 'The on-board USB-JTAG (FTDI FT2232HQ).' },
+        openFPGALoader: { board: 'nexys_a7_100', usb: 'FT2232H', webusb: 'digilent', onboard: true, verified: false, note: 'The on-board USB-JTAG (FTDI FT2232HQ).' },
       },
     },
     source: NEXYSA7_XDC,
@@ -638,7 +638,7 @@ export const BOARDS = [
     programmer: {
       preferred: 'openFPGALoader',
       tools: {
-        openFPGALoader: { board: 'ice40_generic', usb: 'FT2232H', webusb: true, onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
+        openFPGALoader: { board: 'ice40_generic', usb: 'FT2232H', webusb: 'spi', onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
       },
     },
     source: ICEBREAKER_PCF,
@@ -665,7 +665,7 @@ export const BOARDS = [
     programmer: {
       preferred: 'openFPGALoader',
       tools: {
-        openFPGALoader: { board: 'ice40_generic', usb: 'FT2232H', webusb: true, onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
+        openFPGALoader: { board: 'ice40_generic', usb: 'FT2232H', webusb: 'spi', onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
       },
     },
     source: ICEBREAKER_PCF,
