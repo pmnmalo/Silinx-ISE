@@ -9,6 +9,7 @@
 // application runs it). Vivado runs one design after another, alone on the machine.
 //
 //   node scripts/xc7-timing-vivado.mjs [--boards basys3,nexys-a7] [--filter '^(blinky|pong)$'] [--update]
+//     --filter: examples' names separated by | or , ('^…$' whole names, '^' their start, '$' their end, else anywhere)
 //   node scripts/xc7-timing-vivado.mjs --detach [--boards …] [--filter …]   Vivado started on the host in the background
 //     (it does not depend on this machine staying awake); nextpnr's runs here meanwhile; it prints the run's name
 //   node scripts/xc7-timing-vivado.mjs --collect <run> [--update]   its results once it is done (else its progress); the
@@ -114,12 +115,23 @@ touch "$W/done"
 `;
 }
 
+/** --filter's test of an example's name (#3752: no regular expression built from the command line): names separated by
+ *  | or , ('blinky|pong', 'blinky,pong'), in parentheses or not, a name matched whole between ^ and $ ('^(blinky|pong)$'),
+ *  at the name's start after ^ alone, at its end before $ alone, anywhere with neither; anything else an error. */
+export function nameFilter(filter) {
+  const m = /^(\^?)(\(?)(\w+(?:[|,]\w+)*)(\)?)(\$?)$/.exec(filter);
+  if (!m || !m[2] !== !m[4]) throw new Error(`--filter: examples' names separated by | or , (as '^(blinky|pong)$'), not ${filter}`);
+  const names = m[3].split(/[|,]/);
+  const start = m[1] === '^', end = m[5] === '$';
+  return (n) => names.some((x) => (start && end ? n === x : start ? n.startsWith(x) : end ? n.endsWith(x) : n.includes(x)));
+}
+
 /** The designs of a run: [{ id: '<board>-<example>', board, name, part }] of the boards (BOARDS' names) and the examples
- *  whose name matches filter (a regular expression; all with none). */
+ *  whose name matches filter (nameFilter's; all with none). */
 export function selectDesigns(examples, boards, filter) {
-  const re = filter ? new RegExp(filter) : null;
+  const keep = filter ? nameFilter(filter) : () => true;
   for (const b of boards) if (!BOARDS[b]) throw new Error(`--boards: no 7-series board ${b} (${Object.keys(BOARDS).join(', ')})`);
-  return boards.flatMap((board) => examples.filter((n) => !re || re.test(n)).map((name) => ({ id: `${board}-${name}`, board, name, part: BOARDS[board] })));
+  return boards.flatMap((board) => examples.filter(keep).map((name) => ({ id: `${board}-${name}`, board, name, part: BOARDS[board] })));
 }
 
 /** A design's results (its folder: status.txt and measure.tcl's files) as numbers: { status, vivado: { fmaxMHz,

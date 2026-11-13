@@ -74,11 +74,13 @@ uiTest('#2388 a fake family\'s back end runs in the browser\'s worker: its steps
   assert.deepEqual(again.lines.filter((l) => /^(WARNING|ERROR)/.test(l)), []);
 }, { timeout: 60000 });
 
-uiTest('#3662 the flow worker: a family with no tools of its own in the browser is an error naming it, never a method of an object\'s (CodeQL js/unvalidated-dynamic-method-call)', E, async (page) => {
-  const r = await page.eval(async () => {
+// (names of an object's own and of a Map's, and a family of the toolchain with no tools of its own in the browser)
+const FAMILIES = ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'get', 'set', 'spartan3e'];
+uiTest('#3662 #3753 the flow worker: a family with no tools of its own in the browser is an error naming it, never a method of an object\'s nor of a Map\'s (CodeQL js/unvalidated-dynamic-method-call)', E, async (page) => {
+  const r = await page.eval(async (families) => {
     const root = new URL('/', location.href).href;
     const out = [];
-    for (const family of ['constructor', 'toString', 'spartan3e']) {
+    for (const family of families) {
       const w = new Worker('/js/open-flow-worker.js', { type: 'module' });
       const lines = [];
       const done = await new Promise((resolve, reject) => {
@@ -91,8 +93,8 @@ uiTest('#3662 the flow worker: a family with no tools of its own in the browser 
       out.push({ family, ok: done.ok, error: done.error, lines: lines.filter(l => /^(WARNING|ERROR|===)/.test(l)) });
     }
     return out;
-  });
-  assert.deepEqual(r, ['constructor', 'toString', 'spartan3e'].map(family => {
+  }, FAMILIES);
+  assert.deepEqual(r, FAMILIES.map(family => {
     const error = `the family '${family}' has no tools of its own in the browser`;
     return { family, ok: false, error, lines: [`ERROR:Silinx - ${error}`, '=== SILINX FAILED synth (exit 1) ==='] };
   }));
