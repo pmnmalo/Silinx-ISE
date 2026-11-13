@@ -4,12 +4,14 @@
 import { popupMenu } from './ui.js';
 import { KEYS } from './sch-editor.js';
 import { TITLES } from './sch-rename.js';
+import { updateSymbol } from './sch-modsym.js';
+import { symbolDiff } from '/core/schdoc.js';
 
 /** { contextMenu } of mountSchEditor (doc(), live(), sel(), tool(): its current values). */
 export function mountSchContext(ctx) {
   const {
     readOnly, doc, live, segSel, sel, tool, setSel, render, renderProps, rename, duplicateSel, rotateSel, mirrorSel, deleteSel,
-    openInfo, symTarget, opts = {}
+    openInfo, symTarget, opts = {}, modules = () => ({}), edit, flash
   } = ctx;
 
   function contextMenu(e, it) {
@@ -25,8 +27,11 @@ export function mountSchContext(ctx) {
     // (a module's instance: its module's symbol in the Symbol Editor, #3755)
     const s = it.kind === 'sym' && doc().symbols.find(o => o.id === it.id);
     const symbol = s?.type === 'module' && s.params?.module && opts.onEditSymbol && { label: 'Edit Symbol', action: () => opts.onEditSymbol(s.params.module) };
+    // (its Update Symbol, as its Properties' button, #3791: enabled when it is out of date)
+    const stale = s?.type === 'module' && !!symbolDiff(s, modules());
+    const update = s?.type === 'module' && edit && { label: 'Update Symbol', disabled: !stale, ...(stale ? {} : { title: 'The symbol is up to date' }), action: () => updateSymbol(s, { doc, modules, edit, flash }) };
     popupMenu([
-      info, symbol, (info || symbol) && '-',
+      info, symbol, update, (info || symbol || update) && '-',
       { label: 'Rename…', action: () => rename(it) },
       '-',
       parts && { label: 'Duplicate', action: duplicateSel },

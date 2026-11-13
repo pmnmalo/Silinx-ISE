@@ -67,3 +67,34 @@ uiTest('#1183 a module\'s ports changed: its instance drawn as placed, marked ou
   await page.key('z', { modifiers: 2 });
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[0].params.ports[0].name === 'a', [], { what: 'undone' });
 });
+
+uiTest('#3791 Update Symbol in a module instance\'s right-click menu: disabled when up to date; updates it when out of date; one Undo; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'ModSymMenu', top: 'top', files: { 'src/sub.vhd': sub([['a', 'in'], ['b', 'in'], ['y', 'out']]), 'src/top.sch.json': JSON.stringify(top()) } });
+  await page.openProject('ModSymMenu');
+  await page.eval(() => window.SilinxApp.openSch('src/top.sch.json'));
+  await page.waitFor((ed) => document.querySelector(`${ed} svg .sym[data-id="U"]`), [ED], { what: 'drawn' });
+  const item = async () => {
+    await page.rightClick(`${ED} svg .sym[data-id="U"] .hitbox`);
+    await page.waitFor(() => document.querySelector('body > .menu-popup'), [], { what: 'the menu' });
+    return page.eval(() => { const m = [...document.querySelectorAll('body > .menu-popup .mi')].find((x) => /^(Update Symbol|Atualizar Símbolo)$/.test(x.querySelector('.lbl').textContent)); return m && { label: m.querySelector('.lbl').textContent, disabled: m.classList.contains('disabled'), title: m.title }; });
+  };
+  assert.deepEqual(await item(), { label: 'Update Symbol', disabled: true, title: 'The symbol is up to date' });
+  await page.closeMenus();
+  // the module's ports changed: the item enabled; chosen, the instance up to date, its wires kept on b and y
+  await env.server.api('PUT', `/api/projects/ModSymMenu/file?path=${encodeURIComponent('src/sub.vhd')}`, sub([['c', 'in'], ['b', 'in'], ['y', 'out']]));
+  await page.eval(() => window.SilinxApp.reloadProject());
+  await page.waitFor((ed) => document.querySelector(`${ed} svg .sym[data-id="U"]`)?.classList.contains('stale'), [ED], { what: 'out of date' });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  assert.deepEqual(await item(), { label: 'Atualizar Símbolo', disabled: false, title: '' });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await page.closeMenus();
+  await item();
+  await page.click('body > .menu-popup .mi', { text: 'Update Symbol' });
+  await page.waitFor((ed) => !document.querySelector(`${ed} svg .sym[data-id="U"]`).classList.contains('stale'), [ED], { what: 'up to date' });
+  assert.deepEqual(await page.eval(() => window.Silinx.active.schEditor.getDoc().symbols[0].params.ports.map((q) => q.name)), ['b', 'c', 'y']);
+  // one Undo: the symbol of before
+  await page.eval(() => document.querySelector('.doc:not([hidden]) .sch-editor').focus());
+  await page.key('z', { modifiers: 2 });
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[0].params.ports[0].name === 'a', [], { what: 'undone' });
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});

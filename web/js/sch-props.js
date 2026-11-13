@@ -228,7 +228,7 @@ export function mountProps(ctx) {
       if (fn) propBody.append(lutSection(fn));
       // its symbol out of date (#1183): what changed, Update Symbol (sch-modsym.js)
       propBody.append(...staleSection(s, { readOnly, doc, modules, edit, flash }));
-      if (opts.onOpenModule) propBody.append(h('div', { class: 'se-pbtns' }, h('button', { class: 'btn ro-ok', type: 'button', text: readOnly ? 'Open this instance' : 'Open module source', onclick: () => opts.onOpenModule(s.params.module, { instance: s.name, symbol: clone(s) }) })));
+      if (opts.onOpenModule) propBody.append(h('div', { class: 'se-pbtns' }, h('button', { class: 'btn ro-ok', type: 'button', text: readOnly ? 'Open this instance' : 'Open module source', onclick: () => opts.onOpenModule(s.params.module, { instance: s.name, symbol: clone(s) }) }), !readOnly && opts.onEditSymbol ? h('button', { class: 'btn se-editsym', type: 'button', text: 'Edit Symbol', title: 'Its module\'s symbol in the Symbol Editor', onclick: () => opts.onEditSymbol(s.params.module) }) : null));   // (Edit Symbol, #3791)
     }
     if (s.type === 'hdlblock') {
       propBody.append(field('Title', inp(s.params.title || '', x => { s.params.title = String(x); })));

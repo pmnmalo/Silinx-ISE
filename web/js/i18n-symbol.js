@@ -2,6 +2,8 @@
 // dictionary of i18n.js).
 export const SYMBOL_PT = {
   'Edit Symbol': 'Editar Símbolo',
+  'The symbol is up to date': 'O símbolo está atualizado',
+  'Its module\'s symbol in the Symbol Editor': 'O símbolo do seu módulo no Editor de Símbolos',   // (a module instance's Update Symbol disabled, #3791)
   // toolbar
   '◀ Earlier': '◀ Antes', 'Later ▶': 'Depois ▶',
   'Move the selected pin one place earlier on its side (up, or left)': 'Mover o pino selecionado um lugar para trás no seu lado (para cima, ou para a esquerda)',
