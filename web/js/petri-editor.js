@@ -81,8 +81,8 @@ export function mountPetriEditor(container, opts = {}) {
   const bottom = h('div', { class: 'asm-codepanel pn-panel', hidden: true },
     h('div', { class: 'asm-codebar' }, panelTitle, panelTools, h('div', { class: 'asm-spacer' }), btn('✕', 'Close the panel', () => togglePanel(null))), panelBody);
   const mainCol = h('div', { class: 'asm-main' }, canvasWrap, bottom);
-  // (resized and moved, below or on the right: dock-panel.js, #3797)
-  const dock = mountDockPanel({ main: mainCol, panel: bottom, bar: bottom.querySelector('.asm-codebar'), btn, kind: 'petri', changed: () => { if (!destroyed) applyView(); } });
+  // (resized and moved, below or on the left, the net zoomed to fit when it moves: dock-panel.js, #3797, #3802)
+  const dock = mountDockPanel({ main: mainCol, panel: bottom, bar: bottom.querySelector('.asm-codebar'), btn, kind: 'petri', changed: () => { if (!destroyed) applyView(); }, fit: () => { if (!destroyed) fit(); } });
   const selSection = h('section', { class: 'asm-section pn-selection' });
   const netBody = h('div', { class: 'pn-net-body' });
   // (the net's fields: a section always open, as the selection's; the panel folds as a whole, #2735)
