@@ -109,4 +109,8 @@ test('ISE builds example clock for the mimas-v2, with the expected warnings', { 
   const job = await iseBuild('clock', { board: 'mimas-v2' }, MIMAS_V2_CLOCK_WARNINGS);
   // (Silinx's own: an<3> on a header pin, the board having no 4th digit)
   assert.deepEqual(job.lines.filter(l => /^WARNING: /.test(l)), ['WARNING: an<3>: the mimas-v2 has no pin for it; it is on the header pin io_p6<0> (the board\'s constraints)']);
+  // (#3711) the PROM bitstream as a .bin too, for MimasV2Config, and the log's last line says so
+  const bin = path.join(job.result.buildDir, 'digital_clock_prom.bin');
+  assert.ok(fs.existsSync(bin) && fs.statSync(bin).size > 300000, 'build/digital_clock_prom.bin');
+  assert.match(job.lines.at(-1), /^Programming file: Numato Mimas V2: program its flash over its USB with MimasV2Config \(Numato\) and build\/digital_clock_prom\.bin /);
 });

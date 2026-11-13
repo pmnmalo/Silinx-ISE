@@ -354,3 +354,28 @@ test('generateOnly writes the scripts without running any tool', async () => {
   assert.equal(r.body.summary.utilization, null);
   assert.equal(r.body.summary.timingMet, null);
 });
+
+// (#3711) a board whose maker's tool writes its flash over its USB (the Mimas V2's MimasV2Config): Generate Programming
+// File also writes the PROM bitstream (StartUpClk Cclk) as a .bin, and the log ends with how to program it; a Basys2's
+// PROM bitstream stays a .bit alone, its log without that line
+test('local mode: on the Mimas V2, the PROM bitstream (StartUpClk Cclk) as a .bin too, and how to program it with MimasV2Config', { skip: POSIX_ONLY }, async () => {
+  await writeConfig({ mode: 'local' });
+  const ucf = 'NET "clk" LOC = "V10" ;\nNET "sw<0>" LOC = "C17" ;\nNET "sw<1>" LOC = "C18" ;\nNET "led<0>" LOC = "P15" ;\nNET "led<1>" LOC = "P16" ;\n';
+  const dir = await makeProject('Flow3711', { board: 'mimas-v2', ucf });
+  await P.updateProject('Flow3711', pj => { pj.device = { family: 'spartan6', part: 'xc6slx9', package: 'csg324', speed: '-2' }; });
+  const j = await waitJob(jobs, await implement('Flow3711', { steps: ['bitstream'] }));
+  assert.equal(j.status, 'ok', j.lines.join('\n'));
+  const ut = await fs.readFile(path.join(dir, 'build', 'top_prom.ut'), 'utf8');
+  assert.match(ut, /^-g Binary:yes$/m);
+  assert.match(ut, /^-g StartUpClk:Cclk$/m);
+  assert.match(await fs.readFile(path.join(dir, 'build', 'top.ut'), 'utf8'), /^-g Binary:no$/m);
+  assert.ok(fss.existsSync(path.join(dir, 'build', 'top_prom.bin')));
+  assert.equal(j.lines.at(-1), 'Programming file: Numato Mimas V2: program its flash over its USB with MimasV2Config (Numato) and build/top_prom.bin (StartUpClk Cclk, the flash\'s bitstream): python -m MimasV2.Config <SERIAL_PORT> build/top_prom.bin (https://github.com/numato/samplecode/tree/master/FPGA/MimasV2/tools/configuration/python).');
+  assert.deepEqual(j.lines.filter(l => /WARNING/.test(l)), []);
+  const dir2 = await makeProject('Flow3711b');
+  const j2 = await waitJob(jobs, await implement('Flow3711b', { steps: ['bitstream'] }));
+  assert.equal(j2.status, 'ok', j2.lines.join('\n'));
+  assert.match(await fs.readFile(path.join(dir2, 'build', 'top_prom.ut'), 'utf8'), /^-g Binary:no$/m);
+  assert.ok(!fss.existsSync(path.join(dir2, 'build', 'top_prom.bin')));
+  assert.ok(!j2.lines.some(l => /^Programming file:/.test(l)));
+});

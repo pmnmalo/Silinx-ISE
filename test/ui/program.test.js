@@ -174,3 +174,23 @@ uiTest('#1025 Program PROM: every operation shown, no More…; in Portuguese', E
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await noWarnings(page);
 }, { build: DEV, timeout: 120000 });
+
+// #3711: on a board whose maker's tool writes its flash over its USB (the Mimas V2), the panel's note says that first:
+// the tool, build/<top>_prom.bin and its command; a Basys2's note has no such line; in the Silinx and ISE style interfaces
+uiTest('#3711 Program: on the Mimas V2, the note says how to program its flash with MimasV2Config and the .bin', E, async (page) => {
+  await makeProject(env, { name: 'ProgMimas', template: 'gates', board: 'mimas-v2', device: { family: 'spartan6', part: 'xc6slx9', package: 'csg324', speed: '-2' } });
+  await makeProject(env, { name: 'ProgBasys', template: 'gates' });
+  const note = () => page.eval(() => document.querySelector('#workspace > .doc:not([hidden]) .note-box')?.textContent || '');
+  for (const ui of ['silinx', 'ise']) {
+    await useInterface(page, ui);
+    await page.openProject('ProgMimas');
+    await page.eval(() => window.SilinxApp.openImpact());
+    await page.waitFor(() => /Board default programmer/.test(document.querySelector('#workspace > .doc:not([hidden]) .note-box')?.textContent || ''), [], { what: 'iMPACT' });
+    assert.equal((await note()).split('\n')[0], 'Numato Mimas V2: program its flash over its USB with MimasV2Config (Numato) and build/gates_prom.bin (StartUpClk Cclk, the flash\'s bitstream): python -m MimasV2.Config <SERIAL_PORT> build/gates_prom.bin (https://github.com/numato/samplecode/tree/master/FPGA/MimasV2/tools/configuration/python).', ui);
+    await page.openProject('ProgBasys');
+    await page.eval(() => window.SilinxApp.openImpact());
+    await page.waitFor(() => /Board default programmer: djtgcfg/.test(document.querySelector('#workspace > .doc:not([hidden]) .note-box')?.textContent || ''), [], { what: 'the Basys2\'s iMPACT' });
+    assert.doesNotMatch(await note(), /program its flash over its USB/, ui);
+  }
+  await noWarnings(page);
+}, { build: DEV, timeout: 120000 });
