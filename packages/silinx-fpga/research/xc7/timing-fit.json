@@ -1,0 +1,1473 @@
+{
+  "source": "vivado-timing.json",
+  "image": "xilinx/vitis-hls:2025.2",
+  "cells": {
+    "BUFG.I.O": {
+      "n": 9,
+      "mean": 96,
+      "min": 96,
+      "max": 96
+    },
+    "CARRY4.CI.CO0": {
+      "n": 168,
+      "mean": 264.321,
+      "min": 254,
+      "max": 271
+    },
+    "CARRY4.CI.CO1": {
+      "n": 168,
+      "mean": 157,
+      "min": 157,
+      "max": 157
+    },
+    "CARRY4.CI.CO2": {
+      "n": 168,
+      "mean": 228.393,
+      "min": 228,
+      "max": 229
+    },
+    "CARRY4.CI.CO3": {
+      "n": 168,
+      "mean": 115.179,
+      "min": 114,
+      "max": 117
+    },
+    "CARRY4.CI.O0": {
+      "n": 168,
+      "mean": 221.643,
+      "min": 219,
+      "max": 235
+    },
+    "CARRY4.CI.O1": {
+      "n": 168,
+      "mean": 330.178,
+      "min": 323,
+      "max": 348
+    },
+    "CARRY4.CI.O2": {
+      "n": 168,
+      "mean": 239.506,
+      "min": 239,
+      "max": 256
+    },
+    "CARRY4.CI.O3": {
+      "n": 168,
+      "mean": 314.263,
+      "min": 313,
+      "max": 331
+    },
+    "CARRY4.CYINIT.CO0": {
+      "n": 90,
+      "mean": 546.001,
+      "min": 536,
+      "max": 561
+    },
+    "CARRY4.CYINIT.CO1": {
+      "n": 90,
+      "mean": 500.8,
+      "min": 494,
+      "max": 511
+    },
+    "CARRY4.CYINIT.CO2": {
+      "n": 90,
+      "mean": 598.4,
+      "min": 592,
+      "max": 608
+    },
+    "CARRY4.CYINIT.CO3": {
+      "n": 90,
+      "mean": 585.999,
+      "min": 580,
+      "max": 595
+    },
+    "CARRY4.CYINIT.O0": {
+      "n": 90,
+      "mean": 493.2,
+      "min": 482,
+      "max": 510
+    },
+    "CARRY4.CYINIT.O1": {
+      "n": 90,
+      "mean": 611.522,
+      "min": 598,
+      "max": 644
+    },
+    "CARRY4.CYINIT.O2": {
+      "n": 90,
+      "mean": 594.49,
+      "min": 584,
+      "max": 614
+    },
+    "CARRY4.CYINIT.O3": {
+      "n": 90,
+      "mean": 650.344,
+      "min": 642,
+      "max": 678
+    },
+    "CARRY4.DI0.CO0": {
+      "n": 258,
+      "mean": 382.411,
+      "min": 327,
+      "max": 393
+    },
+    "CARRY4.DI0.CO1": {
+      "n": 258,
+      "mean": 471.232,
+      "min": 396,
+      "max": 488
+    },
+    "CARRY4.DI0.CO2": {
+      "n": 258,
+      "mean": 546.744,
+      "min": 474,
+      "max": 564
+    },
+    "CARRY4.DI0.CO3": {
+      "n": 258,
+      "mean": 532.368,
+      "min": 445,
+      "max": 550
+    },
+    "CARRY4.DI0.O1": {
+      "n": 258,
+      "mean": 410.38,
+      "min": 325,
+      "max": 436
+    },
+    "CARRY4.DI0.O2": {
+      "n": 258,
+      "mean": 563.849,
+      "min": 486,
+      "max": 596
+    },
+    "CARRY4.DI0.O3": {
+      "n": 258,
+      "mean": 623.175,
+      "min": 545,
+      "max": 659
+    },
+    "CARRY4.DI1.CO1": {
+      "n": 258,
+      "mean": 447.419,
+      "min": 376,
+      "max": 456
+    },
+    "CARRY4.DI1.CO2": {
+      "n": 258,
+      "mean": 523.38,
+      "min": 459,
+      "max": 533
+    },
+    "CARRY4.DI1.CO3": {
+      "n": 258,
+      "mean": 510.065,
+      "min": 427,
+      "max": 520
+    },
+    "CARRY4.DI1.O2": {
+      "n": 258,
+      "mean": 540.856,
+      "min": 470,
+      "max": 566
+    },
+    "CARRY4.DI1.O3": {
+      "n": 258,
+      "mean": 600.143,
+      "min": 532,
+      "max": 629
+    },
+    "CARRY4.DI2.CO2": {
+      "n": 258,
+      "mean": 358.027,
+      "min": 289,
+      "max": 366
+    },
+    "CARRY4.DI2.CO3": {
+      "n": 258,
+      "mean": 397.884,
+      "min": 299,
+      "max": 404
+    },
+    "CARRY4.DI2.O3": {
+      "n": 258,
+      "mean": 440.318,
+      "min": 367,
+      "max": 463
+    },
+    "CARRY4.DI3.CO3": {
+      "n": 258,
+      "mean": 388.546,
+      "min": 305,
+      "max": 396
+    },
+    "CARRY4.S0.CO0": {
+      "n": 258,
+      "mean": 340,
+      "min": 340,
+      "max": 340
+    },
+    "CARRY4.S0.CO1": {
+      "n": 258,
+      "mean": 433.396,
+      "min": 433,
+      "max": 434
+    },
+    "CARRY4.S0.CO2": {
+      "n": 258,
+      "mean": 512.79,
+      "min": 512,
+      "max": 514
+    },
+    "CARRY4.S0.CO3": {
+      "n": 258,
+      "mean": 500.489,
+      "min": 489,
+      "max": 508
+    },
+    "CARRY4.S0.O0": {
+      "n": 258,
+      "mean": 224.976,
+      "min": 223,
+      "max": 228
+    },
+    "CARRY4.S0.O1": {
+      "n": 258,
+      "mean": 401.186,
+      "min": 400,
+      "max": 403
+    },
+    "CARRY4.S0.O2": {
+      "n": 258,
+      "mean": 521.814,
+      "min": 520,
+      "max": 523
+    },
+    "CARRY4.S0.O3": {
+      "n": 258,
+      "mean": 582.79,
+      "min": 582,
+      "max": 584
+    },
+    "CARRY4.S1.CO1": {
+      "n": 258,
+      "mean": 470.186,
+      "min": 469,
+      "max": 472
+    },
+    "CARRY4.S1.CO2": {
+      "n": 258,
+      "mean": 550.373,
+      "min": 548,
+      "max": 554
+    },
+    "CARRY4.S1.CO3": {
+      "n": 258,
+      "mean": 522.069,
+      "min": 513,
+      "max": 528
+    },
+    "CARRY4.S1.O1": {
+      "n": 258,
+      "mean": 206.976,
+      "min": 205,
+      "max": 210
+    },
+    "CARRY4.S1.O2": {
+      "n": 258,
+      "mean": 558,
+      "min": 558,
+      "max": 558
+    },
+    "CARRY4.S1.O3": {
+      "n": 258,
+      "mean": 619.976,
+      "min": 618,
+      "max": 623
+    },
+    "CARRY4.S2.CO2": {
+      "n": 258,
+      "mean": 293.58,
+      "min": 292,
+      "max": 296
+    },
+    "CARRY4.S2.CO3": {
+      "n": 258,
+      "mean": 368.883,
+      "min": 358,
+      "max": 376
+    },
+    "CARRY4.S2.O2": {
+      "n": 258,
+      "mean": 226.79,
+      "min": 226,
+      "max": 228
+    },
+    "CARRY4.S2.O3": {
+      "n": 258,
+      "mean": 330,
+      "min": 330,
+      "max": 330
+    },
+    "CARRY4.S3.CO3": {
+      "n": 258,
+      "mean": 369.722,
+      "min": 354,
+      "max": 380
+    },
+    "CARRY4.S3.O3": {
+      "n": 258,
+      "mean": 229.373,
+      "min": 227,
+      "max": 233
+    },
+    "DSP48E1.ALUMODE[3:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 2427,
+      "mean": 2427,
+      "max": 2427
+    },
+    "DSP48E1.ALUMODE[3:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 2074,
+      "mean": 2074,
+      "max": 2074
+    },
+    "DSP48E1.ALUMODE[3:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 2055,
+      "mean": 2055,
+      "max": 2055
+    },
+    "DSP48E1.ALUMODE[3:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 2423,
+      "mean": 2423,
+      "max": 2423
+    },
+    "DSP48E1.ALUMODE[3:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 2423,
+      "mean": 2423,
+      "max": 2423
+    },
+    "DSP48E1.ALUMODE[3:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 2292,
+      "mean": 2292,
+      "max": 2292
+    },
+    "DSP48E1.ALUMODE[3:0].P[47:0]": {
+      "n": 3,
+      "min": 2098,
+      "mean": 2098,
+      "max": 2098
+    },
+    "DSP48E1.A[29:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 4171,
+      "mean": 4171,
+      "max": 4171
+    },
+    "DSP48E1.A[29:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 3818,
+      "mean": 3818,
+      "max": 3818
+    },
+    "DSP48E1.A[29:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 3799,
+      "mean": 3799,
+      "max": 3799
+    },
+    "DSP48E1.A[29:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 4406,
+      "mean": 4406,
+      "max": 4406
+    },
+    "DSP48E1.A[29:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 4406,
+      "mean": 4406,
+      "max": 4406
+    },
+    "DSP48E1.A[29:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 4036,
+      "mean": 4036,
+      "max": 4036
+    },
+    "DSP48E1.A[29:0].P[47:0]": {
+      "n": 3,
+      "min": 3841,
+      "mean": 3841,
+      "max": 3841
+    },
+    "DSP48E1.B[17:0].BCOUT[17:0]": {
+      "n": 3,
+      "min": 735,
+      "mean": 735,
+      "max": 735
+    },
+    "DSP48E1.B[17:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 3986,
+      "mean": 3986,
+      "max": 3986
+    },
+    "DSP48E1.B[17:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 3633,
+      "mean": 3633,
+      "max": 3633
+    },
+    "DSP48E1.B[17:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 3615,
+      "mean": 3615,
+      "max": 3615
+    },
+    "DSP48E1.B[17:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 4221,
+      "mean": 4221,
+      "max": 4221
+    },
+    "DSP48E1.B[17:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 4221,
+      "mean": 4221,
+      "max": 4221
+    },
+    "DSP48E1.B[17:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 3851,
+      "mean": 3851,
+      "max": 3851
+    },
+    "DSP48E1.B[17:0].P[47:0]": {
+      "n": 3,
+      "min": 3656,
+      "mean": 3656,
+      "max": 3656
+    },
+    "DSP48E1.CARRYCASCIN.CARRYCASCOUT": {
+      "n": 3,
+      "min": 1478,
+      "mean": 1478,
+      "max": 1478
+    },
+    "DSP48E1.CARRYCASCIN.CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 1124,
+      "mean": 1124,
+      "max": 1124
+    },
+    "DSP48E1.CARRYCASCIN.MULTSIGNOUT": {
+      "n": 3,
+      "min": 1106,
+      "mean": 1106,
+      "max": 1106
+    },
+    "DSP48E1.CARRYCASCIN.PATTERNBDETECT": {
+      "n": 3,
+      "min": 1712,
+      "mean": 1712,
+      "max": 1712
+    },
+    "DSP48E1.CARRYCASCIN.PATTERNDETECT": {
+      "n": 3,
+      "min": 1712,
+      "mean": 1712,
+      "max": 1712
+    },
+    "DSP48E1.CARRYCASCIN.PCOUT[47:0]": {
+      "n": 3,
+      "min": 1343,
+      "mean": 1343,
+      "max": 1343
+    },
+    "DSP48E1.CARRYCASCIN.P[47:0]": {
+      "n": 3,
+      "min": 1147,
+      "mean": 1147,
+      "max": 1147
+    },
+    "DSP48E1.CARRYIN.CARRYCASCOUT": {
+      "n": 3,
+      "min": 1746,
+      "mean": 1746,
+      "max": 1746
+    },
+    "DSP48E1.CARRYIN.CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 1393,
+      "mean": 1393,
+      "max": 1393
+    },
+    "DSP48E1.CARRYIN.MULTSIGNOUT": {
+      "n": 3,
+      "min": 1376,
+      "mean": 1376,
+      "max": 1376
+    },
+    "DSP48E1.CARRYIN.PATTERNBDETECT": {
+      "n": 3,
+      "min": 1982,
+      "mean": 1982,
+      "max": 1982
+    },
+    "DSP48E1.CARRYIN.PATTERNDETECT": {
+      "n": 3,
+      "min": 1982,
+      "mean": 1982,
+      "max": 1982
+    },
+    "DSP48E1.CARRYIN.PCOUT[47:0]": {
+      "n": 3,
+      "min": 1613,
+      "mean": 1613,
+      "max": 1613
+    },
+    "DSP48E1.CARRYIN.P[47:0]": {
+      "n": 3,
+      "min": 1416,
+      "mean": 1416,
+      "max": 1416
+    },
+    "DSP48E1.CARRYINSEL[2:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 2241,
+      "mean": 2241,
+      "max": 2241
+    },
+    "DSP48E1.CARRYINSEL[2:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 1888,
+      "mean": 1888,
+      "max": 1888
+    },
+    "DSP48E1.CARRYINSEL[2:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 1870,
+      "mean": 1870,
+      "max": 1870
+    },
+    "DSP48E1.CARRYINSEL[2:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 2476,
+      "mean": 2476,
+      "max": 2476
+    },
+    "DSP48E1.CARRYINSEL[2:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 2476,
+      "mean": 2476,
+      "max": 2476
+    },
+    "DSP48E1.CARRYINSEL[2:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 2106,
+      "mean": 2106,
+      "max": 2106
+    },
+    "DSP48E1.CARRYINSEL[2:0].P[47:0]": {
+      "n": 3,
+      "min": 1910,
+      "mean": 1910,
+      "max": 1910
+    },
+    "DSP48E1.C[47:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 2150,
+      "mean": 2150,
+      "max": 2150
+    },
+    "DSP48E1.C[47:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 1797,
+      "mean": 1797,
+      "max": 1797
+    },
+    "DSP48E1.C[47:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 1779,
+      "mean": 1779,
+      "max": 1779
+    },
+    "DSP48E1.C[47:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 2386,
+      "mean": 2386,
+      "max": 2386
+    },
+    "DSP48E1.C[47:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 2386,
+      "mean": 2386,
+      "max": 2386
+    },
+    "DSP48E1.C[47:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 2016,
+      "mean": 2016,
+      "max": 2016
+    },
+    "DSP48E1.C[47:0].P[47:0]": {
+      "n": 3,
+      "min": 1820,
+      "mean": 1820,
+      "max": 1820
+    },
+    "DSP48E1.INMODE[4:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 4254,
+      "mean": 4254,
+      "max": 4254
+    },
+    "DSP48E1.INMODE[4:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 3900,
+      "mean": 3900,
+      "max": 3900
+    },
+    "DSP48E1.INMODE[4:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 3883,
+      "mean": 3883,
+      "max": 3883
+    },
+    "DSP48E1.INMODE[4:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 4489,
+      "mean": 4489,
+      "max": 4489
+    },
+    "DSP48E1.INMODE[4:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 4489,
+      "mean": 4489,
+      "max": 4489
+    },
+    "DSP48E1.INMODE[4:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 4119,
+      "mean": 4119,
+      "max": 4119
+    },
+    "DSP48E1.INMODE[4:0].P[47:0]": {
+      "n": 3,
+      "min": 3923,
+      "mean": 3923,
+      "max": 3923
+    },
+    "DSP48E1.MULTSIGNIN.CARRYCASCOUT": {
+      "n": 3,
+      "min": 1848,
+      "mean": 1848,
+      "max": 1848
+    },
+    "DSP48E1.MULTSIGNIN.CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 1494,
+      "mean": 1494,
+      "max": 1494
+    },
+    "DSP48E1.MULTSIGNIN.MULTSIGNOUT": {
+      "n": 3,
+      "min": 1478,
+      "mean": 1478,
+      "max": 1478
+    },
+    "DSP48E1.MULTSIGNIN.PATTERNBDETECT": {
+      "n": 3,
+      "min": 2084,
+      "mean": 2084,
+      "max": 2084
+    },
+    "DSP48E1.MULTSIGNIN.PATTERNDETECT": {
+      "n": 3,
+      "min": 2084,
+      "mean": 2084,
+      "max": 2084
+    },
+    "DSP48E1.MULTSIGNIN.PCOUT[47:0]": {
+      "n": 3,
+      "min": 1713,
+      "mean": 1713,
+      "max": 1713
+    },
+    "DSP48E1.MULTSIGNIN.P[47:0]": {
+      "n": 3,
+      "min": 1518,
+      "mean": 1518,
+      "max": 1518
+    },
+    "DSP48E1.OPMODE[6:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 2657,
+      "mean": 2657,
+      "max": 2657
+    },
+    "DSP48E1.OPMODE[6:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 2304,
+      "mean": 2304,
+      "max": 2304
+    },
+    "DSP48E1.OPMODE[6:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 2286,
+      "mean": 2286,
+      "max": 2286
+    },
+    "DSP48E1.OPMODE[6:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 2892,
+      "mean": 2892,
+      "max": 2892
+    },
+    "DSP48E1.OPMODE[6:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 2892,
+      "mean": 2892,
+      "max": 2892
+    },
+    "DSP48E1.OPMODE[6:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 2522,
+      "mean": 2522,
+      "max": 2522
+    },
+    "DSP48E1.OPMODE[6:0].P[47:0]": {
+      "n": 3,
+      "min": 2326,
+      "mean": 2326,
+      "max": 2326
+    },
+    "DSP48E1.PCIN[47:0].CARRYCASCOUT": {
+      "n": 3,
+      "min": 1848,
+      "mean": 1848,
+      "max": 1848
+    },
+    "DSP48E1.PCIN[47:0].CARRYOUT[3:0]": {
+      "n": 3,
+      "min": 1494,
+      "mean": 1494,
+      "max": 1494
+    },
+    "DSP48E1.PCIN[47:0].MULTSIGNOUT": {
+      "n": 3,
+      "min": 1478,
+      "mean": 1478,
+      "max": 1478
+    },
+    "DSP48E1.PCIN[47:0].PATTERNBDETECT": {
+      "n": 3,
+      "min": 2084,
+      "mean": 2084,
+      "max": 2084
+    },
+    "DSP48E1.PCIN[47:0].PATTERNDETECT": {
+      "n": 3,
+      "min": 2084,
+      "mean": 2084,
+      "max": 2084
+    },
+    "DSP48E1.PCIN[47:0].PCOUT[47:0]": {
+      "n": 3,
+      "min": 1713,
+      "mean": 1713,
+      "max": 1713
+    },
+    "DSP48E1.PCIN[47:0].P[47:0]": {
+      "n": 3,
+      "min": 1518,
+      "mean": 1518,
+      "max": 1518
+    },
+    "FF.C.Q": {
+      "n": 1219,
+      "mean": 347.384,
+      "min": 303,
+      "max": 362
+    },
+    "FF.setup.CE": {
+      "n": 1219,
+      "mean": 109,
+      "min": 109,
+      "max": 109
+    },
+    "FF.setup.D": {
+      "n": 1219,
+      "mean": -51.288,
+      "min": -60,
+      "max": -45
+    },
+    "FF.setup.SR": {
+      "n": 1219,
+      "mean": 479.777,
+      "min": 428,
+      "max": 552
+    },
+    "IBUF.I.O": {
+      "n": 62,
+      "mean": 1421.862,
+      "min": 945.6,
+      "max": 1466.1
+    },
+    "LUT.A1.O5": {
+      "n": 104,
+      "mean": 152.165,
+      "min": 149,
+      "max": 156
+    },
+    "LUT.A1.O6": {
+      "n": 670,
+      "mean": 124,
+      "min": 124,
+      "max": 124
+    },
+    "LUT.A2.O5": {
+      "n": 109,
+      "mean": 152.073,
+      "min": 146,
+      "max": 157
+    },
+    "LUT.A2.O6": {
+      "n": 660,
+      "mean": 124,
+      "min": 124,
+      "max": 124
+    },
+    "LUT.A3.O5": {
+      "n": 102,
+      "mean": 150.588,
+      "min": 148,
+      "max": 153
+    },
+    "LUT.A3.O6": {
+      "n": 745,
+      "mean": 124,
+      "min": 124,
+      "max": 124
+    },
+    "LUT.A4.O5": {
+      "n": 133,
+      "mean": 150.376,
+      "min": 149,
+      "max": 153
+    },
+    "LUT.A4.O6": {
+      "n": 710,
+      "mean": 124,
+      "min": 124,
+      "max": 124
+    },
+    "LUT.A5.O5": {
+      "n": 123,
+      "mean": 118.032,
+      "min": 116,
+      "max": 120
+    },
+    "LUT.A5.O6": {
+      "n": 743,
+      "mean": 124,
+      "min": 124,
+      "max": 124
+    },
+    "LUT.A6.O6": {
+      "n": 646,
+      "mean": 124,
+      "min": 124,
+      "max": 124
+    },
+    "MUXF7.I0.O": {
+      "n": 23,
+      "mean": 203.174,
+      "min": 189,
+      "max": 219
+    },
+    "MUXF7.I1.O": {
+      "n": 23,
+      "mean": 206.913,
+      "min": 190,
+      "max": 225
+    },
+    "MUXF7.S.O": {
+      "n": 23,
+      "mean": 296.609,
+      "min": 276,
+      "max": 314
+    },
+    "MUXF8.I0.O": {
+      "n": 11,
+      "mean": 100.182,
+      "min": 98,
+      "max": 104
+    },
+    "MUXF8.I1.O": {
+      "n": 11,
+      "mean": 90.182,
+      "min": 88,
+      "max": 94
+    },
+    "MUXF8.S.O": {
+      "n": 11,
+      "mean": 279.364,
+      "min": 273,
+      "max": 283
+    },
+    "OBUF.I.O": {
+      "n": 167,
+      "mean": 3513.103,
+      "min": 3495.5,
+      "max": 3534.6
+    },
+    "RAMB18E1.CLKARDCLK.DOADO[15:0]": {
+      "n": 3,
+      "mean": 2454,
+      "min": 2454,
+      "max": 2454
+    },
+    "RAMB18E1.CLKARDCLK.DOBDO[15:0]": {
+      "n": 1,
+      "min": 2454,
+      "mean": 2454,
+      "max": 2454
+    },
+    "RAMB18E1.CLKARDCLK.DOPADOP[1:0]": {
+      "n": 3,
+      "mean": 2454,
+      "min": 2454,
+      "max": 2454
+    },
+    "RAMB18E1.CLKARDCLK.DOPBDOP[1:0]": {
+      "n": 1,
+      "min": 2454,
+      "mean": 2454,
+      "max": 2454
+    },
+    "RAMB18E1.CLKBWRCLK.DOBDO[15:0]": {
+      "n": 2,
+      "mean": 2454,
+      "min": 2454,
+      "max": 2454
+    },
+    "RAMB18E1.CLKBWRCLK.DOPBDOP[1:0]": {
+      "n": 2,
+      "mean": 2454,
+      "min": 2454,
+      "max": 2454
+    },
+    "RAMD32.CLK.O": {
+      "n": 12,
+      "min": 1153,
+      "mean": 1171.167,
+      "max": 1188
+    },
+    "RAMD32.RADR0.O": {
+      "n": 12,
+      "min": 124,
+      "mean": 137.833,
+      "max": 153
+    },
+    "RAMD32.RADR1.O": {
+      "n": 12,
+      "min": 124,
+      "mean": 137.167,
+      "max": 153
+    },
+    "RAMD32.RADR2.O": {
+      "n": 12,
+      "min": 124,
+      "mean": 137.167,
+      "max": 153
+    },
+    "RAMD32.RADR3.O": {
+      "n": 12,
+      "min": 124,
+      "mean": 137.5,
+      "max": 153
+    },
+    "RAMD32.RADR4.O": {
+      "n": 12,
+      "min": 116,
+      "mean": 120.333,
+      "max": 124
+    },
+    "RAMS32.ADR0.O": {
+      "n": 4,
+      "min": 124,
+      "mean": 140,
+      "max": 156
+    },
+    "RAMS32.ADR1.O": {
+      "n": 4,
+      "min": 124,
+      "mean": 140.5,
+      "max": 157
+    },
+    "RAMS32.ADR2.O": {
+      "n": 4,
+      "min": 124,
+      "mean": 137,
+      "max": 150
+    },
+    "RAMS32.ADR3.O": {
+      "n": 4,
+      "min": 124,
+      "mean": 136.5,
+      "max": 149
+    },
+    "RAMS32.ADR4.O": {
+      "n": 4,
+      "min": 119,
+      "mean": 121.5,
+      "max": 124
+    },
+    "RAMS32.CLK.O": {
+      "n": 4,
+      "min": 1163,
+      "mean": 1176.5,
+      "max": 1190
+    }
+  },
+  "wires": {
+    "base": 0,
+    "classes": {
+      "single": 154.4,
+      "double": 191.9,
+      "quad": 326.7,
+      "hex": 248.2,
+      "long": 399.5,
+      "output": null,
+      "imux": 272.4,
+      "bypass": 74.8,
+      "fan": 80.9,
+      "ctrl": 90.8,
+      "bounce": null,
+      "clock": 525.7,
+      "const": null,
+      "site": 77.9,
+      "other": 0
+    },
+    "rmsPs": 95.8,
+    "maxErrPs": 775.1,
+    "samples": 8343
+  },
+  "chipdb": {
+    "SLICE_LUTX": {
+      "A1": {
+        "O6": {
+          "min": 124,
+          "max": 124
+        },
+        "O5": {
+          "min": 149,
+          "max": 156
+        }
+      },
+      "A2": {
+        "O6": {
+          "min": 124,
+          "max": 124
+        },
+        "O5": {
+          "min": 146,
+          "max": 157
+        }
+      },
+      "A3": {
+        "O6": {
+          "min": 124,
+          "max": 124
+        },
+        "O5": {
+          "min": 148,
+          "max": 153
+        }
+      },
+      "A4": {
+        "O6": {
+          "min": 124,
+          "max": 124
+        },
+        "O5": {
+          "min": 149,
+          "max": 153
+        }
+      },
+      "A5": {
+        "O6": {
+          "min": 124,
+          "max": 124
+        },
+        "O5": {
+          "min": 116,
+          "max": 120
+        }
+      },
+      "A6": {
+        "O6": {
+          "min": 124,
+          "max": 124
+        }
+      }
+    },
+    "SLICE_FFX": {
+      "clkToQ": {
+        "min": 303,
+        "max": 362
+      },
+      "setup": {
+        "D": {
+          "min": -60,
+          "max": -45
+        },
+        "CE": {
+          "min": 109,
+          "max": 109
+        },
+        "SR": {
+          "min": 428,
+          "max": 552
+        }
+      }
+    },
+    "CARRY4": {
+      "CI->CO0": {
+        "min": 254,
+        "max": 271
+      },
+      "CI->CO1": {
+        "min": 157,
+        "max": 157
+      },
+      "CI->CO2": {
+        "min": 228,
+        "max": 229
+      },
+      "CI->CO3": {
+        "min": 114,
+        "max": 117
+      },
+      "CI->O0": {
+        "min": 219,
+        "max": 235
+      },
+      "CI->O1": {
+        "min": 323,
+        "max": 348
+      },
+      "CI->O2": {
+        "min": 239,
+        "max": 256
+      },
+      "CI->O3": {
+        "min": 313,
+        "max": 331
+      },
+      "CYINIT->CO0": {
+        "min": 536,
+        "max": 561
+      },
+      "CYINIT->CO1": {
+        "min": 494,
+        "max": 511
+      },
+      "CYINIT->CO2": {
+        "min": 592,
+        "max": 608
+      },
+      "CYINIT->CO3": {
+        "min": 580,
+        "max": 595
+      },
+      "CYINIT->O0": {
+        "min": 482,
+        "max": 510
+      },
+      "CYINIT->O1": {
+        "min": 598,
+        "max": 644
+      },
+      "CYINIT->O2": {
+        "min": 584,
+        "max": 614
+      },
+      "CYINIT->O3": {
+        "min": 642,
+        "max": 678
+      },
+      "DI0->CO0": {
+        "min": 327,
+        "max": 393
+      },
+      "DI0->CO1": {
+        "min": 396,
+        "max": 488
+      },
+      "DI0->CO2": {
+        "min": 474,
+        "max": 564
+      },
+      "DI0->CO3": {
+        "min": 445,
+        "max": 550
+      },
+      "DI0->O1": {
+        "min": 325,
+        "max": 436
+      },
+      "DI0->O2": {
+        "min": 486,
+        "max": 596
+      },
+      "DI0->O3": {
+        "min": 545,
+        "max": 659
+      },
+      "DI1->CO1": {
+        "min": 376,
+        "max": 456
+      },
+      "DI1->CO2": {
+        "min": 459,
+        "max": 533
+      },
+      "DI1->CO3": {
+        "min": 427,
+        "max": 520
+      },
+      "DI1->O2": {
+        "min": 470,
+        "max": 566
+      },
+      "DI1->O3": {
+        "min": 532,
+        "max": 629
+      },
+      "DI2->CO2": {
+        "min": 289,
+        "max": 366
+      },
+      "DI2->CO3": {
+        "min": 299,
+        "max": 404
+      },
+      "DI2->O3": {
+        "min": 367,
+        "max": 463
+      },
+      "DI3->CO3": {
+        "min": 305,
+        "max": 396
+      },
+      "S0->CO0": {
+        "min": 340,
+        "max": 340
+      },
+      "S0->CO1": {
+        "min": 433,
+        "max": 434
+      },
+      "S0->CO2": {
+        "min": 512,
+        "max": 514
+      },
+      "S0->CO3": {
+        "min": 489,
+        "max": 508
+      },
+      "S0->O0": {
+        "min": 223,
+        "max": 228
+      },
+      "S0->O1": {
+        "min": 400,
+        "max": 403
+      },
+      "S0->O2": {
+        "min": 520,
+        "max": 523
+      },
+      "S0->O3": {
+        "min": 582,
+        "max": 584
+      },
+      "S1->CO1": {
+        "min": 469,
+        "max": 472
+      },
+      "S1->CO2": {
+        "min": 548,
+        "max": 554
+      },
+      "S1->CO3": {
+        "min": 513,
+        "max": 528
+      },
+      "S1->O1": {
+        "min": 205,
+        "max": 210
+      },
+      "S1->O2": {
+        "min": 558,
+        "max": 558
+      },
+      "S1->O3": {
+        "min": 618,
+        "max": 623
+      },
+      "S2->CO2": {
+        "min": 292,
+        "max": 296
+      },
+      "S2->CO3": {
+        "min": 358,
+        "max": 376
+      },
+      "S2->O2": {
+        "min": 226,
+        "max": 228
+      },
+      "S2->O3": {
+        "min": 330,
+        "max": 330
+      },
+      "S3->CO3": {
+        "min": 354,
+        "max": 380
+      },
+      "S3->O3": {
+        "min": 227,
+        "max": 233
+      }
+    },
+    "SELMUX2_1": {
+      "I0->O": {
+        "min": 189,
+        "max": 219
+      },
+      "I1->O": {
+        "min": 190,
+        "max": 225
+      },
+      "S->O": {
+        "min": 276,
+        "max": 314
+      }
+    },
+    "MUXF8": {
+      "I0->O": {
+        "min": 98,
+        "max": 104
+      },
+      "I1->O": {
+        "min": 88,
+        "max": 94
+      },
+      "S->O": {
+        "min": 273,
+        "max": 283
+      }
+    },
+    "wires": {
+      "base": 0,
+      "single": 154.4,
+      "double": 191.9,
+      "quad": 326.7,
+      "hex": 248.2,
+      "long": 399.5,
+      "output": null,
+      "imux": 272.4,
+      "bypass": 74.8,
+      "fan": 80.9,
+      "ctrl": 90.8,
+      "bounce": null,
+      "clock": 525.7,
+      "const": null,
+      "site": 77.9,
+      "other": 0
+    }
+  },
+  "fmax": {
+    "rows": [
+      {
+        "board": "basys3",
+        "name": "blinky",
+        "vivado": 198.807,
+        "nextpnr": 241.55,
+        "ratio": 1.215
+      },
+      {
+        "board": "basys3",
+        "name": "clock",
+        "vivado": 190.44,
+        "nextpnr": 268.38,
+        "ratio": 1.409
+      },
+      {
+        "board": "basys3",
+        "name": "gates",
+        "vivado": null,
+        "nextpnr": null,
+        "ratio": null
+      },
+      {
+        "board": "basys3",
+        "name": "isqrt",
+        "vivado": 224.669,
+        "nextpnr": 282.89,
+        "ratio": 1.259
+      },
+      {
+        "board": "basys3",
+        "name": "micro80",
+        "vivado": 129.567,
+        "nextpnr": 146.37,
+        "ratio": 1.13
+      },
+      {
+        "board": "basys3",
+        "name": "pong",
+        "vivado": 132.293,
+        "nextpnr": 159.03,
+        "ratio": 1.202
+      },
+      {
+        "board": "basys3",
+        "name": "stopwatch",
+        "vivado": 107.388,
+        "nextpnr": 210.61,
+        "ratio": 1.961
+      },
+      {
+        "board": "basys3",
+        "name": "traffic",
+        "vivado": 187.371,
+        "nextpnr": 213.58,
+        "ratio": 1.14
+      },
+      {
+        "board": "basys3",
+        "name": "uart",
+        "vivado": 201.735,
+        "nextpnr": 257.6,
+        "ratio": 1.277
+      },
+      {
+        "board": "basys3",
+        "name": "vga",
+        "vivado": 165.536,
+        "nextpnr": 257.2,
+        "ratio": 1.554
+      }
+    ],
+    "logicScale": 1.237,
+    "routeScale": 1.26
+  }
+}
