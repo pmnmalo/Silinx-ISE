@@ -53,7 +53,9 @@ export function measureTcl({ paths = 100 } = {}) {
 lassign $argv dir top part
 cd $dir
 set_param general.maxThreads 2
-read_edif netlist.edf
+# with -top, link_design looks for an EDIF named after the top module (#3738)
+file copy -force netlist.edf $top.edf
+read_edif $top.edf
 read_xdc netlist.xdc
 link_design -top $top -part $part
 place_design

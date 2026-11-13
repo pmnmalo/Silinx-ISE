@@ -276,9 +276,11 @@ test('#3516 the Vivado run: the EDIF\'s Yosys commands, measure.tcl, run.sh; the
   assert.throws(() => edifScript('top; shell'), /invalid top module name/);
   const tcl = measureTcl();
   // the same netlist: linked, placed and routed (no synthesis, no opt_design), its timing written, the routes listed
-  for (const l of ['read_edif netlist.edf', 'read_xdc netlist.xdc', 'link_design -top $top -part $part', 'place_design', 'route_design',
+  for (const l of ['file copy -force netlist.edf $top.edf\nread_edif $top.edf', 'read_xdc netlist.xdc', 'link_design -top $top -part $part', 'place_design', 'route_design',
     'report_timing -delay_type max -max_paths 100 -nworst 1 -unique_pins -input_pins -sort_by slack -file paths.rpt',
     'write_sdf -force -process_corner slow -mode timesim design.sdf', 'puts $f "NET\\t$net"', 'get_nodes -quiet -uphill -of_objects $pip', 'puts $f "LUTPIN\\t$p\\t[get_bel_pins -quiet -of_objects $p]"']) assert.ok(tcl.includes(l), l);
+  // #3738: Vivado's link_design -top found no 'top' in netlist.edf (Project 1-68): the EDIF is read as <top>.edf
+  assert.ok(!tcl.includes('read_edif netlist.edf'));
   assert.ok(!/synth_design|opt_design|write_bitstream|write_checkpoint/.test(tcl));
   for (const f of OUTPUTS) assert.ok(tcl.includes(f), f);
   const sh = runSh();
