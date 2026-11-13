@@ -115,7 +115,8 @@ const FULL_APP = 'the full Silinx application (run `npm start` in the Silinx fol
 async function adeptDevice(vendor = ADEPT_VENDOR, filters = ADEPT_FILTERS) {
   const usb = globalThis.navigator?.usb;
   if (!usb) fail(noWebUsb());
-  const known = (await usb.getDevices()).filter(d => d.vendorId === vendor);
+  // (a device granted before, of the filters' vendor and product: the FTDI boards share a vendor, #2298)
+  const known = (await usb.getDevices()).filter(d => d.vendorId === vendor && filters.some(f => f.vendorId === d.vendorId && (f.productId == null || f.productId === d.productId)));
   if (known.length) return known[0];
   try { return await usb.requestDevice({ filters }); } catch (e) {
     fail(e.name === 'NotFoundError' ? 'no board chosen: connect the board\'s USB cable, switch it on and choose it in the browser\'s list' : e.message);
@@ -385,6 +386,8 @@ export const api = {
     const fs = top && await bitOf(name, `build/${top}.fs`);
     if (fs) return { available: true, size: fs.length, gowin: true };
     const bit = top && await bitOf(name, `build/${top}.bit`), hd = bit && bitHeader(bit);
+    // (an ECP5's .bit, ecppack's: no Xilinx header, its size, #2298)
+    if (bit && !hd && openOnlyDevice((await projectJson(name)).device)) return { available: true, size: bit.length, ecp5: true };
     return hd ? { available: true, designName: hd.design, part: `${hd.part}${hd.package}`, date: hd.date, time: hd.time } : { available: false, reason: 'no bitstream in this browser' };
   },
   // { project, bitfile, bitData? (a .bit chosen from the disk), board, force }: the board's USB driver by its board and the file

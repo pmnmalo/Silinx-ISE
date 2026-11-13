@@ -10,6 +10,7 @@
 //     INIT_ADDR (12), XFER_WRITE (17: the bits taken, in that mode, after an erase), NOOP (02); on CONFIG_DISABLE the SRAM's
 //     bytes (MSB first) checked: its IDCODE command 06 00 00 00 <IDCODE> this device's, else ID_VERIFY_FAILED; DONE when it is.
 // What breaks the protocol (an erase or a write outside the configuration mode, a write before an erase) goes to errors.
+//   - an ECP5 (the ULX3S's, for test/fixtures/ft231x-sim.js): see Ecp5 below.
 //   const { usb, st } = ftdiJtagBoard({ device: 'xc7a35t' }); st.dev.config: the bytes taken, st.dev.done.
 
 const XC7 = { xc7a35t: 0x0362d093, xc7a100t: 0x13631093 };
@@ -92,25 +93,87 @@ class Gw1n {
   }
 }
 
-export function ftdiJtagBoard({ device = 'xc7a35t', deviceOptions = {}, packet = 512, mpsse = true, claimError = null } = {}) {
-  const dev = /^gw/.test(device) ? new Gw1n(device, deviceOptions) : new Artix7(device, deviceOptions);
-  const st = { dev, state: 'TLR', ir: 0, dr: [], tms: 0, low: null, high: null, mode: null, rx: [], clocks: 0, controls: [], badCommands: [] };
+// The ECP5 (Lattice's sysCONFIG, TN1260; the instructions openFPGALoader's SRAM path uses): IR of 8 bits; IDCODE (E0, and the
+// DR after Test-Logic-Reset), LSC_READ_STATUS (3C, 32 bits: DONE 8, ISC_EN 9, BUSY 12, FAIL 13, the configuration check's code
+// 23..26), ISC_ENABLE (C6, its DR 0x00: SRAM), ISC_ERASE (0E, its DR 0x01: SRAM; BUSY for a while), LSC_INIT_ADDRESS (46),
+// LSC_BITSTREAM_BURST (7A: the bits taken, once enabled and erased), ISC_DISABLE (26: DONE when the configuration is good),
+// PRELOAD (1C), BYPASS (FF). The configuration (MSB first), checked at the burst's end, good when it has the preamble FF FF BD B3
+// and VERIFY_ID (E2 00 00 00 <IDCODE>) of this device (another IDCODE: the check's code 1 and FAIL); DONE once ISC mode is left.
+const E = { IDCODE: 0xe0, STATUS: 0x3c, ISC_ENABLE: 0xc6, ISC_ERASE: 0x0e, INIT_ADDRESS: 0x46, BURST: 0x7a, ISC_DISABLE: 0x26, BYPASS: 0xff };
+class Ecp5 {
+  constructor(name, { idcode = 0x41113043, eraseClocks = 40 } = {}) {
+    Object.assign(this, { name, irLen: 8, idcode, eraseClocks, isc: false, erased: false, busy: 0, done: false, fail: false, check: 0, config: null, stream: [], dr8: null, errors: [], ops: [] });
+    this.reset();
+  }
+  reset() { this.ir = E.IDCODE; }
+  captureIr() { return 0x01; }
+  status() { return ((this.done ? 1 : 0) << 8 | (this.isc ? 1 : 0) << 9 | (this.busy ? 1 : 0) << 12 | (this.fail ? 1 : 0) << 13 | this.check << 23) >>> 0; }
+  captureDr() { return this.ir === E.IDCODE ? [this.idcode, 32] : this.ir === E.STATUS ? [this.status(), 32] : this.ir === E.ISC_ENABLE || this.ir === E.ISC_ERASE ? [0, 8] : [0, 1]; }
+  update() {
+    if (![E.STATUS, E.BYPASS, 0x1c].includes(this.ir)) this.ops.push(this.ir);
+    if (this.ir === E.BURST) {
+      if (!this.isc) this.errors.push('LSC_BITSTREAM_BURST outside ISC mode');
+      else if (!this.erased) this.errors.push('LSC_BITSTREAM_BURST before the SRAM was erased');
+      this.stream = [];
+    }
+    if (this.ir === E.ISC_DISABLE) { this.done = this.good; this.isc = false; }
+  }
+  // the 8-bit DRs of ISC_ENABLE and ISC_ERASE, their value on Update-DR; the burst's end: the configuration checked
+  updateDr(bits) {
+    if (this.ir === E.BURST && this.stream.length) { this.verify(); return; }
+    const v = bits.reduce((a, b, i) => a | (b << i), 0);
+    if (this.ir === E.ISC_ENABLE) { if (v !== 0) this.errors.push(`ISC_ENABLE ${v}: not the SRAM's`); this.isc = true; this.done = false; }
+    if (this.ir === E.ISC_ERASE) {
+      if (!this.isc) { this.errors.push('ISC_ERASE outside ISC mode'); return; }
+      if (v !== 1) this.errors.push(`ISC_ERASE ${v}: not the SRAM's`);
+      this.erased = false; this.busy = this.eraseClocks; this.done = false; this.good = false; this.check = 0; this.fail = false;
+    }
+  }
+  shiftedIn(bit) { if (this.ir === E.BURST && this.isc && this.erased) this.stream.push(bit); }
+  clock(state) { if (state === 'RTI' && this.busy && --this.busy === 0) this.erased = true; }
+  verify() {
+    const cfg = msbBytes(this.stream);
+    this.config = cfg;
+    let at = -1;
+    for (let k = 0; k + 4 <= Math.min(cfg.length, 64); k++) if (cfg[k] === 0xff && cfg[k + 1] === 0xff && cfg[k + 2] === 0xbd && cfg[k + 3] === 0xb3) { at = k; break; }
+    if (at < 0) { this.check = 4; this.fail = true; return; }   // (no preamble)
+    for (let k = at + 4; k + 8 <= Math.min(cfg.length, at + 64); k++) {
+      if (cfg[k] === 0xe2 && !cfg[k + 1] && !cfg[k + 2] && !cfg[k + 3]) { if (word(cfg, k + 4) !== this.idcode) { this.check = 1; this.fail = true; return; } break; }
+    }
+    this.good = true;   // (DONE once ISC mode is left)
+  }
+}
 
+/** A device of the simulated chain by its name: an Artix-7, a Gowin GW1N or an ECP5. */
+export function simDevice(name, opts = {}) {
+  return /^gw/.test(name) ? new Gw1n(name, opts) : /^lfe5/.test(name) ? new Ecp5(name, opts) : new Artix7(name, opts);
+}
+
+/** The TAP with one device: tck(tms, tdi) its TDO sampled before the edge; tdo() what it drives now. */
+export function simTap(dev, st = {}) {
+  Object.assign(st, { state: 'TLR', ir: 0, dr: [], clocks: 0 });
+  const tdoNow = () => (st.state === 'SDR' ? st.dr[0] ?? 0 : st.state === 'SIR' ? st.ir & 1 : 0);
   function tck(tms, tdi) {
     st.clocks++;
-    let tdo = 0;
-    if (st.state === 'SDR') tdo = st.dr[0] ?? 0;
-    if (st.state === 'SIR') tdo = st.ir & 1;
+    const tdo = tdoNow();
     if (st.state === 'CIR') st.ir = dev.captureIr();
     else if (st.state === 'SIR') st.ir = (st.ir >> 1) | (tdi << (dev.irLen - 1));
     else if (st.state === 'CDR') { const [v, n] = dev.captureDr(); st.dr = Array.from({ length: n }, (_, i) => Number((BigInt(v) >> BigInt(i)) & 1n)); } else if (st.state === 'SDR') { dev.shiftedIn(tdi); st.dr.shift(); st.dr.push(tdi); }
     const next = NEXT[st.state][tms ? 1 : 0];
     if (next === 'UIR') { dev.ir = st.ir; dev.update(); }
+    if (next === 'UDR') dev.updateDr?.(st.dr);
     if (next === 'TLR') dev.reset();
     st.state = next;
     dev.clock(st.state);
     return tdo;
   }
+  return { tck, tdo: tdoNow };
+}
+
+export function ftdiJtagBoard({ device = 'xc7a35t', deviceOptions = {}, packet = 512, mpsse = true, claimError = null } = {}) {
+  const dev = simDevice(device, deviceOptions);
+  const st = { dev, tms: 0, low: null, high: null, mode: null, rx: [], controls: [], badCommands: [] };
+  const { tck } = simTap(dev, st);
   // a read of n bits: shifted in from bit 7
   const readBits = bits => { let v = 0; for (const b of bits) v = (v >> 1) | (b << 7); return v; };
 

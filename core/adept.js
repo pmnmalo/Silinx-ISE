@@ -13,6 +13,7 @@
 // bits were sent and received.
 
 import { splitBitPart } from '../packages/silinx-fpga/src/parts.js';
+import { ECP5_IDCODES } from './open-bitstream.js';
 
 export const ADEPT_VENDOR = 0x1443;
 export const ADEPT_FILTERS = [{ vendorId: ADEPT_VENDOR }];
@@ -156,7 +157,7 @@ const BYTEREV = Uint8Array.from({ length: 256 }, (_, x) => { let r = 0; for (let
 export const byterev = data => { const out = new Uint8Array(data.length); for (let i = 0; i < data.length; i++) out[i] = BYTEREV[data[i]]; return out; };
 
 // the devices of the boards' chains: IDCODE (version bits masked), name, IR length, kind; the Digilent Adept boards', and
-// the FTDI boards' of core/ftdi-jtag.js (#2298: the Basys 3's and the Nexys A7's Artix-7, UG470; the Tang Nano 9K's GW1NR-9C,
+// the FTDI boards' of core/ftdi-jtag.js and core/ft231x-jtag.js (#2298: the Basys 3's and the Nexys A7's Artix-7, UG470; the Tang Nano 9K's GW1NR-9C,
 // whose IDCODE's top bits are not a version: kept)
 const JTAG_DEVICES = [
   [0x01c10093, 'xc3s100e', 6, 'fpga'], [0x01c1a093, 'xc3s250e', 6, 'fpga'], [0x01c22093, 'xc3s500e', 6, 'fpga'],
@@ -165,6 +166,8 @@ const JTAG_DEVICES = [
   [0x0362e093, 'xc7a15t', 6, 'fpga'], [0x0362d093, 'xc7a35t', 6, 'fpga'], [0x0362c093, 'xc7a50t', 6, 'fpga'],
   [0x03632093, 'xc7a75t', 6, 'fpga'], [0x03631093, 'xc7a100t', 6, 'fpga'], [0x03636093, 'xc7a200t', 6, 'fpga'],
   [0x1100481b, 'gw1nr-9c', 8, 'fpga', 0xffffffff],
+  // (the ULX3S's ECP5, core/ft231x-jtag.js: Lattice's top bits tell the parts apart, kept; core/open-bitstream.js ECP5_IDCODES)
+  ...Object.entries(ECP5_IDCODES).map(([name, id]) => [id, name, 8, 'fpga', 0xffffffff]),
 ];
 const idMask = 0x0fffffff;
 const bigOf = b => { let n = 0n; for (let i = b.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(b[i]); return n; };
