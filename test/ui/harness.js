@@ -900,9 +900,12 @@ function initScripts({ updateCheck, build, ui }) {
  * by the test). `offline: true`: the browser's requests to other hosts are refused and recorded in
  * env.external (see startRecordingProxy). env.newPage(url, { updateCheck, build, ui, sibling }) opens a page (the
  * update check against GitHub only with updateCheck: true; sibling: a page whose browser context it shares). `fileAccess: false`: Chrome without
- * --allow-file-access-from-files, as a user opens a file (the standalone edition from file://, #512).
+ * --allow-file-access-from-files, as a user opens a file (the standalone edition from file://, #512). `webrtc: true`: two
+ * pages of this browser connected over WebRTC with no STUN server (the live sharing's, #3227), by their own addresses:
+ * Chrome as if the pages had the camera's permission, so its candidates are every interface's address, not an mDNS name
+ * (.local, which a Mac may not resolve) nor the default route's only (a VPN's tunnel, which never reaches itself, #3567).
  */
-export async function setupUi({ server = true, offline = false, root = ROOT, fileAccess = true } = {}) {
+export async function setupUi({ server = true, offline = false, root = ROOT, fileAccess = true, webrtc = false } = {}) {
   const missing = missingDependencies(root);
   if (missing.length) throw new Error(dependenciesMessage(missing));
   if (BROWSER !== 'chrome') return setupPlaywright({ server, offline });
@@ -916,7 +919,8 @@ export async function setupUi({ server = true, offline = false, root = ROOT, fil
   const proxy = offline ? await startRecordingProxy() : null;
   // (the proxy also sees Chrome's own requests to Google: the pages' requests are recorded by CDP)
   env.external = proxy ? [] : undefined;
-  const { proc, cdp } = await launchChrome(chrome, tmp, proxy ? [`--proxy-server=${proxy.url}`] : [], { fileAccess });
+  const args = [...(proxy ? [`--proxy-server=${proxy.url}`] : []), ...(webrtc ? ['--use-fake-ui-for-media-stream'] : [])];
+  const { proc, cdp } = await launchChrome(chrome, tmp, args, { fileAccess });
   env.chromeProc = proc;
   env.cdp = cdp;
   env.pageSeq = 0;
