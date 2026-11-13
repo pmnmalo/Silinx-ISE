@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { hashTree, hashFiles, cacheKey, cacheGet, cachePut, cachePrune, cacheTouch, buildOrder, mayStart, markPending, buildsText, runSummary, runBuilds, CACHE_VERSION, doneDesigns, markDesignDone } from './designs-corpus/quality-cache.mjs';
 import { newFailures, GOALS } from './designs-corpus/compare-lib.mjs';
 import { qualityPage } from './designs-corpus/quality-page.mjs';
@@ -211,4 +212,120 @@ test('#3342 the projects of a comparison: each design marked as it is processed,
   assert.match(wf, /run\.mjs --stages frontend,synth,flow --sizes "\$P" --sizes-only --resume --jobs 1/);
   assert.doesNotMatch(wf, /rm -rf "\$P"/, 'a stopped step\'s projects kept');
   assert.match(wf, /mkdir -p "\$P\/\.done" && touch "\$P\/\.done\/\.all"/);
+});
+
+// #3297: a whole comparison (about 60 h) in one run, by parts of the compare job one after another, each to its own
+// deadline, each resuming what the parts before it left. The "What to compare" step's own script, run on a repository of
+// three commits (c0 ← c1 = main; a side commit off c0) with a runner's home of its own.
+const whatToCompare = () => {
+  const wf = fs.readFileSync(path.join(ROOT, '.github/workflows/quality.yml'), 'utf8');
+  const m = /- name: What to compare\n\s+id: what\n\s+run: \|\n([\s\S]*?)\n {8}env:/.exec(wf);
+  return m[1].split('\n').map(l => l.slice(10)).join('\n');
+};
+function partsRepo() {
+  const d = tmp(), repo = path.join(d, 'repo'), home = path.join(d, 'home');
+  const git = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8' }).trim();
+  fs.mkdirSync(repo); fs.mkdirSync(home);
+  git('init', '-q', '-b', 'main');
+  const commit = m => { git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', m); return git('rev-parse', 'HEAD'); };
+  const c0 = commit('c0');
+  git('checkout', '-q', '-b', 'side'); const side = commit('side');
+  git('checkout', '-q', 'main'); const c1 = commit('c1');
+  const pending = path.join(home, 'silinx-cache/quality/builds/pending');
+  return {
+    d, home, c0, c1, side, git,
+    setPending: c => { fs.mkdirSync(path.dirname(pending), { recursive: true }); if (c) fs.writeFileSync(pending, `${c}\n`); else fs.rmSync(pending, { force: true }); },
+    /** One part: a fresh checkout of main (c1), the step run; its outputs, the commit it left checked out, its exit status. */
+    part(part, run = '7', attempt = '1') {
+      git('checkout', '-q', '--detach', c1);
+      const out = path.join(d, `out-${run}-${attempt}-${part}`);
+      fs.writeFileSync(out, '');
+      const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', whatToCompare()], { cwd: repo, encoding: 'utf8',
+        env: { PATH: process.env.PATH, HOME: home, GITHUB_OUTPUT: out, GITHUB_RUN_ID: run, GITHUB_RUN_ATTEMPT: attempt, GITHUB_SHA: c1, PART: String(part) } });
+      return { status: r.status, out: r.stdout + r.stderr, skip: /^skip=true$/m.test(fs.readFileSync(out, 'utf8')), head: git('rev-parse', 'HEAD') };
+    },
+  };
+}
+
+test('#3297 the comparison by parts: the first part picks the commit, the next ones resume it, then skip once it is whole', () => {
+  const r = partsRepo();
+  try {
+    // part 1, nothing pending: main's commit, written for the parts after it
+    let p = r.part(1);
+    assert.equal(p.status, 0, p.out); assert.equal(p.skip, false); assert.equal(p.head, r.c1);
+    assert.equal(fs.readFileSync(path.join(r.home, 'silinx-cache/quality/runs/7-1'), 'utf8').trim(), r.c1);
+    // its deadline came, the comparison partial (compare-ise.mjs's mark): part 2 compares the same commit
+    r.setPending(r.c1);
+    p = r.part(2);
+    assert.equal(p.status, 0, p.out); assert.equal(p.skip, false); assert.equal(p.head, r.c1);
+    // part 2 finished it (the mark removed): parts 3 to 5 skip, nothing built again, no results uploaded
+    r.setPending(null);
+    for (const n of [3, 4, 5]) {
+      p = r.part(n);
+      assert.equal(p.status, 0, p.out); assert.equal(p.skip, true, `part ${n}`);
+      assert.match(p.out, new RegExp(`::notice::Part ${n}: the comparison of ${r.c1} is whole`));
+    }
+    // a run whose first part has another commit's partial comparison to finish (an ancestor of main's): every part on it
+    r.setPending(r.c0);
+    p = r.part(1, '8');
+    assert.equal(p.status, 0, p.out); assert.equal(p.head, r.c0);
+    assert.match(p.out, /left partial by an earlier run/);
+    p = r.part(2, '8');
+    assert.equal(p.status, 0, p.out); assert.equal(p.skip, false); assert.equal(p.head, r.c0);
+    assert.match(p.out, /left partial by the part before/);
+    // c0 whole after part 2: part 3 skips, it does not start main's commit (whose partial results would replace c0's)
+    r.setPending(null);
+    p = r.part(3, '8');
+    assert.equal(p.skip, true); assert.equal(p.head, r.c1);
+    // a pending commit that is not one of main's: main's commit compared
+    r.setPending(r.side);
+    p = r.part(1, '9');
+    assert.equal(p.status, 0, p.out); assert.equal(p.head, r.c1);
+    // a run's attempt again (Re-run failed jobs): a first part again, which resumes the pending comparison
+    r.setPending(r.c0);
+    p = r.part(4, '8', '2');
+    assert.equal(p.status, 0, p.out); assert.equal(p.skip, false); assert.equal(p.head, r.c0);
+    assert.equal(fs.readFileSync(path.join(r.home, 'silinx-cache/quality/runs/8-2'), 'utf8').trim(), r.c0);
+  } finally { fs.rmSync(r.d, { recursive: true, force: true }); }
+});
+
+test('#3297 the comparison by parts: a later part\'s commit not one of main\'s refused; the runs\' marks pruned', () => {
+  const r = partsRepo();
+  try {
+    const runs = path.join(r.home, 'silinx-cache/quality/runs');
+    fs.mkdirSync(runs, { recursive: true });
+    fs.writeFileSync(path.join(runs, '5-1'), `${r.side}\n`);
+    r.setPending(r.side);
+    const p = r.part(2, '5');
+    assert.equal(p.status, 1);
+    assert.match(p.out, new RegExp(`::error::Part 2: ${r.side}, the commit of this run's first part, is not one of main's`));
+    assert.equal(p.head, r.c1, 'not checked out');
+    // a run's mark of more than 40 days removed, a recent one kept
+    const old = path.join(runs, '1-1');
+    fs.writeFileSync(old, `${r.c0}\n`);
+    const t = new Date(Date.now() - 50 * 86400e3); fs.utimesSync(old, t, t);
+    r.setPending(null);
+    r.part(1, '6');
+    assert.equal(fs.existsSync(old), false);
+    assert.equal(fs.existsSync(path.join(runs, '5-1')), true);
+  } finally { fs.rmSync(r.d, { recursive: true, force: true }); }
+});
+
+test('#3297 Quality workflow: the compare job in parts, one after another, every step after the choice skipped once whole', () => {
+  const wf = fs.readFileSync(path.join(ROOT, '.github/workflows/quality.yml'), 'utf8');
+  const compare = /\n {2}compare:\n([\s\S]*?)\n {2}# the results' commit/.exec(wf)[1];
+  assert.match(compare, /strategy:\n\s+max-parallel: 1\n\s+fail-fast: true.*\n\s+matrix:\n\s+part: \[1, 2, 3, 4, 5\]/);
+  const parts = /part: \[([\d, ]+)\]/.exec(compare)[1].split(',').length;
+  // the parts' time for builds (the projects, about 7 h, in the first) against the whole comparison's, about 60 h
+  const num = k => +new RegExp(`${k}: (\\d+)`).exec(compare)[1];
+  assert.ok(parts * num('DEADLINE_MINUTES') - 7 * 60 >= 70 * 60, 'room for the builds, with a margin');
+  assert.match(compare, /PART: \$\{\{ matrix\.part \}\}/);
+  // every step after "What to compare" skipped by a part with nothing left
+  const after = compare.slice(compare.indexOf('- name: What to compare'));
+  const steps = after.split(/\n {6}- /).slice(1);
+  assert.equal(steps.length, 5);
+  for (const s of steps) assert.match(s, /^(?:if: |.*\n\s+if: )(?:always\(\) && )?steps\.what\.outputs\.skip != 'true'$/m, s.split('\n')[0]);
+  // one concurrency group for the whole run: no ISE job between its parts (#3292's group, workflow-level)
+  assert.match(wf, /^concurrency:\n {2}group: ise +#.*\n {2}cancel-in-progress: false$/m);
+  assert.doesNotMatch(compare, /concurrency:/);
 });

@@ -38,7 +38,18 @@ jobs:
     # measured, 1.4 h), each build is kept on the runner as soon as it
     # is measured (compare-ise.mjs --cache), the partial results are published, and the next run resumes the comparison
     # (the same commit, what is kept taken again). The runner's window does not close while a job runs
-    # (scripts/ise-runner/window.mjs)
+    # (scripts/ise-runner/window.mjs).
+    # A whole comparison takes about 60 hours (#3297: 7 h of projects, then 402 builds; the runs of 2026-11-11 measured 206
+    # of them in 29 h), more than a job's 20: the job runs in PARTS, one after another (max-parallel 1), each to its own
+    # deadline, each resuming what the parts before it left (the projects' and the builds' marks, #3292, #3342). The first
+    # part of a run's attempt picks the commit to compare and writes it to ~/silinx-cache/quality/runs/<run>-<attempt>;
+    # the parts after it compare that commit, and skip once it is whole (no pending mark). A part with nothing left takes a
+    # minute; the last part that compared uploads the results (overwrite), which the publish job pushes.
+    strategy:
+      max-parallel: 1
+      fail-fast: true           # (a failed guard: nothing to publish, the parts after it cancelled)
+      matrix:
+        part: [1, 2, 3, 4, 5]
     timeout-minutes: 1200
     permissions:
       contents: read
@@ -55,32 +66,52 @@ jobs:
           persist-credentials: false
       # the commit to compare: a comparison left partial (~/silinx-cache/quality/builds/pending, the builds kept between
       # runs by compare-ise.mjs --cache; of the last 14 days) is resumed when it is a commit of main's, one before the
-      # checkout (main's history fetched without credentials, git's own check), else main's (#3292)
+      # checkout (main's history fetched without credentials, git's own check), else main's (#3292); a later part of the
+      # same run compares its first part's commit, or skips when that comparison is whole (#3297)
       - name: What to compare
         id: what
         run: |
           echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
-          P="$HOME/silinx-cache/quality/builds/pending"
-          if [ -f "$P" ] && [ -n "$(find "$P" -mtime -14)" ]; then
+          P="$HOME/silinx-cache/quality/builds/pending" R="$HOME/silinx-cache/quality/runs"
+          mkdir -p "$R" && find "$R" -type f -mtime +40 -delete
+          R="$R/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" c="" later="" by="an earlier run"
+          if [ -f "$R" ]; then
+            c=$(head -c 40 "$R" | tr -cd 0-9a-f) later=1 by="the part before"
+            if [ ! -f "$P" ] || [ "$(head -c 40 "$P" | tr -cd 0-9a-f)" != "$c" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::Part $PART: the comparison of $c is whole (an earlier part of this run), nothing left"
+              exit 0
+            fi
+          elif [ -f "$P" ] && [ -n "$(find "$P" -mtime -14)" ]; then
             c=$(head -c 40 "$P" | tr -cd 0-9a-f)
+          fi
+          if [ -n "$c" ] && [ "$c" != "$(git rev-parse HEAD)" ]; then
             git fetch -q --no-tags --shallow-since="$(date -v-15d +%Y-%m-%d 2>/dev/null || date -d '15 days ago' +%Y-%m-%d)" origin "$GITHUB_SHA" || true
-            if [ ${#c} -eq 40 ] && [ "$c" != "$(git rev-parse HEAD)" ] && git merge-base --is-ancestor "$c" HEAD 2>/dev/null; then
+            if [ ${#c} -eq 40 ] && git merge-base --is-ancestor "$c" HEAD 2>/dev/null; then
               git checkout -q --detach "$c"
-              echo "::notice::Resuming the comparison of $c (left partial by an earlier run)"
+              echo "::notice::Part $PART: resuming the comparison of $c (left partial by $by)"
+            elif [ -n "$later" ]; then
+              echo "::error::Part $PART: $c, the commit of this run's first part, is not one of main's"; exit 1
             fi
           fi
+          [ -f "$R" ] || git rev-parse HEAD > "$R"
           git log -1 --format='comparing %H (%cs)'
-      - uses: ./.github/actions/setup
+        env:
+          PART: ${{ matrix.part }}
+      - if: steps.what.outputs.skip != 'true'
+        uses: ./.github/actions/setup
         with:
           npm-cache: false
       # the corpus's sources kept on the runner between runs (the checkout cleans the work folder)
       - name: The corpus's sources
+        if: steps.what.outputs.skip != 'true'
         run: |
           mkdir -p "$HOME/silinx-cache/designs-corpus" .cache
           ln -sfn "$HOME/silinx-cache/designs-corpus" .cache/designs-corpus
           npm run fetch:designs
       # the projects of the commit compared, kept for a run that resumes it, design by design (they take hours: #3292, #3342)
       - name: A Silinx project per design
+        if: steps.what.outputs.skip != 'true'
         run: |
           C="$HOME/silinx-cache/quality/projects" P="$HOME/silinx-cache/quality/projects/$(git rev-parse HEAD)"
           mkdir -p "$C"
@@ -95,6 +126,7 @@ jobs:
           ls "$P" | wc -l
           echo "QUALITY_PROJECTS=$P" >> "$GITHUB_ENV"
       - name: Silinx toolchain vs ISE
+        if: steps.what.outputs.skip != 'true'
         # one build at a time, design after design, Silinx's then ISE's (8 GB of memory: a large design needs some GB on
         # each side); --guard: nothing published when a design built before fails now; --cache, --deadline,
         # --build-timeout: the builds kept as they finish, none started after the deadline, none longer than its limit
@@ -103,16 +135,18 @@ jobs:
         run: |
           node test/designs-corpus/compare-ise.mjs "$QUALITY_PROJECTS" --jobs 1 --ise-jobs 1 --serial --guard \
             --cache "$HOME/silinx-cache/quality/builds" --deadline $((START + DEADLINE_MINUTES * 60)) --build-timeout "$BUILD_TIMEOUT_MINUTES"
-      - if: always()
+      # (each part that compared replaces the artifact: the publish job takes the last one's, #3297)
+      - if: always() && steps.what.outputs.skip != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quality-results
+          overwrite: true
           path: |
             test/designs-corpus/ise-comparison.json
             docs/QUALITY.md
 
   # the results' commit, on GitHub's runner (the only job with a writing token, #412 / #486), from the compare
-  # job's artifact, on the commit it compared; only when the comparison passed (--guard). GITHUB_TOKEN cannot
+  # job's artifact (its last part's), on the commit it compared; only when the comparison passed (--guard). GITHUB_TOKEN cannot
   # be scoped to one branch: this job runs no code of the artifact and pushes to quality-results only, which a
   # maintainer reviews before merging it into main.
   publish:
