@@ -4,12 +4,12 @@
 import { constraintsExt, pcfDiagnostics, lpfDiagnostics, cstDiagnostics, xdcDiagnostics, readPins } from './constraints-format.js';
 import { noFlowWarning } from './device-picker.js';
 import { api, followJob } from './api.js';
-import { h, alertDlg, confirmDlg, toast } from './ui.js';
+import { h, alertDlg, confirmDlg } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
 import { primitiveSources } from '/core/unisim.js';
 import { countEvent } from './analytics.js';
 import { S, closeDoc, findDoc, moduleInfo, openDoc, openSummary, projectBoard, refreshSummary, setDirty, status } from './app.js';
-import { log, logLine, showConsolePage, showProblems, setDiagnostics } from './console.js';
+import { log, logError, logInfo, logLine, showConsolePage, showProblems, setDiagnostics } from './console.js';
 import { showCommandLines } from './messages.js';
 import { reloadProject } from './project.js';
 import { refreshOpenEditor, topUcfPorts, ucfPort } from './drawings.js';
@@ -203,7 +203,7 @@ export async function boardUcf() {
 }
 export async function runImpl(mod, steps, opts = {}) {
   // one ISE run at a time (one build directory): checked and taken before any await
-  if (S.busy) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return false; }
+  if (S.busy) { logError('An implementation is already running (use Stop to cancel it)'); return false; }
   // (an experimental family: no flow runs it yet, #3142; the server and the MCP server refuse it too)
   if (projectTool().id === 'no-flow' && noFlowWarning(S.project?.device)) { log(noFlowWarning(S.project.device).replace(/^WARNING/, 'ERROR'), 'err'); return false; }
   S.busy = true;
@@ -442,7 +442,7 @@ export async function showTextDoc(title, text) {
 
 // Stop the running implementation (kills the ISE tool / container run.sh via the job manager).
 export async function stopProcesses() {
-  if (!S.currentJob) { toast('No process is running'); return; }
+  if (!S.currentJob) { logInfo('No process is running'); return; }
   S.stopRequested = true;
   log('Stopping…', 'warn');
   try { await api.cancelJob(S.currentJob); } catch (e) { log(`ERROR: cannot stop the process: ${e.message}`, 'err'); }

@@ -6,6 +6,7 @@
 import { api, followJob } from './api.js';
 import { h, toast, alertDlg, confirmDlg } from './ui.js';
 import { S, app } from './app.js';
+import { logError } from './console.js';
 import { countEvent } from './analytics.js';
 import { runImpl } from './implement.js';
 import { projectTool } from './processes.js';
@@ -30,7 +31,7 @@ export function mountOpenProgram(page) {
   };
 
   const program = async () => {
-    if (busy) { toast('Another operation is running', 'error'); return null; }
+    if (busy) { logError('Another operation is running'); return null; }
     if (none) { app.log('WARNING: This board is not programmed from the browser yet: the local server programs it (silinx serve), with openFPGALoader.', 'warn'); return null; }
     // (no file: the design implemented first, as iMPACT's Program FPGA, #1024)
     if (!(await loadInfo())?.available) {
@@ -47,7 +48,7 @@ export function mountOpenProgram(page) {
       const r = await followJob(job, app.logLine);
       const done = flash ? 'Flash programmed: the FPGA loads the design.' : 'FPGA programmed: the design runs until the board is powered off.';
       if (r.status === 'ok') { app.log(done, 'ok'); toast(done, 'ok'); countEvent('program'); }
-      else { app.log(`${flash ? 'Programming the SPI flash' : 'Programming the FPGA'} failed: ${r.error || 'see log'}`, 'err'); toast('Failed — see console', 'error'); }
+      else logError(`${flash ? 'Programming the SPI flash' : 'Programming the FPGA'} failed: ${r.error || 'see log'}`);
       return r;
     } catch (e) { alertDlg(prog.title, e.message, 'error'); return null; }
     finally { busy = false; }

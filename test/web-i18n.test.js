@@ -89,11 +89,11 @@ test('t(): exact strings, patterns, surrounding whitespace, unknown text unchang
 });
 
 // UI labels written as literals in the sources: label: '…', title: '…', field('…', …), headings…; and (#3539) the
-// texts of toasts, dialogs' titles and messages, plain elements (but those marked data-no-i18n), textContent and the
+// texts of toasts and of the console's messages (#3591), dialogs' titles and messages, plain elements (but those marked data-no-i18n), textContent and the
 // errors a dialog's check returns (a sentence)
 const LABEL_FORMS = [/\blabel: '([^'$`]+)'/g, /\btitle: '([^'$`]+)'/g, /\bfield\('([^'$`]+)'/g, /\bplaceholder: '([^'$`]+)'/g,
   /\bh\('(?:h2|h3|h4|th|label|button|summary|caption)', \{[^{}]*\}, '([^'$`]+)'\)/g,
-  /\btoast\(\s*'([^'$`]+)'/g, /\b(?:alertDlg|confirmDlg|promptDlg)\(\s*'([^'$`]+)'/g,
+  /\btoast\(\s*'([^'$`]+)'/g, /\b(?:log(?:Error|Warning|Info)|message)\(\s*'([^'$`]+)'/g, /\b(?:alertDlg|confirmDlg|promptDlg)\(\s*'([^'$`]+)'/g,
   /\b(?:alertDlg|confirmDlg|promptDlg)\(\s*(?:'[^'$`]*'|[\w.]+),\s*'([^'$`]+)'/g,
   /\bh\('(?:div|p|span|option|b|small|em|strong|li|legend|td)', \{(?![^{}]*no-i18n)[^{}]*\}, '([^'$`]+)'\)/g,
   /\btextContent = '([^'$`]+)'/g, /\breturn '([A-Z][^'$`]* [^'$`]*[.!?…])';/g];

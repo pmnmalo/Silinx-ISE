@@ -4,6 +4,7 @@
 // module in the other files of the project, and a declaration of a package in the files that use the package.
 import { renameSymbol, symbolAt, badName, kindWord, interfaceUnit, renameInterfaceInSource, packageOf, packageDecl, renamePackageItemInSource } from '/core/rename.js';
 import { h, dialog, toast } from './ui.js';
+import { logError, logInfo } from './console.js';
 
 /** Replace [{ line, col, len }] (1-based, of the current text) by `name` in one undoable step. */
 export function applyEdits(editor, edits, name) {
@@ -22,7 +23,7 @@ export async function renameSymbolAtCursor(ctx) {
   const cur = editor.getCursor();
   const text = editor.getValue();
   const at = symbolAt(text, lang, cur.line + 1, cur.ch + 1);
-  if (at.error) { toast(at.error, 'info', 4000); return; }
+  if (at.error) { logInfo(at.error); return; }
   const { sym } = at;
   // a module / entity (and a component of one) is renamed in the whole project, with its file
   if (sym.kind === 'module' || sym.kind === 'entity' || (sym.kind === 'component' && ctx.isModule?.(sym.name))) { ctx.renameModule(sym.name); return; }
@@ -67,7 +68,7 @@ export async function renameSymbolAtCursor(ctx) {
   const name = input.value.trim();
   if (name === sym.name) { editor.focus(); return; }
   const res = renameSymbol(editor.getValue(), lang, cur.line + 1, cur.ch + 1, name);
-  if (res.error) { toast(res.error, 'error', 5000); return; }
+  if (res.error) { logError(res.error); return; }
   applyEdits(editor, res.edits, name);
   let files = 0;
   if (also?.checked) {

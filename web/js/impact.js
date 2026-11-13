@@ -3,6 +3,7 @@
 import { api, followJob } from './api.js';
 import { h, toast, alertDlg, confirmDlg, dialog } from './ui.js';
 import { S, app } from './app.js';
+import { logError } from './console.js';
 import { countEvent } from './analytics.js';
 import { runImpl } from './implement.js';
 import { programFileState, implementFirstText } from './impact-file.js';
@@ -106,14 +107,14 @@ export function mountImpact(el) {
 
   // Run a server job and stream its log to the console.
   const runJob = async (title, start, okMsg) => {
-    if (busy) { toast('Another operation is running', 'error'); return null; }
+    if (busy) { logError('Another operation is running'); return null; }
     busy = true;
     app.log(`\n${title}...`, 'hdr');
     try {
       const { job } = await start();
       const r = await followJob(job, app.logLine);
       if (r.status === 'ok') { app.log(okMsg, 'ok'); toast(okMsg, 'ok'); }
-      else { app.log(`${title} failed: ${r.error || 'see log'}`, 'err'); toast('Failed — see console', 'error'); }
+      else logError(`${title} failed: ${r.error || 'see log'}`);
       return r;
     } catch (e) { alertDlg('iMPACT', e.message, 'error'); return null; }
     finally { busy = false; }
@@ -134,7 +135,7 @@ export function mountImpact(el) {
     // (is the file there: a build in the browser's storage is gone after a reload, its processes' state is not, #1084)
     const there = await api.bitinfo(pj.name).then(b => b?.available, () => undefined);
     const st = programFileState(S.status, there);
-    if (st === 'running') { toast('The design is being implemented: program it when it ends', 'error'); return false; }
+    if (st === 'running') { logError('The design is being implemented: program it when it ends'); return false; }
     const text = implementFirstText(st, pj.top, !!api.standalone);
     if (!text) return true;
     const go = await dialog({

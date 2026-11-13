@@ -18,7 +18,7 @@ import { elaborate } from '/core/compile.js';
 import { boardRemove } from '/core/pin-board.js';
 import { S, app, setDirty } from './app.js';
 import { statusLine } from './status-line.js';
-import { logError } from './console.js';
+import { logError, logWarning } from './console.js';
 
 export function mountPinPlanner(el, doc, top) {
   const pj = S.project;
@@ -242,8 +242,9 @@ export function mountPinPlanner(el, doc, top) {
     const msg = [`${n} I/Os assigned from ${board.name}`];
     if (dirN) msg.push(`${dirN} by direction (${r.byDirection.map(d => `${d.port} → ${d.nets.map(([, l]) => l).join(', ')}`).join('; ')})`);
     if (r.unmatched.length) msg.push(`not assigned: ${r.unmatched.join(', ')}`);
-    toast(msg.join('; '), n ? 'ok' : 'error', 8000);
-    app.log(`I/O Pin Planning: ${msg.join('; ')}.`, r.unmatched.length || !n ? 'warn' : 'ok');
+    // (an action done: a toast; nothing assigned: a warning of the console, #3591)
+    if (n) { toast(msg.join('; '), 'ok', 8000); app.log(`I/O Pin Planning: ${msg.join('; ')}.`, r.unmatched.length ? 'warn' : 'ok'); }
+    else logWarning(`I/O Pin Planning: ${msg.join('; ')}.`);
   }
 
   let lastDups = '';

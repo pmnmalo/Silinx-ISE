@@ -1,7 +1,7 @@
 // The console (Console / Errors / Warnings tabs at the bottom): the log, the warnings and errors it
 // collects, and the quick fixes of the messages (#405: out of app.js).
 import { icon } from './icons.js';
-import { h, toast } from './ui.js';
+import { h } from './ui.js';
 import { quickFixes } from '/core/quickfix.js';
 import { t, onLanguageChange } from './i18n.js';
 import { hintRow, sevWord } from './diaghelp.js';
@@ -66,11 +66,22 @@ export function logLine(line, opts) {
   else if (/=== SILINX (STEP|DONE)/.test(line) || /completed successfully/i.test(line)) cls = 'ok';
   log(line, cls, opts);
 }
-/** An error of the app's own (#3540: a file it cannot read): an ERROR line of the console, its Errors tab
- *  in front, never a toast. */
+/** An error of the app's own (#3540: a file it cannot read; #3591: a refusal, a menu action's error): an ERROR line
+ *  of the console, in the interface's language, its Errors tab in front (no toasted message). */
 export function logError(text) {
-  log(`ERROR: ${text}`, 'err');
+  log(`ERROR: ${t(text)}`, 'err');
   bringForward('errors');
+}
+/** A warning of the app's own (#3591): a WARNING line of the console, its Warnings tab in front. */
+export function logWarning(text) {
+  log(`WARNING: ${t(text)}`, 'warn');
+  bringForward('warnings');
+}
+/** A piece of information of the app's own (#3591: why a command does nothing): an INFO line of the console, the
+ *  console's page in front. */
+export function logInfo(text) {
+  log(`INFO: ${t(text)}`, 'info');
+  bringForward('console');
 }
 export function showConsolePage(page) {
   // (a tab of the console only: the keyboard's focus stays where it is, an editor's typing goes on)
@@ -169,7 +180,7 @@ async function applyDiagFix(d, f) {
   if (!ed) return;
   // the same fix on the editor's text now (it may have changed since the row was drawn)
   const fix = ed.quickFixes(d).find(x => x.title === f.title);
-  if (fix) ed.applyFix(fix); else toast('No quick fix here.', 'info');
+  if (fix) ed.applyFix(fix); else logInfo('No quick fix here.');
 }
 
 // the Clear button: the console's lines and the messages of the tabs
