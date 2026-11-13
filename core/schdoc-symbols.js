@@ -4,6 +4,7 @@
 import { DEVICE_PRIMITIVES, primitiveOf } from './primitives.js';
 import { parseNetName, r10 } from './schdoc.js';
 import { intOr as int } from './util.js';
+import { layoutDef } from './symbol-layout.js';
 export { int };   // (core/util.js's intOr)
 
 // ===================================================================== symbol library
@@ -515,9 +516,11 @@ export function symbolDef(sym, modules = {}) {
     const overridden = p.generics && Object.keys(p.generics).length > 0;
     ports = ports.map(q => {
       const k = String(q.name).toLowerCase(), t = theirs.get(k);
-      return { name: q.name, dir: q.dir || 'in', width: (overridden && snapW.has(k)) ? snapW.get(k) : ((t ? t.width : q.width) ?? 1), type: t ? t.type : q.type };
+      return { name: q.name, dir: q.dir || 'in', width: (overridden && snapW.has(k)) ? snapW.get(k) : ((t ? t.width : q.width) ?? 1), type: t ? t.type : q.type, ...(q.side ? { side: q.side } : {}) };
     });
-    const d = boxDef(ports.filter(q => q.dir !== 'out'), ports.filter(q => q.dir === 'out'), p.module, 80);
+    // (a layout of its own, its module's symbol file's as it was placed, #3755: core/symbol-layout.js)
+    const d = own && p.layout && typeof p.layout === 'object' ? layoutDef(ports, p.layout, p.module)
+      : boxDef(ports.filter(q => q.dir !== 'out'), ports.filter(q => q.dir === 'out'), p.module, 80);
     return { ...d, shape: 'module', title: p.module || '?', missing: !m && !own };
   }
   if (S?.prim) {

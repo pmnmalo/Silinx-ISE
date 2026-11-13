@@ -204,7 +204,7 @@ uiTest('Design pane (#220, #2872): a badge opens its view; a right-click shows t
   assert.deepEqual(procs.slice(0, 2), ['View/Edit Schematic', 'Design Summary/Reports']);
   assert.ok(!procs.some((p) => /Convert to HDL|as base|Generate HDL/.test(p)), procs.join(' | '));
   // one menu on the name and on every badge (#2872): the module's, the schematic's commands in it
-  const MODULE = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Verify Equivalence…', 'Verify Assertions…', ...TB, 'Share Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…'];
+  const MODULE = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Edit Symbol', 'Verify Equivalence…', 'Verify Assertions…', ...TB, 'Share Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…'];
   // (gates the top: Unset as Top Module, #1220)
   // (no Export as ISE Schematic (.sch)…, #3313: no drawing commands for a schematic)
   const GATES = ['Unset as Top Module', ...MODULE.slice(1)];
@@ -232,7 +232,7 @@ uiTest('Design pane (#220, #2872): a badge opens its view; a right-click shows t
   const TRAFFIC = withDrawing(MODULE, 'Convert to ASM chart');
   for (const b of [null, 'FSM', 'VHDL']) assert.deepEqual(await (b ? badgeMenu(page, 'u_fsm - traffic', b) : rowMenu(page, 'u_fsm - traffic')), TRAFFIC, b);
   for (const b of [null, 'Algebra', 'Schematic', 'VHDL']) assert.deepEqual(await (b ? badgeMenu(page, 'u_lamps - lamps', b) : rowMenu(page, 'u_lamps - lamps')), MODULE, b);
-  const PLAIN = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Verify Equivalence…', 'Verify Assertions…', ...TB,
+  const PLAIN = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Edit Symbol', 'Verify Equivalence…', 'Verify Assertions…', ...TB,
     'Convert to Schematic (editable)…', 'Convert to State Machine (ASM)…', 'Convert to State Diagram (FSM)…', 'Share Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…'];
   assert.deepEqual(await badgeMenu(page, 'u_timer - timer', 'VHDL'), PLAIN);
   assert.deepEqual(await badgeMenu(page, 'u_display - sevenseg', 'Verilog'), PLAIN);
@@ -289,7 +289,7 @@ uiTest('every source has its HDL (#207): a schematic without an HDL file gets it
   ]);
   // the block's commands: the HDL module's, none of the schematic's
   await page.treeRow('#hier', 'xlxi_1 - esq_d2_4e', { right: true });
-  assert.deepEqual(await menuLabels(page), ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Verify Equivalence…', 'Verify Assertions…', ...TB, 'Share Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…']);
+  assert.deepEqual(await menuLabels(page), ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Edit Symbol', 'Verify Equivalence…', 'Verify Assertions…', ...TB, 'Share Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…']);
   await page.closeMenus();
   // opened again: nothing more to generate, the same rows
   await page.openProject('teste');

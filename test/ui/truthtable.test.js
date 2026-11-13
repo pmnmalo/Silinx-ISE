@@ -322,7 +322,7 @@ uiTest('Algebra from Module: a vector adder read into a table (exhaustive simula
   // a module is made from a truth table, not a truth table from a module: the module's menu has none (#220)
   await page.treeRow('#hier', 'add1', { right: true });
   assert.deepEqual(await page.waitFor(() => { const m = [...document.querySelectorAll('body > .menu-popup .mi')].map((i) => i.textContent.trim()); return m.length ? m : null; }), [
-    'Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Verify Equivalence…', 'Verify Assertions…', ...TB,
+    'Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', 'Edit Symbol', 'Verify Equivalence…', 'Verify Assertions…', ...TB,
     'Convert to Schematic (editable)…', 'Convert to State Machine (ASM)…', 'Convert to State Diagram (FSM)…',
     'Share Module…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…',
   ]);

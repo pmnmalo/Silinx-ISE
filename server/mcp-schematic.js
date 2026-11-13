@@ -8,7 +8,7 @@ import { toolError, readProject, STR, PROJECT, projectText } from './mcp-util.js
 const IDS = what => ({ type: 'array', items: { type: 'string' }, description: what });
 
 // the schematic of the project (normalized as its editor opens it) and the project's modules (its symbols' pins)
-async function openSchematic(name, rel) {
+export async function openSchematic(name, rel) {
   await readProject(name);
   if (!/\.sch\.json$/i.test(rel)) throw toolError(`${rel}: not a schematic (.sch.json)`);
   const text = await projectText(name, rel, `no file '${rel}' in the project '${name}'`);
@@ -20,7 +20,7 @@ async function openSchematic(name, rel) {
   return { doc, modules };
 }
 // the schematic written (as its editor saves it) and its HDL file made again
-async function save(name, rel, doc) {
+export async function saveSchematic(name, rel, doc) {
   await P.writeFile(name, rel, JSON.stringify(doc, null, 1));
   const { syncDrawing } = await import('./drawing-sync.js');
   return syncDrawing(P, name, rel);
@@ -43,7 +43,7 @@ export const SCHEMATIC_TOOLS = [
       const only = some ? B.selectionWires(doc, { wires: wires || [], symbols: symbols || [], ports: markers || [] }, modules) : null;
       if (only && ![...only].some(id => doc.wires.some(w => w.id === id))) throw toolError('Rearrange Wires: no wire in the selection');
       const { changed } = B.beautifyWires(doc, { modules, ...(only ? { only } : {}) });
-      const sync = changed.length ? await save(name, rel, doc) : null;
+      const sync = changed.length ? await saveSchematic(name, rel, doc) : null;
       return { text: [B.wiresNote('Rearrange Wires', changed.length), ...(sync?.messages || [])].join('\n'),
         data: { project: name, path: rel, changed, stats: B.wireStats(doc, { modules }), ...hdlOf(sync) } };
     },
@@ -61,7 +61,7 @@ export const SCHEMATIC_TOOLS = [
       const elk = new ELK();
       const r = await S.beautifySheet(doc, { modules, layout: g => elk.layout(g) });
       const same = JSON.stringify(doc) === before;
-      const sync = same ? null : await save(name, rel, doc);
+      const sync = same ? null : await saveSchematic(name, rel, doc);
       return { text: [S.sheetNote(r, same), ...(sync?.messages || [])].join('\n'),
         data: { project: name, path: rel, laidOut: r.sheet && !same, changed: r.changed, ...hdlOf(sync) } };
     },

@@ -327,6 +327,8 @@ function moduleContextMenu(e, mod, file) {
     { label: 'Rename…', action: () => renameDialog(file, mod) },
     { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
+    // (its symbol in the schematics, the Symbol Editor's: its pins' order and sides, #3755)
+    { label: 'Edit Symbol', action: () => import('./symbol-doc.js').then(m => m.editSymbol(mod)) },
     // (its equivalence with a reference module, #3177: the Silinx interface's way to it, the ISE style's Processes too)
     { label: 'Verify Equivalence…', action: () => import('./verify.js').then(m => m.verifyProcess(mod)) },
     { label: 'Verify Assertions…', action: () => import('./verify.js').then(m => m.assertProcess(mod)) },
