@@ -21,7 +21,8 @@ import { primitiveSources } from '../core/unisim.js';
 import { spawn } from 'node:child_process';
 import { runCommand, JobCancelled } from './jobs.js';
 import { loadConfig, detectIse, iseStatus, iseModeOf, which } from './toolchain.js';
-import { validateDevice, findPart } from './devices.js';
+import { validateDevice, findPart, findBoard } from './devices.js';
+import { vendorFlash, vendorFlashText } from '../core/vendor-flash.js';
 import { parseBitHeader } from './programmer.js';
 import { within } from './paths.js';
 import { IDENT } from './ident.js';
@@ -177,16 +178,16 @@ export function generateXst({ top, device, impl = {}, includeDirs = [] }) {
  * Spartan-3 families (3/3A/3AN/3A DSP/3E); other families get a conservative set of options that
  * bitgen accepts on all of them (everything else keeps ISE's defaults).
  */
-export function generateUt({ impl = {}, family = 'spartan3e' } = {}) {
+export function generateUt({ impl = {}, family = 'spartan3e', binary = false } = {}) {
   const startup = /^cclk$/i.test(impl.startupClk || '') ? 'Cclk' : /^userclk$/i.test(impl.startupClk || '') ? 'UserClk' : 'JtagClk';
   if (!/^spartan3/.test(family || '')) {
-    return ['-w', '-g DebugBitstream:No', '-g Binary:no', '-g CRC:Enable', '-g UnusedPin:PullDown', '-g UserID:0xFFFFFFFF',
+    return ['-w', '-g DebugBitstream:No', `-g Binary:${binary ? 'yes' : 'no'}`, '-g CRC:Enable', '-g UnusedPin:PullDown', '-g UserID:0xFFFFFFFF',
       `-g StartUpClk:${startup}`, '-g DONE_cycle:4', '-g GTS_cycle:5', '-g GWE_cycle:6', '-g Security:None', ''].join('\n');
   }
   return [
     '-w',
     '-g DebugBitstream:No',
-    '-g Binary:no',
+    `-g Binary:${binary ? 'yes' : 'no'}`,
     '-g CRC:Enable',
     '-g ConfigRate:1',
     '-g ProgPin:PullUp',
@@ -484,7 +485,8 @@ export async function generateBuild(project, projectDir, { steps, sourcesOnly = 
     [`${top}.prj`]: generatePrj(sources),
     [`${top}.xst`]: generateXst({ top, device, impl: project.impl || {}, includeDirs: [...includeDirs].sort() }),
     [`${top}.ut`]: generateUt({ impl: project.impl || {}, family: deviceFamily(device) }),
-    [`${top}_prom.ut`]: generateUt({ impl: { ...(project.impl || {}), startupClk: 'Cclk' }, family: deviceFamily(device) }),
+    // (a board whose maker's tool writes its flash over its USB: the PROM bitstream as a .bin too, #3711)
+    [`${top}_prom.ut`]: generateUt({ impl: { ...(project.impl || {}), startupClk: 'Cclk' }, family: deviceFamily(device), binary: !!vendorFlash(findBoard(project.board), top) }),
     'run.sh': generateRunSh({ top, device, hasUcf, defaultSteps: STEPS, impl: project.impl || {} }),
   };
   for (const [name, text] of Object.entries(files)) await fs.writeFile(path.join(buildDir, name), text);
@@ -591,6 +593,9 @@ export async function runImplementation(job, { project, projectDir, steps, gener
     throw Object.assign(new Error(`ISE flow failed${result.failedStep ? ` in step '${result.failedStep}'` : ''} (exit code ${code})`), { result });
   }
   job.log(result.reports?.bit ? `Bitstream: ${result.reports.bit.path}` : 'Flow finished.');
+  // the board's flash tool and its .bin (#3711)
+  const board = findBoard(project.board), flash = vendorFlashText(board, gen.top);
+  if (flash && fss.existsSync(path.join(gen.buildDir, `${gen.top}_prom.bin`))) job.log(`Programming file: ${flash}`);
   return result;
 }
 

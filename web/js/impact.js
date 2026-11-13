@@ -10,6 +10,7 @@ import { pinsReady } from './pins-check.js';
 import { loadUcfText } from './processes.js';
 import { mountIce40Program } from './program-ice40.js';
 import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
+import { vendorFlashText } from '/core/vendor-flash.js';
 
 const roleOf = name => (/^xcf/i.test(name) ? 'prom' : /^(xc)?(3s|6s|4v|5v|6v|7[akvz])/i.test(name) ? 'fpga' : /^(xc)?(2c|95)/i.test(name) ? 'cpld' : 'other');
 
@@ -95,8 +96,10 @@ export function mountImpact(el) {
         + 'The Platform Flash (PROM) is programmed the same way: select it in the chain.';
       return;
     }
+    // (a board whose maker's tool writes its flash over its USB: that first, the way it is programmed, #3711)
+    const flash = vendorFlashText(board, pj?.top);
     help.textContent = board
-      ? `Board default programmer: ${p?.preferred} (falls back to an installed tool that uses the on-board USB).\n${Object.entries(p?.tools || {}).map(([k, v]) => `• ${k}: ${v.cable ? `cable ${v.cable}` : 'on-board USB'}${v.note ? ` — ${v.note}` : ''}${v.verified === false ? ' (unverified)' : ''}`).join('\n')}`
+      ? `${flash ? `${flash}\n` : ''}Board default programmer: ${p?.preferred} (falls back to an installed tool that uses the on-board USB).\n${Object.entries(p?.tools || {}).map(([k, v]) => `• ${k}: ${v.cable ? `cable ${v.cable}` : 'on-board USB'}${v.note ? ` — ${v.note}` : ''}${v.verified === false ? ' (unverified)' : ''}`).join('\n')}`
       : 'No board selected: choose the programming tool and cable explicitly.';
   };
 

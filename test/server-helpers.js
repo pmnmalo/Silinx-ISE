@@ -143,7 +143,10 @@ case "$tool" in
   map) cp "$F/top_map.mrp" top_map.mrp; : > top_map.ncd; : > top.pcf ;;
   par) cp "$F/top.par" top.par; : > top.ncd ;;
   trce) cp "$F/top.twr" top.twr ;;
-  bitgen) case "$last" in *.bit) out="$last" ;; *) out=top.bit ;; esac; cp "$F/top.bit" "$out" ;;
+  bitgen) case "$last" in *.bit) out="$last" ;; *) out=top.bit ;; esac; cp "$F/top.bit" "$out"
+    # (its option file asks for a binary, -g Binary:yes: the .bin beside it, #3711)
+    ut=""; prev=""; for a in "$@"; do [ "$prev" = "-f" ] && ut="$a"; prev="$a"; done
+    if [ -n "$ut" ] && grep -q "Binary:yes" "$ut"; then cp "$F/top.bit" "\${out%.bit}.bin"; fi ;;
   netgen) mkdir -p "$(dirname "$last")"; echo "-- fake netgen model" > "$last" ;;
   pin2ucf) echo 'NET "clk" LOC = "B8" ;' > "$last" ;;
   xpwr) cp "$F/top.pwr" top.pwr ;;
