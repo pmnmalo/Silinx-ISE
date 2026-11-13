@@ -14,7 +14,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity isqrt_top is
     Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
-              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
               SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
     Port ( clk : in  STD_LOGIC;                   -- the board's clock (CLK_HZ)
            sw  : in  STD_LOGIC_VECTOR (7 downto 0);
@@ -25,6 +25,12 @@ entity isqrt_top is
 end isqrt_top;
 
 architecture Behavioral of isqrt_top is
+    -- the timing in clock cycles: a generic given (the test bench's), else (0) from the board's clock
+    function or_else (given, derived : integer) return integer is
+    begin
+        if given /= 0 then return given; else return derived; end if;
+    end function;
+    constant REFRESH_N : integer := or_else(REFRESH, CLK_HZ / 1000);
     signal boot      : UNSIGNED (1 downto 0) := "00";            -- the reset, for 3 cycles at power-up
     signal rst       : STD_LOGIC;
     signal sw_meta   : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
@@ -74,6 +80,6 @@ begin
     digits <= decimal(root) & decimal(remainder);
 
     display: entity work.sevenseg
-        generic map ( REFRESH => REFRESH )
+        generic map ( REFRESH => REFRESH_N )
         port map ( clk => clk, digits => digits, points => "0100", seg => seg, dp => dp, an => an );
 end Behavioral;

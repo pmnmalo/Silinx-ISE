@@ -26,8 +26,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 entity top is
     Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
-              TICK    : integer := CLK_HZ;         -- clock cycles per second
-              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              TICK    : integer := 0;              -- clock cycles per second: 0 for CLK_HZ
+              REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
               BTN_LOW : boolean := false;          -- true: the board's buttons read '0' when pressed
               SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
     Port ( clk : in  STD_LOGIC;
@@ -40,6 +40,13 @@ entity top is
 end top;
 
 architecture Structural of top is
+    -- the timing in clock cycles: a generic given (the test bench's), else (0) from the board's clock
+    function or_else (given, derived : integer) return integer is
+    begin
+        if given /= 0 then return given; else return derived; end if;
+    end function;
+    constant TICK_N    : integer := or_else(TICK, CLK_HZ);
+    constant REFRESH_N : integer := or_else(REFRESH, CLK_HZ / 1000);
     component sevenseg
         generic ( REFRESH : integer );
         port ( clk    : in  std_logic;
@@ -86,7 +93,7 @@ begin
         port map ( clk => clk, rst => rst, req => req, done => done, night => night, phase => phase );
 
     u_timer : entity work.timer
-        generic map ( TICK => TICK )
+        generic map ( TICK => TICK_N )
         port map ( clk => clk, rst => rst, phase => phase, done => done, blink => blink, left => left );
 
     u_lamps : entity work.lamps
@@ -98,7 +105,7 @@ begin
     -- the seconds left on the right digit (F: blank); the other digits blank
     digits <= x"FFFF" when left = "0000" else x"FFF" & left;
     u_display : sevenseg
-        generic map ( REFRESH => REFRESH )
+        generic map ( REFRESH => REFRESH_N )
         port map ( clk => clk, digits => digits, points => "0000",
                    seg => seg, dp => dp, an => an );
 end Structural;

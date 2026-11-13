@@ -18,8 +18,8 @@ use work.program_pkg.ALL;
 
 entity micro80_top is
     Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
-              TICK    : integer := CLK_HZ / 8;     -- cycles per tick (1/8 s)
-              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              TICK    : integer := 0;              -- cycles per tick (1/8 s): 0 for CLK_HZ / 8
+              REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
               SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
     Port ( clk : in  STD_LOGIC;                   -- the board's clock (CLK_HZ)
            sw  : in  STD_LOGIC_VECTOR (7 downto 0);
@@ -30,6 +30,13 @@ entity micro80_top is
 end micro80_top;
 
 architecture Behavioral of micro80_top is
+    -- the timing in clock cycles: a generic given (the test bench's), else (0) from the board's clock
+    function or_else (given, derived : integer) return integer is
+    begin
+        if given /= 0 then return given; else return derived; end if;
+    end function;
+    constant TICK_N    : integer := or_else(TICK, CLK_HZ / 8);
+    constant REFRESH_N : integer := or_else(REFRESH, CLK_HZ / 1000);
     signal boot     : UNSIGNED (3 downto 0) := "0000";           -- the reset, for 15 cycles at power-up
     signal rst      : STD_LOGIC;
 
@@ -48,7 +55,7 @@ architecture Behavioral of micro80_top is
     signal sw_sync  : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
     signal digits   : STD_LOGIC_VECTOR (15 downto 0) := (others => '1');   -- blank until the program writes
     signal leds     : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
-    signal count    : integer range 0 to TICK - 1 := 0;
+    signal count    : integer range 0 to TICK_N - 1 := 0;
     signal flag     : STD_LOGIC := '0';
     -- the switches as '1' when on, whatever the board's level
     signal swOn  : STD_LOGIC_VECTOR (7 downto 0);
@@ -96,7 +103,7 @@ begin
                     when others => flag <= '0';
                 end case;
             end if;
-            if count = TICK - 1 then                  -- after the clearing: a tick is never lost
+            if count = TICK_N - 1 then                  -- after the clearing: a tick is never lost
                 count <= 0;
                 flag  <= '1';
             else
@@ -109,6 +116,6 @@ begin
     led     <= leds;
 
     display: entity work.sevenseg
-        generic map ( REFRESH => REFRESH )
+        generic map ( REFRESH => REFRESH_N )
         port map ( clk => clk, digits => digits, points => "0000", seg => seg, dp => dp, an => an );
 end Behavioral;
