@@ -194,8 +194,8 @@ export function setupToolbar() {
   tb.append(
     btn('newProject', 'New Project', () => wiz.newProjectWizard()),
     btn('open', 'Open Project', () => wiz.openProjectDialog()),
-    btn('share', 'Share Project', () => import('./share-how.js').then(m => m.shareDialog()), () => !!S.project),   // as File ▸ Share Project…: a copy or live (#3716)
     btn('closeProject', 'Close Project', () => closeProject(), () => !!S.project),   // as File ▸ Close Project (#2027)
+    btn('share', 'Share Project', () => import('./share-how.js').then(m => m.shareDialog()), () => !!S.project),   // as File ▸ Share Project…: a copy or live (#3716; after Close Project, #3719)
     btn('print', 'Print', () => printActive(), printable),   // as File ▸ Print… (#1251)
     h('div', { class: 'tb-sep' }),
     btn('undo', 'Undo', () => undoAny(), () => undoesProject() || !!docEditor(S.active)),   // as Edit ▸ Undo (enabled as it is, #1192)
