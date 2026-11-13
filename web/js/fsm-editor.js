@@ -273,7 +273,7 @@ export function mountFsmEditor(container, opts = {}) {
   });
 
   // ---------------------------------------------------------------------------- side panel (fsm-side.js)
-  const { renderSide } = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody, btn, stateById, transById,
+  const { renderSide } = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody, machineSection, btn, stateById, transById,
     encOf, commit, deleteSelection, readOnly, render, updateToolbar });
 
   // ---------------------------------------------------------------------------- problems (to onProblems: the console, #2737)
