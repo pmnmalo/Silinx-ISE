@@ -56,7 +56,7 @@ async function techNetlist(design) {
 test('instanceGenerics: the integer generics of an elaborated instance', () => {
   const ex = example('blinky');
   const design = elaborate(compile(ex.design), 'top', { generics: { DIV: 2, DEBOUNCE: 2, REFRESH: 4 } });
-  assert.deepEqual(instanceGenerics(design.top), { div: 2, debounce: 2, refresh: 4 });   // (VHDL: lower case)
+  assert.deepEqual(instanceGenerics(design.top), { clk_hz: 50000000, div: 2, debounce: 2, refresh: 4 });   // (VHDL: lower case)
   assert.deepEqual(instanceGenerics(design.top.children.find(c => c.name === 'u_pre')), { DIV: 2 });   // (Verilog)
   assert.deepEqual(instanceGenerics(design.top.children.find(c => c.name === 'u_knight')), {});
   assert.deepEqual(instanceGenerics(null), {});

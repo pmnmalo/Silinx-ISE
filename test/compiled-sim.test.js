@@ -909,7 +909,9 @@ test('#629 a gate-level model: its LUTs read without a helper, its constants fol
 test('#629 pong\'s Post-Synthesis Simulation Model: its run() split by itself (106 000 characters in one piece, never optimized), the same outputs as before', { timeout: 300000 }, async () => {
   const { runOpenFlow } = await import('../core/flow-ide.js');
   const ex = example('pong'), top = ex.project.top, written = {};
-  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', family: 'spartan3e', steps: ['postsynth'], simTop: ex.project.simTop },
+  // (the model of pong's own generics, its counters whole: the test bench's make them a few bits since they are sized by
+  // their counts, #3710, and the model too small to be split)
+  const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', family: 'spartan3e', steps: ['postsynth'] },
     { log: () => {}, sources: () => ex.design, simSources: () => ex.sim, yosys: yosysNode, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {} });
   assert.equal(r.ok, true);
   const file = `netgen/synthesis/${top}_synthesis.v`, model = designOf(src(file, written[file]), top);
