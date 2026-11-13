@@ -1712,7 +1712,7 @@ uiTest('#2288 browser edition: the nextpnr engine places and routes a design of 
   assert.doesNotMatch(log, /SILINX FAILED|Process failed|not available here/, log.slice(-3000));
   assert.doesNotMatch(log, /WARNING|ERROR/, log.slice(-3000));
   for (const re of [/Loading nextpnr and the chip database of xc6slx16csg324 \(WebAssembly, about 5 MB: once, then kept by this browser\)…/,
-    /nextpnr, seed 1: minimum period [\d.]+ ns\./, /Placed \d+ sites by nextpnr in /, /Routed \d+ nets \(\d+ PIPs\) by nextpnr/, /All signals are completely routed\./]) assert.match(log, re);
+    /nextpnr, seed 1: minimum period [\d.]+ ns\./, /Packed and placed \d+ sites by nextpnr in /, /Routed \d+ nets \(\d+ PIPs\) by nextpnr/, /All signals are completely routed\./]) assert.match(log, re);
   // its chip database and bundle from this version's assets, not the Spartan-3E's
   assert.ok(served.some((r) => /^assets\/vendor\/nextpnr-spartan6\/[\d.]+\/chipdb\/chipdb-xc6slx16\.bin\.gz$/.test(r)), served.filter((r) => /nextpnr/.test(r)).join('\n'));
   assert.ok(served.some((r) => /^assets\/vendor\/nextpnr-spartan6\/[\d.]+\/gen\/nextpnr-himbaechel-spartan6\.core\.wasm$/.test(r)), served.filter((r) => /nextpnr/.test(r)).join('\n'));

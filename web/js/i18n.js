@@ -189,7 +189,7 @@ const PT = {
   'Optimization:': 'Otimização:', 'Fast': 'Rápido',
   'Fast: one mapping and one placement, the quickest build. Area: the smallest circuit, the mappings for speed tried too. Speed: the fastest circuit, every mapping for speed and several placements tried. ISE gets Speed / Normal, Area / High and Speed / High.': 'Rápido: um mapeamento e uma colocação, a compilação mais rápida. Área: o circuito mais pequeno, experimentando também os mapeamentos para velocidade. Velocidade: o circuito mais rápido, experimentando todos os mapeamentos para velocidade e várias colocações. O ISE recebe Speed / Normal, Area / High e Speed / High.',
   'FPGA Start-Up Clock:': 'Relógio de Arranque da FPGA:', 'Speed': 'Velocidade', 'Area': 'Área', 'High': 'Alto', 'Normal': 'Normal',
-  'JTAG Clock': 'Relógio JTAG', 'User Clock': 'Relógio do Utilizador', 'Map (Spartan-6):': 'Mapear (Spartan-6):', 'nextpnr (on trial)': 'nextpnr (em ensaio)', 'Process Properties - Synthesis / Implementation / Bitstream': 'Propriedades do Processo - Síntese / Implementação / Bitstream',
+  'JTAG Clock': 'Relógio JTAG', 'User Clock': 'Relógio do Utilizador', 'Map (Spartan-6):': 'Mapear (Spartan-6):', 'Process Properties - Synthesis / Implementation / Bitstream': 'Propriedades do Processo - Síntese / Implementação / Bitstream',
   'Execution mode:': 'Modo de execução:', 'Local (Xilinx ISE installed locally)': 'Local (Xilinx ISE instalado localmente)',
   'Docker image with Xilinx ISE': 'Imagem Docker com Xilinx ISE', 'Remote host with Xilinx ISE via SSH': 'Máquina remota com Xilinx ISE por SSH',
   'ISE settings64.sh:': 'settings64.sh do ISE:', 'Docker image:': 'Imagem Docker:', 'Host:': 'Servidor:', 'User:': 'Utilizador:', 'Port:': 'Porto:',

@@ -1056,10 +1056,10 @@ uiTest('#2137 open mode: no place and route engine to choose; a project saved wi
   await page.waitFor(async () => !('engine' in (await (await fetch('/api/projects/OpenEngine')).json()).impl), [], { what: 'the engine dropped' });
 }, { timeout: 400000 });
 
-// #3138: a Spartan-6 project's Map in Process Properties, Silinx's by default or nextpnr's (on trial, until #3139):
-// with nextpnr's, nextpnr packs and places the design (no warning); the choice saved, in Portuguese too; a Spartan-3E
+// #3138: a Spartan-6 project's Map in Process Properties, nextpnr's by default since its parity (#3139, #3140) or Silinx's:
+// with nextpnr's, nextpnr packs and places the design (no warning); Silinx's saved, in Portuguese too; a Spartan-3E
 // project has no such field (the #2137 test above)
-uiTest('#3138 open mode: a Spartan-6 project\'s Map (Silinx or nextpnr) in Process Properties; nextpnr packs and places it; Portuguese', E, async (page) => {
+uiTest('#3138 #3140 open mode: a Spartan-6 project\'s Map (nextpnr, the default, or Silinx) in Process Properties; nextpnr packs and places it; Portuguese', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'OpenS6Map', template: 'blinky', board: 'nexys3' });
   await page.openProject('OpenS6Map');
@@ -1073,26 +1073,31 @@ uiTest('#3138 open mode: a Spartan-6 project\'s Map (Silinx or nextpnr) in Proce
     return page.eval(() => [...document.querySelectorAll('.dlg-overlay .form-grid > *')].map((e) => e.tagName === 'SELECT' ? `${[...e.options].map((o) => o.text).join('|')} = ${e.value}` : e.textContent.trim()).filter(Boolean));
   };
   const fields = await props();
-  assert.deepEqual(fields.slice(4, 6), ['Map (Spartan-6):', 'Silinx|nextpnr (on trial) = silinx'], fields.join('\n'));
+  assert.deepEqual(fields.slice(4, 6), ['Map (Spartan-6):', 'nextpnr|Silinx = nextpnr'], fields.join('\n'));
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('pt');
   try {
     const pt = await props('Implementar Projeto', 'Propriedades do Processo…');
-    assert.deepEqual(pt.slice(4, 6), ['Mapear (Spartan-6):', 'Silinx|nextpnr (em ensaio) = silinx'], pt.join('\n'));
+    assert.deepEqual(pt.slice(4, 6), ['Mapear (Spartan-6):', 'nextpnr|Silinx = nextpnr'], pt.join('\n'));
     await page.dialogButton('Cancelar');
     await page.waitNoDialog();
   } finally { await setLang('en'); }
-  // nextpnr's Map chosen and saved
-  await props();
-  await page.eval(() => { const s = document.querySelectorAll('.dlg-overlay select')[2]; s.value = 'nextpnr'; s.dispatchEvent(new Event('change', { bubbles: true })); });
-  await page.dialogButton('OK');
-  await page.waitNoDialog();
-  await page.waitFor(async () => (await (await fetch('/api/projects/OpenS6Map')).json()).impl.s6Map === 'nextpnr', [], { what: 'the Map saved' });
-  assert.deepEqual((await props()).slice(5, 6), ['Silinx|nextpnr (on trial) = nextpnr']);
+  // Silinx's Map chosen and saved, then nextpnr's again: the default, not saved
+  const choose = async (map) => {
+    await props();
+    await page.eval((m) => { const s = document.querySelectorAll('.dlg-overlay select')[2]; s.value = m; s.dispatchEvent(new Event('change', { bubbles: true })); }, map);
+    await page.dialogButton('OK');
+    await page.waitNoDialog();
+  };
+  await choose('silinx');
+  await page.waitFor(async () => (await (await fetch('/api/projects/OpenS6Map')).json()).impl.s6Map === 'silinx', [], { what: 'the Map saved' });
+  assert.deepEqual((await props()).slice(5, 6), ['nextpnr|Silinx = silinx']);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
+  await choose('nextpnr');
+  await page.waitFor(async () => !('s6Map' in (await (await fetch('/api/projects/OpenS6Map')).json()).impl), [], { what: 'the default Map saved' });
   const before = (await page.consoleText()).length;
   await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });
   await page.waitFor((b) => /Process "Implement Design" (completed successfully|failed)/.test(window.__console().slice(b)), [before], { what: 'Implement Design', timeout: 240000 });

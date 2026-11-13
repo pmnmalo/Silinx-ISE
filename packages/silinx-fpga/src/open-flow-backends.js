@@ -120,18 +120,19 @@ function mountS3e(base) {
   };
 }
 
-// the netlist's cells by name when nextpnr packs it (spec.s6Map 'nextpnr', #3138: fpga/s6/nextpnr-pack.js), so that
-// Silinx's Map, whose sites nextpnr's placement is read back by, names them as nextpnr's packer does
+// the netlist's cells by name when nextpnr packs it (#3138: fpga/s6/nextpnr-pack.js; the default since #3140, unless
+// spec.s6Map is 'silinx'), so that Silinx's Map, whose sites nextpnr's placement is read back by, names them as nextpnr's
+// packer does
 function sortedForNextpnr(base) {
-  if (base.spec.s6Map !== 'nextpnr') return base;
+  if (base.spec.s6Map === 'silinx') return base;
   let of = null, text = null, nl = null;
   const sorted = () => { const t = base.netlistText(); if (t !== of) { of = t; text = t == null ? t : sortedNetlistText(t); nl = t == null ? base.netlist() : readYosysJson(text); } };
   return { ...base, netlist: () => { sorted(); return nl; }, netlistText: () => { sorted(); return text; } };
 }
 
 // the Spartan-6's Map (#732: open-flow-s6.js) and nextpnr's Place & Route (#2138: open-flow-nextpnr-s6.js), the one
-// engine (#2824: Silinx's own router removed); Place & Route alone packs first, as Map would. With spec.s6Map 'nextpnr'
-// (#3138), nextpnr packs Yosys's netlist too, into the sites of Silinx's Map
+// engine (#2824: Silinx's own router removed); Place & Route alone packs first, as Map would. nextpnr packs Yosys's netlist
+// too, into the sites of Silinx's Map (#3138, the default since #3140); with spec.s6Map 'silinx' it places Silinx's sites
 function mountS6(b) {
   const base = sortedForNextpnr(b);
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
