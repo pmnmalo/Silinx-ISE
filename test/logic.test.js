@@ -961,15 +961,16 @@ test('NAND and NOR forms (#694): only NAND / NOR gates of at most 4 inputs, equa
   assert.deepEqual([formatExpr(f2.ast, 'slash'), f2.gates, f2.inverters], ['/(c + /(a + b))', 2, 0]);
   assert.equal(formatExpr(f2.ast, 'vhdl'), 'c nor (a nor b)');
   assert.equal(formatExpr(f2.ast, 'verilog'), '~(c | ~(a | b))');
-  // more than 4 inputs a gate: groups of ANDs (ORs) made of NANDs (NORs): a·b·c·d·e = /(/(/(/(a·b·c·d))·e))
+  // more than 4 inputs a gate: groups of ANDs (ORs) made of NANDs (NORs): a·b·c·d·e = /(/(/(/(a·b·c·d))·e)), every
+  // complement a NAND with its inputs tied, /(x·x) (#3785)
   const f5 = gateForm(minimize('0'.repeat(31) + '1', 5, { form: 'sop' }), V(5), 'nand');
-  assert.equal(formatExpr(f5.ast, 'slash'), '/(/(/(/(a.b.c.d)).e))');
+  assert.equal(formatExpr(f5.ast, 'slash'), '/(/(/(/(a.b.c.d)./(a.b.c.d)).e)./(/(/(a.b.c.d)./(a.b.c.d)).e))');
   // f = a and f = /a: two NANDs (an inverted rail and an inverter), one NAND
   assert.equal(formatExpr(gateForm(minimize('0011', 2, { form: 'sop' }), ['a', 'b'], 'nand').ast, 'vhdl'), '(a nand a) nand (a nand a)');
   assert.equal(formatExpr(gateForm(minimize('1100', 2, { form: 'pos' }), ['a', 'b'], 'nor').ast, 'vhdl'), 'a nor a');
   // analyzeOutput shows them (the editor's NAND and NOR forms)
   const a = analyzeOutput({ ...newTable('m', ['a', 'b', 'c'], ['f']), table: { f: '10101011' } }, 'f');
-  assert.deepEqual([formatExpr(a.nand.ast, 'slash'), formatExpr(a.nor.ast, 'slash')], ['/(c./(a.b))', '/(/(a + /c) + /(b + /c))']);
+  assert.deepEqual([formatExpr(a.nand.ast, 'slash'), formatExpr(a.nor.ast, 'slash')], ['/(c./(a.b))', '/(/(a + /(c + c)) + /(b + /(c + c)))']);
 });
 
 test('HDL of the NAND and NOR forms (#694): exact VHDL and Verilog, NAND / NOR operations only, no warnings, simulates to the table', () => {

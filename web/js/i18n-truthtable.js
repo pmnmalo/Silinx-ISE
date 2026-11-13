@@ -43,8 +43,8 @@ export const TT_PT = {
   'The search was cut short: a simpler XOR form may exist.': 'A procura foi interrompida: pode existir uma forma XOR mais simples.',
   // the NAND and NOR forms, the schematic of a table (#694)
   'NAND form': 'Forma NAND', 'NOR form': 'Forma NOR',
-  'The minimal SOP with NAND gates only (double negation); an inverter is a NAND of one input': 'A SdP mínima só com portas NAND (dupla negação); um inversor é uma NAND de uma entrada',
-  'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input': 'O PdS mínimo só com portas NOR (dupla negação); um inversor é uma NOR de uma entrada',
+  'The minimal SOP with NAND gates only (double negation); an inverter is a NAND with its inputs tied, /(a·a)': 'A SdP mínima só com portas NAND (dupla negação); um inversor é uma NAND com as entradas ligadas, /(a·a)',
+  'The minimal POS with NOR gates only (double negation); an inverter is a NOR with its inputs tied, /(a + a)': 'O PdS mínimo só com portas NOR (dupla negação); um inversor é uma NOR com as entradas ligadas, /(a + a)',
   'Generated from the Boolean algebra, in its HDL logic form': 'Gerado a partir da álgebra booleana, na sua forma da lógica do HDL',
   'Notation:': 'Notação:', 'Notation of the expressions': 'Notação das expressões', 'Canonical SOP': 'Forma canónica SdP', 'Canonical POS': 'Forma canónica PdS',
   'The sum of the minterms: every input in every term, the don\'t cares left out': 'A soma dos mintermos: todas as entradas em todos os termos, sem as indiferenças',
