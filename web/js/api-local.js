@@ -25,7 +25,7 @@ import { isTrusted, markUntrusted, untrustedMessage } from '../../core/trust.js'
 import { runBrowserFlow, browserOpenStatus } from './open-flow-browser.js';
 import { ADEPT_FILTERS, ADEPT_VENDOR, bitHeader } from '../../core/adept.js';
 import { programUsb, scanUsb } from '../../core/usb-program.js';
-import { adeptLink, runCapture, captureRecord } from '../../core/ila-link.js';
+import { adeptLink, runCapture, captureRecord, captureLinkError } from '../../core/ila-link.js';
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
 import { browserGit } from './git-browser.js';
@@ -408,6 +408,7 @@ export const api = {
   // inserts it), over the board's Adept USB; the capture kept as this session's build/capture.json
   capture: async (name, { spec, probes, top, clock, arm = true, timeoutS = 10 } = {}) => usbJob('capture', async log => {
     if (!spec) fail('the capture\'s settings do not fit the design: Logic Analyzer Settings');
+    if (captureLinkError(spec.family)) fail(captureLinkError(spec.family));
     const link = await adeptLink(await adeptDevice(), spec, { log });
     let cap;
     try { cap = await runCapture(link, spec, { arm, timeoutMs: timeoutS * 1000, log }); } finally { await link.close(); }

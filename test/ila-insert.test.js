@@ -158,11 +158,11 @@ for (const [dlang, design] of [['VHDL', VHDL], ['Verilog', VERILOG]]) {
 }
 
 // ------------------------------------------------------------------ the wrapper with its BSCAN
-test('the capture with its BSCAN checked (Check Syntax\'s design checks) and synthesized by the open flow (Spartan-3E, Spartan-6): the BSCAN, one block RAM, no warnings', async () => {
-  for (const [family, bscan, ram] of [['spartan3e', 'BSCAN_SPARTAN3', /^RAMB16_S9_S9$/], ['spartan6', 'BSCAN_SPARTAN6', /^RAMB(8|16)BWER$/]]) {
+test('the capture with its BSCAN checked (Check Syntax\'s design checks) and synthesized by the open flow (Spartan-3E, Spartan-6, 7-series: #3767): the BSCAN, one block RAM, no warnings', async () => {
+  for (const [family, bscan, ram] of [['spartan3e', 'BSCAN_SPARTAN3', /^RAMB16_S9_S9$/], ['spartan6', 'BSCAN_SPARTAN6', /^RAMB(8|16)BWER$/], ['artix7', 'BSCANE2', /^RAMB18E1$/]]) {
     for (const [dlang, design] of [['VHDL', VHDL], ['Verilog', VERILOG]]) {
       const c = captureSources(designOf(design), settings({ depth: 1024, pre: 100 }), { family });
-      assert.match(c.sources[1].text, new RegExp(`${bscan}${family === 'spartan6' ? ' #\\(\\.JTAG_CHAIN\\(1\\)\\)' : ''} silinx_bscan \\(`));
+      assert.match(c.sources[1].text, new RegExp(`${bscan}${family === 'spartan3e' ? '' : ' #\\(\\.JTAG_CHAIN\\(1\\)\\)'} silinx_bscan \\(`));
       const srcs = [...design, ...c.sources];
       const lib = compile([...primitiveSources(srcs), ...srcs]);
       const d = elaborate(lib, CAPTURE_TOP);

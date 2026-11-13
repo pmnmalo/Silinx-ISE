@@ -3,18 +3,19 @@
 // models (core/flow-models.js mountSimModels) as its io's hooks; an io's own hooks win.
 // spec.capture (the project's logic analyzer, silinx.json capture, #3176): the front end with the capture core and its
 // wrapper inserted (core/ila-insert.js captureFrontEnd), on the families whose open flow places a BSCAN (the Spartan-3E,
-// the Spartan-6: #3766);
+// the Spartan-6: #3766, the 7-series: #3767);
 // the report's `capture` (captureReport), what the Design Summary shows. The simulation models stay the design's own
 // (flow-models.js synthesizes the design again, without the capture). A capture on the board's clock (#3481): its port's
 // constraints (pin, period) added to the design's, unless the design has a port on that pin already (an error).
 import { runFlow } from '../packages/silinx-fpga/src/index.js';
 import { flowFrontEnd } from './synth-front.js';
 import { mountSimModels } from './flow-models.js';
-import { captureFrontEnd, captureClockText, boardClockUcf, boardClockText, bscanCell } from './ila-insert.js';
+import { captureFrontEnd, captureClockText, boardClockUcf, boardClockXdc, boardClockText, bscanCell } from './ila-insert.js';
 import { triggerText } from './ila.js';
 
-// the families whose open flow places and routes the BSCAN (nextpnr 1.5.0's Spartan-3E; nextpnr-spartan6 0.5.0's, #3766)
-const CAPTURE_OPEN_FAMILIES = ['spartan3e', 'spartan6'];
+// the families whose open flow places and routes the BSCAN (nextpnr 1.5.0's Spartan-3E; nextpnr-spartan6 0.5.1's, #3766;
+// nextpnr-xc7 0.1.2's 7-series, #3767)
+const CAPTURE_OPEN_FAMILIES = ['spartan3e', 'spartan6', 'artix7'];
 const FAMILY_NAMES = { spartan3e: 'Spartan-3E', spartan6: 'Spartan-6', artix7: '7-series' };
 
 /** A capture inserted (captureSources's result) as the report has it: the probes, the shape, the trigger, the blocks. */
@@ -31,12 +32,19 @@ function captureReport(c) {
 /**
  * The constraints of a capture on the board's clock (#3481): the design's (ucf, its text or null) with the clock port's
  * pin and period added: { ucf, error } (an error when a port of the design is on that pin already: it is the clock to
- * choose). A capture on a signal of the design: the design's constraints as they are.
+ * choose). A capture on a signal of the design: the design's constraints as they are. xdc: the constraints are XDC (the
+ * 7-series', #3767).
  */
-export function captureUcf(capture, ucf) {
+export function captureUcf(capture, ucf, { xdc = false } = {}) {
   const bc = capture?.boardClock;
   if (!bc) return { ucf, error: null };
-  const taken = new RegExp(`^\\s*NET\\s+"?([^"\\s;]+)"?\\s+LOC\\s*=\\s*"?${bc.pin.replace(/[^A-Za-z0-9]/g, '')}"?\\s*[;|]`, 'im').exec(ucf || '');
+  const pin = bc.pin.replace(/[^A-Za-z0-9]/g, '');
+  if (xdc) {
+    const on = new RegExp(`PACKAGE_PIN\\s+${pin}\\b[^\\n]*\\[get_ports\\s+\\{?([^}\\s\\]]+)`, 'i').exec(ucf || '');
+    if (on) return { ucf, error: `capture: ${boardClockText(bc)} is the design's port ${on[1]} already: choose ${on[1]} as the capture's clock (Logic Analyzer Settings, capture_settings)` };
+    return { ucf: `${ucf ? `${ucf.replace(/\s*$/, '')}\n\n` : ''}${boardClockXdc(bc)}\n`, error: null };
+  }
+  const taken = new RegExp(`^\\s*NET\\s+"?([^"\\s;]+)"?\\s+LOC\\s*=\\s*"?${pin}"?\\s*[;|]`, 'im').exec(ucf || '');
   if (taken) return { ucf, error: `capture: ${boardClockText(bc)} is the design's port ${taken[1]} already: choose ${taken[1]} as the capture's clock (Logic Analyzer Settings, capture_settings)` };
   return { ucf: `${ucf ? `${ucf.replace(/\s*$/, '')}\n\n` : ''}${boardClockUcf(bc, { iostandard: /\bIOSTANDARD\b/i.test(ucf || '') })}\n`, error: null };
 }
@@ -46,11 +54,11 @@ export async function runOpenFlow(spec, io) {
   const family = spec.family || 'spartan3e';
   let capture = null;
   const inserted = captureFrontEnd(flowFrontEnd, spec.capture, { family });
-  const cu = captureUcf(spec.capture, io.ucf);
+  const cu = captureUcf(spec.capture, io.ucf, { xdc: family === 'artix7' });
   if (cu.ucf !== io.ucf) io = { ...io, ucf: cu.ucf };
   const frontEnd = (srcs, top, opts) => {
     if (!CAPTURE_OPEN_FAMILIES.includes(family)) {
-      const on = CAPTURE_OPEN_FAMILIES.map(f => FAMILY_NAMES[f]).join(' and the ');
+      const names = CAPTURE_OPEN_FAMILIES.map(f => FAMILY_NAMES[f]), on = `${names.slice(0, -1).join(', the ')} and the ${names.at(-1)}`;
       return { errors: [`capture: the Silinx toolchain inserts the logic analyzer on the ${on} only (not yet the ${FAMILY_NAMES[family] || family}); clear the capture (capture_settings) to implement the design`], input: () => null };
     }
     if (cu.error) return { errors: [cu.error], input: () => null };

@@ -15,12 +15,19 @@
 //     cap: readCapture's { samples, probes, trigger, status, errors } and polls (the status scans the trigger took)
 //   const link = await adeptLink(usb, spec, { log });  …  await link.close();
 //   captureRecord({ top, clock, spec, probes, cap })   the capture as build/capture.json has it
+//   captureLinkError(family)   why a capture cannot be read on a board of the family yet, or null
 import { CAPTURE_CMD, scanWord, readStatus, readoutCommands, readCapture } from './ila-capture.js';
 import { planCapture } from './ila.js';
 import { Adept, Djtg, Chain, JtagSeq } from './adept.js';
 
 // the Spartan-3E's USER1 instruction (6 bits, BSCAN_SPARTAN3's DRCK1 / SEL1: UG332), the core's register
 export const USER1 = 0x02;
+
+// the families whose boards the links read (the Spartan-3E's Digilent Adept boards; the others' links: #3773)
+const LINK_FAMILIES = ['spartan3e'];
+/** Why a capture cannot be read on a board of the family (a capture's spec.family) yet, or null. */
+export const captureLinkError = family => (LINK_FAMILIES.includes(family || 'spartan3e') ? null
+  : 'reading a capture on the board: the Spartan-3E\'s boards only yet (Basys2, Nexys2: their Digilent Adept USB); the others\' JTAG links are to come (#3773)');
 
 const bitsOf = (spec, w) => `${readStatus(spec, w).width} bit(s) x ${readStatus(spec, w).depth} samples`;
 const fail = msg => { throw new Error(msg); };

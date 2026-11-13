@@ -75,11 +75,12 @@ async function captureSpecOf(name, pj) {
  * save it (build/capture.json). link: one given (the tests'), else boardLink's. Returns { capture, file, spec, probes }.
  */
 export async function captureProject(name, { arm = true, timeoutMs = 10000, device = 0, log = () => {}, link = null } = {}) {
-  const { runCapture, captureRecord } = await import('../core/ila-link.js');
+  const { runCapture, captureRecord, captureLinkError } = await import('../core/ila-link.js');
   const { captureClockText } = await import('../core/ila-insert.js');
   const pj = await P.readProject(name);
   const { spec, probes } = await captureSpecOf(name, pj);
   const own = !link;
+  if (own && captureLinkError(spec.family)) throw new Error(captureLinkError(spec.family));
   link ||= await boardLink(spec, { device });
   let cap;
   try { cap = await runCapture(link, spec, { arm, timeoutMs, log }); } finally { if (own) await link.close(); }

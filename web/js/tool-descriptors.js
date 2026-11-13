@@ -233,7 +233,8 @@ export const SILINX_XC7 = {
   constraints: XDC,
   messages: LOG_MESSAGES,
   program: { process: 'config', page: 'impact', title: 'iMPACT', target: 'jtag', file: '{top}.bit' },
-  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
+  // (the logic analyzer: Implement inserts its core with a BSCANE2, #3767)
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech'], SILINX_CHANGE),
   tasks: LAB_TASKS,
 };
 

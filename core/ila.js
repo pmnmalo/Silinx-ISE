@@ -85,7 +85,7 @@ export function planCapture(spec) {
   if (identError(spec.name, spec.lang)) errors.push(`The module's name: ${identError(spec.name, spec.lang)}.`);
   else if (PORTS.includes(String(spec.name).toLowerCase())) errors.push(`The module's name '${spec.name}' is one of its ports'.`);
   const mem = w => planMemory({ family: spec.family, kind: 'ram', ports: 'dual', width: w, depth: D, style: 'inferred' });
-  let memory = errors.length || !['spartan3e', 'spartan6'].includes(spec.family) ? null : mem(width);
+  let memory = errors.length ? null : spec.family === 'artix7' ? xc7Memory(width, D) : !['spartan3e', 'spartan6'].includes(spec.family) ? null : mem(width);
   // (the Spartan-3E: the memory in arrays no wider than the data bits of the widest block that holds the depth, so that no
   // probe bit is a parity bit only the write port has: ISE's DRC warns of a port writing parity bits it does not read,
   // PhysDesignRules:1060; the packer's parityToData moves such a bit to a free data bit, none left when the probes fill
@@ -99,6 +99,19 @@ export function planCapture(spec) {
     memory = { ...memory, cols: null, rows: null, blocks: parts.reduce((n, m) => n + m.blocks, 0), halves: parts.reduce((n, m) => n + m.halves, 0), parts };
   }
   return { width, regBits: Math.max(width, STATUS_BITS), addrBits: errors.length ? 0 : log2(D), slices, memory, chunks, errors };
+}
+
+// the edge the samples are written on (see above)
+const fallingWrite = spec => spec.family === 'artix7';
+
+// the 7-series' sample memory (#3767), synthesis's to infer: its 18 Kbit blocks (RAMB18E1; a RAMB36E1 is two), the
+// fewest of a shape that holds the depth (512 x 36 as a simple dual port, 1K x 18 … 16K x 1), or distributed RAM when
+// that costs less by Yosys's memory_libmap (a block 129, a RAM64M of 3 bits x 64 words 8: lutrams_xc5v.txt, brams_xc4v.txt)
+const XC7_SHAPES = [[36, 512], [18, 1024], [9, 2048], [4, 4096], [2, 8192], [1, 16384]];
+function xc7Memory(width, depth) {
+  const blocks = Math.min(...XC7_SHAPES.map(([w, d]) => Math.ceil(width / w) * Math.ceil(depth / d)));
+  if (8 * Math.ceil(width / 3) * Math.ceil(depth / 64) < 129 * blocks) return { family: 'artix7', primName: 'distributed RAM', blocks: 0, halves: 0 };
+  return { family: 'artix7', primName: 'RAMB18E1', blocks, halves: blocks };
 }
 
 // the sample memory's arrays: [name, lo, hi] (one, mem, for the whole word; mem0, mem1… for the chunks of planCapture)
@@ -184,7 +197,7 @@ function vhdlOf(spec, plan) {
     'begin',
     `  we <= '0' when state = ${st(IDLE)} else '1';`,
     t ? `  trig <= '1' when ${t} else '0';` : "  trig <= '1';",
-    '  process (clk)', '  begin', '    if rising_edge(clk) then',
+    '  process (clk)', '  begin', `    if ${fallingWrite(spec) ? 'falling' : 'rising'}_edge(clk) then`,
     ...mems.map(([n, lo, hi]) => `      if we = '1' then ${n}(to_integer(wptr)) <= ${whole ? 'probe' : `probe(${hi} downto ${lo})`}; end if;`), '    end if;', '  end process;', '',
     '  process (clk)', '  begin', '    if rising_edge(clk) then',
     '      arm_s <= arm_s(1 downto 0) & arm_t;',
@@ -262,7 +275,7 @@ function verilogOf(spec, plan) {
     "  reg arm_t = 1'b0;",
     "  reg [1:0] ack_s = 2'd0, armed_s = 2'd0, trig_s = 2'd0, done_s = 2'd0;",
     `  wire [${R - 1}:0] status = ${status};`, '',
-    ...mems.map(([n, lo, hi]) => `  always @(posedge clk) if (we) ${n}[wptr] <= ${whole ? 'probe' : `probe[${hi}:${lo}]`};`), '',
+    ...mems.map(([n, lo, hi]) => `  always @(${fallingWrite(spec) ? 'negedge' : 'posedge'} clk) if (we) ${n}[wptr] <= ${whole ? 'probe' : `probe[${hi}:${lo}]`};`), '',
     '  always @(posedge clk) begin',
     '    arm_s <= {arm_s[1:0], arm_t};',
     ...(prev ? ['    prev <= probe;'] : []),

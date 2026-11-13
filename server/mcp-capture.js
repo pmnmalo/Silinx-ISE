@@ -22,7 +22,10 @@ async function designOf(name, pj) {
   const { resourceCount } = await import('../packages/silinx-fpga/src/parts.js');
   const part = findPart(pj.device?.part);
   const family = part?.family || 'spartan3e';
-  const total = part ? resourceCount(part, family === 'spartan6' ? 'ramb8bwer' : 'ramb16') : null;
+  // (the family's block RAM, as the interface counts it: RAMB16s, the Spartan-6's halves; none counted on the 7-series)
+  const { familyProfile } = await import('../core/family-profile.js');
+  const ram = familyProfile(family).blockRam;
+  const total = part && ram ? resourceCount(part, ram.resource) : null;
   return { design, family, total };
 }
 
