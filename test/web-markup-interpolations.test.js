@@ -42,7 +42,9 @@ const NUMERIC_ATTRS = new Set(['x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r'
 const NUMERIC_FNS = /^(?:Math\.\w+|Number|parseInt|parseFloat|mm|r1|snap|textW|DIG_X)$/;
 
 // ---- the safe shapes of an expression, in any context
-const BOARD = 'text|ic|microUsb|hdmiTop|audio|pmodTop|pmod12Top|dsub|dsubLeft|header6|header12|tact|modules|holes|wire';
+// (and the boards drawn as the real ones, #3706 / #3745: pmodSide, unit, expTop, pins, header40, of numbers and a name
+// put through text, #3728)
+const BOARD = 'text|ic|microUsb|hdmiTop|audio|pmodTop|pmod12Top|dsub|dsubLeft|header6|header12|tact|modules|holes|wire|pmodSide|unit|expTop|pins|header40';
 const SAFE = [
   // escaped: esc(…) around the whole expression, or every item of a list escaped
   [/^esc\(.*\)$/s, 'esc'],
@@ -100,7 +102,8 @@ function numericShape(e) {
   if (t.kind === 'ternary') return numericShape(t.yes) && numericShape(t.no);
   // the parenthesized parts, innermost first, each a number
   for (let prev = ''; prev !== e; e = e.replace(/\(([^()]*)\)/g, (m, inner) => (numericShape(inner) ? '0' : m))) prev = e;
-  return /^[\w.?[\]\s+\-*/%,]*$/.test(e.replace(/\.\.\./g, ''));
+  // (a shift, i >> 1, is a number too, #3728)
+  return /^[\w.?[\]\s+\-*/%,]*$/.test(e.replace(/\.\.\./g, '').replace(/>>>?|<</g, '+'));
 }
 
 // the top-level structure of an expression: `c ? a : b`, `a || b`, `(a)`; strings, templates and brackets skipped
@@ -167,6 +170,9 @@ test('#1443 the scanner: the context of an interpolation and the shapes it accep
   ok('ICON[icon]'); ok("text(455, 308, (board.device?.part || 'X').toUpperCase(), { size: 8 })"); ok("segs.map((s, i) => text(580, 383 + i * 8, s)).join('')");
   ok("[N, S, WEST, EAST].map(tact).join('')"); ok("Array.from({ length: 8 }, (_, i) => text(i, 0, `LD${7 - i}`)).join('')");
   ok("[[a + 1, b], [c, d]].map(([x, y]) => `<circle cx=\"${x}\" cy=\"${y}\"/>`).join('')"); ok('DIG_X(1) + 33', 'attr:cx');
+  // #3728: the boards drawn as the real ones (#3706, #3745): their connectors' helpers, a shift in a coordinate
+  ok("pmodSide(false, 140, 'JA')"); ok('unit(4)'); ok("expTop(76, 344, 'A1')"); ok('pins(140, 406, 1, 2)'); ok("header40(364, 228, 'J2')");
+  ok('86 + (i >> 1) * 23', 'attr:x'); ok('x + 4 + (i >> 1) * 9.8', 'attr:x'); bad('i >> 1'); bad('a > b', 'attr:x'); bad('pinsOf(x)');
   bad('ICON[f(x)]'); bad('icon[name]'); bad("segs.map((s) => s.name).join('')"); bad("segs.map((s) => f(s)).join('')"); bad('DIG_X(1) + 33'); bad('textOf(x)');
   // an injection the context rule would miss if it read the attribute wrong
   assert.equal(contextOf('<circle class="asm-port" data-port="'), 'attr:data-port');
