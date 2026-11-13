@@ -195,7 +195,8 @@ test('workflows: the weekly comparison\'s results pushed from GitHub\'s runner, 
   assert.match(publish, /git push -q -f origin HEAD:refs\/heads\/quality-results/);
   // the artifact the compare job uploads holds the files the publish job commits
   const compare = j.compare.join('\n');
-  assert.match(compare, /- if: always\(\)\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: quality-results\n\s+path: \|\n\s+test\/designs-corpus\/ise-comparison\.json\n\s+docs\/QUALITY\.md/);
+  // (each part of the comparison that compared replaces it, #3297)
+  assert.match(compare, /- if: always\(\) && steps\.what\.outputs\.skip != 'true'\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: quality-results\n\s+overwrite: true\n\s+path: \|\n\s+test\/designs-corpus\/ise-comparison\.json\n\s+docs\/QUALITY\.md/);
   for (const f of ['test/designs-corpus/ise-comparison.json', 'docs/QUALITY.md']) assert.match(publish, new RegExp(`git add .*${f.replace(/[./]/g, '\\$&')}`), f);
   assert.match(compare, /compare-ise\.mjs .* --guard/);
   // #2498: the comparison passed 15 hours (14h13m on 2026-10-25)
