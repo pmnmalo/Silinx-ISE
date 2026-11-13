@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { compile, elaborate, simulate } from '../core/compile.js';
 import { designChecks } from '../core/lint.js';
 import { synthesisInput } from '../core/synth-front.js';
@@ -18,7 +19,7 @@ import { simulateC } from '../core/c-interp.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
 
-const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function checkSyntax(files, top) {
   const lib = compile(files);
