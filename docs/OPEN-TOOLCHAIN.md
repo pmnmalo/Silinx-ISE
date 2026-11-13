@@ -26,7 +26,7 @@ or to get around any protection.
 |---|---|---|
 | VHDL / Verilog front end | Silinx (AGPL-3.0): the elaborated design as one flat module | written for Silinx |
 | Synthesis | Yosys `synth_xilinx -family xc3se` (ISC), compiled to WebAssembly by YoWASP: it runs in the browser | independent open-source projects |
-| Pack, place and route | nextpnr-himbaechel, the fork pmnmalo/nextpnr-spartan (`@silinx/nextpnr-himbaechel-spartan3e` / `-spartan6`, ISC), compiled to WebAssembly; on the Spartan-6, Silinx's packer (AGPL-3.0) first | an independent open-source project, its Spartan micro-architectures written for Silinx |
+| Pack, place and route | nextpnr-himbaechel, the fork pmnmalo/nextpnr-spartan (`@silinx/nextpnr-himbaechel-spartan3e` / `-spartan6`, ISC), compiled to WebAssembly; on the Spartan-6, nextpnr packs into the sites of Silinx's packer (AGPL-3.0), which writes their settings | an independent open-source project, its Spartan micro-architectures written for Silinx |
 | Bitstream | Silinx (AGPL-3.0), from the bit database below | written for Silinx |
 | Device description (the chip's wires and routing switches) | The Spartan-3E boards' devices (XC3S100E-CP132, XC3S250E-CP132, XC3S500E-FG320, XC3S1200E-FG320) and the Spartan-6 boards' (XC6SLX16-CSG324, XC6SLX45-CSG324): shipped with Silinx (`packages/silinx-fpga/devices/`). Other devices: each user builds it once from their own ISE | computed by Silinx from the output of ISE's documented `xdl -report` command |
 

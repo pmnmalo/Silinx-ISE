@@ -9,8 +9,8 @@
 //
 //   SILINX_ISE_TESTS=1 SILINX_ISE_HOST=user@host node --test test/ise/examples.test.js
 //   SILINX_ISE_HOST=local: the image on this machine (the self-hosted runner, .github/workflows/ise.yml)
-//   SILINX_S6_MAP=nextpnr: the Spartan-6's open flow with nextpnr's Map (#3139), e.g. its checks alone:
-//     --test-name-pattern="for the (nexys3|atlys) with nextpnr's Map"
+//   SILINX_S6_MAP=silinx: the Spartan-6's open flow with Silinx's Map (nextpnr's the default since #3140), e.g. its checks
+//     alone: --test-name-pattern="for the (nexys3|atlys) with Silinx's Map"
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -63,10 +63,10 @@ before(() => {
 const iseWarnings = lines => [...new Set(lines.filter(l => /^WARNING:(Xst|Pack|Map|Par|Place|Route|Timing|PhysDesignRules|LIT|NgdBuild|ConstraintSystem)/.test(l))
   .map(l => l.replace(/\s+/g, ' ').trim()))].sort();
 
-// the Spartan-6's Map in the open flow's checks: Silinx's, or with SILINX_S6_MAP=nextpnr nextpnr's packer (#3139: its
-// parity, checked by hand until it is the default, #3140)
-const S6_MAP = process.env.SILINX_S6_MAP === 'nextpnr' ? 'nextpnr' : null;
-const s6MapName = S6_MAP ? ' with nextpnr\'s Map' : '';
+// the Spartan-6's Map in the open flow's checks: nextpnr's packer (the default since its parity, #3139, #3140), or with
+// SILINX_S6_MAP=silinx Silinx's
+const S6_MAP = process.env.SILINX_S6_MAP === 'silinx' ? 'silinx' : null;
+const s6MapName = S6_MAP ? ' with Silinx\'s Map' : '';
 
 // the routed design's check against ISE, on every board (the Spartan-6's, #732, too)
 const checkOpenFlow = (name, t) => {

@@ -505,10 +505,10 @@ export async function implProperties() {
   const { synthGoal, GOAL_IMPL } = await import('/packages/silinx-fpga/src/index.js');
   const opt = select([['fast', 'Fast'], ['area', 'Area'], ['speed', 'Speed']], synthGoal(pj.impl));
   const clk = select([['JtagClk', 'JTAG Clock'], ['CCLK', 'CCLK'], ['UserClk', 'User Clock']], pj.impl.startupClk || 'JtagClk');
-  // a Spartan-6's Map (#3138): Silinx's, or nextpnr's packer, on trial until its parity (#3139)
+  // a Spartan-6's Map (#3138): nextpnr's packer, the default since its parity (#3139, #3140), or Silinx's
   const { deviceFamily, s6MapOf } = await import('/packages/silinx-fpga/src/parts.js');
   const { familyProfile } = await import('/core/family-profile.js');
-  const map = familyProfile(deviceFamily(pj.device)).mapChoice ? select([['silinx', 'Silinx'], ['nextpnr', 'nextpnr (on trial)']], s6MapOf(pj.impl)) : null;
+  const map = familyProfile(deviceFamily(pj.device)).mapChoice ? select([['nextpnr', 'nextpnr'], ['silinx', 'Silinx']], s6MapOf(pj.impl)) : null;
   const r = await dialog({
     title: 'Process Properties - Synthesis / Implementation / Bitstream', width: 520,
     body: h('div', { class: 'form-grid' },
@@ -525,7 +525,7 @@ export async function implProperties() {
   if (pj?.name !== pj0.name) return;
   // (a place and route engine saved by an earlier version, #2136: nextpnr, the one engine since #2137)
   const { engine, s6Map, ...impl } = pj.impl;
-  pj.impl = { ...impl, ...GOAL_IMPL[opt.value], startupClk: clk.value, ...((map ? map.value : s6Map) === 'nextpnr' ? { s6Map: 'nextpnr' } : {}) };
+  pj.impl = { ...impl, ...GOAL_IMPL[opt.value], startupClk: clk.value, ...((map ? map.value : s6Map) === 'silinx' ? { s6Map: 'silinx' } : {}) };
   await app.saveProjectJson();
 }
 

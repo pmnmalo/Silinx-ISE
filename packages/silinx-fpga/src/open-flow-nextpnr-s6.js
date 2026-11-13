@@ -48,9 +48,10 @@ export function mountNextpnrS6(ctx) {
     if (!io.nextpnr?.spartan6) throw new StepError('the nextpnr engine is not available here (io.nextpnr)');
     const t = now();
     const db = await loadChipdb(io.nextpnr.spartan6, part, log, StepError);
-    // nextpnr's Map (#3138): it packs Yosys's netlist into the sites of Silinx's Map and places them, its pads and clocks by
-    // its own rules (#3135, #3136); else it places the sites of Silinx's Map, the pads and global buffers fixed by Silinx's
-    const byPacker = spec.s6Map === 'nextpnr';
+    // nextpnr's Map (#3138, the default since #3140): it packs Yosys's netlist into the sites of Silinx's Map and places
+    // them, its pads and clocks by its own rules (#3135, #3136); with spec.s6Map 'silinx' it places the sites of Silinx's
+    // Map, the pads and global buffers fixed by Silinx's
+    const byPacker = spec.s6Map !== 'silinx';
     // the pads and the global buffers, by Silinx's rules (the banks' VCCO, a clock pad's dedicated path); the block RAMs
     // and DSP48A1s by nextpnr (#3137), or with hardByNextpnr false from Silinx's timing-driven placement, a DSP48A1
     // cascade with them (nextpnr 0.1's analytical placer left them columns apart: the stopwatch on the Atlys missed its

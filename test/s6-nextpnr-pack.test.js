@@ -67,10 +67,10 @@ test('samePacking: [] when the fork\'s sites are Silinx\'s Map\'s (an IOB of eit
   assert.deepEqual(samePacking(json({}), { insts: [] }), []);
 });
 
-test('s6MapOf: Silinx\'s Map unless the project chose nextpnr\'s', () => {
-  assert.equal(s6MapOf(undefined), 'silinx');
-  assert.equal(s6MapOf({}), 'silinx');
+test('s6MapOf: nextpnr\'s Map (the default since #3140) unless the project chose Silinx\'s', () => {
+  assert.equal(s6MapOf(undefined), 'nextpnr');
+  assert.equal(s6MapOf({}), 'nextpnr');
   assert.equal(s6MapOf({ s6Map: 'silinx' }), 'silinx');
   assert.equal(s6MapOf({ s6Map: 'nextpnr' }), 'nextpnr');
-  assert.equal(s6MapOf({ s6Map: 'NEXTPNR' }), 'silinx');
+  assert.equal(s6MapOf({ s6Map: 'SILINX' }), 'nextpnr');
 });

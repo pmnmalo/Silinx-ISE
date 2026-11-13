@@ -971,6 +971,9 @@ SILINX_ISE_REMOTE_DIR="$(node -p "require(os.homedir() + '/.silinx/config.json')
 node --test --test-name-pattern="for the (nexys3|atlys) with nextpnr's Map" test/ise/examples.test.js
 ```
 
+Since #3140 nextpnr's Map is the default: the ISE tests check it with no variable, and `SILINX_S6_MAP=silinx` gives
+Silinx's Map instead (its checks alone: `--test-name-pattern="for the (nexys3|atlys) with Silinx's Map"`).
+
 ## Trying the parts that exist
 
 The Spartan-6 parts of the flow are behind a developer flag (#722): with `SILINX_SPARTAN6_OPEN=1` in the server's

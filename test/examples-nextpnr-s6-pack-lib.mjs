@@ -53,8 +53,8 @@ export function packTests(t) {
     test(`#3138 #3139 example ${example} on ${targetName(t)} with nextpnr's Map: packed as Silinx's Map, routed on every seed, its bitstream, no warning; its size Silinx's Map's, its period within ${Math.round((PERIOD_NOISE - 1) * 100)} %`, { timeout: 900000 }, async (ctx) => {
       const { dir, project } = exampleProject(example, t, tmp);
       try {
-        // Silinx's Map first, then nextpnr's on the same synthesis
-        const ours = await flow(dir, project, ['synth', 'translate', 'map', 'par']);
+        // Silinx's Map first (impl.s6Map 'silinx': nextpnr's is the default since #3140), then nextpnr's on the same synthesis
+        const ours = await flow(dir, { ...project, impl: { ...project.impl, s6Map: 'silinx' } }, ['synth', 'translate', 'map', 'par']);
         assert.equal(ours.status, 'ok', linesOf(ours).filter(l => /ERROR/.test(l)).join('\n'));
         const silinx = figures(linesOf(ours));
         const job = await flow(dir, { ...project, impl: { ...project.impl, s6Map: 'nextpnr' } }, ['translate', 'map', 'par', 'trce', 'bitgen'], true);

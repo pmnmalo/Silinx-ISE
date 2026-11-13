@@ -213,9 +213,9 @@ test('Place & Route with no Map step: the design packed first, placed and routed
   assert.ok(checkRoutingS6(parseXdl(files['open/routed.xdl']), dv).ok);
 });
 
-// (#3137) who places the block RAMs and DSP48A1s: nextpnr (S6_HARD_BY_NEXTPNR, since its spartan6 0.2.0), or Silinx
-// with spec.hardByNextpnr false (their sites fixed for nextpnr, attribute BEL); the pads and global buffers are
-// Silinx's either way
+// (#3137) who places the block RAMs and DSP48A1s with Silinx's Map (spec.s6Map 'silinx'; nextpnr's packer places them all,
+// the default since #3140): nextpnr (S6_HARD_BY_NEXTPNR, since its spartan6 0.2.0), or Silinx with spec.hardByNextpnr
+// false (their sites fixed for nextpnr, attribute BEL); the pads and global buffers are Silinx's either way
 const RAM_MUL = `module top(input clk, input we, output reg [3:0] led);
   reg [7:0] mem [0:1023];
   reg [9:0] a = 0; reg [17:0] x = 0, y = 0; reg [7:0] q; reg [35:0] p;
@@ -239,7 +239,7 @@ for (const option of [undefined, false]) {
     };
     assert.equal(S6_HARD_BY_NEXTPNR, true);
     const r = await runFlow({ top: 'top', part, device: 'xc6slx16', pkg: 'csg324', family: 'spartan6', steps: ['synth', 'translate', 'map', 'par'], seed: 1, effort: 1,
-      synthEffort: 'normal', startupClk: 'JtagClk', hardByNextpnr: option }, io);
+      synthEffort: 'normal', startupClk: 'JtagClk', s6Map: 'silinx', hardByNextpnr: option }, io);
     assert.ok(r.ok, `${r.error}\n${lines.filter(l => /ERROR|nextpnr, seed/.test(l)).join('\n')}`);
     assert.deepEqual(lines.filter(l => /^WARNING/.test(l)), []);
     assert.equal(inputs.length, 3);
