@@ -91,6 +91,10 @@ export class Simulator {
     this.opts = opts;
     this.files = opts.files || new Map();
     this.maxWaveEvents = opts.maxWaveEvents ?? 5_000_000;
+    // (waveTail(sig): the changes of a signal's waveform kept, its last ones (its wave.dropped: those let go before),
+    // none of the recording's limit then: a run that shows only its end, the MCP's simulate, in memory bounded by its
+    // signals however long it runs, #3503)
+    this.waveTail = opts.waveTail || null;
     this.maxDeltas = opts.maxDeltas ?? 10_000;
     this.onLog = opts.onLog || null;
     this.reset();
@@ -292,7 +296,11 @@ export class Simulator {
         w.v[n - 1] = nv;
         if (n >= 2 && V.same(w.v[n - 2], nv)) { w.t.pop(); w.v.pop(); }
       } else { w.t.push(this.now); w.v.push(nv); }
-      if (++this.waveEvents > this.maxWaveEvents) {
+      if (this.waveTail) {
+        // (one more than asked: the one before, which a glitch of this time step back to it pops)
+        const keep = this.waveTail(sig) + 1, n2 = w.t.length;
+        if (n2 > 2 * keep) { w.t.splice(0, n2 - keep); w.v.splice(0, n2 - keep); w.dropped = (w.dropped || 0) + n2 - keep; }
+      } else if (++this.waveEvents > this.maxWaveEvents) {
         this.waveTruncated = true;
         this.emit({ kind: 'warning', text: 'waveform recording limit reached; further changes are not recorded' });
       }

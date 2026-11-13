@@ -117,3 +117,48 @@ test('#3408 a cancelled simulation stops and is not answered; the next request i
   input.end();
   await served;
 });
+
+// (the heap's live objects: a collection first, by the gc that --expose-gc gives, set here for this file)
+import v8 from 'node:v8';
+import vm from 'node:vm';
+v8.setFlagsFromString('--expose-gc');
+const gc = vm.runInNewContext('gc');
+const liveMb = () => { gc(); return process.memoryUsage().heapUsed / 1048576; };
+
+test('#3503 simulate: a long run in bounded memory, the waves kept as the changes returned; its warnings; with a VCD, every change', async () => {
+  // (the issue's case: a 32-bit counter on a 1 ps clock, 1500 changes a ns, the recording's limit at 3333 ns before)
+  await ok('new_project', { name: 'mem' });
+  await ok('write_file', { project: 'mem', path: 'sim/tb.vhd', text: TB.replace('7 downto 0', '31 downto 0') });
+  await ok('set_top', { project: 'mem', sim_top: 'tb' });
+  const before = liveMb();
+  let peak = before;
+  // (the heap looked at between the run's chunks, which give the event loop its turn every 50 ms)
+  const probe = setInterval(() => { peak = Math.max(peak, liveMb()); }, 250);
+  let r;
+  try { r = await ok('simulate', { project: 'mem', time_ns: 1e9, timeout_s: 5, max_changes: 5 }); } finally { clearInterval(probe); }
+  const after = liveMb();
+  assert.equal(r.data.limit.kind, 'time');
+  assert.ok(r.data.stoppedAtNs > 100, `stopped at ${r.data.stoppedAtNs} ns`);
+  // (each change of the run before the limit: before, 5,000,000 at most kept, about 500 MB of it)
+  assert.ok(peak - before < 64, `the heap grew by ${Math.round(peak - before)} MB during the run (${r.data.stoppedAtNs} ns)`);
+  assert.ok(after - before < 16, `the heap kept ${Math.round(after - before)} MB after the run`);
+  // the warnings: the time limit's only (no recording's limit: the end of the run is in its waves)
+  assert.deepEqual(r.text.split('\n').filter(l => /^WARNING/.test(l)), ['WARNING: the simulation stopped at its time limit (5 s), before 1000000000 ns: a shorter time_ns, or a longer timeout_s (at most 600).']);
+  assert.deepEqual(r.data.log, []);
+  // the changes returned: the last 5 of each, every change counted (the counter's value at the end, its changes in all)
+  const { clk, n } = r.data.signals;
+  assert.equal(n.changes.length, 5);
+  assert.equal(clk.changes.length, 5);
+  assert.ok(n.changes.at(-1)[0] <= r.data.stoppedAtNs && n.changes.at(-1)[0] > r.data.stoppedAtNs - 0.01, JSON.stringify(n.changes));
+  assert.match(n.final, /^x"[0-9A-F]+"$/i);
+  assert.equal(parseInt(n.final.replace(/^x"|"$/g, ''), 16), n.totalChanges - 1, 'the counter counts its own changes (its first value 0)');
+  assert.ok(Math.abs(clk.totalChanges - 2 * n.totalChanges) <= 2, `${clk.totalChanges} clock changes, ${n.totalChanges} of n`);
+  // with a VCD: every change written (a short run), as before
+  process.env.SILINX_MCP_FOLDER = `${tmp}/exchange`;
+  fs.mkdirSync(process.env.SILINX_MCP_FOLDER);
+  const vcd = 'mem.vcd';
+  const r2 = await ok('simulate', { project: 'mem', time_ns: 0.02, max_changes: 3, vcd });
+  assert.equal(r2.data.signals.n.totalChanges, 11);
+  assert.equal(r2.data.signals.n.changes.length, 3);
+  assert.equal(fs.readFileSync(`${tmp}/exchange/${vcd}`, 'utf8').split('\n').filter(l => /^b\d+ /.test(l)).length, 11);
+});
