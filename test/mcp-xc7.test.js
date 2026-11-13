@@ -38,7 +38,8 @@ test('set_design_properties: the Basys 3, its pins written as an XDC, the exampl
   const r = await ok('set_design_properties', { project: 'b1', board: 'basys3', update_constraints: true });
   // (no "no flow" warning: the Artix-7 is AMD Vivado's, #1649)
   const warnings = ['WARNING: this device\'s constraints are XDC: constraints/top.xdc is the project\'s now, constraints/top.ucf was not converted.'];
-  assert.equal(r.text, `${warnings[0]}\nDevice set to xc7a35t-1-cpg236 (board basys3); synthesis tool vivado; constraints/top.xdc written from the basys3's pins.`);   // (AMD Vivado the Artix-7's default, #3146)
+  // (its 100 MHz clock as the top's CLK_HZ, #3710)
+  assert.equal(r.text, `${warnings[0]}\nsrc/top.vhd: CLK_HZ = 100_000_000, the Digilent Basys 3's clock and inputs (the defaults of its generics).\nDevice set to xc7a35t-1-cpg236 (board basys3); synthesis tool vivado; constraints/top.xdc written from the basys3's pins.`);   // (AMD Vivado the Artix-7's default, #3146)
   assert.deepEqual(r.data.warnings, warnings);
   assert.deepEqual([r.data.constraints, r.data.synthTool], ['constraints/top.xdc', 'vivado']);
   const pj = await P.readProject('b1');
@@ -54,7 +55,7 @@ test('set_design_properties: the Basys 3, its pins written as an XDC, the exampl
   await fails('run_process', { project: 'b1', process: 'bitstream' }, untrusted);
   // back to the Basys2: its constraints a UCF again, the XDC not converted, no warning of the 7-series
   const back = await ok('set_design_properties', { project: 'b1', board: 'basys2' });
-  assert.equal(back.text, 'WARNING: this device\'s constraints are UCF: constraints/top.ucf is the project\'s now, constraints/top.xdc was not converted.\nDevice set to xc3s250e-4-cp132 (board basys2); synthesis tool silinx.');
+  assert.equal(back.text, 'WARNING: this device\'s constraints are UCF: constraints/top.ucf is the project\'s now, constraints/top.xdc was not converted.\nsrc/top.vhd: CLK_HZ = 50_000_000, the Digilent Basys2\'s clock and inputs (the defaults of its generics).\nDevice set to xc3s250e-4-cp132 (board basys2); synthesis tool silinx.');
 });
 
 test('set_design_properties: the XC7A100T with no board, its constraints an XDC', async () => {

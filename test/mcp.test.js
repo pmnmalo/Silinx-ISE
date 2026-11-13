@@ -159,7 +159,7 @@ test('read_file / write_file: a source read and written, a new HDL file added to
 
 test('check_syntax: the design as the application checks it, then an error and a warning with their file and line', async () => {
   const ok = await srv.call('check_syntax', { project: 'Blinky' });
-  assert.equal(ok.content[0].text, 'Process "Check Syntax" of <top> completed successfully (51 signals, 24 processes).');
+  assert.equal(ok.content[0].text, 'Process "Check Syntax" of <top> completed successfully (53 signals, 26 processes).');
   assert.deepEqual(ok.structuredContent, { project: 'Blinky', top: 'top', ok: true, errors: [], warnings: [] });
   assert.equal((await srv.call('check_syntax', { project: 'Blinky', simulation: true })).structuredContent.top, 'tb_top');
   // a missing ';' and an unused signal

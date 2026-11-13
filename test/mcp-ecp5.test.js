@@ -39,6 +39,8 @@ test('set_design_properties: the ULX3S, its pins written as an LPF, the example\
   await ok('new_project_from_example', { name: 'b1', example: 'blinky' });
   const r = await ok('set_design_properties', { project: 'b1', board: 'ulx3s', update_constraints: true });
   assert.equal(r.text, 'WARNING: this device\'s constraints are LPF: constraints/top.lpf is the project\'s now, constraints/top.ucf was not converted.\n'
+    // (its 25 MHz clock as the top's CLK_HZ, #3710)
+    + 'src/top.vhd: CLK_HZ = 25_000_000, the Radiona ULX3S\'s clock and inputs (the defaults of its generics).\n'
     + 'Device set to lfe5u-85f-6-cabga381 (board ulx3s); synthesis tool silinx; constraints/top.lpf written from the ulx3s\'s pins.');
   const pj = await P.readProject('b1');
   assert.deepEqual([pj.device, pj.constraints, pj.synthTool], [{ family: 'ecp5', part: 'lfe5u-85f', package: 'cabga381', speed: '-6' }, 'constraints/top.lpf', 'silinx']);
