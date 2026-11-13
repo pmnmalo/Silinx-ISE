@@ -10,8 +10,8 @@
 // view's model: read back from there after a reload) and the bitstream is downloaded. Configure
 // Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
-import { getDeviceDb, findPart } from '../../core/devices.js';
-import { resourcesOf, openOnlyDevice, deviceFamily, familyName, experimentalDevice, vivadoDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
+import { getDeviceDb, findPart, findBoard } from '../../core/devices.js';
+import { resourcesOf, openOnlyDevice, experimentalDevice, vivadoDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
 import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../core/xise.js';
 import EXAMPLES from 'silinx-examples';
 import { isCSource } from '../../core/view-hdl.js';
@@ -22,9 +22,9 @@ import { createZip, browserCodec, textOf } from '../../core/zip.js';
 import { GATE_LIMITS, gateEntries, gateMessages, gateZip } from '../../core/import-gate.js';
 import { isTrusted, markUntrusted, untrustedMessage } from '../../core/trust.js';
 import { runBrowserFlow, browserOpenStatus } from './open-flow-browser.js';
-import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from '../../core/adept.js';
+import { ADEPT_FILTERS, ADEPT_VENDOR, bitHeader } from '../../core/adept.js';
+import { programUsb, scanUsb } from '../../core/usb-program.js';
 import { adeptLink, runCapture, captureRecord } from '../../core/ila-link.js';
-import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ice40.js';
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
 import { browserGit } from './git-browser.js';
@@ -335,12 +335,12 @@ export const api = {
     const b = buildOf(name);
     const push = l => { job.lines.push(l); job.next = job.lines.length; };
     // the outputs of a previous run no longer match the design (a failure must not leave a bitstream)
-    for (const k of Object.keys(b.files)) if (/^build\/[^/]+(\.bit|\.bin|_pins\.ucf)$|^build\/open\/(placed|routed)\.xdl$|^build\/open\/timing\.txt$/.test(k)) delete b.files[k];
+    for (const k of Object.keys(b.files)) if (/^build\/[^/]+(\.bit|\.bin|\.fs|_pins\.ucf)$|^build\/open\/(placed|routed)\.xdl$|^build\/open\/timing\.txt$/.test(k)) delete b.files[k];
     b.view = null;
     // a workspace folder: the build's files also go into the project's build/ folder
     const folder = store.kind === 'folder' ? store : null;
     const writes = [];
-    if (folder && p.json.top) for (const f of [`build/${p.json.top}.bit`, `build/${p.json.top}_pins.ucf`]) await folder.removePath(name, f).catch(() => {});
+    if (folder && p.json.top) for (const f of [`build/${p.json.top}.bit`, `build/${p.json.top}.bin`, `build/${p.json.top}.fs`, `build/${p.json.top}_pins.ucf`]) await folder.removePath(name, f).catch(() => {});
     if (folder) await folder.removePath(name, BUILD_VIEW).catch(() => {});
     let reported = false;
     const json = p.json, files = { ...p.files };
@@ -379,31 +379,25 @@ export const api = {
   bitinfo: async name => {
     let top = null;
     try { top = (await projectJson(name)).top; } catch { /* no project */ }
-    // (an iCE40's .bin: its size, #2298)
+    // (an iCE40's .bin, a Gowin's .fs: their size, #2298)
     const bin = top && await bitOf(name, `build/${top}.bin`);
     if (bin) return { available: true, size: bin.length, ice40: true };
+    const fs = top && await bitOf(name, `build/${top}.fs`);
+    if (fs) return { available: true, size: fs.length, gowin: true };
     const bit = top && await bitOf(name, `build/${top}.bit`), hd = bit && bitHeader(bit);
     return hd ? { available: true, designName: hd.design, part: `${hd.part}${hd.package}`, date: hd.date, time: hd.time } : { available: false, reason: 'no bitstream in this browser' };
   },
-  // { project, bitfile, bitData? (a .bit chosen from the disk) }
-  program: async ({ project, bitfile, bitData } = {}) => usbJob('program', async log => {
+  // { project, bitfile, bitData? (a .bit chosen from the disk), board, force }: the board's USB driver by its board and the file
+  // (core/usb-program.js: the Adept's, an iCE40's flash, an FT2232H's JTAG for the 7-series and the Gowin, #2298)
+  program: async ({ project, bitfile, bitData, board, force = false } = {}) => usbJob('program', async log => {
     const pjb = project && await projectJson(project);
     if (project && !isTrusted(pjb)) fail(untrustedMessage(project, 'programming the board', pjb));   // (#2830)
-    // an iCE40's .bin: into its board's SPI flash, through its FT2232H (#2298)
-    if (/\.bin$/i.test(bitfile || '')) {
-      const bin = await bitOf(project, bitfile);
-      if (!bin) fail(`no ${bitfile} in this browser: run Generate Programming File first`);
-      return programIce40Flash(await adeptDevice(FTDI_VENDOR, FTDI_FILTERS), bin, { log });
-    }
-    // (an ECP5's or a Gowin's: not over WebUSB yet, the local server's openFPGALoader, #2298)
-    if (pjb && openOnlyDevice(pjb.device)) fail(`the ${familyName(deviceFamily(pjb.device))}'s boards are not programmed from the browser yet: the local server programs them (silinx serve), with openFPGALoader`);
-    const bit = bitData || await bitOf(project, bitfile);
-    if (!bit) fail(`no bitstream ${bitfile || ''} in this browser: run Generate Programming File first, or choose a .bit file`);
-    let part = null;
-    try { part = project ? (await projectJson(project)).device?.part : null; } catch { /* a .bit from the disk */ }
-    return programAdept(await adeptDevice(), bit, { part, log });
+    const data = bitData || await bitOf(project, bitfile);
+    if (!data) fail(/\.(bin|fs)$/i.test(bitfile || '') ? `no ${bitfile} in this browser: run Generate Programming File first`
+      : `no bitstream ${bitfile || ''} in this browser: run Generate Programming File first, or choose a .bit file`);
+    return programUsb({ board: findBoard(board || pjb?.board), device: pjb?.device || null, file: bitfile || '', data, getUsb: adeptDevice, log, force });
   }),
-  scan: async () => usbJob('scan', async log => scanAdept(await adeptDevice(), { log })),
+  scan: async ({ board } = {}) => usbJob('scan', async log => scanUsb({ board: findBoard(board), getUsb: adeptDevice, log })),
   // the logic analyzer's capture (#3176): the core's spec and probes the page made (web/js/capture-ui.js, as Implement
   // inserts it), over the board's Adept USB; the capture kept as this session's build/capture.json
   capture: async (name, { spec, probes, top, clock, arm = true, timeoutS = 10 } = {}) => usbJob('capture', async log => {
