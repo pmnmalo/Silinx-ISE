@@ -15,11 +15,13 @@ export function mountFsmInline(ctx) {
   let inline = null;
   function closeInline(commitIt) {
     if (!inline) return;
-    const { input, apply } = inline;
+    const { input, apply, value } = inline;
     inline = null;
-    if (commitIt) apply(input.value);
+    // (a text left as it was: nothing applied, nothing drawn anew; the side panel's field clicked keeps the focus, #3763)
+    const focused = document.activeElement === input || document.activeElement === document.body;
+    if (commitIt && input.value !== value) apply(input.value);
     input.remove();
-    root.focus({ preventScroll: true });
+    if (focused) root.focus({ preventScroll: true });
   }
   function inlineAt(world, value, apply, { width = 200 } = {}) {
     closeInline(true);
@@ -30,7 +32,7 @@ export function mountFsmInline(ctx) {
     input.style.top = `${clamp(sc.y - wr.top - 14, 4, wr.height - 32)}px`;
     input.style.width = `${width}px`;
     canvasWrap.append(input);
-    inline = { input, apply };
+    inline = { input, apply, value };
     input.addEventListener('keydown', (ev) => {
       ev.stopPropagation();
       if (ev.key === 'Enter') { ev.preventDefault(); closeInline(true); }

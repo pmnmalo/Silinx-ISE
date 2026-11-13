@@ -76,6 +76,27 @@ test('#3286 write_file of a state diagram with a transition\'s bend and a self-l
   assert.deepEqual([c.text, c.data.errors, c.data.warnings], ['Process "Check State Diagram" of traffic.fsm.json completed successfully.', [], []]);
 });
 
+// #3763: a transition added with its condition (the editor lost it when given in the Properties panel as it was drawn):
+// kept, its HDL made with it (compiled and elaborated, no warning), simulate_drawing takes it
+test('#3763 write_file of a state diagram with a new transition and its condition: kept, in its HDL, simulated', async () => {
+  const { compile, elaborate } = await import('../core/compile.js');
+  await ok('new_project_from_example', { name: 'nt', example: 'traffic' });
+  const fsm = JSON.parse(read('nt', 'src/traffic.fsm.json'));
+  fsm.transitions.push({ id: 't9', from: 's2', to: 's1', cond: 'night && !done', outputs: {} });   // (CARS_YELLOW back to CARS at night)
+  const text = JSON.stringify(fsm, null, 2);
+  assert.equal((await ok('write_file', { project: 'nt', path: 'src/traffic.fsm.json', text })).text, `Wrote src/traffic.fsm.json (${text.length} characters).\nsrc/traffic.vhd updated from src/traffic.fsm.json`);
+  assert.deepEqual(JSON.parse(read('nt', 'src/traffic.fsm.json')).transitions.at(-1), { id: 't9', from: 's2', to: 's1', cond: 'night && !done', outputs: {} });
+  const vhd = read('nt', 'src/traffic.vhd');
+  assert.match(vhd, /elsif \(night = '1'\) and \(done = '0'\) then\n +state_next <= S_CARS;/);
+  const lib = compile([{ path: 'traffic.vhd', lang: 'vhdl', text: vhd }]);
+  assert.deepEqual(lib.errors.map(e => `${e.severity}: ${e.message}`), []);
+  assert.deepEqual(elaborate(lib, 'traffic').diags.map(e => `${e.severity}: ${e.message}`), []);
+  const c = await ok('check_drawing', { project: 'nt', file: 'src/traffic.fsm.json' });
+  assert.deepEqual([c.data.errors, c.data.warnings], [[], []]);
+  const r = await ok('simulate_drawing', { project: 'nt', file: 'src/traffic.fsm.json', cycles: [{ req: 1, done: 1 }, { night: 1 }, {}] });
+  assert.deepEqual(r.data.cycles.map(x => [x.state, x.next]), [['CARS', 'CARS_YELLOW'], ['CARS_YELLOW', 'CARS'], ['CARS', 'CARS']]);
+});
+
 // #2924: the Karnaugh maps' order of a truth table, the interface's selector, is the document's kmapOrder: written with
 // write_file, kept, its HDL unchanged
 test('#2924 write_file of a truth table with its Karnaugh maps\' order: kept, its HDL the same', async () => {

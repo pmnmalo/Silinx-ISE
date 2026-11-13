@@ -490,7 +490,9 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
   }
   assert.deepEqual(csv, CSV_FSM);
 
-  // ---- + Input / + Output
+  // ---- + Input / + Output (the Machine section: nothing selected, #3764)
+  await page.eval(() => document.querySelector('.doc:not([hidden]) .fsm-editor').focus());
+  await page.key('Escape');
   await page.click(`${ED} .fsm-add-in`);
   await page.click(`${ED} .fsm-add-out`);
   let m = await model();
