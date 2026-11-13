@@ -1,7 +1,7 @@
 // UI (#2880): the ASM chart editor's Try it panel (#3295) (web/js/asm-sim.js), in both interfaces: the inputs and the reset,
 // Clock ↑, ▶ Run / ■ Stop at a chosen rate, ↶ Back, ⟲ Reset; on the chart the present state, the decisions tested and
 // the exits followed, the conditional outputs lit, the next state; the outputs and the registers; the trace; the panel
-// folded (kept when the chart is opened again; showPanel('sim'), as a design link's view=try opens it, #2881), closed,
+// no fold button (#3800: resized by its edge instead); opened again (showPanel('sim'), as a design link's view=try opens it, #2881), closed,
 // over the canvas on a narrow screen; a chart with errors not simulated, its errors in the console; in Portuguese. No
 // warnings.
 import { before, after } from 'node:test';
@@ -54,10 +54,9 @@ async function openChart(page, name, model) {
   await page.waitFor((d) => document.querySelector(`${d} .asm-sim-btn`), [D], { what: 'the editor' });
 }
 
-uiTest('#2880 the ASM chart\'s Try it panel: inputs, Clock ↑, Run / Stop, Back, Reset, the path on the chart, fold, narrow', E, async (page) => {
+uiTest('#2880 the ASM chart\'s Try it panel: inputs, Clock ↑, Run / Stop, Back, Reset, the path on the chart, no fold, narrow', E, async (page) => {
   await page.setViewport(1600, 900);
   await openChart(page, 'AsmSim', tiny());
-  await page.eval(() => { try { localStorage.removeItem('silinx.asm.sim.folded'); } catch { /* none */ } });
   await page.click(`${D} .asm-sim-btn`);
   await page.waitFor((p) => document.querySelector(p) && !document.querySelector(p).hidden, [P], { what: 'the panel' });
   assert.ok(await page.eval((d) => document.querySelector(`${d} .asm-sim-btn`).classList.contains('active'), D));
@@ -106,17 +105,15 @@ uiTest('#2880 the ASM chart\'s Try it panel: inputs, Clock ↑, Run / Stop, Back
   await waitState(page, 'IDLE');
   assert.equal((await shown(page)).next, 'held in the reset state by rst_n');
   await page.click(`${P} .fsm-bit[data-input=rst_n]`);
-  // fold: the bar only, kept when the chart is opened again; unfold
-  await page.click(`${P} .asm-sim-fold`);
-  await page.waitFor((p) => document.querySelector(p).classList.contains('folded') && !document.querySelector(`${p} > .fsm-panel-body`).getClientRects().length, [P], { what: 'folded' });
+  // no fold button (#3800): its bar's buttons the tools, ⇆ and ✕; opened again when the chart is opened again
+  assert.deepEqual(await page.eval((p) => [...document.querySelectorAll(`${p} .asm-codebar > .asm-btn`)].map((b) => b.textContent), P), ['⇆', '✕']);
+  assert.equal(await page.eval((p) => document.querySelector(`${p} .asm-sim-fold`), P), null);
   await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('asm:src/tiny.asm.json')));
   await page.eval(() => window.SilinxApp.openFile('src/tiny.asm.json'));
   await page.waitFor((d) => document.querySelector(`${d} .asm-sim-btn`), [D], { what: 'the editor again' });
   await page.eval(() => window.SilinxApp.findDoc('asm:src/tiny.asm.json').asmEditor.showPanel('sim'));
-  await page.waitFor((p) => !document.querySelector(p).hidden && document.querySelector(p).classList.contains('folded'), [P], { what: 'folded again' });
+  await page.waitFor((p) => !document.querySelector(p).hidden && document.querySelector(`${p} > .fsm-panel-body`).getClientRects().length, [P], { what: 'opened again' });
   assert.equal(await page.eval(() => window.SilinxApp.findDoc('asm:src/tiny.asm.json').asmEditor.panel), 'sim');
-  await page.click(`${P} .asm-sim-fold`);
-  await page.waitFor((p) => document.querySelector(`${p} > .fsm-panel-body`).getClientRects().length, [P], { what: 'unfolded' });
   // ✕: closed, the chart without its highlights
   await page.click(`${P} .asm-codebar .asm-btn`, { text: '✕' });
   await page.waitFor((p) => document.querySelector(p).hidden, [P], { what: 'closed' });
