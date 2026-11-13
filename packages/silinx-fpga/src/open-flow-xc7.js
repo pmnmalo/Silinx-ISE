@@ -6,6 +6,8 @@
 // server's, else router1's 0.4-0.5 GB); the bit database through io.bitDb() (fpga/xc7/bitdb.js's).
 // The timing is nextpnr's own estimate: optimistic against Vivado's (1.2-1.5 times its Fmax on the same netlist, #3146),
 // so said wherever it is shown, until a model calibrated against Vivado exists.
+// The JTAG's user access (BSCANE2, the logic analyzer's link, #3767): the netlist hands nextpnr a BSCAN on the site of its
+// chain (xc7BscanCells), and the FASM gets the chain's feature, which nextpnr does not write (xc7BscanFeatures).
 import { scriptSynthesis } from './synth-script.js';
 import { XDC } from './xdc.js';
 import { loadChipdb } from './nextpnr-io.js';
@@ -35,6 +37,39 @@ export const xc7Utilization = counts => ({
 });
 // (the lines of the synthesis's report: Vivado's names for those the part's resources do not name)
 const NAMES = { luts: 'Slice LUTs', ffs: 'Slice Registers', ramb16: 'Block RAM Tiles', mult18x18: 'DSPs', bufgmux: 'BUFGCTRL', dcm: 'MMCME2_ADV / PLLE2_ADV', iob: 'Bonded IOB' };
+// the tile of the four BSCAN sites in nextpnr's chip databases (the xc7a50t's, which the xc7a35t takes, and the xc7a100t's:
+// the same grid position); the JTAG chain n's site BSCAN_X0Y<n - 1>, as Vivado's DRC asks (PDRC-2, #3767)
+export const XC7_BSCAN_TILE = 'X46Y124';
+
+/** Yosys's netlist (its text) with each BSCANE2 as nextpnr's xilinx takes it: a BSCAN (its BELs' type) on the BEL of its
+ *  JTAG chain (BSCAN_X0Y<chain - 1>). Returns { text, chains: [the JTAG chains, 1 … 4] }; the text unchanged with none. */
+export function xc7BscanCells(text) {
+  if (!/"BSCANE2"/.test(text)) return { text, chains: [] };
+  const j = JSON.parse(text), chains = [];
+  for (const m of Object.values(j.modules)) {
+    for (const c of Object.values(m.cells || {})) {
+      if (c.type !== 'BSCANE2') continue;
+      // (Yosys writes a parameter as its 32 bits)
+      const p = c.parameters?.JTAG_CHAIN, chain = p === undefined ? 1 : typeof p === 'number' ? p : parseInt(p, /^[01]{9,}$/.test(p) ? 2 : 10);
+      if (!(chain >= 1 && chain <= 4)) throw new Error(`a BSCANE2's JTAG_CHAIN is 1 to 4, not ${p}`);
+      if (chains.includes(chain)) throw new Error(`two BSCANE2s on the JTAG chain ${chain}`);
+      chains.push(chain);
+      c.type = 'BSCAN';
+      c.attributes = { ...c.attributes, BEL: `${XC7_BSCAN_TILE}/BSCAN_X0Y${chain - 1}.BSCAN` };
+    }
+  }
+  return { text: JSON.stringify(j), chains };
+}
+
+/** The FASM lines of the BSCANs' chains (Project X-Ray's CFG_CENTER_MID.BSCAN.JTAG_CHAIN_<n>), on the part's CFG_CENTER_MID
+ *  tile (db: the bit database); '' with none. */
+export function xc7BscanFeatures(db, chains) {
+  if (!chains.length) return '';
+  const tile = db.tiles().find(n => db.tile(n).type === 'CFG_CENTER_MID');
+  if (!tile) throw new Error(`the ${db.part} has no CFG_CENTER_MID tile in the bit database`);
+  return chains.map(c => `${tile}.BSCAN.JTAG_CHAIN_${c}\n`).join('');
+}
+
 // nextpnr's bels (its --report's utilization), named as the part's resources name them (resources.js: their `report`, the
 // Design Summary's rows) or as Vivado's utilization report does, and how many the part has of each (counts: its resources'
 // slices, luts, ffs, iob): the chip database of the xc7a35t is the xc7a50t's (#3143), whose counts nextpnr gives; a resource
@@ -44,7 +79,7 @@ const BELS = [
   [/^SLICE_FFX$/, { id: 'ffs', name: 'Slice Registers' }, r => r.ffs], [/^CARRY4$/, { name: 'CARRY4' }, r => r.slices],
   [/^F7MUX$/, { name: 'F7 Muxes' }, r => 2 * r.slices], [/^F8MUX$/, { name: 'F8 Muxes' }, r => r.slices], [/^RAMB18E1(_RAMB18E1)?$/, { name: 'RAMB18' }],
   [/^RAMB36E1(_RAMB36E1)?$/, { name: 'RAMB36' }], [/^DSP48E1(_DSP48E1)?$/, { name: 'DSPs' }], [/^BUFGCTRL$/, { name: 'BUFGCTRL' }],
-  [/^(MMCME2_ADV|PLLE2_ADV)$/, { name: 'MMCME2_ADV / PLLE2_ADV' }], [/^PAD$/, { id: 'iob', name: 'Bonded IOB' }, r => r.iob],
+  [/^(MMCME2_ADV|PLLE2_ADV)$/, { name: 'MMCME2_ADV / PLLE2_ADV' }], [/^PAD$/, { id: 'iob', name: 'Bonded IOB' }, r => r.iob], [/^BSCAN$/, { name: 'BSCANE2' }],
 ];
 
 // a LUT's INIT that passes one input through (bit i is input k's value in i): nextpnr's feed-through LUTs, around the carry
@@ -177,20 +212,23 @@ function mountXc7(ctx) {
     const nextpnr = tool();
     const chipdb = await loadChipdb(nextpnr, part, log, StepError);
     const router = nextpnr.router || 'router1';
+    let netlist;
+    try { netlist = xc7BscanCells(netlistText()); } catch (e) { throw new StepError(e.message, [], ''); }
     const args = ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'netlist.json', '-o', 'fasm=routed.fasm', '--report', 'report.json',
       '--router', router, '--seed', String(spec.seed || 1), '--timing-allow-fail', ...(xdc.text ? ['-o', 'xdc=design.xdc'] : [])];
     log(`nextpnr-himbaechel (xilinx) places and routes <${top}> on the ${part} (${router}).`);
     const lines = [];
     let out;
     try {
-      out = await nextpnr.run(args, { 'chipdb.bin': chipdb, 'netlist.json': netlistText(), ...(xdc.text && { 'design.xdc': xdc.text }) }, l => lines.push(l));
+      out = await nextpnr.run(args, { 'chipdb.bin': chipdb, 'netlist.json': netlist.text, ...(xdc.text && { 'design.xdc': xdc.text }) }, l => lines.push(l));
     } catch (e) {
       throw new StepError(`nextpnr failed: ${e.message}`, lines.filter(l => /^ERROR:/.test(l)), '');
     }
     const warnings = lines.filter(l => /^Warning:/.test(l));
     for (const l of warnings) log(`WARNING:Place - ${l.replace(/^Warning:\s*/, '')}`);
     nreport = { ...JSON.parse(text(out['report.json'])), clockPorts: xdc.clocks };   // (the clocks' ports, to name them)
-    fasm = text(out['routed.fasm']);
+    // (the BSCANs' chains: features nextpnr's FASM does not write)
+    fasm = text(out['routed.fasm']) + xc7BscanFeatures(io.bitDb(), netlist.chains);
     report.files.routed = io.write('open/routed.fasm', fasm);
     io.write('open/nextpnr-report.json', JSON.stringify(nreport, null, 2) + '\n');
     const items = xc7PlacedUtilization(nreport, spec.resources, ctx.util, fasm);

@@ -3,19 +3,21 @@
 // the xc7a35t's own (its chip database is the xc7a50t's), nextpnr's timing marked as its estimate (a clock net named as
 // synthesis left it: its port's name), synth_xilinx's cells counted, the back end registered for the Artix-7; and its
 // Generate Programming File on the reference FASM of the fork's CI (test/fixtures/xc7): the configuration data
-// byte-identical to Project X-Ray's fasm2frames and xc7frames2bit, only the header Silinx's own.
+// byte-identical to Project X-Ray's fasm2frames and xc7frames2bit, only the header Silinx's own; the JTAG's user access
+// (#3767): a BSCANE2 handed to nextpnr as a BSCAN, its chain's feature on the part's CFG_CENTER_MID tile.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { XC7, XC7_STEPS, XC7_TIMING_MODEL, nextpnrXdc, xc7FasmUtilization, xc7PlacedUtilization, xc7Timing, xc7TimingText, xc7Utilization } from '../src/open-flow-xc7.js';
+import { XC7, XC7_STEPS, XC7_TIMING_MODEL, nextpnrXdc, xc7BscanCells, xc7BscanFeatures, xc7FasmUtilization, xc7PlacedUtilization, xc7Timing, xc7TimingText, xc7Utilization } from '../src/open-flow-xc7.js';
 import { backendOf } from '../src/open-flow-backends.js';
 import { XDC } from '../src/xdc.js';
 import { readConstraints } from '../src/constraints.js';
 import { loadBitDbXc7 } from '../src/fpga/xc7/bitdb-node.js';
 import { readBitXc7 } from '../src/fpga/xc7/bitstream.js';
+import { fasmToFrames } from '../src/fpga/xc7/frames.js';
 import { StepError } from '../src/open-flow-core.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'xc7');
@@ -186,4 +188,45 @@ test('xc7: Place & Route without nextpnr in this installation: the step\'s error
   const netlist = JSON.stringify({ modules: { top: { attributes: { top: 1 }, ports: { clk: { direction: 'input', bits: [2] } }, cells: {}, netnames: {} } } });
   const { steps } = mounted({}, { ctx: { netlistText: () => netlist, top: 'top' } });
   await assert.rejects(steps.par(), e => e instanceof StepError && /nextpnr-himbaechel-xc7 is not in this installation/.test(e.message) && /npm install @silinx\/nextpnr-himbaechel-xc7/.test(e.hint));
+});
+
+test('xc7 #3767: a BSCANE2 handed to nextpnr as a BSCAN on its JTAG chain\'s site (Vivado\'s DRC PDRC-2), its JTAG chain (Yosys\'s 32 bits, a number, none: 1); its chain\'s feature on the CFG_CENTER_MID tile', () => {
+  const nl = cells => JSON.stringify({ modules: { top: { attributes: { top: '1' }, cells } } });
+  const bscan = p => ({ type: 'BSCANE2', parameters: p === undefined ? {} : { JTAG_CHAIN: p }, attributes: {}, connections: {} });
+  const plain = nl({ a: { type: 'LUT1', parameters: {}, connections: {} } });
+  assert.deepEqual(xc7BscanCells(plain), { text: plain, chains: [] });
+  const r = xc7BscanCells(nl({ b: bscan('00000000000000000000000000000011'), c: bscan(1), e: { type: 'LUT1', parameters: {}, connections: {} } }));
+  assert.deepEqual(r.chains, [3, 1]);
+  assert.deepEqual(Object.values(JSON.parse(r.text).modules.top.cells).map(c => [c.type, c.attributes?.BEL]), [['BSCAN', 'X46Y124/BSCAN_X0Y2.BSCAN'], ['BSCAN', 'X46Y124/BSCAN_X0Y0.BSCAN'], ['LUT1', undefined]]);
+  assert.deepEqual(xc7BscanCells(nl({ d: bscan() })).chains, [1]);
+  assert.throws(() => xc7BscanCells(nl({ b: bscan(5) })), /a BSCANE2's JTAG_CHAIN is 1 to 4, not 5/);
+  assert.throws(() => xc7BscanCells(nl({ b: bscan(2), c: bscan('2') })), /two BSCANE2s on the JTAG chain 2/);
+  const db = loadBitDbXc7(PART);
+  assert.equal(xc7BscanFeatures(db, []), '');
+  assert.equal(xc7BscanFeatures(db, [1, 4]), 'CFG_CENTER_MID_X46Y32.BSCAN.JTAG_CHAIN_1\nCFG_CENTER_MID_X46Y32.BSCAN.JTAG_CHAIN_4\n');
+  assert.match(xc7BscanFeatures(loadBitDbXc7('xc7a100tcsg324-1'), [2]), /^CFG_CENTER_MID_X\d+Y\d+\.BSCAN\.JTAG_CHAIN_2\n$/);
+  // (the chain's bits: Project X-Ray's, two frames of the tile, bit 2162 of frame 26 for the chain 1)
+  assert.deepEqual([...db.featureBits('CFG_CENTER_MID_X46Y32', 'BSCAN.JTAG_CHAIN_1', 0, '')].length, 1);
+});
+
+test('xc7 #3767: the BSCAN sites\' 44 PIPs to and from the fabric pseudo-PIPs of the bit database (measured with Vivado: no bit), on both parts', async () => {
+  const { MEASURED_PPIPS } = await import('../research/xc7/measured-ppips.mjs');
+  const pips = MEASURED_PPIPS.CFG_CENTER_MID;
+  assert.equal(new Set(pips).size, 44);
+  // (each of the 11 pins of the 4 sites once: TDO from an IMUX wire, the outputs onto a LOGIC_OUTS wire)
+  for (const k of [1, 2, 3, 4]) {
+    assert.deepEqual(pips.filter(p => p.includes(`BSCAN${k}_`)).map(p => /BSCAN\d_(\w+)/.exec(p)[1]).sort(), ['CAPTURE', 'DRCK', 'RESET', 'RUNTEST', 'SEL', 'SHIFT', 'TCK', 'TDI', 'TDO', 'TMS', 'UPDATE']);
+    assert.match(pips.find(p => p.includes(`BSCAN${k}_TDO`)), new RegExp(`^CFG_CENTER_BSCAN${k}_TDO\\.CFG_CENTER_IMUX\\d+_\\d+$`));
+  }
+  for (const part of [PART, 'xc7a100tcsg324-1']) {
+    const db = loadBitDbXc7(part), tile = db.tiles().find(n => db.tile(n).type === 'CFG_CENTER_MID');
+    for (const p of pips) assert.deepEqual([...db.featureBits(tile, p, 0, '')], [], `${part} ${p}`);
+  }
+  // (a routed BSCAN's FASM as nextpnr writes it, the chain's feature added: its only bit the chain's)
+  const db = loadBitDbXc7(PART);
+  const fasm = ['CFG_CENTER_MID_X46Y32.CFG_CENTER_LOGIC_OUTS_B20_2.CFG_CENTER_BSCAN1_DRCK', 'CFG_CENTER_MID_X46Y32.CFG_CENTER_BSCAN1_TDO.CFG_CENTER_IMUX33_3', 'CFG_CENTER_MID_X46Y32.BSCAN.JTAG_CHAIN_1'].join('\n');
+  const { frames } = fasmToFrames(db, fasm), base = fasmToFrames(db, '').frames;
+  const set = fr => [...fr].flatMap(([a, w]) => [...w].flatMap((x, i) => Array.from({ length: 32 }, (_, b) => ((x >>> b) & 1 ? `${a}:${i * 32 + b}` : null)))).filter(Boolean);
+  const extra = set(frames).filter(k => !set(base).includes(k));
+  assert.deepEqual(extra.length, 1);
 });

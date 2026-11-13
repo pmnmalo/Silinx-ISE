@@ -33,7 +33,7 @@ test('a capture\'s plan: the probes\' bits in the sample word, the register, the
   assert.deepEqual([blocks(17, 1024), blocks(18, 1024), blocks(24, 1024), blocks(9, 2048), blocks(36, 512), blocks(36, 1024)], [2, 2, 2, 2, 2, 3]);
   assert.deepEqual([chunks(16, 1024), chunks(24, 1024), chunks(9, 2048), chunks(36, 512)], [[[0, 15]], [[0, 15], [16, 23]], [[0, 7], [8, 8]], [[0, 31], [32, 35]]]);
   assert.deepEqual(planCapture(capSpec({ family: 'spartan6', depth: 1024, pre: 0, probes: [{ name: 'x', width: 24 }] })).chunks, [[0, 23]]);
-  assert.equal(planCapture(capSpec({ family: 'artix7' })).memory, null);
+  assert.equal(planCapture(capSpec({ family: 'ice40' })).memory, null);
   assert.deepEqual(triggerText(capSpec()), 'the first sample');
   assert.equal(triggerText(capSpec({ trigger: { combine: 'or', conditions: [cond('count', '=', 20), cond('tick', 'rise'), cond('count', 'change')] } })), 'count = 20 or tick rises or count changes');
 });
@@ -100,6 +100,28 @@ for (const lang of ['vhdl', 'verilog']) {
     for (const c of CASES) simulateCapture(capSpec({ lang, ...c }));
   });
 }
+test('#3767 the 7-series\' sample memory planned as synthesis infers it: RAMB18E1s (a RAMB36E1 two), or distributed RAM where it costs less', async () => {
+  // (width x depth, as synth_xilinx -family xc7 maps the core: RAMB18E1 + 2 RAMB36E1; 0: RAM32M / RAM64M / RAM128X1D)
+  const cases = [[9, 1024, 1], [24, 1024, 2], [8, 16384, 8], [40, 2048, 5], [64, 128, 2], [16, 256, 1], [9, 256, 0], [2, 1024, 0], [100, 64, 0]];
+  for (const [w, d, n] of cases) {
+    const spec = capSpec({ lang: 'verilog', family: 'artix7', depth: d, pre: 0, probes: [{ name: 'x', width: w }] });
+    const m = planCapture(spec).memory;
+    assert.deepEqual([m.blocks, m.primName], [n, n ? 'RAMB18E1' : 'distributed RAM'], `${w} x ${d}`);
+    const r = await synthesizeOpen(elaborate(compile([{ path: 'ila.v', text: captureModule(spec).code }]), 'ila'), { family: 'artix7', run: yosysNode });
+    assert.equal((r.cells.RAMB18E1 || 0) + 2 * (r.cells.RAMB36E1 || 0), n, `${w} x ${d}: ${JSON.stringify(r.cells)}`);
+    assert.deepEqual(r.warnings, [], `${w} x ${d}`);
+  }
+});
+
+// #3767 the 7-series' core: its samples written on the clock's falling edge, the same words as on the rising edge
+for (const lang of ['vhdl', 'verilog']) {
+  test(`#3767 the 7-series' capture core simulated (${lang}): written on the falling edge, read into the model's window`, () => {
+    const code = captureModule(capSpec({ lang, family: 'artix7' })).code;
+    assert.match(code, lang === 'verilog' ? /always @\(negedge clk\) if \(we\) mem\[wptr\] <= probe;/ : /if falling_edge\(clk\) then\n\s+if we = '1' then mem\(to_integer\(wptr\)\) <= probe; end if;/);
+    assert.doesNotMatch(captureModule(capSpec({ lang, family: 'spartan3e' })).code, /negedge|falling_edge/);
+    for (const c of CASES) simulateCapture(capSpec({ lang, family: 'artix7', ...c }));
+  });
+}
 // (1024 samples of 21 bits on the Spartan-3E: the memory in two arrays, 16 and 5 bits, planCapture's chunks)
 for (const lang of ['vhdl', 'verilog']) {
   test(`the capture core in two arrays simulated (${lang}): the readout the model's window`, () => {
@@ -110,8 +132,8 @@ for (const lang of ['vhdl', 'verilog']) {
   });
 }
 
-test('the core checked (Check Syntax\'s design checks) and synthesized by the open flow (Spartan-3E, Spartan-6; VHDL, Verilog): its sample memory one block RAM, no warnings', async () => {
-  for (const [family, ram] of [['spartan3e', /^RAMB16_S9_S9$/], ['spartan6', /^RAMB(8|16)BWER$/]]) {
+test('the core checked (Check Syntax\'s design checks) and synthesized by the open flow (Spartan-3E, Spartan-6, 7-series; VHDL, Verilog): its sample memory one block RAM, no warnings', async () => {
+  for (const [family, ram] of [['spartan3e', /^RAMB16_S9_S9$/], ['spartan6', /^RAMB(8|16)BWER$/], ['artix7', /^RAMB18E1$/]]) {
     for (const lang of ['vhdl', 'verilog']) {
       const spec = capSpec({ family, lang, depth: 1024, pre: 100, trigger: { combine: 'and', conditions: [cond('tick', 'rise'), cond('count', '!=', 3)] } });
       const { code } = captureModule(spec);

@@ -6,7 +6,7 @@
 // errors (a capture that does not trigger, one not armed, a board with another core).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runCapture, adeptLink, USER1 } from '../core/ila-link.js';
+import { runCapture, adeptLink, USER1, captureLinkError } from '../core/ila-link.js';
 import { CAPTURE_CMD } from '../core/ila-capture.js';
 import { SimAdeptBoard } from './fixtures/adept-sim.js';
 import { capSpec, cond, expectedCounts, probeOf, hdlLink, CoreModel, SAMPLES } from './ila-lib.mjs';
@@ -70,4 +70,10 @@ test('a capture\'s errors: no trigger in the time given (the capture stays armed
   Object.assign(armed, { armT: 1, since: 0 });
   const cap = await run(armed, { arm: false });
   assert.deepEqual(cap.samples, SAMPLES(spec));
+});
+
+test('#3767 the boards the links read: the Spartan-3E\'s; a 7-series\' or Spartan-6\'s capture said to wait for their links (#3773)', () => {
+  assert.equal(captureLinkError('spartan3e'), null);
+  assert.equal(captureLinkError(undefined), null);
+  for (const f of ['artix7', 'spartan6']) assert.equal(captureLinkError(f), 'reading a capture on the board: the Spartan-3E\'s boards only yet (Basys2, Nexys2: their Digilent Adept USB); the others\' JTAG links are to come (#3773)');
 });

@@ -11,12 +11,14 @@
 //   type's name taken off each line; the types with a tile_type_<type>.json, as Project X-Ray's Database lists them;
 //   an addressed feature of one bit per address, 0 … n - 1 (a block RAM's INIT_00[000] … [255]), on one line:
 //   "INIT_00[] <bit of 0> <bit of 1> …"; a type's bits the same as an earlier type's: "=<that type>";
-// - the part's required features (<part>/required_features.fasm), when it has them.
+// - the part's required features (<part>/required_features.fasm), when it has them;
+// - the pseudo-PIPs Silinx measured that prjxray-db does not have (measured-ppips.mjs: CFG_CENTER_MID's BSCAN pins, #3767).
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { MEASURED_PPIPS } from './measured-ppips.mjs';
 
 const [dbRoot, part = 'xc7a35tcpg236-1', outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'bitdb', 'xc7')] = process.argv.slice(2);
 if (!dbRoot) { console.error('usage: build-db.mjs <prjxray-db> [part] [out dir]'); process.exit(2); }
@@ -98,7 +100,7 @@ for (const type of [...types].sort()) {
   if (!known.includes(type)) continue;
   const l = type.toLowerCase();
   const e = {};
-  const ppips = lines(`ppips_${l}.db`, type).map(x => x.split(' ')[0]);
+  const ppips = [...lines(`ppips_${l}.db`, type).map(x => x.split(' ')[0]), ...(MEASURED_PPIPS[type] || [])];
   if (files.has(`segbits_${l}.db`)) e.segbits = same(type, packRuns(lines(`segbits_${l}.db`, type)));
   if (files.has(`segbits_${l}.block_ram.db`)) e.ramSegbits = same(type, packRuns(lines(`segbits_${l}.block_ram.db`, type)));
   if (ppips.length) e.ppips = ppips.join('\n');

@@ -44,7 +44,7 @@
     "@lezer/highlight": "^1.2.5",
     "@silinx/nextpnr-himbaechel-spartan3e": "1.5.2",
     "@silinx/nextpnr-himbaechel-spartan6": "0.5.1",
-    "@silinx/nextpnr-himbaechel-xc7": "0.1.1",
+    "@silinx/nextpnr-himbaechel-xc7": "0.1.2",
     "@trystero-p2p/torrent": "^0.26.0",
     "@yowasp/yosys": "0.70.1258",
     "elkjs": "^0.12.1",

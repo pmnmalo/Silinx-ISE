@@ -52,6 +52,14 @@ export function boardClockUcf(c, { iostandard = false } = {}) {
     ...(c.dedicated ? [] : [`NET "${n}" CLOCK_DEDICATED_ROUTE = FALSE ;`]),
     `NET "${n}" TNM_NET = "${n}" ;`, `TIMESPEC "TS_${n}" = PERIOD "${n}" ${c.period} ns HIGH 50% ;`].join('\n');
 }
+/** The same as XDC (the 7-series', #3767): its pin and I/O standard, its period (create_clock). */
+export function boardClockXdc(c) {
+  const n = BOARD_CLOCK_PORT;
+  return [`# the logic analyzer's clock: ${boardClockText(c)} (#3481)`,
+    `set_property -dict { PACKAGE_PIN ${c.pin} IOSTANDARD ${c.iostandard || 'LVCMOS33'} } [get_ports {${n}}]`,
+    ...(c.dedicated ? [] : [`set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets {${n}}]`]),
+    `create_clock -period ${(+c.period).toFixed(3)} [get_ports {${n}}]`].join('\n');
+}
 const CAPTURE_CORE = 'silinx_capture';
 // the BSCAN of each family: its cell, its parameters, its pins for tck, sel, capture, shift, tdi, tdo
 const BSCAN = {

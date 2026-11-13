@@ -308,7 +308,7 @@ test('#3146 the Silinx toolchain on the Artix-7 (the project\'s synthesis tool S
   for (const part of ['xc7k70t', 'xc7z020']) assert.equal(toolOf({ part }, true), SILINX, `${part}: not the 7-series back end's`);
   const t = built(SILINX_XC7);
   assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] },
-    { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', 'emulate', { config: ['impact'] }]);
+    { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', 'emulate', { config: SILINX_CONFIG }]);   // (the logic analyzer, #3767)
   assert.equal(find(t, 'synth').label, 'Synthesize - Yosys');
   assert.deepEqual(find(t, 'bitgen').run(), ['synth', 'translate', 'map', 'par', 'bitgen']);   // (the server's list maps in Place & Route)
   assert.deepEqual(orderSteps(XC7_STEPS, ['synth', 'translate', 'map', 'par', 'bitgen']), ['synth', 'translate', 'par', 'bitgen']);

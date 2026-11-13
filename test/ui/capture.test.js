@@ -163,3 +163,30 @@ uiTest('#3481 the logic analyzer on a design with no clock: the board\'s clock i
     await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
   }
 }, { timeout: 120000 });
+
+uiTest('#3767 the logic analyzer\'s settings on the Basys 3: the block RAMs as synthesis infers them on the 7-series (RAMB18E1s, no device total), distributed RAM for a short capture; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'Ila7', template: 'blinky', board: 'basys3' });
+  // (the Silinx toolchain the project's synthesis tool: Vivado's is the 7-series' default)
+  const file = path.join(env.server.workspace, 'Ila7', 'silinx.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), synthTool: 'silinx' }));
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await page.openProject('Ila7');
+  await reloadToolchain(page);
+  await page.treeRow('#procs', 'Logic Analyzer Settings', { dbl: true });
+  await page.waitFor(d => document.querySelector(d), [D], { what: 'the settings dialog' });
+  await fill(page, { probes: ['u_knight.count', 'u_knight.dir'], depth: 1024, pre: 64, conds: [['u_knight.dir', 'rise']] });
+  assert.deepEqual(await state(page), ['9 bits × 1024 samples: 1 block RAM(s)', '', true]);
+  await page.eval(d => { const p = document.querySelector(`${d} .capture-depth`); p.value = '256'; p.dispatchEvent(new Event('input')); }, D);
+  assert.deepEqual(await state(page), ['9 bits × 256 samples: 0 block RAM(s)', '', true]);
+  await page.eval(d => [...document.querySelectorAll(`${d} .dlg-buttons .btn`)].pop().click(), D);
+  await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
+  try {
+    await page.treeRow('#procs', 'Definições do Analisador Lógico', { dbl: true });
+    await page.waitFor(d => document.querySelector(d), [D], { what: 'the dialog in Portuguese' });
+    await fill(page, { probes: ['u_knight.count', 'u_knight.dir'], depth: 1024, pre: 64 });
+    assert.equal((await state(page))[0], '9 bits × 1024 amostras: 1 block RAM(s)');
+    await page.eval(d => [...document.querySelectorAll(`${d} .dlg-buttons .btn`)].pop().click(), D);
+  } finally {
+    await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+  }
+}, { timeout: 120000 });

@@ -8,7 +8,7 @@ which npm installs with it, and includes the ported ones (their code or data in 
 |---|---|---|---|
 | @silinx/nextpnr-himbaechel-spartan3e | 1.5.2 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @silinx/nextpnr-himbaechel-spartan6 | 0.5.1 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
-| @silinx/nextpnr-himbaechel-xc7 | 0.1.1 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
+| @silinx/nextpnr-himbaechel-xc7 | 0.1.2 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @yowasp/nextpnr-ecp5 | 0.11.825 | ISC | https://yowasp.org/ |
 | @yowasp/nextpnr-himbaechel-gowin | 0.11.825 | ISC | https://yowasp.org/ |
 | @yowasp/nextpnr-ice40 | 0.11.825 | ISC | https://yowasp.org/ |
@@ -957,7 +957,7 @@ The WASI SDK 34's runtime libraries (wasi-libc, libc++, libc++abi, libunwind; li
 Licensed under the Apache License v2.0 with LLVM Exceptions (wasi-libc also MIT and CC0 parts): https://github.com/WebAssembly/wasi-libc/blob/main/LICENSE and https://llvm.org/LICENSE.txt
 ```
 
-## @silinx/nextpnr-himbaechel-xc7 0.1.1 — ISC
+## @silinx/nextpnr-himbaechel-xc7 0.1.2 — ISC
 
 https://github.com/pmnmalo/nextpnr-spartan
 
