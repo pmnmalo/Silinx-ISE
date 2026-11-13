@@ -41,7 +41,9 @@ test('realOf / within: by name, and once the symbolic links are followed', () =>
 
 test('#1229 writeFile: ./src/a.vhd, src//a.vhd and src/a.vhd are one file, listed once; silinx.json refused', async () => {
   await P.createProject({ name: 'Norm' });
-  for (const p of ['src/a.vhd', './src/a.vhd', 'src//a.vhd', 'src/./x/../a.vhd']) await P.writeFile('Norm', p, 'entity a is end;\n');
+  for (const p of ['src/a.vhd', './src/a.vhd', 'src//a.vhd']) await P.writeFile('Norm', p, 'entity a is end;\n');
+  // (through a '..': refused, as the browser's store refuses it, not resolved to src/a.vhd, #3598)
+  await assert.rejects(P.writeFile('Norm', 'src/./x/../a.vhd', 'x'), { status: 400, message: "'src/./x/../a.vhd': invalid path: path leaves the project ('..')" });
   await P.writeFile('Norm', './sim//tb_a.vhd', 'entity tb_a is end;\n');
   const pj = await P.readProject('Norm');
   assert.deepEqual(pj.files.map(f => `${f.path} ${f.role}`), ['src/a.vhd design', 'sim/tb_a.vhd sim']);
@@ -52,10 +54,12 @@ test('#1229 writeFile: ./src/a.vhd, src//a.vhd and src/a.vhd are one file, liste
   assert.deepEqual((await P.readProject('Norm')).excluded, []);
   // the description: by any spelling, never through the file route (as the browser store refuses it)
   const before = fs.readFileSync(path.join(ws, 'Norm', 'silinx.json'), 'utf8');
-  for (const p of ['silinx.json', './silinx.json', 'src/../silinx.json'])
+  for (const p of ['silinx.json', './silinx.json'])
     await assert.rejects(P.writeFile('Norm', p, '{}'), e => e.status === 400 && e.message === "silinx.json is the project's description", p);
-  await assert.rejects(P.writeFile('Norm', '.', 'x'), e => e.status === 400 && e.message === 'missing path');
-  await assert.rejects(P.writeFile('Norm', '../Other/x.v', 'x'), e => e.status === 400 && e.message === 'path escapes project');
+  // (through a '..', the project's folder, out of the project: refused as paths, as the browser's store does, #3598)
+  await assert.rejects(P.writeFile('Norm', 'src/../silinx.json', '{}'), { status: 400, message: "'src/../silinx.json': invalid path: path leaves the project ('..')" });
+  await assert.rejects(P.writeFile('Norm', '.', 'x'), { status: 400, message: "'.': invalid path: the project's folder, not a file's path" });
+  await assert.rejects(P.writeFile('Norm', '../Other/x.v', 'x'), { status: 400, message: "'../Other/x.v': invalid path: path leaves the project ('..')" });
   assert.equal(fs.readFileSync(path.join(ws, 'Norm', 'silinx.json'), 'utf8'), before);
 });
 
@@ -148,7 +152,8 @@ test('#3648 the file routes (read, write, rename, delete, its trash): a path out
     renameTo: r => P.renameFile('Routes', 'src/a.vhd', r), delete: r => P.deleteFile('Routes', r), trash: r => P.deleteFile('Routes', r, { trash: true, mustExist: true }) };
   for (const rel of escapes)
     for (const [op, f] of Object.entries(ops))
-      await assert.rejects(async () => f(rel), e => e.status === 400 && e.message === 'path escapes project', `${op} ${rel}`);
+      // (by the path's rule first, the browser store's, #3598: a '..' or an absolute path; the system's escape after it)
+      await assert.rejects(async () => f(rel), e => e.status === 400 && e.message === `'${rel}': invalid path: ${rel.startsWith('/') ? 'absolute path' : "path leaves the project ('..')"}`, `${op} ${rel}`);
   assert.deepEqual([fs.readdirSync(tmp).sort(), fs.readdirSync(ws).sort()], before, 'nothing made or moved outside the project');
   assert.equal(fs.readFileSync(path.join(tmp, 'outside.vhd'), 'utf8'), 'KEEP');
   assert.equal(fs.readFileSync(path.join(ws, 'Other', 'src', 'b.vhd'), 'utf8'), 'OTHER');
