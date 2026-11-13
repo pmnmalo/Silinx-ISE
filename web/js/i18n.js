@@ -31,6 +31,7 @@ import { PINS_PT, PINS_PT_PATTERNS } from './i18n-pins.js';
 import { LABS_PT, LABS_PT_PATTERNS } from './i18n-labs.js';
 import { GRADE_PT, GRADE_PT_PATTERNS } from './i18n-grade.js';
 import { CAPTURE_PT, CAPTURE_PT_PATTERNS } from './i18n-capture.js';
+import { PROGRAM_PT, PROGRAM_PT_PATTERNS } from './i18n-program.js';
 import { MESSAGES_PT } from './i18n-messages.js';
 import { prefKey } from './prefs.js';
 
@@ -223,15 +224,9 @@ const PT = {
   'Loads the FPGA directly (volatile: lost at power-off). Select the PROM in the chain to store the design in flash.': 'Carrega a FPGA diretamente (volátil: perde-se ao desligar). Selecione a PROM na cadeia para guardar o projeto na flash.',
   'Program': 'Programar', 'Erase PROM': 'Apagar PROM', 'No board selected: choose the programming tool and cable explicitly.': 'Nenhuma placa selecionada: escolha a ferramenta e o cabo de programação.',
   'Another operation is running': 'Outra operação está em curso', 'Failed — see console': 'Falhou — ver consola', 'Scan finished.': 'Scan concluído.',
-  // (the iCE40's Configure Target Device, #2298)
-  'Program the iCE40 — SPI flash': 'Programar o iCE40 — flash SPI', 'Program Flash': 'Programar Flash', 'Configuration file (.bin):': 'Ficheiro de configuração (.bin):',
+  // (the open families' Configure Target Device, #2298: web/js/i18n-program.js)
+  'Program Flash': 'Programar Flash',
   '(no board)': '(sem placa)', '(no top module)': '(sem módulo de topo)', 'No top module: set one in the Design pane first.': 'Sem módulo de topo: defina-o primeiro no painel Design.',
-  'the board\'s USB (FT2232H), from the browser (WebUSB)': 'a USB da placa (FT2232H), a partir do browser (WebUSB)',
-  'openFPGALoader, through the board\'s USB (FT2232H)': 'openFPGALoader, pela USB da placa (FT2232H)',
-  'No .bin yet — run "Generate Programming File" first.': 'Ainda não há .bin — execute primeiro "Generate Programming File".',
-  'Writes the .bin into the board\'s SPI flash: the FPGA loads it, and again at every power-up.': 'Escreve o .bin na flash SPI da placa: a FPGA carrega-o, e de novo sempre que é ligada.',
-  'Flash programmed: the FPGA loads the design.': 'Flash programada: a FPGA carrega o projeto.',
-  'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).': 'O FT2232H da placa: o .bin escrito na flash SPI, que a FPGA depois carrega (e sempre que é ligada).',
   'Not yet tested on a real board.': 'Ainda não testado numa placa real.', 'No board selected: choose one in Design Properties.': 'Nenhuma placa selecionada: escolha uma nas Propriedades do Projeto.',
   // editor
   'Templates ▾': 'Modelos ▾', 'Find (Ctrl+F)': 'Procurar (Ctrl+F)', 'Auto-complete': 'Completar automaticamente',
@@ -858,6 +853,8 @@ for (const [k, v] of Object.entries(GRADE_PT)) if (!(k in PT)) PT[k] = v;   // t
 PT_PATTERNS.unshift(...GRADE_PT_PATTERNS);
 for (const [k, v] of Object.entries(CAPTURE_PT)) if (!(k in PT)) PT[k] = v;   // the logic analyzer (#3176)
 PT_PATTERNS.unshift(...CAPTURE_PT_PATTERNS);
+for (const [k, v] of Object.entries(PROGRAM_PT)) if (!(k in PT)) PT[k] = v;   // the open families' Configure Target Device (#2298)
+PT_PATTERNS.unshift(...PROGRAM_PT_PATTERNS);
 for (const [k, v] of Object.entries(MESSAGES_PT)) if (!(k in PT)) PT[k] = v;   // toasts, dialogs, plain elements' texts (#3539)
 
 export const LOCALES = {

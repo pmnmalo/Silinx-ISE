@@ -23,9 +23,10 @@ test('every profile is of a known family; a family with none gets an empty, froz
   }
   assert.equal(familyProfile('ice40').clock, undefined);
   assert.equal(familyProfile('ice40').blockRam, undefined);
-  // (#2302: the ECP5 offers none of the Xilinx families' wizards, and no programming yet; the iCE40 programs its flash)
-  for (const f of ['ecp5', 'gowin']) for (const k of ['clock', 'blockRam', 'multiplier', 'mapChoice', 'program']) assert.equal(familyProfile(f)[k], undefined, `${f} ${k}`);
-  assert.equal(familyProfile('ice40').program, 'spi-flash');
+  // (#2302: the ECP5 offers none of the Xilinx families' wizards; the iCE40 programs its flash, the ECP5 and the Gowin their
+  // SRAM, #2298)
+  for (const f of ['ecp5', 'gowin']) for (const k of ['clock', 'blockRam', 'multiplier', 'mapChoice']) assert.equal(familyProfile(f)[k], undefined, `${f} ${k}`);
+  assert.deepEqual(['ice40', 'ecp5', 'gowin'].map(f => familyProfile(f).program), ['spi-flash', 'sram', 'sram']);
 });
 
 test('the clock manager: the primitive core/clocking.js plans for the family, its resource the resources model\'s', () => {

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { scratchEnv, makeFakes, isolatedPath, startApp, waitJob, writeConfig, makeBit, POSIX_ONLY } from './server-helpers.js';
+import { ecp5Bit, gowinFs } from './fixtures/open-bitstreams.js';
 
 let tmp, fakes, app, jobs, P, prog, tc, oldPath;
 const FAKE_ENV = ['FAKE_PROG_FAIL', 'FAKE_IMPACT_MODE', 'FAKE_PROG_LOG', 'FAKE_ADEPT_NODONE', 'FAKE_XCF_NOVERIFY', 'FAKE_ADEPT_FAIL', 'XILINX'];
@@ -205,28 +206,92 @@ test('program: an iCE40 project\'s .bin into the iCEBreaker\'s flash with openFP
   assert.equal(r.status, 400);
 });
 
-// #2302: an ECP5 project: its .bit (ecppack's, no Xilinx header) by its size in bitinfo; not programmed from Silinx yet
-test('program: an ECP5 project\'s .bit: its size; programming refused, the board\'s own tool named', async () => {
+// #2298: an ECP5 project's .bit (ecppack's, no Xilinx header) loaded into the ULX3S's SRAM by openFPGALoader -b ulx3s -m (its
+// FT231X, never its flash); its part and IDCODE read and checked against the project's; its size in bitinfo; the errors
+test('program: an ECP5 project\'s .bit into the ULX3S\'s SRAM with openFPGALoader -b ulx3s -m; its part checked', { skip: POSIX_ONLY }, async () => {
+  process.env.FAKE_PROG_LOG = path.join(tmp, 'prog-ecp5.log');
   await P.createProject({ name: 'Ecp', board: 'ulx3s', device: { family: 'ecp5', part: 'lfe5u-85f', package: 'cabga381', speed: '-6' } });
   await P.updateProject('Ecp', pj => { pj.top = 'top'; });
   const bit = path.join(P.projectDir('Ecp'), 'build', 'top.bit');
   await fs.mkdir(path.dirname(bit), { recursive: true });
   assert.deepEqual((await app.call('GET', '/projects/Ecp/bitinfo')).body, { available: false, path: bit, ecp5: true });
-  await fs.writeFile(bit, Buffer.alloc(1927725, 0xff));
+  assert.equal((await app.call('POST', '/program', { project: 'Ecp' })).status, 404);
+  await fs.writeFile(bit, ecp5Bit({ size: 1927725 }));
   assert.deepEqual((await app.call('GET', '/projects/Ecp/bitinfo')).body, { available: true, path: bit, size: 1927725, ecp5: true });
-  const r = await app.call('POST', '/program', { project: 'Ecp' });
-  assert.equal(r.status, 400);
-  assert.equal(r.body.error, 'Silinx does not program ECP5 boards yet: build/top.bit is the bitstream, for the board\'s own tools (openFPGALoader)');
+  let j = await run('/program', { project: 'Ecp' });
+  assert.equal(j.status, 'ok', j.lines.join('\n'));
+  assert.deepEqual([j.result.options.tool, j.result.family, j.result.target, j.result.size], ['openFPGALoader', 'ecp5', 'sram', 1927725]);
+  assert.deepEqual(j.result.commands, [{ cmd: 'openFPGALoader', args: ['-b', 'ulx3s', '-m', bit], code: 0 }]);
+  assert.deepEqual(j.result.warnings, []);
+  assert.deepEqual(j.lines.filter(l => /WARNING|ERROR/.test(l)), []);
+  for (const l of [`Bitstream ${bit} (1927725 bytes, an ECP5's .bit: part LFE5U-85F-6CABGA381, IDCODE 0x41113043)`,
+    "NOTE: The on-board FT231X (JTAG): the .bit loaded into the FPGA's SRAM, until the board is powered off.",
+    'NOTE: the openFPGALoader defaults for this board are not verified on real hardware.', 'Programming (SRAM, volatile) with openFPGALoader board=ulx3s', 'Programming finished.']) assert.ok(j.lines.includes(l), l);
+  assert.match(await fs.readFile(process.env.FAKE_PROG_LOG, 'utf8'), /^openFPGALoader -b ulx3s -m .*top\.bit$/m);
+  // a .bit for another ECP5: refused, then forced and warned; not an ECP5 .bit (a Xilinx one): refused; another tool, the tool failing
+  await fs.writeFile(bit, ecp5Bit({ part: 'LFE5U-25F-6CABGA381', idcode: 0x41111043 }));
+  j = await run('/program', { project: 'Ecp' });
+  assert.equal(j.status, 'error');
+  assert.equal(j.error, "bitstream was built for 'LFE5U-25F-6CABGA381' but the target device is 'LFE5U-85F': not programmed");
+  j = await run('/program', { project: 'Ecp', force: true });
+  assert.equal(j.status, 'ok', j.lines.join('\n'));
+  assert.deepEqual(j.result.warnings, ["bitstream was built for 'LFE5U-25F-6CABGA381' but the target device is 'LFE5U-85F'"]);
+  assert.deepEqual(j.lines.filter(l => /WARNING/.test(l)), ["WARNING: bitstream was built for 'LFE5U-25F-6CABGA381' but the target device is 'LFE5U-85F'"]);
+  await fs.writeFile(bit, makeBit());
+  j = await run('/program', { project: 'Ecp' });
+  assert.equal(j.status, 'error');
+  assert.equal(j.error, `${bit}: not an ECP5 bitstream (no Lattice preamble FF FF BD B3)`);
+  await fs.writeFile(bit, ecp5Bit());
+  j = await run('/program', { project: 'Ecp', tool: 'xc3sprog', cable: 'xpc' });
+  assert.equal(j.error, "an ECP5's .bit is programmed with openFPGALoader, not xc3sprog");
+  process.env.FAKE_PROG_FAIL = 'openFPGALoader';
+  j = await run('/program', { project: 'Ecp' });
+  assert.equal(j.error, 'openFPGALoader exited with code 1');
 });
 
-// #2303: a Gowin project: its .fs, not programmed from Silinx yet
-test('program: a Gowin project: its .fs by its size; programming refused with the reason', async () => {
+// #2298: a Gowin project's .fs (gowin_pack's text) loaded into the Tang Nano 9K's SRAM by openFPGALoader -b tangnano9k -m (its
+// BL702); its IDCODE checked; the errors
+test('program: a Gowin project\'s .fs into the Tang Nano 9K\'s SRAM with openFPGALoader -b tangnano9k -m; its IDCODE checked', { skip: POSIX_ONLY }, async () => {
+  process.env.FAKE_PROG_LOG = path.join(tmp, 'prog-gowin.log');
   await P.createProject({ name: 'Gw', board: 'tangnano9k', device: { family: 'gowin', part: 'gw1nr-9c', package: 'qn88', speed: '-6' } });
   await P.updateProject('Gw', pj => { pj.top = 'top'; });
-  assert.deepEqual((await app.call('GET', '/projects/Gw/bitinfo')).body, { available: false, path: path.join(P.projectDir('Gw'), 'build', 'top.fs'), gowin: true });
-  const r = await app.call('POST', '/program', { project: 'Gw' });
-  assert.equal(r.status, 400);
-  assert.equal(r.body.error, 'Silinx does not program Gowin GW1N boards yet: build/top.fs is the bitstream, for the board\'s own tools (openFPGALoader)');
+  const fsFile = path.join(P.projectDir('Gw'), 'build', 'top.fs');
+  assert.deepEqual((await app.call('GET', '/projects/Gw/bitinfo')).body, { available: false, path: fsFile, gowin: true });
+  await fs.mkdir(path.dirname(fsFile), { recursive: true });
+  const text = gowinFs();
+  await fs.writeFile(fsFile, text);
+  assert.deepEqual((await app.call('GET', '/projects/Gw/bitinfo')).body, { available: true, path: fsFile, size: text.length, gowin: true });
+  let j = await run('/program', { project: 'Gw' });
+  assert.equal(j.status, 'ok', j.lines.join('\n'));
+  assert.deepEqual([j.result.family, j.result.target, j.result.warnings], ['gowin', 'sram', []]);
+  assert.deepEqual(j.result.commands, [{ cmd: 'openFPGALoader', args: ['-b', 'tangnano9k', '-m', fsFile], code: 0 }]);
+  assert.deepEqual(j.lines.filter(l => /WARNING|ERROR/.test(l)), []);
+  for (const l of [`Bitstream ${fsFile} (${text.length} bytes, a Gowin's .fs, IDCODE 0x1100481b)`, 'Programming (SRAM, volatile) with openFPGALoader board=tangnano9k',
+    "NOTE: The on-board BL702 (JTAG): the .fs loaded into the FPGA's SRAM, until the board is powered off.", 'Programming finished.']) assert.ok(j.lines.includes(l), l);
+  assert.match(await fs.readFile(process.env.FAKE_PROG_LOG, 'utf8'), /^openFPGALoader -b tangnano9k -m .*top\.fs$/m);
+  // another device's IDCODE: refused; not a .fs: refused; a .fs for a Spartan-3E's board: warned
+  await fs.writeFile(fsFile, gowinFs({ idcode: 0x0900281b }));
+  j = await run('/program', { project: 'Gw' });
+  assert.equal(j.error, "bitstream is for the IDCODE 0x0900281b but the target device 'GW1NR-9C' is 0x1100481b: not programmed");
+  await fs.writeFile(fsFile, 'hello\n');
+  j = await run('/program', { project: 'Gw' });
+  assert.equal(j.error, `${fsFile}: not a Gowin .fs (line 1: not 8-bit groups of 0s and 1s)`);
+  await fs.writeFile(fsFile, text);
+  const other = jobs.createJob('program', jj => prog.programJob(jj, { board: 'tangnano9k', bitfile: fsFile, expectDevice: { part: 'xc3s250e', package: 'cp132' } }));
+  assert.deepEqual((await waitJob(jobs, other.id)).result.warnings, ["a .fs is a Gowin's configuration, but the target device is 'xc3s250e'"]);
+  // (a .fs by an absolute path: only a project's)
+  assert.equal((await app.call('POST', '/program', { bitfile: fsFile })).status, 400);
+  assert.equal((await app.call('POST', '/program', { project: 'Gw', bitfile: 'src/top.v' })).body.error, "only .bit files, or a project's .bin (the iCE40) or .fs (the Gowin), can be programmed");
+});
+
+// #2298: openFPGALoader's command lines: an open family's file, no JTAG chain position; a Xilinx .bit's, its position
+test('buildCommands: openFPGALoader -m for the SRAM, nothing for the flash, --index-chain for a Xilinx .bit', () => {
+  const o = { tool: 'openFPGALoader', fpgaBoard: 'ulx3s', position: 0 };
+  assert.deepEqual(prog.buildCommands('program', { ...o, bitfile: '/p/top.bit', target: 'sram' })[0].args, ['-b', 'ulx3s', '-m', '/p/top.bit']);
+  assert.deepEqual(prog.buildCommands('program', { ...o, fpgaBoard: 'ice40_generic', bitfile: '/p/top.bin', target: 'flash' })[0].args, ['-b', 'ice40_generic', '/p/top.bin']);
+  assert.deepEqual(prog.buildCommands('program', { ...o, fpgaBoard: 'basys3', bitfile: '/p/top.bit' })[0].args, ['-b', 'basys3', '--index-chain', '0', '/p/top.bit']);
+  assert.deepEqual([prog.openFamilyOf('/p/a.bin', null), prog.openFamilyOf('/p/a.fs', { part: 'xc3s250e' }), prog.openFamilyOf('/p/a.bit', { part: 'lfe5u-85f' }), prog.openFamilyOf('/p/a.bit', { part: 'xc7a35t' })],
+    ['ice40', 'gowin', 'ecp5', null]);
 });
 
 test('program: iMPACT success / silent failure / error message; adepttool DONE check; tool exit code', { skip: POSIX_ONLY }, async () => {
@@ -284,7 +349,7 @@ test('program: request errors', async () => {
     [{}, 400, /give a project or a bitfile/],
     [{ bitfile: 'build/top.bit' }, 400, /must be an absolute path when no project is given/],
     [{ project: 'NoTop' }, 400, /project has no top module/],
-    [{ project: 'Prog', bitfile: 'build/top.ucf' }, 400, /only \.bit files, or a project's \.bin \(the iCE40\), can be programmed/],
+    [{ project: 'Prog', bitfile: 'build/top.ucf' }, 400, /only \.bit files, or a project's \.bin \(the iCE40\) or \.fs \(the Gowin\), can be programmed/],
     [{ project: 'Prog', bitfile: 'build/none.bit' }, 404, /bitstream not found/],
     [{ project: 'Prog', bitfile: '../../escape.bit' }, 400, /path escapes project/],
     [{ project: 'Prog', board: 'nope' }, 400, /unknown board 'nope'/],

@@ -35,6 +35,7 @@ const { PROCESS_TOOLS, PROCESSES, REPORT_FILES, OPEN_REPORTS } = await import('.
 const { LAB_TOOLS } = await import('../server/mcp-labs.js');
 const { TIMING_TOOLS } = await import('../server/mcp-timing.js');
 const { CAPTURE_TOOLS } = await import('../server/mcp-capture.js');
+const { BOARD_TOOLS } = await import('../server/mcp-board.js');
 const U = await import('../server/mcp-util.js');
 
 const names = tools => tools.map(t => t.name);
@@ -69,11 +70,12 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(WCFG_TOOLS), ['save_wave_config', 'load_wave_config']);
   assert.deepEqual(names(HLS_TOOLS), ['c_simulation', 'c_cosimulation', 'c_synthesis_report', 'c_generated']);
   assert.deepEqual(names(PROCESS_TOOLS), ['run_process', 'get_report']);
+  assert.deepEqual(names(BOARD_TOOLS), ['program_board']);   // (Configure Target Device, #2674, #2298)
   assert.deepEqual(names(CAPTURE_TOOLS), ['capture_settings', 'capture']);   // (the logic analyzer, #3176)
   assert.deepEqual(names(TIMING_TOOLS), ['timing_paths']);
   assert.deepEqual(names(LAB_TOOLS), ['lab']);   // (the guided labs, #3179)
   assert.deepEqual(names(GRADE_TOOLS), ['grade']);   // (automatic grading, #3192)
-  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...CONSTRAINTS_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...FIND_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS]);
+  assert.deepEqual(mcp.TOOLS, [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...CONSTRAINTS_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...FIND_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...BOARD_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS]);
   assert.equal(new Set(names(mcp.TOOLS)).size, mcp.TOOLS.length);
   for (const t of mcp.TOOLS) {
     assert.equal(typeof t.run, 'function', t.name);

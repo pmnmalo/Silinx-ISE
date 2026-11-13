@@ -42,15 +42,19 @@ export const FAMILY_PROFILES = {
     program: 'spi-flash',
   },
   ecp5: {
-    // its own tools (#2302): nextpnr-ecp5 and ecppack (Project Trellis), as the iCE40's; no programming of its boards yet
-    // (#2298), no clock manager, block RAM or multiplier wizard (their primitives the Xilinx families')
+    // its own tools (#2302): nextpnr-ecp5 and ecppack (Project Trellis), as the iCE40's; no clock manager, block RAM or
+    // multiplier wizard (their primitives the Xilinx families')
     openFlow: { tools: 'nextpnr-ecp5', packer: 'ecppack', package: '@yowasp/nextpnr-ecp5', mb: 30, layout: 'nextpnrEcp5', parts: new RegExp(`^(${Object.keys(ECP5_PARTS).join('|')})$`), partOf: 'an ECP5 part', steps: ECP5_STEPS },
+    // its board programmed: the .bit loaded into the FPGA's SRAM (#2298)
+    program: 'sram',
   },
   gowin: {
     // its own tools (#2303): nextpnr-himbaechel-gowin (Project Apicula) and gowin_pack, Silinx's port of Apicula's (the
-    // package's is Python); no programming of its boards yet (#2298)
+    // package's is Python)
     openFlow: { tools: 'nextpnr-himbaechel-gowin', packer: 'gowin_pack', package: '@yowasp/nextpnr-himbaechel-gowin', mb: 32, layout: 'nextpnrGowin',
       parts: new RegExp(`^(${GOWIN_PARTS.join('|')})$`), partOf: 'a Gowin part', steps: GOWIN_STEPS },
+    // its board programmed: the .fs loaded into the FPGA's SRAM (#2298)
+    program: 'sram',
   },
 };
 
