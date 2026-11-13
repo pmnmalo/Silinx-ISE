@@ -53,7 +53,7 @@ uiTest('#405 Try it parts: the bus value editor, the clock\'s Run and Pause, the
   await page.waitFor((sel) => document.querySelector(`${sel} .se-simlayer .lv-ctl`), [ED], { what: 'Try it' });
   const ev = (fn, ...a) => page.eval(fn, ED, ...a);
   // ---- the panel: its title and notes; no instance yet
-  assert.equal(await ev((sel) => document.querySelector(`${sel} .se-props .se-ptitle`).textContent), 'Trying it out');
+  assert.equal(await ev((sel) => document.querySelector(`${sel} .se-props .se-ptitle`).textContent), 'Try it');
   assert.match(await ev((sel) => document.querySelector(`${sel} .se-props .se-note`).textContent), /^Click an input to change it: 1-bit inputs toggle/);
   assert.equal(await ev((sel) => document.querySelector(`${sel} .lv-inst`).innerHTML), '');
   // ---- the bus editor of p (4 bits): its header, a bad value refused, the radix, +1, 0, Set

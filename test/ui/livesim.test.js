@@ -132,7 +132,10 @@ uiTest('live schematic simulation: toggle inputs, wire colours, outputs, clock s
   await setLang('en');
   assert.ok(en.includes('Stop') && pt.includes('Parar'));
   // Try it, not Simulate (the design flow's, its waves, #992)
-  assert.ok(en.includes('Try it') && pt.includes('Experimentar') && en.includes('Trying it out') && pt.includes('A experimentar'));
+  assert.ok(en.includes('Try it') && pt.includes('Experimentar'));
+  // the bar's badge says Try it, as the button, not Trying it out (#3795)
+  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-simbar .lv-badge`).textContent, ED), 'Try it');
+  assert.ok(!en.some((t) => /^Trying it out/.test(t)) && !pt.some((t) => /^A experimentar/.test(t)), JSON.stringify(en));
   assert.ok(!en.some((t) => /simulat/i.test(t)) && !pt.some((t) => /simula/i.test(t)), JSON.stringify(en));
   assert.deepEqual(untranslated(en, pt, [/^@?(Hex|Decimal|Reset)$/, /symbols?, \d+ nets/]), []);
   // Esc leaves the simulation: wires back to normal, editing possible again
