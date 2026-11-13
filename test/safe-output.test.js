@@ -53,6 +53,7 @@ const REVIEWED = {
   'web/js/schematic-render.js': 1,    // labels through esc; kinds and gates constants (core/schematic.js)
   'web/js/schematic-view.js': 2,      // a constant frame (a counter in its ids); the breadcrumb through esc
   'web/js/side-fold.js': 1,           // a constant chevron
+  'web/js/symbol-editor.js': 1,       // sch-svg.js's symbolSvg: pin and module names through its esc; geometry numbers (#3755)
   'web/js/symbol-info.js': 2,         // HDL through highlightHdl; the symbol's drawing escaped as sch-svg.js
   'web/js/tasks.js': 1,               // a constant icon
   'web/js/toolbar-menu.js': 1,        // a constant icon
