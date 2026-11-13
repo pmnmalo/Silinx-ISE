@@ -38,8 +38,9 @@ export function contextOf(before) {
 // when they are loaded, core/asm.js normalizeModel, core/fsm.js normalizeFsm, core/schdoc.js normalizeDoc)
 const NUMERIC_ATTRS = new Set(['x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'd', 'points',
   'viewBox', 'transform', 'font-size', 'stroke-width', 'stroke-dasharray', 'opacity', 'fill-opacity', 'textLength', 'colspan', 'rowspan']);
-// functions that return a number (or a CSS length, mm) from numbers; DIG_X: a digit's place on a board's drawing (emulator-*.js)
-const NUMERIC_FNS = /^(?:Math\.\w+|Number|parseInt|parseFloat|mm|r1|snap|textW|DIG_X)$/;
+// functions that return a number (or a CSS length, mm) from numbers; DIG_X: a digit's place on a board's drawing (emulator-*.js),
+// PIN_X: a pin's of the Cmod S6's DIP (#3745)
+const NUMERIC_FNS = /^(?:Math\.\w+|Number|parseInt|parseFloat|mm|r1|snap|textW|DIG_X|PIN_X)$/;
 
 // ---- the safe shapes of an expression, in any context
 // (and the boards drawn as the real ones, #3706 / #3745: pmodSide, unit, expTop, pins, header40, of numbers and a name
@@ -63,7 +64,7 @@ const SAFE = [
   [/^uidE?$/, 'id'],
   // markup made by another template (scanned on its own): a local that collects it, a symbol's drawing (s.body), or a function
   // of this module that returns it
-  [/^(?:inner|body|s\.body|label|svg|rows|rows\.join\(''\)|labels|holes|lcdChars|extra|eh|jh|nh|ch|pts|line|css|pages\.join\('\\n'\)|content\(\))$/, 'markup'],
+  [/^(?:inner|body|s\.body|label|svg|rows|rows\.join\(''\)|labels|holes|lcdChars|extra|eh|jh|nh|ch|pts|line|css|dip|pages\.join\('\\n'\)|content\(\))$/, 'markup'],
   // the Board Emulator's drawing helpers (#2478..#2481): emulator-pcb.js's svgText (imported as text) and ic escape their labels,
   // and the layouts' connectors, switches and modules are made of them and of numbers; a list of them joined
   [new RegExp(`^(?:${BOARD})\\(.*\\)$`, 's'), 'markup'],
@@ -172,7 +173,7 @@ test('#1443 the scanner: the context of an interpolation and the shapes it accep
   ok("[[a + 1, b], [c, d]].map(([x, y]) => `<circle cx=\"${x}\" cy=\"${y}\"/>`).join('')"); ok('DIG_X(1) + 33', 'attr:cx');
   // #3728: the boards drawn as the real ones (#3706, #3745): their connectors' helpers, a shift in a coordinate
   ok("pmodSide(false, 140, 'JA')"); ok('unit(4)'); ok("expTop(76, 344, 'A1')"); ok('pins(140, 406, 1, 2)'); ok("header40(364, 228, 'J2')");
-  ok('86 + (i >> 1) * 23', 'attr:x'); ok('x + 4 + (i >> 1) * 9.8', 'attr:x'); bad('i >> 1'); bad('a > b', 'attr:x'); bad('pinsOf(x)');
+  ok('86 + (i >> 1) * 23', 'attr:x'); ok('PIN_X(i)', 'attr:cx'); ok('dip'); bad('PIN_X(i)'); ok('x + 4 + (i >> 1) * 9.8', 'attr:x'); bad('i >> 1'); bad('a > b', 'attr:x'); bad('pinsOf(x)');
   bad('ICON[f(x)]'); bad('icon[name]'); bad("segs.map((s) => s.name).join('')"); bad("segs.map((s) => f(s)).join('')"); bad('DIG_X(1) + 33'); bad('textOf(x)');
   // an injection the context rule would miss if it read the attribute wrong
   assert.equal(contextOf('<circle class="asm-port" data-port="'), 'attr:data-port');
