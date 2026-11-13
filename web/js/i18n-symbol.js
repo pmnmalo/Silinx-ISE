@@ -6,7 +6,7 @@ export const SYMBOL_PT = {
   '◀ Earlier': '◀ Antes', 'Later ▶': 'Depois ▶',
   'Move the selected pin one place earlier on its side (up, or left)': 'Mover o pino selecionado um lugar para trás no seu lado (para cima, ou para a esquerda)',
   'Move the selected pin one place later on its side (down, or right)': 'Mover o pino selecionado um lugar para a frente no seu lado (para baixo, ou para a direita)',
-  'Symbol commands': 'Comandos do símbolo', 'Reset to Default': 'Repor o Predefinido',
+  'Reset to Default': 'Repor o Predefinido',
   'The symbol as Silinx draws it by default: the inputs on the left, the outputs on the right, in the module\'s order':
     'O símbolo como o Silinx o desenha por omissão: as entradas à esquerda, as saídas à direita, pela ordem do módulo',
   // Properties

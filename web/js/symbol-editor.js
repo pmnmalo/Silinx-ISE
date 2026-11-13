@@ -2,14 +2,13 @@
 // Symbol Editor edits a .sym: its pins' order and side (left, right, top, bottom: a pin dragged to its new place, or
 // its Side and Position in the Properties), the spacing between the pins, the body's width and height, where the
 // module's name is drawn. The symbol drawn as the schematic draws it (sch-svg.js). Its toolbar (the pin earlier /
-// later, the zoom, ☰ Properties, the ⋮ menu's Reset to Default), its foldable Properties panel and its status line
+// later, Reset to Default, the zoom, ☰ Properties), its foldable Properties panel and its status line
 // (the pins, the body's size) are the other editors' (docs/UI-GUIDELINES.md); its messages go to the console
 // (onMessage). Standalone: no app state.
 //
 //   const ed = mountSymbolEditor(container, { symbol, module, readOnly, banner, onChange(symbol), onMessage(text, warn) });
 //   ed.getSymbol(); ed.setModule(module); ed.select(pinName); ed.undo(); ed.redo(); ed.destroy();
 import { h } from './dom.js';
-import { toolbarMenu } from './toolbar-menu.js';
 import { toolIcon, zoomTools } from './editor-icons.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import { statusLine } from './status-line.js';
@@ -40,16 +39,15 @@ export function mountSymbolEditor(container, opts = {}) {
   const earlier = btn('◀ Earlier', 'Move the selected pin one place earlier on its side (up, or left)', () => shift(-1), 'sy-earlier');
   const later = btn('Later ▶', 'Move the selected pin one place later on its side (down, or right)', () => shift(1), 'sy-later');
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '200%');
-  const more = toolbarMenu([
-    btn('Reset to Default', 'The symbol as Silinx draws it by default: the inputs on the left, the outputs on the right, in the module\'s order', () => reset(), 'sy-reset'),
-  ], { title: 'Symbol commands', btnClass: 'asm-btn' });
-  const editing = h('div', { class: 'asm-group' }, earlier, later);
+  // (Reset to Default in the toolbar, with the tools that change the symbol, #3789)
+  const resetBtn = btn('Reset to Default', 'The symbol as Silinx draws it by default: the inputs on the left, the outputs on the right, in the module\'s order', () => reset(), 'sy-reset');
+  const editing = h('div', { class: 'asm-group' }, earlier, later, resetBtn);
   const toolbar = h('div', { class: 'asm-toolbar sy-toolbar' },
     readOnly ? null : editing, readOnly ? null : sep(),
     h('div', { class: 'asm-group' }, ...zoomTools(f => setZoom(zoom * f), () => fit()), zoomLbl),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
-    opts.banner || null, readOnly ? null : more.el);
+    opts.banner || null);
 
   // ---------------------------------------------------------------- canvas, side panel, status line
   const svg = document.createElementNS(SVGNS, 'svg');
@@ -149,28 +147,45 @@ export function mountSymbolEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------- the mouse: select a pin, drag it to its new place
   const toLocal = e => { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const m = svg.getScreenCTM(); return m ? p.matrixTransform(m.inverse()) : { x: 0, y: 0 }; };
+  // (no text of the drawing selected by a drag, #3789: the pins' names are drawn, not text to select)
+  svg.addEventListener('mousedown', e => e.preventDefault());
   svg.addEventListener('pointerdown', e => {
+    e.preventDefault();
     const c = e.target.closest?.('.sy-pin');
     sel = c ? c.dataset.pin : null;
     if (c && !readOnly) { dragging = { name: sel, id: e.pointerId }; svg.setPointerCapture?.(e.pointerId); }
     render();
   });
+  // while a pin is dragged: its handle under the pointer, and a mark where it will go on its side (#3789)
+  svg.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const pt = toLocal(e), s = instance(), def = symbolDef(s, s.modules), t = target(dragging.name, pt, def, def.body);
+    svg.querySelectorAll('.sy-ghost, .sy-mark').forEach(x => x.remove());
+    const node = (tag, attrs) => { const n = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v)); svg.append(n); };
+    node('line', { class: 'sy-mark', ...t.mark });
+    node('circle', { class: 'sy-ghost', cx: pt.x, cy: pt.y, r: 5 });
+  });
   svg.addEventListener('pointerup', e => {
     if (!dragging) return;
     const d = dragging; dragging = null;
-    const pt = toLocal(e), s = instance(), def = symbolDef(s, s.modules), b = def.body;
+    const pt = toLocal(e), s = instance(), def = symbolDef(s, s.modules);
     const pin = def.pins.find(q => q.name === d.name);
-    if (pin && Math.hypot(pt.x - pin.x, pt.y - pin.y) < 8) return;   // (a click: only selected)
-    drop(d.name, pt, def, b);
+    if (pin && Math.hypot(pt.x - pin.x, pt.y - pin.y) < 8) { render(); return; }   // (a click: only selected)
+    const t = target(d.name, pt, def, def.body);
+    movePin(d.name, t.side, t.index);
   });
-  function drop(name, pt, def, b) {
+  /** Where the pin `name` dropped at `pt` goes: { side, index, mark } (mark: a bar across that side's leads there). */
+  function target(name, pt, def, b) {
     // (the side the point is beyond, the further one at a corner; inside the body, its nearest edge)
     const dx = pt.x < b.x ? b.x - pt.x : pt.x > b.x + b.w ? pt.x - b.x - b.w : 0, dy = pt.y < b.y ? b.y - pt.y : pt.y > b.y + b.h ? pt.y - b.y - b.h : 0;
     const dist = { W: Math.abs(pt.x - b.x), E: Math.abs(pt.x - (b.x + b.w)), N: Math.abs(pt.y - b.y), S: Math.abs(pt.y - (b.y + b.h)) };
     const sd = dx || dy ? (dx >= dy ? (pt.x < b.x ? 'W' : 'E') : (pt.y < b.y ? 'N' : 'S')) : Object.keys(dist).reduce((a, k) => (dist[k] < dist[a] ? k : a), 'W');
-    const along = q => (sd === 'W' || sd === 'E' ? q.y : q.x), at = sd === 'W' || sd === 'E' ? pt.y : pt.x;
+    const across = sd === 'W' || sd === 'E', along = q => (across ? q.y : q.x), at = across ? pt.y : pt.x;
     const index = def.pins.filter(q => q.side === sd && q.name !== name && along(q) < at).length;
-    movePin(name, sd, index);
+    const c = across ? Math.min(b.y + b.h, Math.max(b.y, pt.y)) : Math.min(b.x + b.w, Math.max(b.x, pt.x));
+    const [e0, e1] = { W: [b.x - 20, b.x], E: [b.x + b.w, b.x + b.w + 20], N: [b.y - 20, b.y], S: [b.y + b.h, b.y + b.h + 20] }[sd];   // (a lead's length)
+    const mark = across ? { x1: e0, y1: c, x2: e1, y2: c } : { x1: c, y1: e0, x2: c, y2: e1 };
+    return { side: sd, index, mark };
   }
   root.addEventListener('keydown', e => {
     if (readOnly || !sel || e.target.closest('input, select, textarea')) return;
