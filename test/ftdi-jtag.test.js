@@ -5,7 +5,7 @@
 // bitstream, no MPSSE, the board in use, an SRAM never erased); the log, with no warning.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FtdiJtag, scanFtdi, programFtdiXilinx, programGowinSram, CABLES, GOWIN } from '../core/ftdi-jtag.js';
+import { FtdiJtag, scanFtdi, programFtdiXilinx, programGowinSram, CABLES, GOWIN, GOWIN_STATUS } from '../core/ftdi-jtag.js';
 import { gowinFsInfo } from '../core/open-bitstream.js';
 import { ftdiJtagBoard, xc7Bitstream } from './fixtures/ftdi-jtag-sim.js';
 import { gowinFs } from './fixtures/open-bitstreams.js';
@@ -82,7 +82,7 @@ test('a GW1NR-9C\'s SRAM erased, then loaded with a .fs: its bytes, DONE; the in
   const { usb, st } = ftdiJtagBoard({ device: 'gw1nr-9c' });
   const fs = gowinFsInfo(gowinFs()), l = logOf();
   const r = await programGowinSram(usb, fs.bytes, opts({ idcode: fs.idcode, log: l.log }));
-  assert.deepEqual([r.fpga, r.status & 0x2000], ['gw1nr-9c', 0x2000]);
+  assert.deepEqual([r.fpga, r.status & GOWIN_STATUS.DONE, r.status & GOWIN_STATUS.EDIT_MODE], ['gw1nr-9c', GOWIN_STATUS.DONE, 0]);
   assert.deepEqual(st.dev.config, fs.bytes);
   assert.deepEqual([st.dev.done, st.dev.errors], [true, []]);
   assert.deepEqual(st.dev.ops, [GOWIN.CONFIG_ENABLE, GOWIN.ERASE_SRAM, GOWIN.XFER_DONE, GOWIN.INIT_ADDR, GOWIN.XFER_WRITE, GOWIN.CONFIG_DISABLE]);
