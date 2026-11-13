@@ -162,6 +162,15 @@ test('the allow-list (#3365): two made-up values in the history, in their files 
   assert.equal(kinds('server/other.js', url).length, 2);
 });
 
+test('GitHub\'s hosted runners\' accounts are no one\'s home folder (#3726): runneradmin, its short name RUNNER~1', () => {
+  const msg = `git reports ${['C:', 'Users', 'runneradmin', 'AppData'].join('/')} for C:\\Users\\RUNNER~1\\AppData, ${['', 'Users', 'runneradmin', 'work'].join('/')} on macOS`;
+  assert.deepEqual(kinds('(message of 00201b6)', msg), []);
+  assert.deepEqual(kinds('test/git.test.js', msg), []);
+  // a user name like them is still found
+  const mac = ['', 'Users', 'runneradmin2'].join('/'), win = ['C:', 'Users', 'RUNNER~2'].join('\\');
+  assert.deepEqual(kinds('a.md', `${mac} ${win}`), [`home folder with a user name: ${mac}`, `home folder with a user name: ${win}`]);
+});
+
 test('the allow-list (#3407): build-settings\' made-up remote folder and computer name, in that file only', () => {
   const line = `remoteDir: '${['', 'home', 'u', 'build'].join('/')}', host: '${dot('build-box', 'local')}'`;
   assert.deepEqual(kinds('test/build-settings.test.js', line), []);

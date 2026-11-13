@@ -96,8 +96,9 @@ export const SELF = ['scripts/check-private-data.mjs', 'test/private-data.test.j
 const allowed = (file, text) => ALLOW.some(([f, t]) =>
   (typeof f === 'string' ? f === file : f.test(file)) && (typeof t === 'string' ? t === text : typeof t === 'function' ? t(text) : t.test(text)));
 
-// placeholders that may follow /Users/, /home/ or C:\Users\ in documentation
-const PLACEHOLDER_USERS = /^(<[^>]+>|\$\w+|\$\{\w+\}|%\w+%|you|me|user|username|name|runner|USER|USERNAME|\.\.\.|…)$/;
+// placeholders that may follow /Users/, /home/ or C:\Users\ in documentation, and GitHub's hosted runners' own
+// accounts (runner on Linux, runneradmin on macOS and Windows, RUNNER~1 its short 8.3 name: #3611's commits, #3726)
+const PLACEHOLDER_USERS = /^(<[^>]+>|\$\w+|\$\{\w+\}|%\w+%|you|me|user|username|name|runner|runneradmin|RUNNER~1|USER|USERNAME|\.\.\.|…)$/;
 
 /** Private / link-local IPv4 ranges (a home or office network). */
 const isNetworkIp = (ip) => { const [a, b] = ip.split('.').map(Number); return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127); };
