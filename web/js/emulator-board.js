@@ -32,18 +32,19 @@ export function mountBoardParts(ctx) {
   const mkButton = (k, cls = 'emu-btn', res = 'btn') => {
     const b = bitFor(res, k);
     const el = h('div', { class: cls, title: `${tip(res, k)} — press and hold (Shift+click keeps it pressed)` });
-    let latched = false, from = 0;
+    let latched = false;
     const set = (on) => { el.classList.toggle('on', on); setInputBit(b, on !== low(b)); };
     // (let go: held down, lit, until the design saw a real press, #3109; at once while paused)
     const up = () => {
       if (latched) return;
       if (!running()) { holds.press(el); set(false); return; }
-      holds.release(el, { until: pressEnd({ from, speed: speed(), period }), now: sim.now, go: () => set(false) });
+      holds.release(el, { until: (from) => pressEnd({ from, speed: speed(), period }), now: sim.now, go: () => set(false) });
     };
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      holds.press(el);
-      if (e.shiftKey) { latched = !latched; set(latched); } else { latched = false; from = sim.now; set(true); el.setPointerCapture(e.pointerId); }
+      // (the press reaches the design now, or once the worker's run in flight is over, #3727)
+      holds.press(el, { now: sim.now, busy: !!sim.busy });
+      if (e.shiftKey) { latched = !latched; set(latched); } else { latched = false; set(true); el.setPointerCapture(e.pointerId); }
     });
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);

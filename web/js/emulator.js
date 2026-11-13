@@ -489,7 +489,9 @@ export function mountEmulator(container, { design, board, assignments, title = '
   // what the board shows is to be drawn: at once when paused (a step, a power cycle), else by the next frame,
   // at most once per displayed frame; nothing while it is not seen (drawn when it is again, #719)
   function refresh() {
-    dirty = true; holds.tick(sim.now);   // (after every run: a button let go whose press the design saw released)
+    // (after every run: a button let go whose press the design saw released; a press made during a run in flight
+    // counted from its end, #3727)
+    dirty = true; holds.tick(sim.now, { settled: !sim.busy });
     if (!running) paint();
     else if (!raf && !paintRaf && shown()) paintRaf = requestAnimationFrame(() => { paintRaf = 0; paint(); });
   }
