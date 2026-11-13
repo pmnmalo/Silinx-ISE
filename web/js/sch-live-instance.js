@@ -31,7 +31,7 @@ export function mountLiveInstance(ctx) {
   function renderProps(el) {
     setPropEl(el);
     el.innerHTML = '';
-    el.append(h('div', { class: 'se-ptitle', text: 'Trying it out' }),
+    el.append(h('div', { class: 'se-ptitle', text: 'Try it' }),
       h('div', { class: 'se-note', text: 'Click an input to change it: 1-bit inputs toggle, buses open a value editor, clock inputs step one cycle. Wires: green = 1, dark green = 0, red = X/U, blue = Z. Hover a pin or a wire to see its value; click a component to list its pins.' }),
       ...(live.bidirs?.length ? [h('div', { class: 'se-note lv-bidir-note', text: 'Bidirectional (inout) markers show the value on the bus. Click one to drive the bus from outside (1-bit: Z, 0, 1 in turn; a bus opens the value editor, Z releases it); released (Z), the circuit drives it.' })] : []),
       h('div', { class: 'lv-inst' }));

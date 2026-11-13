@@ -665,9 +665,9 @@ Object.assign(PT, {
 // live schematic simulation (sch-live.js): Try it, not Simulate (the design flow's, #992)
 Object.assign(PT, {
   'Simulate': 'Simular', 'Try it': 'Experimentar', 'Try it: click the inputs and watch the circuit work (Esc to stop)': 'Experimentar: clique nas entradas e veja o circuito a funcionar (Esc para parar)',
-  'Trying it out: click the inputs (switches, bus values, clocks), hover a wire or pin to see its value, drag to pan. Esc stops.':
-    'A experimentar: clique nas entradas (interruptores, valores de barramentos, relógios), passe o rato sobre um fio ou pino para ver o valor, arraste para deslocar. Esc para.',
-  'Building the circuit\'s model…': 'A construir o modelo do circuito…', 'Trying it out': 'A experimentar',
+  'Try it: click the inputs (switches, bus values, clocks), hover a wire or pin to see its value, drag to pan. Esc stops.':
+    'Experimentar: clique nas entradas (interruptores, valores de barramentos, relógios), passe o rato sobre um fio ou pino para ver o valor, arraste para deslocar. Esc para.',
+  'Building the circuit\'s model…': 'A construir o modelo do circuito…',
   'Power cycle: back to time 0, registers and inputs to their initial values': 'Religar: volta ao tempo 0, registos e entradas com os valores iniciais',
   'Step': 'Passo', 'One clock cycle (rising and falling edge)': 'Um ciclo de relógio (flanco ascendente e descendente)', 'Pause': 'Pausa',
   'Run / pause the clock': 'Executar / pausar o relógio', 'Clock rate': 'Frequência do relógio', 'Buses:': 'Barramentos:',

@@ -75,7 +75,7 @@ uiTest('Try it on the RTL Schematic and the Technology Schematic of gates: the s
   await setLang('pt');
   const pt = await texts();
   await setLang('en');
-  assert.ok(en.includes('Try it') && pt.includes('Experimentar') && en.includes('Trying it out') && pt.includes('A experimentar') && en.includes('Stop') && pt.includes('Parar'), JSON.stringify(pt));
+  assert.ok(en.includes('Try it') && pt.includes('Experimentar') && en.includes('Stop') && pt.includes('Parar'), JSON.stringify(pt));
   assert.deepEqual(untranslated(en, pt, [/^@?(Hex|Decimal|Reset)$/]), []);
   await stopWithEsc(page);
   // View Technology Schematic (the Silinx toolchain's synthesis runs first): the netlist's LUTs and buffers

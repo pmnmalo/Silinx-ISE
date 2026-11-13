@@ -68,7 +68,7 @@ uiTest('#405 schematic drawing: the sheet, the wires, symbols, markers and names
     let updated = 0;
     st.live = { update: (full) => { updated += full ? 1 : 0; } };
     r.render();
-    o.live = [updated, on(), /^Trying it out/.test(status.el.textContent)];
+    o.live = [updated, on(), /^Try it: /.test(status.el.textContent)];
     st.live = null;
     // destroyed: not drawn
     st.destroyed = true; st.doc = { ...st.doc, symbols: [] };

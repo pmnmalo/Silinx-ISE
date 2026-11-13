@@ -102,7 +102,7 @@ function liveController(ctx, live) {
     return { c, runBtn, box };
   });
   bar.append(
-    h('span', { class: 'lv-badge', text: 'Trying it out' }),
+    h('span', { class: 'lv-badge', text: 'Try it' }),
     h('button', { type: 'button', class: 'btn lv-reset', title: 'Power cycle: back to time 0, registers and inputs to their initial values', text: 'Reset', onclick: () => { stopAll(); closeEditor(); act(() => live.reset({ inputs: true })); } }),
     ...(clocks.length ? [h('span', { class: 'lv-sep' }), h('span', { class: 'lv-lbl', text: 'Clock:' }), ...clockBoxes.map(b => b.box)] : []),
     h('span', { class: 'lv-sep' }), h('label', { class: 'lv-lbl', text: 'Buses:' }), radixSel,
