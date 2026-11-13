@@ -20,8 +20,8 @@ use IEEE.NUMERIC_STD.ALL;
 entity uart is
     Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
               BAUD    : integer := 9600;
-              STABLE  : integer := CLK_HZ / 50;    -- button debounce (20 ms)
-              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              STABLE  : integer := 0;              -- button debounce (20 ms): 0 for CLK_HZ / 50
+              REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
               BTN_LOW : boolean := false );        -- true: the board's buttons read '0' when pressed
     Port ( clk : in  STD_LOGIC;                  -- the board's clock (CLK_HZ)
            rx  : in  STD_LOGIC;
@@ -34,6 +34,13 @@ entity uart is
 end uart;
 
 architecture Behavioral of uart is
+    -- the timing in clock cycles: a generic given (the test bench's), else (0) from the board's clock
+    function or_else (given, derived : integer) return integer is
+    begin
+        if given /= 0 then return given; else return derived; end if;
+    end function;
+    constant STABLE_N  : integer := or_else(STABLE, CLK_HZ / 50);
+    constant REFRESH_N : integer := or_else(REFRESH, CLK_HZ / 1000);
     constant BIT_T : integer := CLK_HZ / BAUD;    -- clock cycles a bit
     type rom_t is array (0 to 19) of STD_LOGIC_VECTOR (7 downto 0);
     constant MSG : rom_t := (                    -- "Hello from Silinx!" CR LF
@@ -66,7 +73,7 @@ begin
         port map ( clk => clk, start => start, data => tx_data, busy => tx_busy, tx => tx );
 
     button : entity work.debounce
-        generic map ( STABLE => STABLE )
+        generic map ( STABLE => STABLE_N )
         port map ( clk => clk, btn => btnOn(0), press => press );
 
     -- what is sent: the echo first, then the message's characters one after the other
@@ -105,7 +112,7 @@ begin
     digits <= std_logic_vector(count) & last;
 
     display : entity work.sevenseg
-        generic map ( REFRESH => REFRESH )
+        generic map ( REFRESH => REFRESH_N )
         port map ( clk => clk, digits => digits, points => "0100",
                    seg => seg, dp => dp, an => an );
 end Behavioral;

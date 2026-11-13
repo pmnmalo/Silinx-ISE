@@ -16,9 +16,9 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity stopwatch is
     Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
-              CS      : integer := CLK_HZ / 100;   -- clock cycles per hundredth of a second
-              STABLE  : integer := CLK_HZ / 50;    -- button debounce (20 ms)
-              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              CS      : integer := 0;              -- clock cycles per hundredth of a second: 0 for CLK_HZ / 100
+              STABLE  : integer := 0;              -- button debounce (20 ms): 0 for CLK_HZ / 50
+              REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
               BTN_LOW : boolean := false;          -- true: the board's buttons read '0' when pressed
               SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
     Port ( clk : in  STD_LOGIC;                  -- the board's clock (CLK_HZ)
@@ -31,10 +31,18 @@ entity stopwatch is
 end stopwatch;
 
 architecture Behavioral of stopwatch is
+    -- the timing in clock cycles: a generic given (the test bench's), else (0) from the board's clock
+    function or_else (given, derived : integer) return integer is
+    begin
+        if given /= 0 then return given; else return derived; end if;
+    end function;
+    constant CS_N      : integer := or_else(CS, CLK_HZ / 100);
+    constant STABLE_N  : integer := or_else(STABLE, CLK_HZ / 50);
+    constant REFRESH_N : integer := or_else(REFRESH, CLK_HZ / 1000);
     signal startStop, lap, clear, recall : STD_LOGIC;
     signal running   : boolean := false;
     signal recalling : boolean := false;
-    signal tick      : integer range 0 to CS - 1 := 0;
+    signal tick      : integer range 0 to CS_N - 1 := 0;
     signal elapsed   : UNSIGNED (13 downto 0) := (others => '0');   -- hundredths: 0 .. 9999
     -- the lap memory: 1023 times, written at `laps`, read at `index` (1024 words, a whole block RAM:
     -- the Spartan-6 would put 512 in a 9K half, whose initial data ISE says may be wrong)
@@ -53,10 +61,10 @@ begin
     btnOn <= not btn when BTN_LOW else btn;
     swOn  <= not sw when SW_LOW else sw;
 
-    db0: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(0), press => startStop);
-    db1: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(1), press => lap);
-    db2: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(2), press => clear);
-    db3: entity work.debounce generic map (STABLE => STABLE) port map (clk => clk, btn => btnOn(3), press => recall);
+    db0: entity work.debounce generic map (STABLE => STABLE_N) port map (clk => clk, btn => btnOn(0), press => startStop);
+    db1: entity work.debounce generic map (STABLE => STABLE_N) port map (clk => clk, btn => btnOn(1), press => lap);
+    db2: entity work.debounce generic map (STABLE => STABLE_N) port map (clk => clk, btn => btnOn(2), press => clear);
+    db3: entity work.debounce generic map (STABLE => STABLE_N) port map (clk => clk, btn => btnOn(3), press => recall);
 
     process (clk)
     begin
@@ -66,7 +74,7 @@ begin
             else
                 -- the time
                 if running then
-                    if tick = CS - 1 then
+                    if tick = CS_N - 1 then
                         tick <= 0;
                         if elapsed = 9999 then elapsed <= (others => '0'); else elapsed <= elapsed + 1; end if;
                     else
@@ -108,7 +116,7 @@ begin
     dec: entity work.to_decimal port map (clk => clk, value => shown, digits => digits);
     -- no leading zero on the left digit
     shownDigits <= "1111" & digits(11 downto 0) when digits(15 downto 12) = "0000" else digits;
-    display: entity work.sevenseg generic map (REFRESH => REFRESH)
+    display: entity work.sevenseg generic map (REFRESH => REFRESH_N)
         port map (clk => clk, digits => shownDigits, points => "0100", seg => seg, dp => dp, an => an);
 
     led <= std_logic_vector(resize(index, 8) + 1) when recalling else

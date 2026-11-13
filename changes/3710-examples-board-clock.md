@@ -8,8 +8,10 @@ In short:
 In detail:
 
 - **The examples' clock as a generic, their counters sized by it (#3710).** Each clocked example's top has a `CLK_HZ`
-  generic (50 MHz, the Basys2's), and its timing generics default from it (`TICK := CLK_HZ`, `STABLE := CLK_HZ / 50`,
-  `REFRESH := CLK_HZ / 1000`…). The values at 50 MHz are the ones before, and the test benches still set them. The
+  generic (50 MHz, the Basys2's), and its timing generics come from it: in Verilog as their defaults
+  (`TICK = CLK_HZ`, `STABLE = CLK_HZ / 50`…); in VHDL, whose generics' defaults cannot use another generic (VHDL-93,
+  as XST reads it), with a default of 0, "from CLK_HZ", taken in an architecture constant (`TICK_N := or_else(TICK,
+  CLK_HZ)`). The values at 50 MHz are the ones before, and the test benches still set them. The
   Verilog counters (the clock's tick, pong's step, the debouncers', the displays') are sized by a constant `clog2`
   function. vga's `vga_sync` makes its 25 MHz pixel enable from a `DIV` generic. blinky's ASM chart has 21-bit
   debounce counters (2 000 000 cycles at 100 MHz).
