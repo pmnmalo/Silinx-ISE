@@ -72,7 +72,7 @@ uiTest('#1556 schematic: Duplicate, Rotate, Mirror, Delete in the right-click me
   const sym = async (id) => (await getDoc()).symbols.find((s) => s.id === id);
   const MARKER_MENU = [['Rename…', ''], ['Duplicate', ''], ['Rotate', 'Ctrl+R'], ['Mirror', 'Ctrl+M'], ['Delete', 'Del']];
   // (a module's instance: its module's symbol in the Symbol Editor too, #3755)
-  const MODULE_MENU = [['Symbol Info…', 'F1'], ['Edit Symbol', ''], ...MARKER_MENU];
+  const MODULE_MENU = [['Symbol Info…', 'F1'], ['Edit Symbol', ''], ['Update Symbol', ''], ...MARKER_MENU];   // (#3791: Update Symbol, disabled when up to date)
   // the Symbol Info dialog's heading, closed with Escape; the document unchanged
   const info = async (what) => {
     await page.waitFor(() => document.querySelector('.se-symdoc .se-dhead b'), [], { what: `${what}: Symbol Info` });
@@ -178,7 +178,7 @@ uiTest('#1556 schematic: Duplicate, Rotate, Mirror, Delete in the right-click me
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
     await page.key('Escape');
-    assert.deepEqual(await right(SYM('S3')), [['Informação do Símbolo…', 'F1'], ['Editar Símbolo', ''], ['Mudar o Nome…', ''], ['Duplicar', ''], ['Rodar', 'Ctrl+R'], ['Espelhar', 'Ctrl+M'], ['Apagar', 'Del']]);
+    assert.deepEqual(await right(SYM('S3')), [['Informação do Símbolo…', 'F1'], ['Editar Símbolo', ''], ['Atualizar Símbolo', ''], ['Mudar o Nome…', ''], ['Duplicar', ''], ['Rodar', 'Ctrl+R'], ['Espelhar', 'Ctrl+M'], ['Apagar', 'Del']]);
     await page.key('Escape');
     await page.closeMenus();
     assert.deepEqual(await right(LABEL), [['Mudar o Nome…', ''], ['Apagar', 'Del']]);

@@ -129,6 +129,16 @@ uiTest('#3755 Edit Symbol: the symbol made and opened; pins moved, by the Proper
   await page.rightClick(`${ED} svg .sym[data-id="U"] .hitbox`);
   await page.click('body > .menu-popup .mi', { text: 'Edit Symbol' });
   await page.waitFor(() => window.Silinx.active?.path === 'src/reg1.sym.json', [], { what: 'the symbol in front' });
+  // its Properties' Edit Symbol too (#3791), in Portuguese its tip
+  await page.eval(() => window.SilinxApp.openSch('src/top.sch.json'));
+  await page.waitFor(() => window.Silinx.active?.path === 'src/top.sch.json', [], { what: 'the schematic in front' });
+  await page.click(`${ED} svg .sym[data-id="U"] .hitbox`);
+  await page.waitFor((ed) => document.querySelector(`${ed} .se-editsym`), [ED], { what: 'its Edit Symbol button' });
+  await setLang(page, 'pt');
+  assert.deepEqual(await page.eval((ed) => { const b = document.querySelector(`${ed} .se-editsym`); return [b.textContent, b.title]; }, ED), ['Editar Símbolo', 'O símbolo do seu módulo no Editor de Símbolos']);
+  await setLang(page, 'en');
+  await page.click(`${ED} .se-editsym`);
+  await page.waitFor(() => window.Silinx.active?.path === 'src/reg1.sym.json', [], { what: 'the symbol in front again' });
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 }, { timeout: 180000 });
 

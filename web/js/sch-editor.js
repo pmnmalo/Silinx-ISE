@@ -267,7 +267,7 @@ export function mountSchEditor(container, opts = {}) {
   // the right-click menu (sch-context.js): Rename… (sch-rename.js, #1546), the selection's commands (#1556)
   const { rename } = mountSchRename({ doc: () => doc, nl: () => nl, edit, joinByName, joinMarker, renameLabel });
   const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, segSel, sel: () => sel, tool: () => tool, render, renderProps,
-    rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; }, openInfo: (...a) => openInfo(...a), symTarget: (...a) => symTarget(...a), opts });
+    rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; }, openInfo: (...a) => openInfo(...a), symTarget: (...a) => symTarget(...a), opts, modules: () => modules, edit: (...a) => edit(...a), flash: (...a) => flash(...a) });
   const { finishMove, onMove, onUp } = mountSchMouse({
     segSel, wholeBranch, container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor: () => cursor, destroyed: () => destroyed, doc: () => doc, drag: () => drag, finishSegMove, finishWire,
