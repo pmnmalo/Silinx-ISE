@@ -6,7 +6,7 @@
 // the copies drives its net N times: an error. Isomorphic (no DOM).
 
 const RANGE = /^([A-Za-z][A-Za-z0-9_]*)\s*[([]\s*(\d+)\s*:\s*(\d+)\s*[)\]]$/;
-export const MAX_COPIES = 1024;
+const MAX_COPIES = 1024;
 
 /** An instance name with a range: { base, msb, lsb, n, indices (msb first) }, else null. */
 export function arrayName(name) {
