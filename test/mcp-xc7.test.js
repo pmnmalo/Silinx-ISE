@@ -99,8 +99,8 @@ test('run_process with the Silinx toolchain on the Basys 3: synth_xilinx, nextpn
   const timing = await ok('get_report', { project: 'o3', report: 'timing' });
   assert.equal(timing.data.path, 'build/open/timing.txt');
   assert.match(timing.text, /^Timing of xc7a35tcpg236-1 after Place & Route: nextpnr's estimate .*\n.*\n\nClock clk: [\d.]+ MHz \([\d.]+ ns\), constraint 100 MHz: met\n/);
-  // (a step the back end does not have: refused with its list)
-  await fails('run_process', { project: 'o3', process: 'post_par_model', toolchain: 'silinx' }, 'no step postpar (the steps: synth, translate, par, trce, bitgen)');
+  // (a simulation model, which the 7-series flows do not make: refused before the back end, as simulate refuses it, #3707)
+  await fails('run_process', { project: 'o3', process: 'post_par_model', toolchain: 'silinx' }, 'the Artix-7 flow makes no post-place & route simulation model (only the Spartan flows make them): simulate the behavioral model');
   // (AMD Vivado stays the project's own when no toolchain is asked: the project made through the MCP server, not trusted)
   const untrusted = 'project \'o3\' was made through the MCP server (by an assistant): AMD Vivado runs only once you trust it (Trust Project, in the console when the project opens)';
   await fails('run_process', { project: 'o3', process: 'synthesize' }, untrusted);
