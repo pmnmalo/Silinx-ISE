@@ -29,6 +29,8 @@ import { FLOW_UP_TO, boardUcf, checkUcfFile, regenerateUcf, runImpl, stepTracker
 import { adoptDrawnHdl, drawnHdlClashes, freshHdl, openAsm, openFsm, openPetri, openSch,
   openTt, openTtSchematic, openView, projectPart, refreshSyncBanner, schModules, staleHdl, syncBanner, viewTitle } from './drawings.js';
 import { checkFileSyntax, hdlDiagnostics, markStale, openMode, renderProcesses, saveAll, projectTool } from './processes.js';
+import { designOnly, hiddenHdl, refusedHere, shownFiles } from './design-only.js';
+import { hdlSideFile } from '/core/project-kind.js';
 import { fileContextMenu, inView, renderHierarchy, saveProjectJson, select, serialOp, setTop, treeItem } from './design.js';
 import { printActive, printable, refreshSteps, settingsItems, setupMenus, setupToolbar, showPalette } from './menus.js';
 import { runSimulation } from './viewers.js';
@@ -307,7 +309,7 @@ export const pasteAny = () => clipEditor(S.active)?.paste();
 export const deleteAny = () => clipEditor(S.active)?.deleteSelection();
 
 // put a file of the project folder (back) into the project
-export function addToProject(file) { return serialOp(() => addNow(file)); }
+export function addToProject(file) { return refusedHere(file) ? Promise.resolve(false) : serialOp(() => addNow(file)); }   // (no HDL in a design project, #3780)
 async function addNow(file) {
   const pj = S.project;
   pj.excluded = (pj.excluded || []).filter(f => f !== file);
@@ -453,6 +455,7 @@ export function closeDocByPath(path) { for (const d of [...S.docs]) if (d.path =
 // its id's, web/js/tasks.js taskOfDoc)
 export async function openFile(path, line, col, { task } = {}) {
   if (!S.project) return;
+  if (designOnly() && hdlSideFile(path)) return hiddenHdl(path);   // (a design and simulation project's HDL: its drawing instead, #3780)
   if (path.endsWith('.asm.json')) return openAsm(path);
   if (path.endsWith('.sch.json')) return openSch(path);
   if (/\.(tt|bool)\.json$/.test(path)) return openTt(path);
@@ -733,7 +736,7 @@ export function renderFilesPage() {
   // files sorted by path, each folder as a row of its own (right-click: rename / delete the folder)
   const reg = new Map(S.project.files.map(f => [f.path, f]));
   const inProject = new Set(S.fileTree);
-  const paths = [...new Set([...S.project.files.map(f => f.path), ...(S.diskTree || S.fileTree)])].sort((a, b) => a.localeCompare(b));
+  const paths = shownFiles([...new Set([...S.project.files.map(f => f.path), ...(S.diskTree || S.fileTree)])]).sort((a, b) => a.localeCompare(b));   // (no HDL in a design project, #3780)
   const shown = new Set();
   for (const path of paths) {
     const parts = path.split('/');

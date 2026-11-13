@@ -13,6 +13,9 @@ import { reservedNameDiags } from './processes.js';
 import { countEvent, siteCounts } from './analytics.js';
 import { confirmDeviceChange } from './device-change.js';
 import { boardTop } from './board-top.js';
+import { KIND_OPTIONS, kindBoardOptions, kindFields, makeDesignProject } from './project-kind-ui.js';
+import { DESIGN_KIND, DESIGN_ONLY_LABEL, asFpgaProject, isDesignOnly } from '/core/project-kind.js';
+import { designOnly, refusedHere } from './design-only.js';
 import { byLastUsed } from './project-store.js';
 import { currentProject, opened } from './project.js';
 import { prefKey } from './prefs.js';
@@ -157,6 +160,12 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       : { location: 'this browser: ', hint: kept.supported ? "Projects are kept in this browser's storage (File ▸ Open Workspace Folder… keeps them in a folder on the disk)." : "Projects are kept in this browser's storage (a folder on the disk needs Chrome or Edge)." };
   const name = h('input', { type: 'text', value: st.name, placeholder: 'project name' });
   const tplSel = select([['empty', 'Empty project'], ...templates.map(t => [t, `Example: ${t}`]), ...tests.map(t => [t, `Test design: ${t}`])], template);
+  // the project's kind (#3780): an FPGA project, or a design and simulation one (no board, no device, no HDL); an example's
+  // an FPGA project
+  const kindSel = select(KIND_OPTIONS, 'fpga');
+  const syncKindSel = () => { kindSel.disabled = tplSel.value !== 'empty'; if (kindSel.disabled) kindSel.value = 'fpga'; };
+  tplSel.addEventListener('change', syncKindSel);
+  syncKindSel();
   const p1 = {
     title: 'Create New Project',
     render: () => h('div', {},
@@ -164,7 +173,8 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       h('div', { class: 'form-grid' },
         ...field('Name:', name),
         ...field('Location:', h('input', { type: 'text', value: where.location + (st.name || '…'), disabled: true })),
-        ...field('Start from:', tplSel)),
+        ...field('Start from:', tplSel),
+        ...field('Project Kind:', kindSel)),
       h('div', { class: 'hint', style: { marginTop: '14px' } }, where.hint)),
     validate: async () => {
       const bad = projectNameError(name.value.trim());   // (the server's rule and message, core/project-name.js, #3538)
@@ -203,24 +213,28 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
     topNote.style.display = topNote.textContent ? '' : 'none';
   };
   topType.addEventListener('change', syncTop);
+  const catSel = select(['All'], 'All'), simSel = select(['SSim (VHDL/Verilog; Silinx Simulator)'], ''), stdSel = select(['VHDL-93', 'VHDL-2008'], 'VHDL-93');
+  const isDesign = () => kindSel.value === DESIGN_KIND && tplSel.value === 'empty';
+  const syncKind = kindFields(isDesign, [boardSel, catSel, dp.famSel, dp.partSel, dp.pkgSel, dp.spdSel, synthSel, simSel, langSel, stdSel], topType);
+  kindSel.addEventListener('change', syncKind);
   const p2 = {
     title: 'Project Settings',
     render: () => h('div', {},
       h('div', { class: 'hint' }, 'Select the device and design flow for the project.'),
       h('div', { class: 'form-grid' },
         ...field('Evaluation Development Board:', boardSel),
-        ...field('Product Category:', select(['All'], 'All')),
+        ...field('Product Category:', catSel),
         ...field('Family:', dp.famSel),
         ...field('Device:', dp.partSel),
         ...field('Package:', dp.pkgSel),
         ...field('Speed:', dp.spdSel),
         ...field('Top-Level Source Type:', topType), topNote,
         ...field('Synthesis Tool:', synthSel),
-        ...field('Simulator:', select(['SSim (VHDL/Verilog; Silinx Simulator)'], '')),
+        ...field('Simulator:', simSel),
         ...field('Preferred Language:', langSel),
-        ...field('VHDL Source Analysis Standard:', select(['VHDL-93', 'VHDL-2008'], 'VHDL-93')),
+        ...field('VHDL Source Analysis Standard:', stdSel),
       )),
-    onShow: () => syncTop(),
+    onShow: () => { syncTop(); syncKind(); },
   };
   const summary = h('div');
   const p3 = {
@@ -229,6 +243,12 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
     onShow: () => {
       summary.innerHTML = '';
       const b = db.boards.find(x => x.id === boardSel.value);
+      if (isDesign()) {
+        summary.append(h('pre', { class: 'code-box' }, `Project Navigator will create a new project with the following specifications.\n\n` +
+          `Project:\n  Project Name: ${name.value.trim()}\n  Template:     ${tplSel.value}\n  Kind:         ${DESIGN_ONLY_LABEL}\n\n` +
+          `Flow:\n  Top-Level Source Type: ${TOP_TYPES.find(t => t.id === topType.value).label}\n  Simulator:          SSim (Silinx behavioural simulator)`));
+        return;
+      }
       summary.append(h('pre', { class: 'code-box' },
         `Project Navigator will create a new project with the following specifications.\n\n` +
         `Project:\n  Project Name: ${name.value.trim()}\n  Template:     ${tplSel.value}\n\n` +
@@ -240,15 +260,16 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
   if (!ok) return;
   try {
     if (st.replace) await removeExistingProject(name.value.trim());
-    const pj = await api.createProject({
+    const design = isDesign();
+    const pj = await api.createProject(design ? { name: name.value.trim(), template: 'empty', kind: DESIGN_KIND } : {
       name: name.value.trim(), template: tplSel.value,
       device: dp.value(),
       board: boardSel.value || (tplSel.value !== 'empty' ? undefined : null),
     });
     countEvent('new-project');
-    pj.preferredLanguage = langSel.value;
+    pj.preferredLanguage = design ? 'vhdl' : langSel.value;
     pj.topSourceType = topType.value;
-    pj.synthTool = synthSel.value;
+    if (!design) pj.synthTool = synthSel.value;
     await api.saveProject(pj.name, pj);
     // a diagram / table top: its document and its synchronized HDL module 'top'
     const top = topType.value !== 'hdl' && tplSel.value === 'empty' ? await createTopSource(pj.name, topType.value, langSel.value) : null;
@@ -407,6 +428,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     const c = importSourceFile(f.name, new Uint8Array(await f.arrayBuffer()), role.value);
     if (c.refused === 'gate') { app.log(`WARNING: ${c.message}`, 'warn'); continue; }
     if (c.refused) { await alertDlg(title, c.message, 'error'); continue; }
+    if (refusedHere(c.path)) continue;   // (an HDL file in a design and simulation project, #3780: the console says why)
     if (c.warning) app.log(`WARNING: ${c.warning}`, 'warn');
     if ((S.diskTree || S.fileTree).includes(c.path) && !await confirmDlg(title, `${c.path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, c.path, c.text);
@@ -427,12 +449,13 @@ export async function sourceProperties(path) {
   const { setSourceLanguage, sourceLanguageChoice } = await import('./drawings-lang.js');
   const own = await sourceLanguageChoice(path);
   if (!f && !own) return;
-  const lang = own && select([['', 'Project Preferred Language'], ['vhdl', 'VHDL'], ['verilog', 'Verilog']], own.choice);
+  // (a design and simulation project: no language, its HDL hidden, #3780)
+  const lang = own && !designOnly() && select([['', 'Project Preferred Language'], ['vhdl', 'VHDL'], ['verilog', 'Verilog']], own.choice);
   const r = await dialog({
     title: `Source Properties - ${path}`, width: 440,
-    body: h('div', { class: 'form-grid' }, ...field('File:', h('span', {}, path)), ...field('Language:', lang || h('span', {}, f.lang))),
+    body: h('div', { class: 'form-grid' }, ...field('File:', h('span', {}, path)), ...(designOnly() ? [] : field('Language:', lang || h('span', {}, f.lang)))),
   });
-  if (!r || !own || lang.value === own.choice) return;
+  if (!r || !lang || lang.value === own.choice) return;
   await setSourceLanguage(own.drawing, lang.value);
   await app.reloadProject();
 }
@@ -442,18 +465,21 @@ export async function projectProperties() {
   if (!db) return alertDlg("Design Properties", "The device database could not be loaded (is the Silinx server running?).", "error");
   const pj0 = S.project;
   let pj = pj0;
-  const boardSel = select(boardOptions(db), pj.board || '');
+  // (the board list's first choice: a design and simulation project, both ways, #3780)
+  const boardSel = select(kindBoardOptions(boardOptions(db)), isDesignOnly(pj) ? DESIGN_KIND : pj.board || '');
   const dp = devicePicker(db, pj.device);
   dp.disable(!!pj.board);
-  boardSel.addEventListener('change', () => {
-    const b = db.boards.find(x => x.id === boardSel.value);
-    if (b) dp.set(b.device);
-    dp.disable(!!b);
-  });
   const lang = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], pj.preferredLanguage || 'vhdl');
   // a project from before the setting follows Toolchain Settings
   const synth = select(SYNTH_TOOLS, pj.synthTool || (S.toolchain?.config?.mode === 'silinx' ? 'silinx' : 'xst'));
   dp.lockSynth(synth, pj.synthTool);
+  const syncKind = kindFields(() => boardSel.value === DESIGN_KIND, [dp.famSel, dp.partSel, dp.pkgSel, dp.spdSel, synth, lang]);
+  boardSel.addEventListener('change', () => {
+    const b = db.boards.find(x => x.id === boardSel.value);
+    if (b) dp.set(b.device);
+    dp.disable(!!b);
+    syncKind();
+  });
   const r = await dialog({
     title: 'Design Properties', width: 520,
     body: h('div', { class: 'form-grid' },
@@ -465,15 +491,24 @@ export async function projectProperties() {
       ...field('Top-Level Source Type:', h('span', {}, TOP_TYPES.find(t => t.id === (pj.topSourceType || 'hdl'))?.label || 'HDL')),
       ...field('Synthesis Tool:', synth),
       ...field('Preferred Language:', lang)),
+    onOpen: () => syncKind(),
   });
   if (!r) return;
   // (the choices applied to the project as it is now: a reload while the dialog was open replaced it, #2281)
   pj = await currentProject();
   if (pj?.name !== pj0.name) return;
+  // a design and simulation project made (#3780), or one given a board or a device: an FPGA project then
+  if (boardSel.value === DESIGN_KIND) return isDesignOnly(pj) || makeDesignProject(pj);
+  const fromDesign = isDesignOnly(pj);
   // a new device: the design checked against it first, the user told (#796)
   const next = dp.value();
   if ((next.part !== pj.device.part || next.package !== pj.device.package) && !await confirmDeviceChange(pj, next, db)) return;
   const oldBoard = pj.board, oldDev = `${pj.device.part}-${pj.device.package}`, oldLang = pj.preferredLanguage || 'vhdl';
+  if (fromDesign) {   // (its kind dropped, its constraints file named: the device's format below)
+    pj.constraints = asFpgaProject(pj, { device: dp.value() }).constraints;
+    delete pj.kind;
+    app.log(`${pj.name}: an FPGA project now: its HDL and its implementation shown.`, 'info');
+  }
   pj.board = boardSel.value || null;
   pj.device = dp.value();
   pj.preferredLanguage = lang.value;

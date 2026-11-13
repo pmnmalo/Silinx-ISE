@@ -15,6 +15,8 @@ import { projectSaved, renderHierarchy } from './design.js';
 import { prefKey } from './prefs.js';
 import { watchProject, stopWatching } from './project-watch.js';
 import { gitStartItems, hasGit, openFromRepositoryDialog } from './git.js';
+import { refreshSteps } from './menus.js';
+import { setKindFlag } from './project-kind-flag.js';
 
 const $ = id => document.getElementById(id);
 // how long after a project opens the browser edition fetches what Implement needs (#967): after the opening's own work
@@ -164,6 +166,8 @@ async function reloadProjectNow(render = true, depth = 0) {
   renderHierarchy();
   renderFilesPage();
   renderLibsPage();
+  setKindFlag(S.project);   // (the editors' flag, #3780)
+  refreshSteps();   // (a design and simulation project's toolbar: no Implement, Emulate or Program, #3780)
   if (!render) return;
 }
 
@@ -188,6 +192,7 @@ async function closeProjectNow() {
   if (!await closeAllDocs()) return;
   stopWatching();
   S.project = null; S.lib = null; S.sources = []; S.modules = [];
+  setKindFlag(null);
   resetProjectState();
   try { localStorage.removeItem(prefKey('silinx.lastProject')); } catch { /* ignore */ }
   updateTitle(); renderHierarchy(); renderProcesses(); renderFilesPage(); renderLibsPage();

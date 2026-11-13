@@ -5,7 +5,10 @@
 import { h } from './ui.js';
 import { formatExpr, circuitCost, outputForm, formOf, setOutputLogic } from '/core/logic.js';
 import { canonicalCost } from '/core/logic-canon.js';
+import { designKind } from './project-kind-flag.js';
 
+// (a design and simulation project's, #3780: no HDL)
+const HDL_NOTATIONS = ['vhdl', 'verilog'];
 const NOTATIONS = [['slash', '/a.b + c'], ['slash-compact', '/ab + c'], ['textbook', 'a·b\' + c'], ['compact', 'ab\' + c'], ['vhdl', 'VHDL'], ['verilog', 'Verilog']];
 
 // the HDL logic of the fewest gates, or of the least delay, among the other forms (#1427)
@@ -48,7 +51,7 @@ export function renderTtResults(ctx) {
   const { results } = ctx, M = ctx.M(), out = ctx.out(), A = ctx.A(), notation = ctx.notation();
   results.innerHTML = '';
   const nsel = h('select', { class: 'tt-notation', title: 'Notation of the expressions', onchange: () => { ctx.setNotation(nsel.value); ctx.renderResults(); ctx.renderKmap(); } },
-    ...NOTATIONS.map(([v, l]) => h('option', { value: v, selected: v === notation }, l)));
+    ...NOTATIONS.filter(([v]) => !designKind() || !HDL_NOTATIONS.includes(v)).map(([v, l]) => h('option', { value: v, selected: v === notation }, l)));
   // its tick box (#2951): the form ticked, the output's HDL logic (an XOR form not simpler: its minimal SOP's)
   const tick = f => hdlTick((formOf(M, out) === 'xor' && !A.xor ? 'sop' : formOf(M, out)) === f, () => { ctx.setM(setOutputLogic(M, out, { form: f })); ctx.changed(); });
   const form = (label, f, cls) => {

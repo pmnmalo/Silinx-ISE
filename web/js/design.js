@@ -21,6 +21,7 @@ import { openWizardModule, wizardLabelOf } from './wizard-modules.js';
 import { cBadge, cBadges, cSequential, isC } from './c-source.js';
 import { translationBadge } from './translation.js';
 import { gitMark, gitMenuItems, gitStartItems, hasGit } from './git.js';
+import { checkLabel, designOnly, shownFiles, withoutHdlBadges } from './design-only.js';
 
 const $ = id => document.getElementById(id);
 // the Tasks interface (#799): one tree, no views: the design (as the Implementation view shows it); the test
@@ -45,7 +46,8 @@ export function renderHierarchy() {
   const dev = `${pj.device.part}${pj.device.speed}-${pj.device.package}`;
   const root = treeItem({ label: pj.name, ico: 'project', open: true, mark: gitMark(S.git ? S.git.files.map(f => f.path) : []), onSelect: () => select({ type: 'project' }), key: 'project', onContext: e => projectContextMenu(e) });
   tree.append(root.li);
-  const devItem = treeItem({ label: !sim ? dev : 'Behavioral', ico: !sim ? 'chip' : 'sim', open: true, key: 'device', onSelect: () => select({ type: 'device' }), onContext: e => projectContextMenu(e) });
+  // (a design and simulation project, #3780: no device; its drawings and test benches under Design)
+  const devItem = treeItem({ label: designOnly() ? 'Design' : !sim ? dev : 'Behavioral', ico: !sim ? 'chip' : 'sim', open: true, key: 'device', onSelect: () => select({ type: 'device' }), onContext: e => projectContextMenu(e) });
   root.ul.append(devItem.li);
 
   const lib = S.lib;
@@ -82,11 +84,13 @@ export function renderHierarchy() {
       drawn || sch || wz ? null : translationBadge(file, rowMenu),
       drawn ? clashBadge(drawn) : null,
     ].filter(Boolean);
+    badges.splice(0, badges.length, ...withoutHdlBadges(badges));   // (no HDL in a design project, #3780)
     const it = treeItem({
       label, meta: info ? `(${(sch || file).split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : sch ? viewIcon(sch) : cSrc ? 'file' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
       cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2, badges, module: modName, mark: info ? gitMark([sch, file]) : null,
       onSelect: () => select(drawn ? { type: viewKind(drawn), file: drawn, module: modName, path, instName } : { type: 'module', module: modName, file, path, instName, sch, wizard: wz }),
-      onOpen: () => info && (sch ? openView(sch) : wz ? openWizardModule(file) : openFile(file, info.line)),
+      // (a design project's test bench, its HDL hidden: simulated, #3780)
+      onOpen: () => info && (sch ? openView(sch) : wz ? openWizardModule(file) : designOnly() ? runSimulation(modName) : openFile(file, info.line)),
       onContext: rowMenu,
     });
     parentUl.append(it.li);
@@ -186,8 +190,8 @@ export function moduleBadges(name) {
   const sch = drawn || viewOfModule(info.name, info.file);
   const wz = !sch ? wizardLabelOf(info.file) : null;
   if (isC(info.file)) return [{ text: cBadge(info.file), base: true }, ...(cSequential(info.file) ? [{ text: 'ASM' }] : []), { text: info.lang === 'vhdl' ? 'VHDL' : 'Verilog' }];   // (#1531, #1575)
-  return [sch ? { text: viewBadge(sch), base: true } : null, isTt(sch) ? { text: 'Schematic' } : null, isPn(sch) ? { text: 'FSM' } : null, wz ? { text: wz, base: true } : null,
-    drawn ? null : { text: info.lang === 'vhdl' ? 'VHDL' : 'Verilog', base: !sch && !wz }].filter(Boolean);
+  return withoutHdlBadges([sch ? { text: viewBadge(sch), base: true } : null, isTt(sch) ? { text: 'Schematic' } : null, isPn(sch) ? { text: 'FSM' } : null, wz ? { text: wz, base: true } : null,
+    drawn ? null : { text: info.lang === 'vhdl' ? 'VHDL' : 'Verilog', base: !sch && !wz }].filter(Boolean));
 }
 /** A module's source opened as its Design row's double-click opens it: its drawing, its wizard, else its HDL (SSim's Go
  *  To Source in the Tasks interface, #1385). */
@@ -325,7 +329,7 @@ function moduleContextMenu(e, mod, file) {
     // (what a double-click opens: its drawing, else its HDL, #2872)
     { label: 'Open', action: () => openModuleSource(mod) },
     { label: 'Rename…', action: () => renameDialog(file, mod) },
-    { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
+    { label: checkLabel(), action: () => checkSyntax(mod, isSimView) },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
     // (its symbol in the schematics, the Symbol Editor's: its pins' order and sides, #3755)
     { label: 'Edit Symbol', action: () => import('./symbol-doc.js').then(m => m.editSymbol(mod)) },
@@ -337,7 +341,7 @@ function moduleContextMenu(e, mod, file) {
     // a plain HDL module can be drawn (the drawing then its base); a drawing's module has the drawing's commands
     // (#2872: here, on its name and on every badge alike); a block of a drawing's HDL (#175: its file is the
     // drawing's) neither
-    ...(S.hdlToSch?.[file] ? ownDrawingCommands(mod, file) : [
+    ...(S.hdlToSch?.[file] ? ownDrawingCommands(mod, file) : designOnly() ? [] : [
       { label: 'Convert to Schematic (editable)…', action: () => convertToSchematic(mod) },
       { label: 'Convert to State Machine (ASM)…', action: () => convertToAsm(mod) },
       { label: 'Convert to State Diagram (FSM)…', action: () => convertToFsm(mod) },
@@ -357,7 +361,7 @@ function moduleContextMenu(e, mod, file) {
 export function fileContextMenu(e, file) {
   if (!S.fileTree.includes(file)) {   // a file of the folder that is not in the project
     popupMenu([
-      { label: 'Add to Project', action: () => addToProject(file).then(() => log(`${file} added to the project.`, 'ok')) },
+      { label: 'Add to Project', action: () => addToProject(file).then(added => added !== false && log(`${file} added to the project.`, 'ok')) },
       { label: 'Open', action: () => openFile(file) },
       '-',
       { label: 'Delete File…', action: () => deleteFile(file) },
@@ -367,7 +371,7 @@ export function fileContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openFile(file) },
     { label: 'Rename…', action: () => renameDialog(file) },
-    /\.(vhdl?|v|sv|c)$/i.test(file) ? { label: 'Check Syntax', action: () => checkFileSyntax(file) } : null,   // (.c: Silinx HLS, #1524)
+    /\.(vhdl?|v|sv|c)$/i.test(file) && !designOnly() ? { label: 'Check Syntax', action: () => checkFileSyntax(file) } : null,   // (.c: Silinx HLS, #1524)
     /\.(ucf|pcf|lpf|cst|xdc)$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
     { label: 'Remove from Project', action: () => removeFile(file) },
     { label: 'Delete File…', action: () => deleteFile(file) },
@@ -401,7 +405,7 @@ async function deleteFile(file) {
 export async function addFromFolderDialog() {
   if (!S.project) return;
   const listed = new Set(S.fileTree);
-  const free = (S.diskTree || []).filter(f => !listed.has(f)).sort((a, b) => a.localeCompare(b));
+  const free = shownFiles((S.diskTree || []).filter(f => !listed.has(f))).sort((a, b) => a.localeCompare(b));   // (no HDL in a design project, #3780)
   if (!free.length) return alertDlg('Add to Project', 'Every file of the project folder is in the project.');
   const boxes = free.map(f => h('input', { type: 'checkbox', value: f }));
   const r = await dialog({

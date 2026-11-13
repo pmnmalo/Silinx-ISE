@@ -14,6 +14,7 @@ import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewher
 import { S, app } from './app.js';
 import { mountVectorsPage } from './tbwizard-vectors.js';
 import { NAME_RE } from '/core/ident.js';
+import { designOnly } from './design-only.js';
 
 
 export const designSources = () => S.sources.filter(s => s.role === 'design' && (s.lang === 'vhdl' || s.lang === 'verilog'));
@@ -60,7 +61,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
   const chk = () => [...outs, ...ios];   // what is checked: the outputs and the bidirectional buses
 
   // ---------------------------------------------------------------- page 1: unit under test
-  const modSel = select(mods.map(m => [m.name, `${m.name} (${m.file})`]), uut.name);
+  const modSel = select(mods.map(m => [m.name, `${m.name} (${(designOnly() && S.hdlToSch?.[m.file]) || m.file})`]), uut.name);   // (a design project's: its drawing, #3780)
   const tbName = h('input', { type: 'text', value: name || `tb_${uut.name}` });
   const lang = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], langPick || S.project.preferredLanguage || uut.lang || 'vhdl');
   const loc = h('input', { type: 'text', value: location || 'sim' });
@@ -75,7 +76,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
     render: () => h('div', {},
       h('div', { class: 'hint' }, 'The wizard writes a self-checking test bench: it applies input vectors to the module and compares its outputs with the expected values, reporting each mismatch and TEST PASSED / TEST FAILED at the end.'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
-        ...field('Module to test:', modSel), ...field('Test bench name:', tbName), ...field('Language:', lang), ...field('Location:', loc))),
+        ...field('Module to test:', modSel), ...field('Test bench name:', tbName), ...(designOnly() ? [] : field('Language:', lang)), ...field('Location:', loc))),
     validate: async () => {
       if (!NAME_RE.test(tbName.value.trim())) return 'Enter a valid test bench name (a letter, then letters, digits and _).';
       const r = reservedError(tbName.value.trim());
@@ -145,7 +146,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
     ['walking', 'Walking ones and zeros (all 0, all 1, then one bit at a time)'],
     ['manual', 'I will type the vectors in (starts with one empty vector)'],
     ['none', 'No vectors: a test bench skeleton (clock, reset and the module); I will write the stimulus'],
-  ];
+  ].filter(([m]) => m !== 'none' || !designOnly());   // (a design project's: no HDL to write, #3780)
   const renderModes = () => {
     modeBox.innerHTML = '';
     const n = totalBits();
@@ -245,7 +246,9 @@ export async function testBenchWizard({ module, name = null, location = null, la
   await app.reloadProject();
   app.showInSim(tbName.value.trim());
   app.log(st.mode === 'none' ? `Test Bench Wizard: created the test bench skeleton ${path()} for '${uut.name}' (selected in the Simulation view): write the stimulus, then Simulate Behavioral Model.`
-    : `Test Bench Wizard: created ${path()} (${rows.length} vector(s)) for '${uut.name}' (selected in the Simulation view). Run Simulate Behavioral Model to check the design.`, 'ok');
+    : `Test Bench Wizard: created ${designOnly() ? `the test bench ${tbName.value.trim()}` : path()} (${rows.length} vector(s)) for '${uut.name}' (selected in the Simulation view). Run Simulate Behavioral Model to check the design.`, 'ok');
+  // (a design and simulation project's, #3780: its HDL not shown, the test bench simulated)
+  if (designOnly()) return app.runSimulation?.(tbName.value.trim());
   toast(`Test bench ${path()} created`, 'ok');
   app.openFile(path(), undefined, undefined, task ? { task } : undefined);   // (`task`: opened there, Simulate's, #1392)
 }
