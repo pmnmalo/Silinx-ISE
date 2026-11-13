@@ -3,6 +3,9 @@
 // dictionary of i18n.js); a project's name and Replace Project (New Project's, the imports', #3538).
 export const WIZARDS_PT = {
   'Wizard >': 'Assistente >',   // New Source's button (#958, #2082)
+  // a design and simulation project (#3780: New Project's Project Kind, Design Properties' board list)
+  'Project Kind:': 'Tipo de Projeto:', 'FPGA design (a board and a device)': 'Projeto para FPGA (uma placa e um dispositivo)',
+  'Design and simulation only (no FPGA)': 'Só desenho e simulação (sem FPGA)', 'Check Design of the selected module': 'Verificar Projeto do módulo selecionado',
   'Replace Project': 'Substituir Projeto',   // (New Project's and the imports', #3538)
   // the FSM and ASM wizards
   'FSM Wizard': 'Assistente de FSM', 'ASM Wizard': 'Assistente de ASM',
@@ -88,6 +91,11 @@ export const WIZARDS_PT = {
 const label = what => (WIZARDS_PT[`${what}:`] || `${what}:`).replace(/:$/, '');
 
 export const WIZARDS_PT_PATTERNS = [
+  // a design and simulation project's refusals (core/project-kind.js, the MCP server's too, #3780)
+  [/^(.*): a design and simulation project has drawings only: choose a board in Design Properties to add HDL sources$/, '$1: um projeto só de desenho e simulação tem apenas desenhos: escolha uma placa nas Propriedades do Desenho para acrescentar fontes HDL'],
+  [/^(.*): a design and simulation project does not show its HDL \(its drawings are its sources\)$/, '$1: um projeto só de desenho e simulação não mostra o HDL (as fontes são os desenhos)'],
+  [/^the project '(.*)' is a design and simulation project \(no FPGA\): choose a board in Design Properties to implement, emulate or program it$/, "o projeto '$1' é só de desenho e simulação (sem FPGA): escolha uma placa nas Propriedades do Desenho para o implementar, emular ou programar"],
+  [/^the project '(.*)' cannot become a design and simulation project: its HDL and C sources are not drawings \((.*)\)$/, "o projeto '$1' não pode passar a só desenho e simulação: as fontes HDL e C não são desenhos ($2)"],
   // a project's name (core/project-name.js: the New Project wizard's, the imports', the server's, #3538)
   [/^invalid project name '(.*)': a letter, then up to 63 letters, digits, - and _$/, "nome de projeto inválido '$1': uma letra, depois até 63 letras, dígitos, - e _"],
   [/^A project named '(.*)' already exists: choose another name\.$/, "Já existe um projeto chamado '$1': escolha outro nome."],

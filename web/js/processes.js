@@ -22,6 +22,7 @@ import { openEmulator, openSchematic, openTechSchematic, runSimulation } from '.
 import { cProcesses, failedCDiags, isC } from './c-source.js';
 import { openCModel } from './c-model.js';
 import { EXTRA_STEPS, FLOW_PROCS, IMPL_IDS, buildProcesses, simModelsOf, toolOf } from './tool-descriptors.js';
+import { checkLabel, designOnly } from './design-only.js';
 
 export { EXTRA_STEPS, IMPL_IDS } from './tool-descriptors.js';
 
@@ -41,7 +42,7 @@ const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'sum
 export const vivadoMode = () => !api.standalone && vivadoDevice(S.project?.device) && S.project?.synthTool !== 'silinx';
 export const openMode = () => !vivadoMode() && (openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx'));
 /** The project's tool (its descriptor, web/js/tool-descriptors.js): what the process tree and the tasks are built from. */
-export const projectTool = () => toolOf(S.project?.device, openMode(), { standalone: api.standalone });
+export const projectTool = () => toolOf(S.project?.device, openMode(), { standalone: api.standalone, designOnly: designOnly() });
 // Tasks ▸ Implement: the top module's processes, whatever the Design pane has selected since (#1208)
 const implTop = () => { const d = document.documentElement.dataset; return d.layout === 'tasks' && d.task === 'impl'; };
 /** The item whose processes are shown and the view: the selection's, or in Implement the top module's. */
@@ -53,6 +54,8 @@ function procsShown() {
 function processDefs(sel, view) {
   if (!S.project) return [];
   const defs = selectionProcesses(sel, view);
+  // (a design and simulation project: no Design Summary, its reports the flow's, #3780)
+  if (designOnly()) return defs.filter(p => p.id !== 'summary');
   return defs.some(p => p.id === 'summary') ? defs : [SUMMARY_PROC, ...defs.filter(p => p.id !== 'none')];
 }
 function selectionProcesses(sel, view) {
@@ -74,7 +77,7 @@ function selectionProcesses(sel, view) {
   if (view === 'sim') return [
     ...cp,
     { id: 'isim', label: 'SSim Simulator', ico: 'sim', children: [
-      { id: 'sim-check', label: 'Behavioral Check Syntax', ico: 'process', run: () => checkSyntax(mod, true) },
+      { id: 'sim-check', label: checkLabel('Behavioral Check Syntax'), ico: 'process', run: () => checkSyntax(mod, true) },
       { id: 'sim-run', label: 'Simulate Behavioral Model', ico: 'wave', run: () => runSimulation(mod) },
       // (the models the project's tool generates: none in the flows with no netgen, #3707)
       ...Object.entries(SIM_MODEL_NAMES).filter(([step]) => simModelsOf(projectTool()).includes(step)).map(([step, name]) => ({ id: `sim-${step}`, label: `Simulate ${name} Model`, ico: 'wave', run: () => runSimulation(mod, step) })),
@@ -83,7 +86,7 @@ function selectionProcesses(sel, view) {
     { id: 'verify-assert', label: 'Verify Assertions…', ico: 'process', run: async () => (await import('./verify.js')).assertProcess(mod) },
     { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
     { id: 'tb-wiz', label: 'Create Test Bench (Wizard)…', ico: 'template', run: () => testBench(mod) },
-    ...(cp.length ? [] : [{ id: 'cmodel-sim', label: 'View C Model', ico: 'process', run: () => openCModel(mod) }]),   // (#1530)
+    ...(cp.length || designOnly() ? [] : [{ id: 'cmodel-sim', label: 'View C Model', ico: 'process', run: () => openCModel(mod) }]),   // (#1530; none in a design project, #3780)
   ];
   // synthesis, implementation and emulation work on the project's top module (onTop: what they do to
   // it, said before running when another module is selected, #223)
@@ -283,9 +286,13 @@ export async function checkSyntax(mod, sim = false) {
 async function checkSyntaxInner(mod, sim, id) {
   await saveAll();
   setStatus(id, 'running');
-  log(`\nStarted : "${sim ? 'Behavioral Check Syntax' : 'Check Syntax'}".\n`, 'hdr');
+  log(`\nStarted : "${checkLabel(sim ? 'Behavioral Check Syntax' : 'Check Syntax')}".\n`, 'hdr');
   const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, sim));
-  for (const s of srcs) log(`${s.lang === 'vhdl' ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${s.path}" into library work`);
+  // (a design and simulation project, #3780: its drawings named, not their HDL files)
+  for (const s of srcs) {
+    if (!designOnly()) log(`${s.lang === 'vhdl' ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${s.path}" into library work`);
+    else if (S.hdlToSch?.[s.path]) log(`Checking drawing "${S.hdlToSch[s.path]}"`);
+  }
   const lib = compile(withPrimitives(srcs));
   // (a C source whose HDL cannot be made, #2995: its errors; its module, the top, then not elaborated)
   const cErrs = failedCDiags();

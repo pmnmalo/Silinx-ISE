@@ -1095,9 +1095,10 @@ export async function writeWs(env, project, rel, text) {
 }
 
 /** Create a project on the server with the given files (REST), ready to open. */
-export async function makeProject(env, { name, template = 'empty', board, device, files = {}, top, simTop, constraints, roles = {}, preferredLanguage }) {
+export async function makeProject(env, { name, template = 'empty', board, device, kind, files = {}, top, simTop, constraints, roles = {}, preferredLanguage }) {
   const api = env.server.api;
-  await api('POST', '/api/projects', { name, template, ...(board !== undefined ? { board } : {}), ...(device ? { device } : {}) });
+  // (kind 'design': a design and simulation project, #3780)
+  await api('POST', '/api/projects', { name, template, ...(board !== undefined ? { board } : {}), ...(device ? { device } : {}), ...(kind ? { kind } : {}) });
   for (const [p, text] of Object.entries(files)) await api('PUT', `/api/projects/${encodeURIComponent(name)}/file?path=${encodeURIComponent(p)}`, text);
   const pj = await api('GET', `/api/projects/${encodeURIComponent(name)}`);
   delete pj.fileTree;
