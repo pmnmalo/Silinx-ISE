@@ -628,7 +628,8 @@ Silinx toolchain in the browser: *Implement Design* and *Generate Programming Fi
 Spartan-3E and Spartan-6 boards and the iCE40 (the bitstream is downloaded), and *Configure Target Device* programs the FPGA of
 a Basys2 / Nexys2 over WebUSB (Chrome / Edge; core/adept.js, a port of adepttool's Adept USB
 protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`), and the iCEBreaker's SPI flash (core/ftdi-ice40.js),
-and the FPGA of a Basys 3, a Nexys A7 or a Tang Nano 9K through its FT2232H's (or BL702's) JTAG (core/ftdi-jtag.js, #2298). XST (Xilinx ISE)
+and the FPGA of a Basys 3, a Nexys A7 or a Tang Nano 9K through its FT2232H's (or BL702's) JTAG (core/ftdi-jtag.js, #2298), and a ULX3S's
+through its FT231X (core/ft231x-jtag.js). XST (Xilinx ISE)
 needs the full application (`npm start`).
 
 ## Synthesis and bitstreams (Xilinx ISE 14.7)
@@ -702,7 +703,7 @@ micro-architecture, and the `.bit` written from nextpnr's FASM on Project X-Ray'
 optimistic against Vivado's.
 It takes **the Radiona ULX3S-12f / 25f / 45f / 85f** too (Lattice ECP5, LFE5U in CABGA381): Yosys's `synth_ecp5`, nextpnr-ecp5
 and ecppack (Project Trellis), to `build/<top>.bit`, its pins written as an LPF, loaded into the FPGA by *Configure Target Device* (the
-local server's openFPGALoader -b ulx3s, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the
+local server's openFPGALoader -b ulx3s, or the browser over WebUSB, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the
 **ULX3S + VGA-12f / 25f / 45f / 85f** (the Radiona ULX3S + VGA), a VGA connector on that header.
 It takes **the Sipeed Tang Nano 9K** too (Gowin GW1NR-9C): Yosys's `synth_gowin`, nextpnr-himbaechel-gowin (Project Apicula)
 and gowin_pack, Silinx's JavaScript port of Apicula's (its `.fs` byte for byte Apicula's on the examples), to `build/<top>.fs`,
@@ -789,7 +790,7 @@ the same over WebUSB (`core/xcf.js`, Chrome / Edge, Chrome on Android), its back
 ```
 core/       VHDL/Verilog parsers, elaborator, simulator, schematics, ASM, UCF, zip (browser + Node);
             adept.js / xcf.js: the board and its Platform Flash programmed over WebUSB; ftdi-ice40.js /
-            ftdi-jtag.js: the FTDI boards' (the iCEBreaker's flash, the 7-series' and the Gowin's JTAG)
+            ftdi-jtag.js / ft231x-jtag.js: the FTDI boards' (the iCEBreaker's flash, the 7-series', the Gowin's and the ECP5's JTAG)
 server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
 web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/silinx.css): editor, SSim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image

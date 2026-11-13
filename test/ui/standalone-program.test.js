@@ -5,7 +5,7 @@
 //     loads it into the GW1NR-9C's SRAM through its BL702: the FPGA's DONE, the bytes it took the .fs's; in Portuguese;
 //   - the Basys 3: iMPACT's Initialize Chain finds its XC7A35T, Program FPGA loads a .bit chosen from the disk through its
 //     Digilent FT2232H (DONE); a .bit for the Nexys A7's part refused;
-//   - the ULX3S: not from the browser yet, Program FPGA disabled and why.
+//   - the ULX3S: blinky's .bit made in the browser, loaded into the ECP5's SRAM through its FT231X in bit-bang mode (DONE).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -17,7 +17,7 @@ import { xc7Bitstream } from '../fixtures/ftdi-jtag-sim.js';
 let env, site;
 // (the simulated board, served beside the site)
 const route = async (req, res) => {
-  const m = /^\/__test\/(ftdi-jtag-sim)\.js$/.exec(new URL(req.url, 'http://x').pathname);
+  const m = /^\/__test\/(ftdi-jtag-sim|ft231x-sim)\.js$/.exec(new URL(req.url, 'http://x').pathname);
   if (!m) return false;
   res.writeHead(200, { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' }).end(await fs.readFile(path.join(ROOT, 'test/fixtures', `${m[1]}.js`)));
   return true;
@@ -130,12 +130,30 @@ uiTest('#2298 browser edition: the Basys 3\'s chain scanned, a .bit loaded throu
   assert.equal(await page.eval(() => window.__sim.st.dev.done), false);
 }, { url: () => 'about:blank', timeout: 120000 });
 
-uiTest('#2298 browser edition: the ULX3S not programmed from the browser yet: Program FPGA disabled, and why', E, async (page) => {
+uiTest('#2298 browser edition: the ULX3S\'s .bit made in the browser, loaded into its SRAM through its FT231X (bit-bang JTAG, WebUSB)', E, async (page) => {
   await boot(page);
   await newProject(page, 'WebUlx', 'blinky', 'ulx3s');
   await page.setView('impl');
+  await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
+  await page.waitConsole(/=== SILINX (DONE|FAILED)/, { timeout: 300000 }).catch(async (e) => { throw new Error(`${e.message}\n${(await page.consoleText()).slice(-3000)}`); });
+  assert.deepEqual(problems(await page.consoleText()), []);
+  await page.eval(async (url) => {
+    const { ft231xBoard } = await import(url);
+    window.__sim = ft231xBoard({ device: 'lfe5u-85f' });
+    const usb = window.__sim.usb;
+    Object.defineProperty(navigator, 'usb', { value: { getDevices: async () => [usb], requestDevice: async () => usb }, configurable: true });
+  }, `${site.url}__test/ft231x-sim.js`);
   await page.treeRow('#procs', 'Configure Target Device', { dbl: true, exact: true });
-  await page.waitFor(() => !!document.querySelector('.doc:not([hidden]) .open-program'), [], { what: 'the program page' });
-  assert.deepEqual((await pageTexts(page)).slice(0, 5), ['Program the ECP5 — SRAM', 'Board:', 'Radiona ULX3S', 'Programmer:', 'not from the browser yet: the local server\'s openFPGALoader (silinx serve)']);
-  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .open-program').disabled), true);
-}, { url: () => 'about:blank', timeout: 120000 });
+  await page.waitFor(() => /^Configuration file: build\/\w+\.bit \(1927725 bytes\)$/.test(document.querySelector('.doc:not([hidden]) .imp-file')?.textContent || ''), [], { what: 'the program page' });
+  assert.deepEqual((await pageTexts(page)).slice(0, 5), ['Program the ECP5 — SRAM', 'Board:', 'Radiona ULX3S', 'Programmer:', 'the board\'s USB (FT231X), from the browser (WebUSB)']);
+  const before = (await page.consoleText()).length;
+  await page.click('.doc:not([hidden]) .open-program');
+  await page.waitConsole(/FPGA programmed: the design runs until the board is powered off\.|Programming the FPGA failed/, { timeout: 300000 });
+  const log = (await page.consoleText()).slice(before);
+  assert.deepEqual(problems(log), []);
+  assert.match(log, /Bitstream build\/\w+\.bit \(1927725 bytes, an ECP5's \.bit: part LFE5U-85F-6CABGA381, IDCODE 0x41113043\)\s+Programming \(SRAM, volatile\)\s+Programmer: the board's FT231X \(JTAG, bit-bang\), from the browser \(WebUSB\)\s+JTAG chain: LFE5U-85F\s+Erasing the SRAM\s+LSC_BITSTREAM_BURST: \d+ bytes/);
+  assert.match(log, /DONE: the FPGA is configured in \d+\.\d s\s+FPGA programmed: the design runs until the board is powered off\./);
+  const sim = await page.eval(() => ({ done: window.__sim.st.dev.done, errors: window.__sim.st.dev.errors, overflow: window.__sim.st.overflow, bytes: window.__sim.st.dev.config.length }));
+  assert.deepEqual([sim.done, sim.errors, sim.overflow], [true, [], false]);
+  assert.ok(sim.bytes > 1900000 && sim.bytes < 1927725, String(sim.bytes));   // (the .bit from its preamble on)
+}, { url: () => 'about:blank', timeout: 600000 });
