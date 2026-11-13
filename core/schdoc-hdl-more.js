@@ -4,6 +4,7 @@
 import { arithIo, constBits, findMod, int, vhdlBits, vlogBits } from './schdoc.js';
 import { compareOps, comparePin, constWidth } from './schdoc-symbols.js';
 import { hdlName, vhdlClass } from './schdoc-hdl.js';
+import { arrayOf, copyName, sliceOf } from './sch-array.js';
 
 /** { symbolCasesMore } of generateHdl. */
 export function mountSymbolCasesMore(ctx) {
@@ -211,17 +212,26 @@ export function mountSymbolCasesMore(ctx) {
           const pn = nl.pinNet.get(`${s.id}/${q.name}`), n = q.dir === 'out' && pn?.auto && isolated(pn) ? null : pn;
           let a = n ? (outRead.get(n) && q.dir !== 'out' ? outRead.get(n) : (q.dir === 'out' && outRead.get(n)) || netName(n)) : null;
           if (!a && q.dir !== 'out') diags.push({ severity: 'warning', message: `${s.name}: input ${q.name} of '${mname}' is unconnected`, ref: { kind: 'symbol', id: s.id, pin: q.name } });
-          return [q.name, a];
+          // (an arrayed instance's pin on a bus N times as wide: its slice for each copy, #3755)
+          const sliced = n?.endpoints.some(e => e.sym === s.id && e.pin === q.name && e.sliced);
+          return [q.name, a, sliced && { n, w: q.width || 1 }];
         });
-        if (ci) {
-          const lines = [`${s.name} : entity work.${mname}`];
-          if (gens.length) lines.push(`  generic map (\n${gens.map(([k, v]) => `    ${k} => ${v}`).join(',\n')}\n  )`);
-          const cs = conns.filter(([, a]) => a || true).map(([k, a]) => `    ${k} => ${a ?? 'open'}`);
-          if (cs.length) lines.push(`  port map (\n${cs.join(',\n')}\n  );`); else lines[lines.length - 1] += ';';   // (a module without ports, #1695)
-          body.push(lines.join('\n'));
-        } else {
-          const g = gens.length ? ` #(${gens.map(([k, v]) => `.${k}(${v})`).join(', ')})` : '';
-          body.push(`${mname}${g} ${s.name} (\n${conns.map(([k, a]) => `  .${k}(${a ?? ''})`).join(',\n')}\n);`);
+        // (an arrayed instance, reg(3:0), #3755: its copies one by one, reg_3 … reg_0, each pin sliced or shared)
+        const arr = arrayOf(s), lo = arr ? Math.min(arr.msb, arr.lsb) : 0;
+        // (a net of a bus's bits, a(7:4): those bits of the bus, #1688)
+        const at0 = (a, n) => (n.part ? [n.part.bus ? netName(n.part.bus) : n.part.base, Math.min(n.part.msb, n.part.lsb)] : [a, n.range?.lsb ?? 0]);
+        const copyConns = i => conns.map(([k, a, sl]) => [k, a && sl ? sliceOf(...at0(a, sl.n), i - lo, sl.w, ci) : a]);
+        for (const [label, cs0] of arr ? arr.indices.map(i => [copyName(arr, i), copyConns(i)]) : [[s.name, conns]]) {
+          if (ci) {
+            const lines = [`${label} : entity work.${mname}`];
+            if (gens.length) lines.push(`  generic map (\n${gens.map(([k, v]) => `    ${k} => ${v}`).join(',\n')}\n  )`);
+            const cs = cs0.map(([k, a]) => `    ${k} => ${a ?? 'open'}`);
+            if (cs.length) lines.push(`  port map (\n${cs.join(',\n')}\n  );`); else lines[lines.length - 1] += ';';   // (a module without ports, #1695)
+            body.push(lines.join('\n'));
+          } else {
+            const g = gens.length ? ` #(${gens.map(([k, v]) => `.${k}(${v})`).join(', ')})` : '';
+            body.push(`${mname}${g} ${label} (\n${cs0.map(([k, a]) => `  .${k}(${a ?? ''})`).join(',\n')}\n);`);
+          }
         }
         break;
       }

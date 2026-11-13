@@ -87,3 +87,28 @@ test('edit_symbol: its checks (a pin not a port, a pin twice, a spacing or size 
   const tree = (await ok('project_info', { project: 'e' })).text;
   assert.doesNotMatch(tree, /sym\.json/, 'no symbol file written');
 });
+
+test('place_instance: a 4-bit register from a 1-bit one, reg(3:0), its pins on named nets; its HDL the 4 copies; the errors said', async () => {
+  await ok('new_project', { name: 'a' });
+  await ok('write_file', { project: 'a', path: 'src/reg1.vhd', text: REG });
+  await ok('write_file', { project: 'a', path: 'src/top.vhd', text: 'entity top is end top;\narchitecture a of top is begin end a;\n' });
+  // the schematic: its I/O markers alone (the instance's nets join them by name)
+  const marker = (id, n, dir, width, y) => ({ id, name: n, dir, width, x: dir === 'in' ? 100 : 700, y });
+  const doc = { version: 4, name: 'top', lang: 'vhdl', generatedFile: 'src/top.vhd', sheet: { w: 1700, h: 1100 }, symbols: [], wires: [], labels: [],
+    ports: [marker('P1', 'd', 'in', 4, 100), marker('P2', 'ce', 'in', 1, 200), marker('P3', 'clk', 'in', 1, 300), marker('P4', 'q', 'out', 4, 100)] };
+  await ok('write_file', { project: 'a', path: 'src/top.sch.json', text: JSON.stringify(doc) });
+  const r = await ok('place_instance', { project: 'a', path: 'src/top.sch.json', module: 'reg1', name: 'reg(3:0)', x: 300, y: 200, connect: { d: 'd', ce: 'ce', c: 'clk', q: 'q' } });
+  assert.deepEqual(r.text.split('\n'), ['src/top.sch.json: reg(3:0) (reg1, 4 copies) placed at 300, 200', 'src/top.vhd updated from src/top.sch.json']);
+  assert.deepEqual(r.data.diagnostics, []);
+  const hdl = (await ok('read_file', { project: 'a', path: 'src/top.vhd' })).text;
+  assert.deepEqual(hdl.match(/reg_\d : entity work\.reg1/g), ['reg_3 : entity work.reg1', 'reg_2 : entity work.reg1', 'reg_1 : entity work.reg1', 'reg_0 : entity work.reg1']);
+  assert.match(hdl, /d => d\(2\),\n {6}ce => ce,\n {6}c => clk,\n {6}q => q\(2\)/);
+  const syn = await ok('check_syntax', { project: 'a', top: 'top' });
+  assert.doesNotMatch(syn.text, /ERROR|WARNING/);
+  // a second one, its output on a 1-bit net (the 1-bit marker ce's): the error said; a name not a name, a pin not a port: refused
+  const e = await ok('place_instance', { project: 'a', path: 'src/top.sch.json', module: 'reg1', name: 'r(1:0)', x: 300, y: 500, connect: { q: 'ce' } });
+  assert.match(e.text, /\nERROR: r\(1:0\): output q of its 2 copies drives the 1-bit net 'ce': connect it to a 2-bit bus\n/);
+  await fails('place_instance', { project: 'a', path: 'src/top.sch.json', module: 'reg1', name: 'r(1:', x: 0, y: 0 }, /is not a valid name/);
+  await fails('place_instance', { project: 'a', path: 'src/top.sch.json', module: 'reg1', x: 0, y: 0, connect: { z: 'a' } }, /module 'reg1' has no port 'z'/);
+  await fails('place_instance', { project: 'a', path: 'src/top.sch.json', module: 'nobody', x: 0, y: 0 }, /no module 'nobody'/);
+});
