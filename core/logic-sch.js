@@ -88,12 +88,23 @@ function astTree(e, index, own = false) {
   throw new Error(`schematic of a table: ${e.t}`);
 }
 
+// the complemented inputs of an AND, OR, NAND or NOR as its inverted inputs (#3786: Xilinx's ANDnBk…, inputs I0..I(k-1)
+// inverted, at the bottom): `bubble` leaves on the plain rail, last among the gate's inputs; the other complemented
+// inputs (of an XOR or XNOR: no such Xilinx gate) on the inverted rail, its INV
+function bubbles(g) {
+  if (g.leaf != null) return g;
+  const kids = g.kids.map(bubbles);
+  if (!['and', 'or', 'nand', 'nor'].includes(g.op)) return { ...g, kids };
+  const inv = k => k.leaf != null && k.neg;
+  return { ...g, kids: [...kids.filter(k => !inv(k)), ...kids.filter(inv).map(k => ({ leaf: k.leaf, neg: false, bubble: true }))] };
+}
+
 /**
  * Gate schematic (core/schdoc.js document) of a table: input markers on the left, one vertical
  * rail per used input literal (inverters at the top), the circuit of each output's expression in the
  * form, the one of its HDL module (outputForm, #694: minimal SOP: AND gates then an OR gate; POS: OR
- * then AND; the XOR form with XOR / XNOR gates; NAND or NOR gates only, the inverters too, #3785) and the
- * output markers on the right. A gate has at most 5 inputs (AND, OR), 4 (NAND, NOR, XOR, XNOR).
+ * then AND; the XOR form with XOR / XNOR gates; NAND or NOR gates only, the inverters too, #3785; a complemented input
+ * of an AND, OR, NAND or NOR one of its inverted inputs, AND3B3…, #3786) and the output markers on the right. A gate has at most 5 inputs (AND, OR), 4 (NAND, NOR, XOR, XNOR).
  * opts: { form: one of FORMS for every output (default: each output's own, #2951), lang, name }.
  */
 export function schematicFromTable(docIn, { form, lang, name } = {}) {
@@ -116,7 +127,9 @@ export function schematicFromTable(docIn, { form, lang, name } = {}) {
     const own = !only && (forms[i].form === 'nand' || forms[i].form === 'nor');
     let t = only && ast.args?.length === 1 && ast.args[0].t === 'var' ? { op: `${only}1`, kids: [{ leaf: index.get(ast.args[0].name), neg: false }] } : astTree(ast, index, own);
     t = splitFanIn(t, fanIn);
-    if (t.leaf != null) t = { op: 'buf', kids: [t] };
+    // (an output that is an input: a BUF; its complement: an INV, #3786; the NAND and NOR forms' gates as they are)
+    if (t.leaf != null) t = { op: t.neg && !only ? 'inv' : 'buf', kids: [t.neg && !only ? { leaf: t.leaf, neg: false } : t] };
+    else if (forms[i].form !== 'nand' && forms[i].form !== 'nor') t = bubbles(t);
     return { o, t };
   });
   // ---- sizes and columns
@@ -124,10 +137,11 @@ export function schematicFromTable(docIn, { form, lang, name } = {}) {
   const gateType = g => {
     const k = g.kids.length;
     if (one(g)) return `${g.op.slice(0, -1)}2`;
-    if (g.op === 'buf') return 'buf';
-    return `${g.op}${k}`;
+    if (g.op === 'buf' || g.op === 'inv') return g.op;
+    const b = g.kids.filter(x => x.bubble).length;
+    return `${g.op}${k}${b ? `b${b}` : ''}`;
   };
-  const gateH = g => (g.op === 'buf' ? 20 : one(g) ? 40 : Math.max(40, g.kids.length * 20));
+  const gateH = g => (g.op === 'buf' || g.op === 'inv' ? 20 : one(g) ? 40 : Math.max(40, g.kids.length * 20));
   const size = g => {
     if (g.leaf != null) { g.h = 20; g.level = 0; return; }
     g.kids.forEach(size);

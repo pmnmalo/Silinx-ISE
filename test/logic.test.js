@@ -563,7 +563,8 @@ test('gate schematics (AND/OR, POS, XOR, NAND only, NOR only) pass netlist() and
     assert.deepEqual(schematicErrors(sch).map(e => e.message), [], `case ${k}`);
     const types = [...new Set(sch.symbols.map(s => s.type))];
     if (c.form === 'nand' || c.form === 'nor') assert.ok(types.every(t => new RegExp(`^${c.form}[234]$|^constant$`).test(t)), `${c.form} only: ${types}`);
-    else assert.ok(types.every(t => (c.form === 'xor' ? /^(and[2-5]|or[2-5]|x(n)?or[234]|inv|buf|constant)$/ : /^(and[2-5]|or[2-5]|inv|buf|constant)$/).test(t)), `${c.form}: ${types}`);
+    // (the AND / OR gates with their inverted inputs, AND3B2…, #3786)
+    else assert.ok(types.every(t => (c.form === 'xor' ? /^((and|or)[2-5](b[1-5])?|x(n)?or[234]|inv|buf|constant)$/ : /^((and|or)[2-5](b[1-5])?|inv|buf|constant)$/).test(t)), `${c.form}: ${types}`);
     const g = generateHdl(sch, { lang: c.lang });
     assert.deepEqual(g.diagnostics.filter(d => d.severity === 'error'), []);
     const t = truthTableFromModule([{ path: `${doc.name}.${c.lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.code }], doc.name);
@@ -1085,6 +1086,6 @@ test('the schematic of a table is drawn in its HDL logic form (#694): the same g
   // NAND only: f = a·b + /c = /(c·/(a·b)), two NANDs
   const nd = { ...newTable('nd', ['a', 'b', 'c'], ['f']), table: { f: '10101011' }, form: 'nand' };
   assert.deepEqual(schematicFromTable(nd).symbols.map(s => s.type).sort(), ['nand2', 'nand2']);
-  // the form given overrides the table's
-  assert.deepEqual(schematicFromTable(nd, { form: 'sop' }).symbols.map(s => s.type).sort(), ['and2', 'inv', 'or2']);
+  // the form given overrides the table's (/c an inverted input of the OR, #3786)
+  assert.deepEqual(schematicFromTable(nd, { form: 'sop' }).symbols.map(s => s.type).sort(), ['and2', 'or2b1']);
 });
