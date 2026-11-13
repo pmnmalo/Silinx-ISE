@@ -10,11 +10,13 @@ import { simInputControls, simTraceTable } from './sim-panel.js';
 export function mountFsmBottom(ctx) {
   const {
     opts, M, bottom, btn, destroyed, diags, fit, flash, panel, panelBody, panelTitle, panelTools, render, sim,
-    stateById, updateToolbar, setPanel, setSim
+    stateById, updateToolbar, setPanel, setSim, closeInline = () => {}, renderSide = () => {}
   } = ctx;
 
   // ---------------------------------------------------------------------------- bottom panel
+  // (Try it opened: a text being typed in place applied first, then the diagram locked; closed: unlocked, #3793)
   function togglePanel(which) {
+    if ((panel() === which ? null : which) === 'sim') closeInline(true);
     setPanel(panel() === which ? null : which);
     if (panel() !== 'sim' && sim()) stopRun();
     if (panel() === 'sim' && !sim()) resetSim();
@@ -24,6 +26,7 @@ export function mountFsmBottom(ctx) {
     renderPanel();
     render();
     updateToolbar();
+    renderSide();
   }
   function renderPanel() {
     bottom.classList.toggle('try-it', panel() === 'sim');   // (green, as the schematic's Try it, #3798)

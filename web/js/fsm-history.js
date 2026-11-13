@@ -10,7 +10,8 @@ export function mountFsmHistory(ctx) {
   const {
     opts, M, delBtn, destroyed, encSel, hi, hist, lastKey, lastT, panel, render, renderPanel,
     renderSide, sel, stateById, status, styleSel, tabBtns, timers, transById, validateSoon, setM,
-    setHist, setHi, setLastKey, setLastT, setSel, shared = () => null, setSharedRef = () => {}, simGone = () => {}
+    setHist, setHi, setLastKey, setLastT, setSel, shared = () => null, setSharedRef = () => {}, simGone = () => {},
+    locked = () => false, lockable = () => []
   } = ctx;
   const changed = () => { clearTimeout(timers.change); timers.change = setTimeout(() => { if (!destroyed()) opts.onChange?.(clone(M())); }, 250); };
 
@@ -39,10 +40,12 @@ export function mountFsmHistory(ctx) {
     render(); renderSide(); validateSoon(); updateToolbar(); if (panel()) renderPanel();
     changed();
   }
-  const undo = () => { if (shared()) shared().undo(); else if (hi() > 0) restore(hi() - 1); };
-  const redo = () => { if (shared()) shared().redo(); else if (hi() < hist().length - 1) restore(hi() + 1); };
+  const undo = () => { if (locked()) return; if (shared()) shared().undo(); else if (hi() > 0) restore(hi() - 1); };
+  const redo = () => { if (locked()) return; if (shared()) shared().redo(); else if (hi() < hist().length - 1) restore(hi() + 1); };
   function updateToolbar() {
-    delBtn.disabled = !sel();
+    // (the tools that change the diagram disabled while it is locked: in Try it, #3793)
+    delBtn.disabled = !sel() || locked();
+    for (const b of lockable()) b.disabled = locked();
     encSel.value = M().encoding; styleSel.value = M().style;
     for (const [k, b] of Object.entries(tabBtns)) b.classList.toggle('on', panel() === k);
     status.set([{ text: `${M().states.length} state(s), ${M().transitions.length} transition(s)`, cls: 'fsm-info' },

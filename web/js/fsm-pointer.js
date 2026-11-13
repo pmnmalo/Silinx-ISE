@@ -13,8 +13,10 @@ export function mountFsmPointer(ctx) {
   const {
     M, addState, addTransition, applyView, closeInline, commit, copySel, deleteSelection, drag, editLabel, editState,
     fit, fitted, gOverlay, gStates, geom, paste, print, redo, render, renderSide, root, sel, snapV, stateById, svg,
-    toWorld, transById, uid, undo, view, zoomAt, zoomBy, setFitted, setSel, setDrag, readOnly = false
+    toWorld, transById, uid, undo, view, zoomAt, zoomBy, setFitted, setSel, setDrag, readOnly = false,
+    locked = () => readOnly
   } = ctx;
+  // (locked: read-only, or while Try it is open, #3793: selected, panned, zoomed; nothing changed)
 
   // ---------------------------------------------------------------------------- pointer
   const hitState = (w, rim = 0) => {
@@ -66,7 +68,7 @@ export function mountFsmPointer(ctx) {
     if (tEl) {
       const t = transById(tEl.dataset.trans);
       setSel({ type: 'trans', id: t.id }); render(); renderSide();
-      if (readOnly) return;   // (read-only, #2696: selected, not bent)
+      if (locked()) return;   // (read-only, #2696, or in Try it, #3793: selected, not bent)
       setDrag({ kind: 'bend', sel0, t, start: w, moved: false, bend: t.bend, angle: t.angle, dbl: secondPress(`t:${t.id}`, ev) });
       capture(ev);
       return;
@@ -77,7 +79,7 @@ export function mountFsmPointer(ctx) {
       const d = Math.hypot(w.x - s.x, w.y - s.y);
       const r = radiusOf(s);
       setSel({ type: 'state', id: s.id }); render(); renderSide();
-      if (readOnly) return;
+      if (locked()) return;
       // (a pen's or a finger's rim is wider: a stroke started on its edge, #3286)
       const dbl = secondPress(`s:${s.id}`, ev);
       if (d > r - (ev.pointerType === 'mouse' ? 7 : 12)) {
@@ -89,7 +91,7 @@ export function mountFsmPointer(ctx) {
   }
   function onPointerMove(ev) {
     if (!drag()) {
-      if (readOnly) return;
+      if (locked()) return;
       // the rim of a state shows where a transition can be drawn from
       const w = toWorld(ev.clientX, ev.clientY);
       const s = hitState(w, 6);
@@ -169,7 +171,7 @@ export function mountFsmPointer(ctx) {
     render(); renderSide();
   }
   function onDblClick(ev) {
-    if (readOnly || ev.timeStamp - editedAt < 1000) return;   // (opened by the second press, #3459)
+    if (locked() || ev.timeStamp - editedAt < 1000) return;   // (opened by the second press, #3459)
     const tEl = transAt(ev);
     if (tEl) { editLabel(transById(tEl.dataset.trans)); return; }
     const sEl = ev.target.closest('[data-state]');
@@ -182,7 +184,7 @@ export function mountFsmPointer(ctx) {
     if (ev.target.closest('input, textarea, select')) return;
     const mod = ev.ctrlKey || ev.metaKey;
     const k = ev.key;
-    if (readOnly && (mod ? /^[zyxv]$/i.test(k) : /^(Delete|Backspace|F2)$/.test(k))) return;
+    if (locked() && (mod ? /^[zyxv]$/i.test(k) : /^(Delete|Backspace|F2)$/.test(k))) return;
     if (mod && (k === 'z' || k === 'Z')) { if (ev.shiftKey) redo(); else undo(); ev.preventDefault(); return; }
     if (mod && (k === 'y' || k === 'Y')) { redo(); ev.preventDefault(); return; }
     if (mod && (k === 'p' || k === 'P')) { print(); ev.preventDefault(); ev.stopPropagation(); return; }

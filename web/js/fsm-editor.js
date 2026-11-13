@@ -15,6 +15,7 @@
 // onProblems(diags) after every validation (drawings.js: the console's Errors and Warnings, editor-problems.js, #2737). The bottom panel shows the tables
 // (transition table, state table, encoded table for the binary / gray encodings) and a step-by-step simulation of the
 // diagram (current state highlighted, inputs set by hand, clock steps).
+// While Try it is open the diagram is locked as a read-only one is (#3793): its tools that change it disabled.
 // readOnly: a diagram to read (a Petri net's state machine, #2696): moved about, zoomed, its states and transitions
 // selected and shown, its tables and its simulation; nothing edited, not validated.
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
@@ -112,9 +113,11 @@ export function mountFsmEditor(container, opts = {}) {
     sim: toolWide('sim', 'Try it', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs', () => togglePanel('sim'), 'fsm-tab-btn'),
   };
   const linkHost = h('span', { class: 'fsm-link' });
+  const stateBtn = btn([h('span', { class: 'fsm-ico-state' }), 'State'], 'Add a state (or double-click the drawing)', () => addState(), 'asm-wide');
+  const arrangeBtn = btn('Arrange', 'Automatic layout of the states', () => arrange());
   const toolbar = h('div', { class: 'asm-toolbar fsm-toolbar' },
     h('div', { class: 'asm-group' },
-      btn([h('span', { class: 'fsm-ico-state' }), 'State'], 'Add a state (or double-click the drawing)', () => addState(), 'asm-wide')),
+      stateBtn),
     sep(),
     h('div', { class: 'asm-group' }, delBtn),
     sep(),
@@ -126,7 +129,7 @@ export function mountFsmEditor(container, opts = {}) {
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
     toolbarMenu([
-      btn('Arrange', 'Automatic layout of the states', () => arrange()),
+      arrangeBtn,
       btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.()),
       // (Verify Property, #3177: web/js/verify-props.js)
       ...(opts.onVerify ? [btn('Verify Property…', 'Prove a property of the state machine: a state never reached, a state reached, outputs never 1 together', () => opts.onVerify(clone(M)))] : []),
@@ -134,6 +137,7 @@ export function mountFsmEditor(container, opts = {}) {
     ], { title: 'Layout and conversion', btnClass: 'asm-btn' }).el,
     linkHost);
   const readOnly = !!opts.readOnly;
+  const locked = () => readOnly || panel === 'sim';   // (nothing of the diagram changed, #3793)
 
   // ---------------------------------------------------------------------------- canvas
   const svg = sv('svg', { class: 'asm-canvas fsm-canvas' });
@@ -180,6 +184,7 @@ export function mountFsmEditor(container, opts = {}) {
   const snapV = (v) => Math.round(v / (GRID / 2)) * (GRID / 2);
 
   function addState(at) {
+    if (locked()) return null;
     let p = at;
     if (!p) {
       const r = svg.getBoundingClientRect();
@@ -195,6 +200,7 @@ export function mountFsmEditor(container, opts = {}) {
     return s;
   }
   function addTransition(from, to, shape = {}) {
+    if (locked()) return;
     const t = { id: newId('t'), from, to, cond: '', outputs: {}, ...shape };
     M.transitions.push(t);
     sel = { type: 'trans', id: t.id };
@@ -203,7 +209,7 @@ export function mountFsmEditor(container, opts = {}) {
     setTimeout(() => editLabel(t), 0);
   }
   function deleteSelection() {
-    if (!sel) return;
+    if (!sel || locked()) return;
     if (sel.type === 'state') {
       M.states = M.states.filter((s) => s.id !== sel.id);
       M.transitions = M.transitions.filter((t) => t.from !== sel.id && t.to !== sel.id);
@@ -218,7 +224,7 @@ export function mountFsmEditor(container, opts = {}) {
   // selected, its name made new when it is used
   let pasteN = 0, pasteText = null;
   function copySel(cut = false) {
-    if (sel?.type !== 'state') return;
+    if (sel?.type !== 'state' || (cut && locked())) return;
     const clip = copyDrawing('fsm', M, [sel.id]);
     writeClip('fsm', clip);
     pasteText = JSON.stringify(clip); pasteN = 0;   // (pasted here: next to the original)
@@ -226,7 +232,7 @@ export function mountFsmEditor(container, opts = {}) {
   }
   async function paste(clip) {
     clip ??= await readClip('fsm');
-    if (drawingClipEmpty('fsm', clip) || destroyed) return;
+    if (drawingClipEmpty('fsm', clip) || destroyed || locked()) return;
     const t = JSON.stringify(clip);
     if (t !== pasteText) { pasteText = t; pasteN = clip.from === M.name ? 0 : -1; }
     const d = 2 * GRID * ++pasteN;
@@ -245,7 +251,8 @@ export function mountFsmEditor(container, opts = {}) {
     status, styleSel, tabBtns, timers, transById, validateSoon: (...a) => validateSoon(...a),
     setM: (v) => { M = v; }, setHist: (v) => { hist = v; }, setHi: (v) => { hi = v; },
     setLastKey: (v) => { lastKey = v; }, setLastT: (v) => { lastT = v; }, setSel: (v) => { sel = v; },
-    shared: () => shared, setSharedRef: (v) => { shared = v; }, simGone: () => { if (sim && !stateById(sim.state)) resetSim(); }
+    shared: () => shared, setSharedRef: (v) => { shared = v; }, simGone: () => { if (sim && !stateById(sim.state)) resetSim(); },
+    locked, lockable: () => [stateBtn, arrangeBtn, ...encItems, ...styleItems].filter((b) => b.tagName === 'BUTTON')
   });
 
   // (a text typed in place that is not valid: to the console, by the document, #2729, as every message, #2718)
@@ -273,12 +280,12 @@ export function mountFsmEditor(container, opts = {}) {
     editLabel, editState, fit, fitted: () => fitted, gOverlay, gStates, geom, paste, print, readOnly, redo, render,
     renderSide: (...a) => renderSide(...a), root, sel: () => sel, snapV, stateById, svg, toWorld, transById, uid, undo,
     view: () => view, zoomAt, zoomBy, setFitted: (v) => { fitted = v; }, setSel: (v) => { sel = v; },
-    setDrag: (v) => { drag = v; }
+    setDrag: (v) => { drag = v; }, locked
   });
 
   // ---------------------------------------------------------------------------- side panel (fsm-side.js)
   const { renderSide } = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody, machineSection, btn, stateById, transById,
-    encOf, commit, deleteSelection, readOnly, render, updateToolbar });
+    encOf, commit, deleteSelection, readOnly, locked, render, updateToolbar });
 
   // ---------------------------------------------------------------------------- problems (to onProblems: the console, #2737)
   function validateSoon() { clearTimeout(timers.val); timers.val = setTimeout(runValidate, 120); }
@@ -299,7 +306,7 @@ export function mountFsmEditor(container, opts = {}) {
   const { renderPanel, resetSim, stopRun, togglePanel } = mountFsmBottom({
     opts, M: () => M, bottom, btn, destroyed: () => destroyed, diags: () => diags, fit, flash, panel: () => panel,
     panelBody, panelTitle, panelTools, render, sim: () => sim, stateById, updateToolbar,
-    setPanel: (v) => { panel = v; }, setSim: (v) => { sim = v; }
+    setPanel: (v) => { panel = v; }, setSim: (v) => { sim = v; }, closeInline, renderSide: () => renderSide()
   });
 
   // ---------------------------------------------------------------------------- link
@@ -327,10 +334,10 @@ export function mountFsmEditor(container, opts = {}) {
   return {
     getModel: () => clone(M),
     undo: () => undo(), redo: () => redo(),
-    canUndo: () => (shared ? shared.canUndo() : hi > 0), canRedo: () => (shared ? shared.canRedo() : hi < hist.length - 1),
+    canUndo: () => !locked() && (shared ? shared.canUndo() : hi > 0), canRedo: () => !locked() && (shared ? shared.canRedo() : hi < hist.length - 1),
     // Edit ▸ Cut / Copy / Paste / Delete (#677): a state (a transition: Delete only)
     copy: () => copySel(), cut: () => copySel(true), paste: () => paste(), deleteSelection: () => deleteSelection(),
-    canCopy: () => sel?.type === 'state', canDelete: () => !readOnly && !!sel, canPaste: () => !readOnly && hasClip('fsm'),
+    canCopy: () => sel?.type === 'state', canDelete: () => !locked() && !!sel, canPaste: () => !locked() && hasClip('fsm'),
     setModel(m) {
       closeInline(false);
       M = normalizeFsm(m);

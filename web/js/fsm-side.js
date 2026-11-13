@@ -8,7 +8,7 @@ import { formatOutputs, parseOutputs } from '/core/fsm.js';
 /** { renderSide } of an FSM editor (M(), sel(): its current model and selection; setSel(s) selects). */
 export function mountSide(ctx) {
   const { M, sel, setSel, selSection, machineBody, machineSection = machineBody, btn, stateById, transById, encOf, commit, deleteSelection,
-    readOnly = false, render, updateToolbar } = ctx;
+    readOnly = false, locked = () => readOnly, render, updateToolbar } = ctx;
 
   const field = (label, input, hintText) => h('label', { class: 'asm-field' }, h('span', { class: 'asm-label' }, label), input, hintText ? h('span', { class: 'asm-fhint' }, hintText) : null);
   const input = (value, onchange, { cls = '', ph = '', key = null, title = null } = {}) => {
@@ -26,8 +26,8 @@ export function mountSide(ctx) {
     const b = key ? (selSection.querySelector(`[data-key="${key}"]`) || machineBody.querySelector(`[data-key="${key}"]`)) : null;
     if (b) { b.focus({ preventScroll: true }); if (caret) b.setSelectionRange(...caret); }
   }
-  // (read-only, #2696: its fields shown, disabled; its buttons hidden)
-  const lock = () => { if (readOnly) for (const x of [...selSection.querySelectorAll('input, select, textarea, button'), ...machineBody.querySelectorAll('input, select, textarea, button')]) if (x.tagName === 'BUTTON') x.hidden = true; else x.disabled = true; };
+  // (read-only, #2696, or in Try it, #3793: its fields shown, disabled; its buttons hidden)
+  const lock = () => { if (locked()) for (const x of [...selSection.querySelectorAll('input, select, textarea, button'), ...machineBody.querySelectorAll('input, select, textarea, button')]) if (x.tagName === 'BUTTON') x.hidden = true; else x.disabled = true; };
 
   function renderSelection() {
     selSection.textContent = '';
