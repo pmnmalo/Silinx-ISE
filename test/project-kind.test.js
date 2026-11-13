@@ -4,9 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DESIGN_KIND, DESIGN_ONLY_LABEL, DESIGN_ONLY_MESSAGES as M, addRefusal, asDesignProject, asFpgaProject, hdlFile, hdlSideFile, isDesignOnly, ownSources, toDesignProject } from '../core/project-kind.js';
 
-const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const design = { name: 'd', kind: 'design', board: null, constraints: null, device: { part: 'xc3s250e' }, files: [] };
 
 test('isDesignOnly: the kind design only; an FPGA project has none (every project before)', () => {
