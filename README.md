@@ -700,7 +700,8 @@ Nexys A7** (XC7A100T-CSG324, #3145): in the local server when Silinx is the proj
 default there), and in the browser edition (#3143: about 6.5 MB downloaded on the first run, then kept; the Basys 3's `.bit`
 the local server's byte for byte): Yosys's `synth_xilinx`, nextpnr-himbaechel's xilinx
 micro-architecture, and the `.bit` written from nextpnr's FASM on Project X-Ray's database; its timing is nextpnr's estimate,
-optimistic against Vivado's.
+optimistic against Vivado's. Every example builds on both boards with no warning, its clock at the board's 100 MHz (#3147), and
+runs on them in the Board Emulator.
 It takes **the Radiona ULX3S-12f / 25f / 45f / 85f** too (Lattice ECP5, LFE5U in CABGA381): Yosys's `synth_ecp5`, nextpnr-ecp5
 and ecppack (Project Trellis), to `build/<top>.bit`, its pins written as an LPF, loaded into the FPGA by *Configure Target Device* (the
 local server's openFPGALoader -b ulx3s, or the browser over WebUSB, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the
