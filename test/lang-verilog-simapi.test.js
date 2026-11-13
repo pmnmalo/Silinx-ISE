@@ -92,6 +92,24 @@ test('waveform recording limit: further changes are not recorded and a warning i
   assert.ok(sim.log.some(l => /waveform recording limit reached/.test(l.text)));
 });
 
+test('#3503 waveTail: each wave keeps its last changes only, the ones let go counted; no recording limit then', () => {
+  const src = `module tb; reg c = 0; reg [7:0] n = 0; always #1 c = ~c; always @(posedge c) n = n + 1; endmodule`;
+  const full = build(src), d = build(src);
+  new Simulator(full).run(100_000);
+  const sim = new Simulator(d, { maxWaveEvents: 10, waveTail: s => (s.name === 'n' ? 4 : 1) });
+  sim.run(100_000);
+  for (const name of ['c', 'n']) {
+    const w = sigOf(d, name).wave, all = sigOf(full, name).wave, keep = name === 'n' ? 4 : 1;
+    // (at most twice what it keeps, and one more: the change before)
+    assert.ok(w.t.length > keep && w.t.length <= 2 * (keep + 1), `${name}: ${w.t.length}`);
+    assert.equal((w.dropped || 0) + w.t.length, all.t.length, `${name}: every change counted`);
+    assert.deepEqual(w.t, all.t.slice(-w.t.length), name);
+    assert.deepEqual(w.v.map(v => V.toBin(v)), all.v.slice(-w.v.length).map(v => V.toBin(v)), name);
+  }
+  assert.equal(sim.waveTruncated, false);
+  assert.deepEqual(sim.log, []);
+});
+
 test('a VHDL $stop-like std.env.stop and a Verilog $stop end the run with their reason', () => {
   const d = build('module tb; initial #3 $stop; endmodule');
   const sim = new Simulator(d);

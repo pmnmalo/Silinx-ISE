@@ -199,7 +199,6 @@ export const HDL_TOOLS = [
       const { Simulator, toVCD } = await import('../core/simulator.js');
       const V = await import('../core/values.js');
       const log = [];
-      const sim = new Simulator(design, { files: await dataFiles(name, simSrcs), onLog: e => { if (log.length < 500) log.push({ timeNs: e.time / 1000, kind: e.kind, text: e.text }); } });
       // the signals by name: the top's, then through its instances (uut/count)
       const byPath = new Map();
       const walk = (inst, prefix) => {
@@ -213,6 +212,11 @@ export const HDL_TOOLS = [
       if (unknown.length) throw toolError(`no signal ${unknown.map(n => `'${n}'`).join(', ')} in <${mod}> (names of the top, or paths as uut/count)`);
       if (wanted.length * maxChanges > SIM_LIMITS.changes)
         throw toolError(`signals × max_changes: at most ${nth(SIM_LIMITS.changes)} changes returned (${wanted.length} signals × ${maxChanges}): fewer signals, or a smaller max_changes`);
+      // the waves kept: the changes returned, the wanted signals' last max_changes, the others' present only (#3503:
+      // a long run in bounded memory, no recording's limit); with a VCD, every change (the recording's limit then)
+      const shown = new Set(wanted.map(n => byPath.get(n) ?? byPath.get(String(n).toLowerCase())));
+      const waveTail = vcd ? null : sig => (shown.has(sig) ? maxChanges : 1);
+      const sim = new Simulator(design, { files: await dataFiles(name, simSrcs), waveTail, onLog: e => { if (log.length < 500) log.push({ timeNs: e.time / 1000, kind: e.kind, text: e.text }); } });
       if (forces) for (const line of applyForces(sim, design, forces)) head.push(line);
       const { st, limit } = await runBounded(sim, timeNs * 1000, { timeoutS, signal });
       const fmt = (s, v) => (s.t?.w === 1 ? V.toBin(v) : `${V.toBin(v).length <= 16 ? `"${V.toBin(v)}"` : `x"${V.format(v, 'hex')}"`}`);
@@ -221,7 +225,7 @@ export const HDL_TOOLS = [
         const s = byPath.get(n) ?? byPath.get(String(n).toLowerCase());
         const w = s.wave;
         const changes = w ? w.t.map((t, i) => [t / 1000, fmt(s, w.v[i])]) : [];
-        sigs[n] = { width: s.t?.w ?? null, final: changes.length ? changes.at(-1)[1] : null, changes: changes.slice(-Math.max(1, maxChanges)), totalChanges: changes.length };
+        sigs[n] = { width: s.t?.w ?? null, final: changes.length ? changes.at(-1)[1] : null, changes: changes.slice(-Math.max(1, maxChanges)), totalChanges: (w?.dropped || 0) + changes.length };
       }
       const failed = st.finished === 'error' || log.some(l => l.kind === 'error' || l.kind === 'failure');
       const stopped = `Simulation of <${mod}> stopped at ${st.now / 1000} ns${st.finished ? ` (${st.finished})` : ''}.`;
