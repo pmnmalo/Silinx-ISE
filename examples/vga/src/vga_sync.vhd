@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------------
--- Silinx example (vga): the timing of a 640x480 picture at 60 Hz. A pixel every two clock cycles
--- (25 MHz from the 50 MHz clock: `pixel` is high one cycle in two); a line is 800 pixels, a frame
--- 525 lines:
+-- Silinx example (vga): the timing of a 640x480 picture at 60 Hz. A pixel every DIV clock cycles
+-- (25 MHz: two cycles of a 50 MHz clock, `pixel` high one cycle in two; four of a 100 MHz one); a line
+-- is 800 pixels, a frame 525 lines:
 --   x :   0 .. 639 the picture,  640 .. 655 front porch,  656 .. 751 HSYNC (low),  752 .. 799 back porch
 --   y :   0 .. 479 the picture,  480 .. 489 front porch,  490 .. 491 VSYNC (low),  492 .. 524 back porch
 -- `active`: (x, y) is in the picture (a flip-flop, kept with the counters, as the flags x < 640 and
@@ -12,7 +12,8 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity vga_sync is
-    Port ( clk    : in  STD_LOGIC;                 -- 50 MHz
+    Generic ( DIV : integer := 2 );                -- clock cycles per pixel
+    Port ( clk    : in  STD_LOGIC;
            pixel  : out STD_LOGIC;                 -- the pixel enable: 25 MHz
            x      : out integer range 0 to 799;
            y      : out integer range 0 to 524;
@@ -32,6 +33,7 @@ architecture Behavioral of vga_sync is
     constant V_SYNC    : integer := 2;
     constant V_TOTAL   : integer := 525;
     signal half : STD_LOGIC := '0';
+    signal pace : integer range 0 to DIV - 1 := 0;
     signal hc   : integer range 0 to H_TOTAL - 1 := 0;
     signal vc   : integer range 0 to V_TOTAL - 1 := 0;
     -- in the picture's columns (hc < 640) and lines (vc < 480): set when a counter starts again, cleared
@@ -44,7 +46,9 @@ begin
         variable h, v : STD_LOGIC;
     begin
         if rising_edge(clk) then
-            half <= not half;
+            -- the pixel enable: one cycle in DIV (the cycle after pace's DIV - 2)
+            if pace = DIV - 1 then pace <= 0; else pace <= pace + 1; end if;
+            if DIV = 1 or pace = DIV - 2 then half <= '1'; else half <= '0'; end if;
             if half = '1' then
                 if hc = H_TOTAL - 1 then
                     hc <= 0;

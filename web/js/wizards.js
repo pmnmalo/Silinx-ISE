@@ -12,6 +12,7 @@ import { IMPORT_SOURCE_ACCEPT, IMPORT_SOURCE_ROLES, assignImported, importSource
 import { reservedNameDiags } from './processes.js';
 import { countEvent, siteCounts } from './analytics.js';
 import { confirmDeviceChange } from './device-change.js';
+import { boardTop } from './board-top.js';
 import { byLastUsed } from './project-store.js';
 import { currentProject, opened } from './project.js';
 import { prefKey } from './prefs.js';
@@ -489,6 +490,8 @@ export async function projectProperties() {
   if (noFlowWarning(pj.device)) app.log(noFlowWarning(pj.device), 'warn');
   const changed = pj.board !== oldBoard || `${pj.device.part}-${pj.device.package}` !== oldDev;
   const board = app.projectBoard();
+  // another board: its clock and its inputs' levels as the defaults of the top's generics (#3710)
+  if (pj.board !== oldBoard && board && await boardTop(pj, board, app.log)) await app.reloadProject();
   if (changed && board && pj.top && await confirmDlg('Update Constraints',
     `The target changed to the ${board.name}.\nPin locations (LOC) in the constraints file are board specific.\n\nRegenerate ${pj.constraints || 'the UCF'} from the ${board.name} pin table? (ports are matched by name: clk, led, sw, btn, seg, an…)`)) {
     await app.regenerateUcf(board);

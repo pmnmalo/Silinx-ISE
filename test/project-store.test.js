@@ -71,6 +71,24 @@ test('folder: a project from each example is the server\'s, file for file', asyn
   assert.deepEqual(Object.keys(EXAMPLES).sort(), ['blinky', 'clock', 'gates', 'isqrt', 'micro80', 'pong', 'stopwatch', 'traffic', 'uart', 'vga']);
 });
 
+// (#3710) an example made for another board (the Mimas V2: 100 MHz, its buttons and switches active low): its top's
+// generics CLK_HZ, BTN_LOW and SW_LOW the board's, as the server writes them; its other files the example's
+test('folder: a project from each example for the Mimas V2: its top\'s generics the board\'s, as the server writes them', async () => {
+  const { root, ops } = folder();
+  for (const t of Object.keys(EXAMPLES)) {
+    const name = `Mimas_${t}`;
+    await ops.create({ name, template: t, board: 'mimas-v2', device: { family: 'spartan6', part: 'xc6slx9', package: 'csg324', speed: '-2' } });
+    await P.createProject({ name, template: t, board: 'mimas-v2', device: { family: 'spartan6', part: 'xc6slx9', package: 'csg324', speed: '-2' } });
+    const mine = under(await dump(root), name), server = diskTree(P.projectDir(name));
+    const pj = EXAMPLES[t].json, changed = Object.keys(EXAMPLES[t].files).filter(f => mine[f] !== EXAMPLES[t].files[f]);
+    // (the browser edition writes the board's constraints when the project opens: the UCF aside)
+    for (const f of Object.keys(EXAMPLES[t].files).filter(f => f !== pj.constraints)) assert.equal(mine[f], server[f], `${t}: ${f}`);
+    if (t === 'gates') { assert.deepEqual(changed, [], t); continue; }
+    assert.equal(changed.length, 1, `${t}: ${changed}`);
+    assert.match(mine[changed[0]], /CLK_HZ\s*(?::\s*integer\s*:=\s*100_000_000|=\s*100000000)/, t);
+  }
+});
+
 test('folder: writing, renaming (files and folders), deleting and saving keep silinx.json as the server does', async () => {
   const { root, ops, store } = folder();
   await ops.create({ name: 'Edit' });

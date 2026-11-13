@@ -2,8 +2,8 @@
 -- Silinx example: serial communication (a UART) with a terminal: each character received is sent
 -- back (an echo), and shown.
 --   rx / tx : the board's serial port (RS-232, USB-UART; on the Basys2, a PmodUSBUART on JA),
---             BAUD baud, 8 data bits, no parity, 1 stop bit (8N1): 9600 baud at 50 MHz (CLK_HZ: on
---             a 100 MHz board, 19200 baud; set CLK_HZ to the board's clock for 9600)
+--             BAUD baud, 8 data bits, no parity, 1 stop bit (8N1): 9600 baud (CLK_HZ, the board's
+--             clock, sets the bit time: a project made for a board has its clock there)
 --   display : the bytes received (left, hexadecimal, 00 to FF and again) and the last one (right)
 --   LD7..LD0: the last byte received, in binary
 --   BTN0    : sends the message "Hello from Silinx!" and a line's end (CR LF)
@@ -18,11 +18,12 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity uart is
-    Generic ( CLK_HZ  : integer := 50_000_000;   -- the board's clock
+    Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
               BAUD    : integer := 9600;
-              STABLE  : integer := 1_000_000;    -- button debounce (20 ms)
-              REFRESH : integer := 50_000 );     -- display: cycles per digit (1 ms)
-    Port ( clk : in  STD_LOGIC;                  -- 50 MHz
+              STABLE  : integer := CLK_HZ / 50;    -- button debounce (20 ms)
+              REFRESH : integer := CLK_HZ / 1000;  -- display: cycles per digit (1 ms)
+              BTN_LOW : boolean := false );        -- true: the board's buttons read '0' when pressed
+    Port ( clk : in  STD_LOGIC;                  -- the board's clock (CLK_HZ)
            rx  : in  STD_LOGIC;
            tx  : out STD_LOGIC;
            btn : in  STD_LOGIC_VECTOR (0 downto 0);
@@ -51,7 +52,11 @@ architecture Behavioral of uart is
     signal tx_data  : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
     signal tx_busy  : STD_LOGIC;
     signal digits   : STD_LOGIC_VECTOR (15 downto 0);
+    -- the button as '1' when pressed, whatever the board's level
+    signal btnOn : STD_LOGIC_VECTOR (0 downto 0);
 begin
+    btnOn <= not btn when BTN_LOW else btn;
+
     receiver : entity work.uart_rx
         generic map ( BIT_T => BIT_T )
         port map ( clk => clk, rx => rx, data => rx_data, valid => rx_valid );
@@ -62,7 +67,7 @@ begin
 
     button : entity work.debounce
         generic map ( STABLE => STABLE )
-        port map ( clk => clk, btn => btn(0), press => press );
+        port map ( clk => clk, btn => btnOn(0), press => press );
 
     -- what is sent: the echo first, then the message's characters one after the other
     process (clk)

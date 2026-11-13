@@ -8,6 +8,7 @@ import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { boardAutoAssign, boardConstraintsText, constraintsExtOf } from '../packages/silinx-fpga/src/parts.js';
 import { resolveBoard } from './devices.js';
+import { topForBoard } from '../core/board-generics.js';
 import { realOf, nativeRealOf, hiddenName, within } from './paths.js';
 import { topNameError } from './ident.js';
 import { normalizePath } from '../core/import-gate.js';
@@ -290,9 +291,11 @@ export async function createProject({ name, template = 'empty', device, board, f
     const pj = { ...JSON.parse(await fs.readFile(path.join(src, PROJECT_FILE), 'utf8')), name };
     pj.files ||= [];
     await copyDir(src, dir, { skipRoot: PROJECT_FILE });
-    const was = `${pj.board}|${pj.device?.part}|${pj.device?.package}`;
+    const was = `${pj.board}|${pj.device?.part}|${pj.device?.package}`, fromBoard = pj.board;
     if (device) pj.device = device;
     if (board !== undefined) pj.board = board;
+    // another board than the example's: its clock and its buttons' and switches' levels as the top's generics (#3710)
+    if (pj.board && pj.board !== fromBoard) await boardGenerics(dir, pj);
     // a device whose constraints are of another format (the 7-series' XDC, #3142): the example's file replaced by the board's
     const ext = constraintsExtOf(pj.device);
     if (pj.constraints && !pj.constraints.toLowerCase().endsWith(ext)) {
@@ -316,6 +319,22 @@ export async function createProject({ name, template = 'empty', device, board, f
     ...(fromOutside ? { trusted: false } : {}),
     ...(madeBy === 'mcp' ? { trusted: false, madeBy } : {}),
   });
+}
+
+/** Writes the board's values (its clock, CLK_HZ; its buttons' and switches' levels, BTN_LOW, SW_LOW) as the defaults of
+ *  the generics of a project's top that has them (core/board-generics.js, #3710): topForBoard's result and the board's
+ *  name, or null (nothing changed). */
+export async function boardGenerics(dir, pj) {
+  const r = resolveBoard(pj.board, { part: pj.device?.part });
+  if (!r || !pj.top) return;
+  const sources = [];
+  for (const f of pj.files || []) {
+    if (f.role === 'sim' || !/^(vhdl|verilog)$/.test(f.lang)) continue;
+    try { sources.push({ path: f.path, lang: f.lang, text: await fs.readFile(safeJoin(dir, f.path), 'utf8') }); } catch { /* missing (or outside the project): skipped */ }
+  }
+  const top = topForBoard(sources, pj.top, r);
+  if (top) await fs.writeFile(safeJoin(dir, top.path), top.text);
+  return top ? { ...top, board: r.board.name } : null;
 }
 
 /** Writes a project's UCF from its board's pin table (ports matched by name: clk, led, sw, btn,

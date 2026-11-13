@@ -12,17 +12,27 @@ module sevenseg #(
     output wire        dp,
     output wire [3:0]  an
 );
-    reg [15:0] count = 16'd0;
+    // the bits a count from 0 to n - 1 takes (at least one)
+    function integer clog2(input integer n);
+        integer x;
+        begin
+            x = n - 1;
+            for (clog2 = 0; x > 0; clog2 = clog2 + 1) x = x >> 1;
+            if (clog2 < 1) clog2 = 1;
+        end
+    endfunction
+
+    reg [clog2(REFRESH)-1:0] count = 0;
     reg [1:0]  sel = 2'd0;
     // the digit shown now
     wire [3:0] d = (sel == 2'd0) ? digits[3:0] : (sel == 2'd1) ? digits[7:4] : (sel == 2'd2) ? digits[11:8] : digits[15:12];
 
     always @(posedge clk) begin
         if (count == REFRESH - 1) begin
-            count <= 16'd0;
+            count <= 0;
             sel   <= sel + 2'd1;
         end else
-            count <= count + 16'd1;
+            count <= count + 1'b1;
     end
 
     assign an = ~(4'b0001 << sel);

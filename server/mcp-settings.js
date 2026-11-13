@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as P from './projects.js';
+import { topForBoardText } from '../core/board-generics.js';
 import { toolError, readProject, viewSourcesOf, STR, PROJECT, deviceName } from './mcp-util.js';
 
 // the device database (server/devices.js) and the toolchain package's checks, loaded on first use
@@ -151,6 +152,9 @@ export const SETTINGS_TOOLS = [
         warnings.push(...r.messages.filter(m => /^WARNING/.test(m)));
       }
       const after = await P.readProject(name);
+      // another board: its clock and its inputs' levels as the defaults of the top's generics (#3710), as the dialog does
+      const generics = changed && nextBoard && nextBoard !== (pj.board || null) ? await P.boardGenerics(P.projectDir(name), after) : null;
+      if (generics) languageLines.push(topForBoardText(generics, generics.board));
       const pins = [];
       if (constraints) await P.boardConstraints(P.projectDir(name), after);
       else if (changed && !nextBoard && after.constraints && fs.existsSync(path.join(P.projectDir(name), after.constraints))) pins.push(`WARNING: check the pin locations in ${after.constraints} — they must exist on the ${next.package.toUpperCase()} package.`);
@@ -159,7 +163,7 @@ export const SETTINGS_TOOLS = [
       const noFlow = experimental && !vivado ? [`WARNING: ${R.noFlowMessage(next)}.`] : [];
       warnings.push(...noFlow);
       const text = [...warnings.filter(w => !pins.includes(w) && !languageLines.includes(w) && !noFlow.includes(w)), ...languageLines, `Device set to ${next.part}${next.speed}-${next.package}${nextBoard ? ` (board ${nextBoard})` : ''}; synthesis tool ${after.synthTool || 'of Toolchain Settings'}${constraints ? `; ${after.constraints} written from the ${nextBoard}'s pins` : ''}.`, ...pins, ...noFlow];
-      return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, preferredLanguage: after.preferredLanguage || 'vhdl', constraints: after.constraints || null, constraintsUpdated: constraints, warnings } };
+      return { text: text.join('\n'), data: { project: name, board: nextBoard, device: next, synthTool: after.synthTool || null, preferredLanguage: after.preferredLanguage || 'vhdl', constraints: after.constraints || null, constraintsUpdated: constraints, generics: generics ? { file: generics.path, ...generics.values } : null, warnings } };
     },
   },
   {

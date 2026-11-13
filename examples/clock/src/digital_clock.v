@@ -1,4 +1,4 @@
-// Silinx example: a digital clock on the Basys2 / Nexys2, set with the buttons.
+// Silinx example: a digital clock on the Basys2 / Nexys2 (and other boards: CLK_HZ, BTN_LOW, SW_LOW), set with the buttons.
 //   display : hours and minutes, HH.MM (the decimal point blinks every second, as a clock's colon)
 //   BTN3    : hours + 1
 //   BTN2    : minutes + 1
@@ -11,9 +11,12 @@
 // tens and units by comparisons, no divider), the button debouncers (debounce.v) and the display
 // (sevenseg.v).
 module digital_clock #(
-    parameter TICK    = 50000000,             // clock cycles per second (50 MHz)
-    parameter STABLE  = 1000000,              // button debounce (20 ms)
-    parameter REFRESH = 50000                 // display: cycles per digit (1 ms)
+    parameter CLK_HZ  = 50000000,             // the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
+    parameter TICK    = CLK_HZ,               // clock cycles per second
+    parameter STABLE  = CLK_HZ / 50,          // button debounce (20 ms)
+    parameter REFRESH = CLK_HZ / 1000,        // display: cycles per digit (1 ms)
+    parameter BTN_LOW = 0,                    // 1: the board's buttons read 0 when pressed
+    parameter SW_LOW  = 0                     // 1: the board's switches read 0 when on
 ) (
     input  wire       clk,
     input  wire [1:0] sw,
@@ -23,13 +26,27 @@ module digital_clock #(
     output wire [3:0] an,
     output wire       dp
 );
-    wire incHour, incMin, zeroSec, toggleView;
-    debounce #(.STABLE(STABLE)) db3 (.clk(clk), .btn(btn[3]), .press(incHour));
-    debounce #(.STABLE(STABLE)) db2 (.clk(clk), .btn(btn[2]), .press(incMin));
-    debounce #(.STABLE(STABLE)) db1 (.clk(clk), .btn(btn[1]), .press(zeroSec));
-    debounce #(.STABLE(STABLE)) db0 (.clk(clk), .btn(btn[0]), .press(toggleView));
+    // the bits a count from 0 to n - 1 takes (at least one)
+    function integer clog2(input integer n);
+        integer x;
+        begin
+            x = n - 1;
+            for (clog2 = 0; x > 0; clog2 = clog2 + 1) x = x >> 1;
+            if (clog2 < 1) clog2 = 1;
+        end
+    endfunction
 
-    reg [25:0] tick = 26'd0;
+    // the buttons and switches as 1 when pressed or on, whatever the board's level
+    wire [3:0] btnOn = BTN_LOW ? ~btn : btn;
+    wire [1:0] swOn  = SW_LOW ? ~sw : sw;
+
+    wire incHour, incMin, zeroSec, toggleView;
+    debounce #(.STABLE(STABLE)) db3 (.clk(clk), .btn(btnOn[3]), .press(incHour));
+    debounce #(.STABLE(STABLE)) db2 (.clk(clk), .btn(btnOn[2]), .press(incMin));
+    debounce #(.STABLE(STABLE)) db1 (.clk(clk), .btn(btnOn[1]), .press(zeroSec));
+    debounce #(.STABLE(STABLE)) db0 (.clk(clk), .btn(btnOn[0]), .press(toggleView));
+
+    reg [clog2(TICK)-1:0] tick = 0;
     reg [5:0]  sec = 6'd0, min = 6'd0;
     reg [4:0]  hour = 5'd0;
     reg        secView = 1'b0;                // MM.SS shown
@@ -37,10 +54,10 @@ module digital_clock #(
     wire       half = (tick < TICK / 2);      // the first half of each second
 
     always @(posedge clk) begin
-        if (sw[0]) begin
-            tick <= 26'd0; sec <= 6'd0; min <= 6'd0; hour <= 5'd0; secView <= 1'b0;
+        if (swOn[0]) begin
+            tick <= 0; sec <= 6'd0; min <= 6'd0; hour <= 5'd0; secView <= 1'b0;
         end else begin
-            tick <= (second || zeroSec) ? 26'd0 : tick + 26'd1;
+            tick <= (second || zeroSec) ? 1'b0 : tick + 1'b1;
             if (toggleView) secView <= ~secView;
             // the seconds, and the minutes and hours they carry into
             if (zeroSec)
@@ -79,14 +96,14 @@ module digital_clock #(
     // the hour shown: 0-23, or 1-12 in 12-hour mode
     wire       pm = (hour >= 5'd12);
     wire [4:0] hour12 = (hour == 5'd0) ? 5'd12 : (hour > 5'd12) ? hour - 5'd12 : hour;
-    wire [7:0] h = decimal({1'b0, sw[1] ? hour12 : hour});
+    wire [7:0] h = decimal({1'b0, swOn[1] ? hour12 : hour});
     wire [7:0] m = decimal(min);
     wire [7:0] s = decimal(sec);
     // no leading zero for the hours in 12-hour mode (" 9.05")
-    wire [3:0] h10 = (sw[1] && h[7:4] == 4'd0) ? 4'd15 : h[7:4];
+    wire [3:0] h10 = (swOn[1] && h[7:4] == 4'd0) ? 4'd15 : h[7:4];
 
     sevenseg #(.REFRESH(REFRESH)) display (.clk(clk),
         .digits(secView ? {m, s} : {h10, h[3:0], m}), .points({1'b0, half, 2'b00}), .seg(seg), .dp(dp), .an(an));
 
-    assign led = {half, sw[1] & pm, sec};
+    assign led = {half, swOn[1] & pm, sec};
 endmodule
