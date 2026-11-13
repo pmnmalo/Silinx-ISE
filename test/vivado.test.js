@@ -258,7 +258,8 @@ test('a 7-series project is implemented by Vivado (POST implement, run_process):
   assert.match(r.text, /Process "synthesize" of <top> failed \(1 error\(s\), 0 warning\(s\)\) \(AMD Vivado\)\.$/);
   // (the MCP's result names the workspace as such, never its absolute path, #3418)
   assert.deepEqual(r.data.errors, [`ERROR: AMD Vivado not available (docker mode): ${NOT_READY}. Configure it in Toolchain Settings (vivado in ~/.silinx/config.json, PUT /api/toolchain), or run <workspace>/Basys3Blinky/build/run.sh on a machine with Vivado.`]);
-  assert.match((await call('run_process', { project: 'Basys3Blinky', process: 'post_par_model' })).text, /^run_process: Vivado's flow has no post-place & route simulation model \(postpar\)$/);
+  // (a simulation model: the MCP's refusal of a model the flow does not make, #3707; the job's own, Vivado's, above)
+  assert.equal((await call('run_process', { project: 'Basys3Blinky', process: 'post_par_model' })).text, 'run_process: the Artix-7 flow makes no post-place & route simulation model (only the Spartan flows make them): simulate the behavioral model');
 });
 
 test('a Vivado .bit of the Basys 3: its header read (Vivado\'s design name, its part), the project\'s device matched, programmed by openFPGALoader with the board', async () => {
