@@ -185,10 +185,11 @@ uiTest('#3195 the Design pane\'s project menu: the Git commands (the Silinx inte
   assert.deepEqual(warnings(page), []);
 });
 
-// (#3534) Initialize Repository… on the Start page (after Open from Repository…) and in the Design tree's project and
-// device menus (after Share Project…, before the Git submenu): shown for a project with no repository, the Start
-// page's disabled with no project open, the File menu's dialog run from either; gone from both once the project is a
-// repository; never Sign in with GitHub… (the browser edition's); in Portuguese. Both interfaces; no warnings.
+// (#3534) Initialize Repository… on the Start page (before Open from Repository…, the group's last, #3716) and in
+// the Design tree's project and device menus (after Share Project…, before the Git submenu): shown for a project with
+// no repository, the Start page's disabled with no project open, the File menu's dialog run from either; gone from
+// both once the project is a repository; never Sign in with GitHub… (the browser edition's); in Portuguese. Both
+// interfaces; no warnings.
 const treeItems = async (page, row, item) => {
   await page.rightClick('#hier .row .lbl', { index: row });
   await page.waitForSelector('body > .menu-popup');
@@ -204,7 +205,7 @@ uiTest('#3534 Initialize Repository… on the Start page and in the Design tree\
   await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Open from Repository…'), [], { what: 'the Start page' });
   // no project open: disabled, as the exports
   let cmds = await startCommands(page);
-  assert.deepEqual(cmds.slice(cmds.indexOf('Open from Repository…'), cmds.indexOf('Open from Repository…') + 2), ['Open from Repository…', 'Initialize Repository… (disabled)'], cmds.join(' | '));
+  assert.deepEqual(cmds.slice(cmds.indexOf('Initialize Repository… (disabled)')), ['Initialize Repository… (disabled)', 'Open from Repository…'], cmds.join(' | '));
   assert.ok(!cmds.some((c) => c.startsWith('Sign in with GitHub')), cmds.join(' | '));
   await page.eval(async () => { const { api } = await import('/js/api.js'); await api.createProject({ name: 'startgit', template: 'gates' }); });
   await page.openProject('startgit');
@@ -217,13 +218,13 @@ uiTest('#3534 Initialize Repository… on the Start page and in the Design tree\
   await page.waitDialog('Initialize Repository');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
-  // the project's and the device's rows: after Share Project… (Share Project… where none), before Git
+  // the project's and the device's rows: after Share Project…, before Git
   await page.leftTab('design');
   await page.waitFor(() => document.querySelectorAll('#hier .row .lbl').length >= 2, [], { what: 'the Design tree' });
   for (const row of [0, 1]) {
     const items = await treeItems(page, row);
     const at = items.indexOf('Initialize Repository…');
-    assert.ok(at > 0 && /^(Share Project…|Share Project…)/.test(items[at - 1]) && items[at + 1] === 'Git', `row ${row}: ${items.join(' | ')}`);
+    assert.ok(at > 0 && /^Share Project…/.test(items[at - 1]) && items[at + 1] === 'Git', `row ${row}: ${items.join(' | ')}`);
     assert.ok(!items.some((c) => c.startsWith('Sign in with GitHub')), items.join(' | '));
   }
   // in Portuguese

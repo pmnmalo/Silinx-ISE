@@ -815,8 +815,8 @@ uiTest('toolbar: Print, enabled with a document in front, opens its print previe
   const cmds = () => page.eval(() => [...document.querySelectorAll('#toolbar .tb-btn')].map((b) => b.dataset.cmd));
   const printOff = () => page.eval(() => document.querySelector('#toolbar .tb-btn[data-cmd=print]').disabled);
   const list = await cmds();
-  // (Close Project between Open Project and Print, #2027)
-  assert.ok(list.indexOf('closeProject') === list.indexOf('open') + 1 && list.indexOf('print') === list.indexOf('open') + 2, list.join(' '));
+  // (Share Project then Close Project between Open Project and Print, #2027, #3716)
+  assert.deepEqual(list.slice(list.indexOf('open'), list.indexOf('open') + 4), ['open', 'share', 'closeProject', 'print'], list.join(' '));
   for (const gone of ['summary', 'schematic', 'pins']) assert.ok(!list.includes(gone), `${gone}: ${list.join(' ')}`);
   assert.equal(await page.eval(() => document.querySelector('#toolbar .tb-btn[data-cmd=print]').title), 'Print');
   assert.equal(await printOff(), true, 'no document: Print off');

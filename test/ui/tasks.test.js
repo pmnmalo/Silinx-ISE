@@ -303,9 +303,12 @@ uiTest('#839 Tasks in a development build: with the Development menu, in Portugu
     await page.waitFor(() => { const t = document.getElementById('topbar'); return t.scrollWidth <= t.clientWidth; }, [], { what: `the header fits at ${w} px`, timeout: 3000 });
     if ((await fit(page)).fit === 'current') { current = w; break; }
   }
-  // (#1217: with no Project, Process and Tools menus every label may fit down to the narrow layout: none then)
-  if (current) assert.deepEqual((await fit(page)).labels, ['edit']);
-  else assert.deepEqual((await fit(page)).labels, ['edit', 'sim', 'emu', 'impl'], 'every label down to 1040 px');
+  // (#1217: with no Project, Process and Tools menus every label may fit down to the narrow layout: none then; the labels
+  // as the header's fit is when read: at the width it changes, the header's own width settling late may take it back,
+  // #3716)
+  const last = await fit(page);
+  if (current && last.fit === 'current') assert.deepEqual(last.labels, ['edit']);
+  else assert.deepEqual(last.labels, ['edit', 'sim', 'emu', 'impl'], current ? `back to every label at ${current} px` : 'every label down to 1040 px');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#task-switch .task-btn')].map((b) => b.title)), ['Design', 'Simular', 'Emular', 'Implementar']);
   // with room again (a lab desktop): every label
   await page.setViewport(1920, 1080);
@@ -1487,7 +1490,7 @@ uiTest('#1321 Tasks: no menu bar, the toolbar in the header in its place, withou
     return { menubar: vis(document.getElementById('menubar')), inHeader: tb.parentElement.id === 'topbar',
       cmds: [...tb.querySelectorAll('.tb-btn')].filter(vis).map((b) => b.dataset.cmd), oneLine: document.getElementById('topbar').getBoundingClientRect().height <= 64 };
   });
-  assert.deepEqual(await L(), { menubar: false, inHeader: true, cmds: ['newProject', 'open', 'closeProject', 'print', 'undo', 'redo', 'cut', 'copy', 'paste', 'find'], oneLine: true });
+  assert.deepEqual(await L(), { menubar: false, inHeader: true, cmds: ['newProject', 'open', 'share', 'closeProject', 'print', 'undo', 'redo', 'cut', 'copy', 'paste', 'find'], oneLine: true });
   assert.ok(await page.eval(() => document.getElementById('toolbar').getBoundingClientRect().left < document.getElementById('task-switch').getBoundingClientRect().left), 'before the tasks');
   await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);

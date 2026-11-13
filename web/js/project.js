@@ -245,13 +245,13 @@ export async function renderStartPage() {
     // then the sharing and the git entries in one group (#3699)
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
       ...[['Import Project (.zip)…', 'open', zipDialog('importProjectDialog')], ['Export Project (.zip)…', 'save', () => S.project && zipDialog('exportProjectDialog')(), true]].map(command),
-      h('hr', { class: 'start-sep' }),
-      command(['Share Project…', 'save', () => S.project && import('./share-how.js').then(m => m.shareDialog()), true]),   // (a copy or live, #2826, #3698)
-      // (a GitHub repository, a Classroom assignment's: the server editions, #3195; after Share Project…, #3323)
-      ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : []),
-      // (Initialize Repository…, the open project's, disabled with none as the exports; Sign in with GitHub…, the
-      // browser edition's: where they apply, in both interfaces, #3534)
-      ...gitStartItems().map(it => command([it.label, it.project ? 'save' : 'project', () => (S.project || !it.project) && it.action(), it.project]))),
+      // (the git group after a line, where there is git; Share Project…: the main toolbar's and the File menu's, #3716)
+      ...(git => (git.length ? [h('hr', { class: 'start-sep' }), ...git] : []))([
+        // (Sign in with GitHub…, the browser edition's, first; Initialize Repository…, the open project's, disabled with
+        // none as the exports: where they apply, in both interfaces, #3534, #3716)
+        ...gitStartItems().sort((a, b) => !!a.project - !!b.project).map(it => command([it.label, it.project ? 'save' : 'project', () => (S.project || !it.project) && it.action(), it.project])),
+        // (a GitHub repository, a Classroom assignment's: the server editions, #3195; the group's last, #3716)
+        ...(hasGit() ? [command(['Open from Repository…', 'open', () => openFromRepositoryDialog()])] : [])])),
     // (where the projects are kept above the recent ones, #2029)
     api.standalone ? await storageBox() : await workspaceBox(),
     h('div', { class: 'start-box' }, h('h3', {}, 'Recent Projects'),

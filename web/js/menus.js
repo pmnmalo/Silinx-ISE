@@ -194,6 +194,7 @@ export function setupToolbar() {
   tb.append(
     btn('newProject', 'New Project', () => wiz.newProjectWizard()),
     btn('open', 'Open Project', () => wiz.openProjectDialog()),
+    btn('share', 'Share Project', () => import('./share-how.js').then(m => m.shareDialog()), () => !!S.project),   // as File ▸ Share Project…: a copy or live (#3716)
     btn('closeProject', 'Close Project', () => closeProject(), () => !!S.project),   // as File ▸ Close Project (#2027)
     btn('print', 'Print', () => printActive(), printable),   // as File ▸ Print… (#1251)
     h('div', { class: 'tb-sep' }),
@@ -241,7 +242,7 @@ const toolHas = task => !S.project || hasTask(projectTool(), task);
 // enable / disable the labelled buttons of the Silinx toolbar (cheap: run on clicks and changes)
 export function refreshSteps() {
   for (const b of document.querySelectorAll('#toolbar .m-step')) b.disabled = !b._enabled();
-  for (const b of document.querySelectorAll('#toolbar .tb-btn:is([data-cmd=cut], [data-cmd=copy], [data-cmd=paste], [data-cmd=undo], [data-cmd=redo], [data-cmd=print], [data-cmd=closeProject])')) b.disabled = !b._enabled();
+  for (const b of document.querySelectorAll('#toolbar .tb-btn:is([data-cmd=cut], [data-cmd=copy], [data-cmd=paste], [data-cmd=undo], [data-cmd=redo], [data-cmd=print], [data-cmd=share], [data-cmd=closeProject])')) b.disabled = !b._enabled();
 }
 
 // Command palette: every enabled menu command and every project file
