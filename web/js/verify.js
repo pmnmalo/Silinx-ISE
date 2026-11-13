@@ -5,12 +5,12 @@
 // Verify Assertions: the module's own assertions proved (core/verify-assert.js), a failure's counterexample in the same
 // way (the module alone, its failing assertion reported by the simulation).
 import { api } from './api.js';
-import { h, dialog, toast } from './ui.js';
+import { h, dialog } from './ui.js';
 import { verifyEquivalence, verifyMessages, isVerifyBench, VERIFY_DEPTH, MAX_DEPTH, VERIFY_PROCESS, VERIFY_TIME_LIMIT, MAX_TIME_LIMIT } from '/core/verify.js';
 import { counterexampleBench, benchName } from '/core/verify-bench.js';
 import { verifyAssertions, assertMessages, ASSERT_PROCESS } from '/core/verify-assert.js';
 import { S, app } from './app.js';
-import { log } from './console.js';
+import { log, logInfo } from './console.js';
 import { inView } from './design.js';
 import { saveAll, setStatus } from './processes.js';
 import { runSimulation } from './viewers.js';
@@ -46,7 +46,7 @@ const limits = {};
 async function askReference(mod) {
   const names = [...new Set(S.modules.filter(m => m.kind !== 'package' && m.name.toLowerCase() !== mod.toLowerCase() && !isVerifyBench(S.sources.find(s => s.path === m.file)?.text)).map(m => m.name))]
     .sort((a, b) => a.localeCompare(b));
-  if (!names.length) { toast('The project has no other module to be the reference: add the reference module first', 'info'); return null; }
+  if (!names.length) { logInfo('The project has no other module to be the reference: add the reference module first'); return null; }
   const proposed = names.find(n => REF_NAMES(mod).includes(n.toLowerCase())) || (names.includes(last[mod]) ? last[mod] : names[0]);
   const sel = h('select', { style: { width: '100%' } }, ...names.map(n => h('option', { value: n, 'data-no-i18n': true, selected: n === proposed }, n)));
   const depth = h('input', { type: 'number', min: 1, max: MAX_DEPTH, value: last.depth || VERIFY_DEPTH, style: { width: '6em' } });

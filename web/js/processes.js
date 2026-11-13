@@ -3,7 +3,7 @@
 import { openOnlyDevice, vivadoDevice } from '/packages/silinx-fpga/src/parts.js';
 import { api } from './api.js';
 import { icons, icon } from './icons.js';
-import { h, dialog, popupMenu, toast, longPressMenu } from './ui.js';
+import { h, dialog, popupMenu, longPressMenu } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
 import { reservedModuleDiags } from '/core/reserved.js';
 import { checkC } from '/core/c-check.js';
@@ -12,7 +12,7 @@ import * as wiz from './wizards.js';
 import { designDiags, sevWord } from './diaghelp.js';
 import { S, flushDoc, openFile, openFpgaView, openImpact, openPinPlanner, openSummary, openUcf,
   status, viewRoots, withPrimitives } from './app.js';
-import { log, showProblems, setDiagnostics } from './console.js';
+import { log, logError, logInfo, showProblems, setDiagnostics } from './console.js';
 import { backAnnotatePins, checkUcfFile, generateSimModel, postParTiming, runImpl, stopProcesses,
   synthOpen, textPowerReport, worst } from './implement.js';
 import { isAsm, isFsm, isPn, isTt, openAsm, openFsm, openPetri, openSch, openTt } from './drawings.js';
@@ -161,7 +161,7 @@ async function chooseTop() {
   const byName = (a, b) => a.localeCompare(b);
   const roots = viewRoots(false).sort(byName);   // (in their names' order, not the files')
   const names = [...new Set([...roots, ...S.modules.filter(m => m.kind !== 'package' && m.role !== 'sim').map(m => m.name).sort(byName)])];
-  if (!names.length) return toast('The project has no module that can be the top yet', 'info');
+  if (!names.length) return logInfo('The project has no module that can be the top yet');
   const sel = h('select', { style: { width: '100%' } }, ...names.map(n => h('option', { value: n, 'data-no-i18n': true }, n)));
   const r = await dialog({
     title: 'Set Top Module', width: 420,
@@ -204,7 +204,7 @@ function renderProcessTree(host, defs) {
     const ico = row.children[2];
     if (group && ico) { ico.style.cursor = 'pointer'; ico.addEventListener('click', e => { e.stopPropagation(); toggle(); }); ico.addEventListener('dblclick', e => e.stopPropagation()); }
     row.addEventListener('click', () => { host.querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel')); row.classList.add('sel'); S.selProc = p; });
-    row.addEventListener('dblclick', () => { if (p.disabled && p.title) toast(p.title); else if (p.run && !p.disabled) runProcess(p); });
+    row.addEventListener('dblclick', () => { if (p.disabled && p.title) logInfo(p.title); else if (p.run && !p.disabled) runProcess(p); });
     row.addEventListener('contextmenu', e => {
       e.preventDefault(); row.click();
       popupMenu([
@@ -227,7 +227,7 @@ function renderProcessTree(host, defs) {
 // schematics, editors and programming run in the browser or independently and stay available.
 const ISE_PROCS = FLOW_PROCS;
 export async function runProcess(p) {
-  if (S.busy && ISE_PROCS.includes(p.id)) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return; }
+  if (S.busy && ISE_PROCS.includes(p.id)) { logError('An implementation is already running (use Stop to cancel it)'); return; }
   if (p.onTop && !await topConfirmed(p.label, p.onTop)) return;
   try { await p.run(); }
   catch (e) { log(`ERROR: ${e.message}`, 'err'); console.error(e); }

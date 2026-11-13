@@ -7,6 +7,7 @@
 import { h, toast } from './ui.js';
 import { api } from './api.js';
 import { S, app, findDoc, openDoc, openFile, setDirty } from './app.js';
+import { logInfo } from './console.js';
 import { findPattern, findPaths, findInProject, replaceInText } from '/core/find.js';
 
 /** The project's texts to search: [{ path, text, drawing, generated }], the open editors' as they are. */
@@ -26,7 +27,7 @@ async function projectTexts() {
 
 /** Opens Find in Project (with the text selected in the editor in front, when there is one). */
 export function openFindInProject() {
-  if (!S.project) { toast('Open a project first', 'info'); return; }
+  if (!S.project) { logInfo('Open a project first'); return; }
   const sel = S.active?.editor?.getSelection?.() || '';
   const d = openDoc({ id: 'find', title: 'Find in Project', icon: 'find', create: el => mountFind(el) });
   if (sel && !/\n/.test(sel)) d.setText?.(sel);

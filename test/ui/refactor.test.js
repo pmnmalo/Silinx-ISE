@@ -132,7 +132,9 @@ uiTest('Rename Symbol (F2): every place of the signal in the file, not the comme
   // ---- not a name of this file: a message, no dialog
   await cursorOn(page, 'std_logic', 0);
   await page.key('F2');
-  await page.waitFor(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent === "'std_logic' is not declared in this file: rename it where it is declared."), [], { what: 'the message' });
+  // (a line of the console, not a toast: #3591)
+  await page.waitConsole(/^INFO: 'std_logic' is not declared in this file: rename it where it is declared\.$/m);
+  assert.equal(await page.eval(() => [...document.querySelectorAll('.toast')].filter((t) => /not declared/.test(t.textContent)).length), 0);
   assert.equal(await page.dialogCount(), 0);
 
   // ---- the entity: the project's Rename (module and file)
@@ -593,7 +595,7 @@ end rtl;
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd' && window.Silinx.active.editor);
   await cursorOn(page, 'a', 1);   // (the formal of the port map)
   await page.key('F2');
-  await page.waitFor(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent === "'a' is a port of 'maj3', declared in another file: rename it there."), [], { what: 'the message' });
+  await page.waitConsole(/^INFO: 'a' is a port of 'maj3', declared in another file: rename it there\.$/m);
   assert.equal(await page.dialogCount(), 0);
   assert.equal(await ed(page), TOPV);
 

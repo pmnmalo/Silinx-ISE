@@ -13,7 +13,7 @@ import { countEvent } from './analytics.js';
 import { S, activateDoc, app, closeDoc, findDoc, moduleInfo, openDoc, openFile, projectBoard, status, withPrimitives } from './app.js';
 import { asSsim, benchItems, treeBar, treeItems } from './tasks-sim-tree.js';
 import { mountSimPages } from './tasks-sim-files.js';
-import { log, showConsolePage, setDiagnostics } from './console.js';
+import { log, logError, logInfo, showConsolePage, setDiagnostics } from './console.js';
 import { reloadProject } from './project.js';
 import { generateSimModel, readBuildFile, runImpl } from './implement.js';
 import { ucfPort } from './drawings.js';
@@ -274,7 +274,7 @@ async function runSimulationInner(mod, model, stale) {
       const stimuli = {
         model: bench ? null : S.project.stimuli?.[mod] || null, inst,
         ports: (inst.ports || []).map(p => ({ name: p.name, dir: p.dir, width: p.sig.t.w || 1 })),
-        onChange: m => { if (bench) return; S.project.stimuli = { ...(S.project.stimuli || {}), [mod]: m }; saveProjectJson().catch(e => toast(`Cannot save the stimuli: ${e.message}`, 'error')); },
+        onChange: m => { if (bench) return; S.project.stimuli = { ...(S.project.stimuli || {}), [mod]: m }; saveProjectJson().catch(e => logError(`Cannot save the stimuli: ${e.message}`)); },
         onSaveTestbench: m => saveStimTestbench(inst === design.top ? mod : inst.module, inst, m),
       };
       // (the project's test benches in its tree, another one simulated in a document of its own: #1161)
@@ -362,7 +362,7 @@ const setEnginePref = (e) => { try { localStorage.setItem(prefKey(ENGINE_KEY), e
 const designNow = () => JSON.stringify([S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog').map(s => [s.path, s.text]), S.ucfText || '']);
 // `quiet`: run again on a change of the design (#1401), behind the document in front, no dialog
 export async function openEmulator(mod, { scale, model = null, engine = null, quiet = false } = {}) {
-  if (!mod) { toast('Select the top module first'); return; }
+  if (!mod) { logInfo('Select the top module first'); return; }
   await saveAll();
   const board = projectBoard();
   if (!board) { alertDlg('Board Emulator', 'The project has no board. Choose one in Project ▸ Design Properties (e.g. Digilent Basys2).'); return; }
