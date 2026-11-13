@@ -24,22 +24,44 @@ export function pressEnd({ from, speed, period }) {
  * board's time `now` is at `until`, else when tick(now) reaches it, or goes back before the release (a power
  * cycle: the board's time from 0 again); press(key) drops the one held back (a new press); flush() lets them all
  * go (paused, powered off).
+ *
+ * The compiled engine runs in a worker, a run at a time (up to a quarter of a second's cycles when the page is slow,
+ * #3727): an input set while one is in flight reaches the design once it is over, at a board time the page does not
+ * know yet. press(key, { now, busy }) says when the press reaches the design: `now`, or (busy) the board's time when
+ * the run in flight is over, the first tick(now, { settled: true }) after it; release(key, { until: from => …, … })
+ * then counts from there.
  */
 export function pressHolds() {
-  const held = new Map();
+  const held = new Map(), starts = new Map();
   return {
-    press(key) { held.delete(key); },
+    press(key, { now, busy = false } = {}) {
+      held.delete(key);
+      if (now === undefined) starts.delete(key);
+      else starts.set(key, busy ? null : now);
+    },
     release(key, { until, now, go }) {
       held.delete(key);
+      if (typeof until === 'function') {
+        const from = starts.has(key) ? starts.get(key) : now;
+        starts.delete(key);
+        // (pressed during a run in flight, not settled since: the press's start, and so its end, not known yet)
+        if (from === null) { held.set(key, { from: now, end: until, go }); return; }
+        until = until(from);
+      }
       if (now >= until) go();
       else held.set(key, { from: now, until, go });
     },
-    tick(now) {
-      for (const [key, r] of [...held]) if (now >= r.until || now < r.from) { held.delete(key); r.go(); }
+    tick(now, { settled = true } = {}) {
+      if (settled) for (const [key, at] of starts) if (at === null) starts.set(key, now);
+      for (const [key, r] of [...held]) {
+        if (r.end) { if (!settled) continue; r.until = r.end(now); delete r.end; }
+        if (now >= r.until || now < r.from) { held.delete(key); r.go(); }
+      }
     },
     flush() {
       const all = [...held.values()];
       held.clear();
+      starts.clear();
       for (const r of all) r.go();
     },
     get size() { return held.size; },

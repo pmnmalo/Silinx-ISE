@@ -68,6 +68,40 @@ test('pressHolds: a release held back until the board\'s time is at it, at once 
   assert.deepEqual(gone.slice(-2), ['f', 'g']);
 });
 
+test('#3727 pressHolds: a press made while the worker\'s run is in flight counted from that run\'s end, not from the page\'s older time', () => {
+  const holds = pressHolds(), gone = [];
+  const end = (from) => from + 100 * P;   // 1 kHz: 100 cycles
+  // the page at 1000 cycles, a run of 250 in flight (a slow page): the click reaches the design at 1250 cycles; the
+  // old count (from 1000) let it go as the run came back, at 1250: a press of no cycle for the design
+  holds.press('btn', { now: 1000 * P, busy: true });
+  holds.release('btn', { until: end, now: 1000 * P, go: () => gone.push('btn') });
+  holds.tick(1000 * P, { settled: false });   // (a refresh while the run is in flight: nothing known yet)
+  assert.deepEqual([gone, holds.size], [[], 1]);
+  holds.tick(1250 * P);                       // the run is over: the press starts here
+  assert.deepEqual([gone, holds.size], [[], 1]);
+  holds.tick(1349 * P);
+  assert.deepEqual(gone, []);
+  holds.tick(1350 * P);                       // 100 cycles of the design's time
+  assert.deepEqual([gone, holds.size], [['btn'], 0]);
+  // let go after the run came back: counted from its end all the same
+  holds.press('b2', { now: 2000 * P, busy: true });
+  holds.tick(2250 * P);
+  holds.release('b2', { until: end, now: 2300 * P, go: () => gone.push('b2') });
+  holds.tick(2349 * P);
+  assert.equal(holds.size, 1);
+  holds.tick(2350 * P);
+  assert.deepEqual(gone, ['btn', 'b2']);
+  // no run in flight: from the page's time, as before; long enough already: at once
+  holds.press('b3', { now: 3000 * P });
+  holds.release('b3', { until: end, now: 3100 * P, go: () => gone.push('b3') });
+  assert.deepEqual([gone.at(-1), holds.size], ['b3', 0]);
+  // paused while one waits for its run: flush lets it go
+  holds.press('b4', { now: 4000 * P, busy: true });
+  holds.release('b4', { until: end, now: 4000 * P, go: () => gone.push('b4') });
+  holds.flush();
+  assert.deepEqual([gone.at(-1), holds.size], ['b4', 0]);
+});
+
 const ucfPort = (p) => { const t = p.sig.t, bus = t.w > 1 || (t.kind === 'logic' && !t.scalar); return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null }; };
 
 test('the clock example on the compiled engine at half of real time: a 32 ms click of BTN2 / BTN3 sets the minutes / hours once held, missed when let go at once', { timeout: 300000 }, async () => {
