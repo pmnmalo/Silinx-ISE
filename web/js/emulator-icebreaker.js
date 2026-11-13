@@ -37,8 +37,8 @@ export function icebreakerLayout({ board, title, h, mkDigit, mkLed, mkSwitch, mk
   const pin = (res, k = 0) => pinsOf(board, res)[k] ?? '';
   const has = (res) => board.resources.some((r) => r.name === res);
   // (the modules over the board when it has their resources: the board drawn TOP lower)
-  const hasDisp = has('an'), hasSw = has('sw'), Y0 = hasDisp || hasSw ? TOP : 0, H = BH + Y0;
-  const art = `${modules(board, hasDisp, hasSw)}<g transform="translate(0 ${Y0})">
+  const hasDisp = has('an'), hasSw = has('sw'), hasVga = has('vga_hsync'), Y0 = hasDisp || hasSw || hasVga ? TOP : 0, H = BH + Y0;
+  const art = `${modules(board, hasDisp, hasSw, hasVga)}<g transform="translate(0 ${Y0})">
     <defs><linearGradient id="icbpcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d3a7a"/><stop offset="1" stop-color="#152d63"/></linearGradient></defs>
     <rect x="4" y="4" width="${MW - 8}" height="${BH - 8}" rx="18" fill="url(#icbpcb) #1d3a7a" stroke="#0b1a40" stroke-width="3"/>
     ${holes4(MW, BH)}
@@ -115,8 +115,9 @@ export function icebreakerLayout({ board, title, h, mkDigit, mkLed, mkSwitch, mk
 
 /** The modules over PMOD1A / PMOD1B (#2297), each when the board has its resources: a breadboard with the 4-digit
  *  display (its segments on PMOD1A, its anodes on PMOD1B's lower row, by wires) and the 4 switches' module plugged into
- *  PMOD1B's upper row. */
-function modules(board, hasDisp, hasSw) {
+ *  PMOD1B's upper row; or the PmodVGA plugged into both (#2517, #3745): its two headers, its VGA connector on its far
+ *  edge, the colours' and syncs' pins. */
+function modules(board, hasDisp, hasSw, hasVga) {
   const segs = ['CA', 'CB', 'CC', 'CD', 'CE', 'CF', 'CG'].map((c, i) => `${c}(${pinsOf(board, 'seg')[i] ?? ''})`).concat(`DP(${pinsOf(board, 'dp')[0] ?? ''})`);
   const holes = (y) => Array.from({ length: 2 * 30 }, (_, i) => `<rect x="${52 + (i % 30) * 11}" y="${y + Math.floor(i / 30) * 9}" width="3" height="3" fill="#a59c82"/>`).join('');
   // the wires: the segments to PMOD1A's pins, the anodes to PMOD1B's lower row
@@ -133,7 +134,16 @@ function modules(board, hasDisp, hasSw) {
     <rect x="404" y="40" width="182" height="${TOP - 40}" rx="6" fill="#20357a" stroke="#0e1f4d" stroke-width="2"/>
     <rect x="414" y="${TOP - 14}" width="120" height="18" rx="2" fill="#141414"/>
     ${text(414, 56, 'SWITCHES (PMOD)', { size: 8, anchor: 'start' })}</g>`;
-  return disp + sw;
+  const vgaPins = [['R', 'vga_red'], ['G', 'vga_green'], ['B', 'vga_blue']].map(([c, res]) => `${c}(${pinsOf(board, res).join(' ')})`)
+    .concat(`HS(${pinsOf(board, 'vga_hsync')[0] ?? ''}) VS(${pinsOf(board, 'vga_vsync')[0] ?? ''})`);
+  const vga = !hasVga ? '' : `<g data-module="vga">
+    <rect x="70" y="56" width="530" height="${TOP - 52}" rx="6" fill="#20357a" stroke="#0e1f4d" stroke-width="2"/>
+    <rect x="90" y="${TOP - 14}" width="180" height="18" rx="2" fill="#141414"/><rect x="410" y="${TOP - 14}" width="180" height="18" rx="2" fill="#141414"/>
+    <rect x="240" y="0" width="190" height="16" rx="2" fill="#b9bec6" stroke="#6b7079"/><rect x="262" y="16" width="146" height="50" rx="3" fill="#151515"/>
+    ${[250, 420].map((cx) => `<rect x="${cx - 8}" y="14" width="16" height="40" rx="2" fill="#c3c7cd" stroke="#6b7079"/><circle cx="${cx}" cy="44" r="3.5" fill="#6b7079"/>`).join('')}
+    ${text(335, 86, 'VGA (PMOD)', { size: 10 })}
+    ${vgaPins.map((t, i) => text(335, 104 + i * 14, t, { size: 7, weight: 'normal' })).join('')}</g>`;
+  return disp + sw + vga;
 }
 // its parts' look: the power switch by the USB (its LED the PWR LED), the round tact buttons, the small SMD LEDs
 icebreakerLayout.css = `${POWER_V_CSS}
