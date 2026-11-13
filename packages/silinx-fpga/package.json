@@ -35,7 +35,7 @@
   "author": "Pedro Maló",
   "dependencies": {
     "@silinx/nextpnr-himbaechel-spartan3e": "1.5.2",
-    "@silinx/nextpnr-himbaechel-spartan6": "0.4.1",
+    "@silinx/nextpnr-himbaechel-spartan6": "0.5.1",
     "@silinx/nextpnr-himbaechel-xc7": "0.1.1",
     "@yowasp/yosys": "0.70.1258"
   },

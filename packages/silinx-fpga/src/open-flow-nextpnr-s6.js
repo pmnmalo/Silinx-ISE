@@ -63,7 +63,7 @@ export function mountNextpnrS6(ctx) {
     // (an I/O buffer on a pad with no dedicated path to a global buffer: GENERAL_OK, spartan6.cc's)
     const generalOkOf = site => new Set(phys.insts.filter((inst, i) => inst.kind === 'iob' && !sites.pads.get(site[i])?.bufg.length).map(i => i.name));
     const fixed = new Map(), generalOk = generalOkOf(legal.site);
-    phys.insts.forEach((inst, i) => { if (!byPacker && (hard ? ['iob', 'bufg', 'bram', 'dsp'] : ['iob', 'bufg']).includes(inst.kind)) fixed.set(inst.name, legal.site[i]); });
+    phys.insts.forEach((inst, i) => { if (!byPacker && (hard ? ['iob', 'bufg', 'bram', 'dsp', 'bscan'] : ['iob', 'bufg', 'bscan']).includes(inst.kind)) fixed.set(inst.name, legal.site[i]); });
     const chains = phys.chains.filter(c => c.length > 1).map(c => c.map(i => phys.insts[i].name));
     let mhz = null;
     try { const c = constraints()?.clocks || []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
@@ -71,7 +71,7 @@ export function mountNextpnrS6(ctx) {
     const unplaced = placedXdlS6(nl, packed, phys, { site: [], tile: [], pos: [] }, { part: spec.part, name: spec.top });
     // 1. the placements and their routings, of the placed design with its constants' sources. The seeds differ by up
     // to 20 %, and nextpnr's estimates do not rank them: PLACE_SEEDS of them, the one Silinx's timing model finds fastest.
-    const netlistIn = byPacker ? packInput(netlistText(), phys) : siteNetlist(unplaced, { top: spec.top, fixed, chains, generalOk, device });
+    const netlistIn = byPacker ? packInput(netlistText(), phys, device) : siteNetlist(unplaced, { top: spec.top, fixed, chains, generalOk, device });
     // (a seed nextpnr cannot route, #2131: the next one; the step fails only when none routes)
     let best = null, failed = null;
     const seedOf = async seed => {

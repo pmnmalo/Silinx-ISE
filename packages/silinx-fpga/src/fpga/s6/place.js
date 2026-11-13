@@ -64,10 +64,11 @@ export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = 
   const dspBy = new Map(sites.dsps.map(d => [d.name, d]));
   const nextDsp = s => dspBy.get(s)?.above ?? null;
   const padOf = new Map(sites.pads);
+  const bscanBy = new Map((sites.bscans || []).map(b => [b.name, b]));
   const bramSite = new Map();                 // RAMB16 / RAMB8 site name -> its tile entry
   for (const t of sites.brams) { if (t.r16) bramSite.set(t.r16, t); for (const s of t.r8) bramSite.set(s, t); }
   const posOfSite = name => {
-    const s = slices.get(name) || padOf.get(name) || dspBy.get(name) || bramSite.get(name) || sites.bufgs.find(b => b.name === name);
+    const s = slices.get(name) || padOf.get(name) || dspBy.get(name) || bramSite.get(name) || bscanBy.get(name) || sites.bufgs.find(b => b.name === name);
     return [s.px, s.py];
   };
   const setAt = (i, name) => {
@@ -101,6 +102,7 @@ export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = 
     else if (inst.kind === 'bufg') add({ kind: 'bufg', members: [i], fixed: true });
     else if (inst.kind === 'bram') add({ kind: 'bram', members: [i] });
     else if (inst.kind === 'dsp') add({ kind: 'chain', members: [i], next: nextDsp, dsp: true });
+    else if (inst.kind === 'bscan') add({ kind: 'bscan', members: [i], fixed: true });
   });
 
   // ---------------------------------------------------------------- the pads and the banks' VCCO
@@ -138,6 +140,14 @@ export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = 
       if (pad) warnings.push(`${insts[padInst].name}: the clock enters on pad ${pad.name}, ${pad.bufg.length ? 'whose global buffer is taken' : 'not a clock-capable pin (GCLK)'}: its global buffer ${b} is reached through general routing`);
     }
     setAt(i, b);
+  }
+  // the JTAG's user access (#3766): a BSCAN on the site of its JTAG chain, BSCAN_X0Y<chain - 1> (the site decides the
+  // chain: ISE's bitgen sets the bit of the site that holds it, whatever its JTAG_CHAIN)
+  for (const o of objs.filter(x => x.kind === 'bscan')) {
+    const inst = insts[o.members[0]], b = `BSCAN_X0Y${(inst.chain ?? 1) - 1}`;
+    if (!bscanBy.has(b)) throw new PlaceError(`place: ${inst.name}: its JTAG_CHAIN ${inst.chain} is not one of the ${sites.part}'s 1 to ${bscanBy.size}`);
+    if (owner.has(b)) throw new PlaceError(`place: two BSCANs on the JTAG chain ${inst.chain} (${insts[owner.get(b)].name}, ${inst.name})`);
+    setAt(o.members[0], b);
   }
 
   // ---------------------------------------------------------------- the initial placement (random, legal)
@@ -268,7 +278,7 @@ export function placeS6(phys, sites, { seed = 1, effort = 4, timing = 0.1, nl = 
     revert();
     reweight();
   }
-  const tileOf = name => (slices.get(name) || padOf.get(name) || dspBy.get(name) || bramSite.get(name) || sites.bufgs.find(b => b.name === name)).tile;
+  const tileOf = name => (slices.get(name) || padOf.get(name) || dspBy.get(name) || bramSite.get(name) || bscanBy.get(name) || sites.bufgs.find(b => b.name === name)).tile;
   return {
     site: site.slice(), tile: site.map(tileOf), pos: pos.map(p => p.slice()), wirelength: bb, delay: dmax, warnings,
     stats: { moves, temps, seconds: (Date.now() - t0) / 1000, objects: objs.length, movable: movable.length, initialWirelength, initialDelay },

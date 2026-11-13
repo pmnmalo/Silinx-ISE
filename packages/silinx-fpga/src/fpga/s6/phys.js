@@ -21,8 +21,8 @@
 // from the TIEOFF of a nearby switch box (the router, #730), as ISE routes them.
 //
 // physS6(nl, packed, { ucf }) -> {
-//   insts: [{ name, kind: 'slice' | 'iob' | 'bufg' | 'bram' | 'dsp', type (the site type it needs: SLICEX / SLICEL /
-//            SLICEM, IOB, BUFGMUX, RAMB8BWER, RAMB16BWER, DSP48A1), slice (index in packed.slices) | cell (its
+//   insts: [{ name, kind: 'slice' | 'iob' | 'bufg' | 'bram' | 'dsp' | 'bscan', type (the site type it needs: SLICEX /
+//            SLICEL / SLICEM, IOB, BUFGMUX, RAMB8BWER, RAMB16BWER, DSP48A1, BSCAN), slice (index in packed.slices) | cell (its
 //            cell), loc (an IOB: its pad, from the UCF) , dir, cons (the port's constraints) }]
 //   nets:  [{ name, net (the netlist's) | null (a power net), power: 'vcc' | 'gnd' | null, clock (driven by a
 //            global buffer), driver: { inst, pin } | null, loads: [{ inst, pin }] }]
@@ -37,6 +37,7 @@ import { portAssignments } from '../../ucf.js';
 import { oneBitBusesOf, ucfPortsOf } from '../pack.js';
 import { AND2L, ffKind } from './pack.js';
 import { MEM_TYPE, memConstPins, memInPins, memOutPin, memPositions } from './phys-mem.js';
+import { paramInt } from '../netlist.js';
 
 export class PhysError extends Error {}
 
@@ -47,6 +48,7 @@ const OWN = {
   IBUF: ['IOB', 'iob'], IBUFG: ['IOB', 'iob'], OBUF: ['IOB', 'iob'], OBUFT: ['IOB', 'iob'], IOBUF: ['IOB', 'iob'],
   BUFG: ['BUFGMUX', 'bufg'], BUFGMUX: ['BUFGMUX', 'bufg'],
   RAMB8BWER: ['RAMB8BWER', 'bram'], RAMB16BWER: ['RAMB16BWER', 'bram'], DSP48A1: ['DSP48A1', 'dsp'],
+  BSCAN_SPARTAN6: ['BSCAN', 'bscan'],
 };
 // cells with no site: constants, pulls (an IOB's setting)
 const NO_SITE = /^(GND|VCC|PULLUP|PULLDOWN)$/;
@@ -110,6 +112,9 @@ export function physS6(nl, packed, { ucf = null } = {}) {
       const a = cons[port] || {};
       const dir = c.type === 'IOBUF' ? 'inout' : /^OBUF/.test(c.type) ? 'out' : 'in';
       insts.push({ name: uniq(port), kind: 'iob', type: 'IOB', cell: ci, port, dir, loc: a.loc ? String(a.loc).toUpperCase() : null, cons: a });
+    } else if (own[1] === 'bscan') {
+      // (its JTAG chain, 1 … 4: the site it needs, BSCAN_X0Y<chain - 1>, #3766)
+      insts.push({ name: uniq(c.name), kind: 'bscan', type: 'BSCAN', cell: ci, chain: paramInt(c.params.JTAG_CHAIN, 1) });
     } else insts.push({ name: uniq(c.name), kind: own[1], type: own[0], cell: ci });
   });
 
@@ -291,7 +296,7 @@ export function physS6(nl, packed, { ucf = null } = {}) {
         else if ((r.r === 'ff' || r.r === 'ff5') && ctrlPin[pin] === 'CE' && konst.get(n) === 0) sp = 'CE';
         else if ((r.r === 'ff' || r.r === 'ff5') && ctrlPin[pin] === 'SR' && konst.get(n) === 1 && ffKind(c.type).sr) sp = 'SR';
       } else if (kind === 'iob') sp = pin === 'I' ? 'O' : null;
-      else if (kind === 'bram' || kind === 'dsp') sp = sitePinOf(pin);
+      else if (kind === 'bram' || kind === 'dsp' || kind === 'bscan') sp = sitePinOf(pin);
       if (sp) addLoad(power[konst.get(n) ? 'vcc' : 'gnd'], r.inst, sp);
     }
   }

@@ -130,13 +130,15 @@ export function predictDesign(design, device, dev, db) {
       for (const u of p.unknown) note(u);
     }
   }
-  // a BSCAN_SPARTAN6's JTAG chain: one bit per chain in the corner tile UR_UPPER's region, whichever of the four
-  // sites holds it (db/s6-bscan.json, #3176)
+  // a BSCAN_SPARTAN6: one bit per site in the corner tile UR_UPPER's region, BSCAN_X0Y<k - 1>'s under its key k of
+  // db/s6-bscan.json (#3176: measured with the chain k on that site). The site decides the JTAG chain: ISE's bitgen sets
+  // the bit of the site that holds the BSCAN, whatever its JTAG_CHAIN (#3766), so Silinx's flow places chain n on
+  // BSCAN_X0Y<n - 1>.
   for (const inst of design.insts) {
     if (inst.type !== 'BSCAN' || !inst.placed) continue;
-    const chain = String(inst.cfg.find(c => c.attr === 'JTAG_CHAIN')?.value ?? '1'), off = db.bscan?.chains?.[chain];
+    const k = String(+(/^BSCAN_X0Y(\d+)$/.exec(inst.site)?.[1] ?? NaN) + 1), off = db.bscan?.chains?.[k];
     const ur = device.tileNames.find(t => /^UR_UPPER_X/.test(t));
-    if (!off || !ur) { note(`BSCAN JTAG_CHAIN=${chain}`); continue; }
+    if (!off || !ur) { note(`BSCAN ${inst.site}`); continue; }
     const [f0, b0] = gridRegion(device, dev, ur);
     for (const x of off) { const [f, b] = x.split(',').map(Number); bits.add(`${f0 + f},${b0 + b}`); }
   }

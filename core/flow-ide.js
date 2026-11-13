@@ -2,18 +2,20 @@
 // (packages/silinx-fpga/src/open-flow-core.js runFlow) with the IDE's HDL front end (core/synth-front.js flowFrontEnd) and simulation
 // models (core/flow-models.js mountSimModels) as its io's hooks; an io's own hooks win.
 // spec.capture (the project's logic analyzer, silinx.json capture, #3176): the front end with the capture core and its
-// wrapper inserted (core/ila-insert.js captureFrontEnd), on the Spartan-3E (the families whose open flow places a BSCAN);
+// wrapper inserted (core/ila-insert.js captureFrontEnd), on the families whose open flow places a BSCAN (the Spartan-3E,
+// the Spartan-6: #3766);
 // the report's `capture` (captureReport), what the Design Summary shows. The simulation models stay the design's own
 // (flow-models.js synthesizes the design again, without the capture). A capture on the board's clock (#3481): its port's
 // constraints (pin, period) added to the design's, unless the design has a port on that pin already (an error).
 import { runFlow } from '../packages/silinx-fpga/src/index.js';
 import { flowFrontEnd } from './synth-front.js';
 import { mountSimModels } from './flow-models.js';
-import { captureFrontEnd, captureClockText, boardClockUcf, boardClockText } from './ila-insert.js';
+import { captureFrontEnd, captureClockText, boardClockUcf, boardClockText, bscanCell } from './ila-insert.js';
 import { triggerText } from './ila.js';
 
-// the families whose open flow places and routes the BSCAN (nextpnr 1.5.0's Spartan-3E)
-const CAPTURE_OPEN_FAMILIES = ['spartan3e'];
+// the families whose open flow places and routes the BSCAN (nextpnr 1.5.0's Spartan-3E; nextpnr-spartan6 0.5.0's, #3766)
+const CAPTURE_OPEN_FAMILIES = ['spartan3e', 'spartan6'];
+const FAMILY_NAMES = { spartan3e: 'Spartan-3E', spartan6: 'Spartan-6', artix7: '7-series' };
 
 /** A capture inserted (captureSources's result) as the report has it: the probes, the shape, the trigger, the blocks. */
 function captureReport(c) {
@@ -48,12 +50,13 @@ export async function runOpenFlow(spec, io) {
   if (cu.ucf !== io.ucf) io = { ...io, ucf: cu.ucf };
   const frontEnd = (srcs, top, opts) => {
     if (!CAPTURE_OPEN_FAMILIES.includes(family)) {
-      return { errors: [`capture: the Silinx toolchain inserts the logic analyzer on the Spartan-3E only (not yet the ${family}); clear the capture (capture_settings) to implement the design`], input: () => null };
+      const on = CAPTURE_OPEN_FAMILIES.map(f => FAMILY_NAMES[f]).join(' and the ');
+      return { errors: [`capture: the Silinx toolchain inserts the logic analyzer on the ${on} only (not yet the ${FAMILY_NAMES[family] || family}); clear the capture (capture_settings) to implement the design`], input: () => null };
     }
     if (cu.error) return { errors: [cu.error], input: () => null };
     const r = inserted(srcs, top, opts);
     if (r.capture && !r.errors.length) {
-      capture = { ...captureReport(r.capture), link: 'JTAG USER1 (BSCAN_SPARTAN3)' };
+      capture = { ...captureReport(r.capture), link: `JTAG USER1 (${bscanCell(family)})` };
       io.log(`Logic analyzer: ${capture.probes.map(p => `${p.path}${p.width > 1 ? `[${p.width}]` : ''}`).join(', ')}; ${capture.width} bits x ${capture.depth} samples on ${capture.clock}, ${capture.pre} before the trigger (${capture.trigger}); ${capture.blocks} block RAM(s), read over ${capture.link}.`);
     }
     return r;

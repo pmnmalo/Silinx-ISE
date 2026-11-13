@@ -110,7 +110,7 @@ export async function captureSettings() {
       ...field('Signals to watch:', list), ...field('Clock:', clock), ...field('Samples:', depth), ...field('Before the trigger:', pre),
       ...field('Trigger:', h('div', {}, combine, rows, h('button', { class: 'btn', type: 'button', onclick: () => { addRow(); check(); } }, 'Add a condition'))),
       h('div', { style: { gridColumn: '1 / 3' } }, cost, problems),
-      h('div', { style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } }, 'Implement inserts the capture core (the Silinx toolchain, the Spartan-3E); program the board, then Analyze Design Using the Logic Analyzer.')),
+      h('div', { style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } }, 'Implement inserts the capture core (the Silinx toolchain: the Spartan-3E, the Spartan-6); program the board, then Analyze Design Using the Logic Analyzer.')),
   });
   if (r === 'clear') { delete pj.capture; await saveProjectJson(); log('Logic analyzer: no capture (Implement adds none).'); return; }
   if (r !== 'save' || !ok) return;

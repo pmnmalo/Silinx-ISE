@@ -1,7 +1,7 @@
 // Silinx - the placed Spartan-6 design as XDL (#729): what ISE's `xdl -xdl2ncd` reads and `par -k` routes, and the
 // router (#730) takes (browser + Node). The configuration of each site is written as ISE's xdl -ncd2xdl writes it
 // (the elements and values of the device report's primitive definitions of SLICEX / SLICEL / SLICEM, IOB, BUFG,
-// RAMB8BWER / RAMB16BWER, DSP48A1; a SLICEM's RAMs and shift registers: xdl-mem.js, #1153).
+// RAMB8BWER / RAMB16BWER, DSP48A1, BSCAN (BSCAN_SPARTAN6, #3766); a SLICEM's RAMs and shift registers: xdl-mem.js, #1153).
 //
 //   placedXdlS6(nl, packed, phys, placement, { part, name, device }) -> a design for writeXdl (xdl.js); with the
 //     device (its routing graph) each power net is split into one net a TIEOFF, the one each pin is tied from, its
@@ -73,6 +73,7 @@ export function placedXdlS6(nl, packed, phys, placement, { part, name = 'top', d
     else if (inst.kind === 'bufg') put('BUFG', cells[inst.cell].name, '');
     else if (inst.kind === 'bram') bramCfg(cells[inst.cell], inst.type, put);
     else if (inst.kind === 'dsp') dspCfg(cells[inst.cell], put);
+    else if (inst.kind === 'bscan') bscanCfg(cells[inst.cell], put);
     const type = inst.kind === 'bufg' ? 'BUFG' : inst.type;
     out.push({ name: inst.name, type, placed: true, tile: placement.tile[i], site: placement.site[i], cfg });
   });
@@ -201,6 +202,12 @@ export function placedXdlS6(nl, packed, phys, placement, { part, name = 'top', d
     for (let k = 0; k < pwords; k++) { const key = `INITP_${k.toString(16).toUpperCase().padStart(2, '0')}`; put(key, '', hexOf(P[key], 256)); }
     const w = r8 ? 18 : 36;
     for (const k of ['INIT_A', 'INIT_B', 'SRVAL_A', 'SRVAL_B']) put(k, '', hexOf(P[k], w));
+  }
+  // the JTAG's user access (the logic analyzer's link, #3176): its chain (1 … 4, USER1 … USER4), no JTAG test
+  function bscanCfg(c, put) {
+    put('BSCAN', c.name, '');
+    put('JTAG_CHAIN', '', String(paramInt(c.params.JTAG_CHAIN, 1)));
+    put('JTAG_TEST', '', String(paramInt(c.params.JTAG_TEST, 0)));
   }
   function dspCfg(c, put) {
     const P = c.params;
