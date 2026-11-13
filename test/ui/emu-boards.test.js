@@ -55,7 +55,21 @@ begin
 end rtl;
 `;
 // the boards with fewer than the counter's 8 LEDs: their own design
-const DESIGNS = { 'cmod-s6': { files: { 'src/cmod.vhd': CMOD }, top: 'cmod' }, 'icebreaker-vga': { files: { 'src/ice.vhd': ICE }, top: 'ice' } };
+// the Papilio One's (#3745): no LEDs, switches or buttons, a counter on its wing A
+const PAPILIO = `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
+entity pap is
+  port (clk : in std_logic; wing_a : out std_logic_vector(15 downto 0));
+end pap;
+architecture rtl of pap is
+  signal q : unsigned(31 downto 0) := (others => '0');
+begin
+  process (clk) begin
+    if rising_edge(clk) then q <= q + 1; end if;
+  end process;
+  wing_a <= std_logic_vector(q(31 downto 16));
+end rtl;
+`;
+const DESIGNS = { 'papilio-one': { files: { 'src/pap.vhd': PAPILIO }, top: 'pap' }, 'cmod-s6': { files: { 'src/cmod.vhd': CMOD }, top: 'cmod' }, 'icebreaker-vga': { files: { 'src/ice.vhd': ICE }, top: 'ice' } };
 
 /** The emulator open on `board` with the counter, or the board's own design (or `files`, `top`). */
 async function emulatorOn(page, board, name, { files = DESIGNS[board]?.files ?? { 'src/blink.vhd': BLINK }, top = DESIGNS[board]?.top ?? 'blink' } = {}) {
@@ -72,7 +86,7 @@ uiTest('#2478 the board layouts in a module of their own: emulator.js exports th
   assert.deepEqual(await page.eval(async () => {
     const [a, b] = await Promise.all([import('/js/emulator.js'), import('/js/emulator-layouts.js')]);
     return [a.BOARD_LAYOUTS === b.BOARD_LAYOUTS, Object.keys(b.BOARD_LAYOUTS), Object.entries(b.BOARD_LAYOUTS).filter(([, f]) => f.lcd).map(([id]) => id)];
-  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'icebreaker', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga'], ['s3e-starter', 's3a-starter']]);
+  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'icebreaker', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga', 'papilio-one'], ['s3e-starter', 's3a-starter']]);
 });
 
 for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [860, 720], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]],
@@ -80,7 +94,8 @@ for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexy
   ['s3a-starter', [820, 890], [8, 4, 5, 0]], ['mimas-v2', [900, 600], [8, 8, 6, 3]], ['s3-starter', [900, 565], [8, 8, 4, 4]],
   ['cmod-s6', [936, 252], [4, 0, 2, 0]], ['icebreaker-vga', [1010, 683], [7, 0, 4, 0]],
   ['ulx3s', [1240, 508], [8, 4, 7, 4]], ['ulx3s-vga', [1240, 508], [8, 4, 7, 0]],
-  ['tangnano9k', [1100, 830], [14, 8, 6, 4]], ['tangnano9k-vga', [1100, 830], [14, 8, 6, 0]]]) {
+  ['tangnano9k', [1100, 830], [14, 8, 6, 4]], ['tangnano9k-vga', [1100, 830], [14, 8, 6, 0]],
+  ['papilio-one', [800, 782], [0, 0, 0, 0]]]) {
   uiTest(`#2478 the ${board} drawn: its PCB, LEDs, switches, buttons and digits`, E, async (page) => {
     await emulatorOn(page, board, `Emu-${board}`);
     assert.deepEqual(await page.eval(() => {
@@ -553,6 +568,27 @@ uiTest('#3745 the Tang Nano 9K drawn as the real board: its parts where they are
   noWarnings(page);
 });
 
+uiTest('#3745 the Papilio One drawn as the real board: its wings with the design\'s ports on their pins', E, async (page) => {
+  await emulatorOn(page, 'papilio-one', 'Emu-papilio-real');
+  const g = await geometry(page);
+  assert.deepEqual([g.W, g.H], [800, 782]);   // (the board after its datasheet's photo)
+  // no power switch on the board: the emulator's by the DC jack (top left), upright, its LED (the PWR LED) right of it
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledRight: l.left > s.right }; });
+  assert.deepEqual(sw, { upright: true, ledRight: true });
+  assert.ok(g.power.x < 250 && g.power.y < 120, JSON.stringify(g.power));
+  // the wings' pins 0..15 numbered, the design's ports on them: wing_a<15..0> on A's (the counter), B's and C's free
+  const ports = await page.eval(() => [...document.querySelectorAll('.emu-pcb .pap-port')].map((e) => [e.textContent, e.classList.contains('nc')]));
+  assert.equal(ports.length, 48);
+  assert.deepEqual(ports.filter(([, nc]) => !nc).map(([t]) => t).sort(), Array.from({ length: 16 }, (_, k) => `wing_a<${k}>`).sort());
+  assert.equal((await silkOf(page, 'pap-silk')).length, 32);
+  const xs = await artTexts(page);
+  for (const t of ['Papilio One', 'SPARTAN-3E', 'XC3S500E', 'PWR', 'USB', 'X1', 'RX', 'TX', 'TMS', 'REF', 'VCCO', '32MHz', 'OSC', 'U7', 'WING1', 'WING2', 'A', 'B', 'C']) assert.ok(t in xs, t);
+  assert.ok(xs.C[0] < 100 && xs.B[0] > 650 && xs.A[0] > xs.B[0] && xs.USB[1] < 80);
+  assert.deepEqual(Object.keys(xs).filter((t) => MAKERS.test(t) || /gadget/i.test(t)), []);
+  noWarnings(page);
+});
+
 uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the Mimas V2, the Spartan-3 Starter Board, the Cmod S6, the ULX3S and the Tang Nano 9K in Portuguese: the controls\' tips translated, the silkscreen as on the board', E, async (page) => {
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await page.eval(TEXTS);
@@ -574,7 +610,7 @@ uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the M
 
 // on every board drawn: the pointer aims at each control, what is at its centre is that control (no label, no other
 // part over it)
-for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga']) {
+for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga', 'papilio-one']) {
   uiTest(`#2481 the ${board}'s controls: each one is what is at its centre`, E, async (page) => {
     await emulatorOn(page, board, `Emu-aim-${board}`);
     assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-pcb .emu-btn, .emu-pcb .emu-sw, .emu-pcb .emu-rot-btn, .emu-pcb .emu-power')].filter((c) => {
