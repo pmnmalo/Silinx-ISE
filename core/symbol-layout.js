@@ -5,8 +5,8 @@
 // keeps the layout it was placed with (its params.ports' sides and its params.layout, as #1183 keeps its ports), the
 // schematic's Update Symbol taking a new one (core/schdoc-modsym.js). Isomorphic (no DOM).
 
-export const SYMBOL_SIDES = ['W', 'E', 'N', 'S'];
-export const TITLE_PLACES = ['top', 'center', 'bottom'];
+const SYMBOL_SIDES = ['W', 'E', 'N', 'S'];
+const TITLE_PLACES = ['top', 'center', 'bottom'];
 export const SPACING = { min: 20, max: 100, default: 20 };
 export const SIZE = { min: 40, max: 2000 };
 const chW = 6.2;   // (as boxDef's: the approximate width of a pin name's letter)
@@ -17,7 +17,7 @@ export const isSymbolFile = path => /\.sym\.json$/i.test(String(path || ''));
 /** The symbol file of a module: <module>.sym.json in the folder of its source. */
 export const symbolFileOf = (sourceFile, module) => `${String(sourceFile || '').includes('/') ? String(sourceFile).replace(/\/[^/]*$/, '/') : ''}${module}.sym.json`;
 /** The side a port is drawn on by default: an output on the right, the others on the left (boxDef's). */
-export const defaultSide = port => (port.dir === 'out' ? 'E' : 'W');
+const defaultSide = port => (port.dir === 'out' ? 'E' : 'W');
 
 /** The symbol a module has by default: its ports in its order, on their default sides. */
 export function newSymbol(module) {

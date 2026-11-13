@@ -4,7 +4,7 @@
 import { h } from './dom.js';
 import { SIZE, SPACING } from '/core/symbol-layout.js';
 
-export const SIDE_NAMES = { W: 'Left', E: 'Right', N: 'Top', S: 'Bottom' };
+const SIDE_NAMES = { W: 'Left', E: 'Right', N: 'Top', S: 'Bottom' };
 const TITLE_NAMES = { top: 'Top', center: 'Center', bottom: 'Bottom' };
 
 /** { renderSide } of mountSymbolEditor (S(), sel(), module(): its current symbol, selected pin and module). */

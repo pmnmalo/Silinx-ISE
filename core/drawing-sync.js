@@ -24,7 +24,7 @@ export async function projectModules(P, name) {
 }
 
 /** The project's symbol files: { path: text }. */
-export async function symbolFiles(P, name) {
+async function symbolFiles(P, name) {
   const out = {};
   for (const f of (await P.fileTree(name)).filter(isSymbolFile)) { try { out[f] = await P.readFile(name, f); } catch { /* unreadable */ } }
   return out;
