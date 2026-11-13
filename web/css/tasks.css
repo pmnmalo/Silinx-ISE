@@ -63,6 +63,8 @@ html[data-layout="tasks"][data-task="impl"] #task-impl-bar, html[data-layout="ta
 html[data-layout="tasks"] :is(#task-src-bar, #task-files-bar, #task-close-bar, .task-sim-src-bar, #start-page .start-btns) { display: flex; flex: none; gap: var(--m-bar-pad); padding: var(--m-bar-pad) var(--m-bar-pad) 2px; margin: 0; }
 html[data-layout="tasks"] #task-close-bar { padding: 4px var(--m-bar-pad) var(--m-bar-pad); border-top: 1px solid var(--m-border); }   /* (under the tree, #1309) */
 html[data-layout="tasks"] :is(#task-src-bar, #task-files-bar, #task-close-bar, .task-sim-src-bar, #task-impl-bar, #task-emu-bar, #start-page .start-btns) .btn { flex: 1 1 0; min-width: 0; padding: 4px 6px; font-size: var(--m-fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a design and simulation project (#3780): no HDL test bench imported */
+html[data-layout="tasks"][data-project-kind="design"] .task-sim-src-bar [data-act="add-bench"] { display: none; }
 html[data-layout="tasks"] #design-panel { flex: 1; }
 
 /* ------------------------------------------------------------------ the task's bar (the toolbar's right end) */

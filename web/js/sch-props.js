@@ -12,6 +12,7 @@ import { getLanguage } from './i18n.js';
 import { dialog } from './ui.js';
 import { h } from './dom.js';
 import { reservedError } from '/core/reserved.js';
+import { designKind } from './project-kind-flag.js';
 import { clone, snap, KEYS } from './sch-editor.js';
 import { mountMultiProps } from './sch-multi.js';
 import { mountCompareTicks } from './sch-compare.js';
@@ -115,7 +116,7 @@ export function mountProps(ctx) {
   function sheetProps() {
     propBody.append(h('div', { class: 'se-ptitle', text: 'Schematic sheet' }));
     propBody.append(field('Module name', inp(doc().name, v => { doc().name = String(v).trim() || 'schematic'; })));
-    propBody.append(field('Language', selBox(doc().lang, [['vhdl', 'VHDL'], ['verilog', 'Verilog']], v => { doc().lang = v; setGenLang(v); })));
+    if (!designKind()) propBody.append(field('Language', selBox(doc().lang, [['vhdl', 'VHDL'], ['verilog', 'Verilog']], v => { doc().lang = v; setGenLang(v); })));
     propBody.append(field('Description', ta(doc().description || '', v => { if (String(v).trim()) doc().description = v; else delete doc().description; }, 2), 'shown on the sheet and as a comment in the HDL'));
     propBody.append(field('Sheet size', h('div', { class: 'se-row' },
       inp(doc().sheet.w, v => { doc().sheet.w = Math.max(400, +v || 1700); }, { type: 'number', step: 100 }),

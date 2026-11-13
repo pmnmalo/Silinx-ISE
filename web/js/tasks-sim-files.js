@@ -5,6 +5,7 @@
 
 import { h, popupMenu } from './ui.js';
 import { icon, icons } from './icons.js';
+import { designKind } from './project-kind-flag.js';
 
 let page = 'tree';   // ('tree': Simulation; 'files')
 const panels = new Set();
@@ -32,6 +33,11 @@ function show(to) {
 }
 // (the page shown by the panel's data-sim-page: the Tasks interface's only, web/css/tasks.css)
 function apply(p) {
+  // (a design and simulation project, #3780: its test benches' HDL files not shown, no Files page)
+  const design = designKind();
+  if (design && page === 'files') page = 'tree';
+  const ft = p.tabs.querySelector('.tab[data-page="files"]');
+  if (ft) ft.hidden = design;
   for (const t of p.tabs.querySelectorAll('.tab[data-page]')) t.classList.toggle('active', t.dataset.page === page);
   p.tabs.parentElement.dataset.simPage = page;
   if (page === 'files') p.render();

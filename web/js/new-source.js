@@ -13,6 +13,7 @@ import { reservedError } from '/core/reserved.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere, drawnHdlTaken } from './wizards.js';
 import { NAME_RE, FILE_RE } from '/core/ident.js';
 import { cTemplate, cppTemplate } from './c-templates.js';
+import { designOnly } from './design-only.js';
 export { cTemplate, cppTemplate } from './c-templates.js';
 
 const SOURCE_TYPES = [
@@ -40,6 +41,8 @@ const SOURCE_TYPES = [
   // not in the list any more; newSourceWizard({ type: 'vhdl-pkg' }) still creates one
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src', hidden: true },
 ];
+// a design and simulation project's (#3780)
+const DESIGN_TYPES = ['tt', 'sch', 'fsm', 'asm', 'petri', 'lab'];
 // the constraints files' types: one shown, the device's format's
 const CONSTRAINTS = ['ucf', 'pcf', 'lpf', 'cst', 'xdc'];
 
@@ -51,8 +54,10 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   const LEGACY = { vhdl: ['hdl', 'vhdl'], verilog: ['hdl', 'verilog'], 'vhdl-tb': ['tb', 'vhdl'], 'verilog-tb': ['tb', 'verilog'],
     modwiz: ['hdl'], schwiz: ['sch'], pnwiz: ['petri'], tbwiz: ['tb'] };
   const cons = constraintsFormatOf(S.project.device), consType = id => (id === 'ucf' ? cons : id);   // (the device's format: UCF, PCF, LPF, CST or XDC)
-  let st = SOURCE_TYPES.find(t => t.id === consType(LEGACY[type]?.[0] || type)) || SOURCE_TYPES.find(t => t.id === 'hdl');   // default: Module (HDL)
-  const shown = () => SOURCE_TYPES.filter(t => (CONSTRAINTS.includes(t.id) ? t.id === cons : !t.hidden || t === st));
+  // (a design and simulation project, #3780: its drawings and its labs only, a Schematic by default; no language)
+  const design = designOnly(), ofKind = t => !design || DESIGN_TYPES.includes(t.id);
+  let st = SOURCE_TYPES.filter(ofKind).find(t => t.id === consType(LEGACY[type]?.[0] || type)) || SOURCE_TYPES.find(t => t.id === (design ? 'sch' : 'hdl'));   // default: Module (HDL)
+  const shown = () => SOURCE_TYPES.filter(t => ofKind(t) && (CONSTRAINTS.includes(t.id) ? t.id === cons : !t.hidden || t === st));
   // language of HDL modules and test benches (Define Module / Associate Source pages)
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], lang || LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
   const extOf = t => t.ext ?? (langSel.value === 'verilog' ? '.v' : '.vhd');
@@ -88,7 +93,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   // the same page for every type (#2140): its type, the file name, the location and the language (an HDL file's, the
   // extension follows it, or a drawing's HDL; the project's preferred language by default); the rest on the next
   // pages or in the type's wizard
-  const fileGrid = h('div', { class: 'form-grid' }, ...field('Source type:', typeShown), ...field('File name:', fname), ...field('Location:', loc), ...field('Language:', langSel));
+  const fileGrid = h('div', { class: 'form-grid' }, ...field('Source type:', typeShown), ...field('File name:', fname), ...field('Location:', loc), ...(design ? [] : field('Language:', langSel)));
   const typeShownAt = () => { typeShown.textContent = st.label; };
   const pFile = {
     title: 'File Name and Location',

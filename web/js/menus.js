@@ -19,6 +19,7 @@ import { runImpl, stopProcesses } from './implement.js';
 import { setViewAsTop, topOfView, viewSel } from './drawings.js';
 import { checkSyntax, projectTool, runProcess, saveAll, topConfirmed } from './processes.js';
 import { hasTask } from './tool-descriptors.js';
+import { checkLabel, designOnly, flowOnly } from './design-only.js';
 import { addFromFolderDialog, setTop, unsetTop } from './design.js';
 import { openEmulator, openSchematic, runSimulation } from './viewers.js';
 import { printActive, printable } from './print-doc.js';
@@ -112,7 +113,8 @@ export function setupMenus() {
       { label: 'Implementation', checked: S.view === 'impl', action: () => setView('impl') },
       { label: 'Simulation', checked: S.view === 'sim', action: () => setView('sim') },
       '-',
-      { label: 'Design Summary', icon: icon('summary'), action: () => openSummary(), disabled: hasPj },
+      // (a design and simulation project, #3780: no flow, no board, no HDL: their items left out, web/js/design-only.js)
+      ...flowOnly({ label: 'Design Summary', icon: icon('summary'), action: () => openSummary(), disabled: hasPj }),
       '-',
       // (two documents side by side, each side with its tabs, #1619, #1652)
       { label: 'Split Editor', checked: splitState().on, action: () => toggleSplit() },
@@ -142,10 +144,10 @@ export function setupMenus() {
       { label: 'Exercise…', icon: icon('run'), action: async () => (await import('./exercise-view.js')).exerciseDialog(), disabled: hasPj },
     ] },
     { label: 'Process', items: () => [
-      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy || !toolHas('impl') },
+      ...flowOnly({ label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy || !toolHas('impl') }),
       { label: 'Stop', icon: icon('stop'), action: () => stopProcesses(), disabled: () => !S.currentJob },
       { label: 'Run', action: () => S.selProc && runProcess(S.selProc), disabled: () => !S.selProc?.run },
-      { label: 'Check Syntax', action: () => S.sel?.module && checkSyntax(S.sel.module, S.view === 'sim'), disabled: () => !S.sel?.module },
+      { label: checkLabel(), action: () => S.sel?.module && checkSyntax(S.sel.module, S.view === 'sim'), disabled: () => !S.sel?.module },
       { label: 'Simulate Behavioral Model', icon: icon('wave'), action: () => S.sel?.module && runSimulation(S.sel.module), disabled: () => !S.sel?.module },
     ] },
     { label: 'Tools', items: () => [
@@ -153,11 +155,11 @@ export function setupMenus() {
       { label: 'Boolean Algebra / Karnaugh Map…', icon: icon('algebra'), action: () => wiz.newSourceWizard({ type: 'tt' }), disabled: hasPj },
       { label: 'FSM State Diagram Editor…', icon: icon('fsm'), action: () => wiz.newSourceWizard({ type: 'fsm' }), disabled: hasPj },
       { label: 'Petri Net Editor…', icon: icon('petri'), action: () => wiz.newSourceWizard({ type: 'petri' }), disabled: hasPj },
-      { label: 'I/O Pin Planning', icon: icon('pins'), action: () => openPinPlanner(S.sel?.module), disabled: hasPj },
-      { label: 'iMPACT (Configure Target Device)', icon: icon('impact'), action: () => openImpact() },
-      { label: 'Board Emulator', icon: icon('board'), action: () => openEmulator(S.project.top), disabled: hasPj },
+      ...flowOnly({ label: 'I/O Pin Planning', icon: icon('pins'), action: () => openPinPlanner(S.sel?.module), disabled: hasPj },
+        { label: 'iMPACT (Configure Target Device)', icon: icon('impact'), action: () => openImpact() },
+        { label: 'Board Emulator', icon: icon('board'), action: () => openEmulator(S.project.top), disabled: hasPj }),
       { label: 'RTL Schematic', icon: icon('schematic'), action: () => S.sel?.module && openSchematic(S.sel.module), disabled: () => !S.sel?.module },
-      { label: 'Implemented Design (FPGA View)', icon: icon('chip'), action: () => openFpgaView(), disabled: () => !S.project?.top },
+      ...flowOnly({ label: 'Implemented Design (FPGA View)', icon: icon('chip'), action: () => openFpgaView(), disabled: () => !S.project?.top }),
       '-',
       { label: 'Toolchain Settings (ISE / Programmers)…', icon: icon('gear'), action: () => wiz.toolchainDialog() },
     ] },
@@ -239,9 +241,16 @@ export function setupToolbar() {
 // the project's tool has this task (an experimental family's no Implement, no Emulate, nothing to program: #3142)
 const toolHas = task => !S.project || hasTask(projectTool(), task);
 
+const FLOW_STEPS = ['implement', 'emulate', 'program'];
 // enable / disable the labelled buttons of the Silinx toolbar (cheap: run on clicks and changes)
 export function refreshSteps() {
-  for (const b of document.querySelectorAll('#toolbar .m-step')) b.disabled = !b._enabled();
+  for (const b of document.querySelectorAll('#toolbar .m-step')) {
+    b.disabled = !b._enabled();
+    // (a design and simulation project, #3780: no Implement, Emulate or Program; Check is Check Design)
+    b.hidden = FLOW_STEPS.includes(b.dataset.step) && designOnly();
+    if (b.dataset.step === 'check') b.title = `${checkLabel()} of the selected module`;
+  }
+  for (const b of document.querySelectorAll('#toolbar .tb-btn:is([data-cmd=run], [data-cmd=impact])')) b.hidden = designOnly();
   for (const b of document.querySelectorAll('#toolbar .tb-btn:is([data-cmd=cut], [data-cmd=copy], [data-cmd=paste], [data-cmd=undo], [data-cmd=redo], [data-cmd=print], [data-cmd=share], [data-cmd=closeProject])')) b.disabled = !b._enabled();
 }
 
