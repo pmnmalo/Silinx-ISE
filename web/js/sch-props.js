@@ -17,6 +17,7 @@ import { mountMultiProps } from './sch-multi.js';
 import { mountCompareTicks } from './sch-compare.js';
 import { setMarkerWidth } from '/core/schmarker.js';
 import { instName } from '/core/schname.js';
+import { arrayName } from '/core/sch-array.js';
 import { graphicProps } from './sch-graphics.js';
 
 /** { renderProps, openSelected, renamed, joinByName, renameLabel } of a schematic editor (doc(), sel(), nl(), live(), modules(): its current ones). */
@@ -156,7 +157,7 @@ export function mountProps(ctx) {
     propBody.append(h('div', { class: 'se-ptitle', text: title }), h('div', { class: 'se-note se-sum', 'data-no-i18n': '', text: sum }),
       h('div', { class: 'se-pbtns' }, h('button', { class: 'btn ro-ok se-infobtn', type: 'button', text: 'Symbol Info…', title: 'Symbol Info (F1)', onclick: () => openInfo(infoTarget()) })));
     // (cleared: a fresh automatic name, inst_n, not drawn, #3300)
-    propBody.append(field('Instance name', inp(s.name, v => { s.name = String(v).trim() ? newName(v, s.name) : instName(doc(), s.id, ''); })));
+    propBody.append(field('Instance name', inp(s.name, v => { s.name = String(v).trim() ? newName(v, s.name, s.type === 'module' && arrayName(v)) : instName(doc(), s.id, ''); })));   // (reg(3:0): an arrayed instance, #3755)
     for (const p of symbolParams(s)) {
       const v = s.params[p.name];
       let el;
@@ -257,9 +258,9 @@ export function mountProps(ctx) {
     if (r) flash(`${r}: choose another name.`);
     return !!r;
   }
-  function newName(v, old) {
+  function newName(v, old, arrayed = false) {
     const name = String(v).trim();
-    return !name || refused(name) ? old : name;
+    return !name || (!arrayed && refused(name)) ? old : name;   // (an arrayed instance's base, reg of reg(3:0): never written alone)
   }
   function portProps(p) {
     propBody.append(h('div', { class: 'se-ptitle', text: 'I/O Marker' }));

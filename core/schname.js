@@ -3,11 +3,13 @@
 // then letters, digits and single _, not at the end), not a reserved word of either in any letter case (#679), and
 // not the name of another instance or I/O marker (in any letter case: VHDL ignores it). A net name may be a bus
 // (data(7:0)); another net of the same name is not refused here: the editor asks to connect them by name (#689).
-// An instance's empty name is no error: it gets a fresh automatic name, inst_n (#3300).
+// An instance's empty name is no error: it gets a fresh automatic name, inst_n (#3300). A module's instance may be named
+// with a range, reg(3:0): an arrayed instance, its copies reg_3 … reg_0 (#3755, core/sch-array.js).
 //
 // Isomorphic module (browser + Node).
 import { parseNetName } from './schdoc.js';
 import { reservedError } from './reserved.js';
+import { arrayName } from './sch-array.js';
 
 const IDENT = /^[A-Za-z](?:_?[A-Za-z0-9])*$/;
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
@@ -20,9 +22,11 @@ const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 export function renameError(doc, kind, id, name) {
   const v = String(name ?? '').trim();
   if (!v) return kind === 'sym' ? null : 'Type a name.';   // (an instance's: its automatic name, #3300)
-  const base = kind === 'label' ? parseNetName(v).base : v;
+  const sym0 = kind === 'sym' && (doc.symbols || []).find(s => s.id === id);
+  const base = kind === 'label' ? parseNetName(v).base : sym0?.type === 'module' && arrayName(v) ? arrayName(v).base : v;
   if (!IDENT.test(base)) return `'${base}' is not a valid name: use a letter, then letters, digits and single _ (not at the end).`;
-  const r = reservedError(base);
+  // (an arrayed instance's base, reg of reg(3:0), is never written alone: its copies are reg_3 … reg_0)
+  const r = base !== v && kind === 'sym' ? null : reservedError(base);
   if (r) return `${r}: choose another name.`;
   if (kind === 'label') return null;
   const sym = (doc.symbols || []).find(s => s.id !== id && same(s.name, v));

@@ -59,7 +59,7 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(TABLE_TOOLS), ['set_output_logic']);
   assert.deepEqual(names(CHECK_TOOLS), ['check_drawing']);
   assert.deepEqual(names(SCHEMATIC_TOOLS), ['rearrange_wires', 'rearrange_schematic']);
-  assert.deepEqual(names(SYMBOL_TOOLS), ['read_symbol', 'edit_symbol', 'update_symbols']);   // (a module's symbol, #3755)
+  assert.deepEqual(names(SYMBOL_TOOLS), ['read_symbol', 'edit_symbol', 'update_symbols', 'place_instance']);   // (a module's symbol, #3755)
   assert.deepEqual(names(SIMULATE_DRAWING_TOOLS), ['simulate_drawing']);
   assert.deepEqual(names(SOURCE_TOOLS), ['unset_top', 'remove_from_project', 'add_to_project', 'rename_file', 'rename_module', 'delete_file', 'delete_project']);
   assert.deepEqual(names(FIND_TOOLS), ['find_in_project']);   // (Find in Project, #3546)
