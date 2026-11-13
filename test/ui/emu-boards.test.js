@@ -40,8 +40,25 @@ begin
 end rtl;
 `;
 
-/** The emulator open on `board` with the counter (or `files`, `top`). */
-async function emulatorOn(page, board, name, { files = { 'src/blink.vhd': BLINK }, top = 'blink' } = {}) {
+// the Cmod S6's (#3745): 4 LEDs, 2 buttons; the buttons light LD0 and LD1, LD2 and LD3 the counter's
+const CMOD = `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
+entity cmod is
+  port (clk : in std_logic; btn : in std_logic_vector(1 downto 0); led : out std_logic_vector(3 downto 0));
+end cmod;
+architecture rtl of cmod is
+  signal q : unsigned(23 downto 0) := (others => '0');
+begin
+  process (clk) begin
+    if rising_edge(clk) then q <= q + 1; end if;
+  end process;
+  led <= std_logic_vector(q(23 downto 22)) & btn;
+end rtl;
+`;
+// the boards with fewer than the counter's 8 LEDs: their own design
+const DESIGNS = { 'cmod-s6': { files: { 'src/cmod.vhd': CMOD }, top: 'cmod' } };
+
+/** The emulator open on `board` with the counter, or the board's own design (or `files`, `top`). */
+async function emulatorOn(page, board, name, { files = DESIGNS[board]?.files ?? { 'src/blink.vhd': BLINK }, top = DESIGNS[board]?.top ?? 'blink' } = {}) {
   // (the Spartan-6 and iCE40 boards' device: the default device list has the Spartan-3E boards only)
   await makeProject(env, { name, board, device: resolveBoard(board).device, files, top });
   await page.openProject(name);
@@ -55,12 +72,13 @@ uiTest('#2478 the board layouts in a module of their own: emulator.js exports th
   assert.deepEqual(await page.eval(async () => {
     const [a, b] = await Promise.all([import('/js/emulator.js'), import('/js/emulator-layouts.js')]);
     return [a.BOARD_LAYOUTS === b.BOARD_LAYOUTS, Object.keys(b.BOARD_LAYOUTS), Object.entries(b.BOARD_LAYOUTS).filter(([, f]) => f.lcd).map(([id]) => id)];
-  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'icebreaker', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter'], ['s3e-starter', 's3a-starter']]);
+  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'icebreaker', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6'], ['s3e-starter', 's3a-starter']]);
 });
 
 for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [860, 720], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]],
   ['nexys3', [900, 930], [8, 8, 5, 4]], ['atlys', [1100, 780], [8, 8, 6, 4]], ['basys3', [900, 600], [16, 16, 5, 4]], ['nexys-a7', [900, 820], [16, 16, 6, 8]],
-  ['s3a-starter', [820, 890], [8, 4, 5, 0]], ['mimas-v2', [900, 600], [8, 8, 6, 3]], ['s3-starter', [900, 565], [8, 8, 4, 4]]]) {
+  ['s3a-starter', [820, 890], [8, 4, 5, 0]], ['mimas-v2', [900, 600], [8, 8, 6, 3]], ['s3-starter', [900, 565], [8, 8, 4, 4]],
+  ['cmod-s6', [936, 252], [4, 0, 2, 0]]]) {
   uiTest(`#2478 the ${board} drawn: its PCB, LEDs, switches, buttons and digits`, E, async (page) => {
     await emulatorOn(page, board, `Emu-${board}`);
     assert.deepEqual(await page.eval(() => {
@@ -430,10 +448,32 @@ uiTest('#3745 the Spartan-3 Starter Board drawn as the real board: its parts whe
   noWarnings(page);
 });
 
-uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the Mimas V2 and the Spartan-3 Starter Board in Portuguese: the controls\' tips translated, the silkscreen as on the board', E, async (page) => {
+uiTest('#3745 the Cmod S6 drawn as the real board: a DIP module, its parts where they are', E, async (page) => {
+  await emulatorOn(page, 'cmod-s6', 'Emu-cmods6-real');
+  const g = await geometry(page);
+  assert.deepEqual([g.W, g.H], [936, 252]);   // (2.6" x 0.7", 360 px to the inch)
+  // no power switch on the board: the emulator's by the micro USB on the left end, its LED (the POWER LED) right of it
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledRight: l.left > s.right }; });
+  assert.deepEqual(sw, { upright: true, ledRight: true });
+  assert.ok(g.power.x < g.W * 0.15, JSON.stringify(g.power));
+  // LD3..LD0 in a column, top to bottom, right of the FPGA; BTN0 and BTN1 right of them, side by side
+  assert.ok([3, 2, 1, 0].every((k, i, a) => Math.abs(g[`led${k}`].x - g.led0.x) < 1 && (!i || g[`led${a[i - 1]}`].y < g[`led${k}`].y)));
+  assert.ok(g.led0.x > g.W * 0.65 && g.btn0.x > g.led0.x && g.btn1.x > g.btn0.x && Math.abs(g.btn0.y - g.btn1.y) < 1 && g.btn1.x < g.W * 0.95);
+  assert.deepEqual(await silkOf(page, 'cs6-silk'), ['LD3(P4)', 'LD2(N4)', 'LD1(P3)', 'LD0(N3)', 'BTN1(P9)', 'BTN0(P8)']);
+  // the DIP pins along both long edges (48), the board's name, the FPGA; no maker's name
+  const xs = await artTexts(page);
+  for (const t of ['Cmod S6', 'SPARTAN-6', 'XC6SLX4', 'POWER', 'J4', '8MHz', 'QSPI', '1', '24', '25', '48']) assert.ok(t in xs, t);
+  assert.ok(xs['24'][0] < xs['1'][0] && xs['1'][1] < xs['48'][1] && xs['25'][0] < xs['48'][0]);
+  assert.equal(await page.eval(() => document.querySelectorAll('.emu-pcb-art circle[r="9"]').length), 48);
+  assert.deepEqual(Object.keys(xs).filter((t) => MAKERS.test(t)), []);
+  noWarnings(page);
+});
+
+uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the Mimas V2, the Spartan-3 Starter Board and the Cmod S6 in Portuguese: the controls\' tips translated, the silkscreen as on the board', E, async (page) => {
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await page.eval(TEXTS);
-  for (const [board, cls] of [['basys3', 'b3-silk'], ['nexys-a7', 'nxa7-silk'], ['s3a-starter', 's3a-silk'], ['mimas-v2', 'mv2-silk'], ['s3-starter', 's3sb-silk']]) {
+  for (const [board, cls] of [['basys3', 'b3-silk'], ['nexys-a7', 'nxa7-silk'], ['s3a-starter', 's3a-silk'], ['mimas-v2', 'mv2-silk'], ['s3-starter', 's3sb-silk'], ['cmod-s6', 'cs6-silk']]) {
     await emulatorOn(page, board, `Emu-pt-${board}`);
     await setLang('en');
     const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-pcb')));
@@ -441,7 +481,7 @@ uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the M
     await setLang('pt');
     const pt = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-pcb')));
     assert.deepEqual(untranslated(en, pt, [/^\w+<\d+>$/]), [], board);   // (the design's ports on the parts: its names)
-    assert.ok(pt.some((t) => /^@.* — clique para comutar$/.test(t)), `${board}: ${pt.filter((t) => t.startsWith('@')).slice(0, 3)}`);
+    assert.ok(pt.some((t) => /^@.* — (clique para comutar$|carregue e mantenha)/.test(t)), `${board}: ${pt.filter((t) => t.startsWith('@')).slice(0, 3)}`);
     assert.deepEqual(await silkOf(page, cls), silk, `${board}: the silkscreen`);
     await setLang('en');
     await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('emulator')));
@@ -451,7 +491,7 @@ uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the M
 
 // on every board drawn: the pointer aims at each control, what is at its centre is that control (no label, no other
 // part over it)
-for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter']) {
+for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6']) {
   uiTest(`#2481 the ${board}'s controls: each one is what is at its centre`, E, async (page) => {
     await emulatorOn(page, board, `Emu-aim-${board}`);
     assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-pcb .emu-btn, .emu-pcb .emu-sw, .emu-pcb .emu-rot-btn, .emu-pcb .emu-power')].filter((c) => {

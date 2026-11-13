@@ -64,7 +64,10 @@ for (const [id, fn] of Object.entries(LAYOUTS)) {
   test(`${id} layout (${fn}): the resources it wires widgets to exist on the board with enough pins`, () => {
     const board = boards.find((b) => b.id === id);
     const { used, optional } = resourcesUsed(layoutBody(fn));
-    assert.ok(used.size >= 3, `${fn} uses resources: ${[...used.keys()]}`);
+    // (at least three, or every one of the LEDs, switches, buttons and digits of a board with fewer: the Cmod S6's LEDs
+    // and buttons, #3745)
+    const kinds = ['led', 'sw', 'btn', 'an'].filter((n) => board.resources.some((r) => r.name === n)).length;
+    assert.ok(used.size >= Math.min(3, kinds), `${fn} uses resources: ${[...used.keys()]}`);
     for (const [name, maxIdx] of used) {
       const r = board.resources.find((x) => x.name === name);
       if (!r && optional.has(name)) continue;          // drawn only when the board has it
