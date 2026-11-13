@@ -47,6 +47,9 @@ uiTest('#3755 Edit Symbol: the symbol made and opened; pins moved, by the Proper
   assert.deepEqual(await pins(page), ['d:W', 'ce:W', 'c:W', 'q:E']);
   const fields = () => page.eval((s) => [...document.querySelectorAll(`${s} .doc-status .ds-f`)].map((f) => f.textContent), SY);
   assert.deepEqual(await fields(), ['4 pin(s)', '80 × 80']);
+  // (how to use it at the left of its status line, #3792)
+  const hint = () => page.eval((s) => document.querySelector(`${s} .doc-status .hint`).textContent, SY);
+  assert.equal(await hint(), 'Click a pin to select it; drag it to another place or side; ◀ ▶ or the arrow keys move it along its side');
   // its toolbar: no Undo, Redo or Print of its own; the zooms; the ☰ and ⋮ at its right end
   assert.deepEqual(await page.eval((s) => [...document.querySelectorAll(`${s} .sy-toolbar button`)].filter((x) => /^(Undo|Redo)$|Print/.test(x.title)).length, SY), 0);
   assert.deepEqual(await page.eval((s) => ['zin', 'zout', 'fit'].map((a) => !!document.querySelector(`${s} [data-act=${a}] svg`)), SY), [true, true, true]);
@@ -102,6 +105,7 @@ uiTest('#3755 Edit Symbol: the symbol made and opened; pins moved, by the Proper
     ['◀ Antes', 'Depois ▶', 'Propriedades', 'Saída, 1 bit', 'Lado', 'Posição', 'Símbolo', 'Espaçamento dos pinos', 'Largura', 'Altura', 'Nome do módulo']);
   await page.waitFor((s) => document.querySelector(`${s} .doc-status .ds-f`).textContent === '4 pino(s)', [SY], { what: 'the status line in Portuguese' });
   assert.equal(await page.eval((s) => document.querySelector(`${s} .sy-reset`).textContent, SY), 'Repor o Predefinido');
+  assert.equal(await hint(), 'Clique num pino para o selecionar; arraste-o para outro lugar ou lado; ◀ ▶ ou as setas movem-no ao longo do seu lado');
   assert.deepEqual(await page.eval((s) => [...document.querySelectorAll(`${s} .sy-side option`)].map((o) => o.textContent), SY), ['Esquerda', 'Direita', 'Topo', 'Base']);
   await setLang(page, 'en');
 

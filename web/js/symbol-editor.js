@@ -18,6 +18,7 @@ import { instanceParams, newSymbol, normalizeSymbol, reconcile, symbolDef, symbo
 import { mountSymbolSide } from './symbol-side.js';
 
 const clone = o => JSON.parse(JSON.stringify(o));
+const HOW = 'Click a pin to select it; drag it to another place or side; ◀ ▶ or the arrow keys move it along its side';
 const M = 40;   // (the margin around the symbol: its pins' names)
 
 export function mountSymbolEditor(container, opts = {}) {
@@ -97,7 +98,8 @@ export function mountSymbolEditor(container, opts = {}) {
     zoomLbl.textContent = `${Math.round(zoom * 100)}%`;
     const has = !!sel && !readOnly;
     earlier.disabled = !has; later.disabled = !has;
-    info.set([`${S.pins.length} pin(s)`, `${def.body.w} × ${def.body.h}`]);
+    // (how to use it at its left, as the Schematic editor's tool tip there, #3792)
+    info.set([`${S.pins.length} pin(s)`, `${def.body.w} × ${def.body.h}`], readOnly ? '' : HOW);
     renderSide();
     return def;
   }
