@@ -109,20 +109,20 @@ uiTest('#2298 Configure Target Device of an iCE40: Program Flash writes its .bin
     await page.treeRow('#procs', 'Configure Target Device', { dbl: true, exact: true });
     await page.waitFor(() => /No \.bin yet/.test(document.querySelector('.doc:not([hidden]) .imp-file')?.textContent || ''), [], { what: 'the flash page' });
     // (the page by its button: after the implementation, the Silinx interface shows another document over it)
-    const shown = () => page.eval(() => [...document.querySelector('.ice40-program').closest('.page').querySelectorAll('h2, .imp-settings > *, .imp-file, .ice40-program, .note-box')].map((e) => e.textContent));
+    const shown = () => page.eval(() => [...document.querySelector('.open-program').closest('.page').querySelectorAll('h2, .imp-settings > *, .imp-file, .open-program, .note-box')].map((e) => e.textContent));
     assert.deepEqual(await shown(), ['Program the iCE40 — SPI flash', 'Board:', '1BitSquared iCEBreaker', 'Programmer:', 'openFPGALoader, through the board\'s USB (FT2232H)',
       'Configuration file (.bin):', 'build/blinky.bin', 'No .bin yet — run "Generate Programming File" first.', 'Program Flash',
       'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).\nNot yet tested on a real board.']);
     // its tab: Program Flash, not iMPACT
     assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.tab.active, .doc-tab.active')].map((t) => t.textContent.replace('✕', '').trim()).filter((t) => /Program Flash|iMPACT/.test(t))), ['Program Flash']);
     // no .bin: implement it first (No: nothing runs)
-    await page.click('.doc:not([hidden]) .ice40-program');
+    await page.click('.doc:not([hidden]) .open-program');
     await page.waitDialog('Program Flash');
     assert.match(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().textContent), /There is no build\/blinky\.bin yet\. Implement the design and generate it now\?/);
     await page.dialogButton('No');
     await fs.access(called).then(() => assert.fail('openFPGALoader ran'), () => {});
     // Yes: implemented, then written into the flash
-    await page.click('.doc:not([hidden]) .ice40-program');
+    await page.click('.doc:not([hidden]) .open-program');
     await page.dialogButton('Yes');
     await page.waitDialog('Program Flash', { timeout: 120000 });
     assert.match(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().textContent), /Write build\/blinky\.bin into the board's SPI flash\? The FPGA then loads it, and again at every power-up\./);
@@ -132,7 +132,7 @@ uiTest('#2298 Configure Target Device of an iCE40: Program Flash writes its .bin
     assert.match(log, /Configuration file \S+blinky\.bin \(104090 bytes, an iCE40's \.bin\)/);
     assert.match(log, /Programming \(SPI flash, non-volatile\) with openFPGALoader board=ice40_generic/);
     assert.match(await fs.readFile(called, 'utf8'), /^-b ice40_generic \S+build\/blinky\.bin\n$/);
-    assert.match(await page.eval(() => document.querySelector('.ice40-program').closest('.page').querySelector('.imp-file').textContent), /^Configuration file: build\/blinky\.bin \(104090 bytes\)$/);
+    assert.match(await page.eval(() => document.querySelector('.open-program').closest('.page').querySelector('.imp-file').textContent), /^Configuration file: build\/blinky\.bin \(104090 bytes\)$/);
     // in Portuguese: the page translated
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
     try {

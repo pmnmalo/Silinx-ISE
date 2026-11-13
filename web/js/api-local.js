@@ -11,7 +11,7 @@
 // Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
 import { getDeviceDb, findPart } from '../../core/devices.js';
-import { resourcesOf, openOnlyDevice, experimentalDevice, vivadoDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
+import { resourcesOf, openOnlyDevice, deviceFamily, familyName, experimentalDevice, vivadoDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
 import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../core/xise.js';
 import EXAMPLES from 'silinx-examples';
 import { isCSource } from '../../core/view-hdl.js';
@@ -395,6 +395,8 @@ export const api = {
       if (!bin) fail(`no ${bitfile} in this browser: run Generate Programming File first`);
       return programIce40Flash(await adeptDevice(FTDI_VENDOR, FTDI_FILTERS), bin, { log });
     }
+    // (an ECP5's or a Gowin's: not over WebUSB yet, the local server's openFPGALoader, #2298)
+    if (pjb && openOnlyDevice(pjb.device)) fail(`the ${familyName(deviceFamily(pjb.device))}'s boards are not programmed from the browser yet: the local server programs them (silinx serve), with openFPGALoader`);
     const bit = bitData || await bitOf(project, bitfile);
     if (!bit) fail(`no bitstream ${bitfile || ''} in this browser: run Generate Programming File first, or choose a .bit file`);
     let part = null;

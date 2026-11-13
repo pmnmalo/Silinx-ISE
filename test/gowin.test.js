@@ -7,6 +7,7 @@ import { runFlow, backendOf, familyOfPart, familyName, deviceFamily, constraints
 import { readConstraints } from '../packages/silinx-fpga/src/constraints.js';
 import { gowinUtilization, gowinDevice } from '../packages/silinx-fpga/src/open-flow-gowin.js';
 import { orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
+import { gowinFsInfo, checkOpenBitstream, idHex } from '../core/open-bitstream.js';
 
 const BLINKY = 'module blinky(input clk, output reg [1:0] led);\n  reg [23:0] c = 0;\n  always @(posedge clk) begin c <= c + 1; led <= c[23:22]; end\nendmodule\n';
 const PINS = '// the Tang Nano 9K\'s clock and two of its LEDs\nIO_LOC "clk" 52;\nIO_PORT "clk" IO_TYPE=LVCMOS33;\nIO_LOC  "led[0]" 10;  // LED1\nIO_LOC "led[1]" 11; IO_PORT "led[1]" IO_TYPE=LVCMOS18 PULL_MODE=NONE DRIVE=8;\n'
@@ -107,6 +108,9 @@ test('a design from HDL to its routed design: synth_gowin, nextpnr-himbaechel-go
   const fsText = new TextDecoder().decode(files['blinky.fs']);
   assert.deepEqual([r.report.bit.size, fsText.length], [2069320, 2069320]);
   assert.ok(fsText.split('\n').slice(0, -1).every(l => /^[01]+$/.test(l)));
+  // (as the board's programming reads it, #2298: its IDCODE the GW1NR-9C's)
+  const fsInfo = gowinFsInfo(fsText);
+  assert.deepEqual([idHex(fsInfo.idcode), fsInfo.frames, checkOpenBitstream('gowin', fsInfo, { part: 'gw1nr-9c' })], ['0x1100481b', 728, null]);
   assert.ok(log.some(l => /^Bitstream: build\/blinky\.fs \(2069320 bytes, gowin_pack in [\d.]+ m?s\)$/.test(l)), log.join('\n'));
   // (the next run: the bitstream alone, of the routed design written by this one: the same)
   const next = memoryIo(PINS);

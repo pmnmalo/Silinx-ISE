@@ -8,7 +8,7 @@ import { runImpl } from './implement.js';
 import { programFileState, implementFirstText } from './impact-file.js';
 import { pinsReady } from './pins-check.js';
 import { loadUcfText } from './processes.js';
-import { mountIce40Program } from './program-ice40.js';
+import { mountOpenProgram } from './program-open.js';
 import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
 import { vendorFlashText } from '/core/vendor-flash.js';
 
@@ -17,8 +17,9 @@ const roleOf = name => (/^xcf/i.test(name) ? 'prom' : /^(xc)?(3s|6s|4v|5v|6v|7[a
 export function mountImpact(el) {
   const page = h('div', { class: 'page' });
   el.append(page);
-  // (an iCE40: no JTAG chain, its .bin into the board's SPI flash, #2298)
-  if (openOnlyDevice(S.project?.device)) return mountIce40Program(page);
+  // (an open family's: no JTAG chain, the iCE40's .bin into the board's SPI flash, the ECP5's .bit and the Gowin's .fs into
+  // the FPGA's SRAM, #2298)
+  if (openOnlyDevice(S.project?.device)) return mountOpenProgram(page);
   const pj = S.project;
   const db = S.devices;
   let board = db?.boards.find(b => b.id === pj?.board) || null;

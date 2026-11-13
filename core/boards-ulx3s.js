@@ -34,7 +34,7 @@ const BOARD = {
   jtagChain: [{ name: 'lfe5u', role: 'fpga' }],
   programmer: {
     preferred: 'openFPGALoader',
-    tools: { openFPGALoader: { board: 'ulx3s', onboard: true, verified: false, note: 'The on-board FT231X (JTAG): not from Silinx yet (#2298), openFPGALoader -b ulx3s <top>.bit by hand.' } },
+    tools: { openFPGALoader: { board: 'ulx3s', onboard: true, verified: false, usb: 'FT231X', note: 'The on-board FT231X (JTAG): the .bit loaded into the FPGA\'s SRAM, until the board is powered off.' } },
   },
   source: ULX3S_LPF, sourceUrl: ULX3S_LPF_URL,
 };

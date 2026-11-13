@@ -580,7 +580,9 @@ and the ASM chart made from it), `run_process` (synthesize,
 implement, bitstream, timing, power, pins, the simulation models: the Silinx toolchain, or ISE when it is configured; a project the
 MCP server made or imported runs ISE, or programs a board or a PROM, only once you trust it in the interface: *Trust Project*, #2981) and
 `get_report` (the Design Summary and the reports of the last run: with the Silinx toolchain, Yosys's
-statistics for the synthesis and the pack and route summaries for map and par), `lab` (a project's guided labs: listed, a step shown,
+statistics for the synthesis and the pack and route summaries for map and par), `program_board` (the board programmed with the
+project's file, as *Configure Target Device*: a .bit into the FPGA, an ECP5's .bit or a Gowin's .fs into its SRAM, an iCE40's .bin
+into its SPI flash; a trusted project only, the client asking first), `lab` (a project's guided labs: listed, a step shown,
 checked on the project and recorded, as *Guided Labs…* does; a lab restarted), `capture_settings` (the logic analyzer's
 capture: the signals of the design to watch on the board, the clock, the depth, the trigger, checked on the design with the block
 RAMs it takes), `capture` (a capture on the board over the JTAG cable, the Basys2's / Nexys2's Digilent Adept USB through
@@ -589,7 +591,7 @@ Xilinx ISE's or AMD Vivado's slowest paths, as the Static Timing Report's Paths 
 source lines, sites and nets its Show Path highlights, and the elements of the drawings those lines are generated from; with `from` and `to`, the worst paths between two registers). The projects are those of the Project Navigator
 (the workspace, `SILINX_WORKSPACE`; the browser edition's workspace folder too, its format being
 the same), so what the assistant does is seen in the interface when the project is opened again.
-Every path stays inside its project; programming a board is not one of its tools; the ISE machine's
+Every path stays inside its project; the ISE machine's
 address never appears in a result. Where the assistant's results can be sent is yours to say (#3363): `git_init` gives a project
 only a GitHub repository that `~/.silinx/config.json` names (`"mcp": { "remotes": ["owner/repo", "owner/*"] }`), and
 `share_project` / `follow_project` go only through this computer's Silinx or a relay it names (`"relay": { "relays": [...] }`).
@@ -698,12 +700,12 @@ the local server's byte for byte): Yosys's `synth_xilinx`, nextpnr-himbaechel's 
 micro-architecture, and the `.bit` written from nextpnr's FASM on Project X-Ray's database; its timing is nextpnr's estimate,
 optimistic against Vivado's.
 It takes **the Radiona ULX3S-12f / 25f / 45f / 85f** too (Lattice ECP5, LFE5U in CABGA381): Yosys's `synth_ecp5`, nextpnr-ecp5
-and ecppack (Project Trellis), to `build/<top>.bit`, its pins written as an LPF (not programmed from Silinx yet: openFPGALoader
--b ulx3s, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the
+and ecppack (Project Trellis), to `build/<top>.bit`, its pins written as an LPF, loaded into the FPGA by *Configure Target Device* (the
+local server's openFPGALoader -b ulx3s, #2298). The examples run on it with their seven-segment display on its GPIO header J1; vga on the
 **ULX3S + VGA-12f / 25f / 45f / 85f** (the Radiona ULX3S + VGA), a VGA connector on that header.
 It takes **the Sipeed Tang Nano 9K** too (Gowin GW1NR-9C): Yosys's `synth_gowin`, nextpnr-himbaechel-gowin (Project Apicula)
 and gowin_pack, Silinx's JavaScript port of Apicula's (its `.fs` byte for byte Apicula's on the examples), to `build/<top>.fs`,
-its pins written as a CST (not programmed from Silinx yet: openFPGALoader -b tangnano9k, #2298). The examples run on it with
+its pins written as a CST, loaded into the FPGA by *Configure Target Device* (the local server's openFPGALoader -b tangnano9k, #2298). The examples run on it with
 their LEDs, switches, buttons and display on its headers (every port needs a pin there); vga on the **Sipeed Tang Nano 9K + VGA**.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);

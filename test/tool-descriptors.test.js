@@ -9,6 +9,7 @@ import { ICE40_STEPS } from '../packages/silinx-fpga/src/open-flow-ice40.js';
 import { XC7_STEPS } from '../packages/silinx-fpga/src/open-flow-xc7.js';
 import { ECP5_STEPS } from '../packages/silinx-fpga/src/open-flow-ecp5.js';
 import { GOWIN_STEPS } from '../packages/silinx-fpga/src/open-flow-gowin.js';
+import { familyProfile } from '../core/family-profile.js';
 
 const read = f => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const ids = t => t.flatMap(n => [n.id, ...ids(n.children || [])]);
@@ -46,9 +47,9 @@ test('#2311 the Silinx toolchain: ISE\'s tree without the open synthesis, Synthe
   assert.equal(find(t, 'translate').title, undefined);
 });
 
-test('#2302 the ECP5: the iCE40\'s tree without Configure Target Device (Emulate there, #3704); its steps, reports, LPF, nothing to program', () => {
+test('#2302 the ECP5: the iCE40\'s tree (Emulate there, #3704); its steps, reports, LPF; its .bit loaded into the SRAM (#2298)', () => {
   const t = built(SILINX_ECP5);
-  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', 'emulate']);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', 'emulate', { config: ['impact'] }]);
   assert.equal(toolOf({ part: 'lfe5u-85f' }, true), SILINX_ECP5);
   assert.equal(toolOf({ part: 'lfe5um5g-45f' }, false), ISE, 'a choice of the interface: the device makes the open mode (processes.js openMode)');
   assert.deepEqual(SILINX_ECP5.steps.map(({ produces, ...s }) => s), ECP5_STEPS);
@@ -59,15 +60,15 @@ test('#2302 the ECP5: the iCE40\'s tree without Configure Target Device (Emulate
   assert.ok(read('packages/silinx-fpga/src/open-flow-ecp5.js').includes("io.write('open/routed.config'"));
   for (const r of SILINX_ECP5.reports) assert.ok(SILINX_ECP5.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
   assert.deepEqual(SILINX_ECP5.constraints, { format: 'lpf', ext: '.lpf', label: 'LPF' });
-  assert.equal(SILINX_ECP5.program, null);
+  assert.deepEqual(SILINX_ECP5.program, { process: 'config', page: 'program-open', title: 'Program FPGA', target: 'sram', file: '{top}.bit' });
   assert.deepEqual(SILINX_ECP5.tasks.map(t => t.id), ['edit', 'sim', 'emu', 'impl']);
   assert.ok(!TOOLS.includes(SILINX_ECP5) && SILINX_ECP5.tasks.every(t => allTasks().includes(t)), 'its tasks the others\'');
   assert.equal(SILINX_ECP5.messages.line, MESSAGE_LINE);
 });
 
-test('#2303 the Gowin: the ECP5\'s tree; its steps (gowin_pack\'s .fs), reports, CST', () => {
+test('#2303 the Gowin: the ECP5\'s tree; its steps (gowin_pack\'s .fs), reports, CST; its .fs loaded into the SRAM (#2298)', () => {
   const t = built(SILINX_GOWIN);
-  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', 'emulate']);
+  assert.deepEqual(t.map(shape), ['summary', 'constraints', { synth: ['rtl', 'check', 'cmodel'] }, { impl: [{ translate: [] }, { par: ['trce'] }] }, 'bitgen', 'emulate', { config: ['impact'] }]);
   assert.equal(toolOf({ part: 'gw1nr-9c' }, true), SILINX_GOWIN);
   assert.deepEqual(SILINX_GOWIN.steps.find(s => s.id === 'bitgen').produces, ['{top}.fs']);
   assert.deepEqual(SILINX_GOWIN.steps.map(({ produces, ...s }) => s), GOWIN_STEPS);
@@ -77,7 +78,7 @@ test('#2303 the Gowin: the ECP5\'s tree; its steps (gowin_pack\'s .fs), reports,
   assert.ok(read('packages/silinx-fpga/src/open-flow-gowin.js').includes("io.write('open/routed.json'"));
   for (const r of SILINX_GOWIN.reports) assert.ok(SILINX_GOWIN.steps.find(s => s.id === r.step).produces.includes(r.file), r.id);
   assert.deepEqual(SILINX_GOWIN.constraints, { format: 'cst', ext: '.cst', label: 'CST' });
-  assert.equal(SILINX_GOWIN.program, null);
+  assert.deepEqual(SILINX_GOWIN.program, { process: 'config', page: 'program-open', title: 'Program FPGA', target: 'sram', file: '{top}.fs' });
   assert.deepEqual(SILINX_GOWIN.tasks.map(t => t.id), ['edit', 'sim', 'emu', 'impl']);
 });
 
@@ -212,11 +213,14 @@ test('#2311 each descriptor\'s programming: its process in its tree, the file it
   assert.deepEqual([ISE, SILINX, SILINX_ICE40].map(t => t.program.file), ['{top}.bit', '{top}.bit', '{top}.bin']);
   assert.equal(SILINX_ICE40.program.prom, undefined);
   assert.equal(ISE.program.prom, '{top}_prom.bit');
-  // (#2298: the iCE40's page, its tab's title, and the others' iMPACT)
-  assert.deepEqual([ISE, SILINX, SILINX_ICE40].map(t => [t.program.page, t.program.title, t.program.target]),
-    [['impact', 'iMPACT', 'jtag'], ['impact', 'iMPACT', 'jtag'], ['program-ice40', 'Program Flash', 'spi-flash']]);
-  assert.ok(fs.existsSync(new URL('../web/js/program-ice40.js', import.meta.url)));
-  assert.match(read('web/js/app.js'), /'Program Flash' : 'iMPACT'/);
+  // (#2298: the open families' page, its tab's title its programming's, and the others' iMPACT; each open family's target
+  // its profile's)
+  assert.deepEqual([ISE, SILINX, SILINX_ICE40, SILINX_ECP5, SILINX_GOWIN].map(t => [t.program.page, t.program.title, t.program.target]),
+    [['impact', 'iMPACT', 'jtag'], ['impact', 'iMPACT', 'jtag'], ['program-open', 'Program Flash', 'spi-flash'], ['program-open', 'Program FPGA', 'sram'], ['program-open', 'Program FPGA', 'sram']]);
+  assert.deepEqual(['ice40', 'ecp5', 'gowin'].map(f => familyProfile(f).program), ['spi-flash', 'sram', 'sram']);
+  for (const tool of [SILINX_ECP5, SILINX_GOWIN]) assert.ok(tool.steps.find(s => s.id === 'bitgen').produces.includes(tool.program.file), tool.id);
+  assert.ok(fs.existsSync(new URL('../web/js/program-open.js', import.meta.url)));
+  assert.match(read('web/js/app.js'), /projectTool\(\)\.program\?\.title \|\| 'iMPACT' : 'iMPACT'/);
 });
 
 test('#2311 the task list: every tool has the four tasks of a lab session, each with its button and its dot', () => {

@@ -6,6 +6,7 @@ import { runFlow, backendOf, familyOfPart, familyName, deviceFamily, constraints
 import { readConstraints } from '../packages/silinx-fpga/src/constraints.js';
 import { ecp5Utilization } from '../packages/silinx-fpga/src/open-flow-ecp5.js';
 import { orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
+import { ecp5BitInfo, checkOpenBitstream, idHex } from '../core/open-bitstream.js';
 
 const BLINKY = 'module blinky(input clk, output reg [1:0] led);\n  reg [23:0] c = 0;\n  always @(posedge clk) begin c <= c + 1; led <= c[23:22]; end\nendmodule\n';
 const PINS = '# the ULX3S\'s clock and two of its LEDs\nBLOCK RESETPATHS;\nLOCATE COMP "clk" SITE "G2";\nIOBUF PORT "clk" IO_TYPE=LVCMOS33;\nFREQUENCY PORT "clk" 25 MHZ;\n'
@@ -107,6 +108,9 @@ test('a design from HDL to its bitstream: synth_ecp5, nextpnr-ecp5 at the LPF\'s
   assert.equal(r.report.bit.size, SIZE_85F);
   assert.equal(bit.length, SIZE_85F);
   assert.ok(Buffer.from(bit).includes(Buffer.from([0xff, 0xff, 0xbd, 0xb3])), 'the preamble');
+  // (as the board's programming reads it, #2298: its part and IDCODE the 85F's)
+  const bitInfo = ecp5BitInfo(bit);
+  assert.deepEqual([bitInfo.part, idHex(bitInfo.idcode), checkOpenBitstream('ecp5', bitInfo, { part: 'lfe5u-85f' })], ['LFE5U-85F-6CABGA381', '0x41113043', null]);
   assert.equal(log.at(-2), `Bitstream: build/blinky.bit (${SIZE_85F} bytes, ecppack)`);
   // ecpunpack, then ecppack again: the same bytes (the bitstream is one Project Trellis reads back as a configuration)
   const { runEcpunpack, runEcppack } = await import('@yowasp/nextpnr-ecp5');

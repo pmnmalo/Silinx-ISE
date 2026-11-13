@@ -4,6 +4,7 @@
 //   openFPGALoader  openFPGALoader -c <cable> --detect
 //                   openFPGALoader -c <cable> [--index-chain N] file.bit        (SRAM load only for Spartan-3E)
 //                   openFPGALoader -b <board> file.bin                         (the iCE40: the board's SPI flash, #2298)
+//                   openFPGALoader -b <board> -m file.bit|file.fs               (the ECP5's .bit, the Gowin's .fs: the FPGA's SRAM, #2298)
 //   xc3sprog        xc3sprog -c <cable> -j
 //                   xc3sprog -c <cable> -v -p <pos> file.bit
 //   djtgcfg         djtgcfg enum ; djtgcfg init -d <dev>
@@ -23,7 +24,8 @@ import { fileURLToPath } from 'node:url';
 import { runCommand } from './jobs.js';
 import { loadConfig, detectIse, resolveTool, which, configDir } from './toolchain.js';
 import { findBoard, resolveBoard } from './devices.js';
-import { splitBitPart, familyOfPart, familyName, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
+import { splitBitPart, familyOfPart, familyName, deviceFamily } from '../packages/silinx-fpga/src/parts.js';
+import { ecp5BitInfo, gowinFsInfo, checkOpenBitstream, idHex } from '../core/open-bitstream.js';
 
 import { TOOLS, VALUE } from './programmer-values.js';
 
@@ -127,7 +129,7 @@ export function impactScript({ bitfile, position = 1, cable = 'auto' } = {}) {
  * Build the command(s) for a scan or program operation.
  * @returns {Array<{cmd:string,args:string[],impactScript?:string}>}
  */
-export function buildCommands(op, { tool, cable, device, position, bitfile, fpgaBoard }) {
+export function buildCommands(op, { tool, cable, device, position, bitfile, fpgaBoard, target }) {
   const pos = position === undefined || position === null || position === '' ? null : parseInt(position, 10);
   if (pos !== null && (!Number.isInteger(pos) || pos < 0 || pos > 31)) throw new Error(`invalid chain position '${position}'`);
   const prog = op === 'program';
@@ -137,8 +139,10 @@ export function buildCommands(op, { tool, cable, device, position, bitfile, fpga
       // (-b: openFPGALoader's board, its cable and pins: the iCE40's ice40_generic, #2298)
       const base = [...(fpgaBoard ? ['-b', fpgaBoard] : []), ...(cable ? ['-c', cable] : [])];
       if (!prog) return [{ cmd: tool, args: [...base, '--detect'] }];
-      // (an iCE40's .bin goes to its SPI flash: no JTAG chain)
-      const idx = pos !== null && !/\.bin$/i.test(bitfile) ? ['--index-chain', String(pos)] : [];
+      // (an open family's file, target: an iCE40's .bin to its SPI flash; an ECP5's .bit, a Gowin's .fs to its SRAM, -m: never
+      // its flash; no JTAG chain, the board's)
+      if (target) return [{ cmd: tool, args: [...base, ...(target === 'sram' ? ['-m'] : []), bitfile] }];
+      const idx = pos !== null ? ['--index-chain', String(pos)] : [];
       return [{ cmd: tool, args: [...base, ...idx, bitfile] }];
     }
     case 'xc3sprog': {
@@ -333,28 +337,48 @@ export function parseScanOutput(tool, lines) {
   return devs;
 }
 
-// The iCE40's .bin (#2298): no header to read; openFPGALoader writes it into the board's SPI flash, which the FPGA then
-// loads (and at every power-up)
-async function programIce40(job, o, cfg, req) {
-  const bitfile = req.bitfile, size = (await fs.stat(bitfile)).size;
-  if (o.tool !== 'openFPGALoader') throw new Error(`an iCE40's .bin is programmed with openFPGALoader, not ${o.tool}`);
-  job.log(`Configuration file ${bitfile} (${size} bytes, an iCE40's .bin)`);
-  const warnings = [];
-  if (req.expectDevice?.part && !openOnlyDevice(req.expectDevice)) {
-    const w = `a .bin is an iCE40's configuration, but the target device is '${req.expectDevice.part}'`;
-    warnings.push(w); job.log(`WARNING: ${w}`);
+// The open families' files (#2298): the iCE40's .bin (no header to read), written into the board's SPI flash, which the FPGA
+// then loads (and at every power-up); the ECP5's .bit and the Gowin's .fs, read (core/open-bitstream.js: their device checked
+// as a Xilinx header's) and loaded into the FPGA's SRAM. openFPGALoader's, with the board's -b.
+const OPEN_FILES = {
+  ice40: { what: "an iCE40's .bin", kind: "a .bin is an iCE40's configuration", target: 'flash', mode: 'SPI flash, non-volatile' },
+  ecp5: { what: "an ECP5's .bit", kind: "this .bit is an ECP5's configuration", target: 'sram', mode: 'SRAM, volatile' },
+  gowin: { what: "a Gowin's .fs", kind: "a .fs is a Gowin's configuration", target: 'sram', mode: 'SRAM, volatile' },
+};
+/** The open family a file is programmed as: by its extension (.bin, .fs), a .bit by the project's device (the ECP5's); null:
+ *  a Xilinx .bit. */
+export function openFamilyOf(bitfile, device) {
+  if (/\.bin$/i.test(bitfile)) return 'ice40';
+  if (/\.fs$/i.test(bitfile)) return 'gowin';
+  return deviceFamily(device) === 'ecp5' ? 'ecp5' : null;
+}
+
+async function programOpen(job, o, cfg, req, family) {
+  const bitfile = req.bitfile, size = (await fs.stat(bitfile)).size, F = OPEN_FILES[family];
+  if (o.tool !== 'openFPGALoader') throw new Error(`${F.what} is programmed with openFPGALoader, not ${o.tool}`);
+  const warnings = [], warn = w => { warnings.push(w); job.log(`WARNING: ${w}`); };
+  if (family === 'ice40') job.log(`Configuration file ${bitfile} (${size} bytes, ${F.what})`);
+  else {
+    let info;
+    try { info = family === 'ecp5' ? ecp5BitInfo(await fs.readFile(bitfile)) : gowinFsInfo(await fs.readFile(bitfile, 'latin1')); } catch (e) { throw new Error(`${bitfile}: ${e.message}`); }
+    job.log(`Bitstream ${bitfile} (${size} bytes, ${F.what}${info.part ? `: part ${info.part}` : ''}${info.idcode != null ? `, IDCODE ${idHex(info.idcode)}` : ''})`);
+    const mismatch = checkOpenBitstream(family, info, req.expectDevice);
+    if (mismatch && !req.force) throw new Error(mismatchRefusal(mismatch));
+    if (mismatch) warn(mismatch);
   }
+  // (a file of a family for a device of another: the request's own file, a .bin or a .fs; warned)
+  if (req.expectDevice?.part && deviceFamily(req.expectDevice) !== family) warn(`${F.kind}, but the target device is '${req.expectDevice.part}'`);
   if (o.note) job.log(`NOTE: ${o.note}`);
   if (!o.verified) job.log(`NOTE: the ${o.tool} defaults for this board are not verified on real hardware.`);
-  job.log(`Programming (SPI flash, non-volatile) with ${o.tool}${o.fpgaBoard ? ` board=${o.fpgaBoard}` : ''}${o.cable ? ` cable=${o.cable}` : ''}`);
+  job.log(`Programming (${F.mode}) with ${o.tool}${o.fpgaBoard ? ` board=${o.fpgaBoard}` : ''}${o.cable ? ` cable=${o.cable}` : ''}`);
   const commands = [];
-  for (const c of buildCommands('program', { ...o, bitfile })) {
+  for (const c of buildCommands('program', { ...o, bitfile, target: F.target })) {
     const code = await execTool(job, c, cfg);
     commands.push({ cmd: c.cmd, args: c.args, code });
     if (code !== 0) throw Object.assign(new Error(`${c.cmd} exited with code ${code}`), { result: { options: o, bitfile, warnings, commands } });
   }
   job.log('Programming finished.');
-  return { options: o, bitfile, size, warnings, commands };
+  return { options: o, bitfile, size, family, target: F.target, warnings, commands };
 }
 
 /**
@@ -366,7 +390,8 @@ export async function programJob(job, req) {
   const o = resolveOptions(req, cfg, req.board);
   const bitfile = req.bitfile;
   if (!bitfile || !fss.existsSync(bitfile)) throw new Error(`bitstream not found: ${bitfile}`);
-  if (/\.bin$/i.test(bitfile)) return programIce40(job, o, cfg, req);
+  const open = openFamilyOf(bitfile, req.expectDevice);
+  if (open) return programOpen(job, o, cfg, req, open);
   const info = await readBitInfo(bitfile);
   job.log(`Bitstream ${bitfile}`);
   job.log(`  design ${info.designName}  part ${info.part}  built ${info.date} ${info.time}  (${info.dataLength} bytes of configuration data)`);

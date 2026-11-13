@@ -210,8 +210,8 @@ export const SILINX_ICE40 = {
   constraints: PCF,
   messages: LOG_MESSAGES,
   // (#2298: no JTAG chain and no PROM; the .bin written into the board's SPI flash: openFPGALoader in the local server, WebUSB
-  // in the browser edition)
-  program: { process: 'config', page: 'program-ice40', title: 'Program Flash', target: 'spi-flash', file: '{top}.bin' },
+  // in the browser edition; the page web/js/program-open.js, as the ECP5's and the Gowin's)
+  program: { process: 'config', page: 'program-open', title: 'Program Flash', target: 'spi-flash', file: '{top}.bin' },
   tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
   tasks: LAB_TASKS,
 };
@@ -238,7 +238,8 @@ export const SILINX_XC7 = {
 };
 
 /** The Silinx toolchain on the ECP5 (#2302), with nextpnr-ecp5 and ecppack (Project Trellis): as the iCE40's, its bitstream
- *  ecppack's .bit; no programming of its boards yet (#2298: no Configure Target Device); Emulate on the LPF's pins (#3704). */
+ *  ecppack's .bit, loaded into the FPGA's SRAM by Configure Target Device (#2298: no JTAG chain, the board's); Emulate on the
+ *  LPF's pins (#3704). */
 export const SILINX_ECP5 = {
   id: 'silinx-ecp5', name: 'Silinx toolchain (ECP5)', open: true,
   steps: withProducts(ECP5_STEPS, {
@@ -251,13 +252,13 @@ export const SILINX_ECP5 = {
   ],
   constraints: LPF,
   messages: LOG_MESSAGES,
-  program: null,
-  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE),
+  program: { process: 'config', page: 'program-open', title: 'Program FPGA', target: 'sram', file: '{top}.bit' },
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
   tasks: LAB_TASKS,
 };
 
 /** The Silinx toolchain on the Gowin (#2303), with nextpnr-himbaechel-gowin (Project Apicula) and gowin_pack (Silinx's port of
- *  Apicula's): its bitstream the .fs; no programming of its boards yet (#2298: no Configure Target Device); Emulate on the CST's pins
+ *  Apicula's): its bitstream the .fs, loaded into the FPGA's SRAM by Configure Target Device (#2298); Emulate on the CST's pins
  *  (#3704). */
 export const SILINX_GOWIN = {
   id: 'silinx-gowin', name: 'Silinx toolchain (Gowin)', open: true,
@@ -269,8 +270,8 @@ export const SILINX_GOWIN = {
   ],
   constraints: CST,
   messages: LOG_MESSAGES,
-  program: null,
-  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture', 'config'], SILINX_CHANGE),
+  program: { process: 'config', page: 'program-open', title: 'Program FPGA', target: 'sram', file: '{top}.fs' },
+  tree: treeOf(['synth-open', 'map', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech', 'capture'], SILINX_CHANGE),
   tasks: LAB_TASKS,
 };
 

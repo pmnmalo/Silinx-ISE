@@ -8,7 +8,8 @@
 // checks of core/lint.js, the simulator): the results are the application's. The projects are the
 // workspace's (SILINX_WORKSPACE, as for `silinx serve`): every path stays inside its project
 // (symbolic links included); the processes run the Silinx toolchain, or Xilinx ISE (local, Docker, ssh: run_process's
-// toolchain 'ise') only for a trusted project, as the interface's (SECURITY.md); programming a board is left out.
+// toolchain 'ise') only for a trusted project, as the interface's (SECURITY.md); programming a board too (program_board,
+// server/mcp-board.js, #2674).
 // The ISE machine's address never appears in a result (the logs are redacted).
 import readline from 'node:readline';
 import { VERSION } from '../core/version.js';
@@ -41,6 +42,7 @@ import { GRADE_TOOLS } from './mcp-grade.js';
 import { TIMING_TOOLS } from './mcp-timing.js';
 import { COLLAB_TOOLS, endCollab } from './mcp-collab.js';
 import { CAPTURE_TOOLS } from './mcp-capture.js';
+import { BOARD_TOOLS } from './mcp-board.js';
 
 export { OPEN_REPORTS } from './mcp-processes.js';
 
@@ -54,7 +56,7 @@ const INSTRUCTIONS = 'Silinx: FPGA design for teaching (Spartan-3E; Basys2, Nexy
 
 // the tools, by area: the projects and their files (mcp-projects.js), their settings (mcp-settings.js), their
 // new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), Check Constraints (mcp-constraints.js), the conversions (mcp-convert.js), the read-only views related to a source (mcp-views.js), a drawing's Check (mcp-check.js), a schematic's Rearrange Wires / Schematic (mcp-schematic.js), a state machine's drawing stepped as its Simulate panel does (mcp-simulate-drawing.js), their sources (mcp-sources.js), Find in Project (mcp-find.js), their import and export (mcp-transfer.js), their links (mcp-link.js), git (mcp-git.js), their sharing live (mcp-collab.js), the HDL (mcp-hdl.js), Verify (mcp-verify.js), the wave configurations (mcp-wcfg.js), the C / C++ of Silinx HLS (mcp-hls.js), the processes (mcp-processes.js), the logic analyzer's capture (mcp-capture.js), the timing paths (mcp-timing.js), the guided labs (mcp-labs.js)
-export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...CONSTRAINTS_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...FIND_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS];
+export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...CONSTRAINTS_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...FIND_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...BOARD_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS];
 
 // what a tool's error may hold (#3528): the names of a project's files and modules, a remote's
 const ERROR_UNTRUSTED = 'the error, which may name a project\'s files and modules';

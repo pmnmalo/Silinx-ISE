@@ -707,8 +707,9 @@ export async function openPinPlanner(mod) {
 
 export async function openImpact() {
   const { mountImpact } = await import('./impact.js');
-  // (an iCE40's: its flash, no iMPACT, #2298)
-  openDoc({ id: 'impact', title: openOnlyDevice(S.project?.device) ? 'Program Flash' : 'iMPACT', icon: 'impact', create: (el, d) => mountImpact(el, d) });
+  // (an open family's: its page, titled by its flow's programming (the iCE40's Program Flash, the ECP5's Program FPGA), no
+  // iMPACT, #2298)
+  openDoc({ id: 'impact', title: openOnlyDevice(S.project?.device) ? projectTool().program?.title || 'iMPACT' : 'iMPACT', icon: 'impact', create: (el, d) => mountImpact(el, d) });
 }
 
 // ------------------------------------------------------------------ left pages

@@ -638,7 +638,7 @@ export const BOARDS = [
     programmer: {
       preferred: 'openFPGALoader',
       tools: {
-        openFPGALoader: { board: 'ice40_generic', onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
+        openFPGALoader: { board: 'ice40_generic', usb: 'FT2232H', webusb: true, onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
       },
     },
     source: ICEBREAKER_PCF,
@@ -665,7 +665,7 @@ export const BOARDS = [
     programmer: {
       preferred: 'openFPGALoader',
       tools: {
-        openFPGALoader: { board: 'ice40_generic', onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
+        openFPGALoader: { board: 'ice40_generic', usb: 'FT2232H', webusb: true, onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
       },
     },
     source: ICEBREAKER_PCF,

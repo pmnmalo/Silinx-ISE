@@ -10,8 +10,7 @@ import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
 import { runVivado, isVivadoDevice, vivadoSteps, collectVivadoReports } from './vivado.js';
-import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice, bitstreamExtOf, familyName } from '../packages/silinx-fpga/src/parts.js';
-import { familyProfile } from '../core/family-profile.js';
+import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice, bitstreamExtOf } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
@@ -55,6 +54,45 @@ async function checkWorkspaceBit(full) {
     if (!project) throw new P.HttpError(403, `${full} is in the workspace but in no project: a workspace's bitstream is programmed from its project`);
     if (!isTrusted(project)) throw new P.HttpError(403, untrustedMessage(name, 'programming the board', project));
   }
+}
+
+/**
+ * Program the board: POST /program, and the MCP server's program_board (server/mcp-board.js). b: { project, bitfile (the
+ * project's file, else its build/<top><ext>; an absolute .bit without a project), board, tool, cable, device, position,
+ * force }; the project trusted (#2830). Returns the job (server/programmer.js programJob).
+ */
+export async function startProgramming(b = {}) {
+  const P = Projects, bad = (msg, status = 400) => new P.HttpError(status, msg);
+  let bitfile = null, project = null;
+  if (b.project) {
+    project = await P.readProject(b.project);
+    if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board', project), 403);   // (#2830)
+    const dir = P.projectDir(b.project);
+    if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
+    else {
+      if (!topOf(project)) throw bad('project has no top module; cannot locate build/<top>.bit');
+      bitfile = path.join(dir, 'build', `${project.top}${bitstreamExtOf(project.device)}`);   // (the iCE40's .bin, the Gowin's .fs, #2298)
+    }
+  } else if (b.bitfile) {
+    if (!path.isAbsolute(b.bitfile)) throw bad('bitfile must be an absolute path when no project is given');
+    bitfile = b.bitfile;
+  } else throw bad('give a project or a bitfile');
+  if (!/\.bit$/i.test(bitfile) && !(/\.(bin|fs)$/i.test(bitfile) && !path.isAbsolute(b.bitfile || ''))) throw bad('only .bit files, or a project\'s .bin (the iCE40) or .fs (the Gowin), can be programmed');
+  if (path.isAbsolute(b.bitfile || '')) await checkWorkspaceBit(bitfile);
+  if (!fss.existsSync(bitfile)) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
+  // a file outside the project (iMPACT's file box takes any path): only a real Xilinx bitstream,
+  // and the same answer for any other file as for a missing one (no file-existence check by the API)
+  if (path.isAbsolute(b.bitfile || '')) {
+    let ok = false;
+    try { const fd = await fs.open(bitfile); try { const { buffer, bytesRead } = await fd.read(Buffer.alloc(4096), 0, 4096, 0); parseBitHeader(buffer.subarray(0, bytesRead)); ok = true; } finally { await fd.close(); } } catch { /* not a bitstream */ }
+    if (!ok) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
+  }
+  const board = b.board || project?.board || null;
+  if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
+  // the device the bitstream must be built for: the project's, else the board's, never the request's (#3040); a
+  // mismatch refused unless the request says force
+  const opts = { tool: b.tool, cable: b.cable, device: b.device, position: b.position, board, bitfile, expectDevice: expectedDevice(project, board), force: b.force === true };
+  return createJob('program', j => programJob(j, opts), { meta: { project: b.project || null, bitfile, board } });
 }
 
 /**
@@ -230,45 +268,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
   }));
 
   // ----- programming / JTAG -------------------------------------------------------------------
-  api.post('/program', wrap(async req => {
-    const b = req.body || {};
-    let bitfile = null, project = null;
-    if (b.project) {
-      project = await P.readProject(b.project);
-      if (!isTrusted(project)) throw bad(untrustedMessage(b.project, 'programming the board', project), 403);   // (#2830)
-      // (an open family whose boards Silinx does not program yet: the ECP5's, #2302)
-      if (openOnlyDevice(project.device) && !familyProfile(deviceFamily(project.device)).program) {
-        const fam = deviceFamily(project.device);
-        throw bad(`Silinx does not program ${familyName(fam)} boards yet: build/${project.top || '<top>'}${bitstreamExtOf(project.device)} is the bitstream, for the board's own tools (openFPGALoader)`);
-      }
-      const dir = P.projectDir(b.project);
-      if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
-      else {
-        if (!topOf(project)) throw bad('project has no top module; cannot locate build/<top>.bit');
-        bitfile = path.join(dir, 'build', `${project.top}${bitstreamExtOf(project.device)}`);   // (the iCE40's .bin, #2298)
-      }
-    } else if (b.bitfile) {
-      if (!path.isAbsolute(b.bitfile)) throw bad('bitfile must be an absolute path when no project is given');
-      bitfile = b.bitfile;
-    } else throw bad('give a project or a bitfile');
-    if (!/\.bit$/i.test(bitfile) && !(/\.bin$/i.test(bitfile) && !path.isAbsolute(b.bitfile || ''))) throw bad('only .bit files, or a project\'s .bin (the iCE40), can be programmed');
-    if (path.isAbsolute(b.bitfile || '')) await checkWorkspaceBit(bitfile);
-    if (!fss.existsSync(bitfile)) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
-    // a file outside the project (iMPACT's file box takes any path): only a real Xilinx bitstream,
-    // and the same answer for any other file as for a missing one (no file-existence check by the API)
-    if (path.isAbsolute(b.bitfile || '')) {
-      let ok = false;
-      try { const fd = await fs.open(bitfile); try { const { buffer, bytesRead } = await fd.read(Buffer.alloc(4096), 0, 4096, 0); parseBitHeader(buffer.subarray(0, bytesRead)); ok = true; } finally { await fd.close(); } } catch { /* not a bitstream */ }
-      if (!ok) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
-    }
-    const board = b.board || project?.board || null;
-    if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
-    // the device the bitstream must be built for: the project's, else the board's, never the request's (#3040); a
-    // mismatch refused unless the request says force
-    const opts = { tool: b.tool, cable: b.cable, device: b.device, position: b.position, board, bitfile, expectDevice: expectedDevice(project, board), force: b.force === true };
-    const job = createJob('program', j => programJob(j, opts), { meta: { project: b.project || null, bitfile, board } });
-    return { job: job.id };
-  }));
+  api.post('/program', wrap(async req => ({ job: (await startProgramming(req.body || {})).id })));
 
   // Platform Flash PROM (XCF0xS) of the board: program / verify / erase / read (backup) / reconfigure.
   api.post('/prom', wrap(async req => {
