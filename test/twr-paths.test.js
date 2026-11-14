@@ -70,7 +70,7 @@ test('signalDrivers: a hierarchical name to the processes and assignments that d
   assert.deepEqual(at('u_pre.cnt'), ['src/counter.v:19 process_19'], 'Verilog: an always block');
   assert.deepEqual(at('u_speed.level'), ['src/speed_ctrl.vhd:99 state_register'], 'VHDL: a labelled process');
   assert.deepEqual(at('U_SPEED.Level'), at('u_speed.level'), 'VHDL\'s names in any case');
-  assert.deepEqual(at('step'), ['src/top.vhd:65 assign_65'], 'the top\'s concurrent assignment');
+  assert.deepEqual(at('step'), ['src/top.vhd:82 assign_82'], 'the top\'s concurrent assignment');
   // (each line its text: the process or the assignment)
   for (const n of ['u_pre.cnt', 'u_speed.level', 'step']) for (const x of where(n)) {
     assert.match(fs.readFileSync(path.join(ROOT, 'examples/blinky', x.file), 'utf8').split('\n')[x.line - 1], /process|always|<=/, n);

@@ -17,8 +17,7 @@ import { mountSideFold } from './side-fold.js';
 import { symbolSvg, SVGNS } from './sch-svg.js';
 import { instanceParams, newSymbol, normalizeSymbol, reconcile, symbolDef, symbolPins } from '/core/schdoc.js';
 import { mountSymbolSide } from './symbol-side.js';
-
-const clone = o => JSON.parse(JSON.stringify(o));
+import { clone } from '/core/util.js';
 const HOW = 'Click a pin to select it; drag it to another place or side; ◀ ▶ or the arrow keys move it along its side';
 const M = 40;   // (the margin around the symbol: its pins' names)
 

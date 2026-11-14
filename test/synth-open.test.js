@@ -52,6 +52,7 @@ test('the Yosys script and the device families', () => {
   // 6-input-LUT families: synth_xilinx as it is, the Spartan-6's memory step on its block-RAM rule without the 9K halves (#2130)
   assert.equal(synthCommands('m', 'virtex5'), 'synth_xilinx -family xc5v -ise -flatten -top m');
   assert.equal(synthCommands('m', 'spartan6'), 'synth_xilinx -family xc6s -ise -flatten -top m -run :map_memory; '
+    + 'setattr -set clkbuf_driver 1 =BSCAN_SPARTAN6/w:DRCK; '   // (a BSCAN's DRCK a clock buffer's driver, the capture core's clock: #3766)
     + 'memory_libmap -lib +/xilinx/lutrams_xc5v.txt -lib silinx_brams_xc6s.txt -D IS_SPARTAN6 -logic-cost-rom 0.015625; '
     + 'techmap -map +/xilinx/lutrams_xc5v_map.v; techmap -map +/xilinx/brams_xc3sda_map.v; synth_xilinx -family xc6s -ise -flatten -top m -run map_ffram:');
   assert.match(yosysScript('m', 'spartan6'), /-family xc6s /);
