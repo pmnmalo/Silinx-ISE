@@ -163,7 +163,17 @@ the interface's language, the ports, and the tests with their verdicts and point
     ([CLASSROOM.md](CLASSROOM.md)). Its starter project is made from the statement, in VHDL or Verilog: the top module
     with the statement's ports and an empty body, on the project's board and device.
 
-The MCP server's `grade` tool does each of these (run, ports, reference, expected, student_copy, template, new).
+  - **Class Results…** (in the ⋮ menu) opens the class's results of a teacher's run: the JSON that `silinx grade --json`
+    or `silinx classroom grade --json` writes, picked from the computer. A `grades.json` or `<name>.grades.json` of the
+    project opens the same way from the Files. The Results document shows:
+    - the tests, the class's weakest first: how many students each Accepted, and its most frequent other verdict;
+    - the students, each with each test's verdict and points. A click on a student puts their report in the console;
+    - in the status line: the students, how many are Accepted, and the mean points;
+    - **Export CSV** saves the CSV that `--csv` writes.
+
+    The file is checked as results before it is shown, and its names and messages are shown as text.
+
+The MCP server's `grade` tool does each of these (run, ports, reference, expected, student_copy, template, results, new).
 
 ## The example
 

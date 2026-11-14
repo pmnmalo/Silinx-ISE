@@ -3,7 +3,8 @@
 // viewer (docs/UI-GUIDELINES.md): its toolbar (Add Test, Delete Test, Run Visible Tests, ☰ Properties on a narrow
 // screen, the ⋮ menu's Run All Tests, Ports from the Top, Reference from the Project and Expected from the Reference,
 // #3831: a teacher's exercise made from the project that holds the right design; Export Student Copy and Classroom
-// Template…, #3841: web/js/exercise-package.js), the statement in the interface's language, the ports, the
+// Template…, #3841: web/js/exercise-package.js; Class Results…, the class's results of a teacher's run, #3864:
+// web/js/grade-results-view.js), the statement in the interface's language, the ports, the
 // tests with their verdicts and points once run, the Properties side panel on the right (the exercise's title,
 // statement and top, the selected test's settings: web/js/exercise-props.js), its status line, and every message in the
 // console. The tests run on the project as it is saved, in the page (core/grade.js, the grading of `silinx grade` and of
@@ -112,7 +113,8 @@ function mountExercise(el, doc, path, ex) {
       btn('Reference from the Project', 'The exercise\'s reference design: the project\'s design', 'reference-from-project', () => referenceFromProject()),
       btn('Expected from the Reference', 'The selected vectors test\'s outputs: the reference design\'s, on its rows\' inputs', 'expected-from-reference', () => expectedOutputs()),
       btn('Export Student Copy', 'Save the exercise without its hidden tests and its reference, for the students', 'student-copy', () => exportStudentCopy(pack)),
-      btn('Classroom Template…', 'Save a GitHub Classroom assignment\'s template repository as a zip', 'classroom-template', () => classroomTemplateDialog(pack))], { title: 'The exercise', btnClass: 'asm-btn' }).el));
+      btn('Classroom Template…', 'Save a GitHub Classroom assignment\'s template repository as a zip', 'classroom-template', () => classroomTemplateDialog(pack)),
+      btn('Class Results…', 'Open the class\'s results of a teacher\'s run (silinx grade --json)', 'class-results', () => import('./grade-results-view.js').then(m => m.classResultsDialog(ex)))], { title: 'The exercise', btnClass: 'asm-btn' }).el));
   const pack = { name, path, exercise: () => ex };
   const page = h('div', { class: 'ex-page' });
   const side = h('aside', { class: 'ex-side' }, h('div', { class: 'asm-cap' }, 'Properties'));

@@ -463,6 +463,7 @@ export async function openFile(path, line, col, { task } = {}) {
   if (path.endsWith('.pn.json')) return openPetri(path);
   if (/\.sym\.json$/i.test(path)) return (await import('./symbol-doc.js')).openSymbol(path);   // (a module's symbol, #3755)
   if (path.endsWith('.exercise.json')) return (await import('./exercise-view.js')).openExercise(path);   // (#3192)
+  if (/(^|\/)([^/]+\.)?grades\.json$/i.test(path)) return (await import('./grade-results-view.js')).openResultsFile(path);   // (a class's results, #3864)
   const id = `file:${path}`;
   let doc = findDoc(id);
   const fresh = !doc;
