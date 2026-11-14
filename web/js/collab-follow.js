@@ -8,8 +8,10 @@
 // link …/#follow=<room>.<key>.host) is reached over WebRTC, with codes exchanged by hand (collab-host.js). An editor's
 // link (#3182, …#edit=…) also edits the project's text files: their editors bound live (collab-bind.js); and its
 // drawings edited live (#3183, every drawing: state diagrams, truth tables, ASM charts, Petri nets, schematics): their editors bound to the drawings' structures (collab-drawing.js).
-// A connection to a relay lost is made again on its own (#3835): "Reconnecting to <owner>…" in the toolbar meanwhile,
-// the loss and the return in the console (an editor's changes made meanwhile sent once it is back).
+// A connection to a relay lost is made again on its own (#3835), and one to a room its owner's page hosts, through the
+// meeting point, when the owner was found there (not when the codes were exchanged by hand): "Reconnecting to
+// <owner>…" in the toolbar meanwhile, the loss and the return in the console (an editor's changes made meanwhile sent
+// once it is back).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app, activateDoc } from './app.js';
@@ -62,8 +64,9 @@ export async function startFollowing(hash = location.hash) {
   if (link.via === 'host' && !WS) return null;
   let session;
   try {
-    // (a room the owner's page hosts: its channel not made again yet; a relay's connection, made again, #3835)
-    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(link.relay || location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, sign: link.sign, user: { name }, onEvent: ev => onEvent(ev), ...(WS ? { reconnect: false } : {}) });
+    // (#3835: a relay's connection made again; a room the owner's page hosts, through the meeting point when the owner
+    // was found there, never when the codes were exchanged by hand: they would have to be again)
+    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(link.relay || location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, sign: link.sign, user: { name }, onEvent: ev => onEvent(ev), ...(WS ? (WS.rejoin ? { transport: WS.rejoin } : { reconnect: false }) : {}) });
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);

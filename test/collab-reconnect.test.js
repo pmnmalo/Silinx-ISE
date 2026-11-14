@@ -174,6 +174,29 @@ test('a transport that gives no socket (a room reached by codes): the session en
   assert.equal(ev.at(-1).reason, 'the connection was lost and cannot be made again from here');
 });
 
+test('#3835 a transport that fails (the owner not found at the meeting point yet): tried again later, then joined', async () => {
+  const h = hostedRooms();
+  const doc = owned();
+  const owner = keep(await shareRoom({ url: 'silinx-host:', doc, user: { name: 'Ana' }, WebSocket: h.owner }));
+  const ends = [], ev = [];
+  let tries = 0;
+  const transport = async () => { if (++tries < 3) throw new Error('the owner was not found at the meeting point'); return followerSocket(h, ends); };
+  const f = keep(await followRoom({ url: 'silinx-host:', room: owner.room, key: owner.key, user: { name: 'Rui' }, WebSocket: followerSocket(h, ends), onEvent: e => ev.push(e), reconnect: FAST, transport }));
+  await f.ready;
+  ends.at(-1).close();
+  await until(() => types(ev).includes('offline'), 'offline');
+  await until(() => f.connected(), 'online again');
+  assert.equal(tries, 3);
+  assert.equal(ends.length, 2);
+  assert.deepEqual(types(ev), ['offline', 'online']);
+  // (and one that keeps failing: given up after `for`, as any)
+  const g = keep(await followRoom({ url: 'silinx-host:', room: owner.room, key: owner.key, user: { name: 'Eva' }, WebSocket: followerSocket(h, ends), onEvent: e => ev.push(e), reconnect: { delays: [5], for: 60 }, transport: async () => { throw new Error('not found'); } }));
+  await g.ready;
+  ends.at(-1).close();
+  await until(() => g.closed(), 'given up');
+  assert.equal(ev.at(-1).reason, 'the connection was lost and could not be made again in 0 minutes');
+});
+
 test('a connection lost before the project arrived is not made again: the join fails as before', async () => {
   const h = hostedRooms();
   const doc = owned();

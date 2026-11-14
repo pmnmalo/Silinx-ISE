@@ -6,7 +6,8 @@
 // meeting point between this browser's pages instead (the tests'). The codes exchanged by hand stay as the fall-back:
 // the follower's after MEET_MS with no owner, or at their choice (Exchange Codes Instead). Every message in the console.
 //   meetFollowers(share, hostKey): the owner's page at the meeting point (its followers attached to its room)
-//   findOwner(link) -> a WebSocket class for followRoom, 'codes' (the codes instead) or null (cancelled)
+//   findOwner(link) -> a WebSocket class for followRoom, 'codes' (the codes instead) or null (cancelled); the class's
+//                    rejoin(): the owner found there again, with no dialog (#3835: its connection lost, made again)
 //   publicServers(link) -> the follow dialog's line naming the public servers a hosted room's follower reaches (#3361)
 import { h, dialog } from './ui.js';
 import { app } from './app.js';
@@ -50,6 +51,12 @@ export async function meetFollowers(share, hostKey) {
   }
 }
 
+/** The owner looked for at the meeting point again, MEET_MS at most, with no dialog (#3835: a follower's connection
+ *  lost, core/collab-client.js followRoom's transport): a WebSocket class; an error when not found (tried again later). */
+async function ownerAgain(link) {
+  return meetOwner({ meeting: await meetingPoint(), room: link.room, key: link.key, host: link.host, ms: MEET_MS, maxReceive: OWNER_MAX });
+}
+
 /** A follower looking for the owner at the meeting point, MEET_MS at most; the codes on their choice or after. */
 export async function findOwner(link) {
   const ac = new AbortController();
@@ -64,7 +71,7 @@ export async function findOwner(link) {
       h('p', {}, 'If they cannot be found there, you exchange codes with them instead.')),
     buttons,
   });
-  if (how === 'found') { app.log('Follow a shared project: the owner was found at the meeting point.', 'info'); return found; }
+  if (how === 'found') { app.log('Follow a shared project: the owner was found at the meeting point.', 'info'); found.rejoin = () => ownerAgain(link); return found; }
   ac.abort();
   if (how === null) return null;
   app.log(gaveUp ? `WARNING: Follow a shared project: ${gaveUp} (in ${MEET_MS / 1000} s): exchange codes with them instead.` : 'Follow a shared project: codes exchanged with the owner instead of the meeting point.', gaveUp ? 'warn' : 'info');
