@@ -36,21 +36,21 @@ test('unset_top: the top module, the test bench; nothing to unset', async () => 
 
 test('remove_from_project / add_to_project: a drawing with its HDL file, Check Syntax\'s error, then back', async () => {
   await ok('new_project_from_example', { name: 'r', example: 'traffic' });
-  assert.equal((await ok('check_syntax', { project: 'r' })).text, 'Process "Check Syntax" of <top> completed successfully (44 signals, 33 processes).');
+  assert.equal((await ok('check_syntax', { project: 'r' })).text, 'Process "Check Syntax" of <top> completed successfully (43 signals, 32 processes).');
   const r = await ok('remove_from_project', { project: 'r', path: 'src/lamps.bool.json' });
   assert.equal(r.text, 'Removed src/lamps.bool.json and its HDL file src/lamps.vhd from the project (the files are kept in the project folder).');
   assert.deepEqual(r.data.removed, ['src/lamps.bool.json', 'src/lamps.vhd']);
   assert.ok(fs.existsSync(path.join(P.projectDir('r'), 'src/lamps.vhd')));
   assert.ok(!(await files('r')).includes('src/lamps.vhd'));
   assert.deepEqual((await P.readProject('r')).excluded, ['src/lamps.bool.json']);
-  assert.equal((await ok('check_syntax', { project: 'r' })).text, 'ERROR:HDLCompiler - "src/top.vhd" Line 103: module/entity \'lamps\' not found (instance \'u_lamps\')\nProcess "Check Syntax" of <top> failed (1 error(s), 0 warning(s)).');
+  assert.equal((await ok('check_syntax', { project: 'r' })).text, 'ERROR:HDLCompiler - "src/top.vhd" Line 105: module/entity \'lamps\' not found (instance \'u_lamps\')\nProcess "Check Syntax" of <top> failed (1 error(s), 0 warning(s)).');
   await fails('remove_from_project', { project: 'r', path: 'src/lamps.bool.json' }, '\'src/lamps.bool.json\' is not in the project (add_to_project brings it back)');
   // back: the drawing, then its HDL file
   assert.equal((await ok('add_to_project', { project: 'r', path: 'src/lamps.bool.json' })).text, 'src/lamps.bool.json added to the project.');
   assert.equal((await ok('add_to_project', { project: 'r', path: 'src/lamps.vhd' })).text, 'src/lamps.vhd added to the project (vhdl, design).');
   assert.equal((await ok('add_to_project', { project: 'r', path: 'src/lamps.vhd' })).text, 'src/lamps.vhd is in the project already.');
   assert.deepEqual((await P.readProject('r')).excluded, []);
-  assert.equal((await ok('check_syntax', { project: 'r' })).text, 'Process "Check Syntax" of <top> completed successfully (44 signals, 33 processes).');
+  assert.equal((await ok('check_syntax', { project: 'r' })).text, 'Process "Check Syntax" of <top> completed successfully (43 signals, 32 processes).');
   // the drawing alone (with_hdl false): its HDL file stays
   assert.equal((await ok('remove_from_project', { project: 'r', path: 'src/lamps.bool.json', with_hdl: false })).text, 'Removed src/lamps.bool.json from the project (the file is kept in the project folder).');
   assert.ok((await files('r')).includes('src/lamps.vhd'));
@@ -85,7 +85,7 @@ test('rename_file: a file and a folder, the project\'s files, the drawings\' lin
   assert.equal(f.text, 'Rename: src → rtl (the link of rtl/traffic.fsm.json updated).');
   assert.equal(drawingLink('n', 'rtl/traffic.fsm.json'), 'rtl/traffic.vhd');
   assert.deepEqual(await files('n'), ['hdl/lamps.vhd', 'rtl/sevenseg.v', 'rtl/timer.vhd', 'rtl/top.vhd', 'rtl/traffic.vhd', 'sim/tb_traffic.vhd']);
-  assert.equal((await ok('check_syntax', { project: 'n' })).text, 'Process "Check Syntax" of <top> completed successfully (44 signals, 33 processes).');
+  assert.equal((await ok('check_syntax', { project: 'n' })).text, 'Process "Check Syntax" of <top> completed successfully (43 signals, 32 processes).');
   // the constraints file follows
   await ok('rename_file', { project: 'n', from: 'constraints/traffic.ucf', to: 'constraints/basys2.ucf' });
   assert.equal((await P.readProject('n')).constraints, 'constraints/basys2.ucf');
@@ -192,7 +192,7 @@ test('rename_module: its references, the drawing it is made from, the top; the f
   assert.equal((await ok('rename_module', { project: 'm', module: 'lamps', to: 'lights', file: 'rtl/lights.vhd' })).text,
     'Rename: module \'lamps\' renamed to \'lights\' (3 file(s) updated); src/lamps.bool.json → src/lights.bool.json; src/lamps.vhd → rtl/lights.vhd.\nrtl/lights.vhd updated from src/lights.bool.json');
   assert.deepEqual(await files('m'), ['rtl/lights.vhd', 'sim/tb_traffic.vhd', 'src/crossing.vhd', 'src/sevenseg.v', 'src/timer.vhd', 'src/traffic_top.vhd']);
-  assert.equal((await ok('check_syntax', { project: 'm', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (45 signals, 35 processes).');
+  assert.equal((await ok('check_syntax', { project: 'm', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (44 signals, 34 processes).');
   const s = await ok('simulate', { project: 'm', time_ns: 100000, signals: [] });
   assert.deepEqual([s.data.failed, s.data.log.map(l => l.text), s.data.warnings], [false, ['Simulation finished OK'], []]);
   // a schematic's module
@@ -243,5 +243,5 @@ test('#3536 write_file / rename_file: a path by another case is the project\'s o
   assert.equal(drawingLink('cs', 'src/lamps.bool.json'), 'src/Lamps.vhd');
   assert.ok((await files('cs')).includes('sim/Extra.vhd') && (await files('cs')).includes('src/Lamps.vhd'));
   assert.deepEqual((await P.fileTree('cs')).filter(f => /extra|lamps\.vhd/i.test(f)), ['sim/Extra.vhd', 'src/Lamps.vhd']);
-  assert.equal((await ok('check_syntax', { project: 'cs' })).text, 'Process "Check Syntax" of <top> completed successfully (44 signals, 33 processes).');
+  assert.equal((await ok('check_syntax', { project: 'cs' })).text, 'Process "Check Syntax" of <top> completed successfully (43 signals, 32 processes).');
 });

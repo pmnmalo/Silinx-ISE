@@ -42,12 +42,17 @@ architecture Structural of top is
     constant DIV_N      : integer := or_else(DIV, CLK_HZ / 80);
     constant DEBOUNCE_N : integer := or_else(DEBOUNCE, CLK_HZ / 50);
     constant REFRESH_N  : integer := or_else(REFRESH, CLK_HZ / 1000);
+    -- AN_LOW as sevenseg.v's parameter (1: true; a Verilog module takes an integer)
+    function to_int (b : boolean) return integer is
+    begin
+        if b then return 1; else return 0; end if;
+    end function;
     component prescaler
         generic ( DIV : integer );
         port ( clk : in std_logic; rst : in std_logic; tick : out std_logic );
     end component;
     component sevenseg
-        generic ( REFRESH : integer );
+        generic ( REFRESH : integer; AN_LOW : integer );
         port ( clk : in std_logic; digits : in std_logic_vector(15 downto 0); points : in std_logic_vector(3 downto 0);
                seg : out std_logic_vector(6 downto 0); dp : out std_logic; an : out std_logic_vector(3 downto 0) );
     end component;
@@ -57,8 +62,6 @@ architecture Structural of top is
     -- the buttons and switches as '1' when pressed or on, whatever the board's level
     signal btnOn : STD_LOGIC_VECTOR (1 downto 0);
     signal swOn  : STD_LOGIC_VECTOR (3 downto 0);
-    -- the display's digit enables, active low (the Verilog sevenseg's default), driven here at the board's level
-    signal anLow : STD_LOGIC_VECTOR (3 downto 0);
 begin
     btnOn <= not btn when BTN_LOW else btn;
     swOn  <= not sw when SW_LOW else sw;
@@ -79,10 +82,9 @@ begin
         port map ( clk => clk, rst => swOn(0), inc => step, digits => digits );
 
     u_display : sevenseg
-        generic map ( REFRESH => REFRESH_N )
-        port map ( clk => clk, digits => digits, points => "0000", seg => seg, dp => dp, an => anLow );
+        generic map ( REFRESH => REFRESH_N, AN_LOW => to_int(AN_LOW) )
+        port map ( clk => clk, digits => digits, points => "0000", seg => seg, dp => dp, an => an );
 
     step <= speed_step and not swOn(2);                -- swOn(2): pause
     led  <= leds xor (7 downto 0 => swOn(3));          -- swOn(3): invert
-    an   <= anLow when AN_LOW else not anLow;          -- the board's level
 end Structural;
