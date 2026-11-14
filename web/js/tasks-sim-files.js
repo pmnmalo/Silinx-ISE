@@ -6,6 +6,7 @@
 import { h, popupMenu } from './ui.js';
 import { icon, icons } from './icons.js';
 import { designKind } from './project-kind-flag.js';
+import { naturalCompare } from '../../core/natural-order.js';   // (a relative path: Node imports this module too)
 
 let page = 'tree';   // ('tree': Simulation; 'files')
 const panels = new Set();
@@ -44,7 +45,7 @@ function apply(p) {
 }
 
 function renderFiles(app, ul) {
-  const paths = (app.S.project?.files || []).filter(f => f.role === 'sim').map(f => f.path).sort((a, b) => a.localeCompare(b));
+  const paths = (app.S.project?.files || []).filter(f => f.role === 'sim').map(f => f.path).sort(naturalCompare);
   if (ul.dataset.key === paths.join()) return;
   ul.dataset.key = paths.join();
   ul.replaceChildren(...paths.map(path => {

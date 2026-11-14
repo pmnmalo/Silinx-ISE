@@ -41,6 +41,7 @@ import { keepCursor, keptCursor } from './doc-cursor.js';
 import { mountSplit, placeSplit, splitClosed, splitItems, tabInSight, tabTip } from './split-view.js';
 import { closeAllDocs, restoreViewState, saveViewState, viewKept } from './view-state.js';
 import { following, followNotice, editsHere } from './collab-state.js';
+import { naturalCompare } from '/core/natural-order.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -736,7 +737,7 @@ export function renderFilesPage() {
   // files sorted by path, each folder as a row of its own (right-click: rename / delete the folder)
   const reg = new Map(S.project.files.map(f => [f.path, f]));
   const inProject = new Set(S.fileTree);
-  const paths = shownFiles([...new Set([...S.project.files.map(f => f.path), ...(S.diskTree || S.fileTree)])]).sort((a, b) => a.localeCompare(b));   // (no HDL in a design project, #3780)
+  const paths = shownFiles([...new Set([...S.project.files.map(f => f.path), ...(S.diskTree || S.fileTree)])]).sort(naturalCompare);   // (no HDL in a design project, #3780)
   const shown = new Set();
   for (const path of paths) {
     const parts = path.split('/');

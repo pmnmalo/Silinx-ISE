@@ -6,6 +6,7 @@ import { bodySvg, r1 } from './sch-svg.js';
 import { devicePrimitives } from '/core/primitives.js';
 import { esc, h } from './dom.js';
 import { popupMenu } from './ui.js';
+import { naturalCompare } from '/core/natural-order.js';
 
 /** { catSel, renderPalette, search, symInfo } of mountSchEditor (device(), doc(), infoItem(), modules(), placing(): its current values). */
 export function mountSchPalette(ctx) {
@@ -36,7 +37,7 @@ export function mountSchPalette(ctx) {
     const prims = items.filter(it => SYMBOLS[it.type].prim).sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
     items.forEach((it, k) => { if (SYMBOLS[it.type].prim) items[k] = prims.shift(); });
     // (not a test bench, #332: a Simulation-only source, or a module without ports, which a schematic cannot connect)
-    for (const m of Object.values(modules()).filter(x => !x.block && !x.testbench && x.ports?.length).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const m of Object.values(modules()).filter(x => !x.block && !x.testbench && x.ports?.length).sort((a, b) => naturalCompare(a.name, b.name))) {
       if (m.name === doc().name) continue;
       items.push({ type: 'module', cat: 'Project modules', title: m.name, desc: `${m.ports?.length || 0} ports${m.lang ? ` · ${m.lang.toUpperCase()}` : ''}${m.file ? ` · ${m.file}` : ''}`, params: { module: m.name, generics: {} } });
     }

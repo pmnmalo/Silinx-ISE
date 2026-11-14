@@ -7,6 +7,7 @@ import path from 'node:path';
 import * as P from './projects.js';
 import { DESIGN_ONLY_MESSAGES as M, DESIGN_KIND, hdlSideFile, isDesignOnly, asDesignProject, toDesignProject } from '../core/project-kind.js';
 import { toolError } from './mcp-util.js';
+import { naturalCompare } from '../core/natural-order.js';
 
 // the tools of the flow: none runs in a design project
 const FLOW_TOOLS = new Set(['run_process', 'get_report', 'timing_paths', 'program_board', 'capture_settings', 'capture', 'check_constraints',
@@ -55,7 +56,7 @@ async function generatedFiles(name) {
 /** project_info of a design project: its top and test bench, its drawings and other files, no HDL, no device, board or
  *  constraints (what its Design pane and Files tab show). */
 export function designProjectInfo(name, pj, tree) {
-  const files = tree.filter(f => !/^build\//.test(f) && f !== 'silinx.json' && !hdlSideFile(f));
+  const files = tree.filter(f => !/^build\//.test(f) && f !== 'silinx.json' && !hdlSideFile(f)).sort(naturalCompare);   // (#3819)
   const data = { project: name, kind: DESIGN_KIND, top: pj.top || null, simTop: pj.simTop || null, device: null, board: null, constraints: null, files };
   return { text: [`${name}: a design and simulation project (no FPGA), top ${data.top || '(none)'}, test bench ${data.simTop || '(none)'}`, ...files.map(f => `  ${f}`)].join('\n'), data,
     untrusted: 'the project\'s settings and files\' names' };

@@ -23,6 +23,7 @@ import { wcfgFiles } from './sim-wcfg.js';
 import { prefKey } from './prefs.js';
 import { pinsReady } from './pins-check.js';
 import { isName } from '/core/ident.js';
+import { naturalCompare } from '/core/natural-order.js';
 
 // ---- schematic
 // Netlist written by netgen for `step` (postsynth / posttrans / postmap / postpar) with the
@@ -278,7 +279,7 @@ async function runSimulationInner(mod, model, stale) {
         onSaveTestbench: m => saveStimTestbench(inst === design.top ? mod : inst.module, inst, m),
       };
       // (the project's test benches in its tree, another one simulated in a document of its own: #1161)
-      const benches = () => S.modules.filter(m => m.role === 'sim').map(m => m.name).sort((a, b) => a.localeCompare(b));
+      const benches = () => S.modules.filter(m => m.role === 'sim').map(m => m.name).sort(naturalCompare);
       const view = mountISim(el, { design, sim, title: mod, initialRun: 1_000_000, stimuli, wcfg: wcfgFiles(mod), onOpenSource: ref => ref?.file && openFile(ref.file, ref.line),
         benches, onBench: name => { const d = findDoc(`isim:${name}`); if (d) openDoc({ id: d.id }); else runSimulation(name); },
         // (each row's types: [Waveform], the simulation's own view, marked, its waveform brought to the front; then the

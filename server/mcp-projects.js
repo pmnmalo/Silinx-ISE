@@ -9,6 +9,7 @@ import { TEST_DESIGNS, orderTestDesigns } from '../core/test-designs.js';
 import { nameUnnamed } from '../core/schname.js';
 import { DESIGN_KIND, isDesignOnly } from '../core/project-kind.js';
 import { designProjectInfo } from './mcp-design-only.js';
+import { naturalCompare } from '../core/natural-order.js';
 import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice, redactor } from './mcp-util.js';
 
 // a project the MCP server makes is untrusted (#2981): its tools' results say so
@@ -126,7 +127,7 @@ export const PROJECT_TOOLS = [
       // (a design and simulation project, #3780: its HDL not shown, nor its internal device)
       if (isDesignOnly(pj)) return designProjectInfo(name, pj, await P.fileTree(name));
       const files = (pj.files || []).map(f => ({ path: f.path, lang: f.lang, role: f.role || 'design' }));
-      const all = (await P.fileTree(name)).filter(f => !/^build\//.test(f));
+      const all = (await P.fileTree(name)).filter(f => !/^build\//.test(f)).sort(naturalCompare);   // (the Files page's order, #3819)
       const data = { project: name, top: pj.top || null, simTop: pj.simTop || null, device: pj.device || null, board: pj.board || null, constraints: pj.constraints || null, synthTool: pj.synthTool || null, files, otherFiles: all.filter(f => !files.some(x => x.path === f) && f !== 'silinx.json') };
       return { text: [`${name}: top ${data.top || '(none)'}, test bench ${data.simTop || '(none)'}, ${data.board || 'no board'} (${data.device ? `${data.device.part}${data.device.package}${data.device.speed}` : 'no device'}), constraints ${data.constraints || '(none)'}`,
         ...files.map(f => `  ${f.path} (${f.lang}, ${f.role})`), ...(data.otherFiles.length ? [`  other files: ${data.otherFiles.join(', ')}`] : [])].join('\n'), data,

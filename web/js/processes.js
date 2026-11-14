@@ -23,6 +23,7 @@ import { cProcesses, failedCDiags, isC } from './c-source.js';
 import { openCModel } from './c-model.js';
 import { EXTRA_STEPS, FLOW_PROCS, IMPL_IDS, buildProcesses, simModelsOf, toolOf } from './tool-descriptors.js';
 import { checkLabel, designOnly } from './design-only.js';
+import { naturalCompare } from '/core/natural-order.js';
 
 export { EXTRA_STEPS, IMPL_IDS } from './tool-descriptors.js';
 
@@ -161,7 +162,7 @@ function noTopNote() {
 }
 /** Set Top Module…: the top chosen among the design's modules, the hierarchy's roots first (#1224). */
 async function chooseTop() {
-  const byName = (a, b) => a.localeCompare(b);
+  const byName = naturalCompare;   // (#3819)
   const roots = viewRoots(false).sort(byName);   // (in their names' order, not the files')
   const names = [...new Set([...roots, ...S.modules.filter(m => m.kind !== 'package' && m.role !== 'sim').map(m => m.name).sort(byName)])];
   if (!names.length) return logInfo('The project has no module that can be the top yet');

@@ -22,6 +22,7 @@ import { cBadge, cBadges, cSequential, isC } from './c-source.js';
 import { translationBadge } from './translation.js';
 import { gitMark, gitMenuItems, gitStartItems, hasGit } from './git.js';
 import { checkLabel, designOnly, shownFiles, withoutHdlBadges } from './design-only.js';
+import { firstThenNatural, naturalCompare } from '/core/natural-order.js';
 
 const $ = id => document.getElementById(id);
 // the Tasks interface (#799): one tree, no views: the design (as the Implementation view shows it); the test
@@ -54,7 +55,7 @@ export function renderHierarchy() {
   const roots = viewRoots(sim);
   const topName = !sim ? pj.top : null;   // the Simulation view has no top: Simulate runs the selected module
   const isTopName = n => !!topName && String(n).toLowerCase() === String(topName).toLowerCase();
-  roots.sort((a, b) => (isTopName(a) ? -1 : isTopName(b) ? 1 : a.localeCompare(b)));
+  roots.sort(firstThenNatural(topName));   // (the numbers in the names by their value, #3819)
   const addModule = (parentUl, modName, instName, depth, path) => {
     const info = moduleInfo(modName);
     const isTop = !instName && isTopName(modName);   // (the root's row only: the top's instances are plain rows, #2877)
@@ -405,7 +406,7 @@ async function deleteFile(file) {
 export async function addFromFolderDialog() {
   if (!S.project) return;
   const listed = new Set(S.fileTree);
-  const free = shownFiles((S.diskTree || []).filter(f => !listed.has(f))).sort((a, b) => a.localeCompare(b));   // (no HDL in a design project, #3780)
+  const free = shownFiles((S.diskTree || []).filter(f => !listed.has(f))).sort(naturalCompare);   // (no HDL in a design project, #3780)
   if (!free.length) return alertDlg('Add to Project', 'Every file of the project folder is in the project.');
   const boxes = free.map(f => h('input', { type: 'checkbox', value: f }));
   const r = await dialog({
