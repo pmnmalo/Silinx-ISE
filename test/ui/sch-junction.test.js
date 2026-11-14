@@ -1,6 +1,6 @@
 // UI (#3806): a schematic's junction dots: a wire selected, the dots on it highlighted with it (not the others); a dot
 // dragged by the mouse, the wires ending on it following, square, the connections and the generated HDL the same, no
-// warnings; the arrows move a selected dot; one Undo each; a finger and a pen drag one too (Chrome).
+// warnings; the arrows move a selected dot; one Undo each; Delete with a dot selected alone: no Undo step; a finger and a pen drag one too (Chrome).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, chromeOnly } from './harness.js';
@@ -56,6 +56,17 @@ uiTest('#3806 schematic: a selected wire\'s junction dots highlighted; a dot dra
   assert.deepEqual(await dots(), ['200,200', '500,200 sel']);
   await page.key('Escape');
   await page.waitFor((ed) => !document.querySelector(`${ed} svg .jdot.sel`), [ED], { what: 'nothing selected' });
+
+  // a dot selected alone, Delete: nothing deleted, no Undo step (#3806)
+  const doc0 = JSON.stringify(await page.eval(() => window.Silinx.active.schEditor.getDoc()));
+  assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), false);
+  await page.click(await at(500, 200));
+  await page.waitFor((ed) => document.querySelector(`${ed} svg .jdot[data-id="500,200"].sel`), [ED], { what: 'the dot selected' });
+  await page.key('Delete');
+  await page.waitFor((ed) => !document.querySelector(`${ed} svg .jdot.sel`), [ED], { what: 'Delete taken: the selection cleared' });
+  assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), false, 'no Undo step');
+  assert.equal(JSON.stringify(await page.eval(() => window.Silinx.active.schEditor.getDoc())), doc0, 'nothing deleted');
+  await page.key('Escape');
 
   // the dot dragged by the mouse to (250, 220): its three wires follow, square
   await page.drag(await at(200, 200), await at(250, 220));
