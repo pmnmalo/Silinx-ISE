@@ -1,0 +1,1130 @@
+{
+ "issue": 3760,
+ "vivado": "2025.2",
+ "image": "xilinx/vitis-hls:2025.2",
+ "parts": {
+  "basys3": "xc7a35tcpg236-1",
+  "nexys-a7": "xc7a100tcsg324-1"
+ },
+ "units": {
+  "fmax": "MHz"
+ },
+ "boards": {
+  "basys3": {
+   "gates": {
+    "silinx": {
+     "luts": 1,
+     "feedthroughs": 0,
+     "lutSites": 1,
+     "regs": 0,
+     "slices": 1,
+     "carry4": 0,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": null,
+     "met": null,
+     "warnings": [],
+     "bit": 2192102
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 1,
+     "regs": 0,
+     "slices": 1,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": null,
+     "met": null,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 186463
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 1,
+     "regs": 0,
+     "slices": 1,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": null,
+     "met": null,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Place 46-29] Timing had been disabled during Placer and, therefore, physical synthesis in Placer will be skipped."
+     ],
+     "bit": 186463
+    }
+   },
+   "traffic": {
+    "silinx": {
+     "luts": 84,
+     "feedthroughs": 20,
+     "lutSites": 104,
+     "regs": 60,
+     "slices": 41,
+     "carry4": 14,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 217.53,
+     "met": true,
+     "warnings": [],
+     "bit": 2192100
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 75,
+     "regs": 60,
+     "slices": 28,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 174.186,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Synth 8-3917] design top has port led[2] driven by constant 0",
+      "WARNING: [Synth 8-3917] design top has port led[3] driven by constant 0",
+      "WARNING: [Synth 8-3917] design top has port led[4] driven by constant 0"
+     ],
+     "bit": 289193
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 85,
+     "regs": 60,
+     "slices": 35,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 186.916,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 297709
+    }
+   },
+   "blinky": {
+    "silinx": {
+     "luts": 106,
+     "feedthroughs": 94,
+     "lutSites": 200,
+     "regs": 134,
+     "slices": 78,
+     "carry4": 37,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 255.75,
+     "met": true,
+     "warnings": [],
+     "bit": 2192100
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 99,
+     "regs": 134,
+     "slices": 55,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 220.313,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 303029
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 95,
+     "regs": 134,
+     "slices": 67,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 194.024,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 299773
+    }
+   },
+   "pong": {
+    "silinx": {
+     "luts": 275,
+     "feedthroughs": 152,
+     "lutSites": 427,
+     "regs": 215,
+     "slices": 150,
+     "carry4": 64,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 155.33,
+     "met": true,
+     "warnings": [],
+     "bit": 2192101
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 198,
+     "regs": 215,
+     "slices": 109,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 143.021,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Synth 8-3917] design pong has port dp driven by constant 1"
+     ],
+     "bit": 327322
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 245,
+     "regs": 215,
+     "slices": 131,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 131.839,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 339922
+    }
+   },
+   "stopwatch": {
+    "silinx": {
+     "luts": 182,
+     "feedthroughs": 154,
+     "lutSites": 336,
+     "regs": 207,
+     "slices": 130,
+     "carry4": 54,
+     "bram": 1,
+     "dsp": 3,
+     "fmaxMHz": 230.31,
+     "met": true,
+     "warnings": [],
+     "bit": 2192106
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 143,
+     "regs": 195,
+     "slices": 90,
+     "bram": 0.5,
+     "dsp": 3,
+     "fmaxMHz": 123.778,
+     "met": true,
+     "drc": [
+      [
+       "DPIP-1",
+       "Warning",
+       3
+      ],
+      [
+       "DPOP-2",
+       "Warning",
+       3
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 349091
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 162,
+     "regs": 207,
+     "slices": 107,
+     "bram": 0.5,
+     "dsp": 3,
+     "fmaxMHz": 107.193,
+     "met": true,
+     "drc": [
+      [
+       "DPIP-1",
+       "Warning",
+       3
+      ],
+      [
+       "DPOP-1",
+       "Warning",
+       18
+      ],
+      [
+       "DPOP-2",
+       "Warning",
+       18
+      ],
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ],
+      [
+       "AVAL-4",
+       "Advisory",
+       3
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 368119
+    }
+   },
+   "clock": {
+    "silinx": {
+     "luts": 158,
+     "feedthroughs": 140,
+     "lutSites": 298,
+     "regs": 164,
+     "slices": 115,
+     "carry4": 59,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 232.23,
+     "met": true,
+     "warnings": [],
+     "bit": 2192110
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 118,
+     "regs": 164,
+     "slices": 75,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 199.005,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 304631
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 128,
+     "regs": 164,
+     "slices": 99,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 160.385,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 331531
+    }
+   },
+   "vga": {
+    "silinx": {
+     "luts": 126,
+     "feedthroughs": 50,
+     "lutSites": 176,
+     "regs": 58,
+     "slices": 69,
+     "carry4": 34,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 238.95,
+     "met": true,
+     "warnings": [],
+     "bit": 2192100
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 134,
+     "regs": 63,
+     "slices": 49,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 162.84,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 239785
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 110,
+     "regs": 58,
+     "slices": 56,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 156.814,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 277021
+    }
+   },
+   "isqrt": {
+    "silinx": {
+     "luts": 74,
+     "feedthroughs": 40,
+     "lutSites": 114,
+     "regs": 87,
+     "slices": 51,
+     "carry4": 17,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 295.77,
+     "met": true,
+     "warnings": [],
+     "bit": 2192106
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 57,
+     "regs": 88,
+     "slices": 33,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 269.469,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 288375
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 66,
+     "regs": 87,
+     "slices": 53,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 203.335,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 298235
+    }
+   },
+   "uart": {
+    "silinx": {
+     "luts": 123,
+     "feedthroughs": 53,
+     "lutSites": 176,
+     "regs": 142,
+     "slices": 77,
+     "carry4": 24,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 266.81,
+     "met": true,
+     "warnings": [],
+     "bit": 2192101
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 135,
+     "regs": 150,
+     "slices": 66,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 221.976,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 335282
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 116,
+     "regs": 142,
+     "slices": 59,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 194.553,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 323398
+    }
+   },
+   "micro80": {
+    "silinx": {
+     "luts": 179,
+     "feedthroughs": 73,
+     "lutSites": 252,
+     "regs": 187,
+     "slices": 112,
+     "carry4": 22,
+     "bram": 2,
+     "dsp": 0,
+     "fmaxMHz": 149.9,
+     "met": true,
+     "warnings": [],
+     "bit": 2192108
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 307,
+     "regs": 216,
+     "slices": 118,
+     "bram": 0.5,
+     "dsp": 0,
+     "fmaxMHz": 135.888,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Synth 8-3936] Found unconnected internal register 'IR_reg' and it is trimmed from '8' to '6' bits. [/work/src/src/light8080.vhdl:297]",
+      "WARNING: [Synth 8-3936] Found unconnected internal register 'daa_res9_reg' and it is trimmed from '9' to '8' bits. [/work/src/src/light8080.vhdl:746]"
+     ],
+     "bit": 352645
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 154,
+     "regs": 187,
+     "slices": 75,
+     "bram": 1,
+     "dsp": 0,
+     "fmaxMHz": 128.833,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 379721
+    }
+   }
+  },
+  "nexys-a7": {
+   "gates": {
+    "silinx": {
+     "luts": 1,
+     "feedthroughs": 0,
+     "lutSites": 1,
+     "regs": 0,
+     "slices": 1,
+     "carry4": 0,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": null,
+     "met": null,
+     "warnings": [],
+     "bit": 3825879
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 1,
+     "regs": 0,
+     "slices": 1,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": null,
+     "met": null,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 309256
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 1,
+     "regs": 0,
+     "slices": 1,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": null,
+     "met": null,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Place 46-29] Timing had been disabled during Placer and, therefore, physical synthesis in Placer will be skipped."
+     ],
+     "bit": 311296
+    }
+   },
+   "traffic": {
+    "silinx": {
+     "luts": 86,
+     "feedthroughs": 23,
+     "lutSites": 109,
+     "regs": 60,
+     "slices": 44,
+     "carry4": 14,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 220.8,
+     "met": true,
+     "warnings": [],
+     "bit": 3825877
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 75,
+     "regs": 60,
+     "slices": 29,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 194.515,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Synth 8-3917] design top has port led[2] driven by constant 0",
+      "WARNING: [Synth 8-3917] design top has port led[3] driven by constant 0",
+      "WARNING: [Synth 8-3917] design top has port led[4] driven by constant 0"
+     ],
+     "bit": 390954
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 85,
+     "regs": 60,
+     "slices": 37,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 169.549,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 369122
+    }
+   },
+   "blinky": {
+    "silinx": {
+     "luts": 103,
+     "feedthroughs": 93,
+     "lutSites": 196,
+     "regs": 134,
+     "slices": 78,
+     "carry4": 37,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 275.41,
+     "met": true,
+     "warnings": [],
+     "bit": 3825877
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 99,
+     "regs": 134,
+     "slices": 52,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 231.696,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 404082
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 95,
+     "regs": 134,
+     "slices": 62,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 185.048,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 446794
+    }
+   },
+   "pong": {
+    "silinx": {
+     "luts": 275,
+     "feedthroughs": 141,
+     "lutSites": 416,
+     "regs": 215,
+     "slices": 139,
+     "carry4": 64,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 161.81,
+     "met": true,
+     "warnings": [],
+     "bit": 3825878
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 198,
+     "regs": 215,
+     "slices": 101,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 153.233,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Synth 8-3917] design pong has port dp driven by constant 1"
+     ],
+     "bit": 402891
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 245,
+     "regs": 215,
+     "slices": 122,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 127.405,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 435879
+    }
+   },
+   "stopwatch": {
+    "silinx": {
+     "luts": 189,
+     "feedthroughs": 140,
+     "lutSites": 329,
+     "regs": 207,
+     "slices": 128,
+     "carry4": 54,
+     "bram": 1,
+     "dsp": 3,
+     "fmaxMHz": 209.38,
+     "met": true,
+     "warnings": [],
+     "bit": 3825883
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 143,
+     "regs": 195,
+     "slices": 82,
+     "bram": 0.5,
+     "dsp": 3,
+     "fmaxMHz": 120.963,
+     "met": true,
+     "drc": [
+      [
+       "DPIP-1",
+       "Warning",
+       3
+      ],
+      [
+       "DPOP-2",
+       "Warning",
+       3
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 452364
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 161,
+     "regs": 207,
+     "slices": 107,
+     "bram": 0.5,
+     "dsp": 3,
+     "fmaxMHz": 109.194,
+     "met": true,
+     "drc": [
+      [
+       "DPIP-1",
+       "Warning",
+       3
+      ],
+      [
+       "DPOP-1",
+       "Warning",
+       18
+      ],
+      [
+       "DPOP-2",
+       "Warning",
+       18
+      ],
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ],
+      [
+       "AVAL-4",
+       "Advisory",
+       3
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 460396
+    }
+   },
+   "clock": {
+    "silinx": {
+     "luts": 165,
+     "feedthroughs": 127,
+     "lutSites": 292,
+     "regs": 164,
+     "slices": 111,
+     "carry4": 59,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 244.74,
+     "met": true,
+     "warnings": [],
+     "bit": 3825887
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 117,
+     "regs": 164,
+     "slices": 71,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 205.804,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 390456
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 129,
+     "regs": 164,
+     "slices": 95,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 157.53,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 416564
+    }
+   },
+   "vga": {
+    "silinx": {
+     "luts": 127,
+     "feedthroughs": 49,
+     "lutSites": 176,
+     "regs": 58,
+     "slices": 64,
+     "carry4": 34,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 268.82,
+     "met": true,
+     "warnings": [],
+     "bit": 3825877
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 134,
+     "regs": 63,
+     "slices": 43,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 170.271,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 446942
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 110,
+     "regs": 58,
+     "slices": 57,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 154.919,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 429578
+    }
+   },
+   "isqrt": {
+    "silinx": {
+     "luts": 73,
+     "feedthroughs": 38,
+     "lutSites": 111,
+     "regs": 87,
+     "slices": 57,
+     "carry4": 17,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 297.27,
+     "met": true,
+     "warnings": [],
+     "bit": 3825883
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 56,
+     "regs": 88,
+     "slices": 32,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 218.293,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 384880
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 67,
+     "regs": 87,
+     "slices": 38,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 223.314,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 395816
+    }
+   },
+   "uart": {
+    "silinx": {
+     "luts": 122,
+     "feedthroughs": 52,
+     "lutSites": 174,
+     "regs": 142,
+     "slices": 68,
+     "carry4": 24,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 254.32,
+     "met": true,
+     "warnings": [],
+     "bit": 3825878
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 135,
+     "regs": 150,
+     "slices": 58,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 199.164,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 482943
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 117,
+     "regs": 142,
+     "slices": 57,
+     "bram": 0,
+     "dsp": 0,
+     "fmaxMHz": 193.986,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 424911
+    }
+   },
+   "micro80": {
+    "silinx": {
+     "luts": 173,
+     "feedthroughs": 64,
+     "lutSites": 237,
+     "regs": 187,
+     "slices": 104,
+     "carry4": 22,
+     "bram": 2,
+     "dsp": 0,
+     "fmaxMHz": 166.56,
+     "met": true,
+     "warnings": [],
+     "bit": 3825885
+    },
+    "vivado": {
+     "ok": true,
+     "routed": true,
+     "luts": 307,
+     "regs": 216,
+     "slices": 112,
+     "bram": 0.5,
+     "dsp": 0,
+     "fmaxMHz": 132.89,
+     "met": true,
+     "drc": [],
+     "drcErrors": 0,
+     "warnings": [
+      "WARNING: [Synth 8-3936] Found unconnected internal register 'IR_reg' and it is trimmed from '8' to '6' bits. [/work/src/src/light8080.vhdl:297]",
+      "WARNING: [Synth 8-3936] Found unconnected internal register 'daa_res9_reg' and it is trimmed from '9' to '8' bits. [/work/src/src/light8080.vhdl:746]"
+     ],
+     "bit": 455270
+    },
+    "netlist": {
+     "ok": true,
+     "routed": true,
+     "luts": 154,
+     "regs": 187,
+     "slices": 77,
+     "bram": 1,
+     "dsp": 0,
+     "fmaxMHz": 122.865,
+     "met": true,
+     "drc": [
+      [
+       "RTSTAT-10",
+       "Warning",
+       1
+      ]
+     ],
+     "drcErrors": 0,
+     "warnings": [],
+     "bit": 477918
+    }
+   }
+  }
+ }
+}
