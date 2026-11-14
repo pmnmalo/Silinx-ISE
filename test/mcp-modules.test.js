@@ -59,7 +59,7 @@ test('the tools: those of the areas, the ones of before the split in their order
   assert.deepEqual(names(VIEW_TOOLS), ['related_view']);
   assert.deepEqual(names(TABLE_TOOLS), ['set_output_logic']);
   assert.deepEqual(names(CHECK_TOOLS), ['check_drawing']);
-  assert.deepEqual(names(FSM_TOOLS), ['set_fsm_outputs']);   // (a state's or a transition's outputs, #3814)
+  assert.deepEqual(names(FSM_TOOLS), ['set_fsm_outputs', 'set_fsm_look']);   // (a state's or a transition's outputs, #3814; its look, #3883)
   assert.deepEqual(names(SCHEMATIC_TOOLS), ['rearrange_wires', 'rearrange_schematic', 'move_junction']);
   assert.deepEqual(names(SYMBOL_TOOLS), ['read_symbol', 'edit_symbol', 'update_symbols', 'place_instance']);   // (a module's symbol, #3755)
   assert.deepEqual(names(SIMULATE_DRAWING_TOOLS), ['simulate_drawing']);

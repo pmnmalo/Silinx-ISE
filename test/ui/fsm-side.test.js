@@ -208,7 +208,8 @@ uiTest('#3882 FSM side panel: no Delete button for a state or a transition; a st
     r.trans = buttons();
     return r;
   });
-  assert.deepEqual(out.state, []);
+  // (the look's, #3883: a colour's ✕ back to the theme's, Default look)
+  assert.deepEqual(out.state, ['✕', '✕', '✕', 'Default look']);
   assert.deepEqual(out.list, [['x → S2 /', 'y=1', 'z=0'], ['!x → S0']]);
-  assert.deepEqual(out.trans, ['▲ Earlier', '▼ Later', 'Straighten']);
+  assert.deepEqual(out.trans, ['▲ Earlier', '▼ Later', 'Straighten', '✕', '✕', 'Default look']);
 });

@@ -66,6 +66,13 @@ export const FSM_PT = {
   'The chart cannot be simulated: correct its errors first': 'O fluxograma não pode ser simulado: corrija primeiro os seus erros',
   'Apply one rising clock edge: the machine takes the transition shown in color': 'Aplicar um flanco ascendente do relógio: a máquina toma a transição mostrada a cor',
   'Cycle': 'Ciclo',
+  // a state's or a transition's look (#3883, fsm-look.js)
+  'Look': 'Aspeto', 'Fill colour': 'Cor de preenchimento', 'Border colour': 'Cor do contorno', 'Border width': 'Largura do contorno',
+  'Text colour': 'Cor do texto', 'Line colour': 'Cor da linha', 'Line width': 'Largura da linha', 'Line style': 'Estilo da linha',
+  'Text style': 'Estilo do texto', 'Font': 'Tipo de letra', 'Default (name bold)': 'Predefinido (nome a negrito)', 'Regular': 'Normal',
+  'Bold': 'Negrito', 'Italic': 'Itálico', 'Bold italic': 'Negrito itálico', 'Sans-serif': 'Sem serifa', 'Serif': 'Com serifa',
+  'Monospace': 'Monoespaçado', 'Solid': 'Contínua', 'Dashed': 'Tracejada', 'Dotted': 'Pontilhada', 'Default look': 'Aspeto predefinido',
+  'Back to the colour of the theme': 'Voltar à cor do tema', 'Draw it with the default look, in the colours of the theme': 'Desenhá-lo com o aspeto predefinido, nas cores do tema',
 };
 
 // Plain-language messages of the validation (core/fsm.js) and other texts with names in them
@@ -73,8 +80,20 @@ const WHAT = { 'The module name': 'O nome do módulo', 'The clock': 'O relógio'
 const WHAT_RE = '(The module name|The clock|The reset|Input|Output|State)';
 const where = (w) => w.replace(/^State /, 'Estado ').replace(/^Transition /, 'Transição ');
 const langs = (l) => l.replace(' and ', ' e ');
+// (a look's values, #3883: core/fsm-style.js; with the state or the transition first, Check's, or alone, Properties')
+const LOOK = { 'the fill colour': 'a cor de preenchimento', 'the border colour': 'a cor do contorno', 'the border width': 'a largura do contorno',
+  'the text colour': 'a cor do texto', 'the text size': 'o tamanho do texto', 'the text style': 'o estilo do texto', 'the font': 'o tipo de letra',
+  'the line colour': 'a cor da linha', 'the line width': 'a largura da linha', 'the line style': 'o estilo da linha' };
+const LOOK_RE = `(?:(State .+|Transition .+ → .+): )?(${Object.keys(LOOK).join('|')}) (.+?)`;
+const at = (w) => (w ? `${where(w)}: ` : '');
 
 export const FSM_PT_PATTERNS = [
+  [new RegExp(`^${LOOK_RE} is not a colour: #rrggbb \\(e\\.g\\. (#\\w+)\\)$`), (m, w, n, v, e) => `${at(w)}${LOOK[n]} ${v} não é uma cor: #rrggbb (p.ex. ${e})`],
+  [new RegExp(`^${LOOK_RE} must be a whole number from (\\S+) to (\\S+)$`), (m, w, n, v, a, b) => `${at(w)}${LOOK[n]} ${v} tem de ser um número inteiro de ${a} a ${b}`],
+  [new RegExp(`^${LOOK_RE} must be a number from (\\S+) to (\\S+)$`), (m, w, n, v, a, b) => `${at(w)}${LOOK[n]} ${v} tem de ser um número de ${a} a ${b}`],
+  [new RegExp(`^${LOOK_RE} must be one of (.+)$`), (m, w, n, v, l) => `${at(w)}${LOOK[n]} ${v} tem de ser um de ${l}`],
+  [/^(?:(State .+|Transition .+ → .+): )?'(.*)' is not a property of a (state|transition)'s look \((.*)\)$/, (m, w, k, o, l) => `${at(w)}'${k}' não é uma propriedade do aspeto de ${o === 'state' ? 'um estado' : 'uma transição'} (${l})`],
+  [/^(?:(State .+|Transition .+ → .+): )?its look must be an object \{ (.*) \}$/, (m, w, l) => `${at(w)}o seu aspeto tem de ser um objeto { ${l} }`],
   [new RegExp(`^${WHAT_RE} has no name$`), (m, w) => `${WHAT[w]} não tem nome`],
   [new RegExp(`^${WHAT_RE} '(.*)' is not a valid name: use a letter, then letters, digits and single _ \\(not at the end\\)$`), (m, w, n) => `${WHAT[w]} '${n}' não é um nome válido: use uma letra, seguida de letras, dígitos e _ simples (não no fim)`],
   [new RegExp(`^${WHAT_RE} '(.*)' is a reserved word in (.+)$`), (m, w, n, l) => `${WHAT[w]} '${n}' é uma palavra reservada em ${langs(l)}`],

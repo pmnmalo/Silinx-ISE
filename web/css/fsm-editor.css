@@ -11,30 +11,30 @@
 .fsm-editor .fsm-link .gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
 .fsm-editor .fsm-link .gen-banner a { color: #0645ad; cursor: pointer; text-decoration: underline; }
 
-/* canvas */
+/* canvas (a state's or a transition's look, #3883: the variables its group sets, fsm-render.js; not set, the default look) */
 .fsm-editor .fsm-canvas.rim { cursor: crosshair; }
 .fsm-editor .fsm-state { cursor: move; }
 .fsm-editor .fsm-rim { fill: transparent; stroke: transparent; stroke-width: 8; cursor: crosshair; }
 .fsm-editor .fsm-state:hover .fsm-rim { stroke: color-mix(in srgb, var(--asm-accent) 28%, transparent); }
-.fsm-editor .fsm-circle { fill: var(--fsm-state-fill); stroke: var(--asm-fg); stroke-width: 1.6; }
-.fsm-editor .fsm-circle-in { fill: none; stroke: var(--asm-fg); stroke-width: 1.3; pointer-events: none; }
+.fsm-editor .fsm-circle { fill: var(--fsm-fill, var(--fsm-state-fill)); stroke: var(--fsm-stroke, var(--asm-fg)); stroke-width: var(--fsm-sw, 1.6); }
+.fsm-editor .fsm-circle-in { fill: none; stroke: var(--fsm-stroke, var(--asm-fg)); stroke-width: 1.3; pointer-events: none; }
 .fsm-editor .fsm-entry { fill: none; stroke: var(--asm-fg); stroke-width: 1.6; pointer-events: none; }
 .fsm-editor .fsm-name { fill: var(--asm-fg); font: 700 13px system-ui, -apple-system, "Segoe UI", sans-serif; pointer-events: none; }
 .fsm-editor .fsm-outs { fill: var(--asm-fg); font: 12px var(--asm-mono); pointer-events: none; }
 .fsm-editor .fsm-divider { stroke: color-mix(in srgb, var(--asm-fg) 55%, transparent); stroke-width: 1; pointer-events: none; }
 .fsm-editor .fsm-code { fill: var(--asm-muted); font: 11px var(--asm-mono); pointer-events: none; }
 .fsm-editor .fsm-state:hover .fsm-circle { stroke: var(--asm-accent); }
-.fsm-editor .fsm-state.sel .fsm-circle { stroke: var(--asm-accent); stroke-width: 2.6; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--asm-accent) 60%, transparent)); }
+.fsm-editor .fsm-state.sel .fsm-circle { stroke: var(--asm-accent); stroke-width: max(2.6px, calc(var(--fsm-sw, 1.6) * 1px)); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--asm-accent) 60%, transparent)); }
 .fsm-editor .fsm-state.warn .fsm-circle { stroke: var(--asm-warn); stroke-dasharray: 6 3; }
 .fsm-editor .fsm-state.err .fsm-circle { stroke: var(--asm-danger); stroke-dasharray: 6 3; stroke-width: 2; }
 .fsm-editor .fsm-state.drop .fsm-circle { stroke: var(--asm-ok); stroke-width: 3; stroke-dasharray: none; }
 .fsm-editor .fsm-state.current .fsm-circle { fill: color-mix(in srgb, var(--asm-panel) 45%, var(--fsm-hot) 55%); stroke: var(--fsm-hot); stroke-width: 3; }
 
 .fsm-editor .fsm-edge { cursor: pointer; }
-.fsm-editor .fsm-hit { fill: none; stroke: transparent; stroke-width: 12; }
-.fsm-editor .fsm-edge-line { fill: none; stroke: color-mix(in srgb, var(--asm-fg) 85%, transparent); stroke-width: 1.6; }
+.fsm-editor .fsm-hit { fill: none; stroke: transparent; stroke-width: max(12px, calc(var(--fsm-ew, 1.6) * 1px + 6px)); }
+.fsm-editor .fsm-edge-line { fill: none; stroke: var(--fsm-edge, color-mix(in srgb, var(--asm-fg) 85%, transparent)); stroke-width: var(--fsm-ew, 1.6); stroke-dasharray: var(--fsm-dash, none); stroke-linecap: var(--fsm-cap, butt); }
 .fsm-editor .fsm-edge:hover .fsm-edge-line { stroke: var(--asm-accent); }
-.fsm-editor .fsm-edge.sel .fsm-edge-line { stroke: var(--asm-accent); stroke-width: 2.6; }
+.fsm-editor .fsm-edge.sel .fsm-edge-line { stroke: var(--asm-accent); stroke-width: max(2.6px, calc(var(--fsm-ew, 1.6) * 1px)); }
 .fsm-editor .fsm-edge.warn .fsm-edge-line { stroke: var(--asm-warn); stroke-dasharray: 6 3; }
 .fsm-editor .fsm-edge.err .fsm-edge-line { stroke: var(--asm-danger); stroke-dasharray: 6 3; }
 .fsm-editor .fsm-edge.hot .fsm-edge-line { stroke: var(--fsm-hot); stroke-width: 3; stroke-dasharray: 8 4; }
@@ -93,3 +93,10 @@
 /* a state's or a transition's outputs (#3814): the machine's outputs, name and width read, a value refused marked */
 .fsm-editor .fsm-outvals td.n { word-break: break-all; }
 .fsm-editor .fsm-outvals .asm-input.bad { border-color: var(--asm-danger); background: var(--field-bad-bg); }
+
+/* a state's or a transition's look in Properties (#3883, fsm-look.js) */
+.fsm-editor .asm-section h3.fsm-look-title { margin-top: 12px; }
+.fsm-editor .fsm-colour-row { display: flex; align-items: center; gap: 4px; }
+.fsm-editor .fsm-colour { width: 44px; height: 22px; padding: 0 2px; border: 1px solid var(--asm-border); border-radius: 3px; background: var(--asm-bg); cursor: pointer; }
+.fsm-editor .fsm-colour-reset[hidden] { display: none; }
+.fsm-editor .fsm-look-num { width: 100%; box-sizing: border-box; }
