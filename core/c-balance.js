@@ -11,14 +11,19 @@
 //                                          sum's node -> its term added last
 //   balances(fn)                     whether a top function's sums are balanced: not under its EXPRESSION_BALANCE off
 
+import { bottomUp } from './c-graph.js';
+
 const LATE = 1e6;
 /** The most additions on a path from the node down. */
 function depthOf(g, id, memo) {
-  if (memo.has(id)) return memo.get(id);
-  const n = g.get(id);
-  const d = n.args.length ? (n.op === 'add' ? 1 : 0) + Math.max(...n.args.map((a) => depthOf(g, a, memo))) : 0;
-  memo.set(id, d);
-  return d;
+  const f = (id) => {
+    if (memo.has(id)) return memo.get(id);
+    const n = g.get(id);
+    const d = n.args.length ? (n.op === 'add' ? 1 : 0) + Math.max(...n.args.map(f)) : 0;
+    memo.set(id, d);
+    return d;
+  };
+  return bottomUp([id], (id) => g.get(id).args, f, (id) => memo.has(id))[0];
 }
 
 /** The additions the roots need: each chain of `min` terms or more of one width (and sign) a tree, in place. */
@@ -37,12 +42,21 @@ export function balanceSums(g, all, min = 4, late = null) {
     if (top.op !== 'add' || inner(top)) continue;
     const terms = [];
     // (the chain's terms in their order, and its depth in additions)
-    const collect = (id, first) => {
-      const n = g.get(id);
-      if (!first && !(inner(n) && same(n, top))) { terms.push(id); return 0; }
-      return 1 + Math.max(...n.args.map((a) => collect(a, false)));
-    };
-    const depth = collect(top.id, true);
+    // (a stack of its own, not one call per addition: a chain of thousands, #3595)
+    let depth = 0;
+    const stack = [{ n: top, k: 0, d: 0 }];
+    while (stack.length) {
+      const at = stack[stack.length - 1];
+      if (at.k < at.n.args.length) {
+        const id = at.n.args[at.k++], n = g.get(id);
+        if (inner(n) && same(n, top)) stack.push({ n, k: 0, d: 0 });
+        else terms.push(id);
+      } else {
+        stack.pop();
+        if (stack.length) stack[stack.length - 1].d = Math.max(stack[stack.length - 1].d, at.d + 1);
+        else depth = at.d + 1;
+      }
+    }
     if (terms.length < min || depth <= Math.ceil(Math.log2(terms.length))) continue;
     // (the two shallowest added first, then their sum with the next: a term that is itself a sum added late)
     const t = { w: top.w, s: top.s };

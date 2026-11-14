@@ -136,14 +136,32 @@ export class Graph {
   }
   /** The nodes the outputs need, in an order where each comes after its operands. */
   needed(roots) {
-    const seen = new Set(), out = [];
-    const visit = (id) => {
-      if (seen.has(id)) return;
-      seen.add(id);
-      for (const a of this.nodes[id].args) visit(a);
-      out.push(this.nodes[id]);
-    };
-    for (const r of roots) visit(r);
-    return out;
+    return postorder(roots, (id) => this.nodes[id].args).map((id) => this.nodes[id]);
   }
+}
+
+/** The ids reached from roots through argsOf, each after the ones it reaches, in the order of a depth-first visit
+ *  (args in order); a stack of its own, not one call per node: a long chain of updates of one variable, #3595. */
+export function postorder(roots, argsOf, seen = new Set()) {
+  const out = [];
+  for (const r of roots) {
+    if (seen.has(r)) continue;
+    seen.add(r);
+    const stack = [[r, argsOf(r), 0]];
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      if (top[2] < top[1].length) {
+        const a = top[1][top[2]++];
+        if (!seen.has(a)) { seen.add(a); stack.push([a, argsOf(a), 0]); }
+      } else { stack.pop(); out.push(top[0]); }
+    }
+  }
+  return out;
+}
+/** f, a pass that calls itself on a node's args (memoized), called on every id below the roots from the leaves up
+ *  first: its calls on args then found in its memo, not one call deeper per node of a chain (#3595); the same calls,
+ *  in the same order, as f on the roots alone (the nodes it adds too). skip: the ids f has done already. */
+export function bottomUp(roots, argsOf, f, skip = () => false) {
+  for (const id of postorder(roots, (id) => skip(id) ? [] : argsOf(id))) if (!skip(id)) f(id);
+  return roots.map(f);
 }
