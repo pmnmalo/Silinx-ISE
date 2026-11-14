@@ -144,6 +144,11 @@ export function xc7TimingText(timing, part) {
   return out.join('\n');
 }
 
+/** nextpnr's arguments for Place & Route (its files: chipdb.bin, netlist.json, design.xdc when xdc; out: routed.fasm,
+ *  report.json), as the flow runs it and as scripts/xc7-timing-vivado.mjs runs it again for nextpnr's placement (#3803). */
+export const xc7ParArgs = ({ part, router, seed, xdc }) => ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'netlist.json', '-o', 'fasm=routed.fasm',
+  '--report', 'report.json', '--router', router, '--seed', String(seed || 1), '--timing-allow-fail', ...(xdc ? ['-o', 'xdc=design.xdc'] : [])];
+
 function mountXc7(ctx) {
   const { io, spec, log, report, top, ms, now, constraints, netlistText, StepError } = ctx;
   const part = spec.part;
@@ -177,8 +182,7 @@ function mountXc7(ctx) {
     const nextpnr = tool();
     const chipdb = await loadChipdb(nextpnr, part, log, StepError);
     const router = nextpnr.router || 'router1';
-    const args = ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'netlist.json', '-o', 'fasm=routed.fasm', '--report', 'report.json',
-      '--router', router, '--seed', String(spec.seed || 1), '--timing-allow-fail', ...(xdc.text ? ['-o', 'xdc=design.xdc'] : [])];
+    const args = xc7ParArgs({ part, router, seed: spec.seed, xdc: !!xdc.text });
     log(`nextpnr-himbaechel (xilinx) places and routes <${top}> on the ${part} (${router}).`);
     const lines = [];
     let out;
