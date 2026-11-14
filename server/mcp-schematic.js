@@ -2,9 +2,12 @@
 // what the schematic editor's menu does (web/js/sch-beautify.js), through the same functions (core/schbeautify.js
 // beautifyWires and selectionWires, core/schbeautify-sheet.js beautifySheet) with the same messages; the schematic
 // written and its HDL file made again, as write_file does.
+// A junction dot moved, as its editor's drag or arrows do (#3806, web/js/sch-junction.js): core/schjunction.js's
+// moveJunction, the same refusal of a short and the same warning.
 import * as P from './projects.js';
 import { toolError, readProject, STR, PROJECT, projectText } from './mcp-util.js';
 
+const POINT = what => ({ type: 'object', properties: { x: { type: 'integer' }, y: { type: 'integer' } }, required: ['x', 'y'], additionalProperties: false, description: what });
 const IDS = what => ({ type: 'array', items: { type: 'string' }, description: what });
 
 // the schematic of the project (normalized as its editor opens it) and the project's modules (its symbols' pins)
@@ -64,6 +67,26 @@ export const SCHEMATIC_TOOLS = [
       const sync = same ? null : await saveSchematic(name, rel, doc);
       return { text: [S.sheetNote(r, same), ...(sync?.messages || [])].join('\n'),
         data: { project: name, path: rel, laidOut: r.sheet && !same, changed: r.changed, ...hdlOf(sync) } };
+    },
+  },
+  {
+    name: 'move_junction', title: 'Move a junction dot of a schematic',
+    description: 'Move a junction dot of a schematic (.sch.json), where three or more wires, pins or I/O markers meet, as its editor\'s drag does: the wires ending on it follow it (their end segment moved across, or a jog added, square, on the grid); a pin or a marker under it stays, joined to it by a wire. The connections the same (a move that would short two named nets refused; one that changes them said). The schematic is written and its HDL file made again.',
+    inputSchema: { type: 'object', properties: {
+      project: PROJECT, path: STR('The schematic: a .sch.json file of the project.'),
+      at: POINT('The junction dot (its sheet coordinates, as read_file shows the wires\' points).'), to: POINT('Where it goes (on the grid: multiples of 10).'),
+    }, required: ['project', 'path', 'at', 'to'], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    async run({ project: name, path: rel, at, to }) {
+      const { doc, modules } = await openSchematic(name, rel);
+      const J = await import('../core/schjunction.js');
+      let r;
+      try { r = J.moveJunction(doc, at, to, { modules }); } catch (e) { throw toolError(e.message); }
+      if (r.short) throw toolError(J.shortText('The move', r.short));
+      const sync = to.x !== at.x || to.y !== at.y ? await saveSchematic(name, rel, r.doc) : null;
+      const text = sync ? `The junction dot at (${at.x}, ${at.y}) moved to (${to.x}, ${to.y})` : `The junction dot at (${at.x}, ${at.y}) is already there`;
+      return { text: [text, ...(r.kept ? [] : [J.CONNECTIONS_CHANGED]), ...(sync?.messages || [])].join('\n'),
+        data: { project: name, path: rel, kept: r.kept, ...hdlOf(sync) } };
     },
   },
 ];

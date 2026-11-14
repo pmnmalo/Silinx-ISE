@@ -35,7 +35,9 @@ const MOUNT = async () => {
     hoverPin: null, lastDiags: null, live: null, modules: {}, view: { s: 1.5 }, destroyed: false, showHops: true, showNames: false };
   // (curved wires, #1144: the editor's, on this state)
   const curve = mountSchCurve({ doc: () => st.doc, sel: () => st.sel, oneWire: () => st.sel.size === 1, view: () => st.view, readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
-  const r = mountRender({ curve, segSel: { current: () => null }, state: () => st, refreshNetlist: () => { st.nl = netlist(st.doc); }, uidE: 7, readOnly: false,
+  // (the junction dots, #3806: the editor's, on this state)
+  const junction = (await import('/js/sch-junction.js')).mountSchJunction({ doc: () => st.doc, sel: () => st.sel });
+  const r = mountRender({ curve, segSel: { current: () => null }, junctionSvg: (nl) => junction.svg(nl), state: () => st, refreshNetlist: () => { st.nl = netlist(st.doc); }, uidE: 7, readOnly: false,
     sheetG: svg.querySelector('.se-sheet'), contentG: svg.querySelector('.se-content'), overlayG: svg.querySelector('.se-overlay'), tb, status,
     routeTo: (a, b) => [{ x: b.x, y: a.y }, b], snapPoint: (p) => ({ x: Math.round(p.x / 10) * 10, y: Math.round(p.y / 10) * 10 }),
     bandRect: () => ({ x: 10, y: 20, w: 30, h: 40 }) });

@@ -12,7 +12,7 @@ import { GRAPHIC_TOOLS, graphicGhost } from './sch-graphics.js';
 /** { renderSheet, render, renderOverlay, updateToolbar, updateStatus } of a schematic editor (state(): its current
  *  document, netlist, selection, tool, … at the time of the call; refreshNetlist() computes the netlist again). */
 export function mountRender(ctx) {
-  const { state, curve, segSel, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, routeTo, snapPoint, bandRect } = ctx;
+  const { state, curve, segSel, junctionSvg, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, routeTo, snapPoint, bandRect } = ctx;
   function renderSheet() {
     const { doc } = state();
     const W = doc.sheet.w, H = doc.sheet.h;
@@ -57,7 +57,7 @@ export function mountRender(ctx) {
       const line = hops?.has(w.id) ? `<path class="wline" d="${hopPath(w, hops.get(w.id))}"/>` : `<polyline class="wline" points="${pts}"/>`;
       parts.push(`<g class="${cls}" data-kind="wire" data-id="${esc(w.id)}"><polyline class="whit" points="${pts}"/>${line}${seg ? `<polyline class="wline segsel" points="${seg.a.x},${seg.a.y} ${seg.b.x},${seg.b.y}"/>` : ''}</g>`);
     }
-    if (nl) for (const j of nl.junctions) parts.push(`<circle class="junction" cx="${j.x}" cy="${j.y}" r="3.2"/>`);
+    parts.push(junctionSvg(nl));   // (the junction dots: highlighted with the selected wires, selectable, #3806)
     // a named bus (connected to an input / output marker or labelled) carries its name on every wire
     // of it, over its longest horizontal run (#173); the wires with a label of their own keep that
     if (nl) {
