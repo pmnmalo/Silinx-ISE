@@ -350,10 +350,10 @@ export const BOARDS = [
     jtagChain: [{ name: 'xc6slx9', role: 'fpga' }],
     flash: { type: 'spi', part: 'W25Q80DV', sizeMbit: 8, xcf: false, verified: false, note: 'Winbond W25Q80DV 8 Mbit SPI flash (U10), single-bit SPI; mode pins fixed to Master SPI (M1=0, M0=1). With iMPACT: set XIL_IMPACT_SKIPIDCODECHECK=1 and select N25Q64 as the SPI PROM (same SPI commands), per the EDGE User Manual v3.1. PROG button SW1 (P37) reloads from flash.' },
     programmer: {
-      preferred: 'impact',
+      preferred: 'openFPGALoader',
       tools: {
         impact: { cable: 'auto', position: 1, onboard: true, verified: false, note: 'On-board USB JTAG through an FT2232H (U14; USB Type-B, micro-USB before 2019; JTAG also on header J3), works with iMPACT and ChipScope Pro per the EDGE User Manual v3.1 (FTDI driver needed). Loads over JTAG are lost at power-off or PROG.' },
-        openFPGALoader: { cable: 'ft2232', position: 0, onboard: true, verified: false, note: 'Untested: the bridge is an FT2232H (U14), so a generic ft2232 cable should work; the FT2232H also carries the USB-UART.' },
+        openFPGALoader: { cable: 'ft2232', position: 0, onboard: true, verified: true, note: 'The on-board FT2232H (U14) with the generic ft2232 cable: detect, SRAM load and SPI flash (with --fpga-part xc6slx9tqg144) checked on a real board; the FT2232H also carries the USB-UART.' },
       },
     },
     source: 'EDGE Spartan 6 Master UCF rev 3.2 (Invent Logics)',
