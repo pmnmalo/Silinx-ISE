@@ -22,6 +22,7 @@ import { linkModel, linkSnapshot } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import { mountSideFold } from './side-fold.js';
 import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
+import { onLayoutToggled } from './layout-fit.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
   normalizeModel, newModel, validate, generate, ENCODINGS,
@@ -368,6 +369,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
   });
 
   // ---------------------------------------------------------------------------- init
+  const offLayout = onLayoutToggled(svg, () => fit());   // (the documents' room changed: Full View, #3804)
   applyView();
   render();
   renderInspector();
@@ -417,6 +419,7 @@ export function mountAsmEditor(container, { model, onChange, onProblems, onValid
       dock.destroy();
       Object.values(timers).forEach(clearTimeout);
       ro?.disconnect();
+      offLayout();
       root.remove();
     },
   };

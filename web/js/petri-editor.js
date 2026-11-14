@@ -34,6 +34,7 @@ import { printDiagram, svgSnapshot } from './print.js';
 import { mountPetriToolbar } from './petri-toolbar.js';
 import { petriReadOnlyChrome, lockPetriSide } from './petri-readonly.js';
 import { mountDockPanel } from './dock-panel.js';
+import { onLayoutToggled } from './layout-fit.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const GRID = 20;
@@ -293,6 +294,7 @@ export function mountPetriEditor(container, opts = {}) {
   const initialFit = () => { if (!fitted && !destroyed) fit(); };
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(initialFit) : null;
   ro?.observe(svg);
+  const offLayout = onLayoutToggled(svg, () => fit());   // (the documents' room changed: Full View, #3804)
   setTool('select');
   render();
   requestAnimationFrame(initialFit);
@@ -321,6 +323,6 @@ export function mountPetriEditor(container, opts = {}) {
     showPanel: (p) => { if (panel !== p) togglePanel(p); }, get panel() { return panel; },   // ('sim': a link's view=try, #2869)
     // (a problem's item, from the console)
     select(ref) { if (!nodeOf(ref.id) && !M.arcs.some(a => a.id === ref.id)) return; sel = { kind: ref.kind, id: ref.id }; render(); },
-    destroy() { destroyed = true; dock.destroy(); ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
+    destroy() { destroyed = true; dock.destroy(); ro?.disconnect(); offLayout(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
   };
 }

@@ -259,7 +259,7 @@ export function mountFsmEditor(container, opts = {}) {
   const flash = (msg) => opts.onMessage?.(msg);
 
   // ---------------------------------------------------------------------------- view (fsm-view.js)
-  const { applyView, arrange, fit, print, toScreen, toWorld, zoomAt, zoomBy } = mountFsmView({
+  const { applyView, arrange, fit, offLayout, print, toScreen, toWorld, zoomAt, zoomBy } = mountFsmView({
     M: () => M, commit, fitted: () => fitted, gEdges, pattern, render: (...a) => render(...a), sel: () => sel, svg,
     view: () => view, vp, zoomLbl, setFitted: (v) => { fitted = v; }, setView: (v) => { view = v; },
     setSel: (v) => { sel = v; }
@@ -365,7 +365,7 @@ export function mountFsmEditor(container, opts = {}) {
       stopRun();
       dock.destroy();
       Object.values(timers).forEach(clearTimeout);
-      ro?.disconnect();
+      ro?.disconnect(); offLayout();
       root.remove();
     },
   };

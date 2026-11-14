@@ -1,11 +1,12 @@
 // The state diagram editor's view (#405: out of mountFsmEditor in fsm-editor.js): the drawing's transform and zoom
 // label, screen to drawing and back, the zoom about a point, the diagram's bounds, the fit, the print, and the
-// automatic arrangement.
+// automatic arrangement; the fit again when the documents' room changed (web/js/layout-fit.js, #3804).
 import { autoLayout } from '/core/fsm.js';
+import { onLayoutToggled } from './layout-fit.js';
 import { printDiagram, svgSnapshot } from './print.js';
 import { clamp, radiusOf } from './fsm-editor.js';
 
-/** { applyView, arrange, fit, print, toScreen, toWorld, zoomAt, zoomBy } of mountFsmEditor (M(), fitted(), sel(), view(): its current values). */
+/** { applyView, arrange, fit, offLayout, print, toScreen, toWorld, zoomAt, zoomBy } of mountFsmEditor (M(), fitted(), sel(), view(): its current values). */
 export function mountFsmView(ctx) {
   const {
     M, commit, fitted, gEdges, pattern, render, sel, svg, view, vp, zoomLbl, setFitted, setView, setSel
@@ -64,5 +65,7 @@ export function mountFsmView(ctx) {
     requestAnimationFrame(fit);
   }
 
-  return { applyView, arrange, fit, print, toScreen, toWorld, zoomAt, zoomBy };
+  // (the documents' room changed: Full View, #3804; offLayout() when the editor is destroyed)
+  const offLayout = onLayoutToggled(svg, () => fit());
+  return { applyView, arrange, fit, offLayout, print, toScreen, toWorld, zoomAt, zoomBy };
 }

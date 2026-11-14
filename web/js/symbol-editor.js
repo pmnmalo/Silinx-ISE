@@ -10,6 +10,7 @@
 //   ed.getSymbol(); ed.setModule(module); ed.select(pinName); ed.undo(); ed.redo(); ed.destroy();
 import { h } from './dom.js';
 import { toolIcon, zoomTools } from './editor-icons.js';
+import { onLayoutToggled } from './layout-fit.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import { statusLine } from './status-line.js';
 import { mountSideFold } from './side-fold.js';
@@ -198,6 +199,7 @@ export function mountSymbolEditor(container, opts = {}) {
   if (inStep()) { hist.push(JSON.stringify(normalizeSymbol(opts.symbol || newSymbol(module)).symbol)); hi = 0; commit(); }
   else { hist.push(JSON.stringify(S)); hi = 0; render(); }
   requestAnimationFrame(() => { if (!destroyed && canvasWrap.isConnected) fit(); });
+  const offLayout = onLayoutToggled(canvasWrap, () => fit());   // (the documents' room changed: Full View, #3804)
 
   return {
     root,
@@ -205,6 +207,6 @@ export function mountSymbolEditor(container, opts = {}) {
     setModule(m) { module = m; if (inStep()) commit(); else render(); },
     select(name) { sel = sideOf(name) ? name : null; render(); },
     undo, redo, fit,
-    destroy() { destroyed = true; container.innerHTML = ''; },
+    destroy() { destroyed = true; offLayout(); container.innerHTML = ''; },
   };
 }

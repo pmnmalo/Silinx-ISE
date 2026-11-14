@@ -323,7 +323,7 @@ export function mountISim(container, opts = {}) {
 
   // ---------------------------------------------------------------- view math (isim-view.js)
   const { applyFit, clampView, ensureVisible, tOf, updateHScroll, updateVScroll, xOf, zoomAt, zoomFit } = mountView({
-    WH: () => WH, WW: () => WW, flat, hsc, invalidate: (...a) => invalidate(...a), measure, on, sim, st, vsc
+    WH: () => WH, WW: () => WW, cleanups, flat, hsc, invalidate: (...a) => invalidate(...a), measure, on, sim, st, vsc, waveArea
   });
 
   // ---------------------------------------------------------------- rendering (isim-draw.js)

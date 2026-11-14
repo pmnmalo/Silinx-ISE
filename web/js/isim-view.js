@@ -1,12 +1,14 @@
 // SSim's view of time (#405: out of mountISim in isim.js): time to x and back, the fit to the simulated time, the
 // zoom about a point, the view kept in the simulated span, a time brought into view, and the scrollbars of the rows
-// and of the time (#915: the view's own scroll told from the user's).
+// and of the time (#915: the view's own scroll told from the user's). The fit again when the documents' room changed
+// (web/js/layout-fit.js, #3804).
 import { ROW_H, RULER_H, clamp } from './isim.js';
+import { onLayoutToggled } from './layout-fit.js';
 
 /** { applyFit, clampView, ensureVisible, tOf, updateHScroll, updateVScroll, xOf, zoomAt, zoomFit } of mountISim (WH(), WW(): its current values). */
 export function mountView(ctx) {
   const {
-    WH, WW, flat, hsc, invalidate, measure, on, sim, st, vsc
+    WH, WW, cleanups, flat, hsc, invalidate, measure, on, sim, st, vsc, waveArea
   } = ctx;
 
   // ---------------------------------------------------------------- view math
@@ -19,6 +21,7 @@ export function mountView(ctx) {
     st.t0 = 0; st.scale = span / Math.max(50, WW() - 10);
   }
   function zoomFit() { st.fit = true; applyFit(); invalidate(); }
+  cleanups.push(onLayoutToggled(waveArea, () => zoomFit()));   // (the documents' room changed: Full View, #3804)
   function zoomAt(f, x = null) {
     const px = x ?? (st.cursor >= st.t0 && st.cursor <= tOf(WW()) ? xOf(st.cursor) : WW() / 2);
     const tc = tOf(px);
