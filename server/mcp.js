@@ -30,6 +30,7 @@ import { CONVERT_TOOLS } from './mcp-convert.js';
 import { VIEW_TOOLS } from './mcp-views.js';
 import { CHECK_TOOLS } from './mcp-check.js';
 import { SCHEMATIC_TOOLS } from './mcp-schematic.js';
+import { FSM_TOOLS } from './mcp-fsm.js';
 import { SYMBOL_TOOLS } from './mcp-symbol.js';
 import { SIMULATE_DRAWING_TOOLS } from './mcp-simulate-drawing.js';
 import { HLS_TOOLS } from './mcp-hls.js';
@@ -58,7 +59,7 @@ const INSTRUCTIONS = 'Silinx: FPGA design for teaching (Spartan-3E; Basys2, Nexy
 
 // the tools, by area: the projects and their files (mcp-projects.js), their settings (mcp-settings.js), their
 // new sources (mcp-new-source.js) the wizards (mcp-wizards.js, mcp-test-bench.js), Check Constraints (mcp-constraints.js), the conversions (mcp-convert.js), the read-only views related to a source (mcp-views.js), a drawing's Check (mcp-check.js), a schematic's Rearrange Wires / Schematic (mcp-schematic.js), a module's symbol and Update Symbol (mcp-symbol.js), a state machine's drawing stepped as its Simulate panel does (mcp-simulate-drawing.js), their sources (mcp-sources.js), Find in Project (mcp-find.js), their import and export (mcp-transfer.js), their links (mcp-link.js), git (mcp-git.js), their sharing live (mcp-collab.js), the HDL (mcp-hdl.js), Verify (mcp-verify.js), the wave configurations (mcp-wcfg.js), the C / C++ of Silinx HLS (mcp-hls.js), the processes (mcp-processes.js), the logic analyzer's capture (mcp-capture.js), the timing paths (mcp-timing.js), the guided labs (mcp-labs.js)
-export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...CONSTRAINTS_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...SCHEMATIC_TOOLS, ...SYMBOL_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...FIND_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...BOARD_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS];
+export const TOOLS = [...PROJECT_TOOLS, ...SETTINGS_TOOLS, ...NEW_SOURCE_TOOLS, ...WIZARD_TOOLS, ...CONSTRAINTS_TOOLS, ...TEST_BENCH_TOOLS, ...CONVERT_TOOLS, ...VIEW_TOOLS, ...TABLE_TOOLS, ...CHECK_TOOLS, ...FSM_TOOLS, ...SCHEMATIC_TOOLS, ...SYMBOL_TOOLS, ...SIMULATE_DRAWING_TOOLS, ...SOURCE_TOOLS, ...FIND_TOOLS, ...TRANSFER_TOOLS, ...LINK_TOOLS, ...GIT_TOOLS, ...COLLAB_TOOLS, ...HDL_TOOLS, ...VERIFY_TOOLS, ...WCFG_TOOLS, ...HLS_TOOLS, ...PROCESS_TOOLS, ...BOARD_TOOLS, ...CAPTURE_TOOLS, ...TIMING_TOOLS, ...LAB_TOOLS, ...GRADE_TOOLS];
 
 // what a tool's error may hold (#3528): the names of a project's files and modules, a remote's
 const ERROR_UNTRUSTED = 'the error, which may name a project\'s files and modules';

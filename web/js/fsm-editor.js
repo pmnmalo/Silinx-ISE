@@ -285,7 +285,7 @@ export function mountFsmEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------------------- side panel (fsm-side.js)
   const { renderSide } = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody, machineSection, btn, stateById, transById,
-    encOf, commit, deleteSelection, readOnly, locked, render, updateToolbar });
+    encOf, commit, deleteSelection, readOnly, locked, render, updateToolbar, flash });
 
   // ---------------------------------------------------------------------------- problems (to onProblems: the console, #2737)
   function validateSoon() { clearTimeout(timers.val); timers.val = setTimeout(runValidate, 120); }

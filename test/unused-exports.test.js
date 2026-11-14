@@ -52,7 +52,7 @@ const LEFT = {
   'core/collab-kinds.js': 'LIVE_KINDS',
   'core/collab-link.js': 'VIAS',
   'core/collab-model.js': 'DRAWING_KINDS',
-  'core/fsm.js': 'FSM_VERSION MAX_WIDTH outputProblems formatEnv inputBits MAX_TABLE_INPUT_BITS TT_MAX_INPUTS',
+  'core/fsm.js': 'FSM_VERSION MAX_WIDTH formatEnv inputBits MAX_TABLE_INPUT_BITS TT_MAX_INPUTS',
   'core/hdl-c-expr.js': 'CMP REDUCE',
   'core/hdl-c.js': 'CModelError',
   'core/hls-fft-hdl.js': 'fftHdl',
