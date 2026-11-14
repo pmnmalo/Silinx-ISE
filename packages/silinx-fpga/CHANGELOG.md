@@ -3,6 +3,496 @@
 What changed in each version of silinx-fpga, the Silinx toolchain. The newest version is first. Its versions
 are its own (semver, 0.x until its API is stable), apart from Silinx ISE's.
 
+## 0.4.0
+
+In short:
+
+- **nextpnr-himbaechel-spartan3e 1.4.2:** the placer charges a SLICEM's LUT its slower delay.
+- **Spartan-6 (Nexys3, Atlys):** a design whose outputs have no LOC routes again. Place & Route had failed on every seed
+  when Silinx put such an output on a pad of the top bank that nextpnr cannot reach.
+- **nextpnr-himbaechel-spartan3e 1.4.1:** a carry chain whose carry is read by logic mid-chain is packed.
+- **nextpnr-himbaechel-spartan3e 1.1.1:** past router 1's effort, router 2 routes shorter critical paths in the same
+  time.
+- **nextpnr-himbaechel-spartan3e 1.3.0:** ITC'99 b14, b21 and b22 placed and routed; router 2 stops after 500
+  iterations with an error, not running with no end.
+- **nextpnr-himbaechel-spartan3e 1.4.0:** router 2 converges on ITC'99 b20 and the EPFL multiplier.
+- **nextpnr-himbaechel-spartan3e 1.1.0:** a congested design no longer takes router 1 tens of minutes: past its budget
+  router 2 routes it.
+- **nextpnr stopping with no error:** Place & Route says where nextpnr stopped, its last line, no longer only "it
+  stopped on an error".
+- **Banks' VCCO:** two LOC'd I/Os of one bank whose I/O standards need different VCCO fail at Place & Route, as ISE's
+  DRC refuses them, no longer giving a bitstream ISE would not.
+- The Gowin's bitstream: gowin_pack ported to JavaScript, its .fs byte for byte Apicula's.
+- gowin_pack: the rPLL and the oscillator, their .fs byte for byte Apicula's.
+- The Gowin: a design goes from HDL to its routed design with Yosys's `synth_gowin` and nextpnr-himbaechel-gowin, with its pins in a CST; no bitstream yet.
+- The ECP5: a design goes from HDL to its bitstream with Yosys's `synth_ecp5`, nextpnr-ecp5 and ecppack, with its pins in an LPF.
+
+In detail:
+
+- **BSCANE2 in the 7-series' open flow (#3767):** the netlist hands nextpnr each BSCANE2 as a BSCAN on its JTAG chain's
+  site (open-flow-xc7.js xc7BscanCells: BEL X46Y124/BSCAN_X0Y<chain - 1>, as Vivado's DRC asks, PDRC-2; nextpnr-xc7 0.1.2 with
+  pmnmalo/nextpnr-spartan#44), and the FASM gets the chain's CFG_CENTER_MID.BSCAN.JTAG_CHAIN_<n> (xc7BscanFeatures), which
+  nextpnr does not write. The BSCAN sites' 44 PIPs to and from the fabric in the bit database as pseudo-PIPs
+  (research/xc7/measured-ppips.mjs, merged by build-db.mjs; bitdb/xc7's two parts): measured with Vivado 2025.2
+  (scripts/xc7-bscan-vivado.mjs, a BSCANE2 on each chain, the bitstreams read back), they set no bit. The utilization's
+  BSCANE2 row.
+- **The API: a 7-series .bit read back (#3767):** `bitIndexXc7`, `readBitFramesXc7` and `framesToFeatures`
+  (fpga/xc7/readback.js) from src/index.js, for the BSCAN's measurement against Vivado's bitstreams
+  (scripts/xc7-bscan-vivado.mjs).
+- **BSCAN_SPARTAN6 in the Spartan-6's open flow (#3766):** the Map packs it onto a site of its own (fpga/s6/pack.js,
+  phys.js: kind bscan, its pins the primitive's, its chain), the placer puts it on its JTAG chain's site,
+  BSCAN_X0Y<chain - 1> (fpga/s6/sites.js `bscans`, place.js), nextpnr gets it fixed there in both Maps (its BEL; packInput's
+  for nextpnr's packer), the XDL writes it as ISE does (fpga/s6/xdl.js: BSCAN, JTAG_CHAIN, JTAG_TEST), bitgen writes the bit
+  of the site that holds it (fpga/s6/bitgen.js: the site decides the chain; db/s6-bscan.json's keys the sites, measured with
+  each chain on its own site, #3176; ISE's bitgen sets the site's bit, chain 1 on BSCAN_X0Y3 the bit of chain 4's site); the
+  synthesis gives its DRCK no BUFG (synth-brams-s6.js S6_CLOCK_DRIVERS: no fabric -> BUFGMUX switch is known);
+  nextpnr-spartan6 0.5.1 (its BSCAN BELs and packer, the BSCAN's BEL kept, pmnmalo/nextpnr-spartan#43, #45) places and
+  routes it.
+- **A board's constraints: a port bit it has no pin for goes on a free header pin (#3709).** `boardAutoAssign` (ucf.js)
+  puts the port bits that no resource matches on the free pins of the board's `Headers` group, in the order of the
+  ports. These are user I/O that nothing on the board drives: the Mimas V2's P6..P9, the Elbert V2's, the Spartan-3A
+  Starter Kit's. An input gets a pull-down, a serial `rx` a pull-up (it idles high). Each such bit's UCF line has the
+  comment `# no pin on the board: on the header pin …`, and the result lists them in `onHeaders`. A board with no
+  headers leaves the bits unmatched, as before. `generateUcf` writes an assignment's `comment` after its line.
+- **The 7-series' occupied slices: an empty half of a CLB tile no longer counted (#3683).** `xc7FasmUtilization` counted
+  every slice with a FASM feature, and nextpnr's FASM writer (fasm.cc, `write_logic`) writes both halves of every logic
+  tile it uses: an empty half gets the FF block's default bit, `NOCLKINV`, alone. So the "Number of occupied Slices" was
+  twice the CLB tiles used, 10-20 % of them empty. A slice now counts only with a feature other than `NOCLKINV` (a LUT, a
+  flip-flop, a mux, a carry, a used routing mux of the site).
+  - **Measured** (the examples on the Basys 3, router2, seed 1): gates 2 -> 1, traffic 66 -> 50, blinky 88 -> 73, pong
+    152 -> 136, stopwatch 144 -> 122, clock 112 -> 101, vga 80 -> 66, isqrt 54 -> 47, uart 80 -> 70, micro80 110 -> 91.
+  - **Tests:** test/open-flow-xc7.test.js (a tile's used half and its empty half: one slice; a half with only a flip-flop,
+    a carry, an output mux, a feed-through or an inverted clock counted; the reference FASM of blinky 93 -> 77 slices).
+- CST and LPF (#3663, #3664, #3665, #3666, #3667): their readers' regular expressions in linear time on a long line
+  (CodeQL's js/polynomial-redos): '.' with the s flag, the CST clock comment's end with no two `\s*` in a row. The same
+  model as before; a line's comment followed by a lone carriage return now ends at the line's end.
+- CST and LPF (#3670): a statement with no keyword (`"a" 1;`) throws the readers' own message naming its line, not a
+  TypeError.
+- **Constraints: a net named as an inherited property is a name as any other (#3553).** The constraints' readers (UCF,
+  XDC, PCF, LPF, CST), portAssignments and boardAutoAssign kept a net's attributes in a plain object by its name: a net
+  named `__proto__` was read as the object's prototype, so its attributes went to every later constraint read in the
+  process, and the other formats lost that port's constraints; a timing name `constructor` or `toString` became a clock
+  whose net was a function. A name is now read and written as an own property only (`byName`, `setByName` in ucf.js)
+  and the timing names are a Map: such a net keeps its own constraints, round trips through the writers, and nothing
+  of it reaches another file.
+- Exports nothing imports (#3543): `powerSources` (the Spartan-6 router's, with its tile grid) and the Gowin chip database's
+  `longFuses` removed, used nowhere; the names used only in their own module no longer exported. The package's API
+  (`src/index.js`, `parts.js`, `node.js`) is unchanged.
+- **The 7-series timing against Vivado's, measured (#3516):** `research/xc7/vivado-timing.json` and `timing-fit.json`
+  from Vivado 2025.2 placing and routing Silinx's netlists of the ten examples on the Basys 3 (xc7a35t): each cell's
+  and wire's delays, and the Fmax of both. nextpnr's estimate is 1.13× (micro80) to 1.96× (stopwatch) Vivado's,
+  1.2–1.4× for most; the fit's scales are 1.237 (logic) and 1.26 (routing).
+- **The Gowin's clocks at their own frequencies (#3488).** gowin-clocks.js computes each rPLL output's frequency from its
+  parameters (UG286: CLKOUT = CLKOUTP = FCLKIN·(FBDIV_SEL+1)/(IDIV_SEL+1), CLKOUTD by DYN_SDIV_SEL and CLKOUTD3 by 3 from
+  their CLKOUTD_SRC / CLKOUTD3_SRC, a bypassed output FCLKIN, FCLKIN out of range 100 MHz as gowin_pack takes it, none with
+  dynamic dividers) and the OSC's (250 MHz / FREQ_DIV, 210 MHz on the GW1N-4s), and writes them with the CST's clocks as
+  the SDC nextpnr-himbaechel-gowin reads (`--sdc`: `get_ports` for the CST's, `get_pins {cell/pin}` for the others).
+  `--freq` stays the fastest CST clock, so the routed designs (and their .fs, Apicula's) are unchanged. open-flow-gowin.js's
+  `gowinFmax` reads the clocks back with the constraint nextpnr logged for their net, or `null`: `Clock o: 216.97 MHz
+  (no constraint)`. A PLL clock faster than the design fails Place & Route with nextpnr's error, as on the ECP5 and the
+  iCE40. Tests: gowin-clocks (the formulas, the SDC, the report read back; a 378 MHz CLKOUT failing; a CST with no clock),
+  gowin-pll-osc (each design's clocks at their own frequencies: 54, 90, 15, 108, 6.75, 9, 100, 25, 1.95 MHz, the dynamic
+  one with none), mcp-gowin (get_report with no clock in the CST).
+- **The Spartan-6 pad measurements' ssh options (#3462):** research/s6/measure-3169-s6.sh and run-3169-s6.mjs name
+  them ISE_SSH_ARGS, no longer with Silinx's old name.
+- **A top module's name that Yosys's script would read as more words, refused (#3416):** `synthesizeVerilog` and a
+  script's synthesis (`scriptSynthesis`) refuse a top whose name holds a space or a control character (a VHDL extended
+  identifier, `\a; b\`) before any script is written, with its message (`scriptTopError`, `src/top-name.js`, exported):
+  its words after a `;` were read as Yosys commands.
+- **The Spartan-3E's nextpnr engine at 1.5.2 (#3389, part of #2819 and #2982):** `@silinx/nextpnr-himbaechel-spartan3e`
+  1.5.2. Its 1.5.1 (nextpnr-spartan PR 36) packs the slices as densely as Silinx's packer, and `sliceEstimate` (slice-estimate.js)
+  follows its four changes: the control set compares the set / reset's synchrony, not its mode (a flip-flop set and one
+  reset by one net, one slice); the flip-flops alone go into the free sides of the wide multiplexers' slices too (BX the
+  MUXF5's select, BY the MUXF6 .. MUXF8's placed in the slice: `record_mux_slices`), not only the carry chains'; a sum
+  whose LI is 0 and a stage whose select is 0, of a net, are wires, left out (their loads read the carry in, the DI); each
+  LUT pairs with the first flip-flop it feeds, the LUTs in the netlist's order.
+  1.5.2 (nextpnr-spartan PR 39, part of #2982) predicts a CLB-to-CLB delay from Silinx's route table (`timing.js`
+  delayTable), weighs timing 0.9 in HeAP's refinement and lets `--placer sa` place carry chains.
+- **`sliceEstimate` exact on the examples (#3389):** a carry stage that takes a copy of its select's LUT (or a LUT
+  passing it through) no longer reads the select, so a later stage on it takes the LUT itself, as nextpnr's `stage_lut`
+  (a LUT on two chains' selects was a LUT more); a flip-flop's control set has the slice's CLKINV, CEINV and SRINV
+  (an inverter on the pin, `IS_<pin>_INVERTED`, a `_1` cell), as `same_mode`. On the ten examples the estimate is
+  nextpnr 1.5.2's count (pong, stopwatch, clock and vga one slice fewer than before).
+- **gateAssignments counts the gates of an expression with a stack of its own (#3375):** an expression of thousands of
+  operators (a + b + c …, its left operands nesting as deep) no longer overflows the stack when a design's 1-bit gates
+  are counted (the carry chains' recovery).
+- **The Spartan-6's PIPs held out until nextpnr's chip database has them (#3349):** `bitdb/s6/s6-pips-held.json` keeps
+  the PIPs that ISE has measured but that the open flow must not use yet. If Silinx knew such a PIP, its placer could give
+  a pad a path that nextpnr cannot route (#3152). Silinx's flow does not read the file: `bitDbS6` and `loadBitDbS6` read
+  it only with `held: true`, and the browser never fetches it. The chip database's export
+  (`research/nextpnr-s6/export-unknown-pips.mjs`) does read it, so the fork's generator puts those PIPs in its next
+  Spartan-6 chip database. Once that release is pinned, the PIPs move to the files the flow reads. The file has:
+  - the slave OLOGIC2's `D1_OLOGIC_SITE_S -> OQ_OLOGIC_SITE_S` of the TIOI_INNER tiles (#3269, which `s6-pips-bscan.json`'s
+    note had kept aside) and of the TIOI_OUTER tiles (#3350, measured with ISE: `26,35 27,48 28,14`, the same bits). These
+    are the outputs of the 30 top-bank pads of the XC6SLX16 and the 23 of the XC6SLX45;
+  - #3169's four pad wire -> IBUF PIPs of the TIOB_SINGLE and BIOB_SINGLE tiles, with no bits: the inputs of G9, F9,
+    U11, V11 (XC6SLX16) and G9, F9, R7, T7 (XC6SLX45).
+  - With them, every pad of both parts takes an input and an output.
+- **`@silinx/nextpnr-himbaechel-spartan6` 0.4.1 from npm (#3357):** the dependency is an exact npm version (with the
+  registry's integrity and provenance), no longer a GitHub release asset's URL, which `npm i silinx-fpga` /
+  `npx silinx-fpga` installed unpinned.
+- **The Spartan-6 pads' PIPs in the bit database (#3349, #3269, #3350, #3169):** the six PIPs held out until nextpnr's
+  chip database had them are in the files the flow reads: TIOI_INNER's slave OLOGIC2 `D1_OLOGIC_SITE_S ->
+  OQ_OLOGIC_SITE_S` (`26,35 27,48 28,14`, #3269) in `bitdb/s6/s6-pips-bscan.json`; TIOI_OUTER's (the same bits, #3350)
+  and the TIOB_SINGLE / BIOB_SINGLE pad wire -> IBUF PIPs (no bits, #3169) in `s6-pips-io.json`. `s6-pips-held.json`
+  and the `held` option of `bitDbS6` / `loadBitDbS6` are removed; `research/nextpnr-s6/export-unknown-pips.mjs` gives
+  the same list from the flow's databases. `fpga/s6/pad-paths.js` now gives every pad of the XC6SLX16 and the XC6SLX45
+  an input and an output path. `research/s6/check-held6.mjs` checks the measurements' designs with the flow's
+  databases.
+- **The timing paths read the netlist the run routed (#3335):** the timing step's paths (`open/paths.json`, #3178) take
+  their cells from the netlist this run translated (its top the synthesis's: a logic analyzer's wrapper), not from the
+  build folder's netlist of the project's top, which with a capture is another run's: every path then had no source
+  line.
+- **@yowasp/nextpnr-ice40 0.11.825 (#3309):** the optional peer dependency of the iCE40 flow is the package's release
+  0.11.825, after the build 0.11.96-dev.805; THIRD-PARTY-NOTICES.md follows.
+- **Regular expressions in linear time (#3271, #3171, #3278):** `synBlocks` finds an assignment's escaped target up to
+  the space that ends it, as Verilog's, and `cmpStep` finds each `synth_xilinx … -run <from>:<to>` command by command,
+  both in linear time on any input (they were quadratic, CodeQL js/polynomial-redos), with the same results on the
+  synthesis' own text; `cellSources` escapes the top's name in full in its synthesis file's pattern.
+- **`yosysNode` can be stopped (#3261):** given `{ signal }` (its fifth argument), it runs Yosys in a worker thread of its own, terminated when the signal aborts (the run rejected, `aborted: true`): Yosys's own `-timeout` does nothing in WebAssembly. Without a signal, or in a process that may not start threads (Node's permission model without `--allow-worker`, as the grading's), it runs in the process as before.
+- **chipdbCacheDir in the Node API (#3215):** `src/node.js` exports it, the folder where nextpnr's downloaded chip
+  databases of a package's version are kept, so that a caller can let a sandboxed process read that folder only.
+- **Paths between two points (#3178):** `analyze().paths(n, { from, to })` keeps the paths from some flip-flops (a pass
+  of their own) into some others, and `pins()` lists the flip-flops' pins; `timingPaths(…, { between: true })` gives
+  the registers (`points`) and the worst path of each two (`pairs`), which the timing step writes to `open/paths.json`;
+  the API gains `betweenPaths`.
+- **A timing path's stages name their signals (#3178):** each stage of `timingPaths` gains `signals`, the named Yosys
+  signals its cells drive (a clock-to-out's flip-flop, a logic stage's LUT, a setup's logic and register), by which the
+  IDE finds a path's elements in its drawings.
+- **The slowest paths of the timing analysis (#3178):** `timingGraph().analyze()` returns `paths(n)`, the worst path into
+  each flip-flop, slowest first (a path between the clock's two edges counted twice); `fpga/timing-paths.js` gives each
+  stage its site, net and source lines, and the timing step writes them to `open/paths.json`. The API gains
+  `timingPaths`, `pathsText` and `pathHighlight` (the IDE's Paths panel and its MCP tool read them).
+- **The JTAG user access primitives in the bit databases (#3176, for the logic analyzer).** These are the switches that
+  connect BSCAN_SPARTAN3 and BSCAN_SPARTAN6 to the fabric, measured with ISE by PIP drop on designs implemented from
+  HDL. Silinx's writer is byte-identical with ISE's bitgen on them (but for one output path held back, below). The open flow does not place a BSCAN
+  yet: that needs nextpnr's chip database.
+  - **Spartan-3E:** the top-right corner tile's (UR) switches for every output (CAPTURE, DRCK1, DRCK2, RESET, SEL1, SEL2,
+    SHIFT, TDI, UPDATE) onto the fabric and for TDO1 / TDO2 from it, the site's own `BSCAN:USED` (two bits), and the
+    other switches the designs' routes took: 580 features in `bitdb/s3e-tiles.json`, none of the database's changed.
+    The designs: five with every BSCAN pin used, their logic in five regions of the XC3S250E, and the logic analyzer's
+    capture core on the XC3S100E, XC3S250E and XC3S500E (`research/s3e-bitstream/gen-bscan.mjs`, `measure-3176.sh`,
+    `measured/learn-20bscan-pips.json`; 168 xdl + bitgen runs). All eight are byte-identical, with and without the CRC.
+    The four dies' measured descriptions (`research/s3e-device/data/<die>/measured.json.gz`) rebuilt with them: each
+    gains the corner tile's 50 switches (and one or two CLKT ones), each accepted by ISE's arc probe (`bscanprobe`).
+  - **Spartan-6:** the corner tiles' (UR_UPPER, UR_LOWER) PIPs of the four BSCAN sites, 85 not known before, in
+    `bitdb/s6/s6-pips-bscan.json` (the slave OLOGIC2's `D1 -> OQ` the designs' outputs took also measured, but left out
+    until nextpnr's Spartan-6 chip database has it: #3152's pads). Also the instance's JTAG_CHAIN, one bit per chain whichever site holds it
+    (`bitdb/s6/s6-bscan.json`), which `fpga/s6/bitgen.js` now writes. The designs: one per chain and one with its logic
+    far from the corner, on the XC6SLX16, and two on the XC6SLX45 (`research/s6/gen-bscan6.mjs`, `measure-3176-s6.sh`;
+    50 xdl + bitgen runs; byte-identical but for that output path on two of them). `ana-pipdrop6.mjs --out` writes its result to another file than `s6-pips-other.json`.
+- **BSCAN_SPARTAN3 in the nextpnr engine (#3176):** `@silinx/nextpnr-himbaechel-spartan3e` 1.5.0 places the JTAG's user
+  access primitive and routes its pins. The netlist for nextpnr takes a BSCAN_SPARTAN3 (`NEXTPNR_CELL`), and
+  `fpga/nextpnr-xdl.js` writes nextpnr's BSCAN as ISE's XDL does (`BSCAN_BLACKBOX`), with the cell's own ports only as its
+  site pins.
+- **The measurements of the Spartan-6 pads' held PIPs, repeatable (#3169, #3350).** These are the research scripts
+  that measured, with ISE, the PIPs now waiting in `bitdb/s6/s6-pips-held.json` (#3349):
+  - `research/s6/gen-padsingle6.mjs` writes one design per pad of the TIOB_SINGLE / BIOB_SINGLE tiles, for their pad
+    wire -> IBUF PIPs (no bits).
+  - `gen-padout6.mjs` writes outputs on TIOI_OUTER slave pads, for their slave OLOGIC2's `D1 -> OQ` (`26,35 27,48 28,14`).
+  - `measure-3169-s6.sh` measures either set by PIP drop (`GEN`, `OUT`), one ISE container at a time.
+  - `run-3169-s6.mjs` runs it on both parts with the ISE machine's settings from `~/.silinx/config.json`.
+  - `check-held6.mjs` compares Silinx's writer with ISE's bitgen on the designs, with and without the held PIPs.
+  - The research README records the results.
+- **nextpnr-himbaechel-spartan3e 1.4.2 (#3157).** nextpnr-spartan's PR 30 (40a7f9b3): the placer's estimate of a
+  connection from a LUT on a SLICEM is 55 ps longer, a SLICEM's Tilo (0.759 ns against a SLICEL's 0.704 at -4). The
+  timing analysis, the router and the chip database are unchanged. fpu-adder's mean period -2.4 %, iwls05-sasc's
+  -1.0 %, iwls05-simple-spi's -1.1 % (natively, XC3S1200E).
+- **A port without a LOC takes a pad whose I/O path is known (#3152).** nextpnr's chip database leaves out the PIPs
+  whose bits Silinx's bit database does not know. One of them is the slave OLOGIC2's D1 -> OQ route-through in the top
+  bank's TIOI_INNER tiles (the master's is known), so 30 pads of the XC6SLX16 and 23 of the XC6SLX45 can take no
+  output, and 4 pads of each can take no input. Silinx's placer gave such pads to ports without a LOC, and nextpnr
+  failed on every seed: `Failed to route arc 0.0 of net …, from X6Y4/L_AQ to X5Y0/TIOB_O3_PINW`. The new module
+  `fpga/s6/pad-paths.js` (`padPathsS6`) finds each pad's paths through the known PIPs, in about 0.1 s. Probed
+  pad by pad, nextpnr agrees on both parts. The placer now gives ports without a LOC only pads with their path. The examples, all
+  of their ports LOC'd, are placed as before, so their bitstreams are unchanged.
+- **The Spartan-6's Map: no 5FF on a position whose multiplexed output its logic needs (#3151).** A product of two
+  counters failed with "its pin BMUX carries two nets": the counters' sums left their carry slices by BMUX / CMUX for
+  the DSP48A1s, and the packer had put the product's flip-flops in those positions' 5FFs, which leave by the same
+  pin. The packer now checks, before it places a 5FF, whether the carry's sum or carry out, an F7 / F8 or O5 needs the
+  position's multiplexed output (`fpga/s6/pack.js` muxNeeded); the flip-flop goes elsewhere. The examples pack as
+  before (the same slices on the Nexys3 and the Atlys).
+  - **Tests:** test/s6-routing.test.js (the product packed, placed and routed, in Verilog and in VHDL).
+- **The Spartan-6's chip database for nextpnr gets each routing node's delay from Silinx's timing model (#3149, part of
+  #3137).** `timingExportS6` (`src/fpga/s6/nextpnr-export.js`, run by `research/nextpnr-s6/export-timing.mjs`) gave each
+  PIP only the class of the wire it drives; it now also gives each node its delay as Silinx's timing analysis counts
+  it (`wireDelay`: the node's class and wire type, and on a load's node the model's base and its pin kind's), for the
+  fork's generator to add a path's delays as Silinx does (the keys `nodeClass`, `node`, `tileWire`; the old ones stay).
+  No change for the toolchain's users until the nextpnr package built from it is pinned.
+  - **Tests:** test/nextpnr-s6.test.js (the classes of every node; the node delays of a routed counter add up to
+    Silinx's on its connections).
+- **An option to leave the Spartan-6's block RAMs and DSP48A1s to nextpnr (#3149, part of #3137).** Silinx places them
+  (`placeS6`) and fixes their sites for nextpnr; the spec option `hardByNextpnr` leaves them to nextpnr's placer, the
+  pads and global buffers still Silinx's. Its default, `S6_HARD_BY_NEXTPNR` (`src/open-flow-nextpnr-s6.js`), stays false
+  until the nextpnr package with the new chip database and placer tuning is pinned.
+  - **Tests:** test/nextpnr-s6.test.js (a block RAM and three DSP48A1s fixed by default, left to nextpnr with the
+    option, routed, no warnings).
+- **The 7-series' back end, the Silinx toolchain's (#3146):** `open-flow-xc7.js` registers the Artix-7's back end of
+  `runFlow` (open-flow-backends.js, #2360): Yosys's `synth_xilinx`, then nextpnr-himbaechel's xilinx micro-architecture
+  (`@silinx/nextpnr-himbaechel-xc7` 0.1.1, #3143, a new dependency: `io.nextpnr.xc7`, in Node `nextpnrXc7Node()` with
+  router2, else router1) placing and routing into FASM (`open/routed.fasm`), and the `.bit` written from the FASM by the
+  JavaScript writer on Project X-Ray's database (`fpga/xc7/`, #3144; `io.bitDb()`, in Node `loadBitDbXc7`). Its steps
+  `synth`, `translate`, `par` (nextpnr packs), `trce` and `bitgen` (`XC7_STEPS`); its constraints XDC, written for nextpnr
+  as the ports' `PACKAGE_PIN` and `IOSTANDARD` and the clocks' `create_clock` (a one-bit vector named as nextpnr names it,
+  the ports with no pin warned). The resources nextpnr used are held to the part's own (the xc7a35t's chip database is
+  the xc7a50t's: a design over the part's slices, registers or pins is an error); the timing is nextpnr's estimate,
+  `XC7_TIMING_MODEL`, said so in the report and its text (`open/timing.txt`), optimistic against Vivado. The `.bit`'s
+  header names the part as Vivado does (`7a35tcpg236`). The xc7a35t (Basys 3) only so far: its bit database.
+- **nextpnr's chip databases downloaded on first use (#2329) for the 7-series too:** `chipdbReleaseUrl` knows the
+  fork's `xc7-v<version>` releases. `nextpnr-ports.js`: the ports as nextpnr names them, the iCE40's and the 7-series'.
+- **The API (#3146):** `XC7_STEPS`, `XC7_TIMING_MODEL` and `XILINX_STEPS` (`./parts` too); `./node` adds `nextpnrXc7Node`,
+  `loadBitDbXc7`, `xc7Parts` and `XC7_DB_DIR`.
+- **The 7-series' bitstream checked with no Vivado and no board (part of #3145):** `src/fpga/xc7/readback.js` reads a
+  `.bit` back into its features as Project X-Ray's `bitread` and `bit2fasm` do (`readBitFramesXc7`: the frames from the
+  FAR and FDRI's data, the padding checked, the ECC bits left out; `framesToFeatures`: the features whose bits a tile's
+  frames hold, the bits no feature explains), on its own index of the bit database (`bitIndexXc7`, `tileFeatureBits`),
+  apart from the generator's lookups. `src/fpga/xc7/roundtrip.js` writes the frames `fasm2frames` makes of a FASM
+  (`referenceFrames`, what it adds too: the required features, PUDC_B's pull-up, a bank's STEPDOWN) and compares a
+  `.bit` with nextpnr's FASM by bits, not by names (`roundTrip`: no bit lost, none stray, none of no feature; the
+  pseudo-PIPs, zero encodings, aliases and added features counted). The reference frames are Project X-Ray's for the
+  three FASMs of the fork's CI, and every example's `.bit` on the Basys 3 has the frames of its FASM and a clean round
+  trip.
+- **The xc7a100t's bit database (#3145):** `bitdb/xc7/xc7a100tcsg324-1.json.gz` (396 KB; 3.1 MB unpacked), the
+  Nexys A7's part, made by `research/xc7/build-db.mjs` from the same prjxray-db commit as the xc7a35t's (0a0adde, CC0
+  1.0); `xc7Parts()` lists both. An empty design's `.bit` has the xc7a100t's ID code, its 9448 frames, and the
+  configuration data's length UG470 gives (30,606,304 bits; the xc7a35t's 17,536,096 too).
+- **The 7-series' bitstream in JavaScript (#3144):** `src/fpga/xc7/` writes the configuration frames and the `.bit` of
+  nextpnr's FASM for the xc7a35t, as Project X-Ray's `fasm2frames` and `xc7frames2bit` make them: `parseFasm` (the fasm
+  library's grammar), `fasmToFrames` (a feature's bits from the database, a feature it does not have and a bit set and
+  cleared named as errors, the part's required features, a bank's `STEPDOWN` on its unused IOB33s, PUDC_B's pull-up when
+  asked), `framesText` (the `.frm`), `bitstreamXc7` (the frames' ECC, the part's frames in order, xc7frames2bit's
+  packets) and `readBitXc7`. The bit database `bitdb/xc7/xc7a35tcpg236-1.json.gz` (339 KB; 2.5 MB unpacked) is the
+  subset of Project X-Ray's database (prjxray-db, CC0 1.0) the part needs, made by `research/xc7/build-db.mjs`. The
+  `.bit` of blinky, vga and micro80 is byte-identical to Project X-Ray's. Not in the flow yet (#3146).
+- **The 7-series' bit database from its JSON in the package's API (#3143):** `bitDbXc7` (fpga/xc7/bitdb.js) exported from
+  src/index.js, for the browser edition's flow worker, which fetches and gunzips `bitdb/xc7/<part>.json.gz` itself (Node's
+  `loadBitDbXc7` reads it from disk).
+- **The 7-series' constraints, XDC (#3142):** `XDC` (`readXdc`, `writeXdc`), a format of the constraints' model as PCF
+  is: it reads `set_property -dict { … } [get_ports …]`, one property a line (`LOC` as `PACKAGE_PIN`, `PULLUP true`,
+  `PULLTYPE`, `DRIVE`, `SLEW`), `create_clock` and the design's `[current_design]` properties, keeps the other commands
+  for Vivado, and throws at the line Vivado would stop at. `writeXdc(model, { ports, board, header })` writes the pins
+  the design keeps only, given its ports, and returns the others as `skipped` (a line for a port synthesis removed
+  makes Vivado warn `[Common 17-55]`, #2305); a pin with no I/O standard gets its board's. `boardConstraintsText`
+  writes an XDC for the 7-series. `constraintsFormatOf` / `constraintsExtOf` (UCF, PCF, XDC), `experimentalDevice`
+  and `noFlowMessage` (the Artix-7, an experimental family with no flow yet, #1648).
+- **The Spartan-6's Map by nextpnr, behind an option (#3138):** `spec.s6Map` 'nextpnr' (`s6MapOf(impl)`, from
+  `parts.js`): Place & Route (`open-flow-nextpnr-s6.js`) gives nextpnr-himbaechel's spartan6 package (0.3.0) Yosys's
+  netlist, each I/O buffer with its port and constraints (`fpga/s6/nextpnr-pack.js` `packInput`), for its packer and
+  placer; the sites it packed are checked against Silinx's Map's (`samePacking`: a difference fails the step, naming the
+  sites), its placement read back by them, and the design routed as before. The netlist's cells are sorted by name
+  then (`sortedNetlistText`), so that Silinx's Map names its sites as the packer does. Silinx's Map stays the default
+  until parity (#3139).
+- **The Spartan-6's nextpnr engine: nextpnr-himbaechel-spartan6 0.2.0, which places the block RAMs and DSP48A1s (#3137).**
+  The package's chip database gives each routing node its delay from Silinx's timing model (#3149), and its annealing
+  refinement after HeAP now reaches 40 tiles (60 passes, temperature 0.01, criticality exponent 4). It also fixes a
+  placer hang, a SLICEM cell legalised onto a SLICEL (micro80 on the Atlys). `S6_HARD_BY_NEXTPNR`
+  (`src/open-flow-nextpnr-s6.js`) is now true, so Silinx fixes only the pads and the global buffers; with
+  `hardByNextpnr: false` Silinx still places the block RAMs and DSP48A1s itself. The examples' periods (Optimization
+  Speed, best of 3 seeds, Silinx's timing analysis) are 3.2 % shorter on average on the Nexys3 and the Atlys, with
+  every PERIOD met (#2798).
+  - **Tests:** test/nextpnr-s6.test.js (a block RAM and three DSP48A1s free by default, fixed with
+    `hardByNextpnr: false`), test/examples-nextpnr-s6.test.js (stopwatch and micro80 on both boards: every seed
+    routes, the PERIOD met, no warnings).
+- **The Spartan-6's nextpnr engine: nextpnr-himbaechel-spartan6 0.3.0, with the packer and the pads' rules (#3135, #3136).**
+  The package packs Yosys's `synth_xilinx -family xc6s` netlist into whole sites as Silinx's Map does (the same sites,
+  site pins and timing arcs; the site cell's `SILINX_PACK` attribute names what it holds), and places a packed
+  netlist's pads and global buffers as Silinx's placer does: a LOC as a fixed pad, one VCCO per bank, a clock pad's
+  global buffer on its dedicated path (pmnmalo/nextpnr-spartan#29). Silinx still hands nextpnr the netlist of its own
+  Map's sites, which the package places and routes as 0.2.0 did; handing it Yosys's netlist is #3138.
+- **The research notes no longer cite an open legal question (#3114).** Documentation only. research/s3e-route's
+  README says the description computed from the device report ships for the supported boards' devices
+  (`devices/`), no longer that nothing derived from it is in the repository; research/s3e-device's no longer calls
+  the measurement the answer to an open question of docs/OPEN-TOOLCHAIN.md, whose section is removed.
+- **A signal compared with several constants as LUTs, not as carry chains (#3097):** synth_xilinx's coarse step puts a
+  comparison with a constant of a signal wider than 4 bits on a carry chain (cmp2lcu); a design comparing one signal with
+  many constants (itc99's b05: 40 comparisons of a 9-bit TM, `TM > 99`, `TM > 89`, …) has as many short chains, whose S
+  LUTs are the same functions of the signal: each chain needs its own copy (nextpnr's packer made 127 on b05) and a chain
+  of three stages leaves half a slice empty. Such comparisons, and those that are an OR of the signal's high bits
+  (`prescale_reg > 0`), can now be gates before that step (synth-cmp.js: CMP_MAP, proved equal to Yosys's cells by SAT),
+  whose terms ABC shares; a comparison alone keeps its chain (faster on a wide signal). A run up to the coarse step finds
+  them (probeComparisons, about 0.7 s on blinky; none without a `<` or `>` in the text); the design is then synthesized
+  both ways, side by side, and the one with them as logic kept when it has fewer slices and gains at least as much in
+  slices as it loses in speed by the estimate (keepCmp, r.depth.cmp): the mappings after the chains gone, chosen on the
+  estimate, gave itc99-b15 13 % more slices once placed and secworks-sha1 a path 15 % slower, which keep their netlists
+  now. On the corpus (8 designs change): itc99-b05 252 → 194 slices, verilog-uart 117 → 111 and 8.68 → 6.94 ns,
+  itc99-b11 96 → 89 and 9.10 → 8.14 ns, itc99-b21 38.8 → 35.2 ns; slices −3.3 %, the critical path −2.1 % (geometric
+  means of the 13 designs that have such comparisons). itc99-b05's path 10.9 → 12.1 ns (8 % by the estimate, for 24 % fewer
+  slices: its faster depth-oriented mapping, 9.8 ns and 209 slices, not kept by DEPTH_RULE). The vga example 143 → 122
+  slices, 10.2 → 9.2 ns; the stopwatch 198 → 194. The packer was not the cause: nextpnr fills a slice with 1.9 LUTs on
+  both designs, as on the rest.
+- **Optimization Fast: a design limited by its logic depth synthesized as at Speed too (#3096).** Fast was Yosys's usual
+  mapping alone, so a deep design kept up to 3 times XST's logic levels (#3070: epfl-max 57 against 17). `synthesizeFast`
+  (synth-fast.js) uses the usual mapping. A design deeper than DEEP_RULE (more than 16 levels, 1500 LUTs at most, the old
+  Normal's rule of #468) is also synthesized as at Speed, and that netlist is kept when it is DEEP_RULE.gain (10 %) faster
+  by the estimate: `r.fast { levels, usual, speed, kept }`, said in the log. Fast's back ends take it as `fastSynth`, and
+  so do the flow models and the browser's Synthesize. Measured after Place & Route by Silinx's estimate: epfl-priority
+  44.1 -> 9.4 ns (87 -> 117 slices), epfl-max 70.8 -> 25.2 ns (544 -> 672), itc99-b14 37.4 -> 33.8 ns (663 -> 657).
+  iwls05-i2c, epfl-adder, femtorv32-quark, secworks-siphash and vtr-diffeq1 are not deep by the rule and come out the same.
+  - **Tests:** test/synth-goal.test.js (a 128-request priority encoder, 42 levels: Speed's netlist kept; not 10 % faster:
+    the usual one; not deep: the usual mapping alone; traffic unchanged), test/ui/open-toolchain.test.js (Fast's log line).
+- **Optimization Speed: four placements for a design of over 500 slices (#3095).** At Speed (the High effort), the nextpnr
+  engine made 8 placements of any design over 100 slices. Each was routed, one after the other. A placement of a large
+  design takes minutes. Over 500 slices it now makes 4 (`NEXTPNR_TRIES.highLarge`); up to 500 slices it keeps 8, and up to
+  100, 32. Measured on the corpus at Speed, each placement logged: on itc99-b20 (1335 slices, about 6 min a placement) and
+  secworks-siphash (686, about 2.5 min), the best of 8 was the best of 4 (36.802 and 15.397 ns), and Place & Route takes
+  half as long (b20 48 -> 24 min). vtr-diffeq1 (260 slices) keeps 8 (37.224 -> 37.076 ns from the second four).
+  - **Tests:** packages/silinx-fpga/test/nextpnr-engine.test.js.
+- **The package's READMEs describe nextpnr's pack, place and route (#3082):** the Spartan-6 and the iCE40 in the
+  package's description, `io.nextpnr.ice40` and `nextpnrIce40Node()`, the device descriptions' users, and the
+  research notes' router and `route.mjs` marked removed (#2137).
+- **nextpnr-himbaechel-spartan3e 1.4.1 (#3076).** nextpnr-spartan's PR 26 (5369e3ad): a carry read by logic mid-chain
+  leaves by XB (an F stage's) or YB (a G stage's COUT, beside the next slice's carry in), where 1.4.0's packer stopped
+  ("not supported yet"). `nextpnrToXdl` writes such a G stage's carry as two nets, as Silinx's packer does: the logic's
+  from YB, `<net>_COUT` from COUT to the next slice's CIN.
+- **nextpnr-himbaechel-spartan3e 1.1.1 (#3002).** nextpnr-spartan's PR 19 (60ec2bcb): router 2, where router 1 stops
+  past its effort, routes with its alternate weights (`--router2-alt-weights`: an estimate weight of 1.0, not 1.25).
+  Natively, on Silinx's design corpus: secworks-sha256 41.5 MHz (36.2 on 1.1.0, 43.8 by router 1 alone), secworks-aes
+  34.7 (30.0), epfl-multiplier 14.3 (13.8), vtr-diffeq1 25.6 (26.6). The designs router 1 routes within its effort
+  route as on 1.1.0.
+- **nextpnr-himbaechel-spartan3e 1.3.0 (#2818, #2977, #2982).** nextpnr-spartan's PRs 20 and 24 (50328fbb):
+  - 1.1.2 (#2818): a LUT shared by two stages of one carry chain taken once, not bound on two BELs; an exception
+    nextpnr does not handle (an assertion) said as an `ERROR:` line, exit code 125.
+  - 1.2.0 (#2982): a SLICEM memory's address pins at 0 routed from a free slice's GND source, not a LUT each.
+  - 1.3.0 (#2977): `block_di_on_full_luts`, a carry stage's DI through BX / BY, not pin 1 of a LUT whose four inputs
+    are other nets; router 2's `router2/maxIter`, 500.
+- **nextpnr-himbaechel-spartan3e 1.4.0 (#2977).** nextpnr-spartan's PR 25 (2e505ef6): router 2's congestion weight
+  grows once the overuse has not gone down in 20 iterations (`router2-stall-iter`) and from iteration 200 on
+  (`router2-grow-iter`); `router2-max-iter` (500) sets its limit; its error names each overused wire's nets.
+- **32 placements at High for a small design (#2940):** on the Spartan-3E, `nextpnrTries('high', slices)` gives 32
+  placements to a design of up to 100 slices (`NEXTPNR_TRIES.highSmall`, `smallSlices`) and eight to a larger one, as
+  before; the fastest is kept. On the XC3S1200E at Optimization Speed: iwls05-sasc 4.763 → 4.563 ns, itc99-b10
+  4.751 → 4.659 ns, iwls05-usb-phy 4.889 → 4.819 ns; Place & Route two to three times as long on these designs.
+- **nextpnr-himbaechel-spartan3e 1.1.0 (#2912).** nextpnr-spartan's PR 13 (8d8106e1): router 1 stops past 30000 wires
+  visited per arc to route or 200 million in all (`-o max-visits-per-arc=<n>`, `-o max-visits=<n>`, 0 for no limit),
+  and router 2 routes the design from there (router 1's weak wires unbound first). The budget counts wires visited, not
+  time, so the WebAssembly and native builds route alike. The designs router 1 routes within it (every test of the
+  package's, the corpus's largest processors: serv, picorv32, neorv32) route as on 1.0.0.
+- **nextpnr stopping with no ERROR line (#2818).** When nextpnr stops on an exception of its own, it prints no ERROR
+  line, and in WebAssembly the exception has no message. Place & Route's error now lists nextpnr's last line
+  (`nextpnr stopped with no error message, after: Info: at iteration #11, type ALL: …`): the step it stopped in.
+  (The ITC'99 b14 to b22's crash in the analytical placer, a LUT taken twice by one carry chain, is
+  pmnmalo/nextpnr-spartan#16.)
+- **The nextpnr engine's I/O with no pad of its VCCO, said as Silinx's placer said it (#2816):** when nextpnr finds no free pad in a bank of an I/O's VCCO (the I/Os with no LOC of LVCMOS25, ISE's default, where every bank holds LVCMOS33 pins), the flow's error names every such I/O by its port bit (`led<4>`, not nextpnr's cell `$iopadmap$top.led_4`), the banks with free pads with their VCCO and I/Os, and the constraints that fix it (`NET "led<4>" IOSTANDARD = LVCMOS33;`, or a LOC), instead of "nextpnr failed" and the hint of an ISE mode (`open-flow-nextpnr.js` padVccoError; nextpnrNetlist's `free`, the port bits with no LOC).
+- **The LOC'd I/Os of a bank share its VCCO (#2813).** Before nextpnr runs, Place & Route checks the I/Os the
+  constraints LOC on pads (`bankVccoConflicts`, open-flow-nextpnr.js): an I/O whose I/O standard needs another VCCO
+  than the bank's first LOC'd I/O (ISE's default LVCMOS25) stops it, as ISE's PhysDesignRules:755 and Silinx's old
+  placer did: `place: q<0>: pad A10 is in bank 0, whose other I/Os (clk on B8, LVCMOS33) need VCCO 3.3 V, not 2.5 V
+  (LVCMOS25)`. The I/Os nextpnr places itself already went to a bank of their VCCO.
+- **The IDE's new name in the package (#2624):** the README and the messages say Silinx, the IDE's new name
+  (`silinx-fpga build` on a VHDL source: "VHDL needs Silinx's front end").
+- **The IDE's new name in the third-party notices (#2624):** THIRD-PARTY-NOTICES.md says it is written in the
+  Silinx repository (the IDE's rename to Silinx).
+- **The command line's comment says Silinx (#2624, part of the rename to Silinx):** `src/cli.js`'s header, where a
+  line break split the old name.
+- **gateAssignments with a stack of its own (#2577):** the walk that counts a design's 1-bit gates (the carry chains'
+  recovery) no longer recurses once per level of the bound tree, which an if … elsif chain of thousands of branches
+  nests as deep: such a design's synthesis input is made again.
+- **A back end that packs at Place & Route says so (#2530):** the Spartan-3E's back end (nextpnr) mounts with
+  `packsAtPar: true`, and `runFlow` gives the simulation models `packsAtPar()`: the IDE's Post-Map Simulation Model is then
+  written from nextpnr's routed design (without the routing) rather than from `fpga/pack.js`.
+- **The open synthesis counts the slices as nextpnr packs them (#2529):** `sliceCount` (synth-open.js: Optimization
+  Area's comparison, the mappings for speed's rules keepDepth and keepChains) no longer packs the netlist with
+  `fpga/pack.js`: `sliceEstimate` (slice-estimate.js) counts the slices as the spartan3e micro-architecture of nextpnr
+  packs them (the control inverters, its wide multiplexers, memories, carry chains, the flip-flops alone into the chains'
+  slices, then the LUTs and flip-flops by control set), without running it; a netlist of another family's cells has none
+  (null), as before. Against nextpnr's slices on the ten examples (the XC3S250E): the same on six, one more on pong,
+  stopwatch, clock and vga, as the packer. The open synthesis keeps the same netlists on the examples (High, Normal and
+  Area), the fixture designs and 50 of the corpus's 52 designs of up to 1500 LUTs (High); on itc99-b08 and iwls05-usb-phy
+  the packer's count was 1 to 9 slices off nextpnr's (the estimate's at most 1), and the netlists now kept are smaller once
+  placed (b08 19 -> 18 slices, 6.223 -> 6.028 ns; usb-phy 67 -> 65 slices, 4.822 -> 4.852 ns).
+- **The designs through ISE on nextpnr's chip databases of the measured descriptions (#2502).** Research only; no
+  change for the toolchain's users. `research/s3e-route/open-flow.mjs --chipdb dir` places and routes on
+  `dir/chipdb-<die>.bin` instead of the package's chip database. With the measured descriptions' chip databases, built
+  by the fork's generator (pmnmalo/nextpnr-spartan#14), 85 designs passed ISE: the 10 examples on the four Spartan-3E
+  boards and the 45 open-flow fixtures. Every design had DRC 0 errors and 0 warnings, xdl2ncd 0 warnings, and a `.bit`
+  byte-identical to ISE's bitgen, with CRC on and off (research/s3e-device/README.md, section 17).
+  - **Tests:** test/open-flow.test.js.
+- `src/fpga/gowin/` (#2303): `gowinPack(netlist, db)` (Apicula 0.32's gowin_pack for the GW1N), `loadGowinChipdb` (its chip database's .msgpack.xz: `xz.js`, `msgpack.js`), `gowin-files.js` (the database read from YoWASP's package's resources: its tar parts, Apicula's wheel); `io.nextpnr.gowin` gains `pack(routedJson, family)`, `gowinIo(load, readFile)`; the Gowin's back end its bitgen step (`<top>.fs`, `GOWIN_NO_BITSTREAM` gone). Apicula's licence in the notices; its databases not shipped.
+- `src/fpga/gowin/pll-osc.js` (#2303): `pllAttrs`, `pllPump`, `pllAuxCols`, `oscAttrs` (Apicula 0.32's set_pll_attrs, calc_pll_pump, extra_pll_bels and set_osc_attrs); `gowinPack(netlist, db, device)` takes the device's name (`'GW1N-9C'` by default), which `io.nextpnr.gowin`'s `pack` passes; `attrids.js` gains the PLL and OSC tables.
+- The third family of YoWASP's tools (#2303): `open-flow-gowin.js` (its steps: synth, translate, par into nextpnr's routed netlist; `GOWIN_DEVICES`, the device and family nextpnr is given for a part, a package and a speed; a port with no pin an error before nextpnr; `GOWIN_NO_BITSTREAM`, why there is no bitgen step), `cst.js` (the CST as a format of the constraints' model: IO_LOC, IO_PORT, a clock's period as a `create_clock` comment), `io.nextpnr.gowin` (`gowinIo`, `nextpnrGowinNode`) from YoWASP's `@yowasp/nextpnr-himbaechel-gowin`, an optional peer dependency; the family in `FAMILY_INFO` and the resources model; a board's constraints written as a CST, each pin's I/O standard the board's.
+- The second family of YoWASP's tools, as the iCE40 (#2302): `open-flow-ecp5.js` (its steps: synth, translate, par into Project Trellis's text configuration, bitgen with ecppack; nextpnr's report as the utilization and each clock's Fmax), `lpf.js` (the LPF as a format of the constraints' model: LOCATE, IOBUF, FREQUENCY, the board's BLOCK and SYSCONFIG kept), `io.nextpnr.ecp5` (`ecp5Io`, `nextpnrEcp5Node`) from YoWASP's `@yowasp/nextpnr-ecp5`, an optional peer dependency; `ECP5_PARTS`, `ECP5_STEPS`, `LPF`, `bitstreamExtOf`; the family in `FAMILY_INFO` (its constraints and bitstream's extension, which `constraintsFormatOf` now reads for the iCE40 too) and in the resources model; a board's constraints written as an LPF.
+- **nextpnr's timing for the iCE40, the ECP5 and the Gowin (#2300):** the back ends have a timing step (`trce`, Generate
+  Post-Place & Route Static Timing) and their Place & Route writes nextpnr's report (open/nextpnr-report.json, its clocks
+  added), the timing (report.timing: `engine: 'nextpnr'`, the clocks, the constraints asked), open/timing.txt and
+  open/paths.json in timing-paths.js's shape (nextpnr-timing.js: nextpnrTiming, nextpnrPaths, nextpnrTimingText,
+  mountNextpnrTiming): a stage's cell is the synthesized netlist's that drives the net after it (or the flip-flop of a setup),
+  through nextpnr's names of the nets (name[i], the I/O buffers' $SB_IO_IN… suffixes) and of its packed cells (_LC, _DFFLC,
+  $CARRY), and so cellSources' lines and signals. nextpnr-ice40 and nextpnr-ecp5 run with `--timing-allow-fail`; the Gowin's,
+  whose routed designs carry the setting (the examples' references), runs again with it only when a clock fails its
+  constraint. The Gowin's utilization leaves out GND, VCC, GSR and DUMMY_CELL (gowinPlaced); the iCE40's clocks are named by
+  their ports.
+- PCF, LPF and CST (#2296): each of the model's `netStatements` has the line of its statement (`line`), for the checks of
+  the pins that name their line; an LPF's SLEWRATE written in capitals (SLEWRATE=FAST), as nextpnr-ecp5 reads it.
+- **The Artix-7's back end, AMD Vivado (#1649):** `FAMILY_INFO.artix7.backEnd` is `'vivado'` and `vivadoDevice(device)`
+  says whether a project device's family is one Vivado implements (the IDE's server runs it for the Basys 3 and the
+  Nexys A7); the other 7-series families keep ISE's flow.
+- **Each clock's own critical path made shorter, not only the slowest clock's (#652).** The mappings for speed aim at
+  the estimate's critical path, the slowest clock's: ABC's depth and the critical-LUT resynthesis left a second clock's
+  path to area. vtr-stereovision3's `tm3_clk_v0` (the one clock of the ISE comparison's PERIOD) had 3 levels of LUTs into
+  a counter's enable where XST has 2, under `tm3_clk_v2`'s I2C logic. `domainDelays` (synth-open-path.js) gives each
+  clock's estimated critical path; every end of `pathEnds` now carries its `clock` (the latches one group, `latch`).
+  After the critical-LUT resynthesis, a design of several clocks has the critical LUTs of each other clock made
+  shallower too (synth-open-resynth.js, `r.depth.domains`), kept when no clock's path gets longer and DEPTH_RULE keeps
+  the clocks' geometric mean. On the design corpus at Speed and at Normal: vtr-stereovision3's `tm3_clk_v0` 5.04 ->
+  3.89 ns by the estimate, vtr-ch-intrinsics' clock 4.25 -> 4.17 ns, both with the same LUTs and slices; the other 65
+  designs and the examples (one clock each) have byte-identical netlists. By ISE's trce on the routed designs
+  (compare-ise.mjs, main against the change): vtr-stereovision3's `tm3_clk_v0` 5.958 -> 5.306 ns at Speed (-10.9 %)
+  and 5.714 -> 5.201 at Area (-9.0 %), 3 -> 2 levels as XST's (4.94 and 5.01 ns), `tm3_clk_v2` 6.882 -> 6.782 and
+  7.128 -> 7.124, the same slices; Fast (no resynthesis) and vtr-ch-intrinsics unchanged; every DRC as before, bitgen ok.
+  - **Tests:** test/synth-open-domains.test.js (domainDelays on hand-written netlists: two clocks, a block RAM's ports,
+    the latches, one clock, no flip-flops; a design of two clocks in VHDL and in Verilog at both efforts: its faster
+    clock's enable 3 -> 2 levels, the slower clock's path and the LUTs unchanged, no warning, the netlist simulated).
+- **Optimization Fast: the usual mapping's critical LUTs made one level shallower, their fan-out kept (#652).** Fast was
+  Yosys's usual mapping alone, which follows a short control path as it is written: a LUT level more than XST on
+  spi-fpga-slave's shift-register enable, iwls05-sasc's FIFO, the clock and micro80 examples. `synthesizeFast`
+  (synth-fast.js) now gives the usual mapping's netlist the critical-LUT resynthesis Speed has had since #745, #914 and #1111
+  (synth-open-resynth.js `resynthStage`, each clock's path too). It is no ABC mapping: the critical LUTs are rebuilt from
+  their cones in JavaScript and the netlist written again. It is kept by DEPTH_RULE, on the 4-input-LUT families only (as at
+  Speed), its result in `r.depth.resynth`. Area keeps its usual mapping as it was. Measured after Place & Route by Silinx's
+  estimate (XC3S1200E corpus projects and the examples on their boards, mean of seeds 1–3):
+  - iwls05-sasc: 3 -> 2 levels, 89 -> 95 LUTs, 67 -> 65 slices, 6.12 -> 5.05 ns (-17.4 %);
+  - spi-fpga-slave: 21 -> 23 LUTs, 13 -> 14 slices, 5.55 -> 4.81 ns (-13.4 %), the enable on 2 levels;
+  - vtr-stereovision3: 127 -> 131 LUTs, 77 -> 79 slices, 9.02 -> 8.27 ns (-8.3 %);
+  - the clock example: 199 -> 208 LUTs, 190 -> 195 slices, 8.29 -> 7.66 ns (-7.6 %);
+  - micro80: 7 -> 6 levels, 211 -> 220 LUTs, 144 -> 148 slices, 12.21 -> 11.60 ns (-4.9 %);
+  - iwls05-spi: 785 -> 765 LUTs, 412 -> 402 slices, 15.17 -> 15.60 ns (+2.8 %, faster by the estimate, within the seeds'
+    spread: 15.10 -> 14.99 at seed 2);
+  - geometric mean of the six: -8.3 %; the other examples and corpus designs of #652 keep their netlists (iwls05-usb-phy,
+    iwls05-i2c, the EPFL router, i2c and bar, vtr-diffeq1, traffic, blinky, pong, stopwatch, vga, isqrt, uart, gates); a
+    synthesis takes under a second more.
+  - **Tests:** test/synth-goal.test.js (spi-fpga-slave's enable in VHDL and in Verilog at Fast: 2 levels, 4.17 ns
+    instead of 5.04, 12 LUTs, the netlist simulated against the design, no warning; the usual mapping unchanged).
+- **State machines Yosys makes one-hot itself, tried as written too (#652):** at Optimization Effort High, a design whose
+  state registers Yosys's `fsm` extracts by itself (a Verilog register written without an initial value: Yosys's `auto`,
+  one-hot) is synthesized once more with them marked `fsm_encoding "none"`, their author's codes kept (as XST keeps
+  iwls05-usb-phy's `fs_state` and vtr-stereovision3's `reg_prog_state`), the rest of the script and High's mappings from
+  that netlist (`fsmExtracted` in synth-fsm.js, `r.depth.written`). It is kept when DEPTH_RULE keeps it and it is
+  3 % faster by the estimate or 5 % smaller in LUTs or slices (picorv32's, as fast and 8 LUTs fewer, routed 8 %
+  slower, is not). The design corpus, routed at seed 1: secworks-aes 8691 → 7225 LUTs (−17 %), secworks-sha256
+  2868 → 2677 (−7 %), vtr-stereovision3 144 → 126 LUTs and 120 → 99 flip-flops, iwls05-usb-phy 127 → 115 LUTs;
+  secworks-sha1 15 % shorter (seeds 1-3), vtr-stereovision3 4 %, iwls05-usb-phy 3 %. The examples have no such
+  machine: their netlists are the same. Synthesis at High takes 3 to 30 s more on the 13 designs that have one.
+- **Optimization Fast: a deep design too large for DEEP_RULE gets the SOP balancing again (#370).** Fast was Yosys's usual
+  mapping alone, and #3096's DEEP_RULE (1500 LUTs at most) synthesizes only a smaller deep design as at Speed. So the EPFL
+  arbiter kept the area script's mapping of its 128 ring-shaped priority chains: 4033 LUTs and 30 levels, the "area mapping
+  larger than its depth mapping" of #370. The old Normal effort had given it the GIA's SOP balancing (DEPTH_SOPB, #654).
+  `synthesizeFast` now asks the usual run for it (synthesizeVerilog's `sopb: n`, with depth false: the design written before
+  its LUT mapping, without the wide-multiplexer count, and that one remap for a design of more than n LUTs and more than
+  SOPB_RULE.levels levels). The remap is kept when DEEP_RULE.gain (10 %) faster, as the old Normal kept it, and its result
+  is in `r.depth.sopb`. The order with #652's critical-LUT resynthesis at Fast: the balancing first (in the usual run), then the
+  resynthesis of the netlist that run keeps, so it works on the shallower netlist (and leaves one above SPEED_RULE.maxLuts,
+  as the balanced arbiter, as it is). Every other design's Fast netlist is byte-identical: the examples, iwls05-spi, iwls05-i2c and the
+  corpus's deep designs below 1500 LUTs, whose deep path is unchanged. Area and Speed are unchanged.
+  - **Measured** (the app's flow, the EPFL arbiter in the corpus's I/O wrapper on the XC3S1200E, Silinx's estimate after
+    Place & Route, seeds 1 / 2 / 3): 4090 -> 2579 LUTs (-37 %), 2070 -> 1290 slices (-38 %), 30 -> 7 levels, 37.52 / 40.12 /
+    37.74 -> 12.60 / 12.71 / 12.77 ns (-67 %). The other deep designs above 1500 LUTs come out the same: epfl-sin,
+    epfl-voter, itc99-b20, b21, b22, secworks-sha256, the T80 and vtr-sha (the balancing is not 10 % faster on them, or
+    they are not deeper than 16 levels). It costs one remap of seconds on such a design.
+  - **Tests:** test/synth-goal.test.js (a 128-request priority encoder with DEEP_RULE.maxLuts below its size: 42 levels and
+    49.0 ns in the usual mapping, 6 levels and 7.70 ns so, 217 LUTs, 109 slices, then 7.62 ns with #652's resynthesis; not 10 % faster: the usual netlist, the
+    same as FAST_SYNTH's; the netlist simulated against the design; no warning). The traffic test checks that a design not
+    deep keeps FAST_SYNTH's netlist.
+
 ## 0.3.0
 
 In short:

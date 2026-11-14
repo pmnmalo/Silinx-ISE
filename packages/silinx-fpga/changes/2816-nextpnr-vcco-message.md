@@ -1,3 +1,0 @@
-In detail:
-
-- **The nextpnr engine's I/O with no pad of its VCCO, said as Silinx's placer said it (#2816):** when nextpnr finds no free pad in a bank of an I/O's VCCO (the I/Os with no LOC of LVCMOS25, ISE's default, where every bank holds LVCMOS33 pins), the flow's error names every such I/O by its port bit (`led<4>`, not nextpnr's cell `$iopadmap$top.led_4`), the banks with free pads with their VCCO and I/Os, and the constraints that fix it (`NET "led<4>" IOSTANDARD = LVCMOS33;`, or a LOC), instead of "nextpnr failed" and the hint of an ISE mode (`open-flow-nextpnr.js` padVccoError; nextpnrNetlist's `free`, the port bits with no LOC).
