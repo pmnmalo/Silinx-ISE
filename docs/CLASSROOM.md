@@ -19,6 +19,12 @@ Make the template from the exercise and the project the students start from (`ex
 silinx classroom template exercises/counter4/counter4.exercise.json exercises/counter4/starter counter4-template
 ```
 
+Leave out the starter project, and the template's starter is made from the statement: a `silinx.json` of the Basys2 and the
+top module with the statement's ports and an empty body, in VHDL (`--language verilog` for Verilog). In Silinx, the
+Exercise document's ⋮ menu makes the same template as a zip (**Classroom Template…**, the starter in the language chosen,
+on the project's board and device), and **Export Student Copy** saves the student's copy alone. The MCP server's `grade`
+tool does both (`template`, `student_copy`).
+
 The folder `counter4-template` then holds:
 
 - the starter project (its `silinx.json` and sources);

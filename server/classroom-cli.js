@@ -1,12 +1,13 @@
 // `silinx classroom` (#3193): GitHub Classroom's assignments graded by Silinx (server/classroom.js).
-//   silinx classroom template <exercise.json> <starter project> <out folder> [--silinx-version x.y.z]
+//   silinx classroom template <exercise.json> [<starter project>] <out folder> [--silinx-version x.y.z]
+//                             [--language vhdl|verilog] (no starter: one made from the statement, #3841)
 //   silinx classroom grade <exercise.json> --org <organization> --assignment <name> --out <folder>
 //                          [--before <date>] [--csv grades.csv] [--json grades.json] [--issues] [--quiet]
 // The exit status: 0 when done (grade: every student Accepted), 2 when a student is not, 1 when the command is wrong.
 import { makeTemplate, gradeClassroom, WORKFLOW } from './classroom.js';
 import { textReport } from '../core/grade-report.js';
 
-const VALUED = ['silinx-version', 'org', 'assignment', 'out', 'before', 'csv', 'json'];
+const VALUED = ['silinx-version', 'language', 'org', 'assignment', 'out', 'before', 'csv', 'json'];
 
 /** The command's run on its arguments (after `classroom`): the exit status. out / err: where the texts go. runner: the
  *  GitHub CLI's and git's (server/classroom.js RUNNER; a test's own). */
@@ -17,11 +18,12 @@ export async function classroomCommand(args, { out, err, runner } = {}) {
   for (const k of VALUED) if (args.includes(`--${k}`) && (!opt(k) || opt(k).startsWith('--'))) { err(`silinx classroom: --${k} needs a value\n`); return 1; }
   const [sub, ...plain] = args.filter((a, i) => !a.startsWith('--') && !VALUED.includes(args[i - 1]?.slice(2)));
   if (sub === 'template') {
-    const [exercise, starter, dir] = plain;
-    if (!dir) { err('silinx classroom template: give the exercise, the starter project and a new folder for the template\n'); return 1; }
+    const [exercise, ...rest] = plain;
+    if (rest.length < 1 || rest.length > 2) { err('silinx classroom template: give the exercise, the starter project (or none: one made from the statement) and a new folder for the template\n'); return 1; }
+    const [starter, dir] = rest.length === 2 ? rest : [null, rest[0]];
     try {
-      const r = makeTemplate(exercise, starter, dir, opt('silinx-version') ? { version: opt('silinx-version') } : {});
-      out(`${dir}: the template of ${r.exerciseFile} (${Object.keys(r.files).length} files: the starter project, the visible tests, README.md, ${WORKFLOW})\n`);
+      const r = makeTemplate(exercise, starter, dir, { ...(opt('silinx-version') && { version: opt('silinx-version') }), ...(opt('language') && { lang: opt('language') }) });
+      out(`${dir}: the template of ${r.exerciseFile} (${Object.keys(r.files).length} files: the starter project${starter ? '' : ' made from the statement'}, the visible tests, README.md, ${WORKFLOW})\n`);
       return 0;
     } catch (e) { err(`silinx classroom template: ${e.message}\n`); return 1; }
   }

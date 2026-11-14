@@ -1,13 +1,14 @@
 // The MCP server's grade tool (server/mcp-grade.js, #3192, #2674): an exercise of a project checked, its ports taken
 // from the project's top, run on the project itself (a student's run, its visible tests) and on submissions of the
 // exchange folder (a teacher's: the CSV written there), the student's copy written; its wrong arguments; an exercise
-// authored from the project (#3831: its reference the project's design, a vectors test's outputs filled from it).
+// authored from the project (#3831: its reference the project's design, a vectors test's outputs filled from it); its
+// Classroom template written to the exchange folder (#3841).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratchEnv } from './server-helpers.js';
-import { COUNTER_V, counterExercise } from './grade-fixtures.mjs';
+import { COUNTER_V, VECTORS, counterExercise } from './grade-fixtures.mjs';
 
 let tmp, xchg;
 before(async () => {
@@ -77,7 +78,7 @@ test('grade: a wrong submission\'s first difference; wrong arguments', { timeout
   assert.equal(r.text.split('\n').slice(1, 5).join('\n'), 'w: 0 / 30 points (Wrong Answer), the visible tests\n  WARNING: "src/counter4.v" Line 1: Input <en> is never used.\n  - count (Counting): WA Wrong Answer, 0 / 30\n      cycle 3 (vectors line 6): q is 0011, expected 0010');
   const err = async (args, text) => { const x = await call('grade', args); assert.deepEqual([x.isError, x.text], [true, text]); };
   await err({ project: 'nope' }, 'grade: no project \'nope\' in the workspace');
-  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, reference, expected, student_copy, new');
+  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, reference, expected, student_copy, template, new');
   await err({ project: 'w', exercise: 'x.json' }, 'grade: exercise: \'x.json\' is not a .exercise.json');
   await err({ project: 'w', action: 'student_copy' }, 'grade: file: the new file of the exchange folder for the student\'s copy');
   await err({ project: 'w', submissions: ['../../etc'] }, `grade: submissions: '../../etc' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
@@ -129,4 +130,30 @@ test('#3831 grade reference and expected: the exercise\'s reference the project\
   await ok('write_file', { project: 'teach', path: 'src/counter4.v', text: 'module counter4(' });
   await ok('grade', { project: 'teach', action: 'reference' });
   await err({ project: 'teach', action: 'expected', test: 'vectors' }, 'grade: test vectors: the reference: "src/counter4.v" Line 1: expected identifier but found \'eof\'\ntest vectors: the reference: "" Line 1: top module \'counter4\' not found');
+});
+
+test('#3841 grade template: the Classroom template in a new folder of the exchange folder, its starter from the statement in the project\'s language; graded as the workflow grades it', { timeout: 120000 }, async () => {
+  await counterProject('tpl', COUNTER_V);
+  const ex = counterExercise();
+  ex.tests[0] = { ...ex.tests[0], vectors: undefined, file: 'tests/count.vec' };
+  await ok('write_file', { project: 'tpl', path: 'counter4.exercise.json', text: JSON.stringify(ex) });
+  await ok('write_file', { project: 'tpl', path: 'tests/count.vec', text: VECTORS });
+  const r = await ok('grade', { project: 'tpl', action: 'template', folder: 'tpl-template' });
+  const dir = path.join(xchg, 'tpl-template');
+  assert.equal(r.text, `<exchange folder>/tpl-template: the template of counter4.exercise.json (7 files: the starter project in VHDL, the visible tests, README.md, the workflow)`);
+  assert.deepEqual(r.data.files, ['silinx.json', 'src/counter4.vhd', 'tests/count.vec', 'counter4.exercise.json', 'README.md', '.gitignore', '.github/workflows/silinx-grade.yml']);
+  assert.equal(fs.readFileSync(path.join(dir, 'tests/count.vec'), 'utf8'), VECTORS);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8')).board, 'basys2');
+  assert.doesNotMatch(fs.readdirSync(dir, { recursive: true }).map(f => fs.statSync(path.join(dir, f)).isFile() ? fs.readFileSync(path.join(dir, f), 'utf8') : '').join('\n'), /tb_counter4|"seed"|"reference"/);
+  // (the workflow's run on the template: the starter's visible test a Wrong Answer, no Compile Error)
+  const { gradeAll } = await import('../server/grade.js');
+  const g = await gradeAll(path.join(dir, 'counter4.exercise.json'), [dir], { visible: true, expand: false });
+  assert.deepEqual(g.results.map(x => [x.verdict, x.tests.map(t => t.verdict)]), [['WA', ['WA']]]);
+  // Verilog asked; the wrong arguments
+  const v = await ok('grade', { project: 'tpl', action: 'template', folder: 'tpl-v', starter_language: 'verilog' });
+  assert.ok(v.data.files.includes('src/counter4.v'));
+  const err = async (args, text) => { const x = await call('grade', args); assert.deepEqual([x.isError, x.text], [true, text]); };
+  await err({ project: 'tpl', action: 'template' }, 'grade: folder: the new folder of the exchange folder for the template');
+  await err({ project: 'tpl', action: 'template', folder: 'tpl-template' }, 'grade: \'tpl-template\' is not a new folder: give another');
+  await err({ project: 'tpl', action: 'template', folder: '../x' }, `grade: folder: '../x' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
 });
