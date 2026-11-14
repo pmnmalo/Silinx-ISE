@@ -1,5 +1,5 @@
 // The schematic editor's keyboard (#405: out of mountSchEditor in sch-editor.js): Space held to pan, the tools'
-// letters, Delete, Escape, the arrows moving the selection by the grid (Shift: 5 steps), Rotate / Mirror, Undo /
+// letters, Delete, Escape, the arrows moving the selection by the grid (Shift: 5 steps; a junction dot, #3806), Rotate / Mirror, Undo /
 // Redo, Cut / Copy / Paste, Select All, and the keys of Try it.
 import { GRID } from '/core/schdoc.js';
 import { pasteFromKey } from './clipboard.js';
@@ -7,7 +7,7 @@ import { pasteFromKey } from './clipboard.js';
 /** { onKey, onKeyUp } of mountSchEditor (destroyed(), live(), sel(), spaceDown(), tool(), wireDraw(): its current values). */
 export function mountSchKeys(ctx) {
   const {
-    container, opts, applyMove, beginMove, canvas, copySel, deleteSel, destroyed, finishMove, finishWire, fit,
+    junction, container, opts, applyMove, beginMove, canvas, copySel, deleteSel, destroyed, finishMove, finishWire, fit,
     infoTarget, leaveSim, live, mirrorSel, openInfo, openSelected, paste, readOnly, redo, render, renderOverlay,
     renderProps, rotateSel, sel, selectAll, setTool, spaceDown, tool, undo, wireDraw, zoomAt, setSpaceDown, setWireDraw
   } = ctx;
@@ -79,6 +79,8 @@ export function mountSchKeys(ctx) {
       e.preventDefault();
       const d = (e.shiftKey ? 5 : 1) * GRID;
       const dx = k === 'arrowleft' ? -d : k === 'arrowright' ? d : 0, dy = k === 'arrowup' ? -d : k === 'arrowdown' ? d : 0;
+      const [one] = sel();
+      if (sel().size === 1 && one.startsWith('junction:')) { junction.nudge(one.slice(9), dx, dy); return; }
       const m = beginMove({ x: 0, y: 0 });
       applyMove(m, dx, dy);
       finishMove(m);

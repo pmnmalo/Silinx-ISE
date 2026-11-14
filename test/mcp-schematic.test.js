@@ -72,6 +72,47 @@ test('rearrange_wires: a channel spread evenly with no crossing; a marker\'s wir
   assert.deepEqual([e.isError, e.text], [true, 'rearrange_schematic: src/gates.vhd: not a schematic (.sch.json)']);
 });
 
+// #3806: move_junction, as the editor's drag of a junction dot: the wires ending on it follow, the HDL file the same; a
+// short of two named nets refused (the file as it was), an unnamed net joined said; no dot there, off the grid
+test('move_junction: a junction dot moved, its wires following, the HDL the same; refused, said', async () => {
+  await ok('new_project', { name: 'j' });
+  await ok('new_source', { project: 'j', type: 'schematic', name: 'tee' });
+  const doc = JSON.parse((await ok('read_file', { project: 'j', path: 'src/tee.sch.json' })).text);
+  doc.ports = [port('P1', 'a', 'in', 100, 200), port('P2', 'y', 'out', 400, 100), port('P3', 'z', 'out', 400, 300), port('P4', 'b', 'in', 300, 400)];
+  doc.wires = [{ id: 'W1', points: [P(100, 200), P(200, 200)] }, { id: 'W2', points: [P(200, 200), P(200, 100), P(400, 100)] },
+    { id: 'W3', points: [P(200, 200), P(200, 300), P(400, 300)] }, { id: 'W4', points: [P(300, 400), P(300, 200)] }];
+  await ok('write_file', { project: 'j', path: 'src/tee.sch.json', text: JSON.stringify(doc, null, 1) });
+  const hdl0 = (await ok('read_file', { project: 'j', path: 'src/tee.vhd' })).text;
+  const sch = async () => JSON.parse((await ok('read_file', { project: 'j', path: 'src/tee.sch.json' })).text);
+  const r = await ok('move_junction', { project: 'j', path: 'src/tee.sch.json', at: P(200, 200), to: P(250, 220) });
+  assert.deepEqual(r, { isError: false, text: 'The junction dot at (200, 200) moved to (250, 220)',
+    data: { project: 'j', path: 'src/tee.sch.json', kept: true, hdl: { file: 'src/tee.vhd', written: false } } });
+  assert.deepEqual((await sch()).wires.slice(0, 3).map(w => w.points), [[P(100, 200), P(100, 220), P(250, 220)],
+    [P(250, 220), P(250, 100), P(400, 100)], [P(250, 220), P(250, 300), P(400, 300)]]);
+  assert.equal((await ok('read_file', { project: 'j', path: 'src/tee.vhd' })).text, hdl0);
+  const now = JSON.stringify(await sch());
+  for (const [args, message] of [
+    [{ at: P(250, 220), to: P(300, 200) }, 'The move would short net \'a\' and net \'b\': two named nets cannot be joined. Rename one of them first (the same name connects them).'],
+    [{ at: P(200, 200), to: P(200, 250) }, 'no junction dot at (200, 200)'],
+    [{ at: P(250, 220), to: P(255, 220) }, '(255, 220) is not on the grid (every 10)'],
+    [{ path: 'src/tee.vhd', at: P(250, 220), to: P(250, 230) }, 'src/tee.vhd: not a schematic (.sch.json)'],
+  ]) {
+    const e = await call('move_junction', { project: 'j', path: 'src/tee.sch.json', ...args });
+    assert.deepEqual([e.isError, e.text], [true, `move_junction: ${message}`]);
+  }
+  assert.equal(JSON.stringify(await sch()), now, 'the file as it was');
+  assert.equal((await ok('move_junction', { project: 'j', path: 'src/tee.sch.json', at: P(250, 220), to: P(250, 220) })).text, 'The junction dot at (250, 220) is already there');
+  // the unnamed net between two inverters joined to a's: said
+  const d = await sch();
+  d.symbols = [{ id: 'S1', type: 'inv', x: 300, y: 490, rot: 0, mirror: false, name: 'U1', params: { width: 1 } },
+    { id: 'S2', type: 'inv', x: 500, y: 490, rot: 0, mirror: false, name: 'U2', params: { width: 1 } }];
+  d.wires.push({ id: 'W8', points: [P(380, 500), P(440, 500)] }, { id: 'W9', points: [P(440, 500), P(500, 500)] });
+  await ok('write_file', { project: 'j', path: 'src/tee.sch.json', text: JSON.stringify(d, null, 1) });
+  const k = await ok('move_junction', { project: 'j', path: 'src/tee.sch.json', at: P(250, 220), to: P(440, 500) });
+  assert.equal(k.text.split('\n').slice(0, 2).join('\n'), 'The junction dot at (250, 220) moved to (440, 500)\nConnections changed by this move (a pin now touches another net, or a wire could not be routed). Undo with Ctrl+Z if not intended.');
+  assert.equal(k.data.kept, false);
+});
+
 // #3300: write_file of a schematic whose instance has an empty name gives it its automatic name, inst_n, as its
 // editor does when the name is cleared: the file written with it, said; its HDL the same (a gate's is an expression
 // there), Check Syntax with no warning

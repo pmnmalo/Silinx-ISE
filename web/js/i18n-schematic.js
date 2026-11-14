@@ -132,6 +132,9 @@ export const SCH_PT_PATTERNS = [
   [/^A bus tap takes the bits MSB downto LSB: its LSB \((\d+)\) cannot be above its MSB \((\d+)\)$/, 'Um bus tap tira os bits MSB downto LSB: o seu LSB ($1) não pode ser maior que o seu MSB ($2)'],
   [/^Rearrange Wires: (\d+) wires? drawn again$/, (m, n) => `Reorganizar fios: ${n} fio${n === '1' ? '' : 's'} desenhado${n === '1' ? '' : 's'} de novo`],
   [/^Rearrange Schematic: the symbols kept where they were; (\d+) wires? drawn again$/, (m, n) => `Reorganizar esquemático: os símbolos ficaram onde estavam; ${n} fio${n === '1' ? '' : 's'} desenhado${n === '1' ? '' : 's'} de novo`],
+  // a junction dot moved (#3806)
+  [/^no junction dot at \((-?\d+), (-?\d+)\)$/, 'não há ponto de junção em ($1, $2)'],
+  [/^\((.+), (.+)\) is not on the grid \(every (\d+)\)$/, '($1, $2) não está na grelha (de $3 em $3)'],
   // a wire, a move or a paste between two named nets refused, as in ISE (#754, #806)
   [/^(The wire|The move|Pasting|Duplicating) would short net '(.+)' and net '(.+)': two named nets cannot be joined\. Rename one of them first \(the same name connects them\)\.$/,
     (m, what, a, b) => `${{ 'The wire': 'O fio', 'The move': 'A deslocação', Pasting: 'Colar', Duplicating: 'Duplicar' }[what]} poria em curto a rede '${a}' e a rede '${b}': duas redes com nome não podem ser unidas. Mude primeiro o nome de uma delas (o mesmo nome liga-as).`],

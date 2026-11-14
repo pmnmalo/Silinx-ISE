@@ -2,7 +2,7 @@
 // move with rubber-banding wires, drag a wire's segment, draw a wire, place a symbol or a marker, pan), the pointer's
 // moves (the hover, the drop target), the release (a move checked for clashes, rerouted, untangled), the wheel, the
 // double click, the context menu. Curved wires (#1144): a handle of the selected wire dragged (double-clicked: removed),
-// the wire grabbed on its curve.
+// the wire grabbed on its curve. A junction dot (#3806): selected, dragged (sch-junction.js).
 import { GRID, defaultParams, instanceParams, normalizeDoc, splitWiresAt, symbolPins } from '/core/schdoc.js';
 import { connectionsKept, connectivity, placementClashes, rerouteAfterMove } from '/core/schroute.js';
 import { closeMenus, twoFingerView } from './ui.js';
@@ -14,7 +14,7 @@ import { GRAPHIC_TOOLS, mountSchGraphics } from './sch-graphics.js';
 /** { finishMove, onMove, onUp } of mountSchEditor (cursor(), destroyed(), doc(), drag(), hoverPin(), keepConn(), live(), modules(), sel(), spaceDown(), tool(), view(), wireDraw(): its current values). */
 export function mountSchMouse(ctx) {
   const {
-    container, opts, edit, nextId, promptBox, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
+    junction, container, opts, edit, nextId, promptBox, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor, destroyed, doc, drag, finishSegMove, finishWire, flash, hoverPin, ioClick, itemAt, keepConn, live, modules,
     netClick, pinNear, placeAt, propBody, pushUndo, readOnly, refusedShort, render, renderOverlay, renderProps, segSel, sel,
     setTool, spaceDown, startPlace, svg, toSheet, tool, updateStatus, view, wireClick, wholeBranch, wireDraw, zoomAt, setCursor, setDoc, setDrag,
@@ -59,6 +59,16 @@ export function mountSchMouse(ctx) {
       return;
     }
     const it = itemAt(e.target);
+    // a junction dot (#3806): selected; dragged, the wires ending on it following
+    if (it?.kind === 'junction') {
+      e.preventDefault();
+      const k = `junction:${it.id}`, sel0 = sel();
+      if (e.shiftKey || e.ctrlKey || e.metaKey) { if (sel().has(k)) sel().delete(k); else sel().add(k); render(); renderProps(); return; }
+      if (!sel().has(k) || sel().size !== 1) { segSel.clear(); setSel(new Set([k])); render(); renderProps(); }
+      const d = !readOnly && e.detail < 2 ? junction.begin(it.id, pt) : null;
+      if (d) setDrag({ ...d, sel0 });
+      return;
+    }
     if (it) {
       // the item is drawn again below (render): without this, Safari (WebKit) sends the mousedown to
       // the removed element and moves the keyboard focus to the page, so F1, Delete, Ctrl+C… did
@@ -96,6 +106,10 @@ export function mountSchMouse(ctx) {
       const dx = snap(pt.x) - drag().start.x, dy = snap(pt.y) - drag().start.y;
       if (dx || dy) closeMenus();
       applyMove(drag(), dx, dy); return;
+    }
+    if (drag()?.kind === 'junction') {
+      if (snap(pt.x) !== drag().start.x || snap(pt.y) !== drag().start.y) closeMenus();
+      junction.move(drag(), pt); return;
     }
     if (drag()?.kind === 'seg') {
       const d = drag().hz ? snap(pt.y) - drag().start.y : snap(pt.x) - drag().start.x;
@@ -159,6 +173,7 @@ export function mountSchMouse(ctx) {
     if (d.kind === 'seg') { if (d.d) { finishSegMove(d); if (!wholeBranch()) { segSel.pick(d.id, toSheet(e.clientX, e.clientY)); render(); } } return; }
     if (d.kind === 'stroke') { strokeEnd(d, toSheet(e.clientX, e.clientY)); return; }
     if (d.kind === 'knot') { curve.endKnot(d); return; }
+    if (d.kind === 'junction') { junction.end(d); return; }
     if (d.kind === 'graphic') { setDrag(graphics.up(d, toSheet(e.clientX, e.clientY))); return; }
     if (d.kind === 'move') {
       if (d.dx || d.dy) finishMove(d);
@@ -188,6 +203,7 @@ export function mountSchMouse(ctx) {
       render(); renderProps();
     } else if (d?.kind === 'band' || d?.kind === 'graphic') renderOverlay();
     else if (d?.kind === 'stroke') strokeCancel();
+    else if (d?.kind === 'junction') junction.cancel(d);
     else if (d?.kind === 'knot') { curve.cancelKnot(d); if (d.sel0) { setSel(d.sel0); render(); renderProps(); } }
   }
   function onDouble(it) {

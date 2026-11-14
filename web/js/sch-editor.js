@@ -53,6 +53,8 @@ import { mountSchCurve } from './sch-curve.js';
 import { mountSchBeautify } from './sch-beautify.js';
 import { mountSchPanels } from './sch-panels.js';
 import { mountSchJoin } from './sch-join.js';
+import { mountSchJunction } from './sch-junction.js';
+import { shortText } from '/core/schjunction.js';
 import { onLayoutToggled } from './layout-fit.js';
 import { clone } from '/core/util.js';
 export { clone };   // (core/util.js's)
@@ -198,7 +200,7 @@ export function mountSchEditor(container, opts = {}) {
   function refreshNetlist() { try { nl = netlist(doc, { modules }); } catch (e) { console.error(e); nl = null; } }
   const { renderSheet, render, renderOverlay, updateToolbar, updateStatus } = mountRender({
     state: () => ({ doc, nl, sel, tool, placing, drag, wireDraw, cursor, hoverPin, lastDiags, live, modules, view, destroyed, showHops: showHops(), showNames: showNames() }),
-    curve, segSel, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack,
+    curve, segSel, junctionSvg: (...a) => junction.svg(...a), refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack,
     routeTo: (...a) => routeTo(...a), snapPoint: (...a) => snapPoint(...a), bandRect });
 
   // ---------------- properties panel (sch-props.js); an I/O marker given a net's name (sch-join.js, #2170)
@@ -225,9 +227,7 @@ export function mountSchEditor(container, opts = {}) {
     promptBox: (...a) => promptBox(...a), renderPalette, render, renderOverlay, renderProps,
     updateToolbar, updateStatus, joinByName, joinMarker, renamed });
   // a short of two named nets refused (#754, #806): the status line says why
-  function shortNote(what, [a, b]) {
-    flash(`${what} would short net '${a}' and net '${b}': two named nets cannot be joined. Rename one of them first (the same name connects them).`, 6000);
-  }
+  function shortNote(what, pair) { flash(shortText(what, pair), 6000); }
   // a move or a paste that shorted two named nets (#806): the document as it was before, nothing to undo
   function refusedShort(before, what) {
     const short = netShort(JSON.parse(before), doc, { modules });
@@ -237,6 +237,7 @@ export function mountSchEditor(container, opts = {}) {
     shortNote(what, short);
     return true;
   }
+  const junction = mountSchJunction({ doc: () => doc, setDoc: (v) => { doc = v; }, modules: () => modules, sel: () => sel, setSel: (v) => { sel = v; }, snapshot, pushUndo, changed, render, renderProps, flash: (...a) => flash(...a), shortNote });   // (the junction dots: highlighted, selected, dragged, #3806)
 
   // ---------------- selection operations (sch-select.js)
   const { copySel, deleteSel, duplicateSel, mirrorSel, mirrorVSel, paste, rotateSel, selectAll, selected } = mountSchSelect({
@@ -269,7 +270,7 @@ export function mountSchEditor(container, opts = {}) {
   const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, segSel, sel: () => sel, tool: () => tool, render, renderProps,
     rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; }, openInfo: (...a) => openInfo(...a), symTarget: (...a) => symTarget(...a), opts, modules: () => modules, edit: (...a) => edit(...a), flash: (...a) => flash(...a) });
   const { finishMove, onMove, onUp } = mountSchMouse({
-    segSel, wholeBranch, container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
+    junction, segSel, wholeBranch, container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor: () => cursor, destroyed: () => destroyed, doc: () => doc, drag: () => drag, finishSegMove, finishWire,
     flash: (...a) => flash(...a), hoverPin: () => hoverPin, ioClick, itemAt, keepConn, live: () => live,
     modules: () => modules, netClick, pinNear, placeAt, propBody, pushUndo, readOnly, refusedShort, render,
@@ -281,7 +282,7 @@ export function mountSchEditor(container, opts = {}) {
 
   // ---------------- keyboard (sch-keys.js)
   const { onKey, onKeyUp } = mountSchKeys({
-    container, opts, applyMove, beginMove, canvas, copySel, deleteSel, destroyed: () => destroyed, finishMove,
+    junction, container, opts, applyMove, beginMove, canvas, copySel, deleteSel, destroyed: () => destroyed, finishMove,
     finishWire, fit, infoTarget: (...a) => infoTarget(...a), leaveSim: (...a) => leaveSim(...a), live: () => live,
     mirrorSel, openInfo: (...a) => openInfo(...a), openSelected, paste, readOnly, redo, render, renderOverlay,
     renderProps, rotateSel, sel: () => sel, selectAll, setTool, spaceDown: () => spaceDown, tool: () => tool, undo,
