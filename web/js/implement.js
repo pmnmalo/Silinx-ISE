@@ -158,18 +158,34 @@ async function checkConstraints(warnings = null) {
     log(`ERROR: the project device ${devStr(pj.device)} does not match the board ${board.name} (${devStr(board.device)}). Fix it in Project > Design Properties.`, 'err');
     return false;
   }
-  if (!pj.constraints || !S.fileTree.includes(pj.constraints)) return true;
+  return boardConstraints(board);
+}
+
+/**
+ * Constraints made for another board (#3742: Implement's check, and the Board Emulator's before it runs): their pins
+ * that are not on the board said in the console, and their regeneration from the board's pin table offered. True when
+ * the pins are the board's (or there are no constraints) or the constraints were regenerated (Implement: with every port); false
+ * when declined. emulate: the Board Emulator's (a warning, its own words); quiet: said, not asked (false).
+ */
+export async function boardConstraints(board, { emulate = false, quiet = false } = {}) {
+  const pj = S.project;
+  if (!board || !pj.constraints || !S.fileTree.includes(pj.constraints)) return true;
   const { locsNotOnBoard } = await import('/packages/silinx-fpga/src/parts.js');
   let bad = [];
   // (in the device's format: a PCF's, an LPF's, a CST's pins too, #2296)
   try { bad = locsNotOnBoard(readPins(pj.device, await api.readFile(pj.name, pj.constraints), { ports: topUcfPorts() }).assignments, board); } catch { return true; }
   if (!bad.length) return true;
   const list = bad.slice(0, 8).map(b => `${b.net}=${b.loc}`).join(', ') + (bad.length > 8 ? ', …' : '');
-  log(`ERROR: ${pj.constraints} uses ${bad.length} pin(s) that are not on the ${board.name}: ${list}`, 'err');
-  const fix = await confirmDlg('Constraints do not match the board',
+  if (emulate) log(`WARNING: Board Emulator: ${pj.constraints} uses ${bad.length} pin(s) that are not on the ${board.name} (constraints made for another board): ${list}`, 'warn');
+  else log(`ERROR: ${pj.constraints} uses ${bad.length} pin(s) that are not on the ${board.name}: ${list}`, 'err');
+  const fix = !quiet && await confirmDlg('Constraints do not match the board',
     `${pj.constraints} assigns ${bad.length} pin(s) that do not exist on the ${board.name} (${list}).\n\nRegenerate the constraints from the ${board.name} pin table now? (ports are matched by name: clk, led, sw, btn, seg, an…)`);
-  if (!fix) return false;
-  return regenerateUcf(board);
+  if (!fix) {
+    if (emulate) log(`Board Emulator: not run: ${pj.constraints} is another board's; regenerate it for the ${board.name} (Update Constraints) or set its pins in I/O Pin Planning.`, 'warn');
+    return false;
+  }
+  const all = await regenerateUcf(board);
+  return emulate || all;   // (the emulator runs with the ports not assigned unconnected, as it says)
 }
 
 export async function regenerateUcf(board = projectBoard()) {

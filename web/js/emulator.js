@@ -14,7 +14,7 @@ import { boardWiring, boardOutputs, lcdState, lcdFeed, emulatorClocks, manualClo
 import { h } from './dom.js';
 import { mountBoardParts } from './emulator-board.js';
 import { mountEmuSerial } from './emulator-serial.js';
-import { UART_GROUPS } from '/core/uart.js';
+import { uartBit } from '/core/uart.js';
 import { pressHolds } from '/core/emulate-press.js';
 import { mountEmuSide } from './emulator-side.js';
 import { mountEmuPaint } from './emulator-paint.js';
@@ -251,7 +251,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   // iCEBreaker's BTN_N, #2511) released
   // the serial port's RX idle (#2536)
   const restsHigh = (b) => (b.res.pull === 'up' && b.kind !== 'sw' && b.kind !== 'btn') || (b.res.extra?.activeLow && (b.kind === 'btn' || b.kind === 'sw'))
-    || UART_GROUPS.includes(b.res.group);
+    || uartBit(b);
   for (const b of wiring.bits) if (b.dir === 'in' && restsHigh(b)) inVal.set(b.sig, (inVal.get(b.sig) ?? 0n) | (1n << BigInt(b.pos)));
   let lcd = lcdState(), lcdView = null;
 

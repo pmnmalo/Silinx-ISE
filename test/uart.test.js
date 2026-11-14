@@ -14,7 +14,7 @@ import { resolveBoard } from '../server/devices.js';
 import { boardWiring, emulatorClocks } from '../core/emulate.js';
 import { netlistOf } from '../core/compiled-sim.js';
 import { CompiledBoard } from '../core/emulate-compiled.js';
-import { BAUDS, UART_GROUPS, UartDecoder, serialText, textBytes, uartFrames, uartPins } from '../core/uart.js';
+import { BAUDS, UART_GROUPS, UartDecoder, serialText, textBytes, uartBit, uartFrames, uartPins } from '../core/uart.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 // a line's changes ([cycle, level…]) for bytes sent one after the other from cycle c0, `gap` bit times between
@@ -116,6 +116,27 @@ test('uartPins: each board\'s serial port in its resources, from the UCF\'s wiri
   assert.equal(p.rx.res.name, 'rs232_dte_rxd');   // (the first RX of the TX's group)
   assert.equal(uartPins({ bits: bits.slice(0, 1) }), null);
   assert.deepEqual(uartPins({ bits: bits.slice(0, 2) }), { tx: null, rx: bits[1] });
+});
+
+test('uartPins: only a port in the serial pin\'s direction; another board\'s clock on the TX pin is no RX (#3742)', () => {
+  // the clock example's Basys2 pins on a Numato Mimas V2: its clock pin B8 is the Mimas V2's USB-UART TX (an output)
+  const r = resolveBoard('mimas-v2'), board = { id: 'mimas-v2', name: r.board.name, device: r.device, resources: r.resources };
+  const port = (name, dir) => ({ name, dir, sig: { t: { w: 1, kind: 'logic', scalar: true } } });
+  const ports = [port('clk', 'in'), port('led', 'out')];
+  const ucf = parseUcf('NET "clk" LOC = "B8";\nNET "led" LOC = "B8";', { ports: ports.map((p) => ({ name: p.name, dir: p.dir, width: 1 })) });
+  const wiring = boardWiring({ ports, assignments: ucf.assignments, board });
+  const clk = wiring.bits.find((b) => b.port === 'clk'), led = wiring.bits.find((b) => b.port === 'led');
+  assert.equal(clk.res.name, 'uart_tx');
+  assert.equal(uartBit(clk), false);
+  assert.equal(uartBit(led), true);
+  assert.equal(uartPins({ bits: [clk] }), null);   // (the old code: RX = clk)
+  assert.deepEqual(uartPins({ bits: [clk, led] }), { tx: led, rx: null });
+  // an output on an RX pin is no TX; an inout resource takes both
+  const res = (name, dir) => ({ name, group: 'UART', dir });
+  assert.equal(uartPins({ bits: [{ res: res('rx', 'in'), dir: 'out' }] }), null);
+  assert.equal(uartBit({ res: res('io', 'inout'), dir: 'in' }), true);
+  assert.equal(uartBit({ res: res('io', 'inout'), dir: 'out' }), true);
+  assert.equal(uartBit({ res: { name: 'led', group: 'LEDs', dir: 'out' }, dir: 'out' }), false);
 });
 
 // the echo on a Nexys2 (50 MHz, its RS-232 port, the LEDs)
