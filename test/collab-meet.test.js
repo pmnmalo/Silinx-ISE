@@ -116,6 +116,27 @@ test('at the meeting point: two followers find the owner, the project arrives, a
   assert.deepEqual(ended.sort(), ['Eva: the owner stopped sharing', 'Rui: the owner stopped sharing']);
 });
 
+test('#3835 a follower\'s connection to the owner lost: found again at the meeting point (followRoom\'s transport), the owner\'s change meanwhile arrives, each sees the other again', async () => {
+  const m = point();
+  const o = await owner(m);
+  const ev = [];
+  const again = () => meetOwner({ meeting: m, room: o.session.room, key: o.session.key, host: o.hk.pub, ms: 3000 });
+  const rui = keep(await followRoom({ url: 'silinx-host:', room: o.session.room, key: o.session.key, user: { name: 'Rui' }, WebSocket: await again(), onEvent: e => { if (e.type !== 'peers') ev.push(e.type); }, reconnect: { delays: [10, 20], for: 5000 }, transport: again }));
+  await rui.ready;
+  await until(() => o.session.peers().length === 1, 'Rui in');
+  const id = rui.doc.clientID;
+  // (the connection dropped: the owner's end of it gone, then the follower's)
+  for (const end of [...o.at.ends.values()]) end.close();
+  await until(() => ev.includes('offline'), 'offline');
+  putFile(o.session.doc, 'src/top.vhd', 'entity top is end entity;\n');
+  await until(() => rui.connected(), 'online again', 6000);
+  await until(() => docFile(rui.doc, 'src/top.vhd') === 'entity top is end entity;\n', 'the change made meanwhile');
+  assert.equal(rui.doc.clientID, id);
+  await until(() => o.session.peers().map(p => p.name).join() === 'Rui' && rui.owner()?.name === 'Ana', 'each sees the other again');
+  assert.equal(o.at.ends.size, 1);
+  assert.deepEqual(ev, ['offline', 'online']);
+});
+
 test('an impostor with the link, posing as the owner: its proof (forged, or the owner\'s of its own) refused, it is ignored and sent nothing; the follower finds the real owner', async () => {
   const m = point();
   const o = await owner(m);

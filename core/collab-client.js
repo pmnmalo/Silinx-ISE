@@ -242,8 +242,8 @@ const REFUSED = [1003, 1008, 1009];
  *  event ({ fatal: true }), `ready` rejected, nothing more applied.
  *  Its connection lost once the project has arrived (#3835), not ended (the owner did not stop sharing, `close()` was
  *  not called, no limit was passed, the room did not refuse it: REFUSED), it is made again (`reconnect`: RECONNECT; false: never), with the same document
- *  and client id, through a new socket of `transport()` (a WebSocket class; null: none, the session ends; default:
- *  `WebSocket` again): an event { type: 'offline', reason } at its loss, { type: 'online' } once joined again. The owner
+ *  and client id, through a new socket of `transport()` (a WebSocket class; null: none, the session ends; an error: tried
+ *  again later; default: `WebSocket` again): an event { type: 'offline', reason } at its loss, { type: 'online' } once joined again. The owner
  *  sends the whole document again, as at any join; an editor then sends, signed, what of its own changes the owner's
  *  document lacks (its own updates past the owner's clock of it): nothing it changed meanwhile is lost. */
 export async function followRoom({ url, room, key: keyText, sign = null, user, WebSocket: WS = globalThis.WebSocket, onEvent = () => {}, limits = FOLLOW_LIMITS, reconnect = RECONNECT, transport = null }) {
@@ -366,7 +366,8 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
   };
   async function attempt(n) {
     let S = null;
-    try { S = transport ? await transport() : WS; } catch { /* none */ }
+    // (a transport that fails, the owner not found at the meeting point yet: tried again later; none: the end)
+    try { S = transport ? await transport() : WS; } catch { if (!ended) later(n + 1); return; }
     if (ended) return;
     if (!S) { end('the connection was lost and cannot be made again from here'); return; }
     let j;
