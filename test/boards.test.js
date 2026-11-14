@@ -75,7 +75,8 @@ test('#3741 the Elbert V2: seg a..g, dp and an (3 digits) on Numato\'s pins, act
   const elbert = BOARDS.find(b => b.id === 'elbert-v2'), r = Object.fromEntries(elbert.resources.map(x => [x.name, x]));
   assert.deepEqual(r.seg.pins, ['P117', 'P116', 'P115', 'P113', 'P112', 'P111', 'P110']);
   assert.deepEqual(r.dp.pins, ['P114']);
-  assert.deepEqual(r.an.pins, ['P120', 'P121', 'P124']);
+  // (#3847) an<0> the rightmost digit: Numato's diagram's S1, Enable 3 = P124; P120 the leftmost, S3
+  assert.deepEqual(r.an.pins, ['P124', 'P121', 'P120']);
   assert.equal(r.seg_en, undefined);
   for (const n of ['seg', 'dp', 'an', 'dip', 'btn']) assert.equal(r[n].extra?.activeLow, true, n);
   const { EXAMPLES, exampleUcf } = await import('./examples-lib.mjs');
@@ -89,7 +90,7 @@ test('#3741 the Elbert V2: seg a..g, dp and an (3 digits) on Numato\'s pins, act
   const { text } = exampleUcf('clock', { board: 'elbert-v2' });
   const locs = Object.fromEntries([...text.matchAll(/^NET "([^"]+)"\s+LOC = "([^"]+)"/gm)].map(m => [m[1], m[2]]));
   assert.deepEqual(['seg<0>', 'seg<1>', 'seg<2>', 'seg<3>', 'seg<4>', 'seg<5>', 'seg<6>', 'dp', 'an<0>', 'an<1>', 'an<2>'].map(n => locs[n]),
-    ['P117', 'P116', 'P115', 'P113', 'P112', 'P111', 'P110', 'P114', 'P120', 'P121', 'P124']);
+    ['P117', 'P116', 'P115', 'P113', 'P112', 'P111', 'P110', 'P114', 'P124', 'P121', 'P120']);
   assert.match(text, /^NET "an<3>"\s+LOC = "P31" ;  # no pin on the board: on the header pin io_p1<0>$/m);
   assert.deepEqual(['clk', 'sw<0>', 'sw<1>', 'btn<0>', 'btn<3>'].map(n => locs[n]), ['P129', 'P70', 'P69', 'P80', 'P77']);
   assert.match(text, /TIMESPEC "TS_clk" = PERIOD "clk" 83\.333 ns HIGH 50% ;/);
