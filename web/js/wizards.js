@@ -544,15 +544,18 @@ export async function implProperties() {
   const opt = select([['fast', 'Fast'], ['area', 'Area'], ['speed', 'Speed']], synthGoal(pj.impl));
   const clk = select([['JtagClk', 'JTAG Clock'], ['CCLK', 'CCLK'], ['UserClk', 'User Clock']], pj.impl.startupClk || 'JtagClk');
   // a Spartan-6's Map (#3138): Silinx's, or nextpnr's packer, on trial until its parity (#3139)
-  const { deviceFamily, s6MapOf } = await import('/packages/silinx-fpga/src/parts.js');
+  const { deviceFamily, s6MapOf, xc7SeedsOf } = await import('/packages/silinx-fpga/src/parts.js');
   const { familyProfile } = await import('/core/family-profile.js');
   const map = familyProfile(deviceFamily(pj.device)).mapChoice ? select([['silinx', 'Silinx'], ['nextpnr', 'nextpnr (on trial)']], s6MapOf(pj.impl)) : null;
+  // a 7-series' Place & Route (#3825): one seed, or the best Fmax of 3 seeds
+  const seeds = familyProfile(deviceFamily(pj.device)).seedsChoice ? select([['1', 'One seed'], ['3', 'Best of 3 seeds (router2)']], String(xc7SeedsOf(pj.impl))) : null;
   const r = await dialog({
     title: 'Process Properties - Synthesis / Implementation / Bitstream', width: 520,
     body: h('div', { class: 'form-grid' },
       ...field('Optimization:', opt),
       ...field('FPGA Start-Up Clock:', clk),
       ...(map ? field('Map (Spartan-6):', map) : []),
+      ...(seeds ? field('Place & Route (7-series):', seeds) : []),
       // what each Optimization does (#282, #2470)
       h('div', { class: 'effort-hint', style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } },
         'Fast: one mapping and one placement, the quickest build. Area: the smallest circuit, the mappings for speed tried too. Speed: the fastest circuit, every mapping for speed and several placements tried. ISE gets Speed / Normal, Area / High and Speed / High.'),
@@ -562,8 +565,9 @@ export async function implProperties() {
   pj = await currentProject();   // (#2281)
   if (pj?.name !== pj0.name) return;
   // (a place and route engine saved by an earlier version, #2136: nextpnr, the one engine since #2137)
-  const { engine, s6Map, ...impl } = pj.impl;
-  pj.impl = { ...impl, ...GOAL_IMPL[opt.value], startupClk: clk.value, ...((map ? map.value : s6Map) === 'nextpnr' ? { s6Map: 'nextpnr' } : {}) };
+  const { engine, s6Map, xc7Seeds, ...impl } = pj.impl;
+  pj.impl = { ...impl, ...GOAL_IMPL[opt.value], startupClk: clk.value, ...((map ? map.value : s6Map) === 'nextpnr' ? { s6Map: 'nextpnr' } : {}),
+    ...(xc7SeedsOf({ xc7Seeds: seeds ? +seeds.value : xc7Seeds }) === 3 ? { xc7Seeds: 3 } : {}) };
   await app.saveProjectJson();
 }
 

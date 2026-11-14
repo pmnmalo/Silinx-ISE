@@ -25,6 +25,7 @@ const OPTIMIZATIONS = ['fast', 'area', 'speed'];
 const STARTUP_CLOCKS = { jtag: 'JtagClk', cclk: 'CCLK', user: 'UserClk' };
 // the Spartan-6's Map (#3138): Silinx's, or nextpnr's packer (on trial until its parity, #3139)
 const S6_MAPS = ['silinx', 'nextpnr'];
+const XC7_SEEDS = [1, 3];
 
 // the issues of the design on a new device (web/js/device-change.js deviceChangeMessages): the primitives its
 // family lacks, the resources the design needs more of than the part has
@@ -183,33 +184,39 @@ export const SETTINGS_TOOLS = [
   },
   {
     name: 'set_process_properties', title: 'Process Properties',
-    description: 'Change a project\'s Process Properties: the Optimization (fast: one mapping and one placement, the quickest build; area: the smallest circuit; speed: the fastest circuit, several placements tried), and the FPGA start-up clock (jtag when programming over JTAG; cclk when booting from the PROM or flash; user); on a Spartan-6, its Map (s6_map: silinx, Silinx\'s own, the default; nextpnr, on trial: nextpnr packs Yosys\'s netlist too). The Silinx toolchain places and routes with nextpnr.',
+    description: 'Change a project\'s Process Properties: the Optimization (fast: one mapping and one placement, the quickest build; area: the smallest circuit; speed: the fastest circuit, several placements tried), and the FPGA start-up clock (jtag when programming over JTAG; cclk when booting from the PROM or flash; user); on a Spartan-6, its Map (s6_map: silinx, Silinx\'s own, the default; nextpnr, on trial: nextpnr packs Yosys\'s netlist too); on a 7-series, its Place & Route\'s seeds (xc7_seeds: 1, the default; 3: nextpnr\'s router2 with seeds 1, 2 and 3, the best Fmax kept, ties to the lowest seed). The Silinx toolchain places and routes with nextpnr.',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       optimization: { type: 'string', enum: OPTIMIZATIONS, description: 'The Optimization.' },
       startup_clock: { type: 'string', enum: Object.keys(STARTUP_CLOCKS), description: 'The FPGA start-up clock.' },
       s6_map: { type: 'string', enum: S6_MAPS, description: 'A Spartan-6\'s Map: silinx (the default) or nextpnr (on trial).' },
+      xc7_seeds: { type: 'integer', enum: XC7_SEEDS, description: 'A 7-series\' Place & Route: 1 seed (the default) or the best of 3.' },
     }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    async run({ project: name, optimization, startup_clock: clock, s6_map: map }) {
+    async run({ project: name, optimization, startup_clock: clock, s6_map: map, xc7_seeds: seeds }) {
       const pj = await readProject(name);
-      if (!optimization && !clock && !map) throw toolError('give optimization, startup_clock or s6_map');
+      if (!optimization && !clock && !map && seeds === undefined) throw toolError('give optimization, startup_clock, s6_map or xc7_seeds');
       const { familyProfile } = await import('../core/family-profile.js');
       const s6 = !!familyProfile((await parts()).deviceFamily(pj.device)).mapChoice;   // (a Spartan-6's Map, as Process Properties shows it)
       if (map && !S6_MAPS.includes(map)) throw toolError(`s6_map: one of ${S6_MAPS.join(', ')}`);
       if (map && !s6) throw toolError(`s6_map: the project's device (${deviceName(pj.device)}) is not a Spartan-6`);
+      // (a 7-series' seeds, #3825)
+      const xc7 = !!familyProfile((await parts()).deviceFamily(pj.device)).seedsChoice;
+      if (seeds !== undefined && !XC7_SEEDS.includes(seeds)) throw toolError(`xc7_seeds: one of ${XC7_SEEDS.join(', ')}`);
+      if (seeds !== undefined && !xc7) throw toolError(`xc7_seeds: the project's device (${deviceName(pj.device)}) is not a 7-series`);
       if (optimization && !OPTIMIZATIONS.includes(optimization)) throw toolError(`optimization: one of ${OPTIMIZATIONS.join(', ')}`);
       if (clock && !STARTUP_CLOCKS[clock]) throw toolError(`startup_clock: one of ${Object.keys(STARTUP_CLOCKS).join(', ')}`);
       const { synthGoal, GOAL_IMPL } = await import('../packages/silinx-fpga/src/index.js');
-      const { s6MapOf } = await parts();
+      const { s6MapOf, xc7SeedsOf } = await parts();
       // (a place and route engine saved by an earlier version, #2136: dropped, nextpnr the one engine since #2137)
       await P.updateProject(name, p => {
-        const { engine, s6Map, ...impl } = p.impl || {};
-        return { ...p, impl: { ...impl, ...(optimization ? GOAL_IMPL[optimization] : {}), ...(clock ? { startupClk: STARTUP_CLOCKS[clock] } : {}), ...(s6MapOf({ s6Map: map ?? s6Map }) === 'nextpnr' ? { s6Map: 'nextpnr' } : {}) } };
+        const { engine, s6Map, xc7Seeds, ...impl } = p.impl || {};
+        return { ...p, impl: { ...impl, ...(optimization ? GOAL_IMPL[optimization] : {}), ...(clock ? { startupClk: STARTUP_CLOCKS[clock] } : {}), ...(s6MapOf({ s6Map: map ?? s6Map }) === 'nextpnr' ? { s6Map: 'nextpnr' } : {}),
+          ...(xc7SeedsOf({ xc7Seeds: seeds ?? xc7Seeds }) === 3 ? { xc7Seeds: 3 } : {}) } };
       });
       const impl = (await P.readProject(name)).impl || {};
-      const data = { project: name, optimization: synthGoal(impl), startupClock: Object.keys(STARTUP_CLOCKS).find(k => STARTUP_CLOCKS[k] === (impl.startupClk || 'JtagClk')), ...(s6 ? { s6Map: s6MapOf(impl) } : {}) };
-      return { text: `${name}: Optimization ${data.optimization}, FPGA start-up clock ${data.startupClock}${s6 ? `, Map ${data.s6Map === 'nextpnr' ? 'nextpnr (on trial)' : 'Silinx'}` : ''}.`, data };
+      const data = { project: name, optimization: synthGoal(impl), startupClock: Object.keys(STARTUP_CLOCKS).find(k => STARTUP_CLOCKS[k] === (impl.startupClk || 'JtagClk')), ...(s6 ? { s6Map: s6MapOf(impl) } : {}), ...(xc7 ? { xc7Seeds: xc7SeedsOf(impl) } : {}) };
+      return { text: `${name}: Optimization ${data.optimization}, FPGA start-up clock ${data.startupClock}${s6 ? `, Map ${data.s6Map === 'nextpnr' ? 'nextpnr (on trial)' : 'Silinx'}` : ''}${xc7 ? `, Place & Route ${data.xc7Seeds === 3 ? 'the best of 3 seeds' : 'one seed'}` : ''}.`, data };
     },
   },
   {

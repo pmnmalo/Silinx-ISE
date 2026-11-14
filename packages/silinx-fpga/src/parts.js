@@ -18,7 +18,7 @@ export { CST } from './cst.js';
 export { XDC, readXdc, writeXdc } from './xdc.js';
 
 // the flow's steps
-export { OPEN_STEPS, OPEN_CHAIN, XILINX_STEPS, orderOpenSteps, orderSteps, engineOf, s6MapOf } from './open-steps.js';
+export { OPEN_STEPS, OPEN_CHAIN, XILINX_STEPS, orderOpenSteps, orderSteps, engineOf, s6MapOf, xc7SeedsOf } from './open-steps.js';
 
 // the placed and routed design (XDL), and a device's report (XDLRC)
 export { parseXdl, parseXdlrc, writeXdl, lutTable, fpgaModel, deviceGrid, MODEL_VERSION } from './xdl.js';
