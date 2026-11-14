@@ -1,6 +1,6 @@
 // UI (#3819): the Design pane's roots in natural order: x_1, x_2, x_10 (not x_1, x_10, x_2), the Implementation view's
 // top first; the Simulation view's (the ISE style interface's) and Simulate's test bench choice (the Silinx interface's)
-// alike; a module's instances in its source's order. Both interfaces; no warnings.
+// alike; a module's instances by their names too (u_10, u_2, u_1 written: u_1, u_2, u_10). Both interfaces; no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -11,7 +11,8 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
 const leaf = n => `module ${n}(input a, output y); assign y = a; endmodule\n`;
-const TOP = 'module top(input a, output y); wire w1, w2; x_1 u_1(.a(a), .y(w1)); x_2 u_2(.a(w1), .y(w2)); x_10 u_10(.a(w2), .y(y)); endmodule\n';
+// (its instances written in the order u_10, u_2, u_1: listed by their names)
+const TOP = 'module top(input a, output y); wire w1, w2; x_10 u_10(.a(a), .y(w1)); x_2 u_2(.a(w1), .y(w2)); x_1 u_1(.a(w2), .y(y)); endmodule\n';
 const bench = n => `module ${n}; reg a; wire y; top uut(.a(a), .y(y)); endmodule\n`;
 // the modules written in the files' order 10, 2, 1: the order is the names'
 const FILES = {
@@ -34,7 +35,7 @@ const rows = async (page) => {
 };
 const IMPL = ['top', '  u_1 - x_1', '  u_2 - x_2', '  u_10 - x_10', 'y_1', 'y_2', 'y_10'];
 
-uiTest('#3819 the Design pane\'s roots in natural order (x_2 before x_10), the top first; the Simulation\'s too; instances in their source\'s order', E, async (page) => {
+uiTest('#3819 the Design pane\'s roots in natural order (x_2 before x_10), the top first; the Simulation\'s too; a module\'s instances too', E, async (page) => {
   await makeProject(env, { name: 'HierOrder', top: 'top', simTop: 'tb_1', files: FILES, roles: ROLES });
   await page.openProject('HierOrder');
   await page.leftTab('design');
