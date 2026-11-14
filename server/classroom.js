@@ -82,9 +82,9 @@ function readmeText(ex, exerciseFile) {
     `## ${localize(ex.title, lang)}`, '', localize(ex.statement, lang), '',
     ...(lang === 'pt'
       ? [`O módulo de topo é \`${ex.top}\`, com os portos ${ports}. Abra este projeto no Silinx: Project ▸ Exercise… executa os testes visíveis de \`${exerciseFile}\` (ou \`silinx grade ${exerciseFile} . --visible\`).`,
-        '', 'Em cada push, o GitHub executa os testes visíveis: os vereditos estão no resumo da execução (Actions). Os testes escondidos são executados pelo professor no fim do prazo.']
+        '', 'Em cada push, o GitHub executa os testes visíveis: os vereditos estão no resumo da execução (Actions) e, no Silinx, em Git ▸ Verificações do GitHub (Checks). Os testes escondidos são executados pelo professor no fim do prazo.']
       : [`The top module is \`${ex.top}\`, with the ports ${ports}. Open this project in Silinx: Project ▸ Exercise… runs the visible tests of \`${exerciseFile}\` (or \`silinx grade ${exerciseFile} . --visible\`).`,
-        '', 'On each push, GitHub runs the visible tests: their verdicts are in the run\'s summary (Actions). The hidden tests are run by the teacher at the deadline.']),
+        '', 'On each push, GitHub runs the visible tests: their verdicts are in the run\'s summary (Actions) and, in Silinx, in Git ▸ GitHub Checks. The hidden tests are run by the teacher at the deadline.']),
   ].join('\n');
   return `# ${localize(ex.title, 'en')}\n\n${part('en')}\n\n${part('pt')}\n`;
 }

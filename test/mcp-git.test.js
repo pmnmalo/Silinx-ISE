@@ -1,6 +1,6 @@
 // The MCP server's tools of git (#3195, server/mcp-git.js) against a local bare repository (no network): git_clone (an
 // untrusted project), git_status, git_commit, git_push, git_pull, git_log (a file as it was), git_init, their texts,
-// a failure's message and hint as the console shows them; .git stays out of the file tools (#3035).
+// a failure's message and hint as the console shows them; .git stays out of the file tools (#3035); git_checks (#3194).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -143,4 +143,41 @@ test('#3363 git_init sets only a remote the user\'s settings name (mcp.remotes);
   // (a tool's own text: none)
   const status = await raw('git_status', { project: 'lab1' });
   assert.deepEqual([status.content.length, status.structuredContent.untrusted], [1, undefined]);
+});
+
+test('#3194 git_checks: what GitHub said of the branch\'s upstream (a Classroom assignment\'s verdicts); no remote, nothing pushed', async () => {
+  const { fakeGitHub } = await import('./fake-github.mjs');
+  const GH = await import('../server/git-github.js');
+  await ok('new_project_from_example', { name: 'chk', example: 'gates' });
+  await ok('git_init', { project: 'chk' });
+  await fails('git_checks', { project: 'chk' }, 'the repository has no remote (origin)\nHint: Initialize Repository… with the GitHub repository\'s address sets it.');
+  const bare2 = path.join(tmp, 'chk.git');
+  fs.mkdirSync(bare2);
+  sh(bare2, 'init', '--quiet', '--bare');
+  sh(path.join(ws, 'chk'), 'remote', 'add', 'origin', bare2);
+  await fails('git_checks', { project: 'chk' }, 'nothing pushed to GitHub yet: the branch has no upstream\nHint: Push first: GitHub then runs the repository\'s workflows on the commit.');
+  // (a clone: its upstream the assignment's commit, whose workflow ran the visible tests)
+  const bare3 = path.join(tmp, 'lab2.git');
+  fs.mkdirSync(bare3);
+  sh(bare3, 'init', '--quiet', '--bare');
+  sh(path.join(tmp, 'seed'), 'push', '--quiet', bare3, 'HEAD:main');
+  await ok('git_clone', { url: bare3, name: 'lab2' });
+  const sha = sh(bare3, 'rev-parse', 'main').trim();
+  const gh = fakeGitHub();
+  gh.seed('local/lab2');
+  GH.GITHUB_TESTING.fetch = gh.fetch;
+  try {
+    const none = await ok('git_checks', { project: 'lab2' });
+    assert.deepEqual([none.text, none.data.state], [`No check on GitHub for commit ${sha.slice(0, 7)}: the repository has no workflow, or it has not started yet.`, 'none']);
+    gh.setChecks('local/lab2', sha, [{ name: 'grade', status: 'completed', conclusion: 'failure', annotations: [
+      { level: 'failure', title: 'Silinx: counter4', message: '10 / 40 points, Wrong Answer' },
+      { level: 'notice', title: 'Silinx: impl', message: 'AC Accepted, 10 / 10' }] }]);
+    const r = await call('git_checks', { project: 'lab2' });
+    assert.equal(r.isError, false, r.text);
+    assert.equal(r.text, [`ERROR: grade: failure (commit ${sha.slice(0, 7)}): https://github.com/local/lab2/runs/1001`,
+      'ERROR:   Silinx: counter4: 10 / 40 points, Wrong Answer', '  Silinx: impl: AC Accepted, 10 / 10'].join('\n'));
+    assert.deepEqual([r.data.project, r.data.remote, r.data.commit, r.data.conclusion, r.data.untrusted.content], ['lab2', 'local/lab2', sha, 'failure', 'the checks\' names, titles and annotations, which the repository\'s workflows wrote']);
+    // (no token in this environment: none sent)
+    assert.ok(gh.requests.every(q => !q.headers.authorization));
+  } finally { GH.GITHUB_TESTING.fetch = null; }
 });

@@ -20,6 +20,8 @@ import { gateEntries, gateMessages, GateError, GATE_LIMITS } from './import-gate
 import { DRAWING_RE } from './drawing-merge.js';
 import { drawingConflicts, resolveConflict } from './git-resolve.js';
 
+import { commitChecks } from './github-checks.js';
+
 export const GitError = GitHubError;
 export const PROJECT_FILE = 'silinx.json';
 
@@ -302,5 +304,13 @@ export function restGit({ client, projects, meta }) {
     return { project: name, commit: commitSha, path: key, text };
   }
 
-  return { status, clone, init, commit, push, pull, log, show };
+  /** The checks GitHub ran on the project's last pushed commit (#3194: a Classroom assignment's visible tests):
+   *  { project, remote, ...commitChecks }. */
+  async function checks(name) {
+    const m = await need(name);
+    if (!m.commit) throw new GitError('nothing pushed to GitHub yet: the project has no commit there', 'Commit and Push first: GitHub then runs the repository\'s workflows on the commit.', 409);
+    return { project: name, remote: `${m.owner}/${m.repo}`, ...await commitChecks(client, { owner: m.owner, repo: m.repo, ref: m.commit }) };
+  }
+
+  return { status, clone, init, commit, push, pull, log, show, checks };
 }

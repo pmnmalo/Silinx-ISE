@@ -99,6 +99,7 @@ export const api = {
   gitPush: name => req('POST', `/api/projects/${enc(name)}/git/push`, {}),
   gitPull: (name, { resolve = null } = {}) => req('POST', `/api/projects/${enc(name)}/git/pull`, resolve ? { resolve } : {}),
   gitLog: (name, limit = 100) => req('GET', `/api/projects/${enc(name)}/git/log?limit=${limit}`),
+  gitChecks: name => req('GET', `/api/projects/${enc(name)}/git/checks`),   // (#3194)
   gitShow: (name, commit, path) => req('GET', `/api/projects/${enc(name)}/git/show?commit=${enc(commit)}&path=${enc(path)}`),
   devices: () => req('GET', '/api/devices'),
   toolchain: (project = null) => req('GET', `/api/toolchain${project ? `?project=${enc(project)}` : ''}`),
