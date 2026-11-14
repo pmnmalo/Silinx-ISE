@@ -565,7 +565,7 @@ diagram, its base from then on) and `convert_drawing` (a state diagram to an ASM
 `remove_from_project` and `add_to_project`, `rename_file` (a file or a folder), `rename_module` (its
 instances, drawings and top with it), `delete_file` and `delete_project` (into the workspace's `.trash` folder, from where they
 can be moved back),
-`git_clone`, `git_init`, `git_status`, `git_commit`, `git_push`, `git_pull` and `git_log` (a project in a GitHub repository, as the interface's git: its history, a file as it was in a commit),
+`git_clone`, `git_init`, `git_status`, `git_commit`, `git_push`, `git_pull`, `git_log` and `git_checks` (a project in a GitHub repository, as the interface's git: its history, a file as it was in a commit, what GitHub's workflows said of the last push: a Classroom assignment's verdicts),
 `export_project` and `import_project` (a Xilinx ISE or a Silinx project, as a .zip; a .xise or a project folder too;
 only in the exchange folder: your Downloads, or the folder `SILINX_MCP_FOLDER` names), `import_source` (files of the exchange
 folder copied into a project, as *Import Source* / *Add Copy of Source* / *Import Test Bench*), `find_in_project` (*Find in

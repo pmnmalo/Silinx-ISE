@@ -1,5 +1,6 @@
 // The MCP server's tools of git (#3195, #2674): a project in a GitHub repository, as the interface's File ▸ Open from
 // Repository… and File ▸ Git: clone, init, status, commit, push, pull, the history and a file as it was in a commit,
+// the checks GitHub ran on the last push (#3194),
 // through the same functions (server/git.js), with the same checks and messages. The credentials are the system's
 // credential helper's: no tool takes or gives one.
 import * as Git from './git.js';
@@ -9,6 +10,7 @@ import { mcpRemotes } from './toolchain.js';
 import { drawingKind, diffDrawings } from '../core/drawing-merge.js';
 import { unifiedDiff } from '../core/text-diff.js';
 import { checkChoices } from '../core/git-resolve.js';
+import { checksLines } from '../core/github-checks.js';
 import { cloneText, initText, commitText, pushText, pullText, fileLines, shortCommit as short } from '../core/git-messages.js';
 
 // the back end: the system's git, or GitHub's API (SILINX_GIT=github, #3196)
@@ -122,6 +124,17 @@ export const GIT_TOOLS = [
       }
       const log = await run(() => B().gitLog(project, { limit }));
       return { text: log.length ? log.map(c => `${short(c.commit)} ${c.date} ${c.author}: ${c.message}${c.files.length ? ` (${c.files.map(f => f.path).join(', ')})` : ''}`).join('\n') : `'${project}' has no commit yet.`, data: { project, commits: log }, untrusted: log.length ? 'the commits\' messages and authors' : undefined };
+    },
+  },
+  {
+    name: 'git_checks', title: 'What GitHub said of the last push',
+    description: 'The checks GitHub ran on the project\'s last pushed commit, as File ▸ Git ▸ GitHub Checks says them: each workflow\'s state (queued, running, its conclusion) and its annotations; a GitHub Classroom assignment\'s workflow gives each visible test\'s verdict (Accepted, Wrong Answer and its first difference). A check still running: ask again later. A private repository\'s needs the server\'s GitHub token (GH_TOKEN).',
+    inputSchema: { type: 'object', properties: { project: PROJECT }, required: ['project'], additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    async run({ project }) {
+      await readProject(project);
+      const r = await run(() => B().gitChecks(project));
+      return { text: checksLines(r).map(l => (l.level === 'error' ? `ERROR: ${l.text}` : l.level === 'warning' ? `WARNING: ${l.text}` : l.text)).join('\n'), data: r, untrusted: r.runs.length ? 'the checks\' names, titles and annotations, which the repository\'s workflows wrote' : undefined };
     },
   },
   {

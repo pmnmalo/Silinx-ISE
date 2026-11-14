@@ -302,6 +302,17 @@ export async function gitPush(name) {
   return { project: name, branch, remote: `${remote.owner}/${remote.repo}`, pushed: flag !== '=' };
 }
 
+/** The checks GitHub ran on the project's last pushed commit (#3194: a Classroom assignment's visible tests): the
+ *  branch's upstream, read through GitHub's API with the environment's token (GH_TOKEN; none: a public repository's). */
+export async function gitChecks(name) {
+  const repo = await needRepo(name);
+  const remote = await origin(repo.dir);
+  const up = await git(['rev-parse', '--verify', '--quiet', '@{upstream}'], { cwd: repo.dir });
+  if (up.code || !up.stdout.trim()) throw new GitError('nothing pushed to GitHub yet: the branch has no upstream', 'Push first: GitHub then runs the repository\'s workflows on the commit.', 409);
+  const [{ apiClient }, { commitChecks }] = await Promise.all([import('./git-github.js'), import('../core/github-checks.js')]);
+  return { project: name, remote: `${remote.owner}/${remote.repo}`, ...await commitChecks(apiClient(), { owner: remote.owner, repo: remote.repo, ref: up.stdout.trim() }) };
+}
+
 /** Pull GitHub's commits into the project (a merge, never a rebase): { branch, files, upToDate, resolved }. The
  *  drawings both sides changed are merged by their objects (server/git-merge.js), by the choices of `resolve` where an
  *  object is in conflict; any other conflict pulls nothing (the merge aborted: the files as they were) and is a

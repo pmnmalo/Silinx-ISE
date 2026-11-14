@@ -3,7 +3,8 @@
 // a URL that is not GitHub's said beside its field; the project opened, untrusted; the Design pane's marks (changed,
 // new) and gone once committed; Commit… (an empty message said beside its field), Push to GitHub, Pull from GitHub,
 // a rejected push and a conflict as ERROR lines with their hint in the console; the same commands in the Design pane's
-// project menu; the labels in Portuguese. Both interfaces; no warnings.
+// project menu; GitHub Checks (#3194: the hint after a push; a project with no remote); the labels in Portuguese. Both
+// interfaces; no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -98,7 +99,7 @@ uiTest('#3195 Open from Repository…, the marks, Commit…, Push and Pull; a re
   await page.waitFor(() => !document.querySelector('#hier .git-mark'), [], { what: 'the marks gone' });
   // Push to GitHub
   await page.menu('File', 'Push to GitHub');
-  await page.waitConsole(/Pushed main to local\/lab1\./);
+  await page.waitConsole(/Pushed main to local\/lab1\.\nGitHub runs the repository's checks on the push \(a Classroom assignment's visible tests\): Git ▸ GitHub Checks says their result\./);   // (#3194)
   assert.equal(sh(remote, 'log', '-1', '--format=%s', 'main'), 'Counter changed\n');
   // another author's commit: Pull from GitHub brings it, the file read again
   theirs('lab1', 'src/sevenseg.v', '// theirs\n');
@@ -173,6 +174,9 @@ uiTest('#3195 the Design pane\'s project menu: the Git commands (the Silinx inte
   assert.ok((await marks(page)).every((m) => / N New: not committed yet$/.test(m)), (await marks(page)).join(' | '));
   await page.menu('File', 'Push to GitHub');
   await page.waitConsole(/ERROR: the repository has no remote \(origin\)\nHint: Initialize Repository… with the GitHub repository's address sets it\./);
+  // GitHub Checks (#3194): the server's route, its failure and hint in the console
+  await page.menu('File', 'GitHub Checks');
+  await page.waitConsole(/GitHub's checks of 'fresh'…\nERROR: the repository has no remote \(origin\)\nHint: Initialize Repository… with the GitHub repository's address sets it\./);
   // in Portuguese: the menu's labels, the dialog's
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   const pt = await gitItems();
@@ -181,6 +185,8 @@ uiTest('#3195 the Design pane\'s project menu: the Git commands (the Silinx inte
   await page.waitDialog('Registar (Commit)');
   assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .form-grid label')].map((l) => l.textContent).join('|')), 'Mensagem:');
   await page.dialogButton('Cancelar');
+  await page.menu('Ficheiro', 'Verificações do GitHub (Checks)');
+  await page.waitConsole(/GitHub's checks of 'fresh'…\nERROR: the repository has no remote \(origin\)\nHint: Initialize Repository… with the GitHub repository's address sets it\.\nGitHub's checks of 'fresh'…\nERROR: the repository has no remote/);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(warnings(page), []);
 });
