@@ -4,6 +4,7 @@ import { atlysLayout } from './emulator-atlys.js';
 import { basys2Layout } from './emulator-basys2.js';
 import { basys3Layout } from './emulator-basys3.js';
 import { cmodS6Layout } from './emulator-cmod-s6.js';
+import { elbertV2Layout } from './emulator-elbert-v2.js';
 import { icebreakerLayout } from './emulator-icebreaker.js';
 import { mimasV2Layout } from './emulator-mimas-v2.js';
 import { nexys2Layout } from './emulator-nexys2.js';
@@ -21,4 +22,4 @@ export const BOARD_LAYOUTS = { basys2: basys2Layout, nexys2: nexys2Layout, 's3e-
   's3-starter': s3StarterLayout, 'cmod-s6': cmodS6Layout,
   'icebreaker-vga': icebreakerLayout, ulx3s: ulx3sLayout, 'ulx3s-vga': ulx3sLayout,
   tangnano9k: tangnano9kLayout, 'tangnano9k-vga': tangnano9kLayout,
-  'papilio-one': papilioOneLayout };
+  'papilio-one': papilioOneLayout, 'elbert-v2': elbertV2Layout };
