@@ -1,13 +1,15 @@
 // Renaming a module on the server (#2674), as the interface's Rename of a module does (web/js/rename.js renameDialog's
 // checks, renameSource): the module in every HDL source (its declaration, its instances, core/rename.js), the
 // schematics' symbols of it and the drawing it is generated from (its name; the drawing, named after it, renamed
-// with it), the project's top and test bench, its stimuli; optionally its file (the drawings' links follow), and the
+// with it), its symbol file (<module>.sym.json, #3829: renamed with it, beside its file), the project's top and test
+// bench, its stimuli; optionally its file (the drawings' links follow), and the
 // drawings changed make their HDL again (server/drawing-sync.js). The files are moved all or nothing.
 import { compile } from '../core/compile.js';
 import { renameModuleInSource, renameModuleInSchematic } from '../core/rename.js';
 import { reservedError } from '../core/reserved.js';
 import { syncDrawing } from './drawing-sync.js';
 import { isName } from '../core/ident.js';
+import { isSymbolFile, renameSymbolFile } from '../core/symbol-layout.js';
 
 const VIEW = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
 const extOf = p => (VIEW.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
@@ -81,6 +83,14 @@ export async function renameModule(P, name, oldName, newName, { to = null } = {}
     for (const [f, d] of Object.entries(views)) {
       if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.(asm|tt|bool|fsm)\.json$/i.test(f) ? 2 : 1)); }
     }
+  }
+  // its symbol (#3829): the module's name in it, the file named after the module following it and its file
+  const syms = {};
+  for (const f of tree.filter(isSymbolFile)) { try { syms[f] = await P.readFile(name, f); } catch { /* skip */ } }
+  const sym = newName !== oldName || moved.has(from) ? renameSymbolFile(syms, moved.get(from) || from, oldName, newName) : null;
+  if (sym) {
+    if (sym.text !== syms[sym.from]) changed.set(sym.from, sym.text);
+    if (sym.to !== sym.from) moved.set(sym.from, sym.to);
   }
   for (const [a, b] of moved) if (a !== b && tree.some(f => eq(f, b)) && !eq(a, b)) throw fail(`${b} already exists.`);
   // 1. the files moved, all or nothing (a failure undoes the moves already done)

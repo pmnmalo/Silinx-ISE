@@ -150,3 +150,18 @@ export function layoutDef(ports, layout, title) {
   const titleY = where === 'center' ? oy + bh / 2 + 1 : where === 'bottom' ? oy + bh - 9 : oy + 11;
   return { w, h, body: { x: 20, y: oy, w: bw, h: bh }, pins, titleY };
 }
+
+/** A module's symbol file when the module is renamed (#3829): among the project's symbol files (`files`, { path: text }),
+ *  the one of module `oldName` (as attachSymbols finds it), its text with the module `newName`, and its path: a file
+ *  named after the module follows it, beside its source `source` (its path after the rename). Null: it has none. */
+export function renameSymbolFile(files, source, oldName, newName) {
+  for (const [path, text] of Object.entries(files || {})) {
+    if (!isSymbolFile(path)) continue;
+    let o;
+    try { o = JSON.parse(text); } catch { continue; }
+    const base = path.replace(/^.*\//, '').replace(/\.sym\.json$/i, '');
+    if (!o || typeof o !== 'object' || lc(typeof o.module === 'string' && o.module.trim() ? o.module.trim() : base) !== lc(oldName)) continue;
+    return { from: path, to: lc(base) === lc(oldName) ? symbolFileOf(source, newName) : path, text: symbolText({ ...o, module: newName }) };
+  }
+  return null;
+}

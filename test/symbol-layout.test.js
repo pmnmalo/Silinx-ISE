@@ -7,7 +7,7 @@ import {
   attachSymbols, generateHdl, instanceParams, newSymbol, netlist, normalizeDoc, normalizeSymbol, readSymbol, reconcile, symbolDef, symbolDiff,
   symbolFileOf, symbolPins, symbolText, updateModuleSymbols
 } from '../core/schdoc.js';
-import { layoutChanged, layoutDef, layoutOf } from '../core/symbol-layout.js';
+import { layoutChanged, layoutDef, layoutOf, renameSymbolFile } from '../core/symbol-layout.js';
 import { simulate } from '../core/compile.js';
 
 const P = (name, dir = 'in', width = 1) => ({ name, dir, width });
@@ -202,4 +202,24 @@ test('#3755 a schematic of an instance with a symbol of its own: its HDL compile
     assert.deepEqual([...r.lib.errors, ...r.design.diags].map(e => e.message), [], `${lang}: no warnings`);
     assert.deepEqual(r.sim.log.map(l => l.text.replace(/'/g, '').replace(/^.*q=/, '')), ['1', '0', '0', '1', '0', '0'], lang);
   }
+});
+
+test('#3829 renameSymbolFile: the module\'s symbol file found as attachSymbols finds it, its module renamed, a file named after it following it', () => {
+  const sym = (module, extra = {}) => symbolText({ ...newSymbol({ name: module, ports: [{ name: 'd', dir: 'in' }, { name: 'q', dir: 'out' }] }), ...extra });
+  const files = { 'src/reg1.sym.json': sym('reg1', { spacing: 30 }), 'src/other.sym.json': sym('other'), 'src/top.vhd': 'x' };
+  const r = renameSymbolFile(files, 'src/bit_reg.vhd', 'REG1', 'bit_reg');
+  assert.deepEqual([r.from, r.to], ['src/reg1.sym.json', 'src/bit_reg.sym.json']);
+  assert.deepEqual(JSON.parse(r.text), { ...JSON.parse(files['src/reg1.sym.json']), module: 'bit_reg' });
+  // beside its source: the source moved to another folder, the symbol with it
+  assert.equal(renameSymbolFile(files, 'lib/bit_reg.vhd', 'reg1', 'bit_reg').to, 'lib/bit_reg.sym.json');
+  // a symbol file not named after the module (its module field says whose): kept where it is, its module renamed
+  const odd = { 'src/shape.sym.json': sym('reg1') };
+  assert.deepEqual([renameSymbolFile(odd, 'src/r.vhd', 'reg1', 'r').to, JSON.parse(renameSymbolFile(odd, 'src/r.vhd', 'reg1', 'r').text).module], ['src/shape.sym.json', 'r']);
+  // a file with no module field: its name says whose
+  const bare = { 'src/reg1.sym.json': '{"pins":[]}\n' };
+  assert.equal(renameSymbolFile(bare, 'src/r.vhd', 'reg1', 'r').to, 'src/r.sym.json');
+  // none: no symbol file of the module, or one that is not JSON
+  assert.equal(renameSymbolFile(files, 'src/x.vhd', 'nobody', 'x'), null);
+  assert.equal(renameSymbolFile({ 'src/reg1.sym.json': 'not json' }, 'src/r.vhd', 'reg1', 'r'), null);
+  assert.equal(renameSymbolFile(null, 'src/r.vhd', 'reg1', 'r'), null);
 });
