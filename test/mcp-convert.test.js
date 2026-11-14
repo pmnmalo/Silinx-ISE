@@ -40,7 +40,7 @@ test('convert_module to a schematic: stopwatch\'s and blinky\'s top, the schemat
   await fails('convert_module', { project: 's', module: 'stopwatch', to: 'asm' }, '\'stopwatch\' is made from src/stopwatch.sch.json already: its file src/stopwatch.vhd is generated from that drawing');
   await ok('new_project_from_example', { name: 'b', example: 'blinky' });
   assert.equal((await ok('convert_module', { project: 'b', module: 'top', to: 'schematic' })).text,
-    '\'top\' converted to the schematic src/top.sch.json (15 symbols drawn, 3 HDL blocks keeping the HDL that is not drawn): it is now the module\'s base, src/top.vhd generated from it.');
+    '\'top\' converted to the schematic src/top.sch.json (15 symbols drawn, 4 HDL blocks keeping the HDL that is not drawn): it is now the module\'s base, src/top.vhd generated from it.');
   assert.match((await ok('check_syntax', { project: 'b', simulation: true })).text, /^Process "Check Syntax" of <tb_top> completed successfully \(\d+ signals, \d+ processes\)\.$/);
 });
 
@@ -105,7 +105,7 @@ test('convert_module to a state diagram and to an ASM chart: traffic\'s state ma
     assert.equal(read(n, 'src/traffic.vhd'), hdl);
     const w = await ok('write_file', { project: n, path: `src/traffic.${to}.json`, text: read(n, `src/traffic.${to}.json`) });
     assert.match(w.text, new RegExp(`\\nsrc/traffic\\.vhd updated from src/traffic\\.${to}\\.json$`));
-    assert.equal((await ok('check_syntax', { project: n, simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (44 signals, 34 processes).');
+    assert.equal((await ok('check_syntax', { project: n, simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (45 signals, 35 processes).');
     await passes(n, 100000, ['Simulation finished OK']);
   }
 });

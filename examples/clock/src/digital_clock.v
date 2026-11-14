@@ -1,4 +1,5 @@
-// Silinx example: a digital clock on the Basys2 / Nexys2 (and other boards: CLK_HZ, BTN_LOW, SW_LOW), set with the buttons.
+// Silinx example: a digital clock on the Basys2 / Nexys2 (and other boards: CLK_HZ, BTN_LOW, SW_LOW,
+// AN_LOW), set with the buttons.
 //   display : hours and minutes, HH.MM (the decimal point blinks every second, as a clock's colon)
 //   BTN3    : hours + 1
 //   BTN2    : minutes + 1
@@ -16,7 +17,8 @@ module digital_clock #(
     parameter STABLE  = CLK_HZ / 50,          // button debounce (20 ms)
     parameter REFRESH = CLK_HZ / 1000,        // display: cycles per digit (1 ms)
     parameter BTN_LOW = 0,                    // 1: the board's buttons read 0 when pressed
-    parameter SW_LOW  = 0                     // 1: the board's switches read 0 when on
+    parameter SW_LOW  = 0,                    // 1: the board's switches read 0 when on
+    parameter AN_LOW  = 1                     // 1: the board's digit enables light a digit at 0
 ) (
     input  wire       clk,
     input  wire [1:0] sw,
@@ -102,7 +104,7 @@ module digital_clock #(
     // no leading zero for the hours in 12-hour mode (" 9.05")
     wire [3:0] h10 = (swOn[1] && h[7:4] == 4'd0) ? 4'd15 : h[7:4];
 
-    sevenseg #(.REFRESH(REFRESH)) display (.clk(clk),
+    sevenseg #(.REFRESH(REFRESH), .AN_LOW(AN_LOW)) display (.clk(clk),
         .digits(secView ? {m, s} : {h10, h[3:0], m}), .points({1'b0, half, 2'b00}), .seg(seg), .dp(dp), .an(an));
 
     assign led = {half, swOn[1] & pm, sec};

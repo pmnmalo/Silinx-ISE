@@ -1,7 +1,8 @@
 ----------------------------------------------------------------------------------
 -- Silinx example (uart): the 4-digit 7-segment display of the Basys2 / Nexys2, multiplexed:
 -- one digit at a time, each for REFRESH clock cycles (1 ms at 50 MHz: the four digits seem lit at
--- once). Segments, decimal point and anodes are active low; seg(0) is segment a ... seg(6) is g.
+-- once). Segments and decimal point are active low, the anodes at AN_LOW's level (true: low);
+-- seg(0) is segment a ... seg(6) is g.
 -- Each digit: a hexadecimal digit, 0-9 and A-F (b and d in lower case, as a 7-segment display
 -- shows them). points(i): the decimal point of digit i.
 ----------------------------------------------------------------------------------
@@ -10,7 +11,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity sevenseg is
-    Generic ( REFRESH : integer := 50_000 );
+    Generic ( REFRESH : integer := 50_000;
+              AN_LOW  : boolean := true );   -- true: a digit lit by its anode at '0'
     Port ( clk    : in  STD_LOGIC;
            digits : in  STD_LOGIC_VECTOR (15 downto 0);   -- digit 3 (left) .. digit 0 (right)
            points : in  STD_LOGIC_VECTOR (3 downto 0);
@@ -23,6 +25,11 @@ architecture Behavioral of sevenseg is
     signal count : integer range 0 to REFRESH - 1 := 0;
     signal sel   : UNSIGNED (1 downto 0) := "00";
     signal d     : STD_LOGIC_VECTOR (3 downto 0);
+    -- the anodes at the board's level: as written (a digit lit at '0'), or inverted
+    function level (v : STD_LOGIC_VECTOR) return STD_LOGIC_VECTOR is
+    begin
+        if AN_LOW then return v; else return not v; end if;
+    end function;
 begin
     process (clk)
     begin
@@ -43,10 +50,10 @@ begin
         digits(15 downto 12) when others;
 
     with sel select an <=
-        "1110" when "00",
-        "1101" when "01",
-        "1011" when "10",
-        "0111" when others;
+        level("1110") when "00",
+        level("1101") when "01",
+        level("1011") when "10",
+        level("0111") when others;
 
     dp <= not points(to_integer(sel));
 

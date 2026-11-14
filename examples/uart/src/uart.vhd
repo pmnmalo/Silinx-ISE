@@ -22,7 +22,8 @@ entity uart is
               BAUD    : integer := 9600;
               STABLE  : integer := 0;              -- button debounce (20 ms): 0 for CLK_HZ / 50
               REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
-              BTN_LOW : boolean := false );        -- true: the board's buttons read '0' when pressed
+              BTN_LOW : boolean := false;          -- true: the board's buttons read '0' when pressed
+              AN_LOW  : boolean := true );         -- true: the board's digit enables light a digit at '0'
     Port ( clk : in  STD_LOGIC;                  -- the board's clock (CLK_HZ)
            rx  : in  STD_LOGIC;
            tx  : out STD_LOGIC;
@@ -112,7 +113,7 @@ begin
     digits <= std_logic_vector(count) & last;
 
     display : entity work.sevenseg
-        generic map ( REFRESH => REFRESH_N )
+        generic map ( REFRESH => REFRESH_N, AN_LOW => AN_LOW )
         port map ( clk => clk, digits => digits, points => "0100",
                    seg => seg, dp => dp, an => an );
 end Behavioral;

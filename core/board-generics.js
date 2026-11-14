@@ -1,8 +1,10 @@
 // Silinx - an example's top made for another board (#3710): the examples take the board's clock as a generic, CLK_HZ
 // (their timing generics default from it: TICK := CLK_HZ, REFRESH := CLK_HZ / 1000…), and the level of its buttons and
-// switches as BTN_LOW and SW_LOW (true: they read '0' when pressed or on, as the Numato boards' do). A project made
-// from an example for another board than the example's gets them written as the defaults of its top's generics, from
-// the board's pin table: its clock's period, the activeLow of its buttons and switches. Shared by the server's New
+// switches as BTN_LOW and SW_LOW (true: they read '0' when pressed or on, as the Numato boards' do), and the level of its
+// 7-segment display's digit enables as AN_LOW (true: a digit is on at '0', as the Basys2's is; false on the EDGE
+// Spartan 6, #3884). A project made from an example for another board than the example's gets them written as the
+// defaults of its top's generics, from the board's pin table: its clock's period, the activeLow of its buttons and
+// switches, the activeHigh of its digit enables. Shared by the server's New
 // Project (server/projects.js), the browser edition's (web/js/project-store.js) and the tests' example projects.
 //
 // Isomorphic ES module (browser + Node), no DOM.
@@ -11,7 +13,7 @@ import { periodNs } from '../packages/silinx-fpga/src/parts.js';
 // a board resource by its name, else the first of its group (as boardAutoAssign finds a port's: Numato's "dip")
 const resourceOf = (resources, name, group) => resources.find(r => r.name === name) || resources.find(r => r.group === group) || null;
 
-/** The values of a board (resolveBoard's { resources }): { CLK_HZ, BTN_LOW, SW_LOW }, each only when the board has
+/** The values of a board (resolveBoard's { resources }): { CLK_HZ, BTN_LOW, SW_LOW, AN_LOW }, each only when the board has
  *  the resource (a board with no clock has no CLK_HZ). */
 export function boardGenericValues(resolved) {
   const res = resolved?.resources || [];
@@ -22,6 +24,9 @@ export function boardGenericValues(resolved) {
   const btn = resourceOf(res, 'btn', 'Buttons'), sw = resourceOf(res, 'sw', 'Switches');
   if (btn) out.BTN_LOW = !!btn.extra?.activeLow;
   if (sw) out.SW_LOW = !!sw.extra?.activeLow;
+  // (the digit enables: active low unless the board says activeHigh, #3884)
+  const an = res.find(r => r.name === 'an');
+  if (an) out.AN_LOW = !an.extra?.activeHigh;
   return out;
 }
 
@@ -83,5 +88,6 @@ export function topForBoard(sources, top, resolved) {
 
 /** The console's line of a top made for a board (topForBoard's result): its generics' new defaults. */
 export function topForBoardText(r, boardName) {
-  return `${r.path}: ${r.changed.map(n => `${n} = ${literal(r.values[n], r.lang)}`).join(', ')}, the ${boardName}'s clock and inputs (the defaults of its generics).`;
+  const what = r.changed.includes('AN_LOW') ? 'clock, inputs and display' : 'clock and inputs';
+  return `${r.path}: ${r.changed.map(n => `${n} = ${literal(r.values[n], r.lang)}`).join(', ')}, the ${boardName}'s ${what} (the defaults of its generics).`;
 }

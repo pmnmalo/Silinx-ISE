@@ -38,7 +38,7 @@ test('write_file of a drawing: its HDL file made again; with errors, stale, and 
   const w = await ok('write_file', { project: 't', path: 'src/lamps.bool.json', text: JSON.stringify(tt, null, 2) });
   assert.equal(w.text, `Wrote src/lamps.bool.json (${JSON.stringify(tt, null, 2).length} characters).\nsrc/lamps.vhd updated from src/lamps.bool.json`);
   assert.deepEqual(w.data.hdl, { file: 'src/lamps.vhd', written: true, removed: null, stale: null });
-  assert.equal((await ok('check_syntax', { project: 't' })).text, 'Process "Check Syntax" of <top> completed successfully (43 signals, 32 processes).');
+  assert.equal((await ok('check_syntax', { project: 't' })).text, 'Process "Check Syntax" of <top> completed successfully (44 signals, 33 processes).');
   // a state diagram with errors
   const good = read('t', 'src/traffic.fsm.json');
   const fsm = JSON.parse(good);
@@ -53,7 +53,7 @@ test('write_file of a drawing: its HDL file made again; with errors, stale, and 
   assert.equal(s.text, `${stale}\nThe simulation of <tb_traffic> did not start: 1 error(s) (check_syntax with simulation).`);
   // fixed: Check Syntax as before
   await ok('write_file', { project: 't', path: 'src/traffic.fsm.json', text: good });
-  assert.equal((await ok('check_syntax', { project: 't' })).text, 'Process "Check Syntax" of <top> completed successfully (43 signals, 32 processes).');
+  assert.equal((await ok('check_syntax', { project: 't' })).text, 'Process "Check Syntax" of <top> completed successfully (44 signals, 33 processes).');
 });
 
 // #3286: a state diagram's transitions as its editor draws a stroke: a transition's bend, a self-loop's angle, written
@@ -119,7 +119,7 @@ test('set_source_properties: a drawing in Verilog (its HDL file with it), back t
   assert.equal(v.text, 'src/traffic.fsm.json: its HDL is now in Verilog, src/traffic.v (src/traffic.vhd removed)\nsrc/traffic.fsm.json: Verilog.');
   assert.deepEqual((await P.readProject('s')).sourceLanguage, { 'src/traffic.fsm.json': 'verilog' });
   assert.ok((await P.readProject('s')).files.some(f => f.path === 'src/traffic.v' && f.lang === 'verilog'));
-  assert.equal((await ok('check_syntax', { project: 's', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (44 signals, 34 processes).');
+  assert.equal((await ok('check_syntax', { project: 's', simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (45 signals, 35 processes).');
   await passes('s', ['Simulation finished OK']);
   assert.equal((await ok('set_source_properties', { project: 's', path: 'src/traffic.fsm.json', language: 'verilog' })).text, 'src/traffic.fsm.json: Verilog, as it was.');
   // its own kept when the Preferred Language changes

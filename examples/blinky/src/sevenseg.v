@@ -1,9 +1,10 @@
 // Silinx example (blinky; the clock example's display driver): the 4-digit 7-segment display of the Basys2 / Nexys2, multiplexed: one
 // digit at a time, each for REFRESH clock cycles (1 ms at 50 MHz: the four digits seem lit at once).
-// Segments, decimal point and anodes are active low; seg[0] is segment a ... seg[6] is segment g.
+// Segments and decimal point are active low, the anodes at AN_LOW's level; seg[0] is segment a ... seg[6] is segment g.
 // Each digit: 0-9 a number, 15 blank. points[i]: the decimal point of digit i.
 module sevenseg #(
-    parameter REFRESH = 50000
+    parameter REFRESH = 50000,
+    parameter AN_LOW  = 1                     // 1: a digit lit by its anode at 0
 ) (
     input  wire        clk,
     input  wire [15:0] digits,                // digit 3 (left) .. digit 0 (right), 4 bits each
@@ -35,7 +36,7 @@ module sevenseg #(
             count <= count + 1'b1;
     end
 
-    assign an = ~(4'b0001 << sel);
+    assign an = AN_LOW ? ~(4'b0001 << sel) : 4'b0001 << sel;
     assign dp = ~points[sel];
 
     always @(*) begin
