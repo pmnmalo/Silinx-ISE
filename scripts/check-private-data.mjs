@@ -52,6 +52,8 @@ const ALLOW = [
   ['test/corpus/vloghammer-gen.mjs', 'claire@yosyshq.com', 'the copyright notice of VlogHammer (ISC licence), which a port must keep'],
   ['test/lang-vhdl-types.test.js', '6.4.2.3', 'a section of the VHDL standard'],
   [/^((core|packages\/silinx-hdl\/src)\/(elab-expr|elaborate)\.js|test\/vhdl-unconstrained-const\.test\.js)$/, '9.3.3.3', 'a section of the VHDL standard (#2559; in the HDL front end package since #1710)'],
+  [/^((packages\/silinx-hdl\/)?(src\/vhdl\/interface-refs\.js|changes\/3744-vhdl-interface-default-refs\.md|CHANGELOG\.md)|core\/translate-to-vhdl\.js|test\/(vhdl-interface-refs|translate)\.test\.js)$/, '4.3.2.1',
+    'a section of the VHDL standard: interface lists, a default that uses an earlier object of its list (#3744)'],
   ['core/vhdl/actual.js', '4.3.2.2', 'a section of the VHDL standard, which the file named before #2579 (in the history only)'],
   [/^(test\/((ui\/)?(design|mcp)-link|ui\/link-hash)\.test\.js|\(message of 9973e11\))$/, /^(https:\/\/u:p@example\.org\/a\.zip|10\.0\.0\.5|192\.168\.1\.1|172\.(20|32)\.0\.1|169\.254\.169\.254|fd00::1|mac-mini\.local|100\.101\.102\.103|8\.8\.8\.8|192\.169\.0\.1|2606:4700::1111)$/,
     'a link\'s zip address refused or taken (#2829; a link given to a running app, #3316, #3345; named in the message of #3415\'s commit, #3494): made-up local and public addresses, a made-up login'],
