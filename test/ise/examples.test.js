@@ -125,3 +125,10 @@ test('ISE builds example clock for the elbert-v2, with the expected warnings', {
   const ucf = fs.readFileSync(path.join(job.result.buildDir, 'digital_clock.ucf'), 'utf8');
   for (const [net, loc] of [['seg<0>', 'P117'], ['seg<6>', 'P110'], ['dp', 'P114'], ['an<0>', 'P124'], ['an<2>', 'P120']]) assert.match(ucf, new RegExp(`^NET "${net}"\\s+LOC = "${loc}"`, 'm'), net);
 });
+
+// (#3869) the clock on the Spartan-3 Starter Board, an XC3S200 (a Spartan-3, ISE only): its bitgen takes the .ut's
+// options (its ConfigRate from 3 MHz; the Elbert V2's, a Spartan-3A, has no DCMShutdown: the test above), no warning
+test('ISE builds example clock for the s3-starter, with the expected warnings', { skip, timeout: 30 * 60000 }, async () => {
+  const job = await iseBuild('clock', { board: 's3-starter' }, []);
+  assert.deepEqual(job.lines.filter(l => /^WARNING: /.test(l)), []);
+});
