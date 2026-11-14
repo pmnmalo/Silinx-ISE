@@ -398,7 +398,8 @@ export const isProjectFile = key => foldName(key) === PROJECT_FILE;
 export async function isProjectFileAt(dir, full) {
   if (isProjectFile(relKey(dir, full))) return true;
   try {
-    const [a, b] = await Promise.all([fs.stat(full), fs.stat(path.join(dir, PROJECT_FILE))]);
+    // (as bigint: Windows's 64-bit file ids are past a Number's precision, two files of a folder alike, #3878)
+    const [a, b] = await Promise.all([fs.stat(full, { bigint: true }), fs.stat(path.join(dir, PROJECT_FILE), { bigint: true })]);
     return a.dev === b.dev && a.ino === b.ino;
   } catch { return false; }
 }
