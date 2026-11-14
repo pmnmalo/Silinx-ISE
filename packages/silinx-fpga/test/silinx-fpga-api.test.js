@@ -22,11 +22,11 @@ test('#1678 silinx-fpga: its entries, the API, its light part and the API in Nod
 
 // the API's names: a change to them is a change of the API (its version, #1681), made on purpose
 const API = ['CST', 'ECP5_PARTS', 'ECP5_STEPS', 'FAMILY_INFO', 'FAST_SYNTH', 'GOAL_IMPL', 'GOWIN_DEVICES', 'GOWIN_PARTS', 'GOWIN_STEPS', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'LPF', 'PCF', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError', 'XC7_STEPS', 'XC7_TIMING_MODEL', 'XDC', 'XILINX_STEPS',
-  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'betweenPaths', 'bitDbS6', 'bitDbXc7', 'bitName', 'bitgen', 'bitstreamExtOf', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsExtOf', 'constraintsFormatOf',
+  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'betweenPaths', 'bitDbS6', 'bitDbXc7', 'bitIndexXc7', 'bitName', 'bitgen', 'bitstreamExtOf', 'boardAutoAssign', 'boardConstraintsText', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsExtOf', 'constraintsFormatOf',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'ecp5Io', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'experimentalDevice', 'familyFromXise', 'familyName',
-  'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'gowinIo', 'gowinPack', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'loadGowinChipdb', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
+  'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'framesToFeatures', 'gateAssignments', 'generateUcf', 'gowinIo', 'gowinPack', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'loadGowinChipdb', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
   'nextpnrIo', 'noFlowMessage', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'pathHighlight', 'pathsText', 'periodNs', 'powerReport',
-  'primitiveInstances', 'readBit', 'readXdc', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
+  'primitiveInstances', 'readBit', 'readBitFramesXc7', 'readXdc', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
   'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6MapOf', 's6OpenStatus', 'scriptTopError', 'splitBitPart', 'splitPart', 'synthEffort', 'synthGoal', 'synthesizeArea', 'synthesizeFast',
   'synthesizeVerilog', 'timingPaths', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'vivadoDevice', 'writeBit', 'writeXdc', 'writeXdl', 'yosysWorkerSource'];
 const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'XC7_DB_DIR', 'loadBitDbXc7', 'nextpnrXc7Node', 'xc7Parts', 'buildDeviceCache', 'chipdbCacheDir', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'leaveOutChipdbs', 'loadBitDbS6', 'loadDb',

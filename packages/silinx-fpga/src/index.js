@@ -71,3 +71,6 @@ export { s6OpenStatus } from './fpga/s6/devices.js';
 export { bitDbS6, fetchBitDbS6, s6DbNames } from './fpga/s6/bitdb.js';
 // the 7-series' bit database from its JSON (bitdb/xc7/<part>.json.gz, gunzipped and parsed): the browser's worker's (#3143)
 export { bitDbXc7 } from './fpga/xc7/bitdb.js';
+// a 7-series .bit read back into its frames and features (bitread, bit2fasm): the BSCAN's measurement against Vivado's
+// bitstreams (scripts/xc7-bscan-vivado.mjs, #3767)
+export { bitIndexXc7, readBitFramesXc7, framesToFeatures } from './fpga/xc7/readback.js';
