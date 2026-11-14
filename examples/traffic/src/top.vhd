@@ -48,8 +48,13 @@ architecture Structural of top is
     end function;
     constant TICK_N    : integer := or_else(TICK, CLK_HZ);
     constant REFRESH_N : integer := or_else(REFRESH, CLK_HZ / 1000);
+    -- AN_LOW as sevenseg.v's parameter (1: true; a Verilog module takes an integer)
+    function to_int (b : boolean) return integer is
+    begin
+        if b then return 1; else return 0; end if;
+    end function;
     component sevenseg
-        generic ( REFRESH : integer );
+        generic ( REFRESH : integer; AN_LOW : integer );
         port ( clk    : in  std_logic;
                digits : in  std_logic_vector(15 downto 0);
                points : in  std_logic_vector(3 downto 0);
@@ -70,12 +75,9 @@ architecture Structural of top is
     -- the buttons and switches as '1' when pressed or on, whatever the board's level
     signal btnOn : STD_LOGIC_VECTOR (0 downto 0);
     signal swOn  : STD_LOGIC_VECTOR (1 downto 0);
-    -- the display's digit enables, active low (the Verilog sevenseg's default), driven here at the board's level
-    signal anLow : STD_LOGIC_VECTOR (3 downto 0);
 begin
     btnOn <= not btn when BTN_LOW else btn;
     swOn  <= not sw when SW_LOW else sw;
-    an    <= anLow when AN_LOW else not anLow;
 
     rst <= swOn(0);
 
@@ -109,7 +111,7 @@ begin
     -- the seconds left on the right digit (F: blank); the other digits blank
     digits <= x"FFFF" when left = "0000" else x"FFF" & left;
     u_display : sevenseg
-        generic map ( REFRESH => REFRESH_N )
+        generic map ( REFRESH => REFRESH_N, AN_LOW => to_int(AN_LOW) )
         port map ( clk => clk, digits => digits, points => "0000",
-                   seg => seg, dp => dp, an => anLow );
+                   seg => seg, dp => dp, an => an );
 end Structural;

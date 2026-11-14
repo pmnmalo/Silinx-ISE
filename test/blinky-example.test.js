@@ -58,7 +58,7 @@ const MUTANTS = [
   ['the ones digit wrapping at 8', 'src/bcd_counter.vhd', 'if ones /= 9 then', 'if ones /= 8 then', /display: expected 14 steps, got 15/],
   ['a count that goes on while paused', 'src/top.vhd', 'inc => step', 'inc => speed_step', /pause did not hold the display/],
   ['a reset that keeps the count', 'src/bcd_counter.vhd', 'ones <= (others => \'0\'); tens <= (others => \'0\');\n                hundreds <= (others => \'0\'); thousands <= (others => \'0\');', 'null;', /reset did not clear the count/],
-  ['the digits in the wrong order', 'src/top.vhd', 'an => anLow );', 'an(0) => anLow(3), an(1) => anLow(2), an(2) => anLow(1), an(3) => anLow(0) );', /display: expected 14 steps, got 4100/],
+  ['the digits in the wrong order', 'src/top.vhd', 'an => an );', 'an(0) => an(3), an(1) => an(2), an(2) => an(1), an(3) => an(0) );', /display: expected 14 steps, got 4100/],
 ];
 for (const [what, file, from, to, message] of MUTANTS) {
   test(`blinky: the test bench fails on ${what}`, { timeout: 120000 }, async () => {
