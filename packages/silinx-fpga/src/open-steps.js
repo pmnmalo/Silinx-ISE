@@ -83,3 +83,7 @@ export const engineOf = () => 'nextpnr';
 /** A project's Map of the Spartan-6 (#3138): 'silinx' (Silinx's own, fpga/s6/pack.js, the default until nextpnr's packer
  *  reaches parity, #3139) or 'nextpnr' (the fork's packer, which packs and places Yosys's netlist: impl.s6Map). */
 export const s6MapOf = impl => (impl?.s6Map === 'nextpnr' ? 'nextpnr' : 'silinx');
+
+/** A 7-series project's seeds of nextpnr (#3825): 3 (impl.xc7Seeds, Process Properties' best of 3 seeds: the best Fmax kept)
+ *  or 1, the default. */
+export const xc7SeedsOf = impl => (impl?.xc7Seeds === 3 ? 3 : 1);

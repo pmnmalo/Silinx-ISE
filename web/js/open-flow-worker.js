@@ -210,7 +210,7 @@ self.onmessage = async ({ data }) => {
           spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post),
           spartan6: nextpnrBrowser(nextpnrS6Url || new URL('vendor/nextpnr-spartan6/gen/bundle.js', base).href, post, 'runNextpnrHimbaechelSpartan6', 5),
           // (the 7-series', #3143: router2 as the local server's, router1 where it runs out of this browser's memory)
-          xc7: routerFallback(nextpnrBrowser(nextpnrXc7Url || new URL('vendor/nextpnr-xc7/gen/bundle.js', base).href, post, xc7.runner, xc7.mb), post),
+          xc7: routerFallback(nextpnrBrowser(nextpnrXc7Url || new URL('vendor/nextpnr-xc7/gen/bundle.js', base).href, post, xc7.runner, xc7.mb)),
         } : null });
     const res = await runOpenFlow(spec, io);
     // the FPGA view's model, from the routed design

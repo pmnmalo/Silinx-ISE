@@ -9,7 +9,7 @@ import { blackboxesIn, blackboxModels } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
 import { synthEffort, synthGoal, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
-import { OPEN_STEPS, engineOf, s6MapOf, orderOpenSteps, orderSteps, deviceFamily, constraintsFormatOf } from '/packages/silinx-fpga/src/parts.js';
+import { OPEN_STEPS, engineOf, s6MapOf, xc7SeedsOf, orderOpenSteps, orderSteps, deviceFamily, constraintsFormatOf } from '/packages/silinx-fpga/src/parts.js';
 import { familyProfile } from '/core/family-profile.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
@@ -192,7 +192,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   // (a device with some of the steps only, as the server refuses the others: the Spartan-6's, #722)
   const missing = st.steps ? runSteps.filter(s => !st.steps.includes(s)) : [];
   if (missing.length) throw new Error(`the Silinx toolchain has no ${missing.join(', ')} for ${st.part} yet (only ${st.steps.join(', ')})`);
-  const spec = { top, part: st.part, device: dev, pkg, speed: String(project.device.speed || ''), family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), s6Map: s6MapOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), ...(resources && { resources }) };
+  const spec = { top, part: st.part, device: dev, pkg, speed: String(project.device.speed || ''), family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), s6Map: s6MapOf(project.impl), xc7Seeds: xc7SeedsOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), ...(resources && { resources }) };
   if (synthUpToDate && !spec.steps.includes('synth')) spec.synthUpToDate = synthUpToDate;
   // (the logic analyzer's capture, inserted by the front end: core/flow-ide.js, #3176)
   if (project.capture) spec.capture = project.capture;

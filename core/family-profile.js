@@ -32,6 +32,8 @@ export const FAMILY_PROFILES = {
     // ../chipdb beside it; mb: its WebAssembly and a chip database, the log's), Project X-Ray's bit databases in bitdb/xc7
     // (one per part: <part>.json.gz), its steps (nextpnr packs in its Place & Route)
     openFlow: { parts: /^xc7a\d+t$/, bitDb: 'xc7', nextpnr: true, uarch: 'xilinx', runner: 'runNextpnrHimbaechelXilinx', layout: 'nextpnrXc7', mb: 6, steps: XC7_STEPS },
+    // its Place & Route's seeds in Process Properties (#3825): one, or the best of 3 (impl.xc7Seeds)
+    seedsChoice: true,
   },
   ice40: {
     // its own tools (#2295): nextpnr-ice40 and icepack, their steps, no device description of the Silinx toolchain;

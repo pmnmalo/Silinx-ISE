@@ -122,7 +122,7 @@ test('set_process_properties: the Optimization, the start-up clock; no place and
   assert.deepEqual((await P.readProject('p1')).impl, { optMode: 'Speed', optLevel: 2, startupClk: 'CCLK' });
   const f = await ok('set_process_properties', { project: 'p1', optimization: 'fast', startup_clock: 'jtag' });
   assert.equal(f.text, 'p1: Optimization fast, FPGA start-up clock jtag.');
-  await fails('set_process_properties', { project: 'p1' }, 'give optimization, startup_clock or s6_map');
+  await fails('set_process_properties', { project: 'p1' }, 'give optimization, startup_clock, s6_map or xc7_seeds');
   await fails('set_process_properties', { project: 'p1', optimization: 'tiny' }, 'optimization: one of fast, area, speed');
   await fails('set_process_properties', { project: 'p1', startup_clock: 'JtagClk' }, 'startup_clock: one of jtag, cclk, user');
   await fails('set_process_properties', { project: 'p1', pr_engine: 'silinx' }, 'unknown pr_engine');
