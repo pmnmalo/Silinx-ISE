@@ -529,10 +529,11 @@ export const BOARDS = [
       { name: 'dip', label: 'DIP switches DPSwitch0..7 (active low: ON reads 0)', pins: ['P70', 'P69', 'P68', 'P64', 'P63', 'P60', 'P59', 'P58'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Switches', extra: { activeLow: true } },
       { name: 'btn', label: 'Push buttons Switch0..5 (active low)', pins: ['P80', 'P79', 'P78', 'P77', 'P76', 'P75'], dir: 'in', iostandard: 'LVCMOS33', pull: 'up', group: 'Buttons', extra: { activeLow: true } },
       // the display (3 digits, common anode, all active low): Numato's SevenSegment[7..1] are a..g, [0] the decimal point
-      // (its demo's "abcdefgh"), Enable[0..2] the digits; as the other boards' seg (CA..CG), dp and an (#3741, the Mimas V2's #3709)
+      // (its demo's "abcdefgh"), Enable[0..2] the digits; as the other boards' seg (CA..CG), dp and an (#3741, the Mimas V2's #3709);
+      // an<0> the rightmost digit (S1, Enable 3 = P124 on Numato's diagram), as the other boards' (#3847)
       { name: 'seg', label: '7-segment segments a..g SevenSegment[7..1] (active low)', pins: ['P117', 'P116', 'P115', 'P113', 'P112', 'P111', 'P110'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: '7-segment', extra: { activeLow: true } },
       { name: 'dp', label: '7-segment decimal point SevenSegment[0] (active low)', pins: ['P114'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: '7-segment', extra: { activeLow: true } },
-      { name: 'an', label: '7-segment digit enables Enable[0..2] (active low)', pins: ['P120', 'P121', 'P124'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: '7-segment', extra: { activeLow: true } },
+      { name: 'an', label: '7-segment digit enables Enable[2..0], right to left (active low)', pins: ['P124', 'P121', 'P120'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: '7-segment', extra: { activeLow: true } },
       { name: 'vga_red', label: 'VGA red Red[0..2]', pins: ['P103', 'P104', 'P105'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: 'VGA' },
       { name: 'vga_green', label: 'VGA green Green[0..2]', pins: ['P99', 'P101', 'P102'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: 'VGA' },
       { name: 'vga_blue', label: 'VGA blue Blue[1..2] (2 bits)', pins: ['P96', 'P98'], dir: 'out', iostandard: 'LVCMOS33', drive: 12, slew: 'slow', group: 'VGA' },
