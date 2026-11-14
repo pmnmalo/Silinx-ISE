@@ -12,6 +12,12 @@
 //     --filter: examples' names separated by | or , ('^…$' whole names, '^' their start, '$' their end, else anywhere)
 //   node scripts/xc7-timing-vivado.mjs --detach [--boards …] [--filter …]   Vivado started on the host in the background
 //     (it does not depend on this machine staying awake); nextpnr's runs here meanwhile; it prints the run's name
+//   node scripts/xc7-timing-vivado.mjs --placement [--detach] [--boards …] [--filter …]   nextpnr's placement routed and
+//     timed by Vivado (#3803): each design placed by nextpnr here (as the open flow runs it, --write), its cells' sites and
+//     BELs fixed in Vivado (measure.tcl after link_design: placement.txt, written as placement.xdc), route_design (a
+//     place_design before it places only what nextpnr's placement did not give: the IO buffers at their pins, a carry
+//     chain nextpnr moved, a LUTRAM's parts); with --update its numbers go to each design's nextpnrPlacement, its own
+//     measurement (Vivado's placement, the fit) kept. A run's mode is kept for --collect.
 //   node scripts/xc7-timing-vivado.mjs --collect <run> [--update]   its results once it is done (else its progress); the
 //     run's folder on the host deleted only once --update has saved them
 //     --update: the numbers written to packages/silinx-fpga/research/xc7/vivado-timing.json (per board and example:
@@ -36,7 +42,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const BOARDS = { basys3: 'xc7a35tcpg236-1', 'nexys-a7': 'xc7a100tcsg324-1' };
 const SETTINGS = ['/tools/Xilinx/*/Vivado/settings64.sh', '/tools/Xilinx/Vivado/*/settings64.sh', '/opt/Xilinx/*/Vivado/settings64.sh', '/opt/Xilinx/Vivado/*/settings64.sh'];
 /** The files measure.tcl writes in a design's folder, moved to its results. */
-export const OUTPUTS = ['route.rpt', 'summary.rpt', 'paths.rpt', 'design.sdf', 'routes.txt'];
+export const OUTPUTS = ['route.rpt', 'summary.rpt', 'paths.rpt', 'design.sdf', 'routes.txt', 'placement.rpt', 'placement.xdc'];
 
 /** Yosys's commands that write Silinx's netlist (netlist.json, the open flow's) as the EDIF Vivado reads (netlist.edf):
  *  the Xilinx cells' library read first (their ports' directions), unused library cells and scope cells left out. */
@@ -45,10 +51,86 @@ export function edifScript(top) {
   return `read_verilog -lib -specify +/xilinx/cells_sim.v; read_verilog -lib +/xilinx/cells_xtra.v; read_json netlist.json; hierarchy -top ${top} -purge_lib; select -clear; delete t:$scopeinfo; write_edif -pvector bra netlist.edf`;
 }
 
+/** nextpnr's placement of a design (#3803) as placementTcl reads it (placement.txt): a line per cell of Vivado's netlist
+ *  that nextpnr placed, "<cell>\t<grid x>\t<grid y>\t<site prefix>\t<site x in the tile>\t<site y>\t<BEL>" (NEXTPNR_BEL
+ *  X10Y143/SLICE_X1Y0.C6LUT: the tile at the grid point (10, 143), Vivado's GRID_POINT_X and _Y, its second SLICE, the
+ *  BEL C6LUT). routed: nextpnr's --write JSON (text or object); cells: the names of Vivado's netlist's cells (the
+ *  synthesis's top module's). A cell keeps its name in nextpnr but for a carry chain's CARRY4 that nextpnr packed again
+ *  (<name>$split$muxcy<k>$PACKED_CARRY4$): Vivado's CARRY4 where k is 0 (the chain where it was), else left to Vivado
+ *  (a chain moved by a MUXCY). Left out, and counted by type in `left`: the cells nextpnr made (feed-through LUTs, a
+ *  LUTRAM's parts, the constants' drivers), the IO buffers (their pins fixed by netlist.xdc) and a moved CARRY4.
+ *  -> { lines: [{ cell, x, y, prefix, sx, sy, bel }], text, left: { type: n } } */
+export function placementLines(routed, cells) {
+  const json = typeof routed === 'string' ? JSON.parse(routed) : routed;
+  const top = Object.values(json.modules || {}).find((m) => m.attributes?.top) || Object.values(json.modules || {})[0] || { cells: {} };
+  const names = new Set(cells), lines = [], left = {};
+  for (const [name, c] of Object.entries(top.cells || {})) {
+    const m = /^X(\d+)Y(\d+)\/([A-Z0-9]+(?:_[A-Z0-9]+)*?)_X(\d+)Y(\d+)\.(?:.*\.)?([A-Za-z0-9_]+)$/.exec(c.attributes?.NEXTPNR_BEL || '');
+    const carry = /^(.*)\$split\$muxcy(\d+)\$PACKED_CARRY4\$$/.exec(name);
+    const cell = names.has(name) ? name : carry && carry[2] === '0' && names.has(carry[1]) ? carry[1] : null;
+    if (!m || !cell || /^IOB33|^PAD$|^PSEUDO_/.test(c.type)) { left[c.type] = (left[c.type] || 0) + 1; continue; }
+    lines.push({ cell, x: +m[1], y: +m[2], prefix: m[3], sx: +m[4], sy: +m[5], bel: m[6] });
+  }
+  lines.sort((a, b) => (a.cell < b.cell ? -1 : a.cell > b.cell ? 1 : 0));
+  for (const l of lines) if (/[\t\n]/.test(l.cell)) throw new Error(`a cell's name with a tab or a newline: ${JSON.stringify(l.cell)}`);
+  const text = lines.map((l) => `${l.cell}\t${l.x}\t${l.y}\t${l.prefix}\t${l.sx}\t${l.sy}\t${l.bel}\n`).join('');
+  return { lines, text, left };
+}
+
+/** The part of measure.tcl that fixes nextpnr's placement (#3803, placement.txt: placementLines'), after link_design:
+ *  each cell's site found from its tile's grid point (the sites of the tile with its prefix, the lowest X and Y plus its
+ *  offset, as nextpnr's chip database names them relative to the tile), placed there (place_cell) with IS_LOC_FIXED and
+ *  IS_BEL_FIXED, and written as the same constraints in placement.xdc (to read before link_design in another run);
+ *  placement.rpt: a line per cell not placed (MISSING: not in Vivado's netlist, NOSITE, FAILED: place_cell's error), then
+ *  the counts. place_design after it places only what nextpnr's placement did not give (the IO buffers at their pins,
+ *  a moved carry chain, the LUTRAMs) and moves no fixed cell; route_design routes nextpnr's placement. */
+const PLACEMENT_TCL = `# nextpnr's placement (#3803): placement.txt's cells fixed where nextpnr put them
+set tiles [dict create]
+foreach t [get_tiles] { dict set tiles "[get_property GRID_POINT_X $t],[get_property GRID_POINT_Y $t]" $t }
+proc siteOf {tiles gx gy prefix sx sy} {
+  if {![dict exists $tiles "$gx,$gy"]} { return "" }
+  set xs {}; set ys {}
+  foreach s [get_sites -quiet -of_objects [dict get $tiles "$gx,$gy"]] {
+    if {[regexp "^\${prefix}_X(\\\\d+)Y(\\\\d+)\\$" [get_property NAME $s] - x y]} { lappend xs $x; lappend ys $y }
+  }
+  if {[llength $xs] == 0} { return "" }
+  return "\${prefix}_X[expr {[tcl::mathfunc::min {*}$xs] + $sx}]Y[expr {[tcl::mathfunc::min {*}$ys] + $sy}]"
+}
+set cells [dict create]
+foreach c [get_cells -quiet -hierarchical -filter {IS_PRIMITIVE}] { dict set cells [get_property NAME $c] $c }
+set fixed 0; set missing 0; set nosite 0; set failed 0
+set in [open placement.txt r]; set xdc [open placement.xdc w]; set rpt [open placement.rpt w]
+while {[gets $in line] >= 0} {
+  lassign [split $line "\\t"] name gx gy prefix sx sy bel
+  if {![dict exists $cells $name]} { incr missing; puts $rpt "MISSING\\t$name"; continue }
+  set site [siteOf $tiles $gx $gy $prefix $sx $sy]
+  if {$site eq ""} { incr nosite; puts $rpt "NOSITE\\t$name\\tX\${gx}Y\${gy} \${prefix}_X\${sx}Y\${sy}"; continue }
+  set c [dict get $cells $name]
+  if {[catch {place_cell $c $site/$bel} err]} { incr failed; puts $rpt "FAILED\\t$name\\t$site/$bel\\t[string map {"\\n" " "} $err]"; continue }
+  set_property IS_BEL_FIXED 1 $c
+  set_property IS_LOC_FIXED 1 $c
+  incr fixed
+  set q "get_cells -hierarchical -filter {NAME == \\"$name\\"}"
+  puts $xdc "set_property BEL $bel \\[$q\\]\\nset_property LOC $site \\[$q\\]"
+}
+close $in; close $xdc
+puts $rpt "FIXED\\t$fixed\\nMISSING\\t$missing\\nNOSITE\\t$nosite\\nFAILED\\t$failed"
+puts $rpt "UNPLACED\\t[llength [get_cells -quiet -hierarchical -filter {IS_PRIMITIVE && PRIMITIVE_LEVEL != INTERNAL && LOC == ""}]]"
+close $rpt
+`;
+
+/** placement.rpt's counts (PLACEMENT_TCL's): { fixed, missing, nosite, failed, unplaced } (the cells left to place_design:
+ *  unplaced), or null with none. */
+export function placementCounts(text) {
+  const n = (k) => { const m = new RegExp(`^${k}\\t(\\d+)$`, 'm').exec(text); return m ? +m[1] : null; };
+  const c = { fixed: n('FIXED'), missing: n('MISSING'), nosite: n('NOSITE'), failed: n('FAILED'), unplaced: n('UNPLACED') };
+  return c.fixed === null ? null : c;
+}
+
 /** measure.tcl: a design's netlist (netlist.edf, its constraints netlist.xdc) placed and routed by Vivado, and its timing
  *  written: route.rpt, summary.rpt (the Fmax), paths.rpt (the worst paths, each element), design.sdf (slow corner), and
  *  routes.txt (each routed net's driver, sinks and PIPs by their nodes; each LUT input's bel pin: parseRoutes's). */
-export function measureTcl({ paths = 100 } = {}) {
+export function measureTcl({ paths = 100, placement = false } = {}) {
   return `# Generated by Silinx (#3516, scripts/xc7-timing-vivado.mjs): Silinx's netlist placed and routed by Vivado, its timing written.
 #   vivado -mode batch -source measure.tcl -tclargs <design folder> <top> <part>
 lassign $argv dir top part
@@ -59,7 +141,7 @@ file copy -force netlist.edf $top.edf
 read_edif $top.edf
 read_xdc netlist.xdc
 link_design -top $top -part $part
-place_design
+${placement ? PLACEMENT_TCL : ''}place_design
 route_design
 report_route_status -file route.rpt
 report_timing_summary -max_paths 1 -report_unconstrained -file summary.rpt
@@ -135,8 +217,8 @@ export function selectDesigns(examples, boards, filter) {
 }
 
 /** A design's results (its folder: status.txt and measure.tcl's files) as numbers: { status, vivado: { fmaxMHz,
- *  minPeriodNs, wnsNs, logicNs, routeNs, levels }, cells, wires } (cells: the cells' statistics; wires: the routes'
- *  groups), or { status, error } when Vivado failed. read(file) -> its text or ''. */
+ *  minPeriodNs, wnsNs, logicNs, routeNs, levels }, cells, wires, placement? } (cells: the cells' statistics; wires: the
+ *  routes' groups; placement: on nextpnr's placement, placementCounts'), or { status, error } when Vivado failed. read(file) -> its text or ''. */
 export function designNumbers(read, parseSummary) {
   const status = /vivado (\d+)/.exec(read('status.txt'))?.[1] ?? null;
   if (status !== '0') return { status, error: `Vivado ${status === null ? 'did not run' : `exited with ${status}`}` };
@@ -145,11 +227,13 @@ export function designNumbers(read, parseSummary) {
   const sdf = parseSdf(read('design.sdf'));
   const routes = parseRoutes(read('routes.txt'));
   const conns = routes.nets.flatMap(connections);
+  const placement = placementCounts(read('placement.rpt'));
   return {
     status,
     vivado: { fmaxMHz: sum.maxFreqMHz, minPeriodNs: sum.minPeriodNs, wnsNs: sum.wnsNs, logicNs: worst?.logicNs ?? null, routeNs: worst?.routeNs ?? null, levels: worst?.levels ?? null },
     cells: cellStats(cellSamples(sdf, routes.lutPins)),
     wires: groupWires(wireSamples(sdf, conns)),
+    ...(placement && { placement }),
   };
 }
 
@@ -166,12 +250,17 @@ export function jobContainers(text, image = '') {
 export const keepsRun = (args) => !args.includes('--update');
 
 /** The measurement file's content with a run's designs ({ id: { board, name, vivado, nextpnr, cells, wires } }) put in
- *  (each board's examples sorted; a design measured again replaced). */
-export function mergeMeasurement(old, designs, { image }) {
+ *  (each board's examples sorted; a design measured again replaced). With placement (--placement, #3803), Vivado's run on
+ *  nextpnr's placement: only the design's nextpnrPlacement { vivado, nextpnr, sameNetlist, placement } replaced, its own
+ *  measurement (Vivado's placement, the fit's numbers) kept; a design measured again keeps its nextpnrPlacement. */
+export function mergeMeasurement(old, designs, { image, placement = false }) {
   const examples = structuredClone(old?.examples || {});
   for (const d of Object.values(designs)) {
     if (d.error) continue;
-    (examples[d.board] ||= {})[d.name] = { vivado: d.vivado, nextpnr: d.nextpnr ?? null, sameNetlist: d.sameNetlist ?? null, cells: d.cells, wires: d.wires };
+    const was = (examples[d.board] ||= {})[d.name] || {};
+    examples[d.board][d.name] = placement
+      ? { ...was, nextpnrPlacement: { vivado: d.vivado, nextpnr: d.nextpnr ?? null, sameNetlist: d.sameNetlist ?? null, placement: d.placement ?? null } }
+      : { vivado: d.vivado, nextpnr: d.nextpnr ?? null, sameNetlist: d.sameNetlist ?? null, cells: d.cells, wires: d.wires, ...(was.nextpnrPlacement && { nextpnrPlacement: was.nextpnrPlacement }) };
   }
   const sorted = Object.fromEntries(Object.keys(examples).sort().map((b) => [b, Object.fromEntries(Object.keys(examples[b]).sort().map((n) => [n, examples[b][n]]))]));
   return { issue: 3516, vivado: '2025.2', image, units: { delays: 'ps', fmax: 'MHz', paths: 'ns' }, examples: sorted };
@@ -193,17 +282,36 @@ async function openFlow(d, into, steps) {
   return { dir, project, top, netlist, reports: r.reports, warnings: lines.filter((l) => /WARNING|ERROR/.test(l)) };
 }
 
+/** nextpnr's placement of a design's netlist (f: openFlow's) as placement.txt in folder D (#3803): nextpnr run as the open
+ *  flow runs it (xc7ParArgs, the server's router, seed 1: the placement nextpnrNumbers times), its design written
+ *  (--write). -> { cells: placed, left: placementLines' } */
+async function writePlacement(d, f, D) {
+  const { nextpnrXc7Node } = await import('../packages/silinx-fpga/src/node.js');
+  const { xc7ParArgs, nextpnrXdc, portBits } = await import('../packages/silinx-fpga/src/index.js');
+  const { readXdc } = await import('../packages/silinx-fpga/src/parts.js');
+  const np = nextpnrXc7Node();
+  const xdc = nextpnrXdc(readXdc(fs.readFileSync(path.join(f.dir, f.project.constraints), 'utf8')), portBits(f.netlist, f.top));
+  const args = [...xc7ParArgs({ part: d.part, router: np.router, seed: 1, xdc: !!xdc.text }), '--write', 'routed.json'];
+  const out = await np.run(args, { 'chipdb.bin': await np.chipdb(d.part, () => {}), 'netlist.json': f.netlist, ...(xdc.text && { 'design.xdc': xdc.text }) });
+  const cells = Object.keys((Object.values(JSON.parse(f.netlist).modules).find((m) => m.attributes?.top) || { cells: {} }).cells);
+  const p = placementLines(new TextDecoder().decode(out['routed.json']), cells);
+  fs.writeFileSync(path.join(D, 'placement.txt'), p.text);
+  return { cells: p.lines.length, left: p.left };
+}
+
 /** What Vivado reads of a design ({ board, name }), written in folder D: its netlist (the open flow's synthesis, the
- *  projects made in into) as netlist.edf, its constraints as netlist.xdc. -> { top, netlist: the JSON's hash }. */
-async function prepareDesign(d, into, D) {
+ *  projects made in into) as netlist.edf, its constraints as netlist.xdc; with placement, nextpnr's placement
+ *  (placement.txt). -> { top, netlist: the JSON's hash, placed? } */
+async function prepareDesign(d, into, D, { placement = false } = {}) {
   const { yosysNode } = await import('../packages/silinx-fpga/src/node.js');
   const f = await openFlow(d, into, ['synth', 'translate']);
   const out = await yosysNode(['-q', '-p', edifScript(f.top)], { 'netlist.json': f.netlist });
   fs.mkdirSync(D, { recursive: true });
   fs.writeFileSync(path.join(D, 'netlist.edf'), out['netlist.edf']);
   fs.copyFileSync(path.join(f.dir, f.project.constraints), path.join(D, 'netlist.xdc'));
+  const placed = placement ? await writePlacement(d, f, D) : null;
   fs.rmSync(f.dir, { recursive: true, force: true });
-  return { top: f.top, netlist: sha(f.netlist) };
+  return { top: f.top, netlist: sha(f.netlist), ...(placed && { placed }) };
 }
 
 /** nextpnr's numbers of a design (the whole open flow, as the application runs it): { netlist: its netlist's hash (the
@@ -261,16 +369,17 @@ async function main() {
       const busy = local ? [] : jobContainers(ssh("docker ps --format '{{.Image}}\t{{.Names}}'"), IMAGE);
       if (busy.length) { console.error(`another job is running on the host (${busy.join(', ')}): Vivado runs alone there, wait for it`); process.exit(4); }
       // each design's netlist (the open flow's synthesis) as an EDIF, its constraints, in the work folder
-      const list = [];
+      // (--placement: nextpnr's placement too, fixed in Vivado, #3803)
+      const placement = a.includes('--placement'), list = [];
       for (const d of designs) {
-        Object.assign(d, await prepareDesign(d, projects, path.join(work, 'designs', d.id)));
+        Object.assign(d, await prepareDesign(d, projects, path.join(work, 'designs', d.id), { placement }));
         list.push(`${d.id} ${d.top} ${d.part}`);
-        console.log(`${d.id}: netlist of <${d.top}> written for Vivado`);
+        console.log(`${d.id}: netlist of <${d.top}> written for Vivado${d.placed ? `, nextpnr's placement of ${d.placed.cells} cells (left to Vivado: ${Object.entries(d.placed.left).map(([t, n]) => `${n} ${t}`).join(', ') || 'none'})` : ''}`);
       }
-      meta = { image: IMAGE, designs: Object.fromEntries(designs.map((d) => [d.id, d])) };
+      meta = { image: IMAGE, placement, designs: Object.fromEntries(designs.map((d) => [d.id, d])) };
       fs.writeFileSync(path.join(work, 'designs.txt'), `${list.join('\n')}\n`);
       fs.writeFileSync(path.join(work, 'silinx.json'), JSON.stringify(meta, null, 2));
-      fs.writeFileSync(path.join(work, 'measure.tcl'), measureTcl());
+      fs.writeFileSync(path.join(work, 'measure.tcl'), measureTcl({ placement }));
       fs.writeFileSync(path.join(work, 'run.sh'), runSh());
       fs.rmSync(projects, { recursive: true, force: true });
       if (local) run('docker', [...docker, '-v', `${work}:/w`, IMAGE, 'bash', '/w/run.sh', '/w']);
@@ -312,11 +421,12 @@ async function main() {
       const read = (f) => (fs.existsSync(path.join(R, f)) ? fs.readFileSync(path.join(R, f), 'utf8') : '');
       results[d.id] = { ...d, ...designNumbers(read, parseTimingSummary), nextpnr: nextpnr[d.id], sameNetlist: nextpnr[d.id]?.netlist === d.netlist };
       const r = results[d.id];
-      console.log(`${d.id.padEnd(22)} ${r.error ? r.error : `Vivado ${r.vivado.fmaxMHz ?? '-'} MHz, nextpnr ${r.nextpnr?.fmaxMHz ?? '-'} MHz, ${r.wires.reduce((s, g) => s + g.n, 0)} connections`}`);
+      const p = r.placement;
+      console.log(`${d.id.padEnd(22)} ${r.error ? r.error : `Vivado ${r.vivado.fmaxMHz ?? '-'} MHz${meta.placement ? ' on nextpnr\'s placement' : ''}, nextpnr ${r.nextpnr?.fmaxMHz ?? '-'} MHz, ${r.wires.reduce((s, g) => s + g.n, 0)} connections${p ? `; ${p.fixed} cells fixed, ${p.missing + p.nosite + p.failed} not (MISSING ${p.missing}, NOSITE ${p.nosite}, FAILED ${p.failed}: placement.rpt), ${p.unplaced} left to place_design` : ''}`}`);
     }
     if (a.includes('--update')) {
       const old = fs.existsSync(MEASURED) ? JSON.parse(fs.readFileSync(MEASURED, 'utf8')) : null;
-      const m = mergeMeasurement(old, results, { image: meta.image });
+      const m = mergeMeasurement(old, results, { image: meta.image, placement: !!meta.placement });
       fs.mkdirSync(path.dirname(MEASURED), { recursive: true });
       fs.writeFileSync(MEASURED, `${JSON.stringify(m, null, 1)}\n`);
       fs.writeFileSync(FITTED, `${JSON.stringify(fitMeasurement(m), null, 2)}\n`);

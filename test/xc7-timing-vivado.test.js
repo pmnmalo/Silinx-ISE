@@ -2,12 +2,18 @@
 // the parsing of what Vivado writes (hand-written snippets in its format, 2025.2's: an SDF, report_timing's paths, the
 // routes measure.tcl lists; not Vivado's files), the cells' and routes' numbers made of them, the fit of the wire classes
 // (on delays made from known ones), the table for the fork's chip database, the Tcl and the shell script run on the host.
+// Vivado on nextpnr's placement (#3803): the cells placed, the Tcl that fixes them (run by tclsh, Vivado's commands stubbed).
 // No Vivado: the measurement itself runs on the ISE runner's machine.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { sexpr, timescalePs, parseSdf, parseTimingPaths, parseRoutes, connections, wireClass, lutBelPin, nextpnrPathSplit } from '../scripts/xc7-timing-parse.mjs';
 import { cellSamples, cellStats, wireSamples, groupWires, mergeCellStats, mergeGroups, nnls, fitWires, chipdbTable, compareFmax, fitMeasurement, CLASSES } from '../scripts/xc7-timing-fit.mjs';
-import { edifScript, measureTcl, runSh, selectDesigns, nameFilter, designNumbers, mergeMeasurement, keepsRun, jobContainers, BOARDS, OUTPUTS } from '../scripts/xc7-timing-vivado.mjs';
+import { edifScript, measureTcl, runSh, selectDesigns, nameFilter, designNumbers, mergeMeasurement, keepsRun, jobContainers, placementLines, placementCounts, BOARDS, OUTPUTS } from '../scripts/xc7-timing-vivado.mjs';
+import { xc7ParArgs } from '../packages/silinx-fpga/src/open-flow-xc7.js';
 import { parseTimingSummary } from '../server/vivado-reports.js';
 
 const SDF = `(DELAYFILE
@@ -282,10 +288,11 @@ test('#3516 the Vivado run: the EDIF\'s Yosys commands, measure.tcl, run.sh; the
   // #3738: Vivado's link_design -top found no 'top' in netlist.edf (Project 1-68): the EDIF is read as <top>.edf
   assert.ok(!tcl.includes('read_edif netlist.edf'));
   assert.ok(!/synth_design|opt_design|write_bitstream|write_checkpoint/.test(tcl));
-  for (const f of OUTPUTS) assert.ok(tcl.includes(f), f);
+  for (const f of OUTPUTS) assert.equal(tcl.includes(f), !f.startsWith('placement.'), f);
+  for (const f of OUTPUTS) assert.ok(measureTcl({ placement: true }).includes(f), f);
   const sh = runSh();
   assert.match(sh, /timeout "\$T" vivado -mode batch -nojournal -notrace -log "\$R\/vivado.log" -source "\$W\/measure.tcl" -tclargs "\$D" "\$top" "\$part"/);
-  assert.match(sh, /for f in route\.rpt summary\.rpt paths\.rpt design\.sdf routes\.txt; do/);
+  assert.match(sh, /for f in route\.rpt summary\.rpt paths\.rpt design\.sdf routes\.txt placement\.rpt placement\.xdc; do/);
   assert.match(sh, /touch "\$W\/done"\n$/);
   assert.deepEqual(BOARDS, { basys3: 'xc7a35tcpg236-1', 'nexys-a7': 'xc7a100tcsg324-1' });
   assert.deepEqual(selectDesigns(['gates', 'blinky', 'pong'], ['basys3', 'nexys-a7'], '^(blinky|pong)$').map((d) => [d.id, d.part]),
@@ -385,4 +392,104 @@ test('#3752 --filter: examples\' names, matched as the same regular expression w
   for (const f of ['(a+)+$', '.*', 'blink.', '^(blinky|pong$', '^blinky)$', 'blinky||pong', '|blinky', 'a b', '^$', '$^blinky', '[a-z]+', '\\w']) {
     assert.throws(() => selectDesigns(['gates', 'blinky'], ['basys3'], f), (e) => e.message === `--filter: examples' names separated by | or , (as '^(blinky|pong)$'), not ${f}`, f);
   }
+});
+// nextpnr's design (--write) as its xilinx micro-architecture writes it: a cell's NEXTPNR_BEL is its tile's grid point,
+// its site relative to the tile and the BEL
+const ROUTED = { modules: { top: { attributes: { top: '00000000000000000000000000000001' }, cells: {
+  'u.cnt[16]$x': { type: 'SLICE_LUTX', attributes: { NEXTPNR_BEL: 'X10Y143/SLICE_X1Y0.C6LUT' } },
+  'q_reg': { type: 'SLICE_FFX', attributes: { NEXTPNR_BEL: 'X10Y143/SLICE_X0Y0.A5FF' } },
+  'u.cnt[16]$LUT196': { type: 'SLICE_LUTX', attributes: { NEXTPNR_BEL: 'X10Y143/SLICE_X0Y0.B6LUT' } },
+  'add.carry4$split$muxcy0$PACKED_CARRY4$': { type: 'CARRY4', attributes: { NEXTPNR_BEL: 'X10Y144/SLICE_X0Y0.CARRY4' } },
+  'sub.carry4$split$muxcy2$PACKED_CARRY4$': { type: 'CARRY4', attributes: { NEXTPNR_BEL: 'X12Y144/SLICE_X0Y0.CARRY4' } },
+  'mem': { type: 'RAMB18E1_RAMB18E1', attributes: { NEXTPNR_BEL: 'X20Y50/RAMB18_X0Y1.RAMB18E1' } },
+  'bufg': { type: 'BUFGCTRL', attributes: { NEXTPNR_BEL: 'X60Y108/BUFGCTRL_X0Y0.BUFGCTRL' } },
+  'led[0]': { type: 'PAD', attributes: { NEXTPNR_BEL: 'X114Y138/IOB_X0Y0.IOB33S.PAD' } },
+  '$iopadmap$top.led_0$intcell$OBUF': { type: 'IOB33_OUTBUF', attributes: { NEXTPNR_BEL: 'X114Y138/IOB_X0Y0.IOB33.OUTBUF' } },
+  '$PACKER_GND_DRV': { type: 'PSEUDO_GND', attributes: { NEXTPNR_BEL: 'X0Y0/PSEUDO_GND' } },
+  'floating': { type: 'SLICE_FFX', attributes: {} },
+} } } };
+const NETLIST_CELLS = ['u.cnt[16]$x', 'q_reg', 'add.carry4', 'sub.carry4', 'mem', 'bufg', 'led_OBUF[0]_inst', 'floating'];
+
+test('#3803 nextpnr\'s placement for Vivado: its cells of Vivado\'s netlist at their grid points, sites and BELs; the cells nextpnr made left out', () => {
+  const p = placementLines(JSON.stringify(ROUTED), NETLIST_CELLS);
+  assert.deepEqual(p.lines, [
+    { cell: 'add.carry4', x: 10, y: 144, prefix: 'SLICE', sx: 0, sy: 0, bel: 'CARRY4' },   // (packed again where it was: Vivado's CARRY4)
+    { cell: 'bufg', x: 60, y: 108, prefix: 'BUFGCTRL', sx: 0, sy: 0, bel: 'BUFGCTRL' },
+    { cell: 'mem', x: 20, y: 50, prefix: 'RAMB18', sx: 0, sy: 1, bel: 'RAMB18E1' },
+    { cell: 'q_reg', x: 10, y: 143, prefix: 'SLICE', sx: 0, sy: 0, bel: 'A5FF' },
+    { cell: 'u.cnt[16]$x', x: 10, y: 143, prefix: 'SLICE', sx: 1, sy: 0, bel: 'C6LUT' },
+  ]);
+  // a feed-through LUT, the chain moved by two MUXCYs, the pad and its buffer, the constant's driver, an unplaced cell
+  assert.deepEqual(p.left, { SLICE_LUTX: 1, CARRY4: 1, PAD: 1, IOB33_OUTBUF: 1, PSEUDO_GND: 1, SLICE_FFX: 1 });
+  assert.equal(p.text.split('\n')[0], 'add.carry4\t10\t144\tSLICE\t0\t0\tCARRY4');
+  assert.equal(p.text.split('\n').length, 6);
+  assert.equal(placementLines(ROUTED, NETLIST_CELLS).text, p.text);
+  assert.deepEqual(placementLines({ modules: {} }, NETLIST_CELLS), { lines: [], text: '', left: {} });
+  const tab = { modules: { top: { attributes: { top: '1' }, cells: { 'a\tb': { type: 'SLICE_FFX', attributes: { NEXTPNR_BEL: 'X1Y1/SLICE_X0Y0.AFF' } } } } } };
+  assert.throws(() => placementLines(tab, ['a\tb']), /a cell's name with a tab/);
+  // nextpnr run again for its placement with the open flow's own arguments (and --write)
+  assert.deepEqual(xc7ParArgs({ part: 'xc7a35tcpg236-1', router: 'router2', xdc: true }), ['--device', 'xc7a35tcpg236-1', '--chipdb', 'chipdb.bin', '--json', 'netlist.json',
+    '-o', 'fasm=routed.fasm', '--report', 'report.json', '--router', 'router2', '--seed', '1', '--timing-allow-fail', '-o', 'xdc=design.xdc']);
+  assert.deepEqual(xc7ParArgs({ part: 'p', router: 'router1', seed: 3, xdc: false }).slice(-3), ['--seed', '3', '--timing-allow-fail']);
+});
+
+test('#3803 measure.tcl on nextpnr\'s placement: the cells fixed after link_design, then place_design for the rest and route_design', () => {
+  const tcl = measureTcl({ placement: true });
+  const at = (s) => { const i = tcl.indexOf(s); assert.ok(i >= 0, s); return i; };
+  assert.ok(at('link_design -top $top -part $part') < at('set in [open placement.txt r]'));
+  assert.ok(at('set in [open placement.txt r]') < at('place_design\nroute_design'));
+  for (const l of ['dict set tiles "[get_property GRID_POINT_X $t],[get_property GRID_POINT_Y $t]" $t', 'place_cell $c $site/$bel', 'set_property IS_BEL_FIXED 1 $c', 'set_property IS_LOC_FIXED 1 $c']) at(l);
+  assert.equal(measureTcl().includes('placement.txt'), false);
+  assert.equal(measureTcl({ placement: false }), measureTcl());
+  assert.ok(!/synth_design|opt_design|write_bitstream|write_checkpoint/.test(tcl));
+  assert.deepEqual(placementCounts('FAILED\tx\tSLICE_X0Y0/AFF\terr\nFIXED\t5\nMISSING\t1\nNOSITE\t0\nFAILED\t2\nUNPLACED\t30\n'), { fixed: 5, missing: 1, nosite: 0, failed: 2, unplaced: 30 });
+  assert.equal(placementCounts(''), null);
+});
+
+// the placement's Tcl run by tclsh on Vivado's commands stubbed: two tiles (a CLB's two SLICEs, a BRAM's RAMB18s and RAMB36)
+test('#3803 measure.tcl\'s placement in Tcl: each site found from its tile\'s grid point; placement.xdc and placement.rpt', (t) => {
+  try { execFileSync('tclsh', [], { input: 'exit 0\n' }); } catch { t.skip('no tclsh'); return; }
+  const tcl = measureTcl({ placement: true });
+  const block = tcl.slice(tcl.indexOf('# nextpnr\'s placement'), tcl.indexOf('place_design\nroute_design'));
+  const stubs = `set props [dict create T1 {GRID_POINT_X 10 GRID_POINT_Y 143} T2 {GRID_POINT_X 20 GRID_POINT_Y 50}]
+set sites [dict create T1 {SLICE_X13Y143 SLICE_X12Y143} T2 {RAMB18_X1Y21 RAMB36_X1Y10 RAMB18_X1Y20}]
+set placed {}
+proc get_tiles {} { return {T1 T2} }
+proc get_property {p o} { global props; if {$p eq "NAME"} { return $o }; return [dict get $props $o $p] }
+proc get_sites {args} { global sites; return [dict get $sites [lindex $args end]] }
+proc get_cells {args} { if {[string match *LOC* [lindex $args end]]} { return {io1 io2} }; return [list {u.cnt[16]$x} mem bad far] }
+proc place_cell {c sb} { global placed; if {$c eq "bad"} { error "illegal\\nplacement" }; lappend placed "$c $sb" }
+proc set_property {p v c} { global placed; lappend placed "$p $c" }
+`;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-3803-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'placement.txt'), 'u.cnt[16]$x\t10\t143\tSLICE\t1\t0\tC6LUT\nmem\t20\t50\tRAMB18\t0\t1\tRAMB18E1\nnone\t10\t143\tSLICE\t0\t0\tAFF\nfar\t99\t99\tSLICE\t0\t0\tAFF\nbad\t10\t143\tSLICE\t0\t0\tAFF\n');
+    fs.writeFileSync(path.join(dir, 'run.tcl'), `cd {${dir}}\n${stubs}${block}puts [join $placed \\n]\n`);
+    const out = execFileSync('tclsh', [path.join(dir, 'run.tcl')], { encoding: 'utf8' });
+    assert.deepEqual(out.trim().split('\n'), ['u.cnt[16]$x SLICE_X13Y143/C6LUT', 'IS_BEL_FIXED u.cnt[16]$x', 'IS_LOC_FIXED u.cnt[16]$x',
+      'mem RAMB18_X1Y21/RAMB18E1', 'IS_BEL_FIXED mem', 'IS_LOC_FIXED mem']);
+    assert.equal(fs.readFileSync(path.join(dir, 'placement.xdc'), 'utf8'), [
+      'set_property BEL C6LUT [get_cells -hierarchical -filter {NAME == "u.cnt[16]$x"}]', 'set_property LOC SLICE_X13Y143 [get_cells -hierarchical -filter {NAME == "u.cnt[16]$x"}]',
+      'set_property BEL RAMB18E1 [get_cells -hierarchical -filter {NAME == "mem"}]', 'set_property LOC RAMB18_X1Y21 [get_cells -hierarchical -filter {NAME == "mem"}]', ''].join('\n'));
+    const rpt = fs.readFileSync(path.join(dir, 'placement.rpt'), 'utf8');
+    assert.deepEqual(rpt.split('\n').slice(0, 3), ['MISSING\tnone', 'NOSITE\tfar\tX99Y99 SLICE_X0Y0', 'FAILED\tbad\tSLICE_X12Y143/AFF\tillegal placement']);
+    assert.deepEqual(placementCounts(rpt), { fixed: 2, missing: 1, nosite: 1, failed: 1, unplaced: 2 });
+    // a design's numbers carry the counts
+    const files = { 'status.txt': 'vivado 0\n', 'paths.rpt': PATHS, 'design.sdf': SDF, 'routes.txt': ROUTES, 'placement.rpt': rpt };
+    assert.deepEqual(designNumbers((f) => files[f] ?? '', () => ({})).placement, { fixed: 2, missing: 1, nosite: 1, failed: 1, unplaced: 2 });
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('#3803 the measurement file: Vivado on nextpnr\'s placement kept apart from Vivado\'s own measurement, each kept when the other is measured again', () => {
+  const own = { vivado: { fmaxMHz: 198.8 }, nextpnr: { fmaxMHz: 150 }, sameNetlist: true, cells: { 'FF.C.Q': { n: 1, min: 1, mean: 1, max: 1 } }, wires: [] };
+  const old = { examples: { basys3: { blinky: own } } };
+  const placed = { board: 'basys3', name: 'blinky', vivado: { fmaxMHz: 170 }, nextpnr: { fmaxMHz: 150 }, sameNetlist: true, placement: { fixed: 300, missing: 0, nosite: 0, failed: 0, unplaced: 27 }, cells: {}, wires: [] };
+  const m = mergeMeasurement(old, { a: placed, b: { ...placed, name: 'pong' } }, { image: 'i', placement: true });
+  assert.deepEqual(m.examples.basys3.blinky, { ...own, nextpnrPlacement: { vivado: { fmaxMHz: 170 }, nextpnr: { fmaxMHz: 150 }, sameNetlist: true, placement: placed.placement } });
+  assert.deepEqual(Object.keys(m.examples.basys3.pong), ['nextpnrPlacement']);
+  const again = mergeMeasurement(m, { a: { board: 'basys3', name: 'blinky', ...own, vivado: { fmaxMHz: 199 } } }, { image: 'i' });
+  assert.equal(again.examples.basys3.blinky.vivado.fmaxMHz, 199);
+  assert.equal(again.examples.basys3.blinky.nextpnrPlacement.vivado.fmaxMHz, 170);
+  // the fit reads only the designs' own measurements
+  assert.deepEqual(fitMeasurement(again).fmax.rows.map((r) => [r.name, r.vivado]), [['blinky', 199], ['pong', null]]);
 });
