@@ -2,7 +2,7 @@
 .tt-editor { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--panel, #fff); color: var(--fg, #000); font-size: var(--fs, 12px); overflow: hidden; }
 .tt-editor * { box-sizing: border-box; }
 .tt-toolbar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-height: 28px; padding: 2px 32px 2px 4px; background: var(--toolbar-grad, #eee); border-bottom: 1px solid var(--border, #aaa); }
-.tt-toolbar input[type=text] { width: 140px; font-family: var(--mono, monospace); }
+.tt-toolbar input[type=text] { width: 280px; min-width: 120px; max-width: 100%; flex: 0 1 280px; font-family: var(--mono, monospace); }   /* (wide enough for several names, #3815; shrinking, then wrapping, on a narrow toolbar) */
 .tt-toolbar .tt-btn { min-width: 0; padding: 2px 8px; }
 .tt-sep { width: 1px; height: 18px; background: #c0c0c0; box-shadow: 1px 0 #fff; margin: 0 4px; }
 .tt-check { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }

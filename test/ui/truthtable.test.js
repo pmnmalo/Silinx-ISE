@@ -386,6 +386,8 @@ uiTest('Truth Table (#196, #2107): input / output names applied on leaving the f
     return page.eval((t) => document.querySelector(`${t} .tt-err`).textContent, T);
   };
   assert.equal(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].filter((b) => b.textContent === 'Apply').length, T), 0);
+  // the Inputs and Outputs boxes wide enough for several names (#3815: 140 px before)
+  for (const w of await page.eval((t) => ['.tt-inputs', '.tt-outputs'].map((c) => document.querySelector(`${t} ${c}`).getBoundingClientRect().width), T)) assert.ok(w >= 250, `a text box ${w} px wide`);
   // f = a (rows 4..7)
   for (const r of [4, 5, 6, 7]) await page.click(`${T} .tt-cell[data-out=f][data-row="${r}"]`);
   assert.equal(await cells('f'), '00001111');
