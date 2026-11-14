@@ -6,6 +6,7 @@ import { icons, icon } from './icons.js';
 import { h, dialog, popupMenu, longPressMenu } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
 import { reservedModuleDiags } from '/core/reserved.js';
+import { naturalCompare } from '/core/hier-order.js';
 import { checkC } from '/core/c-check.js';
 import { blackboxChecks } from '/core/c-blackbox.js';
 import * as wiz from './wizards.js';
@@ -161,9 +162,8 @@ function noTopNote() {
 }
 /** Set Top Module…: the top chosen among the design's modules, the hierarchy's roots first (#1224). */
 async function chooseTop() {
-  const byName = (a, b) => a.localeCompare(b);
-  const roots = viewRoots(false).sort(byName);   // (in their names' order, not the files')
-  const names = [...new Set([...roots, ...S.modules.filter(m => m.kind !== 'package' && m.role !== 'sim').map(m => m.name).sort(byName)])];
+  const roots = viewRoots(false).sort(naturalCompare);   // (in their names' order, not the files'; natural: x_2 before x_10, #3819)
+  const names = [...new Set([...roots, ...S.modules.filter(m => m.kind !== 'package' && m.role !== 'sim').map(m => m.name).sort(naturalCompare)])];
   if (!names.length) return logInfo('The project has no module that can be the top yet');
   const sel = h('select', { style: { width: '100%' } }, ...names.map(n => h('option', { value: n, 'data-no-i18n': true }, n)));
   const r = await dialog({

@@ -6,6 +6,7 @@ import { icon } from './icons.js';
 import { h, alertDlg, confirmDlg, dialog, popupMenu, toast, longPressMenu } from './ui.js';
 import * as wiz from './wizards.js';
 import { drawnModule } from '/core/view-hdl.js';
+import { hierarchyOrder } from '/core/hier-order.js';
 import { S, addToProject, closeDoc, fixMissingTops, instancesOf, moduleInfo, openFile, projectUndo, syncFpgaView,
   viewRoots } from './app.js';
 import { log } from './console.js';
@@ -51,10 +52,10 @@ export function renderHierarchy() {
   root.ul.append(devItem.li);
 
   const lib = S.lib;
-  const roots = viewRoots(sim);
   const topName = !sim ? pj.top : null;   // the Simulation view has no top: Simulate runs the selected module
   const isTopName = n => !!topName && String(n).toLowerCase() === String(topName).toLowerCase();
-  roots.sort((a, b) => (isTopName(a) ? -1 : isTopName(b) ? 1 : a.localeCompare(b)));
+  // (the top first, then in natural order: x_2 before x_10, #3819)
+  const roots = hierarchyOrder(viewRoots(sim), topName);
   const addModule = (parentUl, modName, instName, depth, path) => {
     const info = moduleInfo(modName);
     const isTop = !instName && isTopName(modName);   // (the root's row only: the top's instances are plain rows, #2877)

@@ -12,6 +12,7 @@ import { getLanguage } from './i18n.js';
 import { dialog } from './ui.js';
 import { h } from './dom.js';
 import { reservedError } from '/core/reserved.js';
+import { naturalCompare } from '/core/hier-order.js';
 import { designKind } from './project-kind-flag.js';
 import { clone, snap, KEYS } from './sch-editor.js';
 import { mountMultiProps } from './sch-multi.js';
@@ -209,7 +210,7 @@ export function mountProps(ctx) {
       }
     }
     if (s.type === 'module') {
-      const names = Object.keys(modules()).sort();
+      const names = Object.keys(modules()).sort(naturalCompare);
       const modOpts = names.includes(s.params.module) ? names : [s.params.module, ...names];
       const modSel = selBox(s.params.module, modOpts, x => { s.params.module = x; s.params.generics = {}; delete s.params.ports; });
       modSel.setAttribute('data-no-i18n', '');   // module names (a module may be called sync, up...)

@@ -12,6 +12,7 @@
 
 import { h } from './ui.js';
 import { simModelsOf } from './tool-descriptors.js';
+import { naturalCompare } from '../../core/hier-order.js';
 
 /** SSim's toolbar in its wave window's line, where its name ("Default.wcfg") and the cursor's text were (`tasks`: the
  *  Tasks interface, #1026; web/css/tasks.css hides them), its stimuli bar under it (#1270), else both back under its title
@@ -146,9 +147,9 @@ export async function simulate(app) {
 
 /** The modules Simulate can run: the test benches, then the design's modules (its top first). */
 export function simChoices(project, modules = []) {
-  const benches = modules.filter(m => m.role === 'sim').map(m => m.name).sort((a, b) => a.localeCompare(b));
+  const benches = modules.filter(m => m.role === 'sim').map(m => m.name).sort(naturalCompare);
   const design = modules.filter(m => m.role !== 'sim').map(m => m.name)
-    .sort((a, b) => (a === project?.top ? -1 : b === project?.top ? 1 : a.localeCompare(b)));
+    .sort((a, b) => (a === project?.top ? -1 : b === project?.top ? 1 : naturalCompare(a, b)));   // (natural order, #3819)
   return { benches, design };
 }
 
