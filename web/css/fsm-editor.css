@@ -88,3 +88,7 @@
 /* the reset's name on the start-up arrow */
 .fsm-editor .fsm-reset { fill: var(--asm-fg); font: 11px var(--asm-mono); pointer-events: none; }
 
+
+/* a state's or a transition's outputs (#3814): the machine's outputs, name and width read, a value refused marked */
+.fsm-editor .fsm-outvals td.n { word-break: break-all; }
+.fsm-editor .fsm-outvals .asm-input.bad { border-color: var(--asm-danger); background: var(--field-bad-bg); }

@@ -1,14 +1,16 @@
 // The FSM state diagram editor's side panel (#405: out of mountFsmEditor): the selection's properties (a state: its
 // name, Moore outputs, encoding and transitions; a transition: its condition, Mealy outputs, priority) and the
 // machine's (its name, clock and reset, inputs and outputs, encoding). mountSide(ctx) is called by mountFsmEditor
-// where this code was.
+// where this code was. A state's or a transition's outputs: a table of the machine's outputs, its value editable
+// (core/fsm-outputs.js, #3814; a value refused: the console, flash(text)).
 import { h } from './ui.js';
-import { formatOutputs, parseOutputs } from '/core/fsm.js';
+import { formatOutputs } from '/core/fsm.js';
+import { dropOutputValues, outputRows, outputsWhere, renameOutputValues, setOutputValue } from '/core/fsm-outputs.js';
 
 /** { renderSide } of an FSM editor (M(), sel(): its current model and selection; setSel(s) selects). */
 export function mountSide(ctx) {
   const { M, sel, setSel, selSection, machineBody, machineSection = machineBody, btn, stateById, transById, encOf, commit, deleteSelection,
-    readOnly = false, locked = () => readOnly, render, updateToolbar } = ctx;
+    readOnly = false, locked = () => readOnly, render, updateToolbar, flash = () => {} } = ctx;
 
   const field = (label, input, hintText) => h('label', { class: 'asm-field' }, h('span', { class: 'asm-label' }, label), input, hintText ? h('span', { class: 'asm-fhint' }, hintText) : null);
   const input = (value, onchange, { cls = '', ph = '', key = null, title = null } = {}) => {
@@ -18,6 +20,28 @@ export function mountSide(ctx) {
     if (key) el.dataset.key = key;
     return el;
   };
+  // (a state's or a transition's outputs, #3814: one row per output of the machine, its name and width as declared,
+  // its value typed: checked as it is typed (a value refused marked, and when it is left, said in the console and
+  // the value in force shown again); empty: not set; `base`: what an empty value stands for, a transition's state's)
+  const outputsTable = (key, obj, where, base = null) => {
+    const rows = outputRows(M(), obj().outputs, base);
+    if (!rows.length) return h('p', { class: 'asm-muted fsm-noouts' }, 'The machine has no outputs');
+    const tbl = h('table', { class: `asm-table fsm-outvals ${key}` }, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Width'), h('th', {}, 'Value')));
+    for (const r of rows) {
+      const el = input(r.value, (v, done) => {
+        const o = obj();
+        if (!o) return;
+        const s = setOutputValue(o.outputs, r.name, v, M().outputs);
+        el.classList.toggle('bad', !!s.error);
+        if (!s.error) { if (JSON.stringify(s.outputs) !== JSON.stringify(o.outputs)) { o.outputs = s.outputs; commit(`${key}:${r.name}`); } return; }
+        if (done) { flash(`${where()}: ${s.error}`); el.value = o.outputs[r.name] ?? ''; el.classList.remove('bad'); }
+      }, { cls: 'mono v', ph: r.placeholder, key: `${key}:${r.name}` });
+      tbl.append(h('tr', {}, h('td', { class: 'mono n' }, r.name), h('td', { class: 'c' }, String(r.width)), h('td', {}, el)));
+    }
+    return tbl;
+  };
+  const outputsField = (label, table, hintText) => h('div', { class: 'asm-field' }, h('span', { class: 'asm-label' }, label), table, h('span', { class: 'asm-fhint' }, hintText));
+
   // (the field being typed in focused again, its caret where it was: a panel drawn anew under it, #3763)
   function renderSide() {
     const a = document.activeElement, key = (selSection.contains(a) || machineBody.contains(a)) ? a.dataset.key : null;
@@ -43,12 +67,7 @@ export function mountSide(ctx) {
       const id = s.id, cur = () => stateById(id);
       const e = encOf().get(s.id);
       const name = input(s.name, (v, done) => { if (!cur()) return; cur().name = v.trim(); commit('sname'); if (done) renderMachine(); }, { cls: 'mono fsm-sname', key: 'sname' });
-      const outs = input(formatOutputs(s.outputs), (v) => {
-        const r = parseOutputs(v, M().outputs);
-        outErr.textContent = r.error || '';
-        if (!r.error && cur()) { cur().outputs = r.outputs; commit('souts'); }
-      }, { cls: 'mono fsm-souts', ph: 'e.g. z=1, y=2\'b10', key: 'souts' });
-      const outErr = h('span', { class: 'asm-fhint c-err' });
+      const outs = outputsTable('souts', cur, () => outputsWhere(M(), { type: 'state', id }));
       const init = h('input', { type: 'checkbox', class: 'fsm-initial', checked: M().initial === s.id, disabled: M().initial === s.id });
       init.addEventListener('change', () => { if (init.checked) { M().initial = id; commit(); renderSelection(); } });
       const ts = M().transitions.filter((t) => t.from === s.id);
@@ -56,7 +75,7 @@ export function mountSide(ctx) {
       selSection.append(...[h('h3', {}, 'State'),
         field('Name', name),
         s.comment ? h('p', { class: 'asm-muted fsm-scomment' }, s.comment) : null,
-        field('Outputs (Moore)', outs, 'Outputs while in this state: output=value, separated by commas. The other outputs keep their default value.'), outErr,
+        outputsField('Outputs (Moore)', outs, 'The value of each output while in this state (empty: its default value).'),
         h('label', { class: 'asm-check' }, init, 'Initial (reset) state'),
         e && M().encoding !== 'enum' ? h('p', { class: 'asm-muted' }, `Code: ${e.bits} (${M().encoding})`) : null,
         h('div', { class: 'asm-label' }, `Transitions out of ${s.name} (the first true condition is taken)`),
@@ -75,12 +94,7 @@ export function mountSide(ctx) {
     from.addEventListener('change', () => reroute('from', from.value));
     to.addEventListener('change', () => reroute('to', to.value));
     const cond = input(t.cond, (v) => { if (!cur()) return; cur().cond = v.trim(); commit('cond'); }, { cls: 'mono fsm-cond', ph: 'e.g. x && !y   (empty = always)', key: 'cond' });
-    const outErr = h('span', { class: 'asm-fhint c-err' });
-    const outs = input(formatOutputs(t.outputs), (v) => {
-      const r = parseOutputs(v, M().outputs);
-      outErr.textContent = r.error || '';
-      if (!r.error && cur()) { cur().outputs = r.outputs; commit('touts'); }
-    }, { cls: 'mono fsm-touts', ph: 'e.g. z=1', key: 'touts' });
+    const outs = outputsTable('touts', cur, () => outputsWhere(M(), { type: 'trans', id }), stateById(t.from)?.outputs);
     const siblings = M().transitions.filter((x) => x.from === t.from);
     const pos = siblings.indexOf(t);
     const move = (dir) => {
@@ -94,7 +108,7 @@ export function mountSide(ctx) {
     selSection.append(h('h3', {}, 'Transition'),
       h('div', { class: 'asm-grid2' }, field('From', from), field('To', to)),
       field('Condition', cond, 'Boolean expression over the inputs: x, !x, x && y, x || !y, a == 2\'b01, b[0] (also and, or, not, =). Empty: always.'),
-      field('Outputs (Mealy)', outs, 'Outputs while this transition is taken: output=value, separated by commas (they make the machine a Mealy machine).'), outErr,
+      outputsField('Outputs (Mealy)', outs, 'The value of each output while this transition is taken (empty: the state\'s value; a value makes the machine a Mealy machine).'),
       h('div', { class: 'asm-label' }, `Priority ${pos + 1} of ${siblings.length} in ${stateById(t.from)?.name ?? '?'}`),
       h('div', { class: 'asm-row' },
         btn('▲ Earlier', 'Try this condition before the previous one', () => move(-1), 'asm-small'),
@@ -116,10 +130,17 @@ export function mountSide(ctx) {
       const L = () => (kind === 'out' ? M().outputs : M().inputs);
       const tbl = h('table', { class: 'asm-table' }, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Width'), kind === 'out' ? h('th', {}, 'Default') : null, h('th', {})));
       list.forEach((p, i) => {
-        const nm = input(p.name, (v) => { if (!L()[i]) return; L()[i].name = v.trim(); commit(`p${kind}${i}`); }, { cls: 'mono', key: `p${kind}${i}` });
+        // (an output renamed: its values in the states and transitions given the new name when it is left, #3814)
+        let was = p.name;
+        const nm = input(p.name, (v, done) => {
+          if (!L()[i]) return;
+          L()[i].name = v.trim();
+          if (done && kind === 'out') { renameOutputValues(M(), was, v.trim()); was = v.trim(); }
+          commit(`p${kind}${i}`);
+        }, { cls: 'mono', key: `p${kind}${i}` });
         const w = input(String(p.width), (v) => { const n = parseInt(v, 10); if (Number.isFinite(n) && L()[i]) { L()[i].width = n; commit(`w${kind}${i}`); } }, { cls: 'w', key: `w${kind}${i}` });
         const df = kind === 'out' ? input(p.default, (v) => { if (!L()[i]) return; L()[i].default = v.trim() || '0'; commit(`d${i}`); }, { cls: 'mono d', key: `d${i}` }) : null;
-        const x = h('button', { type: 'button', class: 'asm-x', title: 'Remove', onclick: () => { L().splice(i, 1); commit(); renderMachine(); } }, '✕');
+        const x = h('button', { type: 'button', class: 'asm-x', title: 'Remove', onclick: () => { const [gone] = L().splice(i, 1); if (kind === 'out' && gone && !L().some((o) => o.name === gone.name)) dropOutputValues(M(), gone.name); commit(); renderMachine(); } }, '✕');
         tbl.append(h('tr', {}, h('td', {}, nm), h('td', { class: 'c' }, w), df ? h('td', {}, df) : null, h('td', { class: 'c' }, x)));
       });
       return tbl;

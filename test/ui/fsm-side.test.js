@@ -1,8 +1,10 @@
 // UI: the FSM editor's side panel (web/js/fsm-side.js, #405: out of mountFsmEditor), mounted alone in the page with
 // an editor of its own (the model of a new diagram) whose actions are recorded: nothing selected, a state (its name, its
-// Moore outputs and their errors, its code, made initial, its transitions, one opened), a transition (its condition, its
+// Moore outputs, its code, made initial, its transitions, one opened), a transition (its condition, its
 // priority moved, its target, outputs given to it: the machine Mealy, #2728), a selection gone; the machine (its name, a port added
-// and removed, the reset, the description).
+// and removed, the reset, the description). A state's and a transition's outputs: a table of the machine's outputs (#3814:
+// name and width read-only, a value set, cleared, refused with its message in the console, following an output renamed
+// or removed; in Portuguese).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest } from './harness.js';
@@ -20,16 +22,16 @@ const MOUNT = async () => {
   document.body.append(selSection, machineBody);
   const M = newFsm('fsm');
   let sel = null;
-  const commits = [], calls = [];
+  const commits = [], calls = [], msgs = [];
   const side = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody,
     btn: (label, title, onclick, cls = '') => h('button', { type: 'button', class: `asm-btn ${cls}`, title, onclick }, label),
     stateById: (id) => M.states.find((s) => s.id === id), transById: (id) => M.transitions.find((t) => t.id === id),
     encOf: () => new Map(fsmEncoding(M).map((e) => [e.id, e])), commit: (k) => commits.push(k ?? ''), deleteSelection: () => calls.push('delete'),
-    render: () => calls.push('render'), updateToolbar: () => calls.push('toolbar') });
+    render: () => calls.push('render'), updateToolbar: () => calls.push('toolbar'), flash: (m) => msgs.push(m) });
   const field = (root, label) => [...root.querySelectorAll('.asm-field')].find((f) => f.querySelector('.asm-label').textContent === label)
     .querySelector('input, select, textarea');
   const set = (el, v, ev = 'input') => { el.value = v; el.dispatchEvent(new Event(ev)); };
-  window.__s = { fsmKind, side, M, commits, calls, selSection, machineBody, field, set, sel: () => sel, select: (s) => { sel = s; } };
+  window.__s = { fsmKind, side, M, commits, calls, msgs, selSection, machineBody, field, set, sel: () => sel, select: (s) => { sel = s; } };
   return true;
 };
 
@@ -44,11 +46,11 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
     select({ type: 'state', id: 's2' }); side.renderSide();
     r.state = [S.querySelector('h3').textContent, S.querySelector('.asm-muted').textContent, [...S.querySelectorAll('.fsm-tlist li')].map((li) => li.textContent)];
     set(field(S, 'Name'), ' MID ');
-    set(field(S, 'Outputs (Moore)'), 'z=');
-    r.err = S.querySelector('.c-err').textContent !== '';
-    set(field(S, 'Outputs (Moore)'), 'z=1');
+    set(field(S, 'Outputs (Moore)'), '2');
+    r.err = [field(S, 'Outputs (Moore)').classList.contains('bad'), M.states[1].outputs];
+    set(field(S, 'Outputs (Moore)'), '1');
     S.querySelector('.fsm-initial').click();
-    r.s2 = [M.states[1].name, M.states[1].outputs, M.initial, S.querySelector('.c-err').textContent];
+    r.s2 = [M.states[1].name, M.states[1].outputs, M.initial, field(S, 'Outputs (Moore)').classList.contains('bad')];
     // its first transition opened
     S.querySelector('.fsm-tlist li').click();
     r.opened = [sel(), S.querySelector('h3').textContent, calls.splice(0)];
@@ -60,7 +62,7 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
     r.prio2 = [...S.querySelectorAll('div.asm-label')].map((d) => d.textContent);
     set(field(S, 'To'), 's2', 'change');
     r.t3 = [M.transitions.find((t) => t.id === 't3').cond, M.transitions.find((t) => t.id === 't3').to, field(S, 'Outputs (Mealy)').disabled, fsmKind(M)];
-    set(field(S, 'Outputs (Mealy)'), 'z=1');
+    set(field(S, 'Outputs (Mealy)'), '1');
     r.mealy = [M.transitions.find((t) => t.id === 't3').outputs, fsmKind(M), S.querySelectorAll('.asm-fhint')[1].textContent];
     // a selection whose transition is gone: nothing
     M.transitions = M.transitions.filter((t) => t.id !== 't3'); side.renderSide();
@@ -70,48 +72,97 @@ uiTest('#405 FSM side panel: nothing, a state (name, outputs, code, initial, its
   });
   assert.deepEqual(out.none, [true, 0, ['toolbar']]);   // (nothing selected: no section, #2729)
   assert.deepEqual(out.state, ['State', 'Code: 01 (binary)', ['x → S2', '!x → S0']]);
-  assert.equal(out.err, true);
-  assert.deepEqual(out.s2, ['MID', { z: '1' }, 's2', '']);
+  assert.deepEqual(out.err, [true, {}]);
+  assert.deepEqual(out.s2, ['MID', { z: '1' }, 's2', false]);
   assert.deepEqual(out.opened, [{ type: 'trans', id: 't3' }, 'Transition', ['toolbar', 'render', 'toolbar']]);   // (the state's panel, then the transition's)
   assert.deepEqual(out.prio, ['Priority 1 of 2 in MID']);
   assert.deepEqual(out.order, ['t4', 't3']);
   assert.deepEqual(out.prio2, ['Priority 2 of 2 in MID']);
   assert.deepEqual(out.t3, ['x && y', 's2', false, 'moore']);
-  assert.deepEqual(out.mealy, [{ z: '1' }, 'mealy', 'Outputs while this transition is taken: output=value, separated by commas (they make the machine a Mealy machine).']);
+  assert.deepEqual(out.mealy, [{ z: '1' }, 'mealy', 'The value of each output while this transition is taken (empty: the state\'s value; a value makes the machine a Mealy machine).']);
   assert.deepEqual(out.gone, [null, true, 0]);
-  assert.deepEqual(out.commits, ['sname', 'souts', '', 'cond', '', '', 'touts']);
+  assert.deepEqual(out.commits, ['sname', 'souts:z', '', 'cond', '', '', 'touts:z']);
 });
 
-uiTest('#3288 FSM side panel: an output assignment checked (a comma missing, an output not declared), under its field, in English and Portuguese', E, async (page) => {
+uiTest('#3814 FSM side panel: a state\'s and a transition\'s outputs, a table of the machine\'s (name, width read-only; a value set, cleared, refused in the console; an output renamed, removed), in Portuguese', E, async (page) => {
   await page.eval(MOUNT);
-  const run = () => page.eval(async () => {
-    const { side, M, commits, selSection: S, set, select } = window.__s;
-    const tick = () => new Promise((ok) => setTimeout(ok, 0));   // (the translation's observer)
+  const out = await page.eval(async () => {
+    const { side, M, commits, msgs, selSection: S, machineBody: B, set, select } = window.__s;
     const r = {};
+    M.outputs = [{ name: 'z', width: 1, default: '0' }, { name: 'y', width: 2, default: "2'b01" }];
+    M.states[1].outputs = { y: '2' };
+    const table = () => [...S.querySelectorAll('.fsm-outvals tr')].map((tr) => [...tr.children].map((c) => {
+      const i = c.querySelector('input');
+      return i ? `[${i.value}|${i.placeholder}]` : c.textContent;
+    }));
+    const val = (key, n) => S.querySelector(`input[data-key="${key}:${n}"]`);
+    const hint = () => S.querySelector('.fsm-outvals').closest('.asm-field').querySelector('.asm-fhint').textContent;
+    // the state S1: every output, its name and width as text (not fields), its value
     select({ type: 'state', id: 's2' }); side.renderSide();
-    const err = () => S.querySelector('.c-err').textContent;
-    for (const v of ['z=1z=1', 'q=1', 'z=1', 'z']) { set(S.querySelector('.fsm-souts'), v); await tick(); r[`s:${v}`] = [err(), { ...M.states[1].outputs }]; }
+    r.state = [table(), S.querySelectorAll('.fsm-outvals td:not(:last-child) input').length, hint()];
+    // y: 3 set; z: 1 set; y cleared (its default: left out)
+    set(val('souts', 'y'), '3'); set(val('souts', 'z'), ' 1 '); r.set = { ...M.states[1].outputs };
+    set(val('souts', 'y'), ''); r.cleared = { ...M.states[1].outputs };
+    // refused as it is typed (marked, nothing changed, nothing said yet); left: said in the console, the value in force again
+    set(val('souts', 'y'), '4');
+    r.typed = [val('souts', 'y').classList.contains('bad'), { ...M.states[1].outputs }, msgs.length];
+    set(val('souts', 'y'), '4', 'change');
+    r.left = [val('souts', 'y').classList.contains('bad'), val('souts', 'y').value, msgs.splice(0)];
+    set(val('souts', 'z'), 'x'); set(val('souts', 'z'), 'x', 'change');
+    r.notConst = [val('souts', 'z').value, msgs.splice(0), { ...M.states[1].outputs }];
+    // the transition S1 → S2: the same table; an empty value stands for the state's (z: 1) or the default (y)
     select({ type: 'trans', id: 't3' }); side.renderSide();
-    for (const v of ['q=0', 'z=x']) { set(S.querySelector('.fsm-touts'), v); await tick(); r[`t:${v}`] = [err(), { ...M.transitions.find((t) => t.id === 't3').outputs }]; }
-    M.states[1].outputs = {}; M.transitions.find((t) => t.id === 't3').outputs = {};
+    r.trans = [table(), hint()];
+    set(val('touts', 'y'), '3'); r.mealy = { ...M.transitions.find((t) => t.id === 't3').outputs };
+    set(val('touts', 'y'), "3'b100"); set(val('touts', 'y'), "3'b100", 'change');
+    r.transMsg = [msgs.splice(0), val('touts', 'y').value];
+    set(val('touts', 'z'), '0'); set(val('touts', 'z'), ''); r.transCleared = { ...M.transitions.find((t) => t.id === 't3').outputs };
+    // y renamed w in the machine's Properties (its values follow), then z removed (its values gone)
+    select(null); side.renderSide();
+    const name = [...B.querySelectorAll('.fsm-outputs .asm-table tr')][2].querySelector('input');
+    set(name, 'w'); set(name, 'w', 'change');
+    B.querySelectorAll('.fsm-outputs .asm-x')[0].click();
+    select({ type: 'state', id: 's2' }); side.renderSide();
+    r.renamed = [table(), { ...M.states[1].outputs }, { ...M.transitions.find((t) => t.id === 't3').outputs }];
+    // no outputs: said
+    M.outputs = []; side.renderSide();
+    r.none = [S.querySelector('.fsm-outvals'), S.querySelector('.fsm-noouts')?.textContent];
     r.commits = commits.splice(0);
+    M.outputs = [{ name: 'z', width: 1, default: '0' }];
     return r;
   });
-  const out = await run();
-  assert.deepEqual(out, {
-    's:z=1z=1': ["the value '1z=1' of z must be a constant (e.g. 0, 1, 4'b1010, 5)", {}],
-    's:q=1': ["'q' is not an output", {}],
-    's:z=1': ['', { z: '1' }],
-    's:z': ['', { z: '1' }],
-    't:q=0': ["'q' is not an output", {}],
-    't:z=x': ["the value 'x' of z must be a constant (e.g. 0, 1, 4'b1010, 5)", {}],
-    commits: ['souts', 'souts'],
-  });
-  // in Portuguese
+  assert.deepEqual(out.state, [[['Name', 'Width', 'Value'], ['z', '1', '[|0]'], ['y', '2', "[2|2'b01]"]], 0, 'The value of each output while in this state (empty: its default value).']);
+  assert.deepEqual(out.set, { y: '3', z: '1' });
+  assert.deepEqual(out.cleared, { z: '1' });
+  assert.deepEqual(out.typed, [true, { z: '1' }, 0]);
+  assert.deepEqual(out.left, [false, '', ['State S1: the value 4 of y does not fit in 2 bit(s)']]);
+  assert.deepEqual(out.notConst, ['1', ["State S1: the value 'x' of z must be a constant (e.g. 0, 1, 4'b1010, 5)"], { z: '1' }]);
+  assert.deepEqual(out.trans, [[['Name', 'Width', 'Value'], ['z', '1', '[|1]'], ['y', '2', "[|2'b01]"]],
+    'The value of each output while this transition is taken (empty: the state\'s value; a value makes the machine a Mealy machine).']);
+  assert.deepEqual(out.mealy, { y: '3' });
+  assert.deepEqual(out.transMsg, [["Transition S1 → S2: the value 3'b100 of y does not fit in 2 bit(s)"], '3']);
+  assert.deepEqual(out.transCleared, { y: '3' });
+  assert.deepEqual(out.renamed, [[['Name', 'Width', 'Value'], ['w', '2', "[|2'b01]"]], {}, { w: '3' }]);
+  assert.deepEqual(out.none, [null, 'The machine has no outputs']);
+  assert.deepEqual(out.commits, ['souts:y', 'souts:z', 'souts:y', 'touts:y', 'touts:z', 'touts:z', 'pout1', 'pout1', '']);
+  // in Portuguese: the headers, the label, the hints
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
-    const pt = await run();
-    assert.deepEqual([pt['s:z=1z=1'][0], pt['s:q=1'][0], pt['t:z=x'][0]], ["o valor '1z=1' de z tem de ser uma constante (p.ex. 0, 1, 4'b1010, 5)", "'q' não é uma saída", "o valor 'x' de z tem de ser uma constante (p.ex. 0, 1, 4'b1010, 5)"]);
+    const pt = await page.eval(async () => {
+      const { side, M, selSection: S, select } = window.__s;
+      const tick = () => new Promise((ok) => setTimeout(ok, 0));   // (the translation's observer)
+      const field = () => S.querySelector('.fsm-outvals').closest('.asm-field');
+      select({ type: 'state', id: 's2' }); side.renderSide(); await tick();
+      const r = [[...S.querySelectorAll('.fsm-outvals th')].map((th) => th.textContent), field().querySelector('.asm-label').textContent, field().querySelector('.asm-fhint').textContent];
+      select({ type: 'trans', id: 't3' }); side.renderSide(); await tick();
+      r.push(field().querySelector('.asm-label').textContent, field().querySelector('.asm-fhint').textContent);
+      M.outputs = []; side.renderSide(); await tick();
+      r.push(S.querySelector('.fsm-noouts').textContent);
+      M.outputs = [{ name: 'z', width: 1, default: '0' }];
+      return r;
+    });
+    assert.deepEqual(pt, [['Nome', 'Largura', 'Valor'], 'Saídas (Moore)', 'O valor de cada saída neste estado (vazio: o seu valor por omissão).',
+      'Saídas (Mealy)', 'O valor de cada saída enquanto esta transição é tomada (vazio: o valor do estado; um valor faz da máquina uma máquina de Mealy).', 'A máquina não tem saídas']);
   } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
 });
 

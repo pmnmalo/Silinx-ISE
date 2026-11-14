@@ -27,14 +27,15 @@ export const FSM_PT = {
   // selection
   'State (Moore outputs inside)': 'Estado (saídas de Moore lá dentro)', 'Initial (reset) state': 'Estado inicial (de reset)',
   'Name': 'Nome', 'Outputs (Moore)': 'Saídas (Moore)',
-  'Outputs while in this state: output=value, separated by commas. The other outputs keep their default value.': 'Saídas neste estado: saída=valor, separadas por vírgulas. As outras saídas ficam com o valor por omissão.',
-  "e.g. z=1, y=2'b10": "p.ex. z=1, y=2'b10", 'Delete state': 'Apagar estado', 'Delete this state and its transitions': 'Apagar este estado e as suas transições',
+  'The value of each output while in this state (empty: its default value).': 'O valor de cada saída neste estado (vazio: o seu valor por omissão).',
+  'The machine has no outputs': 'A máquina não tem saídas',
+  'Delete state': 'Apagar estado', 'Delete this state and its transitions': 'Apagar este estado e as suas transições',
   'Transition': 'Transição', 'From': 'De', 'To': 'Para', 'Condition': 'Condição',
   "Boolean expression over the inputs: x, !x, x && y, x || !y, a == 2'b01, b[0] (also and, or, not, =). Empty: always.":
     "Expressão booleana das entradas: x, !x, x && y, x || !y, a == 2'b01, b[0] (também and, or, not, =). Vazia: sempre.",
   'Outputs (Mealy)': 'Saídas (Mealy)',
-  'Outputs while this transition is taken: output=value, separated by commas (they make the machine a Mealy machine).': 'Saídas enquanto esta transição é tomada: saída=valor, separadas por vírgulas (fazem da máquina uma máquina de Mealy).',
-  'e.g. x && !y   (empty = always)': 'p.ex. x && !y   (vazia = sempre)', 'e.g. z=1': 'p.ex. z=1',
+  'The value of each output while this transition is taken (empty: the state\'s value; a value makes the machine a Mealy machine).': 'O valor de cada saída enquanto esta transição é tomada (vazio: o valor do estado; um valor faz da máquina uma máquina de Mealy).',
+  'e.g. x && !y   (empty = always)': 'p.ex. x && !y   (vazia = sempre)',
   '▲ Earlier': '▲ Antes', 'Try this condition before the previous one': 'Testar esta condição antes da anterior', '▼ Later': '▼ Depois',
   'Try this condition after the next one': 'Testar esta condição depois da seguinte', 'Straighten': 'Endireitar', 'Default shape of the arrow': 'Forma original da seta',
   'Delete transition': 'Apagar transição', 'Delete this transition': 'Apagar esta transição',
@@ -91,6 +92,7 @@ export const FSM_PT_PATTERNS = [
   [/^(State .+|Transition .+ → .+): the value (.*) of (\S+) does not fit in (\d+) bit\(s\)$/, (m, w, v, o, k) => `${where(w)}: o valor ${v} de ${o} não cabe em ${k} bit(s)`],
   // (the Outputs fields' own errors, core/fsm.js parseOutputs, #3288)
   [/^'(.*)' is not an output$/, "'$1' não é uma saída"],
+  [/^the value (.*) of (\S+) does not fit in (\d+) bit\(s\)$/, 'o valor $1 de $2 não cabe em $3 bit(s)'],
   [/^the value '(.*)' of (\S+) must be a constant \(e\.g\. 0, 1, 4'b1010, 5\)$/, "o valor '$1' de $2 tem de ser uma constante (p.ex. 0, 1, 4'b1010, 5)"],
   [/^'(.*)' is not an output assignment \(write output=value, e\.g\. z=1\)$/, "'$1' não é uma atribuição de saída (escreva saída=valor, p.ex. z=1)"],
   [/^A transition starts or ends at a state that does not exist$/, 'Uma transição começa ou acaba num estado que não existe'],
