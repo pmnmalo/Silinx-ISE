@@ -8,7 +8,7 @@ import { withChipdbFetch } from './nextpnr-chipdb-node.js';
 
 /** One run of nextpnr in a worker thread of its own (nextpnr-xc7-node-worker.js): run()'s arguments and result, so that several
  *  go at once (the best of 3 seeds, #3825); the process ended (Stop) ends it. */
-export function runXc7Apart(args, files, onLine = () => {}) {
+function runXc7Apart(args, files, onLine = () => {}) {
   return new Promise((resolve, reject) => {
     const w = new Worker(new URL('./nextpnr-xc7-node-worker.js', import.meta.url));
     const end = (f, x) => { w.terminate(); f(x); };
