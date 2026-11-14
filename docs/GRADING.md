@@ -157,7 +157,13 @@ the interface's language, the ports, and the tests with their verdicts and point
   - **Add Test** and **Delete Test**, and the **Properties** panel, edit the title, the statement, the top and the
     selected test's settings.
 
-The MCP server's `grade` tool does each of these (run, ports, reference, expected, new).
+  - **Export Student Copy** (in the ⋮ menu) saves the student's copy of the exercise: no hidden test, no reference,
+    and the visible tests' files written in.
+  - **Classroom Template…** (in the ⋮ menu) saves the GitHub Classroom assignment's template repository as a zip
+    ([CLASSROOM.md](CLASSROOM.md)). Its starter project is made from the statement, in VHDL or Verilog: the top module
+    with the statement's ports and an empty body, on the project's board and device.
+
+The MCP server's `grade` tool does each of these (run, ports, reference, expected, student_copy, template, new).
 
 ## The example
 

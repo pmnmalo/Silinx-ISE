@@ -166,11 +166,15 @@ test('#3193 the docs\' commands: silinx classroom template and grade as docs/CLA
   }
   const run = async a => { out = ''; err = ''; const code = await classroomCommand(a, io); return { code, out, err }; };
   assert.deepEqual(await run([]), { code: 1, out: '', err: 'silinx classroom: template or grade (silinx help)\n' });
-  assert.deepEqual(await run(['template', EXERCISE]), { code: 1, out: '', err: 'silinx classroom template: give the exercise, the starter project and a new folder for the template\n' });
+  assert.deepEqual(await run(['template', EXERCISE]), { code: 1, out: '', err: 'silinx classroom template: give the exercise, the starter project (or none: one made from the statement) and a new folder for the template\n' });
   assert.deepEqual(await run(['grade', EXERCISE, '--org', 'o']), { code: 1, out: '', err: 'silinx classroom grade: give the exercise and --assignment, --out\n' });
   assert.deepEqual(await run(['grade', EXERCISE, '--org']), { code: 1, out: '', err: 'silinx classroom: --org needs a value\n' });
   assert.deepEqual(await run(['grade', EXERCISE, '--push']), { code: 1, out: '', err: 'silinx classroom: unknown option --push\n' });
   // (bin/silinx.js runs it)
   const r = execFileSync(process.execPath, [path.join(ROOT, 'bin/silinx.js'), 'classroom', 'template', EXERCISE, path.join(EX, 'starter'), path.join(tmp, 'bin-template')], { encoding: 'utf8' });
   assert.match(r, /: the template of counter4\.exercise\.json \(7 files/);
+  // (no starter project: one made from the statement, in the language asked, #3841)
+  assert.deepEqual(await run(['template', EXERCISE, path.join(tmp, 'no-starter'), '--language', 'verilog']), { code: 0, out: `${path.join(tmp, 'no-starter')}: the template of counter4.exercise.json (7 files: the starter project made from the statement, the visible tests, README.md, ${WORKFLOW})\n`, err: '' });
+  assert.match(fs.readFileSync(path.join(tmp, 'no-starter/src/counter4.v'), 'utf8'), /^\/\/ counter4: the exercise's top module, with the statement's ports\./);
+  assert.deepEqual(await run(['template', EXERCISE, path.join(tmp, 'no-starter-c'), '--language', 'c']), { code: 1, out: '', err: 'silinx classroom template: the starter\'s language: vhdl or verilog (c)\n' });
 });
