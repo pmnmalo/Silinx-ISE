@@ -116,11 +116,12 @@ function topBreadboard(board, hasDisp, hasVga) {
   if (hasDisp) {
     const segs = ['CA', 'CB', 'CC', 'CD', 'CE', 'CF', 'CG'].map((c, i) => `${c}(${pinsOf(board, 'seg')[i] ?? ''})`).concat(`DP(${pinsOf(board, 'dp')[0] ?? ''})`);
     const segPins = [...pinsOf(board, 'seg'), ...pinsOf(board, 'dp')];
+    const anWires = pinsOf(board, 'an').map((p, i) => wire(DIG_X(3 - i), DIG_Y + 36, pinX(J7, p), pinY, '#7a4a2a')).join('');
     return `<g data-module="display">${base}
     <rect x="${DIG_X(0) - 32}" y="${DIG_Y - 36}" width="${DIG_X(3) - DIG_X(0) + 64}" height="72" rx="3" fill="#0b0b0b" stroke="#2a2a2a"/>
     ${segs.map((t, i) => text(410 + (i % 2) * 74, 60 + Math.floor(i / 2) * 14, t, { size: 7, anchor: 'start', weight: 'normal', fill: '#55503f' })).join('')}
     ${segPins.map((p, i) => wire(40 + i * 12, T - 40, pinX(J7, p), pinY, COLOURS[i])).join('')}
-    ${pinsOf(board, 'an').map((p, i) => wire(DIG_X(3 - i), DIG_Y + 36, pinX(J7, p), pinY, '#7a4a2a')).join('')}</g>`;
+    ${anWires}</g>`;
   }
   if (hasVga) {
     const vgaPins = [['R', 'vga_red'], ['G', 'vga_green'], ['B', 'vga_blue']].map(([c, res]) => `${c}(${pinsOf(board, res).join(' ')})`)
@@ -139,9 +140,10 @@ function topBreadboard(board, hasDisp, hasVga) {
 function bottomBreadboard(board) {
   const pinY = T + J6_Y, y0 = T + BH + 14;
   const parts = [['led', BB_LED_Y - 12], ['sw', BB_SW_Y - 26], ['btn', BB_SW_Y - 14]];
+  const ioWires = parts.map(([res, y]) => pinsOf(board, res).map((p, i) => wire(pinX(J6, p), y, pinX(J6, p), pinY, COLOURS[i % 8])).join('')).join('');
   return `<g data-module="io"><rect x="140" y="${y0}" width="${W - 160}" height="${BB - 24}" rx="6" fill="${BREADBOARD}" stroke="#b7ae94" stroke-width="2"/>
     ${holeRows(152, y0 + 8, 72)}${holeRows(152, y0 + BB - 46, 72)}
-    ${parts.map(([res, y]) => pinsOf(board, res).map((p, i) => wire(pinX(J6, p), y, pinX(J6, p), pinY, COLOURS[i % 8])).join('')).join('')}</g>`;
+    ${ioWires}</g>`;
 }
 // its parts' look: the white tact buttons, the SMD LEDs (the board's red, the breadboard's bigger), the upright power
 // switch (its LED right of it), the switches the iCEBreaker's modules' (emulator-icebreaker.js); the ports upright
