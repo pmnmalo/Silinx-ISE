@@ -8,12 +8,16 @@
 // - in Portuguese;
 // - a project with no exercise: New Exercise makes one from its top;
 // - a teacher's exercise authored from the project (#3831): Reference from the Project, then Expected from the Reference
-//   filling a vectors test's outputs, then graded; in Portuguese.
+//   filling a vectors test's outputs, then graded; in Portuguese;
+// - packaged for the students (#3841): Export Student Copy and Classroom Template… saved, nothing hidden in them; in
+//   Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { setupUi, uiTest, makeProject, readWs, writeWs, ROOT } from './harness.js';
+import zlib from 'node:zlib';
+import { setupUi, uiTest, makeProject, readWs, writeWs, waitDownload, ROOT } from './harness.js';
+import { readZip, textOf } from '../../core/zip.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -231,9 +235,60 @@ uiTest('#3831 an exercise authored from the project: Reference from the Project,
   await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
   await page.waitFor(() => document.documentElement.lang === 'pt');
   await page.click(`${D} .ex-bar .tb-more-btn`);
-  const items = await page.eval((d) => [...document.querySelectorAll(`${d} .ex-bar .tb-more-menu .asm-btn`)].map((b) => `${b.textContent}: ${b.title}`), D);
+  const items = await page.eval((d) => [...document.querySelectorAll(`${d} .ex-bar .tb-more-menu .asm-btn`)].slice(0, 4).map((b) => `${b.textContent}: ${b.title}`), D);
   assert.deepEqual(items, ['Executar Todos os Testes: Executar todos os testes do exercício, também os escondidos', 'Portos do Topo: O topo e os portos do exercício: os do módulo de topo do projeto',
     'Referência do Projeto: O desenho de referência do exercício: o desenho do projeto', 'Esperado da Referência: As saídas do teste de vetores selecionado: as do desenho de referência, nas entradas das suas linhas']);
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
+  await page.waitFor(() => document.documentElement.lang === 'en');
+}, { timeout: 120000 });
+
+uiTest('#3841 an exercise packaged for the students: Export Student Copy and Classroom Template… saved, nothing hidden in them; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'pack', board: 'basys2', top: 'counter4',
+    files: { 'src/counter4.vhd': RIGHT, 'counter4.exercise.json': read('counter4.exercise.json'), 'tests/count.vec': read('tests/count.vec'), 'ref/counter4.vhd': RIGHT, 'tb/tb_counter4.vhd': read('tb/tb_counter4.vhd') } });
+  const pj = await env.server.api('GET', '/api/projects/pack');
+  delete pj.fileTree;
+  pj.files = pj.files.filter((f) => f.path === 'src/counter4.vhd');
+  await env.server.api('PUT', '/api/projects/pack', pj);
+  await page.openProject('pack');
+  await page.menu('Project', 'Exercise…');
+  await page.waitFor((d) => window.Silinx.active?.id === 'exercise:counter4.exercise.json' && document.querySelector(d)?.dataset.ready === '1', [D], { what: 'the exercise' });
+  const menu = async (text) => { await page.click(`${D} .ex-bar .tb-more-btn`); await page.click(`${D} .ex-bar .tb-more-menu .asm-btn`, { text }); };
+  // the student's copy: the visible tests only, the vectors' file written in
+  await menu('Export Student Copy');
+  const copy = JSON.parse(await fs.promises.readFile(await waitDownload(page, 'counter4.exercise.json'), 'utf8'));
+  assert.deepEqual(copy.tests.map((t) => t.id), ['count', 'impl']);
+  assert.equal(copy.tests[0].vectors, read('tests/count.vec'));
+  assert.equal('reference' in copy, false);
+  await page.waitConsole(/counter4\.exercise\.json: the student's copy of counter4\.exercise\.json, its 2 visible test\(s\), no hidden test and no reference\./);
+  // the Classroom template, its starter in Verilog
+  await menu('Classroom Template…');
+  await page.waitDialog('Classroom Template');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay [data-prop="starter-language"]').value), 'vhdl');
+  await page.eval(() => { const s = document.querySelector('.dlg-overlay [data-prop="starter-language"]'); s.value = 'verilog'; s.dispatchEvent(new Event('change')); });
+  await page.dialogButton('Save Zip');
+  const codec = { inflate: (d, limit) => zlib.inflateRawSync(d, { maxOutputLength: Math.max(1, limit) }), deflate: (d) => zlib.deflateRawSync(d) };
+  const entries = await readZip(new Uint8Array(await fs.promises.readFile(await waitDownload(page, 'counter4-template.zip'))), codec);
+  assert.deepEqual(entries.map((e) => e.path), ['silinx.json', 'src/counter4.v', 'tests/count.vec', 'counter4.exercise.json', 'README.md', '.gitignore', '.github/workflows/silinx-grade.yml']);
+  const text = Object.fromEntries(entries.map((e) => [e.path, textOf(e)]));
+  assert.equal(text['tests/count.vec'], read('tests/count.vec'));
+  assert.match(text['src/counter4.v'], /^\/\/ counter4: the exercise's top module, with the statement's ports\. Its design is yours to write\.\nmodule counter4 \(/);
+  assert.equal(JSON.parse(text['silinx.json']).board, 'basys2');
+  assert.doesNotMatch(Object.values(text).join('\n'), /tb_counter4|"seed"|"reference"/);
+  await page.waitConsole(/counter4-template\.zip: the Classroom template of counter4\.exercise\.json \(7 files: the starter project in Verilog, the visible tests, README\.md, the workflow\)\./);
+  assert.doesNotMatch(await page.consoleText(), /ERROR|WARNING/);
+  // in Portuguese: the menu's labels and the dialog's
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
+  await page.waitFor(() => document.documentElement.lang === 'pt');
+  await page.click(`${D} .ex-bar .tb-more-btn`);
+  const items = await page.eval((d) => [...document.querySelectorAll(`${d} .ex-bar .tb-more-menu .asm-btn`)].slice(4).map((b) => `${b.textContent}: ${b.title}`), D);
+  assert.deepEqual(items, ['Exportar a Cópia do Aluno: Guardar o exercício sem os testes escondidos e a referência, para os alunos',
+    'Modelo do Classroom…: Guardar o repositório modelo de uma tarefa do GitHub Classroom como um zip']);
+  await page.click(`${D} .ex-bar .tb-more-menu .asm-btn`, { text: 'Modelo do Classroom…' });
+  await page.waitDialog('Modelo do Classroom');
+  const dlg = await page.eval(() => ({ text: document.querySelector('.dlg-overlay .ex-template').textContent, buttons: [...document.querySelectorAll('.dlg-overlay .dlg-buttons button')].map((b) => b.textContent) }));
+  assert.match(dlg.text, /^O repositório modelo de uma tarefa do GitHub Classroom: .*Linguagem do projeto inicial/);
+  assert.deepEqual(dlg.buttons, ['Guardar o Zip', 'Cancelar']);
+  await page.dialogButton('Cancelar');
   await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
   await page.waitFor(() => document.documentElement.lang === 'en');
 }, { timeout: 120000 });

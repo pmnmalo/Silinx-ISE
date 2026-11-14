@@ -2,7 +2,8 @@
 // by Project ▸ Exercise… (which makes one when the project has none: its top and ports, a first visible test). As every
 // viewer (docs/UI-GUIDELINES.md): its toolbar (Add Test, Delete Test, Run Visible Tests, ☰ Properties on a narrow
 // screen, the ⋮ menu's Run All Tests, Ports from the Top, Reference from the Project and Expected from the Reference,
-// #3831: a teacher's exercise made from the project that holds the right design), the statement in the interface's language, the ports, the
+// #3831: a teacher's exercise made from the project that holds the right design; Export Student Copy and Classroom
+// Template…, #3841: web/js/exercise-package.js), the statement in the interface's language, the ports, the
 // tests with their verdicts and points once run, the Properties side panel on the right (the exercise's title,
 // statement and top, the selected test's settings: web/js/exercise-props.js), its status line, and every message in the
 // console. The tests run on the project as it is saved, in the page (core/grade.js, the grading of `silinx grade` and of
@@ -19,6 +20,7 @@ import { panelToggle } from './narrow.js';
 import { statusLine } from './status-line.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import { mountExerciseProps } from './exercise-props.js';
+import { exportStudentCopy, classroomTemplateDialog } from './exercise-package.js';
 import { browserSynthesize } from './grade-synth-browser.js';
 import { isExerciseFile, exerciseProblems, localize, testsOf, pointsOf, withFileTexts, newExercise, exerciseFileOf, VERDICTS } from '/core/grade-format.js';
 import { gradeTests, summarize, referenceVectors } from '/core/grade.js';
@@ -108,7 +110,10 @@ function mountExercise(el, doc, path, ex) {
     toolbarMenu([btn('Run All Tests', 'Run every test of the exercise, the hidden ones too', 'run-all', () => run(false)),
       btn('Ports from the Top', 'The exercise\'s top and ports: the project\'s top module\'s', 'ports-from-top', () => portsFromTop()),
       btn('Reference from the Project', 'The exercise\'s reference design: the project\'s design', 'reference-from-project', () => referenceFromProject()),
-      btn('Expected from the Reference', 'The selected vectors test\'s outputs: the reference design\'s, on its rows\' inputs', 'expected-from-reference', () => expectedOutputs())], { title: 'The exercise', btnClass: 'asm-btn' }).el));
+      btn('Expected from the Reference', 'The selected vectors test\'s outputs: the reference design\'s, on its rows\' inputs', 'expected-from-reference', () => expectedOutputs()),
+      btn('Export Student Copy', 'Save the exercise without its hidden tests and its reference, for the students', 'student-copy', () => exportStudentCopy(pack)),
+      btn('Classroom Template…', 'Save a GitHub Classroom assignment\'s template repository as a zip', 'classroom-template', () => classroomTemplateDialog(pack))], { title: 'The exercise', btnClass: 'asm-btn' }).el));
+  const pack = { name, path, exercise: () => ex };
   const page = h('div', { class: 'ex-page' });
   const side = h('aside', { class: 'ex-side' }, h('div', { class: 'asm-cap' }, 'Properties'));
   root.append(h('div', { class: 'ex-main' }, page, side), line.el);
