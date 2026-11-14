@@ -10,14 +10,19 @@ export const UART_GROUPS = ['UART', 'RS-232', 'USB-UART'];
 /** The baud rates the terminal offers (9600 by default). */
 export const BAUDS = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200];
 
+/** Whether a port bit (boardWiring's) is on the serial port in its direction: an input on its RX pin, an output on its
+ *  TX pin; not an input on the TX pin (another board's clock pin, #3742), nor an output on the RX pin. */
+export function uartBit(b) {
+  return UART_GROUPS.includes(b.res.group) && (b.dir === 'in' ? b.res.dir !== 'out' : b.res.dir !== 'in');
+}
+
 /**
  * The serial port's port bits (boardWiring's): { tx (the design's output), rx (its input) }, either null when the
  * UCF does not wire it; null when it wires neither (a board with two ports, the first wired: the Starter Kit's DCE).
  */
 export function uartPins(wiring) {
-  const on = (b) => UART_GROUPS.includes(b.res.group);
-  const tx = wiring.bits.find((b) => on(b) && b.dir !== 'in') || null;
-  const rx = wiring.bits.find((b) => on(b) && b.dir === 'in' && (!tx || b.res.group === tx.res.group)) || null;
+  const tx = wiring.bits.find((b) => uartBit(b) && b.dir !== 'in') || null;
+  const rx = wiring.bits.find((b) => uartBit(b) && b.dir === 'in' && (!tx || b.res.group === tx.res.group)) || null;
   return tx || rx ? { tx, rx } : null;
 }
 
