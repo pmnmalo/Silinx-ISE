@@ -51,6 +51,7 @@
 .fsm-editor .fsm-tlist { margin: 0 0 8px; padding-left: 22px; font: 12px var(--asm-mono); }
 .fsm-editor .fsm-tlist li.link { cursor: pointer; padding: 1px 0; }
 .fsm-editor .fsm-tlist li.link:hover { color: var(--asm-accent); }
+.fsm-editor .fsm-tlist .fsm-tout { padding-left: 2ch; }
 
 /* bottom panel (its simulation's rules the ASM chart's Simulate panel's too, #2880: .asm-editor, which both editors are) */
 .asm-editor .fsm-panel { flex: 0 0 44%; }

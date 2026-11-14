@@ -29,7 +29,6 @@ export const FSM_PT = {
   'Name': 'Nome', 'Outputs (Moore)': 'Saídas (Moore)',
   'The value of each output while in this state (empty: its default value).': 'O valor de cada saída neste estado (vazio: o seu valor por omissão).',
   'The machine has no outputs': 'A máquina não tem saídas',
-  'Delete state': 'Apagar estado', 'Delete this state and its transitions': 'Apagar este estado e as suas transições',
   'Transition': 'Transição', 'From': 'De', 'To': 'Para', 'Condition': 'Condição',
   "Boolean expression over the inputs: x, !x, x && y, x || !y, a == 2'b01, b[0] (also and, or, not, =). Empty: always.":
     "Expressão booleana das entradas: x, !x, x && y, x || !y, a == 2'b01, b[0] (também and, or, not, =). Vazia: sempre.",
@@ -38,7 +37,6 @@ export const FSM_PT = {
   'e.g. x && !y   (empty = always)': 'p.ex. x && !y   (vazia = sempre)',
   '▲ Earlier': '▲ Antes', 'Try this condition before the previous one': 'Testar esta condição antes da anterior', '▼ Later': '▼ Depois',
   'Try this condition after the next one': 'Testar esta condição depois da seguinte', 'Straighten': 'Endireitar', 'Default shape of the arrow': 'Forma original da seta',
-  'Delete transition': 'Apagar transição', 'Delete this transition': 'Apagar esta transição',
   // machine
   'Module name': 'Nome do módulo', 'Width': 'Largura', 'Default': 'Omissão', 'Remove': 'Remover', 'Inputs': 'Entradas', 'Outputs': 'Saídas',
   '+ Input': '+ Entrada', 'Add an input': 'Acrescentar uma entrada', '+ Output': '+ Saída', 'Add an output': 'Acrescentar uma saída',

@@ -102,7 +102,12 @@ export function outputProblems(outs, outputs) {
 
 /** "z=1, y=2'b10" */
 export function formatOutputs(o) {
-  return Object.entries(o || {}).map(([k, v]) => `${k}=${v}`).join(', ');
+  return outputLines(o).join(', ');
+}
+
+/** ["z=1", "y=2'b10"]: the outputs as they are shown, one per line (the drawing's labels, Properties, #3882). */
+export function outputLines(o) {
+  return Object.entries(o || {}).map(([k, v]) => `${k}=${v}`);
 }
 
 /** Split a transition label "cond / z=1" into { cond, outputs } (a '/' followed by '=' belongs to the condition);

@@ -1,9 +1,10 @@
 // The FSM editor's drawing of its diagram (#405: out of mountFsmEditor): a transition's geometry (its arc, a
 // self-loop's direction away from the other arrows, its label's place), the states with their codes and the initial
 // one, the transitions with their labels, the selection, the problems and, while simulating, the current state and
-// transition. mountRender(ctx) is called by mountFsmEditor where this code was.
-import { fsmEncoding, formatOutputs, stepFsm } from '/core/fsm.js';
-import { sv, radiusOf, textW } from './fsm-editor.js';
+// transition. mountRender(ctx) is called by mountFsmEditor where this code was. A state's or a transition's outputs: one
+// per line (#3882), a transition's under its condition, the block growing away from its arrow.
+import { fsmEncoding, outputLines, stepFsm } from '/core/fsm.js';
+import { sv, radiusOf, stateTexts, textW } from './fsm-editor.js';
 
 /** { encOf, geom, render } of an FSM editor (state(): its current model, selection, problems, simulation). */
 export function mountRender(ctx) {
@@ -49,7 +50,7 @@ export function mountRender(ctx) {
       const p1 = p(-0.42, ra), p2 = p(0.42, ra), c1 = p(-0.62, ra * 2.7), c2 = p(0.62, ra * 2.7);
       const apex = p(0, ra * 2.35);
       const lab = p(0, ra * 2.35 + 14);
-      return { d: `M${p1.x},${p1.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${p2.x},${p2.y}`, apex, lab, anchor: Math.cos(ang) > 0.35 ? 'start' : Math.cos(ang) < -0.35 ? 'end' : 'middle', self: true };
+      return { d: `M${p1.x},${p1.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${p2.x},${p2.y}`, apex, lab, anchor: Math.cos(ang) > 0.35 ? 'start' : Math.cos(ang) < -0.35 ? 'end' : 'middle', self: true, out: { x: Math.cos(ang), y: Math.sin(ang) } };
     }
     const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
     const n = { x: -dy / L, y: dx / L };
@@ -64,14 +65,12 @@ export function mountRender(ctx) {
     if (!side) side = n.y <= 0 ? 1 : -1;
     const lab = { x: apex.x + n.x * side * 13, y: apex.y + n.y * side * 13 };
     const anchor = Math.abs(n.x * side) > 0.5 ? (n.x * side > 0 ? 'start' : 'end') : 'middle';
-    return { d: `M${P0.x},${P0.y} Q${C.x},${C.y} ${P2.x},${P2.y}`, apex, lab, anchor, n, mid };
+    return { d: `M${P0.x},${P0.y} Q${C.x},${C.y} ${P2.x},${P2.y}`, apex, lab, anchor, n, mid, out: { x: n.x * side, y: n.y * side } };
   }
-  const labelText = (t) => {
-    const { M } = state();
-    const c = t.cond || '';
-    const o = formatOutputs(t.outputs);
-    if (M.type === 'mealy' || o) return o ? `${c || '1'} / ${o}` : c;
-    return c;
+  // (a transition's label: its condition, then " /" and its outputs one per line; none: the condition alone)
+  const labelLines = (t) => {
+    const c = t.cond || '', o = outputLines(t.outputs);
+    return o.length ? [`${c || '1'} /`, ...o] : c ? [c] : [];
   };
 
   // ---------------------------------------------------------------------------- rendering
@@ -91,12 +90,16 @@ export function mountRender(ctx) {
       const marker = isSel ? `${uid}-arr-sel` : hot === t.id ? `${uid}-arr-hot` : `${uid}-arr`;
       const grp = sv('g', { class: cls, 'data-trans': t.id });
       grp.append(sv('path', { class: 'fsm-hit', d: g.d }), sv('path', { class: 'fsm-edge-line', d: g.d, 'marker-end': `url(#${marker})` }));
-      const txt = labelText(t);
-      if (txt || isSel) {
-        const w = Math.max(14, textW(txt || '…')) + 8;
+      const lines = labelLines(t);
+      if (lines.length || isSel) {
+        const shown = lines.length ? lines : ['…'];
+        const w = Math.max(14, ...shown.map(textW)) + 8, hgt = 14 * shown.length + 4;
         const x0 = g.anchor === 'start' ? g.lab.x - 4 : g.anchor === 'end' ? g.lab.x - w + 4 : g.lab.x - w / 2;
-        grp.append(sv('rect', { class: 'fsm-label-bg', x: x0, y: g.lab.y - 9, width: w, height: 18, rx: 4 }),
-          sv('text', { class: `fsm-label${txt ? '' : ' empty'}`, x: g.lab.x, y: g.lab.y + 4, 'text-anchor': g.anchor }, txt || '…'));
+        // (several lines: beside the arrow, centred on its place; above or below it, growing away from it)
+        const y0 = shown.length === 1 || g.anchor !== 'middle' ? g.lab.y - hgt / 2 : g.out.y < 0 ? g.lab.y + 9 - hgt : g.lab.y - 9;
+        const text = sv('text', { class: `fsm-label${lines.length ? '' : ' empty'}`, x: g.lab.x, y: y0 + 13, 'text-anchor': g.anchor });
+        shown.forEach((l, i) => text.append(sv('tspan', { x: g.lab.x, dy: i ? 14 : 0 }, l)));
+        grp.append(sv('rect', { class: 'fsm-label-bg', x: x0, y: y0, width: w, height: hgt, rx: 4 }), text);
       }
       gEdges.append(grp);
     }
@@ -110,11 +113,12 @@ export function mountRender(ctx) {
       }
       grp.append(sv('circle', { class: 'fsm-rim', r: r + 6 }), sv('circle', { class: 'fsm-circle', r }));
       if (s.id === M.initial) grp.append(sv('circle', { class: 'fsm-circle-in', r: r - 5 }));
-      const outs = formatOutputs(s.outputs);
-      grp.append(sv('text', { class: 'fsm-name', x: 0, y: outs ? -4 : 5, 'text-anchor': 'middle' }, s.name || '?'));
-      if (outs) {
-        grp.append(sv('line', { class: 'fsm-divider', x1: -r * 0.72, y1: 3, x2: r * 0.72, y2: 3 }));
-        grp.append(sv('text', { class: 'fsm-outs', x: 0, y: 17, 'text-anchor': 'middle' }, outs));
+      const tx = stateTexts(s);
+      grp.append(sv('text', { class: 'fsm-name', x: 0, y: tx.name, 'text-anchor': 'middle' }, s.name || '?'));
+      if (tx.outs.length) {
+        const half = Math.sqrt(Math.max(0, r * r - tx.divider * tx.divider)) * 0.72;
+        grp.append(sv('line', { class: 'fsm-divider', x1: -half, y1: tx.divider, x2: half, y2: tx.divider }));
+        for (const o of tx.outs) grp.append(sv('text', { class: 'fsm-outs', x: 0, y: o.y, 'text-anchor': 'middle' }, o.text));
       }
       const e = enc.get(s.id);
       if (e) grp.append(sv('text', { class: 'fsm-code', x: r * 0.72 + 4, y: -r * 0.72 - 2 }, e.bits));

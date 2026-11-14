@@ -27,7 +27,7 @@ import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
-  normalizeFsm, newFsm, validateFsm, formatOutputs, FSM_ENCODINGS, STATE_R,
+  normalizeFsm, newFsm, validateFsm, outputLines, FSM_ENCODINGS, STATE_R,
 } from '/core/fsm.js';
 import { mountSide } from './fsm-side.js';
 import { mountRender } from './fsm-render.js';
@@ -52,10 +52,17 @@ export { sv };   // (web/js/dom.js's)
 const CHW = 7.3;                       // width of a 12px monospace character
 export const textW = (s) => String(s).length * CHW;
 
-/** Radius of a state circle (grows with its texts). */
+/** A state's texts in its circle: its name's baseline, the divider's height and its outputs, one per line (#3882),
+ *  the block centred on the circle's centre. */
+export function stateTexts(s) {
+  const lines = outputLines(s.outputs), up = 7 * Math.max(0, lines.length - 1);
+  return { name: lines.length ? -4 - up : 5, divider: 3 - up, outs: lines.map((text, i) => ({ text, y: 17 + 14 * i - up })) };
+}
+
+/** Radius of a state circle (grows with its texts: each line's ends inside the circle). */
 export function radiusOf(s) {
-  const outs = formatOutputs(s.outputs);
-  return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, Math.ceil(textW(outs) / 2) + 10);
+  const t = stateTexts(s), inside = (text, y) => Math.ceil(Math.hypot(textW(text) / 2, Math.max(Math.abs(y - 10), Math.abs(y + 3)))) + 4;
+  return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, ...t.outs.map((o) => Math.max(Math.ceil(textW(o.text) / 2) + 10, inside(o.text, o.y))));
 }
 
 // (read-only, #2696: the tools that change the diagram, Check, the ⋮ menu (Layout and conversion, the HDL's settings)
@@ -285,7 +292,7 @@ export function mountFsmEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------------------- side panel (fsm-side.js)
   const { renderSide } = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody, machineSection, btn, stateById, transById,
-    encOf, commit, deleteSelection, readOnly, locked, render, updateToolbar, flash });
+    encOf, commit, readOnly, locked, render, updateToolbar, flash });
 
   // ---------------------------------------------------------------------------- problems (to onProblems: the console, #2737)
   function validateSoon() { clearTimeout(timers.val); timers.val = setTimeout(runValidate, 120); }

@@ -5,8 +5,9 @@
 // rewrites the HDL, which simulates like the diagram; the HDL is read-only, #1176; a diagram with
 // errors leaves it as it was and gives the out-of-sync banner with the reason); step-by-step
 // simulation; HDL module -> diagram and diagram -> ASM chart; Portuguese texts; the priority of the
-// transitions (▼ Later), Straighten, Export CSV, the simulator's ⟲ Reset and Clock ↑, Delete state /
-// transition, + Input / + Output, Zoom / Fit, ↶ ↷ and Edit ▸ Undo / Redo (#195).
+// transitions (▼ Later), Straighten, Export CSV, the simulator's ⟲ Reset and Clock ↑, a state / a transition
+// deleted by the toolbar's Delete and the Delete key (no Delete button in Properties, #3882), + Input / + Output,
+// Zoom / Fit, ↶ ↷ and Edit ▸ Undo / Redo (#195).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs, waitDownload } from './harness.js';
@@ -238,8 +239,8 @@ uiTest('State diagram (FSM): step-by-step simulation, Mealy labels, module -> di
   await page.openProject('FsmSim');
   await page.eval(() => window.SilinxApp.openFsm('src/m.fsm.json'));
   await page.waitFor((ed) => window.Silinx.active?.id === 'fsm:src/m.fsm.json' && document.querySelector(ed), [ED]);
-  // Mealy label "condition / outputs"
-  assert.equal(await page.eval((ed) => document.querySelector(`${ed} [data-trans=t2] .fsm-label`).textContent, ED), '!x / z=1');
+  // Mealy label "condition /" and its outputs, one per line (#3882)
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} [data-trans=t2] .fsm-label tspan`)].map((t) => t.textContent), ED), ['!x /', 'z=1']);
   // ---- simulation: x = 1, clock -> B; x = 0: z = 1 (Mealy) and the transition back to A is shown
   await page.click(`${ED} .fsm-tab-btn`, { text: 'Try it' });
   await page.waitForSelector(`${ED} .fsm-sim`);
@@ -397,7 +398,7 @@ uiTest('State diagram (FSM): Create Boolean Algebra with more than 4 output bits
   await page.waitFor(() => window.Silinx.docs.find((d) => d.id === 'tt:src/wide_out.bool.json')?.el.querySelectorAll('.tt-editor .tt-cell[data-out=led_0]').length === 8, [], { what: 'led_0 column', timeout: 30000 });
 });
 
-uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simulator ⟲ Reset / Clock ↑, Delete state / transition, + Input / + Output, Zoom / Fit, ↶ ↷ and Edit ▸ Undo / Redo (#195)', E, async (page) => {
+uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simulator ⟲ Reset / Clock ↑, a state / transition deleted (toolbar, Delete key; no button in Properties, #3882), + Input / + Output, Zoom / Fit, ↶ ↷ and Edit ▸ Undo / Redo (#195)', E, async (page) => {
   const m0 = normalizeFsm({
     name: 'pri', type: 'mealy', inputs: [{ name: 'x', width: 1 }, { name: 'y', width: 1 }], outputs: [{ name: 'z', width: 1 }],
     states: [{ id: 'a', name: 'A', x: 100, y: 100 }, { id: 'b', name: 'B', x: 300, y: 100 }, { id: 'c', name: 'C', x: 300, y: 300 }],
@@ -504,7 +505,8 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
   m = await model();
   assert.deepEqual([m.inputs.map((p) => p.name), m.outputs.map((p) => p.name)], [['x', 'y'], ['z']]);
 
-  // ---- Delete transition, Delete state (and its transitions); ↶ ↷ and Edit ▸ Undo / Redo
+  // ---- a transition deleted by the toolbar's Delete, a state (and its transitions) by the Delete key: Properties has no
+  // Delete button (#3882); ↶ ↷ and Edit ▸ Undo / Redo
   // (t3 has no label: always, no outputs) clicked on its arrow
   for (let i = 0; i < 20 && !await page.eval((ed) => document.querySelector(`${ed} [data-trans=t3]`).classList.contains('sel'), ED); i++) {
     await page.click(await page.eval((ed) => {
@@ -514,13 +516,17 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
     }, ED));
     await new Promise((r) => setTimeout(r, 100));
   }
-  await page.waitFor((ed) => /Delete transition/.test(document.querySelector(`${ed} .fsm-selection`).textContent), [ED], { what: 't3 selected' });
-  await side('Delete transition');
+  await page.waitFor((ed) => document.querySelector(`${ed} .fsm-selection h3`)?.textContent === 'Transition', [ED], { what: 't3 selected' });
+  const sideButtons = () => page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-selection button`)].map((b) => b.textContent), ED);
+  assert.deepEqual(await sideButtons(), ['▲ Earlier', '▼ Later', 'Straighten']);
+  await page.click(`${ED} .asm-toolbar [data-act=delete]`);
   assert.equal(await order(), 't2,t1,t4');
   assert.deepEqual(await warnings(), WARN_FSM_NO_T3);
   await page.click(`${ED} [data-state=c] .fsm-circle`);
-  await page.waitFor((ed) => /Delete state/.test(document.querySelector(`${ed} .fsm-selection`).textContent), [ED]);
-  await side('Delete state');
+  await page.waitFor((ed) => document.querySelector(`${ed} .fsm-selection h3`)?.textContent === 'State', [ED]);
+  assert.deepEqual(await sideButtons(), []);
+  await page.eval((ed) => document.querySelector(ed).focus(), ED);
+  await page.key('Delete');
   m = await model();
   assert.deepEqual([m.states.map((s) => s.id), m.transitions.map((t) => t.id)], [['a', 'b'], ['t1']]);
   await tool('↶');
