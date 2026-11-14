@@ -7,6 +7,8 @@
 // Nodes of the graph both emitters write as they are.
 // Isomorphic ES module: no DOM and no Node APIs.
 
+import { bottomUp } from './c-graph.js';
+
 const LIMB = 17;
 const S18 = { w: 18, s: true }, S36 = { w: 36, s: true };
 
@@ -82,5 +84,5 @@ export function splitMuls(g, roots, every = false) {
     memo.set(id, r);
     return r;
   };
-  return roots.map(f);
+  return bottomUp(roots, (id) => g.get(id).args, f, (id) => memo.has(id));
 }

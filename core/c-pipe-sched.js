@@ -20,6 +20,7 @@
 //     markDependences(body)              DEPENDENCE's (#1961) on the loops they are in, and on those in those
 //   moduloSchedule(body, ii)             the stages
 import { balanceSums } from './c-balance.js';
+import { bottomUp } from './c-graph.js';
 import { BOOL } from './c-types.js';
 import { nodeDelay } from './c-timing.js';
 import { dependenceOf } from './c-pragma.js';
@@ -418,8 +419,11 @@ export const pipelineSchedMethods = {
       if (!upd.has(name)) { upd.set(name, null); upd.set(name, at(c - 1, v)); }
       return this.regNode(r);
     };
+    // (whether at(c, v) is v's operands as stage c computes them: a chain of them followed by a stack of its own, #3595)
+    const deeper = (c, v) => !(stageOf(v) < c) && !qFifo.has(v) && !qMem.has(v) && !inOf.has(v) && g.get(v).args.length > 0;
     /** The node v as stage c computes it: what an earlier stage gave from its registers. */
-    const at = (c, v) => {
+    const at = (c, v) => bottomUp([v], (x) => deeper(c, x) ? g.get(x).args : [], (x) => atOne(c, x), (x) => memo.has(`${c}:${x}`))[0];
+    const atOne = (c, v) => {
       const key = `${c}:${v}`;
       if (memo.has(key)) return memo.get(key);
       const node = g.get(v), s = stageOf(v);
@@ -430,7 +434,7 @@ export const pipelineSchedMethods = {
       else if (qMem.has(v)) out = this.memQ(this.slots.get(memOf(qMem.get(v))), qMem.get(v) === memOf(qMem.get(v)) ? 0 : 1);
       else if (inOf.has(v)) out = inOf.get(v);
       else if (node.args.length) {
-        const args = node.args.map((a) => at(c, a));
+        const args = node.args.map((a) => atOne(c, a));
         out = args.every((a, k) => a === node.args[k]) ? v : g.add(node.op, args, { w: node.w, s: node.s }, extraOf(node));
       }
       memo.set(key, out);
