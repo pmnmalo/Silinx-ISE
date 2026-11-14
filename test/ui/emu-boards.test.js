@@ -86,7 +86,7 @@ uiTest('#2478 the board layouts in a module of their own: emulator.js exports th
   assert.deepEqual(await page.eval(async () => {
     const [a, b] = await Promise.all([import('/js/emulator.js'), import('/js/emulator-layouts.js')]);
     return [a.BOARD_LAYOUTS === b.BOARD_LAYOUTS, Object.keys(b.BOARD_LAYOUTS), Object.entries(b.BOARD_LAYOUTS).filter(([, f]) => f.lcd).map(([id]) => id)];
-  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'icebreaker', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga', 'papilio-one'], ['s3e-starter', 's3a-starter']]);
+  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'icebreaker', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga', 'papilio-one', 'elbert-v2'], ['s3e-starter', 's3a-starter']]);
 });
 
 for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [860, 720], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]],
@@ -95,7 +95,7 @@ for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexy
   ['cmod-s6', [936, 252], [4, 0, 2, 0]], ['icebreaker-vga', [1010, 683], [7, 0, 4, 0]],
   ['ulx3s', [1240, 508], [8, 4, 7, 4]], ['ulx3s-vga', [1240, 508], [8, 4, 7, 0]],
   ['tangnano9k', [1100, 830], [14, 8, 6, 4]], ['tangnano9k-vga', [1100, 830], [14, 8, 6, 0]],
-  ['papilio-one', [800, 782], [0, 0, 0, 0]]]) {
+  ['papilio-one', [800, 782], [0, 0, 0, 0]], ['elbert-v2', [900, 650], [8, 8, 6, 3]]]) {
   uiTest(`#2478 the ${board} drawn: its PCB, LEDs, switches, buttons and digits`, E, async (page) => {
     await emulatorOn(page, board, `Emu-${board}`);
     assert.deepEqual(await page.eval(() => {
@@ -438,6 +438,44 @@ uiTest('#3745 the Mimas V2 drawn as the real board: its parts where they are, as
   noWarnings(page);
 });
 
+uiTest('#3745 the Elbert V2 drawn as the real board: its parts where they are, its silkscreen, no maker\'s logo', E, async (page) => {
+  await emulatorOn(page, 'elbert-v2', 'Emu-elbert-real');
+  const g = await geometry(page);
+  assert.deepEqual([g.W, g.H], [900, 650]);   // (the board's proportions, after Numato's connection diagram)
+  // no power switch on the board: the emulator's on the left, right of the USB, upright, its LED under it
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledBelow: l.top > s.bottom }; });
+  assert.deepEqual(sw, { upright: true, ledBelow: true });
+  assert.ok(g.power.x < g.W * 0.12 && g.power.y > g.H * 0.3 && g.power.y < g.H * 0.5, JSON.stringify(g.power));
+  // the 3 digits bottom left, each where its enable's pin is (Numato's diagram: P120 the left one, S3; P124 the right
+  // one, S1); D1..D8 (LED0..LED7) right to left, right of the middle
+  const an = await page.eval(async () => (await import('/core/boards.js')).BOARDS.find((b) => b.id === 'elbert-v2').resources.find((r) => r.name === 'an').pins);
+  const xOf = { P120: 134, P121: 210, P124: 285 };
+  assert.deepEqual([...an].sort(), Object.keys(xOf));
+  an.forEach((p, k) => assert.ok(Math.abs(g[`an${k}`].x - xOf[p]) < 1 && g[`an${k}`].y > g.H * 0.55 && g[`an${k}`].y < g.H * 0.75, `an${k} (${p}): ${JSON.stringify(g[`an${k}`])}`));
+  const leds = [7, 6, 5, 4, 3, 2, 1, 0].map((k) => `led${k}`);
+  assert.ok(leftToRight(g, leds) && leds.every((n) => Math.abs(g[n].y - g.led0.y) < 1 && g[n].x > g.W * 0.6 && g[n].y > g.H * 0.6 && g[n].y < g.H * 0.75));
+  // the push buttons top right: SW1 / SW2, SW6 / SW4 in pairs, SW3 between them, SW5 under them
+  assert.ok([0, 1, 2, 3, 4, 5].every((k) => g[`btn${k}`].x > g.W * 0.78 && g[`btn${k}`].y < g.H * 0.5));
+  assert.ok(g.btn0.x < g.btn1.x && Math.abs(g.btn0.y - g.btn1.y) < 1 && g.btn5.x < g.btn3.x && Math.abs(g.btn5.y - g.btn3.y) < 1);
+  assert.ok(g.btn0.y < g.btn2.y && g.btn2.y < g.btn5.y && g.btn5.y < g.btn4.y && g.btn2.x > g.btn0.x && g.btn2.x < g.btn1.x);
+  // the DIP switch upright on the right edge under the buttons: DPSwitch0 at the top, sideways toggles
+  const dip = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => `dip${k}`);
+  assert.ok(dip.every((n, i) => g[n].x > g.W * 0.9 && g[n].y > g.btn4.y && g[n].w > 1.5 * g[n].h && (!i || g[dip[i - 1]].y < g[n].y)));
+  assert.deepEqual(await silkOf(page, 'elb-silk'), [...an].reverse().map((p) => ({ P120: 'S3', P121: 'S2', P124: 'S1' })[p]).concat(['D8', 'D7', 'D6', 'D5', 'D4', 'D3', 'D2', 'D1', 'SW6', 'SW5', 'SW4', 'SW3', 'SW2', 'SW1']));
+  // the connectors on their edges: VGA, STEREO JACK, MICRO SD along the top, left to right; the DC jack over the USB on
+  // the left edge; the headers P4, P2, P6, P1 along the bottom, left to right, P5 and JTAG (P3) bottom left
+  const xs = await artTexts(page);
+  for (const t of ['ELBERT V2', 'SPARTAN-3A', 'XC3S50A', 'TQG144', 'LM317', 'M25P16', 'PIC', 'ICSP', 'FWUP', '12MHz', 'P8', 'D10', 'V-SELECT',
+    'DIP SWITCH', '7 SEGMENT DISPLAYS', 'a(P117)', 'g(P110)', 'dp(P114)']) assert.ok(t in xs, t);
+  assert.ok(['VGA', 'STEREO JACK', 'MICRO SD'].every((t, i, a) => xs[t][1] < g.H * 0.2 && (!i || xs[a[i - 1]][0] < xs[t][0])), JSON.stringify(xs));
+  assert.ok(xs['DC BARREL JACK'][0] < g.W * 0.1 && xs.USB[0] < g.W * 0.1 && xs['DC BARREL JACK'][1] < xs.USB[1]);
+  assert.ok(['P4', 'P2', 'P6', 'P1'].every((t, i, a) => xs[t][1] > g.H * 0.7 && (!i || xs[a[i - 1]][0] < xs[t][0])), JSON.stringify(xs));
+  assert.ok(xs.P5[0] < xs.P4[0] && xs.JTAG[0] < xs.P5[0] && xs.P5[1] > xs.P4[1]);
+  assert.deepEqual(Object.keys(xs).filter((t) => MAKERS.test(t) || /numato/i.test(t)), []);
+  noWarnings(page);
+});
+
 uiTest('#3745 the Spartan-3 Starter Board drawn as the real board: its parts where they are, as they are turned', E, async (page) => {
   await emulatorOn(page, 's3-starter', 'Emu-s3sb-real');
   const g = await geometry(page);
@@ -589,10 +627,10 @@ uiTest('#3745 the Papilio One drawn as the real board: its wings with the design
   noWarnings(page);
 });
 
-uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the Mimas V2, the Spartan-3 Starter Board, the Cmod S6, the ULX3S and the Tang Nano 9K in Portuguese: the controls\' tips translated, the silkscreen as on the board', E, async (page) => {
+uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the Mimas V2, the Spartan-3 Starter Board, the Cmod S6, the ULX3S, the Tang Nano 9K and the Elbert V2 in Portuguese: the controls\' tips translated, the silkscreen as on the board', E, async (page) => {
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await page.eval(TEXTS);
-  for (const [board, cls] of [['basys3', 'b3-silk'], ['nexys-a7', 'nxa7-silk'], ['s3a-starter', 's3a-silk'], ['mimas-v2', 'mv2-silk'], ['s3-starter', 's3sb-silk'], ['cmod-s6', 'cs6-silk'], ['ulx3s', 'ulx-silk'], ['tangnano9k', 'tn9-silk']]) {
+  for (const [board, cls] of [['basys3', 'b3-silk'], ['nexys-a7', 'nxa7-silk'], ['s3a-starter', 's3a-silk'], ['mimas-v2', 'mv2-silk'], ['s3-starter', 's3sb-silk'], ['cmod-s6', 'cs6-silk'], ['ulx3s', 'ulx-silk'], ['tangnano9k', 'tn9-silk'], ['elbert-v2', 'elb-silk']]) {
     await emulatorOn(page, board, `Emu-pt-${board}`);
     await setLang('en');
     const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-pcb')));
@@ -610,7 +648,7 @@ uiTest('#3706 #3745 the Basys 3, the Nexys A7, the Spartan-3A Starter Kit, the M
 
 // on every board drawn: the pointer aims at each control, what is at its centre is that control (no label, no other
 // part over it)
-for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga', 'papilio-one']) {
+for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'basys3', 'nexys-a7', 's3a-starter', 'mimas-v2', 's3-starter', 'cmod-s6', 'icebreaker-vga', 'ulx3s', 'ulx3s-vga', 'tangnano9k', 'tangnano9k-vga', 'papilio-one', 'elbert-v2']) {
   uiTest(`#2481 the ${board}'s controls: each one is what is at its centre`, E, async (page) => {
     await emulatorOn(page, board, `Emu-aim-${board}`);
     assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-pcb .emu-btn, .emu-pcb .emu-sw, .emu-pcb .emu-rot-btn, .emu-pcb .emu-power')].filter((c) => {
