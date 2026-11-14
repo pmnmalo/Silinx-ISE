@@ -39,7 +39,7 @@ export const xc7Utilization = counts => ({
 const NAMES = { luts: 'Slice LUTs', ffs: 'Slice Registers', ramb16: 'Block RAM Tiles', mult18x18: 'DSPs', bufgmux: 'BUFGCTRL', dcm: 'MMCME2_ADV / PLLE2_ADV', iob: 'Bonded IOB' };
 // the tile of the four BSCAN sites in nextpnr's chip databases (the xc7a50t's, which the xc7a35t takes, and the xc7a100t's:
 // the same grid position); the JTAG chain n's site BSCAN_X0Y<n - 1>, as Vivado's DRC asks (PDRC-2, #3767)
-export const XC7_BSCAN_TILE = 'X46Y124';
+const XC7_BSCAN_TILE = 'X46Y124';
 
 /** Yosys's netlist (its text) with each BSCANE2 as nextpnr's xilinx takes it: a BSCAN (its BELs' type) on the BEL of its
  *  JTAG chain (BSCAN_X0Y<chain - 1>). Returns { text, chains: [the JTAG chains, 1 … 4] }; the text unchanged with none. */

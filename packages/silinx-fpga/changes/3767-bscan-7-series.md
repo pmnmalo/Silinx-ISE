@@ -7,3 +7,6 @@ In detail:
   (research/xc7/measured-ppips.mjs, merged by build-db.mjs; bitdb/xc7's two parts): measured with Vivado 2025.2
   (scripts/xc7-bscan-vivado.mjs, a BSCANE2 on each chain, the bitstreams read back), they set no bit. The utilization's
   BSCANE2 row.
+- **The API: a 7-series .bit read back (#3767):** `bitIndexXc7`, `readBitFramesXc7` and `framesToFeatures`
+  (fpga/xc7/readback.js) from src/index.js, for the BSCAN's measurement against Vivado's bitstreams
+  (scripts/xc7-bscan-vivado.mjs).
