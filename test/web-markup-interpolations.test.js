@@ -44,8 +44,8 @@ const NUMERIC_FNS = /^(?:Math\.\w+|Number|parseInt|parseFloat|mm|r1|snap|textW|D
 
 // ---- the safe shapes of an expression, in any context
 // (and the boards drawn as the real ones, #3706 / #3745: pmodSide, unit, expTop, pins, header40, of numbers and a name
-// put through text, #3728; the ULX3S's and Tang Nano 9K's headers, pins, holes and breadboards, #3745)
-const BOARD = 'text|ic|microUsb|hdmiTop|audio|pmodTop|pmod12Top|dsub|dsubLeft|header6|header12|tact|modules|holes|wire|pmodSide|unit|expTop|pins|header40|header|pins2|headerRow|pinNames|holeRows|breadboard|topBreadboard|bottomBreadboard';
+// put through text, #3728; the ULX3S's, Tang Nano 9K's and Papilio One's headers, pins, holes, breadboards and wings, #3745)
+const BOARD = 'text|ic|microUsb|hdmiTop|audio|pmodTop|pmod12Top|dsub|dsubLeft|header6|header12|tact|modules|holes|wire|pmodSide|unit|expTop|pins|header40|header|pins2|headerRow|pinNames|holeRows|breadboard|topBreadboard|bottomBreadboard|wing';
 const SAFE = [
   // escaped: esc(…) around the whole expression, or every item of a list escaped
   [/^esc\(.*\)$/s, 'esc'],
