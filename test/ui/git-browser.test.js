@@ -6,7 +6,8 @@
 // Pull from GitHub (an open document read again); a rejected commit and a conflict as ERROR lines with their hint;
 // History… and a file as it was; Sign out of GitHub; the token never in a URL nor in the console, kept in the browser's
 // storage (Remember me, the default), or in this tab's when unticked (#3356; the device flow's scope: the private
-// repositories when asked). In Portuguese; with no relay nor OAuth App set up, the sign-in with a pasted token (its steps, a refusal). Both interfaces; no warnings.
+// repositories when asked). In Portuguese; with no relay nor OAuth App set up, the sign-in with a pasted token (its steps, a refusal).
+// GitHub Checks (#3194): none yet, the hint after a push, queued, the verdicts. Both interfaces; no warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -299,5 +300,45 @@ uiTest('#3534 the browser edition: Sign in with GitHub… on the Start page and 
   await page.leftTab('start');
   await page.waitFor(() => [...document.querySelectorAll('#start-page .entry a')].some((a) => a.textContent === 'Iniciar sessão no GitHub…'), [], { what: 'the Start page in Portuguese' });
   await page.eval(() => localStorage.removeItem('silinx.lang'));
+  assert.deepEqual(warnings(page), []);
+}, { url: () => 'about:blank', timeout: 180000 });
+
+uiTest('#3194 GitHub Checks: no check yet, the hint after a push, a check queued, then its verdicts (a Classroom assignment\'s); in Portuguese', E, async (page) => {
+  const REPO = 'course/counter4-ana';
+  gh.seed(REPO, filesOf(BLINKY));
+  await boot(page);
+  await page.eval((t) => localStorage.setItem('silinx.github-token', t), gh.token);
+  await openRepo(page, `https://github.com/${REPO}`);
+  await page.waitFor(() => window.Silinx.project?.name === 'counter4-ana' && document.querySelector('#hier .row'), [], { what: 'counter4-ana open' });
+  const short = (s) => s.slice(0, 7);
+  await page.menu('File', 'GitHub Checks');
+  await page.waitConsole(new RegExp(`GitHub's checks of 'counter4-ana'…\\nNo check on GitHub for commit ${short(gh.head(REPO))}: the repository has no workflow, or it has not started yet\\.`));
+  // a commit pushed: where to see what GitHub's workflows say of it
+  const counter = gh.filesAt(REPO, 'main')['src/counter.v'];
+  await edit(page, 'src/counter.v', `${counter}// done\n`);
+  await commit(page, 'Done');
+  await page.waitConsole(/Pushed main to course\/counter4-ana\.\nGitHub runs the repository's checks on the push \(a Classroom assignment's visible tests\): Git ▸ GitHub Checks says their result\./);
+  const sha = gh.head(REPO);
+  gh.setChecks(REPO, sha, [{ name: 'grade', status: 'queued' }]);
+  await page.menu('File', 'GitHub Checks');
+  await page.waitConsole(new RegExp(`grade: queued \\(commit ${short(sha)}\\); Checks again shows its result\\.`));
+  gh.setChecks(REPO, sha, [{ name: 'grade', status: 'completed', conclusion: 'failure', annotations: [
+    { level: 'failure', title: 'Silinx: counter4', message: '10 / 40 points, Wrong Answer' },
+    { level: 'failure', title: 'Silinx: count', message: 'WA Wrong Answer, 0 / 30: cycle 1 (vectors line 4): q is 0000, expected 0001' },
+    { level: 'notice', title: 'Silinx: impl', message: 'AC Accepted, 10 / 10' }] }]);
+  await page.menu('File', 'GitHub Checks');
+  const verdicts = new RegExp(`ERROR: grade: failure \\(commit ${short(sha)}\\): https://github\\.com/course/counter4-ana/runs/\\d+\\nERROR:   Silinx: counter4: 10 / 40 points, Wrong Answer\\nERROR:   Silinx: count: WA Wrong Answer, 0 / 30: cycle 1 \\(vectors line 4\\): q is 0000, expected 0001\\n  Silinx: impl: AC Accepted, 10 / 10`);
+  await page.waitConsole(verdicts);
+  // in Portuguese: the menu's label (the console's lines are git's and GitHub's, in English)
+  await page.eval(() => localStorage.setItem('silinx.lang', 'pt'));
+  await boot(page);
+  await page.waitFor(() => document.documentElement.lang === 'pt' && window.Silinx.project?.name === 'counter4-ana' && document.querySelector('#hier .row'), [], { what: 'Portuguese, counter4-ana' });
+  await page.waitFor(() => !!window.SilinxApp.S.git, [], { what: 'the project\'s git status' });
+  await ptMenu(page, 'Verificações do GitHub (Checks)', 'GitHub Checks');
+  await page.waitConsole(verdicts);
+  await page.eval(() => localStorage.removeItem('silinx.lang'));
+  // the token only in the Authorization header: never in a URL nor in the console
+  assert.ok(gh.requests.filter((q) => q.url.includes('check-runs')).every((q) => q.headers.authorization === `Bearer ${gh.token}` && !q.url.includes(gh.token)));
+  assert.ok(!page.console.some((c) => c.text.includes(gh.token)));
   assert.deepEqual(warnings(page), []);
 }, { url: () => 'about:blank', timeout: 180000 });

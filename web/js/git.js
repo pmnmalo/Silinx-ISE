@@ -1,6 +1,7 @@
 // Git in the interface (#3195: the server editions, through the system's git, server/git.js; #3196: the browser edition,
 // through GitHub's REST API, web/js/git-browser.js, where a commit is pushed at once and the sign-in is Silinx's): File ▸
-// Open from Repository…, File ▸ Git ▸ (Commit…, Push to GitHub, Pull from GitHub, History… (web/js/git-history.js),
+// Open from Repository…, File ▸ Git ▸ (Commit…, Push to GitHub, Pull from GitHub, History… (web/js/git-history.js), GitHub
+// Checks (#3194: what GitHub's workflows said of the last push),
 // Initialize Repository…), the same in the Design pane's
 // project menu (the Silinx interface has no File menu), and the Design pane's marks of the files changed or new since
 // the last commit (S.git, refreshed when the project opens, after its files are written and after each command).
@@ -16,6 +17,7 @@ import { renderHierarchy } from './design.js';
 import { field } from './wizards.js';
 import { applyChanges } from './project-watch.js';
 import { commitText, pushText, pullText, cloneText, initText } from '/core/git-messages.js';
+import { checksLines } from '/core/github-checks.js';
 import { checkUrl, nameFromRepo } from '/core/github-url.js';
 
 // ------------------------------------------------------------------ git on this server
@@ -159,16 +161,31 @@ async function commitDialog() {
   try {
     const c = await api.gitCommit(S.project.name, r);
     log(commitText(c), 'ok');
-    if (c.pushed) log(pushText(c), 'ok');   // (the browser edition's: pushed at once)
+    if (c.pushed) { log(pushText(c), 'ok'); log(CHECKS_HINT, 'info'); }   // (the browser edition's: pushed at once)
     toast('Committed', 'ok');
     return c;
   } catch (e) { logGitError(e); return null; } finally { await refreshGitStatus(); }
 }
 
+// (#3194) a push starts the repository's workflows on GitHub: a Classroom assignment's runs its visible tests
+const CHECKS_HINT = 'GitHub runs the repository\'s checks on the push (a Classroom assignment\'s visible tests): Git ▸ GitHub Checks says their result.';
+
+/** File ▸ Git ▸ GitHub Checks (#3194): what GitHub's workflows said of the last pushed commit, in the console (a
+ *  Classroom assignment's: each visible test's verdict). */
+async function gitChecks() {
+  if (!S.project) return null;
+  log(`GitHub's checks of '${S.project.name}'…`, 'info');
+  try {
+    const c = await api.gitChecks(S.project.name);
+    for (const l of checksLines(c)) log(l.level === 'error' ? `ERROR: ${l.text}` : l.level === 'warning' ? `WARNING: ${l.text}` : l.text, l.level === 'error' ? 'err' : l.level === 'warning' ? 'warn' : c.conclusion === 'success' ? 'ok' : 'info');
+    return c;
+  } catch (e) { logGitError(e); return null; }
+}
+
 /** File ▸ Git ▸ Push. */
 async function gitPush() {
   if (!S.project) return null;
-  try { const p = await api.gitPush(S.project.name); log(pushText(p), 'ok'); return p; } catch (e) { logGitError(e); return null; } finally { await refreshGitStatus(); }
+  try { const p = await api.gitPush(S.project.name); log(pushText(p), 'ok'); if (p.pushed) log(CHECKS_HINT, 'info'); return p; } catch (e) { logGitError(e); return null; } finally { await refreshGitStatus(); }
 }
 
 /** File ▸ Git ▸ Pull: GitHub's commits merged in; the project read again (its open documents, by the watcher). A
@@ -226,6 +243,7 @@ export const gitMenuItems = () => [
   ...(api.standalone ? [] : [{ label: 'Push to GitHub', action: () => gitPush(), disabled: !S.git }]),
   { label: 'Pull from GitHub', action: () => gitPull(), disabled: !S.git },
   { label: 'History…', action: () => import('./git-history.js').then(m => m.historyDialog()), disabled: !S.git },
+  { label: 'GitHub Checks', action: () => gitChecks(), disabled: !S.git },
   '-',
   { label: 'Initialize Repository…', action: () => initDialog() },
   ...(api.standalone ? ['-', api.githubSignedIn()

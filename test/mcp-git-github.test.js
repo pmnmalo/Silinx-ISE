@@ -2,7 +2,8 @@
 // a stand-in for GitHub (test/fake-github.mjs), no network and no git: git_clone (an untrusted project, made by the
 // MCP), git_status after write_file, git_commit pushed at once, git_push with nothing left, git_pull and its conflict,
 // git_log and a file as it was, git_init on an empty repository; the token of GH_TOKEN only in the Authorization header,
-// never in a result; what a project was at its last commit kept out of the workspace; the interface's routes the same.
+// never in a result; what a project was at its last commit kept out of the workspace; the interface's routes the same;
+// git_checks, the last pushed commit's (#3194).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -100,4 +101,26 @@ test('git_init on an empty GitHub repository, its first commit; no token said wi
   const answer = await new Promise((resolve) => routes['GET /projects/:p/git/status']({ params: { p: 'fresh' }, query: {} }, { headersSent: false, json: resolve, status: () => ({ json: resolve }) }));
   // (write_file registers a new HDL file in silinx.json: changed too)
   assert.deepEqual([answer.repository, answer.branch, answer.files], [true, 'main', [{ path: 'silinx.json', state: 'modified' }, { path: 'src/x.vhd', state: 'new' }]]);
+});
+
+test('#3194 git_checks through GitHub\'s API: the last pushed commit\'s checks, running then done; the token in the header only', async () => {
+  gh.seed('pmalo/lab3', filesOf(BLINKY), { private: true });
+  await ok('git_clone', { url: 'https://github.com/pmalo/lab3' });
+  const head = gh.head('pmalo/lab3');
+  gh.setChecks('pmalo/lab3', head, [{ name: 'grade', status: 'in_progress' }]);
+  const running = await ok('git_checks', { project: 'lab3' });
+  assert.deepEqual([running.text, running.data.state], [`grade: running (commit ${head.slice(0, 7)}); Checks again shows its result.`, 'pending']);
+  // (a commit pushed: its checks, not the clone's)
+  await ok('write_file', { project: 'lab3', path: 'src/extra.v', text: 'module extra; endmodule\n' });
+  const c = await ok('git_commit', { project: 'lab3', message: 'Done' });
+  assert.equal(gh.head('pmalo/lab3'), c.data.commit);
+  gh.setChecks('pmalo/lab3', c.data.commit, [{ name: 'grade', status: 'completed', conclusion: 'success', annotations: [{ level: 'notice', title: 'Silinx: counter4', message: '40 / 40 points, Accepted' }] }]);
+  const done = await ok('git_checks', { project: 'lab3' });
+  assert.equal(done.text, `grade: success (commit ${c.data.commit.slice(0, 7)}): https://github.com/pmalo/lab3/runs/${1002}\n  Silinx: counter4: 40 / 40 points, Accepted`);
+  assert.deepEqual([done.data.remote, done.data.commit, done.data.conclusion], ['pmalo/lab3', c.data.commit, 'success']);
+  const asked = gh.requests.filter(q => q.url.includes('check-runs'));
+  assert.ok(asked.length >= 3 && asked.every(q => q.headers.authorization === `Bearer ${gh.token}` && !q.url.includes(gh.token)));
+  // (a project not in a repository)
+  await ok('new_project_from_example', { name: 'loose', example: 'gates' });
+  await fails('git_checks', { project: 'loose' }, 'the project \'loose\' is not in a git repository\nHint: Initialize Repository… with its GitHub repository, or Open from Repository… opens a project from GitHub.');
 });

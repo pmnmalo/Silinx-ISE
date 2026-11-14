@@ -27,8 +27,8 @@ The folder `counter4-template` then holds:
 - a `README.md` for the students, in English and Portuguese;
 - `.github/workflows/silinx-grade.yml`. On each push, it installs a release of Silinx (the version in
   `SILINX_VERSION`, the zip checked against the release's `SHA256SUMS`), then runs
-  `silinx grade counter4.exercise.json . --visible`. The report goes in the job's summary, and the job fails while a
-  visible test is not Accepted. The workflow uses no secret and reads the repository only.
+  `silinx grade counter4.exercise.json . --visible`. The report goes in the job's summary, each verdict is an annotation of the
+  commit's check (`--annotations`), and the job fails while a visible test is not Accepted. The workflow uses no secret and reads the repository only.
 
 Push the folder as a repository of the course's organization, and mark it a template (Settings ▸ Template repository).
 With the GitHub CLI:
@@ -50,6 +50,9 @@ autograding is not needed: Silinx's workflow is the check.
   tests in the page.
 - Each push runs the workflow. The Actions tab, or the commit's check, shows the verdict of each visible test, and for a
   Wrong Answer, the cycle, the signal, the expected and obtained values and the cycles around it.
+- In Silinx, after a push, **Git ▸ GitHub Checks** says the same verdicts in the console, with the first difference of
+  each Wrong Answer (the MCP's `git_checks` too). A private assignment's repository needs the sign-in: Sign in with
+  GitHub… with the private repositories in the browser edition, `GH_TOKEN` for a server.
 - The hidden tests' verdicts come at the deadline, from the teacher.
 
 ## 4. The teacher's run at the deadline

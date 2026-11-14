@@ -1,5 +1,5 @@
 // The routes of git (#3195, server/git.js) for the interface of the server editions: a project's status, commit, push,
-// pull, history and a file as it was in a commit, a repository made or cloned. A failure answers its message and its
+// pull, history, the checks GitHub ran on the last push, and a file as it was in a commit, a repository made or cloned. A failure answers its message and its
 // hint ({ error, hint, files }), which the console shows.
 import * as Git from './git.js';
 import * as GH from './git-github.js';
@@ -34,6 +34,7 @@ export function registerGitRoutes(api) {
   api.post('/projects/:p/git/commit', route(req => B().gitCommit(req.params.p, body(req).message)));
   api.post('/projects/:p/git/push', route(req => B().gitPush(req.params.p)));
   api.post('/projects/:p/git/pull', route(async req => B().gitPull(req.params.p, { resolve: (await import('../core/git-resolve.js')).checkChoices(body(req).resolve) })));
+  api.get('/projects/:p/git/checks', route(req => B().gitChecks(req.params.p)));   // (#3194)
   api.get('/projects/:p/git/log', route(req => B().gitLog(req.params.p, { limit: req.query.limit })));
   api.get('/projects/:p/git/show', route(req => B().gitShow(req.params.p, req.query.commit, req.query.path)));
 }
