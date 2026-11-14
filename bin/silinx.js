@@ -17,8 +17,8 @@ const USAGE = `usage:
                                                     grade submissions (project folders, zips, or a folder of
                                                         them) on an exercise's tests: a report per submission
   silinx grade <exercise.json> --student-copy <out.exercise.json>   the exercise without its hidden tests
-  silinx classroom template <exercise.json> <starter project> <out folder> [--silinx-version x.y.z]
-                                                    a GitHub Classroom assignment's template (docs/CLASSROOM.md)
+  silinx classroom template <exercise.json> [<starter project>] <out folder> [--silinx-version x.y.z]
+                            [--language vhdl|verilog]   a GitHub Classroom assignment's template (docs/CLASSROOM.md)
   silinx classroom grade <exercise.json> --org <org> --assignment <name> --out <folder> [--before <date>]
                          [--csv grades.csv] [--json grades.json] [--issues]   every test on the students' repositories
   silinx toolchain [--docker <image>]                show / set the ISE toolchain (docker image)

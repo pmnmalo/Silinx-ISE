@@ -16,10 +16,10 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { loadExercise, gradeAll } from './grade.js';
-import { visibleCopy, localize } from '../core/grade-format.js';
+import { localize } from '../core/grade-format.js';
 import { textReport, csvReport } from '../core/grade-report.js';
 import { VERSION } from '../core/version.js';
-import { workflowYaml, readmeText, WORKFLOW } from '../core/classroom-template.js';
+import { starterProject, templateFiles } from '../core/grade-package.js';
 
 export { CHECKOUT, SETUP_NODE, WORKFLOW, workflowYaml } from '../core/classroom-template.js';
 const NAME_RE = /^[A-Za-z0-9._-]+$/;
@@ -37,30 +37,24 @@ function filesOf(dir, rel = '') {
   return out;
 }
 
-/** The template repository of an exercise in `outDir` (new or empty): the starter project's files, the student's copy
- *  of the exercise (<id>.exercise.json) with the files beside it its visible tests read, README.md, .gitignore and the
- *  workflow. Returns { files, exerciseFile } (the files written, by path). */
-export function makeTemplate(exerciseFile, starterDir, outDir, { version = VERSION } = {}) {
+/** The template repository of an exercise in `outDir` (new or empty): the starter project's files (the folder
+ *  `starterDir`, or with none the project made from the statement in `lang`: core/grade-package.js starterProject), the
+ *  student's copy of the exercise (<id>.exercise.json) with the files beside it its visible tests read, README.md,
+ *  .gitignore and the workflow (core/grade-package.js templateFiles). Returns { files, exerciseFile } (the files
+ *  written, by path). */
+export function makeTemplate(exerciseFile, starterDir, outDir, { version = VERSION, lang = 'vhdl' } = {}) {
   const { exercise: ex, problems } = loadExercise(exerciseFile);
   if (!ex) throw new Error(problems.join('\n'));
-  if (!fs.existsSync(path.join(starterDir, 'silinx.json'))) throw new Error(`${starterDir}: no Silinx project (silinx.json) to start from`);
+  if (starterDir && !fs.existsSync(path.join(starterDir, 'silinx.json'))) throw new Error(`${starterDir}: no Silinx project (silinx.json) to start from`);
   if (fs.existsSync(outDir) && fs.readdirSync(outDir).length) throw new Error(`${outDir} is not empty: give a new folder`);
-  const workflow = workflowYaml(`${ex.id}.exercise.json`, { version });
+  const starter = starterDir ? new Map(filesOf(starterDir).map(rel => [rel, fs.readFileSync(path.join(starterDir, rel), 'utf8')])) : starterProject(ex, { lang });
   // (the student's copy as the exercise writes it, its visible tests' files beside it copied, no other)
   const raw = JSON.parse(fs.readFileSync(exerciseFile, 'utf8'));
-  const copy = visibleCopy(raw);
-  const beside = copy.tests.flatMap(t => [...(typeof t.file === 'string' ? [t.file] : []), ...(t.files || []).filter(f => typeof f?.file === 'string').map(f => f.file)]);
-  const name = `${ex.id}.exercise.json`;
-  const written = {};
-  const put = (rel, text) => { const f = path.join(outDir, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); written[rel] = text; };
-  for (const rel of filesOf(starterDir)) if (!/\.exercise\.json$/i.test(rel)) put(rel, fs.readFileSync(path.join(starterDir, rel), 'utf8'));
   const exDir = path.dirname(path.resolve(exerciseFile));
-  for (const rel of beside) put(rel, fs.readFileSync(path.join(exDir, rel), 'utf8'));
-  put(name, `${JSON.stringify(copy, null, 2)}\n`);
-  put('README.md', readmeText(ex, name));
-  put('.gitignore', 'build/\n');
-  put(WORKFLOW, workflow);
-  return { files: written, exerciseFile: name };
+  const files = templateFiles(ex, raw, { starter, beside: rel => fs.readFileSync(path.join(exDir, rel), 'utf8'), version });
+  const written = {};
+  for (const [rel, text] of files) { const f = path.join(outDir, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); written[rel] = text; }
+  return { files: written, exerciseFile: `${ex.id}.exercise.json` };
 }
 
 // ---------------------------------------------------------------- the teacher's run
