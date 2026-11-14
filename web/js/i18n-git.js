@@ -15,6 +15,7 @@ export const GIT_PT = {
   'A .gitignore leaves build/ and the tools\' outputs out of the commits.': 'Um .gitignore deixa build/ e os resultados das ferramentas fora dos commits.',
   'In conflict': 'Em conflito', 'New: not committed yet': 'Novo: ainda sem commit', 'Changed since the last commit': 'Alterado desde o último commit',
   'Committed': 'Registado', 'History…': 'Histórico…', 'History': 'Histórico', 'No commit yet.': 'Ainda sem commits.',
+  'GitHub Checks': 'Verificações do GitHub (Checks)',   // (#3194)
   // the browser edition (#3196: GitHub's API, its own sign-in)
   'Commit and Push…': 'Registar e Enviar (Commit e Push)…', 'Commit and Push': 'Registar e Enviar (Commit e Push)',
   'Sign in with GitHub…': 'Iniciar sessão no GitHub…', 'Sign in with GitHub': 'Iniciar sessão no GitHub', 'Sign out of GitHub': 'Terminar sessão no GitHub',

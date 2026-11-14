@@ -89,6 +89,7 @@ export function browserGit({ store, ops, prefix = 'silinx.' }) {
     gitPush: name => backend().push(name),
     gitPull: (name, opts = {}) => backend().pull(name, opts),
     gitLog: (name, limit = 100) => backend().log(name, { limit }),
+    gitChecks: name => backend().checks(name),
     gitShow: (name, commit, path) => backend().show(name, commit, path),
     // a project deleted: what it was in its repository forgotten (a new one of its name is no clone)
     gitForget: name => meta.set(name, null),

@@ -116,7 +116,7 @@ read that user's files has the server too.
   or one of that list. `share_project` and `follow_project` connect only to the Silinx server of this computer
   (loopback) or to a relay the configuration file names (`relay.relays`), never to another host, a private or local
   address included. Both lists are `FILE_ONLY` settings: the page cannot change them. A tool's result that holds a
-  project's or a remote's text (`read_file`, `find_in_project`, `git_log`, `git_diff`, `get_report`, the import's, `import_source`'s and a clone's
+  project's or a remote's text (`read_file`, `find_in_project`, `git_log`, `git_diff`, `git_checks`, `get_report`, the import's, `import_source`'s and a clone's
   warnings, `follow_project`'s files and names, `share_project`'s followers and warnings, `open_link`'s design,
   `project_info`, a project's own lab in `lab`, the lines a design prints in `simulate`, and every tool's error, #3528;
   a failed `check_syntax`'s, a `simulate` that did not start, a failed `run_process`, a `verify` that failed or could
