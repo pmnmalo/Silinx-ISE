@@ -9,6 +9,7 @@ import { h, dialog } from './ui.js';
 import { verifyEquivalence, verifyMessages, isVerifyBench, VERIFY_DEPTH, MAX_DEPTH, VERIFY_PROCESS, VERIFY_TIME_LIMIT, MAX_TIME_LIMIT } from '/core/verify.js';
 import { counterexampleBench, benchName } from '/core/verify-bench.js';
 import { verifyAssertions, assertMessages, ASSERT_PROCESS } from '/core/verify-assert.js';
+import { naturalCompare } from '/core/hier-order.js';
 import { S, app } from './app.js';
 import { log, logInfo } from './console.js';
 import { inView } from './design.js';
@@ -45,7 +46,7 @@ const limits = {};
 /** The reference module, the depth and the time limit, asked: { reference, depth, timeLimit }, or null (cancelled). */
 async function askReference(mod) {
   const names = [...new Set(S.modules.filter(m => m.kind !== 'package' && m.name.toLowerCase() !== mod.toLowerCase() && !isVerifyBench(S.sources.find(s => s.path === m.file)?.text)).map(m => m.name))]
-    .sort((a, b) => a.localeCompare(b));
+    .sort(naturalCompare);   // (natural order, #3819)
   if (!names.length) { logInfo('The project has no other module to be the reference: add the reference module first'); return null; }
   const proposed = names.find(n => REF_NAMES(mod).includes(n.toLowerCase())) || (names.includes(last[mod]) ? last[mod] : names[0]);
   const sel = h('select', { style: { width: '100%' } }, ...names.map(n => h('option', { value: n, 'data-no-i18n': true, selected: n === proposed }, n)));

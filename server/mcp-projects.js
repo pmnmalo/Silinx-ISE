@@ -9,7 +9,7 @@ import { TEST_DESIGNS, orderTestDesigns } from '../core/test-designs.js';
 import { nameUnnamed } from '../core/schname.js';
 import { DESIGN_KIND, isDesignOnly } from '../core/project-kind.js';
 import { designProjectInfo } from './mcp-design-only.js';
-import { toolError, clip, projectPath, readProject, elaborateView, diagLine, STR, PROJECT, deviceName, boardDevice, redactor } from './mcp-util.js';
+import { toolError, clip, projectPath, readProject, elaborateView, viewSourcesOf, diagLine, STR, PROJECT, deviceName, boardDevice, redactor } from './mcp-util.js';
 
 // a project the MCP server makes is untrusted (#2981): its tools' results say so
 const UNTRUSTED = ' It is untrusted, as every project an assistant makes: Xilinx ISE and programming a board or a PROM wait until the user trusts it in the interface (Trust Project); the Silinx toolchain runs.';
@@ -21,6 +21,14 @@ function nameInstances(text) {
   if (!m || !Array.isArray(m.symbols)) return null;
   const names = nameUnnamed(m);
   return names.length ? { text: JSON.stringify(m, null, 1), names } : null;
+}
+
+// the roots of a view's hierarchy as the Design pane lists them (#3819): the Implementation view's top first, then in
+// natural order (x_2 before x_10); none when the sources do not compile
+async function hierarchyOf(name, pj, sim) {
+  const { compile } = await import('../core/compile.js');
+  const { hierarchyRoots } = await import('../core/hier-order.js');
+  try { return hierarchyRoots(compile(await viewSourcesOf(name, pj, sim)), { sim, top: pj.top || '' }); } catch { return []; }
 }
 
 export const PROJECT_TOOLS = [
@@ -118,7 +126,7 @@ export const PROJECT_TOOLS = [
   },
   {
     name: 'project_info', title: 'A project\'s settings and files',
-    description: 'A project\'s top module, test bench (simulation top), device, board, constraints file and its files (path, language, role: design, sim or impl).',
+    description: 'A project\'s top module, test bench (simulation top), device, board, constraints file, its files (path, language, role: design, sim or impl) and the roots of its hierarchy in the Implementation and the Simulation view, as the Design pane lists them (the top first, then the names in natural order: x_2 before x_10).',
     inputSchema: { type: 'object', properties: { project: PROJECT }, required: ['project'], additionalProperties: false },
     annotations: { readOnlyHint: true },
     async run({ project: name }) {
@@ -127,9 +135,11 @@ export const PROJECT_TOOLS = [
       if (isDesignOnly(pj)) return designProjectInfo(name, pj, await P.fileTree(name));
       const files = (pj.files || []).map(f => ({ path: f.path, lang: f.lang, role: f.role || 'design' }));
       const all = (await P.fileTree(name)).filter(f => !/^build\//.test(f));
-      const data = { project: name, top: pj.top || null, simTop: pj.simTop || null, device: pj.device || null, board: pj.board || null, constraints: pj.constraints || null, synthTool: pj.synthTool || null, files, otherFiles: all.filter(f => !files.some(x => x.path === f) && f !== 'silinx.json') };
+      const hierarchy = { implementation: await hierarchyOf(name, pj, false), simulation: await hierarchyOf(name, pj, true) };
+      const data = { project: name, top: pj.top || null, simTop: pj.simTop || null, device: pj.device || null, board: pj.board || null, constraints: pj.constraints || null, synthTool: pj.synthTool || null, files, otherFiles: all.filter(f => !files.some(x => x.path === f) && f !== 'silinx.json'), hierarchy };
       return { text: [`${name}: top ${data.top || '(none)'}, test bench ${data.simTop || '(none)'}, ${data.board || 'no board'} (${data.device ? `${data.device.part}${data.device.package}${data.device.speed}` : 'no device'}), constraints ${data.constraints || '(none)'}`,
-        ...files.map(f => `  ${f.path} (${f.lang}, ${f.role})`), ...(data.otherFiles.length ? [`  other files: ${data.otherFiles.join(', ')}`] : [])].join('\n'), data,
+        ...files.map(f => `  ${f.path} (${f.lang}, ${f.role})`), ...(data.otherFiles.length ? [`  other files: ${data.otherFiles.join(', ')}`] : []),
+        ...Object.entries(hierarchy).filter(([, r]) => r.length).map(([v, r]) => `  ${v} hierarchy: ${r.join(', ')}`)].join('\n'), data,
       // (its silinx.json's fields and its files' names: the project's own text, #3528)
       untrusted: 'the project\'s settings and files\' names' };
     },

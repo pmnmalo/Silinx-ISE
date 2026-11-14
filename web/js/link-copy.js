@@ -16,6 +16,7 @@ import { currentViewState } from './view-state.js';
 import { layoutNow } from './tasks.js';
 import { browserCodec, textOf } from '/core/zip.js';
 import { gateZip } from '/core/import-gate.js';
+import { naturalCompare } from '/core/hier-order.js';
 import { EXPIRY_DAYS } from '/core/gist-link.js';
 import { rememberLink, shortLinksDialog } from './short-links.js';
 import { qrBox } from './link-qr.js';
@@ -39,8 +40,8 @@ export async function copyLinkDialog({ module = null, view = null } = {}) {
   try { design = (await encodeDesign(entries)).design; } catch (e) { encodeError = e.message; }
   // the Module list follows Open in (#2878): the simulation's, the test benches (the project's first); the others', the
   // design's modules (its top first), no test bench
-  const pj = S.project, byName = (a, b) => a.localeCompare(b);
-  const benches = [...new Set([pj.simTop, ...(S.modules || []).filter(m => m.role === 'sim').map(m => m.name).sort(byName)].filter(Boolean))];
+  const pj = S.project;
+  const benches = [...new Set([pj.simTop, ...(S.modules || []).filter(m => m.role === 'sim').map(m => m.name).sort(naturalCompare)].filter(Boolean))];
   const designMods = [...new Set([pj.top, ...(S.modules || []).filter(m => m.role !== 'sim').map(m => m.name)].filter(Boolean))];
   const viewSel = h('select', { 'data-field': 'view' }, ...VIEWS.map(([v, l]) => h('option', { value: v, selected: v === (view || '') }, l)));
   const modSel = h('select', { 'data-field': 'module' });
