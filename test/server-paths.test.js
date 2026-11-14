@@ -150,10 +150,12 @@ test('#3648 the file routes (read, write, rename, delete, its trash): a path out
   const escapes = ['../outside.vhd', '../../outside.vhd', 'src/../../Other/src/b.vhd', 'SRC/../../../outside.vhd', '/outside.vhd', path.join(tmp, 'outside.vhd'), '..', '../Other'];
   const ops = { read: r => P.readFile('Routes', r), write: r => P.writeFile('Routes', r, 'x'), renameFrom: r => P.renameFile('Routes', r, 'src/c.vhd'),
     renameTo: r => P.renameFile('Routes', 'src/a.vhd', r), delete: r => P.deleteFile('Routes', r), trash: r => P.deleteFile('Routes', r, { trash: true, mustExist: true }) };
+  // (the temporary folder's absolute path: a drive letter on Windows, #3862)
+  const reasonOf = r => (/^[A-Za-z]:/.test(r) ? 'absolute path (a drive letter)' : r.startsWith('/') ? 'absolute path' : "path leaves the project ('..')");
   for (const rel of escapes)
     for (const [op, f] of Object.entries(ops))
       // (by the path's rule first, the browser store's, #3598: a '..' or an absolute path; the system's escape after it)
-      await assert.rejects(async () => f(rel), e => e.status === 400 && e.message === `'${rel}': invalid path: ${rel.startsWith('/') ? 'absolute path' : "path leaves the project ('..')"}`, `${op} ${rel}`);
+      await assert.rejects(async () => f(rel), e => e.status === 400 && e.message === `'${rel}': invalid path: ${reasonOf(rel)}`, `${op} ${rel}`);
   assert.deepEqual([fs.readdirSync(tmp).sort(), fs.readdirSync(ws).sort()], before, 'nothing made or moved outside the project');
   assert.equal(fs.readFileSync(path.join(tmp, 'outside.vhd'), 'utf8'), 'KEEP');
   assert.equal(fs.readFileSync(path.join(ws, 'Other', 'src', 'b.vhd'), 'utf8'), 'OTHER');

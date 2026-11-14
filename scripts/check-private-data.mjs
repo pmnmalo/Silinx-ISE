@@ -71,6 +71,7 @@ const ALLOW = [
   ['test/static-editions.test.js', '/Users/x', 'a made-up file:// path of a downloaded edition (in the history only, #555)'],
   ['research/ink-models/serve.mjs', /^(10\.0\.0\.0|172\.16\.0\.0|192\.168\.0\.0|255\.(0|240|255)\.0\.0)$/, 'the private networks\' ranges and masks: the name constraints of the spike\'s local certificate authority (#1060)'],
   [/^\(message of (fda526c|dc20cc0)\)$/, '3.3.1.1', "XPower's section number in two commit messages"],
+  [/^\(message of 7f66d78\)$/, '4.3.2.1', "the VHDL LRM's section number (a generic's default naming another generic) in a commit message"],
   [/^\(message of e22948b\)$/, '/Users/Me', "the made-up macOS home folder of test/impl.test.js (#1336), named in its commit's message"],
   ['CHANGELOG.md', '/Users/Me', "the same, named in 15.14.0's section for one commit (in the history only, #1336)"],
   // ISE's text reports and simulation models of our own test designs (no personal data in them):
