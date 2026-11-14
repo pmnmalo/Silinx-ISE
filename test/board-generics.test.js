@@ -23,6 +23,7 @@ test('#3710 the board\'s values: its clock in Hz (whole kHz), its buttons\' and 
   assert.deepEqual(v('icebreaker'), { CLK_HZ: 12_000_000, BTN_LOW: false, SW_LOW: false });
   // (no switches: no SW_LOW)
   assert.deepEqual(v('cmod-s6'), { CLK_HZ: 8_000_000, BTN_LOW: false });
+  assert.deepEqual(v('edge-spartan6'), { CLK_HZ: 50_000_000, BTN_LOW: false, SW_LOW: false });
   assert.deepEqual(boardGenericValues(null), {});
   for (const b of BOARDS) assert.ok(Number.isInteger(v(b.id).CLK_HZ) && v(b.id).CLK_HZ > 0, b.id);
 });

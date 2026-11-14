@@ -103,7 +103,7 @@ test('validateDevice accepts every family and rejects bad package / speed / part
 test('boards: devices exist with that package and speed, pins are unique, programmer + flash info', () => {
   const ids = dev.BOARDS.map(b => b.id);
   assert.equal(new Set(ids).size, ids.length);
-  for (const id of ['nexys3', 'atlys', 'mimas-v2', 'cmod-s6', 's3a-starter', 's3-starter', 'papilio-one', 'elbert-v2']) assert.ok(dev.findBoard(id), id);
+  for (const id of ['nexys3', 'atlys', 'mimas-v2', 'cmod-s6', 's3a-starter', 's3-starter', 'papilio-one', 'elbert-v2', 'edge-spartan6']) assert.ok(dev.findBoard(id), id);
   for (const b of dev.BOARDS) {
     for (const d of [b.device, ...(b.variants || []).map(v => v.device)]) {
       const p = dev.findPart(d.part);
