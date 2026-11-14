@@ -11,6 +11,7 @@ import { Simulator } from '../core/simulator.js';
 import { primitiveSources } from '../core/unisim.js';
 import { translateSource, translationLang, translatedPath } from '../core/translate.js';
 import { EXAMPLES, example } from './examples-lib.mjs';
+import { diags, sim } from './lang-util.js';
 
 const other = p => (langOfPath(p) === 'vhdl' ? 'verilog' : 'vhdl');
 const tr = (text, path, to = other(path), sources = []) => translateSource(text, { path, to, sources });
@@ -317,6 +318,43 @@ endmodule
     '        end case;',
     '    end process;',
     'end Behavioral;'));
+});
+
+test("#3744 Verilog to VHDL: a parameter's default that uses an earlier parameter has that one's default in its place (VHDL-93 refuses a generic's default that uses another generic, LRM 4.3.2.1); compiled and simulated in both languages, no warning", () => {
+  const v = `module m #(parameter W = 8, parameter D = W * 2, parameter E = D + W) (output [D-1:0] q);
+    assign q = E;
+endmodule
+`;
+  const r = tr(v, 'src/m.v');
+  assert.equal(r.text, VH('m.v',
+    'entity m is',
+    '    generic (',
+    '        W : integer := 8;',
+    '        D : integer := 8 * 2;',
+    '        E : integer := 8 * 2 + 8',
+    '    );',
+    '    port (',
+    '        q : out std_logic_vector(D - 1 downto 0)',
+    '    );',
+    'end m;',
+    '',
+    'architecture Behavioral of m is',
+    'begin',
+    '    q <= std_logic_vector(to_unsigned(E, D));',
+    'end Behavioral;'));
+  const vtb = 'module tb; wire [15:0] q; m u (.q(q)); initial #1 $display("q = %0d", q); endmodule\n';
+  const vhtb = `${VHDL_HEAD}entity tb is end tb;
+architecture sim of tb is
+    signal q : std_logic_vector(15 downto 0);
+begin
+    u : entity work.m port map (q => q);
+    process begin wait for 1 ns; report "q = " & integer'image(to_integer(unsigned(q))); wait; end process;
+end sim;
+`;
+  for (const src of [{ 'm.v': v, 'tb.v': vtb }, { 'm.vhd': r.text, 'tb.vhd': vhtb }]) {
+    assert.deepEqual(diags(src, 'tb'), [], Object.keys(src)[0]);
+    assert.deepEqual(sim(src, 'tb').out.filter(l => /q = /.test(l)).map(l => l.replace(/^.*q = /, 'q = ')), ['q = 24'], Object.keys(src)[0]);
+  }
 });
 
 test('Verilog to VHDL: a function, a memory, a for loop, an instance with an expression and a ?: in a port (intermediate signals), the carry of a sum kept, a name reserved in VHDL, names of one letter case apart', () => {

@@ -8,6 +8,19 @@
 import { at, atLine, cannot, intOf, reservedInVhdl, walk, targetName, indent, ifGenerateBranches } from './translate-util.js';
 import { bitLike, exprH, toBool, toInt, toSl, toType, PREC } from './translate-vhdl-expr.js';
 
+/** The generics' defaults: a parameter's default that uses an earlier parameter has that one's default in its place, as
+ *  VHDL-93 does not allow a generic's default to use another generic of its entity (LRM 4.3.2.1, #3744). */
+function genericDefaults(params) {
+  const defs = new Map();
+  // (a node is copied only when it uses one)
+  const uses = e => { let u = false; walk(e, n => { if (n.op === 'ref' && defs.has(n.name)) u = true; }); return u; };
+  const sub = e => !e || typeof e !== 'object' || !uses(e) ? e : Array.isArray(e) ? e.map(sub)
+    : e.op === 'ref' ? defs.get(e.name)
+      : Object.fromEntries(Object.entries(e).map(([k, v]) => [k, k === 'loc' ? v : sub(v)]));
+  for (const p of params) if (p.default) defs.set(p.name, sub(p.default));
+  return defs;
+}
+
 const stmtsOf = x => (!x ? [] : x.kind === 'block' ? x.stmts : [x]);
 
 /** One Verilog module in VHDL: { text, renamed: [[from, to]] }. modules: the project's Verilog modules (an instance's
@@ -37,7 +50,8 @@ export function moduleToVhdl(mod, { modules = [], unit = 'ns' } = {}) {
   for (const n of readOuts) cx.names.get(n).internal = uniqueName(cx, `${n}_i`);
   foldInitials(cx, mod);
   // the entity
-  const generics = (mod.params || []).filter(p => !p.local).map(p => `${cx.name(p.name)} : ${typeText(cx, cx.type(p.name))} := ${p.default ? toType(exprH(cx, p.default), cx.type(p.name)).c : '0'}`);
+  const defaults = genericDefaults((mod.params || []).filter(p => !p.local));
+  const generics = (mod.params || []).filter(p => !p.local).map(p => `${cx.name(p.name)} : ${typeText(cx, cx.type(p.name))} := ${p.default ? toType(exprH(cx, defaults.get(p.name)), cx.type(p.name)).c : '0'}`);
   const ports = (mod.ports || []).map(p => `${cx.name(p.name)} : ${{ in: 'in', out: 'out', inout: 'inout' }[p.dir] || 'in'} ${typeText(cx, cx.type(p.name))}`);
   const name = cx.vname(mod.name);
   const entity = [`entity ${name} is`,

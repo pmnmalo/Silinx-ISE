@@ -57,7 +57,7 @@ const sources = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: t
 const moved = sources('packages/silinx-hdl/src').sort();
 
 test('#1710 the front end\'s modules are in the package, core/\'s old paths re-export them', async () => {
-  assert.equal(shims.length, 49);
+  assert.equal(shims.length, 50);
   assert.deepEqual(shims.map(([, m]) => m).sort(), moved, 'every module of the package has its old path');
   for (const [old, mod] of shims) {
     assert.equal(mod, `packages/silinx-hdl/src/${old.slice('core/'.length)}`, old);

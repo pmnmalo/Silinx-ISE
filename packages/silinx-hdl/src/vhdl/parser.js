@@ -46,6 +46,7 @@ import { concurrentMethods } from './parse-concurrent.js';
 import { sequentialMethods } from './parse-seq.js';
 import { expressionMethods } from './parse-expr.js';
 import { nestingMethods } from './parse-nesting.js';
+import { interfaceRefMethods } from './interface-refs.js';
 import { mapBits } from './nodes.js';
 import { ParseError, STD_LIBS, block } from './parse-defs.js';
 import { dedupe, mergePackageDecls } from './parse-helpers.js';
@@ -342,6 +343,7 @@ class Parser {
   parseGenericList() {
     this.expectOp('(');
     const params = [];
+    const earlier = [];   // (a default must not use them, #3744)
     for (;;) {
       this.guardList(() => {
         if (this.isKw('type') || this.isKw('function') || this.isKw('procedure') || this.isKw('package')) {
@@ -355,8 +357,9 @@ class Parser {
         this.expectOp(':');
         this.acceptKw('in');
         const type = this.parseSubtypeIndication();
-        const def = this.acceptOp(':=') ? this.parseExpression() : null;
+        const def = this.acceptOp(':=') ? this.parseInterfaceDefault(earlier, 'generic', names) : null;
         for (const nm of names) params.push({ name: nm, type, default: def, local: false, loc: this.loc(tok) });
+        earlier.push(...names.map(name => ({ name, what: 'generic', line: tok.line })));
       });
       if (this.acceptOp(';')) continue;
       break;
@@ -368,6 +371,7 @@ class Parser {
   parsePortList() {
     this.expectOp('(');
     const ports = [];
+    const earlier = [];   // (a default must not use them, #3744)
     for (;;) {
       this.guardList(() => {
         const tok = this.peek();
@@ -382,8 +386,9 @@ class Parser {
         else if (this.acceptKw('linkage')) dir = 'inout';
         const type = this.parseSubtypeIndication();
         this.acceptKw('bus');
-        const def = this.acceptOp(':=') ? this.parseExpression() : null;
+        const def = this.acceptOp(':=') ? this.parseInterfaceDefault(earlier, 'port', names) : null;
         for (const nm of names) ports.push({ name: nm, dir, type, default: def, loc: this.loc(tok) });
+        earlier.push(...names.map(name => ({ name, what: 'port', line: tok.line })));
       });
       if (this.acceptOp(';')) continue;
       break;
@@ -519,4 +524,4 @@ class Parser {
 }
 // the declarations, the concurrent and sequential statements, the expressions (parse-decls.js, parse-concurrent.js,
 // parse-seq.js, parse-expr.js, #405)
-Object.assign(Parser.prototype, declarationMethods, concurrentMethods, sequentialMethods, expressionMethods, nestingMethods);
+Object.assign(Parser.prototype, declarationMethods, concurrentMethods, sequentialMethods, expressionMethods, nestingMethods, interfaceRefMethods);

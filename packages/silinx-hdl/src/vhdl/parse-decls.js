@@ -370,8 +370,10 @@ export const declarationMethods = {
   parseParamList() {
     this.expectOp('(');
     const params = [];
+    const earlier = [];   // (a default must not use them, #3744)
     for (;;) {
       this.guardList(() => {
+        const tok = this.peek();
         let cls;
         if (this.isKw('constant') || this.isKw('signal') || this.isKw('variable') || this.isKw('file')) cls = this.next().value;
         const names = this.parseIdList();
@@ -383,7 +385,8 @@ export const declarationMethods = {
         else if (this.acceptKw('buffer')) dir = 'out';
         const type = this.parseSubtypeIndication();
         this.acceptKw('bus');
-        const def = this.acceptOp(':=') ? this.parseExpression() : null;
+        const def = this.acceptOp(':=') ? this.parseInterfaceDefault(earlier, 'parameter', names) : null;
+        earlier.push(...names.map(name => ({ name, what: 'parameter', line: tok.line })));
         for (const nm of names) {
           const p = { name: nm, type, dir, default: def };
           if (cls) p.class = cls;
