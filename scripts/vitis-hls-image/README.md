@@ -71,3 +71,16 @@ example: Vivado's and nextpnr's Fmax, the cells' delays, the routes' delays grou
 that replace the stubs of the fork's `gen/xilinx_gen.py`, CARRY4's and the F7/F8 multiplexers' arcs, a delay per wire
 class, and the logic and routing scales of the critical paths). Vivado's files are deleted with the run's folder.
 `SILINX_VIVADO_IMAGE` (default `xilinx/vitis-hls:2025.2`), `SILINX_VIVADO_TIMEOUT` (a design's, s; default 3600).
+
+## The 7-series' examples against Vivado (#3760)
+
+`scripts/xc7-vivado-compare.mjs` builds each example on the Basys 3 and the Nexys A7 with Silinx's open flow (here), with
+Vivado's own flow from the HDL (the application's `run.tcl`), and Silinx's netlist placed, routed and written as a
+bitstream by Vivado (its DRC on Silinx's synthesis); both Vivado builds of a design in the same container, one design
+after another, alone on the machine.
+
+    node scripts/xc7-vivado-compare.mjs --detach [--boards basys3,nexys-a7] [--filter '^(blinky|pong)$']
+    node scripts/xc7-vivado-compare.mjs --collect silinx-xc7v-… --update
+
+`--update` writes the numbers and Vivado's warning lines to `test/xc7-vivado-comparison.json` and the table of
+docs/TOOLCHAIN.md (`test/xc7-vivado-comparison.test.js` checks both); Vivado's files are deleted with the run's folder.

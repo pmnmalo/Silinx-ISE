@@ -164,7 +164,7 @@ Every example builds on the Basys 3 and the Nexys A7 with no warning, each clock
 estimate (#3147, `test/open-flow-xc7-server.test.js`, which holds each build to these numbers: up to 15 % more LUTs, the
 registers within 10 %, the frequency up to 15 % lower). The LUTs are nextpnr's count (each 6LUT and 5LUT, its feed-throughs
 included): Vivado counts a LUT site once, about 4–13 % fewer on blinky, vga and micro80 (#3160); Vivado's numbers on
-every example are to join the weekly quality comparison (#3760).
+every example are below.
 
 | Example | Basys 3: LUTs | registers | MHz | Nexys A7: LUTs | registers | MHz |
 |---|---|---|---|---|---|---|
@@ -178,6 +178,53 @@ every example are to join the weekly quality comparison (#3760).
 | isqrt | 72 | 86 | 282.9 | 73 | 86 | 316.8 |
 | uart | 122 | 138 | 257.6 | 122 | 138 | 260.0 |
 | micro80 | 169 | 185 | 146.4 | 179 | 185 | 150.1 |
+
+Against AMD Vivado ML Standard 2025.2 (#3760, part of #3145: Vivado cannot read nextpnr's FASM, so the Spartan-3E's
+byte-identical check does not carry over), each example on both boards is built three ways by
+`scripts/xc7-vivado-compare.mjs` (Vivado on the ISE runner's machine, alone, one build after another): Silinx's open flow;
+Vivado's own flow from the HDL, as the application's Vivado flow runs it (the example's settings: Speed, its effort
+level); and Silinx's netlist placed and routed by Vivado with no optimisation, then written as a bitstream (Vivado's
+DRC and `write_bitstream`'s on Silinx's synthesis, its LUTs counted Vivado's way). `test/xc7-vivado-comparison.test.js`
+checks the recorded results (`test/xc7-vivado-comparison.json`): Vivado builds every example with the expected warnings
+(those of `test/vivado/examples.test.js`), routed, its clock met, DRC clean; Silinx's netlist passes Vivado's DRC and
+`write_bitstream`, its clock met, the same registers; the open flow's LUTs and frequency within bounds of Vivado's; and
+this table is the results'. The LUTs: the LUT sites with logic (Vivado's count), Silinx's with nextpnr's feed-throughs
+in parentheses (#3160).
+
+What it shows (Vivado 2025.2, the examples together): Silinx's open flow takes about the LUTs Vivado does (1,308 against
+1,267 on the Basys 3; up to 1.4 times on pong and clock, 0.6 times on micro80), and as
+many again in feed-throughs; Silinx's synthesis placed by Vivado takes fewer (1,162). nextpnr's frequency estimate is 1.2–1.75
+times Vivado's timing of the same netlist (#3516), so it is above Vivado's own flow's on every example (1.25 times, the
+geometric mean); stopwatch's 2.2 times, its DSP48E1s timed by nextpnr's stubs (#3875). Vivado accepts every netlist of
+Silinx's: no DRC error, one net with no routable load (RTSTAT-10, a warning), its bitstream written. Two netlist details
+the comparison handles: a port of one bit (`btn(0 downto 0)`) is a scalar in Silinx's netlist, its pin named so in the
+XDC Vivado reads; and Silinx's `.bit` is not compressed where the board's XDC asks for it (BITSTREAM.GENERAL.COMPRESS),
+Vivado's is (#3876).
+
+<!-- xc7-vivado-comparison: begin (scripts/xc7-vivado-compare.mjs --update) -->
+| Board | Example | LUTs: Silinx (+ feed-throughs) | LUTs: Silinx's netlist in Vivado | LUTs: Vivado | Registers: Silinx / Vivado | Slices: Silinx / Vivado | MHz: Silinx | MHz: Silinx's netlist in Vivado | MHz: Vivado | Vivado's DRC on Silinx's netlist |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Basys 3 | gates | 1 (+0) | 1 | 1 | 0 / 0 | 1 / 1 | – | – | – | clean |
+| Basys 3 | traffic | 84 (+20) | 85 | 75 | 60 / 60 | 41 / 28 | 218 | 187 | 174 | RTSTAT-10 |
+| Basys 3 | blinky | 106 (+94) | 95 | 99 | 134 / 134 | 78 / 55 | 256 | 194 | 220 | RTSTAT-10 |
+| Basys 3 | pong | 275 (+152) | 245 | 198 | 215 / 215 | 150 / 109 | 155 | 132 | 143 | RTSTAT-10 |
+| Basys 3 | stopwatch | 182 (+154) | 162 | 143 | 207 / 195 | 130 / 90 | 230 | 107 | 124 | DPIP-1, DPOP-1, DPOP-2, RTSTAT-10, AVAL-4 |
+| Basys 3 | clock | 158 (+140) | 128 | 118 | 164 / 164 | 115 / 75 | 232 | 160 | 199 | RTSTAT-10 |
+| Basys 3 | vga | 126 (+50) | 110 | 134 | 58 / 63 | 69 / 49 | 239 | 157 | 163 | RTSTAT-10 |
+| Basys 3 | isqrt | 74 (+40) | 66 | 57 | 87 / 88 | 51 / 33 | 296 | 203 | 269 | RTSTAT-10 |
+| Basys 3 | uart | 123 (+53) | 116 | 135 | 142 / 150 | 77 / 66 | 267 | 195 | 222 | RTSTAT-10 |
+| Basys 3 | micro80 | 179 (+73) | 154 | 307 | 187 / 216 | 112 / 118 | 150 | 129 | 136 | RTSTAT-10 |
+| Nexys A7 | gates | 1 (+0) | 1 | 1 | 0 / 0 | 1 / 1 | – | – | – | clean |
+| Nexys A7 | traffic | 86 (+23) | 85 | 75 | 60 / 60 | 44 / 29 | 221 | 170 | 195 | RTSTAT-10 |
+| Nexys A7 | blinky | 103 (+93) | 95 | 99 | 134 / 134 | 78 / 52 | 275 | 185 | 232 | RTSTAT-10 |
+| Nexys A7 | pong | 275 (+141) | 245 | 198 | 215 / 215 | 139 / 101 | 162 | 127 | 153 | RTSTAT-10 |
+| Nexys A7 | stopwatch | 189 (+140) | 161 | 143 | 207 / 195 | 128 / 82 | 209 | 109 | 121 | DPIP-1, DPOP-1, DPOP-2, RTSTAT-10, AVAL-4 |
+| Nexys A7 | clock | 165 (+127) | 129 | 117 | 164 / 164 | 111 / 71 | 245 | 158 | 206 | RTSTAT-10 |
+| Nexys A7 | vga | 127 (+49) | 110 | 134 | 58 / 63 | 64 / 43 | 269 | 155 | 170 | RTSTAT-10 |
+| Nexys A7 | isqrt | 73 (+38) | 67 | 56 | 87 / 88 | 57 / 32 | 297 | 223 | 218 | RTSTAT-10 |
+| Nexys A7 | uart | 122 (+52) | 117 | 135 | 142 / 150 | 68 / 58 | 254 | 194 | 199 | RTSTAT-10 |
+| Nexys A7 | micro80 | 173 (+64) | 154 | 307 | 187 / 216 | 104 / 112 | 167 | 123 | 133 | RTSTAT-10 |
+<!-- xc7-vivado-comparison: end -->
 
 And around the flow, one issue each: the boards and examples (#2297), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).

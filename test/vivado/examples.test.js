@@ -1,4 +1,4 @@
-// The example projects (examples/gates … micro80) on the Basys 3 through AMD Vivado ML Standard 2025.2 (#1649), as
+// The example projects (examples/gates … micro80) on the Basys 3 and the Nexys A7 (#3760) through AMD Vivado ML Standard 2025.2 (#1649), as
 // test/ise/examples.test.js builds them with ISE (opt-in: it needs Vivado's Docker image, on the ISE machine):
 //   - Vivado builds each example (synth_design, opt_design, place_design, route_design, the timing, write_bitstream)
 //     with no error and the expected warnings (CRITICAL WARNING and WARNING alike: none, but traffic's and pong's
@@ -15,8 +15,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { EXAMPLES, exampleProject } from '../examples-lib.mjs';
-import { vivadoExamplesConfig, vivadoWarnings } from '../vivado-examples-config.mjs';
+import { EXAMPLES, XC7_TARGETS, exampleProject } from '../examples-lib.mjs';
+import { vivadoExamplesConfig, vivadoWarnings, VIVADO_WARNINGS, VIVADO_DRC } from '../vivado-examples-config.mjs';
 
 const IMAGE = process.env.SILINX_VIVADO_IMAGE || 'xilinx/vitis-hls:2025.2';
 const enabled = process.env.SILINX_VIVADO_TESTS === '1';
@@ -24,20 +24,6 @@ const enabled = process.env.SILINX_VIVADO_TESTS === '1';
 const LOCAL = process.env.SILINX_ISE_HOST === 'local';
 const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILINX_ISE_HOST || '');
 const skip = !enabled ? 'set SILINX_VIVADO_TESTS=1 to run the Vivado tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the Vivado Docker image), or local (the image here)' : false;
-const TARGET = { board: 'basys3' };
-// the warnings Vivado gives on each example: none, but synthesis's on an output the design drives with a constant (traffic's
-// unused LEDs, pong's decimal point: as the designs mean them; ISE's XST says nothing of them)
-const constant = (top, port, v) => `WARNING: [Synth 8-3917] design ${top} has port ${port} driven by constant ${v}`;
-const VIVADO_WARNINGS = { ...Object.fromEntries(EXAMPLES.map(n => [n, []])),
-  traffic: [constant('top', 'led[2]', 0), constant('top', 'led[3]', 0), constant('top', 'led[4]', 0)],
-  pong: [constant('pong', 'dp', 1)],
-  // the light8080 processor, as it is (#2544): its registers' bits it never reads
-  micro80: ['WARNING: [Synth 8-3936] Found unconnected internal register \'IR_reg\' and it is trimmed from \'8\' to \'6\' bits. [/work/src/src/light8080.vhdl:297]',
-    'WARNING: [Synth 8-3936] Found unconnected internal register \'daa_res9_reg\' and it is trimmed from \'9\' to \'8\' bits. [/work/src/src/light8080.vhdl:746]'] };
-// the design rule check's findings on each example: none, but stopwatch's DSP48 multipliers (its division by constants)
-// not pipelined, Vivado's performance advice
-const VIVADO_DRC = { stopwatch: [['DPIP-1', 'Warning', 'Input pipelining', 3], ['DPOP-2', 'Warning', 'MREG Output pipelining', 3]] };
-
 let tmp;
 before(() => {
   if (skip) return;
@@ -49,18 +35,19 @@ before(() => {
   fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify(config));
 });
 
-for (const name of EXAMPLES) {
-  test(`Vivado builds example ${name} for the Basys 3 with no warnings, routed, timed, DRC clean`, { skip, timeout: 60 * 60000 }, async () => {
+const PARTS = { basys3: ['xc7a35t', '7a35tcpg236'], 'nexys-a7': ['xc7a100t', '7a100tcsg324'] };
+for (const { board: b } of XC7_TARGETS) for (const name of EXAMPLES) {
+  test(`Vivado builds example ${name} for the ${b} with no warnings, routed, timed, DRC clean`, { skip, timeout: 60 * 60000 }, async () => {
     const { createJob } = await import('../../server/jobs.js');
     const { runVivado } = await import('../../server/vivado.js');
     const { resolveBoard } = await import('../../server/devices.js');
-    const { dir, project } = exampleProject(name, TARGET, tmp);
+    const { dir, project } = exampleProject(name, { board: b }, tmp);
     assert.match(project.constraints, /\.xdc$/);
     const board = resolveBoard(project.board).board;
     const job = createJob('example', j => runVivado(j, { project, projectDir: dir, steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'], board }));
     while (job.status === 'running') await new Promise(r => setTimeout(r, 1000));
     assert.equal(job.status, 'ok', job.lines.filter(l => /ERROR/.test(l)).join('\n'));
-    assert.deepEqual(vivadoWarnings(job.lines), VIVADO_WARNINGS[name]);
+    assert.deepEqual(vivadoWarnings(job.lines), VIVADO_WARNINGS[b][name]);
     const r = JSON.parse(fs.readFileSync(path.join(dir, 'build', 'reports.json'), 'utf8'));
     assert.equal(r.source, 'vivado');
     assert.equal(r.par.routed, true, JSON.stringify(r.par));
@@ -72,8 +59,9 @@ for (const name of EXAMPLES) {
       assert.equal(r.timing.met, true, JSON.stringify(r.timing));
       assert.ok(r.timing.maxFreqMHz > 100, `${r.timing.maxFreqMHz} MHz`);
     }
-    assert.deepEqual(r.messages, { errors: 0, criticalWarnings: 0, warnings: VIVADO_WARNINGS[name].length });
-    assert.ok(r.bit?.size > 2e6, 'a .bit for the xc7a35t');
-    assert.equal(r.bit.header.part, '7a35tcpg236');
+    assert.deepEqual(r.messages, { errors: 0, criticalWarnings: 0, warnings: VIVADO_WARNINGS[b][name].length });
+    // (compressed: the board's XDC sets BITSTREAM.GENERAL.COMPRESS)
+    assert.ok(r.bit?.size > 1e5, `a .bit for the ${PARTS[b][0]}`);
+    assert.equal(r.bit.header.part, PARTS[b][1]);
   });
 }
