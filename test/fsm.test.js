@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  newFsm, normalizeFsm, validateFsm, analyzeFsm, fsmErrors, parseLabel, parseOutputs, formatOutputs, stepFsm, simulateFsm,
+  newFsm, normalizeFsm, validateFsm, analyzeFsm, fsmErrors, parseLabel, parseOutputs, formatOutputs, outputLines, stepFsm, simulateFsm,
   generateFsm, fsmFromHdl, sameFsm, fsmEncoding, transitionTable, stateTable, encodedTable, truthTablesOf, toCsv,
   fsmToAsm, asmToFsm, autoLayout, evalCond, parseCond, FSM_ENCODINGS, STATE_R,
 } from '../core/fsm.js';
@@ -108,6 +108,17 @@ test('labels: "condition / outputs", output lists', () => {
   assert.deepEqual(parseOutputs('z; y=0\nw := 3').outputs, { z: '1', y: '0', w: '3' });
   assert.ok(parseOutputs('3 = z').error);
   assert.equal(formatOutputs({ z: '1', w: "2'b10" }), "z=1, w=2'b10");
+});
+
+test('#3882 outputs shown one per line: outputLines, in their order; none, an empty list; formatOutputs the same joined', () => {
+  assert.deepEqual(outputLines({ z: '1', w: "2'b10" }), ['z=1', "w=2'b10"]);
+  assert.deepEqual(outputLines({}), []);
+  assert.deepEqual(outputLines(undefined), []);
+  assert.deepEqual(outputLines(null), []);
+  const o = { y: '0', count: "4'b1010", z: '1' };
+  assert.equal(outputLines(o).join(', '), formatOutputs(o));
+  // (the lines read back as the same outputs)
+  assert.deepEqual(parseOutputs(outputLines(o).join('\n')).outputs, o);
 });
 
 test('#3288 output assignments checked against the machine\'s outputs: a constant value, a declared output; Check says the same', () => {

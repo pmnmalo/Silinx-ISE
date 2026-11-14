@@ -2,14 +2,15 @@
 // name, Moore outputs, encoding and transitions; a transition: its condition, Mealy outputs, priority) and the
 // machine's (its name, clock and reset, inputs and outputs, encoding). mountSide(ctx) is called by mountFsmEditor
 // where this code was. A state's or a transition's outputs: a table of the machine's outputs, its value editable
-// (core/fsm-outputs.js, #3814; a value refused: the console, flash(text)).
+// (core/fsm-outputs.js, #3814; a value refused: the console, flash(text)). No Delete button: a state or a transition is
+// deleted as any selection is, by the Delete key or the toolbar's (#3882).
 import { h } from './ui.js';
-import { formatOutputs } from '/core/fsm.js';
+import { outputLines } from '/core/fsm.js';
 import { dropOutputValues, outputRows, outputsWhere, renameOutputValues, setOutputValue } from '/core/fsm-outputs.js';
 
 /** { renderSide } of an FSM editor (M(), sel(): its current model and selection; setSel(s) selects). */
 export function mountSide(ctx) {
-  const { M, sel, setSel, selSection, machineBody, machineSection = machineBody, btn, stateById, transById, encOf, commit, deleteSelection,
+  const { M, sel, setSel, selSection, machineBody, machineSection = machineBody, btn, stateById, transById, encOf, commit,
     readOnly = false, locked = () => readOnly, render, updateToolbar, flash = () => {} } = ctx;
 
   const field = (label, input, hintText) => h('label', { class: 'asm-field' }, h('span', { class: 'asm-label' }, label), input, hintText ? h('span', { class: 'asm-fhint' }, hintText) : null);
@@ -79,9 +80,10 @@ export function mountSide(ctx) {
         h('label', { class: 'asm-check' }, init, 'Initial (reset) state'),
         e && M().encoding !== 'enum' ? h('p', { class: 'asm-muted' }, `Code: ${e.bits} (${M().encoding})`) : null,
         h('div', { class: 'asm-label' }, `Transitions out of ${s.name} (the first true condition is taken)`),
+        // (a transition's outputs one per line under it, #3882)
         h('ol', { class: 'fsm-tlist' }, ...ts.map((t) => h('li', { class: 'link', onclick: () => { setSel({ type: 'trans', id: t.id }); render(); renderSide(); } },
-          `${t.cond || '1'} → ${stateById(t.to)?.name ?? '?'}${Object.keys(t.outputs).length ? ` / ${formatOutputs(t.outputs)}` : ''}`))),
-        h('div', { class: 'asm-row' }, btn('Delete state', 'Delete this state and its transitions', () => deleteSelection(), 'asm-danger asm-small'))].filter(Boolean));
+          `${t.cond || '1'} → ${stateById(t.to)?.name ?? '?'}${outputLines(t.outputs).length ? ' /' : ''}`,
+          ...outputLines(t.outputs).map((o) => h('div', { class: 'mono fsm-tout' }, o)))))].filter(Boolean));
       return;
     }
     const t = transById(sel().id);
@@ -113,8 +115,7 @@ export function mountSide(ctx) {
       h('div', { class: 'asm-row' },
         btn('▲ Earlier', 'Try this condition before the previous one', () => move(-1), 'asm-small'),
         btn('▼ Later', 'Try this condition after the next one', () => move(1), 'asm-small'),
-        btn('Straighten', 'Default shape of the arrow', () => { const c = cur(); if (c) { delete c.bend; delete c.angle; commit(); } }, 'asm-small')),
-      h('div', { class: 'asm-row' }, btn('Delete transition', 'Delete this transition', () => deleteSelection(), 'asm-danger asm-small')));
+        btn('Straighten', 'Default shape of the arrow', () => { const c = cur(); if (c) { delete c.bend; delete c.angle; commit(); } }, 'asm-small')));
   }
 
   function renderMachine() {

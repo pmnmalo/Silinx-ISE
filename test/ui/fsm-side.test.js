@@ -26,7 +26,7 @@ const MOUNT = async () => {
   const side = mountSide({ M: () => M, sel: () => sel, setSel: (s) => { sel = s; }, selSection, machineBody,
     btn: (label, title, onclick, cls = '') => h('button', { type: 'button', class: `asm-btn ${cls}`, title, onclick }, label),
     stateById: (id) => M.states.find((s) => s.id === id), transById: (id) => M.transitions.find((t) => t.id === id),
-    encOf: () => new Map(fsmEncoding(M).map((e) => [e.id, e])), commit: (k) => commits.push(k ?? ''), deleteSelection: () => calls.push('delete'),
+    encOf: () => new Map(fsmEncoding(M).map((e) => [e.id, e])), commit: (k) => commits.push(k ?? ''),
     render: () => calls.push('render'), updateToolbar: () => calls.push('toolbar'), flash: (m) => msgs.push(m) });
   const field = (root, label) => [...root.querySelectorAll('.asm-field')].find((f) => f.querySelector('.asm-label').textContent === label)
     .querySelector('input, select, textarea');
@@ -191,4 +191,24 @@ uiTest('#405 FSM side panel: the machine (its name, a port added and removed, th
   assert.deepEqual(out.machine, ['ctl', 'low', 'counts']);
   assert.equal(out.noDesc, false);
   assert.deepEqual(out.commits, ['name', '', '', '', '', '', '']);
+});
+
+uiTest('#3882 FSM side panel: no Delete button for a state or a transition; a state\'s transitions with their outputs one per line', E, async (page) => {
+  await page.eval(MOUNT);
+  const out = await page.eval(() => {
+    const { side, M, selSection: S, select } = window.__s;
+    M.outputs = [{ name: 'y', width: 1, default: '0' }, { name: 'z', width: 1, default: '0' }];
+    M.transitions.find((t) => t.id === 't3').outputs = { y: '1', z: '0' };
+    const r = {};
+    const buttons = () => [...S.querySelectorAll('button')].map((b) => b.textContent);
+    select({ type: 'state', id: 's2' }); side.renderSide();
+    r.state = buttons();
+    r.list = [...S.querySelectorAll('.fsm-tlist li')].map((li) => [li.firstChild.textContent, ...[...li.querySelectorAll('.fsm-tout')].map((d) => d.textContent)]);
+    select({ type: 'trans', id: 't3' }); side.renderSide();
+    r.trans = buttons();
+    return r;
+  });
+  assert.deepEqual(out.state, []);
+  assert.deepEqual(out.list, [['x → S2 /', 'y=1', 'z=0'], ['!x → S0']]);
+  assert.deepEqual(out.trans, ['▲ Earlier', '▼ Later', 'Straighten']);
 });
