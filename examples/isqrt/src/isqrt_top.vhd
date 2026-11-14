@@ -15,7 +15,8 @@ use IEEE.NUMERIC_STD.ALL;
 entity isqrt_top is
     Generic ( CLK_HZ  : integer := 50_000_000;     -- the board's clock, in Hz (50 MHz on the Basys2 / Nexys2)
               REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
-              SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
+              SW_LOW  : boolean := false;          -- true: the board's switches read '0' when on
+              AN_LOW  : boolean := true );         -- true: the board's digit enables light a digit at '0'
     Port ( clk : in  STD_LOGIC;                   -- the board's clock (CLK_HZ)
            sw  : in  STD_LOGIC_VECTOR (7 downto 0);
            led : out STD_LOGIC_VECTOR (1 downto 0);
@@ -80,6 +81,6 @@ begin
     digits <= decimal(root) & decimal(remainder);
 
     display: entity work.sevenseg
-        generic map ( REFRESH => REFRESH_N )
+        generic map ( REFRESH => REFRESH_N, AN_LOW => AN_LOW )
         port map ( clk => clk, digits => digits, points => "0100", seg => seg, dp => dp, an => an );
 end Behavioral;

@@ -20,7 +20,8 @@ entity stopwatch is
               STABLE  : integer := 0;              -- button debounce (20 ms): 0 for CLK_HZ / 50
               REFRESH : integer := 0;              -- display: cycles per digit (1 ms): 0 for CLK_HZ / 1000
               BTN_LOW : boolean := false;          -- true: the board's buttons read '0' when pressed
-              SW_LOW  : boolean := false );        -- true: the board's switches read '0' when on
+              SW_LOW  : boolean := false;          -- true: the board's switches read '0' when on
+              AN_LOW  : boolean := true );         -- true: the board's digit enables light a digit at '0'
     Port ( clk : in  STD_LOGIC;                  -- the board's clock (CLK_HZ)
            sw  : in  STD_LOGIC_VECTOR (0 downto 0);
            btn : in  STD_LOGIC_VECTOR (3 downto 0);
@@ -116,7 +117,7 @@ begin
     dec: entity work.to_decimal port map (clk => clk, value => shown, digits => digits);
     -- no leading zero on the left digit
     shownDigits <= "1111" & digits(11 downto 0) when digits(15 downto 12) = "0000" else digits;
-    display: entity work.sevenseg generic map (REFRESH => REFRESH_N)
+    display: entity work.sevenseg generic map (REFRESH => REFRESH_N, AN_LOW => AN_LOW)
         port map (clk => clk, digits => shownDigits, points => "0100", seg => seg, dp => dp, an => an);
 
     led <= std_logic_vector(resize(index, 8) + 1) when recalling else

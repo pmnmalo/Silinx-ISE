@@ -475,13 +475,13 @@ test('the examples: every end, endcase, endmodule… and every ";" at the end of
   assert.ok(n > 300, `${n} cases`);
   // (where the parser stops far from the cause, no fix: an `end process;` missing before a process)
   assert.deepEqual(none, ["blinky/sim/tb_top.vhd:34: unexpected 'process' in sequential statement",
-    "isqrt/src/isqrt_top.vhd:72: unexpected 'entity' in sequential statement",
-    "micro80/src/micro80_top.vhd:72: unexpected 'entity' in sequential statement",
-    "micro80/src/micro80_top.vhd:113: unexpected 'entity' in sequential statement",
-    "stopwatch/src/stopwatch.vhd:113: unexpected 'entity' in sequential statement",
-    "traffic/src/top.vhd:90: unexpected 'entity' in sequential statement",
+    "isqrt/src/isqrt_top.vhd:73: unexpected 'entity' in sequential statement",
+    "micro80/src/micro80_top.vhd:73: unexpected 'entity' in sequential statement",
+    "micro80/src/micro80_top.vhd:114: unexpected 'entity' in sequential statement",
+    "stopwatch/src/stopwatch.vhd:114: unexpected 'entity' in sequential statement",
+    "traffic/src/top.vhd:94: unexpected 'entity' in sequential statement",
     "traffic/sim/tb_traffic.vhd:69: unexpected 'process' in sequential statement",
-    "uart/src/uart.vhd:109: unexpected 'entity' in sequential statement",
+    "uart/src/uart.vhd:110: unexpected 'entity' in sequential statement",
     "uart/sim/tb_uart.vhd:71: unexpected 'process' in sequential statement",
     "vga/sim/tb_vga.vhd:75: unexpected 'process' in sequential statement"]);
 });

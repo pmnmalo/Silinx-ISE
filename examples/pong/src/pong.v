@@ -1,4 +1,5 @@
-// Silinx example: LED Pong, a game for two players on the Basys2 / Nexys2 (and other boards: CLK_HZ, BTN_LOW, SW_LOW).
+// Silinx example: LED Pong, a game for two players on the Basys2 / Nexys2 (and other boards: CLK_HZ, BTN_LOW, SW_LOW,
+// AN_LOW).
 // The ball is the lit LED. The right player has BTN0 (at LD0), the left player BTN3 (at LD7).
 //   - the server's LED blinks: the server presses their button to serve;
 //   - the ball runs along the LEDs; when it reaches your end LED, press your button to send it back
@@ -16,7 +17,8 @@ module pong #(
     parameter REFRESH  = CLK_HZ / 1000,       // display: cycles per digit (1 ms)
     parameter WIN      = 5,                   // points to win a game
     parameter BTN_LOW  = 0,                   // 1: the board's buttons read 0 when pressed
-    parameter SW_LOW   = 0                    // 1: the board's switches read 0 when on
+    parameter SW_LOW   = 0,                   // 1: the board's switches read 0 when on
+    parameter AN_LOW   = 1                    // 1: the board's digit enables light a digit at 0
 ) (
     input  wire       clk,
     input  wire [1:0] sw,
@@ -139,6 +141,7 @@ module pong #(
         endcase
     end
 
-    sevenseg #(.REFRESH(REFRESH)) display (.clk(clk), .digits({scoreL, paused ? 8'hAA : 8'hFF, scoreR}), .seg(seg), .an(an));
+    sevenseg #(.REFRESH(REFRESH), .AN_LOW(AN_LOW)) display (.clk(clk),
+        .digits({scoreL, paused ? 8'hAA : 8'hFF, scoreR}), .seg(seg), .an(an));
     assign dp = 1'b1;                         // decimal point off
 endmodule

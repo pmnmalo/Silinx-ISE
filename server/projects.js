@@ -326,9 +326,9 @@ export async function createProject({ name, template = 'empty', device, board, k
   return writeProject(name, kind ? asDesignProject({ ...json, device: DEFAULT_DEVICE }) : json);
 }
 
-/** Writes the board's values (its clock, CLK_HZ; its buttons' and switches' levels, BTN_LOW, SW_LOW) as the defaults of
- *  the generics of a project's top that has them (core/board-generics.js, #3710): topForBoard's result and the board's
- *  name, or null (nothing changed). */
+/** Writes the board's values (its clock, CLK_HZ; its buttons' and switches' levels, BTN_LOW, SW_LOW; its digit enables'
+ *  level, AN_LOW, #3884) as the defaults of the generics of a project's top that has them (core/board-generics.js,
+ *  #3710): topForBoard's result and the board's name, or null (nothing changed). */
 export async function boardGenerics(dir, pj) {
   const r = resolveBoard(pj.board, { part: pj.device?.part });
   if (!r || !pj.top) return;

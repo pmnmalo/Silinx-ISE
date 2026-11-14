@@ -29,8 +29,8 @@ uiTest('#3710 Design Properties: on the Mimas V2, the clock\'s top gets the boar
   await page.dialogButton('No');
   await page.waitNoDialog();
   await page.waitFor((l) => window.__console().split('\n').includes(l), [LINE], { what: 'the console\'s line' });
-  const params = (await top()).split('\n').filter((l) => /parameter (CLK_HZ|BTN_LOW|SW_LOW) /.test(l)).map((l) => l.trim().replace(/\s*\/\/.*$/, ''));
-  assert.deepEqual(params, ['parameter CLK_HZ  = 100000000,', 'parameter BTN_LOW = 1,', 'parameter SW_LOW  = 1']);
+  const params = (await top()).split('\n').filter((l) => /parameter (CLK_HZ|BTN_LOW|SW_LOW|AN_LOW) /.test(l)).map((l) => l.trim().replace(/\s*\/\/.*$/, ''));
+  assert.deepEqual(params, ['parameter CLK_HZ  = 100000000,', 'parameter BTN_LOW = 1,', 'parameter SW_LOW  = 1,', 'parameter AN_LOW  = 1']);
   await page.menu('Edit', 'Undo Design Properties');
   await page.waitFor(() => window.Silinx.project.board === 'basys2', [], { what: 'undo design properties' });
   assert.equal(await top(), EXAMPLE);

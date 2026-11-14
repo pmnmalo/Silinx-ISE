@@ -40,7 +40,7 @@ export const micro80S3eWarnings = srcDir => [
   'WARNING:Xst:646 - Signal <acc_high_ge9> is assigned but never used. This unconnected signal will be trimmed during the optimization process.',
   'WARNING:Xst:646 - Signal <daa_res9<8>> is assigned but never used. This unconnected signal will be trimmed during the optimization process.',
   'WARNING:Xst:646 - Signal <ucode_field2<13:10>> is assigned but never used. This unconnected signal will be trimmed during the optimization process.',
-  ...['fetch', 'halt', 'inta', 'inte', 'rd', 'vma'].map(port => `WARNING:Xst:753 - "${srcDir}/micro80_top.vhd" line 74: Unconnected output port '${port}' of component 'light8080'.`),
+  ...['fetch', 'halt', 'inta', 'inte', 'rd', 'vma'].map(port => `WARNING:Xst:753 - "${srcDir}/micro80_top.vhd" line 75: Unconnected output port '${port}' of component 'light8080'.`),
 ];
 
 /** On the Spartan-6 (the Nexys3 through ISE's project flow; both boards in test/ise/examples.test.js, #2679): XST's

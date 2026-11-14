@@ -1,6 +1,7 @@
-// The top of a project whose board changed (Design Properties, #3710): the board's clock and its buttons' and switches'
-// levels written as the defaults of the top's generics CLK_HZ, BTN_LOW and SW_LOW (core/board-generics.js, as the
-// server's New Project and the MCP server's set_design_properties write them), the console told.
+// The top of a project whose board changed (Design Properties, #3710): the board's clock, its buttons' and switches'
+// levels and its display's digit enables' level written as the defaults of the top's generics CLK_HZ, BTN_LOW, SW_LOW
+// and AN_LOW (#3884; core/board-generics.js, as the server's New Project and the MCP server's set_design_properties
+// write them), the console told.
 import { api } from './api.js';
 import { topForBoard, topForBoardText } from '/core/board-generics.js';
 
