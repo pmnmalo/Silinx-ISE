@@ -344,6 +344,8 @@ export function exportIseSch(docIn, opts = {}) {
         customs.set(key, { name: iseName, sym: s, def, cdef, info, pinMap });
         blockdefs.set(key, cdef);
       } else if (info.hdl && (prev.sym.hdl || '') !== (s.hdl || '')) warn(`${s.name}: HDL block '${iseName}' differs from another block with the same name`);
+      // (a module's instances drawn with two layouts, #3828: ISE draws them all with the first one's symbol)
+      else if (info.module && JSON.stringify(customDef(iseName, def, pinMap, stamp)) !== JSON.stringify(prev.cdef)) warn(`${s.name}: its symbol of '${iseName}' is not that of ${prev.sym.name} (out of date): ISE draws both with ${prev.sym.name}'s (Update Symbol first)`);
     }
     // instance origin: lines the ISE pins up with the Silinx pins (library symbols: most pins; stubs for the others)
     const cands = new Map();
@@ -520,8 +522,11 @@ function symFile(name, def, pinMap, stamp) {
   for (const q of def.pins) {
     const sh = cd.shapes.find(s => s.kind === 'line' && s.x1 === X(q.x) && s.y1 === X(q.y - oy));
     if (sh) L.push(shapeXml(sh, '        '));
-    const tx = q.side === 'E' ? X(q.x) - 72 : X(q.x) + 72;
-    L.push(`        <text style="${q.side === 'E' ? 'alignment:RIGHT;' : ''}fontsize:24;fontname:Arial" x="${tx}" y="${X(q.y - oy)}">${xesc(pinMap[q.name])}</text>`);
+    // (a pin on the top or the bottom, #3828: its name inside the body, under or over its lead)
+    const tb = q.side === 'N' || q.side === 'S';
+    const tx = tb ? X(q.x) : q.side === 'E' ? X(q.x) - 72 : X(q.x) + 72;
+    const ty = q.side === 'N' ? r.y + 48 : q.side === 'S' ? r.y + r.h - 8 : X(q.y - oy);
+    L.push(`        <text style="${tb ? 'alignment:BCENTER;' : q.side === 'E' ? 'alignment:RIGHT;' : ''}fontsize:24;fontname:Arial" x="${tx}" y="${ty}">${xesc(pinMap[q.name])}</text>`);
   }
   L.push('    </graph>', '</symbol>', '');
   return L.join('\n');

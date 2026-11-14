@@ -14,7 +14,7 @@ import { DESIGN_ONLY_MESSAGES, isDesignOnly } from '../core/project-kind.js';
 import { deviceFamily, experimentalDevice, noFlowMessage, openOnlyDevice, bitstreamExtOf } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
-import { importXise, importIseSchematics } from './xise.js';
+import { importXise, importIseSchematics, iseModuleSymbols } from './xise.js';
 import { within, nativeRealOf } from './paths.js';
 import * as Projects from './projects.js';
 import { mountXiseRoutes } from './xise-routes.js';
@@ -24,7 +24,7 @@ import { normalizePath } from '../core/import-gate.js';
 import { foldName } from '../core/fold-name.js';
 
 // files that only Silinx understands: not part of an exported Xilinx ISE project
-export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|bool|fsm)\.json)$/i;
+export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|bool|fsm|sym)\.json)$/i;   // (a module's symbol too, #3828)
 
 const implJobs = new Map();   // project name -> id of its latest implementation job
 
@@ -352,6 +352,8 @@ export async function importXiseProject(P, name, xiseText, provided) {
     const symbols = {};
     for (const [k, v] of Object.entries(provided)) if (/\.sym$/i.test(k)) symbols[path.posix.basename(k)] = v;
     const existing = p => provided[p];
+    // (the modules' symbols ISE draws otherwise than Silinx's default: their .sym.json, #3828)
+    for (const f of iseModuleSymbols(symbols, sources, existing)) await P.writeFile(name, f.path, f.text);
     for (const r of importIseSchematics(schFiles, { sources, symbols, lang: parsed.lang, existing })) {
       warnings.push(...r.warnings);
       if (!r.json) continue;

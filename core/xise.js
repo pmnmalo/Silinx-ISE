@@ -7,7 +7,9 @@
 // Top-level values use ISE's "Module|name" (Verilog) / "Architecture|entity|arch" (VHDL) syntax.
 
 import { FAMILY_INFO, deviceFamily, familyFromXise, familyOfPart, familyName } from '../packages/silinx-fpga/src/parts.js';
-import { convertIseSchematics, exportIseSch, iseTimestamp } from './isesch.js';
+import { convertIseSchematics, exportIseSch, iseTimestamp, parseIseSym } from './isesch.js';
+import { iseSymFileLayout } from './isesch-symbol.js';
+import { symbolFileOf, symbolText } from './symbol-layout.js';
 import { compile, langOfPath } from './compile.js';
 import { modulesFromLibrary } from './schdoc.js';
 import { isCSource, viewHdl } from './view-hdl.js';
@@ -292,6 +294,34 @@ export function importIseSchematics(schFiles, { sources = {}, symbols = {}, lang
     const warnings = r.warnings.map(w => (w.startsWith(r.sch) ? w : `${r.sch}: ${w}`));
     if (!r.doc) { out.push({ sch: r.sch, warnings }); continue; }
     out.push({ sch: r.sch, json: r.json, jsonText: JSON.stringify(r.doc, null, 1), hdl: r.hdl, code: r.code, lang, warnings });
+  }
+  return out;
+}
+
+/**
+ * The modules' symbols of an imported ISE project (#3828): each .sym of `symbols` ({ name.sym: text }) that is the
+ * symbol of a module of `sources` ({ path: text }) and draws it otherwise than Silinx does by default (its pins on other
+ * sides, in another order) as the module's symbol file, <module>.sym.json beside its source (core/isesch-symbol.js), so
+ * that its instances, drawn with it, are not out of date. A file the import carries already (existing) is kept.
+ * Returns [{ path, text, module }].
+ */
+export function iseModuleSymbols(symbols, sources, existing = () => undefined) {
+  let modules = {};
+  try {
+    const hdl = Object.fromEntries(Object.entries(sources || {}).filter(([p]) => /\.(vhdl?|v|sv)$/i.test(p)));
+    modules = modulesFromLibrary(compile(Object.entries(hdl).map(([path, text]) => ({ path, text }))), { sources: hdl });
+  } catch { return []; }
+  const out = [];
+  for (const [k, text] of Object.entries(symbols || {})) {
+    let parsed;
+    try { parsed = parseIseSym(text); } catch { continue; }
+    const want = (parsed.name || k.replace(/^.*\//, '').replace(/\.sym$/i, '')).toLowerCase();
+    const mod = Object.values(modules).find(m => m.name.toLowerCase() === want);
+    const symbol = mod && iseSymFileLayout(text, parsed, mod);
+    if (!symbol) continue;
+    const path = symbolFileOf(mod.file, mod.name);
+    if (typeof existing(path) === 'string' || out.some(o => o.path === path)) continue;
+    out.push({ path, text: symbolText(symbol), module: mod.name });
   }
   return out;
 }
