@@ -137,7 +137,8 @@ jobs:
   webkit-standalone:
     needs: changes
     if: needs.changes.outputs.run == 'true'
-    runs-on: ubuntu-latest
+    # (Ubuntu 24.04: Playwright's WebKit is built for its libicu 74, ubuntu-latest's 26.04 has 78, #3854)
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -203,7 +204,8 @@ jobs:
   browsers:
     needs: changes
     if: needs.changes.outputs.run == 'true'
-    runs-on: ubuntu-latest
+    # (Ubuntu 24.04: Playwright's WebKit is built for its libicu 74, ubuntu-latest's 26.04 has 78, #3854)
+    runs-on: ubuntu-24.04
     # (Firefox, then WebKit, one file at a time: about 25 minutes, #1126; the steps' own limits first, #2939)
     timeout-minutes: 70
     steps:

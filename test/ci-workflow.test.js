@@ -67,6 +67,8 @@ test('CI: at a release (a tag v*, or the toolchain package\'s silinx-fpga-v*, #1
   // (past its steps' own: the install's 25 minutes, the tests' 40, #2939)
   assert.match(br, /^ {4}timeout-minutes: 70$/m);
   assert.match(br, /- run: npm run test:browsers\n {8}timeout-minutes: 40$/m);
+  // WebKit's jobs on Ubuntu 24.04: Playwright's WebKit needs its libicu 74, ubuntu-latest (26.04) has 78 (#3854)
+  for (const k of ['browsers', 'webkit-standalone']) assert.match(j[k].join('\n'), /^    runs-on: ubuntu-24\.04$/m, k);
   // the macOS and Windows smoke tests
   assert.ok(j.os.includes('        os: [macos-latest, windows-latest]'));
   // the history's private-data scan (#498, #555): the tagged commit's history, node's built-ins only
