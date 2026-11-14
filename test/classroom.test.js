@@ -49,7 +49,7 @@ test('#3193 the template: the starter project, the student\'s copy and the files
   assert.throws(() => makeTemplate(EXERCISE, EX, path.join(tmp, 't2')), /no Silinx project \(silinx\.json\) to start from/);
 });
 
-test('#3193 the workflow: silinx grade --visible on each push, a release checked against its SHA256SUMS, the summary, no secret, read only', () => {
+test('#3193 #3194 the workflow: silinx grade --visible on each push, its verdicts as annotations, a release checked against its SHA256SUMS, the summary, no secret, read only', () => {
   const y = workflowYaml('counter4.exercise.json');
   assert.match(y, /^on:\n {2}push:\n {2}workflow_dispatch:\npermissions:\n {2}contents: read\n/m);
   assert.match(y, new RegExp(`SILINX_VERSION: ${VERSION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\n`));
@@ -58,6 +58,9 @@ test('#3193 the workflow: silinx grade --visible on each push, a release checked
   assert.match(y, /curl -fsSL -o "silinx-\$SILINX_VERSION\.zip" "https:\/\/github\.com\/pmnmalo\/Silinx\/releases\/download\/v\$SILINX_VERSION\/silinx-\$SILINX_VERSION\.zip"\n/);
   assert.ok(y.includes('grep " silinx-$SILINX_VERSION.zip$" SHA256SUMS | sha256sum -c -\n'));
   assert.match(y, /node "\$RUNNER_TEMP\/silinx\/bin\/silinx\.js" grade counter4\.exercise\.json \. --visible --json "\$RUNNER_TEMP\/grade\.json"/);
+  // (each verdict an annotation of the check run, #3194: the file written by --annotations, printed to the job's log)
+  assert.ok(y.includes('--annotations "$RUNNER_TEMP/annotations.txt" > "$RUNNER_TEMP/report.txt"\n'));
+  assert.ok(y.includes('\n          [ -f "$RUNNER_TEMP/annotations.txt" ] && cat "$RUNNER_TEMP/annotations.txt"\n'));
   assert.match(y, />> "\$GITHUB_STEP_SUMMARY"\n {10}exit \$status\n$/);
   assert.doesNotMatch(y, /secrets\.|GITHUB_TOKEN|pull_request_target|write/);
   // (every action pinned by its commit)

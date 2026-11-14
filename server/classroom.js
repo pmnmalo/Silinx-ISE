@@ -28,7 +28,8 @@ const NAME_RE = /^[A-Za-z0-9._-]+$/;
 export const WORKFLOW = '.github/workflows/silinx-grade.yml';
 
 /** The template's workflow: on each push (and by hand), a release of Silinx installed (its zip checked against the
- *  release's SHA256SUMS) and the exercise's visible tests run on the repository; the report in the job's summary; the
+ *  release's SHA256SUMS) and the exercise's visible tests run on the repository; the report in the job's summary, each
+ *  verdict an annotation of the job's check run (core/grade-annotations.js: Silinx's Git ▸ Checks reads them); the
  *  job fails when a visible test is not Accepted. No secret, no write permission. */
 export function workflowYaml(exerciseFile, { version = VERSION } = {}) {
   if (!/^[A-Za-z0-9._-]+\.exercise\.json$/.test(exerciseFile)) throw new Error(`the exercise's file: a name of letters, digits, . _ - (${exerciseFile})`);
@@ -65,9 +66,10 @@ jobs:
       - name: Run the visible tests
         run: |
           set +e
-          node "$RUNNER_TEMP/silinx/bin/silinx.js" grade ${exerciseFile} . --visible --json "$RUNNER_TEMP/grade.json" > "$RUNNER_TEMP/report.txt"
+          node "$RUNNER_TEMP/silinx/bin/silinx.js" grade ${exerciseFile} . --visible --json "$RUNNER_TEMP/grade.json" --annotations "$RUNNER_TEMP/annotations.txt" > "$RUNNER_TEMP/report.txt"
           status=$?
           cat "$RUNNER_TEMP/report.txt"
+          [ -f "$RUNNER_TEMP/annotations.txt" ] && cat "$RUNNER_TEMP/annotations.txt"
           { echo '## Silinx: the visible tests'; echo; echo '\`\`\`'; cat "$RUNNER_TEMP/report.txt"; echo '\`\`\`'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 `;
