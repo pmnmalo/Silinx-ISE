@@ -85,7 +85,7 @@ test('simulate_drawing: a drawing with errors is not simulated; inputs that are 
   await fails({ ...f, cycles: [{ d: 8 }] }, 'cycle 0: d = 8 does not fit in 3 bit(s)');
   await fails({ ...f, cycles: [{ d: -1 }] }, 'cycle 0: d = -1: a non-negative integer or binary digits ("0101")');
   await fails({ ...f, cycles: [] }, 'cycles: one object of inputs per clock cycle, e.g. [{ "go": 1 }, { "go": 0 }]');
-  await fails({ project: 'e', file: 'src/x.vhd', cycles: [{}] }, "'src/x.vhd' is not an ASM chart or a state diagram (.asm.json, .fsm.json)");
+  await fails({ project: 'e', file: 'src/x.vhd', cycles: [{}] }, "'src/x.vhd' is not an ASM chart, a state diagram or a schematic (.asm.json, .fsm.json, .sch.json)");
   await fails({ project: 'e', file: 'src/none.asm.json', cycles: [{}] }, "no drawing 'src/none.asm.json' in the project 'e'");
   const fsm = { name: 'z', inputs: [], outputs: [], states: [{ id: 's1', name: '', x: 0, y: 0, outputs: {} }], transitions: [], initial: 's1' };
   await ok('write_file', { project: 'e', path: 'src/z.fsm.json', text: JSON.stringify(fsm) });
