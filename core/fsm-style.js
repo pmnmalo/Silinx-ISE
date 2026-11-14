@@ -18,9 +18,9 @@
 // setStyle, with the same checks and messages; a file's values not valid are kept (normalizeFsm) and are errors of
 // Check (validateFsm: styleProblems), the drawing made with the default look in their place (styleOf).
 
-export const FSM_FONTS = ['sans-serif', 'serif', 'monospace'];
-export const FSM_TEXT_STYLES = ['regular', 'bold', 'italic', 'bold-italic'];
-export const FSM_DASHES = ['solid', 'dashed', 'dotted'];
+const FSM_FONTS = ['sans-serif', 'serif', 'monospace'];
+const FSM_TEXT_STYLES = ['regular', 'bold', 'italic', 'bold-italic'];
+const FSM_DASHES = ['solid', 'dashed', 'dotted'];
 export const FONT_SIZE = { min: 6, max: 48 };
 export const LINE_WIDTH = { min: 0.5, max: 10 };
 

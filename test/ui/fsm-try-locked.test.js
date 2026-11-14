@@ -90,7 +90,7 @@ uiTest('#3793 FSM editor: the diagram locked while Try it is open, unlocked when
   // ---- Try it closed: unlocked
   await page.click(`${ED} .fsm-tab-btn`, { text: 'Try it' });
   await page.waitFor((ed) => !document.querySelector(`${ed} .fsm-sim`), [ED], { what: 'Try it closed' });
-  assert.deepEqual(await side(), { h: 'Transition', fields: [false], buttons: 3 });   // (▲ Earlier, ▼ Later, Straighten: no Delete button, #3882)
+  assert.deepEqual(await side(), { h: 'Transition', fields: [false], buttons: 4 });   // (▲ Earlier, ▼ Later, Straighten, Default look (#3883): no Delete button, #3882)
   assert.deepEqual(await tools(page), { state: false, del: false, menu: [false] });
   await page.waitFor(() => window.Silinx.active.fsmEditor.fitted(), [], { what: 'fitted' });
   await new Promise((r) => setTimeout(r, 300));
