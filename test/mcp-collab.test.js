@@ -620,3 +620,40 @@ test('#3835 follow_project: its connection lost is made again; meanwhile connect
   await ok('follow_project', { link: editLink, stop: true });
   await ok('share_project', { project: 'trafficRc', action: 'stop' });
 });
+
+test('#3835 share_project: its connection to the relay lost, its room resumed; meanwhile status says so (connected: false); a change on disk meanwhile reaches the follower once back', async () => {
+  await ok('new_project_from_example', { name: 'trafficRs', example: 'traffic' });
+  // (the MCP's sockets, as this test sees them; `down`: a new one fails, as a network gone)
+  const Base = globalThis.WebSocket, socks = [];
+  let down = false;
+  globalThis.WebSocket = class FlakyWebSocket extends Base { constructor(...a) { super(...a); socks.push(this); if (down) this.close(); } };
+  let page;
+  try {
+    const { data: { link } } = await ok('share_project', { project: 'trafficRs', name: 'Ana', server: base });
+    globalThis.WebSocket = Base;
+    const l = parseFollowLink(link);
+    const ev = [];
+    page = await followRoom({ url: relayUrl(l.base, 'follow'), room: l.room, key: l.key, user: { name: 'Rui' }, onEvent: e => { if (e.type !== 'peers') ev.push(e.type); } });
+    await page.ready;
+    assert.equal((await ok('share_project', { project: 'trafficRs', action: 'status' })).data.connected, true);
+    globalThis.WebSocket = class FlakyWebSocket extends Base { constructor(...a) { super(...a); socks.push(this); if (down) this.close(); } };
+    down = true;
+    socks[0].close();
+    const off = await until(async () => { const r = await ok('share_project', { project: 'trafficRs', action: 'status' }); return r.data.connected ? null : r; }, 'the loss seen');
+    assert.equal(off.data.shared, true);
+    assert.ok(off.text.startsWith(`'trafficRs' is shared: ${link}\nThe connection to the relay was lost: reconnecting (its followers see the project as it was until it is back).\nFollowers:`), off.text);
+    const text = `-- changed meanwhile\n${await P.readFile('trafficRs', 'src/timer.vhd')}`;
+    fs.writeFileSync(path.join(P.projectDir('trafficRs'), 'src/timer.vhd'), text);
+    await sleep(300);
+    down = false;
+    await until(async () => (await ok('share_project', { project: 'trafficRs', action: 'status' })).data.connected, 'back', 10_000);
+    await until(() => docFile(page.doc, 'src/timer.vhd') === text, 'the change made meanwhile at the follower\'s', 8000);
+    const st = await until(async () => { const r = await ok('share_project', { project: 'trafficRs', action: 'status' }); return r.data.followers.length ? r : null; }, 'Rui in the status again', 20_000);
+    assert.equal(st.text, `'trafficRs' is shared: ${link}\nFollowers:\nRui (follower)`);
+    assert.deepEqual(st.data.warnings, []);
+    assert.equal(page.closed(), false);
+    assert.deepEqual(ev, []);   // (the follower: no loss, no error)
+  } finally { globalThis.WebSocket = Base; }
+  await ok('share_project', { project: 'trafficRs', action: 'stop' });
+  await until(() => page.closed(), 'the page told');
+});

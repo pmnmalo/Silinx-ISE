@@ -53,4 +53,5 @@ export const COLLAB_PT_PATTERNS = [
   [/^Following ([^."():]+)$/, 'A seguir $1'],
   [/^Follow ([^."():]+)$/, 'Seguir $1'],
   [/^Reconnecting to ([^."():]+)…$/, 'A religar a $1…'],   // (#3835)
+  [/^Reconnecting…$/, 'A religar…'],   // (#3835: the owner's)
 ];

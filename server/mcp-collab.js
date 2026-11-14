@@ -11,7 +11,8 @@
 // share_project writes what an editor changes in one to the disk (the gate, the project untrusted) and its HDL made again
 // from it; follow_project reads one as merged (and its Check), and writes one as this participant's edit, merged per
 // object and per field with the others' (core/collab-model.js). A follow's connection lost is made again (#3835): its
-// result says so meanwhile (connected: false), a write merged then and sent once it is back.
+// result says so meanwhile (connected: false), a write merged then and sent once it is back; a share's, its room resumed
+// on the relay (its status: connected: false meanwhile).
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import * as P from './projects.js';
@@ -145,7 +146,7 @@ const peerLines = peers => (peers.length ? peers.map(p => `${p.name} (${p.role})
 export const COLLAB_TOOLS = [
   {
     name: 'share_project', title: 'Share a project live (read only)',
-    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project… does with Live chosen (Share Module… with top): action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared.',
+    description: 'Share a project of the workspace live, read only, as the interface\'s Share Project… does with Live chosen (Share Module… with top): action start gives the link that anyone opens to follow it (in Silinx, or follow_project), its files and drawings as they change on disk; status, who follows it and what they look at; stop ends it for them all. It goes through the relay of a running Silinx server (server: its address, default http://127.0.0.1:8642; on this computer, its token read from the configuration folder; another computer\'s relay only when the user\'s settings name it, relay.relays in config.json); the relay reads nothing of the project (end-to-end encrypted with a key in the link\'s fragment). Its builds (build/) are not shared. Its connection to the relay lost, its room is resumed on its own (status: connected: false meanwhile; its followers get what changed once it is back).',
     inputSchema: { type: 'object', properties: {
       project: PROJECT,
       action: { type: 'string', enum: ['start', 'status', 'stop'], description: 'start (default), status or stop.' },
@@ -175,7 +176,9 @@ export const COLLAB_TOOLS = [
         if (!cur || cur.session.closed()) { if (cur) { shares.delete(name); cur.off(); } return { text: `'${name}' is not shared.`, data: { project: name, shared: false } }; }
         const peers = cur.session.peers();
         const warns = cur.warnings.map(w => `\nWARNING: ${w}`).join('');
-        return { text: `'${name}' is shared: ${cur.link}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, link: cur.link, ...withQr(cur.link), followers: peers, warnings: [...cur.warnings] }, untrusted: peers.length || cur.warnings.length ? [...(peers.length ? ['the followers\' names and views'] : []), ...(cur.warnings.length ? ['the warnings, which name the shared project\'s files'] : [])].join(', ') : undefined };
+        // (#3835: its connection to the relay lost, being made again: said)
+        const lost = cur.session.connected() ? '' : '\nThe connection to the relay was lost: reconnecting (its followers see the project as it was until it is back).';
+        return { text: `'${name}' is shared: ${cur.link}${lost}\nFollowers:\n${peerLines(peers)}${warns}`, data: { project: name, shared: true, connected: cur.session.connected(), link: cur.link, ...withQr(cur.link), followers: peers, warnings: [...cur.warnings] }, untrusted: peers.length || cur.warnings.length ? [...(peers.length ? ['the followers\' names and views'] : []), ...(cur.warnings.length ? ['the warnings, which name the shared project\'s files'] : [])].join(', ') : undefined };
       }
       await readProject(name);
       // (a module's links, Share Module…: one of the design's modules, #3631)
