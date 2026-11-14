@@ -13,7 +13,7 @@
 import { getDeviceDb, findPart, findBoard } from '../../core/devices.js';
 import { DESIGN_ONLY_MESSAGES, isDesignOnly } from '../../core/project-kind.js';
 import { resourcesOf, openOnlyDevice, experimentalDevice, vivadoDevice, noFlowMessage, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
-import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../core/xise.js';
+import { exportCSources, exportXise, importXise, importIseSchematics, iseModuleSymbols, exportIseSchematics } from '../../core/xise.js';
 import EXAMPLES from 'silinx-examples';
 import { isCSource } from '../../core/view-hdl.js';
 import { orderExamples } from '../../core/examples.js';
@@ -209,6 +209,8 @@ function xiseProject(name, xise, files = {}) {
     }
     const symbols = {};
     for (const [k, v] of Object.entries(files)) if (/\.sym$/i.test(k)) symbols[k.split('/').pop()] = v;
+    // (the modules' symbols ISE draws otherwise than Silinx's default: their .sym.json, #3828)
+    for (const f of iseModuleSymbols(symbols, sources, k => files[k])) pfiles[f.path] = f.text;
     for (const r of importIseSchematics(schFiles, { sources, symbols, lang: parsed.lang, existing: k => files[k] })) {
       warnings.push(...r.warnings);
       if (!r.json) continue;
@@ -484,7 +486,7 @@ export const api = {
     // Xilinx ISE project: no Silinx-only files (silinx.json, ASM charts, Silinx schematics)
     const entries = [{ path: `${name}.xise`, data: xml },
       ...generated.map(f => ({ path: f.path, data: f.text })),
-      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k) && !isCSource(k) && !/(^|\/)[^/]+\.(asm|sch|tt|bool|fsm)\.json$/i.test(k)).map(([path, data]) => ({ path, data }))];
+      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k) && !isCSource(k) && !/(^|\/)[^/]+\.(asm|sch|tt|bool|fsm|sym)\.json$/i.test(k)).map(([path, data]) => ({ path, data }))];
     return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip`, warnings: [...sch.warnings, ...c.warnings] };
   },
   // the zip's entries as a project (project-store.js projectFromZip: every path inside the project,

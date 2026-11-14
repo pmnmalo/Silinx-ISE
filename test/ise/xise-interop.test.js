@@ -135,3 +135,58 @@ for (const example of EXAMPLES) {
     });
   }
 }
+
+// #3828: a schematic's arrayed instance (reg(3:0) of a 1-bit register) drawn with its module's symbol of its own (Q on
+// the left, D on the top, the clock at the bottom), exported (its .sch, the module's .sym), built by ISE's project flow
+// (its sch2hdl reads the array: 4 flip-flops in map's report) to the bitstream with no warnings, and what ISE leaves imported back: the
+// instance arrayed, drawn with the symbol, the module's .sym.json made from the .sym
+test('#3828 an arrayed instance with its module\'s symbol of its own: exported, built in ISE\'s project flow, imported back', { skip, timeout: 30 * 60000 }, async () => {
+  const { normalizeDoc, symbolPins, generateHdl } = await import('../../core/schdoc.js');
+  const { instanceParams, symbolText } = await import('../../core/symbol-layout.js');
+  const name = 'arrayed-basys2-250';
+  const dir = path.join(process.env.SILINX_WORKSPACE, name);
+  const REG = 'library ieee;\nuse ieee.std_logic_1164.all;\n\nentity reg1 is\n  port (d, ce, c : in std_logic; q : out std_logic);\nend entity reg1;\n\narchitecture rtl of reg1 is\nbegin\n  process (c) begin\n    if rising_edge(c) then\n      if ce = \'1\' then q <= d; end if;\n    end if;\n  end process;\nend architecture rtl;\n';
+  const SYM = { version: 1, kind: 'symbol', module: 'reg1', pins: [{ name: 'q', side: 'W' }, { name: 'ce', side: 'W' }, { name: 'd', side: 'N' }, { name: 'c', side: 'S' }], spacing: 20, width: null, height: null, title: 'top' };
+  const mods = { reg1: { name: 'reg1', lang: 'vhdl', ports: ['d', 'ce', 'c', 'q'].map(n => ({ name: n, dir: n === 'q' ? 'out' : 'in', width: 1 })), symbol: SYM } };
+  const s = { id: 'U', type: 'module', x: 400, y: 300, rot: 0, mirror: false, name: 'reg(3:0)', params: { module: 'reg1', generics: {}, ...instanceParams(mods.reg1) } };
+  const OUT = { W: [-80, 0], E: [80, 0], N: [0, -80], S: [0, 80] };
+  const wires = [], ports = [];
+  for (const p of symbolPins(s, mods)) {
+    const b = { x: p.x + OUT[p.side][0], y: p.y + OUT[p.side][1] };
+    wires.push({ id: `w_${p.name}`, points: [{ x: p.x, y: p.y }, b] });
+    ports.push({ id: `m_${p.name}`, name: p.name === 'c' ? 'clk' : p.name, dir: p.dir === 'out' ? 'out' : 'in', width: p.name === 'd' || p.name === 'q' ? 4 : 1, x: b.x, y: b.y });
+  }
+  const doc = normalizeDoc({ version: 4, name: 'top', lang: 'vhdl', generatedFile: 'src/top.vhd', symbols: [s], wires, ports, labels: [] }, { modules: mods });
+  const g = generateHdl(doc, { lang: 'vhdl', modules: mods });
+  assert.deepEqual(g.diagnostics, []);
+  const pins = { 'd<0>': 'P11', 'd<1>': 'L3', 'd<2>': 'K3', 'd<3>': 'B4', ce: 'G3', clk: 'B8', 'q<0>': 'M5', 'q<1>': 'M11', 'q<2>': 'P7', 'q<3>': 'P6' };
+  const files = { 'src/reg1.vhd': REG, 'src/reg1.sym.json': symbolText(SYM), 'src/top.sch.json': JSON.stringify(doc, null, 1), 'src/top.vhd': g.code,
+    'constraints/top.ucf': Object.entries(pins).map(([n, l]) => `NET "${n}" LOC = "${l}" ;\n`).join('') };
+  for (const [p, t] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), t); }
+  const project = { name, version: 1, device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, board: 'basys2', boardVariant: '250', top: 'top', simTop: '',
+    files: [{ path: 'src/reg1.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/top.vhd', lang: 'vhdl', role: 'design' }], constraints: 'constraints/top.ucf' };
+  fs.writeFileSync(path.join(dir, 'silinx.json'), JSON.stringify(project, null, 2));
+
+  const out = await exportToFolder(name);
+  assert.deepEqual(out.warnings, ["src/top.sch: 'reg1': project module — ISE uses its HDL source and the reg1.sym symbol (or regenerate it with Create Schematic Symbol)"]);
+  assert.match(fs.readFileSync(path.join(out.dir, 'src/top.sch'), 'utf8'), /<block symbolname="reg1" name="reg\(3:0\)">/);
+  const job = await runInIse(name, out.dir, out.xise);
+  assert.equal(job.status, 'ok', job.lines.filter(l => /ERROR|INTEROP|invalid|couldn't/i.test(l)).slice(0, 30).join('\n'));
+  const said = job.lines.map(l => l.trim()).filter(l => l.startsWith('INTEROP'));
+  assert.match(said[1] || '', /^INTEROP status (up_to_date|warnings)$/, said.join('\n'));
+  assert.deepEqual(iseWarnings(job.lines), []);
+  // (the array's 4 copies: 4 flip-flops in map's report)
+  const mrp = fs.readdirSync(out.dir).find(f => /_map\.mrp$/i.test(f));
+  assert.ok(mrp, 'map\'s report');
+  assert.match(fs.readFileSync(path.join(out.dir, mrp), 'utf8'), /Number of Slice Flip Flops:\s+4 out of/);
+
+  const zip = await createZip(walk(out.dir), NODE_CODEC);
+  const r = await fetch(`${base}/projects/import-zip?name=${encodeURIComponent(`back-${name}`)}`, { method: 'POST', body: Buffer.from(zip) });
+  const body = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(body));
+  assert.deepEqual([body.warnings, body.missing], [[], []]);
+  const ws = path.join(process.env.SILINX_WORKSPACE, `back-${name}`);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ws, 'src/reg1.sym.json'), 'utf8')).pins, SYM.pins);
+  const back = JSON.parse(fs.readFileSync(path.join(ws, 'src/top.sch.json'), 'utf8')).symbols.find(x => x.type === 'module');
+  assert.deepEqual([back.name, back.params.ports.map(q => `${q.name}:${q.side}`)], ['reg(3:0)', ['q:W', 'ce:W', 'd:N', 'c:S']]);
+});

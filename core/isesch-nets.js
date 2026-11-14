@@ -4,7 +4,10 @@
 // the signals, and the HDL blocks' specs. importIseSch places and wires what this returns. Isomorphic (no DOM, no
 // Node APIs).
 import { validIdent } from './schdoc.js';
-import { AUTO_RE, blockdefPinPoints, iseXform, lc, libPins, mapSymbol, onSegment, parseIseName, parseIseSym } from './isesch.js';
+import { arrayName } from './sch-array.js';
+import { iseSymbolLayout } from './isesch-symbol.js';
+import { instanceParams } from './symbol-layout.js';
+import { AUTO_RE, blockdefPinPoints, findModule, iseXform, lc, libPins, mapSymbol, onSegment, parseIseName, parseIseSym } from './isesch.js';
 
 /** The ISE netlist of a parsed schematic (parseIseSch) read for its import: { sigs, keyWidth, blocks, portPol, helpers, memberOf, mainInfo, claim, keyName, declLines, sheetGeo, sheetPt }. */
 export function readIseNets(model, opts, { lang, modules, docName, warn }) {
@@ -71,6 +74,13 @@ export function readIseNets(model, opts, { lang, modules, docName, warn }) {
       for (const [n, l] of local) pt.set(n, sheetPt(inst, l[0], l[1]));
     }
     const spec = mapSymbol(b, modules, warn, { local, def, sym: sd });
+    // (a module's instance drawn with its symbol's pins on their sides, in their order, #3828: core/isesch-symbol.js)
+    if (spec.type === 'module') {
+      const mod = findModule(modules, b.symbol), rect = def?.shapes.find(sh => sh.kind === 'rect') || null;
+      const at = local.size === b.pins.length ? [...local].map(([name, [x, y]]) => ({ name, x, y })) : sd?.pins;
+      const symbol = mod && iseSymbolLayout(at, rect, mod);
+      if (symbol) spec.params = { ...spec.params, ...instanceParams({ ...mod, symbol }) };
+    }
     blocks.push({ blk: b, name: b.name, spec, inst, def, pt });
   }
 
@@ -177,7 +187,18 @@ export function readIseNets(model, opts, { lang, modules, docName, warn }) {
     else if (s.p.range && !mainInfo.has(s.key)) want = `${s.p.base}_${s.p.msb}_${s.p.lsb}`;
     keyName.set(s.key, claim(want, s.key));
   }
-  for (const B of blocks) B.xname = claim(B.name, `#inst:${B.name}`);
+  // (an arrayed instance of a module, reg(3:0), #3828: its name with its range, its copies' names claimed)
+  for (const B of blocks) {
+    const arr = B.spec.type === 'module' ? arrayName(B.name) : null;
+    if (arr && arr.n > 1) {
+      // (its base may be a keyword, reg: its copies' names, reg_3 … reg_0, are the identifiers)
+      const tag = `#inst:${B.name}`, free = nm => (!owner.has(lc(nm)) || owner.get(lc(nm)) === tag) && validIdent(nm, lang);
+      let base = arr.base, k = 0;
+      while (!arr.indices.every(i => free(`${base}_${i}`))) base = `${arr.base}_${++k}`;
+      for (const i of arr.indices) owner.set(lc(`${base}_${i}`), tag);
+      B.xname = `${base}(${arr.msb}:${arr.lsb})`;
+    } else B.xname = claim(B.name, `#inst:${B.name}`);
+  }
 
   // ------------------------------------------------------------- finalize specs (hdl block pin names, code)
   const declLines = [];
