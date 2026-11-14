@@ -6,7 +6,7 @@ import { icon } from './icons.js';
 import { h, alertDlg, confirmDlg, dialog, popupMenu, toast, longPressMenu } from './ui.js';
 import * as wiz from './wizards.js';
 import { drawnModule } from '/core/view-hdl.js';
-import { hierarchyOrder } from '/core/hier-order.js';
+import { hierarchyOrder, instanceOrder } from '/core/hier-order.js';
 import { S, addToProject, closeDoc, fixMissingTops, instancesOf, moduleInfo, openFile, projectUndo, syncFpgaView,
   viewRoots } from './app.js';
 import { log } from './console.js';
@@ -96,7 +96,7 @@ export function renderHierarchy() {
     });
     parentUl.append(it.li);
     if (info && depth < 30) {
-      const kids = instancesOf(info.mod);
+      const kids = instanceOrder(instancesOf(info.mod));   // (by their names in natural order, then their modules', #3819)
       if (!kids.length) it.setLeaf();
       for (const k of kids) addModule(it.ul, k.module, k.name, depth + 1, `${path}/${k.name}`);
     } else it.setLeaf();

@@ -1,9 +1,9 @@
 // core/hier-order.js (#3819): the hierarchy's names in natural order (the digit runs by their value, the rest
 // case-insensitively, ties kept in their order), checked against a reference of its own; the roots of a view's
-// hierarchy, the Implementation view's top first.
+// hierarchy, the Implementation view's top first; a module's instances by their names, then their modules'.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { naturalCompare, hierarchyOrder, hierarchyRoots } from '../core/hier-order.js';
+import { naturalCompare, hierarchyOrder, hierarchyRoots, instanceOrder } from '../core/hier-order.js';
 import { compile } from '../core/compile.js';
 
 const sorted = names => [...names].sort(naturalCompare);
@@ -93,4 +93,18 @@ test('#3819 hierarchyRoots: the Implementation view\'s top first, the Simulation
   assert.deepEqual(hierarchyRoots(lib, { top: 'x_10', visible: design }), ['x_10', 'top', 'x_1', 'x_2']);
   assert.deepEqual(hierarchyRoots(lib, { sim: true, top: 'top' }), ['tb_top', 'x_1', 'x_2', 'x_10']);
   assert.deepEqual(hierarchyRoots(compile([])), []);
+});
+
+test('#3819 instanceOrder: by the instances\' names in natural order, then their modules\'; a copy', () => {
+  const kids = [{ name: 'u_10', module: 'x_10' }, { name: 'u_2', module: 'x_2' }, { name: 'u_1', module: 'x_1' }];
+  assert.deepEqual(instanceOrder(kids).map(k => k.name), ['u_1', 'u_2', 'u_10']);
+  assert.deepEqual(kids.map(k => k.name), ['u_10', 'u_2', 'u_1'], 'not sorted in place');
+  // the examples' traffic: u_display, u_fsm, u_lamps, u_timer (not their source's order)
+  assert.deepEqual(instanceOrder(['u_fsm', 'u_timer', 'u_lamps', 'u_display'].map(name => ({ name, module: 'm' }))).map(k => k.name), ['u_display', 'u_fsm', 'u_lamps', 'u_timer']);
+  // the same name (another case, in two generate branches): by the module, natural; then kept
+  assert.deepEqual(instanceOrder([{ name: 'g.U', module: 'm_10' }, { name: 'g.u', module: 'm_2' }, { name: 'G.u', module: 'M_2' }]).map(k => `${k.name} ${k.module}`),
+    ['g.u m_2', 'G.u M_2', 'g.U m_10']);
+  // generate prefixes: by their numbers too
+  assert.deepEqual(instanceOrder(['g[10].u', 'g[2].u', 'g[1].u', 'u'].map(name => ({ name, module: 'm' }))).map(k => k.name), ['g[1].u', 'g[2].u', 'g[10].u', 'u']);
+  assert.deepEqual(instanceOrder([]), []);
 });

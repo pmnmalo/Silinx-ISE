@@ -86,27 +86,27 @@ const EXAMPLES = {
       'project H_traffic',
       '  chip xc3s250e-4-cp132',
       '    moduleTop top [VHDL*] (top.vhd)',
-      '      fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
-      '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
       '      verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
+      '      fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
+      '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
+      '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
     ],
     sim: [
       'project H_traffic',
       '  sim Behavioral',
       '    vhdl tb_traffic [VHDL*] (tb_traffic.vhd)',
       '      vhdl uut - top [VHDL*] (top.vhd)',
-      '        fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
-      '        vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '        algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
       '        verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
+      '        fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
+      '        algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
+      '        vhdl u_timer - timer [VHDL*] (timer.vhd)',
     ],
     tips: [
       'top: VHDL (Open)',
-      'u_fsm - traffic: FSM (Base: its HDL is generated from it) VHDL (Generated from the state diagram)',
-      'u_timer - timer: VHDL (Open)',
-      'u_lamps - lamps: Algebra (Base: its HDL is generated from it) Schematic (Generated from the Boolean algebra, in its HDL logic form) VHDL (Generated from the Boolean algebra)',
       'u_display - sevenseg: Verilog (Open) VHDL (Translated to VHDL (read-only))',
+      'u_fsm - traffic: FSM (Base: its HDL is generated from it) VHDL (Generated from the state diagram)',
+      'u_lamps - lamps: Algebra (Base: its HDL is generated from it) Schematic (Generated from the Boolean algebra, in its HDL logic form) VHDL (Generated from the Boolean algebra)',
+      'u_timer - timer: VHDL (Open)',
     ],
   },
   blinky: {
@@ -114,30 +114,30 @@ const EXAMPLES = {
       'project H_blinky',
       '  chip xc3s250e-4-cp132',
       '    moduleTop top [VHDL*] (top.vhd)',
-      '      verilog u_pre - prescaler [Verilog*] [VHDL] (counter.v)',
-      '      asm u_speed - speed_ctrl [ASM*] [VHDL] (speed_ctrl.asm.json)',
-      '      vhdl u_knight - knight [VHDL*] (knight.vhd)',
       '      vhdl u_count - bcd_counter [VHDL*] (bcd_counter.vhd)',
       '      verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
+      '      vhdl u_knight - knight [VHDL*] (knight.vhd)',
+      '      verilog u_pre - prescaler [Verilog*] [VHDL] (counter.v)',
+      '      asm u_speed - speed_ctrl [ASM*] [VHDL] (speed_ctrl.asm.json)',
     ],
     sim: [
       'project H_blinky',
       '  sim Behavioral',
       '    vhdl tb_top [VHDL*] (tb_top.vhd)',
       '      vhdl uut - top [VHDL*] (top.vhd)',
-      '        verilog u_pre - prescaler [Verilog*] [VHDL] (counter.v)',
-      '        asm u_speed - speed_ctrl [ASM*] [VHDL] (speed_ctrl.asm.json)',
-      '        vhdl u_knight - knight [VHDL*] (knight.vhd)',
       '        vhdl u_count - bcd_counter [VHDL*] (bcd_counter.vhd)',
       '        verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
+      '        vhdl u_knight - knight [VHDL*] (knight.vhd)',
+      '        verilog u_pre - prescaler [Verilog*] [VHDL] (counter.v)',
+      '        asm u_speed - speed_ctrl [ASM*] [VHDL] (speed_ctrl.asm.json)',
     ],
     tips: [
       'top: VHDL (Open)',
-      'u_pre - prescaler: Verilog (Open) VHDL (Translated to VHDL (read-only))',
-      'u_speed - speed_ctrl: ASM (Base: its HDL is generated from it) VHDL (Generated from the state machine)',
-      'u_knight - knight: VHDL (Open)',
       'u_count - bcd_counter: VHDL (Open)',
       'u_display - sevenseg: Verilog (Open) VHDL (Translated to VHDL (read-only))',
+      'u_knight - knight: VHDL (Open)',
+      'u_pre - prescaler: Verilog (Open) VHDL (Translated to VHDL (read-only))',
+      'u_speed - speed_ctrl: ASM (Base: its HDL is generated from it) VHDL (Generated from the state machine)',
     ],
   },
 };
@@ -369,10 +369,13 @@ uiTest('Design pane (#207) from the keyboard: ↑ / ↓ select, ← / → collap
   await page.treeRow('#hier', 'top', { exact: true });
   await page.eval(() => document.querySelector('#hier .tree').focus());
   const sel = () => page.eval(() => document.querySelector('#hier .row.sel .lbl').textContent);
+  // (the instances by their names, #3819: u_display, u_fsm, u_lamps, u_timer)
+  await page.key('ArrowDown');
+  assert.equal(await sel(), 'u_display - sevenseg');
   await page.key('ArrowDown');
   assert.equal(await sel(), 'u_fsm - traffic');
   await page.key('ArrowDown');
-  assert.equal(await sel(), 'u_timer - timer');
+  assert.equal(await sel(), 'u_lamps - lamps');
   await page.key('ArrowUp');
   assert.equal(await sel(), 'u_fsm - traffic');
   // ←: to the parent, again: collapsed; →: expanded
@@ -383,6 +386,8 @@ uiTest('Design pane (#207) from the keyboard: ↑ / ↓ select, ← / → collap
   await page.key('ArrowRight');
   assert.equal(await page.eval(() => document.querySelector('#hier [data-key="m:top"]').nextElementSibling.hidden), false);
   await page.key('ArrowRight');
+  assert.equal(await sel(), 'u_display - sevenseg');
+  await page.key('ArrowDown');
   assert.equal(await sel(), 'u_fsm - traffic');
   // Enter: the base (the state diagram)
   await page.key('Enter');
@@ -408,10 +413,10 @@ uiTest('Design pane (#207, #220) in Portuguese: the badges [FSM] [Álgebra] [VHD
     await page.waitFor(() => [...document.querySelectorAll('#hier .badge')].some((b) => b.textContent === 'Álgebra'), [], { what: 'the badges in Portuguese' });
     assert.deepEqual(await tips(page), [
       'top: VHDL (Abrir)',
-      'u_fsm - traffic: FSM (Base: o seu HDL é gerado a partir daqui) VHDL (Gerado a partir do diagrama de estados)',
-      'u_timer - timer: VHDL (Abrir)',
-      'u_lamps - lamps: Álgebra (Base: o seu HDL é gerado a partir daqui) Esquemático (Gerado a partir da álgebra booleana, na sua forma da lógica do HDL) VHDL (Gerado a partir da álgebra booleana)',
       'u_display - sevenseg: Verilog (Abrir) VHDL (Traduzido para VHDL (só de leitura))',
+      'u_fsm - traffic: FSM (Base: o seu HDL é gerado a partir daqui) VHDL (Gerado a partir do diagrama de estados)',
+      'u_lamps - lamps: Álgebra (Base: o seu HDL é gerado a partir daqui) Esquemático (Gerado a partir da álgebra booleana, na sua forma da lógica do HDL) VHDL (Gerado a partir da álgebra booleana)',
+      'u_timer - timer: VHDL (Abrir)',
     ]);
     // the row's menu on every badge (#2872), the drawing's commands in it
     const fsm = await rowMenu(page, 'u_fsm - traffic');
@@ -536,10 +541,10 @@ end architecture rtl;
     'project H_mig_plain',
     '  chip xc3s250e-4-cp132',
     '    moduleTop top [VHDL*] (top.vhd)',
-    '      vhdl u_fsm - traffic [VHDL*] (traffic.vhd)',
-    '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-    '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
     '      verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
+    '      vhdl u_fsm - traffic [VHDL*] (traffic.vhd)',
+    '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
+    '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
   ]);
 }, { ui: 'ise' });
 
