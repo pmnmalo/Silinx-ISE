@@ -20,6 +20,7 @@ import { compile, elaborate } from './compile.js';
 import { Simulator } from './simulator.js';
 import { clocksOf } from './schematic.js';
 import * as V from './values.js';
+import { arrayOf, copyName } from './sch-array.js';
 
 // simulated time of one input change / clock half period (ps): long enough for `after` delays in
 // HDL modules to mature, the value itself is not shown as a time scale
@@ -199,8 +200,17 @@ class LiveSim {
     this.portSig = new Map(doc.ports.map(p => [p.id, find(p.name)]));
     // instances of module symbols (their port values; pins left open have no net)
     this.instOf = new Map();
+    // (an arrayed instance, reg(3:0), #3827: its copies reg_3 … reg_0, with their indices)
+    const child = nm => (top.children || []).find(x => nk(x.name) === nk(nm));
+    this.copiesOf = new Map();
     for (const s of doc.symbols) if (s.type === 'module') {
-      const c = (top.children || []).find(x => nk(x.name) === nk(s.name));
+      const arr = arrayOf(s);
+      if (arr) {
+        const cs = arr.indices.map(i => ({ k: i - Math.min(arr.msb, arr.lsb), inst: child(copyName(arr, i)) }));
+        if (cs.every(c => c.inst)) this.copiesOf.set(s.id, cs.sort((a, b) => b.k - a.k));
+        continue;
+      }
+      const c = child(s.name);
       if (c) this.instOf.set(s.id, c);
     }
     // clock inputs: read on an edge by some process, or wired to a clock pin (C of a flip-flop…)
@@ -331,9 +341,8 @@ class LiveSim {
     const net = this.nl.pinNet.get(`${symId}/${pin}`);
     const sig = net ? this.netSig.get(net.id) : null;
     if (sig) return this.sigValue(sig);
-    const inst = this.instOf.get(symId);
-    const p = inst?.ports.find(q => q.name.toLowerCase() === String(pin).toLowerCase());
-    return p ? this.sigValue(p.sig) : null;
+    const p = this.instancePorts(symId).find(q => q.name.toLowerCase() === String(pin).toLowerCase());
+    return p ? p.value : null;
   }
   portValue(portId) { return this.sigValue(this.portSig.get(portId) ?? null); }
   /** Stored value of a flip-flop / register / counter symbol (its Q), or null. */
@@ -344,9 +353,21 @@ class LiveSim {
   }
   /** Ports of a module instance with their values: [{ name, dir, value }]. */
   instancePorts(symId) {
+    const copies = this.copiesOf.get(symId);
+    if (copies) return this.arrayPorts(symId, copies);
     const inst = this.instOf.get(symId);
     if (!inst) return [];
     return inst.ports.map(p => ({ name: p.name, dir: p.dir, value: this.sigValue(p.sig) }));
+  }
+  /** The ports of an arrayed instance (#3827): a pin sliced over its copies, the copies' values side by side (the
+   *  copy of the high end first, as on its bus), and one left open too (each copy's own); a shared one, its value. */
+  arrayPorts(symId, copies) {
+    const shared = new Set(this.nl.nets.flatMap(n => n.endpoints.filter(e => e.sym === symId && !e.sliced).map(e => String(e.pin).toLowerCase())));
+    return copies[0].inst.ports.map((p, j) => {
+      const vals = copies.map(c => this.sigValue(c.inst.ports[j].sig));
+      const value = shared.has(p.name.toLowerCase()) ? vals[0] : vals.some(v => v == null) ? null : V.concat(vals);
+      return { name: p.name, dir: p.dir, value };
+    });
   }
   /** Signature of every net value (for repainting only what changed): Map(net id -> 'level:text'). */
   snapshot(radix = 'hex') {
