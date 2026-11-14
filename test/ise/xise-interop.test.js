@@ -136,9 +136,9 @@ for (const example of EXAMPLES) {
   }
 }
 
-// #3828: a schematic's arrayed instance (reg(3:0) of a 1-bit register) drawn with its module's symbol of its own (Q on
+// #3828: a schematic's arrayed instance (bits(3:0) of a 1-bit register) drawn with its module's symbol of its own (Q on
 // the left, D on the top, the clock at the bottom), exported (its .sch, the module's .sym), built by ISE's project flow
-// (its sch2hdl reads the array: 4 flip-flops in map's report) to the bitstream with no warnings, and what ISE leaves imported back: the
+// (its sch2hdl reads the array: 4 flip-flops in map's report; the base not a Verilog keyword, which sch2hdl refuses as a block name) to the bitstream with no warnings, and what ISE leaves imported back: the
 // instance arrayed, drawn with the symbol, the module's .sym.json made from the .sym
 test('#3828 an arrayed instance with its module\'s symbol of its own: exported, built in ISE\'s project flow, imported back', { skip, timeout: 30 * 60000 }, async () => {
   const { normalizeDoc, symbolPins, generateHdl } = await import('../../core/schdoc.js');
@@ -148,7 +148,7 @@ test('#3828 an arrayed instance with its module\'s symbol of its own: exported, 
   const REG = 'library ieee;\nuse ieee.std_logic_1164.all;\n\nentity reg1 is\n  port (d, ce, c : in std_logic; q : out std_logic);\nend entity reg1;\n\narchitecture rtl of reg1 is\nbegin\n  process (c) begin\n    if rising_edge(c) then\n      if ce = \'1\' then q <= d; end if;\n    end if;\n  end process;\nend architecture rtl;\n';
   const SYM = { version: 1, kind: 'symbol', module: 'reg1', pins: [{ name: 'q', side: 'W' }, { name: 'ce', side: 'W' }, { name: 'd', side: 'N' }, { name: 'c', side: 'S' }], spacing: 20, width: null, height: null, title: 'top' };
   const mods = { reg1: { name: 'reg1', lang: 'vhdl', ports: ['d', 'ce', 'c', 'q'].map(n => ({ name: n, dir: n === 'q' ? 'out' : 'in', width: 1 })), symbol: SYM } };
-  const s = { id: 'U', type: 'module', x: 400, y: 300, rot: 0, mirror: false, name: 'reg(3:0)', params: { module: 'reg1', generics: {}, ...instanceParams(mods.reg1) } };
+  const s = { id: 'U', type: 'module', x: 400, y: 300, rot: 0, mirror: false, name: 'bits(3:0)', params: { module: 'reg1', generics: {}, ...instanceParams(mods.reg1) } };
   const OUT = { W: [-80, 0], E: [80, 0], N: [0, -80], S: [0, 80] };
   const wires = [], ports = [];
   for (const p of symbolPins(s, mods)) {
@@ -169,16 +169,17 @@ test('#3828 an arrayed instance with its module\'s symbol of its own: exported, 
 
   const out = await exportToFolder(name);
   assert.deepEqual(out.warnings, ["src/top.sch: 'reg1': project module — ISE uses its HDL source and the reg1.sym symbol (or regenerate it with Create Schematic Symbol)"]);
-  assert.match(fs.readFileSync(path.join(out.dir, 'src/top.sch'), 'utf8'), /<block symbolname="reg1" name="reg\(3:0\)">/);
+  assert.match(fs.readFileSync(path.join(out.dir, 'src/top.sch'), 'utf8'), /<block symbolname="reg1" name="bits\(3:0\)">/);
   const job = await runInIse(name, out.dir, out.xise);
   assert.equal(job.status, 'ok', job.lines.filter(l => /ERROR|INTEROP|invalid|couldn't/i.test(l)).slice(0, 30).join('\n'));
   const said = job.lines.map(l => l.trim()).filter(l => l.startsWith('INTEROP'));
   assert.match(said[1] || '', /^INTEROP status (up_to_date|warnings)$/, said.join('\n'));
   assert.deepEqual(iseWarnings(job.lines), []);
-  // (the array's 4 copies: 4 flip-flops in map's report)
+  // (the array's 4 copies: 4 flip-flops in map's report, in the slices or packed into the IOBs)
   const mrp = fs.readdirSync(out.dir).find(f => /_map\.mrp$/i.test(f));
   assert.ok(mrp, 'map\'s report');
-  assert.match(fs.readFileSync(path.join(out.dir, mrp), 'utf8'), /Number of Slice Flip Flops:\s+4 out of/);
+  const ffs = [...fs.readFileSync(path.join(out.dir, mrp), 'utf8').matchAll(/(?:Number of Slice Flip Flops|IOB Flip Flops):\s+(\d+)/g)].reduce((a, m) => a + Number(m[1]), 0);
+  assert.equal(ffs, 4);
 
   const zip = await createZip(walk(out.dir), NODE_CODEC);
   const r = await fetch(`${base}/projects/import-zip?name=${encodeURIComponent(`back-${name}`)}`, { method: 'POST', body: Buffer.from(zip) });
@@ -188,5 +189,5 @@ test('#3828 an arrayed instance with its module\'s symbol of its own: exported, 
   const ws = path.join(process.env.SILINX_WORKSPACE, `back-${name}`);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ws, 'src/reg1.sym.json'), 'utf8')).pins, SYM.pins);
   const back = JSON.parse(fs.readFileSync(path.join(ws, 'src/top.sch.json'), 'utf8')).symbols.find(x => x.type === 'module');
-  assert.deepEqual([back.name, back.params.ports.map(q => `${q.name}:${q.side}`)], ['reg(3:0)', ['q:W', 'ce:W', 'd:N', 'c:S']]);
+  assert.deepEqual([back.name, back.params.ports.map(q => `${q.name}:${q.side}`)], ['bits(3:0)', ['q:W', 'ce:W', 'd:N', 'c:S']]);
 });
