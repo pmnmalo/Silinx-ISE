@@ -518,13 +518,13 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
   }
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-selection h3`)?.textContent === 'Transition', [ED], { what: 't3 selected' });
   const sideButtons = () => page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-selection button`)].map((b) => b.textContent), ED);
-  assert.deepEqual(await sideButtons(), ['▲ Earlier', '▼ Later', 'Straighten']);
+  assert.deepEqual(await sideButtons(), ['▲ Earlier', '▼ Later', 'Straighten', '✕', '✕', 'Default look']);   // (its look's, #3883: the colours' ✕ hidden)
   await page.click(`${ED} .asm-toolbar [data-act=delete]`);
   assert.equal(await order(), 't2,t1,t4');
   assert.deepEqual(await warnings(), WARN_FSM_NO_T3);
   await page.click(`${ED} [data-state=c] .fsm-circle`);
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-selection h3`)?.textContent === 'State', [ED]);
-  assert.deepEqual(await sideButtons(), []);
+  assert.deepEqual(await sideButtons(), ['✕', '✕', '✕', 'Default look']);   // (its look's only, #3883)
   await page.eval((ed) => document.querySelector(ed).focus(), ED);
   await page.key('Delete');
   m = await model();
