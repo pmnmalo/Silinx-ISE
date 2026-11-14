@@ -70,3 +70,22 @@ test('#3709 ISE\'s build of the clock example on the Mimas V2: not refused, its 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+// (#3741) the Elbert V2's display on its own pins: ISE's build of the examples warns of an<3> alone (3 digits), and of the
+// uart's rx and tx (no USB-UART on the board), not of the display's an<0..2> and dp, which the old table put on headers
+test('#3741 ISE\'s build of the examples on the Elbert V2: only an<3> (and the uart\'s rx, tx) on header pins, warned', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-headers-'));
+  try {
+    const { exampleProject, EXAMPLES } = await import('./examples-lib.mjs');
+    const ise = await import('../server/ise.js');
+    const on = (bit, pin) => `${bit}: the elbert-v2 has no pin for it; it is on the header pin io_p1<${pin}> (the board's constraints)`;
+    const expected = { gates: [], vga: [], uart: [on('rx', 0), on('tx', 1), on('an<3>', 2)] };
+    for (const name of EXAMPLES) {
+      const { dir, project } = exampleProject(name, { board: 'elbert-v2' }, path.join(tmp, name));
+      const g = await ise.generateBuild(project, dir);
+      assert.deepEqual(g.warnings, expected[name] ?? [on('an<3>', 0)], name);
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

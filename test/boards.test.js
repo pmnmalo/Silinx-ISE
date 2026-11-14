@@ -67,3 +67,23 @@ test('#3709 the Mimas V2: seg a..g, dp and an (3 digits) on Numato\'s pins, acti
   assert.deepEqual(['clk', 'sw<0>', 'sw<1>', 'btn<0>', 'btn<3>'].map(n => locs[n]), ['V10', 'C17', 'C18', 'M18', 'L17']);
   assert.match(text, /TIMESPEC "TS_clk" = PERIOD "clk" 10 ns HIGH 50% ;/);
 });
+
+// (#3741) the Elbert V2's display as the Mimas V2's (#3709): Numato's SevenSegment[7..1] are a..g and [0] the decimal
+// point (its demo's "abcdefgh"), its 3 digit enables Enable[0..2] an (its demo scans "110"), all active low; the
+// examples' seg, dp and an then on its pins (an<3> on a header pin, the board having 3 digits), not on its headers
+test('#3741 the Elbert V2: seg a..g, dp and an (3 digits) on Numato\'s pins, active low, the examples\' display on them', async () => {
+  const elbert = BOARDS.find(b => b.id === 'elbert-v2'), r = Object.fromEntries(elbert.resources.map(x => [x.name, x]));
+  assert.deepEqual(r.seg.pins, ['P117', 'P116', 'P115', 'P113', 'P112', 'P111', 'P110']);
+  assert.deepEqual(r.dp.pins, ['P114']);
+  assert.deepEqual(r.an.pins, ['P120', 'P121', 'P124']);
+  assert.equal(r.seg_en, undefined);
+  for (const n of ['seg', 'dp', 'an', 'dip', 'btn']) assert.equal(r[n].extra?.activeLow, true, n);
+  const { EXAMPLES, exampleUcf } = await import('./examples-lib.mjs');
+  for (const name of EXAMPLES) assert.deepEqual(exampleUcf(name, { board: 'elbert-v2' }).unmatched, [], name);
+  const { text } = exampleUcf('clock', { board: 'elbert-v2' });
+  const locs = Object.fromEntries([...text.matchAll(/^NET "([^"]+)"\s+LOC = "([^"]+)"/gm)].map(m => [m[1], m[2]]));
+  assert.deepEqual(['seg<0>', 'seg<1>', 'seg<2>', 'seg<3>', 'seg<4>', 'seg<5>', 'seg<6>', 'dp', 'an<0>', 'an<1>', 'an<2>'].map(n => locs[n]),
+    ['P117', 'P116', 'P115', 'P113', 'P112', 'P111', 'P110', 'P114', 'P120', 'P121', 'P124']);
+  assert.match(text, /^NET "an<3>"\s+LOC = "P31" ;  # no pin on the board: on the header pin io_p1<0>$/m);
+  assert.deepEqual(['clk', 'sw<0>', 'sw<1>', 'btn<0>', 'btn<3>'].map(n => locs[n]), ['P129', 'P70', 'P69', 'P80', 'P77']);
+});

@@ -47,6 +47,8 @@ const ISE_WARNINGS = {
 const ISE_S6_WARNINGS = { micro80: MICRO80_S6_WARNINGS };
 // ISE's warnings on the clock on the Mimas V2 (#3709)
 const MIMAS_V2_CLOCK_WARNINGS = [];
+// ISE's warnings on the clock on the Elbert V2 (#3741)
+const ELBERT_V2_CLOCK_WARNINGS = [];
 
 let tmp;
 before(() => {
@@ -113,4 +115,13 @@ test('ISE builds example clock for the mimas-v2, with the expected warnings', { 
   const bin = path.join(job.result.buildDir, 'digital_clock_prom.bin');
   assert.ok(fs.existsSync(bin) && fs.statSync(bin).size > 300000, 'build/digital_clock_prom.bin');
   assert.match(job.lines.at(-1), /^Programming file: Numato Mimas V2: program its flash over its USB with MimasV2Config \(Numato\) and build\/digital_clock_prom\.bin /);
+});
+
+// (#3741) the clock example on the Numato Elbert V2, an XC3S50A (a Spartan-3A, ISE only): its display's seg a..g, dp and
+// an on Numato's pins (an<3>, 3 digits, on a header pin), its 12 MHz clock, its active-low buttons and DIP switches
+test('ISE builds example clock for the elbert-v2, with the expected warnings', { skip, timeout: 30 * 60000 }, async () => {
+  const job = await iseBuild('clock', { board: 'elbert-v2' }, ELBERT_V2_CLOCK_WARNINGS);
+  assert.deepEqual(job.lines.filter(l => /^WARNING: /.test(l)), ['WARNING: an<3>: the elbert-v2 has no pin for it; it is on the header pin io_p1<0> (the board\'s constraints)']);
+  const ucf = fs.readFileSync(path.join(job.result.buildDir, 'digital_clock.ucf'), 'utf8');
+  for (const [net, loc] of [['seg<0>', 'P117'], ['seg<6>', 'P110'], ['dp', 'P114'], ['an<0>', 'P120'], ['an<2>', 'P124']]) assert.match(ucf, new RegExp(`^NET "${net}"\\s+LOC = "${loc}"`, 'm'), net);
 });
