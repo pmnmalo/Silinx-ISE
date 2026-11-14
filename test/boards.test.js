@@ -95,3 +95,37 @@ test('#3741 the Elbert V2: seg a..g, dp and an (3 digits) on Numato\'s pins, act
   assert.deepEqual(['clk', 'sw<0>', 'sw<1>', 'btn<0>', 'btn<3>'].map(n => locs[n]), ['P129', 'P70', 'P69', 'P80', 'P77']);
   assert.match(text, /TIMESPEC "TS_clk" = PERIOD "clk" 83\.333 ns HIGH 50% ;/);
 });
+
+// (#3873) the EDGE Spartan 6: an XC6SLX9-2 in TQG144, its pins from the vendor's master UCF (rev 3.2); the resources
+// checked on a real board verified (clk, led, btn, seg, dp, an), the others not; its LEDs D10..D17 the display's
+// segments, so each pin in one resource only; the examples' constraints on its pins, none on a header
+test('#3873 the EDGE Spartan 6: its part, its pins and their levels, the examples\' constraints on them', async () => {
+  const edge = BOARDS.find(b => b.id === 'edge-spartan6'), r = Object.fromEntries(edge.resources.map(x => [x.name, x]));
+  assert.deepEqual(edge.device, { family: 'spartan6', part: 'xc6slx9', package: 'tqg144', speed: '-2' });
+  assert.deepEqual(r.clk.pins, ['P84']);
+  assert.equal(r.clk.extra.period, '20 ns');
+  assert.deepEqual(r.led.pins, ['P33', 'P32', 'P30', 'P29', 'P27', 'P26', 'P24', 'P23']);
+  assert.deepEqual(r.btn.pins, ['P40', 'P41', 'P43', 'P44', 'P45']);
+  assert.deepEqual(r.seg.pins, ['P143', 'P142', 'P141', 'P140', 'P139', 'P138', 'P137']);
+  assert.deepEqual(r.dp.pins, ['P134']);
+  assert.deepEqual(r.an.pins, ['P127', 'P131', 'P132', 'P133']);
+  // (segments active low, digit enables active high: 1 = the digit on)
+  for (const n of ['seg', 'dp']) assert.equal(r[n].extra?.activeLow, true, n);
+  for (const n of ['an', 'led', 'btn']) assert.equal(r[n].extra?.activeHigh, true, n);
+  assert.deepEqual(edge.resources.filter(x => x.verified).map(x => x.name), ['clk', 'led', 'btn', 'seg', 'dp', 'an']);
+  const pins = edge.resources.flatMap(x => x.pins);
+  assert.equal(new Set(pins).size, pins.length, 'each pin in one resource');
+  assert.equal(edge.programmer.preferred, 'openFPGALoader');
+  assert.deepEqual([edge.programmer.tools.openFPGALoader.cable, edge.programmer.tools.openFPGALoader.verified], ['ft2232', true]);
+  const { EXAMPLES, exampleUcf } = await import('./examples-lib.mjs');
+  for (const name of EXAMPLES) {
+    const { text, unmatched } = exampleUcf(name, { board: 'edge-spartan6' });
+    assert.deepEqual(unmatched, [], name);
+    assert.doesNotMatch(text, /# no pin on the board/, name);
+  }
+  const { text } = exampleUcf('clock', { board: 'edge-spartan6' });
+  const locs = Object.fromEntries([...text.matchAll(/^NET "([^"]+)"\s+LOC = "([^"]+)"/gm)].map(m => [m[1], m[2]]));
+  assert.deepEqual(['clk', 'sw<0>', 'sw<1>', 'btn<0>', 'btn<3>', 'led<0>', 'seg<0>', 'seg<6>', 'dp', 'an<0>', 'an<3>'].map(n => locs[n]),
+    ['P84', 'P22', 'P21', 'P40', 'P44', 'P33', 'P143', 'P137', 'P134', 'P127', 'P133']);
+  assert.match(text, /TIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;/);
+});
