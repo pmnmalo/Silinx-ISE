@@ -588,3 +588,35 @@ test('#3527 regression: follow_project leaves a room whose owner sends a part of
   await ok('follow_project', { link, stop: true });
   await ok('share_project', { project: 'rootsEd', action: 'stop' });
 });
+
+test('#3835 follow_project: its connection lost is made again; meanwhile connected: false, said, a write merged and sent once it is back', async () => {
+  await ok('new_project_from_example', { name: 'trafficRc', example: 'traffic' });
+  const { data: { editLink } } = await ok('share_project', { project: 'trafficRc', name: 'Ana', server: base, editors: true });
+  // (the MCP's sockets, as this test sees them; `down`: a new one fails, as a network gone)
+  const Base = globalThis.WebSocket, socks = [];
+  let down = false;
+  globalThis.WebSocket = class FlakyWebSocket extends Base { constructor(...a) { super(...a); socks.push(this); if (down) this.close(); } };
+  try {
+    const f = await ok('follow_project', { link: editLink, name: 'Bot' });
+    assert.equal(f.data.connected, true);
+    assert.ok(!f.text.includes('reconnecting'), f.text);
+    down = true;
+    socks.at(-1).close();
+    const off = await until(async () => { const r = await ok('follow_project', { link: editLink }); return r.data.connected ? null : r; }, 'the loss seen');
+    assert.equal(off.data.following, true);
+    assert.ok(off.text.includes('\nThe connection to the relay was lost: reconnecting (what this shows is as it was then).'), off.text);
+    const timer = await P.readFile('trafficRc', 'src/timer.vhd');
+    const w = await ok('follow_project', { link: editLink, write: { path: 'src/timer.vhd', text: `-- offline\n${timer}` } });
+    assert.ok(w.text.includes('Wrote src/timer.vhd (merged as this participant\'s edit, sent once the connection is back).'), w.text);
+    down = false;
+    await until(async () => (await ok('follow_project', { link: editLink })).data.connected, 'back', 10_000);
+    await until(async () => (await P.readFile('trafficRc', 'src/timer.vhd')) === `-- offline\n${timer}`, 'the write on the disk', 8000);
+    assert.ok(socks.length >= 2);
+    // (the owner sees Bot again, and nothing refused: no warning)
+    const st = await until(async () => { const r = await ok('share_project', { project: 'trafficRc', action: 'status' }); return r.data.followers.length ? r : null; }, 'Bot in the status again');
+    assert.deepEqual(st.data.followers.map(p => p.name), ['Bot']);
+    assert.deepEqual(st.data.warnings, []);
+  } finally { globalThis.WebSocket = Base; }
+  await ok('follow_project', { link: editLink, stop: true });
+  await ok('share_project', { project: 'trafficRc', action: 'stop' });
+});

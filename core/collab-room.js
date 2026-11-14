@@ -14,7 +14,7 @@
 // - a room ends with its owner (stopping sharing, or the connection lost): its followers are told and closed.
 // A participant is a socket: send(data, { binary }), close(code, reason), readyState (1: open), as a WebSocket of
 // `ws`; its transport gives each message to `message(data, binary)` and its end to `close()`.
-import { KIND, PROTOCOL, fromFrame, senderOf } from './collab-client.js';
+import { KIND, PROTOCOL, NOT_SHARED, fromFrame, senderOf } from './collab-client.js';
 import { b64url } from './collab-crypto.js';
 import { verifierOf, verifyFrame, PUB_RE } from './collab-sign.js';
 
@@ -62,7 +62,7 @@ export function collabRooms({ limits = ROOM_LIMITS } = {}) {
         }
         if (msg.type === 'join') {
           const r = typeof msg.room === 'string' ? rooms.get(msg.room) : null;
-          if (!r) return fail(ws, 'this shared project is no longer shared (its owner stopped sharing it)');
+          if (!r) return fail(ws, NOT_SHARED);
           if (r.followers.size >= limits.followers) return fail(ws, `this shared project has ${limits.followers} followers already`);
           if (msg.client === r.ownerClient || [...r.followers.values()].includes(msg.client)) return fail(ws, 'another participant of this shared project has this client id');
           r.followers.set(ws, msg.client);

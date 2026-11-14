@@ -8,6 +8,8 @@
 // link …/#follow=<room>.<key>.host) is reached over WebRTC, with codes exchanged by hand (collab-host.js). An editor's
 // link (#3182, …#edit=…) also edits the project's text files: their editors bound live (collab-bind.js); and its
 // drawings edited live (#3183, every drawing: state diagrams, truth tables, ASM charts, Petri nets, schematics): their editors bound to the drawings' structures (collab-drawing.js).
+// A connection to a relay lost is made again on its own (#3835): "Reconnecting to <owner>…" in the toolbar meanwhile,
+// the loss and the return in the console (an editor's changes made meanwhile sent once it is back).
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app, activateDoc } from './app.js';
@@ -60,7 +62,8 @@ export async function startFollowing(hash = location.hash) {
   if (link.via === 'host' && !WS) return null;
   let session;
   try {
-    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(link.relay || location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, sign: link.sign, user: { name }, onEvent: ev => onEvent(ev) });
+    // (a room the owner's page hosts: its channel not made again yet; a relay's connection, made again, #3835)
+    session = await followRoom({ url: WS ? 'silinx-host:' : relayUrl(link.relay || location.href, 'follow'), WebSocket: WS, room: link.room, key: link.key, sign: link.sign, user: { name }, onEvent: ev => onEvent(ev), ...(WS ? { reconnect: false } : {}) });
     await Promise.race([session.ready, new Promise((_, no) => setTimeout(() => no(new Error('the project did not arrive (is its owner still sharing it?)')), ARRIVE_MS))]);
   } catch (e) { session?.close(); app.log(`ERROR: Follow a shared project: ${e.message}.`, 'err'); return null; }
   const { project, owner } = docProject(session.doc);
@@ -119,14 +122,19 @@ export async function stopFollowing() {
 
 function draw() {
   if (!fol) return;
-  const closed = fol.session.closed();
-  const label = closed ? 'Not shared any more' : fol.following ? `Following ${collab.owner}` : `Follow ${collab.owner}`;
-  renderPresence({ label, me: { name: fol.name, role: 'follower', color: colorOf(fol.session.doc.clientID), me: true }, peers: closed ? [] : fol.session.peers() });
+  const closed = fol.session.closed(), lost = !closed && !fol.session.connected();
+  const label = closed ? 'Not shared any more' : lost ? `Reconnecting to ${collab.owner}…` : fol.following ? `Following ${collab.owner}` : `Follow ${collab.owner}`;
+  renderPresence({ label, me: { name: fol.name, role: 'follower', color: colorOf(fol.session.doc.clientID), me: true }, peers: closed || lost ? [] : fol.session.peers() });
 }
 
 function onEvent(ev) {
   if (!fol) return;
   if (ev.type === 'peers') { draw(); track(); }
+  else if (ev.type === 'offline') {
+    app.log(`WARNING: The connection to ${collab.owner}'s project "${collab.project}" was lost: reconnecting${collab.editor ? ' (your changes meanwhile are sent once it is back)' : ' (what you see is as it was then until it is back)'}.`, 'warn');
+    draw();
+    for (const d of S.docs) d.editor?.setPeers?.([]);
+  } else if (ev.type === 'online') { app.log(`Reconnected to ${collab.owner}'s project "${collab.project}"${collab.editor ? ': your changes made meanwhile are sent' : ''}.`, 'ok'); draw(); track(); }
   else if (ev.type === 'closed') { app.log(`WARNING: ${collab.owner}'s project "${collab.project}" is no longer followed (${ev.reason}): what you see is as it was then.`, 'warn'); draw(); for (const d of S.docs) d.editor?.setPeers?.([]); }
   else if (ev.type === 'error') app.log(`${ev.fatal ? 'ERROR' : 'WARNING'}: Follow a shared project: ${ev.message}.`, ev.fatal ? 'err' : 'warn');
 }

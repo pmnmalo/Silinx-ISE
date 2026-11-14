@@ -10,7 +10,8 @@
 // link writes a file's text, merged as one participant's edit. The drawings edited live (#3183, every drawing: state diagrams, truth tables, ASM charts, Petri nets, schematics):
 // share_project writes what an editor changes in one to the disk (the gate, the project untrusted) and its HDL made again
 // from it; follow_project reads one as merged (and its Check), and writes one as this participant's edit, merged per
-// object and per field with the others' (core/collab-model.js).
+// object and per field with the others' (core/collab-model.js). A follow's connection lost is made again (#3835): its
+// result says so meanwhile (connected: false), a write merged then and sent once it is back.
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import * as P from './projects.js';
@@ -213,7 +214,7 @@ export const COLLAB_TOOLS = [
   },
   {
     name: 'follow_project', title: 'Follow a shared project (read only)',
-    description: 'Follow a project someone shares (a link …/#follow=… of Share Project… or share_project), read only (an editor\'s link, …/#edit=…: write changes its text files and drawings), as the interface does when opened at that link: gives the project\'s files, who is in it, the file the owner has open and their cursor; path: that file\'s text as it is now (call again to see it change; a drawing as its participants have merged it, with its Check (but a truth table and a schematic)). stop: leave. The project is not copied into the workspace (import nothing; read it here).',
+    description: 'Follow a project someone shares (a link …/#follow=… of Share Project… or share_project), read only (an editor\'s link, …/#edit=…: write changes its text files and drawings), as the interface does when opened at that link: gives the project\'s files, who is in it, the file the owner has open and their cursor; path: that file\'s text as it is now (call again to see it change; a drawing as its participants have merged it, with its Check (but a truth table and a schematic)). stop: leave. Its connection lost is made again on its own (connected: false meanwhile, what it gives as it was then; a write sent once it is back). The project is not copied into the workspace (import nothing; read it here).',
     inputSchema: { type: 'object', properties: {
       link: STR('The link to follow (the whole address).'),
       path: STR('A file of the project: its text as it is now.'),
@@ -271,11 +272,13 @@ export const COLLAB_TOOLS = [
         `Following ${owner}'s project '${project?.name}' (${cur.session.editor ? 'an editor: its text files and drawings' : 'read only'})${l.top ? `, its link opening on ${l.top}` : ''}.`,
         `Files: ${fileTree.join(', ')}`,
         `In it:\n${peerLines(peers)}`,
-        ...(write !== undefined ? [`Wrote ${write.path} (merged as this participant's edit).`] : []),
+        // (its connection lost, being made again, #3835: what it shows as it was then; a write sent once it is back)
+        ...(cur.session.connected() ? [] : ['The connection to the relay was lost: reconnecting (what this shows is as it was then).']),
+        ...(write !== undefined ? [`Wrote ${write.path} (merged as this participant's edit${cur.session.connected() ? '' : ', sent once the connection is back'}).`] : []),
         ...(text !== null ? [`${path}:`, text] : []),
         ...(check ? check.lines : []),
       ];
-      return { text: lines.join('\n'), data: { following: true, editor: cur.session.editor, owner, project: project?.name ?? null, files: fileTree, participants: peers, ownerView: view, ...(l.top ? { top: l.top } : {}), ...(text !== null ? { path, text } : {}), ...(check ? { check: { errors: check.errors, warnings: check.warnings } } : {}) }, untrusted: text !== null ? `the shared project's files, names and the file ${path}` : 'the shared project\'s files and names' };
+      return { text: lines.join('\n'), data: { following: true, connected: cur.session.connected(), editor: cur.session.editor, owner, project: project?.name ?? null, files: fileTree, participants: peers, ownerView: view, ...(l.top ? { top: l.top } : {}), ...(text !== null ? { path, text } : {}), ...(check ? { check: { errors: check.errors, warnings: check.warnings } } : {}) }, untrusted: text !== null ? `the shared project's files, names and the file ${path}` : 'the shared project\'s files and names' };
     },
   },
 ];

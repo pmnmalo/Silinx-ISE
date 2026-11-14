@@ -52,4 +52,5 @@ export const COLLAB_PT_PATTERNS = [
   // (the presence's button: the owner's name)
   [/^Following ([^."():]+)$/, 'A seguir $1'],
   [/^Follow ([^."():]+)$/, 'Seguir $1'],
+  [/^Reconnecting to ([^."():]+)…$/, 'A religar a $1…'],   // (#3835)
 ];
